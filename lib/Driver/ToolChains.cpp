@@ -1293,6 +1293,26 @@ static void addLinkSanitizerLibArgsForLinux(const ArgList &Args,
     Arguments.push_back("-ldl");
 }
 
+/// Returns true if the compiler depends on features provided by the ObjC
+/// runtime that are not present on the deployment target indicated by
+/// \p triple.
+static bool wantsObjCRuntime(const llvm::Triple &triple) {
+  assert((!triple.isTvOS() || triple.isiOS()) &&
+         "tvOS is considered a kind of iOS");
+
+  // When updating the versions listed here, please record the most recent
+  // feature being depended on and when it was introduced:
+  //
+  // - The hook to override class_getImageName (macOS 10.14 and equivalent)
+  if (triple.isiOS())
+    return triple.isOSVersionLT(12);
+  if (triple.isMacOSX())
+    return triple.isMacOSXVersionLT(10, 14);
+  if (triple.isWatchOS())
+    return triple.isOSVersionLT(5);
+  llvm_unreachable("unknown Darwin OS");
+}
+
 ToolChain::InvocationInfo
 toolchains::Darwin::constructInvocation(const LinkJobAction &job,
                                         const JobContext &context) const {
@@ -1377,15 +1397,9 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   if (llvm::sys::fs::exists(CompilerRTPath))
     Arguments.push_back(context.Args.MakeArgString(CompilerRTPath));
 
-  bool wantsObjCRuntime = false;
-  if (Triple.isiOS())
-    wantsObjCRuntime = Triple.isOSVersionLT(9);
-  else if (Triple.isMacOSX())
-    wantsObjCRuntime = Triple.isMacOSXVersionLT(10, 11);
-
   if (context.Args.hasFlag(options::OPT_link_objc_runtime,
                            options::OPT_no_link_objc_runtime,
-                           /*Default=*/wantsObjCRuntime)) {
+                           /*Default=*/wantsObjCRuntime(Triple))) {
     llvm::SmallString<128> ARCLiteLib(D.getSwiftProgramPath());
     llvm::sys::path::remove_filename(ARCLiteLib); // 'swift'
     llvm::sys::path::remove_filename(ARCLiteLib); // 'bin'
