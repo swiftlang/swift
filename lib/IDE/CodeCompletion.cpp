@@ -1955,17 +1955,13 @@ public:
     // lookups is IUO, not Optional as it is for the @optional attribute.
     if (dynamicOrOptional) {
       T = T->getOptionalObjectType();
-      suffix = "!?";
-    } else {
-      suffix = "!";
+      suffix = "?";
     }
 
-    Type ObjectType = T->getReferenceStorageReferent()->getOptionalObjectType();
-
-    if (ObjectType->isVoid())
-      Builder.addTypeAnnotation("Void" + suffix);
-    else
-      Builder.addTypeAnnotation(ObjectType.getStringAsComponent() + suffix);
+    T = T->getReferenceStorageReferent();
+    PrintOptions PO;
+    PO.PrintOptionalAsImplicitlyUnwrapped = true;
+    Builder.addTypeAnnotation(T.getString(PO) + suffix);
   }
 
   /// For printing in code completion results, replace archetypes with

@@ -296,3 +296,20 @@ func test_28188259(x: ((Int) -> Void) -> Void) {
 // RDAR_28188259-DAG: Pattern/CurrModule:                 ({#_#})[#Void#]; name=(_)
 // RDAR_28188259-DAG: Keyword[self]/CurrNominal:          .self[#(_) -> ()#]; name=self
 // RDAR_28188259: End completions
+
+// rdar://problem/40956846
+// RUN: %target-swift-ide-test -code-completion -code-completion-token=RDAR_40956846 -source-filename=%s | %FileCheck %s -check-prefix=RDAR_40956846
+func test_40956846(
+  arg_40956846_1: inout Int!,
+  arg_40956846_2: Void!,
+  arg_40956846_3: (() -> Int)!,
+  arg_40956846_4: inout ((Int) -> Int)!
+) {
+  let y = #^RDAR_40956846^#
+}
+// RDAR_40956846: Begin completions
+// RDAR_40956846-DAG: Decl[LocalVar]/Local:               arg_40956846_1[#inout Int!#]; name=arg_40956846_1
+// RDAR_40956846-DAG: Decl[LocalVar]/Local:               arg_40956846_2[#Void!#]; name=arg_40956846_2
+// RDAR_40956846-DAG: Decl[LocalVar]/Local:               arg_40956846_3[#(() -> Int)!#]; name=arg_40956846_3
+// RDAR_40956846-DAG: Decl[LocalVar]/Local:               arg_40956846_4[#inout ((Int) -> Int)!#]; name=arg_40956846_4
+// RDAR_40956846: End completions
