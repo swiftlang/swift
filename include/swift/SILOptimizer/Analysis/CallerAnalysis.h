@@ -127,10 +127,8 @@ public:
     return self->FuncInfos[F];
   }
 
-#ifndef NDEBUG
   LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
                             "Only for use in the debugger");
-#endif
 
   /// Print the state of the caller analysis as a sequence of yaml documents for
   /// each callee we are tracking.
