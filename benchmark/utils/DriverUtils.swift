@@ -439,10 +439,14 @@ func printRunInfo(_ c: TestConfig) {
 }
 
 func runBenchmarks(_ c: TestConfig) {
-  let units = "us"
-  print("#\(c.delim)TEST\(c.delim)SAMPLES\(c.delim)MIN(\(units))\(c.delim)MAX(\(units))\(c.delim)MEAN(\(units))\(c.delim)SD(\(units))\(c.delim)MEDIAN(\(units))")
   var sumBenchResults = BenchResults()
   sumBenchResults.sampleCount = 0
+  let withUnit = {$0 + "(us)"}
+  let header = (
+    ["#", "TEST", "SAMPLES"] +
+    ["MIN", "MAX", "MEAN", "SD", "MEDIAN"].map(withUnit)
+  ).joined(separator: c.delim)
+  print(header)
 
   for t in c.tests {
     guard let results = runBench(t, c) else {
