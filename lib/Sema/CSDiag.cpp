@@ -2199,22 +2199,15 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
   // telling us that it knows what it is doing, then believe it.
   if (!options.contains(TCC_ForceRecheck)) {
     if (CS.TC.isExprBeingDiagnosed(subExpr)) {
-      auto exprAndCS = CS.TC.getExprBeingDiagnosed(subExpr);
-      auto *savedExpr = exprAndCS.first;
+      auto *savedExpr = CS.TC.getExprBeingDiagnosed(subExpr);
       if (subExpr == savedExpr)
         return subExpr;
 
-      auto *oldCS = exprAndCS.second;
-
-      // The types on the result might have already been cached into
-      // another CS, but likely not this one.
-      if (oldCS != &CS)
-        CS.transferExprTypes(oldCS, savedExpr);
-
+      CS.cacheExprTypes(savedExpr);
       return savedExpr;
     }
 
-    CS.TC.addExprForDiagnosis(subExpr, std::make_pair(subExpr, &CS));
+    CS.TC.addExprForDiagnosis(subExpr, subExpr);
   }
 
   // Validate contextual type before trying to use it.
@@ -2300,7 +2293,8 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
     SavedTypeData.restore();
   }
 
-  CS.TC.addExprForDiagnosis(preCheckedExpr, std::make_pair(subExpr, &CS));
+  if (preCheckedExpr != subExpr)
+    CS.TC.addExprForDiagnosis(preCheckedExpr, subExpr);
 
   return subExpr;
 }
