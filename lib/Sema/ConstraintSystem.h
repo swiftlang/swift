@@ -3528,6 +3528,12 @@ public:
   size_t getNumSkippedParameters() const { return NumSkippedParameters; }
 };
 
+/// Diagnose an attempt to recover when we have a value of optional type
+/// that needs to be unwrapped.
+///
+/// \returns true if a diagnostic was produced.
+bool diagnoseUnwrap(TypeChecker &TC, DeclContext *DC, Expr *expr, Type type);
+
 /// Diagnose an attempt to recover from a member access into a value of
 /// optional type which needed to be unwrapped for the member to be found.
 ///
@@ -3535,6 +3541,20 @@ public:
 bool diagnoseBaseUnwrapForMemberAccess(Expr *baseExpr, Type baseType,
                                        DeclName memberName,
                                        SourceRange memberRange);
+
+// Return true if, when replacing "<expr>" with "<expr> ?? T", parentheses need
+// to be added around <expr> first in order to maintain the correct precedence.
+bool exprNeedsParensBeforeAddingNilCoalescing(TypeChecker &TC,
+                                              DeclContext *DC,
+                                              Expr *expr);
+
+// Return true if, when replacing "<expr>" with "<expr> as T", parentheses need
+// to be added around the new expression in order to maintain the correct
+// precedence.
+bool exprNeedsParensAfterAddingNilCoalescing(TypeChecker &TC,
+                                             DeclContext *DC,
+                                             Expr *expr,
+                                             Expr *rootExpr);
 
 } // end namespace swift
 
