@@ -8107,7 +8107,7 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
       Type unwrappedType = type->getOptionalObjectType();
       if (!unwrappedType)
         return false;
-      
+
       TC.diagnose(affected->getLoc(), diag::optional_not_unwrapped, type,
                   unwrappedType);
 
@@ -8156,13 +8156,12 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
     return true;
   }
           
-  case FixKind::OptionalChaining: {
+  case FixKind::UnwrapOptionalBase: {
     auto type = solution.simplifyType(getType(affected))
                 ->getRValueObjectType();
-    auto diag = TC.diagnose(affected->getLoc(),
-                            diag::missing_unwrap_optional, type);
-    diag.fixItInsertAfter(affected->getEndLoc(), "?");
-    return true;
+    DeclName memberName = fix.first.getDeclNameArgument(*this);
+    return diagnoseBaseUnwrapForMemberAccess(affected, type, memberName,
+                                             SourceRange());
   }
 
   case FixKind::ForceDowncast: {

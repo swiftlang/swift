@@ -2262,15 +2262,6 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
       allowFreeTypeVariables)
     TCEOptions |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
   
-  // If we're not passing down contextual type information this time, but the
-  // original failure had type info that wasn't an optional type,
-  // then set the flag to prefer fixits with force unwrapping.
-  if (!convertType) {
-    auto previousType = CS.getContextualType();
-    if (previousType && previousType->getOptionalObjectType().isNull())
-      TCEOptions |= TypeCheckExprFlags::PreferForceUnwrapToOptional;
-  }
-
   auto resultTy = CS.TC.typeCheckExpression(
       subExpr, CS.DC, TypeLoc::withoutLoc(convertType), convertTypePurpose,
       TCEOptions, listener, &CS);
@@ -7751,15 +7742,9 @@ bool FailureDiagnosis::diagnoseMemberFailures(
       }
 
       if (!optionalResult.ViableCandidates.empty()) {
-        diagnose(BaseLoc, diag::optional_base_not_unwrapped,
-                 baseObjTy, memberName, OT->getOptionalObjectType())
-          .highlight(memberRange);
-
-        diagnose(BaseLoc, diag::optional_base_chain, memberName)
-          .fixItInsertAfter(baseExpr->getEndLoc(), "?");
-        diagnose(BaseLoc, diag::unwrap_with_force_value)
-          .fixItInsertAfter(baseExpr->getEndLoc(), "!");
-        return true;
+        if (diagnoseBaseUnwrapForMemberAccess(baseExpr, baseObjTy, memberName,
+                                              memberRange))
+          return true;
       }
     }
 
@@ -8664,5 +8649,24 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
   // If all else fails, diagnose the failure by looking through the system's
   // constraints.
   diagnoseFailureForExpr(expr);
+  return true;
+}
+
+bool swift::diagnoseBaseUnwrapForMemberAccess(Expr *baseExpr, Type baseType,
+                                              DeclName memberName,
+                                              SourceRange memberRange) {
+  auto unwrappedBaseType = baseType->getOptionalObjectType();
+  if (!unwrappedBaseType)
+    return false;
+
+  ASTContext &ctx = baseType->getASTContext();
+  DiagnosticEngine &diags = ctx.Diags;
+  diags.diagnose(baseExpr->getLoc(), diag::optional_base_not_unwrapped,
+                 baseType, memberName, unwrappedBaseType);
+
+  diags.diagnose(baseExpr->getLoc(), diag::optional_base_chain, memberName)
+    .fixItInsertAfter(baseExpr->getEndLoc(), "?");
+  diags.diagnose(baseExpr->getLoc(), diag::unwrap_with_force_value)
+    .fixItInsertAfter(baseExpr->getEndLoc(), "!");
   return true;
 }
