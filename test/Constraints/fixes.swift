@@ -148,9 +148,15 @@ struct Q {
   let s: String?
 }
 let q = Q(s: nil)
-let a: Int? = q.s.utf8 // expected-error{{value of optional type 'String?' not unwrapped; did you mean to use '!' or '?'?}} {{18-18=?}}
-let b: Int = q.s.utf8 // expected-error{{value of optional type 'String?' not unwrapped; did you mean to use '!' or '?'?}} {{17-17=!}}
-let d: Int! = q.s.utf8 // expected-error{{value of optional type 'String?' not unwrapped; did you mean to use '!' or '?'?}} {{18-18=?}}
+let a: Int? = q.s.utf8 // expected-error{{value of optional type 'String?' must be unwrapped to refer to member 'utf8' of wrapped base type 'String'}}
+// expected-note@-1{{chain the optional using '?'}}{{18-18=?}}
+// expected-note@-2{{force-unwrap using '!'}}{{18-18=!}}
+let b: Int = q.s.utf8 // expected-error{{value of optional type 'String?' must be unwrapped to refer to member 'utf8' of wrapped base type 'String'}}
+// expected-note@-1{{chain the optional using '?'}}{{17-17=?}}
+// expected-note@-2{{force-unwrap using '!'}}{{17-17=!}}
+let d: Int! = q.s.utf8 // expected-error{{value of optional type 'String?' must be unwrapped to refer to member 'utf8' of wrapped base type 'String'}}
+// expected-note@-1{{chain the optional using '?'}}{{18-18=?}}
+// expected-note@-2{{force-unwrap using '!'}}{{18-18=!}}
 let c = q.s.utf8 // expected-error{{value of optional type 'String?' not unwrapped; did you mean to use '!' or '?'?}} {{12-12=?}}
 
 // SR-1116

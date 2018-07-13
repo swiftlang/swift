@@ -7751,14 +7751,14 @@ bool FailureDiagnosis::diagnoseMemberFailures(
       }
 
       if (!optionalResult.ViableCandidates.empty()) {
-        // By default we assume that the LHS type is not optional.
-        StringRef fixIt = "!";
-        auto contextualType = CS.getContextualType();
-        if (contextualType && isa<OptionalType>(contextualType.getPointer()))
-          fixIt = "?";
+        diagnose(BaseLoc, diag::optional_base_not_unwrapped,
+                 baseObjTy, memberName, OT->getOptionalObjectType())
+          .highlight(memberRange);
 
-        diagnose(BaseLoc, diag::missing_unwrap_optional, baseObjTy)
-            .fixItInsertAfter(baseExpr->getEndLoc(), fixIt);
+        diagnose(BaseLoc, diag::optional_base_chain, memberName)
+          .fixItInsertAfter(baseExpr->getEndLoc(), "?");
+        diagnose(BaseLoc, diag::unwrap_with_force_value)
+          .fixItInsertAfter(baseExpr->getEndLoc(), "!");
         return true;
       }
     }
