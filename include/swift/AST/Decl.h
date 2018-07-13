@@ -4445,6 +4445,10 @@ public:
   BehaviorRecord *getMutableBehavior() {
     return BehaviorInfo.getPointer();
   }
+  
+  /// True if the storage exports a property descriptor for key paths in
+  /// other modules.
+  bool exportsPropertyDescriptor() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

@@ -156,6 +156,12 @@ void TBDGenVisitor::visitAccessorDecl(AccessorDecl *AD) {
 }
 
 void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
+  // Add the property descriptor if the decl needs it.
+  if (SwiftModule->getASTContext().LangOpts.EnableKeyPathResilience
+      && ASD->exportsPropertyDescriptor()) {
+    addSymbol(LinkEntity::forPropertyDescriptor(ASD));
+  }
+
   // Explicitly look at each accessor here: see visitAccessorDecl.
   for (auto accessor : ASD->getAllAccessors()) {
     visitAbstractFunctionDecl(accessor);

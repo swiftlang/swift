@@ -1228,47 +1228,6 @@ TypeConverter::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl) {
   }
 }
 
-static bool doesStorageNeedDescriptor(AbstractStorageDecl *decl) {
-  // The storage needs a descriptor if it sits at a module's ABI boundary,
-  // meaning it has public linkage.
-  
-  // Any property that's potentially resilient should have accessors
-  // synthesized.
-  if (!decl->getGetter())
-    return false;
-
-  // If the getter is mutating, we cannot form a keypath to it at all.
-  if (decl->isGetterMutating())
-    return false;
-
-  // TODO: If previous versions of an ABI-stable binary needed the descriptor,
-  // then we still do.
-
-  auto getter = SILDeclRef(decl->getGetter());
-  auto getterLinkage = getter.getLinkage(ForDefinition);
-  
-  switch (getterLinkage) {
-  case SILLinkage::Public:
-  case SILLinkage::PublicNonABI:
-    // We may need a descriptor.
-    break;
-    
-  case SILLinkage::Shared:
-  case SILLinkage::Private:
-  case SILLinkage::Hidden:
-    // Don't need a public descriptor.
-    return false;
-    
-  case SILLinkage::HiddenExternal:
-  case SILLinkage::PrivateExternal:
-  case SILLinkage::PublicExternal:
-  case SILLinkage::SharedExternal:
-    llvm_unreachable("should be definition linkage?");
-  }
-
-  return true;
-}
-
 static bool canStorageUseTrivialDescriptor(SILModule &M,
                                            AbstractStorageDecl *decl) {
   // A property can use a trivial property descriptor if the key path component
@@ -1322,7 +1281,7 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
   if (!SILModuleConventions(M).useLoweredAddresses())
     return;
   
-  if (!doesStorageNeedDescriptor(decl))
+  if (!decl->exportsPropertyDescriptor())
     return;
   
   Type baseTy;
