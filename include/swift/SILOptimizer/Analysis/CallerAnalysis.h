@@ -119,12 +119,28 @@ public:
   /// Notify the analysis about changed witness or vtables.
   virtual void invalidateFunctionTables() override { }
 
-  const FunctionInfo &getCallerInfo(SILFunction *F) {
+  const FunctionInfo &getCallerInfo(SILFunction *F) const {
     // Recompute every function in the invalidated function list and empty the
     // list.
-    processRecomputeFunctionList();
-    return FuncInfos[F];
+    auto *self = const_cast<CallerAnalysis *>(this);
+    self->processRecomputeFunctionList();
+    return self->FuncInfos[F];
   }
+
+#ifndef NDEBUG
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "Only for use in the debugger");
+#endif
+
+  /// Print the state of the caller analysis as a sequence of yaml documents for
+  /// each callee we are tracking.
+  void print(llvm::raw_ostream &os) const;
+
+  /// Print the state of the caller analysis as a sequence of yaml documents for
+  /// each callee we are tracking to the passed in file path.
+  LLVM_ATTRIBUTE_DEPRECATED(void print(const char *filePath)
+                                const LLVM_ATTRIBUTE_USED,
+                            "Only for use in the debugger");
 };
 
 /// NOTE: this can be extended to contain the callsites of the function.
