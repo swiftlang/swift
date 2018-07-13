@@ -603,6 +603,23 @@ SILCombiner::optimizeConcatenationOfStringLiterals(ApplyInst *AI) {
   return tryToConcatenateStrings(AI, Builder);
 }
 
+/// This routine replaces the old witness method inst with a new one.
+void SILCombiner::replaceWitnessMethodInst(
+    FullApplySite Apply, WitnessMethodInst *WMI, SILBuilderContext &BuilderCtx,
+    const CanType &ConcreteType, ProtocolConformanceRef &ConformanceRef) {
+  SILBuilderWithScope WMIBuilder(WMI, BuilderCtx);
+  auto *NewWMI = WMIBuilder.createWitnessMethod(
+      WMI->getLoc(), ConcreteType, ConformanceRef, WMI->getMember(),
+      WMI->getType());
+  MutableArrayRef<Operand> Operands = Apply.getInstruction()->getAllOperands();
+  for (auto &Op : Operands) {
+    if (Op.get() == WMI)
+      Op.set(NewWMI);
+  }
+  if (WMI->use_empty())
+    eraseInstFromFunction(*WMI);
+}
+
 /// Given an Apply and an argument value produced by InitExistentialAddrInst,
 /// return true if the argument can be replaced by a copy of its value.
 ///
@@ -712,7 +729,8 @@ SILCombiner::createApplyWithConcreteType(FullApplySite Apply,
   }
   // The apply can only be rewritten in terms of the concrete value if it is
   // legal to pass that value as the self argument.
-  if (CEI.isCopied && !canReplaceCopiedSelf(Apply, CEI.InitExistential, DA))
+  if (CEI.isCopied && (!CEI.InitExistential ||
+                       !canReplaceCopiedSelf(Apply, CEI.InitExistential, DA)))
     return nullptr;
 
   // Create a set of arguments.
@@ -773,24 +791,24 @@ SILCombiner::createApplyWithConcreteType(FullApplySite Apply,
 ///   apply %witness<T : Protocol>(%existential)
 ///
 /// ==> apply %witness<Concrete : Protocol>(%existential)
-SILInstruction *
+bool
 SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply,
                                                     WitnessMethodInst *WMI) {
   // Check if it is legal to perform the propagation.
   if (WMI->getConformance().isConcrete())
-    return nullptr;
+    return false;
 
 
   // If the lookup type is not an opened existential type,
   // it cannot be made more concrete.
   if (!WMI->getLookupType()->isOpenedExistential())
-    return nullptr;
+    return false;
 
   // Try to derive the concrete type of self and the related conformance by
   // searching for a preceding init_existential.
   const ConcreteExistentialInfo CEI(Apply.getSelfArgumentOperand());
   if (!CEI.isValid())
-    return nullptr;
+    return false;
 
   // Get the conformance of the init_existential type, which is passed as the
   // self argument, on the witness' protocol.
@@ -806,6 +824,10 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply,
     OpenedArchetypesTracker.addOpenedArchetypeDef(
         cast<ArchetypeType>(CEI.ConcreteType), CEI.ConcreteTypeDef);
   }
+
+  // This vriable tracks if we are adding a new WitnessMethodinst.
+  bool newWMIAdded = false;
+
   // Propagate the concrete type into a callee-operand, which is a
   // witness_method instruction. It's ok to rewrite the witness method in terms
   // of a concrete type without rewriting the apply itself. In fact, doing so
@@ -819,27 +841,15 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply,
   // are stuck:
   // We will re-create the same instruction and re-populate the worklist
   // with it.
-  if (CEI.ConcreteType != WMI->getLookupType()
-      || SelfConformance != WMI->getConformance()) {
-    SILBuilderWithScope WMIBuilder(WMI, BuilderCtx);
-    // Keep around the dependence on the open instruction unless we've
-    // actually eliminated the use.
-    auto *NewWMI = WMIBuilder.createWitnessMethod(
-        WMI->getLoc(), CEI.ConcreteType, SelfConformance, WMI->getMember(),
-        WMI->getType());
-    // Replace only uses of the witness_method in the apply that was analyzed by
-    // ConcreteExistentialInfo.
-    MutableArrayRef<Operand> Operands =
-        Apply.getInstruction()->getAllOperands();
-    for (auto &Op : Operands) {
-      if (Op.get() == WMI)
-        Op.set(NewWMI);
-    }
-    if (WMI->use_empty())
-      eraseInstFromFunction(*WMI);
+  if (CEI.ConcreteType != WMI->getLookupType() ||
+      SelfConformance != WMI->getConformance()) {
+    replaceWitnessMethodInst(Apply, WMI, BuilderCtx, CEI.ConcreteType,
+                             SelfConformance);
+    newWMIAdded = true;
   }
   // Try to rewrite the apply.
-  return createApplyWithConcreteType(Apply, CEI, BuilderCtx);
+  createApplyWithConcreteType(Apply, CEI, BuilderCtx);
+  return newWMIAdded;
 }
 
 /// Rewrite a protocol extension lookup type from an archetype to a concrete
