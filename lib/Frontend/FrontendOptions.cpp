@@ -251,6 +251,8 @@ bool FrontendOptions::canActionEmitReferenceDependencies(ActionType action) {
 bool FrontendOptions::canActionEmitObjCHeader(ActionType action) {
   switch (action) {
   case ActionType::NoneAction:
+  case ActionType::Parse:
+  case ActionType::ResolveImports:
   case ActionType::DumpParse:
   case ActionType::DumpInterfaceHash:
   case ActionType::DumpAST:
@@ -262,8 +264,6 @@ bool FrontendOptions::canActionEmitObjCHeader(ActionType action) {
   case ActionType::Immediate:
   case ActionType::REPL:
     return false;
-  case ActionType::Parse:
-  case ActionType::ResolveImports:
   case ActionType::Typecheck:
   case ActionType::MergeModules:
   case ActionType::EmitModuleOnly:
