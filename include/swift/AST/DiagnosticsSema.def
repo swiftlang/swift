@@ -885,10 +885,6 @@ NOTE(note_init_parameter,none,
 ERROR(missing_nullary_call,none,
      "function produces expected type %0; did you mean to call it with '()'?",
      (Type))
-ERROR(missing_unwrap_optional,none,
-      "value of optional type %0 not unwrapped; did you mean to use '!' "
-      "or '?'?",
-     (Type))
 ERROR(optional_not_unwrapped,none,
       "value of optional type %0 must be unwrapped to a value of type %1",
      (Type, Type))

@@ -7906,9 +7906,7 @@ static bool exprNeedsParensAfterAddingAs(TypeChecker &TC, DeclContext *DC,
   return exprNeedsParensOutsideFollowingOperator(TC, DC, expr, rootExpr, asPG);
 }
 
-// Return true if, when replacing "<expr>" with "<expr> ?? T", parentheses need
-// to be added around <expr> first in order to maintain the correct precedence.
-static bool exprNeedsParensBeforeAddingNilCoalescing(TypeChecker &TC,
+bool swift::exprNeedsParensBeforeAddingNilCoalescing(TypeChecker &TC,
                                                      DeclContext *DC,
                                                      Expr *expr) {
   auto asPG =
@@ -7918,10 +7916,7 @@ static bool exprNeedsParensBeforeAddingNilCoalescing(TypeChecker &TC,
   return exprNeedsParensInsideFollowingOperator(TC, DC, expr, asPG);
 }
 
-// Return true if, when replacing "<expr>" with "<expr> as T", parentheses need
-// to be added around the new expression in order to maintain the correct
-// precedence.
-static bool exprNeedsParensAfterAddingNilCoalescing(TypeChecker &TC,
+bool swift::exprNeedsParensAfterAddingNilCoalescing(TypeChecker &TC,
                                                     DeclContext *DC,
                                                     Expr *expr,
                                                     Expr *rootExpr) {
@@ -8093,7 +8088,7 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
     
   switch (fix.first.getKind()) {
   case FixKind::ForceOptional: {
-    const Expr *unwrapped = affected->getValueProvidingExpr();
+    Expr *unwrapped = affected->getValueProvidingExpr();
     auto type = solution.simplifyType(getType(affected))
                   ->getRValueObjectType();
 
@@ -8104,54 +8099,7 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
                       "try!");
 
     } else {
-      Type unwrappedType = type->getOptionalObjectType();
-      if (!unwrappedType)
-        return false;
-
-      TC.diagnose(affected->getLoc(), diag::optional_not_unwrapped, type,
-                  unwrappedType);
-
-      // Suggest a default value via ?? <default value>
-      {
-        auto diag =
-          TC.diagnose(affected->getLoc(), diag::unwrap_with_default_value);
-
-        // Figure out what we need to parenthesize.
-        bool needsParensInside =
-          exprNeedsParensBeforeAddingNilCoalescing(TC, DC, affected);
-        bool needsParensOutside =
-          exprNeedsParensAfterAddingNilCoalescing(TC, DC, affected, expr);
-
-        llvm::SmallString<2> insertBefore;
-        llvm::SmallString<32> insertAfter;
-        if (needsParensOutside) {
-          insertBefore += "(";
-        }
-        if (needsParensInside) {
-          insertBefore += "(";
-          insertAfter += ")";
-        }
-        insertAfter += " ?? <" "#default value#" ">";
-        if (needsParensOutside)
-          insertAfter += ")";
-
-        if (!insertBefore.empty()) {
-          diag.fixItInsert(affected->getStartLoc(), insertBefore);
-        }
-        diag.fixItInsertAfter(affected->getEndLoc(), insertAfter);
-      }
-
-      // Suggest a force-unwrap.
-      {
-        auto diag =
-          TC.diagnose(affected->getLoc(), diag::unwrap_with_force_value);
-        if (affected->canAppendPostfixExpression(true)) {
-          diag.fixItInsertAfter(affected->getEndLoc(), "!");
-        } else {
-          diag.fixItInsert(affected->getStartLoc(), "(")
-              .fixItInsertAfter(affected->getEndLoc(), ")!");
-        }
-      }
+      return diagnoseUnwrap(TC, DC, unwrapped, type);
     }
     return true;
   }

@@ -8652,6 +8652,60 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
   return true;
 }
 
+bool swift::diagnoseUnwrap(TypeChecker &TC, DeclContext *DC,
+                           Expr *expr, Type type) {
+  Type unwrappedType = type->getOptionalObjectType();
+  if (!unwrappedType)
+    return false;
+
+  TC.diagnose(expr->getLoc(), diag::optional_not_unwrapped, type,
+              unwrappedType);
+
+  // Suggest a default value via ?? <default value>
+  {
+    auto diag =
+      TC.diagnose(expr->getLoc(), diag::unwrap_with_default_value);
+
+    // Figure out what we need to parenthesize.
+    bool needsParensInside =
+      exprNeedsParensBeforeAddingNilCoalescing(TC, DC, expr);
+    bool needsParensOutside =
+      exprNeedsParensAfterAddingNilCoalescing(TC, DC, expr, expr);
+
+    llvm::SmallString<2> insertBefore;
+    llvm::SmallString<32> insertAfter;
+    if (needsParensOutside) {
+      insertBefore += "(";
+    }
+    if (needsParensInside) {
+      insertBefore += "(";
+      insertAfter += ")";
+    }
+    insertAfter += " ?? <" "#default value#" ">";
+    if (needsParensOutside)
+      insertAfter += ")";
+
+    if (!insertBefore.empty()) {
+      diag.fixItInsert(expr->getStartLoc(), insertBefore);
+    }
+    diag.fixItInsertAfter(expr->getEndLoc(), insertAfter);
+  }
+
+  // Suggest a force-unwrap.
+  {
+    auto diag =
+      TC.diagnose(expr->getLoc(), diag::unwrap_with_force_value);
+    if (expr->canAppendPostfixExpression(true)) {
+      diag.fixItInsertAfter(expr->getEndLoc(), "!");
+    } else {
+      diag.fixItInsert(expr->getStartLoc(), "(")
+          .fixItInsertAfter(expr->getEndLoc(), ")!");
+    }
+  }
+
+  return true;
+}
+
 bool swift::diagnoseBaseUnwrapForMemberAccess(Expr *baseExpr, Type baseType,
                                               DeclName memberName,
                                               SourceRange memberRange) {
