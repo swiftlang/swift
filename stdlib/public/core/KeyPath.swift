@@ -174,7 +174,7 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
         case .struct:
           offset += rawComponent._structOrClassOffset
 
-        case .class, .computed, .optionalChain, .optionalForce, .optionalWrap:
+        case .class, .computed, .optionalChain, .optionalForce, .optionalWrap, .external:
           return .none
         }
 
@@ -423,6 +423,9 @@ public class ReferenceWritableKeyPath<
 @_frozen // FIXME(sil-serialize-all)
 @usableFromInline // FIXME(sil-serialize-all)
 internal enum KeyPathComponentKind {
+  /// The keypath references an externally-defined property or subscript whose
+  /// component describes how to interact with the key path.
+  case external
   /// The keypath projects within the storage of the outer value, like a
   /// stored property in a struct.
   case `struct`
@@ -822,6 +825,10 @@ internal struct RawKeyPathComponent {
       return _SwiftKeyPathComponentHeader_DiscriminatorShift
     }
     @inlinable // FIXME(sil-serialize-all)
+    internal static var externalTag: UInt32 {
+      return _SwiftKeyPathComponentHeader_ExternalTag
+    }
+    @inlinable // FIXME(sil-serialize-all)
     internal static var structTag: UInt32 {
       return _SwiftKeyPathComponentHeader_StructTag
     }
@@ -934,6 +941,8 @@ internal struct RawKeyPathComponent {
     @inlinable // FIXME(sil-serialize-all)
     internal var kind: KeyPathComponentKind {
       switch (discriminator, payload) {
+      case (Header.externalTag, _):
+        return .external
       case (Header.structTag, _):
         return .struct
       case (Header.classTag, _):
@@ -958,18 +967,28 @@ internal struct RawKeyPathComponent {
       return MemoryLayout<Int>.size - MemoryLayout<Int32>.size
     }
 
+    
+    @inlinable // FIXME(sil-serialize-all)
+    internal var isTrivialPropertyDescriptor: Bool {
+      return _value ==
+        _SwiftKeyPathComponentHeader_TrivialPropertyDescriptorMarker
+    }
   }
 
   @inlinable // FIXME(sil-serialize-all)
   internal var bodySize: Int {
+    let ptrSize = MemoryLayout<Int>.size
     switch header.kind {
     case .struct, .class:
       if header.payload == Header.payloadMask { return 4 } // overflowed
       return 0
+    case .external:
+      // align to pointer + pointer to external descriptor
+      // + N generic argument accessors (N in payload)
+      return Header.pointerAlignmentSkew + ptrSize * (1 + Int(header.payload))
     case .optionalChain, .optionalForce, .optionalWrap:
       return 0
     case .computed:
-      let ptrSize = MemoryLayout<Int>.size
       // align to pointer, minimum two pointers for id and get
       var total = Header.pointerAlignmentSkew + ptrSize * 2
       // additional word for a setter
@@ -1130,6 +1149,8 @@ internal struct RawKeyPathComponent {
       case (false, true):
         _sanityCheckFailure("impossible")
       }
+    case .external:
+      _sanityCheckFailure("should have been instantiated away")
     }
   }
 
@@ -1149,6 +1170,8 @@ internal struct RawKeyPathComponent {
          let destructor = _computedArgumentWitnesses.pointee.destroy {
         destructor(_computedMutableArguments, _computedArgumentSize)
       }
+    case .external:
+      _sanityCheckFailure("should have been instantiated away")
     }
   }
 
@@ -1209,6 +1232,8 @@ internal struct RawKeyPathComponent {
       }
 
       componentSize += addedSize
+    case .external:
+      _sanityCheckFailure("should have been instantiated away")
     }
     buffer = UnsafeMutableRawBufferPointer(
       start: buffer.baseAddress.unsafelyUnwrapped + componentSize,
@@ -2253,6 +2278,24 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
       // reassigned.
       capability = .reference
       popOffset()
+    case .external:
+      // Look at the external property descriptor to see if we should take it
+      // over the component given in the pattern.
+      let genericParamCount = Int(header.payload)
+      let descriptor = buffer.pop(UnsafeRawPointer.self)
+      let descriptorHeader = descriptor.load(as: RawKeyPathComponent.Header.self)
+      if descriptorHeader.isTrivialPropertyDescriptor {
+        // If the descriptor is trivial, then use the local candidate.
+        // Leave this external reference out of the final object size.
+        size -= (2 + genericParamCount) * MemoryLayout<Int>.size
+        // Skip the generic parameter accessors to get to it.
+        _ = buffer.popRaw(size: MemoryLayout<Int>.size * genericParamCount,
+                          alignment: MemoryLayout<Int>.alignment)
+        continue
+      }
+
+      // TODO: Measure the instantiated size of the external component.
+      fatalError("to be implemented")
     case .computed:
       let settable =
         header.payload & RawKeyPathComponent.Header.computedSettableFlag != 0
@@ -2527,6 +2570,22 @@ internal func _instantiateKeyPathBuffer(
           start: destData.baseAddress.unsafelyUnwrapped + stride,
           count: destData.count - stride)
       }
+    case .external:
+      // Look at the external property descriptor to see if we should take it
+      // over the component given in the pattern.
+      let genericParamCount = Int(header.payload)
+      let descriptor = patternBuffer.pop(UnsafeRawPointer.self)
+      let descriptorHeader = descriptor.load(as: RawKeyPathComponent.Header.self)
+      if descriptorHeader.isTrivialPropertyDescriptor {
+        // If the descriptor is trivial, then use the local candidate.
+        // Skip the generic parameter accessors to get to it.
+        _ = patternBuffer.popRaw(
+          size: MemoryLayout<Int>.size * genericParamCount,
+          alignment: MemoryLayout<Int>.alignment)
+        continue
+      }
+
+      fatalError("to be implemented")
     }
 
     // Break if this is the last component.
