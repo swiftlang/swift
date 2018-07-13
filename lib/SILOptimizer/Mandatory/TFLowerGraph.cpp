@@ -1813,7 +1813,8 @@ GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
         break;
       }
       case SymbolicValue::Aggregate:
-        llvm_unreachable("FIXME: Handle normal aggregate arguments");
+      case SymbolicValue::Array:
+        llvm_unreachable("FIXME: Handle normal aggregate/array arguments");
       }
       // Done with normal attributes.
       break;

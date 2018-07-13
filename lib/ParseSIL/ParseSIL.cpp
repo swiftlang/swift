@@ -1039,7 +1039,7 @@ static bool parseSymbolicValue(SymbolicValue &value, SILParser &SP,
     });
     if (status.isError())
       return true;
-    value = SymbolicValue::getAggregate(elements, allocator);
+    value = SymbolicValue::getArray(elements, allocator);
     return false;
   }
   P.diagnose(P.Tok, diag::sil_graph_op_expected_attr_value);

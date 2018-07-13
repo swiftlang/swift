@@ -28,8 +28,6 @@ class SerializedSILLoader;
 
 struct APIntSymbolicValue;
 struct APFloatSymbolicValue;
-struct StringSymbolicValue;
-struct AggregateSymbolicValue;
 struct EnumWithPayloadSymbolicValue;
 struct DerivedAddressValue;
 struct SymbolicValueMemoryObject;
@@ -125,6 +123,12 @@ class SymbolicValue {
 
     /// This represents an index *into* a memory object.
     RK_DerivedAddress,
+
+    /// This represents an array value.
+    RK_Array,
+
+    /// This represents an address of a memory object containing an array.
+    RK_ArrayAddress,
   };
 
   union {
@@ -165,11 +169,11 @@ class SymbolicValue {
 
     /// When this SymbolicValue is of "String" kind, this pointer stores
     /// information about the StringRef value it holds.
-    StringSymbolicValue *string;
+    const char *string;
 
     /// When this SymbolicValue is of "Aggregate" kind, this pointer stores
     /// information about the array elements and count.
-    AggregateSymbolicValue *aggregate;
+    const SymbolicValue *aggregate;
 
     /// When this SymbolicValue is of "Enum" kind, this pointer stores
     /// information about the enum case type.
@@ -186,6 +190,12 @@ class SymbolicValue {
     /// When this SymbolicValue is of "DerivedAddress" kind, this pointer stores
     /// information about the memory object and access path of the access.
     DerivedAddressValue *derivedAddress;
+
+    /// For RK_Array, this is the elements of the array.
+    const SymbolicValue *array;
+
+    /// For RK_ArrayAddress, this is the memory object referenced.
+    SymbolicValueMemoryObject *arrayAddress;
   } value;
 
   RepresentationKind representationKind : 8;
@@ -197,6 +207,15 @@ class SymbolicValue {
     /// This is the number of bits in an RK_Integer or RK_IntegerInline
     /// representation, which makes the number of entries in the list derivable.
     unsigned integer_bitwidth;
+
+    /// This is the numer of bytes for an RK_String representation.
+    unsigned string_numBytes;
+
+    /// This is the number of elements for an RK_Aggregate representation.
+    unsigned aggregate_numElements;
+
+    /// This is the number of elements for an RK_Array representation.
+    unsigned array_numElements;
   } aux;
 
 public:
@@ -235,6 +254,9 @@ public:
 
     /// This value represents the address of, or into, a memory object.
     Address,
+
+    /// This value represents an array value.
+    Array,
 
     /// These values are generally only seen internally to the system, external
     /// clients shouldn't have to deal with them.
@@ -326,7 +348,7 @@ public:
   APFloat getFloatValue() const;
 
   /// Returns a SymbolicValue representing a UTF-8 encoded string.
-  static SymbolicValue getString(const StringRef string,
+  static SymbolicValue getString(StringRef string,
                                  llvm::BumpPtrAllocator &allocator);
 
   /// Returns the UTF-8 encoded string underlying a SymbolicValue.
@@ -380,6 +402,19 @@ public:
 
   /// Return just the memory object for an address value.
   SymbolicValueMemoryObject *getAddressValueMemoryObject() const;
+
+  /// Produce an array of elements.
+  static SymbolicValue getArray(ArrayRef<SymbolicValue> elements,
+                                llvm::BumpPtrAllocator &allocator);
+  static SymbolicValue getArrayAddress(SymbolicValueMemoryObject *memoryObject){
+    SymbolicValue result;
+    result.representationKind = RK_ArrayAddress;
+    result.value.directAddress = memoryObject;
+    return result;
+  }
+
+  ArrayRef<SymbolicValue> getArrayValue() const;
+
 
   /// Given that this is an 'Unknown' value, emit diagnostic notes providing
   /// context about what the problem is.  If there is no location for some

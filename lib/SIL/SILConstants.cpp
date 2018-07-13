@@ -71,20 +71,21 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
     return;
   case RK_Aggregate: {
     ArrayRef<SymbolicValue> elements = getAggregateValue();
-    if (elements.empty()) {
+    switch (elements.size()) {
+    case 0:
       os << "agg: 0 elements []\n";
       return;
-    } else if (elements.size() == 1) {
+    case 1:
       os << "agg: 1 elt: ";
       elements[0].print(os, indent+2);
       return;
+    default:
+      os << "agg: " << elements.size() << " elements [\n";
+      for (auto elt : elements)
+        elt.print(os, indent+2);
+      os.indent(indent) << "]\n";
+      return;
     }
-    os << "agg: " << elements.size() << " element" << "s"[elements.size() == 1]
-       << " [\n";
-    for (auto elt : elements)
-      elt.print(os, indent+2);
-    os.indent(indent) << "]\n";
-    return;
   }
   case RK_Enum: {
     auto *decl = getEnumValue();
@@ -110,6 +111,25 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
                [&]() { os << ", "; });
     os << "\n";
     break;
+  }
+  case RK_Array:
+  case RK_ArrayAddress: {
+    ArrayRef<SymbolicValue> elements = getArrayValue();
+    switch (elements.size()) {
+    case 0:
+      os << "array: 0 elements []\n";
+      return;
+    case 1:
+      os << "array: 1 elt: ";
+      elements[0].print(os, indent+2);
+      return;
+    default:
+      os << "array: " << elements.size() << " elements [\n";
+      for (auto elt : elements)
+        elt.print(os, indent+2);
+      os.indent(indent) << "]\n";
+      return;
+    }
   }
   }
 }
@@ -148,6 +168,9 @@ SymbolicValue::Kind SymbolicValue::getKind() const {
   case RK_DirectAddress:
   case RK_DerivedAddress:
     return Address;
+  case RK_Array:
+  case RK_ArrayAddress:
+    return Array;
   case RK_Inst:
     auto *inst = value.inst;
     if (isa<IntegerLiteralInst>(inst))
@@ -213,6 +236,15 @@ SymbolicValue SymbolicValue::cloneInto(llvm::BumpPtrAllocator &allocator) const{
                                         memObject->getValue(), allocator);
     return getAddress(newMemObject, accessPath, allocator);
   }
+  case RK_Array:
+  case RK_ArrayAddress: {
+    auto elts = getArrayValue();
+    SmallVector<SymbolicValue, 4> results;
+    results.reserve(elts.size());
+    for (auto elt : elts)
+      results.push_back(elt.cloneInto(allocator));
+    return getArray(results, allocator);
+  }
   }
 }
 
@@ -227,8 +259,6 @@ SymbolicValueMemoryObject::create(Type type, SymbolicValue value,
   new (result) SymbolicValueMemoryObject(type, value);
   return result;
 }
-
-
 
 //===----------------------------------------------------------------------===//
 // Integers
@@ -377,54 +407,19 @@ APFloat SymbolicValue::getFloatValue() const {
 // Strings
 //===----------------------------------------------------------------------===//
 
-namespace swift {
-/// This is a representation of an UTF-8 encoded string, stored as a trailing
-/// array of bytes.  Elements of this value are bump-pointer allocated.
-struct alignas(uint64_t) StringSymbolicValue final
-  : private llvm::TrailingObjects<StringSymbolicValue, char> {
-    friend class llvm::TrailingObjects<StringSymbolicValue, char>;
-
-  /// The number of bytes in the trailing array.
-  const unsigned numBytes;
-
-  static StringSymbolicValue *create(const StringRef string,
-                                     llvm::BumpPtrAllocator &allocator) {
-    auto size = StringSymbolicValue::totalSizeToAlloc<char>(string.size());
-    auto rawMem = allocator.Allocate(size, alignof(StringSymbolicValue));
-
-    // Placement initialize the StringSymbolicValue.
-    auto ilv = ::new (rawMem) StringSymbolicValue(string.size());
-    std::uninitialized_copy(string.begin(), string.end(),
-                            ilv->getTrailingObjects<char>());
-    return ilv;
-  }
-
-  StringRef getValue() const {
-    return {
-      getTrailingObjects<char>(), numTrailingObjects(OverloadToken<char>())
-    };
-  }
-
-  // This is used by the llvm::TrailingObjects base class.
-  size_t numTrailingObjects(OverloadToken<char>) const {
-    return numBytes;
-  }
-private:
-  StringSymbolicValue() = delete;
-  StringSymbolicValue(const StringSymbolicValue &) = delete;
-  StringSymbolicValue(unsigned numBytes) :
-    numBytes(numBytes) {}
-};
-} // end namespace swift
-
 // Returns a SymbolicValue representing a UTF-8 encoded string.
-SymbolicValue SymbolicValue::getString(const StringRef string,
+SymbolicValue SymbolicValue::getString(StringRef string,
                                        llvm::BumpPtrAllocator &allocator) {
-  auto stringValue = StringSymbolicValue::create(string, allocator);
-  assert(stringValue && "String value must be present");
+  // TODO: Could have an inline representation for strings if thre was demand,
+  // just store a char[8] as the storage.
+
+  auto *resultPtr = allocator.Allocate<char>(string.size());
+  std::uninitialized_copy(string.begin(), string.end(), resultPtr);
+
   SymbolicValue result;
   result.representationKind = RK_String;
-  result.value.string = stringValue;
+  result.value.string = resultPtr;
+  result.aux.string_numBytes = string.size();
   return result;
 }
 
@@ -433,7 +428,7 @@ StringRef SymbolicValue::getStringValue() const {
   assert(getKind() == String);
 
   if (representationKind == RK_String)
-    return value.string->getValue();
+    return StringRef(value.string, aux.string_numBytes);
 
   assert(representationKind == RK_Inst);
   return cast<StringLiteralInst>(value.inst)->getValue();
@@ -443,65 +438,24 @@ StringRef SymbolicValue::getStringValue() const {
 // Aggregates
 //===----------------------------------------------------------------------===//
 
-namespace swift {
-
-/// This is the representation of a constant aggregate value.  It maintains
-/// the elements as a trailing array of SymbolicValue's.  Note that single
-/// element structs do not use this (as a performance optimization to reduce
-/// allocations).
-struct alignas(SymbolicValue) AggregateSymbolicValue final
-: private llvm::TrailingObjects<AggregateSymbolicValue, SymbolicValue> {
-  friend class llvm::TrailingObjects<AggregateSymbolicValue, SymbolicValue>;
-
-  /// This is the number of elements in the aggregate.
-  const unsigned numElements;
-
-  static AggregateSymbolicValue *create(ArrayRef<SymbolicValue> elements,
-                                       llvm::BumpPtrAllocator &allocator) {
-    auto byteSize =
-      AggregateSymbolicValue::totalSizeToAlloc<SymbolicValue>(elements.size());
-    auto rawMem = allocator.Allocate(byteSize, alignof(AggregateSymbolicValue));
-
-    //  Placement initialize the AggregateSymbolicValue.
-    auto alv = ::new (rawMem) AggregateSymbolicValue(elements.size());
-    std::uninitialized_copy(elements.begin(), elements.end(),
-                            alv->getTrailingObjects<SymbolicValue>());
-    return alv;
-  }
-
-  /// Return the element constants for this aggregate constant.  These are
-  /// known to all be constants.
-  ArrayRef<SymbolicValue> getElements() const {
-    return { getTrailingObjects<SymbolicValue>(), numElements };
-  }
-
-  // This is used by the llvm::TrailingObjects base class.
-  size_t numTrailingObjects(OverloadToken<SymbolicValue>) const {
-    return numElements;
-  }
-private:
-  AggregateSymbolicValue() = delete;
-  AggregateSymbolicValue(const AggregateSymbolicValue &) = delete;
-  AggregateSymbolicValue(unsigned numElements) : numElements(numElements) {}
-};
-} // end namespace swift
-
-
 /// This returns a constant Symbolic value with the specified elements in it.
 /// This assumes that the elements lifetime has been managed for this.
 SymbolicValue SymbolicValue::getAggregate(ArrayRef<SymbolicValue> elements,
                                           llvm::BumpPtrAllocator &allocator) {
-  auto aggregate = AggregateSymbolicValue::create(elements, allocator);
-  assert(aggregate && "aggregate value must be present");
+  // Copy the integers from the APInt into the bump pointer.
+  auto *resultElts = allocator.Allocate<SymbolicValue>(elements.size());
+  std::uninitialized_copy(elements.begin(), elements.end(), resultElts);
+
   SymbolicValue result;
   result.representationKind = RK_Aggregate;
-  result.value.aggregate = aggregate;
+  result.value.aggregate = resultElts;
+  result.aux.aggregate_numElements = elements.size();
   return result;
 }
 
 ArrayRef<SymbolicValue> SymbolicValue::getAggregateValue() const {
   assert(getKind() == Aggregate);
-  return value.aggregate->getElements();
+  return ArrayRef<SymbolicValue>(value.aggregate, aux.aggregate_numElements);
 }
 
 //===----------------------------------------------------------------------===//
@@ -598,7 +552,7 @@ struct DerivedAddressValue final
   }
 private:
   DerivedAddressValue() = delete;
-  DerivedAddressValue(const AggregateSymbolicValue &) = delete;
+  DerivedAddressValue(const DerivedAddressValue &) = delete;
   DerivedAddressValue(SymbolicValueMemoryObject *memoryObject,
                       unsigned numElements)
    : memoryObject(memoryObject), numElements(numElements) {}
@@ -648,6 +602,32 @@ SymbolicValueMemoryObject *SymbolicValue::getAddressValueMemoryObject() const {
   return value.derivedAddress->memoryObject;
 }
 
+//===----------------------------------------------------------------------===//
+// Arrays
+//===----------------------------------------------------------------------===//
+
+/// Produce an array of elements.
+SymbolicValue SymbolicValue::getArray(ArrayRef<SymbolicValue> elements,
+                                      llvm::BumpPtrAllocator &allocator) {
+  // Copy the integers from the APInt into the bump pointer.
+  auto *resultElts = allocator.Allocate<SymbolicValue>(elements.size());
+  std::uninitialized_copy(elements.begin(), elements.end(), resultElts);
+
+  SymbolicValue result;
+  result.representationKind = RK_Array;
+  result.value.array = resultElts;
+  result.aux.array_numElements = elements.size();
+  return result;
+}
+
+ArrayRef<SymbolicValue> SymbolicValue::getArrayValue() const {
+  assert(getKind() == Array);
+  auto val = *this;
+  if (representationKind == RK_ArrayAddress)
+    val = value.arrayAddress->getValue();
+  assert(val.representationKind == RK_Array);
+  return ArrayRef<SymbolicValue>(val.value.array, val.aux.array_numElements);
+}
 
 //===----------------------------------------------------------------------===//
 // Higher level code
