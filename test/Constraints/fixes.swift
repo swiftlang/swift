@@ -47,16 +47,28 @@ func forgotCall() {
 /// Forgot the '!' to unwrap an optional.
 func parseInt() -> Int? { }
 
+func <(lhs: A, rhs: A) -> A? { return nil }
+
 func forgotOptionalBang(_ a: A, obj: AnyObject) {
-  var i: Int = parseInt() // expected-error{{value of optional type 'Int?' not unwrapped; did you mean to use '!' or '?'?}}{{26-26=!}}
+  var i: Int = parseInt() // expected-error{{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+  // expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}}{{26-26= ?? <#default value#>}}
+  // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}{{26-26=!}}
 
   var a = A(), b = B()
-  b = a as? B  // expected-error{{value of optional type 'B?' not unwrapped; did you mean to use '!' or '?'?}}{{7-7=(}}{{14-14=)!}}
+  b = a as? B  // expected-error{{value of optional type 'B?' must be unwrapped to a value of type 'B'}}
+  // expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}}{{14-14= ?? <#default value#>}}
+  // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}{{7-7=(}}{{14-14=)!}}
 
+  a = a < a // expected-error{{value of optional type 'A?' must be unwrapped to a value of type 'A'}}
+  // expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}}{{7-7=(}}{{12-12=) ?? <#default value#>}}
+  // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}{{7-7=(}}{{12-12=)!}}
+  
   // rdar://problem/20377684 -- take care that the '!' doesn't fall into an
   // optional evaluation context
   let bo: B? = b
-  let b2: B = bo?.createB() // expected-error{{value of optional type 'B?' not unwrapped; did you mean to use '!' or '?'?}}{{15-15=(}}{{28-28=)!}}
+  let b2: B = bo?.createB() // expected-error{{value of optional type 'B?' must be unwrapped to a value of type 'B'}}
+  // expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+  // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
 }
 
 // Crash with one-element tuple with labeled element
@@ -64,7 +76,9 @@ class Dinner {}
 
 func microwave() -> Dinner {
   let d: Dinner? = nil
-  return (n: d) // expected-error{{value of optional type 'Dinner?' not unwrapped; did you mean to use '!' or '?'?}} {{16-16=!}}
+  return (n: d) // expected-error{{value of optional type 'Dinner?' must be unwrapped to a value of type 'Dinner'}}
+  // expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+  // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
 }
 
 func forgotAnyObjectBang(_ obj: AnyObject) {
@@ -89,7 +103,9 @@ func extraCall() {
   var i = 7
   i = i() // expected-error{{cannot call value of non-function type 'Int'}}{{8-10=}}
 
-  maybeFn()(5) // expected-error{{value of optional type '((Int) -> Int)?' not unwrapped; did you mean to use '!' or '?'?}}{{12-12=!}}
+  maybeFn()(5) // expected-error{{value of optional type '((Int) -> Int)?' must be unwrapped to a value of type '(Int) -> Int'}}
+  // expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+  // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
 }
 
 class U {
