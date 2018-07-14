@@ -268,14 +268,21 @@ def obtain_all_additional_swift_sources(args, config, with_ssh, scheme_name,
                     remote = config['https-clone-pattern'] % remote_repo_id
 
             repo_branch = None
+            repo_not_in_scheme = False
             if scheme_name:
                 for v in config['branch-schemes'].values():
                     if scheme_name not in v['aliases']:
+                        continue
+                    # If repo is not specified in the scheme, skip cloning it.
+                    if repo_name not in v['repos']:
+                        repo_not_in_scheme = True
                         continue
                     repo_branch = v['repos'][repo_name]
                     break
                 else:
                     repo_branch = scheme_name
+            if repo_not_in_scheme:
+                continue
 
             pool_args.append([args, repo_name, repo_info, repo_branch, remote,
                               with_ssh, scheme_name, skip_history,
