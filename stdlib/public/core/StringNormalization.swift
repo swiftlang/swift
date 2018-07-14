@@ -13,42 +13,66 @@
 import SwiftShims
 
 extension Unicode {
-  /// A normalization form for strings.
+  /// A normalization form for Unicode text.
+  ///
+  /// Unicode extended grapheme clusters can be equivalent to each other despite
+  /// differences in their underlying representation. Normalization removes
+  /// unwanted differences in representation; roughly speaking, a normalization
+  /// form specifies which differences are unwanted and how they should be
+  /// normalized.
+  ///
+  /// Two __canonically equivalent__ texts should have no differences in display
+  /// formatting or interpretation. For example, Ä (00C4 LATIN CAPITAL LETTER A
+  /// WITH DIAERESIS) is equivalent to Ä (0041 LATIN CAPITAL LETTER A + 0308
+  /// COMBINING DIAERESIS).
+  ///
+  /// Two __compatibly equivalent__ texts may, in some contexts, have
+  /// differences in display formatting or interpretation; for example, ½ (00BD
+  /// VULGAR FRACTION ONE HALF) is compatibly equivalent to 1⁄2 (0031 DIGIT ONE
+  /// + 2044 FRACTION SLASH + 0032 DIGIT TWO).
   /* non-frozen */ public enum NormalizationForm {
-    /// Unicode normalization form D (canonical decomposition).
+    /// Normalization Form D (NFD), canonical decomposition.
+    ///
+    /// This algorithm separates single code points into canonically equivalent
+    /// sequences of code points, where possible.
     case nfd
 
-    /// Unicode normalization form C (canonical decomposition followed by
-    /// canonical composition).
+    /// Normalization Form C (NFC), canonical decomposition followed by
+    /// canonical composition.
+    ///
+    /// This algorithm combines canonically equivalent decomposed sequences of
+    /// code points into their canonically equivalent single code points, where
+    /// possible.
     case nfc
 
-    /// Unicode normalization form KD (compatibility decomposition).
+    /// Normalization Form KD (NFKD), compatibility decomposition.
+    ///
+    /// This algorithm separates single code points into compatibly equivalent
+    /// sequences of code points, where possible; the decomposition may discard
+    /// information important for formatting or interpretation in some contexts.
     case nfkd
 
-    /// Unicode normalization form KC (compatibility decomposition followed by
-    /// canonical composition).
+    /// Normalization Form KC (NFKC), compatibility decomposition followed by
+    /// canonical composition.
+    ///
+    /// This algorithm combines compatibly equivalent decomposed sequences of
+    /// code points into their canonically equivalent single code points, where
+    /// possible; the decomposition may discard information important for
+    /// formatting or interpretation in some contexts.
     case nfkc
 
-    /// Unicode normalization form KC (compatibility decomposition followed by
-    /// canonical composition) with case-folding.
+    /// "Fast C or D" (FCD), as described in Unicode Technical Note #5.
     ///
-    /// This algorithm is formalized by the Unicode standard. The expression
-    /// `str.normalized(.nfkc).caseFolded().normalized(.nfkc)` approximates, but
-    /// is not always identical to, `str.normalized(.nfkcCaseFold)`.
-    case nfkcCaseFold
-
-    /// "Fast C or D" (FCD) form, as described in Unicode Technical Note #5.
-    ///
-    /// FCD does not describe a unique form: two canonically equivalent strings
-    /// normalized using this algorithm can be non-identical. All NFD strings
-    /// and most NFC strings fulfill the conditions of FCD form.
+    /// FCD does not describe a unique form: two canonically equivalent texts
+    /// normalized using this algorithm can be non-identical in their underlying
+    /// representation. All NFD strings and most NFC strings fulfill the
+    /// conditions of FCD form.
     case fcd
 
-    /// "Fast C Contiguous" (FCC) form, as described in Unicode Technical Note
-    /// #5.
+    /// "Fast C Contiguous" (FCC), as described in Unicode Technical Note #5.
     ///
     /// This algorithm is a modification of the NFC algorithm that eliminates
-    /// discontiguous composition. For most strings, the FCC and NFC forms are
+    /// discontiguous composition. For most texts, the FCC and NFC forms are
     /// identical.
     case fcc
   }
@@ -56,73 +80,39 @@ extension Unicode {
 
 // An internal namespace for various normalization heuristics.
 internal enum _Normalization {
-  // ICU's NFD unorm2 instance.
-  internal static var _nfdNormalizer: OpaquePointer = {
+  // Returns ICU's unorm2 instance corresponding to the given normalization
+  // form.
+  internal static func _normalizer(
+    _ form: Unicode.NormalizationForm
+  ) -> OpaquePointer {
     var err = __swift_stdlib_U_ZERO_ERROR
-    let normalizer = __swift_stdlib_unorm2_getNFDInstance(&err)
+    let normalizer: OpaquePointer
+    switch form {
+    case .nfd: normalizer = __swift_stdlib_unorm2_getNFDInstance(&err)
+    case .nfc: normalizer = __swift_stdlib_unorm2_getNFCInstance(&err)
+    case .nfkd: normalizer = __swift_stdlib_unorm2_getNFKDInstance(&err)
+    case .nfkc: normalizer = __swift_stdlib_unorm2_getNFKCInstance(&err)
+    case .fcd: normalizer = __swift_stdlib_unorm2_getFCDInstance(&err)
+    case .fcc: normalizer = __swift_stdlib_unorm2_getFCCInstance(&err)
+    // @unknown default: fatalError("Unrecognized normalization form")
+    }
+
     guard err.isSuccess else {
       // This shouldn't be possible unless some deep (unrecoverable) system
       // invariants are violated.
       fatalError("Unable to talk to ICU")
     }
     return normalizer
-  }()
+  }
 
-  // ICU's NFC unorm2 instance.
-  internal static var _nfcNormalizer: OpaquePointer = {
-    var err = __swift_stdlib_U_ZERO_ERROR
-    let normalizer = __swift_stdlib_unorm2_getNFCInstance(&err)
-    guard err.isSuccess else { fatalError("Unable to talk to ICU") }
-    return normalizer
-  }()
-
-  // ICU's NFKD unorm2 instance.
-  internal static var _nfkdNormalizer: OpaquePointer = {
-    var err = __swift_stdlib_U_ZERO_ERROR
-    let normalizer = __swift_stdlib_unorm2_getNFKDInstance(&err)
-    guard err.isSuccess else { fatalError("Unable to talk to ICU") }
-    return normalizer
-  }()
-
-  // ICU's NFKC unorm2 instance.
-  internal static var _nfkcNormalizer: OpaquePointer = {
-    var err = __swift_stdlib_U_ZERO_ERROR
-    let normalizer = __swift_stdlib_unorm2_getNFKCInstance(&err)
-    guard err.isSuccess else { fatalError("Unable to talk to ICU") }
-    return normalizer
-  }()
-
-  // ICU's NFKCCasefold unorm2 instance.
-  internal static var _nfkcCasefoldNormalizer: OpaquePointer = {
-    var err = __swift_stdlib_U_ZERO_ERROR
-    let normalizer = __swift_stdlib_unorm2_getNFKCCasefoldInstance(&err)
-    guard err.isSuccess else { fatalError("Unable to talk to ICU") }
-    return normalizer
-  }()
-
-    // ICU's FCD unorm2 instance.
-  internal static var _fcdNormalizer: OpaquePointer = {
-    var err = __swift_stdlib_U_ZERO_ERROR
-    let normalizer = __swift_stdlib_unorm2_getFCDInstance(&err)
-    guard err.isSuccess else { fatalError("Unable to talk to ICU") }
-    return normalizer
-  }()
-
-  // ICU's FCC unorm2 instance.
-  internal static var _fccNormalizer: OpaquePointer = {
-    var err = __swift_stdlib_U_ZERO_ERROR
-    let normalizer = __swift_stdlib_unorm2_getFCCInstance(&err)
-    guard err.isSuccess else { fatalError("Unable to talk to ICU") }
-    return normalizer
-  }()
-
-  // Whether this buffer of code units satisfies the quickCheck=YES property for
-  // normality checking.
+  // Returns a Boolean value indicating whether this buffer of code units
+  // satisfies the quickCheck=YES property for normality checking.
   //
-  // ICU provides a quickCheck, which may yield "YES", "NO", or "MAYBE". YES
-  // means that the string was determined to be definitely normal. In practice,
-  // the majority of strings have this property. Checking for YES is
-  // considerably faster than trying to distinguish between NO and MAYBE.
+  // ICU provides a quickCheck, which may yield YES, NO, or MAYBE; there are no
+  // MAYBE values for NFD and NFKD. YES means that the string was determined to
+  // be definitely normal. In practice, the majority of strings have this
+  // property. Checking for YES is considerably faster than trying to
+  // distinguish between NO and MAYBE.
   internal static func _prenormalQuickCheckYes(
     normalizer: OpaquePointer = _Normalization._nfcNormalizer,
     _ buffer: UnsafeBufferPointer<UInt16>
@@ -158,6 +148,9 @@ internal enum _Normalization {
 }
 
 extension _Normalization {
+  internal static var _nfcNormalizer: OpaquePointer =
+    _Normalization._normalizer(.nfc)
+
   // When normalized in NFC, some segments may expand in size (e.g. some non-BMP
   // musical notes). This expansion is capped by the maximum expansion factor of
   // the normal form. For NFC, that is 3x.
@@ -182,7 +175,8 @@ extension UnicodeScalar {
   // segments can, as a process of normalization, expand, contract, and even
   // produce new sub-segments.
 
-  // Whether this scalar value always has a normalization boundary before it.
+  // A Boolean value indicating Whether this scalar value always has a
+  // normalization boundary before it.
   internal var _hasNormalizationBoundaryBefore: Bool {
     _sanityCheck(Int32(exactly: self.value) != nil, "top bit shouldn't be set")
     let value = Int32(bitPattern: self.value)

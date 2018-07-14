@@ -1273,10 +1273,6 @@ StringTests.test("normalized(_:)") {
     asciiDomain,
     { String(UnicodeScalar(Int($0))!) },
     { String(UnicodeScalar(Int($0))!).normalized(.nfc) })
-  expectEqualFunctionsForDomain(
-    asciiDomain,
-    { String(UnicodeScalar(Int(tolower($0)))!) },
-    { String(UnicodeScalar(Int($0))!).normalized(.nfkcCaseFold) })
 
   expectEqual("∭", "∭".normalized(.nfd))
   expectEqual("∭", "∭".normalized(.nfc))

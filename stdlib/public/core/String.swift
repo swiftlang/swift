@@ -1241,25 +1241,7 @@ internal func _nativeUnicodeNormalizeString(
   defer { _fixLifetime(guts) }
   let utf16 = guts._unmanagedUTF16View
 
-  let norm: OpaquePointer
-  switch form {
-  case .nfd:
-    norm = _Normalization._nfdNormalizer
-  case .nfc:
-    norm = _Normalization._nfcNormalizer
-  case .nfkd:
-    norm = _Normalization._nfkdNormalizer
-  case .nfkc:
-    norm = _Normalization._nfkcNormalizer
-  case .nfkcCaseFold:
-    norm = _Normalization._nfkcCasefoldNormalizer
-  case .fcd:
-    norm = _Normalization._fcdNormalizer
-  case .fcc:
-    norm = _Normalization._fccNormalizer
-  @unknown default:
-    fatalError("Unrecognized normalization form")
-  }
+  let norm = _Normalization._normalizer(form)
   guard !_Normalization._prenormalQuickCheckYes(normalizer: norm, utf16) else {
     return str
   }
@@ -1277,7 +1259,7 @@ internal func _nativeUnicodeNormalizeString(
     numericCast(storage.capacity), // FIXME: handle overflow case
     &err)
   guard err.isSuccess || err == __swift_stdlib_U_BUFFER_OVERFLOW_ERROR else {
-    fatalError("unorm2_normalize: Unexpected error normalizing unicode string.")
+    fatalError("unorm2_normalize: Unexpected error normalizing Unicode string.")
   }
   let correctSize = Int(z)
 
@@ -1295,7 +1277,7 @@ internal func _nativeUnicodeNormalizeString(
       &err)
   }
   guard err.isSuccess else {
-    fatalError("unorm2_normalize: Unexpected error normalizing unicode string.")
+    fatalError("unorm2_normalize: Unexpected error normalizing Unicode string.")
   }
   storage.count = correctSize
   return String(_largeStorage: storage)
@@ -1451,6 +1433,12 @@ extension String {
   /// Returns a normalized version of the string using the given Unicode
   /// normalization form.
   ///
+  /// Unicode extended grapheme clusters can be equivalent to each other despite
+  /// differences in their underlying representation. Normalization removes
+  /// unwanted differences in representation; roughly speaking, a normalization
+  /// form specifies which differences are unwanted and how they should be
+  /// normalized.
+  ///
   /// - Parameter form: The normalization form to be used.
   /// - Returns: A normalized copy of the string.
   ///
@@ -1458,12 +1446,8 @@ extension String {
   public func normalized(_ form: Unicode.NormalizationForm) -> String {
     if _guts.isASCII {
       switch form {
-      case .nfd, .nfc, .nfkd, .nfkc, .fcd, .fcc:
-        return self
-      case .nfkcCaseFold:
-        return self.lowercased()
-      @unknown default:
-        fatalError("Unrecognized normalization form")
+      case .nfd, .nfc, .nfkd, .nfkc, .fcd, .fcc: return self
+      // @unknown default: fatalError("Unrecognized normalization form")
       }
     }
 

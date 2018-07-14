@@ -41,7 +41,6 @@ typedef int32_t UChar32;
 typedef int8_t UBool;
 typedef swift::__swift_stdlib_UProperty UProperty;
 typedef swift::__swift_stdlib_UErrorCode UErrorCode;
-#define U_FAILURE(x) ((x)>__swift_stdlib_U_ZERO_ERROR)
 
 #define U_MAX_VERSION_LENGTH 4
 typedef uint8_t UVersionInfo[U_MAX_VERSION_LENGTH];
@@ -82,7 +81,6 @@ int32_t u_strToTitle(UChar *, int32_t, const UChar *, int32_t,
                      UBreakIterator *, const char *, UErrorCode *);
 int32_t u_strToUpper(UChar *, int32_t, const UChar *, int32_t, const char *,
                      UErrorCode *);
-#define U_FOLD_CASE_DEFAULT 0
 int32_t u_strFoldCase(UChar *, int32_t, const UChar *, int32_t, uint32_t,
                       UErrorCode *);
 double u_getNumericValue(UChar32);
@@ -125,7 +123,7 @@ swift::_swift_stdlib_unicode_strToUpper(uint16_t *Destination,
                                        SourceLength,
                                        "", &ErrorCode);
   if (U_FAILURE(ErrorCode) && ErrorCode != U_BUFFER_OVERFLOW_ERROR) {
-    swift::crash("u_strToUpper: Unexpected error uppercasing unicode string.");
+    swift::crash("u_strToUpper: Unexpected error uppercasing Unicode string.");
   }
   return OutputLength;
 }
@@ -146,7 +144,7 @@ swift::_swift_stdlib_unicode_strToLower(uint16_t *Destination,
                                        SourceLength,
                                        "", &ErrorCode);
   if (U_FAILURE(ErrorCode) && ErrorCode != U_BUFFER_OVERFLOW_ERROR) {
-    swift::crash("u_strToLower: Unexpected error lowercasing unicode string.");
+    swift::crash("u_strToLower: Unexpected error lowercasing Unicode string.");
   }
   return OutputLength;
 }
@@ -166,10 +164,11 @@ swift::_swift_stdlib_unicode_strFoldCase(uint16_t *Destination,
                                         DestinationCapacity,
                                         reinterpret_cast<const UChar *>(Source),
                                         SourceLength,
-                                        U_FOLD_CASE_DEFAULT, &ErrorCode);
-  if (U_FAILURE(ErrorCode) && ErrorCode !=
-      static_cast<UErrorCode>(__swift_stdlib_U_BUFFER_OVERFLOW_ERROR)) {
-    swift::crash("u_strFoldCase: Unexpected error case-folding unicode string.");
+                                        0, &ErrorCode);
+  if (ErrorCode > static_cast<UErrorCode>(__swift_stdlib_U_ZERO_ERROR) &&
+      ErrorCode !=
+          static_cast<UErrorCode>(__swift_stdlib_U_BUFFER_OVERFLOW_ERROR)) {
+    swift::crash("u_strFoldCase: Unexpected error case-folding Unicode string.");
   }
   return OutputLength;
 }
