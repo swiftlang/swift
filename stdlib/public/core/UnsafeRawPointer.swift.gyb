@@ -220,88 +220,17 @@
 ///       // Accessing 'numberPointer' is undefined behavior.
 @_fixed_layout
 public struct Unsafe${Mutable}RawPointer: _Pointer {
+  
+  public typealias Pointee = UInt8
+  
   /// The underlying raw pointer.
   /// Implements conformance to the public protocol `_Pointer`.
   public let _rawValue: Builtin.RawPointer
-
-  /// Creates a new raw pointer from the given raw or typed pointer.
-  ///
-  /// Use this initializer to explicitly convert `other` to an `${Self}`
-  /// instance. This initializer creates a new pointer to the same address as
-  /// `other` and performs no allocation or copying.
-  ///
-  /// - Parameter other: The pointer to convert.
-  @_transparent
-  public init(_ other: Unsafe${Mutable}RawPointer) {
-    self = other
-  }
-
-  /// Creates a new raw pointer from the given raw or typed pointer.
-  ///
-  /// Use this initializer to explicitly convert `other` to an `${Self}`
-  /// instance. This initializer creates a new pointer to the same address as
-  /// `other` and performs no allocation or copying.
-  ///
-  /// - Parameter other: The pointer to convert. If `other` is `nil`, the
-  ///   result is `nil`.
-  @_transparent
-  public init?(_ other: Unsafe${Mutable}RawPointer?) {
-    guard let unwrapped = other else { return nil }
-    self = unwrapped
-  }
 
   /// Creates a new raw pointer from a builtin raw pointer.
   @_transparent
   public init(_ _rawValue: Builtin.RawPointer) {
     self._rawValue = _rawValue
-  }
-
-  /// Creates a new raw pointer from the given opaque pointer.
-  ///
-  /// Use this initializer to explicitly convert `other` to an `${Self}`
-  /// instance. This initializer creates a new pointer to the same address as
-  /// `other` and performs no allocation or copying.
-  ///
-  /// - Parameter other: The opaque pointer to convert.
-  @_transparent
-  public init(_ other: OpaquePointer) {
-    _rawValue = other._rawValue
-  }
-
-  /// Creates a new raw pointer from the given opaque pointer.
-  ///
-  /// Use this initializer to explicitly convert `other` to an `${Self}`
-  /// instance. This initializer creates a new pointer to the same address as
-  /// `other` and performs no allocation or copying.
-  ///
-  /// - Parameter other: The opaque pointer to convert. If `other` is `nil`,
-  ///   the result is `nil`.
-  @_transparent
-  public init?(_ other: OpaquePointer?) {
-    guard let unwrapped = other else { return nil }
-    _rawValue = unwrapped._rawValue
-  }
-
-  /// Creates a new raw pointer from the given address, specified as a bit
-  /// pattern.
-  ///
-  /// - Parameter bitPattern: A bit pattern to use for the address of the new
-  ///   raw pointer. If `bitPattern` is zero, the result is `nil`.
-  @_transparent
-  public init?(bitPattern: Int) {
-    if bitPattern == 0 { return nil }
-    _rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
-  }
-
-  /// Creates a new raw pointer from the given address, specified as a bit
-  /// pattern.
-  ///
-  /// - Parameter bitPattern: A bit pattern to use for the address of the new
-  ///   raw pointer. If `bitPattern` is zero, the result is `nil`.
-  @_transparent
-  public init?(bitPattern: UInt) {
-    if bitPattern == 0 { return nil }
-    _rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 
   /// Creates a new raw pointer from the given typed pointer.
@@ -797,94 +726,10 @@ public struct Unsafe${Mutable}RawPointer: _Pointer {
 }
 
 extension ${Self}: Strideable {
-  /// Returns the distance from this pointer to the given pointer.
-  ///
-  /// With pointers `p` and `q`, the result of `p.distance(to: q)` is
-  /// equivalent to `q - p`.
-  ///
-  /// - Parameter x: The pointer to calculate the distance to.
-  /// - Returns: The distance from this pointer to `x`, in bytes.
-  @inlinable
-  public func distance(to x: ${Self}) -> Int {
-    return Int(Builtin.sub_Word(Builtin.ptrtoint_Word(x._rawValue),
-        Builtin.ptrtoint_Word(_rawValue)))
-  }
-
-  /// Returns a pointer offset from this pointer by the specified number of
-  /// bytes.
-  ///
-  /// With pointer `p` and distance `n`, the result of `p.advanced(by: n)` is
-  /// equivalent to `p + n`.
-  ///
-  /// The resulting pointer must be within the bounds of the same allocation as
-  /// this pointer.
-  ///
-  /// - Parameter n: The number of bytes to offset this pointer. `n` may be
-  ///   positive, negative, or zero.
-  /// - Returns: A pointer offset from this pointer by `n` bytes.
+  // custom version for raw pointers
   @inlinable
   public func advanced(by n: Int) -> ${Self} {
     return ${Self}(Builtin.gepRaw_Word(_rawValue, n._builtinWordValue))
-  }
-}
-
-extension ${Self}: Equatable {
-  // - Note: This may be more efficient than Strideable's implementation
-  //   calling ${Self}.distance().
-  /// Returns a Boolean value indicating whether two pointers are equal.
-  ///
-  /// - Parameters:
-  ///   - lhs: A pointer.
-  ///   - rhs: Another pointer.
-  /// - Returns: `true` if `lhs` and `rhs` reference the same memory address;
-  ///   otherwise, `false`.
-  @_transparent
-  public static func == (lhs: ${Self}, rhs: ${Self}) -> Bool {
-    return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
-  }
-}
-
-extension ${Self}: Comparable {
-  // - Note: This is an unsigned comparison unlike Strideable's
-  //   implementation.
-  /// Returns a Boolean value indicating whether the first pointer references
-  /// an earlier memory location than the second pointer.
-  ///
-  /// - Parameters:
-  ///   - lhs: A pointer.
-  ///   - rhs: Another pointer.
-  /// - Returns: `true` if `lhs` references a memory address earlier than
-  ///   `rhs`; otherwise, `false`.
-  @_transparent
-  public static func < (lhs: ${Self}, rhs: ${Self}) -> Bool {
-    return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
-  }
-}
-
-extension ${Self}: Hashable {
-  /// Hashes the essential components of this value by feeding them into the
-  /// given hasher.
-  ///
-  /// - Parameter hasher: The hasher to use when combining the components
-  ///   of this instance.
-  @inlinable
-  public func hash(into hasher: inout Hasher) {
-    hasher.combine(Int(bitPattern: self))
-  }
-}
-
-extension Unsafe${Mutable}RawPointer : CustomDebugStringConvertible {
-  /// A textual representation of the pointer, suitable for debugging.
-  public var debugDescription: String {
-    return _rawPointerToString(_rawValue)
-  }
-}
-
-extension Unsafe${Mutable}RawPointer : CustomReflectable {
-  public var customMirror: Mirror {
-    let ptrValue = UInt64(
-      bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
-    return Mirror(self, children: ["pointerValue": ptrValue])
   }
 }
 
@@ -898,42 +743,6 @@ extension OpaquePointer {
   public init?(_ from: Unsafe${Mutable}RawPointer?) {
     guard let unwrapped = from else { return nil }
     self._rawValue = unwrapped._rawValue
-  }
-}
-
-extension Int {
-  /// Creates a new value with the bit pattern of the given pointer.
-  ///
-  /// The new value represents the address of the pointer passed as `pointer`.
-  /// If `pointer` is `nil`, the result is `0`.
-  ///
-  /// - Parameter pointer: The pointer to use as the source for the new
-  ///   integer.
-  @inlinable
-  public init(bitPattern pointer: Unsafe${Mutable}RawPointer?) {
-    if let pointer = pointer {
-      self = Int(Builtin.ptrtoint_Word(pointer._rawValue))
-    } else {
-      self = 0
-    }
-  }
-}
-
-extension UInt {
-  /// Creates a new value with the bit pattern of the given pointer.
-  ///
-  /// The new value represents the address of the pointer passed as `pointer`.
-  /// If `pointer` is `nil`, the result is `0`.
-  ///
-  /// - Parameter pointer: The pointer to use as the source for the new
-  ///   integer.
-  @inlinable
-  public init(bitPattern pointer: Unsafe${Mutable}RawPointer?) {
-    if let pointer = pointer {
-      self = UInt(Builtin.ptrtoint_Word(pointer._rawValue))
-    } else {
-      self = 0
-    }
   }
 }
 

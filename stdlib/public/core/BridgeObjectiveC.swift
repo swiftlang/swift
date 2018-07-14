@@ -490,16 +490,6 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   }
 }
 
-extension AutoreleasingUnsafeMutablePointer: Equatable {
-  @_transparent
-  public static func == (
-    lhs: AutoreleasingUnsafeMutablePointer,
-    rhs: AutoreleasingUnsafeMutablePointer
-  ) -> Bool {
-    return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
-  }
-}
-
 extension UnsafeMutableRawPointer {
   /// Creates a new raw pointer from an `AutoreleasingUnsafeMutablePointer`
   /// instance.
@@ -541,14 +531,6 @@ extension UnsafeRawPointer {
   public init?<T>(_ other: AutoreleasingUnsafeMutablePointer<T>?) {
     guard let unwrapped = other else { return nil }
     self.init(unwrapped)
-  }
-}
-
-extension AutoreleasingUnsafeMutablePointer : CustomDebugStringConvertible {
-  /// A textual representation of `self`, suitable for debugging.
-  @inlinable
-  public var debugDescription: String {
-    return _rawPointerToString(_rawValue)
   }
 }
 
