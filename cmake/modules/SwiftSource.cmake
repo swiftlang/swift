@@ -67,12 +67,29 @@ function(handle_swift_sources
 
     file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}${objsubdir}")
 
-    set(swift_obj
+    # FIXME: The stdlib can't build to multiple output files right now because
+    # it generates subtraction relocations that need to be fixed up.
+    if(SWIFTSOURCES_IS_STDLIB_CORE)
+      set(USE_THREADED_WMO_arg)
+    else()
+      set(USE_THREADED_WMO_arg USE_THREADED_WMO)
+    endif()
+
+    set(swift_outputs)
+    if(USE_THREADED_WMO_arg)
+      foreach(source ${swift_sources})
+        get_filename_component(source_name "${source}" NAME_WE)
+        list(APPEND swift_outputs
+          "${CMAKE_CURRENT_BINARY_DIR}${objsubdir}/${source_name}${CMAKE_C_OUTPUT_EXTENSION}")
+      endforeach()
+    else()
+      set(swift_outputs
         "${CMAKE_CURRENT_BINARY_DIR}${objsubdir}/${SWIFTSOURCES_MODULE_NAME}${CMAKE_C_OUTPUT_EXTENSION}")
+    endif()
 
     # FIXME: We shouldn't /have/ to build things in a single process.
     # <rdar://problem/15972329>
-    list(APPEND swift_compile_flags "-force-single-frontend-invocation")
+   list(APPEND swift_compile_flags "-force-single-frontend-invocation")
 
     if(SWIFTSOURCES_IS_STDLIB_CORE)
       list(APPEND swift_compile_flags "-Xcc" "-D__SWIFT_CURRENT_DYLIB=swiftCore")
@@ -84,7 +101,7 @@ function(handle_swift_sources
         sib_dependency_target
         sibopt_dependency_target
         sibgen_dependency_target
-        OUTPUT ${swift_obj}
+        OUTPUT ${swift_outputs}
         SOURCES ${swift_sources}
         DEPENDS ${SWIFTSOURCES_DEPENDS}
         FLAGS ${swift_compile_flags}
@@ -98,6 +115,7 @@ function(handle_swift_sources
         ${IS_SDK_OVERLAY_arg}
         ${EMBED_BITCODE_arg}
         ${STATIC_arg}
+        ${USE_THREADED_WMO_arg}
         INSTALL_IN_COMPONENT "${SWIFTSOURCES_INSTALL_IN_COMPONENT}")
     set("${dependency_target_out_var_name}" "${dependency_target}" PARENT_SCOPE)
     set("${dependency_module_target_out_var_name}" "${module_dependency_target}" PARENT_SCOPE)
@@ -105,7 +123,7 @@ function(handle_swift_sources
     set("${dependency_sibopt_target_out_var_name}" "${sibopt_dependency_target}" PARENT_SCOPE)
     set("${dependency_sibgen_target_out_var_name}" "${sibgen_dependency_target}" PARENT_SCOPE)
 
-    list(APPEND result ${swift_obj})
+    list(APPEND result ${swift_outputs})
   endif()
 
   llvm_process_sources(result ${result})
@@ -124,6 +142,35 @@ function(add_swift_source_group sources)
   set_source_files_properties(${sources}
     PROPERTIES
     HEADER_FILE_ONLY true)
+endfunction()
+
+# Generate an output file map for the given sources
+#
+# Usage:
+#   _generate_output_file_map(
+#     output_path
+#     SOURCES path/to/foo.swift [path/to/bar.swift...]
+#     OUTPUTS path/to/foo.o [path/to/bar.o...]
+#     )
+function(_generate_output_file_map output_path)
+  cmake_parse_arguments(OFM "" "" "SOURCES;OUTPUTS" ${ARGN})
+
+  list(LENGTH OFM_SOURCES source_count)
+  list(LENGTH OFM_OUTPUTS output_count)
+
+  precondition_binary_op(EQUAL source_count output_count
+    MESSAGE "number of sources does not match number of outputs")
+
+  set(json "{\n")
+  math(EXPR max "${source_count} - 1")
+  foreach(i RANGE ${max})
+    list(GET OFM_SOURCES ${i} source)
+    list(GET OFM_OUTPUTS ${i} output)
+    set(json "${json}\"${source}\": { \"object\": \"${output}\" },\n")
+  endforeach()
+  set(json "${json}\"\": {}\n}")
+
+  file(WRITE "${output_path}" ${json})
 endfunction()
 
 # Compile a swift file into an object file (as a library).
@@ -151,15 +198,16 @@ endfunction()
 #     [MODULE_NAME]                     # The module name.
 #     [INSTALL_IN_COMPONENT]            # Install produced files.
 #     [EMBED_BITCODE]                   # Embed LLVM bitcode into the .o files
+#     [USE_THREADED_WMO]                # If set, use threaded WMO mode
 #     )
 function(_compile_swift_files
     dependency_target_out_var_name dependency_module_target_out_var_name
     dependency_sib_target_out_var_name dependency_sibopt_target_out_var_name
     dependency_sibgen_target_out_var_name)
   cmake_parse_arguments(SWIFTFILE
-    "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE"
-    "OUTPUT;MODULE_NAME;INSTALL_IN_COMPONENT"
-    "SOURCES;FLAGS;DEPENDS;SDK;ARCHITECTURE;API_NOTES;OPT_FLAGS;MODULE_DIR"
+    "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE;USE_THREADED_WMO"
+    "MODULE_NAME;INSTALL_IN_COMPONENT;MODULE_DIR"
+    "SOURCES;OUTPUT;FLAGS;DEPENDS;SDK;ARCHITECTURE;API_NOTES;OPT_FLAGS"
     ${ARGN})
 
   # Check arguments.
@@ -200,6 +248,23 @@ function(_compile_swift_files
     endif()
   endforeach()
 
+  set(output_option)
+  if (SWIFTFILE_USE_THREADED_WMO)
+    get_filename_component(output_dir "${first_output}" DIRECTORY)
+    set(output_file_map "${output_dir}/output.json")
+    _generate_output_file_map("${output_file_map}"
+      SOURCES ${source_files}
+      OUTPUTS ${SWIFTFILE_OUTPUT})
+    set(output_option
+      "-output-file-map" "${output_file_map}"
+      "-num-threads" "2")
+  elseif (num_outputs EQUAL 1)
+    set(output_option "-o" ${first_output})
+  else ()
+    # If there are more than one output files, we assume that they are specified
+    # manually e.g. with a custom output file map.
+  endif()
+
   # Compute flags for the Swift compiler.
   set(swift_flags)
 
@@ -228,6 +293,8 @@ function(_compile_swift_files
   # Don't include libarclite in any build products by default.
   list(APPEND swift_flags "-no-link-objc-runtime")
 
+  list(APPEND swift_flags "-module-name" "${SWIFTFILE_MODULE_NAME}")
+
   if(SWIFT_SIL_VERIFY_ALL)
     list(APPEND swift_flags "-Xfrontend" "-sil-verify-all")
   endif()
@@ -252,7 +319,7 @@ function(_compile_swift_files
   # FIXME: Cleaner way to do this?
   if(SWIFTFILE_IS_STDLIB_CORE)
     list(APPEND swift_flags
-        "-nostdimport" "-parse-stdlib" "-module-name" "Swift")
+        "-nostdimport" "-parse-stdlib")
     list(APPEND swift_flags "-Xfrontend" "-group-info-path"
                             "-Xfrontend" "${GROUP_INFO_JSON_FILE}")
   endif()
@@ -371,13 +438,6 @@ function(_compile_swift_files
       DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}")
   endforeach()
 
-  # If there are more than one output files, we assume that they are specified
-  # otherwise e.g. with an output file map.
-  set(output_option)
-  if (${num_outputs} EQUAL 1)
-    set(output_option "-o" ${first_output})
-  endif()
-
   set(embed_bitcode_option)
   if (SWIFTFILE_EMBED_BITCODE)
     set(embed_bitcode_option "-embed-bitcode")
@@ -433,7 +493,7 @@ function(_compile_swift_files
       ${command_create_dirs}
       COMMAND ""
       OUTPUT ${obj_dirs}
-      COMMENT "Generating obj dirs for ${first_output}")
+      COMMENT "Generating obj dirs for ${SWIFTFILE_MODULE_NAME}")
 
   # Generate the api notes if we need them.
   if (apinotes_outputs)
@@ -449,7 +509,7 @@ function(_compile_swift_files
           ${swift_compiler_tool_dep}
           ${depends_create_apinotes}
           ${obj_dirs_dependency_target}
-        COMMENT "Generating API notes ${first_output}")
+        COMMENT "Generating API notes for ${SWIFTFILE_MODULE_NAME}")
   endif()
 
   # Then we can compile both the object files and the swiftmodule files
@@ -476,7 +536,7 @@ function(_compile_swift_files
         ${file_path} ${source_files} ${SWIFTFILE_DEPENDS}
         ${swift_ide_test_dependency} ${api_notes_dependency_target}
         ${obj_dirs_dependency_target}
-      COMMENT "Compiling ${first_output}")
+      COMMENT "Compiling ${SWIFTFILE_MODULE_NAME}")
   set("${dependency_target_out_var_name}" "${dependency_target}" PARENT_SCOPE)
 
   # This is the target to generate:
