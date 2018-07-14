@@ -903,6 +903,7 @@ StringTests.test("stringGutsReserve")
   .skip(.nativeRuntime("Foundation dependency"))
   .code {
 #if _runtime(_ObjC)
+  guard #available(iOS 11.0, *) else { return }
   for k in 0...7 {
     var base: String
     var startedNative: Bool
