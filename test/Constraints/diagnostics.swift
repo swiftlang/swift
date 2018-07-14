@@ -221,7 +221,9 @@ struct StructWithOptionalArray {
 }
 
 func testStructWithOptionalArray(_ foo: StructWithOptionalArray) -> Int {
-  return foo.array[0]  // expected-error {{value of optional type '[Int]?' not unwrapped; did you mean to use '!' or '?'?}} {{19-19=!}}
+  return foo.array[0]  // expected-error {{value of optional type '[Int]?' must be unwrapped to refer to member 'subscript' of wrapped base type '[Int]'}}
+  // expected-note@-1{{chain the optional using '?' to access member 'subscript' only for non-'nil' base values}}{{19-19=?}}
+  // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}{{19-19=!}}
 }
 
 
@@ -577,7 +579,9 @@ _ = (i = 6) ? 42 : 57 // expected-error {{use of '=' in a boolean context, did y
 // <rdar://problem/22263468> QoI: Not producing specific argument conversion diagnostic for tuple init
 func r22263468(_ a : String?) {
   typealias MyTuple = (Int, String)
-  _ = MyTuple(42, a) // expected-error {{value of optional type 'String?' not unwrapped; did you mean to use '!' or '?'?}} {{20-20=!}}
+  _ = MyTuple(42, a) // expected-error {{value of optional type 'String?' must be unwrapped to a value of type 'String'}}
+  // expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+  // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
 }
 
 
@@ -634,7 +638,9 @@ func someFunction() -> () {
 // <rdar://problem/23560128> QoI: trying to mutate an optional dictionary result produces bogus diagnostic
 func r23560128() {
   var a : (Int,Int)?
-  a.0 = 42  // expected-error {{value of optional type '(Int, Int)?' not unwrapped; did you mean to use '!' or '?'?}} {{4-4=?}}
+  a.0 = 42 // expected-error{{value of optional type '(Int, Int)?' must be unwrapped to refer to member '0' of wrapped base type '(Int, Int)'}}
+  // expected-note@-1{{chain the optional }}
+  // expected-note@-2{{force-unwrap using '!'}}
 }
 
 // <rdar://problem/21890157> QoI: wrong error message when accessing properties on optional structs without unwrapping
@@ -642,7 +648,9 @@ struct ExampleStruct21890157 {
   var property = "property"
 }
 var example21890157: ExampleStruct21890157?
-example21890157.property = "confusing"  // expected-error {{value of optional type 'ExampleStruct21890157?' not unwrapped; did you mean to use '!' or '?'?}} {{16-16=?}}
+example21890157.property = "confusing"  // expected-error {{value of optional type 'ExampleStruct21890157?' must be unwrapped to refer to member 'property' of wrapped base type 'ExampleStruct21890157'}}
+  // expected-note@-1{{chain the optional }}
+  // expected-note@-2{{force-unwrap using '!'}}
 
 
 struct UnaryOp {}

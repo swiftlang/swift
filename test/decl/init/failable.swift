@@ -32,7 +32,9 @@ class DuplicateDecls {
 func testConstruction(_ i: Int, s: String) {
   let s0Opt = S0(string: s)
   assert(s0Opt != nil)
-  var _: S0 = s0Opt // expected-error{{value of optional type 'S0?' not unwrapped; did you mean to use '!' or '?'?}} {{20-20=!}}
+  var _: S0 = s0Opt // expected-error{{value of optional type 'S0?' must be unwrapped}}
+  // expected-note@-1{{coalesce}}
+  // expected-note@-2{{force-unwrap}}
   
   let s0IUO = S0(int: i)
   assert(s0IUO != nil)
