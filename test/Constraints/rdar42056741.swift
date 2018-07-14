@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -code-completion-token=COMPLETE -source-filename=%s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify %s
 // REQUIRES: objc_interop
 
 import Foundation
@@ -18,6 +18,6 @@ class A {
 class B {
   var bar: Bool = false
   func baz() {
-    bar = A.default.foo(arg: self.#^COMPLETE^#)
+    bar = A.default.foo(arg: self.) // expected-error {{expected member name following '.'}}
   }
 }
