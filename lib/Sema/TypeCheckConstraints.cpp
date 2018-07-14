@@ -429,6 +429,28 @@ static bool diagnoseRangeOperatorMisspell(UnresolvedDeclRefExpr *UDRE,
   return false;
 }
 
+static bool diagnoseIncDecOperator(UnresolvedDeclRefExpr *UDRE,
+                                   TypeChecker &TC) {
+  auto name = UDRE->getName().getBaseIdentifier();
+  if (!name.isOperator())
+    return false;
+
+  auto corrected = StringRef();
+  if (name.str() == "++")
+    corrected = "+= 1";
+  else if (name.str() == "--")
+    corrected = "-= 1";
+
+  if (!corrected.empty()) {
+    TC.diagnose(UDRE->getLoc(), diag::use_unresolved_identifier_corrected,
+                name, true, corrected)
+      .highlight(UDRE->getSourceRange());
+
+    return true;
+  }
+  return false;
+}
+
 static bool findNonMembers(TypeChecker &TC,
                            ArrayRef<LookupResultEntry> lookupResults,
                            DeclRefKind refKind, bool breakOnMember,
@@ -503,6 +525,7 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     // operator misspelling. Otherwise try to diagnose a juxtaposition
     // e.g. (x*-4) that needs whitespace.
     if (diagnoseRangeOperatorMisspell(UDRE, *this) ||
+        diagnoseIncDecOperator(UDRE, *this) ||
         diagnoseOperatorJuxtaposition(UDRE, DC, *this)) {
       return new (Context) ErrorExpr(UDRE->getSourceRange());
     }

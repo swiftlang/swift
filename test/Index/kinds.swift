@@ -185,6 +185,7 @@ prefix func -(a: AStruct) -> AStruct { return a }
 // CHECK: [[@LINE-1]]:13 | function/prefix-operator/Swift | -(_:) | s:14swift_ide_test1sopyAA7AStructVADF | Def | rel: 0
 
 // PostfixOperator
+postfix operator ++
 postfix func ++(a: AStruct) -> AStruct { return a }
 // CHECK: [[@LINE-1]]:14 | function/postfix-operator/Swift | ++(_:) | s:14swift_ide_test2ppoPyAA7AStructVADF | Def | rel: 0
 
