@@ -92,7 +92,7 @@ import Foundation
 // CHECK:     }
 // CHECK:     { i8*, i8*, i8* } { 
 // CHECK:       i8* getelementptr inbounds ([14 x i8], [14 x i8]* @"\01L_selector_data(.cxx_destruct)", i64 0, i64 0), 
-// CHECK:       i8* getelementptr inbounds ([3 x i8], [3 x i8]* @{{.*}}, i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* @{{.*}}, i64 0, i64 0),
 // CHECK:       i8* bitcast (void ([[OPAQUE:.*]]*, i8*)* @"$S11objc_bridge3BasCfETo" to i8*)
 // CHECK:     }
 // CHECK:   ]
