@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -253,33 +253,32 @@ extension MutableCollection {
   ///   collection match `belongsInSecondPartition`, the returned index is
   ///   equal to the collection's `endIndex`.
   ///
-  /// - Complexity: O(*n*)
+  /// - Complexity: O(*n*) where n is the length of the collection.
   @inlinable
   public mutating func partition(
     by belongsInSecondPartition: (Element) throws -> Bool
   ) rethrows -> Index {
-
-    var pivot = startIndex
-    while true {
-      if pivot == endIndex {
-        return pivot
-      }
-      if try belongsInSecondPartition(self[pivot]) {
-        break
-      }
-      formIndex(after: &pivot)
-    }
-
-    var i = index(after: pivot)
-    while i < endIndex {
-      if try !belongsInSecondPartition(self[i]) {
-        swapAt(i, pivot)
-        formIndex(after: &pivot)
-      }
-      formIndex(after: &i)
-    }
-    return pivot
+    return try _halfStablePartition(isSuffixElement: belongsInSecondPartition)
   }
+
+  /// Moves all elements satisfying `isSuffixElement` into a suffix of the
+  /// collection, returning the start position of the resulting suffix.
+  ///
+  /// - Complexity: O(*n*) where n is the length of the collection.
+  @inlinable
+  internal mutating func _halfStablePartition(
+    isSuffixElement: (Element) throws -> Bool
+  ) rethrows -> Index {
+    guard var i = try firstIndex(where: isSuffixElement)
+    else { return endIndex }
+    
+    var j = index(after: i)
+    while j != endIndex {
+      if try !isSuffixElement(self[j]) { swapAt(i, j); formIndex(after: &i) }
+      formIndex(after: &j)
+    }
+    return i
+  }  
 }
 
 extension MutableCollection where Self : BidirectionalCollection {
@@ -364,6 +363,114 @@ extension MutableCollection where Self : BidirectionalCollection {
     }
 
     return lo
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// shuffled()/shuffle()
+//===----------------------------------------------------------------------===//
+
+extension Sequence {
+  /// Returns the elements of the sequence, shuffled using the given generator
+  /// as a source for randomness.
+  ///
+  /// You use this method to randomize the elements of a sequence when you
+  /// are using a custom random number generator. For example, you can shuffle
+  /// the numbers between `0` and `9` by calling the `shuffled(using:)` method
+  /// on that range:
+  ///
+  ///     let numbers = 0...9
+  ///     let shuffledNumbers = numbers.shuffled(using: &myGenerator)
+  ///     // shuffledNumbers == [8, 9, 4, 3, 2, 6, 7, 0, 5, 1]
+  ///
+  /// - Parameter generator: The random number generator to use when shuffling
+  ///   the sequence.
+  /// - Returns: An array of this sequence's elements in a shuffled order.
+  ///
+  /// - Complexity: O(*n*)
+  @inlinable
+  public func shuffled<T: RandomNumberGenerator>(
+    using generator: inout T
+  ) -> [Element] {
+    var result = ContiguousArray(self)
+    result.shuffle(using: &generator)
+    return Array(result)
+  }
+  
+  /// Returns the elements of the sequence, shuffled.
+  ///
+  /// For example, you can shuffle the numbers between `0` and `9` by calling
+  /// the `shuffled()` method on that range:
+  ///
+  ///     let numbers = 0...9
+  ///     let shuffledNumbers = numbers.shuffled()
+  ///     // shuffledNumbers == [1, 7, 6, 2, 8, 9, 4, 3, 5, 0]
+  ///
+  /// This method uses the default random generator, `Random.default`. The call
+  /// to `numbers.shuffled()` above is equivalent to calling
+  /// `numbers.shuffled(using: &Random.default)`.
+  ///
+  /// - Returns: A shuffled array of this sequence's elements.
+  ///
+  /// - Complexity: O(*n*)
+  @inlinable
+  public func shuffled() -> [Element] {
+    return shuffled(using: &Random.default)
+  }
+}
+
+extension MutableCollection where Self : RandomAccessCollection {
+  /// Shuffles the collection in place, using the given generator as a source
+  /// for randomness.
+  ///
+  /// You use this method to randomize the elements of a collection when you
+  /// are using a custom random number generator. For example, you can use the
+  /// `shuffle(using:)` method to randomly reorder the elements of an array.
+  ///
+  ///     var names = ["Alejandro", "Camila", "Diego", "Luciana", "Luis", "Sofía"]
+  ///     names.shuffle(using: &myGenerator)
+  ///     // names == ["Sofía", "Alejandro", "Camila", "Luis", "Diego", "Luciana"]
+  ///
+  /// - Parameter generator: The random number generator to use when shuffling
+  ///   the collection.
+  ///
+  /// - Complexity: O(*n*)
+  @inlinable
+  public mutating func shuffle<T: RandomNumberGenerator>(
+    using generator: inout T
+  ) {
+    let count = self.count
+    guard count > 1 else { return }
+    var amount = count
+    var currentIndex = startIndex
+    while amount > 1 {
+      let random = generator.next(upperBound: UInt(amount))
+      amount -= 1
+      swapAt(
+        currentIndex,
+        index(currentIndex, offsetBy: numericCast(random))
+      )
+      formIndex(after: &currentIndex)
+    }
+  }
+  
+  /// Shuffles the collection in place.
+  ///
+  /// Use the `shuffle()` method to randomly reorder the elements of an
+  /// array.
+  ///
+  ///     var names = ["Alejandro", "Camila", "Diego", "Luciana", "Luis", "Sofía"]
+  ///     names.shuffle(using: myGenerator)
+  ///     // names == ["Luis", "Camila", "Luciana", "Sofía", "Alejandro", "Diego"]
+  ///
+  /// This method uses the default random generator, `Random.default`. The call
+  /// to `names.shuffle()` above is equivalent to calling
+  /// `names.shuffle(using: &Random.default)`.
+  ///
+  /// - Complexity: O(*n*)
+  @inlinable
+  public mutating func shuffle() {
+    shuffle(using: &Random.default)
   }
 }
 

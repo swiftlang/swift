@@ -37,17 +37,22 @@ public let DictionaryKeysContains = [
     runFunction: run_DictionaryKeysContains,
     tags: [.validation, .api, .Dictionary],
     setUpFunction: setup_DictionaryKeysContainsNative,
-    tearDownFunction: teardown_DictionaryKeysContains),
+    tearDownFunction: teardown_DictionaryKeysContains,
+    unsupportedPlatforms: [.linux]),
 ]
 #endif
 
 private var dictionary: [NSString: NSString]!
 
 private func setup_DictionaryKeysContainsNative() {
+#if os(Linux)
+  fatalError("Unsupported benchmark")
+#else
   let keyValuePairs = (1...1_000_000).map {
     ("\($0)" as NSString, "\($0)" as NSString)
   }
   dictionary = [NSString: NSString](uniqueKeysWithValues: keyValuePairs)
+#endif
 }
 
 #if _runtime(_ObjC)
@@ -68,9 +73,13 @@ private func teardown_DictionaryKeysContains() {
 
 @inline(never)
 public func run_DictionaryKeysContains(_ N: Int) {
+#if os(Linux)
+  fatalError("Unsupported benchmark")
+#else
   for _ in 0..<(N * 100) {
     CheckResults(dictionary.keys.contains("42"))
     CheckResults(!dictionary.keys.contains("-1"))
   }
+#endif
 }
 

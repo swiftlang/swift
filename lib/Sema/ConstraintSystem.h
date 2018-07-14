@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1124,6 +1124,15 @@ private:
     /// \brief Depth of the solution stack.
     unsigned depth = 0;
 
+    /// \brief Maximum depth reached so far in exploring solutions.
+    unsigned maxDepth = 0;
+
+    /// \brief Count of the number of leaf scopes we've created. These
+    /// either result in a failure to solve, or in a solution, unlike
+    /// all the intermediate scopes. They are interesting to track as
+    /// part of a metric of whether an expression is too complex.
+    unsigned leafScopes = 0;
+
     /// \brief Whether to record failures or not.
     bool recordFixes = false;
 
@@ -1143,19 +1152,6 @@ private:
     // Statistics
     #define CS_STATISTIC(Name, Description) unsigned Name = 0;
     #include "ConstraintSolverStats.def"
-
-    /// \brief Register given scope to be tracked by the current solver state,
-    /// this helps to make sure that all of the retired/generated constraints
-    /// are dealt with correctly when the life time of the scope ends.
-    ///
-    /// \param scope The scope to associate with current solver state.
-    void registerScope(SolverScope *scope) {
-      CS.incrementScopeCounter();
-      auto scopeInfo =
-        std::make_tuple(scope, retiredConstraints.begin(),
-                        generatedConstraints.size());
-      scopes.push_back(scopeInfo);
-    }
 
     /// \brief Check whether there are any retired constraints present.
     bool hasRetiredConstraints() const {
@@ -1204,6 +1200,23 @@ private:
       }
     }
 
+    /// \brief Register given scope to be tracked by the current solver state,
+    /// this helps to make sure that all of the retired/generated constraints
+    /// are dealt with correctly when the life time of the scope ends.
+    ///
+    /// \param scope The scope to associate with current solver state.
+    void registerScope(SolverScope *scope) {
+      ++depth;
+      maxDepth = std::max(maxDepth, depth);
+      scope->scopeNumber = NumStatesExplored++;
+
+      CS.incrementScopeCounter();
+      auto scopeInfo =
+        std::make_tuple(scope, retiredConstraints.begin(),
+                        generatedConstraints.size());
+      scopes.push_back(scopeInfo);
+    }
+
     /// \brief Restore all of the retired/generated constraints to the state
     /// before given scope. This is required because retired constraints have
     /// to be re-introduced to the system in order of arrival (LIFO) and list
@@ -1212,6 +1225,12 @@ private:
     ///
     /// \param scope The solver scope to rollback.
     void rollback(SolverScope *scope) {
+      --depth;
+
+      unsigned countScopesExplored = NumStatesExplored - scope->scopeNumber;
+      if (countScopesExplored == 1)
+        ++leafScopes;
+
       SolverScope *savedScope;
       // The position of last retired constraint before given scope.
       ConstraintList::iterator lastRetiredPos;
@@ -1440,6 +1459,12 @@ public:
     /// The previous score.
     Score PreviousScore;
 
+    /// The scope number of this scope. Set when the scope is registered.
+    unsigned scopeNumber = 0;
+
+    /// Time in fractional seconds at which we entered this scope.
+    double startTime;
+
     /// Constraint graph scope associated with this solver scope.
     ConstraintGraphScope CGScope;
 
@@ -1451,6 +1476,13 @@ public:
   public:
     explicit SolverScope(ConstraintSystem &cs);
     ~SolverScope();
+
+    Optional<double> getElapsedTimeInFractionalSeconds() {
+      if (!cs.Timer)
+        return None;
+
+      return cs.Timer->getElapsedProcessTimeInFractionalSeconds() - startTime;
+    }
   };
 
   ConstraintSystem(TypeChecker &tc, DeclContext *dc,
@@ -1538,6 +1570,10 @@ private:
 
   /// Add a new type variable that was already created.
   void addTypeVariable(TypeVariableType *typeVar);
+  
+  /// \brief Add a constraint from the subscript base to the root of the key
+  /// path literal to the constraint system.
+  void addKeyPathApplicationRootConstraint(Type root, ConstraintLocatorBuilder locator);
 
 public:
   /// \brief Lookup for a member with the given name in the given base type.
@@ -1909,6 +1945,12 @@ public:
   /// due to a change.
   ConstraintList &getActiveConstraints() { return ActiveConstraints; }
 
+  void findConstraints(SmallVectorImpl<Constraint *> &found,
+                       llvm::function_ref<bool(const Constraint &)> pred) {
+    filterConstraints(ActiveConstraints, pred, found);
+    filterConstraints(InactiveConstraints, pred, found);
+  }
+
   /// \brief Retrieve the representative of the equivalence class containing
   /// this type variable.
   TypeVariableType *getRepresentative(TypeVariableType *typeVar) {
@@ -2028,12 +2070,6 @@ public:
   /// \brief Determine if the type in question is AnyHashable.
   bool isAnyHashableType(Type t);
 
-  /// Call Expr::propagateLValueAccessKind on the given expression,
-  /// using a custom accessor for the type on the expression that
-  /// reads the type from the ConstraintSystem expression type map.
-  void propagateLValueAccessKind(Expr *E, AccessKind accessKind, bool isShallow,
-                                 bool allowOverwrite = false);
-
   /// Call Expr::isTypeReference on the given expression, using a
   /// custom accessor for the type on the expression that reads the
   /// type from the ConstraintSystem expression type map.
@@ -2073,6 +2109,16 @@ private:
   /// Introduce the constraints associated with the given type variable
   /// into the worklist.
   void addTypeVariableConstraintsToWorkList(TypeVariableType *typeVar);
+
+  static void
+  filterConstraints(ConstraintList &constraints,
+                    llvm::function_ref<bool(const Constraint &)> pred,
+                    SmallVectorImpl<Constraint *> &found) {
+    for (auto &constraint : constraints) {
+      if (pred(constraint))
+        found.push_back(&constraint);
+    }
+  }
 
 public:
 
@@ -2144,6 +2190,15 @@ public:
                    ConstraintLocatorBuilder locator,
                    OpenedTypeMap &replacements);
 
+  /// Given generic signature open its generic requirements,
+  /// using substitution function, and record them in the
+  /// constraint system for further processing.
+  void openGenericRequirements(DeclContext *outerDC,
+                               GenericSignature *signature,
+                               bool skipProtocolSelfConstraint,
+                               ConstraintLocatorBuilder locator,
+                               llvm::function_ref<Type(Type)> subst);
+
   /// Record the set of opened types for the given locator.
   void recordOpenedTypes(
          ConstraintLocatorBuilder locator,
@@ -2163,6 +2218,7 @@ public:
                           ValueDecl *decl,
                           FunctionRefKind functionRefKind,
                           ConstraintLocatorBuilder locator,
+                          DeclContext *useDC,
                           const DeclRefExpr *base = nullptr);
 
   /// \brief Retrieve the type of a reference to the given value declaration,
@@ -2774,10 +2830,7 @@ private:
       if (formBindingScore(x) < formBindingScore(y))
         return true;
 
-      if (!x.hasNonDefaultableBindings())
-        return false;
-
-      if (x.FullyBound || x.SubtypeOfExistentialType)
+      if (formBindingScore(y) < formBindingScore(x))
         return false;
 
       // If the only difference is default types,
@@ -3059,6 +3112,15 @@ public:
   /// \brief Determine if we've already explored too many paths in an
   /// attempt to solve this expression.
   bool getExpressionTooComplex(SmallVectorImpl<Solution> const &solutions) {
+    auto used = TC.Context.getSolverMemory();
+    for (auto const& s : solutions) {
+      used += s.getTotalMemory();
+    }
+    MaxMemory = std::max(used, MaxMemory);
+    auto threshold = TC.Context.LangOpts.SolverMemoryThreshold;
+    if (MaxMemory > threshold)
+      return true;
+
     auto timeoutThresholdInMillis = TC.getExpressionTimeoutThresholdInSeconds();
     if (Timer && Timer->isExpired(timeoutThresholdInMillis)) {
       // Disable warnings about expressions that go over the warning
@@ -3068,32 +3130,9 @@ public:
       return true;
     }
 
-    if (!getASTContext().isSwiftVersion3()) {
-      if (CountScopes < TypeCounter)
-        return false;
-
-      // If we haven't explored a relatively large number of possibilities
-      // yet, continue.
-      if (CountScopes <= 16 * 1024)
-        return false;
-
-      // Clearly exponential
-      if (TypeCounter < 32 && CountScopes > (1U << TypeCounter))
-        return true;
-
-      // Bail out once we've looked at a really large number of
-      // choices, even if we haven't used a huge amount of memory.
-      if (CountScopes > TC.Context.LangOpts.SolverBindingThreshold)
-        return true;
-    }
-
-    auto used = TC.Context.getSolverMemory();
-    for (auto const& s : solutions) {
-      used += s.getTotalMemory();
-    }
-    MaxMemory = std::max(used, MaxMemory);
-    auto threshold = TC.Context.LangOpts.SolverMemoryThreshold;
-    return MaxMemory > threshold;
+    // Bail out once we've looked at a really large number of
+    // choices.
+    return CountScopes > TC.Context.LangOpts.SolverBindingThreshold;
   }
   
   LLVM_ATTRIBUTE_DEPRECATED(
@@ -3198,7 +3237,7 @@ public:
 /// \returns true if the call arguments could not be matched to the parameters.
 bool matchCallArguments(ArrayRef<AnyFunctionType::Param> argTuple,
                         ArrayRef<AnyFunctionType::Param> params,
-                        const SmallVectorImpl<bool> &defaultMap,
+                        const llvm::SmallBitVector &defaultMap,
                         bool hasTrailingClosure,
                         bool allowFixes,
                         MatchCallArgumentListener &listener,
@@ -3446,6 +3485,48 @@ public:
     // Always recur into the children.
     return { true, expr };
   }
+};
+
+/// \brief Matches array of function parameters to candidate inputs,
+/// which can be anything suitable (e.g., parameters, arguments).
+///
+/// It claims inputs sequentially and tries to pair between an input
+/// and the next appropriate parameter. The detailed matching behavior
+/// of each pair is specified by a custom function (i.e., pairMatcher).
+/// It considers variadic and defaulted arguments when forming proper
+/// input-parameter pairs; however, other information like label and
+/// type information is not directly used here. It can be implemented
+/// in the custom function when necessary.
+class InputMatcher {
+  size_t NumSkippedParameters;
+  const llvm::SmallBitVector DefaultValueMap;
+  const ArrayRef<AnyFunctionType::Param> Params;
+
+public:
+  enum Result {
+    /// The specified inputs are successfully matched.
+    IM_Succeeded,
+    /// There are input(s) left unclaimed while all parameters are matched.
+    IM_HasUnclaimedInput,
+    /// There are parateter(s) left unmatched while all inputs are claimed.
+    IM_HasUnmatchedParam,
+    /// Custom pair matcher function failure.
+    IM_CustomPairMatcherFailed,
+  };
+
+  InputMatcher(const ArrayRef<AnyFunctionType::Param> params,
+               const llvm::SmallBitVector &defaultValueMap);
+
+  /// Matching a given array of inputs.
+  ///
+  /// \param numInputs The number of inputs.
+  /// \param pairMatcher Custom matching behavior of an input-parameter pair.
+  /// \return the matching result.
+  Result
+  match(int numInputs,
+        std::function<bool(unsigned inputIdx, unsigned paramIdx)> pairMatcher);
+
+  size_t getNumSkippedParameters() const { return NumSkippedParameters; }
 };
 } // end namespace swift
 

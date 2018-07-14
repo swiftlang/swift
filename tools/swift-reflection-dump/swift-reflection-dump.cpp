@@ -122,17 +122,17 @@ findReflectionSection(const ObjectFile *objectFile,
 
 static ReflectionInfo findReflectionInfo(const ObjectFile *objectFile) {
   auto fieldSection = findReflectionSection<FieldSection>(
-      objectFile, {"__swift4_fieldmd", ".swift4_fieldmd", "swift4_fieldmd"});
+      objectFile, {"__swift5_fieldmd", ".swift5_fieldmd", "swift5_fieldmd"});
   auto associatedTypeSection = findReflectionSection<AssociatedTypeSection>(
-      objectFile, {"__swift4_assocty", ".swift4_assocty", "swift4_assocty"});
+      objectFile, {"__swift5_assocty", ".swift5_assocty", "swift5_assocty"});
   auto builtinTypeSection = findReflectionSection<BuiltinTypeSection>(
-      objectFile, {"__swift4_builtin", ".swift4_builtin", "swift4_builtin"});
+      objectFile, {"__swift5_builtin", ".swift5_builtin", "swift5_builtin"});
   auto captureSection = findReflectionSection<CaptureSection>(
-      objectFile, {"__swift4_capture", ".swift4_capture", "swift4_capture"});
+      objectFile, {"__swift5_capture", ".swift5_capture", "swift5_capture"});
   auto typeRefSection = findReflectionSection<GenericSection>(
-      objectFile, {"__swift4_typeref", ".swift4_typeref", "swift4_typeref"});
+      objectFile, {"__swift5_typeref", ".swift5_typeref", "swift5_typeref"});
   auto reflectionStringsSection = findReflectionSection<GenericSection>(
-      objectFile, {"__swift4_reflstr", ".swift4_reflstr", "swift4_reflstr"});
+      objectFile, {"__swift5_reflstr", ".swift5_reflstr", "swift5_reflstr"});
 
   // The entire object file is mapped into this process's memory, so the
   // local/remote mapping is identity.

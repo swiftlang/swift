@@ -419,10 +419,12 @@ void DCE::propagateLiveness(SILInstruction *I) {
 SILBasicBlock *DCE::nearestUsefulPostDominator(SILBasicBlock *Block) {
   // Find the nearest post-dominator that has useful instructions.
   auto *PostDomNode = PDT->getNode(Block)->getIDom();
-  while (!LiveBlocks.count(PostDomNode->getBlock()))
+  while (PostDomNode && !LiveBlocks.count(PostDomNode->getBlock()))
     PostDomNode = PostDomNode->getIDom();
 
-  return PostDomNode->getBlock();
+  if (PostDomNode)
+    return PostDomNode->getBlock();
+  return nullptr;
 }
 
 // Replace the given conditional branching instruction with a plain
@@ -485,8 +487,11 @@ bool DCE::removeDead(SILFunction &F) {
       // We want to replace dead terminators with unconditional branches to
       // the nearest post-dominator that has useful instructions.
       if (isa<TermInst>(Inst)) {
-        replaceBranchWithJump(Inst,
-                              nearestUsefulPostDominator(Inst->getParent()));
+        SILBasicBlock *postDom = nearestUsefulPostDominator(Inst->getParent());
+        if (!postDom)
+          continue;
+  
+        replaceBranchWithJump(Inst, postDom);
         Inst->eraseFromParent();
         BranchesChanged = true;
         Changed = true;

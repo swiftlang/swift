@@ -71,10 +71,18 @@ RawSyntax::RawSyntax(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
                      SourcePresence Presence, bool ManualMemory) {
   assert(Kind != SyntaxKind::Token &&
          "'token' syntax node must be constructed with dedicated constructor");
-  Bits.Kind = unsigned(Kind);
-  Bits.Presence = unsigned(Presence);
-  Bits.ManualMemory = unsigned(ManualMemory);
-  Bits.NumChildren = Layout.size();
+  Bits.Common.Kind = unsigned(Kind);
+  Bits.Common.Presence = unsigned(Presence);
+  Bits.Common.ManualMemory = unsigned(ManualMemory);
+  Bits.Layout.NumChildren = Layout.size();
+
+  // Compute the text length
+  Bits.Layout.TextLength = 0;
+  for (const auto ChildNode : Layout) {
+    if (ChildNode && !ChildNode->isMissing()) {
+      Bits.Layout.TextLength += ChildNode->getTextLength();
+    }
+  }
 
   // Initialize layout data.
   std::uninitialized_copy(Layout.begin(), Layout.end(),
@@ -85,12 +93,12 @@ RawSyntax::RawSyntax(tok TokKind, OwnedString Text,
                      ArrayRef<TriviaPiece> LeadingTrivia,
                      ArrayRef<TriviaPiece> TrailingTrivia,
                      SourcePresence Presence, bool ManualMemory) {
-  Bits.Kind = unsigned(SyntaxKind::Token);
-  Bits.Presence = unsigned(Presence);
-  Bits.ManualMemory = unsigned(ManualMemory);
-  Bits.TokenKind = unsigned(TokKind);
-  Bits.NumLeadingTrivia = LeadingTrivia.size();
-  Bits.NumTrailingTrivia = TrailingTrivia.size();
+  Bits.Common.Kind = unsigned(SyntaxKind::Token);
+  Bits.Common.Presence = unsigned(Presence);
+  Bits.Common.ManualMemory = unsigned(ManualMemory);
+  Bits.Token.TokenKind = unsigned(TokKind);
+  Bits.Token.NumLeadingTrivia = LeadingTrivia.size();
+  Bits.Token.NumTrailingTrivia = TrailingTrivia.size();
 
   // Initialize token text.
   ::new (static_cast<void *>(getTrailingObjects<OwnedString>()))
@@ -101,7 +109,7 @@ RawSyntax::RawSyntax(tok TokKind, OwnedString Text,
   // Initialize trailing trivia.
   std::uninitialized_copy(TrailingTrivia.begin(), TrailingTrivia.end(),
                           getTrailingObjects<TriviaPiece>() +
-                              Bits.NumLeadingTrivia);
+                              Bits.Token.NumLeadingTrivia);
 }
 
 RawSyntax::~RawSyntax() {
@@ -237,6 +245,7 @@ void RawSyntax::print(llvm::raw_ostream &OS, SyntaxPrintOptions Opts) const {
 
 void RawSyntax::dump() const {
   dump(llvm::errs(), /*Indent*/ 0);
+  llvm::errs() << '\n';
 }
 
 void RawSyntax::dump(llvm::raw_ostream &OS, unsigned Indent) const {

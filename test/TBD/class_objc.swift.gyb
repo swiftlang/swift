@@ -1,0 +1,78 @@
+// RUN: %empty-directory(%t)
+// RUN: %gyb %s > %t/main.swift
+
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -import-objc-header %S/Inputs/objc_class_header.h -validate-tbd-against-ir=missing %t/main.swift -disable-objc-attr-requires-foundation-module
+
+// RUN: %target-swift-frontend -enable-resilience -emit-ir -o/dev/null -parse-as-library -module-name test -import-objc-header %S/Inputs/objc_class_header.h -validate-tbd-against-ir=missing %t/main.swift -disable-objc-attr-requires-foundation-module
+
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -import-objc-header %S/Inputs/objc_class_header.h -validate-tbd-against-ir=missing %t/main.swift -disable-objc-attr-requires-foundation-module -O
+
+// RUN: %target-swift-frontend -enable-resilience -emit-ir -o/dev/null -parse-as-library -module-name test -import-objc-header %S/Inputs/objc_class_header.h -validate-tbd-against-ir=missing %t/main.swift -disable-objc-attr-requires-foundation-module -O
+
+// With -enable-testing:
+
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -import-objc-header %S/Inputs/objc_class_header.h -validate-tbd-against-ir=all %t/main.swift -disable-objc-attr-requires-foundation-module -enable-testing
+
+// RUN: %target-swift-frontend -enable-resilience -emit-ir -o/dev/null -parse-as-library -module-name test -import-objc-header %S/Inputs/objc_class_header.h -validate-tbd-against-ir=all %t/main.swift -disable-objc-attr-requires-foundation-module -enable-testing
+
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -import-objc-header %S/Inputs/objc_class_header.h -validate-tbd-against-ir=all %t/main.swift -disable-objc-attr-requires-foundation-module -enable-testing -O
+
+// RUN: %target-swift-frontend -enable-resilience -emit-ir -o/dev/null -parse-as-library -module-name test -import-objc-header %S/Inputs/objc_class_header.h -validate-tbd-against-ir=all %t/main.swift -disable-objc-attr-requires-foundation-module -enable-testing -O
+
+// REQUIRES: objc_interop
+
+import Foundation
+
+
+%{
+names = ["Open", "Public", "Internal", "Private"]
+
+METHODS = "{access} {override} func method{name}() {{}}"
+OBJC_METHOD = "@objc {access} {override} func method{name}ObjC() {{}}"
+def classBody(i, override=False):
+    methods = []
+    for name in names[i:]:
+        is_private = name == "Private"
+        args = {"access": name.lower(), "name": name,
+                "override": "override" if override and not is_private else ""}
+        methods.append(METHODS.format(**args))
+        if not is_private:
+            methods.append(OBJC_METHOD.format(**args))
+
+    return "\n".join(methods)
+}%
+
+% for i, name in enumerate(names):
+% access = name.lower()
+
+// a class by itself
+${access} class ${name}Empty: NSObject {
+${classBody(i)}
+}
+
+// subclasses of that
+% for subname in names[i:]:
+% subaccess = subname.lower()
+${subaccess} class ${subname}Sub${name}Empty: ${name}Empty {
+${classBody(i, override=True)}
+}
+%end
+
+${access} class ${name}InheritObjCProtocol: NSObject, ObjCProtocol {
+${classBody(i)}
+}
+
+// some bugs were revealed when there's @objc without inheriting from
+// NSObject.
+@objc ${access} class ${name}ObjCOnly {
+${classBody(i)}
+}
+
+%end
+
+@usableFromInline
+@objc
+internal class InternalObjCOnlyUsableFromInline {
+${classBody(names.index("Internal"))}
+}
+

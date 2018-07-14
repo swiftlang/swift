@@ -13,9 +13,6 @@
 #ifndef SWIFT_STRINGS_H
 #define SWIFT_STRINGS_H
 
-#include "swift/Basic/LLVM.h"
-#include "llvm/ADT/StringRef.h"
-
 namespace swift {
 
 /// The extension for serialized modules.
@@ -92,10 +89,6 @@ constexpr static const char BUILTIN_TYPE_NAME_VEC[] = "Builtin.Vec";
 constexpr static const char BUILTIN_TYPE_NAME_SILTOKEN[] = "Builtin.SILToken";
 /// The name of the Builtin type for Word
 constexpr static const char BUILTIN_TYPE_NAME_WORD[] = "Builtin.Word";
-
-constexpr static StringLiteral OPTIMIZE_SIL_PRESERVE_EXCLUSIVITY =
-    "optimize.sil.preserve_exclusivity";
-
 } // end namespace swift
 
 #endif // SWIFT_STRINGS_H

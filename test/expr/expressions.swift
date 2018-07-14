@@ -256,7 +256,7 @@ func test_lambda() {
 
 func test_lambda2() {
   { () -> protocol<Int> in
-    // expected-warning @-1 {{'protocol<...>' composition syntax is deprecated and not needed here}} {{11-24=Int}}
+    // expected-error @-1 {{'protocol<...>' composition syntax has been removed and is not needed here}} {{11-24=Int}}
     // expected-error @-2 {{non-protocol, non-class type 'Int' cannot be used within a protocol-constrained type}}
     // expected-warning @-3 {{result of call to closure returning 'Any' is unused}}
     return 1
@@ -814,8 +814,8 @@ public struct TestPropMethodOverloadGroup {
 // <rdar://problem/18496742> Passing ternary operator expression as inout crashes Swift compiler
 func inoutTests(_ arr: inout Int) {
   var x = 1, y = 2
-  (true ? &x : &y) // expected-error 2 {{use of extraneous '&'}}
-  let a = (true ? &x : &y) // expected-error 2 {{use of extraneous '&'}}
+  (true ? &x : &y) // expected-error {{use of extraneous '&'}}
+  let a = (true ? &x : &y) // expected-error {{use of extraneous '&'}}
 
   inoutTests(true ? &x : &y) // expected-error {{use of extraneous '&'}}
 
@@ -827,7 +827,7 @@ func inoutTests(_ arr: inout Int) {
   inoutTests(&x)
   
   // <rdar://problem/17489894> inout not rejected as operand to assignment operator
-  &x += y  // expected-error {{'&' can only appear immediately in a call argument list}}}
+  &x += y  // expected-error {{'&' can only appear immediately in a call argument list}}
 
   // <rdar://problem/23249098>
   func takeAny(_ x: Any) {}

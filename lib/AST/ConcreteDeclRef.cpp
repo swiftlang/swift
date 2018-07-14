@@ -56,7 +56,7 @@ void ConcreteDeclRef::dump(raw_ostream &os) {
   // If specialized, dump the substitutions.
   if (isSpecialized()) {
     os << " [with ";
-    getSubstitutions().dump(os);
+    getSubstitutions().dump(os, SubstitutionMap::DumpStyle::Minimal);
     os << ']';
   }
 }

@@ -13,10 +13,11 @@ public class MyGizmo {
      gizmo = Gizmo()
    }
 	 // CHECK-LABEL: sil @$S8outliner7MyGizmoC11usePropertyyyF
-	 // CHECK: [[FUN:%.*]] = function_ref @$SSo5GizmoC14stringPropertySSSgvgToTeab_
-	 // CHECK: apply [[FUN]]({{.*}}) : $@convention(thin) (@in_guaranteed Gizmo) -> @owned Optional<String>
+	 // CHECK: [[A_FUN:%.*]] = function_ref @$SSo5GizmoC14stringPropertySSSgvgToTeab_
+	 // CHECK: apply [[A_FUN]]({{.*}}) : $@convention(thin) (@in_guaranteed Gizmo) -> @owned Optional<String>
 	 // CHECK-NOT: return
-	 // CHECK: apply [[FUN]]({{.*}}) : $@convention(thin) (@in_guaranteed Gizmo) -> @owned Optional<String>
+         // CHECK: [[P_FUN:%.*]] = function_ref @$SSo5GizmoC14stringPropertySSSgvgToTepb_
+	 // CHECK: apply [[P_FUN]]({{.*}}) : $@convention(thin) (Gizmo) -> @owned Optional<String>
 	 // CHECK: return
    public func useProperty() {
      print(gizmo.stringProperty)
@@ -165,3 +166,12 @@ func dontCrash3() -> String? {
   return bundle.path(forResource: resource, ofType: "png")
       ?? bundle.path(forResource: resource, ofType: "apng")
 }
+
+extension Operation {
+  func dontCrash4() {
+    if completionBlock != nil {
+      completionBlock = { }
+    }
+  }
+}
+

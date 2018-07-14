@@ -333,5 +333,93 @@ DemangleToMetadataTests.test("superclass requirements") {
   expectNil(_typeByMangledName("4main4SG10VyAA2C3CG"))
 }
 
+//
+// Extensions of external types, and constrained extensions
+//
+
+struct SG11<T> {}
+
+extension Dictionary {
+  struct Inner<V: P1> {}
+}
+
+extension SG11 where T: P1 {
+  struct InnerTConformsToP1<U: P2> { }
+}
+
+extension SG11.InnerTConformsToP1 where U: P3 {
+  struct InnermostUConformsToP3<V: P4> { }
+}
+
+struct ConformsToP2AndP3: P2, P3 { }
+
+DemangleToMetadataTests.test("Nested types in extensions") {
+  expectEqual(
+    Dictionary<String, Int>.Inner<ConformsToP1>.self,
+    _typeByMangledName("s10DictionaryV4mainE5InnerVySSSi_AC12ConformsToP1VG")!)
+  expectEqual(
+    SG11<ConformsToP1>.InnerTConformsToP1<ConformsToP2>.self,
+    _typeByMangledName("4main4SG11VA2A2P1RzlE016InnerTConformsToC0VyAA08ConformsfC0V_AA0gF2P2VG")!)
+  expectEqual(
+    SG11<ConformsToP1>.InnerTConformsToP1<ConformsToP2AndP3>
+                      .InnermostUConformsToP3<ConformsToP4a>.self,
+    _typeByMangledName("4main4SG11VA2A2P1RzlE016InnerTConformsToC0VA2A2P3Rd__rlE018InnermostUConformsfG0VyAA08ConformsfC0V_AA0jf5P2AndG0V_AA0jF3P4aVG")!)
+
+  // Failure case: Dictionary's outer `Key: Hashable` constraint not sastified
+  // TODO: expectNil(_typeByMangledName("s10DictionaryV4mainE5InnerVyAC12ConformsToP1VSi_AC12ConformsToP1VG"))
+  // Failure case: Dictionary's inner `V: P1` constraint not satisfied
+  expectNil(_typeByMangledName("s10DictionaryV4mainE5InnerVySSSi_AC12ConformsToP2VG"))
+
+  // Failure case: SG11's outer `T: P1` constraint not satisfied
+  expectNil(_typeByMangledName("4main4SG11VA2A2P1RzlE016InnerTConformsToC0VyAA08ConformsF2P2V_AHGMa"))
+  // Failure case: SG11's inner `U: P2` constraint not satisfied
+  expectNil(_typeByMangledName("4main4SG11VA2A2P1RzlE016InnerTConformsToC0VyAA08ConformsfC0V_AHGMa"))
+
+  // TODO: Failure case: InnermostUConformsToP3's 'U: P3' constraint not satisfied
+  
+}
+
+//
+// Nested types in same-type-constrained extensions
+//
+
+/* TODO
+
+struct SG12<T: P1, U: P2> {}
+
+struct ConformsToP1AndP2 : P1, P2 { }
+
+extension SG12 where U == T {
+  struct InnerTEqualsU<V: P3> { }
+}
+
+extension SG12 where T == ConformsToP1 {
+  struct InnerTEqualsConformsToP1<V: P3> { }
+}
+
+extension SG12 where U == ConformsToP2 {
+  struct InnerUEqualsConformsToP2<V: P3> { }
+}
+
+DemangleToMetadataTests.test("Nested types in same-type-constrained extensions") {
+  expectEqual(
+    SG12<ConformsToP1AndP2, ConformsToP1AndP2>.InnerTEqualsU<ConformsToP3>.self,
+    _typeByMangledName("4main4SG12VA2A2P2Rzq_RszrlE13InnerTEqualsUVyAA015ConformsToP1AndC0VAH_AA0fG2P3VG")!)
+  expectEqual(
+    SG12<ConformsToP1, ConformsToP2>.InnerTEqualsConformsToP1<ConformsToP3>.self,
+    _typeByMangledName("4main4SG12VA2A12ConformsToP1VRszrlE012InnerTEqualscdE0VyAeA0cD2P2V_AA0cD2P3VG")!)
+  expectEqual(
+    SG12<ConformsToP1, ConformsToP2>.InnerUEqualsConformsToP2<ConformsToP3>.self,
+    _typeByMangledName("4main4SG12VA2A12ConformsToP2VRs_rlE012InnerUEqualscdE0VyAA0cD2P1VAE_AA0cD2P3VG")!)
+
+  // TODO: Cases where mangled name doesn't match constraints
+  // T != U in InnerTEqualsU
+  // V !: P3 in InnerTEqualsU
+  // T != ConformsToP1 in InnerTEqualsConformsToP1
+  // V !: P3 in InnerTEqualsConformsToP1
+}
+
+ */
+
 runAllTests()
 

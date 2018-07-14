@@ -40,7 +40,12 @@ class SILProfiler;
 enum IsBare_t { IsNotBare, IsBare };
 enum IsTransparent_t { IsNotTransparent, IsTransparent };
 enum Inline_t { InlineDefault, NoInline, AlwaysInline };
-enum IsThunk_t { IsNotThunk, IsThunk, IsReabstractionThunk };
+enum IsThunk_t {
+  IsNotThunk,
+  IsThunk,
+  IsReabstractionThunk,
+  IsSignatureOptimizedThunk
+};
 
 class SILSpecializeAttr final {
   friend SILFunction;
@@ -120,9 +125,6 @@ private:
   /// The information about specialization.
   /// Only set if this function is a specialization of another function.
   const GenericSpecializationInformation *SpecializationInfo;
-
-  /// The forwarding substitutions, lazily computed.
-  Optional<SubstitutionList> ForwardingSubs;
 
   /// The forwarding substitution map, lazily computed.
   SubstitutionMap ForwardingSubMap;
@@ -226,6 +228,33 @@ private:
   /// that the function's home module performed SIL diagnostics prior to
   /// serialization.
   bool WasDeserializedCanonical = false;
+
+  static void
+  validateSubclassScope(SubclassScope scope, IsThunk_t isThunk,
+                        const GenericSpecializationInformation *genericInfo) {
+#ifndef NDEBUG
+    // The _original_ function for a method can turn into a thunk through
+    // signature optimization, meaning it needs to retain its subclassScope, but
+    // other thunks and specializations are implementation details and so
+    // shouldn't be connected to their parent class.
+    bool thunkCanHaveSubclassScope;
+    switch (isThunk) {
+    case IsNotThunk:
+    case IsSignatureOptimizedThunk:
+      thunkCanHaveSubclassScope = true;
+      break;
+    case IsThunk:
+    case IsReabstractionThunk:
+      thunkCanHaveSubclassScope = false;
+      break;
+    }
+    auto allowsInterestingScopes = thunkCanHaveSubclassScope && !genericInfo;
+    assert(
+        allowsInterestingScopes ||
+        scope == SubclassScope::NotApplicable &&
+            "SubclassScope on specialization or non-signature-optimized thunk");
+#endif
+  }
 
   SILFunction(SILModule &module, SILLinkage linkage, StringRef mangledName,
               CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
@@ -576,13 +605,20 @@ public:
 
   /// Get this function's thunk attribute.
   IsThunk_t isThunk() const { return IsThunk_t(Thunk); }
-  void setThunk(IsThunk_t isThunk) { Thunk = isThunk; }
+  void setThunk(IsThunk_t isThunk) {
+    validateSubclassScope(getClassSubclassScope(), isThunk, SpecializationInfo);
+    Thunk = isThunk;
+  }
 
   /// Get the class visibility (relevant for class methods).
   SubclassScope getClassSubclassScope() const {
     return SubclassScope(ClassSubclassScope);
   }
-    
+  void setClassSubclassScope(SubclassScope scope) {
+    validateSubclassScope(scope, isThunk(), SpecializationInfo);
+    ClassSubclassScope = static_cast<unsigned>(scope);
+  }
+
   /// Get this function's noinline attribute.
   Inline_t getInlineStrategy() const { return Inline_t(InlineStrategy); }
   void setInlineStrategy(Inline_t inStr) { InlineStrategy = inStr; }
@@ -590,7 +626,7 @@ public:
   /// \return the function side effects information.
   EffectsKind getEffectsKind() const { return EffectsKindAttr; }
 
-  /// \return True if the function is annotated with the @effects attribute.
+  /// \return True if the function is annotated with the @_effects attribute.
   bool hasEffectsKind() const {
     return EffectsKindAttr != EffectsKind::Unspecified;
   }
@@ -658,6 +694,7 @@ public:
 
   void setSpecializationInfo(const GenericSpecializationInformation *Info) {
     assert(!isSpecialization());
+    validateSubclassScope(getClassSubclassScope(), isThunk(), Info);
     SpecializationInfo = Info;
   }
 
@@ -683,10 +720,6 @@ public:
 
   /// Converts the given function definition to a declaration.
   void convertToDeclaration();
-
-  /// Return the identity substitutions necessary to forward this call if it is
-  /// generic.
-  SubstitutionList getForwardingSubstitutions();
 
   /// Return the identity substitutions necessary to forward this call if it is
   /// generic.
@@ -867,6 +900,9 @@ public:
   /// block inside.  This depends on there being a 'dot' and 'gv' program in
   /// your path.
   void viewCFG() const;
+  /// Like ViewCFG, but the graph does not show the contents of basic blocks.
+  void viewCFGOnly() const;
+
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,

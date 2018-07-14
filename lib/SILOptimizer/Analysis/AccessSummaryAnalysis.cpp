@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-access-summary-analysis"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SILOptimizer/Analysis/AccessSummaryAnalysis.h"
 #include "swift/SILOptimizer/Analysis/FunctionOrder.h"
@@ -67,13 +68,15 @@ void AccessSummaryAnalysis::processArgument(FunctionInfo *info,
     switch (user->getKind()) {
     case SILInstructionKind::BeginAccessInst: {
       auto *BAI = cast<BeginAccessInst>(user);
-      const IndexTrieNode *subPath = findSubPathAccessed(BAI);
-      summary.mergeWith(BAI->getAccessKind(), BAI->getLoc(), subPath);
-      // We don't add the users of the begin_access to the worklist because
-      // even if these users eventually begin an access to the address
-      // or a projection from it, that access can't begin more exclusive
-      // access than this access -- otherwise it will be diagnosed
-      // elsewhere.
+      if (BAI->getEnforcement() != SILAccessEnforcement::Unsafe) {
+        const IndexTrieNode *subPath = findSubPathAccessed(BAI);
+        summary.mergeWith(BAI->getAccessKind(), BAI->getLoc(), subPath);
+        // We don't add the users of the begin_access to the worklist because
+        // even if these users eventually begin an access to the address
+        // or a projection from it, that access can't begin more exclusive
+        // access than this access -- otherwise it will be diagnosed
+        // elsewhere.
+      }
       break;
     }
     case SILInstructionKind::EndUnpairedAccessInst:
@@ -487,6 +490,12 @@ getSingleAddressProjectionUser(SingleValueInstruction *I) {
   for (Operand *Use : I->getUses()) {
     SILInstruction *User = Use->getUser();
     if (isa<BeginAccessInst>(I) && isa<EndAccessInst>(User))
+      continue;
+
+    // Ignore sanitizer instrumentation when looking for a single projection
+    // user. This ensures that we're able to find a single projection subpath
+    // even when sanitization is enabled.
+    if (isSanitizerInstrumentation(User))
       continue;
 
     // We have more than a single user so bail.

@@ -24,6 +24,7 @@
 #include "swift/Runtime/ExistentialContainer.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Mutex.h"
+#include "swift/Runtime/Once.h"
 #include "swift/Strings.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/PointerLikeTypeTraits.h"
@@ -54,6 +55,7 @@
 #endif
 
 #if SWIFT_OBJC_INTEROP
+#include <dlfcn.h>
 #include <objc/runtime.h>
 #endif
 
@@ -593,7 +595,7 @@ swift::swift_getObjCClassFromMetadata(const Metadata *theMetadata) {
 
   // Otherwise, the input should already be a Swift class object.
   auto theClass = cast<ClassMetadata>(theMetadata);
-  assert(theClass->isTypeMetadata() && !theClass->isArtificialSubclass());
+  assert(theClass->isTypeMetadata());
   return theClass;
 }
 
@@ -876,6 +878,9 @@ public:
 
 class TupleCache : public MetadataCache<TupleCacheEntry, false, TupleCache> {
 public:
+// FIXME: https://bugs.swift.org/browse/SR-1155
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Winvalid-offsetof"
   static TupleCacheEntry *
   resolveExistingEntry(const TupleTypeMetadata *metadata) {
     // The correctness of this arithmetic is verified by an assertion in
@@ -885,6 +890,7 @@ public:
     auto entry = reinterpret_cast<const TupleCacheEntry*>(bytes);
     return const_cast<TupleCacheEntry*>(entry);
   }
+#pragma clang diagnostic pop
 };
 
 } // end anonymous namespace
@@ -1053,23 +1059,6 @@ static OpaqueValue *tuple_initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
   return tuple_projectBuffer<IsPOD, IsInline>(dest, metatype);
 }
 
-/// Generic tuple value witness for 'initializeBufferWithTakeOfBuffer'.
-template <bool IsPOD, bool IsInline>
-static OpaqueValue *tuple_initializeBufferWithTakeOfBuffer(ValueBuffer *dest,
-                                                           ValueBuffer *src,
-                                                     const Metadata *metatype) {
-  assert(IsPOD == tuple_getValueWitnesses(metatype)->isPOD());
-  assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
-  if (IsInline) {
-    return tuple_initializeWithTake<IsPOD, IsInline>(
-        tuple_projectBuffer<IsPOD, IsInline>(dest, metatype),
-        tuple_projectBuffer<IsPOD, IsInline>(src, metatype), metatype);
-  }
-  auto *srcReference = *reinterpret_cast<HeapObject**>(src);
-  *reinterpret_cast<HeapObject**>(dest) = srcReference;
-  return tuple_projectBuffer<IsPOD, IsInline>(dest, metatype);
-}
-
 template <bool IsPOD, bool IsInline>
 static unsigned tuple_getEnumTagSinglePayload(const OpaqueValue *enumAddr,
                                               unsigned numEmptyCases,
@@ -1077,9 +1066,8 @@ static unsigned tuple_getEnumTagSinglePayload(const OpaqueValue *enumAddr,
   auto *witnesses = self->getValueWitnesses();
   auto size = witnesses->getSize();
   auto numExtraInhabitants = witnesses->getNumExtraInhabitants();
-  auto getExtraInhabitantIndex =
-      (static_cast<const ExtraInhabitantsValueWitnessTable *>(witnesses)
-           ->getExtraInhabitantIndex);
+  auto EIVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(witnesses);
+  auto getExtraInhabitantIndex = EIVWT ? EIVWT->getExtraInhabitantIndex : nullptr;
 
   return getEnumTagSinglePayloadImpl(enumAddr, numEmptyCases, self, size,
                                      numExtraInhabitants,
@@ -1093,9 +1081,8 @@ tuple_storeEnumTagSinglePayload(OpaqueValue *enumAddr, unsigned whichCase,
   auto *witnesses = self->getValueWitnesses();
   auto size = witnesses->getSize();
   auto numExtraInhabitants = witnesses->getNumExtraInhabitants();
-  auto storeExtraInhabitant =
-      (static_cast<const ExtraInhabitantsValueWitnessTable *>(witnesses)
-           ->storeExtraInhabitant);
+  auto EIVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(witnesses);
+  auto storeExtraInhabitant = EIVWT ? EIVWT->storeExtraInhabitant : nullptr;
 
   storeEnumTagSinglePayloadImpl(enumAddr, whichCase, numEmptyCases, self, size,
                                 numExtraInhabitants, storeExtraInhabitant);
@@ -1211,13 +1198,15 @@ static void performBasicLayout(TypeLayout &layout,
     if (!eltLayout->flags.isPOD()) isPOD = false;
     if (!eltLayout->flags.isBitwiseTakable()) isBitwiseTakable = false;
   }
-  bool isInline = ValueWitnessTable::isValueInline(size, alignMask + 1);
+  bool isInline =
+      ValueWitnessTable::isValueInline(isBitwiseTakable, size, alignMask + 1);
 
   layout.size = size;
-  layout.flags = ValueWitnessFlags().withAlignmentMask(alignMask)
-                                    .withPOD(isPOD)
-                                    .withBitwiseTakable(isBitwiseTakable)
-                                    .withInlineStorage(isInline);
+  layout.flags = ValueWitnessFlags()
+                     .withAlignmentMask(alignMask)
+                     .withPOD(isPOD)
+                     .withBitwiseTakable(isBitwiseTakable)
+                     .withInlineStorage(isInline);
   layout.stride = std::max(size_t(1), roundUpToAlignMask(size, alignMask));
 }
 
@@ -1484,7 +1473,20 @@ bool swift::equalContexts(const ContextDescriptor *a,
         && kind <= ContextDescriptorKind::Type_Last) {
       auto typeA = cast<TypeContextDescriptor>(a);
       auto typeB = cast<TypeContextDescriptor>(b);
-      return strcmp(typeA->Name.get(), typeB->Name.get()) == 0;
+      if (strcmp(typeA->Name.get(), typeB->Name.get()) != 0)
+        return false;
+      
+      // A synthesized entity has to match the related entity tag too.
+      if (typeA->isSynthesizedRelatedEntity()) {
+        if (!typeB->isSynthesizedRelatedEntity())
+          return false;
+        
+        if (typeA->getSynthesizedDeclRelatedEntityTag()
+            != typeB->getSynthesizedDeclRelatedEntityTag())
+          return false;
+      }
+      
+      return true;
     }
     
     // Otherwise, this runtime doesn't know anything about this context kind.
@@ -1554,20 +1556,6 @@ static OpaqueValue *pod_indirect_initializeBufferWithCopyOfBuffer(
   return reinterpret_cast<OpaqueValue *>(bytePtr + byteOffset);
 }
 
-static OpaqueValue *pod_indirect_initializeBufferWithTakeOfBuffer(
-                    ValueBuffer *dest, ValueBuffer *src, const Metadata *self) {
-  auto wtable = self->getValueWitnesses();
-  auto *srcReference = *reinterpret_cast<HeapObject**>(src);
-  *reinterpret_cast<HeapObject**>(dest) = srcReference;
-
-  // Project the address of the value in the buffer.
-  unsigned alignMask = wtable->getAlignmentMask();
-  // Compute the byte offset of the object in the box.
-  unsigned byteOffset = (sizeof(HeapObject) + alignMask) & ~alignMask;
-  auto *bytePtr = reinterpret_cast<char *>(srcReference);
-  return reinterpret_cast<OpaqueValue *>(bytePtr + byteOffset);
-}
-
 static void pod_noop(void *object, const Metadata *self) {
 }
 #define pod_direct_destroy \
@@ -1584,9 +1572,6 @@ static OpaqueValue *pod_direct_initializeWithCopy(OpaqueValue *dest,
 #define pod_direct_initializeBufferWithCopyOfBuffer \
   pointer_function_cast<value_witness_types::initializeBufferWithCopyOfBuffer> \
     (pod_direct_initializeWithCopy)
-#define pod_direct_initializeBufferWithTakeOfBuffer \
-  pointer_function_cast<value_witness_types::initializeBufferWithTakeOfBuffer> \
-    (pod_direct_initializeWithCopy)
 #define pod_direct_assignWithCopy pod_direct_initializeWithCopy
 #define pod_indirect_assignWithCopy pod_direct_initializeWithCopy
 #define pod_direct_initializeWithTake pod_direct_initializeWithCopy
@@ -1600,9 +1585,8 @@ static unsigned pod_direct_getEnumTagSinglePayload(const OpaqueValue *enumAddr,
   auto *witnesses = self->getValueWitnesses();
   auto size = witnesses->getSize();
   auto numExtraInhabitants = witnesses->getNumExtraInhabitants();
-  auto getExtraInhabitantIndex =
-      (static_cast<const ExtraInhabitantsValueWitnessTable *>(witnesses)
-           ->getExtraInhabitantIndex);
+  auto EIVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(witnesses);
+  auto getExtraInhabitantIndex = EIVWT ? EIVWT->getExtraInhabitantIndex : nullptr;
 
   return getEnumTagSinglePayloadImpl(enumAddr, numEmptyCases, self, size,
                                      numExtraInhabitants,
@@ -1616,9 +1600,8 @@ static void pod_direct_storeEnumTagSinglePayload(OpaqueValue *enumAddr,
   auto *witnesses = self->getValueWitnesses();
   auto size = witnesses->getSize();
   auto numExtraInhabitants = witnesses->getNumExtraInhabitants();
-  auto storeExtraInhabitant =
-      (static_cast<const ExtraInhabitantsValueWitnessTable *>(witnesses)
-           ->storeExtraInhabitant);
+  auto EIVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(witnesses);
+  auto storeExtraInhabitant = EIVWT ? EIVWT->storeExtraInhabitant : nullptr;
 
   storeEnumTagSinglePayloadImpl(enumAddr, whichCase, numEmptyCases, self, size,
                                 numExtraInhabitants, storeExtraInhabitant);
@@ -1699,23 +1682,12 @@ void swift::installCommonValueWitnesses(const TypeLayout &layout,
     // Use POD value witnesses for operations that do an initializeWithTake.
     if (flags.isInlineStorage()) {
       vwtable->initializeWithTake = pod_direct_initializeWithTake;
-      vwtable->initializeBufferWithTakeOfBuffer
-        = pod_direct_initializeBufferWithTakeOfBuffer;
     } else {
       vwtable->initializeWithTake = pod_indirect_initializeWithTake;
-      vwtable->initializeBufferWithTakeOfBuffer
-        = pod_indirect_initializeBufferWithTakeOfBuffer;
     }
     return;
   }
 
-  if (!flags.isInlineStorage()) {
-    // For values stored out-of-line, initializeBufferWithTakeOfBuffer is
-    // always a memcpy.
-    vwtable->initializeBufferWithTakeOfBuffer
-      = pod_indirect_initializeBufferWithTakeOfBuffer;
-    return;
-  }
 }
 
 /***************************************************************************/
@@ -2004,6 +1976,45 @@ swift::swift_relocateClassMetadata(ClassMetadata *self,
   return self;
 }
 
+#if SWIFT_OBJC_INTEROP
+
+// FIXME: This is from a later version of <objc/runtime.h>. Once the declaration
+// is available in SDKs, we can remove this typedef.
+typedef BOOL (*objc_hook_getImageName)(
+    Class _Nonnull cls, const char * _Nullable * _Nonnull outImageName);
+
+/// \see customGetImageNameFromClass
+static objc_hook_getImageName defaultGetImageNameFromClass = nullptr;
+
+/// A custom implementation of Objective-C's class_getImageName for Swift
+/// classes, which knows how to handle dynamically-initialized class metadata.
+///
+/// Per the documentation for objc_setHook_getImageName, any non-Swift classes
+/// will still go through the normal implementation of class_getImageName,
+/// which is stored in defaultGetImageNameFromClass.
+static BOOL
+customGetImageNameFromClass(Class _Nonnull objcClass,
+                            const char * _Nullable * _Nonnull outImageName) {
+  auto *classAsMetadata = reinterpret_cast<const ClassMetadata *>(objcClass);
+
+  // Is this a Swift class?
+  if (classAsMetadata->isTypeMetadata() &&
+      !classAsMetadata->isArtificialSubclass()) {
+    const void *descriptor = classAsMetadata->getDescription();
+    assert(descriptor &&
+           "all non-artificial Swift classes should have a descriptor");
+    Dl_info imageInfo = {};
+    if (!dladdr(descriptor, &imageInfo))
+      return NO;
+    *outImageName = imageInfo.dli_fname;
+    return imageInfo.dli_fname != nullptr;
+  }
+
+  // If not, fall back to the default implementation.
+  return defaultGetImageNameFromClass(objcClass, outImageName);
+}
+#endif
+
 /// Initialize the field offset vector for a dependent-layout class, using the
 /// "Universal" layout strategy.
 void
@@ -2012,6 +2023,23 @@ swift::swift_initClassMetadata(ClassMetadata *self,
                                size_t numFields,
                                const TypeLayout * const *fieldTypes,
                                size_t *fieldOffsets) {
+#if SWIFT_OBJC_INTEROP
+  // Register our custom implementation of class_getImageName.
+  static swift_once_t onceToken;
+  swift_once(&onceToken, [](void *unused) {
+    (void)unused;
+    // FIXME: This is from a later version of <objc/runtime.h>. Once the
+    // declaration is available in SDKs, we can access this directly instead of
+    // using dlsym.
+    if (void *setHookPtr = dlsym(RTLD_DEFAULT, "objc_setHook_getImageName")) {
+      auto setHook = reinterpret_cast<
+          void(*)(objc_hook_getImageName _Nonnull,
+                  objc_hook_getImageName _Nullable * _Nonnull)>(setHookPtr);
+      setHook(customGetImageNameFromClass, &defaultGetImageNameFromClass);
+    }
+  }, nullptr);
+#endif
+
   _swift_initializeSuperclass(self);
 
   // Start layout by appending to a standard heap object header.
@@ -2565,7 +2593,7 @@ OpaqueExistentialValueWitnessTableCacheEntry(unsigned numWitnessTables) {
   Data.flags = ValueWitnessFlags()
     .withAlignment(Box::Container::getAlignment(numWitnessTables))
     .withPOD(false)
-    .withBitwiseTakable(false)
+    .withBitwiseTakable(true)
     .withInlineStorage(false)
     .withExtraInhabitants(false);
   Data.stride = Box::Container::getStride(numWitnessTables);
@@ -3096,6 +3124,58 @@ swift::swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique) {
   return uniqueMetadata;
 }
 
+/// Unique-ing of foreign types' witness tables.
+namespace {
+  class ForeignWitnessTableCacheEntry {
+  public:
+    struct Key {
+      const TypeContextDescriptor *type;
+      const ProtocolDescriptor *protocol;
+    };
+
+    const Key key;
+    const WitnessTable *data;
+
+    ForeignWitnessTableCacheEntry(const ForeignWitnessTableCacheEntry::Key k,
+                                  const WitnessTable *d)
+        : key(k), data(d) {}
+
+    intptr_t getKeyIntValueForDump() {
+      return reinterpret_cast<intptr_t>(key.type);
+    }
+
+    int compareWithKey(const Key other) const {
+      if (auto r = comparePointers(other.protocol, key.protocol))
+        return r;
+      return strcmp(other.type->Name.get(), key.type->Name.get());
+    }
+
+    static size_t getExtraAllocationSize(const Key,
+                                         const WitnessTable *) {
+      return 0;
+    }
+
+    size_t getExtraAllocationSize() const {
+      return 0;
+    }
+  };
+}
+
+static SimpleGlobalCache<ForeignWitnessTableCacheEntry> ForeignWitnessTables;
+
+const WitnessTable *swift::swift_getForeignWitnessTable(
+    const WitnessTable *witnessTableCandidate,
+    const TypeContextDescriptor *contextDescriptor,
+    const ProtocolDescriptor *protocol) {
+  auto result =
+      ForeignWitnessTables
+          .getOrInsert(
+              ForeignWitnessTableCacheEntry::Key{contextDescriptor, protocol},
+              witnessTableCandidate)
+          .first->data;
+  return result;
+}
+
 /***************************************************************************/
 /*** Other metadata routines ***********************************************/
 /***************************************************************************/
@@ -3113,23 +3193,9 @@ Metadata::getClassObject() const {
     return wrapper->Class;
   }
   // Other kinds of types don't have class objects.
-  case MetadataKind::Struct:
-  case MetadataKind::Enum:
-  case MetadataKind::Optional:
-  case MetadataKind::ForeignClass:
-  case MetadataKind::Opaque:
-  case MetadataKind::Tuple:
-  case MetadataKind::Function:
-  case MetadataKind::Existential:
-  case MetadataKind::ExistentialMetatype:
-  case MetadataKind::Metatype:
-  case MetadataKind::HeapLocalVariable:
-  case MetadataKind::HeapGenericLocalVariable:
-  case MetadataKind::ErrorObject:
+  default:
     return nullptr;
   }
-
-  swift_runtime_unreachable("Unhandled MetadataKind in switch.");
 }
 
 template <> OpaqueValue *Metadata::allocateBoxForExistentialIn(ValueBuffer *buffer) const {
@@ -3203,9 +3269,10 @@ StringRef swift::getStringForMetadataKind(MetadataKind kind) {
     case MetadataKind::NAME: \
       return #NAME;
 #include "swift/ABI/MetadataKind.def"
+      
+  default:
+    return "<unknown>";
   }
-
-  swift_runtime_unreachable("Unhandled metadata kind?!");
 }
 
 #ifndef NDEBUG
@@ -3377,6 +3444,7 @@ WitnessTableCacheEntry::allocate(GenericWitnessTable *genericTable,
   size_t numRequirements =
     protocol->NumRequirements + WitnessTableFirstRequirementOffset;
   assert(numPatternWitnesses <= numRequirements);
+  (void)numRequirements;
 
   // Number of bytes for any private storage used by the conformance itself.
   size_t privateSizeInWords = genericTable->WitnessTablePrivateSizeInWords;
@@ -3940,3 +4008,7 @@ void swift::verifyMangledNameRoundtrip(const Metadata *metadata) {
                    metadata, mangledName.c_str(), (const Metadata *)result);
 }
 #endif
+
+const TypeContextDescriptor *swift::swift_getTypeContextDescriptor(const Metadata *type) {
+    return type->getTypeContextDescriptor();
+}

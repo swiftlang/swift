@@ -642,7 +642,7 @@ internal func _copyCollectionToContiguousArray<
     _uninitializedCount: count,
     minimumCapacity: 0)
 
-  var p = UnsafeMutableBufferPointer(start: result.firstElementAddress, count: count)
+  let p = UnsafeMutableBufferPointer(start: result.firstElementAddress, count: count)
   var (itr, end) = source._copyContents(initializing: p)
 
   _debugPrecondition(itr.next() == nil,

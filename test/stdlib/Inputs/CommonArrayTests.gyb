@@ -340,6 +340,102 @@ ${Suite}.test("${ArrayType}/withUnsafeMutableBytes")
   expectEqual(10, b[0])
 }
 
+// FIXME: Implement these changes for ArraySlice and ContiguousArray
+
+%if ArrayType == 'Array':
+
+//===----------------------------------------------------------------------===//
+// reserveCapacity semantics
+//===----------------------------------------------------------------------===//
+
+${Suite}.test("${ArrayType}/reserveCapacity") {
+  var a = ${ArrayType}<Int>()
+  for capacity in stride(from: 0, to: 1000, by: 53) {
+    a.reserveCapacity(capacity)
+    expectLE(capacity, a.capacity)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// init(_unsafeUninitializedCapacity:initializingWith:)
+//===----------------------------------------------------------------------===//
+
+extension Collection {
+  func stablyPartitioned(
+    by belongsInFirstPartition: (Element) -> Bool
+  ) -> ${ArrayType}<Element> {
+    let result = ${ArrayType}<Element>(_unsafeUninitializedCapacity: self.count) {
+      buffer, initializedCount in
+      var lowIndex = 0
+      var highIndex = buffer.count
+      for element in self {
+        if belongsInFirstPartition(element) {
+          buffer[lowIndex] = element
+          lowIndex += 1
+        } else {
+          highIndex -= 1
+          buffer[highIndex] = element
+        }
+      }
+      
+      buffer[highIndex...].reverse()
+      initializedCount = buffer.count
+    }
+    return result
+  }
+}
+
+${Suite}.test("${ArrayType}/init(_unsafeUninitializedCapacity:...:)") {
+  var a = ${ArrayType}(0..<300)
+  let p = a.stablyPartitioned(by: { $0 % 2 == 0 })
+  expectEqualSequence(
+    [stride(from: 0, to: 300, by: 2), stride(from: 1, to: 300, by: 2)].joined(),
+    p
+  )
+}
+
+${Suite}.test("${ArrayType}/init(_unsafeUninitializedCapacity:...:)/throwing") {
+  final class InstanceCountedClass {
+    static var instanceCounter = 0
+
+    init() { InstanceCountedClass.instanceCounter += 1 }
+    deinit { InstanceCountedClass.instanceCounter -= 1 }
+  }
+  enum E: Error { case error }
+
+  do {
+    var a = Array<InstanceCountedClass>(_unsafeUninitializedCapacity: 10) { buffer, c in
+      let p = buffer.baseAddress!
+      for i in 0..<5 {
+        (p + i).initialize(to: InstanceCountedClass())
+      }
+      c = 5
+    }
+    expectEqual(5, a.count)
+    expectEqual(5, InstanceCountedClass.instanceCounter)
+
+    a = []
+    expectEqual(0, InstanceCountedClass.instanceCounter)
+
+    a = try Array(_unsafeUninitializedCapacity: 10) { buffer, c in
+      let p = buffer.baseAddress!
+      for i in 0..<5 {
+        (p + i).initialize(to: InstanceCountedClass())
+      }
+      c = 5
+      throw E.error
+    }
+
+    // The throw above should prevent reaching here, which should mean the
+    // instances created in the closure should get deallocated before the final
+    // expectation outside the do/catch block.
+    expectTrue(false)
+  } catch {}
+  expectEqual(0, InstanceCountedClass.instanceCounter)
+}
+
+%end
+
 //===---
 // Check that iterators traverse a snapshot of the collection.
 //===---

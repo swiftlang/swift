@@ -229,7 +229,12 @@ extension FlattenCollection.Index : Comparable {
 
 extension FlattenCollection.Index : Hashable
   where Base.Index : Hashable, Base.Element.Index : Hashable {
-  @inlinable // FIXME(sil-serialize-all)
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
+  @inlinable
   public func hash(into hasher: inout Hasher) {
     hasher.combine(_outer)
     hasher.combine(_inner)
@@ -520,10 +525,3 @@ extension LazyCollectionProtocol
     return FlattenCollection(elements).lazy
   }
 }
-
-// @available(*, deprecated, renamed: "FlattenCollection.Index")
-public typealias FlattenCollectionIndex<T> = FlattenCollection<T>.Index where T : Collection, T.Element : Collection
-@available(*, deprecated, renamed: "FlattenCollection.Index")
-public typealias FlattenBidirectionalCollectionIndex<T> = FlattenCollection<T>.Index where T : BidirectionalCollection, T.Element : BidirectionalCollection
-@available(*, deprecated, renamed: "FlattenCollection")
-public typealias FlattenBidirectionalCollection<T> = FlattenCollection<T> where T : BidirectionalCollection, T.Element : BidirectionalCollection

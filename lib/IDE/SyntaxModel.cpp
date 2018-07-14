@@ -16,6 +16,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
@@ -800,9 +801,9 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     else
       SR = VD->getSourceRange();
     SN.Range = charSourceRangeFromSourceRange(SM, SR);
-    if (VD->hasAccessorFunctions())
-      SN.BodyRange = innerCharSourceRangeFromSourceRange(SM,
-                                                         VD->getBracesRange());
+    auto bracesRange = VD->getBracesRange();
+    if (bracesRange.isValid())
+      SN.BodyRange = innerCharSourceRangeFromSourceRange(SM, bracesRange);
     SourceLoc NRStart = VD->getNameLoc();
     SourceLoc NREnd = NRStart.getAdvancedLoc(VD->getName().getLength());
     SN.NameRange = CharSourceRange(SM, NRStart, NREnd);
@@ -875,8 +876,15 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
         SN.Kind = SyntaxStructureKind::EnumElement;
         SN.Range = charSourceRangeFromSourceRange(SM,
                                                   EnumElemD->getSourceRange());
-        SN.NameRange = CharSourceRange(EnumElemD->getNameLoc(),
-                                       EnumElemD->getName().getLength());
+        if (auto ParamList = EnumElemD->getParameterList()) {
+          SourceRange NameRange = SourceRange(EnumElemD->getNameLoc(),
+                                              ParamList->getSourceRange().End);
+          SN.NameRange = charSourceRangeFromSourceRange(SM, NameRange);
+        } else {
+          SN.NameRange = CharSourceRange(EnumElemD->getNameLoc(),
+                                         EnumElemD->getName().getLength());
+        }
+
         if (auto *E = EnumElemD->getRawValueExpr()) {
           SourceRange ElemRange = E->getSourceRange();
           SN.Elements.emplace_back(SyntaxStructureElementKind::InitExpr,

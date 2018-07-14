@@ -45,6 +45,7 @@ SILCoverageMap::create(SILModule &M, StringRef Filename, StringRef Name,
 
   // Assert that this coverage map is unique.
   assert(result.second && "Duplicate coverage mapping for function");
+  (void)result;
 
   return CM;
 }

@@ -40,6 +40,7 @@ struct FooStruct {
 }
 
 // FOO_STRUCT_COMMON: Begin completions
+// FOO_STRUCT_COMMON-NEXT: Keyword[self]/CurrNominal: self[#FooStruct#]; name=self
 // FOO_STRUCT_COMMON-NEXT: Decl[InstanceVar]/CurrNominal:    instanceVar[#Int#]{{; name=.+$}}
 // FOO_STRUCT_COMMON-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc0()[#Void#]{{; name=.+$}}
 // FOO_STRUCT_COMMON-NEXT: Decl[InstanceMethod]/CurrNominal: builderFunc1()[#FooStruct#]{{; name=.+$}}

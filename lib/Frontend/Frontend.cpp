@@ -149,9 +149,10 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
     Invocation.getLangOptions().AttachCommentsToDecls = true;
   }
 
-  Context.reset(new ASTContext(Invocation.getLangOptions(),
-                               Invocation.getSearchPathOptions(), SourceMgr,
-                               Diagnostics));
+  Context.reset(ASTContext::get(Invocation.getLangOptions(),
+                                Invocation.getSearchPathOptions(), SourceMgr,
+                                Diagnostics));
+  registerTypeCheckerRequestFunctions(Context->evaluator);
 
   if (setUpModuleLoaders())
     return true;
@@ -197,10 +198,10 @@ bool CompilerInstance::setUpModuleLoaders() {
     Context->addModuleLoader(SourceLoader::create(*Context,
                                                   !immediate,
                                                   enableResilience,
-                                                  DepTracker));
+                                                  getDependencyTracker()));
   }
   {
-    auto SML = SerializedModuleLoader::create(*Context, DepTracker);
+    auto SML = SerializedModuleLoader::create(*Context, getDependencyTracker());
     this->SML = SML.get();
     Context->addModuleLoader(std::move(SML));
   }
@@ -210,7 +211,7 @@ bool CompilerInstance::setUpModuleLoaders() {
     // knowledge.
     auto clangImporter =
         ClangImporter::create(*Context, Invocation.getClangImporterOptions(),
-                              Invocation.getPCHHash(), DepTracker);
+                              Invocation.getPCHHash(), getDependencyTracker());
     if (!clangImporter) {
       Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
       return true;
@@ -424,7 +425,21 @@ shouldImplicityImportSwiftOnoneSupportModule(CompilerInvocation &Invocation) {
   return Invocation.getFrontendOptions().isCreatingSIL();
 }
 
+void CompilerInstance::performParseAndResolveImportsOnly() {
+  performSemaUpTo(SourceFile::NameBound);
+}
+
 void CompilerInstance::performSema() {
+  performSemaUpTo(SourceFile::TypeChecked);
+}
+
+void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
+  // FIXME: A lot of the logic in `performParseOnly` is a stripped-down version
+  // of the logic in `performSemaUpTo`.  We should try to unify them over time.
+  if (LimitStage <= SourceFile::Parsed) {
+    return performParseOnly();
+  }
+
   FrontendStatsTracer tracer(Context->Stats, "perform-sema");
   Context->LoadedModules[MainModule->getName()] = getMainModule();
 
@@ -456,7 +471,7 @@ void CompilerInstance::performSema() {
   if (MainBufferID != NO_SUCH_BUFFER)
     addMainFileToModule(implicitImports);
 
-  parseAndCheckTypes(implicitImports);
+  parseAndCheckTypesUpTo(implicitImports, LimitStage);
 }
 
 CompilerInstance::ImplicitImports::ImplicitImports(CompilerInstance &compiler) {
@@ -574,8 +589,8 @@ void CompilerInstance::addMainFileToModule(
   addAdditionalInitialImportsTo(MainFile, implicitImports);
 }
 
-void CompilerInstance::parseAndCheckTypes(
-    const ImplicitImports &implicitImports) {
+void CompilerInstance::parseAndCheckTypesUpTo(
+    const ImplicitImports &implicitImports, SourceFile::ASTStage_t limitStage) {
   FrontendStatsTracer tracer(Context->Stats, "parse-and-check-types");
   // Delayed parsing callback for the primary file, or all files
   // in non-WMO mode.
@@ -610,8 +625,8 @@ void CompilerInstance::parseAndCheckTypes(
   // In addition, the main file has parsing and type-checking
   // interwined.
   if (MainBufferID != NO_SUCH_BUFFER) {
-    parseAndTypeCheckMainFile(PersistentState, PrimaryDelayedCB.get(),
-                              TypeCheckOptions);
+    parseAndTypeCheckMainFileUpTo(limitStage, PersistentState,
+                                  PrimaryDelayedCB.get(), TypeCheckOptions);
   }
 
   assert(llvm::all_of(MainModule->getFiles(), [](const FileUnit *File) -> bool {
@@ -621,6 +636,11 @@ void CompilerInstance::parseAndCheckTypes(
     return SF->ASTStage >= SourceFile::NameBound;
   }) && "some files have not yet had their imports resolved");
   MainModule->setHasResolvedImports();
+
+  // If the limiting AST stage is name binding, we're done.
+  if (limitStage <= SourceFile::NameBound) {
+    return;
+  }
 
   const auto &options = Invocation.getFrontendOptions();
   forEachFileToTypeCheck([&](SourceFile &SF) {
@@ -719,7 +739,8 @@ bool CompilerInstance::parsePartialModulesAndLibraryFiles(
   return hadLoadError;
 }
 
-void CompilerInstance::parseAndTypeCheckMainFile(
+void CompilerInstance::parseAndTypeCheckMainFileUpTo(
+    SourceFile::ASTStage_t LimitStage,
     PersistentParserState &PersistentState,
     DelayedParsingCallbacks *DelayedParseCB,
     OptionSet<TypeCheckingFlags> TypeCheckOptions) {
@@ -746,15 +767,27 @@ void CompilerInstance::parseAndTypeCheckMainFile(
     parseIntoSourceFile(MainFile, MainFile.getBufferID().getValue(), &Done,
                         TheSILModule ? &SILContext : nullptr, &PersistentState,
                         DelayedParseCB);
+
     if (mainIsPrimary) {
-      const auto &options = Invocation.getFrontendOptions();
-      performTypeChecking(MainFile, PersistentState.getTopLevelContext(),
-                          TypeCheckOptions, CurTUElem,
-                          options.WarnLongFunctionBodies,
-                          options.WarnLongExpressionTypeChecking,
-                          options.SolverExpressionTimeThreshold,
-                          options.SwitchCheckingInvocationThreshold);
+      switch (LimitStage) {
+      case SourceFile::Parsing:
+      case SourceFile::Parsed:
+        llvm_unreachable("invalid limit stage");
+      case SourceFile::NameBound:
+        performNameBinding(MainFile, CurTUElem);
+        break;
+      case SourceFile::TypeChecked:
+        const auto &options = Invocation.getFrontendOptions();
+        performTypeChecking(MainFile, PersistentState.getTopLevelContext(),
+                            TypeCheckOptions, CurTUElem,
+                            options.WarnLongFunctionBodies,
+                            options.WarnLongExpressionTypeChecking,
+                            options.SolverExpressionTimeThreshold,
+                            options.SwitchCheckingInvocationThreshold);
+        break;
+      }
     }
+
     CurTUElem = MainFile.Decls.size();
   } while (!Done);
 
@@ -871,6 +904,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
   if (MainBufferID != NO_SUCH_BUFFER) {
     SourceFile &MainFile =
         MainModule->getMainSourceFile(Invocation.getSourceFileKind());
+    MainFile.SyntaxParsingCache = Invocation.getMainFileSyntaxParsingCache();
 
     bool Done;
     do {

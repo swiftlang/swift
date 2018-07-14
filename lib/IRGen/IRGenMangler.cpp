@@ -45,7 +45,6 @@ std::string IRGenMangler::mangleValueWitness(Type type, ValueWitness witness) {
     GET_MANGLING(AssignWithCopy) \
     GET_MANGLING(InitializeWithTake) \
     GET_MANGLING(AssignWithTake) \
-    GET_MANGLING(InitializeBufferWithTakeOfBuffer) \
     GET_MANGLING(GetEnumTagSinglePayload) \
     GET_MANGLING(StoreEnumTagSinglePayload) \
     GET_MANGLING(StoreExtraInhabitant) \
@@ -90,7 +89,7 @@ IRGenMangler::mangleTypeForReflection(IRGenModule &IGM,
   
   if (IGM.CurSourceFile
       && !isa<ClangModuleUnit>(IGM.CurSourceFile)
-      && !IGM.getOptions().UseJIT) {
+      && !IGM.getOptions().IntegratedREPL) {
     CanSymbolicReference = [&](const DeclContext *dc) -> bool {
       // Symbolically reference types that are defined in the same file unit
       // as we're referencing from.
@@ -116,7 +115,7 @@ std::string IRGenMangler::mangleTypeForLLVMTypeName(CanType Ty) {
   // don't start with a digit and don't need to be quoted.
   Buffer << 'T';
   if (auto P = dyn_cast<ProtocolType>(Ty)) {
-    appendProtocolName(P->getDecl());
+    appendProtocolName(P->getDecl(), /*allowStandardSubstitution=*/false);
     appendOperator("P");
   } else {
     appendType(Ty);
@@ -142,19 +141,17 @@ mangleProtocolForLLVMTypeName(ProtocolCompositionType *type) {
       if (i == 0)
         appendOperator("_");
     }
-    if (layout.superclass) {
-      auto superclassTy = layout.superclass;
-
+    if (auto superclass = layout.explicitSuperclass) {
       // We share type infos for different instantiations of a generic type
       // when the archetypes have the same exemplars.  We cannot mangle
       // archetypes, and the mangling does not have to be unique, so we just
       // mangle the unbound generic form of the type.
-      if (superclassTy->hasArchetype()) {
-        superclassTy = superclassTy->getClassOrBoundGenericClass()
+      if (superclass->hasArchetype()) {
+        superclass = superclass->getClassOrBoundGenericClass()
           ->getDeclaredType();
       }
 
-      appendType(CanType(superclassTy));
+      appendType(CanType(superclass));
       appendOperator("Xc");
     } else if (layout.getLayoutConstraint()) {
       appendOperator("Xl");

@@ -18,6 +18,7 @@ func foo(_ b: BarForwardDeclaredClass) {
   _ = barGlobalVariableOldEnumElement
   _ = PropertyUserInterface.methodPlus()
   let _: BarBaseNested
+  _ = barGlobalHoistedFuncOldName(0, 1, 2)
 }
 
 func foo1(_ b: BarForwardDeclaredClass) {

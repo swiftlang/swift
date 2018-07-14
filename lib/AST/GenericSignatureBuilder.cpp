@@ -166,7 +166,7 @@ public:
   ///
   /// \returns the path, or None if it contained unresolved dependent member
   /// types.
-  RewritePath static createPath(Type type);
+  static RewritePath createPath(Type type);
 
   /// Decompose a type into a path.
   ///
@@ -1775,7 +1775,7 @@ FloatingRequirementSource FloatingRequirementSource::asInferred(
 bool FloatingRequirementSource::isRecursive(
                                     Type rootType,
                                     GenericSignatureBuilder &builder) const {
-  llvm::SmallSet<std::pair<CanType, ProtocolDecl *>, 4> visitedAssocReqs;
+  llvm::SmallSet<std::pair<CanType, ProtocolDecl *>, 32> visitedAssocReqs;
   for (auto storedSource = storage.dyn_cast<const RequirementSource *>();
        storedSource; storedSource = storedSource->parent) {
     // FIXME: isRecursive() is completely misnamed
@@ -2604,20 +2604,28 @@ ConstraintResult GenericSignatureBuilder::handleUnresolvedRequirement(
   }
 }
 
-// Function for feeding through any other requirements that the conformance
-// requires to be satisfied. These are things we're inferring.
-static void addConditionalRequirements(GenericSignatureBuilder &builder,
-                                       ProtocolConformanceRef conformance,
-                                       ModuleDecl *inferForModule) {
+bool GenericSignatureBuilder::addConditionalRequirements(
+    ProtocolConformanceRef conformance, ModuleDecl *inferForModule,
+    SourceLoc loc) {
   // Abstract conformances don't have associated decl-contexts/modules, but also
   // don't have conditional requirements.
   if (conformance.isConcrete()) {
-    auto source = FloatingRequirementSource::forInferred(nullptr);
-    for (auto requirement : conformance.getConditionalRequirements()) {
-      builder.addRequirement(requirement, source, inferForModule);
-      ++NumConditionalRequirementsAdded;
+    if (auto condReqs = conformance.getConditionalRequirementsIfAvailable()) {
+      auto source = FloatingRequirementSource::forInferred(nullptr);
+      for (auto requirement : *condReqs) {
+        addRequirement(requirement, source, inferForModule);
+        ++NumConditionalRequirementsAdded;
+      }
+    } else {
+      if (loc.isValid())
+        Diags.diagnose(loc, diag::unsupported_recursive_requirements);
+
+      Impl->HadAnyError = true;
+      return true;
     }
   }
+
+  return false;
 }
 
 const RequirementSource *
@@ -2639,9 +2647,7 @@ GenericSignatureBuilder::resolveConcreteConformance(ResolvedType type,
   // Lookup the conformance of the concrete type to this protocol.
   auto conformance =
       lookupConformance(type.getDependentType(*this)->getCanonicalType(),
-                        concrete,
-                        proto->getDeclaredInterfaceType()
-                          ->castTo<ProtocolType>());
+                        concrete, proto);
   if (!conformance) {
     if (!concrete->hasError() && concreteSource->getLoc().isValid()) {
       Impl->HadAnyError = true;
@@ -2658,7 +2664,10 @@ GenericSignatureBuilder::resolveConcreteConformance(ResolvedType type,
 
   concreteSource = concreteSource->viaConcrete(*this, *conformance);
   equivClass->recordConformanceConstraint(*this, type, proto, concreteSource);
-  addConditionalRequirements(*this, *conformance, /*inferForModule=*/nullptr);
+  if (addConditionalRequirements(*conformance, /*inferForModule=*/nullptr,
+                                 concreteSource->getLoc()))
+    return nullptr;
+
   return concreteSource;
 }
 const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
@@ -2672,9 +2681,7 @@ const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
   // Lookup the conformance of the superclass to this protocol.
   auto conformance =
     lookupConformance(type.getDependentType(*this)->getCanonicalType(),
-                      superclass,
-                      proto->getDeclaredInterfaceType()
-                        ->castTo<ProtocolType>());
+                      superclass, proto);
   if (!conformance) return nullptr;
 
   // Conformance to this protocol is redundant; update the requirement source
@@ -2689,7 +2696,10 @@ const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
   superclassSource =
     superclassSource->viaSuperclass(*this, *conformance);
   equivClass->recordConformanceConstraint(*this, type, proto, superclassSource);
-  addConditionalRequirements(*this, *conformance, /*inferForModule=*/nullptr);
+  if (addConditionalRequirements(*conformance, /*inferForModule=*/nullptr,
+                                 superclassSource->getLoc()))
+    return nullptr;
+
   return superclassSource;
 }
 
@@ -3825,16 +3835,16 @@ GenericSignatureBuilder::getLookupConformanceFn()
 Optional<ProtocolConformanceRef>
 GenericSignatureBuilder::lookupConformance(CanType dependentType,
                                            Type conformingReplacementType,
-                                           ProtocolType *conformedProtocol) {
+                                           ProtocolDecl *conformedProtocol) {
   if (conformingReplacementType->isTypeParameter())
-    return ProtocolConformanceRef(conformedProtocol->getDecl());
+    return ProtocolConformanceRef(conformedProtocol);
 
   // Figure out which module to look into.
   // FIXME: When lookupConformance() starts respecting modules, we'll need
   // to do some filtering here.
-  ModuleDecl *searchModule = conformedProtocol->getDecl()->getParentModule();
+  ModuleDecl *searchModule = conformedProtocol->getParentModule();
   auto result = searchModule->lookupConformance(conformingReplacementType,
-                                                conformedProtocol->getDecl());
+                                                conformedProtocol);
   if (result && getLazyResolver())
     getLazyResolver()->markConformanceUsed(*result, searchModule);
 
@@ -3948,6 +3958,12 @@ ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
                                     Type type,
                                     ArchetypeResolutionKind resolutionKind,
                                     bool wantExactPotentialArchetype) {
+  // An error type is best modeled as an unresolved potential archetype, since
+  // there's no way to be sure what it is actually meant to be.
+  if (type->is<ErrorType>()) {
+    return ResolvedType::forUnresolved(nullptr);
+  }
+
   // The equivalence class of a generic type is known directly.
   if (auto genericParam = type->getAs<GenericTypeParamType>()) {
     unsigned index = GenericParamKey(genericParam).findIndexIn(
@@ -4122,7 +4138,7 @@ void GenericSignatureBuilder::addGenericParameter(GenericTypeParamType *GenericP
 /// Visit all of the types that show up in the list of inherited
 /// types.
 static ConstraintResult visitInherited(
-         ArrayRef<TypeLoc> inheritedTypes,
+         llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
          llvm::function_ref<ConstraintResult(Type, const TypeRepr *)> visitType) {
   // Local function that (recursively) adds inherited types.
   ConstraintResult result = ConstraintResult::Resolved;
@@ -4149,8 +4165,17 @@ static ConstraintResult visitInherited(
   };
 
   // Visit all of the inherited types.
-  for (auto inherited : inheritedTypes) {
-    visitInherited(inherited.getType(), inherited.getTypeRepr());
+  auto typeDecl = decl.dyn_cast<TypeDecl *>();
+  auto extDecl = decl.dyn_cast<ExtensionDecl *>();
+  ArrayRef<TypeLoc> inheritedTypes = typeDecl ? typeDecl->getInherited()
+                                              : extDecl->getInherited();
+  for (unsigned index : indices(inheritedTypes)) {
+    Type inheritedType = typeDecl ? typeDecl->getInheritedType(index)
+                                  : extDecl->getInheritedType(index);
+    if (!inheritedType) continue;
+
+    const auto &inherited = inheritedTypes[index];
+    visitInherited(inheritedType, inherited.getTypeRepr());
   }
 
   return result;
@@ -4188,15 +4213,15 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
 
   if (!onlySameTypeConstraints) {
     // Add all of the inherited protocol requirements, recursively.
-    if (auto resolver = getLazyResolver())
-      resolver->resolveInheritedProtocols(proto);
-
     auto inheritedReqResult =
       addInheritedRequirements(proto, selfType.getUnresolvedType(), source,
                                proto->getModuleContext());
     if (isErrorResult(inheritedReqResult))
       return inheritedReqResult;
   }
+
+  if (auto resolver = getLazyResolver())
+    resolver->resolveTrailingWhereClause(proto);
 
   // Add any requirements in the where clause on the protocol.
   if (auto WhereClause = proto->getTrailingWhereClause()) {
@@ -4726,11 +4751,13 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
         // getLookupConformanceFns used in here don't use that parameter anyway.
         auto dependentType = CanType();
         auto conformance =
-            getLookupConformanceFn()(dependentType, subjectType, proto);
+            getLookupConformanceFn()(dependentType, subjectType, proto->getDecl());
 
         // FIXME: diagnose if there's no conformance.
         if (conformance) {
-          addConditionalRequirements(*this, *conformance, inferForModule);
+          if (addConditionalRequirements(*conformance, inferForModule,
+                                         source.getLoc()))
+            return ConstraintResult::Conflicting;
         }
       }
     }
@@ -4761,9 +4788,9 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
         anyErrors = true;
     }
 
-    if (layout.superclass) {
+    if (auto superclass = layout.explicitSuperclass) {
       if (isErrorResult(addSuperclassRequirementDirect(resolvedSubject,
-                                                       layout.superclass,
+                                                       superclass,
                                                        source)))
         anyErrors = true;
     }
@@ -5222,10 +5249,6 @@ ConstraintResult GenericSignatureBuilder::addInheritedRequirements(
       decl->getInterfaceType()->is<ErrorType>())
     return ConstraintResult::Resolved;
 
-  // Walk the 'inherited' list to identify requirements.
-  if (auto resolver = getLazyResolver())
-    resolver->resolveInheritanceClause(decl);
-
   // Local function to get the source.
   auto getFloatingSource = [&](const TypeRepr *typeRepr, bool forInferred) {
     if (parentSource) {
@@ -5267,7 +5290,7 @@ ConstraintResult GenericSignatureBuilder::addInheritedRequirements(
         UnresolvedHandlingKind::GenerateConstraints, inferForModule);
   };
 
-  return visitInherited(decl->getInherited(), visitType);
+  return visitInherited(decl, visitType);
 }
 
 ConstraintResult GenericSignatureBuilder::addRequirement(
@@ -5464,6 +5487,9 @@ public:
 
       return Action::Continue;
     }
+
+    if (!ty->isSpecialized())
+      return Action::Continue;
 
     // Infer from generic nominal types.
     auto decl = ty->getAnyNominal();
@@ -6992,17 +7018,24 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
 void GenericSignatureBuilder::checkConcreteTypeConstraints(
                               TypeArrayView<GenericTypeParamType> genericParams,
                               EquivalenceClass *equivClass) {
+  // Resolve any thus-far-unresolved dependent types.
+  Type resolvedConcreteType =
+    resolveDependentMemberTypes(*this, equivClass->concreteType);
+
   checkConstraintList<Type>(
     genericParams, equivClass->concreteTypeConstraints,
     [&](const ConcreteConstraint &constraint) {
-      return constraint.value->isEqual(equivClass->concreteType);
+      if (constraint.value->isEqual(resolvedConcreteType))
+        return true;
+
+      auto resolvedType =
+        resolveDependentMemberTypes(*this, constraint.value);
+      return resolvedType->isEqual(resolvedConcreteType);
     },
     [&](const Constraint<Type> &constraint) {
       Type concreteType = constraint.value;
 
       // If the concrete type is equivalent, the constraint is redundant.
-      // FIXME: Should check this constraint after substituting in the
-      // archetype anchors for each dependent type.
       if (concreteType->isEqual(equivClass->concreteType))
         return ConstraintRelation::Redundant;
 
@@ -7017,9 +7050,7 @@ void GenericSignatureBuilder::checkConcreteTypeConstraints(
     diag::redundant_same_type_to_concrete,
     diag::same_type_redundancy_here);
 
-  // Resolve any thus-far-unresolved dependent types.
-  equivClass->concreteType =
-    resolveDependentMemberTypes(*this, equivClass->concreteType);
+  equivClass->concreteType = resolvedConcreteType;
 }
 
 void GenericSignatureBuilder::checkSuperclassConstraints(
@@ -7027,23 +7058,20 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
                               EquivalenceClass *equivClass) {
   assert(equivClass->superclass && "No superclass constraint?");
 
-  // FIXME: We should be substituting in the canonical type in context so
-  // we can resolve superclass requirements, e.g., if you had:
-  //
-  //   class Foo<T>
-  //   class Bar: Foo<Int>
-  //
-  //   func foo<T, U where U: Bar, U: Foo<T>>(...) { ... }
-  //
-  // then the second `U: Foo<T>` constraint introduces a `T == Int`
-  // constraint, and we will need to perform that substitution for this final
-  // check.
+  // Resolve any this-far-unresolved dependent types.
+  Type resolvedSuperclass =
+    resolveDependentMemberTypes(*this, equivClass->superclass);
 
   auto representativeConstraint =
     checkConstraintList<Type>(
       genericParams, equivClass->superclassConstraints,
       [&](const ConcreteConstraint &constraint) {
-        return constraint.value->isEqual(equivClass->superclass);
+        if (constraint.value->isEqual(resolvedSuperclass))
+          return true;
+
+        Type resolvedType =
+          resolveDependentMemberTypes(*this, constraint.value);
+        return resolvedType->isEqual(equivClass->superclass);
       },
       [&](const Constraint<Type> &constraint) {
         Type superclass = constraint.value;
@@ -7060,15 +7088,16 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
       diag::superclass_redundancy_here);
 
   // Resolve any this-far-unresolved dependent types.
-  equivClass->superclass =
-    resolveDependentMemberTypes(*this, equivClass->superclass);
+  equivClass->superclass = resolvedSuperclass;
 
   // If we have a concrete type, check it.
   // FIXME: Substitute into the concrete type.
   if (equivClass->concreteType) {
+    Type resolvedConcreteType =
+      resolveDependentMemberTypes(*this, equivClass->concreteType);
     auto existing = equivClass->findAnyConcreteConstraintAsWritten();
     // Make sure the concrete type fulfills the superclass requirement.
-    if (!equivClass->superclass->isExactSuperclassOf(equivClass->concreteType)){
+    if (!equivClass->superclass->isExactSuperclassOf(resolvedConcreteType)){
       Impl->HadAnyError = true;
       if (existing) {
         Diags.diagnose(existing->source->getLoc(), diag::type_does_not_inherit,
@@ -7088,7 +7117,7 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
                        diag::type_does_not_inherit,
                        representativeConstraint.getSubjectDependentType(
                                                               genericParams),
-                       equivClass->concreteType, equivClass->superclass);
+                       resolvedConcreteType, equivClass->superclass);
       }
     } else if (representativeConstraint.source->shouldDiagnoseRedundancy(true)
                && existing &&
@@ -7456,6 +7485,12 @@ GenericSignature *GenericSignatureBuilder::computeGenericSignature(
 GenericSignature *GenericSignatureBuilder::computeRequirementSignature(
                                                      ProtocolDecl *proto) {
   GenericSignatureBuilder builder(proto->getASTContext());
+
+  if (!proto->hasInterfaceType()) {
+    // FIXME: Overkill.
+    if (auto lazyResolver = proto->getASTContext().getLazyResolver())
+      lazyResolver->resolveDeclSignature(proto);
+  }
 
   // Add the 'self' parameter.
   auto selfType =

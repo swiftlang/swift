@@ -2,9 +2,13 @@ from Child import Child
 from Node import Node  # noqa: I201
 
 ATTRIBUTE_NODES = [
-    # token-list -> token token-list?
+    # token-list -> token? token-list?
     Node('TokenList', kind='SyntaxCollection',
          element='Token'),
+
+    # token-list -> token token-list?
+    Node('NonEmptyTokenList', kind='SyntaxCollection',
+         element='Token', omit_when_empty=True),
 
     # attribute -> '@' identifier '('? 
     #              ( identifier 

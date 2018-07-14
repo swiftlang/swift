@@ -413,7 +413,8 @@ class Bar {
     self.collectionView? .#^BOUND_IUO^#x
     self.collectionView! .#^FORCED_IUO^#x
   }
-  // MEMBEROF_IUO: Begin completions, 1 items
+  // MEMBEROF_IUO: Begin completions, 2 items
+  // MEMBEROF_IUO: Keyword[self]/CurrNominal: self[#Foo#]; name=self
   // MEMBEROF_IUO: Decl[InstanceVar]/CurrNominal: x[#Int#]; name=x
   // MEMBEROF_IUO: End completions
 }

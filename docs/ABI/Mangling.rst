@@ -329,27 +329,63 @@ Types
   any-generic-type ::= protocol 'P'              // nominal protocol type
   any-generic-type ::= context decl-name 'a'     // typealias type (used in DWARF and USRs)
 
-  any-generic-type ::= 'S' KNOWN-TYPE-KIND       // known nominal type substitution
-  any-generic-type ::= 'S' NATURAL KNOWN-TYPE-KIND    // repeated known type substitutions of the same kind
+  any-generic-type ::= standard-substitutions
+  
+  standard-substitutions ::= 'S' KNOWN-TYPE-KIND       // known nominal type substitution
+  standard-substitutions ::= 'S' NATURAL KNOWN-TYPE-KIND    // repeated known type substitutions of the same kind
 
+  KNOWN-TYPE-KIND ::= 'A'                    // Swift.AutoreleasingUnsafeMutablePointer
   KNOWN-TYPE-KIND ::= 'a'                    // Swift.Array
+  KNOWN-TYPE-KIND ::= 'B'                    // Swift.BinaryFloatingPoint
   KNOWN-TYPE-KIND ::= 'b'                    // Swift.Bool
   KNOWN-TYPE-KIND ::= 'c'                    // Swift.UnicodeScalar
+  KNOWN-TYPE-KIND ::= 'D'                    // Swift.Dictionary
   KNOWN-TYPE-KIND ::= 'd'                    // Swift.Float64
+  KNOWN-TYPE-KIND ::= 'E'                    // Swift.Encodable
+  KNOWN-TYPE-KIND ::= 'e'                    // Swift.Decodable
+  KNOWN-TYPE-KIND ::= 'F'                    // Swift.FloatingPoint
   KNOWN-TYPE-KIND ::= 'f'                    // Swift.Float32
+  KNOWN-TYPE-KIND ::= 'G'                    // Swift.RandomNumberGenerator
+  KNOWN-TYPE-KIND ::= 'H'                    // Swift.Hashable
+  KNOWN-TYPE-KIND ::= 'h'                    // Swift.Set
+  KNOWN-TYPE-KIND ::= 'I'                    // Swift.DefaultIndices
   KNOWN-TYPE-KIND ::= 'i'                    // Swift.Int
-  KNOWN-TYPE-KIND ::= 'V'                    // Swift.UnsafeRawPointer
-  KNOWN-TYPE-KIND ::= 'v'                    // Swift.UnsafeMutableRawPointer
+  KNOWN-TYPE-KIND ::= 'J'                    // Swift.Character
+  KNOWN-TYPE-KIND ::= 'j'                    // Swift.Numeric
+  KNOWN-TYPE-KIND ::= 'K'                    // Swift.BidirectionalCollection
+  KNOWN-TYPE-KIND ::= 'k'                    // Swift.RandomAccessCollection
+  KNOWN-TYPE-KIND ::= 'L'                    // Swift.Comparable
+  KNOWN-TYPE-KIND ::= 'l'                    // Swift.Collection
+  KNOWN-TYPE-KIND ::= 'M'                    // Swift.MutableCollection
+  KNOWN-TYPE-KIND ::= 'm'                    // Swift.RangeReplaceableCollection
+  KNOWN-TYPE-KIND ::= 'N'                    // Swift.ClosedRange
+  KNOWN-TYPE-KIND ::= 'n'                    // Swift.Range
+  KNOWN-TYPE-KIND ::= 'O'                    // Swift.ObjectIdentifier
   KNOWN-TYPE-KIND ::= 'P'                    // Swift.UnsafePointer
   KNOWN-TYPE-KIND ::= 'p'                    // Swift.UnsafeMutablePointer
-  KNOWN-TYPE-KIND ::= 'Q'                    // Swift.ImplicitlyUnwrappedOptional
+  KNOWN-TYPE-KIND ::= 'Q'                    // Swift.Equatable
   KNOWN-TYPE-KIND ::= 'q'                    // Swift.Optional
   KNOWN-TYPE-KIND ::= 'R'                    // Swift.UnsafeBufferPointer
   KNOWN-TYPE-KIND ::= 'r'                    // Swift.UnsafeMutableBufferPointer
   KNOWN-TYPE-KIND ::= 'S'                    // Swift.String
+  KNOWN-TYPE-KIND ::= 's'                    // Swift.Substring
+  KNOWN-TYPE-KIND ::= 'T'                    // Swift.Sequence
+  KNOWN-TYPE-KIND ::= 't'                    // Swift.IteratorProtocol
+  KNOWN-TYPE-KIND ::= 'U'                    // Swift.UnsignedInteger
   KNOWN-TYPE-KIND ::= 'u'                    // Swift.UInt
+  KNOWN-TYPE-KIND ::= 'V'                    // Swift.UnsafeRawPointer
+  KNOWN-TYPE-KIND ::= 'v'                    // Swift.UnsafeMutableRawPointer
+  KNOWN-TYPE-KIND ::= 'W'                    // Swift.UnsafeRawBufferPointer
+  KNOWN-TYPE-KIND ::= 'w'                    // Swift.UnsafeMutableRawBufferPointer
+  KNOWN-TYPE-KIND ::= 'X'                    // Swift.RangeExpression
+  KNOWN-TYPE-KIND ::= 'x'                    // Swift.Strideable
+  KNOWN-TYPE-KIND ::= 'Y'                    // Swift.RawRepresentable
+  KNOWN-TYPE-KIND ::= 'y'                    // Swift.StringProtocol
+  KNOWN-TYPE-KIND ::= 'Z'                    // Swift.SignedInteger
+  KNOWN-TYPE-KIND ::= 'z'                    // Swift.BinaryInteger
 
   protocol ::= context decl-name
+  protocol ::= standard-substitutions
 
   type ::= 'Bb'                              // Builtin.BridgeObject
   type ::= 'BB'                              // Builtin.UnsafeValueBuffer
@@ -431,7 +467,6 @@ Types
 
   assoc-type-list ::= assoc-type-name '_' assoc-type-name*
 
-  archetype ::= context 'Qq' INDEX           // archetype+context (DWARF only)
   archetype ::= associated-type
 
   associated-type ::= substitution
@@ -762,7 +797,7 @@ The type is the function type of the specialized function.
 
 ::
 
-  specialization ::= spec-arg* 'Tf' SPEC-INFO UNIQUE-ID? ARG-SPEC-KIND* '_' ARG-SPEC-KIND  // Function signature specialization kind
+  specialization ::= spec-arg* 'Tf' SPEC-INFO ARG-SPEC-KIND* '_' ARG-SPEC-KIND  // Function signature specialization kind
 
 The ``<ARG-SPEC-KIND>`` describes how arguments are specialized.
 Some kinds need arguments, which precede ``Tf``.
@@ -783,12 +818,11 @@ Some kinds need arguments, which precede ``Tf``.
 
   FRAGILE ::= 'q'
 
-  UNIQUE-ID ::= NATURAL                      // Used to make unique function names
-
   ARG-SPEC-KIND ::= 'n'                      // Unmodified argument
   ARG-SPEC-KIND ::= 'c'                      // Consumes n 'type' arguments which are closed over types in argument order
                                              // and one 'identifier' argument which is the closure symbol name
   ARG-SPEC-KIND ::= 'p' CONST-PROP           // Constant propagated argument
+  ARG-SPEC-KIND ::= 'e' 'D'? 'G'? 'X'?       // Generic argument, with optional dead, owned=>guaranteed or exploded-specifier
   ARG-SPEC-KIND ::= 'd' 'G'? 'X'?            // Dead argument, with optional owned=>guaranteed or exploded-specifier
   ARG-SPEC-KIND ::= 'g' 'X'?                 // Owned => Guaranteed,, with optional exploded-specifier
   ARG-SPEC-KIND ::= 'x'                      // Exploded

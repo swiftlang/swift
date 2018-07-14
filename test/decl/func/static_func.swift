@@ -105,10 +105,15 @@ extension C_Derived {
   class override func ef5() {} // expected-error {{not supported}}
 }
 
-protocol P {
+protocol P { // expected-note{{extended type declared here}}
   static func f1()
   static func f2()
   static func f3() {} // expected-error {{protocol methods must not have bodies}}
   static final func f4() // expected-error {{only classes and class members may be marked with 'final'}}
+  class func f5() // expected-error {{class methods are only allowed within classes; use 'static' to declare a requirement fulfilled by either a static or class method}} {{3-8=static}}
+}
+
+extension P {
+  class func f6() {} // expected-error {{class methods are only allowed within classes; use 'static' to declare a static method}} {{3-8=static}}
 }
 

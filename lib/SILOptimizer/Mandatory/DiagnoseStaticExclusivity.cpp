@@ -734,6 +734,8 @@ static void checkCaptureAccess(ApplySite Apply, AccessState &State) {
     SILValue Argument = Apply.getArgument(ArgumentIndex);
     assert(Argument->getType().isAddress());
 
+    // A valid AccessedStorage should alway sbe found because Unsafe accesses
+    // are not tracked by AccessSummaryAnalysis.
     const AccessedStorage &Storage = findValidAccessedStorage(Argument);
     auto AccessIt = State.Accesses->find(Storage);
 
@@ -811,9 +813,15 @@ static void checkForViolationAtApply(ApplySite Apply, AccessState &State) {
 static void checkForViolationsAtInstruction(SILInstruction &I,
                                             AccessState &State) {
   if (auto *BAI = dyn_cast<BeginAccessInst>(&I)) {
+    if (BAI->getEnforcement() == SILAccessEnforcement::Unsafe)
+      return;
+
     SILAccessKind Kind = BAI->getAccessKind();
     const AccessedStorage &Storage =
       findValidAccessedStorage(BAI->getSource());
+    // Storage may be associated with a nested access where the outer access is
+    // "unsafe". That's ok because the outer access can itself be treated like a
+    // valid source, as long as we don't ask for its source.
     AccessInfo &Info = (*State.Accesses)[Storage];
     const IndexTrieNode *SubPath = State.ASA->findSubPathAccessed(BAI);
     if (auto Conflict = shouldReportAccess(Info, Kind, SubPath)) {
@@ -826,6 +834,9 @@ static void checkForViolationsAtInstruction(SILInstruction &I,
   }
 
   if (auto *EAI = dyn_cast<EndAccessInst>(&I)) {
+    if (EAI->getBeginAccess()->getEnforcement() == SILAccessEnforcement::Unsafe)
+      return;
+
     auto It =
       State.Accesses->find(findValidAccessedStorage(EAI->getSource()));
     AccessInfo &Info = It->getSecond();
@@ -868,7 +879,9 @@ static void checkForViolationsAtInstruction(SILInstruction &I,
     ApplySite apply(PAI);
     if (llvm::any_of(range(apply.getNumArguments()),
                      [apply](unsigned argIdx) {
-                       return apply.getArgumentConvention(argIdx)
+                       unsigned calleeIdx =
+                         apply.getCalleeArgIndexOfFirstAppliedArg() + argIdx;
+                       return apply.getArgumentConvention(calleeIdx)
                          == SILArgumentConvention::Indirect_InoutAliasable;
                      })) {
       checkNoEscapePartialApply(PAI);
@@ -980,6 +993,28 @@ static void checkNoEscapePartialApply(PartialApplyInst *PAI) {
       uses.append(EI->getUses().begin(), EI->getUses().end());
       continue;
     }
+    // Recurse through partial_apply to handle special cases before handling
+    // ApplySites in general below.
+    if (PartialApplyInst *PAI = dyn_cast<PartialApplyInst>(user)) {
+      // Use the same logic as checkForViolationAtApply applied to a def-use
+      // traversal.
+      //
+      // checkForViolationAtApply recurses through partial_apply chains.
+      if (oper->get() == PAI->getCallee()) {
+        uses.append(PAI->getUses().begin(), PAI->getUses().end());
+        continue;
+      }
+      // checkForViolationAtApply also uses findClosureForAppliedArg which in
+      // turn checks isPartialApplyOfReabstractionThunk.
+      //
+      // A closure with @inout_aliasable arguments may be applied to a
+      // thunk as "escaping", but as long as the thunk is only used as a
+      // '@noescape" type then it is safe.
+      if (isPartialApplyOfReabstractionThunk(PAI)) {
+        uses.append(PAI->getUses().begin(), PAI->getUses().end());
+        continue;
+      }
+    }
     if (isa<ApplySite>(user)) {
       SILValue arg = oper->get();
       auto ArgumentFnType = getSILFunctionTypeForValue(arg);
@@ -1065,7 +1100,16 @@ static void checkAccessedAddress(Operand *memOper, StorageMap &Accesses) {
   // initialization, not a formal memory access. The strength of
   // verification rests on the completeness of the opcode list inside
   // findAccessedStorage.
-  if (!storage || !isPossibleFormalAccessBase(storage, memInst->getFunction()))
+  //
+  // For the purpose of verification, an unidentified access is
+  // unenforced. These occur in cases like global addressors and local buffers
+  // that make use of RawPointers.
+  if (!storage || storage.getKind() == AccessedStorage::Unidentified)
+    return;
+
+  // Some identifiable addresses can also be recognized as local initialization
+  // or other patterns that don't qualify as formal access.
+  if (!isPossibleFormalAccessBase(storage, memInst->getFunction()))
     return;
 
   // A box or stack variable may represent lvalues, but they can only conflict
@@ -1080,6 +1124,9 @@ static void checkAccessedAddress(Operand *memOper, StorageMap &Accesses) {
   // Otherwise, the address base should be an in-scope begin_access.
   if (storage.getKind() == AccessedStorage::Nested) {
     auto *BAI = cast<BeginAccessInst>(storage.getValue());
+    if (BAI->getEnforcement() == SILAccessEnforcement::Unsafe)
+      return;
+
     const AccessedStorage &Storage = findValidAccessedStorage(BAI->getSource());
     AccessInfo &Info = Accesses[Storage];
     if (!Info.hasAccessesInProgress())

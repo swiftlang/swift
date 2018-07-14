@@ -25,7 +25,7 @@ public func f(s : S) -> (() -> ()) {
   return { gg = s }
 }
 
-// CHECK-DAG: @"\01l__swift4_reflection_descriptor" = private constant {{.*}}, section ".sw5cptr$B"
+// CHECK-DAG: @"\01l__swift5_reflection_descriptor" = private constant {{.*}}, section ".sw5cptr$B"
 // CHECK-DAG: @"{{.*}}" = {{.*}} c"Sq", {{.*}} section ".sw5tyrf$B"
 // CHECK-DAG: @{{[0-9]+}} = {{.*}} c"none\00", section ".sw5rfst$B"
 // CHECK-DAG: @{{[0-9]+}} = {{.*}} c"some\00", section ".sw5rfst$B"

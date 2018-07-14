@@ -196,8 +196,9 @@ func test012() {
   } catch {
     error.#^INSIDE_CATCH_ERR_DOT1^#
   }
-// ERROR_DOT-NOT: Begin completions
 }
+// ERROR_DOT: Begin completions
+// ERROR_DOT: Keyword[self]/CurrNominal: self[#Error#]; name=self
 func test013() {
   do {
   } catch let e {

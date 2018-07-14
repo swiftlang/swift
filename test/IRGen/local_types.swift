@@ -28,18 +28,6 @@ public struct PatternStruct {
   })()
 }
 
-public func singleDefaultArgument(i: Int = {
-  // CHECK-DAG: @"$S11local_types21singleDefaultArgument1iySi_tFfA_SiycfU_06SingledE6StructL_VMf" = internal constant
-  struct SingleDefaultArgumentStruct {
-    let i: Int
-  }
-  return 2
-
-  }()){
-    print(i)
-}
-
-
 #if COMPILED_OUT
 public func topLevelIfConfig() {
   class LocalClassDisabled {}

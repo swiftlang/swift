@@ -24,6 +24,8 @@ class Sema;
 
 namespace swift {
 
+class DeclContext;
+
 class ClangModuleLoader : public ModuleLoader {
 private:
   virtual void anchor();
@@ -46,6 +48,16 @@ public:
   /// \returns true if there was an error adding the search path.
   virtual bool addSearchPath(StringRef newSearchPath, bool isFramework,
                              bool isSystem) = 0;
+
+  /// Determine whether \c overlayDC is within an overlay module for the
+  /// imported context enclosing \c importedDC.
+  ///
+  /// This routine is used for various hacks that are only permitted within
+  /// overlays of imported modules, e.g., Objective-C bridging conformances.
+  virtual bool isInOverlayModuleForImportedModule(
+                                            const DeclContext *overlayDC,
+                                            const DeclContext *importedDC) = 0;
+
 };
 
 } // namespace swift

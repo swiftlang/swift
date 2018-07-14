@@ -74,6 +74,8 @@ bool isUnknownKind(SyntaxKind Kind);
 SyntaxKind getUnknownKind(SyntaxKind Kind);
 } // end namespace syntax
 
+bool parserShallOmitWhenNoChildren(syntax::SyntaxKind Kind);
+
 namespace json {
 
 /// Serialization traits for SyntaxKind.
@@ -107,5 +109,9 @@ struct ScalarEnumerationTraits<swift::syntax::SyntaxKind> {
 };
 
 } // end namespace yaml
+} // end namespace llvm
+
+namespace llvm {
+  raw_ostream &operator<<(raw_ostream &OS, swift::syntax::SyntaxKind Kind);
 } // end namespace llvm
 #endif // SWIFT_SYNTAX_KIND_H

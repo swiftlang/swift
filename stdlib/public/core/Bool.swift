@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -43,6 +43,7 @@
 ///         print(i)
 ///         i -= 1
 ///     }
+///     // error: 'Int' is not convertible to 'Bool'
 ///
 /// The correct approach in Swift is to compare the `i` value with zero in the
 /// `while` statement.
@@ -68,7 +69,6 @@ public struct Bool {
   ///
   /// Do not call this initializer directly. Instead, use the Boolean literal
   /// `false` to create a new `Bool` instance.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init() {
     let zero: Int8 = 0
@@ -86,10 +86,56 @@ public struct Bool {
   public init(_ value: Bool) {
     self = value
   }
+
+  /// Returns a random Boolean value, using the given generator as a source for
+  /// randomness.
+  ///
+  /// This method returns `true` and `false` with equal probability. Use this
+  /// method to generate a random Boolean value when you are using a custom
+  /// random number generator.
+  ///
+  ///     let flippedHeads = Bool.random(using: &myGenerator)
+  ///     if flippedHeads {
+  ///         print("Heads, you win!")
+  ///     } else {
+  ///         print("Maybe another try?")
+  ///     }
+  ///
+  /// - Parameter generator: The random number generator to use when creating
+  ///   the new random value.
+  /// - Returns: Either `true` or `false`, randomly chosen with equal
+  ///   probability.
+  @inlinable
+  public static func random<T: RandomNumberGenerator>(
+    using generator: inout T
+  ) -> Bool {
+    return (generator.next() >> 17) & 1 == 0
+  }
+  
+  /// Returns a random Boolean value.
+  ///
+  /// This method returns `true` and `false` with equal probability.
+  ///
+  ///     let flippedHeads = Bool.random()
+  ///     if flippedHeads {
+  ///         print("Heads, you win!")
+  ///     } else {
+  ///         print("Maybe another try?")
+  ///     }
+  ///
+  /// `Bool.random()` uses the default random generator, `Random.default`. The
+  /// call in the example above is equivalent to
+  /// `Bool.random(using: &Random.default)`.
+  ///
+  /// - Returns: Either `true` or `false`, randomly chosen with equal
+  ///   probability.
+  @inlinable
+  public static func random() -> Bool {
+    return Bool.random(using: &Random.default)
+  }
 }
 
 extension Bool : _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLiteral {
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init(_builtinBooleanLiteral value: Builtin.Int1) {
     self._value = value
@@ -113,7 +159,6 @@ extension Bool : _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLitera
   /// this Boolean literal initializer behind the scenes.
   ///
   /// - Parameter value: The value of the new instance.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init(booleanLiteral value: Bool) {
     self = value
@@ -122,7 +167,6 @@ extension Bool : _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLitera
 
 extension Bool {
   // This is a magic entry point known to the compiler.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public // COMPILER_INTRINSIC
   func _getBuiltinLogicValue() -> Builtin.Int1 {
@@ -139,13 +183,11 @@ extension Bool : CustomStringConvertible {
 }
 
 // This is a magic entry point known to the compiler.
-@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public // COMPILER_INTRINSIC
 func _getBool(_ v: Builtin.Int1) -> Bool { return Bool(v) }
 
 extension Bool: Equatable {
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func == (lhs: Bool, rhs: Bool) -> Bool {
     return Bool(Builtin.cmp_eq_Int1(lhs._value, rhs._value))
@@ -153,7 +195,12 @@ extension Bool: Equatable {
 }
 
 extension Bool: Hashable {
-  @inlinable // FIXME(sil-serialize-all)
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
+  @inlinable
   public func hash(into hasher: inout Hasher) {
     hasher.combine((self ? 1 : 0) as UInt8)
   }
@@ -198,7 +245,6 @@ extension Bool {
   ///     // Prints "You look nice today!"
   ///
   /// - Parameter a: The Boolean value to negate.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static prefix func ! (a: Bool) -> Bool {
     return Bool(Builtin.xor_Int1(a._value, true._value))

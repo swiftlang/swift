@@ -14,67 +14,25 @@ typealias Bool = Builtin.Int1
 
 // CHECK: call swiftcc void @swift_errorInMain(
 
-infix operator * {
-  associativity left
-  precedence 200
-}
-infix operator / {
-  associativity left
-  precedence 200
-}
-infix operator % {
-  associativity left
-  precedence 200
-}
+infix operator *
+infix operator /
+infix operator %
 
-infix operator + {
-  associativity left
-  precedence 190
-}
-infix operator - {
-  associativity left
-  precedence 190
-}
+infix operator +
+infix operator -
 
-infix operator << {
-  associativity none
-  precedence 180
-}
-infix operator >> {
-  associativity none
-  precedence 180
-}
+infix operator <<
+infix operator >>
 
-infix operator ... {
-  associativity none
-  precedence 175
-}
+infix operator ...
 
-infix operator < {
-  associativity none
-  precedence 170
-}
-infix operator <= {
-  associativity none
-  precedence 170
-}
-infix operator > {
-  associativity none
-  precedence 170
-}
-infix operator >= {
-  associativity none
-  precedence 170
-}
+infix operator <
+infix operator <=
+infix operator >
+infix operator >=
 
-infix operator == {
-  associativity none
-  precedence 160
-}
-infix operator != {
-  associativity none
-  precedence 160
-}
+infix operator ==
+infix operator !=
 
 func * (lhs: Int, rhs: Int) -> Int {
   return Builtin.mul_Int32(lhs, rhs)
@@ -225,12 +183,12 @@ func sizeof_alignof_test() {
 
 // CHECK: define hidden {{.*}}void @"$S8builtins27generic_sizeof_alignof_testyyxlF"
 func generic_sizeof_alignof_test<T>(_: T) {
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 9
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 8
   // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
   // CHECK-NEXT: [[SIZE:%.*]] = ptrtoint i8* [[T1]] to i64
   // CHECK-NEXT: store i64 [[SIZE]], i64* [[S:%.*]]
   var s = Builtin.sizeof(T.self)
-  // CHECK: [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 10
+  // CHECK: [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 9
   // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
   // CHECK-NEXT: [[T2:%.*]] = ptrtoint i8* [[T1]] to i64
   // CHECK-NEXT: [[T3:%.*]] = and i64 [[T2]], 65535
@@ -241,7 +199,7 @@ func generic_sizeof_alignof_test<T>(_: T) {
 
 // CHECK: define hidden {{.*}}void @"$S8builtins21generic_strideof_testyyxlF"
 func generic_strideof_test<T>(_: T) {
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 11
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 10
   // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
   // CHECK-NEXT: [[STRIDE:%.*]] = ptrtoint i8* [[T1]] to i64
   // CHECK-NEXT: store i64 [[STRIDE]], i64* [[S:%.*]]
@@ -771,7 +729,7 @@ func isUniqueIUO(_ ref: inout Builtin.NativeObject?) -> Bool {
 
 // CHECK-LABEL: define {{.*}} @{{.*}}generic_ispod_test
 func generic_ispod_test<T>(_: T) {
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 10
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 9
   // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
   // CHECK-NEXT: [[FLAGS:%.*]] = ptrtoint i8* [[T1]] to i64
   // CHECK-NEXT: [[ISNOTPOD:%.*]] = and i64 [[FLAGS]], 65536
@@ -785,7 +743,7 @@ func ispod_test() {
   // CHECK: store i1 true, i1*
   // CHECK: store i1 false, i1*
   var t = Builtin.ispod(Int.self)
-  var f = Builtin.ispod(Builtin.NativeObject)
+  var f = Builtin.ispod(Builtin.NativeObject.self)
 }
 
 // CHECK-LABEL: define {{.*}} @{{.*}}is_same_metatype
@@ -819,6 +777,8 @@ func unsafeGuaranteed_test(_ x: Builtin.NativeObject) -> Builtin.NativeObject {
 
 // CHECK-LABEL: define {{.*}} @{{.*}}unsafeGuaranteedEnd_test
 // CHECK-NEXT: {{.*}}:
+// CHECK-NEXT: alloca
+// CHECK-NEXT: store
 // CHECK-NEXT: ret void
 func unsafeGuaranteedEnd_test(_ x: Builtin.Int8) {
   Builtin.unsafeGuaranteedEnd(x)
@@ -849,9 +809,8 @@ func atomicload(_ p: Builtin.RawPointer) {
 }
 
 // CHECK-LABEL: define {{.*}} @"$S8builtins14stringObjectOryS2u_SutF"(i64, i64)
-// CHECK-NEXT: {{.*}}:
-// CHECK-NEXT: %2 = or i64 %0, %1
-// CHECK-NEXT: ret i64 %2
+// CHECK:      %4 = or i64 %0, %1
+// CHECK-NEXT: ret i64 %4
 func stringObjectOr(_ x: UInt, _ y: UInt) -> UInt {
   return UInt(Builtin.stringObjectOr_Int64(
   x._value, y._value))

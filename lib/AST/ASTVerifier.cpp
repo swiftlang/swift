@@ -558,16 +558,6 @@ public:
         }
         return;
       }
-
-      // Require an access kind to be set on every l-value expression.
-      // Note that the empty tuple type is assignable but usually isn't
-      // an l-value, so we have to be conservative there.
-      if (E->getType()->hasLValueType() != E->hasLValueAccessKind() &&
-          !(E->hasLValueAccessKind() && E->getType()->isAssignableType())) {
-        Out << "l-value expression does not have l-value access kind set\n";
-        E->print(Out);
-        abort();
-      }
     }
     void verifyChecked(Stmt *S) {}
     void verifyChecked(Pattern *P) { }
@@ -934,6 +924,7 @@ public:
     void verifyChecked(DeferStmt *S) {
       auto FT = S->getTempDecl()->getInterfaceType()->castTo<AnyFunctionType>();
       assert(FT->isNoEscape() && "Defer statements must not escape");
+      (void)FT;
       verifyCheckedBase(S);
     }
 
@@ -1251,7 +1242,7 @@ public:
       }
 
       auto layout = srcTy->getExistentialLayout();
-      if (layout.superclass ||
+      if (layout.explicitSuperclass ||
           !layout.isObjC() ||
           layout.getProtocols().size() != 1) {
         Out << "ProtocolMetatypeToObject with non-ObjC-protocol metatype:\n";
@@ -1576,7 +1567,7 @@ public:
                  "\nArgument type: ";
           E->getArg()->getType().print(Out);
           Out << "\nParameter type: ";
-          FT->getInput()->print(Out);
+          FT->printParams(Out);
           Out << "\n";
           E->dump(Out);
           abort();
@@ -1624,7 +1615,7 @@ public:
       if (auto *baseIOT = E->getBase()->getType()->getAs<InOutType>()) {
         if (!baseIOT->getObjectType()->is<ArchetypeType>()) {
           auto *VD = dyn_cast<VarDecl>(E->getMember().getDecl());
-          if (!VD || !VD->hasAccessorFunctions()) {
+          if (!VD || VD->getAllAccessors().empty()) {
             Out << "member_ref_expr on value of inout type\n";
             E->dump(Out);
             abort();
@@ -1756,7 +1747,6 @@ public:
         Out << "Unexpected types in IdentityExpr\n";
         abort();
       }
-      checkSameLValueAccessKind(E, E->getSubExpr(), "IdentityExpr");
 
       verifyCheckedBase(E);
     }
@@ -2091,6 +2081,19 @@ public:
       abort();
     }
 
+    void verifyChecked(LoadExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying LoadExpr", E);
+
+      auto *subExpr = E->getSubExpr();
+      if (isa<ParenExpr>(subExpr) || isa<ForceValueExpr>(subExpr)) {
+        Out << "Immediate ParenExpr/ForceValueExpr should preceed a LoadExpr\n";
+        E->dump(Out);
+        abort();
+      }
+
+      verifyCheckedBase(E);
+    }
+
     static bool hasEnclosingFunctionContext(DeclContext *dc) {
       switch (dc->getContextKind()) {
       case DeclContextKind::AbstractClosureExpr:
@@ -2151,6 +2154,13 @@ public:
       verifyCheckedBase(VD);
     }
 
+    bool shouldWalkIntoLazyInitializers() override {
+      // We don't want to walk into lazy initializers because they should
+      // have been reparented to their synthesized getter, which will
+      // invalidate various invariants.
+      return false;
+    }
+
     void verifyChecked(PatternBindingDecl *binding) {
       // Look at all of the VarDecls being bound.
       for (auto entry : binding->getPatternList())
@@ -2194,20 +2204,18 @@ public:
           abort();
         }
       }
-      if (ASD->hasAddressors()) {
-        if (auto addressor = ASD->getAddressor()) {
-          if (addressor->isMutating() != ASD->isGetterMutating()) {
-            Out << "AbstractStorageDecl::isGetterMutating is out of sync"
-                   " with whether immutable addressor is mutating";
-            abort();
-          }
+      if (auto addressor = ASD->getAddressor()) {
+        if (addressor->isMutating() != ASD->isGetterMutating()) {
+          Out << "AbstractStorageDecl::isGetterMutating is out of sync"
+                 " with whether immutable addressor is mutating";
+          abort();
         }
-        if (auto addressor = ASD->getMutableAddressor()) {
-          if (addressor->isMutating() != ASD->isSetterMutating()) {
-            Out << "AbstractStorageDecl::isSetterMutating is out of sync"
-                   " with whether mutable addressor is mutating";
-            abort();
-          }
+      }
+      if (auto addressor = ASD->getMutableAddressor()) {
+        if (addressor->isMutating() != ASD->isSetterMutating()) {
+          Out << "AbstractStorageDecl::isSetterMutating is out of sync"
+                 " with whether mutable addressor is mutating";
+          abort();
         }
       }
 
@@ -2255,15 +2263,15 @@ public:
 
       // Variables must have materializable type, unless they are parameters,
       // in which case they must either have l-value type or be anonymous.
-      if (!var->getInterfaceType()->isMaterializable() || var->isInOut()) {
+      if (!var->getInterfaceType()->isMaterializable()) {
         if (!isa<ParamDecl>(var)) {
-          Out << "Non-parameter VarDecl has non-materializable type: ";
+          Out << "VarDecl has non-materializable type: ";
           var->getType().print(Out);
           Out << "\n";
           abort();
         }
 
-        if (!var->getInterfaceType()->is<InOutType>() && var->hasName()) {
+        if (!var->isInOut() && var->hasName()) {
           Out << "ParamDecl may only have non-materializable tuple type "
                  "when it is anonymous: ";
           var->getType().print(Out);
@@ -2340,8 +2348,7 @@ public:
 
       if (var->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
         auto varTy = var->getInterfaceType()
-                         ->getReferenceStorageReferent()
-                         ->getWithoutSpecifierType();
+                         ->getReferenceStorageReferent();
 
         // FIXME: Update to look for plain Optional once
         // ImplicitlyUnwrappedOptional is removed
@@ -2906,13 +2913,13 @@ public:
           abort();
         }
         const ParamDecl *selfParam = FD->getImplicitSelfDecl();
-        if (!selfParam->getInterfaceType()->is<InOutType>()) {
+        if (!selfParam->isInOut()) {
           Out << "mutating function does not have inout 'self'\n";
           abort();
         }
       } else {
         const ParamDecl *selfParam = FD->getImplicitSelfDecl();
-        if (selfParam && selfParam->getInterfaceType()->is<InOutType>()) {
+        if (selfParam && selfParam->isInOut()) {
           Out << "non-mutating function has inout 'self'\n";
           abort();
         }
@@ -2925,7 +2932,7 @@ public:
           abort();
         }
 
-        auto resultTy = FD->getResultInterfaceType()->getWithoutSpecifierType();
+        auto resultTy = FD->getResultInterfaceType();
 
         // FIXME: Update to look for plain Optional once
         // ImplicitlyUnwrappedOptional is removed
@@ -2959,27 +2966,26 @@ public:
         }
       }
 
-      auto storedAccessor =
-        storageDecl->getAccessorFunction(FD->getAccessorKind());
+      auto storedAccessor = storageDecl->getAccessor(FD->getAccessorKind());
       if (storedAccessor != FD) {
         Out << "storage declaration has different accessor for this kind\n";
         abort();
       }
 
       switch (FD->getAccessorKind()) {
-      case AccessorKind::IsGetter:
-      case AccessorKind::IsSetter:
-      case AccessorKind::IsWillSet:
-      case AccessorKind::IsDidSet:
-      case AccessorKind::IsMaterializeForSet:
+      case AccessorKind::Get:
+      case AccessorKind::Set:
+      case AccessorKind::WillSet:
+      case AccessorKind::DidSet:
+      case AccessorKind::MaterializeForSet:
         if (FD->getAddressorKind() != AddressorKind::NotAddressor) {
           Out << "non-addressor accessor has an addressor kind\n";
           abort();
         }
         break;
 
-      case AccessorKind::IsAddressor:
-      case AccessorKind::IsMutableAddressor:
+      case AccessorKind::Address:
+      case AccessorKind::MutableAddress:
         if (FD->getAddressorKind() == AddressorKind::NotAddressor) {
           Out << "addressor does not have an addressor kind\n";
           abort();
@@ -3130,15 +3136,6 @@ public:
       T.print(Out);
       Out << "\n";
       abort();
-    }
-
-    void checkSameLValueAccessKind(Expr *LHS, Expr *RHS, const char *what) {
-      if (LHS->hasLValueAccessKind() != RHS->hasLValueAccessKind() ||
-          (LHS->hasLValueAccessKind() &&
-           LHS->getLValueAccessKind() != RHS->getLValueAccessKind())) {
-        Out << what << " has a mismatched l-value access kind\n";
-        abort();
-      }
     }
 
     // Verification utilities.

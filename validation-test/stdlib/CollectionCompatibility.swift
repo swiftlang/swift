@@ -24,7 +24,7 @@ struct MyCollection<Element>: Collection {
 }
 
 //===--- MyBidiCollection -------------------------------------------------===//
-/// A simple collection that attempts to use an Int16 IndexDistance
+/// A simple collection that doesn't declare an IndexDistance
 struct MyBidiCollection<Element>: BidirectionalCollection {
   var _elements: [Element]
   
@@ -45,12 +45,12 @@ let CollectionDistance = TestSuite("Collection.IndexDistance")
 
 CollectionDistance.test("Int16/distance") {
   let c = MyCollection<Int>(_elements: [1,2,3])
-  let d: Int16 = c.distance(from: c.startIndex, to: c.endIndex)
+  var d: Int16 = c.distance(from: c.startIndex, to: c.endIndex)
   expectEqual(3, d)
+  expectType(MyCollection<Int>.IndexDistance.self, &d)
   // without type context, you now get an Int
   var i = c.distance(from: c.startIndex, to: c.endIndex)
   expectType(Int.self, &i)
-  expectType(MyCollection<Int>.IndexDistance.self, &i)
 }
 
 CollectionDistance.test("Int16/advance") {
@@ -76,12 +76,10 @@ CollectionDistance.test("Int16/advance") {
 
 CollectionDistance.test("Int64/distance") {
   let c = MyBidiCollection<Int>(_elements: [1,2,3])
-  let d: Int16 = c.distance(from: c.startIndex, to: c.endIndex)
+  var d = c.distance(from: c.startIndex, to: c.endIndex)
   expectEqual(3, d)
-  // without type context, you now get an Int
-  var i = c.distance(from: c.startIndex, to: c.endIndex)
-  expectType(Int.self, &i)
-  expectType(MyCollection<Int>.IndexDistance.self, &i)
+  expectType(Int.self, &d)
+  expectType(MyBidiCollection<Int>.IndexDistance.self, &d)
 }
 
 CollectionDistance.test("Int64/advance") {
@@ -104,6 +102,17 @@ CollectionDistance.test("Int64/advance") {
 
   checkCollection(c, [1,2,3], stackTrace: SourceLocStack()) { $0 == $1 }
   checkBidirectionalCollection(c, [1,2,3])
+}
+
+extension Collection where Index == Int, IndexDistance == Int {
+  var myCount: Int {
+    return distance(from: startIndex, to: endIndex)
+  }
+}
+
+CollectionDistance.test("IndexDistance/constraint") {
+  let n = [1,2,3].myCount
+  expectEqual(3, n)
 }
 
 runAllTests()

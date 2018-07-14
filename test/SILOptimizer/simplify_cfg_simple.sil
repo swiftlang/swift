@@ -1,0 +1,29 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -simplify-cfg %s | %FileCheck %s
+//
+// Make sure that we can succesfully call simplify-cfg with that name via sil-opt.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// CHECK-LABEL: sil @simple_test : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'simple_test'
+sil @simple_test : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int1, -1
+  cond_br %0, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %9999 = tuple ()
+  return %9999 : $()
+}

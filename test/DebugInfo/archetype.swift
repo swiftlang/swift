@@ -22,5 +22,5 @@ func ExistentialTuple<T: RandomAccessIndex>(_ x: T, y: T) -> T.Distance {
   return _overflowChecked((tmp.0, tmp.1))
 }
 // CHECK: ![[TT]] = !DICompositeType(tag: DW_TAG_structure_type,
-// CHECK-SAME:                       name: "$S9archetype16ExistentialTuple_1y8Distance
+// CHECK-SAME:                       name: "$S8DistanceQz_SbtD"
 

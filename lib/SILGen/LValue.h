@@ -431,7 +431,7 @@ public:
   /// Add a member component to the access path of this lvalue.
   void addMemberComponent(SILGenFunction &SGF, SILLocation loc,
                           AbstractStorageDecl *storage,
-                          SubstitutionList subs,
+                          SubstitutionMap subs,
                           LValueOptions options,
                           bool isSuper,
                           AccessKind accessKind,
@@ -442,7 +442,7 @@ public:
 
   void addMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
                              VarDecl *var,
-                             SubstitutionList subs,
+                             SubstitutionMap subs,
                              LValueOptions options,
                              bool isSuper,
                              AccessKind accessKind,
@@ -452,7 +452,7 @@ public:
 
   void addMemberSubscriptComponent(SILGenFunction &SGF, SILLocation loc,
                                    SubscriptDecl *subscript,
-                                   SubstitutionList subs,
+                                   SubstitutionMap subs,
                                    LValueOptions options,
                                    bool isSuper,
                                    AccessKind accessKind,

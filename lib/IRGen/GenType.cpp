@@ -43,7 +43,6 @@
 #include "ProtocolInfo.h"
 #include "ReferenceTypeInfo.h"
 #include "ScalarTypeInfo.h"
-#include "WeakTypeInfo.h"
 #include "NativeConventionSchema.h"
 #include "IRGenMangler.h"
 #include "NonFixedTypeInfo.h"
@@ -1158,10 +1157,11 @@ const TypeInfo &IRGenModule::getTypeMetadataPtrTypeInfo() {
   return Types.getTypeMetadataPtrTypeInfo();
 }
 
-const LoadableTypeInfo &TypeConverter::getTypeMetadataPtrTypeInfo() {
+const TypeInfo &TypeConverter::getTypeMetadataPtrTypeInfo() {
   if (TypeMetadataPtrTI) return *TypeMetadataPtrTI;
-  TypeMetadataPtrTI =
-    createUnmanagedStorageType(IGM.TypeMetadataPtrTy);
+  TypeMetadataPtrTI = createUnmanagedStorageType(IGM.TypeMetadataPtrTy,
+                                                 ReferenceCounting::Unknown,
+                                                 /*isOptional*/false);
   TypeMetadataPtrTI->NextConverted = FirstType;
   FirstType = TypeMetadataPtrTI;
   return *TypeMetadataPtrTI;
@@ -1243,12 +1243,15 @@ const LoadableTypeInfo &TypeConverter::getEmptyTypeInfo() {
   return *EmptyTI;
 }
 
-const TypeInfo &TypeConverter::getResilientStructTypeInfo() {
-  if (ResilientStructTI) return *ResilientStructTI;
-  ResilientStructTI = convertResilientStruct();
-  ResilientStructTI->NextConverted = FirstType;
-  FirstType = ResilientStructTI;
-  return *ResilientStructTI;
+const TypeInfo &
+TypeConverter::getResilientStructTypeInfo(IsABIAccessible_t isAccessible) {
+  auto &cache = isAccessible ? AccessibleResilientStructTI
+                             : InaccessibleResilientStructTI;
+  if (cache) return *cache;
+  cache = convertResilientStruct(isAccessible);
+  cache->NextConverted = FirstType;
+  FirstType = cache;
+  return *cache;
 }
 
 /// Get the fragile type information for the given type, which may not
@@ -1365,17 +1368,7 @@ const TypeInfo &IRGenModule::getTypeInfoForLowered(CanType T) {
 const TypeInfo &TypeConverter::getCompleteTypeInfo(CanType T) {
   auto entry = getTypeEntry(T);
   assert(entry.is<const TypeInfo*>() && "getting TypeInfo recursively!");
-  auto &ti = *entry.get<const TypeInfo*>();
-  assert(ti.isComplete());
-  return ti;
-}
-
-const TypeInfo *TypeConverter::tryGetCompleteTypeInfo(CanType T) {
-  auto entry = getTypeEntry(T);
-  if (!entry.is<const TypeInfo*>()) return nullptr;
-  auto &ti = *entry.get<const TypeInfo*>();
-  if (!ti.isComplete()) return nullptr;
-  return &ti;
+  return *entry.get<const TypeInfo*>();
 }
 
 ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t) {
@@ -1675,12 +1668,10 @@ TypeCacheEntry TypeConverter::convertType(CanType ty) {
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
     llvm_unreachable("can't convert dependent type");
-  case TypeKind::UnmanagedStorage:
-    return convertUnmanagedStorageType(cast<UnmanagedStorageType>(ty));
-  case TypeKind::UnownedStorage:
-    return convertUnownedStorageType(cast<UnownedStorageType>(ty));
-  case TypeKind::WeakStorage:
-    return convertWeakStorageType(cast<WeakStorageType>(ty));
+#define REF_STORAGE(Name, ...) \
+  case TypeKind::Name##Storage: \
+    return convert##Name##StorageType(cast<Name##StorageType>(ty));
+#include "swift/AST/ReferenceStorage.def"
   case TypeKind::SILBlockStorage: {
     return convertBlockStorageType(cast<SILBlockStorageType>(ty));
   case TypeKind::SILBox:
@@ -1702,42 +1693,22 @@ const TypeInfo *TypeConverter::convertInOutType(InOutType *T) {
                          IGM.getPointerAlignment());
 }
 
-/// Convert an [unowned] storage type.  The implementation here
-/// depends on the underlying reference type.
-const TypeInfo *
-TypeConverter::convertUnownedStorageType(UnownedStorageType *refType) {
-  // The type may be optional.
-  CanType referent(refType->getReferentType());
-  if (auto referentObj = referent.getOptionalObjectType())
-    referent = referentObj;
-  assert(referent->allowsOwnership());
-  auto &referentTI = cast<ReferenceTypeInfo>(getCompleteTypeInfo(referent));
-  return referentTI.createUnownedStorageType(*this);
+/// Convert a reference storage type. The implementation here depends on the
+/// underlying reference type. The type may be optional.
+#define REF_STORAGE(Name, ...) \
+const TypeInfo * \
+TypeConverter::convert##Name##StorageType(Name##StorageType *refType) { \
+  CanType referent(refType->getReferentType()); \
+  bool isOptional = false; \
+  if (auto referentObj = referent.getOptionalObjectType()) { \
+    referent = referentObj; \
+    isOptional = true; \
+  } \
+  assert(referent->allowsOwnership()); \
+  auto &referentTI = cast<ReferenceTypeInfo>(getCompleteTypeInfo(referent)); \
+  return referentTI.create##Name##StorageType(*this, isOptional); \
 }
-
-/// Convert an @unowned(unsafe) storage type.  The implementation here
-/// depends on the underlying reference type.
-const TypeInfo *
-TypeConverter::convertUnmanagedStorageType(UnmanagedStorageType *refType) {
-  // The type may be optional.
-  CanType referent(refType->getReferentType());
-  if (auto referentObj = referent.getOptionalObjectType())
-    referent = referentObj;
-  assert(referent->allowsOwnership());
-  auto &referentTI = cast<ReferenceTypeInfo>(getCompleteTypeInfo(referent));
-  return referentTI.createUnmanagedStorageType(*this);
-}
-
-/// Convert a weak storage type.  The implementation here
-/// depends on the underlying reference type.
-const TypeInfo *
-TypeConverter::convertWeakStorageType(WeakStorageType *refType) {
-  CanType referent =
-      CanType(refType->getReferentType()->getOptionalObjectType());
-  assert(referent->allowsOwnership());
-  auto &referentTI = cast<ReferenceTypeInfo>(getCompleteTypeInfo(referent));
-  return referentTI.createWeakStorageType(*this);
-}
+#include "swift/AST/ReferenceStorage.def"
 
 static void overwriteForwardDecl(llvm::DenseMap<TypeBase*, TypeCacheEntry> &cache,
                                  TypeBase *key, const TypeInfo *result) {
@@ -1934,7 +1905,7 @@ const TypeInfo *TypeConverter::convertMetatypeType(MetatypeType *T) {
   return &getMetatypeTypeInfo(T->getRepresentation());
 }
 
-const LoadableTypeInfo &
+const TypeInfo &
 TypeConverter::getMetatypeTypeInfo(MetatypeRepresentation representation) {
   switch (representation) {
   case MetatypeRepresentation::Thin:

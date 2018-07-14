@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -14,31 +14,41 @@
 #define _REENTRANT
 #include <math.h>
 #endif
-#include <random>
-#include <type_traits>
-#include <cmath>
-#if defined(_WIN32)
+
+#if defined(_WIN32) && !defined(__CYGWIN__)
 #include <io.h>
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+#include <Bcrypt.h>
+#pragma comment(lib, "Bcrypt.lib")
 #else
-#include <unistd.h>
 #include <pthread.h>
 #include <semaphore.h>
 #include <sys/ioctl.h>
+#include <unistd.h>
 #endif
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <fcntl.h>
+#include <algorithm>
+#include <cmath>
 #include <errno.h>
-#include <sys/types.h>
+#include <fcntl.h>
+#include <random>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#if __has_include(<sys/random.h>)
+#include <sys/random.h>
+#endif
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <type_traits>
+
+#include "llvm/Support/DataTypes.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Config.h"
+#include "swift/Runtime/Debug.h"
+#include "swift/Runtime/Mutex.h"
 #include "../SwiftShims/LibcShims.h"
-#include "llvm/Support/DataTypes.h"
 
 using namespace swift;
 
@@ -171,7 +181,7 @@ int swift::_stdlib_ioctlPtr(int fd, unsigned long int request, void* ptr) {
 
 #if defined(__FreeBSD__)
 SWIFT_RUNTIME_STDLIB_INTERNAL
-char * _Nullable *swift::_stdlib_getEnviron() {
+char * _Nullable * _Null_unspecified swift::_stdlib_getEnviron() {
   extern char **environ;
   return environ;
 }
@@ -308,3 +318,76 @@ swift::_stdlib_cxx11_mt19937_uniform(__swift_uint32_t upper_bound) {
   std::uniform_int_distribution<__swift_uint32_t> RandomUniform(0, upper_bound);
   return RandomUniform(getGlobalMT19937());
 }
+
+// _stdlib_random
+//
+// Should the implementation of this function add a new platform/change for a
+// platform, make sure to also update the documentation regarding platform
+// implementation of this function.
+// This can be found at: /docs/Random.md
+
+#if defined(__APPLE__)
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+void swift::_stdlib_random(void *buf, __swift_size_t nbytes) {
+  arc4random_buf(buf, nbytes);
+}
+
+#elif defined(_WIN32) && !defined(__CYGWIN__)
+#warning TODO: Test _stdlib_random on Windows
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+void swift::_stdlib_random(void *buf, __swift_size_t nbytes) {
+  NTSTATUS status = BCryptGenRandom(nullptr,
+                                    static_cast<PUCHAR>(buf),
+                                    static_cast<ULONG>(nbytes),
+                                    BCRYPT_USE_SYSTEM_PREFERRED_RNG);
+  if (!BCRYPT_SUCCESS(status)) {
+    fatalError(0, "Fatal error: 0x%.8X in '%s'\n", status, __func__);
+  }
+}
+
+#else
+
+#undef  WHILE_EINTR
+#define WHILE_EINTR(expression) ({                                             \
+  decltype(expression) result = -1;                                            \
+  do { result = (expression); } while (result == -1 && errno == EINTR);        \
+  result;                                                                      \
+})
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+void swift::_stdlib_random(void *buf, __swift_size_t nbytes) {
+  while (nbytes > 0) {
+    __swift_ssize_t actual_nbytes = -1;
+#if defined(GRND_RANDOM)
+    static const bool getrandom_available =
+      !(getrandom(nullptr, 0, 0) == -1 && errno == ENOSYS);
+    if (getrandom_available) {
+      actual_nbytes = WHILE_EINTR(getrandom(buf, nbytes, 0));
+    }
+#elif defined(__Fuchsia__)
+    __swift_size_t getentropy_nbytes = std::min(nbytes, __swift_size_t{256});
+    if (0 == getentropy(buf, getentropy_nbytes)) {
+      actual_nbytes = getentropy_nbytes;
+    }
+#endif
+    if (actual_nbytes == -1) {
+      static const int fd =
+        WHILE_EINTR(_stdlib_open("/dev/urandom", O_RDONLY | O_CLOEXEC, 0));
+      if (fd != -1) {
+        static StaticMutex mutex;
+        mutex.withLock([&] {
+          actual_nbytes = WHILE_EINTR(_stdlib_read(fd, buf, nbytes));
+        });
+      }
+    }
+    if (actual_nbytes == -1) {
+      fatalError(0, "Fatal error: %d in '%s'\n", errno, __func__);
+    }
+    buf = static_cast<uint8_t *>(buf) + actual_nbytes;
+    nbytes -= actual_nbytes;
+  }
+}
+
+#endif

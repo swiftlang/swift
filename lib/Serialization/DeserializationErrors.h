@@ -110,19 +110,19 @@ class XRefTracePath {
         break;
       case Kind::Accessor:
         switch (getDataAs<uintptr_t>()) {
-        case Getter:
+        case Get:
           os << "(getter)";
           break;
-        case Setter:
+        case Set:
           os << "(setter)";
           break;
         case MaterializeForSet:
           os << "(materializeForSet)";
           break;
-        case Addressor:
+        case Address:
           os << "(addressor)";
           break;
-        case MutableAddressor:
+        case MutableAddress:
           os << "(mutableAddressor)";
           break;
         case WillSet:
@@ -354,6 +354,41 @@ public:
     return llvm::inconvertibleErrorCode();
   }
 };
+
+class SILEntityError : public llvm::ErrorInfo<SILEntityError> {
+  friend ErrorInfo;
+  static const char ID;
+  void anchor() override;
+
+  std::unique_ptr<ErrorInfoBase> underlyingReason;
+  StringRef name;
+public:
+  SILEntityError(StringRef name, std::unique_ptr<ErrorInfoBase> reason)
+      : underlyingReason(std::move(reason)), name(name) {}
+
+  void log(raw_ostream &OS) const override {
+    OS << "could not deserialize SIL entity '" << name << "'";
+    if (underlyingReason) {
+      OS << ": ";
+      underlyingReason->log(OS);
+    }
+  }
+
+  std::error_code convertToErrorCode() const override {
+    return llvm::inconvertibleErrorCode();
+  }
+};
+
+LLVM_NODISCARD
+static inline std::unique_ptr<llvm::ErrorInfoBase>
+takeErrorInfo(llvm::Error error) {
+  std::unique_ptr<llvm::ErrorInfoBase> result;
+  llvm::handleAllErrors(std::move(error),
+                        [&](std::unique_ptr<llvm::ErrorInfoBase> info) {
+    result = std::move(info);
+  });
+  return result;
+}
 
 class PrettyStackTraceModuleFile : public llvm::PrettyStackTraceEntry {
   const char *Action;

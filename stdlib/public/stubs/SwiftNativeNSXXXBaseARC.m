@@ -49,7 +49,7 @@
 #endif
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-size_t swift_stdlib_NSStringHashValue(NSString *SWIFT_NS_RELEASES_ARGUMENT str,
+size_t swift_stdlib_NSStringHashValue(NSString *str,
                                       bool isASCII) {
   AUTORELEASEPOOL {
     return isASCII ? str.hash : str.decomposedStringWithCanonicalMapping.hash;
@@ -68,7 +68,7 @@ swift_stdlib_NSStringHashValuePointer(void *opaque, bool isASCII) {
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 NS_RETURNS_RETAINED NSString *
-swift_stdlib_NSStringLowercaseString(NSString *SWIFT_NS_RELEASES_ARGUMENT str) {
+swift_stdlib_NSStringLowercaseString(NSString *str) {
   AUTORELEASEPOOL {
     return str.lowercaseString;
   }
@@ -76,7 +76,7 @@ swift_stdlib_NSStringLowercaseString(NSString *SWIFT_NS_RELEASES_ARGUMENT str) {
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 NS_RETURNS_RETAINED NSString *
-swift_stdlib_NSStringUppercaseString(NSString *SWIFT_NS_RELEASES_ARGUMENT str) {
+swift_stdlib_NSStringUppercaseString(NSString *str) {
   AUTORELEASEPOOL {
     return str.uppercaseString;
   }

@@ -42,14 +42,20 @@
 // CHECK-NEXT:     }
 // CHECK-NEXT:   ],
 // CHECK-NEXT:   "pid": 1
+// CHECK-NEXT:   "process": {
+// CHECK-NEXT:   	"real_pid": 1
+// CHECK-NEXT:   }
 // CHECK-NEXT: }
 
-// CHECK-NEXT: 113
+// CHECK-NEXT: {{[1-9][0-9]*}}
 // CHECK-NEXT: {
 // CHECK-NEXT:   "kind": "finished",
 // CHECK-NEXT:   "name": "compile",
 // CHECK-NEXT:   "pid": 1,
 // CHECK-NEXT:   "output": "Output placeholder\n",
+// CHECK-NEXT:   "process": {
+// CHECK-NEXT:   	"real_pid": 1
+// CHECK-NEXT:   },
 // CHECK-NEXT:   "exit-status": 0
 // CHECK-NEXT: }
 
@@ -84,15 +90,21 @@
 // CHECK-NEXT:       "path": "{{.*}}/parseable_output.swift.tmp.h"
 // CHECK-NEXT:     }
 // CHECK-NEXT:   ],
-// CHECK-NEXT:   "pid": 2
+// CHECK-NEXT:   "pid": 2,
+// CHECK-NEXT:   "process": {
+// CHECK-NEXT:   	"real_pid": 2
+// CHECK-NEXT:   }
 // CHECK-NEXT: }
 
-// CHECK-NEXT: 118
+// CHECK-NEXT: {{[1-9][0-9]*}}
 // CHECK-NEXT: {
 // CHECK-NEXT:   "kind": "finished",
 // CHECK-NEXT:   "name": "merge-module",
 // CHECK-NEXT:   "pid": 2,
 // CHECK-NEXT:   "output": "Output placeholder\n",
+// CHECK-NEXT:   "process": {
+// CHECK-NEXT:   	"real_pid": 2
+// CHECK-NEXT:   },
 // CHECK-NEXT:   "exit-status": 0
 // CHECK-NEXT: }
 
@@ -116,14 +128,20 @@
 // CHECK-NEXT:       "path": "{{.*}}/parseable_output.swift.tmp.out"
 // CHECK-NEXT:     }
 // CHECK-NEXT:   ],
-// CHECK-NEXT:   "pid": 3
+// CHECK-NEXT:   "pid": 3,
+// CHECK-NEXT:   "process": {
+// CHECK-NEXT:   	"real_pid": 3
+// CHECK-NEXT:   }
 // CHECK-NEXT: }
 
-// CHECK-NEXT: 110
+// CHECK-NEXT: {{[1-9][0-9]*}}
 // CHECK-NEXT: {
 // CHECK-NEXT:   "kind": "finished",
 // CHECK-NEXT:   "name": "link",
 // CHECK-NEXT:   "pid": 3,
 // CHECK-NEXT:   "output": "Output placeholder\n",
+// CHECK-NEXT:   "process": {
+// CHECK-NEXT:   	"real_pid": 3
+// CHECK-NEXT:   },
 // CHECK-NEXT:   "exit-status": 0
 // CHECK-NEXT: }

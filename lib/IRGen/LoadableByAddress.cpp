@@ -296,9 +296,13 @@ bool LargeSILTypeMapper::shouldTransformResults(GenericEnvironment *genEnv,
   if (!modifiableFunction(loweredTy)) {
     return false;
   }
+
   if (loweredTy->getNumResults() != 1) {
-    return false;
+    auto resultType = loweredTy->getAllResultsType();
+    auto newResultType = getNewSILType(genEnv, resultType, Mod);
+    return resultType != newResultType;
   }
+
   auto singleResult = loweredTy->getSingleResult();
   auto resultStorageType = singleResult.getSILStorageType();
   auto newResultStorageType = getNewSILType(genEnv, resultStorageType, Mod);
@@ -452,6 +456,7 @@ SILType LargeSILTypeMapper::getNewSILType(GenericEnvironment *GenericEnv,
   }
   SILType newSILType = getNewOptionalFunctionType(GenericEnv, storageType, Mod);
   if (newSILType != storageType) {
+    oldToNewTypeMap[typePair] = newSILType;
     return newSILType;
   }
   if (auto fnType = storageType.getAs<SILFunctionType>()) {
@@ -949,6 +954,7 @@ void LargeValueVisitor::visitDeallocInst(DeallocStackInst *instr) {
     assert(pass.allocToApplyRetMap.find(opAsInstr) !=
                pass.allocToApplyRetMap.end() &&
            "Unexpected dealloc instr!");
+    (void)opAsInstr;
   }
 }
 
@@ -1285,8 +1291,7 @@ SILArgument *LoadableStorageAllocation::replaceArgType(SILBuilder &argBuilder,
 void LoadableStorageAllocation::insertIndirectReturnArgs() {
   GenericEnvironment *genEnv = pass.F->getGenericEnvironment();
   auto loweredTy = pass.F->getLoweredFunctionType();
-  auto singleResult = loweredTy->getSingleResult();
-  SILType resultStorageType = singleResult.getSILStorageType();
+  SILType resultStorageType = loweredTy->getAllResultsType();
   auto canType = resultStorageType.getASTType();
   if (canType->hasTypeParameter()) {
     assert(genEnv && "Expected a GenericEnv");
@@ -1366,18 +1371,26 @@ void LoadableStorageAllocation::convertApplyResults() {
                                               pass.Mod)) {
         continue;
       }
-      auto singleResult = origSILFunctionType->getSingleResult();
-      auto resultStorageType = singleResult.getSILStorageType();
+      auto resultStorageType = origSILFunctionType->getAllResultsType();
       if (!isLargeLoadableType(genEnv, resultStorageType, pass.Mod)) {
-        // Make sure it is a function type
-        if (!resultStorageType.is<SILFunctionType>()) {
-          // Check if it is an optional function type
-          auto optionalType = resultStorageType.getOptionalObjectType();
-          assert(optionalType &&
-                 "Expected SILFunctionType or Optional for the result type");
-          assert(optionalType.is<SILFunctionType>() &&
-                 "Expected a SILFunctionType inside the optional Type");
-        }
+        // Make sure it contains a function type
+        auto numFuncTy = llvm::count_if(origSILFunctionType->getResults(),
+            [](const SILResultInfo &origResult) {
+              auto resultStorageTy = origResult.getSILStorageType();
+              // Check if it is a function type
+              if (resultStorageTy.is<SILFunctionType>()) {
+                return true;
+              }
+              // Check if it is an optional function type
+              auto optionalType = resultStorageTy.getOptionalObjectType();
+              if (optionalType && optionalType.is<SILFunctionType>()) {
+                return true;
+              }
+              return false;
+            });
+        assert(numFuncTy != 0 &&
+               "Expected a SILFunctionType inside the result Type");
+        (void)numFuncTy;
         continue;
       }
       auto newSILType =
@@ -2018,6 +2031,8 @@ static void rewriteFunction(StructLoweringState &pass,
     assert(srcType && "Expected an address-type source");
     assert(tgtType.isAddress() && "Expected an address-type target");
     assert(srcType == tgtType && "Source and target type do not match");
+    (void)srcType;
+    (void)tgtType;
 
     SILBuilderWithScope copyBuilder(instr);
     createOutlinedCopyCall(copyBuilder, src, tgt, pass);
@@ -2086,7 +2101,8 @@ static void rewriteFunction(StructLoweringState &pass,
       auto *convInstr = cast<BeginAccessInst>(instr);
       newInstr = resultTyBuilder.createBeginAccess(
           Loc, convInstr->getOperand(), convInstr->getAccessKind(),
-          convInstr->getEnforcement(), convInstr->hasNoNestedConflict());
+          convInstr->getEnforcement(), convInstr->hasNoNestedConflict(),
+          convInstr->isFromBuiltin());
       break;
     }
     case SILInstructionKind::EnumInst: {
@@ -2208,10 +2224,24 @@ static bool rewriteFunctionReturn(StructLoweringState &pass) {
   } else if (containsFunctionSignature(genEnv, pass.Mod, resultTy,
                                        newSILType) &&
              (resultTy != newSILType)) {
-    assert(loweredTy->getNumResults() == 1 && "Expected a single result");
-    SILResultInfo origResultInfo = loweredTy->getSingleResult();
-    SILResultInfo newSILResultInfo(newSILType.getASTType(),
-                                   origResultInfo.getConvention());
+
+    llvm::SmallVector<SILResultInfo, 2> newSILResultInfo;
+    if (auto tupleType = newSILType.getAs<TupleType>()) {
+      auto originalResults = loweredTy->getResults();
+      for (unsigned int i = 0; i < originalResults.size(); ++i) {
+        auto origResultInfo = originalResults[i];
+        auto canElem = tupleType.getElementType(i);
+        SILType objectType = SILType::getPrimitiveObjectType(canElem);
+        auto newResult = SILResultInfo(objectType.getASTType(), origResultInfo.getConvention());
+        newSILResultInfo.push_back(newResult);
+      }
+    } else {
+      assert(loweredTy->getNumResults() == 1 && "Expected a single result");
+      auto origResultInfo = loweredTy->getSingleResult();
+      auto newResult = SILResultInfo(newSILType.getASTType(), origResultInfo.getConvention());
+      newSILResultInfo.push_back(newResult);
+    }
+
     auto NewTy = SILFunctionType::get(
         loweredTy->getGenericSignature(), loweredTy->getExtInfo(),
         loweredTy->getCoroutineKind(),
@@ -2374,7 +2404,7 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
     auto *castedApply = cast<ApplyInst>(applyInst);
     SILValue newApply =
       applyBuilder.createApply(castedApply->getLoc(), callee,
-                               applySite.getSubstitutions(),
+                               applySite.getSubstitutionMap(),
                                callArgs, castedApply->isNonThrowing());
     castedApply->replaceAllUsesWith(newApply);
     break;
@@ -2383,7 +2413,7 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
     auto *castedApply = cast<TryApplyInst>(applyInst);
     applyBuilder.createTryApply(
         castedApply->getLoc(), callee,
-        applySite.getSubstitutions(), callArgs,
+        applySite.getSubstitutionMap(), callArgs,
         castedApply->getNormalBB(), castedApply->getErrorBB());
     break;
   }
@@ -2391,7 +2421,7 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
     auto oldApply = cast<BeginApplyInst>(applyInst);
     auto newApply =
       applyBuilder.createBeginApply(oldApply->getLoc(), callee,
-                                    applySite.getSubstitutions(), callArgs,
+                                    applySite.getSubstitutionMap(), callArgs,
                                     oldApply->isNonThrowing());
 
     // Use the new token result.
@@ -2405,6 +2435,7 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
     assert(oldYields.size() == newYields.size() &&
            oldYields.size() == oldYieldedValues.size() &&
            newYields.size() == newYieldedValues.size());
+    (void)newYields;
     for (auto i : indices(oldYields)) {
       SILValue oldValue = oldYieldedValues[i];
       SILValue newValue = newYieldedValues[i];
@@ -2437,7 +2468,7 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
 
     auto newApply =
       applyBuilder.createPartialApply(castedApply->getLoc(), callee,
-                                      applySite.getSubstitutions(), callArgs,
+                                      applySite.getSubstitutionMap(), callArgs,
                                       partialApplyConvention);
     castedApply->replaceAllUsesWith(newApply);
     break;
@@ -2647,7 +2678,7 @@ void LoadableByAddress::run() {
   for (auto &F : *getModule())
     runOnFunction(&F);
 
-  if (modFuncs.empty()) {
+  if (modFuncs.empty() && modApplies.empty()) {
     return;
   }
 

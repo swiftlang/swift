@@ -161,8 +161,6 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
       SmallVector<ProtocolConformance *, 2> conformances;
       loader.first->loadAllConformances(nominal, loader.second, conformances);
       loadAllConformances(nominal, conformances);
-    } else if (nominal->getParentSourceFile() && resolver) {
-      resolver->resolveDeclSignature(nominal);
     }
 
     nominalFunc(nominal);
@@ -248,7 +246,7 @@ void ConformanceLookupTable::inheritConformances(ClassDecl *classDecl,
         }
         if (inheritedType->isExistentialType()) {
           auto layout = inheritedType->getExistentialLayout();
-          if (layout.superclass) {
+          if (layout.explicitSuperclass) {
             superclassLoc = inherited.getSourceRange().Start;
             return superclassLoc;
           }
@@ -294,11 +292,8 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
     forEachInStage(
         stage, nominal, resolver,
         [&](NominalTypeDecl *nominal) {
-          if (resolver)
-            resolver->resolveInheritanceClause(nominal);
-
-          addProtocols(nominal->getInherited(),
-                       ConformanceSource::forExplicit(nominal), resolver);
+          addInheritedProtocols(nominal,
+                                ConformanceSource::forExplicit(nominal));
         },
         [&](ExtensionDecl *ext,
             ArrayRef<LazyResolver::ConformanceConstructionInfo> protos) {
@@ -317,15 +312,16 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
     // because an implied conformance in the superclass is considered
     // "fixed" in the subclass.
     if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
-      if (resolver)
-        resolver->resolveSuperclass(classDecl);
-
       if (auto superclassDecl = classDecl->getSuperclassDecl()) {
         // Break infinite recursion when visiting ill-formed classes
         // with circular inheritance.
         if (VisitingSuperclass)
           return;
         llvm::SaveAndRestore<bool> visiting(VisitingSuperclass, true);
+
+        // Don't update our own lookup table if we inherit from ourselves.
+        if (classDecl == superclassDecl)
+          break;
 
         // Resolve the conformances of the superclass.
         superclassDecl->prepareConformanceTable();
@@ -489,17 +485,25 @@ bool ConformanceLookupTable::addProtocol(ProtocolDecl *protocol, SourceLoc loc,
   return true;
 }
 
-void ConformanceLookupTable::addProtocols(ArrayRef<TypeLoc> inherited,
-                                          ConformanceSource source,
-                                          LazyResolver *resolver) {
+void ConformanceLookupTable::addInheritedProtocols(
+                          llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
+                          ConformanceSource source) {
   // Visit each of the types in the inheritance list to find
   // protocols.
-  for (const auto &entry : inherited) {
-    if (!entry.getType() || !entry.getType()->isExistentialType())
+  auto typeDecl = decl.dyn_cast<TypeDecl *>();
+  auto extDecl = decl.dyn_cast<ExtensionDecl *>();
+  unsigned numInherited = typeDecl ? typeDecl->getInherited().size()
+                                   : extDecl->getInherited().size();
+  for (auto index : range(numInherited)) {
+    Type inheritedType = typeDecl ? typeDecl->getInheritedType(index)
+                                  : extDecl->getInheritedType(index);
+    if (!inheritedType || !inheritedType->isExistentialType())
       continue;
-    auto layout = entry.getType()->getExistentialLayout();
+    SourceLoc loc = typeDecl ? typeDecl->getInherited()[index].getLoc()
+                             : extDecl->getInherited()[index].getLoc();
+    auto layout = inheritedType->getExistentialLayout();
     for (auto *proto : layout.getProtocols())
-      addProtocol(proto->getDecl(), entry.getLoc(), source);
+      addProtocol(proto->getDecl(), loc, source);
   }
 }
 
@@ -517,15 +521,6 @@ void ConformanceLookupTable::expandImpliedConformances(NominalTypeDecl *nominal,
     ConformanceEntry *conformanceEntry = AllConformances[dc][i];
     ProtocolDecl *conformingProtocol = conformanceEntry->getProtocol();
 
-    // Visit the protocols inherited by this protocol, adding them as
-    // implied conformances.
-    if (resolver) {
-      if (nominal == dc)
-        resolver->resolveInheritanceClause(nominal);
-      else
-        resolver->resolveInheritanceClause(cast<ExtensionDecl>(dc));
-    }
-
     // An @objc enum that explicitly conforms to the Error protocol
     // also implicitly conforms to _ObjectiveCBridgeableError, via the
     // known protocol _BridgedNSError.
@@ -542,10 +537,8 @@ void ConformanceLookupTable::expandImpliedConformances(NominalTypeDecl *nominal,
       }
     }
 
-    // Add inherited protocols.
-    addProtocols(conformingProtocol->getInherited(),
-                 ConformanceSource::forImplied(conformanceEntry),
-                 resolver);
+    addInheritedProtocols(conformingProtocol,
+                          ConformanceSource::forImplied(conformanceEntry));
   }
 }
 
@@ -670,6 +663,19 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
                                           rhs->getDeclaredLoc())
              ? Ordering::Before
              : Ordering::After;
+  }
+
+  // If one of the conformances comes from the same file as the type
+  // declaration, pick that one; this is so that conformance synthesis works if
+  // there's any implied conformance in the same file as the type.
+  auto NTD =
+      lhs->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto typeSF = NTD->getParentSourceFile();
+  if (typeSF) {
+    if (typeSF == lhsSF)
+      return Ordering::Before;
+    if (typeSF == rhsSF)
+      return Ordering::After;
   }
 
   // Otherwise, pick the earlier file unit.
@@ -828,6 +834,8 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
   if (auto resolver = nominal->getASTContext().getLazyResolver()) {
     if (auto ED = dyn_cast<ExtensionDecl>(conformingDC)) {
       resolver->resolveExtension(ED);
+    } else {
+      resolver->resolveDeclSignature(cast<NominalTypeDecl>(conformingDC));
     }
   }
 

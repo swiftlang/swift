@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -95,8 +95,11 @@ public:
     SubscriptResult,
     /// \brief The lookup for a constructor member.
     ConstructorMember,
-    /// \brief Rvalue adjustment.
-    RvalueAdjustment,
+    /// \brief An implicit @lvalue-to-inout conversion; only valid for operator
+    /// arguments.
+    LValueConversion,
+    /// \brief RValue adjustment.
+    RValueAdjustment,
     /// \brief The result of a closure.
     ClosureResult,
     /// \brief The parent of a nested type.
@@ -107,12 +110,11 @@ public:
     SequenceIteratorProtocol,
     /// \brief The element type of a generator.
     GeneratorElementType,
-    /// \brief The element of an array type.
-    ArrayElementType,
     /// \brief The scalar type of a tuple type.
     ScalarToTuple,
-    /// \brief The load of an lvalue.
-    Load,
+    /// \brief An argument passed in an autoclosure parameter
+    /// position, which must match the autoclosure return type.
+    AutoclosureResult,
     /// The requirement that we're matching during protocol conformance
     /// checking.
     Requirement,
@@ -151,15 +153,15 @@ public:
     case SubscriptMember:
     case SubscriptResult:
     case ConstructorMember:
-    case RvalueAdjustment:
+    case LValueConversion:
+    case RValueAdjustment:
     case ClosureResult:
     case ParentType:
     case InstanceType:
     case SequenceIteratorProtocol:
     case GeneratorElementType:
-    case ArrayElementType:
     case ScalarToTuple:
-    case Load:
+    case AutoclosureResult:
     case Requirement:
     case Witness:
     case OpenedGeneric:
@@ -201,17 +203,17 @@ public:
     case ApplyArgToParam:
     case SequenceIteratorProtocol:
     case GeneratorElementType:
-    case ArrayElementType:
     case ClosureResult:
     case ConstructorMember:
     case InstanceType:
-    case Load:
+    case AutoclosureResult:
     case OptionalPayload:
     case Member:
     case MemberRefBase:
     case UnresolvedMember:
     case ParentType:
-    case RvalueAdjustment:
+    case LValueConversion:
+    case RValueAdjustment:
     case ScalarToTuple:
     case SubscriptIndex:
     case SubscriptMember:

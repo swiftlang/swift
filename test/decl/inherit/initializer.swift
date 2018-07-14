@@ -92,45 +92,6 @@ func testNotInherited2() {
   var n2 = NotInherited2(double: 2.72828) // expected-error{{'NotInherited2' cannot be constructed because it has no accessible initializers}}
 }
 
-// Inheritance of unnamed parameters.
-class SuperUnnamed {
-  init(int _: Int) { }
-  init(_ : Double) { }
-
-  init(string _: String) { }
-  init(_ : Float) { }
-}
-
-class SubUnnamed : SuperUnnamed { }
-
-func testSubUnnamed(_ i: Int, d: Double, s: String, f: Float) {
-  _ = SubUnnamed(int: i)
-  _ = SubUnnamed(d)
-  _ = SubUnnamed(string: s)
-  _ = SubUnnamed(f)
-}
-
-// rdar://problem/17960407 - Inheritance of generic initializers
-class ConcreteBase {
-  required init(i: Int) {}
-}
-
-class GenericDerived<T> : ConcreteBase {}
-
-class GenericBase<T> {
-  required init(t: T) {}
-}
-
-class GenericDerived2<U> : GenericBase<(U, U)> {}
-
-class ConcreteDerived : GenericBase<Int> {}
-
-func testGenericInheritance() {
-  _ = GenericDerived<Int>(i: 10)
-  _ = GenericDerived2<Int>(t: (10, 100))
-  _ = ConcreteDerived(t: 1000)
-}
-
 // FIXME: <rdar://problem/16331406> Implement inheritance of variadic designated initializers
 class SuperVariadic {
   init(ints: Int...) { } // expected-note{{variadic superclass initializer defined here}}
@@ -151,58 +112,3 @@ func testClassInGenericFunc<T>(t: T) {
   _ = B(t: t)
 }
 
-// rdar://problem/34789779
-public class Node {
-  var data : Data
-
-  public struct Data {
-    var index: Int32 = 0// for helpers
-  }
-
- init(data: inout Data/*, context: Context*/) {
-   self.data = data
- }
-
- public required init(node: Node) {
-   data = node.data
- }
-}
-
-class SubNode : Node {
-  var a: Int
-
-  required init(node: Node) {
-    a = 1
-    super.init(node: node)
-  }
-
-  init(data: inout Data, additionalParam: Int) {
-    a = additionalParam
-    super.init(data: &data)
-  }
-}
-
-class GenericSubNode<T> : SubNode {
-  required init(node: Node) {
-    super.init(node: node)
-  }
-
-  init(data: inout Data, value: T) {
-    super.init(data: &data, additionalParam: 1)
-  }
-}
-
-protocol HasValue {
-  associatedtype Value
-  func getValue() -> Value
-}
-
-class GenericWrapperNode<T : HasValue> : GenericSubNode<T.Value> {
-  required init(node: Node) {
-    super.init(node: node)
-  }
-
-  init(data: inout Data, otherValue: T) {
-    super.init(data: &data, value: otherValue.getValue())
-  }
-}

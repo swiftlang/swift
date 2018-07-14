@@ -28,6 +28,7 @@
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/Parse/SyntaxParsingCache.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
@@ -93,8 +94,6 @@ enum class FileUnitKind {
   SerializedAST,
   /// An imported Clang module.
   ClangModule,
-  /// A derived declaration.
-  Derived,
 };
 
 enum class SourceFileKind {
@@ -152,7 +151,7 @@ public:
   };
 
 private:
-  /// If non-NULL, an plug-in that should be used when performing external
+  /// If non-NULL, a plug-in that should be used when performing external
   /// lookups.
   // FIXME: Do we really need to bloat all modules with this?
   DebuggerClient *DebugClient = nullptr;
@@ -838,6 +837,10 @@ public:
   /// The list of top-level declarations in the source file.
   std::vector<Decl*> Decls;
 
+  /// A cache of syntax nodes that can be reused when creating the syntax tree
+  /// for this file.
+  SyntaxParsingCache *SyntaxParsingCache = nullptr;
+
   /// The list of local type declarations in the source file.
   llvm::SetVector<TypeDecl *> LocalTypeDecls;
 
@@ -972,6 +975,10 @@ public:
   ReferencedNameTracker *getReferencedNameTracker() {
     return ReferencedNames ? ReferencedNames.getPointer() : nullptr;
   }
+  const ReferencedNameTracker *getReferencedNameTracker() const {
+    return ReferencedNames ? ReferencedNames.getPointer() : nullptr;
+  }
+
   void createReferencedNameTracker();
 
   /// \brief The buffer ID for the file that was imported, or None if there

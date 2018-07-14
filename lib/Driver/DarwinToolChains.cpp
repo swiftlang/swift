@@ -84,8 +84,12 @@ toolchains::Darwin::constructInvocation(const InterpretJobAction &job,
 }
 
 static StringRef
-getDarwinLibraryNameSuffixForTriple(const llvm::Triple &triple) {
-  switch (getDarwinPlatformKind(triple)) {
+getDarwinLibraryNameSuffixForTriple(const llvm::Triple &triple,
+                                    bool distinguishSimulator = true) {
+  const DarwinPlatformKind kind = getDarwinPlatformKind(triple);
+  const DarwinPlatformKind effectiveKind =
+      distinguishSimulator ? kind : getNonSimulatorPlatform(kind);
+  switch (effectiveKind) {
   case DarwinPlatformKind::MacOS:
     return "osx";
   case DarwinPlatformKind::IPhoneOS:
@@ -173,6 +177,7 @@ static bool findXcodeClangPath(llvm::SmallVectorImpl<char> &path) {
     queue.execute(nullptr,
                   [&path](sys::ProcessId PID, int returnCode, StringRef output,
                           StringRef errors,
+                          sys::TaskProcessInformation ProcInfo,
                           void *unused) -> sys::TaskFinishedResponse {
                     if (returnCode == 0) {
                       output = output.rtrim();
@@ -191,6 +196,26 @@ static void addVersionString(const ArgList &inputArgs, ArgStringList &arguments,
   llvm::raw_svector_ostream os{buf};
   os << major << '.' << minor << '.' << micro;
   arguments.push_back(inputArgs.MakeArgString(os.str()));
+}
+
+/// Returns true if the compiler depends on features provided by the ObjC
+/// runtime that are not present on the deployment target indicated by
+/// \p triple.
+static bool wantsObjCRuntime(const llvm::Triple &triple) {
+  assert((!triple.isTvOS() || triple.isiOS()) &&
+         "tvOS is considered a kind of iOS");
+
+  // When updating the versions listed here, please record the most recent
+  // feature being depended on and when it was introduced:
+  //
+  // - The hook to override class_getImageName (macOS 10.14 and equivalent)
+  if (triple.isiOS())
+    return triple.isOSVersionLT(12);
+  if (triple.isMacOSX())
+    return triple.isMacOSXVersionLT(10, 14);
+  if (triple.isWatchOS())
+    return triple.isOSVersionLT(5);
+  llvm_unreachable("unknown Darwin OS");
 }
 
 ToolChain::InvocationInfo
@@ -261,16 +286,25 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   assert(Triple.isOSDarwin());
 
   // FIXME: If we used Clang as a linker instead of going straight to ld,
-  // we wouldn't have to replicate Clang's logic here.
-  bool wantsObjCRuntime = false;
-  if (Triple.isiOS())
-    wantsObjCRuntime = Triple.isOSVersionLT(9);
-  else if (Triple.isMacOSX())
-    wantsObjCRuntime = Triple.isMacOSXVersionLT(10, 11);
+  // we wouldn't have to replicate a bunch of Clang's logic here.
+
+  // Always link the regular compiler_rt if it's present.
+  //
+  // Note: Normally we'd just add this unconditionally, but it's valid to build
+  // Swift and use it as a linker without building compiler_rt.
+  SmallString<128> CompilerRTPath;
+  getClangLibraryPath(context.Args, CompilerRTPath);
+  llvm::sys::path::append(
+      CompilerRTPath,
+      Twine("libclang_rt.") +
+        getDarwinLibraryNameSuffixForTriple(Triple, /*simulator*/false) +
+        ".a");
+  if (llvm::sys::fs::exists(CompilerRTPath))
+    Arguments.push_back(context.Args.MakeArgString(CompilerRTPath));
 
   if (context.Args.hasFlag(options::OPT_link_objc_runtime,
                            options::OPT_no_link_objc_runtime,
-                           /*Default=*/wantsObjCRuntime)) {
+                           /*Default=*/wantsObjCRuntime(Triple))) {
     llvm::SmallString<128> ARCLiteLib(D.getSwiftProgramPath());
     llvm::sys::path::remove_filename(ARCLiteLib); // 'swift'
     llvm::sys::path::remove_filename(ARCLiteLib); // 'bin'
@@ -374,9 +408,8 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   }
 
   if (context.Args.hasArg(options::OPT_profile_generate)) {
-    SmallString<128> LibProfile(RuntimeLibPath);
-    llvm::sys::path::remove_filename(LibProfile); // remove platform name
-    llvm::sys::path::append(LibProfile, "clang", "lib", "darwin");
+    SmallString<128> LibProfile;
+    getClangLibraryPath(context.Args, LibProfile);
 
     StringRef RT;
     if (Triple.isiOS()) {
@@ -449,4 +482,12 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
       context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
 
   return II;
+}
+
+bool toolchains::Darwin::shouldStoreInvocationInDebugInfo() const {
+  // This matches the behavior in Clang (see
+  // clang/lib/driver/ToolChains/Darwin.cpp).
+  if (const char *S = ::getenv("RC_DEBUG_OPTIONS"))
+    return S[0] != '\0';
+  return false;
 }

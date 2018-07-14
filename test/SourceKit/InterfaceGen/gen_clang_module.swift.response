@@ -4367,13 +4367,14 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.decl.var.global,
     key.accessibility: source.lang.swift.accessibility.public,
-    key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FooEnum1X",
     key.offset: 405,
     key.length: 31,
     key.typename: "FooEnum1",
     key.nameoffset: 409,
     key.namelength: 9,
+    key.bodyoffset: 430,
+    key.bodylength: 5,
     key.docoffset: 371,
     key.doclength: 27,
     key.attributes: [
@@ -4499,13 +4500,14 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.decl.var.global,
     key.accessibility: source.lang.swift.accessibility.public,
-    key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FooEnum2X",
     key.offset: 607,
     key.length: 31,
     key.typename: "FooEnum2",
     key.nameoffset: 611,
     key.namelength: 9,
+    key.bodyoffset: 632,
+    key.bodylength: 5,
     key.attributes: [
       {
         key.offset: 600,
@@ -4517,13 +4519,14 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.decl.var.global,
     key.accessibility: source.lang.swift.accessibility.public,
-    key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FooEnum2Y",
     key.offset: 646,
     key.length: 31,
     key.typename: "FooEnum2",
     key.nameoffset: 650,
     key.namelength: 9,
+    key.bodyoffset: 671,
+    key.bodylength: 5,
     key.attributes: [
       {
         key.offset: 639,
@@ -4647,13 +4650,14 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.decl.var.global,
     key.accessibility: source.lang.swift.accessibility.public,
-    key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FooEnum3X",
     key.offset: 847,
     key.length: 31,
     key.typename: "FooEnum3",
     key.nameoffset: 851,
     key.namelength: 9,
+    key.bodyoffset: 872,
+    key.bodylength: 5,
     key.attributes: [
       {
         key.offset: 840,
@@ -4665,13 +4669,14 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.decl.var.global,
     key.accessibility: source.lang.swift.accessibility.public,
-    key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FooEnum3Y",
     key.offset: 886,
     key.length: 31,
     key.typename: "FooEnum3",
     key.nameoffset: 890,
     key.namelength: 9,
+    key.bodyoffset: 911,
+    key.bodylength: 5,
     key.attributes: [
       {
         key.offset: 879,
@@ -4830,13 +4835,14 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
       {
         key.kind: source.lang.swift.decl.var.static,
         key.accessibility: source.lang.swift.accessibility.public,
-        key.setter_accessibility: source.lang.swift.accessibility.public,
         key.name: "enableMince",
         key.offset: 1283,
         key.length: 49,
         key.typename: "FooRuncingOptions",
         key.nameoffset: 1294,
         key.namelength: 11,
+        key.bodyoffset: 1326,
+        key.bodylength: 5,
         key.attributes: [
           {
             key.offset: 1276,
@@ -4848,13 +4854,14 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
       {
         key.kind: source.lang.swift.decl.var.static,
         key.accessibility: source.lang.swift.accessibility.public,
-        key.setter_accessibility: source.lang.swift.accessibility.public,
         key.name: "enableQuince",
         key.offset: 1345,
         key.length: 50,
         key.typename: "FooRuncingOptions",
         key.nameoffset: 1356,
         key.namelength: 12,
+        key.bodyoffset: 1389,
+        key.bodylength: 5,
         key.attributes: [
           {
             key.offset: 1338,
@@ -5985,13 +5992,14 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
       {
         key.kind: source.lang.swift.decl.var.instance,
         key.accessibility: source.lang.swift.accessibility.open,
-        key.setter_accessibility: source.lang.swift.accessibility.open,
         key.name: "fooProperty3",
         key.offset: 4301,
         key.length: 31,
         key.typename: "Int32",
         key.nameoffset: 4305,
         key.namelength: 12,
+        key.bodyoffset: 4326,
+        key.bodylength: 5,
         key.attributes: [
           {
             key.offset: 4296,
@@ -6132,13 +6140,14 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.decl.var.global,
     key.accessibility: source.lang.swift.accessibility.public,
-    key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FOO_MACRO_1",
     key.offset: 4721,
     key.length: 30,
     key.typename: "Int32",
     key.nameoffset: 4725,
     key.namelength: 11,
+    key.bodyoffset: 4745,
+    key.bodylength: 5,
     key.attributes: [
       {
         key.offset: 4714,
@@ -6150,13 +6159,14 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.decl.var.global,
     key.accessibility: source.lang.swift.accessibility.public,
-    key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FOO_MACRO_2",
     key.offset: 4759,
     key.length: 30,
     key.typename: "Int32",
     key.nameoffset: 4763,
     key.namelength: 11,
+    key.bodyoffset: 4783,
+    key.bodylength: 5,
     key.attributes: [
       {
         key.offset: 4752,
@@ -6168,13 +6178,14 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.decl.var.global,
     key.accessibility: source.lang.swift.accessibility.public,
-    key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FOO_MACRO_3",
     key.offset: 4797,
     key.length: 30,
     key.typename: "Int32",
     key.nameoffset: 4801,
     key.namelength: 11,
+    key.bodyoffset: 4821,
+    key.bodylength: 5,
     key.attributes: [
       {
         key.offset: 4790,
@@ -6186,13 +6197,14 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.decl.var.global,
     key.accessibility: source.lang.swift.accessibility.public,
-    key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FOO_MACRO_4",
     key.offset: 4874,
     key.length: 31,
     key.typename: "UInt32",
     key.nameoffset: 4878,
     key.namelength: 11,
+    key.bodyoffset: 4899,
+    key.bodylength: 5,
     key.attributes: [
       {
         key.offset: 4867,
@@ -6204,13 +6216,14 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.decl.var.global,
     key.accessibility: source.lang.swift.accessibility.public,
-    key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FOO_MACRO_5",
     key.offset: 4913,
     key.length: 31,
     key.typename: "UInt64",
     key.nameoffset: 4917,
     key.namelength: 11,
+    key.bodyoffset: 4938,
+    key.bodylength: 5,
     key.attributes: [
       {
         key.offset: 4906,
@@ -6222,13 +6235,14 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.decl.var.global,
     key.accessibility: source.lang.swift.accessibility.public,
-    key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FOO_MACRO_6",
     key.offset: 4952,
     key.length: 38,
     key.typename: "typedef_int_t",
     key.nameoffset: 4956,
     key.namelength: 11,
+    key.bodyoffset: 4984,
+    key.bodylength: 5,
     key.attributes: [
       {
         key.offset: 4945,
@@ -6240,13 +6254,14 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.decl.var.global,
     key.accessibility: source.lang.swift.accessibility.public,
-    key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FOO_MACRO_7",
     key.offset: 4998,
     key.length: 38,
     key.typename: "typedef_int_t",
     key.nameoffset: 5002,
     key.namelength: 11,
+    key.bodyoffset: 5030,
+    key.bodylength: 5,
     key.attributes: [
       {
         key.offset: 4991,
@@ -6258,13 +6273,14 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.decl.var.global,
     key.accessibility: source.lang.swift.accessibility.public,
-    key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FOO_MACRO_8",
     key.offset: 5044,
     key.length: 29,
     key.typename: "Int8",
     key.nameoffset: 5048,
     key.namelength: 11,
+    key.bodyoffset: 5067,
+    key.bodylength: 5,
     key.attributes: [
       {
         key.offset: 5037,
@@ -6276,13 +6292,14 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.decl.var.global,
     key.accessibility: source.lang.swift.accessibility.public,
-    key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FOO_MACRO_9",
     key.offset: 5081,
     key.length: 30,
     key.typename: "Int32",
     key.nameoffset: 5085,
     key.namelength: 11,
+    key.bodyoffset: 5105,
+    key.bodylength: 5,
     key.attributes: [
       {
         key.offset: 5074,
@@ -6294,13 +6311,14 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.decl.var.global,
     key.accessibility: source.lang.swift.accessibility.public,
-    key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FOO_MACRO_10",
     key.offset: 5119,
     key.length: 31,
     key.typename: "Int16",
     key.nameoffset: 5123,
     key.namelength: 12,
+    key.bodyoffset: 5144,
+    key.bodylength: 5,
     key.attributes: [
       {
         key.offset: 5112,
@@ -6312,13 +6330,14 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.decl.var.global,
     key.accessibility: source.lang.swift.accessibility.public,
-    key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FOO_MACRO_11",
     key.offset: 5158,
     key.length: 29,
     key.typename: "Int",
     key.nameoffset: 5162,
     key.namelength: 12,
+    key.bodyoffset: 5181,
+    key.bodylength: 5,
     key.attributes: [
       {
         key.offset: 5151,
@@ -6330,13 +6349,14 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.decl.var.global,
     key.accessibility: source.lang.swift.accessibility.public,
-    key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FOO_MACRO_OR",
     key.offset: 5195,
     key.length: 31,
     key.typename: "Int32",
     key.nameoffset: 5199,
     key.namelength: 12,
+    key.bodyoffset: 5220,
+    key.bodylength: 5,
     key.attributes: [
       {
         key.offset: 5188,
@@ -6348,13 +6368,14 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.decl.var.global,
     key.accessibility: source.lang.swift.accessibility.public,
-    key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FOO_MACRO_AND",
     key.offset: 5234,
     key.length: 32,
     key.typename: "Int32",
     key.nameoffset: 5238,
     key.namelength: 13,
+    key.bodyoffset: 5260,
+    key.bodylength: 5,
     key.attributes: [
       {
         key.offset: 5227,
@@ -6366,13 +6387,14 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.decl.var.global,
     key.accessibility: source.lang.swift.accessibility.public,
-    key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FOO_MACRO_BITWIDTH",
     key.offset: 5274,
     key.length: 38,
     key.typename: "UInt64",
     key.nameoffset: 5278,
     key.namelength: 18,
+    key.bodyoffset: 5306,
+    key.bodylength: 5,
     key.attributes: [
       {
         key.offset: 5267,
@@ -6384,13 +6406,14 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.decl.var.global,
     key.accessibility: source.lang.swift.accessibility.public,
-    key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FOO_MACRO_SIGNED",
     key.offset: 5320,
     key.length: 36,
     key.typename: "UInt32",
     key.nameoffset: 5324,
     key.namelength: 16,
+    key.bodyoffset: 5350,
+    key.bodylength: 5,
     key.attributes: [
       {
         key.offset: 5313,
@@ -6402,13 +6425,14 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.decl.var.global,
     key.accessibility: source.lang.swift.accessibility.public,
-    key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FOO_MACRO_REDEF_1",
     key.offset: 5365,
     key.length: 36,
     key.typename: "Int32",
     key.nameoffset: 5369,
     key.namelength: 17,
+    key.bodyoffset: 5395,
+    key.bodylength: 5,
     key.attributes: [
       {
         key.offset: 5358,
@@ -6420,13 +6444,14 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.decl.var.global,
     key.accessibility: source.lang.swift.accessibility.public,
-    key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FOO_MACRO_REDEF_2",
     key.offset: 5410,
     key.length: 36,
     key.typename: "Int32",
     key.nameoffset: 5414,
     key.namelength: 17,
+    key.bodyoffset: 5440,
+    key.bodylength: 5,
     key.attributes: [
       {
         key.offset: 5403,

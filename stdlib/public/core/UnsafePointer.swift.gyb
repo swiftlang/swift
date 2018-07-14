@@ -271,7 +271,7 @@
 ///       var number = 5
 ///       let numberPointer = Unsafe${Mutable}Pointer<Int>(&number)
 ///       // Accessing 'numberPointer' is undefined behavior.
-@_fixed_layout
+@_fixed_layout // unsafe-performance
 public struct ${Self}<Pointee>: _Pointer {
 
   /// A type that represents the distance between two pointers.
@@ -281,7 +281,6 @@ public struct ${Self}<Pointee>: _Pointer {
   public let _rawValue: Builtin.RawPointer
 
   /// Creates ${a_Self} from a builtin raw pointer.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init(_ _rawValue : Builtin.RawPointer) {
     self._rawValue = _rawValue
@@ -290,7 +289,6 @@ public struct ${Self}<Pointee>: _Pointer {
   /// Creates a new typed pointer from the given opaque pointer.
   ///
   /// - Parameter from: The opaque pointer to convert to a typed pointer.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init(_ from : OpaquePointer) {
     _rawValue = from._rawValue
@@ -300,7 +298,6 @@ public struct ${Self}<Pointee>: _Pointer {
   ///
   /// - Parameter from: The opaque pointer to convert to a typed pointer. If
   ///   `from` is `nil`, the result of this initializer is `nil`.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init?(_ from : OpaquePointer?) {
     guard let unwrapped = from else { return nil }
@@ -316,7 +313,6 @@ public struct ${Self}<Pointee>: _Pointer {
   ///
   /// - Parameter bitPattern: A bit pattern to use for the address of the new
   ///   pointer. If `bitPattern` is zero, the result is `nil`.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init?(bitPattern: Int) {
     if bitPattern == 0 { return nil }
@@ -332,7 +328,6 @@ public struct ${Self}<Pointee>: _Pointer {
   ///
   /// - Parameter bitPattern: A bit pattern to use for the address of the new
   ///   pointer. If `bitPattern` is zero, the result is `nil`.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init?(bitPattern: UInt) {
     if bitPattern == 0 { return nil }
@@ -342,7 +337,6 @@ public struct ${Self}<Pointee>: _Pointer {
   /// Creates a new pointer from the given typed pointer.
   ///
   /// - Parameter other: The typed pointer to convert.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init(_ other: ${Self}<Pointee>) {
     self = other
@@ -352,7 +346,6 @@ public struct ${Self}<Pointee>: _Pointer {
   ///
   /// - Parameter other: The typed pointer to convert. If `other` is `nil`, the
   ///   result is `nil`.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init?(_ other: ${Self}<Pointee>?) {
     guard let unwrapped = other else { return nil }
@@ -364,7 +357,6 @@ public struct ${Self}<Pointee>: _Pointer {
   /// immutable pointer.
   ///
   /// - Parameter other: The immutable pointer to convert.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init(mutating other: UnsafePointer<Pointee>) {
     self._rawValue = other._rawValue
@@ -375,7 +367,6 @@ public struct ${Self}<Pointee>: _Pointer {
   ///
   /// - Parameter other: The immutable pointer to convert. If `other` is `nil`,
   ///   the result is `nil`.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init?(mutating other: UnsafePointer<Pointee>?) {
     guard let unwrapped = other else { return nil }
@@ -386,7 +377,6 @@ public struct ${Self}<Pointee>: _Pointer {
   /// given mutable pointer.
   ///
   /// - Parameter other: The pointer to convert.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init(_ other: UnsafeMutablePointer<Pointee>) {
     self._rawValue = other._rawValue
@@ -397,7 +387,6 @@ public struct ${Self}<Pointee>: _Pointer {
   ///
   /// - Parameter other: The pointer to convert. If `other` is `nil`, the
   ///   result is `nil`.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init?(_ other: UnsafeMutablePointer<Pointee>?) {
     guard let unwrapped = other else { return nil }
@@ -436,12 +425,6 @@ public struct ${Self}<Pointee>: _Pointer {
     Builtin.bindMemory(rawPtr, count._builtinWordValue, Pointee.self)
     return UnsafeMutablePointer(rawPtr)
   }
-  
-  @available(swift, deprecated: 4.1, obsoleted: 5.0.0, message: "Swift currently only supports freeing entire heap blocks, use deallocate() instead")
-  public func deallocate(capacity _: Int) { 
-    self.deallocate()
-  }
-
 %  end
 
   /// Deallocates the memory block previously allocated at this pointer.
@@ -468,7 +451,7 @@ public struct ${Self}<Pointee>: _Pointer {
   /// When reading from the `pointee` property, the instance referenced by
   /// this pointer must already be initialized.
 %  end
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // unsafe-performance
   public var pointee: Pointee {
 %  if mutable:
     @_transparent unsafeAddress {
@@ -485,11 +468,6 @@ public struct ${Self}<Pointee>: _Pointer {
   }
 
 %  if mutable:
-  @available(swift, deprecated: 4.1, obsoleted: 5.0.0, renamed: "initialize(repeating:count:)")
-  public func initialize(to newValue: Pointee, count: Int = 1) { 
-    initialize(repeating: newValue, count: count)
-  }
-
   /// Initializes this pointer's memory with the specified number of
   /// consecutive copies of the given value.
   ///
@@ -683,28 +661,6 @@ public struct ${Self}<Pointee>: _Pointer {
     // }
   }
 
-  /// Initializes memory starting at this pointer's address with the elements
-  /// of the given collection.
-  ///
-  /// The region of memory starting at this pointer and covering `source.count`
-  /// instances of the pointer's `Pointee` type must be uninitialized or
-  /// `Pointee` must be a trivial type. After calling `initialize(from:)`, the
-  /// region is initialized.
-  ///
-  /// - Parameter source: A collection of elements of the pointer's `Pointee`
-  ///   type.
-  // This is fundamentally unsafe since collections can underreport their count.
-  @inlinable
-  @available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'UnsafeMutableBufferPointer.initialize(from:)' instead")
-  public func initialize<C : Collection>(from source: C)
-    where C.Element == Pointee {
-    let buf = UnsafeMutableBufferPointer(start: self, count: numericCast(source.count))
-    var (remainders,writtenUpTo) = source._copyContents(initializing: buf)
-    // ensure that exactly rhs.count elements were written
-    _precondition(remainders.next() == nil, "rhs underreported its count")
-    _precondition(writtenUpTo == buf.endIndex, "rhs overreported its count")
-  }
-
   /// Replaces the memory referenced by this pointer with the values
   /// starting at the given pointer, leaving the source memory uninitialized.
   ///
@@ -733,13 +689,6 @@ public struct ${Self}<Pointee>: _Pointer {
     // for i in 0..<count {
     //   self[i] = (source + i).move()
     // }
-  }
-  
-  @available(swift, deprecated: 4.1, obsoleted: 5.0.0, message: "the default argument to deinitialize(count:) has been removed, please specify the count explicitly") 
-  @inlinable
-  @discardableResult
-  public func deinitialize() -> UnsafeMutableRawPointer {
-    return deinitialize(count: 1)
   }
   
   /// Deinitializes the specified number of values starting at this pointer.
@@ -870,7 +819,6 @@ extension ${Self}: Equatable {
   ///   - rhs: Another pointer.
   /// - Returns: `true` if `lhs` and `rhs` reference the same memory address;
   ///   otherwise, `false`.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func == (lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Bool {
     return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
@@ -890,19 +838,23 @@ extension ${Self}: Comparable {
   ///   - rhs: Another pointer.
   /// - Returns: `true` if `lhs` references a memory address earlier than
   ///   `rhs`; otherwise, `false`.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func < (lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Bool {
     return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
   }
 }
 extension ${Self}: Hashable {
-  @inlinable // FIXME(sil-serialize-all)
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
+  @inlinable
   public func hash(into hasher: inout Hasher) {
     hasher.combine(UInt(bitPattern: self))
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func _rawHashValue(seed: (UInt64, UInt64)) -> Int {
     return Hasher._hash(seed: seed, UInt(bitPattern: self))
   }
@@ -982,32 +934,15 @@ extension ${Self}: Strideable {
 
 extension ${Self} : CustomDebugStringConvertible {
   /// A textual representation of the pointer, suitable for debugging.
-  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return _rawPointerToString(_rawValue)
   }
 }
 
 extension ${Self} : CustomReflectable {
-  @inlinable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     let ptrValue = UInt64(bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
     return Mirror(self, children: ["pointerValue": ptrValue])
-  }
-}
-
-extension ${Self} : CustomPlaygroundQuickLookable {
-  @inlinable // FIXME(sil-serialize-all)
-  internal var summary: String {
-    let selfType = "${Self}"
-    let ptrValue = UInt64(bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
-    return ptrValue == 0 ? "\(selfType)(nil)" : "\(selfType)(0x\(_uint64ToString(ptrValue, radix:16, uppercase:true)))"
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @available(*, deprecated, message: "${Self}.customPlaygroundQuickLook will be removed in a future Swift version")
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return .text(summary)
   }
 }
 
@@ -1037,7 +972,7 @@ extension UInt {
   ///
   /// - Parameter pointer: The pointer to use as the source for the new
   ///   integer.
-  @inlinable
+  @inlinable // unsafe-performance
   public init<U>(bitPattern pointer: ${Self}<U>?) {
     if let pointer = pointer {
       self = UInt(Builtin.ptrtoint_Word(pointer._rawValue))
@@ -1048,7 +983,7 @@ extension UInt {
 }
 
 extension ${Self} {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // unsafe-performance
   internal static var _max : ${Self} {
     return ${Self}(
       bitPattern: 0 as Int &- MemoryLayout<Pointee>.stride

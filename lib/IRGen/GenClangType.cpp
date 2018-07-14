@@ -623,10 +623,10 @@ clang::CanQualType GenClangType::visitProtocolCompositionType(
     return getClangIdType(getClangASTContext());
 
   auto superclassTy = clangCtx.ObjCBuiltinIdTy;
-  if (layout.superclass) {
+  if (auto layoutSuperclassTy = layout.getSuperclass()) {
     superclassTy = clangCtx.getCanonicalType(
       cast<clang::ObjCObjectPointerType>(
-        Converter.convert(IGM, CanType(layout.superclass)))
+        Converter.convert(IGM, CanType(layoutSuperclassTy)))
         ->getPointeeType());
   }
 

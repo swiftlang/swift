@@ -1,10 +1,11 @@
 // REQUIRES: objc_interop
 // RUN: %empty-directory(%t.mod)
 // RUN: %target-swift-frontend -emit-module -o %t.mod/Cities.swiftmodule %S/Inputs/Cities.swift -module-name Cities -parse-as-library
-// RUN: %empty-directory(%t) && %target-swift-frontend -c -update-code -primary-file %s  -I %t.mod -api-diff-data-file %S/Inputs/string-representable.json -emit-migrated-file-path %t/string-representable.swift.result -disable-migrator-fixits -o /dev/null
+// RUN: %empty-directory(%t) && %target-swift-frontend -c -update-code -primary-file %s  -I %t.mod -api-diff-data-file %S/Inputs/string-representable.json -emit-migrated-file-path %t/string-representable.swift.result -disable-migrator-fixits -o /dev/null -F %S/mock-sdk
 // RUN: diff -u %S/string-representable.swift.expected %t/string-representable.swift.result
 
 import Cities
+import Bar
 
 func foo(_ c: Container) -> String {
   c.Value = convertToNewAttribute("")
@@ -12,11 +13,14 @@ func foo(_ c: Container) -> String {
   c.addingAttributes(convertToCitiesContainerAttributeDictionary(["a": "b", "a": "b", "a": "b"]))
   c.adding(attributes: convertToSimpleAttributeDictionary(["a": 1, "a": 2, "a": 3]))
   c.adding(optionalAttributes: convertToOptionalSimpleAttributeDictionary(["a": 1, "a": 2, "a": 3]))
-  _ = Container(optionalAttributes: convertToOptionalSimpleAttributeDictionary(nil))
-  _ = Container(optionalAttrArray: convertToOptionalSimpleAttributeArray(nil))
+  _ = Container(optionalAttributes: convertToOptionalSimpleAttributeDictionary([:]))
+  _ = Container(optionalAttrArray: convertToOptionalSimpleAttributeArray([]))
+  _ = Container(optionalAttributes: nil)
+  _ = Container(optionalAttrArray: nil)
   c.adding(attrArray: convertToSimpleAttributeArray(["key1", "key2"]))
   c.add(single: convertToSimpleAttribute(""))
-  c.add(singleOptional: convertToOptionalSimpleAttribute(nil))
+  c.add(singleOptional: convertToOptionalSimpleAttribute(""))
+  c.add(singleOptional: nil)
   _ = convertFromSimpleAttributeDictionary(c.getAttrDictionary())
   _ = convertFromOptionalSimpleAttributeDictionary(c.getOptionalAttrDictionary())
   _ = convertFromSimpleAttribute(c.getSingleAttr())
@@ -24,17 +28,92 @@ func foo(_ c: Container) -> String {
   _ = convertFromSimpleAttributeArray(c.getAttrArray())
   _ = convertFromOptionalSimpleAttributeArray(c.getOptionalAttrArray())
 
-  c.addingAttributes(convertToCitiesContainerAttributeDictionary(convertFromSimpleAttributeDictionary(c.getAttrDictionary())))
-  c.adding(optionalAttributes: convertToOptionalSimpleAttributeDictionary(convertFromSimpleAttributeDictionary(c.getAttrDictionary())))
+  c.addingAttributes(c.getAttrDictionary())
+  c.adding(optionalAttributes: c.getAttrDictionary())
 
   c.attrDict = convertToSimpleAttributeDictionary(["a": "b", "a": "b", "a": "b"])
   c.attrArr = convertToSimpleAttributeArray(["key1", "key2"])
   _ = convertFromSimpleAttributeArray(c.attrArr)
   _ = convertFromSimpleAttributeDictionary(c.attrDict)
-  c.adding(attributes: convertToSimpleAttributeDictionary(convertFromSimpleAttributeDictionary(c.attrDict)))
-  _ = Container(optionalAttrArray: convertToOptionalSimpleAttributeArray(convertFromSimpleAttributeArray(c.attrArr)))
-  c.adding(optionalAttributes: convertToOptionalSimpleAttributeDictionary(convertFromOptionalSimpleAttributeDictionary(c.optionalAttrDict)))
+  c.adding(attributes: c.attrDict)
+  _ = Container(optionalAttrArray: c.attrArr)
+  c.adding(optionalAttributes: c.optionalAttrDict)
+  _ = convertFromNewAttribute(AttributeWrapper.NewAttribute)
+  c.Value = AttributeWrapper.NewAttribute
+  c.optionalAttrDict = nil
   return convertFromNewAttribute(c.Value)
+}
+
+class C: BarForwardDeclaredClass {}
+
+func revert(_ a: AwesomeCityAttribute, b: Wrapper.Attribute) {
+  _ = "somevalue"
+  _ = "somevalue"
+  _ = "somevalue"
+  _ = "somevalue"
+  _ = a
+  _ = "somevalue"
+  _ = "somevalue"
+  _ = b
+  _ = NewAttributeWrapper.NewKnownAttr
+  _ = "somevalue"
+  _ = "somevalue"
+}
+
+
+func bar(_ c: Container) {
+  let attr: AliasAttribute = ""
+  c.add(single: attr)
+}
+
+public class SubContainer: Container {
+  public override func adding(optionalAttributes subname: [String: Any]?) {
+// Local variable inserted by Swift 4.2 migrator.
+let subname = convertFromOptionalSimpleAttributeDictionary(subname)
+}
+  public override func adding(attributes myname: [String: Any]) {
+// Local variable inserted by Swift 4.2 migrator.
+let myname = convertFromSimpleAttributeDictionary(myname)
+}
+  public override func adding(attrArray: [String]) {
+// Local variable inserted by Swift 4.2 migrator.
+let attrArray = convertFromSimpleAttributeArray(attrArray)
+}
+  public override func add(single: String) {
+// Local variable inserted by Swift 4.2 migrator.
+let single = convertFromSimpleAttribute(single)
+}
+  public override func add(singleOptional: String?) {
+// Local variable inserted by Swift 4.2 migrator.
+let singleOptional = convertFromOptionalSimpleAttribute(singleOptional)
+}
+}
+
+// Helper function inserted by Swift 4.2 migrator.
+fileprivate func convertFromOptionalSimpleAttributeDictionary(_ input: [SimpleAttribute: Any]?) -> [String: Any]? {
+	guard let input = input else { return nil }
+	return Dictionary(uniqueKeysWithValues: input.map {key, value in (key.rawValue, value)})
+}
+
+// Helper function inserted by Swift 4.2 migrator.
+fileprivate func convertFromSimpleAttributeDictionary(_ input: [SimpleAttribute: Any]) -> [String: Any] {
+	return Dictionary(uniqueKeysWithValues: input.map {key, value in (key.rawValue, value)})
+}
+
+// Helper function inserted by Swift 4.2 migrator.
+fileprivate func convertFromSimpleAttributeArray(_ input: [SimpleAttribute]) -> [String] {
+	return input.map { key in key.rawValue }
+}
+
+// Helper function inserted by Swift 4.2 migrator.
+fileprivate func convertFromSimpleAttribute(_ input: SimpleAttribute) -> String {
+	return input.rawValue
+}
+
+// Helper function inserted by Swift 4.2 migrator.
+fileprivate func convertFromOptionalSimpleAttribute(_ input: SimpleAttribute?) -> String? {
+	guard let input = input else { return nil }
+	return input.rawValue
 }
 
 // Helper function inserted by Swift 4.2 migrator.
@@ -78,33 +157,6 @@ fileprivate func convertToSimpleAttribute(_ input: String) -> SimpleAttribute {
 fileprivate func convertToOptionalSimpleAttribute(_ input: String?) -> SimpleAttribute? {
 	guard let input = input else { return nil }
 	return SimpleAttribute(rawValue: input)
-}
-
-// Helper function inserted by Swift 4.2 migrator.
-fileprivate func convertFromSimpleAttributeDictionary(_ input: [SimpleAttribute: Any]) -> [String: Any] {
-	return Dictionary(uniqueKeysWithValues: input.map {key, value in (key.rawValue, value)})
-}
-
-// Helper function inserted by Swift 4.2 migrator.
-fileprivate func convertFromOptionalSimpleAttributeDictionary(_ input: [SimpleAttribute: Any]?) -> [String: Any]? {
-	guard let input = input else { return nil }
-	return Dictionary(uniqueKeysWithValues: input.map {key, value in (key.rawValue, value)})
-}
-
-// Helper function inserted by Swift 4.2 migrator.
-fileprivate func convertFromSimpleAttribute(_ input: SimpleAttribute) -> String {
-	return input.rawValue
-}
-
-// Helper function inserted by Swift 4.2 migrator.
-fileprivate func convertFromOptionalSimpleAttribute(_ input: SimpleAttribute?) -> String? {
-	guard let input = input else { return nil }
-	return input.rawValue
-}
-
-// Helper function inserted by Swift 4.2 migrator.
-fileprivate func convertFromSimpleAttributeArray(_ input: [SimpleAttribute]) -> [String] {
-	return input.map { key in key.rawValue }
 }
 
 // Helper function inserted by Swift 4.2 migrator.

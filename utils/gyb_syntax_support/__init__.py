@@ -92,7 +92,7 @@ def create_node_map():
 
 
 def is_visitable(node):
-    return not node.is_base() and not node.collection_element
+    return not node.is_base()
 
 
 def dedented_lines(description):

@@ -475,6 +475,11 @@ BUILTIN_MISC_OPERATION(StaticReport, "staticReport", "", Special)
 BUILTIN_MISC_OPERATION(AssertConf, "assert_configuration", "n", Special)
 
 /// StringObjectOr has type (T,T) -> T.
+/// Sets bits in a string object. The first operand is bit-cast string literal
+/// pointer to an integer. The second operand is the bit mask to be or'd into
+/// the high bits of the pointer.
+/// It is required that the or'd bits are all 0 in the first operand. So this
+/// or-operation is actually equivalent to an addition.
 BUILTIN_MISC_OPERATION(StringObjectOr,     "stringObjectOr",      "n", Integer)
 
 /// Special truncation builtins that check for sign and overflow errors. These

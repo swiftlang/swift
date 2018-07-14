@@ -142,7 +142,7 @@ func test1() {
 // CHECK: <enum>enum <name>SomeEnum</name> {
 // CHECK:   <enum-case>case <enum-elem><name>North</name></enum-elem></enum-case>
 // CHECK:   <enum-case>case <enum-elem><name>South</name></enum-elem>, <enum-elem><name>East</name></enum-elem></enum-case>
-// CHECK:   <enum-case>case <enum-elem><name>QRCode</name>(<param><type>String</type></param>)</enum-elem></enum-case>
+// CHECK:   <enum-case>case <enum-elem><name>QRCode(<param><type>String</type></param>)</name></enum-elem></enum-case>
 // CHECK:   <enum-case>case</enum-case>
 // CHECK: }</enum>
 enum SomeEnum {

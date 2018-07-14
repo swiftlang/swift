@@ -132,7 +132,10 @@ public:
 
   /// Returns the child index of this node in its parent,
   /// if it has one, otherwise 0.
-  CursorIndex getIndexInParent() const;
+  CursorIndex getIndexInParent() const { return getData().getIndexInParent(); }
+
+  /// Return the number of bytes this node takes when spelled out in the source
+  size_t getTextLength() const { return getRaw()->getTextLength(); }
 
   /// Returns true if this syntax node represents a token.
   bool isToken() const;
@@ -199,6 +202,13 @@ public:
   AbsolutePosition getAbsoluteEndPosition() const {
     return Data->getAbsoluteEndPosition();
   }
+
+  /// Get the absolute position without skipping the leading trivia of this
+  /// node.
+  AbsolutePosition getAbsolutePositionWithLeadingTrivia() const {
+    return Data->getAbsolutePositionWithLeadingTrivia();
+  }
+
   // TODO: hasSameStructureAs ?
 };
 

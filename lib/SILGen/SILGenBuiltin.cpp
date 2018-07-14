@@ -593,7 +593,8 @@ static ManagedValue emitBuiltinBeginUnpairedModifyAccess(SILGenFunction &SGF,
                                  /*invariant*/ false);
   SGF.B.createBeginUnpairedAccess(loc, addr, buffer, SILAccessKind::Modify,
                                   SILAccessEnforcement::Dynamic,
-                                  /*noNestedConflict*/ false);
+                                  /*noNestedConflict*/ false,
+                                  /*fromBuiltin*/ true);
 
   return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
 }
@@ -630,7 +631,8 @@ static ManagedValue emitBuiltinPerformInstantaneousReadAccess(
   // use will be trivially optimized away.
   SGF.B.createBeginUnpairedAccess(loc, addr, unusedBuffer, SILAccessKind::Read,
                                   SILAccessEnforcement::Dynamic,
-                                  /*noNestedConflict*/ true);
+                                  /*noNestedConflict*/ true,
+                                  /*fromBuiltin*/ true);
 
   return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
 }
@@ -655,7 +657,8 @@ static ManagedValue emitBuiltinEndUnpairedAccess(SILGenFunction &SGF,
                                                  /*strict*/ true,
                                                  /*invariant*/ false);
   SGF.B.createEndUnpairedAccess(loc, buffer, SILAccessEnforcement::Dynamic,
-                                /*aborted*/ false);
+                                /*aborted*/ false,
+                                /*fromBuiltin*/ true);
 
   return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
 }
@@ -898,6 +901,7 @@ static ManagedValue emitBuiltinValueToBridgeObject(SILGenFunction &SGF,
          "ValueToBridgeObject should have one sub");
   auto &fromTL = SGF.getTypeLowering(subs.getReplacementTypes()[0]);
   assert(fromTL.isTrivial() && "Expected a trivial type");
+  (void)fromTL;
 
   SILValue result = SGF.B.createValueToBridgeObject(loc, args[0].getValue());
   return SGF.emitManagedRetain(loc, result);

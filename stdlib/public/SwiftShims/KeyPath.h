@@ -56,6 +56,9 @@ static const __swift_uint32_t _SwiftKeyPathComponentHeader_OptionalTag
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_ExternalTag
   = 0x7F;
 
+static const __swift_uint32_t
+_SwiftKeyPathComponentHeader_TrivialPropertyDescriptorMarker = 0xFFFFFFFFU;
+
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_MaximumOffsetPayload
   = 0x00FFFFFCU;
   

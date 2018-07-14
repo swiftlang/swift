@@ -28,4 +28,14 @@ func iuo_error(prop: IUOProperty) {
   // expected-error@-1 {{cannot invoke 'optional' with no arguments}}
   let _: Coat = prop.iuo!.optional!()
   let _: Coat = prop.iuo!.optional!()!
+
+  let _ = prop.iuo.name
+}
+
+protocol X {}
+
+extension X where Self : OptionalRequirements {
+  func test() {
+    let _ = self.name
+  }
 }

@@ -535,3 +535,19 @@ func testDoRethrow() {
   doRethrow(fn:) { (a, b) in return a }
   DoRethrowGeneric<Int>().method(fn:) { (a, b) in return a }
 }
+
+// https://bugs.swift.org/browse/SR-7120 - capture lists
+func rethrowsWithCaptureList<R, T>(
+  array: [T],
+  operation: (Int) throws -> R
+) rethrows -> R {
+  return try array.withUnsafeBytes { [array] _ in
+    return try operation(array.count)
+  }
+}
+
+// rdar://problem/40472018: Crash on rethrows function with variadic parameter and throwing function parameter.
+public func variadic_rethrows(_ values: Int..., body: (Int) throws -> ()) rethrows { }
+public func rdar40472018() {
+  variadic_rethrows(1, 2) { _ in }
+}

@@ -539,3 +539,11 @@ struct S : Q, Equatable {
 }
 
 @_alignment(16) public struct float3 { public var x, y, z: Float }
+
+#sourceLocation(file: "otherFile.swift", line: 5)
+
+func foo() {}
+
+#sourceLocation()
+
+"abc \( } ) def"

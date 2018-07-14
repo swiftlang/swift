@@ -89,12 +89,14 @@ swift::swift_initEnumMetadataSinglePayload(EnumMetadata *self,
   auto vwtable = getMutableVWTableForInit(self, layoutFlags);
   
   size_t align = payloadLayout->flags.getAlignment();
+  bool isBT = payloadLayout->flags.isBitwiseTakable();
   TypeLayout layout;
   layout.size = size;
-  layout.flags = payloadLayout->flags
-    .withExtraInhabitants(unusedExtraInhabitants > 0)
-    .withEnumWitnesses(true)
-    .withInlineStorage(ValueWitnessTable::isValueInline(size, align));
+  layout.flags =
+      payloadLayout->flags.withExtraInhabitants(unusedExtraInhabitants > 0)
+          .withEnumWitnesses(true)
+          .withInlineStorage(
+              ValueWitnessTable::isValueInline(isBT, size, align));
   auto rawStride = llvm::alignTo(size, align);
   layout.stride = rawStride == 0 ? 1 : rawStride;
   
@@ -144,9 +146,8 @@ unsigned swift::swift_getEnumCaseSinglePayload(const OpaqueValue *value,
   auto *payloadWitnesses = payload->getValueWitnesses();
   auto size = payloadWitnesses->getSize();
   auto numExtraInhabitants = payloadWitnesses->getNumExtraInhabitants();
-  auto getExtraInhabitantIndex =
-      (static_cast<const ExtraInhabitantsValueWitnessTable *>(payloadWitnesses)
-           ->getExtraInhabitantIndex);
+  auto EIVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(payloadWitnesses);
+  auto getExtraInhabitantIndex = EIVWT ? EIVWT->getExtraInhabitantIndex : nullptr;
 
   return getEnumTagSinglePayloadImpl(value, emptyCases, payload, size,
                                      numExtraInhabitants,
@@ -161,9 +162,8 @@ void swift::swift_storeEnumTagSinglePayload(OpaqueValue *value,
   auto *payloadWitnesses = payload->getValueWitnesses();
   auto size = payloadWitnesses->getSize();
   auto numExtraInhabitants = payloadWitnesses->getNumExtraInhabitants();
-  auto storeExtraInhabitant =
-      (static_cast<const ExtraInhabitantsValueWitnessTable *>(payloadWitnesses)
-           ->storeExtraInhabitant);
+  auto EIVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(payloadWitnesses);
+  auto storeExtraInhabitant = EIVWT ? EIVWT->storeExtraInhabitant : nullptr;
 
   storeEnumTagSinglePayloadImpl(value, whichCase, emptyCases, payload, size,
                                 numExtraInhabitants, storeExtraInhabitant);
@@ -200,14 +200,14 @@ swift::swift_initEnumMetadataMultiPayload(EnumMetadata *enumType,
   TypeLayout layout;
   layout.size = totalSize;
   layout.flags = ValueWitnessFlags()
-    .withAlignmentMask(alignMask)
-    .withPOD(isPOD)
-    .withBitwiseTakable(isBT)
-    // TODO: Extra inhabitants
-    .withExtraInhabitants(false)
-    .withEnumWitnesses(true)
-    .withInlineStorage(ValueWitnessTable::isValueInline(totalSize, alignMask+1))
-    ;
+                     .withAlignmentMask(alignMask)
+                     .withPOD(isPOD)
+                     .withBitwiseTakable(isBT)
+                     // TODO: Extra inhabitants
+                     .withExtraInhabitants(false)
+                     .withEnumWitnesses(true)
+                     .withInlineStorage(ValueWitnessTable::isValueInline(
+                         isBT, totalSize, alignMask + 1));
   auto rawStride = (totalSize + alignMask) & ~alignMask;
   layout.stride = rawStride == 0 ? 1 : rawStride;
   

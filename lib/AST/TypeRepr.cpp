@@ -157,11 +157,12 @@ TypeRepr *CloneVisitor::visitCompoundIdentTypeRepr(CompoundIdentTypeRepr *T) {
 }
 
 TypeRepr *CloneVisitor::visitFunctionTypeRepr(FunctionTypeRepr *T) {
-  return new (Ctx) FunctionTypeRepr(/*FIXME: Clone?*/T->getGenericParams(),
-                                    visit(T->getArgsTypeRepr()),
-                                    T->getThrowsLoc(),
-                                    T->getArrowLoc(),
-                                    visit(T->getResultTypeRepr()));
+  return new (Ctx) FunctionTypeRepr(
+                              /*FIXME: Clone?*/T->getGenericParams(),
+                              cast<TupleTypeRepr>(visit(T->getArgsTypeRepr())),
+                              T->getThrowsLoc(),
+                              T->getArrowLoc(),
+                              visit(T->getResultTypeRepr()));
 }
 
 TypeRepr *CloneVisitor::visitArrayTypeRepr(ArrayTypeRepr *T) {
@@ -476,6 +477,10 @@ SILBoxTypeRepr *SILBoxTypeRepr::create(ASTContext &C,
   auto mem = C.Allocate(size, alignof(SILBoxTypeRepr));
   return new (mem) SILBoxTypeRepr(GenericParams, LBraceLoc, Fields, RBraceLoc,
                                   ArgLAngleLoc, GenericArgs, ArgRAngleLoc);
+}
+
+SourceLoc FunctionTypeRepr::getStartLocImpl() const {
+  return ArgsTy->getStartLoc();
 }
 
 SourceLoc SILBoxTypeRepr::getStartLocImpl() const {

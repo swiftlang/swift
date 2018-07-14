@@ -105,10 +105,10 @@ static bool printObjCUSRForAccessor(const AbstractStorageDecl *ASD,
 
   ObjCSelector Selector;
   switch (Kind) {
-    case swift::AccessorKind::IsGetter:
+    case swift::AccessorKind::Get:
       Selector = ASD->getObjCGetterSelector();
       break;
-    case swift::AccessorKind::IsSetter:
+    case swift::AccessorKind::Set:
       Selector = ASD->getObjCSetterSelector();
       break;
     default:

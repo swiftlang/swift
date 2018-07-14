@@ -204,7 +204,7 @@ protocol P0 {
 }
 
 protocol P1 {
-  func %%%(lhs: Self, rhs: Self) -> Self // expected-warning{{operator '%%%' declared in protocol must be 'static'}}{{3-3=static }}
+  func %%%(lhs: Self, rhs: Self) -> Self // expected-error{{operator '%%%' declared in protocol must be 'static'}}{{3-3=static }}
 }
 
 struct S0 {
@@ -355,3 +355,13 @@ class C6 {
     if x == x && x = x { } // expected-error{{expression is not assignable: '&&' returns immutable value}}
   }
 }
+
+_ = 1..<1 // OK
+_ = 1…1 // expected-error {{use of unresolved operator '…'; did you mean '...'?}} {{6-9=...}}
+_ = 1….1 // expected-error {{use of unresolved operator '…'; did you mean '...'?}} {{6-9=...}}
+_ = 1.…1 // expected-error {{use of unresolved operator '.…'; did you mean '...'?}} {{6-10=...}}
+_ = 1…<1 // expected-error {{use of unresolved operator '…<'; did you mean '..<'?}} {{6-10=..<}}
+_ = 1..1 // expected-error {{use of unresolved operator '..'; did you mean '...'?}} {{6-8=...}}
+_ = 1....1 // expected-error {{use of unresolved operator '....'; did you mean '...'?}} {{6-10=...}}
+_ = 1...<1 // expected-error {{use of unresolved operator '...<'; did you mean '..<'?}} {{6-10=..<}}
+_ = 1....<1 // expected-error {{use of unresolved operator '....<'; did you mean '..<'?}} {{6-11=..<}}

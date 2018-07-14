@@ -284,28 +284,7 @@ static bool isSameInitSequence(const InitSequence &LHS,
 
 /// Check if a given let property can be assigned externally.
 static bool isAssignableExternally(VarDecl *Property, SILModule *Module) {
-  AccessLevel access = Property->getEffectiveAccess();
-  SILLinkage linkage;
-  switch (access) {
-  case AccessLevel::Private:
-  case AccessLevel::FilePrivate:
-    linkage = SILLinkage::Private;
-    DEBUG(llvm::dbgs() << "Property " << *Property << " has private access\n");
-    break;
-  case AccessLevel::Internal:
-    linkage = SILLinkage::Hidden;
-    DEBUG(llvm::dbgs() << "Property " << *Property << " has internal access\n");
-    break;
-  case AccessLevel::Public:
-  case AccessLevel::Open:
-    linkage = SILLinkage::Public;
-    DEBUG(llvm::dbgs() << "Property " << *Property << " has public access\n");
-    break;
-  }
-
-  DEBUG(llvm::dbgs() << "Module of " << *Property << " WMO mode is: " << Module->isWholeModule() << "\n");
-
-  if (isPossiblyUsedExternally(linkage, Module->isWholeModule())) {
+  if (Module->isVisibleExternally(Property)) {
     // If at least one of the properties of the enclosing type cannot be
     // used externally, then no initializer can be implemented externally as
     // it wouldn't be able to initialize such a property.

@@ -705,7 +705,7 @@ public:
                          PatternBindingDecl *&ArgPattern,
                          VarDecl *&ArgVariable) {
     const char *LoggerName =
-        isDebugPrint ? "$builtin_debugPrint" : "$builtin_print";
+        isDebugPrint ? "__builtin_debugPrint" : "__builtin_print";
 
     UnresolvedDeclRefExpr *LoggerRef = new (Context) UnresolvedDeclRefExpr(
         Context.getIdentifier(LoggerName), DeclRefKind::Ordinary,
@@ -724,7 +724,7 @@ public:
   }
 
   Added<Stmt *> logPostPrint(SourceRange SR) {
-    return buildLoggerCallWithArgs("$builtin_postPrint",
+    return buildLoggerCallWithArgs("__builtin_postPrint",
                                    MutableArrayRef<Expr *>(), SR);
   }
 
@@ -754,10 +754,8 @@ public:
     VD->setImplicit();
 
     NamedPattern *NP = new (Context) NamedPattern(VD, /*implicit*/ true);
-    PatternBindingDecl *PBD = PatternBindingDecl::create(
-        Context, SourceLoc(), StaticSpellingKind::None, SourceLoc(), NP,
-        MaybeLoadInitExpr, TypeCheckDC);
-    PBD->setImplicit();
+    PatternBindingDecl *PBD = PatternBindingDecl::createImplicit(
+        Context, StaticSpellingKind::None, NP, MaybeLoadInitExpr, TypeCheckDC);
 
     return std::make_pair(PBD, VD);
   }
@@ -771,16 +769,13 @@ public:
         new (Context) StringLiteralExpr(NameInContext->c_str(), SourceRange());
     NameExpr->setImplicit(true);
 
-    const size_t buf_size = 11;
-    char *const id_buf = (char *)Context.Allocate(buf_size, 1);
     std::uniform_int_distribution<unsigned> Distribution(0, 0x7fffffffu);
     const unsigned id_num = Distribution(RNG);
-    ::snprintf(id_buf, buf_size, "%u", id_num);
-    Expr *IDExpr = new (Context) IntegerLiteralExpr(id_buf, SourceLoc(), true);
+    Expr *IDExpr = IntegerLiteralExpr::createFromUnsigned(Context, id_num);
 
     Expr *LoggerArgExprs[] = {*E, NameExpr, IDExpr};
 
-    return buildLoggerCallWithArgs("$builtin_log_with_id",
+    return buildLoggerCallWithArgs("__builtin_log_with_id",
                                    MutableArrayRef<Expr *>(LoggerArgExprs), SR);
   }
 
@@ -794,7 +789,7 @@ public:
 
   Added<Stmt *> buildScopeCall(SourceRange SR, bool IsExit) {
     const char *LoggerName =
-        IsExit ? "$builtin_log_scope_exit" : "$builtin_log_scope_entry";
+        IsExit ? "__builtin_log_scope_exit" : "__builtin_log_scope_entry";
 
     return buildLoggerCallWithArgs(LoggerName, MutableArrayRef<Expr *>(), SR);
   }
@@ -814,26 +809,10 @@ public:
     std::pair<unsigned, unsigned> EndLC = Context.SourceMgr.getLineAndColumn(
         Lexer::getLocForEndOfToken(Context.SourceMgr, SR.End));
 
-    const size_t buf_size = 8;
-
-    char *start_line_buf = (char *)Context.Allocate(buf_size, 1);
-    char *end_line_buf = (char *)Context.Allocate(buf_size, 1);
-    char *start_column_buf = (char *)Context.Allocate(buf_size, 1);
-    char *end_column_buf = (char *)Context.Allocate(buf_size, 1);
-
-    ::snprintf(start_line_buf, buf_size, "%u", StartLC.first);
-    ::snprintf(start_column_buf, buf_size, "%u", StartLC.second);
-    ::snprintf(end_line_buf, buf_size, "%u", EndLC.first);
-    ::snprintf(end_column_buf, buf_size, "%u", EndLC.second);
-
-    Expr *StartLine =
-        new (Context) IntegerLiteralExpr(start_line_buf, SR.End, true);
-    Expr *EndLine =
-        new (Context) IntegerLiteralExpr(end_line_buf, SR.End, true);
-    Expr *StartColumn =
-        new (Context) IntegerLiteralExpr(start_column_buf, SR.End, true);
-    Expr *EndColumn =
-        new (Context) IntegerLiteralExpr(end_column_buf, SR.End, true);
+    Expr *StartLine = IntegerLiteralExpr::createFromUnsigned(Context, StartLC.first);
+    Expr *EndLine = IntegerLiteralExpr::createFromUnsigned(Context, EndLC.first);
+    Expr *StartColumn = IntegerLiteralExpr::createFromUnsigned(Context, StartLC.second);
+    Expr *EndColumn = IntegerLiteralExpr::createFromUnsigned(Context, EndLC.second);
 
     llvm::SmallVector<Expr *, 6> ArgsWithSourceRange(Args.begin(), Args.end());
 
@@ -870,7 +849,7 @@ public:
                                   AccessSemantics::Ordinary, Apply->getType());
 
     UnresolvedDeclRefExpr *SendDataRef = new (Context)
-        UnresolvedDeclRefExpr(Context.getIdentifier("$builtin_send_data"),
+        UnresolvedDeclRefExpr(Context.getIdentifier("__builtin_send_data"),
                               DeclRefKind::Ordinary, DeclNameLoc());
 
     SendDataRef->setImplicit(true);

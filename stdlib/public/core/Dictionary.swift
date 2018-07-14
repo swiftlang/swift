@@ -294,7 +294,7 @@ import SwiftShims
 /// dictionary called `interestingNumbers` with string keys and values that
 /// are integer arrays, then sorts each array in-place in descending order.
 ///
-///     var interestingNumbers = ["primes": [2, 3, 5, 7, 11, 13, 15],
+///     var interestingNumbers = ["primes": [2, 3, 5, 7, 11, 13, 17],
 ///                               "triangular": [1, 3, 6, 10, 15, 21, 28],
 ///                               "hexagonal": [1, 6, 15, 28, 45, 66, 91]]
 ///     for key in interestingNumbers.keys {
@@ -302,7 +302,7 @@ import SwiftShims
 ///     }
 ///
 ///     print(interestingNumbers["primes"]!)
-///     // Prints "[15, 13, 11, 7, 5, 3, 2]"
+///     // Prints "[17, 13, 11, 7, 5, 3, 2]"
 ///
 /// Iterating Over the Contents of a Dictionary
 /// ===========================================
@@ -382,8 +382,11 @@ import SwiftShims
 @_fixed_layout
 public struct Dictionary<Key: Hashable, Value> {
 
+  @usableFromInline
   internal typealias _Self = Dictionary<Key, Value>
+  @usableFromInline
   internal typealias _VariantBuffer = _VariantDictionaryBuffer<Key, Value>
+  @usableFromInline
   internal typealias _NativeBuffer = _NativeDictionaryBuffer<Key, Value>
 
   /// The element type of a dictionary: a tuple containing an individual
@@ -408,7 +411,7 @@ public struct Dictionary<Key: Hashable, Value> {
   ///
   /// - Parameter minimumCapacity: The minimum number of key-value pairs that
   ///   the newly created dictionary should be able to store without
-  //    reallocating its storage buffer.
+  ///   reallocating its storage buffer.
   @inlinable // FIXME(sil-serialize-all)
   public init(minimumCapacity: Int) {
     _variantBuffer = .native(_NativeBuffer(minimumCapacity: minimumCapacity))
@@ -798,15 +801,63 @@ extension Dictionary: ExpressibleByDictionaryLiteral {
   /// - Parameter elements: The key-value pairs that will make up the new
   ///   dictionary. Each key in `elements` must be unique.
   @inlinable // FIXME(sil-serialize-all)
-  @effects(readonly)
+  @_effects(readonly)
   public init(dictionaryLiteral elements: (Key, Value)...) {
     self.init(_nativeBuffer: _NativeDictionaryBuffer.fromArray(elements))
   }
 }
 
 extension Dictionary {
-  /// Accesses the element with the given key, or the specified default value,
-  /// if the dictionary doesn't contain the given key.
+  /// Accesses the value with the given key. If the dictionary doesn't contain
+  /// the given key, accesses the provided default value as if the key and
+  /// default value existed in the dictionary.
+  ///
+  /// Use this subscript when you want either the value for a particular key
+  /// or, when that key is not present in the dictionary, a default value. This
+  /// example uses the subscript with a message to use in case an HTTP response
+  /// code isn't recognized:
+  ///
+  ///     var responseMessages = [200: "OK",
+  ///                             403: "Access forbidden",
+  ///                             404: "File not found",
+  ///                             500: "Internal server error"]
+  ///
+  ///     let httpResponseCodes = [200, 403, 301]
+  ///     for code in httpResponseCodes {
+  ///         let message = responseMessages[code, default: "Unknown response"]
+  ///         print("Response \(code): \(message)")
+  ///     }
+  ///     // Prints "Response 200: OK"
+  ///     // Prints "Response 403: Access Forbidden"
+  ///     // Prints "Response 301: Unknown response"
+  ///
+  /// When a dictionary's `Value` type has value semantics, you can use this
+  /// subscript to perform in-place operations on values in the dictionary.
+  /// The following example uses this subscript while counting the occurences
+  /// of each letter in a string:
+  ///
+  ///     let message = "Hello, Elle!"
+  ///     var letterCounts: [Character: Int] = [:]
+  ///     for letter in message {
+  ///         letterCounts[letter, defaultValue: 0] += 1
+  ///     }
+  ///     // letterCounts == ["H": 1, "e": 2, "l": 4, "o": 1, ...]
+  ///
+  /// When `letterCounts[letter, defaultValue: 0] += 1` is executed with a
+  /// value of `letter` that isn't already a key in `letterCounts`, the
+  /// specified default value (`0`) is returned from the subscript,
+  /// incremented, and then added to the dictionary under that key.
+  ///
+  /// - Note: Do not use this subscript to modify dictionary values if the
+  ///   dictionary's `Value` type is a class. In that case, the default value
+  ///   and key are not written back to the dictionary after an operation.
+  ///
+  /// - Parameters:
+  ///   - key: The key the look up in the dictionary.
+  ///   - defaultValue: The default value to use if `key` doesn't exist in the
+  ///     dictionary.
+  /// - Returns: The value associated with `key` in the dictionary`; otherwise,
+  ///   `defaultValue`.
   @inlinable // FIXME(sil-serialize-all)
   public subscript(
     key: Key, default defaultValue: @autoclosure () -> Value
@@ -1120,53 +1171,6 @@ extension Dictionary {
   }
 }
 
-// Maintain old `keys` and `values` types in Swift 3 mode.
-
-extension Dictionary {
-  /// A collection containing just the keys of the dictionary.
-  ///
-  /// When iterated over, keys appear in this collection in the same order as
-  /// they occur in the dictionary's key-value pairs. Each key in the keys
-  /// collection has a unique value.
-  ///
-  ///     let countryCodes = ["BR": "Brazil", "GH": "Ghana", "JP": "Japan"]
-  ///     print(countryCodes)
-  ///     // Prints "["BR": "Brazil", "JP": "Japan", "GH": "Ghana"]"
-  ///
-  ///     for k in countryCodes.keys {
-  ///         print(k)
-  ///     }
-  ///     // Prints "BR"
-  ///     // Prints "JP"
-  ///     // Prints "GH"
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, obsoleted: 4.0)
-  public var keys: LazyMapCollection<[Key: Value], Key> {
-    return self.lazy.map { $0.key }
-  }
-
-  /// A collection containing just the values of the dictionary.
-  ///
-  /// When iterated over, values appear in this collection in the same order as
-  /// they occur in the dictionary's key-value pairs.
-  ///
-  ///     let countryCodes = ["BR": "Brazil", "GH": "Ghana", "JP": "Japan"]
-  ///     print(countryCodes)
-  ///     // Prints "["BR": "Brazil", "JP": "Japan", "GH": "Ghana"]"
-  ///
-  ///     for v in countryCodes.values {
-  ///         print(v)
-  ///     }
-  ///     // Prints "Brazil"
-  ///     // Prints "Japan"
-  ///     // Prints "Ghana"
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, obsoleted: 4.0)
-  public var values: LazyMapCollection<[Key: Value], Value> {
-    return self.lazy.map { $0.value }
-  }
-}
-
 extension Dictionary {
   /// A collection containing just the keys of the dictionary.
   ///
@@ -1315,7 +1319,6 @@ extension Dictionary {
       return _makeCollectionDescription(for: self, withTypeName: nil)
     }
 
-    @inlinable // FIXME(sil-serialize-all)
     public var debugDescription: String {
       return _makeCollectionDescription(for: self, withTypeName: "Dictionary.Keys")
     }
@@ -1386,7 +1389,6 @@ extension Dictionary {
       return _makeCollectionDescription(for: self, withTypeName: nil)
     }
 
-    @inlinable // FIXME(sil-serialize-all)
     public var debugDescription: String {
       return _makeCollectionDescription(for: self, withTypeName: "Dictionary.Values")
     }
@@ -1467,7 +1469,12 @@ extension Dictionary: Equatable where Value: Equatable {
 }
 
 extension Dictionary: Hashable where Value: Hashable {
-  @inlinable // FIXME(sil-serialize-all)
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
+  @inlinable
   public func hash(into hasher: inout Hasher) {
     var commutativeHash = 0
     for (k, v) in self {
@@ -1479,6 +1486,65 @@ extension Dictionary: Hashable where Value: Hashable {
       commutativeHash ^= elementHasher._finalize()
     }
     hasher.combine(commutativeHash)
+  }
+}
+
+extension Dictionary: _HasCustomAnyHashableRepresentation
+where Value: Hashable {
+  public func _toCustomAnyHashable() -> AnyHashable? {
+    return AnyHashable(_box: _DictionaryAnyHashableBox(self))
+  }
+}
+
+internal struct _DictionaryAnyHashableBox<Key: Hashable, Value: Hashable>
+  : _AnyHashableBox {
+  internal let _value: Dictionary<Key, Value>
+  internal let _canonical: Dictionary<AnyHashable, AnyHashable>
+
+  internal init(_ value: Dictionary<Key, Value>) {
+    self._value = value
+    self._canonical = value as Dictionary<AnyHashable, AnyHashable>
+  }
+
+  internal var _base: Any {
+    return _value
+  }
+
+  internal var _canonicalBox: _AnyHashableBox {
+    return _DictionaryAnyHashableBox<AnyHashable, AnyHashable>(_canonical)
+  }
+
+  internal func _isEqual(to other: _AnyHashableBox) -> Bool? {
+    guard
+      let other = other as? _DictionaryAnyHashableBox<AnyHashable, AnyHashable>
+    else {
+      return nil
+    }
+    return _canonical == other._value
+  }
+
+  internal var _hashValue: Int {
+    return _canonical.hashValue
+  }
+
+  internal func _hash(into hasher: inout Hasher) {
+    _canonical.hash(into: &hasher)
+  }
+
+  internal func _rawHashValue(_seed: (UInt64, UInt64)) -> Int {
+    return _canonical._rawHashValue(seed: _seed)
+  }
+
+  internal func _unbox<T: Hashable>() -> T? {
+    return _value as? T
+  }
+
+  internal func _downCastConditional<T>(
+    into result: UnsafeMutablePointer<T>
+  ) -> Bool {
+    guard let value = _value as? T else { return false }
+    result.initialize(to: value)
+    return true
   }
 }
 
@@ -1513,7 +1579,6 @@ extension Dictionary: CustomStringConvertible, CustomDebugStringConvertible {
 
   /// A string that represents the contents of the dictionary, suitable for
   /// debugging.
-  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return _makeDescription()
   }
@@ -1535,7 +1600,7 @@ internal func _stdlib_NSDictionary_allKeys(_ nsd: _NSDictionary)
   let storage = _HeapBuffer<Int, AnyObject>(
     _HeapBufferStorage<Int, AnyObject>.self, count, count)
 
-  nsd.getObjects(nil, andKeys: storage.baseAddress)
+  nsd.getObjects(nil, andKeys: storage.baseAddress, count: count)
   return storage
 }
 #endif
@@ -1800,6 +1865,7 @@ public func _dictionaryBridgeFromObjectiveCConditional<
 internal class _RawNativeDictionaryStorage
   : _SwiftNativeNSDictionary, _NSDictionaryCore
 {
+  @usableFromInline
   internal typealias RawStorage = _RawNativeDictionaryStorage
 
   @usableFromInline // FIXME(sil-serialize-all)
@@ -1911,8 +1977,11 @@ internal class _RawNativeDictionaryStorage
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  internal func getObjects(_ objects: UnsafeMutablePointer<AnyObject>?,
-    andKeys keys: UnsafeMutablePointer<AnyObject>?) {
+  @objc(getObjects:andKeys:count:)
+  internal func getObjects(
+    _ objects: UnsafeMutablePointer<AnyObject>?,
+    andKeys keys: UnsafeMutablePointer<AnyObject>?,
+    count: Int) {
     // Do nothing, we're empty
   }
 #endif
@@ -1973,7 +2042,9 @@ internal class _TypedNativeDictionaryStorage<Key, Value>
 final internal class _HashableTypedNativeDictionaryStorage<Key: Hashable, Value>
   : _TypedNativeDictionaryStorage<Key, Value> {
 
+  @usableFromInline
   internal typealias FullContainer = Dictionary<Key, Value>
+  @usableFromInline
   internal typealias Buffer = _NativeDictionaryBuffer<Key, Value>
 
   // This type is made with allocWithTailElems, so no init is ever called.
@@ -2080,28 +2151,38 @@ final internal class _HashableTypedNativeDictionaryStorage<Key: Hashable, Value>
 
   // We also override the following methods for efficiency.
   @inlinable // FIXME(sil-serialize-all)
-  @objc
-  override func getObjects(_ objects: UnsafeMutablePointer<AnyObject>?,
-    andKeys keys: UnsafeMutablePointer<AnyObject>?) {
-    // The user is expected to provide a storage of the correct size
+  @objc(getObjects:andKeys:count:)
+  override func getObjects(
+    _ objects: UnsafeMutablePointer<AnyObject>?,
+    andKeys keys: UnsafeMutablePointer<AnyObject>?,
+    count: Int) {
+    _precondition(count >= 0, "Invalid count")
+    guard count > 0 else { return }
+    var i = 0 // Current position in the output buffers
     if let unmanagedKeys = _UnmanagedAnyObjectArray(keys) {
       if let unmanagedObjects = _UnmanagedAnyObjectArray(objects) {
         // keys nonnull, objects nonnull
-        for (offset: i, element: (key: key, value: val)) in full.enumerated() {
-          unmanagedObjects[i] = _bridgeAnythingToObjectiveC(val)
+        for (key, value) in full {
+          unmanagedObjects[i] = _bridgeAnythingToObjectiveC(value)
           unmanagedKeys[i] = _bridgeAnythingToObjectiveC(key)
+          i += 1
+          guard i < count else { break }
         }
       } else {
         // keys nonnull, objects null
-        for (offset: i, element: (key: key, value: _)) in full.enumerated() {
+        for (key, _) in full {
           unmanagedKeys[i] = _bridgeAnythingToObjectiveC(key)
+          i += 1
+          guard i < count else { break }
         }
       }
     } else {
       if let unmanagedObjects = _UnmanagedAnyObjectArray(objects) {
         // keys null, objects nonnull
-        for (offset: i, element: (key: _, value: val)) in full.enumerated() {
-          unmanagedObjects[i] = _bridgeAnythingToObjectiveC(val)
+        for (_, value) in full {
+          unmanagedObjects[i] = _bridgeAnythingToObjectiveC(value)
+          i += 1
+          guard i < count else { break }
         }
       } else {
         // do nothing, both are null
@@ -2122,11 +2203,16 @@ final internal class _HashableTypedNativeDictionaryStorage<Key: Hashable, Value>
 @_fixed_layout
 internal struct _NativeDictionaryBuffer<Key, Value> {
 
+  @usableFromInline // FIXME(sil-serialize-all)
   internal typealias RawStorage = _RawNativeDictionaryStorage
+  @usableFromInline // FIXME(sil-serialize-all)
   internal typealias TypedStorage = _TypedNativeDictionaryStorage<Key, Value>
+  @usableFromInline // FIXME(sil-serialize-all)
   internal typealias Buffer = _NativeDictionaryBuffer<Key, Value>
+  @usableFromInline // FIXME(sil-serialize-all)
   internal typealias Index = _NativeDictionaryIndex<Key, Value>
 
+  @usableFromInline
   internal typealias SequenceElementWithoutLabels = (Key, Value)
 
   /// See this comments on _RawNativeDictionaryStorage and its subclasses to
@@ -2276,8 +2362,7 @@ internal struct _NativeDictionaryBuffer<Key, Value> {
     return _storage.initializedEntries[i]
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal func destroyEntry(at i: Int) {
     _sanityCheck(isInitializedEntry(at: i))
     defer { _fixLifetime(self) }
@@ -2287,8 +2372,7 @@ internal struct _NativeDictionaryBuffer<Key, Value> {
     _storage.initializedEntries[i] = false
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal func initializeKey(_ k: Key, value v: Value, at i: Int) {
     _sanityCheck(!isInitializedEntry(at: i))
     defer { _fixLifetime(self) }
@@ -2298,8 +2382,7 @@ internal struct _NativeDictionaryBuffer<Key, Value> {
     _storage.initializedEntries[i] = true
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal func moveInitializeEntry(from: Buffer, at: Int, toEntryAt: Int) {
     _sanityCheck(!isInitializedEntry(at: toEntryAt))
     defer { _fixLifetime(self) }
@@ -2310,8 +2393,7 @@ internal struct _NativeDictionaryBuffer<Key, Value> {
     _storage.initializedEntries[toEntryAt] = true
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal func value(at i: Int) -> Value {
     _sanityCheck(isInitializedEntry(at: i))
     defer { _fixLifetime(self) }
@@ -2319,8 +2401,7 @@ internal struct _NativeDictionaryBuffer<Key, Value> {
     return (values + i).pointee
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal func setKey(_ key: Key, value: Value, at i: Int) {
     _sanityCheck(isInitializedEntry(at: i))
     defer { _fixLifetime(self) }
@@ -2371,8 +2452,10 @@ internal struct _NativeDictionaryBuffer<Key, Value> {
 
 extension _NativeDictionaryBuffer where Key: Hashable
 {
+  @usableFromInline
   internal typealias HashTypedStorage =
     _HashableTypedNativeDictionaryStorage<Key, Value>
+  @usableFromInline
   internal typealias SequenceElement = (key: Key, value: Value)
 
   @inlinable // FIXME(sil-serialize-all)
@@ -2622,7 +2705,9 @@ extension _NativeDictionaryBuffer where Key: Hashable
 final internal class _NativeDictionaryNSEnumerator<Key, Value>
   : _SwiftNativeNSEnumerator, _NSEnumerator {
 
+  @usableFromInline
   internal typealias Buffer = _NativeDictionaryBuffer<Key, Value>
+  @usableFromInline
   internal typealias Index = _NativeDictionaryIndex<Key, Value>
 
   @inlinable // FIXME(sil-serialize-all)
@@ -2704,9 +2789,13 @@ final internal class _NativeDictionaryNSEnumerator<Key, Value>
 final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
   : _SwiftNativeNSDictionary, _NSDictionaryCore {
 
+  @usableFromInline
   internal typealias NativeBuffer = _NativeDictionaryBuffer<Key, Value>
+  @usableFromInline
   internal typealias BridgedBuffer = _NativeDictionaryBuffer<AnyObject, AnyObject>
+  @usableFromInline
   internal typealias NativeIndex = _NativeDictionaryIndex<Key, Value>
+  @usableFromInline
   internal typealias BridgedIndex = _NativeDictionaryIndex<AnyObject, AnyObject>
 
   @inlinable // FIXME(sil-serialize-all)
@@ -2772,12 +2861,13 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @objc
+  @objc(getObjects:andKeys:count:)
   internal func getObjects(
     _ objects: UnsafeMutablePointer<AnyObject>?,
-    andKeys keys: UnsafeMutablePointer<AnyObject>?
+    andKeys keys: UnsafeMutablePointer<AnyObject>?,
+    count: Int
   ) {
-    bridgedAllKeysAndValues(objects, keys)
+    bridgedAllKeysAndValues(objects, keys, count)
   }
 
   @inlinable // FIXME(sil-serialize-all)
@@ -2867,11 +2957,13 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
   @nonobjc
   internal func bridgedAllKeysAndValues(
     _ objects: UnsafeMutablePointer<AnyObject>?,
-    _ keys: UnsafeMutablePointer<AnyObject>?
+    _ keys: UnsafeMutablePointer<AnyObject>?,
+    _ count: Int
   ) {
+    _precondition(count >= 0, "Invalid count")
+    guard count > 0 else { return }
     bridgeEverything()
-    // The user is expected to provide a storage of the correct size
-    var i = 0 // Position in the input storage
+    var i = 0 // Current position in the output buffers
     let bucketCount = nativeBuffer.bucketCount
 
     if let unmanagedKeys = _UnmanagedAnyObjectArray(keys) {
@@ -2882,6 +2974,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
             unmanagedObjects[i] = bridgedBuffer.value(at: position)
             unmanagedKeys[i] = bridgedBuffer.key(at: position)
             i += 1
+            guard i < count else { break }
           }
         }
       } else {
@@ -2890,6 +2983,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
           if bridgedBuffer.isInitializedEntry(at: position) {
             unmanagedKeys[i] = bridgedBuffer.key(at: position)
             i += 1
+            guard i < count else { break }
           }
         }
       }
@@ -2900,6 +2994,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
           if bridgedBuffer.isInitializedEntry(at: position) {
             unmanagedObjects[i] = bridgedBuffer.value(at: position)
             i += 1
+            guard i < count else { break }
           }
         }
       } else {
@@ -3003,11 +3098,16 @@ internal struct _CocoaDictionaryBuffer: _HashBuffer {
     self.cocoaDictionary = cocoaDictionary
   }
 
+  @usableFromInline
   internal typealias Index = _CocoaDictionaryIndex
+  @usableFromInline
   internal typealias SequenceElement = (AnyObject, AnyObject)
+  @usableFromInline
   internal typealias SequenceElementWithoutLabels = (AnyObject, AnyObject)
 
+  @usableFromInline
   internal typealias Key = AnyObject
+  @usableFromInline
   internal typealias Value = AnyObject
 
   @inlinable // FIXME(sil-serialize-all)
@@ -3126,13 +3226,19 @@ internal struct _CocoaDictionaryBuffer: _HashBuffer {
 @_frozen
 internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
 
+  @usableFromInline
   internal typealias NativeBuffer = _NativeDictionaryBuffer<Key, Value>
+  @usableFromInline
   internal typealias NativeIndex = _NativeDictionaryIndex<Key, Value>
 #if _runtime(_ObjC)
+  @usableFromInline
   internal typealias CocoaBuffer = _CocoaDictionaryBuffer
 #endif
+  @usableFromInline
   internal typealias SequenceElement = (key: Key, value: Value)
+  @usableFromInline
   internal typealias SequenceElementWithoutLabels = (key: Key, value: Value)
+  @usableFromInline
   internal typealias SelfType = _VariantDictionaryBuffer
 
   case native(NativeBuffer)
@@ -3354,6 +3460,7 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
   // _HashBuffer conformance
   //
 
+  @usableFromInline
   internal typealias Index = DictionaryIndex<Key, Value>
 
   @inlinable // FIXME(sil-serialize-all)
@@ -4224,9 +4331,12 @@ extension _CocoaDictionaryIndex {
 @_frozen // FIXME(sil-serialize-all)
 @usableFromInline // FIXME(sil-serialize-all)
 internal enum DictionaryIndexRepresentation<Key: Hashable, Value> {
+  @usableFromInline
   typealias _Index = DictionaryIndex<Key, Value>
+  @usableFromInline
   typealias _NativeIndex = _Index._NativeIndex
 #if _runtime(_ObjC)
+  @usableFromInline
   typealias _CocoaIndex = _Index._CocoaIndex
 #endif
 
@@ -4257,8 +4367,10 @@ extension Dictionary {
     // safe to copy the state.  So, we cannot implement Index that is a value
     // type for bridged NSDictionary in terms of Cocoa enumeration facilities.
 
+    @usableFromInline
     internal typealias _NativeIndex = _NativeDictionaryIndex<Key, Value>
 #if _runtime(_ObjC)
+    @usableFromInline
     internal typealias _CocoaIndex = _CocoaDictionaryIndex
 #endif
 
@@ -4362,7 +4474,7 @@ extension Dictionary.Index {
     }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func hash(into hasher: inout Hasher) {
   #if _runtime(_ObjC)
     if _fastPath(_guaranteedNative) {
@@ -4388,6 +4500,7 @@ extension Dictionary.Index {
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
 final internal class _CocoaDictionaryIterator: IteratorProtocol {
+  @usableFromInline
   internal typealias Element = (AnyObject, AnyObject)
 
   // Cocoa Dictionary iterator has to be a class, otherwise we cannot
@@ -4474,9 +4587,11 @@ final internal class _CocoaDictionaryIterator: IteratorProtocol {
 @usableFromInline
 @_frozen // FIXME(sil-serialize-all)
 internal enum DictionaryIteratorRepresentation<Key: Hashable, Value> {
+  @usableFromInline
   internal typealias _Iterator = DictionaryIterator<Key, Value>
-  internal typealias _NativeBuffer =
-    _NativeDictionaryBuffer<Key, Value>
+  @usableFromInline
+  internal typealias _NativeBuffer = _NativeDictionaryBuffer<Key, Value>
+  @usableFromInline
   internal typealias _NativeIndex = _Iterator._NativeIndex
 
   // For native buffer, we keep two indices to keep track of the iteration
@@ -4505,8 +4620,9 @@ public struct DictionaryIterator<Key: Hashable, Value>: IteratorProtocol {
   // Index, which is multi-pass, it is suitable for implementing a
   // IteratorProtocol, which is being consumed as iteration proceeds.
 
-  internal typealias _NativeBuffer =
-    _NativeDictionaryBuffer<Key, Value>
+  @usableFromInline
+  internal typealias _NativeBuffer = _NativeDictionaryBuffer<Key, Value>
+  @usableFromInline
   internal typealias _NativeIndex = _NativeDictionaryIndex<Key, Value>
 
   @usableFromInline
@@ -4586,7 +4702,6 @@ public struct DictionaryIterator<Key: Hashable, Value>: IteratorProtocol {
 
 extension DictionaryIterator: CustomReflectable {
   /// A mirror that reflects the iterator.
-  @inlinable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     return Mirror(
       self,
@@ -4596,7 +4711,6 @@ extension DictionaryIterator: CustomReflectable {
 
 extension Dictionary: CustomReflectable {
   /// A mirror that reflects the dictionary.
-  @inlinable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     let style = Mirror.DisplayStyle.dictionary
     return Mirror(self, unlabeledChildren: self, displayStyle: style)
@@ -4664,20 +4778,6 @@ extension Dictionary {
   public mutating func popFirst() -> Element? {
     guard !isEmpty else { return nil }
     return remove(at: startIndex)
-  }
-
-  @inlinable
-  @available(swift, obsoleted: 4.0)
-  public func filter(
-    _ isIncluded: (Element) throws -> Bool, obsoletedInSwift4: () = ()
-  ) rethrows -> [Element] {
-    var result: [Element] = []
-    for x in self {
-      if try isIncluded(x) {
-        result.append(x)
-      }
-    }
-    return result
   }
 
   /// The total number of key-value pairs that the dictionary can contain without

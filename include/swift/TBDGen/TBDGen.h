@@ -23,13 +23,23 @@ namespace swift {
 class FileUnit;
 class ModuleDecl;
 
-void enumeratePublicSymbols(FileUnit *module, llvm::StringSet<> &symbols,
-                            bool hasMultipleIGMs);
-void enumeratePublicSymbols(ModuleDecl *module, llvm::StringSet<> &symbols,
-                            bool hasMultipleIGMs);
+/// \brief Options for controlling the exact set of symbols included in the TBD
+/// output.
+struct TBDGenOptions {
+  /// \brief Whether this compilation has multiple IRGen instances.
+  bool HasMultipleIGMs;
+  /// \brief The install-name used for the compilation.
+  llvm::StringRef InstallName;
+  /// \brief The module link name (for force loading).
+  llvm::StringRef ModuleLinkName;
+};
 
-void writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os, bool hasMultipleIGMs,
-                  llvm::StringRef installName);
+void enumeratePublicSymbols(FileUnit *module, llvm::StringSet<> &symbols,
+                            TBDGenOptions &opts);
+void enumeratePublicSymbols(ModuleDecl *module, llvm::StringSet<> &symbols,
+                            TBDGenOptions &opts);
+
+void writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os, TBDGenOptions &opts);
 
 } // end namespace swift
 

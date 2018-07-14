@@ -74,7 +74,7 @@ extension NSObject {
 // CHECK:   [[OBJCERR:%.*]] = enum $Optional<NSError>, #Optional.some!enumelt.1, [[T1]] : $NSError
 // CHECK:   [[TEMP:%.*]] = alloc_stack $Optional<NSError>
 // CHECK:   store [[OBJCERR]] to [init] [[TEMP]]
-// CHECK:   [[SETTER:%.*]] = function_ref @$Ss33AutoreleasingUnsafeMutablePointerV7pointeexvs :
+// CHECK:   [[SETTER:%.*]] = function_ref @$SSA7pointeexvs :
 // CHECK:   apply [[SETTER]]<Optional<NSError>>([[TEMP]], [[UNWRAPPED_OUT]])
 // CHECK:   dealloc_stack [[TEMP]]
 // CHECK:   br bb5
@@ -117,7 +117,7 @@ extension NSObject {
 // CHECK:   [[OBJCERR:%.*]] = enum $Optional<NSError>, #Optional.some!enumelt.1, [[T1]] : $NSError
 // CHECK:   [[TEMP:%.*]] = alloc_stack $Optional<NSError>
 // CHECK:   store [[OBJCERR]] to [init] [[TEMP]]
-// CHECK:   [[SETTER:%.*]] = function_ref @$Ss33AutoreleasingUnsafeMutablePointerV7pointeexvs :
+// CHECK:   [[SETTER:%.*]] = function_ref @$SSA7pointeexvs :
 // CHECK:   apply [[SETTER]]<Optional<NSError>>([[TEMP]], [[UNWRAPPED_OUT]])
 // CHECK:   dealloc_stack [[TEMP]]
 // CHECK:   br bb5

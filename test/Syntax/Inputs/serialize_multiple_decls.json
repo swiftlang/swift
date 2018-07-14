@@ -27,7 +27,7 @@
                     },
                     {
                       "kind": "LineComment",
-                      "value": "\/\/ RUN: diff %t %S\/Inputs\/serialize_multiple_decls.json"
+                      "value": "\/\/ RUN: diff %t %S\/Inputs\/serialize_multiple_decls.json -u"
                     },
                     {
                       "kind": "Newline",
@@ -94,6 +94,7 @@
               ],
               "presence": "Present"
             },
+            null,
             null
           ],
           "presence": "Present"
@@ -176,6 +177,7 @@
               ],
               "presence": "Present"
             },
+            null,
             null
           ],
           "presence": "Present"

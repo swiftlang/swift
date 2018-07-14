@@ -717,7 +717,7 @@ bool swift::ArraySemanticsCall::replaceByValue(SILValue V) {
 
 bool swift::ArraySemanticsCall::replaceByAppendingValues(
     SILModule &M, SILFunction *AppendFn, SILFunction *ReserveFn,
-    const SmallVectorImpl<SILValue> &Vals, ArrayRef<Substitution> Subs) {
+    const SmallVectorImpl<SILValue> &Vals, SubstitutionMap Subs) {
   assert(getKind() == ArrayCallKind::kAppendContentsOf &&
          "Must be an append_contentsOf call");
   assert(AppendFn && "Must provide an append SILFunction");

@@ -17,6 +17,8 @@
 
 #include "swift/Subsystems.h"
 #include "TypeChecker.h"
+#include "TypeCheckObjC.h"
+#include "CodeSynthesis.h"
 #include "MiscDiagnostics.h"
 #include "GenericTypeResolver.h"
 #include "swift/AST/ASTWalker.h"
@@ -484,6 +486,17 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
       TC.validateDecl(decl);
     }
 
+    // Synthesize any necessary function bodies.
+    // FIXME: If we're not planning to run SILGen, this is wasted effort.
+    while (!TC.FunctionsToSynthesize.empty()) {
+      auto function = TC.FunctionsToSynthesize.back().second;
+      TC.FunctionsToSynthesize.pop_back();
+      if (function.getDecl()->isInvalid() || TC.Context.hadError())
+        continue;
+
+      TC.synthesizeFunctionBody(function);
+    }
+
     // Validate any referenced declarations for SIL's purposes.
     // Note: if we ever start putting extension members in vtables, we'll need
     // to validate those members too.
@@ -523,6 +536,7 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
   } while (currentFunctionIdx < TC.definedFunctions.size() ||
            currentExternalDef < TC.Context.ExternalDefinitions.size() ||
            currentSynthesizedDecl < SF.SynthesizedDecls.size() ||
+           !TC.FunctionsToSynthesize.empty() ||
            !TC.DeclsToFinalize.empty() ||
            !TC.ConformanceContexts.empty() ||
            !TC.DelayedRequirementSignatures.empty() ||
@@ -585,7 +599,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 
   // Make sure we have a type checker.
   //
-  // FIXME: We should never have a type checker here, but currently do when
+  // FIXME: We should never have a type checker here, but currently we do when
   // we're using immediate together with -enable-source-import.
   //
   // This possibility should be eliminated, since it results in duplicated
@@ -596,7 +610,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 
   // Make sure that name binding has been completed before doing any type
   // checking.
-    performNameBinding(SF, StartElem);
+  performNameBinding(SF, StartElem);
 
   {
     // NOTE: The type checker is scoped to be torn down before AST
@@ -656,6 +670,10 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
         }
       }
     });
+
+    // Look for bridging functions. This only matters when
+    // -enable-source-import is provided.
+    checkBridgedFunctions(TC.Context);
 
     // Type check the top-level elements of the source file.
     bool hasTopLevelCode = false;
@@ -789,7 +807,7 @@ swift::handleSILGenericParams(ASTContext &Ctx, GenericParamList *genericParams,
   return TypeChecker(Ctx).handleSILGenericParams(genericParams, DC);
 }
 
-bool swift::typeCheckCompletionDecl(Decl *D) {
+void swift::typeCheckCompletionDecl(Decl *D) {
   auto &Ctx = D->getASTContext();
 
   // Set up a diagnostics engine that swallows diagnostics.
@@ -799,8 +817,7 @@ bool swift::typeCheckCompletionDecl(Decl *D) {
   if (auto ext = dyn_cast<ExtensionDecl>(D))
     TC.validateExtension(ext);
   else
-    TC.typeCheckDecl(D);
-  return true;
+    TC.validateDecl(cast<ValueDecl>(D));
 }
 
 static Optional<Type> getTypeOfCompletionContextExpr(
@@ -942,8 +959,7 @@ void TypeChecker::diagnoseAmbiguousMemberType(Type baseTy,
       .highlight(baseRange);
   }
   for (const auto &member : lookup) {
-    diagnose(member.first, diag::found_candidate_type,
-             member.second);
+    diagnose(member.Member, diag::found_candidate_type, member.MemberType);
   }
 }
 

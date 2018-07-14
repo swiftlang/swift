@@ -1,19 +1,19 @@
-set(UTILS_SOURCES
-  Utils/CFG.cpp
-  Utils/CastOptimizer.cpp
-  Utils/CheckedCastBrJumpThreading.cpp
-  Utils/ConstantFolding.cpp
-  Utils/Devirtualize.cpp
-  Utils/GenericCloner.cpp
-  Utils/Generics.cpp
-  Utils/LoadStoreOptUtils.cpp
-  Utils/Local.cpp
-  Utils/LoopUtils.cpp
-  Utils/OptimizerStatsUtils.cpp
-  Utils/PerformanceInlinerUtils.cpp
-  Utils/SILInliner.cpp
-  Utils/SILSSAUpdater.cpp
-  Utils/SpecializationMangler.cpp
-  Utils/StackNesting.cpp
-  PARENT_SCOPE)
-
+silopt_register_sources(
+  CFG.cpp
+  CastOptimizer.cpp
+  CheckedCastBrJumpThreading.cpp
+  ConstantFolding.cpp
+  Devirtualize.cpp
+  Existential.cpp
+  GenericCloner.cpp
+  Generics.cpp
+  LoadStoreOptUtils.cpp
+  Local.cpp
+  LoopUtils.cpp
+  OptimizerStatsUtils.cpp
+  PerformanceInlinerUtils.cpp
+  SILInliner.cpp
+  SILSSAUpdater.cpp
+  SpecializationMangler.cpp
+  StackNesting.cpp
+)

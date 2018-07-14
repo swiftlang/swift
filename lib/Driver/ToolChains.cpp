@@ -186,6 +186,7 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension);
   inputArgs.AddLastArg(arguments, options::OPT_enable_testing);
   inputArgs.AddLastArg(arguments, options::OPT_g_Group);
+  inputArgs.AddLastArg(arguments, options::OPT_debug_info_format);
   inputArgs.AddLastArg(arguments, options::OPT_import_underlying_module);
   inputArgs.AddLastArg(arguments, options::OPT_module_cache_path);
   inputArgs.AddLastArg(arguments, options::OPT_module_link_name);
@@ -247,6 +248,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
                                const JobContext &context) const {
   InvocationInfo II{SWIFT_EXECUTABLE_NAME};
   ArgStringList &Arguments = II.Arguments;
+  II.allowsResponseFiles = true;
 
   Arguments.push_back("-frontend");
 
@@ -265,6 +267,10 @@ ToolChain::constructInvocation(const CompileJobAction &job,
           context.Args.getLastArg(options::OPT_api_diff_data_file)) {
     Arguments.push_back("-api-diff-data-file");
     Arguments.push_back(DataPath->getValue());
+  }
+  if (auto DataDir = context.Args.getLastArg(options::OPT_api_diff_data_dir)) {
+    Arguments.push_back("-api-diff-data-dir");
+    Arguments.push_back(DataDir->getValue());
   }
   if (context.Args.hasArg(options::OPT_dump_usr)) {
     Arguments.push_back("-dump-usr");
@@ -358,6 +364,11 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     context.Args.AddLastArg(Arguments, options::OPT_index_store_path);
     if (!context.Args.hasArg(options::OPT_index_ignore_system_modules))
       Arguments.push_back("-index-system-modules");
+  }
+
+  if (context.Args.hasArg(options::OPT_debug_info_store_invocation) ||
+      shouldStoreInvocationInDebugInfo()) {
+    Arguments.push_back("-debug-info-store-invocation");
   }
 
   return II;

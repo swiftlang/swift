@@ -45,7 +45,7 @@ protected:
                 Alignment align, IsPOD_t pod, IsBitwiseTakable_t bt,
                 IsFixedSize_t alwaysFixedSize,
                 SpecialTypeInfoKind stik = SpecialTypeInfoKind::Fixed)
-      : TypeInfo(type, align, pod, bt, alwaysFixedSize, stik),
+      : TypeInfo(type, align, pod, bt, alwaysFixedSize, IsABIAccessible, stik),
         SpareBits(spareBits) {
     assert(SpareBits.size() == size.getValueInBits());
     assert(isFixedSize());
@@ -58,7 +58,7 @@ protected:
                 Alignment align, IsPOD_t pod, IsBitwiseTakable_t bt,
                 IsFixedSize_t alwaysFixedSize,
                 SpecialTypeInfoKind stik = SpecialTypeInfoKind::Fixed)
-      : TypeInfo(type, align, pod, bt, alwaysFixedSize, stik),
+      : TypeInfo(type, align, pod, bt, alwaysFixedSize, IsABIAccessible, stik),
         SpareBits(std::move(spareBits)) {
     assert(SpareBits.size() == size.getValueInBits());
     assert(isFixedSize());
@@ -69,6 +69,7 @@ protected:
 public:
   // This is useful for metaprogramming.
   static bool isFixed() { return true; }
+  static IsABIAccessible_t isABIAccessible() { return IsABIAccessible; }
 
   /// Whether this type is known to be empty.
   bool isKnownEmpty(ResilienceExpansion expansion) const {

@@ -720,7 +720,11 @@ function(_add_swift_library_single target name)
   if(SWIFT_EMBED_BITCODE_SECTION AND NOT SWIFTLIB_SINGLE_DONT_EMBED_BITCODE)
     if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "IOS" OR "${SWIFTLIB_SINGLE_SDK}" STREQUAL "TVOS" OR "${SWIFTLIB_SINGLE_SDK}" STREQUAL "WATCHOS")
       list(APPEND SWIFTLIB_SINGLE_C_COMPILE_FLAGS "-fembed-bitcode")
-      list(APPEND SWIFTLIB_SINGLE_LINK_FLAGS "-Xlinker" "-bitcode_bundle" "-Xlinker" "-bitcode_hide_symbols" "-Xlinker" "-lto_library" "-Xlinker" "${LLVM_LIBRARY_DIR}/libLTO.dylib")
+      list(APPEND SWIFTLIB_SINGLE_LINK_FLAGS "-Xlinker" "-bitcode_bundle" "-Xlinker" "-lto_library" "-Xlinker" "${LLVM_LIBRARY_DIR}/libLTO.dylib")
+      # If we are asked to hide symbols, pass the obfuscation flag to libLTO.
+      if (SWIFT_EMBED_BITCODE_SECTION_HIDE_SYMBOLS)
+        list(APPEND SWIFTLIB_SINGLE_LINK_FLAGS "-Xlinker" "-bitcode_hide_symbols")
+      endif()
       set(embed_bitcode_arg EMBED_BITCODE)
     endif()
   endif()
@@ -780,9 +784,9 @@ function(_add_swift_library_single target name)
           ${SWIFTLIB_SINGLE_SDK} STREQUAL "OSX")
         # HACK: don't build WatchKit API notes for OS X.
       else()
-        if (NOT IS_DIRECTORY "${SWIFT_SOURCE_DIR}/stdlib/public/SDK/${framework_name}")
-          list(APPEND SWIFTLIB_SINGLE_API_NOTES "${framework_name}")
-        endif()
+        # Always build the "non-overlay" apinotes to keep them in sync
+        # rdar://40496966
+        list(APPEND SWIFTLIB_SINGLE_API_NOTES "${framework_name}")
       endif()
     endforeach()
   endif()
@@ -792,9 +796,6 @@ function(_add_swift_library_single target name)
     set(module_name "Swift")
   else()
     string(REPLACE swift "" module_name "${name}")
-  endif()
-  if("${module_name}" IN_LIST SWIFT_API_NOTES_INPUTS)
-    set(SWIFTLIB_SINGLE_API_NOTES "${module_name}")
   endif()
 
   if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS")
@@ -1869,6 +1870,13 @@ function(add_swift_library name)
               FILES "${UNIVERSAL_LIBRARY_NAME}"
               DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}"
               PERMISSIONS ${file_permissions})
+          swift_is_installing_component("${SWIFTLIB_INSTALL_IN_COMPONENT}" is_installing)
+
+          if(NOT is_installing)
+            set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${VARIANT_NAME})
+          else()
+            set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${VARIANT_NAME})
+          endif()
         endif()
 
         # If we built static variants of the library, create a lipo target for

@@ -108,8 +108,8 @@ enum class ImportTypeKind {
   /// \brief Import the type of a literal value.
   Value,
 
-  /// \brief Import the type of a literal value that can be bridged.
-  BridgedValue,
+  /// \brief Import the type of an Objective-C generic argument.
+  ObjCCollectionElement,
 
   /// \brief Import the declared type of a variable.
   Variable,
@@ -625,11 +625,9 @@ public:
     } else if (auto *CD = dyn_cast<ConstructorDecl>(decl)) {
       assert(CD->getInterfaceType());
       ty = CD->getResultInterfaceType();
-    } else if (auto *SD = dyn_cast<SubscriptDecl>(decl)) {
-      ty = SD->getElementInterfaceType();
     } else {
-      auto *VD = cast<VarDecl>(decl);
-      ty = VD->getInterfaceType()->getReferenceStorageReferent();
+      ty = cast<AbstractStorageDecl>(decl)->getValueInterfaceType()
+                                          ->getReferenceStorageReferent();
     }
 #endif
 
@@ -1352,7 +1350,9 @@ public:
   void forEachDistinctName(
       const clang::NamedDecl *decl,
       llvm::function_ref<bool(importer::ImportedName,
-                              importer::ImportNameVersion)> action);
+                              importer::ImportNameVersion)> action) {
+    getNameImporter().forEachDistinctImportName(decl, CurrentVersion, action);
+  }
 
   /// Dump the Swift-specific name lookup tables we generate.
   void dumpSwiftLookupTables();
@@ -1380,6 +1380,10 @@ namespace importer {
 
 /// Whether we should suppress the import of the given Clang declaration.
 bool shouldSuppressDeclImport(const clang::Decl *decl);
+
+/// Identifies certain UIKit constants that used to have overlay equivalents,
+/// but are now renamed using the swift_name attribute.
+bool isSpecialUIKitStructZeroProperty(const clang::NamedDecl *decl);
 
 /// Finds a particular kind of nominal by looking through typealiases.
 template <typename T>

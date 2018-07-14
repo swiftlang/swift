@@ -433,7 +433,7 @@
       "name": "foo3",
       "printedName": "foo3(_:)",
       "declKind": "Func",
-      "usr": "s:4cake4foo3yys10DictionaryVySiSSGF",
+      "usr": "s:4cake4foo3yySDySiSSGF",
       "location": "",
       "moduleName": "cake",
       "children": [
@@ -446,7 +446,7 @@
           "kind": "TypeNominal",
           "name": "Dictionary",
           "printedName": "[Int : String]",
-          "usr": "s:s10DictionaryV",
+          "usr": "s:SD",
           "children": [
             {
               "kind": "TypeNominal",
@@ -583,8 +583,9 @@
             },
             {
               "kind": "TypeNominal",
-              "name": "InOut",
-              "printedName": "inout Hasher"
+              "name": "Hasher",
+              "printedName": "Hasher",
+              "usr": "s:s6HasherV"
             }
           ]
         },

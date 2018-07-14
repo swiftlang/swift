@@ -39,9 +39,6 @@ class Traversal : public TypeVisitor<Traversal, bool>
     if (auto parent = ty->getParent())
       if (doIt(parent)) return true;
 
-    if (doIt(ty->getSinglyDesugaredType()))
-      return true;
-
     for (auto arg : ty->getInnermostGenericArgs())
       if (doIt(arg))
         return true;

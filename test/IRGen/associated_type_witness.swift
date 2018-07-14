@@ -69,7 +69,7 @@ struct Fulfilled<T : P & Q> : Assocked {
 // CHECK-NEXT:    [[T3:%.*]] = call swiftcc %swift.metadata_response @swift_checkMetadataState(i64 %0, %swift.type* [[T2]])
 // CHECK-NEXT:    [[CHECKED:%.*]] = extractvalue %swift.metadata_response [[T3]], 0
 // CHECK-NEXT:    [[STATE:%.*]] = extractvalue %swift.metadata_response [[T3]], 1
-// CHECK-NEXT:    [[T3:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[CHECKED]], 0
+// CHECK:         [[T3:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[CHECKED]], 0
 // CHECK-NEXT:    [[T4:%.*]] = insertvalue %swift.metadata_response [[T3]], i64 [[STATE]], 1
 // CHECK-NEXT:    ret %swift.metadata_response [[T4]]
 
@@ -142,7 +142,7 @@ struct Computed<T, U> : Assocked {
 // CHECK:         [[T0:%.*]] = bitcast %swift.type* %"Computed<T, U>" to %swift.type**
 // CHECK-NEXT:    [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i64 3
 // CHECK-NEXT:    [[U:%.*]] = load %swift.type*, %swift.type** [[T1]], align 8, !invariant.load
-// CHECK-NEXT:    [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S23associated_type_witness4PairVMa"(i64 %0, %swift.type* [[T]], %swift.type* [[U]])
+// CHECK:         [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S23associated_type_witness4PairVMa"(i64 %0, %swift.type* [[T]], %swift.type* [[U]])
 // CHECK-NEXT:    [[FETCH_RESULT]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK-NEXT:    [[FETCH_STATE]] = extractvalue %swift.metadata_response [[T0]], 1
 // CHECK-NEXT:    [[COMPLETE:%.*]] = icmp eq i64 [[FETCH_STATE]], 0

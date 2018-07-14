@@ -78,7 +78,7 @@ func _canBeClass<T>(_: T.Type) -> Int8 {
 ///   - type: The type to cast `x` to. `type` and the type of `x` must have the
 ///     same size of memory representation and compatible memory layout.
 /// - Returns: A new instance of type `U`, cast from `x`.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable // unsafe-performance
 @_transparent
 public func unsafeBitCast<T, U>(_ x: T, to type: U.Type) -> U {
   _precondition(MemoryLayout<T>.size == MemoryLayout<U>.size,
@@ -100,38 +100,33 @@ public func _identityCast<T, U>(_ x: T, to expectedType: U.Type) -> U {
 }
 
 /// `unsafeBitCast` something to `AnyObject`.
-@inlinable // FIXME(sil-serialize-all)
-@_transparent
+@usableFromInline @_transparent
 internal func _reinterpretCastToAnyObject<T>(_ x: T) -> AnyObject {
   return unsafeBitCast(x, to: AnyObject.self)
 }
 
-@inlinable
-@_transparent
+@usableFromInline @_transparent
 internal func == (
   lhs: Builtin.NativeObject, rhs: Builtin.NativeObject
 ) -> Bool {
   return unsafeBitCast(lhs, to: Int.self) == unsafeBitCast(rhs, to: Int.self)
 }
 
-@inlinable
-@_transparent
+@usableFromInline @_transparent
 internal func != (
   lhs: Builtin.NativeObject, rhs: Builtin.NativeObject
 ) -> Bool {
   return !(lhs == rhs)
 }
 
-@inlinable
-@_transparent
+@usableFromInline @_transparent
 internal func == (
   lhs: Builtin.RawPointer, rhs: Builtin.RawPointer
 ) -> Bool {
   return unsafeBitCast(lhs, to: Int.self) == unsafeBitCast(rhs, to: Int.self)
 }
 
-@inlinable
-@_transparent
+@usableFromInline @_transparent
 internal func != (lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
   return !(lhs == rhs)
 }
@@ -169,8 +164,7 @@ public func != (t0: Any.Type?, t1: Any.Type?) -> Bool {
 /// Tell the optimizer that this code is unreachable if condition is
 /// known at compile-time to be true.  If condition is false, or true
 /// but not a compile-time constant, this call has no effect.
-@inlinable // FIXME(sil-serialize-all)
-@_transparent
+@usableFromInline @_transparent
 internal func _unreachable(_ condition: Bool = true) {
   if condition {
     // FIXME: use a parameterized version of Builtin.unreachable when
@@ -181,8 +175,7 @@ internal func _unreachable(_ condition: Bool = true) {
 
 /// Tell the optimizer that this code is unreachable if this builtin is
 /// reachable after constant folding build configuration builtins.
-@inlinable // FIXME(sil-serialize-all)
-@_transparent
+@usableFromInline @_transparent
 internal func _conditionallyUnreachable() -> Never {
   Builtin.conditionallyUnreachable()
 }
@@ -659,15 +652,13 @@ func _getSuperclass(_ t: Any.Type) -> AnyClass? {
 // and type checking will fail.
 
 /// Returns `true` if `object` is uniquely referenced.
-@inlinable // FIXME(sil-serialize-all)
-@_transparent
+@usableFromInline @_transparent
 internal func _isUnique<T>(_ object: inout T) -> Bool {
   return Bool(Builtin.isUnique(&object))
 }
 
 /// Returns `true` if `object` is uniquely referenced or pinned.
-@inlinable // FIXME(sil-serialize-all)
-@_transparent
+@usableFromInline @_transparent
 internal func _isUniqueOrPinned<T>(_ object: inout T) -> Bool {
   return Bool(Builtin.isUniqueOrPinned(&object))
 }
@@ -728,15 +719,19 @@ internal func _unsafeDowncastToAnyObject(fromAny any: Any) -> AnyObject {
   _sanityCheck(type(of: any) is AnyObject.Type
                || type(of: any) is AnyObject.Protocol,
                "Any expected to contain object reference")
-  // With a SIL instruction, we could more efficiently grab the object reference
-  // out of the Any's inline storage.
-
-  // On Linux, bridging isn't supported, so this is a force cast.
-#if _runtime(_ObjC)
+  // Ideally we would do something like this:
+  //
+  // func open<T>(object: T) -> AnyObject {
+  //   return unsafeBitCast(object, to: AnyObject.self)
+  // }
+  // return _openExistential(any, do: open)
+  //
+  // Unfortunately, class constrained protocol existentials conform to AnyObject
+  // but are not word-sized.  As a result, we cannot currently perform the
+  // `unsafeBitCast` on them just yet.  When they are word-sized, it would be
+  // possible to efficiently grab the object reference out of the inline
+  // storage.
   return any as AnyObject
-#else
-  return any as! AnyObject
-#endif
 }
 
 // Game the SIL diagnostic pipeline by inlining this into the transparent

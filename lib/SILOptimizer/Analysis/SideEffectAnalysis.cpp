@@ -334,7 +334,7 @@ bool FunctionSideEffects::setDefinedEffects(SILFunction *F) {
     case EffectsKind::ReadNone:
       return true;
     case EffectsKind::ReadOnly:
-      // @effects(readonly) is worthless if we have owned parameters, because
+      // @_effects(readonly) is worthless if we have owned parameters, because
       // the release inside the callee may call a deinit, which itself can do
       // anything.
       if (!F->hasOwnedParameters()) {
@@ -356,7 +356,7 @@ bool FunctionSideEffects::summarizeFunction(SILFunction *F) {
   if (!F->empty())
     ParamEffects.resize(F->getArguments().size());
 
-  // Handle @effects attributes
+  // Handle @_effects attributes
   if (setDefinedEffects(F)) {
     DEBUG(llvm::dbgs() << "  -- has defined effects " << F->getName() << '\n');
     return true;
@@ -463,7 +463,7 @@ bool FunctionSideEffects::summarizeCall(FullApplySite fullApply) {
   }
 
   if (SILFunction *SingleCallee = fullApply.getReferencedFunction()) {
-    // Does the function have any @effects?
+    // Does the function have any @_effects?
     if (setDefinedEffects(SingleCallee))
       return true;
   }
@@ -481,15 +481,20 @@ void FunctionSideEffects::analyzeInstruction(SILInstruction *I) {
   case SILInstructionKind::AllocStackInst:
   case SILInstructionKind::DeallocStackInst:
     return;
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case SILInstructionKind::Name##RetainInst: \
+  case SILInstructionKind::StrongRetain##Name##Inst: \
+  case SILInstructionKind::Copy##Name##ValueInst:
+#include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::StrongRetainInst:
-  case SILInstructionKind::StrongRetainUnownedInst:
   case SILInstructionKind::RetainValueInst:
-  case SILInstructionKind::UnownedRetainInst:
     getEffectsOn(I->getOperand(0))->Retains = true;
     return;
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case SILInstructionKind::Name##ReleaseInst:
+#include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::StrongReleaseInst:
   case SILInstructionKind::ReleaseValueInst:
-  case SILInstructionKind::UnownedReleaseInst:
     getEffectsOn(I->getOperand(0))->Releases = true;
     return;
   case SILInstructionKind::UnconditionalCheckedCastInst:

@@ -18,11 +18,11 @@
 #include "MiscDiagnostics.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
-#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/Support/Debug.h"
 
@@ -80,6 +80,7 @@ public:
   IGNORED_ATTR(Effects)
   IGNORED_ATTR(Exported)
   IGNORED_ATTR(FixedLayout)
+  IGNORED_ATTR(ForbidSerializingReference)
   IGNORED_ATTR(Frozen)
   IGNORED_ATTR(Implements)
   IGNORED_ATTR(ImplicitlyUnwrappedOptional)
@@ -541,8 +542,8 @@ void AttributeEarlyChecker::visitNSManagedAttr(NSManagedAttr *attr) {
   };
 
   // @NSManaged properties must be written as stored.
-  switch (VD->getStorageKind()) {
-  case AbstractStorageDecl::Stored:
+  auto impl = VD->getImplInfo();
+  if (impl.isSimpleStored()) {
     // @NSManaged properties end up being computed; complain if there is
     // an initializer.
     if (VD->getParentInitializer()) {
@@ -552,21 +553,14 @@ void AttributeEarlyChecker::visitNSManagedAttr(NSManagedAttr *attr) {
       PBD->setInit(PBD->getPatternEntryIndexForVarDecl(VD), nullptr);
     }
     // Otherwise, ok.
-    break;
-
-  case AbstractStorageDecl::StoredWithTrivialAccessors:
-    llvm_unreachable("Already created accessors?");
-
-  case AbstractStorageDecl::ComputedWithMutableAddress:
-  case AbstractStorageDecl::Computed:
+  } else if (impl.getReadImpl() == ReadImplKind::Address ||
+             impl.getWriteImpl() == WriteImplKind::MutableAddress) {
+    return diagnoseNotStored(/*addressed*/ 2);    
+  } else if (impl.getWriteImpl() == WriteImplKind::StoredWithObservers ||
+             impl.getWriteImpl() == WriteImplKind::InheritedWithObservers) {
+    return diagnoseNotStored(/*observing*/ 1);    
+  } else {
     return diagnoseNotStored(/*computed*/ 0);
-  case AbstractStorageDecl::StoredWithObservers:
-  case AbstractStorageDecl::InheritedWithObservers:
-    return diagnoseNotStored(/*observing*/ 1);
-  case AbstractStorageDecl::Addressed:
-  case AbstractStorageDecl::AddressedWithTrivialAccessors:
-  case AbstractStorageDecl::AddressedWithObservers:
-    return diagnoseNotStored(/*addressed*/ 2);
   }
 
   // @NSManaged properties cannot be @NSCopying
@@ -629,24 +623,13 @@ void AttributeEarlyChecker::visitLazyAttr(LazyAttr *attr) {
 
 
   // TODO: Lazy properties can't yet be observed.
-  switch (VD->getStorageKind()) {
-  case AbstractStorageDecl::Stored:
-  case AbstractStorageDecl::StoredWithTrivialAccessors:
-    break;
-
-  case AbstractStorageDecl::StoredWithObservers:
+  auto impl = VD->getImplInfo();
+  if (impl.isSimpleStored()) {
+    // ok
+  } else if (VD->hasStorage()) {
     diagnoseAndRemoveAttr(attr, diag::lazy_not_observable);
-    break;
-
-  case AbstractStorageDecl::InheritedWithObservers:
-  case AbstractStorageDecl::ComputedWithMutableAddress:
-  case AbstractStorageDecl::Computed:
-  case AbstractStorageDecl::Addressed:
-  case AbstractStorageDecl::AddressedWithTrivialAccessors:
-  case AbstractStorageDecl::AddressedWithObservers:
-    assert(!VD->hasStorage() && "Non-stored AbstractStorageDecl has storage?");
+  } else {
     diagnoseAndRemoveAttr(attr, diag::lazy_not_on_computed);
-    break;
   }
 }
 
@@ -805,6 +788,7 @@ public:
     IGNORED_ATTR(Dynamic)
     IGNORED_ATTR(Effects)
     IGNORED_ATTR(Exported)
+    IGNORED_ATTR(ForbidSerializingReference)
     IGNORED_ATTR(GKInspectable)
     IGNORED_ATTR(IBDesignable)
     IGNORED_ATTR(IBInspectable)
@@ -1284,6 +1268,13 @@ void AttributeChecker::visitNSCopyingAttr(NSCopyingAttr *attr) {
     return;
   }
 
+  if (VD->hasInterfaceType()) {
+    if (TC.checkConformanceToNSCopying(VD)) {
+      attr->setInvalid();
+      return;
+    }
+  }
+
   assert(VD->getOverriddenDecl() == nullptr &&
          "Can't have value with storage that is an override");
 
@@ -1413,7 +1404,9 @@ static bool isObjCClassExtensionInOverlay(DeclContext *dc) {
   if (!classDecl)
     return false;
 
-  return isInOverlayModuleForImportedModule(ext, classDecl);
+  auto clangLoader = dc->getASTContext().getClangModuleLoader();
+  if (!clangLoader) return false;
+  return clangLoader->isInOverlayModuleForImportedModule(ext, classDecl);
 }
 
 void AttributeChecker::visitRequiredAttr(RequiredAttr *attr) {
@@ -1509,7 +1502,6 @@ void AttributeChecker::visitAccessControlAttr(AccessControlAttr *attr) {
     }
 
   } else if (auto extension = dyn_cast<ExtensionDecl>(D->getDeclContext())) {
-    TC.computeDefaultAccessLevel(extension);
     AccessLevel maxAccess = extension->getMaxAccessLevel();
     if (std::min(attr->getAccess(), AccessLevel::Public) > maxAccess) {
       // FIXME: It would be nice to say what part of the requirements actually
@@ -1978,9 +1970,7 @@ void AttributeChecker::visitUsableFromInlineAttr(UsableFromInlineAttr *attr) {
 
   // On internal declarations, @inlinable implies @usableFromInline.
   if (VD->getAttrs().hasAttribute<InlinableAttr>()) {
-    if (attr->isImplicit())
-      attr->setInvalid();
-    else
+    if (TC.Context.isSwiftVersionAtLeast(4,2))
       diagnoseAndRemoveAttr(attr, diag::inlinable_implies_usable_from_inline);
     return;
   }
@@ -2142,48 +2132,49 @@ void TypeChecker::checkReferenceOwnershipAttr(VarDecl *var,
   // A weak variable must have type R? or R! for some ownership-capable type R.
   auto underlyingType = type->getOptionalObjectType();
   auto isOptional = bool(underlyingType);
-  auto allowOptional = false;
-  switch (ownershipKind) {
-  case ReferenceOwnership::Strong:
-    llvm_unreachable("Cannot specify 'strong' in an ownership attribute");
-  case ReferenceOwnership::Unowned:
-  case ReferenceOwnership::Unmanaged:
+
+  switch (optionalityOf(ownershipKind)) {
+  case ReferenceOwnershipOptionality::AllowedIfImporting:
+    // Allow SIL to emulate importing testing and debugging.
+    if (auto sourceFile = var->getDeclContext()->getParentSourceFile())
+      if (sourceFile->Kind == SourceFileKind::SIL)
+        break;
+    LLVM_FALLTHROUGH;
+  case ReferenceOwnershipOptionality::Disallowed:
+    if (isOptional) {
+      diagnose(var->getStartLoc(), diag::invalid_ownership_with_optional,
+               ownershipKind)
+        .fixItReplace(attr->getRange(), "weak");
+      attr->setInvalid();
+    }
     break;
-  case ReferenceOwnership::Weak:
-    allowOptional = true;
+  case ReferenceOwnershipOptionality::Allowed:
+    if (!isOptional)
+      break;
+    LLVM_FALLTHROUGH;
+  case ReferenceOwnershipOptionality::Required:
     if (var->isLet()) {
-      diagnose(var->getStartLoc(), diag::invalid_weak_let);
+      diagnose(var->getStartLoc(), diag::invalid_ownership_is_let,
+               ownershipKind);
       attr->setInvalid();
     }
 
-    if (isOptional)
-      break;
-
-    attr->setInvalid();
-
     // While @IBOutlet can be weak, it must be optional. Let it diagnose.
-    if (var->getAttrs().hasAttribute<IBOutletAttr>())
-      break;
-
-    auto diag = diagnose(var->getStartLoc(),
-                         diag::invalid_weak_ownership_not_optional,
-                         OptionalType::get(type));
-    auto typeRange = var->getTypeSourceRangeForDiagnostics();
-    if (type->hasSimpleTypeRepr()) {
-      diag.fixItInsertAfter(typeRange.End, "?");
-    } else {
-      diag.fixItInsert(typeRange.Start, "(")
-        .fixItInsertAfter(typeRange.End, ")?");
+    if (!isOptional && !var->getAttrs().hasAttribute<IBOutletAttr>()) {
+      attr->setInvalid();
+      auto diag = diagnose(var->getStartLoc(),
+                           diag::invalid_ownership_not_optional,
+                           ownershipKind,
+                           OptionalType::get(type));
+      auto typeRange = var->getTypeSourceRangeForDiagnostics();
+      if (type->hasSimpleTypeRepr()) {
+        diag.fixItInsertAfter(typeRange.End, "?");
+      } else {
+        diag.fixItInsert(typeRange.Start, "(")
+          .fixItInsertAfter(typeRange.End, ")?");
+      }
     }
     break;
-  }
-
-
-  if (!allowOptional && isOptional) {
-    diagnose(var->getStartLoc(), diag::invalid_ownership_with_optional,
-             ownershipKind)
-      .fixItReplace(attr->getRange(), "weak");
-    attr->setInvalid();
   }
 
   if (!underlyingType)

@@ -307,6 +307,34 @@ bool TypeChecker::validateRequirement(SourceLoc whereLoc, RequirementRepr &req,
   if (req.isInvalid())
     return true;
 
+  // Note that we are resolving within a requirement.
+  options |= TypeResolutionFlags::GenericRequirement;
+
+  // Protocol where clauses cannot add conformance and superclass constraints
+  // to 'Self', because we need to be able to resolve inherited protocols and
+  // protocol superclasses before computing the protocol requirement signature.
+  if (options & TypeResolutionFlags::ProtocolWhereClause) {
+    if (req.getKind() == RequirementReprKind::TypeConstraint ||
+        req.getKind() == RequirementReprKind::LayoutConstraint) {
+      if (auto *subjectTyR = req.getSubjectLoc().getTypeRepr()) {
+        if (auto *componentTyR = dyn_cast<ComponentIdentTypeRepr>(subjectTyR)) {
+          if (componentTyR->getIdentifier() == Context.Id_Self) {
+            diagnose(req.getSubjectLoc().getLoc(),
+                     diag::protocol_where_clause_self_requirement);
+
+            req.getSubjectLoc().setType(ErrorType::get(Context));
+
+            if (req.getKind() == RequirementReprKind::TypeConstraint)
+              req.getConstraintLoc().setType(ErrorType::get(Context));
+
+            req.setInvalid();
+            return true;
+          }
+        }
+      }
+    }
+  }
+
   switch (req.getKind()) {
   case RequirementReprKind::TypeConstraint: {
     // Validate the types.
@@ -424,6 +452,7 @@ TypeChecker::prepareGenericParamList(GenericParamList *gp,
 
   unsigned depth = gp->getDepth();
   for (auto paramDecl : *gp) {
+    checkDeclAttributesEarly(paramDecl);
     paramDecl->setDepth(depth);
     if (!paramDecl->hasAccess())
       paramDecl->setAccess(access);
@@ -451,14 +480,13 @@ static void revertDependentTypeLoc(TypeLoc &tl) {
     return;
 
   // Make sure we validate the type again.
-  tl.setType(Type(), /*validated=*/false);
+  tl.setType(Type());
 }
 
 /// Revert the dependent types within the given generic parameter list.
 void TypeChecker::revertGenericParamList(GenericParamList *genericParams) {
   // Revert the inherited clause of the generic parameter list.
   for (auto param : *genericParams) {
-    param->setCheckedInheritanceClause(false);
     for (auto &inherited : param->getInherited())
       revertDependentTypeLoc(inherited);
   }
@@ -1289,7 +1317,6 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
     ArrayRef<Requirement> requirements,
     TypeSubstitutionFn substitutions,
     LookupConformanceFn conformances,
-    UnsatisfiedDependency *unsatisfiedDependency,
     ConformanceCheckOptions conformanceOptions,
     GenericRequirementsCheckListener *listener,
     SubstOptions options) {
@@ -1357,26 +1384,10 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
         //        diagnose problems with conformances.
         auto result =
             conformsToProtocol(firstType, proto->getDecl(), dc,
-                               conformanceOptions, loc, unsatisfiedDependency);
+                               conformanceOptions, loc);
 
-        // Unsatisfied dependency case.
-        auto status = result.getStatus();
-        switch (status) {
-        case RequirementCheckResult::Failure:
-          // A failure at the top level is diagnosed elsewhere.
-          if (current.Parents.empty())
-            return status;
-
-          diagnostic = diag::type_does_not_conform_owner;
-          diagnosticNote = diag::type_does_not_inherit_or_conform_requirement;
-          requirementFailure = true;
-          break;
-        case RequirementCheckResult::UnsatisfiedDependency:
-        case RequirementCheckResult::SubstitutionFailure:
-          // pass it on up.
-          return status;
-        case RequirementCheckResult::Success: {
-          auto conformance = result.getConformance();
+        if (result) {
+          auto conformance = *result;
           // Report the conformance.
           if (listener && valid && current.Parents.empty()) {
             listener->satisfiedConformance(rawFirstType, firstType,
@@ -1391,9 +1402,15 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
           }
           continue;
         }
-        }
+
+        // A failure at the top level is diagnosed elsewhere.
+        if (current.Parents.empty())
+          return RequirementCheckResult::Failure;
 
         // Failure needs to emit a diagnostic.
+        diagnostic = diag::type_does_not_conform_owner;
+        diagnosticNote = diag::type_does_not_inherit_or_conform_requirement;
+        requirementFailure = true;
         break;
       }
 

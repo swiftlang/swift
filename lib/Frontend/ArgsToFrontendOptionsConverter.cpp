@@ -60,6 +60,10 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (const Arg *A = Args.getLastArg(OPT_index_store_path)) {
     Opts.IndexStorePath = A->getValue();
   }
+  if (const Arg *A = Args.getLastArg(OPT_output_request_graphviz)) {
+    Opts.RequestEvaluatorGraphVizPath = A->getValue();
+  }
+
   Opts.IndexSystemModules |= Args.hasArg(OPT_index_system_modules);
 
   Opts.EmitVerboseSIL |= Args.hasArg(OPT_emit_verbose_sil);
@@ -318,6 +322,8 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::EmitImportedModules;
   if (Opt.matches(OPT_parse))
     return FrontendOptions::ActionType::Parse;
+  if (Opt.matches(OPT_resolve_imports))
+    return FrontendOptions::ActionType::ResolveImports;
   if (Opt.matches(OPT_typecheck))
     return FrontendOptions::ActionType::Typecheck;
   if (Opt.matches(OPT_dump_parse))
@@ -461,6 +467,12 @@ bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
   if (!FrontendOptions::canActionEmitDependencies(Opts.RequestedAction) &&
       Opts.InputsAndOutputs.hasDependenciesPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_dependencies);
+    return true;
+  }
+  if (!FrontendOptions::canActionEmitReferenceDependencies(Opts.RequestedAction)
+      && Opts.InputsAndOutputs.hasReferenceDependenciesPath()) {
+    Diags.diagnose(SourceLoc(),
+                   diag::error_mode_cannot_emit_reference_dependencies);
     return true;
   }
   if (!FrontendOptions::canActionEmitObjCHeader(Opts.RequestedAction) &&

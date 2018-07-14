@@ -30,9 +30,10 @@ protocol BadMembers2 {
 func badMembers2(_ a: BadMembers2) {
   a#^BAD_MEMBERS_2^#
 }
-// BAD_MEMBERS_2: Begin completions, 2 items
+// BAD_MEMBERS_2: Begin completions, 3 items
 // BAD_MEMBERS_2-NEXT: Decl[InstanceVar]/CurrNominal: .prop[#Int#]{{; name=.+$}}
 // BAD_MEMBERS_2-NEXT: Decl[Subscript]/CurrNominal:   [{#Int#}][#Double#]{{; name=.+$}}
+// BAD_MEMBERS_2-NEXT: Keyword[self]/CurrNominal:     .self[#BadMembers2#]; name=self
 // BAD_MEMBERS_2-NEXT: End completions
 
 func globalFunc() {}
@@ -133,13 +134,12 @@ protocol Fooable {
 }
 
 // rdar://problem/22688199
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_22688199 | %FileCheck %s -check-prefix=FLIP_CURRIED
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_22688199
 func curried(_ a: Int)(_ b1: Int, _ b2: Int) { }
 func flip<A, B, C>(_ f: A -> B -> C) -> B -> A -> C { }
 func rdar22688199() {
   let f = flip(curried)(#^RDAR_22688199^#
 }
-// FLIP_CURRIED: Pattern/CurrModule: ['(']{#Int#}, {#Int#}[')'][#(Int) -> ()#]
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_22836263
 func rdar22836263() {
@@ -220,10 +220,9 @@ protocol Bar_38149042 {
 func foo_38149042(bar: Bar_38149042) {
   _ = bar.foo? #^RDAR_38149042^# .x
 }
-// RDAR_38149042: Begin completions, 3 items
+// RDAR_38149042: Begin completions, 2 items
 // RDAR_38149042-DAG: Decl[InstanceVar]/CurrNominal:                  .x[#Int#]; name=x
-// RDAR_38149042-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: [' ']=== {#AnyObject?#}[#Bool#]; name==== AnyObject?
-// RDAR_38149042-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: [' ']!== {#AnyObject?#}[#Bool#]; name=!== AnyObject?
+// RDAR_38149042-DAG: Keyword[self]/CurrNominal: .self[#Baz_38149042#]; name=self
 // RDAR_38149042: End completions
 
 // rdar://problem/38272904
@@ -246,3 +245,71 @@ func foo_38272904(a: A_38272904) {
   bar_38272904(a: .foo() #^RDAR_38272904^#)
 }
 // RDAR_38272904: Begin completions
+
+// rdar://problem/41159258
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=RDAR41159258_1 | %FileCheck %s -check-prefix=RDAR_41159258
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=RDAR41159258_2 | %FileCheck %s -check-prefix=RDAR_41159258
+public func ==(lhs: RDAR41159258_MyResult1, rhs: RDAR41159258_MyResult1) -> Bool {
+  fatalError()
+}
+public func ==(lhs: RDAR41159258_MyResult2, rhs: RDAR41159258_MyResult2) -> Bool {
+  fatalError()
+}
+public enum RDAR41159258_MyResult1 {
+  case failure(Error)
+}
+public enum RDAR41159258_MyResult2 {
+  case failure(Error)
+}
+
+public struct RDAR41159258_MyError: Error {}
+
+func foo(x: RDAR41159258_MyResult1) {
+  let x: RDAR41159258_MyResult1
+  x = .failure(RDAR41159258_MyError()) #^RDAR41159258_1^#
+  let y: Bool
+  y = .failure(RDAR41159258_MyError()) #^RDAR41159258_2^#
+}
+// RDAR_41159258: Begin completions
+
+
+// rdar://problem/41232519
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=RDAR41232519 | %FileCheck %s -check-prefix=RDAR_41232519
+public protocol IntProvider {
+  func nextInt() -> Int
+}
+
+public final class IntStore {
+  public var myInt: Int = 0
+  func readNextInt(from provider: IntProvider) {
+      myInt = provider.nextInt() #^RDAR41232519^#
+  }
+}
+// RDAR_41232519: Begin completions
+
+// rdar://problem/28188259
+// RUN: %target-swift-ide-test -code-completion -code-completion-token=RDAR_28188259 -source-filename=%s | %FileCheck %s -check-prefix=RDAR_28188259
+func test_28188259(x: ((Int) -> Void) -> Void) {
+  x({_ in }#^RDAR_28188259^#)
+}
+// RDAR_28188259: Begin completions
+// RDAR_28188259-DAG: Pattern/CurrModule:                 ({#_#})[#Void#]; name=(_)
+// RDAR_28188259-DAG: Keyword[self]/CurrNominal:          .self[#(_) -> ()#]; name=self
+// RDAR_28188259: End completions
+
+// rdar://problem/40956846
+// RUN: %target-swift-ide-test -code-completion -code-completion-token=RDAR_40956846 -source-filename=%s | %FileCheck %s -check-prefix=RDAR_40956846
+func test_40956846(
+  arg_40956846_1: inout Int!,
+  arg_40956846_2: Void!,
+  arg_40956846_3: (() -> Int)!,
+  arg_40956846_4: inout ((Int) -> Int)!
+) {
+  let y = #^RDAR_40956846^#
+}
+// RDAR_40956846: Begin completions
+// RDAR_40956846-DAG: Decl[LocalVar]/Local:               arg_40956846_1[#inout Int!#]; name=arg_40956846_1
+// RDAR_40956846-DAG: Decl[LocalVar]/Local:               arg_40956846_2[#Void!#]; name=arg_40956846_2
+// RDAR_40956846-DAG: Decl[LocalVar]/Local:               arg_40956846_3[#(() -> Int)!#]; name=arg_40956846_3
+// RDAR_40956846-DAG: Decl[LocalVar]/Local:               arg_40956846_4[#inout ((Int) -> Int)!#]; name=arg_40956846_4
+// RDAR_40956846: End completions

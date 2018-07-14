@@ -192,6 +192,15 @@ public:
     lex(Result, LeadingTrivia, TrailingTrivia);
   }
 
+  /// Reset the lexer's buffer pointer to \p Offset bytes after the buffer
+  /// start.
+  void resetToOffset(size_t Offset) {
+    assert(BufferStart + Offset <= BufferEnd && "Offset after buffer end");
+
+    CurPtr = BufferStart + Offset;
+    lexImpl();
+  }
+
   bool isKeepingComments() const {
     return RetainComments == CommentRetentionMode::ReturnAsTokens;
   }

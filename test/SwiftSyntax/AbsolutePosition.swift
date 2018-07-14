@@ -90,7 +90,7 @@ PositionTests.test("Recursion") {
       l.append(SyntaxFactory.makeCodeBlockItem(
         item: SyntaxFactory.makeReturnStmt(
           returnKeyword: SyntaxFactory.makeToken(.returnKeyword, presence: .present)
-            .withTrailingTrivia(.newlines(1)), expression: nil), semicolon: nil))
+            .withTrailingTrivia(.newlines(1)), expression: nil), semicolon: nil, errorTokens: nil))
     }
     let root = SyntaxFactory.makeSourceFile(
       statements: SyntaxFactory.makeCodeBlockItemList(l),
@@ -150,7 +150,7 @@ PositionTests.test("WithoutSourceFileRoot") {
       item: SyntaxFactory.makeReturnStmt(
         returnKeyword: SyntaxFactory.makeToken(.returnKeyword, presence: .present)
           .withLeadingTrivia(.newlines(1)).withTrailingTrivia(.newlines(1)),
-            expression: nil), semicolon: nil)
+          expression: nil), semicolon: nil, errorTokens: nil)
      expectEqual(0, item.position.utf8Offset)
      expectEqual(1, item.positionAfterSkippingLeadingTrivia.utf8Offset)
   })

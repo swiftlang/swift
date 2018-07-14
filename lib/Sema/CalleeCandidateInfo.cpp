@@ -17,6 +17,7 @@
 #include "ConstraintSystem.h"
 #include "CSDiag.h"
 #include "CalleeCandidateInfo.h"
+#include "TypeCheckAvailability.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeWalker.h"
@@ -65,7 +66,7 @@ UncurriedCandidate::UncurriedCandidate(ValueDecl *decl, unsigned level)
     auto *DC = decl->getInnermostDeclContext();
     if (auto *GFT = entityType->getAs<GenericFunctionType>()) {
       auto subs = DC->getGenericEnvironmentOfContext()
-      ->getForwardingSubstitutions();
+      ->getForwardingSubstitutionMap();
       entityType = GFT->substGenericArgs(subs);
     } else {
       // FIXME: look through unforced IUOs here?
@@ -308,9 +309,8 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
     return {CC_GeneralMismatch, {}};
 
   auto candArgs = candidate.getParameters();
-  SmallVector<bool, 4> candDefaultMap;
-  computeDefaultMap(candArgs, candidate.getDecl(), candidate.level,
-                    candDefaultMap);
+  llvm::SmallBitVector candDefaultMap =
+    computeDefaultMap(candArgs, candidate.getDecl(), candidate.level);
   
   struct OurListener : public MatchCallArgumentListener {
     CandidateCloseness result = CC_ExactMatch;
@@ -835,7 +835,7 @@ CalleeCandidateInfo::CalleeCandidateInfo(Type baseType,
     // the uncurry level is 1 if self has already been applied.
     unsigned uncurryLevel = 0;
     if (decl->getDeclContext()->isTypeContext() &&
-        selfAlreadyApplied)
+        selfAlreadyApplied && !isa<SubscriptDecl>(decl))
       uncurryLevel = 1;
     
     candidates.push_back({ decl, uncurryLevel });
@@ -878,6 +878,25 @@ CalleeCandidateInfo::CalleeCandidateInfo(Type baseType,
   
   if (!candidates.empty())
     declName = candidates[0].getDecl()->getBaseName().userFacingName();
+}
+
+CalleeCandidateInfo &CalleeCandidateInfo::
+operator=(const CalleeCandidateInfo &CCI) {
+  if (this != &CCI) {
+    // If the reference member (i.e., CS) is identical, just copy remaining
+    // members; otherwise, reconstruct the object.
+    if (&CS == &CCI.CS) {
+      declName = CCI.declName;
+      hasTrailingClosure = CCI.hasTrailingClosure;
+      candidates = CCI.candidates;
+      closeness = CCI.closeness;
+      failedArgument = CCI.failedArgument;
+    } else {
+      this->~CalleeCandidateInfo();
+      new (this) CalleeCandidateInfo(CCI);
+    }
+  }
+  return *this;
 }
 
 /// Given a set of parameter lists from an overload group, and a list of
@@ -1058,8 +1077,8 @@ bool CalleeCandidateInfo::diagnoseSimpleErrors(const Expr *E) {
   if (closeness == CC_Unavailable) {
     auto decl = candidates[0].getDecl();
     assert(decl && "Only decl-based candidates may be marked unavailable");
-    return CS.TC.diagnoseExplicitUnavailability(decl, loc, CS.DC,
-                                                dyn_cast<CallExpr>(E));
+    return diagnoseExplicitUnavailability(decl, loc, CS.DC,
+                                          dyn_cast<CallExpr>(E));
   }
   
   // Handle symbols that are matches, but are not accessible from the current

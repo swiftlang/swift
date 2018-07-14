@@ -272,7 +272,8 @@ addGetterToReadOnlyDerivedProperty(TypeChecker &tc,
   auto getter =
     declareDerivedPropertyGetter(tc, property, propertyContextType);
 
-  property->makeComputed(SourceLoc(), getter, nullptr, nullptr, SourceLoc());
+  property->setAccessors(StorageImplInfo::getImmutableComputed(),
+                         SourceLoc(), {getter}, SourceLoc());
 
   return getter;
 }
@@ -296,7 +297,7 @@ DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
   
   auto getterDecl = AccessorDecl::create(C,
     /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
-    AccessorKind::IsGetter, AddressorKind::NotAddressor, property,
+    AccessorKind::Get, AddressorKind::NotAddressor, property,
     /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
     /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
     /*GenericParams=*/nullptr, params,
@@ -362,12 +363,8 @@ DerivedConformance::declareDerivedProperty(Identifier name,
                                  /*implicit*/ true);
   propPat->setType(propertyContextType);
 
-  auto pbDecl = PatternBindingDecl::create(C, SourceLoc(),
-                                           StaticSpellingKind::None,
-                                           SourceLoc(), propPat, nullptr,
-                                           parentDC);
-  pbDecl->setImplicit();
-
+  auto *pbDecl = PatternBindingDecl::createImplicit(
+      C, StaticSpellingKind::None, propPat, /*InitExpr*/ nullptr, parentDC);
   return {propDecl, pbDecl};
 }
 
@@ -402,7 +399,8 @@ bool DerivedConformance::checkAndDiagnoseDisallowedContext(
     TC.diagnose(ConformanceDecl->getLoc(),
                 diag::cannot_synthesize_in_crossfile_extension,
                 getProtocolType());
-    TC.diagnose(Nominal->getLoc(), diag::type_declared_here);
+    TC.diagnose(Nominal->getLoc(), diag::kind_declared_here,
+                DescriptiveDeclKind::Type);
     return true;
   }
 

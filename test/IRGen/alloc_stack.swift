@@ -10,6 +10,7 @@ class Foobar {
 
 // Make sure we are mis-initializing the alloca.
 // CHECK-LABEL: define {{.*}}swiftcc %T11alloc_stack6FoobarC* @"$S11alloc_stack6FoobarCACycfc"(%T11alloc_stack6FoobarC* swiftself)
+// CHECK: alloca %TSb, align 1
 // CHECK-NOT: store{{.*}}opaque
 // CHECK:  ret {{.*}}%0
 // CHECK:}

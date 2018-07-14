@@ -80,7 +80,6 @@ std::string GenericSpecializationMangler::mangle() {
   SILFunctionType *FTy = Function->getLoweredFunctionType();
   CanGenericSignature Sig = FTy->getGenericSignature();
 
-  auto SubMap = Sig->getSubstitutionMap(Subs);
   bool First = true;
   for (auto ParamType : Sig->getSubstitutableParams()) {
     appendType(Type(ParamType).subst(SubMap)->getCanonicalType());
@@ -161,6 +160,12 @@ void FunctionSignatureSpecializationMangler::setArgumentGuaranteedToOwned(
     unsigned OrigArgIdx) {
   OrigArgs[OrigArgIdx].first |=
       ArgumentModifierIntBase(ArgumentModifier::GuaranteedToOwned);
+}
+
+void FunctionSignatureSpecializationMangler::setArgumentExistentialToGeneric(
+    unsigned OrigArgIdx) {
+  OrigArgs[OrigArgIdx].first |=
+      ArgumentModifierIntBase(ArgumentModifier::ExistentialToGeneric);
 }
 
 void FunctionSignatureSpecializationMangler::setArgumentBoxToValue(
@@ -288,6 +293,11 @@ void FunctionSignatureSpecializationMangler::mangleArgument(
   }
 
   bool hasSomeMod = false;
+  if (ArgMod & ArgumentModifierIntBase(ArgumentModifier::ExistentialToGeneric)) {
+    ArgOpBuffer << 'e';
+    hasSomeMod = true;
+  }
+
   if (ArgMod & ArgumentModifierIntBase(ArgumentModifier::Dead)) {
     ArgOpBuffer << 'd';
     hasSomeMod = true;
@@ -329,12 +339,9 @@ mangleReturnValue(ReturnValueModifierIntBase RetMod) {
   }
 }
 
-std::string FunctionSignatureSpecializationMangler::mangle(int UniqueID) {
+std::string FunctionSignatureSpecializationMangler::mangle() {
   ArgOpStorage.clear();
   beginMangling();
-
-  if (UniqueID)
-    ArgOpBuffer << UniqueID;
 
   for (unsigned i : indices(OrigArgs)) {
     ArgumentModifierIntBase ArgMod;

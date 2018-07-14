@@ -612,10 +612,6 @@ Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind,
   assert((kind != ConstraintKind::LiteralConformsTo) ||
          second->is<ProtocolType>());
 
-  // Bridging constraints require bridging to be enabled.
-  assert(kind != ConstraintKind::BridgingConversion
-         || cs.TC.Context.LangOpts.EnableObjCInterop);
-
   // Create the constraint.
   unsigned size = totalSizeToAlloc<TypeVariableType*>(typeVars.size());
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));

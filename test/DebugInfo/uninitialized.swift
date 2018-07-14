@@ -8,8 +8,8 @@ public func f() {
   var object: MyClass
   // CHECK: %[[OBJ:.*]] = alloca %[[T1:.*]]*, align
   // CHECK: call void @llvm.dbg.declare(metadata %[[T1]]** %[[OBJ]],
-  // CHECK: %[[BC1:.*]] = bitcast %[[T1]]** %[[OBJ]] to %swift.opaque**, !dbg
-  // CHECK: store %swift.opaque* null, %swift.opaque** %[[BC1]], align {{.*}}, !dbg
+  // CHECK: %[[BC1:.*]] = bitcast %[[T1]]** %[[OBJ]] to %swift.opaque**
+  // CHECK: store %swift.opaque* null, %swift.opaque** %[[BC1]], align {{.*}}
   // OPT-NOT: store
   // OPT: ret
 }
@@ -20,8 +20,8 @@ public func g() {
   var dict: Dictionary<Int64, Int64>
   // CHECK: %[[DICT:.*]] = alloca %[[T2:.*]], align
   // CHECK: call void @llvm.dbg.declare(metadata %[[T2]]* %[[DICT]],
-  // CHECK: %[[BC2:.*]] = bitcast %[[T2]]* %[[DICT]] to %swift.opaque**, !dbg
-  // CHECK: store %swift.opaque* null, %swift.opaque** %[[BC2]], align {{.*}}, !dbg
+  // CHECK: %[[BC2:.*]] = bitcast %[[T2]]* %[[DICT]] to %swift.opaque**
+  // CHECK: store %swift.opaque* null, %swift.opaque** %[[BC2]], align {{.*}}
   // OPT-NOT: store
   // OPT: ret
 }

@@ -156,21 +156,21 @@ void SILLinkerVisitor::linkInVTable(ClassDecl *D) {
 void SILLinkerVisitor::visitApplyInst(ApplyInst *AI) {
   if (auto sig = AI->getCallee()->getType().castTo<SILFunctionType>()
                    ->getGenericSignature()) {
-    visitApplySubstitutions(sig->getSubstitutionMap(AI->getSubstitutions()));
+    visitApplySubstitutions(AI->getSubstitutionMap());
   }
 }
 
 void SILLinkerVisitor::visitTryApplyInst(TryApplyInst *TAI) {
   if (auto sig = TAI->getCallee()->getType().castTo<SILFunctionType>()
                    ->getGenericSignature()) {
-    visitApplySubstitutions(sig->getSubstitutionMap(TAI->getSubstitutions()));
+    visitApplySubstitutions(TAI->getSubstitutionMap());
   }
 }
 
 void SILLinkerVisitor::visitPartialApplyInst(PartialApplyInst *PAI) {
   if (auto sig = PAI->getCallee()->getType().castTo<SILFunctionType>()
                     ->getGenericSignature()) {
-    visitApplySubstitutions(sig->getSubstitutionMap(PAI->getSubstitutions()));
+    visitApplySubstitutions(PAI->getSubstitutionMap());
   }
 }
 
@@ -283,7 +283,7 @@ void SILLinkerVisitor::visitProtocolConformance(
   }
 }
 
-void SILLinkerVisitor::visitApplySubstitutions(const SubstitutionMap &subs) {
+void SILLinkerVisitor::visitApplySubstitutions(SubstitutionMap subs) {
   for (auto &reqt : subs.getGenericSignature()->getRequirements()) {
     switch (reqt.getKind()) {
     case RequirementKind::Conformance: {

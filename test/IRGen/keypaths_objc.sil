@@ -8,7 +8,7 @@ import Swift
 import Foundation
 
 class C: NSObject {
-  dynamic var x: NSString { get }
+  @objc dynamic var x: NSString { get }
   @sil_stored final var stored: Int
   override init()
 }

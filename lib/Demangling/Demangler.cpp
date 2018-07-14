@@ -264,8 +264,8 @@ bool swift::Demangle::isStruct(llvm::StringRef mangledName) {
   return isStructNode(Dem.demangleType(mangledName));
 }
 
-namespace swift {
-namespace Demangle {
+using namespace swift;
+using namespace Demangle;
 
 //////////////////////////////////
 // Node member functions        //
@@ -1195,6 +1195,17 @@ NodePointer Demangler::popTypeList() {
 }
 
 NodePointer Demangler::popProtocol() {
+  if (NodePointer Type = popNode(Node::Kind::Type)) {
+    if (Type->getNumChildren() < 1)
+      return nullptr;
+
+    NodePointer Proto = Type->getChild(0);
+    if (Proto->getKind() != Node::Kind::Protocol)
+      return nullptr;
+
+    return Type;
+  }
+
   NodePointer Name = popNode(isDeclName);
   NodePointer Ctx = popContext();
   NodePointer Proto = createWithChildren(Node::Kind::Protocol, Ctx, Name);
@@ -1321,8 +1332,14 @@ NodePointer Demangler::demangleBoundGenericArgs(NodePointer Nominal,
     case Node::Kind::Enum:
       kind = Node::Kind::BoundGenericEnum;
       break;
+    case Node::Kind::Protocol:
+      kind = Node::Kind::BoundGenericProtocol;
+      break;
     case Node::Kind::OtherNominalType:
       kind = Node::Kind::BoundGenericOtherNominalType;
+      break;
+    case Node::Kind::TypeAlias:
+      kind = Node::Kind::BoundGenericTypeAlias;
       break;
     default:
       return nullptr;
@@ -1545,13 +1562,6 @@ NodePointer Demangler::demangleArchetype() {
             createWithChildren(Node::Kind::AssociatedTypeRef, ArcheTy, Ident));
       addSubstitution(AssocTy);
       return AssocTy;
-    }
-    case 'q': {
-      NodePointer Idx = demangleIndexAsNode();
-      NodePointer Ctx = popContext();
-      NodePointer DeclCtx = createWithChild(Node::Kind::DeclContext, Ctx);
-      return createType(createWithChildren(Node::Kind::QualifiedArchetype,
-                                           Idx, DeclCtx));
     }
     case 'y': {
       NodePointer T = demangleAssociatedTypeSimple(demangleGenericParamIndex());
@@ -1863,7 +1873,7 @@ NodePointer Demangler::demangleGenericSpecialization(Node::Kind SpecKind) {
 
 NodePointer Demangler::demangleFunctionSpecialization() {
   NodePointer Spec = demangleSpecAttributes(
-        Node::Kind::FunctionSignatureSpecialization, /*demangleUniqueID*/ true);
+        Node::Kind::FunctionSignatureSpecialization);
   unsigned ParamIdx = 0;
   while (Spec && !nextIf('_')) {
     Spec = addChild(Spec, demangleFuncSpecParam(ParamIdx));
@@ -1979,6 +1989,24 @@ NodePointer Demangler::demangleFuncSpecParam(Node::IndexType ParamIdx) {
           return nullptr;
       }
     }
+    case 'e': {
+      unsigned Value =
+          unsigned(FunctionSigSpecializationParamKind::ExistentialToGeneric);
+      if (nextIf('D'))
+        Value |= unsigned(FunctionSigSpecializationParamKind::Dead);
+      if (nextIf('G'))
+        Value |=
+            unsigned(FunctionSigSpecializationParamKind::OwnedToGuaranteed);
+      if (nextIf('O'))
+        Value |=
+            unsigned(FunctionSigSpecializationParamKind::GuaranteedToOwned);
+      if (nextIf('X'))
+        Value |= unsigned(FunctionSigSpecializationParamKind::SROA);
+      return addChild(
+          Param,
+          createNode(Node::Kind::FunctionSignatureSpecializationParamKind,
+                     Value));
+    }
     case 'd': {
       unsigned Value = unsigned(FunctionSigSpecializationParamKind::Dead);
       if (nextIf('G'))
@@ -2041,24 +2069,14 @@ NodePointer Demangler::addFuncSpecParamNumber(NodePointer Param,
      Node::Kind::FunctionSignatureSpecializationParamPayload, Str));
 }
 
-NodePointer Demangler::demangleSpecAttributes(Node::Kind SpecKind,
-                                              bool demangleUniqueID) {
+NodePointer Demangler::demangleSpecAttributes(Node::Kind SpecKind) {
   bool isFragile = nextIf('q');
 
   int PassID = (int)nextChar() - '0';
   if (PassID < 0 || PassID > 9)
     return nullptr;
 
-  int Idx = -1;
-  if (demangleUniqueID)
-    Idx = demangleNatural();
-
-  NodePointer SpecNd = nullptr;
-  if (Idx >= 0) {
-    SpecNd = createNode(SpecKind, Idx);
-  } else {
-    SpecNd = createNode(SpecKind);
-  }
+  NodePointer SpecNd = createNode(SpecKind);
   if (isFragile)
     SpecNd->addChild(createNode(Node::Kind::SpecializationIsFragile),
                      *this);
@@ -2695,6 +2713,3 @@ NodePointer Demangler::demangleObjCTypeName() {
 
   return Global;
 }
-
-} // namespace Demangle
-} // namespace swift

@@ -78,8 +78,8 @@ func returnsImplicitlyUnwrappedOptional() -> FooStruct! {
 
 @objc
 class ObjcClass {
-  var instanceVar: Int = 0
-  func instanceFunc() -> ObjcClass { return self }
+  @objc var instanceVar: Int = 0
+  @objc func instanceFunc() -> ObjcClass { return self }
 }
 
 // OPT_NO_DOT_FOOSTRUCT: Begin completions
@@ -135,9 +135,11 @@ class ObjcClass {
 // OBJCCLASS_MEMBERS_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc()[#ObjcClass#]
 // OBJCCLASS_MEMBERS_NO_DOT-NEXT: Decl[InfixOperatorFunction]/OtherModule[Swift]: === {#AnyObject?#}[#Bool#]
 // OBJCCLASS_MEMBERS_NO_DOT-NEXT: Decl[InfixOperatorFunction]/OtherModule[Swift]: !== {#AnyObject?#}[#Bool#]
+// OBJCCLASS_MEMBERS_NO_DOT-NEXT: Keyword[self]/CurrNominal: .self[#ObjcClass#]; name=self
 // OBJCCLASS_MEMBERS_NO_DOT-NEXT: End completions
 
 // OBJCCLASS_MEMBERS_DOT: Begin completions
+// OBJCCLASS_MEMBERS_DOT-NEXT: Keyword[self]/CurrNominal: self[#ObjcClass#]; name=self
 // OBJCCLASS_MEMBERS_DOT-NEXT: Decl[InstanceVar]/CurrNominal:    instanceVar[#Int#]
 // OBJCCLASS_MEMBERS_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc()[#ObjcClass#]
 // OBJCCLASS_MEMBERS_DOT-NEXT: End completions

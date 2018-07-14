@@ -112,6 +112,6 @@ struct BigStructWithNativeObjects {
   // This function is not representable in Objective-C, so don't emit the objc entry point.
   // CHECK-NOT: @_TToFC17objc_class_export3Foo23doStuffToBigSwiftStruct1ffS_FTV17objc_class_export27BigStructWithNativeObjects_T_
 
-  init() { }
+  @objc init() { }
 }
 

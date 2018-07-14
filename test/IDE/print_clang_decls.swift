@@ -88,6 +88,7 @@
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSArray.  Bbb.{{$}}
 // FOUNDATION-NEXT: {{^}}class NSArray : NSObject {{{$}}
+// FOUNDATION-NEXT: init!(objects: UnsafePointer<AnyObject>?, count cnt: Int)
 // FOUNDATION-NEXT: subscript(idx: Int) -> Any { get }
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSRuncingMode.  Bbb.{{$}}
