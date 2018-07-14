@@ -369,27 +369,6 @@ extension LazyMapCollection {
   }
 }
 
-@available(*, unavailable, message: "use += 1")
-@discardableResult
-public prefix func ++ <F: FloatingPoint>(rhs: inout F) -> F {
-  fatalError("++ is not available")
-}
-@available(*, unavailable, message: "use -= 1")
-@discardableResult
-public prefix func -- <F: FloatingPoint>(rhs: inout F) -> F {
-  fatalError("-- is not available")
-}
-@available(*, unavailable, message: "use += 1")
-@discardableResult
-public postfix func ++ <F: FloatingPoint>(lhs: inout F) -> F {
-  fatalError("++ is not available")
-}
-@available(*, unavailable, message: "use -= 1")
-@discardableResult
-public postfix func -- <F: FloatingPoint>(lhs: inout F) -> F {
-  fatalError("-- is not available")
-}
-
 extension FloatingPoint {
   @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Please use the `abs(_:)` free function")
   public static func abs(_ x: Self) -> Self {
