@@ -281,7 +281,9 @@ struct S<T> {
 
   func subscribe<Object: AnyObject>(object: Object?, method: (Object, T) -> ()) where Object: Hashable {
     let wrappedMethod = { (object: AnyObject, value: T) in }
-    // expected-error @+1 {{value of optional type 'Object?' not unwrapped; did you mean to use '!' or '?'?}}
+    // expected-error @+3 {{value of optional type 'Object?' must be unwrapped to a value of type 'Object'}}
+    // expected-note @+2{{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+    // expected-note @+1{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
     cs.forEach { $0.w.append(value: wrappedMethod, forKey: object) }
   }
 }

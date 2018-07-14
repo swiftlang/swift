@@ -902,10 +902,21 @@ NOTE(note_init_parameter,none,
 ERROR(missing_nullary_call,none,
      "function produces expected type %0; did you mean to call it with '()'?",
      (Type))
-ERROR(missing_unwrap_optional,none,
-      "value of optional type %0 not unwrapped; did you mean to use '!' "
-      "or '?'?",
-     (Type))
+ERROR(optional_not_unwrapped,none,
+      "value of optional type %0 must be unwrapped to a value of type %1",
+     (Type, Type))
+NOTE(unwrap_with_default_value,none,
+     "coalesce using '?" "?' to provide a default when the optional value "
+     "contains 'nil'", ())
+NOTE(unwrap_with_force_value,none,
+     "force-unwrap using '!' to abort execution if the optional value contains "
+     "'nil'", ())
+ERROR(optional_base_not_unwrapped,none,
+      "value of optional type %0 must be unwrapped to refer to member %1 of "
+      "wrapped base type %2", (Type, DeclName, Type))
+NOTE(optional_base_chain,none,
+     "chain the optional using '?' to access member %0 only for non-'nil' "
+     "base values", (DeclName))
 ERROR(missing_unwrap_optional_try,none,
       "value of optional type %0 not unwrapped; did you mean to use 'try!' "
       "or chain with '?'?",
