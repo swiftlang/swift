@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -emit-library -o %t/libSimpleNSObjectSubclass.dylib %S/Inputs/SimpleNSObjectSubclass.swift
+// RUN: %target-build-swift -emit-library -o %t/libSimpleNSObjectSubclass.dylib %S/Inputs/SimpleNSObjectSubclass.swift -Xlinker -install_name -Xlinker @executable_path/libSimpleNSObjectSubclass.dylib
 // RUN: %target-codesign %t/libSimpleNSObjectSubclass.dylib
 
 // RUN: %target-build-swift %s -o %t/main -lSimpleNSObjectSubclass -L%t -import-objc-header %S/Inputs/class_getImageName-static-helper.h
