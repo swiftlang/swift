@@ -1230,6 +1230,77 @@ internal func _nativeUnicodeCaseFoldString(_ str: String) -> String {
   return String(_largeStorage: storage)
 }
 
+@usableFromInline // FIXME(sil-serialize-all)
+internal func _nativeUnicodeNormalizeString(
+  _ str: String, _ form: Unicode.NormalizationForm
+) -> String {
+
+  // TODO (TODO: JIRA): check for small
+
+  let guts = str._guts._extractContiguousUTF16()
+  defer { _fixLifetime(guts) }
+  let utf16 = guts._unmanagedUTF16View
+
+  let norm: OpaquePointer
+  switch form {
+  case .nfd:
+    norm = _Normalization._nfdNormalizer
+  case .nfc:
+    norm = _Normalization._nfcNormalizer
+  case .nfkd:
+    norm = _Normalization._nfkdNormalizer
+  case .nfkc:
+    norm = _Normalization._nfkcNormalizer
+  case .nfkcCaseFold:
+    norm = _Normalization._nfkcCasefoldNormalizer
+  case .fcd:
+    norm = _Normalization._fcdNormalizer
+  case .fcc:
+    norm = _Normalization._fccNormalizer
+  @unknown default:
+    fatalError("Unrecognized normalization form")
+  }
+  guard !_Normalization._prenormalQuickCheckYes(normalizer: norm, utf16) else {
+    return str
+  }
+
+  var storage = _SwiftStringStorage<UTF16.CodeUnit>.create(
+    capacity: utf16.count, count: utf16.count)
+
+  // Try to write it out to the same length.
+  var err = __swift_stdlib_U_ZERO_ERROR
+  let z = __swift_stdlib_unorm2_normalize(
+    norm,
+    utf16.start,
+    numericCast(utf16.count),
+    storage.start,
+    numericCast(storage.capacity), // FIXME: handle overflow case
+    &err)
+  guard err.isSuccess || err == __swift_stdlib_U_BUFFER_OVERFLOW_ERROR else {
+    fatalError("unorm2_normalize: Unexpected error normalizing unicode string.")
+  }
+  let correctSize = Int(z)
+
+  // If more space is needed, do it again with the correct buffer size.
+  if correctSize > storage.capacity {
+    storage = _SwiftStringStorage<UTF16.CodeUnit>.create(
+      capacity: correctSize, count: correctSize)
+
+    _ = __swift_stdlib_unorm2_normalize(
+      norm,
+      utf16.start,
+      numericCast(utf16.count),
+      storage.start,
+      numericCast(storage.capacity), // FIXME: handle overflow case
+      &err)
+  }
+  guard err.isSuccess else {
+    fatalError("unorm2_normalize: Unexpected error normalizing unicode string.")
+  }
+  storage.count = correctSize
+  return String(_largeStorage: storage)
+}
+
 // Unicode algorithms
 extension String {
   // FIXME: implement case folding without relying on Foundation.
@@ -1375,6 +1446,28 @@ extension String {
     }
 
     return _nativeUnicodeCaseFoldString(self)
+  }
+
+  /// Returns a normalized version of the string using the given Unicode
+  /// normalization form.
+  ///
+  /// - Parameter form: The normalization form to be used.
+  /// - Returns: A normalized copy of the string.
+  ///
+  /// - Complexity: O(*n*)
+  public func normalized(_ form: Unicode.NormalizationForm) -> String {
+    if _guts.isASCII {
+      switch form {
+      case .nfd, .nfc, .nfkd, .nfkc, .fcd, .fcc:
+        return self
+      case .nfkcCaseFold:
+        return self.lowercased()
+      @unknown default:
+        fatalError("Unrecognized normalization form")
+      }
+    }
+
+    return _nativeUnicodeNormalizeString(self, form)
   }
 
   /// Creates an instance from the description of a given

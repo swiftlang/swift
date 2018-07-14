@@ -1263,6 +1263,29 @@ StringTests.test("caseFolded()") {
   expectEqual("ᎠᎡᎢ", "ᎠᎡᎢ".caseFolded())
 }
 
+StringTests.test("normalized(_:)") {
+  // Use setlocale so tolower() is correct on ASCII.
+  setlocale(LC_ALL, "C")
+
+  // Check the ASCII domain.
+  let asciiDomain: [Int32] = Array(0..<128)
+  expectEqualFunctionsForDomain(
+    asciiDomain,
+    { String(UnicodeScalar(Int($0))!) },
+    { String(UnicodeScalar(Int($0))!).normalized(.nfc) })
+  expectEqualFunctionsForDomain(
+    asciiDomain,
+    { String(UnicodeScalar(Int(tolower($0)))!) },
+    { String(UnicodeScalar(Int($0))!).normalized(.nfkcCaseFold) })
+
+  expectEqual("∭", "∭".normalized(.nfd))
+  expectEqual("∭", "∭".normalized(.nfc))
+  expectEqual("∫∫∫", "∭".normalized(.nfkd))
+  expectEqual("∫∫∫", "∭".normalized(.nfkc))
+  expectEqual("∭", "∭".normalized(.fcd))
+  expectEqual("∭", "∭".normalized(.fcc))
+}
+
 StringTests.test("unicodeViews") {
   // Check the UTF views work with slicing
 

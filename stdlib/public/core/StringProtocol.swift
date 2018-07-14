@@ -40,6 +40,7 @@ public protocol StringProtocol
   func lowercased() -> String
   func uppercased() -> String
   func caseFolded() -> String
+  func normalized(_ form: Unicode.NormalizationForm) -> String
 
   /// Creates a string from the given Unicode code units in the specified
   /// encoding.
