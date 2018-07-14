@@ -105,7 +105,19 @@ struct SILReverseAutoDiffIndices {
     }
     return true;
   }
+  
+  void print(llvm::raw_ostream &s = llvm::outs()) const {
+    s << "(source=" << source << " parameters=(";
+    interleave(parameters, [&s](unsigned p) { s << p; }, [&s]{ s << ' '; });
+    s << "))";
+  }
 };
+
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &s,
+                                     const SILReverseAutoDiffIndices &indices) {
+  indices.print(s);
+  return s;
+}
 
 /// Flags to define the semantics and the type signature of a gradient function.
 enum class SILGradientFlags : unsigned {
