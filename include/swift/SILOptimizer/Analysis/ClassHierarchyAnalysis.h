@@ -34,14 +34,14 @@ public:
       ProtocolImplementations;
 
   ClassHierarchyAnalysis(SILModule *Mod)
-      : SILAnalysis(AnalysisKind::ClassHierarchy), M(Mod) {
-      init(); 
-    }
+      : SILAnalysis(SILAnalysisKind::ClassHierarchy), M(Mod) {
+    init();
+  }
 
   ~ClassHierarchyAnalysis();
 
   static bool classof(const SILAnalysis *S) {
-    return S->getKind() == AnalysisKind::ClassHierarchy;
+    return S->getKind() == SILAnalysisKind::ClassHierarchy;
   }
 
   /// Invalidate all information in this analysis.

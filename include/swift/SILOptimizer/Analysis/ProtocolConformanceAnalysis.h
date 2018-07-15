@@ -37,14 +37,14 @@ public:
       ProtocolConformanceMap;
 
   ProtocolConformanceAnalysis(SILModule *Mod)
-      : SILAnalysis(AnalysisKind::ProtocolConformance), M(Mod) {
+      : SILAnalysis(SILAnalysisKind::ProtocolConformance), M(Mod) {
     init();
   }
 
   ~ProtocolConformanceAnalysis();
 
   static bool classof(const SILAnalysis *S) {
-    return S->getKind() == AnalysisKind::ProtocolConformance;
+    return S->getKind() == SILAnalysisKind::ProtocolConformance;
   }
 
   /// Invalidate all information in this analysis.

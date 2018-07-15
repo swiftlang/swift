@@ -126,10 +126,10 @@ class BasicCalleeAnalysis : public SILAnalysis {
 
 public:
   BasicCalleeAnalysis(SILModule *M)
-      : SILAnalysis(AnalysisKind::BasicCallee), M(*M), Cache(nullptr) {}
+      : SILAnalysis(SILAnalysisKind::BasicCallee), M(*M), Cache(nullptr) {}
 
   static bool classof(const SILAnalysis *S) {
-    return S->getKind() == AnalysisKind::BasicCallee;
+    return S->getKind() == SILAnalysisKind::BasicCallee;
   }
 
   /// Invalidate all information in this analysis.

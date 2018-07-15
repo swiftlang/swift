@@ -750,7 +750,7 @@ public:
   EscapeAnalysis(SILModule *M);
 
   static bool classof(const SILAnalysis *S) {
-    return S->getKind() == AnalysisKind::Escape;
+    return S->getKind() == SILAnalysisKind::Escape;
   }
 
   virtual void initialize(SILPassManager *PM) override;

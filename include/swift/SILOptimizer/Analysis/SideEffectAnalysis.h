@@ -89,7 +89,8 @@ class GenericFunctionEffectAnalysis : public BottomUpIPAnalysis {
   BasicCalleeAnalysis *BCA;
 
 public:
-  GenericFunctionEffectAnalysis(AnalysisKind kind) : BottomUpIPAnalysis(kind) {}
+  GenericFunctionEffectAnalysis(SILAnalysisKind kind)
+      : BottomUpIPAnalysis(kind) {}
 
   const FunctionEffects &getEffects(SILFunction *F) {
     FunctionInfo *functionInfo = getFunctionInfo(F);
@@ -441,10 +442,10 @@ class SideEffectAnalysis
 public:
   SideEffectAnalysis()
       : GenericFunctionEffectAnalysis<FunctionSideEffects>(
-            AnalysisKind::SideEffect) {}
+            SILAnalysisKind::SideEffect) {}
 
   static bool classof(const SILAnalysis *S) {
-    return S->getKind() == AnalysisKind::SideEffect;
+    return S->getKind() == SILAnalysisKind::SideEffect;
   }
 };
 

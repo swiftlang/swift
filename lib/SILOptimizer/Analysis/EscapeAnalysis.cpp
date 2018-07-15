@@ -993,11 +993,9 @@ void EscapeAnalysis::ConnectionGraph::verifyStructure() const {
 //                          EscapeAnalysis
 //===----------------------------------------------------------------------===//
 
-EscapeAnalysis::EscapeAnalysis(SILModule *M) :
-  BottomUpIPAnalysis(AnalysisKind::Escape), M(M),
-  ArrayType(M->getASTContext().getArrayDecl()), BCA(nullptr) {
-}
-
+EscapeAnalysis::EscapeAnalysis(SILModule *M)
+    : BottomUpIPAnalysis(SILAnalysisKind::Escape), M(M),
+      ArrayType(M->getASTContext().getArrayDecl()), BCA(nullptr) {}
 
 void EscapeAnalysis::initialize(SILPassManager *PM) {
   BCA = PM->getAnalysis<BasicCalleeAnalysis>();
