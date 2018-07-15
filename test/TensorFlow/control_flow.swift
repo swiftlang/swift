@@ -75,7 +75,6 @@ public func weighPetOnlyDefault(pet: Pet) {
 // CHECK:        return
 // CHECK-NEXT: }  // end sil function
 
-
 // CHECK-LABEL: ---- ANALYSIS STATE FOR FUNCTION {{.*}}testCondBranch
 // CHECK:       bb0:
 // CHECK:       [Copy]    cond_br {{.*}}, bb2, bb1
@@ -280,3 +279,39 @@ public func foo<T>(_ a: T) {
 //   }
 //   _hostOp(a)
 // }
+
+// An infinite loop that we reject in partitioning.
+public func infLoop1() {
+  let maxCount: Int32 = 100
+  var a = Tensor<Int32>(0)
+  let count: Int32 = 0 
+  while count < maxCount {
+    // expected-error @+1 {{Cannot partition function}}
+    a += a
+  }
+  a -= a
+  _hostOp(a)
+}
+
+// Another infinite loop that we reject in partitioning.
+// simplified from https://bugs.swift.org/browse/SR-8236
+public func infLoop2(maxCount: Int32) {
+  var a = Tensor<Int32>(0)
+  var count: Int32 = 0
+  // expected-warning @+1 {{implicitly copied to the accelerator}}
+  while count < maxCount {
+    a += a
+    count += 1
+    if count == 50 {
+      let i: Int32 = 0
+      // this causes trouble: infinite loop
+      while i < maxCount {
+        count += i
+      }  // expected-error {{Cannot partition function}}
+      a = Tensor<Int32>(count)
+      break
+    }
+  }
+  a -= a
+  _hostOp(a)
+}

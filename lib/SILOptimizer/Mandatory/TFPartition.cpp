@@ -715,10 +715,13 @@ public:
 
 private:
   // Marking.
-  void markBlock(SILBasicBlock *BB);
-  void markInstruction(SILInstruction &inst, Marking mark);
-  void markArgument(SILArgument *arg, SILInstruction *user);
-  void markValue(SILValue value, SILInstruction *user);
+  /// Return true if we've encountered an error. In that case the diagnostic
+  /// must have been emitted.
+  bool markBlock(SILBasicBlock *BB);
+  bool markInstruction(SILInstruction &inst, Marking mark);
+  bool markArgument(SILArgument *arg, SILInstruction *user);
+  bool markValue(SILValue value, SILInstruction *user);
+
   void sinkValueIntoRegionForPromotion(SILInstruction *&inst);
 
   void promoteCopyToMove();
@@ -974,7 +977,9 @@ diagnoseCopyToHost(SILValue value, SILInstruction *user, SILLocation loc) {
 /// Some instruction in the specified block needs to be split out to the
 /// accelerator, so we mark it (and its control dependencies) as to-be-moved
 /// over.
-void TFFunctionPartition::markBlock(SILBasicBlock *BB) {
+/// Return true if we've encountered an error. In that case the diagnostic must
+/// have been emitted.
+bool TFFunctionPartition::markBlock(SILBasicBlock *BB) {
   // "tensorStartPoint" marks the start of the extracted function, so it must
   // dominate all blocks that are to be extracted.
   assert(DI.dominates(tensorStartPoint->getParent(), BB) &&
@@ -983,7 +988,7 @@ void TFFunctionPartition::markBlock(SILBasicBlock *BB) {
   // Insert the block into our set - if the block is already there, we have
   // nothing more to do.
   if (!markedBlocks.insert(BB).second)
-    return;
+    return false;
 
   // Walk predecessors until we find marked blocks or other blocks we are
   // control-dependent on.
@@ -1017,6 +1022,19 @@ void TFFunctionPartition::markBlock(SILBasicBlock *BB) {
     // Check the predecessors of this block.  If any of them have multiple
     // successors, then we may be control-dependent on that conditional.
     for (auto pred : thisBB->getPredecessorBlocks()) {
+      if (pred->getSingleSuccessorBlock() == pred) {
+        // Edge case: we've entered an infinite loop, so we'll just error
+        // out here.
+        // FIXME: Consider using a different error code than `tf_op_misuse`.
+        diagnose(hostFn.getASTContext(),
+                 getUserSourceLocation(pred->front().getDebugLocation())
+                     .getSourceLoc(),
+                 diag::tf_op_misuse,
+                 "Cannot partition function '" + hostFn.getName().str() +
+                     "' -- is there an infinite loop?");
+        return true;
+      }
+
       // Count the number of successors of this block which are tensor related,
       // for sanity-check purposes.
       //
@@ -1024,6 +1042,18 @@ void TFFunctionPartition::markBlock(SILBasicBlock *BB) {
       // so we can insert a kill of the tensor program.
       unsigned numTensorSuccs = 0;
       for (auto succ : pred->getSuccessorBlocks()) {
+        if (succ->getSingleSuccessorBlock() == succ) {
+          // Edge case: we've entered an infinite loop, so we'll just error
+          // out here.
+          // FIXME: Consider using a different error code than `tf_op_misuse`.
+          diagnose(hostFn.getASTContext(),
+                   getUserSourceLocation(succ->front().getDebugLocation())
+                       .getSourceLoc(),
+                   diag::tf_op_misuse,
+                   "Cannot partition function '" + hostFn.getName().str() +
+                       "' -- is there an infinite loop?");
+          return true;
+        }
         if (tensorCodeBlocks.contains(succ))
           ++numTensorSuccs;
         else {
@@ -1078,7 +1108,8 @@ void TFFunctionPartition::markBlock(SILBasicBlock *BB) {
 
       auto predTerm = pred->getTerminator();
       if (shouldMarkCopy(predTerm)) {
-        markInstruction(*predTerm, Marking::Copy);
+        if (markInstruction(*predTerm, Marking::Copy))
+          return true;
         continue;
       }
 
@@ -1096,6 +1127,7 @@ void TFFunctionPartition::markBlock(SILBasicBlock *BB) {
                + " not supported for TFFunctionPartition");
     }
   }
+  return false;
 }
 
 
@@ -1175,11 +1207,11 @@ static ScalarPromoteClass shouldPromoteToTensorOp(SILInstruction *inst,
   return ScalarPromoteClass::CanPromote;
 }
 
-void TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
+bool TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
   // Insert the specified instruction into the marked set.  If it is already
   // there then we have nothing more to do.
   if (!markedInstructions.insert({&inst, mark}).second)
-    return;
+    return false;
 
   // If we're moving a computation to the accelerator and we see a tuple_extract
   // from a moved value, then we move the tuple_extract as well, to make sure
@@ -1197,24 +1229,26 @@ void TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
           // It is possible the tuple extract already got marked as a copy.  If
           // so, remove its entry so we can upgrade it to a move.
           markedInstructions.erase(user);
-          markInstruction(*user, Marking::Move);
+          if (markInstruction(*user, Marking::Move))
+            return true;
         }
       }
   }
 
   // If we are simply deleting this instruction, then we're done.
   if (mark == Marking::Delete)
-    return;
+    return false;
 
   // Make sure the instruction's block is marked as being copied over to the
   // tensor program.
-  markBlock(inst.getParent());
+  if (markBlock(inst.getParent()))
+    return true;
 
   // If we have an uncond branch with basic block arguments, don't add operands
   // as used values.  Instead, we'll use more careful conditional liveness
   // based on whether the BB args in the successor are live.
   if (isa<BranchInst>(&inst))
-    return;
+    return false;
 
   // If we are moving the instruction over, then we know it is a tensor op, and
   // it get special attention.  Otherwise, we just recursively mark the
@@ -1245,23 +1279,25 @@ void TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
     // computation over to the accelerator, by copying the value over, or by
     // passing as an argument to the tensor computation.
     for (auto &op : operandRange)
-      markValue(op.get(), &inst);
-    return;
+      if (markValue(op.get(), &inst))
+        return true;
+    return false;
   }
 
   // If this is a tuple_extract of a tensor op, then we already marked its
   // operand.
   if (isa<TupleExtractInst>(inst))
-    return;
+    return false;
 
   // Okay, we know that the instruction is a tensor op.  Decode its argument
   // list so we know how to handle the operands.
   if (auto *graphOp = dyn_cast<GraphOperationInst>(&inst)) {
     for (unsigned i = 0, e = graphOp->getNumOperands(); i != e; ++i) {
       // Tensor and scalar input operands are recursively marked.
-      markValue(graphOp->getOperand(i), graphOp);
+      if (markValue(graphOp->getOperand(i), graphOp))
+        return true;
     }
-    return;
+    return false;
   }
 
   SILTensorOpInfo tfopInfo = SILTensorOpInfo::decode(&inst).getValue();
@@ -1270,14 +1306,16 @@ void TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
     if (tfopInfo.isInput(i) &&
         // Don't mark array designators.
         !inst.getOperand(i)->getType().is<MetatypeType>())
-      markValue(inst.getOperand(i), &inst);
+      if (markValue(inst.getOperand(i), &inst))
+        return true;
   }
+  return false;
 }
 
-void TFFunctionPartition::markArgument(SILArgument *arg, SILInstruction *user) {
+bool TFFunctionPartition::markArgument(SILArgument *arg, SILInstruction *user) {
   // If we've already marked this argument, there is nothing more to do.
   if (markedBBArguments.count(arg))
-    return;
+    return false;
 
   // If this BB argument is outside the region dominated by the start point,
   // then we pass its value in as an argument to the tensor function.
@@ -1287,12 +1325,13 @@ void TFFunctionPartition::markArgument(SILArgument *arg, SILInstruction *user) {
     });
     tensorFnArguments.push_back(SILValue(arg));
     diagnoseCopyToAccelerator(arg, user, /*tensorProgramArgument*/true);
-    return;
+    return false;
   }
 
   // Ok, since we're marking it, we need to make sure the argument's block is
   // marked as being copied.
-  markBlock(arg->getParent());
+  if (markBlock(arg->getParent()))
+    return true;
 
   // If this is a value of TensorFlow value type, then we move it to the
   // accelerator.  If it is also used on the host, it will be copied back.
@@ -1326,8 +1365,10 @@ void TFFunctionPartition::markArgument(SILArgument *arg, SILInstruction *user) {
     SmallVector<SILValue, 4> incomingValues;
     arg->getIncomingValues(incomingValues);
     for (auto v : incomingValues)
-      markValue(v, user);
+      if (markValue(v, user))
+        return true;
   }
+  return false;
 }
 
 /// Determine whether we are able to move the specified instruction across
@@ -1520,11 +1561,11 @@ sinkValueIntoRegionForPromotion(SILInstruction *&inst) {
 /// Indicate that the specified value must be available on the accelerator.
 /// This can be done by moving the computation over, or by inserting a data
 /// transfer.
-void TFFunctionPartition::markValue(SILValue value, SILInstruction *user) {
+bool TFFunctionPartition::markValue(SILValue value, SILInstruction *user) {
   // We can safely ignore SILUndef, since SILCloner will just make another
   // one for us.
   if (isa<SILUndef>(value))
-    return;
+    return false;
 
   if (auto *arg = dyn_cast<SILArgument>(value))
     return markArgument(arg, user);
@@ -1532,12 +1573,12 @@ void TFFunctionPartition::markValue(SILValue value, SILInstruction *user) {
   auto *inst = value->getDefiningInstruction();
   assert(inst);
   if (markedInstructions.count(inst))
-    return;
+    return false;
 
   // If this is a reference to a tensor op that we haven't gotten to yet, just
   // ignore it.  The outer marking loop will find it and mark it.
   if (tensorOpsSet.count(inst))
-    return;
+    return false;
 
   // Determine whether the instruction is lexically before the tensor program
   // start point, and whether it is something we can promote into the graph.
@@ -1583,7 +1624,7 @@ void TFFunctionPartition::markValue(SILValue value, SILInstruction *user) {
     // the accelerator.
     if (!isAcceleratorOnly(hostFn))
       diagnoseCopyToAccelerator(value, user, /*tensorProgramArgument*/true);
-    return;
+    return false;
   }
 
   // If this is a scalar operation that can be promoted to a tensor op on the
@@ -1599,7 +1640,7 @@ void TFFunctionPartition::markValue(SILValue value, SILInstruction *user) {
   // Instead of cloning over this instruction, we'll add a send after it and
   // insert a receive in the accelerator code.
   markedInstructions.insert({inst, Marking::Send});
-  markBlock(inst->getParent());
+  return markBlock(inst->getParent());
 }
 
 /// Given a set of tensor operations, find the nearest common ancestor of those
@@ -1834,6 +1875,8 @@ static const char* markingEnumToStr(Marking m) {
 /// Scan the function looking for blocks with tensor operations in them.  As
 /// we find them, mark them as "to-be-partitioned", which marks (transitive)
 /// data and control dependencies.
+/// Return true if no tensor ops are found or we've encountered an error. In the
+/// lattercase the diagnostic must have been emitted.
 bool TFFunctionPartition::markFunction() {
   bool loggedInput = false;
 
@@ -1925,7 +1968,7 @@ bool TFFunctionPartition::markFunction() {
   // If there is nothing to do, or the ops in this function are malformed,
   // don't touch this function.
   if (tensorOps.empty() || invalidOpFound)
-    return false;
+    return true;
 
   // Compute the blocksReachingTensorCode set.
   tensorCodeBlocks.compute(tensorOps);
@@ -1956,7 +1999,8 @@ bool TFFunctionPartition::markFunction() {
   // operations as being moved over to the graph, and recursively mark their
   // operands as appropriate.
   for (auto inst : tensorOps)
-    markInstruction(*inst, Marking::Move);
+    if (markInstruction(*inst, Marking::Move))
+      return true;
 
   // Optimize the host code (and avoid copies back to the host in some cases) by
   // changing scalar operations marked as "Copy" into "Move" when all of their
@@ -1977,7 +2021,7 @@ bool TFFunctionPartition::markFunction() {
         diagnose(hostFn.getASTContext(),
                  markInfo.first->getLoc().getSourceLoc(),
                  diag::tf_convention_tf_host_code_not_allowed);
-        return false;
+        return true;
       }
 
   // Not that we know all of the instructions we'll be moving over, find the end
@@ -2075,7 +2119,7 @@ bool TFFunctionPartition::markFunction() {
 
   assert(DI.dominates(startBB, endBB));
 
-  return true;
+  return false;
 }
 
 
@@ -2390,19 +2434,6 @@ static void createConstTensorAttrsOnAccel(
 static SILValue getSingleValueResult(GraphOperationInst *inst) {
   assert(inst->getNumResults() == 1);
   return inst->getResults()[0];
-}
-
-static void createConstTensorAttrsOnAccel(
-    unsigned constVal, SILType valTy, SILLocation loc, ASTContext &ctx,
-    SILBuilder &B, std::string &opName,
-    SmallVectorImpl<GraphOperationAttribute> &attributes) {
-  // Literals take attributes specifying the dtype and value.
-  attributes.push_back(
-      {ctx.getIdentifier("dtype$dtype"),
-       SymbolicValue::getMetatype(valTy.getASTType()->getCanonicalType())});
-  attributes.push_back({ctx.getIdentifier("value$tensor"),
-                        SymbolicValue::getInteger(APInt(/*width*/ 32, constVal),
-                                                  ctx.getAllocator())});
 }
 
 /// Given a primitive scalar instruction like a literal or an LLVM IR
@@ -4294,8 +4325,8 @@ void TFPartition::run() {
   DEBUG(llvm::dbgs() << "  " << hostFn->getName()
                      << " should be partitioned.\n");
   TFFunctionPartition partitioner(*hostFn, PM, *tfModule);
-  if (!partitioner.markFunction())
-    return; // No tensor ops found in the function.
+  if (partitioner.markFunction())
+    return; // No tensor ops found, or we've encountered an error.
   DEBUG(llvm::dbgs() << "  " << hostFn->getName()
                      << " contains tensor op(s).\n");
 
