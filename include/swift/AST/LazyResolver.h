@@ -60,9 +60,6 @@ public:
   /// consistency and provides the value a type.
   virtual void resolveDeclSignature(ValueDecl *VD) = 0;
 
-  /// Resolve the "is Objective-C" bit for the given declaration.
-  virtual void resolveIsObjC(ValueDecl *VD) = 0;
-
   /// Resolve the trailing where clause of the given protocol in-place.
   virtual void resolveTrailingWhereClause(ProtocolDecl *proto) = 0;
 

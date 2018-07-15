@@ -112,16 +112,6 @@ bool shouldDiagnoseObjCReason(ObjCReason reason, ASTContext &ctx);
 /// complain about the correct attribute during @objc inference.
 unsigned getObjCDiagnosticAttrKind(ObjCReason reason);
 
-/// Figure out if a declaration should be exported to Objective-C.
-Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
-                                      const ValueDecl *VD,
-                                      bool allowImplicit = false);
-
-/// Record whether the given declaration is @objc, and why.
-void markAsObjC(TypeChecker &TC, ValueDecl *D,
-                Optional<ObjCReason> isObjC,
-                Optional<ForeignErrorConvention> errorConvention = llvm::None);
-
 /// Determine whether the given function can be represented in Objective-C,
 /// and figure out its foreign error convention (if any).
 bool isRepresentableInObjC(const AbstractFunctionDecl *AFD,

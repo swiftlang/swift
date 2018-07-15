@@ -2245,6 +2245,7 @@ class ValueDecl : public Decl {
   } LazySemanticInfo;
 
   friend class OverriddenDeclsRequest;
+  friend class IsObjCRequest;
 
 protected:
   ValueDecl(DeclKind K,

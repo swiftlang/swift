@@ -159,3 +159,37 @@ void OverriddenDeclsRequest::noteCycleStep(DiagnosticEngine &diags) const {
   auto decl = std::get<0>(getStorage());
   diags.diagnose(decl, diag::circular_reference_through);
 }
+
+//----------------------------------------------------------------------------//
+// isObjC computation.
+//----------------------------------------------------------------------------//
+
+bool IsObjCRequest::breakCycle() const {
+  auto decl = std::get<0>(getStorage());
+  return decl->getAttrs().hasAttribute<ObjCAttr>();
+}
+
+void IsObjCRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  // FIXME: Improve this diagnostic.
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_reference);
+}
+
+void IsObjCRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  // FIXME: Customize this further.
+  diags.diagnose(decl, diag::circular_reference_through);
+}
+
+Optional<bool> IsObjCRequest::getCachedResult() const {
+  auto decl = std::get<0>(getStorage());
+  if (decl->LazySemanticInfo.isObjCComputed)
+    return decl->LazySemanticInfo.isObjC;
+
+  return None;
+}
+
+void IsObjCRequest::cacheResult(bool value) const {
+  auto decl = std::get<0>(getStorage());
+  decl->setIsObjC(value);
+}

@@ -1234,9 +1234,6 @@ public:
     validateDeclForNameLookup(VD);
   }
 
-  /// Resolve the "is Objective-C" bit for the given declaration.
-  virtual void resolveIsObjC(ValueDecl *VD) override;
-
   virtual void bindExtension(ExtensionDecl *ext) override;
 
   virtual void resolveExtension(ExtensionDecl *ext) override {
@@ -1921,28 +1918,6 @@ public:
   ///
   /// Return true if there was an error.
   bool checkConformanceToNSCopying(VarDecl *var);
-
-  /// Find the @objc requirement that are witnessed by the given
-  /// declaration.
-  ///
-  /// \param anySingleRequirement If true, returns at most a single requirement,
-  /// which might be any of the requirements that match.
-  ///
-  /// \returns the set of requirements to which the given witness is a
-  /// witness.
-  llvm::TinyPtrVector<ValueDecl *> findWitnessedObjCRequirements(
-                                     const ValueDecl *witness,
-                                     bool anySingleRequirement = false);
-
-  /// Mark any _ObjectiveCBridgeable conformances in the given type as "used".
-  void useObjectiveCBridgeableConformances(
-                        DeclContext *dc, Type type);
-
-  /// If this bound-generic type is bridged, mark any
-  /// _ObjectiveCBridgeable conformances in the generic arguments of
-  /// the given type as "used".
-  void useObjectiveCBridgeableConformancesOfArgs(
-                        DeclContext *dc, BoundGenericType *bound);
 
   /// Mark any _BridgedNSError/_BridgedStoredNSError/related
   /// conformances in the given type as "used".

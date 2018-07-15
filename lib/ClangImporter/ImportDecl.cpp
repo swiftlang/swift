@@ -5675,6 +5675,8 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
   result->setInterfaceType(allocType);
   Impl.recordImplicitUnwrapForDecl(result,
                                    importedType.isImplicitlyUnwrapped());
+  result->setOverriddenDecls({ });
+  result->setIsObjC(false);
 
   finishFuncDecl(decl, result);
   if (correctSwiftName)

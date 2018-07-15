@@ -673,6 +673,7 @@ NormalProtocolConformance::getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
 
   // Otherwise, resolve the type witness.
   PrettyStackTraceRequirement trace("resolving", this, assocType);
+  if (!resolver) resolver = assocType->getASTContext().getLazyResolver();
   assert(resolver && "Unable to resolve type witness");
 
   // Block recursive resolution of this type witness.

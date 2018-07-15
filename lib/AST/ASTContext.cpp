@@ -2365,8 +2365,6 @@ void AbstractFunctionDecl::setForeignErrorConvention(
 
 Optional<ForeignErrorConvention>
 AbstractFunctionDecl::getForeignErrorConvention() const {
-  if (!isObjC() && !getAttrs().hasAttribute<CDeclAttr>())
-    return None;
   if (!hasThrows())
     return None;
   auto &conventionsMap = getASTContext().getImpl().ForeignErrorConventions;

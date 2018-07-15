@@ -2398,6 +2398,24 @@ public:
     TC.checkDeclAttributes(VD);
 
     triggerAccessorSynthesis(TC, VD);
+
+    // Under the Swift 3 inference rules, if we have @IBInspectable or
+    // @GKInspectable but did not infer @objc, warn that the attribute is
+    if (!VD->isObjC() && TC.Context.LangOpts.EnableSwift3ObjCInference) {
+      if (auto attr = VD->getAttrs().getAttribute<IBInspectableAttr>()) {
+        TC.diagnose(attr->getLocation(),
+                    diag::attribute_meaningless_when_nonobjc,
+                    attr->getAttrName())
+          .fixItRemove(attr->getRange());
+      }
+
+      if (auto attr = VD->getAttrs().getAttribute<GKInspectableAttr>()) {
+        TC.diagnose(attr->getLocation(),
+                    diag::attribute_meaningless_when_nonobjc,
+                    attr->getAttrName())
+          .fixItRemove(attr->getRange());
+      }
+    }
   }
 
 
@@ -2553,6 +2571,7 @@ public:
     }
 
     triggerAccessorSynthesis(TC, SD);
+    (void)SD->isObjC();
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
@@ -3061,6 +3080,8 @@ public:
       // Complain if we should have a body.
       TC.diagnose(FD->getLoc(), diag::func_decl_without_brace);
     }
+
+    (void)FD->isObjC();
   }
 
   void visitModuleDecl(ModuleDecl *) { }
@@ -3287,6 +3308,8 @@ public:
       // Complain if we should have a body.
       TC.diagnose(CD->getLoc(), diag::missing_initializer_def);
     }
+
+    (void)CD->isObjC();
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
@@ -3295,6 +3318,8 @@ public:
 
     if (DD->hasBody())
       TC.definedFunctions.push_back(DD);
+
+    (void)DD->isObjC();
   }
 };
 } // end anonymous namespace
@@ -3801,10 +3826,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     validateAttributes(*this, D);
 
     if (auto CD = dyn_cast<ClassDecl>(nominal)) {
-      // Mark a class as @objc. This must happen before checking its members.
-      Optional<ObjCReason> isObjC = shouldMarkAsObjC(*this, CD);
-      markAsObjC(*this, CD, isObjC);
-
       // Determine whether we require in-class initializers.
       if (CD->getAttrs().hasAttribute<RequiresStoredPropertyInitsAttr>() ||
           (CD->hasSuperclass() &&
@@ -3824,7 +3845,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     if (auto *ED = dyn_cast<EnumDecl>(nominal)) {
       // @objc enums use their raw values as the value representation, so we
       // need to force the values to be checked.
-      resolveIsObjC(ED);
       if (ED->isObjC())
         checkEnumRawValues(*this, ED);
     }
@@ -3879,25 +3899,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     resolveTrailingWhereClause(proto);
 
     validateAttributes(*this, D);
-
-    // If the protocol is @objc, it may only refine other @objc protocols.
-    // FIXME: Revisit this restriction.
-    if (proto->getAttrs().hasAttribute<ObjCAttr>()) {
-      Optional<ObjCReason> isObjC = ObjCReason(ObjCReason::ImplicitlyObjC);
-
-      for (auto inherited : proto->getInheritedProtocols()) {
-        if (!inherited->isObjC()) {
-          diagnose(proto->getLoc(),
-                   diag::objc_protocol_inherits_non_objc_protocol,
-                   proto->getDeclaredType(), inherited->getDeclaredType());
-          diagnose(inherited->getLoc(), diag::kind_identifier_declared_here,
-                   DescriptiveDeclKind::Protocol, inherited->getName());
-          isObjC = None;
-        }
-      }
-
-      markAsObjC(*this, proto, isObjC);
-    }
 
     // FIXME: IRGen likes to emit @objc protocol descriptors even if the
     // protocol comes from a different module or translation unit.
@@ -3975,33 +3976,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // Properties need some special validation logic.
     if (auto *nominalDecl = VD->getDeclContext()
             ->getAsNominalTypeOrNominalTypeExtensionContext()) {
-      // If this is a property, check if it needs to be exposed to
-      // Objective-C.
-      Optional<ObjCReason> isObjC = shouldMarkAsObjC(*this, VD);
-
-      if (isObjC && !swift::isRepresentableInObjC(VD, *isObjC))
-        isObjC = None;
-
-      markAsObjC(*this, VD, isObjC);
-
-      // Under the Swift 3 inference rules, if we have @IBInspectable or
-      // @GKInspectable but did not infer @objc, warn that the attribute is
-      if (!isObjC && Context.LangOpts.EnableSwift3ObjCInference) {
-        if (auto attr = VD->getAttrs().getAttribute<IBInspectableAttr>()) {
-          diagnose(attr->getLocation(),
-                   diag::attribute_meaningless_when_nonobjc,
-                   attr->getAttrName())
-            .fixItRemove(attr->getRange());
-        }
-
-        if (auto attr = VD->getAttrs().getAttribute<GKInspectableAttr>()) {
-          diagnose(attr->getLocation(),
-                   diag::attribute_meaningless_when_nonobjc,
-                   attr->getAttrName())
-            .fixItRemove(attr->getRange());
-        }
-      }
-
       // If this variable is a class member, mark it final if the
       // class is final, or if it was declared with 'let'.
       auto staticSpelling =
@@ -4206,15 +4180,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       if (FD->isOperator())
         checkMemberOperator(*this, FD);
 
-      Optional<ObjCReason> isObjC = shouldMarkAsObjC(*this, FD);
       auto accessor = dyn_cast<AccessorDecl>(FD);
-
-      auto *protocolContext = dyn_cast<ProtocolDecl>(
-          FD->getDeclContext());
-      if (protocolContext && accessor) {
-        if (isObjC)
-          isObjC = ObjCReason::Accessor;
-      }
 
       if (accessor && accessor->isGetterOrSetter()) {
         // If the property decl is an instance property, its accessors will
@@ -4224,45 +4190,13 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
         AbstractStorageDecl *storage = accessor->getStorage();
 
-        if (storage->getAttrs().hasAttribute<NonObjCAttr>())
-          isObjC = None;
-        else if (storage->isObjC()) {
-          if (!isObjC) {
-            // Make this accessor @objc because its property is @objc.
-            isObjC = ObjCReason::Accessor;
-          } else if (auto storageObjCAttr =
-                       storage->getAttrs().getAttribute<ObjCAttr>()) {
-            // If @objc on the storage declaration was inferred using a
-            // deprecated rule, but this accessor is @objc in its own right,
-            // complain.
-            ;
-            if (storageObjCAttr && storageObjCAttr->isSwift3Inferred() &&
-                shouldDiagnoseObjCReason(*isObjC, Context)) {
-              diagnose(storage, diag::accessor_swift3_objc_inference,
-                       storage->getDescriptiveKind(), storage->getFullName(),
-                       isa<SubscriptDecl>(storage), accessor->isSetter())
-                .fixItInsert(storage->getAttributeInsertionLoc(
-                                                      /*forModifier=*/false),
-                             "@objc ");
-            }
-          }
-        }
-
         // If the storage is dynamic or final, propagate to this accessor.
-        if (isObjC &&
-            storage->isDynamic())
+        if (storage->isDynamic())
           makeDynamic(Context, FD);
 
         if (storage->isFinal())
           makeFinal(Context, FD);
       }
-
-      Optional<ForeignErrorConvention> errorConvention;
-      if (isObjC &&
-          (FD->isInvalid() || !isRepresentableInObjC(FD, *isObjC,
-                                                     errorConvention)))
-        isObjC = None;
-      markAsObjC(*this, FD, isObjC, errorConvention);
 
       inferFinalAndDiagnoseIfNeeded(*this, FD, FD->getStaticSpelling());
       inferDynamic(Context, FD);
@@ -4354,20 +4288,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     validateAttributes(*this, CD);
 
-    // An initializer is ObjC-compatible if it's explicitly @objc or a member
-    // of an ObjC-compatible class.
-    if (CD->getDeclContext()->isTypeContext()) {
-      Optional<ObjCReason> isObjC = shouldMarkAsObjC(*this, CD,
-          /*allowImplicit=*/true);
-
-      Optional<ForeignErrorConvention> errorConvention;
-      if (isObjC &&
-          (CD->isInvalid() ||
-           !isRepresentableInObjC(CD, *isObjC, errorConvention)))
-        isObjC = None;
-      markAsObjC(*this, CD, isObjC, errorConvention);
-    }
-
     inferDynamic(Context, CD);
 
     if (CD->getFailability() == OTK_ImplicitlyUnwrappedOptional) {
@@ -4405,16 +4325,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     DD->setSignatureIsValidated();
 
-    // Do this before markAsObjC() to diagnose @nonobjc better
     validateAttributes(*this, DD);
-
-    // Destructors are always @objc, because their Objective-C entry point is
-    // -dealloc.
-    if (Context.LangOpts.EnableObjCInterop)
-      markAsObjC(*this, DD, ObjCReason(ObjCReason::ImplicitlyObjC));
-    else
-      DD->setIsObjC(false);
-
     break;
   }
 
@@ -4443,14 +4354,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     if (SD->getDeclContext()->isTypeContext()) {
       // If this is a class member, mark it final if the class is final.
       inferFinalAndDiagnoseIfNeeded(*this, SD, StaticSpellingKind::None);
-
-      // A subscript is ObjC-compatible if it's explicitly @objc, or a
-      // member of an ObjC-compatible class or protocol.
-      Optional<ObjCReason> isObjC = shouldMarkAsObjC(*this, SD);
-
-      if (isObjC && !swift::isRepresentableInObjC(SD, *isObjC))
-        isObjC = None;
-      markAsObjC(*this, SD, isObjC);
 
       // Infer 'dynamic' before touching accessors.
       inferDynamic(Context, SD);
@@ -4673,6 +4576,9 @@ void TypeChecker::requestMemberLayout(ValueDecl *member) {
     requestNominalLayout(classDecl);
   if (auto *protocolDecl = dyn_cast<ProtocolDecl>(dc))
     requestNominalLayout(protocolDecl);
+
+  // Check whether the member is @objc.
+  (void)member->isObjC();
 }
 
 void TypeChecker::requestNominalLayout(NominalTypeDecl *nominalDecl) {

@@ -2035,12 +2035,8 @@ void ValueDecl::setOverriddenDecls(ArrayRef<ValueDecl *> overridden) {
 }
 
 bool ValueDecl::isObjC() const {
-  if (LazySemanticInfo.isObjCComputed)
-    return LazySemanticInfo.isObjC;
-
-  // Fallback: look for an @objc attribute.
-  // FIXME: This should become an error, eventually.
-  return getAttrs().hasAttribute<ObjCAttr>();
+  ASTContext &ctx = getASTContext();
+  return ctx.evaluator(IsObjCRequest{const_cast<ValueDecl *>(this)});
 }
 
 void ValueDecl::setIsObjC(bool value) {
@@ -3063,7 +3059,9 @@ ObjCClassKind ClassDecl::checkObjCAncestry() const {
     if (CD->isGenericContext())
       genericAncestry = true;
 
-    if (CD->isObjC())
+    // FIXME: Checking isObjC() introduces cyclic dependencies here, but this
+    // doesn't account for ill-formed @objc.
+    if (CD->getAttrs().hasAttribute<ObjCAttr>())
       isObjC = true;
 
     if (!CD->hasSuperclass())

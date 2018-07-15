@@ -2394,21 +2394,6 @@ static void configureDesignatedInitAttributes(TypeChecker &tc,
   ctor->getAttrs().add(new (ctx) OverrideAttr(/*IsImplicit=*/true));
   ctor->setOverriddenDecl(superclassCtor);
 
-  if (superclassCtor->isObjC()) {
-    // Inherit the @objc name from the superclass initializer, if it
-    // has one.
-    if (auto objcAttr = superclassCtor->getAttrs().getAttribute<ObjCAttr>()) {
-      if (objcAttr->hasName()) {
-        auto *clonedAttr = objcAttr->clone(ctx);
-        clonedAttr->setImplicit(true);
-        ctor->getAttrs().add(clonedAttr);
-      }
-    }
-
-    auto errorConvention = superclassCtor->getForeignErrorConvention();
-    markAsObjC(tc, ctor, ObjCReason(ObjCReason::ImplicitlyObjC),
-               errorConvention);
-  }
   if (superclassCtor->isRequired())
     ctor->getAttrs().add(new (ctx) RequiredAttr(/*IsImplicit=*/true));
   if (superclassCtor->isDynamic())

@@ -1472,7 +1472,6 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     else
       diags.diagnose(override, diag::missing_override);
     diags.diagnose(base, diag::overridden_here);
-    override->getAttrs().add(new (ctx) OverrideAttr(SourceLoc()));
   }
 
   // If the overridden method is declared in a Swift Class Declaration,

@@ -1493,8 +1493,6 @@ void ClassDecl::recordObjCMethod(AbstractFunctionDecl *method) {
     createObjCMethodLookup();
   }
 
-  assert(method->isObjC() && "Not an Objective-C method");
-
   // Record the method.
   bool isInstanceMethod = method->isObjCInstanceMethod();
   auto selector = method->getObjCSelector();
@@ -1890,9 +1888,6 @@ bool DeclContext::lookupQualified(Type type,
         continue;
 
       // If the declaration is not @objc, it cannot be called dynamically.
-      if (typeResolver)
-        typeResolver->resolveIsObjC(decl);
-
       if (!decl->isObjC())
         continue;
 

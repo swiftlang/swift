@@ -54,7 +54,7 @@ class Outer3
 // CHECK-NEXT:          `--{{.*}}SuperclassTypeRequest
 // CHECK-NEXT:              `--{{.*}}InheritedTypeRequest(circular_inheritance.(file).Right@
 // CHECK-NEXT:                  `--{{.*}}AccessLevelRequest{{.*}}
-// CHECK-NEXT:                  `--{{.*}}AccessLevelRequest{{.*}}
+// CHECK-NEXT:                  `--{{.*}}IsObjCRequest{{.*}}
 // CHECK-NEXT:                  `--{{.*}}SuperclassTypeRequest{{.*(cyclic dependency)}}
 
 // CHECK-DOT: digraph Dependencies
