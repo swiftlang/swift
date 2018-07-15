@@ -57,12 +57,6 @@ namespace constraints {
 using ConformanceMap =
     llvm::DenseMap<SubstitutableType *, SmallVector<ProtocolConformance *, 2>>;
 
-/// \brief Used for recursive lookups into an expr that is already
-/// being type-checked and the constraint system in which its type is
-/// stored.
-using ExprAndConstraintSystem =
-    std::pair<Expr *, constraints::ConstraintSystem *>;
-
 /// Special-case type checking semantics for certain declarations.
 enum class DeclTypeCheckingSemantics {
   /// A normal declaration.
@@ -907,7 +901,7 @@ private:
   llvm::DenseSet<CanType> CIntegerTypes;
 
   /// The set of expressions currently being analyzed for failures.
-  llvm::DenseMap<Expr*, ExprAndConstraintSystem> DiagnosedExprs;
+  llvm::DenseMap<Expr*, Expr*> DiagnosedExprs;
 
   ModuleDecl *StdlibModule = nullptr;
 
@@ -2497,13 +2491,13 @@ public:
   void checkInitializerErrorHandling(Initializer *I, Expr *E);
   void checkEnumElementErrorHandling(EnumElementDecl *D);
 
-  void addExprForDiagnosis(Expr *E1, ExprAndConstraintSystem Result) {
+  void addExprForDiagnosis(Expr *E1, Expr *Result) {
     DiagnosedExprs[E1] = Result;
   }
   bool isExprBeingDiagnosed(Expr *E) {
     return DiagnosedExprs.count(E);
   }
-  ExprAndConstraintSystem getExprBeingDiagnosed(Expr *E) {
+  Expr *getExprBeingDiagnosed(Expr *E) {
     return DiagnosedExprs[E];
   }
 
