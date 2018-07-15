@@ -239,4 +239,32 @@ extension MutableCollection {
   }
 }
 
+// the legacy swap free function
+//
+/// Exchanges the values of the two arguments.
+///
+/// The two arguments must not alias each other. To swap two elements of a
+/// mutable collection, use the `swapAt(_:_:)` method of that collection
+/// instead of this function.
+///
+/// - Parameters:
+///   - a: The first value to swap.
+///   - b: The second value to swap.
+@inlinable
+public func swap<T>(_ a: inout T, _ b: inout T) {
+  // Semantically equivalent to (a, b) = (b, a).
+  // Microoptimized to avoid retain/release traffic.
+  let p1 = Builtin.addressof(&a)
+  let p2 = Builtin.addressof(&b)
+  _debugPrecondition(
+    p1 != p2,
+    "swapping a location with itself is not supported")
+
+  // Take from P1.
+  let tmp: T = Builtin.take(p1)
+  // Transfer P2 into P1.
+  Builtin.initialize(Builtin.take(p2) as T, p1)
+  // Initialize P2.
+  Builtin.initialize(tmp, p2)
+}
 
