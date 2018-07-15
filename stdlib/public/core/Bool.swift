@@ -176,7 +176,6 @@ extension Bool {
 
 extension Bool : CustomStringConvertible {
   /// A textual representation of the Boolean value.
-  @inlinable // FIXME(sil-serialize-all)
   public var description: String {
     return self ? "true" : "false"
   }

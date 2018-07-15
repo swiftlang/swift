@@ -275,7 +275,6 @@ extension AnyHashable : Hashable {
 }
 
 extension AnyHashable : CustomStringConvertible {
-  @inlinable // FIXME(sil-serialize-all)
   public var description: String {
     return String(describing: base)
   }

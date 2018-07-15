@@ -284,7 +284,6 @@ extension Unicode.Scalar :
 
 extension Unicode.Scalar : CustomStringConvertible, CustomDebugStringConvertible {
   /// A textual representation of the Unicode scalar.
-  @inlinable // FIXME(sil-serialize-all)
   public var description: String {
     return String(self)
   }

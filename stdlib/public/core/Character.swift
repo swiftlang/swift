@@ -357,7 +357,6 @@ extension Character
 }
 
 extension Character : CustomStringConvertible {
-  @inlinable // FIXME(sil-serialize-all)
   public var description: String {
     return String(describing: self)
   }

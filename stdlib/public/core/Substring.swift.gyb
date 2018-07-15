@@ -331,7 +331,6 @@ extension Substring : CustomReflectable {
 }
 
 extension Substring : CustomStringConvertible {
-  @inlinable // FIXME(sil-serialize-all)
   public var description: String {
     return String(self)
   }
