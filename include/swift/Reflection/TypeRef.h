@@ -667,63 +667,33 @@ public:
   }
 
   static bool classof(const TypeRef *TR) {
-    auto Kind = TR->getKind();
-    return (Kind == TypeRefKind::UnownedStorage ||
-            Kind == TypeRefKind::WeakStorage ||
-            Kind == TypeRefKind::UnmanagedStorage);
+    switch (TR->getKind()) {
+#define REF_STORAGE(Name, ...) \
+    case TypeRefKind::Name##Storage:
+#include "swift/AST/ReferenceStorage.def"
+      return true;
+    default:
+      return false;
+    }
   }
 };
 
-class UnownedStorageTypeRef final : public ReferenceStorageTypeRef {
-  using ReferenceStorageTypeRef::Profile;
-public:
-  UnownedStorageTypeRef(const TypeRef *Type)
-    : ReferenceStorageTypeRef(TypeRefKind::UnownedStorage, Type) {}
-
-  template <typename Allocator>
-  static const UnownedStorageTypeRef *create(Allocator &A,
-                                             const TypeRef *Type) {
-    FIND_OR_CREATE_TYPEREF(A, UnownedStorageTypeRef, Type);
-  }
-
-  static bool classof(const TypeRef *TR) {
-    return TR->getKind() == TypeRefKind::UnownedStorage;
-  }
-};
-
-class WeakStorageTypeRef final : public ReferenceStorageTypeRef {
-  using ReferenceStorageTypeRef::Profile;
-public:
-  WeakStorageTypeRef(const TypeRef *Type)
-    : ReferenceStorageTypeRef(TypeRefKind::WeakStorage, Type) {}
-
-  template <typename Allocator>
-  static const WeakStorageTypeRef *create(Allocator &A,
-                                          const TypeRef *Type) {
-    FIND_OR_CREATE_TYPEREF(A, WeakStorageTypeRef, Type);
-  }
-
-  static bool classof(const TypeRef *TR) {
-    return TR->getKind() == TypeRefKind::WeakStorage;
-  }
-};
-
-class UnmanagedStorageTypeRef final : public ReferenceStorageTypeRef {
-  using ReferenceStorageTypeRef::Profile;
-public:
-  UnmanagedStorageTypeRef(const TypeRef *Type)
-    : ReferenceStorageTypeRef(TypeRefKind::UnmanagedStorage, Type) {}
-
-  template <typename Allocator>
-  static const UnmanagedStorageTypeRef *create(Allocator &A,
-                                               const TypeRef *Type) {
-    FIND_OR_CREATE_TYPEREF(A, UnmanagedStorageTypeRef, Type);
-  }
-
-  static bool classof(const TypeRef *TR) {
-    return TR->getKind() == TypeRefKind::UnmanagedStorage;
-  }
-};
+#define REF_STORAGE(Name, ...) \
+  class Name##StorageTypeRef final : public ReferenceStorageTypeRef { \
+    using ReferenceStorageTypeRef::Profile; \
+  public: \
+    Name##StorageTypeRef(const TypeRef *Type) \
+      : ReferenceStorageTypeRef(TypeRefKind::Name##Storage, Type) {} \
+    template <typename Allocator> \
+    static const Name##StorageTypeRef *create(Allocator &A, \
+                                              const TypeRef *Type) { \
+      FIND_OR_CREATE_TYPEREF(A, Name##StorageTypeRef, Type); \
+    } \
+    static bool classof(const TypeRef *TR) { \
+      return TR->getKind() == TypeRefKind::Name##Storage; \
+    } \
+  };
+#include "swift/AST/ReferenceStorage.def"
 
 class SILBoxTypeRef final : public TypeRef {
   const TypeRef *BoxedType;

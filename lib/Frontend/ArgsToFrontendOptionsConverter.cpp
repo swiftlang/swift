@@ -322,6 +322,8 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::EmitImportedModules;
   if (Opt.matches(OPT_parse))
     return FrontendOptions::ActionType::Parse;
+  if (Opt.matches(OPT_resolve_imports))
+    return FrontendOptions::ActionType::ResolveImports;
   if (Opt.matches(OPT_typecheck))
     return FrontendOptions::ActionType::Typecheck;
   if (Opt.matches(OPT_dump_parse))
@@ -465,6 +467,12 @@ bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
   if (!FrontendOptions::canActionEmitDependencies(Opts.RequestedAction) &&
       Opts.InputsAndOutputs.hasDependenciesPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_dependencies);
+    return true;
+  }
+  if (!FrontendOptions::canActionEmitReferenceDependencies(Opts.RequestedAction)
+      && Opts.InputsAndOutputs.hasReferenceDependenciesPath()) {
+    Diags.diagnose(SourceLoc(),
+                   diag::error_mode_cannot_emit_reference_dependencies);
     return true;
   }
   if (!FrontendOptions::canActionEmitObjCHeader(Opts.RequestedAction) &&

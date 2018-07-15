@@ -12,8 +12,7 @@
 
 import SwiftShims
 
-@inlinable // FIXME(sil-serialize-all)
-@_transparent
+@usableFromInline @_transparent
 internal func _abstract(
   methodName: StaticString = #function,
   file: StaticString = #file, line: UInt = #line
@@ -59,6 +58,7 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
   ///   of this instance.
   @_effects(releasenone)
   final public func hash(into hasher: inout Hasher) {
+    ObjectIdentifier(type(of: self)).hash(into: &hasher)
     return withBuffer {
       var buffer = $0
       while true {
@@ -478,17 +478,21 @@ internal struct ComputedPropertyID: Hashable {
 @usableFromInline // FIXME(sil-serialize-all)
 @_fixed_layout // FIXME(sil-serialize-all)
 internal struct ComputedArgumentWitnesses {
+  @usableFromInline // FIXME(sil-serialize-all)
   internal typealias Destroy = @convention(thin)
     (_ instanceArguments: UnsafeMutableRawPointer, _ size: Int) -> ()
+  @usableFromInline // FIXME(sil-serialize-all)
   internal typealias Copy = @convention(thin)
     (_ srcInstanceArguments: UnsafeRawPointer,
      _ destInstanceArguments: UnsafeMutableRawPointer,
      _ size: Int) -> ()
+  @usableFromInline // FIXME(sil-serialize-all)
   internal typealias Equals = @convention(thin)
     (_ xInstanceArguments: UnsafeRawPointer,
      _ yInstanceArguments: UnsafeRawPointer,
      _ size: Int) -> Bool
   // FIXME(hasher) Combine to an inout Hasher instead
+  @usableFromInline // FIXME(sil-serialize-all)
   internal typealias Hash = @convention(thin)
     (_ instanceArguments: UnsafeRawPointer,
      _ size: Int) -> Int
@@ -597,7 +601,6 @@ internal enum KeyPathComponent: Hashable {
 
   @_effects(releasenone)
   internal func hash(into hasher: inout Hasher) {
-    var hasher = hasher
     func appendHashFromArgument(
       _ argument: KeyPathComponent.ArgumentRef?
     ) {

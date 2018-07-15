@@ -1,9 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -o %t/a.out_swift3 -swift-version 3
-// RUN: %target-build-swift %s -o %t/a.out_swift4 -swift-version 4
+// RUN: %target-build-swift %s -o %t/a.out
 //
-// RUN: %target-run %t/a.out_swift3
-// RUN: %target-run %t/a.out_swift4
+// RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
@@ -40,7 +38,7 @@ DispatchAPI.test("DispatchGroup creation") {
 }
 
 DispatchAPI.test("Dispatch sync return value") {
-  let value = 24;
+  let value = 24
   let q = DispatchQueue(label: "Test")
   let result = q.sync() { return 24 }
   expectEqual(value, result)
@@ -516,14 +514,8 @@ DispatchAPI.test("DispatchData.bufferUnsafeRawBufferPointer") {
 
 DispatchAPI.test("DispatchIO.initRelativePath") {
 	let q = DispatchQueue(label: "initRelativePath queue")
-#if swift(>=4.0)
 	let chan = DispatchIO(type: .random, path: "_REL_PATH_", oflag: O_RDONLY, mode: 0, queue: q, cleanupHandler: { (error) in })
 	expectEqual(chan, nil)
-#else
-	expectCrashLater()
-	let chan = DispatchIO(type: .random, path: "_REL_PATH_", oflag: O_RDONLY, mode: 0, queue: q, cleanupHandler: { (error) in })
-	chan.setInterval(interval: .seconds(1)) // Dereference of unexpected nil should crash
-#endif
 }
 
 if #available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *) {
@@ -595,11 +587,9 @@ DispatchAPI.test("DispatchTimeInterval") {
 	expectTrue(t == t) // This would crash.
 }
 
-#if swift(>=4.0)
 DispatchAPI.test("DispatchTimeInterval.never.equals") {
 	expectTrue(DispatchTimeInterval.never == DispatchTimeInterval.never)
 	expectTrue(DispatchTimeInterval.seconds(10) != DispatchTimeInterval.never);
 	expectTrue(DispatchTimeInterval.never != DispatchTimeInterval.seconds(10));
 	expectTrue(DispatchTimeInterval.seconds(10) == DispatchTimeInterval.seconds(10));
 }
-#endif

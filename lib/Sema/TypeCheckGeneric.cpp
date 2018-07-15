@@ -307,6 +307,34 @@ bool TypeChecker::validateRequirement(SourceLoc whereLoc, RequirementRepr &req,
   if (req.isInvalid())
     return true;
 
+  // Note that we are resolving within a requirement.
+  options |= TypeResolutionFlags::GenericRequirement;
+
+  // Protocol where clauses cannot add conformance and superclass constraints
+  // to 'Self', because we need to be able to resolve inherited protocols and
+  // protocol superclasses before computing the protocol requirement signature.
+  if (options & TypeResolutionFlags::ProtocolWhereClause) {
+    if (req.getKind() == RequirementReprKind::TypeConstraint ||
+        req.getKind() == RequirementReprKind::LayoutConstraint) {
+      if (auto *subjectTyR = req.getSubjectLoc().getTypeRepr()) {
+        if (auto *componentTyR = dyn_cast<ComponentIdentTypeRepr>(subjectTyR)) {
+          if (componentTyR->getIdentifier() == Context.Id_Self) {
+            diagnose(req.getSubjectLoc().getLoc(),
+                     diag::protocol_where_clause_self_requirement);
+
+            req.getSubjectLoc().setType(ErrorType::get(Context));
+
+            if (req.getKind() == RequirementReprKind::TypeConstraint)
+              req.getConstraintLoc().setType(ErrorType::get(Context));
+
+            req.setInvalid();
+            return true;
+          }
+        }
+      }
+    }
+  }
+
   switch (req.getKind()) {
   case RequirementReprKind::TypeConstraint: {
     // Validate the types.
@@ -424,6 +452,7 @@ TypeChecker::prepareGenericParamList(GenericParamList *gp,
 
   unsigned depth = gp->getDepth();
   for (auto paramDecl : *gp) {
+    checkDeclAttributesEarly(paramDecl);
     paramDecl->setDepth(depth);
     if (!paramDecl->hasAccess())
       paramDecl->setAccess(access);
@@ -458,7 +487,6 @@ static void revertDependentTypeLoc(TypeLoc &tl) {
 void TypeChecker::revertGenericParamList(GenericParamList *genericParams) {
   // Revert the inherited clause of the generic parameter list.
   for (auto param : *genericParams) {
-    param->setCheckedInheritanceClause(false);
     for (auto &inherited : param->getInherited())
       revertDependentTypeLoc(inherited);
   }

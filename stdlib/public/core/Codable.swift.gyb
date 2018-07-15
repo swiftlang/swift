@@ -92,7 +92,6 @@ extension CodingKey {
   }
 
   /// A textual representation of this key, suitable for debugging.
-  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return description
   }
@@ -2178,3 +2177,7 @@ public extension UnkeyedDecodingContainer {
     return try self.decode(T.self)
   }
 }
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

@@ -1545,10 +1545,20 @@ ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo) {
     if (Tok.is(tok::kw_if)) {
       SyntaxParsingContext ElseIfCtxt(SyntaxContext, SyntaxKind::IfStmt);
       ElseBody = parseStmtIf(LabeledStmtInfo());
+    } else if (Tok.is(tok::code_complete)) {
+      if (CodeCompletion)
+        CodeCompletion->completeAfterIfStmt(/*hasElse*/true);
+      Status.setHasCodeCompletion();
+      consumeToken(tok::code_complete);
     } else {
       ElseBody = parseBraceItemList(diag::expected_lbrace_after_else);
     }
     Status |= ElseBody;
+  } else if (Tok.is(tok::code_complete)) {
+    if (CodeCompletion)
+      CodeCompletion->completeAfterIfStmt(/*hasElse*/false);
+    Status.setHasCodeCompletion();
+    consumeToken(tok::code_complete);
   }
 
   return makeParserResult(

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -o - -swift-version 3 | %FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
 
 public class C {
 
@@ -11,7 +11,7 @@ public class C {
   // CHECK: ![[DBG]] = !DILocation(line: 0, scope: ![[CURRY_THUNK]])
   func someHandler() { }
 
-  func doSomethingWithHandler(_ theHandler: ((Void) -> Void)!) -> Void {
+  func doSomethingWithHandler(_ theHandler: (() -> Void)!) -> Void {
 	  theHandler()
   }
 

@@ -5,14 +5,14 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: %target-swift-frontend %s -emit-ir -swift-version 3
+// RUN: %target-swift-frontend %s -emit-ir
 
 // Test case submitted to project by https://github.com/tmu (Teemu Kurppa)
 // rdar://18118173
 
 class a<T : Hashable> {
   var b = [T : Bool]()
-  init<S : Sequence where S.Iterator.Element == T>(_ c: S) {
+  init<S : Sequence>(_ c: S) where S.Iterator.Element == T {
     c.map { self.b[$0] = true }
   }
 }

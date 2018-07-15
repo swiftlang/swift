@@ -271,3 +271,80 @@ class ClassWithLoadableStructWithBiggerString {
         return LoadableStructWithBiggerString(a1: BiggerString(str:"", double:0.0), a2: [], a3: [])
     }
 }
+
+//===----------------------------------------------------------------------===//
+// SR-8076
+//===----------------------------------------------------------------------===//
+public typealias sr8076_Filter = (BigStruct) -> Bool
+
+public protocol sr8076_Query {
+    associatedtype Returned
+}
+
+public protocol sr8076_ProtoQueryHandler {
+    func forceHandle_1<Q: sr8076_Query>(query: Q) -> Void
+    func forceHandle_2<Q: sr8076_Query>(query: Q) -> (Q.Returned, BigStruct?)
+    func forceHandle_3<Q: sr8076_Query>(query: Q) -> (Q.Returned, sr8076_Filter?)
+    func forceHandle_4<Q: sr8076_Query>(query: Q) throws -> (Q.Returned, sr8076_Filter?)
+}
+
+public protocol sr8076_QueryHandler: sr8076_ProtoQueryHandler {
+    associatedtype Handled: sr8076_Query
+    func handle_1(query: Handled) -> Void
+    func handle_2(query: Handled) -> (Handled.Returned, BigStruct?)
+    func handle_3(query: Handled) -> (Handled.Returned, sr8076_Filter?)
+    func handle_4(query: Handled) throws -> (Handled.Returned, sr8076_Filter?)
+}
+
+
+public extension sr8076_QueryHandler {
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S22big_types_corner_cases19sr8076_QueryHandlerPAAE13forceHandle_15queryyqd___tAA0e1_F0Rd__lF"(%swift.opaque* noalias nocapture, %swift.type*{{.*}}, %swift.type*{{.*}}, i8** {{.*}}.sr8076_QueryHandler, i8** {{.*}}.sr8076_Query, %swift.opaque* noalias nocapture swiftself)
+// CHECK: call swiftcc void {{.*}}(%swift.opaque* noalias nocapture {{.*}}, %swift.refcounted* swiftself {{.*}})
+// CHECK: ret void
+    func forceHandle_1<Q: sr8076_Query>(query: Q) -> Void {
+        guard let body = handle_1 as? (Q) -> Void else {
+            fatalError("handler \(self) is expected to handle query \(query)")
+        }
+        body(query)
+    }
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S22big_types_corner_cases19sr8076_QueryHandlerPAAE13forceHandle_25query8ReturnedQyd___AA9BigStructVSgtqd___tAA0e1_F0Rd__lF"(%T22big_types_corner_cases9BigStructVSg* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type*{{.*}}, %swift.type*{{.*}}, i8** {{.*}}.sr8076_QueryHandler, i8** {{.*}}.sr8076_Query, %swift.opaque* noalias nocapture swiftself)
+// CHECK: [[ALLOC:%.*]] = alloca %T22big_types_corner_cases9BigStructVSg
+// CHECK: call swiftcc void {{.*}}(%T22big_types_corner_cases9BigStructVSg* noalias nocapture sret [[ALLOC]], %swift.opaque* noalias nocapture {{.*}}, %swift.opaque* noalias nocapture {{.*}}, %swift.refcounted* swiftself {{.*}})
+// CHECK: ret void
+    func forceHandle_2<Q: sr8076_Query>(query: Q) -> (Q.Returned, BigStruct?) {
+        guard let body = handle_2 as? (Q) -> (Q.Returned, BigStruct?) else {
+            fatalError("handler \(self) is expected to handle query \(query)")
+        }
+        return body(query)
+    }
+
+// CHECK-LABEL-64: define{{( dllexport)?}}{{( protected)?}} swiftcc { i64, i64 } @"$S22big_types_corner_cases19sr8076_QueryHandlerPAAE13forceHandle_35query8ReturnedQyd___SbAA9BigStructVcSgtqd___tAA0e1_F0Rd__lF"(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type*{{.*}}, %swift.type*{{.*}}, i8** {{.*}}.sr8076_QueryHandler, i8** {{.*}}.sr8076_Query, %swift.opaque* noalias nocapture swiftself)
+// CHECK-64: {{.*}} = call swiftcc { i64, i64 } {{.*}}(%swift.opaque* noalias nocapture {{.*}}, %swift.opaque* noalias nocapture {{.*}}, %swift.refcounted* swiftself {{.*}})
+// CHECK-64: ret { i64, i64 }
+
+// CHECK-LABEL-32: define{{( dllexport)?}}{{( protected)?}} swiftcc { i32, i32} @"$S22big_types_corner_cases19sr8076_QueryHandlerPAAE13forceHandle_35query8ReturnedQyd___SbAA9BigStructVcSgtqd___tAA0e1_F0Rd__lF"(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type*{{.*}}, %swift.type*{{.*}}, i8** {{.*}}.sr8076_QueryHandler, i8** {{.*}}.sr8076_Query, %swift.opaque* noalias nocapture swiftself)
+// CHECK-32: {{.*}} = call swiftcc { i32, i32 } {{.*}}(%swift.opaque* noalias nocapture {{.*}}, %swift.opaque* noalias nocapture {{.*}}, %swift.refcounted* swiftself {{.*}})
+// CHECK-32: ret { i32, i32 }
+    func forceHandle_3<Q: sr8076_Query>(query: Q) -> (Q.Returned, sr8076_Filter?) {
+        guard let body = handle_3 as? (Q) -> (Q.Returned, sr8076_Filter?) else {
+            fatalError("handler \(self) is expected to handle query \(query)")
+        }
+        return body(query)
+    }
+
+// CHECK-LABEL-64: define{{( dllexport)?}}{{( protected)?}} swiftcc { i64, i64 } @"$S22big_types_corner_cases19sr8076_QueryHandlerPAAE13forceHandle_45query8ReturnedQyd___SbAA9BigStructVcSgtqd___tKAA0e1_F0Rd__lF"(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type*{{.*}}, %swift.type*{{.*}}, i8** {{.*}}.sr8076_QueryHandler, i8** {{.*}}.sr8076_Query, %swift.opaque* noalias nocapture swiftself, %swift.error** swifterror)
+// CHECK-64: {{.*}} = call swiftcc { i64, i64 } {{.*}}(%swift.opaque* noalias nocapture {{.*}}, %swift.opaque* noalias nocapture {{.*}}, %swift.refcounted* swiftself {{.*}}, %swift.error** nocapture swifterror {{.*}})
+// CHECK-64: ret { i64, i64 }
+
+// CHECK-LABEL-32: define{{( dllexport)?}}{{( protected)?}} swiftcc { i32, i32} @"$S22big_types_corner_cases19sr8076_QueryHandlerPAAE13forceHandle_45query8ReturnedQyd___SbAA9BigStructVcSgtqd___tKAA0e1_F0Rd__lF"(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type*{{.*}}, %swift.type*{{.*}}, i8** {{.*}}.sr8076_QueryHandler, i8** {{.*}}.sr8076_Query, %swift.opaque* noalias nocapture swiftself, %swift.error** swifterror)
+// CHECK-32: {{.*}} = call swiftcc { i32, i32 } {{.*}}(%swift.opaque* noalias nocapture {{.*}}, %swift.opaque* noalias nocapture {{.*}}, %swift.refcounted* swiftself {{.*}}, %swift.error** nocapture {{.*}})
+// CHECK-32: ret { i32, i32 }
+    func forceHandle_4<Q: sr8076_Query>(query: Q) throws -> (Q.Returned, sr8076_Filter?) {
+        guard let body = handle_4 as? (Q) throws -> (Q.Returned, sr8076_Filter?) else {
+            fatalError("handler \(self) is expected to handle query \(query)")
+        }
+        return try body(query)
+    }
+}

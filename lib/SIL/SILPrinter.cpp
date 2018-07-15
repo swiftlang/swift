@@ -1344,29 +1344,21 @@ public:
     printDebugVar(DVAI->getVarInfo());
   }
 
-  void visitLoadUnownedInst(LoadUnownedInst *LI) {
-    if (LI->isTake())
-      *this << "[take] ";
-    *this << getIDAndType(LI->getOperand());
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  void visitLoad##Name##Inst(Load##Name##Inst *LI) { \
+    if (LI->isTake()) \
+      *this << "[take] "; \
+    *this << getIDAndType(LI->getOperand()); \
+  } \
+  void visitStore##Name##Inst(Store##Name##Inst *SI) { \
+    *this << Ctx.getID(SI->getSrc()) << " to "; \
+    if (SI->isInitializationOfDest()) \
+      *this << "[initialization] "; \
+    *this << getIDAndType(SI->getDest()); \
   }
-  void visitStoreUnownedInst(StoreUnownedInst *SI) {
-    *this << Ctx.getID(SI->getSrc()) << " to ";
-    if (SI->isInitializationOfDest())
-      *this << "[initialization] ";
-    *this << getIDAndType(SI->getDest());
-  }
-
-  void visitLoadWeakInst(LoadWeakInst *LI) {
-    if (LI->isTake())
-      *this << "[take] ";
-    *this << getIDAndType(LI->getOperand());
-  }
-  void visitStoreWeakInst(StoreWeakInst *SI) {
-    *this << Ctx.getID(SI->getSrc()) << " to ";
-    if (SI->isInitializationOfDest())
-      *this << "[initialization] ";
-    *this << getIDAndType(SI->getDest());
-  }
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
+#include "swift/AST/ReferenceStorage.def"
 
   void visitCopyAddrInst(CopyAddrInst *CI) {
     if (CI->isTakeOfSrc())
@@ -1491,18 +1483,15 @@ public:
   void visitRawPointerToRefInst(RawPointerToRefInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand());
   }
-  void visitRefToUnownedInst(RefToUnownedInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand());
+
+#define LOADABLE_REF_STORAGE(Name, ...) \
+  void visitRefTo##Name##Inst(RefTo##Name##Inst *CI) { \
+    printUncheckedConversionInst(CI, CI->getOperand()); \
+  } \
+  void visit##Name##ToRefInst(Name##ToRefInst *CI) { \
+    printUncheckedConversionInst(CI, CI->getOperand()); \
   }
-  void visitUnownedToRefInst(UnownedToRefInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand());
-  }
-  void visitRefToUnmanagedInst(RefToUnmanagedInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand());
-  }
-  void visitUnmanagedToRefInst(UnmanagedToRefInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand());
-  }
+#include "swift/AST/ReferenceStorage.def"
   void visitThinToThickFunctionInst(ThinToThickFunctionInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand());
   }
@@ -1539,9 +1528,11 @@ public:
     *this << getIDAndType(I->getOperand());
   }
 
-  void visitCopyUnownedValueInst(CopyUnownedValueInst *I) {
-    *this << getIDAndType(I->getOperand());
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  void visitCopy##Name##ValueInst(Copy##Name##ValueInst *I) { \
+    *this << getIDAndType(I->getOperand()); \
   }
+#include "swift/AST/ReferenceStorage.def"
 
   void visitDestroyValueInst(DestroyValueInst *I) {
     *this << getIDAndType(I->getOperand());
@@ -2141,6 +2132,16 @@ public:
         *this << " : "
               << component.getSubscriptIndexHash()->getLoweredType();
       }
+      
+      if (auto external = component.getExternalDecl()) {
+        *this << ", external #";
+        printValueDecl(external, PrintState.OS);
+        auto subs = component.getExternalSubstitutions();
+        if (!subs.empty()) {
+          printSubstitutions(subs);
+        }
+      }
+      
       break;
     }
     case KeyPathPatternComponent::Kind::OptionalWrap:
@@ -2161,30 +2162,6 @@ public:
       }
       *this << component.getComponentType();
       break;
-    }
-    case KeyPathPatternComponent::Kind::External: {
-      *this << "external #";
-      printValueDecl(component.getExternalDecl(), PrintState.OS);
-      if (!component.getExternalSubstitutions().empty()) {
-        printSubstitutions(component.getExternalSubstitutions());
-      }
-      
-      if (!component.getSubscriptIndices().empty()) {
-        printComponentIndices(component.getSubscriptIndices());
-      }
-      
-      *this << " : $" << component.getComponentType();
-      
-      if (!component.getSubscriptIndices().empty()) {
-        *this << ", indices_equals ";
-        component.getSubscriptIndexEquals()->printName(PrintState.OS);
-        *this << " : "
-              << component.getSubscriptIndexEquals()->getLoweredType();
-        *this << ", indices_hash ";
-        component.getSubscriptIndexHash()->printName(PrintState.OS);
-        *this << " : "
-              << component.getSubscriptIndexHash()->getLoweredType();
-      }
     }
     }
   }
@@ -2326,6 +2303,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   switch (isThunk()) {
   case IsNotThunk: break;
   case IsThunk: OS << "[thunk] "; break;
+  case IsSignatureOptimizedThunk:
+    OS << "[signature_optimized_thunk] ";
+    break;
   case IsReabstractionThunk: OS << "[reabstraction_thunk] "; break;
   }
 

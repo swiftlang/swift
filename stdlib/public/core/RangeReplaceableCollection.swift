@@ -14,15 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A type that supports replacement of an arbitrary subrange of elements with
-/// the elements of another collection.
-///
-/// In most cases, it's best to ignore this protocol and use the
-/// `RangeReplaceableCollection` protocol instead, because it has a more
-/// complete interface.
-@available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'RandomAccessCollection' instead")
-public typealias RangeReplaceableIndexable = RangeReplaceableCollection
-
 /// A collection that supports replacement of an arbitrary subrange of elements
 /// with the elements of another collection.
 ///

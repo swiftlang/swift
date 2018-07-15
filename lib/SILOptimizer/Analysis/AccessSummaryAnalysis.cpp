@@ -68,13 +68,15 @@ void AccessSummaryAnalysis::processArgument(FunctionInfo *info,
     switch (user->getKind()) {
     case SILInstructionKind::BeginAccessInst: {
       auto *BAI = cast<BeginAccessInst>(user);
-      const IndexTrieNode *subPath = findSubPathAccessed(BAI);
-      summary.mergeWith(BAI->getAccessKind(), BAI->getLoc(), subPath);
-      // We don't add the users of the begin_access to the worklist because
-      // even if these users eventually begin an access to the address
-      // or a projection from it, that access can't begin more exclusive
-      // access than this access -- otherwise it will be diagnosed
-      // elsewhere.
+      if (BAI->getEnforcement() != SILAccessEnforcement::Unsafe) {
+        const IndexTrieNode *subPath = findSubPathAccessed(BAI);
+        summary.mergeWith(BAI->getAccessKind(), BAI->getLoc(), subPath);
+        // We don't add the users of the begin_access to the worklist because
+        // even if these users eventually begin an access to the address
+        // or a projection from it, that access can't begin more exclusive
+        // access than this access -- otherwise it will be diagnosed
+        // elsewhere.
+      }
       break;
     }
     case SILInstructionKind::EndUnpairedAccessInst:

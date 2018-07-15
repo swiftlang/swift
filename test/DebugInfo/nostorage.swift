@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -o %t -swift-version 3
+// RUN: %target-swift-frontend %s -emit-ir -g -o %t
 // RUN: cat %t | %FileCheck %s --check-prefix=CHECK1
 // RUN: cat %t | %FileCheck %s --check-prefix=CHECK2
 // RUN: cat %t | %FileCheck %s --check-prefix=CHECK3
@@ -15,7 +15,7 @@ public class Foo {
       // CHECK1-SAME:                         type: ![[METAFOO:[0-9]+]]
       // CHECK1: ![[METAFOO]] = !DICompositeType(tag: DW_TAG_structure_type,
       // CHECK1-SAME:                            flags:
-            let type = type(of: self)
+            let type = Swift.type(of: self)
             used(type)
         }()
     }

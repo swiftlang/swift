@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -o - -swift-version 3 | %FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
 class A {
     init(handler: (() -> ())) { }
 }
@@ -15,7 +15,7 @@ func function() {
   // CHECK: call void @llvm.dbg.{{.*}}(metadata %swift.weak*
   // CHECK-NOT:                        metadata [[B]]
   // CHECK: call
-    A(handler: { [weak b] _ in
+    A(handler: { [weak b] in
             if b != nil { }
         })
 }

@@ -154,7 +154,6 @@ public:
                                     VarDecl *field, SILType resultTy);
 
   using SILBuilder::createCopyValue;
-  using SILBuilder::createCopyUnownedValue;
 
   /// Emit a +1 copy on \p originalValue that lives until the end of the current
   /// lexical scope.
@@ -179,11 +178,15 @@ public:
   ManagedValue createFormalAccessCopyValue(SILLocation loc,
                                            ManagedValue originalValue);
 
-  ManagedValue createCopyUnownedValue(SILLocation loc,
-                                      ManagedValue originalValue);
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  using SILBuilder::createCopy##Name##Value; \
+  ManagedValue createCopy##Name##Value(SILLocation loc, \
+                                       ManagedValue originalValue);
+#define UNCHECKED_REF_STORAGE(Name, ...) \
+  ManagedValue createUnsafeCopy##Name##Value(SILLocation loc, \
+                                             ManagedValue originalValue);
+#include "swift/AST/ReferenceStorage.def"
 
-  ManagedValue createUnsafeCopyUnownedValue(SILLocation loc,
-                                            ManagedValue originalValue);
   ManagedValue createOwnedPHIArgument(SILType type);
   ManagedValue createGuaranteedPHIArgument(SILType type);
 

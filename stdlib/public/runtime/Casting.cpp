@@ -2701,7 +2701,7 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
                 (HeapObject *)srcObject, (OpaqueValue *)optDestBuffer,
                 targetType, targetType, targetBridgeWitness);
   }
-  SWIFT_CC_PLUSZERO_GUARD(swift_unknownRelease(srcObject));
+  swift_unknownRelease(srcObject);
 
   // If we succeeded, take from the optional buffer into the
   // destination buffer.
@@ -2941,6 +2941,12 @@ static bool tryBridgeNonVerbatimFromObjectiveCUniversal(
       return true;
     }
   }
+  // Try to bridge NSError to Error.
+  if (tryDynamicCastNSErrorObjectToValue(sourceValue, destValue, nativeType,
+                                         DynamicCastFlags::Default)) {
+    return true;
+  }
+
   
   return false;
 }
@@ -3010,7 +3016,6 @@ _bridgeNonVerbatimFromObjectiveCConditional(
 
   // Local function that releases the source and returns false.
   auto fail = [&] () -> bool {
-    SWIFT_CC_PLUSONE_GUARD(swift_unknownRelease(sourceValue));
     return false;
   };
   

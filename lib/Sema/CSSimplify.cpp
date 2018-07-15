@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -664,11 +664,8 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
     // Check if exactly one argument was passed to this function, otherwise
     // we obviously have a mismatch.
     if (auto tupleArgType = dyn_cast<TupleType>(argType.getPointer())) {
-      // Total hack: In Swift 3 mode, argument labels are ignored when calling
-      // function type with a single Any parameter.
       if (tupleArgType->getNumElements() != 1 ||
-          (!cs.getASTContext().isSwiftVersion3() &&
-           tupleArgType->getElement(0).hasName())) {
+          tupleArgType->getElement(0).hasName()) {
         return cs.getTypeMatchFailure(locator);
       }
     }
@@ -704,21 +701,6 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
   llvm::SmallBitVector defaultMap =
     computeDefaultMap(params, callee, calleeLevel);
   
-  if (callee && cs.getASTContext().isSwiftVersion3()
-      && argType->is<TupleType>()) {
-    // Hack: In Swift 3 mode, accept `foo(x, y)` for `foo((x, y))` when the
-    // callee is a function-typed property or an enum constructor whose
-    // argument is a single unlabeled type parameter.
-    if (auto *prop = dyn_cast<VarDecl>(callee)) {
-      auto *fnType = prop->getInterfaceType()->getAs<AnyFunctionType>();
-      if (fnType && fnType->getInput()->isTypeParameter())
-        argType = ParenType::get(cs.getASTContext(), argType);
-    } else if (auto *enumCtor = dyn_cast<EnumElementDecl>(callee)) {
-      if (enumCtor->getArgumentInterfaceType()->isTypeParameter())
-        argType = ParenType::get(cs.getASTContext(), argType);
-    }
-  }
-
   // Extract the arguments.
   auto args = decomposeArgType(argType, argLabels);
   
@@ -1154,7 +1136,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   // arity).
   auto func1Input = func1->getInput();
   auto func2Input = func2->getInput();
-  if (!getASTContext().isSwiftVersion3()) {
+  {
     SmallVector<LocatorPathElt, 4> path;
     locator.getLocatorParts(path);
 
@@ -1387,16 +1369,24 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
     }
   }
 
-  if (layout.superclass) {
+  if (layout.explicitSuperclass) {
     auto subKind = std::min(ConstraintKind::Subtype, kind);
-    auto result = matchTypes(type1, layout.superclass, subKind, subflags,
-                             locator);
+    auto result = matchTypes(type1, layout.explicitSuperclass, subKind,
+                             subflags, locator);
     if (result.isFailure())
       return result;
   }
 
   for (auto *proto : layout.getProtocols()) {
     auto *protoDecl = proto->getDecl();
+
+    if (auto superclass = protoDecl->getSuperclass()) {
+      auto subKind = std::min(ConstraintKind::Subtype, kind);
+      auto result = matchTypes(type1, superclass, subKind,
+                               subflags, locator);
+      if (result.isFailure())
+        return result;
+    }
 
     switch (simplifyConformsToConstraint(type1, protoDecl, kind, locator,
                                          subflags)) {
@@ -1429,10 +1419,16 @@ static bool isStringCompatiblePointerBaseType(TypeChecker &TC,
 /// Determine whether the first type with the given number of optionals
 /// is potentially more optional than the second type with its number of
 /// optionals.
-static bool isPotentiallyMoreOptionalThan(Type objType1,
-                                          unsigned numOptionals1,
-                                          Type objType2,
-                                          unsigned numOptionals2) {
+static bool isPotentiallyMoreOptionalThan(Type type1, Type type2) {
+
+  SmallVector<Type, 2> optionals1;
+  Type objType1 = type1->lookThroughAllOptionalTypes(optionals1);
+  auto numOptionals1 = optionals1.size();
+
+  SmallVector<Type, 2> optionals2;
+  type2->lookThroughAllOptionalTypes(optionals2);
+  auto numOptionals2 = optionals2.size();
+
   if (numOptionals1 <= numOptionals2 && !objType1->isTypeVariableOrMember())
     return false;
 
@@ -1444,22 +1440,12 @@ static void enumerateOptionalConversionRestrictions(
                     Type type1, Type type2,
                     ConstraintKind kind, ConstraintLocatorBuilder locator,
                     llvm::function_ref<void(ConversionRestrictionKind)> fn) {
-  SmallVector<Type, 2> optionals1;
-  Type objType1 = type1->lookThroughAllOptionalTypes(optionals1);
-
-  SmallVector<Type, 2> optionals2;
-  Type objType2 = type2->lookThroughAllOptionalTypes(optionals2);
-
-  if (optionals1.empty() && optionals2.empty())
-    return;
-
   // Optional-to-optional.
-  if (!optionals1.empty() && !optionals2.empty())
+  if (type1->getOptionalObjectType() && type2->getOptionalObjectType())
     fn(ConversionRestrictionKind::OptionalToOptional);
 
   // Inject a value into an optional.
-  if (isPotentiallyMoreOptionalThan(objType2, optionals2.size(),
-                                    objType1, optionals1.size())) {
+  if (isPotentiallyMoreOptionalThan(type2, type1)) {
     fn(ConversionRestrictionKind::ValueToOptional);
   }
 }
@@ -1569,13 +1555,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // types of two function types, we have to be careful to preserve
   // ParenType sugar.
   bool isArgumentTupleMatch = isArgumentTupleConversion;
-  bool isSwiftVersion3 = getASTContext().isSwiftVersion3();
 
-  // ... but not in Swift 3 mode, where this behavior was broken.
-  if (!isSwiftVersion3)
-    if (auto elt = locator.last())
-      if (elt->getKind() == ConstraintLocator::FunctionArgument)
-        isArgumentTupleMatch = true;
+  if (auto elt = locator.last())
+    if (elt->getKind() == ConstraintLocator::FunctionArgument)
+      isArgumentTupleMatch = true;
 
   // If we have type variables that have been bound to fixed types, look through
   // to the fixed type.
@@ -1587,8 +1570,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   auto desugar1 = type1->getDesugaredType();
   auto desugar2 = type2->getDesugaredType();
   TypeVariableType *typeVar1, *typeVar2;
-  if (isArgumentTupleMatch &&
-      !isSwiftVersion3) {
+  if (isArgumentTupleMatch) {
     typeVar1 = dyn_cast<TypeVariableType>(type1.getPointer());
     typeVar2 = dyn_cast<TypeVariableType>(type2.getPointer());
 
@@ -1773,8 +1755,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     return formUnsolvedResult();
   }
 
-  if (isArgumentTupleMatch &&
-      !isSwiftVersion3) {
+  if (isArgumentTupleMatch) {
     if (!typeVar1 && !typeVar2) {
       if (type1->hasParenSugar() != type2->hasParenSugar()) {
         return getTypeMatchFailure(locator);
@@ -2849,7 +2830,6 @@ ConstraintSystem::simplifyCheckedCastConstraint(
 
   case CheckedCastKind::Coercion:
   case CheckedCastKind::BridgingCoercion:
-  case CheckedCastKind::Swift3BridgingDowncast:
   case CheckedCastKind::Unresolved:
     llvm_unreachable("Not a valid result");
   }
@@ -3541,26 +3521,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
 
   // If the lookup found no hits at all (either viable or unviable), diagnose it
   // as such and try to recover in various ways.
-
-  auto instanceTy = baseObjTy;
-  if (auto MTT = instanceTy->getAs<MetatypeType>())
-    instanceTy = MTT->getInstanceType();
-  
-  // Value member lookup has some hacks too.
   if (shouldAttemptFixes() && baseObjTy->getOptionalObjectType()) {
     // If the base type was an optional, look through it.
-    
-    // Determine whether or not we want to provide an optional chaining fixit or
-    // a force unwrap fixit.
-    bool optionalChain;
-    if (!getContextualType())
-      optionalChain = !(Options & ConstraintSystemFlags::PreferForceUnwrapToOptional);
-    else
-      optionalChain = !getContextualType()->getOptionalObjectType().isNull();
-    auto fixKind = optionalChain ? FixKind::OptionalChaining : FixKind::ForceOptional;
 
-    // Note the fix.
-    if (recordFix(fixKind, locator))
+    // We're unwrapping the base to perform a member access.
+    if (recordFix(Fix::getUnwrapOptionalBase(*this, member), locator))
       return SolutionKind::Error;
     
     // Look through one level of optional.
@@ -3760,10 +3725,7 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
       // Bridging NSNumber to NSValue is one-way, since there are multiple Swift
       // value types that bridge to those object types. It requires a checked
       // cast to get back.
-      // We accepted these coercions in Swift 3 mode, so we have to live with
-      // them (but give a warning) in that language mode.
-      if (!TC.Context.LangOpts.isSwiftVersion3()
-          && TC.Context.isObjCClassWithMultipleSwiftBridgedTypes(objcClass))
+      if (TC.Context.isObjCClassWithMultipleSwiftBridgedTypes(objcClass))
         return SolutionKind::Error;
 
       // If the bridged value type is generic, the generic arguments
@@ -5117,8 +5079,8 @@ ConstraintSystem::simplifyFixConstraint(Fix fix, Type type1, Type type2,
     getDefaultDecompositionOptions(flags) | TMF_ApplyingFix;
   switch (fix.getKind()) {
   case FixKind::ForceOptional:
-  case FixKind::OptionalChaining: {
-    // Assume that '!' was applied to the first type.
+  case FixKind::UnwrapOptionalBase: {
+    // Assume that we've unwrapped the first type.
     auto result =
         matchTypes(type1->getRValueObjectType()->getOptionalObjectType(), type2,
                    matchKind, subflags, locator);

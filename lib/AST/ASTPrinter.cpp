@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -740,6 +740,16 @@ void PrintAST::printAttributes(const Decl *D) {
     Options.ExcludeAttrList.push_back(DAK_Final);
   }
 
+  // If the declaration is implicitly @objc, print the attribute now.
+  if (Options.PrintImplicitAttrs) {
+    if (auto VD = dyn_cast<ValueDecl>(D)) {
+      if (VD->isObjC() && !VD->getAttrs().hasAttribute<ObjCAttr>()) {
+        Printer.printAttrName("@objc");
+        Printer << " ";
+      }
+    }
+  }
+
   D->getAttrs().print(Printer, Options, D);
 
   Options.ExcludeAttrList.resize(originalExcludeAttrCount);
@@ -1400,57 +1410,54 @@ static bool isAccessorAssumedNonMutating(AccessorDecl *accessor) {
   llvm_unreachable("bad addressor kind");
 }
 
-static StringRef getAddressorLabel(AccessorDecl *addressor) {
-  switch (addressor->getAddressorKind()) {
-  case AddressorKind::NotAddressor:
-    llvm_unreachable("addressor claims not to be an addressor");
-  case AddressorKind::Unsafe:
-    return "unsafeAddress";
-  case AddressorKind::Owning:
-    return "addressWithOwner";
-  case AddressorKind::NativeOwning:
-    return "addressWithNativeOwner";
-  case AddressorKind::NativePinning:
-    return "addressWithPinnedNativeOwner";
-  }
-  llvm_unreachable("bad addressor kind");
-}
+static StringRef getAccessorLabel(AccessorDecl *accessor) {
+  switch (accessor->getAccessorKind()) {
+#define SINGLETON_ACCESSOR(ID, KEYWORD) \
+  case AccessorKind::ID: return #KEYWORD;
+#define ACCESSOR(ID)
+#include "swift/AST/AccessorKinds.def"
 
-static StringRef getMutableAddressorLabel(AccessorDecl *addressor) {
-  switch (addressor->getAddressorKind()) {
-  case AddressorKind::NotAddressor:
-    llvm_unreachable("addressor claims not to be an addressor");
-  case AddressorKind::Unsafe:
-    return "unsafeMutableAddress";
-  case AddressorKind::Owning:
-    return "mutableAddressWithOwner";
-  case AddressorKind::NativeOwning:
-    return "mutableAddressWithNativeOwner";
-  case AddressorKind::NativePinning:
-    return "mutableAddressWithPinnedNativeOwner";
+  case AccessorKind::Address:
+    switch (accessor->getAddressorKind()) {
+    case AddressorKind::NotAddressor: llvm_unreachable("bad combination");
+#define IMMUTABLE_ADDRESSOR(ID, KEYWORD) \
+    case AddressorKind::ID: return #KEYWORD;
+#define ACCESSOR(ID)
+#include "swift/AST/AccessorKinds.def"
+    }
+    llvm_unreachable("bad addressor kind");
+
+  case AccessorKind::MutableAddress:
+    switch (accessor->getAddressorKind()) {
+    case AddressorKind::NotAddressor: llvm_unreachable("bad combination");
+#define MUTABLE_ADDRESSOR(ID, KEYWORD) \
+    case AddressorKind::ID: return #KEYWORD;
+#define ACCESSOR(ID)
+#include "swift/AST/AccessorKinds.def"
+    }
+    llvm_unreachable("bad addressor kind");
   }
-  llvm_unreachable("bad addressor kind");
+  llvm_unreachable("bad accessor kind");
 }
 
 void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
   if (isa<VarDecl>(ASD) && !Options.PrintPropertyAccessors)
     return;
 
-  auto storageKind = ASD->getStorageKind();
-
   // Never print anything for stored properties.
-  if (storageKind == AbstractStorageDecl::Stored)
+  if (ASD->getAllAccessors().empty())
     return;
+
+  auto impl = ASD->getImplInfo();
 
   // Treat StoredWithTrivialAccessors the same as Stored unless
   // we're printing for SIL, in which case we want to distinguish it
   // from a pure stored property.
-  if (storageKind == AbstractStorageDecl::StoredWithTrivialAccessors) {
-    if (!Options.PrintForSIL) return;
-
-    // Don't print an accessor for a let; the parser can't handle it.
-    if (isa<VarDecl>(ASD) && cast<VarDecl>(ASD)->isLet())
-      return;
+  if (impl.isSimpleStored()) {
+    if (Options.PrintForSIL) {
+      Printer << " { get " << (impl.supportsMutation() ? "set }" : "}");
+    }
+    return;
   }
 
   // We sometimes want to print the accessors abstractly
@@ -1496,22 +1503,23 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
 
   // Honor !Options.PrintGetSetOnRWProperties in the only remaining
   // case where we could end up printing { get set }.
-  if (storageKind == AbstractStorageDecl::StoredWithTrivialAccessors ||
-      storageKind == AbstractStorageDecl::Computed) {
-    if (!Options.PrintGetSetOnRWProperties &&
-        !Options.FunctionDefinitions &&
-        ASD->getSetter() &&
-        !ASD->getGetter()->isMutating() &&
-        !ASD->getSetter()->isExplicitNonMutating()) {
-      return;
-    }
+  if ((impl.getReadImpl() == ReadImplKind::Stored ||
+       impl.getReadImpl() == ReadImplKind::Get) &&
+      (impl.getWriteImpl() == WriteImplKind::Stored ||
+       impl.getWriteImpl() == WriteImplKind::Set) &&
+      (impl.getReadWriteImpl() == ReadWriteImplKind::MaterializeToTemporary) &&
+      !Options.PrintGetSetOnRWProperties &&
+      !Options.FunctionDefinitions &&
+      !ASD->getGetter()->isMutating() &&
+      !ASD->getSetter()->isExplicitNonMutating()) {
+    return;
   }
 
   // Otherwise, print all the concrete defining accessors.
 
   bool PrintAccessorBody = Options.FunctionDefinitions || Options.FunctionBody;
 
-  auto PrintAccessor = [&](AccessorDecl *Accessor, StringRef Label) {
+  auto PrintAccessor = [&](AccessorDecl *Accessor) {
     if (!Accessor)
       return;
     if (!PrintAccessorBody) {
@@ -1527,7 +1535,7 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
         }
       }
       Printer << " ";
-      Printer.printKeyword(Label); // Contextual keyword get, set, ...
+      Printer.printKeyword(getAccessorLabel(Accessor));
     } else {
       Printer.printNewline();
       IndentRAII IndentMore(*this);
@@ -1536,59 +1544,49 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
     }
   };
 
-  auto PrintAddressor = [&](AccessorDecl *accessor) {
-    if (!accessor) return;
-    PrintAccessor(accessor, getAddressorLabel(accessor));
-  };
-
-  auto PrintMutableAddressor = [&](AccessorDecl *accessor) {
-    if (!accessor) return;
-    PrintAccessor(accessor, getMutableAddressorLabel(accessor));
-  };
-
   Printer << " {";
-  switch (storageKind) {
-  case AbstractStorageDecl::Stored:
-    llvm_unreachable("filtered out above!");
-
-  case AbstractStorageDecl::StoredWithTrivialAccessors:
-  case AbstractStorageDecl::Computed:
-    if (ASD->getGetter() && !ASD->getSetter() && PrintAccessorBody &&
-          !Options.FunctionDefinitions) {
-      // Omit the 'get' keyword. Directly print getter
-      if (auto BodyFunc = Options.FunctionBody) {
-        Printer.printNewline();
-        IndentRAII IndentBody(*this);
-        indent();
-        Printer << BodyFunc(ASD->getGetter());
-      }
-    } else {
-      PrintAccessor(ASD->getGetter(), "get");
-      PrintAccessor(ASD->getSetter(), "set");
+  if (impl.getReadImpl() == ReadImplKind::Get && ASD->getGetter() &&
+      !ASD->supportsMutation() &&
+      PrintAccessorBody && !Options.FunctionDefinitions) {
+    // Omit the 'get' keyword. Directly print getter
+    if (auto BodyFunc = Options.FunctionBody) {
+      Printer.printNewline();
+      IndentRAII IndentBody(*this);
+      indent();
+      Printer << BodyFunc(ASD->getGetter());
+    }    
+  } else {
+    switch (impl.getReadImpl()) {
+    case ReadImplKind::Stored:
+    case ReadImplKind::Inherited:
+      break;
+    case ReadImplKind::Get:
+      PrintAccessor(ASD->getGetter());
+      break;
+    case ReadImplKind::Address:
+      PrintAccessor(ASD->getAddressor());
+      break;
     }
-    break;
-
-  case AbstractStorageDecl::StoredWithObservers:
-  case AbstractStorageDecl::InheritedWithObservers:
-    PrintAccessor(ASD->getWillSetFunc(), "willSet");
-    PrintAccessor(ASD->getDidSetFunc(), "didSet");
-    break;
-
-  case AbstractStorageDecl::Addressed:
-  case AbstractStorageDecl::AddressedWithTrivialAccessors:
-  case AbstractStorageDecl::AddressedWithObservers:
-    PrintAddressor(ASD->getAddressor());
-    PrintMutableAddressor(ASD->getMutableAddressor());
-    if (ASD->hasObservers()) {
-      PrintAccessor(ASD->getWillSetFunc(), "willSet");
-      PrintAccessor(ASD->getDidSetFunc(), "didSet");
+    switch (impl.getWriteImpl()) {
+    case WriteImplKind::Immutable:
+      break;
+    case WriteImplKind::Stored:
+      llvm_unreachable("simply-stored variable should have been filtered out");
+    case WriteImplKind::StoredWithObservers:
+    case WriteImplKind::InheritedWithObservers:
+      PrintAccessor(ASD->getWillSetFunc());
+      PrintAccessor(ASD->getDidSetFunc());
+      break;
+    case WriteImplKind::Set:
+      PrintAccessor(ASD->getSetter());
+      // FIXME: ReadWriteImplKind::Modify
+      break;
+    case WriteImplKind::MutableAddress:
+      PrintAccessor(ASD->getMutableAddressor());
+      PrintAccessor(ASD->getWillSetFunc());
+      PrintAccessor(ASD->getDidSetFunc());
+      break;
     }
-    break;
-
-  case AbstractStorageDecl::ComputedWithMutableAddress:
-    PrintAccessor(ASD->getGetter(), "get");
-    PrintMutableAddressor(ASD->getMutableAddressor());
-    break;
   }
   if (PrintAccessorBody) {
     Printer.printNewline();
@@ -2403,22 +2401,12 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
   switch (auto kind = decl->getAccessorKind()) {
   case AccessorKind::Get:
   case AccessorKind::Address:
-    recordDeclLoc(decl,
-      [&]{
-        Printer << (kind == AccessorKind::Get
-                      ? "get" : getAddressorLabel(decl));
-      });
-    Printer << " {";
-    break;
   case AccessorKind::DidSet:
   case AccessorKind::MaterializeForSet:
   case AccessorKind::MutableAddress:
     recordDeclLoc(decl,
       [&]{
-        Printer << (kind == AccessorKind::DidSet ? "didSet" :
-                    kind == AccessorKind::MaterializeForSet
-                      ? "materializeForSet"
-                      : getMutableAddressorLabel(decl));
+        Printer << getAccessorLabel(decl);
       });
     Printer << " {";
     break;
@@ -2426,7 +2414,7 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
   case AccessorKind::WillSet:
     recordDeclLoc(decl,
       [&]{
-        Printer << (decl->isSetter() ? "set" : "willSet");
+        Printer << getAccessorLabel(decl);
 
         auto params = decl->getParameterLists().back();
         if (params->size() != 0 && !params->get(0)->isImplicit()) {
@@ -3018,20 +3006,18 @@ bool Decl::shouldPrintInContext(const PrintOptions &PO) const {
     // Stored variables in Swift source will be picked up by the
     // PatternBindingDecl.
     if (auto *VD = dyn_cast<VarDecl>(this)) {
-      if (!VD->hasClangNode() && VD->hasStorage() &&
-          VD->getStorageKind() != VarDecl::StoredWithObservers)
+      if (!VD->hasClangNode() && VD->getImplInfo().isSimpleStored())
         return false;
     }
 
-    // Skip pattern bindings that consist of just one computed variable.
+    // Skip pattern bindings that consist of just one variable with
+    // interesting accessors.
     if (auto pbd = dyn_cast<PatternBindingDecl>(this)) {
       if (pbd->getPatternList().size() == 1) {
         auto pattern =
           pbd->getPatternList()[0].getPattern()->getSemanticsProvidingPattern();
         if (auto named = dyn_cast<NamedPattern>(pattern)) {
-          auto StorageKind = named->getDecl()->getStorageKind();
-          if (StorageKind == VarDecl::Computed ||
-              StorageKind == VarDecl::StoredWithObservers)
+          if (!named->getDecl()->getImplInfo().isSimpleStored())
             return false;
         }
       }
@@ -3861,23 +3847,13 @@ public:
     Printer.printName(T->getName());
   }
 
-  void visitUnownedStorageType(UnownedStorageType *T) {
-    if (Options.PrintStorageRepresentationAttrs)
-      Printer << "@sil_unowned ";
-    visit(T->getReferentType());
+#define REF_STORAGE(Name, name, ...) \
+  void visit##Name##StorageType(Name##StorageType *T) { \
+    if (Options.PrintStorageRepresentationAttrs) \
+      Printer << "@sil_" #name " "; \
+    visit(T->getReferentType()); \
   }
-
-  void visitUnmanagedStorageType(UnmanagedStorageType *T) {
-    if (Options.PrintStorageRepresentationAttrs)
-      Printer << "@sil_unmanaged ";
-    visit(T->getReferentType());
-  }
-
-  void visitWeakStorageType(WeakStorageType *T) {
-    if (Options.PrintStorageRepresentationAttrs)
-      Printer << "@sil_weak ";
-    visit(T->getReferentType());
-  }
+#include "swift/AST/ReferenceStorage.def"
 
   void visitTypeVariableType(TypeVariableType *T) {
     if (T->getASTContext().LangOpts.DebugConstraintSolver) {
@@ -4033,8 +4009,6 @@ StringRef swift::getCheckedCastKindName(CheckedCastKind kind) {
     return "set_downcast";
   case CheckedCastKind::BridgingCoercion:
     return "bridging_coercion";
-  case CheckedCastKind::Swift3BridgingDowncast:
-    return "bridging_downcast";
   }
   llvm_unreachable("bad checked cast name");
 }

@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name builtins -assume-parsing-unqualified-ownership-sil -parse-stdlib -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module -swift-version 3 | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-frontend -module-name builtins -assume-parsing-unqualified-ownership-sil -parse-stdlib -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 // REQUIRES: CPU=x86_64
 
@@ -14,67 +14,25 @@ typealias Bool = Builtin.Int1
 
 // CHECK: call swiftcc void @swift_errorInMain(
 
-infix operator * {
-  associativity left
-  precedence 200
-}
-infix operator / {
-  associativity left
-  precedence 200
-}
-infix operator % {
-  associativity left
-  precedence 200
-}
+infix operator *
+infix operator /
+infix operator %
 
-infix operator + {
-  associativity left
-  precedence 190
-}
-infix operator - {
-  associativity left
-  precedence 190
-}
+infix operator +
+infix operator -
 
-infix operator << {
-  associativity none
-  precedence 180
-}
-infix operator >> {
-  associativity none
-  precedence 180
-}
+infix operator <<
+infix operator >>
 
-infix operator ... {
-  associativity none
-  precedence 175
-}
+infix operator ...
 
-infix operator < {
-  associativity none
-  precedence 170
-}
-infix operator <= {
-  associativity none
-  precedence 170
-}
-infix operator > {
-  associativity none
-  precedence 170
-}
-infix operator >= {
-  associativity none
-  precedence 170
-}
+infix operator <
+infix operator <=
+infix operator >
+infix operator >=
 
-infix operator == {
-  associativity none
-  precedence 160
-}
-infix operator != {
-  associativity none
-  precedence 160
-}
+infix operator ==
+infix operator !=
 
 func * (lhs: Int, rhs: Int) -> Int {
   return Builtin.mul_Int32(lhs, rhs)
@@ -785,7 +743,7 @@ func ispod_test() {
   // CHECK: store i1 true, i1*
   // CHECK: store i1 false, i1*
   var t = Builtin.ispod(Int.self)
-  var f = Builtin.ispod(Builtin.NativeObject)
+  var f = Builtin.ispod(Builtin.NativeObject.self)
 }
 
 // CHECK-LABEL: define {{.*}} @{{.*}}is_same_metatype

@@ -10,14 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A type that provides subscript access to its elements.
-///
-/// In most cases, it's best to ignore this protocol and use the
-/// `MutableCollection` protocol instead, because it has a more complete
-/// interface.
-@available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'MutableCollection' instead")
-public typealias MutableIndexable = MutableCollection
-
 /// A collection that supports subscript assignment.
 ///
 /// Collections that conform to `MutableCollection` gain the ability to

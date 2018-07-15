@@ -787,10 +787,6 @@ enum class ConstraintSystemFlags {
   /// Whether we allow the solver to attempt fixes to the system.
   AllowFixes = 0x01,
   
-  /// Set if the client prefers fixits to be in the form of force unwrapping
-  /// or optional chaining to return an optional.
-  PreferForceUnwrapToOptional = 0x02,
-
   /// If set, this is going to prevent constraint system from erasing all
   /// discovered solutions except the best one.
   ReturnAllDiscoveredSolutions = 0x04,
@@ -1003,6 +999,9 @@ private:
 
   /// Types used in fixes.
   std::vector<Type> FixedTypes;
+
+  /// Declaration names used in fixes.
+  std::vector<DeclName> FixedDeclNames;
 
   /// \brief The set of remembered disjunction choices used to reach
   /// the current constraint system.
@@ -1352,30 +1351,6 @@ private:
     bool walkToDeclPre(Decl *decl) override { return false; }
   };
 
-  class TransferExprTypes : public ASTWalker {
-    ConstraintSystem &toCS;
-    ConstraintSystem &fromCS;
-
-  public:
-    TransferExprTypes(ConstraintSystem &toCS, ConstraintSystem &fromCS)
-        : toCS(toCS), fromCS(fromCS) {}
-
-    Expr *walkToExprPost(Expr *expr) override {
-      if (fromCS.hasType(expr))
-        toCS.setType(expr, fromCS.getType(expr));
-
-      return expr;
-    }
-
-    /// \brief Ignore statements.
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
-      return { false, stmt };
-    }
-
-    /// \brief Ignore declarations.
-    bool walkToDeclPre(Decl *decl) override { return false; }
-  };
-
 public:
 
   void setExprTypes(Expr *expr) {
@@ -1399,10 +1374,6 @@ public:
   void cacheSubExprTypes(Expr *expr) {
     bool excludeRoot = true;
     expr->walk(CacheExprTypes(expr, *this, excludeRoot));
-  }
-
-  void transferExprTypes(ConstraintSystem *oldCS, Expr *expr) {
-    expr->walk(TransferExprTypes(*this, *oldCS));
   }
 
   /// \brief The current solver state.
@@ -2085,12 +2056,6 @@ public:
 
   /// \brief Determine if the type in question is AnyHashable.
   bool isAnyHashableType(Type t);
-
-  /// Call Expr::propagateLValueAccessKind on the given expression,
-  /// using a custom accessor for the type on the expression that
-  /// reads the type from the ConstraintSystem expression type map.
-  void propagateLValueAccessKind(Expr *E, AccessKind accessKind, bool isShallow,
-                                 bool allowOverwrite = false);
 
   /// Call Expr::isTypeReference on the given expression, using a
   /// custom accessor for the type on the expression that reads the
@@ -3152,26 +3117,9 @@ public:
       return true;
     }
 
-    if (!getASTContext().isSwiftVersion3()) {
-      if (CountScopes < TypeCounter)
-        return false;
-
-      // If we haven't explored a relatively large number of possibilities
-      // yet, continue.
-      if (CountScopes <= 16 * 1024)
-        return false;
-
-      // Clearly exponential
-      if (TypeCounter < 32 && CountScopes > (1U << TypeCounter))
-        return true;
-
-      // Bail out once we've looked at a really large number of
-      // choices.
-      if (CountScopes > TC.Context.LangOpts.SolverBindingThreshold)
-        return true;
-    }
-
-    return false;
+    // Bail out once we've looked at a really large number of
+    // choices.
+    return CountScopes > TC.Context.LangOpts.SolverBindingThreshold;
   }
   
   LLVM_ATTRIBUTE_DEPRECATED(
@@ -3525,6 +3473,77 @@ public:
     return { true, expr };
   }
 };
+
+/// \brief Matches array of function parameters to candidate inputs,
+/// which can be anything suitable (e.g., parameters, arguments).
+///
+/// It claims inputs sequentially and tries to pair between an input
+/// and the next appropriate parameter. The detailed matching behavior
+/// of each pair is specified by a custom function (i.e., pairMatcher).
+/// It considers variadic and defaulted arguments when forming proper
+/// input-parameter pairs; however, other information like label and
+/// type information is not directly used here. It can be implemented
+/// in the custom function when necessary.
+class InputMatcher {
+  size_t NumSkippedParameters;
+  const llvm::SmallBitVector DefaultValueMap;
+  const ArrayRef<AnyFunctionType::Param> Params;
+
+public:
+  enum Result {
+    /// The specified inputs are successfully matched.
+    IM_Succeeded,
+    /// There are input(s) left unclaimed while all parameters are matched.
+    IM_HasUnclaimedInput,
+    /// There are parateter(s) left unmatched while all inputs are claimed.
+    IM_HasUnmatchedParam,
+    /// Custom pair matcher function failure.
+    IM_CustomPairMatcherFailed,
+  };
+
+  InputMatcher(const ArrayRef<AnyFunctionType::Param> params,
+               const llvm::SmallBitVector &defaultValueMap);
+
+  /// Matching a given array of inputs.
+  ///
+  /// \param numInputs The number of inputs.
+  /// \param pairMatcher Custom matching behavior of an input-parameter pair.
+  /// \return the matching result.
+  Result
+  match(int numInputs,
+        std::function<bool(unsigned inputIdx, unsigned paramIdx)> pairMatcher);
+
+  size_t getNumSkippedParameters() const { return NumSkippedParameters; }
+};
+
+/// Diagnose an attempt to recover when we have a value of optional type
+/// that needs to be unwrapped.
+///
+/// \returns true if a diagnostic was produced.
+bool diagnoseUnwrap(TypeChecker &TC, DeclContext *DC, Expr *expr, Type type);
+
+/// Diagnose an attempt to recover from a member access into a value of
+/// optional type which needed to be unwrapped for the member to be found.
+///
+/// \returns true if a diagnostic was produced.
+bool diagnoseBaseUnwrapForMemberAccess(Expr *baseExpr, Type baseType,
+                                       DeclName memberName,
+                                       SourceRange memberRange);
+
+// Return true if, when replacing "<expr>" with "<expr> ?? T", parentheses need
+// to be added around <expr> first in order to maintain the correct precedence.
+bool exprNeedsParensBeforeAddingNilCoalescing(TypeChecker &TC,
+                                              DeclContext *DC,
+                                              Expr *expr);
+
+// Return true if, when replacing "<expr>" with "<expr> as T", parentheses need
+// to be added around the new expression in order to maintain the correct
+// precedence.
+bool exprNeedsParensAfterAddingNilCoalescing(TypeChecker &TC,
+                                             DeclContext *DC,
+                                             Expr *expr,
+                                             Expr *rootExpr);
+
 } // end namespace swift
 
 #endif // LLVM_SWIFT_SEMA_CONSTRAINT_SYSTEM_H

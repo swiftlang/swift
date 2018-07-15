@@ -635,11 +635,15 @@ ClosureSpecCloner::initCloned(const CallSiteDescriptor &CallSiteDesc,
       // and not the original linkage.
       // Otherwise the new function could have an external linkage (in case the
       // original function was de-serialized) and would not be code-gen'd.
+      // It's also important to disconnect this specialized function from any
+      // classes (the classSubclassScope), because that may incorrectly
+      // influence the linkage.
       getSpecializedLinkage(ClosureUser, ClosureUser->getLinkage()), ClonedName,
       ClonedTy, ClosureUser->getGenericEnvironment(),
       ClosureUser->getLocation(), IsBare, ClosureUser->isTransparent(),
       CallSiteDesc.isSerialized(), ClosureUser->getEntryCount(),
-      ClosureUser->isThunk(), ClosureUser->getClassSubclassScope(),
+      ClosureUser->isThunk(),
+      /*classSubclassScope=*/SubclassScope::NotApplicable,
       ClosureUser->getInlineStrategy(), ClosureUser->getEffectsKind(),
       ClosureUser, ClosureUser->getDebugScope());
   if (!ClosureUser->hasQualifiedOwnership()) {

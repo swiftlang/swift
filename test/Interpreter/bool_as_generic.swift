@@ -1,10 +1,10 @@
-// RUN: %target-run-simple-swift-swift3 | %FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 // <rdar://problem/13986638> Missing Bool metadata when Bool is used as a generic
 // parameter or existential value
 
-prefix operator !! {}
-infix operator &&& {}
+prefix operator !!
+infix operator &&&
 
 protocol BooleanProtocol {
   var boolValue: Bool { get }

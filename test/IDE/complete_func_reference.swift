@@ -1,24 +1,24 @@
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=VOID_VOID_0 | %FileCheck %s -check-prefix=VOID_VOID
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=VOID_VOID_1 | %FileCheck %s -check-prefix=VOID_VOID
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=VOID_VOID_2 | %FileCheck %s -check-prefix=VOID_VOID
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=VOID_VOID_3 | %FileCheck %s -check-prefix=VOID_VOID
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=VOID_VOID_4 | %FileCheck %s -check-prefix=VOID_VOID
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=ANY_INT_0 | %FileCheck %s -check-prefix=ANY_INT
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=ANY_INT_1 | %FileCheck %s -check-prefix=ANY_INT
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=ANY_INT_2 > %t.results
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=VOID_VOID_0 | %FileCheck %s -check-prefix=VOID_VOID
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=VOID_VOID_1 | %FileCheck %s -check-prefix=VOID_VOID
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=VOID_VOID_2 | %FileCheck %s -check-prefix=VOID_VOID
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=VOID_VOID_3 | %FileCheck %s -check-prefix=VOID_VOID
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=VOID_VOID_4 | %FileCheck %s -check-prefix=VOID_VOID
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ANY_INT_0 | %FileCheck %s -check-prefix=ANY_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ANY_INT_1 | %FileCheck %s -check-prefix=ANY_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ANY_INT_2 > %t.results
 // RUN:%FileCheck %s -check-prefix=ANY_INT < %t.results
 // RUN:%FileCheck %s -check-prefix=ANY_INT_STATIC_CURRY < %t.results
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=ANY_INT_3 | %FileCheck %s -check-prefix=ANY_INT
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=ANY_INT_4 | %FileCheck %s -check-prefix=ANY_INT
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=INT_ANY_0 | %FileCheck %s -check-prefix=INT_ANY
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=INT_ANY_1 | %FileCheck %s -check-prefix=INT_ANY
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=INT_ANY_2 > %t.results
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ANY_INT_3 | %FileCheck %s -check-prefix=ANY_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ANY_INT_4 | %FileCheck %s -check-prefix=ANY_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INT_ANY_0 | %FileCheck %s -check-prefix=INT_ANY
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INT_ANY_1 | %FileCheck %s -check-prefix=INT_ANY
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INT_ANY_2 > %t.results
 // RUN: %FileCheck %s -check-prefix=INT_ANY < %t.results
 // RUN: %FileCheck %s -check-prefix=INT_ANY_STATIC_CURRY < %t.results
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=INT_ANY_3 > %t.results
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=VOID_INT_INT_0 | %FileCheck %s -check-prefix=VOID_INT_INT
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=VOID_INT_INT_1 | %FileCheck %s -check-prefix=VOID_INT_INT
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=VOID_INT_INT_2 | %FileCheck %s -check-prefix=VOID_INT_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INT_ANY_3 > %t.results
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=VOID_INT_INT_0 | %FileCheck %s -check-prefix=VOID_INT_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=VOID_INT_INT_1 | %FileCheck %s -check-prefix=VOID_INT_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=VOID_INT_INT_2 | %FileCheck %s -check-prefix=VOID_INT_INT
 
 func voidToVoid() {}
 func voidToInt() -> Int {}
@@ -122,7 +122,7 @@ do {
 }
 
 // ANY_INT: Begin completions
-// ANY_INT-DAG: Decl{{.*}}/TypeRelation[Convertible]: anyToInt(a:);
+// ANY_INT-DAG: Decl{{.*}}:      anyToInt({#a: Any#})[#Int#]; name=anyToInt(a: Any)
 // ANY_INT-DAG: Decl{{.*}}/NotRecommended/TypeRelation[Invalid]: intToVoid({#a: Int#})[#Void#];
 // ANY_INT-DAG: Decl{{.*}}/NotRecommended/TypeRelation[Invalid]: anyToVoid({#a: Any#})[#Void#];
 // ANY_INT-DAG: Decl{{.*}}/NotRecommended/TypeRelation[Invalid]: voidToVoid()[#Void#];
@@ -135,7 +135,7 @@ do {
 // ANY_INT: End completions
 
 // ANY_INT_STATIC_CURRY: Begin completions
-// ANY_INT_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: anyToInt({#self: S0#})[#(a: Any) -> Int#];
+// ANY_INT_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal:   anyToInt({#self: S0#})[#(a: Any) -> Int#]; name=anyToInt(S0)
 // ANY_INT_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: voidToVoid({#self: S0#})[#() -> Void#];
 // ANY_INT_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: intToVoid({#self: S0#})[#(a: Int) -> Void#];
 // ANY_INT_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: anyToVoid({#self: S0#})[#(a: Any) -> Void#];
@@ -153,12 +153,12 @@ do {
 }
 
 // INT_ANY: Begin completions
-// INT_ANY-DAG: Decl{{.*}}/TypeRelation[Convertible]: intToAny(a:);
-// INT_ANY-DAG: Decl{{.*}}/TypeRelation[Convertible]: intToInt(a:);
-// INT_ANY-DAG: Decl{{.*}}/TypeRelation[Convertible]: intToVoid(a:);
-// INT_ANY-DAG: Decl{{.*}}/TypeRelation[Convertible]: anyToAny(a:);
-// INT_ANY-DAG: Decl{{.*}}/TypeRelation[Convertible]: anyToInt(a:);
-// INT_ANY-DAG: Decl{{.*}}/TypeRelation[Convertible]: anyToVoid(a:);
+// INT_ANY-DAG: Decl{{.*}}:      intToAny({#a: Int#})[#Any#]; name=intToAny(a: Int)
+// INT_ANY-DAG: Decl{{.*}}:      intToInt({#a: Int#})[#Int#]; name=intToInt(a: Int)
+// INT_ANY-DAG: Decl{{.*}}:      intToVoid({#a: Int#})[#Void#]; name=intToVoid(a: Int)
+// INT_ANY-DAG: Decl{{.*}}:      anyToAny({#a: Any#})[#Any#]; name=anyToAny(a: Any)
+// INT_ANY-DAG: Decl{{.*}}:      anyToInt({#a: Any#})[#Int#]; name=anyToInt(a: Any)
+// INT_ANY-DAG: Decl{{.*}}:      anyToVoid({#a: Any#})[#Void#]; name=anyToVoid(a: Any)
 // INT_ANY-DAG: Decl{{.*}}/TypeRelation[Convertible]: returnsIntToInt()[#(Int) -> Int#];
 // INT_ANY-DAG: Decl{{.*}}/NotRecommended/TypeRelation[Invalid]: voidToVoid()[#Void#];
 // INT_ANY-DAG: Decl{{.*}}:      voidToInt()[#Int#];
@@ -166,12 +166,12 @@ do {
 // INT_ANY: End completions
 
 // INT_ANY_STATIC_CURRY: Begin completions
-// INT_ANY_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: intToInt({#self: S0#})[#(a: Int) -> Int#];
-// INT_ANY_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: intToVoid({#self: S0#})[#(a: Int) -> Void#];
-// INT_ANY_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: anyToAny({#self: S0#})[#(a: Any) -> Any#];
-// INT_ANY_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: anyToVoid({#self: S0#})[#(a: Any) -> Void#];
-// INT_ANY_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: intToAny({#self: S0#})[#(a: Int) -> Any#];
-// INT_ANY_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: anyToInt({#self: S0#})[#(a: Any) -> Int#];
+// INT_ANY_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal:   intToInt({#self: S0#})[#(a: Int) -> Int#]; name=intToInt(S0)
+// INT_ANY_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: intToVoid({#self: S0#})[#(a: Int) -> Void#]; name=intToVoid(S0)
+// INT_ANY_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal:   anyToAny({#self: S0#})[#(a: Any) -> Any#]; name=anyToAny(S0)
+// INT_ANY_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: anyToVoid({#self: S0#})[#(a: Any) -> Void#]; name=anyToVoid(S0)
+// INT_ANY_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal:   intToAny({#self: S0#})[#(a: Int) -> Any#]; name=intToAny(S0)
+// INT_ANY_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal:   anyToInt({#self: S0#})[#(a: Any) -> Int#]; name=anyToInt(S0)
 // INT_ANY_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: returnsIntToInt({#self: S0#})[#() -> (Int) -> Int#];
 // INT_ANY_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal:   voidToAny({#self: S0#})[#() -> Any#];
 // INT_ANY_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal:   voidToInt({#self: S0#})[#() -> Int#];

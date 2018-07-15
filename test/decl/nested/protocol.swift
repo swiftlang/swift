@@ -66,12 +66,26 @@ enum OuterEnum {
 
 class OuterClass {
   protocol InnerProtocol : OuterClass { }
-  // expected-error@-1{{non-class type 'InnerProtocol' cannot inherit from class 'OuterClass'}}
-  // expected-error@-2{{protocol 'InnerProtocol' cannot be nested inside another declaration}}
+  // expected-error@-1{{protocol 'InnerProtocol' cannot be nested inside another declaration}}
 }
 
 class OtherGenericClass<T> {
   protocol InnerProtocol : OtherGenericClass { }
-  // expected-error@-1{{non-class type 'InnerProtocol' cannot inherit from class 'OtherGenericClass<T>'}}
-  // expected-error@-2{{protocol 'InnerProtocol' cannot be nested inside another declaration}}
+  // expected-error@-1{{protocol 'InnerProtocol' cannot be nested inside another declaration}}
+}
+
+protocol SelfDotTest {
+  func f(_: Self.Class)
+  class Class {}
+  // expected-error@-1{{type 'Class' cannot be nested in protocol 'SelfDotTest'}}
+}
+
+struct Outer {
+  typealias E = NestedValidation.T
+  protocol NestedValidation { // expected-error {{protocol 'NestedValidation' cannot be nested inside another declaration}}
+    typealias T = A.B
+    class A { // expected-error {{type 'A' cannot be nested in protocol 'NestedValidation'}}
+      typealias B = Int
+    }
+  }
 }

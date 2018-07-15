@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 3
+// RUN: %target-typecheck-verify-swift
 
 protocol P {
   associatedtype SomeType
@@ -85,11 +85,11 @@ for j in i.wibble(a, a) { // expected-error {{type 'A' does not conform to proto
 
 // Generic as part of function/tuple types
 func f6<T:P2>(_ g: (Void) -> T) -> (c: Int, i: T) { // expected-warning {{when calling this function in Swift 4 or later, you must pass a '()' tuple; did you mean for the input type to be '()'?}} {{20-26=()}}
-  return (c: 0, i: g())
+  return (c: 0, i: g(()))
 }
 
 func f7() -> (c: Int, v: A) {
-  let g: (Void) -> A = { return A() } // expected-warning {{when calling this function in Swift 4 or later, you must pass a '()' tuple; did you mean for the input type to be '()'?}} {{10-16=()}}
+  let g: (Void) -> A = { _ in return A() } // expected-warning {{when calling this function in Swift 4 or later, you must pass a '()' tuple; did you mean for the input type to be '()'?}} {{10-16=()}}
   return f6(g) // expected-error {{cannot convert return expression of type '(c: Int, i: A)' to return type '(c: Int, v: A)'}}
 }
 
@@ -221,7 +221,9 @@ struct StructWithOptionalArray {
 }
 
 func testStructWithOptionalArray(_ foo: StructWithOptionalArray) -> Int {
-  return foo.array[0]  // expected-error {{value of optional type '[Int]?' not unwrapped; did you mean to use '!' or '?'?}} {{19-19=!}}
+  return foo.array[0]  // expected-error {{value of optional type '[Int]?' must be unwrapped to refer to member 'subscript' of wrapped base type '[Int]'}}
+  // expected-note@-1{{chain the optional using '?' to access member 'subscript' only for non-'nil' base values}}{{19-19=?}}
+  // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}{{19-19=!}}
 }
 
 
@@ -421,7 +423,10 @@ enum Color {
   static func frob(_ a : Int, b : inout Int) -> Color {}
 }
 let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) }) // expected-error {{'map' produces '[T]', not the expected contextual result type '(Int, Color)'}}
-let _: [(Int, Color)] = [1,2].map({ ($0, .Unknown("")) })// expected-error {{missing argument label 'description:' in call}} {{51-51=description: }}
+
+// FIXME: rdar://41416346
+let _: [(Int, Color)] = [1,2].map({ ($0, .Unknown("")) })// expected-error {{'map' produces '[T]', not the expected contextual result type '[(Int, Color)]'}}
+
 let _: [Color] = [1,2].map { _ in .Unknown("") }// expected-error {{missing argument label 'description:' in call}} {{44-44=description: }}
 
 let _: (Int) -> (Int, Color) = { ($0, .Unknown("")) } // expected-error {{missing argument label 'description:' in call}} {{48-48=description: }}
@@ -574,7 +579,9 @@ _ = (i = 6) ? 42 : 57 // expected-error {{use of '=' in a boolean context, did y
 // <rdar://problem/22263468> QoI: Not producing specific argument conversion diagnostic for tuple init
 func r22263468(_ a : String?) {
   typealias MyTuple = (Int, String)
-  _ = MyTuple(42, a) // expected-error {{value of optional type 'String?' not unwrapped; did you mean to use '!' or '?'?}} {{20-20=!}}
+  _ = MyTuple(42, a) // expected-error {{value of optional type 'String?' must be unwrapped to a value of type 'String'}}
+  // expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+  // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
 }
 
 
@@ -631,7 +638,9 @@ func someFunction() -> () {
 // <rdar://problem/23560128> QoI: trying to mutate an optional dictionary result produces bogus diagnostic
 func r23560128() {
   var a : (Int,Int)?
-  a.0 = 42  // expected-error {{value of optional type '(Int, Int)?' not unwrapped; did you mean to use '!' or '?'?}} {{4-4=?}}
+  a.0 = 42 // expected-error{{value of optional type '(Int, Int)?' must be unwrapped to refer to member '0' of wrapped base type '(Int, Int)'}}
+  // expected-note@-1{{chain the optional }}
+  // expected-note@-2{{force-unwrap using '!'}}
 }
 
 // <rdar://problem/21890157> QoI: wrong error message when accessing properties on optional structs without unwrapping
@@ -639,7 +648,9 @@ struct ExampleStruct21890157 {
   var property = "property"
 }
 var example21890157: ExampleStruct21890157?
-example21890157.property = "confusing"  // expected-error {{value of optional type 'ExampleStruct21890157?' not unwrapped; did you mean to use '!' or '?'?}} {{16-16=?}}
+example21890157.property = "confusing"  // expected-error {{value of optional type 'ExampleStruct21890157?' must be unwrapped to refer to member 'property' of wrapped base type 'ExampleStruct21890157'}}
+  // expected-note@-1{{chain the optional }}
+  // expected-note@-2{{force-unwrap using '!'}}
 
 
 struct UnaryOp {}
@@ -694,7 +705,7 @@ if AssocTest.one(1) == AssocTest.one(1) {} // expected-error{{binary operator '=
 func r24251022() {
   var a = 1
   var b: UInt32 = 2
-  _ = a + b // expected-warning {{deprecated}}
+  _ = a + b // expected-error {{unavailable}}
   a += a + // expected-error {{binary operator '+=' cannot be applied to operands of type 'Int' and 'UInt32'}} expected-note {{overloads for '+=' exist}}
     b
 }
@@ -706,12 +717,14 @@ func overloadSetResultType(_ a : Int, b : Int) -> Int {
 }
 
 postfix operator +++
-postfix func +++ <T>(_: inout T) -> T { fatalError() }
+postfix func +++ <T>(_: inout T) -> T { fatalError() } // expected-note {{in call to operator '+++'}}
 
 // <rdar://problem/21523291> compiler error message for mutating immutable field is incorrect
 func r21523291(_ bytes : UnsafeMutablePointer<UInt8>) {
-  let i = 42   // expected-note {{change 'let' to 'var' to make it mutable}}
-  _ = bytes[i+++]  // expected-error {{cannot pass immutable value as inout argument: 'i' is a 'let' constant}}
+  let i = 42
+
+  // FIXME: rdar://41416382
+  _ = bytes[i+++]  // expected-error {{generic parameter 'T' could not be inferred}}
 }
 
 
@@ -862,37 +875,6 @@ func foo1255_1() {
 func foo1255_2() -> Int {
   return true || false // expected-error {{cannot convert return expression of type 'Bool' to return type 'Int'}}
 }
-
-// SR-2505: "Call arguments did not match up" assertion
-
-// Here we're simulating the busted Swift 3 behavior -- see
-// test/Constraints/diagnostics_swift4.swift for the correct
-// behavior.
-
-func sr_2505(_ a: Any) {} // expected-note {{}}
-sr_2505()          // expected-error {{missing argument for parameter #1 in call}}
-sr_2505(a: 1)      // FIXME: emit a warning saying this becomes an error in Swift 4
-sr_2505(1, 2)      // expected-error {{extra argument in call}}
-sr_2505(a: 1, 2)   // expected-error {{extra argument in call}}
-
-struct C_2505 {
-  init(_ arg: Any) {
-  }
-}
-
-protocol P_2505 {
-}
-
-extension C_2505 {
-  init<T>(from: [T]) where T: P_2505 {
-  }
-}
-
-class C2_2505: P_2505 {
-}
-
-// FIXME: emit a warning saying this becomes an error in Swift 4
-let c_2505 = C_2505(arg: [C2_2505()])
 
 // Diagnostic message for initialization with binary operations as right side
 let foo1255_3: String = 1 + 2 + 3 // expected-error {{cannot convert value of type 'Int' to specified type 'String'}}
@@ -1218,4 +1200,10 @@ func badTypes() {
   let array = [Int](sequence)
   // expected-error@-1 {{type of expression is ambiguous without more context}}
   // FIXME: terrible diagnostic
+}
+
+// rdar://34357545
+func unresolvedTypeExistential() -> Bool {
+  return (Int.self==_{})
+  // expected-error@-1 {{ambiguous reference to member '=='}}
 }

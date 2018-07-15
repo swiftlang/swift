@@ -1011,7 +1011,9 @@ static CanSILFunctionType getSILFunctionType(
   if (extInfo.hasContext())
     calleeConvention = conventions.getCallee();
 
-  bool pseudogeneric = (constant ? isPseudogeneric(*constant) : false);
+  bool pseudogeneric = genericSig && constant
+    ? isPseudogeneric(*constant)
+    : false;
 
   // NOTE: SILFunctionType::ExtInfo doesn't track everything that
   // AnyFunctionType::ExtInfo tracks. For example: 'throws' or 'auto-closure'
@@ -2122,6 +2124,7 @@ const SILConstantInfo &TypeConverter::getConstantInfo(SILDeclRef constant) {
 
   auto inserted = ConstantTypes.insert({constant, result});
   assert(inserted.second);
+  (void)inserted;
   return *result;
 }
 
@@ -2252,7 +2255,7 @@ TypeConverter::getConstantOverrideInfo(SILDeclRef derived, SILDeclRef base) {
     auto overrideInterfaceFnTy = overrideInterfaceTy->castTo<FunctionType>();
     overrideInterfaceTy =
         GenericFunctionType::get(derivedInterfaceFnTy->getGenericSignature(),
-                                 overrideInterfaceFnTy->getInput(),
+                                 overrideInterfaceFnTy->getParams(),
                                  overrideInterfaceFnTy->getResult(),
                                  overrideInterfaceFnTy->getExtInfo());
   }
@@ -2289,6 +2292,7 @@ TypeConverter::getConstantOverrideInfo(SILDeclRef derived, SILDeclRef base) {
   
   auto inserted = ConstantOverrideTypes.insert({{derived, base}, result});
   assert(inserted.second);
+  (void)inserted;
   return *result;
 }
 
@@ -2372,8 +2376,12 @@ public:
       witnessMethodConformance =
           conformance->subst(selfType, Subst, Conformances);
     }
+    
+    // The substituted type is no longer generic, so it'd never be
+    // pseudogeneric.
+    auto extInfo = origType->getExtInfo().withIsPseudogeneric(false);
 
-    return SILFunctionType::get(nullptr, origType->getExtInfo(),
+    return SILFunctionType::get(nullptr, extInfo,
                                 origType->getCoroutineKind(),
                                 origType->getCalleeConvention(), substParams,
                                 substYields, substResults, substErrorResult,

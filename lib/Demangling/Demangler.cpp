@@ -1332,6 +1332,9 @@ NodePointer Demangler::demangleBoundGenericArgs(NodePointer Nominal,
     case Node::Kind::Enum:
       kind = Node::Kind::BoundGenericEnum;
       break;
+    case Node::Kind::Protocol:
+      kind = Node::Kind::BoundGenericProtocol;
+      break;
     case Node::Kind::OtherNominalType:
       kind = Node::Kind::BoundGenericOtherNominalType;
       break;
@@ -1870,7 +1873,7 @@ NodePointer Demangler::demangleGenericSpecialization(Node::Kind SpecKind) {
 
 NodePointer Demangler::demangleFunctionSpecialization() {
   NodePointer Spec = demangleSpecAttributes(
-        Node::Kind::FunctionSignatureSpecialization, /*demangleUniqueID*/ true);
+        Node::Kind::FunctionSignatureSpecialization);
   unsigned ParamIdx = 0;
   while (Spec && !nextIf('_')) {
     Spec = addChild(Spec, demangleFuncSpecParam(ParamIdx));
@@ -2066,24 +2069,14 @@ NodePointer Demangler::addFuncSpecParamNumber(NodePointer Param,
      Node::Kind::FunctionSignatureSpecializationParamPayload, Str));
 }
 
-NodePointer Demangler::demangleSpecAttributes(Node::Kind SpecKind,
-                                              bool demangleUniqueID) {
+NodePointer Demangler::demangleSpecAttributes(Node::Kind SpecKind) {
   bool isFragile = nextIf('q');
 
   int PassID = (int)nextChar() - '0';
   if (PassID < 0 || PassID > 9)
     return nullptr;
 
-  int Idx = -1;
-  if (demangleUniqueID)
-    Idx = demangleNatural();
-
-  NodePointer SpecNd = nullptr;
-  if (Idx >= 0) {
-    SpecNd = createNode(SpecKind, Idx);
-  } else {
-    SpecNd = createNode(SpecKind);
-  }
+  NodePointer SpecNd = createNode(SpecKind);
   if (isFragile)
     SpecNd->addChild(createNode(Node::Kind::SpecializationIsFragile),
                      *this);

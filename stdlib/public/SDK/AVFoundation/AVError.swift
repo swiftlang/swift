@@ -58,6 +58,13 @@ extension AVError {
   }
 
   /// The media type.
+  @available(swift, obsoleted: 4.2)
+  public var mediaType: String? {
+    return userInfo[AVErrorMediaTypeKey] as? String
+  }
+
+  /// The media type.
+  @available(swift, introduced: 4.2)
   public var mediaType: AVMediaType? {
     return userInfo[AVErrorMediaTypeKey] as? AVMediaType
   }

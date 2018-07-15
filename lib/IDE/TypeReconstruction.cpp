@@ -570,12 +570,10 @@ FindNamedDecls(ASTContext *ast, const DeclBaseName &name, VisitNodeResult &resul
             if (decl->hasInterfaceType()) {
               result._decls.push_back(decl);
               Type decl_type;
-              if (decl->hasInterfaceType()) {
-                decl_type = decl->getInterfaceType();
-                MetatypeType *meta_type = decl_type->getAs<MetatypeType>();
-                if (meta_type)
-                  decl_type = meta_type->getInstanceType();
-              }
+              decl_type = decl->getInterfaceType();
+              MetatypeType *meta_type = decl_type->getAs<MetatypeType>();
+              if (meta_type)
+                decl_type = meta_type->getInstanceType();
               result._types.push_back(decl_type);
             }
           }
@@ -633,15 +631,11 @@ FindNamedDecls(ASTContext *ast, const DeclBaseName &name, VisitNodeResult &resul
       for (auto decl : decls) {
         if (decl->hasInterfaceType()) {
           result._decls.push_back(decl);
-          if (decl->hasInterfaceType()) {
-            result._types.push_back(decl->getInterfaceType());
-            MetatypeType *meta_type =
-                result._types.back()->getAs<MetatypeType>();
-            if (meta_type)
-              result._types.back() = meta_type->getInstanceType();
-          } else {
-            result._types.push_back(Type());
-          }
+          result._types.push_back(decl->getInterfaceType());
+          MetatypeType *meta_type =
+            result._types.back()->getAs<MetatypeType>();
+          if (meta_type)
+            result._types.back() = meta_type->getInstanceType();
         }
       }
       return result._types.size();
@@ -778,13 +772,31 @@ static void VisitNodeGenericTypealias(ASTContext *ast,
   }
 
   if (generic_type_result._decls.size() != 1 ||
-      generic_type_result._types.size() != 1 ||
-      template_types_result._types.empty())
+      generic_type_result._types.size() != 1)
     return;
 
   auto *genericTypeAlias =
       cast<TypeAliasDecl>(generic_type_result._decls.front());
   GenericSignature *signature = genericTypeAlias->getGenericSignature();
+  if (signature &&
+      template_types_result._types.size() !=
+        signature->getGenericParams().size()) {
+    result._error = stringWithFormat(
+        "wrong number of generic arguments (%d) for generic typealias %s; "
+        "expected %d",
+        template_types_result._types.size(),
+        genericTypeAlias->getBaseName().userFacingName(),
+        signature->getGenericParams().size());
+
+    return;
+  }
+
+  if (signature && signature->getNumConformanceRequirements() != 0) {
+    result._error =
+      "cannot handle generic typealias with conformance requirements";
+    return;
+  }
+
   // FIXME: handle conformances.
   SubstitutionMap subMap;
   if (signature)
@@ -2254,6 +2266,14 @@ static void VisitNode(
   case Demangle::Node::Kind::BoundGenericEnum:
   case Demangle::Node::Kind::BoundGenericOtherNominalType:
     VisitNodeBoundGeneric(ast, node, result);
+    break;
+
+  case Demangle::Node::Kind::BoundGenericProtocol:
+    if (node->getNumChildren() < 2)
+      return;
+
+    // Only visit the conforming type.
+    VisitNode(ast, node->getChild(1), result);
     break;
 
   case Demangle::Node::Kind::BoundGenericTypeAlias:

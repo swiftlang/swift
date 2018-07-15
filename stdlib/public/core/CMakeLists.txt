@@ -73,7 +73,6 @@ set(SWIFTLIB_ESSENTIAL
   Hashing.swift
   HeapBuffer.swift
   ICU.swift
-  ImplicitlyUnwrappedOptional.swift
   Indices.swift
   InputStream.swift
   IntegerParsing.swift
@@ -123,7 +122,6 @@ set(SWIFTLIB_ESSENTIAL
   Sort.swift.gyb
   StaticString.swift
   Stride.swift.gyb
-  StringCharacterView.swift # ORDER DEPENDENCY: Must precede String.swift
   StringHashable.swift  # ORDER DEPENDENCY: Must precede String.swift
   String.swift
   StringBridge.swift
@@ -152,14 +150,15 @@ set(SWIFTLIB_ESSENTIAL
   UnavailableStringAPIs.swift.gyb
   UnicodeEncoding.swift
   UnicodeParser.swift
+  UnicodeScalarProperties.swift
   Unmanaged.swift
   UnmanagedOpaqueString.swift
   UnmanagedString.swift
   UnsafeBitMap.swift
   UnsafeBufferPointer.swift.gyb
   UnsafeRawBufferPointer.swift.gyb
-  UnsafePointer.swift.gyb
-  UnsafeRawPointer.swift.gyb
+  UnsafePointer.swift
+  UnsafeRawPointer.swift
   UTFEncoding.swift
   UTF8.swift
   UTF16.swift
@@ -168,6 +167,7 @@ set(SWIFTLIB_ESSENTIAL
   StringGraphemeBreaking.swift # ORDER DEPENDENCY: Must follow UTF16.swift
   ValidUTF8Buffer.swift
   WriteBackMutableSlice.swift
+  MigrationSupport.swift
   )
 
 # The complete list of sources in the core standard library.  Includes

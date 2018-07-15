@@ -60,9 +60,7 @@ void DebuggerClient::anchor() {}
 void AccessFilteringDeclConsumer::foundDecl(ValueDecl *D,
                                             DeclVisibilityKind reason) {
   if (D->getASTContext().LangOpts.EnableAccessControl) {
-    if (TypeResolver)
-      TypeResolver->resolveAccessControl(D);
-    if (D->isInvalid() && !D->hasAccess())
+    if (D->isInvalid())
       return;
     if (!D->isAccessibleFrom(DC))
       return;
@@ -84,13 +82,8 @@ bool swift::removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls) {
   if (decls.size() < 2)
     return false;
 
-  auto lazyResolver = decls.front()->getASTContext().getLazyResolver();
   llvm::SmallPtrSet<ValueDecl*, 8> overridden;
   for (auto decl : decls) {
-    // Compute enough information to make the overridden-declaration available.
-    if (lazyResolver)
-      lazyResolver->resolveOverriddenDecl(decl);
-
     while (auto overrides = decl->getOverriddenDecl()) {
       overridden.insert(overrides);
 
@@ -105,10 +98,6 @@ bool swift::removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls) {
         ///        cause instead (incomplete circularity detection).
         assert(decl != overrides && "Circular class inheritance?");
         decl = overrides;
-
-        if (lazyResolver)
-          lazyResolver->resolveOverriddenDecl(decl);
-
         continue;
       }
 
@@ -1722,12 +1711,24 @@ bool DeclContext::lookupQualified(Type type,
   SmallVector<NominalTypeDecl *, 4> stack;
   llvm::SmallPtrSet<NominalTypeDecl *, 4> visited;
 
+  // Note that we don't have to visit the superclass of a protocol.
+  // If we started with an archetype or existential, we'll visit the
+  // superclass because we will have added it to the stack upfront.
+  //
+  // If we started with a concrete class conforming to a protocol
+  // with a superclass, we will visit the superclass from the
+  // concrete type.
+  bool checkProtocolSuperclass = false;
+
   // Handle nominal types.
   bool wantProtocolMembers = (options & NL_ProtocolMembers);
   bool wantLookupInAllClasses = false;
   if (auto nominal = type->getAnyNominal()) {
     visited.insert(nominal);
     stack.push_back(nominal);
+
+    if (isa<ProtocolDecl>(nominal))
+      checkProtocolSuperclass = true;
   }
   // Handle archetypes
   else if (auto archetypeTy = type->getAs<ArchetypeType>()) {
@@ -1737,8 +1738,8 @@ bool DeclContext::lookupQualified(Type type,
         stack.push_back(proto);
 
     // Look into the superclasses of this archetype.
-    if (auto superclassTy = archetypeTy->getSuperclass())
-      if (auto superclassDecl = superclassTy->getAnyNominal())
+    if (auto superclass = archetypeTy->getSuperclass())
+      if (auto superclassDecl = superclass->getClassOrBoundGenericClass())
         if (visited.insert(superclassDecl).second)
           stack.push_back(superclassDecl);
   }
@@ -1756,10 +1757,10 @@ bool DeclContext::lookupQualified(Type type,
         stack.push_back(protoDecl);
     }
 
-    if (layout.superclass) {
-      auto *nominalDecl = layout.superclass->getAnyNominal();
-      if (visited.insert(nominalDecl).second)
-        stack.push_back(nominalDecl);
+    if (auto superclass = layout.explicitSuperclass) {
+      auto *superclassDecl = superclass->getClassOrBoundGenericClass();
+      if (visited.insert(superclassDecl).second)
+        stack.push_back(superclassDecl);
     }
   } else {
     llvm_unreachable("Bad type for qualified lookup");
@@ -1788,9 +1789,6 @@ bool DeclContext::lookupQualified(Type type,
 
     // Check access.
     if (!(options & NL_IgnoreAccessControl)) {
-      if (typeResolver)
-        typeResolver->resolveAccessControl(decl);
-
       return decl->isAccessibleFrom(this);
     }
 
@@ -1852,10 +1850,9 @@ bool DeclContext::lookupQualified(Type type,
       }
 
       if (visitSuperclass) {
-        if (auto superclassType = classDecl->getSuperclass())
-          if (auto superclassDecl = superclassType->getClassOrBoundGenericClass())
-            if (visited.insert(superclassDecl).second)
-              stack.push_back(superclassDecl);
+        if (auto superclassDecl = classDecl->getSuperclassDecl())
+          if (visited.insert(superclassDecl).second)
+            stack.push_back(superclassDecl);
       }
     }
 
@@ -1864,6 +1861,15 @@ bool DeclContext::lookupQualified(Type type,
     // step.
     if (!wantProtocolMembers && !currentIsProtocol)
       continue;
+
+    if (checkProtocolSuperclass) {
+      if (auto *protoDecl = dyn_cast<ProtocolDecl>(current)) {
+        if (auto superclassDecl = protoDecl->getSuperclassDecl()) {
+          visited.insert(superclassDecl);
+          stack.push_back(superclassDecl);
+        }
+      }
+    }
 
     SmallVector<ProtocolDecl *, 4> protocols;
     for (auto proto : current->getAllProtocols()) {
@@ -1908,9 +1914,6 @@ bool DeclContext::lookupQualified(Type type,
       // If the declaration has an override, name lookup will also have
       // found the overridden method. Skip this declaration, because we
       // prefer the overridden method.
-      if (typeResolver)
-        typeResolver->resolveOverriddenDecl(decl);
-
       if (decl->getOverriddenDecl())
         continue;
 

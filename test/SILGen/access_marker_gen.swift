@@ -150,5 +150,6 @@ func testDispatchedClassInstanceProperty(d: D) {
 // CHECK:     bb0([[D:%.*]] : @guaranteed $D
 // CHECK:       [[METHOD:%.*]] = class_method [[D]] : $D, #D.x!materializeForSet.1
 // CHECK:       apply [[METHOD]]({{.*}}, [[D]])
+// CHECK:       begin_access [modify] [unsafe]
 // CHECK-NOT:   begin_access
 

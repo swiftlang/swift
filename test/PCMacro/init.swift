@@ -2,7 +2,7 @@
 // RUN: cp %s %t/main.swift
 // RUN: %target-build-swift -Xfrontend -pc-macro -o %t/main %S/Inputs/PCMacroRuntime.swift %t/main.swift
 // RUN: %target-run %t/main | %FileCheck %s
-// RUN: %target-build-swift -Xfrontend -pc-macro -Xfrontend -playground -Xfrontend -debugger-support -o %t/main %S/Inputs/PCMacroRuntime.swift %t/main.swift %S/Inputs/SilentPlaygroundsRuntime.swift
+// RUN: %target-build-swift -Xfrontend -pc-macro -Xfrontend -playground -o %t/main %S/Inputs/PCMacroRuntime.swift %t/main.swift %S/Inputs/SilentPlaygroundsRuntime.swift
 // RUN: %target-run %t/main | %FileCheck %s
 // REQUIRES: executable_test
 // XFAIL: *

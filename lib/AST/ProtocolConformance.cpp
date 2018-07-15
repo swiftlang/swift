@@ -130,12 +130,6 @@ ProtocolConformanceRef::getTypeWitnessByName(Type type,
                                              ProtocolConformanceRef conformance,
                                              Identifier name,
                                              LazyResolver *resolver) {
-  // For an archetype, retrieve the nested type with the appropriate
-  // name. There are no conformance tables.
-  if (auto archetype = type->getAs<ArchetypeType>()) {
-    return archetype->getNestedType(name);
-  }
-
   // Find the named requirement.
   AssociatedTypeDecl *assocType = nullptr;
   auto members = conformance.getRequirement()->lookupDirect(name);
@@ -149,8 +143,15 @@ ProtocolConformanceRef::getTypeWitnessByName(Type type,
   if (!assocType)
     return nullptr;
 
-  if (conformance.isAbstract())
+  if (conformance.isAbstract()) {
+    // For an archetype, retrieve the nested type with the appropriate
+    // name. There are no conformance tables.
+    if (auto archetype = type->getAs<ArchetypeType>()) {
+      return archetype->getNestedType(name);
+    }
+
     return DependentMemberType::get(type, assocType);
+  }
 
   auto concrete = conformance.getConcrete();
   if (!concrete->hasTypeWitness(assocType, resolver)) {
@@ -861,7 +862,7 @@ void SpecializedProtocolConformance::computeConditionalRequirements() const {
     auto &ctxt = getProtocol()->getASTContext();
     ConditionalRequirements = ctxt.AllocateCopy(newReqs);
   } else {
-    ConditionalRequirements = {};
+    ConditionalRequirements = ArrayRef<Requirement>();
   }
 }
 

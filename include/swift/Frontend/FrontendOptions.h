@@ -105,6 +105,7 @@ public:
   enum class ActionType {
     NoneAction,        ///< No specific action
     Parse,             ///< Parse only
+    ResolveImports,    ///< Parse and resolve imports only
     Typecheck,         ///< Parse and type-check only
     DumpParse,         ///< Parse only and dump AST
     DumpInterfaceHash, ///< Parse and dump the interface token hash.
@@ -244,13 +245,14 @@ public:
 
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {
+    Default,        ///< Do the default validation for the current platform.
     None,           ///< Do no validation.
     MissingFromTBD, ///< Only check for symbols that are in IR but not TBD.
     All, ///< Check for symbols that are in IR but not TBD and TBD but not IR.
   };
 
   /// Compare the symbols in the IR against the TBD file we would generate.
-  TBDValidationMode ValidateTBDAgainstIR = TBDValidationMode::None;
+  TBDValidationMode ValidateTBDAgainstIR = TBDValidationMode::Default;
 
   /// The install_name to use in the TBD file.
   std::string TBDInstallName;
@@ -295,6 +297,7 @@ public:
 
 private:
   static bool canActionEmitDependencies(ActionType);
+  static bool canActionEmitReferenceDependencies(ActionType);
   static bool canActionEmitObjCHeader(ActionType);
   static bool canActionEmitLoadedModuleTrace(ActionType);
   static bool canActionEmitModule(ActionType);

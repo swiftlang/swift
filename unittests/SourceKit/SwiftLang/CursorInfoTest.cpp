@@ -136,8 +136,7 @@ public:
     auto Args = CArgs.hasValue() ? makeArgs(DocName, *CArgs)
                                  : std::vector<const char *>{};
     auto Buf = MemoryBuffer::getMemBufferCopy(Text, DocName);
-    getLang().editorOpen(DocName, Buf.get(), /*EnableSyntaxMap=*/false,
-                         Consumer, Args);
+    getLang().editorOpen(DocName, Buf.get(), Consumer, Args);
   }
 
   void replaceText(StringRef DocName, unsigned Offset, unsigned Length,
