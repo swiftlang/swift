@@ -682,7 +682,7 @@ public:
   SmallPtrSet<SILInstruction*, 8> explicitCopyMarkers;
 
   struct PartitionedTensorProgram {
-    // Needed to work with unique_ptr.
+    // Initialize all members to NULL.
     PartitionedTensorProgram() {}
 
     PartitionedTensorProgram(

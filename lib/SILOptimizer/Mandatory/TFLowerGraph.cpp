@@ -598,11 +598,11 @@ public:
                        ArrayRef<int64_t> dims, ArrayRef<int> numDims,
                        ArrayRef<int64_t *> dimPtrs);
 
-  // For `op` with `opName` under construction, set a function typed attribute
+  // For `op` with `opName` under construction, set a function-typed attribute
   // with a graph function name derived from `silFuncName` under the following
-  // naming convention Let `silFuncName` be "$foo", then the corresponding graph
-  // function name is "foo.tf_only". If that graph function's definition is
-  // available in `graphFunctions`, copy it cover to `resultGraph`. Otherwise
+  // naming convention: Let `silFuncName` be "$foo", then the corresponding
+  // graph function name is "foo.tf_only". If that graph function's definition
+  // is available in `graphFunctions`, copy it over to `resultGraph`. Otherwise
   // add an entry to `pendingGraphFnNames`, so that the graph function
   // definition can be copied over later when it becomes available.
   bool handleFunctionAttribute(TF_OperationDescription *op,
@@ -1650,23 +1650,13 @@ static bool copyGraphFunctions(SILFunction &fn, SILLocation loc,
     }
   };
 
-  // TODO: enable `foundFunc` related logic when the TF_GetFunctionName() API is
-  // added to TF. bool foundFunc = false;
+  // TODO: Add sanity-check code that `funcs` include a function named
+  // `graphFuncName`.
   for (auto *func : funcs) {
-#if 0
-#ifndef NDEBUG
-    const char *funcName = TF_GetFunctionName(func);
-    DEBUG(llvm::dbgs() << " Copying graph function " << funcName << " over.\n");
-    if (std::string(funcName) == graphFuncName)
-      foundFunc = true;
-#endif // NDEBUG
-#endif // 0
     TF_GraphCopyFunction(resultGraph, func, /*gradient*/ nullptr, status);
     if (checkStatus(fn, loc, status))
       return true;
   }
-  // assert(foundFunc);
-  // (void)foundFunc;
 
   // All done!
   return false;
