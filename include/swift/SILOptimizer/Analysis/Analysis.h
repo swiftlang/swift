@@ -83,14 +83,13 @@ private:
   bool invalidationLock;
 
 public:
-
   /// Returns the kind of derived class.
   AnalysisKind getKind() const { return kind; }
 
-  /// C'tor.
+  /// Constructor.
   SILAnalysis(AnalysisKind k) : kind(k), invalidationLock(false) {}
 
-  /// D'tor.
+  /// Destructor.
   virtual ~SILAnalysis() {}
   
   /// Can be used to retrieve other analysis passes from \p PM, which this
@@ -104,7 +103,7 @@ public:
   void unlockInvalidation() { invalidationLock = false; }
 
   /// Return True if this analysis is locked and should not be invalidated.
-  bool isLocked() { return invalidationLock; }
+  bool isLocked() const { return invalidationLock; }
 
   /// Invalidate all information in this analysis.
   virtual void invalidate() = 0;
@@ -137,10 +136,12 @@ public:
   static void verifyFunction(SILFunction *F);
 };
 
-// RAII helper for locking analyses.
+/// RAII helper for locking analyses. Locks the analysis upon construction and
+/// unlocks upon destruction.
 class AnalysisPreserver {
   SILAnalysis *analysis;
-  public:
+
+public:
   AnalysisPreserver(SILAnalysis *a) : analysis(a) {
     analysis->lockInvalidation();
   }
