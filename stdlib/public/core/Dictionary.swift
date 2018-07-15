@@ -897,7 +897,7 @@ extension Dictionary {
   ///   transformed value of the same or of a different type.
   /// - Returns: A dictionary containing the keys and transformed values of
   ///   this dictionary.
-  @inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func compactMapValues<T>(
     _ transform: (Value) throws -> T?
   ) rethrows -> Dictionary<Key, T> {
