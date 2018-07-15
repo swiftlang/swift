@@ -119,7 +119,7 @@ set(SWIFTLIB_ESSENTIAL
   Shims.swift
   Slice.swift
   SmallString.swift
-  Sort.swift.gyb
+  Sort.swift
   StaticString.swift
   Stride.swift.gyb
   StringHashable.swift  # ORDER DEPENDENCY: Must precede String.swift
