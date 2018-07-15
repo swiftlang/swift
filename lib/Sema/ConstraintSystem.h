@@ -790,6 +790,16 @@ enum class ConstraintSystemFlags {
   /// If set, this is going to prevent constraint system from erasing all
   /// discovered solutions except the best one.
   ReturnAllDiscoveredSolutions = 0x04,
+
+  /// Set if the client wants diagnostics suppressed.
+  SuppressDiagnostics = 0x08,
+
+  /// If set, the client wants a best-effort solution to the constraint system,
+  /// but can tolerate a solution where all of the constraints are solved, but
+  /// not all type variables have been determined.  In this case, the constraint
+  /// system is not applied to the expression AST, but the ConstraintSystem is
+  /// left in-tact.
+  AllowUnresolvedTypeVariables = 0x10,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -1707,6 +1717,10 @@ public:
       return false;
 
     return !solverState || solverState->recordFixes;
+  }
+
+  bool shouldSuppressDiagnostics() {
+    return Options.contains(ConstraintSystemFlags::SuppressDiagnostics);
   }
 
   /// \brief Log and record the application of the fix. Return true iff any
@@ -2962,7 +2976,6 @@ private:
                                      bool *foundConsistent);
   bool areBindPairConsistent(Constraint *first, Constraint *second);
 
-public:
   /// \brief Solve the system of constraints generated from provided expression.
   ///
   /// \param expr The expression to generate constraints from.
@@ -2974,12 +2987,34 @@ public:
   ///
   /// \returns Error is an error occurred, Solved is system is consistent
   /// and solutions were found, Unsolved otherwise.
-  SolutionKind solve(Expr *&expr,
-                     Type convertType,
-                     ExprTypeCheckListener *listener,
-                     SmallVectorImpl<Solution> &solutions,
-                     FreeTypeVariableBinding allowFreeTypeVariables
-                       = FreeTypeVariableBinding::Disallow);
+  SolutionKind solveImpl(Expr *&expr,
+                         Type convertType,
+                         ExprTypeCheckListener *listener,
+                         SmallVectorImpl<Solution> &solutions,
+                         FreeTypeVariableBinding allowFreeTypeVariables
+                          = FreeTypeVariableBinding::Disallow);
+
+public:
+  /// \brief Solve the system of constraints generated from provided expression.
+  ///
+  /// The expression should have already been pre-checked with
+  /// preCheckExpression().
+  ///
+  /// \param expr The expression to generate constraints from.
+  /// \param convertType The expected type of the expression.
+  /// \param listener The callback to check solving progress.
+  /// \param solutions The set of solutions to the system of constraints.
+  /// \param allowFreeTypeVariables How to bind free type variables in
+  /// the solution.
+  ///
+  /// \returns true is an error occurred, false is system is consistent
+  /// and solutions were found.
+  bool solve(Expr *&expr,
+             Type convertType,
+             ExprTypeCheckListener *listener,
+             SmallVectorImpl<Solution> &solutions,
+             FreeTypeVariableBinding allowFreeTypeVariables
+             = FreeTypeVariableBinding::Disallow);
 
   /// \brief Solve the system of constraints.
   ///
@@ -3067,7 +3102,6 @@ public:
   /// non-single expression closures.
   Expr *applySolution(Solution &solution, Expr *expr,
                       Type convertType, bool discardedExpr,
-                      bool suppressDiagnostics,
                       bool skipClosures);
 
   /// \brief Apply a given solution to the expression to the top-level

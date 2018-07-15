@@ -1487,22 +1487,6 @@ public:
   /// expression and folding sequence expressions.
   bool preCheckExpression(Expr *&expr, DeclContext *dc);
 
-  /// Sets up and solves the constraint system \p cs to type check the given
-  /// expression.
-  ///
-  /// The expression should have already been pre-checked with
-  /// preCheckExpression().
-  ///
-  /// \returns true if an error occurred, false otherwise.
-  ///
-  /// \see typeCheckExpression
-  bool solveForExpression(Expr *&expr, DeclContext *dc, Type convertType,
-                          FreeTypeVariableBinding allowFreeTypeVariables,
-                          ExprTypeCheckListener *listener,
-                          constraints::ConstraintSystem &cs,
-                          SmallVectorImpl<constraints::Solution> &viable,
-                          TypeCheckExprOptions options);
-
   /// \name Name lookup
   ///
   /// Routines that perform name lookup.
