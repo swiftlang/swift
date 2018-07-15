@@ -292,6 +292,39 @@ extension UInt {
   }
 }
 
+// Pointer arithmetic operators (formerly via Strideable)
+extension Strideable where Self : _Pointer {
+  @_transparent
+  public static func + (lhs: Self, rhs: Self.Stride) -> Self {
+    return lhs.advanced(by: rhs)
+  }
+
+  @_transparent
+  public static func + (lhs: Self.Stride, rhs: Self) -> Self {
+    return rhs.advanced(by: lhs)
+  }
+
+  @_transparent
+  public static func - (lhs: Self, rhs: Self.Stride) -> Self {
+    return lhs.advanced(by: -rhs)
+  }
+
+  @_transparent
+  public static func - (lhs: Self, rhs: Self) -> Self.Stride {
+    return rhs.distance(to: lhs)
+  }
+
+  @_transparent
+  public static func += (lhs: inout Self, rhs: Self.Stride) {
+    lhs = lhs.advanced(by: rhs)
+  }
+
+  @_transparent
+  public static func -= (lhs: inout Self, rhs: Self.Stride) {
+    lhs = lhs.advanced(by: -rhs)
+  }
+}
+
 /// Derive a pointer argument from a convertible pointer type.
 @_transparent
 public // COMPILER_INTRINSIC

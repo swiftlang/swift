@@ -969,18 +969,3 @@ extension OpaquePointer {
     self._rawValue = unwrapped._rawValue
   }
 }
-
-
-extension UnsafeMutableRawPointer {
-  @available(*, unavailable, renamed: "init(mutating:)")
-  public init(_ from : UnsafeRawPointer) { Builtin.unreachable() }
-
-  @available(*, unavailable, renamed: "init(mutating:)")
-  public init?(_ from : UnsafeRawPointer?) { Builtin.unreachable(); return nil }
-
-  @available(*, unavailable, renamed: "init(mutating:)")
-  public init<T>(_ from : UnsafePointer<T>) { Builtin.unreachable() }
-
-  @available(*, unavailable, renamed: "init(mutating:)")
-  public init?<T>(_ from : UnsafePointer<T>?) { Builtin.unreachable(); return nil }
-}
