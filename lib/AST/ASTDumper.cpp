@@ -1877,8 +1877,8 @@ public:
   }
 
   void visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *E) {
-    printCommon(E, "other_constructor_ref_expr")
-      << " decl=";
+    printCommon(E, "other_constructor_ref_expr");
+    PrintWithColorRAII(OS, DeclColor) << " decl=";
     printDeclRef(E->getDeclRef());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
@@ -1917,9 +1917,9 @@ public:
   }
 
   void visitMemberRefExpr(MemberRefExpr *E) {
-    printCommon(E, "member_ref_expr")
-      << " decl=";
-    E->getMember().dump(OS);
+    printCommon(E, "member_ref_expr");
+    PrintWithColorRAII(OS, DeclColor) << " decl=";
+    printDeclRef(E->getMember());
     if (E->getAccessSemantics() != AccessSemantics::Ordinary)
       PrintWithColorRAII(OS, AccessLevelColor)
         << " " << getAccessSemanticsString(E->getAccessSemantics());
@@ -1931,8 +1931,8 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitDynamicMemberRefExpr(DynamicMemberRefExpr *E) {
-    printCommon(E, "dynamic_member_ref_expr")
-      << " decl=";
+    printCommon(E, "dynamic_member_ref_expr");
+    PrintWithColorRAII(OS, DeclColor) << " decl=";
     E->getMember().dump(OS);
     OS << '\n';
     printRec(E->getBase());
@@ -2013,7 +2013,7 @@ public:
     if (E->isSuper())
       OS << " super";
     if (E->hasDecl()) {
-      OS << "  decl=";
+      PrintWithColorRAII(OS, DeclColor) << " decl=";
       printDeclRef(E->getDecl());
     }
     printArgumentLabels(E->getArgumentLabels());
@@ -2032,9 +2032,9 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitDynamicSubscriptExpr(DynamicSubscriptExpr *E) {
-    printCommon(E, "dynamic_subscript_expr")
-      << " decl=";
-    E->getMember().dump(OS);
+    printCommon(E, "dynamic_subscript_expr");
+    PrintWithColorRAII(OS, DeclColor) << " decl=";
+    printDeclRef(E->getMember());
     printArgumentLabels(E->getArgumentLabels());
     OS << '\n';
     printRec(E->getBase());
@@ -2518,12 +2518,8 @@ public:
   void visitObjCSelectorExpr(ObjCSelectorExpr *E) {
     printCommon(E, "objc_selector_expr");
     OS << " kind=" << getObjCSelectorExprKindString(E->getSelectorKind());
-    OS << " decl=";
-    if (auto method = E->getMethod()) {
-      method->dumpRef(OS);
-    } else {
-      OS << "<unresolved>";
-    }
+    PrintWithColorRAII(OS, DeclColor) << " decl=";
+    printDeclRef(E->getMethod());
     OS << '\n';
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
