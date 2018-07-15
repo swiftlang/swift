@@ -1,12 +1,12 @@
-set(ARC_SOURCES
-  ARC/ARCBBState.cpp
-  ARC/ARCLoopOpts.cpp
-  ARC/ARCMatchingSet.cpp
-  ARC/ARCRegionState.cpp
-  ARC/ARCSequenceOpts.cpp
-  ARC/GlobalARCSequenceDataflow.cpp
-  ARC/GlobalLoopARCSequenceDataflow.cpp
-  ARC/RCStateTransition.cpp
-  ARC/RCStateTransitionVisitors.cpp
-  ARC/RefCountState.cpp
-  PARENT_SCOPE)
+silopt_register_sources(
+  ARCBBState.cpp
+  ARCLoopOpts.cpp
+  ARCMatchingSet.cpp
+  ARCRegionState.cpp
+  ARCSequenceOpts.cpp
+  GlobalARCSequenceDataflow.cpp
+  GlobalLoopARCSequenceDataflow.cpp
+  RCStateTransition.cpp
+  RCStateTransitionVisitors.cpp
+  RefCountState.cpp
+)

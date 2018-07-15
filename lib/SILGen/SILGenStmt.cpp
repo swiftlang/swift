@@ -426,7 +426,7 @@ namespace {
     SourceLoc deferLoc;
   public:
     DeferEscapeCheckerCleanup(SourceLoc deferLoc) : deferLoc(deferLoc) {}
-    void emit(SILGenFunction &SGF, CleanupLocation l) override {
+    void emit(SILGenFunction &SGF, CleanupLocation l, ForUnwind_t forUnwind) override {
       assert(false && "Sema didn't catch exit out of a defer?");
     }
     void dump(SILGenFunction &) const override {
@@ -446,7 +446,7 @@ namespace {
   public:
     DeferCleanup(SourceLoc deferLoc, Expr *call)
       : deferLoc(deferLoc), call(call) {}
-    void emit(SILGenFunction &SGF, CleanupLocation l) override {
+    void emit(SILGenFunction &SGF, CleanupLocation l, ForUnwind_t forUnwind) override {
       SGF.Cleanups.pushCleanup<DeferEscapeCheckerCleanup>(deferLoc);
       auto TheCleanup = SGF.Cleanups.getTopCleanup();
 
@@ -467,14 +467,21 @@ namespace {
 
 void StmtEmitter::visitDeferStmt(DeferStmt *S) {
   // Emit the closure for the defer, along with its binding.
-  SGF.visitFuncDecl(S->getTempDecl());
+  // If the defer is at the top-level code, insert 'mark_escape_inst'
+  // to the top-level code to check initialization of any captured globals.
+  FuncDecl *deferDecl = S->getTempDecl();
+  auto declCtxKind = deferDecl->getDeclContext()->getContextKind();
+  auto &sgm = SGF.SGM;
+  if (declCtxKind == DeclContextKind::TopLevelCodeDecl && sgm.TopLevelSGF &&
+      sgm.TopLevelSGF->B.hasValidInsertionPoint()) {
+    sgm.emitMarkFunctionEscapeForTopLevelCodeGlobals(
+        S, deferDecl->getCaptureInfo());
+  }
+  SGF.visitFuncDecl(deferDecl);
 
   // Register a cleanup to invoke the closure on any exit paths.
   SGF.Cleanups.pushCleanup<DeferCleanup>(S->getDeferLoc(), S->getCallExpr());
 }
-
-
-
 
 void StmtEmitter::visitIfStmt(IfStmt *S) {
   Scope condBufferScope(SGF.Cleanups, S);
@@ -1003,5 +1010,5 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
   }
 
   // Branch to the cleanup destination.
-  Cleanups.emitBranchAndCleanups(ThrowDest, loc, exn);
+  Cleanups.emitBranchAndCleanups(ThrowDest, loc, exn, IsForUnwind);
 }

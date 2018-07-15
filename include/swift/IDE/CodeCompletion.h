@@ -503,6 +503,7 @@ enum class CompletionKind {
   ReturnStmtExpr,
   ForEachSequence,
   AfterPound,
+  AfterIfStmtElse,
   GenericParams,
   SwiftKeyPath,
 };

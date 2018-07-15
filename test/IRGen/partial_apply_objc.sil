@@ -11,8 +11,8 @@ import Foundation
 import gizmo
 
 @objc class ObjCClass : BaseClassForMethodFamilies {
-  func method(x: Int) {}
-  func method2(r: NSRect) {}
+  @objc func method(x: Int) {}
+  @objc func method2(r: NSRect) {}
 
   override func fakeInitFamily() -> ObjCClass { return self }
 }

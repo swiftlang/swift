@@ -465,7 +465,7 @@ private:
 static StructDecl *createContextStructForFunction(SILFunction *function,
                                                   StringRef name) {
   auto *swiftModule = function->getModule().getSwiftModule();
-  auto &file = swiftModule->getMainFile(FileUnitKind::Derived);
+  auto &file = swiftModule->getMainFile(FileUnitKind::Source);
   auto &ctx = file.getASTContext();
   auto *genParams = function->getDeclContext()->getGenericParamsOfContext();
   auto structId = ctx.getIdentifier(name);

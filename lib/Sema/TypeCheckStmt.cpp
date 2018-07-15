@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -642,11 +642,9 @@ public:
       // Create a pattern binding to initialize the generator.
       auto genPat = new (TC.Context) NamedPattern(generator);
       genPat->setImplicit();
-      auto genBinding =
-          PatternBindingDecl::create(TC.Context, SourceLoc(),
-                                     StaticSpellingKind::None,
-                                     S->getForLoc(), genPat, getIterator, DC);
-      genBinding->setImplicit();
+      auto *genBinding = PatternBindingDecl::createImplicit(
+          TC.Context, StaticSpellingKind::None, genPat, getIterator, DC,
+          /*VarLoc*/ S->getForLoc());
       S->setIterator(genBinding);
     }
 
@@ -948,7 +946,7 @@ public:
 
       // If the previous case fellthrough, similarly check that that case's bindings
       // includes our first label item's pattern bindings and types.
-      if (PreviousFallthrough) {
+      if (PreviousFallthrough && previousBlock) {
         auto firstPattern = caseBlock->getCaseLabelItems()[0].getPattern();
         SmallVector<VarDecl *, 4> Vars;
         firstPattern->collectVariables(Vars);

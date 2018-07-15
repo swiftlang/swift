@@ -64,7 +64,6 @@ def TypedUnaryIntrinsicFunctions():
 %  if bits == 80:
 #if !os(Windows) && (arch(i386) || arch(x86_64))
 %  end
-@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public func _${ufunc}(_ x: ${T}) -> ${T} {
   return ${T}(Builtin.int_${ufunc}_FPIEEE${bits}(x._value))

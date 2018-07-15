@@ -9,7 +9,7 @@
 import Foundation
 
 public class Horse : NSObject {
-  public dynamic func gallop() {}
+  @objc public dynamic func gallop() {}
 }
 
 // Make sure we can reference dynamic thunks and curry thunks

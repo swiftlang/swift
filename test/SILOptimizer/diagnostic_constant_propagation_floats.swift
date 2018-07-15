@@ -191,3 +191,28 @@ func testFloatArithmetic() {
   let b: Float = 10.0
   _blackHole(a * b)
 }
+
+func testIntToFloatConversion() {
+  let f1: Float = 16777216
+  _blackHole(f1)
+
+  let f2: Float = 1_000_000_000_000 // expected-warning {{'1000000000000' is not exactly representable as 'Float'; it becomes '999999995904'}}
+  _blackHole(f2)
+
+  // First positive integer that cannot be precisely represented in Float: 2^24 + 1
+  let f3: Float = 16777217 // expected-warning {{'16777217' is not exactly representable as 'Float'; it becomes '16777216'}}
+  _blackHole(f3)
+
+  let d1: Double = 9_007_199_254_740_992 // This value is 2^53
+  _blackHole(d1)
+
+  // FIXME: False Negative: no warning is produced here since we do not
+  // distinguish between implicit Double conversion that are within the
+  // context of an explicit conversion from others.
+  let d2: Double = 9_007_199_254_740_993
+  _blackHole(d2)
+
+   // No warnings are emitted for conversion through explicit constructor calls.
+  _blackHole(Float(16777217))
+  _blackHole(Double(2_147_483_647))
+}

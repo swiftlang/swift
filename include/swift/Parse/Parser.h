@@ -414,7 +414,7 @@ public:
     BacktrackingScope(Parser &P)
         : P(P), PP(P.getParserPosition()), DT(P.Diags) {
       SynContext.emplace(P.SyntaxContext);
-      SynContext->setDiscard();
+      SynContext->setBackTracking();
     }
 
     ~BacktrackingScope();
@@ -909,7 +909,7 @@ public:
                 TypeLoc elementTy, ParameterList *indices,
                 SmallVectorImpl<Decl *> &decls);
 
-    AbstractStorageDecl::StorageKindTy
+    StorageImplInfo
     classify(Parser &P, AbstractStorageDecl *storage, bool invalid,
              ParseDeclOptions flags, SourceLoc staticLoc,
              const DeclAttributes &attrs,

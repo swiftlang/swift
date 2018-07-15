@@ -20,8 +20,6 @@ uint32_t getMetadataKindOf(
     OpaqueValue *value,
     const Metadata *type
 ) {
-  auto result = uint32_t(type->getKind());
-  SWIFT_CC_PLUSONE_GUARD(type->vw_destroy(value));
-  return result;
+  return uint32_t(type->getKind());
 }
 

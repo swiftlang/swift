@@ -52,7 +52,7 @@ public class NWProtocolIP : NWProtocol {
 
 		/// Specify a single version of the Internet NWProtocol to allow.
 		/// Setting this value will constrain which address endpoints can
-		/// be used, and will filter DNS results during connection establishement.
+		/// be used, and will filter DNS results during connection establishment.
 		public var version: Version {
 			set {
 				self._version = newValue

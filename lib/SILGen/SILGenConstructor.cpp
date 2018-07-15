@@ -31,7 +31,10 @@ static SILValue emitConstructorMetatypeArg(SILGenFunction &SGF,
                                            ValueDecl *ctor) {
   // In addition to the declared arguments, the constructor implicitly takes
   // the metatype as its first argument, like a static function.
-  Type metatype = ctor->getInterfaceType()->castTo<AnyFunctionType>()->getInput();
+  auto ctorFnType = ctor->getInterfaceType()->castTo<AnyFunctionType>();
+  assert(ctorFnType->getParams().size() == 1 &&
+         "more than one self parameter?");
+  Type metatype = ctorFnType->getParams()[0].getType();
   auto *DC = ctor->getInnermostDeclContext();
   auto &AC = SGF.getASTContext();
   auto VD =
@@ -784,15 +787,13 @@ static ManagedValue emitSelfForMemberInit(SILGenFunction &SGF, SILLocation loc,
                                           VarDecl *selfDecl) {
   CanType selfFormalType = selfDecl->getType()->getCanonicalType();
   if (selfFormalType->hasReferenceSemantics())
-    return SGF.emitRValueForDecl(loc, selfDecl, selfDecl->getType(),
+    return SGF.emitRValueForDecl(loc, selfDecl, selfFormalType,
                                  AccessSemantics::DirectToStorage,
                                  SGFContext::AllowImmediatePlusZero)
       .getAsSingleValue(SGF, loc);
   else
-    return SGF.emitLValueForDecl(loc, selfDecl,
-                                 selfDecl->getType()->getCanonicalType(),
-                                 AccessKind::Write,
-                                 AccessSemantics::DirectToStorage);
+    return SGF.emitAddressOfLocalVarDecl(loc, selfDecl, selfFormalType,
+                                         AccessKind::Write);
 }
 
 static LValue emitLValueForMemberInit(SILGenFunction &SGF, SILLocation loc,
@@ -940,7 +941,7 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
       if (pbd->isStatic()) continue;
 
       for (auto entry : pbd->getPatternList()) {
-        auto init = entry.getInit();
+        auto init = entry.getNonLazyInit();
         if (!init) continue;
 
         // Cleanup after this initialization.

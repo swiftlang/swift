@@ -1,0 +1,214 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -licm | %FileCheck %s
+// REQUIRES: CPU=x86_64
+// REQUIRES: OS=macosx
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+var x: Int
+
+let reversedArray: ReversedCollection<[Int]>
+
+// x
+sil_global hidden @$S3tmp1xSivp : $Int
+
+// reversedArray
+sil_global hidden [let] @$S3tmp13reversedArrays18ReversedCollectionVySaySiGGvp : $ReversedCollection<Array<Int>>
+
+// _swiftEmptyArrayStorage
+sil_global @_swiftEmptyArrayStorage : $_SwiftEmptyArrayStorage
+
+
+// CHECK-LABEL: sil hidden @multi_end_licm : $@convention(thin) () -> () {
+// CHECK: bb2:
+// CHECK: [[GLOBALVAR:%.*]] = global_addr @$S3tmp1xSivp : $*Int
+// CHECK: [[BEGINA:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]] : $*Int
+// CHECK-NEXT: br [[LOOPH:bb[0-9]+]]({{.*}} : $Builtin.Int64)
+// CHECK: [[LOOPH]]({{.*}} : $Builtin.Int64)
+// CHECK: cond_br {{.*}}, [[LOOPCOND1:bb[0-9]+]], [[LOOPCOND2:bb[0-9]+]]
+// CHECK: [[LOOPCOND1]]:
+// CHECK-NEXT: store
+// CHECK-NEXT: cond_br {{.*}}, [[LOOPEXIT1:bb[0-9]+]], [[LOOPCONT1:bb[0-9]+]]
+// CHECK: [[LOOPEXIT1]]:
+// CHECK-NEXT: end_access [[BEGINA]] : $*Int
+// CHECK-NEXT: br [[LOOPAFTEREXIT:bb[0-9]+]]
+// CHECK: [[LOOPCOND2]]:
+// CHECK-NEXT: struct $Int
+// CHECK-NEXT: store
+// CHECK-NEXT: cond_br {{.*}}, [[LOOPEXIT2:bb[0-9]+]], [[LOOPCONT1]]
+// CHECK: [[LOOPEXIT2]]:
+// CHECK-NEXT: end_access [[BEGINA]] : $*Int
+// CHECK-NEXT: br [[LOOPAFTEREXIT]]
+// CHECK: [[LOOPCONT1]]:
+// CHECK-NEXT: br [[LOOPH]]
+// CHECK: [[LOOPAFTEREXIT]]:
+// CHECK-NEXT: br [[FUNCRET:bb[0-9]+]]
+// CHECK: [[FUNCRET]]:
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil hidden @multi_end_licm : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @$S3tmp13reversedArrays18ReversedCollectionVySaySiGGvp : $*ReversedCollection<Array<Int>>
+  %1 = struct_element_addr %0 : $*ReversedCollection<Array<Int>>, #ReversedCollection._base
+  %2 = struct_element_addr %1 : $*Array<Int>, #Array._buffer
+  %3 = struct_element_addr %2 : $*_ArrayBuffer<Int>, #_ArrayBuffer._storage
+  %4 = struct_element_addr %3 : $*_BridgeStorage<_ContiguousArrayStorageBase, _NSArrayCore>, #_BridgeStorage.rawValue
+  %5 = load %4 : $*Builtin.BridgeObject
+  %6 = unchecked_ref_cast %5 : $Builtin.BridgeObject to $_ContiguousArrayStorageBase
+  %7 = ref_element_addr %6 : $_ContiguousArrayStorageBase, #_ContiguousArrayStorageBase.countAndCapacity
+  %8 = struct_element_addr %7 : $*_ArrayBody, #_ArrayBody._storage
+  %9 = struct_element_addr %8 : $*_SwiftArrayBodyStorage, #_SwiftArrayBodyStorage.count
+  %10 = struct_element_addr %9 : $*Int, #Int._value
+  %11 = load %10 : $*Builtin.Int64
+  %12 = builtin "assumeNonNegative_Int64"(%11 : $Builtin.Int64) : $Builtin.Int64
+  %13 = integer_literal $Builtin.Int64, 0
+  %14 = integer_literal $Builtin.Int1, 0
+  %15 = builtin "cmp_eq_Int64"(%12 : $Builtin.Int64, %13 : $Builtin.Int64) : $Builtin.Int1
+  %16 = builtin "int_expect_Int1"(%15 : $Builtin.Int1, %14 : $Builtin.Int1) : $Builtin.Int1
+  cond_br %16, bb1, bb2
+
+bb1:
+  br bbRet
+
+bb2:
+  %19 = global_addr @$S3tmp1xSivp : $*Int
+  %20 = integer_literal $Builtin.Int64, 1
+  %21 = integer_literal $Builtin.Int1, -1
+  %23 = ref_tail_addr %6 : $_ContiguousArrayStorageBase, $Int
+  br bb4(%12 : $Builtin.Int64)
+
+bb4(%27 : $Builtin.Int64):
+  %28 = builtin "ssub_with_overflow_Int64"(%27 : $Builtin.Int64, %20 : $Builtin.Int64, %21 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %29 = tuple_extract %28 : $(Builtin.Int64, Builtin.Int1), 0
+  %30 = tuple_extract %28 : $(Builtin.Int64, Builtin.Int1), 1
+  cond_fail %30 : $Builtin.Int1
+  %32 = builtin "cmp_slt_Int64"(%29 : $Builtin.Int64, %13 : $Builtin.Int64) : $Builtin.Int1
+  %33 = load %10 : $*Builtin.Int64
+  %34 = builtin "assumeNonNegative_Int64"(%33 : $Builtin.Int64) : $Builtin.Int64 
+  %35 = builtin "cmp_slt_Int64"(%29 : $Builtin.Int64, %34 : $Builtin.Int64) : $Builtin.Int1
+  %36 = builtin "xor_Int1"(%35 : $Builtin.Int1, %21 : $Builtin.Int1) : $Builtin.Int1
+  %37 = builtin "or_Int1"(%32 : $Builtin.Int1, %36 : $Builtin.Int1) : $Builtin.Int1
+  cond_fail %37 : $Builtin.Int1
+  %39 = builtin "truncOrBitCast_Int64_Word"(%29 : $Builtin.Int64) : $Builtin.Word
+  %40 = index_addr %23 : $*Int, %39 : $Builtin.Word
+  %41 = struct_element_addr %40 : $*Int, #Int._value
+  %42 = load %41 : $*Builtin.Int64
+  %43 = struct $Int (%42 : $Builtin.Int64)
+  debug_value %43 : $Int, let, name "item"
+  %global = begin_access [modify] [dynamic] [no_nested_conflict] %19 : $*Int
+  %46 = builtin "cmp_eq_Int64"(%29 : $Builtin.Int64, %13 : $Builtin.Int64) : $Builtin.Int1
+  %47 = builtin "int_expect_Int1"(%46 : $Builtin.Int1, %14 : $Builtin.Int1) : $Builtin.Int1
+  cond_br %47, bbend1, bbend2
+  
+bbend1:
+  store %43 to %global : $*Int
+  end_access %global : $*Int
+  cond_br %47, bb6, bb5
+  
+bbend2:
+  %otherInt = struct $Int (%27 : $Builtin.Int64)
+  store %otherInt to %global : $*Int
+  end_access %global : $*Int
+  cond_br %47, bb6, bb5
+
+bb5:
+  br bb4(%29 : $Builtin.Int64)
+
+bb6:
+  br bbRet
+  
+bbRet:
+  %25 = tuple ()
+  return %25 : $()
+} // end sil function 'multi_end_licm'
+
+// CHECK-LABEL: sil hidden @multi_end_licm_loop_exit : $@convention(thin) () -> () {
+// CHECK: br [[LOOPH:bb[0-9]+]]({{.*}} : $Builtin.Int64)
+// CHECK: [[LOOPH]]({{.*}} : $Builtin.Int64)
+// CHECK: begin_access [modify] [dynamic] [no_nested_conflict]
+// CHECK: cond_br {{.*}}, [[LOOPCOND1:bb[0-9]+]], [[LOOPCOND2:bb[0-9]+]]
+// CHECK: [[LOOPCOND1]]
+// CHECK-NEXT: store
+// CHECK-NEXT: end_access
+// CHECK: return
+sil hidden @multi_end_licm_loop_exit : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @$S3tmp13reversedArrays18ReversedCollectionVySaySiGGvp : $*ReversedCollection<Array<Int>>
+  %1 = struct_element_addr %0 : $*ReversedCollection<Array<Int>>, #ReversedCollection._base
+  %2 = struct_element_addr %1 : $*Array<Int>, #Array._buffer
+  %3 = struct_element_addr %2 : $*_ArrayBuffer<Int>, #_ArrayBuffer._storage
+  %4 = struct_element_addr %3 : $*_BridgeStorage<_ContiguousArrayStorageBase, _NSArrayCore>, #_BridgeStorage.rawValue
+  %5 = load %4 : $*Builtin.BridgeObject
+  %6 = unchecked_ref_cast %5 : $Builtin.BridgeObject to $_ContiguousArrayStorageBase
+  %7 = ref_element_addr %6 : $_ContiguousArrayStorageBase, #_ContiguousArrayStorageBase.countAndCapacity
+  %8 = struct_element_addr %7 : $*_ArrayBody, #_ArrayBody._storage
+  %9 = struct_element_addr %8 : $*_SwiftArrayBodyStorage, #_SwiftArrayBodyStorage.count
+  %10 = struct_element_addr %9 : $*Int, #Int._value
+  %11 = load %10 : $*Builtin.Int64
+  %12 = builtin "assumeNonNegative_Int64"(%11 : $Builtin.Int64) : $Builtin.Int64
+  %13 = integer_literal $Builtin.Int64, 0
+  %14 = integer_literal $Builtin.Int1, 0
+  %15 = builtin "cmp_eq_Int64"(%12 : $Builtin.Int64, %13 : $Builtin.Int64) : $Builtin.Int1
+  %16 = builtin "int_expect_Int1"(%15 : $Builtin.Int1, %14 : $Builtin.Int1) : $Builtin.Int1
+  cond_br %16, bb1, bb2
+
+bb1:
+  br bbRet
+
+bb2:
+  %19 = global_addr @$S3tmp1xSivp : $*Int
+  %20 = integer_literal $Builtin.Int64, 1
+  %21 = integer_literal $Builtin.Int1, -1
+  %23 = ref_tail_addr %6 : $_ContiguousArrayStorageBase, $Int
+  br bb4(%12 : $Builtin.Int64)
+
+bb4(%27 : $Builtin.Int64):
+  %28 = builtin "ssub_with_overflow_Int64"(%27 : $Builtin.Int64, %20 : $Builtin.Int64, %21 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %29 = tuple_extract %28 : $(Builtin.Int64, Builtin.Int1), 0
+  %30 = tuple_extract %28 : $(Builtin.Int64, Builtin.Int1), 1
+  cond_fail %30 : $Builtin.Int1
+  %32 = builtin "cmp_slt_Int64"(%29 : $Builtin.Int64, %13 : $Builtin.Int64) : $Builtin.Int1
+  %33 = load %10 : $*Builtin.Int64
+  %34 = builtin "assumeNonNegative_Int64"(%33 : $Builtin.Int64) : $Builtin.Int64 
+  %35 = builtin "cmp_slt_Int64"(%29 : $Builtin.Int64, %34 : $Builtin.Int64) : $Builtin.Int1
+  %36 = builtin "xor_Int1"(%35 : $Builtin.Int1, %21 : $Builtin.Int1) : $Builtin.Int1
+  %37 = builtin "or_Int1"(%32 : $Builtin.Int1, %36 : $Builtin.Int1) : $Builtin.Int1
+  cond_fail %37 : $Builtin.Int1
+  %39 = builtin "truncOrBitCast_Int64_Word"(%29 : $Builtin.Int64) : $Builtin.Word
+  %40 = index_addr %23 : $*Int, %39 : $Builtin.Word
+  %41 = struct_element_addr %40 : $*Int, #Int._value
+  %42 = load %41 : $*Builtin.Int64
+  %43 = struct $Int (%42 : $Builtin.Int64)
+  debug_value %43 : $Int, let, name "item"
+  %global = begin_access [modify] [dynamic] [no_nested_conflict] %19 : $*Int
+  %46 = builtin "cmp_eq_Int64"(%29 : $Builtin.Int64, %13 : $Builtin.Int64) : $Builtin.Int1
+  %47 = builtin "int_expect_Int1"(%46 : $Builtin.Int1, %14 : $Builtin.Int1) : $Builtin.Int1
+  cond_br %47, bbend1, bbend2
+  
+bbend1:
+  store %43 to %global : $*Int
+  end_access %global : $*Int
+  cond_br %47, bb6, bb5
+  
+bbend2:
+  %otherInt = struct $Int (%27 : $Builtin.Int64)
+  store %otherInt to %global : $*Int
+  cond_br %47, bbOut, bb5
+
+bbOut:
+  end_access %global : $*Int
+  br bb6
+
+bb5:
+  br bb4(%29 : $Builtin.Int64)
+
+bb6:
+  br bbRet
+  
+bbRet:
+  %25 = tuple ()
+  return %25 : $()
+} // end sil function 'multi_end_licm_loop_exit'

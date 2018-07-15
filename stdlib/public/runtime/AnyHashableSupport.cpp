@@ -161,27 +161,9 @@ void _swift_makeAnyHashableUpcastingToHashableBaseType(
 
       if (auto unboxedHashableWT =
               swift_conformsToProtocol(unboxedType, &HashableProtocolDescriptor)) {
-#ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
-        ValueBuffer unboxedCopyBuf;
-        // Allocate buffer.
-        OpaqueValue *unboxedValueCopy =
-            unboxedType->allocateBufferIn(&unboxedCopyBuf);
-        // initWithCopy.
-        unboxedType->vw_initializeWithCopy(
-            unboxedValueCopy, const_cast<OpaqueValue *>(unboxedValue));
-
-        _swift_makeAnyHashableUpcastingToHashableBaseType(
-            unboxedValueCopy, anyHashableResultPointer, unboxedType,
-            unboxedHashableWT);
-
-        // Deallocate buffer.
-        unboxedType->deallocateBufferIn(&unboxedCopyBuf);
-        type->vw_destroy(value);
-#else
         _swift_makeAnyHashableUpcastingToHashableBaseType(
             const_cast<OpaqueValue *>(unboxedValue), anyHashableResultPointer,
             unboxedType, unboxedHashableWT);
-#endif
         return;
       }
     }

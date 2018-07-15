@@ -487,17 +487,29 @@ Fix Fix::getForcedDowncast(ConstraintSystem &cs, Type toType) {
   return Fix(FixKind::ForceDowncast, index);
 }
 
+Fix Fix::getUnwrapOptionalBase(ConstraintSystem &cs, DeclName memberName) {
+  unsigned index = cs.FixedDeclNames.size();
+  cs.FixedDeclNames.push_back(memberName);
+  return Fix(FixKind::UnwrapOptionalBase, index);
+}
+
 Type Fix::getTypeArgument(ConstraintSystem &cs) const {
   assert(getKind() == FixKind::ForceDowncast);
   return cs.FixedTypes[Data];
+}
+
+/// If this fix has a name argument, retrieve it.
+DeclName Fix::getDeclNameArgument(ConstraintSystem &cs) const {
+  assert(getKind() == FixKind::UnwrapOptionalBase);
+  return cs.FixedDeclNames[Data];
 }
 
 StringRef Fix::getName(FixKind kind) {
   switch (kind) {
   case FixKind::ForceOptional:
     return "fix: force optional";
-  case FixKind::OptionalChaining:
-    return "fix: optional chaining";
+  case FixKind::UnwrapOptionalBase:
+    return "fix: unwrap optional base of member lookup";
   case FixKind::ForceDowncast:
     return "fix: force downcast";
   case FixKind::AddressOf:

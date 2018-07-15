@@ -27,6 +27,7 @@
 #include <system_error>
 
 using namespace swift;
+using swift::version::Version;
 
 namespace {
 using AccessPathElem = std::pair<Identifier, SourceLoc>;
@@ -293,7 +294,7 @@ FileUnit *SerializedModuleLoader::loadAST(
 
     SmallString<32> versionBuf;
     llvm::raw_svector_ostream versionString(versionBuf);
-    versionString << Ctx.LangOpts.EffectiveLanguageVersion;
+    versionString << Version::getCurrentLanguageVersion();
     if (versionString.str() == shortVersion)
       return false;
 

@@ -88,11 +88,11 @@ import Foundation
 // CHECK:     { i8*, i8*, i8* } {
 // CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* @"\01L_selector_data(acceptSet:)", i64 0, i64 0),
 // CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* @{{[0-9]+}}, i64 0, i64 0),
-// CHECK:       i8* bitcast (void (%3*, i8*, %4*)* @"$S11objc_bridge3BasC9acceptSetyys0E0VyACSo8NSObjectCs8Hashable10ObjectiveCg_GFTo" to i8*)
+// CHECK:       i8* bitcast (void (%3*, i8*, %4*)* @"$S11objc_bridge3BasC9acceptSetyyShyACSo8NSObjectCSH10ObjectiveCg_GFTo" to i8*)
 // CHECK:     }
 // CHECK:     { i8*, i8*, i8* } { 
 // CHECK:       i8* getelementptr inbounds ([14 x i8], [14 x i8]* @"\01L_selector_data(.cxx_destruct)", i64 0, i64 0), 
-// CHECK:       i8* getelementptr inbounds ([3 x i8], [3 x i8]* @{{.*}}, i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* @{{.*}}, i64 0, i64 0),
 // CHECK:       i8* bitcast (void ([[OPAQUE:.*]]*, i8*)* @"$S11objc_bridge3BasCfETo" to i8*)
 // CHECK:     }
 // CHECK:   ]
@@ -132,7 +132,7 @@ var NSS : NSString = NSString()
 extension NSString {
   // CHECK: define internal [[OPAQUE:.*]]* @"$SSo8NSStringC11objc_bridgeE13nsstrFakePropABvgTo"([[OPAQUE:.*]]*, i8*) unnamed_addr
   // CHECK: define internal void @"$SSo8NSStringC11objc_bridgeE13nsstrFakePropABvsTo"([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr
-  var nsstrFakeProp : NSString {
+  @objc var nsstrFakeProp : NSString {
     get {
       return NSS
     }
@@ -140,20 +140,20 @@ extension NSString {
   }
 
   // CHECK: define internal [[OPAQUE:.*]]* @"$SSo8NSStringC11objc_bridgeE11nsstrResultAByFTo"([[OPAQUE:.*]]*, i8*) unnamed_addr
-  func nsstrResult() -> NSString { return NSS }
+  @objc func nsstrResult() -> NSString { return NSS }
 
   // CHECK: define internal void @"$SSo8NSStringC11objc_bridgeE8nsstrArg1syAB_tFTo"([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr
-  func nsstrArg(s s: NSString) { }
+  @objc func nsstrArg(s s: NSString) { }
 }
 
 class Bas : NSObject {
   // CHECK: define internal [[OPAQUE:.*]]* @"$S11objc_bridge3BasC11strRealPropSSvgTo"([[OPAQUE:.*]]*, i8*) unnamed_addr {{.*}} {
   // CHECK: define internal void @"$S11objc_bridge3BasC11strRealPropSSvsTo"([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr {{.*}} {
-  var strRealProp : String
+  @objc var strRealProp : String
 
   // CHECK: define internal [[OPAQUE:.*]]* @"$S11objc_bridge3BasC11strFakePropSSvgTo"([[OPAQUE:.*]]*, i8*) unnamed_addr {{.*}} {
   // CHECK: define internal void @"$S11objc_bridge3BasC11strFakePropSSvsTo"([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr {{.*}} {
-  var strFakeProp : String {
+  @objc var strFakeProp : String {
     get {
       return ""
     }
@@ -162,11 +162,11 @@ class Bas : NSObject {
 
   // CHECK: define internal [[OPAQUE:.*]]* @"$S11objc_bridge3BasC13nsstrRealPropSo8NSStringCvgTo"([[OPAQUE:.*]]*, i8*) unnamed_addr {{.*}} {
   // CHECK: define internal void @"$S11objc_bridge3BasC13nsstrRealPropSo8NSStringCvsTo"([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr {{.*}} {
-  var nsstrRealProp : NSString
+  @objc var nsstrRealProp : NSString
 
   // CHECK: define hidden swiftcc %TSo8NSStringC* @"$S11objc_bridge3BasC13nsstrFakePropSo8NSStringCvg"(%T11objc_bridge3BasC* swiftself) {{.*}} {
   // CHECK: define internal void @"$S11objc_bridge3BasC13nsstrFakePropSo8NSStringCvsTo"([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr {{.*}} {
-  var nsstrFakeProp : NSString {
+  @objc var nsstrFakeProp : NSString {
     get {
       return NSS
     }
@@ -174,14 +174,14 @@ class Bas : NSObject {
   }
 
   // CHECK: define internal [[OPAQUE:.*]]* @"$S11objc_bridge3BasC9strResultSSyFTo"([[OPAQUE:.*]]*, i8*) unnamed_addr {{.*}} {
-  func strResult() -> String { return "" }
+  @objc func strResult() -> String { return "" }
   // CHECK: define internal void @"$S11objc_bridge3BasC6strArg1sySS_tFTo"([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr {{.*}} {
-  func strArg(s s: String) { }
+  @objc func strArg(s s: String) { }
 
   // CHECK: define internal [[OPAQUE:.*]]* @"$S11objc_bridge3BasC11nsstrResultSo8NSStringCyFTo"([[OPAQUE:.*]]*, i8*) unnamed_addr {{.*}} {
-  func nsstrResult() -> NSString { return NSS }
+  @objc func nsstrResult() -> NSString { return NSS }
   // CHECK: define internal void @"$S11objc_bridge3BasC8nsstrArg1sySo8NSStringC_tFTo"([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr {{.*}} {
-  func nsstrArg(s s: NSString) { }
+  @objc func nsstrArg(s s: NSString) { }
 
   override init() { 
     strRealProp = String()
@@ -193,11 +193,11 @@ class Bas : NSObject {
 
   override var hashValue: Int { return 0 }
 
-  func acceptSet(_ set: Set<Bas>) { }
+  @objc func acceptSet(_ set: Set<Bas>) { }
 }
 
 func ==(lhs: Bas, rhs: Bas) -> Bool { return true }
 
 class OptionalBlockProperty: NSObject {
-  var x: (([AnyObject]) -> [AnyObject])?
+  @objc var x: (([AnyObject]) -> [AnyObject])?
 }

@@ -24,6 +24,10 @@
 // Currently -gdwarf-types should give the same results as -g.
 // RUN: %target-swift-frontend %s -emit-ir -gdwarf-types -o - | %FileCheck %s
 // --------------------------------------------------------------------
+// Verify that -g -debug-info-format=dwarf gives the same results as -g.
+// RUN: %target-swift-frontend %s -emit-ir -g -debug-info-format=dwarf -o - \
+// RUN:   | %FileCheck %s
+// --------------------------------------------------------------------
 //
 // CHECK: foo
 // CHECK-DAG: ret{{.*}}, !dbg ![[RET:[0-9]+]]

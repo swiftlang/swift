@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | %FileCheck %s
+// RUN: %target-run-simple-swift-swift3 | %FileCheck %s
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
@@ -55,3 +55,20 @@ foo.addObserver(foo, forKeyPath: "foo", options: [], context: &kvoContext)
 let bar = foo.foo
 // CHECK-NEXT: 0
 print(bar)
+
+let fooClass: AnyClass = object_getClass(foo)!
+precondition(fooClass !== Foo.self, "no KVO subclass?")
+precondition(fooClass is Foo.Type, "improper KVO subclass")
+precondition(!(fooClass is Observer.Type), "improper KVO subclass")
+
+let fooClassAsObject: AnyObject = fooClass
+precondition(fooClassAsObject !== Foo.self, "no KVO subclass?")
+precondition(fooClassAsObject is Foo.Type, "improper KVO subclass")
+precondition(!(fooClassAsObject is Observer.Type), "improper KVO subclass")
+
+let fooClassAsAny: Any = fooClass
+precondition(fooClassAsAny is Foo.Type, "improper KVO subclass")
+precondition(!(fooClassAsAny is Observer.Type), "improper KVO subclass")
+
+// CHECK-NEXT: class metadata checks okay
+print("class metadata checks okay")

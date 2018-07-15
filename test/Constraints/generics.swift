@@ -578,3 +578,17 @@ func rdar39616039() {
   var c = foo(default: 42.0, ["foo": Float(0)])
   c += 1 // ok
 }
+
+// https://bugs.swift.org/browse/SR-8075
+
+func sr8075() {
+  struct UIFont {
+    init(ofSize: Float) {}
+  }
+
+  func switchOnCategory<T>(_ categoryToValue: [Int: T]) -> T {
+    fatalError()
+  }
+
+  let _: UIFont = .init(ofSize: switchOnCategory([0: 15.5, 1: 20.5]))
+}

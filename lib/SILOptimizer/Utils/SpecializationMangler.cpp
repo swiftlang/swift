@@ -341,12 +341,9 @@ mangleReturnValue(ReturnValueModifierIntBase RetMod) {
   }
 }
 
-std::string FunctionSignatureSpecializationMangler::mangle(int UniqueID) {
+std::string FunctionSignatureSpecializationMangler::mangle() {
   ArgOpStorage.clear();
   beginMangling();
-
-  if (UniqueID)
-    ArgOpBuffer << UniqueID;
 
   for (unsigned i : indices(OrigArgs)) {
     ArgumentModifierIntBase ArgMod;

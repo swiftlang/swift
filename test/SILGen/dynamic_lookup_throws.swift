@@ -9,7 +9,7 @@
 import Foundation
 
 class Blub : NSObject {
-   func blub() throws {}
+   @objc func blub() throws {}
 }
 
 // CHECK-LABEL: sil hidden @$S21dynamic_lookup_throws8testBlub1ayyXl_tKF : $@convention(thin) (@guaranteed AnyObject) -> @error Error

@@ -61,7 +61,6 @@ public struct StaticString
   /// The static string must store a pointer to either ASCII or UTF-8 code
   /// units. Accessing this property when `hasPointerRepresentation` is
   /// `false` triggers a runtime error.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public var utf8Start: UnsafePointer<UInt8> {
     _precondition(
@@ -75,7 +74,6 @@ public struct StaticString
   /// The static string must store a single Unicode scalar value. Accessing
   /// this property when `hasPointerRepresentation` is `true` triggers a
   /// runtime error.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public var unicodeScalar: Unicode.Scalar {
     _precondition(
@@ -88,7 +86,6 @@ public struct StaticString
   ///
   /// - Warning: If the static string stores a single Unicode scalar value, the
   ///   value of `utf8CodeUnitCount` is unspecified.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public var utf8CodeUnitCount: Int {
     _precondition(
@@ -99,7 +96,6 @@ public struct StaticString
 
   /// A Boolean value indicating whether the static string stores a pointer to
   /// ASCII or UTF-8 code units.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public var hasPointerRepresentation: Bool {
     return (UInt8(_flags) & 0x1) == 0
@@ -114,7 +110,6 @@ public struct StaticString
   ///
   /// - Warning: If the static string stores a single Unicode scalar value, the
   ///   value of `isASCII` is unspecified.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public var isASCII: Bool {
     return (UInt8(_flags) & 0x2) != 0
@@ -160,7 +155,6 @@ public struct StaticString
   }
 
   /// Creates an empty static string.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init() {
     self = ""
@@ -278,14 +272,12 @@ public struct StaticString
   }
 
   /// A textual representation of the static string, suitable for debugging.
-  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return self.description.debugDescription
   }
 }
 
 extension StaticString {
-  @inlinable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     return Mirror(reflecting: description)
   }

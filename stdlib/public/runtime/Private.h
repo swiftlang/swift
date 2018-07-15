@@ -43,15 +43,10 @@ class TypeReferenceOwnership {
 public:
   constexpr TypeReferenceOwnership() : Data(0) {}
 
-  bool isWeak() const { return Data & Weak; }
-  bool isUnowned() const { return Data & Unowned; }
-  bool isUnmanaged() const { return Data & Unmanaged; }
-
-  void setWeak() { Data |= Weak; }
-
-  void setUnowned() { Data |= Unowned; }
-
-  void setUnmanaged() { Data |= Unmanaged; }
+#define REF_STORAGE(Name, ...) \
+  void set##Name() { Data |= Name; } \
+  bool is##Name() const { return Data & Name; }
+#include "swift/AST/ReferenceStorage.def"
 };
 
 /// Type information consists of metadata and its ownership info,
@@ -120,7 +115,8 @@ public:
 #if SWIFT_HAS_OPAQUE_ISAS
     // The ISA is opaque so masking it will not return a pointer.  We instead
     // need to call the objc runtime to get the class.
-    return reinterpret_cast<const ClassMetadata*>(object_getClass((id)object));
+    id idObject = reinterpret_cast<id>(const_cast<void *>(object));
+    return reinterpret_cast<const ClassMetadata*>(object_getClass(idObject));
 #else
     // Load the isa field.
     uintptr_t bits = *reinterpret_cast<const uintptr_t*>(object);

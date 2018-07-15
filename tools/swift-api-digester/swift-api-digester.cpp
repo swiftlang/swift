@@ -2387,13 +2387,25 @@ static void detectRename(NodePtr L, NodePtr R) {
   }
 }
 
+static bool isOwnershipEquivalent(ReferenceOwnership Left,
+                                  ReferenceOwnership Right) {
+  if (Left == Right)
+    return true;
+  if (Left == ReferenceOwnership::Unowned && Right == ReferenceOwnership::Weak)
+    return true;
+  if (Left == ReferenceOwnership::Weak && Right == ReferenceOwnership::Unowned)
+    return true;
+  return false;
+}
+
 static void detectDeclChange(NodePtr L, NodePtr R) {
   assert(L->getKind() == R->getKind());
   if (auto LD = dyn_cast<SDKNodeDecl>(L)) {
     auto *RD = R->getAs<SDKNodeDecl>();
     if (LD->isStatic() ^ RD->isStatic())
       L->annotate(NodeAnnotation::StaticChange);
-    if (LD->getReferenceOwnership() != RD->getReferenceOwnership())
+    if (!isOwnershipEquivalent(LD->getReferenceOwnership(),
+                               RD->getReferenceOwnership()))
       L->annotate(NodeAnnotation::OwnershipChange);
     detectRename(L, R);
   }
@@ -2543,6 +2555,12 @@ class TypeMemberDiffFinder : public SDKNodeVisitor {
     if (nodeParent->getKind() == SDKNodeKind::DeclType &&
         diffParent->getKind() == SDKNodeKind::Root)
       TypeMemberDiffs.insert({diffNode, node});
+
+    // Move from a member variable to global variable.
+    if (nodeParent->getKind() == SDKNodeKind::Root &&
+        diffParent->getKind() == SDKNodeKind::DeclType)
+      TypeMemberDiffs.insert({diffNode, node});
+
     // Move from a member variable to another member variable
     if (nodeParent->getKind() == SDKNodeKind::DeclType &&
         diffParent->getKind() == SDKNodeKind::DeclType &&
@@ -3557,18 +3575,9 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
   }
   case NodeAnnotation::OwnershipChange: {
     auto getOwnershipDescription = [&](swift::ReferenceOwnership O) {
-      switch (O) {
-      case ReferenceOwnership::Strong:
+      if (O == ReferenceOwnership::Strong)
         return Ctx.buffer("strong");
-      case ReferenceOwnership::Weak:
-        return Ctx.buffer("weak");
-      case ReferenceOwnership::Unowned:
-        return Ctx.buffer("unowned");
-      case ReferenceOwnership::Unmanaged:
-        return Ctx.buffer("unowned(unsafe)");
-      }
-
-      llvm_unreachable("Unhandled Ownership in switch.");
+      return keywordOf(O);
     };
     auto *Count = UpdateMap.findUpdateCounterpart(Node)->getAs<SDKNodeDecl>();
     AttrChangedDecls.Diags.emplace_back(
@@ -3757,7 +3766,8 @@ static void findTypeMemberDiffs(NodePtr leftSDKRoot, NodePtr rightSDKRoot,
     // index, old printed name)
     TypeMemberDiffItem item = {
         right->getAs<SDKNodeDecl>()->getUsr(),
-        rightParent->getAs<SDKNodeDecl>()->getFullyQualifiedName(),
+        rightParent->getKind() == SDKNodeKind::Root ?
+          StringRef() : rightParent->getAs<SDKNodeDecl>()->getFullyQualifiedName(),
         right->getPrintedName(), findSelfIndex(right), None,
         leftParent->getKind() == SDKNodeKind::Root ?
           StringRef() : leftParent->getAs<SDKNodeDecl>()->getFullyQualifiedName(),

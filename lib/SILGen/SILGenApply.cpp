@@ -3342,7 +3342,7 @@ class DeallocateUninitializedBox : public Cleanup {
 public:
   DeallocateUninitializedBox(SILValue box) : box(box) {}
 
-  void emit(SILGenFunction &SGF, CleanupLocation l) override {
+  void emit(SILGenFunction &SGF, CleanupLocation l, ForUnwind_t forUnwind) override {
     SGF.B.createDeallocBox(l, box);
   }
 
@@ -3861,6 +3861,7 @@ CallEmission::applyEnumElementConstructor(SGFContext C) {
   }
 
   assert(substFnType->getNumResults() == 1);
+  (void)substFnType;
   ManagedValue resultMV = SGF.emitInjectEnum(
       uncurriedLoc, std::move(payload), SGF.getLoweredType(formalResultType),
       element, uncurriedContext);
@@ -4833,7 +4834,7 @@ namespace {
     DeallocateUninitializedArray(SILValue array)
       : Array(array) {}
 
-    void emit(SILGenFunction &SGF, CleanupLocation l) override {
+    void emit(SILGenFunction &SGF, CleanupLocation l, ForUnwind_t forUnwind) override {
       SGF.emitUninitializedArrayDeallocation(l, Array);
     }
 
@@ -5202,6 +5203,7 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
       auto subscriptsTupleType = cast<TupleType>(subscripts.getType());
       assert(accessType.getParams().size()
               == 1 + subscriptsTupleType->getNumElements());
+      (void)subscriptsTupleType;
       SmallVector<RValue, 8> eltRVs;
       std::move(subscripts).extractElements(eltRVs);
       for (auto &elt : eltRVs)
@@ -5294,15 +5296,17 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
 
   auto origAccessType = SGM.Types.getConstantInfo(materializeForSet).FormalType;
 
-  auto origSelfType = origAccessType->getInput()
-      ->getInOutObjectType()
+  assert(origAccessType->getParams().size() == 1 &&
+         "more than one self parameter?");
+  auto origSelfType = origAccessType
+      ->getParams()[0].getPlainType()
       ->getCanonicalType();
 
   CanGenericSignature genericSig;
   if (auto genericFnType = dyn_cast<GenericFunctionType>(origAccessType))
     genericSig = genericFnType.getGenericSignature();
 
-  return MaterializedLValue(ManagedValue::forUnmanaged(address),
+  return MaterializedLValue(ManagedValue::forLValue(address),
                             origSelfType, genericSig,
                             optionalCallback, callbackStorage);
 }

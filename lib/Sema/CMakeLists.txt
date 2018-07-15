@@ -32,6 +32,7 @@ add_swift_library(swiftSema STATIC
   PlaygroundTransform.cpp
   ResilienceDiagnostics.cpp
   SourceLoader.cpp
+  TypeCheckAccess.cpp
   TypeCheckAttr.cpp
   TypeCheckAvailability.cpp
   TypeCheckCaptures.cpp
@@ -40,6 +41,8 @@ add_swift_library(swiftSema STATIC
   TypeCheckCompilerEvaluable.cpp
   TypeCheckConstraints.cpp
   TypeCheckDecl.cpp
+  TypeCheckDeclObjC.cpp
+  TypeCheckDeclOverride.cpp
   TypeCheckError.cpp
   TypeCheckExpr.cpp
   TypeCheckExprObjC.cpp
@@ -49,7 +52,7 @@ add_swift_library(swiftSema STATIC
   TypeCheckProtocol.cpp
   TypeCheckProtocolInference.cpp
   TypeCheckREPL.cpp
-  TypeCheckRequests.cpp
+  TypeCheckRequestFunctions.cpp
   TypeCheckStmt.cpp
   TypeCheckSwitchStmt.cpp
   TypeCheckType.cpp

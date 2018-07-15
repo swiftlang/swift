@@ -53,7 +53,7 @@ class RequiresInheritedBad : RequiresOkay { // expected-error{{class 'RequiresIn
 
 @requires_stored_property_inits
 class NSSomething : NSObject { 
-  // expected-note@-1 {{class 'NSSomething' requires all stored properties to have initial values or use @NSManaged}}
+  // expected-note@-1 {{class 'NSSomething' requires all stored properties to have initial values}}
   // expected-error@-2 {{class 'NSSomething' has no initializers}}
-  var x: Int // expected-error{{stored property 'x' requires an initial value or should be @NSManaged}}
+  var x: Int // expected-error{{stored property 'x' requires an initial value}}
 }

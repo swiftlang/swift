@@ -188,6 +188,12 @@ namespace swift {
                         bool hasTrailingClosure, ConstraintSystem &CS,
                         bool selfAlreadyApplied = true);
 
+    ~CalleeCandidateInfo() = default;
+    CalleeCandidateInfo(const CalleeCandidateInfo &CCI) = default;
+    CalleeCandidateInfo &operator=(const CalleeCandidateInfo &CCI);
+    CalleeCandidateInfo(CalleeCandidateInfo &&CCI) = delete;
+    CalleeCandidateInfo &operator=(CalleeCandidateInfo &&CCI) = delete;
+
     using ClosenessResultTy = std::pair<CandidateCloseness, FailedArgumentInfo>;
     using ClosenessPredicate =
         const std::function<ClosenessResultTy(UncurriedCandidate)> &;

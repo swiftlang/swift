@@ -75,7 +75,6 @@
 #include "MetadataRequest.h"
 #include "NativeConventionSchema.h"
 #include "ReferenceTypeInfo.h"
-#include "WeakTypeInfo.h"
 
 using namespace swift;
 using namespace irgen;
@@ -970,14 +969,9 @@ public:
   }
   void visitDebugValueInst(DebugValueInst *i);
   void visitDebugValueAddrInst(DebugValueAddrInst *i);
-  void visitLoadWeakInst(LoadWeakInst *i);
-  void visitStoreWeakInst(StoreWeakInst *i);
   void visitRetainValueInst(RetainValueInst *i);
   void visitRetainValueAddrInst(RetainValueAddrInst *i);
   void visitCopyValueInst(CopyValueInst *i);
-  void visitCopyUnownedValueInst(CopyUnownedValueInst *i) {
-    llvm_unreachable("unimplemented");
-  }
   void visitReleaseValueInst(ReleaseValueInst *i);
   void visitReleaseValueAddrInst(ReleaseValueAddrInst *i);
   void visitDestroyValueInst(DestroyValueInst *i);
@@ -1085,11 +1079,6 @@ public:
   void visitStrongUnpinInst(StrongUnpinInst *i);
   void visitStrongRetainInst(StrongRetainInst *i);
   void visitStrongReleaseInst(StrongReleaseInst *i);
-  void visitStrongRetainUnownedInst(StrongRetainUnownedInst *i);
-  void visitUnownedRetainInst(UnownedRetainInst *i);
-  void visitUnownedReleaseInst(UnownedReleaseInst *i);
-  void visitLoadUnownedInst(LoadUnownedInst *i);
-  void visitStoreUnownedInst(StoreUnownedInst *i);
   void visitIsUniqueInst(IsUniqueInst *i);
   void visitIsUniqueOrPinnedInst(IsUniqueOrPinnedInst *i);
   void visitIsEscapingClosureInst(IsEscapingClosureInst *i);
@@ -1119,10 +1108,6 @@ public:
   void visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *i);
   void visitRefToRawPointerInst(RefToRawPointerInst *i);
   void visitRawPointerToRefInst(RawPointerToRefInst *i);
-  void visitRefToUnownedInst(RefToUnownedInst *i);
-  void visitUnownedToRefInst(UnownedToRefInst *i);
-  void visitRefToUnmanagedInst(RefToUnmanagedInst *i);
-  void visitUnmanagedToRefInst(UnmanagedToRefInst *i);
   void visitThinToThickFunctionInst(ThinToThickFunctionInst *i);
   void visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *i);
   void visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *i);
@@ -1164,6 +1149,27 @@ public:
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *i);
   
   void visitKeyPathInst(KeyPathInst *I);
+
+
+#define LOADABLE_REF_STORAGE_HELPER(Name) \
+  void visitRefTo##Name##Inst(RefTo##Name##Inst *i); \
+  void visit##Name##ToRefInst(Name##ToRefInst *i);
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  void visitLoad##Name##Inst(Load##Name##Inst *i); \
+  void visitStore##Name##Inst(Store##Name##Inst *i);
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  LOADABLE_REF_STORAGE_HELPER(Name) \
+  void visitStrongRetain##Name##Inst(StrongRetain##Name##Inst *i); \
+  void visit##Name##RetainInst(Name##RetainInst *i); \
+  void visit##Name##ReleaseInst(Name##ReleaseInst *i); \
+  void visitCopy##Name##ValueInst(Copy##Name##ValueInst *i);
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...") \
+  ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
+#define UNCHECKED_REF_STORAGE(Name, ...) \
+  LOADABLE_REF_STORAGE_HELPER(Name)
+#include "swift/AST/ReferenceStorage.def"
+#undef LOADABLE_REF_STORAGE_HELPER
 };
 
 } // end anonymous namespace
@@ -1871,9 +1877,15 @@ void IRGenSILFunction::visitAllocGlobalInst(AllocGlobalInst *i) {
 
   auto expansion = IGM.getResilienceExpansionForLayout(var);
 
+  // FIXME: Remove this once LLDB has proper support for resilience.
+  bool isREPLVar = false;
+  if (auto *decl = var->getDecl())
+    if (decl->isREPLVar())
+      isREPLVar = true;
+
   // If the global is fixed-size in all resilience domains that can see it,
   // we allocated storage for it statically, and there's nothing to do.
-  if (ti.isFixedSize(expansion))
+  if (isREPLVar || ti.isFixedSize(expansion))
     return;
 
   // Otherwise, the static storage for the global consists of a fixed-size
@@ -1901,9 +1913,15 @@ void IRGenSILFunction::visitGlobalAddrInst(GlobalAddrInst *i) {
   Address addr = IGM.getAddrOfSILGlobalVariable(var, ti,
                                                 NotForDefinition);
 
+  // FIXME: Remove this once LLDB has proper support for resilience.
+  bool isREPLVar = false;
+  if (auto *decl = var->getDecl())
+    if (decl->isREPLVar())
+      isREPLVar = true;
+
   // If the global is fixed-size in all resilience domains that can see it,
   // we allocated storage for it statically, and there's nothing to do.
-  if (ti.isFixedSize(expansion)) {
+  if (isREPLVar || ti.isFixedSize(expansion)) {
     setLoweredAddress(i, addr);
     return;
   }
@@ -3747,32 +3765,6 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
                                                             : IndirectValue);
 }
 
-void IRGenSILFunction::visitLoadWeakInst(swift::LoadWeakInst *i) {
-  Address source = getLoweredAddress(i->getOperand());
-  auto &weakTI = cast<WeakTypeInfo>(getTypeInfo(i->getOperand()->getType()));
-
-  Explosion result;
-  if (i->isTake()) {
-    weakTI.weakTakeStrong(*this, source, result);
-  } else {
-    weakTI.weakLoadStrong(*this, source, result);
-  }
-
-  setLoweredExplosion(i, result);
-}
-
-void IRGenSILFunction::visitStoreWeakInst(swift::StoreWeakInst *i) {
-  Explosion source = getLoweredExplosion(i->getSrc());
-  Address dest = getLoweredAddress(i->getDest());
-
-  auto &weakTI = cast<WeakTypeInfo>(getTypeInfo(i->getDest()->getType()));
-  if (i->isInitializationOfDest()) {
-    weakTI.weakInit(*this, source, dest);
-  } else {
-    weakTI.weakAssign(*this, source, dest);
-  }
-}
-
 void IRGenSILFunction::visitFixLifetimeInst(swift::FixLifetimeInst *i) {
   if (i->getOperand()->getType().isAddress()) {
     // Just pass in the address to fix lifetime if we have one. We will not do
@@ -3846,56 +3838,79 @@ void IRGenSILFunction::visitStrongReleaseInst(swift::StrongReleaseInst *i) {
 static const ReferenceTypeInfo &getReferentTypeInfo(IRGenFunction &IGF,
                                                     SILType silType) {
   auto type = silType.castTo<ReferenceStorageType>().getReferentType();
+  if (auto ty = type->getOptionalObjectType())
+    type = ty->getCanonicalType();
   return cast<ReferenceTypeInfo>(IGF.getTypeInfoForLowered(type));
 }
 
-void IRGenSILFunction::
-visitStrongRetainUnownedInst(swift::StrongRetainUnownedInst *i) {
-  Explosion lowered = getLoweredExplosion(i->getOperand());
-  auto &ti = getReferentTypeInfo(*this, i->getOperand()->getType());
-  ti.strongRetainUnowned(*this, lowered, i->isAtomic() ? irgen::Atomicity::Atomic
-                                                       : irgen::Atomicity::NonAtomic);
-}
-
-void IRGenSILFunction::visitUnownedRetainInst(swift::UnownedRetainInst *i) {
-  Explosion lowered = getLoweredExplosion(i->getOperand());
-  auto &ti = getReferentTypeInfo(*this, i->getOperand()->getType());
-  ti.unownedRetain(*this, lowered, i->isAtomic() ? irgen::Atomicity::Atomic
-                                                 : irgen::Atomicity::NonAtomic);
-}
-
-void IRGenSILFunction::visitUnownedReleaseInst(swift::UnownedReleaseInst *i) {
-  Explosion lowered = getLoweredExplosion(i->getOperand());
-  auto &ti = getReferentTypeInfo(*this, i->getOperand()->getType());
-  ti.unownedRelease(*this, lowered, i->isAtomic() ? irgen::Atomicity::Atomic
-                                                  : irgen::Atomicity::NonAtomic);
-}
-
-void IRGenSILFunction::visitLoadUnownedInst(swift::LoadUnownedInst *i) {
-  Address source = getLoweredAddress(i->getOperand());
-  auto &ti = getReferentTypeInfo(*this, i->getOperand()->getType());
-
-  Explosion result;
-  if (i->isTake()) {
-    ti.unownedTakeStrong(*this, source, result);
-  } else {
-    ti.unownedLoadStrong(*this, source, result);
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
+  void IRGenSILFunction::visitLoad##Name##Inst(swift::Load##Name##Inst *i) { \
+    Address source = getLoweredAddress(i->getOperand()); \
+    auto silTy = i->getOperand()->getType(); \
+    auto ty = cast<Name##StorageType>(silTy.getASTType()); \
+    auto isOptional = bool(ty.getReferentType()->getOptionalObjectType()); \
+    auto &ti = getReferentTypeInfo(*this, silTy); \
+    Explosion result; \
+    if (i->isTake()) { \
+      ti.name##TakeStrong(*this, source, result, isOptional); \
+    } else { \
+      ti.name##LoadStrong(*this, source, result, isOptional); \
+    } \
+    setLoweredExplosion(i, result); \
+  } \
+  void IRGenSILFunction::visitStore##Name##Inst(swift::Store##Name##Inst *i) { \
+    Explosion source = getLoweredExplosion(i->getSrc()); \
+    Address dest = getLoweredAddress(i->getDest()); \
+    auto silTy = i->getDest()->getType(); \
+    auto ty = cast<Name##StorageType>(silTy.getASTType()); \
+    auto isOptional = bool(ty.getReferentType()->getOptionalObjectType()); \
+    auto &ti = getReferentTypeInfo(*this, silTy); \
+    if (i->isInitializationOfDest()) { \
+      ti.name##Init(*this, source, dest, isOptional); \
+    } else { \
+      ti.name##Assign(*this, source, dest, isOptional); \
+    } \
   }
-
-  setLoweredExplosion(i, result);
-}
-
-void IRGenSILFunction::visitStoreUnownedInst(swift::StoreUnownedInst *i) {
-  Explosion source = getLoweredExplosion(i->getSrc());
-  Address dest = getLoweredAddress(i->getDest());
-
-  auto &ti = getReferentTypeInfo(*this, i->getDest()->getType());
-  if (i->isInitializationOfDest()) {
-    ti.unownedInit(*this, source, dest);
-  } else {
-    ti.unownedAssign(*this, source, dest);
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
+  void IRGenSILFunction:: \
+  visitStrongRetain##Name##Inst(swift::StrongRetain##Name##Inst *i) { \
+    Explosion lowered = getLoweredExplosion(i->getOperand()); \
+    auto &ti = getReferentTypeInfo(*this, i->getOperand()->getType()); \
+    ti.strongRetain##Name(*this, lowered, \
+                            i->isAtomic() ? irgen::Atomicity::Atomic \
+                                          : irgen::Atomicity::NonAtomic); \
+  } \
+  void IRGenSILFunction::visit##Name##RetainInst(swift::Name##RetainInst *i) { \
+    Explosion lowered = getLoweredExplosion(i->getOperand()); \
+    auto &ti = getReferentTypeInfo(*this, i->getOperand()->getType()); \
+    ti.name##Retain(*this, lowered, \
+                    i->isAtomic() ? irgen::Atomicity::Atomic \
+                                  : irgen::Atomicity::NonAtomic); \
+  } \
+  void \
+  IRGenSILFunction::visit##Name##ReleaseInst(swift::Name##ReleaseInst *i) { \
+    Explosion lowered = getLoweredExplosion(i->getOperand()); \
+    auto &ti = getReferentTypeInfo(*this, i->getOperand()->getType()); \
+    ti.name##Release(*this, lowered, \
+                     i->isAtomic() ? irgen::Atomicity::Atomic \
+                                   : irgen::Atomicity::NonAtomic); \
+  } \
+  void IRGenSILFunction::visitCopy##Name##ValueInst( \
+                                            swift::Copy##Name##ValueInst *i) { \
+    Explosion in = getLoweredExplosion(i->getOperand()); \
+    auto &ti = getReferentTypeInfo(*this, i->getOperand()->getType()); \
+    ti.strongRetain##Name(*this, in, irgen::Atomicity::Atomic); \
+    /* Semantically we are just passing through the input parameter but as a */\
+    /* strong reference... at LLVM IR level these type differences don't */ \
+    /* matter. So just set the lowered explosion appropriately. */ \
+    Explosion output = getLoweredExplosion(i->getOperand()); \
+    setLoweredExplosion(i, output); \
   }
-}
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
+  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, "...") \
+  ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, name, "...")
+#include "swift/AST/ReferenceStorage.def"
+#undef COMMON_CHECKED_REF_STORAGE
 
 static bool hasReferenceSemantics(IRGenSILFunction &IGF,
                                   SILType silType) {
@@ -3950,6 +3965,7 @@ void IRGenSILFunction::visitIsEscapingClosureInst(
 
   auto fnType = operandType.getAs<SILFunctionType>();
   assert(fnType->getExtInfo().hasContext() && "Must have a closure operand");
+  (void)fnType;
 
   // This code relies on that an optional<()->()>'s tag fits in the function
   // pointer.
@@ -3957,6 +3973,7 @@ void IRGenSILFunction::visitIsEscapingClosureInst(
   assert(TI.mayHaveExtraInhabitants(IGM) &&
          "Must have extra inhabitants to be able to handle the optional "
          "closure case");
+  (void)TI;
 
   Explosion closure = getLoweredExplosion(i->getOperand());
   auto func = closure.claimNext();
@@ -4719,10 +4736,10 @@ static void trivialRefConversion(IRGenSILFunction &IGF,
 void IRGenSILFunction::visit##KIND##Inst(swift::KIND##Inst *i) {  \
   ::trivialRefConversion(*this, i->getOperand(), i); \
 }
-NOOP_CONVERSION(UnownedToRef)
-NOOP_CONVERSION(RefToUnowned)
-NOOP_CONVERSION(UnmanagedToRef)
-NOOP_CONVERSION(RefToUnmanaged)
+#define LOADABLE_REF_STORAGE(Name, ...) \
+  NOOP_CONVERSION(Name##ToRef) \
+  NOOP_CONVERSION(RefTo##Name)
+#include "swift/AST/ReferenceStorage.def"
 #undef NOOP_CONVERSION
 
 void IRGenSILFunction::visitThinToThickFunctionInst(

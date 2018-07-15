@@ -1189,6 +1189,12 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
     ///
     /// Meaningful for all type-descriptor kinds.
     IsReflectable = 2,
+    
+    /// Set if the type is a Clang-importer-synthesized related entity. After
+    /// the null terminator for the type name is another null-terminated string
+    /// containing the tag that discriminates the entity from other synthesized
+    /// declarations associated with the same declaration.
+    IsSynthesizedRelatedEntity = 3,
 
     /// Set if the context descriptor is includes metadata for dynamically
     /// constructing a class's vtables at metadata instantiation time.
@@ -1220,6 +1226,10 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(IsCTag, isCTag, setIsCTag)
   FLAGSET_DEFINE_FLAG_ACCESSORS(IsCTypedef, isCTypedef, setIsCTypedef)
   FLAGSET_DEFINE_FLAG_ACCESSORS(IsReflectable, isReflectable, setIsReflectable)
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(IsSynthesizedRelatedEntity,
+                                isSynthesizedRelatedEntity,
+                                setIsSynthesizedRelatedEntity)
 
   FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasVTable,
                                 class_hasVTable,

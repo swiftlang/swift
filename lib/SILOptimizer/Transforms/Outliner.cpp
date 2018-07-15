@@ -1141,7 +1141,7 @@ class OutlinePatterns {
   llvm::DenseMap<CanType, SILDeclRef> BridgeFromObjectiveCache;
 
 public:
-  /// Try matching an outlineable pattern from the current current instruction.
+  /// Try matching an outlineable pattern from the current instruction.
   OutlinePattern *tryToMatch(SILBasicBlock::iterator CurInst) {
     if (BridgedPropertyPattern.matchInstSequence(CurInst))
       return &BridgedPropertyPattern;

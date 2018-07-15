@@ -1749,8 +1749,11 @@ void SwiftEditorDocument::parse(ImmutableTextSnapshotRef Snapshot,
     Impl.SemanticInfo->getInvocation()->applyTo(CompInv);
     Impl.SemanticInfo->getInvocation()->raw(Args, PrimaryFile);
   } else {
+    // Use stdin as a .swift input to satisfy the driver. Note that we don't
+    // use Impl.FilePath here because it may be invalid filename for driver
+    // like "" or "-foobar".
     SmallVector<const char *, 1> Args;
-    Args.push_back(Impl.FilePath.c_str()); // Input
+    Args.push_back("-");
     std::string Error;
     // Ignore possible error(s)
     Lang.getASTManager().
@@ -2027,7 +2030,6 @@ void SwiftEditorDocument::reportDocumentStructure(SourceFile &SrcFile,
 //===----------------------------------------------------------------------===//
 
 void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
-                                  bool EnableSyntaxMap,
                                   EditorConsumer &Consumer,
                                   ArrayRef<const char *> Args) {
 
@@ -2084,7 +2086,8 @@ void SwiftLangSupport::editorClose(StringRef Name, bool RemoveCache) {
 // EditorReplaceText
 //===----------------------------------------------------------------------===//
 
-void SwiftLangSupport::editorReplaceText(StringRef Name, llvm::MemoryBuffer *Buf,
+void SwiftLangSupport::editorReplaceText(StringRef Name,
+                                         llvm::MemoryBuffer *Buf,
                                          unsigned Offset, unsigned Length,
                                          EditorConsumer &Consumer) {
   auto EditorDoc = EditorDocuments.getByUnresolvedName(Name);

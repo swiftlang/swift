@@ -1974,10 +1974,10 @@ static bool tryDynamicCastBoxedSwiftValue(OpaqueValue *dest,
 extern "C" const StructDescriptor NOMINAL_TYPE_DESCR_SYM(Sa);
 
 /// Nominal type descriptor for Swift.Dictionary.
-extern "C" const StructDescriptor STRUCT_TYPE_DESCR_SYM(s10Dictionary);
+extern "C" const StructDescriptor NOMINAL_TYPE_DESCR_SYM(SD);
 
 /// Nominal type descriptor for Swift.Set.
-extern "C" const StructDescriptor STRUCT_TYPE_DESCR_SYM(s3Set);
+extern "C" const StructDescriptor NOMINAL_TYPE_DESCR_SYM(Sh);
 
 // internal func _arrayDownCastIndirect<SourceValue, TargetValue>(
 //   _ source: UnsafePointer<Array<SourceValue>>,
@@ -2091,7 +2091,7 @@ static bool _dynamicCastStructToStruct(OpaqueValue *destination,
     }
 
   // Dictionaries.
-  } else if (descriptor == &STRUCT_TYPE_DESCR_SYM(s10Dictionary)) {
+  } else if (descriptor == &NOMINAL_TYPE_DESCR_SYM(SD)) {
     if (flags & DynamicCastFlags::Unconditional) {
       _swift_dictionaryDownCastIndirect(source, destination,
                                         sourceArgs[0], sourceArgs[1],
@@ -2107,7 +2107,7 @@ static bool _dynamicCastStructToStruct(OpaqueValue *destination,
     }
 
   // Sets.
-  } else if (descriptor == &STRUCT_TYPE_DESCR_SYM(s3Set)) {
+  } else if (descriptor == &NOMINAL_TYPE_DESCR_SYM(Sh)) {
     if (flags & DynamicCastFlags::Unconditional) {
       _swift_setDownCastIndirect(source, destination,
                                  sourceArgs[0], targetArgs[0],
@@ -2701,7 +2701,7 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
                 (HeapObject *)srcObject, (OpaqueValue *)optDestBuffer,
                 targetType, targetType, targetBridgeWitness);
   }
-  SWIFT_CC_PLUSZERO_GUARD(swift_unknownRelease(srcObject));
+  swift_unknownRelease(srcObject);
 
   // If we succeeded, take from the optional buffer into the
   // destination buffer.
@@ -2941,6 +2941,12 @@ static bool tryBridgeNonVerbatimFromObjectiveCUniversal(
       return true;
     }
   }
+  // Try to bridge NSError to Error.
+  if (tryDynamicCastNSErrorObjectToValue(sourceValue, destValue, nativeType,
+                                         DynamicCastFlags::Default)) {
+    return true;
+  }
+
   
   return false;
 }
@@ -3010,7 +3016,6 @@ _bridgeNonVerbatimFromObjectiveCConditional(
 
   // Local function that releases the source and returns false.
   auto fail = [&] () -> bool {
-    SWIFT_CC_PLUSONE_GUARD(swift_unknownRelease(sourceValue));
     return false;
   };
   

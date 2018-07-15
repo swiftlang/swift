@@ -34,14 +34,14 @@ import objc_extension_base
 }
 
 extension NSObject {
-  func someMethod() -> String { return "Hello" }
+  @objc func someMethod() -> String { return "Hello" }
 }
 
 extension Gizmo: NewProtocol {
-  func brandNewInstanceMethod() {
+  @objc func brandNewInstanceMethod() {
   }
 
-  class func brandNewClassMethod() {
+  @objc class func brandNewClassMethod() {
   }
 
   // Overrides an instance method of NSObject
@@ -50,8 +50,7 @@ extension Gizmo: NewProtocol {
   }
 
   // Overrides a class method of NSObject
-  open override class func initialize() {
-  }
+  @objc override class func hasOverride() {}
 }
 
 /*
@@ -71,10 +70,10 @@ extension Gizmo: NewProtocol {
 // CHECK: }, section "__DATA, __objc_const", align 8
 
 extension Gizmo {
-  func brandSpankingNewInstanceMethod() {
+  @objc func brandSpankingNewInstanceMethod() {
   }
 
-  class func brandSpankingNewClassMethod() {
+  @objc class func brandSpankingNewClassMethod() {
   }
 }
 
@@ -115,8 +114,8 @@ class Hoozit : NSObject {
 // CHECK: }, section "__DATA, __objc_const", align 8
 
 extension Hoozit {
-  func blibble() { }
-  class func blobble() { }
+  @objc func blibble() { }
+  @objc class func blobble() { }
 }
 
 class SwiftOnly { }
@@ -146,9 +145,11 @@ extension Wotsit {
 extension NSObject {
   private enum SomeEnum { case X }
 
-  public func needMetadataOfSomeEnum() {
+  @objc public func needMetadataOfSomeEnum() {
     print(NSObject.SomeEnum.X)
   }
+
+  @objc class func hasOverride() {}
 }
 
 
@@ -179,7 +180,7 @@ extension NSDogcow {
   @NSManaged var woof: Int
 }
 
-// CHECK: @"$SSo8NSObjectC15objc_extensionsE8SomeEnum33_1F05E59585E0BB585FCA206FBFF1A92DLLOs9EquatableACWp" =
+// CHECK: @"$SSo8NSObjectC15objc_extensionsE8SomeEnum33_1F05E59585E0BB585FCA206FBFF1A92DLLOSQACWp" =
 
 class SwiftSubGizmo : SwiftBaseGizmo {
 

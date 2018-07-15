@@ -1,6 +1,17 @@
 [
   {
     "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Var",
+    "NodeAnnotation": "RevertSimpleStringRepresentableUpdate",
+    "ChildIndex": "0",
+    "LeftUsr": "c:@globalAttributeName",
+    "LeftComment": "AnimalAttributeName",
+    "RightUsr": "",
+    "RightComment": "String",
+    "ModuleName": "APINotesTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
     "NodeKind": "TypeDecl",
     "NodeAnnotation": "RevertTypeAliasDeclToRawRepresentable",
     "ChildIndex": "0",
@@ -160,6 +171,14 @@
     "OldTypeName": "NewType",
     "NewPrintedName": "oldMember",
     "NewTypeName": "OldType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@globalAttributeName",
+    "OldPrintedName": "globalAttributeName",
+    "OldTypeName": "AnimalAttributeName",
+    "NewPrintedName": "globalAttributeName",
+    "NewTypeName": ""
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",

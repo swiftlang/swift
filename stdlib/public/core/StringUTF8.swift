@@ -178,7 +178,7 @@ extension String {
         _guts, range: (n..<count, performBoundsCheck: true),
         ascii: { _ in
           Builtin.unreachable()
-          return Index._UTF8Buffer() },
+          /* return Index._UTF8Buffer() */ },
         utf16: { utf16 in
           var i = utf16.makeIterator()
           return UTF8View._fillBuffer(from: &i) },
@@ -396,7 +396,6 @@ extension String {
       return String(_guts)
     }
 
-    @inlinable // FIXME(sil-serialize-all)
     public var debugDescription: String {
       return "UTF8View(\(self.description.debugDescription))"
     }
@@ -449,38 +448,6 @@ extension String {
     nullTerminatedUTF8 += utf8
     nullTerminatedUTF8.append(0)
     return try nullTerminatedUTF8.withUnsafeBufferPointer(body)
-  }
-
-  /// Creates a string corresponding to the given sequence of UTF-8 code units.
-  ///
-  /// If `utf8` is an ill-formed UTF-8 code sequence, the result is `nil`.
-  ///
-  /// You can use this initializer to create a new string from a slice of
-  /// another string's `utf8` view.
-  ///
-  ///     let picnicGuest = "Deserving porcupine"
-  ///     if let i = picnicGuest.utf8.firstIndex(of: 32) {
-  ///         let adjective = String(picnicGuest.utf8[..<i])
-  ///         print(adjective)
-  ///     }
-  ///     // Prints "Optional(Deserving)"
-  ///
-  /// The `adjective` constant is created by calling this initializer with a
-  /// slice of the `picnicGuest.utf8` view.
-  ///
-  /// - Parameter utf8: A UTF-8 code sequence.
-  @available(swift, deprecated: 3.2,
-    message: "Failable initializer was removed in Swift 4. When upgrading to Swift 4, please use non-failable String.init(_:UTF8View)")
-  @available(swift, obsoleted: 4.0,
-    message: "Please use non-failable String.init(_:UTF8View) instead")
-  public init?(_ utf8: UTF8View) {
-    if utf8.startIndex.transcodedOffset != 0
-      || utf8.endIndex.transcodedOffset != 0
-      || utf8._legacyPartialCharacters.start
-      || utf8._legacyPartialCharacters.end {
-      return nil
-    }
-    self = String(utf8._guts)
   }
 
   /// Creates a string corresponding to the given sequence of UTF-8 code units.
@@ -718,50 +685,8 @@ extension String.UTF8View.Index {
 // Reflection
 extension String.UTF8View : CustomReflectable {
   /// Returns a mirror that reflects the UTF-8 view of a string.
-  @inlinable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     return Mirror(self, unlabeledChildren: self)
-  }
-}
-
-extension String.UTF8View : CustomPlaygroundQuickLookable {
-  @inlinable // FIXME(sil-serialize-all)
-  @available(*, deprecated, message: "UTF8View.customPlaygroundQuickLook will be removed in a future Swift version")
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return .text(description)
-  }
-}
-
-// backward compatibility for index interchange.
-extension String.UTF8View {
-  @inlinable // FIXME(sil-serialize-all)
-  @available(
-    swift, obsoleted: 4.0,
-    message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
-  public func index(after i: Index?) -> Index {
-    return index(after: i!)
-  }
-  @inlinable // FIXME(sil-serialize-all)
-  @available(
-    swift, obsoleted: 4.0,
-    message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
-  public func index(_ i: Index?, offsetBy n: Int) -> Index {
-    return index(i!, offsetBy: n)
-  }
-  @inlinable // FIXME(sil-serialize-all)
-  @available(
-    swift, obsoleted: 4.0,
-    message: "Any String view index conversion can fail in Swift 4; please unwrap the optional indices")
-  public func distance(
-    from i: Index?, to j: Index?) -> Int {
-    return distance(from: i!, to: j!)
-  }
-  @inlinable // FIXME(sil-serialize-all)
-  @available(
-    swift, obsoleted: 4.0,
-    message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
-  public subscript(i: Index?) -> Unicode.UTF8.CodeUnit {
-    return self[i!]
   }
 }
 
@@ -780,42 +705,6 @@ extension String.UTF8View {
   @available(swift, introduced: 4)
   public subscript(r: Range<Index>) -> String.UTF8View.SubSequence {
     return String.UTF8View.SubSequence(self, _bounds: r)
-  }
-
-  @available(swift, obsoleted: 4)
-  public subscript(r: Range<Index>) -> String.UTF8View {
-    let wholeString = String(_guts)
-    let legacyPartialCharacters = (
-      (self._legacyPartialCharacters.start &&
-        r.lowerBound.encodedOffset == 0) ||
-      r.lowerBound.samePosition(in: wholeString) == nil,
-      (self._legacyPartialCharacters.end &&
-        r.upperBound.encodedOffset == _guts.count) ||
-      r.upperBound.samePosition(in: wholeString) == nil)
-
-    if r.upperBound.transcodedOffset == 0 {
-      return String.UTF8View(
-        _guts._extractSlice(
-        r.lowerBound.encodedOffset..<r.upperBound.encodedOffset),
-        legacyOffsets: (r.lowerBound.transcodedOffset, 0),
-        legacyPartialCharacters: legacyPartialCharacters)
-    }
-
-    let b0 = r.upperBound.utf8Buffer!.first!
-    let scalarLength8 = (~b0).leadingZeroBitCount
-    let scalarLength16 = scalarLength8 == 4 ? 2 : 1
-    let coreEnd = r.upperBound.encodedOffset + scalarLength16
-    return String.UTF8View(
-      _guts._extractSlice(r.lowerBound.encodedOffset..<coreEnd),
-      legacyOffsets: (
-        r.lowerBound.transcodedOffset,
-        r.upperBound.transcodedOffset - scalarLength8),
-      legacyPartialCharacters: legacyPartialCharacters)
-  }
-
-  @available(swift, obsoleted: 4)
-  public subscript(bounds: ClosedRange<Index>) -> String.UTF8View {
-    return self[bounds.relative(to: self)]
   }
 }
 

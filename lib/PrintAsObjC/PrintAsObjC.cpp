@@ -1735,14 +1735,14 @@ private:
       return;
     }
 
-    if (layout.superclass) {
-      auto *CD = layout.superclass->getClassOrBoundGenericClass();
+    if (auto superclass = layout.explicitSuperclass) {
+      auto *CD = superclass->getClassOrBoundGenericClass();
       assert(CD->isObjC());
       if (isMetatype) {
         os << "SWIFT_METATYPE(" << getNameForObjC(CD) << ")";
       } else {
         os << getNameForObjC(CD);
-        if (auto *BGT = layout.superclass->getAs<BoundGenericClassType>())
+        if (auto *BGT = superclass->getAs<BoundGenericClassType>())
           printGenericArgs(BGT);
       }
     } else {
@@ -1754,7 +1754,7 @@ private:
       protos.push_back(proto->getDecl());
     printProtocols(protos);
 
-    if (layout.superclass && !isMetatype)
+    if (layout.explicitSuperclass && !isMetatype)
       os << " *";
 
     printNullability(optionalKind);
@@ -2011,8 +2011,8 @@ class ReferencedTypeFinder : public TypeVisitor<ReferencedTypeFinder> {
 
   void visitProtocolCompositionType(ProtocolCompositionType *composition) {
     auto layout = composition->getExistentialLayout();
-    if (layout.superclass)
-      visit(layout.superclass);
+    if (auto superclass = layout.explicitSuperclass)
+      visit(superclass);
     for (auto proto : layout.getProtocols())
       visit(proto);
   }
@@ -2442,7 +2442,7 @@ public:
            "#endif\n"
            "\n"
            "#pragma clang diagnostic ignored \"-Wauto-import\"\n"
-           "#include <objc/NSObject.h>\n"
+           "#include <Foundation/Foundation.h>\n"
            "#include <stdint.h>\n"
            "#include <stddef.h>\n"
            "#include <stdbool.h>\n"

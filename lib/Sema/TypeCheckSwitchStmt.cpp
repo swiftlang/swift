@@ -214,6 +214,8 @@ namespace {
           Spaces({}) {}
 
       static Space forType(Type T, Identifier NameForPrinting) {
+        if (T->isStructurallyUninhabited())
+          return Space();
         return Space(T, NameForPrinting);
       }
       static Space forUnknown(bool allowedButNotRequired) {
@@ -221,10 +223,17 @@ namespace {
       }
       static Space forConstructor(Type T, Identifier H, bool downgrade,
                                   ArrayRef<Space> SP) {
+        if (llvm::any_of(SP, std::mem_fn(&Space::isEmpty))) {
+          // A constructor with an unconstructible parameter can never actually
+          // be used.
+          return Space();
+        }
         return Space(T, H, downgrade, SP);
       }
       static Space forConstructor(Type T, Identifier H, bool downgrade,
                                   std::forward_list<Space> SP) {
+        // No need to filter SP here; this is only used to copy other
+        // Constructor spaces.
         return Space(T, H, downgrade, SP);
       }
       static Space forBool(bool C) {
@@ -308,38 +317,6 @@ namespace {
         assert(getKind() == SpaceKind::BooleanConstant
                 && "Wrong kind of space tried to access bool value");
         return TypeAndVal.getInt();
-      }
-
-      // Defines a "usefulness" metric that returns whether the given space
-      // contributes meaningfully to the exhaustiveness of a pattern.
-      bool isUseful() const {
-        auto subspacesUseful = [](const Space &space) {
-          for (auto &subspace : space.getSpaces()) {
-            if (!subspace.isUseful()) {
-              return false;
-            }
-          }
-          return true;
-        };
-
-        switch (getKind()) {
-        case SpaceKind::Empty:
-          return false;
-        case SpaceKind::Type:
-        case SpaceKind::BooleanConstant:
-        case SpaceKind::UnknownCase:
-          return true;
-        case SpaceKind::Disjunct:
-          if (getSpaces().empty()) {
-            return false;
-          }
-          return subspacesUseful(*this);
-        case SpaceKind::Constructor:
-          if (getSpaces().empty()) {
-            return true;
-          }
-          return subspacesUseful(*this);
-        }
       }
 
       // An optimization that computes if the difference of this space and
@@ -427,7 +404,7 @@ namespace {
         PAIRCASE (SpaceKind::Constructor, SpaceKind::Constructor): {
           // Optimization: If the constructor heads don't match, subspace is
           // impossible.
-          if (this->Head.compare(other.Head) != 0) {
+          if (this->Head != other.Head) {
             return false;
           }
           
@@ -493,11 +470,6 @@ namespace {
         }
       }
 
-      static Space intersect(const Space &a, const Space &b, TypeChecker &TC,
-                             const DeclContext *DC) {
-        return a.intersect(b, TC, DC).simplify(TC, DC);
-      }
-
       // Returns the intersection of this space with another.  The intersection
       // is the largest shared subspace occupied by both arguments.
       Space intersect(const Space &other, TypeChecker &TC,
@@ -519,7 +491,7 @@ namespace {
           std::transform(
               other.getSpaces().begin(), other.getSpaces().end(),
               std::back_inserter(intersectedCases),
-              [&](const Space &s) { return intersect(*this, s, TC, DC); });
+              [&](const Space &s) { return this->intersect(s, TC, DC); });
           return Space::forDisjunct(intersectedCases);
         }
 
@@ -529,7 +501,7 @@ namespace {
         PAIRCASE (SpaceKind::Disjunct, SpaceKind::BooleanConstant):
         PAIRCASE (SpaceKind::Disjunct, SpaceKind::UnknownCase): {
           // (S1 || ... || Sn) & S iff (S & S1) && ... && (S & Sn)
-          return intersect(other, *this, TC, DC);
+          return other.intersect(*this, TC, DC);
         }
         PAIRCASE (SpaceKind::Type, SpaceKind::Type): {
           // Optimization: The intersection of equal types is that type.
@@ -537,10 +509,10 @@ namespace {
             return other;
           } else if (canDecompose(this->getType(), DC)) {
             auto decomposition = decompose(TC, DC, this->getType());
-            return intersect(decomposition, other, TC, DC);
+            return decomposition.intersect(other, TC, DC);
           } else if (canDecompose(other.getType(), DC)) {
             auto decomposition = decompose(TC, DC, other.getType());
-            return intersect(*this, decomposition, TC, DC);
+            return this->intersect(decomposition, TC, DC);
           } else {
             return other;
           }
@@ -548,7 +520,7 @@ namespace {
         PAIRCASE (SpaceKind::Type, SpaceKind::Constructor): {
           if (canDecompose(this->getType(), DC)) {
             auto decomposition = decompose(TC, DC, this->getType());
-            return intersect(decomposition, other, TC, DC);
+            return decomposition.intersect(other, TC, DC);
           } else {
             return other;
           }
@@ -569,7 +541,7 @@ namespace {
           std::transform(this->getSpaces().begin(), this->getSpaces().end(),
                          std::back_inserter(newSubSpaces),
                          [&](const Space &subSpace) {
-                           return intersect(subSpace, other, TC, DC);
+                           return subSpace.intersect(other, TC, DC);
                          });
           return Space::forConstructor(this->getType(), this->getHead(),
                                        this->canDowngradeToWarning(),
@@ -579,7 +551,7 @@ namespace {
         PAIRCASE (SpaceKind::Constructor, SpaceKind::Constructor): {
           // Optimization: If the heads don't match, the intersection of
           // the constructor spaces is empty.
-          if (this->getHead().compare(other.Head) != 0) {
+          if (this->getHead() != other.Head) {
             return Space();
           }
           
@@ -594,7 +566,7 @@ namespace {
           auto j = other.getSpaces().begin();
           for (; i != this->getSpaces().end() && j != other.getSpaces().end();
                ++i, ++j) {
-            auto result = intersect(*i, *j, TC, DC);
+            auto result = i->intersect(*j, TC, DC);
             // If at least one of the constructor sub-spaces is empty,
             // it makes the whole space empty as well.
             if (result.isEmpty()) {
@@ -608,7 +580,7 @@ namespace {
 
         PAIRCASE (SpaceKind::UnknownCase, SpaceKind::Type):
         PAIRCASE (SpaceKind::UnknownCase, SpaceKind::Constructor):
-          return intersect(other, *this, TC, DC);
+          return other.intersect(*this, TC, DC);
         PAIRCASE (SpaceKind::UnknownCase, SpaceKind::UnknownCase):
           if (other.isAllowedButNotRequired())
             return other;
@@ -624,7 +596,7 @@ namespace {
 
           if (canDecompose(other.getType(), DC)) {
             auto decomposition = decompose(TC, DC, other.getType());
-            return intersect(*this, decomposition, TC, DC);
+            return this->intersect(decomposition, TC, DC);
           }
           return Space();
         }
@@ -634,7 +606,7 @@ namespace {
           return Space();
 
         PAIRCASE (SpaceKind::Type, SpaceKind::BooleanConstant): {
-          return intersect(other, *this, TC, DC);
+          return other.intersect(*this, TC, DC);
         }
 
         PAIRCASE (SpaceKind::Empty, SpaceKind::BooleanConstant):
@@ -678,10 +650,10 @@ namespace {
             return Space();
           } else if (canDecompose(this->getType(), DC)) {
             auto decomposition = decompose(TC, DC, this->getType());
-            return intersect(decomposition, other, TC, DC);
+            return decomposition.intersect(other, TC, DC);
           } else if (canDecompose(other.getType(), DC)) {
             auto decomposition = decompose(TC, DC, other.getType());
-            return intersect(*this, decomposition, TC, DC);
+            return this->intersect(decomposition, TC, DC);
           }
           return Space();
         }
@@ -736,13 +708,12 @@ namespace {
         PAIRCASE (SpaceKind::Constructor, SpaceKind::UnknownCase): {
           SmallVector<Space, 4> newSubSpaces;
           for (auto subSpace : this->getSpaces()) {
-            auto diff = subSpace.minus(other, TC, DC, minusCount);
-            if (!diff)
+            auto nextSpace = subSpace.minus(other, TC, DC, minusCount);
+            if (!nextSpace)
               return None;
-            auto nextSpace = diff->simplify(TC, DC);
-            if (nextSpace.isEmpty())
+            if (nextSpace.getValue().isEmpty())
               return Space();
-            newSubSpaces.push_back(nextSpace);
+            newSubSpaces.push_back(nextSpace.getValue());
           }
           return Space::forConstructor(this->getType(), this->getHead(),
                                        this->canDowngradeToWarning(),
@@ -752,7 +723,7 @@ namespace {
         PAIRCASE (SpaceKind::Constructor, SpaceKind::Constructor): {
           // Optimization: If the heads of the constructors don't match then
           // the two are disjoint and their difference is the first space.
-          if (this->Head.compare(other.Head) != 0) {
+          if (this->Head != other.Head) {
             return *this;
           }
 
@@ -773,7 +744,7 @@ namespace {
             auto &s2 = *j;
             // If the intersection of each subspace is ever empty then the
             // two spaces are disjoint and their difference is the first space.
-            if (intersect(s1, s2, TC, DC).isEmpty()) {
+            if (s1.intersect(s2, TC, DC).isEmpty()) {
               return *this;
             }
 
@@ -944,59 +915,6 @@ namespace {
               buffer << "(not_required)";
           }
           break;
-        }
-      }
-
-      // For optimization, attempt to simplify a space by removing any empty
-      // cases and unpacking empty or singular disjunctions where possible.
-      Space simplify(TypeChecker &TC, const DeclContext *DC) const {
-        switch (getKind()) {
-        case SpaceKind::Constructor: {
-          // If a constructor has no spaces it is an enum without a payload and
-          // cannot be optimized further.
-          if (getSpaces().empty()) {
-            return *this;
-          }
-
-          // Simplify each component subspace.  If, after simplification, any
-          // subspace contains an empty, then the whole space is empty.
-          SmallVector<Space, 4> simplifiedSpaces;
-          for (const auto &space : Spaces) {
-            auto simplified = space.simplify(TC, DC);
-            if (simplified.isEmpty())
-              return Space();
-
-            simplifiedSpaces.push_back(simplified);
-          }
-
-          return Space::forConstructor(getType(), Head, canDowngradeToWarning(),
-                                       simplifiedSpaces);
-        }
-        case SpaceKind::Type: {
-          // If the decomposition of a space is empty, the space is empty.
-          if (canDecompose(this->getType(), DC)) {
-            SmallVector<Space, 4> ss;
-            decompose(TC, DC, this->getType(), ss);
-            if (ss.empty()) {
-              return Space();
-            }
-            return *this;
-          } else {
-            return *this;
-          }
-        }
-        case SpaceKind::Disjunct: {
-          // Simplify each disjunct.
-          SmallVector<Space, 4> simplifiedSpaces;
-          std::transform(Spaces.begin(), Spaces.end(),
-                         std::back_inserter(simplifiedSpaces),
-                         [&](const Space &el){
-            return el.simplify(TC, DC);
-          });
-          return Space::forDisjunct(simplifiedSpaces);
-        }
-        default:
-          return *this;
         }
       }
 
@@ -1187,7 +1105,104 @@ namespace {
         return false;
       }
     }
-    
+
+    /// Estimate how big is the search space that exhaustivity
+    /// checker needs to cover, based on the total space and information
+    /// from the `switch` statement itself. Some of the easy situations
+    /// like `case .foo(let bar)` don't really contribute to the complexity
+    /// of the search so their sub-space sizes could be excluded from
+    /// consideration.
+    ///
+    /// \param total The total space to check.
+    /// \param covered The space covered by the `case` statements in the switch.
+    ///
+    /// \returns The size of the search space exhastivity checker has to check.
+    size_t estimateSearchSpaceSize(const Space &total, const Space &covered) {
+      switch (PairSwitch(total.getKind(), covered.getKind())) {
+      PAIRCASE(SpaceKind::Type, SpaceKind::Type): {
+        return total.getType()->isEqual(covered.getType())
+                    ? 0
+                    : total.getSize(TC, DC);
+      }
+      PAIRCASE(SpaceKind::Type, SpaceKind::Disjunct):
+      PAIRCASE(SpaceKind::Type, SpaceKind::Constructor): {
+        if (!Space::canDecompose(total.getType(), DC))
+          break;
+
+        auto decomposition = Space::decompose(TC, DC, total.getType());
+        return estimateSearchSpaceSize(decomposition, covered);
+      }
+
+      PAIRCASE(SpaceKind::Disjunct, SpaceKind::Disjunct):
+      PAIRCASE(SpaceKind::Disjunct, SpaceKind::Constructor): {
+        auto &spaces = total.getSpaces();
+        return std::accumulate(spaces.begin(), spaces.end(), 0,
+                               [&](size_t totalSize, const Space &space) {
+                                 return totalSize + estimateSearchSpaceSize(
+                                                        space, covered);
+                               });
+      }
+
+      // Search space size computation is not commutative, because it
+      // tries to check if space on right-hand side is covering any
+      // portion of the "total" space on the left.
+      PAIRCASE(SpaceKind::Constructor, SpaceKind::Disjunct): {
+        for (const auto &space : covered.getSpaces()) {
+          // enum E { case foo }
+          // func bar(_ lhs: E, _ rhs: E) {
+          //   switch (lhs, rhs) {
+          //     case (_, _): break
+          // }
+          if (total == space)
+            return 0;
+
+          if (!space.isSubspace(total, TC, DC))
+            continue;
+
+          if (estimateSearchSpaceSize(total, space) == 0)
+            return 0;
+        }
+        break;
+      }
+
+      PAIRCASE(SpaceKind::Constructor, SpaceKind::Constructor): {
+        if (total.getHead() != covered.getHead())
+          break;
+
+        auto &lhs = total.getSpaces();
+        auto &rhs = covered.getSpaces();
+
+        if (std::distance(lhs.begin(), lhs.end()) !=
+            std::distance(rhs.begin(), rhs.end()))
+          return total.getSize(TC, DC);
+
+        auto i = lhs.begin();
+        auto j = rhs.begin();
+
+        size_t totalSize = 0;
+        for (; i != lhs.end() && j != rhs.end(); ++i, ++j) {
+          // The only light-weight checking we can do
+          // is when sub-spaces on both sides are types
+          // otherwise we'd have to decompose, which
+          // is too heavy, so let's just return total
+          // space size if such situation is detected.
+          if (i->getKind() != SpaceKind::Type ||
+              j->getKind() != SpaceKind::Type)
+            return total.getSize(TC, DC);
+
+          totalSize += estimateSearchSpaceSize(*i, *j);
+        }
+
+        return totalSize;
+      }
+
+      default:
+        break;
+      }
+
+      return total.getSize(TC, DC);
+    }
+
     void checkExhaustiveness(bool limitedChecking) {
       // If the type of the scrutinee is uninhabited, we're already dead.
       // Allow any well-typed patterns through.
@@ -1228,13 +1243,14 @@ namespace {
           Space projection = projectPattern(TC, caseItem.getPattern(),
                                             sawDowngradablePattern);
 
-          if (projection.isUseful()
-                && projection.isSubspace(Space::forDisjunct(spaces), TC, DC)) {
+          if (!projection.isEmpty() &&
+              projection.isSubspace(Space::forDisjunct(spaces), TC, DC)) {
             sawRedundantPattern |= true;
 
             TC.diagnose(caseItem.getStartLoc(),
                           diag::redundant_particular_case)
               .highlight(caseItem.getSourceRange());
+            continue;
           } else {
             Expr *cachedExpr = nullptr;
             if (checkRedundantLiteral(caseItem.getPattern(), cachedExpr)) {
@@ -1245,6 +1261,7 @@ namespace {
               TC.diagnose(cachedExpr->getLoc(),
                           diag::redundant_particular_literal_case_here)
                 .highlight(cachedExpr->getSourceRange());
+              continue;
             }
           }
           spaces.push_back(projection);
@@ -1254,21 +1271,22 @@ namespace {
       Space totalSpace = Space::forType(subjectType, Identifier());
       Space coveredSpace = Space::forDisjunct(spaces);
 
-      const size_t totalSpaceSize = totalSpace.getSize(TC, DC);
-      if (totalSpaceSize > Space::getMaximumSize()) {
-        diagnoseCannotCheck(sawRedundantPattern, totalSpaceSize, coveredSpace,
+      const size_t searchSpaceSizeEstimate =
+          estimateSearchSpaceSize(totalSpace, coveredSpace);
+      if (searchSpaceSizeEstimate > Space::getMaximumSize()) {
+        diagnoseCannotCheck(sawRedundantPattern, totalSpace, coveredSpace,
                             unknownCase);
         return;
       }
       unsigned minusCount = 0;
       auto diff = totalSpace.minus(coveredSpace, TC, DC, &minusCount);
       if (!diff) {
-        diagnoseCannotCheck(sawRedundantPattern, totalSpaceSize, coveredSpace,
+        diagnoseCannotCheck(sawRedundantPattern, totalSpace, coveredSpace,
                             unknownCase);
         return;
       }
       
-      auto uncovered = diff->simplify(TC, DC);
+      auto uncovered = diff.getValue();
       if (unknownCase && uncovered.isEmpty()) {
         TC.diagnose(unknownCase->getLoc(), diag::redundant_particular_case)
           .highlight(unknownCase->getSourceRange());
@@ -1279,7 +1297,6 @@ namespace {
       // that are implicitly frozen.
       uncovered = *uncovered.minus(Space::forUnknown(unknownCase == nullptr),
                                    TC, DC, /*&minusCount*/ nullptr);
-      uncovered = uncovered.simplify(TC, DC);
 
       if (uncovered.isEmpty())
         return;
@@ -1315,7 +1332,7 @@ namespace {
     };
     
     void diagnoseCannotCheck(const bool sawRedundantPattern,
-                             const size_t totalSpaceSize,
+                             const Space &totalSpace,
                              const Space &coveredSpace,
                              const CaseStmt *unknownCase) {
       // Because the space is large or the check is too slow,
@@ -1327,7 +1344,7 @@ namespace {
       // a 'default' to be inserted.
       // FIXME: Do something sensible for non-frozen enums.
       if (!sawRedundantPattern &&
-          coveredSpace.getSize(TC, DC) >= totalSpaceSize)
+          coveredSpace.getSize(TC, DC) >= totalSpace.getSize(TC, DC))
         return;
       diagnoseMissingCases(RequiresDefault::SpaceTooLarge, Space(),
                            unknownCase);

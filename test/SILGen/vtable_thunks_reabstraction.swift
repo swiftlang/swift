@@ -541,7 +541,7 @@ class MoreGenericSub1<T, TT> : GenericBase<T> {
 
 // CHECK-LABEL: sil_vtable MoreGenericSub1 {
 // CHECK-NEXT:   #GenericBase.doStuff!1: <T><U> (GenericBase<T>) -> (T, U) -> () : @$S27vtable_thunks_reabstraction15MoreGenericSub1C7doStuff1t1uyx_qd__tlF [override] // MoreGenericSub1.doStuff<A>(t:u:)
-// CHECK-NEXT:   #GenericBase.init!initializer.1: <T><U> (GenericBase<T>.Type) -> (T, U) -> GenericBase<T> : @$S27vtable_thunks_reabstraction11GenericBaseC1t1uACyxGx_qd__tclufc [inherited]   // GenericBase.init<A>(t:u:)
+// CHECK-NEXT:   #GenericBase.init!initializer.1: <T><U> (GenericBase<T>.Type) -> (T, U) -> GenericBase<T> : @$S27vtable_thunks_reabstraction15MoreGenericSub1C1t1uACyxq_Gx_qd__tclufc [override] // MoreGenericSub1.init<A>(t:u:)
 // CHECK-NEXT:   #MoreGenericSub1.deinit!deallocator: @$S27vtable_thunks_reabstraction15MoreGenericSub1CfD     // MoreGenericSub1.__deallocating_deinit
 // CHECK-NEXT: }
 
@@ -553,6 +553,6 @@ class MoreGenericSub2<TT, T> : GenericBase<T> {
 
 // CHECK-LABEL: sil_vtable MoreGenericSub2 {
 // CHECK-NEXT:   #GenericBase.doStuff!1: <T><U> (GenericBase<T>) -> (T, U) -> () : @$S27vtable_thunks_reabstraction15MoreGenericSub2C7doStuff1t1uyq__qd__tlF [override]        // MoreGenericSub2.doStuff<A>(t:u:)
-// CHECK-NEXT:   #GenericBase.init!initializer.1: <T><U> (GenericBase<T>.Type) -> (T, U) -> GenericBase<T> : @$S27vtable_thunks_reabstraction11GenericBaseC1t1uACyxGx_qd__tclufc [inherited]   // GenericBase.init<A>(t:u:)
+// CHECK-NEXT:   #GenericBase.init!initializer.1: <T><U> (GenericBase<T>.Type) -> (T, U) -> GenericBase<T> : @$S27vtable_thunks_reabstraction15MoreGenericSub2C1t1uACyxq_Gq__qd__tclufc [override] // MoreGenericSub2.init<A>(t:u:)
 // CHECK-NEXT:   #MoreGenericSub2.deinit!deallocator: @$S27vtable_thunks_reabstraction15MoreGenericSub2CfD     // MoreGenericSub2.__deallocating_deinit
 // CHECK-NEXT: }

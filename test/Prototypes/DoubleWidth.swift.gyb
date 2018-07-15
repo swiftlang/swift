@@ -55,14 +55,12 @@ public struct DoubleWidth<Base : FixedWidthInteger>
 #endif
 
   /// The high part of the value.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public var high: High {
     return _storage.high
   }
 
   /// The low part of the value.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public var low: Low {
     return _storage.low
@@ -72,7 +70,6 @@ public struct DoubleWidth<Base : FixedWidthInteger>
   ///
   /// - Parameter value: The tuple to use as the source of the new instance's
   ///   high and low parts.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init(_ value: (high: High, low: Low)) {
 #if _endian(big)
@@ -101,7 +98,6 @@ public struct DoubleWidth<Base : FixedWidthInteger>
     self.init((_high, low))
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init() {
     self.init(0, 0)
@@ -681,7 +677,6 @@ binaryOperators = [
     return high.nonzeroBitCount + low.nonzeroBitCount
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public var byteSwapped: DoubleWidth {
     return DoubleWidth(

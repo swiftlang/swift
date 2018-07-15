@@ -78,8 +78,8 @@ func returnsImplicitlyUnwrappedOptional() -> FooStruct! {
 
 @objc
 class ObjcClass {
-  var instanceVar: Int = 0
-  func instanceFunc() -> ObjcClass { return self }
+  @objc var instanceVar: Int = 0
+  @objc func instanceFunc() -> ObjcClass { return self }
 }
 
 // OPT_NO_DOT_FOOSTRUCT: Begin completions

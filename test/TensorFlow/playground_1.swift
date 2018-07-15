@@ -20,7 +20,7 @@ let x = 12345678  // a distinctive number to filecheck for.
 // CHECK: [[INT:%.*]] = load [[INTP]] : $*Int
 // CHECK: [[INTP:%.*]] = alloc_stack $Int
 // CHECK: store [[INT]] to [[INTP]] : $*Int
-// CHECK: [[LOGFN:%.*]] = function_ref @{{.*}}$builtin_log_with_id{{.*}}
+// CHECK: [[LOGFN:%.*]] = function_ref @{{.*}}__builtin_log_with_id{{.*}}
 // CHECK: apply [[LOGFN]]<Int>([[INTP]],
 
 

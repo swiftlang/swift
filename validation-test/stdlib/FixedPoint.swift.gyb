@@ -1,4 +1,4 @@
-// RUN: %target-run-stdlib-swiftgyb
+// RUN: %target-run-stdlib-swiftgyb-swift3
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -233,22 +233,26 @@ hash_value_test_template = gyb.parse_template("hash_value",
 % for self_ty in all_integer_types(word_bits):
 %   Self = self_ty.stdlib_name
 
-FixedPoint.test("${Self}.hashValue") {
+FixedPoint.test("${Self}.hash(into:)") {
 
 %   for bit_pattern in test_bit_patterns:
 
   do {
 %     input = prepare_bit_pattern(bit_pattern, self_ty.bits, self_ty.is_signed)
     let input = get${Self}(${input})
-    let output = getInt(input.hashValue)
+    var hasher = Hasher()
+    input.hash(into: &hasher)
+    let output = getInt(hasher.finalize())
 
-    var hasher = _SipHash13(_seed: Hasher._seed)
-%     if prepare_bit_pattern(input, word_bits, self_ty.is_signed) == input:
-    hasher._combine(UInt(truncatingIfNeeded: ${input} as ${"" if self_ty.is_signed else "U"}Int))
+%     reference = prepare_bit_pattern(bit_pattern, self_ty.bits, False)
+%     if self_ty.bits == 64:
+    let expected = Hasher._hash(seed: Hasher._seed, ${reference} as UInt64)
 %     else:
-    hasher._combine(UInt64(truncatingIfNeeded: input))
+    let expected = Hasher._hash(
+      seed: Hasher._seed,
+      bytes: ${reference},
+      count: ${self_ty.bits / 8})
 %     end
-    let expected = getInt(Int(truncatingIfNeeded: hasher.finalize()))
     expectEqual(expected, output, "input: \(input)")
   }
 

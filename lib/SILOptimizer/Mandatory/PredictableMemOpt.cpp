@@ -65,16 +65,24 @@ static unsigned getNumSubElements(SILType T, SILModule &M) {
 
 /// getAccessPathRoot - Given an address, dive through any tuple/struct element
 /// addresses to get the underlying value.
-static SILValue getAccessPathRoot(SILValue Pointer) {
-  while (1) {
-    if (auto *TEAI = dyn_cast<TupleElementAddrInst>(Pointer))
-      Pointer = TEAI->getOperand();
-    else if (auto SEAI = dyn_cast<StructElementAddrInst>(Pointer))
-      Pointer = SEAI->getOperand();
-    else if (auto BAI = dyn_cast<BeginAccessInst>(Pointer))
-      Pointer = BAI->getSource();
-    else
-      return Pointer;
+static SILValue getAccessPathRoot(SILValue pointer) {
+  while (true) {
+    if (auto *TEAI = dyn_cast<TupleElementAddrInst>(pointer)) {
+      pointer = TEAI->getOperand();
+      continue;
+    }
+
+    if (auto *SEAI = dyn_cast<StructElementAddrInst>(pointer)) {
+      pointer = SEAI->getOperand();
+      continue;
+    }
+
+    if (auto *BAI = dyn_cast<BeginAccessInst>(pointer)) {
+      pointer = BAI->getSource();
+      continue;
+    }
+
+    return pointer;
   }
 }
 
@@ -941,11 +949,14 @@ void AvailableValueDataflowContext::explodeCopyAddr(CopyAddrInst *CAI) {
       }
       continue;
 
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+    case SILInstructionKind::Name##RetainInst: \
+    case SILInstructionKind::Name##ReleaseInst: \
+    case SILInstructionKind::StrongRetain##Name##Inst:
+#include "swift/AST/ReferenceStorage.def"
     case SILInstructionKind::RetainValueInst:
     case SILInstructionKind::StrongRetainInst:
     case SILInstructionKind::StrongReleaseInst:
-    case SILInstructionKind::UnownedRetainInst:
-    case SILInstructionKind::UnownedReleaseInst:
     case SILInstructionKind::ReleaseValueInst: // Destroy overwritten value
       // These are ignored.
       continue;

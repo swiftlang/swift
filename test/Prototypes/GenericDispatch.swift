@@ -34,7 +34,7 @@ protocol F {
   // refinement of F having a non-default distance implementation need
   // to know about it.  These refinements are expected to be rare
   // (which is why defaulted requirements are a win)
-  func ~> (_: Self, _: (_Distance, (Self))) -> Int
+  static func ~> (_: Self, _: (_Distance, (Self))) -> Int
 }
 
 // Operation tag for distance

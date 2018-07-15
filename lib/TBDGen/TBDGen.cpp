@@ -46,7 +46,7 @@ void TBDGenVisitor::visitPatternBindingDecl(PatternBindingDecl *PBD) {
     auto *var = entry.getAnchoringVarDecl();
 
     // Non-global variables might have an explicit initializer symbol.
-    if (entry.getInit() && !isGlobalOrStaticVar(var)) {
+    if (entry.getNonLazyInit() && !isGlobalOrStaticVar(var)) {
       auto declRef =
           SILDeclRef(var, SILDeclRef::Kind::StoredPropertyInitializer);
       // Stored property initializers for public properties are currently
@@ -164,7 +164,7 @@ void TBDGenVisitor::visitAccessorDecl(AccessorDecl *AD) {
 
 void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
   // Explicitly look at each accessor here: see visitAccessorDecl.
-  for (auto accessor : ASD->getAllAccessorFunctions()) {
+  for (auto accessor : ASD->getAllAccessors()) {
     visitAbstractFunctionDecl(accessor);
   }
 }
