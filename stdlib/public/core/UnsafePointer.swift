@@ -219,27 +219,6 @@ public struct UnsafePointer<Pointee>: _Pointer {
     self._rawValue = _rawValue
   }
 
-  /// Creates an immutable typed pointer referencing the same memory as the
-  /// given mutable pointer.
-  ///
-  /// - Parameter other: The pointer to convert.
-  @_transparent
-  public init(_ other: UnsafeMutablePointer<Pointee>) {
-    self._rawValue = other._rawValue
-  }
-
-  /// Creates an immutable typed pointer referencing the same memory as the
-  /// given mutable pointer.
-  ///
-  /// - Parameter other: The pointer to convert. If `other` is `nil`, the
-  ///   result is `nil`.
-  @_transparent
-  public init?(_ other: UnsafeMutablePointer<Pointee>?) {
-    guard let unwrapped = other else { return nil }
-    self.init(unwrapped)
-  }
-
-
   /// Deallocates the memory block previously allocated at this pointer.
   ///
   /// This pointer must be a pointer to the start of a previously allocated memory 
@@ -259,7 +238,6 @@ public struct UnsafePointer<Pointee>: _Pointer {
       return self
     }
   }
-
 
   /// Executes the given closure while temporarily binding the specified number
   /// of instances to the given type.
