@@ -235,33 +235,6 @@ public struct UnsafeRawPointer: _Pointer {
     _rawValue = unwrapped._rawValue
   }
 
-  /// Creates a new raw pointer from the given typed pointer.
-  ///
-  /// Use this initializer to explicitly convert `other` to an `UnsafeRawPointer`
-  /// instance. This initializer creates a new pointer to the same address as
-  /// `other` and performs no allocation or copying.
-  ///
-  /// - Parameter other: The typed pointer to convert.
-  @_transparent
-  public init<T>(_ other: UnsafeMutablePointer<T>) {
-    _rawValue = other._rawValue
-  }
-
-  /// Creates a new raw pointer from the given typed pointer.
-  ///
-  /// Use this initializer to explicitly convert `other` to an `UnsafeRawPointer`
-  /// instance. This initializer creates a new pointer to the same address as
-  /// `other` and performs no allocation or copying.
-  ///
-  /// - Parameter other: The typed pointer to convert. If `other` is `nil`, the
-  ///   result is `nil`.
-  @_transparent
-  public init?<T>(_ other: UnsafeMutablePointer<T>?) {
-    guard let unwrapped = other else { return nil }
-    _rawValue = unwrapped._rawValue
-  }
-
-
   /// Deallocates the previously allocated memory block referenced by this pointer.
   ///
   /// The memory to be deallocated must be uninitialized or initialized to a
@@ -332,7 +305,6 @@ public struct UnsafeRawPointer: _Pointer {
   public func assumingMemoryBound<T>(to: T.Type) -> UnsafePointer<T> {
     return UnsafePointer<T>(_rawValue)
   }
-
 
   /// Returns a new instance of the given type, constructed from the raw memory
   /// at the specified offset.

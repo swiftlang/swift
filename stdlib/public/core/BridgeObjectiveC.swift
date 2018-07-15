@@ -422,42 +422,13 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   /// `self`.
   ///
   /// - Precondition: `self != nil`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // unsafe-performance
   public subscript(i: Int) -> Pointee {
     @_transparent
     get {
       // We can do a strong load normally.
       return (UnsafePointer<Pointee>(self) + i).pointee
     }
-  }
-
-  /// Explicit construction from an UnsafeMutablePointer.
-  ///
-  /// This is inherently unsafe; UnsafeMutablePointer assumes the
-  /// referenced memory has +1 strong ownership semantics, whereas
-  /// AutoreleasingUnsafeMutablePointer implies +0 semantics.
-  ///
-  /// - Warning: Accessing `pointee` as a type that is unrelated to
-  ///   the underlying memory's bound type is undefined.
-  @_transparent
-  public init<U>(_ from: UnsafeMutablePointer<U>) {
-    self._rawValue = from._rawValue
-  }
-
-  /// Explicit construction from an UnsafeMutablePointer.
-  ///
-  /// Returns nil if `from` is nil.
-  ///
-  /// This is inherently unsafe; UnsafeMutablePointer assumes the
-  /// referenced memory has +1 strong ownership semantics, whereas
-  /// AutoreleasingUnsafeMutablePointer implies +0 semantics.
-  ///
-  /// - Warning: Accessing `pointee` as a type that is unrelated to
-  ///   the underlying memory's bound type is undefined.
-  @_transparent
-  public init?<U>(_ from: UnsafeMutablePointer<U>?) {
-    guard let unwrapped = from else { return nil }
-    self.init(unwrapped)
   }
 
   /// Explicit construction from a UnsafePointer.
@@ -467,7 +438,6 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   ///
   /// - Warning: Accessing `pointee` as a type that is unrelated to
   ///   the underlying memory's bound type is undefined.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   internal init<U>(_ from: UnsafePointer<U>) {
     self._rawValue = from._rawValue
@@ -482,7 +452,6 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   ///
   /// - Warning: Accessing `pointee` as a type that is unrelated to
   ///   the underlying memory's bound type is undefined.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   internal init?<U>(_ from: UnsafePointer<U>?) {
     guard let unwrapped = from else { return nil }
