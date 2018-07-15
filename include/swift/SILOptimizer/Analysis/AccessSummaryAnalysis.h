@@ -176,7 +176,7 @@ private:
   IndexTrieNode *SubPathTrie;
 
 public:
-  AccessSummaryAnalysis() : BottomUpIPAnalysis(AnalysisKind::AccessSummary) {
+  AccessSummaryAnalysis() : BottomUpIPAnalysis(SILAnalysisKind::AccessSummary) {
     SubPathTrie = new IndexTrieNode();
   }
 
@@ -205,7 +205,7 @@ public:
   virtual void invalidateFunctionTables() override {}
 
   static bool classof(const SILAnalysis *S) {
-    return S->getKind() == AnalysisKind::AccessSummary;
+    return S->getKind() == SILAnalysisKind::AccessSummary;
   }
 
   /// Returns a description of the subpath suitable for use in diagnostics.

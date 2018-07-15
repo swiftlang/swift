@@ -25,10 +25,10 @@ class TypeExpansionAnalysis : public SILAnalysis {
   llvm::DenseMap<SILType, ProjectionPathList> ExpansionCache;
 public:
   TypeExpansionAnalysis(SILModule *M)
-      : SILAnalysis(AnalysisKind::TypeExpansion) {}
+      : SILAnalysis(SILAnalysisKind::TypeExpansion) {}
 
   static bool classof(const SILAnalysis *S) {
-    return S->getKind() == AnalysisKind::TypeExpansion;
+    return S->getKind() == SILAnalysisKind::TypeExpansion;
   }
 
   /// Return ProjectionPath to every leaf or intermediate node of the given type.

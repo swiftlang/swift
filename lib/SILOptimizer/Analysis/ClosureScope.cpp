@@ -133,7 +133,7 @@ void ClosureScopeData::compute(SILModule *M) {
 }
 
 ClosureScopeAnalysis::ClosureScopeAnalysis(SILModule *M)
-    : SILAnalysis(AnalysisKind::ClosureScope), M(M), scopeData(nullptr) {}
+    : SILAnalysis(SILAnalysisKind::ClosureScope), M(M), scopeData(nullptr) {}
 
 ClosureScopeAnalysis::~ClosureScopeAnalysis() = default;
 

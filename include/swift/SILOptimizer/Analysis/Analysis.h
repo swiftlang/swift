@@ -28,6 +28,17 @@ class SILModule;
 class SILFunction;
 class SILPassManager;
 
+/// A list of the known analysis.
+struct SILAnalysisKind {
+  enum InnerTy {
+#define ANALYSIS(NAME) NAME,
+#include "Analysis.def"
+  } value;
+
+  SILAnalysisKind(InnerTy newValue) : value(newValue) {}
+  operator InnerTy() const { return value; }
+};
+
 /// The base class for all SIL-level analysis.
 class SILAnalysis : public DeleteNotificationHandler {
 public:
@@ -67,15 +78,9 @@ public:
     Everything = Calls | Branches | Instructions,
   };
 
-  /// A list of the known analysis.
-  enum class AnalysisKind {
-#define ANALYSIS(NAME) NAME,
-#include "Analysis.def"
-  };
-
 private:
   /// Stores the kind of derived class.
-  const AnalysisKind kind;
+  const SILAnalysisKind kind;
 
   /// A lock that prevents the invalidation of this analysis. When this
   /// variable is set to True then the PassManager should not invalidate
@@ -84,10 +89,10 @@ private:
 
 public:
   /// Returns the kind of derived class.
-  AnalysisKind getKind() const { return kind; }
+  SILAnalysisKind getKind() const { return kind; }
 
   /// Constructor.
-  SILAnalysis(AnalysisKind k) : kind(k), invalidationLock(false) {}
+  SILAnalysis(SILAnalysisKind k) : kind(k), invalidationLock(false) {}
 
   /// Destructor.
   virtual ~SILAnalysis() {}
@@ -239,7 +244,7 @@ public:
   virtual ~FunctionAnalysisBase() {
     deleteAllAnalysisProviders();
   }
-  FunctionAnalysisBase(AnalysisKind k) : SILAnalysis(k), storage() {}
+  FunctionAnalysisBase(SILAnalysisKind k) : SILAnalysis(k), storage() {}
   FunctionAnalysisBase(const FunctionAnalysisBase &) = delete;
   FunctionAnalysisBase &operator=(const FunctionAnalysisBase &) = delete;
 

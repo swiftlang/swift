@@ -155,11 +155,12 @@ private:
 
 
 public:
-  AliasAnalysis(SILModule *M) :
-    SILAnalysis(AnalysisKind::Alias), Mod(M), SEA(nullptr), EA(nullptr) {}
+  AliasAnalysis(SILModule *M)
+      : SILAnalysis(SILAnalysisKind::Alias), Mod(M), SEA(nullptr), EA(nullptr) {
+  }
 
   static bool classof(const SILAnalysis *S) {
-    return S->getKind() == AnalysisKind::Alias;
+    return S->getKind() == SILAnalysisKind::Alias;
   }
   
   virtual void initialize(SILPassManager *PM) override;
