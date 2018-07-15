@@ -2920,17 +2920,13 @@ private:
   /// \brief Solve the system of constraints after it has already been
   /// simplified.
   ///
-  /// \param disjunction The disjunction to try and solve using simplified
-  /// constraint system.
-  ///
   /// \param solutions The set of solutions to this system of constraints.
   ///
   /// \param allowFreeTypeVariables How to bind free type variables in
   /// the solution.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool solveSimplified(Constraint *disjunction,
-                       SmallVectorImpl<Solution> &solutions,
+  bool solveSimplified(SmallVectorImpl<Solution> &solutions,
                        FreeTypeVariableBinding allowFreeTypeVariables);
 
   /// \brief Find reduced domains of disjunction constraints for given
@@ -2942,15 +2938,10 @@ private:
   /// \param expr The expression to find reductions for.
   void shrink(Expr *expr);
 
-  /// \brief Pick a disjunction from the given list, which,
-  /// based on the associated constraints, is the most viable to
-  /// reduce depth of the search tree.
+  /// \brief Pick a disjunction from the InactiveConstraints list.
   ///
-  /// \param disjunctions A collection of disjunctions to examine.
-  ///
-  /// \returns The disjunction with most weight relative to others, based
-  /// on the number of constraints associated with it, or nullptr otherwise.
-  Constraint *selectDisjunction(SmallVectorImpl<Constraint *> &disjunctions);
+  /// \returns The selected disjunction.
+  Constraint *selectDisjunction();
 
   bool simplifyForConstraintPropagation();
   void collectNeighboringBindOverloadDisjunctions(
@@ -3345,8 +3336,7 @@ public:
       llvm::SaveAndRestore<ConstraintSystem::SolverScope *>
           partialSolutionScope(cs.solverState->PartialSolutionScope, &scope);
 
-      failed = cs.solveSimplified(cs.selectDisjunction(Disjunctions), solutions,
-                                  allowFreeTypeVariables);
+      failed = cs.solveSimplified(solutions, allowFreeTypeVariables);
     }
 
     // Put the constraints back into their original bucket.

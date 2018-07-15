@@ -1492,13 +1492,8 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
 
   // If we don't have more than one component, just solve the whole
   // system.
-  if (numComponents < 2) {
-    SmallVector<Constraint *, 8> disjunctions;
-    collectDisjunctions(disjunctions);
-
-    return solveSimplified(selectDisjunction(disjunctions), solutions,
-                           allowFreeTypeVariables);
-  }
+  if (numComponents < 2)
+    return solveSimplified(solutions, allowFreeTypeVariables);
 
   if (TC.Context.LangOpts.DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
@@ -1885,13 +1880,17 @@ static Constraint *selectBestBindingDisjunction(
   return nullptr;
 }
 
-Constraint *ConstraintSystem::selectDisjunction(
-    SmallVectorImpl<Constraint *> &disjunctions) {
+Constraint *ConstraintSystem::selectDisjunction() {
+  SmallVector<Constraint *, 4> disjunctions;
+
+  collectDisjunctions(disjunctions);
+
   if (disjunctions.empty())
     return nullptr;
 
   auto *disjunction =
       selectBestBindingDisjunction(*this, disjunctions);
+
   if (disjunction)
     return disjunction;
 
@@ -1922,8 +1921,10 @@ Constraint *ConstraintSystem::selectDisjunction(
 }
 
 bool ConstraintSystem::solveSimplified(
-    Constraint *disjunction, SmallVectorImpl<Solution> &solutions,
+    SmallVectorImpl<Solution> &solutions,
     FreeTypeVariableBinding allowFreeTypeVariables) {
+
+  auto *disjunction = selectDisjunction();
 
   auto bestBindings = determineBestBindings();
 
@@ -1936,6 +1937,8 @@ bool ConstraintSystem::solveSimplified(
                                    bestBindings->Bindings, solutions,
                                    allowFreeTypeVariables);
   }
+
+
 
   // If there are no disjunctions we can't solve this system unless we have
   // free type variables and are allowing them in the solution.
