@@ -4302,33 +4302,51 @@ getDynamicCallableMethods(Type type, ConstraintSystem &CS,
   auto it = CS.DynamicCallableCache.find(canType);
   if (it != CS.DynamicCallableCache.end()) return it->second;
 
-  auto calculate = [&]() -> DynamicCallableMethods {
-    // If this is a protocol composition, check if any of the protocols have the
-    // attribute.
-    if (auto protocolComp = dyn_cast<ProtocolCompositionType>(canType)) {
-      DynamicCallableMethods methods;
-      for (auto protocolType : protocolComp->getMembers()) {
-        auto tmp = getDynamicCallableMethods(protocolType, CS, locator, error);
-        if (error) return methods;
-        if (tmp.argumentsMethod) {
-          if (methods.argumentsMethod &&
-              methods.argumentsMethod != tmp.argumentsMethod) {
-            error = true;
-            return methods;
-          }
-          methods.argumentsMethod = tmp.argumentsMethod;
+  // Calculate @dynamicCallable methods for composite types with multiple
+  // components (protocol composition types and archetypes).
+  auto calculateForComponentTypes =
+      [&](ArrayRef<Type> componentTypes) -> DynamicCallableMethods {
+    DynamicCallableMethods methods;
+    for (auto componentType : componentTypes) {
+      auto tmp = getDynamicCallableMethods(componentType, CS, locator, error);
+      if (error) return methods;
+      if (tmp.argumentsMethod) {
+        if (methods.argumentsMethod &&
+            methods.argumentsMethod != tmp.argumentsMethod) {
+          error = true;
+          return methods;
         }
-        if (tmp.keywordArgumentsMethod) {
-          if (methods.keywordArgumentsMethod &&
-              methods.keywordArgumentsMethod != tmp.keywordArgumentsMethod) {
-            error = true;
-            return methods;
-          }
-          methods.keywordArgumentsMethod = tmp.keywordArgumentsMethod;
-        }
+        methods.argumentsMethod = tmp.argumentsMethod;
       }
-      return methods;
+      if (tmp.keywordArgumentsMethod) {
+        if (methods.keywordArgumentsMethod &&
+            methods.keywordArgumentsMethod != tmp.keywordArgumentsMethod) {
+          error = true;
+          return methods;
+        }
+        methods.keywordArgumentsMethod = tmp.keywordArgumentsMethod;
+      }
     }
+    return methods;
+  };
+
+  // Calculate @dynamicCallable methods.
+  auto calculate = [&]() -> DynamicCallableMethods {
+    // If this is an archetype type, check if any types it conforms to
+    // (superclass or protocols) have the attribute.
+    if (auto archetype = dyn_cast<ArchetypeType>(canType)) {
+      SmallVector<Type, 2> componentTypes;
+      for (auto protocolDecl : archetype->getConformsTo())
+        componentTypes.push_back(protocolDecl->getDeclaredType());
+      if (auto superclass = archetype->getSuperclass())
+        componentTypes.push_back(superclass);
+      return calculateForComponentTypes(componentTypes);
+    }
+
+    // If this is a protocol composition, check if any of its members have the
+    // attribute.
+    if (auto protocolComp = dyn_cast<ProtocolCompositionType>(canType))
+      return calculateForComponentTypes(protocolComp->getMembers());
 
     // Otherwise, this must be a nominal type.
     // Dynamic calling doesn't work for tuples, etc.
