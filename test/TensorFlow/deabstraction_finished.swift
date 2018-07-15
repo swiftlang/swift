@@ -99,18 +99,14 @@ CHECK-LABEL: --- INPUT FUNCTION {{.*}}stringAttributes
  CHECK: graph_op "foo"() {attr1: "", attr2: "abc", __device: "/device:CPU:0"}
 */
 
-#if false
-
-
-// FIXME: Constexpr propagation of tensorshape should handle this.
 public func tensorShape() -> Tensor<Float> {
-  let shape : TensorShape = [2,1]
-  // xpected-error @+1 {{attribute 'value' requires a constant argument}}
-  return Tensor(handle: #tfop("Const", dtype: Float.self, value$tensor: [1.0, 2.0], value$shape: shape))
+  let shape : TensorShape = [1, 2]
+
+  return Tensor(handle: #tfop("Const", dtype: Float.self, value$tensor: [17.0 as Float, 18.0], value$shape: shape))
 }
 
 // b/75407624
-
+#if false
 // This requires propagation of the array initializer of TensorShape through its
 // initializers.
 public func test75407624() {

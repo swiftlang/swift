@@ -302,9 +302,19 @@ APInt SymbolicValue::getIntegerValue() const {
   }
 
   assert(representationKind == RK_Inst);
-  // TODO: Will eventually support the bump-pointer allocated folded int value.
   return cast<IntegerLiteralInst>(value.inst)->getValue();
 }
+
+unsigned SymbolicValue::getIntegerValueBitWidth() const {
+  assert(getKind() == Integer);
+  if (representationKind == RK_IntegerInline ||
+      representationKind == RK_Integer)
+    return aux.integer_bitwidth;
+
+  assert(representationKind == RK_Inst);
+  return cast<IntegerLiteralInst>(value.inst)->getValue().getBitWidth();
+}
+
 
 //===----------------------------------------------------------------------===//
 // Floats
@@ -402,6 +412,22 @@ APFloat SymbolicValue::getFloatValue() const {
   assert(representationKind == RK_Inst);
   return cast<FloatLiteralInst>(value.inst)->getValue();
 }
+
+const llvm::fltSemantics *SymbolicValue::getFloatValueSemantics() const {
+  assert(getKind() == Float);
+
+  if (representationKind == RK_Float32)
+    return &APFloat::IEEEsingle();
+  if (representationKind == RK_Float64)
+    return &APFloat::IEEEdouble();
+
+  if (representationKind == RK_Float)
+    return &value.floatingPoint->semantics;
+
+  assert(representationKind == RK_Inst);
+  return &getFloatValue().getSemantics();
+}
+
 
 //===----------------------------------------------------------------------===//
 // Strings
@@ -661,6 +687,21 @@ static SILDebugLocation skipInternalLocations(SILDebugLocation loc) {
 
   return loc;
 }
+
+/// Dig through single element aggregates, return the ultimate thing inside of
+/// it.  This is useful when dealing with integers and floats, because
+SymbolicValue SymbolicValue::lookThroughSingleElementAggregates() const {
+  auto result = *this;
+  while (1) {
+    if (result.getKind() != Aggregate)
+      return result;
+    auto elts = result.getAggregateValue();
+    if (elts.size() != 1)
+      return result;
+    result = elts[0];
+  }
+}
+
 
 /// Given that this is an 'Unknown' value, emit diagnostic notes providing
 /// context about what the problem is.
