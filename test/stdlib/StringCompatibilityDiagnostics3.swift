@@ -22,6 +22,8 @@ func testPopFirst() {
 
   var _ = String(str.utf8) ?? "" // expected-warning{{'init' is deprecated: Failable initializer was removed in Swift 4. When upgrading to Swift 4, please use non-failable String.init(_:UTF8View)}}
   var _ = String(str.utf8) // expected-warning{{'init' is deprecated: Failable initializer was removed in Swift 4. When upgrading to Swift 4, please use non-failable String.init(_:UTF8View)}}
-  var _: String = String(str.utf8) // expected-error {{value of optional type 'String?' not unwrapped; did you mean to use '!' or '?'?}}
+  var _: String = String(str.utf8) // expected-error {{value of optional type 'String?' must be unwrapped to a value of type 'String'}}
+  // expected-note@-1{{coalesce}}
+  // expected-note@-2{{force-unwrap}}
 }
 
