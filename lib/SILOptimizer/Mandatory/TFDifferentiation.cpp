@@ -82,11 +82,15 @@ static FuncDecl *lookupAssociativeOperatorDeclInProtocol(DeclName operatorName,
                                                          ProtocolDecl *);
 static SILParameterInfo getFormalParameterInfo(CanType, SILModule &);
 static SILResultInfo getFormalResultInfo(CanType, SILModule &);
-static void collectAllFormalResultsInTypeOrder(SILFunction &function,
-                                            SmallVectorImpl<SILValue> &results);
+static void collectAllFormalResultsInTypeOrder(SILFunction &,
+                                               SmallVectorImpl<SILValue> &);
+static void extractAllElements(SILValue, SILBuilder &,
+                               SmallVectorImpl<SILValue> &);
+static SILValue joinElements(ArrayRef<SILValue>, SILBuilder &, SILLocation);
+template<typename IndResRange>
 static void collectAllActualResultsInTypeOrder(
   ApplyInst *ai, ArrayRef<SILValue> extractedDirectResults,
-  ArrayRef<SILValue> indirectResults, SmallVectorImpl<SILValue> &results);
+  IndResRange &&indirectResults, SmallVectorImpl<SILValue> &results);
 static FunctionRefInst *findReferenceToVisibleFunction(SILValue value);
 static SILValue reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
                                           SILValue oldConvertedFunc,
@@ -95,7 +99,6 @@ static SILValue reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
                                             [](SILValue arg) { return arg; });
 static StoreOwnershipQualifier getBufferSOQ(Type type, SILModule &module);
 static LoadOwnershipQualifier getBufferLOQ(Type type, SILModule &module);
-static bool isUserDefinedDifferentiable(SILFunction *);
 
 //===----------------------------------------------------------------------===//
 // Auxiliary data structures
@@ -254,8 +257,16 @@ public:
 ///
 class PrimalInfo {
 private:
-  /// The primal value struct type.
-  StructDecl *primalValueStruct;
+  /// The primal value struct declaration.
+  StructDecl *primalValueStruct = nullptr;
+  
+  /// The SIL module;
+  const SILModule &module;
+  
+  /// The corresponding type of the primal value struct. This is initially
+  /// null. After this field is computed, mutation of primal value will lead to
+  /// unexpected behavior.
+  StructType *primalValueStructType = nullptr;
   
   /// Mapping from original values that are preserved as non-control-dependent
   /// primal values to declaration references in the primal value struct.
@@ -264,6 +275,33 @@ private:
   /// Mapping from types to distinct tapes. Tapes are uniqued by the element
   /// type.
   DenseMap<CanType, VarDecl *> typeTapeMap;
+  
+  /// Mapping from non-control-dependent `apply` instructions in the original
+  /// function to the primal values returned by the corresponding call in the
+  /// primal function.
+  ///
+  /// For example, in the original function:
+  ///     %orig_res = apply %f(%x)
+  ///
+  /// This will be transformed into the following in the primal function:
+  ///     %tuple = apply %f(%x)
+  ///     %prim_val_0 = tuple_extract %tuple, 0
+  ///     ...
+  ///     %prim_val_n = tuple_extract %tuple, n
+  ///     %orig_res_0 = tuple_extract %tuple, 0
+  ///     ...
+  ///     %orig_res_n = tuple_extract %tuple, n
+  ///     %prim_vals = tuple (%prim_val_0, ..., %prim_val_n)     [CHECKPOINT]
+  ///     %orig_results = tuple (%orig_res_0, ..., %orig_res_n)  [CHECKPOINT]
+  ///
+  /// If this function is non-control-dependent, primal values will be
+  /// checkpointed into the primal value struct as a tuple member, and get
+  /// inserted into `nestedStaticPrimalValueMap`. Otherwise, it'll go to the
+  /// corresponding tape of its type.
+  DenseMap<ApplyInst *, VarDecl *> nestedStaticPrimalValueMap;
+  
+  /// Mapping from `apply` instructions to their
+  DenseMap<ApplyInst *, VarDecl *> applyTapeMap;
 
   /// Mapping from original basic blocks to their associated IDs. In the primal
   /// function, we push the predecessor block ID for each basic block that has
@@ -283,12 +321,26 @@ private:
   /// Mangler for mangling types.
   Mangle::ASTMangler mangler;
 
+private:
+  VarDecl *addVarDecl(StringRef name, Type type) {
+    auto &ctx = primalValueStruct->getASTContext();
+    auto id = ctx.getIdentifier(name);
+    auto *varDecl = new (ctx) VarDecl(/*IsStatic*/ false,
+                                      VarDecl::Specifier::Var,
+                                      /*IsCaptureList*/ false,
+                                      SourceLoc(), id, type,
+                                      primalValueStruct);
+    varDecl->setInterfaceType(type);
+    primalValueStruct->addMember(varDecl);
+    return varDecl;
+  }
+
 public:
   PrimalInfo(const PrimalInfo &) = delete;
   PrimalInfo &operator=(const PrimalInfo &) = delete;
   
-  PrimalInfo(StructDecl *primalValueStruct)
-    : primalValueStruct(&*primalValueStruct) {}
+  explicit PrimalInfo(StructDecl *primalValueStruct, const SILModule &module)
+    : primalValueStruct(&*primalValueStruct), module(module) {}
 
   /// Returns the primal value struct that the primal info is established
   /// around.
@@ -296,29 +348,61 @@ public:
     return primalValueStruct;
   }
   
-  /// Add a primal value decl for a non-control-dependent (static) value in the
-  /// original function.
-  VarDecl *addStaticPrimalValueDecl(SILValue originalValue,
-                                    Type primalValueType) {
-    auto &astCtx = primalValueStruct->getASTContext();
-    auto id =
-      astCtx.getIdentifier("v_" + llvm::itostr(staticPrimalValueMap.size()));
-    auto *varDecl = new (astCtx) VarDecl(/*IsStatic*/ false,
-                                         VarDecl::Specifier::Var,
-                                         /*IsCaptureList*/ false,
-                                         SourceLoc(), id, primalValueType,
-                                         primalValueStruct);
-    varDecl->setInterfaceType(primalValueType);
-    primalValueStruct->addMember(varDecl);
-    staticPrimalValueMap.insert({originalValue, varDecl});
-    return varDecl;
+  /// Computes the primal value struct type.
+  StructType *computePrimalValueStructType() {
+    assert(!primalValueStructType &&
+           "The primal value struct type has been computed before");
+    primalValueStructType =
+    StructType::get(primalValueStruct, Type(),
+                    primalValueStruct->getASTContext());
+    return primalValueStructType;
+  }
+  
+  /// Returns the primal value struct type, assuming the primal value struct
+  /// type has already been computed before.
+  StructType *getPrimalValueStructType() const {
+    assert(primalValueStructType &&
+           "The primal value struct type has not been computed");
+    return primalValueStructType;
   }
 
-  /// Looks up a primal value decl in the primal value struct for a
-  /// non-control-dependent (static) value in the original function.
-  VarDecl *lookupStaticPrimalValueDecl(SILValue originalValue) const {
+  /// Returns the lowered SIL type for the primal value struct.
+  SILType getLoweredPrimalValueStructType() const {
+    return module.Types.getLoweredType(getPrimalValueStructType());
+  }
+  
+  /// Add a primal value decl for a non-control-dependent (static) value in the
+  /// original function.
+  VarDecl *addStaticPrimalValueDecl(SILValue originalValue) {
+    auto *decl = addVarDecl("v_" + llvm::itostr(staticPrimalValueMap.size()),
+                            originalValue->getType().getASTType());
+    staticPrimalValueMap.insert({originalValue, decl});
+    return decl;
+  }
+  
+  /// Add a nested primal value decl for a non-control-dependent (static) primal
+  /// value returned by the corresponding instruction in the primal function
+  /// of an `apply` instruction in the original function.
+  VarDecl *addNestedStaticPrimalValueDecl(ApplyInst *inst,
+                                          CanType primalValueType) {
+    auto *decl = addVarDecl("pv_", primalValueType);
+    nestedStaticPrimalValueMap.insert({inst, decl});
+    return decl;
+  }
+
+  /// Finds the primal value decl in the primal value struct for a static primal
+  /// value in the original function.
+  VarDecl *lookupDirectStaticPrimalValueDecl(SILValue originalValue) const {
     auto lookup = staticPrimalValueMap.find(originalValue);
     return lookup == staticPrimalValueMap.end() ? nullptr : lookup->getSecond();
+  }
+  
+  /// Finds the primal value decl in the primal value struct for an `apply` in
+  /// the original function.
+  VarDecl *lookupNestedStaticPrimalValueDecl(ApplyInst *inst) {
+    auto lookup = nestedStaticPrimalValueMap.find(inst);
+    return lookup == nestedStaticPrimalValueMap.end()
+      ? nullptr : lookup->getSecond();
   }
   
   /// Retrieves the tape decl in the primal value struct for the specified type.
@@ -327,16 +411,9 @@ public:
     auto insertion = typeTapeMap.try_emplace(type, nullptr);
     auto &tapeDecl = insertion.first->getSecond();
     if (insertion.second) {
-      auto id = astCtx.getIdentifier("tape_" + mangler.mangleTypeAsUSR(type));
       auto tapeType =
         BoundGenericType::get(astCtx.get_AutoDiffTapeDecl(), Type(), { type });
-      tapeDecl = new (astCtx) VarDecl(/*isStatic*/ false,
-                                      VarDecl::Specifier::Var,
-                                      /*IsCaptureList*/ false,
-                                      SourceLoc(), id, tapeType,
-                                      primalValueStruct);
-      tapeDecl->setInterfaceType(tapeType);
-      primalValueStruct->addMember(tapeDecl);
+      tapeDecl = addVarDecl("t_" + mangler.mangleTypeAsUSR(type), tapeType);
     }
     return tapeDecl;
   }
@@ -353,15 +430,9 @@ public:
     if (predecessorTraceTapeDecl)
       return predecessorTraceTapeDecl;
     auto &ctx = primalValueStruct->getASTContext();
-    auto id = ctx.getIdentifier("pred_trace");
     auto tapeType = BoundGenericType::get(ctx.get_AutoDiffTapeDecl(), Type(),
                                           { getBuiltinType(ctx, "Int64") });
-    predecessorTraceTapeDecl = new (ctx) VarDecl(/*isStatic*/ false,
-                                             VarDecl::Specifier::Var,
-                                             /*isCaptureList*/ false,
-                                             SourceLoc(), id, tapeType,
-                                             primalValueStruct);
-    predecessorTraceTapeDecl->setInterfaceType(tapeType);
+    predecessorTraceTapeDecl = addVarDecl("pred_trace", tapeType);
     return predecessorTraceTapeDecl;
   }
 };
@@ -435,8 +506,10 @@ public:
     return primalInfo.get();
   }
   
-  void initializePrimalInfo(StructDecl *pvStruct) {
-    primalInfo = llvm::make_unique<PrimalInfo>(pvStruct);
+  /// Initialize primal info for primal synthesis.
+  void initializePrimalInfo(StructDecl *pvStruct, const SILModule &module) {
+    assert(!primalInfo && "Primal info was previously initialized");
+    primalInfo = std::unique_ptr<PrimalInfo>(new PrimalInfo(pvStruct, module));
   }
   
   SILReverseAutoDiffIndices getIndices() const { return attr->getIndices(); }
@@ -1196,6 +1269,34 @@ isActive(SILValue value, const SILReverseAutoDiffIndices &indices) const {
   return isVaried(value, indices.parameters) && isUseful(value, indices.source);
 }
 
+static void dumpActivityInfo(SILValue value,
+                             const SILReverseAutoDiffIndices &indices,
+                             DifferentiableActivityInfo &activityInfo,
+                             llvm::raw_ostream &s = llvm::dbgs()) {
+  s << '[';
+  if (activityInfo.isActive(value, indices))
+    s << "ACTIVE";
+  else if (activityInfo.isVaried(value, indices.parameters))
+    s << "VARIED";
+  else if (activityInfo.isUseful(value, indices.source))
+    s << "USEFUL";
+  s << "] " << value;
+}
+
+static void dumpActivityInfo(SILFunction &fn,
+                             const SILReverseAutoDiffIndices &indices,
+                             DifferentiableActivityInfo &activityInfo,
+                             llvm::raw_ostream &s = llvm::dbgs()) {
+  s << "Activity info for " << fn.getName() << " at " << indices << '\n';
+  for (auto &bb : fn) {
+    for (auto *arg : bb.getArguments())
+      dumpActivityInfo(arg, indices, activityInfo, s);
+    for (auto &inst : bb)
+      for (auto res : inst.getResults())
+        dumpActivityInfo(res, indices, activityInfo, s);
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // Local utilities
 //===----------------------------------------------------------------------===//
@@ -1416,9 +1517,10 @@ void collectAllFormalResultsInTypeOrder(SILFunction &function,
 
 /// Given a function call site, gather all of its actual results (both direct
 /// and indirect) in an order defined by its result type.
+template<typename IndResRange>
 static void collectAllActualResultsInTypeOrder(
   ApplyInst *ai, ArrayRef<SILValue> extractedDirectResults,
-  ArrayRef<SILValue> indirectResults, SmallVectorImpl<SILValue> &results) {
+  IndResRange &&indirectResults, SmallVectorImpl<SILValue> &results) {
   auto callee = ai->getCallee();
   SILFunctionConventions calleeConvs(callee->getType().getAs<SILFunctionType>(),
                                      ai->getModule());
@@ -1637,6 +1739,54 @@ static void convertToIndirectSeed(intmax_t value, CanType type,
                       /*isNonThrowing*/ false);
 }
 
+/// Given a value, extracts all elements to `result` from this value if it's a
+/// tuple. Otherwise, add this value directly to `result`.
+static void extractAllElements(SILValue val, SILBuilder &builder,
+                               SmallVectorImpl<SILValue> &result) {
+  if (auto tupleType = val->getType().getAs<TupleType>())
+    for (auto i : range(tupleType->getNumElements()))
+      result.push_back(builder.createTupleExtract(val.getLoc(), val, i));
+  else
+    result.push_back(val);
+}
+
+/// Given a range of elements, joins these into a single value. If there's
+/// exactly one element, returns that element. Otherwise, creates a tuple using
+/// a `tuple` instruction.
+static SILValue joinElements(ArrayRef<SILValue> elements, SILBuilder &builder,
+                             SILLocation loc) {
+  if (elements.size() == 1)
+    return elements.front();
+  return builder.createTuple(loc, elements);
+}
+
+/// Given a range of types, joins these into a single type. If there's exactly
+/// one element type, returns that element type. Otherwise, creates a tuple type
+/// of all element types.
+template<typename TypeRange>
+static CanType joinElementTypes(TypeRange &&range,
+                                const ASTContext &ctx) {
+  if (range.size() == 1)
+    return range.front();
+  auto typeElts = map<SmallVector<TupleTypeElt, 8>>(range, [&](Type type) {
+    return type;
+  });
+  return TupleType::get(typeElts, ctx);
+}
+
+/// Given a range of SIL values, retrives the canonical types of these values,
+/// and joins these types into a single type.
+template<typename SILValueRange>
+static CanType joinElementTypesFromValues(SILValueRange &&range,
+                                          const ASTContext &ctx) {
+  if (range.size() == 1)
+    return range.front()->getType().getASTType();
+  SmallVector<TupleTypeElt, 8> elts;
+  transform(range, elts.begin(),
+            [&](SILValue val) { return val->getType().getASTType(); });
+  return TupleType::get(elts, ctx)->getCanonicalType();
+}
+
 //===----------------------------------------------------------------------===//
 // PrimalGen - generates primal functions for each differentiation task in
 // the SIL module.
@@ -1709,41 +1859,6 @@ StructDecl *ADContext::createDependentStructForFunction(SILFunction *function) {
     ctxStruct->print(s); s << '\n';
   });
   return ctxStruct;
-}
-
-/// Determine the kind of the given primal value. It is a BB argument, a
-/// cost-free conversion like `struct_extract`, a value to be recomputed in
-/// the adjoint, an control-independent checkpoint, or a tape checkpoint.
-static PrimalValueKind classifyInstruction(SILInstruction *inst,
-                                           const DominanceInfo &domInfo) {
-  auto *fn = inst->getParentBlock()->getParent();
-  auto *entry = fn->getEntryBlock();
-  auto *bb = inst->getParentBlock();
-  switch (inst->getKind()) {
-  case SILInstructionKind::IntegerLiteralInst:
-  case SILInstructionKind::FloatLiteralInst:
-  case SILInstructionKind::StringLiteralInst:
-  case SILInstructionKind::ConstStringLiteralInst:
-  case SILInstructionKind::TupleInst:
-  case SILInstructionKind::StructInst:
-  case SILInstructionKind::TupleExtractInst:
-  case SILInstructionKind::StructExtractInst:
-  case SILInstructionKind::EnumInst:
-  case SILInstructionKind::FunctionRefInst:
-  case SILInstructionKind::ConvertFunctionInst:
-  case SILInstructionKind::ThinToThickFunctionInst:
-  case SILInstructionKind::BuiltinInst:
-  case SILInstructionKind::PartialApplyInst:
-  case SILInstructionKind::GlobalValueInst:
-  case SILInstructionKind::KeyPathInst:
-  case SILInstructionKind::MetatypeInst:
-  case SILInstructionKind::GradientInst:
-    return PrimalValueKind::Conversion;
-  default:
-    return domInfo.dominates(entry, bb)
-      ? PrimalValueKind::StaticCheckpoint
-      : PrimalValueKind::TapeCheckpoint;
-  }
 }
 
 /// For a nested function call whose result tuple is active on the
@@ -1831,6 +1946,26 @@ static bool diagnoseUnsupportedControlFlow(ADContext &context,
   return false;
 }
 
+/// Given the original function and a call to the corresponding primal function,
+/// collect primal values and original results returned by the primal call.
+static
+void collectPrimalValuesAndOriginalResults(SILFunctionType *origFnTy,
+                                           ApplyInst *primalCall,
+                                           ArrayRef<SILValue> extractedDirRes,
+                                           SmallVectorImpl<SILValue> &primVals,
+                                           SmallVectorImpl<SILValue> &origRes) {
+  SmallVector<SILValue, 8> allResults;
+  collectAllActualResultsInTypeOrder(primalCall, extractedDirRes,
+                                     primalCall->getIndirectSILResults(),
+                                     allResults);
+  ArrayRef<SILValue> allResultsRef(allResults);
+  auto numOrigRes = origFnTy->getNumResults();
+  auto primValsRef = allResultsRef.drop_back(numOrigRes);
+  auto origResRef = allResultsRef.take_back(numOrigRes);
+  primVals.append(primValsRef.begin(), primValsRef.end());
+  origRes.append(origResRef.begin(), origResRef.end());
+}
+
 namespace {
 class PrimalGenCloner final : public SILClonerWithScopes<PrimalGenCloner> {
 private:
@@ -1841,7 +1976,10 @@ private:
   const DifferentiableActivityInfo &activityInfo;
 
   /// The dominator tree of the original function.
-  const DominanceInfo &domInfo;
+  /// const DominanceInfo &domInfo;
+  
+  /// The postdominator tree of the original function.
+  const PostDominanceInfo &postDomInfo;
 
   // To be used for control flow support.
   // const SILLoopInfo &loopInfo;
@@ -1875,16 +2013,56 @@ private:
   PrimalInfo &getPrimalInfo() const {
     return *getDifferentiationTask()->getPrimalInfo();
   }
+  
+protected:
+  /// Determine the kind of the given primal value. It is a BB argument, a
+  /// cost-free conversion like `struct_extract`, a value to be recomputed in
+  /// the adjoint, an control-independent checkpoint, or a tape checkpoint.
+  PrimalValueKind classifyPrimalValue(SILInstruction *inst) {
+    assert(inst->getFunction() == getOriginal());
+    auto *entry = getOriginal()->getEntryBlock();
+    auto *bb = inst->getParentBlock();
+    switch (inst->getKind()) {
+      case SILInstructionKind::IntegerLiteralInst:
+      case SILInstructionKind::FloatLiteralInst:
+      case SILInstructionKind::StringLiteralInst:
+      case SILInstructionKind::ConstStringLiteralInst:
+      case SILInstructionKind::TupleInst:
+      case SILInstructionKind::StructInst:
+      case SILInstructionKind::TupleExtractInst:
+      case SILInstructionKind::TupleElementAddrInst:
+      case SILInstructionKind::ApplyInst:
+      case SILInstructionKind::StructExtractInst:
+      case SILInstructionKind::StructElementAddrInst:
+      case SILInstructionKind::EnumInst:
+      case SILInstructionKind::FunctionRefInst:
+      case SILInstructionKind::ConvertFunctionInst:
+      case SILInstructionKind::ThinToThickFunctionInst:
+      case SILInstructionKind::BuiltinInst:
+      case SILInstructionKind::PartialApplyInst:
+      case SILInstructionKind::GlobalValueInst:
+      case SILInstructionKind::KeyPathInst:
+      case SILInstructionKind::MetatypeInst:
+      case SILInstructionKind::GradientInst:
+        return PrimalValueKind::Conversion;
+      default:
+        return postDomInfo.dominates(bb, entry)
+        ? PrimalValueKind::StaticCheckpoint
+        : PrimalValueKind::TapeCheckpoint;
+    }
+  }
 
 public:
   explicit PrimalGenCloner(const FunctionSynthesisItem &synthesis,
                            const DifferentiableActivityInfo &activityInfo,
                            const DominanceInfo &domInfo,
+                           const PostDominanceInfo &pdomInfo,
                            const SILLoopInfo &loopInfo,
                            PrimalGen &primalGen,
                            ADContext &context)
     : SILClonerWithScopes(*synthesis.target), synthesis(synthesis),
-      activityInfo(activityInfo), domInfo(domInfo), /*loopInfo(loopInfo),*/
+      activityInfo(activityInfo), /*domInfo(domInfo),*/ postDomInfo(pdomInfo),
+      /*loopInfo(loopInfo),*/
       primalGen(primalGen) {}
 
   /// Entry of primal generation for a function.
@@ -1899,7 +2077,7 @@ public:
     if (getContext().hasErrorOccurred())
       return;
     SILClonerWithScopes::postProcess(orig, cloned);
-    switch (classifyInstruction(orig, domInfo)) {
+    switch (classifyPrimalValue(orig)) {
     case PrimalValueKind::Conversion:
       break;
     case PrimalValueKind::ToRematerialize:
@@ -1908,13 +2086,14 @@ public:
       // FIXME: Get or create typed tape, and emit push-to-tape builtin.
       llvm_unreachable("Unhandled tape checkpoint");
     case PrimalValueKind::StaticCheckpoint:
-      if (auto *originalSVI = dyn_cast<SingleValueInstruction>(orig)) {
-        auto *primalSVI = cast<SingleValueInstruction>(cloned);
+      for (auto resultPair :
+             llvm::zip(orig->getResults(), cloned->getResults())) {
         DEBUG(getDebugStream() << "Found static checkpoint "
               << *cloned << '\n');
-        getPrimalInfo().addStaticPrimalValueDecl(
-          originalSVI, primalSVI->getType().getASTType());
-        staticPrimalValues.push_back(primalSVI);
+        SILValue origRes, clonedRes;
+        std::tie(origRes, clonedRes) = resultPair;
+        getPrimalInfo().addStaticPrimalValueDecl(origRes);
+        staticPrimalValues.push_back(clonedRes);
       }
       break;
     }
@@ -2101,44 +2280,38 @@ public:
                                           ai->getSubstitutionMap(), newArgs,
                                           ai->isNonThrowing());
     // After applying the primal, we need to handle the primal's direct results.
-    SILValue origResultFromPrimal;
-    // If there's just one result, there's no primal value.
-    auto primalTupleRetTy = primalCall->getType().getAs<TupleType>();
-    if (!primalTupleRetTy)
-      origResultFromPrimal = primalCall;
-    // If there are multiple results, the result is a tuple, which may contain
-    // primal values before original results. In this case, we extract all
-    // original results and form a tuple.
-    else {
-      // The number of elements is the same as the original result of the
-      // `apply`.
-      unsigned origNumElts = 1;
-      if (auto origTup = ai->getType().getAs<TupleType>())
-        origNumElts = origTup->getNumElements();
-      // Extract original result(s) returned by primal. These are
-      // the first few elements in the tuple. If the number of
-      // original results is 1, use that single result directly.
-      if (origNumElts == 1)
-        origResultFromPrimal = builder.createTupleExtract(ai->getLoc(),
-                                                          primalCall, 1);
-      // Otherwise, create a new tuple of original results.
-      else {
-        SmallVector<SILValue, 8> origResults(origNumElts);
-        for (unsigned i : range(origNumElts))
-          origResults[i] =
-            builder.createTupleExtract(ai->getLoc(), primalCall, i);
-        origResultFromPrimal = builder.createTuple(ai->getLoc(), origResults);
-      }
-    }
+    // These results include direct primal values and direct original results.
+    SmallVector<SILValue, 8> primVals, origResults, allDirResults;
+    extractAllElements(primalCall, builder, allDirResults);
+    collectPrimalValuesAndOriginalResults(primalFnTy, primalCall, allDirResults,
+                                          primVals, origResults);
+    
+    // Get original direct results for cloning.
+    SmallVector<SILValue, 8> origDirResults;
+    for (auto origRes : origResults)
+      if (origRes->getType().isObject())
+        origDirResults.push_back(origRes);
+    auto origDirResultFromPrimal =
+      joinElements(origDirResults, builder, primalCall->getLoc());
     // Store the original result from primal to the value map.
-    ValueMap.insert({ai, origResultFromPrimal});
-
-    // Add this primal value to the primal struct decl.
-    getPrimalInfo().addStaticPrimalValueDecl(
-      ai, primalCall->getType().getASTType());
-    // Add to the list of static primal values for creating a primal value
-    // struct value later in `visitSILFunction`.
-    staticPrimalValues.push_back(primalCall);
+    ValueMap.insert({ai, origDirResultFromPrimal});
+    
+    // FIXME: Handle indirect passing. One possible way is to scan the entire
+    // data flow to determine whether the primal value struct should be
+    // indirect. Then use a flag to determine whether we'll use SSA operations
+    // or address operations to perform checkpointing.
+    
+    // Checkpoint nested primal values as a tuple.
+    auto nestedPrimValDeclTy =
+      joinElementTypesFromValues(primVals, getASTContext());
+    getPrimalInfo().addNestedStaticPrimalValueDecl(ai, nestedPrimValDeclTy);
+    auto primValAggr = joinElements(primVals, builder, primalCall->getLoc());
+    staticPrimalValues.push_back(primValAggr);
+    
+    // Checkpoint original results as a tuple.
+    getPrimalInfo().addStaticPrimalValueDecl(ai);
+    auto origResAggr = joinElements(origResults, builder, primalCall->getLoc());
+    staticPrimalValues.push_back(origResAggr);
 
     // Some instructions that produce the callee may have been cloned.
     // If the original callee did not have any users beyond this `apply`,
@@ -2188,34 +2361,6 @@ public:
 };
 } // end anonymous namespace
 
-static void dumpActivityInfo(SILValue value,
-                             const SILReverseAutoDiffIndices &indices,
-                             DifferentiableActivityInfo &activityInfo,
-                             llvm::raw_ostream &s = llvm::dbgs()) {
-  s << '[';
-  if (activityInfo.isActive(value, indices))
-    s << "ACTIVE";
-  else if (activityInfo.isVaried(value, indices.parameters))
-    s << "VARIED";
-  else if (activityInfo.isUseful(value, indices.source))
-    s << "USEFUL";
-  s << "] " << value;
-}
-
-static void dumpActivityInfo(SILFunction &fn,
-                             const SILReverseAutoDiffIndices &indices,
-                             DifferentiableActivityInfo &activityInfo,
-                             llvm::raw_ostream &s = llvm::dbgs()) {
-  s << "Activity info for " << fn.getName() << " at " << indices << '\n';
-  for (auto &bb : fn) {
-    for (auto *arg : bb.getArguments())
-      dumpActivityInfo(arg, indices, activityInfo, s);
-    for (auto &inst : bb)
-      for (auto res : inst.getResults())
-        dumpActivityInfo(res, indices, activityInfo, s);
-  }
-}
-
 void PrimalGen::performSynthesis(FunctionSynthesisItem item) {
   // FIXME: If the original function has multiple basic blocks, bail out since
   // AD does not support control flow yet.
@@ -2226,17 +2371,20 @@ void PrimalGen::performSynthesis(FunctionSynthesisItem item) {
   auto *activityAnalysis =
     passManager.getAnalysis<DifferentiableActivityAnalysis>();
   auto *domAnalysis = passManager.getAnalysis<DominanceAnalysis>();
+  auto *pdomAnalysis = passManager.getAnalysis<PostDominanceAnalysis>();
   auto *loopAnalysis = passManager.getAnalysis<SILLoopAnalysis>();
   auto &activityInfo = *activityAnalysis->get(item.original);
   auto &domInfo = *domAnalysis->get(item.original);
+  auto &pdomInfo = *pdomAnalysis->get(item.original);
   auto &loopInfo = *loopAnalysis->get(item.original);
   // Canonicalize the orignal function's control flow.
   ControlFlowCanonicalization(*item.original, domInfo, loopInfo).run();
   // For debugging, dump the original function's activity analysis.
   DEBUG(dumpActivityInfo(*item.original, item.differentiationTask->getIndices(),
                          activityInfo, getDebugStream()));
-  // Generate primal code.
-  PrimalGenCloner cloner(item, activityInfo, domInfo, loopInfo, *this, context);
+  // Synthesize primal.
+  PrimalGenCloner cloner(item, activityInfo, domInfo, pdomInfo,
+                         loopInfo, *this, context);
   cloner.run();
 }
 
@@ -2255,7 +2403,7 @@ PrimalGen::createEmptyPrimal(DifferentiationTask *task) {
                            manglePositionalConfig(indices);
   StructDecl *primalValueStructDecl =
     context.createDependentStructForFunction(original);
-  task->initializePrimalInfo(primalValueStructDecl);
+  task->initializePrimalInfo(primalValueStructDecl, module);
   auto pvType = primalValueStructDecl->getDeclaredType()->getCanonicalType();
   auto objTy = SILType::getPrimitiveObjectType(pvType);
   auto resultConv = objTy.isLoadable(module)
@@ -2552,25 +2700,32 @@ public:
     }
   }
 };
-  
-static inline llvm::raw_ostream &operator<<(llvm::raw_ostream &s,
-                                            const AdjointValue &v) {
-  v.print(s);
-  return s;
-}
 
 /// `AdjointRematCloner` is used to clone non-checkpointed computation
 /// that is to be rematerialized from the original function to the adjoint
 /// function. It's called by `AdjointEmitter` during adjoint code generation.
-class AdjointRematCloner final : public SILCloner<AdjointRematCloner> {
+class AdjointRematCloner final : public SILClonerWithScopes<AdjointRematCloner>
+{
   friend class AdjointEmitter;
 private:
   SILFunction &getOriginal() {
     return getBuilder().getFunction();
   }
-  
+
 public:
-  AdjointRematCloner(SILFunction &fn) : SILCloner(fn) {}
+  AdjointRematCloner(SILFunction &fn) : SILClonerWithScopes(fn) {}
+  
+  void insertValueMapping(std::pair<SILValue, SILValue> valuePair) {
+    auto insertion = ValueMap.insert(valuePair);
+    assert(insertion.second && "The original value was mapped before");
+  }
+
+  void setInsertionPointBeforeTerminator(SILBasicBlock *bb) {
+    if (auto *term = bb->getTerminator())
+      getBuilder().setInsertionPoint(term);
+    else
+      getBuilder().setInsertionPoint(bb);
+  }
 };
 
 class AdjointEmitter final : public SILInstructionVisitor<AdjointEmitter> {
@@ -2583,6 +2738,9 @@ private:
 
   /// The dominator tree of the original function.
   const DominanceInfo &domInfo;
+  
+  /// The post-dominator tree of the original function.
+  const PostDominanceInfo &postDomInfo;
 
   // To be used for control flow support.
   // const SILLoopInfo &loopInfo;
@@ -2617,16 +2775,20 @@ private:
 
   llvm::BumpPtrAllocator allocator;
 
-  ADContext &getContext() {
+  ADContext &getContext() const {
     return adjointGen.context;
   }
   
-  SILModule &getModule() {
+  SILModule &getModule() const {
     return getContext().getModule();
   }
 
-  ASTContext &getASTContext() {
+  ASTContext &getASTContext() const {
     return synthesis.target->getASTContext();
+  }
+  
+  PrimalInfo &getPrimalInfo() const {
+    return *getDifferentiationTask()->getPrimalInfo();
   }
 
   SILFunction &getOriginal() const { return *synthesis.original; }
@@ -2640,10 +2802,10 @@ private:
 public:
   explicit AdjointEmitter(const FunctionSynthesisItem &item,
                           DifferentiableActivityInfo &activityInfo,
-                          DominanceInfo &domInfo, SILLoopInfo &loopInfo,
-                          AdjointGen &adjointGen)
+                          DominanceInfo &domInfo, PostDominanceInfo &pdomInfo,
+                          SILLoopInfo &loopInfo, AdjointGen &adjointGen)
   : synthesis(item), activityInfo(activityInfo), domInfo(domInfo),
-    adjointGen(adjointGen), rematCloner(getAdjoint()),
+    postDomInfo(pdomInfo), adjointGen(adjointGen), rematCloner(getAdjoint()),
     builder(getAdjoint()) {}
 
 protected:
@@ -2737,7 +2899,7 @@ public:
     // parameters".
     for (auto pair : zip(original.getArgumentsWithoutIndirectResults(),
                          originalParametersInAdj))
-      rematCloner.ValueMap.insert(pair);
+      rematCloner.insertValueMapping(pair);
 
     // Assign adjoint to the return value.
     //   y = tuple (y0, ..., yn)
@@ -2803,7 +2965,7 @@ public:
     // Get the corresponding adjoint basic block.
     auto adjBB = getAdjointBlock(bb);
     // Prepare the remat cloner for on-demand rematerialization.
-    rematCloner.getBuilder().setInsertionPoint(bb);
+    rematCloner.setInsertionPointBeforeTerminator(bb);
     getBuilder().setInsertionPoint(adjBB);
     // Visit each instruction in reverse order.
     for (auto &inst : reversed(*bb)) {
@@ -2828,22 +2990,63 @@ public:
   SILType remapType(SILType type) {
     return type;
   }
+  
+  /// Determines if the given value is a control-dependent value in the original
+  /// function. This helps determine whether to retrieve a primal value from
+  /// the struct directly or from a tape.
+  bool isControlDependent(SILValue value) const {
+    auto &fn = getOriginal();
+    assert(value->getFunction() == &fn && "Value not in the original function");
+    return !postDomInfo.dominates(value->getParentBlock(), fn.getEntryBlock());
+  }
 
-  /// Remap clone non-checkpointed original instructions to the adjoint.
+  // Given a primal value in the original function, extract this value from the
+  // primal value struct either by struct extraction or tape operation.
+  //
+  // The boolean flag `nested` determines for an `apply` instruction whether we
+  // are extracting its nested primal values (as an aggregate) instead of its
+  // original results. When `nested` is true, `value` must be an `apply`
+  // instruction.
+  SILValue extractPrimalValueIfAny(SILValue value, bool nested = false) {
+    auto &pi = getPrimalInfo();
+    VarDecl *field = nullptr;
+    if (nested) {
+      auto *applyInst = cast<ApplyInst>(value);
+      field = pi.lookupNestedStaticPrimalValueDecl(applyInst);
+    } else {
+      field = pi.lookupDirectStaticPrimalValueDecl(value);
+    }
+    SILValue extracted;
+    auto loc = remapLocation(value.getLoc());
+    if (isControlDependent(value)) {
+      // TODO: handle control-dependent values through tape operations. The
+      // general strategy is to emit an `autodiffPopFromTape` builtin in the
+      // corresponding adjoint block of the dominator of all uses of the value.
+      llvm_unreachable("Control-dependent primal value are not handled yet");
+    }
+    // If it's an address, use `struct_element_addr` to get the element address.
+    if (pi.getLoweredPrimalValueStructType().isAddress())
+      extracted = getBuilder()
+        .createStructElementAddr(loc, primalValueAggregateInAdj, field);
+    // Otherwise, the primal value struct is a normal SSA value. Emit a
+    // `struct_extract`.
+    else {
+      extracted = getBuilder().createStructExtract(
+        remapLocation(value.getLoc()), primalValueAggregateInAdj, field);
+    }
+    // Memorize this value mapping in the remat cloner, when we are not
+    // extracting a nested primal value aggregate.
+    if (!nested)
+      rematCloner.insertValueMapping({value, extracted});
+    return extracted;
+  }
+
+  /// Remap a value in the original function.
   SILValue remapValue(SILValue value) {
     // If `value` is a checkpointed primal value, extract it from the primal
     // value aggregate.
-    if (auto *pvDecl = getDifferentiationTask()->getPrimalInfo()
-          ->lookupStaticPrimalValueDecl(value))
-      return rematCloner.ValueMap.insert({value,
-        getBuilder().createStructExtract(
-          remapLocation(value.getLoc()), primalValueAggregateInAdj, pvDecl)})
-            .first->second;
-    // TODO: If `value` is a non-entry BB argument, get the value popped off the
-    // tape.
-    assert(!isa<SILArgument>(value) ||
-           value->getParentBlock() == getOriginal().getEntryBlock() &&
-           "FIXME: general BB args are not handled yet");
+    if (auto extractedPV = extractPrimalValueIfAny(value))
+      return extractedPV;
     // Otherwise, `value` is a non-checkpointed primal value. Recursively
     // rematerialize it in the adjoint function.
     if (auto *inst = value->getDefiningInstruction())
@@ -2889,54 +3092,16 @@ public:
     SILFunctionConventions origConv(origTy, getModule());
     for (auto param : ai->getArgumentsWithoutIndirectResults())
       args.push_back(remapValue(param));
-    // Add primal values and original results from the primal call, if this
-    // function's primal function returns primal values. We determine whether
-    // this function returns primal values by the difference between the # of
-    // its original results and the # of its primal results.
-    // FIXME: Indirect primal values can be problematic.
-    auto primResult = remapValue(ai);
-    auto mappedOrigIndResults = map<SmallVector<SILValue, 8>>(
-      ai->getIndirectSILResults(),
-      [this](SILValue val) { return remapValue(val); });
-    // If the primal returns a tuple, then there can be primal values. We
-    // extract all these results.
-    if (auto tupleTy = primResult->getType().getAs<TupleType>()) {
-      SmallVector<SILValue, 8> primDirResults;
-      for (unsigned i : range(tupleTy->getNumElements()))
-        primDirResults.push_back(
-          getBuilder().createTupleExtract(loc, primResult, i));
-      auto numOrigDirRes = origConv.getNumDirectSILResults();
-      auto origDirResults =
-        ArrayRef<SILValue>(primDirResults).drop_back(numOrigDirRes);
-      auto dirPrimVals = ArrayRef<SILValue>(primDirResults)
-        .slice(tupleTy->getNumElements() - numOrigDirRes);
-      auto numPrimDirRes = dirPrimVals.size();
-      // Pair all `tuple_extract`s in original function with extracted values in
-      // the remat cloner's ValueMap.
-      for (auto *use : ai->getUses())
-        if (auto *sei = dyn_cast<StructExtractInst>(use->getUser()))
-          rematCloner.ValueMap[sei] =
-            primDirResults[sei->getFieldNo() + numPrimDirRes];
-      // Collect all mapped original results.
-      SmallVector<SILValue, 8> results;
-      // FIXME: Indirect primal results are not handled. To do it properly, we
-      // need to make PrimalGen store primal values and results separately in
-      // the primal value struct so that we have a direct mapping for each
-      // original value.
-      collectAllActualResultsInTypeOrder(ai, origDirResults,
-                                         mappedOrigIndResults, results);
-      args.append(dirPrimVals.begin(), dirPrimVals.end());
-      args.append(results.begin(), results.end());
-    }
-    // Otherwise, there cannot be primal values. We push the mapped original
-    // result and indirect results (if any) in the type-defined order.
-    else {
-      // Collect all mapped results.
-      SmallVector<SILValue, 8> results;
-      collectAllActualResultsInTypeOrder(ai, { primResult },
-                                         mappedOrigIndResults, results);
-      args.append(results.begin(), results.end());
-    }
+    
+    // Add original values and nested primal values.
+    auto origResultAggr = extractPrimalValueIfAny(ai, /*nested*/ false);
+    SmallVector<SILValue, 8> origResults, nestedPrimVals;
+    extractAllElements(origResultAggr, builder, origResults);
+    auto nestedPrimValAggr = extractPrimalValueIfAny(ai, /*nested*/ true);
+    extractAllElements(nestedPrimValAggr, builder, nestedPrimVals);
+    args.append(nestedPrimVals.begin(), nestedPrimVals.end());
+    args.append(origResults.begin(), origResults.end());
+
     // Add seed.
     auto seed = getAdjointValue(ai);
     auto *seedBuf = getBuilder().createAllocStack(loc, seed.getType());
@@ -2971,13 +3136,11 @@ public:
           getBuilder().createTupleExtract(applyAdj->getLoc(), applyAdj, i));
     else
       dirResults.push_back(applyAdj);
-    // Get all indirect results for computing all results along with direct
-    // results.
-    auto indResults = map<SmallVector<SILValue, 8>>(
-      applyAdj->getIndirectSILResults(), [](SILValue val) { return val; });
     // Get all results in type-defined order.
     SmallVector<SILValue, 8> allResults;
-    collectAllActualResultsInTypeOrder(ai, dirResults, indResults, allResults);
+    collectAllActualResultsInTypeOrder(ai, dirResults,
+                                       applyAdj->getIndirectSILResults(),
+                                       allResults);
     // Set adjoints for all original parameters.
     for (auto i : range(origConvs.getSILArgIndexOfFirstParam(),
                         origConvs.getNumParameters()))
@@ -3158,13 +3321,12 @@ public:
     }
     case BuiltinValueKind::FDiv: {
       auto adjVal = materializeAdjoint(adj, opLoc);
-      auto lhs = bi->getOperand(0);
-      auto rhs = bi->getOperand(1);
+      auto lhs = remapValue(bi->getOperand(0));
+      auto rhs = remapValue(bi->getOperand(1));
       // x' = seed / y
       auto adjLHS = builder.createBuiltinBinaryFunction(
-        opLoc, "fdiv", opType, opType,
-        { adjVal, remapValue(bi->getOperand(1)) });
-      addAdjointValue(lhs, adjLHS);
+        opLoc, "fdiv", opType, opType, { adjVal, rhs });
+      addAdjointValue(bi->getOperand(0), adjLHS);
       // y' = -x / y^2 * seed
       auto minusLHS = builder.createBuiltinBinaryFunction(
         opLoc, "fneg", opType, opType, { lhs });
@@ -3174,7 +3336,7 @@ public:
         opLoc, "fdiv", opType, opType, { minusLHS, squareRHS });
       auto adjRHS = builder.createBuiltinBinaryFunction(
         opLoc, "fmul", opType, {}, { adjVal, div });
-      addAdjointValue(rhs, adjRHS);
+      addAdjointValue(bi->getOperand(1), adjRHS);
       break;
     }
     default:
@@ -3202,7 +3364,7 @@ void AdjointEmitter::rematerializeOriginalInstruction(SILInstruction *inst) {
   // Ensure that all operands have a corresponding value in the adjoint.
   for (auto &op : inst->getAllOperands())
     remapValue(op.get());
-  rematCloner.getBuilder().setInsertionPoint(ncd);
+  rematCloner.setInsertionPointBeforeTerminator(ncd);
   rematCloner.visit(inst);
 }
 
@@ -3427,12 +3589,15 @@ void AdjointGen::performSynthesis(FunctionSynthesisItem item) {
   auto *activityAnalysis =
     passManager.getAnalysis<DifferentiableActivityAnalysis>();
   auto *domAnalysis = passManager.getAnalysis<DominanceAnalysis>();
+  auto *pdomAnalysis = passManager.getAnalysis<PostDominanceAnalysis>();
   auto *loopAnalysis = passManager.getAnalysis<SILLoopAnalysis>();
-  auto &activityInfo = *activityAnalysis->get(item.original);
-  auto &domInfo = *domAnalysis->get(item.original);
-  auto &loopInfo = *loopAnalysis->get(item.original);
   // Generate primal code.
-  AdjointEmitter emitter(item, activityInfo, domInfo, loopInfo, *this);
+  AdjointEmitter emitter(item,
+                         *activityAnalysis->get(item.original),
+                         *domAnalysis->get(item.original),
+                         *pdomAnalysis->get(item.original),
+                         *loopAnalysis->get(item.original),
+                         *this);
   emitter.run();
   debugDump(*item.target);
 }
