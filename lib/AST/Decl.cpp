@@ -279,7 +279,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(MaterializeForSet, "materializeForSet accessor");
   ENTRY(Addressor, "address accessor");
   ENTRY(MutableAddressor, "mutableAddress accessor");
-  ENTRY(EnumElement, "enum element");
+  ENTRY(EnumElement, "enum case");
   ENTRY(Module, "module");
   ENTRY(MissingMember, "missing member placeholder");
   ENTRY(Requirement, "requirement");

@@ -1799,7 +1799,7 @@ enum BadEnum1: Int { case X }
 
 @objc
 enum BadEnum2: Int {
-  @objc(X:)   // expected-error{{'@objc' enum element must have a simple name}}{{10-11=}}
+  @objc(X:)   // expected-error{{'@objc' enum case must have a simple name}}{{10-11=}}
   case X
 }
 
