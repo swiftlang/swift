@@ -292,8 +292,7 @@ public:
   FunctionInfoTy *operator->() { return *this; }
 };
 
-#define ANALYSIS(NAME)                                                         \
-SILAnalysis *create##NAME##Analysis(SILModule *);
+#define ANALYSIS(NAME) SILAnalysis *create##NAME##Analysis(SILModule *);
 #include "Analysis.def"
 
 } // end namespace swift
