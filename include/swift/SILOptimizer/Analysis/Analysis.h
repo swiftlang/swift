@@ -157,16 +157,31 @@ public:
 
 /// An abstract base class that implements the boiler plate of caching and
 /// invalidating analysis for specific functions.
-template<typename AnalysisTy>
+///
+/// The usage expectation is that the derived function analysis will inherit
+/// from FunctionAnalysisBase and pass in as a template argument the
+/// "FunctionInfoTy" struct as a template argument. The FunctionInfoTy struct
+/// should represent all of the information that the analysis should store about
+/// an individual function. As a toy example:
+///
+/// ```
+/// struct TriviallyDeadAnalysisFunctionInfo {
+///   bool isTriviallyDead;
+/// };
+///
+/// class TriviallyDeadAnalysis
+///   : public FunctionAnalysisBase<TriviallyDeadAnalysisFunctionInfo> { ... }
+/// ```
+template <typename FunctionInfoTy>
 class FunctionAnalysisBase : public SILAnalysis {
 protected:
-  using StorageTy = llvm::DenseMap<SILFunction *, AnalysisTy *>;
+  using StorageTy = llvm::DenseMap<SILFunction *, FunctionInfoTy *>;
 
   /// Maps functions to their analysis provider.
   StorageTy storage;
 
-  /// Construct a new empty analysis for a specific function \p F.
-  virtual AnalysisTy *newFunctionAnalysis(SILFunction *f) = 0;
+  /// Construct a new empty function info for a specific function \p F.
+  virtual FunctionInfoTy *newFunctionAnalysis(SILFunction *f) = 0;
 
   /// Return True if the analysis should be invalidated given trait \K is
   /// preserved.
@@ -174,7 +189,7 @@ protected:
 
   /// A stub function that verifies the specific AnalysisTy \p A. This is
   /// meant to be overridden by subclasses.
-  virtual void verify(AnalysisTy *A) const {}
+  virtual void verify(FunctionInfoTy *funcInfo) const {}
 
   void deleteAllAnalysisProviders() {
     for (auto iter : storage)
@@ -183,21 +198,21 @@ protected:
   }
 
 public:
-  /// Returns true if we have an analysis for a specific function \p F without
-  /// actually constructing it.
-  bool hasAnalysis(SILFunction *f) const { return storage.count(f); }
+  /// Returns true if we have data for a specific function \p F without actually
+  /// attempting to construct the function info.
+  bool hasFunctionInfo(SILFunction *f) const { return storage.count(f); }
 
   /// Attempt to lookup up the information that the analysis has for the given
   /// function. Returns nullptr upon failure.
-  NullablePtr<AnalysisTy> maybeGet(SILFunction *f) {
+  NullablePtr<FunctionInfoTy> maybeGet(SILFunction *f) {
     auto iter = storage.find(f);
     if (iter == storage.end())
       return nullptr;
     return iter->second;
   }
 
-  /// Returns an analysis provider for a specific function \p F.
-  AnalysisTy *get(SILFunction *f) {
+  /// Returns a function info structure for a specific function \p F.
+  FunctionInfoTy *get(SILFunction *f) {
     // Check that the analysis can handle this function.
     verifyFunction(f);
 
@@ -212,7 +227,7 @@ public:
     deleteAllAnalysisProviders();
   }
 
-  /// Helper function to remove the analysis data for a function.
+  /// Helper function to remove the function info for a specific function.
   void invalidateFunction(SILFunction *f) {
     auto &it = storage.FindAndConstruct(f);
     if (!it.second)
@@ -244,14 +259,15 @@ public:
   virtual ~FunctionAnalysisBase() {
     deleteAllAnalysisProviders();
   }
+
   FunctionAnalysisBase(SILAnalysisKind k) : SILAnalysis(k), storage() {}
   FunctionAnalysisBase(const FunctionAnalysisBase &) = delete;
   FunctionAnalysisBase &operator=(const FunctionAnalysisBase &) = delete;
 
   /// Verify all of the AnalysisTy for all functions.
   ///
-  /// This is not meant to be overridden by subclasses. See "void
-  /// verify(AnalysisTy *A)".
+  /// This is not meant to be overridden by subclasses. Instead please override
+  /// void FunctionAnalysisBase::verify(FunctionInfoTy *fInfo).
   virtual void verify() const override final {
     for (auto iter : storage) {
       if (!iter.second)
@@ -260,11 +276,11 @@ public:
     }
   }
 
-  /// Verify the AnalysisTy that we have stored for the specific function \p
+  /// Verify the FunctionInfoTy that we have stored for the specific function \p
   /// F.
   ///
-  /// This is not meant to be overridden by subclasses. See "void
-  /// verify(AnalysisTy *analysis)".
+  /// This is not meant to be overridden by subclasses. Instead, please
+  /// override: void FunctionAnalysisBase::verify(FunctionInfoTy *fInfo).
   virtual void verify(SILFunction *f) const override final {
     auto iter = storage.find(f);
     if (iter == storage.end())
