@@ -2580,8 +2580,7 @@ extension _NativeDictionaryBuffer where Key: Hashable
     }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal static func bucketCount(
     forCapacity capacity: Int,
     maxLoadFactorInverse: Double
@@ -3246,8 +3245,7 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
   case cocoa(CocoaBuffer)
 #endif
 
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal var guaranteedNative: Bool {
     return _canBeClass(Key.self) == 0 || _canBeClass(Value.self) == 0
   }
@@ -4394,14 +4392,12 @@ extension Dictionary {
     }
 #endif
 
-    @inlinable // FIXME(sil-serialize-all)
-    @_transparent
+    @usableFromInline @_transparent
     internal var _guaranteedNative: Bool {
       return _canBeClass(Key.self) == 0 && _canBeClass(Value.self) == 0
     }
 
-    @inlinable // FIXME(sil-serialize-all)
-    @_transparent
+    @usableFromInline @_transparent
     internal var _nativeIndex: _NativeIndex {
       switch _value {
       case ._native(let nativeIndex):
@@ -4414,8 +4410,7 @@ extension Dictionary {
     }
 
 #if _runtime(_ObjC)
-    @inlinable // FIXME(sil-serialize-all)
-    @_transparent
+    @usableFromInline @_transparent
     internal var _cocoaIndex: _CocoaIndex {
       switch _value {
       case ._native:
@@ -4649,8 +4644,7 @@ public struct DictionaryIterator<Key: Hashable, Value>: IteratorProtocol {
   }
 #endif
 
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal var _guaranteedNative: Bool {
     return _canBeClass(Key.self) == 0 || _canBeClass(Value.self) == 0
   }

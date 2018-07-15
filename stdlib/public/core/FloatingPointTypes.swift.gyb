@@ -317,28 +317,23 @@ extension ${Self}: BinaryFloatingPoint {
     @usableFromInline // FIXME(sil-serialize-all)
     internal var _storage: (UInt64, UInt16, /* pad */ UInt16, UInt16, UInt16)
 
-    @inlinable // FIXME(sil-serialize-all)
-    @_transparent
+    @usableFromInline @_transparent
     internal var explicitSignificand: UInt64 { return _storage.0 }
 
-    @inlinable // FIXME(sil-serialize-all)
-    @_transparent
+    @usableFromInline @_transparent
     internal var signAndExponent: UInt16 { return _storage.1 }
 
-    @inlinable // FIXME(sil-serialize-all)
-    @_transparent
+    @usableFromInline @_transparent
     internal var sign: FloatingPointSign {
       return FloatingPointSign(rawValue: Int(signAndExponent &>> 15))!
     }
 
-    @inlinable // FIXME(sil-serialize-all)
-    @_transparent
+    @usableFromInline @_transparent
     internal var exponentBitPattern: UInt {
       return UInt(signAndExponent) & 0x7fff
     }
 
-    @inlinable // FIXME(sil-serialize-all)
-    @_transparent
+    @usableFromInline @_transparent
     internal init(explicitSignificand: UInt64, signAndExponent: UInt16) {
       _storage = (explicitSignificand, signAndExponent, 0, 0, 0)
     }
