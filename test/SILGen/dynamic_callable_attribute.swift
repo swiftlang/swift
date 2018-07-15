@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -emit-silgen -verify %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -verify %s | %FileCheck %s
+
+// Check that dynamic calls resolve to the right `dynamicallyCall` method in SIL.
  
 @dynamicCallable
 public struct Callable {
@@ -17,9 +19,9 @@ public func foo(a: Callable) {
  
 // CHECK-LABEL: sil @foo
 // CHECK: bb0(%0 : $Callable):
-// CHECK: [[DYN_CALL_1:%.*]] = function_ref @$S4main8CallableV15dynamicallyCall13withArgumentsySaySiG_tF
+// CHECK: [[DYN_CALL_1:%.*]] = function_ref @$S26dynamic_callable_attribute8CallableV15dynamicallyCall13withArgumentsySaySiG_tF
 // CHECK-NEXT: apply [[DYN_CALL_1]]
-// CHECK: [[DYN_CALL_2:%.*]] = function_ref @$S4main8CallableV15dynamicallyCall13withArgumentsySaySiG_tF
+// CHECK: [[DYN_CALL_2:%.*]] = function_ref @$S26dynamic_callable_attribute8CallableV15dynamicallyCall13withArgumentsySaySiG_tF
 // CHECK-NEXT: apply [[DYN_CALL_2]]
-// CHECK: [[DYN_CALL_3:%.*]] = function_ref @$S4main8CallableV15dynamicallyCall20withKeywordArgumentsys17DictionaryLiteralVySSSiG_tF
+// CHECK: [[DYN_CALL_3:%.*]] = function_ref @$S26dynamic_callable_attribute8CallableV15dynamicallyCall20withKeywordArgumentsys17DictionaryLiteralVySSSiG_tF
 // CHECK-NEXT: apply [[DYN_CALL_3]]
