@@ -103,7 +103,7 @@ public:
   void unlockInvalidation() { invalidationLock = false; }
 
   /// Return True if this analysis is locked and should not be invalidated.
-  bool isLocked() { return invalidationLock; }
+  bool isLocked() const { return invalidationLock; }
 
   /// Invalidate all information in this analysis.
   virtual void invalidate() = 0;
