@@ -7335,6 +7335,89 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
   return literal;
 }
 
+// Resolve @dynamicCallable applications.
+static Expr *finishApplyDynamicCallable(ConstraintSystem &cs, ApplyExpr *apply,
+                                        ConstraintLocatorBuilder locator) {
+  auto fn = apply->getFn();
+
+  auto isDynamicCallable = [&](Expr *base) {
+    auto type = cs.getType(base);
+    return cs.DynamicCallableCache.count(type->getCanonicalType());
+  };
+  assert(isDynamicCallable(fn) && "Expected a valid @dynamicCallable type");
+
+  auto &ctx = cs.getASTContext();
+  auto methods = cs.DynamicCallableCache[cs.getType(fn)->getCanonicalType()];
+  assert(methods.isValid() && "Expected a valid @dynamicCallable type");
+
+  TupleExpr *arg = dyn_cast<TupleExpr>(apply->getArg());
+  if (auto parenExpr = dyn_cast<ParenExpr>(apply->getArg())) {
+    arg = TupleExpr::createImplicit(ctx, parenExpr->getSubExpr(), {});
+  }
+
+  // Determine whether to call the positional arguments method or the
+  // keyword arguments method.
+  bool useKwargsMethod = methods.argumentsMethod == nullptr;
+  if (!useKwargsMethod) {
+    for (auto name : arg->getElementNames()) {
+      if (!name.empty()) {
+        useKwargsMethod = true;
+        break;
+      }
+    }
+  }
+
+  auto method = useKwargsMethod
+    ? methods.keywordArgumentsMethod
+    : methods.argumentsMethod;
+  assert(method && "Dynamic call method should exist");
+
+  auto memberType =
+    cs.getTypeOfMemberReference(cs.getType(fn), method, cs.DC,
+                                /*isDynamicResult*/ false,
+                                FunctionRefKind::DoubleApply,
+                                locator).second;
+  auto methodType = memberType->castTo<AnyFunctionType>();
+
+  // Construct expression referencing the `dynamicallyCall` method.
+  Expr *member =
+    new (ctx) MemberRefExpr(fn, fn->getEndLoc(), ConcreteDeclRef(method),
+                            DeclNameLoc(method->getNameLoc()),
+                            /*Implicit*/ true);
+
+  // Construct argument to the method (either an array or dictionary
+  // expression).
+  Expr *argument = nullptr;
+  if (!useKwargsMethod) {
+    argument = ArrayExpr::create(ctx, SourceLoc(), arg->getElements(),
+                                 {}, SourceLoc());
+  } else {
+    SmallVector<Identifier, 4> names;
+    SmallVector<Expr *, 4> dictElements;
+    for (unsigned i = 0, n = arg->getNumElements(); i < n; i++) {
+      Expr *labelExpr =
+        new (ctx) StringLiteralExpr(arg->getElementName(i).get(),
+                                    arg->getElementNameLoc(i),
+                                    /*Implicit*/ true);
+      Expr *pair =
+        TupleExpr::createImplicit(ctx, { labelExpr, arg->getElement(i) },
+                                  {});
+      dictElements.push_back(pair);
+    }
+    argument = DictionaryExpr::create(ctx, SourceLoc(), dictElements, {},
+                                      SourceLoc());
+  }
+  argument->setImplicit();
+
+  // Construct call to the `dynamicallyCall` method.
+  auto argumentName = methodType->getParams()[0].getLabel();
+  Expr *result = CallExpr::createImplicit(ctx, member, argument,
+                                          { argumentName });
+  cs.TC.typeCheckExpression(result, cs.DC);
+  cs.cacheExprTypes(result);
+  return result;
+}
+
 Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
                                 ConstraintLocatorBuilder locator) {
   TypeChecker &tc = cs.getTypeChecker();
@@ -7688,82 +7771,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
   // Handle @dynamicCallable applications.
   // At this point, all other AppyExpr cases have been handled.
-  auto isDynamicCallable = [&](Expr *base) {
-    auto type = cs.getType(base);
-    return type && cs.DynamicCallableCache.count(type->getCanonicalType());
-  };
-  assert(isDynamicCallable(fn) && "Expected a valid @dynamicCallable type");
-
-  auto &ctx = tc.Context;
-  auto methods = cs.DynamicCallableCache[cs.getType(fn)->getCanonicalType()];
-  assert(methods.isValid() && "Expected a valid @dynamicCallable type");
-
-  TupleExpr *arg = dyn_cast<TupleExpr>(apply->getArg());
-  if (auto parenExpr = dyn_cast<ParenExpr>(apply->getArg())) {
-    arg = TupleExpr::createImplicit(ctx, parenExpr->getSubExpr(), {});
-  }
-
-  // Determine whether to call the positional arguments method or the
-  // keyword arguments method.
-  bool useKwargsMethod = methods.argumentsMethod == nullptr;
-  if (!useKwargsMethod) {
-    for (auto name : arg->getElementNames()) {
-      if (!name.empty()) {
-        useKwargsMethod = true;
-        break;
-      }
-    }
-  }
-
-  auto method = useKwargsMethod
-    ? methods.keywordArgumentsMethod
-    : methods.argumentsMethod;
-  assert(method && "Dynamic call method should exist");
-
-  auto memberType =
-    cs.getTypeOfMemberReference(cs.getType(fn), method, cs.DC,
-                                /*isDynamicResult*/ false,
-                                FunctionRefKind::DoubleApply,
-                                locator).second;
-  auto methodType = memberType->castTo<AnyFunctionType>();
-
-  // Construct expression referencing the `dynamicallyCall` method.
-  Expr *member =
-    new (ctx) MemberRefExpr(fn, fn->getEndLoc(), ConcreteDeclRef(method),
-                            DeclNameLoc(method->getNameLoc()),
-                            /*Implicit*/ true);
-
-  // Construct argument to the method (either an array or dictionary
-  // expression).
-  Expr *argument = nullptr;
-  if (!useKwargsMethod) {
-    argument = ArrayExpr::create(ctx, SourceLoc(), arg->getElements(),
-                                 {}, SourceLoc());
-  } else {
-    SmallVector<Identifier, 4> names;
-    SmallVector<Expr *, 4> dictElements;
-    for (unsigned i = 0, n = arg->getNumElements(); i < n; i++) {
-      Expr *labelExpr =
-        new (ctx) StringLiteralExpr(arg->getElementName(i).get(),
-                                    arg->getElementNameLoc(i),
-                                    /*Implicit*/ true);
-      Expr *pair =
-        TupleExpr::createImplicit(ctx, { labelExpr, arg->getElement(i) },
-                                  {});
-      dictElements.push_back(pair);
-    }
-    argument = DictionaryExpr::create(ctx, SourceLoc(), dictElements, {},
-                                      SourceLoc());
-  }
-  argument->setImplicit();
-
-  // Construct call to the `dynamicallyCall` method.
-  auto argumentName = methodType->getParams()[0].getLabel();
-  Expr *result = CallExpr::createImplicit(ctx, member, argument,
-                                          { argumentName });
-  tc.typeCheckExpression(result, dc);
-  cs.cacheExprTypes(result);
-  return result;
+  return finishApplyDynamicCallable(cs, apply, locator);
 }
 
 
