@@ -21,6 +21,9 @@
 #include "swift/AST/TensorFlow.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
+#ifdef SWIFT_ENABLE_TENSORFLOW
+#include "tensorflow/c/c_api.h"
+#endif
 
 namespace swift {
 namespace tf {
@@ -581,45 +584,78 @@ private:
     SILFunction *extractFunctionForDevice(DeviceType deviceType);
   };
 
-  // Represent the TF graph of a graph function named `graphFnName`, which
-  // corresponds to the SIL host function `silHostFnName`. `graphDefProto` can
-  // contain more functions beyond `graphFnName`, if that function calls into
-  // other graph functions (e.g. if it has functional If/While ops).
-  struct SerializedGraphFunction {
+  /// Represent the TF graph of a graph function named `graphFnName`, which
+  /// corresponds to the SIL host function `silHostFnName`. `graph` can contain
+  /// more functions beyond `graphFnName`, if that function calls into other
+  /// graph functions (e.g. if it has functional If/While ops).
+  struct LoweredGraphFunction {
+    LoweredGraphFunction(
+        const std::string &silHostFnName, const std::string &graphFnName,
+        std::unique_ptr<TF_Graph, decltype(&TF_DeleteGraph)> graph,
+        SmallVector<std::pair<StringRef, SILLocation>, 1> pendingGraphFnNames)
+        : silHostFnName(silHostFnName), graphFnName(graphFnName),
+          graph(std::move(graph)),
+          pendingGraphFnNames(std::move(pendingGraphFnNames)) {}
+
+    LoweredGraphFunction(LoweredGraphFunction &&) = delete;
+
+    /// Used as the buffer to back a StringRef-typed map key value elsewhere.
     std::string silHostFnName;
+
     std::string graphFnName;
-    std::vector<char> graphDefProto;
+
+    std::unique_ptr<TF_Graph, decltype(&TF_DeleteGraph)> graph;
+
+    /// Each entry track a "pending" graph function F (via its host function
+    /// name) referenced by this function, along with the source location
+    /// indicating where this function references F.
+    /// "Pending" means the graph definition of F is not yet available. Once it
+    /// is generated later, it will be copied over to `graph` so that `graph`
+    /// becomes self-contained.
+    SmallVector<std::pair<StringRef, SILLocation>, 1> pendingGraphFnNames;
   };
 
-  /// Lower `fn` (which was formed by the partitioner) into a TensorFlow graph
-  /// function (along with any helper functions that it calls into), and insert
-  /// them as a single `SerializedGraphFunction` entry to `graphFunctions`,
-  /// keyed on `hostFnName`. This way a subsequent lowered graph function foo()
-  /// can call/use this function, if the corresponding SIL code of foo()
+  /// Lower the accelerator-only function `fn` (which was formed by the
+  /// partitioner) into a TensorFlow graph function, and add an entry to
+  /// `graphFunctions`, keyed on `hostFnName`. This way another graph function
+  /// foo() can call/use this function, if the corresponding SIL code of foo()
   /// calls/uses `hostFnName`.
-  ///
-  /// If the function being lowered calls/uses another graph function bar(),
-  /// bar() must have been lowered and must exist in `graphFunctions`.
-  void lowerTFFunction(
+  bool lowerTFFunction(
       StringRef hostFnName, SILFunction *fn,
       const GraphGlobalConfiguration &configuration,
-      llvm::DenseMap<StringRef, SerializedGraphFunction> &graphFunctions);
+      llvm::DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>>
+          &graphFunctions);
 
-  /// Similar to the function above, except it returns the encoded TensorFlow
-  /// graph (still in the binary GraphDef protobuf), and sets `entryFnBaseName`
-  /// accordingly for the runtime to call as a set of graph function nodes.
+  /// Similar to the function above, except it handles a non-accelerator-only
+  /// function, which can be lowered to graph functions on a set of TF devices.
   ///
   /// When configuration.usedDeviceTypes has N>1 devices, in addition to
-  /// `entryFnBaseName`, also generate another N-1 nodes named
-  /// `entryFnBaseName_helper_{i}`, with i ranging from 0 to N-2. These N nodes
-  /// correspond to the N per-device graph functions, and must be called by the
-  /// runtime in a single SessionRun() call. Those N-1 helper functions take no
-  /// input or output tensors, and are executed for their side-effects of
-  /// sending/receiving tensors with the function of `entryFnBaseName`.
-  std::vector<char> lowerTFGraph(
-      SILFunction *fn, const GraphGlobalConfiguration &configuration,
-      const llvm::DenseMap<StringRef, SerializedGraphFunction> &graphFunctions,
-      std::string &entryFnBaseName);
+  /// generating a graph function whose name is
+  /// LoweredGraphFunction::graphFnName (referred to as `entryFnBaseName`), also
+  /// generate another N-1 nodes named `entryFnBaseName_helper_{i}`, with i
+  /// ranging from 0 to N-2. These N nodes correspond to the N per-device graph
+  /// functions, and must be called by the runtime in a single SessionRun()
+  /// call. Those N-1 helper functions take no input or output tensors, and are
+  /// executed for their side-effects of sending/receiving tensors with the
+  /// function of `entryFnBaseName`.
+  bool
+  lowerTFGraph(StringRef hostFnName, SILFunction *fn,
+               const GraphGlobalConfiguration &configuration,
+               llvm::DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>>
+                   &graphFunctions);
+
+  /// Copy the graphs functions in `srcGraph` to `resultGraph`, and verify that
+  /// `graphFuncName` must be one of the graph functions to copy over. Return
+  /// true on error, with error already emitted on `fn` and `loc`.
+  bool copyGraphFunctions(SILFunction &fn, SILLocation loc,
+                          StringRef graphFuncName, TF_Graph *srcGraph,
+                          TF_Graph *resultGraph);
+
+  /// Serialize `resultGraph` into a binary protobuf into `bytes`.
+  /// Return true on error, with a error diagnostic already emitted.
+  bool serializeGraphProtoBuf(SILFunction &SILFn, TF_Graph *resultGraph,
+                              std::vector<char> &bytes);
+
 } // end namespace tf
 } // end namespace swift
 #endif

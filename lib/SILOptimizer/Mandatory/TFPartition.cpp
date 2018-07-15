@@ -617,6 +617,9 @@ class TFFunctionPartition {
 public:
   SILFunction &hostFn;
   ModuleDecl &tensorFlowModule;  // TensorFlow standard library.
+  /// For partitionable functions, map the SIL host function names to the
+  /// lowered TF graph artifacts.
+  DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>> &graphFunctions;
   GraphGlobalConfiguration configuration; // Device placement info.
   DominanceInfo &DI;
   BlocksReachingTensorCode tensorCodeBlocks;
@@ -678,27 +681,29 @@ public:
   /// Set of all of the __tf_send calls that silence copy-in warnings.
   SmallPtrSet<SILInstruction*, 8> explicitCopyMarkers;
 
- public:
-  TFFunctionPartition(SILFunction &Fn, SILPassManager *PM,
-                      ModuleDecl &tensorFlowModule)
-      : hostFn(Fn), tensorFlowModule(tensorFlowModule),
-        configuration(GraphGlobalConfiguration::getForFunction(Fn,
-                                                   /*removeConfigInst*/true)),
-        DI(*PM->getAnalysis<DominanceAnalysis>()->get(&Fn)),
-        tensorCodeBlocks(Fn) {}
-
-  bool markFunction();
-
   struct PartitionedTensorProgram {
-    SILFunction *acceleratorFn; // The function representing the tensor program.
+    // Needed to work with unique_ptr.
+    PartitionedTensorProgram() {}
+
+    PartitionedTensorProgram(
+        StringLiteralInst *programPlaceholder,
+        IntegerLiteralInst *programLengthPlaceholder,
+        StringLiteralInst *entryFunctionBaseNamePlaceholder,
+        IntegerLiteralInst *helperFunctionCountPlaceholder,
+        SILValue theTensorComputation)
+        : programPlaceholder(programPlaceholder),
+          programLengthPlaceholder(programLengthPlaceholder),
+          entryFunctionBaseNamePlaceholder(entryFunctionBaseNamePlaceholder),
+          helperFunctionCountPlaceholder(helperFunctionCountPlaceholder),
+          theTensorComputation(theTensorComputation) {}
 
     /// These are placeholder instructions inserted during partitioning to
     /// represent the tensor program itself.  These will be replaced when the
     /// tensor function is lowered to a TF graph.
-    StringLiteralInst *programPlaceholder;
-    IntegerLiteralInst *programLengthPlaceholder;
-    StringLiteralInst *entryFunctionBaseNamePlaceholder;
-    IntegerLiteralInst *helperFunctionCountPlaceholder;
+    StringLiteralInst *programPlaceholder = nullptr;
+    IntegerLiteralInst *programLengthPlaceholder = nullptr;
+    StringLiteralInst *entryFunctionBaseNamePlaceholder = nullptr;
+    IntegerLiteralInst *helperFunctionCountPlaceholder = nullptr;
 
     /// This is the "TensorFlow.TensorComputation" object returned by the
     /// '_swift_tfc_StartTensorComputation' runtime API entrypoint.  This is
@@ -706,7 +711,44 @@ public:
     /// transformation has been made.
     SILValue theTensorComputation;
   };
-  PartitionedTensorProgram partition();
+
+  PartitionedTensorProgram tensorProgram;
+  // The accelerator function corresponding to `tensorProgram`.
+  SILFunction *acceleratorFn = nullptr;
+
+public:
+  TFFunctionPartition(SILFunction &Fn, SILPassManager *PM,
+                      ModuleDecl &tensorFlowModule,
+                      DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>>
+                          &graphFunctions)
+      : hostFn(Fn), tensorFlowModule(tensorFlowModule),
+        graphFunctions(graphFunctions),
+        configuration(GraphGlobalConfiguration::getForFunction(
+            hostFn,
+            /*removeConfigInst*/ true)),
+        DI(*PM->getAnalysis<DominanceAnalysis>()->get(&Fn)),
+        tensorCodeBlocks(Fn) {}
+
+  ~TFFunctionPartition() {
+    // Remove the partitioned function so it doesn't go through the normal
+    // compiler flow.
+    if (acceleratorFn)
+      acceleratorFn->getModule().eraseFunction(acceleratorFn);
+  }
+
+  /// Run the marking/analysis phase on this function. Return true on error.
+  bool markFunction(bool &hasTensorOps);
+
+  /// Partition and lower this function to a graph, and add an entry to
+  /// `graphFunctions`.  Return true on error.
+  ///
+  /// Should only be called when markFunction() succeeds.
+  bool partitionAndLowerGraph(bool isTest);
+
+  // Complete graph lowering by serializing it into a protobuf. For a
+  // non-accelerator-only function, also complete the host function rewrite, by
+  // "installing" the serialized protobuf bytes into that function.
+  void finalizeGraphLowering(StringRef entryFnBaseName, TF_Graph *graph);
 
   void diagnoseCopyToAccelerator(SILValue value, SILInstruction *user,
                                  bool isTensorProgramArgument);
@@ -727,6 +769,18 @@ private:
   void promoteCopyToMove();
   void markTensorBBArgumentsForDeletion();
 
+  /// Partially construct `tensorProgram`, by generating an accelerator function
+  /// from partitioning the host function.
+  /// Return true on error.
+  bool partition(bool isTest);
+
+  /// Lower the accelerator function into a graph, add an entry to
+  /// `graphFunctions`. Also delete the accelerator function so that it does not
+  /// go through the normal compiler flow. Return true on error.
+  ///
+  /// Should only be called when partition() succeeds.
+  bool lowerGraph(bool isTest);
+
   /// Rewrite the host program, inserting a call to _TFCStartTensorComputation
   /// at the start point of the tensor function, passing in the tensor program
   /// itself, input tensor arguments etc.
@@ -734,7 +788,7 @@ private:
   /// The `resultValues` list is the set of tensor handle values moved to the
   /// accelerator program that should be returned as program results instead of
   /// being sent back.
-  PartitionedTensorProgram
+  void
   insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues);
 
   // `oldResult` is a tensor in the original host program which has some use
@@ -1875,9 +1929,12 @@ static const char* markingEnumToStr(Marking m) {
 /// Scan the function looking for blocks with tensor operations in them.  As
 /// we find them, mark them as "to-be-partitioned", which marks (transitive)
 /// data and control dependencies.
-/// Return true if no tensor ops are found or we've encountered an error. In the
-/// lattercase the diagnostic must have been emitted.
-bool TFFunctionPartition::markFunction() {
+/// Return true if we've encountered an error, in which case the diagnostic must
+/// have been emitted. Otherwise, return false, set `hasTensorOps` based on
+/// whether this function has any tensor ops, and add any SIL functions
+/// referenced in the tfops of this function as function-typed attributes to
+/// `worklist` and `addedToWorklist`
+bool TFFunctionPartition::markFunction(bool &hasTensorOps) {
   bool loggedInput = false;
 
   // Print out the input to the partitioning pass on the first op we encounter.
@@ -1964,11 +2021,14 @@ bool TFFunctionPartition::markFunction() {
       tensorOpsSet.insert(inst);
     }
   }
+  hasTensorOps = !tensorOps.empty();
 
   // If there is nothing to do, or the ops in this function are malformed,
   // don't touch this function.
-  if (tensorOps.empty() || invalidOpFound)
+  if (invalidOpFound)
     return true;
+  if (!hasTensorOps)
+    return false;
 
   // Compute the blocksReachingTensorCode set.
   tensorCodeBlocks.compute(tensorOps);
@@ -2121,9 +2181,6 @@ bool TFFunctionPartition::markFunction() {
 
   return false;
 }
-
-
-
 
 //===----------------------------------------------------------------------===//
 //                              PartitionCloner
@@ -3718,9 +3775,8 @@ void TFFunctionPartition::balanceRetainReleaseCount(SILValue oldResult,
   }
 }
 
-auto TFFunctionPartition::
-insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
-       -> PartitionedTensorProgram {
+void TFFunctionPartition::insertTensorComputationStartEndTerminate(
+    ArrayRef<SILValue> resultValues) {
   // Sanity check that all result values are tensor handles. Note SIL
   // accelerator functions under the "tensorflow" convention can also return
   // variant and resource tensors (in addition to tensor handles), but such
@@ -3779,7 +3835,7 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
   if (!startComputationFn || !finishComputationFn || !terminateComputationFn) {
     diagnose(ctx, hostFn.getLocation().getSourceLoc(), diag::tf_internal_error,
              "'_swift_tfc_' entrypoints not found in TensorFlow module");
-    return { nullptr, nullptr, nullptr, nullptr, nullptr, SILValue() };
+    return;
   }
 
   // Create various types and SIL types that we'll be using below.
@@ -4061,14 +4117,49 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
                   /*args*/{ tensorComputation }, /*isNonThrowing*/false);
   }
 
-  return {
-    nullptr,  // New function hasn't been created yet.
-    programPlaceholder,
-    programLengthPlaceholder,
-    entryFunctionBaseNamePlaceholder,
-    helperFunctionCountPlaceholder,
-    tensorComputation
-  };
+  tensorProgram = {programPlaceholder, programLengthPlaceholder,
+                   entryFunctionBaseNamePlaceholder,
+                   helperFunctionCountPlaceholder, tensorComputation};
+}
+
+bool TFFunctionPartition::partitionAndLowerGraph(bool isTest) {
+  // If partition() returns true, short circuit the execution and error out.
+  return partition(isTest) || lowerGraph(isTest);
+}
+
+// Our partitioning can leave around lots of unconditional branches between
+// blocks that formerly had control edges.  Go through and merge those to make
+// later passes simpler.
+static void contractUncondBranches(SILFunction *fn) {
+  // Iterate carefully to avoid invalidating iterators: we mutate the block list
+  // while we walk it.
+  for (auto bbi = fn->begin(), e = fn->end(); bbi != e;) {
+    auto *bb = &*bbi;
+    ++bbi; // Increment the iterator in case we do no transformation.
+
+    if (auto succ = bb->getSingleSuccessorBlock()) {
+      if (succ != bb && succ->getSinglePredecessorBlock()) {
+        if (auto *BI = dyn_cast<BranchInst>(bb->getTerminator())) {
+          // If there are any BB arguments in the destination, replace them with
+          // the branch operands, since they must dominate the dest block.
+          for (unsigned i = 0, e = BI->getArgs().size(); i != e; ++i) {
+            assert(succ->getArgument(i) != BI->getArg(i) &&
+                   "Cloned code regions are always reachable");
+            succ->getArgument(i)->replaceAllUsesWith(BI->getArg(i));
+          }
+
+          // Zap BI and move all of the instructions from DestBB into this one.
+          BI->eraseFromParent();
+          bb->spliceAtEnd(succ);
+          succ->eraseFromParent();
+
+          // Revisit this node: we have new successor(s) and may need to
+          // contract them as well.  Also, bbi may be invalidated at this point.
+          bbi = SILFunction::iterator(bb);
+        }
+      }
+    }
+  }
 }
 
 /// Run the TensorFlow partitioning pass.  This pass is a very close relative to
@@ -4078,11 +4169,11 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
 /// operations and a subset of the CFG that is profitable and interesting to
 /// move to the accelerator.
 ///
-/// If the returned PartitionedTensorProgram::fn is null, an error has occurred,
-/// and diagnostics will be issued. Otherwise, it points to an accelerator
-/// function generated by this call, to be lowered to a TF graph.
+/// If it returns true, an error has occurred, and diagnostics has been
+/// issued. Otherwise, it sets `acceleratorFn` to an accelerator function
+/// generated by this call, to be lowered to a TF graph.
 ///
-auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
+bool TFFunctionPartition::partition(bool isTest) {
   assert(!markedBlocks.empty() &&
          "Shouldn't run on functions with no tensor ops");
 
@@ -4182,18 +4273,17 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
     outs->flush();
   }
 
-  PartitionedTensorProgram resultProgram;
   if (!isAcceleratorOnly(hostFn)) {
     // Insert the start/finish and any terminate runtime calls.
     // FIXME: Order resultValues based on the ordering of their defining
     // instructions first, so that the generated tensor program has a
     // deterministic output tensor ordering.
-    resultProgram = insertTensorComputationStartEndTerminate(resultValues);
+    insertTensorComputationStartEndTerminate(resultValues);
 
     // If the TensorFlow module is malformed, bail out without breaking the
     // code.
-    if (!resultProgram.theTensorComputation)
-      return resultProgram;
+    if (!tensorProgram.theTensorComputation)
+      return true;
   }
 
   // Calculate the parameter list for the new function.
@@ -4221,8 +4311,15 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
       hostFn.getLocation(), hostFn.getName().str() + ".tf", SILLinkage::Private,
       newFnType,
       /*What's this*/ IsBare, IsNotTransparent, IsNotSerialized);
+  SWIFT_DEFER {
+    // If we error out before assigning `resultFn` to the member field
+    // `acceleratorFn`, we should make sure this synthensized function is
+    // removed, to avoid it going through the normal compiler flow.
+    if (resultFn)
+      resultFn->getModule().eraseFunction(resultFn);
+  };
 
-  PartitionCloner PC(*this, *resultFn, resultProgram.theTensorComputation,
+  PartitionCloner PC(*this, *resultFn, tensorProgram.theTensorComputation,
                      tensorFlowModule);
 
   // Fill in the cloned function body.
@@ -4230,78 +4327,160 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
 
   // Clean up the source function, removing the tensor code.
   if (!isAcceleratorOnly(hostFn) && !PC.finalizeOriginal())
-    return resultProgram;
+    return true;
 
   // Success!
-  resultProgram.acceleratorFn = resultFn;
-  return resultProgram;
+  acceleratorFn = resultFn;
+  resultFn = nullptr;
+
+  // Our partitioning can leave around lots of unconditional branches between
+  // blocks that formerly had control edges.  Go through and merge those to
+  // make later passes simpler.
+  contractUncondBranches(acceleratorFn);
+
+  if (auto outs = getTFDumpIntermediateStream()) {
+    *outs << "--- TFPartition Accelerator Result: " << acceleratorFn->getName()
+          << "\n";
+    acceleratorFn->print(*outs);
+    *outs << "----\n";
+    outs->flush();
+  } else if (isTest) {
+    llvm::outs() << "--- TFPartition Accelerator Result: "
+                 << acceleratorFn->getName() << "\n";
+    acceleratorFn->print(llvm::outs());
+    llvm::outs() << "----\n";
+    llvm::outs().flush();
+  }
+
+#ifndef NDEBUG
+  // Verify that the generated function is ok.
+  acceleratorFn->verify();
+#endif
+
+  return false;
 }
 
+bool TFFunctionPartition::lowerGraph(bool isTest) {
+  assert(acceleratorFn);
+  if (isAcceleratorOnly(hostFn)) {
+    assert(configuration.usedDeviceTypes.size() == 1 &&
+           "An accelerator-only SIL function must be lowered to a single TF "
+           "device.");
+    if (lowerTFFunction(hostFn.getName(), acceleratorFn, configuration,
+                        graphFunctions))
+      return true;
+
+    // Remove the host function so it doesn't go through the normal
+    // compiler flow.
+    hostFn.getModule().eraseFunction(&hostFn);
+  } else {
+    if (lowerTFGraph(hostFn.getName(), acceleratorFn, configuration,
+                     graphFunctions
+                     /*entryFnBaseName, pendingGraphFnNames*/))
+      return true;
+  }
+
+  return false;
+}
+
+void TFFunctionPartition::finalizeGraphLowering(StringRef entryFnBaseName,
+                                                TF_Graph *graph) {
+  assert(!entryFnBaseName.startswith("$"));
+  std::vector<char> bytes;
+  if (serializeGraphProtoBuf(hostFn, graph, bytes))
+    return; // error already emitted
+
+  if (isAcceleratorOnly(hostFn))
+    return;
+
+  // Now that we know what the tensor program actually is, we can replace
+  // the placeholder instructions for the data + length with the actual bits
+  // we want to use.
+  // This effectively emits the encoded graph as a global symbol.
+  SILBuilder B(tensorProgram.programPlaceholder);
+  auto data = B.createStringLiteral(hostFn.getLocation(),
+                                    StringRef(bytes.data(), bytes.size()),
+                                    StringLiteralInst::Encoding::Bytes);
+  auto len = B.createIntegerLiteral(
+      hostFn.getLocation(), tensorProgram.programLengthPlaceholder->getType(),
+      bytes.size());
+
+  auto name =
+      B.createStringLiteral(hostFn.getLocation(), StringRef(entryFnBaseName),
+                            StringLiteralInst::Encoding::UTF8);
+  // Set the number of helper functions here based on the # devices involved
+  // in this TF program.
+  auto helperFunctionCount = B.createIntegerLiteral(
+      hostFn.getLocation(),
+      tensorProgram.helperFunctionCountPlaceholder->getType(),
+      configuration.usedDeviceTypes.size() - 1);
+  tensorProgram.programPlaceholder->replaceAllUsesWith(data);
+  tensorProgram.programPlaceholder->eraseFromParent();
+  tensorProgram.programLengthPlaceholder->replaceAllUsesWith(len);
+  tensorProgram.programLengthPlaceholder->eraseFromParent();
+  tensorProgram.entryFunctionBaseNamePlaceholder->replaceAllUsesWith(name);
+  tensorProgram.entryFunctionBaseNamePlaceholder->eraseFromParent();
+  tensorProgram.helperFunctionCountPlaceholder->replaceAllUsesWith(
+      helperFunctionCount);
+  tensorProgram.helperFunctionCountPlaceholder->eraseFromParent();
+
+  if (auto outs = getTFDumpIntermediateStream()) {
+    *outs << "--- TFPartition Host Result: " << hostFn.getName() << "\n";
+    hostFn.print(*outs);
+    *outs << "---\n";
+    outs->flush();
+  }
+}
 
 //===----------------------------------------------------------------------===//
 //                              Top Level Driver
 //===----------------------------------------------------------------------===//
 
-
-// Our partitioning can leave around lots of unconditional branches between
-// blocks that formerly had control edges.  Go through and merge those to make
-// later passes simpler.
-static void contractUncondBranches(SILFunction *fn) {
-  // Iterate carefully to avoid invalidating iterators: we mutate the block list
-  // while we walk it.
-  for (auto bbi = fn->begin(), e = fn->end(); bbi != e; ) {
-    auto *bb = &*bbi;
-    ++bbi;  // Increment the iterator in case we do no transformation.
-
-    if (auto succ = bb->getSingleSuccessorBlock()) {
-      if (succ != bb && succ->getSinglePredecessorBlock()) {
-        if (auto *BI = dyn_cast<BranchInst>(bb->getTerminator())) {
-          // If there are any BB arguments in the destination, replace them with
-          // the branch operands, since they must dominate the dest block.
-          for (unsigned i = 0, e = BI->getArgs().size(); i != e; ++i) {
-            assert(succ->getArgument(i) != BI->getArg(i) &&
-                   "Cloned code regions are always reachable");
-            succ->getArgument(i)->replaceAllUsesWith(BI->getArg(i));
-          }
-
-          // Zap BI and move all of the instructions from DestBB into this one.
-          BI->eraseFromParent();
-          bb->spliceAtEnd(succ);
-          succ->eraseFromParent();
-
-          // Revisit this node: we have new successor(s) and may need to
-          // contract them as well.  Also, bbi may be invalidated at this point.
-          bbi = SILFunction::iterator(bb);
-        }
-      }
-    }
-  }
-}
-
 namespace {
-class TFPartition : public SILFunctionTransform {
+class TFPartition : public SILModuleTransform {
+  ModuleDecl *tfModule = nullptr;
+
   bool isTest = false;
   TensorFunctionClassifier tfc;
-  // For accelerator-only functions, map the SIL host function names to the
-  // lowered TF graph artifacts.
-  DenseMap<StringRef, SerializedGraphFunction> graphFunctions;
+  /// For partitionable functions, map the SIL host function names to the
+  /// lowered TF graph artifacts.
+  ///
+  /// Impl note: The value type is a unique_ptr to avoid having to moving the
+  /// underlying `LoweredGraphFunction` object once it's constructed, because
+  /// the map key is backed by the string field
+  /// `LoweredGraphFunction::silHostFnName` in that object.
+  DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>> graphFunctions;
+
+  using HostPartitionContext =
+      std::pair<SILFunction *, std::unique_ptr<TFFunctionPartition>>;
 
 public:
   TFPartition(bool isTest) : isTest(isTest) {}
 
   /// The entry point to the transformation.
   void run() override;
+
+private:
+  /// Partition and lower `hostFn` if it's eligible. Add an entry to
+  /// `hostPartitionContexts`, if it references some other function F as a
+  /// function-typed attribute, but the graph function definition of F is not
+  /// yet available.
+  bool
+  processFunction(SILFunction *hostFn,
+                  SmallVectorImpl<HostPartitionContext> &hostPartitionContexts);
+
+  /// Partition and lower `hostFn` into a graph if it's eligible. In that case
+  /// set `partitioner` to the created partitioner instance to continue with
+  /// graph serialization later, or otherwise set `partitioner` to NULL.  Return
+  /// true on error.
+  bool partitionFunction(SILFunction *hostFn,
+                         std::unique_ptr<TFFunctionPartition> &partitioner);
 };
 } // end anonymous namespace
 
 void TFPartition::run() {
-  SILFunction *hostFn = getFunction();
-  if (isAcceleratorOnly(*hostFn)) {
-    DEBUG(llvm::dbgs() << "SIL function " << hostFn->getName()
-                       << " is accelerator-only.\n");
-  }
-  auto &ctx = hostFn->getASTContext();
-
+  SILModule *module = getModule();
+  auto &ctx = module->getASTContext();
   // TODO(clattner): This logic will eventually be subsumed by the
   // corresponding logic in the TFDeabstraction pass.  Until deabstraction
   // is done, we have some amount of top-level redundancy here because we have
@@ -4310,23 +4489,127 @@ void TFPartition::run() {
   // If the TensorFlow module hasn't been imported by the program, don't do
   // anything.  This avoids impacting compile time for non-TensorFlow using
   // Swift programs by doing extraneous analysis.
-  auto tfModule = ctx.getLoadedModule(ctx.getIdentifier("TensorFlow"));
+  tfModule = ctx.getLoadedModule(ctx.getIdentifier("TensorFlow"));
   if (!tfModule)
     return;
+
+  // We use a two-pass design below. The first pass partitions and lowers those
+  // partitionable functions into graphs. When we process a function that
+  // references in function-typed attributes other functions that are not yet
+  // lowered, keep track of them in `hostPartitionContexts`, to be processed in
+  // the second pass.
+  //
+  // Loop over all of the functions defined in the current module. Since we are
+  // synthesizing new functions into the module (those accelerator functions),
+  // we make a snapshot of the functions to be processed into `fns`, and then
+  // start the processing.
+  SmallVector<SILFunction *, 16> fns;
+  for (auto &fn : *module) {
+    if (!fn.isDefinition())
+      continue;
+    fns.push_back(&fn);
+  }
+
+  // Track the set of functions that reference some function-typed attributes
+  // whose graph function definitions are not yet available.
+  SmallVector<HostPartitionContext, 16> hostPartitionContexts;
+  for (auto *fn : fns)
+    if (processFunction(fn, hostPartitionContexts))
+      continue; // error already emitted, but continue processing other
+                // functions.
+
+  // In the second pass, we know all partitionable functions have had their
+  // graph function bodies generated. When a function foo() references another
+  // function bar() as a function-typed attribute, but bar()'s graph function
+  // body is not avilable during the first pass, we will be copying the graph
+  // function body of bar() into the graph function body of foo() in this pass.
+  for (auto &context : hostPartitionContexts) {
+    auto *hostFn = context.first;
+    auto *partitioner = context.second.get();
+    assert(graphFunctions.count(hostFn->getName()));
+    auto &thisGraphFunc = *graphFunctions[hostFn->getName()];
+    auto *resultGraph = thisGraphFunc.graph.get();
+    for (auto pair : thisGraphFunc.pendingGraphFnNames) {
+      auto silHostFnName = pair.first;
+      auto loc = pair.second;
+      // TODO: Support the case where `silHostFnName` is defined in another
+      // module if that's important.
+      assert(graphFunctions.count(silHostFnName));
+      auto &srcGraphFunc = graphFunctions[silHostFnName];
+      auto *srcGraph = srcGraphFunc->graph.get();
+      if (copyGraphFunctions(*hostFn, loc, srcGraphFunc->graphFnName, srcGraph,
+                             resultGraph))
+        return; // error already emitted.
+    }
+    partitioner->finalizeGraphLowering(thisGraphFunc.graphFnName, resultGraph);
+  }
+}
+
+bool TFPartition::processFunction(
+    SILFunction *hostFn,
+    SmallVectorImpl<HostPartitionContext> &hostPartitionContexts) {
+  std::unique_ptr<TFFunctionPartition> partitioner;
+  if (partitionFunction(hostFn, partitioner)) {
+    return true; // error already emitted.
+  } else if (partitioner) {
+    assert(graphFunctions.count(hostFn->getName()));
+    auto &thisGraphFunc = *graphFunctions[hostFn->getName()];
+    if (thisGraphFunc.pendingGraphFnNames.empty()) {
+      // The lowered graph is self-contained, so we can serialize it and
+      // complete the host function rewrite here.
+      auto *resultGraph = thisGraphFunc.graph.get();
+      partitioner->finalizeGraphLowering(thisGraphFunc.graphFnName,
+                                         resultGraph);
+    } else {
+      // The lowered graph references some other graph functions whose
+      // bodies are not yet available -- track it for continued processing
+      // in the second pass.
+      hostPartitionContexts.push_back(
+          std::make_pair(hostFn, std::move(partitioner)));
+    }
+  }
+
+  // If this is called from sil-opt, we currently just print out the results
+  // and quit.  This allows writing regression tests for the tf-partition
+  // pass in isolation.  This is pretty unconventional for a SIL pass, but
+  // this is an unconventional pass!
+  if (isTest) {
+    llvm::outs() << "--- TFPartition Host Result: " << hostFn->getName()
+                 << "\n";
+    hostFn->print(llvm::outs());
+    llvm::outs() << "---\n";
+    llvm::outs().flush();
+  }
+  return false;
+}
+
+bool TFPartition::partitionFunction(
+    SILFunction *hostFn, std::unique_ptr<TFFunctionPartition> &partitioner) {
+  if (isAcceleratorOnly(*hostFn)) {
+    DEBUG(llvm::dbgs() << "SIL function " << hostFn->getName()
+                       << " is accelerator-only.\n");
+  }
 
   // If this function is a building block of larger tensor programs (e.g.
   // the ops defined in the TensorFlow module), then don't transform it in
   // isolation.
   DEBUG(llvm::dbgs() << "Processing SIL function " << hostFn->getName()
-                     << " in TFPartition::run().\n");
+                     << " in TFPartition::partitionFunction().\n");
   if (!tfc.shouldBePartitioned(hostFn))
-    return;
+    return false;
 
   DEBUG(llvm::dbgs() << "  " << hostFn->getName()
                      << " should be partitioned.\n");
-  TFFunctionPartition partitioner(*hostFn, PM, *tfModule);
-  if (partitioner.markFunction())
-    return; // No tensor ops found, or we've encountered an error.
+  partitioner = llvm::make_unique<TFFunctionPartition>(*hostFn, PM, *tfModule,
+                                                       graphFunctions);
+  bool hasTensorOps = false;
+  if (partitioner->markFunction(hasTensorOps))
+    return true; // We've encountered an error.
+  if (!hasTensorOps) {
+    partitioner = nullptr;
+    return false;
+  }
+
   DEBUG(llvm::dbgs() << "  " << hostFn->getName()
                      << " contains tensor op(s).\n");
 
@@ -4341,7 +4624,7 @@ void TFPartition::run() {
              diag::tf_internal_error,
              "TensorFlow graph program extraction does not work on generic "
              "functions yet");
-    return;
+    return true;
   }
 
   // Because we're in active development, it is common to do something wrong
@@ -4353,121 +4636,14 @@ void TFPartition::run() {
              "nothing in the TensorFlow module should require partitioning, "
              "did you forget @inlinable on '" + hostFn->getName().str()
              + "'?");
-    return;
+    return true;
   }
 
   // Actually do the partitioning transformation, splitting out a new SIL
   // function for the tensor program body.
-  auto tensorProgram = partitioner.partition();
-
-  // If the TensorFlow module is malformed, exit without breaking the SIL:
+  // If we've encountered an error, exit without breaking the SIL:
   // an error has already been emitted.
-  if (!tensorProgram.acceleratorFn)
-    return;
-
-  // Our partitioning can leave around lots of unconditional branches between
-  // blocks that formerly had control edges.  Go through and merge those to
-  // make later passes simpler.
-  contractUncondBranches(tensorProgram.acceleratorFn);
-
-  if (auto outs = getTFDumpIntermediateStream()) {
-    *outs << "--- TFPartition Accelerator Result: "
-          << tensorProgram.acceleratorFn->getName() << "\n";
-    tensorProgram.acceleratorFn->print(*outs);
-    *outs << "----\n";
-    outs->flush();
-  } else if (isTest) {
-    llvm::outs() << "--- TFPartition Accelerator Result: "
-                 << tensorProgram.acceleratorFn->getName() << "\n";
-    tensorProgram.acceleratorFn->print(llvm::outs());
-    llvm::outs() << "----\n";
-    llvm::outs().flush();
-  }
-
-#ifndef NDEBUG
-  // Verify that the generated function is ok.
-  tensorProgram.acceleratorFn->verify();
-#endif
-
-  // If this is called from sil-opt, we currently just print out the results
-  // and quit.  This allows writing regression tests for the tf-partition
-  // pass in isolation.  This is pretty unconventional for a SIL pass, but
-  // this is an unconventional pass!
-  if (isTest) {
-    llvm::outs() << "--- TFPartition Host Result: " << hostFn->getName()
-                 << "\n";
-    hostFn->print(llvm::outs());
-    llvm::outs() << "---\n";
-    llvm::outs().flush();
-
-    // Finally, we're done.  Remove the partitioned function so it doesn't go
-    // through the normal compiler flow.
-    tensorProgram.acceleratorFn->getModule().eraseFunction(
-        tensorProgram.acceleratorFn);
-    return;
-  }
-
-  // Next translate it to a graph.
-  if (isAcceleratorOnly(*hostFn)) {
-    assert(partitioner.configuration.usedDeviceTypes.size() == 1 &&
-           "An accelerator-only SIL function must be lowered to a single TF "
-           "device.");
-    lowerTFFunction(hostFn->getName(), tensorProgram.acceleratorFn,
-                    partitioner.configuration, graphFunctions);
-
-    // Remove the partitioned function so it doesn't go through the normal
-    // compiler flow.
-    hostFn->getModule().eraseFunction(hostFn);
-  } else {
-    std::string entryFnBaseName;
-    auto bytes =
-        lowerTFGraph(tensorProgram.acceleratorFn, partitioner.configuration,
-                     /*graphFnNames*/ graphFunctions, entryFnBaseName);
-    assert(!StringRef(entryFnBaseName).startswith("$"));
-
-    // Now that we know what the tensor program actually is, we can replace
-    // the placeholder instructions for the data + length with the actual bits
-    // we want to use.
-    // This effectively emits the encoded graph as a global symbol.
-    SILBuilder B(tensorProgram.programPlaceholder);
-    auto data = B.createStringLiteral(hostFn->getLocation(),
-                                      StringRef(bytes.data(), bytes.size()),
-                                      StringLiteralInst::Encoding::Bytes);
-    auto len = B.createIntegerLiteral(
-        hostFn->getLocation(),
-        tensorProgram.programLengthPlaceholder->getType(), bytes.size());
-
-    auto name = B.createStringLiteral(hostFn->getLocation(),
-                                      StringRef(entryFnBaseName),
-                                      StringLiteralInst::Encoding::UTF8);
-    // Set the number of helper functions here based on the # devices involved
-    // in this TF program.
-    auto helperFunctionCount = B.createIntegerLiteral(
-        hostFn->getLocation(),
-        tensorProgram.helperFunctionCountPlaceholder->getType(),
-        partitioner.configuration.usedDeviceTypes.size() - 1);
-    tensorProgram.programPlaceholder->replaceAllUsesWith(data);
-    tensorProgram.programPlaceholder->eraseFromParent();
-    tensorProgram.programLengthPlaceholder->replaceAllUsesWith(len);
-    tensorProgram.programLengthPlaceholder->eraseFromParent();
-    tensorProgram.entryFunctionBaseNamePlaceholder->replaceAllUsesWith(name);
-    tensorProgram.entryFunctionBaseNamePlaceholder->eraseFromParent();
-    tensorProgram.helperFunctionCountPlaceholder->replaceAllUsesWith(
-        helperFunctionCount);
-    tensorProgram.helperFunctionCountPlaceholder->eraseFromParent();
-
-    if (auto outs = getTFDumpIntermediateStream()) {
-      *outs << "--- TFPartition Host Result: " << hostFn->getName() << "\n";
-      hostFn->print(*outs);
-      *outs << "---\n";
-      outs->flush();
-    }
-  }
-
-  // Finally, we're done.  Remove the partitioned function so it doesn't go
-  // through the normal compiler flow.
-  tensorProgram.acceleratorFn->getModule().eraseFunction(
-      tensorProgram.acceleratorFn);
+  return partitioner->partitionAndLowerGraph(isTest);
 }
 
 SILTransform *swift::createTFPartition() {
