@@ -120,7 +120,7 @@ public:
   ~ClosureScopeAnalysis();
 
   static bool classof(const SILAnalysis *S) {
-    return S->getKind() == AnalysisKind::ClosureScope;
+    return S->getKind() == SILAnalysisKind::ClosureScope;
   }
 
   SILModule *getModule() const { return M; }
