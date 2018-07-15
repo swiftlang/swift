@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -93,15 +93,8 @@ enum class CheckedCastKind : unsigned {
   SetDowncast,
   /// A bridging conversion that always succeeds.
   BridgingCoercion,
-  /// A bridging conversion that may fail, because there are multiple Swift
-  /// value types that bridge to the same Cocoa object type.
-  ///
-  /// This kind is only used for Swift 3 compatibility diagnostics and is
-  /// treated the same as 'BridgingCoercion' otherwise. In Swift 4 or later,
-  /// any conversions with this kind show up as ValueCasts.
-  Swift3BridgingDowncast,
 
-  Last_CheckedCastKind = Swift3BridgingDowncast,
+  Last_CheckedCastKind = BridgingCoercion,
 };
 
 /// What are the high-level semantics of this access?

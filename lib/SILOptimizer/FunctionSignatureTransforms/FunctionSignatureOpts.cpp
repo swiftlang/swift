@@ -185,9 +185,8 @@ FunctionSignatureTransformDescriptor::createOptimizedSILFunctionName() {
     Mangler.setReturnValueOwnedToUnowned();
   }
 
-  SILModule &M = F->getModule();
   auto MangledName = Mangler.mangle();
-  assert(!M.hasFunction(MangledName));
+  assert(!F->getModule().hasFunction(MangledName));
 
   return MangledName;
 }
