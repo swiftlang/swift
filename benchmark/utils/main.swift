@@ -54,6 +54,7 @@ import DictTest4
 import DictTest4Legacy
 import DictionaryBridge
 import DictionaryBridgeToObjC
+import DictionaryCompactMapValues
 import DictionaryCopy
 import DictionaryGroup
 import DictionaryKeysContains
@@ -217,6 +218,7 @@ registerBenchmark(Dictionary4)
 registerBenchmark(Dictionary4Legacy)
 registerBenchmark(DictionaryBridge)
 registerBenchmark(DictionaryBridgeToObjC)
+registerBenchmark(DictionaryCompactMapValues)
 registerBenchmark(DictionaryCopy)
 registerBenchmark(DictionaryGroup)
 registerBenchmark(DictionaryKeysContains)

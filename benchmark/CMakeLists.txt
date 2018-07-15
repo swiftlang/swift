@@ -66,6 +66,7 @@ set(SWIFT_BENCH_MODULES
     single-source/DictTest4Legacy
     single-source/DictionaryBridge
     single-source/DictionaryBridgeToObjC
+    single-source/DictionaryCompactMapValues
     single-source/DictionaryCopy
     single-source/DictionaryGroup
     single-source/DictionaryKeysContains
