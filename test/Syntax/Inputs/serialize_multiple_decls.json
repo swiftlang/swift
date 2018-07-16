@@ -1,18 +1,23 @@
 {
+  "id": 20,
   "kind": "SourceFile",
   "layout": [
     {
+      "id": 19,
       "kind": "CodeBlockItemList",
       "layout": [
         {
+          "id": 8,
           "kind": "CodeBlockItem",
           "layout": [
             {
+              "id": 7,
               "kind": "StructDecl",
               "layout": [
                 null,
                 null,
                 {
+                  "id": 1,
                   "tokenKind": {
                     "kind": "kw_struct"
                   },
@@ -40,10 +45,10 @@
                       "value": 1
                     }
                   ],
-                  "presence": "Present",
-                  "id": 1
+                  "presence": "Present"
                 },
                 {
+                  "id": 2,
                   "tokenKind": {
                     "kind": "identifier",
                     "text": "A"
@@ -55,31 +60,32 @@
                       "value": 1
                     }
                   ],
-                  "presence": "Present",
-                  "id": 2
+                  "presence": "Present"
                 },
                 null,
                 null,
                 null,
                 {
+                  "id": 6,
                   "kind": "MemberDeclBlock",
                   "layout": [
                     {
+                      "id": 3,
                       "tokenKind": {
                         "kind": "l_brace"
                       },
                       "leadingTrivia": [],
                       "trailingTrivia": [],
-                      "presence": "Present",
-                      "id": 3
+                      "presence": "Present"
                     },
                     {
+                      "id": 4,
                       "kind": "MemberDeclList",
                       "layout": [],
-                      "presence": "Present",
-                      "id": 4
+                      "presence": "Present"
                     },
                     {
+                      "id": 5,
                       "tokenKind": {
                         "kind": "r_brace"
                       },
@@ -90,32 +96,31 @@
                         }
                       ],
                       "trailingTrivia": [],
-                      "presence": "Present",
-                      "id": 5
+                      "presence": "Present"
                     }
                   ],
-                  "presence": "Present",
-                  "id": 6
+                  "presence": "Present"
                 }
               ],
-              "presence": "Present",
-              "id": 7
+              "presence": "Present"
             },
             null,
             null
           ],
-          "presence": "Present",
-          "id": 8
+          "presence": "Present"
         },
         {
+          "id": 16,
           "kind": "CodeBlockItem",
           "layout": [
             {
+              "id": 15,
               "kind": "StructDecl",
               "layout": [
                 null,
                 null,
                 {
+                  "id": 9,
                   "tokenKind": {
                     "kind": "kw_struct"
                   },
@@ -131,10 +136,10 @@
                       "value": 1
                     }
                   ],
-                  "presence": "Present",
-                  "id": 9
+                  "presence": "Present"
                 },
                 {
+                  "id": 10,
                   "tokenKind": {
                     "kind": "identifier",
                     "text": "B"
@@ -146,31 +151,32 @@
                       "value": 1
                     }
                   ],
-                  "presence": "Present",
-                  "id": 10
+                  "presence": "Present"
                 },
                 null,
                 null,
                 null,
                 {
+                  "id": 14,
                   "kind": "MemberDeclBlock",
                   "layout": [
                     {
+                      "id": 11,
                       "tokenKind": {
                         "kind": "l_brace"
                       },
                       "leadingTrivia": [],
                       "trailingTrivia": [],
-                      "presence": "Present",
-                      "id": 11
+                      "presence": "Present"
                     },
                     {
+                      "id": 12,
                       "kind": "MemberDeclList",
                       "layout": [],
-                      "presence": "Present",
-                      "id": 12
+                      "presence": "Present"
                     },
                     {
+                      "id": 13,
                       "tokenKind": {
                         "kind": "r_brace"
                       },
@@ -181,28 +187,24 @@
                         }
                       ],
                       "trailingTrivia": [],
-                      "presence": "Present",
-                      "id": 13
+                      "presence": "Present"
                     }
                   ],
-                  "presence": "Present",
-                  "id": 14
+                  "presence": "Present"
                 }
               ],
-              "presence": "Present",
-              "id": 15
+              "presence": "Present"
             },
             null,
             null
           ],
-          "presence": "Present",
-          "id": 16
+          "presence": "Present"
         }
       ],
-      "presence": "Present",
-      "id": 19
+      "presence": "Present"
     },
     {
+      "id": 18,
       "tokenKind": {
         "kind": "eof",
         "text": ""
@@ -214,10 +216,8 @@
         }
       ],
       "trailingTrivia": [],
-      "presence": "Present",
-      "id": 18
+      "presence": "Present"
     }
   ],
-  "presence": "Present",
-  "id": 20
+  "presence": "Present"
 }

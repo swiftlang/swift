@@ -2355,8 +2355,11 @@ void SwiftLangSupport::editorReplaceText(StringRef Name,
     bool BuildSyntaxTree = Consumer.syntaxTreeEnabled() ||
                            Consumer.forceLibSyntaxBasedProcessing();
 
-    llvm::Optional<SyntaxParsingCache> SyntaxCache;
-    if (EditorDoc->getSyntaxTree().hasValue()) {
+    llvm::Optional<SyntaxParsingCache> SyntaxCache = llvm::None;
+    bool IncrementalSyntaxParsing = Consumer.forceLibSyntaxBasedProcessing() ||
+                                    Consumer.syntaxTreeTransferMode() ==
+                                        SyntaxTreeTransferMode::Incremental;
+    if (EditorDoc->getSyntaxTree().hasValue() && IncrementalSyntaxParsing) {
       SyntaxCache.emplace(EditorDoc->getSyntaxTree().getValue());
       SyntaxCache->addEdit(Offset, Offset + Length, Buf->getBufferSize());
     }
@@ -2407,6 +2410,23 @@ void SwiftLangSupport::editorReplaceText(StringRef Name,
       }
     } else {
       Consumer.handleSyntaxReuseRegions({});
+    }
+
+    if (Consumer.syntaxTreeEnabled()) {
+      std::unordered_set<unsigned> ReusedNodeIds = {};
+      if (SyntaxCache.hasValue()) {
+        auto &ReusedVector = SyntaxCache->getReusedNodeIds();
+        ReusedNodeIds = std::unordered_set<unsigned>(ReusedVector.begin(),
+                                                     ReusedVector.end());
+      }
+      std::string SyntaxTreeString;
+      llvm::raw_string_ostream SyntaxTreeStream(SyntaxTreeString);
+
+      swift::json::Output::UserInfoMap JsonUserInfo;
+      JsonUserInfo[swift::json::OmitNodesUserInfoKey] = &ReusedNodeIds;
+      swift::json::Output SyntaxTreeOutput(SyntaxTreeStream, JsonUserInfo);
+      SyntaxTreeOutput << *EditorDoc->getSyntaxTree()->getRaw();
+      Consumer.handleSerializedSyntaxTree(SyntaxTreeStream.str());
     }
 
     if (ValidateSyntaxTree) {

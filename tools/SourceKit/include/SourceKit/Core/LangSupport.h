@@ -195,6 +195,15 @@ struct SourceFileRange {
   uintptr_t End;
 };
 
+enum class SyntaxTreeTransferMode {
+  /// Don't transfer the syntax tree
+  Off,
+  /// Transfer the syntax tree incrementally
+  Incremental,
+  /// Always transfer the entire syntax tree
+  Full
+};
+
 class EditorConsumer {
   virtual void anchor();
 public:
@@ -245,7 +254,10 @@ public:
   virtual bool handleSourceText(StringRef Text) = 0;
 
   virtual bool handleSerializedSyntaxTree(StringRef Text) = 0;
-  virtual bool syntaxTreeEnabled() = 0;
+  virtual bool syntaxTreeEnabled() {
+    return syntaxTreeTransferMode() != SyntaxTreeTransferMode::Off;
+  }
+  virtual SyntaxTreeTransferMode syntaxTreeTransferMode() = 0;
 
   virtual bool syntaxReuseInfoEnabled() = 0;
   virtual bool handleSyntaxReuseRegions(

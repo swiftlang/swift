@@ -89,8 +89,10 @@ class NullEditorConsumer : public EditorConsumer {
 
   bool handleSourceText(StringRef Text) override { return false; }
   bool handleSerializedSyntaxTree(StringRef Text) override { return false; }
-  bool syntaxTreeEnabled() override { return false; }
-  bool forceLibSyntaxBasedProcessing() override { return false; }
+
+  SyntaxTreeTransferMode syntaxTreeTransferMode() override {
+    return SyntaxTreeTransferMode::Off;
+  }
 
   bool syntaxReuseInfoEnabled() override { return false; }
 
@@ -98,6 +100,8 @@ class NullEditorConsumer : public EditorConsumer {
       std::vector<SourceFileRange> ReuseRegions) override {
     return false;
   }
+
+  bool forceLibSyntaxBasedProcessing() override { return false; }
 public:
   bool needsSema = false;
 };
