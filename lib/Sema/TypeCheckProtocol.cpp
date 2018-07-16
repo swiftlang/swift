@@ -35,6 +35,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/TypeMatcher.h"
@@ -4086,6 +4087,10 @@ void TypeChecker::useBridgedNSErrorConformances(DeclContext *dc, Type type) {
 }
 
 void TypeChecker::checkConformance(NormalProtocolConformance *conformance) {
+  PrettyStackTraceType trace1(Context, "checking conformance of",
+                              conformance->getType());
+  PrettyStackTraceDecl trace2("...to", conformance->getProtocol());
+
   MultiConformanceChecker checker(*this);
   checker.addConformance(conformance);
   checker.checkAllConformances();
@@ -4096,6 +4101,10 @@ void TypeChecker::checkConformanceRequirements(
   // If the conformance is already invalid, there's nothing to do here.
   if (conformance->isInvalid())
     return;
+
+  PrettyStackTraceType trace1(Context, "checking conformance requirements of",
+                              conformance->getType());
+  PrettyStackTraceDecl trace2("...to", conformance->getProtocol());
 
   conformance->setSignatureConformances({ });
 
