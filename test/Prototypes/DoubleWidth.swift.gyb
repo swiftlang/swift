@@ -246,7 +246,7 @@ extension DoubleWidth {
   }
 }
 
-extension DoubleWidth.Words: Collection {  
+extension DoubleWidth.Words {
   public struct Index : Comparable {
     public var _value: _IndexValue
 
@@ -268,8 +268,10 @@ extension DoubleWidth.Words: Collection {
       case let (.high(l), .high(r)): return l < r
       }
     }
-  }
+  }  
+}
 
+extension DoubleWidth.Words: Collection {
   public var startIndex: Index {
     return Index(.low(_low.startIndex))
   }
