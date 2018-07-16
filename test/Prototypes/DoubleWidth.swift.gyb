@@ -221,7 +221,6 @@ extension DoubleWidth: _ExpressibleByBuiltinIntegerLiteral {
 
 #endif
 
-
 extension DoubleWidth {
   public struct Words {
     public var _high: High.Words
@@ -239,7 +238,7 @@ extension DoubleWidth {
       _sanityCheck(!_low.isEmpty)
     }
 
-    public enum _IndexValue {
+    internal enum _WordsIndexValue {
       case low(Low.Words.Index)
       case high(High.Words.Index)
     }
@@ -247,28 +246,32 @@ extension DoubleWidth {
 }
 
 extension DoubleWidth.Words {
-  public struct Index : Comparable {
-    public var _value: _IndexValue
+  public struct Index {
+    internal var _value: _WordsIndexValue
 
-    public init(_ _value: _IndexValue) { self._value = _value }
+    internal init(_ _value: _WordsIndexValue) { self._value = _value }
+  }
+}
 
-    public static func ==(lhs: Index, rhs: Index) -> Bool {
-      switch (lhs._value, rhs._value) {
-      case let (.low(l), .low(r)): return l == r
-      case let (.high(l), .high(r)): return l == r
-      default: return false
-      }
+extension DoubleWidth.Words.Index: Equatable {
+  public static func ==(lhs: DoubleWidth.Words.Index, rhs: DoubleWidth.Words.Index) -> Bool {
+    switch (lhs._value, rhs._value) {
+    case let (.low(l), .low(r)): return l == r
+    case let (.high(l), .high(r)): return l == r
+    default: return false
     }
+  }
+}
 
-    public static func <(lhs: Index, rhs: Index) -> Bool {
-      switch (lhs._value, rhs._value) {
-      case let (.low(l), .low(r)): return l < r
-      case (.low(_), .high(_)): return true
-      case (.high(_), .low(_)): return false
-      case let (.high(l), .high(r)): return l < r
-      }
+extension DoubleWidth.Words.Index: Comparable {
+  public static func <(lhs: DoubleWidth.Words.Index, rhs: DoubleWidth.Words.Index) -> Bool {
+    switch (lhs._value, rhs._value) {
+    case let (.low(l), .low(r)): return l < r
+    case (.low(_), .high(_)): return true
+    case (.high(_), .low(_)): return false
+    case let (.high(l), .high(r)): return l < r
     }
-  }  
+  }
 }
 
 extension DoubleWidth.Words: Collection {
