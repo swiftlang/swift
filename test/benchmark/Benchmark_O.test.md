@@ -45,20 +45,25 @@ LISTALL-SAME: unstable
 LISTALL: AngryPhonebook
 ````
 
-````
-RUN: %Benchmark_O AngryPhonebook --num-iters=1 \
-RUN:             | %FileCheck %s --check-prefix NUMITERS1
-NUMITERS1: AngryPhonebook,1
-NUMITERS1-NOT: 0,0,0,0,0
-````
+## Benchmark Selection
+The logic for filtering tests based on specified names, indices and tags
+is shared between the default "run" and `--list` commands. It is tested on
+the list command, which is much faster, because it runs no benchmarks.
+It provides us with ability to do a "dry run".
 
-Should run benchmark by name, even if its tags match the default skip-tags
-(unstable,skip). Ackermann is marked unstable
+Run benchmark by name (even if its tags match the skip-tags) or test number:
 
 ````
-RUN: %Benchmark_O Ackermann | %FileCheck %s --check-prefix NAMEDSKIP
+RUN: %Benchmark_O Ackermann --list | %FileCheck %s --check-prefix NAMEDSKIP
 NAMEDSKIP: Ackermann
 
+RUN: %Benchmark_O 1 --list | %FileCheck %s --check-prefix RUNBYNUMBER
+RUNBYNUMBER: Ackermann
+````
+
+Composition of `tags` and `skip-tags`:
+
+````
 RUN: %Benchmark_O --list --tags=Dictionary,Array \
 RUN:             | %FileCheck %s --check-prefix ANDTAGS
 ANDTAGS: TwoSum
@@ -79,4 +84,24 @@ ORSKIPTAGS: Ackermann
 ORSKIPTAGS-NOT: DictOfArraysToArrayOfDicts
 ORSKIPTAGS: Fibonacci
 ORSKIPTAGS-NOT: RomanNumbers
+````
+
+## Running Benchmarks
+Each real benchmark execution takes about a second. If possible, multiple checks
+are combined into one run to minimize the test time.
+
+````
+RUN: %Benchmark_O AngryPhonebook --num-iters=1 \
+RUN:             | %FileCheck %s --check-prefix NUMITERS1 \
+RUN:                             --check-prefix LOGHEADER \
+RUN:                             --check-prefix LOGBENCH
+LOGHEADER-LABEL: #,TEST,SAMPLES,MIN(us),MAX(us),MEAN(us),SD(us),MEDIAN(us)
+LOGBENCH: {{[0-9]+}},
+NUMITERS1: AngryPhonebook,1
+NUMITERS1-NOT: 0,0,0,0,0
+LOGBENCH-SAME: ,{{[0-9]+}},{{[0-9]+}},{{[0-9]+}},{{[0-9]+}},{{[0-9]+}}
+
+RUN: %Benchmark_O 1 Ackermann 1 | %FileCheck %s --check-prefix RUNJUSTONCE
+RUNJUSTONCE-LABEL: 1,Ackermann
+RUNJUSTONCE-NOT: 1,Ackermann
 ````
