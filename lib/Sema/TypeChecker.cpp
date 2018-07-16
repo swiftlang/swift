@@ -900,13 +900,17 @@ bool swift::typeCheckExpression(DeclContext *DC, Expr *&parsedExpr) {
   auto &ctx = DC->getASTContext();
   if (ctx.getLazyResolver()) {
     TypeChecker *TC = static_cast<TypeChecker *>(ctx.getLazyResolver());
-    auto resultTy = TC->typeCheckExpression(parsedExpr, DC);
+    auto resultTy = TC->typeCheckExpression(parsedExpr, DC, TypeLoc(),
+                                      ContextualTypePurpose::CTP_Unused,
+                                      TypeCheckExprFlags::SuppressDiagnostics);
     return !resultTy;
   } else {
     // Set up a diagnostics engine that swallows diagnostics.
     DiagnosticEngine diags(ctx.SourceMgr);
     TypeChecker TC(ctx, diags);
-    auto resultTy = TC.typeCheckExpression(parsedExpr, DC);
+    auto resultTy = TC.typeCheckExpression(parsedExpr, DC, TypeLoc(),
+                                      ContextualTypePurpose::CTP_Unused,
+                                      TypeCheckExprFlags::SuppressDiagnostics);
     return !resultTy;
   }
 }

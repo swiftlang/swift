@@ -1167,6 +1167,7 @@ namespace {
       if (!E->isActivated())
         return Type();
 
+      CS.Options |= ConstraintSystemFlags::SuppressDiagnostics;
       return CS.createTypeVariable(CS.getConstraintLocator(E),
                                    TVO_CanBindToLValue);
     }
@@ -3562,6 +3563,8 @@ public:
   }
 
   Type visitCodeCompletionExpr(CodeCompletionExpr *Expr) override {
+    auto &cs = getConstraintSystem();
+    cs.Options |= ConstraintSystemFlags::SuppressDiagnostics;
     return createFreeTypeVariableType(Expr);
   }
 

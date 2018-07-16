@@ -1320,12 +1320,63 @@ void ConstraintSystem::shrink(Expr *expr) {
   }
 }
 
+bool ConstraintSystem::solve(Expr *&expr,
+                             Type convertType,
+                             ExprTypeCheckListener *listener,
+                             SmallVectorImpl<Solution> &solutions,
+                             FreeTypeVariableBinding allowFreeTypeVariables) {
+  // Attempt to solve the constraint system.
+  auto solution = solveImpl(expr,
+                            convertType,
+                            listener,
+                            solutions,
+                            allowFreeTypeVariables);
+
+  // The constraint system has failed
+  if (solution == SolutionKind::Error)
+    return true;
+
+  // If the system is unsolved or there are multiple solutions present but
+  // type checker options do not allow unresolved types, let's try to salvage
+  if (solution == SolutionKind::Unsolved ||
+      (solutions.size() != 1 &&
+       !Options.contains(
+           ConstraintSystemFlags::AllowUnresolvedTypeVariables))) {
+    if (shouldSuppressDiagnostics())
+      return true;
+
+    // Try to provide a decent diagnostic.
+    if (salvage(solutions, expr)) {
+      // If salvage produced an error message, then it failed to salvage the
+      // expression, just bail out having reported the error.
+      return true;
+    }
+
+    // The system was salvaged; continue on as if nothing happened.
+  }
+
+  if (TC.getLangOpts().DebugConstraintSolver) {
+    auto &log = getASTContext().TypeCheckerDebug->getStream();
+    if (solutions.size() == 1) {
+      log << "---Solution---\n";
+      solutions[0].dump(log);
+    } else {
+      for (unsigned i = 0, e = solutions.size(); i != e; ++i) {
+        log << "--- Solution #" << i << " ---\n";
+        solutions[i].dump(log);
+      }
+    }
+  }
+
+  return false;
+}
+
 ConstraintSystem::SolutionKind
-ConstraintSystem::solve(Expr *&expr,
-                        Type convertType,
-                        ExprTypeCheckListener *listener,
-                        SmallVectorImpl<Solution> &solutions,
-                        FreeTypeVariableBinding allowFreeTypeVariables) {
+ConstraintSystem::solveImpl(Expr *&expr,
+                            Type convertType,
+                            ExprTypeCheckListener *listener,
+                            SmallVectorImpl<Solution> &solutions,
+                            FreeTypeVariableBinding allowFreeTypeVariables) {
   if (TC.getLangOpts().DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
     log << "---Constraint solving for the expression at ";

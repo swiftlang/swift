@@ -8088,11 +8088,13 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
 Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
                                       Type convertType,
                                       bool discardedExpr,
-                                      bool suppressDiagnostics,
                                       bool skipClosures) {
   // If any fixes needed to be applied to arrive at this solution, resolve
   // them to specific expressions.
   if (!solution.Fixes.empty()) {
+    if (shouldSuppressDiagnostics())
+      return nullptr;
+
     // If we can diagnose the problem with the fixits that we've pre-assumed,
     // do so now.
     if (applySolutionFixes(expr, solution))
@@ -8108,7 +8110,7 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
   for (auto &e : solution.Conformances)
     TC.markConformanceUsed(e.second, DC);
 
-  ExprRewriter rewriter(*this, solution, suppressDiagnostics);
+  ExprRewriter rewriter(*this, solution, shouldSuppressDiagnostics());
   ExprWalker walker(rewriter);
 
   // Apply the solution to the expression.
