@@ -421,7 +421,8 @@ public:
   // Helpers
 
   /// Dig through single element aggregates, return the ultimate thing inside of
-  /// it.  This is useful when dealing with integers and floats, because
+  /// it.  This is useful when dealing with integers and floats, because they
+  /// are often wrapped in single-element struct wrappers.
   SymbolicValue lookThroughSingleElementAggregates() const;
 
   /// Given that this is an 'Unknown' value, emit diagnostic notes providing

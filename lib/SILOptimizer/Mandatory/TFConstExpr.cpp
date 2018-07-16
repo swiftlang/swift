@@ -811,7 +811,7 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
     // Build this value as an array of elements.  Wrap it up into a memory
     // object with an address refering to it.
     auto arrayVal = SymbolicValue::getArray(elementConstants,
-                                     evaluator.getAllocator());
+                                            evaluator.getAllocator());
 
     auto *memObject =
       SymbolicValueMemoryObject::create(arrayType, arrayVal,

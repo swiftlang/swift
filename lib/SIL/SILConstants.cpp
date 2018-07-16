@@ -689,7 +689,8 @@ static SILDebugLocation skipInternalLocations(SILDebugLocation loc) {
 }
 
 /// Dig through single element aggregates, return the ultimate thing inside of
-/// it.  This is useful when dealing with integers and floats, because
+/// it.  This is useful when dealing with integers and floats, because they
+/// are often wrapped in single-element struct wrappers.
 SymbolicValue SymbolicValue::lookThroughSingleElementAggregates() const {
   auto result = *this;
   while (1) {
