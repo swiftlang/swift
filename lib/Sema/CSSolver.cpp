@@ -13,14 +13,15 @@
 // This file implements the constraint solver used in the type checker.
 //
 //===----------------------------------------------------------------------===//
-#include "ConstraintSystem.h"
 #include "ConstraintGraph.h"
+#include "ConstraintSystem.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeWalker.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Compiler.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
+#include "llvm/Support/raw_ostream.h"
+#include <algorithm>
 #include <memory>
 #include <tuple>
 
@@ -1814,6 +1815,9 @@ static bool shouldSkipDisjunctionChoice(ConstraintSystem &cs,
 static Constraint *selectBestBindingDisjunction(
     ConstraintSystem &cs, SmallVectorImpl<Constraint *> &disjunctions) {
 
+  if (disjunctions.empty())
+    return nullptr;
+
   // Collect any disjunctions that simply attempt bindings for a
   // type variable.
   SmallVector<Constraint *, 8> bindingDisjunctions;
@@ -1884,44 +1888,28 @@ Constraint *ConstraintSystem::selectDisjunction() {
   SmallVector<Constraint *, 4> disjunctions;
 
   collectDisjunctions(disjunctions);
-
-  if (disjunctions.empty())
-    return nullptr;
-
-  auto *disjunction =
-      selectBestBindingDisjunction(*this, disjunctions);
-
-  if (disjunction)
+  if (auto *disjunction = selectBestBindingDisjunction(*this, disjunctions))
     return disjunction;
 
   // Pick the disjunction with the lowest disjunction number in order
   // to solve them in the order they were created (which should be
   // stable within an expression).
-  disjunction = disjunctions[0];
-  auto found = DisjunctionNumber.find(disjunction);
-  assert(found != DisjunctionNumber.end());
-  auto lowestNumber = found->second;
-  if (lowestNumber > 0) {
-    for (auto contender : llvm::makeArrayRef(disjunctions).slice(1)) {
-      auto found = DisjunctionNumber.find(contender);
-      assert(found != DisjunctionNumber.end());
-      unsigned newNumber = found->second;
-      if (newNumber < lowestNumber) {
-        lowestNumber = newNumber;
-        disjunction = contender;
+  auto minDisjunction =
+      std::min_element(disjunctions.begin(), disjunctions.end(),
+                       [&](Constraint *first, Constraint *second) -> bool {
+                         auto firstFound = DisjunctionNumber.find(first);
+                         auto secondFound = DisjunctionNumber.find(second);
 
-        if (lowestNumber == 0)
-          break;
-      }
-    }
-  }
+                         assert(firstFound != DisjunctionNumber.end() &&
+                                secondFound != DisjunctionNumber.end());
 
-  // If there are no active constraints in the disjunction, there is
-  // no solution.
-  // if (bestSize == 0)
-  //   return nullptr;
+                         return firstFound->second < secondFound->second;
+                       });
 
-  return disjunction;
+  if (minDisjunction != disjunctions.end())
+    return *minDisjunction;
+
+  return nullptr;
 }
 
 bool ConstraintSystem::solveSimplified(
