@@ -6389,13 +6389,10 @@ void SwiftDeclConverter::recordObjCOverride(AbstractFunctionDecl *decl) {
   // Make sure that we always set the overriden declarations.
   SWIFT_DEFER {
     if (!decl->overriddenDeclsComputed())
-      (void)decl->setOverriddenDecls({ });
+      decl->setOverriddenDecls({ });
   };
 
   // Figure out the class in which this method occurs.
-  if (!decl->getDeclContext()->isTypeContext())
-    return;
-
   auto classDecl = decl->getDeclContext()->getAsClassOrClassExtensionContext();
   if (!classDecl)
     return;

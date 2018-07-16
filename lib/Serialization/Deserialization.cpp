@@ -2705,7 +2705,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
         overriddenAssocTypes.push_back(overriddenAssocType);
       }
     }
-    (void)assocType->setOverriddenDecls(overriddenAssocTypes);
+    assocType->setOverriddenDecls(overriddenAssocTypes);
 
     break;
   }

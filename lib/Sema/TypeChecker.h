@@ -1235,9 +1235,6 @@ public:
     validateDeclForNameLookup(VD);
   }
 
-  /// Resolve the "overridden" declaration of the given declaration.
-  virtual void resolveOverriddenDecl(ValueDecl *VD) override;
-
   /// Resolve the "is Objective-C" bit for the given declaration.
   virtual void resolveIsObjC(ValueDecl *VD) override;
 
@@ -2018,9 +2015,10 @@ public:
   /// \param name The name of the entity to look for.
   /// \param loc The source location at which name lookup occurs.
   /// \param options Options that control name lookup.
-  LookupResult lookupUnqualified(DeclContext *dc, DeclName name, SourceLoc loc,
-                                 NameLookupOptions options
-                                   = defaultUnqualifiedLookupOptions);
+  static LookupResult lookupUnqualified(DeclContext *dc, DeclName name,
+                                        SourceLoc loc,
+                                        NameLookupOptions options
+                                          = defaultUnqualifiedLookupOptions);
 
   /// Perform unqualified type lookup at the given source location
   /// within a particular declaration context.
@@ -2030,9 +2028,9 @@ public:
   /// \param loc The source location at which name lookup occurs.
   /// \param options Options that control name lookup.
   LookupResult
-  lookupUnqualifiedType(DeclContext *dc, DeclName name, SourceLoc loc,
-                        NameLookupOptions options
-                          = defaultUnqualifiedLookupOptions);
+  static lookupUnqualifiedType(DeclContext *dc, DeclName name, SourceLoc loc,
+                               NameLookupOptions options
+                                 = defaultUnqualifiedLookupOptions);
 
   /// \brief Lookup a member in the given type.
   ///
@@ -2042,9 +2040,9 @@ public:
   /// \param options Options that control name lookup.
   ///
   /// \returns The result of name lookup.
-  LookupResult lookupMember(DeclContext *dc, Type type, DeclName name,
-                            NameLookupOptions options
-                              = defaultMemberLookupOptions);
+  static LookupResult lookupMember(DeclContext *dc, Type type, DeclName name,
+                                   NameLookupOptions options
+                                     = defaultMemberLookupOptions);
 
   /// \brief Check whether the given declaration can be written as a
   /// member of the given base type.

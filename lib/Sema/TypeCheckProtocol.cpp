@@ -2270,14 +2270,15 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
 
   // Record type witnesses for any "overridden" associated types.
   llvm::SetVector<AssociatedTypeDecl *> overriddenAssocTypes;
-  overriddenAssocTypes.insert(assocType->getOverriddenDecls().begin(),
-                              assocType->getOverriddenDecls().end());
+  auto assocOverriddenDecls = assocType->getOverriddenDecls();
+  overriddenAssocTypes.insert(assocOverriddenDecls.begin(),
+                              assocOverriddenDecls.end());
   for (unsigned idx = 0; idx < overriddenAssocTypes.size(); ++idx) {
     auto overridden = overriddenAssocTypes[idx];
 
     // Note all of the newly-discovered overridden associated types.
-    overriddenAssocTypes.insert(overridden->getOverriddenDecls().begin(),
-                                overridden->getOverriddenDecls().end());
+    auto overriddenDecls = overridden->getOverriddenDecls();
+    overriddenAssocTypes.insert(overriddenDecls.begin(), overriddenDecls.end());
 
     // Find the conformance for this overridden protocol.
     auto overriddenConformance =

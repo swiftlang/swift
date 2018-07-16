@@ -98,7 +98,7 @@ void makeFinal(ASTContext &ctx, ValueDecl *D);
 void makeDynamic(ASTContext &ctx, ValueDecl *D);
 
 // Implemented in TypeCheckerOverride.cpp
-bool checkOverrides(TypeChecker &TC, ValueDecl *decl);
+bool checkOverrides(ValueDecl *decl);
 
 // These are implemented in CodeSynthesis.cpp.
 void maybeAddMaterializeForSet(AbstractStorageDecl *storage,
