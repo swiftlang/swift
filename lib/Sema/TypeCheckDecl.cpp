@@ -2945,6 +2945,8 @@ public:
 
     TC.checkDeclCircularity(CD);
     TC.ConformanceContexts.push_back(CD);
+
+    (void)CD->isObjC();
   }
 
   void visitProtocolDecl(ProtocolDecl *PD) {
