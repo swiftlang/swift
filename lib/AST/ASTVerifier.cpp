@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1469,7 +1469,9 @@ public:
           }
         };
 
-        // These outer entities will be interleaved in multi-level optionals.
+        // FIXME: This doesn't seem like a particularly robust
+        //        approach to tracking whether pointer conversions
+        //        always appear as call arguments.
         while (true) {
           // Look through optional evaluations.
           if (auto *optionalEval = dyn_cast<OptionalEvaluationExpr>(subExpr)) {
@@ -1481,6 +1483,17 @@ public:
           // Look through injections into Optional<Pointer>.
           if (auto *injectIntoOpt = dyn_cast<InjectIntoOptionalExpr>(subExpr)) {
             subExpr = injectIntoOpt->getSubExpr();
+            continue;
+          }
+
+          // FIXME: This is only handling the value conversion, not
+          //        the key conversion. What this verifier check
+          //        should probably do is just track whether we're
+          //        currently visiting arguments of an apply when we
+          //        find these conversions.
+          if (auto *upcast =
+                  dyn_cast<CollectionUpcastConversionExpr>(subExpr)) {
+            subExpr = upcast->getValueConversion().Conversion;
             continue;
           }
 
