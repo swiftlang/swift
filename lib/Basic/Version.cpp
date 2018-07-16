@@ -384,6 +384,11 @@ bool operator>=(const class Version &lhs,
   return true;
 }
 
+bool operator<(const class Version &lhs, const class Version &rhs) {
+
+  return !(lhs >= rhs);
+}
+
 bool operator==(const class Version &lhs,
                 const class Version &rhs) {
   auto n = std::max(lhs.size(), rhs.size());
@@ -446,4 +451,3 @@ std::string getSwiftRevision() {
 
 } // end namespace version
 } // end namespace swift
-
