@@ -433,7 +433,23 @@ func testInitializationThroughTupleElementDiag() {
   // expected-note@-5 {{a strong reference is required to prevent the instance from being deallocated}}
   // expected-note@-6 {{'c3' declared here}}
 
-  _ = c1; _ = c2; _ = c3
+  unowned let ((c4, c5), c6): ((C, C), C) = ((a: D(), b: C()), c: D())
+  // expected-warning@-1 {{instance will be immediately deallocated because variable 'c4' is 'unowned'}}
+  // expected-note@-2 {{a strong reference is required to prevent the instance from being deallocated}}
+  // expected-note@-3 {{'c4' declared here}}
+  // expected-warning@-4 {{instance will be immediately deallocated because variable 'c5' is 'unowned'}}
+  // expected-note@-5 {{a strong reference is required to prevent the instance from being deallocated}}
+  // expected-note@-6 {{'c5' declared here}}
+  // expected-warning@-7 {{instance will be immediately deallocated because variable 'c6' is 'unowned'}}
+  // expected-note@-8 {{a strong reference is required to prevent the instance from being deallocated}}
+  // expected-note@-9 {{'c6' declared here}}
+
+  unowned let c7 = ((C(), C()) as (a: C, b: C)).0
+  // expected-warning@-1 {{instance will be immediately deallocated because variable 'c7' is 'unowned'}}
+  // expected-note@-2 {{a strong reference is required to prevent the instance from being deallocated}}
+  // expected-note@-3 {{'c7' declared here}}
+
+  _ = c1; _ = c2; _ = c3; _ = c4; _ = c5; _ = c6; _ = c7
 }
 
 class E<T> {}
@@ -445,14 +461,6 @@ func testGenericWeakClassDiag() {
   // expected-note@-3 {{'e' declared here}}
 
   _ = e
-}
-
-// The diagnostic doesn't currently support tuple shuffles.
-func testDontDiagnoseThroughTupleShuffles() {
-  unowned let (c1, (c2, c3)): (c: C, (b: C, a: C)) = ((a: D(), b: C()), c: D())
-  unowned let c4 = ((a: C(), b: C()) as (b: C, a: C)).0
-
-  _ = c1; _ = c2; _ = c3; _ = c4
 }
 
 extension Optional {

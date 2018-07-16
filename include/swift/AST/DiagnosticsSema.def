@@ -4225,6 +4225,14 @@ WARNING(hashvalue_implementation,none,
         "conform type %0 to 'Hashable' by implementing 'hash(into:)' instead",
         (Type))
 
+//------------------------------------------------------------------------------
+// MARK: Tuple Shuffle Diagnostics
+//------------------------------------------------------------------------------
+
+WARNING(warn_reordering_tuple_shuffle_deprecated,none,
+        "expression shuffles the elements of this tuple; "
+        "this behavior is deprecated", ())
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

@@ -189,7 +189,7 @@ func test5() {
 
 
   let c: (a: Int, b: Int) = (1,2)
-  let _: (b: Int, a: Int) = c  // Ok, reshuffle tuple.
+  let _: (b: Int, a: Int) = c  // expected-warning {{expression shuffles the elements of this tuple}} 
 }
 
 

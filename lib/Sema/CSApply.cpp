@@ -5064,6 +5064,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
 
   /// Check each of the tuple elements in the destination.
   bool anythingShuffled = false;
+  bool anythingReordered = false;
   SmallVector<TupleTypeElt, 4> toSugarFields;
   SmallVector<TupleTypeElt, 4> fromTupleExprFields(
                                  fromTuple->getElements().size());
@@ -5075,6 +5076,12 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
     // If the source and destination index are different, we'll be shuffling.
     if (sources[i] != i) {
       anythingShuffled = true;
+
+      // Shuffling argument labels out of order is no longer allowed. If the
+      // shuffle is successfully constructed, we will diagnose it below.
+      const auto &paraElt = fromTuple->getElement(i);
+      if (paraElt.getName() != toElt.getName())
+        anythingReordered = true;
     }
 
     // We're matching one element to another. If the types already
@@ -5161,6 +5168,14 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
   ArrayRef<unsigned> sourcesRef = sources;
   ArrayRef<int> sourcesCast((const int *) sourcesRef.data(),
                             sourcesRef.size());
+
+  // Shuffling tuple elements is an anti-pattern worthy of a diagnostic.  We
+  // will form the shuffle for now, but a future compiler should decline to
+  // do so and begin the process of removing them altogether.
+  if (anythingReordered) {
+    cs.TC.diagnose(expr->getLoc(),
+                   diag::warn_reordering_tuple_shuffle_deprecated);
+  }
 
   // Create the tuple shuffle.
   return
@@ -6636,7 +6651,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       
       llvm_unreachable("unhandled metatype kind");
     }
-    
+
     if (auto toClass = toType->getClassOrBoundGenericClass()) {
       if (toClass->getName() == cs.getASTContext().Id_Protocol
           && toClass->getModuleContext()->getName()
