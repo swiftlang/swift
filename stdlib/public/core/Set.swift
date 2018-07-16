@@ -2656,6 +2656,21 @@ internal struct _CocoaSetBuffer: _HashBuffer {
 
     _sanityCheckFailure("this function should never be called")
   }
+
+  @usableFromInline
+  internal func _toNative<E: Hashable>(
+    bucketCount: Int
+  ) -> _NativeSetBuffer<E> {
+    let cocoaSet = self.cocoaSet
+    var newNativeBuffer = _NativeSetBuffer<E>(bucketCount: bucketCount)
+    let oldCocoaIterator = _CocoaSetIterator(cocoaSet)
+    while let element = oldCocoaIterator.next() {
+      newNativeBuffer.unsafeAddNew(
+        key: _forceBridgeFromObjectiveC(element, E.self))
+    }
+    newNativeBuffer.count = cocoaSet.count
+    return newNativeBuffer
+  }
 }
 #endif
 
@@ -2835,17 +2850,7 @@ internal enum _VariantSetBuffer<Element: Hashable>: _HashBuffer {
     case .native:
       fatalError("This should have been handled earlier")
     case .cocoa(let cocoaBuffer):
-      let cocoaSet = cocoaBuffer.cocoaSet
-      var newNativeBuffer = NativeBuffer(bucketCount: desiredBucketCount)
-      let oldCocoaIterator = _CocoaSetIterator(cocoaSet)
-      while let key = oldCocoaIterator.next() {
-        newNativeBuffer.unsafeAddNew(
-            key: _forceBridgeFromObjectiveC(key, Value.self))
-      }
-
-      newNativeBuffer.count = cocoaSet.count
-
-      self = .native(newNativeBuffer)
+      self = .native(cocoaBuffer._toNative(bucketCount: desiredBucketCount))
       return (reallocated: true, capacityChanged: true)
     }
 #else
@@ -2854,7 +2859,6 @@ internal enum _VariantSetBuffer<Element: Hashable>: _HashBuffer {
   }
 
 #if _runtime(_ObjC)
-  @inline(never)
   @usableFromInline
   internal mutating func migrateDataToNativeBuffer(
     _ cocoaBuffer: _CocoaSetBuffer

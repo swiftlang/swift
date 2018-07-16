@@ -3157,6 +3157,23 @@ internal struct _CocoaDictionaryBuffer: _HashBuffer {
 
     _sanityCheckFailure("this function should never be called")
   }
+
+  @usableFromInline
+  internal func _toNative<K: Hashable, V>(
+    bucketCount: Int
+  ) -> _NativeDictionaryBuffer<K, V> {
+    let cocoaDictionary = self.cocoaDictionary
+    var newNativeBuffer =
+      _NativeDictionaryBuffer<K, V>(bucketCount: bucketCount)
+    let oldCocoaIterator = _CocoaDictionaryIterator(cocoaDictionary)
+    while let (key, value) = oldCocoaIterator.next() {
+      newNativeBuffer.unsafeAddNew(
+        key: _forceBridgeFromObjectiveC(key, K.self),
+        value: _forceBridgeFromObjectiveC(value, V.self))
+    }
+    newNativeBuffer.count = cocoaDictionary.count
+    return newNativeBuffer
+  }
 }
 #endif
 
@@ -3334,19 +3351,7 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
     case .native:
       fatalError("This should have been handled earlier")
     case .cocoa(let cocoaBuffer):
-      let cocoaDictionary = cocoaBuffer.cocoaDictionary
-      var newNativeBuffer = NativeBuffer(bucketCount: desiredBucketCount)
-      let oldCocoaIterator = _CocoaDictionaryIterator(cocoaDictionary)
-
-      while let (key, value) = oldCocoaIterator.next() {
-        newNativeBuffer.unsafeAddNew(
-          key: _forceBridgeFromObjectiveC(key, Key.self),
-          value: _forceBridgeFromObjectiveC(value, Value.self))
-      }
-
-      newNativeBuffer.count = cocoaDictionary.count
-
-      self = .native(newNativeBuffer)
+      self = .native(cocoaBuffer._toNative(bucketCount: desiredBucketCount))
       return (reallocated: true, capacityChanged: true)
     }
 #else
@@ -4569,7 +4574,7 @@ public struct DictionaryIterator<Key: Hashable, Value>: IteratorProtocol {
   internal static func _cocoa(
     _ buffer: _CocoaDictionaryBuffer
   ) -> DictionaryIterator{
-    let iterator = _CocoaDictionaryIterator(cocoaBuffer.cocoaDictionary)
+    let iterator = _CocoaDictionaryIterator(buffer.cocoaDictionary)
     return DictionaryIterator(_state: ._cocoa(iterator))
   }
 #endif
