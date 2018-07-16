@@ -272,9 +272,10 @@ private:
   /// primal values to declaration references in the primal value struct.
   DenseMap<SILValue, VarDecl *> staticPrimalValueMap;
   
-  /// Mapping from types to distinct tapes. Tapes are uniqued by the element
+  /// Mapping from types of control-dependent direct primal values to distinct
+  /// tapes. Tapes are uniqued by the element
   /// type.
-  DenseMap<CanType, VarDecl *> typeTapeMap;
+  DenseMap<CanType, VarDecl *> directTapeTypeMap;
   
   /// Mapping from non-control-dependent `apply` instructions in the original
   /// function to the primal values returned by the corresponding call in the
@@ -300,8 +301,12 @@ private:
   /// corresponding tape of its type.
   DenseMap<ApplyInst *, VarDecl *> nestedStaticPrimalValueMap;
   
-  /// Mapping from `apply` instructions to their
-  DenseMap<ApplyInst *, VarDecl *> applyTapeMap;
+  /// Mapping from types of control-dependent nested primal values to district
+  /// tapes.
+  DenseMap<CanType, VarDecl *> nestedTapeTypeMap;
+
+  /// Set of control-dependent primal values that have been checkpointed.
+  SmallPtrSet<SILValue, 16> tapedDirectPrimalValueSet;
 
   /// Mapping from original basic blocks to their associated IDs. In the primal
   /// function, we push the predecessor block ID for each basic block that has
@@ -408,7 +413,7 @@ public:
   /// Retrieves the tape decl in the primal value struct for the specified type.
   VarDecl *getOrCreateTapeDeclForType(CanType type) {
     auto &astCtx = primalValueStruct->getASTContext();
-    auto insertion = typeTapeMap.try_emplace(type, nullptr);
+    auto insertion = directTapeTypeMap.try_emplace(type, nullptr);
     auto &tapeDecl = insertion.first->getSecond();
     if (insertion.second) {
       auto tapeType =
@@ -2721,11 +2726,11 @@ public:
     assert(insertion.second && "The original value was mapped before");
   }
 
-  void setInsertionPointBeforeTerminator(SILBasicBlock *bb) {
-    if (auto *term = bb->getTerminator())
-      getBuilder().setInsertionPoint(term);
-    else
-      getBuilder().setInsertionPoint(bb);
+  void setInsertionPointBeforeAnyTerminator(SILBasicBlock *bb) {
+    if (!bb->empty())
+      if (auto *ti = dyn_cast<TermInst>(&bb->back()))
+        getBuilder().setInsertionPoint(ti);
+    getBuilder().setInsertionPoint(bb);
   }
 };
 
@@ -2966,7 +2971,7 @@ public:
     // Get the corresponding adjoint basic block.
     auto adjBB = getAdjointBlock(bb);
     // Prepare the remat cloner for on-demand rematerialization.
-    rematCloner.setInsertionPointBeforeTerminator(bb);
+    rematCloner.setInsertionPointBeforeAnyTerminator(bb);
     getBuilder().setInsertionPoint(adjBB);
     // Visit each instruction in reverse order.
     for (auto &inst : reversed(*bb)) {
@@ -3011,12 +3016,6 @@ public:
   SILValue extractPrimalValueIfAny(SILValue value, bool nested = false) {
     auto &pi = getPrimalInfo();
     VarDecl *field = nullptr;
-    if (nested) {
-      auto *applyInst = cast<ApplyInst>(value);
-      field = pi.lookupNestedStaticPrimalValueDecl(applyInst);
-    } else {
-      field = pi.lookupDirectStaticPrimalValueDecl(value);
-    }
     SILValue extracted;
     auto loc = remapLocation(value.getLoc());
     if (isControlDependent(value)) {
@@ -3025,15 +3024,28 @@ public:
       // corresponding adjoint block of the dominator of all uses of the value.
       llvm_unreachable("Control-dependent primal value are not handled yet");
     }
-    // If it's an address, use `struct_element_addr` to get the element address.
-    if (pi.getLoweredPrimalValueStructType().isAddress())
-      extracted = getBuilder()
-        .createStructElementAddr(loc, primalValueAggregateInAdj, field);
-    // Otherwise, the primal value struct is a normal SSA value. Emit a
-    // `struct_extract`.
+    // For non-control-dependent primal values, we just look up the struct
+    // directly.
     else {
-      extracted = getBuilder().createStructExtract(
-        remapLocation(value.getLoc()), primalValueAggregateInAdj, field);
+      if (nested) {
+        auto *applyInst = cast<ApplyInst>(value);
+        field = pi.lookupNestedStaticPrimalValueDecl(applyInst);
+      } else {
+        field = pi.lookupDirectStaticPrimalValueDecl(value);
+      }
+      // No field found, so this primal value was not checkpointed.
+      if (!field)
+        return nullptr;
+      // If it's an address, use `struct_element_addr` to get the element address.
+      if (pi.getLoweredPrimalValueStructType().isAddress())
+        extracted = getBuilder()
+          .createStructElementAddr(loc, primalValueAggregateInAdj, field);
+      // Otherwise, the primal value struct is a normal SSA value. Emit a
+      // `struct_extract`.
+      else {
+        extracted = getBuilder().createStructExtract(
+          remapLocation(value.getLoc()), primalValueAggregateInAdj, field);
+      }
     }
     // Memorize this value mapping in the remat cloner, when we are not
     // extracting a nested primal value aggregate.
@@ -3365,7 +3377,7 @@ void AdjointEmitter::rematerializeOriginalInstruction(SILInstruction *inst) {
   // Ensure that all operands have a corresponding value in the adjoint.
   for (auto &op : inst->getAllOperands())
     remapValue(op.get());
-  rematCloner.setInsertionPointBeforeTerminator(ncd);
+  rematCloner.setInsertionPointBeforeAnyTerminator(ncd);
   rematCloner.visit(inst);
 }
 
@@ -3974,8 +3986,8 @@ void Differentiation::run() {
   if (context.hasErrorOccurred())
     return;
 
-  // Fill the body of the empty canonical gradient function corresponding to
-  // each differentiation task, and we are done!
+  // Fill the body of each empty canonical gradient function corresponding to
+  // each differentiation task.
   for (auto &task : context.getDifferentiationTasks()) {
     auto *canGradFn = context.lookupCanonicalGradient(task.get());
     assert(canGradFn && "Cannot find the canonical gradient function");
