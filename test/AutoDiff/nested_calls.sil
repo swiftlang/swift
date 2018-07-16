@@ -1,0 +1,85 @@
+// RUN: %target-sil-opt -differentiation %s | %FileCheck %s
+
+import Builtin
+import Swift
+
+sil_stage raw
+
+sil hidden @foo_prim : $@convention(thin) (Float) -> (Float, Float) {
+bb0(%0 : $Float):
+  %1 = tuple (%0 : $Float, %0 : $Float)
+  return %1 : $(Float, Float)
+}
+
+sil hidden @foo_adj : $@convention(thin) (Float, Float, Float) -> Float {
+bb0(%0 : $Float, %1 : $Float, %2 : $Float):
+  return %2 : $Float
+}
+
+sil hidden [reverse_differentiable source 0 wrt 0 primal @foo_prim adjoint @foo_adj] @foo : $@convention(thin) (Float) -> Float {
+bb0(%0 : $Float):
+  return %0 : $Float
+}
+
+// Nested function being called by `@func_to_diff`.
+sil hidden @nested_func_without_diffattr : $@convention(thin) (Float) -> Float {
+bb0(%0 : $Float):
+  %1 = function_ref @foo : $@convention(thin) (Float) -> Float
+  %2 = apply %1(%0) : $@convention(thin) (Float) -> Float
+  return %2 : $Float
+}
+
+// CHECK-LABEL: @nested_func_to_diff__primal_src_0_wrt_0 : @convention(thin) (Float) -> (nested_func_to_diff__Type, Float)
+
+// CHECK-LABEL: @nested_func_to_diff__adjoint_src_0_wrt_0 : @convention(thin) (Float, nested_func_to_diff__Type, Float, Float) -> Float
+//                                                                               ^               ^                 ^       ^       
+//                                                                            orig arg      primal vals      orig result  seed
+
+// Main function to differentiate.
+sil hidden @func_to_diff : $@convention(thin) (Float) -> Float {
+bb0(%0 : $Float):
+  %1 = function_ref @nested_func_without_diffattr : $@convention(thin) (Float) -> Float
+  %2 = apply %1(%0) : $@convention(thin) (Float) -> Float
+  %3 = function_ref @nested_func_without_diffattr : $@convention(thin) (Float) -> Float
+  %4 = apply %3(%2) : $@convention(thin) (Float) -> Float
+  %5 = tuple (%4 : $Float, %4 : $Float)
+  %6 = tuple_extract %5 : $(Float, Float), 0
+  return %6 : $Float
+}
+
+// CHECK-LABEL: @func_to_diff__primal_src_0_wrt_0 : @convention(thin) (Float) -> (nested_func_to_diff__Type, Float)
+// sil @func_to_diff__primal_src_0_wrt_0 : $@convention(thin) (Float) -> (@owned func_to_diff__Type, Float) {
+// bb0(%0 : $Float):
+//   // function_ref nested_func_without_diffattr__primal_src_0_wrt_0
+//   %1 = function_ref @nested_func_without_diffattr__primal_src_0_wrt_0 : $@convention(thin) (Float) -> (@owned nested_func_without_diffattr__Type, Float)
+//   %2 = apply %1(%0) : $@convention(thin) (Float) -> (@owned nested_func_without_diffattr__Type, Float) // users: %8, %3
+//   %3 = tuple_extract %2 : $(nested_func_without_diffattr__Type, Float), 1
+//   %4 = function_ref @nested_func_without_diffattr : $@convention(thin) (Float) -> Float
+//   %5 = apply %4(%3) : $@convention(thin) (Float) -> Float
+//   %6 = tuple (%5 : $Float, %5 : $Float)
+//   %7 = tuple_extract %6 : $(Float, Float), 0
+//   %8 = struct $func_to_diff__Type (%2 : $(nested_func_without_diffattr__Type, Float), %5 : $Float)
+//   %9 = tuple (%7 : $Float, %8 : $func_to_diff__Type)
+//   return %9 : $(Float, func_to_diff__Type)
+// }
+
+// CHECK-LABEL: @func_to_diff__adjoint_src_0_wrt_0 :
+// sil hidden @func_to_diff__adjoint_src_0_wrt_0 : $@convention(thin) (Float, func_to_diff__Type, Float) -> Float {
+// bb0(%0 : $Float, %1 : $func_to_diff__Type, %2 : $Float):
+//   %3 = function_ref @nested_func_without_diffattr__adjoint_src_0_wrt_0 : $@convention(thin) (Float, nested_func_without_diffattr__Type, Float) -> Float
+//   %4 = apply %3(%0) : $@convention(thin) (Float, nested_func_without_diffattr__Type, Float) -> Float
+//   %5 = alloc_stack $Float
+//   store %4 to [trivial] %5 : $*Float
+//   %7 = load [trivial] %5 : $*Float
+//   dealloc_stack %5 : $*Float
+//   return %7 : $Float
+// }
+
+sil hidden @main : $@convention(thin) (Float) -> () {
+bb0(%0 : $Float):
+  %1 = function_ref @func_to_diff : $@convention(thin) (Float) -> Float
+  %2 = gradient [source 0] [wrt 0] %1 : $@convention(thin) (Float) -> Float
+  %3 = apply %2(%0) : $@convention(thin) (Float) -> Float
+  %4 = tuple ()
+  return %4 : $()
+}

@@ -661,8 +661,7 @@ SILCloner<ImplClass>::visitGradientInst(GradientInst *Inst) {
                                 getOpValue(Inst->getOriginal()),
                                 Inst->getSourceIndex(),
                                 Inst->getParameterIndices(),
-                                Inst->isSeedable(),
-                                Inst->isPreservingResult()));
+                                Inst->getOptions()));
 }
 
 template<typename ImplClass>

@@ -1504,6 +1504,12 @@ ERROR(sil_reverse_autodiff_expected_source_index,PointsToFirstBadToken,
 ERROR(sil_reverse_autodiff_expected_parameter_index,PointsToFirstBadToken,
       "expected the index of a parameter to differentiate with respect to", ())
 
+ERROR(sil_reverse_autodiff_expected_option,PointsToFirstBadToken,
+      "expected a gradient option: 'seedable', 'preserving_result' or 'delayed'", ())
+
+ERROR(sil_reverse_autodiff_duplicate_option,PointsToFirstBadToken,
+      "duplicate gradient option", ())
+
 ERROR(sil_gradient_invalid_seed_type,PointsToFirstBadToken,
       "expected seed '%0' to have type %1", (StringRef, Type))
 

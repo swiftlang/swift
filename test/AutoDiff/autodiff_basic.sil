@@ -29,12 +29,11 @@ bb0(%0 : $Float):
 
 // CHECK-LABEL: sil hidden @bar :
 // CHECK: bb0
-// CHECK:   %1 = function_ref @foo : $@convention(thin) (Float) -> Float
-// CHECK:   %2 = function_ref @foo__grad_src_0_wrt_0 : $@convention(thin) (Float) -> Float
-// CHECK:   %3 = apply %2(%0) : $@convention(thin) (Float) -> Float
-// CHECK:   %4 = function_ref @foo__grad_src_0_wrt_0_p : $@convention(thin) (Float) -> (Float, Float)
-// CHECK:   %5 = apply %4(%3) : $@convention(thin) (Float) -> (Float, Float)
-// CHECK:   return %5 : $(Float, Float)
+// CHECK:   %1 = function_ref @foo__grad_src_0_wrt_0 : $@convention(thin) (Float) -> Float
+// CHECK:   %2 = apply %1(%0) : $@convention(thin) (Float) -> Float
+// CHECK:   %3 = function_ref @foo__grad_src_0_wrt_0_p : $@convention(thin) (Float) -> (Float, Float)
+// CHECK:   %4 = apply %3(%2) : $@convention(thin) (Float) -> (Float, Float)
+// CHECK:   return %4 : $(Float, Float)
 // CHECK: }
 
 // CHECK-LABEL:sil hidden @foo__grad_src_0_wrt_0_s_p :
