@@ -1100,6 +1100,7 @@ namespace  {
     UNINTERESTING_ATTR(Alignment)
     UNINTERESTING_ATTR(CDecl)
     UNINTERESTING_ATTR(Consuming)
+    UNINTERESTING_ATTR(Dynamic)
     UNINTERESTING_ATTR(DynamicMemberLookup)
     UNINTERESTING_ATTR(SILGenName)
     UNINTERESTING_ATTR(Exported)
@@ -1114,6 +1115,7 @@ namespace  {
     UNINTERESTING_ATTR(Optimize)
     UNINTERESTING_ATTR(Inlinable)
     UNINTERESTING_ATTR(Effects)
+    UNINTERESTING_ATTR(Final)
     UNINTERESTING_ATTR(FixedLayout)
     UNINTERESTING_ATTR(Lazy)
     UNINTERESTING_ATTR(LLDBDebuggerFunction)
@@ -1182,46 +1184,6 @@ namespace  {
                        isa<ConstructorDecl>(Override));
         Diags.diagnose(Base, diag::overridden_here);
       }
-    }
-
-    void visitFinalAttr(FinalAttr *attr) {
-      // If this is an accessor, don't complain if we would have
-      // complained about the storage declaration.
-      if (auto accessor = dyn_cast<AccessorDecl>(Override)) {
-        if (auto storageDecl = accessor->getStorage()) {
-          if (storageDecl->getOverriddenDecl() &&
-              storageDecl->getOverriddenDecl()->isFinal())
-            return;
-        }
-      }
-
-      // FIXME: Customize message to the kind of thing.
-      auto baseKind = Base->getDescriptiveKind();
-      switch (baseKind) {
-      case DescriptiveDeclKind::StaticLet:
-      case DescriptiveDeclKind::StaticVar:
-      case DescriptiveDeclKind::StaticMethod:
-        Diags.diagnose(Override, diag::override_static, baseKind);
-        break;
-      default:
-        Diags.diagnose(Override, diag::override_final,
-                       Override->getDescriptiveKind(), baseKind);
-        break;
-      }
-
-      Diags.diagnose(Base, diag::overridden_here);
-    }
-
-    void visitDynamicAttr(DynamicAttr *attr) {
-      // Final overrides are not dynamic.
-      if (Override->isFinal())
-        return;
-
-      // Must be @objc to be 'dynamic'.
-      if (!Override->isObjC())
-        return;
-
-      makeDynamic(Override->getASTContext(), Override);
     }
 
     void visitObjCAttr(ObjCAttr *attr) {
@@ -1507,6 +1469,27 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
                      isa<ConstructorDecl>(override));
       diags.diagnose(base, diag::overridden_here);
     }
+  }
+
+  // The overridden declaration cannot be 'final'.
+  if (base->isFinal() && !isa<AccessorDecl>(override)) {
+    // FIXME: Customize message to the kind of thing.
+    auto baseKind = base->getDescriptiveKind();
+    switch (baseKind) {
+    case DescriptiveDeclKind::StaticLet:
+    case DescriptiveDeclKind::StaticVar:
+    case DescriptiveDeclKind::StaticMethod:
+      override->diagnose(diag::override_static, baseKind);
+      break;
+    default:
+      override->diagnose(diag::override_final,
+                         override->getDescriptiveKind(), baseKind);
+      break;
+    }
+
+    base->diagnose(diag::overridden_here);
+
+    return true;
   }
 
   // FIXME: Possibly should extend to more availability checking.

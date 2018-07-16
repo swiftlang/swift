@@ -119,16 +119,12 @@ class FinalEntity: NSObject, EntityIDProto {
 // CHECK-LABEL: sil_vtable SwiftGizmo {
 // CHECK-NEXT:   #SwiftGizmo.modifyX!1: {{.*}} : @$S19objc_attr_NSManaged10SwiftGizmoC7modifyXyyF
 // CHECK-NEXT:   #SwiftGizmo.testFunc!1: {{.*}} : @$S19objc_attr_NSManaged10SwiftGizmoC8testFuncyyF
-// CHECK-NEXT:   #SwiftGizmo.init!initializer.1: {{.*}} : @$S19objc_attr_NSManaged10SwiftGizmoCACSgycfc
-// CHECK-NEXT:   #SwiftGizmo.init!initializer.1: {{.*}} : @$S19objc_attr_NSManaged10SwiftGizmoC7bellsOnACSgSi_tcfc
 // CHECK-NEXT:   #SwiftGizmo.deinit!deallocator: @$S19objc_attr_NSManaged10SwiftGizmoCfD
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_vtable FinalGizmo {
 // CHECK-NEXT:   #SwiftGizmo.modifyX!1: {{.*}} : @$S19objc_attr_NSManaged10SwiftGizmoC7modifyX{{[_0-9a-zA-Z]*}}F
 // CHECK-NEXT:   #SwiftGizmo.testFunc!1: {{.*}} : @$S19objc_attr_NSManaged10SwiftGizmoC8testFunc{{[_0-9a-zA-Z]*}}F
-// CHECK-NEXT:   #SwiftGizmo.init!initializer.1: {{.*}} : @$S19objc_attr_NSManaged10FinalGizmoC{{[_0-9a-zA-Z]*}}fc
-// CHECK-NEXT:   #SwiftGizmo.init!initializer.1: {{.*}} : @$S19objc_attr_NSManaged10FinalGizmoC{{[_0-9a-zA-Z]*}}fc
 // CHECK-NEXT:   #FinalGizmo.deinit!deallocator: @$S19objc_attr_NSManaged10FinalGizmoCfD
 // CHECK-NEXT: }
 

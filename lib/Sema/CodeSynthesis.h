@@ -95,7 +95,6 @@ public:
 
 // These are implemented in TypeCheckDecl.cpp.
 void makeFinal(ASTContext &ctx, ValueDecl *D);
-void makeDynamic(ASTContext &ctx, ValueDecl *D);
 
 // Implemented in TypeCheckerOverride.cpp
 bool checkOverrides(ValueDecl *decl);

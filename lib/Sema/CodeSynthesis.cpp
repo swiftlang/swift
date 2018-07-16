@@ -2396,8 +2396,6 @@ static void configureDesignatedInitAttributes(TypeChecker &tc,
 
   if (superclassCtor->isRequired())
     ctor->getAttrs().add(new (ctx) RequiredAttr(/*IsImplicit=*/true));
-  if (superclassCtor->isDynamic())
-    ctor->getAttrs().add(new (ctx) DynamicAttr(/*IsImplicit*/true));
 }
 
 ConstructorDecl *

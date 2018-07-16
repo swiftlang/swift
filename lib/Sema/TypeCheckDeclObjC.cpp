@@ -1117,16 +1117,11 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
 
   ASTContext &ctx = VD->getASTContext();
 
-  // Infer '@objc' for 'dynamic' members.
+  // Under Swift 3's @objc inference rules, 'dynamic' infers '@objc'.
   if (auto attr = VD->getAttrs().getAttribute<DynamicAttr>()) {
-    // For implicit 'dynamic', just infer '@objc' implicitly.
-    if (attr->isImplicit())
-      return ObjCReason(ObjCReason::ImplicitlyObjC);
-
     bool isGetterOrSetter =
       isa<AccessorDecl>(VD) && cast<AccessorDecl>(VD)->isGetterOrSetter();
 
-    // Under Swift 3's @objc inference rules, 'dynamic' infers '@objc'.
     if (ctx.LangOpts.EnableSwift3ObjCInference) {
       // If we've been asked to warn about deprecated @objc inference, do so
       // now.
@@ -1146,10 +1141,8 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
     // anyway for better recovery.
     VD->diagnose(diag::dynamic_requires_objc,
                  VD->getDescriptiveKind(), VD->getFullName())
-      .highlight(attr->getRange())
       .fixItInsert(VD->getAttributeInsertionLoc(/*forModifier=*/false),
-                   "@objc ");
-
+                 "@objc ");
     return ObjCReason(ObjCReason::ImplicitlyObjC);
   }
 
@@ -1310,11 +1303,6 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
   auto makeNotObjC = [&] {
     if (auto objcAttr = VD->getAttrs().getAttribute<ObjCAttr>()) {
       objcAttr->setInvalid();
-    }
-
-    // FIXME: For now, only @objc declarations can be dynamic.
-    if (auto attr = VD->getAttrs().getAttribute<DynamicAttr>()) {
-      attr->setInvalid();
     }
   };
 

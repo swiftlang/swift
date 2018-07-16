@@ -193,3 +193,37 @@ void IsObjCRequest::cacheResult(bool value) const {
   auto decl = std::get<0>(getStorage());
   decl->setIsObjC(value);
 }
+
+//----------------------------------------------------------------------------//
+// isDynamic computation.
+//----------------------------------------------------------------------------//
+
+bool IsDynamicRequest::breakCycle() const {
+  auto decl = std::get<0>(getStorage());
+  return decl->getAttrs().hasAttribute<DynamicAttr>();
+}
+
+void IsDynamicRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  // FIXME: Improve this diagnostic.
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_reference);
+}
+
+void IsDynamicRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  // FIXME: Customize this further.
+  diags.diagnose(decl, diag::circular_reference_through);
+}
+
+Optional<bool> IsDynamicRequest::getCachedResult() const {
+  auto decl = std::get<0>(getStorage());
+  if (decl->LazySemanticInfo.isDynamicComputed)
+    return decl->LazySemanticInfo.isDynamic;
+
+  return None;
+}
+
+void IsDynamicRequest::cacheResult(bool value) const {
+  auto decl = std::get<0>(getStorage());
+  decl->setIsDynamic(value);
+}

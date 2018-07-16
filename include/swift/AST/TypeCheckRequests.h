@@ -177,6 +177,33 @@ public:
   void cacheResult(bool value) const;
 };
 
+/// Determine whether the given declaration is 'dynamic''.
+class IsDynamicRequest :
+    public SimpleRequest<IsDynamicRequest,
+                         CacheKind::SeparatelyCached,
+                         bool,
+                         ValueDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend class SimpleRequest;
+
+  // Evaluation.
+  bool evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+
+public:
+  // Cycle handling
+  bool breakCycle() const;
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
+};
+
 /// The zone number for the type checker.
 #define SWIFT_TYPE_CHECKER_REQUESTS_TYPEID_ZONE 10
 
