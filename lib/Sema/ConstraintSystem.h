@@ -902,6 +902,13 @@ public:
   /// The original CS if this CS was created as a simplification of another CS
   ConstraintSystem *baseCS = nullptr;
 
+  /// \brief The total number of disjunctions created.
+  unsigned CountDisjunctions = 0;
+
+  /// \brief Map from disjunction to the number indicating the order it
+  //         was created in.
+  llvm::DenseMap<Constraint *, unsigned> DisjunctionNumber;
+
 private:
 
   /// \brief Allocator used for all of the related constraint systems.
@@ -1851,6 +1858,11 @@ public:
   void addExplicitConversionConstraint(Type fromType, Type toType,
                                        bool allowFixes,
                                        ConstraintLocatorBuilder locator);
+
+  void noteNewDisjunction(Constraint *constraint) {
+    assert(constraint->getKind() == ConstraintKind::Disjunction);
+    DisjunctionNumber[constraint] = CountDisjunctions++;
+  }
 
   /// \brief Add a disjunction constraint.
   void addDisjunctionConstraint(ArrayRef<Constraint *> constraints,

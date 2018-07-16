@@ -1894,19 +1894,23 @@ Constraint *ConstraintSystem::selectDisjunction() {
   if (disjunction)
     return disjunction;
 
-  // Pick the smallest disjunction.
-  // FIXME: This heuristic isn't great, but it helped somewhat for
-  // overload sets.
+  // Pick the disjunction with the lowest disjunction number in order
+  // to solve them in the order they were created (which should be
+  // stable within an expression).
   disjunction = disjunctions[0];
-  auto bestSize = disjunction->countActiveNestedConstraints();
-  if (bestSize > 2) {
+  auto found = DisjunctionNumber.find(disjunction);
+  assert(found != DisjunctionNumber.end());
+  auto lowestNumber = found->second;
+  if (lowestNumber > 0) {
     for (auto contender : llvm::makeArrayRef(disjunctions).slice(1)) {
-      unsigned newSize = contender->countActiveNestedConstraints();
-      if (newSize < bestSize) {
-        bestSize = newSize;
+      auto found = DisjunctionNumber.find(contender);
+      assert(found != DisjunctionNumber.end());
+      unsigned newNumber = found->second;
+      if (newNumber < lowestNumber) {
+        lowestNumber = newNumber;
         disjunction = contender;
 
-        if (bestSize == 2)
+        if (lowestNumber == 0)
           break;
       }
     }
@@ -1914,8 +1918,8 @@ Constraint *ConstraintSystem::selectDisjunction() {
 
   // If there are no active constraints in the disjunction, there is
   // no solution.
-  if (bestSize == 0)
-    return nullptr;
+  // if (bestSize == 0)
+  //   return nullptr;
 
   return disjunction;
 }
