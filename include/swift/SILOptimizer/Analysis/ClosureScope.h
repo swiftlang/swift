@@ -144,7 +144,7 @@ public:
   }
 
   /// Notify the analysis about a newly created function.
-  virtual void notifyAddFunction(SILFunction *F) override {
+  virtual void notifyAddedOrModifiedFunction(SILFunction *F) override {
     // Nothing to be done because the analysis does not cache anything
     // per call-site in functions.
   }

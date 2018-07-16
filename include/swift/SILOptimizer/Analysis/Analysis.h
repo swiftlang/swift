@@ -116,8 +116,8 @@ public:
   /// Invalidate all of the information for a specific function.
   virtual void invalidate(SILFunction *f, InvalidationKind k) = 0;
 
-  /// Notify the analysis about a newly created function.
-  virtual void notifyAddFunction(SILFunction *f) = 0;
+  /// Notify the analysis about a newly added or modified function.
+  virtual void notifyAddedOrModifiedFunction(SILFunction *f) = 0;
 
   /// Notify the analysis about a function which will be deleted from the
   /// module.
@@ -244,7 +244,7 @@ public:
   }
 
   /// Notify the analysis about a newly created function.
-  virtual void notifyAddFunction(SILFunction *f) override {}
+  virtual void notifyAddedOrModifiedFunction(SILFunction *f) override {}
 
   /// Notify the analysis about a function which will be deleted from the
   /// module.
