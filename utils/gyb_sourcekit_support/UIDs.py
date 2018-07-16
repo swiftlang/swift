@@ -52,7 +52,7 @@ UID_KEYS = [
     KEY('ForceLibSyntaxBasedProcessing', 'key.forcelibsyntaxbasedprocessing'),
     KEY('EnableSyntaxReuseRegions', 'key.enablesyntaxreuseregions'),
     KEY('EnableSyntaxMap', 'key.enablesyntaxmap'),
-    KEY('EnableSyntaxTree', 'key.enablesyntaxtree'),
+    KEY('SyntaxTreeTransferMode', 'key.syntaxtreetransfermode'),
     KEY('EnableStructure', 'key.enablesubstructure'),
     KEY('Description', 'key.description'),
     KEY('TypeName', 'key.typename'),
@@ -403,4 +403,7 @@ UID_KINDS = [
     KIND('Unknown', 'source.syntacticrename.unknown'),
     KIND('StatNumRequests', 'source.statistic.num-requests'),
     KIND('StatNumSemaRequests', 'source.statistic.num-semantic-requests'),
+    KIND('SyntaxTreeOff', 'source.syntaxtree.transfer.off'),
+    KIND('SyntaxTreeIncremental', 'source.syntaxtree.transfer.incremental'),
+    KIND('SyntaxTreeFull', 'source.syntaxtree.transfer.full'),
 ]

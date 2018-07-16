@@ -73,7 +73,7 @@ struct SKEditorConsumerOptions {
   bool EnableSyntaxMap = false;
   bool EnableStructure = false;
   bool EnableDiagnostics = false;
-  bool EnableSyntaxTree = false;
+  SyntaxTreeTransferMode SyntaxTransferMode = SyntaxTreeTransferMode::Off;
   bool SyntacticOnly = false;
   bool EnableSyntaxReuseInfo = false;
   // FIXME: This is just for bootstrapping incremental syntax tree parsing.
@@ -247,6 +247,21 @@ static void fillDictionaryForDiagnosticInfo(
     ResponseBuilder::Dictionary Elem, const DiagnosticEntryInfo &Info);
 
 static void enableCompileNotifications(bool value);
+
+static SyntaxTreeTransferMode syntaxTransferModeFromUID(sourcekitd_uid_t UID) {
+  if (UID == nullptr) {
+    // Default is no syntax tree
+    return SyntaxTreeTransferMode::Off;
+  } else if (UID == KindSyntaxTreeOff) {
+    return SyntaxTreeTransferMode::Off;
+  } else if (UID == KindSyntaxTreeIncremental) {
+    return SyntaxTreeTransferMode::Incremental;
+  } else if (UID == KindSyntaxTreeFull) {
+    return SyntaxTreeTransferMode::Full;
+  } else {
+    llvm_unreachable("Unexpected syntax tree transfer mode");
+  }
+}
 
 static void handleRequestImpl(sourcekitd_object_t Req,
                               ResponseReceiver Receiver);
@@ -435,8 +450,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     Req.getInt64(KeyEnableStructure, EnableStructure, /*isOptional=*/true);
     int64_t EnableDiagnostics = true;
     Req.getInt64(KeyEnableDiagnostics, EnableDiagnostics, /*isOptional=*/true);
-    int64_t EnableSyntaxTree = false;
-    Req.getInt64(KeyEnableSyntaxTree, EnableSyntaxTree, /*isOptional=*/true);
+    auto TransferModeUID = Req.getUID(KeySyntaxTreeTransferMode);
     int64_t SyntacticOnly = false;
     Req.getInt64(KeySyntacticOnly, SyntacticOnly, /*isOptional=*/true);
     int64_t ForceLibSyntaxBasedProcessing = false;
@@ -450,7 +464,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     Opts.EnableSyntaxMap = EnableSyntaxMap;
     Opts.EnableStructure = EnableStructure;
     Opts.EnableDiagnostics = EnableDiagnostics;
-    Opts.EnableSyntaxTree = EnableSyntaxTree;
+    Opts.SyntaxTransferMode = syntaxTransferModeFromUID(TransferModeUID);
     Opts.SyntacticOnly = SyntacticOnly;
     Opts.EnableSyntaxReuseInfo = EnableSyntaxReuseInfo;
     Opts.ForceLibSyntaxBasedProcessing = ForceLibSyntaxBasedProcessing;
@@ -484,8 +498,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     Req.getInt64(KeyEnableStructure, EnableStructure, /*isOptional=*/true);
     int64_t EnableDiagnostics = true;
     Req.getInt64(KeyEnableDiagnostics, EnableDiagnostics, /*isOptional=*/true);
-    int64_t EnableSyntaxTree = false;
-    Req.getInt64(KeyEnableSyntaxTree, EnableSyntaxTree, /*isOptional=*/true);
+    auto TransferModeUID = Req.getUID(KeySyntaxTreeTransferMode);
     int64_t SyntacticOnly = false;
     Req.getInt64(KeySyntacticOnly, SyntacticOnly, /*isOptional=*/true);
     int64_t ForceLibSyntaxBasedProcessing = false;
@@ -500,7 +513,8 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     Opts.EnableSyntaxMap = EnableSyntaxMap;
     Opts.EnableStructure = EnableStructure;
     Opts.EnableDiagnostics = EnableDiagnostics;
-    Opts.EnableSyntaxTree = EnableSyntaxTree;
+    Opts.SyntaxTransferMode = syntaxTransferModeFromUID(TransferModeUID);
+    Opts.EnableSyntaxReuseInfo = EnableSyntaxReuseInfo;
     Opts.SyntacticOnly = SyntacticOnly;
     Opts.EnableSyntaxReuseInfo = EnableSyntaxReuseInfo;
     Opts.ForceLibSyntaxBasedProcessing = ForceLibSyntaxBasedProcessing;
@@ -2080,11 +2094,14 @@ public:
 
   bool handleSourceText(StringRef Text) override;
   bool handleSerializedSyntaxTree(StringRef Text) override;
-  bool syntaxTreeEnabled() override { return Opts.EnableSyntaxTree; }
 
   bool syntaxReuseInfoEnabled() override { return Opts.EnableSyntaxReuseInfo; }
   bool handleSyntaxReuseRegions(
       std::vector<SourceFileRange> ReuseRegions) override;
+
+  SyntaxTreeTransferMode syntaxTreeTransferMode() override {
+    return Opts.SyntaxTransferMode;
+  }
 
   void finished() override {
     if (RespReceiver)
