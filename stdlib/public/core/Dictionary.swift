@@ -3110,9 +3110,7 @@ internal struct _CocoaDictionaryBuffer: _HashBuffer {
   @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
   internal func maybeGet(_ key: Key) -> Value? {
-
-  return cocoaDictionary.objectFor(key)
-
+    return cocoaDictionary.objectFor(key)
   }
 
   @inlinable // FIXME(sil-serialize-all)
@@ -3154,7 +3152,6 @@ internal struct _CocoaDictionaryBuffer: _HashBuffer {
   @inlinable // FIXME(sil-serialize-all)
   internal static func fromArray(_ elements: [SequenceElementWithoutLabels])
     -> _CocoaDictionaryBuffer {
-
     _sanityCheckFailure("this function should never be called")
   }
 
