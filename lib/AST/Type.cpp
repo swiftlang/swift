@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1995,15 +1995,6 @@ getForeignRepresentable(Type type, ForeignLanguage language,
                    : ForeignRepresentableKind::Trivial,
                    nullptr };
     };
-
-    // HACK: In Swift 3 mode, we accepted (Void) -> Void for () -> Void
-    if (dc->getASTContext().isSwiftVersion3()
-        && functionType->getParams().size() == 1
-        && functionType->getParams()[0].getLabel().empty()
-        && functionType->getParams()[0].getType()->isVoid()
-        && functionType->getResult()->isVoid()) {
-      return success(anyStaticBridged, anyBridged, isBlock);
-    }
 
     // Look at the result type.
     Type resultType = functionType->getResult();
