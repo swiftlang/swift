@@ -106,20 +106,18 @@ extension DoubleWidth : CustomDebugStringConvertible {
   }
 }
 
-extension DoubleWidth : Comparable {
+extension DoubleWidth : Equatable {
   public static func ==(lhs: DoubleWidth, rhs: DoubleWidth) -> Bool {
-    return lhs._storage.low == rhs._storage.low &&
-      lhs._storage.high == rhs._storage.high
+    return lhs._storage.low == rhs._storage.low
+        && lhs._storage.high == rhs._storage.high
   }
+}
 
+extension DoubleWidth : Comparable {
   public static func <(lhs: DoubleWidth, rhs: DoubleWidth) -> Bool {
-    if lhs._storage.high < rhs._storage.high {
-      return true
-    }
-    if lhs._storage.high > rhs._storage.high {
-      return false
-    }
-    return lhs._storage.low < rhs._storage.low
+    if lhs._storage.high < rhs._storage.high { return true }
+    else if lhs._storage.high > rhs._storage.high { return false }
+    else { return lhs._storage.low < rhs._storage.low }
   }
 }
 
