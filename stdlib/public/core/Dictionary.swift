@@ -2488,7 +2488,7 @@ extension _NativeDictionaryBuffer where Key: Hashable
   }
 
 #if _runtime(_ObjC)
-  @inlinable // FIXME(sil-serialize-all)
+  @usableFromInline
   internal func bridged() -> _NSDictionary {
     // We can zero-cost bridge if our keys are verbatim
     // or if we're the empty singleton.
@@ -2770,28 +2770,18 @@ final internal class _NativeDictionaryNSEnumerator<Key, Value>
 /// This is the fallback implementation for situations where toll-free bridging
 /// isn't possible. On first access, a NativeDictionaryBuffer of AnyObject will be
 /// constructed containing all the bridged elements.
-@_fixed_layout // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
   : _SwiftNativeNSDictionary, _NSDictionaryCore {
 
-  @usableFromInline
   internal typealias NativeBuffer = _NativeDictionaryBuffer<Key, Value>
-  @usableFromInline
   internal typealias BridgedBuffer = _NativeDictionaryBuffer<AnyObject, AnyObject>
-  @usableFromInline
-  internal typealias NativeIndex = _NativeDictionaryIndex<Key, Value>
-  @usableFromInline
-  internal typealias BridgedIndex = _NativeDictionaryIndex<AnyObject, AnyObject>
 
-  @inlinable // FIXME(sil-serialize-all)
   @nonobjc
   internal init(bucketCount: Int = 2) {
     nativeBuffer = NativeBuffer(bucketCount: bucketCount)
     super.init()
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   internal init(nativeBuffer: NativeBuffer) {
     self.nativeBuffer = nativeBuffer
     super.init()
@@ -2801,15 +2791,12 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
   // operations on it.
   //
   // Do not access this property directly.
-  @usableFromInline // FIXME(sil-serialize-all)
   @nonobjc
   internal var _heapStorageBridged_DoNotUse: AnyObject?
 
   /// The unbridged elements.
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var nativeBuffer: NativeBuffer
 
-  @inlinable // FIXME(sil-serialize-all)
   @objc(copyWithZone:)
   internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
     // Instances of this class should be visible outside of standard library as
@@ -2824,7 +2811,6 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
   // `nativeBuffer`.
   //
 
-  @inlinable // FIXME(sil-serialize-all)
   @objc
   internal required init(
     objects: UnsafePointer<AnyObject?>,
@@ -2834,7 +2820,6 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     _sanityCheckFailure("don't call this designated initializer")
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @objc(objectForKey:)
   internal func objectFor(_ aKey: AnyObject) -> AnyObject? {
     return bridgingObjectForKey(aKey)
@@ -2845,7 +2830,6 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     return enumerator()
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @objc(getObjects:andKeys:count:)
   internal func getObjects(
     _ objects: UnsafeMutablePointer<AnyObject>?,
@@ -2855,7 +2839,6 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     bridgedAllKeysAndValues(objects, keys, count)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @objc(enumerateKeysAndObjectsWithOptions:usingBlock:)
   internal func enumerateKeysAndObjects(options: Int,
     using block: @convention(block) (Unmanaged<AnyObject>, Unmanaged<AnyObject>,
@@ -2875,7 +2858,6 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
 
   /// Returns the pointer to the stored property, which contains bridged
   /// Dictionary elements.
-  @inlinable // FIXME(sil-serialize-all)
   @nonobjc
   internal var _heapStorageBridgedPtr: UnsafeMutablePointer<AnyObject?> {
     return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
@@ -2883,7 +2865,6 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
   }
 
   /// The buffer for bridged Dictionary elements, if present.
-  @inlinable // FIXME(sil-serialize-all)
   @nonobjc
   internal var _bridgedStorage: BridgedBuffer.RawStorage? {
     get {
@@ -2895,7 +2876,6 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
   }
 
   /// Attach a buffer for bridged Dictionary elements.
-  @inlinable // FIXME(sil-serialize-all)
   @nonobjc
   internal func _initializeHeapStorageBridged(_ newStorage: AnyObject) {
     _stdlib_atomicInitializeARCRef(
@@ -2903,12 +2883,10 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
   }
 
   /// Returns the bridged Dictionary values.
-  @inlinable // FIXME(sil-serialize-all)
   internal var bridgedBuffer: BridgedBuffer {
     return BridgedBuffer(_storage: _bridgedStorage!)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @nonobjc
   internal func bridgeEverything() {
     if _fastPath(_bridgedStorage != nil) {
@@ -2938,7 +2916,6 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     _initializeHeapStorageBridged(bridged._storage)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @nonobjc
   internal func bridgedAllKeysAndValues(
     _ objects: UnsafeMutablePointer<AnyObject>?,
@@ -2988,13 +2965,11 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @objc
   internal var count: Int {
     return nativeBuffer.count
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @nonobjc
   internal func bridgingObjectForKey(_ aKey: AnyObject)
     -> AnyObject? {
@@ -3016,7 +2991,6 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     return _NativeDictionaryNSEnumerator<AnyObject, AnyObject>(bridgedBuffer)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @objc(countByEnumeratingWithState:objects:count:)
   internal func countByEnumerating(
     with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
@@ -3065,8 +3039,6 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
   }
 }
 #else
-@_fixed_layout // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value> { }
 #endif
 
@@ -4802,7 +4774,6 @@ extension Dictionary {
 
   /// Returns the native Dictionary hidden inside this NSDictionary;
   /// returns nil otherwise.
-  @inlinable // FIXME(sil-serialize-all)
   public static func _bridgeFromObjectiveCAdoptingNativeStorageOf(
     _ s: AnyObject
   ) -> Dictionary<Key, Value>? {
