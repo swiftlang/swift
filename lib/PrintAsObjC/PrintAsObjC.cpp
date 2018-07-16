@@ -767,18 +767,18 @@ private:
                !FD->getAttrs().hasAttribute<DiscardableResultAttr>()) {
       os << " SWIFT_WARN_UNUSED_RESULT";
     }
-
+    
     printAvailability(FD);
     
     os << ';';
   }
-
+  
   enum class PrintLeadingSpace : bool {
     No = false,
     Yes = true
   };
-
-  /// Returns \c true if anything was printed.
+    
+    /// Returns \c true if anything was printed.
   bool printAvailability(
       const Decl *D,
       PrintLeadingSpace printLeadingSpace = PrintLeadingSpace::Yes) {
@@ -794,13 +794,20 @@ private:
         if (AvAttr->PlatformAgnostic == PlatformAgnosticAvailabilityKind::Unavailable) {
           // Availability for *
           if (!AvAttr->Rename.empty() && isa<ValueDecl>(D)) {
-            // NB: Don't bother getting obj-c names, we can't get one for the
             // rename
             maybePrintLeadingSpace();
             os << "SWIFT_UNAVAILABLE_MSG(\"'"
                << cast<ValueDecl>(D)->getBaseName()
                << "' has been renamed to '";
-            printEncodedString(AvAttr->Rename, false);
+            auto referencedDecl = findRenamedDecl(AvAttr, D);
+            if (referencedDecl.hasValue()) {
+              SmallString<128> scratch;
+              auto renamedObjCRuntimeName = referencedDecl.getValue()->
+              getObjCRuntimeName()->getString(scratch);
+              printEncodedString(renamedObjCRuntimeName, false);
+            } else {
+              printEncodedString(AvAttr->Rename, false);
+            }
             os << '\'';
             if (!AvAttr->Message.empty()) {
               os << ": ";
@@ -825,7 +832,15 @@ private:
             printEncodedString(AvAttr->Message);
             if (!AvAttr->Rename.empty()) {
               os << ", ";
-              printEncodedString(AvAttr->Rename);
+              auto referencedDecl = findRenamedDecl(AvAttr, D);
+              if (referencedDecl.hasValue()) {
+                SmallString<128> scratch;
+                auto renamedObjCRuntimeName = referencedDecl.getValue()->
+                  getObjCRuntimeName()->getString(scratch);
+                printEncodedString(renamedObjCRuntimeName);
+              } else {
+                printEncodedString(AvAttr->Rename);
+              }
             }
             os << ")";
           } else {
@@ -899,10 +914,17 @@ private:
         }
       }
       if (!AvAttr->Rename.empty() && isa<ValueDecl>(D)) {
-        // NB: Don't bother getting obj-c names, we can't get one for the rename
         os << ",message=\"'" << cast<ValueDecl>(D)->getBaseName()
            << "' has been renamed to '";
-        printEncodedString(AvAttr->Rename, false);
+        auto referencedDecl = findRenamedDecl(AvAttr, D);
+        if (referencedDecl.hasValue()) {
+          SmallString<128> scratch;
+          auto renamedObjCRuntimeName = referencedDecl.getValue()->
+          getObjCRuntimeName()->getString(scratch);
+          printEncodedString(renamedObjCRuntimeName, false);
+        } else {
+          printEncodedString(AvAttr->Rename, false);
+        }
         os << '\'';
         if (!AvAttr->Message.empty()) {
           os << ": ";
@@ -1880,6 +1902,41 @@ private:
     visitPart(RST->getReferentType(), optionalKind);
   }
   
+  Optional<ValueDecl *> findRenamedDecl(const swift::AvailableAttr *AvAttr, const swift::Decl *D) {
+    if (!isa<ValueDecl>(D) || isa<ClassDecl>(D))
+      return None;
+      
+    SmallVector<ValueDecl *, 4> lookupResults;
+    auto renamedParsedDeclName = swift::parseDeclName(AvAttr->Rename);
+    auto renamedDeclName = renamedParsedDeclName.formDeclName(D->getASTContext());
+    
+    auto declContext = D->getDeclContext();
+    declContext->lookupQualified(declContext->getSelfTypeInContext(),
+                                 renamedDeclName, NL_QualifiedDefault, NULL,
+                                 lookupResults);
+    Optional<ValueDecl *>renamedFuncDecl = None;
+    
+    for (auto candidate : lookupResults) {
+      if (!shouldInclude(candidate))
+        continue;
+      
+      if (candidate->getKind() != D->getKind())
+        continue;
+      
+      if (candidate->getKind() == DeclKind::Func && isa<FuncDecl>(candidate)
+          && cast<FuncDecl>(candidate)->getParameterLists().size() !=
+          cast<FuncDecl>(D)->getParameterLists().size())
+        continue;
+      
+      if (renamedFuncDecl)
+      /* TODO: Diagnose to compiler to tell the user that we found multiple candidates */;
+      
+      renamedFuncDecl = candidate;
+    }
+    
+    return renamedFuncDecl;
+  }
+    
   /// RAII class for printing multi-part C types, such as functions and arrays.
   class PrintMultiPartType {
     ObjCPrinter &Printer;

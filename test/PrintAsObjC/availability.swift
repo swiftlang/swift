@@ -45,11 +45,15 @@
 // CHECK-DAG: SWIFT_AVAILABILITY(ios_app_extension,unavailable)
 // CHECK-DAG: SWIFT_AVAILABILITY(tvos_app_extension,unavailable)
 // CHECK-DAG: SWIFT_AVAILABILITY(watchos_app_extension,unavailable)
+// CHECK-NEXT: + (void)creditCardFormViewControllerWithPublicKey:(NSInteger)publicKey;
+// CHECK-NEXT: + (void)makeCreditCardFormViewControllerWithPublicKey:(NSInteger)publicKey SWIFT_DEPRECATED_MSG("use something else", "creditCardFormViewControllerWithPublicKey:");
 // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: - (nonnull instancetype)initWithX:(NSInteger)_ OBJC_DESIGNATED_INITIALIZER SWIFT_AVAILABILITY(macos,introduced=10.10);
 // CHECK-NEXT: @property (nonatomic, readonly) NSInteger simpleProperty;
 // CHECK-NEXT: @property (nonatomic) NSInteger alwaysUnavailableProperty SWIFT_UNAVAILABLE_MSG("'alwaysUnavailableProperty' has been renamed to 'baz': whatever");
 // CHECK-NEXT: @property (nonatomic, readonly) NSInteger alwaysDeprecatedProperty SWIFT_DEPRECATED_MSG("use something else", "quux");
+// CHECK-NEXT: @property (nonatomic, readonly) NSInteger numberOfAlwaysDeprecatedObjCProperty SWIFT_DEPRECATED_MSG("use something else", "replaceForDeprecatedObjCProperty");
+// CHECK-NEXT: @property (nonatomic, readonly) NSInteger replaceForDeprecatedObjCProperty;
 // CHECK-NEXT: @property (nonatomic, readonly, strong) Availability * _Null_unspecified singlePlatCombinedPropertyClass SWIFT_AVAILABILITY(macos,introduced=10.7,deprecated=10.9,obsoleted=10.10);
 // CHECK-NEXT: @property (nonatomic, readonly) NSInteger platformUnavailableRenameWithMessageProperty SWIFT_AVAILABILITY(macos,unavailable,message="'platformUnavailableRenameWithMessageProperty' has been renamed to 'anotherPlea': still trapped");
 // CHECK-NEXT: @end
@@ -148,6 +152,15 @@
     @available(tvOSApplicationExtension, unavailable)
     @available(watchOSApplicationExtension, unavailable)
     @objc func extensionUnavailable() {}
+  
+  @objc(creditCardFormViewControllerWithPublicKey:)
+  public class func makeCreditCardFormViewController(withPublicKey publicKey: Int) {}
+  
+  @available(*, deprecated,
+  message: "use something else",
+  renamed: "makeCreditCardFormViewController(withPublicKey:)")
+  @objc(makeCreditCardFormViewControllerWithPublicKey:) public class func __makeCreditCardForm(withPublicKey publicKey: Int) {}
+
 
     @objc init() {}
     @available(macOS 10.10, *)
@@ -172,6 +185,19 @@
 		return -1
 	    }
     }
+  @available(*, deprecated, message: "use something else", renamed: "__replaceForDeprecatedObjCProperty")
+  @objc(numberOfAlwaysDeprecatedObjCProperty) var alwaysDeprecatedObjCProperty: Int {
+    get {
+      return -1
+    }
+  }
+
+  @objc(replaceForDeprecatedObjCProperty) var __replaceForDeprecatedObjCProperty: Int {
+    get {
+      return -1
+    }
+  }
+
     @available(macOS, introduced: 10.7, deprecated: 10.9, obsoleted: 10.10)
     @objc var singlePlatCombinedPropertyClass: Availability! {
 	get {
