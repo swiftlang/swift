@@ -15,13 +15,37 @@ as a verification of this public API to prevent its accidental breakage.
 [BD]: https://github.com/apple/swift/blob/master/benchmark/scripts/Benchmark_Driver
 [Testing]: https://github.com/apple/swift/blob/master/docs/Testing.md
 
-````
-RUN: %Benchmark_O --list | %FileCheck %s --check-prefix LISTTAGS
-LISTTAGS: AngryPhonebook,[
-LISTTAGS-NOT: TestsUtils.BenchmarkCategory.
-LISTTAGS-SAME: String,
-LISTTAGS-SAME: ]
+Note: Following tests use *Ackermann* as an example of a benchmark that is
+excluded from the default "pre-commit" list because it is marked `unstable` and
+the default skip-tags (`unstable,skip`) will exclude it. It's also
+alphabetically the first benchmark in the test suite (used to verify running by
+index). If these assumptions change, the test must be adapted.
 
+## List Format
+````
+RUN: %Benchmark_O --list | %FileCheck %s \
+RUN:                      --check-prefix LISTPRECOMMIT \
+RUN:                      --check-prefix LISTTAGS
+LISTPRECOMMIT: #,Test,[Tags]
+LISTPRECOMMIT-NOT: Ackermann
+LISTPRECOMMIT: {{[0-9]+}},AngryPhonebook
+LISTTAGS-SAME: ,[
+LISTTAGS-NOT: TestsUtils.BenchmarkCategory.
+LISTTAGS-SAME: String, api, validation
+LISTTAGS-SAME: ]
+````
+
+Verify Ackermann is listed when skip-tags are explicitly empty and that it is
+marked unstable:
+
+````
+RUN: %Benchmark_O --list --skip-tags= | %FileCheck %s --check-prefix LISTALL
+LISTALL: Ackermann
+LISTALL-SAME: unstable
+LISTALL: AngryPhonebook
+````
+
+````
 RUN: %Benchmark_O AngryPhonebook --num-iters=1 \
 RUN:             | %FileCheck %s --check-prefix NUMITERS1
 NUMITERS1: AngryPhonebook,1
@@ -55,13 +79,4 @@ ORSKIPTAGS: Ackermann
 ORSKIPTAGS-NOT: DictOfArraysToArrayOfDicts
 ORSKIPTAGS: Fibonacci
 ORSKIPTAGS-NOT: RomanNumbers
-
-RUN: %Benchmark_O --list | %FileCheck %s --check-prefix LISTPRECOMMIT
-LISTPRECOMMIT: #,Test,[Tags]
-LISTPRECOMMIT-NOT: Ackermann
-LISTPRECOMMIT: {{[0-9]+}},AngryPhonebook
-
-RUN: %Benchmark_O --list --skip-tags= | %FileCheck %s --check-prefix LISTALL
-LISTALL: Ackermann
-LISTALL: AngryPhonebook
 ````
