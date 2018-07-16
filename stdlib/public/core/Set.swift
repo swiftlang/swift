@@ -595,7 +595,7 @@ extension Set: SetAlgebra {
   public mutating func insert(
     _ newMember: Element
   ) -> (inserted: Bool, memberAfterInsert: Element) {
-    return _variantBuffer.insert(newMember, forKey: newMember)
+    return _variantBuffer.insert(newMember)
   }
 
   /// Inserts the given element into the set unconditionally.
@@ -621,7 +621,7 @@ extension Set: SetAlgebra {
   @inlinable // FIXME(sil-serialize-all)
   @discardableResult
   public mutating func update(with newMember: Element) -> Element? {
-    return _variantBuffer.updateValue(newMember, forKey: newMember)
+    return _variantBuffer.update(with: newMember)
   }
 
   /// Removes the specified element from the set.
@@ -641,7 +641,7 @@ extension Set: SetAlgebra {
   @inlinable // FIXME(sil-serialize-all)
   @discardableResult
   public mutating func remove(_ member: Element) -> Element? {
-    return _variantBuffer.removeValue(forKey: member)
+    return _variantBuffer.remove(member)
   }
 
   /// Removes the element at the given index of the set.
@@ -2923,8 +2923,8 @@ internal enum _VariantSetBuffer<Element: Hashable>: _SetBuffer {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  internal mutating func nativeUpdateValue(
-    _ value: Element, forKey key: Element
+  internal mutating func nativeUpdate(
+    with key: Element
   ) -> Element? {
     var (i, found) = asNative._find(key, startBucket: asNative._bucket(key))
 
@@ -2940,7 +2940,7 @@ internal enum _VariantSetBuffer<Element: Hashable>: _SetBuffer {
       i = asNative._find(key, startBucket: asNative._bucket(key)).pos
     }
 
-    let oldValue: Element? = found ? asNative.key(at: i.offset) : nil
+    let old: Element? = found ? asNative.key(at: i.offset) : nil
     if found {
       asNative.setKey(key, at: i.offset)
     } else {
@@ -2948,34 +2948,34 @@ internal enum _VariantSetBuffer<Element: Hashable>: _SetBuffer {
       asNative.count += 1
     }
 
-    return oldValue
+    return old
   }
 
   @inlinable // FIXME(sil-serialize-all)
   @discardableResult
-  internal mutating func updateValue(
-    _ value: Element,
-    forKey key: Element
-  ) -> Element? {
+  internal mutating func update(with value: Element) -> Element? {
     if _fastPath(guaranteedNative) {
-      return nativeUpdateValue(value, forKey: key)
+      return nativeUpdate(with: value)
     }
 
     switch self {
     case .native:
-      return nativeUpdateValue(value, forKey: key)
+      return nativeUpdate(with: value)
 #if _runtime(_ObjC)
     case .cocoa(let cocoaBuffer):
       migrateDataToNativeBuffer(cocoaBuffer)
-      return nativeUpdateValue(value, forKey: key)
+      return nativeUpdate(with: value)
 #endif
     }
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  internal mutating func nativeInsert(
-    _ value: Element, forKey key: Element
+  @discardableResult
+  internal mutating func insert(
+    _ key: Element
   ) -> (inserted: Bool, memberAfterInsert: Element) {
+    ensureNativeBuffer()
+
     var (i, found) = asNative._find(key, startBucket: asNative._bucket(key))
     if found {
       return (inserted: false, memberAfterInsert: asNative.key(at: i.offset))
@@ -2992,16 +2992,7 @@ internal enum _VariantSetBuffer<Element: Hashable>: _SetBuffer {
     asNative.initializeKey(key, at: i.offset)
     asNative.count += 1
 
-    return (inserted: true, memberAfterInsert: value)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @discardableResult
-  internal mutating func insert(
-    _ value: Element, forKey key: Element
-  ) -> (inserted: Bool, memberAfterInsert: Element) {
-    ensureNativeBuffer()
-    return nativeInsert(value, forKey: key)
+    return (inserted: true, memberAfterInsert: key)
   }
 
   /// - parameter idealBucket: The ideal bucket for the element being deleted.
@@ -3072,7 +3063,7 @@ internal enum _VariantSetBuffer<Element: Hashable>: _SetBuffer {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  internal mutating func nativeRemoveObject(forKey key: Element) -> Element? {
+  internal mutating func nativeRemove(_ key: Element) -> Element? {
     var idealBucket = asNative._bucket(key)
     var (index, found) = asNative._find(key, startBucket: idealBucket)
 
@@ -3150,9 +3141,8 @@ internal enum _VariantSetBuffer<Element: Hashable>: _SetBuffer {
       let anyObjectKey: AnyObject = index.allKeys[index.currentKeyIndex]
       migrateDataToNativeBuffer(cocoaBuffer)
       let key = _forceBridgeFromObjectiveC(anyObjectKey, Element.self)
-      let value = nativeRemoveObject(forKey: key)
-
-      _sanityCheck(key == value, "bridging did not preserve equality")
+      let old = nativeRemove(key)
+      _sanityCheck(key == old, "bridging did not preserve equality")
       return key
 #endif
     }
@@ -3160,22 +3150,22 @@ internal enum _VariantSetBuffer<Element: Hashable>: _SetBuffer {
 
   @inlinable // FIXME(sil-serialize-all)
   @discardableResult
-  internal mutating func removeValue(forKey key: Element) -> Element? {
+  internal mutating func remove(_ member: Element) -> Element? {
     if _fastPath(guaranteedNative) {
-      return nativeRemoveObject(forKey: key)
+      return nativeRemove(member)
     }
 
     switch self {
     case .native:
-      return nativeRemoveObject(forKey: key)
+      return nativeRemove(member)
 #if _runtime(_ObjC)
     case .cocoa(let cocoaBuffer):
-      let anyObjectKey: AnyObject = _bridgeAnythingToObjectiveC(key)
-      if cocoaBuffer.maybeGet(anyObjectKey) == nil {
+      let cocoaMember = _bridgeAnythingToObjectiveC(member)
+      if cocoaBuffer.maybeGet(cocoaMember) == nil {
         return nil
       }
       migrateDataToNativeBuffer(cocoaBuffer)
-      return nativeRemoveObject(forKey: key)
+      return nativeRemove(member)
 #endif
     }
   }
