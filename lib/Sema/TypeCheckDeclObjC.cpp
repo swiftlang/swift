@@ -1068,10 +1068,13 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
     return ObjCReason(ObjCReason::ExplicitlyObjC);
   // Getter or setter for an @objc property or subscript.
   if (auto accessor = dyn_cast<AccessorDecl>(VD)) {
-    if ((accessor->getAccessorKind() == AccessorKind::Get ||
-         accessor->getAccessorKind() == AccessorKind::Set) &&
-        accessor->getStorage()->isObjC())
-      return ObjCReason(ObjCReason::Accessor);
+    if (accessor->getAccessorKind() == AccessorKind::Get ||
+        accessor->getAccessorKind() == AccessorKind::Set) {
+      if (accessor->getStorage()->isObjC())
+        return ObjCReason(ObjCReason::Accessor);
+
+      return None;
+    }
   }
   // @IBOutlet, @IBAction, @NSManaged, and @GKInspectable imply @objc.
   //
