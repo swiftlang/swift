@@ -4100,7 +4100,7 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
         start: asNative.startIndex, end: asNative.endIndex, buffer: buffer)
 #if _runtime(_ObjC)
     case .cocoa(let cocoaBuffer):
-      return ._cocoa(_CocoaDictionaryIterator(cocoaBuffer.cocoaDictionary))
+      return ._cocoa(cocoaBuffer)
 #endif
     }
   }
@@ -4431,10 +4431,8 @@ extension Dictionary.Index {
 }
 
 #if _runtime(_ObjC)
-@_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
 final internal class _CocoaDictionaryIterator: IteratorProtocol {
-  @usableFromInline
   internal typealias Element = (AnyObject, AnyObject)
 
   // Cocoa Dictionary iterator has to be a class, otherwise we cannot
@@ -4443,26 +4441,21 @@ final internal class _CocoaDictionaryIterator: IteratorProtocol {
 
   // This stored property should be stored at offset zero.  There's code below
   // relying on this.
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _fastEnumerationState: _SwiftNSFastEnumerationState =
     _makeSwiftNSFastEnumerationState()
 
   // This stored property should be stored right after `_fastEnumerationState`.
   // There's code below relying on this.
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _fastEnumerationStackBuf = _CocoaFastEnumerationStackBuf()
 
-  @usableFromInline // FIXME(sil-serialize-all)
   internal let cocoaDictionary: _NSDictionary
 
-  @inlinable // FIXME(sil-serialize-all)
   internal var _fastEnumerationStatePtr:
     UnsafeMutablePointer<_SwiftNSFastEnumerationState> {
     return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
       to: _SwiftNSFastEnumerationState.self)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   internal var _fastEnumerationStackBufPtr:
     UnsafeMutablePointer<_CocoaFastEnumerationStackBuf> {
     return UnsafeMutableRawPointer(_fastEnumerationStatePtr + 1)
@@ -4473,17 +4466,14 @@ final internal class _CocoaDictionaryIterator: IteratorProtocol {
   // Int8 just because our storage holds 16 elements: fast enumeration is
   // allowed to return inner pointers to the container, which can be much
   // larger.
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var itemIndex: Int = 0
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var itemCount: Int = 0
 
-  @inlinable // FIXME(sil-serialize-all)
   internal init(_ cocoaDictionary: _NSDictionary) {
     self.cocoaDictionary = cocoaDictionary
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @usableFromInline
   internal func next() -> Element? {
     if itemIndex < 0 {
       return nil
@@ -4575,10 +4565,11 @@ public struct DictionaryIterator<Key: Hashable, Value>: IteratorProtocol {
       _state: ._native(start: start, end: end, buffer: buffer))
   }
 #if _runtime(_ObjC)
-  @inlinable // FIXME(sil-serialize-all)
+  @usableFromInline
   internal static func _cocoa(
-    _ iterator: _CocoaDictionaryIterator
+    _ buffer: _CocoaDictionaryBuffer
   ) -> DictionaryIterator{
+    let iterator = _CocoaDictionaryIterator(cocoaBuffer.cocoaDictionary)
     return DictionaryIterator(_state: ._cocoa(iterator))
   }
 #endif
