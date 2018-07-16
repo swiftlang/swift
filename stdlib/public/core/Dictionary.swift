@@ -2766,23 +2766,14 @@ final internal class _NativeDictionaryNSEnumerator<Key, Value>
 
 #if _runtime(_ObjC)
 /// This class exists for Objective-C bridging. It holds a reference to a
-/// NativeDictionaryBuffer, and can be upcast to NSSelf when bridging is necessary.
-/// This is the fallback implementation for situations where toll-free bridging
-/// isn't possible. On first access, a NativeDictionaryBuffer of AnyObject will be
-/// constructed containing all the bridged elements.
+/// NativeDictionaryBuffer, and can be upcast to NSSelf when bridging is
+/// necessary.  This is the fallback implementation for situations where
+/// toll-free bridging isn't possible. On first access, a NativeDictionaryBuffer
+/// of AnyObject will be constructed containing all the bridged elements.
 final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
   : _SwiftNativeNSDictionary, _NSDictionaryCore {
 
-  internal typealias NativeBuffer = _NativeDictionaryBuffer<Key, Value>
-  internal typealias BridgedBuffer = _NativeDictionaryBuffer<AnyObject, AnyObject>
-
-  @nonobjc
-  internal init(bucketCount: Int = 2) {
-    nativeBuffer = NativeBuffer(bucketCount: bucketCount)
-    super.init()
-  }
-
-  internal init(nativeBuffer: NativeBuffer) {
+  internal init(nativeBuffer: _NativeDictionaryBuffer<Key, Value>) {
     self.nativeBuffer = nativeBuffer
     super.init()
   }
@@ -2795,7 +2786,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
   internal var _heapStorageBridged_DoNotUse: AnyObject?
 
   /// The unbridged elements.
-  internal var nativeBuffer: NativeBuffer
+  internal var nativeBuffer: _NativeDictionaryBuffer<Key, Value>
 
   @objc(copyWithZone:)
   internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
@@ -2835,92 +2826,6 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     _ objects: UnsafeMutablePointer<AnyObject>?,
     andKeys keys: UnsafeMutablePointer<AnyObject>?,
     count: Int
-  ) {
-    bridgedAllKeysAndValues(objects, keys, count)
-  }
-
-  @objc(enumerateKeysAndObjectsWithOptions:usingBlock:)
-  internal func enumerateKeysAndObjects(options: Int,
-    using block: @convention(block) (Unmanaged<AnyObject>, Unmanaged<AnyObject>,
-     UnsafeMutablePointer<UInt8>) -> Void) {
-    bridgeEverything()
-    let bucketCount = nativeBuffer.bucketCount
-    var stop: UInt8 = 0
-    for position in 0..<bucketCount {
-      if bridgedBuffer.isInitializedEntry(at: position) {
-        block(Unmanaged.passUnretained(bridgedBuffer.key(at: position)),
-          Unmanaged.passUnretained(bridgedBuffer.value(at: position)),
-          &stop)
-      }
-      if stop != 0 { return }
-    }
-  }
-
-  /// Returns the pointer to the stored property, which contains bridged
-  /// Dictionary elements.
-  @nonobjc
-  internal var _heapStorageBridgedPtr: UnsafeMutablePointer<AnyObject?> {
-    return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
-      to: Optional<AnyObject>.self)
-  }
-
-  /// The buffer for bridged Dictionary elements, if present.
-  @nonobjc
-  internal var _bridgedStorage: BridgedBuffer.RawStorage? {
-    get {
-      if let ref = _stdlib_atomicLoadARCRef(object: _heapStorageBridgedPtr) {
-        return unsafeDowncast(ref, to: BridgedBuffer.RawStorage.self)
-      }
-      return nil
-    }
-  }
-
-  /// Attach a buffer for bridged Dictionary elements.
-  @nonobjc
-  internal func _initializeHeapStorageBridged(_ newStorage: AnyObject) {
-    _stdlib_atomicInitializeARCRef(
-      object: _heapStorageBridgedPtr, desired: newStorage)
-  }
-
-  /// Returns the bridged Dictionary values.
-  internal var bridgedBuffer: BridgedBuffer {
-    return BridgedBuffer(_storage: _bridgedStorage!)
-  }
-
-  @nonobjc
-  internal func bridgeEverything() {
-    if _fastPath(_bridgedStorage != nil) {
-      return
-    }
-
-    // FIXME: rdar://problem/19486139 (split bridged buffers for keys and values)
-    // We bridge keys and values unconditionally here, even if one of them
-    // actually is verbatim bridgeable (e.g. Dictionary<Int, AnyObject>).
-    // Investigate only allocating the buffer for a Set in this case.
-
-    // Create buffer for bridged data.
-    let bridged = BridgedBuffer(
-      _exactBucketCount: nativeBuffer.bucketCount,
-      unhashable: ())
-
-    // Bridge everything.
-    for i in 0..<nativeBuffer.bucketCount {
-      if nativeBuffer.isInitializedEntry(at: i) {
-        let key = _bridgeAnythingToObjectiveC(nativeBuffer.key(at: i))
-        let val = _bridgeAnythingToObjectiveC(nativeBuffer.value(at: i))
-        bridged.initializeKey(key, value: val, at: i)
-      }
-    }
-
-    // Atomically put the bridged elements in place.
-    _initializeHeapStorageBridged(bridged._storage)
-  }
-
-  @nonobjc
-  internal func bridgedAllKeysAndValues(
-    _ objects: UnsafeMutablePointer<AnyObject>?,
-    _ keys: UnsafeMutablePointer<AnyObject>?,
-    _ count: Int
   ) {
     _precondition(count >= 0, "Invalid count")
     guard count > 0 else { return }
@@ -2963,6 +2868,83 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
         // do nothing, both are null
       }
     }
+  }
+
+  @objc(enumerateKeysAndObjectsWithOptions:usingBlock:)
+  internal func enumerateKeysAndObjects(options: Int,
+    using block: @convention(block) (Unmanaged<AnyObject>, Unmanaged<AnyObject>,
+     UnsafeMutablePointer<UInt8>) -> Void) {
+    bridgeEverything()
+    let bucketCount = nativeBuffer.bucketCount
+    var stop: UInt8 = 0
+    for position in 0..<bucketCount {
+      if bridgedBuffer.isInitializedEntry(at: position) {
+        block(Unmanaged.passUnretained(bridgedBuffer.key(at: position)),
+          Unmanaged.passUnretained(bridgedBuffer.value(at: position)),
+          &stop)
+      }
+      if stop != 0 { return }
+    }
+  }
+
+  /// Returns the pointer to the stored property, which contains bridged
+  /// Dictionary elements.
+  @nonobjc
+  internal var _heapStorageBridgedPtr: UnsafeMutablePointer<AnyObject?> {
+    return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
+      to: Optional<AnyObject>.self)
+  }
+
+  /// The buffer for bridged Dictionary elements, if present.
+  @nonobjc
+  internal var _bridgedStorage: _RawNativeDictionaryStorage? {
+    get {
+      if let ref = _stdlib_atomicLoadARCRef(object: _heapStorageBridgedPtr) {
+        return unsafeDowncast(ref, to: _RawNativeDictionaryStorage.self)
+      }
+      return nil
+    }
+  }
+
+  /// Attach a buffer for bridged Dictionary elements.
+  @nonobjc
+  internal func _initializeHeapStorageBridged(_ newStorage: AnyObject) {
+    _stdlib_atomicInitializeARCRef(
+      object: _heapStorageBridgedPtr, desired: newStorage)
+  }
+
+  /// Returns the bridged Dictionary values.
+  internal var bridgedBuffer: _NativeDictionaryBuffer<AnyObject, AnyObject> {
+    return _NativeDictionaryBuffer(_storage: _bridgedStorage!)
+  }
+
+  @nonobjc
+  internal func bridgeEverything() {
+    if _fastPath(_bridgedStorage != nil) {
+      return
+    }
+
+    // FIXME: rdar://problem/19486139 (split bridged buffers for keys and values)
+    // We bridge keys and values unconditionally here, even if one of them
+    // actually is verbatim bridgeable (e.g. Dictionary<Int, AnyObject>).
+    // Investigate only allocating the buffer for a Set in this case.
+
+    // Create buffer for bridged data.
+    let bridged = _NativeDictionaryBuffer<AnyObject, AnyObject>(
+      _exactBucketCount: nativeBuffer.bucketCount,
+      unhashable: ())
+
+    // Bridge everything.
+    for i in 0..<nativeBuffer.bucketCount {
+      if nativeBuffer.isInitializedEntry(at: i) {
+        let key = _bridgeAnythingToObjectiveC(nativeBuffer.key(at: i))
+        let val = _bridgeAnythingToObjectiveC(nativeBuffer.value(at: i))
+        bridged.initializeKey(key, value: val, at: i)
+      }
+    }
+
+    // Atomically put the bridged elements in place.
+    _initializeHeapStorageBridged(bridged._storage)
   }
 
   @objc

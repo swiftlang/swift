@@ -2348,19 +2348,7 @@ final internal class _NativeSetNSEnumerator<Element>
 final internal class _SwiftDeferredNSSet<Element: Hashable>
   : _SwiftNativeNSSet, _NSSetCore {
 
-  internal typealias NativeBuffer = _NativeSetBuffer<Element>
-  internal typealias BridgedBuffer = _NativeSetBuffer<AnyObject>
-
-  internal typealias Key = Element
-  internal typealias Value = Element
-
-  @nonobjc
-  internal init(bucketCount: Int = 2) {
-    nativeBuffer = NativeBuffer(bucketCount: bucketCount)
-    super.init()
-  }
-
-  internal init(nativeBuffer: NativeBuffer) {
+  internal init(nativeBuffer: _NativeSetBuffer<Element>) {
     self.nativeBuffer = nativeBuffer
     super.init()
   }
@@ -2373,7 +2361,7 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
   internal var _heapStorageBridged_DoNotUse: AnyObject?
 
   /// The unbridged elements.
-  internal var nativeBuffer: NativeBuffer
+  internal var nativeBuffer: _NativeSetBuffer<Element>
 
   @objc(copyWithZone:)
   internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
@@ -2396,7 +2384,17 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
 
   @objc
   internal func member(_ object: AnyObject) -> AnyObject? {
-    return bridgingObjectForKey(object)
+    guard let element =
+      _conditionallyBridgeFromObjectiveC(object, Element.self)
+    else { return nil }
+
+    let (i, found) = nativeBuffer._find(
+      element, startBucket: nativeBuffer._bucket(element))
+    if found {
+      bridgeEverything()
+      return bridgedBuffer.value(at: i.offset)
+    }
+    return nil
   }
 
   @objc
@@ -2414,11 +2412,10 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
 
   /// The buffer for bridged Set elements, if present.
   @nonobjc
-  internal var _bridgedStorage:
-    BridgedBuffer.RawStorage? {
+  internal var _bridgedStorage: _RawNativeSetStorage? {
     get {
       if let ref = _stdlib_atomicLoadARCRef(object: _heapStorageBridgedPtr) {
-        return unsafeDowncast(ref, to: BridgedBuffer.RawStorage.self)
+        return unsafeDowncast(ref, to: _RawNativeSetStorage.self)
       }
       return nil
     }
@@ -2432,8 +2429,8 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
   }
 
   /// Returns the bridged Set values.
-  internal var bridgedBuffer: BridgedBuffer {
-    return BridgedBuffer(_storage: _bridgedStorage!)
+  internal var bridgedBuffer: _NativeSetBuffer<AnyObject> {
+    return _NativeSetBuffer(_storage: _bridgedStorage!)
   }
 
   @nonobjc
@@ -2448,7 +2445,7 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
     // Investigate only allocating the buffer for a Set in this case.
 
     // Create buffer for bridged data.
-    let bridged = BridgedBuffer(
+    let bridged = _NativeSetBuffer<AnyObject>(
       _exactBucketCount: nativeBuffer.bucketCount,
       unhashable: ())
 
@@ -2467,21 +2464,6 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
   @objc
   internal var count: Int {
     return nativeBuffer.count
-  }
-
-  @nonobjc
-  internal func bridgingObjectForKey(_ aKey: AnyObject)
-    -> AnyObject? {
-    guard let nativeKey = _conditionallyBridgeFromObjectiveC(aKey, Key.self)
-    else { return nil }
-
-    let (i, found) = nativeBuffer._find(
-      nativeKey, startBucket: nativeBuffer._bucket(nativeKey))
-    if found {
-      bridgeEverything()
-      return bridgedBuffer.value(at: i.offset)
-    }
-    return nil
   }
 
   @objc
