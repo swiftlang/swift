@@ -199,7 +199,7 @@ public:
   virtual void invalidate() override;
   virtual void invalidate(SILFunction *F, InvalidationKind K) override;
   virtual void notifyAddedOrModifiedFunction(SILFunction *F) override {}
-  virtual void notifyDeleteFunction(SILFunction *F) override {
+  virtual void notifyWillDeleteFunction(SILFunction *F) override {
     invalidate(F, InvalidationKind::Nothing);
   }
   virtual void invalidateFunctionTables() override {}

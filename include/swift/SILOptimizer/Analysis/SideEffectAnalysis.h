@@ -127,7 +127,7 @@ public:
 
   /// Notify the analysis about a function which will be deleted from the
   /// module.
-  virtual void notifyDeleteFunction(SILFunction *F) override {
+  virtual void notifyWillDeleteFunction(SILFunction *F) override {
     invalidate(F, InvalidationKind::Nothing);
   }
 
