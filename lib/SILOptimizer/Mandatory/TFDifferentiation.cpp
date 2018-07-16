@@ -595,7 +595,7 @@ struct FunctionSynthesisItem {
   SILReverseAutoDiffIndices indices;
 
   /// The parent differentiation task. This will be used for diagnostics.
-  DifferentiationTask *differentiationTask;
+  DifferentiationTask *task;
 };
 
 /// The kind of SIL value in the primal function.
@@ -2004,7 +2004,7 @@ private:
   }
 
   DifferentiationTask *getDifferentiationTask() const {
-    return synthesis.differentiationTask;
+    return synthesis.task;
   }
 
   SILFunction *getOriginal() const { return synthesis.original; }
@@ -2220,7 +2220,7 @@ public:
     // FIXME: If there are multiple active results, we don't support it yet.
     // To support this, we need to emit a primal call for each active result.
     if (activeResultIndices.size() > 1) {
-      context.emitNondifferentiabilityError(ai, synthesis.differentiationTask);
+      context.emitNondifferentiabilityError(ai, synthesis.task);
       return;
     }
     // Form expected indices by assuming there's only one result.
@@ -2231,14 +2231,14 @@ public:
     // If callee does not trace back to a `function_ref`, it is an opaque
     // function. Emit a "not differentiable" diagnostic here.
     if (!calleeOriginalFRI) {
-      context.emitNondifferentiabilityError(ai, synthesis.differentiationTask);
+      context.emitNondifferentiabilityError(ai, synthesis.task);
       return;
     }
     auto *calleeOriginalFn = calleeOriginalFRI->getReferencedFunction();
     // Find or register a differentiation task for this function.
     auto *newTask = context.lookUpOrRegisterDifferentiationTask(
       calleeOriginalFn, indices,
-      /*invoker*/ {ai, synthesis.differentiationTask});
+      /*invoker*/ {ai, synthesis.task});
     // Associate the new differenetiation task with this `apply` instruction, so
     // that adjoint synthesis can pick it up.
     getDifferentiationTask()->getAssociatedTasks().insert({ai, newTask});
@@ -2365,7 +2365,7 @@ void PrimalGen::performSynthesis(FunctionSynthesisItem item) {
   // FIXME: If the original function has multiple basic blocks, bail out since
   // AD does not support control flow yet.
   // Compute necessary analyses on the original function.
-  diagnoseUnsupportedControlFlow(context, item.differentiationTask);
+  diagnoseUnsupportedControlFlow(context, item.task);
   // Synthesize the function.
   auto &passManager = context.getPassManager();
   auto *activityAnalysis =
@@ -2380,7 +2380,7 @@ void PrimalGen::performSynthesis(FunctionSynthesisItem item) {
   // Canonicalize the orignal function's control flow.
   ControlFlowCanonicalization(*item.original, domInfo, loopInfo).run();
   // For debugging, dump the original function's activity analysis.
-  DEBUG(dumpActivityInfo(*item.original, item.differentiationTask->getIndices(),
+  DEBUG(dumpActivityInfo(*item.original, item.task->getIndices(),
                          activityInfo, getDebugStream()));
   // Synthesize primal.
   PrimalGenCloner cloner(item, activityInfo, domInfo, pdomInfo,
@@ -2461,6 +2461,7 @@ void PrimalGen::run() {
     auto synthesis = worklist.back();
     worklist.pop_back();
     performSynthesis(synthesis);
+    synthesis.task->getPrimalInfo()->computePrimalValueStructType();
     DEBUG(synthesis.target->verify());
   }
 }
@@ -2796,7 +2797,7 @@ private:
   SILBuilder &getBuilder() { return builder; }
 
   DifferentiationTask *getDifferentiationTask() const {
-    return synthesis.differentiationTask;
+    return synthesis.task;
   }
 
 public:
