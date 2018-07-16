@@ -222,8 +222,8 @@ extension DoubleWidth: _ExpressibleByBuiltinIntegerLiteral {
 #endif
 
 
-extension DoubleWidth : FixedWidthInteger {
-    public struct Words : Collection {
+extension DoubleWidth {
+  public struct Words : Collection {
     public enum _IndexValue {
       case low(Low.Words.Index)
       case high(High.Words.Index)
@@ -308,7 +308,9 @@ extension DoubleWidth : FixedWidthInteger {
       }
     }
   }
+}
 
+extension DoubleWidth : FixedWidthInteger {
   public var words: Words {
     return Words(self)
   }
