@@ -1647,19 +1647,32 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     auto baseAccessor = baseASD->getAccessor(kind);
     if (!baseAccessor) return { };
 
-    // For setter accessors, we need the base's setter to be
-    // accessible from the overriding context, or it's not an override.
-    if ((kind == AccessorKind::Set ||
-         kind == AccessorKind::MaterializeForSet) &&
-        !baseASD->isSetterAccessibleFrom(overridingASD->getDeclContext()))
-      return { };
+    switch (kind) {
+      case AccessorKind::Get:
+        break;
 
-    // A materializeForSet for an override of storage with a
-    // forced static dispatch materializeForSet is not itself an
-    // override.
-    if (kind == AccessorKind::MaterializeForSet &&
-        baseAccessor->hasForcedStaticDispatch())
-      return { };
+      case AccessorKind::MaterializeForSet:
+        // A materializeForSet for an override of storage with a
+        // forced static dispatch materializeForSet is not itself an
+        // override.
+        if (baseAccessor->hasForcedStaticDispatch())
+          return { };
+
+        LLVM_FALLTHROUGH;
+
+      case AccessorKind::Set:
+        // For setter accessors, we need the base's setter to be
+        // accessible from the overriding context, or it's not an override.
+        if (!baseASD->isSetterAccessibleFrom(overridingASD->getDeclContext()))
+          return { };
+        break;
+
+      case AccessorKind::Address:
+      case AccessorKind::DidSet:
+      case AccessorKind::MutableAddress:
+      case AccessorKind::WillSet:
+        return { };
+    }
 
     // We are overriding the base accessor.
     return SmallVector<ValueDecl *, 1>{baseAccessor};
