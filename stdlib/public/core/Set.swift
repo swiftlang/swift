@@ -1515,25 +1515,6 @@ internal protocol _SetBuffer { // FIXME: Remove or refactor for Set.
   func maybeGet(_ key: Element) -> Element?
 }
 
-internal protocol _MutableSetBuffer: _SetBuffer {
-  @discardableResult
-  mutating func updateValue(_ value: Element, forKey key: Element) -> Element?
-
-  @discardableResult
-  mutating func insert(
-    _ value: Element, forKey key: Element
-  ) -> (inserted: Bool, memberAfterInsert: Element)
-
-  @discardableResult
-  mutating func remove(at index: Index) -> Element
-
-  @discardableResult
-  mutating func removeValue(forKey key: Element) -> Element?
-
-  mutating func removeAll(keepingCapacity keepCapacity: Bool)
-}
-
-
 /// An instance of this class has all `Set` data tail-allocated.
 /// Enough bytes are allocated to hold the bitmap for marking valid entries,
 /// keys, and values. The data layout starts with the bitmap, followed by the
@@ -2593,7 +2574,7 @@ internal struct _CocoaSetBuffer: _SetBuffer {
 
 @usableFromInline
 @_frozen
-internal enum _VariantSetBuffer<Element: Hashable>: _MutableSetBuffer {
+internal enum _VariantSetBuffer<Element: Hashable>: _SetBuffer {
 
   @usableFromInline
   internal typealias NativeBuffer = _NativeSetBuffer<Element>

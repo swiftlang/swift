@@ -1869,24 +1869,6 @@ internal protocol _DictionaryBuffer {
   func maybeGet(_ key: Key) -> Value?
 }
 
-internal protocol _MutableDictionaryBuffer: _DictionaryBuffer {
-  @discardableResult
-  mutating func updateValue(_ value: Value, forKey key: Key) -> Value?
-
-  @discardableResult
-  mutating func insert(
-    _ value: Value, forKey key: Key
-  ) -> (inserted: Bool, memberAfterInsert: Value)
-
-  @discardableResult
-  mutating func remove(at index: Index) -> SequenceElement
-
-  @discardableResult
-  mutating func removeValue(forKey key: Key) -> Value?
-
-  mutating func removeAll(keepingCapacity keepCapacity: Bool)
-}
-
 /// An instance of this class has all `Dictionary` data tail-allocated.
 /// Enough bytes are allocated to hold the bitmap for marking valid entries,
 /// keys, and values. The data layout starts with the bitmap, followed by the
@@ -3132,7 +3114,7 @@ internal struct _CocoaDictionaryBuffer: _DictionaryBuffer {
 @usableFromInline
 @_frozen
 internal enum _VariantDictionaryBuffer<Key: Hashable, Value>
-  : _MutableDictionaryBuffer {
+  : _DictionaryBuffer {
 
   @usableFromInline
   internal typealias NativeBuffer = _NativeDictionaryBuffer<Key, Value>
