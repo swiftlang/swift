@@ -263,12 +263,16 @@ func stringArguments(_ s: String) {
 func optionality(_ op: UnsafeMutablePointer<Float>?) {
   takesMutableVoidPointer(op)
 % if not suffix:
-  // expected-error@-2 {{value of optional type 'UnsafeMutablePointer<Float>?' not unwrapped}}
+  // expected-error@-2 {{value of optional type 'UnsafeMutablePointer<Float>?' must be unwrapped}}
+  // expected-note@-3{{coalesce}}
+  // expected-note@-4{{force-unwrap}}
 % end
 
   takesConstVoidPointer(op)
 % if not suffix:
-  // expected-error@-2 {{value of optional type 'UnsafeMutablePointer<Float>?' not unwrapped}}
+  // expected-error@-2 {{value of optional type 'UnsafeMutablePointer<Float>?' must be unwrapped}}
+  // expected-note@-3{{coalesce}}
+  // expected-note@-4{{force-unwrap}}
 % end
 }
 

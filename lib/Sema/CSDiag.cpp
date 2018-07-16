@@ -2255,15 +2255,6 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
       allowFreeTypeVariables)
     TCEOptions |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
   
-  // If we're not passing down contextual type information this time, but the
-  // original failure had type info that wasn't an optional type,
-  // then set the flag to prefer fixits with force unwrapping.
-  if (!convertType) {
-    auto previousType = CS.getContextualType();
-    if (previousType && previousType->getOptionalObjectType().isNull())
-      TCEOptions |= TypeCheckExprFlags::PreferForceUnwrapToOptional;
-  }
-
   auto resultTy = CS.TC.typeCheckExpression(
       subExpr, CS.DC, TypeLoc::withoutLoc(convertType), convertTypePurpose,
       TCEOptions, listener, &CS);
@@ -7745,15 +7736,9 @@ bool FailureDiagnosis::diagnoseMemberFailures(
       }
 
       if (!optionalResult.ViableCandidates.empty()) {
-        // By default we assume that the LHS type is not optional.
-        StringRef fixIt = "!";
-        auto contextualType = CS.getContextualType();
-        if (contextualType && isa<OptionalType>(contextualType.getPointer()))
-          fixIt = "?";
-
-        diagnose(BaseLoc, diag::missing_unwrap_optional, baseObjTy)
-            .fixItInsertAfter(baseExpr->getEndLoc(), fixIt);
-        return true;
+        if (diagnoseBaseUnwrapForMemberAccess(baseExpr, baseObjTy, memberName,
+                                              memberRange))
+          return true;
       }
     }
 
@@ -8658,5 +8643,78 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
   // If all else fails, diagnose the failure by looking through the system's
   // constraints.
   diagnoseFailureForExpr(expr);
+  return true;
+}
+
+bool swift::diagnoseUnwrap(TypeChecker &TC, DeclContext *DC,
+                           Expr *expr, Type type) {
+  Type unwrappedType = type->getOptionalObjectType();
+  if (!unwrappedType)
+    return false;
+
+  TC.diagnose(expr->getLoc(), diag::optional_not_unwrapped, type,
+              unwrappedType);
+
+  // Suggest a default value via ?? <default value>
+  {
+    auto diag =
+      TC.diagnose(expr->getLoc(), diag::unwrap_with_default_value);
+
+    // Figure out what we need to parenthesize.
+    bool needsParensInside =
+      exprNeedsParensBeforeAddingNilCoalescing(TC, DC, expr);
+    bool needsParensOutside =
+      exprNeedsParensAfterAddingNilCoalescing(TC, DC, expr, expr);
+
+    llvm::SmallString<2> insertBefore;
+    llvm::SmallString<32> insertAfter;
+    if (needsParensOutside) {
+      insertBefore += "(";
+    }
+    if (needsParensInside) {
+      insertBefore += "(";
+      insertAfter += ")";
+    }
+    insertAfter += " ?? <" "#default value#" ">";
+    if (needsParensOutside)
+      insertAfter += ")";
+
+    if (!insertBefore.empty()) {
+      diag.fixItInsert(expr->getStartLoc(), insertBefore);
+    }
+    diag.fixItInsertAfter(expr->getEndLoc(), insertAfter);
+  }
+
+  // Suggest a force-unwrap.
+  {
+    auto diag =
+      TC.diagnose(expr->getLoc(), diag::unwrap_with_force_value);
+    if (expr->canAppendPostfixExpression(true)) {
+      diag.fixItInsertAfter(expr->getEndLoc(), "!");
+    } else {
+      diag.fixItInsert(expr->getStartLoc(), "(")
+          .fixItInsertAfter(expr->getEndLoc(), ")!");
+    }
+  }
+
+  return true;
+}
+
+bool swift::diagnoseBaseUnwrapForMemberAccess(Expr *baseExpr, Type baseType,
+                                              DeclName memberName,
+                                              SourceRange memberRange) {
+  auto unwrappedBaseType = baseType->getOptionalObjectType();
+  if (!unwrappedBaseType)
+    return false;
+
+  ASTContext &ctx = baseType->getASTContext();
+  DiagnosticEngine &diags = ctx.Diags;
+  diags.diagnose(baseExpr->getLoc(), diag::optional_base_not_unwrapped,
+                 baseType, memberName, unwrappedBaseType);
+
+  diags.diagnose(baseExpr->getLoc(), diag::optional_base_chain, memberName)
+    .fixItInsertAfter(baseExpr->getEndLoc(), "?");
+  diags.diagnose(baseExpr->getLoc(), diag::unwrap_with_force_value)
+    .fixItInsertAfter(baseExpr->getEndLoc(), "!");
   return true;
 }

@@ -36,7 +36,9 @@ mutT? = T()
 mutT?.mutS = S()
 mutT?.mutS? = S()
 mutT?.mutS?.x += 0
-_ = mutT?.mutS?.x + 0 // expected-error{{value of optional type 'Int?' not unwrapped}} {{5-5=(}} {{18-18=)!}}
+_ = mutT?.mutS?.x + 0 // expected-error{{value of optional type 'Int?' must be unwrapped}}
+// expected-note@-1{{coalesce}}
+// expected-note@-2{{force-unwrap}}
 mutT?.mutS?.y -= 0 // expected-error{{left side of mutating operator isn't mutable: 'y' is a 'let' constant}}
 mutT?.immS = S() // expected-error{{cannot assign to property: 'immS' is a 'let' constant}}
 mutT?.immS? = S() // expected-error{{cannot assign to value: 'immS' is a 'let' constant}}
