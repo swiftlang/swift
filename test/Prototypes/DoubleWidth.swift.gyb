@@ -237,16 +237,16 @@ extension DoubleWidth {
       self._low = value._storage.low.words
       _sanityCheck(!_low.isEmpty)
     }
-
-    internal enum _WordsIndexValue: Equatable {
-      case low(Low.Words.Index)
-      case high(High.Words.Index)
-    }
   }
 }
 
-extension DoubleWidth.Words {
+extension DoubleWidth.Words {  
   public struct Index {
+    internal enum _WordsIndexValue: Equatable {
+      case low(DoubleWidth.Low.Words.Index)
+      case high(DoubleWidth.High.Words.Index)
+    }
+
     internal var _value: _WordsIndexValue
 
     internal init(_ _value: _WordsIndexValue) { self._value = _value }
@@ -259,8 +259,8 @@ extension DoubleWidth.Words.Index: Comparable {
   public static func <(lhs: DoubleWidth.Words.Index, rhs: DoubleWidth.Words.Index) -> Bool {
     switch (lhs._value, rhs._value) {
     case let (.low(l), .low(r)): return l < r
-    case (.low(_), .high(_)): return true
-    case (.high(_), .low(_)): return false
+    case (.low, .high): return true
+    case (.high, .low): return false
     case let (.high(l), .high(r)): return l < r
     }
   }
@@ -282,15 +282,15 @@ extension DoubleWidth.Words: Collection {
 
   public func index(after i: Index) -> Index {
     switch i._value {
+    case let .low(li) where Base.bitWidth < UInt.bitWidth:
+      return Index(.high(_high.endIndex)) 
     case let .low(li):
-      if Base.bitWidth < UInt.bitWidth {
-        return Index(.high(_high.endIndex)) 
-      }
       let next = _low.index(after: li)
       if next == _low.endIndex { 
         return Index(.high(_high.startIndex)) 
+      } else {
+        return Index(.low(next))        
       }
-      return Index(.low(next))
     case let .high(hi):
       return Index(.high(_high.index(after: hi)))
     }
