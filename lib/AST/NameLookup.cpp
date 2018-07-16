@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -693,10 +693,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
             ExtendedType = DC->getSelfTypeInContext();
             MetaBaseDC = DC;
-            if (Ctx.isSwiftVersion3())
-              BaseDC = MetaBaseDC;
-            else
-              BaseDC = PBI;
+            BaseDC = PBI;
 
             isTypeLookup = PBD->isStatic();
           }
@@ -756,7 +753,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             // might be type checking a default argument expression and
             // performing name lookup from there), the base declaration
             // is the nominal type, not 'self'.
-            if ((Ctx.isSwiftVersion3() || !AFD->isImplicit()) &&
+            if (!AFD->isImplicit() &&
                 Loc.isValid() &&
                 AFD->getBodySourceRange().isValid() &&
                 !SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc)) {
@@ -831,23 +828,6 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           bool FoundAny = false;
           auto startIndex = Results.size();
           for (auto Result : Lookup) {
-            // In Swift 3 mode, unqualified lookup skips static methods when
-            // performing lookup from instance context.
-            //
-            // We don't want to carry this forward to Swift 4, since it makes
-            // for poor diagnostics.
-            //
-            // Also, it was quite a special case and not as general as it
-            // should be -- it didn't apply to properties or subscripts, and
-            // the opposite case where we're in static context and an instance
-            // member shadows the module member wasn't handled either.
-            if (Ctx.isSwiftVersion3() &&
-                !isTypeLookup &&
-                isa<FuncDecl>(Result) &&
-                cast<FuncDecl>(Result)->isStatic()) {
-              continue;
-            }
-
             // Classify this declaration.
             FoundAny = true;
 
