@@ -198,7 +198,7 @@ public:
   virtual void initialize(SILPassManager *PM) override {}
   virtual void invalidate() override;
   virtual void invalidate(SILFunction *F, InvalidationKind K) override;
-  virtual void notifyAddFunction(SILFunction *F) override {}
+  virtual void notifyAddedOrModifiedFunction(SILFunction *F) override {}
   virtual void notifyDeleteFunction(SILFunction *F) override {
     invalidate(F, InvalidationKind::Nothing);
   }
