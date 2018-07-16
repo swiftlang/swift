@@ -224,7 +224,6 @@ extension DoubleWidth: _ExpressibleByBuiltinIntegerLiteral {
 
 extension DoubleWidth : FixedWidthInteger {
     public struct Words : Collection {
-    @_frozen // FIXME(sil-serialize-all)
     public enum _IndexValue {
       case low(Low.Words.Index)
       case high(High.Words.Index)
