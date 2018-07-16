@@ -3,14 +3,14 @@
 let x = 1
 let y = 2
 if (x > y) {
-    defer { // expected-note {{defer statement at the end of block is pointless}}
+    defer { // expected-note {{'defer' at the end of its scope is redundant and will execute immediately}}
         print("not so useful defer stmt.")
     }
 }
 
 func sr7307(_ value: Bool) {
     let negated = !value 
-    defer { // expected-note {{defer statement at the end of block is pointless}}
+    defer { // expected-note {{'defer' at the end of its scope is redundant and will execute immediately}}
         print("negated value is {negated}")
     }
 }

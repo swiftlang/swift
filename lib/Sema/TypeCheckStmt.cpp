@@ -313,7 +313,7 @@ public:
   /// expressions are not discarded.
   bool IsREPL;
 
-  /// Used to distinguish the frist BraceStmt that starts a TopLevelCodeDecl
+  /// Used to distinguish the first BraceStmt that starts a TopLevelCodeDecl.
   bool IsBraceStmtFromTopLevelDecl;
 
   struct AddLabeledStmt {
@@ -355,13 +355,16 @@ public:
   };
 
   StmtChecker(TypeChecker &TC, AbstractFunctionDecl *AFD)
-    : TC(TC), TheFunc(AFD), DC(AFD), IsREPL(false), IsBraceStmtFromTopLevelDecl(false) { }
+      : TC(TC), TheFunc(AFD), DC(AFD), IsREPL(false),
+        IsBraceStmtFromTopLevelDecl(false) {}
 
   StmtChecker(TypeChecker &TC, ClosureExpr *TheClosure)
-    : TC(TC), TheFunc(TheClosure), DC(TheClosure), IsREPL(false), IsBraceStmtFromTopLevelDecl(false) { }
+      : TC(TC), TheFunc(TheClosure), DC(TheClosure), IsREPL(false),
+        IsBraceStmtFromTopLevelDecl(false) {}
 
   StmtChecker(TypeChecker &TC, DeclContext *DC)
-    : TC(TC), TheFunc(), DC(DC), IsREPL(false), IsBraceStmtFromTopLevelDecl(true) {
+      : TC(TC), TheFunc(), DC(DC), IsREPL(false),
+        IsBraceStmtFromTopLevelDecl(true) {
     if (const SourceFile *SF = DC->getParentSourceFile())
       if (SF->Kind == SourceFileKind::REPL)
         IsREPL = true;
@@ -1401,14 +1404,15 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
 Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
   const SourceManager &SM = TC.Context.SourceMgr;
 
-  // Diagnose defer statement being last one in block ( Only if
-  // BraceStmt does not start a TopLevelDecl )
+  // Diagnose defer statement being last one in block (only if
+  // BraceStmt does not start a TopLevelDecl).
   if (IsBraceStmtFromTopLevelDecl) {
     IsBraceStmtFromTopLevelDecl = false;
   } else if (BS->getNumElements() > 0) {
-    if (auto stmt = BS->getElement(BS->getNumElements() - 1).dyn_cast<Stmt*>()) {
+    if (auto stmt =
+            BS->getElement(BS->getNumElements() - 1).dyn_cast<Stmt *>()) {
       if (auto deferStmt = dyn_cast<DeferStmt>(stmt)) {
-        TC.diagnose(deferStmt->getStartLoc(), diag::defer_stmt_at_blockend);
+        TC.diagnose(deferStmt->getStartLoc(), diag::defer_stmt_at_block_end);
       }
     }
   }
