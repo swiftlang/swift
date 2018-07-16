@@ -119,9 +119,9 @@ public:
   /// Notify the analysis about a newly added or modified function.
   virtual void notifyAddedOrModifiedFunction(SILFunction *f) = 0;
 
-  /// Notify the analysis about a function which will be deleted from the
+  /// Notify the analysis about a function that will be deleted from the
   /// module.
-  virtual void notifyDeleteFunction(SILFunction *f) = 0;
+  virtual void notifyWillDeleteFunction(SILFunction *f) = 0;
 
   /// Notify the analysis about changed witness or vtables.
   virtual void invalidateFunctionTables() = 0;
@@ -248,7 +248,7 @@ public:
 
   /// Notify the analysis about a function which will be deleted from the
   /// module.
-  virtual void notifyDeleteFunction(SILFunction *f) override {
+  virtual void notifyWillDeleteFunction(SILFunction *f) override {
     invalidateFunction(f);
   }
 

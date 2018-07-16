@@ -207,8 +207,8 @@ public:
     // Invalidate the analysis (unless they are locked)
     for (auto AP : Analysis)
       if (!AP->isLocked())
-        AP->notifyDeleteFunction(F);
-    
+        AP->notifyWillDeleteFunction(F);
+
     CurrentPassHasInvalidated = true;
     // Any change let all passes run again.
     CompletedPassesMap[F].reset();
