@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1102,6 +1102,7 @@ namespace  {
     UNINTERESTING_ATTR(NSApplicationMain)
     UNINTERESTING_ATTR(NSCopying)
     UNINTERESTING_ATTR(NSManaged)
+    UNINTERESTING_ATTR(ObjC)
     UNINTERESTING_ATTR(ObjCBridged)
     UNINTERESTING_ATTR(Optional)
     UNINTERESTING_ATTR(Override)
@@ -1200,42 +1201,6 @@ namespace  {
         return;
 
       makeDynamic(Override->getASTContext(), Override);
-    }
-
-    void visitObjCAttr(ObjCAttr *attr) {
-      // Checking for overrides of declarations that are implicitly @objc
-      // and occur in class extensions, because overriding will no longer be
-      // possible under the Swift 4 rules.
-
-      // We only care about the storage declaration.
-      if (isa<AccessorDecl>(Override)) return;
-
-      // If @objc was explicit or handled elsewhere, nothing to do.
-      if (!attr->isSwift3Inferred()) return;
-
-      // If we aren't warning about Swift 3 @objc inference, we're done.
-      if (Override->getASTContext().LangOpts.WarnSwift3ObjCInference ==
-            Swift3ObjCInferenceWarnings::None)
-        return;
-
-      // If 'dynamic' was implicit, we'll already have warned about this.
-      if (auto dynamicAttr = Base->getAttrs().getAttribute<DynamicAttr>()) {
-        if (!dynamicAttr->isImplicit()) return;
-      }
-
-      // The overridden declaration needs to be in an extension.
-      if (!isa<ExtensionDecl>(Base->getDeclContext())) return;
-
-      // Complain.
-      Diags.diagnose(Override, diag::override_swift3_objc_inference,
-                     Override->getDescriptiveKind(),
-                     Override->getFullName(),
-                     Base->getDeclContext()
-                       ->getAsNominalTypeOrNominalTypeExtensionContext()
-                       ->getName());
-      Diags.diagnose(Base, diag::make_decl_objc, Base->getDescriptiveKind())
-        .fixItInsert(Base->getAttributeInsertionLoc(false),
-                     "@objc ");
     }
   };
 } // end anonymous namespace

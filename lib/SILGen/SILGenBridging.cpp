@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1423,34 +1423,6 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     // For an accessor, look at the storage declaration's attributes.
     if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
       decl = accessor->getStorage();
-    }
-
-    if (auto attr = decl->getAttrs().getAttribute<ObjCAttr>()) {
-      // If @objc was inferred based on the Swift 3 @objc inference rules, but
-      // we aren't compiling in Swift 3 compatibility mode, emit a call to
-      // Builtin.swift3ImplicitObjCEntrypoint() to enable runtime logging of
-      // the uses of such entrypoints.
-      if (attr->isSwift3Inferred() &&
-          !decl->getAttrs().hasAttribute<DynamicAttr>() &&
-          !getASTContext().LangOpts.isSwiftVersion3()) {
-        
-        // Get the starting source location of the declaration so we can say
-        // exactly where to stick '@objc'.
-        SourceLoc objcInsertionLoc =
-          decl->getAttributeInsertionLoc(/*modifier*/ false);
-
-        auto objcInsertionLocArgs
-          = emitSourceLocationArgs(objcInsertionLoc, loc);
-        
-        B.createBuiltin(loc,
-          getASTContext().getIdentifier("swift3ImplicitObjCEntrypoint"),
-          getModule().Types.getEmptyTupleType(), { }, {
-            objcInsertionLocArgs.filenameStartPointer.forward(*this),
-            objcInsertionLocArgs.filenameLength.forward(*this),
-            objcInsertionLocArgs.line.forward(*this),
-            objcInsertionLocArgs.column.forward(*this)
-          });
-      }
     }
   }
 

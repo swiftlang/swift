@@ -299,22 +299,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableAppExtensionRestrictions |= Args.hasArg(OPT_enable_app_extension);
 
-  Opts.EnableSwift3ObjCInference =
-    Args.hasFlag(OPT_enable_swift3_objc_inference,
-                 OPT_disable_swift3_objc_inference,
-                 Opts.isSwiftVersion3());
-
-  if (Opts.EnableSwift3ObjCInference) {
-    if (const Arg *A = Args.getLastArg(
-                                   OPT_warn_swift3_objc_inference_minimal,
-                                   OPT_warn_swift3_objc_inference_complete)) {
-      if (A->getOption().getID() == OPT_warn_swift3_objc_inference_minimal)
-        Opts.WarnSwift3ObjCInference = Swift3ObjCInferenceWarnings::Minimal;
-      else
-        Opts.WarnSwift3ObjCInference = Swift3ObjCInferenceWarnings::Complete;
-    }
-  }
-
   Opts.EnableNSKeyedArchiverDiagnostics =
       Args.hasFlag(OPT_enable_nskeyedarchiver_diagnostics,
                    OPT_disable_nskeyedarchiver_diagnostics,

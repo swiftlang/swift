@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -348,12 +348,6 @@ ObjCForwardDeclarations("enable-objc-forward-declarations",
 static llvm::cl::opt<bool>
 InferImportAsMember("enable-infer-import-as-member",
     llvm::cl::desc("Infer when a global could be imported as a member"),
-    llvm::cl::cat(Category),
-    llvm::cl::init(false));
-
-static llvm::cl::opt<bool>
-EnableSwift3ObjCInference("enable-swift3-objc-inference",
-    llvm::cl::desc("Enable Swift 3's @objc inference rules"),
     llvm::cl::cat(Category),
     llvm::cl::init(false));
 
@@ -3088,9 +3082,6 @@ int main(int argc, char *argv[]) {
       options::CodeCompleteCallPatternHeuristics;
   InitInvok.getLangOptions().InferImportAsMember |=
     options::InferImportAsMember;
-  InitInvok.getLangOptions().EnableSwift3ObjCInference =
-    options::EnableSwift3ObjCInference ||
-    InitInvok.getLangOptions().isSwiftVersion3();
   InitInvok.getClangImporterOptions().ImportForwardDeclarations |=
     options::ObjCForwardDeclarations;
   InitInvok.getClangImporterOptions().InferImportAsMember |=

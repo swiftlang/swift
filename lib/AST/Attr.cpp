@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -664,7 +664,6 @@ ObjCAttr::ObjCAttr(SourceLoc atLoc, SourceRange baseRange,
   }
 
   Bits.ObjCAttr.ImplicitName = false;
-  Bits.ObjCAttr.Swift3Inferred = false;
 }
 
 ObjCAttr *ObjCAttr::create(ASTContext &Ctx, Optional<ObjCSelector> name,
@@ -742,7 +741,6 @@ SourceLoc ObjCAttr::getRParenLoc() const {
 
 ObjCAttr *ObjCAttr::clone(ASTContext &context) const {
   auto attr = new (context) ObjCAttr(getName(), isNameImplicit());
-  attr->setSwift3Inferred(isSwift3Inferred());
   return attr;
 }
 

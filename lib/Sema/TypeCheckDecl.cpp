@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -3980,24 +3980,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
       markAsObjC(*this, VD, isObjC);
 
-      // Under the Swift 3 inference rules, if we have @IBInspectable or
-      // @GKInspectable but did not infer @objc, warn that the attribute is
-      if (!isObjC && Context.LangOpts.EnableSwift3ObjCInference) {
-        if (auto attr = VD->getAttrs().getAttribute<IBInspectableAttr>()) {
-          diagnose(attr->getLocation(),
-                   diag::attribute_meaningless_when_nonobjc,
-                   attr->getAttrName())
-            .fixItRemove(attr->getRange());
-        }
-
-        if (auto attr = VD->getAttrs().getAttribute<GKInspectableAttr>()) {
-          diagnose(attr->getLocation(),
-                   diag::attribute_meaningless_when_nonobjc,
-                   attr->getAttrName())
-            .fixItRemove(attr->getRange());
-        }
-      }
-
       // If this variable is a class member, mark it final if the
       // class is final, or if it was declared with 'let'.
       auto staticSpelling =
@@ -4276,21 +4258,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
           if (!isObjC) {
             // Make this accessor @objc because its property is @objc.
             isObjC = ObjCReason::Accessor;
-          } else if (auto storageObjCAttr =
-                       storage->getAttrs().getAttribute<ObjCAttr>()) {
-            // If @objc on the storage declaration was inferred using a
-            // deprecated rule, but this accessor is @objc in its own right,
-            // complain.
-            ;
-            if (storageObjCAttr && storageObjCAttr->isSwift3Inferred() &&
-                shouldDiagnoseObjCReason(*isObjC, Context)) {
-              diagnose(storage, diag::accessor_swift3_objc_inference,
-                       storage->getDescriptiveKind(), storage->getFullName(),
-                       isa<SubscriptDecl>(storage), accessor->isSetter())
-                .fixItInsert(storage->getAttributeInsertionLoc(
-                                                      /*forModifier=*/false),
-                             "@objc ");
-            }
           }
         }
 

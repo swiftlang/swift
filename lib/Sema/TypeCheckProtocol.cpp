@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -3585,23 +3585,6 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
         if (checkObjCWitnessSelector(TC, requirement, witness)) {
           Conformance->setInvalid();
           return;
-        }
-
-        // If the @objc on the witness was inferred using the deprecated
-        // Swift 3 rules, warn if asked.
-        if (auto attr = witness->getAttrs().getAttribute<ObjCAttr>()) {
-          if (attr->isSwift3Inferred() &&
-              TC.Context.LangOpts.WarnSwift3ObjCInference
-                == Swift3ObjCInferenceWarnings::Minimal) {
-            TC.diagnose(Conformance->getLoc(),
-                        diag::witness_swift3_objc_inference,
-                        witness->getDescriptiveKind(), witness->getFullName(),
-                        Conformance->getProtocol()->getDeclaredInterfaceType());
-            TC.diagnose(witness, diag::make_decl_objc,
-                        witness->getDescriptiveKind())
-              .fixItInsert(witness->getAttributeInsertionLoc(false),
-                           "@objc ");
-          }
         }
       }
     };
