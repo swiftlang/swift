@@ -788,6 +788,7 @@ static TF_Tensor *convertValuesToTensor(ArrayRef<APInt> elts,
   // Set up its contents, element-wise.
   // FIXME: This will need a byte swap for big endian hosts.
   auto *ptr = (char *)TF_TensorData(tensor);
+
   for (auto elt : elts) {
     if (dtype == TF_BOOL) {
       // Swift/LLVM uses a 1-bit APInt to represent a bool, but TF_BOOL is 1
@@ -885,11 +886,11 @@ static void decodeShapeElements(SILValue attrValue,
 
 /// Decode the shape array attribute from the tfop builtin instruction, starting
 /// at operand `operandIdx`, into `dims`, `numDims` and `dimPtrs`.
-static void decodeShapeArray(const SILTensorOpInfo &tfopInfo,
-                             unsigned &operandIdx, unsigned operandEndIdx,
-                             SmallVectorImpl<int64_t> &dims,
-                             SmallVectorImpl<int> &numDims,
-                             SmallVectorImpl<int64_t *> &dimPtrs) {
+static void decodeShapeArrayLegacy(const SILTensorOpInfo &tfopInfo,
+                                   unsigned &operandIdx, unsigned operandEndIdx,
+                                   SmallVectorImpl<int64_t> &dims,
+                                   SmallVectorImpl<int> &numDims,
+                                   SmallVectorImpl<int64_t *> &dimPtrs) {
   auto *inst = tfopInfo.inst;
   auto numShapes = cast<IntegerLiteralInst>(inst->getOperand(operandIdx))
                        ->getValue()
@@ -941,7 +942,7 @@ TFGraphLowering::visitGraphOpSendToHostInst(GraphOperationInfo &graphOpInfo) {
 
   assert(graphOpInfo.getDeviceString() == DEFAULT_CPU_DEVICE &&
          "SendToHost must run on CPU device");
-  int tensorId = inst->getAttribute("tensorId")
+  int tensorId = inst->getAttributeNamed("tensorId")
                      .getValue()
                      .getIntegerValue()
                      .getLimitedValue();
@@ -1152,7 +1153,7 @@ TFGraphLowering::visitGraphOpRecvFromHostInst(GraphOperationInfo &graphOpInfo) {
   // int tensorId = graphOpInfo.getIntAttrOperand(0, "tensorId");
   assert(graphOpInfo.getDeviceString() == DEFAULT_CPU_DEVICE &&
          "SendToHost must run on CPU device");
-  int tensorId = inst->getAttribute("tensorId")
+  int tensorId = inst->getAttributeNamed("tensorId")
                      .getValue()
                      .getIntegerValue()
                      .getLimitedValue();
@@ -1353,7 +1354,7 @@ GLStatus TFGraphLowering::visitBuiltinD2DTensorRecvInst(SILTensorOpInfo &tfopInf
   if (inst->getNumOperands() > 3) {
     unsigned i = 3;  // 3 is the start operand idx for the shape attr.
     unsigned e = inst->getNumOperands();
-    decodeShapeArray(tfopInfo, i, e, dims, numDims, dimPtrs);
+    decodeShapeArrayLegacy(tfopInfo, i, e, dims, numDims, dimPtrs);
     // We should be consuming all operands by now.
     assert(i+1 == e);
   }
@@ -1470,7 +1471,7 @@ GLStatus TFGraphLowering::visitBuiltinD2DTensorSendInst(SILTensorOpInfo &tfopInf
   if (inst->getNumOperands() > 4) {
     unsigned i = 4;  // 4 is the start operand idx for the shape attr.
     unsigned e = inst->getNumOperands();
-    decodeShapeArray(tfopInfo, i, e, dims, numDims, dimPtrs);
+    decodeShapeArrayLegacy(tfopInfo, i, e, dims, numDims, dimPtrs);
     // We should be consuming all operands by now.
     assert(i+1 == e);
   }
@@ -1541,7 +1542,7 @@ GLStatus TFGraphLowering::visitTFDataset(BuiltinInst *inst) {
   SmallVector<int64_t*, 8> dimPtrs;
   unsigned i = 3;
   unsigned e = inst->getNumOperands();
-  decodeShapeArray(tfopInfo, i, e, dims, numDims, dimPtrs);
+  decodeShapeArrayLegacy(tfopInfo, i, e, dims, numDims, dimPtrs);
 
   // Even when this built-in returns multiple tensors, they are always presented
   // by a single tuple.
@@ -1724,6 +1725,16 @@ GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
     }
   }
 
+  // This helper function decodes a shape attribute into its values.
+  auto decodeShapeAttr =
+    [&](SymbolicValue attr, SmallVectorImpl<int64_t> &result) {
+    attr = attr.lookThroughSingleElementAggregates();
+    for (auto elt : attr.getArrayValue()) {
+      elt = elt.lookThroughSingleElementAggregates();
+      result.push_back(elt.getIntegerValue().getLimitedValue());
+    }
+  };
+
   // Process all of the attributes.
   // For an inst like:
   //   graph_op "Const"() {dtype$dtype: $Builtin.Int64, value$tensor: i1 0
@@ -1732,7 +1743,10 @@ GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
   // We use unsigned instead of TF_DataType, to express the invalid initial
   // value 0.
   unsigned dtypeAttr = 0;
-  for (auto attr : inst->getAttributes()) {
+  for (unsigned nextAttributeNumber = 0, e = inst->getNumAttributes();
+       nextAttributeNumber != e; ) {
+    // Look at which attribute comes next.
+    auto attr = inst->getAttribute(nextAttributeNumber++);
     auto attrInfo = GraphOperationInfo::decodeAttributeName(attr.name);
     auto attrValue = attr.value;
 
@@ -1772,13 +1786,11 @@ GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
         TF_SetAttrFloat(op, name.c_str(), value.convertToFloat());
         break;
       }
-      case SymbolicValue::Metatype: {
-        auto ty = attrValue.getMetatypeValue();
-        auto dtype = convertSwiftTypeToTF(ty);
-        assert(dtype && "expected a valid tensorflow type");
-        TF_SetAttrType(op, name.c_str(), (TF_DataType)dtype);
+      case SymbolicValue::Metatype:
+        dtypeAttr = convertSwiftTypeToTF(attrValue.getMetatypeValue());
+        assert(dtypeAttr && "expected a valid tensorflow type");
+        TF_SetAttrType(op, name.c_str(), (TF_DataType)dtypeAttr);
         break;
-      }
       case SymbolicValue::String: {
         auto value = attrValue.getStringValue();
         if (name != DEVICE_ATTR) {
@@ -1833,17 +1845,33 @@ GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
       // a scalar case.
       SmallVector<APInt, 4> elements;
       SmallVector<int64_t, 4> shape;
+
       // The scalar case is very simple, the shape of a scalar is 0d, and the
       // data type comes from an attr that should already be processed.
-      if (attrValue.getKind() == SymbolicValue::Integer) {
-        auto intVal = attrValue.getIntegerValue();
-        elements.push_back(intVal);
-      }
-      else if (attrValue.getKind() == SymbolicValue::Float) {
-        auto castedIntVal = attrValue.getFloatValue().bitcastToAPInt();
-        elements.push_back(castedIntVal);
+      auto addScalar = [&](SymbolicValue value) {
+        value = value.lookThroughSingleElementAggregates();
+
+        if (value.getKind() == SymbolicValue::Integer) {
+          auto intVal = value.getIntegerValue();
+          elements.push_back(intVal);
+        } else {
+          assert(value.getKind() == SymbolicValue::Float);
+          auto castedIntVal = value.getFloatValue().bitcastToAPInt();
+          elements.push_back(castedIntVal);
+        }
+      };
+
+      if (attrValue.getKind() == SymbolicValue::Integer ||
+          attrValue.getKind() == SymbolicValue::Float) {
+        addScalar(attrValue);
       } else {
-        llvm_unreachable("FIXME: Tensor-typed attr is not yet handled");
+        // Add all the elements to the elements list.
+        for (auto elt : attrValue.getArrayValue())
+          addScalar(elt);
+
+        // Decode the shape attribute which must come next.
+        auto shapeAttr = inst->getAttribute(nextAttributeNumber++).value;
+        decodeShapeAttr(shapeAttr, shape);
       }
       // Set the tensor as the attribute on the graph node.
       auto tensor =
@@ -1854,11 +1882,21 @@ GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
         return GLStatus::Error;
       break;
     }
-    case SILTensorOpInfo::OperandClass::Shape:
+    case SILTensorOpInfo::OperandClass::Shape: {
+      SmallVector<int64_t, 4> shape;
+      decodeShapeAttr(attrValue, shape);
+      TF_SetAttrShape(op, name.c_str(), shape.data(), shape.size());
+      break;
+    }
+
     case SILTensorOpInfo::OperandClass::ShapeArray:
+      // TODO: TF_SetAttrShapeList
     case SILTensorOpInfo::OperandClass::Array:
-    case SILTensorOpInfo::OperandClass::ArrayElement:
+      // TODO: TF_SetAttrTypeList, TF_SetAttrStringList, TF_SetAttrIntList,
+      // TF_SetAttrFloatList, TF_SetAttrBoolList
       llvm_unreachable("FIXME: These operand classes are not yet handled");
+    case SILTensorOpInfo::OperandClass::ArrayElement:
+      llvm_unreachable("This is a legacy class that shouldn't happen");
     }
   }
 
@@ -2109,7 +2147,7 @@ GLStatus TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
       SmallVector<int64_t, 8> dims;
       SmallVector<int, 3> numDims;
       SmallVector<int64_t*, 8> dimPtrs;
-      decodeShapeArray(tfopInfo, i, e, dims, numDims, dimPtrs);
+      decodeShapeArrayLegacy(tfopInfo, i, e, dims, numDims, dimPtrs);
       if (name != SHAPE_ARRAY_ATTR) {
         // SHAPE_ARRAY_ATTR is a pseudo-attribute used by the compiler's
         // partitioning and graph lowering passes to propagate shape info for

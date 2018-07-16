@@ -1620,7 +1620,7 @@ canonicalizeOperands(GraphGlobalConfiguration &configuration) {
 /// Return the device attribute associated with `inst`, which is required to
 /// exist.
 StringRef GraphOperationInfo::getDeviceString() const {
-  auto attr = inst->getAttribute(DEVICE_ATTR);
+  auto attr = inst->getAttributeNamed(DEVICE_ATTR);
   assertWithDump(attr.hasValue(), "Tensor op instruction has no device string");
   return attr.getValue().getStringValue();
 }
