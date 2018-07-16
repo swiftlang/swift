@@ -1909,57 +1909,6 @@ bool GenericRequirementsCheckListener::diagnoseUnsatisfiedRequirement(
   return false;
 }
 
-bool TypeChecker::
-solveForExpression(Expr *&expr, DeclContext *dc, Type convertType,
-                   FreeTypeVariableBinding allowFreeTypeVariables,
-                   ExprTypeCheckListener *listener, ConstraintSystem &cs,
-                   SmallVectorImpl<Solution> &viable,
-                   TypeCheckExprOptions options) {
-  // Attempt to solve the constraint system.
-  auto solution = cs.solve(expr,
-                           convertType,
-                           listener,
-                           viable,
-                           allowFreeTypeVariables);
-
-  // The constraint system has failed
-  if (solution == ConstraintSystem::SolutionKind::Error)
-    return true;
-
-  // If the system is unsolved or there are multiple solutions present but
-  // type checker options do not allow unresolved types, let's try to salvage
-  if (solution == ConstraintSystem::SolutionKind::Unsolved
-      || (viable.size() != 1 &&
-          !options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables))) {
-    if (options.contains(TypeCheckExprFlags::SuppressDiagnostics))
-      return true;
-
-    // Try to provide a decent diagnostic.
-    if (cs.salvage(viable, expr)) {
-      // If salvage produced an error message, then it failed to salvage the
-      // expression, just bail out having reported the error.
-      return true;
-    }
-
-    // The system was salvaged; continue on as if nothing happened.
-  }
-
-  if (getLangOpts().DebugConstraintSolver) {
-    auto &log = Context.TypeCheckerDebug->getStream();
-    if (viable.size() == 1) {
-      log << "---Solution---\n";
-      viable[0].dump(log);
-    } else {
-      for (unsigned i = 0, e = viable.size(); i != e; ++i) {
-        log << "--- Solution #" << i << " ---\n";
-        viable[i].dump(log);
-      }
-    }
-  }
-
-  return false;
-}
-
 #pragma mark High-level entry points
 Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       TypeLoc convertType,
@@ -1976,6 +1925,13 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
 
   // Construct a constraint system from this expression.
   ConstraintSystemOptions csOptions = ConstraintSystemFlags::AllowFixes;
+
+  if (options.contains(TypeCheckExprFlags::SuppressDiagnostics))
+    csOptions |= ConstraintSystemFlags::SuppressDiagnostics;
+
+  if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables))
+    csOptions |= ConstraintSystemFlags::AllowUnresolvedTypeVariables;
+
   ConstraintSystem cs(*this, dc, csOptions);
   cs.baseCS = baseCS;
   CleanupIllFormedExpressionRAII cleanup(expr);
@@ -2007,9 +1963,6 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   // that we don't later treat it as an actual conversion constraint.
   if (options.contains(TypeCheckExprFlags::ConvertTypeIsOnlyAHint))
     convertType = TypeLoc();
-  
-  bool suppressDiagnostics =
-    options.contains(TypeCheckExprFlags::SuppressDiagnostics);
 
   // If the client can handle unresolved type variables, leave them in the
   // system.
@@ -2019,8 +1972,8 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
 
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
-  if (solveForExpression(expr, dc, convertType.getType(),
-                         allowFreeTypeVariables, listener, cs, viable, options))
+  if (cs.solve(expr, convertType.getType(), listener, viable,
+               allowFreeTypeVariables))
     return Type();
 
   // If the client allows the solution to have unresolved type expressions,
@@ -2046,11 +1999,10 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   }
 
   // Apply the solution to the expression.
-  bool isDiscarded = options.contains(TypeCheckExprFlags::IsDiscarded);
-  bool skipClosures = options.contains(TypeCheckExprFlags::SkipMultiStmtClosures);
-  result = cs.applySolution(solution, result, convertType.getType(),
-                            isDiscarded, suppressDiagnostics,
-                            skipClosures);
+  result = cs.applySolution(
+      solution, result, convertType.getType(),
+      options.contains(TypeCheckExprFlags::IsDiscarded),
+      options.contains(TypeCheckExprFlags::SkipMultiStmtClosures));
   if (!result) {
     // Failure already diagnosed, above, as part of applying the solution.
     return Type();
@@ -2072,7 +2024,7 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
 
   // Unless the client has disabled them, perform syntactic checks on the
   // expression now.
-  if (!suppressDiagnostics &&
+  if (!cs.shouldSuppressDiagnostics() &&
       !options.contains(TypeCheckExprFlags::DisableStructuralChecks)) {
     bool isExprStmt = options.contains(TypeCheckExprFlags::IsExprStmt);
     performSyntacticExprDiagnostics(*this, result, dc, isExprStmt);
@@ -2092,7 +2044,7 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
   referencedDecl = nullptr;
 
   // Construct a constraint system from this expression.
-  ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
+  ConstraintSystem cs(*this, dc, ConstraintSystemFlags::SuppressDiagnostics);
   CleanupIllFormedExpressionRAII cleanup(expr);
 
   // Attempt to solve the constraint system.
@@ -2108,9 +2060,8 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
   // re-check.
   if (needClearType)
     expr->setType(Type());
-  if (solveForExpression(expr, dc, /*convertType*/Type(),
-                         allowFreeTypeVariables, listener, cs, viable,
-                         TypeCheckExprFlags::SuppressDiagnostics)) {
+  if (cs.solve(expr, /*convertType*/Type(), listener, viable,
+               allowFreeTypeVariables)) {
     recoverOriginalType();
     return Type();
   }
@@ -2177,8 +2128,8 @@ void TypeChecker::getPossibleTypesOfExpressionWithoutApplying(
 
   // Construct a constraint system from this expression.
   ConstraintSystemOptions options;
-  options |= ConstraintSystemFlags::AllowFixes;
   options |= ConstraintSystemFlags::ReturnAllDiscoveredSolutions;
+  options |= ConstraintSystemFlags::SuppressDiagnostics;
 
   ConstraintSystem cs(*this, dc, options);
 
@@ -2194,9 +2145,8 @@ void TypeChecker::getPossibleTypesOfExpressionWithoutApplying(
     if (originalType && originalType->hasError())
       expr->setType(Type());
 
-    solveForExpression(expr, dc, /*convertType*/ Type(), allowFreeTypeVariables,
-                       listener, cs, viable,
-                       TypeCheckExprFlags::SuppressDiagnostics);
+    cs.solve(expr, /*convertType*/ Type(), listener, viable,
+             allowFreeTypeVariables);
   }
 
   for (auto &solution : viable) {
@@ -2210,7 +2160,7 @@ bool TypeChecker::typeCheckCompletionSequence(Expr *&expr, DeclContext *DC) {
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
   // Construct a constraint system from this expression.
-  ConstraintSystem CS(*this, DC, ConstraintSystemFlags::AllowFixes);
+  ConstraintSystem CS(*this, DC, ConstraintSystemFlags::SuppressDiagnostics);
   CleanupIllFormedExpressionRAII cleanup(expr);
 
   auto *SE = cast<SequenceExpr>(expr);

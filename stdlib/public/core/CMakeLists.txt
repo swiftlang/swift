@@ -121,7 +121,7 @@ set(SWIFTLIB_ESSENTIAL
   SmallString.swift
   Sort.swift
   StaticString.swift
-  Stride.swift.gyb
+  Stride.swift
   StringHashable.swift  # ORDER DEPENDENCY: Must precede String.swift
   String.swift
   StringBridge.swift
