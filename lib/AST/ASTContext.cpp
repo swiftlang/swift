@@ -1784,24 +1784,26 @@ ASTContext::getConformance(Type conformingType,
 /// that instead.
 static ProtocolConformance *collapseSpecializedConformance(
                                              Type type,
-                                             ProtocolConformance *conformance) {
+                                             ProtocolConformance *conformance,
+                                             SubstitutionMap substitutions) {
   while (true) {
-    // If the conformance matches, return it.
-    if (conformance->getType()->isEqual(type))
-      return conformance;
-
     switch (conformance->getKind()) {
-    case ProtocolConformanceKind::Inherited:
-      conformance = cast<InheritedProtocolConformance>(conformance)
-                      ->getInheritedConformance();
-      break;
-
     case ProtocolConformanceKind::Specialized:
       conformance = cast<SpecializedProtocolConformance>(conformance)
                       ->getGenericConformance();
       break;
 
     case ProtocolConformanceKind::Normal:
+    case ProtocolConformanceKind::Inherited:
+      // If the conformance matches, return it.
+      if (conformance->getType()->isEqual(type)) {
+        for (auto subConformance : substitutions.getConformances())
+          if (!subConformance.isAbstract())
+            return nullptr;
+
+        return conformance;
+      }
+
       return nullptr;
     }
   }
@@ -1814,7 +1816,8 @@ ASTContext::getSpecializedConformance(Type type,
   // If we are performing a substitution that would get us back to the
   // a prior conformance (e.g., mapping into and then out of a conformance),
   // return the existing conformance.
-  if (auto existing = collapseSpecializedConformance(type, generic)) {
+  if (auto existing = collapseSpecializedConformance(type, generic,
+                                                     substitutions)) {
     ++NumCollapsedSpecializedProtocolConformances;
     return existing;
   }
