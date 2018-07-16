@@ -777,10 +777,8 @@ private:
 //--- Globals ---------------------------------------------------------------
 public:
   std::pair<llvm::GlobalVariable *, llvm::Constant *>
-  createStringConstant(StringRef Str, bool willBeRelativelyAddressed = false,
-                       StringRef sectionName = "");
-  llvm::Constant *getAddrOfGlobalString(StringRef utf8,
-                                        bool willBeRelativelyAddressed = false);
+  createStringConstant(StringRef Str, StringRef sectionName = "");
+  llvm::Constant *getAddrOfGlobalString(StringRef utf8);
   llvm::Constant *getAddrOfGlobalUTF16String(StringRef utf8);
   llvm::Constant *getAddrOfGlobalConstantString(StringRef utf8);
   llvm::Constant *getAddrOfGlobalUTF16ConstantString(StringRef utf8);

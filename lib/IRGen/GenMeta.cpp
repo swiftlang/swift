@@ -314,8 +314,7 @@ namespace {
     }
     
     void addName() {
-      B.addRelativeAddress(IGM.getAddrOfGlobalString(M->getName().str(),
-                                           /*willBeRelativelyAddressed*/ true));
+      B.addRelativeAddress(IGM.getAddrOfGlobalString(M->getName().str()));
     }
     
     bool isUniqueDescriptor() {
@@ -501,8 +500,7 @@ namespace {
         name = Type->getName().str();
       }
       
-      auto nameStr = IGM.getAddrOfGlobalString(name,
-                                           /*willBeRelativelyAddressed*/ true);
+      auto nameStr = IGM.getAddrOfGlobalString(name);
       B.addRelativeAddress(nameStr);
     }
       
@@ -3114,8 +3112,7 @@ namespace {
       IRGenMangler mangler;
       std::string Name =
         mangler.mangleTypeForForeignMetadataUniquing(targetType);
-      llvm::Constant *nameStr = IGM.getAddrOfGlobalString(Name,
-                                                 /*relatively addressed*/ true);
+      llvm::Constant *nameStr = IGM.getAddrOfGlobalString(Name);
       B.addRelativeAddress(nameStr);
     }
 
@@ -3703,8 +3700,7 @@ namespace {
     void addAssociatedTypeNames() {
       llvm::Constant *global = nullptr;
       if (!AssociatedTypeNames.empty()) {
-        global = IGM.getAddrOfGlobalString(AssociatedTypeNames,
-                                           /*willBeRelativelyAddressed=*/true);
+        global = IGM.getAddrOfGlobalString(AssociatedTypeNames);
       }
       B.addRelativeAddressOrNull(global);
     }
