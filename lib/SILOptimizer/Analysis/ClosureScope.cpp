@@ -150,7 +150,7 @@ void ClosureScopeAnalysis::invalidate() {
   if (scopeData) scopeData->reset();
 }
 
-void ClosureScopeAnalysis::notifyDeleteFunction(SILFunction *F) {
+void ClosureScopeAnalysis::notifyWillDeleteFunction(SILFunction *F) {
   if (scopeData) scopeData->erase(F);
 }
 
