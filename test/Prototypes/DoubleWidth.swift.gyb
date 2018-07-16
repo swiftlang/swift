@@ -238,7 +238,7 @@ extension DoubleWidth {
       _sanityCheck(!_low.isEmpty)
     }
 
-    internal enum _WordsIndexValue {
+    internal enum _WordsIndexValue: Equatable {
       case low(Low.Words.Index)
       case high(High.Words.Index)
     }
@@ -253,15 +253,7 @@ extension DoubleWidth.Words {
   }
 }
 
-extension DoubleWidth.Words.Index: Equatable {
-  public static func ==(lhs: DoubleWidth.Words.Index, rhs: DoubleWidth.Words.Index) -> Bool {
-    switch (lhs._value, rhs._value) {
-    case let (.low(l), .low(r)): return l == r
-    case let (.high(l), .high(r)): return l == r
-    default: return false
-    }
-  }
-}
+extension DoubleWidth.Words.Index: Equatable { }
 
 extension DoubleWidth.Words.Index: Comparable {
   public static func <(lhs: DoubleWidth.Words.Index, rhs: DoubleWidth.Words.Index) -> Bool {
