@@ -1865,9 +1865,6 @@ public func _dictionaryBridgeFromObjectiveCConditional<
 internal class _RawNativeDictionaryStorage
   : _SwiftNativeNSDictionary, _NSDictionaryCore
 {
-  @usableFromInline
-  internal typealias RawStorage = _RawNativeDictionaryStorage
-
   @usableFromInline // FIXME(sil-serialize-all)
   @nonobjc
   internal final var bucketCount: Int
@@ -1901,7 +1898,7 @@ internal class _RawNativeDictionaryStorage
   /// be mutated.
   @inlinable // FIXME(sil-serialize-all)
   @nonobjc
-  internal static var empty: RawStorage {
+  internal static var empty: _RawNativeDictionaryStorage {
     return Builtin.bridgeFromRawPointer(
       Builtin.addressof(&_swiftEmptyDictionaryStorage))
   }
@@ -2200,9 +2197,6 @@ final internal class _HashableTypedNativeDictionaryStorage<Key: Hashable, Value>
 @usableFromInline
 @_fixed_layout
 internal struct _NativeDictionaryBuffer<Key, Value> {
-
-  @usableFromInline // FIXME(sil-serialize-all)
-  internal typealias RawStorage = _RawNativeDictionaryStorage
   @usableFromInline // FIXME(sil-serialize-all)
   internal typealias TypedStorage = _TypedNativeDictionaryStorage<Key, Value>
   @usableFromInline // FIXME(sil-serialize-all)
@@ -2216,7 +2210,7 @@ internal struct _NativeDictionaryBuffer<Key, Value> {
   /// See this comments on _RawNativeDictionaryStorage and its subclasses to
   /// understand why we store an untyped storage here.
   @usableFromInline // FIXME(sil-serialize-all)
-  internal var _storage: RawStorage
+  internal var _storage: _RawNativeDictionaryStorage
 
   /// Creates a Buffer with a storage that is typed, but doesn't understand
   /// Hashing. Mostly for bridging; prefer `init(minimumCapacity:)`.
@@ -2230,10 +2224,13 @@ internal struct _NativeDictionaryBuffer<Key, Value> {
     self.init(_exactBucketCount: bucketCount, storage: storage)
   }
 
-  /// Given a bucket count and uninitialized RawStorage, completes the
-  /// initialization and returns a Buffer.
+  /// Given a bucket count and uninitialized _RawNativeDictionaryStorage,
+  /// completes the initialization and returns a Buffer.
   @inlinable // FIXME(sil-serialize-all)
-  internal init(_exactBucketCount bucketCount: Int, storage: RawStorage) {
+  internal init(
+    _exactBucketCount bucketCount: Int,
+    storage: _RawNativeDictionaryStorage
+  ) {
     storage.bucketCount = bucketCount
     storage.count = 0
 
@@ -2308,14 +2305,14 @@ internal struct _NativeDictionaryBuffer<Key, Value> {
 
   /// Constructs a buffer adopting the given storage.
   @inlinable // FIXME(sil-serialize-all)
-  internal init(_storage: RawStorage) {
+  internal init(_storage: _RawNativeDictionaryStorage) {
     self._storage = _storage
   }
 
   /// Constructs an instance from the empty singleton.
   @inlinable // FIXME(sil-serialize-all)
   internal init() {
-    self._storage = RawStorage.empty
+    self._storage = _RawNativeDictionaryStorage.empty
   }
 
   // Most of the implementation of the _HashBuffer protocol,
@@ -2498,7 +2495,7 @@ extension _NativeDictionaryBuffer where Key: Hashable
 
     if (_isBridgedVerbatimToObjectiveC(Key.self) &&
         _isBridgedVerbatimToObjectiveC(Value.self)) ||
-        self._storage === RawStorage.empty {
+        self._storage === _RawNativeDictionaryStorage.empty {
       nsSet = self._storage
     } else {
       nsSet = _SwiftDeferredNSDictionary(nativeBuffer: self)

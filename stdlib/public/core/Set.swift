@@ -1511,12 +1511,7 @@ extension Set {
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline // FIXME(sil-serialize-all)
 @_objc_non_lazy_realization
-internal class _RawNativeSetStorage:
-  _SwiftNativeNSSet, _NSSetCore
-{
-  @usableFromInline
-  internal typealias RawStorage = _RawNativeSetStorage
-
+internal class _RawNativeSetStorage: _SwiftNativeNSSet, _NSSetCore {
   @usableFromInline // FIXME(sil-serialize-all)
   @nonobjc
   internal final var bucketCount: Int
@@ -1547,7 +1542,7 @@ internal class _RawNativeSetStorage:
   /// be mutated.
   @inlinable // FIXME(sil-serialize-all)
   @nonobjc
-  internal static var empty: RawStorage {
+  internal static var empty: _RawNativeSetStorage {
     return Builtin.bridgeFromRawPointer(
       Builtin.addressof(&_swiftEmptySetStorage))
   }
@@ -1783,8 +1778,6 @@ final internal class _HashableTypedNativeSetStorage<Element: Hashable>
 internal struct _NativeSetBuffer<Element> {
 
   @usableFromInline
-  internal typealias RawStorage = _RawNativeSetStorage
-  @usableFromInline
   internal typealias TypedStorage = _TypedNativeSetStorage<Element>
   @usableFromInline
   internal typealias Buffer = _NativeSetBuffer<Element>
@@ -1801,7 +1794,7 @@ internal struct _NativeSetBuffer<Element> {
   /// See this comments on _RawNativeSetStorage and its subclasses to
   /// understand why we store an untyped storage here.
   @usableFromInline // FIXME(sil-serialize-all)
-  internal var _storage: RawStorage
+  internal var _storage: _RawNativeSetStorage
 
   /// Creates a Buffer with a storage that is typed, but doesn't understand
   /// Hashing. Mostly for bridging; prefer `init(minimumCapacity:)`.
@@ -1814,10 +1807,13 @@ internal struct _NativeSetBuffer<Element> {
     self.init(_exactBucketCount: bucketCount, storage: storage)
   }
 
-  /// Given a bucket count and uninitialized RawStorage, completes the
+  /// Given a bucket count and uninitialized _RawNativeSetStorage, completes the
   /// initialization and returns a Buffer.
   @inlinable // FIXME(sil-serialize-all)
-  internal init(_exactBucketCount bucketCount: Int, storage: RawStorage) {
+  internal init(
+    _exactBucketCount bucketCount: Int,
+    storage: _RawNativeSetStorage
+  ) {
     storage.bucketCount = bucketCount
     storage.count = 0
 
@@ -1883,14 +1879,14 @@ internal struct _NativeSetBuffer<Element> {
 
   /// Constructs a buffer adopting the given storage.
   @inlinable // FIXME(sil-serialize-all)
-  internal init(_storage: RawStorage) {
+  internal init(_storage: _RawNativeSetStorage) {
     self._storage = _storage
   }
 
   /// Constructs an instance from the empty singleton.
   @inlinable // FIXME(sil-serialize-all)
   internal init() {
-    self._storage = RawStorage.empty
+    self._storage = _RawNativeSetStorage.empty
   }
 
   // Most of the implementation of the _HashBuffer protocol,
@@ -2068,7 +2064,7 @@ extension _NativeSetBuffer where Element: Hashable
 
     if (_isBridgedVerbatimToObjectiveC(Key.self) &&
         _isBridgedVerbatimToObjectiveC(Value.self)) ||
-        self._storage === RawStorage.empty {
+        self._storage === _RawNativeSetStorage.empty {
       nsSet = self._storage
     } else {
       nsSet = _SwiftDeferredNSSet(nativeBuffer: self)
