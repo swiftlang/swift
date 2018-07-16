@@ -1618,6 +1618,8 @@ GLStatus TFGraphLowering::visitTFDataset(BuiltinInst *inst) {
   return GLStatus::Success;
 }
 
+/// Check whether the specified TensorFlow status object is valid or not.  If
+/// valid return false.  If invalid, emit a diagnostic and return true.
 static bool checkStatus(SILFunction &fn, SILLocation loc, TF_Status *status,
                         Diag<StringRef> id = diag::tf_lowering_error) {
   if (TF_GetCode(status) == TF_OK)
