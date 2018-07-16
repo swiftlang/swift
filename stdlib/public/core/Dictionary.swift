@@ -1922,7 +1922,6 @@ internal class _RawNativeDictionaryStorage
   /// Get the NSEnumerator implementation for self.
   /// _HashableTypedNativeDictionaryStorage overloads this to give
   /// _NativeSelfNSEnumerator proper type parameters.
-  @inlinable // FIXME(sil-serialize-all)
   @objc
   internal func enumerator() -> _NSEnumerator {
     return _NativeDictionaryNSEnumerator<AnyObject, AnyObject>(
@@ -1971,7 +1970,6 @@ internal class _RawNativeDictionaryStorage
     return nil
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   internal func keyEnumerator() -> _NSEnumerator {
     return enumerator()
   }
@@ -2071,7 +2069,7 @@ final internal class _HashableTypedNativeDictionaryStorage<Key: Hashable, Value>
     return FullContainer(_nativeBuffer: buffer)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @objc
   internal override func enumerator() -> _NSEnumerator {
     return _NativeDictionaryNSEnumerator<Key, Value>(
         Buffer(_storage: self))
@@ -2699,33 +2697,24 @@ extension _NativeDictionaryBuffer where Key: Hashable
 #if _runtime(_ObjC)
 /// An NSEnumerator that works with any NativeDictionaryBuffer of
 /// verbatim bridgeable elements. Used by the various NSDictionary impls.
-@_fixed_layout // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 final internal class _NativeDictionaryNSEnumerator<Key, Value>
   : _SwiftNativeNSEnumerator, _NSEnumerator {
 
-  @usableFromInline
   internal typealias Buffer = _NativeDictionaryBuffer<Key, Value>
-  @usableFromInline
   internal typealias Index = _NativeDictionaryIndex<Key, Value>
 
-  @inlinable // FIXME(sil-serialize-all)
   internal override required init() {
     _sanityCheckFailure("don't call this designated initializer")
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   internal init(_ buffer: Buffer) {
     self.buffer = buffer
     nextIndex = buffer.startIndex
     endIndex = buffer.endIndex
   }
 
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var buffer: Buffer
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var nextIndex: Index
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var endIndex: Index
 
   //
@@ -2734,7 +2723,6 @@ final internal class _NativeDictionaryNSEnumerator<Key, Value>
   // Do not call any of these methods from the standard library!
   //
 
-  @inlinable // FIXME(sil-serialize-all)
   @objc
   internal func nextObject() -> AnyObject? {
     if nextIndex == endIndex {
@@ -2745,7 +2733,6 @@ final internal class _NativeDictionaryNSEnumerator<Key, Value>
     return key
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @objc(countByEnumeratingWithState:objects:count:)
   internal func countByEnumerating(
     with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
@@ -2853,7 +2840,6 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     return bridgingObjectForKey(aKey)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @objc
   internal func keyEnumerator() -> _NSEnumerator {
     return enumerator()
@@ -3024,7 +3010,6 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     return nil
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @objc
   internal func enumerator() -> _NSEnumerator {
     bridgeEverything()
