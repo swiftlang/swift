@@ -5080,6 +5080,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
 
   /// Check each of the tuple elements in the destination.
   bool anythingShuffled = false;
+  bool anythingReordered = false;
   SmallVector<TupleTypeElt, 4> toSugarFields;
   SmallVector<TupleTypeElt, 4> fromTupleExprFields(
                                  fromTuple->getElements().size());
@@ -5094,6 +5095,12 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
     // If the source and destination index are different, we'll be shuffling.
     if ((unsigned)sources[i] != i) {
       anythingShuffled = true;
+
+      // Shuffling argument labels out of order is no longer allowed. If the
+      // shuffle is successfully constructed, we will diagnose it below.
+      const auto &paraElt = fromTuple->getElement(i);
+      if (paraElt.getName() != toElt.getName())
+        anythingReordered = true;
     }
 
     // We're matching one element to another. If the types already
@@ -5169,7 +5176,22 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
 
     return expr;
   }
-  
+
+  if (anythingReordered) {
+    if (cs.getASTContext().isSwiftVersionAtLeast(5)) {
+      // Reject the shuffle in Swift 5.
+      //
+      // FIXME: Do not fail the solution set in CSApply.  Fail it much earlier
+      // in the solver when we are allowed to remove the compatibility warning.
+      cs.TC.diagnose(expr->getLoc(),
+                     diag::reordering_tuple_shuffle_deprecated);
+      return nullptr;
+    } else {
+      cs.TC.diagnose(expr->getLoc(),
+                     diag::warn_reordering_tuple_shuffle_deprecated);
+    }
+  }
+
   // Create the tuple shuffle.
   return
     cs.cacheType(TupleShuffleExpr::create(tc.Context,
@@ -6648,7 +6670,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       
       llvm_unreachable("unhandled metatype kind");
     }
-    
+
     if (auto toClass = toType->getClassOrBoundGenericClass()) {
       if (toClass->getName() == cs.getASTContext().Id_Protocol
           && toClass->getModuleContext()->getName()

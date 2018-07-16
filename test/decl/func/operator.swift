@@ -112,7 +112,7 @@ var f2 : (Int) -> Int = (+-+)
 var f3 : (inout Int) -> Int = (-+-) // expected-error{{ambiguous use of operator '-+-'}}
 var f4 : (inout Int, Int) -> Int = (+-+=)
 var r5 : (a : (Int, Int) -> Int, b : (Int, Int) -> Int) = (+, -)
-var r6 : (a : (Int, Int) -> Int, b : (Int, Int) -> Int) = (b : +, a : -)
+var r6 : (a : (Int, Int) -> Int, b : (Int, Int) -> Int) = (b : +, a : -) // expected-warning {{expression shuffles the elements of this tuple; this behavior is deprecated in Swift 4}}
 
 struct f6_S {
   subscript(op : (Int, Int) -> Int) -> Int {

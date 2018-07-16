@@ -52,7 +52,7 @@ func funcdecl5(_ a: Int, _ y: Int) {
   var b = a.1+a.f
 
   // Tuple expressions with named elements.
-  var i : (y : Int, x : Int) = (x : 42, y : 11)
+  var i : (y : Int, x : Int) = (x : 42, y : 11) // expected-warning {{expression shuffles the elements of this tuple; this behavior is deprecated in Swift 4}}
   funcdecl1(123, 444)
   
   // Calls.
