@@ -92,8 +92,7 @@ public struct DoubleWidth<Base : FixedWidthInteger>
   // For that reason, we'll include an internal initializer that takes two
   // separate arguments.
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
-  @_transparent
+  @usableFromInline  @_transparent
   internal init(_ _high: High, _ low: Low) {
     self.init((_high, low))
   }
@@ -562,9 +561,7 @@ extension DoubleWidth : FixedWidthInteger {
   /// "Masking" notionally involves repeatedly incrementing or decrementing this
   /// value by `self.bitWidth` until the result is contained in the range
   /// `0..<self.bitWidth`.
-  @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
-  @_transparent
+  @usableFromInline  @_transparent
   internal func _masked() -> DoubleWidth {
     // FIXME(integers): test types with bit widths that aren't powers of 2
     if DoubleWidth.bitWidth.nonzeroBitCount == 1 {

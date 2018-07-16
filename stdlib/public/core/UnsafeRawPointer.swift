@@ -280,7 +280,6 @@ public struct UnsafeRawPointer: _Pointer {
   ///   region is bound to `T`, but has not been modified in any other way.
   ///   The number of bytes in this region is
   ///   `count * MemoryLayout<T>.stride`.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @discardableResult
   public func bindMemory<T>(
@@ -627,7 +626,6 @@ public struct UnsafeMutableRawPointer: _Pointer {
   ///   region is bound to `T`, but has not been modified in any other way.
   ///   The number of bytes in this region is
   ///   `count * MemoryLayout<T>.stride`.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @discardableResult
   public func bindMemory<T>(

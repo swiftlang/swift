@@ -82,7 +82,6 @@ func _stdlib_atomicCompareExchangeStrongPtr<T>(
 }
 % end # optional
 
-@inlinable // FIXME(sil-serialize-all)
 @_transparent
 @discardableResult
 public // @testable

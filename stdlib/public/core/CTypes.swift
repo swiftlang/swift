@@ -109,8 +109,7 @@ public struct OpaquePointer {
   @usableFromInline
   internal var _rawValue: Builtin.RawPointer
 
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal init(_ v: Builtin.RawPointer) {
     self._rawValue = v
   }
