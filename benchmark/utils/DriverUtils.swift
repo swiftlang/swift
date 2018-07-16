@@ -19,38 +19,7 @@ import Darwin
 import TestsUtils
 
 struct BenchResults {
-  var delim: String  = ","
-  var sampleCount: UInt64 = 0
-  var min: UInt64 = 0
-  var max: UInt64 = 0
-  var mean: UInt64 = 0
-  var sd: UInt64 = 0
-  var median: UInt64 = 0
-
-  init() {}
-
-  init(delim: String, sampleCount: UInt64, min: UInt64, max: UInt64, mean: UInt64, sd: UInt64, median: UInt64) {
-    self.delim = delim
-    self.sampleCount = sampleCount
-    self.min = min
-    self.max = max
-    self.mean = mean
-    self.sd = sd
-    self.median = median
-
-    // Sanity the bounds of our results
-    precondition(self.min <= self.max, "min should always be <= max")
-    precondition(self.min <= self.mean, "min should always be <= mean")
-    precondition(self.min <= self.median, "min should always be <= median")
-    precondition(self.max >= self.mean, "max should always be >= mean")
-    precondition(self.max >= self.median, "max should always be >= median")
-  }
-}
-
-extension BenchResults : CustomStringConvertible {
-  var description: String {
-     return "\(sampleCount)\(delim)\(min)\(delim)\(max)\(delim)\(mean)\(delim)\(sd)\(delim)\(median)"
-  }
+  let sampleCount, min, max, mean, sd, median: UInt64
 }
 
 struct Test {
@@ -413,7 +382,7 @@ func runBench(_ test: Test, _ c: TestConfig) -> BenchResults? {
   let (mean, sd) = internalMeanSD(samples)
 
   // Return our benchmark results.
-  return BenchResults(delim: c.delim, sampleCount: UInt64(samples.count),
+  return BenchResults(sampleCount: UInt64(samples.count),
                       min: samples.min()!, max: samples.max()!,
                       mean: mean, sd: sd, median: internalMedian(samples))
 }
@@ -438,6 +407,7 @@ func printRunInfo(_ c: TestConfig) {
   }
 }
 
+/// Execute benchmarks and continuously report the measurement results.
 func runBenchmarks(_ c: TestConfig) {
   let withUnit = {$0 + "(us)"}
   let header = (
@@ -448,16 +418,25 @@ func runBenchmarks(_ c: TestConfig) {
 
   var testCount = 0
 
-  for t in c.tests {
-    guard let results = runBench(t, c) else {
-      print("\(t.index)\(c.delim)\(t.name)\(c.delim)Unsupported")
-      fflush(stdout)
-      continue
+  func report(_ t: Test, results: BenchResults?) {
+    func values(r: BenchResults) -> [String] {
+      return [r.sampleCount, r.min, r.max, r.mean, r.sd, r.median]
+        .map { String($0) }
     }
-    print("\(t.index)\(c.delim)\(t.name)\(c.delim)\(results.description)")
+    let benchmarkStats = (
+      [String(t.index), t.name] + (results.map(values) ?? ["Unsupported"])
+    ).joined(separator: c.delim)
+
+    print(benchmarkStats)
     fflush(stdout)
 
-    testCount += 1
+    if (results != nil) {
+      testCount += 1
+    }
+  }
+
+  for t in c.tests {
+    report(t, results:runBench(t, c))
   }
 
   print("")
