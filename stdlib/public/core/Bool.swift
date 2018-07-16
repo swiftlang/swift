@@ -75,8 +75,7 @@ public struct Bool {
     self._value = Builtin.trunc_Int8_Int1(zero._value)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal init(_ v: Builtin.Int1) { self._value = v }
   
   /// Creates an instance equal to the given Boolean value.
@@ -284,7 +283,6 @@ extension Bool {
   /// - Parameters:
   ///   - lhs: The left-hand side of the operation.
   ///   - rhs: The right-hand side of the operation.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @inline(__always)
   public static func && (lhs: Bool, rhs: @autoclosure () throws -> Bool) rethrows
@@ -325,7 +323,6 @@ extension Bool {
   /// - Parameters:
   ///   - lhs: The left-hand side of the operation.
   ///   - rhs: The right-hand side of the operation.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @inline(__always)
   public static func || (lhs: Bool, rhs: @autoclosure () throws -> Bool) rethrows

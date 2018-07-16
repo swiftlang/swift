@@ -661,7 +661,6 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// - Returns: A typed buffer of the newly bound memory. The memory in this
   ///   region is bound to `T`, but has not been modified in any other way.
   ///   The typed buffer references `self.count / MemoryLayout<T>.stride` instances of `T`.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @discardableResult
   public func bindMemory<T>(
