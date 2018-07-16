@@ -223,35 +223,7 @@ extension DoubleWidth: _ExpressibleByBuiltinIntegerLiteral {
 
 
 extension DoubleWidth {
-  public struct Words : Collection {
-    public enum _IndexValue {
-      case low(Low.Words.Index)
-      case high(High.Words.Index)
-    }
-    
-        public struct Index : Comparable {
-      public var _value: _IndexValue
-
-      public init(_ _value: _IndexValue) { self._value = _value }
-
-      public static func ==(lhs: Index, rhs: Index) -> Bool {
-        switch (lhs._value, rhs._value) {
-        case let (.low(l), .low(r)): return l == r
-        case let (.high(l), .high(r)): return l == r
-        default: return false
-        }
-      }
-
-      public static func <(lhs: Index, rhs: Index) -> Bool {
-        switch (lhs._value, rhs._value) {
-        case let (.low(l), .low(r)): return l < r
-        case (.low(_), .high(_)): return true
-        case (.high(_), .low(_)): return false
-        case let (.high(l), .high(r)): return l < r
-        }
-      }
-    }
-
+  public struct Words {
     public var _high: High.Words
     public var _low: Low.Words
 
@@ -267,45 +239,75 @@ extension DoubleWidth {
       _sanityCheck(!_low.isEmpty)
     }
 
-    public var startIndex: Index {
-      return Index(.low(_low.startIndex))
+    public enum _IndexValue {
+      case low(Low.Words.Index)
+      case high(High.Words.Index)
+    }
+  }
+}
+
+extension DoubleWidth.Words: Collection {  
+  public struct Index : Comparable {
+    public var _value: _IndexValue
+
+    public init(_ _value: _IndexValue) { self._value = _value }
+
+    public static func ==(lhs: Index, rhs: Index) -> Bool {
+      switch (lhs._value, rhs._value) {
+      case let (.low(l), .low(r)): return l == r
+      case let (.high(l), .high(r)): return l == r
+      default: return false
+      }
     }
 
-    public var endIndex: Index {
-      return Index(.high(_high.endIndex))
-    }
-    
-    public var count: Int {
-      if Base.bitWidth < UInt.bitWidth { return 1 }
-      return Int(_low.count) + Int(_high.count)
-    }
-  
-    public func index(after i: Index) -> Index {
-      switch i._value {
-      case let .low(li):
-        if Base.bitWidth < UInt.bitWidth {
-          return Index(.high(_high.endIndex)) 
-        }
-        let next = _low.index(after: li)
-        if next == _low.endIndex { 
-          return Index(.high(_high.startIndex)) 
-        }
-        return Index(.low(next))
-      case let .high(hi):
-        return Index(.high(_high.index(after: hi)))
+    public static func <(lhs: Index, rhs: Index) -> Bool {
+      switch (lhs._value, rhs._value) {
+      case let (.low(l), .low(r)): return l < r
+      case (.low(_), .high(_)): return true
+      case (.high(_), .low(_)): return false
+      case let (.high(l), .high(r)): return l < r
       }
     }
+  }
+
+  public var startIndex: Index {
+    return Index(.low(_low.startIndex))
+  }
+
+  public var endIndex: Index {
+    return Index(.high(_high.endIndex))
+  }
   
-    public subscript(_ i: Index) -> UInt {
+  public var count: Int {
+    if Base.bitWidth < UInt.bitWidth { return 1 }
+    return Int(_low.count) + Int(_high.count)
+  }
+
+  public func index(after i: Index) -> Index {
+    switch i._value {
+    case let .low(li):
       if Base.bitWidth < UInt.bitWidth {
-        _precondition(i == Index(.low(_low.startIndex)), "Invalid index")
-        _sanityCheck(2 * Base.bitWidth <= UInt.bitWidth)
-        return _low.first! | (_high.first! &<< Base.bitWidth._lowWord) 
+        return Index(.high(_high.endIndex)) 
       }
-      switch i._value {
-      case let .low(li): return _low[li]
-      case let .high(hi): return _high[hi]
+      let next = _low.index(after: li)
+      if next == _low.endIndex { 
+        return Index(.high(_high.startIndex)) 
       }
+      return Index(.low(next))
+    case let .high(hi):
+      return Index(.high(_high.index(after: hi)))
+    }
+  }
+
+  public subscript(_ i: Index) -> UInt {
+    if Base.bitWidth < UInt.bitWidth {
+      _precondition(i == Index(.low(_low.startIndex)), "Invalid index")
+      _sanityCheck(2 * Base.bitWidth <= UInt.bitWidth)
+      return _low.first! | (_high.first! &<< Base.bitWidth._lowWord) 
+    }
+    switch i._value {
+    case let .low(li): return _low[li]
+    case let .high(hi): return _high[hi]
     }
   }
 }
