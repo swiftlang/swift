@@ -20,7 +20,6 @@
 
 #include "TFCanonicalizeCFG.h"
 #include "TFUtilities.h"
-#include "llvm/ADT/iterator_range.h"
 #include "swift/AST/TensorFlow.h"
 #include "swift/Basic/TransformArrayRef.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -32,6 +31,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILUndef.h"
+#include "llvm/ADT/iterator_range.h"
 
 using namespace swift;
 using namespace tf;
@@ -262,9 +262,10 @@ SESERegionBuilder::processAcyclicRegionExcludingEnd(SILBasicBlock *startBB,
 
 /// Create a TF handle of the appropriate integer type for the given bitwith
 /// that is initialized to the given value.
-SILValue createTFIntegerConst(GraphGlobalConfiguration& graphConfiguration,
-                              SILBuilder &builder, SILLocation location,
-                              unsigned bitwidth, intmax_t value) {
+static SILValue
+createTFIntegerConst(GraphGlobalConfiguration &graphConfiguration,
+                     SILBuilder &builder, SILLocation location,
+                     unsigned bitwidth, intmax_t value) {
   ASTContext& context = builder.getASTContext();
   SILType intType =
       SILType::getBuiltinIntegerType(bitwidth, builder.getASTContext());
@@ -277,7 +278,7 @@ SILValue createTFIntegerConst(GraphGlobalConfiguration& graphConfiguration,
                         SymbolicValue::getInteger(APInt(bitwidth, value),
                                                   context.getAllocator())});
   graphConfiguration.handleDevicePlacement(
-      "Const",
+      opName,
       /*opDevice*/ getDeviceString(DeviceType::ALL), builder, location,
       attributes);
   GraphOperationInst *constNode = builder.createGraphOperation(
@@ -309,12 +310,12 @@ private:
 
   void initialize();
 
-  /// Create a new header for the loop and returns a pair consisting of
+  /// Create a new header for the loop and return a pair consisting of
   /// the new block and the phi argument corresponding to the exitIndex.
   std::pair<SILBasicBlock *, SILValue> createNewHeader();
 
-  /// Create a new latch block and clones all the arguments from new header.
-  SILBasicBlock *createLatchBlock(SILBasicBlock *newHeader);
+  /// Create a new latch block and clone all the arguments from new header.
+  SILBasicBlock *createNewLatch(SILBasicBlock *newHeader);
 
   // Patch the edges that go to the header and exit blocks to the new header or
   // latch block as appropriate. Also, return the map consisting of indices
@@ -344,8 +345,8 @@ private:
 
   // Configuration for graph construction.
   GraphGlobalConfiguration *graphConfiguration;
-  DominanceInfo* DI;
-  SILLoopInfo* LI;
+  DominanceInfo *DI;
+  SILLoopInfo *LI;
   SILLoop *loop;
   SILBasicBlock *header;
   SILBasicBlock *preheader;
@@ -364,7 +365,7 @@ private:
 void SingleExitLoopTransformer::initialize() {
   // Remember some information from the loop before it gets transformed.
 
-  // exit Blocks
+  // Exit Blocks
   loop->getExitBlocks(exitBlocks);
   // All the exiting edges need to be rewired.
   loop->getExitEdges(edgesToFix);
@@ -419,6 +420,8 @@ TermInst *SingleExitLoopTransformer::appendArguments(
     newTermInst =
         builder.createBranch(branch->getLoc(), branch->getDestBB(), args);
   } else if (auto *condBranch = dyn_cast<CondBranchInst>(termInst)) {
+    // At the moment we can only add arguments to br and cond_br.
+    assert(condBranch && "Terminator is not a branch or conditional branch.");
     bool isTrueEdge = condBranch->getTrueBB() == target;
     assert(((isTrueEdge && condBranch->getTrueBB() == target) ||
             (!isTrueEdge && condBranch->getFalseBB() == target)) &&
@@ -431,9 +434,6 @@ TermInst *SingleExitLoopTransformer::appendArguments(
         condBranch->getLoc(), condBranch->getCondition(),
         condBranch->getTrueBB(), trueArgs, condBranch->getFalseBB(), falseArgs,
         condBranch->getTrueBBCount(), condBranch->getFalseBBCount());
-  } else {
-    // At the moment we can only add arguments to br and cond_br.
-    llvm_unreachable("Can't add argument to terminator");
   }
   // Remove the old terminator instruction.
   termInst->dropAllReferences();
@@ -476,11 +476,11 @@ SingleExitLoopTransformer::createNewHeader() {
 }
 
 SILBasicBlock *
-SingleExitLoopTransformer::createLatchBlock(SILBasicBlock *newHeader) {
+SingleExitLoopTransformer::createNewLatch(SILBasicBlock *newHeader) {
   // Create a new latch block.
   SILBasicBlock *latchBlock = currentFn->createBasicBlock();
   latchBlock->cloneArgumentList(newHeader);
-  SILBuilder  builder(latchBlock);
+  SILBuilder builder(latchBlock);
   SmallVector<SILValue, 8> latchArgs;
   for (const SILArgument *latchArg : latchBlock->getArguments()) {
     latchArgs.push_back(latchArg);
@@ -601,7 +601,7 @@ SILBasicBlock *SingleExitLoopTransformer::createNewExitBlockWithDemux(
   SILBasicBlock *newExitBlock = createBlockOutsideLoop();
 
   SILBuilder builder(newExitBlock);
-  ASTContext& context = builder.getASTContext();
+  ASTContext &context = builder.getASTContext();
 
   auto curBlockIter = exitBlocks.rbegin();
   SILBasicBlock *demuxBlock = *curBlockIter++;
@@ -634,7 +634,7 @@ SILBasicBlock *SingleExitLoopTransformer::createNewExitBlockWithDemux(
             SILType::getBuiltinIntegerType(1, context))});
     assert(condTensorInst->getNumResults() == 1);
     SILValue condTensor = condTensorInst->getResults()[0];
-    GraphOperationInst* condValue = builder.createGraphOperation(
+    GraphOperationInst *condValue = builder.createGraphOperation(
         headerLocation, context.getIdentifier("tf_tensor_to_i1"),
         /*operands*/ {condTensor}, /*attributes */ {},
         {SILType::getBuiltinIntegerType(1, context)});
@@ -663,7 +663,7 @@ bool SingleExitLoopTransformer::transform() {
   SILValue exitIndexArg = headerResult.second;
 
   // Create a new latch block.
-  SILBasicBlock *latchBlock = createLatchBlock(newHeader);
+  SILBasicBlock *latchBlock = createNewLatch(newHeader);
 
   // Patch the edges and return the map consisting of indices assigned
   // to the exit blocks.
