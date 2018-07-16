@@ -1102,6 +1102,7 @@ namespace  {
     UNINTERESTING_ATTR(NSApplicationMain)
     UNINTERESTING_ATTR(NSCopying)
     UNINTERESTING_ATTR(NSManaged)
+    UNINTERESTING_ATTR(ObjC)
     UNINTERESTING_ATTR(ObjCBridged)
     UNINTERESTING_ATTR(Optional)
     UNINTERESTING_ATTR(Override)
@@ -1200,10 +1201,6 @@ namespace  {
         return;
 
       makeDynamic(Override->getASTContext(), Override);
-    }
-
-    void visitObjCAttr(ObjCAttr *attr) {
-      // FIXME: Removing this results in compile-time errors.
     }
   };
 } // end anonymous namespace

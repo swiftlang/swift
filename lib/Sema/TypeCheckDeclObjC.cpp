@@ -1079,16 +1079,11 @@ Optional<ObjCReason> swift::shouldMarkAsObjC(TypeChecker &TC,
       return ObjCReason::witnessToObjC(requirements.front());
   }
 
-  ASTContext &ctx = VD->getASTContext();
-
   // Infer '@objc' for 'dynamic' members.
   if (auto attr = VD->getAttrs().getAttribute<DynamicAttr>()) {
     // For implicit 'dynamic', just infer '@objc' implicitly.
     if (attr->isImplicit())
       return ObjCReason(ObjCReason::ImplicitlyObjC);
-
-    bool isGetterOrSetter =
-      isa<AccessorDecl>(VD) && cast<AccessorDecl>(VD)->isGetterOrSetter();
 
     // Complain that 'dynamic' requires '@objc', but (quietly) infer @objc
     // anyway for better recovery.
