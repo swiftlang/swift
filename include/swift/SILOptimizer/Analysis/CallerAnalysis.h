@@ -104,8 +104,8 @@ public:
     RecomputeFunctionList.insert(F);
   }
 
-  /// Notify the analysis about a newly created function.
-  virtual void notifyAddFunction(SILFunction *F) override {
+  /// Notify the analysis about a newly created or modified function.
+  virtual void notifyAddedOrModifiedFunction(SILFunction *F) override {
     RecomputeFunctionList.insert(F);
   }
 

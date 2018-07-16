@@ -163,14 +163,16 @@ public:
   /// is derived. This is used to avoid an infinite amount of functions pushed
   /// on the worklist (e.g. caused by a bug in a specializing optimization).
   void addFunctionToWorklist(SILFunction *F, SILFunction *DerivedFrom);
-  
+
   /// \brief Iterate over all analysis and notify them of the function.
+  ///
   /// This function does not necessarily have to be newly created function. It
   /// is the job of the analysis to make sure no extra work is done if the
   /// particular analysis has been done on the function.
   void notifyAnalysisOfFunction(SILFunction *F) {
-    for (auto AP : Analysis)
-      AP->notifyAddFunction(F);
+    for (auto AP : Analysis) {
+      AP->notifyAddedOrModifiedFunction(F);
+    }
   }
 
   /// \brief Broadcast the invalidation of the function to all analysis.
