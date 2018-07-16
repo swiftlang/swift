@@ -2099,9 +2099,8 @@ private:
         unsigned NumBits = BuiltinIntTy->getWidth().getFixedWidth();
         Name += "_Int" + llvm::utostr(NumBits);
       }
-    }
-    else if (auto BuiltinFloatTy =
-                 dyn_cast<BuiltinFloatType>(OpdTy.getASTType())) {
+    } else if (auto BuiltinFloatTy =
+                   dyn_cast<BuiltinFloatType>(OpdTy.getASTType())) {
       Name += "_FP";
       switch (BuiltinFloatTy->getFPKind()) {
       case BuiltinFloatType::IEEE16: Name += "IEEE16"; break;
