@@ -3602,6 +3602,47 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     }
     break;
   }
+  case SILInstructionKind::ReallocRefInst: {
+    SmallVector<SILType, 2> ElementTypes;
+    SmallVector<SILValue, 2> ElementCounts;
+    while (P.consumeIf(tok::l_square)) {
+      Identifier Id;
+      parseSILIdentifier(Id, diag::expected_in_attribute_list);
+      StringRef Optional = Id.str();
+      if (Optional == "tail_elems") {
+        SILType ElemTy;
+        if (parseSILType(ElemTy) || !P.Tok.isAnyOperator() ||
+            P.Tok.getText() != "*")
+          return true;
+        P.consumeToken();
+
+        SILValue ElemCount;
+        if (parseTypedValueRef(ElemCount, B))
+          return true;
+
+        ElementTypes.push_back(ElemTy);
+        ElementCounts.push_back(ElemCount);
+      } else {
+        return true;
+      }
+      P.parseToken(tok::r_square, diag::expected_in_attribute_list);
+    }
+    SILValue Metadata;
+    if (parseTypedValueRef(Val, B) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ","))
+      return true;
+
+    SILType ObjectType;
+    if (parseSILType(ObjectType))
+      return true;
+
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    ResultVal = B.createReallocRef(InstLoc, ObjectType, Val, ElementTypes,
+                                   ElementCounts);
+    break;
+  }
   case SILInstructionKind::AllocRefInst:
   case SILInstructionKind::AllocRefDynamicInst: {
     bool IsObjC = false;

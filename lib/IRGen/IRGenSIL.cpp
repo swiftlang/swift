@@ -919,6 +919,7 @@ public:
                                   llvm::Value *addr);
   void visitAllocStackInst(AllocStackInst *i);
   void visitAllocRefInst(AllocRefInst *i);
+  void visitReallocRefInst(ReallocRefInst *i);
   void visitAllocRefDynamicInst(AllocRefDynamicInst *i);
   void visitAllocBoxInst(AllocBoxInst *i);
 
@@ -4093,6 +4094,10 @@ void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {
   Explosion e;
   e.add(alloced);
   setLoweredExplosion(i, e);
+}
+
+void IRGenSILFunction::visitReallocRefInst(swift::ReallocRefInst *i) {
+  llvm_unreachable("unimplemented: incomplete realloc_ref implementation");
 }
 
 void IRGenSILFunction::visitAllocRefDynamicInst(swift::AllocRefDynamicInst *i) {

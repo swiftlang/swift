@@ -1446,6 +1446,55 @@ public:
   }
 };
 
+/// ReallocRefInst - This represents the reallocation primitive of a reference
+/// type. If the reallocation was successfully the reference is returned with
+/// the altered size. If the reallocation failed the reference is returned at
+/// a new address in an allocation with the altered size and the contents are
+/// bit-wise copied.
+/// This is only useful for tail-allocated arrays and the new size must always
+/// be larger than the original size.
+class ReallocRefInst final
+    : public InstructionBaseWithTrailingOperands<
+                                               SILInstructionKind::ReallocRefInst,
+                                               ReallocRefInst,
+                                               AllocRefInstBase, SILType> {
+  friend AllocRefInstBase;
+  friend SILBuilder;
+
+  ReallocRefInst(SILDebugLocation DebugLoc, SILFunction &F, SILType ObjectType,
+                 SILValue ExistingRef, ArrayRef<SILType> ElementTypes,
+                 ArrayRef<SILValue> AllOperands)
+      : InstructionBaseWithTrailingOperands(AllOperands, DebugLoc, ObjectType,
+                                            false, false, ElementTypes) {
+    assert(AllOperands.size() >= ElementTypes.size());
+    std::uninitialized_copy(ElementTypes.begin(), ElementTypes.end(),
+                            getTrailingObjects<SILType>());
+  }
+
+  static ReallocRefInst *create(SILDebugLocation DebugLoc, SILFunction &F,
+                                SILType ObjectType, SILValue ExistingRef,
+                                ArrayRef<SILType> ElementTypes,
+                                ArrayRef<SILValue> ElementCountOperands,
+                                SILOpenedArchetypesState &OpenedArchetypes);
+
+public:
+  ArrayRef<Operand> getTypeDependentOperands() const {
+    return getAllOperands().slice(getNumTailTypes());
+  }
+
+  MutableArrayRef<Operand> getTypeDependentOperands() {
+    return getAllOperands().slice(getNumTailTypes());
+  }
+
+  SILValue getReallocPointer() {
+    llvm_unreachable("Unimplemented! realloc_ref implementation incomplete");
+  }
+
+  SILValue getReallocSize() {
+    llvm_unreachable("Unimplemented! realloc_ref implementation incomplete");
+  }
+};
+
 /// AllocRefDynamicInst - This represents the primitive allocation of
 /// an instance of a reference type whose runtime type is provided by
 /// the given metatype value. Aside from the reference count, the

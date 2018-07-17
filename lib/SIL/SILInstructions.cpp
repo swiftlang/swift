@@ -232,6 +232,27 @@ AllocRefInst *AllocRefInst::create(SILDebugLocation Loc, SILFunction &F,
                                      ElementTypes, AllOperands);
 }
 
+ReallocRefInst *
+ReallocRefInst::create(SILDebugLocation Loc, SILFunction &F, SILType ObjectType,
+                       SILValue ExistingRef, ArrayRef<SILType> ElementTypes,
+                       ArrayRef<SILValue> ElementCountOperands,
+                       SILOpenedArchetypesState &OpenedArchetypes) {
+  assert(ElementTypes.size() == ElementCountOperands.size());
+  SmallVector<SILValue, 8> AllOperands(ElementCountOperands.begin(),
+                                       ElementCountOperands.end());
+  for (SILType ElemType : ElementTypes) {
+    collectTypeDependentOperands(AllOperands, OpenedArchetypes, F,
+                                 ElemType.getASTType());
+  }
+  collectTypeDependentOperands(AllOperands, OpenedArchetypes, F,
+                               ObjectType.getASTType());
+  auto Size = totalSizeToAlloc<swift::Operand, SILType>(AllOperands.size(),
+                                                        ElementTypes.size());
+  auto Buffer = F.getModule().allocateInst(Size, alignof(ReallocRefInst));
+  return ::new (Buffer) ReallocRefInst(Loc, F, ObjectType, ExistingRef,
+                                       ElementTypes, AllOperands);
+}
+
 AllocRefDynamicInst *
 AllocRefDynamicInst::create(SILDebugLocation DebugLoc, SILFunction &F,
                             SILValue metatypeOperand, SILType ty, bool objc,

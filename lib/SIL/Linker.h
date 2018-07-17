@@ -75,6 +75,7 @@ public:
   void visitInitExistentialAddrInst(InitExistentialAddrInst *IEI);
   void visitInitExistentialRefInst(InitExistentialRefInst *IERI);
   void visitAllocRefInst(AllocRefInst *ARI);
+  void visitReallocRefInst(ReallocRefInst *RRI);
   void visitMetatypeInst(MetatypeInst *MI);
 
 private:

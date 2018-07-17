@@ -1050,6 +1050,11 @@ public:
     *this << ARI->getType();
   }
 
+  void visitReallocRefInst(ReallocRefInst *RRI) {
+    printAllocRefInstBase(RRI);
+    *this << RRI->getType();
+  }
+
   void visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
     printAllocRefInstBase(ARDI);
     *this << getIDAndType(ARDI->getMetatypeOperand());

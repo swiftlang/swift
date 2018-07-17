@@ -465,6 +465,10 @@ SILInstruction *SILCombiner::visitAllocRefInst(AllocRefInst *AR) {
   return nullptr;
 }
 
+SILInstruction *SILCombiner::visitReallocRefInst(ReallocRefInst *RRI) {
+  return nullptr;
+}
+
 /// Returns the base address if \p val is an index_addr with constant index.
 static SILValue isConstIndexAddr(SILValue val, unsigned &index) {
   auto *IA = dyn_cast<IndexAddrInst>(val);

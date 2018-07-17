@@ -1257,6 +1257,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     }
     break;
   }
+  case SILInstructionKind::ReallocRefInst:
   case SILInstructionKind::AllocRefInst:
   case SILInstructionKind::AllocRefDynamicInst: {
     assert(RecordKind == SIL_ONE_TYPE_VALUES &&

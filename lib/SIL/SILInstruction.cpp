@@ -367,6 +367,8 @@ namespace {
       return true;
     }
 
+    bool visitReallocRefInst(const ReallocRefInst *RHS) { return true; }
+
     bool visitAllocRefDynamicInst(const AllocRefDynamicInst *RHS) {
       return true;
     }

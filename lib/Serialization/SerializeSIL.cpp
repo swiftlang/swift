@@ -827,6 +827,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     break;
   }
   case SILInstructionKind::AllocRefInst:
+  case SILInstructionKind::ReallocRefInst:
   case SILInstructionKind::AllocRefDynamicInst: {
     const AllocRefInstBase *ARI = cast<AllocRefInstBase>(&SI);
     unsigned abbrCode = SILAbbrCodes[SILOneTypeValuesLayout::Code];

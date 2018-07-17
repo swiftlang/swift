@@ -231,6 +231,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                       AllocationInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(AllocRefInst, alloc_ref,
                       AllocationInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(ReallocRefInst, realloc_ref,
+                      AllocationInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(AllocRefDynamicInst, alloc_ref_dynamic,
                       AllocationInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(AllocValueBufferInst, alloc_value_buffer,

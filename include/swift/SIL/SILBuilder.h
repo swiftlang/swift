@@ -385,6 +385,19 @@ public:
                                        C.OpenedArchetypes));
   }
 
+  ReallocRefInst *createReallocRef(SILLocation Loc, SILType ObjectType,
+                                   SILValue Val, ArrayRef<SILType> ElementTypes,
+                                   ArrayRef<SILValue> ElementCountOperands) {
+    // ReallocRefInst expand to function calls and can therefore not be
+    // counted towards the function prologue.
+    assert(!Loc.isInPrologue() &&
+           "ReallocRefInst can not count towards function prologue since it "
+           "expands into function calls");
+    return insert(ReallocRefInst::create(
+        getSILDebugLocation(Loc), getFunction(), ObjectType, Val, ElementTypes,
+        ElementCountOperands, C.OpenedArchetypes));
+  }
+
   AllocRefDynamicInst *createAllocRefDynamic(SILLocation Loc, SILValue operand,
                                              SILType type, bool objc,
                                     ArrayRef<SILType> ElementTypes,
