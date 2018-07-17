@@ -5060,7 +5060,7 @@ static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
 
   // Final members are always be called directly.
   // Dynamic methods are always accessed by objc_msgSend().
-  if (decl->isFinal() || decl->isDynamic())
+  if (decl->isFinal() || decl->isDynamic() || decl->hasClangNode())
     return false;
 
   if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
