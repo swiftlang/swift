@@ -1289,7 +1289,7 @@ public:
     if (auto ASD = dyn_cast<AbstractStorageDecl>(D))
       ASD->setSetterAccess(access);
     // All imported decls are constructed fully validated.
-    D->setValidationStarted();
+    D->setValidationToChecked();
     if (auto AFD = dyn_cast<AbstractFunctionDecl>(static_cast<Decl *>(D)))
       AFD->setNeedsNewVTableEntry(false);
     return D;

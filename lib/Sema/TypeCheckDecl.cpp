@@ -1106,8 +1106,7 @@ static void validatePatternBindingEntries(TypeChecker &tc,
   if (binding->hasValidationStarted())
     return;
 
-  binding->setIsBeingValidated();
-  SWIFT_DEFER { binding->setIsBeingValidated(false); };
+  DeclValidationRAII IBV(binding);
 
   for (unsigned i = 0, e = binding->getNumPatternEntries(); i != e; ++i)
     validatePatternBindingEntry(tc, binding, i);
@@ -2028,8 +2027,7 @@ void TypeChecker::validateDecl(PrecedenceGroupDecl *PGD) {
 
   if (PGD->isInvalid() || PGD->hasValidationStarted())
     return;
-  PGD->setIsBeingValidated();
-  SWIFT_DEFER { PGD->setIsBeingValidated(false); };
+  DeclValidationRAII IBV(PGD);
 
   bool isInvalid = false;
 
@@ -3668,6 +3666,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   // up to the caller, who must call hasValidSignature() to
   // check that validateDecl() returned a fully-formed decl.
   if (D->hasValidationStarted()) {
+    if (!(D->isBeingValidated() || D->hasValidSignature()))
+      D->dump();
     // If this isn't reentrant (i.e. D has already been validated), the
     // signature better be valid.
     assert(D->isBeingValidated() || D->hasValidSignature());
@@ -3736,8 +3736,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   case DeclKind::AssociatedType: {
     auto assocType = cast<AssociatedTypeDecl>(D);
 
-    assocType->setIsBeingValidated();
-    SWIFT_DEFER { assocType->setIsBeingValidated(false); };
+    DeclValidationRAII IBV(assocType);
 
     checkDeclAttributesEarly(assocType);
 
@@ -3774,8 +3773,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   case DeclKind::TypeAlias: {
     auto typeAlias = cast<TypeAliasDecl>(D);
     // Check generic parameters, if needed.
-    typeAlias->setIsBeingValidated();
-    SWIFT_DEFER { typeAlias->setIsBeingValidated(false); };
+    DeclValidationRAII IBV(typeAlias);
 
     validateGenericTypeSignature(typeAlias);
     validateTypealiasType(*this, typeAlias);
@@ -3789,9 +3787,9 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     nominal->computeType();
 
     // Check generic parameters, if needed.
-    nominal->setIsBeingValidated();
+    DeclValidationRAII IBV(nominal);
     validateGenericTypeSignature(nominal);
-    nominal->setIsBeingValidated(false);
+    nominal->setSignatureIsValidated();
 
     validateAttributes(*this, D);
 
@@ -3836,9 +3834,9 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       proto->computeType();
 
     // Validate the generic type signature, which is just <Self : P>.
-    proto->setIsBeingValidated();
+    DeclValidationRAII IBV(proto);
     validateGenericTypeSignature(proto);
-    proto->setIsBeingValidated(false);
+    proto->setSignatureIsValidated();
 
     // See the comment in validateDeclForNameLookup(); we may have validated
     // the alias before we built the protocol's generic environment.
@@ -3859,15 +3857,12 @@ void TypeChecker::validateDecl(ValueDecl *D) {
           (void) aliasDecl->getFormalAccess();
 
           // Check generic parameters, if needed.
-          bool validated = aliasDecl->hasValidationStarted();
-          if (!validated)
-            aliasDecl->setIsBeingValidated();
-          SWIFT_DEFER {
-            if (!validated)
-              aliasDecl->setIsBeingValidated(false);
-          };
-
-          validateTypealiasType(*this, aliasDecl);
+          if (aliasDecl->hasValidationStarted()) {
+            validateTypealiasType(*this, aliasDecl);
+          } else {
+            DeclValidationRAII IBV(aliasDecl);
+            validateTypealiasType(*this, aliasDecl);
+          }
         }
       }
     }
@@ -3914,7 +3909,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // we don't really know how to type-check them.
     // We can also hit this when code-completing in a closure body.
     //
-    // FIXME: Also, note that we don't call setValidationStarted() here,
+    // FIXME: Also, note that we don't call setValidationToChecked() here,
     // because the ExprCleanser clears the type of ParamDecls, so we
     // can end up here multiple times for the same ParamDecl.
     auto *PD = cast<ParamDecl>(D);
@@ -3933,7 +3928,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // 'for ... in ...' loop.
     if (PBD == nullptr) {
       if (!VD->hasInterfaceType()) {
-        VD->setValidationStarted();
+        VD->setValidationToChecked();
         VD->markInvalid();
       }
 
@@ -3946,7 +3941,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     if (PBD->isBeingValidated())
       return;
 
-    D->setIsBeingValidated();
+    DeclValidationRAII IBV(D);
 
     if (!VD->hasInterfaceType()) {
       // Attempt to infer the type using initializer expressions.
@@ -3965,7 +3960,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // We're not really done with processing the signature yet, but
     // @objc checking requires the declaration to call itself validated
     // so that it can be considered as a witness.
-    D->setIsBeingValidated(false);
+    D->setSignatureIsValidated();
 
     checkDeclAttributesEarly(VD);
     validateAttributes(*this, VD);
@@ -4045,7 +4040,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     checkDeclAttributesEarly(FD);
 
-    FD->setIsBeingValidated();
+    DeclValidationRAII IBV(FD);
 
     // Bind operator functions to the corresponding operator declaration.
     if (FD->isOperator())
@@ -4221,7 +4216,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     if (badType) {
       FD->setInterfaceType(ErrorType::get(Context));
       FD->setInvalid();
-      FD->setIsBeingValidated(false);
       break;
     }
 
@@ -4239,7 +4233,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     // We want the function to be available for name lookup as soon
     // as it has a valid interface type.
-    FD->setIsBeingValidated(false);
+    FD->setSignatureIsValidated();
 
     if (FD->isInvalid())
       break;
@@ -4336,7 +4330,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   case DeclKind::Constructor: {
     auto *CD = cast<ConstructorDecl>(D);
 
-    CD->setIsBeingValidated();
+    DeclValidationRAII IBV(CD);
 
     checkDeclAttributesEarly(CD);
 
@@ -4430,7 +4424,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     // We want the constructor to be available for name lookup as soon
     // as it has a valid interface type.
-    CD->setIsBeingValidated(false);
+    CD->setSignatureIsValidated();
 
     validateAttributes(*this, CD);
 
@@ -4470,7 +4464,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       return;
     }
 
-    DD->setIsBeingValidated();
+    DeclValidationRAII IBV(DD);
 
     assert(DD->getDeclContext()->isTypeContext()
            && "Decl parsing must prevent destructors outside of types!");
@@ -4498,7 +4492,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     if (!DD->getGenericSignatureOfContext())
       configureInterfaceType(DD, DD->getGenericSignature());
 
-    DD->setIsBeingValidated(false);
+    DD->setSignatureIsValidated();
 
     // Do this before markAsObjC() to diagnose @nonobjc better
     validateAttributes(*this, DD);
@@ -4516,7 +4510,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   case DeclKind::Subscript: {
     auto *SD = cast<SubscriptDecl>(D);
 
-    SD->setIsBeingValidated();
+    DeclValidationRAII IBV(SD);
 
     auto dc = SD->getDeclContext();
 
@@ -4562,7 +4556,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         configureInterfaceType(SD, SD->getGenericSignature());
     }
 
-    SD->setIsBeingValidated(false);
+    SD->setSignatureIsValidated();
 
     checkDeclAttributesEarly(SD);
 
@@ -4604,7 +4598,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     checkDeclAttributesEarly(EED);
     validateAttributes(*this, EED);
 
-    EED->setIsBeingValidated(true);
+    DeclValidationRAII IBV(EED);
 
     if (auto *PL = EED->getParameterList()) {
       GenericTypeToArchetypeResolver resolver(EED->getParentEnum());
@@ -4638,12 +4632,12 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       }
     }
 
-    EED->setIsBeingValidated(false);
-
     // Now that we have an argument type we can set the element's declared
     // type.
     if (!EED->hasInterfaceType() && !EED->computeType())
       break;
+
+    EED->setSignatureIsValidated();
 
     // Require the carried type to be materializable.
     if (auto argTy = EED->getArgumentInterfaceType()) {
@@ -4729,36 +4723,37 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
       if (!typealias->getGenericParams()) {
         if (typealias->isBeingValidated()) return;
 
-        bool validated = typealias->hasValidationStarted();
+        auto helper = [&] {
+          (void) typealias->getFormalAccess();
 
-        if (!validated)
-          typealias->setIsBeingValidated();
-        SWIFT_DEFER {
-          if (!validated)
-            typealias->setIsBeingValidated(false);
+          ProtocolRequirementTypeResolver resolver;
+          TypeResolutionOptions options =
+            TypeResolutionFlags::TypeAliasUnderlyingType;
+          if (validateType(typealias->getUnderlyingTypeLoc(),
+                           typealias, options, &resolver)) {
+            typealias->setInvalid();
+            typealias->getUnderlyingTypeLoc().setInvalidType(Context);
+          }
+
+          typealias->setUnderlyingType(
+                                  typealias->getUnderlyingTypeLoc().getType());
+
+          // Note that this doesn't set the generic environment of the alias yet,
+          // because we haven't built one for the protocol.
+          //
+          // See how validateDecl() sets the generic environment on alias members
+          // explicitly.
+          //
+          // FIXME: Hopefully this can all go away with the ITC.
         };
 
-        (void) typealias->getFormalAccess();
-
-        ProtocolRequirementTypeResolver resolver;
-        TypeResolutionOptions options =
-          TypeResolutionFlags::TypeAliasUnderlyingType;
-        if (validateType(typealias->getUnderlyingTypeLoc(),
-                         typealias, options, &resolver)) {
-          typealias->setInvalid();
-          typealias->getUnderlyingTypeLoc().setInvalidType(Context);
+        if (typealias->hasValidationStarted()) {
+          helper();
+        } else {
+          DeclValidationRAII IBV(typealias);
+          helper();
         }
 
-        typealias->setUnderlyingType(
-                                typealias->getUnderlyingTypeLoc().getType());
-
-        // Note that this doesn't set the generic environment of the alias yet,
-        // because we haven't built one for the protocol.
-        //
-        // See how validateDecl() sets the generic environment on alias members
-        // explicitly.
-        //
-        // FIXME: Hopefully this can all go away with the ITC.
         return;
       }
     }
@@ -5106,8 +5101,7 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
   if (ext->hasValidationStarted())
     return;
 
-  ext->setIsBeingValidated();
-  SWIFT_DEFER { ext->setIsBeingValidated(false); };
+  DeclValidationRAII IBV(ext);
 
   // If the extension is already known to be invalid, we're done.
   if (ext->isInvalid())
