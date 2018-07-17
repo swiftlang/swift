@@ -1681,6 +1681,9 @@ GraphOperationInfo::decodeAttributeName(Identifier name) {
   return { nameStr.substr(0, dollarLoc), opClass };
 }
 
+// TODO: This shouldn't be on GraphOperationInfo, it should move into
+// deabstraction.
+
 /// Given a SILValue that may be an array literal, attempt to decode it into the
 /// values that make up its elements.  If this fails or if the value is not an
 /// array, this returns a null Type.  Otherwise it decodes the array, returns
@@ -1705,20 +1708,39 @@ decodeArrayElements(SILValue value, SmallVectorImpl<SILValue> &elements,
   // Figure out the number of elements, which must be a constant integer.
   auto *apply = cast<ApplyInst>(teiValue->getOperand());
 
+  if (decodeArrayElements(apply, elements, arrayInsts))
+    return elementType;
+  return Type();
+
+    return Type();
+  return elementType;
+}
+
+/// Given an apply that may be an array literal, attempt to decode it into
+/// the values that make up its elements.  If this fails or if the value is
+/// not an array, this returns false.  Otherwise it decodes the array,
+/// returns the values of each element, and returns true.
+///
+/// If arrayInsts is non-null and if decoding succeeds, this function adds
+/// all of the instructions relevant to the definition of this array into
+/// the set.  If decoding fails, then the contents of this set is undefined.
+bool GraphOperationInfo::
+decodeArrayElements(ApplyInst *apply,
+                    SmallVectorImpl<SILValue> &elements,
+                    SmallPtrSet<SILInstruction*, 8> *arrayInsts) {
+
   // Verify we have a call to _allocateUninitializedArray.
   SILValue numElementsVal;
   if (!isArrayAllocUninit(apply, numElementsVal) ||
       !isa<IntegerLiteralInst>(numElementsVal))
-    return Type();
+    return false;
   uint64_t numElements =
     cast<IntegerLiteralInst>(numElementsVal)->getValue().getLimitedValue();
 
-  if (tf::ConstExprEvaluator::decodeAllocUninitializedArray(apply,
-                                                            numElements,
-                                                            elements,
-                                                            arrayInsts))
-    return Type();
-  return elementType;
+  return !tf::ConstExprEvaluator::decodeAllocUninitializedArray(apply,
+                                                                numElements,
+                                                                elements,
+                                                                arrayInsts);
 }
 
 
@@ -1897,6 +1919,57 @@ SILLocation tf::getUserSourceLocation(SILInstruction *inst) {
   }
 
   return getUserSourceLocation(inst->getDebugLocation());
+}
+
+/// Create a "Const" tensor operation containing the specified scalars, with
+/// the specified shape and elementType (setting dtype).  The resultType is
+/// the TensorHandle type to produce, and targetDevice is the device set for
+/// the operation.
+GraphOperationInst *
+tf::createConstTensor(Type elementType, SymbolicValue scalars,
+                      SymbolicValue shape, SILType resultType, SILLocation loc,
+                      DeviceType targetDevice, SILBuilder &B) {
+  auto &context = B.getASTContext();
+  auto &allocator = context.getAllocator();
+
+  // Ensure that the array of initializer values is in the module's allocator.
+  scalars = scalars.cloneInto(allocator);
+  shape = shape.cloneInto(allocator);
+  assert(scalars.getKind() == SymbolicValue::Array &&
+         shape.getKind() == SymbolicValue::Array &&
+         "expected array constants for scalars and shape");
+
+  SmallVector<GraphOperationAttribute, 8> attributes;
+
+  // Add a dtype attribute for the array element.
+  attributes.push_back({
+    context.getIdentifier("dtype"),
+    SymbolicValue::getMetatype(elementType->getCanonicalType())
+  });
+
+  // Add an attribute for the value$tensor attribute.
+  auto tensorSuffix =
+  SILTensorOpInfo::getOperandClassSuffix(SILTensorOpInfo::OperandClass::Tensor);
+  attributes.push_back({
+    context.getIdentifier(std::string("value") + tensorSuffix), scalars
+  });
+
+  // Add the value$shape attribute.
+  auto shapeSuffix =
+  SILTensorOpInfo::getOperandClassSuffix(SILTensorOpInfo::OperandClass::Shape);
+  attributes.push_back({
+    context.getIdentifier(std::string("value") + shapeSuffix), shape
+  });
+
+  // All graph_op's get a device.
+  attributes.push_back({
+    context.getIdentifier(DEVICE_ATTR),
+    SymbolicValue::getString(getDeviceString(targetDevice), allocator)
+  });
+
+  // Finally build a new graphop instruction with the simplified operands.
+  return B.createGraphOperation(loc, context.getIdentifier("Const"),
+                                /*operands*/{}, attributes, resultType);
 }
 
 
