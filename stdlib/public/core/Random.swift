@@ -113,38 +113,33 @@ extension RandomNumberGenerator {
 /// The default source of random data.
 ///
 /// When you generate random values, shuffle a collection, or perform another
-/// operation that depends on random data, this type's `default` property is
-/// the generator used by default. For example, the two method calls in this
-/// example are equivalent:
+/// operation that depends on random data, this type's `default` property is the
+/// generator used by default. For example, the two method calls in this example
+/// are equivalent:
 ///
 ///     let x = Int.random(in: 1...100)
-///     let y = Int.random(in: 1...100, using: &Random.default)
+///     var g = SystemRandomNumberGenerator()
+///     let y = Int.random(in: 1...100, using: &g)
 ///
-/// `Random.default` is automatically seeded, is safe to use in multiple
-/// threads, and uses a cryptographically secure algorithm whenever possible.
+/// `SystemRandomNumberGenerator` is automatically seeded, is safe to use in
+/// multiple threads, and uses a cryptographically secure algorithm whenever
+/// possible.
 ///
 /// Platform Implementation of `Random`
 /// ===================================
 ///
-/// While the `Random.default` generator is automatically seeded and
-/// thread-safe on every platform, the cryptographic quality of the stream of
-/// random data produced by the generator may vary. For more detail, see the
+/// While the `SystemRandomNumberGenerator` generator is automatically seeded
+/// and thread-safe on every platform, the cryptographic quality of the stream
+/// of random data produced by the generator may vary. For more detail, see the
 /// documentation for the APIs used by each platform.
 ///
 /// - Apple platforms use `arc4random_buf(3)`.
 /// - Linux platforms use `getrandom(2)` when available; otherwise, they read
 ///   from `/dev/urandom`.
 @_fixed_layout
-public struct Random : RandomNumberGenerator {
-  /// The default instance of the `Random` random number generator.
+public struct SystemRandomNumberGenerator : RandomNumberGenerator {
   @inlinable
-  public static var `default`: Random {
-    get { return Random() }
-    set { /* Discard */ }
-  }
-
-  @inlinable
-  internal init() {}
+  public init() { }
 
   /// Returns a value from a uniform, independent distribution of binary data.
   ///
