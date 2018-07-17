@@ -1963,59 +1963,10 @@ Constraint *ConstraintSystem::selectDisjunction() {
   return nullptr;
 }
 
-bool ConstraintSystem::solveSimplified(
-    SmallVectorImpl<Solution> &solutions,
+bool ConstraintSystem::solveForDisjunctionChoices(
+    Constraint *disjunction, SmallVectorImpl<Solution> &solutions,
     FreeTypeVariableBinding allowFreeTypeVariables) {
-
-  auto *disjunction = selectDisjunction();
-
-  auto bestBindings = determineBestBindings();
-
-  // If we have a binding that does not involve type variables, and is
-  // not fully bound, or we have no disjunction to attempt instead,
-  // go ahead and try the bindings for this type variable.
-  if (bestBindings && (!disjunction || (!bestBindings->InvolvesTypeVariables &&
-                                        !bestBindings->FullyBound))) {
-    return tryTypeVariableBindings(solverState->depth, bestBindings->TypeVar,
-                                   bestBindings->Bindings, solutions,
-                                   allowFreeTypeVariables);
-  }
-
-
-
-  // If there are no disjunctions we can't solve this system unless we have
-  // free type variables and are allowing them in the solution.
-  if (!disjunction) {
-    if (allowFreeTypeVariables == FreeTypeVariableBinding::Disallow ||
-        !hasFreeTypeVariables())
-      return true;
-
-    // If this solution is worse than the best solution we've seen so far,
-    // skip it.
-    if (worseThanBestSolution())
-      return true;
-
-    // If we only have relational or member constraints and are allowing
-    // free type variables, save the solution.
-    for (auto &constraint : InactiveConstraints) {
-      switch (constraint.getClassification()) {
-      case ConstraintClassification::Relational:
-      case ConstraintClassification::Member:
-        continue;
-      default:
-        return true;
-      }
-    }
-
-    auto solution = finalize(allowFreeTypeVariables);
-    if (TC.getLangOpts().DebugConstraintSolver) {
-      auto &log = getASTContext().TypeCheckerDebug->getStream();
-      log.indent(solverState->depth * 2) << "(found solution)\n";
-    }
-
-    solutions.push_back(std::move(solution));
-    return false;
-  }
+  assert(disjunction->getKind() == ConstraintKind::Disjunction);
 
   // Remove this disjunction constraint from the list.
   auto afterDisjunction = InactiveConstraints.erase(disjunction);
@@ -2144,10 +2095,6 @@ bool ConstraintSystem::solveSimplified(
     }
   }
 
-  // Put the disjunction constraint back in its place.
-  InactiveConstraints.insert(afterDisjunction, disjunction);
-  CG.addConstraint(disjunction);
-
   if (hasDisabledChoices) {
     // Re-enable previously disabled overload choices.
     for (auto *choice : disjunction->getNestedConstraints()) {
@@ -2156,10 +2103,72 @@ bool ConstraintSystem::solveSimplified(
     }
   }
 
+  // Put the disjunction constraint back in its place.
+  InactiveConstraints.insert(afterDisjunction, disjunction);
+  CG.addConstraint(disjunction);
+
+  return bool(lastSolvedChoice.hasValue());
+}
+
+bool ConstraintSystem::solveSimplified(
+    SmallVectorImpl<Solution> &solutions,
+    FreeTypeVariableBinding allowFreeTypeVariables) {
+
+  auto *disjunction = selectDisjunction();
+
+  auto bestBindings = determineBestBindings();
+
+  // If we have a binding that does not involve type variables, and is
+  // not fully bound, or we have no disjunction to attempt instead,
+  // go ahead and try the bindings for this type variable.
+  if (bestBindings && (!disjunction || (!bestBindings->InvolvesTypeVariables &&
+                                        !bestBindings->FullyBound))) {
+    return tryTypeVariableBindings(solverState->depth, bestBindings->TypeVar,
+                                   bestBindings->Bindings, solutions,
+                                   allowFreeTypeVariables);
+  }
+
+  // If there are no disjunctions we can't solve this system unless we have
+  // free type variables and are allowing them in the solution.
+  if (!disjunction) {
+    if (allowFreeTypeVariables == FreeTypeVariableBinding::Disallow ||
+        !hasFreeTypeVariables())
+      return true;
+
+    // If this solution is worse than the best solution we've seen so far,
+    // skip it.
+    if (worseThanBestSolution())
+      return true;
+
+    // If we only have relational or member constraints and are allowing
+    // free type variables, save the solution.
+    for (auto &constraint : InactiveConstraints) {
+      switch (constraint.getClassification()) {
+      case ConstraintClassification::Relational:
+      case ConstraintClassification::Member:
+        continue;
+      default:
+        return true;
+      }
+    }
+
+    auto solution = finalize(allowFreeTypeVariables);
+    if (TC.getLangOpts().DebugConstraintSolver) {
+      auto &log = getASTContext().TypeCheckerDebug->getStream();
+      log.indent(solverState->depth * 2) << "(found solution)\n";
+    }
+
+    solutions.push_back(std::move(solution));
+    return false;
+  }
+
+  bool foundSolution = solveForDisjunctionChoices(disjunction, solutions,
+                                                  allowFreeTypeVariables);
+
   // If we are exiting due to an expression that is too complex, do
   // not allow our caller to continue as if we have been successful.
   auto tooComplex = getExpressionTooComplex(solutions);
-  return tooComplex || !lastSolvedChoice;
+  return tooComplex || !foundSolution;
 }
 
 Optional<Score>
