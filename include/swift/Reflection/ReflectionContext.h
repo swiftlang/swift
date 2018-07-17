@@ -215,7 +215,7 @@ public:
       return readMachOSections<MachOTraits<4>>(ImageStart);
     if (*HeaderMagic == llvm::MachO::MH_MAGIC_64)
       return readMachOSections<MachOTraits<8>>(ImageStart);
-    llvm_unreachable("invalid pointer size");
+    return false;
   }
 #endif // defined(__APPLE__) && defined(__MACH__)
   
