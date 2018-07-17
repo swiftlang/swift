@@ -352,8 +352,8 @@ TEST_F(CursorInfoTest, CursorInfoMustWaitDueToken) {
   replaceText(DocName, findOffset(TextToReplace, Contents), TextToReplace.size(),
               ExpensiveInit);
   // Change 'foo' to 'fog' by replacing the last character.
-  replaceText(DocName, FooRefOffs+2, 1, "g");
   replaceText(DocName, FooOffs+2, 1, "g");
+  replaceText(DocName, FooRefOffs+2, 1, "g");
 
   // Should wait for the new AST, because the cursor location points to a
   // different token.
@@ -381,8 +381,8 @@ TEST_F(CursorInfoTest, CursorInfoMustWaitDueTokenRace) {
   setNeedsSema(true);
   open(DocName, Contents, llvm::makeArrayRef(Args));
   // Change 'foo' to 'fog' by replacing the last character.
-  replaceText(DocName, FooRefOffs + 2, 1, "g");
   replaceText(DocName, FooOffs + 2, 1, "g");
+  replaceText(DocName, FooRefOffs + 2, 1, "g");
 
   // Should wait for the new AST, because the cursor location points to a
   // different token.
