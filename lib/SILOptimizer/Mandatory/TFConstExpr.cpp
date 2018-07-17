@@ -1440,6 +1440,7 @@ static bool analyzeArrayInitUses(SILValue v,
 
     // We can always remove retain/release instructions and debug_value.
     if (isa<StrongRetainInst>(user) || isa<StrongReleaseInst>(user) ||
+        isa<RetainValueInst>(user) || isa<ReleaseValueInst>(user) ||
         isa<DebugValueInst>(user)) {
       if (arrayInsts) arrayInsts->insert(user);
       continue;
