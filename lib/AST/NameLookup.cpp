@@ -1529,11 +1529,12 @@ ValueDecl::adjustAccessLevelForProtocolExtension(AccessLevel access) const {
       // and expects these extension methods to witness public protocol
       // requirements. Which works at the ABI level, so let's keep
       // supporting that here by passing 'isUsageFromInline'.
-      auto protoAccess = protocol->getFormalAccess(/*useDC=*/nullptr,
-                                                   /*isUsageFromInline=*/true);
-      if (protoAccess == AccessLevel::Private)
-        protoAccess = AccessLevel::FilePrivate;
-      access = std::min(access, protoAccess);
+      auto protoAccess =
+          protocol->getFormalAccessScope(/*useDC=*/nullptr,
+                                         /*isUsageFromInline=*/true);
+      // FIXME: The calling code should be written in terms of AccessScope,
+      // so that this can just use AccessScope::intersectWith.
+      access = std::min(access, protoAccess.requiredAccessForDiagnostics());
     }
   }
 

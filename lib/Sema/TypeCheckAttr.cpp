@@ -1934,11 +1934,10 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
 void AttributeChecker::visitFixedLayoutAttr(FixedLayoutAttr *attr) {
   auto *VD = cast<ValueDecl>(D);
 
-  auto access = VD->getFormalAccess(/*useDC=*/nullptr,
-                                    /*treatUsableFromInlineAsPublic=*/true);
-  if (access < AccessLevel::Public) {
+  if (VD->getFormalAccess() < AccessLevel::Public &&
+      !VD->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
     diagnoseAndRemoveAttr(attr, diag::fixed_layout_attr_on_internal_type,
-                          VD->getFullName(), access);
+                          VD->getFullName(), VD->getFormalAccess());
   }
 }
 
@@ -2093,9 +2092,8 @@ void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
     break;
   }
 
-  auto access = ED->getFormalAccess(/*useDC=*/nullptr,
-                                    /*treatUsableFromInlineAsPublic=*/true);
-  if (access < AccessLevel::Public) {
+  if (ED->getFormalAccess() < AccessLevel::Public &&
+      !ED->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
     diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonpublic, attr);
   }
 }

@@ -2347,19 +2347,14 @@ public:
   /// Returns the access level specified explicitly by the user, or provided by
   /// default according to language rules.
   ///
-  /// This is the access used when calculating if access control is being used
-  /// consistently. If \p useDC is provided (the location where the value is
-  /// being used), features that affect formal access such as \c \@testable are
-  /// taken into account.
-  ///
-  /// If \p treatUsableFromInlineAsPublic is true, declarations marked with the
-  /// \c @usableFromInline attribute are treated as public. This is normally
-  /// false for name lookup and other source language concerns, but true when
-  /// computing the linkage of generated functions.
+  /// Most of the time this is not the interesting value to check; access is
+  /// limited by enclosing scopes per SE-0025. Use #getFormalAccessScope to
+  /// check if access control is being used consistently, and to take features
+  /// such as \c \@testable and \c \@usableFromInline into account.
   ///
   /// \sa getFormalAccessScope
-  AccessLevel getFormalAccess(const DeclContext *useDC = nullptr,
-                              bool treatUsableFromInlineAsPublic = false) const;
+  /// \sa hasOpenAccess
+  AccessLevel getFormalAccess() const;
 
   /// If this declaration is a member of a protocol extension, return the
   /// minimum of the given access level and the protocol's access level.
@@ -2373,7 +2368,8 @@ public:
   /// visible.
   AccessLevel adjustAccessLevelForProtocolExtension(AccessLevel access) const;
 
-  /// Determine whether this Decl has either Private or FilePrivate access.
+  /// Determine whether this Decl has either Private or FilePrivate access,
+  /// and its DeclContext does not.
   bool isOutermostPrivateOrFilePrivateScope() const;
 
   /// Returns the outermost DeclContext from which this declaration can be
@@ -2395,6 +2391,7 @@ public:
   ///
   /// \sa getFormalAccess
   /// \sa isAccessibleFrom
+  /// \sa hasOpenAccess
   AccessScope
   getFormalAccessScope(const DeclContext *useDC = nullptr,
                        bool treatUsableFromInlineAsPublic = false) const;
@@ -2447,6 +2444,14 @@ public:
   /// the default implementations are not visible to name lookup.
   bool isAccessibleFrom(const DeclContext *DC,
                         bool forConformance = false) const;
+
+  /// Returns whether this declaration should be treated as \c open from
+  /// \p useDC. This is very similar to #getFormalAccess, but takes
+  /// \c \@testable into account.
+  ///
+  /// This is mostly only useful when considering requirements on an override:
+  /// if the base declaration is \c open, the override might have to be too.
+  bool hasOpenAccess(const DeclContext *useDC) const;
 
   /// Retrieve the "interface" type of this value, which uses
   /// GenericTypeParamType if the declaration is generic. For a generic

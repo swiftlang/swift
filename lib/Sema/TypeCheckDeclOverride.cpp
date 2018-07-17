@@ -794,17 +794,16 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
   // defining module.  This is not required for constructors, which are
   // never really "overridden" in the intended sense here, because of
   // course derived classes will change how the class is initialized.
-  AccessLevel matchAccess = baseDecl->getFormalAccess(dc);
+  bool baseHasOpenAccess = baseDecl->hasOpenAccess(dc);
   if (!isAccessor &&
-      matchAccess < AccessLevel::Open &&
+      !baseHasOpenAccess &&
       baseDecl->getModuleContext() != decl->getModuleContext() &&
       !isa<ConstructorDecl>(decl)) {
     diags.diagnose(decl, diag::override_of_non_open,
                    decl->getDescriptiveKind());
 
-  } else if (matchAccess == AccessLevel::Open &&
-             classDecl->getFormalAccess(dc) ==
-               AccessLevel::Open &&
+  } else if (baseHasOpenAccess &&
+             classDecl->hasOpenAccess(dc) &&
              decl->getFormalAccess() != AccessLevel::Open &&
              !decl->isFinal()) {
     {
@@ -847,7 +846,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
     if (shouldDiagnose || shouldDiagnoseSetter) {
       bool overriddenForcesAccess =
         (requiredAccessScope->hasEqualDeclContextWith(matchAccessScope) &&
-         matchAccess != AccessLevel::Open);
+         !baseHasOpenAccess);
       AccessLevel requiredAccess =
         requiredAccessScope->requiredAccessForDiagnostics();
       {
