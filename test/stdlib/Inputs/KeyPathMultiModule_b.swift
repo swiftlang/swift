@@ -4,6 +4,9 @@ public struct A {
   public subscript<T: Hashable>(withGeneric index: T) -> T {
     return index
   }
+
+  public var storedA: B<Int>
+  public private(set) var storedB: Double
 }
 
 public struct B<U> {
@@ -14,6 +17,9 @@ public struct B<U> {
   public subscript<T: Hashable>(withGeneric i: T) -> T {
     return i
   }
+
+  public var storedA: U
+  public internal(set) var storedB: U
 }
 
 public func A_x_keypath() -> KeyPath<A, Int> {
@@ -51,3 +57,22 @@ public func B_Double_subscript_withGeneric_butt_keypath()
   return \B<Double>.[withGeneric: "Never is the universal butt type"]
 }
 
+public func A_storedA_keypath() -> KeyPath<A, B<Int>> {
+  return \A.storedA
+}
+
+public func A_storedA_storedB_keypath() -> KeyPath<A, Int> {
+  return \A.storedA.storedB
+}
+
+public func A_storedB_keypath() -> KeyPath<A, Double> {
+  return \A.storedB
+}
+
+public func B_storedA_keypath<T>(_: T.Type) -> KeyPath<B<T>, T> {
+  return \B.storedA
+}
+
+public func B_storedB_keypath<T>(_: T.Type) -> KeyPath<B<T>, T> {
+  return \B.storedB
+}

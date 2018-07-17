@@ -1,15 +1,15 @@
 // -- Test with resilience enabled
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -force-single-frontend-invocation -Xfrontend -enable-key-path-resilience -Xfrontend -enable-resilience -module-name KeyPathMultiModule_b -c -o %t/KeyPathMultiModule_b.o -emit-module-path %t/KeyPathMultiModule_b.swiftmodule -parse-as-library %S/Inputs/KeyPathMultiModule_b.swift
-// RUN: %target-build-swift -Xfrontend -enable-key-path-resilience %t/KeyPathMultiModule_b.o -I %t %s -o %t/a.out
-// RUN: %target-run %t/a.out
+// RUN: %target-build-swift -Xfrontend -enable-key-path-resilience %t/KeyPathMultiModule_b.o -I %t %s -o %t/a.out.resilient
+// RUN: %target-run %t/a.out.resilient
 
 // -- Test again with resilience disabled, which changes the circumstances under
-// which we emit and use property descriptors
+//    which we emit and use property descriptors
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -force-single-frontend-invocation -Xfrontend -enable-key-path-resilience -module-name KeyPathMultiModule_b -c -o %t/KeyPathMultiModule_b.o -emit-module-path %t/KeyPathMultiModule_b.swiftmodule -parse-as-library %S/Inputs/KeyPathMultiModule_b.swift
-// RUN: %target-build-swift -Xfrontend -enable-key-path-resilience %t/KeyPathMultiModule_b.o -I %t %s -o %t/a.out
-// RUN: %target-run %t/a.out
+// RUN: %target-build-swift -Xfrontend -enable-key-path-resilience %t/KeyPathMultiModule_b.o -I %t %s -o %t/a.out.fragile
+// RUN: %target-run %t/a.out.fragile
 
 import KeyPathMultiModule_b
 import StdlibUnittest
@@ -34,6 +34,12 @@ keyPathMultiModule.test("identity across multiple modules") {
               \B<Double>.[withGeneric: "buttt"])
   expectEqual(B_Double_subscript_withGeneric_butt_keypath(),
               \B<Double>.[withGeneric: "Never is the universal butt type"])
+
+  expectEqual(A_storedA_keypath(), \A.storedA)
+  expectEqual(A_storedA_storedB_keypath(), \A.storedA.storedB)
+  expectEqual(A_storedB_keypath(), \A.storedB)
+  expectEqual(B_storedA_keypath(Double.self), \B<Double>.storedA)
+  expectEqual(B_storedB_keypath(Double.self), \B<Double>.storedB)
 }
 
 runAllTests()

@@ -873,6 +873,10 @@ internal struct RawKeyPathComponent {
       return _SwiftKeyPathComponentHeader_UnresolvedIndirectOffsetPayload
     }
     @inlinable // FIXME(sil-serialize-all)
+    internal static var maximumOffsetPayload: UInt32 {
+      return _SwiftKeyPathComponentHeader_MaximumOffsetPayload
+    }
+    @inlinable // FIXME(sil-serialize-all)
     internal static var computedMutatingFlag: UInt32 {
       return _SwiftKeyPathComponentHeader_ComputedMutatingFlag
     }
@@ -967,11 +971,56 @@ internal struct RawKeyPathComponent {
       return MemoryLayout<Int>.size - MemoryLayout<Int32>.size
     }
 
-    
     @inlinable // FIXME(sil-serialize-all)
     internal var isTrivialPropertyDescriptor: Bool {
       return _value ==
         _SwiftKeyPathComponentHeader_TrivialPropertyDescriptorMarker
+    }
+
+    /// If this is the header for a component in a key path pattern, return
+    /// the size of the body of the component.
+    @inlinable // FIXME(sil-serialize-all)
+    internal var patternComponentBodySize: Int {
+      switch kind {
+      case .struct, .class:
+        if payload == Header.unresolvedFieldOffsetPayload
+           || payload == Header.outOfLineOffsetPayload {
+          // A 32-bit offset is stored in the body.
+          return MemoryLayout<UInt32>.size
+        }
+        if payload == Header.unresolvedIndirectOffsetPayload {
+          // A pointer-aligned, pointer-sized pointer is stored in the body.
+          return Header.pointerAlignmentSkew + MemoryLayout<Int>.size
+        }
+        // Otherwise, there's no body.
+        return Header.pointerAlignmentSkew
+
+      case .external:
+        // The body holds a pointer to the external property descriptor,
+        // and some number of substitution arguments, the count of which is
+        // in the payload.
+        return Header.pointerAlignmentSkew
+          + MemoryLayout<Int>.size * (1 + Int(payload))
+
+      case .computed:
+        // The body holds at minimum the id and getter.
+        var size = Header.pointerAlignmentSkew + MemoryLayout<Int>.size * 2
+        // If settable, it also holds the setter.
+        if payload & Header.computedSettableFlag != 0 {
+          size += MemoryLayout<Int>.size
+        }
+        // If there are arguments, there's also a layout function,
+        // witness table, and initializer function.
+        if payload & Header.computedHasArgumentsFlag != 0 {
+          size += MemoryLayout<Int>.size * 3
+        }
+
+        return size
+
+      case .optionalForce, .optionalChain, .optionalWrap:
+        // Otherwise, there's no body.
+        return Header.pointerAlignmentSkew
+      }
     }
   }
 
@@ -2266,6 +2315,17 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
       }
     }
 
+    // Ensure that we pop an amount of data consistent with what
+    // RawKeyPathComponent.Header.patternComponentBodySize computes.
+    var bufferSizeBefore = 0
+    var expectedPop = 0
+
+    _sanityCheck({
+      bufferSizeBefore = buffer.data.count
+      expectedPop = header.patternComponentBodySize
+      return true
+    }())
+
     switch header.kind {
     case .struct:
       // No effect on the capability.
@@ -2288,14 +2348,61 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
         // If the descriptor is trivial, then use the local candidate.
         // Leave this external reference out of the final object size.
         size -= (2 + genericParamCount) * MemoryLayout<Int>.size
-        // Skip the generic parameter accessors to get to it.
+        // Skip the generic parameter accessors to get to the local candidate.
         _ = buffer.popRaw(size: MemoryLayout<Int>.size * genericParamCount,
                           alignment: MemoryLayout<Int>.alignment)
         continue
       }
 
-      // TODO: Measure the instantiated size of the external component.
-      fatalError("to be implemented")
+      // Measure the instantiated size of the external component.
+      switch descriptorHeader.kind {
+      case .class:
+        // A stored class property is reference-writable.
+        // TODO: we should dynamically prevent "let" properties from being
+        // reassigned (in both the struct and class cases).
+        capability = .reference
+        fallthrough
+      case .struct:
+        // Drop this external reference...
+        size -= header.patternComponentBodySize
+        _ = buffer.popRaw(size: MemoryLayout<Int>.size * genericParamCount,
+                          alignment: MemoryLayout<Int>.alignment)
+        // ...and the local candidate, which is the component following this
+        // one.
+        let localCandidateHeader = buffer.pop(RawKeyPathComponent.Header.self)
+        let localCandidateSize = localCandidateHeader.patternComponentBodySize
+        size -= (localCandidateSize
+                 + MemoryLayout<RawKeyPathComponent.Header>.size)
+        _ = buffer.popRaw(size: localCandidateSize,
+                          alignment: MemoryLayout<UInt32>.alignment)
+
+        _sanityCheck({
+          expectedPop += localCandidateSize
+                      +  MemoryLayout<RawKeyPathComponent.Header>.size
+          return true
+        }())
+
+        // The final component will be a stored component with just an offset.
+        // If the offset requires resolution, then it'll be stored out of
+        // line after the header.
+        if descriptorHeader.payload
+            > RawKeyPathComponent.Header.maximumOffsetPayload {
+          size += MemoryLayout<UInt32>.size
+        }
+
+        // Pad to pointer alignment if there are following components.
+        if !buffer.data.isEmpty {
+          let alignMask = MemoryLayout<Int>.alignment - 1
+          size = (size + alignMask) & ~alignMask
+        }
+
+      case .computed:
+        fatalError("to be implemented")
+
+      case .external, .optionalChain, .optionalForce, .optionalWrap:
+        _sanityCheckFailure("should not appear as property descriptor")
+      }
+
     case .computed:
       let settable =
         header.payload & RawKeyPathComponent.Header.computedSettableFlag != 0
@@ -2356,6 +2463,25 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
       break
     }
 
+    // Check that we consumed the expected amount of data from the pattern.
+    _sanityCheck(
+      {
+        // Round the amount of data we read up to alignment to include padding,
+        // skewed by the header size.
+        let alignMask = MemoryLayout<Int>.alignment - 1
+        let popped =
+          (bufferSizeBefore - buffer.data.count
+           - RawKeyPathComponent.Header.pointerAlignmentSkew
+           + alignMask) & ~alignMask
+          + RawKeyPathComponent.Header.pointerAlignmentSkew
+
+        return expectedPop == popped
+      }(),
+      """
+      component size consumed during instance size measurement does not match \
+      component size returned by patternComponentBodySize
+      """)
+
     // Break if this is the last component.
     if buffer.data.count == 0 { break }
 
@@ -2363,6 +2489,8 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
     _ = buffer.popRaw(size: MemoryLayout<Int>.size,
                       alignment: MemoryLayout<Int>.alignment)
   }
+
+  _sanityCheck(buffer.data.isEmpty, "didn't read entire pattern")
 
   // Chaining always renders the whole key path read-only.
   if didChain {
@@ -2439,13 +2567,24 @@ internal func _instantiateKeyPathBuffer(
     let componentAddr = destData.baseAddress.unsafelyUnwrapped
     let header = patternBuffer.pop(RawKeyPathComponent.Header.self)
 
+    // Ensure that we pop an amount of data consistent with what
+    // RawKeyPathComponent.Header.patternComponentBodySize computes.
+    var bufferSizeBefore = 0
+    var expectedPop = 0
 
-    func tryToResolveOffset() {
+    _sanityCheck({
+      bufferSizeBefore = patternBuffer.data.count
+      expectedPop = header.patternComponentBodySize
+      return true
+    }())
+
+    func tryToResolveOffset(header: RawKeyPathComponent.Header,
+                            getOutOfLineOffset: () -> UInt32) {
       if header.payload == RawKeyPathComponent.Header.unresolvedFieldOffsetPayload {
         // Look up offset in type metadata. The value in the pattern is the
         // offset within the metadata object.
         let metadataPtr = unsafeBitCast(base, to: UnsafeRawPointer.self)
-        let offsetOfOffset = patternBuffer.pop(UInt32.self)
+        let offsetOfOffset = getOutOfLineOffset()
 
         let offset: UInt32
         if (header.kind == .struct) {
@@ -2480,7 +2619,7 @@ internal func _instantiateKeyPathBuffer(
       // Otherwise, just transfer the pre-resolved component.
       pushDest(header)
       if header.payload == RawKeyPathComponent.Header.outOfLineOffsetPayload {
-        let offset = patternBuffer.pop(UInt32.self)
+        let offset = getOutOfLineOffset() //patternBuffer.pop(UInt32.self)
         pushDest(offset)
       }
     }
@@ -2488,13 +2627,15 @@ internal func _instantiateKeyPathBuffer(
     switch header.kind {
     case .struct:
       // The offset may need to be resolved dynamically.
-      tryToResolveOffset()
+      tryToResolveOffset(header: header,
+                         getOutOfLineOffset: { patternBuffer.pop(UInt32.self) })
     case .class:
       // Crossing a class can end the reference prefix, and makes the following
       // key path potentially reference-writable.
       endOfReferencePrefixComponent = previousComponentAddr
       // The offset may need to be resolved dynamically.
-      tryToResolveOffset()
+      tryToResolveOffset(header: header,
+                         getOutOfLineOffset: { patternBuffer.pop(UInt32.self) })
     case .optionalChain,
          .optionalWrap,
          .optionalForce:
@@ -2585,8 +2726,65 @@ internal func _instantiateKeyPathBuffer(
         continue
       }
 
-      fatalError("to be implemented")
+
+      // Instantiate the component according to the external property
+      // descriptor.
+      switch descriptorHeader.kind {
+      case .class:
+        // Crossing a class can end the reference prefix, and makes the following
+        // key path potentially reference-writable.
+        endOfReferencePrefixComponent = previousComponentAddr
+        fallthrough
+
+      case .struct:
+        // Drop the generic parameter accessors. We don't need them to
+        // instantiate a stored component.
+        _ = patternBuffer.popRaw(
+          size: MemoryLayout<Int>.size * genericParamCount,
+          alignment: MemoryLayout<Int>.alignment)
+
+        // Drop the local candidate.
+        let localCandidateHeader = patternBuffer.pop(RawKeyPathComponent.Header.self)
+        let localCandidateSize = localCandidateHeader.patternComponentBodySize
+        _ = patternBuffer.popRaw(size: localCandidateSize,
+                                 alignment: MemoryLayout<UInt32>.alignment)
+
+        _sanityCheck({
+          expectedPop += localCandidateSize
+                      +  MemoryLayout<RawKeyPathComponent.Header>.size
+          return true
+        }())
+
+        // Instantiate the offset using the info from the descriptor.
+        tryToResolveOffset(header: descriptorHeader,
+                           getOutOfLineOffset: {
+                             descriptor.load(fromByteOffset: 4,
+                                             as: UInt32.self)
+                           })
+
+      case .computed:
+        fatalError("to be implemented")
+
+      case .external, .optionalChain, .optionalForce, .optionalWrap:
+        _sanityCheckFailure("should not appear as property descriptor")
+      }
     }
+
+    // Check that we consumed the expected amount of data from the pattern.
+    _sanityCheck(
+      {
+        let alignMask = MemoryLayout<Int>.alignment - 1
+        let popped =
+          (bufferSizeBefore - patternBuffer.data.count
+           - RawKeyPathComponent.Header.pointerAlignmentSkew
+           + alignMask) & ~alignMask
+          + RawKeyPathComponent.Header.pointerAlignmentSkew
+        return expectedPop == popped
+      }(),
+      """
+      component size consumed during instantiation does not match \
+      component size returned by patternComponentBodySize
+      """)
 
     // Break if this is the last component.
     if patternBuffer.data.count == 0 { break }
@@ -2599,7 +2797,9 @@ internal func _instantiateKeyPathBuffer(
   }
 
   // We should have traversed both buffers.
-  _sanityCheck(patternBuffer.data.isEmpty && destData.count == 0)
+  _sanityCheck(patternBuffer.data.isEmpty, "did not read the entire pattern")
+  _sanityCheck(destData.count == 0,
+               "did not write to all of the allocated space")
 
   // Write out the header.
   let destHeader = KeyPathBuffer.Header(
