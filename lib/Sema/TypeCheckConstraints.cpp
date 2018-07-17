@@ -1834,10 +1834,12 @@ void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
 Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
   // If constructor call is expected to produce an optional let's not attempt
   // this optimization because literal initializers aren't failable.
-  if (!ExprStack.empty()) {
-    auto *parent = ExprStack.back();
-    if (isa<BindOptionalExpr>(parent) || isa<ForceValueExpr>(parent))
-      return nullptr;
+  if (!TC.getLangOpts().isSwiftVersionAtLeast(5)) {
+    if (!ExprStack.empty()) {
+      auto *parent = ExprStack.back();
+      if (isa<BindOptionalExpr>(parent) || isa<ForceValueExpr>(parent))
+        return nullptr;
+    }
   }
 
   auto *call = dyn_cast<CallExpr>(E);
