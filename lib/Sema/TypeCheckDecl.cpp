@@ -4158,16 +4158,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     if (auto gp = FD->getGenericParams()) {
       gp->setOuterParameters(FD->getDeclContext()->getGenericParamsOfContext());
 
-      auto *sig = validateGenericFuncSignature(FD);
-
-      GenericEnvironment *env;
-      if (auto AD = dyn_cast<AccessorDecl>(FD)) {
-        env = cast<SubscriptDecl>(AD->getStorage())->getGenericEnvironment();
-        assert(env && "accessor has generics but subscript is not generic");
-      } else {
-        env = sig->createGenericEnvironment();
-      }
-      FD->setGenericEnvironment(env);
+      validateGenericFuncSignature(FD);
 
       // Revert the types within the signature so it can be type-checked with
       // archetypes below.
@@ -4175,17 +4166,17 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     } else if (auto genericSig =
                  FD->getDeclContext()->getGenericSignatureOfContext()) {
       if (!isa<AccessorDecl>(FD)) {
-        (void)validateGenericFuncSignature(FD);
+        validateGenericFuncSignature(FD);
 
         // Revert all of the types within the signature of the function.
         revertGenericFuncSignature(FD);
       } else {
         // We've inherited all of the type information already.
         configureInterfaceType(FD, genericSig);
-      }
 
-      FD->setGenericEnvironment(
+        FD->setGenericEnvironment(
           FD->getDeclContext()->getGenericEnvironmentOfContext());
+      }
     }
 
     // Set the context type of 'self'.
@@ -4387,21 +4378,16 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       // Write up generic parameters and check the generic parameter list.
       gp->setOuterParameters(CD->getDeclContext()->getGenericParamsOfContext());
 
-      auto *sig = validateGenericFuncSignature(CD);
-      auto *env = sig->createGenericEnvironment();
-      CD->setGenericEnvironment(env);
+      validateGenericFuncSignature(CD);
 
       // Revert the types within the signature so it can be type-checked with
       // archetypes below.
       revertGenericFuncSignature(CD);
     } else if (CD->getDeclContext()->getGenericSignatureOfContext()) {
-      (void)validateGenericFuncSignature(CD);
+      validateGenericFuncSignature(CD);
 
       // Revert all of the types within the signature of the constructor.
       revertGenericFuncSignature(CD);
-
-      CD->setGenericEnvironment(
-          CD->getDeclContext()->getGenericEnvironmentOfContext());
     }
 
     // Set the context type of 'self'.
@@ -4471,9 +4457,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     configureImplicitSelf(*this, DD);
 
     if (DD->getDeclContext()->getGenericSignatureOfContext()) {
-      (void)validateGenericFuncSignature(DD);
-      DD->setGenericEnvironment(
-          DD->getDeclContext()->getGenericEnvironmentOfContext());
+      validateGenericFuncSignature(DD);
     }
 
     // Set the context type of 'self'.
@@ -4514,21 +4498,16 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       // Write up generic parameters and check the generic parameter list.
       gp->setOuterParameters(dc->getGenericParamsOfContext());
 
-      auto *sig = validateGenericSubscriptSignature(SD);
-      auto *env = sig->createGenericEnvironment();
-      SD->setGenericEnvironment(env);
+      validateGenericSubscriptSignature(SD);
 
       // Revert the types within the signature so it can be type-checked with
       // archetypes below.
       revertGenericSubscriptSignature(SD);
     } else if (dc->getGenericSignatureOfContext()) {
-      (void)validateGenericSubscriptSignature(SD);
+      validateGenericSubscriptSignature(SD);
 
       // Revert all of the types within the signature of the subscript.
       revertGenericSubscriptSignature(SD);
-
-      SD->setGenericEnvironment(
-          SD->getDeclContext()->getGenericEnvironmentOfContext());
     }
 
     // Type check the subscript parameters.

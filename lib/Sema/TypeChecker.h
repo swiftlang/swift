@@ -1275,10 +1275,9 @@ public:
   void configureInterfaceType(AbstractFunctionDecl *func,
                               GenericSignature *sig);
 
-  /// Validate the signature of a generic function.
-  ///
-  /// \param func The generic function.
-  GenericSignature *validateGenericFuncSignature(AbstractFunctionDecl *func);
+  /// Compute the generic signature, generic environment and interface type
+  /// of a generic function.
+  void validateGenericFuncSignature(AbstractFunctionDecl *func);
 
   /// Revert the signature of a generic function to its pre-type-checked state,
   /// so that it can be type checked again when we have resolved its generic
@@ -1292,10 +1291,9 @@ public:
                              GenericSignature *parentSig,
                              GenericTypeResolver *resolver);
 
-  /// Validate the signature of a generic subscript.
-  ///
-  /// \param subscript The generic subscript.
-  GenericSignature *validateGenericSubscriptSignature(SubscriptDecl *subscript);
+  /// Compute the generic signature, generic environment and interface type
+  /// of a generic subscript.
+  void validateGenericSubscriptSignature(SubscriptDecl *subscript);
 
   /// Revert the signature of a generic function to its pre-type-checked state,
   /// so that it can be type checked again when we have resolved its generic

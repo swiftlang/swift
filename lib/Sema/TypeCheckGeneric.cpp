@@ -834,8 +834,7 @@ static void checkReferencedGenericParams(GenericContext *dc,
   }
 }
 
-GenericSignature *
-TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
+void TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   bool invalid = false;
 
   GenericSignature *sig;
@@ -859,8 +858,7 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
     // there might still be errors that have not yet been diagnosed. Revert the
     // generic function signature and type-check it again, completely.
     revertGenericFuncSignature(func);
-    if (gp)
-      revertGenericParamList(gp);
+    revertGenericParamList(gp);
 
     // Debugging of the generic signature.
     if (Context.LangOpts.DebugGenericSignatures) {
@@ -873,9 +871,20 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
       sig->getCanonicalSignature()->print(llvm::errs());
       llvm::errs() << "\n";
     }
+
+    GenericEnvironment *env;
+    if (auto accessor = dyn_cast<AccessorDecl>(func)) {
+      env = cast<SubscriptDecl>(accessor->getStorage())->getGenericEnvironment();
+      assert(env && "accessor has generics but subscript is not generic");
+    } else {
+      env = sig->createGenericEnvironment();
+    }
+    func->setGenericEnvironment(env);
   } else {
     // Inherit the signature of our environment.
     sig = func->getDeclContext()->getGenericSignatureOfContext();
+    func->setGenericEnvironment(
+      func->getDeclContext()->getGenericEnvironmentOfContext());
   }
 
   CompleteGenericTypeResolver completeResolver(*this, sig);
@@ -888,8 +897,7 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   if (invalid) {
     func->setInterfaceType(ErrorType::get(Context));
     func->setInvalid();
-    // null doesn't mean error here: callers still expect the signature.
-    return sig;
+    return;
   }
 
   configureInterfaceType(func, sig);
@@ -898,8 +906,6 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   // dependent types in the generic signature.
   assert(func->getInterfaceType()->hasError() ||
          !func->getInterfaceType()->findUnresolvedDependentMemberType());
-
-  return sig;
 }
 
 void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func,
@@ -1071,7 +1077,7 @@ void TypeChecker::revertGenericSubscriptSignature(SubscriptDecl *subscript) {
     revertDependentTypeLoc(param->getTypeLoc());
 }
 
-GenericSignature *
+void
 TypeChecker::validateGenericSubscriptSignature(SubscriptDecl *subscript) {
   bool invalid = false;
 
@@ -1111,9 +1117,13 @@ TypeChecker::validateGenericSubscriptSignature(SubscriptDecl *subscript) {
       sig->getCanonicalSignature()->print(llvm::errs());
       llvm::errs() << "\n";
     }
+
+    subscript->setGenericEnvironment(sig->createGenericEnvironment());
   } else {
     // Inherit the signature of our environment.
     sig = subscript->getDeclContext()->getGenericSignatureOfContext();
+    subscript->setGenericEnvironment(
+      subscript->getDeclContext()->getGenericEnvironmentOfContext());
   }
 
   CompleteGenericTypeResolver completeResolver(*this, sig);
@@ -1127,11 +1137,10 @@ TypeChecker::validateGenericSubscriptSignature(SubscriptDecl *subscript) {
     subscript->setInterfaceType(ErrorType::get(Context));
     subscript->setInvalid();
     // null doesn't mean error here: callers still expect the signature.
-    return sig;
+    return;
   }
 
   configureInterfaceType(subscript, sig);
-  return sig;
 }
 
 void TypeChecker::configureInterfaceType(SubscriptDecl *subscript,
