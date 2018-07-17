@@ -1171,7 +1171,7 @@ bool TFFunctionPartition::markBlock(SILBasicBlock *BB) {
         // We intend for `predTerm` to still run on host (and thus did not
         // mark its parent block), but send its result to accelerator.
         markedInstructions.insert({predTerm, Marking::Send});
-        // Even though we don't need to mark `pred` for Accelerator if it has no
+        // Even though we don't need to mark `pred` for accelerator if it has no
         // block which it is control-dependent on, when there is a block that
         // `pred` is control-dependent on, we need to mark that block. This is
         // done by marking `pred` first. Otherwise we can miss marking an
@@ -1326,7 +1326,7 @@ bool TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
 
   assert(mark == Marking::Move);
   // If we are moving the instruction over, then we know it is a tensor op, and
-  // it get special attention.
+  // it gets special attention.
 
   // If we're moving a computation to the accelerator and we see a tuple_extract
   // from a moved value, then we move the tuple_extract as well, to make sure
