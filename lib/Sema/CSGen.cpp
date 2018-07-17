@@ -2059,7 +2059,6 @@ namespace {
             ty = CS.createTypeVariable(CS.getConstraintLocator(locator));
           return CS.getTypeChecker().getOptionalType(var->getLoc(), ty);
         case ReferenceOwnershipOptionality::Allowed:
-        case ReferenceOwnershipOptionality::AllowedIfImporting:
         case ReferenceOwnershipOptionality::Disallowed:
           break;
         }
