@@ -126,6 +126,7 @@ namespace {
     void formGraphOp(SILTensorOpInfo &opInfo,
                      DenseMap<SILValue, SymbolicValue> &constants,
                      GraphGlobalConfiguration &deviceConfig);
+    void cleanupDeadInstructions();
   };
 }  // end anonymous namespace
 
@@ -1493,51 +1494,6 @@ static Type getArrayElementType(SILType ty) {
   return Type();
 }
 
-namespace {
-/// This is a little helper for working with literal arrays that may want to get
-/// deleted if all references to them are removed.
-struct ArrayElementDecoder {
-  SmallVector<SILValue, 4> elements;
-  SmallPtrSet<SILInstruction*, 8> arrayInsts;
-
-
-  /// Given a SILValue that may be an array, attempt to decode it into the
-  /// literal values that make up its elements.  This returns the element type
-  /// of the array if it succeeds, otherwise a null type.
-  Type decode(SILValue operand) {
-    return GraphOperationInfo::decodeArrayElements(operand, elements,
-                                                   &arrayInsts);
-  }
-
-  /// Try to remove the instructions that make up the array initialization.
-  void removeInstructionsIfPossible() {
-    if (arrayInsts.empty())
-      return;
-
-    // If we can remove it, drop all inter-dependent references.
-    for (auto inst : arrayInsts)
-      inst->dropAllReferences();
-    // Then erase the instructions themselves.
-    for (auto inst : arrayInsts)
-      inst->eraseFromParent();
-  }
-};
-} // end anonymous namespace
-
-/// A reference to the specified array was just dropped.  If it was a literal
-/// array and this was the last use, clean up the instructions that fed it.
-///
-/// FIXME: Would it be better to just make this a cleanup pass in deabstraction?
-/// That would handle other arrays that are now dead due to arrays and stuff.
-///
-static void removeArrayValueIfPossible(SILValue array) {
-  // If this array is a literal that we can decode, remove the instructions that
-  // it came from.
-  ArrayElementDecoder decoder;
-  if (decoder.decode(array))
-    decoder.removeInstructionsIfPossible();
-}
-
 /// If all the operands to a call to __tf_tensor_from_scalars are constants, we
 /// can promote this to a 'Const' node with an attached TF_Tensor attribute.
 /// It takes a 1D array of scalars and a shape as a 1D array of integers.
@@ -1562,23 +1518,16 @@ tryToPromoteTensorFromScalars(ApplyInst *inst,
   auto scalarIt = constants.find(scalarsValue);
   if (scalarIt == constants.end() || !scalarIt->second.isConstant())
     return nullptr;
+  auto scalars = scalarIt->second;
+
   auto shapeIt = constants.find(shapeValue);
   if (shapeIt == constants.end() || !shapeIt->second.isConstant())
     return nullptr;
+  auto shape = shapeIt->second;
 
-  // Okay, we were able to resolve the two arrays of constants.  Transform this
-  // into the correct Const operation.
-  SILBuilder B(inst);
-  auto &context = B.getASTContext();
-  auto &allocator = context.getAllocator();
-
-  // Move the array of initializer values out of the constExpr evaluator, into
-  // the module's allocator.
-  auto scalars = scalarIt->second.cloneInto(allocator);
-  auto shape = shapeIt->second.cloneInto(allocator);
-  assert(scalars.getKind() == SymbolicValue::Array &&
-         shape.getKind() == SymbolicValue::Array &&
-         "Unexpected value for array constant");
+  // Get the element type of the array.
+  auto elementType = getArrayElementType(scalarsValue->getType());
+  if (!elementType) return nullptr;
 
   // Verify we have the right number of scalars.  If not, emit an error and
   // leave the broken code without promoting it to an op.
@@ -1595,66 +1544,29 @@ tryToPromoteTensorFromScalars(ApplyInst *inst,
       " scalars for this shape, but has " + llvm::utostr(numElements);
 
     auto loc = getUserSourceLocation(inst);
+    auto &context = inst->getType().getASTContext();
     diagnose(context, loc.getSourceLoc(), diag::tf_op_misuse, errorInfo)
       .highlight(loc.getSourceRange());
     return nullptr;
   }
 
-  // We transform this into a "Const" op, where the values are part of the
-  // 'value' tensor attribute and the shape is hard coded.
-  SmallVector<GraphOperationAttribute, 8> attributes;
-
-  // Add a dtype attribute for the array element.
-  auto dtype = getArrayElementType(scalarsValue->getType());
-  if (!dtype) return nullptr;
-
-  attributes.push_back({
-    context.getIdentifier("dtype"),
-    SymbolicValue::getMetatype(dtype->getCanonicalType())
-  });
-
-  // Add an attribute for the value$tensor attribute.
-  auto tensorSuffix =
-  SILTensorOpInfo::getOperandClassSuffix(SILTensorOpInfo::OperandClass::Tensor);
-  attributes.push_back({
-    context.getIdentifier(std::string("value") + tensorSuffix), scalars
-  });
-
-  // Add the value$shape attribute.
-  auto shapeSuffix =
-  SILTensorOpInfo::getOperandClassSuffix(SILTensorOpInfo::OperandClass::Shape);
-  attributes.push_back({
-    context.getIdentifier(std::string("value") + shapeSuffix), shape
-  });
-
-  // All graph_op's get a device.
-  attributes.push_back({
-    context.getIdentifier(DEVICE_ATTR),
-    SymbolicValue::getString(getDeviceString(deviceConfig.primaryDeviceType),
-                             allocator)
-  });
-
-  // Finally build a new graphop instruction with the simplified operands.
-  auto newInst =
-  B.createGraphOperation(inst->getLoc(), context.getIdentifier("Const"),
-                         /*operands*/{}, attributes, inst->getType());
-  newInst->setDebugLocation(inst->getDebugLocation());
+  // Okay, we were able to resolve the two arrays of constants.  Transform this
+  // into the correct Const operation.
+  SILBuilder B(inst);
+  B.setCurrentDebugScope(inst->getDebugScope());
+  auto result = createConstTensor(elementType, scalars, shape,
+                                  inst->getType(), inst->getLoc(),
+                                  deviceConfig, B);
 
   // Replace the old instruction with the new one.
-  inst->replaceAllUsesPairwiseWith(newInst);
+  inst->replaceAllUsesPairwiseWith(result);
 
   // Clean up the IR.
   auto callee = dyn_cast<FunctionRefInst>(inst->getOperand(0));
   inst->eraseFromParent();
   if (callee && callee->use_empty())
     callee->eraseFromParent();
-
-  // The original call took the array at +0, so we don't need to destroy it.
-  // however, we want to clean up the mess to make the resultant IR simpler.
-  // Do so now if possible.
-  removeArrayValueIfPossible(scalarsValue);
-  removeArrayValueIfPossible(shapeValue);
-  return newInst;
+  return result;
 }
 
 /// If all the operands to a call to __tf_tensor_from_scalars_1d are constants,
@@ -1686,35 +1598,15 @@ tryToPromoteTensorFromScalars1D(ApplyInst *inst,
   if (scalarIt == constants.end() || !scalarIt->second.isConstant())
     return nullptr;
 
-  SILBuilder B(inst);
-  auto &context = B.getASTContext();
-  auto &allocator = context.getAllocator();
-
-  // Move the array of initializer values out of the constExpr evaluator, into
-  // the module's allocator.
-  auto scalars = scalarIt->second.cloneInto(allocator);
+  auto scalars = scalarIt->second;
   assert(scalars.getKind() == SymbolicValue::Array &&
          "Unexpected value for array constant");
 
-  // We transform this into a "Const" op, where the values are part of the
-  // 'value' tensor attribute and the shape is hard coded.
-  SmallVector<GraphOperationAttribute, 8> attributes;
-
   // Add a dtype attribute for the array element.
-  auto dtype = getArrayElementType(arrayValue->getType());
-  if (!dtype) return nullptr;
+  auto elementType = getArrayElementType(arrayValue->getType());
+  if (!elementType) return nullptr;
 
-  attributes.push_back({
-    context.getIdentifier("dtype"),
-    SymbolicValue::getMetatype(dtype->getCanonicalType())
-  });
-
-  // Add an attribute for the value$tensor attribute.
-  auto tensorSuffix =
-  SILTensorOpInfo::getOperandClassSuffix(SILTensorOpInfo::OperandClass::Tensor);
-  attributes.push_back({
-    context.getIdentifier(std::string("value") + tensorSuffix), scalars
-  });
+  auto &allocator = inst->getType().getASTContext().getAllocator();
 
   // This takes a Tensor operand, but needs a shape added.  Since this is 1d,
   // our shape is just a single entry array with the length of scalars, like
@@ -1722,39 +1614,22 @@ tryToPromoteTensorFromScalars1D(ApplyInst *inst,
   auto shape = SymbolicValue::getArray({
     SymbolicValue::getInteger(scalars.getArrayValue().size(), /*bitwidth*/ 32)
   }, allocator);
-  auto shapeSuffix =
-   SILTensorOpInfo::getOperandClassSuffix(SILTensorOpInfo::OperandClass::Shape);
-  attributes.push_back({
-    context.getIdentifier(std::string("value") + shapeSuffix), shape
-  });
 
-  // All graph_op's get a device.
-  attributes.push_back({
-    context.getIdentifier(DEVICE_ATTR),
-    SymbolicValue::getString(getDeviceString(deviceConfig.primaryDeviceType),
-                             allocator)
-  });
-
-  // Finally build a new graphop instruction with the simplified operands.
-  auto newInst =
-    B.createGraphOperation(inst->getLoc(), context.getIdentifier("Const"),
-                           /*operands*/{}, attributes, inst->getType());
-  newInst->setDebugLocation(inst->getDebugLocation());
+  SILBuilder B(inst);
+  B.setCurrentDebugScope(inst->getDebugScope());
+  auto result = createConstTensor(elementType, scalars, shape,
+                                  inst->getType(), inst->getLoc(),
+                                  deviceConfig, B);
 
   // Replace the old instruction with the new one.
-  inst->replaceAllUsesPairwiseWith(newInst);
+  inst->replaceAllUsesPairwiseWith(result);
 
   // Clean up the IR.
   auto callee = dyn_cast<FunctionRefInst>(inst->getOperand(0));
   inst->eraseFromParent();
   if (callee && callee->use_empty())
     callee->eraseFromParent();
-
-  // The original call took the array at +0, so we don't need to destroy it.
-  // however, we want to clean up the mess to make the resultant IR simpler.
-  // Do so now if possible.
-  removeArrayValueIfPossible(arrayValue);
-  return newInst;
+  return result;
 }
 
 
@@ -1853,6 +1728,104 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
     }
   }
 }
+
+namespace {
+  /// This is a little helper for working with literal arrays that may want to get
+  /// deleted if all references to them are removed.
+  struct ArrayElementDecoder {
+    SmallVector<SILValue, 4> elements;
+    SmallPtrSet<SILInstruction*, 8> arrayInsts;
+
+    /// Given a SILValue that may be an array, attempt to decode it into the
+    /// literal values that make up its elements.  This returns the element type
+    /// of the array if it succeeds, otherwise a null type.
+    Type decode(SILValue operand) {
+      return GraphOperationInfo::decodeArrayElements(operand, elements,
+                                                     &arrayInsts);
+    }
+
+    /// Given an applyinst for _allocateUninitialized, try to decode it.  This
+    /// returns true on success or false on failure.
+    bool decodeApply(ApplyInst *inst) {
+      return GraphOperationInfo::decodeArrayElements(inst, elements,
+                                                     &arrayInsts);
+    }
+
+    /// Try to remove the instructions that make up the array initialization.
+    void removeInstructionsIfPossible(SILBasicBlock::iterator &it) {
+      if (arrayInsts.empty())
+        return;
+
+      // If the iterator is pointing to an instruction we're about to remove,
+      // advance it to avoid invalidation.
+      while (arrayInsts.count(&*it))
+        ++it;
+
+      // If we can remove it, drop all inter-dependent references.
+      for (auto inst : arrayInsts)
+        inst->dropAllReferences();
+      // Then erase the instructions themselves.
+      for (auto inst : arrayInsts)
+        inst->eraseFromParent();
+    }
+  };
+} // end anonymous namespace
+
+
+
+/// A reference to the specified array was just dropped.  If it was a literal
+/// array and this was the last use, clean up the instructions that fed it.
+///
+static void removeArrayValueIfPossible(ApplyInst *array,
+                                       SILBasicBlock::iterator &it) {
+  // If this array is a literal that we can decode, remove the instructions that
+  // it came from.
+  ArrayElementDecoder decoder;
+  if (decoder.decodeApply(array))
+    decoder.removeInstructionsIfPossible(it);
+}
+
+/// Deabstraction can leave around lots of dead instructions from the attributes
+/// that get promoted, including heavy weight types that inline into a lot of
+/// code, like arrays.  Do a quick pass to remove these, improving compile time
+/// of subsequent passes.
+void TFDeabstraction::cleanupDeadInstructions() {
+  llvm::PrettyStackTraceFormat
+  X("TFDeabstraction::cleanupDeadInstructions");
+
+  for (auto &block : fn) {
+    for (auto instIt = block.begin(), e = block.end(); instIt != e; ) {
+      // Manually move iterator to avoid invalidation if we remove 'inst'.
+      auto *inst = &*instIt++;
+
+      // Do a quick job to remove obvious dead instructions.  Don't delete debug
+      // instructions.
+      if (isa<SingleValueInstruction>(inst) &&
+          isInstructionTriviallyDead(inst)) {
+        recursivelyDeleteTriviallyDeadInstructions(inst);
+        continue;
+      }
+
+      // The original call took the array at +0, so we don't need to destroy it.
+      // however, we want to clean up the mess to make the resultant IR simpler.
+      // Do so now if possible.
+      if (auto *apply = dyn_cast<ApplyInst>(inst)) {
+        removeArrayValueIfPossible(apply, instIt);
+        continue;
+      }
+
+      // TODO: Remove dead stack slots for tensors being passed as input lists.
+
+      // TODO: need to delete TensorShape.init and other methods that we
+      // shouldn't bake in special knowledge of.  Needs integration with
+      // ConstExpr.
+
+      // TODO: Handle String.init and other stuff.  Refactor this when ConstExpr
+      // handling subsumes ConstantPropagation.
+    }
+  }
+}
+
 
 // TODO: move this from TFUtilities when deabstraction is done.
 SILValue getTensorProtocolHandleMember(SILValue v, SILLocation loc,
@@ -1963,11 +1936,6 @@ formGraphOp(SILTensorOpInfo &opInfo,
         opName += elementMarker;
         inputs.push_back(elt);
       }
-
-      // Okay, now that we updated this operand, try to remove the array
-      // entirely  If we can't, then we just leave it alone: we were using it as
-      // a +0 value, so we can just drop the use.
-      arrayDecoder.removeInstructionsIfPossible();
       continue;
     }
 
@@ -2146,24 +2114,6 @@ formGraphOp(SILTensorOpInfo &opInfo,
 
   // TODO: Analyze the operands to the instruction and remove them if they are
   // now dead.
-
-  /// TODO: Analyze and subsume this if necessary.
-#if 0
-
-  // Check to see if the usage of this op looks ok.  If not, reject it with
-  // an error and ignore it.
-  auto error = opInfo.checkAndDiagnoseOperands();
-  if (!error.empty()) {
-    diagnoseInvalid(error);
-    return;
-  }
-
-  // If the tensor operation uses array parameters or has scalar values that
-  // are passed through memory, promote them to being simple arguments to
-  // make all subsequent analyses and promotion of the tensor operations
-  // simpler.
-  opInfo.canonicalizeOperands(deviceConfig);
-#endif
 }
 
 /// Process the specified top level function as a deabstraction context: if it
@@ -2220,9 +2170,14 @@ void TFDeabstraction::doIt() {
 
   logCurrentState("After propagateTensorValues", /*detailed*/true);
 
-  // Canonicalize attribute arguments, checking that they have constants, and
-  // flattening array attributes.
+  // Canonicalize attribute arguments, check that they have constants,
+  // flatten array attributes, and form graph_op instructions.
   checkAttributesAndFormGraphOps();
+
+  logCurrentState("Before Cleanup", /*detailed*/true);
+
+  // Remove code that is dead now that tensor operations are formed.
+  cleanupDeadInstructions();
 
   logCurrentState("Result", /*detailed*/false);
 

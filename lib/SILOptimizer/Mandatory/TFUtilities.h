@@ -496,6 +496,19 @@ private:
                                     SmallVectorImpl<SILValue> &elements,
                         SmallPtrSet<SILInstruction*, 8> *arrayInsts = nullptr);
 
+    /// Given an apply that may be an array literal, attempt to decode it into
+    /// the values that make up its elements.  If this fails or if the value is
+    /// not an array, this returns false.  Otherwise it decodes the array,
+    /// returns the values of each element, and returns true.
+    ///
+    /// If arrayInsts is non-null and if decoding succeeds, this function adds
+    /// all of the instructions relevant to the definition of this array into
+    /// the set.  If decoding fails, then the contents of this set is undefined.
+    static bool decodeArrayElements(ApplyInst *apply,
+                                    SmallVectorImpl<SILValue> &elements,
+                        SmallPtrSet<SILInstruction*, 8> *arrayInsts = nullptr);
+
+
   private:
     void assertWithDump(bool cond, const char *assertMsg) const;
   };
@@ -525,6 +538,14 @@ private:
   //===--------------------------------------------------------------------===//
   // Other stuff
   //===--------------------------------------------------------------------===//
+
+  /// Create a "Const" tensor operation containing the specified scalars, with
+  /// the specified shape and elementType (setting dtype).  The resultType is
+  /// the TensorHandle type to produce.
+  GraphOperationInst *
+  createConstTensor(Type elementType, SymbolicValue scalars,
+                    SymbolicValue shape, SILType resultType, SILLocation loc,
+                    GraphGlobalConfiguration &deviceConfig, SILBuilder &B);
 
   /// This struct provides a an efficient implementation of a predicate that
   /// determines whether a type is or contains a TensorHandle that will be
