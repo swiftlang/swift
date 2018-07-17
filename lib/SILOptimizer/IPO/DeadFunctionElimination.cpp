@@ -702,7 +702,7 @@ public:
 
       LLVM_DEBUG(llvm::dbgs() << "  erase dead function " << F->getName() << "\n");
       NumDeadFunc++;
-      DFEPass->notifyDeleteFunction(F);
+      DFEPass->notifyWillDeleteFunction(F);
       Module->eraseFunction(F);
     }
     if (changedTables)
