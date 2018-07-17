@@ -724,13 +724,13 @@ getLoweredFunctionParameterIndex(unsigned paramIndex, AnyFunctionType *ty) {
 /// Given a @differentiable attribute and the function declaration that holds
 /// this attribute, this function returns the lowered (SIL) parameter indices
 /// to differentiate with respect to.
-static llvm::BitVector getLoweredAutoDiffParameterIndices(
+static llvm::SmallBitVector getLoweredAutoDiffParameterIndices(
     SILGenModule &SGM, const AbstractFunctionDecl *AFD, const SILFunction *F,
     const DifferentiableAttr *DA) {
   auto *fnTy =
     AFD->getInterfaceType()->getCanonicalType()->getAs<AnyFunctionType>();
   auto silFnTy = SGM.getLoweredType(fnTy).castTo<SILFunctionType>();
-  llvm::BitVector indices(silFnTy->getNumParameters());
+  llvm::SmallBitVector indices(silFnTy->getNumParameters());
   // We don't diff wrt `self` unless it is explicitly specified, therefore
   // dropping the last SIL parameter if it's a method.
   if (AFD->getImplicitSelfDecl())

@@ -19,7 +19,7 @@
 #define SWIFT_AST_AUTODIFF_H
 
 #include "ASTContext.h"
-#include "llvm/ADT/BitVector.h"
+#include "llvm/ADT/SmallBitVector.h"
 
 namespace swift {
 
@@ -71,7 +71,7 @@ public:
     return Loc;
   }
 
-  bool isEqual(AutoDiffParameter other) const {
+  bool isEqual(const AutoDiffParameter &other) const {
     if (getKind() == other.getKind() && getKind() == Kind::Index)
       return getIndex() == other.getIndex();
     return getKind() == other.getKind() && getKind() == Kind::Self;
@@ -84,25 +84,17 @@ public:
 /// respect to.
 struct SILReverseAutoDiffIndices {
   unsigned source;
-  llvm::BitVector parameters;
+  llvm::SmallBitVector parameters;
   
   /*implicit*/ SILReverseAutoDiffIndices(unsigned source,
-                                         llvm::BitVector parameters)
+                                         llvm::SmallBitVector parameters)
     : source(source), parameters(parameters) {}
   
   /*implicit*/ SILReverseAutoDiffIndices(unsigned source,
-                                         ArrayRef<unsigned> parameters)
-    : SILReverseAutoDiffIndices(source, llvm::BitVector(parameters.size())) {
-    int last = -1;
-    for (auto paramIdx : parameters) {
-      assert((int)paramIdx > last && "Parameter indices must be ascending");
-      last = paramIdx;
-      this->parameters.set(paramIdx);
-    }
-  }
+                                         ArrayRef<unsigned> parameters);
 
   bool operator==(const SILReverseAutoDiffIndices &other) const {
-    return source == other.source && parameters == other.parameters;
+    return source == other.source && parameters.test(other.parameters);
   }
 
   void print(llvm::raw_ostream &s = llvm::outs()) const {
@@ -145,19 +137,19 @@ struct SILReverseAutoDiffConfiguration {
 
   /*implicit*/
   SILReverseAutoDiffConfiguration(SILReverseAutoDiffIndices indices,
-                                  bool seedable, bool preservingResult)
-    : indices(indices), options(getCanonicalGradientOptions()) {}
+                                  SILGradientOptions options)
+    : indices(indices), options(options) {}
 
   /*implicit*/
   SILReverseAutoDiffConfiguration(SILReverseAutoDiffIndices indices,
-                                  SILGradientOptions options)
-    : indices(indices), options(options) {}
+                                  bool seedable, bool preservingResult)
+    : SILReverseAutoDiffConfiguration(indices, getCanonicalGradientOptions()) {}
 
   unsigned getSourceIndex() const {
     return indices.source;
   }
 
-  llvm::BitVector getParameterIndices() const {
+  llvm::SmallBitVector getParameterIndices() const {
     return indices.parameters;
   }
 
@@ -218,20 +210,19 @@ template<typename T> struct DenseMapInfo;
 
 template<> struct DenseMapInfo<SILReverseAutoDiffIndices> {
   static SILReverseAutoDiffIndices getEmptyKey() {
-    return { DenseMapInfo<unsigned>::getEmptyKey(), BitVector() };
+    return { DenseMapInfo<unsigned>::getEmptyKey(), SmallBitVector() };
   }
 
   static SILReverseAutoDiffIndices getTombstoneKey() {
     return { DenseMapInfo<unsigned>::getTombstoneKey(),
-             BitVector(sizeof(intptr_t), true) };
+             SmallBitVector(sizeof(intptr_t), true) };
   }
 
   static unsigned getHashValue(const SILReverseAutoDiffIndices &Val) {
+    auto params = Val.parameters.set_bits();
     unsigned combinedHash =
-      hash_combine(~1U, DenseMapInfo<unsigned>::getHashValue(Val.source));
-    for (auto i : Val.parameters.set_bits())
-      combinedHash = hash_combine(combinedHash,
-        DenseMapInfo<unsigned>::getHashValue(i));
+      hash_combine(~1U, DenseMapInfo<unsigned>::getHashValue(Val.source),
+                   hash_combine_range(params.begin(), params.end()));
     return combinedHash;
   }
 

@@ -106,7 +106,7 @@ SILFunctionType::getGradientType(SILReverseAutoDiffConfiguration config,
   auto originalParams = getParameters();
   auto originalResult = getResults()[config.getSourceIndex()];
   auto originalSourceResultTy = originalResult.getType();
-  llvm::BitVector paramIndices = config.getParameterIndices();
+  llvm::SmallBitVector paramIndices = config.getParameterIndices();
   SmallVector<SILParameterInfo, 4> gradParams;
   SmallVector<SILResultInfo, 4> gradResults;
   // Collect original parameters to gradient parameters. They have the same

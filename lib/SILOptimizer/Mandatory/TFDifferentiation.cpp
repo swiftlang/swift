@@ -629,7 +629,7 @@ private:
   struct Task {
     SILFunction *original;
     SILFunction *adjoint;
-    llvm::BitVector paramIndices;
+    llvm::SmallBitVector paramIndices;
   };
   /// Process an original function and generate its adjoint.
   void processTask(Task task, SmallVectorImpl<Task> &worklist);
