@@ -283,13 +283,13 @@ public func _hostOp<Scalar>(_ x: TensorHandle<Scalar>) {
 /// inference/propagation design.
 @inlinable @inline(__always)
 public func _scalarTensorWithShape<T>(_ x: Tensor<T>) -> Tensor<T> {
-  let ret: TensorHandle<T> = #tfop("Identity", x, __shapes: [TensorShape()])
+  let ret: TensorHandle<T> = #tfop("Identity", x, __shapes$shapearray: [TensorShape()])
   return Tensor<T>(handle: ret)
 }
 
 @inlinable @inline(__always)
 public func _addScalarTensorsWithShape<T>(_ x: Tensor<T>, _ y: Tensor<T>
 ) -> Tensor<T> {
-  let ret: TensorHandle<T> = #tfop("Add", x, y, __shapes: [TensorShape()])
+  let ret: TensorHandle<T> = #tfop("Add", x, y, __shapes$shapearray: [TensorShape()])
   return Tensor<T>(handle: ret)
 }

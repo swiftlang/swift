@@ -723,6 +723,8 @@ public:
                           &graphFunctions)
       : hostFn(Fn), tensorFlowModule(tensorFlowModule),
         graphFunctions(graphFunctions),
+        // TODO: remote this call once partition pass is folded into
+        // deabstraction.
         configuration(GraphGlobalConfiguration::getForFunction(
             hostFn,
             /*removeConfigInst*/ true)),
@@ -2372,9 +2374,10 @@ void PartitionCloner::visitCondBranchInst(CondBranchInst *inst) {
     assert(eltTy->isBuiltinIntegerType(1) && "expected Tensor<i1>");
 
     auto name = B.getASTContext().getIdentifier("tf_tensor_to_i1");
-    cond = B.createBuiltin(getOpLocation(inst->getLoc()), name,
-                   SILType::getPrimitiveObjectType(eltTy->getCanonicalType()),
-                           /*substitutionlist*/{}, cond);
+    cond = getSingleValueResult(B.createGraphOperation(
+        getOpLocation(inst->getLoc()), name,
+        /*operands*/ {cond}, /*attributes*/ {},
+        {SILType::getPrimitiveObjectType(eltTy->getCanonicalType())}));
   }
 
   doPostProcess(inst,
@@ -2481,9 +2484,18 @@ static void createConstTensorAttrsOnAccel(
   attributes.push_back({ctx.getIdentifier("value$tensor"), constVal});
 }
 
-static SILValue getSingleValueResult(GraphOperationInst *inst) {
-  assert(inst->getNumResults() == 1);
-  return inst->getResults()[0];
+static void
+addScalarShapeArrayAttr(SmallVectorImpl<GraphOperationAttribute> &attributes,
+                        ASTContext &ctx) {
+  // For TPU graph, set a scalar shape array, with attr name
+  // "__shapes$shapearray".
+  auto attrName = std::string(SHAPE_ARRAY_ATTR) +
+                  SILTensorOpInfo::getOperandClassSuffix(
+                      SILTensorOpInfo::OperandClass::ShapeArray);
+  auto scalarShape = SymbolicValue::getArray({}, ctx.getAllocator());
+  attributes.push_back(
+      {ctx.getIdentifier(attrName),
+       SymbolicValue::getArray({scalarShape}, ctx.getAllocator())});
 }
 
 /// Given a primitive scalar instruction like a literal or an LLVM IR
@@ -2531,7 +2543,7 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
 
   auto &B = getBuilder();
   auto &ctx = B.getASTContext();
-  SmallVector<GraphOperationAttribute, 2> attributes;
+  SmallVector<GraphOperationAttribute, 4> attributes;
 
   // Handle opKind-specific issues.
   switch (opKind) {
@@ -2584,6 +2596,9 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
   FP.configuration.handleDevicePlacement(
       opInfo.first, /*opDevice*/ getDeviceString(DeviceType::ALL), B, loc,
       attributes);
+
+  if (FP.configuration.primaryDeviceType == DeviceType::TPU)
+    addScalarShapeArrayAttr(attributes, ctx);
 
   auto *result =
       B.createGraphOperation(loc, ctx.getIdentifier(opName), operands,
@@ -2673,13 +2688,14 @@ createAcceleratorReceive(SILBuilder &B, SILLocation loc, SILType valueTy,
                          GraphGlobalConfiguration &configuration) {
   auto &ctx = B.getASTContext();
   auto opType = "tfc.RecvFromHost";
-  std::string instName = std::string("__tfop_") + opType + ",tensorId";
-  SmallVector<SILValue, 2> operands;
-  auto tensorIdAttr = B.createIntegerLiteral(
-      loc, SILType::getBuiltinIntegerType(32, ctx), idNumber);
-  operands.push_back(tensorIdAttr);
-  configuration.handleDevicePlacement(opType, /*opDevice*/ "", B, loc, operands,
-                                      instName);
+  std::string instName = opType;
+
+  SmallVector<GraphOperationAttribute, 3> attributes;
+  attributes.push_back({ctx.getIdentifier("tensorId"),
+                        SymbolicValue::getInteger(APInt(/*width*/ 32, idNumber),
+                                                  ctx.getAllocator())});
+  configuration.handleDevicePlacement(opType, /*opDevice*/ "", B, loc,
+                                      attributes);
 
   // For XLA compilation, and when receiving a promoted scalar from the host,
   // add a __shapes pseudo-attr to assist the XLA compiler. This special case is
@@ -2689,57 +2705,12 @@ createAcceleratorReceive(SILBuilder &B, SILLocation loc, SILType valueTy,
   //
   // TODO: Do this also for XLA-based GPU (and CPU) execution. Consider
   // extending `configuration` with a bool indicating if we are targeting XLA.
-  if (configuration.primaryDeviceType == DeviceType::TPU && isScalar) {
-    // Add a list of operands corresponding to a scalar-tensor shaped shape
-    // array attr, with opName extension "__shapes$shapearray,$shape". Note
-    // the single element in the shape array, the scalar shape, has no
-    // dimensions.
-
-    // First add the $shapearray operand.
-    instName += std::string(",") + SHAPE_ARRAY_ATTR;
-    instName += SILTensorOpInfo::getOperandClassSuffix(
-        SILTensorOpInfo::OperandClass::ShapeArray);
-    auto int64Ty = SILType::getBuiltinIntegerType(64, B.getASTContext());
-    operands.push_back(B.createIntegerLiteral(loc, int64Ty,
-                                              /*numShapes*/ 1));
-
-    // Now add a scalar shape (with no dimensions) to the shape array.
-    instName += ",";
-    instName += SILTensorOpInfo::getOperandClassSuffix(
-        SILTensorOpInfo::OperandClass::Shape);
-    auto scalarTy = getTensorHandleElementType(valueTy.getASTType());
-    auto metatypeType =
-        MetatypeType::get(scalarTy, MetatypeRepresentation::Thin)
-            ->getCanonicalType();
-    operands.push_back(
-        B.createMetatype(loc, SILType::getPrimitiveObjectType(metatypeType)));
-  }
-  auto subMap =
-    getSingleSubstitutionMapForElementType(valueTy.getASTType(), ctx);
+  if (configuration.primaryDeviceType == DeviceType::TPU && isScalar)
+    addScalarShapeArrayAttr(attributes, ctx);
   auto name = ctx.getIdentifier(instName);
-  return B.createBuiltin(loc, name, valueTy, subMap, operands);
-}
-
-static SILValue createAcceleratorReceiveViaGraphOp(
-    SILBuilder &B, SILLocation loc, SILType valueTy, bool isScalar,
-    unsigned idNumber, GraphGlobalConfiguration &configuration) {
-  // TODO: lift this restriction once GraphOpInst supports shape array attrs.
-  assert(configuration.primaryDeviceType != DeviceType::TPU || !isScalar);
-
-  auto &ctx = B.getASTContext();
-  auto opType = "tfc.RecvFromHost";
-  std::string instName = "tfc.RecvFromHost";
-  SmallVector<GraphOperationAttribute, 2> attributes;
-  auto &allocator = B.getModule().getASTContext().getAllocator();
-  attributes.push_back(
-      {ctx.getIdentifier("tensorId"),
-       SymbolicValue::getInteger(APInt(/*width*/ 32, idNumber), allocator)});
-  configuration.handleDevicePlacement(opType, /*opDevice*/ "", B, loc,
-                                      attributes);
-
-  auto *inst = B.createGraphOperation(loc, ctx.getIdentifier(instName),
-                                      /*operands*/ {}, attributes, {valueTy});
-  return getSingleValueResult(inst);
+  return getSingleValueResult(B.createGraphOperation(loc, name,
+                                                     /*operands*/ {},
+                                                     attributes, {valueTy}));
 }
 
 static void
@@ -3082,13 +3053,8 @@ void PartitionCloner::handleSendRecvForTerminator(TermInst *inst) {
   auto BA = getBuilder(); // Builder for accelerator.
   auto loc = remapLocation(getUserSourceLocation(inst->getDebugLocation()));
   auto receivedCaseId =
-      (FP.configuration.primaryDeviceType == DeviceType::TPU)
-          ? createAcceleratorReceive(BA, loc, remapType(int32SILType),
-                                     /*isScalar*/ true, nextSendID,
-                                     FP.configuration)
-          : createAcceleratorReceiveViaGraphOp(
-                BA, loc, remapType(int32SILType),
-                /*isScalar*/ true, nextSendID, FP.configuration);
+      createAcceleratorReceive(BA, loc, remapType(int32SILType),
+                               /*isScalar*/ true, nextSendID, FP.configuration);
 
   // Let K be the total # cases (including the optional default case). Create a
   // chain of K-1 BB's with cond_br, to dispatch to the K cases.
@@ -3197,12 +3163,8 @@ void PartitionCloner::insertSend(SILInstruction &inst) {
     // Create the receive in the accelerator code.  Each send/receive pair gets
     // a unique ID to associate one with the other.
     this->ValueMap[result] =
-        (FP.configuration.primaryDeviceType == DeviceType::TPU && isScalar)
-            ? createAcceleratorReceive(BA, loc, remapType(result->getType()),
-                                       isScalar, nextSendID, FP.configuration)
-            : createAcceleratorReceiveViaGraphOp(
-                  BA, loc, remapType(result->getType()), isScalar, nextSendID,
-                  FP.configuration);
+        createAcceleratorReceive(BA, loc, remapType(result->getType()),
+                                 isScalar, nextSendID, FP.configuration);
 
     // if `result` is a scalar, we need to convert it to TensorHandle<T>,
     // before sending that value to accelerator. We pass such a function
