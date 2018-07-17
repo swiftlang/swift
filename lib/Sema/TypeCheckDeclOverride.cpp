@@ -1340,7 +1340,8 @@ static bool diagnoseOverrideForAvailability(ValueDecl *override,
 
 static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
   // This can happen with circular inheritance.
-  // FIXME: BUT IT SHOULD NOT HAPPEN NOW
+  // FIXME: This shouldn't be possible once name lookup goes through the
+  // request-evaluator.
   if (override == base)
     return true;
 
