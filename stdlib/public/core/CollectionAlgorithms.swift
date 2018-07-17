@@ -416,7 +416,8 @@ extension Sequence {
   /// - Complexity: O(*n*)
   @inlinable
   public func shuffled() -> [Element] {
-    return shuffled(using: &Random.default)
+    var g = SystemRandomNumberGenerator()
+    return shuffled(using: &g)
   }
 }
 
@@ -471,7 +472,8 @@ extension MutableCollection where Self : RandomAccessCollection {
   /// - Complexity: O(*n*)
   @inlinable
   public mutating func shuffle() {
-    shuffle(using: &Random.default)
+    var g = SystemRandomNumberGenerator()
+    shuffle(using: &g)
   }
 }
 

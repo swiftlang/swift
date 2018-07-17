@@ -124,15 +124,16 @@ public struct Bool {
   ///         print("Maybe another try?")
   ///     }
   ///
-  /// `Bool.random()` uses the default random generator, `Random.default`. The
-  /// call in the example above is equivalent to
-  /// `Bool.random(using: &Random.default)`.
+  /// `Bool.random()` uses the default random generator,
+  /// `SystemRandomNumberGenerator`. To supply a non-default generator, call the
+  /// equivalent method that takes one as an argument.
   ///
   /// - Returns: Either `true` or `false`, randomly chosen with equal
   ///   probability.
   @inlinable
   public static func random() -> Bool {
-    return Bool.random(using: &Random.default)
+    var g = SystemRandomNumberGenerator()
+    return Bool.random(using: &g)
   }
 }
 
