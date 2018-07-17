@@ -2943,6 +2943,14 @@ private:
   /// \brief Collect the current inactive disjunction constraints.
   void collectDisjunctions(SmallVectorImpl<Constraint *> &disjunctions);
 
+  /// \brief Attempt to solve for the choices in the given disjunction.
+  ///
+  /// \returns true if we found at least one solution.
+  bool
+  solveForDisjunctionChoices(Constraint *disjunction,
+                             SmallVectorImpl<Solution> &solutions,
+                             FreeTypeVariableBinding allowFreeTypeVariables);
+
   /// \brief Solve the system of constraints after it has already been
   /// simplified.
   ///
