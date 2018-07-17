@@ -19,7 +19,7 @@ import Darwin
 import TestsUtils
 
 struct BenchResults {
-  let sampleCount, min, max, mean, sd, median: UInt64
+  let sampleCount, min, max, mean, sd, median, maxRSS: UInt64
 }
 
 public var registeredBenchmarks: [BenchmarkInfo] = []
@@ -263,6 +263,37 @@ class Timer {
 
 class SampleRunner {
   let timer = Timer()
+  let baseline = SampleRunner.usage()
+  let c: TestConfig
+
+  init(_ config: TestConfig) {
+    self.c = config
+  }
+
+  private static func usage() -> rusage {
+    var u = rusage(); getrusage(RUSAGE_SELF, &u); return u
+  }
+
+  /// Returns maximum resident set size (MAX_RSS) delta in bytes
+  func measureMemoryUsage() -> Int {
+      var current = SampleRunner.usage()
+      let maxRSS = current.ru_maxrss - baseline.ru_maxrss
+
+      if c.verbose {
+        let pages = maxRSS / sysconf(_SC_PAGESIZE)
+        func deltaEquation(_ stat: KeyPath<rusage, Int>) -> String {
+          let b = baseline[keyPath: stat], c = current[keyPath: stat]
+          return "\(c) - \(b) = \(c - b)"
+        }
+        print("""
+                  MAX_RSS \(deltaEquation(\rusage.ru_maxrss)) (\(pages) pages)
+                  ICS \(deltaEquation(\rusage.ru_nivcsw))
+                  VCS \(deltaEquation(\rusage.ru_nvcsw))
+              """)
+      }
+      return maxRSS
+  }
+
   func run(_ name: String, fn: (Int) -> Void, num_iters: UInt) -> UInt64 {
     // Start the timer.
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
@@ -299,7 +330,7 @@ func runBench(_ test: BenchmarkInfo, _ c: TestConfig) -> BenchResults? {
     print("Running \(test.name) for \(c.numSamples) samples.")
   }
 
-  let sampler = SampleRunner()
+  let sampler = SampleRunner(c)
   for s in 0..<c.numSamples {
     test.setUpFunction?()
     let time_per_sample: UInt64 = 1_000_000_000 * UInt64(c.iterationScale)
@@ -351,7 +382,8 @@ func runBench(_ test: BenchmarkInfo, _ c: TestConfig) -> BenchResults? {
   // Return our benchmark results.
   return BenchResults(sampleCount: UInt64(samples.count),
                       min: samples.min()!, max: samples.max()!,
-                      mean: mean, sd: sd, median: internalMedian(samples))
+                      mean: mean, sd: sd, median: internalMedian(samples),
+                      maxRSS: UInt64(sampler.measureMemoryUsage()))
 }
 
 func printRunInfo(_ c: TestConfig) {
@@ -377,6 +409,7 @@ func runBenchmarks(_ c: TestConfig) {
   let header = (
     ["#", "TEST", "SAMPLES"] +
     ["MIN", "MAX", "MEAN", "SD", "MEDIAN"].map(withUnit)
+    + ["MAX_RSS(B)"]
   ).joined(separator: c.delim)
   print(header)
 
@@ -384,7 +417,7 @@ func runBenchmarks(_ c: TestConfig) {
 
   func report(_ index: String, _ t: BenchmarkInfo, results: BenchResults?) {
     func values(r: BenchResults) -> [String] {
-      return [r.sampleCount, r.min, r.max, r.mean, r.sd, r.median]
+      return [r.sampleCount, r.min, r.max, r.mean, r.sd, r.median, r.maxRSS]
         .map { String($0) }
     }
     let benchmarkStats = (

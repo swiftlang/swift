@@ -95,11 +95,11 @@ RUN: %Benchmark_O AngryPhonebook --num-iters=1 \
 RUN:              | %FileCheck %s --check-prefix NUMITERS1 \
 RUN:                              --check-prefix LOGHEADER \
 RUN:                              --check-prefix LOGBENCH
-LOGHEADER-LABEL: #,TEST,SAMPLES,MIN(us),MAX(us),MEAN(us),SD(us),MEDIAN(us)
+LOGHEADER-LABEL: #,TEST,SAMPLES,MIN(us),MAX(us),MEAN(us),SD(us),MEDIAN(us),MAX_RSS(B)
 LOGBENCH: {{[0-9]+}},
 NUMITERS1: AngryPhonebook,1
 NUMITERS1-NOT: 0,0,0,0,0
-LOGBENCH-SAME: ,{{[0-9]+}},{{[0-9]+}},{{[0-9]+}},{{[0-9]+}},{{[0-9]+}}
+LOGBENCH-SAME: ,{{[0-9]+}},{{[0-9]+}},{{[0-9]+}},{{[0-9]+}},{{[0-9]+}},{{[0-9]+}}
 ````
 
 ### Verbose Mode
@@ -108,7 +108,8 @@ LOGBENCH-SAME: ,{{[0-9]+}},{{[0-9]+}},{{[0-9]+}},{{[0-9]+}},{{[0-9]+}}
 RUN: %Benchmark_O 1 Ackermann 1 AngryPhonebook --verbose --num-samples=2 \
 RUN:              | %FileCheck %s --check-prefix RUNJUSTONCE \
 RUN:                              --check-prefix CONFIG \
-RUN:                              --check-prefix LOGVERBOSE
+RUN:                              --check-prefix LOGVERBOSE \
+RUN:                              --check-prefix MEASUREENV
 CONFIG: NumSamples: 2
 CONFIG: Tests Filter: ["1", "Ackermann", "1", "AngryPhonebook"]
 CONFIG: Tests to run: Ackermann, AngryPhonebook
@@ -117,6 +118,9 @@ LOGVERBOSE: Measuring with scale {{[0-9]+}}.
 LOGVERBOSE-NEXT: Sample 0,{{[0-9]+}}
 LOGVERBOSE-NEXT: Measuring with scale {{[0-9]+}}.
 LOGVERBOSE-NEXT: Sample 1,{{[0-9]+}}
+MEASUREENV: MAX_RSS {{[0-9]+}} - {{[0-9]+}} = {{[0-9]+}} ({{[0-9]+}} pages)
+MEASUREENV: ICS {{[0-9]+}} - {{[0-9]+}} = {{[0-9]+}}
+MEASUREENV: VCS {{[0-9]+}} - {{[0-9]+}} = {{[0-9]+}}
 RUNJUSTONCE-LABEL: 1,Ackermann
 RUNJUSTONCE-NOT: 1,Ackermann
 LOGVERBOSE-LABEL: Running AngryPhonebook for 2 samples.
