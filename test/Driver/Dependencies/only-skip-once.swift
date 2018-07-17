@@ -5,6 +5,7 @@
 // RUN: cd %t && %target-swiftc_driver -driver-show-job-lifecycle -output-file-map %t/output-file-map.json -incremental main.swift file1.swift file2.swift -j1 2>&1 | %FileCheck -check-prefix=CHECK-INITIAL %s
 
 // CHECK-INITIAL-NOT: warning
+// CHECK-INITIAL: Queuing (initial):
 // CHECK-INITIAL: Job finished: {compile: main.o <= main.swift}
 // CHECK-INITIAL: Job finished: {compile: file1.o <= file1.swift}
 // CHECK-INITIAL: Job finished: {compile: file2.o <= file2.swift}
@@ -14,6 +15,7 @@
 // RUN: cd %t && %target-swiftc_driver -driver-show-job-lifecycle -output-file-map %t/output-file-map.json -incremental main.swift file1.swift file2.swift -j1 2>&1 | %FileCheck -check-prefix=CHECK-REBUILD %s
 
 // We should skip the main and file1 rebuilds here, but we should only note skipping them _once_
+// CHECK-REBUILD: Queuing (initial):
 // CHECK-REBUILD: Job finished: {compile: file2.o <= file2.swift}
 // CHECK-REBUILD: Job skipped: {compile: main.o <= main.swift}
 // CHECK-REBUILD: Job skipped: {compile: file1.o <= file1.swift}
