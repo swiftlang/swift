@@ -1,0 +1,88 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -enforce-exclusivity=unchecked -diagnose-static-exclusivity -verify -enable-sil-ownership | %FileCheck %s
+//
+// These tests are extensions of those in
+// exclusivity_static_diagnostics.sil. Once those tests are rewritten
+// with full ownership annotations, the files can be merged.
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+// -----------------------------------------------------------------------------
+// <rdar://problem/42242406> [SR-8266]: Compiler crash when checking
+// exclusivity of inout alias closureWithNoCapture,
+// closureWithConflict, partialApplyPhiThunk, and testPartialApplyPhi.
+//
+// Test that 'checkNoEscapePartialApply' does not assert on a noescape
+// closure passed through a block argument.
+
+sil hidden @closureWithNoCapture : $@convention(thin) (Int32) -> () {
+bb0(%0 : @trivial $Int32):
+  %2 = tuple ()
+  return %2 : $()
+}
+
+sil hidden @closureWithConflict : $@convention(thin) (Int32, @inout_aliasable Int32) -> () {
+bb0(%0 : @trivial $Int32, %1 : @trivial $*Int32):
+  // FIXME: a conflict should be reported here.
+  %2 = begin_access [modify] [unknown] %1 : $*Int32
+  end_access %2 : $*Int32
+  %v = tuple ()
+  return %v : $()
+}
+
+sil shared [transparent] [serializable] [reabstraction_thunk] @partialApplyPhiThunk : $@convention(thin) (@in_guaranteed Int32, @guaranteed @noescape @callee_guaranteed (Int32) -> (@error Error)) -> (@error Error) {
+bb0(%0 : @trivial $*Int32, %1 : @trivial $@noescape @callee_guaranteed (Int32) -> (@error Error)):
+  %val = load [trivial] %0 : $*Int32
+  try_apply %1(%val) : $@noescape @callee_guaranteed (Int32) -> (@error Error), normal bb1, error bb2
+
+bb1(%v : @trivial $()):
+  return %v : $()
+
+bb2(%5 : @owned $Error):
+  throw %5 : $Error
+}
+
+sil @takeGenericNoEscapeFunction : $@convention(method) <τ_0_0> (@inout τ_0_0, @noescape @callee_guaranteed (@in_guaranteed τ_0_0) -> (@error Error)) -> (@error Error)
+
+// CHECK-LABEL: sil @testPartialApplyPhi
+sil @testPartialApplyPhi : $@convention(thin) (Int, @inout Int32) -> (@error Error) {
+bb0(%0 : @trivial $Int, %1 : @trivial $*Int32):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %f1 = function_ref @closureWithNoCapture : $@convention(thin) (Int32) -> ()
+  %pa1 = partial_apply [callee_guaranteed] %f1() : $@convention(thin) (Int32) -> ()
+  br bb3(%pa1 : $@callee_guaranteed (Int32) -> ())
+
+bb2:
+  %f2 = function_ref @closureWithConflict : $@convention(thin) (Int32, @inout_aliasable Int32) -> ()
+  %pa2 = partial_apply [callee_guaranteed] %f2(%1) : $@convention(thin) (Int32, @inout_aliasable Int32) -> ()
+  br bb3(%pa2 : $@callee_guaranteed (Int32) -> ())
+
+bb3(%pa3 : @owned $@callee_guaranteed (Int32) -> ()):
+  %cvt3 = convert_function %pa3 : $@callee_guaranteed (Int32) -> () to $@callee_guaranteed (Int32) -> (@error Error)
+  %esc3 = convert_escape_to_noescape [not_guaranteed] %cvt3 : $@callee_guaranteed (Int32) -> (@error Error) to $@noescape @callee_guaranteed (Int32) -> (@error Error)
+
+  %f3 = function_ref @partialApplyPhiThunk : $@convention(thin) (@in_guaranteed Int32, @guaranteed @noescape @callee_guaranteed (Int32) -> (@error Error)) -> (@error Error)
+  %pa4 = partial_apply [callee_guaranteed] %f3(%esc3) : $@convention(thin) (@in_guaranteed Int32, @guaranteed @noescape @callee_guaranteed (Int32) -> (@error Error)) -> (@error Error)
+  %esc4 = convert_escape_to_noescape [not_guaranteed] %pa4 : $@callee_guaranteed (@in_guaranteed Int32) -> (@error Error) to $@noescape @callee_guaranteed (@in_guaranteed Int32) -> (@error Error)
+
+  // In the original test case, the closures are destroyed before their use. Is that ok?
+  destroy_value %pa4 : $@callee_guaranteed (@in_guaranteed Int32) -> (@error Error)
+  destroy_value %cvt3 : $@callee_guaranteed (Int32) -> (@error Error)
+
+  // FIXME: a conflict should be reported here.
+  %access = begin_access [modify] [static] %1 : $*Int32
+  %f4 = function_ref @takeGenericNoEscapeFunction : $@convention(method) <τ_0_0> (@inout τ_0_0, @noescape @callee_guaranteed (@in_guaranteed τ_0_0) -> (@error Error)) -> (@error Error)
+  try_apply %f4<Int32>(%access, %esc4) : $@convention(method) <τ_0_0> (@inout τ_0_0, @noescape @callee_guaranteed (@in_guaranteed τ_0_0) -> (@error Error)) -> (@error Error), normal bb4, error bb5
+
+bb4(%v : @trivial $()):
+  end_access %access : $*Int32
+  return %v : $()
+
+bb5(%e : @owned $Error):
+  end_access %access : $*Int32
+  throw %e : $Error
+}
