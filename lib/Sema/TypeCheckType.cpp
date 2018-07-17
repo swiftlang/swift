@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1942,14 +1942,9 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   // Handle @escaping
   if (hasFunctionAttr && ty->is<FunctionType>()) {
     if (attrs.has(TAK_escaping)) {
-      // For compatibility with 3.0, we don't emit an error if it appears on a
-      // variadic argument list.
-      bool skipDiagnostic =
-          isVariadicFunctionParam && Context.isSwiftVersion3();
-
       // The attribute is meaningless except on parameter types.
       bool isEnum = options.contains(TypeResolutionFlags::EnumCase);
-      if ((isEnum || !isParam) && !skipDiagnostic) {
+      if (isEnum || !isParam) {
         auto loc = attrs.getLoc(TAK_escaping);
         auto attrRange = getTypeAttrRangeWithAt(TC, loc);
 
@@ -2784,108 +2779,8 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
   return TupleType::get(elements, Context);
 }
 
-/// Restore Swift3 behavior of ambiguous composition for source compatibility.
-///
-/// Currently, 'P1 & P2.Type' is parsed as (composition P1, (metatype P2))
-/// In Swift3, that was (metatype (composition P1, P2)).
-/// For source compatibility, before resolving Type of that, reconstruct
-/// TypeRepr as so, and emit a warning with fix-it to enclose it with
-/// parenthesis; '(P1 & P2).Type'
-//
-/// \param Comp The type composition to be checked and fixed.
-///
-/// \returns Fixed TypeRepr, or nullptr that indicates no need to fix.
-static TypeRepr *fixCompositionWithPostfix(TypeChecker &TC,
-                                           CompositionTypeRepr *Comp) {
-  // Only for Swift3
-  if (!TC.Context.isSwiftVersion3())
-    return nullptr;
-
-  auto Types = Comp->getTypes();
-  TypeRepr *LastType = nullptr;
-  for (auto i = Types.begin(), e = Types.end(); i != e; ++i) {
-    if (!isa<IdentTypeRepr>(*i)) {
-      // Found non-IdentType not at the last, can't help.
-      if (i + 1 != e)
-        return nullptr;
-      LastType = *i;
-    }
-  }
-  // Only IdentType(s) it's OK.
-  if (!LastType)
-    return nullptr;
-
-  // Strip off the postfix type repr.
-  SmallVector<TypeRepr *, 2> Postfixes;
-  while (true) {
-    if (auto T = dyn_cast<ProtocolTypeRepr>(LastType)) {
-      Postfixes.push_back(LastType);
-      LastType = T->getBase();
-    } else if (auto T = dyn_cast<MetatypeTypeRepr>(LastType)) {
-      Postfixes.push_back(LastType);
-      LastType = T->getBase();
-    } else if (auto T = dyn_cast<OptionalTypeRepr>(LastType)) {
-      Postfixes.push_back(LastType);
-      LastType = T->getBase();
-    } else if (auto T =
-        dyn_cast<ImplicitlyUnwrappedOptionalTypeRepr>(LastType)) {
-      Postfixes.push_back(LastType);
-      LastType = T->getBase();
-    } else if (!isa<IdentTypeRepr>(LastType)) {
-      // Found non-IdentTypeRepr, can't help;
-      return nullptr;
-    } else {
-      break;
-    }
-  }
-  assert(!Postfixes.empty() && isa<IdentTypeRepr>(LastType));
-
-  // Now, we know we can fix-it. do it.
-  SmallVector<TypeRepr *, 4> Protocols(Types.begin(), Types.end() - 1);
-  Protocols.push_back(LastType);
-
-  // Emit fix-it to enclose composition part into parentheses.
-  TypeRepr *InnerMost = Postfixes.back();
-  TC.diagnose(InnerMost->getLoc(), diag::protocol_composition_with_postfix,
-      isa<ProtocolTypeRepr>(InnerMost) ? ".Protocol" :
-      isa<MetatypeTypeRepr>(InnerMost) ? ".Type" :
-      isa<OptionalTypeRepr>(InnerMost) ? "?" :
-      isa<ImplicitlyUnwrappedOptionalTypeRepr>(InnerMost) ? "!" :
-      /* unreachable */"")
-    .highlight({Comp->getStartLoc(), LastType->getEndLoc()})
-    .fixItInsert(Comp->getStartLoc(), "(")
-    .fixItInsertAfter(LastType->getEndLoc(), ")");
-
-  // Reconstruct postfix type repr with collected protocols.
-  TypeRepr *Fixed = CompositionTypeRepr::create(
-    TC.Context, Protocols, Comp->getStartLoc(),
-    {Comp->getCompositionRange().Start, LastType->getEndLoc()});
-
-  // Add back postix TypeRepr(s) to the composition.
-  while (Postfixes.size()) {
-    auto Postfix = Postfixes.pop_back_val();
-    if (auto T = dyn_cast<ProtocolTypeRepr>(Postfix))
-      Fixed = new (TC.Context) ProtocolTypeRepr(Fixed, T->getProtocolLoc());
-    else if (auto T = dyn_cast<MetatypeTypeRepr>(Postfix))
-      Fixed = new (TC.Context) MetatypeTypeRepr(Fixed, T->getMetaLoc());
-    else if (auto T = dyn_cast<OptionalTypeRepr>(Postfix))
-      Fixed = new (TC.Context) OptionalTypeRepr(Fixed, T->getQuestionLoc());
-    else if (auto T = dyn_cast<ImplicitlyUnwrappedOptionalTypeRepr>(Postfix))
-      Fixed = new (TC.Context)
-        ImplicitlyUnwrappedOptionalTypeRepr(Fixed, T->getExclamationLoc());
-    else
-      llvm_unreachable("unexpected type repr");
-  }
-
-  return Fixed;
-}
-
 Type TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
                                           TypeResolutionOptions options) {
-
-  // Fix 'P1 & P2.Type' to '(P1 & P2).Type' for Swift3
-  if (auto fixed = fixCompositionWithPostfix(TC, repr))
-    return resolveType(fixed, options);
 
   // Note that the superclass type will appear as part of one of the
   // types in 'Members', so it's not used when constructing the
