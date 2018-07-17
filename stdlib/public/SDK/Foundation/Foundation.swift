@@ -95,3 +95,18 @@ extension CVarArg where Self: _ObjectiveCBridgeable {
     return _encodeBitsAsWords(object)
   }
 }
+
+//===----------------------------------------------------------------------===//
+// Optionality Checker
+//===----------------------------------------------------------------------===//
+
+// This protocol is expected to be conformed to by Optional only.
+// It can be used to check if a type is Optional within Foundation internal scope.
+fileprivate protocol _Unwrappable {}
+
+extension Optional : _Unwrappable {}
+
+@inline(__always)
+internal func _isOptionalType<T>(_ type: T.Type) -> Bool {
+    return type is _Unwrappable.Type
+}

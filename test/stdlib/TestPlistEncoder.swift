@@ -68,6 +68,14 @@ class TestPropertyListEncoder : TestPropertyListEncoderSuper {
     _testRoundTrip(of: TopLevelWrapper(c), in: .xml)
   }
 
+  func testEncodingTopLevelSingleValueContainerForOptionalType() {
+    let c = CounterOptional(nil)
+    _testEncodeFailure(of: c, in: .binary)
+    _testEncodeFailure(of: c, in: .xml)
+    _testRoundTrip(of: TopLevelWrapper(c), in: .binary)
+    _testRoundTrip(of: TopLevelWrapper(c), in: .xml)
+  }
+
   // MARK: - Encoding Top-Level Structured Types
   func testEncodingTopLevelStructuredStruct() {
     // Address is a struct type with multiple fields.
@@ -424,6 +432,29 @@ fileprivate final class Counter : Codable, Equatable {
   }
 
   static func ==(_ lhs: Counter, _ rhs: Counter) -> Bool {
+    return lhs === rhs || lhs.count == rhs.count
+  }
+}
+
+/// A simple referential counter type that encodes as a single Int? value.
+fileprivate final class CounterOptional : Codable, Equatable {
+  var count: Int? = nil
+
+  init(_ def: Int?) {
+    count = def
+  }
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.singleValueContainer()
+    count = try container.decode(Int?.self)
+  }
+
+  func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(self.count)
+  }
+
+  static func ==(_ lhs: CounterOptional, _ rhs: CounterOptional) -> Bool {
     return lhs === rhs || lhs.count == rhs.count
   }
 }
@@ -805,6 +836,7 @@ PropertyListEncoderTests.test("testEncodingTopLevelStructuredStruct") { TestProp
 PropertyListEncoderTests.test("testEncodingTopLevelStructuredClass") { TestPropertyListEncoder().testEncodingTopLevelStructuredClass() }
 PropertyListEncoderTests.test("testEncodingTopLevelStructuredSingleStruct") { TestPropertyListEncoder().testEncodingTopLevelStructuredSingleStruct() }
 PropertyListEncoderTests.test("testEncodingTopLevelStructuredSingleClass") { TestPropertyListEncoder().testEncodingTopLevelStructuredSingleClass() }
+PropertyListEncoderTests.test("testEncodingTopLevelSingleValueContainerForOptionalType") { TestPropertyListEncoder().testEncodingTopLevelSingleValueContainerForOptionalType() }
 PropertyListEncoderTests.test("testEncodingTopLevelDeepStructuredType") { TestPropertyListEncoder().testEncodingTopLevelDeepStructuredType() }
 PropertyListEncoderTests.test("testEncodingClassWhichSharesEncoderWithSuper") { TestPropertyListEncoder().testEncodingClassWhichSharesEncoderWithSuper() }
 PropertyListEncoderTests.test("testEncodingTopLevelNullableType") { TestPropertyListEncoder().testEncodingTopLevelNullableType() }

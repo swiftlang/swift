@@ -2007,7 +2007,7 @@ extension _JSONDecoder : SingleValueDecodingContainer {
     public func decode<T : Decodable>(_ type: T.Type) throws -> T {
         // Not expecting NonNull for Optional, which may take null for nil case.
         if !_isOptionalType(type) {
-            try expectNonNull(T.self)
+            try expectNonNull(type)
         }
         return try self.unbox(self.storage.topContainer, as: type)!
     }
@@ -2455,19 +2455,4 @@ fileprivate extension EncodingError {
         let debugDescription = "Unable to encode \(valueDescription) directly in JSON. Use JSONEncoder.NonConformingFloatEncodingStrategy.convertToString to specify how the value should be encoded."
         return .invalidValue(value, EncodingError.Context(codingPath: codingPath, debugDescription: debugDescription))
     }
-}
-
-//===----------------------------------------------------------------------===//
-// Optionality Checker
-//===----------------------------------------------------------------------===//
-
-// This protocol is expected to be conformed to by Optional only.
-// It is used to check if a type is Optional.
-fileprivate protocol _Unwrappable {}
-
-extension Optional : _Unwrappable {}
-
-@inline(__always)
-fileprivate func _isOptionalType<T>(_ type: T.Type) -> Bool {
-    return type as? _Unwrappable.Type != nil
 }
