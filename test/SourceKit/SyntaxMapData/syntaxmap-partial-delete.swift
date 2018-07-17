@@ -1,5 +1,7 @@
 // RUN: %sourcekitd-test -req=open -print-raw-response %S/Inputs/syntaxmap-partial-delete.swift == -req=edit -print-raw-response -pos=2:10 -length=2 -replace='' %S/Inputs/syntaxmap-partial-delete.swift | %sed_clean > %t.response
 // RUN: %FileCheck -input-file=%t.response %s
+// RUN: %sourcekitd-test -req=open -print-raw-response %S/Inputs/syntaxmap-partial-delete.swift -force-libsyntax-based-processing == -req=edit -print-raw-response -pos=2:10 -length=2 -replace='' %S/Inputs/syntaxmap-partial-delete.swift -force-libsyntax-based-processing | %sed_clean > %t.libsyntax.response
+// RUN: %FileCheck -input-file=%t.libsyntax.response %s
 
 // CHECK: {{^}}{
 // CHECK-NEXT: key.offset: 0,
