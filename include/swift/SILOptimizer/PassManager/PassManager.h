@@ -203,7 +203,7 @@ public:
   }
 
   /// \brief Iterate over all analysis and notify them of a deleted function.
-  void notifyDeleteFunction(SILFunction *F) {
+  void notifyWillDeleteFunction(SILFunction *F) {
     // Invalidate the analysis (unless they are locked)
     for (auto AP : Analyses)
       if (!AP->isLocked())
