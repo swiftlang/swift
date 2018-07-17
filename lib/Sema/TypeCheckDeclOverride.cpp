@@ -783,6 +783,8 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
     diags.diagnose(baseDecl, diag::overridden_here);
   }
 
+  bool isAccessor = isa<AccessorDecl>(decl);
+
   // Check that the override has the required access level.
   // Overrides have to be at least as accessible as what they
   // override, except:
@@ -793,7 +795,8 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
   // never really "overridden" in the intended sense here, because of
   // course derived classes will change how the class is initialized.
   AccessLevel matchAccess = baseDecl->getFormalAccess(dc);
-  if (matchAccess < AccessLevel::Open &&
+  if (!isAccessor &&
+      matchAccess < AccessLevel::Open &&
       baseDecl->getModuleContext() != decl->getModuleContext() &&
       !isa<ConstructorDecl>(decl)) {
     diags.diagnose(decl, diag::override_of_non_open,
@@ -1000,16 +1003,16 @@ bool swift::checkOverrides(ValueDecl *decl) {
     // Otherwise, we have more checking to do.
   }
 
+  // Accessor methods get overrides through their storage declaration, and
+  // all checking can be performed via that mechanism.
+  if (isa<AccessorDecl>(decl)) {
+    (void)decl->getOverriddenDecls();
+    return false;
+  }
+
   // Set up matching, but bail out if there's nothing to match.
   OverrideMatcher matcher(decl);
   if (!matcher) return false;
-
-  // Ignore accessor methods (e.g. getters and setters), they will be handled
-  // when their storage decl is processed.
-  // FIXME: We should pull information from the storage declaration, but
-  // that will be handled at a different point.
-  if (isa<AccessorDecl>(decl))
-    return false;
 
   // Look for members with the same name and matching types as this
   // one.
@@ -1068,6 +1071,11 @@ bool swift::checkOverrides(ValueDecl *decl) {
   }
 
   // FIXME: Check for missing 'override' keyword here?
+
+  // We performed override checking, so record the override.
+  // FIXME: It's weird to be pushing state here, but how do we say that
+  // this check subsumes the normal 'override' check?
+  decl->setOverriddenDecl(matches.front().Decl);
   return false;
 }
 
@@ -1230,6 +1238,9 @@ bool swift::overrideRequiresKeyword(ValueDecl *overridden) {
     return ctor->isDesignatedInit() && !ctor->isRequired();
   }
 
+  if (isa<AccessorDecl>(overridden))
+    return false;
+
   return true;
 }
 
@@ -1341,7 +1352,8 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     auto *overrideASD = cast<AbstractStorageDecl>(override);
 
     // Make sure that the overriding property doesn't have storage.
-    if (overrideASD->hasStorage() &&
+    if ((overrideASD->hasStorage() ||
+         overrideASD->getAttrs().hasAttribute<LazyAttr>()) &&
         !(overrideASD->getWillSetFunc() || overrideASD->getDidSetFunc())) {
       bool downgradeToWarning = false;
       if (!ctx.isSwiftVersionAtLeast(5) &&
@@ -1401,9 +1413,15 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     }
   }
 
+  // Various properties are only checked for the storage declarations
+  // and not for the individual accessors. Otherwise, we end up with
+  // duplicated diagnostics.
+  bool isAccessor = isa<AccessorDecl>(override);
+
   // Non-Objective-C declarations in extensions cannot override or
   // be overridden.
-  if ((base->getDeclContext()->isExtensionContext() ||
+  if (!isAccessor &&
+      (base->getDeclContext()->isExtensionContext() ||
        override->getDeclContext()->isExtensionContext()) &&
       !base->isObjC()) {
     bool baseCanBeObjC = canBeRepresentedInObjC(base);
@@ -1443,7 +1461,8 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
   // FIXME: Only warn if the extension is in another module, and if
   // it is in the same module, update the vtable.
   if (auto *baseDecl = dyn_cast<ClassDecl>(base->getDeclContext())) {
-    if (baseDecl->hasKnownSwiftImplementation() &&
+    if (!isAccessor &&
+        baseDecl->hasKnownSwiftImplementation() &&
         !base->isDynamic() &&
         override->getDeclContext()->isExtensionContext()) {
       // For compatibility, only generate a warning in Swift 3
@@ -1472,7 +1491,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
   }
 
   // The overridden declaration cannot be 'final'.
-  if (base->isFinal() && !isa<AccessorDecl>(override)) {
+  if (base->isFinal() && !isAccessor) {
     // FIXME: Customize message to the kind of thing.
     auto baseKind = base->getDescriptiveKind();
     switch (baseKind) {
@@ -1658,6 +1677,15 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     }
 
     // We are overriding the base accessor.
+
+    // Check the correctness of the override.
+    OverrideMatcher matcher(accessor);
+    if (matcher.checkOverride(baseAccessor,
+                              OverrideCheckingAttempt::PerfectMatch)) {
+      invalidateOverrideAttribute(decl);
+      return { };
+    }
+
     return SmallVector<ValueDecl *, 1>{baseAccessor};
   }
 
