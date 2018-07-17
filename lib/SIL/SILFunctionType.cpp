@@ -102,11 +102,11 @@ CanType SILFunctionType::getSelfInstanceType() const {
 CanSILFunctionType
 SILFunctionType::getGradientType(SILReverseAutoDiffConfiguration config,
                                  SILModule &M) {
+  // FIXME: Handle `Delayed` gradient option.
   auto originalParams = getParameters();
-  auto originalResult = getResults()[config.sourceIndex];
+  auto originalResult = getResults()[config.getSourceIndex()];
   auto originalSourceResultTy = originalResult.getType();
-  SmallVector<unsigned, 4> allParamIndices;
-  ArrayRef<unsigned> paramIndices = config.parameterIndices;
+  llvm::SmallBitVector paramIndices = config.getParameterIndices();
   SmallVector<SILParameterInfo, 4> gradParams;
   SmallVector<SILResultInfo, 4> gradResults;
   // Collect original parameters to gradient parameters. They have the same
@@ -114,7 +114,7 @@ SILFunctionType::getGradientType(SILReverseAutoDiffConfiguration config,
   for (auto &originalParam : originalParams)
     gradParams.push_back(originalParam);
   // If seedable, add original result to the parameter list.
-  if (config.seedable) {
+  if (config.isSeedable()) {
     ParameterConvention seedConv;
     switch (originalResult.getConvention()) {
     case ResultConvention::Indirect:
@@ -130,20 +130,18 @@ SILFunctionType::getGradientType(SILReverseAutoDiffConfiguration config,
     }
     gradParams.push_back({ originalSourceResultTy, seedConv });
   }
-  // If no differentiation parameters are specified, differentiation is done
-  // with respect to all of original's parameters. For simplicity, we add all
+  // If no differentiation parameters are specified, differentiation is with
+  // respect to all of original's parameters. For simplicity, we add all
   // parameter indices to a temporary.
-  if (config.parameterIndices.empty()) {
-    auto allParamRange = range(0, getNumParameters());
-    allParamIndices.append(allParamRange.begin(), allParamRange.end());
-    paramIndices = allParamIndices;
+  if (paramIndices.none()) {
+    paramIndices.resize(getNumParameters());
+    paramIndices.set();
   }
   // If preserving result, the original result will be the first result.
-  if (config.preservingResult) {
+  if (config.isPreservingResult())
     gradResults.push_back(originalResult);
-  }
   // Collect differentiation parameters to gradient results.
-  for (auto index : paramIndices) {
+  for (auto index : paramIndices.set_bits()) {
     auto param = originalParams[index];
     ResultConvention conv;
     switch (param.getConvention()) {
@@ -162,7 +160,40 @@ SILFunctionType::getGradientType(SILReverseAutoDiffConfiguration config,
     }
     gradResults.push_back({ param.getType(), conv });
   }
-  // Create an expected function type.
+  // If the gradient is delayed, the result type is
+  //   (original_params...) -> (original_result?, (seed?) -> (derivatives...))
+  if (config.isDelayed()) {
+    // The delayed gradient function (inner) type.
+    ArrayRef<SILParameterInfo> delayedGradParams = config.isSeedable()
+      ? ArrayRef<SILParameterInfo>(&gradParams.back(), 1)
+      : ArrayRef<SILParameterInfo>();
+    ArrayRef<SILResultInfo> delayedGradResults = config.isPreservingResult()
+      ? ArrayRef<SILResultInfo>(gradResults).drop_front()
+      : ArrayRef<SILResultInfo>(gradResults);
+    auto delayedGradFuncTy = SILFunctionType::get(
+      getGenericSignature(),
+      getExtInfo().withRepresentation(Representation::Thin),
+      getCoroutineKind(), getCalleeConvention(),
+      delayedGradParams, {}, delayedGradResults, None,
+      getASTContext(), getWitnessMethodConformanceOrNone());
+    ArrayRef<SILParameterInfo> params = config.isSeedable()
+      ? ArrayRef<SILParameterInfo>(gradParams).drop_back()
+      : ArrayRef<SILParameterInfo>(gradParams);
+    SILResultInfo delayedGradFuncResult(
+      delayedGradFuncTy, ResultConvention::Unowned);
+    SmallVector<SILResultInfo, 2> results;
+    if (config.isPreservingResult())
+      results.append({gradResults.front(), delayedGradFuncResult});
+    else
+      results.append({delayedGradFuncResult});
+    // $convention(thin) (seed?) -> (derivatives...)
+    return SILFunctionType::get(getGenericSignature(), getExtInfo(),
+                                getCoroutineKind(), getCalleeConvention(),
+                                params, getYields(), results,
+                                getOptionalErrorResult(), getASTContext(),
+                                None);
+  }
+  // Create an expected function type for the non-delayed case.
   return SILFunctionType::get(getGenericSignature(), getExtInfo(),
                               getCoroutineKind(), getCalleeConvention(),
                               gradParams, getYields(), gradResults,
