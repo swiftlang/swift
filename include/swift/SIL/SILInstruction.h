@@ -8125,6 +8125,7 @@ public:
   OperandValueArrayRef getArguments() const {
     return OperandValueArrayRef(getAllOperands());
   }
+  GraphOperationAttribute getAttribute(unsigned i) const;
 
   ArrayRef<GraphOperationAttribute> getAttributes() const {
     return Attributes;
@@ -8134,7 +8135,7 @@ public:
     return Attributes;
   }
 
-  Optional<SymbolicValue> getAttribute(StringRef name);
+  Optional<SymbolicValue> getAttributeNamed(StringRef name);
 
   static bool classof(const SILNode *N) {
     return N->getKind() == SILNodeKind::GraphOperationInst;

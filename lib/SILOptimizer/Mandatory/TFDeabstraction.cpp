@@ -1697,6 +1697,9 @@ tryToPromoteTensorFromScalars1D(ApplyInst *inst,
   assert(inst->getNumOperands() == 2 && isTensorHandle(inst->getType()) &&
          "Unexpected type signature for __tf_tensor_from_scalars_1d");
 
+  // FIXME: All of this (including expandArrayConstant) needs a massive revamp
+  // and simplification to produce graphops directly.
+
   // If we can't analyze the scalars as an arrays of constants, give up.
   auto scalarIt = constants.find(inst->getOperand(1));
   if (scalarIt == constants.end() || !scalarIt->second.isConstant())
@@ -1708,7 +1711,7 @@ tryToPromoteTensorFromScalars1D(ApplyInst *inst,
   std::string name = "__tfop_Const";
 
   // Try to expand the array into its scalars.
-  expandArrayConstant(scalarIt->second.getAggregateValue(),
+  expandArrayConstant(scalarIt->second.getArrayValue(),
                       getArrayElementType(inst->getOperand(1)->getType()),
                       "value",
                       SILTensorOpInfo::OperandClass::Tensor,
@@ -1748,6 +1751,7 @@ tryToPromoteTensorFromScalars1D(ApplyInst *inst,
   auto arrayValue = inst->getOperand(1);
 
   // Finally build a new builtin instruction with the simplified operands.
+  // FIXME: This should create a graphop directly!
   auto newInst =
     B.createBuiltin(inst->getLoc(),
                     B.getASTContext().getIdentifier(name),
@@ -2038,7 +2042,12 @@ formGraphOp(SILTensorOpInfo &opInfo,
     auto attrName = operandClass.first.str() +
        SILTensorOpInfo::getOperandClassSuffix(operandClass.second);
 
-    auto constValue = it->second.cloneInto(allocator);
+    // Get the constant, ignoring struct wrappers.
+    auto constValue = it->second.lookThroughSingleElementAggregates();
+
+    // Clone it out of the ConstExpr pool into the global SILModule pool.
+    constValue = constValue.cloneInto(allocator);
+
     auto attrIdentifier = context.getIdentifier(attrName);
     attributes.push_back({ attrIdentifier, constValue });
 
@@ -2061,22 +2070,72 @@ formGraphOp(SILTensorOpInfo &opInfo,
     case SILTensorOpInfo::OperandClass::InputElt:
     case SILTensorOpInfo::OperandClass::Normal:  // No modifier.
       break;
-    case SILTensorOpInfo::OperandClass::DType:   // This integer value is a dtype.
+    case SILTensorOpInfo::OperandClass::DType:
+      // This integer value is a dtype.
       if (constValue.getKind() != SymbolicValue::Integer)
         return diagnoseInvalidAttr("requires a constant integer");
       break;
     case SILTensorOpInfo::OperandClass::Shape:
     case SILTensorOpInfo::OperandClass::Array:
+      if (constValue.getKind() != SymbolicValue::Array)
+        return diagnoseInvalidAttr("requires an array");
+      // TODO: Check that the elements are the right types.  We should reject
+      // a shape with floats (or other junk) in the elements.
+      break;
+
     case SILTensorOpInfo::OperandClass::ShapeArray:
     case SILTensorOpInfo::OperandClass::ArrayElement:
       // Match logic from checkAndDiagnoseOperands.
       assert(0 && "FIXME: array constant exprs aren't handled yet");
     case SILTensorOpInfo::OperandClass::Tensor:
-      // FIXME: Support array constants.
-      if (constValue.getKind() != SymbolicValue::Integer &&
-          constValue.getKind() != SymbolicValue::Float)
+      // FIXME: There needs to be a dtype attribute before this.
+
+      if (constValue.getKind() == SymbolicValue::Integer ||
+          constValue.getKind() == SymbolicValue::Float)
+        break;
+
+      if (constValue.getKind() != SymbolicValue::Array)
         return diagnoseInvalidAttr("requires a constant that is an integer,"
                                    " floating point, or array thereof");
+
+      auto elements = constValue.getArrayValue();
+
+      /// Tensor array arguments must always be followed by a shape.
+      if (i+1 >= opInfo.operandClasses.size() ||
+          opInfo.operandClasses[i+1].second !=
+                      SILTensorOpInfo::OperandClass::Shape)
+        return diagnoseInvalidAttr("tensor attributes must be followed by "
+                                   "a shape attribute");
+
+      // TODO: Decode the shape and validate that it matches the # elements
+      // we have.
+
+      // Empty tensor value is ok.
+      if (elements.empty()) break;
+
+      auto firstElt = elements.front().lookThroughSingleElementAggregates();
+
+      // Verify that all the elements are the same type, and that they are
+      // either integer or FP.
+      if (firstElt.getKind() == SymbolicValue::Integer) {
+        for (auto elt : elements) {
+          elt = elt.lookThroughSingleElementAggregates();
+          if (elt.getKind() != SymbolicValue::Integer ||
+              elt.getIntegerValueBitWidth() !=
+              firstElt.getIntegerValueBitWidth())
+            return diagnoseInvalidAttr("array values must be the same type");
+        }
+      } else if (firstElt.getKind() == SymbolicValue::Float) {
+        for (auto elt : elements) {
+          elt = elt.lookThroughSingleElementAggregates();
+          if (elt.getKind() != SymbolicValue::Float ||
+              elt.getFloatValueSemantics() != firstElt.getFloatValueSemantics())
+            return diagnoseInvalidAttr("array values must be the same type");
+        }
+      } else {
+        return diagnoseInvalidAttr("requires a constant that is an integer,"
+                                   " floating point, or array thereof");
+      }
       break;
     }
   }

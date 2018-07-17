@@ -806,12 +806,24 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
       elementConstants.push_back(eltCst);
     }
 
-    auto v = SymbolicValue::getAggregate(elementConstants,
-                                         evaluator.getAllocator());
-#if 0   // TODO: Build array representation we don't have yet.
-#endif
-    (void)v;
-    break;
+    auto arrayType = apply->getType().castTo<TupleType>()->getElementType(0);
+
+    // Build this value as an array of elements.  Wrap it up into a memory
+    // object with an address refering to it.
+    auto arrayVal = SymbolicValue::getArray(elementConstants,
+                                            evaluator.getAllocator());
+
+    auto *memObject =
+      SymbolicValueMemoryObject::create(arrayType, arrayVal,
+                                        evaluator.getAllocator());
+
+    // Okay, now we have the array memory object, return the indirect array
+    // value and the pointer object we need for the tuple result.
+    auto indirectArr = SymbolicValue::getArrayAddress(memObject);
+    auto address = SymbolicValue::getAddress(memObject);
+    setValue(apply, SymbolicValue::getAggregate({indirectArr, address},
+                                                evaluator.getAllocator()));
+    return None;
   }
   }
 
@@ -1165,7 +1177,9 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
   if (isa<DebugValueInst>(inst) || isa<DebugValueAddrInst>(inst) ||
       isa<EndAccessInst>(inst) ||
       // Constant have no important state.
-      isa<DestroyAddrInst>(inst))
+      isa<DestroyAddrInst>(inst) ||
+      isa<RetainValueInst>(inst) || isa<ReleaseValueInst>(inst) ||
+      isa<StrongRetainInst>(inst) || isa<StrongReleaseInst>(inst))
     return None;
 
   // If this is a special flow-sensitive instruction like a stack allocation,

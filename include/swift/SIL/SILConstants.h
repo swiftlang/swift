@@ -208,7 +208,7 @@ class SymbolicValue {
     /// representation, which makes the number of entries in the list derivable.
     unsigned integer_bitwidth;
 
-    /// This is the numer of bytes for an RK_String representation.
+    /// This is the number of bytes for an RK_String representation.
     unsigned string_numBytes;
 
     /// This is the number of elements for an RK_Aggregate representation.
@@ -341,11 +341,13 @@ public:
                                   llvm::BumpPtrAllocator &allocator);
 
   APInt getIntegerValue() const;
+  unsigned getIntegerValueBitWidth() const;
 
   static SymbolicValue getFloat(const APFloat &value,
                                 llvm::BumpPtrAllocator &allocator);
 
   APFloat getFloatValue() const;
+  const llvm::fltSemantics *getFloatValueSemantics() const;
 
   /// Returns a SymbolicValue representing a UTF-8 encoded string.
   static SymbolicValue getString(StringRef string,
@@ -415,6 +417,13 @@ public:
 
   ArrayRef<SymbolicValue> getArrayValue() const;
 
+  //===--------------------------------------------------------------------===//
+  // Helpers
+
+  /// Dig through single element aggregates, return the ultimate thing inside of
+  /// it.  This is useful when dealing with integers and floats, because they
+  /// are often wrapped in single-element struct wrappers.
+  SymbolicValue lookThroughSingleElementAggregates() const;
 
   /// Given that this is an 'Unknown' value, emit diagnostic notes providing
   /// context about what the problem is.  If there is no location for some

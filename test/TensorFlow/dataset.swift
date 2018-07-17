@@ -74,7 +74,7 @@ public func createMockDataSet() -> VariantHandle {
 // CHECK-NOT:   node {
 // CHECK:       function {
 // CHECK-NEXT:    signature {
-// CHECK-NEXT:      name: "{{.*}}createMockDataSet{{.*}}.tf_CPU.device_partition"
+// CHECK-NEXT:      name: "{{.*}}createMockDataSet{{.*}}.tf_only"
 // CHECK:           output_arg {
 // CHECK-NEXT:        name: "op_createmockdataset{{.*}}"
 // CHECK-NEXT:        type: DT_VARIANT
