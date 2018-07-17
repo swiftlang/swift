@@ -1,3 +1,4 @@
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -verify %s
 // RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -verify %s | %FileCheck %s
 
 import TensorFlow
@@ -47,10 +48,7 @@ public func testEmptyScalarsArray() {
  CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testEmptyScalarsArray
  CHECK: sil private @{{.*}}testEmptyScalarsArray{{.*}} : $@callee_owned () -> () {
  CHECK: bb0:
- CHECK: integer_literal $Builtin.Int32, 0
- CHECK: integer_literal $Builtin.Int32, 20
- CHECK: integer_literal $Builtin.Int32, 30
- CHECK: builtin "__tfop_Const,value$tensor,value$shape,$elt,$elt,$elt,dtype,__device"({{.*}} : $@thin Int32.Type, {{.*}} : $@thin Int32.Type, {{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}} : $@thin Int32.Type
+ CHECK: graph_op "Const"() {dtype: $Int32, value$tensor: [], value$shape: [[i32 0], [i32 20], [i32 30]]
  CHECK: builtin "__tfop_Add,$in,$in,T,__device"({{.*}} : $TensorHandle<Int32>, {{.*}} : $TensorHandle<Int32>
  */
 
