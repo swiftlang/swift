@@ -172,9 +172,7 @@ protected:
 
   ProtocolConformanceRef remapConformance(Type type,
                                           ProtocolConformanceRef conf) {
-    return conf.subst(type,
-                      QuerySubstitutionMap{SubsMap},
-                      LookUpConformanceInSubstitutionMap(SubsMap));
+    return conf.subst(type, SubsMap);
   }
 
   SubstitutionMap remapSubstitutionMap(SubstitutionMap Subs) {
