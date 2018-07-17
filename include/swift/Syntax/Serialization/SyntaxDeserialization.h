@@ -156,8 +156,15 @@ template <> struct MappingTraits<swift::RC<swift::RawSyntax>> {
       in.mapRequired("trailingTrivia", trailingTrivia);
       swift::SourcePresence presence;
       in.mapRequired("presence", presence);
-      value = swift::RawSyntax::make(tokenKind, text, leadingTrivia,
-                                     trailingTrivia, presence, nullptr);
+      /// FIXME: This is a workaround for existing bug from llvm yaml parser
+      /// which would raise error when deserializing number with trailing
+      /// character like "1\n". See https://bugs.llvm.org/show_bug.cgi?id=15505
+      StringRef nodeIdString;
+      in.mapRequired("id", nodeIdString);
+      unsigned nodeId = std::atoi(nodeIdString.data());
+      value =
+          swift::RawSyntax::make(tokenKind, text, leadingTrivia, trailingTrivia,
+                                 presence, /*Arena=*/nullptr, nodeId);
     } else {
       swift::SyntaxKind kind;
       in.mapRequired("kind", kind);
@@ -165,7 +172,14 @@ template <> struct MappingTraits<swift::RC<swift::RawSyntax>> {
       in.mapRequired("layout", layout);
       swift::SourcePresence presence;
       in.mapRequired("presence", presence);
-      value = swift::RawSyntax::make(kind, layout, presence, nullptr);
+      /// FIXME: This is a workaround for existing bug from llvm yaml parser
+      /// which would raise error when deserializing number with trailing
+      /// character like "1\n". See https://bugs.llvm.org/show_bug.cgi?id=15505
+      StringRef nodeIdString;
+      in.mapRequired("id", nodeIdString);
+      unsigned nodeId = std::atoi(nodeIdString.data());
+      value = swift::RawSyntax::make(kind, layout, presence, /*Arena=*/nullptr,
+                                     nodeId);
     }
   }
 };

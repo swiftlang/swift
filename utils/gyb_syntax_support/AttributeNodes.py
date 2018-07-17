@@ -25,7 +25,7 @@ ATTRIBUTE_NODES = [
          children=[
              Child('AtSignToken', kind='AtSignToken', 
                    description='The `@` sign.'),
-             Child('AttributeName', kind='Token', 
+             Child('AttributeName', kind='Token', classification='Attribute',
                    description='The name of the attribute.'),
              Child('LeftParen', kind='LeftParenToken', is_optional=True,
                    description='''

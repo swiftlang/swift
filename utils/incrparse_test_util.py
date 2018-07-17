@@ -196,6 +196,10 @@ def main():
         test_case + '.incr.swift.serialized.json'
     serialized_post_edit_filename = post_edit_file.name + '.serialized.json'
 
+    serialized_incr_no_ids_filename = serialized_incr_filename + '.noids.json'
+    serialized_post_edit_no_ids_filename = serialized_post_edit_filename + \
+        '.noids.json'
+
     try:
         # Serialise the pre-edit syntax tree
         run_command(
@@ -232,6 +236,20 @@ def main():
             ['-output-filename', serialized_incr_filename] +
             print_visual_reuse_info_args)
 
+        with open(serialized_incr_no_ids_filename, 'w+') as file:
+            subprocess.check_call(
+                ['grep'] + 
+                ['-v'] +
+                ['-e', '^ *"id": [0-9]*$'] +
+                [serialized_incr_filename], stdout=file)
+
+        with open(serialized_post_edit_no_ids_filename, 'w+') as file:
+            subprocess.check_call(
+                ['grep'] + 
+                ['-v'] +
+                ['-e', '^ *"id": [0-9]*$'] +
+                [serialized_post_edit_filename], stdout=file)
+
         if print_visual_reuse_info:
             print(incr_parse_output)
             exit(0)
@@ -247,8 +265,8 @@ def main():
         run_command(
             [
                 'diff', '-u',
-                serialized_post_edit_filename,
-                serialized_incr_filename
+                serialized_incr_no_ids_filename,
+                serialized_post_edit_no_ids_filename
             ])
     except subprocess.CalledProcessError as e:
         print('Test case "%s" of %s FAILed' % (test_case, test_file.name), 
