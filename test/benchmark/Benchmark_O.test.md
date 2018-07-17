@@ -92,16 +92,32 @@ are combined into one run to minimize the test time.
 
 ````
 RUN: %Benchmark_O AngryPhonebook --num-iters=1 \
-RUN:             | %FileCheck %s --check-prefix NUMITERS1 \
-RUN:                             --check-prefix LOGHEADER \
-RUN:                             --check-prefix LOGBENCH
+RUN:              | %FileCheck %s --check-prefix NUMITERS1 \
+RUN:                              --check-prefix LOGHEADER \
+RUN:                              --check-prefix LOGBENCH
 LOGHEADER-LABEL: #,TEST,SAMPLES,MIN(us),MAX(us),MEAN(us),SD(us),MEDIAN(us)
 LOGBENCH: {{[0-9]+}},
 NUMITERS1: AngryPhonebook,1
 NUMITERS1-NOT: 0,0,0,0,0
 LOGBENCH-SAME: ,{{[0-9]+}},{{[0-9]+}},{{[0-9]+}},{{[0-9]+}},{{[0-9]+}}
+````
 
-RUN: %Benchmark_O 1 Ackermann 1 | %FileCheck %s --check-prefix RUNJUSTONCE
+### Verbose Mode
+
+````
+RUN: %Benchmark_O 1 Ackermann 1 AngryPhonebook --verbose --num-samples=2 \
+RUN:              | %FileCheck %s --check-prefix RUNJUSTONCE \
+RUN:                              --check-prefix CONFIG \
+RUN:                              --check-prefix LOGVERBOSE
+CONFIG: NumSamples: 2
+CONFIG: Tests Filter: ["1", "Ackermann", "1", "AngryPhonebook"]
+CONFIG: Tests to run: Ackermann, AngryPhonebook
+LOGVERBOSE-LABEL: Running Ackermann for 2 samples.
+LOGVERBOSE: Measuring with scale {{[0-9]+}}.
+LOGVERBOSE-NEXT: Sample 0,{{[0-9]+}}
+LOGVERBOSE-NEXT: Measuring with scale {{[0-9]+}}.
+LOGVERBOSE-NEXT: Sample 1,{{[0-9]+}}
 RUNJUSTONCE-LABEL: 1,Ackermann
 RUNJUSTONCE-NOT: 1,Ackermann
+LOGVERBOSE-LABEL: Running AngryPhonebook for 2 samples.
 ````
