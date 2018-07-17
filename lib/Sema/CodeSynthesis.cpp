@@ -2152,9 +2152,16 @@ static void configureDesignatedInitAttributes(TypeChecker &tc,
 
   // If the superclass has its own availability, make sure the synthesized
   // constructor is only as available as its superclass's constructor.
-  if (superclassCtor->getAttrs().hasAttribute<AvailableAttr>()) {
+  {
+    SmallVector<Decl *, 2> asAvailableAs;
+    asAvailableAs.push_back(superclassCtor);
+    Decl *parentDecl = classDecl;
+    while (parentDecl != nullptr) {
+      asAvailableAs.push_back(parentDecl);
+      parentDecl = parentDecl->getDeclContext()->getAsDeclOrDeclExtensionContext();
+    }
     AvailabilityInference::applyInferredAvailableAttrs(
-        ctor, {classDecl, superclassCtor}, ctx);
+        ctor, asAvailableAs, ctx);
   }
 
   if (superclassCtor->isObjC()) {
