@@ -124,10 +124,9 @@ private:
                                StringRef adjointName);
 
 public:
-  static SILReverseDifferentiableAttr *create(SILModule &M,
-                                              SILReverseAutoDiffIndices indices,
-                                              StringRef primalName,
-                                              StringRef adjointName);
+  static SILReverseDifferentiableAttr *create(
+      SILModule &M, SILReverseAutoDiffIndices indices,
+      StringRef primalName = StringRef(), StringRef adjointName = StringRef());
   
   bool hasPrimal() const { return !PrimalName.empty(); }
   StringRef getPrimalName() const { assert(hasPrimal()); return PrimalName; }
