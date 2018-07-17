@@ -39,7 +39,7 @@ func someLocalFunctionThatShouldBeForceInlined() {
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: main
 // CHECK: sil private @main.tf : $@callee_owned ()
-// CHECK:   builtin "__tfop_Const,
+// CHECK:   graph_op "Const"
 // CHECK:   builtin "__tfop_Add,
 // CHECK:   builtin "__tfop_Sub,
 // CHECK:   return

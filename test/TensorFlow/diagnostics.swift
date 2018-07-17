@@ -25,13 +25,6 @@ public func nonConstantAttribute(x: Tensor<Float>, padding: Padding) {
                       padding: padding))
 }
 
-public func shapeError() {
-  // expected-error @+1 {{tensor literal should have 9 scalars for this shape, but has 8}}
-  let _ = Tensor<Float>(shape: [1, 3, 3, 1],
-                        scalars: [0, 1, 0, 1, 1, 1, 0, 1])
-}
-
-
 class ClassTest {
   var w = Tensor<Float>(zeros: [1, 2])  // expected-warning {{value implicitly copied to the host}}
   let b = Tensor<Float>(zeros: [1, 2])

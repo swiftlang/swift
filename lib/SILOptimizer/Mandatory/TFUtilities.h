@@ -580,7 +580,6 @@ private:
     bool containsTensorFlowValue(SILType ty) {
       return containsTensorFlowValue(ty.getASTType());
     }
-
   };
 
   /// Partitions an accelerator SIL function into a set of per-device SIL
