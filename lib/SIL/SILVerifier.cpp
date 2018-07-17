@@ -1213,7 +1213,7 @@ public:
     auto config = GI->getConfiguration();
     require(config.getSourceIndex() < origFnTy->getNumResults(),
             "Differentiation source index out of bounds");
-    llvm::BitVector paramIndices = config.getParameterIndices();
+    llvm::SmallBitVector paramIndices = config.getParameterIndices();
     require(!config.getParameterIndices().empty(),
             "Parameter indices cannot be empty; they must be explicitly "
             "specified");

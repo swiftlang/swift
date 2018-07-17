@@ -134,7 +134,7 @@ SILFunctionType::getGradientType(SILReverseAutoDiffConfiguration config,
   // with respect to all of original's parameters. For simplicity, we add all
   // parameter indices to a temporary.
   if (config.getParameterIndices().empty())
-    paramIndices = llvm::BitVector(getNumParameters());
+    paramIndices = llvm::SmallBitVector(getNumParameters(), true);
   // If preserving result, the original result will be the first result.
   if (config.isPreservingResult())
     gradResults.push_back(originalResult);
