@@ -519,8 +519,8 @@ extension Unicode.Scalar.Properties {
     return _hasBinaryProperty(__swift_stdlib_UCHAR_CASE_IGNORABLE)
   }
 
-  /// A Boolean property indicating whether the scalar's `lowercaseMapping`
-  /// differs from the NFD normalized form of the scalar itself.
+  /// A Boolean property indicating whether the scalar's normalized form differs
+  /// from the `lowercaseMapping` of each constituent scalar.
   ///
   /// This property corresponds to the `Changes_When_Lowercased` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
@@ -528,8 +528,8 @@ extension Unicode.Scalar.Properties {
     return _hasBinaryProperty(__swift_stdlib_UCHAR_CHANGES_WHEN_LOWERCASED)
   }
 
-  /// A Boolean property indicating whether the scalar's `uppercaseMapping`
-  /// differs from the NFD normalized form of the scalar itself.
+  /// A Boolean property indicating whether the scalar's normalized form differs
+  /// from the `uppercaseMapping` of each constituent scalar.
   ///
   /// This property corresponds to the `Changes_When_Uppercased` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
@@ -537,8 +537,8 @@ extension Unicode.Scalar.Properties {
     return _hasBinaryProperty(__swift_stdlib_UCHAR_CHANGES_WHEN_UPPERCASED)
   }
 
-  /// A Boolean property indicating whether the scalar's `titlecaseMapping`
-  /// differs from the NFD normalized form of the scalar itself.
+  /// A Boolean property indicating whether the scalar's normalized form differs
+  /// from the `titlecaseMapping` of each constituent scalar.
   ///
   /// This property corresponds to the `Changes_When_Titlecased` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
@@ -546,8 +546,8 @@ extension Unicode.Scalar.Properties {
     return _hasBinaryProperty(__swift_stdlib_UCHAR_CHANGES_WHEN_TITLECASED)
   }
 
-  /// A Boolean property indicating whether the scalar is one that is not
-  /// identical to its case-fold mapping.
+  /// A Boolean property indicating whether the scalar's normalized form differs
+  /// from the case-fold mapping of each constituent scalar.
   ///
   /// This property corresponds to the `Changes_When_Casefolded` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
