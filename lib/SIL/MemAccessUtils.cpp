@@ -181,6 +181,16 @@ static bool isExternalGlobalAddressor(ApplyInst *AI) {
   return funcRef->isGlobalInit() && funcRef->isExternalDeclaration();
 }
 
+// Return true if the given StructExtractInst extracts the RawPointer from
+// Unsafe[Mutable]Pointer.
+static bool isUnsafePointerExtraction(StructExtractInst *SEI) {
+  assert(isa<BuiltinRawPointerType>(SEI->getType().getASTType()));
+  auto &C = SEI->getModule().getASTContext();
+  auto *decl = SEI->getStructDecl();
+  return decl == C.getUnsafeMutablePointerDecl()
+    || decl == C.getUnsafePointerDecl();
+}
+
 // Given an address base is a block argument, verify that it is actually a box
 // projected from a switch_enum. This is a valid pattern at any SIL stage
 // resulting in a block-type phi. In later SIL stages, the optimizer may form
@@ -231,6 +241,12 @@ AccessedStorage swift::findAccessedStorage(SILValue sourceAddr) {
     if (kind != AccessedStorage::Unidentified)
       return AccessedStorage(address, kind);
 
+    // If the address producer cannot immediately be classified, follow the
+    // use-def chain of address, box, or RawPointer producers.
+    assert(address->getType().isAddress()
+           || isa<SILBoxType>(address->getType().getASTType())
+           || isa<BuiltinRawPointerType>(address->getType().getASTType()));
+
     // Handle other unidentified address sources.
     switch (address->getKind()) {
     default:
@@ -246,6 +262,14 @@ AccessedStorage swift::findAccessedStorage(SILValue sourceAddr) {
         return AccessedStorage(address, AccessedStorage::Unidentified);
 
       // Don't currently allow any other calls to return an accessed address.
+      return AccessedStorage();
+
+    case ValueKind::StructExtractInst:
+      // Handle nested access to a KeyPath projection. The projection itself
+      // uses a Builtin. However, the returned UnsafeMutablePointer may be
+      // converted to an address and accessed via an inout argument.
+      if (isUnsafePointerExtraction(cast<StructExtractInst>(address)))
+        return AccessedStorage(address, AccessedStorage::Unidentified);
       return AccessedStorage();
 
     // A block argument may be a box value projected out of
@@ -276,6 +300,12 @@ AccessedStorage swift::findAccessedStorage(SILValue sourceAddr) {
       return AccessedStorage();
     }
 
+    // ref_tail_addr project an address from a reference.
+    // This is a valid address producer for nested @inout argument
+    // access, but it is never used for formal access of identified objects.
+    case ValueKind::RefTailAddrInst:
+      return AccessedStorage(address, AccessedStorage::Unidentified);
+
     // Inductive cases:
     // Look through address casts to find the source address.
     case ValueKind::MarkUninitializedInst:
@@ -297,8 +327,8 @@ AccessedStorage swift::findAccessedStorage(SILValue sourceAddr) {
       continue;
 
     // Access to a Builtin.RawPointer. Treat this like the inductive cases
-    // above because some RawPointer's originate from identified locations. See
-    // the special case for global addressors, which return RawPointer above.
+    // above because some RawPointers originate from identified locations. See
+    // the special case for global addressors, which return RawPointer, above.
     //
     // If the inductive search does not find a valid addressor, it will
     // eventually reach the default case that returns in invalid location. This
@@ -320,11 +350,10 @@ AccessedStorage swift::findAccessedStorage(SILValue sourceAddr) {
       address = cast<SingleValueInstruction>(address)->getOperand(0);
       continue;
 
-    // Subobject projections.
+    // Address-to-address subobject projections.
     case ValueKind::StructElementAddrInst:
     case ValueKind::TupleElementAddrInst:
     case ValueKind::UncheckedTakeEnumDataAddrInst:
-    case ValueKind::RefTailAddrInst:
     case ValueKind::TailAddrInst:
     case ValueKind::IndexAddrInst:
       address = cast<SingleValueInstruction>(address)->getOperand(0);

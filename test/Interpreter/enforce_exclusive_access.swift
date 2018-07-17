@@ -3,7 +3,6 @@
 //
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
-// REQUIRES: rdar41660554
 
 // Tests for traps at run time when enforcing exclusive access.
 
@@ -306,7 +305,7 @@ ExclusiveAccessTestSuite.test("SequentialKeyPathWritesDontOverlap") {
 
   c[keyPath: getF] = 7
   c[keyPath: getF] = 8 // no-trap
-  c[keyPath: getF] += c[keyPath: getF] + 1 // no-trap
+  c[keyPath: getF] += c[keyPath: getF] // no-trap
 }
 
 ExclusiveAccessTestSuite.test("KeyPathInoutKeyPathWriteClassStoredProp")
