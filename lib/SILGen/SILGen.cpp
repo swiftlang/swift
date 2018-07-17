@@ -691,16 +691,12 @@ emitMarkFunctionEscapeForTopLevelCodeGlobals(SILLocation loc,
 /// SWIFT_ENABLE_TENSORFLOW
 IntRange<unsigned> SILGenModule::
 getLoweredFunctionParameterIndex(unsigned paramIndex, AnyFunctionType *ty) {
-  // Returns the number of types the given type will be flattened into as a
-  // function parameter during SILGen.
-  std::function<unsigned(Type)> getNumFlattenedTypes;
-  getNumFlattenedTypes = [&](Type type) {
-    if (auto *tupleTy = type->getAs<TupleType>()) {
-      return accumulate(tupleTy->getElementTypes(), 0,
-                        [&](unsigned prev, Type eltTy) {
-                          return prev + getNumFlattenedTypes(eltTy);
-                        });
-    }
+  // A helper function that the number of types the given type will be flattened
+  // into as a function parameter during SILGen.
+  auto getNumFlattenedTypes = [&](Type type) -> unsigned {
+    auto silTy = Types.getLoweredType(type);
+    if (auto tupleTy = silTy.getAs<TupleType>())
+      return tupleTy->getNumElements();
     return 1;
   };
   // Starting from the first parameter index (0), increment `startIndex` until
@@ -709,14 +705,11 @@ getLoweredFunctionParameterIndex(unsigned paramIndex, AnyFunctionType *ty) {
   unsigned startIndex = 0;
   auto params = ty->getParams();
   assert(paramIndex < params.size() && "Parameter index out of bounds!");
-  for (unsigned i = 0; i != paramIndex; ++i) {
-    auto paramTy = params[i].getType()->getCanonicalType();
-    startIndex += getNumFlattenedTypes(paramTy);
-  }
+  for (auto i : range(paramIndex))
+    startIndex += getNumFlattenedTypes(params[i].getType());
   // Compute the offset from the given parameter's first corresponding argument
   // index to the last corresponding argument index.
-  unsigned offset =
-    getNumFlattenedTypes(params[paramIndex].getType()->getCanonicalType());
+  unsigned offset = getNumFlattenedTypes(params[paramIndex].getType());
   return range(startIndex, startIndex + offset);
 }
 
@@ -736,11 +729,8 @@ static llvm::SmallBitVector getLoweredAutoDiffParameterIndices(
   if (AFD->getImplicitSelfDecl())
     fnTy = fnTy->getResult()->getAs<AnyFunctionType>();
   // If no parameters are specified, add all parameter indices.
-  if (DA->getParameters().empty()) {
-    for (unsigned i : range(fnTy->getNumParams()))
-      for (unsigned paramIdx : SGM.getLoweredFunctionParameterIndex(i, fnTy))
-        indices.set(paramIdx);
-  }
+  if (DA->getParameters().empty())
+    indices.set();
   // Otherwise, convert differentiation parameters.
   else {
     bool hasSelf = false;
@@ -750,7 +740,10 @@ static llvm::SmallBitVector getLoweredAutoDiffParameterIndices(
       case AutoDiffParameter::Kind::Index: {
         auto idx = param.getIndex();
         auto paramIdxRange = SGM.getLoweredFunctionParameterIndex(idx, fnTy);
-        indices.set(paramIdxRange.front(), paramIdxRange.back());
+        if (paramIdxRange.size() == 1)
+          indices.set(paramIdxRange.front());
+        else
+          indices.set(paramIdxRange.front(), paramIdxRange.back());
         break;
       }
       // 'self' is always the last SIL parameter.
@@ -762,7 +755,7 @@ static llvm::SmallBitVector getLoweredAutoDiffParameterIndices(
     }
     // The last SIL parameter is `self`, if needed.
     if (hasSelf)
-      indices.set(fnTy->getNumParams());
+      indices.set(silFnTy->getNumParameters() - 1);
   }
   return indices;
 }
