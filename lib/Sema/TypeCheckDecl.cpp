@@ -4642,6 +4642,8 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
 
     TC.validateDecl(VD);
 
+    TC.requestMemberLayout(VD);
+
     // The only thing left to do is synthesize storage for lazy variables.
     auto *prop = dyn_cast<VarDecl>(D);
     if (!prop)
