@@ -2134,12 +2134,6 @@ void TypeChecker::checkReferenceOwnershipAttr(VarDecl *var,
   auto isOptional = bool(underlyingType);
 
   switch (optionalityOf(ownershipKind)) {
-  case ReferenceOwnershipOptionality::AllowedIfImporting:
-    // Allow SIL to emulate importing testing and debugging.
-    if (auto sourceFile = var->getDeclContext()->getParentSourceFile())
-      if (sourceFile->Kind == SourceFileKind::SIL)
-        break;
-    LLVM_FALLTHROUGH;
   case ReferenceOwnershipOptionality::Disallowed:
     if (isOptional) {
       diagnose(var->getStartLoc(), diag::invalid_ownership_with_optional,
