@@ -207,8 +207,7 @@ void TFDeabstraction::inlineCalls() {
 
     // Never inline _allocateUninitializedArray (even of Tensors).  It is the
     // entrypoint used by SILGen to represent array allocations.
-    if (TFStrictDeabstraction &&
-        callee.getName().contains("_allocateUninitializedArray"))
+    if (callee.getName().contains("_allocateUninitializedArray"))
       return false;
 
     // FIXME: This is a specific hack to inline literal conversion operations
@@ -221,8 +220,7 @@ void TFDeabstraction::inlineCalls() {
         callee.getName().contains("S10TensorFlow0A0VAAs13FloatingPointRzrlE12"
                                   "randomNormal4mean6stddev5s") ||
         callee.getName().contains("S10TensorFlow0A5ShapeV12arrayLiteral"
-                                  "ACs5Int32Vd_tcfC") ||
-        callee.getName().contains("_allocateUninitializedArray"))
+                                  "ACs5Int32Vd_tcfC"))
       if (!TFStrictDeabstraction)
         return true;
 
@@ -1581,9 +1579,6 @@ tryToPromoteTensorFromScalars(ApplyInst *inst,
 /// On success, this removes the applyexpr and returns a pointer to the new
 /// instruction that it created.  On failure, it returns a nullptr.
 ///
-/// FIXME: This is a near duplication of the logic used by TFPartitioning in
-/// SILTensorOpInfo::decodeTensorFromScalars1D.  When constexpr propagation is
-/// done, we should remove the logic in SILTensorOpInfo.
 static GraphOperationInst *
 tryToPromoteTensorFromScalars1D(ApplyInst *inst,
                           const DenseMap<SILValue, SymbolicValue> &constants,
