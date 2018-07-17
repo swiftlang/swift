@@ -694,7 +694,7 @@ getLoweredFunctionParameterIndex(unsigned paramIndex, AnyFunctionType *ty) {
   // A helper function that the number of types the given type will be flattened
   // into as a function parameter during SILGen.
   auto getNumFlattenedTypes = [&](Type type) -> unsigned {
-    auto silTy = Types.getLoweredType(type);
+    auto silTy = getLoweredType(type);
     if (auto tupleTy = silTy.getAs<TupleType>())
       return tupleTy->getNumElements();
     return 1;
