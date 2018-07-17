@@ -114,38 +114,30 @@ class SILReverseDifferentiableAttr final {
   friend SILFunction;
 
 private:
-  /// The index of the original result to differentiate from.
-  unsigned SourceIndex;
-  /// The number of parameters of the original function to differentiate with
-  /// respect to.
-  unsigned NumParamIndices;
+  /// The AD indices.
+  SILReverseAutoDiffIndices indices;
   /// The primal and adjoint function names.
   StringRef PrimalName, AdjointName;
   /// Constructor, copying parameter indices to the trailing buffer.
-  SILReverseDifferentiableAttr(unsigned sourceIndex,
-                               ArrayRef<unsigned> paramIndices,
+  SILReverseDifferentiableAttr(SILReverseAutoDiffIndices indices,
                                StringRef primalName,
                                StringRef adjointName);
 
 public:
-  static SILReverseDifferentiableAttr *create(
-    SILModule &M, unsigned sourceIndex, ArrayRef<unsigned> paramIndices,
-    StringRef primalName = StringRef(),
-    StringRef adjointName = StringRef());
-
-  StringRef getPrimalName() const { return PrimalName; }
+  static SILReverseDifferentiableAttr *create(SILModule &M,
+                                              SILReverseAutoDiffIndices indices,
+                                              StringRef primalName,
+                                              StringRef adjointName);
+  
+  bool hasPrimal() const { return !PrimalName.empty(); }
+  StringRef getPrimalName() const { assert(hasPrimal()); return PrimalName; }
   void setPrimalName(StringRef name) { PrimalName = name; }
-  StringRef getAdjointName() const { return AdjointName; }
+
+  bool hasAdjoint() const { return !AdjointName.empty(); }
+  StringRef getAdjointName() const { assert(hasAdjoint()); return AdjointName; }
   void setAdjointName(StringRef name) { AdjointName = name; }
 
-  unsigned getSourceIndex() const {
-    return SourceIndex;
-  }
-  
-  ArrayRef<unsigned> getParamIndices() const;
-  unsigned *getParamIndicesData() {
-    return reinterpret_cast<unsigned *>(this+1);
-  }
+  SILReverseAutoDiffIndices getIndices() const { return indices; }
 
   void print(llvm::raw_ostream &OS) const;
 };

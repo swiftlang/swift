@@ -1077,6 +1077,7 @@ static bool parseReverseDifferentiableAttr(
   // Function that parses an index into `ParamIndices`. Returns true on error.
   auto parseParam = [&]() -> bool {
     unsigned Index;
+    // TODO: Reject non-ascending parameter index lists.
     if (P.parseUnsignedInteger(Index, LastLoc,
           diag::sil_reverse_autodiff_expected_parameter_index))
       return true;
@@ -1114,9 +1115,8 @@ static bool parseReverseDifferentiableAttr(
                    diag::sil_attr_differentiable_expected_rsquare))
     return true;
   // Create an AdjointAttr and we are done.
-  auto *Attr =
-    SILReverseDifferentiableAttr::create(SP.SILMod, SourceIndex, ParamIndices,
-                                         PrimName.str(), AdjName.str());
+  auto *Attr = SILReverseDifferentiableAttr::create(
+      SP.SILMod, {SourceIndex, ParamIndices}, PrimName.str(), AdjName.str());
   DAs.push_back(Attr);
   return false;
 }
@@ -2780,9 +2780,10 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     if (P.parseToken(tok::l_square, diag::expected_tok_in_sil_instr, "[") ||
         parseVerbatim("wrt"))
       return true;
-    auto parseIndex = [&] {
+    auto parseIndex = [&]() -> bool {
       unsigned index;
       SourceLoc indexLoc;
+      // TODO: Reject non-ascending parameter index lists.
       if (P.parseUnsignedInteger(index, indexLoc,
                            diag::sil_reverse_autodiff_expected_parameter_index))
         return true;
@@ -2796,24 +2797,30 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
         return true;
     if (P.parseToken(tok::r_square, diag::expected_tok_in_sil_instr, "]"))
       return true;
-    // Parse optional [seedable] and optional [preserving_result].
-    bool seedable = false;
-    bool preservingResult = false;
-    if (P.peekToken().getText() != "preserving_result" &&
-        P.consumeIf(tok::l_square)) {
-      if (P.Tok.getText() != "preserving_result") {
-        if (parseVerbatim("seedable") ||
-            P.parseToken(tok::r_square, diag::expected_tok_in_sil_instr, "]"))
-          return true;
-        seedable = true;
-      }
-    }
-    if (P.consumeIf(tok::l_square)) {
-      if (parseVerbatim("preserving_result") ||
-          P.parseToken(tok::r_square, diag::expected_tok_in_sil_instr, "]"))
+    // Parse optional [seedable], [preserving_result] and [delayed].
+    SILGradientOptions existingOptions;
+    auto parseOption = [&]() -> bool {
+      SILGradientOptions option =
+        llvm::StringSwitch<SILGradientOptions>(P.Tok.getText())
+          .Case("seedable", SILGradientFlags::Seedable)
+          .Case("preserving_result", SILGradientFlags::PreservingResult)
+          .Case("delayed", SILGradientFlags::Delayed)
+          .Default(None);
+      P.consumeToken(tok::identifier);
+      if (!option) {
+        P.diagnose(P.Tok, diag::sil_reverse_autodiff_expected_option);
         return true;
-      preservingResult = true;
-    }
+      }
+      if (existingOptions.contains(option)) {
+        P.diagnose(P.Tok, diag::sil_reverse_autodiff_duplicate_option);
+        return true;
+      }
+      existingOptions |= option;
+      return P.parseToken(tok::r_square, diag::expected_tok_in_sil_instr, "]");
+    };
+    while (P.consumeIf(tok::l_square))
+      if (parseOption())
+        return true;
     // Parse original function value.
     UnresolvedValueName originalName;
     SILType originalTy;
@@ -2828,11 +2835,10 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       return true;
     }
     SILValue original = getLocalValue(originalName, originalTy, InstLoc, B);
-
     if (parseSILDebugLocation(InstLoc, B))
       return true;
-    ResultVal = B.createGradient(
-      InstLoc, original, sourceIndex, paramIndices, seedable, preservingResult);
+    SILReverseAutoDiffIndices indices(sourceIndex, paramIndices);
+    ResultVal = B.createGradient(InstLoc, original, indices, existingOptions);
     break;
   }
 

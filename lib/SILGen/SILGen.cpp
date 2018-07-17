@@ -724,46 +724,47 @@ getLoweredFunctionParameterIndex(unsigned paramIndex, AnyFunctionType *ty) {
 /// Given a @differentiable attribute and the function declaration that holds
 /// this attribute, this function returns the lowered (SIL) parameter indices
 /// to differentiate with respect to.
-static
-void getLoweredDifferentiationIndices(SILGenModule &SGM,
-                                      const AbstractFunctionDecl *AFD,
-                                      const SILFunction *F,
-                                      const DifferentiableAttr *DA,
-                                      SmallVectorImpl<unsigned> &indices) {
-  auto fnTy =
+static llvm::BitVector getLoweredAutoDiffParameterIndices(
+    SILGenModule &SGM, const AbstractFunctionDecl *AFD, const SILFunction *F,
+    const DifferentiableAttr *DA) {
+  auto *fnTy =
     AFD->getInterfaceType()->getCanonicalType()->getAs<AnyFunctionType>();
+  auto silFnTy = SGM.getLoweredType(fnTy).castTo<SILFunctionType>();
+  llvm::BitVector indices(silFnTy->getNumParameters());
   // We don't diff wrt `self` unless it is explicitly specified, therefore
   // dropping the last SIL parameter if it's a method.
   if (AFD->getImplicitSelfDecl())
     fnTy = fnTy->getResult()->getAs<AnyFunctionType>();
   // If no parameters are specified, add all parameter indices.
   if (DA->getParameters().empty()) {
-    for (unsigned i = 0, n = fnTy->getNumParams(); i != n; ++i)
+    for (unsigned i : range(fnTy->getNumParams()))
       for (unsigned paramIdx : SGM.getLoweredFunctionParameterIndex(i, fnTy))
-        indices.push_back(paramIdx);
-    return;
+        indices.set(paramIdx);
   }
   // Otherwise, convert differentiation parameters.
-  bool hasSelf = false;
-  for (auto param : DA->getParameters()) {
-    switch (param.getKind()) {
-    // Normal index maps directly to a SIL parameter index.
-    case AutoDiffParameter::Kind::Index: {
-      auto idx = param.getIndex();
-      auto paramIdxRange = SGM.getLoweredFunctionParameterIndex(idx, fnTy);
-      indices.append(paramIdxRange.begin(), paramIdxRange.end());
-      break;
+  else {
+    bool hasSelf = false;
+    for (auto param : DA->getParameters()) {
+      switch (param.getKind()) {
+      // Normal index maps directly to a SIL parameter index.
+      case AutoDiffParameter::Kind::Index: {
+        auto idx = param.getIndex();
+        auto paramIdxRange = SGM.getLoweredFunctionParameterIndex(idx, fnTy);
+        indices.set(paramIdxRange.front(), paramIdxRange.back());
+        break;
+      }
+      // 'self' is always the last SIL parameter.
+      case AutoDiffParameter::Kind::Self:
+        // Sema guarantees this case to occur at most once.
+        hasSelf = true;
+        break;
+      }
     }
-    // 'self' is always the last SIL parameter.
-    case AutoDiffParameter::Kind::Self:
-      // Sema guarantees this case to occur at most once.
-      hasSelf = true;
-      break;
-    }
+    // The last SIL parameter is `self`, if needed.
+    if (hasSelf)
+      indices.set(fnTy->getNumParams());
   }
-  // The last SIL parameter is `self`, if needed.
-  if (hasSelf)
-    indices.push_back(fnTy->getNumParams());
+  return indices;
 }
 
 void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
@@ -823,12 +824,11 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
       StringRef adjName =
         getFunction(SILDeclRef(adjointFn), ForDefinition)->getName();
       // Get lowered argument indices.
-      SmallVector<unsigned, 8> indices;
-      getLoweredDifferentiationIndices(*this, AFD, silOriginalFn, diffAttr,
-                                       indices);
+      auto paramIndices =
+        getLoweredAutoDiffParameterIndices(*this, AFD, silOriginalFn, diffAttr);
+      SILReverseAutoDiffIndices indices(/*source*/ 0, paramIndices);
       silOriginalFn->addReverseDifferentiableAttr(
-        SILReverseDifferentiableAttr::create(M, /*sourceIndex*/ 0,
-                                             indices, primName, adjName));
+          SILReverseDifferentiableAttr::create(M, indices, primName, adjName));
       break;
     }
     }

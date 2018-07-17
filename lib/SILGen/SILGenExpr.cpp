@@ -2789,7 +2789,8 @@ visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
 
 /// SWIFT_ENABLE_TENSORFLOW
 static RValue emitGradientInst(RValueEmitter &RVE, const SGFContext &C,
-                               ReverseAutoDiffExpr *E, bool isValueAndGrad) {
+                               ReverseAutoDiffExpr *E,
+                               SILGradientOptions options = None) {
   SILLocation loc(E);
   auto *origExpr = E->getOriginalExpr();
   auto origTy = origExpr->getType()->getAs<AnyFunctionType>();
@@ -2811,23 +2812,21 @@ static RValue emitGradientInst(RValueEmitter &RVE, const SGFContext &C,
     for (auto idx : silParamIndices)
       loweredParamIndices.push_back(idx);
   }
+  SILReverseAutoDiffIndices indices(/*sourceIndex*/ 0, loweredParamIndices);
   auto gradInst = RVE.SGF.B.createGradient(loc, origVal.forward(RVE.SGF),
-                                           /*sourceIndex*/ 0,
-                                           loweredParamIndices,
-                                           /*seedable*/ false,
-                                           /*preservingResult*/ isValueAndGrad);
+                                           indices, options);
   ManagedValue v = RVE.SGF.emitManagedRValueWithCleanup(gradInst);
   return RValue(RVE.SGF, E, v);
 }
 
 RValue RValueEmitter::
 visitGradientExpr(GradientExpr *E, SGFContext C) {
-  return emitGradientInst(*this, C, E, /*isValueAndGrad*/ false);
+  return emitGradientInst(*this, C, E);
 }
 
 RValue RValueEmitter::
 visitValueAndGradientExpr(ValueAndGradientExpr *E, SGFContext C) {
-  return emitGradientInst(*this, C, E, /*isValueAndGrad*/ true);
+  return emitGradientInst(*this, C, E, SILGradientFlags::PreservingResult);
 }
 
 // SWIFT_ENABLE_TENSORFLOW
