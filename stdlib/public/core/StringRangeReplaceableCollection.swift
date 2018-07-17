@@ -150,16 +150,17 @@ extension String : StringProtocol, RangeReplaceableCollection {
   ///     print(s[i])
   ///     // Prints "t"
   ///
-  /// The value passed as `distance` must not offset `i` beyond the bounds of the
-  /// collection.
+  /// The value passed as `distance` must not offset `i` beyond the bounds of
+  /// the collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
   ///   - distance: The distance to offset `i`.
-  /// - Returns: An index offset by `distance` from the index `i`. If `distance` is positive,
-  ///   this is the same value as the result of `distance` calls to `index(after:)`.
-  ///   If `distance` is negative, this is the same value as the result of `-distance` calls
-  ///   to `index(before:)`.
+  /// - Returns: An index offset by `distance` from the index `i`. If
+  ///   `distance` is positive, this is the same value as the result of
+  ///   `distance` calls to `index(after:)`. If `distance` is negative, this
+  ///   is the same value as the result of `abs(distance)` calls to
+  ///   `index(before:)`.
   ///
   /// - Complexity: O(*k*), where *k* is the absolute value of `distance`.
   public func index(_ i: Index, offsetBy distance: IndexDistance) -> Index {

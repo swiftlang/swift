@@ -261,7 +261,7 @@ extension ArraySlice: RandomAccessCollection, MutableCollection {
   /// - Returns: An index offset by `distance` from the index `i`. If
   ///   `distance` is positive, this is the same value as the result of
   ///   `distance` calls to `index(after:)`. If `distance` is negative, this
-  ///   is the same value as the result of `-distance` calls to
+  ///   is the same value as the result of `abs(distance)` calls to
   ///   `index(before:)`.
   @inlinable
   public func index(_ i: Int, offsetBy distance: Int) -> Int {

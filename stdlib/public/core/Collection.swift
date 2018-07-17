@@ -669,7 +669,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// - Returns: An index offset by `distance` from the index `i`. If
   ///   `distance` is positive, this is the same value as the result of
   ///   `distance` calls to `index(after:)`. If `distance` is negative, this
-  ///   is the same value as the result of `-distance` calls to
+  ///   is the same value as the result of `abs(distance)` calls to
   ///   `index(before:)`.
   ///
   /// - Complexity: O(1) if the collection conforms to
@@ -874,7 +874,7 @@ extension Collection {
   /// - Returns: An index offset by `distance` from the index `i`. If
   ///   `distance` is positive, this is the same value as the result of
   ///   `distance` calls to `index(after:)`. If `distance` is negative, this
-  ///   is the same value as the result of `-distance` calls to
+  ///   is the same value as the result of `abs(distance)` calls to
   ///   `index(before:)`.
   ///
   /// - Complexity: O(1) if the collection conforms to
