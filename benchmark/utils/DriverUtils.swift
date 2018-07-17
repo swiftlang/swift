@@ -22,40 +22,6 @@ struct BenchResults {
   let sampleCount, min, max, mean, sd, median: UInt64
 }
 
-struct Test {
-  let benchInfo: BenchmarkInfo
-  let index: Int
-
-  /// The name of the benchmark.
-  var name: String {
-    return benchInfo.name
-  }
-
-  /// The "main routine" of the benchmark.
-  var runFunction: ((Int) -> ())? {
-    return benchInfo.runFunction
-  }
-
-  /// The benchmark categories that this test belongs to. Used for filtering.
-  var tags: [BenchmarkCategory] {
-    return benchInfo.tags.sorted()
-  }
-
-  /// An optional initialization function for a benchmark that is run before
-  /// measuring begins. Intended to be used to initialize global data used in
-  /// a benchmark.
-  var setUpFunction: (() -> ())? {
-    return benchInfo.setUpFunction
-  }
-
-  /// An optional deinitialization function that if non-null is run /after/ a
-  /// measurement has been taken.
-  var tearDownFunction: (() -> ())? {
-    return benchInfo.tearDownFunction
-  }
-}
-
-// We should migrate to a collection of BenchmarkInfo.
 public var registeredBenchmarks: [BenchmarkInfo] = []
 
 enum TestAction {
@@ -100,7 +66,7 @@ struct TestConfig {
   var afterRunSleep: Int?
 
   /// The list of tests to run.
-  var tests = [Test]()
+  var tests = [(index: Int, info: BenchmarkInfo)]()
 
   mutating func processArguments() -> TestAction {
     let validOptions = [
@@ -211,7 +177,7 @@ struct TestConfig {
         return benchmarkNamesOrIndices.contains(benchmark.name) ||
           benchmarkNamesOrIndices.contains(String(indices[benchmark.name]!))
       }
-    }.map { Test(benchInfo: $0, index: indices[$0.name]!) }
+    }.map { (index: indices[$0.name]!, info: $0) }
   }
 }
 
@@ -315,7 +281,7 @@ class SampleRunner {
 }
 
 /// Invoke the benchmark entry point and return the run time in milliseconds.
-func runBench(_ test: Test, _ c: TestConfig) -> BenchResults? {
+func runBench(_ test: BenchmarkInfo, _ c: TestConfig) -> BenchResults? {
   var samples = [UInt64](repeating: 0, count: c.numSamples)
 
   // Before we do anything, check that we actually have a function to
@@ -398,10 +364,7 @@ func printRunInfo(_ c: TestConfig) {
     }
     print("Tests Filter: \(c.filters)")
     print("Tests to run: ", terminator: "")
-    for t in c.tests {
-      print("\(t.name), ", terminator: "")
-    }
-    print("")
+    print(c.tests.map({ $0.1.name }).joined(separator: ", "))
     print("")
     print("--- DATA ---")
   }
@@ -418,13 +381,13 @@ func runBenchmarks(_ c: TestConfig) {
 
   var testCount = 0
 
-  func report(_ t: Test, results: BenchResults?) {
+  func report(_ index: Int, _ t: BenchmarkInfo, results: BenchResults?) {
     func values(r: BenchResults) -> [String] {
       return [r.sampleCount, r.min, r.max, r.mean, r.sd, r.median]
         .map { String($0) }
     }
     let benchmarkStats = (
-      [String(t.index), t.name] + (results.map(values) ?? ["Unsupported"])
+      [String(index), t.name] + (results.map(values) ?? ["Unsupported"])
     ).joined(separator: c.delim)
 
     print(benchmarkStats)
@@ -435,8 +398,8 @@ func runBenchmarks(_ c: TestConfig) {
     }
   }
 
-  for t in c.tests {
-    report(t, results:runBench(t, c))
+  for (index, test) in c.tests {
+    report(index, test, results:runBench(test, c))
   }
 
   print("")
@@ -458,8 +421,10 @@ public func main() {
     case .listTests:
       config.findTestsToRun()
       print("#\(config.delim)Test\(config.delim)[Tags]")
-      for t in config.tests {
-        print("\(t.index)\(config.delim)\(t.name)\(config.delim)\(t.tags)")
+      for (index, t) in config.tests {
+      let testDescription = [String(index), t.name, t.tags.sorted().description]
+        .joined(separator: config.delim)
+      print(testDescription)
       }
     case .run:
       config.findTestsToRun()
