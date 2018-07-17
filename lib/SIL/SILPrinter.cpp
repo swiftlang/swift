@@ -1151,10 +1151,11 @@ public:
 
   /// SWIFT_ENABLE_TENSORFLOW
   void visitGradientInst(GradientInst *GI) {
-    *this << "[source " << GI->getSourceIndex() << "] ";
-    if (!GI->getParameterIndices().empty()) {
+    auto indices = GI->getIndices();
+    *this << "[source " << indices.source << "] ";
+    if (!indices.parameters.empty()) {
       *this << "[wrt ";
-      interleave(GI->getParameterIndices(), [&](unsigned idx) {
+      interleave(indices.parameters.set_bits(), [&](unsigned idx) {
         *this << idx;
       }, [&]{
         *this << ", ";
@@ -3173,8 +3174,9 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
 
 /// SWIFT_ENABLE_TENSORFLOW
 void SILReverseDifferentiableAttr::print(llvm::raw_ostream &OS) const {
-  OS << "source " << getSourceIndex() << " wrt ";
-  interleave(getParamIndices(),
+  auto indices = getIndices();
+  OS << "source " << indices.source << " wrt ";
+  interleave(indices.parameters.set_bits(),
              [&](unsigned index) { OS << index; },
              [&] { OS << ", "; });
   if (!PrimalName.empty()) OS << " primal @" << PrimalName;
