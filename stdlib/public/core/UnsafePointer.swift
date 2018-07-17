@@ -355,8 +355,8 @@ public struct UnsafePointer<Pointee>: _Pointer {
 /// deinitialized is in an *uninitialized* state. Uninitialized memory must be
 /// initialized before it can be accessed for reading.
 ///
-/// You can use methods like `initialize(to:count:)`, `initialize(from:)`, and
-/// `moveInitialize(from:count:)` to initialize the memory referenced by a
+/// You can use methods like `initialize(to:count:)`, `initialize(from:count:)`,
+/// and `moveInitialize(from:count:)` to initialize the memory referenced by a
 /// pointer with a value or series of values.
 ///
 /// Initialized Memory
@@ -383,8 +383,9 @@ public struct UnsafePointer<Pointee>: _Pointer {
 /// An `UnsafeMutablePointer<UInt8>` instance allocated with eight bytes of
 /// memory, `uint8Pointer`, will be used for the examples below.
 ///
+///     var bytes: [UInt8] = [39, 77, 111, 111, 102, 33, 39, 0]
 ///     let uint8Pointer = UnsafeMutablePointer<UInt8>.allocate(capacity: 8)
-///     uint8Pointer.initialize(from: [39, 77, 111, 111, 102, 33, 39, 0])
+///     uint8Pointer.initialize(from: &bytes, count: 8)
 ///
 /// When you only need to temporarily access a pointer's memory as a different
 /// type, use the `withMemoryRebound(to:capacity:)` method. For example, you
@@ -550,9 +551,11 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   /// instances and then initializes that memory with the elements of a range.
   ///
   ///     let intPointer = UnsafeMutablePointer<Int>.allocate(capacity: 4)
-  ///     intPointer.initialize(from: 1...4)
+  ///     for i in 0..<4 {
+  ///         (intPointer + i).initialize(to: i)
+  ///     }
   ///     print(intPointer.pointee)
-  ///     // Prints "1"
+  ///     // Prints "0"
   ///
   /// When you allocate memory, always remember to deallocate once you're
   /// finished.
@@ -728,7 +731,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   /// The region of memory starting at this pointer and covering `count`
   /// instances of the pointer's `Pointee` type must be uninitialized or
   /// `Pointee` must be a trivial type. After calling
-  /// `initialize(from:count:)`, the region is initialized and the memory
+  /// `moveInitialize(from:count:)`, the region is initialized and the memory
   /// region `source..<(source + count)` is uninitialized.
   ///
   /// - Parameters:
@@ -799,7 +802,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   /// The region of memory starting at this pointer and covering `count`
   /// instances of the pointer's `Pointee` type must be initialized or
   /// `Pointee` must be a trivial type. After calling
-  /// `initialize(from:count:)`, the region is initialized and the memory
+  /// `moveAssign(from:count:)`, the region is initialized and the memory
   /// region `source..<(source + count)` is uninitialized.
   ///
   /// - Parameters:

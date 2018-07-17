@@ -332,16 +332,16 @@ extension Bool {
 }
 
 extension Bool {
-  @inlinable
-  /// Toggles the value of the Boolean. 
+  /// Toggles the Boolean variable's value.
   ///
-  /// Calling this method sets the variable to `true` if it was `false`,
-  /// and sets it to `false` if it was `true`. For example:
+  /// Use this method to toggle a Boolean value from `true` to `false` or from
+  /// `false` to `true`.
   ///
   ///    var bools = [true, false]
   ///
   ///    bools[0].toggle()
-  ///    // bools now contains [false, false]
+  ///    // bools == [false, false]
+  @inlinable
   public mutating func toggle() {
     self = !self
   }
