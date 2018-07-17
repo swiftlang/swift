@@ -5083,7 +5083,7 @@ static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
   }
 
   auto base = decl->getOverriddenDecl();
-  if (!base || base->hasClangNode())
+  if (!base || base->hasClangNode() || base->isDynamic())
     return true;
 
   // If the method overrides something, we only need a new entry if the

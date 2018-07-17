@@ -1293,16 +1293,22 @@ bool IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   if (isa<TypeDecl>(decl))
     return false;
 
+  // A non-@objc entity is never 'dynamic'.
+  if (!decl->isObjC())
+    return false;
+
   // @objc declarations in class extensions are implicitly dynamic.
   // This is intended to enable overriding the declarations.
   auto dc = decl->getDeclContext();
-  if (isa<ExtensionDecl>(dc) && dc->getAsClassOrClassExtensionContext() &&
-      decl->isObjC()) {
+  if (isa<ExtensionDecl>(dc) && dc->getAsClassOrClassExtensionContext()) {
     return makeDynamic(decl);
   }
 
   // If any of the declarations overridden by this declaration are dynamic
   // or were imported from Objective-C, this declaration is dynamic.
+  // Don't do this if the declaration is not exposed to Objective-C; that's
+  // currently the (only) manner in which one can make an override of a
+  // dynamic declaration non-dynamic.
   for (auto overridden : evaluator(OverriddenDeclsRequest{decl})) {
     if (overridden->isDynamic())
       return makeDynamic(decl);
