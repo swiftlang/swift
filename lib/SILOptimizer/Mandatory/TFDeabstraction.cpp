@@ -1556,7 +1556,7 @@ tryToPromoteTensorFromScalars(ApplyInst *inst,
   B.setCurrentDebugScope(inst->getDebugScope());
   auto result = createConstTensor(elementType, scalars, shape,
                                   inst->getType(), inst->getLoc(),
-                                  deviceConfig, B);
+                                  deviceConfig.primaryDeviceType, B);
 
   // Replace the old instruction with the new one.
   inst->replaceAllUsesPairwiseWith(result);
@@ -1619,7 +1619,7 @@ tryToPromoteTensorFromScalars1D(ApplyInst *inst,
   B.setCurrentDebugScope(inst->getDebugScope());
   auto result = createConstTensor(elementType, scalars, shape,
                                   inst->getType(), inst->getLoc(),
-                                  deviceConfig, B);
+                                  deviceConfig.primaryDeviceType, B);
 
   // Replace the old instruction with the new one.
   inst->replaceAllUsesPairwiseWith(result);

@@ -541,11 +541,12 @@ private:
 
   /// Create a "Const" tensor operation containing the specified scalars, with
   /// the specified shape and elementType (setting dtype).  The resultType is
-  /// the TensorHandle type to produce.
+  /// the TensorHandle type to produce, and targetDevice is the device set for
+  /// the operation.
   GraphOperationInst *
   createConstTensor(Type elementType, SymbolicValue scalars,
                     SymbolicValue shape, SILType resultType, SILLocation loc,
-                    GraphGlobalConfiguration &deviceConfig, SILBuilder &B);
+                    DeviceType targetDevice, SILBuilder &B);
 
   /// This struct provides a an efficient implementation of a predicate that
   /// determines whether a type is or contains a TensorHandle that will be

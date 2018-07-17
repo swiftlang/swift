@@ -1921,13 +1921,14 @@ SILLocation tf::getUserSourceLocation(SILInstruction *inst) {
   return getUserSourceLocation(inst->getDebugLocation());
 }
 
-/// Create a "Const" tensor operation containing the specified scalars, with the
-/// specified shape and elementType (setting dtype).  The resultType is the
-/// TensorHandle type to produce.
+/// Create a "Const" tensor operation containing the specified scalars, with
+/// the specified shape and elementType (setting dtype).  The resultType is
+/// the TensorHandle type to produce, and targetDevice is the device set for
+/// the operation.
 GraphOperationInst *
 tf::createConstTensor(Type elementType, SymbolicValue scalars,
                       SymbolicValue shape, SILType resultType, SILLocation loc,
-                      GraphGlobalConfiguration &deviceConfig, SILBuilder &B) {
+                      DeviceType targetDevice, SILBuilder &B) {
   auto &context = B.getASTContext();
   auto &allocator = context.getAllocator();
 
@@ -1963,8 +1964,7 @@ tf::createConstTensor(Type elementType, SymbolicValue scalars,
   // All graph_op's get a device.
   attributes.push_back({
     context.getIdentifier(DEVICE_ATTR),
-    SymbolicValue::getString(getDeviceString(deviceConfig.primaryDeviceType),
-                             allocator)
+    SymbolicValue::getString(getDeviceString(targetDevice), allocator)
   });
 
   // Finally build a new graphop instruction with the simplified operands.
