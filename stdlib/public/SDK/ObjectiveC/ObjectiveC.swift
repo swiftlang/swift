@@ -205,14 +205,30 @@ extension NSObject : Equatable, Hashable {
 
   /// The hash value.
   ///
+  /// NSObject implements this by returning `self.hash`. Subclasses can
+  /// customize hashing by overriding the `hash` property.
+  ///
   /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
   ///
   /// - Note: the hash value is not guaranteed to be stable across
   ///   different invocations of the same program.  Do not persist the
   ///   hash value across program runs.
-  @objc
-  open var hashValue: Int {
+  @nonobjc
+  public var hashValue: Int {
     return hash
+  }
+
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// NSObject implements this by feeding `self.hash` to the hasher. Subclasses
+  /// can customize hashing by overriding the `hash` property.
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(hash)
+  }
+
+  public func _rawHashValue(seed: (UInt64, UInt64)) -> Int {
+    return self.hash._rawHashValue(seed: seed)
   }
 }
 
