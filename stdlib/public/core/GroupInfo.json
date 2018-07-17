@@ -140,6 +140,7 @@
       "Integers.swift",
       "IntegerParsing.swift"],
     "Floating": [
+      "BinaryFloatingPoint.swift",
       "FloatingPoint.swift",
       "FloatingPointParsing.swift",
       "FloatingPointTypes.swift"]}
