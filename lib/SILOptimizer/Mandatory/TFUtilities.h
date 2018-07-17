@@ -483,32 +483,6 @@ private:
     static std::pair<StringRef, SILTensorOpInfo::OperandClass>
     decodeAttributeName(Identifier name);
 
-    /// Given a SILValue that may be an array literal, attempt to decode it into
-    /// the values that make up its elements.  If this fails or if the value is
-    /// not an array, this returns a null Type.  Otherwise it decodes the array,
-    /// returns the values of each element, and returns the element type of the
-    /// array.
-    ///
-    /// If arrayInsts is non-null and if decoding succeeds, this function adds
-    /// all of the instructions relevant to the definition of this array into
-    /// the set.  If decoding fails, then the contents of this set is undefined.
-    static Type decodeArrayElements(SILValue value,
-                                    SmallVectorImpl<SILValue> &elements,
-                        SmallPtrSet<SILInstruction*, 8> *arrayInsts = nullptr);
-
-    /// Given an apply that may be an array literal, attempt to decode it into
-    /// the values that make up its elements.  If this fails or if the value is
-    /// not an array, this returns false.  Otherwise it decodes the array,
-    /// returns the values of each element, and returns true.
-    ///
-    /// If arrayInsts is non-null and if decoding succeeds, this function adds
-    /// all of the instructions relevant to the definition of this array into
-    /// the set.  If decoding fails, then the contents of this set is undefined.
-    static bool decodeArrayElements(ApplyInst *apply,
-                                    SmallVectorImpl<SILValue> &elements,
-                        SmallPtrSet<SILInstruction*, 8> *arrayInsts = nullptr);
-
-
   private:
     void assertWithDump(bool cond, const char *assertMsg) const;
   };

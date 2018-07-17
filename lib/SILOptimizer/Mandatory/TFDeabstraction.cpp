@@ -1724,6 +1724,20 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
   }
 }
 
+/// If the specified type is a Swift.Array or some element type, then return the
+/// element type.  Otherwise, return a null Type.
+static Type getArrayElementType(Type ty) {
+  if (auto bgst = ty->getAs<BoundGenericStructType>())
+    if (bgst->getDecl() == bgst->getASTContext().getArrayDecl())
+      return bgst->getGenericArgs()[0];
+  return Type();
+}
+
+/// Return true if this is a reference to the _allocateUninitialized helper
+/// in array in the standard library allocating zero elements.
+/// TODO: Move to deabstraction when other clients are removed.
+bool isArrayAllocUninit(SILValue op, SILValue &numElements);
+
 namespace {
   /// This is a little helper for working with literal arrays that may want to get
   /// deleted if all references to them are removed.
@@ -1734,16 +1748,41 @@ namespace {
     /// Given a SILValue that may be an array, attempt to decode it into the
     /// literal values that make up its elements.  This returns the element type
     /// of the array if it succeeds, otherwise a null type.
-    Type decode(SILValue operand) {
-      return GraphOperationInfo::decodeArrayElements(operand, elements,
-                                                     &arrayInsts);
+    Type decode(SILValue value) {
+      auto elementType = getArrayElementType(value->getType().getASTType());
+      if (!elementType) return Type();
+
+      // The only pattern we support involves a call to _allocateUninitializedArray.
+      // The array value will be a tuple extract from the 0th result of the call.
+      auto *teiValue = dyn_cast<TupleExtractInst>(value);
+      if (!teiValue || teiValue->getFieldNo() != 0 ||
+          !isa<ApplyInst>(teiValue->getOperand()))
+        return Type();
+
+      // Figure out the number of elements, which must be a constant integer.
+      auto *apply = cast<ApplyInst>(teiValue->getOperand());
+
+      if (decodeApply(apply))
+        return elementType;
+      return Type();
+
+      return Type();
+      return elementType;
     }
 
     /// Given an applyinst for _allocateUninitialized, try to decode it.  This
     /// returns true on success or false on failure.
-    bool decodeApply(ApplyInst *inst) {
-      return GraphOperationInfo::decodeArrayElements(inst, elements,
-                                                     &arrayInsts);
+    bool decodeApply(ApplyInst *apply) {
+      // Verify we have a call to _allocateUninitializedArray.
+      SILValue numElementsVal;
+      if (!isArrayAllocUninit(apply, numElementsVal) ||
+          !isa<IntegerLiteralInst>(numElementsVal))
+        return false;
+      uint64_t numElements =
+      cast<IntegerLiteralInst>(numElementsVal)->getValue().getLimitedValue();
+
+      return !tf::ConstExprEvaluator::
+      decodeAllocUninitializedArray(apply, numElements, elements, &arrayInsts);
     }
 
     /// Try to remove the instructions that make up the array initialization.
