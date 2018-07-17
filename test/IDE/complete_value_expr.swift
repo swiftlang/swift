@@ -1855,7 +1855,7 @@ func testDeDuped(_ x: dedupS) {
 }
 func testDeDuped2(_ x: dedupP) {
   x#^PROTOCOL_EXT_DEDUP_2^#
-// PROTOCOL_EXT_DEDUP_2: Begin completions, 4 items
+// PROTOCOL_EXT_DEDUP_2: Begin completions, 5 items
 // PROTOCOL_EXT_DEDUP_2: Decl[InstanceMethod]/CurrNominal:   .foo()[#dedupP.T#]; name=foo()
 // PROTOCOL_EXT_DEDUP_2: Decl[InstanceVar]/CurrNominal:      .bar[#dedupP.T#]; name=bar
 // PROTOCOL_EXT_DEDUP_2: Decl[Subscript]/CurrNominal:        [{#Self.T#}][#Self.T#]; name=[Self.T]
@@ -1864,7 +1864,7 @@ func testDeDuped2(_ x: dedupP) {
 }
 func testDeDuped3<T : dedupP where T.T == Int>(_ x: T) {
   x#^PROTOCOL_EXT_DEDUP_3^#
-// PROTOCOL_EXT_DEDUP_3: Begin completions, 4 items
+// PROTOCOL_EXT_DEDUP_3: Begin completions, 5 items
 // PROTOCOL_EXT_DEDUP_3: Decl[InstanceMethod]/Super:   .foo()[#Int#]; name=foo()
 // PROTOCOL_EXT_DEDUP_3: Decl[InstanceVar]/Super:      .bar[#Int#]; name=bar
 // PROTOCOL_EXT_DEDUP_3: Decl[Subscript]/Super:        [{#Self.T#}][#Self.T#]; name=[Self.T]

@@ -19,6 +19,7 @@
 #include "DerivedConformances.h"
 #include "MiscDiagnostics.h"
 #include "TypeChecker.h"
+#include "TypeCheckAvailability.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Basic/Statistic.h"
@@ -34,6 +35,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/TypeMatcher.h"
@@ -206,38 +208,6 @@ getTypesToCompare(ValueDecl *reqt, Type reqtType, bool reqtTypeIsIUO,
   return std::make_tuple(reqtType, witnessType, optAdjustment);
 }
 
-// Given that we're looking at a stored property, should we use the
-// mutating rules for the setter or the getter when trying to match
-// the given requirement?
-static bool shouldUseSetterRequirements(AccessorKind reqtKind) {
-  // We have cases for addressors here because we might reasonably
-  // allow them as protocol requirements someday.
-
-  switch (reqtKind) {
-  case AccessorKind::Get:
-  case AccessorKind::Address:
-    return false;
-
-  case AccessorKind::Set:
-  case AccessorKind::MutableAddress:
-  case AccessorKind::MaterializeForSet:
-    return true;
-
-  case AccessorKind::WillSet:
-  case AccessorKind::DidSet:
-    llvm_unreachable("willSet/didSet protocol requirement?");
-  }
-  llvm_unreachable("bad accessor kind");
-}
-
-static AccessorDecl *getAddressorForRequirement(AbstractStorageDecl *witness,
-                                                AccessorKind reqtKind) {
-  assert(witness->hasAddressors());
-  if (shouldUseSetterRequirements(reqtKind))
-    return witness->getMutableAddressor();
-  return witness->getAddressor();
-}
-
 // Verify that the mutating bit is correct between a protocol requirement and a
 // witness.  This returns true on invalid.
 static bool checkMutating(FuncDecl *requirement, FuncDecl *witness,
@@ -257,31 +227,70 @@ static bool checkMutating(FuncDecl *requirement, FuncDecl *witness,
   else {
     auto reqtAsAccessor = cast<AccessorDecl>(requirement);
     auto storage = cast<AbstractStorageDecl>(witnessDecl);
-    switch (storage->getStorageKind()) {
 
-    // A stored property on a value type will have a mutating setter
-    // and a non-mutating getter.
-    case AbstractStorageDecl::Stored:
-      witnessMutating = reqtAsAccessor->isInstanceMember() &&
-        shouldUseSetterRequirements(reqtAsAccessor->getAccessorKind());
+    auto isReadMutating = [&] {
+      switch (storage->getReadImpl()) {
+      case ReadImplKind::Stored:
+        return false;
+      case ReadImplKind::Address:
+        return storage->getAddressor()->isMutating();
+      case ReadImplKind::Inherited:
+      case ReadImplKind::Get:
+        llvm_unreachable("should have a getter");
+      }
+    };
+
+    auto isStoredSetterMutating = [&] {
+      // A stored property on a value type will have a mutating setter
+      // and a non-mutating getter.
+      return reqtAsAccessor->isInstanceMember();
+    };
+
+    auto isWriteMutating = [&] {
+      switch (storage->getWriteImpl()) {
+      case WriteImplKind::Stored:
+        return isStoredSetterMutating();
+      case WriteImplKind::MutableAddress:
+        return storage->getMutableAddressor()->isMutating();
+      case WriteImplKind::Immutable:
+        llvm_unreachable("asking for setter for immutable storage");
+      case WriteImplKind::Set:
+      case WriteImplKind::StoredWithObservers:
+      case WriteImplKind::InheritedWithObservers:
+        llvm_unreachable("should have a setter");
+      }
+    };
+
+    auto isReadWriteMutating = [&] {
+      switch (storage->getReadWriteImpl()) {
+      case ReadWriteImplKind::Stored:
+        return isStoredSetterMutating();
+      case ReadWriteImplKind::MutableAddress:
+        return storage->getMutableAddressor()->isMutating();
+      case ReadWriteImplKind::MaterializeToTemporary:
+        return isReadMutating() || isWriteMutating();
+      case ReadWriteImplKind::Immutable:
+        llvm_unreachable("asking for setter for immutable storage");
+      case ReadWriteImplKind::MaterializeForSet:
+        llvm_unreachable("should have a materializeForSet");
+      }
+    };
+
+    switch (reqtAsAccessor->getAccessorKind()) {
+    case AccessorKind::Get:
+      witnessMutating = isReadMutating();
       break;
 
-    // For an addressed property, consider the appropriate addressor.
-    case AbstractStorageDecl::Addressed: {
-      AccessorDecl *addressor =
-        getAddressorForRequirement(storage, reqtAsAccessor->getAccessorKind());
-      witnessMutating = addressor->isMutating();
+    case AccessorKind::Set:
+      witnessMutating = isWriteMutating();
       break;
-    }
 
-    case AbstractStorageDecl::StoredWithObservers:
-    case AbstractStorageDecl::StoredWithTrivialAccessors:
-    case AbstractStorageDecl::InheritedWithObservers:
-    case AbstractStorageDecl::AddressedWithTrivialAccessors:
-    case AbstractStorageDecl::AddressedWithObservers:
-    case AbstractStorageDecl::ComputedWithMutableAddress:
-    case AbstractStorageDecl::Computed:
-      llvm_unreachable("missing witness reference for kind with accessors");
+    case AccessorKind::MaterializeForSet:
+      witnessMutating = isReadWriteMutating();
+      break;
+
+    default:
+      llvm_unreachable("unexpected accessor requirement");
     }
   }
 
@@ -343,6 +352,48 @@ static ParameterList *getParameterList(ValueDecl *value) {
   return subscript->getIndices();
 }
 
+// Find a standin declaration to place the diagnostic at for the
+// given accessor kind.
+static ValueDecl *getStandinForAccessor(AbstractStorageDecl *witnessStorage,
+                                        AccessorKind requirementKind) {
+  auto getExplicitAccessor = [&](AccessorKind kind) -> AccessorDecl* {
+    if (auto accessor = witnessStorage->getAccessor(kind)) {
+      if (!accessor->isImplicit())
+        return accessor;
+    }
+    return nullptr;
+  };
+
+  // If the storage actually explicitly provides that accessor, great.
+  if (auto accessor = getExplicitAccessor(requirementKind))
+    return accessor;
+
+  // If it didn't, check to see if it provides something else that corresponds
+  // to the requirement.
+  switch (requirementKind) {
+  case AccessorKind::Get:
+    if (auto addressor = getExplicitAccessor(AccessorKind::Address))
+      return addressor;
+    break;
+
+  case AccessorKind::MaterializeForSet:
+    if (auto setter = getExplicitAccessor(AccessorKind::Set))
+      return setter;
+    LLVM_FALLTHROUGH;
+
+  case AccessorKind::Set:
+    if (auto addressor = getExplicitAccessor(AccessorKind::MutableAddress))
+      return addressor;
+    break;
+
+  default:
+    break;
+  }
+
+  // Otherwise, just diagnose starting at the storage declaration itself.
+  return witnessStorage;
+}
+
 RequirementMatch
 swift::matchWitness(
              TypeChecker &tc,
@@ -396,10 +447,6 @@ swift::matchWitness(
     // Check that the mutating bit is ok.
     if (checkMutating(funcReq, funcWitness, funcWitness))
       return RequirementMatch(witness, MatchKind::MutatingConflict);
-    if (funcWitness->isNonMutating() && funcReq->isConsuming())
-      return RequirementMatch(witness, MatchKind::NonMutatingConflict);
-    if (funcWitness->isConsuming() && !funcReq->isConsuming())
-      return RequirementMatch(witness, MatchKind::ConsumingConflict);
 
     // If the requirement is rethrows, the witness must either be
     // rethrows or be non-throwing.
@@ -424,34 +471,15 @@ swift::matchWitness(
         !witness->isSettable(witness->getDeclContext()))
       return RequirementMatch(witness, MatchKind::SettableConflict);
 
-    // Find a standin declaration to place the diagnostic at for the
-    // given accessor kind.
-    auto getStandinForAccessor = [&](AccessorKind kind) -> ValueDecl* {
-      // If the witness actually explicitly provided that accessor,
-      // then great.
-      if (auto accessor = witnessASD->getAccessorFunction(kind))
-        if (!accessor->isImplicit())
-          return accessor;
-
-      // If it didn't, check to see if it provides something else.
-      if (witnessASD->hasAddressors()) {
-        return getAddressorForRequirement(witnessASD, kind);
-      }
-
-      // Otherwise, just diagnose starting at the storage declaration
-      // itself.
-      return witnessASD;
-    };
-    
     // Validate that the 'mutating' bit lines up for getters and setters.
     if (checkMutating(reqASD->getGetter(), witnessASD->getGetter(),
                       witnessASD))
-      return RequirementMatch(getStandinForAccessor(AccessorKind::Get),
+      return RequirementMatch(getStandinForAccessor(witnessASD, AccessorKind::Get),
                               MatchKind::MutatingConflict);
     
     if (req->isSettable(req->getDeclContext()) &&
         checkMutating(reqASD->getSetter(), witnessASD->getSetter(), witnessASD))
-      return RequirementMatch(getStandinForAccessor(AccessorKind::Set),
+      return RequirementMatch(getStandinForAccessor(witnessASD, AccessorKind::Set),
                               MatchKind::MutatingConflict);
 
     // Decompose the parameters for subscript declarations.
@@ -534,9 +562,6 @@ swift::matchWitness(
       // Variadic bits must match.
       // FIXME: Specialize the match failure kind
       if (reqParams[i].isVariadic() != witnessParams[i].isVariadic())
-        return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
-
-      if (reqParams[i].isShared() != witnessParams[i].isShared())
         return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
 
       if (reqParams[i].isInOut() != witnessParams[i].isInOut())
@@ -2217,7 +2242,6 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
 
     // Inject the typealias into the nominal decl that conforms to the protocol.
     if (auto nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext()) {
-      TC.computeAccessLevel(nominal);
       // FIXME: Ideally this would use the protocol's access too---that is,
       // a typealias added for an internal protocol shouldn't need to be
       // public---but that can be problematic if the same type conforms to two
@@ -2759,6 +2783,21 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
 
     case CheckKind::Access:
     case CheckKind::AccessOfSetter: {
+      // Swift 4.2 relaxed some rules for protocol witness matching.
+      //
+      // This meant that it was possible for an optional protocol requirement
+      // to have a witness where previously in Swift 4.1 it did not.
+      //
+      // Since witnesses must be as visible as the protocol, this caused a
+      // source compatibility break if the witness was not sufficiently
+      // visible.
+      //
+      // Work around this by discarding the witness if its not sufficiently
+      // visible.
+      if (!TC.Context.isSwiftVersionAtLeast(5))
+        if (requirement->getAttrs().hasAttribute<OptionalAttr>())
+          return ResolveWitnessResult::Missing;
+
       // Avoid relying on the lifetime of 'this'.
       const DeclContext *DC = this->DC;
       diagnoseOrDefer(requirement, false,
@@ -2785,6 +2824,14 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                        requiredAccess,
                        protoAccessScope.accessLevelForDiagnostics(),
                        proto->getName());
+        if (auto *decl = dyn_cast<AbstractFunctionDecl>(witness)) {
+          auto isMemberwiseInitializer =
+              decl->getBodyKind() ==
+              AbstractFunctionDecl::BodyKind::MemberwiseInitializer;
+          if (isMemberwiseInitializer) {
+            return;
+          }
+        }
         auto fixItDiag = diags.diagnose(witness, diag::witness_fix_access,
                                         witness->getDescriptiveKind(),
                                         requiredAccess);
@@ -2816,7 +2863,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
 
     case CheckKind::Unavailable: {
       auto *attr = requirement->getAttrs().getUnavailable(TC.Context);
-      TC.diagnoseUnavailableOverride(witness, requirement, attr);
+      diagnoseUnavailableOverride(witness, requirement, attr);
       break;
     }
 
@@ -3114,7 +3161,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
   for (auto candidate : candidates) {
     // Skip nested generic types.
     if (auto *genericDecl = dyn_cast<GenericTypeDecl>(candidate.Member))
-      if (genericDecl->getGenericParams())
+      if (genericDecl->isGeneric())
         continue;
 
     // Skip typealiases with an unbound generic type as their underlying type.
@@ -3764,8 +3811,8 @@ Optional<ProtocolConformanceRef> TypeChecker::containsProtocol(
 
     // First, if we have a superclass constraint, the class may conform
     // concretely.
-    if (layout.superclass) {
-      if (auto result = conformsToProtocol(layout.superclass, Proto,
+    if (layout.explicitSuperclass) {
+      if (auto result = conformsToProtocol(layout.explicitSuperclass, Proto,
                                            DC, options)) {
         return result;
       }
@@ -3774,11 +3821,24 @@ Optional<ProtocolConformanceRef> TypeChecker::containsProtocol(
     // Next, check if the existential contains the protocol in question.
     for (auto P : layout.getProtocols()) {
       auto *PD = P->getDecl();
+
       // If we found the protocol we're looking for, return an abstract
       // conformance to it.
-      if (PD == Proto || PD->inheritsFrom(Proto)) {
+      if (PD == Proto)
         return ProtocolConformanceRef(Proto);
+
+      // If the protocol has a superclass constraint, we might conform
+      // concretely.
+      if (auto superclass = PD->getSuperclass()) {
+        if (auto result = conformsToProtocol(superclass, Proto,
+                                             DC, options)) {
+          return result;
+        }
       }
+
+      // Now check refined protocols.
+      if (PD->inheritsFrom(Proto))
+        return ProtocolConformanceRef(Proto);
     }
 
     return None;
@@ -3825,11 +3885,18 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
     markConformanceUsed(*lookupResult, DC);
   }
 
-  // If we have a concrete conformance with conditional requirements that
+  auto condReqs = lookupResult->getConditionalRequirementsIfAvailable();
+  // If we have a conditional requirements that
   // we need to check, do so now.
-  if (lookupResult->isConcrete() &&
-      !lookupResult->getConditionalRequirements().empty() &&
-      !options.contains(ConformanceCheckFlags::SkipConditionalRequirements)) {
+  if (!condReqs) {
+    assert(
+        options.contains(
+            ConformanceCheckFlags::AllowUnavailableConditionalRequirements) &&
+        "unhandled recursion: missing conditional requirements when they're "
+        "required");
+  } else if (!condReqs->empty() &&
+             !options.contains(
+                 ConformanceCheckFlags::SkipConditionalRequirements)) {
     // Figure out the location of the conditional conformance.
     auto conformanceDC = lookupResult->getConcrete()->getDeclContext();
     SourceLoc noteLoc;
@@ -3838,16 +3905,12 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
     else
       noteLoc = cast<NominalTypeDecl>(conformanceDC)->getLoc();
 
-    auto conditionalCheckResult =
-      checkGenericArguments(DC, ComplainLoc, noteLoc, T,
-                            { Type(lookupResult->getRequirement()
-                                ->getProtocolSelfType()) },
-                            lookupResult->getConditionalRequirements(),
-                            [](SubstitutableType *dependentType) {
-                              return Type(dependentType);
-                            },
-                            LookUpConformance(*this, DC),
-                            options);
+    auto conditionalCheckResult = checkGenericArguments(
+        DC, ComplainLoc, noteLoc, T,
+        {Type(lookupResult->getRequirement()->getProtocolSelfType())},
+        *condReqs,
+        [](SubstitutableType *dependentType) { return Type(dependentType); },
+        LookUpConformance(*this, DC), options);
     switch (conditionalCheckResult) {
     case RequirementCheckResult::Success:
       break;
@@ -4041,6 +4104,10 @@ void TypeChecker::useBridgedNSErrorConformances(DeclContext *dc, Type type) {
 }
 
 void TypeChecker::checkConformance(NormalProtocolConformance *conformance) {
+  PrettyStackTraceType trace1(Context, "checking conformance of",
+                              conformance->getType());
+  PrettyStackTraceDecl trace2("...to", conformance->getProtocol());
+
   MultiConformanceChecker checker(*this);
   checker.addConformance(conformance);
   checker.checkAllConformances();
@@ -4051,6 +4118,10 @@ void TypeChecker::checkConformanceRequirements(
   // If the conformance is already invalid, there's nothing to do here.
   if (conformance->isInvalid())
     return;
+
+  PrettyStackTraceType trace1(Context, "checking conformance requirements of",
+                              conformance->getType());
+  PrettyStackTraceDecl trace2("...to", conformance->getProtocol());
 
   conformance->setSignatureConformances({ });
 
@@ -4338,7 +4409,6 @@ static bool shouldWarnAboutPotentialWitness(
 
   // Don't warn if the potential witness has been explicitly given less
   // visibility than the conformance.
-  groupChecker.getTypeChecker().computeAccessLevel(witness);
   if (witness->getFormalAccess() < access) {
     if (auto attr = witness->getAttrs().getAttribute<AccessControlAttr>())
       if (!attr->isImplicit()) return false;
@@ -4920,7 +4990,7 @@ TypeChecker::findWitnessedObjCRequirements(const ValueDecl *witness,
             auto *storageReq = dyn_cast<AbstractStorageDecl>(req);
             if (!storageReq)
               continue;
-            req = storageReq->getAccessorFunction(*accessorKind);
+            req = storageReq->getAccessor(*accessorKind);
             if (!req)
               continue;
           }
@@ -4938,10 +5008,10 @@ TypeChecker::findWitnessedObjCRequirements(const ValueDecl *witness,
         auto *storageFound = dyn_cast_or_null<AbstractStorageDecl>(found);
         if (!storageReq || !storageFound)
           continue;
-        req = storageReq->getAccessorFunction(*accessorKind);
+        req = storageReq->getAccessor(*accessorKind);
         if (!req)
           continue;
-        found = storageFound->getAccessorFunction(*accessorKind);
+        found = storageFound->getAccessor(*accessorKind);
       }
 
       // Determine whether the witness for this conformance is in fact

@@ -113,6 +113,10 @@ static bool validateSymbolSet(DiagnosticEngine &diags,
     }
   }
 
+  if (error) {
+    diags.diagnose(SourceLoc(), diag::tbd_validation_failure);
+  }
+
   return error;
 }
 

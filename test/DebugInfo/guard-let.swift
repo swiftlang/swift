@@ -21,9 +21,13 @@ public func f(_ i : Int?)
   use(val)
 }
 
-// With large type optimizations the string is passed indirectly on i386 so
-// there is no shadow copy happening.
+// With large type optimizations the string is passed indirectly on the
+// following architectures so there is no shadow copy happening. As this
+// tests that we're emitting the DI correctly, we can skip running on them.
 // UNSUPPORTED: CPU=i386
+// UNSUPPORTED: CPU=armv7
+// UNSUPPORTED: CPU=armv7s
+// UNSUPPORTED: CPU=armv7k
 
 public func g(_ s : String?)
 {

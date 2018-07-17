@@ -78,7 +78,7 @@ bool getIntegerIndex(SILValue IndexVal, unsigned &IndexConst);
 /// TypeAlignments.h.
 ///
 /// Projection Kinds which can be represented via indices can use as many bits
-/// as they want to represent the kind. When the index value is uses at most 11
+/// as they want to represent the kind. When the index value uses at most 11
 /// bits, we represent it inline in the data structure. This is taking advantage
 /// of the fact that on most modern OSes (including Darwin), the zero page is
 /// not allocated. In the case where we have more than 11 bits of value

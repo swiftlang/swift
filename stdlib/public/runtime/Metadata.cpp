@@ -24,6 +24,7 @@
 #include "swift/Runtime/ExistentialContainer.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Mutex.h"
+#include "swift/Runtime/Once.h"
 #include "swift/Strings.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/PointerLikeTypeTraits.h"
@@ -54,6 +55,7 @@
 #endif
 
 #if SWIFT_OBJC_INTEROP
+#include <dlfcn.h>
 #include <objc/runtime.h>
 #endif
 
@@ -593,7 +595,7 @@ swift::swift_getObjCClassFromMetadata(const Metadata *theMetadata) {
 
   // Otherwise, the input should already be a Swift class object.
   auto theClass = cast<ClassMetadata>(theMetadata);
-  assert(theClass->isTypeMetadata() && !theClass->isArtificialSubclass());
+  assert(theClass->isTypeMetadata());
   return theClass;
 }
 
@@ -1064,9 +1066,8 @@ static unsigned tuple_getEnumTagSinglePayload(const OpaqueValue *enumAddr,
   auto *witnesses = self->getValueWitnesses();
   auto size = witnesses->getSize();
   auto numExtraInhabitants = witnesses->getNumExtraInhabitants();
-  auto getExtraInhabitantIndex =
-      (static_cast<const ExtraInhabitantsValueWitnessTable *>(witnesses)
-           ->getExtraInhabitantIndex);
+  auto EIVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(witnesses);
+  auto getExtraInhabitantIndex = EIVWT ? EIVWT->getExtraInhabitantIndex : nullptr;
 
   return getEnumTagSinglePayloadImpl(enumAddr, numEmptyCases, self, size,
                                      numExtraInhabitants,
@@ -1080,9 +1081,8 @@ tuple_storeEnumTagSinglePayload(OpaqueValue *enumAddr, unsigned whichCase,
   auto *witnesses = self->getValueWitnesses();
   auto size = witnesses->getSize();
   auto numExtraInhabitants = witnesses->getNumExtraInhabitants();
-  auto storeExtraInhabitant =
-      (static_cast<const ExtraInhabitantsValueWitnessTable *>(witnesses)
-           ->storeExtraInhabitant);
+  auto EIVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(witnesses);
+  auto storeExtraInhabitant = EIVWT ? EIVWT->storeExtraInhabitant : nullptr;
 
   storeEnumTagSinglePayloadImpl(enumAddr, whichCase, numEmptyCases, self, size,
                                 numExtraInhabitants, storeExtraInhabitant);
@@ -1473,7 +1473,20 @@ bool swift::equalContexts(const ContextDescriptor *a,
         && kind <= ContextDescriptorKind::Type_Last) {
       auto typeA = cast<TypeContextDescriptor>(a);
       auto typeB = cast<TypeContextDescriptor>(b);
-      return strcmp(typeA->Name.get(), typeB->Name.get()) == 0;
+      if (strcmp(typeA->Name.get(), typeB->Name.get()) != 0)
+        return false;
+      
+      // A synthesized entity has to match the related entity tag too.
+      if (typeA->isSynthesizedRelatedEntity()) {
+        if (!typeB->isSynthesizedRelatedEntity())
+          return false;
+        
+        if (typeA->getSynthesizedDeclRelatedEntityTag()
+            != typeB->getSynthesizedDeclRelatedEntityTag())
+          return false;
+      }
+      
+      return true;
     }
     
     // Otherwise, this runtime doesn't know anything about this context kind.
@@ -1572,9 +1585,8 @@ static unsigned pod_direct_getEnumTagSinglePayload(const OpaqueValue *enumAddr,
   auto *witnesses = self->getValueWitnesses();
   auto size = witnesses->getSize();
   auto numExtraInhabitants = witnesses->getNumExtraInhabitants();
-  auto getExtraInhabitantIndex =
-      (static_cast<const ExtraInhabitantsValueWitnessTable *>(witnesses)
-           ->getExtraInhabitantIndex);
+  auto EIVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(witnesses);
+  auto getExtraInhabitantIndex = EIVWT ? EIVWT->getExtraInhabitantIndex : nullptr;
 
   return getEnumTagSinglePayloadImpl(enumAddr, numEmptyCases, self, size,
                                      numExtraInhabitants,
@@ -1588,9 +1600,8 @@ static void pod_direct_storeEnumTagSinglePayload(OpaqueValue *enumAddr,
   auto *witnesses = self->getValueWitnesses();
   auto size = witnesses->getSize();
   auto numExtraInhabitants = witnesses->getNumExtraInhabitants();
-  auto storeExtraInhabitant =
-      (static_cast<const ExtraInhabitantsValueWitnessTable *>(witnesses)
-           ->storeExtraInhabitant);
+  auto EIVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(witnesses);
+  auto storeExtraInhabitant = EIVWT ? EIVWT->storeExtraInhabitant : nullptr;
 
   storeEnumTagSinglePayloadImpl(enumAddr, whichCase, numEmptyCases, self, size,
                                 numExtraInhabitants, storeExtraInhabitant);
@@ -1965,6 +1976,45 @@ swift::swift_relocateClassMetadata(ClassMetadata *self,
   return self;
 }
 
+#if SWIFT_OBJC_INTEROP
+
+// FIXME: This is from a later version of <objc/runtime.h>. Once the declaration
+// is available in SDKs, we can remove this typedef.
+typedef BOOL (*objc_hook_getImageName)(
+    Class _Nonnull cls, const char * _Nullable * _Nonnull outImageName);
+
+/// \see customGetImageNameFromClass
+static objc_hook_getImageName defaultGetImageNameFromClass = nullptr;
+
+/// A custom implementation of Objective-C's class_getImageName for Swift
+/// classes, which knows how to handle dynamically-initialized class metadata.
+///
+/// Per the documentation for objc_setHook_getImageName, any non-Swift classes
+/// will still go through the normal implementation of class_getImageName,
+/// which is stored in defaultGetImageNameFromClass.
+static BOOL
+customGetImageNameFromClass(Class _Nonnull objcClass,
+                            const char * _Nullable * _Nonnull outImageName) {
+  auto *classAsMetadata = reinterpret_cast<const ClassMetadata *>(objcClass);
+
+  // Is this a Swift class?
+  if (classAsMetadata->isTypeMetadata() &&
+      !classAsMetadata->isArtificialSubclass()) {
+    const void *descriptor = classAsMetadata->getDescription();
+    assert(descriptor &&
+           "all non-artificial Swift classes should have a descriptor");
+    Dl_info imageInfo = {};
+    if (!dladdr(descriptor, &imageInfo))
+      return NO;
+    *outImageName = imageInfo.dli_fname;
+    return imageInfo.dli_fname != nullptr;
+  }
+
+  // If not, fall back to the default implementation.
+  return defaultGetImageNameFromClass(objcClass, outImageName);
+}
+#endif
+
 /// Initialize the field offset vector for a dependent-layout class, using the
 /// "Universal" layout strategy.
 void
@@ -1973,6 +2023,23 @@ swift::swift_initClassMetadata(ClassMetadata *self,
                                size_t numFields,
                                const TypeLayout * const *fieldTypes,
                                size_t *fieldOffsets) {
+#if SWIFT_OBJC_INTEROP
+  // Register our custom implementation of class_getImageName.
+  static swift_once_t onceToken;
+  swift_once(&onceToken, [](void *unused) {
+    (void)unused;
+    // FIXME: This is from a later version of <objc/runtime.h>. Once the
+    // declaration is available in SDKs, we can access this directly instead of
+    // using dlsym.
+    if (void *setHookPtr = dlsym(RTLD_DEFAULT, "objc_setHook_getImageName")) {
+      auto setHook = reinterpret_cast<
+          void(*)(objc_hook_getImageName _Nonnull,
+                  objc_hook_getImageName _Nullable * _Nonnull)>(setHookPtr);
+      setHook(customGetImageNameFromClass, &defaultGetImageNameFromClass);
+    }
+  }, nullptr);
+#endif
+
   _swift_initializeSuperclass(self);
 
   // Start layout by appending to a standard heap object header.
@@ -3377,6 +3444,7 @@ WitnessTableCacheEntry::allocate(GenericWitnessTable *genericTable,
   size_t numRequirements =
     protocol->NumRequirements + WitnessTableFirstRequirementOffset;
   assert(numPatternWitnesses <= numRequirements);
+  (void)numRequirements;
 
   // Number of bytes for any private storage used by the conformance itself.
   size_t privateSizeInWords = genericTable->WitnessTablePrivateSizeInWords;

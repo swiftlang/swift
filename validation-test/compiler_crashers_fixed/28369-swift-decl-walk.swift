@@ -11,7 +11,7 @@
 protocol P {
 }
 struct A<T> {
-    func a<B where T: P>(b: B) -> B {
+    func a<B>(b: B) -> B where T: P {
       return b
     }
 }

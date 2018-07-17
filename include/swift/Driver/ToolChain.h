@@ -122,6 +122,12 @@ protected:
     std::vector<std::pair<const char *, const char *>> ExtraEnvironment;
     std::vector<FilelistInfo> FilelistInfos;
 
+    // Not all platforms and jobs support the use of response files, so assume
+    // "false" by default. If the executable specified in the InvocationInfo
+    // constructor supports response files, this can be overridden and set to
+    // "true".
+    bool allowsResponseFiles = false;
+
     InvocationInfo(const char *name, llvm::opt::ArgStringList args = {},
                    decltype(ExtraEnvironment) extraEnv = {})
         : ExecutableName(name), Arguments(std::move(args)),

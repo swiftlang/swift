@@ -561,8 +561,28 @@ bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
     if (nominalDecl->isGenericContext())
       return false;
 
+    auto expansion = ResilienceExpansion::Maximal;
+
+    // Normally, if a value type is known to have a fixed layout to us, we will
+    // have emitted fully initialized metadata for it, including a payload size
+    // field for enum metadata for example, allowing the type metadata to be
+    // used in other resilience domains without initialization.
+    //
+    // However, when -enable-resilience-bypass is on, we might be using a value
+    // type from another module built with resilience enabled. In that case, the
+    // type looks like it has fixed size to us, since we're bypassing resilience,
+    // but the metadata still requires runtime initialization, so its incorrect
+    // to reference it directly.
+    //
+    // While unconditionally using minimal expansion is correct, it is not as
+    // efficient as it should be, so only do so if -enable-resilience-bypass is on.
+    //
+    // FIXME: All of this goes away once lldb supports resilience.
+    if (IGM.IRGen.Opts.EnableResilienceBypass)
+      expansion = ResilienceExpansion::Minimal;
+
     // Resiliently-sized metadata access always requires an accessor.
-    return (IGM.getTypeInfoForUnlowered(type).isFixedSize());
+    return (IGM.getTypeInfoForUnlowered(type).isFixedSize(expansion));
   }
 
   // The empty tuple type has a singleton metadata.
@@ -1157,9 +1177,9 @@ namespace {
                                !layout.requiresClass());
       llvm::Value *superclassConstraint =
         llvm::ConstantPointerNull::get(IGF.IGM.TypeMetadataPtrTy);
-      if (layout.superclass) {
+      if (auto superclass = layout.explicitSuperclass) {
         superclassConstraint = IGF.emitAbstractTypeMetadataRef(
-          CanType(layout.superclass));
+          CanType(superclass));
       }
 
       auto call = IGF.Builder.CreateCall(IGF.IGM.getGetExistentialMetadataFn(),
@@ -2263,23 +2283,15 @@ namespace {
       // object.
 
       auto &C = IGF.IGM.Context;
-      CanType referent;
-      switch (type->getOwnership()) {
-      case ReferenceOwnership::Strong:
-        llvm_unreachable("shouldn't be a ReferenceStorageType");
-      case ReferenceOwnership::Weak:
-        referent = type.getReferentType().getOptionalObjectType();
-        break;
-      case ReferenceOwnership::Unmanaged:
-      case ReferenceOwnership::Unowned:
-        referent = type.getReferentType();
-        break;
-      }
+      CanType referent = type.getReferentType();
+      CanType underlyingTy = referent;
+      if (auto Ty = referent.getOptionalObjectType())
+        underlyingTy = Ty;
 
       // Reference storage types with witness tables need open-coded layouts.
       // TODO: Maybe we could provide prefabs for 1 witness table.
-      if (referent.isExistentialType()) {
-        auto layout = referent.getExistentialLayout();
+      if (underlyingTy.isExistentialType()) {
+        auto layout = underlyingTy.getExistentialLayout();
         for (auto *protoTy : layout.getProtocols()) {
           auto *protoDecl = protoTy->getDecl();
           if (IGF.getSILTypes().protocolRequiresWitnessTable(protoDecl))
@@ -2298,7 +2310,7 @@ namespace {
       }
 
       CanType valueWitnessReferent;
-      switch (getReferenceCountingForType(IGF.IGM, referent)) {
+      switch (getReferenceCountingForType(IGF.IGM, underlyingTy)) {
       case ReferenceCounting::Unknown:
       case ReferenceCounting::Block:
       case ReferenceCounting::ObjC:
@@ -2319,7 +2331,7 @@ namespace {
 
       // Get the reference storage type of the builtin object whose value
       // witness we can borrow.
-      if (type->getOwnership() == ReferenceOwnership::Weak)
+      if (referent->getOptionalObjectType())
         valueWitnessReferent = OptionalType::get(valueWitnessReferent)
           ->getCanonicalType();
 

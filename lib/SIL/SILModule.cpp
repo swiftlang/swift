@@ -849,9 +849,28 @@ void SILModule::setOptRecordStream(
 SILProperty *SILProperty::create(SILModule &M,
                                  bool Serialized,
                                  AbstractStorageDecl *Decl,
-                                 KeyPathPatternComponent Component) {
+                                 Optional<KeyPathPatternComponent> Component) {
   auto prop = new (M) SILProperty(Serialized, Decl, Component);
   M.properties.push_back(prop);
   return prop;
 }
 
+// Definition from SILLinkage.h.
+SILLinkage swift::getDeclSILLinkage(const ValueDecl *decl) {
+  AccessLevel access = decl->getEffectiveAccess();
+  SILLinkage linkage;
+  switch (access) {
+  case AccessLevel::Private:
+  case AccessLevel::FilePrivate:
+    linkage = SILLinkage::Private;
+    break;
+  case AccessLevel::Internal:
+    linkage = SILLinkage::Hidden;
+    break;
+  case AccessLevel::Public:
+  case AccessLevel::Open:
+    linkage = SILLinkage::Public;
+    break;
+  }
+  return linkage;
+}

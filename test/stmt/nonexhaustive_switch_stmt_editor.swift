@@ -15,7 +15,7 @@ let NSEC_PER_SEC : UInt64 = 1000000000
 }
 
 func unproxify(t : TemporalProxy) -> TimeInterval {
-  switch t { // expected-warning {{switch must be exhaustive}}
+  switch t { // expected-error {{switch must be exhaustive}}
   // expected-note@-1 {{do you want to add missing cases?}}
   case let .seconds(s):
     return TimeInterval(s)

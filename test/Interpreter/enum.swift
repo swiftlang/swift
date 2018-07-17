@@ -520,10 +520,10 @@ func presentEitherOrsOf<T, U>(t: T, u: U) {
   presentEitherOr(EitherOr<T, U>.Right(u))
 }
 
-presentEitherOr(EitherOr<(), ()>.Left())  // CHECK-NEXT: Left(())
+presentEitherOr(EitherOr<(), ()>.Left(()))  // CHECK-NEXT: Left(())
 presentEitherOr(EitherOr<(), ()>.Middle)  // CHECK-NEXT: Middle
 presentEitherOr(EitherOr<(), ()>.Center)  // CHECK-NEXT: Center
-presentEitherOr(EitherOr<(), ()>.Right()) // CHECK-NEXT: Right(())
+presentEitherOr(EitherOr<(), ()>.Right(())) // CHECK-NEXT: Right(())
 
 // CHECK-NEXT: Left(())
 // CHECK-NEXT: Middle
@@ -542,7 +542,7 @@ presentEitherOr(EitherOr<Int, String>.Right("foo")) // CHECK-NEXT: Right(foo)
 // CHECK-NEXT: Right(foo)
 presentEitherOrsOf(t: 1, u: "foo")
 
-presentEitherOr(EitherOr<(), String>.Left())       // CHECK-NEXT: Left(())
+presentEitherOr(EitherOr<(), String>.Left(()))       // CHECK-NEXT: Left(())
 presentEitherOr(EitherOr<(), String>.Middle)       // CHECK-NEXT: Middle
 presentEitherOr(EitherOr<(), String>.Center)       // CHECK-NEXT: Center
 presentEitherOr(EitherOr<(), String>.Right("foo")) // CHECK-NEXT: Right(foo)

@@ -215,31 +215,55 @@ getSILFunctionTypeRepresentationString(SILFunctionType::Representation value) {
 
   llvm_unreachable("Unhandled SILFunctionTypeRepresentation in switch.");
 }
-static StringRef
-getAbstractStorageDeclKindString(AbstractStorageDecl::StorageKindTy value) {
-  switch (value) {
-  case AbstractStorageDecl::Stored:
-    return "stored";
-  case AbstractStorageDecl::StoredWithTrivialAccessors:
-    return "stored_with_trivial_accessors";
-  case AbstractStorageDecl::StoredWithObservers:
-    return "stored_with_observers";
-  case AbstractStorageDecl::InheritedWithObservers:
-    return "inherited_with_observers";
-  case AbstractStorageDecl::Addressed:
-    return "addressed";
-  case AbstractStorageDecl::AddressedWithTrivialAccessors:
-    return "addressed_with_trivial_accessors";
-  case AbstractStorageDecl::AddressedWithObservers:
-    return "addressed_with_observers";
-  case AbstractStorageDecl::ComputedWithMutableAddress:
-    return "computed_with_mutable_address";
-  case AbstractStorageDecl::Computed:
-    return "computed";
-  }
 
-  llvm_unreachable("Unhandled AbstractStorageDecl in switch.");
+StringRef swift::getReadImplKindName(ReadImplKind kind) {
+  switch (kind) {
+  case ReadImplKind::Stored:
+    return "stored";
+  case ReadImplKind::Inherited:
+    return "inherited";
+  case ReadImplKind::Get:
+    return "getter";
+  case ReadImplKind::Address:
+    return "addressor";
+  }
+  llvm_unreachable("bad kind");
 }
+
+StringRef swift::getWriteImplKindName(WriteImplKind kind) {
+  switch (kind) {
+  case WriteImplKind::Immutable:
+    return "immutable";
+  case WriteImplKind::Stored:
+    return "stored";
+  case WriteImplKind::StoredWithObservers:
+    return "stored_with_observers";
+  case WriteImplKind::InheritedWithObservers:
+    return "inherited_with_observers";
+  case WriteImplKind::Set:
+    return "setter";
+  case WriteImplKind::MutableAddress:
+    return "mutable_addressor";
+  }
+  llvm_unreachable("bad kind");
+}
+
+StringRef swift::getReadWriteImplKindName(ReadWriteImplKind kind) {
+  switch (kind) {
+  case ReadWriteImplKind::Immutable:
+    return "immutable";
+  case ReadWriteImplKind::Stored:
+    return "stored";
+  case ReadWriteImplKind::MaterializeForSet:
+    return "materialize_for_set";
+  case ReadWriteImplKind::MutableAddress:
+    return "mutable_addressor";
+  case ReadWriteImplKind::MaterializeToTemporary:
+    return "materialize_to_temporary";
+  }
+  llvm_unreachable("bad kind");
+}
+
 static StringRef getImportKindString(ImportKind value) {
   switch (value) {
   case ImportKind::Module: return "module";
@@ -306,15 +330,6 @@ static StringRef getAccessorKindString(AccessorKind value) {
 
   llvm_unreachable("Unhandled AccessorKind in switch.");
 }
-static StringRef getAccessKindString(AccessKind value) {
-  switch (value) {
-    case AccessKind::Read: return "read";
-    case AccessKind::Write: return "write";
-    case AccessKind::ReadWrite: return "readwrite";
-  }
-
-  llvm_unreachable("Unhandled AccessKind in switch.");
-}
 static StringRef
 getMagicIdentifierLiteralExprKindString(MagicIdentifierLiteralExpr::Kind value) {
   switch (value) {
@@ -341,7 +356,7 @@ static StringRef getAccessSemanticsString(AccessSemantics value) {
   switch (value) {
     case AccessSemantics::Ordinary: return "ordinary";
     case AccessSemantics::DirectToStorage: return "direct_to_storage";
-    case AccessSemantics::DirectToAccessor: return "direct_to_accessor";
+    case AccessSemantics::DirectToImplementation: return "direct_to_impl";
     case AccessSemantics::BehaviorInitialization: return "behavior_init";
   }
 
@@ -775,7 +790,9 @@ namespace {
     void visitSourceFile(const SourceFile &SF) {
       OS.indent(Indent);
       PrintWithColorRAII(OS, ParenthesisColor) << '(';
-      PrintWithColorRAII(OS, ASTNodeColor) << "source_file";
+      PrintWithColorRAII(OS, ASTNodeColor) << "source_file ";
+      PrintWithColorRAII(OS, LocationColor) << '\"' << SF.getFilename() << '\"';
+      
       for (Decl *D : SF.Decls) {
         if (D->isImplicit())
           continue;
@@ -794,48 +811,35 @@ namespace {
         PrintWithColorRAII(OS, DeclModifierColor) << " let";
       if (VD->hasNonPatternBindingInit())
         PrintWithColorRAII(OS, DeclModifierColor) << " non_pattern_init";
-      PrintWithColorRAII(OS, DeclModifierColor)
-        << " storage_kind="
-        << getAbstractStorageDeclKindString(VD->getStorageKind());
       if (VD->getAttrs().hasAttribute<LazyAttr>())
         PrintWithColorRAII(OS, DeclModifierColor) << " lazy";
-
+      printStorageImpl(VD);
       printAccessors(VD);
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
+    void printStorageImpl(AbstractStorageDecl *D) {
+      auto impl = D->getImplInfo();
+      PrintWithColorRAII(OS, DeclModifierColor)
+        << " readImpl="
+        << getReadImplKindName(impl.getReadImpl());
+      if (!impl.supportsMutation()) {
+        PrintWithColorRAII(OS, DeclModifierColor)
+          << " immutable";
+      } else {
+        PrintWithColorRAII(OS, DeclModifierColor)
+          << " writeImpl="
+          << getWriteImplKindName(impl.getWriteImpl());
+        PrintWithColorRAII(OS, DeclModifierColor)
+          << " readWriteImpl="
+          << getReadWriteImplKindName(impl.getReadWriteImpl());
+      }
+    }
+
     void printAccessors(AbstractStorageDecl *D) {
-      if (FuncDecl *Get = D->getGetter()) {
+      for (auto accessor : D->getAllAccessors()) {
         OS << "\n";
-        printRec(Get);
-      }
-      if (FuncDecl *Set = D->getSetter()) {
-        OS << "\n";
-        printRec(Set);
-      }
-      if (FuncDecl *MaterializeForSet = D->getMaterializeForSetFunc()) {
-        OS << "\n";
-        printRec(MaterializeForSet);
-      }
-      if (D->hasObservers()) {
-        if (FuncDecl *WillSet = D->getWillSetFunc()) {
-          OS << "\n";
-          printRec(WillSet);
-        }
-        if (FuncDecl *DidSet = D->getDidSetFunc()) {
-          OS << "\n";
-          printRec(DidSet);
-        }
-      }
-      if (D->hasAddressors()) {
-        if (FuncDecl *addressor = D->getAddressor()) {
-          OS << "\n";
-          printRec(addressor);
-        }
-        if (FuncDecl *mutableAddressor = D->getMutableAddressor()) {
-          OS << "\n";
-          printRec(mutableAddressor);
-        }
+        printRec(accessor);
       }
     }
 
@@ -907,8 +911,7 @@ namespace {
 
     void visitSubscriptDecl(SubscriptDecl *SD) {
       printCommon(SD, "subscript_decl");
-      OS << " storage_kind="
-         << getAbstractStorageDeclKindString(SD->getStorageKind());
+      printStorageImpl(SD);
       printAccessors(SD);
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
@@ -1723,11 +1726,6 @@ public:
     if (E->isImplicit())
       PrintWithColorRAII(OS, ExprModifierColor) << " implicit";
     PrintWithColorRAII(OS, TypeColor) << " type='" << GetTypeOfExpr(E) << '\'';
-
-    if (E->hasLValueAccessKind()) {
-      PrintWithColorRAII(OS, ExprModifierColor)
-        << " accessKind=" << getAccessKindString(E->getLValueAccessKind());
-    }
 
     // If we have a source range and an ASTContext, print the source range.
     if (auto Ty = GetTypeOfExpr(E)) {
@@ -2556,6 +2554,11 @@ public:
     printSemanticExpr(E->getSemanticExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+  void visitLazyInitializerExpr(LazyInitializerExpr *E) {
+    printCommon(E, "lazy_initializer_expr") << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
   void visitObjCSelectorExpr(ObjCSelectorExpr *E) {
     printCommon(E, "objc_selector_expr");
     OS << " kind=" << getObjCSelectorExprKindString(E->getSelectorKind());
@@ -2978,10 +2981,17 @@ static void dumpProtocolConformanceRec(
       }
     }
 
-    for (auto requirement : normal->getConditionalRequirements()) {
+    if (auto condReqs = normal->getConditionalRequirementsIfAvailableOrCached(
+            /*computeIfPossible=*/false)) {
+      for (auto requirement : *condReqs) {
+        out << '\n';
+        out.indent(indent + 2);
+        requirement.dump(out);
+      }
+    } else {
       out << '\n';
       out.indent(indent + 2);
-      requirement.dump(out);
+      out << "(conditional requirements unable to be computed)";
     }
     break;
   }
@@ -3009,10 +3019,16 @@ static void dumpProtocolConformanceRec(
                            SubstitutionMap::DumpStyle::Full, indent + 2,
                            visited);
     out << '\n';
-    for (auto subReq : conf->getConditionalRequirements()) {
+    if (auto condReqs = conf->getConditionalRequirementsIfAvailableOrCached(
+            /*computeIfPossible=*/false)) {
+      for (auto subReq : *condReqs) {
+        out.indent(indent + 2);
+        subReq.dump(out);
+        out << '\n';
+      }
+    } else {
       out.indent(indent + 2);
-      subReq.dump(out);
-      out << '\n';
+      out << "(conditional requirements unable to be computed)\n";
     }
     dumpProtocolConformanceRec(conf->getGenericConformance(), out, indent + 2,
                                visited);
@@ -3266,23 +3282,13 @@ namespace {
       OS << ")";
     }
 
-    void visitUnownedStorageType(UnownedStorageType *T, StringRef label) {
-      printCommon(label, "unowned_storage_type");
-      printRec(T->getReferentType());
-      OS << ")";
+#define REF_STORAGE(Name, name, ...) \
+    void visit##Name##StorageType(Name##StorageType *T, StringRef label) { \
+      printCommon(label, #name "_storage_type"); \
+      printRec(T->getReferentType()); \
+      OS << ")"; \
     }
-
-    void visitUnmanagedStorageType(UnmanagedStorageType *T, StringRef label) {
-      printCommon(label, "unmanaged_storage_type");
-      printRec(T->getReferentType());
-      OS << ")";
-    }
-
-    void visitWeakStorageType(WeakStorageType *T, StringRef label) {
-      printCommon(label, "weak_storage_type");
-      printRec(T->getReferentType());
-      OS << ")";
-    }
+#include "swift/AST/ReferenceStorage.def"
 
     void visitEnumType(EnumType *T, StringRef label) {
       printCommon(label, "enum_type");

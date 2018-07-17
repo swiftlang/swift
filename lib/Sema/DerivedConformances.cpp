@@ -272,7 +272,7 @@ addGetterToReadOnlyDerivedProperty(TypeChecker &tc,
   auto getter =
     declareDerivedPropertyGetter(tc, property, propertyContextType);
 
-  property->setAccessors(VarDecl::Computed,
+  property->setAccessors(StorageImplInfo::getImmutableComputed(),
                          SourceLoc(), {getter}, SourceLoc());
 
   return getter;
@@ -363,12 +363,8 @@ DerivedConformance::declareDerivedProperty(Identifier name,
                                  /*implicit*/ true);
   propPat->setType(propertyContextType);
 
-  auto pbDecl = PatternBindingDecl::create(C, SourceLoc(),
-                                           StaticSpellingKind::None,
-                                           SourceLoc(), propPat, nullptr,
-                                           parentDC);
-  pbDecl->setImplicit();
-
+  auto *pbDecl = PatternBindingDecl::createImplicit(
+      C, StaticSpellingKind::None, propPat, /*InitExpr*/ nullptr, parentDC);
   return {propDecl, pbDecl};
 }
 

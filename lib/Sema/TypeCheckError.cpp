@@ -134,6 +134,9 @@ public:
         fn = conversion->getSubExpr()->getValueProvidingExpr();
       } else if (auto conversion = dyn_cast<BindOptionalExpr>(fn)) {
         fn = conversion->getSubExpr()->getValueProvidingExpr();
+      // Look through optional injections.
+      } else if (auto injection = dyn_cast<InjectIntoOptionalExpr>(fn)) {
+        fn = injection->getSubExpr()->getValueProvidingExpr();
       // Look through function conversions.
       } else if (auto conversion = dyn_cast<FunctionConversionExpr>(fn)) {
         fn = conversion->getSubExpr()->getValueProvidingExpr();

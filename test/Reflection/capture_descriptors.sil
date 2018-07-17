@@ -208,11 +208,11 @@ bb0(%t: $T, %u: $U):
   return %12 : $()
 }
 
-sil @pseudogeneric_caller : $@convention(thin) @pseudogeneric <A : AnyObject, B : AnyObject, C : AnyObject> (@owned A, @owned B) -> @owned @pseudogeneric @callee_guaranteed () -> () {
+sil @pseudogeneric_caller : $@convention(thin) @pseudogeneric <A : AnyObject, B : AnyObject, C : AnyObject> (@owned A, @owned B) -> @owned @callee_guaranteed () -> () {
 bb0(%a: $A, %b: $B):
   %f = function_ref @pseudogeneric_callee : $@convention(thin) @pseudogeneric <T : AnyObject, U : AnyObject> (@owned T, @owned U) -> ()
   %c = partial_apply [callee_guaranteed] %f<A, B>(%a, %b) : $@convention(thin) @pseudogeneric <A : AnyObject, B : AnyObject> (@owned A, @owned B) -> ()
-  return %c : $@pseudogeneric @callee_guaranteed () -> ()
+  return %c : $@callee_guaranteed () -> ()
 }
 
 // CHECK:      - Capture types:

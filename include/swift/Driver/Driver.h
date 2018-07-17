@@ -102,7 +102,10 @@ public:
 
   /// Whether or not the output should contain debug info.
   // FIXME: Eventually this should be replaced by dSYM generation.
-  IRGenDebugInfoKind DebugInfoKind = IRGenDebugInfoKind::None;
+  IRGenDebugInfoLevel DebugInfoLevel = IRGenDebugInfoLevel::None;
+
+  /// What kind of debug info to generate.
+  IRGenDebugInfoFormat DebugInfoFormat = IRGenDebugInfoFormat::None;
 
   /// Whether or not the driver should generate a module.
   bool ShouldGenerateModule = false;

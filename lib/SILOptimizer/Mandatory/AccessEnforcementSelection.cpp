@@ -81,6 +81,7 @@ struct AddressCapture {
   bool isValid() const { return bool(site); }
 };
 
+LLVM_ATTRIBUTE_UNUSED
 raw_ostream &operator<<(raw_ostream &os, const AddressCapture &capture) {
   os << *capture.site.getInstruction() << " captures Arg #"
      << capture.calleeArgIdx;

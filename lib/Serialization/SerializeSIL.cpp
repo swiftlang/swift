@@ -626,8 +626,12 @@ SILSerializer::writeKeyPathPatternComponent(
       break;
     }
   };
-  auto handleComputedIndices
+  auto handleComputedExternalReferenceAndIndices
     = [&](const KeyPathPatternComponent &component) {
+      ListOfValues.push_back(S.addDeclRef(component.getExternalDecl()));
+      ListOfValues.push_back(
+        S.addSubstitutionMapRef(component.getExternalSubstitutions()));
+  
       auto indices = component.getSubscriptIndices();
       ListOfValues.push_back(indices.size());
       for (auto &index : indices) {
@@ -656,7 +660,7 @@ SILSerializer::writeKeyPathPatternComponent(
     handleComputedId(component.getComputedPropertyId());
     ListOfValues.push_back(
                   addSILFunctionRef(component.getComputedPropertyGetter()));
-    handleComputedIndices(component);
+    handleComputedExternalReferenceAndIndices(component);
     break;
   case KeyPathPatternComponent::Kind::SettableProperty:
     handleComponentCommon(KeyPathComponentKindEncoding::SettableProperty);
@@ -665,7 +669,7 @@ SILSerializer::writeKeyPathPatternComponent(
                   addSILFunctionRef(component.getComputedPropertyGetter()));
     ListOfValues.push_back(
                   addSILFunctionRef(component.getComputedPropertySetter()));
-    handleComputedIndices(component);
+    handleComputedExternalReferenceAndIndices(component);
     break;
   case KeyPathPatternComponent::Kind::OptionalChain:
     handleComponentCommon(KeyPathComponentKindEncoding::OptionalChain);
@@ -675,13 +679,6 @@ SILSerializer::writeKeyPathPatternComponent(
     break;
   case KeyPathPatternComponent::Kind::OptionalWrap:
     handleComponentCommon(KeyPathComponentKindEncoding::OptionalWrap);
-    break;
-  case KeyPathPatternComponent::Kind::External:
-    handleComponentCommon(KeyPathComponentKindEncoding::External);
-    ListOfValues.push_back(S.addDeclRef(component.getExternalDecl()));
-    ListOfValues.push_back(
-      S.addSubstitutionMapRef(component.getExternalSubstitutions()));
-    handleComputedIndices(component);
     break;
   }
 }
@@ -1205,6 +1202,17 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         ListOfValues);
     break;
   }
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case SILInstructionKind::Load##Name##Inst:
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case SILInstructionKind::Name##RetainInst: \
+  case SILInstructionKind::Name##ReleaseInst: \
+  case SILInstructionKind::StrongRetain##Name##Inst: \
+  case SILInstructionKind::Copy##Name##ValueInst:
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...") \
+  ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
+#include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::CondFailInst:
   case SILInstructionKind::RetainValueInst:
   case SILInstructionKind::DestructureStructInst:
@@ -1213,7 +1221,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::UnmanagedRetainValueInst:
   case SILInstructionKind::EndBorrowArgumentInst:
   case SILInstructionKind::CopyValueInst:
-  case SILInstructionKind::CopyUnownedValueInst:
   case SILInstructionKind::DestroyValueInst:
   case SILInstructionKind::ReleaseValueInst:
   case SILInstructionKind::ReleaseValueAddrInst:
@@ -1229,8 +1236,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::LoadInst:
   case SILInstructionKind::LoadBorrowInst:
   case SILInstructionKind::BeginBorrowInst:
-  case SILInstructionKind::LoadUnownedInst:
-  case SILInstructionKind::LoadWeakInst:
   case SILInstructionKind::ClassifyBridgeObjectInst:
   case SILInstructionKind::ValueToBridgeObjectInst:
   case SILInstructionKind::FixLifetimeInst:
@@ -1240,9 +1245,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::StrongReleaseInst:
   case SILInstructionKind::StrongRetainInst:
   case SILInstructionKind::StrongUnpinInst:
-  case SILInstructionKind::StrongRetainUnownedInst:
-  case SILInstructionKind::UnownedRetainInst:
-  case SILInstructionKind::UnownedReleaseInst:
   case SILInstructionKind::IsUniqueInst:
   case SILInstructionKind::IsUniqueOrPinnedInst:
   case SILInstructionKind::AbortApplyInst:
@@ -1254,10 +1256,10 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     unsigned Attr = 0;
     if (auto *LI = dyn_cast<LoadInst>(&SI))
       Attr = unsigned(LI->getOwnershipQualifier());
-    else if (auto *LWI = dyn_cast<LoadWeakInst>(&SI))
-      Attr = LWI->isTake();
-    else if (auto *LUI = dyn_cast<LoadUnownedInst>(&SI))
-      Attr = LUI->isTake();
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+    else if (auto *LI = dyn_cast<Load##Name##Inst>(&SI)) \
+      Attr = LI->isTake();
+#include "swift/AST/ReferenceStorage.def"
     else if (auto *DRI = dyn_cast<DeallocRefInst>(&SI))
       Attr = (unsigned)DRI->canAllocOnStack();
     else if (auto *RCI = dyn_cast<RefCountingInst>(&SI))
@@ -1443,6 +1445,10 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     break;
   }
   // Conversion instructions (and others of similar form).
+#define LOADABLE_REF_STORAGE(Name, ...) \
+  case SILInstructionKind::RefTo##Name##Inst: \
+  case SILInstructionKind::Name##ToRefInst:
+#include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::OpenExistentialRefInst:
   case SILInstructionKind::OpenExistentialMetatypeInst:
   case SILInstructionKind::OpenExistentialBoxInst:
@@ -1458,10 +1464,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::AddressToPointerInst:
   case SILInstructionKind::RefToRawPointerInst:
   case SILInstructionKind::RawPointerToRefInst:
-  case SILInstructionKind::RefToUnownedInst:
-  case SILInstructionKind::UnownedToRefInst:
-  case SILInstructionKind::RefToUnmanagedInst:
-  case SILInstructionKind::UnmanagedToRefInst:
   case SILInstructionKind::ThinToThickFunctionInst:
   case SILInstructionKind::ThickToObjCMetatypeInst:
   case SILInstructionKind::ObjCToThickMetatypeInst:
@@ -1651,26 +1653,25 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     break;
   }
 
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case SILInstructionKind::Store##Name##Inst:
+#include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::AssignInst:
   case SILInstructionKind::CopyAddrInst:
   case SILInstructionKind::StoreInst:
-  case SILInstructionKind::StoreBorrowInst:
-  case SILInstructionKind::StoreUnownedInst:
-  case SILInstructionKind::StoreWeakInst: {
+  case SILInstructionKind::StoreBorrowInst: {
     SILValue operand, value;
     unsigned Attr = 0;
-    if (SI.getKind() == SILInstructionKind::StoreWeakInst) {
-      Attr = cast<StoreWeakInst>(&SI)->isInitializationOfDest();
-      operand = cast<StoreWeakInst>(&SI)->getDest();
-      value = cast<StoreWeakInst>(&SI)->getSrc();
-    } else if (SI.getKind() == SILInstructionKind::StoreUnownedInst) {
-      Attr = cast<StoreUnownedInst>(&SI)->isInitializationOfDest();
-      operand = cast<StoreUnownedInst>(&SI)->getDest();
-      value = cast<StoreUnownedInst>(&SI)->getSrc();
-    } else if (SI.getKind() == SILInstructionKind::StoreInst) {
+    if (SI.getKind() == SILInstructionKind::StoreInst) {
       Attr = unsigned(cast<StoreInst>(&SI)->getOwnershipQualifier());
       operand = cast<StoreInst>(&SI)->getDest();
       value = cast<StoreInst>(&SI)->getSrc();
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+    } else if (SI.getKind() == SILInstructionKind::Store##Name##Inst) { \
+      Attr = cast<Store##Name##Inst>(&SI)->isInitializationOfDest(); \
+      operand = cast<Store##Name##Inst>(&SI)->getDest(); \
+      value = cast<Store##Name##Inst>(&SI)->getSrc();
+#include "swift/AST/ReferenceStorage.def"
     } else if (SI.getKind() == SILInstructionKind::AssignInst) {
       operand = cast<AssignInst>(&SI)->getDest();
       value = cast<AssignInst>(&SI)->getSrc();
@@ -2231,8 +2232,11 @@ void SILSerializer::writeSILProperty(const SILProperty &prop) {
   SmallVector<ValueID, 4> componentValues;
   SmallVector<ProtocolConformanceRef, 4> serializeAfter;
   
-  writeKeyPathPatternComponent(prop.getComponent(),
-                               componentValues, serializeAfter);
+  if (auto component = prop.getComponent()) {
+    writeKeyPathPatternComponent(*component, componentValues, serializeAfter);
+  } else {
+    componentValues.push_back((unsigned)KeyPathComponentKindEncoding::Trivial);
+  }
   
   PropertyLayout::emitRecord(
     Out, ScratchRecord,
@@ -2439,6 +2443,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   // FIXME: Resilience: could write out vtable for fragile classes.
   const DeclContext *assocDC = SILMod->getAssociatedContext();
   assert(assocDC && "cannot serialize SIL without an associated DeclContext");
+  (void)assocDC;
   for (const SILVTable &vt : SILMod->getVTables()) {
     if ((ShouldSerializeAll || vt.isSerialized()) &&
         SILMod->shouldSerializeEntitiesAssociatedWithDeclContext(vt.getClass()))

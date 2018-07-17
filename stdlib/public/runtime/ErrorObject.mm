@@ -385,7 +385,6 @@ NSDictionary *_swift_stdlib_getErrorDefaultUserInfo(OpaqueValue *error,
   //   -> AnyObject?
   auto foundationGetDefaultUserInfo = getErrorBridgingInfo().GetErrorDefaultUserInfo;
   if (!foundationGetDefaultUserInfo) {
-    SWIFT_CC_PLUSONE_GUARD(T->vw_destroy(error));
     return nullptr;
   }
 
@@ -462,47 +461,27 @@ swift::_swift_stdlib_bridgeErrorToNSError(SwiftError *errorObject) {
 extern "C" const ProtocolDescriptor PROTOCOL_DESCR_SYM(s5Error);
 
 bool
-swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
-                                    OpaqueValue *src,
-                                    const Metadata *srcType,
-                                    const Metadata *destType,
-                                    DynamicCastFlags flags) {
+swift::tryDynamicCastNSErrorObjectToValue(HeapObject *object,
+                                          OpaqueValue *dest,
+                                          const Metadata *destType,
+                                          DynamicCastFlags flags) {
   Class NSErrorClass = getNSErrorClass();
-  auto CFErrorTypeID = SWIFT_LAZY_CONSTANT(CFErrorGetTypeID());
 
-  NSError *srcInstance;
-
-  // Is the input type an NSError?
-  switch (srcType->getKind()) {
-  case MetadataKind::Class:
-  case MetadataKind::ObjCClassWrapper:
-    // Native class or ObjC class should be an NSError subclass.
-    if (![srcType->getObjCClassObject() isSubclassOfClass: NSErrorClass])
-      return false;
-    
-    srcInstance = *reinterpret_cast<NSError * const*>(src);
-    
-    // A _SwiftNativeNSError box can always be unwrapped to cast the value back
-    // out as an Error existential.
-    if (!reinterpret_cast<SwiftError*>(srcInstance)->isPureNSError()) {
-      auto theErrorProtocol = &PROTOCOL_DESCR_SYM(s5Error);
-      auto theErrorTy =
-        swift_getExistentialTypeMetadata(ProtocolClassConstraint::Any,
-                                         nullptr, 1, &theErrorProtocol);
-      return swift_dynamicCast(dest, src, theErrorTy, destType, flags);
-    }
-    
-    break;
-  case MetadataKind::ForeignClass: {
-    // Foreign class should be CFError.
-    CFTypeRef srcInstance = *reinterpret_cast<CFTypeRef *>(src);
-    if (CFGetTypeID(srcInstance) != CFErrorTypeID)
-      return false;
-    break;
-  }
-  // Not a class.
-  default:
+  // The object must be an NSError subclass.
+  if (![reinterpret_cast<id>(object) isKindOfClass: NSErrorClass])
     return false;
+
+  NSError *srcInstance = reinterpret_cast<NSError *>(object);
+
+  // A _SwiftNativeNSError box can always be unwrapped to cast the value back
+  // out as an Error existential.
+  if (!reinterpret_cast<SwiftError*>(srcInstance)->isPureNSError()) {
+    auto theErrorProtocol = &PROTOCOL_DESCR_SYM(s5Error);
+    auto theErrorTy =
+      swift_getExistentialTypeMetadata(ProtocolClassConstraint::Any,
+                                       nullptr, 1, &theErrorProtocol);
+    return swift_dynamicCast(dest, reinterpret_cast<OpaqueValue *>(&object),
+                             theErrorTy, destType, flags);
   }
 
   // public func Foundation._bridgeNSErrorToError<
@@ -521,17 +500,45 @@ swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
   auto witness = swift_conformsToProtocol(destType,
                                           TheObjectiveCBridgeableError);
 
-  if (!witness)
-    return false;
+  if (witness) {
+    // If so, attempt the bridge.
+    if (bridgeNSErrorToError(srcInstance, dest, destType, witness)) {
+      if (flags & DynamicCastFlags::TakeOnSuccess)
+        objc_release(srcInstance);
+      return true;
+    }
+  }
 
-  // If so, attempt the bridge.
-  SWIFT_CC_PLUSONE_GUARD(objc_retain(srcInstance));
-  if (bridgeNSErrorToError(srcInstance, dest, destType, witness)) {
-    if (flags & DynamicCastFlags::TakeOnSuccess)
-      objc_release(srcInstance);
+  // If the destination is just an Error then we can bridge directly.
+  auto *destTypeExistential = dyn_cast<ExistentialTypeMetadata>(destType);
+  if (destTypeExistential &&
+      destTypeExistential->getRepresentation() == ExistentialTypeRepresentation::Error) {
+    auto destBoxAddr = reinterpret_cast<NSError**>(dest);
+    *destBoxAddr = objc_retain(srcInstance);
     return true;
   }
+
   return false;
+}
+
+bool
+swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
+                                    OpaqueValue *src,
+                                    const Metadata *srcType,
+                                    const Metadata *destType,
+                                    DynamicCastFlags flags) {
+  // NSError instances must be class instances, anything else automatically fails.
+  switch (srcType->getKind()) {
+  case MetadataKind::Class:
+  case MetadataKind::ObjCClassWrapper:
+  case MetadataKind::ForeignClass:
+    return tryDynamicCastNSErrorObjectToValue(*reinterpret_cast<HeapObject **>(src),
+                                              dest, destType, flags);
+
+  // Not a class.
+  default:
+    return false;
+  }
 }
 
 SwiftError *

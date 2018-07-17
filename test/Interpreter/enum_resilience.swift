@@ -436,4 +436,28 @@ ResilientEnumTestSuite.test("ResilientEnumExtension") {
   expectEqual(Base.self, ResilientMultiPayloadGenericEnumFixedSize<Base>.A.getTypeParameter())
 }
 
+public class Container {
+  private enum Multi {
+    case none
+    case some(Container)
+    case other(ResilientRef)
+  }
+  private var m: Multi
+  var i: Int
+  init() {
+    m = .none
+    i = 0
+    switch self.m {
+      case .none:
+        print("success")
+      case .some(_), .other(_):
+        assert(false, "noooo!")
+    }
+  }
+}
+
+ResilientEnumTestSuite.test("ResilientPrivateEnumMember") {
+  _ = Container()
+}
+
 runAllTests()

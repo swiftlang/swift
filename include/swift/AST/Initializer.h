@@ -99,6 +99,11 @@ public:
 
   unsigned getBindingIndex() const { return SpareBits; }
 
+  /// If this initializes a single @lazy variable, return it.
+  VarDecl *getInitializedLazyVar() const;
+
+  /// If this initializes a single @lazy variable, lazily create a self
+  /// declaration for it to refer to.
   ParamDecl *getImplicitSelfDecl();
 
   static bool classof(const DeclContext *DC) {

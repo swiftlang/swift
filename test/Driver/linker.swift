@@ -90,7 +90,7 @@
 
 // SIMPLE: bin/ld{{"? }}
 // SIMPLE-NOT: -syslibroot
-// SIMPLE-DAG: -macosx_version_min 10.{{[0-9]+}}.{{[0-9]+}}
+// SIMPLE: -macosx_version_min 10.{{[0-9]+}}.{{[0-9]+}}
 // SIMPLE-NOT: -syslibroot
 // SIMPLE: -o linker
 
@@ -315,11 +315,11 @@
 
 
 // FILELIST: bin/ld{{"? }}
-// FILELIST-NOT: .o
+// FILELIST-NOT: .o{{"? }}
 // FILELIST: -filelist {{"?[^-]}}
-// FILELIST-NOT: .o
-// FILELIST: /a.o
-// FILELIST-NOT: .o
+// FILELIST-NOT: .o{{"? }}
+// FILELIST: /a.o{{"? }}
+// FILELIST-NOT: .o{{"? }}
 // FILELIST: -o linker
 
 

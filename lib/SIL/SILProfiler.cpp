@@ -86,6 +86,7 @@ bool doesASTRequireProfiling(SILModule &M, ASTNode N) {
 } // namespace swift
 
 /// Check that the input AST has at least been type-checked.
+LLVM_ATTRIBUTE_UNUSED
 static bool hasASTBeenTypeChecked(ASTNode N) {
   DeclContext *DC = N.getAsDeclContext();
   assert(DC && "Invalid AST node for profiling");
@@ -140,8 +141,8 @@ static void walkPatternForProfiling(PatternBindingDecl *PBD,
                                     ASTWalker &Walker) {
   if (PBD && !PBD->isStatic())
     for (auto E : PBD->getPatternList())
-      if (E.getInit())
-        E.getInit()->walk(Walker);
+      if (auto init = E.getNonLazyInit())
+        init->walk(Walker);
 }
 
 /// Special logic for handling closure visitation.

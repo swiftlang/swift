@@ -86,7 +86,7 @@ enum class KeyPathComponentKindEncoding : uint8_t {
   OptionalChain,
   OptionalForce,
   OptionalWrap,
-  External,
+  Trivial,
 };
 enum class KeyPathComputedComponentIdKindEncoding : uint8_t {
   Property,
@@ -287,7 +287,7 @@ namespace sil_block {
       BCRecordLayout<SIL_FUNCTION, SILLinkageField,
                      BCFixed<1>,  // transparent
                      BCFixed<2>,  // serialized
-                     BCFixed<2>,  // thunk/reabstraction_thunk
+                     BCFixed<2>,  // thunks: signature optimized/reabstraction
                      BCFixed<1>,  // global_init
                      BCFixed<2>,  // inlineStrategy
                      BCFixed<2>,  // optimizationMode

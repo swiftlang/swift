@@ -58,6 +58,8 @@ PASS(AccessEnforcementOpts, "access-enforcement-opts",
      "Access Enforcement Optimization")
 PASS(AccessEnforcementSelection, "access-enforcement-selection",
      "Access Enforcement Selection")
+PASS(AccessEnforcementWMO, "access-enforcement-wmo",
+     "Access Enforcement Whole Module Optimization")
 PASS(AccessSummaryDumper, "access-summary-dump",
      "Dump Address Parameter Access Summary")
 PASS(AccessedStorageDumper, "accessed-storage-dump",

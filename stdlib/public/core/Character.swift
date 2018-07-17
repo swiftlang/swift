@@ -84,6 +84,7 @@ public struct Character {
     return UInt64(Builtin.zext_Int63_Int64(value))
   }
 
+  @usableFromInline // FIXME(sil-serialize-all)
   typealias UTF16View = String.UTF16View
   @inlinable // FIXME(sil-serialize-all)
   internal var utf16: UTF16View {
@@ -366,7 +367,6 @@ extension Character : LosslessStringConvertible { }
 
 extension Character : CustomDebugStringConvertible {
   /// A textual representation of the character, suitable for debugging.
-  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return String(self).debugDescription
   }

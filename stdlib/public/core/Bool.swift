@@ -69,7 +69,6 @@ public struct Bool {
   ///
   /// Do not call this initializer directly. Instead, use the Boolean literal
   /// `false` to create a new `Bool` instance.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @compilerEvaluable
   public init() {
@@ -140,7 +139,6 @@ public struct Bool {
 }
 
 extension Bool : _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLiteral {
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @compilerEvaluable
   public init(_builtinBooleanLiteral value: Builtin.Int1) {
@@ -165,7 +163,6 @@ extension Bool : _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLitera
   /// this Boolean literal initializer behind the scenes.
   ///
   /// - Parameter value: The value of the new instance.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @compilerEvaluable
   public init(booleanLiteral value: Bool) {
@@ -175,7 +172,6 @@ extension Bool : _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLitera
 
 extension Bool {
   // This is a magic entry point known to the compiler.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @compilerEvaluable
   public // COMPILER_INTRINSIC
@@ -193,13 +189,11 @@ extension Bool : CustomStringConvertible {
 }
 
 // This is a magic entry point known to the compiler.
-@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public // COMPILER_INTRINSIC
 func _getBool(_ v: Builtin.Int1) -> Bool { return Bool(v) }
 
 extension Bool: Equatable {
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @compilerEvaluable
   public static func == (lhs: Bool, rhs: Bool) -> Bool {
@@ -258,7 +252,6 @@ extension Bool {
   ///     // Prints "You look nice today!"
   ///
   /// - Parameter a: The Boolean value to negate.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @compilerEvaluable
   public static prefix func ! (a: Bool) -> Bool {

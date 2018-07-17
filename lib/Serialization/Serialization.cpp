@@ -481,32 +481,63 @@ static const Decl *getDeclForContext(const DeclContext *DC) {
 
 namespace {
   struct Accessors {
-    StorageKind Kind;
+    uint8_t ReadImpl, WriteImpl, ReadWriteImpl;
     SmallVector<AccessorDecl *, 8> Decls;
   };
 } // end anonymous namespace
 
-static StorageKind getRawStorageKind(AbstractStorageDecl::StorageKindTy kind) {
+static uint8_t getRawReadImplKind(swift::ReadImplKind kind) {
   switch (kind) {
-#define CASE(KIND) case AbstractStorageDecl::KIND: return StorageKind::KIND
-  CASE(Stored);
-  CASE(StoredWithTrivialAccessors);
-  CASE(StoredWithObservers);
-  CASE(InheritedWithObservers);
-  CASE(Computed);
-  CASE(ComputedWithMutableAddress);
-  CASE(Addressed);
-  CASE(AddressedWithTrivialAccessors);
-  CASE(AddressedWithObservers);
+#define CASE(KIND)                                     \
+  case swift::ReadImplKind::KIND:                      \
+    return uint8_t(serialization::ReadImplKind::KIND);
+  CASE(Stored)
+  CASE(Get)
+  CASE(Inherited)
+  CASE(Address)
 #undef CASE
   }
-  llvm_unreachable("bad storage kind");
+  llvm_unreachable("bad kind");
+}
+
+static unsigned getRawWriteImplKind(swift::WriteImplKind kind) {
+  switch (kind) {
+#define CASE(KIND)                                      \
+  case swift::WriteImplKind::KIND:                      \
+    return uint8_t(serialization::WriteImplKind::KIND);
+  CASE(Immutable)
+  CASE(Stored)
+  CASE(Set)
+  CASE(StoredWithObservers)
+  CASE(InheritedWithObservers)
+  CASE(MutableAddress)
+#undef CASE
+  }
+  llvm_unreachable("bad kind");
+}
+
+static unsigned getRawReadWriteImplKind(swift::ReadWriteImplKind kind) {
+  switch (kind) {
+#define CASE(KIND)                                          \
+  case swift::ReadWriteImplKind::KIND:                      \
+    return uint8_t(serialization::ReadWriteImplKind::KIND);
+  CASE(Immutable)
+  CASE(Stored)
+  CASE(MaterializeForSet)
+  CASE(MutableAddress)
+  CASE(MaterializeToTemporary)
+#undef CASE
+  }
+  llvm_unreachable("bad kind");
 }
 
 static Accessors getAccessors(const AbstractStorageDecl *storage) {
   Accessors accessors;
-  accessors.Kind = getRawStorageKind(storage->getStorageKind());
-  auto decls = storage->getAllAccessorFunctions();
+  auto impl = storage->getImplInfo();
+  accessors.ReadImpl = getRawReadImplKind(impl.getReadImpl());
+  accessors.WriteImpl = getRawWriteImplKind(impl.getWriteImpl());
+  accessors.ReadWriteImpl = getRawReadWriteImplKind(impl.getReadWriteImpl());
+  auto decls = storage->getAllAccessors();
   accessors.Decls.append(decls.begin(), decls.end());
   return accessors;
 }
@@ -587,17 +618,13 @@ DeclContextID Serializer::addDeclContextRef(const DeclContext *DC) {
   return id;
 }
 
-DeclID Serializer::addDeclRef(const Decl *D, bool forceSerialization,
-                              bool allowTypeAliasXRef) {
+DeclID Serializer::addDeclRef(const Decl *D, bool allowTypeAliasXRef) {
   if (!D)
     return 0;
 
-  DeclIDAndForce &id = DeclAndTypeIDs[D];
-  if (id.first != 0) {
-    if (forceSerialization && !id.second)
-      id.second = true;
-    return id.first;
-  }
+  DeclID &id = DeclAndTypeIDs[D];
+  if (id != 0)
+    return id;
 
   assert((!isDeclXRef(D) || isa<ValueDecl>(D) || isa<OperatorDecl>(D) ||
           isa<PrecedenceGroupDecl>(D)) &&
@@ -611,9 +638,9 @@ DeclID Serializer::addDeclRef(const Decl *D, bool forceSerialization,
           D->getModuleContext() == M) &&
          "cannot cross-reference typealiases directly (use the NameAliasType)");
 
-  id = { ++LastDeclID, forceSerialization };
+  id = ++LastDeclID;
   DeclsAndTypesToWrite.push(D);
-  return id.first;
+  return id;
 }
 
 serialization::TypeID Serializer::addTypeRef(Type ty) {
@@ -626,12 +653,12 @@ serialization::TypeID Serializer::addTypeRef(Type ty) {
 #endif
 
   auto &id = DeclAndTypeIDs[ty];
-  if (id.first != 0)
-    return id.first;
+  if (id != 0)
+    return id;
 
-  id = { ++LastTypeID, true };
+  id = ++LastTypeID;
   DeclsAndTypesToWrite.push(ty);
-  return id.first;
+  return id;
 }
 
 IdentifierID Serializer::addDeclBaseNameRef(DeclBaseName ident) {
@@ -1546,8 +1573,7 @@ void Serializer::writeNormalConformance(
                                       Type type, TypeDecl *typeDecl) {
     data.push_back(addDeclRef(assocType));
     data.push_back(addTypeRef(type));
-    data.push_back(addDeclRef(typeDecl, /*forceSerialization*/false,
-                              /*allowTypeAliasXRef*/true));
+    data.push_back(addDeclRef(typeDecl, /*allowTypeAliasXRef*/true));
     ++numTypeWitnesses;
     return false;
   });
@@ -1875,7 +1901,8 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
     XRefTypePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                         addDeclBaseNameRef(generic->getName()),
                                         addDeclBaseNameRef(discriminator),
-                                        false);
+                                        /*inProtocolExtension*/false,
+                                        generic->hasClangNode());
     break;
   }
 
@@ -1906,7 +1933,8 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
     bool isProtocolExt = SD->getDeclContext()->getAsProtocolExtensionContext();
     XRefValuePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                          addTypeRef(ty), SUBSCRIPT_ID,
-                                         isProtocolExt, SD->isStatic());
+                                         isProtocolExt, SD->hasClangNode(),
+                                         SD->isStatic());
     break;
   }
       
@@ -1922,6 +1950,7 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
       XRefValuePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                            addTypeRef(ty), nameID,
                                            isProtocolExt,
+                                           storage->hasClangNode(),
                                            storage->isStatic());
 
       abbrCode =
@@ -1946,6 +1975,7 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
       XRefInitializerPathPieceLayout::emitRecord(
         Out, ScratchRecord, abbrCode, addTypeRef(ty),
         (bool)ctor->getDeclContext()->getAsProtocolExtensionContext(),
+        ctor->hasClangNode(),
         getStableCtorInitializerKind(ctor->getInitKind()));
       break;
     }
@@ -1955,7 +1985,7 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
     XRefValuePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                          addTypeRef(ty),
                                          addDeclBaseNameRef(fn->getBaseName()),
-                                         isProtocolExt,
+                                         isProtocolExt, fn->hasClangNode(),
                                          fn->isStatic());
 
     if (fn->isOperator()) {
@@ -2035,7 +2065,7 @@ void Serializer::writeCrossReference(const Decl *D) {
     XRefTypePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                         addDeclBaseNameRef(type->getName()),
                                         addDeclBaseNameRef(discriminator),
-                                        isProtocolExt);
+                                        isProtocolExt, D->hasClangNode());
     return;
   }
 
@@ -2044,10 +2074,8 @@ void Serializer::writeCrossReference(const Decl *D) {
   abbrCode = DeclTypeAbbrCodes[XRefValuePathPieceLayout::Code];
   IdentifierID iid = addDeclBaseNameRef(val->getBaseName());
   XRefValuePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                       addTypeRef(ty),
-                                       iid,
-                                       isProtocolExt,
-                                       val->isStatic());
+                                       addTypeRef(ty), iid, isProtocolExt,
+                                       D->hasClangNode(), val->isStatic());
 }
 
 /// Translate from the AST associativity enum to the Serialization enum
@@ -2137,18 +2165,6 @@ DEF_VERIFY_ATTR(Destructor)
 #else
 static void verifyAttrSerializable(const Decl *D) {}
 #endif
-
-static bool isForced(const Decl *D,
-                     const llvm::DenseMap<Serializer::DeclTypeUnion,
-                                          Serializer::DeclIDAndForce> &table) {
-  if (table.lookup(D).second)
-    return true;
-  for (const DeclContext *DC = D->getDeclContext(); !DC->isModuleScopeContext();
-       DC = DC->getParent())
-    if (table.lookup(getDeclForContext(DC)).second)
-      return true;
-  return false;
-}
 
 static inline unsigned getOptionalOrZero(const llvm::Optional<unsigned> &X) {
   if (X.hasValue())
@@ -2383,7 +2399,7 @@ bool Serializer::isDeclXRef(const Decl *D) const {
     assert(isa<GenericTypeParamDecl>(D) && "unexpected decl kind");
     return false;
   }
-  return !isForced(D, DeclAndTypeIDs);
+  return true;
 }
 
 void Serializer::writeDeclContext(const DeclContext *DC) {
@@ -2643,7 +2659,7 @@ void Serializer::writeDecl(const Decl *D) {
 
   PrettyStackTraceDecl trace("serializing", D);
 
-  auto id = DeclAndTypeIDs[D].first;
+  auto id = DeclAndTypeIDs[D];
   assert(id != 0 && "decl or type not referenced properly");
   (void)id;
 
@@ -2733,10 +2749,12 @@ void Serializer::writeDecl(const Decl *D) {
       inheritedAndDependencyTypes.push_back(addTypeRef(inherited.getType()));
     size_t numInherited = inheritedAndDependencyTypes.size();
 
-    // FIXME: Figure out what to do with requirements and such, which the
-    // extension also depends on. Right now just do what is safe to drop, which
-    // is the base declaration.
-    auto dependencies = collectDependenciesFromType(baseTy);
+    llvm::SmallSetVector<Type, 4> dependencies;
+    collectDependenciesFromType(dependencies, baseTy, /*excluding*/nullptr);
+    for (Requirement req : extension->getGenericRequirements()) {
+      collectDependenciesFromRequirement(dependencies, req,
+                                         /*excluding*/nullptr);
+    }
     for (auto dependencyTy : dependencies)
       inheritedAndDependencyTypes.push_back(addTypeRef(dependencyTy));
 
@@ -2985,6 +3003,7 @@ void Serializer::writeDecl(const Decl *D) {
                              addDeclBaseNameRef(theStruct->getName()),
                              contextID,
                              theStruct->isImplicit(),
+                             theStruct->isObjC(),
                              addGenericEnvironmentRef(
                                             theStruct->getGenericEnvironment()),
                              rawAccessLevel,
@@ -3035,6 +3054,7 @@ void Serializer::writeDecl(const Decl *D) {
                             addDeclBaseNameRef(theEnum->getName()),
                             contextID,
                             theEnum->isImplicit(),
+                            theEnum->isObjC(),
                             addGenericEnvironmentRef(
                                              theEnum->getGenericEnvironment()),
                             addTypeRef(theEnum->getRawType()),
@@ -3117,6 +3137,7 @@ void Serializer::writeDecl(const Decl *D) {
                                  /*resolver=*/nullptr),
                                addGenericEnvironmentRef(
                                                 proto->getGenericEnvironment()),
+                               addTypeRef(proto->getSuperclass()),
                                rawAccessLevel,
                                inherited);
 
@@ -3159,7 +3180,9 @@ void Serializer::writeDecl(const Decl *D) {
                           var->hasNonPatternBindingInit(),
                           var->isGetterMutating(),
                           var->isSetterMutating(),
-                          (unsigned) accessors.Kind,
+                          accessors.ReadImpl,
+                          accessors.WriteImpl,
+                          accessors.ReadWriteImpl,
                           accessors.Decls.size(),
                           addTypeRef(ty),
                           addDeclRef(var->getOverriddenDecl()),
@@ -3384,7 +3407,9 @@ void Serializer::writeDecl(const Decl *D) {
                                 subscript->isObjC(),
                                 subscript->isGetterMutating(),
                                 subscript->isSetterMutating(),
-                                (unsigned) accessors.Kind,
+                                accessors.ReadImpl,
+                                accessors.WriteImpl,
+                                accessors.ReadWriteImpl,
                                 accessors.Decls.size(),
                                 addGenericEnvironmentRef(
                                             subscript->getGenericEnvironment()),
@@ -3537,9 +3562,9 @@ static uint8_t
 getRawStableReferenceOwnership(swift::ReferenceOwnership ownership) {
   switch (ownership) {
   SIMPLE_CASE(ReferenceOwnership, Strong)
-  SIMPLE_CASE(ReferenceOwnership, Weak)
-  SIMPLE_CASE(ReferenceOwnership, Unowned)
-  SIMPLE_CASE(ReferenceOwnership, Unmanaged)
+#define REF_STORAGE(Name, ...) \
+  SIMPLE_CASE(ReferenceOwnership, Name)
+#include "swift/AST/ReferenceStorage.def"
   }
   llvm_unreachable("bad ownership kind");
 }
@@ -3607,7 +3632,7 @@ static TypeAliasDecl *findTypeAliasForBuiltin(ASTContext &Ctx, Type T) {
 void Serializer::writeType(Type ty) {
   using namespace decls_block;
 
-  auto id = DeclAndTypeIDs[ty].first;
+  auto id = DeclAndTypeIDs[ty];
   assert(id != 0 && "type not referenced properly");
   (void)id;
 
@@ -3635,7 +3660,6 @@ void Serializer::writeType(Type ty) {
     unsigned abbrCode = DeclTypeAbbrCodes[BuiltinAliasTypeLayout::Code];
     BuiltinAliasTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                        addDeclRef(typeAlias,
-                                                  /*forceSerialization*/false,
                                                   /*allowTypeAliasXRef*/true),
                                        TypeID());
     break;
@@ -3647,9 +3671,7 @@ void Serializer::writeType(Type ty) {
     unsigned abbrCode = DeclTypeAbbrCodes[NameAliasTypeLayout::Code];
     NameAliasTypeLayout::emitRecord(
                            Out, ScratchRecord, abbrCode,
-                           addDeclRef(typeAlias,
-                                      /*forceSerialization*/false,
-                                      /*allowTypeAliasXRef*/true),
+                           addDeclRef(typeAlias, /*allowTypeAliasXRef*/true),
                            addTypeRef(alias->getParent()),
                            addTypeRef(alias->getSinglyDesugaredType()),
                            addSubstitutionMapRef(alias->getSubstitutionMap()));
@@ -3948,9 +3970,10 @@ void Serializer::writeType(Type ty) {
     break;
   }
 
-  case TypeKind::UnownedStorage:
-  case TypeKind::UnmanagedStorage:
-  case TypeKind::WeakStorage: {
+#define REF_STORAGE(Name, ...) \
+  case TypeKind::Name##Storage:
+#include "swift/AST/ReferenceStorage.def"
+  {
     auto refTy = cast<ReferenceStorageType>(ty.getPointer());
 
     unsigned abbrCode = DeclTypeAbbrCodes[ReferenceStorageTypeLayout::Code];
@@ -3968,7 +3991,6 @@ void Serializer::writeType(Type ty) {
     unsigned abbrCode = DeclTypeAbbrCodes[UnboundGenericTypeLayout::Code];
     UnboundGenericTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                          addDeclRef(generic->getDecl(),
-                                                    /*forceSerialization*/false,
                                                     /*allowTypeAliasXRef*/true),
                                          addTypeRef(generic->getParent()));
     break;

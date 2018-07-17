@@ -2399,28 +2399,26 @@ namespace {
           }
         }
 
-        auto ROK = ReferenceOwnership::Strong; // The default.
+        auto ROK = ReferenceOwnership::Strong;
         if (auto *OA = var->getAttrs().getAttribute<ReferenceOwnershipAttr>())
           ROK = OA->get();
 
-        switch (ROK) {
-        case ReferenceOwnership::Strong:
-        case ReferenceOwnership::Unowned:
-        case ReferenceOwnership::Unmanaged:
-          if (ty)
-            return ty;
-          return CS.createTypeVariable(CS.getConstraintLocator(locator));
-        case ReferenceOwnership::Weak:
-          // For weak variables, use Optional<T>.
+        switch (optionalityOf(ROK)) {
+        case ReferenceOwnershipOptionality::Required:
           if (ty && ty->getOptionalObjectType())
             return ty; // Already Optional<T>.
           // Create a fresh type variable to handle overloaded expressions.
           if (!ty || ty->is<TypeVariableType>())
             ty = CS.createTypeVariable(CS.getConstraintLocator(locator));
           return CS.getTypeChecker().getOptionalType(var->getLoc(), ty);
+        case ReferenceOwnershipOptionality::Allowed:
+        case ReferenceOwnershipOptionality::AllowedIfImporting:
+        case ReferenceOwnershipOptionality::Disallowed:
+          break;
         }
-
-        llvm_unreachable("Unhandled ReferenceOwnership kind");
+        if (ty)
+          return ty;
+        return CS.createTypeVariable(CS.getConstraintLocator(locator));
       }
 
       case PatternKind::Typed: {
@@ -3153,8 +3151,8 @@ namespace {
       auto locator = CS.getConstraintLocator(expr);
       auto projectedTy = CS.createTypeVariable(locator,
                                                TVO_CanBindToLValue);
-      CS.addKeyPathApplicationConstraint(expr->getKeyPath()->getType(),
-                                         expr->getBase()->getType(),
+      CS.addKeyPathApplicationConstraint(CS.getType(expr->getKeyPath()),
+                                         CS.getType(expr->getBase()),
                                          projectedTy,
                                          locator);
       return projectedTy;
@@ -3162,6 +3160,10 @@ namespace {
     
     Type visitEnumIsCaseExpr(EnumIsCaseExpr *expr) {
       return CS.getASTContext().getBoolDecl()->getDeclaredType();
+    }
+
+    Type visitLazyInitializerExpr(LazyInitializerExpr *expr) {
+      return expr->getType();
     }
 
     Type visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {

@@ -2497,7 +2497,7 @@ static SILValue getSingleValueResult(GraphOperationInst *inst) {
 /// instruction (represented as a builtin), promote it to a tensor op in the
 /// graph function.
 void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
-  auto loc = remapLocation(inst->getLoc());
+  auto loc = remapLocation(getUserSourceLocation(inst->getDebugLocation()));
 
   // Determine which kind of scalar operation this is, since different forms get
   // different sorts of processing applied to them.
