@@ -2853,7 +2853,9 @@ static void dumpProtocolConformanceRefRec(
     const ProtocolConformanceRef conformance, llvm::raw_ostream &out,
     unsigned indent,
     llvm::SmallPtrSetImpl<const ProtocolConformance *> &visited) {
-  if (conformance.isConcrete()) {
+  if (conformance.isInvalid()) {
+    out.indent(indent) << "(invalid_conformance)";
+  } else if (conformance.isConcrete()) {
     dumpProtocolConformanceRec(conformance.getConcrete(), out, indent, visited);
   } else {
     out.indent(indent) << "(abstract_conformance protocol="

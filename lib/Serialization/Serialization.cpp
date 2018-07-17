@@ -863,6 +863,8 @@ void Serializer::writeBlockInfoBlock() {
   // These layouts can exist in both decl blocks and sil blocks.
 #define BLOCK_RECORD_WITH_NAMESPACE(K, X) emitRecordID(Out, X, #X, nameBuffer)
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
+                              decls_block::INVALID_PROTOCOL_CONFORMANCE);
+  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::ABSTRACT_PROTOCOL_CONFORMANCE);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::NORMAL_PROTOCOL_CONFORMANCE);
@@ -1639,6 +1641,12 @@ Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
                              const std::array<unsigned, 256> &abbrCodes,
                              GenericEnvironment *genericEnv) {
   using namespace decls_block;
+
+  if (conformanceRef.isInvalid()) {
+    unsigned abbrCode = abbrCodes[InvalidProtocolConformanceLayout::Code];
+    InvalidProtocolConformanceLayout::emitRecord(Out, ScratchRecord, abbrCode);
+    return;
+  }
 
   if (conformanceRef.isAbstract()) {
     unsigned abbrCode = abbrCodes[AbstractProtocolConformanceLayout::Code];
@@ -4073,6 +4081,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<NormalProtocolConformanceLayout>();
   registerDeclTypeAbbr<SpecializedProtocolConformanceLayout>();
   registerDeclTypeAbbr<InheritedProtocolConformanceLayout>();
+  registerDeclTypeAbbr<InvalidProtocolConformanceLayout>();
   registerDeclTypeAbbr<NormalProtocolConformanceIdLayout>();
   registerDeclTypeAbbr<ProtocolConformanceXrefLayout>();
 

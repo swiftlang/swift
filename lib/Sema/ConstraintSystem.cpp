@@ -1998,9 +1998,14 @@ Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
       Type lookupBaseType = newBase->getWithoutSpecifierType();
 
       if (lookupBaseType->mayHaveMembers()) {
-        auto subs = lookupBaseType->getContextSubstitutionMap(
-          cs.DC->getParentModule(),
-            assocType->getDeclContext());
+        auto *proto = assocType->getProtocol();
+        auto conformance = cs.DC->getParentModule()->lookupConformance(
+          lookupBaseType, proto);
+        if (!conformance)
+          return DependentMemberType::get(lookupBaseType, assocType);
+
+        auto subs = SubstitutionMap::getProtocolSubstitutions(
+          proto, lookupBaseType, *conformance);
         auto result = assocType->getDeclaredInterfaceType().subst(subs);
 
         if (result && !result->hasError())
