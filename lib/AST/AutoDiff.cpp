@@ -11,17 +11,21 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/AutoDiff.h"
+#include "swift/Basic/LLVM.h"
 
 using namespace swift;
 
 SILReverseAutoDiffIndices::SILReverseAutoDiffIndices(
-    unsigned source, ArrayRef<unsigned> parameters)
-    : SILReverseAutoDiffIndices(source,
-                                llvm::SmallBitVector(parameters.size())) {
+    unsigned source, ArrayRef<unsigned> parameters) : source(source) {
   int last = -1;
+  unsigned maxIdx = 0;
   for (auto paramIdx : parameters) {
     assert((int)paramIdx > last && "Parameter indices must be ascending");
     last = paramIdx;
+    if (paramIdx > maxIdx) {
+      maxIdx = paramIdx;
+      this->parameters.resize(maxIdx);
+    }
     this->parameters.set(paramIdx);
   }
 }
