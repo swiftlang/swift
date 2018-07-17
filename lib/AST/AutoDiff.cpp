@@ -24,7 +24,7 @@ SILReverseAutoDiffIndices::SILReverseAutoDiffIndices(
     last = paramIdx;
     if (paramIdx > maxIdx) {
       maxIdx = paramIdx;
-      this->parameters.resize(maxIdx);
+      this->parameters.resize(maxIdx + 1);
     }
     this->parameters.set(paramIdx);
   }

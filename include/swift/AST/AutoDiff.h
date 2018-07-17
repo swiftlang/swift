@@ -80,16 +80,22 @@ public:
 
 /// SIL-level automatic differentiation indices. Consists of a source index,
 /// i.e. index of the dependent result to differentiate from, and parameter
-/// indices, i.e. index of an independent parameter to differentiate with
+/// indices, i.e. index of independent parameters to differentiate with
 /// respect to.
 struct SILReverseAutoDiffIndices {
+  /// The index of the dependent result to differentiate from.
   unsigned source;
+  /// Indices of independent parameters to differentiate with respect to.
   llvm::SmallBitVector parameters;
   
+  /// Creates a set of AD indices from the given source index and a bit vector
+  /// representing parameter indices.
   /*implicit*/ SILReverseAutoDiffIndices(unsigned source,
                                          llvm::SmallBitVector parameters)
     : source(source), parameters(parameters) {}
   
+  /// Creates a set of AD indices from the given source index and an array of
+  /// parameter indices. Elements in `parameters` must be acending integers.
   /*implicit*/ SILReverseAutoDiffIndices(unsigned source,
                                          ArrayRef<unsigned> parameters);
 
