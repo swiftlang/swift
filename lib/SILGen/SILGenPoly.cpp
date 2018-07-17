@@ -598,8 +598,10 @@ ManagedValue Transform::transform(ManagedValue v,
         KnownProtocolKind::Hashable);
     auto conformance = SGF.SGM.M.getSwiftModule()->lookupConformance(
         inputSubstType, protocol);
-    auto result = SGF.emitAnyHashableErasure(Loc, v, inputSubstType,
-                                             *conformance, ctxt);
+    auto addr = v.getType().isAddress() ? v : v.materialize(SGF, Loc);
+    auto result = SGF.emitAnyHashableErasure(Loc, addr,
+                                             inputSubstType, *conformance,
+                                             ctxt);
     if (result.isInContext())
       return ManagedValue::forInContext();
     return std::move(result).getAsSingleValue(SGF, Loc);

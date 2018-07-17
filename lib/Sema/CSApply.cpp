@@ -3299,7 +3299,6 @@ namespace {
         }
         expr->setCastKind(castKind);
         break;
-      case CheckedCastKind::Swift3BridgingDowncast:
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::SetDowncast:
@@ -3658,19 +3657,6 @@ namespace {
       Expr *sub = handleOptionalBindings(expr->getSubExpr(), toType,
                                          OptionalBindingsCastKind::Bridged,
                                          [&](Expr *sub, Type toInstanceType) {
-        // Warn about NSNumber and NSValue bridging coercions we accepted in
-        // Swift 3 but which can fail at runtime.
-        if (tc.Context.LangOpts.isSwiftVersion3()
-            && tc.typeCheckCheckedCast(cs.getType(sub), toInstanceType,
-                                       CheckedCastContextKind::None,
-                                       dc, SourceLoc(), sub, SourceRange())
-                 == CheckedCastKind::Swift3BridgingDowncast) {
-          tc.diagnose(expr->getLoc(),
-                      diag::missing_forced_downcast_swift3_compat_warning,
-                      cs.getType(sub), toInstanceType)
-            .fixItReplace(expr->getAsLoc(), "as!");
-        }
-        
         return buildObjCBridgeExpr(sub, toInstanceType, locator);
       });
 
@@ -3736,7 +3722,6 @@ namespace {
       }
 
       // Valid casts.
-      case CheckedCastKind::Swift3BridgingDowncast:
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::SetDowncast:
@@ -3823,7 +3808,6 @@ namespace {
       }
 
       // Valid casts.
-      case CheckedCastKind::Swift3BridgingDowncast:
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::SetDowncast:
@@ -5703,34 +5687,6 @@ Expr *ExprRewriter::coerceCallArguments(
         return param.getType()->hasUnresolvedType();
       });
 
-  // If you value your sanity, ignore the body of this 'if' statement.
-  if (cs.getASTContext().isSwiftVersion3() && params.size() == 1) {
-    const auto &param = params.front();
-    auto paramType = param.getType();
-
-    // Total hack: In Swift 3 mode, we can end up with an arity mismatch due to
-    // loss of ParenType sugar.
-    if (isa<TupleExpr>(arg)) {
-      auto *tupleType = paramType->getAs<TupleType>();
-      if (!param.hasLabel() && !param.isVariadic() && tupleType) {
-        // Rebuild the function type.
-        funcType = FunctionType::get(tupleType, funcType->getResult(),
-                                     funcType->getExtInfo());
-        params = funcType->getParams();
-      }
-    }
-
-    // Total hack: In Swift 3 mode, argument labels are ignored when calling
-    // function type with a single Any parameter.
-    if (params.size() == 1 && params.front().getType()->isAny()) {
-      auto argType = cs.getType(arg);
-      if (auto *tupleArgType = dyn_cast<TupleType>(argType.getPointer())) {
-        if (tupleArgType->getNumElements() == 1)
-          matchCanFail = true;
-      }
-    }
-  }
-
   auto paramType = AnyFunctionType::composeInput(tc.Context, params, false);
   bool allParamsMatch = cs.getType(arg)->isEqual(paramType);
 
@@ -5781,6 +5737,7 @@ Expr *ExprRewriter::coerceCallArguments(
 
   assert((matchCanFail || !failed) && "Call arguments did not match up?");
   (void)failed;
+  (void)matchCanFail;
 
   // We should either have parentheses or a tuple.
   auto *argTuple = dyn_cast<TupleExpr>(arg);
@@ -6526,8 +6483,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       if (toType->hasUnresolvedType())
         break;
 
-      // HACK: Fix problem related to Swift 3 mode (with assertions),
-      // since Swift 3 mode allows passing arguments with extra parens
+      // HACK: Fix problem related to Swift 4 mode (with assertions),
+      // since Swift 4 mode allows passing arguments with extra parens
       // to parameters which don't expect them, it should be supported
       // by "deep equality" type - Optional<T> e.g.
       // ```swift
@@ -6537,7 +6494,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // ```
       //
       // See also: https://bugs.swift.org/browse/SR-6796
-      if (cs.getASTContext().isSwiftVersionAtLeast(3) &&
+      if (cs.getASTContext().isSwiftVersionAtLeast(4) &&
           !cs.getASTContext().isSwiftVersionAtLeast(5)) {
         auto obj1 = fromType->getOptionalObjectType();
         auto obj2 = toType->getOptionalObjectType();
@@ -7794,6 +7751,27 @@ static bool exprNeedsParensAfterAddingAs(TypeChecker &TC, DeclContext *DC,
   return exprNeedsParensOutsideFollowingOperator(TC, DC, expr, rootExpr, asPG);
 }
 
+bool swift::exprNeedsParensBeforeAddingNilCoalescing(TypeChecker &TC,
+                                                     DeclContext *DC,
+                                                     Expr *expr) {
+  auto asPG =
+    TC.lookupPrecedenceGroup(DC, DC->getASTContext().Id_NilCoalescingPrecedence,
+                             SourceLoc());
+  if (!asPG) return true;
+  return exprNeedsParensInsideFollowingOperator(TC, DC, expr, asPG);
+}
+
+bool swift::exprNeedsParensAfterAddingNilCoalescing(TypeChecker &TC,
+                                                    DeclContext *DC,
+                                                    Expr *expr,
+                                                    Expr *rootExpr) {
+  auto asPG =
+    TC.lookupPrecedenceGroup(DC, DC->getASTContext().Id_NilCoalescingPrecedence,
+                             SourceLoc());
+  if (!asPG) return true;
+  return exprNeedsParensOutsideFollowingOperator(TC, DC, expr, rootExpr, asPG);
+}
+
 namespace {
   class ExprWalker : public ASTWalker {
     ExprRewriter &Rewriter;
@@ -7955,7 +7933,7 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
     
   switch (fix.first.getKind()) {
   case FixKind::ForceOptional: {
-    const Expr *unwrapped = affected->getValueProvidingExpr();
+    Expr *unwrapped = affected->getValueProvidingExpr();
     auto type = solution.simplifyType(getType(affected))
                   ->getRValueObjectType();
 
@@ -7966,25 +7944,17 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
                       "try!");
 
     } else {
-      auto diag = TC.diagnose(affected->getLoc(),
-                              diag::missing_unwrap_optional, type);
-      if (affected->canAppendPostfixExpression(true)) {
-        diag.fixItInsertAfter(affected->getEndLoc(), "!");
-      } else {
-        diag.fixItInsert(affected->getStartLoc(), "(")
-            .fixItInsertAfter(affected->getEndLoc(), ")!");
-      }
+      return diagnoseUnwrap(TC, DC, unwrapped, type);
     }
     return true;
   }
           
-  case FixKind::OptionalChaining: {
+  case FixKind::UnwrapOptionalBase: {
     auto type = solution.simplifyType(getType(affected))
                 ->getRValueObjectType();
-    auto diag = TC.diagnose(affected->getLoc(),
-                            diag::missing_unwrap_optional, type);
-    diag.fixItInsertAfter(affected->getEndLoc(), "?");
-    return true;
+    DeclName memberName = fix.first.getDeclNameArgument(*this);
+    return diagnoseBaseUnwrapForMemberAccess(affected, type, memberName,
+                                             SourceRange());
   }
 
   case FixKind::ForceDowncast: {
@@ -8067,24 +8037,6 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
         llvm_unreachable("Coercions handled in other disjunction branch");
 
       // Valid casts.
-      case CheckedCastKind::Swift3BridgingDowncast: {
-        // Swift 3 accepted coercions from NSNumber and NSValue to Swift
-        // value types, even though there are multiple Swift types that
-        // bridge to those classes, and the bridging operation back into Swift
-        // is type-checked. For compatibility, downgrade to a warning.
-        assert(TC.Context.LangOpts.isSwiftVersion3()
-               && "should only appear in Swift 3 compat mode");
-
-        TC.diagnose(coerceExpr->getLoc(),
-                    diag::missing_forced_downcast_swift3_compat_warning,
-                    fromType, toType)
-          .highlight(coerceExpr->getSourceRange())
-          .fixItReplace(coerceExpr->getLoc(), "as!");
-
-        // This is just a warning, so allow the expression to type-check.
-        return false;
-      }
-
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::SetDowncast:
@@ -8136,11 +8088,13 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
 Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
                                       Type convertType,
                                       bool discardedExpr,
-                                      bool suppressDiagnostics,
                                       bool skipClosures) {
   // If any fixes needed to be applied to arrive at this solution, resolve
   // them to specific expressions.
   if (!solution.Fixes.empty()) {
+    if (shouldSuppressDiagnostics())
+      return nullptr;
+
     // If we can diagnose the problem with the fixits that we've pre-assumed,
     // do so now.
     if (applySolutionFixes(expr, solution))
@@ -8156,7 +8110,7 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
   for (auto &e : solution.Conformances)
     TC.markConformanceUsed(e.second, DC);
 
-  ExprRewriter rewriter(*this, solution, suppressDiagnostics);
+  ExprRewriter rewriter(*this, solution, shouldSuppressDiagnostics());
   ExprWalker walker(rewriter);
 
   // Apply the solution to the expression.

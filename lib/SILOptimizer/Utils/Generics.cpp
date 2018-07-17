@@ -288,6 +288,7 @@ static bool createsInfiniteSpecializationLoop(ApplySite Apply) {
   auto *Callee = Apply.getCalleeFunction();
   SILFunction *Caller = nullptr;
   Caller = Apply.getFunction();
+  int numAcceptedCycles = 1;
 
   // Name of the function to be specialized.
   auto GenericFunc = Callee;
@@ -327,7 +328,13 @@ static bool createsInfiniteSpecializationLoop(ApplySite Apply) {
       if (growingSubstitutions(CurSpecializationInfo->getSubstitutions(),
                                Apply.getSubstitutionMap())) {
         DEBUG(llvm::dbgs() << "Found a generic specialization loop!\n");
-        return true;
+
+        // Accept a cycles up to a limit. This is necessary to generate
+        // efficient code for some library functions, like compactMap, which
+        // contain small specialization cycles.
+        if (numAcceptedCycles == 0)
+          return true;
+        numAcceptedCycles--;
       }
     }
 

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -59,77 +59,6 @@ static void errorAndExit(const char *message) {
 static void errnoAndExit(const char *message) {
   fprintf(stderr, "%s: %s\n", message, strerror(errno));
   abort();
-}
-
-static swift_reflection_section_t
-makeLocalSection(const void *Buffer, RemoteSection Section,
-                 RemoteReflectionInfo Info) {
-  if (Section.Size == 0) {
-    swift_reflection_section_t LS = {NULL, NULL};
-    return LS;
-  }
-
-  uintptr_t Base
-    = (uintptr_t)Buffer + Section.StartAddress - Info.StartAddress;
-  swift_reflection_section_t LS = {
-    (void *)Base,
-    (void *)(Base + Section.Size)
-  };
-  return LS;
-}
-
-static
-uintptr_t getStartAddress(const RemoteSection Sections[], size_t Count) {
-  uintptr_t Start = 0;
-  for (size_t i = 0; i < Count; ++i) {
-    if (Sections[i].StartAddress != 0) {
-      if (Start != 0)
-        Start = MIN(Start, Sections[i].StartAddress);
-      else
-        Start = Sections[i].StartAddress;
-    }
-  }
-  return Start;
-}
-
-static
-uintptr_t getEndAddress(const RemoteSection Sections[], size_t Count) {
-  uintptr_t End = 0;
-  for (size_t i = 0; i < Count; ++i) {
-    if (Sections[i].StartAddress != 0)
-      End = MAX(End, Sections[i].EndAddress);
-  }
-  return End;
-}
-
-static
-RemoteReflectionInfo makeRemoteReflectionInfo(RemoteSection fieldmd,
-                                              RemoteSection assocty,
-                                              RemoteSection builtin,
-                                              RemoteSection capture,
-                                              RemoteSection typeref,
-                                              RemoteSection reflstr) {
-  RemoteReflectionInfo Info = {
-    fieldmd,
-    assocty,
-    builtin,
-    capture,
-    typeref,
-    reflstr,
-    0,
-    0
-  };
-
-  const RemoteSection Sections[6] = {
-    fieldmd, assocty, builtin, capture, typeref, reflstr
-  };
-
-  Info.StartAddress = getStartAddress(Sections, 6);
-
-  uintptr_t EndAddress = getEndAddress(Sections, 6);
-  Info.TotalSize = EndAddress - Info.StartAddress;
-
-  return Info;
 }
 
 static const size_t ReadEnd = 0;
@@ -272,18 +201,6 @@ PipeMemoryReader createPipeMemoryReader() {
   return Reader;
 }
 
-static
-RemoteSection makeRemoteSection(const PipeMemoryReader *Reader) {
-  uintptr_t Start;
-  size_t Size;
-
-  PipeMemoryReader_collectBytesFromPipe(Reader, &Start, sizeof(Start));
-  PipeMemoryReader_collectBytesFromPipe(Reader, &Size, sizeof(Size));
-
-  RemoteSection RS = {Start, Size, Start + Size};
-  return RS;
-}
-
 #if defined(__APPLE__) && defined(__MACH__)
 static void
 PipeMemoryReader_receiveImages(SwiftReflectionContextRef RC,
@@ -310,6 +227,89 @@ PipeMemoryReader_receiveImages(SwiftReflectionContextRef RC,
 }
 
 #else
+
+static swift_reflection_section_t
+makeLocalSection(const void *Buffer, RemoteSection Section,
+                 RemoteReflectionInfo Info) {
+  if (Section.Size == 0) {
+    swift_reflection_section_t LS = {NULL, NULL};
+    return LS;
+  }
+
+  uintptr_t Base
+    = (uintptr_t)Buffer + Section.StartAddress - Info.StartAddress;
+  swift_reflection_section_t LS = {
+    (void *)Base,
+    (void *)(Base + Section.Size)
+  };
+  return LS;
+}
+
+static
+uintptr_t getStartAddress(const RemoteSection Sections[], size_t Count) {
+  uintptr_t Start = 0;
+  for (size_t i = 0; i < Count; ++i) {
+    if (Sections[i].StartAddress != 0) {
+      if (Start != 0)
+        Start = MIN(Start, Sections[i].StartAddress);
+      else
+        Start = Sections[i].StartAddress;
+    }
+  }
+  return Start;
+}
+
+static
+uintptr_t getEndAddress(const RemoteSection Sections[], size_t Count) {
+  uintptr_t End = 0;
+  for (size_t i = 0; i < Count; ++i) {
+    if (Sections[i].StartAddress != 0)
+      End = MAX(End, Sections[i].EndAddress);
+  }
+  return End;
+}
+
+static
+RemoteReflectionInfo makeRemoteReflectionInfo(RemoteSection fieldmd,
+                                              RemoteSection assocty,
+                                              RemoteSection builtin,
+                                              RemoteSection capture,
+                                              RemoteSection typeref,
+                                              RemoteSection reflstr) {
+  RemoteReflectionInfo Info = {
+    fieldmd,
+    assocty,
+    builtin,
+    capture,
+    typeref,
+    reflstr,
+    0,
+    0
+  };
+
+  const RemoteSection Sections[6] = {
+    fieldmd, assocty, builtin, capture, typeref, reflstr
+  };
+
+  Info.StartAddress = getStartAddress(Sections, 6);
+
+  uintptr_t EndAddress = getEndAddress(Sections, 6);
+  Info.TotalSize = EndAddress - Info.StartAddress;
+
+  return Info;
+}
+
+static
+RemoteSection makeRemoteSection(const PipeMemoryReader *Reader) {
+  uintptr_t Start;
+  size_t Size;
+
+  PipeMemoryReader_collectBytesFromPipe(Reader, &Start, sizeof(Start));
+  PipeMemoryReader_collectBytesFromPipe(Reader, &Size, sizeof(Size));
+
+  RemoteSection RS = {Start, Size, Start + Size};
+  return RS;
+}
 
 static void
 PipeMemoryReader_receiveReflectionInfo(SwiftReflectionContextRef RC,

@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend -swift-version 4 -typecheck %s 2>&1 | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-%target-runtime %s
+// RUN: not %target-swift-frontend -typecheck %s 2>&1 | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-%target-runtime %s
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
   import Darwin

@@ -13,14 +13,15 @@
 // This file implements the constraint solver used in the type checker.
 //
 //===----------------------------------------------------------------------===//
-#include "ConstraintSystem.h"
 #include "ConstraintGraph.h"
+#include "ConstraintSystem.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeWalker.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Compiler.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
+#include "llvm/Support/raw_ostream.h"
+#include <algorithm>
 #include <memory>
 #include <tuple>
 
@@ -806,12 +807,63 @@ ConstraintSystem::solveSingle(FreeTypeVariableBinding allowFreeTypeVariables) {
   return std::move(solutions[0]);
 }
 
+bool ConstraintSystem::solve(Expr *&expr,
+                             Type convertType,
+                             ExprTypeCheckListener *listener,
+                             SmallVectorImpl<Solution> &solutions,
+                             FreeTypeVariableBinding allowFreeTypeVariables) {
+  // Attempt to solve the constraint system.
+  auto solution = solveImpl(expr,
+                            convertType,
+                            listener,
+                            solutions,
+                            allowFreeTypeVariables);
+
+  // The constraint system has failed
+  if (solution == SolutionKind::Error)
+    return true;
+
+  // If the system is unsolved or there are multiple solutions present but
+  // type checker options do not allow unresolved types, let's try to salvage
+  if (solution == SolutionKind::Unsolved ||
+      (solutions.size() != 1 &&
+       !Options.contains(
+           ConstraintSystemFlags::AllowUnresolvedTypeVariables))) {
+    if (shouldSuppressDiagnostics())
+      return true;
+
+    // Try to provide a decent diagnostic.
+    if (salvage(solutions, expr)) {
+      // If salvage produced an error message, then it failed to salvage the
+      // expression, just bail out having reported the error.
+      return true;
+    }
+
+    // The system was salvaged; continue on as if nothing happened.
+  }
+
+  if (TC.getLangOpts().DebugConstraintSolver) {
+    auto &log = getASTContext().TypeCheckerDebug->getStream();
+    if (solutions.size() == 1) {
+      log << "---Solution---\n";
+      solutions[0].dump(log);
+    } else {
+      for (unsigned i = 0, e = solutions.size(); i != e; ++i) {
+        log << "--- Solution #" << i << " ---\n";
+        solutions[i].dump(log);
+      }
+    }
+  }
+
+  return false;
+}
+
 ConstraintSystem::SolutionKind
-ConstraintSystem::solve(Expr *&expr,
-                        Type convertType,
-                        ExprTypeCheckListener *listener,
-                        SmallVectorImpl<Solution> &solutions,
-                        FreeTypeVariableBinding allowFreeTypeVariables) {
+ConstraintSystem::solveImpl(Expr *&expr,
+                            Type convertType,
+                            ExprTypeCheckListener *listener,
+                            SmallVectorImpl<Solution> &solutions,
+                            FreeTypeVariableBinding allowFreeTypeVariables) {
   if (TC.getLangOpts().DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
     log << "---Constraint solving for the expression at ";
@@ -974,13 +1026,8 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
 
   // If we don't have more than one component, just solve the whole
   // system.
-  if (numComponents < 2) {
-    SmallVector<Constraint *, 8> disjunctions;
-    collectDisjunctions(disjunctions);
-
-    return solveSimplified(selectDisjunction(disjunctions), solutions,
-                           allowFreeTypeVariables);
-  }
+  if (numComponents < 2)
+    return solveSimplified(solutions, allowFreeTypeVariables);
 
   if (TC.Context.LangOpts.DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
@@ -1291,121 +1338,37 @@ static bool shouldSkipDisjunctionChoice(ConstraintSystem &cs,
   return false;
 }
 
-// Attempt to find a disjunction of bind constraints where all options
-// in the disjunction are binding the same type variable.
-//
-// Prefer disjunctions where the bound type variable is also the
-// right-hand side of a conversion constraint, since having a concrete
-// type that we're converting to can make it possible to split the
-// constraint system into multiple ones.
-static Constraint *selectBestBindingDisjunction(
-    ConstraintSystem &cs, SmallVectorImpl<Constraint *> &disjunctions) {
+Constraint *ConstraintSystem::selectDisjunction() {
+  SmallVector<Constraint *, 4> disjunctions;
 
-  // Collect any disjunctions that simply attempt bindings for a
-  // type variable.
-  SmallVector<Constraint *, 8> bindingDisjunctions;
-  for (auto *disjunction : disjunctions) {
-    llvm::Optional<TypeVariableType *> commonTypeVariable;
-    if (llvm::all_of(
-            disjunction->getNestedConstraints(),
-            [&](Constraint *bindingConstraint) {
-              if (bindingConstraint->getKind() != ConstraintKind::Bind)
-                return false;
+  collectDisjunctions(disjunctions);
 
-              auto *tv =
-                  bindingConstraint->getFirstType()->getAs<TypeVariableType>();
-              // Only do this for simple type variable bindings, not for
-              // bindings like: ($T1) -> $T2 bind String -> Int
-              if (!tv)
-                return false;
+  // Pick the disjunction with the lowest disjunction number in order
+  // to solve them in the order they were created (which should be
+  // stable within an expression).
+  auto minDisjunction =
+      std::min_element(disjunctions.begin(), disjunctions.end(),
+                       [&](Constraint *first, Constraint *second) -> bool {
+                         auto firstFound = DisjunctionNumber.find(first);
+                         auto secondFound = DisjunctionNumber.find(second);
 
-              if (!commonTypeVariable.hasValue())
-                commonTypeVariable = tv;
+                         assert(firstFound != DisjunctionNumber.end() &&
+                                secondFound != DisjunctionNumber.end());
 
-              if (commonTypeVariable.getValue() != tv)
-                return false;
+                         return firstFound->second < secondFound->second;
+                       });
 
-              return true;
-            })) {
-      bindingDisjunctions.push_back(disjunction);
-    }
-  }
-
-  for (auto *disjunction : bindingDisjunctions) {
-    auto nested = disjunction->getNestedConstraints();
-    assert(!nested.empty());
-    auto *tv = cs.simplifyType(nested[0]->getFirstType())
-                   ->getRValueType()
-                   ->getAs<TypeVariableType>();
-    assert(tv);
-
-    SmallVector<Constraint *, 8> constraints;
-    cs.getConstraintGraph().gatherConstraints(
-        tv, constraints, ConstraintGraph::GatheringKind::EquivalenceClass);
-
-    for (auto *constraint : constraints) {
-      if (constraint->getKind() != ConstraintKind::Conversion)
-        continue;
-
-      auto toType =
-          cs.simplifyType(constraint->getSecondType())->getRValueType();
-      auto *toTV = toType->getAs<TypeVariableType>();
-      if (tv != toTV)
-        continue;
-
-      return disjunction;
-    }
-  }
-
-  // If we had any binding disjunctions, return the first of
-  // those. These ensure that we attempt to bind types earlier than
-  // trying the elements of other disjunctions, which can often mean
-  // we fail faster.
-  if (!bindingDisjunctions.empty())
-    return bindingDisjunctions[0];
+  if (minDisjunction != disjunctions.end())
+    return *minDisjunction;
 
   return nullptr;
 }
 
-Constraint *ConstraintSystem::selectDisjunction(
-    SmallVectorImpl<Constraint *> &disjunctions) {
-  if (disjunctions.empty())
-    return nullptr;
-
-  auto *disjunction =
-      selectBestBindingDisjunction(*this, disjunctions);
-  if (disjunction)
-    return disjunction;
-
-  // Pick the smallest disjunction.
-  // FIXME: This heuristic isn't great, but it helped somewhat for
-  // overload sets.
-  disjunction = disjunctions[0];
-  auto bestSize = disjunction->countActiveNestedConstraints();
-  if (bestSize > 2) {
-    for (auto contender : llvm::makeArrayRef(disjunctions).slice(1)) {
-      unsigned newSize = contender->countActiveNestedConstraints();
-      if (newSize < bestSize) {
-        bestSize = newSize;
-        disjunction = contender;
-
-        if (bestSize == 2)
-          break;
-      }
-    }
-  }
-
-  // If there are no active constraints in the disjunction, there is
-  // no solution.
-  if (bestSize == 0)
-    return nullptr;
-
-  return disjunction;
-}
-
 bool ConstraintSystem::solveSimplified(
-    Constraint *disjunction, SmallVectorImpl<Solution> &solutions,
+    SmallVectorImpl<Solution> &solutions,
     FreeTypeVariableBinding allowFreeTypeVariables) {
+
+  auto *disjunction = selectDisjunction();
 
   auto bestBindings = determineBestBindings();
 
@@ -1418,6 +1381,8 @@ bool ConstraintSystem::solveSimplified(
                                    bestBindings->Bindings, solutions,
                                    allowFreeTypeVariables);
   }
+
+
 
   // If there are no disjunctions we can't solve this system unless we have
   // free type variables and are allowing them in the solution.

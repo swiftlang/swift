@@ -41,7 +41,7 @@ import SwiftShims
 //   +----/-------------------------------------------+
 //       /
 //      |
-//      V  _RawNativeDictionaryStorage (a class)  
+//      V  _RawNativeDictionaryStorage (a class)
 //   +-----------------------------------------------------------+
 //   | bucketCount                                               |
 //   | count                                                     |
@@ -84,7 +84,7 @@ import SwiftShims
 // The Native Kinds of Storage
 // ---------------------------
 //
-// There are three different classes that can provide a native backing storage: 
+// There are three different classes that can provide a native backing storage:
 // * `_RawNativeDictionaryStorage`
 // * `_TypedNativeDictionaryStorage<K, V>`                   (extends Raw)
 // * `_HashableTypedNativeDictionaryStorage<K: Hashable, V>` (extends Typed)
@@ -94,16 +94,16 @@ import SwiftShims
 // In a less optimized implementation, the parent classes could
 // be eliminated, as they exist only to provide special-case behaviors.
 // HashableStorage has everything a full implementation of a Dictionary
-// requires, and is subsequently able to provide a full NSDictionary 
-// implementation. Note that HashableStorage must have the `K: Hashable` 
-// constraint because the NSDictionary implementation can't be provided in a 
+// requires, and is subsequently able to provide a full NSDictionary
+// implementation. Note that HashableStorage must have the `K: Hashable`
+// constraint because the NSDictionary implementation can't be provided in a
 // constrained extension.
 //
-// In normal usage, you can expect the backing storage of a Dictionary to be a 
+// In normal usage, you can expect the backing storage of a Dictionary to be a
 // NativeStorage.
 //
 // TypedStorage is distinguished from HashableStorage to allow us to create a
-// `_NativeDictionaryBuffer<AnyObject, AnyObject>`. Without the Hashable 
+// `_NativeDictionaryBuffer<AnyObject, AnyObject>`. Without the Hashable
 // requirement, such a Buffer is restricted to operations which can be performed
 // with only the structure of the Storage: indexing and iteration. This is used
 // in _SwiftDeferredNSDictionary to construct twin "native" and "bridged"
@@ -111,21 +111,21 @@ import SwiftShims
 // resultant index then used on the bridged storage.
 //
 // The only thing that TypedStorage adds over RawStorage is an implementation of
-// deinit, to clean up the AnyObjects it stores. Although it nominally 
-// inherits an NSDictionary implementation from RawStorage, this implementation 
-// isn't useful and is never used. 
+// deinit, to clean up the AnyObjects it stores. Although it nominally
+// inherits an NSDictionary implementation from RawStorage, this implementation
+// isn't useful and is never used.
 //
-// RawStorage exists to allow a type-punned empty singleton Storage to be 
-// created. Any time an empty Dictionary is created, this Storage is used. If 
-// this type didn't exist, then NativeBuffer would have to store a Storage that 
-// declared its actual type parameters. Similarly, the empty singleton would 
-// have to declare its actual type parameters. If the singleton was, for 
-// instance, a `HashableStorage<(), ()>`, then it would be a violation of 
+// RawStorage exists to allow a type-punned empty singleton Storage to be
+// created. Any time an empty Dictionary is created, this Storage is used. If
+// this type didn't exist, then NativeBuffer would have to store a Storage that
+// declared its actual type parameters. Similarly, the empty singleton would
+// have to declare its actual type parameters. If the singleton was, for
+// instance, a `HashableStorage<(), ()>`, then it would be a violation of
 // Swift's strict aliasing rules to pass it where a `HashableStorage<Int, Int>`
 // was expected.
 //
 // It's therefore necessary for several types to store a RawStorage, rather than
-// a TypedStorage, to allow for the possibility of the empty singleton. 
+// a TypedStorage, to allow for the possibility of the empty singleton.
 // RawStorage also provides an implementation of an always-empty NSDictionary.
 //
 //
@@ -135,7 +135,7 @@ import SwiftShims
 // FIXME: decide if this guarantee is worth making, as it restricts
 // collision resolution to first-come-first-serve. The most obvious alternative
 // would be robin hood hashing. The Rust code base is the best
-// resource on a *practical* implementation of robin hood hashing I know of: 
+// resource on a *practical* implementation of robin hood hashing I know of:
 // https://github.com/rust-lang/rust/blob/ac919fcd9d4a958baf99b2f2ed5c3d38a2ebf9d0/src/libstd/collections/hash/map.rs#L70-L178
 //
 // Indexing a container, `c[i]`, uses the integral offset stored in the index
@@ -177,16 +177,16 @@ import SwiftShims
 //   contains the empty singleton Storage which is returned as a toll-free
 //   implementation of `NSDictionary`.
 //
-// * If both `K` and `V` are bridged verbatim, then `Dictionary<K, V>` is 
+// * If both `K` and `V` are bridged verbatim, then `Dictionary<K, V>` is
 //   still toll-free bridged to `NSDictionary` by returning its Storage.
 //
 // * If the Dictionary is actually a lazily bridged NSDictionary, then that
-//   NSDictionary is returned. 
+//   NSDictionary is returned.
 //
-// * Otherwise, bridging the `Dictionary` is done by wrapping its buffer in a 
+// * Otherwise, bridging the `Dictionary` is done by wrapping its buffer in a
 //   `_SwiftDeferredNSDictionary<K, V>`. This incurs an O(1)-sized allocation.
 //
-//   Complete bridging of the native Storage's elements to another Storage 
+//   Complete bridging of the native Storage's elements to another Storage
 //   is performed on first access. This is O(n) work, but is hopefully amortized
 //   by future accesses.
 //
@@ -888,6 +888,24 @@ extension Dictionary {
   ) rethrows -> Dictionary<Key, T> {
     return try Dictionary<Key, T>(
       _variantBuffer: _variantBuffer.mapValues(transform))
+  }
+
+  /// Returns a new dictionary containing the keys of this dictionary with the
+  /// values transformed by the given closure.
+  /// - Parameter transform: A closure that transforms a value. `transform`
+  ///   accepts each value of the dictionary as its parameter and returns a
+  ///   transformed value of the same or of a different type.
+  /// - Returns: A dictionary containing the keys and transformed values of
+  ///   this dictionary.
+  @inlinable // FIXME(sil-serialize-all)
+  public func compactMapValues<T>(
+    _ transform: (Value) throws -> T?
+  ) rethrows -> Dictionary<Key, T> {
+    return try self.reduce(into: [Key: T](), { (result, x) in
+      if let value = try transform(x.value) {
+        result[x.key] = value
+      }
+    })
   }
 
   /// Updates the value stored in the dictionary for the given key, or adds a
@@ -2562,8 +2580,7 @@ extension _NativeDictionaryBuffer where Key: Hashable
     }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal static func bucketCount(
     forCapacity capacity: Int,
     maxLoadFactorInverse: Double
@@ -3228,8 +3245,7 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
   case cocoa(CocoaBuffer)
 #endif
 
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal var guaranteedNative: Bool {
     return _canBeClass(Key.self) == 0 || _canBeClass(Value.self) == 0
   }
@@ -4376,14 +4392,12 @@ extension Dictionary {
     }
 #endif
 
-    @inlinable // FIXME(sil-serialize-all)
-    @_transparent
+    @usableFromInline @_transparent
     internal var _guaranteedNative: Bool {
       return _canBeClass(Key.self) == 0 && _canBeClass(Value.self) == 0
     }
 
-    @inlinable // FIXME(sil-serialize-all)
-    @_transparent
+    @usableFromInline @_transparent
     internal var _nativeIndex: _NativeIndex {
       switch _value {
       case ._native(let nativeIndex):
@@ -4396,8 +4410,7 @@ extension Dictionary {
     }
 
 #if _runtime(_ObjC)
-    @inlinable // FIXME(sil-serialize-all)
-    @_transparent
+    @usableFromInline @_transparent
     internal var _cocoaIndex: _CocoaIndex {
       switch _value {
       case ._native:
@@ -4631,8 +4644,7 @@ public struct DictionaryIterator<Key: Hashable, Value>: IteratorProtocol {
   }
 #endif
 
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal var _guaranteedNative: Bool {
     return _canBeClass(Key.self) == 0 || _canBeClass(Value.self) == 0
   }

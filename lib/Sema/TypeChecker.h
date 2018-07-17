@@ -57,12 +57,6 @@ namespace constraints {
 using ConformanceMap =
     llvm::DenseMap<SubstitutableType *, SmallVector<ProtocolConformance *, 2>>;
 
-/// \brief Used for recursive lookups into an expr that is already
-/// being type-checked and the constraint system in which its type is
-/// stored.
-using ExprAndConstraintSystem =
-    std::pair<Expr *, constraints::ConstraintSystem *>;
-
 /// Special-case type checking semantics for certain declarations.
 enum class DeclTypeCheckingSemantics {
   /// A normal declaration.
@@ -259,10 +253,6 @@ enum class TypeCheckExprFlags {
   /// If set, this expression is being re-type checked as part of diagnostics,
   /// and so we should not visit bodies of non-single expression closures.
   SkipMultiStmtClosures = 0x40,
-
-  /// Set if the client prefers fixits to be in the form of force unwrapping
-  /// or optional chaining to return an optional.
-  PreferForceUnwrapToOptional = 0x80,
 
   /// If set, don't apply a solution.
   SkipApplyingSolution = 0x100,
@@ -783,7 +773,7 @@ private:
   Optional<NominalTypeDecl *> ArrayDecl;
 
   /// The set of expressions currently being analyzed for failures.
-  llvm::DenseMap<Expr*, ExprAndConstraintSystem> DiagnosedExprs;
+  llvm::DenseMap<Expr*, Expr*> DiagnosedExprs;
 
   ModuleDecl *StdlibModule = nullptr;
 
@@ -1496,22 +1486,6 @@ public:
   /// Pre-check the expression, validating any types that occur in the
   /// expression and folding sequence expressions.
   bool preCheckExpression(Expr *&expr, DeclContext *dc);
-
-  /// Sets up and solves the constraint system \p cs to type check the given
-  /// expression.
-  ///
-  /// The expression should have already been pre-checked with
-  /// preCheckExpression().
-  ///
-  /// \returns true if an error occurred, false otherwise.
-  ///
-  /// \see typeCheckExpression
-  bool solveForExpression(Expr *&expr, DeclContext *dc, Type convertType,
-                          FreeTypeVariableBinding allowFreeTypeVariables,
-                          ExprTypeCheckListener *listener,
-                          constraints::ConstraintSystem &cs,
-                          SmallVectorImpl<constraints::Solution> &viable,
-                          TypeCheckExprOptions options);
 
   /// \name Name lookup
   ///
@@ -2315,13 +2289,13 @@ public:
   void checkInitializerErrorHandling(Initializer *I, Expr *E);
   void checkEnumElementErrorHandling(EnumElementDecl *D);
 
-  void addExprForDiagnosis(Expr *E1, ExprAndConstraintSystem Result) {
+  void addExprForDiagnosis(Expr *E1, Expr *Result) {
     DiagnosedExprs[E1] = Result;
   }
   bool isExprBeingDiagnosed(Expr *E) {
     return DiagnosedExprs.count(E);
   }
-  ExprAndConstraintSystem getExprBeingDiagnosed(Expr *E) {
+  Expr *getExprBeingDiagnosed(Expr *E) {
     return DiagnosedExprs[E];
   }
 

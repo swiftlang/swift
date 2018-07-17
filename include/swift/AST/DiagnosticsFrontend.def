@@ -108,15 +108,17 @@ NOTE(note_valid_swift_versions, none,
      "valid arguments to '-swift-version' are %0", (StringRef))
 
 ERROR(error_mode_cannot_emit_dependencies,none,
-  "this mode does not support emitting dependency files", ())
+      "this mode does not support emitting dependency files", ())
+ERROR(error_mode_cannot_emit_reference_dependencies,none,
+      "this mode does not support emitting reference dependency files", ())
 ERROR(error_mode_cannot_emit_header,none,
-  "this mode does not support emitting Objective-C headers", ())
+      "this mode does not support emitting Objective-C headers", ())
 ERROR(error_mode_cannot_emit_loaded_module_trace,none,
-  "this mode does not support emitting the loaded module trace", ())
+      "this mode does not support emitting the loaded module trace", ())
 ERROR(error_mode_cannot_emit_module,none,
-  "this mode does not support emitting modules", ())
+      "this mode does not support emitting modules", ())
 ERROR(error_mode_cannot_emit_module_doc,none,
-  "this mode does not support emitting module documentation files", ())
+      "this mode does not support emitting module documentation files", ())
 
 WARNING(emit_reference_dependencies_without_primary_file,none,
   "ignoring -emit-reference-dependencies (requires -primary-file)", ())

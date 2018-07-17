@@ -2103,7 +2103,6 @@ extension BinaryInteger {
   /// - Parameters:
   ///   - lhs: An integer to compare.
   ///   - rhs: Another integer to compare.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   //@inline(__always)
   public static func <= <Other : BinaryInteger>(lhs: Self, rhs: Other) -> Bool {
@@ -2120,7 +2119,6 @@ extension BinaryInteger {
   /// - Parameters:
   ///   - lhs: An integer to compare.
   ///   - rhs: Another integer to compare.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   //@inline(__always)
   public static func >= <Other : BinaryInteger>(lhs: Self, rhs: Other) -> Bool {
@@ -2137,7 +2135,6 @@ extension BinaryInteger {
   /// - Parameters:
   ///   - lhs: An integer to compare.
   ///   - rhs: Another integer to compare.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   //@inline(__always)
   public static func > <Other : BinaryInteger>(lhs: Self, rhs: Other) -> Bool {
@@ -2656,7 +2653,6 @@ ${operatorComment(x.nonMaskingOperator, True)}
     return lhs
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @_semantics("optimize.sil.specialize.generic.partial.never")
   public static func ${x.nonMaskingOperator}= <
@@ -3296,10 +3292,15 @@ public struct ${Self}
   /// - Parameter source: A floating-point value to convert to an integer.
   @_transparent
   public init?(exactly source: ${FloatType}) {
-    self._value = Builtin.fpto${u}i_FPIEEE${FloatBits}_${BuiltinName}(source._value)
-    if ${FloatType}(self) != source {
+    guard source > ${str(lower)}.0 && source < ${str(upper)}.0 else {
+      // The source is out of bounds (including infinities).
       return nil
     }
+    guard source == source.rounded(.towardZero) else {
+      // The source is a fraction or NaN.
+      return nil
+    }
+    self._value = Builtin.fpto${u}i_FPIEEE${FloatBits}_${BuiltinName}(source._value)
   }
 
 %     if FloatType == 'Float80':

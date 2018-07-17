@@ -74,6 +74,8 @@ ProtocolConformanceRef::ProtocolConformanceRef(ProtocolDecl *protocol,
 }
 
 ProtocolDecl *ProtocolConformanceRef::getRequirement() const {
+  assert(!isInvalid());
+
   if (isConcrete()) {
     return getConcrete()->getProtocol();
   } else {
@@ -83,8 +85,19 @@ ProtocolDecl *ProtocolConformanceRef::getRequirement() const {
 
 ProtocolConformanceRef
 ProtocolConformanceRef::subst(Type origType,
+                              SubstitutionMap subMap) const {
+  return subst(origType,
+               QuerySubstitutionMap{subMap},
+               LookUpConformanceInSubstitutionMap(subMap));
+}
+
+ProtocolConformanceRef
+ProtocolConformanceRef::subst(Type origType,
                               TypeSubstitutionFn subs,
                               LookupConformanceFn conformances) const {
+  if (isInvalid())
+    return *this;
+
   auto substType = origType.subst(subs, conformances,
                                   SubstFlags::UseErrorType);
 
@@ -96,8 +109,7 @@ ProtocolConformanceRef::subst(Type origType,
       // If this is a class, we need to traffic in the actual type that
       // implements the protocol, not 'Self' and not any subclasses (with their
       // inherited conformances).
-      substType =
-          substType->eraseDynamicSelfType()->getSuperclassForDecl(classDecl);
+      substType = substType->getSuperclassForDecl(classDecl);
     }
     return ProtocolConformanceRef(
       getConcrete()->subst(substType, subs, conformances));
@@ -130,6 +142,8 @@ ProtocolConformanceRef::getTypeWitnessByName(Type type,
                                              ProtocolConformanceRef conformance,
                                              Identifier name,
                                              LazyResolver *resolver) {
+  assert(!conformance.isInvalid());
+
   // Find the named requirement.
   AssociatedTypeDecl *assocType = nullptr;
   auto members = conformance.getRequirement()->lookupDirect(name);
@@ -739,9 +753,7 @@ ProtocolConformanceRef::getAssociatedConformance(Type conformingType,
     SubstitutionMap::getProtocolSubstitutions(getRequirement(),
                                               conformingType, *this);
   auto abstractConf = ProtocolConformanceRef(protocol);
-  return abstractConf.subst(assocType,
-                            QuerySubstitutionMap{subMap},
-                            LookUpConformanceInSubstitutionMap(subMap));
+  return abstractConf.subst(assocType, subMap);
 }
 
 ProtocolConformanceRef
@@ -942,9 +954,7 @@ SpecializedProtocolConformance::getAssociatedConformance(Type assocType,
        ? conformance.getConcrete()->getType()
        : GenericConformance->getAssociatedType(assocType, resolver));
 
-  return conformance.subst(origType,
-                           QuerySubstitutionMap{subMap},
-                           LookUpConformanceInSubstitutionMap(subMap));
+  return conformance.subst(origType, subMap);
 }
 
 ConcreteDeclRef
@@ -1025,6 +1035,14 @@ bool ProtocolConformance::witnessTableAccessorRequiresArguments() const {
 bool ProtocolConformance::isVisibleFrom(const DeclContext *dc) const {
   // FIXME: Implement me!
   return true;
+}
+
+ProtocolConformance *
+ProtocolConformance::subst(Type substType,
+                           SubstitutionMap subMap) const {
+  return subst(substType,
+               QuerySubstitutionMap{subMap},
+               LookUpConformanceInSubstitutionMap(subMap));
 }
 
 ProtocolConformance *
@@ -1351,14 +1369,14 @@ ProtocolConformance *ProtocolConformance::getCanonicalConformance() {
 
 /// Check of all types used by the conformance are canonical.
 bool ProtocolConformanceRef::isCanonical() const {
-  if (isAbstract())
+  if (isAbstract() || isInvalid())
     return true;
   return getConcrete()->isCanonical();
 }
 
 ProtocolConformanceRef
 ProtocolConformanceRef::getCanonicalConformanceRef() const {
-  if (isAbstract())
+  if (isAbstract() || isInvalid())
     return *this;
   return ProtocolConformanceRef(getConcrete()->getCanonicalConformance());
 }

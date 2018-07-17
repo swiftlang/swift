@@ -61,8 +61,7 @@ internal protocol _HashBuffer {
 /// The inverse of the default hash table load factor.  Factored out so that it
 /// can be used in multiple places in the implementation and stay consistent.
 /// Should not be used outside `Dictionary` implementation.
-@inlinable // FIXME(sil-serialize-all)
-@_transparent
+@usableFromInline @_transparent
 internal var _hashContainerDefaultMaxLoadFactorInverse: Double {
   return 1.0 / 0.75
 }

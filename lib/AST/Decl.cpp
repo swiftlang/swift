@@ -279,7 +279,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(MaterializeForSet, "materializeForSet accessor");
   ENTRY(Addressor, "address accessor");
   ENTRY(MutableAddressor, "mutableAddress accessor");
-  ENTRY(EnumElement, "enum element");
+  ENTRY(EnumElement, "enum case");
   ENTRY(Module, "module");
   ENTRY(MissingMember, "missing member placeholder");
   ENTRY(Requirement, "requirement");
@@ -376,12 +376,32 @@ case DeclKind::ID: return cast<ID##Decl>(this)->getSourceRange();
 SourceRange Decl::getSourceRangeIncludingAttrs() const {
   auto Range = getSourceRange();
 
-  // Attributes on AccessorDecl are syntactically belong to PatternBindingDecl.
-  if (isa<AccessorDecl>(this) || isa<VarDecl>(this))
+  // Attributes on AccessorDecl may syntactically belong to PatternBindingDecl.
+  // e.g. 'override'.
+  if (auto *AD = dyn_cast<AccessorDecl>(this)) {
+    // If this is implicit getter, accessor range should not include attributes.
+    if (!AD->getAccessorKeywordLoc().isValid())
+      return Range;
+
+    // Otherwise, include attributes directly attached to the accessor.
+    SourceLoc VarLoc = AD->getStorage()->getStartLoc();
+    for (auto Attr : getAttrs()) {
+      if (!Attr->getRange().isValid())
+        continue;
+
+      SourceLoc AttrStartLoc = Attr->getRangeWithAt().Start;
+      if (getASTContext().SourceMgr.isBeforeInBuffer(VarLoc, AttrStartLoc))
+        Range.widen(AttrStartLoc);
+    }
+    return Range;
+  }
+
+  // Attributes on VarDecl syntactically belong to PatternBindingDecl.
+  if (isa<VarDecl>(this))
     return Range;
 
   // Attributes on PatternBindingDecls are attached to VarDecls in AST.
-  if (const PatternBindingDecl *PBD = dyn_cast<PatternBindingDecl>(this)) {
+  if (auto *PBD = dyn_cast<PatternBindingDecl>(this)) {
     for (auto Entry : PBD->getPatternList())
       Entry.getPattern()->forEachVariable([&](VarDecl *VD) {
         for (auto Attr : VD->getAttrs())

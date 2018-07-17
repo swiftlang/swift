@@ -69,7 +69,7 @@ private:
   }
 
 public:
-  CallerAnalysis(SILModule *M) : SILAnalysis(AnalysisKind::Caller), Mod(*M) {
+  CallerAnalysis(SILModule *M) : SILAnalysis(SILAnalysisKind::Caller), Mod(*M) {
     // Make sure we compute everything first time called.
     for (auto &F : Mod) {
       FuncInfos.FindAndConstruct(&F);
@@ -78,7 +78,7 @@ public:
   }
 
   static bool classof(const SILAnalysis *S) {
-    return S->getKind() == AnalysisKind::Caller;
+    return S->getKind() == SILAnalysisKind::Caller;
   }
 
   /// Invalidate all information in this analysis.
@@ -104,14 +104,14 @@ public:
     RecomputeFunctionList.insert(F);
   }
 
-  /// Notify the analysis about a newly created function.
-  virtual void notifyAddFunction(SILFunction *F) override {
+  /// Notify the analysis about a newly created or modified function.
+  virtual void notifyAddedOrModifiedFunction(SILFunction *F) override {
     RecomputeFunctionList.insert(F);
   }
 
   /// Notify the analysis about a function which will be deleted from the
   /// module.
-  virtual void notifyDeleteFunction(SILFunction *F) override {
+  virtual void notifyWillDeleteFunction(SILFunction *F) override {
     invalidateExistingCalleeRelation(F);
     RecomputeFunctionList.remove(F);
   }
@@ -119,12 +119,26 @@ public:
   /// Notify the analysis about changed witness or vtables.
   virtual void invalidateFunctionTables() override { }
 
-  const FunctionInfo &getCallerInfo(SILFunction *F) {
+  const FunctionInfo &getCallerInfo(SILFunction *F) const {
     // Recompute every function in the invalidated function list and empty the
     // list.
-    processRecomputeFunctionList();
-    return FuncInfos[F];
+    auto *self = const_cast<CallerAnalysis *>(this);
+    self->processRecomputeFunctionList();
+    return self->FuncInfos[F];
   }
+
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "Only for use in the debugger");
+
+  /// Print the state of the caller analysis as a sequence of yaml documents for
+  /// each callee we are tracking.
+  void print(llvm::raw_ostream &os) const;
+
+  /// Print the state of the caller analysis as a sequence of yaml documents for
+  /// each callee we are tracking to the passed in file path.
+  LLVM_ATTRIBUTE_DEPRECATED(void print(const char *filePath)
+                                const LLVM_ATTRIBUTE_USED,
+                            "Only for use in the debugger");
 };
 
 /// NOTE: this can be extended to contain the callsites of the function.
@@ -132,7 +146,8 @@ class CallerAnalysis::FunctionInfo {
   friend class CallerAnalysis;
 
   /// A list of all the functions this function calls or partially applies.
-  llvm::SetVector<SILFunction *> Callees;
+  llvm::SmallSetVector<SILFunction *, 4> Callees;
+
   /// A list of all the callers this function has.
   llvm::SmallSet<SILFunction *, 4> Callers;
 
@@ -143,7 +158,7 @@ class CallerAnalysis::FunctionInfo {
   /// function.
   /// This is a little bit off-topic because a partial_apply is not really
   /// a "call" of this function.
-  llvm::DenseMap<SILFunction *, int> PartialAppliers;
+  llvm::SmallMapVector<SILFunction *, int, 1> PartialAppliers;
 
 public:
   /// Returns true if this function has at least one caller.

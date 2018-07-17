@@ -19,7 +19,7 @@ public struct P<I, O> {
   public func test() -> P<I, [O]> {
     return P<I, [O]> { input in
       var output: [O] = []
-      _ = R<([O], I)>.value(output, input) // expected-error {{enum element 'value' expects a single parameter of type '([O], I)'}}
+      _ = R<([O], I)>.value(output, input) // expected-error {{enum case 'value' expects a single parameter of type '([O], I)'}}
       return R<([O], I)>.value((output, input))
     }
   }

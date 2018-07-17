@@ -270,14 +270,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         // Warn about surprising implicit optional promotions.
         checkOptionalPromotions(Call);
         
-        // Check for tuple splat.
-        //
-        // Note that in Swift 4 mode, this is rejected much earlier in
-        // the constraint solver; this check only exists to preserve the
-        // behavior of the earlier, incomplete implementation of SE-0110.
-        if (TC.Context.isSwiftVersion3())
-          checkTupleSplat(Call);
-
         // Check the callee, looking through implicit conversions.
         auto base = Call->getFn();
         unsigned uncurryLevel = 0;
@@ -543,33 +535,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     }
 
 
-    /// Warn on tuple splat, which is deprecated.  For example:
-    ///
-    ///     func f(a : Int, _ b : Int) {}
-    ///     let x = (1,2)
-    ///     f(x)
-    ///
-    void checkTupleSplat(ApplyExpr *Call) {
-      auto FT = Call->getFn()->getType()->getAs<AnyFunctionType>();
-      // If this wasn't type checked correctly then don't worry about it.
-      if (!FT) return;
-
-      // If we're passing multiple parameters, then this isn't a tuple splat.
-      auto arg = Call->getArg()->getSemanticsProvidingExpr();
-      if (isa<TupleExpr>(arg) || isa<TupleShuffleExpr>(arg))
-        return;
-
-      // We care about whether the parameter list of the callee syntactically
-      // has more than one argument.  It has to *syntactically* have a tuple
-      // type as its argument.  A ParenType wrapping a TupleType is a single
-      // parameter.
-      auto params = FT->getParams();
-      if (params.size() > 1) {
-        TC.diagnose(Call->getLoc(), diag::tuple_splat_use, params.size())
-          .highlight(Call->getArg()->getSourceRange());
-      }
-    }
-
     void checkUseOfModule(DeclRefExpr *E) {
       // Allow module values as a part of:
       // - ignored base expressions;
@@ -674,11 +639,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       if (!noescapeArgument) return;
 
-      // In Swift 3, this is just a warning.
       TC.diagnose(apply->getLoc(),
-                  TC.Context.isSwiftVersion3()
-                    ? diag::warn_noescape_param_call
-                    : diag::err_noescape_param_call,
+                  diag::err_noescape_param_call,
                   noescapeArgument.getDecl()->getName(),
                   noescapeArgument.isDeclACapture())
         .highlight(problematicArg->getSourceRange());
@@ -739,38 +701,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       }
     }
 
-    // Swift 3 mode produces a warning + Fix-It for the missing ".self"
-    // in certain cases.
-    bool shouldWarnOnMissingSelf(Expr *E) {
-      if (!TC.Context.isSwiftVersion3())
-        return false;
-
-      if (auto *TE = dyn_cast<TypeExpr>(E)) {
-        if (auto *TR = TE->getTypeRepr()) {
-          if (auto *ITR = dyn_cast<IdentTypeRepr>(TR)) {
-            auto range = ITR->getComponentRange();
-            assert(!range.empty());
-
-            // Swift 3 did not consistently diagnose identifier type reprs
-            // with multiple components.
-            if (range.front() != range.back())
-              return true;
-          }
-        }
-      }
-
-      auto *ParentExpr = Parent.getAsExpr();
-
-      // Swift 3 did not diagnose missing '.self' in argument lists.
-      if (ParentExpr &&
-          (isa<ParenExpr>(ParentExpr) ||
-           isa<TupleExpr>(ParentExpr)) &&
-          CallArgs.count(ParentExpr) > 0)
-        return true;
-
-      return false;
-    }
-
     // Diagnose metatype values that don't appear as part of a property,
     // method, or constructor reference.
     void checkUseOfMetaTypeName(Expr *E) {
@@ -795,19 +725,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
             isa<OpenExistentialExpr>(ParentExpr)) {
           return;
         }
-      }
-
-      if (shouldWarnOnMissingSelf(E)) {
-        auto diag = TC.diagnose(E->getEndLoc(),
-                                diag::warn_value_of_metatype_missing_self,
-                                E->getType()->getRValueInstanceType());
-        if (E->canAppendPostfixExpression()) {
-          diag.fixItInsertAfter(E->getEndLoc(), ".self");
-        } else {
-          diag.fixItInsert(E->getStartLoc(), "(");
-          diag.fixItInsertAfter(E->getEndLoc(), ").self");
-        }
-        return;
       }
 
       // Is this a protocol metatype?
@@ -3034,9 +2951,7 @@ static void checkSwitch(TypeChecker &TC, const SwitchStmt *stmt) {
   // We want to warn about "case .Foo, .Bar where 1 != 100:" since the where
   // clause only applies to the second case, and this is surprising.
   for (auto cs : stmt->getCases()) {
-    // We forgot to do this in Swift 3
-    if (!TC.Context.isSwiftVersion3())
-      TC.checkUnsupportedProtocolType(cs);
+    TC.checkUnsupportedProtocolType(cs);
 
     // The case statement can have multiple case items, each can have a where.
     // If we find a "where", and there is a preceding item without a where, and

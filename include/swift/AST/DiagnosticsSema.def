@@ -117,7 +117,7 @@ ERROR(could_not_use_type_member_on_instance,none,
       "static member %1 cannot be used on instance of type %0",
       (Type, DeclName))
 ERROR(could_not_use_enum_element_on_instance,none,
-      "enum element %0 cannot be referenced as an instance member",
+      "enum case %0 cannot be used as an instance member",
       (DeclName))
 ERROR(could_not_use_type_member_on_protocol_metatype,none,
       "static member %1 cannot be used on protocol metatype %0",
@@ -294,12 +294,6 @@ ERROR(err_noescape_param_call,none,
       "parameter %0 to a call to a non-escaping function parameter can allow "
       "re-entrant modification of a variable",
       (DeclName, unsigned))
-WARNING(warn_noescape_param_call,none,
-      "passing a %select{|closure which captures a }1non-escaping function "
-      "parameter %0 to a call to a non-escaping function parameter can allow "
-      "re-entrant modification of a variable and will be illegal in Swift 4",
-      (DeclName, unsigned))
-
 ERROR(cannot_call_function_value,none,
       "cannot invoke value of function type with argument list '%0'",
       (StringRef))
@@ -902,10 +896,21 @@ NOTE(note_init_parameter,none,
 ERROR(missing_nullary_call,none,
      "function produces expected type %0; did you mean to call it with '()'?",
      (Type))
-ERROR(missing_unwrap_optional,none,
-      "value of optional type %0 not unwrapped; did you mean to use '!' "
-      "or '?'?",
-     (Type))
+ERROR(optional_not_unwrapped,none,
+      "value of optional type %0 must be unwrapped to a value of type %1",
+     (Type, Type))
+NOTE(unwrap_with_default_value,none,
+     "coalesce using '?" "?' to provide a default when the optional value "
+     "contains 'nil'", ())
+NOTE(unwrap_with_force_value,none,
+     "force-unwrap using '!' to abort execution if the optional value contains "
+     "'nil'", ())
+ERROR(optional_base_not_unwrapped,none,
+      "value of optional type %0 must be unwrapped to refer to member %1 of "
+      "wrapped base type %2", (Type, DeclName, Type))
+NOTE(optional_base_chain,none,
+     "chain the optional using '?' to access member %0 only for non-'nil' "
+     "base values", (DeclName))
 ERROR(missing_unwrap_optional_try,none,
       "value of optional type %0 not unwrapped; did you mean to use 'try!' "
       "or chain with '?'?",
@@ -913,10 +918,6 @@ ERROR(missing_unwrap_optional_try,none,
 ERROR(missing_forced_downcast,none,
       "%0 is not convertible to %1; "
       "did you mean to use 'as!' to force downcast?", (Type, Type))
-WARNING(missing_forced_downcast_swift3_compat_warning,none,
-        "bridging %0 to %1 may fail at runtime and will become a checked "
-        "cast in Swift 4; did you mean to use 'as!' to force downcast?",
-        (Type, Type))
 ERROR(missing_explicit_conversion,none,
       "%0 is not implicitly convertible to %1; "
       "did you mean to use 'as' to explicitly convert?", (Type, Type))
@@ -2855,18 +2856,11 @@ WARNING(store_in_willset,none,
         "attempting to store to property %0 within its own willSet, which is "
         "about to be overwritten by the new value", (Identifier))
 
-ERROR(tuple_splat_use,none,
-      "passing %0 arguments to a callee as a single tuple value has been removed in Swift 3",
-        (unsigned))
-
-
 ERROR(value_of_module_type,none,
       "expected module member name after module name", ())
 
 ERROR(value_of_metatype_type,none,
       "expected member name or constructor call after type name", ())
-WARNING(warn_value_of_metatype_missing_self,none,
-      "missing '.self' for reference to metatype of type %0", (Type))
 
 NOTE(add_parens_to_type,none,
      "add arguments after the type to construct a value of the type", ())

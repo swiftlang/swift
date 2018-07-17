@@ -130,7 +130,9 @@ func properties(_ b: B) {
   var obj : AnyObject = b
   var optStr = obj.nsstringProperty // optStr has type String??
   if optStr != nil {
-    var s : String = optStr! // expected-error{{value of optional type 'String?' not unwrapped; did you mean to use '!' or '?'?}}
+    var s : String = optStr! // expected-error{{value of optional type 'String?' must be unwrapped}}
+    // expected-note@-1{{coalesce}}
+    // expected-note@-2{{force-unwrap}}
     var t : String = optStr!!
   }
 
@@ -288,7 +290,9 @@ extension Wobbler2 : NSMaybeInitWobble { // expected-error{{type 'Wobbler2' does
 
 func optionalMemberAccess(_ w: NSWobbling) {
   w.wobble()
-  w.wibble() // expected-error{{value of optional type '(() -> Void)?' not unwrapped; did you mean to use '!' or '?'?}} {{11-11=!}}
+  w.wibble() // expected-error{{value of optional type '(() -> Void)?' must be unwrapped}}
+  // expected-note@-1{{coalesce}}
+  // expected-note@-2{{force-unwrap}}
   let x = w[5]!!
   _ = x
 }

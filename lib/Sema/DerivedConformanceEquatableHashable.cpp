@@ -92,10 +92,6 @@ static bool canDeriveConformance(TypeChecker &tc, DeclContext *DC,
                                  ProtocolDecl *protocol) {
   // The type must be an enum or a struct.
   if (auto enumDecl = dyn_cast<EnumDecl>(target)) {
-    // The enum must have cases.
-    if (!enumDecl->hasCases())
-      return false;
-
     // The cases must not have associated values, or all associated values must
     // conform to the protocol.
     return allAssociatedValuesConformToProtocol(tc, DC, enumDecl, protocol);
@@ -302,6 +298,34 @@ static GuardStmt *returnIfNotEqualGuard(ASTContext &C,
   // guard lhs == rhs else { return false }
   auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
   return new (C) GuardStmt(SourceLoc(), C.AllocateCopy(conditions), body);
+}
+
+static void
+deriveBodyEquatable_enum_uninhabited_eq(AbstractFunctionDecl *eqDecl) {
+  auto parentDC = eqDecl->getDeclContext();
+  ASTContext &C = parentDC->getASTContext();
+
+  auto args = eqDecl->getParameterLists().back();
+  auto aParam = args->get(0);
+  auto bParam = args->get(1);
+
+  assert(!cast<EnumDecl>(aParam->getType()->getAnyNominal())->hasCases());
+
+  SmallVector<ASTNode, 1> statements;
+  SmallVector<ASTNode, 0> cases;
+
+  // switch (a, b) { }
+  auto aRef = new (C) DeclRefExpr(aParam, DeclNameLoc(), /*implicit*/ true);
+  auto bRef = new (C) DeclRefExpr(bParam, DeclNameLoc(), /*implicit*/ true);
+  auto abExpr = TupleExpr::create(C, SourceLoc(), {aRef, bRef}, {}, {},
+                                  SourceLoc(), /*HasTrailingClosure*/ false,
+                                  /*implicit*/ true);
+  auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), abExpr,
+                                       SourceLoc(), cases, SourceLoc(), C);
+  statements.push_back(switchStmt);
+
+  auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
+  eqDecl->setBody(body);
 }
 
 /// Derive the body for an '==' operator for an enum that has no associated
@@ -673,11 +697,13 @@ ValueDecl *DerivedConformance::deriveEquatable(ValueDecl *requirement) {
 
   // Build the necessary decl.
   if (requirement->getBaseName() == "==") {
-    if (auto ED = dyn_cast<EnumDecl>(Nominal)) {
+    if (auto ed = dyn_cast<EnumDecl>(Nominal)) {
       auto bodySynthesizer =
-          ED->hasOnlyCasesWithoutAssociatedValues()
-              ? &deriveBodyEquatable_enum_noAssociatedValues_eq
-              : &deriveBodyEquatable_enum_hasAssociatedValues_eq;
+          !ed->hasCases()
+              ? &deriveBodyEquatable_enum_uninhabited_eq
+              : ed->hasOnlyCasesWithoutAssociatedValues()
+                    ? &deriveBodyEquatable_enum_noAssociatedValues_eq
+                    : &deriveBodyEquatable_enum_hasAssociatedValues_eq;
       return deriveEquatable_eq(*this, TC.Context.Id_derived_enum_equals,
                                 bodySynthesizer);
     } else if (isa<StructDecl>(Nominal))

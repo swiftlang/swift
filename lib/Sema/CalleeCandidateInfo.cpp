@@ -1012,10 +1012,10 @@ bool CalleeCandidateInfo::diagnoseGenericParameterErrors(Expr *badArgExpr) {
     // Check for optional near miss.
     if (auto argOptType = substitution->getOptionalObjectType()) {
       if (isSubstitutableFor(argOptType, paramArchetype, CS.DC)) {
-        CS.TC.diagnose(badArgExpr->getLoc(), diag::missing_unwrap_optional,
-                       argType);
-        foundFailure = true;
-        break;
+        if (diagnoseUnwrap(CS.TC, CS.DC, badArgExpr, substitution)) {
+          foundFailure = true;
+          break;
+        }
       }
     }
     

@@ -893,10 +893,8 @@ static unsigned getNumRemovedArgumentLabels(TypeChecker &TC, ValueDecl *decl,
   // bar.map(E.foo)
   //
   // `E.foo` has to act as a regular function type passed as a value.
-  if (!TC.getLangOpts().isSwiftVersion3()) {
-    if (auto *EED = dyn_cast<EnumElementDecl>(decl)) {
-      numParameterLists = EED->hasAssociatedValues() ? 2 : 1;
-    }
+  if (auto *EED = dyn_cast<EnumElementDecl>(decl)) {
+    numParameterLists = EED->hasAssociatedValues() ? 2 : 1;
   }
 
   // Only applicable to functions. Nothing else should have argument labels in
@@ -2000,9 +1998,14 @@ Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
       Type lookupBaseType = newBase->getWithoutSpecifierType();
 
       if (lookupBaseType->mayHaveMembers()) {
-        auto subs = lookupBaseType->getContextSubstitutionMap(
-          cs.DC->getParentModule(),
-            assocType->getDeclContext());
+        auto *proto = assocType->getProtocol();
+        auto conformance = cs.DC->getParentModule()->lookupConformance(
+          lookupBaseType, proto);
+        if (!conformance)
+          return DependentMemberType::get(lookupBaseType, assocType);
+
+        auto subs = SubstitutionMap::getProtocolSubstitutions(
+          proto, lookupBaseType, *conformance);
         auto result = assocType->getDeclaredInterfaceType().subst(subs);
 
         if (result && !result->hasError())

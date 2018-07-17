@@ -1066,7 +1066,8 @@ class LoopRegionAnalysis : public FunctionAnalysisBase<LoopRegionFunctionInfo> {
 
 public:
   LoopRegionAnalysis(SILModule *M)
-    : FunctionAnalysisBase<LoopRegionFunctionInfo>(AnalysisKind::LoopRegion) {}
+      : FunctionAnalysisBase<LoopRegionFunctionInfo>(
+            SILAnalysisKind::LoopRegion) {}
 
   LoopRegionAnalysis(const LoopRegionAnalysis &) = delete;
   LoopRegionAnalysis &operator=(const LoopRegionAnalysis &) = delete;
@@ -1076,7 +1077,7 @@ public:
   virtual void initialize(SILPassManager *PM) override;
 
   static bool classof(const SILAnalysis *S) {
-    return S->getKind() == AnalysisKind::LoopRegion;
+    return S->getKind() == SILAnalysisKind::LoopRegion;
   }
 
   virtual LoopRegionFunctionInfo *newFunctionAnalysis(SILFunction *F) override {
