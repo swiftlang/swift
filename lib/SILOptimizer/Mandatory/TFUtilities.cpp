@@ -1713,7 +1713,6 @@ decodeArrayElements(SILValue value, SmallVectorImpl<SILValue> &elements,
   uint64_t numElements =
     cast<IntegerLiteralInst>(numElementsVal)->getValue().getLimitedValue();
 
-
   if (tf::ConstExprEvaluator::decodeAllocUninitializedArray(apply,
                                                             numElements,
                                                             elements,

@@ -264,17 +264,21 @@ SymbolicValueMemoryObject::create(Type type, SymbolicValue value,
 // Integers
 //===----------------------------------------------------------------------===//
 
+SymbolicValue SymbolicValue::getInteger(int64_t value, unsigned bitWidth) {
+  SymbolicValue result;
+  result.representationKind = RK_IntegerInline;
+  result.value.integerInline = value;
+  result.aux.integer_bitwidth = bitWidth;
+  return result;
+}
+
+
 SymbolicValue SymbolicValue::getInteger(const APInt &value,
                                         llvm::BumpPtrAllocator &allocator) {
   // In the common case, we can form an inline representation.
   unsigned numWords = value.getNumWords();
-  if (numWords == 1) {
-    SymbolicValue result;
-    result.representationKind = RK_IntegerInline;
-    result.value.integerInline = value.getRawData()[0];
-    result.aux.integer_bitwidth = value.getBitWidth();
-    return result;
-  }
+  if (numWords == 1)
+    return getInteger(value.getRawData()[0], value.getBitWidth());
 
   // Copy the integers from the APInt into the bump pointer.
   auto *words = allocator.Allocate<uint64_t>(numWords);

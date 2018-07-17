@@ -337,6 +337,7 @@ public:
     return representationKind == RK_Inst ? value.inst : nullptr;
   }
 
+  static SymbolicValue getInteger(int64_t value, unsigned bitWidth);
   static SymbolicValue getInteger(const APInt &value,
                                   llvm::BumpPtrAllocator &allocator);
 

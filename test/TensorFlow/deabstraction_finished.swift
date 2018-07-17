@@ -106,17 +106,23 @@ public func tensorShape() -> Tensor<Float> {
 }
 
 // b/75407624
-#if false
 // This requires propagation of the array initializer of TensorShape through its
 // initializers.
 public func test75407624() {
-  // xpected-warning @+1 {{copied to the accelerator}}
   let a = Tensor<Float>([1])
-  // xpected-warning @+1 {{copied to the accelerator}}
   let b = Tensor<Float>(shape: [1], repeating: 1)
-  // xpected-warning @+1 {{copied to the accelerator}}
   let c = Tensor<Float>(shape: [1], repeating: 1)
-  // xpected-note @+1 {{value used here}}
-  _ = a+b+c
+  let d = Tensor<Float>(shape: [2,2], scalars: [1,2,3,4])
+  _ = a+b+c+d
 }
-#endif
+/* CHECK-LABEL: ---- INPUT FUNCTION {{.*}}test75407624
+ * CHECK: graph_op "Const"() {dtype: $Float, value$tensor: {{.}}[f32 0x3F800000 /* 1 */]], value$shape: [i32 1],
+ * CHECK: [[B1X:%.*]] = graph_op "Const"() {dtype: $Int32, value$tensor: {{.}}[i32 1]], value$shape: [i32 1],
+ * CHECK: [[BX2:%.*]] = graph_op "tfc.scalarToTensor,s"(
+ * CHECK:  graph_op "Fill,i,i"([[B1X]] : $TensorHandle<Int32>, [[BX2]] : $TensorHandle<Float>)
+ * CHECK: [[C1X:%.*]] = graph_op "Const"() {dtype: $Int32, value$tensor: {{.}}[i32 1]], value$shape: [i32 1],
+ * CHECK: [[CX2:%.*]] = graph_op "tfc.scalarToTensor,s"(
+ * CHECK:  graph_op "Fill,i,i"([[C1X]] : $TensorHandle<Int32>, [[CX2]] : $TensorHandle<Float>)
+ * CHECK: graph_op "Const"() {dtype: $Float, value$tensor: {{.}}[f32 0x3F800000 /* 1 */], [f32 0x40000000 /* 2 */], [f32 0x40400000 /* 3 */], [f32 0x40800000 /* 4 */]], value$shape: {{.}}[i32 2], [i32 2]],
+ * CHECK-LABEL: ---- END OF 
+*/

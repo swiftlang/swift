@@ -112,7 +112,7 @@ static std::string getDeviceString(DeviceType deviceType) {
 }
 
 /// The returned string can be used to construct SIL function names.
-static std::string getDeviceShortName(DeviceType deviceType) {
+static inline std::string getDeviceShortName(DeviceType deviceType) {
   switch (deviceType) {
     case DeviceType::CPU:
       return "CPU";
