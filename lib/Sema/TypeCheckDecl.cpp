@@ -4592,6 +4592,9 @@ void TypeChecker::requestMemberLayout(ValueDecl *member) {
   if (auto *protocolDecl = dyn_cast<ProtocolDecl>(dc))
     requestNominalLayout(protocolDecl);
 
+  // Compute overrides.
+  (void)member->getOverriddenDecls();
+
   // Check whether the member is @objc or dynamic.
   (void)member->isObjC();
   (void)member->isDynamic();
