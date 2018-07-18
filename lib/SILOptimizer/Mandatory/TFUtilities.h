@@ -357,16 +357,6 @@ private:
              operandClasses[operandNumber].second == OperandClass::InputElt;
     }
 
-    /// Return true if this apply instruction is to a function that can be
-    /// conditionally hoisted into the graph, but don't check the operands to
-    /// see if they are actually constants we can handle.
-    static bool isDecodableApply(ApplyInst *apply);
-
-    /// If the specified call is to a function that we can promote to an op,
-    /// rewrite the instruction and return a new one that does so.  Otherwise,
-    /// return the same instruction.
-    static SILInstruction *decodeApply(ApplyInst *apply);
-
     /// Analyze the specified SIL instruction and return a SILTensorOpInfo
     /// result if the instruction is a valid tensor operation.  This is the
     /// way that SILTensorOpInfo's are created.
@@ -429,9 +419,6 @@ private:
    private:
     SILTensorOpInfo(BuiltinInst *inst) : inst(inst) {}
     bool decodeBuiltin();
-    static SILInstruction *decodeTensorFromScalars(ApplyInst *inst);
-    static SILInstruction *decodeTensorFromScalars1D(ApplyInst *inst);
-    static SILInstruction *decodeTensorFromScalarsND(ApplyInst *inst);
   };
 
   /// Holds information about a TensorFlow operation as represented in SIL
