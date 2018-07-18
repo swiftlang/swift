@@ -1330,7 +1330,7 @@ bool TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
 
   // If we're moving a computation to the accelerator and we see a tuple_extract
   // from a moved value, then we move the tuple_extract as well, to make sure
-  // that any copy-to-host or results are scalar values, not the multiple
+  // that all copy-to-host or results are scalar values, not the multiple
   // results of tensor ops.
   for (auto result : inst.getResults())
     for (auto *use : result->getUses()) {
