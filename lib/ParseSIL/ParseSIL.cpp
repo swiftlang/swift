@@ -901,8 +901,8 @@ void SILParser::convertRequirements(SILFunction *F,
 ///     format used by the 'float_literal' instruction.
 /// - A UTF-8 string literal ("foo").
 /// - A metatype (the instance type is parsed) ($Float).
-/// - An aggregate ([i32 1, i64 2, f32 3.0]).
-///   - Aggregates values represent constant arrays/structs/tuples.
+/// - An aggregate ((i32 1, i64 2, f32 3.0)).
+///   - Aggregates values represent constant structs/tuples.
 /// - A SIL function reference (@foo : $(Int) -> Int).
 /// Returns true on error.
 static bool parseSymbolicValue(SymbolicValue &value, SILParser &SP,
@@ -1028,15 +1028,46 @@ static bool parseSymbolicValue(SymbolicValue &value, SILParser &SP,
     return false;
   }
   // Handle aggregate literals.
+  if (P.Tok.is(tok::l_paren)) {
+    SourceLoc lParenLoc = P.consumeToken(tok::l_paren);
+    SourceLoc rParenLoc;
+
+    SmallVector<SymbolicValue, 8> elements;
+    ParserStatus status =
+      P.parseList(tok::r_paren, lParenLoc, rParenLoc,
+                  /*AllowSepAfterLast*/ false,
+                  diag::sil_const_aggregate_expected_rparen,
+                  SyntaxKind::Unknown, [&]() -> ParserStatus {
+      SymbolicValue element;
+      if (parseSymbolicValue(element, SP, B))
+        return makeParserError();
+      elements.push_back(element);
+      return makeParserSuccess();
+    });
+    if (status.isError())
+      return true;
+    value = SymbolicValue::getAggregate(elements, allocator);
+    return false;
+  }
+  // Handle array literals.
   if (P.Tok.is(tok::l_square)) {
     SourceLoc lSquareLoc = P.consumeToken(tok::l_square);
+    SILType elementType;
+    if (SP.parseSILType(elementType))
+      return true;
+
+    if (!P.consumeIf(tok::colon)) {
+      P.diagnose(P.Tok, diag::expected_sil_colon, "array elements");
+      return true;
+    }
+
     SourceLoc rSquareLoc;
 
     SmallVector<SymbolicValue, 8> elements;
     ParserStatus status =
       P.parseList(tok::r_square, lSquareLoc, rSquareLoc,
                   /*AllowSepAfterLast*/ false,
-                  diag::sil_const_aggregate_expected_rsquare,
+                  diag::sil_const_array_expected_rsquare,
                   SyntaxKind::Unknown,
                   [&]() -> ParserStatus {
       SymbolicValue element;
@@ -1047,7 +1078,8 @@ static bool parseSymbolicValue(SymbolicValue &value, SILParser &SP,
     });
     if (status.isError())
       return true;
-    value = SymbolicValue::getArray(elements, allocator);
+    value = SymbolicValue::getArray(elements, elementType.getASTType(),
+                                    allocator);
     return false;
   }
   P.diagnose(P.Tok, diag::sil_graph_op_expected_attr_value);

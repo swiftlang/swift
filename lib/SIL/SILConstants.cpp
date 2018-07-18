@@ -114,17 +114,19 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
   }
   case RK_Array:
   case RK_ArrayAddress: {
-    ArrayRef<SymbolicValue> elements = getArrayValue();
+    CanType elementType;
+    ArrayRef<SymbolicValue> elements = getArrayValue(elementType);
+    os << "array<" << elementType << ">: " << elements.size();
     switch (elements.size()) {
     case 0:
-      os << "array: 0 elements []\n";
+      os << " elements []\n";
       return;
     case 1:
-      os << "array: 1 elt: ";
+      os << " elt: ";
       elements[0].print(os, indent+2);
       return;
     default:
-      os << "array: " << elements.size() << " elements [\n";
+      os << " elements [\n";
       for (auto elt : elements)
         elt.print(os, indent+2);
       os.indent(indent) << "]\n";
@@ -238,12 +240,13 @@ SymbolicValue SymbolicValue::cloneInto(llvm::BumpPtrAllocator &allocator) const{
   }
   case RK_Array:
   case RK_ArrayAddress: {
-    auto elts = getArrayValue();
+    CanType elementType;
+    auto elts = getArrayValue(elementType);
     SmallVector<SymbolicValue, 4> results;
     results.reserve(elts.size());
     for (auto elt : elts)
       results.push_back(elt.cloneInto(allocator));
-    return getArray(results, allocator);
+    return getArray(results, elementType, allocator);
   }
   }
 }
@@ -636,27 +639,75 @@ SymbolicValueMemoryObject *SymbolicValue::getAddressValueMemoryObject() const {
 // Arrays
 //===----------------------------------------------------------------------===//
 
+namespace swift {
+
+/// This is the representation of a derived address.  A derived address refers
+/// to a memory object along with an access path that drills into it.
+struct ArraySymbolicValue final
+: private llvm::TrailingObjects<ArraySymbolicValue, SymbolicValue> {
+  friend class llvm::TrailingObjects<ArraySymbolicValue, SymbolicValue>;
+
+  const CanType elementType;
+
+  /// This is the number of indices in the derived address.
+  const unsigned numElements;
+
+  static ArraySymbolicValue *create(ArrayRef<SymbolicValue> elements,
+                                    CanType elementType,
+                                    llvm::BumpPtrAllocator &allocator) {
+    auto byteSize =
+      ArraySymbolicValue::totalSizeToAlloc<SymbolicValue>(elements.size());
+    auto rawMem = allocator.Allocate(byteSize, alignof(ArraySymbolicValue));
+
+    //  Placement initialize the object.
+    auto asv = ::new (rawMem) ArraySymbolicValue(elementType, elements.size());
+    std::uninitialized_copy(elements.begin(), elements.end(),
+                            asv->getTrailingObjects<SymbolicValue>());
+    return asv;
+  }
+
+  /// Return the element constants for this aggregate constant.  These are
+  /// known to all be constants.
+  ArrayRef<SymbolicValue> getElements() const {
+    return { getTrailingObjects<SymbolicValue>(), numElements };
+  }
+
+  // This is used by the llvm::TrailingObjects base class.
+  size_t numTrailingObjects(OverloadToken<SymbolicValue>) const {
+    return numElements;
+  }
+private:
+  ArraySymbolicValue() = delete;
+  ArraySymbolicValue(const ArraySymbolicValue &) = delete;
+  ArraySymbolicValue(CanType elementType, unsigned numElements)
+   : elementType(elementType), numElements(numElements) {}
+};
+} // end namespace swift
+
 /// Produce an array of elements.
 SymbolicValue SymbolicValue::getArray(ArrayRef<SymbolicValue> elements,
+                                      CanType elementType,
                                       llvm::BumpPtrAllocator &allocator) {
-  // Copy the integers from the APInt into the bump pointer.
-  auto *resultElts = allocator.Allocate<SymbolicValue>(elements.size());
-  std::uninitialized_copy(elements.begin(), elements.end(), resultElts);
-
+  // TODO: Could compress the empty array representation if there were a reason
+  // to.
+  auto asv = ArraySymbolicValue::create(elements, elementType, allocator);
   SymbolicValue result;
   result.representationKind = RK_Array;
-  result.value.array = resultElts;
-  result.aux.array_numElements = elements.size();
+  result.value.array = asv;
   return result;
 }
 
-ArrayRef<SymbolicValue> SymbolicValue::getArrayValue() const {
+ArrayRef<SymbolicValue>
+SymbolicValue::getArrayValue(CanType &elementType) const {
   assert(getKind() == Array);
   auto val = *this;
   if (representationKind == RK_ArrayAddress)
     val = value.arrayAddress->getValue();
+  
   assert(val.representationKind == RK_Array);
-  return ArrayRef<SymbolicValue>(val.value.array, val.aux.array_numElements);
+
+  elementType = val.value.array->elementType;
+  return val.value.array->getElements();
 }
 
 //===----------------------------------------------------------------------===//
