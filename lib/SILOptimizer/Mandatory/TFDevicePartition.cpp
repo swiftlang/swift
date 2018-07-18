@@ -794,11 +794,9 @@ class DevicePartitionerImpl
       auto *transferInst = B.createGraphOperation(
           loc, ctx.getIdentifier(newInstName),
           /*operands*/ {opValue}, attributes, {opValue->getType()});
-      // auto *transferInst = getSingleValueResult(result);
 
       markInstForDevice(operandDeviceType, transferInst);
       markInstForDevice(deviceType, transferInst);
-      // transferInstsByDestDevice[lookupKey] = transferInst;
       transferInstsByDestDevice[lookupKey] = getSingleValueResult(transferInst);
     }
     inst->setOperand(operIdx, transferInstsByDestDevice[lookupKey]);
