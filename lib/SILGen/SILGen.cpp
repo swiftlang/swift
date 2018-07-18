@@ -689,16 +689,16 @@ emitMarkFunctionEscapeForTopLevelCodeGlobals(SILLocation loc,
 }
 
 /// SWIFT_ENABLE_TENSORFLOW
+static unsigned countNumFlattenedElementTypes(Type type) {
+  if (auto *tupleTy = type->getCanonicalType()->getAs<TupleType>())
+    accumulate(tupleTy->getElementTypes(), 0, [&](unsigned num, Type type) {
+      return num + countNumFlattenedElementTypes(type);
+    });
+  return 1;
+}
+
 IntRange<unsigned> SILGenModule::
 getLoweredFunctionParameterIndex(unsigned paramIndex, AnyFunctionType *ty) {
-  // A helper function that the number of types the given type will be flattened
-  // into as a function parameter during SILGen.
-  auto getNumFlattenedTypes = [&](Type type) -> unsigned {
-    auto silTy = getLoweredType(type);
-    if (auto tupleTy = silTy.getAs<TupleType>())
-      return tupleTy->getNumElements();
-    return 1;
-  };
   // Starting from the first parameter index (0), increment `startIndex` until
   // we find the first corresponding argument index for the given function
   // parameter index.
@@ -706,10 +706,10 @@ getLoweredFunctionParameterIndex(unsigned paramIndex, AnyFunctionType *ty) {
   auto params = ty->getParams();
   assert(paramIndex < params.size() && "Parameter index out of bounds!");
   for (auto i : range(paramIndex))
-    startIndex += getNumFlattenedTypes(params[i].getType());
+    startIndex += countNumFlattenedElementTypes(params[i].getType());
   // Compute the offset from the given parameter's first corresponding argument
   // index to the last corresponding argument index.
-  unsigned offset = getNumFlattenedTypes(params[paramIndex].getType());
+  unsigned offset = countNumFlattenedElementTypes(params[paramIndex].getType());
   return range(startIndex, startIndex + offset);
 }
 
