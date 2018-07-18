@@ -4464,6 +4464,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
   case DeclKind::EnumElement: {
     auto *EED = cast<EnumElementDecl>(D);
+    EnumDecl *ED = EED->getParentEnum();
 
     checkDeclAttributesEarly(EED);
     validateAttributes(*this, EED);
@@ -4471,7 +4472,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     DeclValidationRAII IBV(EED);
 
     if (auto *PL = EED->getParameterList()) {
-      GenericTypeToArchetypeResolver resolver(EED->getParentEnum());
+      CompleteGenericTypeResolver resolver(*this, ED->getGenericSignature());
 
       bool isInvalid
         = typeCheckParameterList(PL, EED->getParentEnum(),
@@ -4487,7 +4488,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     // If we have a raw value, make sure there's a raw type as well.
     if (auto *rawValue = EED->getRawValueExpr()) {
-      EnumDecl *ED = EED->getParentEnum();
       if (!ED->hasRawType()) {
         diagnose(rawValue->getLoc(),diag::enum_raw_value_without_raw_type);
         // Recover by setting the raw type as this element's type.
@@ -4504,8 +4504,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     // Now that we have an argument type we can set the element's declared
     // type.
-    if (!EED->hasInterfaceType() && !EED->computeType())
-      break;
+    if (!EED->isInvalid())
+      EED->computeType();
 
     EED->setSignatureIsValidated();
 

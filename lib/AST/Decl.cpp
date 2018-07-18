@@ -5402,8 +5402,8 @@ bool EnumElementDecl::computeType() {
 
   // The type of the enum element is either (T) -> T or (T) -> ArgType -> T.
   if (auto *PL = getParameterList()) {
-    auto paramTy = PL->getType(getASTContext());
-    resultTy = FunctionType::get(paramTy->mapTypeOutOfContext(), resultTy);
+    auto paramTy = PL->getInterfaceType(getASTContext());
+    resultTy = FunctionType::get(paramTy, resultTy);
   }
 
   if (auto *genericSig = ED->getGenericSignatureOfContext())
