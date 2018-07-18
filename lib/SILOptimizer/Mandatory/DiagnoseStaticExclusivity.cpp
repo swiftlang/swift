@@ -896,6 +896,14 @@ static void checkNoEscapePartialApply(PartialApplyInst *PAI) {
         continue;
       }
     }
+    auto *termInst = dyn_cast<TermInst>(user);
+    if (termInst && termInst->isBranch()) {
+      // FIXME: Passing noescape closures through block arguments is currently a
+      // hole in the exclusivity model. This is only permitted on the 4.2
+      // branch. The implementation on master should follow block arguments both
+      // here and in checkForViolationAtApply.
+      continue;
+    }
     llvm::dbgs() << "Unexpected partial_apply use: " << *user;
     llvm_unreachable("A partial_apply with @inout_aliasable may only be "
                      "used as a @noescape function type argument.");
