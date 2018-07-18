@@ -2502,9 +2502,8 @@ where Self.RawSignificand : FixedWidthInteger {
   /// of `range`, some concrete values may be represented more frequently than
   /// others.
   ///
-  /// This method uses the default random generator, `Random.default`. The call
-  /// to `Double.random(in: ${exampleRange})` above is equivalent to calling
-  /// `Double.random(in: ${exampleRange}, using: &Random.default)`.
+  /// This method is equivalent to calling the version that takes a generator, 
+  /// passing in the system's default random generator.
   ///
   /// - Parameter range: The range in which to create a random value.
 %   if Range == 'Range':
