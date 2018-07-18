@@ -344,12 +344,12 @@ extension PettableContainer {
 }
 
 // expected-error@+2{{inheritance from a generic Objective-C class 'GenericClass' must bind type parameters of 'GenericClass' to specific concrete types}}
-// expected-error@+1 4{{objc}}
+// expected-error@+1 2{{objc}}
 class SwiftGenericSubclassA<X: AnyObject>: GenericClass<X> {}
 // expected-error@+1{{inheritance from a generic Objective-C class 'GenericClass' must bind type parameters of 'GenericClass' to specific concrete types}}
 class SwiftGenericSubclassB<X: AnyObject>: GenericClass<GenericClass<X>> {}
 // expected-error@+2{{inheritance from a generic Objective-C class 'GenericClass' must bind type parameters of 'GenericClass' to specific concrete types}}
-// expected-error@+1 4{{objc}}
+// expected-error@+1 2{{objc}}
 class SwiftGenericSubclassC<X: NSCopying>: GenericClass<X> {}
 
 class SwiftConcreteSubclassA: GenericClass<AnyObject> {
