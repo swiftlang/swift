@@ -4907,7 +4907,8 @@ SourceRange AbstractFunctionDecl::getSignatureSourceRange() const {
 ObjCSelector
 AbstractFunctionDecl::getObjCSelector(DeclName preferredName) const {
   // FIXME: Forces computation of the Objective-C selector.
-  (void)isObjC();
+  if (getASTContext().getLazyResolver())
+    (void)isObjC();
 
   // If there is an @objc attribute with a name, use that name.
   auto *objc = getAttrs().getAttribute<ObjCAttr>();
