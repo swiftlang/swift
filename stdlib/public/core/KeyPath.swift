@@ -1567,6 +1567,15 @@ internal struct KeyPathBuffer {
     trivial = header.trivial
     hasReferencePrefix = header.hasReferencePrefix
   }
+
+  @inlinable // FIXME(sil-serialize-all)
+  internal init(partialData: UnsafeRawBufferPointer,
+                trivial: Bool = false,
+                hasReferencePrefix: Bool = false) {
+    self.data = partialData
+    self.trivial = trivial
+    self.hasReferencePrefix = hasReferencePrefix
+  }
   
   @inlinable // FIXME(sil-serialize-all)
   internal func destroy() {
@@ -2326,6 +2335,27 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
       return true
     }())
 
+    func setComputedCapability(for header: RawKeyPathComponent.Header) {
+      let settable =
+        header.payload & RawKeyPathComponent.Header.computedSettableFlag != 0
+      let mutating =
+        header.payload & RawKeyPathComponent.Header.computedMutatingFlag != 0
+
+      switch (settable, mutating) {
+      case (false, false):
+        // If the property is get-only, the capability becomes read-only, unless
+        // we get another reference-writable component.
+        capability = .readOnly
+      case (true, false):
+        capability = .reference
+      case (true, true):
+        // Writable if the base is. No effect.
+        break
+      case (false, true):
+        _sanityCheckFailure("unpossible")
+      }
+    }
+
     switch header.kind {
     case .struct:
       // No effect on the capability.
@@ -2397,7 +2427,41 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
         }
 
       case .computed:
-        fatalError("to be implemented")
+        // If the external declaration is computed, and it takes captured
+        // arguments, then we have to build a bit of a chimera. The canonical
+        // identity and accessors come from the descriptor, but the argument
+        // handling is still as described in the local candidate.
+        if descriptorHeader.payload &
+                      RawKeyPathComponent.Header.computedHasArgumentsFlag != 0 {
+          fatalError("to be implemented")
+        }
+
+        // If there aren't any captured arguments expected in the external
+        // component, then we only need to adopt its accessors.
+        // Drop this external reference...
+        size -= header.patternComponentBodySize
+        _ = buffer.popRaw(size: MemoryLayout<Int>.size * genericParamCount,
+                          alignment: MemoryLayout<Int>.alignment)
+        // ...and the local candidate, which is the component following this
+        // one.
+        let localCandidateHeader = buffer.pop(RawKeyPathComponent.Header.self)
+        let localCandidateSize = localCandidateHeader.patternComponentBodySize
+        size -= (localCandidateSize
+                 + MemoryLayout<RawKeyPathComponent.Header>.size)
+        _ = buffer.popRaw(size: localCandidateSize,
+                          alignment: MemoryLayout<UInt32>.alignment)
+
+        _sanityCheck({
+          expectedPop += localCandidateSize
+                      +  MemoryLayout<RawKeyPathComponent.Header>.size
+          return true
+        }())
+
+        // The final component will be an instantiation of the computed
+        // component. With no arguments, the instantiated size will be the
+        // same as the pattern size.
+        setComputedCapability(for: descriptorHeader)
+        size += descriptorHeader.patternComponentBodySize
 
       case .external, .optionalChain, .optionalForce, .optionalWrap:
         _sanityCheckFailure("should not appear as property descriptor")
@@ -2406,25 +2470,10 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
     case .computed:
       let settable =
         header.payload & RawKeyPathComponent.Header.computedSettableFlag != 0
-      let mutating =
-        header.payload & RawKeyPathComponent.Header.computedMutatingFlag != 0
-
       let hasArguments =
         header.payload & RawKeyPathComponent.Header.computedHasArgumentsFlag != 0
 
-      switch (settable, mutating) {
-      case (false, false):
-        // If the property is get-only, the capability becomes read-only, unless
-        // we get another reference-writable component.
-        capability = .readOnly
-      case (true, false):
-        capability = .reference
-      case (true, true):
-        // Writable if the base is. No effect.
-        break
-      case (false, true):
-        _sanityCheckFailure("unpossible")
-      }
+      setComputedCapability(for: header)
 
       _ = buffer.popRaw(size: MemoryLayout<Int>.size * (settable ? 3 : 2),
                         alignment: MemoryLayout<Int>.alignment)
@@ -2624,25 +2673,9 @@ internal func _instantiateKeyPathBuffer(
       }
     }
 
-    switch header.kind {
-    case .struct:
-      // The offset may need to be resolved dynamically.
-      tryToResolveOffset(header: header,
-                         getOutOfLineOffset: { patternBuffer.pop(UInt32.self) })
-    case .class:
-      // Crossing a class can end the reference prefix, and makes the following
-      // key path potentially reference-writable.
-      endOfReferencePrefixComponent = previousComponentAddr
-      // The offset may need to be resolved dynamically.
-      tryToResolveOffset(header: header,
-                         getOutOfLineOffset: { patternBuffer.pop(UInt32.self) })
-    case .optionalChain,
-         .optionalWrap,
-         .optionalForce:
-      // No instantiation necessary.
-      pushDest(header)
-      break
-    case .computed:
+    func tryToResolveComputed(header: RawKeyPathComponent.Header,
+                              accessorsBuffer: inout KeyPathBuffer,
+                              argsBuffer: inout KeyPathBuffer) {
       // A nonmutating settable property can end the reference prefix and
       // makes the following key path potentially reference-writable.
       if header.payload & RawKeyPathComponent.Header.computedSettableFlag != 0
@@ -2652,7 +2685,7 @@ internal func _instantiateKeyPathBuffer(
 
       // The ID may need resolution if the property is keyed by a selector.
       var newHeader = header
-      var id = patternBuffer.pop(Int.self)
+      var id = accessorsBuffer.pop(Int.self)
       switch header.payload
                          & RawKeyPathComponent.Header.computedIDResolutionMask {
       case RawKeyPathComponent.Header.computedIDResolved:
@@ -2670,27 +2703,29 @@ internal func _instantiateKeyPathBuffer(
       pushDest(newHeader)
       pushDest(id)
       // Carry over the accessors.
-      let getter = patternBuffer.pop(UnsafeRawPointer.self)
+      let getter = accessorsBuffer.pop(UnsafeRawPointer.self)
       pushDest(getter)
       if header.payload & RawKeyPathComponent.Header.computedSettableFlag != 0{
-        let setter = patternBuffer.pop(UnsafeRawPointer.self)
+        let setter = accessorsBuffer.pop(UnsafeRawPointer.self)
         pushDest(setter)
       }
+      _sanityCheck(accessorsBuffer.data.isEmpty)
+
       // Carry over the arguments.
       if header.payload
           & RawKeyPathComponent.Header.computedHasArgumentsFlag != 0 {
-        let getLayoutRaw = patternBuffer.pop(UnsafeRawPointer.self)
+        let getLayoutRaw = argsBuffer.pop(UnsafeRawPointer.self)
         let getLayout = unsafeBitCast(getLayoutRaw,
           to: RawKeyPathComponent.ComputedArgumentLayoutFn.self)
 
-        let witnesses = patternBuffer.pop(
+        let witnesses = argsBuffer.pop(
           UnsafePointer<ComputedArgumentWitnesses>.self)
 
         if let _ = witnesses.pointee.destroy {
           isTrivial = false
         }
 
-        let initializerRaw = patternBuffer.pop(UnsafeRawPointer.self)
+        let initializerRaw = argsBuffer.pop(UnsafeRawPointer.self)
         let initializer = unsafeBitCast(initializerRaw,
           to: RawKeyPathComponent.ComputedArgumentInitializerFn.self)
 
@@ -2711,6 +2746,41 @@ internal func _instantiateKeyPathBuffer(
           start: destData.baseAddress.unsafelyUnwrapped + stride,
           count: destData.count - stride)
       }
+    }
+
+    switch header.kind {
+    case .struct:
+      // The offset may need to be resolved dynamically.
+      tryToResolveOffset(header: header,
+                         getOutOfLineOffset: { patternBuffer.pop(UInt32.self) })
+    case .class:
+      // Crossing a class can end the reference prefix, and makes the following
+      // key path potentially reference-writable.
+      endOfReferencePrefixComponent = previousComponentAddr
+      // The offset may need to be resolved dynamically.
+      tryToResolveOffset(header: header,
+                         getOutOfLineOffset: { patternBuffer.pop(UInt32.self) })
+    case .optionalChain,
+         .optionalWrap,
+         .optionalForce:
+      // No instantiation necessary.
+      pushDest(header)
+      break
+    case .computed:
+      // Slice off the accessors.
+      let accessorSize: Int
+      if header.payload & RawKeyPathComponent.Header.computedSettableFlag != 0 {
+        accessorSize = 3
+      } else {
+        accessorSize = 2
+      }
+      let accessorData =
+        patternBuffer.popRaw(size: MemoryLayout<Int>.size * accessorSize,
+                             alignment: MemoryLayout<Int>.alignment)
+      var accessorBuffer = KeyPathBuffer(partialData: accessorData)
+      tryToResolveComputed(header: header,
+                           accessorsBuffer: &accessorBuffer,
+                           argsBuffer: &patternBuffer)
     case .external:
       // Look at the external property descriptor to see if we should take it
       // over the component given in the pattern.
@@ -2763,7 +2833,51 @@ internal func _instantiateKeyPathBuffer(
                            })
 
       case .computed:
-        fatalError("to be implemented")
+        // If the external declaration is computed, and it takes captured
+        // arguments, then we have to build a bit of a chimera. The canonical
+        // identity and accessors come from the descriptor, but the argument
+        // handling is still as described in the local candidate.
+        if descriptorHeader.payload
+                    & RawKeyPathComponent.Header.computedHasArgumentsFlag != 0 {
+          fatalError("to be implemented")
+        }
+        
+        // If there aren't any captured arguments expected in the external
+        // component, then we only need to adopt its accessors.
+        // Drop this external reference...
+        _ = patternBuffer.popRaw(
+          size: MemoryLayout<Int>.size * genericParamCount,
+          alignment: MemoryLayout<Int>.alignment)
+        // ...and the local candidate, which is the component following this
+        // one.
+        let localCandidateHeader =
+          patternBuffer.pop(RawKeyPathComponent.Header.self)
+        let localCandidateSize = localCandidateHeader.patternComponentBodySize
+        _ = patternBuffer.popRaw(size: localCandidateSize,
+                                 alignment: MemoryLayout<UInt32>.alignment)
+
+        _sanityCheck({
+          expectedPop += localCandidateSize
+                      +  MemoryLayout<RawKeyPathComponent.Header>.size
+          return true
+        }())
+
+        var descriptorBuffer = KeyPathBuffer(
+          partialData: UnsafeRawBufferPointer(
+            start: descriptor + MemoryLayout<RawKeyPathComponent.Header>.size,
+            count: descriptorHeader.patternComponentBodySize))
+        var emptyBuffer = KeyPathBuffer(
+          partialData: UnsafeRawBufferPointer(
+            start: descriptor,
+            count: 0))
+
+        // The final component is an instantiation of the computed
+        // component from the descriptor.
+        tryToResolveComputed(header: descriptorHeader,
+                             accessorsBuffer: &descriptorBuffer,
+                             argsBuffer: &emptyBuffer)
+
+        _sanityCheck(descriptorBuffer.data.isEmpty)
 
       case .external, .optionalChain, .optionalForce, .optionalWrap:
         _sanityCheckFailure("should not appear as property descriptor")

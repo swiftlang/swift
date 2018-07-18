@@ -18,6 +18,8 @@ var keyPathMultiModule = TestSuite("key paths across multiple modules")
 
 keyPathMultiModule.test("identity across multiple modules") {
   expectEqual(A_x_keypath(), \A.x)
+  expectEqual(A_y_keypath(), \A.y)
+  expectEqual(A_z_keypath(), \A.z)
   expectEqual(A_subscript_withGeneric_keypath(index: 0), \A.[withGeneric: 0])
   expectEqual(A_subscript_withGeneric_keypath(index: "butt"),
               \A.[withGeneric: "butt"])

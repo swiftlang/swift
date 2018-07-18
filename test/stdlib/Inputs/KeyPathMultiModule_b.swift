@@ -7,6 +7,16 @@ public struct A {
 
   public var storedA: B<Int>
   public private(set) var storedB: Double
+
+  public var y: Int {
+    get { return 0 }
+    set { }
+  }
+
+  public private(set) var z: Int {
+    get { return 0 }
+    set { }
+  }
 }
 
 public struct B<U> {
@@ -24,6 +34,14 @@ public struct B<U> {
 
 public func A_x_keypath() -> KeyPath<A, Int> {
   return \A.x
+}
+
+public func A_y_keypath() -> KeyPath<A, Int> {
+  return \A.y
+}
+
+public func A_z_keypath() -> KeyPath<A, Int> {
+  return \A.z
 }
 
 public func A_subscript_withGeneric_keypath<T: Hashable>(index: T)
