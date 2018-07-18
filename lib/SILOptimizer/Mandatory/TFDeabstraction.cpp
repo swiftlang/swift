@@ -1735,70 +1735,68 @@ static Type getArrayElementType(Type ty) {
 bool isArrayAllocUninit(SILValue op, SILValue &numElements);
 
 namespace {
-  /// This is a little helper for working with literal arrays that may want to get
-  /// deleted if all references to them are removed.
-  struct ArrayElementDecoder {
-    SmallVector<SILValue, 4> elements;
-    SmallPtrSet<SILInstruction*, 8> arrayInsts;
+/// This is a little helper for working with literal arrays that may want to get
+/// deleted if all references to them are removed.
+struct ArrayElementDecoder {
+  SmallVector<SILValue, 4> elements;
+  SmallPtrSet<SILInstruction*, 8> arrayInsts;
 
-    /// Given a SILValue that may be an array, attempt to decode it into the
-    /// literal values that make up its elements.  This returns the element type
-    /// of the array if it succeeds, otherwise a null type.
-    Type decode(SILValue value) {
-      auto elementType = getArrayElementType(value->getType().getASTType());
-      if (!elementType) return Type();
+  /// Given a SILValue that may be an array, attempt to decode it into the
+  /// literal values that make up its elements.  This returns the element type
+  /// of the array if it succeeds, otherwise a null type.
+  Type decode(SILValue value) {
+    auto elementType = getArrayElementType(value->getType().getASTType());
+    if (!elementType) return Type();
 
-      // The only pattern we support involves a call to _allocateUninitializedArray.
-      // The array value will be a tuple extract from the 0th result of the call.
-      auto *teiValue = dyn_cast<TupleExtractInst>(value);
-      if (!teiValue || teiValue->getFieldNo() != 0 ||
-          !isa<ApplyInst>(teiValue->getOperand()))
-        return Type();
-
-      // Figure out the number of elements, which must be a constant integer.
-      auto *apply = cast<ApplyInst>(teiValue->getOperand());
-
-      if (decodeApply(apply))
-        return elementType;
+    // The only pattern we support involves a call to
+    // _allocateUninitializedArray.  The array value will be a tuple extract
+    // from the 0th result of the call.
+    auto *teiValue = dyn_cast<TupleExtractInst>(value);
+    if (!teiValue || teiValue->getFieldNo() != 0 ||
+        !isa<ApplyInst>(teiValue->getOperand()))
       return Type();
 
-      return Type();
+    // Figure out the number of elements, which must be a constant integer.
+    auto *apply = cast<ApplyInst>(teiValue->getOperand());
+
+    if (decodeApply(apply))
       return elementType;
-    }
+    return Type();
+  }
 
-    /// Given an applyinst for _allocateUninitialized, try to decode it.  This
-    /// returns true on success or false on failure.
-    bool decodeApply(ApplyInst *apply) {
-      // Verify we have a call to _allocateUninitializedArray.
-      SILValue numElementsVal;
-      if (!isArrayAllocUninit(apply, numElementsVal) ||
-          !isa<IntegerLiteralInst>(numElementsVal))
-        return false;
-      uint64_t numElements =
-      cast<IntegerLiteralInst>(numElementsVal)->getValue().getLimitedValue();
+  /// Given an applyinst for _allocateUninitialized, try to decode it.  This
+  /// returns true on success or false on failure.
+  bool decodeApply(ApplyInst *apply) {
+    // Verify we have a call to _allocateUninitializedArray.
+    SILValue numElementsVal;
+    if (!isArrayAllocUninit(apply, numElementsVal) ||
+        !isa<IntegerLiteralInst>(numElementsVal))
+      return false;
+    uint64_t numElements =
+    cast<IntegerLiteralInst>(numElementsVal)->getValue().getLimitedValue();
 
-      return !tf::ConstExprEvaluator::
-      decodeAllocUninitializedArray(apply, numElements, elements, &arrayInsts);
-    }
+    return !tf::ConstExprEvaluator::
+    decodeAllocUninitializedArray(apply, numElements, elements, &arrayInsts);
+  }
 
-    /// Try to remove the instructions that make up the array initialization.
-    void removeInstructionsIfPossible(SILBasicBlock::iterator &it) {
-      if (arrayInsts.empty())
-        return;
+  /// Try to remove the instructions that make up the array initialization.
+  void removeInstructionsIfPossible(SILBasicBlock::iterator &it) {
+    if (arrayInsts.empty())
+      return;
 
-      // If the iterator is pointing to an instruction we're about to remove,
-      // advance it to avoid invalidation.
-      while (arrayInsts.count(&*it))
-        ++it;
+    // If the iterator is pointing to an instruction we're about to remove,
+    // advance it to avoid invalidation.
+    while (arrayInsts.count(&*it))
+      ++it;
 
-      // If we can remove it, drop all inter-dependent references.
-      for (auto inst : arrayInsts)
-        inst->dropAllReferences();
-      // Then erase the instructions themselves.
-      for (auto inst : arrayInsts)
-        inst->eraseFromParent();
-    }
-  };
+    // If we can remove it, drop all inter-dependent references.
+    for (auto inst : arrayInsts)
+      inst->dropAllReferences();
+    // Then erase the instructions themselves.
+    for (auto inst : arrayInsts)
+      inst->eraseFromParent();
+  }
+};
 } // end anonymous namespace
 
 
@@ -2158,11 +2156,6 @@ formGraphOp(SILTensorOpInfo &opInfo,
 ///      top level code in scripts.
 ///   3) SSA Promotion of stack values to registers.
 ///   4) Scalarization of struct/tuple values.
-///
-/// TODO:
-///   *) Move tensor op canonicalization up from tf-partition.
-///   *) Enums.  What can we reliably do with them?  Should they be out of
-///      model?  We can definitely do ones without payload values.
 ///
 void TFDeabstraction::doIt() {
   // Start by inlining functions that take and return Tensor values.
