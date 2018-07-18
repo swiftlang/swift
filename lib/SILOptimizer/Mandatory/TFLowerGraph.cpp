@@ -1830,6 +1830,7 @@ GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
       case SymbolicValue::Enum:
       case SymbolicValue::EnumWithPayload:
       case SymbolicValue::Address:
+      case SymbolicValue::Aggregate:  // Tuples and structs
         assert(0 && "These attribute kinds cannot happen here");
       case SymbolicValue::Integer: {
         auto value = attrValue.getIntegerValue();
@@ -1878,9 +1879,12 @@ GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
           return GLStatus::Error;
         break;
       }
-      case SymbolicValue::Aggregate:
-      case SymbolicValue::Array:
-        llvm_unreachable("FIXME: Handle normal aggregate/array arguments");
+      case SymbolicValue::Array: {
+        // FIXME: Handle array attributes.
+        internalError(getUserSourceLocation(inst->getDebugLocation()),
+                      "FIXME: Handle array attributes");
+        return GLStatus::Error;
+      }
       }
       // Done with normal attributes.
       break;
@@ -1948,7 +1952,10 @@ GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
     case SILTensorOpInfo::OperandClass::Array:
       // TODO: TF_SetAttrTypeList, TF_SetAttrStringList, TF_SetAttrIntList,
       // TF_SetAttrFloatList, TF_SetAttrBoolList
-      llvm_unreachable("FIXME: These operand classes are not yet handled");
+      internalError(getUserSourceLocation(inst->getDebugLocation()),
+                    "FIXME: Handle array and shapearray attributes");
+      return GLStatus::Error;
+
     case SILTensorOpInfo::OperandClass::ArrayElement:
       llvm_unreachable("This is a legacy class that shouldn't happen");
     }

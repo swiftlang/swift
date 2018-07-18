@@ -80,13 +80,6 @@ static WellKnownFunction classifyFunction(SILFunction *fn) {
 // ConstExprFunctionState implementation.
 //===----------------------------------------------------------------------===//
 
-/// Return true if the specified SIL type is considered to be a pointer that
-/// we track an address for.  This is true for SIL address types as well as the
-/// Builtin.RawPointer type.
-static bool isPointer(SILType ty) {
-  return ty.isAddress() || ty.is<BuiltinRawPointerType>();
-}
-
 namespace {
   /// This type represents the state of computed values within a function
   /// as evaluation happens.  A separate instance of this is made for each
@@ -343,6 +336,26 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
   if (auto *bai = dyn_cast<BeginAccessInst>(value))
     return getConstantValue(bai->getOperand());
 
+  // Builtin.RawPointer and addresses have the same representation.
+  if (auto *p2ai = dyn_cast<PointerToAddressInst>(value))
+    return getConstantValue(p2ai->getOperand());
+
+  // Indexing a pointer moves its deepest index.
+  if (auto *ia = dyn_cast<IndexAddrInst>(value)) {
+    auto index = getConstantValue(ia->getOperand(1));
+    if (!index.isConstant())
+      return index;
+    auto basePtr = getConstantValue(ia->getOperand(0));
+    if (basePtr.getKind() != SymbolicValue::Address)
+      return basePtr;
+
+    SmallVector<unsigned, 4> accessPath;
+    auto *memObject = basePtr.getAddressValue(accessPath);
+    assert(!accessPath.empty() && "Can't index a non-indexed address");
+    accessPath.back() += index.getIntegerValue().getLimitedValue();
+    return SymbolicValue::getAddress(memObject, accessPath,
+                                     evaluator.getAllocator());
+  }
 
   DEBUG(llvm::dbgs() << "ConstExpr Unknown simple: " << *value << "\n");
 
@@ -773,37 +786,42 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
     return None;
   }
   case WellKnownFunction::AllocateUninitializedArray: {
-    // We evaluate _allocateUninitialized in the flow-insensitive case because
-    // we otherwise won't find the stores to initialize the array elements.
-    // Collect them here and pretend that the array was initialized atomically.
-    if (fn)
-      break;  // Analyze flow sensitive case normally.
-
     // This function has this signature:
     //   func _allocateUninitializedArray<Element>(_ builtinCount: Builtin.Word)
     //     -> (Array<Element>, Builtin.RawPointer)
 
     // Figure out the allocation size.
-    auto numElements = getConstantValue(apply->getOperand(1));
-    if (!numElements.isConstant())
-      return numElements;
+    auto numElementsSV = getConstantValue(apply->getOperand(1));
+    if (!numElementsSV.isConstant())
+      return numElementsSV;
 
-    SmallVector<SILValue, 8> elements;
-    if (ConstExprEvaluator::decodeAllocUninitializedArray(apply,
-                            numElements.getIntegerValue().getLimitedValue(),
-                                                          elements,
-                                                       /*arrayInsts*/nullptr))
-      return SymbolicValue::getUnknown((SILInstruction*)apply,
-                                       UnknownReason::Default);
+    unsigned numElements = numElementsSV.getIntegerValue().getLimitedValue();
 
-    // Okay, we were able to decode the array.  See if we can fold all of the
-    // elements we found.
     SmallVector<SymbolicValue, 8> elementConstants;
-    for (auto elt : elements) {
-      auto eltCst = getConstantValue(elt);
-      if (!eltCst.isConstant())
-        return eltCst;
-      elementConstants.push_back(eltCst);
+    if (fn) {
+      // In the flow sensitive case, we can analyze this as an allocation of
+      // uninitialized array memory, and allow the stores to the pointer result
+      // to initialize the elements in a normal flow sensitive way.
+      elementConstants.assign(numElements, SymbolicValue::getUninitMemory());
+    } else {
+      // We handle the flow-insensitive case specially in order to find the
+      // stores to initialize the array elements.  Collect them here and pretend
+      // that the array was initialized atomically.
+      SmallVector<SILValue, 8> elements;
+      if (ConstExprEvaluator::decodeAllocUninitializedArray(apply, numElements,
+                                                            elements,
+                                                         /*arrayInsts*/nullptr))
+        return SymbolicValue::getUnknown((SILInstruction*)apply,
+                                         UnknownReason::Default);
+
+      // Okay, we were able to decode the array.  See if we can fold all of the
+      // elements we found.
+      for (auto elt : elements) {
+        auto eltCst = getConstantValue(elt);
+        if (!eltCst.isConstant())
+          return eltCst;
+        elementConstants.push_back(eltCst);
+      }
     }
 
     auto arrayType = apply->getType().castTo<TupleType>()->getElementType(0);
@@ -820,7 +838,11 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
     // Okay, now we have the array memory object, return the indirect array
     // value and the pointer object we need for the tuple result.
     auto indirectArr = SymbolicValue::getArrayAddress(memObject);
-    auto address = SymbolicValue::getAddress(memObject);
+
+    // The address notationally points to the first element of the array.
+    auto address = SymbolicValue::getAddress(memObject, {0},
+                                             evaluator.getAllocator());
+
     setValue(apply, SymbolicValue::getAggregate({indirectArr, address},
                                                 evaluator.getAllocator()));
     return None;
@@ -934,6 +956,14 @@ SymbolicValue ConstExprFunctionState::getConstantValue(SILValue value) {
   return calculatedValues[value] = result;
 }
 
+/// If the specified type is a Swift.Array of some element type, then return the
+/// element type.  Otherwise, return a null Type.
+static Type getArrayElementType(Type ty) {
+  if (auto bgst = ty->getAs<BoundGenericStructType>())
+    if (bgst->getDecl() == bgst->getASTContext().getArrayDecl())
+      return bgst->getGenericArgs()[0];
+  return Type();
+}
 
 /// Given an aggregate value like {{1, 2}, 3} and an access path like [0,1], and
 /// a scalar like 4, return the aggregate value with the indexed element
@@ -951,13 +981,9 @@ static bool updateIndexedElement(SymbolicValue &aggregate,
     return false;
   }
 
-  // If we have a non-aggregate then fail.  If we have an uninit memory, then
-  // scalarize it into an aggregate to continue.  This happens when memory
-  // objects are initialized piecewise.
-  if (aggregate.getKind() != SymbolicValue::Aggregate) {
-    if (aggregate.getKind() != SymbolicValue::UninitMemory)
-      return true;
-
+  // If we have an uninit memory, then scalarize it into an aggregate to
+  // continue.  This happens when memory objects are initialized piecewise.
+  if (aggregate.getKind() == SymbolicValue::UninitMemory) {
     unsigned numMembers;
     // We need to have either a struct or a tuple type.
     if (auto *decl = type->getStructOrBoundGenericStruct()) {
@@ -974,29 +1000,44 @@ static bool updateIndexedElement(SymbolicValue &aggregate,
     aggregate = SymbolicValue::getAggregate(newElts, allocator);
   }
 
+  // If we have a non-aggregate then fail.
+  if (aggregate.getKind() != SymbolicValue::Aggregate &&
+      aggregate.getKind() != SymbolicValue::Array)
+    return true;
+
   unsigned elementNo = indices.front();
   Type eltType;
 
-  // We need to have either a struct or a tuple type.
-  if (auto *decl = type->getStructOrBoundGenericStruct()) {
+  // We need to have an array, struct or a tuple type.
+  if (auto ty = getArrayElementType(type)) {
+    eltType = ty;
+  } else if (auto *decl = type->getStructOrBoundGenericStruct()) {
     auto it = decl->getStoredProperties().begin();
     std::advance(it, elementNo);
     eltType = (*it)->getType();
   } else if (auto tuple = type->getAs<TupleType>()) {
     assert(elementNo < tuple->getNumElements() && "invalid index");
     eltType = tuple->getElement(elementNo).getType();
-  } else {
+  } else  {
     return true;
   }
 
   // Update the indexed element of the aggregate.
-  auto oldElts = aggregate.getAggregateValue();
+  ArrayRef<SymbolicValue> oldElts;
+  if (aggregate.getKind() == SymbolicValue::Aggregate)
+    oldElts = aggregate.getAggregateValue();
+  else
+    oldElts = aggregate.getArrayValue();
+
   SmallVector<SymbolicValue, 4> newElts(oldElts.begin(), oldElts.end());
   if (updateIndexedElement(newElts[elementNo], indices.drop_front(),
                            scalar, eltType, allocator))
     return true;
 
-  aggregate = SymbolicValue::getAggregate(newElts, allocator);
+  if (aggregate.getKind() == SymbolicValue::Aggregate)
+    aggregate = SymbolicValue::getAggregate(newElts, allocator);
+  else
+    aggregate = SymbolicValue::getArray(newElts, allocator);
   return false;
 }
 

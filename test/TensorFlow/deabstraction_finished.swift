@@ -126,3 +126,11 @@ public func test75407624() {
  * CHECK: graph_op "Const"() {dtype: $Float, value$tensor: [ [f32 0x3F800000 /* 1 */], [f32 0x40000000 /* 2 */], [f32 0x40400000 /* 3 */], [f32 0x40800000 /* 4 */]], value$shape: [ [i32 2], [i32 2]],
  * CHECK-LABEL: ---- END OF 
 */
+
+
+public func testConvolution(x: Tensor<Float>, filter: Tensor<Float>) -> Tensor<Float> {
+  // expected-error @+1 {{FIXME: Handle array attributes}}
+  return x.toAccelerator().convolved2D(withFilter: filter.toAccelerator(),
+                                       strides: (1, 2, 3, 4), padding: .same)
+}
+
