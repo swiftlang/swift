@@ -24,6 +24,22 @@ public struct Arguments {
   }
 }
 
+enum ArgumentError: Error {
+  case missingValue(String)
+  case general(String)
+}
+
+extension ArgumentError: CustomStringConvertible {
+  public var description: String {
+    switch self {
+    case let .missingValue(key):
+      return "\(key) requires a value" //"Missing value for `\(key)`"
+    case let .general(description):
+      return "\(description)"
+    }
+  }
+}
+
 /// Using CommandLine.arguments, returns an Arguments struct describing
 /// the arguments to this program. If we fail to parse arguments, we
 /// return nil.

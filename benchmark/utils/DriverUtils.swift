@@ -27,7 +27,6 @@ public var registeredBenchmarks: [BenchmarkInfo] = []
 enum TestAction {
   case run
   case listTests
-  case fail(String)
   case help([String])
 }
 
@@ -68,14 +67,14 @@ struct TestConfig {
   /// The list of tests to run.
   var tests = [(index: String, info: BenchmarkInfo)]()
 
-  mutating func processArguments() -> TestAction {
+  mutating func processArguments() throws -> TestAction {
     let validOptions = [
       "--iter-scale", "--num-samples", "--num-iters",
       "--verbose", "--delim", "--list", "--sleep",
       "--tags", "--skip-tags", "--help"
     ]
     guard let benchArgs = parseArgs(validOptions) else {
-      return .fail("Failed to parse arguments")
+      throw ArgumentError.general("Failed to parse arguments")
     }
 
     filters = benchArgs.positionalArgs
@@ -85,17 +84,17 @@ struct TestConfig {
     }
 
     if let x = benchArgs.optionalArgsMap["--iter-scale"] {
-      if x.isEmpty { return .fail("--iter-scale requires a value") }
+      if x.isEmpty { throw ArgumentError.missingValue("--iter-scale") }
       iterationScale = Int(x)!
     }
 
     if let x = benchArgs.optionalArgsMap["--num-iters"] {
-      if x.isEmpty { return .fail("--num-iters requires a value") }
+      if x.isEmpty { throw ArgumentError.missingValue("--num-iters") }
       fixedNumIters = numericCast(Int(x)!)
     }
 
     if let x = benchArgs.optionalArgsMap["--num-samples"] {
-      if x.isEmpty { return .fail("--num-samples requires a value") }
+      if x.isEmpty { throw ArgumentError.missingValue("--num-samples") }
       numSamples = Int(x)!
     }
 
@@ -105,25 +104,23 @@ struct TestConfig {
     }
 
     if let x = benchArgs.optionalArgsMap["--delim"] {
-      if x.isEmpty { return .fail("--delim requires a value") }
+      if x.isEmpty { throw ArgumentError.missingValue("--delim") }
       delim = x
     }
 
-    if let x = benchArgs.optionalArgsMap["--tags"] {
-      if x.isEmpty { return .fail("--tags requires a value") }
-
-      // We support specifying multiple tags by splitting on comma, i.e.:
-      //
-      //  --tags=Array,Dictionary
-      //
-      // FIXME: If we used Error instead of .fail, then we could have a cleaner
-      // impl here using map on x and tags.formUnion.
-      for t in x.split(separator: ",") {
-        guard let cat = BenchmarkCategory(rawValue: String(t)) else {
-          return .fail("Unknown benchmark category: '\(t)'")
-        }
-        tags.insert(cat)
+    func parseCategory(tag: String) throws -> BenchmarkCategory {
+      guard let category = BenchmarkCategory(rawValue: tag) else {
+        throw ArgumentError.general("Unknown benchmark category: '\(tag)'")
       }
+      return category
+    }
+
+    if let x = benchArgs.optionalArgsMap["--tags"] {
+      if x.isEmpty { throw ArgumentError.missingValue("--tags") }
+      // We support specifying multiple tags by splitting on comma, i.e.:
+      //  --tags=Array,Dictionary
+      tags.formUnion(
+        try x.split(separator: ",").map(String.init).map(parseCategory))
     }
 
     if let x = benchArgs.optionalArgsMap["--skip-tags"] {
@@ -132,22 +129,14 @@ struct TestConfig {
       skipTags = []
 
       // We support specifying multiple tags by splitting on comma, i.e.:
-      //
       //  --skip-tags=Array,Set,unstable,skip
-      //
-      // FIXME: If we used Error instead of .fail, then we could have a cleaner
-      // impl here using map on x and tags.formUnion.
-      for t in x.split(separator: ",") {
-        guard let cat = BenchmarkCategory(rawValue: String(t)) else {
-          return .fail("Unknown benchmark category: '\(t)'")
-        }
-        skipTags.insert(cat)
-      }
+      skipTags.formUnion(
+        try x.split(separator: ",").map(String.init).map(parseCategory))
     }
 
     if let x = benchArgs.optionalArgsMap["--sleep"] {
       guard let v = Int(x) else {
-        return .fail("--sleep requires a non-empty integer value")
+        throw ArgumentError.missingValue("--sleep")
       }
       afterRunSleep = v
     }
@@ -440,17 +429,13 @@ func runBenchmarks(_ c: TestConfig) {
 
 public func main() {
   var config = TestConfig()
-
-  switch (config.processArguments()) {
+  do {
+    switch (try config.processArguments()) {
     case let .help(validOptions):
       print("Valid options:")
       for v in validOptions {
         print("    \(v)")
       }
-    case let .fail(msg):
-      // We do this since we need an autoclosure...
-      fflush(stdout)
-      fatalError("\(msg)")
     case .listTests:
       config.findTestsToRun()
       print("#\(config.delim)Test\(config.delim)[Tags]")
@@ -466,5 +451,13 @@ public func main() {
       if let x = config.afterRunSleep {
         sleep(UInt32(x))
       }
+    }
+  } catch let error as ArgumentError {
+    fflush(stdout)
+    fputs(error.description, stderr)
+    fflush(stderr)
+    exit(1)
+  } catch {
+    fatalError("\(error)")
   }
 }
