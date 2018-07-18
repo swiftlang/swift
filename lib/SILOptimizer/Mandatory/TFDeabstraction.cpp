@@ -2020,16 +2020,20 @@ formGraphOp(SILTensorOpInfo &opInfo,
       // strip-away the possible aggregate wrapper.
       constValue = constValue.lookThroughSingleElementAggregates();
       if (constValue.getKind() != SymbolicValue::Array) {
-        constValue.dump();
         diagnoseInvalidAttr("requires an array");
         return true;
       }
-      auto elements = constValue.getArrayValue();
+      CanType eltType;
+      auto elements = constValue.getArrayValue(eltType);
+      if (!StringRef(eltType->getString()).startswith("Int")) {
+        diagnoseInvalidAttr("requires an array of ints");
+        return true;
+      }
       for (auto elt : elements) {
         // strip-away the possible aggregate wrapper.
         elt = elt.lookThroughSingleElementAggregates();
         if (elt.getKind() != SymbolicValue::Integer) {
-          diagnoseInvalidAttr("Shape attr requires an array of ints!");
+          diagnoseInvalidAttr("requires an array of ints");
           return true;
         }
       }
@@ -2058,7 +2062,10 @@ formGraphOp(SILTensorOpInfo &opInfo,
     case SILTensorOpInfo::OperandClass::ShapeArray: {
       if (constValue.getKind() != SymbolicValue::Array)
         return diagnoseInvalidAttr("requires an array");
-      auto shapes = constValue.getArrayValue();
+      CanType eltType;
+      auto shapes = constValue.getArrayValue(eltType);
+      if (eltType->getString() != "TensorShape")
+        return diagnoseInvalidAttr("requires an array of TensorShape objects");
       for (auto shape : shapes) {
         if (verifyShapeAttr(shape))
           return; // error already emitted.

@@ -106,10 +106,10 @@ public func explicitDevicePlacementAll() {
   let x: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: Float(1.0), __device: "/device:GPU:0")
   // For GPU -> TPU transfer, always go through CPU first. Compiler can be
   // extended to generate this Identity op if needed.
-  let x_cpu: TensorHandle<Float> = #tfop("Identity", x, __shapes$shapearray: [TensorShape()], __device: "/device:CPU:0")
-  let y_cpu: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: Float(1.0), __shapes$shapearray: [TensorShape()], __device: "/device:CPU:0")
+  let x_cpu: TensorHandle<Float> = #tfop("Identity", x, __shapes: [TensorShape()], __device: "/device:CPU:0")
+  let y_cpu: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: Float(1.0), __shapes: [TensorShape()], __device: "/device:CPU:0")
   // y is sent from CPU to TPU.
-  let z_tpu: TensorHandle<Float> = #tfop("Add", x_cpu, y_cpu , __shapes$shapearray: [TensorShape()], __device: "TPU_SYSTEM")
+  let z_tpu: TensorHandle<Float> = #tfop("Add", x_cpu, y_cpu , __shapes: [TensorShape()], __device: "TPU_SYSTEM")
   _hostOp(z_tpu)
 }
 
@@ -165,7 +165,7 @@ public func explicitDevicePlacementAll() {
 // CHECK-NEXT:       device: "/device:CPU:0"
 
 public func GPUToTPUTransfer_Unsupported() {
-  let x: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: Float(1.0), __shapes$shapearray: [TensorShape()], __device: "/device:GPU:0")
+  let x: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: Float(1.0), __shapes: [TensorShape()], __device: "/device:GPU:0")
   // expected-error @+1 {{TPU infeed enqueue cannot run on this device}}
   let _: TensorHandle<Float> = #tfop("Identity", x, __device: "TPU_SYSTEM")
 }

@@ -957,9 +957,12 @@ static void decodeShapeArray(const GraphOperationInfo &graphOpInfo,
   auto *inst = graphOpInfo.inst;
   auto attr = inst->getAttribute(attrIdx);
   auto attrInfo = GraphOperationInfo::decodeAttributeName(attr.name);
-  assert(attrInfo.second == SILTensorOpInfo::OperandClass::ShapeArray);
+  assert(attrInfo.second == SILTensorOpInfo::OperandClass::Normal ||
+         attrInfo.second == SILTensorOpInfo::OperandClass::ShapeArray);
   assert(attrInfo.first == attrName);
-  auto shapeArray = attr.value.getArrayValue();
+  CanType eltType;
+  auto shapeArray = attr.value.getArrayValue(eltType);
+  assert(eltType->getString() == "TensorShape");
   auto numShapes = shapeArray.size();
   for (unsigned shapeIdx = 0; shapeIdx != numShapes; ++shapeIdx) {
     auto prevNumDims = dims.size();
@@ -1807,10 +1810,18 @@ GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
         break;
       }
       case SymbolicValue::Array: {
-        // FIXME: Handle array attributes.
-        internalError(getUserSourceLocation(inst->getDebugLocation()),
-                      "FIXME: Handle array attributes");
-        return GLStatus::Error;
+        if (isShapeArrayPseudoAttr(name, attrValue)) {
+          // SHAPE_ARRAY_ATTR is a pseudo-attribute used by the compiler's
+          // partitioning and graph lowering passes to propagate shape info for
+          // XLA compilation (e.g. feed shape info to infeed / outfeed ops), and
+          // will not be lowered into this graph op itself.
+          break;
+        } else {
+          // FIXME: Handle array attributes.
+          internalError(getUserSourceLocation(inst->getDebugLocation()),
+                        "FIXME: Handle array attributes");
+          return GLStatus::Error;
+        }
       }
       }
       // Done with normal attributes.
@@ -1876,10 +1887,14 @@ GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
     }
 
     case SILTensorOpInfo::OperandClass::ShapeArray:
-      if (name != SHAPE_ARRAY_ATTR) {
-        llvm_unreachable("FIXME: These operand classes are not yet handled");
-      } else {
+      if (isShapeArrayPseudoAttr(name, attrValue)) {
+        // SHAPE_ARRAY_ATTR is a pseudo-attribute used by the compiler's
+        // partitioning and graph lowering passes to propagate shape info for
+        // XLA compilation (e.g. feed shape info to infeed / outfeed ops), and
+        // will not be lowered into this graph op itself.
         break;
+      } else {
+        llvm_unreachable("FIXME: These operand classes are not yet handled");
       }
     case SILTensorOpInfo::OperandClass::Array:
       // TODO: TF_SetAttrTypeList, TF_SetAttrStringList, TF_SetAttrIntList,
@@ -1943,16 +1958,14 @@ GLStatus TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
   SILTensorOpInfo tfopInfo = SILTensorOpInfo::decode(inst).getValue();
 
   // Swift host <-> TF device sends/recvs.
-  if (tfopInfo.opName == "tfc.SendToHost" ||
-      tfopInfo.opName == "tfc.RecvFromHost")
-    assert(0 &&
-           "Host sends/recvs are only supported in strict deabstraction mode!");
+  assert(tfopInfo.opName != "tfc.SendToHost" &&
+         tfopInfo.opName != "tfc.RecvFromHost" &&
+         "Host sends/recvs are only supported in strict deabstraction mode!");
 
   // Device-to-device sends/recvs.
-  if (tfopInfo.opName == "tfc.D2DTensorRecv" ||
-      tfopInfo.opName == "tfc.D2DTensorSend")
-    assert(0 &&
-           "D2D sends/recvs are only supported in strict deabstraction mode!");
+  assert(tfopInfo.opName != "tfc.D2DTensorRecv" &&
+         tfopInfo.opName != "tfc.D2DTensorSend" &&
+         "D2D sends/recvs are only supported in strict deabstraction mode!");
 
   // Handle other TF ops.
   auto &graphFn = getCurrentGraphFunction();

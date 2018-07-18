@@ -277,8 +277,8 @@ public func test1RecvScalarTPU() {
 // compilation. The shape array attr gets propagated to TensorTransfer.
 //
 // CHECK-LABEL: --- TFDevicePartition Cross Device Tensor Transfer Annotation Result: {{.*}}test1RecvScalarTPU{{.*}}
-// CHECK:      [[X_SCALAR_CPU:%.*]] = graph_op "tfc.RecvFromHost"() {tensorId: i32 0, __device: "/device:CPU:0", __shapes$shapearray:
-// CHECK:      [[X_SCALAR_TPU:%.*]] = graph_op "tfc.TensorTransfer,i"([[X_SCALAR_CPU]] : $TensorHandle{{.*}}) {transferId: i32 0, srcDevice: "/device:CPU:0", destDevice: "ALL_DEVICES", __shapes$shapearray
+// CHECK:      [[X_SCALAR_CPU:%.*]] = graph_op "tfc.RecvFromHost"() {tensorId: i32 0, __device: "/device:CPU:0", __shapes: [$TensorShape: [$Int32: ]]} : $TensorHandle
+// CHECK:      [[X_SCALAR_TPU:%.*]] = graph_op "tfc.TensorTransfer,i"([[X_SCALAR_CPU]] : $TensorHandle{{.*}}) {transferId: i32 0, srcDevice: "/device:CPU:0", destDevice: "ALL_DEVICES", __shapes
 // This is the promoted scalar add that computes x.scalar! + 2
 // CHECK-NEXT: graph_op "Add,i,i"([[X_SCALAR_TPU]] : $TensorHandle
 // This is z + z

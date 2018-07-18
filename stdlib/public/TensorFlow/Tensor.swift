@@ -139,7 +139,7 @@ public extension Tensor {
     // TF CPU first, before TF CPU sends the tensor to TPU.
     let ret: TensorHandle<Scalar> = #tfop("Identity",
                                           tensor,
-                                          __shapes$shapearray: [shape],
+                                          __shapes: [shape],
                                           __device: "/device:CPU:0")
     return Tensor(handle: ret)
   }
@@ -159,7 +159,7 @@ public extension Tensor {
     // If the `self` tensor resides on TPU, the shape is specified on that
     // device first, before outfeeding the tensor to CPU, a required step for
     // sending the tensor to the host.
-    let tensor: TensorHandle<Scalar> = #tfop("Identity", self, __shapes$shapearray: [shape])
+    let tensor: TensorHandle<Scalar> = #tfop("Identity", self, __shapes: [shape])
     return Tensor(handle: tensor).toHost()
   }
 

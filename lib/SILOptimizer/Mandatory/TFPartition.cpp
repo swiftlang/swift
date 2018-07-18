@@ -2487,15 +2487,18 @@ static void createConstTensorAttrsOnAccel(
 static void
 addScalarShapeArrayAttr(SmallVectorImpl<GraphOperationAttribute> &attributes,
                         ASTContext &ctx) {
-  // For TPU graph, set a scalar shape array, with attr name
-  // "__shapes$shapearray".
-  auto attrName = std::string(SHAPE_ARRAY_ATTR) +
-                  SILTensorOpInfo::getOperandClassSuffix(
-                      SILTensorOpInfo::OperandClass::ShapeArray);
-  auto scalarShape = SymbolicValue::getArray({}, ctx.getAllocator());
+  // For TPU graph, set a scalar shape array, with attr name "__shapes".
+  auto attrName = std::string(SHAPE_ARRAY_ATTR);
+  // A shape is an array of ints -- empty array means it's a scalar (0d) shape.
+  auto scalarShape = SymbolicValue::getArray(
+      {}, ctx.getInt32Decl()->getDeclaredType()->getCanonicalType(),
+      ctx.getAllocator());
   attributes.push_back(
       {ctx.getIdentifier(attrName),
-       SymbolicValue::getArray({scalarShape}, ctx.getAllocator())});
+       SymbolicValue::getArray(
+           {scalarShape},
+           ctx.getTensorShapeDecl()->getDeclaredType()->getCanonicalType(),
+           ctx.getAllocator())});
 }
 
 /// Given a primitive scalar instruction like a literal or an LLVM IR
@@ -2691,9 +2694,8 @@ createAcceleratorReceive(SILBuilder &B, SILLocation loc, SILType valueTy,
   std::string instName = opType;
 
   SmallVector<GraphOperationAttribute, 3> attributes;
-  attributes.push_back({ctx.getIdentifier("tensorId"),
-                        SymbolicValue::getInteger(APInt(/*width*/ 32, idNumber),
-                                                  ctx.getAllocator())});
+  attributes.push_back(
+      {ctx.getIdentifier("tensorId"), SymbolicValue::getInteger(idNumber, 32)});
   configuration.handleDevicePlacement(opType, /*opDevice*/ "", B, loc,
                                       attributes);
 
@@ -2784,10 +2786,8 @@ void createAcceleratorSend(SILBuilder &B, SILLocation loc, SILValue value,
   std::string instName = opType;
   instName += GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
   SmallVector<GraphOperationAttribute, 2> attributes;
-  auto &allocator = B.getModule().getASTContext().getAllocator();
   attributes.push_back(
-      {ctx.getIdentifier("tensorId"),
-       SymbolicValue::getInteger(APInt(/*width*/ 32, idNumber), allocator)});
+      {ctx.getIdentifier("tensorId"), SymbolicValue::getInteger(idNumber, 32)});
   configuration.handleDevicePlacement(opType, /*opDevice*/ "", B, loc,
                                       attributes);
   B.createGraphOperation(loc, ctx.getIdentifier(instName),
@@ -3065,10 +3065,8 @@ void PartitionCloner::handleSendRecvForTerminator(TermInst *inst) {
     {
       std::string constOpName = "Const";
       SmallVector<GraphOperationAttribute, 2> attributes;
-      createConstTensorAttrsOnAccel(
-          SymbolicValue::getInteger(APInt(/*width*/ 32, caseId),
-                                    ctx.getAllocator()),
-          int32SILType, ctx, attributes);
+      createConstTensorAttrsOnAccel(SymbolicValue::getInteger(caseId, 32),
+                                    int32SILType, ctx, attributes);
       FP.configuration.handleDevicePlacement(
           "Const", /*opDevice*/ getDeviceString(DeviceType::ALL), BA, loc,
           attributes);

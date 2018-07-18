@@ -1494,7 +1494,8 @@ GraphOperationInfo::decodeAttributeName(Identifier name) {
   return { nameStr.substr(0, dollarLoc), opClass };
 }
 
-int GraphOperationInfo::getIntAttr(unsigned attrIdx, StringRef attrName) const {
+int64_t GraphOperationInfo::getIntAttr(unsigned attrIdx,
+                                       StringRef attrName) const {
   auto attr = inst->getAttribute(attrIdx);
   auto attrInfo = GraphOperationInfo::decodeAttributeName(attr.name);
   assert(attrInfo.first == attrName);
@@ -1838,4 +1839,12 @@ containsTensorFlowValue(CanSILFunctionType fnType) {
       return true;
 
   return false;
+}
+
+bool tf::isShapeArrayPseudoAttr(StringRef attrName, SymbolicValue attrValue) {
+  if (attrName != SHAPE_ARRAY_ATTR)
+    return false;
+  CanType eltType;
+  (void)attrValue.getArrayValue(eltType);
+  return eltType->getString() == "TensorShape";
 }

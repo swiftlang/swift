@@ -288,9 +288,8 @@ void DevicePartitionCloner::addD2DSend(GraphOperationInfo &graphOpInfo,
 
   auto &allocator = ctx.getAllocator();
   SmallVector<GraphOperationAttribute, 4> attributes;
-  attributes.push_back(
-      {ctx.getIdentifier("transferId"),
-       SymbolicValue::getInteger(APInt(/*width*/ 32, transferId), allocator)});
+  attributes.push_back({ctx.getIdentifier("transferId"),
+                        SymbolicValue::getInteger(transferId, 32)});
   attributes.push_back(
       {ctx.getIdentifier("destDevice"),
        SymbolicValue::getString(getDeviceString(destDevice), allocator)});
@@ -323,9 +322,8 @@ void DevicePartitionCloner::addD2DRecv(GraphOperationInfo &graphOpInfo,
 
   auto &allocator = ctx.getAllocator();
   SmallVector<GraphOperationAttribute, 4> attributes;
-  attributes.push_back(
-      {ctx.getIdentifier("transferId"),
-       SymbolicValue::getInteger(APInt(/*width*/ 32, transferId), allocator)});
+  attributes.push_back({ctx.getIdentifier("transferId"),
+                        SymbolicValue::getInteger(transferId, 32)});
   attributes.push_back(
       {ctx.getIdentifier("srcDevice"),
        SymbolicValue::getString(getDeviceString(srcDevice), allocator)});
@@ -767,8 +765,7 @@ class DevicePartitionerImpl
       SmallVector<GraphOperationAttribute, 4> attributes;
       attributes.push_back(
           {ctx.getIdentifier("transferId"),
-           SymbolicValue::getInteger(
-               APInt(/*width*/ 32, nextTensorTransferId++), allocator)});
+           SymbolicValue::getInteger(nextTensorTransferId++, 32)});
       attributes.push_back(
           {ctx.getIdentifier("srcDevice"),
            SymbolicValue::getString(getDeviceString(operandDeviceType),
@@ -783,10 +780,8 @@ class DevicePartitionerImpl
         for (unsigned i = 0, e = graphOpInst->getNumAttributes(); i != e; ++i) {
           auto attr = graphOpInst->getAttribute(i);
           auto attrInfo = GraphOperationInfo::decodeAttributeName(attr.name);
-          if (attrInfo.second != SILTensorOpInfo::OperandClass::ShapeArray ||
-              attrInfo.first != SHAPE_ARRAY_ATTR)
+          if (!tf::isShapeArrayPseudoAttr(attrInfo.first, attr.value))
             continue;
-
           attributes.push_back(attr);
         }
       }
