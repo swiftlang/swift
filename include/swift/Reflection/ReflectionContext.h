@@ -129,6 +129,7 @@ public:
       auto CmdHdr = reinterpret_cast<typename T::SegmentCmd *>(CmdBuf.get());
       if (strncmp(CmdHdr->segname, "__TEXT", sizeof(CmdHdr->segname)) == 0) {
         Command = CmdHdr;
+        savedBuffers.push_back(std::move(CmdBuf));
         break;
       }
       Offset += CmdHdr->cmdsize;
@@ -138,30 +139,24 @@ public:
     if (!Command)
       return false;
 
-    auto SectAddress = RemoteAddress(CmdStartAddress.getAddressData() + Offset +
-                                     sizeof(typename T::SegmentCmd));
-    std::vector<typename T::Section *> SectionsHdr;
-    for (unsigned I = 0; I < Command->nsects; ++I) {
-      auto SecHdrBuf = this->getReader().readBytes(
-          RemoteAddress(SectAddress.getAddressData() +
-                        (I * sizeof(typename T::Section))),
-          sizeof(typename T::Section));
-      auto SecHdr = reinterpret_cast<typename T::Section *>(SecHdrBuf.get());
-      if (strncmp(SecHdr->sectname, "__swift5", strlen("__swift5")) == 0)
-        SectionsHdr.push_back(SecHdr);
-    }
+    // Read everything including the __TEXT segment.
+    Buf = this->getReader().readBytes(ImageStart, Command->vmsize);
+    auto Start = reinterpret_cast<const char *>(Buf.get());
 
     auto findMachOSectionByName = [&](std::string Name)
         -> std::pair<std::pair<const char *, const char *>, uint32_t> {
-      // Now for all the sections, find their name.
-      for (auto &S : SectionsHdr) {
+      auto cmdOffset = Start + Offset + sizeof(typename T::Header);
+      auto SegCmd = reinterpret_cast<typename T::SegmentCmd *>(cmdOffset);
+      auto SectAddress = reinterpret_cast<const char *>(cmdOffset) +
+                         sizeof(typename T::SegmentCmd);
+      for (unsigned I = 0; I < SegCmd->nsects; ++I) {
+        auto S = reinterpret_cast<typename T::Section *>(
+            SectAddress + (I * sizeof(typename T::Section)));
         if (strncmp(S->sectname, Name.c_str(), strlen(Name.c_str())) != 0)
           continue;
-        auto SecStart = RemoteAddress(ImageStart.getAddressData() + S->offset);
+        auto SecStart = Start + S->offset;
         auto SecSize = S->size;
-        auto SecBuf = this->getReader().readBytes(SecStart, SecSize);
-        auto SecContents = reinterpret_cast<const char *>(SecBuf.get());
-        return {{SecContents, SecContents + SecSize}, 0};
+        return {{SecStart, SecStart + SecSize}, 0};
       }
       return {{nullptr, nullptr}, 0};
     };
@@ -181,7 +176,6 @@ public:
         ReflStrMdSec.first.first == nullptr)
       return false;
 
-    Buf = this->getReader().readBytes(ImageStart, sizeof(typename T::Header));
     auto LocalStartAddress = reinterpret_cast<uintptr_t>(Buf.get());
     auto RemoteStartAddress = static_cast<uintptr_t>(ImageStart.getAddressData());
 
@@ -195,6 +189,7 @@ public:
         LocalStartAddress,
         RemoteStartAddress};
 
+    savedBuffers.push_back(std::move(Buf));
     this->addReflectionInfo(info);
     return true;
   }
