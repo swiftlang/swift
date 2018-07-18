@@ -38,11 +38,14 @@
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/TypeLowering.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/LoopUtils.h"
 #include "swift/Serialization/SerializedSILLoader.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/SmallDenseSet.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
@@ -52,11 +55,13 @@
 
 using namespace swift;
 using llvm::DenseMap;
+using llvm::SmallDenseSet;
 
 //===----------------------------------------------------------------------===//
 // Local helper declarations
 //===----------------------------------------------------------------------===//
 
+static inline llvm::raw_ostream &getDebugStream();
 static NominalTypeDecl *getStdlibTypeDecl(StringRef, ASTContext &);
 static std::string mangleADIndices(SILReverseAutoDiffIndices);
 static std::string mangleADConfig(const SILReverseAutoDiffConfiguration &);
@@ -535,7 +540,7 @@ public:
   bool isUseful(SILValue value,
                 unsigned dependentVariableIndex) const;
   bool isVaried(SILValue value,
-                llvm::BitVector parameterIndices) const;
+                llvm::SmallBitVector parameterIndices) const;
   bool isActive(SILValue value,
                 const SILReverseAutoDiffIndices &indices) const;
 };
@@ -661,7 +666,7 @@ isVaried(SILValue value, unsigned independentVariableIndex) const {
 }
 
 bool DifferentiableActivityInfo::
-isVaried(SILValue value, llvm::BitVector parameterIndices) const {
+isVaried(SILValue value, llvm::SmallBitVector parameterIndices) const {
   for (auto paramIdx : parameterIndices.set_bits())
     if (!isVaried(value, paramIdx))
       return false;
@@ -1088,6 +1093,10 @@ template<typename T>
 static void debugDump(T &v) {
   DEBUG(llvm::dbgs() << "\n==== BEGIN DEBUG DUMP ===="
         << v << "==== END DEBUG DUMP ====\n");
+}
+
+static inline raw_ostream &getDebugStream() {
+  return llvm::dbgs() << "[AD] ";
 }
 
 static
