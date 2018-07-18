@@ -2022,14 +2022,13 @@ CanType ValueDecl::getOverloadSignatureType() const {
   return CanType();
 }
 
-SmallVector<ValueDecl *, 1> ValueDecl::getOverriddenDecls() const {
+llvm::TinyPtrVector<ValueDecl *> ValueDecl::getOverriddenDecls() const {
   ASTContext &ctx = getASTContext();
   return ctx.evaluator(OverriddenDeclsRequest{const_cast<ValueDecl *>(this)});
 }
 
 void ValueDecl::setOverriddenDecls(ArrayRef<ValueDecl *> overridden) {
-  SmallVector<ValueDecl *, 1> overriddenVec(overridden.begin(),
-                                            overridden.end());
+  llvm::TinyPtrVector<ValueDecl *> overriddenVec(overridden);
   OverriddenDeclsRequest request{const_cast<ValueDecl *>(this)};
   request.cacheResult(overriddenVec);
 }
@@ -2892,18 +2891,18 @@ SourceRange AssociatedTypeDecl::getSourceRange() const {
   return SourceRange(KeywordLoc, endLoc);
 }
 
-SmallVector<AssociatedTypeDecl *, 1>
+llvm::TinyPtrVector<AssociatedTypeDecl *>
 AssociatedTypeDecl::getOverriddenDecls() const {
   // FIXME: Performance hack because we end up looking at the overridden
   // declarations of an associated type a *lot*.
   OverriddenDeclsRequest request{const_cast<AssociatedTypeDecl *>(this)};
-  SmallVector<ValueDecl *, 1> overridden;
+  llvm::TinyPtrVector<ValueDecl *> overridden;
   if (auto cached = request.getCachedResult())
     overridden = std::move(*cached);
   else
     overridden = AbstractTypeParamDecl::getOverriddenDecls();
 
-  SmallVector<AssociatedTypeDecl *, 1> assocTypes;
+  llvm::TinyPtrVector<AssociatedTypeDecl *> assocTypes;
   for (auto decl : overridden) {
     assocTypes.push_back(cast<AssociatedTypeDecl>(decl));
   }

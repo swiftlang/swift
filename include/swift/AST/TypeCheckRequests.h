@@ -21,6 +21,7 @@
 #include "swift/AST/SimpleRequest.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/TinyPtrVector.h"
 
 namespace swift {
 
@@ -126,7 +127,7 @@ public:
 class OverriddenDeclsRequest
   : public SimpleRequest<OverriddenDeclsRequest,
                          CacheKind::SeparatelyCached,
-                         SmallVector<ValueDecl *, 1>,
+                         llvm::TinyPtrVector<ValueDecl *>,
                          ValueDecl *> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -135,19 +136,19 @@ private:
   friend class SimpleRequest;
 
   // Evaluation.
-  SmallVector<ValueDecl *, 1> evaluate(Evaluator &evaluator,
-                                       ValueDecl *decl) const;
+  llvm::TinyPtrVector<ValueDecl *> evaluate(Evaluator &evaluator,
+                                            ValueDecl *decl) const;
 
 public:
   // Cycle handling
-  SmallVector<ValueDecl *, 1> breakCycle() const { return { }; }
+  llvm::TinyPtrVector<ValueDecl *> breakCycle() const { return { }; }
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
 
   // Separate caching.
   bool isCached() const { return true; }
-  Optional<SmallVector<ValueDecl *, 1>> getCachedResult() const;
-  void cacheResult(SmallVector<ValueDecl *, 1> value) const;
+  Optional<llvm::TinyPtrVector<ValueDecl *>> getCachedResult() const;
+  void cacheResult(llvm::TinyPtrVector<ValueDecl *> value) const;
 };
 
 /// Determine whether the given declaration is exposed to Objective-C.

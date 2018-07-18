@@ -1534,7 +1534,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
 /// Minimize the set of overridden associated types, eliminating any
 /// associated types that are overridden by other associated types.
 static void minimizeOverriddenAssociatedTypes(
-                           SmallVectorImpl<ValueDecl *> &assocTypes) {
+                           llvm::TinyPtrVector<ValueDecl *> &assocTypes) {
   // Mark associated types that are "worse" than some other associated type,
   // because they come from an inherited protocol.
   bool anyWorse = false;
@@ -1562,9 +1562,10 @@ static void minimizeOverriddenAssociatedTypes(
   // Copy in the associated types that aren't worse than any other associated
   // type.
   unsigned nextIndex = 0;
-  for (unsigned i : indices(assocTypes)) {
+  MutableArrayRef<ValueDecl *> buffer = assocTypes;
+  for (unsigned i : indices(buffer)) {
     if (worseThanAny[i]) continue;
-    assocTypes[nextIndex++] = assocTypes[i];
+    buffer[nextIndex++] = buffer[i];
   }
 
   assocTypes.erase(assocTypes.begin() + nextIndex, assocTypes.end());
@@ -1580,11 +1581,11 @@ static int compareSimilarAssociatedTypes(ValueDecl *const *lhs,
 
 /// Compute the set of associated types that are overridden by the given
 /// associated type.
-static SmallVector<ValueDecl *, 1>
+static llvm::TinyPtrVector<ValueDecl *>
 computeOverriddenAssociatedTypes(AssociatedTypeDecl *assocType) {
   // Find associated types with the given name in all of the inherited
   // protocols.
-  SmallVector<ValueDecl *, 1> overriddenAssocTypes;
+  llvm::TinyPtrVector<ValueDecl *> overriddenAssocTypes;
   auto proto = assocType->getProtocol();
   proto->walkInheritedProtocols([&](ProtocolDecl *inheritedProto) {
     if (proto == inheritedProto) return TypeWalker::Action::Continue;
@@ -1619,7 +1620,7 @@ computeOverriddenAssociatedTypes(AssociatedTypeDecl *assocType) {
   return overriddenAssocTypes;
 }
 
-SmallVector<ValueDecl *, 1>
+llvm::TinyPtrVector<ValueDecl *>
 OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // For an associated type, compute the (minimized) set of overridden
   // declarations.
@@ -1687,7 +1688,7 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
       return { };
     }
 
-    return SmallVector<ValueDecl *, 1>{baseAccessor};
+    return llvm::TinyPtrVector<ValueDecl *>{baseAccessor};
   }
 
   // Only initializers and declarations marked with the 'override' declaration
@@ -1723,5 +1724,5 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     return { };
   }
 
-  return SmallVector<ValueDecl *, 1>{matches.front().Decl};
+  return llvm::TinyPtrVector<ValueDecl *>{matches.front().Decl};
 }

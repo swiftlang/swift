@@ -1595,26 +1595,27 @@ GenericEnvironment *ASTContext::getOrCreateCanonicalGenericEnvironment(
   return env;
 }
 
-Optional<SmallVector<ValueDecl *, 1>>
+Optional<llvm::TinyPtrVector<ValueDecl *>>
 OverriddenDeclsRequest::getCachedResult() const {
   auto decl = std::get<0>(getStorage());
   if (!decl->LazySemanticInfo.hasOverriddenComputed)
     return None;
 
   // If there are no overridden declarations (the common case), return.
-  SmallVector<ValueDecl *, 1> overridden;
+  llvm::TinyPtrVector<ValueDecl *> overridden;
   if (!decl->LazySemanticInfo.hasOverridden) return overridden;
 
   // Retrieve the set of overrides from the ASTContext.
   ASTContext &ctx = decl->getASTContext();
   auto known = ctx.getImpl().Overrides.find(decl);
   assert(known != ctx.getImpl().Overrides.end());
-  overridden.assign(known->second.begin(), known->second.end());
+  overridden.insert(overridden.end(),
+                    known->second.begin(), known->second.end());
   return overridden;
 }
 
 void OverriddenDeclsRequest::cacheResult(
-                                    SmallVector<ValueDecl *, 1> value) const {
+                                llvm::TinyPtrVector<ValueDecl *> value) const {
   auto decl = std::get<0>(getStorage());
   decl->LazySemanticInfo.hasOverriddenComputed = true;
   decl->LazySemanticInfo.hasOverridden = !value.empty();
@@ -1632,7 +1633,8 @@ void OverriddenDeclsRequest::cacheResult(
 
   // Record the overrides in the context.
   auto &ctx = decl->getASTContext();
-  auto overriddenCopy = ctx.AllocateCopy(value);
+  auto overriddenCopy =
+    ctx.AllocateCopy(value.operator ArrayRef<ValueDecl *>());
   (void)ctx.getImpl().Overrides.insert({decl, overriddenCopy});
 }
 

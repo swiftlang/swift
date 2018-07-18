@@ -2482,7 +2482,7 @@ public:
   ValueDecl *getOverriddenDecl() const;
 
   /// Retrieve the declarations that this declaration overrides, if any.
-  SmallVector<ValueDecl *, 1> getOverriddenDecls() const;
+  llvm::TinyPtrVector<ValueDecl *> getOverriddenDecls() const;
 
   /// Set the declaration that this declaration overrides.
   void setOverriddenDecl(ValueDecl *overridden) {
@@ -2901,7 +2901,7 @@ public:
 
   /// Retrieve the set of associated types overridden by this associated
   /// type.
-  SmallVector<AssociatedTypeDecl *, 1> getOverriddenDecls() const;
+  llvm::TinyPtrVector<AssociatedTypeDecl *> getOverriddenDecls() const;
 
   SourceLoc getStartLoc() const { return KeywordLoc; }
   SourceRange getSourceRange() const;
