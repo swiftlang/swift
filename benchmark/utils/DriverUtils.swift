@@ -451,6 +451,7 @@ public func main() {
       }
     case let .fail(msg):
       // We do this since we need an autoclosure...
+      fflush(stdout)
       fatalError("\(msg)")
     case .listTests:
       config.findTestsToRun()

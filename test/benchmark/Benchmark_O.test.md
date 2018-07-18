@@ -87,8 +87,8 @@ ORSKIPTAGS-NOT: RomanNumbers
 ````
 
 ## Running Benchmarks
-Each real benchmark execution takes about a second. If possible, multiple checks
-are combined into one run to minimize the test time.
+Each real benchmark execution takes about a second per sample. If possible,
+multiple checks are combined into one run to minimize the test time.
 
 ````
 RUN: %Benchmark_O AngryPhonebook --num-iters=1 \
@@ -124,4 +124,54 @@ MEASUREENV: VCS {{[0-9]+}} - {{[0-9]+}} = {{[0-9]+}}
 RUNJUSTONCE-LABEL: 1,Ackermann
 RUNJUSTONCE-NOT: 1,Ackermann
 LOGVERBOSE-LABEL: Running AngryPhonebook for 2 samples.
+````
+
+## Error Handling
+
+````
+RUN: not --crash %Benchmark_O --bogus 2>&1 \
+RUN:              | %FileCheck %s --check-prefix ARGPARSE \
+RUN:                              --check-prefix CRASH
+ARGPARSE: Invalid option: --bogus
+CRASH: Fatal error:
+ARGPARSE: Failed to parse arguments
+CRASH: Illegal instruction: 4
+
+RUN: not --crash %Benchmark_O --iter-scale \
+RUN:         2>&1 | %FileCheck %s --check-prefix NOVALUE
+NOVALUE: --iter-scale requires a value
+
+RUN: not --crash %Benchmark_O --iter-scale= \
+RUN:         2>&1 | %FileCheck %s --check-prefix EMPTYVAL
+EMPTYVAL: --iter-scale requires a value
+
+RUN: not --crash %Benchmark_O --iter-scale=NaN \
+RUN:         2>&1 | %FileCheck %s --check-prefix NANVALUE
+NANVALUE: Illegal instruction
+
+RUN: not --crash %Benchmark_O --num-iters \
+RUN:         2>&1 | %FileCheck %s --check-prefix NUMITERS
+NUMITERS: --num-iters requires a value
+
+RUN: not --crash %Benchmark_O --num-samples \
+RUN:         2>&1 | %FileCheck %s --check-prefix NUMSAMPLES
+NUMSAMPLES: --num-samples requires a value
+
+RUN: not --crash %Benchmark_O --sleep \
+RUN:         2>&1 | %FileCheck %s --check-prefix SLEEP
+SLEEP: --sleep requires a
+SLEEP-SAME: value
+
+RUN: not --crash %Benchmark_O --delim \
+RUN:         2>&1 | %FileCheck %s --check-prefix DELIM
+DELIM: --delim requires a value
+
+RUN: not --crash %Benchmark_O --tags=bogus \
+RUN:         2>&1 | %FileCheck %s --check-prefix BADTAG
+BADTAG: Unknown benchmark category: 'bogus'
+
+RUN: not --crash %Benchmark_O --skip-tags=bogus \
+RUN:         2>&1 | %FileCheck %s --check-prefix BADSKIPTAG
+BADSKIPTAG: Unknown benchmark category: 'bogus'
+
 ````
