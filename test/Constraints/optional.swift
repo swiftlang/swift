@@ -272,3 +272,23 @@ class Bar {
 func rdar37508855(_ e1: X?, _ e2: X?) -> [X] {
   return [e1, e2].filter { $0 == nil }.map { $0! }
 }
+
+func se0213() {
+  struct Q: ExpressibleByStringLiteral {
+    typealias StringLiteralType =  String
+
+    var foo: String
+
+    init?(_ possibleQ: StringLiteralType) {
+      return nil
+    }
+
+    init(stringLiteral str: StringLiteralType) {
+      self.foo = str
+    }
+  }
+
+  _ = Q("why")?.foo // Ok
+  _ = Q("who")!.foo // Ok
+  _ = Q?("how") // Ok
+}

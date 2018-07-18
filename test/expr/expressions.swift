@@ -910,3 +910,10 @@ Sr3439: do {
   let obj = C();
   _ = obj[#column] // Ok.
 }
+
+// rdar://problem/23672697 - No way to express literal integers larger than Int without using type ascription
+let _: Int64 = 0xFFF_FFFF_FFFF_FFFF
+let _: Int64 = Int64(0xFFF_FFFF_FFFF_FFFF)
+let _: Int64 = 0xFFF_FFFF_FFFF_FFFF as Int64
+let _ = Int64(0xFFF_FFFF_FFFF_FFFF)
+let _ = 0xFFF_FFFF_FFFF_FFFF as Int64
