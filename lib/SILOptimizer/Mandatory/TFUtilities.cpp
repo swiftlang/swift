@@ -1511,46 +1511,6 @@ std::string GraphOperationInfo::getStringAttr(unsigned attrIdx,
   return attrValue.getStringValue().str();
 }
 
-/// Given a SILValue that may be an array literal, attempt to decode it into the
-/// values that make up its elements.  If this fails or if the value is not an
-/// array, this returns a null Type.  Otherwise it decodes the array, returns
-/// the values of each element, and returns the element type of the array.
-///
-/// If arrayInsts is non-null and if decoding succeeds, this function adds
-/// all of the instructions relevant to the definition of this array into
-/// the set.  If decoding fails, then the contents of this set is undefined.
-Type GraphOperationInfo::
-decodeArrayElements(SILValue value, SmallVectorImpl<SILValue> &elements,
-                    SmallPtrSet<SILInstruction*, 8> *arrayInsts) {
-  auto elementType = getArrayElementType(value->getType().getASTType());
-  if (!elementType) return Type();
-
-  // The only pattern we support involves a call to _allocateUninitializedArray.
-  // The array value will be a tuple extract from the 0th result of the call.
-  auto *teiValue = dyn_cast<TupleExtractInst>(value);
-  if (!teiValue || teiValue->getFieldNo() != 0 ||
-      !isa<ApplyInst>(teiValue->getOperand()))
-    return Type();
-
-  // Figure out the number of elements, which must be a constant integer.
-  auto *apply = cast<ApplyInst>(teiValue->getOperand());
-
-  // Verify we have a call to _allocateUninitializedArray.
-  SILValue numElementsVal;
-  if (!isArrayAllocUninit(apply, numElementsVal) ||
-      !isa<IntegerLiteralInst>(numElementsVal))
-    return Type();
-  uint64_t numElements =
-    cast<IntegerLiteralInst>(numElementsVal)->getValue().getLimitedValue();
-
-  if (tf::ConstExprEvaluator::decodeAllocUninitializedArray(apply,
-                                                            numElements,
-                                                            elements,
-                                                            arrayInsts))
-    return Type();
-  return elementType;
-}
-
 //===----------------------------------------------------------------------===//
 // Device Partitioning Utilities
 //===----------------------------------------------------------------------===//
