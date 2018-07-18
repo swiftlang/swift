@@ -456,6 +456,8 @@ enum ScoreKind {
   SK_CollectionUpcastConversion,
   /// A value-to-optional conversion.
   SK_ValueToOptional,
+  /// Instantiating a function with archetype T as an Optional value.
+  SK_BindOptionalToArchetype,
   /// A conversion to an empty existential type ('Any' or '{}').
   SK_EmptyExistentialConversion,
   /// A key path application subscript.
