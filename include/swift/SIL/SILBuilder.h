@@ -476,12 +476,10 @@ public:
 
   /// SWIFT_ENABLE_TENSORFLOW
   GradientInst *createGradient(SILLocation loc, SILValue original,
-                               unsigned sourceIndex,
-                               ArrayRef<unsigned> paramIndices, bool seedable,
-                               bool preservingResult) {
+                               SILReverseAutoDiffIndices indices,
+                               SILGradientOptions options) {
     return insert(GradientInst::create(getModule(), getSILDebugLocation(loc),
-                                       original, sourceIndex, paramIndices,
-                                       seedable, preservingResult));
+                                       original, indices, options));
   }
 
   BuiltinInst *createBuiltin(SILLocation Loc, Identifier Name, SILType ResultTy,

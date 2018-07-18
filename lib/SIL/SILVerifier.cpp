@@ -1211,17 +1211,15 @@ public:
     CanSILFunctionType origFnTy = GI->getOriginalType();
     require(origFnTy, "Original function value must have function type");
     auto config = GI->getConfiguration();
-    require(config.sourceIndex < origFnTy->getNumResults(),
+    require(config.getSourceIndex() < origFnTy->getNumResults(),
             "Differentiation source index out of bounds");
-    SmallVector<unsigned, 8> allParamIndices;
-    ArrayRef<unsigned> paramIndices = config.parameterIndices;
-    require(!config.parameterIndices.empty(),
+    llvm::SmallBitVector paramIndices = config.getParameterIndices();
+    require(!config.getParameterIndices().empty(),
             "Parameter indices cannot be empty; they must be explicitly "
             "specified");
     // Verify differentiation parameters.
     int lastIndex = -1;
-    for (unsigned i = 0, n = paramIndices.size(); i != n; ++i) {
-      auto index = paramIndices[i];
+    for (auto index : paramIndices.set_bits()) {
       require((int)index > lastIndex, "Parameter indices must be ascending");
       auto paramTy = origFnTy->getParameters()[index].getType();
       require(!(paramTy.isAnyClassReferenceType() ||
@@ -4460,12 +4458,12 @@ public:
   void verifyReverseDifferentiableAttr(SILFunction *F,
                                        SILReverseDifferentiableAttr &Attr) {
     // Parameter indices must be specified.
-    require(!Attr.getParamIndices().empty(),
+    require(!Attr.getIndices().parameters.empty(),
             "Parameter indices cannot be empty");
     // Verify if specified parameter indices are valid.
     auto numParams = F->getLoweredFunctionType()->getNumParameters();
     int lastIndex = -1;
-    for (auto paramIdx : Attr.getParamIndices()) {
+    for (auto paramIdx : Attr.getIndices().parameters.set_bits()) {
       require(paramIdx < numParams, "Parameter index out of bounds.");
       auto currentIdx = (int)paramIdx;
       require(currentIdx > lastIndex, "Parameter indices not ascending.");
