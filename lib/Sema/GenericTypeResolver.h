@@ -57,9 +57,6 @@ public:
   /// Determine whether the given types are equivalent within the generic
   /// context.
   virtual bool areSameType(Type type1, Type type2) = 0;
-
-  /// Set the contextual type or the interface type of the parameter.
-  virtual void recordParamType(ParamDecl *decl, Type ty) = 0;
 };
 
 /// Generic type resolver that leaves all generic types dependent.
@@ -78,8 +75,6 @@ public:
                                           ComponentIdentTypeRepr *ref);
 
   virtual bool areSameType(Type type1, Type type2);
-
-  virtual void recordParamType(ParamDecl *decl, Type ty);
 };
 
 /// Generic type resolver that maps a generic type parameter type to its
@@ -106,8 +101,6 @@ public:
                                           ComponentIdentTypeRepr *ref);
 
   virtual bool areSameType(Type type1, Type type2);
-
-  virtual void recordParamType(ParamDecl *decl, Type ty);
 };
 
 /// Generic type resolver that only handles what can appear in a protocol
@@ -126,8 +119,6 @@ public:
                                           ComponentIdentTypeRepr *ref);
 
   virtual bool areSameType(Type type1, Type type2);
-
-  virtual void recordParamType(ParamDecl *decl, Type ty);
 };
 
 /// Generic type resolver that performs complete resolution of dependent
@@ -155,8 +146,6 @@ public:
                                           ComponentIdentTypeRepr *ref);
 
   virtual bool areSameType(Type type1, Type type2);
-
-  virtual void recordParamType(ParamDecl *decl, Type ty);
 };
 
 } // end namespace swift

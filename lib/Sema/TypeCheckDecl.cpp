@@ -4116,7 +4116,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
           auto accessorParam = valueParams->get(valueParams->size() - e + i);
           accessorParam->setType(paramTy);
           accessorParam->setInterfaceType(paramIfaceTy);
-          accessorParam->getTypeLoc().setType(paramTy);
+          accessorParam->getTypeLoc().setType(paramIfaceTy);
         }
       }
 

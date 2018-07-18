@@ -50,10 +50,6 @@ bool DependentGenericTypeResolver::areSameType(Type type1, Type type2) {
   return true;
 }
 
-void DependentGenericTypeResolver::recordParamType(ParamDecl *decl, Type type) {
-  // Do nothing
-}
-
 Type GenericTypeToArchetypeResolver::mapTypeIntoContext(Type type) {
   return GenericEnvironment::mapTypeIntoContext(GenericEnv, type);
 }
@@ -68,19 +64,6 @@ Type GenericTypeToArchetypeResolver::resolveDependentMemberType(
 
 bool GenericTypeToArchetypeResolver::areSameType(Type type1, Type type2) {
   return type1->isEqual(type2);
-}
-
-void GenericTypeToArchetypeResolver::recordParamType(ParamDecl *decl, Type type) {
-  decl->setType(type);
-
-  // When type checking a closure or subscript index, this is the only
-  // resolver that runs, so make sure we also set the interface type,
-  // if one was not already set.
-  //
-  // When type checking functions, the CompleteGenericTypeResolver sets
-  // the interface type.
-  if (!decl->hasInterfaceType())
-    decl->setInterfaceType(type->mapTypeOutOfContext());
 }
 
 Type ProtocolRequirementTypeResolver::mapTypeIntoContext(Type type) {
@@ -108,12 +91,6 @@ bool ProtocolRequirementTypeResolver::areSameType(Type type1, Type type2) {
   if (depMem1->getName() != depMem2->getName()) return false;
 
   return areSameType(depMem1->getBase(), depMem2->getBase());
-}
-
-void ProtocolRequirementTypeResolver::recordParamType(ParamDecl *decl,
-                                                      Type type) {
-  llvm_unreachable(
-      "recording a param type of a protocol requirement doesn't make sense");
 }
 
 CompleteGenericTypeResolver::CompleteGenericTypeResolver(
@@ -240,11 +217,6 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
 bool CompleteGenericTypeResolver::areSameType(Type type1, Type type2) {
   return genericSig->getCanonicalTypeInContext(type1)
            == genericSig->getCanonicalTypeInContext(type2);
-}
-
-void
-CompleteGenericTypeResolver::recordParamType(ParamDecl *decl, Type type) {
-  decl->setInterfaceType(type);
 }
 
 ///
