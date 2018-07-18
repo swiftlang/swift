@@ -1890,6 +1890,8 @@ GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
         if (elementTypeString == "String") {
           SmallVector<const void*, 4> pointers;
           SmallVector<size_t, 4> sizes;
+          pointers.reserve(elements.size());
+          sizes.reserve(elements.size());
           for (auto elt : elements) {
             auto bytes = elt.getStringValue();
             pointers.push_back(bytes.data());
@@ -1901,6 +1903,7 @@ GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
         }
         if (StringRef(elementTypeString).startswith("Int")) {
           SmallVector<int64_t, 4> values;
+          values.reserve(elements.size());
           for (auto elt : elements)
             values.push_back(elt.getIntegerValue().getLimitedValue());
           TF_SetAttrIntList(op, name.c_str(), values.data(), values.size());
@@ -1908,8 +1911,11 @@ GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
         }
         if (elementTypeString == "Float" || elementTypeString == "Double") {
           SmallVector<float, 4> values;
+          values.reserve(elements.size());
           for (auto elt : elements) {
             auto value = elt.getFloatValue();
+            // TensorFlow only supports float32 attributes, and isn't designed
+            // for high precision, so we force truncate down.
             bool losesInfo = false;
             value.convert(APFloat::IEEEsingle(), APFloat::rmNearestTiesToEven,
                           &losesInfo);
@@ -1920,6 +1926,7 @@ GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
         }
         if (elementTypeString == "Bool") {
           SmallVector<unsigned char, 4> values;
+          values.reserve(elements.size());
           for (auto elt : elements)
             values.push_back(elt.getIntegerValue().getLimitedValue() != 0);
           TF_SetAttrBoolList(op, name.c_str(), values.data(), values.size());
@@ -1947,22 +1954,20 @@ GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
       auto dtype = (TF_DataType)dtypeAttr;
       auto dtypeSize = TF_DataTypeSize(dtype);
 
-      // Tensor can support two cases: an array case (not yet implemented), and
-      // a scalar case.
-      SmallVector<APInt, 4> elements;
-
       // Add a scalar to the elements list, checking that it is the right size
-      // for our dtype.
-      auto addScalar = [&](SymbolicValue value) -> bool {
+      // for our dtype, and adjusting for a couple of special cases we
+      // intentionally support.
+      auto addScalar = [&](SymbolicValue value,
+                           SmallVectorImpl<APInt> &elements) -> bool {
         value = value.lookThroughSingleElementAggregates();
 
         if (value.getKind() == SymbolicValue::Integer) {
           auto intVal = value.getIntegerValue();
-          if (dtype == TF_BOOL) {
-            // Swift/LLVM uses a 1-bit APInt to represent a bool, but TF_BOOL is
-            // 1 byte or more.
+
+          // Swift.Bool is represented as a 1-bit value, but TF_BOOL is 1 byte
+          // or more.
+          if (dtype == TF_BOOL)
             intVal = intVal.zext(dtypeSize * 8);
-          }
           elements.push_back(intVal);
         } else {
           assert(value.getKind() == SymbolicValue::Float);
@@ -1975,7 +1980,10 @@ GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
           elements.push_back(floatValue.bitcastToAPInt());
         }
 
-        if (elements.back().getBitWidth() != dtypeSize*8) {
+        // Sanity check that the user provided the right size types for this
+        // dtype.  This will produce an error if they attempt to use an array
+        // of int64's with TF_INT16 for example.
+        if (elements.back().getBitWidth() != dtypeSize * 8) {
           internalError(inst->getLoc(),
                         "invalid element type for tensor dtype");
           return true;
@@ -1984,18 +1992,21 @@ GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
         return false;
       };
 
+      // Tensor can support two cases: an array case, and a scalar case.
+      SmallVector<APInt, 4> elements;
+
       // The scalar case is very simple, the shape of a scalar is 0d, and the
       // data type comes from an attr that should already be processed.
       SmallVector<int64_t, 4> shape;
       if (attrValue.getKind() == SymbolicValue::Integer ||
           attrValue.getKind() == SymbolicValue::Float) {
-        if (addScalar(attrValue))
+        if (addScalar(attrValue, elements))
           return GLStatus::Error;
       } else {
         // Add all the elements to the elements list.
         CanType eltType;
         for (auto elt : attrValue.getArrayValue(eltType)) {
-          if (addScalar(elt))
+          if (addScalar(elt, elements))
             return GLStatus::Error;
         }
 
