@@ -68,6 +68,8 @@ static std::string mangleADConfig(const SILReverseAutoDiffConfiguration &);
 static SILFunction *lookupOrLinkFunction(StringRef name, SILModule &);
 static FuncDecl *lookupAssociativeOperatorDeclInProtocol(DeclName operatorName,
                                                          ProtocolDecl *);
+static void collectAllFormalResultsInTypeOrder(SILFunction &,
+                                               SmallVectorImpl<SILValue> &);
 
 //===----------------------------------------------------------------------===//
 // Auxiliary data structures
@@ -551,6 +553,10 @@ DifferentiableActivityInfo *
 DifferentiableActivityAnalysis::newFunctionAnalysis(SILFunction *f) {
   assert(dominanceAnalysis && "Expect a valid dominance anaysis");
   return new DifferentiableActivityInfo(*f);
+}
+
+void DifferentiableActivityAnalysis::initialize(SILPassManager *pm) {
+  dominanceAnalysis = pm->getAnalysis<DominanceAnalysis>();
 }
 
 SILAnalysis *swift::createDifferentiableActivityAnalysis(SILModule *m) {
@@ -1419,6 +1425,31 @@ static void convertToIndirectSeed(intmax_t value, CanType type,
   else {
     llvm_unreachable("Unsupported type for differentiation");
   }
+}
+
+/// Given a function, gather all of its formal results (as SSA values) in the
+/// body (both direct and indirect) in an order defined by its result type. Note
+/// that "formal results" refer to result values in the body of the function,
+/// not at call sites.
+static
+void collectAllFormalResultsInTypeOrder(SILFunction &function,
+                                        SmallVectorImpl<SILValue> &results) {
+  SILFunctionConventions convs(function.getLoweredFunctionType(),
+                               function.getModule());
+  auto indResults = function.getIndirectResults();
+  auto *retInst = cast<ReturnInst>(function.findReturnBB()->getTerminator());
+  auto retVal = retInst->getOperand();
+  SmallVector<SILValue, 8> dirResults;
+  if (auto *tupleInst =
+        dyn_cast_or_null<TupleInst>(retVal->getDefiningInstruction()))
+    dirResults.append(tupleInst->getElements().begin(),
+                      tupleInst->getElements().end());
+  else
+    dirResults.push_back(retVal);
+  unsigned indResIdx = 0, dirResIdx = 0;
+  for (auto &resInfo : convs.getResults())
+    results.push_back(resInfo.isFormalDirect()
+      ? dirResults[dirResIdx++] : indResults[indResIdx++]);
 }
 
 //===----------------------------------------------------------------------===//
