@@ -1,3 +1,6 @@
+// SWIFT_ENABLE_TENSORFLOW: This test is unsupported because moving Swift executables without the TensorFlow libraries causes dynamic linking to fail.
+// UNSUPPORTED: tensorflow
+
 // Make sure that the platform-appropriate clang_rt library (found relative to
 // the compiler) is included when using Swift as a linker (with Apple targets).
 
