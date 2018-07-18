@@ -2268,18 +2268,6 @@ static void validateAbstractStorageDecl(TypeChecker &TC,
   // Add any mandatory accessors now.
   maybeAddAccessorsToStorage(TC, storage);
 
-#if false
-  // We can't delay validation of getters and setters on @objc properties,
-  // because if they never get validated at all then conformance checkers
-  // will complain about selector mismatches.
-  if (storage->isObjC()) {
-    if (auto *getter = storage->getGetter())
-      TC.validateDecl(getter);
-    if (auto *setter = storage->getSetter())
-      TC.validateDecl(setter);
-  }
-#endif
-
   // Everything else about the accessors can wait until finalization.
   // This will validate all the accessors.
   TC.DeclsToFinalize.insert(storage);
@@ -4607,6 +4595,21 @@ void TypeChecker::requestMemberLayout(ValueDecl *member) {
   // Check whether the member is @objc or dynamic.
   (void)member->isObjC();
   (void)member->isDynamic();
+
+  // If this represents (abstract) storage, form the appropriate accessors.
+  if (auto storage = dyn_cast<AbstractStorageDecl>(member)) {
+    validateAbstractStorageDecl(*this, storage);
+
+    // Request layout of the accessors for an @objc declaration.
+    // We can't delay validation of getters and setters on @objc properties,
+    // because if they never get validated at all then conformance checkers
+    // will complain about selector mismatches.
+    if (storage->isObjC()) {
+      for (auto accessor : storage->getAllAccessors()) {
+        requestMemberLayout(accessor);
+      }
+    }
+  }
 }
 
 void TypeChecker::requestNominalLayout(NominalTypeDecl *nominalDecl) {
