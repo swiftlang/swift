@@ -435,7 +435,7 @@ public func testResourceAndVariants() {
 
 /*
 CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testResourceAndVariantsyyF
-CHECK:  [[values:%.*]] = graph_op "Const"() {dtype: $Float, value$tensor: [ [f32 0x3F800000 /* 1 */], [f32 0x40000000 /* 2 */],
+CHECK:  [[values:%.*]] = graph_op "Const"() {dtype: $Float, value$tensor: [$Float: (f32 0x3F800000 /* 1 */), (f32 0x40000000 /* 2 */),
 CHECK:  [[dataset:%.*]] = builtin "__tfop_TensorDataSet,$in,Toutput_types$array,$elt,output_shapes$shapearray,$shape,$elt,__device"([[values]] : $TensorHandle<Float>
 CHECK:  [[iterator:%.*]] = builtin "__tfop_Iterator,shared_name,container,output_types$array,$elt,output_shapes$shapearray,$shape,$elt,__device"({{.*}} : $Builtin.RawPointer, {{.*}} : $Builtin.RawPointer
 CHECK:  builtin "__tfop_MakeIterator,$in,$in,__device"([[dataset]] : $VariantHandle, [[iterator]] : $ResourceHandle, {{.*}}) : $()

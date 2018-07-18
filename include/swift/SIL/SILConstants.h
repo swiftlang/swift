@@ -29,6 +29,7 @@ class SerializedSILLoader;
 struct APIntSymbolicValue;
 struct APFloatSymbolicValue;
 struct EnumWithPayloadSymbolicValue;
+struct ArraySymbolicValue;
 struct DerivedAddressValue;
 struct SymbolicValueMemoryObject;
 
@@ -192,7 +193,7 @@ class SymbolicValue {
     DerivedAddressValue *derivedAddress;
 
     /// For RK_Array, this is the elements of the array.
-    const SymbolicValue *array;
+    ArraySymbolicValue *array;
 
     /// For RK_ArrayAddress, this is the memory object referenced.
     SymbolicValueMemoryObject *arrayAddress;
@@ -213,9 +214,6 @@ class SymbolicValue {
 
     /// This is the number of elements for an RK_Aggregate representation.
     unsigned aggregate_numElements;
-
-    /// This is the number of elements for an RK_Array representation.
-    unsigned array_numElements;
   } aux;
 
 public:
@@ -407,7 +405,9 @@ public:
   SymbolicValueMemoryObject *getAddressValueMemoryObject() const;
 
   /// Produce an array of elements.
+  
   static SymbolicValue getArray(ArrayRef<SymbolicValue> elements,
+                                CanType elementType,
                                 llvm::BumpPtrAllocator &allocator);
   static SymbolicValue getArrayAddress(SymbolicValueMemoryObject *memoryObject){
     SymbolicValue result;
@@ -416,7 +416,7 @@ public:
     return result;
   }
 
-  ArrayRef<SymbolicValue> getArrayValue() const;
+  ArrayRef<SymbolicValue> getArrayValue(CanType &elementType) const;
 
   //===--------------------------------------------------------------------===//
   // Helpers

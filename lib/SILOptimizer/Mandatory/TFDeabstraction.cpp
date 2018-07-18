@@ -1495,15 +1495,6 @@ void TFDeabstraction::propagateTensorValues() {
   }
 }
 
-/// If the specified type is a Swift.Array or some element type, then return the
-/// element type.  Otherwise, return a null Type.
-static Type getArrayElementType(SILType ty) {
-  if (auto bgst = ty.getASTType()->getAs<BoundGenericStructType>())
-    if (bgst->getDecl() == bgst->getASTContext().getArrayDecl())
-      return bgst->getGenericArgs()[0];
-  return Type();
-}
-
 /// If all the operands to a call to __tf_tensor_from_scalars are constants, we
 /// can promote this to a 'Const' node with an attached TF_Tensor attribute.
 /// It takes a 1D array of scalars and a shape as a 1D array of integers.
@@ -1529,25 +1520,26 @@ tryToPromoteTensorFromScalars(ApplyInst *inst,
   if (scalarIt == constants.end() || !scalarIt->second.isConstant())
     return nullptr;
   auto scalars = scalarIt->second;
+  CanType scalarsElementType;
+  auto scalarsElements = scalars.getArrayValue(scalarsElementType);
 
   auto shapeIt = constants.find(shapeValue);
   if (shapeIt == constants.end() || !shapeIt->second.isConstant())
     return nullptr;
   auto shape = shapeIt->second;
 
-  // Get the element type of the array.
-  auto elementType = getArrayElementType(scalarsValue->getType());
-  if (!elementType) return nullptr;
+  CanType shapeElementType;
+  auto shapeElements = shape.getArrayValue(shapeElementType);
 
   // Verify we have the right number of scalars.  If not, emit an error and
   // leave the broken code without promoting it to an op.
   uint64_t scalarCount = 1;
-  for (auto elt : shape.getArrayValue()) {
+  for (auto elt : shapeElements) {
     if (!elt.isConstant()) return nullptr;
     elt = elt.lookThroughSingleElementAggregates();
     scalarCount *= elt.getIntegerValue().getLimitedValue();
   }
-  uint64_t numElements = scalars.getArrayValue().size();
+  uint64_t numElements = scalarsElements.size();
   if (scalarCount != numElements) {
     std::string errorInfo =
       "tensor literal should have " + llvm::utostr(scalarCount) +
@@ -1564,7 +1556,7 @@ tryToPromoteTensorFromScalars(ApplyInst *inst,
   // into the correct Const operation.
   SILBuilder B(inst);
   B.setCurrentDebugScope(inst->getDebugScope());
-  auto result = createConstTensor(elementType, scalars, shape,
+  auto result = createConstTensor(scalarsElementType, scalars, shape,
                                   inst->getType(), inst->getLoc(),
                                   deviceConfig.primaryDeviceType, B);
 
@@ -1608,23 +1600,22 @@ tryToPromoteTensorFromScalars1D(ApplyInst *inst,
   auto scalars = scalarIt->second;
   assert(scalars.getKind() == SymbolicValue::Array &&
          "Unexpected value for array constant");
+  CanType scalarElementType;
+  auto scalarElements = scalars.getArrayValue(scalarElementType);
 
-  // Add a dtype attribute for the array element.
-  auto elementType = getArrayElementType(arrayValue->getType());
-  if (!elementType) return nullptr;
-
-  auto &allocator = inst->getType().getASTContext().getAllocator();
+  auto &context = inst->getType().getASTContext();
+  auto &allocator = context.getAllocator();
 
   // This takes a Tensor operand, but needs a shape added.  Since this is 1d,
   // our shape is just a single entry array with the length of scalars, like
   // [i32 42] if the scalars list is 42 entries in size.
   auto shape = SymbolicValue::getArray({
-    SymbolicValue::getInteger(scalars.getArrayValue().size(), /*bitwidth*/ 32)
-  }, allocator);
+    SymbolicValue::getInteger(scalarElements.size(), /*bitwidth*/ 32)
+  }, context.getInt32Decl()->getDeclaredType()->getCanonicalType(), allocator);
 
   SILBuilder B(inst);
   B.setCurrentDebugScope(inst->getDebugScope());
-  auto result = createConstTensor(elementType, scalars, shape,
+  auto result = createConstTensor(scalarElementType, scalars, shape,
                                   inst->getType(), inst->getLoc(),
                                   deviceConfig.primaryDeviceType, B);
 
@@ -2089,7 +2080,8 @@ formGraphOp(SILTensorOpInfo &opInfo,
         return diagnoseInvalidAttr("requires a constant that is an integer,"
                                    " floating point, or array thereof");
 
-      auto elements = constValue.getArrayValue();
+      CanType eltType;
+      auto elements = constValue.getArrayValue(eltType);
 
       /// Tensor array arguments must always be followed by a shape.
       if (i+1 >= opInfo.operandClasses.size() ||

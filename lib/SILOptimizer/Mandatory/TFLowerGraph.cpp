@@ -939,10 +939,11 @@ static void decodeShapeArrayLegacy(const SILTensorOpInfo &tfopInfo,
 static void decodeShapeAttr(SymbolicValue attr,
                             SmallVectorImpl<int64_t> &result) {
   attr = attr.lookThroughSingleElementAggregates();
-  for (auto elt : attr.getArrayValue()) {
+  CanType eltType;
+  for (auto elt : attr.getArrayValue(eltType)) {
     elt = elt.lookThroughSingleElementAggregates();
     result.push_back(elt.getIntegerValue().getLimitedValue());
-  }
+    }
 }
 
 // (graphOpInfo, /*attrIdx*/ 3, dims, numDims, dimPtrs) {
@@ -1850,7 +1851,8 @@ GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
         addScalar(attrValue);
       } else {
         // Add all the elements to the elements list.
-        for (auto elt : attrValue.getArrayValue())
+        CanType eltType;
+        for (auto elt : attrValue.getArrayValue(eltType))
           addScalar(elt);
 
         // Decode the shape attribute which must come next.

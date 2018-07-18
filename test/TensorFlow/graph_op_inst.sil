@@ -16,7 +16,8 @@ bb0:
   %3 = graph_op "tf.Dummy"() {string1: "hello", string2: "world"} : $Tensor<Float>
   %4 = graph_op "tf.Dummy"() {metatype1: $Float, metatype2: $Tensor<Float>} : $Tensor<Float>
   %5 = graph_op "tf.Dummy"() {function1: @chained_op_test : $@convention(thin) (Tensor<Float>, Tensor<Float>) -> Tensor<Float>} : $Tensor<Float>
-  %6 = graph_op "tf.Dummy"() {array: [[i8 1, i32 -2], [f32 -1.0, $Float]]} : $Tensor<Float>
+  %6 = graph_op "tf.Dummy"() {aggregate: ((i8 1, i32 -2), (f32 -1.0, $Float))} : $Tensor<Float>
+  %7 = graph_op "tf.Smarty"() {array: [$Int: i32 -2, i32 97]} : $Tensor<Float>
   return %0 : $Tensor<Float>
 }
 
@@ -28,7 +29,8 @@ bb0:
 // CHECK-NEXT:   %3 = graph_op "tf.Dummy"() {string1: "hello", string2: "world"} : $Tensor<Float>
 // CHECK-NEXT:   %4 = graph_op "tf.Dummy"() {metatype1: $Float, metatype2: $Tensor<Float>} : $Tensor<Float>
 // CHECK-NEXT:   %5 = graph_op "tf.Dummy"() {function1: @chained_op_test : $@convention(thin) (Tensor<Float>, Tensor<Float>) -> Tensor<Float>} : $Tensor<Float>
-// CHECK-NEXT:   %6 = graph_op "tf.Dummy"() {array: [{{.*}}[i8 1, i32 -2], [f32 0xBF800000 /* -1 */, $Float]]} : $Tensor<Float>
+// CHECK-NEXT:   %6 = graph_op "tf.Dummy"() {aggregate: ((i8 1, i32 -2), (f32 0xBF800000 /* -1 */, $Float))} : $Tensor<Float>
+// CHECK-NEXT:   %7 = graph_op "tf.Smarty"() {array: [$Int: i32 -2, i32 97]} : $Tensor<Float>
 // CHECK-NEXT:   return %0 : $Tensor<Float>
 // CHECK-NEXT: }
 
