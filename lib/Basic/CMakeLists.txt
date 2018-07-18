@@ -71,6 +71,7 @@ add_swift_library(swiftBasic STATIC
   DiverseStack.cpp
   Edit.cpp
   EditorPlaceholder.cpp
+  ExponentialGrowthAppendingBinaryByteStream.cpp
   FileSystem.cpp
   JSONSerialization.cpp
   LangOptions.cpp
