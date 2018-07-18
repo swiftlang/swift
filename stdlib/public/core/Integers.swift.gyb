@@ -2591,9 +2591,8 @@ extension FixedWidthInteger {
   ///     // Prints "64"
   ///     // Prints "5"
   ///
-  /// This method uses the default random generator, `Random.default`. The call
-  /// to `Int.random(in: ${exampleRange})` above is equivalent to calling
-  /// `Int.random(in: ${exampleRange}, using: &Random.default)`.
+  /// This method is equivalent to calling the version that takes a generator, 
+  /// passing in the system's default random generator.
   ///
   /// - Parameter range: The range in which to create a random value.
 %   if Range == 'Range':
