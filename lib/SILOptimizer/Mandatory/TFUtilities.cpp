@@ -1167,8 +1167,6 @@ bool SILTensorOpInfo::isDecodableApply(ApplyInst *apply) {
 /// rewrite the instruction and return a new one that does so.  Otherwise,
 /// return the same instruction.
 SILInstruction *SILTensorOpInfo::decodeApply(ApplyInst *apply) {
-  return apply;
-
   auto fn = apply->getCalleeFunction();
   if (!fn) return apply;
 
