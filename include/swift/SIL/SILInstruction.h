@@ -7839,62 +7839,58 @@ class GradientInst final
                            SingleValueInstruction> {
 private:
   friend SILBuilder;
-  /// The differentiation source index, i.e. the index of the result to
-  /// differentiate from.
-  unsigned SourceIndex;
-  /// The number of parameters of the original function to differentiate with
-  /// respect to.
-  unsigned NumParamIndices;
-  /// Whether the gradient function is seedable, i.e. able to take a
-  /// back-propagated adjoint value as the last parameter.
-  bool Seedable;
-  /// Whether the gradient function is preserving the result of the original
-  /// function.
-  bool PreservingResult;
+  /// The reverse-mode AD indices.
+  SILReverseAutoDiffIndices Indices;
+  /// Gradient options.
+  SILGradientOptions Options;
   /// Space for 1 operand: the original function to be differentiated.
   FixedOperandList<1> Operands;
 
   GradientInst(SILModule &module, SILDebugLocation debugLoc, SILValue original,
-               unsigned Sourceindex, ArrayRef<unsigned> paramIndices,
-               bool seedable, bool preservingResult);
+               SILReverseAutoDiffIndices indices, SILGradientOptions options);
 
   /// A utility function for computing the SIL type of the gradient of a
   /// function, given the specified differentiation configuration options.
   static SILType getGradientSILType(SILModule &module, SILValue original,
-                                    unsigned sourceIndex,
-                                    ArrayRef<unsigned> paramIndices,
-                                    bool seedable, bool preservingResult);
+                                    SILReverseAutoDiffIndices indices,
+                                    SILGradientOptions options);
 
 public:
   ~GradientInst() {};
 
   static GradientInst *create(SILModule &M, SILDebugLocation debugLoc,
-                              SILValue original, unsigned sourceIndex,
-                              ArrayRef<unsigned> paramIndices,
-                              bool seedable, bool preservingResult);
+                              SILValue original,
+                              SILReverseAutoDiffIndices indices,
+                              SILGradientOptions options);
 
   SILValue getOriginal() const { return Operands[0].get(); }
 
   CanSILFunctionType getOriginalType() const {
     return getOriginal()->getType().getAs<SILFunctionType>();
   }
-                             
-  unsigned getSourceIndex() const {
-    return SourceIndex;
+
+  SILGradientOptions getOptions() const {
+    return Options;
   }
 
-  unsigned *getParameterIndicesData() {
-    return reinterpret_cast<unsigned *>(this+1);
+  bool isSeedable() const {
+    return Options.contains(SILGradientFlags::Seedable);
   }
 
-  ArrayRef<unsigned> getParameterIndices() const;
+  bool isPreservingResult() const {
+    return Options.contains(SILGradientFlags::PreservingResult);
+  }
 
-  bool isSeedable() const { return Seedable; }
+  bool isDelayed() const {
+    return Options.contains(SILGradientFlags::Delayed);
+  }
 
-  bool isPreservingResult() const { return PreservingResult; }
+  SILReverseAutoDiffIndices getIndices() const {
+    return Indices;
+  }
 
   SILReverseAutoDiffConfiguration getConfiguration() const {
-    return { SourceIndex, getParameterIndices(), Seedable, PreservingResult };
+    return { Indices, Options };
   }
 
   ArrayRef<Operand> getAllOperands() const {
