@@ -856,10 +856,9 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
       param->markInvalid();
       hadError = true;
     } else {
-      if (!type->isMaterializable()) {
+      if (type->is<InOutType>())
         param->setSpecifier(VarDecl::Specifier::InOut);
-      }
-      resolver.recordParamType(param, type->getInOutObjectType());
+      param->setInterfaceType(type->getInOutObjectType());
     }
     
     checkTypeModifyingDeclAttributes(param);

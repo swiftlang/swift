@@ -1046,7 +1046,6 @@ public:
   /// to be in a correct and valid form.
   ///
   /// \param type The generic type to which to apply arguments.
-  /// \param decl The declaration of the type.
   /// \param loc The source location for diagnostic reporting.
   /// \param dc The context where the arguments are applied.
   /// \param generic The arguments to apply with the angle bracket range for
@@ -1058,7 +1057,7 @@ public:
   /// error.
   ///
   /// \see applyUnboundGenericArguments
-  Type applyGenericArguments(Type type, TypeDecl *decl, SourceLoc loc,
+  Type applyGenericArguments(Type type, SourceLoc loc,
                              DeclContext *dc, GenericIdentTypeRepr *generic,
                              TypeResolutionOptions options,
                              GenericTypeResolver *resolver);
@@ -1275,15 +1274,9 @@ public:
   void configureInterfaceType(AbstractFunctionDecl *func,
                               GenericSignature *sig);
 
-  /// Validate the signature of a generic function.
-  ///
-  /// \param func The generic function.
-  GenericSignature *validateGenericFuncSignature(AbstractFunctionDecl *func);
-
-  /// Revert the signature of a generic function to its pre-type-checked state,
-  /// so that it can be type checked again when we have resolved its generic
-  /// parameters.
-  void revertGenericFuncSignature(AbstractFunctionDecl *func);
+  /// Compute the generic signature, generic environment and interface type
+  /// of a generic function.
+  void validateGenericFuncSignature(AbstractFunctionDecl *func);
 
   /// Check the generic parameters in the given generic parameter list (and its
   /// parent generic parameter lists) according to the given resolver.
@@ -1292,15 +1285,9 @@ public:
                              GenericSignature *parentSig,
                              GenericTypeResolver *resolver);
 
-  /// Validate the signature of a generic subscript.
-  ///
-  /// \param subscript The generic subscript.
-  GenericSignature *validateGenericSubscriptSignature(SubscriptDecl *subscript);
-
-  /// Revert the signature of a generic function to its pre-type-checked state,
-  /// so that it can be type checked again when we have resolved its generic
-  /// parameters.
-  void revertGenericSubscriptSignature(SubscriptDecl *subscript);
+  /// Compute the generic signature, generic environment and interface type
+  /// of a generic subscript.
+  void validateGenericSubscriptSignature(SubscriptDecl *subscript);
 
   /// Configure the interface type of a subscript declaration.
   void configureInterfaceType(SubscriptDecl *subscript,

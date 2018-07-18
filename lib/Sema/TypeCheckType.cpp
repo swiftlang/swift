@@ -341,7 +341,7 @@ static bool isPointerToVoid(ASTContext &Ctx, Type Ty, bool &IsMutable) {
   return BGT->getGenericArgs().front()->isVoid();
 }
 
-Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
+Type TypeChecker::applyGenericArguments(Type type,
                                         SourceLoc loc, DeclContext *dc,
                                         GenericIdentTypeRepr *generic,
                                         TypeResolutionOptions options,
@@ -355,10 +355,7 @@ Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
   }
 
   // We must either have an unbound generic type, or a generic type alias.
-  if (!type->is<UnboundGenericType>() &&
-      !(isa<TypeAliasDecl>(decl) &&
-        cast<TypeAliasDecl>(decl)->getGenericParams())) {
-
+  if (!type->is<UnboundGenericType>()) {
     auto diag = diagnose(loc, diag::not_a_generic_type, type);
 
     // Don't add fixit on module type; that isn't the right type regardless
@@ -376,24 +373,7 @@ Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
   }
 
   auto *unboundType = type->castTo<UnboundGenericType>();
-
-  // If we have a non-generic type alias, we have an unbound generic type.
-  // Grab the decl from the unbound generic type.
-  //
-  // The idea is if you write:
-  //
-  // typealias Foo = Bar.Baz
-  //
-  // Then 'Foo<Int>' applies arguments to Bar.Baz, whereas if you write:
-  //
-  // typealias Foo<T> = Bar.Baz<T>
-  //
-  // Then 'Foo<Int>' applies arguments to Foo itself.
-  //
-  if (isa<TypeAliasDecl>(decl) &&
-      !cast<TypeAliasDecl>(decl)->getGenericParams()) {
-    decl = unboundType->getDecl();
-  }
+  auto *decl = unboundType->getDecl();
 
   // Make sure we have the right number of generic arguments.
   // FIXME: If we have fewer arguments than we need, that might be okay, if
@@ -509,7 +489,7 @@ Type TypeChecker::applyUnboundGenericArguments(
   // generic arguments.
   auto resultType = decl->getDeclaredInterfaceType();
 
-  bool hasTypeParameterOrVariable = false;
+  bool hasTypeVariable = false;
 
   // Get the substitutions for outer generic parameters from the parent
   // type.
@@ -526,9 +506,7 @@ Type TypeChecker::applyUnboundGenericArguments(
     }
 
     subs = parentType->getContextSubstitutions(decl->getDeclContext());
-
-    hasTypeParameterOrVariable |=
-      (parentType->hasTypeParameter() || parentType->hasTypeVariable());
+    hasTypeVariable |= parentType->hasTypeVariable();
   }
 
   SourceLoc noteLoc = decl->getLoc();
@@ -545,13 +523,12 @@ Type TypeChecker::applyUnboundGenericArguments(
     subs[origTy->getCanonicalType()->castTo<GenericTypeParamType>()] =
       substTy;
 
-    hasTypeParameterOrVariable |=
-      (substTy->hasTypeParameter() || substTy->hasTypeVariable());
+    hasTypeVariable |= substTy->hasTypeVariable();
   }
 
   // Check the generic arguments against the requirements of the declaration's
   // generic signature.
-  if (!hasTypeParameterOrVariable) {
+  if (!hasTypeVariable) {
     auto result =
       checkGenericArguments(dc, loc, noteLoc, unboundType,
                             genericSig->getGenericParams(),
@@ -695,7 +672,7 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
 
   if (generic && !options.contains(TypeResolutionFlags::ResolveStructure)) {
     // Apply the generic arguments to the type.
-    type = TC.applyGenericArguments(type, typeDecl, loc, fromDC, generic,
+    type = TC.applyGenericArguments(type, loc, fromDC, generic,
                                     options, resolver);
     if (!type)
       return nullptr;
@@ -1149,6 +1126,26 @@ static Type resolveNestedIdentTypeComponent(
               TypeResolutionOptions options,
               bool diagnoseErrors,
               GenericTypeResolver *resolver) {
+  auto maybeApplyGenericArgs = [&](Type memberType) {
+    // If there are generic arguments, apply them now.
+    if (!options.contains(TypeResolutionFlags::ResolveStructure)) {
+      if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp)) {
+        return TC.applyGenericArguments(memberType, comp->getIdLoc(),
+                                        DC, genComp, options, resolver);
+      }
+    }
+
+    if (memberType->is<UnboundGenericType>() &&
+        !options.contains(TypeResolutionFlags::AllowUnboundGenerics) &&
+        !options.contains(TypeResolutionFlags::TypeAliasUnderlyingType) &&
+        !options.contains(TypeResolutionFlags::ResolveStructure)) {
+      diagnoseUnboundGenericType(TC, memberType, comp->getLoc());
+      return ErrorType::get(TC.Context);
+    }
+
+    return memberType;
+  };
+
   auto maybeDiagnoseBadMemberType = [&](TypeDecl *member, Type memberType,
                                         AssociatedTypeDecl *inferredAssocType) {
     // Diagnose invalid cases.
@@ -1198,22 +1195,7 @@ static Type resolveNestedIdentTypeComponent(
       return memberType;
 
     // If there are generic arguments, apply them now.
-    if (!options.contains(TypeResolutionFlags::ResolveStructure)) {
-      if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp)) {
-        return TC.applyGenericArguments(memberType, member, comp->getIdLoc(),
-                                        DC, genComp, options, resolver);
-      }
-    }
-
-    if (memberType->is<UnboundGenericType>() &&
-        !options.contains(TypeResolutionFlags::AllowUnboundGenerics) &&
-        !options.contains(TypeResolutionFlags::TypeAliasUnderlyingType) &&
-        !options.contains(TypeResolutionFlags::ResolveStructure)) {
-      diagnoseUnboundGenericType(TC, memberType, comp->getLoc());
-      return ErrorType::get(TC.Context);
-    }
-
-    return memberType;
+    return maybeApplyGenericArgs(memberType);
   };
 
   // Short-circuiting.
@@ -1223,8 +1205,18 @@ static Type resolveNestedIdentTypeComponent(
   // and we skip much of the work below.
   if (parentTy->isTypeParameter()) {
     if (auto memberType = resolver->resolveDependentMemberType(
-            parentTy, DC, parentRange, comp))
+            parentTy, DC, parentRange, comp)) {
+      // Hack -- if we haven't resolved this to a declaration yet, don't
+      // attempt to apply generic arguments, since this will emit a
+      // diagnostic, and its possible that this type will become a concrete
+      // type later on.
+      if (!memberType->is<DependentMemberType>() ||
+          memberType->castTo<DependentMemberType>()->getAssocType()) {
+        return maybeApplyGenericArgs(memberType);
+      }
+
       return memberType;
+    }
   }
 
   // Phase 2: If a declaration has already been bound, use it.
