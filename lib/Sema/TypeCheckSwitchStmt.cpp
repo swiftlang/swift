@@ -1182,9 +1182,6 @@ namespace {
       // can assume the user did the right thing and that they don't need
       // a 'default' to be inserted.
       // FIXME: Do something sensible for non-frozen enums.
-      if (!sawRedundantPattern &&
-          coveredSpace.getSize(TC, DC) >= totalSpace.getSize(TC, DC))
-        return;
       diagnoseMissingCases(RequiresDefault::SpaceTooLarge, Space(),
                            unknownCase);
     }
