@@ -181,6 +181,9 @@ public:
   /// Profile the substitution map, for use with LLVM's FoldingSet.
   void profile(llvm::FoldingSetNodeID &id) const;
 
+  const llvm::DenseMap<CanType, SmallVector<ProtocolConformanceRef, 1>> &
+  getConformanceMap() const { return conformanceMap; }
+  
 private:
   friend class GenericSignature;
   friend class GenericEnvironment;

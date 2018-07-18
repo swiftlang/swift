@@ -3290,57 +3290,36 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
     = Conformance->populateSignatureConformances();
 
   class GatherConformancesListener : public GenericRequirementsCheckListener {
-    TypeChecker &tc;
     NormalProtocolConformance *conformance;
     std::function<void(ProtocolConformanceRef)> &writer;
   public:
     GatherConformancesListener(
-                         TypeChecker &tc,
-                        NormalProtocolConformance *conformance,
-                         std::function<void(ProtocolConformanceRef)> &writer)
-      : tc(tc), conformance(conformance), writer(writer) { }
+        NormalProtocolConformance *conformance,
+        std::function<void(ProtocolConformanceRef)> &writer)
+      : conformance(conformance), writer(writer) { }
 
     void satisfiedConformance(Type depTy, Type replacementTy,
                               ProtocolConformanceRef conformance) override {
       // The conformance will use contextual types, but we want the
       // interface type equivalent.
-
-      // If we have an inherited conformance for an archetype, dig out the
-      // superclass conformance to translate.
-      Type inheritedInterfaceType;
       if (conformance.isConcrete() &&
           conformance.getConcrete()->getType()->hasArchetype()) {
         auto concreteConformance = conformance.getConcrete();
-        if (concreteConformance->getKind()
-              == ProtocolConformanceKind::Inherited &&
-            conformance.getConcrete()->getType()->is<ArchetypeType>()) {
-          inheritedInterfaceType =
-            concreteConformance->getType()->mapTypeOutOfContext();
-          concreteConformance =
-            cast<InheritedProtocolConformance>(concreteConformance)
-              ->getInheritedConformance();
-        }
 
         // Map the conformance.
-        // FIXME: It would be so much easier and efficient if we had
-        // ProtocolConformance::mapTypesOutOfContext().
         auto interfaceType =
           concreteConformance->getType()->mapTypeOutOfContext();
 
-        conformance = *tc.conformsToProtocol(
-                         interfaceType,
-                         conformance.getRequirement(),
-                         this->conformance->getDeclContext(),
-                         (ConformanceCheckFlags::SuppressDependencyTracking|
-                          ConformanceCheckFlags::SkipConditionalRequirements));
+        concreteConformance = concreteConformance->subst(
+            interfaceType,
+            [](SubstitutableType *type) -> Type {
+              if (auto *archetypeType = type->getAs<ArchetypeType>())
+                return archetypeType->getInterfaceType();
+              return type;
+            },
+            MakeAbstractConformanceForGenericType());
 
-        // Reinstate inherited conformance.
-        if (inheritedInterfaceType) {
-          conformance =
-            ProtocolConformanceRef(
-              tc.Context.getInheritedConformance(inheritedInterfaceType,
-                                                 conformance.getConcrete()));
-        }
+        conformance = ProtocolConformanceRef(concreteConformance);
       }
 
       writer(conformance);
@@ -3356,7 +3335,7 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
 
       return false;
     }
-  } listener(TC, Conformance, writer);
+  } listener(Conformance, writer);
 
   auto result = TC.checkGenericArguments(
       DC, Loc, Loc,
