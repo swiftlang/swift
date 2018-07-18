@@ -119,10 +119,13 @@ void ProtocolRequirementTypeResolver::recordParamType(ParamDecl *decl,
 CompleteGenericTypeResolver::CompleteGenericTypeResolver(
                                               TypeChecker &tc,
                                               GenericSignature *genericSig)
-  : tc(tc), genericSig(genericSig),
-    builder(*tc.Context.getOrCreateGenericSignatureBuilder(
-                               genericSig->getCanonicalSignature()))
-{
+  : tc(tc), genericSig(genericSig) {
+  if (genericSig) {
+    builder = tc.Context.getOrCreateGenericSignatureBuilder(
+      genericSig->getCanonicalSignature());
+  } else {
+    builder = nullptr;
+  }
 }
 
 Type CompleteGenericTypeResolver::mapTypeIntoContext(Type type) {
@@ -135,14 +138,14 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
                                     SourceRange baseRange,
                                     ComponentIdentTypeRepr *ref) {
   auto baseEquivClass =
-    builder.resolveEquivalenceClass(
+    builder->resolveEquivalenceClass(
                                 baseTy,
                                 ArchetypeResolutionKind::CompleteWellFormed);
   assert(baseEquivClass && "Unknown base type?");
 
   // Look for a nested type with the given name.
   if (auto nestedType =
-          baseEquivClass->lookupNestedType(builder, ref->getIdentifier())) {
+          baseEquivClass->lookupNestedType(*builder, ref->getIdentifier())) {
     // Record the type we found.
     ref->setValue(nestedType, nullptr);
   } else {
@@ -153,7 +156,7 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
     tc.performTypoCorrection(DC, DeclRefKind::Ordinary,
                              MetatypeType::get(baseTy),
                              NameLookupFlags::ProtocolMembers,
-                             corrections, &builder);
+                             corrections, builder);
 
     // Check whether we have a single type result.
     auto singleType = cast_or_null<TypeDecl>(

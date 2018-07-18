@@ -140,7 +140,7 @@ public:
 class CompleteGenericTypeResolver : public GenericTypeResolver {
   TypeChecker &tc;
   GenericSignature *genericSig;
-  GenericSignatureBuilder &builder;
+  GenericSignatureBuilder *builder;
 
 public:
   CompleteGenericTypeResolver(TypeChecker &tc, GenericSignature *genericSig);
