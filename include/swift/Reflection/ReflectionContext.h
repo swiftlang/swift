@@ -202,10 +202,6 @@ public:
     if (!Buf)
       return false;
     auto HeaderMagic = reinterpret_cast<const uint32_t *>(Buf.get());
-    if (*HeaderMagic != llvm::MachO::MH_MAGIC &&
-        *HeaderMagic != llvm::MachO::MH_MAGIC_64)
-      return false;
-
     if (*HeaderMagic == llvm::MachO::MH_MAGIC)
       return readMachOSections<MachOTraits<4>>(ImageStart);
     if (*HeaderMagic == llvm::MachO::MH_MAGIC_64)
