@@ -1171,6 +1171,14 @@ bool TFFunctionPartition::markBlock(SILBasicBlock *BB) {
         // We intend for `predTerm` to still run on host (and thus did not
         // mark its parent block), but send its result to accelerator.
         markedInstructions.insert({predTerm, Marking::Send});
+        // Even though we don't need to mark `pred` for accelerator if it has no
+        // block which it is control-dependent on, when there is a block that
+        // `pred` is control-dependent on, we need to mark that block. This is
+        // done by marking `pred` first. Otherwise we can miss marking an
+        // encompassing loop where `pred` and `thisBB` are part of the loop
+        // body.
+        if (markBlock(pred))
+          return true;
         continue;
       }
 
@@ -1261,36 +1269,15 @@ static ScalarPromoteClass shouldPromoteToTensorOp(SILInstruction *inst,
   return ScalarPromoteClass::CanPromote;
 }
 
+/// In addition to marking this inst itself for accelerator (Copy or Move), also
+/// mark the block, and the operands of this inst. In addition, for
+/// Marking::Copy, handle a few special types of scalar promotion.
 bool TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
+  assert(mark == Marking::Copy || mark == Marking::Move);
+
   // Insert the specified instruction into the marked set.  If it is already
   // there then we have nothing more to do.
   if (!markedInstructions.insert({&inst, mark}).second)
-    return false;
-
-  // If we're moving a computation to the accelerator and we see a tuple_extract
-  // from a moved value, then we move the tuple_extract as well, to make sure
-  // that any copy-to-host or results are scalar values, not the multiple
-  // results of tensor ops.
-  if (mark == Marking::Move) {
-    for (auto result : inst.getResults())
-      for (auto *use : result->getUses()) {
-        auto user = use->getUser();
-
-        // FIXME: We should probably consider these as tensorops to make sure
-        // they get moved to the accelerator and we don't end up with any
-        // multi-result tensor operations being copied over.
-        if (isa<TupleExtractInst>(user)) {
-          // It is possible the tuple extract already got marked as a copy.  If
-          // so, remove its entry so we can upgrade it to a move.
-          markedInstructions.erase(user);
-          if (markInstruction(*user, Marking::Move))
-            return true;
-        }
-      }
-  }
-
-  // If we are simply deleting this instruction, then we're done.
-  if (mark == Marking::Delete)
     return false;
 
   // Make sure the instruction's block is marked as being copied over to the
@@ -1304,12 +1291,11 @@ bool TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
   if (isa<BranchInst>(&inst))
     return false;
 
-  // If we are moving the instruction over, then we know it is a tensor op, and
-  // it get special attention.  Otherwise, we just recursively mark the
-  // operands in question.
+  // If we are copying the instruction over (for scalar promotion), we just
+  // recursively mark the operands in question.
   // TODO: This special case will go away when Tensor ops are not representing
   // attributes as operands.
-  if (mark != Marking::Move) {
+  if (mark == Marking::Copy) {
     auto operandRange = inst.getAllOperands();
 
     // Some instructions require special handling during marking.
@@ -1338,6 +1324,29 @@ bool TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
     return false;
   }
 
+  assert(mark == Marking::Move);
+  // If we are moving the instruction over, then we know it is a tensor op, and
+  // it gets special attention.
+
+  // If we're moving a computation to the accelerator and we see a tuple_extract
+  // from a moved value, then we move the tuple_extract as well, to make sure
+  // that all copy-to-host or results are scalar values, not the multiple
+  // results of tensor ops.
+  for (auto result : inst.getResults())
+    for (auto *use : result->getUses()) {
+      auto user = use->getUser();
+
+      // FIXME: We should probably consider these as tensorops to make sure
+      // they get moved to the accelerator and we don't end up with any
+      // multi-result tensor operations being copied over.
+      if (isa<TupleExtractInst>(user)) {
+        // It is possible the tuple extract already got marked as a copy.  If
+        // so, remove its entry so we can upgrade it to a move.
+        markedInstructions.erase(user);
+        if (markInstruction(*user, Marking::Move))
+          return true;
+      }
+    }
   // If this is a tuple_extract of a tensor op, then we already marked its
   // operand.
   if (isa<TupleExtractInst>(inst))

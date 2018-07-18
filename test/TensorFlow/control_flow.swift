@@ -315,3 +315,17 @@ public func infLoop2(maxCount: Int32) {
   a -= a
   _hostOp(a)
 }
+
+// TODO: Enable this test when we fix
+// SESE FIXME: Imperfect loop exits not handled yet!
+// public func SR8256(_ cond: Int?) {
+//   let a = Tensor<Float>(1.0)
+//   var i: Int32 = 0
+//   let maxCount: Int32 = 10
+//   while i < maxCount {
+//     if cond != nil {
+//       _hostOp(a+a)
+//     }
+//     i += 1
+//   }
+// }
