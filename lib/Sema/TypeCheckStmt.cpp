@@ -1412,7 +1412,8 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
     if (auto stmt =
             BS->getElement(BS->getNumElements() - 1).dyn_cast<Stmt *>()) {
       if (auto deferStmt = dyn_cast<DeferStmt>(stmt)) {
-        TC.diagnose(deferStmt->getStartLoc(), diag::defer_stmt_at_block_end);
+        TC.diagnose(deferStmt->getStartLoc(), diag::defer_stmt_at_block_end)
+            .fixItReplace(deferStmt->getStartLoc(), "do");
       }
     }
   }
