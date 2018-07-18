@@ -1979,13 +1979,6 @@ bool TFFunctionPartition::markFunction(bool &hasTensorOps) {
         continue;
       }
 
-      // If this is a well known function that can be transformed into an op, do
-      // so first.
-      if (auto apply = dyn_cast<ApplyInst>(inst)) {
-        inst = SILTensorOpInfo::decodeApply(apply);
-        bbi = SILBasicBlock::iterator(inst);
-      }
-
       auto opInfo = SILTensorOpInfo::decode(inst);
       if (!opInfo)
         continue;
