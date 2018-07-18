@@ -406,6 +406,308 @@ bool ADContext::supportsFloatingPointDifferentiation(Type type) const {
 }
 
 //===----------------------------------------------------------------------===//
+// Control flow canonicalization
+//===----------------------------------------------------------------------===//
+
+namespace {
+class ControlFlowCanonicalization {
+private:
+  SILFunction &function;
+  SILBuilder builder = SILBuilder(function);
+  DominanceInfo &domInfo;
+  SILLoopInfo &loopInfo;
+
+public:
+  explicit ControlFlowCanonicalization(SILFunction &function,
+                                       DominanceInfo &domInfo,
+                                       SILLoopInfo &loopInfo)
+    : function(function), domInfo(domInfo), loopInfo(loopInfo) {}
+
+  /// Run control flow canonicalization on the function.
+  bool run();
+};
+}
+
+bool ControlFlowCanonicalization::run() {
+  DEBUG(getDebugStream() << "Running control flow canonicalization on function "
+        << function.getName() << '\n');
+  bool changed = false;
+  assert(!function.isNoReturnFunction() && !function.isExternalDeclaration());
+  assert(function.findReturnBB().getNodePtr());
+  // Canonicalize loops.
+  canonicalizeAllLoops(&domInfo, &loopInfo);
+  // TODO: Handle multiple loop exits.
+  return changed;
+}
+
+//===----------------------------------------------------------------------===//
+// Activity Analysis
+//===----------------------------------------------------------------------===//
+
+/// In many real situations, the end-users of AD need only the derivatives of
+/// some selected outputs of `P` with respect to some selected inputs of `P`.
+/// Whatever the differentiation mode (tangent, reverse,...), these restrictions
+/// allow the AD tool to produce a much more efficient differentiated program.
+/// Essentially, fixing some inputs and neglecting some outputs allows AD to
+/// just forget about several intermediate differentiated variables.
+///
+/// Activity analysis is the specific analysis that detects these situations,
+/// therefore allowing for a better differentiated code. Activity analysis is
+/// present in all transformation-based AD tools.
+///
+/// To begin with, the end-user specifies that only some output variables (the
+/// “dependent”) must be differentiated with respect to only some input
+/// variables (the “independent”). We say that variable `y` depends on `x` when
+/// the derivative of `y` with respect to `x` is not trivially null. We say that
+/// a variable is “varied” if it depends on at least one independent. Conversely
+/// we say that a variable is “useful” if at least one dependent depends on it.
+/// Finally, we say that a variable is “active” if it is at the same time varied
+/// and useful. In the special case of the tangent mode, it is easy to check
+/// that when variable `v` is not varied at some place in the program, then its
+/// derivative `v̇` at this place is certainly null. Conversely when variable `v`
+/// is not useful, then whatever the value of `v̇`, this value does not matter
+/// for the final result. Symmetric reasoning applies for the reverse mode of
+/// AD: observing that differentiated variables go upstream, we see that a
+/// useless variable has a null derivative, in other words the partial
+/// derivative of the output with respect to this variable is null. Conversely
+/// when variable `v` is not varied, then whatever the value of `v`, this value
+/// does not matter for the final result.
+///
+/// Reference:
+/// Laurent Hascoët. Automatic Differentiation by Program Transformation. 2017.
+
+namespace {
+
+class DifferentiableActivityInfo;
+class DifferentiableActivityAnalysis
+  : public FunctionAnalysisBase<DifferentiableActivityInfo> {
+  private:
+  DominanceAnalysis *dominanceAnalysis = nullptr;
+
+  public:
+  explicit DifferentiableActivityAnalysis()
+    : FunctionAnalysisBase(AnalysisKind::DifferentiableActivity) {}
+
+  static bool classof(const SILAnalysis *s) {
+    return s->getKind() == AnalysisKind::DifferentiableActivity;
+  }
+
+  virtual bool shouldInvalidate(SILAnalysis::InvalidationKind k) override {
+    return k & InvalidationKind::Everything;
+  }
+
+  virtual
+  DifferentiableActivityInfo *newFunctionAnalysis(SILFunction *f) override;
+
+  virtual void initialize(SILPassManager *pm) override;
+};
+
+class DifferentiableActivityInfo {
+private:
+  SILFunction &function;
+
+  /// Input values, i.e. parameters (both direct and indirect).
+  SmallVector<SILValue, 4> inputValues;
+  /// Output values, i.e. individual values (not the final tuple) being returned
+  /// by the `return` instruction.
+  SmallVector<SILValue, 4> outputValues;
+
+  /// The set of useful variables, indexed by the corresponding dependent value
+  /// (output) index.
+  SmallVector<SmallDenseSet<SILValue>, 4> usefulValueSets;
+  /// The set of useful variables, indexed by the corresponding independent
+  /// value (input) index.
+  SmallVector<SmallDenseSet<SILValue>, 4> variedValueSets;
+
+  /// Perform analysis and populate sets.
+  void analyze();
+
+public:
+  explicit DifferentiableActivityInfo(SILFunction &f);
+
+  bool isIndependent(SILValue value,
+                     const SILReverseAutoDiffIndices &indices) const;
+  bool isDependent(SILValue value,
+                   const SILReverseAutoDiffIndices &indices) const;
+  bool isVaried(SILValue value,
+                unsigned independentVariableIndex) const;
+  bool isUseful(SILValue value,
+                unsigned dependentVariableIndex) const;
+  bool isVaried(SILValue value,
+                llvm::BitVector parameterIndices) const;
+  bool isActive(SILValue value,
+                const SILReverseAutoDiffIndices &indices) const;
+};
+
+} // end anonymous namespace
+
+DifferentiableActivityInfo *
+DifferentiableActivityAnalysis::newFunctionAnalysis(SILFunction *f) {
+  assert(dominanceAnalysis && "Expect a valid dominance anaysis");
+  return new DifferentiableActivityInfo(*f);
+}
+
+SILAnalysis *swift::createDifferentiableActivityAnalysis(SILModule *m) {
+  return new DifferentiableActivityAnalysis();
+}
+
+DifferentiableActivityInfo::
+DifferentiableActivityInfo(SILFunction &f) : function(f) {
+  analyze();
+}
+
+/// Recursively find all "varied" values relative to the given value.
+///
+/// NOTE: The given value will **not** be considered varied.
+static void collectVariedValues(SILValue value,
+                                SmallDenseSet<SILValue> &variedValues,
+                                unsigned inputIndex,
+                                SmallDenseSet<SILValue> &visited) {
+  auto insertion = visited.insert(value);
+  if (!insertion.second) return;
+  for (auto use : value->getUses()) {
+    auto *inst = use->getUser();
+    // If there's a `store` of this value, we consider the destination varied.
+    if (auto *storeInst = dyn_cast<StoreInst>(inst)) {
+      SILValue buffer = storeInst->getDest();
+      // If the def is `begin_access`, then its operand is the actual buffer.
+      if (auto *def =
+            dyn_cast_or_null<BeginAccessInst>(buffer->getDefiningInstruction()))
+        buffer = def->getOperand();
+      DEBUG(getDebugStream() << "VARIED @ " << inputIndex << ":\n"
+            << buffer << '\n');
+      variedValues.insert(buffer);
+      visited.insert(buffer);
+      collectVariedValues(buffer, variedValues, inputIndex, visited);
+      continue;
+    }
+    // For other instructions, consider their results varied.
+    for (auto val : inst->getResults()) {
+      DEBUG(getDebugStream() << "VARIED @ " << inputIndex << ":\n"
+            << val << '\n');
+      variedValues.insert(val);
+      // Recursively collect.
+      collectVariedValues(val, variedValues, inputIndex, visited);
+    }
+  }
+}
+
+/// Recursively find all "useful" values relative to the given value.
+///
+/// NOTE: The given value will be considered useful.
+static void collectUsefulValues(SILValue value,
+                                SmallDenseSet<SILValue> &usefulValues,
+                                unsigned outputIndex) {
+  DEBUG(getDebugStream() << "USEFUL @ " << outputIndex << ":\n"
+        << value << '\n');
+  usefulValues.insert(value);
+  if (auto *def = value->getDefiningInstruction())
+    for (auto &op : def->getAllOperands())
+      collectUsefulValues(op.get(), usefulValues, outputIndex);
+}
+
+void DifferentiableActivityInfo::analyze() {
+  DEBUG(getDebugStream() << "Running activity analysis on @"
+        << function.getName() << '\n');
+  // Inputs are just function's arguments, count `n`.
+  auto paramArgs = function.getArgumentsWithoutIndirectResults();
+  for (auto valueAndIndex : enumerate(paramArgs)) {
+    inputValues.push_back(valueAndIndex.first);
+  }
+  DEBUG({
+    auto &s = getDebugStream();
+    s << "Inputs in @" << function.getName() << ":\n";
+    for (auto val : inputValues) s << val << '\n';
+  });
+  // Outputs are indirect result buffers and return values, count `m`.
+  collectAllFormalResultsInTypeOrder(function, outputValues);
+  DEBUG({
+    auto &s = getDebugStream();
+    s << "Outputs in @" << function.getName() << ":\n";
+    for (auto val : outputValues) s << val << '\n';
+  });
+  // Initialize sets to store useful values and varied values.
+  usefulValueSets.append(outputValues.size(), {});
+  variedValueSets.append(inputValues.size(), {});
+  // Mark varied values for each independent varible.
+  SmallDenseSet<SILValue> visitedVariedValues;
+  for (auto valAndIdx : enumerate(inputValues))
+    collectVariedValues(valAndIdx.first, variedValueSets[valAndIdx.second],
+                        valAndIdx.second, visitedVariedValues);
+  // Mark useful values for each dependent variable.
+  for (auto valAndIdx : enumerate(outputValues))
+    collectUsefulValues(valAndIdx.first, usefulValueSets[valAndIdx.second],
+                        valAndIdx.second);
+}
+
+bool DifferentiableActivityInfo::
+isIndependent(SILValue value, const SILReverseAutoDiffIndices &indices) const {
+  for (auto paramIdx : indices.parameters.set_bits())
+    if (inputValues[paramIdx] == value)
+      return true;
+  return false;
+}
+
+bool DifferentiableActivityInfo::
+isDependent(SILValue value, const SILReverseAutoDiffIndices &indices) const {
+  return inputValues[indices.source] == value;
+}
+
+bool DifferentiableActivityInfo::
+isVaried(SILValue value, unsigned independentVariableIndex) const {
+  auto &set = variedValueSets[independentVariableIndex];
+  return set.find(value) != set.end();
+}
+
+bool DifferentiableActivityInfo::
+isVaried(SILValue value, llvm::BitVector parameterIndices) const {
+  for (auto paramIdx : parameterIndices.set_bits())
+    if (!isVaried(value, paramIdx))
+      return false;
+  return true;
+}
+
+bool DifferentiableActivityInfo::
+isUseful(SILValue value, unsigned dependentVariableIndex) const {
+  auto &set = usefulValueSets[dependentVariableIndex];
+  return set.find(value) != set.end();
+}
+
+bool DifferentiableActivityInfo::
+isActive(SILValue value, const SILReverseAutoDiffIndices &indices) const {
+  return isVaried(value, indices.parameters) && isUseful(value, indices.source);
+}
+
+static void dumpActivityInfo(SILValue value,
+                             const SILReverseAutoDiffIndices &indices,
+                             DifferentiableActivityInfo &activityInfo,
+                             llvm::raw_ostream &s = llvm::dbgs()) {
+  s << '[';
+  if (activityInfo.isActive(value, indices))
+    s << "ACTIVE";
+  else if (activityInfo.isVaried(value, indices.parameters))
+    s << "VARIED";
+  else if (activityInfo.isUseful(value, indices.source))
+    s << "USEFUL";
+  s << "] " << value;
+}
+
+static void dumpActivityInfo(SILFunction &fn,
+                             const SILReverseAutoDiffIndices &indices,
+                             DifferentiableActivityInfo &activityInfo,
+                             llvm::raw_ostream &s = llvm::dbgs()) {
+  s << "Activity info for " << fn.getName() << " at " << indices << '\n';
+  for (auto &bb : fn) {
+    for (auto *arg : bb.getArguments())
+      dumpActivityInfo(arg, indices, activityInfo, s);
+    for (auto &inst : bb)
+      for (auto res : inst.getResults())
+        dumpActivityInfo(res, indices, activityInfo, s);
+  }
+}
+
+
+//===----------------------------------------------------------------------===//
 // PrimalGen - generates primal functions for each differentiation task in
 // the SIL module.
 //===----------------------------------------------------------------------===//

@@ -44,5 +44,7 @@ ANALYSIS(ProtocolConformance)
 ANALYSIS(RCIdentity)
 ANALYSIS(SideEffect)
 ANALYSIS(TypeExpansion)
+// SWIFT_ENABLE_TENSORFLOW
+ANALYSIS(DifferentiableActivity)
 
 #undef ANALYSIS
