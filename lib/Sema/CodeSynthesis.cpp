@@ -2396,6 +2396,14 @@ static void configureDesignatedInitAttributes(TypeChecker &tc,
 
   if (superclassCtor->isRequired())
     ctor->getAttrs().add(new (ctx) RequiredAttr(/*IsImplicit=*/true));
+
+  // If the superclass constructor is @objc but the subclass constructor is
+  // not representable in Objective-C, add @nonobjc implicitly.
+  Optional<ForeignErrorConvention> errorConvention;
+  if (superclassCtor->isObjC() &&
+      !isRepresentableInObjC(ctor, ObjCReason::MemberOfObjCSubclass,
+                             errorConvention))
+    ctor->getAttrs().add(new (ctx) NonObjCAttr(/*isImplicit=*/true));
 }
 
 ConstructorDecl *

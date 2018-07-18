@@ -1167,8 +1167,7 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
       return None;
 
     if (classDecl->checkObjCAncestry() != ObjCClassKind::NonObjC) {
-      return VD->isImplicit() ? ObjCReason(ObjCReason::ImplicitlyObjC)
-                              : ObjCReason(ObjCReason::MemberOfObjCSubclass);
+      return ObjCReason(ObjCReason::MemberOfObjCSubclass);
     }
   }
 
