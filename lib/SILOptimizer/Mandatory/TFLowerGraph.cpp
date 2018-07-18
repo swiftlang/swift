@@ -579,24 +579,25 @@ public:
 
   GLStatus visitTFOpInst(BuiltinInst *inst);
 
-  GLStatus visitBuiltinRecvFromHostInst(SILTensorOpInfo &tfopInfo);
   GLStatus visitGraphOpSendToHostInst(GraphOperationInfo &graphOpInfo);
   GLStatus visitGraphOpRecvFromHostInst(GraphOperationInfo &graphOpInfo);
   // D2D means device-to-device.
-  GLStatus visitBuiltinD2DTensorRecvInst(SILTensorOpInfo &tfopInfo);
-  GLStatus visitBuiltinD2DTensorSendInst(SILTensorOpInfo &tfopInfo);
+  GLStatus visitGraphOpD2DTensorRecvInst(GraphOperationInfo &graphOpInfo);
+  GLStatus visitGraphOpD2DTensorSendInst(GraphOperationInfo &graphOpInfo);
 
   // Helper functions to add different flavors of send/recv TF ops.
-  GLStatus addTFRecvOp(BuiltinInst *inst, int transferId, StringRef srcDevice);
-  GLStatus addTFSendOp(BuiltinInst *inst, int transferId, StringRef destDevice);
+  GLStatus addTFRecvOp(SILInstruction *inst, int transferId,
+                       StringRef srcDevice);
+  GLStatus addTFSendOp(SILInstruction *inst, int transferId,
+                       StringRef destDevice);
   // For the TPU infeed/outfeed related ops, the shape array of the tensor being
   // transferred is given by `dims`, `numDims` and `dimPtrs`.
-  GLStatus addTPUDequeueOp(BuiltinInst *inst, bool isInfeed, int transferId,
-                       ArrayRef<int64_t> dims, ArrayRef<int> numDims,
-                       ArrayRef<int64_t *> dimPtrs);
-  GLStatus addTPUEnqueueOp(BuiltinInst *inst, bool isInfeed, int transferId,
-                       ArrayRef<int64_t> dims, ArrayRef<int> numDims,
-                       ArrayRef<int64_t *> dimPtrs);
+  GLStatus addTPUDequeueOp(SILInstruction *inst, bool isInfeed, int transferId,
+                           ArrayRef<int64_t> dims, ArrayRef<int> numDims,
+                           ArrayRef<int64_t *> dimPtrs);
+  GLStatus addTPUEnqueueOp(SILInstruction *inst, bool isInfeed, int transferId,
+                           ArrayRef<int64_t> dims, ArrayRef<int> numDims,
+                           ArrayRef<int64_t *> dimPtrs);
 
   // For `op` with `opName` under construction, set a function-typed attribute
   // with a graph function name derived from `silFuncName` under the following
@@ -934,6 +935,52 @@ static void decodeShapeArrayLegacy(const SILTensorOpInfo &tfopInfo,
   }
 }
 
+// This helper function decodes a shape attribute into its values.
+static void decodeShapeAttr(SymbolicValue attr,
+                            SmallVectorImpl<int64_t> &result) {
+  attr = attr.lookThroughSingleElementAggregates();
+  CanType eltType;
+  for (auto elt : attr.getArrayValue(eltType)) {
+    elt = elt.lookThroughSingleElementAggregates();
+    result.push_back(elt.getIntegerValue().getLimitedValue());
+    }
+}
+
+// (graphOpInfo, /*attrIdx*/ 3, dims, numDims, dimPtrs) {
+/// Decode the shape array attribute from attr `attrIdx` in the graph_op
+/// instruction, into `dims`, `numDims` and `dimPtrs`.
+static void decodeShapeArray(const GraphOperationInfo &graphOpInfo,
+                             StringRef attrName, unsigned attrIdx,
+                             SmallVectorImpl<int64_t> &dims,
+                             SmallVectorImpl<int> &numDims,
+                             SmallVectorImpl<int64_t *> &dimPtrs) {
+  auto *inst = graphOpInfo.inst;
+  auto attr = inst->getAttribute(attrIdx);
+  auto attrInfo = GraphOperationInfo::decodeAttributeName(attr.name);
+  assert(attrInfo.second == SILTensorOpInfo::OperandClass::Normal ||
+         attrInfo.second == SILTensorOpInfo::OperandClass::ShapeArray);
+  assert(attrInfo.first == attrName);
+  CanType eltType;
+  auto shapeArray = attr.value.getArrayValue(eltType);
+  assert(eltType->getString() == "TensorShape");
+  auto numShapes = shapeArray.size();
+  for (unsigned shapeIdx = 0; shapeIdx != numShapes; ++shapeIdx) {
+    auto prevNumDims = dims.size();
+    auto shape = shapeArray[shapeIdx];
+    decodeShapeAttr(shape, dims);
+    numDims.push_back(int(dims.size() - prevNumDims));
+  }
+
+  // Now that we've build the array of dimensions, convert it to the array
+  // of pointers that TensorFlow needs.  This is safe now that the vector
+  // has finished its resizing.
+  auto dimPtr = dims.data();
+  for (unsigned shapeIdx = 0; shapeIdx != numShapes; ++shapeIdx) {
+    dimPtrs.push_back(dimPtr);
+    dimPtr += numDims[shapeIdx];
+  }
+}
+
 GLStatus
 TFGraphLowering::visitGraphOpSendToHostInst(GraphOperationInfo &graphOpInfo) {
   auto &graphFn = getCurrentGraphFunction();
@@ -1025,119 +1072,6 @@ TFGraphLowering::visitGraphOpSendToHostInst(GraphOperationInfo &graphOpInfo) {
     TF_AddInput(desc, {globalQueueOp, 0});
     TF_SetDevice(desc, DEFAULT_CPU_DEVICE);
     TF_SetAttrTypeList(desc, "component_types", &inputType, 1);
-    TF_FinishOperation(desc, status);
-    if (checkStatus(getUserSourceLocation(inst->getDebugLocation())))
-      return GLStatus::Error;
-  }
-  return GLStatus::Success;
-}
-
-GLStatus TFGraphLowering::visitBuiltinRecvFromHostInst(SILTensorOpInfo &tfopInfo) {
-  auto &graphFn = getCurrentGraphFunction();
-  // TODO(b/78472806): Add a more thorough and proper fix for effectful ops in
-  // the while cond function.
-  if (!graphFn.shouldLowerEffectfulOps) {
-    internalError(
-        getUserSourceLocation(tfopInfo.inst->getDebugLocation()),
-        "FIXME: cannot lower a Host->TF tensor transfer in a loop header",
-        diag::tfop_invalid_tfop);
-    return GLStatus::Error;
-  }
-
-  // Type check and process the parameters.
-  // recvFromHost has type <T> (tensorId$int, device$string) -> (T)
-  // Optionally it can carry a shape array attr, only used for shape propagation
-  // in XLA compilation.
-  auto *inst = tfopInfo.inst;
-  assert(inst->getNumResults() == 1);
-  assert(inst->getNumOperands() >= 2);
-
-  int tensorId = tfopInfo.getIntAttrOperand(0, "tensorId");
-  assert(tfopInfo.getDeviceString() == DEFAULT_CPU_DEVICE &&
-         "SendToHost must run on CPU device");
-
-  TF_DataType outputType;
-  {
-    assert(inst->getNumResults() == 1);
-    outputType =
-        getTensorFlowDataType(inst->getResults()[0]->getType(), inst->getLoc());
-  }
-
-  // Add dequeue to the local graph function, and the corresponding enqueue to
-  // the top level function, so that caller can enqueue tensors via SessionRun.
-  TF_Operation *queueOp;
-  {
-    auto opName = "fifo_queue_" + llvm::itostr(tensorId);
-    auto *desc =
-        TF_NewOperation(graphFn.getGraph(), "FIFOQueueV2", opName.c_str());
-    TF_SetDevice(desc, DEFAULT_CPU_DEVICE);
-    TF_SetAttrInt(desc, "capacity", NAMED_TENSOR_QUEUE_CAPACITY);
-    TF_SetAttrTypeList(desc, "component_types", &outputType, 1);
-    TF_SetAttrString(desc, "shared_name", opName.data(), opName.size());
-    queueOp = graphFn.finishOp(desc, /*hasSideEffects*/ false,
-                               /*isEligibleForTPU*/ false, status);
-    if (checkStatus(getUserSourceLocation(inst->getDebugLocation())))
-      return GLStatus::Error;
-  }
-
-  {
-    auto opName = "fifo_queue_dequeue_" + llvm::itostr(tensorId);
-    auto *desc =
-        TF_NewOperation(graphFn.getGraph(), "QueueDequeueV2", opName.c_str());
-    TF_AddInput(desc, {queueOp, 0});
-    TF_SetDevice(desc, DEFAULT_CPU_DEVICE);
-    TF_SetAttrTypeList(desc, "component_types", &outputType, 1);
-
-    auto dequeueOp = graphFn.finishOp(desc, /*hasSideEffects*/ true,
-                                      /*isEligibleForTPU*/ false, status);
-    if (checkStatus(getUserSourceLocation(inst->getDebugLocation())))
-      return GLStatus::Error;
-    addValueMapping({inst, 0}, {dequeueOp, 0});
-  }
-
-  // Now add enqueue to the top level graph function. Multiple graph functions
-  // can have their own dequeue ops over the same tensorId.
-  // One example is to dequeue tensors both within the while op's body
-  // function, and also right after the while op is executed.
-  // In that case, we only generate a single enqueue op at the top level.
-  if (!processedTensorIdsForReceive.insert(tensorId).second)
-    return GLStatus::Success;
-
-  // The code here is different enough from the above that it's not worth
-  // extracting common code into functions.
-  TF_Operation *globalQueueOp;
-  {
-    auto opName = "fifo_queue_" + llvm::itostr(tensorId);
-    auto *desc = TF_NewOperation(resultGraph, "FIFOQueueV2", opName.c_str());
-    TF_SetDevice(desc, DEFAULT_CPU_DEVICE);
-    TF_SetAttrInt(desc, "capacity", NAMED_TENSOR_QUEUE_CAPACITY);
-    TF_SetAttrTypeList(desc, "component_types", &outputType, 1);
-    // FIXME: Revisit whether to populate "shared_name".
-    TF_SetAttrString(desc, "shared_name", opName.data(), opName.size());
-    globalQueueOp = TF_FinishOperation(desc, status);
-    if (checkStatus(getUserSourceLocation(inst->getDebugLocation())))
-      return GLStatus::Error;
-  }
-
-  TF_Operation *inputTensorPlaceholder;
-  {
-    auto opName = "arg_tensor_enqueue_" + llvm::itostr(tensorId);
-    auto *desc = TF_NewOperation(resultGraph, "Placeholder", opName.c_str());
-    TF_SetAttrType(desc, "dtype", outputType);
-
-    inputTensorPlaceholder = TF_FinishOperation(desc, status);
-    if (checkStatus(getUserSourceLocation(inst->getDebugLocation())))
-      return GLStatus::Error;
-  }
-
-  {
-    auto opName = "fifo_queue_enqueue_" + llvm::itostr(tensorId);
-    auto *desc = TF_NewOperation(resultGraph, "QueueEnqueueV2", opName.c_str());
-    TF_AddInput(desc, {globalQueueOp, 0});
-    TF_Output inputTensor{inputTensorPlaceholder, 0};
-    TF_AddInputList(desc, &inputTensor, 1);
-    TF_SetDevice(desc, DEFAULT_CPU_DEVICE);
-    TF_SetAttrTypeList(desc, "Tcomponents", &outputType, 1);
     TF_FinishOperation(desc, status);
     if (checkStatus(getUserSourceLocation(inst->getDebugLocation())))
       return GLStatus::Error;
@@ -1260,8 +1194,8 @@ TFGraphLowering::visitGraphOpRecvFromHostInst(GraphOperationInfo &graphOpInfo) {
   return GLStatus::Success;
 }
 
-GLStatus TFGraphLowering::addTFRecvOp(BuiltinInst *inst, int transferId,
-                                  StringRef srcDevice) {
+GLStatus TFGraphLowering::addTFRecvOp(SILInstruction *inst, int transferId,
+                                      StringRef srcDevice) {
   auto opName = "tf_recv_" + llvm::itostr(transferId);
   auto &graphFn = getCurrentGraphFunction();
   auto *desc = TF_NewOperation(graphFn.getGraph(), "_Recv", opName.c_str());
@@ -1283,14 +1217,15 @@ GLStatus TFGraphLowering::addTFRecvOp(BuiltinInst *inst, int transferId,
                                   /*isEligibleForTPU*/ false, status);
   if (checkStatus(getUserSourceLocation(inst->getDebugLocation())))
     return GLStatus::Error;
-  addValueMapping({inst, 0}, {recvOp, 0});
+  addValueMapping({outputFromRecvVal, 0}, {recvOp, 0});
   return GLStatus::Success;
 }
 
-GLStatus TFGraphLowering::addTPUDequeueOp(BuiltinInst *inst, bool isInfeed,
-                                      int transferId, ArrayRef<int64_t> dims,
-                                      ArrayRef<int> numDims,
-                                      ArrayRef<int64_t *> dimPtrs) {
+GLStatus TFGraphLowering::addTPUDequeueOp(SILInstruction *inst, bool isInfeed,
+                                          int transferId,
+                                          ArrayRef<int64_t> dims,
+                                          ArrayRef<int> numDims,
+                                          ArrayRef<int64_t *> dimPtrs) {
   // Infeed dequeue runs on TPU, while outfeed dequeue runs on CPU.
   // Otherwise they have the same op signature.
   if (numDims.size() != 1) {
@@ -1346,34 +1281,34 @@ GLStatus TFGraphLowering::addTPUDequeueOp(BuiltinInst *inst, bool isInfeed,
   if (checkStatus(getUserSourceLocation(inst->getDebugLocation())))
     return GLStatus::Error;
   for (int i = 0, n = numDims.size(); i != n; ++i) {
-    addValueMapping({inst, i}, {dequeue, i});
+    addValueMapping({inst->getResults()[i], 0}, {dequeue, i});
   }
 
   return GLStatus::Success;
 }
 
-GLStatus TFGraphLowering::visitBuiltinD2DTensorRecvInst(SILTensorOpInfo &tfopInfo) {
-  // Signature: "__tfop_tfc.D2DTensorRecv,transferId,srcDevice,device"
+GLStatus TFGraphLowering::visitGraphOpD2DTensorRecvInst(
+    GraphOperationInfo &graphOpInfo) {
+  // Signature: "tfc.D2DTensorRecv {transferId,srcDevice,device}"
   // Can also carry an optional shape array.
-  auto *inst = tfopInfo.inst;
+  auto *inst = graphOpInfo.inst;
   assert(inst->getNumResults() == 1);
-  assert(inst->getNumOperands() >= 3);
-  assert(tfopInfo.getDeviceString() == thisDeviceTypeStr);
+  assert(inst->getNumOperands() == 0);
+  assert(inst->getNumAttributes() == 3 || inst->getNumAttributes() == 4);
+  assert(graphOpInfo.getDeviceString() == thisDeviceTypeStr);
 
-  int transferId = tfopInfo.getIntAttrOperand(0, "transferId");
-  auto srcDeviceStr = tfopInfo.getStringAttrOperand(1, "srcDevice");
+  int transferId = graphOpInfo.getIntAttr(0, "transferId");
+  auto srcDeviceStr = graphOpInfo.getStringAttr(1, "srcDevice");
   auto srcDevice = getOpDeviceType(srcDeviceStr);
   assert(thisDeviceType != srcDevice);
 
   SmallVector<int64_t, 8> dims;
   SmallVector<int, 3> numDims;
   SmallVector<int64_t*, 8> dimPtrs;
-  if (inst->getNumOperands() > 3) {
-    unsigned i = 3;  // 3 is the start operand idx for the shape attr.
-    unsigned e = inst->getNumOperands();
-    decodeShapeArrayLegacy(tfopInfo, i, e, dims, numDims, dimPtrs);
-    // We should be consuming all operands by now.
-    assert(i+1 == e);
+  if (inst->getNumAttributes() == 4) {
+    // 3 is the attr idx for the optional shape array attr.
+    decodeShapeArray(graphOpInfo, SHAPE_ARRAY_ATTR, /*attrIdx*/ 3, dims,
+                     numDims, dimPtrs);
   }
   if (thisDeviceType == DeviceType::TPU) {
     return addTPUDequeueOp(inst, /* isInfeed */ true, transferId, dims, numDims,
@@ -1386,8 +1321,8 @@ GLStatus TFGraphLowering::visitBuiltinD2DTensorRecvInst(SILTensorOpInfo &tfopInf
   }
 }
 
-GLStatus TFGraphLowering::addTFSendOp(BuiltinInst *inst, int transferId,
-                                  StringRef destDevice) {
+GLStatus TFGraphLowering::addTFSendOp(SILInstruction *inst, int transferId,
+                                      StringRef destDevice) {
   auto opName = "tf_send_" + llvm::itostr(transferId);
   auto &graphFn = getCurrentGraphFunction();
   auto *desc = TF_NewOperation(graphFn.getGraph(), "_Send", opName.c_str());
@@ -1414,10 +1349,11 @@ GLStatus TFGraphLowering::addTFSendOp(BuiltinInst *inst, int transferId,
   return GLStatus::Success;
 }
 
-GLStatus TFGraphLowering::addTPUEnqueueOp(BuiltinInst *inst, bool isInfeed,
-                                      int transferId, ArrayRef<int64_t> dims,
-                                      ArrayRef<int> numDims,
-                                      ArrayRef<int64_t *> dimPtrs) {
+GLStatus TFGraphLowering::addTPUEnqueueOp(SILInstruction *inst, bool isInfeed,
+                                          int transferId,
+                                          ArrayRef<int64_t> dims,
+                                          ArrayRef<int> numDims,
+                                          ArrayRef<int64_t *> dimPtrs) {
   // Infeed enqueue runs on CPU, while outfeed enqueue runs on TPU.
   if (isInfeed) {
     if (thisDeviceType != DeviceType::CPU) {
@@ -1468,30 +1404,28 @@ GLStatus TFGraphLowering::addTPUEnqueueOp(BuiltinInst *inst, bool isInfeed,
   return GLStatus::Success;
 }
 
-GLStatus TFGraphLowering::visitBuiltinD2DTensorSendInst(SILTensorOpInfo &tfopInfo) {
-  // Signature: "__tfop_tfc.D2DTensorSend,$in,transferId,destDevice,device"
+GLStatus TFGraphLowering::visitGraphOpD2DTensorSendInst(
+    GraphOperationInfo &graphOpInfo) {
+  // Signature: "tfc.D2DTensorSend,$in {transferId,destDevice,device}"
   // Can also carry an optional shape array.
-  auto *inst = tfopInfo.inst;
-  assert(inst->getNumResults() == 1);
-  assert(inst->getNumOperands() >= 4);
-  assert(tfopInfo.getDeviceString() == thisDeviceTypeStr);
+  auto *inst = graphOpInfo.inst;
+  assert(inst->getNumResults() == 0);
+  assert(inst->getNumOperands() == 1);
+  assert(inst->getNumAttributes() == 3 || inst->getNumAttributes() == 4);
+  assert(graphOpInfo.getDeviceString() == thisDeviceTypeStr);
 
-  assert(tfopInfo.isInput(0));
-  int transferId = tfopInfo.getIntAttrOperand(1, "transferId");
-  auto destDeviceStr = tfopInfo.getStringAttrOperand(2, "destDevice");
+  int transferId = graphOpInfo.getIntAttr(0, "transferId");
+  auto destDeviceStr = graphOpInfo.getStringAttr(1, "destDevice");
   auto destDevice = getOpDeviceType(destDeviceStr);
   assert(thisDeviceType != destDevice);
 
   SmallVector<int64_t, 8> dims;
   SmallVector<int, 3> numDims;
   SmallVector<int64_t*, 8> dimPtrs;
-  if (inst->getNumOperands() > 4) {
-    unsigned i = 4;  // 4 is the start operand idx for the shape attr.
-    unsigned e = inst->getNumOperands();
-    decodeShapeArrayLegacy(tfopInfo, i, e, dims, numDims, dimPtrs);
-    // We should be consuming all operands by now.
-    assert(i+1 == e);
-  }
+  if (inst->getNumAttributes() == 4)
+    // 3 is the attr idx for the optional shape array attr.
+    decodeShapeArray(graphOpInfo, SHAPE_ARRAY_ATTR, /*attrIdx*/ 3, dims,
+                     numDims, dimPtrs);
   if (thisDeviceType == DeviceType::TPU) {
     return addTPUEnqueueOp(inst, /* isInfeed */ false, transferId, dims, numDims,
                     dimPtrs);
@@ -1713,8 +1647,6 @@ GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
   if (inst->getName().str() == "tf_tensor_to_i1")
     return GLStatus::Success;
 
-  auto &graphFn = getCurrentGraphFunction();
-
   // Decode information about the graph_op.
   GraphOperationInfo decoder(inst);
   SmallVector<GraphOperationInfo::InputMarker, 4> inputInfos;
@@ -1725,6 +1657,14 @@ GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
     return visitGraphOpRecvFromHostInst(decoder);
   else if (opName == "tfc.SendToHost")
     return visitGraphOpSendToHostInst(decoder);
+
+  // Device-to-device sends/recvs.
+  if (opName == "tfc.D2DTensorRecv")
+    return visitGraphOpD2DTensorRecvInst(decoder);
+  else if (opName == "tfc.D2DTensorSend")
+    return visitGraphOpD2DTensorSendInst(decoder);
+
+  auto &graphFn = getCurrentGraphFunction();
 
   // The name label we put on the op is summarized from the "stack trace" of
   // the operation's source location.
@@ -1787,17 +1727,6 @@ GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
     }
     }
   }
-
-  // This helper function decodes a shape attribute into its values.
-  auto decodeShapeAttr =
-    [&](SymbolicValue attr, SmallVectorImpl<int64_t> &result) {
-    attr = attr.lookThroughSingleElementAggregates();
-    CanType eltType;
-    for (auto elt : attr.getArrayValue(eltType)) {
-      elt = elt.lookThroughSingleElementAggregates();
-      result.push_back(elt.getIntegerValue().getLimitedValue());
-    }
-  };
 
   // Process all of the attributes.
   // For an inst like:
@@ -1881,10 +1810,18 @@ GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
         break;
       }
       case SymbolicValue::Array: {
-        // FIXME: Handle array attributes.
-        internalError(getUserSourceLocation(inst->getDebugLocation()),
-                      "FIXME: Handle array attributes");
-        return GLStatus::Error;
+        if (isShapeArrayPseudoAttr(name, attrValue)) {
+          // SHAPE_ARRAY_ATTR is a pseudo-attribute used by the compiler's
+          // partitioning and graph lowering passes to propagate shape info for
+          // XLA compilation (e.g. feed shape info to infeed / outfeed ops), and
+          // will not be lowered into this graph op itself.
+          break;
+        } else {
+          // FIXME: Handle array attributes.
+          internalError(getUserSourceLocation(inst->getDebugLocation()),
+                        "FIXME: Handle array attributes");
+          return GLStatus::Error;
+        }
       }
       }
       // Done with normal attributes.
@@ -1950,7 +1887,15 @@ GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
     }
 
     case SILTensorOpInfo::OperandClass::ShapeArray:
-      // TODO: TF_SetAttrShapeList
+      if (isShapeArrayPseudoAttr(name, attrValue)) {
+        // SHAPE_ARRAY_ATTR is a pseudo-attribute used by the compiler's
+        // partitioning and graph lowering passes to propagate shape info for
+        // XLA compilation (e.g. feed shape info to infeed / outfeed ops), and
+        // will not be lowered into this graph op itself.
+        break;
+      } else {
+        llvm_unreachable("FIXME: These operand classes are not yet handled");
+      }
     case SILTensorOpInfo::OperandClass::Array:
       // TODO: TF_SetAttrTypeList, TF_SetAttrStringList, TF_SetAttrIntList,
       // TF_SetAttrFloatList, TF_SetAttrBoolList
@@ -2013,15 +1958,14 @@ GLStatus TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
   SILTensorOpInfo tfopInfo = SILTensorOpInfo::decode(inst).getValue();
 
   // Swift host <-> TF device sends/recvs.
-  assert(tfopInfo.opName != "tfc.SendToHost"); // Already switched to graph op.
-  if (tfopInfo.opName == "tfc.RecvFromHost")
-    return visitBuiltinRecvFromHostInst(tfopInfo);
+  assert(tfopInfo.opName != "tfc.SendToHost" &&
+         tfopInfo.opName != "tfc.RecvFromHost" &&
+         "Host sends/recvs are only supported in strict deabstraction mode!");
 
   // Device-to-device sends/recvs.
-  if (tfopInfo.opName == "tfc.D2DTensorRecv")
-    return visitBuiltinD2DTensorRecvInst(tfopInfo);
-  else if (tfopInfo.opName == "tfc.D2DTensorSend")
-    return visitBuiltinD2DTensorSendInst(tfopInfo);
+  assert(tfopInfo.opName != "tfc.D2DTensorRecv" &&
+         tfopInfo.opName != "tfc.D2DTensorSend" &&
+         "D2D sends/recvs are only supported in strict deabstraction mode!");
 
   // Handle other TF ops.
   auto &graphFn = getCurrentGraphFunction();

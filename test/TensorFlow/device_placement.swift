@@ -1,15 +1,14 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -O -emit-sil -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph  -Xllvm -tf-strict-deabstraction -O -emit-sil -verify %s | %FileCheck %s
 
 import TensorFlow
 
 public func implicitDevicePlacement() {
-  let x: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: 1.0)
+  let x: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: Float(1.0))
   _hostOp(x)
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}implicitDevicePlacement{{.*}}
-// CHECK: string_literal utf8 "/device:CPU:0"
-// CHECK: builtin "__tfop_Const,dtype,value$tensor,__device
+// CHECK: graph_op "Const"() {dtype: $Float, value$tensor: f32 0x3F800000 /* 1 */, __device: "/device:CPU:0"} : $TensorHandle<Float>
 
 public func implicitDeviceConfig() {
   let x = Tensor<Float>(1.0)
@@ -57,22 +56,21 @@ public func explicitDeviceConfigTPU() {
 
 // This involves cross-device sends/recvs.
 public func explicitDevicePlacementGPU() {
-  let x: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: 1.0, __device: "/device:GPU:0")
+  let x: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: Float(1.0), __device: "/device:GPU:0")
   _hostOp(x)
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}explicitDevicePlacementGPU{{.*}}
-// CHECK: string_literal utf8 "/device:GPU:0"
-// CHECK: builtin "__tfop_Const,dtype,value$tensor,__device
+// CHECK: graph_op "Const"() {dtype: $Float, value$tensor: f32 0x3F800000 /* 1 */, __device: "/device:GPU:0"} : $TensorHandle<Float>
 
 // CHECK-LABEL: --- TFDevicePartition Cross Device Tensor Transfer Annotation Result: {{.*}}explicitDevicePlacementGPU{{.*}}
-// CHECK: builtin "__tfop_tfc.TensorTransfer
+// CHECK: graph_op "tfc.TensorTransfer
 
 // CHECK-LABEL: --- TFDevicePartition Per-Device Function Extraction Result: {{.*}}explicitDevicePlacementGPU{{.*}}CPU{{.*}}
-// CHECK: builtin "__tfop_tfc.D2DTensorRecv
+// CHECK: graph_op "tfc.D2DTensorRecv
 
 // CHECK-LABEL: --- TFDevicePartition Per-Device Function Extraction Result: {{.*}}explicitDevicePlacementGPU{{.*}}GPU{{.*}}
-// CHECK: builtin "__tfop_tfc.D2DTensorSend
+// CHECK: graph_op "tfc.D2DTensorSend
 
 // Check that in the TF graph, there is one function node for each of GPU and
 // CPU. The GPU graph function has a send node, and the CPU one has a recv node.
@@ -105,11 +103,11 @@ public func explicitDevicePlacementGPU() {
 // Instead, we check on the _Send node in the next test.
 
 public func explicitDevicePlacementAll() {
-  let x: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: 1.0, __device: "/device:GPU:0")
+  let x: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: Float(1.0), __device: "/device:GPU:0")
   // For GPU -> TPU transfer, always go through CPU first. Compiler can be
   // extended to generate this Identity op if needed.
   let x_cpu: TensorHandle<Float> = #tfop("Identity", x, __shapes: [TensorShape()], __device: "/device:CPU:0")
-  let y_cpu: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: 1.0, __shapes: [TensorShape()], __device: "/device:CPU:0")
+  let y_cpu: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: Float(1.0), __shapes: [TensorShape()], __device: "/device:CPU:0")
   // y is sent from CPU to TPU.
   let z_tpu: TensorHandle<Float> = #tfop("Add", x_cpu, y_cpu , __shapes: [TensorShape()], __device: "TPU_SYSTEM")
   _hostOp(z_tpu)
@@ -120,31 +118,31 @@ public func explicitDevicePlacementAll() {
 //
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}explicitDevicePlacementAll{{.*}}
 //
-// CHECK:      builtin "__tfop_tfc.TensorTransfer
-// CHECK:      builtin "__tfop_tfc.TensorTransfer
-// CHECK:      builtin "__tfop_tfc.TensorTransfer
-// CHECK:      builtin "__tfop_tfc.TensorTransfer
-// CHECK-NOT:  builtin "__tfop_tfc.TensorTransfer
+// CHECK:      graph_op "tfc.TensorTransfer
+// CHECK:      graph_op "tfc.TensorTransfer
+// CHECK:      graph_op "tfc.TensorTransfer
+// CHECK:      graph_op "tfc.TensorTransfer
+// CHECK-NOT:  graph_op "tfc.TensorTransfer
 
 // CHECK-LABEL: --- TFDevicePartition Per-Device Function Extraction Result: {{.*}}explicitDevicePlacementAll{{.*}}CPU{{.*}}
 // get x from GPU
-// CHECK: builtin "__tfop_tfc.D2DTensorRecv
+// CHECK: graph_op "tfc.D2DTensorRecv
 // send x_cpu to TPU
-// CHECK: builtin "__tfop_tfc.D2DTensorSend
+// CHECK: graph_op "tfc.D2DTensorSend
 // send y_cpu to TPU
-// CHECK: builtin "__tfop_tfc.D2DTensorSend
+// CHECK: graph_op "tfc.D2DTensorSend
 // get add result from TPU
-// CHECK: builtin "__tfop_tfc.D2DTensorRecv
+// CHECK: graph_op "tfc.D2DTensorRecv
 
 // CHECK-LABEL: --- TFDevicePartition Per-Device Function Extraction Result: {{.*}}explicitDevicePlacementAll{{.*}}GPU{{.*}}
 // send x to CPU
-// CHECK: builtin "__tfop_tfc.D2DTensorSend
+// CHECK: graph_op "tfc.D2DTensorSend
 
 // CHECK-LABEL: --- TFDevicePartition Per-Device Function Extraction Result: {{.*}}explicitDevicePlacementAll{{.*}}TPU{{.*}}
 // Receive two operands from CPU, and send the add result back to CPU.
-// CHECK: builtin "__tfop_tfc.D2DTensorRecv
-// CHECK: builtin "__tfop_tfc.D2DTensorRecv
-// CHECK: builtin "__tfop_tfc.D2DTensorSend
+// CHECK: graph_op "tfc.D2DTensorRecv
+// CHECK: graph_op "tfc.D2DTensorRecv
+// CHECK: graph_op "tfc.D2DTensorSend
 
 // These send/recv ops are threaded via control dependency.
 // CHECK:          name: "{{.*}}explicitDevicePlacementAll{{.*}}.tf_CPU.device_partition"
@@ -167,7 +165,7 @@ public func explicitDevicePlacementAll() {
 // CHECK-NEXT:       device: "/device:CPU:0"
 
 public func GPUToTPUTransfer_Unsupported() {
-  let x: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: 1.0, __shapes: [TensorShape()], __device: "/device:GPU:0")
+  let x: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: Float(1.0), __shapes: [TensorShape()], __device: "/device:GPU:0")
   // expected-error @+1 {{TPU infeed enqueue cannot run on this device}}
   let _: TensorHandle<Float> = #tfop("Identity", x, __device: "TPU_SYSTEM")
 }

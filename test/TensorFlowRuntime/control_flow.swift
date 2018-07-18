@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-run-strict-da-swift
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize
 
@@ -73,9 +73,16 @@ public func testEnumWithPayload(_ x: EnumWithPayload, _ expectedVal: Float) {
     print(x)
   case .b(let x):
     print(x)
-    val += Tensor<Float>(x)
+    let tx = Tensor<Float>(x).toAccelerator(shape: TensorShape())
+    val += tx
+    // val += Tensor<Float>(x)
+    // val = _addScalarTensorsWithShape(val, Tensor<Float>(x))
   case .c(let x, let y):
-    val *= x + y
+    let tx = Tensor<Float>(x).toAccelerator(shape: TensorShape())
+    let ty = Tensor<Float>(y).toAccelerator(shape: TensorShape())
+    val *= tx + ty
+    // let z = _addScalarTensorsWithShape(x, y)
+    // val *= z
     print(x, y)
   case .d(let f):
     val += 10.0
@@ -113,7 +120,8 @@ public func testSwitchEnum(_ a: Tensor<Float>?,
                            _ expectedVal: Float) {
   var b = Tensor<Float>(2.0)
   if let a = a {
-    b += a
+    b += a.toAccelerator(shape: TensorShape())
+    // b = _addScalarTensorsWithShape(b, a)
   }
   b -= 1.0
   expectNearlyEqualWithScalarTensor(expectedVal, b)

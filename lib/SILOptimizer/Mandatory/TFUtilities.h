@@ -130,6 +130,11 @@ static inline std::string getDeviceShortName(DeviceType deviceType) {
   }
 }
 
+/// Returns true if `attrName` is SHAPE_ARRAY_ATTR, `attrValue` is an array of
+/// TensorShape-typed elements.
+// TODO: move device related code out of this header file.
+bool isShapeArrayPseudoAttr(StringRef name, SymbolicValue attrValue);
+
 /// This struct holds information about the global configuration of the graph
 /// we are generating.  This can be different between distinct graphs in the
 /// same program though.
@@ -470,9 +475,20 @@ private:
     static std::pair<StringRef, SILTensorOpInfo::OperandClass>
     decodeAttributeName(Identifier name);
 
-  private:
+    /// Get an int-typed attribute at `attrIdx`, which must have `attrName`.
+    int64_t getIntAttr(unsigned attrIdx, StringRef attrName) const;
+
+    /// Get a string-typed attribute at `attrIdx`, which must have `attrName`.
+    std::string getStringAttr(unsigned attrIdx, StringRef attrName) const;
+
     void assertWithDump(bool cond, const char *assertMsg) const;
   };
+
+  /// `inst` must have a single result, and return that result value.
+  static inline SILValue getSingleValueResult(GraphOperationInst *inst) {
+    assert(inst->getNumResults() == 1);
+    return inst->getResults()[0];
+  }
 
   //===--------------------------------------------------------------------===//
   // Source location helpers

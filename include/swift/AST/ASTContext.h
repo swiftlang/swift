@@ -434,6 +434,10 @@ public:
   /// has been imported.  Otherwise, this returns null.
   ClassDecl *getTensorHandleDecl() const;
 
+  /// Retrieve the decl for TensorFlow.TensorShape iff the TensorFlow module
+  /// has been imported.  Otherwise, this returns null.
+  StructDecl *getTensorShapeDecl() const;
+
   /// Retrieve the type for Swift._AutoDiffTape.
   CanType getAutoDiffTapeType() const;
 
