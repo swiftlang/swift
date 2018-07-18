@@ -26,6 +26,8 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/Defer.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILVisitor.h"
 #include "llvm/ADT/ScopedHashTable.h"
@@ -3584,4 +3586,47 @@ bool tf::lowerTFGraph(
   return lowerTFGraphOrFunction(hostFnName, fn, entryFnBaseName,
                                 /*isAcceleratorOnly*/ false, deviceInfo,
                                 graphFunctions);
+}
+
+
+//===----------------------------------------------------------------------===//
+// TFLowerGraphTestPass
+//===----------------------------------------------------------------------===//
+
+namespace {
+/// This is a SIL pass that drives the TF Graph generation process.  This is not
+/// used by the compiler proper, it just exists so we can drive it through
+/// sil-opt and write testcases.
+struct TFLowerGraphTestPass : public SILFunctionTransform {
+
+  /// The entry point to the transformation.
+  void run() override {
+    auto fn = getFunction();
+    auto deviceInfo = GraphFunctionDeviceInfo::getForFunction(
+        *fn, /*removeConfigInst*/ true);
+    llvm::DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>>
+        graphFunctions;
+    if (lowerTFGraph(fn->getName(), fn, deviceInfo, graphFunctions)) {
+      llvm::errs() << "Failed to generate TFGraph for " << fn->getName()
+                   << "\n";
+      return;
+    }
+    for (const auto &kv : graphFunctions) {
+      const LoweredGraphFunction* resultGraph = kv.second.get();
+      size_t len;
+      const char *content = TF_GraphDebugString(resultGraph->graph.get(), &len);
+      llvm::outs() << "--- TFPartition GraphDef Proto: " << fn->getName()
+                   << "\n";
+      llvm::outs() << content << "\n";
+      llvm::outs() << "----\n";
+      llvm::outs().flush();
+      free((void*)content);
+    }
+  }
+};
+
+} // end anonymous namespace.
+
+SILTransform *swift::createTFLowerGraph() {
+  return new TFLowerGraphTestPass();
 }
