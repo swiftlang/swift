@@ -1126,6 +1126,26 @@ static Type resolveNestedIdentTypeComponent(
               TypeResolutionOptions options,
               bool diagnoseErrors,
               GenericTypeResolver *resolver) {
+  auto maybeApplyGenericArgs = [&](Type memberType) {
+    // If there are generic arguments, apply them now.
+    if (!options.contains(TypeResolutionFlags::ResolveStructure)) {
+      if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp)) {
+        return TC.applyGenericArguments(memberType, comp->getIdLoc(),
+                                        DC, genComp, options, resolver);
+      }
+    }
+
+    if (memberType->is<UnboundGenericType>() &&
+        !options.contains(TypeResolutionFlags::AllowUnboundGenerics) &&
+        !options.contains(TypeResolutionFlags::TypeAliasUnderlyingType) &&
+        !options.contains(TypeResolutionFlags::ResolveStructure)) {
+      diagnoseUnboundGenericType(TC, memberType, comp->getLoc());
+      return ErrorType::get(TC.Context);
+    }
+
+    return memberType;
+  };
+
   auto maybeDiagnoseBadMemberType = [&](TypeDecl *member, Type memberType,
                                         AssociatedTypeDecl *inferredAssocType) {
     // Diagnose invalid cases.
@@ -1175,22 +1195,7 @@ static Type resolveNestedIdentTypeComponent(
       return memberType;
 
     // If there are generic arguments, apply them now.
-    if (!options.contains(TypeResolutionFlags::ResolveStructure)) {
-      if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp)) {
-        return TC.applyGenericArguments(memberType, comp->getIdLoc(),
-                                        DC, genComp, options, resolver);
-      }
-    }
-
-    if (memberType->is<UnboundGenericType>() &&
-        !options.contains(TypeResolutionFlags::AllowUnboundGenerics) &&
-        !options.contains(TypeResolutionFlags::TypeAliasUnderlyingType) &&
-        !options.contains(TypeResolutionFlags::ResolveStructure)) {
-      diagnoseUnboundGenericType(TC, memberType, comp->getLoc());
-      return ErrorType::get(TC.Context);
-    }
-
-    return memberType;
+    return maybeApplyGenericArgs(memberType);
   };
 
   // Short-circuiting.
@@ -1200,8 +1205,18 @@ static Type resolveNestedIdentTypeComponent(
   // and we skip much of the work below.
   if (parentTy->isTypeParameter()) {
     if (auto memberType = resolver->resolveDependentMemberType(
-            parentTy, DC, parentRange, comp))
+            parentTy, DC, parentRange, comp)) {
+      // Hack -- if we haven't resolved this to a declaration yet, don't
+      // attempt to apply generic arguments, since this will emit a
+      // diagnostic, and its possible that this type will become a concrete
+      // type later on.
+      if (!memberType->is<DependentMemberType>() ||
+          memberType->castTo<DependentMemberType>()->getAssocType()) {
+        return maybeApplyGenericArgs(memberType);
+      }
+
       return memberType;
+    }
   }
 
   // Phase 2: If a declaration has already been bound, use it.
