@@ -332,7 +332,8 @@ static SILValue getValueInsideStructInst(SILValue value) {
 
 /// Return true if this is a reference to the _allocateUninitialized helper
 /// in array in the standard library allocating zero elements.
-static bool isArrayAllocUninit(SILValue op, SILValue &numElements) {
+/// TODO: Move to deabstraction when other clients are removed.
+bool isArrayAllocUninit(SILValue op, SILValue &numElements) {
   auto *apply = dyn_cast<ApplyInst>(op->getDefiningInstruction());
   if (!apply) return false;
   auto *callee = dyn_cast<FunctionRefInst>(apply->getOperand(0));
@@ -1679,68 +1680,6 @@ GraphOperationInfo::decodeAttributeName(Identifier name) {
 
   // Slice the suffix off the attribute name and add the decoded version.
   return { nameStr.substr(0, dollarLoc), opClass };
-}
-
-// TODO: This shouldn't be on GraphOperationInfo, it should move into
-// deabstraction.
-
-/// Given a SILValue that may be an array literal, attempt to decode it into the
-/// values that make up its elements.  If this fails or if the value is not an
-/// array, this returns a null Type.  Otherwise it decodes the array, returns
-/// the values of each element, and returns the element type of the array.
-///
-/// If arrayInsts is non-null and if decoding succeeds, this function adds
-/// all of the instructions relevant to the definition of this array into
-/// the set.  If decoding fails, then the contents of this set is undefined.
-Type GraphOperationInfo::
-decodeArrayElements(SILValue value, SmallVectorImpl<SILValue> &elements,
-                    SmallPtrSet<SILInstruction*, 8> *arrayInsts) {
-  auto elementType = getArrayElementType(value->getType().getASTType());
-  if (!elementType) return Type();
-
-  // The only pattern we support involves a call to _allocateUninitializedArray.
-  // The array value will be a tuple extract from the 0th result of the call.
-  auto *teiValue = dyn_cast<TupleExtractInst>(value);
-  if (!teiValue || teiValue->getFieldNo() != 0 ||
-      !isa<ApplyInst>(teiValue->getOperand()))
-    return Type();
-
-  // Figure out the number of elements, which must be a constant integer.
-  auto *apply = cast<ApplyInst>(teiValue->getOperand());
-
-  if (decodeArrayElements(apply, elements, arrayInsts))
-    return elementType;
-  return Type();
-
-    return Type();
-  return elementType;
-}
-
-/// Given an apply that may be an array literal, attempt to decode it into
-/// the values that make up its elements.  If this fails or if the value is
-/// not an array, this returns false.  Otherwise it decodes the array,
-/// returns the values of each element, and returns true.
-///
-/// If arrayInsts is non-null and if decoding succeeds, this function adds
-/// all of the instructions relevant to the definition of this array into
-/// the set.  If decoding fails, then the contents of this set is undefined.
-bool GraphOperationInfo::
-decodeArrayElements(ApplyInst *apply,
-                    SmallVectorImpl<SILValue> &elements,
-                    SmallPtrSet<SILInstruction*, 8> *arrayInsts) {
-
-  // Verify we have a call to _allocateUninitializedArray.
-  SILValue numElementsVal;
-  if (!isArrayAllocUninit(apply, numElementsVal) ||
-      !isa<IntegerLiteralInst>(numElementsVal))
-    return false;
-  uint64_t numElements =
-    cast<IntegerLiteralInst>(numElementsVal)->getValue().getLimitedValue();
-
-  return !tf::ConstExprEvaluator::decodeAllocUninitializedArray(apply,
-                                                                numElements,
-                                                                elements,
-                                                                arrayInsts);
 }
 
 

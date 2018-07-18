@@ -1221,15 +1221,25 @@ public:
       *this << " : $" << function->getLoweredFunctionType();
       return;
     }
-    case SymbolicValue::Aggregate:
-      *this << "[";
-      interleave(v.getAggregateValue(), [&](SymbolicValue element) {
+    case SymbolicValue::Aggregate: {
+      *this << '[';
+      // FileCheck uses [[]] syntax for its meta variables when pattern
+      // matching, so we don't want to produce [[]] for arrays, just emit a
+      // space if we detect this situation.
+      auto elements = v.getAggregateValue();
+      if (!elements.empty() &&
+          (elements[0].getKind() == SymbolicValue::Aggregate ||
+           elements[0].getKind() == SymbolicValue::Array))
+        *this << ' ';
+
+      interleave(elements, [&](SymbolicValue element) {
         visitSymbolicValue(element);
       }, [&] {
         *this << ", ";
       });
-      *this << "]";
+      *this << ']';
       return;
+    }
     case SymbolicValue::Enum:
       *this << SILDeclRef(v.getEnumValue(), SILDeclRef::Kind::EnumElement);
       return;
@@ -1240,17 +1250,27 @@ public:
       visitSymbolicValue(v.getEnumPayloadValue());
       *this << ")";
       return;
-    case SymbolicValue::Array:
+    case SymbolicValue::Array: {
       // Note, this prints arrays and aggregates as the same value.  We may want
       // to produce distinguishing syntax at some point.
-      *this << "[";
-      interleave(v.getArrayValue(), [&](SymbolicValue element) {
+      *this << '[';
+      // FileCheck uses [[]] syntax for its meta variables when pattern
+      // matching, so we don't want to produce [[]] for arrays, just emit a
+      // space if we detect this situation.
+      auto elements = v.getArrayValue();
+      if (!elements.empty() &&
+          (elements[0].getKind() == SymbolicValue::Aggregate ||
+           elements[0].getKind() == SymbolicValue::Array))
+        *this << ' ';
+
+      interleave(elements, [&](SymbolicValue element) {
         visitSymbolicValue(element);
       }, [&] {
         *this << ", ";
       });
       *this << "]";
       return;
+    }
     case SymbolicValue::UninitMemory:
     case SymbolicValue::Unknown:
     case SymbolicValue::Address:
