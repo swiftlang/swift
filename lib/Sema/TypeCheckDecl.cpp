@@ -4249,9 +4249,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         // had an @objc or @iboutlet property.
 
         AbstractStorageDecl *storage = accessor->getStorage();
-        // Validate the subscript or property because it might not be type
-        // checked yet.
-        validateDecl(storage);
 
         if (storage->getAttrs().hasAttribute<NonObjCAttr>())
           isObjC = None;
