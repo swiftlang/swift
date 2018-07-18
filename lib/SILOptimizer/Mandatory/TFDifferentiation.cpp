@@ -479,12 +479,13 @@ bool ControlFlowCanonicalization::run() {
 namespace {
 
 class DifferentiableActivityInfo;
+
 class DifferentiableActivityAnalysis
   : public FunctionAnalysisBase<DifferentiableActivityInfo> {
-  private:
+private:
   DominanceAnalysis *dominanceAnalysis = nullptr;
 
-  public:
+public:
   explicit DifferentiableActivityAnalysis()
     : FunctionAnalysisBase(AnalysisKind::DifferentiableActivity) {}
 
@@ -678,10 +679,10 @@ isActive(SILValue value, const SILReverseAutoDiffIndices &indices) const {
   return isVaried(value, indices.parameters) && isUseful(value, indices.source);
 }
 
-static void dumpActivityInfo(SILValue value,
-                             const SILReverseAutoDiffIndices &indices,
-                             DifferentiableActivityInfo &activityInfo,
-                             llvm::raw_ostream &s = llvm::dbgs()) {
+static inline void dumpActivityInfo(SILValue value,
+                                    const SILReverseAutoDiffIndices &indices,
+                                    DifferentiableActivityInfo &activityInfo,
+                                    llvm::raw_ostream &s = llvm::dbgs()) {
   s << '[';
   if (activityInfo.isActive(value, indices))
     s << "ACTIVE";
@@ -692,10 +693,10 @@ static void dumpActivityInfo(SILValue value,
   s << "] " << value;
 }
 
-static void dumpActivityInfo(SILFunction &fn,
-                             const SILReverseAutoDiffIndices &indices,
-                             DifferentiableActivityInfo &activityInfo,
-                             llvm::raw_ostream &s = llvm::dbgs()) {
+static inline void dumpActivityInfo(SILFunction &fn,
+                                    const SILReverseAutoDiffIndices &indices,
+                                    DifferentiableActivityInfo &activityInfo,
+                                    llvm::raw_ostream &s = llvm::dbgs()) {
   s << "Activity info for " << fn.getName() << " at " << indices << '\n';
   for (auto &bb : fn) {
     for (auto *arg : bb.getArguments())
