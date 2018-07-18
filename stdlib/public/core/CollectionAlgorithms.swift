@@ -406,9 +406,8 @@ extension Sequence {
   ///     let shuffledNumbers = numbers.shuffled()
   ///     // shuffledNumbers == [1, 7, 6, 2, 8, 9, 4, 3, 5, 0]
   ///
-  /// This method uses the default random generator, `Random.default`. The call
-  /// to `numbers.shuffled()` above is equivalent to calling
-  /// `numbers.shuffled(using: &Random.default)`.
+  /// This method is equivalent to calling the version that takes a generator, 
+  /// passing in the system's default random generator.
   ///
   /// - Returns: A shuffled array of this sequence's elements.
   ///
@@ -464,9 +463,8 @@ extension MutableCollection where Self : RandomAccessCollection {
   ///     names.shuffle(using: myGenerator)
   ///     // names == ["Luis", "Camila", "Luciana", "Sofía", "Alejandro", "Diego"]
   ///
-  /// This method uses the default random generator, `Random.default`. The call
-  /// to `names.shuffle()` above is equivalent to calling
-  /// `names.shuffle(using: &Random.default)`.
+  /// This method is equivalent to calling the version that takes a generator, 
+  /// passing in the system's default random generator.
   ///
   /// - Complexity: O(*n*)
   @inlinable
