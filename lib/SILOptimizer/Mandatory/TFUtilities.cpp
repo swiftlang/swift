@@ -1494,6 +1494,23 @@ GraphOperationInfo::decodeAttributeName(Identifier name) {
   return { nameStr.substr(0, dollarLoc), opClass };
 }
 
+int64_t GraphOperationInfo::getIntAttr(unsigned attrIdx,
+                                       StringRef attrName) const {
+  auto attr = inst->getAttribute(attrIdx);
+  auto attrInfo = GraphOperationInfo::decodeAttributeName(attr.name);
+  assert(attrInfo.first == attrName);
+  auto attrValue = attr.value;
+  return attrValue.getIntegerValue().getLimitedValue();
+}
+
+std::string GraphOperationInfo::getStringAttr(unsigned attrIdx,
+                                              StringRef attrName) const {
+  auto attr = inst->getAttribute(attrIdx);
+  auto attrInfo = GraphOperationInfo::decodeAttributeName(attr.name);
+  assert(attrInfo.first == attrName);
+  auto attrValue = attr.value;
+  return attrValue.getStringValue().str();
+}
 
 //===----------------------------------------------------------------------===//
 // Device Partitioning Utilities
@@ -1822,4 +1839,12 @@ containsTensorFlowValue(CanSILFunctionType fnType) {
       return true;
 
   return false;
+}
+
+bool tf::isShapeArrayPseudoAttr(StringRef attrName, SymbolicValue attrValue) {
+  if (attrName != SHAPE_ARRAY_ATTR)
+    return false;
+  CanType eltType;
+  (void)attrValue.getArrayValue(eltType);
+  return eltType->getString() == "TensorShape";
 }

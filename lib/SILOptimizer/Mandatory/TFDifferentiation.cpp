@@ -58,7 +58,7 @@ using llvm::DenseMap;
 //===----------------------------------------------------------------------===//
 
 static NominalTypeDecl *getStdlibTypeDecl(StringRef, ASTContext &);
-static std::string manglePositionalConfig(unsigned, ArrayRef<unsigned>);
+static std::string mangleADIndices(SILReverseAutoDiffIndices);
 static std::string mangleADConfig(const SILReverseAutoDiffConfiguration &);
 static SILFunction *lookupOrLinkFunction(StringRef name, SILModule &);
 static FuncDecl *lookupAssociativeOperatorDeclInProtocol(DeclName operatorName,
@@ -86,8 +86,7 @@ struct DifferentiationTask {
   }
 
   SILReverseAutoDiffConfiguration getMasterConfig() const {
-    return SILReverseAutoDiffConfiguration::getMaster(attr->getSourceIndex(),
-                                                      attr->getParamIndices());
+    return SILReverseAutoDiffConfiguration::getMaster(attr->getIndices());
   }
 };
 } // end anonymous namespace
@@ -284,32 +283,32 @@ public:
   /// Determines whether the given type conforms to FloatingPoint.
   bool supportsFloatingPointDifferentiation(Type type) const;
 
-  void insertPrimal(SILFunction *original, unsigned sourceIndex,
-                    ArrayRef<unsigned> paramIndices, SILFunction *primal) {
+  void insertPrimal(SILFunction *original, SILReverseAutoDiffIndices indices,
+                    SILFunction *primal) {
     auto *attr =
-      getOrCreateReverseDifferentiableAttr(original, sourceIndex, paramIndices);
+      getOrCreateReverseDifferentiableAttr(original, indices);
     attr->setPrimalName(primal->getName());
   }
 
-  void insertAdjoint(SILFunction *original, unsigned sourceIndex,
-                     ArrayRef<unsigned> paramIndices, SILFunction *adjoint) {
+  void insertAdjoint(SILFunction *original, SILReverseAutoDiffIndices indices,
+                     SILFunction *adjoint) {
     auto *attr =
-      getOrCreateReverseDifferentiableAttr(original, sourceIndex, paramIndices);
+      getOrCreateReverseDifferentiableAttr(original, indices);
     attr->setAdjointName(adjoint->getName());
   }
 
-  SILFunction *lookupPrimal(SILFunction *original, unsigned sourceIndex,
-                            ArrayRef<unsigned> paramIndices) {
+  SILFunction *lookupPrimal(SILFunction *original,
+                            SILReverseAutoDiffIndices indices) {
     if (auto *attr =
-        lookupReverseDifferentiableAttr(original, sourceIndex, paramIndices))
+        lookupReverseDifferentiableAttr(original, indices))
       return lookupPrimal(attr);
     return nullptr;
   }
 
-  SILFunction *lookupAdjoint(SILFunction *original, unsigned sourceIndex,
-                             ArrayRef<unsigned> paramIndices) {
+  SILFunction *lookupAdjoint(SILFunction *original,
+                             SILReverseAutoDiffIndices indices) {
     if (auto *attr =
-        lookupReverseDifferentiableAttr(original, sourceIndex, paramIndices))
+        lookupReverseDifferentiableAttr(original, indices))
       return lookupPrimal(attr);
     return nullptr;
   }
@@ -343,12 +342,10 @@ public:
   /// hashing on SILFunction's side or maintaining a dictionary in ADContext.
   /// In any case, this is not performance-critical.
   SILReverseDifferentiableAttr *
-  lookupReverseDifferentiableAttr(SILFunction *original, unsigned sourceIndex,
-                                  ArrayRef<unsigned> paramIndices) const {
+  lookupReverseDifferentiableAttr(SILFunction *original,
+                                  SILReverseAutoDiffIndices indices) const {
     for (auto *attr : original->getReverseDifferentiableAttrs())
-      if (attr->getSourceIndex() == sourceIndex &&
-          (attr->getParamIndices().data() == paramIndices.data() ||
-           attr->getParamIndices().equals(paramIndices)))
+      if (attr->getIndices() == indices)
         return attr;
     return nullptr;
   }
@@ -357,14 +354,11 @@ public:
   /// original function corresponding to the specified parameter indices.
   SILReverseDifferentiableAttr *
   getOrCreateReverseDifferentiableAttr(SILFunction *function,
-                                       unsigned sourceIndex,
-                                       ArrayRef<unsigned> paramIndices) {
+                                       SILReverseAutoDiffIndices indices) {
     if (auto *attr =
-        lookupReverseDifferentiableAttr(function, sourceIndex, paramIndices))
+        lookupReverseDifferentiableAttr(function, indices))
       return attr;
-    auto *attr = SILReverseDifferentiableAttr::create(getModule(),
-                                                      sourceIndex,
-                                                      paramIndices);
+    auto *attr = SILReverseDifferentiableAttr::create(getModule(), indices);
     function->addReverseDifferentiableAttr(attr);
     return attr;
   }
@@ -435,19 +429,18 @@ public:
                           PrimalFunctionInfo>;
   /// Perform primal generation, and indirectly returns a mapping from original
   /// functions to primal infos.
-  void generate(Result &primalInfos);
+  void generate();
 
 private:
   /// Creates an empty primal function.
-  SILFunction *createPrimalFunction(SILFunction *original, unsigned sourceIndex,
-                                    ArrayRef<unsigned> paramIndices);
+  SILFunction *createPrimalFunction(SILFunction *original,
+                                    SILReverseAutoDiffIndices indices);
   /// A task specifies the empty primal function to be filled in, and what its
   /// corresponding original and parameter indices are.
   struct Task {
     SILFunction *original;
     SILFunction *primal;
-    unsigned sourceIndex;
-    ArrayRef<unsigned> paramIndices;
+    SILReverseAutoDiffIndices indices;
   };
   /// Processes an original function and generate its adjoint.
   void processTask(Task task,
@@ -535,12 +528,12 @@ void PrimalGen::processTask(PrimalGen::Task task,
 }
 
 /// Creates a primal function.
-SILFunction *PrimalGen::createPrimalFunction(SILFunction *original,
-                                             unsigned sourceIndex,
-                                             ArrayRef<unsigned> paramIndices) {
+SILFunction *
+PrimalGen::createPrimalFunction(SILFunction *original,
+                                SILReverseAutoDiffIndices indices) {
   auto &module = context.getModule();
-  std::string primalName = original->getName().str() + "__primal_" +
-                           manglePositionalConfig(sourceIndex, paramIndices);
+  std::string primalName =
+    original->getName().str() + "__primal_" + mangleADIndices(indices);
   // Create a `<fn_name>__Checkpoints` struct.
   auto checkpointStructName = original->getName().str() + "__Checkpoints";
   StructDecl *checkpointStorageDecl =
@@ -575,7 +568,7 @@ SILFunction *PrimalGen::createPrimalFunction(SILFunction *original,
 /// Starting from functions to be differentiated using the `gradient`
 /// instruction, recursively generate a primal function for each original
 /// function along the differentiation path.
-void PrimalGen::generate(PrimalGen::Result &primalInfos) {
+void PrimalGen::generate() {
   SmallVector<Task, 16> worklist;
   // Push everything to the worklist.
   for (auto &task : diffTasks) {
@@ -584,10 +577,9 @@ void PrimalGen::generate(PrimalGen::Result &primalInfos) {
       continue;
     auto *original = task.original;
     auto *diffAttr = task.attr;
-    auto sourceIndex = diffAttr->getSourceIndex();
-    auto paramIndices = diffAttr->getParamIndices();
-    auto *primal = createPrimalFunction(original, sourceIndex, paramIndices);
-    worklist.push_back({original, primal, sourceIndex, paramIndices});
+    auto indices = diffAttr->getIndices();
+    auto *primal = createPrimalFunction(original, indices);
+    worklist.push_back({original, primal, indices});
   }
   // Iterate through the worklist, look up existing adjoint. If an adjoint
   // exists for the task, do nothing. Otherwise, create a function and process
@@ -597,7 +589,6 @@ void PrimalGen::generate(PrimalGen::Result &primalInfos) {
     worklist.pop_back();
     PrimalFunctionInfo pi;
     pi.primal = task.primal;
-    primalInfos.insert({{task.original, task.paramIndices}, pi});
     processTask(task, worklist, pi);
   }
 }
@@ -616,8 +607,6 @@ private:
   ArrayRef<DifferentiationTask> diffTasks;
   /// The global AD context.
   ADContext &context;
-  /// A mapping from original functions to their primal infos.
-  PrimalGen::Result &primalInfos;
 
   /// Emit instructions to accumulate adjoint.
   void accumulateAdjoint(SILValue oldAdjoint, SILValue newAdjoint,
@@ -626,22 +615,21 @@ private:
 
 public:
   explicit AdjointGen(ArrayRef<DifferentiationTask> diffTasks,
-                      ADContext &context, PrimalGen::Result &primalInfos)
-    : diffTasks(diffTasks), context(context), primalInfos(primalInfos) {}
+                      ADContext &context)
+    : diffTasks(diffTasks), context(context) {}
   void generate();
 
 private:
   /// Creates an empty adjoint function.
   SILFunction *createAdjointFunction(SILFunction *original,
                                      CanType checkpointsType,
-                                     unsigned sourceIndex,
-                                     ArrayRef<unsigned> paramIndices);
+                                     SILReverseAutoDiffIndices indices);
   /// A task specifies the empty adjoint function to be filled in, and what its
   /// corresponding original and parameter indices are.
   struct Task {
     SILFunction *original;
     SILFunction *adjoint;
-    ArrayRef<unsigned> paramIndices;
+    llvm::SmallBitVector paramIndices;
   };
   /// Process an original function and generate its adjoint.
   void processTask(Task task, SmallVectorImpl<Task> &worklist);
@@ -696,8 +684,7 @@ void AdjointGen::accumulateAdjoint(SILValue oldAdjoint, SILValue newAdjoint,
 SILFunction *
 AdjointGen::createAdjointFunction(SILFunction *original,
                                   CanType checkpointsType,
-                                  unsigned sourceIndex,
-                                  ArrayRef<unsigned> paramIndices) {
+                                  SILReverseAutoDiffIndices indices) {
   auto &module = context.getModule();
 
   // Given a canonical type, returns parameter info.
@@ -739,8 +726,8 @@ AdjointGen::createAdjointFunction(SILFunction *original,
   adjParams.push_back(getFormalParamInfo(checkpointsType));
   adjParams.push_back(
     getFormalParamInfo(origTy->getSingleResult().getType()));
-  auto adjName = original->getName().str() + "__adj_" +
-                 manglePositionalConfig(sourceIndex, paramIndices);
+  auto adjName =
+    original->getName().str() + "__adj_" + mangleADIndices(indices);
   auto adjType = SILFunctionType::get(origTy->getGenericSignature(),
                                       origTy->getExtInfo(),
                                       origTy->getCoroutineKind(),
@@ -772,15 +759,14 @@ void AdjointGen::generate() {
       continue;
     auto *original = task.original;
     auto *diffAttr = task.attr;
-    auto sourceIndex = diffAttr->getSourceIndex();
-    auto paramIndices = diffAttr->getParamIndices();
+    auto indices = diffAttr->getIndices();
     auto *primal = context.lookupPrimal(task.attr);
     assert(primal && "PrimalGen didn't run on this function before?!");
     auto primalTy = primal->getLoweredFunctionType();
     auto checkpointsTy = primalTy->getSingleResult().getType();
     auto *adjoint =
-      createAdjointFunction(original, checkpointsTy, sourceIndex, paramIndices);
-    worklist.push_back({original, adjoint, paramIndices});
+      createAdjointFunction(original, checkpointsTy, indices);
+    worklist.push_back({original, adjoint, indices.parameters});
   }
   // Iterate over the worklist, look up existing adjoint. If an adjoint exists
   // for the task, do nothing. Otherwise, create a function and process it.
@@ -901,12 +887,10 @@ static SILFunction *lookupOrLinkFunction(StringRef name, SILModule &module) {
   return module.findFunction(name, SILLinkage::PublicExternal);
 }
 
-/// Mangles a positional AD config, i.e. a source index and a parameter index
-/// list.
-static std::string manglePositionalConfig(unsigned sourceIndex,
-                                          ArrayRef<unsigned> paramIndices) {
-  std::string result = "src_" + llvm::utostr(sourceIndex) + "_wrt_";
-  interleave(paramIndices,
+/// Mangles a set of AD indices.
+static std::string mangleADIndices(SILReverseAutoDiffIndices indices) {
+  std::string result = "src_" + llvm::utostr(indices.source) + "_wrt_";
+  interleave(indices.parameters.set_bits(),
              [&](unsigned idx) { result += llvm::utostr(idx); },
              [&]{ result += '_'; });
   return result;
@@ -915,12 +899,13 @@ static std::string manglePositionalConfig(unsigned sourceIndex,
 /// Mangles an AD configuration.
 static
 std::string mangleADConfig(const SILReverseAutoDiffConfiguration &config) {
-  std::string result = "grad_" +
-    manglePositionalConfig(config.sourceIndex, config.parameterIndices);
-  if (config.seedable)
+  std::string result = "grad_" + mangleADIndices(config.indices);
+  if (config.isSeedable())
     result += "_s";
-  if (config.preservingResult)
+  if (config.isPreservingResult())
     result += "_p";
+  if (config.isDelayed())
+    result += "_d";
   return result;
 }
 
@@ -1160,20 +1145,18 @@ static SILFunction *getOrCreateGradient(
   // Step 1: Make sure the `[differentiable]` attribute exists. Based on this
   // attribute, create a differentiation task.
   SILReverseDifferentiableAttr *attr =
-    context.getOrCreateReverseDifferentiableAttr(original, config.sourceIndex,
-                                                 config.parameterIndices);
+    context.getOrCreateReverseDifferentiableAttr(original, config.indices);
   DifferentiationTask newTask { original, attr };
   // Update config's parameter indices to not depend on GradientInst's storage
   // because it will be removed.
-  config.parameterIndices = attr->getParamIndices();
+  config.indices.parameters = attr->getIndices().parameters;
 
   // Step 2: Get or create a seedable, result-preserving gradient function. If
   // this function exists, return it.
   SILFunction *canonicalGrad = nullptr;
   // The master AD config corresponds to the canonical gradient.
   auto masterConfig =
-    SILReverseAutoDiffConfiguration::getMaster(config.sourceIndex,
-                                               config.parameterIndices);
+    SILReverseAutoDiffConfiguration::getMaster(config.indices);
   // If it already exists, we'll simply use the existing one.
   if (auto *existingGrad = context.lookupGradient({original, masterConfig}))
     canonicalGrad = existingGrad;
@@ -1213,7 +1196,7 @@ static SILFunction *getOrCreateGradient(
     for (auto arg : gradFn->getArguments())
       args.push_back(arg);
     // If it's not seedable, we need to create a default seed.
-    if (!config.seedable) {
+    if (!config.isSeedable()) {
       auto seedTy = origTy->getSingleResult().getType();
       auto seedSILTy = SILType::getPrimitiveObjectType(seedTy);
       // Call `<seed type>.init(1)` to create a default
@@ -1253,7 +1236,7 @@ static SILFunction *getOrCreateGradient(
     // If the config is result-preserving, or if the original result is
     // indirect, we can just return whatever direct results the canonical
     // gradient produces.
-    if (config.preservingResult ||
+    if (config.isPreservingResult() ||
         canGradConv.getResults()[0].isFormalIndirect()) {
       builder.createReturn(loc, resultAndGrad);
     }
@@ -1504,15 +1487,14 @@ void Differentiation::run() {
 
   // Run primal generation.
   PrimalGen primalGen(worklist, context);
-  PrimalGen::Result primalInfos;
-  primalGen.generate(primalInfos);
+  primalGen.generate();
 
   // If there were any error, back out.
   if (context.hasErrorOccurred())
     return;
 
   // Run adjoint generation.
-  AdjointGen adjointGen(worklist, context, primalInfos);
+  AdjointGen adjointGen(worklist, context);
   adjointGen.generate();
 
   // If there were any error, back out.

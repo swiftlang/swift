@@ -672,7 +672,7 @@ MULTIPLE_VALUE_INST(DestructureTupleInst, destructure_tuple,
                     SILInstruction, None, DoesNotRelease)
 // SWIFT_ENABLE_TENSORFLOW
 MULTIPLE_VALUE_INST(GraphOperationInst, graph_op,
-                    SILInstruction, None, DoesNotRelease)
+                    SILInstruction, MayHaveSideEffects, DoesNotRelease)
 INST_RANGE(MultipleValueInstruction, BeginApplyInst, GraphOperationInst)
 
 NODE_RANGE(SILInstruction, AllocStackInst, GraphOperationInst)

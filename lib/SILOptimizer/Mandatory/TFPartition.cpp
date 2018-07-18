@@ -723,6 +723,8 @@ public:
                           &graphFunctions)
       : hostFn(Fn), tensorFlowModule(tensorFlowModule),
         graphFunctions(graphFunctions),
+        // TODO: remote this call once partition pass is folded into
+        // deabstraction.
         configuration(GraphGlobalConfiguration::getForFunction(
             hostFn,
             /*removeConfigInst*/ true)),
@@ -1171,6 +1173,14 @@ bool TFFunctionPartition::markBlock(SILBasicBlock *BB) {
         // We intend for `predTerm` to still run on host (and thus did not
         // mark its parent block), but send its result to accelerator.
         markedInstructions.insert({predTerm, Marking::Send});
+        // Even though we don't need to mark `pred` for accelerator if it has no
+        // block which it is control-dependent on, when there is a block that
+        // `pred` is control-dependent on, we need to mark that block. This is
+        // done by marking `pred` first. Otherwise we can miss marking an
+        // encompassing loop where `pred` and `thisBB` are part of the loop
+        // body.
+        if (markBlock(pred))
+          return true;
         continue;
       }
 
@@ -1261,36 +1271,15 @@ static ScalarPromoteClass shouldPromoteToTensorOp(SILInstruction *inst,
   return ScalarPromoteClass::CanPromote;
 }
 
+/// In addition to marking this inst itself for accelerator (Copy or Move), also
+/// mark the block, and the operands of this inst. In addition, for
+/// Marking::Copy, handle a few special types of scalar promotion.
 bool TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
+  assert(mark == Marking::Copy || mark == Marking::Move);
+
   // Insert the specified instruction into the marked set.  If it is already
   // there then we have nothing more to do.
   if (!markedInstructions.insert({&inst, mark}).second)
-    return false;
-
-  // If we're moving a computation to the accelerator and we see a tuple_extract
-  // from a moved value, then we move the tuple_extract as well, to make sure
-  // that any copy-to-host or results are scalar values, not the multiple
-  // results of tensor ops.
-  if (mark == Marking::Move) {
-    for (auto result : inst.getResults())
-      for (auto *use : result->getUses()) {
-        auto user = use->getUser();
-
-        // FIXME: We should probably consider these as tensorops to make sure
-        // they get moved to the accelerator and we don't end up with any
-        // multi-result tensor operations being copied over.
-        if (isa<TupleExtractInst>(user)) {
-          // It is possible the tuple extract already got marked as a copy.  If
-          // so, remove its entry so we can upgrade it to a move.
-          markedInstructions.erase(user);
-          if (markInstruction(*user, Marking::Move))
-            return true;
-        }
-      }
-  }
-
-  // If we are simply deleting this instruction, then we're done.
-  if (mark == Marking::Delete)
     return false;
 
   // Make sure the instruction's block is marked as being copied over to the
@@ -1304,12 +1293,11 @@ bool TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
   if (isa<BranchInst>(&inst))
     return false;
 
-  // If we are moving the instruction over, then we know it is a tensor op, and
-  // it get special attention.  Otherwise, we just recursively mark the
-  // operands in question.
+  // If we are copying the instruction over (for scalar promotion), we just
+  // recursively mark the operands in question.
   // TODO: This special case will go away when Tensor ops are not representing
   // attributes as operands.
-  if (mark != Marking::Move) {
+  if (mark == Marking::Copy) {
     auto operandRange = inst.getAllOperands();
 
     // Some instructions require special handling during marking.
@@ -1338,6 +1326,29 @@ bool TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
     return false;
   }
 
+  assert(mark == Marking::Move);
+  // If we are moving the instruction over, then we know it is a tensor op, and
+  // it gets special attention.
+
+  // If we're moving a computation to the accelerator and we see a tuple_extract
+  // from a moved value, then we move the tuple_extract as well, to make sure
+  // that all copy-to-host or results are scalar values, not the multiple
+  // results of tensor ops.
+  for (auto result : inst.getResults())
+    for (auto *use : result->getUses()) {
+      auto user = use->getUser();
+
+      // FIXME: We should probably consider these as tensorops to make sure
+      // they get moved to the accelerator and we don't end up with any
+      // multi-result tensor operations being copied over.
+      if (isa<TupleExtractInst>(user)) {
+        // It is possible the tuple extract already got marked as a copy.  If
+        // so, remove its entry so we can upgrade it to a move.
+        markedInstructions.erase(user);
+        if (markInstruction(*user, Marking::Move))
+          return true;
+      }
+    }
   // If this is a tuple_extract of a tensor op, then we already marked its
   // operand.
   if (isa<TupleExtractInst>(inst))
@@ -2372,9 +2383,10 @@ void PartitionCloner::visitCondBranchInst(CondBranchInst *inst) {
     assert(eltTy->isBuiltinIntegerType(1) && "expected Tensor<i1>");
 
     auto name = B.getASTContext().getIdentifier("tf_tensor_to_i1");
-    cond = B.createBuiltin(getOpLocation(inst->getLoc()), name,
-                   SILType::getPrimitiveObjectType(eltTy->getCanonicalType()),
-                           /*substitutionlist*/{}, cond);
+    cond = getSingleValueResult(B.createGraphOperation(
+        getOpLocation(inst->getLoc()), name,
+        /*operands*/ {cond}, /*attributes*/ {},
+        {SILType::getPrimitiveObjectType(eltTy->getCanonicalType())}));
   }
 
   doPostProcess(inst,
@@ -2481,9 +2493,21 @@ static void createConstTensorAttrsOnAccel(
   attributes.push_back({ctx.getIdentifier("value$tensor"), constVal});
 }
 
-static SILValue getSingleValueResult(GraphOperationInst *inst) {
-  assert(inst->getNumResults() == 1);
-  return inst->getResults()[0];
+static void
+addScalarShapeArrayAttr(SmallVectorImpl<GraphOperationAttribute> &attributes,
+                        ASTContext &ctx) {
+  // For TPU graph, set a scalar shape array, with attr name "__shapes".
+  auto attrName = std::string(SHAPE_ARRAY_ATTR);
+  // A shape is an array of ints -- empty array means it's a scalar (0d) shape.
+  auto scalarShape = SymbolicValue::getArray(
+      {}, ctx.getInt32Decl()->getDeclaredType()->getCanonicalType(),
+      ctx.getAllocator());
+  attributes.push_back(
+      {ctx.getIdentifier(attrName),
+       SymbolicValue::getArray(
+           {scalarShape},
+           ctx.getTensorShapeDecl()->getDeclaredType()->getCanonicalType(),
+           ctx.getAllocator())});
 }
 
 /// Given a primitive scalar instruction like a literal or an LLVM IR
@@ -2531,7 +2555,7 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
 
   auto &B = getBuilder();
   auto &ctx = B.getASTContext();
-  SmallVector<GraphOperationAttribute, 2> attributes;
+  SmallVector<GraphOperationAttribute, 4> attributes;
 
   // Handle opKind-specific issues.
   switch (opKind) {
@@ -2584,6 +2608,9 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
   FP.configuration.handleDevicePlacement(
       opInfo.first, /*opDevice*/ getDeviceString(DeviceType::ALL), B, loc,
       attributes);
+
+  if (FP.configuration.primaryDeviceType == DeviceType::TPU)
+    addScalarShapeArrayAttr(attributes, ctx);
 
   auto *result =
       B.createGraphOperation(loc, ctx.getIdentifier(opName), operands,
@@ -2673,13 +2700,13 @@ createAcceleratorReceive(SILBuilder &B, SILLocation loc, SILType valueTy,
                          GraphGlobalConfiguration &configuration) {
   auto &ctx = B.getASTContext();
   auto opType = "tfc.RecvFromHost";
-  std::string instName = std::string("__tfop_") + opType + ",tensorId";
-  SmallVector<SILValue, 2> operands;
-  auto tensorIdAttr = B.createIntegerLiteral(
-      loc, SILType::getBuiltinIntegerType(32, ctx), idNumber);
-  operands.push_back(tensorIdAttr);
-  configuration.handleDevicePlacement(opType, /*opDevice*/ "", B, loc, operands,
-                                      instName);
+  std::string instName = opType;
+
+  SmallVector<GraphOperationAttribute, 3> attributes;
+  attributes.push_back(
+      {ctx.getIdentifier("tensorId"), SymbolicValue::getInteger(idNumber, 32)});
+  configuration.handleDevicePlacement(opType, /*opDevice*/ "", B, loc,
+                                      attributes);
 
   // For XLA compilation, and when receiving a promoted scalar from the host,
   // add a __shapes pseudo-attr to assist the XLA compiler. This special case is
@@ -2689,57 +2716,12 @@ createAcceleratorReceive(SILBuilder &B, SILLocation loc, SILType valueTy,
   //
   // TODO: Do this also for XLA-based GPU (and CPU) execution. Consider
   // extending `configuration` with a bool indicating if we are targeting XLA.
-  if (configuration.primaryDeviceType == DeviceType::TPU && isScalar) {
-    // Add a list of operands corresponding to a scalar-tensor shaped shape
-    // array attr, with opName extension "__shapes$shapearray,$shape". Note
-    // the single element in the shape array, the scalar shape, has no
-    // dimensions.
-
-    // First add the $shapearray operand.
-    instName += std::string(",") + SHAPE_ARRAY_ATTR;
-    instName += SILTensorOpInfo::getOperandClassSuffix(
-        SILTensorOpInfo::OperandClass::ShapeArray);
-    auto int64Ty = SILType::getBuiltinIntegerType(64, B.getASTContext());
-    operands.push_back(B.createIntegerLiteral(loc, int64Ty,
-                                              /*numShapes*/ 1));
-
-    // Now add a scalar shape (with no dimensions) to the shape array.
-    instName += ",";
-    instName += SILTensorOpInfo::getOperandClassSuffix(
-        SILTensorOpInfo::OperandClass::Shape);
-    auto scalarTy = getTensorHandleElementType(valueTy.getASTType());
-    auto metatypeType =
-        MetatypeType::get(scalarTy, MetatypeRepresentation::Thin)
-            ->getCanonicalType();
-    operands.push_back(
-        B.createMetatype(loc, SILType::getPrimitiveObjectType(metatypeType)));
-  }
-  auto subMap =
-    getSingleSubstitutionMapForElementType(valueTy.getASTType(), ctx);
+  if (configuration.primaryDeviceType == DeviceType::TPU && isScalar)
+    addScalarShapeArrayAttr(attributes, ctx);
   auto name = ctx.getIdentifier(instName);
-  return B.createBuiltin(loc, name, valueTy, subMap, operands);
-}
-
-static SILValue createAcceleratorReceiveViaGraphOp(
-    SILBuilder &B, SILLocation loc, SILType valueTy, bool isScalar,
-    unsigned idNumber, GraphGlobalConfiguration &configuration) {
-  // TODO: lift this restriction once GraphOpInst supports shape array attrs.
-  assert(configuration.primaryDeviceType != DeviceType::TPU || !isScalar);
-
-  auto &ctx = B.getASTContext();
-  auto opType = "tfc.RecvFromHost";
-  std::string instName = "tfc.RecvFromHost";
-  SmallVector<GraphOperationAttribute, 2> attributes;
-  auto &allocator = B.getModule().getASTContext().getAllocator();
-  attributes.push_back(
-      {ctx.getIdentifier("tensorId"),
-       SymbolicValue::getInteger(APInt(/*width*/ 32, idNumber), allocator)});
-  configuration.handleDevicePlacement(opType, /*opDevice*/ "", B, loc,
-                                      attributes);
-
-  auto *inst = B.createGraphOperation(loc, ctx.getIdentifier(instName),
-                                      /*operands*/ {}, attributes, {valueTy});
-  return getSingleValueResult(inst);
+  return getSingleValueResult(B.createGraphOperation(loc, name,
+                                                     /*operands*/ {},
+                                                     attributes, {valueTy}));
 }
 
 static void
@@ -2813,10 +2795,8 @@ void createAcceleratorSend(SILBuilder &B, SILLocation loc, SILValue value,
   std::string instName = opType;
   instName += GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
   SmallVector<GraphOperationAttribute, 2> attributes;
-  auto &allocator = B.getModule().getASTContext().getAllocator();
   attributes.push_back(
-      {ctx.getIdentifier("tensorId"),
-       SymbolicValue::getInteger(APInt(/*width*/ 32, idNumber), allocator)});
+      {ctx.getIdentifier("tensorId"), SymbolicValue::getInteger(idNumber, 32)});
   configuration.handleDevicePlacement(opType, /*opDevice*/ "", B, loc,
                                       attributes);
   B.createGraphOperation(loc, ctx.getIdentifier(instName),
@@ -3082,13 +3062,8 @@ void PartitionCloner::handleSendRecvForTerminator(TermInst *inst) {
   auto BA = getBuilder(); // Builder for accelerator.
   auto loc = remapLocation(getUserSourceLocation(inst->getDebugLocation()));
   auto receivedCaseId =
-      (FP.configuration.primaryDeviceType == DeviceType::TPU)
-          ? createAcceleratorReceive(BA, loc, remapType(int32SILType),
-                                     /*isScalar*/ true, nextSendID,
-                                     FP.configuration)
-          : createAcceleratorReceiveViaGraphOp(
-                BA, loc, remapType(int32SILType),
-                /*isScalar*/ true, nextSendID, FP.configuration);
+      createAcceleratorReceive(BA, loc, remapType(int32SILType),
+                               /*isScalar*/ true, nextSendID, FP.configuration);
 
   // Let K be the total # cases (including the optional default case). Create a
   // chain of K-1 BB's with cond_br, to dispatch to the K cases.
@@ -3099,10 +3074,8 @@ void PartitionCloner::handleSendRecvForTerminator(TermInst *inst) {
     {
       std::string constOpName = "Const";
       SmallVector<GraphOperationAttribute, 2> attributes;
-      createConstTensorAttrsOnAccel(
-          SymbolicValue::getInteger(APInt(/*width*/ 32, caseId),
-                                    ctx.getAllocator()),
-          int32SILType, ctx, attributes);
+      createConstTensorAttrsOnAccel(SymbolicValue::getInteger(caseId, 32),
+                                    int32SILType, ctx, attributes);
       FP.configuration.handleDevicePlacement(
           "Const", /*opDevice*/ getDeviceString(DeviceType::ALL), BA, loc,
           attributes);
@@ -3197,12 +3170,8 @@ void PartitionCloner::insertSend(SILInstruction &inst) {
     // Create the receive in the accelerator code.  Each send/receive pair gets
     // a unique ID to associate one with the other.
     this->ValueMap[result] =
-        (FP.configuration.primaryDeviceType == DeviceType::TPU && isScalar)
-            ? createAcceleratorReceive(BA, loc, remapType(result->getType()),
-                                       isScalar, nextSendID, FP.configuration)
-            : createAcceleratorReceiveViaGraphOp(
-                  BA, loc, remapType(result->getType()), isScalar, nextSendID,
-                  FP.configuration);
+        createAcceleratorReceive(BA, loc, remapType(result->getType()),
+                                 isScalar, nextSendID, FP.configuration);
 
     // if `result` is a scalar, we need to convert it to TensorHandle<T>,
     // before sending that value to accelerator. We pass such a function

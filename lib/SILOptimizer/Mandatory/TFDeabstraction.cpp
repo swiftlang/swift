@@ -1684,8 +1684,16 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
     // If this is a normal tensor operation, validate it and transform it into a
     // graphOp instruction.
     if (TFStrictDeabstraction) {
-      if (auto opInfo = SILTensorOpInfo::decode(inst))
+      if (auto opInfo = SILTensorOpInfo::decode(inst)) {
+        // Do not translate this special inst into a graph op, since otherwise
+        // it gets removed by the performance pipeline.
+        // TODO: remove this inst in the getForFunction() call above, once
+        // the partition pass is folded into deabstraction.
+        if (opInfo->opName == "tfc.configureTPU" ||
+            opInfo->opName == "tfc.configureGPU")
+          continue;
         formGraphOp(*opInfo, constants, deviceConfiguration);
+      }
     }
 
     // Take a look at the various well known function calls that we can promote
@@ -2008,6 +2016,29 @@ formGraphOp(SILTensorOpInfo &opInfo,
         return diagnoseInvalidAttr("may not use this device name");
     }
 
+    auto verifyShapeAttr = [&](SymbolicValue constValue) -> bool {
+      // strip-away the possible aggregate wrapper.
+      constValue = constValue.lookThroughSingleElementAggregates();
+      if (constValue.getKind() != SymbolicValue::Array) {
+        diagnoseInvalidAttr("requires an array");
+        return true;
+      }
+      CanType eltType;
+      auto elements = constValue.getArrayValue(eltType);
+      if (!StringRef(eltType->getString()).startswith("Int")) {
+        diagnoseInvalidAttr("requires an array of ints");
+        return true;
+      }
+      for (auto elt : elements) {
+        // strip-away the possible aggregate wrapper.
+        elt = elt.lookThroughSingleElementAggregates();
+        if (elt.getKind() != SymbolicValue::Integer) {
+          diagnoseInvalidAttr("requires an array of ints");
+          return true;
+        }
+      }
+      return false;
+    };
     // Verify that the type of this attribute is ok for the OperandClass we
     // have.
     switch (operandClass.second) {
@@ -2020,18 +2051,31 @@ formGraphOp(SILTensorOpInfo &opInfo,
       if (constValue.getKind() != SymbolicValue::Integer)
         return diagnoseInvalidAttr("requires a constant integer");
       break;
-    case SILTensorOpInfo::OperandClass::Shape:
     case SILTensorOpInfo::OperandClass::Array:
       if (constValue.getKind() != SymbolicValue::Array)
         return diagnoseInvalidAttr("requires an array");
-      // TODO: Check that the elements are the right types.  We should reject
-      // a shape with floats (or other junk) in the elements.
       break;
-
-    case SILTensorOpInfo::OperandClass::ShapeArray:
+    case SILTensorOpInfo::OperandClass::Shape:
+      if (verifyShapeAttr(constValue))
+        return; // error already emitted.
+      break;
+    case SILTensorOpInfo::OperandClass::ShapeArray: {
+      if (constValue.getKind() != SymbolicValue::Array)
+        return diagnoseInvalidAttr("requires an array");
+      CanType eltType;
+      auto shapes = constValue.getArrayValue(eltType);
+      if (eltType->getString() != "TensorShape")
+        return diagnoseInvalidAttr("requires an array of TensorShape objects");
+      for (auto shape : shapes) {
+        if (verifyShapeAttr(shape))
+          return; // error already emitted.
+      }
+      break;
+    }
     case SILTensorOpInfo::OperandClass::ArrayElement:
       // Match logic from checkAndDiagnoseOperands.
-      assert(0 && "FIXME: array constant exprs aren't handled yet");
+      inst->dump();
+      assert(0 && "FIXME: array elem exprs aren't handled yet");
     case SILTensorOpInfo::OperandClass::Tensor:
       // FIXME: There needs to be a dtype attribute before this.
 
