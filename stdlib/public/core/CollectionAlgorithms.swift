@@ -11,6 +11,28 @@
 //===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
+// first
+//===----------------------------------------------------------------------===//
+
+extension Collection {
+  /// The first element of the collection.
+  ///
+  /// If the collection is empty, the value of this property is `nil`.
+  ///
+  ///     let numbers = [10, 20, 30, 40, 50]
+  ///     if let firstNumber = numbers.first {
+  ///         print(firstNumber)
+  ///     }
+  ///     // Prints "10"
+  @inlinable
+  public var first: Element? {
+    let start = startIndex
+    if start != endIndex { return self[start] }
+    else { return nil }
+  }  
+}
+
+//===----------------------------------------------------------------------===//
 // last
 //===----------------------------------------------------------------------===//
 

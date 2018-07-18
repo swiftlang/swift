@@ -238,16 +238,6 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
         if x == NSNotFound { return nil } else { return x }
     }
 
-    /// Returns the first integer in `self`, or nil if `self` is empty.
-    public var first: Element? {
-        return _handle.map { _toOptional($0.firstIndex) }
-    }
-    
-    /// Returns the last integer in `self`, or nil if `self` is empty.
-    public var last: Element? {
-        return _handle.map { _toOptional($0.lastIndex) }
-    }
-    
     /// Returns an integer contained in `self` which is greater than `integer`, or `nil` if a result could not be found.
     public func integerGreaterThan(_ integer: Element) -> Element? {
         return _handle.map { _toOptional($0.indexGreaterThanIndex(integer)) }
