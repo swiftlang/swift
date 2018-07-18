@@ -837,8 +837,11 @@ static void checkReferencedGenericParams(GenericContext *dc,
 void TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   bool invalid = false;
 
+  auto *dc = func->getDeclContext();
+
   GenericSignature *sig;
   if (auto gp = func->getGenericParams()) {
+    gp->setOuterParameters(dc->getGenericParamsOfContext());
     prepareGenericParamList(gp, func);
 
     // Create the generic signature builder.
@@ -882,9 +885,8 @@ void TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
     func->setGenericEnvironment(env);
   } else {
     // Inherit the signature of our environment.
-    sig = func->getDeclContext()->getGenericSignatureOfContext();
-    func->setGenericEnvironment(
-      func->getDeclContext()->getGenericEnvironmentOfContext());
+    sig = dc->getGenericSignatureOfContext();
+    func->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
   }
 
   CompleteGenericTypeResolver completeResolver(*this, sig);
@@ -1081,8 +1083,11 @@ void
 TypeChecker::validateGenericSubscriptSignature(SubscriptDecl *subscript) {
   bool invalid = false;
 
+  auto *dc = subscript->getDeclContext();
+
   GenericSignature *sig;
   if (auto *gp = subscript->getGenericParams()) {
+    gp->setOuterParameters(dc->getGenericParamsOfContext());
     prepareGenericParamList(gp, subscript);
 
     // Create the generic signature builder.
@@ -1121,9 +1126,8 @@ TypeChecker::validateGenericSubscriptSignature(SubscriptDecl *subscript) {
     subscript->setGenericEnvironment(sig->createGenericEnvironment());
   } else {
     // Inherit the signature of our environment.
-    sig = subscript->getDeclContext()->getGenericSignatureOfContext();
-    subscript->setGenericEnvironment(
-      subscript->getDeclContext()->getGenericEnvironmentOfContext());
+    sig = dc->getGenericSignatureOfContext();
+    subscript->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
   }
 
   CompleteGenericTypeResolver completeResolver(*this, sig);

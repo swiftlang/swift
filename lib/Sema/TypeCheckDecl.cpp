@@ -4178,8 +4178,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     // If we have generic parameters, check the generic signature now.
     if (auto gp = FD->getGenericParams()) {
-      gp->setOuterParameters(FD->getDeclContext()->getGenericParamsOfContext());
-
       validateGenericFuncSignature(FD);
     } else if (auto genericSig =
                  FD->getDeclContext()->getGenericSignatureOfContext()) {
@@ -4397,9 +4395,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       configureImplicitSelf(*this, CD);
 
     if (auto gp = CD->getGenericParams()) {
-      // Write up generic parameters and check the generic parameter list.
-      gp->setOuterParameters(CD->getDeclContext()->getGenericParamsOfContext());
-
       validateGenericFuncSignature(CD);
     } else if (CD->getDeclContext()->getGenericSignatureOfContext()) {
       validateGenericFuncSignature(CD);
@@ -4515,9 +4510,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     auto dc = SD->getDeclContext();
 
     if (auto gp = SD->getGenericParams()) {
-      // Write up generic parameters and check the generic parameter list.
-      gp->setOuterParameters(dc->getGenericParamsOfContext());
-
       validateGenericSubscriptSignature(SD);
     } else if (dc->getGenericSignatureOfContext()) {
       validateGenericSubscriptSignature(SD);
