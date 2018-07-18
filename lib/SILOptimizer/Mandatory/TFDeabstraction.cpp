@@ -1603,14 +1603,15 @@ tryToPromoteTensorFromScalars1D(ApplyInst *inst,
   CanType scalarElementType;
   auto scalarElements = scalars.getArrayValue(scalarElementType);
 
-  auto &allocator = inst->getType().getASTContext().getAllocator();
+  auto &context = inst->getType().getASTContext();
+  auto &allocator = context.getAllocator();
 
   // This takes a Tensor operand, but needs a shape added.  Since this is 1d,
   // our shape is just a single entry array with the length of scalars, like
   // [i32 42] if the scalars list is 42 entries in size.
   auto shape = SymbolicValue::getArray({
     SymbolicValue::getInteger(scalarElements.size(), /*bitwidth*/ 32)
-  }, scalarElementType, allocator);
+  }, context.getInt32Decl()->getDeclaredType()->getCanonicalType(), allocator);
 
   SILBuilder B(inst);
   B.setCurrentDebugScope(inst->getDebugScope());
