@@ -807,11 +807,6 @@ static TF_Tensor *convertValuesToTensor(ArrayRef<APInt> elts,
   auto *ptr = (char *)TF_TensorData(tensor);
 
   for (auto elt : elts) {
-    if (dtype == TF_BOOL) {
-      // Swift/LLVM uses a 1-bit APInt to represent a bool, but TF_BOOL is 1
-      // byte or more.
-      elt = elt.zext(dtypeSize * 8);
-    }
     assert(elt.getBitWidth() == dtypeSize * 8);
     memcpy(ptr, elt.getRawData(), dtypeSize);
     ptr += dtypeSize;
@@ -1949,46 +1944,67 @@ GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
         inst->dump();
         llvm_unreachable("dtype attr must have been processed!");
       }
+      auto dtype = (TF_DataType)dtypeAttr;
+      auto dtypeSize = TF_DataTypeSize(dtype);
+
       // Tensor can support two cases: an array case (not yet implemented), and
       // a scalar case.
       SmallVector<APInt, 4> elements;
-      SmallVector<int64_t, 4> shape;
 
-      // The scalar case is very simple, the shape of a scalar is 0d, and the
-      // data type comes from an attr that should already be processed.
-      auto addScalar = [&](SymbolicValue value) {
+      // Add a scalar to the elements list, checking that it is the right size
+      // for our dtype.
+      auto addScalar = [&](SymbolicValue value) -> bool {
         value = value.lookThroughSingleElementAggregates();
 
         if (value.getKind() == SymbolicValue::Integer) {
           auto intVal = value.getIntegerValue();
+          if (dtype == TF_BOOL) {
+            // Swift/LLVM uses a 1-bit APInt to represent a bool, but TF_BOOL is
+            // 1 byte or more.
+            intVal = intVal.zext(dtypeSize * 8);
+          }
           elements.push_back(intVal);
         } else {
           assert(value.getKind() == SymbolicValue::Float);
-          // TensorFlow always uses float32 attributes.
           auto floatValue = value.getFloatValue();
           bool losesInfo = false;
-          floatValue.convert(APFloat::IEEEsingle(), APFloat::rmNearestTiesToEven,
-                             &losesInfo);
+          // Convert to float if necessary.
+          if (dtype == TF_FLOAT)
+            floatValue.convert(APFloat::IEEEsingle(),
+                               APFloat::rmNearestTiesToEven, &losesInfo);
           elements.push_back(floatValue.bitcastToAPInt());
         }
+
+        if (elements.back().getBitWidth() != dtypeSize*8) {
+          internalError(inst->getLoc(),
+                        "invalid element type for tensor dtype");
+          return true;
+        }
+
+        return false;
       };
 
+      // The scalar case is very simple, the shape of a scalar is 0d, and the
+      // data type comes from an attr that should already be processed.
+      SmallVector<int64_t, 4> shape;
       if (attrValue.getKind() == SymbolicValue::Integer ||
           attrValue.getKind() == SymbolicValue::Float) {
-        addScalar(attrValue);
+        if (addScalar(attrValue))
+          return GLStatus::Error;
       } else {
         // Add all the elements to the elements list.
         CanType eltType;
-        for (auto elt : attrValue.getArrayValue(eltType))
-          addScalar(elt);
+        for (auto elt : attrValue.getArrayValue(eltType)) {
+          if (addScalar(elt))
+            return GLStatus::Error;
+        }
 
         // Decode the shape attribute which must come next.
         auto shapeAttr = inst->getAttribute(nextAttributeNumber++).value;
         decodeShapeAttr(shapeAttr, shape);
       }
       // Set the tensor as the attribute on the graph node.
-      auto tensor =
-          convertValuesToTensor(elements, shape, (TF_DataType)dtypeAttr);
+      auto tensor = convertValuesToTensor(elements, shape, dtype);
       TF_SetAttrTensor(op, name.c_str(), tensor, status);
       TF_DeleteTensor(tensor);
       if (checkStatus(inst->getLoc()))
