@@ -2280,24 +2280,38 @@ static AccessLevel getTestableAccess(const ValueDecl *decl) {
   return AccessLevel::Public;
 }
 
-/// Like ValueDecl::getFormalAccess, but takes into account the parameters that
-/// ValueDecl::getFormalAccessScope is aware of.
-static AccessLevel
-getAdjustedFormalAccess(const ValueDecl *VD, const DeclContext *useDC,
-                        bool treatUsableFromInlineAsPublic) {
-  AccessLevel result = VD->getFormalAccess();
+/// Adjust \p access based on whether \p VD is \@usableFromInline or has been
+/// testably imported from \p useDC.
+///
+/// \p access isn't always just `VD->getFormalAccess()` because this adjustment
+/// may be for a write, in which case the setter's access might be used instead.
+static AccessLevel getAdjustedFormalAccess(const ValueDecl *VD,
+                                           AccessLevel access,
+                                           const DeclContext *useDC,
+                                           bool treatUsableFromInlineAsPublic) {
   if (treatUsableFromInlineAsPublic &&
-      result == AccessLevel::Internal &&
+      access == AccessLevel::Internal &&
       VD->isUsableFromInline()) {
     return AccessLevel::Public;
   }
-  if (useDC && (result == AccessLevel::Internal ||
-                result == AccessLevel::Public)) {
+
+  if (useDC && (access == AccessLevel::Internal ||
+                access == AccessLevel::Public)) {
     if (auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext()))
       if (useSF->hasTestableImport(VD->getModuleContext()))
         return getTestableAccess(VD);
   }
-  return result;
+
+  return access;
+}
+
+/// Convenience overload that uses `VD->getFormalAccess()` as the access to
+/// adjust.
+static AccessLevel
+getAdjustedFormalAccess(const ValueDecl *VD, const DeclContext *useDC,
+                        bool treatUsableFromInlineAsPublic) {
+  return getAdjustedFormalAccess(VD, VD->getFormalAccess(), useDC,
+                                 treatUsableFromInlineAsPublic);
 }
 
 AccessLevel ValueDecl::getEffectiveAccess() const {
@@ -2370,31 +2384,39 @@ bool ValueDecl::hasOpenAccess(const DeclContext *useDC) const {
   return access == AccessLevel::Open;
 }
 
-AccessScope
-ValueDecl::getFormalAccessScope(const DeclContext *useDC,
-                                bool treatUsableFromInlineAsPublic) const {
-  const DeclContext *result = getDeclContext();
-  AccessLevel access = getAdjustedFormalAccess(this, useDC,
+/// Given the formal access level for using \p VD, compute the scope where
+/// \p VD may be accessed, taking \@usableFromInline, \@testable imports,
+/// and enclosing access levels into account.
+///
+/// \p access isn't always just `VD->getFormalAccess()` because this adjustment
+/// may be for a write, in which case the setter's access might be used instead.
+static AccessScope
+getAccessScopeForFormalAccess(const ValueDecl *VD,
+                              AccessLevel formalAccess,
+                              const DeclContext *useDC,
+                              bool treatUsableFromInlineAsPublic) {
+  AccessLevel access = getAdjustedFormalAccess(VD, formalAccess, useDC,
                                                treatUsableFromInlineAsPublic);
+  const DeclContext *resultDC = VD->getDeclContext();
 
-  while (!result->isModuleScopeContext()) {
-    if (result->isLocalContext() || access == AccessLevel::Private)
-      return AccessScope(result, true);
+  while (!resultDC->isModuleScopeContext()) {
+    if (resultDC->isLocalContext() || access == AccessLevel::Private)
+      return AccessScope(resultDC, /*private*/true);
 
-    if (auto enclosingNominal = dyn_cast<NominalTypeDecl>(result)) {
+    if (auto enclosingNominal = dyn_cast<NominalTypeDecl>(resultDC)) {
       auto enclosingAccess =
-        getAdjustedFormalAccess(enclosingNominal, useDC,
-                                treatUsableFromInlineAsPublic);
+          getAdjustedFormalAccess(enclosingNominal, useDC,
+                                  treatUsableFromInlineAsPublic);
       access = std::min(access, enclosingAccess);
 
-    } else if (auto enclosingExt = dyn_cast<ExtensionDecl>(result)) {
+    } else if (auto enclosingExt = dyn_cast<ExtensionDecl>(resultDC)) {
       // Just check the base type. If it's a constrained extension, Sema should
       // have already enforced access more strictly.
       if (auto extendedTy = enclosingExt->getExtendedType()) {
         if (auto nominal = extendedTy->getAnyNominal()) {
           auto nominalAccess =
-            getAdjustedFormalAccess(nominal, useDC,
-                                    treatUsableFromInlineAsPublic);
+              getAdjustedFormalAccess(nominal, useDC,
+                                      treatUsableFromInlineAsPublic);
           access = std::min(access, nominalAccess);
         }
       }
@@ -2403,22 +2425,144 @@ ValueDecl::getFormalAccessScope(const DeclContext *useDC,
       llvm_unreachable("unknown DeclContext kind");
     }
 
-    result = result->getParent();
+    resultDC = resultDC->getParent();
   }
 
   switch (access) {
   case AccessLevel::Private:
   case AccessLevel::FilePrivate:
-    assert(result->isModuleScopeContext());
-    return AccessScope(result, access == AccessLevel::Private);
+    assert(resultDC->isModuleScopeContext());
+    return AccessScope(resultDC, access == AccessLevel::Private);
   case AccessLevel::Internal:
-    return AccessScope(result->getParentModule());
+    return AccessScope(resultDC->getParentModule());
   case AccessLevel::Public:
   case AccessLevel::Open:
     return AccessScope::getPublic();
   }
 
   llvm_unreachable("unknown access level");
+}
+
+AccessScope
+ValueDecl::getFormalAccessScope(const DeclContext *useDC,
+                                bool treatUsableFromInlineAsPublic) const {
+  return getAccessScopeForFormalAccess(this, getFormalAccess(), useDC,
+                                       treatUsableFromInlineAsPublic);
+}
+
+/// Checks if \p VD may be used from \p useDC, taking \@testable imports into
+/// account.
+///
+/// Whenever the enclosing context of \p VD is usable from \p useDC, this
+/// should compute the same result as checkAccess, below, but more slowly.
+///
+/// See ValueDecl::isAccessibleFrom for a description of \p forConformance.
+static bool checkAccessUsingAccessScopes(const DeclContext *useDC,
+                                         const ValueDecl *VD,
+                                         AccessLevel access) {
+  AccessScope accessScope =
+      getAccessScopeForFormalAccess(VD, access, useDC,
+                                    /*treatUsableFromInlineAsPublic*/false);
+  return accessScope.getDeclContext() == useDC ||
+         AccessScope(useDC).isChildOf(accessScope);
+}
+
+/// Checks if \p VD may be used from \p useDC, taking \@testable imports into
+/// account.
+///
+/// When \p access is the same as `VD->getFormalAccess()` and the enclosing
+/// context of \p VD is usable from \p useDC, this ought to be the same as
+/// getting the AccessScope for `VD` and checking if \p useDC is within it.
+/// However, there's a source compatibility hack around protocol extensions
+/// that makes it not quite the same.
+///
+/// See ValueDecl::isAccessibleFrom for a description of \p forConformance.
+static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
+                        AccessLevel access, bool forConformance) {
+  auto *sourceDC = VD->getDeclContext();
+
+  if (!forConformance) {
+    if (auto *proto = sourceDC->getAsProtocolOrProtocolExtensionContext()) {
+      // FIXME: Swift 4.1 allowed accessing protocol extension methods that were
+      // marked 'public' if the protocol was '@_versioned' (now
+      // '@usableFromInline'). Which works at the ABI level, so let's keep
+      // supporting that here by explicitly checking for it.
+      if (access == AccessLevel::Public) {
+        assert(proto->getDeclContext()->isModuleScopeContext() &&
+               "if we get nested protocols, this should not apply to them");
+        if (proto->getFormalAccess() == AccessLevel::Internal &&
+            proto->isUsableFromInline()) {
+          return true;
+        }
+      }
+
+      // Skip the fast path below and just compare access scopes.
+      return checkAccessUsingAccessScopes(useDC, VD, access);
+    }
+  }
+
+  // Fast path: assume that the client context already has access to our parent
+  // DeclContext, and only check what might be different about this declaration.
+  if (!useDC)
+    return access >= AccessLevel::Public;
+
+  switch (access) {
+  case AccessLevel::Private:
+    return (useDC == sourceDC ||
+      AccessScope::allowsPrivateAccess(useDC, sourceDC));
+  case AccessLevel::FilePrivate:
+    return useDC->getModuleScopeContext() == sourceDC->getModuleScopeContext();
+  case AccessLevel::Internal: {
+    const ModuleDecl *sourceModule = sourceDC->getParentModule();
+    const DeclContext *useFile = useDC->getModuleScopeContext();
+    if (useFile->getParentModule() == sourceModule)
+      return true;
+    if (auto *useSF = dyn_cast<SourceFile>(useFile))
+      if (useSF->hasTestableImport(sourceModule))
+        return true;
+    return false;
+  }
+  case AccessLevel::Public:
+  case AccessLevel::Open:
+    return true;
+  }
+  llvm_unreachable("bad access level");
+}
+
+bool ValueDecl::isAccessibleFrom(const DeclContext *useDC,
+                                 bool forConformance) const {
+  auto access = getFormalAccess();
+  bool result = checkAccess(useDC, this, access, forConformance);
+
+  // For everything outside of protocols and operators, we should get the same
+  // result using either implementation of checkAccess, because useDC must
+  // already have access to this declaration's DeclContext.
+  // FIXME: Arguably, we're doing the wrong thing for operators here too,
+  // because we're finding internal operators within private types. Fortunately
+  // we have a requirement that a member operator take the enclosing type as an
+  // argument, so it won't ever match.
+  assert(getDeclContext()->getAsProtocolOrProtocolExtensionContext() ||
+         isOperator() ||
+         result == checkAccessUsingAccessScopes(useDC, this, access));
+
+  return result;
+}
+
+bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC,
+                                                 bool forConformance) const {
+  assert(isSettable(DC));
+
+  // If a stored property does not have a setter, it is still settable from the
+  // designated initializer constructor. In this case, don't check setter
+  // access; it is not set.
+  if (hasStorage() && !isSettable(nullptr))
+    return true;
+
+  if (isa<ParamDecl>(this))
+    return true;
+
+  auto access = getSetterFormalAccess();
+  return checkAccess(DC, this, access, forConformance);
 }
 
 void ValueDecl::copyFormalAccessFrom(const ValueDecl *source,
