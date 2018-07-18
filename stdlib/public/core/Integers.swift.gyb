@@ -223,8 +223,8 @@ def operatorComment(operator, fixedWidth):
         '%': """\
   /// Returns the remainder of dividing the first value by the second.
   ///
-  /// The result of the modulo operator (`%`) has the same sign as `lhs` and is
-  /// less than `rhs.magnitude`.
+  /// The result of the remainder operator (`%`) has the same sign as `lhs` and
+  /// is less than `rhs.magnitude`.
   ///
   ///     let x = 22 % 5
   ///     // x == 2
