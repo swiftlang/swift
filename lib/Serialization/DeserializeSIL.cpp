@@ -12,13 +12,16 @@
 
 #define DEBUG_TYPE "deserialize"
 #include "DeserializeSIL.h"
+
+#include "DeserializationErrors.h"
+#include "SILFormat.h"
+
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/Serialization/ModuleFile.h"
-#include "SILFormat.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -37,6 +40,9 @@ using namespace swift;
 using namespace swift::serialization;
 using namespace swift::serialization::sil_block;
 using namespace llvm::support;
+
+const char SILEntityError::ID = '\0';
+void SILEntityError::anchor() {}
 
 STATISTIC(NumDeserializedFunc, "Number of deserialized SIL functions");
 
@@ -339,7 +345,14 @@ SILFunction *SILDeserializer::getFuncForReference(StringRef name,
     // Otherwise, look for a function with this name in the module.
     auto iter = FuncTable->find(name);
     if (iter != FuncTable->end()) {
-      fn = readSILFunction(*iter, nullptr, name, /*declarationOnly*/ true);
+      auto maybeFn = readSILFunctionChecked(*iter, nullptr, name,
+                                            /*declarationOnly*/ true);
+      if (maybeFn) {
+        fn = maybeFn.get();
+      } else {
+        // Ignore the failure; we'll synthesize a bogus function instead.
+        llvm::consumeError(maybeFn.takeError());
+      }
     }
   }
 
@@ -362,7 +375,15 @@ SILFunction *SILDeserializer::getFuncForReference(StringRef name) {
   if (iter == FuncTable->end())
     return nullptr;
 
-  return readSILFunction(*iter, nullptr, name, /*declarationOnly*/ true);
+  auto maybeFn = readSILFunctionChecked(*iter, nullptr, name,
+                                        /*declarationOnly*/ true);
+  if (!maybeFn) {
+    // Ignore the failure and just pretend the function doesn't exist
+    llvm::consumeError(maybeFn.takeError());
+    return nullptr;
+  }
+
+  return maybeFn.get();
 }
 
 /// Helper function to find a SILGlobalVariable given its name. It first checks
@@ -386,6 +407,19 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
                                               StringRef name,
                                               bool declarationOnly,
                                               bool errorIfEmptyBody) {
+  llvm::Expected<SILFunction *> deserialized =
+      readSILFunctionChecked(FID, existingFn, name, declarationOnly,
+                             errorIfEmptyBody);
+  if (!deserialized) {
+    MF->fatal(deserialized.takeError());
+  }
+  return deserialized.get();
+}
+
+llvm::Expected<SILFunction *>
+SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
+                                        StringRef name, bool declarationOnly,
+                                        bool errorIfEmptyBody) {
   // We can't deserialize function bodies after IRGen lowering passes have
   // happened since other definitions in the module will no longer be in
   // canonical SIL form.
@@ -444,7 +478,16 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
     MF->error();
     return nullptr;
   }
-  auto ty = getSILType(MF->getType(funcTyID), SILValueCategory::Object);
+  auto astType = MF->getTypeChecked(funcTyID);
+  if (!astType) {
+    if (!existingFn || errorIfEmptyBody) {
+      return llvm::make_error<SILEntityError>(
+          name, takeErrorInfo(astType.takeError()));
+    }
+    llvm::consumeError(astType.takeError());
+    return existingFn;
+  }
+  auto ty = getSILType(astType.get(), SILValueCategory::Object);
   if (!ty.is<SILFunctionType>()) {
     DEBUG(llvm::dbgs() << "not a function type for SILFunction\n");
     MF->error();
@@ -795,8 +838,15 @@ SILDeserializer::readKeyPathComponent(ArrayRef<uint64_t> ListOfValues,
   ArrayRef<KeyPathPatternComponent::Index> indices;
   SILFunction *indicesEquals = nullptr;
   SILFunction *indicesHash = nullptr;
+  AbstractStorageDecl *externalDecl = nullptr;
+  SubstitutionMap externalSubs;
 
-  auto handleComputedIndices = [&] {
+  auto handleComputedExternalReferenceAndIndices = [&] {
+    auto externalDeclID = ListOfValues[nextValue++];
+    externalDecl =
+      cast_or_null<AbstractStorageDecl>(MF->getDecl(externalDeclID));
+    externalSubs = MF->getSubstitutionMap(ListOfValues[nextValue++]);
+    
     SmallVector<KeyPathPatternComponent::Index, 4> indicesBuf;
     auto numIndexes = ListOfValues[nextValue++];
     indicesBuf.reserve(numIndexes);
@@ -831,9 +881,10 @@ SILDeserializer::readKeyPathComponent(ArrayRef<uint64_t> ListOfValues,
     auto id = handleComputedId();
     auto getterName = MF->getIdentifier(ListOfValues[nextValue++]);
     auto getter = getFuncForReference(getterName.str());
-    handleComputedIndices();
+    handleComputedExternalReferenceAndIndices();
     return KeyPathPatternComponent::forComputedGettableProperty(
-        id, getter, indices, indicesEquals, indicesHash, type);
+        id, getter, indices, indicesEquals, indicesHash,
+        externalDecl, externalSubs, type);
   }
   case KeyPathComponentKindEncoding::SettableProperty: {
     auto id = handleComputedId();
@@ -841,9 +892,10 @@ SILDeserializer::readKeyPathComponent(ArrayRef<uint64_t> ListOfValues,
     auto getter = getFuncForReference(getterName.str());
     auto setterName = MF->getIdentifier(ListOfValues[nextValue++]);
     auto setter = getFuncForReference(setterName.str());
-    handleComputedIndices();
+    handleComputedExternalReferenceAndIndices();
     return KeyPathPatternComponent::forComputedSettableProperty(
-        id, getter, setter, indices, indicesEquals, indicesHash, type);
+        id, getter, setter, indices, indicesEquals, indicesHash,
+        externalDecl, externalSubs, type);
     break;
   }
   case KeyPathComponentKindEncoding::OptionalChain:
@@ -855,15 +907,6 @@ SILDeserializer::readKeyPathComponent(ArrayRef<uint64_t> ListOfValues,
   case KeyPathComponentKindEncoding::OptionalWrap:
     return KeyPathPatternComponent::forOptional(
         KeyPathPatternComponent::Kind::OptionalWrap, type);
-  case KeyPathComponentKindEncoding::External: {
-    auto declID = ListOfValues[nextValue++];
-    auto decl = cast<AbstractStorageDecl>(MF->getDecl(declID));
-    auto subMap = MF->getSubstitutionMap(ListOfValues[nextValue++]);
-    handleComputedIndices();
-    return KeyPathPatternComponent::forExternal(decl, subMap, indices,
-                                                indicesEquals, indicesHash,
-                                                type);
-  }
   case KeyPathComponentKindEncoding::Trivial:
     llvm_unreachable("handled above");
   }
@@ -1070,6 +1113,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   ONEOPERAND_ONETYPE_INST(OpenExistentialValue)
   ONEOPERAND_ONETYPE_INST(OpenExistentialBoxValue)
   // Conversion instructions.
+#define LOADABLE_REF_STORAGE(Name, ...) \
+  ONEOPERAND_ONETYPE_INST(RefTo##Name) \
+  ONEOPERAND_ONETYPE_INST(Name##ToRef)
+#include "swift/AST/ReferenceStorage.def"
   ONEOPERAND_ONETYPE_INST(UncheckedRefCast)
   ONEOPERAND_ONETYPE_INST(UncheckedAddrCast)
   ONEOPERAND_ONETYPE_INST(UncheckedTrivialBitCast)
@@ -1080,10 +1127,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   ONEOPERAND_ONETYPE_INST(AddressToPointer)
   ONEOPERAND_ONETYPE_INST(RefToRawPointer)
   ONEOPERAND_ONETYPE_INST(RawPointerToRef)
-  ONEOPERAND_ONETYPE_INST(RefToUnowned)
-  ONEOPERAND_ONETYPE_INST(UnownedToRef)
-  ONEOPERAND_ONETYPE_INST(RefToUnmanaged)
-  ONEOPERAND_ONETYPE_INST(UnmanagedToRef)
   ONEOPERAND_ONETYPE_INST(ThinToThickFunction)
   ONEOPERAND_ONETYPE_INST(ThickToObjCMetatype)
   ONEOPERAND_ONETYPE_INST(ObjCToThickMetatype)
@@ -1385,6 +1428,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     assert(expectedType == getSILType(Ty, (SILValueCategory)TyCategory) &&
            "Type of a global variable does not match GlobalAddr.");
     (void)Ty;
+    (void)expectedType;
     if (OpCode == SILInstructionKind::GlobalAddrInst) {
       ResultVal = Builder.createGlobalAddr(Loc, g);
     } else {
@@ -1558,12 +1602,17 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                    (Atomicity)Attr);          \
     break;
 
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  REFCOUNTING_INSTRUCTION(Name##Retain) \
+  REFCOUNTING_INSTRUCTION(Name##Release) \
+  REFCOUNTING_INSTRUCTION(StrongRetain##Name) \
+  UNARY_INSTRUCTION(Copy##Name##Value)
+#include "swift/AST/ReferenceStorage.def"
   UNARY_INSTRUCTION(CondFail)
   REFCOUNTING_INSTRUCTION(RetainValue)
   REFCOUNTING_INSTRUCTION(RetainValueAddr)
   REFCOUNTING_INSTRUCTION(UnmanagedRetainValue)
   UNARY_INSTRUCTION(CopyValue)
-  UNARY_INSTRUCTION(CopyUnownedValue)
   UNARY_INSTRUCTION(DestroyValue)
   REFCOUNTING_INSTRUCTION(ReleaseValue)
   REFCOUNTING_INSTRUCTION(ReleaseValueAddr)
@@ -1588,9 +1637,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   REFCOUNTING_INSTRUCTION(StrongUnpin)
   REFCOUNTING_INSTRUCTION(StrongRetain)
   REFCOUNTING_INSTRUCTION(StrongRelease)
-  REFCOUNTING_INSTRUCTION(StrongRetainUnowned)
-  REFCOUNTING_INSTRUCTION(UnownedRetain)
-  REFCOUNTING_INSTRUCTION(UnownedRelease)
   UNARY_INSTRUCTION(IsUnique)
   UNARY_INSTRUCTION(IsUniqueOrPinned)
   UNARY_INSTRUCTION(AbortApply)
@@ -1641,24 +1687,28 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   }
 
-  case SILInstructionKind::LoadUnownedInst: {
-    auto Ty = MF->getType(TyID);
-    bool isTake = (Attr > 0);
-    ResultVal = Builder.createLoadUnowned(Loc,
-        getLocalValue(ValID,
-                      getSILType(Ty, (SILValueCategory)TyCategory)),
-        IsTake_t(isTake));
-    break;
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case SILInstructionKind::Load##Name##Inst: { \
+    auto Ty = MF->getType(TyID); \
+    bool isTake = (Attr > 0); \
+    auto Val = getLocalValue(ValID, getSILType(Ty, \
+                                               SILValueCategory(TyCategory)));\
+    ResultVal = Builder.createLoad##Name(Loc, Val, IsTake_t(isTake)); \
+    break; \
+  } \
+  case SILInstructionKind::Store##Name##Inst: { \
+    auto Ty = MF->getType(TyID); \
+    SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory); \
+    auto refType = addrType.castTo<Name##StorageType>(); \
+    auto ValType = SILType::getPrimitiveObjectType(refType.getReferentType()); \
+    bool isInit = (Attr > 0); \
+    ResultVal = Builder.createStore##Name(Loc, \
+                                          getLocalValue(ValID, ValType), \
+                                          getLocalValue(ValID2, addrType), \
+                                          IsInitialization_t(isInit)); \
+    break; \
   }
-  case SILInstructionKind::LoadWeakInst: {
-    auto Ty = MF->getType(TyID);
-    bool isTake = (Attr > 0);
-    ResultVal = Builder.createLoadWeak(Loc,
-        getLocalValue(ValID,
-                      getSILType(Ty, (SILValueCategory)TyCategory)),
-        IsTake_t(isTake));
-    break;
-  }
+#include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::MarkUninitializedInst: {
     auto Ty = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
     auto Kind = (MarkUninitializedInst::Kind)Attr;
@@ -1733,30 +1783,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     bool fromBuiltin = (Attr >> 3) & 0x01;
     ResultVal = Builder.createEndUnpairedAccess(Loc, op, enforcement, aborted,
                                                 fromBuiltin);
-    break;
-  }
-  case SILInstructionKind::StoreUnownedInst: {
-    auto Ty = MF->getType(TyID);
-    SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory);
-    auto refType = addrType.castTo<UnownedStorageType>();
-    auto ValType = SILType::getPrimitiveObjectType(refType.getReferentType());
-    bool isInit = (Attr > 0);
-    ResultVal = Builder.createStoreUnowned(Loc,
-                    getLocalValue(ValID, ValType),
-                    getLocalValue(ValID2, addrType),
-                    IsInitialization_t(isInit));
-    break;
-  }
-  case SILInstructionKind::StoreWeakInst: {
-    auto Ty = MF->getType(TyID);
-    SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory);
-    auto refType = addrType.castTo<WeakStorageType>();
-    auto ValType = SILType::getPrimitiveObjectType(refType.getReferentType());
-    bool isInit = (Attr > 0);
-    ResultVal = Builder.createStoreWeak(Loc,
-                    getLocalValue(ValID, ValType),
-                    getLocalValue(ValID2, addrType),
-                    IsInitialization_t(isInit));
     break;
   }
   case SILInstructionKind::CopyAddrInst: {
@@ -2396,14 +2422,21 @@ SILFunction *SILDeserializer::lookupSILFunction(SILFunction *InFunc) {
   if (iter == FuncTable->end())
     return nullptr;
 
-  auto Func = readSILFunction(*iter, InFunc, name, /*declarationOnly*/ false);
-  if (Func) {
-    DEBUG(llvm::dbgs() << "Deserialize SIL:\n";
-          Func->dump());
-    assert(InFunc->getName() == Func->getName());
+  auto maybeFunc = readSILFunctionChecked(*iter, InFunc, name,
+                                          /*declarationOnly*/ false);
+  if (!maybeFunc) {
+    // Ignore the error; treat it as if we didn't have a definition.
+    llvm::consumeError(maybeFunc.takeError());
+    return nullptr;
   }
 
-  return Func;
+  if (maybeFunc.get()) {
+    DEBUG(llvm::dbgs() << "Deserialize SIL:\n";
+          maybeFunc.get()->dump());
+    assert(InFunc->getName() == maybeFunc.get()->getName());
+  }
+
+  return maybeFunc.get();
 }
 
 /// Check for existence of a function with a given name and required linkage.
@@ -2480,11 +2513,20 @@ SILFunction *SILDeserializer::lookupSILFunction(StringRef name,
   if (iter == FuncTable->end())
     return nullptr;
 
-  auto Func = readSILFunction(*iter, nullptr, name, declarationOnly);
-  if (Func)
+  auto maybeFunc = readSILFunctionChecked(*iter, nullptr, name,
+                                          declarationOnly);
+
+  if (!maybeFunc) {
+    // Ignore the error; treat it as if we didn't have a definition.
+    llvm::consumeError(maybeFunc.takeError());
+    return nullptr;
+  }
+
+  if (maybeFunc.get()) {
     DEBUG(llvm::dbgs() << "Deserialize SIL:\n";
-          Func->dump());
-  return Func;
+          maybeFunc.get()->dump());
+  }
+  return maybeFunc.get();
 }
 
 SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
@@ -2580,8 +2622,12 @@ void SILDeserializer::getAllSILFunctions() {
     auto DI = FuncTable->find(*KI);
     assert(DI != FuncTable->end() && "There should never be a key without data.");
 
-    readSILFunction(*DI, nullptr, *KI, false,
-                    false/*errorIfEmptyBody*/);
+    auto maybeFunc = readSILFunctionChecked(*DI, nullptr, *KI, false,
+                                            false/*errorIfEmptyBody*/);
+    if (!maybeFunc) {
+      // Ignore the error; treat it as if we didn't have a definition.
+      llvm::consumeError(maybeFunc.takeError());
+    }
   }
 }
 

@@ -201,6 +201,16 @@ public:
   /// params in AbstractFunctionDecl and NominalTypeDecl.
   virtual bool shouldWalkIntoGenericParams() { return false; }
 
+  /// This method configures whether the walker should walk into the
+  /// initializers of lazy variables.  These initializers are semantically
+  /// different from other initializers in their context and so sometimes
+  /// should not be visited.
+  ///
+  /// Note that visiting the body of the lazy getter will find a
+  /// LazyInitializerExpr with the initializer as its sub-expression.
+  /// However, ASTWalker does not walk into LazyInitializerExprs on its own.
+  virtual bool shouldWalkIntoLazyInitializers() { return true; }
+
   /// walkToParameterListPre - This method is called when first visiting a
   /// ParameterList, before walking into its parameters.  If it returns false,
   /// the subtree is skipped.

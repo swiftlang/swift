@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -67,7 +67,11 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
     case SK_CollectionUpcastConversion:
       log << "collection upcast conversion";
       break;
-        
+
+    case SK_BindOptionalToArchetype:
+      log << "bind optional to archetype";
+      break;
+
     case SK_ValueToOptional:
       log << "value to optional";
       break;
@@ -372,6 +376,10 @@ static bool paramIsIUO(Decl *decl, int paramNum) {
     auto *param = paramList->get(paramNum);
     return param->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
   }
+  if (auto *ee = dyn_cast<EnumElementDecl>(decl)) {
+    auto *param = ee->getParameterList()->get(paramNum);
+    return param->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+  }
 
   auto *subscript = cast<SubscriptDecl>(decl);
   auto *index = subscript->getIndices()->get(paramNum);
@@ -602,8 +610,6 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
         auto funcTy2 = openedType2->castTo<FunctionType>();
         auto params1 = funcTy1->getParams();
         auto params2 = funcTy2->getParams();
-        llvm::SmallBitVector defaultMapType2 =
-          computeDefaultMap(params2, decl2, outerDC2->isTypeContext());
 
         unsigned numParams1 = params1.size();
         unsigned numParams2 = params2.size();
@@ -611,14 +617,10 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
 
         // If they both have trailing closures, compare those separately.
         bool compareTrailingClosureParamsSeparately = false;
-        if (!tc.getLangOpts().isSwiftVersion3()) {
-          if (numParams1 > 0 && numParams2 > 0 &&
-              params1.back().getType()->is<AnyFunctionType>() &&
-              params2.back().getType()->is<AnyFunctionType>()) {
-            compareTrailingClosureParamsSeparately = true;
-            --numParams1;
-            --numParams2;
-          }
+        if (numParams1 > 0 && numParams2 > 0 &&
+            params1.back().getType()->is<AnyFunctionType>() &&
+            params2.back().getType()->is<AnyFunctionType>()) {
+          compareTrailingClosureParamsSeparately = true;
         }
 
         auto maybeAddSubtypeConstraint =
@@ -636,61 +638,65 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
           Type paramType1 = getAdjustedParamType(param1);
           Type paramType2 = getAdjustedParamType(param2);
 
+          // If we have:
+          //   param1Type = $T0?
+          //   param2Type = $T1
+          // the subtype constraint check will always return true
+          // since we'll attempt to bind $T1 as $T0?.
+          //
+          // What we're comparing here is foo<T>(_: T?) vs. foo<T>(_: T) and
+          // we don't want to consider the optional-taking function to be the
+          // the more specialized one since throughout the type system we
+          // consider T to be a subtype of T?.
+          SmallVector<Type, 2> optionals1;
+          paramType1->lookThroughAllOptionalTypes(optionals1);
+          auto numOptionals1 = optionals1.size();
+
+          SmallVector<Type, 2> optionals2;
+          Type objType2 = paramType2->lookThroughAllOptionalTypes(optionals2);
+          auto numOptionals2 = optionals2.size();
+
+          if (numOptionals1 > numOptionals2 &&
+              (objType2->is<TypeVariableType>() || objType2->isAny()))
+            return false;
+
           // Check whether the first parameter is a subtype of the second.
           cs.addConstraint(ConstraintKind::Subtype,
                            paramType1, paramType2, locator);
           return true;
         };
 
-        for (unsigned param1 = 0, param2 = 0; param2 != numParams2; ++param2) {
-          // If there is a default for parameter in the second function
-          // while there are still some parameters left unclaimed in first,
-          // it could only mean that default parameters are intermixed e.g.
-          //
-          // ```swift
-          // func foo(a: Int) {}
-          // func foo(q: String = "", a: Int) {}
-          // ```
-          // or
-          // ```swift
-          // func foo(a: Int, c: Int) {}
-          // func foo(a: Int, b: Int = 0, c: Int) {}
-          // ```
-          // and we shouldn't claim parameter from the first function.
-          if (param1 < numParams1 && numParams1 != numParams2 &&
-              defaultMapType2[param2]) {
-            fewerEffectiveParameters = true;
-            continue;
-          }
-
-          // If we've claimed all of the parameters from first
-          // function, the rest of the parameters in second should
-          // be either default or variadic.
-          if (param1 >= numParams1) {
-            if (!defaultMapType2[param2] && !params2[param2].isVariadic())
-              return false;
-
-            fewerEffectiveParameters = true;
-            continue;
-          }
-
+        auto pairMatcher = [&](unsigned idx1, unsigned idx2) -> bool {
           // Emulate behavior from when IUO was a type, where IUOs
           // were considered subtypes of plain optionals, but not
           // vice-versa.  This wouldn't normally happen, but there are
           // cases where we can rename imported APIs so that we have a
           // name collision, and where the parameter type(s) are the
           // same except for details of the kind of optional declared.
-          auto param1IsIUO = paramIsIUO(decl1, param1);
-          auto param2IsIUO = paramIsIUO(decl2, param2);
+          auto param1IsIUO = paramIsIUO(decl1, idx1);
+          auto param2IsIUO = paramIsIUO(decl2, idx2);
           if (param2IsIUO && !param1IsIUO)
             return false;
 
-          if (!maybeAddSubtypeConstraint(params1[param1], params2[param2]))
+          if (!maybeAddSubtypeConstraint(params1[idx1], params2[idx2]))
             return false;
 
-          // claim the parameter as used.
-          ++param1;
+          return true;
+        };
+
+        auto defaultMap = computeDefaultMap(
+            params2, decl2, decl2->getDeclContext()->isTypeContext());
+        auto params2ForMatching = params2;
+        if (compareTrailingClosureParamsSeparately) {
+          --numParams1;
+          params2ForMatching = params2.drop_back();
         }
+
+        InputMatcher IM(params2ForMatching, defaultMap);
+        if (IM.match(numParams1, pairMatcher) != InputMatcher::IM_Succeeded)
+          return false;
+
+        fewerEffectiveParameters |= (IM.getNumSkippedParameters() != 0);
 
         if (compareTrailingClosureParamsSeparately)
           if (!maybeAddSubtypeConstraint(params1.back(), params2.back()))
@@ -702,10 +708,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
 
       if (!knownNonSubtype) {
         // Solve the system.
-        auto solution = cs.solveSingle(FreeTypeVariableBinding::Allow);
-
-        // Ban value-to-optional conversions.
-        if (solution && solution->getFixedScore().Data[SK_ValueToOptional] == 0)
+        if (cs.solveSingle(FreeTypeVariableBinding::Allow))
           return true;
       }
 
@@ -771,9 +774,6 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
   
   auto foundRefinement1 = false;
   auto foundRefinement2 = false;
-
-  bool isStdlibOptionalMPlusOperator1 = false;
-  bool isStdlibOptionalMPlusOperator2 = false;
 
   auto getWeight = [&](ConstraintLocator *locator) -> unsigned {
     if (auto *anchor = locator->getAnchor()) {
@@ -980,40 +980,6 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         foundRefinement2 = decl2InSubprotocol;
       }
     }
-
-    // FIXME: Lousy hack for ?? to prefer the catamorphism (flattening)
-    // over the mplus (non-flattening) overload if all else is equal.
-    if (decl1->getBaseName() == "??") {
-      assert(decl2->getBaseName() == "??");
-
-      auto check = [](const ValueDecl *VD) -> bool {
-        if (!VD->getModuleContext()->isStdlibModule())
-          return false;
-        auto fnTy = VD->getInterfaceType()->castTo<AnyFunctionType>();
-        if (!fnTy->getResult()->getOptionalObjectType())
-          return false;
-
-        // Check that the standard library hasn't added another overload of
-        // the ?? operator.
-        auto params = fnTy->getParams();
-        assert(params.size() == 2);
-
-        auto param1 = params[0].getType();
-        auto param2 = params[1].getType()->castTo<AnyFunctionType>();
-
-        assert(param1->getOptionalObjectType());
-        assert(param2->isAutoClosure());
-        assert(param2->getResult()->getOptionalObjectType());
-
-        (void) param1;
-        (void) param2;
-
-        return true;
-      };
-
-      isStdlibOptionalMPlusOperator1 = check(decl1);
-      isStdlibOptionalMPlusOperator2 = check(decl2);
-    }
   }
 
   // Compare the type variable bindings.
@@ -1127,14 +1093,6 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     if (foundRefinement2) {
       ++score2;
     }
-  }
-
-  // FIXME: All other things being equal, prefer the catamorphism (flattening)
-  // overload of ?? over the mplus (non-flattening) overload.
-  if (score1 == score2) {
-    // This is correct: we want to /disprefer/ the mplus.
-    score2 += isStdlibOptionalMPlusOperator1;
-    score1 += isStdlibOptionalMPlusOperator2;
   }
 
   // FIXME: There are type variables and overloads not common to both solutions
@@ -1380,4 +1338,56 @@ SolutionDiff::SolutionDiff(ArrayRef<Solution> solutions) {
       break;
     }
   }
+}
+
+InputMatcher::InputMatcher(const ArrayRef<AnyFunctionType::Param> params,
+                           const llvm::SmallBitVector &defaultValueMap)
+    : NumSkippedParameters(0), DefaultValueMap(defaultValueMap),
+      Params(params) {}
+
+InputMatcher::Result
+InputMatcher::match(int numInputs,
+                    std::function<bool(unsigned, unsigned)> pairMatcher) {
+
+  int inputIdx = 0;
+  int numParams = Params.size();
+  for (int i = 0; i < numParams; ++i) {
+    // If we've claimed all of the inputs, the rest of the parameters should
+    // be either default or variadic.
+    if (inputIdx == numInputs) {
+      if (!DefaultValueMap[i] && !Params[i].isVariadic())
+        return IM_HasUnmatchedParam;
+      ++NumSkippedParameters;
+      continue;
+    }
+
+    // If there is a default for parameter, while there are still some
+    // input left unclaimed, it could only mean that default parameters
+    // are intermixed e.g.
+    //
+    // inputs: (a: Int)
+    // params: (q: String = "", a: Int)
+    //
+    // or
+    // inputs: (a: Int, c: Int)
+    // params: (a: Int, b: Int = 0, c: Int)
+    //
+    // and we shouldn't claim any input and just skip such parameter.
+    if ((numInputs - inputIdx) < (numParams - i) && DefaultValueMap[i]) {
+      ++NumSkippedParameters;
+      continue;
+    }
+
+    // Call custom function to match the input-parameter pair.
+    if (!pairMatcher(inputIdx, i))
+      return IM_CustomPairMatcherFailed;
+
+    // claim the input as used.
+    ++inputIdx;
+  }
+
+  if (inputIdx < numInputs)
+    return IM_HasUnclaimedInput;
+
+  return IM_Succeeded;
 }

@@ -167,6 +167,9 @@ public:
   /// The SILModuleConventions for this SIL module.
   SILModuleConventions silConv;
 
+  /// The DeclContext corresponding to the function currently being emitted.
+  DeclContext * const FunctionDC;
+
   /// The name of the function currently being emitted, as presented to user
   /// code by #function.
   DeclName MagicFunctionName;
@@ -380,7 +383,7 @@ public:
   /// Get the PGO node's parent.
   Optional<ASTNode> getPGOParent(ASTNode Node) const;
 
-  SILGenFunction(SILGenModule &SGM, SILFunction &F);
+  SILGenFunction(SILGenModule &SGM, SILFunction &F, DeclContext *DC);
   ~SILGenFunction();
   
   /// Return a stable reference to the current cleanup.
@@ -441,7 +444,8 @@ public:
   void enterDebugScope(SILLocation Loc) {
     auto *Parent =
         DebugScopeStack.size() ? DebugScopeStack.back() : F.getDebugScope();
-    auto *DS = new (SGM.M) SILDebugScope(Loc, &getFunction(), Parent);
+    auto *DS = new (SGM.M)
+        SILDebugScope(Loc.getAsRegularLocation(), &getFunction(), Parent);
     DebugScopeStack.push_back(DS);
     B.setCurrentDebugScope(DS);
   }
@@ -1055,14 +1059,18 @@ public:
                               SILDeclRef constant,
                               CanSILFunctionType constantTy);
 
-  /// Emit the specified VarDecl as an LValue if possible, otherwise return
-  /// null.
-  ManagedValue emitLValueForDecl(SILLocation loc, VarDecl *var,
-                                 CanType formalRValueType,
-                                 AccessKind accessKind,
-                                 AccessSemantics semantics
-                                   = AccessSemantics::Ordinary);
-  
+  /// Given that a variable is a local stored variable, return its address.
+  ManagedValue emitAddressOfLocalVarDecl(SILLocation loc, VarDecl *var,
+                                         CanType formalRValueType,
+                                         AccessKind accessKind);
+
+  // FIXME: demote this to private state.
+  ManagedValue maybeEmitAddressOfNonMemberVarDecl(SILLocation loc,
+                                                  VarDecl *var,
+                                                  CanType formalRValueType,
+                                                  AccessKind accessKind,
+                                                  AccessSemantics semantics);
+
   /// Produce an RValue for a reference to the specified declaration,
   /// with the given type and in response to the specified expression.  Try to
   /// emit into the specified SGFContext to avoid copies (when provided).
@@ -1754,11 +1762,10 @@ public:
   LValue emitLValue(Expr *E, AccessKind accessKind,
                     LValueOptions options = LValueOptions());
 
-  /// Emit a reference to a variable as an lvalue.
-  LValue emitLValueForAddressedNonMemberVarDecl(SILLocation loc, VarDecl *var,
-                                                CanType formalRValueType,
-                                                AccessKind accessKind,
-                                                AccessSemantics semantics);
+  RValue emitRValueForNonMemberVarDecl(SILLocation loc, VarDecl *var,
+                                       CanType formalRValueType,
+                                       AccessSemantics semantics,
+                                       SGFContext C);
 
   /// Emit an lvalue that directly refers to the given instance variable
   /// (without going through getters or setters).

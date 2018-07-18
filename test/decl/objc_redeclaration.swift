@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -module-name ZZZ %s -disable-objc-attr-requires-foundation-module -verify -verify-ignore-unknown -swift-version 3
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -module-name ZZZ %s -disable-objc-attr-requires-foundation-module -verify -verify-ignore-unknown
 
 import Foundation
 
@@ -57,7 +57,7 @@ extension Redecl1 {
 }
 
 extension DummyClass {
-  func nsstringProperty2() -> Int { return 0 } // expected-error{{method 'nsstringProperty2()' with Objective-C selector 'nsstringProperty2' conflicts with getter for 'nsstringProperty2' with the same Objective-C selector}}
+  @objc func nsstringProperty2() -> Int { return 0 } // expected-error{{method 'nsstringProperty2()' with Objective-C selector 'nsstringProperty2' conflicts with getter for 'nsstringProperty2' with the same Objective-C selector}}
 }
 
 // FIXME: Remove -verify-ignore-unknown.

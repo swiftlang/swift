@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -211,9 +211,9 @@ bool CanType::isReferenceTypeImpl(CanType type, bool functionsCount) {
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct:
   case TypeKind::SILToken:
-  case TypeKind::UnownedStorage:
-  case TypeKind::UnmanagedStorage:
-  case TypeKind::WeakStorage:
+#define REF_STORAGE(Name, ...) \
+  case TypeKind::Name##Storage:
+#include "swift/AST/ReferenceStorage.def"
     return false;
 
   case TypeKind::GenericTypeParam:
@@ -257,7 +257,7 @@ ExistentialLayout::ExistentialLayout(ProtocolCompositionType *type) {
   auto members = type->getMembers();
   if (!members.empty() &&
       isa<ClassDecl>(members[0]->getAnyNominal())) {
-    superclass = members[0];
+    explicitSuperclass = members[0];
     members = members.slice(1);
   }
 
@@ -284,7 +284,7 @@ ExistentialLayout CanType::getExistentialLayout() {
 }
 
 bool ExistentialLayout::requiresClass() const {
-  if (hasExplicitAnyObject || superclass)
+  if (hasExplicitAnyObject || explicitSuperclass)
     return true;
 
   for (auto proto : getProtocols()) {
@@ -295,8 +295,28 @@ bool ExistentialLayout::requiresClass() const {
   return false;
 }
 
+Type ExistentialLayout::getSuperclass() const {
+  if (explicitSuperclass)
+    return explicitSuperclass;
+
+  for (auto proto : getProtocols()) {
+    // If we have a generic signature, check there, because it
+    // will pick up superclass constraints from protocols that we
+    // refine as well.
+    auto *protoDecl = proto->getDecl();
+    if (auto genericSig = protoDecl->getGenericSignature()) {
+      if (auto superclass = genericSig->getSuperclassBound(
+            protoDecl->getSelfInterfaceType()))
+        return superclass;
+    } else if (auto superclass = protoDecl->getSuperclass())
+      return superclass;
+  }
+
+  return Type();
+}
+
 bool ExistentialLayout::isAnyObject() const {
-  return (hasExplicitAnyObject && !superclass && getProtocols().empty());
+  return (hasExplicitAnyObject && !explicitSuperclass && getProtocols().empty());
 }
 
 bool TypeBase::isObjCExistentialType() {
@@ -561,7 +581,6 @@ CanType CanType::getOptionalObjectTypeImpl(CanType type) {
   if (auto boundTy = dyn_cast<BoundGenericEnumType>(type))
     if (boundTy->getDecl()->isOptionalDecl())
       return boundTy.getGenericArgs()[0];
-
   return CanType();
 }
 
@@ -624,7 +643,7 @@ bool TypeBase::isAnyObject() {
 bool ExistentialLayout::isErrorExistential() const {
   auto protocols = getProtocols();
   return (!hasExplicitAnyObject &&
-          !superclass &&
+          !explicitSuperclass &&
           protocols.size() == 1 &&
           protocols[0]->getDecl()->isSpecificProtocol(KnownProtocolKind::Error));
 }
@@ -785,7 +804,17 @@ swift::decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels) {
                                             parenTy->getParameterFlags()));
     return result;
   }
-    
+
+  // If `Void` has been explicitly specified, resulting decomposition
+  // should be empty, just like empty tuple would be.
+  case TypeKind::NameAlias: {
+    auto &ctx = type->getASTContext();
+    auto *typealias = cast<NameAliasType>(type.getPointer());
+    if (typealias->getDecl() == ctx.getVoidDecl())
+      return result;
+    break;
+  }
+
   default:
     // Default behavior below; inject the argument as the sole parameter.
     break;
@@ -1142,9 +1171,10 @@ CanType TypeBase::computeCanonicalType() {
     break;
   }
 
-  case TypeKind::UnownedStorage:
-  case TypeKind::UnmanagedStorage:
-  case TypeKind::WeakStorage: {
+#define REF_STORAGE(Name, ...) \
+  case TypeKind::Name##Storage:
+#include "swift/AST/ReferenceStorage.def"
+  {
     auto ref = cast<ReferenceStorageType>(this);
     Type referentType = ref->getReferentType()->getCanonicalType();
     Result = ReferenceStorageType::get(referentType, ref->getOwnership(),
@@ -1431,7 +1461,7 @@ bool TypeBase::satisfiesClassConstraint() {
   return mayHaveSuperclass() || isObjCExistentialType();
 }
 
-Type TypeBase::getSuperclass() {
+Type TypeBase::getSuperclass(bool useArchetypes) {
   auto *nominalDecl = getAnyNominal();
   auto *classDecl = dyn_cast_or_null<ClassDecl>(nominalDecl);
 
@@ -1443,8 +1473,8 @@ Type TypeBase::getSuperclass() {
     if (auto dynamicSelfTy = getAs<DynamicSelfType>())
       return dynamicSelfTy->getSelfType();
 
-    if (auto compositionTy = getAs<ProtocolCompositionType>())
-      return compositionTy->getExistentialLayout().superclass;
+    if (isExistentialType())
+      return getExistentialLayout().getSuperclass();
 
     // No other types have superclasses.
     return Type();
@@ -1466,7 +1496,9 @@ Type TypeBase::getSuperclass() {
   ModuleDecl *module = classDecl->getModuleContext();
   auto subMap = getContextSubstitutionMap(module,
                                           classDecl,
-                                          classDecl->getGenericEnvironment());
+                                          (useArchetypes
+                                           ? classDecl->getGenericEnvironment()
+                                           : nullptr));
   return superclassTy.subst(subMap);
 }
 
@@ -1848,8 +1880,8 @@ getObjCObjectRepresentable(Type type, const DeclContext *dc) {
   if (type->isExistentialType()) {
     auto layout = type->getExistentialLayout();
     if (layout.isObjC() &&
-        (!layout.superclass ||
-         getObjCObjectRepresentable(layout.superclass, dc) ==
+        (!layout.explicitSuperclass ||
+         getObjCObjectRepresentable(layout.explicitSuperclass, dc) ==
            ForeignRepresentableKind::Object))
       return ForeignRepresentableKind::Object;
   }
@@ -1963,15 +1995,6 @@ getForeignRepresentable(Type type, ForeignLanguage language,
                    : ForeignRepresentableKind::Trivial,
                    nullptr };
     };
-
-    // HACK: In Swift 3 mode, we accepted (Void) -> Void for () -> Void
-    if (dc->getASTContext().isSwiftVersion3()
-        && functionType->getParams().size() == 1
-        && functionType->getParams()[0].getLabel().empty()
-        && functionType->getParams()[0].getType()->isVoid()
-        && functionType->getResult()->isVoid()) {
-      return success(anyStaticBridged, anyBridged, isBlock);
-    }
 
     // Look at the result type.
     Type resultType = functionType->getResult();
@@ -2919,7 +2942,8 @@ Optional<ProtocolConformanceRef>
 MakeAbstractConformanceForGenericType::operator()(CanType dependentType,
                                        Type conformingReplacementType,
                                        ProtocolDecl *conformedProtocol) const {
-  assert((conformingReplacementType->is<SubstitutableType>()
+  assert((conformingReplacementType->is<ErrorType>()
+          || conformingReplacementType->is<SubstitutableType>()
           || conformingReplacementType->is<DependentMemberType>())
          && "replacement requires looking up a concrete conformance");
   return ProtocolConformanceRef(conformedProtocol);
@@ -3180,19 +3204,18 @@ const DependentMemberType *TypeBase::findUnresolvedDependentMemberType() {
 }
 
 static Type getConcreteTypeForSuperclassTraversing(Type t) {
-  if (!t->getAnyNominal()) {
-    if (auto archetype = t->getAs<ArchetypeType>()) {
-      return archetype->getSuperclass();
-    } else if (auto dynamicSelfTy = t->getAs<DynamicSelfType>()) {
-      return dynamicSelfTy->getSelfType();
-    } else if (auto compositionTy = t->getAs<ProtocolCompositionType>()) {
-      return compositionTy->getExistentialLayout().superclass;
-    }
+  if (t->isExistentialType()) {
+    return t->getExistentialLayout().getSuperclass();
+  } if (auto archetype = t->getAs<ArchetypeType>()) {
+    return archetype->getSuperclass();
+  } else if (auto dynamicSelfTy = t->getAs<DynamicSelfType>()) {
+    return dynamicSelfTy->getSelfType();
   }
   return t;
 }
 
-Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass) {
+Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
+                                    bool useArchetypes) {
   Type t = getConcreteTypeForSuperclassTraversing(this);
 
   while (t) {
@@ -3205,7 +3228,7 @@ Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass) {
     if (nominalDecl == baseClass)
       return t;
 
-    t = t->getSuperclass();
+    t = t->getSuperclass(useArchetypes);
   }
   llvm_unreachable("no inheritance relationship between given classes");
 }
@@ -3592,9 +3615,10 @@ case TypeKind::Id:
                                 fnTy->getWitnessMethodConformanceOrNone());
   }
 
-  case TypeKind::UnownedStorage:
-  case TypeKind::UnmanagedStorage:
-  case TypeKind::WeakStorage: {
+#define REF_STORAGE(Name, ...) \
+  case TypeKind::Name##Storage:
+#include "swift/AST/ReferenceStorage.def"
+  {
     auto storageTy = cast<ReferenceStorageType>(base);
     Type refTy = storageTy->getReferentType();
     Type substRefTy = refTy.transformRec(fn);
@@ -4021,8 +4045,13 @@ bool Type::isPrivateStdlibType(bool treatNonBuiltinProtocolsAsPublic) const {
   return false;
 }
 
+// NOTE: If you add a new SOMETIMES_LOADABLE_CHECKED_REF_STORAGE type, then you
+// may or may not want to emulate what 'unowned' does.
 bool UnownedStorageType::isLoadable(ResilienceExpansion resilience) const {
-  return getReferentType()->usesNativeReferenceCounting(resilience);
+  auto ty = getReferentType();
+  if (auto underlyingTy = ty->getOptionalObjectType())
+    ty = underlyingTy;
+  return ty->usesNativeReferenceCounting(resilience);
 }
 
 static bool doesOpaqueClassUseNativeReferenceCounting(const ASTContext &ctx) {
@@ -4086,8 +4115,8 @@ bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
   case TypeKind::ProtocolComposition: {
     auto layout = getExistentialLayout();
     assert(layout.requiresClass() && "Opaque existentials don't use refcounting");
-    if (layout.superclass)
-      return layout.superclass->usesNativeReferenceCounting(resilience);
+    if (auto superclass = layout.getSuperclass())
+      return superclass->usesNativeReferenceCounting(resilience);
     return ::doesOpaqueClassUseNativeReferenceCounting(type->getASTContext());
   }
 
@@ -4114,11 +4143,11 @@ bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct:
   case TypeKind::SILToken:
-  case TypeKind::UnownedStorage:
-  case TypeKind::UnmanagedStorage:
-  case TypeKind::WeakStorage:
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
+#define REF_STORAGE(Name, ...) \
+  case TypeKind::Name##Storage:
+#include "swift/AST/ReferenceStorage.def"
     llvm_unreachable("type is not a class reference");
   }
 

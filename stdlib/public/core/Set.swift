@@ -503,6 +503,61 @@ extension Set: Hashable {
   }
 }
 
+extension Set: _HasCustomAnyHashableRepresentation {
+  public func _toCustomAnyHashable() -> AnyHashable? {
+    return AnyHashable(_box: _SetAnyHashableBox(self))
+  }
+}
+
+internal struct _SetAnyHashableBox<Element: Hashable>: _AnyHashableBox {
+  internal let _value: Set<Element>
+  internal let _canonical: Set<AnyHashable>
+
+  internal init(_ value: Set<Element>) {
+    self._value = value
+    self._canonical = value as Set<AnyHashable>
+  }
+
+  internal var _base: Any {
+    return _value
+  }
+
+  internal var _canonicalBox: _AnyHashableBox {
+    return _SetAnyHashableBox<AnyHashable>(_canonical)
+  }
+
+  internal func _isEqual(to other: _AnyHashableBox) -> Bool? {
+    guard let other = other as? _SetAnyHashableBox<AnyHashable> else {
+      return nil
+    }
+    return _canonical == other._value
+  }
+
+  internal var _hashValue: Int {
+    return _canonical.hashValue
+  }
+
+  internal func _hash(into hasher: inout Hasher) {
+    _canonical.hash(into: &hasher)
+  }
+
+  func _rawHashValue(_seed: (UInt64, UInt64)) -> Int {
+    return _canonical._rawHashValue(seed: _seed)
+  }
+
+  internal func _unbox<T: Hashable>() -> T? {
+    return _value as? T
+  }
+
+  internal func _downCastConditional<T>(
+    into result: UnsafeMutablePointer<T>
+  ) -> Bool {
+    guard let value = _value as? T else { return false }
+    result.initialize(to: value)
+    return true
+  }
+}
+
 extension Set: SetAlgebra {
 
   /// Inserts the given element in the set if it is not already present.
@@ -1038,7 +1093,6 @@ extension Set: CustomStringConvertible, CustomDebugStringConvertible {
   }
 
   /// A string that represents the contents of the set, suitable for debugging.
-  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return _makeCollectionDescription(for: self, withTypeName: "Set")
   }
@@ -1883,8 +1937,7 @@ internal struct _NativeSetBuffer<Element> {
     return _storage.initializedEntries[i]
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal func destroyEntry(at i: Int) {
     _sanityCheck(isInitializedEntry(at: i))
     defer { _fixLifetime(self) }
@@ -1893,8 +1946,7 @@ internal struct _NativeSetBuffer<Element> {
     _storage.initializedEntries[i] = false
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal func initializeKey(_ k: Key, at i: Int) {
     _sanityCheck(!isInitializedEntry(at: i))
     defer { _fixLifetime(self) }
@@ -1903,8 +1955,7 @@ internal struct _NativeSetBuffer<Element> {
     _storage.initializedEntries[i] = true
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal func moveInitializeEntry(from: Buffer, at: Int, toEntryAt: Int) {
     _sanityCheck(!isInitializedEntry(at: toEntryAt))
 
@@ -1916,8 +1967,7 @@ internal struct _NativeSetBuffer<Element> {
   }
 
   /// Alias for key(at:) in Sets for better code reuse
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal func value(at i: Int) -> Value {
     return key(at: i)
   }
@@ -2100,8 +2150,7 @@ extension _NativeSetBuffer where Element: Hashable
     }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal static func bucketCount(
     forCapacity capacity: Int,
     maxLoadFactorInverse: Double
@@ -2699,8 +2748,7 @@ internal enum _VariantSetBuffer<Element: Hashable>: _HashBuffer {
   case cocoa(CocoaBuffer)
 #endif
 
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal var guaranteedNative: Bool {
     return _canBeClass(Key.self) == 0 || _canBeClass(Value.self) == 0
   }
@@ -3619,14 +3667,12 @@ extension Set {
     }
 #endif
 
-    @inlinable // FIXME(sil-serialize-all)
-    @_transparent
+    @usableFromInline @_transparent
     internal var _guaranteedNative: Bool {
       return _canBeClass(Key.self) == 0 && _canBeClass(Value.self) == 0
     }
 
-    @inlinable // FIXME(sil-serialize-all)
-    @_transparent
+    @usableFromInline @_transparent
     internal var _nativeIndex: _NativeIndex {
       switch _value {
       case ._native(let nativeIndex):
@@ -3639,8 +3685,7 @@ extension Set {
     }
 
 #if _runtime(_ObjC)
-    @inlinable // FIXME(sil-serialize-all)
-    @_transparent
+    @usableFromInline @_transparent
     internal var _cocoaIndex: _CocoaIndex {
       switch _value {
       case ._native:
@@ -3877,8 +3922,7 @@ public struct SetIterator<Element: Hashable>: IteratorProtocol {
   }
 #endif
 
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal var _guaranteedNative: Bool {
     return _canBeClass(Element.self) == 0
   }
@@ -3928,7 +3972,6 @@ public struct SetIterator<Element: Hashable>: IteratorProtocol {
 
 extension SetIterator: CustomReflectable {
   /// A mirror that reflects the iterator.
-  @inlinable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     return Mirror(
       self,
@@ -3938,7 +3981,6 @@ extension SetIterator: CustomReflectable {
 
 extension Set: CustomReflectable {
   /// A mirror that reflects the set.
-  @inlinable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     let style = Mirror.DisplayStyle.`set`
     return Mirror(self, unlabeledChildren: self, displayStyle: style)
@@ -4004,20 +4046,6 @@ extension Set {
   public mutating func popFirst() -> Element? {
     guard !isEmpty else { return nil }
     return remove(at: startIndex)
-  }
-
-  @inlinable
-  @available(swift, obsoleted: 4.0)
-  public func filter(
-    _ isIncluded: (Element) throws -> Bool, obsoletedInSwift4: () = ()
-  ) rethrows -> [Element] {
-    var result: [Element] = []
-    for x in self {
-      if try isIncluded(x) {
-        result.append(x)
-      }
-    }
-    return result
   }
 
   /// The total number of elements that the set can contain without

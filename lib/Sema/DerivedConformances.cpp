@@ -272,7 +272,7 @@ addGetterToReadOnlyDerivedProperty(TypeChecker &tc,
   auto getter =
     declareDerivedPropertyGetter(tc, property, propertyContextType);
 
-  property->setAccessors(VarDecl::Computed,
+  property->setAccessors(StorageImplInfo::getImmutableComputed(),
                          SourceLoc(), {getter}, SourceLoc());
 
   return getter;
@@ -326,7 +326,7 @@ DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
                                       FunctionType::ExtInfo());
   getterDecl->setInterfaceType(interfaceType);
   getterDecl->copyFormalAccessFrom(property);
-  getterDecl->setValidationStarted();
+  getterDecl->setValidationToChecked();
 
   tc.Context.addSynthesizedDecl(getterDecl);
 
@@ -347,7 +347,7 @@ DerivedConformance::declareDerivedProperty(Identifier name,
   propDecl->setImplicit();
   propDecl->copyFormalAccessFrom(Nominal, /*sourceIsParentContext*/ true);
   propDecl->setInterfaceType(propertyInterfaceType);
-  propDecl->setValidationStarted();
+  propDecl->setValidationToChecked();
 
   // If this is supposed to be a final property, mark it as such.
   assert(isFinal || !parentDC->getAsClassOrClassExtensionContext());
@@ -363,12 +363,8 @@ DerivedConformance::declareDerivedProperty(Identifier name,
                                  /*implicit*/ true);
   propPat->setType(propertyContextType);
 
-  auto pbDecl = PatternBindingDecl::create(C, SourceLoc(),
-                                           StaticSpellingKind::None,
-                                           SourceLoc(), propPat, nullptr,
-                                           parentDC);
-  pbDecl->setImplicit();
-
+  auto *pbDecl = PatternBindingDecl::createImplicit(
+      C, StaticSpellingKind::None, propPat, /*InitExpr*/ nullptr, parentDC);
   return {propDecl, pbDecl};
 }
 

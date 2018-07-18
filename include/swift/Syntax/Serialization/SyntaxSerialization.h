@@ -141,6 +141,8 @@ struct ObjectTraits<syntax::RawSyntax> {
     }
     auto presence = value.getPresence();
     out.mapRequired("presence", presence);
+    auto nodeId = value.getId();
+    out.mapRequired("id", nodeId);
   }
 };
 

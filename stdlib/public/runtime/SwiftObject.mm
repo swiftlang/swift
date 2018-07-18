@@ -183,7 +183,7 @@ NSString *swift_stdlib_getDescription(OpaqueValue *value,
 
 NSString *swift::getDescription(OpaqueValue *value, const Metadata *type) {
   auto result = swift_stdlib_getDescription(value, type);
-  SWIFT_CC_PLUSZERO_GUARD(type->vw_destroy(value));
+  type->vw_destroy(value);
   return [result autorelease];
 }
 

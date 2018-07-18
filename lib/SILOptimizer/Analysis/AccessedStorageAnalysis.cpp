@@ -174,7 +174,7 @@ bool FunctionAccessedStorage::mergeAccesses(
   for (auto &rawStorageInfo : otherStorageAccesses) {
     const StorageAccessInfo &otherStorageInfo =
       transformStorage(rawStorageInfo);
-    // transformStorage() returns invalid storage object for local storage
+    // If transformStorage() returns invalid storage object for local storage,
     // that should not be merged with the caller.
     if (!otherStorageInfo)
       continue;
@@ -272,7 +272,9 @@ transformCalleeStorage(const StorageAccessInfo &storage,
     SILValue argVal = getCallerArg(fullApply, storage.getParamIndex());
     if (argVal) {
       // Remap the argument source value and inherit the old storage info.
-      return StorageAccessInfo(findAccessedStorageNonNested(argVal), storage);
+      auto calleeStorage = findAccessedStorageNonNested(argVal);
+      if (calleeStorage)
+        return StorageAccessInfo(calleeStorage, storage);
     }
     // If the argument can't be transformed, demote it to an unidentified
     // access.

@@ -420,10 +420,6 @@ namespace {
       return true;
     }
 
-    bool visitStrongRetainUnownedInst(const StrongRetainUnownedInst *RHS) {
-      return true;
-    }
-
     bool visitLoadInst(const LoadInst *RHS) {
       auto LHSQualifier = cast<LoadInst>(LHS)->getOwnershipQualifier();
       return LHSQualifier == RHS->getOwnershipQualifier();
@@ -715,21 +711,18 @@ namespace {
       return true;
     }
 
-    bool visitRefToUnownedInst(RefToUnownedInst *RHS) {
-      return true;
+#define LOADABLE_REF_STORAGE_HELPER(Name) \
+    bool visit##Name##ToRefInst(Name##ToRefInst *RHS) { return true; } \
+    bool visitRefTo##Name##Inst(RefTo##Name##Inst *RHS) { return true; }
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+    LOADABLE_REF_STORAGE_HELPER(Name) \
+    bool visitStrongRetain##Name##Inst(const StrongRetain##Name##Inst *RHS) { \
+      return true; \
     }
-
-    bool visitUnownedToRefInst(UnownedToRefInst *RHS) {
-      return true;
-    }
-
-    bool visitRefToUnmanagedInst(RefToUnmanagedInst *RHS) {
-      return true;
-    }
-
-    bool visitUnmanagedToRefInst(UnmanagedToRefInst *RHS) {
-      return true;
-    }
+#define UNCHECKED_REF_STORAGE(Name, ...) \
+    LOADABLE_REF_STORAGE_HELPER(Name)
+#include "swift/AST/ReferenceStorage.def"
+#undef LOADABLE_REF_STORAGE_HELPER
 
     bool visitThinToThickFunctionInst(ThinToThickFunctionInst *RHS) {
       return true;
@@ -1014,7 +1007,9 @@ bool SILInstruction::mayRelease() const {
   case SILInstructionKind::YieldInst:
   case SILInstructionKind::DestroyAddrInst:
   case SILInstructionKind::StrongReleaseInst:
-  case SILInstructionKind::UnownedReleaseInst:
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case SILInstructionKind::Name##ReleaseInst:
+#include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::ReleaseValueInst:
   case SILInstructionKind::ReleaseValueAddrInst:
     return true;

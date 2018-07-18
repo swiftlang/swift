@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir -swift-version 3 | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s
 
 // rdar://problem/20628295
 
@@ -40,5 +40,5 @@ func wangle<T : Cat>(_ t: T.Type) {
 }
 
 feed(Cat())
-wangle(Cat)
+wangle(Cat.self)
 Anesthesiologist<Cat>().disentangle(Cat())

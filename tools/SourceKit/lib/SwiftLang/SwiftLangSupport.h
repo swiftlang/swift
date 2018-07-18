@@ -94,7 +94,7 @@ public:
 
   void parse(ImmutableTextSnapshotRef Snapshot, SwiftLangSupport &Lang,
              bool BuildSyntaxTree);
-  void readSyntaxInfo(EditorConsumer& consumer);
+  void readSyntaxInfo(EditorConsumer &consumer);
   void readSemanticInfo(ImmutableTextSnapshotRef Snapshot,
                         EditorConsumer& Consumer);
 
@@ -397,7 +397,7 @@ public:
   void
   codeCompleteSetCustom(ArrayRef<CustomCompletionInfo> completions) override;
 
-  void editorOpen(StringRef Name, llvm::MemoryBuffer *Buf, bool EnableSyntaxMap,
+  void editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
                   EditorConsumer &Consumer,
                   ArrayRef<const char *> Args) override;
 

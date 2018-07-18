@@ -278,14 +278,10 @@ swift_layout_kind_t getTypeInfoKind(const TypeInfo &TI) {
   case TypeInfoKind::Reference: {
     auto &ReferenceTI = cast<ReferenceTypeInfo>(TI);
     switch (ReferenceTI.getReferenceKind()) {
-    case ReferenceKind::Strong:
-      return SWIFT_STRONG_REFERENCE;
-    case ReferenceKind::Unowned:
-      return SWIFT_UNOWNED_REFERENCE;
-    case ReferenceKind::Weak:
-      return SWIFT_WEAK_REFERENCE;
-    case ReferenceKind::Unmanaged:
-      return SWIFT_UNMANAGED_REFERENCE;
+    case ReferenceKind::Strong: return SWIFT_STRONG_REFERENCE;
+#define REF_STORAGE(Name, name, NAME) \
+    case ReferenceKind::Name: return SWIFT_##NAME##_REFERENCE;
+#include "swift/AST/ReferenceStorage.def"
     }
   }
   }

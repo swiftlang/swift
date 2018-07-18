@@ -46,6 +46,7 @@ namespace swift {
   class DelayedParsingCallbacks;
   class DiagnosticConsumer;
   class DiagnosticEngine;
+  class Evaluator;
   class FileUnit;
   class GenericEnvironment;
   class GenericParamList;
@@ -342,6 +343,19 @@ namespace swift {
     struct Implementation;
     Implementation &Impl;
   };
+
+  /// Register AST-level request functions with the evaluator.
+  ///
+  /// The ASTContext will automatically call these upon construction.
+  void registerAccessRequestFunctions(Evaluator &evaluator);
+
+  /// Register Sema-level request functions with the evaluator.
+  ///
+  /// Clients that form an ASTContext and will perform any semantic queries
+  /// using Sema-level logic should call these functions after forming the
+  /// ASTContext.
+  void registerTypeCheckerRequestFunctions(Evaluator &evaluator);
+
 } // end namespace swift
 
 #endif // SWIFT_SUBSYSTEMS_H

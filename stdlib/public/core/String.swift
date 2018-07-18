@@ -742,6 +742,18 @@ extension String {
   ) -> String {
     return String._fromUTF8(input, repair: repair)!
   }
+
+  @inlinable
+  @usableFromInline
+  static func _fromWellFormedUTF16CodeUnits<C : RandomAccessCollection>(
+    _ input: C, repair: Bool = false
+  ) -> String where C.Element == UTF16.CodeUnit {
+    if let smol = _SmallUTF8String(input) {
+      return String(_StringGuts(smol))
+    }
+    return String._fromCodeUnits(
+      input, encoding: UTF16.self, repairIllFormedSequences: repair)!
+  }
 }
 
 extension String : _ExpressibleByBuiltinUnicodeScalarLiteral {
@@ -859,7 +871,6 @@ extension String : ExpressibleByStringLiteral {
 
 extension String : CustomDebugStringConvertible {
   /// A representation of the string that is suitable for debugging.
-  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     var result = "\""
     for us in self.unicodeScalars {

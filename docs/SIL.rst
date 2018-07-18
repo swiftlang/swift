@@ -2237,7 +2237,7 @@ store
   // $T must be a loadable type
 
 Stores the value ``%0`` to memory at address ``%1``.  The type of %1 is ``*T``
-and the type of ``%0 is ``T``, which must be a loadable type. This will
+and the type of ``%0`` is ``T``, which must be a loadable type. This will
 overwrite the memory at ``%1``. If ``%1`` already references a value that
 requires ``release`` or other cleanup, that value must be loaded before being
 stored over and cleaned up. It is undefined behavior to store to an address
@@ -3064,8 +3064,7 @@ float_literal
   // $Builtin.FP<n> must be a builtin floating-point type
   // %1 has type $Builtin.FP<n>
 
-Creates a floating-point literal value. The result will be of type ``
-``Builtin.FP<n>``, which must be a builtin floating-point type. The literal
+Creates a floating-point literal value. The result will be of type ``Builtin.FP<n>``, which must be a builtin floating-point type. The literal
 value is specified as the bitwise representation of the floating point value,
 using Swift's hexadecimal integer literal syntax.
 
@@ -5002,7 +5001,7 @@ return
 Exits the current function and returns control to the calling function. If
 the current function was invoked with an ``apply`` instruction, the result
 of that function will be the operand of this ``return`` instruction. If
-the current function was invoked with a ``try_apply` instruction, control
+the current function was invoked with a ``try_apply`` instruction, control
 resumes at the normal destination, and the value of the basic block argument
 will be the operand of this ``return`` instruction.
 
@@ -5441,7 +5440,7 @@ constant replacement but leave the function application to be serialized to
 sil).
 
 The compiler flag that influences the value of the ``assert_configuration``
-function application is the optimization flag: at ``-Onone` the application will
+function application is the optimization flag: at ``-Onone`` the application will
 be replaced by ``Debug`` at higher optimization levels the instruction will be
 replaced by ``Release``. Optionally, the value to use for replacement can be
 specified with the ``-assert-config`` flag which overwrites the value selected by

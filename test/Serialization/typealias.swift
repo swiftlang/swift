@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -module-name alias -emit-module -o %t %S/Inputs/alias.swift -swift-version 3
-// RUN: %target-build-swift -I %t %s -module-name typealias -emit-module-path %t/typealias.swiftmodule -o %t/typealias.o -swift-version 3
+// RUN: %target-build-swift -module-name alias -emit-module -o %t %S/Inputs/alias.swift
+// RUN: %target-build-swift -I %t %s -module-name typealias -emit-module-path %t/typealias.swiftmodule -o %t/typealias.o
 // RUN: llvm-bcanalyzer %t/alias.swiftmodule | %FileCheck %s
-// RUN: %target-build-swift -I %t %s -swift-version 3 -o %t/a.out
+// RUN: %target-build-swift -I %t %s -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck -check-prefix=OUTPUT %s
 // REQUIRES: executable_test
 
@@ -40,8 +40,8 @@ print("\(monadic(i))\n", terminator: "")
 
 // OUTPUT: -42
 
-func subtract(x: MyInt64, y: MyInt64) -> MyInt64 {
-  return x - y
+func subtract(_ t : (x: MyInt64, y: MyInt64)) -> MyInt64 {
+  return t.x - t.y
 }
 var dyadic : TwoIntFunction = subtract
 print("\(dyadic((named.b, i))) \(dyadic(both))\n", terminator: "")

@@ -57,9 +57,8 @@ func test0(c c: C) {
 // CHECK-NEXT:  %1 = project_box %0
 // CHECK-NEXT:  debug_value_addr %1 : $*@sil_weak Optional<C>, var, name "bC", argno 1
 // CHECK-NEXT:  [[READ:%.*]] = begin_access [read] [unknown] %1
-// CHECK-NEXT:  [[STK:%.*]] = alloc_stack $Optional<C>
 // CHECK-NEXT:  [[VAL:%.*]] = load_weak [[READ]] : $*@sil_weak Optional<C>
-// CHECK-NEXT:  store [[VAL]] to [init] [[STK]] : $*Optional<C>
+// CHECK-NEXT:  end_access [[READ]]
 func testClosureOverWeak() {
   weak var bC = C()
   takeClosure { bC!.f() }

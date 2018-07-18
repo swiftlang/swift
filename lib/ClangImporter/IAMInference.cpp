@@ -690,6 +690,7 @@ IAMResult IAMInference::inferVar(const clang::VarDecl *varDecl) {
   auto fail = [varDecl]() -> IAMResult {
     DEBUG(llvm::dbgs() << "failed to infer variable: ");
     DEBUG(varDecl->print(llvm::dbgs()));
+    (void)varDecl;
     DEBUG(llvm::dbgs() << "\n");
     ++FailInferVar;
     return {};
@@ -733,6 +734,7 @@ IAMResult IAMInference::infer(const clang::NamedDecl *clangDecl) {
   auto fail = [funcDecl]() -> IAMResult {
     DEBUG(llvm::dbgs() << "failed to infer function: ");
     DEBUG(funcDecl->print(llvm::dbgs()));
+    (void)funcDecl;
     DEBUG(llvm::dbgs() << "\n");
     ++FailInferFunction;
     return {};

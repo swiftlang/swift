@@ -87,3 +87,7 @@ public struct ResilientWeakRef {
     ref = r
   }
 }
+
+public struct ResilientRef {
+  public var r: Referent
+}

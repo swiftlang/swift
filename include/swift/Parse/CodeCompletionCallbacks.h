@@ -202,6 +202,8 @@ public:
 
   virtual void completeAfterPound(CodeCompletionExpr *E, StmtKind ParentKind) = 0;
 
+  virtual void completeAfterIfStmt(bool hasElse) = 0;
+
   virtual void completeGenericParams(TypeLoc TL) = 0;
 
   /// \brief Signals that the AST for the all the delayed-parsed code was

@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 //
 // RUN: %target-clang -fobjc-arc %S/Inputs/ObjCClasses/ObjCClasses.m -c -o %t/ObjCClasses.o
-// RUN: %target-build-swift -I %S/Inputs/ObjCClasses/ %t/ObjCClasses.o %s -o %t/a.out -swift-version 3
+// RUN: %target-build-swift -I %S/Inputs/ObjCClasses/ %t/ObjCClasses.o %s -o %t/a.out
 // RUN: %target-run %t/a.out
 
 // REQUIRES: executable_test
@@ -111,7 +111,7 @@ ImportedObjCGenerics.test("ClassConstraints") {
   expectEqual("woof", makeContainedAnimalMakeNoise(x: petCarrier))
 }
 
-class ClassWithMethodsUsingObjCGenerics: NSObject {
+@objc @objcMembers class ClassWithMethodsUsingObjCGenerics: NSObject {
   func copyContainer(_ x: CopyingContainer<NSString>) -> CopyingContainer<NSString> {
     return x
   }

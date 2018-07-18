@@ -137,6 +137,9 @@ ERROR(variable_inout_before_initialized,none,
 ERROR(variable_closure_use_uninit,none,
       "%select{variable|constant}1 '%0' captured by a closure before being"
       " initialized", (StringRef, bool))
+ERROR(variable_defer_use_uninit,none,
+      "%select{variable|constant}1 '%0' used in defer before being"
+      " initialized", (StringRef, bool))
 ERROR(self_closure_use_uninit,none,
       "'self' captured by a closure before all members were initialized", ())
 

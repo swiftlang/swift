@@ -150,12 +150,18 @@ static std::pair<unsigned, unsigned> getTypeDepthAndWidth(Type t) {
   if (auto *FnTy = t->getAs<FunctionType>()) {
     Depth++;
     unsigned MaxTypeDepth = 0;
+    auto Params = FnTy->getParams();
+    Width += Params.size();
+    for (auto &Param : Params) {
+      unsigned TypeWidth;
+      unsigned TypeDepth;
+      std::tie(TypeDepth, TypeWidth) = getTypeDepthAndWidth(Param.getType());
+      if (TypeDepth > MaxTypeDepth)
+        MaxTypeDepth = TypeDepth;
+      Width += TypeWidth;
+    }
     unsigned TypeWidth;
     unsigned TypeDepth;
-    std::tie(TypeDepth, TypeWidth) = getTypeDepthAndWidth(FnTy->getInput());
-    if (TypeDepth > MaxTypeDepth)
-      MaxTypeDepth = TypeDepth;
-    Width += TypeWidth;
     std::tie(TypeDepth, TypeWidth) = getTypeDepthAndWidth(FnTy->getResult());
     if (TypeDepth > MaxTypeDepth)
       MaxTypeDepth = TypeDepth;
@@ -282,6 +288,7 @@ static bool createsInfiniteSpecializationLoop(ApplySite Apply) {
   auto *Callee = Apply.getCalleeFunction();
   SILFunction *Caller = nullptr;
   Caller = Apply.getFunction();
+  int numAcceptedCycles = 1;
 
   // Name of the function to be specialized.
   auto GenericFunc = Callee;
@@ -321,7 +328,13 @@ static bool createsInfiniteSpecializationLoop(ApplySite Apply) {
       if (growingSubstitutions(CurSpecializationInfo->getSubstitutions(),
                                Apply.getSubstitutionMap())) {
         DEBUG(llvm::dbgs() << "Found a generic specialization loop!\n");
-        return true;
+
+        // Accept a cycles up to a limit. This is necessary to generate
+        // efficient code for some library functions, like compactMap, which
+        // contain small specialization cycles.
+        if (numAcceptedCycles == 0)
+          return true;
+        numAcceptedCycles--;
       }
     }
 
@@ -1840,6 +1853,7 @@ SILFunction *GenericFuncSpecializer::tryCreateSpecialization() {
   auto *Caller = ReInfo.getApply() ? ReInfo.getApply().getFunction() : nullptr;
   SubstitutionMap Subs = Caller ? ReInfo.getApply().getSubstitutionMap()
                                 : ReInfo.getClonerParamSubstitutionMap();
+  SpecializedF->setClassSubclassScope(SubclassScope::NotApplicable);
   SpecializedF->setSpecializationInfo(
       GenericSpecializationInformation::create(Caller, GenericFunc, Subs));
   return SpecializedF;

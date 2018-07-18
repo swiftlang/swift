@@ -12,7 +12,7 @@
 
 @_exported import Foundation // Clang module
 
-extension NSDate : CustomPlaygroundQuickLookable {
+extension NSDate : _CustomPlaygroundQuickLookable {
   @nonobjc
   var summary: String {
     let df = DateFormatter()

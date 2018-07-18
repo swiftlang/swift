@@ -164,9 +164,9 @@ namespace swift {
       PM->invalidateFunctionTables();
     }
 
-    /// Inform the pass manager of a deleted function.
-    void notifyDeleteFunction(SILFunction *F) {
-      PM->notifyDeleteFunction(F);
+    /// Inform the pass manager that we are going to delete a function.
+    void notifyWillDeleteFunction(SILFunction *F) {
+      PM->notifyWillDeleteFunction(F);
     }
 
     /// Inform the pass manager of an added function.

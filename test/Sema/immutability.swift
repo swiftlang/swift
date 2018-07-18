@@ -2,6 +2,9 @@
 
 func markUsed<T>(_ t: T) {}
 
+prefix operator ++
+public prefix func ++ <T>(rhs: inout T) -> T { fatalError() }
+
 let bad_property_1: Int {    // expected-error {{'let' declarations cannot be computed properties}} {{1-4=var}}
   get {
     return 42

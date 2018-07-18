@@ -771,6 +771,14 @@ SubclassScope SILDeclRef::getSubclassScope() const {
   if (context->isExtensionContext())
     return SubclassScope::NotApplicable;
 
+  // Various forms of thunks don't either.
+  if (isThunk() || isForeign)
+    return SubclassScope::NotApplicable;
+
+  // Default arg generators only need to be visible in Swift 3.
+  if (isDefaultArgGenerator() && !context->getASTContext().isSwiftVersion3())
+    return SubclassScope::NotApplicable;
+
   auto *classType = context->getAsClassOrClassExtensionContext();
   if (!classType || classType->isFinal())
     return SubclassScope::NotApplicable;

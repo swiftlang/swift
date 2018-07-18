@@ -193,7 +193,12 @@ void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
   P.addHighLevelCSE();
   P.addSILCombine();
   P.addSimplifyCFG();
+  // Optimize access markers for better LICM: might merge accesses
+  // It will also set the no_nested_conflict for dynamic accesses
+  P.addAccessEnforcementOpts();
   P.addHighLevelLICM();
+  // Simplify CFG after LICM that creates new exit blocks
+  P.addSimplifyCFG();
   // Start of loop unrolling passes.
   P.addArrayCountPropagation();
   // To simplify induction variable.
@@ -446,7 +451,12 @@ static void addLateLoopOptPassPipeline(SILPassPipelinePlan &P) {
 
   // Perform the final lowering transformations.
   P.addCodeSinking();
+  // Optimize access markers for better LICM: might merge accesses
+  // It will also set the no_nested_conflict for dynamic accesses
+  P.addAccessEnforcementOpts();
   P.addLICM();
+  // Simplify CFG after LICM that creates new exit blocks
+  P.addSimplifyCFG();
 
   // Optimize overflow checks.
   P.addRedundantOverflowCheckRemoval();
@@ -469,6 +479,7 @@ static void addLateLoopOptPassPipeline(SILPassPipelinePlan &P) {
 static void addLastChanceOptPassPipeline(SILPassPipelinePlan &P) {
   // Optimize access markers for improved IRGen after all other optimizations.
   P.addAccessEnforcementOpts();
+  P.addAccessEnforcementWMO();
 
   // Only has an effect if the -assume-single-thread option is specified.
   P.addAssumeSingleThreaded();

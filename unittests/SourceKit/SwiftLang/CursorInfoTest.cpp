@@ -90,6 +90,7 @@ class NullEditorConsumer : public EditorConsumer {
   bool handleSourceText(StringRef Text) override { return false; }
   bool handleSerializedSyntaxTree(StringRef Text) override { return false; }
   bool syntaxTreeEnabled() override { return false; }
+  bool forceLibSyntaxBasedProcessing() override { return false; }
 
 public:
   bool needsSema = false;
@@ -136,8 +137,7 @@ public:
     auto Args = CArgs.hasValue() ? makeArgs(DocName, *CArgs)
                                  : std::vector<const char *>{};
     auto Buf = MemoryBuffer::getMemBufferCopy(Text, DocName);
-    getLang().editorOpen(DocName, Buf.get(), /*EnableSyntaxMap=*/false,
-                         Consumer, Args);
+    getLang().editorOpen(DocName, Buf.get(), Consumer, Args);
   }
 
   void replaceText(StringRef DocName, unsigned Offset, unsigned Length,
@@ -352,8 +352,8 @@ TEST_F(CursorInfoTest, CursorInfoMustWaitDueToken) {
   replaceText(DocName, findOffset(TextToReplace, Contents), TextToReplace.size(),
               ExpensiveInit);
   // Change 'foo' to 'fog' by replacing the last character.
-  replaceText(DocName, FooRefOffs+2, 1, "g");
   replaceText(DocName, FooOffs+2, 1, "g");
+  replaceText(DocName, FooRefOffs+2, 1, "g");
 
   // Should wait for the new AST, because the cursor location points to a
   // different token.
@@ -381,8 +381,8 @@ TEST_F(CursorInfoTest, CursorInfoMustWaitDueTokenRace) {
   setNeedsSema(true);
   open(DocName, Contents, llvm::makeArrayRef(Args));
   // Change 'foo' to 'fog' by replacing the last character.
-  replaceText(DocName, FooRefOffs + 2, 1, "g");
   replaceText(DocName, FooOffs + 2, 1, "g");
+  replaceText(DocName, FooRefOffs + 2, 1, "g");
 
   // Should wait for the new AST, because the cursor location points to a
   // different token.

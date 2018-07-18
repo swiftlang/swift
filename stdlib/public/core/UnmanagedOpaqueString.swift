@@ -157,6 +157,8 @@ extension _UnmanagedOpaqueString : Sequence {
 extension _UnmanagedOpaqueString : RandomAccessCollection {
   internal typealias IndexDistance = Int
   internal typealias Indices = Range<Index>
+
+  @usableFromInline // FIXME(sil-serialize-all)
   internal typealias SubSequence = _UnmanagedOpaqueString
 
   @_fixed_layout

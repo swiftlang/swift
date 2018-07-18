@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s -enable-objc-interop  | %FileCheck %s -DINT=i%target-ptrsize --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-objc-%target-ptrsize
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s -disable-objc-interop | %FileCheck %s -DINT=i%target-ptrsize --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-native-%target-ptrsize
 
 class C {}
 protocol P: class {}
@@ -29,46 +30,54 @@ struct ReferenceStorageTypeLayout<T, Native : C, Unknown : AnyObject> {
   // CHECK: store i8** getelementptr inbounds (i8*, i8** @"$SBoSgXwWV", i32 8)
   weak            var nwi: Native!
 
-  // -- Open-code layout for protocol types with witness tables.
-  //   Note that the layouts for unowned(safe) references are
-  //   only bitwise takable when ObjC interop is disabled.
-  // CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_16_8_[[UNOWNED_XI:[0-9a-f]+]]{{(,|_bt,)}} i32 0, i32 0)
-  // CHECK-32: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_8_4_[[UNOWNED_XI:[0-9a-f]+]]{{(,|_bt,)}} i32 0, i32 0)
-  unowned(safe)   var ps:  P
-  // CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_16_8_[[REF_XI:[0-9a-f]+]]_pod, i32 0, i32 0)
-  // CHECK-32: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_8_4_[[REF_XI:[0-9a-f]+]]_pod, i32 0, i32 0)
+  // -- Open-code layout for protocol types with witness tables. Note:
+  //    1) The layouts for unowned(safe) references are only bitwise takable
+  //       when ObjC interop is disabled.
+  //    2) 0x7fffffff is the max extra inhabitant count, but not all types in
+  //       all scenarios.
+  // CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_16_8_[[REF_XI:[0-9a-f][0-9a-f][0-9a-f]+]]_pod, i32 0, i32 0)
+  // CHECK-32: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_8_4_[[REF_XI:[0-9a-f][0-9a-f][0-9a-f]+]]_pod, i32 0, i32 0)
   unowned(unsafe) var pu:  P
-  // CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_16_8_[[WEAK_XI:[0-9a-f]+]], i32 0, i32 0)
-  // CHECK-32: store i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @type_layout_8_4_[[WEAK_XI:[0-9a-f]+]], i32 0, i32 0)
+  // CHECK-native-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_16_8_[[REF_XI]]_bt, i32 0, i32 0)
+  // CHECK-objc-64:   store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_16_8_7fffffff, i32 0, i32 0)
+  // CHECK-native-32: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_8_4_[[REF_XI]]_bt, i32 0, i32 0)
+  // CHECK-objc-32:   store i8** getelementptr inbounds ([{{(3|4)}} x i8*], [{{(3|4)}} x i8*]* @type_layout_8_4_[[REF_XI32:[0-9a-f]+]], i32 0, i32 0)
+  unowned(safe)   var ps:  P
+  // CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_16_8_7fffffff, i32 0, i32 0)
+  // CHECK-32: store i8** getelementptr inbounds ([{{(3|4)}} x i8*], [{{(3|4)}} x i8*]* @type_layout_8_4_[[REF_XI32_2:[0-9a-f]+]], i32 0, i32 0)
   weak            var pwo: P?
-  // CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_16_8_[[WEAK_XI]], i32 0, i32 0)
-  // CHECK-32: store i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @type_layout_8_4_[[WEAK_XI]], i32 0, i32 0)
+  // CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_16_8_7fffffff, i32 0, i32 0)
+  // CHECK-32: store i8** getelementptr inbounds ([{{(3|4)}} x i8*], [{{(3|4)}} x i8*]* @type_layout_8_4_[[REF_XI32_2]], i32 0, i32 0)
   weak            var pwi: P!
 
-  // CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_24_8_[[UNOWNED_XI]]{{(,|_bt,)}} i32 0, i32 0)
-  // CHECK-32: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_12_4_[[UNOWNED_XI]]{{(,|_bt,)}} i32 0, i32 0)
+  // CHECK-native-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_24_8_[[REF_XI]]_bt, i32 0, i32 0)
+  // CHECK-objc-64:   store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_24_8_7fffffff, i32 0, i32 0)
+  // CHECK-native-32: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_12_4_[[REF_XI]]_bt, i32 0, i32 0)
+  // CHECK-objc-32:   store i8** getelementptr inbounds ([{{(3|4)}} x i8*], [{{(3|4)}} x i8*]* @type_layout_12_4_[[REF_XI32]], i32 0, i32 0)
   unowned(safe)   var pqs:  P & Q
   // CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_24_8_[[REF_XI]]_pod, i32 0, i32 0)
   // CHECK-32: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_12_4_[[REF_XI]]_pod, i32 0, i32 0)
   unowned(unsafe) var pqu:  P & Q
-  // CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_24_8_[[WEAK_XI]], i32 0, i32 0)
-  // CHECK-32: store i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @type_layout_12_4_[[WEAK_XI]], i32 0, i32 0)
+  // CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_24_8_7fffffff, i32 0, i32 0)
+  // CHECK-32: store i8** getelementptr inbounds ([{{(3|4)}} x i8*], [{{(3|4)}} x i8*]* @type_layout_12_4_[[REF_XI32_2]], i32 0, i32 0)
   weak            var pqwo: (P & Q)?
-  // CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_24_8_[[WEAK_XI]], i32 0, i32 0)
-  // CHECK-32: store i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @type_layout_12_4_[[WEAK_XI]], i32 0, i32 0)
+  // CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_24_8_7fffffff, i32 0, i32 0)
+  // CHECK-32: store i8** getelementptr inbounds ([{{(3|4)}} x i8*], [{{(3|4)}} x i8*]* @type_layout_12_4_[[REF_XI32_2]], i32 0, i32 0)
   weak            var pqwi: (P & Q)!
 
-  // CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_24_8_[[UNOWNED_XI]]{{(,|_bt,)}} i32 0, i32 0)
-  // CHECK-32: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_12_4_[[UNOWNED_XI]]{{(,|_bt,)}} i32 0, i32 0)
+  // CHECK-native-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_24_8_[[REF_XI]]_bt, i32 0, i32 0)
+  // CHECK-objc-64:   store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_24_8_7fffffff_bt, i32 0, i32 0)
+  // CHECK-native-32: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_12_4_[[REF_XI]]_bt, i32 0, i32 0)
+  // CHECK-objc-32:   store i8** getelementptr inbounds ([{{(3|4)}} x i8*], [{{(3|4)}} x i8*]* @type_layout_12_4_[[REF_XI32]]_bt, i32 0, i32 0)
   unowned(safe)   var pqcs:  P & Q & C
   // CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_24_8_[[REF_XI]]_pod, i32 0, i32 0)
-  // CHECK-32: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_12_4_[[REF_XI]]_pod, i32 0, i32 0)
+  // CHECK-32: store i8** getelementptr inbounds ([{{(3|4)}} x i8*], [{{(3|4)}} x i8*]* @type_layout_12_4_[[REF_XI]]_pod, i32 0, i32 0)
   unowned(unsafe) var pqcu:  P & Q & C
-  // CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_24_8_[[WEAK_XI]], i32 0, i32 0)
-  // CHECK-32: store i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @type_layout_12_4_[[WEAK_XI]], i32 0, i32 0)
+  // CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_24_8_7fffffff, i32 0, i32 0)
+  // CHECK-32: store i8** getelementptr inbounds ([{{(3|4)}} x i8*], [{{(3|4)}} x i8*]* @type_layout_12_4_[[REF_XI32_2]], i32 0, i32 0)
   weak            var pqcwo: (P & Q & C)?
-  // CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_24_8_[[WEAK_XI]], i32 0, i32 0)
-  // CHECK-32: store i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @type_layout_12_4_[[WEAK_XI]], i32 0, i32 0)
+  // CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_24_8_7fffffff, i32 0, i32 0)
+  // CHECK-32: store i8** getelementptr inbounds ([{{(3|4)}} x i8*], [{{(3|4)}} x i8*]* @type_layout_12_4_[[REF_XI32_2]], i32 0, i32 0)
   weak            var pqcwi: (P & Q & C)!
 
   // -- Unknown-refcounted existential without witness tables.

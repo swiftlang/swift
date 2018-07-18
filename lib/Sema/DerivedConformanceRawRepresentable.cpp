@@ -90,6 +90,27 @@ static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl) {
   }
 #endif
 
+  if (enumDecl->isObjC()) {
+    // Special case: ObjC enums are represented by their raw value, so just use
+    // a bitcast.
+
+    // return unsafeBitCast(self, to: RawType.self)
+    DeclName name(C, C.getIdentifier("unsafeBitCast"), {Identifier(), C.Id_to});
+    auto functionRef = new (C) UnresolvedDeclRefExpr(name,
+                                                     DeclRefKind::Ordinary,
+                                                     DeclNameLoc());
+    auto selfRef = DerivedConformance::createSelfDeclRef(toRawDecl);
+    auto bareTypeExpr = TypeExpr::createImplicit(rawTy, C);
+    auto typeExpr = new (C) DotSelfExpr(bareTypeExpr, SourceLoc(), SourceLoc());
+    auto call = CallExpr::createImplicit(C, functionRef, {selfRef, typeExpr},
+                                         {Identifier(), C.Id_to});
+    auto returnStmt = new (C) ReturnStmt(SourceLoc(), call);
+    auto body = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt),
+                                  SourceLoc());
+    toRawDecl->setBody(body);
+    return;
+  }
+
   Type enumType = parentDC->getDeclaredTypeInContext();
 
   SmallVector<ASTNode, 4> cases;
@@ -352,7 +373,7 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
   initDecl->setInterfaceType(allocIfaceType);
   initDecl->setInitializerInterfaceType(initIfaceType);
   initDecl->copyFormalAccessFrom(enumDecl, /*sourceIsParentContext*/true);
-  initDecl->setValidationStarted();
+  initDecl->setValidationToChecked();
 
   // If the containing module is not resilient, make sure clients can construct
   // an instance without function call overhead.

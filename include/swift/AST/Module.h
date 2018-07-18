@@ -94,8 +94,6 @@ enum class FileUnitKind {
   SerializedAST,
   /// An imported Clang module.
   ClangModule,
-  /// A derived declaration.
-  Derived,
 };
 
 enum class SourceFileKind {
@@ -153,7 +151,7 @@ public:
   };
 
 private:
-  /// If non-NULL, an plug-in that should be used when performing external
+  /// If non-NULL, a plug-in that should be used when performing external
   /// lookups.
   // FIXME: Do we really need to bloat all modules with this?
   DebuggerClient *DebugClient = nullptr;

@@ -201,9 +201,10 @@ class NonObjCClassWithObjCProperty {
   // CHECK: [[RAW_POINTER:%.*]] = tuple_extract [[TUPLE]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>), 0
   // CHECK: [[OBJECT:%.*]] = pointer_to_address [[RAW_POINTER]] : $Builtin.RawPointer to [strict] $*NSObject
   // CHECK: [[OBJECT_DEP:%.*]] = mark_dependence [[OBJECT]] : $*NSObject on [[ARG]]
-  // CHECK: [[LOADED_OBJECT:%.*]] = load_borrow [[OBJECT_DEP]]
+  // CHECK: [[OBJECT_ACCESS:%.*]] = begin_access [modify] [unsafe] [[OBJECT_DEP]] : $*NSObject
+  // CHECK: [[LOADED_OBJECT:%.*]] = load_borrow [[OBJECT_ACCESS]]
   // CHECK: [[UNMANAGED_OBJECT:%.*]] = ref_to_unmanaged [[LOADED_OBJECT]] : $NSObject to $@sil_unmanaged NSObject
-  // CHECK: end_borrow [[LOADED_OBJECT]] from [[OBJECT_DEP]]
+  // CHECK: end_borrow [[LOADED_OBJECT]] from [[OBJECT_ACCESS]]
   func useProperty() {
     useAutoreleasingUnsafeMutablePointer(&property)
   }

@@ -39,19 +39,15 @@ protected:
   /// Represents a function which is implementing a vtable or witness table
   /// method.
   struct FuncImpl {
-    FuncImpl(SILFunction *F, ClassDecl *Cl) : F(F) { Impl.Cl = Cl; }
-    FuncImpl(SILFunction *F, ProtocolConformance *C) : F(F) { Impl.Conf = C; }
+    FuncImpl(SILFunction *F, ClassDecl *Cl) : F(F), Impl(Cl) {}
+    FuncImpl(SILFunction *F, ProtocolConformance *C) : F(F), Impl(C) {}
 
     /// The implementing function.
     SILFunction *F;
 
-    union {
-      /// In case of a vtable method.
-      ClassDecl *Cl;
-
-      /// In case of a witness method.
-      ProtocolConformance *Conf;
-    } Impl;
+    /// This is a class decl if we are tracking a class_method (i.e. a vtable
+    /// method) and a protocol conformance if we are tracking a witness_method.
+    PointerUnion<ClassDecl *, ProtocolConformance *> Impl;
   };
 
   /// Stores which functions implement a vtable or witness table method.
@@ -238,7 +234,6 @@ protected:
     case KeyPathPatternComponent::Kind::OptionalChain:
     case KeyPathPatternComponent::Kind::OptionalForce:
     case KeyPathPatternComponent::Kind::OptionalWrap:
-    case KeyPathPatternComponent::Kind::External:
       break;
     }
   }
@@ -303,7 +298,8 @@ protected:
 
     for (FuncImpl &FImpl : mi->implementingFunctions) {
       if (!isAlive(FImpl.F) &&
-          canHaveSameImplementation(FD, MethodCl, FImpl.Impl.Cl)) {
+          canHaveSameImplementation(FD, MethodCl,
+                                    FImpl.Impl.get<ClassDecl *>())) {
         makeAlive(FImpl.F);
       } else {
         allImplsAreCalled = false;
@@ -320,9 +316,10 @@ protected:
       return;
     mi->methodIsCalled = true;
     for (FuncImpl &FImpl : mi->implementingFunctions) {
-      if (FImpl.Impl.Conf) {
-        SILWitnessTable *WT = Module->lookUpWitnessTable(FImpl.Impl.Conf,
-                                                  /*deserializeLazily*/ false);
+      if (auto *Conf = FImpl.Impl.dyn_cast<ProtocolConformance *>()) {
+        SILWitnessTable *WT =
+            Module->lookUpWitnessTable(Conf,
+                                       /*deserializeLazily*/ false);
         if (!WT || isAlive(WT))
           makeAlive(FImpl.F);
       } else {
@@ -373,6 +370,13 @@ protected:
   }
 
   /// Retrieve the visibility information from the AST.
+  ///
+  /// This differs from SILModule::isVisibleExternally(VarDecl *) because of
+  /// it's handling of class methods. It returns true for methods whose
+  /// declarations are not directly visible externally, but have been imported
+  /// from another module. This ensures that entries aren't deleted from vtables
+  /// imported from the stdlib.
+  /// FIXME: Passes should not embed special logic for handling linkage.
   bool isVisibleExternally(const ValueDecl *decl) {
     AccessLevel access = decl->getEffectiveAccess();
     SILLinkage linkage;
@@ -392,9 +396,7 @@ protected:
     if (isPossiblyUsedExternally(linkage, Module->isWholeModule()))
       return true;
 
-    // If a vtable or witness table (method) is only visible in another module
-    // it can be accessed inside that module and we don't see this access.
-    // We hit this case e.g. if a table is imported from the stdlib.
+    // Special case for vtable visibility.
     if (decl->getDeclContext()->getParentModule() != Module->getSwiftModule())
       return true;
 
@@ -700,7 +702,7 @@ public:
 
       DEBUG(llvm::dbgs() << "  erase dead function " << F->getName() << "\n");
       NumDeadFunc++;
-      DFEPass->notifyDeleteFunction(F);
+      DFEPass->notifyWillDeleteFunction(F);
       Module->eraseFunction(F);
     }
     if (changedTables)

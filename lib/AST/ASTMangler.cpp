@@ -21,7 +21,9 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/Ownership.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/Basic/Defer.h"
@@ -380,6 +382,9 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
 
 std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC,
                                               GenericEnvironment *GE) {
+  PrettyStackTraceType prettyStackTrace(Ty->getASTContext(),
+                                        "mangling type for debugger", Ty);
+
   GenericEnv = GE;
   DWARFMangling = true;
   beginMangling();
@@ -650,7 +655,7 @@ void ASTMangler::appendDeclName(const ValueDecl *decl) {
     assert(((relatedEntityKind[0] >= 'a' && relatedEntityKind[0] <= 'j') ||
             (relatedEntityKind[0] >= 'A' && relatedEntityKind[0] <= 'J')) &&
            "Only [a-jA-J] are reserved for related entity kinds");
-    return appendOperatorParam("L", synthesizedTypeAttr->getManglingName());
+    return appendOperatorParam("L", relatedEntityKind);
   }
 
   StringRef privateDiscriminator = getPrivateDiscriminatorIfNecessary(decl);
@@ -746,17 +751,13 @@ void ASTMangler::appendType(Type type) {
         return appendType(aliasTy->getSinglyDesugaredType());
       }
 
-      if (type->isSpecialized()) {
+      if (aliasTy->getSubstitutionMap().hasAnySubstitutableParams()) {
         // Try to mangle the entire name as a substitution.
         if (tryMangleSubstitution(tybase))
           return;
 
         appendAnyGenericType(decl);
         bool isFirstArgList = true;
-        if (auto *nominalType = type->getAs<NominalType>()) {
-          if (nominalType->getParent())
-            type = nominalType->getParent();
-        }
         appendBoundGenericArgs(type, isFirstArgList);
         appendRetroactiveConformances(type);
         appendOperator("G");
@@ -803,17 +804,11 @@ void ASTMangler::appendType(Type type) {
       appendType(cast<InOutType>(tybase)->getObjectType());
       return appendOperator("z");
 
-    case TypeKind::UnmanagedStorage:
-      appendType(cast<UnmanagedStorageType>(tybase)->getReferentType());
-      return appendOperator("Xu");
-
-    case TypeKind::UnownedStorage:
-      appendType(cast<UnownedStorageType>(tybase)->getReferentType());
-      return appendOperator("Xo");
-
-    case TypeKind::WeakStorage:
-      appendType(cast<WeakStorageType>(tybase)->getReferentType());
-      return appendOperator("Xw");
+#define REF_STORAGE(Name, ...) \
+    case TypeKind::Name##Storage: \
+      appendType(cast<Name##StorageType>(tybase)->getReferentType()); \
+      return appendOperator(manglingOf(ReferenceOwnership::Name));
+#include "swift/AST/ReferenceStorage.def"
 
     case TypeKind::Tuple:
       appendTypeList(type);
@@ -838,8 +833,8 @@ void ASTMangler::appendType(Type type) {
       if (First)
         appendOperator("y");
 
-      if (layout.superclass) {
-        appendType(layout.superclass);
+      if (auto superclass = layout.explicitSuperclass) {
+        appendType(superclass);
         return appendOperator("Xc");
       } else if (layout.hasExplicitAnyObject) {
         return appendOperator("Xl");
@@ -1039,16 +1034,74 @@ void ASTMangler::bindGenericParameters(const DeclContext *DC) {
     bindGenericParameters(sig->getCanonicalSignature());
 }
 
+unsigned ASTMangler::appendBoundGenericArgs(DeclContext *dc,
+                                            SubstitutionMap subs,
+                                            bool &isFirstArgList) {
+  auto decl = dc->getInnermostDeclarationDeclContext();
+  if (!decl) return 0;
+
+  // For an extension declaration, use the nominal type declaration instead.
+  // This is important when extending a nested type, because the generic
+  // parameters will line up with the (semantic) nesting of the nominal type.
+  if (auto ext = dyn_cast<ExtensionDecl>(decl))
+    decl = ext->getAsNominalTypeOrNominalTypeExtensionContext();
+
+  // Handle the generic arguments of the parent.
+  unsigned currentGenericParamIdx =
+    appendBoundGenericArgs(decl->getDeclContext(), subs, isFirstArgList);
+
+  // If this is potentially a generic context, emit a generic argument list.
+  if (auto genericContext = decl->getAsGenericContext()) {
+    if (isFirstArgList) {
+      appendOperator("y");
+      isFirstArgList = false;
+    } else {
+      appendOperator("_");
+    }
+
+    // If we are generic at this level, emit all of the replacements at
+    // this level.
+    if (genericContext->isGeneric()) {
+      auto genericParams = subs.getGenericSignature()->getGenericParams();
+      unsigned depth = genericParams[currentGenericParamIdx]->getDepth();
+      assert(genericContext->getGenericParams()->getDepth() == depth &&
+             "Depth mismatch mangling substitution map");
+      auto replacements = subs.getReplacementTypes();
+      for (unsigned lastGenericParamIdx = genericParams.size();
+           (currentGenericParamIdx != lastGenericParamIdx &&
+            genericParams[currentGenericParamIdx]->getDepth() == depth);
+           ++currentGenericParamIdx) {
+        Type replacementType = replacements[currentGenericParamIdx];
+        if (replacementType->hasArchetype())
+          replacementType = replacementType->mapTypeOutOfContext();
+
+        appendType(replacementType);
+      }
+    }
+  }
+
+  return currentGenericParamIdx;
+}
+
 void ASTMangler::appendBoundGenericArgs(Type type, bool &isFirstArgList) {
-  BoundGenericType *boundType = nullptr;
-  if (auto *unboundType = type->getAs<UnboundGenericType>()) {
+  TypeBase *typePtr = type.getPointer();
+  ArrayRef<Type> genericArgs;
+  if (auto *typeAlias = dyn_cast<NameAliasType>(typePtr)) {
+    appendBoundGenericArgs(typeAlias->getDecl(),
+                           typeAlias->getSubstitutionMap(),
+                           isFirstArgList);
+    return;
+  }
+
+  if (auto *unboundType = dyn_cast<UnboundGenericType>(typePtr)) {
     if (Type parent = unboundType->getParent())
       appendBoundGenericArgs(parent, isFirstArgList);
-  } else if (auto *nominalType = type->getAs<NominalType>()) {
+  } else if (auto *nominalType = dyn_cast<NominalType>(typePtr)) {
     if (Type parent = nominalType->getParent())
       appendBoundGenericArgs(parent, isFirstArgList);
   } else {
-    boundType = type->castTo<BoundGenericType>();
+    auto boundType = cast<BoundGenericType>(typePtr);
+    genericArgs = boundType->getGenericArgs();
     if (Type parent = boundType->getParent())
       appendBoundGenericArgs(parent, isFirstArgList);
   }
@@ -1058,10 +1111,8 @@ void ASTMangler::appendBoundGenericArgs(Type type, bool &isFirstArgList) {
   } else {
     appendOperator("_");
   }
-  if (boundType) {
-    for (Type arg : boundType->getGenericArgs()) {
-      appendType(arg);
-    }
+  for (Type arg : genericArgs) {
+    appendType(arg);
   }
 }
 

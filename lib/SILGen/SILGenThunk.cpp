@@ -58,7 +58,7 @@ SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
     // Currently a dynamic thunk looks just like a foreign-to-native thunk around
     // an ObjC method. This would change if we introduced a native
     // runtime-hookable mechanism.
-    SILGenFunction SGF(*this, *F);
+    SILGenFunction SGF(*this, *F, SwiftModule);
     SGF.emitForeignToNativeThunk(constant);
   }
 
@@ -201,7 +201,7 @@ void SILGenModule::emitCurryThunk(SILDeclRef constant) {
   preEmitFunction(constant, fd, f, fd);
   PrettyStackTraceSILFunction X("silgen emitCurryThunk", f);
 
-  SILGenFunction(*this, *f).emitCurryThunk(constant);
+  SILGenFunction(*this, *f, SwiftModule).emitCurryThunk(constant);
   postEmitFunction(constant, f);
 }
 
@@ -214,7 +214,7 @@ void SILGenModule::emitForeignToNativeThunk(SILDeclRef thunk) {
     f->setSerialized(IsSerializable);
   preEmitFunction(thunk, thunk.getDecl(), f, thunk.getDecl());
   PrettyStackTraceSILFunction X("silgen emitForeignToNativeThunk", f);
-  SILGenFunction(*this, *f).emitForeignToNativeThunk(thunk);
+  SILGenFunction(*this, *f, SwiftModule).emitForeignToNativeThunk(thunk);
   postEmitFunction(thunk, f);
 }
 
@@ -231,7 +231,7 @@ void SILGenModule::emitNativeToForeignThunk(SILDeclRef thunk) {
   PrettyStackTraceSILFunction X("silgen emitNativeToForeignThunk", f);
   f->setBare(IsBare);
   f->setThunk(IsThunk);
-  SILGenFunction(*this, *f).emitNativeToForeignThunk(thunk);
+  SILGenFunction(*this, *f, SwiftModule).emitNativeToForeignThunk(thunk);
   postEmitFunction(thunk, f);
 }
 

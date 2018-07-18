@@ -6,9 +6,9 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: %target-swift-frontend %s -emit-ir -swift-version 3
+// RUN: %target-swift-frontend %s -emit-ir
 
 // Issue found by https://github.com/jansabbe (Jan Sabbe)
 
-class A<B : Collection where B : AnyObject> {
+class A<B : Collection> where B : AnyObject {
 }

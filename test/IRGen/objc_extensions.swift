@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -disable-objc-attr-requires-foundation-module -emit-module %S/Inputs/objc_extension_base.swift -o %t -swift-version 3
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir -swift-version 3 | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -disable-objc-attr-requires-foundation-module -emit-module %S/Inputs/objc_extension_base.swift -o %t
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
@@ -34,14 +34,14 @@ import objc_extension_base
 }
 
 extension NSObject {
-  func someMethod() -> String { return "Hello" }
+  @objc func someMethod() -> String { return "Hello" }
 }
 
 extension Gizmo: NewProtocol {
-  func brandNewInstanceMethod() {
+  @objc func brandNewInstanceMethod() {
   }
 
-  class func brandNewClassMethod() {
+  @objc class func brandNewClassMethod() {
   }
 
   // Overrides an instance method of NSObject
@@ -50,8 +50,7 @@ extension Gizmo: NewProtocol {
   }
 
   // Overrides a class method of NSObject
-  open override class func initialize() {
-  }
+  @objc override class func hasOverride() {}
 }
 
 /*
@@ -71,10 +70,10 @@ extension Gizmo: NewProtocol {
 // CHECK: }, section "__DATA, __objc_const", align 8
 
 extension Gizmo {
-  func brandSpankingNewInstanceMethod() {
+  @objc func brandSpankingNewInstanceMethod() {
   }
 
-  class func brandSpankingNewClassMethod() {
+  @objc class func brandSpankingNewClassMethod() {
   }
 }
 
@@ -115,8 +114,8 @@ class Hoozit : NSObject {
 // CHECK: }, section "__DATA, __objc_const", align 8
 
 extension Hoozit {
-  func blibble() { }
-  class func blobble() { }
+  @objc func blibble() { }
+  @objc class func blobble() { }
 }
 
 class SwiftOnly { }
@@ -146,9 +145,11 @@ extension Wotsit {
 extension NSObject {
   private enum SomeEnum { case X }
 
-  public func needMetadataOfSomeEnum() {
+  @objc public func needMetadataOfSomeEnum() {
     print(NSObject.SomeEnum.X)
   }
+
+  @objc class func hasOverride() {}
 }
 
 

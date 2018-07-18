@@ -16,6 +16,7 @@
 
 #include "swift/Basic/STLExtras.h"
 #include "swift/Demangling/Demangle.h"
+#include "swift/AST/Ownership.h"
 #include "swift/Strings.h"
 #include <cstdio>
 #include <cstdlib>
@@ -266,6 +267,7 @@ private:
     case Node::Kind::BoundGenericClass:
     case Node::Kind::BoundGenericEnum:
     case Node::Kind::BoundGenericStructure:
+    case Node::Kind::BoundGenericProtocol:
     case Node::Kind::BoundGenericOtherNominalType:
     case Node::Kind::BoundGenericTypeAlias:
     case Node::Kind::BuiltinTypeName:
@@ -428,8 +430,9 @@ private:
     case Node::Kind::TypeMetadataInstantiationFunction:
     case Node::Kind::TypeMetadataLazyCache:
     case Node::Kind::UncurriedFunctionType:
-    case Node::Kind::Unmanaged:
-    case Node::Kind::Unowned:
+#define REF_STORAGE(Name, ...) \
+    case Node::Kind::Name:
+#include "swift/AST/ReferenceStorage.def"
     case Node::Kind::UnsafeAddressor:
     case Node::Kind::UnsafeMutableAddressor:
     case Node::Kind::ValueWitness:
@@ -437,7 +440,6 @@ private:
     case Node::Kind::Variable:
     case Node::Kind::VTableAttribute:
     case Node::Kind::VTableThunk:
-    case Node::Kind::Weak:
     case Node::Kind::WillSet:
     case Node::Kind::ReflectionMetadataBuiltinDescriptor:
     case Node::Kind::ReflectionMetadataFieldDescriptor:
@@ -537,6 +539,15 @@ private:
     {
       // no sugar here
       printBoundGenericNoSugar(Node);
+      return;
+    }
+
+    // Print the conforming type for a "bound" protocol node "as" the protocol
+    // type.
+    if (Node->getKind() == Node::Kind::BoundGenericProtocol) {
+      printChildren(Node->getChild(1));
+      Printer << " as ";
+      print(Node->getChild(0));
       return;
     }
 
@@ -1120,18 +1131,12 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     print(Node->getChild(0));
     print(Node->getChild(1));
     return nullptr;
-  case Node::Kind::Weak:
-    Printer << "weak ";
-    print(Node->getChild(0));
+#define REF_STORAGE(Name, ...) \
+  case Node::Kind::Name: \
+    Printer << keywordOf(ReferenceOwnership::Name) << " "; \
+    print(Node->getChild(0)); \
     return nullptr;
-  case Node::Kind::Unowned:
-    Printer << "unowned ";
-    print(Node->getChild(0));
-    return nullptr;
-  case Node::Kind::Unmanaged:
-    Printer << "unowned(unsafe) ";
-    print(Node->getChild(0));
-    return nullptr;
+#include "swift/AST/ReferenceStorage.def"
   case Node::Kind::InOut:
     Printer << "inout ";
     print(Node->getChild(0));
@@ -1558,6 +1563,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::BoundGenericClass:
   case Node::Kind::BoundGenericStructure:
   case Node::Kind::BoundGenericEnum:
+  case Node::Kind::BoundGenericProtocol:
   case Node::Kind::BoundGenericOtherNominalType:
   case Node::Kind::BoundGenericTypeAlias:
     printBoundGeneric(Node);

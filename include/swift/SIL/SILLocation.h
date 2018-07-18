@@ -406,6 +406,13 @@ public:
   /// Return the location as a DeclContext or null.
   DeclContext *getAsDeclContext() const;
 
+  /// Convert a specialized location kind into a regular location.
+  SILLocation getAsRegularLocation() {
+    SILLocation RegularLoc = *this;
+    RegularLoc.setLocationKind(RegularKind);
+    return RegularLoc;
+  }
+
   SourceLoc getDebugSourceLoc() const;
   SourceLoc getSourceLoc() const;
   SourceLoc getStartSourceLoc() const;

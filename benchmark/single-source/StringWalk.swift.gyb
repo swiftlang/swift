@@ -195,3 +195,7 @@ public func run_CharIndexing_${Name}_unicodeScalars_Backwards(_ N: Int) {
 
 
 % end
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

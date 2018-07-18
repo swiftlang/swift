@@ -1,58 +1,58 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -disable-objc-attr-requires-foundation-module -swift-version 3 -o %t %S/Inputs/AnyObject/foo_swift_module.swift
-// RUN: %target-swift-frontend -emit-module -disable-objc-attr-requires-foundation-module -swift-version 3 -o %t %S/Inputs/AnyObject/bar_swift_module.swift
+// RUN: %target-swift-frontend -emit-module -disable-objc-attr-requires-foundation-module -o %t %S/Inputs/AnyObject/foo_swift_module.swift
+// RUN: %target-swift-frontend -emit-module -disable-objc-attr-requires-foundation-module -o %t %S/Inputs/AnyObject/bar_swift_module.swift
 // RUN: cp %S/Inputs/AnyObject/baz_clang_module.h %t
 // RUN: cp %S/Inputs/AnyObject/module.map %t
 
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_FUNC_PARAM_NO_DOT_1 > %t.dl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_FUNC_PARAM_NO_DOT_1 > %t.dl.txt
 // RUN: %FileCheck %s -check-prefix=DL_INSTANCE_NO_DOT < %t.dl.txt
 // RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_FUNC_PARAM_DOT_1 > %t.dl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_FUNC_PARAM_DOT_1 > %t.dl.txt
 // RUN: %FileCheck %s -check-prefix=DL_INSTANCE_DOT < %t.dl.txt
 // RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_VAR_NO_DOT_1 > %t.dl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_VAR_NO_DOT_1 > %t.dl.txt
 // RUN: %FileCheck %s -check-prefix=DL_INSTANCE_NO_DOT < %t.dl.txt
 // RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_VAR_DOT_1 > %t.dl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_VAR_DOT_1 > %t.dl.txt
 // RUN: %FileCheck %s -check-prefix=DL_INSTANCE_DOT < %t.dl.txt
 // RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_RETURN_VAL_NO_DOT_1 > %t.dl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_RETURN_VAL_NO_DOT_1 > %t.dl.txt
 // RUN: %FileCheck %s -check-prefix=DL_INSTANCE_NO_DOT < %t.dl.txt
 // RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_RETURN_VAL_DOT_1 > %t.dl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_RETURN_VAL_DOT_1 > %t.dl.txt
 // RUN: %FileCheck %s -check-prefix=DL_INSTANCE_DOT < %t.dl.txt
 // RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_CALL_RETURN_VAL_NO_DOT_1 > %t.dl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_CALL_RETURN_VAL_NO_DOT_1 > %t.dl.txt
 // RUN: %FileCheck %s -check-prefix=TLOC_MEMBERS_NO_DOT < %t.dl.txt
 // RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_CALL_RETURN_VAL_DOT_1 > %t.dl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_CALL_RETURN_VAL_DOT_1 > %t.dl.txt
 // RUN: %FileCheck %s -check-prefix=TLOC_MEMBERS_DOT < %t.dl.txt
 // RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_FUNC_NAME_1 > %t.dl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_FUNC_NAME_1 > %t.dl.txt
 // RUN: %FileCheck %s -check-prefix=DL_FUNC_NAME_1 < %t.dl.txt
 // RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_FUNC_NAME_PAREN_1 > %t.dl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_FUNC_NAME_PAREN_1 > %t.dl.txt
 // RUN: %FileCheck %s -check-prefix=DL_FUNC_NAME_PAREN_1 < %t.dl.txt
 // RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_FUNC_NAME_BANG_1 > %t.dl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_FUNC_NAME_BANG_1 > %t.dl.txt
 // RUN: %FileCheck %s -check-prefix=DL_FUNC_NAME_BANG_1 < %t.dl.txt
 // RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_CLASS_NO_DOT_1 > %t.dl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_CLASS_NO_DOT_1 > %t.dl.txt
 // RUN: %FileCheck %s -check-prefix=DL_CLASS_NO_DOT < %t.dl.txt
 // RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_CLASS_DOT_1 > %t.dl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -disable-objc-attr-requires-foundation-module -code-completion-token=DL_CLASS_DOT_1 > %t.dl.txt
 // RUN: %FileCheck %s -check-prefix=DL_CLASS_DOT < %t.dl.txt
 // RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.dl.txt
 
@@ -249,27 +249,27 @@ protocol Bar { func bar() }
 // Blocked by: rdar://15136550 Properties in protocols not implemented
 
 @objc class TopLevelObjcClass {
-  func returnsObjcClass(_ i: Int) -> TopLevelObjcClass {}
+  @objc func returnsObjcClass(_ i: Int) -> TopLevelObjcClass {}
 
-  func topLevelObjcClass_InstanceFunc1() {}
-  class func topLevelObjcClass_ClassFunc1() {}
-  subscript(i: Int8) -> Int {
+  @objc func topLevelObjcClass_InstanceFunc1() {}
+  @objc class func topLevelObjcClass_ClassFunc1() {}
+  @objc subscript(i: Int8) -> Int {
     get {
       return 0
     }
   }
-  var topLevelObjcClass_Property1: Int
+  @objc var topLevelObjcClass_Property1: Int
 }
 
 @objc class TopLevelObjcClass_DuplicateMembers {
-  func topLevelObjcClass_InstanceFunc1() {}
-  class func topLevelObjcClass_ClassFunc1() {}
-  subscript(i: Int8) -> Int {
+  @objc func topLevelObjcClass_InstanceFunc1() {}
+  @objc class func topLevelObjcClass_ClassFunc1() {}
+  @objc subscript(i: Int8) -> Int {
     get {
       return 0
     }
   }
-  var topLevelObjcClass_Property1: Int
+  @objc var topLevelObjcClass_Property1: Int
 }
 
 class TopLevelClass {
@@ -293,10 +293,10 @@ class TopLevelClass {
 }
 
 @objc protocol TopLevelObjcProtocol {
-  func topLevelObjcProtocol_InstanceFunc1()
-  class func topLevelObjcProtocol_ClassFunc1()
-  subscript (i: TopLevelObjcClass) -> Int { get set }
-  var topLevelObjcProtocol_Property1: Int { get set }
+  @objc func topLevelObjcProtocol_InstanceFunc1()
+  @objc class func topLevelObjcProtocol_ClassFunc1()
+  @objc subscript (i: TopLevelObjcClass) -> Int { get set }
+  @objc var topLevelObjcProtocol_Property1: Int { get set }
 }
 
 class ContainerForNestedClass1 {
@@ -336,7 +336,7 @@ struct ContainerForNestedClass2 {
 
 class GenericContainerForNestedClass1<T> {
   class Nested3 {
-    @objc func ERROR1() {}
+    func ERROR1() {}
     func ERROR2() {}
     class func ERROR3() {}
     typealias ERROR = Int
@@ -352,7 +352,7 @@ class GenericContainerForNestedClass1<T> {
 
 struct GenericContainerForNestedClass2<T> {
   class Nested3 {
-    @objc func ERROR1() {}
+    func ERROR1() {}
     func ERROR2() {}
     class func ERROR3() {}
     typealias ERROR = Int
@@ -367,36 +367,36 @@ struct GenericContainerForNestedClass2<T> {
 }
 
 @objc class Base1 {
-  func base1_InstanceFunc1() {}
+  @objc func base1_InstanceFunc1() {}
 
-  func base1_InstanceFunc2(_ a: Derived) {}
+  @objc func base1_InstanceFunc2(_ a: Derived) {}
 
-  func base1_InstanceFunc3(_ a: Derived) {}
+  @objc func base1_InstanceFunc3(_ a: Derived) {}
 
-  func base1_InstanceFunc4() -> Base {}
+  @objc func base1_InstanceFunc4() -> Base {}
 
-  var base1_Property1: Int
+  @objc var base1_Property1: Int
 
-  var base1_Property2: Base
+  @objc var base1_Property2: Base
 }
 
 @objc class Derived1 : Base1 {
-  func base1_InstanceFunc1() {}
+  @objc func base1_InstanceFunc1() {}
 
-  func base1_InstanceFunc2(_ a: Derived) {}
+  @objc func base1_InstanceFunc2(_ a: Derived) {}
 
-  func base1_InstanceFunc3(_ a: Base) {}
+  @objc func base1_InstanceFunc3(_ a: Base) {}
 
-  func base1_InstanceFunc4() -> Derived {}
+  @objc func base1_InstanceFunc4() -> Derived {}
 
-  var base1_Property1: Int {
+  @objc var base1_Property1: Int {
     get {
       return 0
     }
     set {}
   }
 
-  var base1_Property2: Derived {
+  @objc var base1_Property2: Derived {
     get {
       return Derived()
     }

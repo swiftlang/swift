@@ -24,9 +24,14 @@ CHANGELOG
 Swift 5.0
 ---------
 
-- [SR-419][]
+* Notable bug fix: unowned and unowned(unsafe) variables now support optional
+  types.
 
-  In Swift 5 mode, when setting a property from within its own `didSet` or `willSet` observer, the observer will now only avoid being recursively called if the property is set on `self` (either implicitly or explicitly).
+* [SR-419][]
+
+  In Swift 5 mode, when setting a property from within its own `didSet` or
+  `willSet` observer, the observer will now only avoid being recursively called
+  if the property is set on `self` (either implicitly or explicitly).
 
   For example:
   ```swift
@@ -225,11 +230,10 @@ Swift 4.2
 * [SE-0143][]
 
   The standard library types `Optional`, `Array`, `ArraySlice`,
-  `ContiguousArray`, `Dictionary`, `DictionaryLiteral`, `Range`, and
-  `ClosedRange` now conform to the `Hashable` protocol when their element or
-  bound types (as the case may be) conform to `Hashable`.  This makes
-  synthesized `Hashable` implementations available for types that include stored
-  properties of these types.
+  `ContiguousArray`, `Dictionary`, `Range`, and `ClosedRange` now conform to the
+  `Hashable` protocol when their element or bound types (as the case may be)
+  conform to `Hashable`.  This makes synthesized `Hashable` implementations
+  available for types that include stored properties of these types.
 
 * [SE-0196][]
   

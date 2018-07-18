@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -558,16 +558,6 @@ public:
         }
         return;
       }
-
-      // Require an access kind to be set on every l-value expression.
-      // Note that the empty tuple type is assignable but usually isn't
-      // an l-value, so we have to be conservative there.
-      if (E->getType()->hasLValueType() != E->hasLValueAccessKind() &&
-          !(E->hasLValueAccessKind() && E->getType()->isAssignableType())) {
-        Out << "l-value expression does not have l-value access kind set\n";
-        E->print(Out);
-        abort();
-      }
     }
     void verifyChecked(Stmt *S) {}
     void verifyChecked(Pattern *P) { }
@@ -934,6 +924,7 @@ public:
     void verifyChecked(DeferStmt *S) {
       auto FT = S->getTempDecl()->getInterfaceType()->castTo<AnyFunctionType>();
       assert(FT->isNoEscape() && "Defer statements must not escape");
+      (void)FT;
       verifyCheckedBase(S);
     }
 
@@ -1251,7 +1242,7 @@ public:
       }
 
       auto layout = srcTy->getExistentialLayout();
-      if (layout.superclass ||
+      if (layout.explicitSuperclass ||
           !layout.isObjC() ||
           layout.getProtocols().size() != 1) {
         Out << "ProtocolMetatypeToObject with non-ObjC-protocol metatype:\n";
@@ -1478,7 +1469,9 @@ public:
           }
         };
 
-        // These outer entities will be interleaved in multi-level optionals.
+        // FIXME: This doesn't seem like a particularly robust
+        //        approach to tracking whether pointer conversions
+        //        always appear as call arguments.
         while (true) {
           // Look through optional evaluations.
           if (auto *optionalEval = dyn_cast<OptionalEvaluationExpr>(subExpr)) {
@@ -1490,6 +1483,17 @@ public:
           // Look through injections into Optional<Pointer>.
           if (auto *injectIntoOpt = dyn_cast<InjectIntoOptionalExpr>(subExpr)) {
             subExpr = injectIntoOpt->getSubExpr();
+            continue;
+          }
+
+          // FIXME: This is only handling the value conversion, not
+          //        the key conversion. What this verifier check
+          //        should probably do is just track whether we're
+          //        currently visiting arguments of an apply when we
+          //        find these conversions.
+          if (auto *upcast =
+                  dyn_cast<CollectionUpcastConversionExpr>(subExpr)) {
+            subExpr = upcast->getValueConversion().Conversion;
             continue;
           }
 
@@ -1624,7 +1628,7 @@ public:
       if (auto *baseIOT = E->getBase()->getType()->getAs<InOutType>()) {
         if (!baseIOT->getObjectType()->is<ArchetypeType>()) {
           auto *VD = dyn_cast<VarDecl>(E->getMember().getDecl());
-          if (!VD || !VD->hasAccessorFunctions()) {
+          if (!VD || VD->getAllAccessors().empty()) {
             Out << "member_ref_expr on value of inout type\n";
             E->dump(Out);
             abort();
@@ -1756,7 +1760,6 @@ public:
         Out << "Unexpected types in IdentityExpr\n";
         abort();
       }
-      checkSameLValueAccessKind(E, E->getSubExpr(), "IdentityExpr");
 
       verifyCheckedBase(E);
     }
@@ -2091,6 +2094,19 @@ public:
       abort();
     }
 
+    void verifyChecked(LoadExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying LoadExpr", E);
+
+      auto *subExpr = E->getSubExpr();
+      if (isa<ParenExpr>(subExpr) || isa<ForceValueExpr>(subExpr)) {
+        Out << "Immediate ParenExpr/ForceValueExpr should preceed a LoadExpr\n";
+        E->dump(Out);
+        abort();
+      }
+
+      verifyCheckedBase(E);
+    }
+
     static bool hasEnclosingFunctionContext(DeclContext *dc) {
       switch (dc->getContextKind()) {
       case DeclContextKind::AbstractClosureExpr:
@@ -2151,6 +2167,13 @@ public:
       verifyCheckedBase(VD);
     }
 
+    bool shouldWalkIntoLazyInitializers() override {
+      // We don't want to walk into lazy initializers because they should
+      // have been reparented to their synthesized getter, which will
+      // invalidate various invariants.
+      return false;
+    }
+
     void verifyChecked(PatternBindingDecl *binding) {
       // Look at all of the VarDecls being bound.
       for (auto entry : binding->getPatternList())
@@ -2194,20 +2217,18 @@ public:
           abort();
         }
       }
-      if (ASD->hasAddressors()) {
-        if (auto addressor = ASD->getAddressor()) {
-          if (addressor->isMutating() != ASD->isGetterMutating()) {
-            Out << "AbstractStorageDecl::isGetterMutating is out of sync"
-                   " with whether immutable addressor is mutating";
-            abort();
-          }
+      if (auto addressor = ASD->getAddressor()) {
+        if (addressor->isMutating() != ASD->isGetterMutating()) {
+          Out << "AbstractStorageDecl::isGetterMutating is out of sync"
+                 " with whether immutable addressor is mutating";
+          abort();
         }
-        if (auto addressor = ASD->getMutableAddressor()) {
-          if (addressor->isMutating() != ASD->isSetterMutating()) {
-            Out << "AbstractStorageDecl::isSetterMutating is out of sync"
-                   " with whether mutable addressor is mutating";
-            abort();
-          }
+      }
+      if (auto addressor = ASD->getMutableAddressor()) {
+        if (addressor->isMutating() != ASD->isSetterMutating()) {
+          Out << "AbstractStorageDecl::isSetterMutating is out of sync"
+                 " with whether mutable addressor is mutating";
+          abort();
         }
       }
 
@@ -2958,8 +2979,7 @@ public:
         }
       }
 
-      auto storedAccessor =
-        storageDecl->getAccessorFunction(FD->getAccessorKind());
+      auto storedAccessor = storageDecl->getAccessor(FD->getAccessorKind());
       if (storedAccessor != FD) {
         Out << "storage declaration has different accessor for this kind\n";
         abort();
@@ -3129,15 +3149,6 @@ public:
       T.print(Out);
       Out << "\n";
       abort();
-    }
-
-    void checkSameLValueAccessKind(Expr *LHS, Expr *RHS, const char *what) {
-      if (LHS->hasLValueAccessKind() != RHS->hasLValueAccessKind() ||
-          (LHS->hasLValueAccessKind() &&
-           LHS->getLValueAccessKind() != RHS->getLValueAccessKind())) {
-        Out << what << " has a mismatched l-value access kind\n";
-        abort();
-      }
     }
 
     // Verification utilities.

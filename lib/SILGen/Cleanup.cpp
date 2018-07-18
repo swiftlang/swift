@@ -56,7 +56,7 @@ void CleanupManager::popTopDeadCleanups(CleanupsDepth end) {
 }
 
 void CleanupManager::emitCleanups(CleanupsDepth depth, CleanupLocation loc,
-                                  bool popCleanups) {
+                                  ForUnwind_t forUnwind, bool popCleanups) {
   auto begin = stack.stable_begin();
   while (begin != depth) {
     auto iter = stack.find(begin);
@@ -76,7 +76,7 @@ void CleanupManager::emitCleanups(CleanupsDepth depth, CleanupLocation loc,
       stack.pop();
 
     if (cleanup.isActive() && SGF.B.hasValidInsertionPoint())
-      cleanup.emit(SGF, loc);
+      cleanup.emit(SGF, loc, forUnwind);
 
     stack.checkIterator(begin);
   }
@@ -95,7 +95,7 @@ void CleanupManager::endScope(CleanupsDepth depth, CleanupLocation loc) {
   
   // Iteratively mark cleanups dead and pop them.
   // Maybe we'd get better results if we marked them all dead in one shot?
-  emitCleanups(depth, loc);
+  emitCleanups(depth, loc, NotForUnwind);
 }
 
 bool CleanupManager::hasAnyActiveCleanups(CleanupsDepth from,
@@ -111,11 +111,12 @@ bool CleanupManager::hasAnyActiveCleanups(CleanupsDepth from) {
 /// threading out through any cleanups we might need to run.  This does not
 /// pop the cleanup stack.
 void CleanupManager::emitBranchAndCleanups(JumpDest dest, SILLocation branchLoc,
-                                           ArrayRef<SILValue> args) {
+                                           ArrayRef<SILValue> args,
+                                           ForUnwind_t forUnwind) {
   SILGenBuilder &builder = SGF.getBuilder();
   assert(builder.hasValidInsertionPoint() && "Emitting branch in invalid spot");
   emitCleanups(dest.getDepth(), dest.getCleanupLocation(),
-               /*popCleanups=*/false);
+               forUnwind, /*popCleanups=*/false);
   builder.createBranch(branchLoc, dest.getBlock(), args);
 }
 
@@ -123,7 +124,7 @@ void CleanupManager::emitCleanupsForReturn(CleanupLocation loc) {
   SILGenBuilder &builder = SGF.getBuilder();
   assert(builder.hasValidInsertionPoint() && "Emitting return in invalid spot");
   (void)builder;
-  emitCleanups(stack.stable_end(), loc, /*popCleanups=*/false);
+  emitCleanups(stack.stable_end(), loc, NotForUnwind, /*popCleanups=*/false);
 }
 
 /// Emit a new block that jumps to the specified location and runs necessary
@@ -131,7 +132,8 @@ void CleanupManager::emitCleanupsForReturn(CleanupLocation loc) {
 /// returns the dest block.
 SILBasicBlock *CleanupManager::emitBlockForCleanups(JumpDest dest,
                                                     SILLocation branchLoc,
-                                                    ArrayRef<SILValue> args) {
+                                                    ArrayRef<SILValue> args,
+                                                    ForUnwind_t forUnwind) {
   // If there are no cleanups to run, just return the Dest block directly.
   if (!hasAnyActiveCleanups(dest.getDepth()))
     return dest.getBlock();
@@ -139,7 +141,7 @@ SILBasicBlock *CleanupManager::emitBlockForCleanups(JumpDest dest,
   // Otherwise, create and emit a new block.
   auto *newBlock = SGF.createBasicBlock();
   SILGenSavedInsertionPoint IPRAII(SGF, newBlock);
-  emitBranchAndCleanups(dest, branchLoc, args);
+  emitBranchAndCleanups(dest, branchLoc, args, forUnwind);
   return newBlock;
 }
 

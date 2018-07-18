@@ -3525,9 +3525,17 @@ bool SimplifyCFG::simplifyProgramTerminationBlock(SILBasicBlock *BB) {
     // The type being operated on might contain weak references,
     // or other side references - We'll corrupt the weak reference table
     // if we fail to release the old value.
-    if (!isa<StrongReleaseInst>(I) && !isa<UnownedReleaseInst>(I) && 
-        !isa<ReleaseValueInst>(I) && !isa<DestroyAddrInst>(I))
+    switch (I.getKind()) {
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+    case SILInstructionKind::Name##ReleaseInst:
+#include "swift/AST/ReferenceStorage.def"
+    case SILInstructionKind::StrongReleaseInst:
+    case SILInstructionKind::ReleaseValueInst:
+    case SILInstructionKind::DestroyAddrInst:
+      break;
+    default:
       continue;
+    }
     InstsToRemove.insert(&I);
   }
 
