@@ -4405,12 +4405,10 @@ simplifyDynamicCallableApplicableFnConstraint(
   // keyword arguments method.
   bool useKwargsMethod = methods.argumentsMethod == nullptr;
   if (!useKwargsMethod) {
-    for (auto param : func1->getParams()) {
-      if (param.hasLabel()) {
-        useKwargsMethod = true;
-        break;
-      }
-    }
+    useKwargsMethod = llvm::find_if(func1->getParams(),
+        [](AnyFunctionType::Param param) {
+            return param.hasLabel();
+        });
   }
 
   auto method = useKwargsMethod
