@@ -280,6 +280,10 @@ public:
   LLVM_READONLY
   bool isExtensionContext() const; // see swift/AST/Decl.h
 
+  /// \brief Determine whether this is a constrained protocol extension context.
+  LLVM_READONLY
+  bool isConstrainedProtocolExtensionContext() const;
+
   /// If this DeclContext is a NominalType declaration or an
   /// extension thereof, return the NominalTypeDecl.
   LLVM_READONLY

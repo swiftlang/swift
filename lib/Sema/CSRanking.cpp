@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "ConstraintSystem.h"
+#include "swift/AST/DeclContext.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ParameterList.h"
@@ -445,8 +446,22 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
           return better1;
         }
       } else if (inProtocolExtension1 || inProtocolExtension2) {
-        // One member is in a protocol extension, the other is in a concrete type.
-        // Prefer the member in the concrete type.
+        // If we are comparing declaration on protocol to
+        // declaration in constrained protocol extension,
+        // let's always prefer the one from extension as more
+        // "specialized" because static dispatch is preferable in that case.
+        if (inProtocolExtension1 &&
+            outerDC2->getAsProtocolOrProtocolExtensionContext()) {
+          return outerDC1->isConstrainedProtocolExtensionContext();
+        }
+
+        if (inProtocolExtension2 &&
+            outerDC1->getAsProtocolOrProtocolExtensionContext()) {
+          return !outerDC2->isConstrainedProtocolExtensionContext();
+        }
+
+        // One member is in a protocol extension, the other
+        // is in a concrete type. Prefer the member in the concrete type.
         return inProtocolExtension2;
       }
 

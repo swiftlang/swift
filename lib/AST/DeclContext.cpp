@@ -101,6 +101,15 @@ ProtocolDecl *DeclContext::getAsProtocolOrProtocolExtensionContext() const {
   return dyn_cast_or_null<ProtocolDecl>(getAsTypeOrTypeExtensionContext());
 }
 
+bool DeclContext::isConstrainedProtocolExtensionContext() const {
+  if (auto *decl = const_cast<Decl *>(getAsDeclOrDeclExtensionContext()))
+    if (auto *ED = dyn_cast<ExtensionDecl>(decl))
+      if (auto type = ED->getExtendedType())
+        return ED->isConstrainedExtension() &&
+               isa<ProtocolDecl>(type->getAnyNominal());
+  return false;
+}
+
 ProtocolDecl *DeclContext::getAsProtocolExtensionContext() const {
   if (auto decl = const_cast<Decl*>(getAsDeclOrDeclExtensionContext()))
     if (auto ED = dyn_cast<ExtensionDecl>(decl))
