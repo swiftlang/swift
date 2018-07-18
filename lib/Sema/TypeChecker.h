@@ -1046,7 +1046,6 @@ public:
   /// to be in a correct and valid form.
   ///
   /// \param type The generic type to which to apply arguments.
-  /// \param decl The declaration of the type.
   /// \param loc The source location for diagnostic reporting.
   /// \param dc The context where the arguments are applied.
   /// \param generic The arguments to apply with the angle bracket range for
@@ -1058,7 +1057,7 @@ public:
   /// error.
   ///
   /// \see applyUnboundGenericArguments
-  Type applyGenericArguments(Type type, TypeDecl *decl, SourceLoc loc,
+  Type applyGenericArguments(Type type, SourceLoc loc,
                              DeclContext *dc, GenericIdentTypeRepr *generic,
                              TypeResolutionOptions options,
                              GenericTypeResolver *resolver);

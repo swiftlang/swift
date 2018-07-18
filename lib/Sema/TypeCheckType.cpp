@@ -341,7 +341,7 @@ static bool isPointerToVoid(ASTContext &Ctx, Type Ty, bool &IsMutable) {
   return BGT->getGenericArgs().front()->isVoid();
 }
 
-Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
+Type TypeChecker::applyGenericArguments(Type type,
                                         SourceLoc loc, DeclContext *dc,
                                         GenericIdentTypeRepr *generic,
                                         TypeResolutionOptions options,
@@ -355,10 +355,7 @@ Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
   }
 
   // We must either have an unbound generic type, or a generic type alias.
-  if (!type->is<UnboundGenericType>() &&
-      !(isa<TypeAliasDecl>(decl) &&
-        cast<TypeAliasDecl>(decl)->getGenericParams())) {
-
+  if (!type->is<UnboundGenericType>()) {
     auto diag = diagnose(loc, diag::not_a_generic_type, type);
 
     // Don't add fixit on module type; that isn't the right type regardless
@@ -376,24 +373,7 @@ Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
   }
 
   auto *unboundType = type->castTo<UnboundGenericType>();
-
-  // If we have a non-generic type alias, we have an unbound generic type.
-  // Grab the decl from the unbound generic type.
-  //
-  // The idea is if you write:
-  //
-  // typealias Foo = Bar.Baz
-  //
-  // Then 'Foo<Int>' applies arguments to Bar.Baz, whereas if you write:
-  //
-  // typealias Foo<T> = Bar.Baz<T>
-  //
-  // Then 'Foo<Int>' applies arguments to Foo itself.
-  //
-  if (isa<TypeAliasDecl>(decl) &&
-      !cast<TypeAliasDecl>(decl)->getGenericParams()) {
-    decl = unboundType->getDecl();
-  }
+  auto *decl = unboundType->getDecl();
 
   // Make sure we have the right number of generic arguments.
   // FIXME: If we have fewer arguments than we need, that might be okay, if
@@ -692,7 +672,7 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
 
   if (generic && !options.contains(TypeResolutionFlags::ResolveStructure)) {
     // Apply the generic arguments to the type.
-    type = TC.applyGenericArguments(type, typeDecl, loc, fromDC, generic,
+    type = TC.applyGenericArguments(type, loc, fromDC, generic,
                                     options, resolver);
     if (!type)
       return nullptr;
@@ -1197,7 +1177,7 @@ static Type resolveNestedIdentTypeComponent(
     // If there are generic arguments, apply them now.
     if (!options.contains(TypeResolutionFlags::ResolveStructure)) {
       if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp)) {
-        return TC.applyGenericArguments(memberType, member, comp->getIdLoc(),
+        return TC.applyGenericArguments(memberType, comp->getIdLoc(),
                                         DC, genComp, options, resolver);
       }
     }
