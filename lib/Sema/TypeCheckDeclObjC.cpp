@@ -1258,7 +1258,7 @@ static void markAsObjC(ValueDecl *D, ObjCReason reason,
 bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
   auto dc = VD->getDeclContext();
   Optional<ObjCReason> isObjC;
-  if (dc->getAsClassOrClassExtensionContext()) {
+  if (dc->getAsClassOrClassExtensionContext() && !isa<TypeDecl>(VD)) {
     // Members of classes can be @objc.
     isObjC = shouldMarkAsObjC(VD, isa<ConstructorDecl>(VD));
   }
