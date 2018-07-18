@@ -2356,18 +2356,6 @@ public:
   /// \sa hasOpenAccess
   AccessLevel getFormalAccess() const;
 
-  /// If this declaration is a member of a protocol extension, return the
-  /// minimum of the given access level and the protocol's access level.
-  ///
-  /// Otherwise, return the given access level unmodified.
-  ///
-  /// This is used when checking name lookup visibility. Protocol extension
-  /// members can be found when performing name lookup on a concrete type;
-  /// if the concrete type is visible from the lookup context but the
-  /// protocol is not, we do not want the protocol extension members to be
-  /// visible.
-  AccessLevel adjustAccessLevelForProtocolExtension(AccessLevel access) const;
-
   /// Determine whether this Decl has either Private or FilePrivate access,
   /// and its DeclContext does not.
   bool isOutermostPrivateOrFilePrivateScope() const;

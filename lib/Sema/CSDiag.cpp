@@ -1662,8 +1662,7 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
       // clamp the formal access for diagnostics purposes to the formal access
       // of the protocol itself.
       diagnose(nameLoc, diag::candidate_inaccessible, decl->getBaseName(),
-               decl->adjustAccessLevelForProtocolExtension(
-                 decl->getFormalAccess()));
+               decl->getFormalAccessScope().accessLevelForDiagnostics());
       for (auto cand : result.UnviableCandidates)
         diagnose(cand.first.getDecl(), diag::decl_declared_here, memberName);
         

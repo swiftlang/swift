@@ -1520,9 +1520,9 @@ void ClassDecl::recordObjCMethod(AbstractFunctionDecl *method) {
   vec.push_back(method);
 }
 
-AccessLevel
-ValueDecl::adjustAccessLevelForProtocolExtension(AccessLevel access) const {
-  if (auto *ext = dyn_cast<ExtensionDecl>(getDeclContext())) {
+static AccessLevel
+adjustAccessLevelForProtocolExtension(const ValueDecl *VD, AccessLevel access) {
+  if (auto *ext = dyn_cast<ExtensionDecl>(VD->getDeclContext())) {
     if (auto *protocol = ext->getAsProtocolOrProtocolExtensionContext()) {
       // Note: it gets worse. The standard library has public methods
       // in protocol extensions of a @usableFromInline internal protocol,
@@ -1549,7 +1549,7 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
   auto *sourceDC = VD->getDeclContext();
 
   if (!forConformance)
-    access = VD->adjustAccessLevelForProtocolExtension(access);
+    access = adjustAccessLevelForProtocolExtension(VD, access);
 
   switch (access) {
   case AccessLevel::Private:
