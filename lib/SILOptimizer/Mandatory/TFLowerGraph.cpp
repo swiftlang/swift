@@ -808,11 +808,6 @@ static TF_Tensor *convertValuesToTensor(ArrayRef<APInt> elts,
   auto *ptr = (char *)TF_TensorData(tensor);
 
   for (auto elt : elts) {
-    if (dtype == TF_BOOL) {
-      // Swift/LLVM uses a 1-bit APInt to represent a bool, but TF_BOOL is 1
-      // byte or more.
-      elt = elt.zext(dtypeSize * 8);
-    }
     assert(elt.getBitWidth() == dtypeSize * 8);
     memcpy(ptr, elt.getRawData(), dtypeSize);
     ptr += dtypeSize;
@@ -1810,18 +1805,73 @@ GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
         break;
       }
       case SymbolicValue::Array: {
-        if (isShapeArrayPseudoAttr(name, attrValue)) {
-          // SHAPE_ARRAY_ATTR is a pseudo-attribute used by the compiler's
-          // partitioning and graph lowering passes to propagate shape info for
-          // XLA compilation (e.g. feed shape info to infeed / outfeed ops), and
-          // will not be lowered into this graph op itself.
+        // SHAPE_ARRAY_ATTR is a pseudo-attribute used by the compiler's
+        // partitioning and graph lowering passes to propagate shape info for
+        // XLA compilation (e.g. feed shape info to infeed / outfeed ops), and
+        // will not be lowered into this graph op itself.
+        if (isShapeArrayPseudoAttr(name, attrValue))
           break;
-        } else {
-          // FIXME: Handle array attributes.
-          internalError(getUserSourceLocation(inst->getDebugLocation()),
-                        "FIXME: Handle array attributes");
-          return GLStatus::Error;
+
+        CanType elementType;
+        auto rawElements = attrValue.getArrayValue(elementType);
+        SmallVector<SymbolicValue, 4> elements;
+        elements.reserve(rawElements.size());
+        for (auto elt : rawElements)
+          elements.push_back(elt.lookThroughSingleElementAggregates());
+
+        auto elementTypeString = elementType->getString();
+
+        // TODO: TF_SetAttrTypeList
+
+        if (elementTypeString == "String") {
+          SmallVector<const void*, 4> pointers;
+          SmallVector<size_t, 4> sizes;
+          pointers.reserve(elements.size());
+          sizes.reserve(elements.size());
+          for (auto elt : elements) {
+            auto bytes = elt.getStringValue();
+            pointers.push_back(bytes.data());
+            sizes.push_back(bytes.size());
+          }
+          TF_SetAttrStringList(op, name.c_str(), pointers.data(), sizes.data(),
+                               elements.size());
+          break;
         }
+        if (StringRef(elementTypeString).startswith("Int")) {
+          SmallVector<int64_t, 4> values;
+          values.reserve(elements.size());
+          for (auto elt : elements)
+            values.push_back(elt.getIntegerValue().getLimitedValue());
+          TF_SetAttrIntList(op, name.c_str(), values.data(), values.size());
+          break;
+        }
+        if (elementTypeString == "Float" || elementTypeString == "Double") {
+          SmallVector<float, 4> values;
+          values.reserve(elements.size());
+          for (auto elt : elements) {
+            auto value = elt.getFloatValue();
+            // TensorFlow only supports float32 attributes, and isn't designed
+            // for high precision, so we force truncate down.
+            bool losesInfo = false;
+            value.convert(APFloat::IEEEsingle(), APFloat::rmNearestTiesToEven,
+                          &losesInfo);
+            values.push_back(value.convertToFloat());
+          }
+          TF_SetAttrFloatList(op, name.c_str(), values.data(), values.size());
+          break;
+        }
+        if (elementTypeString == "Bool") {
+          SmallVector<unsigned char, 4> values;
+          values.reserve(elements.size());
+          for (auto elt : elements)
+            values.push_back(elt.getIntegerValue().getLimitedValue() != 0);
+          TF_SetAttrBoolList(op, name.c_str(), values.data(), values.size());
+          break;
+        }
+
+        internalError(getUserSourceLocation(inst->getDebugLocation()),
+                      "unknown array attribute");
+        return GLStatus::Error;
       }
       }
       // Done with normal attributes.
@@ -1837,42 +1887,71 @@ GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
         inst->dump();
         llvm_unreachable("dtype attr must have been processed!");
       }
-      // Tensor can support two cases: an array case (not yet implemented), and
-      // a scalar case.
-      SmallVector<APInt, 4> elements;
-      SmallVector<int64_t, 4> shape;
+      auto dtype = (TF_DataType)dtypeAttr;
+      auto dtypeSize = TF_DataTypeSize(dtype);
 
-      // The scalar case is very simple, the shape of a scalar is 0d, and the
-      // data type comes from an attr that should already be processed.
-      auto addScalar = [&](SymbolicValue value) {
+      // Add a scalar to the elements list, checking that it is the right size
+      // for our dtype, and adjusting for a couple of special cases we
+      // intentionally support.
+      auto addScalar = [&](SymbolicValue value,
+                           SmallVectorImpl<APInt> &elements) -> bool {
         value = value.lookThroughSingleElementAggregates();
 
         if (value.getKind() == SymbolicValue::Integer) {
           auto intVal = value.getIntegerValue();
+
+          // Swift.Bool is represented as a 1-bit value, but TF_BOOL is 1 byte
+          // or more.
+          if (dtype == TF_BOOL)
+            intVal = intVal.zext(dtypeSize * 8);
           elements.push_back(intVal);
         } else {
           assert(value.getKind() == SymbolicValue::Float);
-          auto castedIntVal = value.getFloatValue().bitcastToAPInt();
-          elements.push_back(castedIntVal);
+          auto floatValue = value.getFloatValue();
+          bool losesInfo = false;
+          // Convert to float if necessary.
+          if (dtype == TF_FLOAT)
+            floatValue.convert(APFloat::IEEEsingle(),
+                               APFloat::rmNearestTiesToEven, &losesInfo);
+          elements.push_back(floatValue.bitcastToAPInt());
         }
+
+        // Sanity check that the user provided the right size types for this
+        // dtype.  This will produce an error if they attempt to use an array
+        // of int64's with TF_INT16 for example.
+        if (elements.back().getBitWidth() != dtypeSize * 8) {
+          internalError(inst->getLoc(),
+                        "invalid element type for tensor dtype");
+          return true;
+        }
+
+        return false;
       };
 
+      // Tensor can support two cases: an array case, and a scalar case.
+      SmallVector<APInt, 4> elements;
+
+      // The scalar case is very simple, the shape of a scalar is 0d, and the
+      // data type comes from an attr that should already be processed.
+      SmallVector<int64_t, 4> shape;
       if (attrValue.getKind() == SymbolicValue::Integer ||
           attrValue.getKind() == SymbolicValue::Float) {
-        addScalar(attrValue);
+        if (addScalar(attrValue, elements))
+          return GLStatus::Error;
       } else {
         // Add all the elements to the elements list.
         CanType eltType;
-        for (auto elt : attrValue.getArrayValue(eltType))
-          addScalar(elt);
+        for (auto elt : attrValue.getArrayValue(eltType)) {
+          if (addScalar(elt, elements))
+            return GLStatus::Error;
+        }
 
         // Decode the shape attribute which must come next.
         auto shapeAttr = inst->getAttribute(nextAttributeNumber++).value;
         decodeShapeAttr(shapeAttr, shape);
       }
       // Set the tensor as the attribute on the graph node.
-      auto tensor =
-          convertValuesToTensor(elements, shape, (TF_DataType)dtypeAttr);
+      auto tensor = convertValuesToTensor(elements, shape, dtype);
       TF_SetAttrTensor(op, name.c_str(), tensor, status);
       TF_DeleteTensor(tensor);
       if (checkStatus(inst->getLoc()))
@@ -1887,22 +1966,17 @@ GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
     }
 
     case SILTensorOpInfo::OperandClass::ShapeArray:
-      if (isShapeArrayPseudoAttr(name, attrValue)) {
-        // SHAPE_ARRAY_ATTR is a pseudo-attribute used by the compiler's
-        // partitioning and graph lowering passes to propagate shape info for
-        // XLA compilation (e.g. feed shape info to infeed / outfeed ops), and
-        // will not be lowered into this graph op itself.
+      // SHAPE_ARRAY_ATTR is a pseudo-attribute used by the compiler's
+      // partitioning and graph lowering passes to propagate shape info for
+      // XLA compilation (e.g. feed shape info to infeed / outfeed ops), and
+      // will not be lowered into this graph op itself.
+      if (isShapeArrayPseudoAttr(name, attrValue))
         break;
-      } else {
-        llvm_unreachable("FIXME: These operand classes are not yet handled");
-      }
-    case SILTensorOpInfo::OperandClass::Array:
-      // TODO: TF_SetAttrTypeList, TF_SetAttrStringList, TF_SetAttrIntList,
-      // TF_SetAttrFloatList, TF_SetAttrBoolList
       internalError(getUserSourceLocation(inst->getDebugLocation()),
-                    "FIXME: Handle array and shapearray attributes");
+                    "FIXME: Handle shapearray attributes");
       return GLStatus::Error;
 
+    case SILTensorOpInfo::OperandClass::Array:      // Handled as 'normal'
     case SILTensorOpInfo::OperandClass::ArrayElement:
       llvm_unreachable("This is a legacy class that shouldn't happen");
     }

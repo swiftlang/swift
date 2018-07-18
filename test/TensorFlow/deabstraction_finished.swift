@@ -129,7 +129,6 @@ public func test75407624() {
 
 
 public func testConvolution(x: Tensor<Float>, filter: Tensor<Float>) -> Tensor<Float> {
-  // expected-error @+1 {{FIXME: Handle array attributes}}
   return x.toAccelerator().convolved2D(withFilter: filter.toAccelerator(),
                                        strides: (1, 2, 3, 4), padding: .same)
 }
