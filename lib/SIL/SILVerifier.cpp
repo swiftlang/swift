@@ -1210,7 +1210,7 @@ public:
   void checkGradientInst(GradientInst *GI) {
     CanSILFunctionType origFnTy = GI->getOriginalType();
     require(origFnTy, "Original function value must have function type");
-    auto config = GI->getConfiguration();
+    auto config = GI->getConfig();
     require(config.getSourceIndex() < origFnTy->getNumResults(),
             "Differentiation source index out of bounds");
     llvm::SmallBitVector paramIndices = config.getParameterIndices();

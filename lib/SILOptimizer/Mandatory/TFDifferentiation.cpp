@@ -22,162 +22,500 @@
 #define DEBUG_TYPE "differentiation"
 
 #include "swift/AST/AutoDiff.h"
+#include "swift/AST/Builtins.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
-#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/Basic/Defer.h"
-#include "swift/SIL/AbstractionPattern.h"
-#include "swift/SIL/Dominance.h"
 #include "swift/SIL/FormalLinkage.h"
+#include "swift/SIL/LoopInfo.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
-#include "swift/SIL/TypeLowering.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/LoopUtils.h"
 #include "swift/Serialization/SerializedSILLoader.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/Hashing.h"
+#include "swift/SILOptimizer/Utils/Local.h"
+#include "llvm/ADT/BreadthFirstIterator.h"
 #include "llvm/ADT/DenseSet.h"
-#include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/StringExtras.h"
-#include "llvm/ADT/StringSwitch.h"
-#include "llvm/ADT/TinyPtrVector.h"
 
 using namespace swift;
 using llvm::DenseMap;
 using llvm::SmallDenseSet;
+using llvm::SmallDenseMap;
+using llvm::SmallSet;
 
 //===----------------------------------------------------------------------===//
-// Local helper declarations
+// Helpers
 //===----------------------------------------------------------------------===//
 
-static inline llvm::raw_ostream &getDebugStream();
-static NominalTypeDecl *getStdlibTypeDecl(StringRef, ASTContext &);
-static std::string mangleADIndices(SILReverseAutoDiffIndices);
-static std::string mangleADConfig(const SILReverseAutoDiffConfiguration &);
-static SILFunction *lookupOrLinkFunction(StringRef name, SILModule &);
-static FuncDecl *lookupAssociativeOperatorDeclInProtocol(DeclName operatorName,
-                                                         ProtocolDecl *);
-static void collectAllFormalResultsInTypeOrder(SILFunction &,
-                                               SmallVectorImpl<SILValue> &);
+/// Prints an "[AD] " prefix to `llvm::dbgs()` and returns the debug stream.
+/// This is being used to print short debug messages with the AD pass.
+static raw_ostream &getADDebugStream() {
+  return llvm::dbgs() << "[AD] ";
+}
+
+/// Given a dumpable value, dumps it to `llvm::dbgs()`.
+template<typename T>
+static inline void debugDump(T &v) {
+  DEBUG(llvm::dbgs() << "\n==== BEGIN DEBUG DUMP ====\n" << v <<
+        "\n==== END DEBUG DUMP ====\n");
+}
+
+/// Given a set of AD indices, mangles it into a textual form.
+static std::string mangleADIndices(const SILReverseAutoDiffIndices &indices) {
+  std::string result = "src_" + llvm::utostr(indices.source) + "_wrt_";
+  interleave(indices.parameters.set_bits(),
+             [&](unsigned idx) { result += llvm::utostr(idx); },
+             [&]{ result += '_'; });
+  return result;
+}
+
+/// Mangles an AD configuration. The mangling rule looks like
+///   "grad_src_<src_idx>_wrt_<param_idx0>_<param_idx1>_..._<options>"
+/// ... where options mangle as the following:
+///   "_s" : seedable
+///   "_p" : preserving_result
+///   "_d" : delayed
+static std::string mangleADConfig(
+    const SILReverseAutoDiffConfig &config) {
+  std::string result = "grad_" + mangleADIndices(config.indices);
+  if (config.isSeedable())
+    result += "_s";
+  if (config.isPreservingResult())
+    result += "_p";
+  if (config.isDelayed())
+    result += "_d";
+  return result;
+}
+
+/// Creates arguments in the entry block based on the function type.
+static void createEntryArguments(SILFunction *f) {
+  auto *entry = f->getEntryBlock();
+  auto conv = f->getConventions();
+  assert((entry->getNumArguments() == 0 || conv.getNumSILArguments() == 0) &&
+         "Entry already has arguments?!");
+  for (auto indResultTy : conv.getIndirectSILResultTypes())
+    entry->createFunctionArgument(indResultTy.getAddressType());
+  for (auto paramTy : conv.getParameterSILTypes())
+    entry->createFunctionArgument(paramTy);
+}
+
+/// Looks up a function in the current module. If it exists, returns it.
+/// Otherwise, attempt to link it from imported modules. Returns null if such
+/// function name does not exist.
+static SILFunction *lookupOrLinkFunction(StringRef name, SILModule &module) {
+  DEBUG(getADDebugStream() << "Looking up function " << name << '\n');
+  assert(!name.empty());
+  if (auto *localFn = module.lookUpFunction(name))
+    return localFn;
+  return module.findFunction(name, SILLinkage::PublicExternal);
+}
+
+/// Given a type, returns its formal SIL parameter info.
+static SILParameterInfo getFormalParameterInfo(
+    CanType type, SILModule &module) {
+  SILType silTy = SILType::getPrimitiveObjectType(type);
+  ParameterConvention conv;
+  if (SILModuleConventions::isPassedIndirectlyInSIL(silTy, module))
+    conv = ParameterConvention::Indirect_In;
+  else if (silTy.isTrivial(module))
+    conv = ParameterConvention::Direct_Unowned;
+  else
+    conv = ParameterConvention::Direct_Guaranteed;
+  return { type, conv };
+}
+
+/// Given a type, returns its formal SIL result info.
+static SILResultInfo getFormalResultInfo(CanType type, SILModule &module) {
+  SILType silTy = SILType::getPrimitiveObjectType(type);
+  ResultConvention conv;
+  if (SILModuleConventions::isPassedIndirectlyInSIL(silTy, module))
+    conv = ResultConvention::Indirect;
+  else if (silTy.isTrivial(module))
+    conv = ResultConvention::Unowned;
+  else
+    conv = ResultConvention::Owned;
+  return { type, conv };
+}
+
+/// Given a function, gather all of its formal results (both direct and
+/// indirect) in an order defined by its result type. Note that "formal results"
+/// refer to result values in the body of the function, not at call sites.
+static void collectAllFormalResultsInTypeOrder(
+    SILFunction &function, SmallVectorImpl<SILValue> &results) {
+  SILFunctionConventions convs(function.getLoweredFunctionType(),
+                               function.getModule());
+  auto indResults = function.getIndirectResults();
+  auto *retInst = cast<ReturnInst>(function.findReturnBB()->getTerminator());
+  auto retVal = retInst->getOperand();
+  SmallVector<SILValue, 8> dirResults;
+  if (auto *tupleInst =
+      dyn_cast_or_null<TupleInst>(retVal->getDefiningInstruction()))
+    dirResults.append(tupleInst->getElements().begin(),
+                      tupleInst->getElements().end());
+  else
+    dirResults.push_back(retVal);
+  unsigned indResIdx = 0, dirResIdx = 0;
+  for (auto &resInfo : convs.getResults())
+    results.push_back(resInfo.isFormalDirect()
+                      ? dirResults[dirResIdx++] : indResults[indResIdx++]);
+}
+
+/// Given a function call site, gather all of its actual results (both direct
+/// and indirect) in an order defined by its result type.
+template<typename IndResRange>
+static void collectAllActualResultsInTypeOrder(
+    ApplyInst *ai, ArrayRef<SILValue> extractedDirectResults,
+    IndResRange &&indirectResults, SmallVectorImpl<SILValue> &results) {
+  auto callee = ai->getCallee();
+  SILFunctionConventions calleeConvs(callee->getType().getAs<SILFunctionType>(),
+                                     ai->getModule());
+  unsigned indResIdx = 0, dirResIdx = 0;
+  for (auto &resInfo : calleeConvs.getResults())
+    results.push_back(resInfo.isFormalDirect()
+      ? extractedDirectResults[dirResIdx++] : indirectResults[indResIdx++]);
+}
+
+/// Given a range of types, joins these into a single type. If there's exactly
+/// one element type, returns that element type. Otherwise, creates a tuple type
+/// of all element types.
+template<typename TypeRange>
+static CanType joinElementTypes(TypeRange &&range, const ASTContext &ctx) {
+  if (range.size() == 1)
+    return range.front();
+  auto typeElts = map<SmallVector<TupleTypeElt, 8>>(range, [&](Type type) {
+    return type;
+  });
+  return TupleType::get(typeElts, ctx);
+}
+
+/// Given a range of SIL values, retrives the canonical types of these values,
+/// and joins these types into a single type.
+template<typename SILValueRange>
+static CanType joinElementTypesFromValues(SILValueRange &&range,
+                                          const ASTContext &ctx) {
+  if (range.size() == 1)
+    return range.front()->getType().getASTType();
+  SmallVector<TupleTypeElt, 8> elts;
+  transform(range, elts.begin(),
+            [&](SILValue val) { return val->getType().getASTType(); });
+  return TupleType::get(elts, ctx)->getCanonicalType();
+}
+
+/// Looks through the definition of a function value. If the source that
+/// produced this function value is `function_ref` and the function is visible
+/// (either in the same module or is serialized), returns the instruction.
+/// Otherwise, returns null.
+static FunctionRefInst *findReferenceToVisibleFunction(SILValue value) {
+  auto *inst = value->getDefiningInstruction();
+  if (!inst) return nullptr;
+  if (auto *fri = dyn_cast<FunctionRefInst>(inst)) {
+    auto *fn = fri->getReferencedFunction();
+    if (&fn->getModule() == &inst->getModule() ||
+        fn->isSerialized() == IsSerialized)
+      return fri;
+  }
+  if (auto *thinToThink = dyn_cast<ThinToThickFunctionInst>(inst))
+    return findReferenceToVisibleFunction(thinToThink->getOperand());
+  if (auto *convertFn = dyn_cast<ConvertFunctionInst>(inst))
+    return findReferenceToVisibleFunction(convertFn->getOperand());
+  return nullptr;
+}
+
+/// Given an operator name, such as "+", and a protocol, returns the
+/// "+" operator with type `(Self, Self) -> Self`. If the operator does not
+/// exist in the protocol, returns null.
+static FuncDecl *findAssociativeOperatorDeclInProtocol(
+    DeclName operatorName, ProtocolDecl *protocol) {
+  assert(operatorName.isOperator());
+  // Find the operator requirement in the `VectorNumeric` protocol
+  // declaration and cache it.
+  auto plusLookup = protocol->lookupDirect(operatorName);
+  // Find the `+` with type siguature `(Self, Self) -> Self`.
+  for (auto *decl : plusLookup) {
+    auto *fd = dyn_cast<FuncDecl>(decl);
+    if (!fd || !fd->isBinaryOperator()) continue;
+    auto *paramList = fd->getParameterList(1);
+    auto *protoSelfTy = fd->getProtocolSelfType();
+    // Make sure parameters have `Self` type.
+    for (auto *param : paramList->getArray())
+      if (!param->getType()->isEqual(protoSelfTy))
+        continue;
+    // Make sure the result type is also `Self`.
+    if (!fd->getResultInterfaceType()->isEqual(protoSelfTy))
+      continue;
+    // This is the function type we want: `(Self, Self) -> Self`.
+    return fd;
+  }
+  // Not found.
+  return nullptr;
+}
+
+/// Assuming the buffer is for indirect passing, returns the store ownership
+/// qualifier for creating a `store` instruction into the buffer.
+static StoreOwnershipQualifier getBufferSOQ(Type type, SILModule &module) {
+  return module.Types.getTypeLowering(type).isTrivial()
+    ? StoreOwnershipQualifier::Trivial : StoreOwnershipQualifier::Init;
+}
+
+/// Assuming the buffer is for indirect passing, returns the load ownership
+/// qualified for creating a `load` instruction from the buffer.
+static LoadOwnershipQualifier getBufferLOQ(Type type, SILModule &module) {
+  return module.Types.getTypeLowering(type).isTrivial()
+    ? LoadOwnershipQualifier::Trivial : LoadOwnershipQualifier::Take;
+}
 
 //===----------------------------------------------------------------------===//
 // Auxiliary data structures
 //===----------------------------------------------------------------------===//
 
 namespace {
-// A differentiation task, specifying the original function and the
-// `[reverse_differentiable]` attribute on the function. PrimalGen and
-// AdjointGen will synthesize the primal and the adjoint for this task, filling
-// the primal and adjoint fields in the attribute.
-struct DifferentiationTask {
-  SILFunction *original = nullptr;
-  SILReverseDifferentiableAttr *attr = nullptr;
+class DifferentiationTask;
 
-  /*implicit*/ DifferentiationTask(SILFunction *original,
-                                   SILReverseDifferentiableAttr *attr)
-    : original(original), attr(attr) {}
+/// The invoker of a differentiation task. It can be some user syntax, e.g.
+/// `#gradient` expression, the differentiation pass, or nothing at all. This
+/// will be used to emit informative diagnostics.
+struct DifferentiationInvoker {
+public:
+  /// The kind of the invoker of a differentiation task.
+  enum class Kind {
+    // No known invoker. This is the case when the differentiation is requested
+    // from SIL source via a `gradient` instruction **without** being linked to
+    // a Swift AST node.
+    GradientInst,
+
+    // Invoked by the indirect application of differentiation. This case has an
+    // associated differentiation task reference.
+    IndirectDifferentiation,
+
+    // Invoked by a differential operator, such as `#gradient`, in the Swift
+    // source. This case has an associated differential operator, i.e. a
+    // `ReverseAutoDiffExpr`.
+    DifferentialOperator,
+
+    // Invoked by a `@differentiable` attribute in the Swift source. This case
+    // has an associated `@differentiable` attribute.
+    DifferentiableAttribute,
+  };
+
+private:
+  Kind kind;
+  union Value {
+    /// The instruction associated with the `SILSource` case.
+    GradientInst *gradientInst;
+    Value(GradientInst *inst) : gradientInst(inst) {}
+
+    /// The parent differentiation task associated with the
+    /// `IndirectDifferentiation` case.
+    std::pair<ApplyInst *,
+              DifferentiationTask *> indirectDifferentiation;
+    Value(ApplyInst *applyInst, DifferentiationTask *parentTask)
+      : indirectDifferentiation({applyInst, parentTask}) {}
+
+    /// The differential operator associated with the `DifferentialOperator`
+    /// case.
+    ReverseAutoDiffExpr *differentialOperator;
+    Value(ReverseAutoDiffExpr *expr) : differentialOperator(expr) {}
+
+    /// The `@differentiable` attribute associated with the
+    /// `DifferentiableAttribute` case.
+    DifferentiableAttr *differentiableAttribute;
+    Value(DifferentiableAttr *attr) : differentiableAttribute(attr) {}
+  } value;
+
+  /*implicit*/
+  DifferentiationInvoker(Kind kind, Value value)
+    : kind(kind), value(value) {}
+
+public:
+  DifferentiationInvoker(GradientInst *inst)
+    : kind(Kind::GradientInst), value(inst) {}
+  DifferentiationInvoker(ApplyInst *applyInst,
+                         DifferentiationTask *task)
+    : kind(Kind::IndirectDifferentiation), value(applyInst, task) {}
+  DifferentiationInvoker(ReverseAutoDiffExpr *expr)
+    : kind(Kind::DifferentialOperator), value(expr) {}
+  DifferentiationInvoker(DifferentiableAttr *attr)
+    : kind(Kind::DifferentiableAttribute), value(attr) {}
+
+  Kind getKind() const { return kind; }
+
+  GradientInst *getGradientInst() const {
+    assert(kind == Kind::GradientInst);
+    return value.gradientInst;
+  }
+
+  std::pair<ApplyInst *, DifferentiationTask *>
+  getIndirectDifferentiation() const {
+    assert(kind == Kind::IndirectDifferentiation);
+    return value.indirectDifferentiation;
+  }
+
+  ReverseAutoDiffExpr *getDifferentialOperator() const {
+    assert(kind == Kind::DifferentialOperator);
+    return value.differentialOperator;
+  }
+
+  DifferentiableAttr *getDifferentiableAttribute() const {
+    assert(kind == Kind::DifferentiableAttribute);
+    return value.differentiableAttribute;
+  }
+
+  void print(llvm::raw_ostream &os) const;
+};
+  
+/// A differentiation task, specifying the original function and the
+/// `[reverse_differentiable]` attribute on the function. PrimalGen and
+/// AdjointGen will synthesize the primal and the adjoint for this task, filling
+/// the primal and adjoint fields in the attribute.
+///
+/// NOTE: A task instance manages a `[reverse_differentiable]` SIL attribute and
+/// shall be the only one that modifies this attribute.
+class DifferentiationTask {
+  friend llvm::DenseMapInfo<DifferentiationTask>;
+  friend class ADContext;
+
+private:
+  /// The original function to be differentiated.
+  SILFunction *original;
+
+  /// The `[reverse_differentiable]` attribute on the original function. Since
+  /// attribute synthesis is part of differentiation, a
+  /// `[reverse_differentiable]` attribute must be available when a
+  /// `DifferentiationTask` is created. The AD configuration resides within the
+  /// attribute. This is guaranteed to be non-null.
+  SILReverseDifferentiableAttr *attr;
+
+  /// The invoker of this differentiation task.
+  DifferentiationInvoker invoker;
+
+  /// Mapping from original `apply` instructions to their corresponding
+  /// differentiation tasks, if it's active. This is filled during primal
+  /// synthesis, so that adjoint synthesis does not need to recompute the
+  /// original function and differentiation indices.
+  DenseMap<ApplyInst *, DifferentiationTask *> associatedTasks;
+
+  /// Cache for primal and adjoint.
+  SILFunction *primal = nullptr;
+  SILFunction *adjoint = nullptr;
+
+protected:
+  /// Create a differentiation task.
+  ///
+  /// @param original The original function to be differentiated.
+  /// @param attr The [reverse_differentiable] attribute to take control of.
+  /// @param invoker The invoker of this differentiation task.
+  /// @param module The module where differentiation happens.
+  explicit DifferentiationTask(SILFunction *original,
+                               SILReverseDifferentiableAttr *&&attr,
+                               SILModule &module,
+                               DifferentiationInvoker invoker)
+    : original(original), attr(attr), invoker(invoker) {
+    if (attr->hasPrimal())
+      primal = lookupOrLinkFunction(attr->getPrimalName(), module);
+    if (attr->hasAdjoint())
+      adjoint = lookupOrLinkFunction(attr->getAdjointName(), module);
+  }
+
+public:
+  DifferentiationTask(const DifferentiationTask &) = delete;
+  DifferentiationTask &operator=(const DifferentiationTask &) = delete;
+
+  SILFunction *getOriginal() const { return original; }
+  SILReverseDifferentiableAttr *getAttribute() const { return attr; }
+  DifferentiationInvoker getInvoker() const { return invoker; }
+  
+  const SILReverseAutoDiffIndices &getIndices() const {
+    return attr->getIndices();
+  }
+
+  SILFunction *getPrimal() const { return primal; }
+  SILFunction *getAdjoint() const { return adjoint; }
+
+  void setPrimal(SILFunction *fn) {
+    assert(fn); primal = fn;
+    attr->setPrimalName(fn->getName());
+  }
+  
+  void setAdjoint(SILFunction *fn) {
+    assert(fn); adjoint = fn;
+    attr->setAdjointName(fn->getName());
+  }
+
+  DenseMap<ApplyInst *, DifferentiationTask *> &getAssociatedTasks() {
+    return associatedTasks;
+  }
 
   bool isEqual(const DifferentiationTask &other) const {
     return original == other.original && attr == other.attr;
   }
 
-  SILReverseAutoDiffConfiguration getMasterConfig() const {
-    return SILReverseAutoDiffConfiguration::getMaster(attr->getIndices());
-  }
-};
-} // end anonymous namespace
-
-namespace llvm {
-using swift::SILFunction;
-using swift::SILReverseDifferentiableAttr;
-
-template<typename T> struct DenseMapInfo;
-
-template<> struct DenseMapInfo<DifferentiationTask> {
-  static DifferentiationTask getEmptyKey() {
-    return {
-      DenseMapInfo<SILFunction *>::getEmptyKey(),
-      DenseMapInfo<SILReverseDifferentiableAttr *>::getEmptyKey()
-    };
+  SILReverseAutoDiffConfig getMasterConfig() const {
+    return SILReverseAutoDiffConfig::getMaster(getIndices());
   }
 
-  static DifferentiationTask getTombstoneKey() {
-    return {
-      DenseMapInfo<SILFunction *>::getTombstoneKey(),
-      DenseMapInfo<SILReverseDifferentiableAttr *>::getTombstoneKey()
-    };
-  }
-
-  static unsigned getHashValue(const DifferentiationTask &Val) {
-    return hash_combine(
-      DenseMapInfo<SILFunction *>::getHashValue(Val.original),
-      DenseMapInfo<SILReverseDifferentiableAttr *>::getHashValue(Val.attr)
-    );
-  }
-
-  static bool isEqual(const DifferentiationTask &LHS,
-                      const DifferentiationTask &RHS) {
-    return LHS.isEqual(RHS);
-  }
-};
-} // end llvm namespace
-
-namespace {
-/// The kind of SIL value in the primal function.
-enum class PrimalValueKind {
-  /// Argument to the primal function.
-  Argument,
-  /// The value can be converted from its arguments using the same instruction.
-  Conversion,
-  /// Intentially discarded for rematerialization.
-  ToRematerialize,
-  /// The value is statically grouped into the primal value struct and can be
-  /// accessed directly using `struct_extract`.
-  StaticCheckpoint,
-  /// The value is pushed onto the differentiation tape in the struct and can be
-  /// accessed when popped from the tape.
-  TapeCheckpoint
+  void print(llvm::raw_ostream &os) const;
 };
 
-/// The result coming from PrimalGen.
-struct PrimalFunctionInfo {
-  /// The primal function.
-  SILFunction *primal = nullptr;
-  /// Checkpoint storage.
-  StructDecl *checkpointStorageDecl = nullptr;
-  /// A mapping from primal checkpoints to the declaration references in the
-  /// checkpoints struct.
-  DenseMap<SILValue, SILDeclRef> staticCheckpointMap;
-  /// A mapping from primal checkpoints to the declaration references of tapes
-  /// they belong to.
-  DenseMap<SILValue, SILDeclRef> tapedCheckpointMap;
-};
+static
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                                     DifferentiationInvoker invoker) {
+  invoker.print(os);
+  return os;
+}
+
+void DifferentiationInvoker::print(llvm::raw_ostream &os) const {
+  os << "(differentiation_invoker ";
+  switch (kind) {
+  case Kind::GradientInst:
+    os << "gradient_inst=(" << *getGradientInst() << ")";
+    break;
+  case Kind::IndirectDifferentiation: {
+    auto indDiff = getIndirectDifferentiation();
+    os << "indirect_differentiation=(apply_inst=(" << *indDiff.first
+       << ") task=" << indDiff.second << ')';
+    break;
+  }
+  case Kind::DifferentialOperator:
+    os << "differential_operator=(";
+    getDifferentialOperator()->print(os);
+    os << ")";
+    break;
+  case Kind::DifferentiableAttribute:
+    os << "differentiable_attribute=(";
+    getDifferentiableAttribute()->print(os);
+    os << ")";
+    break;
+  }
+  os << ')';
+}
+
+void DifferentiationTask::print(llvm::raw_ostream &os) const {
+  os << "(differentiation_task original=@" << original->getName()
+     << " attribute=";
+  attr->print(os);
+  os << " invoker=" << invoker << ")";
+}
 
 using GradientLookupKey = std::pair<SILFunction *,
-                                    SILReverseAutoDiffConfiguration>;
-} // end anonymous namespace
+                                    SILReverseAutoDiffConfig>;
 
 //===----------------------------------------------------------------------===//
 // ADContext - Per-module contextual information for the Differentiation pass.
 //===----------------------------------------------------------------------===//
 
-namespace {
 class ADContext {
 private:
   /// The module where Differentiation is performed on.
   SILModule &module;
-  
+
   /// AST context.
   ASTContext &astCtx = module.getASTContext();
 
@@ -190,18 +528,20 @@ private:
   /// to point to [reverse_differentiable wrt ...]'s trailing index storage.
   DenseMap<GradientLookupKey, SILFunction *> gradientMap;
 
-  /// Type converter.
-  Lowering::TypeConverter typeConverter;
-  
+  /// Queue of differentiation tasks.
+  SmallVector<std::unique_ptr<DifferentiationTask>, 32> differentiationTasks;
+  /// Mapping from enqueued differentiation tasks to their indices in
+  /// `differentiationTasks`.
+  SmallDenseMap<
+    std::pair<SILFunction *, SILReverseAutoDiffIndices>,
+    unsigned> enqueuedTaskIndices;
+
   /// SIL loader.
   ///
   /// FIXME: Fix SILModule's deserialization so that we can drop the local
   /// cache and use `SILModule::lookUpWitnessTable` directly.
   const std::unique_ptr<SerializedSILLoader> silLoader =
     SerializedSILLoader::create(astCtx, &module, nullptr);
-
-  /// A map from conformances to witness tables in the current module.
-  DenseMap<ProtocolConformance *, SILWitnessTable *> witnessTables;
 
   /// The VectorNumeric protocol in the standard library.
   ProtocolDecl *vectorNumericProtocol =
@@ -222,15 +562,17 @@ private:
   FuncDecl *cachedNumericPlusFn = nullptr;
 
 public:
-  SILModule &getModule() const { return module; }
-  ASTContext &getASTContext() const { return module.getASTContext(); }
-  SILPassManager &getPassManager() const { return passManager; }
-
   /// Construct an ADContext for the given module.
   explicit ADContext(SILModule &module, SILPassManager &passManager);
 
-  Lowering::TypeConverter &getTypeConverter() {
-    return typeConverter;
+  SILModule &getModule() const { return module; }
+  ASTContext &getASTContext() const { return module.getASTContext(); }
+  SILPassManager &getPassManager() const { return passManager; }
+  Lowering::TypeConverter &getTypeConverter() { return module.Types; }
+
+  ArrayRef<std::unique_ptr<DifferentiationTask>>
+  getDifferentiationTasks() const {
+    return differentiationTasks;
   }
 
   /// Finds a witness table for the specified conformance in the current module.
@@ -240,14 +582,12 @@ public:
   SILWitnessTable *
   lookupOrLinkWitnessTable(ProtocolConformanceRef confRef) {
     auto *conf = confRef.getConcrete();
-    auto lookup = witnessTables.find(conf);
-    if (lookup != witnessTables.end())
-      return lookup->getSecond();
+    if (auto existingTable = module.lookUpWitnessTable(confRef))
+      return existingTable;
     auto *decl =
       conf->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
     auto linkage = getSILLinkage(getDeclLinkage(decl), NotForDefinition);
     auto *newTable = module.createWitnessTableDeclaration(conf, linkage);
-    witnessTables.insert({conf, newTable});
     newTable = silLoader->lookupWitnessTable(newTable);
     // Update linkage for witness methods.
     // FIXME: Figure out why witnesses have shared linkage by default.
@@ -260,11 +600,11 @@ public:
   ProtocolDecl *getVectorNumericProtocol() const {
     return vectorNumericProtocol;
   }
-  
+
   ProtocolDecl *getNumericProtocol() const {
     return numericProtocol;
   }
-  
+
   ProtocolDecl *getFloatingPointProtocol() const {
     return floatingPointProtocol;
   }
@@ -272,61 +612,38 @@ public:
   FuncDecl *getVectorPlusDecl() {
     if (cachedVectorPlusFn)
       return cachedVectorPlusFn;
-    return cachedVectorPlusFn = lookupAssociativeOperatorDeclInProtocol(
+    return cachedVectorPlusFn = findAssociativeOperatorDeclInProtocol(
       astCtx.getIdentifier("+"), vectorNumericProtocol);
   }
 
   FuncDecl *getNumericPlusDecl() {
     if (cachedNumericPlusFn)
       return cachedNumericPlusFn;
-    return cachedNumericPlusFn = lookupAssociativeOperatorDeclInProtocol(
+    return cachedNumericPlusFn = findAssociativeOperatorDeclInProtocol(
       astCtx.getIdentifier("+"), numericProtocol);
   }
 
   /// Determines whether the given type conforms to VectorNumeric while the
   /// ScalarElement associated type conforms to FloatingPoint.
   bool supportsVectorDifferentiation(Type type) const;
-  
+
   /// Determines whether the given type conforms to FloatingPoint.
-  bool supportsFloatingPointDifferentiation(Type type) const;
+  bool supportsScalarDifferentiation(Type type) const;
 
-  void insertPrimal(SILFunction *original, SILReverseAutoDiffIndices indices,
-                    SILFunction *primal) {
-    auto *attr =
-      getOrCreateReverseDifferentiableAttr(original, indices);
-    attr->setPrimalName(primal->getName());
+  /// Retrieves the function dependent type container in the current Swift
+  /// module. If it does not exist, create one.
+  SourceFile &getFunctionDependentTypeContainer() {
+    // FIXME: To handle this more properly, we should make a DerivedFileUnit
+    // class to contain all synthesized implicit type declarations.
+    for (auto *file : module.getSwiftModule()->getFiles())
+      if (auto *src = dyn_cast<SourceFile>(file))
+        return *src;
+    llvm_unreachable("No files?");
   }
 
-  void insertAdjoint(SILFunction *original, SILReverseAutoDiffIndices indices,
-                     SILFunction *adjoint) {
-    auto *attr =
-      getOrCreateReverseDifferentiableAttr(original, indices);
-    attr->setAdjointName(adjoint->getName());
-  }
-
-  SILFunction *lookupPrimal(SILFunction *original,
-                            SILReverseAutoDiffIndices indices) {
-    if (auto *attr =
-        lookupReverseDifferentiableAttr(original, indices))
-      return lookupPrimal(attr);
-    return nullptr;
-  }
-
-  SILFunction *lookupAdjoint(SILFunction *original,
-                             SILReverseAutoDiffIndices indices) {
-    if (auto *attr =
-        lookupReverseDifferentiableAttr(original, indices))
-      return lookupPrimal(attr);
-    return nullptr;
-  }
-
-  SILFunction *lookupPrimal(SILReverseDifferentiableAttr *attr) {
-    return lookupOrLinkFunction(attr->getPrimalName(), module);
-  }
-
-  SILFunction *lookupAdjoint(SILReverseDifferentiableAttr *attr) {
-    return lookupOrLinkFunction(attr->getAdjointName(), module);
-  }
+  /// Creates a function-dependent struct, which is associated uniquely with the
+  /// specified function and has the same generic signature as the function.
+  StructDecl *createDependentStructForFunction(SILFunction *function);
 
   void insertGradient(const GradientLookupKey &key, SILFunction *gradient) {
     gradientMap.insert({key, gradient});
@@ -337,8 +654,8 @@ public:
     return lookup == gradientMap.end() ? nullptr : lookup->getSecond();
   }
 
-  SILFunction *lookupCanonicalGradient(const DifferentiationTask &task) const {
-    return lookupGradient({task.original, task.getMasterConfig()});
+  SILFunction *lookupCanonicalGradient(const DifferentiationTask *task) const {
+    return lookupGradient({task->original, task->getMasterConfig()});
   }
 
   /// Finds the `[reverse_differentiable]` attribute on the specified original
@@ -349,32 +666,113 @@ public:
   /// hashing on SILFunction's side or maintaining a dictionary in ADContext.
   /// In any case, this is not performance-critical.
   SILReverseDifferentiableAttr *
-  lookupReverseDifferentiableAttr(SILFunction *original,
-                                  SILReverseAutoDiffIndices indices) const {
+  lookupReverseDifferentiableAttr(
+      SILFunction *original, const SILReverseAutoDiffIndices &indices) const {
     for (auto *attr : original->getReverseDifferentiableAttrs())
       if (attr->getIndices() == indices)
         return attr;
     return nullptr;
   }
 
-  /// Finds or creates a `[reverse_differentiable]` attribute on the specified
-  /// original function corresponding to the specified parameter indices.
   SILReverseDifferentiableAttr *
-  getOrCreateReverseDifferentiableAttr(SILFunction *function,
-                                       SILReverseAutoDiffIndices indices) {
-    if (auto *attr =
-        lookupReverseDifferentiableAttr(function, indices))
-      return attr;
-    auto *attr = SILReverseDifferentiableAttr::create(getModule(), indices);
-    function->addReverseDifferentiableAttr(attr);
+  createReverseDifferentiableAttr(
+      SILFunction *original, const SILReverseAutoDiffIndices &indices) const {
+    assert(!lookupReverseDifferentiableAttr(original, indices));
+    auto *attr =
+      SILReverseDifferentiableAttr::create(getModule(), indices,
+                                           /*primalName*/ StringRef(),
+                                           /*adjointName*/ StringRef());
+    original->addReverseDifferentiableAttr(attr);
     return attr;
   }
 
+  /// Finds or creates a `[reverse_differentiable]` attribute on the specified
+  /// original function corresponding to the specified parameter indices.
+  SILReverseDifferentiableAttr *
+  getOrCreateReverseDifferentiableAttr(
+      SILFunction *original, const SILReverseAutoDiffIndices &indices) {
+    if (auto *attr = lookupReverseDifferentiableAttr(original, indices))
+      return attr;
+    return createReverseDifferentiableAttr(original, indices);
+  }
+
+  /// Finds a differentiation task on a function such that the task produces
+  /// adjoints for the specified indices.
+  DifferentiationTask *
+  lookupDifferentiationTask(SILFunction *original,
+                            const SILReverseAutoDiffIndices &indices) {
+    auto *attr = lookupReverseDifferentiableAttr(original, indices);
+    if (!attr) return nullptr;
+    auto existing = enqueuedTaskIndices.find({original, indices});
+    if (existing == enqueuedTaskIndices.end()) return nullptr;
+    return differentiationTasks[existing->getSecond()].get();
+  }
+  
+  /// Finds a differentiation task on a function such that the task produces
+  /// adjoints for the least number of parameters that is a superset of
+  /// the parameter indices in `indices`.
+  DifferentiationTask *
+  lookupMinimalDifferentiationTask(SILFunction *original,
+                                   const SILReverseAutoDiffIndices &indices) {
+    const llvm::SmallBitVector *supersetParamIndices;
+    const auto &indexSet = indices.parameters;
+    for (auto *rda : original->getReverseDifferentiableAttrs())
+      if (all_of(rda->getIndices().parameters.set_bits(),
+                 [&](unsigned idx) -> bool { return indexSet[idx]; }))
+        supersetParamIndices = &rda->getIndices().parameters;
+    auto existing = enqueuedTaskIndices.find(
+      {original, {indices.source, *supersetParamIndices}});
+    if (existing == enqueuedTaskIndices.end()) return nullptr;
+    return differentiationTasks[existing->getSecond()].get();
+  }
+
+  /// Register a differentiation task in the global worklist. This will ensure
+  /// that a `[reverse_differentiable]` attribute will be generated for the
+  /// specified indices, and that primal/adjoint synthesis will be run in the
+  /// Differentiation pass.
+  DifferentiationTask *
+  registerDifferentiationTask(SILFunction *original,
+                              const SILReverseAutoDiffIndices &indices,
+                              DifferentiationInvoker invoker) {
+    auto *attr = getOrCreateReverseDifferentiableAttr(original, indices);
+    std::unique_ptr<DifferentiationTask> task(
+      new DifferentiationTask(original, std::move(attr), module, invoker));
+    differentiationTasks.push_back(std::move(task));
+    return differentiationTasks.back().get();
+  }
+
+  DifferentiationTask *
+  lookUpOrRegisterDifferentiationTask(SILFunction *original,
+                                      const SILReverseAutoDiffIndices &indices,
+                                      DifferentiationInvoker invoker) {
+    if (auto *existingTask = lookupDifferentiationTask(original, indices))
+      return existingTask;
+    return registerDifferentiationTask(original, indices, invoker);
+  }
+
   template<typename...T, typename...U>
-  InFlightDiagnostic
-  diagnose(SourceLoc loc, Diag<T...> diag, U &&...args) {
+  InFlightDiagnostic diagnose(SourceLoc loc, Diag<T...> diag,
+                              U &&...args) const {
     return getASTContext().Diags.diagnose(loc, diag, std::forward<U>(args)...);
   }
+
+  /// Given an instruction and a differentiation task associated with the
+  /// parent function, emits a "not differentiable" error based on the task. If
+  /// the task is indirect, emits notes all the way up to the outermost task,
+  /// and emits an error at the outer task. Otherwise, emits an error directly.
+  void emitNondifferentiabilityError(
+    SILInstruction *inst, const DifferentiationTask *task,
+    Diag<> noteAtInnermostNode = diag::autodiff_expression_is_not_differentiable
+  );
+
+  /// Given a value and a differentiation task associated with the parent
+  /// function, emits a "not differentiable" error based on the task. If the
+  /// task is indirect, emits notes all the way up to the outermost task, and
+  /// emits an error at the outer task. Otherwise, emits an error directly.
+  void emitNondifferentiabilityError(
+    SILValue value, const DifferentiationTask *task,
+    Diag<> noteAtInnermostNode = diag::autodiff_expression_is_not_differentiable
+  );
 
   void setErrorOccurred() { errorOccurred = true; }
   bool hasErrorOccurred() const { return errorOccurred; }
@@ -382,13 +780,83 @@ public:
 } // end anonymous namespace
 
 ADContext::ADContext(SILModule &module, SILPassManager &passManager)
-  : module(module), passManager(passManager), typeConverter(module)
-{
-  // Add local witness tables to the local map.
-  for (auto &wt : module.getWitnessTables())
-    witnessTables.insert({wt.getConformance(), &wt});
+  : module(module), passManager(passManager) {}
+
+void ADContext::emitNondifferentiabilityError(SILValue value,
+                                              const DifferentiationTask *task,
+                                              Diag<> noteAtInnermostNode) {
+  emitNondifferentiabilityError(value->getDefiningInstruction(), task,
+                                noteAtInnermostNode);
 }
 
+void ADContext::emitNondifferentiabilityError(SILInstruction *inst,
+                                              const DifferentiationTask *task,
+                                              Diag<> noteAtInnermostNode) {
+  SWIFT_DEFER { setErrorOccurred(); };
+  // Location of the instruction.
+  auto srcLoc = inst->getLoc().getSourceLoc();
+  if (srcLoc.isInvalid()) srcLoc = SourceLoc();
+  auto invoker = task->getInvoker();
+  DEBUG(getADDebugStream() << "Diagnosing non-differentiability for value \n\t"
+        << *inst << "\n" << "while performing differentiation task\n\t" << task
+        << '\n');
+  switch (invoker.getKind()) {
+  // For a gradient instruction that is not associated with any source
+  // location, we emit a diagnostic without source location.
+  case DifferentiationInvoker::Kind::GradientInst:
+    diagnose(srcLoc, diag::autodiff_function_not_differentiable);
+    return;
+
+  // For indirect differentiation, emit a "not differentiable" note on the
+  // expression first. Then emit an error at the source invoker of
+  // differentiation, and a "when differentiating this"  note at each indirect
+  // invoker.
+  case DifferentiationInvoker::Kind::IndirectDifferentiation: {
+    // Emit a default note at the innermost differentiation invoker.
+    diagnose(srcLoc, noteAtInnermostNode);
+    // Iteratively retrieve the outermost task, starting with the parent of the
+    // current node, until the task is no longer indirect.
+    auto *outerTask = invoker.getIndirectDifferentiation().second;
+    while (outerTask->getInvoker().getKind() ==
+             DifferentiationInvoker::Kind::IndirectDifferentiation) {
+      std::tie(inst, outerTask) =
+        outerTask->getInvoker().getIndirectDifferentiation();
+      auto applyLoc = inst->getLoc().getSourceLoc();
+      if (applyLoc.isValid())
+        diagnose(applyLoc, diag::autodiff_when_differentiating_function_call);
+    }
+    // Now we've reached a direct task, recursive once to emit an error.
+    emitNondifferentiabilityError(inst, outerTask);
+    return;
+  }
+
+  // For a differential operator, emit a "not differentiable" note on the
+  // expression first. Then emit an error at the differential operator.
+  case DifferentiationInvoker::Kind::DifferentialOperator: {
+    auto *expr = invoker.getDifferentialOperator();
+    diagnose(srcLoc, noteAtInnermostNode);
+    diagnose(expr->getLoc(),
+      diag::autodiff_differential_operator_applied_to_nondifferentiable)
+        .highlight(expr->getOriginalExpr()->getSourceRange());
+    return;
+  }
+
+  // For a `@differentiable` attribute, emit a "not differentiable" note on the
+  // expression first. Then emit an error at the `@differentiable` attribute.
+  case DifferentiationInvoker::Kind::DifferentiableAttribute: {
+    auto *attr = invoker.getDifferentiableAttribute();
+    diagnose(srcLoc, noteAtInnermostNode);
+    diagnose(attr->getLocation(),
+      diag::autodiff_differentiable_attr_applied_to_nondifferentiable)
+        .highlight(attr->getRangeWithAt());
+    return;
+  }
+  }
+}
+
+/// Determines whether the type supports vector differentiation. We say that a
+/// type supports vector differentiation if it conforms to `VectorNumeric` and
+/// the associated type `ScalarElement` conforms to `FloatingPoint`.
 bool ADContext::supportsVectorDifferentiation(Type type) const {
   auto *swiftModule = module.getSwiftModule();
   // Look up conformance.
@@ -406,7 +874,10 @@ bool ADContext::supportsVectorDifferentiation(Type type) const {
   return scalarConf.hasValue();
 }
 
-bool ADContext::supportsFloatingPointDifferentiation(Type type) const {
+/// Determines whether the type supports scalar differentiation. We say that a
+/// type supports scalar differentiation if it conforms to `FloatingPoint` and
+/// the associated type `ScalarElement` conforms to `FloatingPoint`.
+bool ADContext::supportsScalarDifferentiation(Type type) const {
   auto *swiftModule = module.getSwiftModule();
   auto fpConf = swiftModule->lookupConformance(type, floatingPointProtocol);
   return fpConf.hasValue();
@@ -436,8 +907,8 @@ public:
 }
 
 bool ControlFlowCanonicalization::run() {
-  DEBUG(getDebugStream() << "Running control flow canonicalization on function "
-        << function.getName() << '\n');
+  DEBUG(getADDebugStream() << "Running control flow canonicalization on "
+        "function " << function.getName() << '\n');
   bool changed = false;
   assert(!function.isNoReturnFunction() && !function.isExternalDeclaration());
   assert(function.findReturnBB().getNodePtr());
@@ -450,6 +921,9 @@ bool ControlFlowCanonicalization::run() {
 //===----------------------------------------------------------------------===//
 // Activity Analysis
 //===----------------------------------------------------------------------===//
+
+namespace {
+class DifferentiableActivityInfo;
 
 /// In many real situations, the end-users of AD need only the derivatives of
 /// some selected outputs of `P` with respect to some selected inputs of `P`.
@@ -482,11 +956,6 @@ bool ControlFlowCanonicalization::run() {
 ///
 /// Reference:
 /// Laurent Hascoët. Automatic Differentiation by Program Transformation. 2017.
-
-namespace {
-
-class DifferentiableActivityInfo;
-
 class DifferentiableActivityAnalysis
   : public FunctionAnalysisBase<DifferentiableActivityInfo> {
 private:
@@ -509,7 +978,12 @@ public:
 
   virtual void initialize(SILPassManager *pm) override;
 };
+} // end anonymous namespace
 
+namespace {
+/// Result of activity analysis on a function. Accepts queries for whether a
+/// value is "varied", "useful" or "active" against certain differentiation
+/// indices.
 class DifferentiableActivityInfo {
 private:
   SILFunction &function;
@@ -542,11 +1016,10 @@ public:
   bool isUseful(SILValue value,
                 unsigned dependentVariableIndex) const;
   bool isVaried(SILValue value,
-                llvm::SmallBitVector parameterIndices) const;
+                const llvm::SmallBitVector &parameterIndices) const;
   bool isActive(SILValue value,
                 const SILReverseAutoDiffIndices &indices) const;
 };
-
 } // end anonymous namespace
 
 DifferentiableActivityInfo *
@@ -586,7 +1059,7 @@ static void collectVariedValues(SILValue value,
       if (auto *def =
             dyn_cast_or_null<BeginAccessInst>(buffer->getDefiningInstruction()))
         buffer = def->getOperand();
-      DEBUG(getDebugStream() << "VARIED @ " << inputIndex << ":\n"
+      DEBUG(getADDebugStream() << "VARIED @ " << inputIndex << ":\n"
             << buffer << '\n');
       variedValues.insert(buffer);
       visited.insert(buffer);
@@ -595,7 +1068,7 @@ static void collectVariedValues(SILValue value,
     }
     // For other instructions, consider their results varied.
     for (auto val : inst->getResults()) {
-      DEBUG(getDebugStream() << "VARIED @ " << inputIndex << ":\n"
+      DEBUG(getADDebugStream() << "VARIED @ " << inputIndex << ":\n"
             << val << '\n');
       variedValues.insert(val);
       // Recursively collect.
@@ -610,7 +1083,7 @@ static void collectVariedValues(SILValue value,
 static void collectUsefulValues(SILValue value,
                                 SmallDenseSet<SILValue> &usefulValues,
                                 unsigned outputIndex) {
-  DEBUG(getDebugStream() << "USEFUL @ " << outputIndex << ":\n"
+  DEBUG(getADDebugStream() << "USEFUL @ " << outputIndex << ":\n"
         << value << '\n');
   usefulValues.insert(value);
   if (auto *def = value->getDefiningInstruction())
@@ -619,7 +1092,7 @@ static void collectUsefulValues(SILValue value,
 }
 
 void DifferentiableActivityInfo::analyze() {
-  DEBUG(getDebugStream() << "Running activity analysis on @"
+  DEBUG(getADDebugStream() << "Running activity analysis on @"
         << function.getName() << '\n');
   // Inputs are just function's arguments, count `n`.
   auto paramArgs = function.getArgumentsWithoutIndirectResults();
@@ -627,14 +1100,14 @@ void DifferentiableActivityInfo::analyze() {
     inputValues.push_back(valueAndIndex.first);
   }
   DEBUG({
-    auto &s = getDebugStream();
+    auto &s = getADDebugStream();
     s << "Inputs in @" << function.getName() << ":\n";
     for (auto val : inputValues) s << val << '\n';
   });
   // Outputs are indirect result buffers and return values, count `m`.
   collectAllFormalResultsInTypeOrder(function, outputValues);
   DEBUG({
-    auto &s = getDebugStream();
+    auto &s = getADDebugStream();
     s << "Outputs in @" << function.getName() << ":\n";
     for (auto val : outputValues) s << val << '\n';
   });
@@ -668,11 +1141,11 @@ isDependent(SILValue value, const SILReverseAutoDiffIndices &indices) const {
 bool DifferentiableActivityInfo::
 isVaried(SILValue value, unsigned independentVariableIndex) const {
   auto &set = variedValueSets[independentVariableIndex];
-  return set.find(value) != set.end();
+  return set.count(value);
 }
 
 bool DifferentiableActivityInfo::
-isVaried(SILValue value, llvm::SmallBitVector parameterIndices) const {
+isVaried(SILValue value, const llvm::SmallBitVector &parameterIndices) const {
   for (auto paramIdx : parameterIndices.set_bits())
     if (!isVaried(value, paramIdx))
       return false;
@@ -682,7 +1155,7 @@ isVaried(SILValue value, llvm::SmallBitVector parameterIndices) const {
 bool DifferentiableActivityInfo::
 isUseful(SILValue value, unsigned dependentVariableIndex) const {
   auto &set = usefulValueSets[dependentVariableIndex];
-  return set.find(value) != set.end();
+  return set.count(value);
 }
 
 bool DifferentiableActivityInfo::
@@ -718,534 +1191,80 @@ static inline void dumpActivityInfo(SILFunction &fn,
   }
 }
 
-
 //===----------------------------------------------------------------------===//
-// PrimalGen - generates primal functions for each differentiation task in
-// the SIL module.
+// Code emission utilities
 //===----------------------------------------------------------------------===//
 
-namespace {
-class PrimalGen {
-private:
-  /// A reference to the list of original functions to generate a primal
-  /// function for.
-  ArrayRef<DifferentiationTask> diffTasks;
-
-  /// The global AD context.
-  ADContext &context;
-
-public:
-  explicit PrimalGen(ArrayRef<DifferentiationTask> diffTasks,
-                     ADContext &context)
-    : diffTasks(diffTasks), context(context) {}
-
-  using Result = DenseMap<std::pair<SILFunction *, ArrayRef<unsigned>>,
-                          PrimalFunctionInfo>;
-  /// Perform primal generation, and indirectly returns a mapping from original
-  /// functions to primal infos.
-  void generate();
-
-private:
-  /// Creates an empty primal function.
-  SILFunction *createPrimalFunction(SILFunction *original,
-                                    SILReverseAutoDiffIndices indices);
-  /// A task specifies the empty primal function to be filled in, and what its
-  /// corresponding original and parameter indices are.
-  struct Task {
-    SILFunction *original;
-    SILFunction *primal;
-    SILReverseAutoDiffIndices indices;
-  };
-  /// Processes an original function and generate its adjoint.
-  void processTask(Task task,
-                   SmallVectorImpl<Task> &worklist,
-                   PrimalFunctionInfo &primalInfo);
-};
-} // end anonymous namespace
-
-/// Creates a struct declaration (without contents) for storing contextual
-/// information for a function. The newly created struct will have the same
-/// generic parameters as the function.
-///
-/// This helper function will be used to create checkpointing structs,
-/// specifically structs for control-independent checkpoints and tape groups.
-static StructDecl *createContextStructForFunction(SILFunction *function,
-                                                  StringRef name) {
-  auto *swiftModule = function->getModule().getSwiftModule();
-  auto &file = swiftModule->getMainFile(FileUnitKind::Source);
-  auto &ctx = file.getASTContext();
-  auto *genParams = function->getDeclContext()->getGenericParamsOfContext();
-  auto structId = ctx.getIdentifier(name);
-  auto ctxStruct =
-    new (ctx) StructDecl(/*StructLoc*/ function->getLocation().getSourceLoc(),
-                         /*Name*/ structId,
-                         /*NameLoc*/ function->getLocation().getSourceLoc(),
-                         /*Inherited*/ {},
-                         /*GenericParams*/ genParams,
-                         /*DC*/ file.getLocalContext());
-  ctx.addExternalDecl(ctxStruct);
-  return ctxStruct;
-}
-
-/// Determine the kind of the given primal value. It is a BB argument, a
-/// cost-free conversion like `struct_extract`, a value to be recomputed in
-/// the adjoint, an control-independent checkpoint, or a tape checkpoint.
-static PrimalValueKind classifyInstruction(SILValue value,
-                                           DominanceInfo &domInfo) {
-  auto *fn = value->getParentBlock()->getParent();
-  auto *entry = fn->getEntryBlock();
-  auto *bb = value->getParentBlock();
-  switch (value->getKind()) {
-    case ValueKind::SILFunctionArgument:
-      return PrimalValueKind::Argument;
-    case ValueKind::IntegerLiteralInst:
-    case ValueKind::FloatLiteralInst:
-    case ValueKind::StringLiteralInst:
-    case ValueKind::ConstStringLiteralInst:
-    case ValueKind::TupleInst:
-    case ValueKind::StructInst:
-    case ValueKind::TupleExtractInst:
-    case ValueKind::StructExtractInst:
-    case ValueKind::EnumInst:
-    case ValueKind::FunctionRefInst:
-    case ValueKind::ConvertFunctionInst:
-    case ValueKind::ThinToThickFunctionInst:
-    case ValueKind::BuiltinInst:
-    case ValueKind::ApplyInst:
-    case ValueKind::PartialApplyInst:
-    case ValueKind::GlobalValueInst:
-    case ValueKind::KeyPathInst:
-    case ValueKind::MetatypeInst:
-    case ValueKind::GradientInst:
-      return PrimalValueKind::Conversion;
-    default:
-      return domInfo.dominates(entry, bb)
-        ? PrimalValueKind::StaticCheckpoint
-        : PrimalValueKind::TapeCheckpoint;
-  }
-}
-
-namespace {
-class PrimalGenCloner : public SILClonerWithScopes<PrimalGenCloner> {
-public:
-  explicit PrimalGenCloner(SILFunction &newFn) : SILClonerWithScopes(newFn) {}
-};
-} // end anonymous namespace
-
-void PrimalGen::processTask(PrimalGen::Task task,
-                            SmallVectorImpl<PrimalGen::Task> &worklist,
-                            PrimalFunctionInfo &primalInfo) {
-  auto *domAnalysis = context.getPassManager().getAnalysis<DominanceAnalysis>();
-  auto *domInfo = domAnalysis->get(task.original);
-
-  llvm_unreachable("Unimplemented");
-}
-
-/// Creates a primal function.
-SILFunction *
-PrimalGen::createPrimalFunction(SILFunction *original,
-                                SILReverseAutoDiffIndices indices) {
-  auto &module = context.getModule();
-  std::string primalName =
-    original->getName().str() + "__primal_" + mangleADIndices(indices);
-  // Create a `<fn_name>__Checkpoints` struct.
-  auto checkpointStructName = original->getName().str() + "__Checkpoints";
-  StructDecl *checkpointStorageDecl =
-    createContextStructForFunction(original, checkpointStructName);
-  auto csdType =
-    checkpointStorageDecl->getInterfaceType()->getCanonicalType();
-  auto objTy = SILType::getPrimitiveObjectType(csdType);
-  auto resultConv = objTy.isLoadable(module)
-    ? ResultConvention::Owned : ResultConvention::Unowned;
-  SILResultInfo csResult(csdType, resultConv);
-  // Create result info for checkpoints.
-  auto originalTy = original->getLoweredFunctionType();
-  auto primalTy = SILFunctionType::get(originalTy->getGenericSignature(),
-                                       originalTy->getExtInfo(),
-                                       originalTy->getCoroutineKind(),
-                                       originalTy->getCalleeConvention(),
-                                       originalTy->getParameters(),
-                                       originalTy->getYields(),
-                                       { csResult },
-                                       originalTy->getErrorResult(),
-                                       context.getASTContext());
-  auto *primal = module.getOrCreateFunction(original->getLocation(),
-                                            primalName,
-                                            SILLinkage::Public,
-                                            primalTy,
-                                            original->isBare(),
-                                            original->isTransparent(),
-                                            original->isSerialized());
-  return primal;
-}
-
-/// Starting from functions to be differentiated using the `gradient`
-/// instruction, recursively generate a primal function for each original
-/// function along the differentiation path.
-void PrimalGen::generate() {
-  SmallVector<Task, 16> worklist;
-  // Push everything to the worklist.
-  for (auto &task : diffTasks) {
-    // If the original function already has a primal, skip this task.
-    if (context.lookupPrimal(task.attr))
-      continue;
-    auto *original = task.original;
-    auto *diffAttr = task.attr;
-    auto indices = diffAttr->getIndices();
-    auto *primal = createPrimalFunction(original, indices);
-    worklist.push_back({original, primal, indices});
-  }
-  // Iterate through the worklist, look up existing adjoint. If an adjoint
-  // exists for the task, do nothing. Otherwise, create a function and process
-  // it.
-  while (!worklist.empty()) {
-    auto task = worklist.back();
-    worklist.pop_back();
-    PrimalFunctionInfo pi;
-    pi.primal = task.primal;
-    processTask(task, worklist, pi);
-  }
-}
-
-//===----------------------------------------------------------------------===//
-// AdjointGen - generates an adjoint function for each differentiation task
-// in a SIL module.
-//===----------------------------------------------------------------------===//
-
-/// The adjoint generator for all gradient functions. Executed after PrimalGen.
-namespace {
-class AdjointGen {
-private:
-  /// A reference to the global differentiation worklist created in the
-  /// Differentiation pass, storing the gradient instructions to process.
-  ArrayRef<DifferentiationTask> diffTasks;
-  /// The global AD context.
-  ADContext &context;
-
-  /// Emit instructions to accumulate adjoint.
-  void accumulateAdjoint(SILValue oldAdjoint, SILValue newAdjoint,
-                         SILValue resultBuffer, SILBuilder &builder,
-                         SILLocation loc) const;
-
-public:
-  explicit AdjointGen(ArrayRef<DifferentiationTask> diffTasks,
-                      ADContext &context)
-    : diffTasks(diffTasks), context(context) {}
-  void generate();
-
-private:
-  /// Creates an empty adjoint function.
-  SILFunction *createAdjointFunction(SILFunction *original,
-                                     CanType checkpointsType,
-                                     SILReverseAutoDiffIndices indices);
-  /// A task specifies the empty adjoint function to be filled in, and what its
-  /// corresponding original and parameter indices are.
-  struct Task {
-    SILFunction *original;
-    SILFunction *adjoint;
-    llvm::SmallBitVector paramIndices;
-  };
-  /// Process an original function and generate its adjoint.
-  void processTask(Task task, SmallVectorImpl<Task> &worklist);
-};
-} // end anonymous namespace
-
-void AdjointGen::accumulateAdjoint(SILValue oldAdjoint, SILValue newAdjoint,
-                                   SILValue resultBuffer, SILBuilder &builder,
-                                   SILLocation loc) const {
-  auto adjointTy = oldAdjoint->getType().getASTType();
-  assert(adjointTy->isEqual(oldAdjoint->getType().getASTType()) &&
-         "Adjoints must have equal types!");
-  auto adjointTyDecl = adjointTy->getAnyNominal();
-  // If the type conforms to `VectorNumeric`, then combine them using
-  // `VectorNumeric.+`. If the type conforms to `FloatingPoint`, then use
-  // `Numeric.+`.
-  FuncDecl *combinerFuncDecl;
-  ProtocolDecl *proto;
-  if (context.supportsVectorDifferentiation(adjointTy)) {
-    combinerFuncDecl = context.getVectorPlusDecl();
-    proto = context.getVectorNumericProtocol();
-  }
-  else if (context.supportsFloatingPointDifferentiation(adjointTy)) {
-    combinerFuncDecl = context.getNumericPlusDecl();
-    proto = context.getFloatingPointProtocol();
-  }
+/// Given a value, extracts all elements to `result` from this value if it's a
+/// tuple. Otherwise, add this value directly to `result`.
+static void extractAllElements(SILValue val, SILBuilder &builder,
+                               SmallVectorImpl<SILValue> &result) {
+  if (auto tupleType = val->getType().getAs<TupleType>())
+    for (auto i : range(tupleType->getNumElements()))
+      result.push_back(builder.createTupleExtract(val.getLoc(), val, i));
   else
-    llvm_unreachable("Invalid adjoint type!");
-  
-  // Call the combiner function and return.
-  auto adjointParentModule = adjointTyDecl->getModuleContext();
-  auto confRef = *adjointParentModule->lookupConformance(adjointTy, proto);
-  auto fnTy = combinerFuncDecl->getInterfaceType();
-  auto silFnTy = SILType::getPrimitiveObjectType(fnTy->getCanonicalType());
-  SILDeclRef declRef(combinerFuncDecl, SILDeclRef::Kind::Func);
-  // Link witness table.
-  context.lookupOrLinkWitnessTable(confRef);
-  // %0 = witness_method @+
-  auto witnessMethod = builder.createWitnessMethod(loc, adjointTy, confRef,
-                                                   declRef, silFnTy);
-  auto subMap = SubstitutionMap::getProtocolSubstitutions(proto, adjointTy, confRef);
-  // %1 = metatype $T.Type
-  auto metatypeType = MetatypeType::get(adjointTy)->getCanonicalType();
-  auto metatypeSILType = SILType::getPrimitiveObjectType(metatypeType);
-  auto metatype = builder.createMetatype(loc, metatypeSILType);
-  // %2 = apply $0(%result, %new, %old, %1)
-  builder.createApply(loc, witnessMethod, subMap,
-                      { resultBuffer, newAdjoint, oldAdjoint, metatype },
-                      /*isNonThrowing*/ false);
+    result.push_back(val);
 }
 
-SILFunction *
-AdjointGen::createAdjointFunction(SILFunction *original,
-                                  CanType checkpointsType,
-                                  SILReverseAutoDiffIndices indices) {
-  auto &module = context.getModule();
+/// Given a range of elements, joins these into a single value. If there's
+/// exactly one element, returns that element. Otherwise, creates a tuple using
+/// a `tuple` instruction.
+static SILValue joinElements(ArrayRef<SILValue> elements, SILBuilder &builder,
+                             SILLocation loc) {
+  if (elements.size() == 1)
+    return elements.front();
+  return builder.createTuple(loc, elements);
+}
 
-  // Given a canonical type, returns parameter info.
-  auto getFormalParamInfo = [&module](CanType ty) -> SILParameterInfo {
-    SILType silTy = SILType::getPrimitiveObjectType(ty);
-    ParameterConvention conv;
-    if (SILModuleConventions::isPassedIndirectlyInSIL(silTy, module))
-      conv = ParameterConvention::Indirect_In;
-    else if (silTy.isTrivial(module))
-      conv = ParameterConvention::Direct_Unowned;
-    else
-      conv = ParameterConvention::Direct_Owned;
-    return { ty, conv };
-  };
-
-  // Given a canonical type, returns result info.
-  auto getFormalResultInfo = [&module](CanType ty) -> SILResultInfo {
-    SILType silTy = SILType::getPrimitiveObjectType(ty);
-    ResultConvention conv;
-    if (SILModuleConventions::isPassedIndirectlyInSIL(silTy, module))
-      conv = ResultConvention::Indirect;
-    else if (silTy.isTrivial(module))
-      conv = ResultConvention::Unowned;
-    else
-      conv = ResultConvention::Owned;
-    return { ty, conv };
-  };
-
-  // Parameters of the adjoint include the original parameters, a value
-  // representing primal checkpoints, and a seed.
-  // Results of the adjoint have the same type as the original parameters.
-  SmallVector<SILParameterInfo, 8> adjParams;
-  SmallVector<SILResultInfo, 8> adjResults;
-  auto origTy = original->getLoweredFunctionType();
-  for (auto &param : origTy->getParameters()) {
-    adjParams.push_back(param);
-    adjResults.push_back(getFormalResultInfo(param.getType()));
+/// When a function value is used in an instruciton (usually `apply`), there's
+/// some conversion instruction in between, e.g. `thin_to_thick_function`. Given
+/// a new function value and an old function value, this helper function
+/// recursively converts the new function just like how the old function is
+/// converted.
+static SILValue reapplyFunctionConversion(
+    SILValue newFunc, SILValue oldFunc, SILValue oldConvertedFunc,
+    SILBuilder &builder, SILLocation loc,
+    std::function<SILValue(SILValue)> substituteOperand
+      = [](SILValue v) { return v; }) {
+  // If the old func is the new func, then there's no conversion.
+  if (oldFunc == oldConvertedFunc)
+    return newFunc;
+  // Handle a few instruction cases.
+  // thin_to_thick_function
+  if (auto *tttfi = dyn_cast<ThinToThickFunctionInst>(oldConvertedFunc)) {
+    auto operand = tttfi->getOperand();
+    auto operandFnTy = operand->getType().castTo<SILFunctionType>();
+    auto thickTy =
+      operandFnTy->getWithRepresentation(SILFunctionTypeRepresentation::Thick);
+    auto silTy = SILType::getPrimitiveObjectType(thickTy);
+    auto innerNewFunc = reapplyFunctionConversion(
+      newFunc, oldFunc, tttfi->getOperand(), builder, loc, substituteOperand);
+    return builder.createThinToThickFunction(loc, innerNewFunc, silTy);
   }
-  adjParams.push_back(getFormalParamInfo(checkpointsType));
-  adjParams.push_back(
-    getFormalParamInfo(origTy->getSingleResult().getType()));
-  auto adjName =
-    original->getName().str() + "__adj_" + mangleADIndices(indices);
-  auto adjType = SILFunctionType::get(origTy->getGenericSignature(),
-                                      origTy->getExtInfo(),
-                                      origTy->getCoroutineKind(),
-                                      origTy->getCalleeConvention(),
-                                      adjParams, {}, adjResults, None,
-                                      original->getASTContext());
-  auto *adjoint = module.createFunction(original->getLinkage(),
-                                        adjName, adjType,
-                                        original->getGenericEnvironment(),
-                                        original->getLocation(),
-                                        original->isBare(),
-                                        original->isTransparent(),
-                                        original->isSerialized());
-  adjoint->setDebugScope(
-    new (module) SILDebugScope(original->getLocation(), adjoint));
-  return adjoint;
-}
-
-void AdjointGen::processTask(AdjointGen::Task task,
-                             SmallVectorImpl<AdjointGen::Task> &worklist) {
-  llvm_unreachable("unimplemented");
-}
-
-void AdjointGen::generate() {
-  SmallVector<Task, 16> worklist;
-  // Push everything to the worklist.
-  for (auto task : diffTasks) {
-    if (context.lookupAdjoint(task.attr))
-      continue;
-    auto *original = task.original;
-    auto *diffAttr = task.attr;
-    auto indices = diffAttr->getIndices();
-    auto *primal = context.lookupPrimal(task.attr);
-    assert(primal && "PrimalGen didn't run on this function before?!");
-    auto primalTy = primal->getLoweredFunctionType();
-    auto checkpointsTy = primalTy->getSingleResult().getType();
-    auto *adjoint =
-      createAdjointFunction(original, checkpointsTy, indices);
-    worklist.push_back({original, adjoint, indices.parameters});
+  // partial_apply
+  if (auto *pai = dyn_cast<PartialApplyInst>(oldConvertedFunc)) {
+    SmallVector<SILValue, 8> newArgs;
+    newArgs.reserve(pai->getNumArguments());
+    for (auto arg : pai->getArguments())
+      newArgs.push_back(substituteOperand(arg));
+    auto innerNewFunc = reapplyFunctionConversion(newFunc, oldFunc,
+                                                  pai->getCallee(), builder,
+                                                  loc, substituteOperand);
+    return builder.createPartialApply(
+      loc, innerNewFunc, pai->getSubstitutionMap(), newArgs,
+      pai->getOrigCalleeType()->getCalleeConvention());
   }
-  // Iterate over the worklist, look up existing adjoint. If an adjoint exists
-  // for the task, do nothing. Otherwise, create a function and process it.
-  while (!worklist.empty()) {
-    auto task = worklist.back();
-    worklist.pop_back();
-    processTask(task, worklist);
-  }
-}
-
-//===----------------------------------------------------------------------===//
-// Local utilities
-//===----------------------------------------------------------------------===//
-
-template<typename T>
-static void debugDump(T &v) {
-  DEBUG(llvm::dbgs() << "\n==== BEGIN DEBUG DUMP ===="
-        << v << "==== END DEBUG DUMP ====\n");
-}
-
-static inline raw_ostream &getDebugStream() {
-  return llvm::dbgs() << "[AD] ";
-}
-
-static
-FuncDecl *lookupAssociativeOperatorDeclInProtocol(DeclName operatorName,
-                                                  ProtocolDecl *protocol) {
-  assert(operatorName.isOperator());
-  // Find the operator requirement in the `VectorNumeric` protocol
-  // declaration and cache it.
-  auto plusLookup = protocol->lookupDirect(operatorName);
-  // Find the `+` with type siguature `(Self, Self) -> Self`.
-  for (auto *decl : plusLookup) {
-    auto *fd = dyn_cast<FuncDecl>(decl);
-    if (!fd || !fd->isBinaryOperator()) continue;
-    auto *paramList = fd->getParameterList(1);
-    auto *protoSelfTy = fd->getProtocolSelfType();
-    // Make sure parameters have `Self` type.
-    for (auto *param : paramList->getArray())
-      if (param->getType()->isEqual(protoSelfTy))
-        continue;
-    // Make sure the result type is also `Self`.
-    if (fd->getResultInterfaceType()->isEqual(protoSelfTy))
-      continue;
-    // This is the function we want: `+ : (Self, Self) -> Self`.
-    return fd;
-  }
-  // Not found.
-  return nullptr;
-}
-
-/// Finds a type declaration in the standard library.
-static NominalTypeDecl *getStdlibTypeDecl(StringRef name, ASTContext &ctx) {
-  SmallVector<ValueDecl *, 1> lookupResults;
-  ctx.lookupInSwiftModule(name, lookupResults);
-  assert(!lookupResults.empty() && "Name does not exist in stdlib?");
-  return cast<NominalTypeDecl>(lookupResults[0]);
-}
-
-// FIXME: Unify with similar code in TFUtilities.
-static
-void lookupProtocolRequiredMembers(NominalTypeDecl *typeDecl,
-                                   ProtocolDecl *proto,
-                                   DeclName name, ModuleDecl *module,
-                                   SmallVectorImpl<ValueDecl *> &results) {
-  // Make sure the given type conforms to the given protocol.
-  SmallVector<ProtocolConformance *, 2> conformances;
-  auto type = typeDecl->getDeclaredInterfaceType();
-  typeDecl->lookupConformance(module, proto, conformances);
-  assert(!conformances.empty() && "Type doesn't conform to the protocol?");
-  // Look up nominal type candidates and protocol requirement candidates.
-  SmallVector<ValueDecl *, 2> lookupResults;
-  typeDecl->lookupQualified(
-    type, name, NLOptions::NL_ProtocolMembers, nullptr, lookupResults);
-  // Append matches to results.
-  for (ValueDecl *decl : lookupResults)
-    results.push_back(decl);
-}
-
-// FIXME: Unify with similar code in TFUtilities.
-static SILFunction *
-findSILFunctionForRequiredProtocolMember(NominalTypeDecl *typeDecl,
-                                         ProtocolDecl *proto, DeclName name,
-                                         ModuleDecl *module,
-                                         SILModule &silModule) {
-  SmallVector<ValueDecl *, 4> results;
-  lookupProtocolRequiredMembers(typeDecl, proto, name, module, results);
-  for (auto *result : results) {
-    std::string name = SILDeclRef(result).mangle();
-    if (auto *fn = lookupOrLinkFunction(name, silModule))
-      return fn;
-  }
-  return nullptr;
-}
-
-/// Looks through the definition of a function value. If the source that
-/// produced this function value is `function_ref` and the function is visible
-/// (either in the same module or is serialized), returns the instruction.
-/// Otherwise, returns null.
-static FunctionRefInst *findReferenceToVisibleFunction(SILValue value) {
-  auto *inst = value->getDefiningInstruction();
-  if (!inst) return nullptr;
-  if (auto *fri = dyn_cast<FunctionRefInst>(inst)) {
-    auto *fn = fri->getReferencedFunction();
-    if (&fn->getModule() == &inst->getModule() ||
-        fn->isSerialized() == IsSerialized)
-      return fri;
-  }
-  if (auto *thinToThink = dyn_cast<ThinToThickFunctionInst>(inst))
-    return findReferenceToVisibleFunction(thinToThink->getOperand());
-  if (auto *convertFn = dyn_cast<ConvertFunctionInst>(inst))
-    return findReferenceToVisibleFunction(convertFn->getOperand());
-  return nullptr;
-}
-
-/// Looks up a function in the current module. If it exists, returns it.
-/// Otherwise, attempt to link it from imported modules. Returns null if such
-/// function name does not exist.
-static SILFunction *lookupOrLinkFunction(StringRef name, SILModule &module) {
-  if (auto *localFn = module.lookUpFunction(name))
-    return localFn;
-  return module.findFunction(name, SILLinkage::PublicExternal);
-}
-
-/// Mangles a set of AD indices.
-static std::string mangleADIndices(SILReverseAutoDiffIndices indices) {
-  std::string result = "src_" + llvm::utostr(indices.source) + "_wrt_";
-  interleave(indices.parameters.set_bits(),
-             [&](unsigned idx) { result += llvm::utostr(idx); },
-             [&]{ result += '_'; });
-  return result;
-}
-
-/// Mangles an AD configuration.
-static
-std::string mangleADConfig(const SILReverseAutoDiffConfiguration &config) {
-  std::string result = "grad_" + mangleADIndices(config.indices);
-  if (config.isSeedable())
-    result += "_s";
-  if (config.isPreservingResult())
-    result += "_p";
-  if (config.isDelayed())
-    result += "_d";
-  return result;
-}
-
-/// Creates arguments in the entry block based on the function type.
-static void createEntryArguments(SILFunction *f) {
-  auto *entry = f->getEntryBlock();
-  auto conv = f->getConventions();
-  assert((entry->getNumArguments() == 0 || conv.getNumSILArguments() == 0) &&
-         "Entry already has arguments?!");
-  for (auto indResultTy : conv.getIndirectSILResultTypes())
-    entry->createFunctionArgument(indResultTy.getAddressType());
-  for (auto paramTy : conv.getParameterSILTypes())
-    entry->createFunctionArgument(paramTy);
+  llvm_unreachable("Unhandled function convertion instruction");
 }
 
 /// Convert an integer literal to a type that is expressible by integer literal.
-static void convertFromIntegerLiteral(intmax_t value,
-                                      NominalTypeDecl *targetTypeDecl,
-                                      SILValue resultBuf,
-                                      SILLocation loc,
-                                      SILBuilder &builder,
-                                      ADContext &context) {
+static
+void convertIntToIndirectExpressible(intmax_t value,
+                                     NominalTypeDecl *targetTypeDecl,
+                                     SILValue resultBuf,
+                                     SILLocation loc,
+                                     SILBuilder &builder,
+                                     ADContext &context) {
   auto &module = builder.getModule();
   auto &astCtx = module.getASTContext();
   auto targetTy =
@@ -1275,8 +1294,9 @@ static void convertFromIntegerLiteral(intmax_t value,
   auto *ebilProto =
     astCtx.getProtocol(KnownProtocolKind::ExpressibleByBuiltinIntegerLiteral);
   // `init(_builtinIntegerLiteral:)`
-  DeclName builtinLitInitName(astCtx, DeclBaseName::createConstructor(),
-                              {astCtx.getIdentifier("_builtinIntegerLiteral")});
+  DeclName builtinLitInitName(astCtx, DeclBaseName::createConstructor(), {
+    astCtx.getIdentifier("_builtinIntegerLiteral")
+  });
   auto *initBILDecl =
     cast<ConstructorDecl>(ebilProto->lookupDirect(builtinLitInitName)[0]);
   SILDeclRef initBILDeclRef(initBILDecl);
@@ -1293,8 +1313,8 @@ static void convertFromIntegerLiteral(intmax_t value,
   // %3 = witness_method ...
   auto initBILFn = builder.createWitnessMethod(loc, intLitTy, ebilConfRef,
                                                initBILDeclRef, initBILType);
-  // Get substitution map.
-  auto initBILSubMap =
+  // Get substitutions.
+  auto intLitSubMap =
     SubstitutionMap::getProtocolSubstitutions(ebilProto, intLitTy, ebilConfRef);
   // Allocate result buffer.
   // %intLitBuf = alloc_stack $IntegerLiteralType
@@ -1305,10 +1325,10 @@ static void convertFromIntegerLiteral(intmax_t value,
     builder.createDeallocStack(loc, intLitBuf);
   };
   // %4 = apply %3 <...>(%intLitBuf, %1, %2)
-  builder.createApply(loc, initBILFn, initBILSubMap,
+  builder.createApply(loc, initBILFn, intLitSubMap,
                       { intLitBuf, builtinInt, intLitMetatype },
                       /*isNonThrowing*/ false);
-  
+
   // Step 2. Initialize a value of type `<target type>` by calling
   // %5 = metatype $@thin <target type>.IntegerLiteralType.Type
   auto targetMetatypeTy = SILType::getPrimitiveObjectType(
@@ -1317,8 +1337,9 @@ static void convertFromIntegerLiteral(intmax_t value,
   // `ExpressibleByIntegerLiteral.init(integerLiteral: %4)`.
   auto *eilProto =
     astCtx.getProtocol(KnownProtocolKind::ExpressibleByIntegerLiteral);
-  DeclName intLitInitName(astCtx, DeclBaseName::createConstructor(),
-                          {astCtx.getIdentifier("integerLiteral")});
+  DeclName intLitInitName(astCtx, DeclBaseName::createConstructor(), {
+    astCtx.getIdentifier("integerLiteral")
+  });
   auto *initILDecl =
     cast<ConstructorDecl>(eilProto->lookupDirect(intLitInitName)[0]);
   SILDeclRef initILDeclRef(initILDecl);
@@ -1332,146 +1353,183 @@ static void convertFromIntegerLiteral(intmax_t value,
   // %6 = witness_method ...
   auto initILFn = builder.createWitnessMethod(loc, targetTy, eilConfRef,
                                               initILDeclRef, initILType);
-  // Get substitution map.
-  auto initILSubMap =
-    SubstitutionMap::getProtocolSubstitutions(eilProto, targetTy, eilConf);
+  // Get substitutions.
+  auto targetSubMap =
+    SubstitutionMap::getProtocolSubstitutions(eilProto, targetTy, eilConfRef);
   // %7 = apply %6 <...>(%resultBuf, %intLitBuf, %5)
-  builder.createApply(loc, initILFn, initILSubMap,
+  builder.createApply(loc, initILFn, targetSubMap,
                       { resultBuf, intLitBuf, targetMetatype },
                       /*isNonThrowing*/ false);
 }
 
 /// Create a seed value.
 ///
-/// NOTE: This will reduced to only support scalar AD when vector AD supports
-/// optional seeds, because a vector of 1 doesn't make sense in vector AD.
+/// NOTE: This will be reduced to only support scalar AD when vector AD supports
+/// optional seeds, because a vector of 1s as seed doesn't make mathematical
+/// sense in vector AD.
 static void convertToIndirectSeed(intmax_t value, CanType type,
                                   SILValue seedBuf, SILLocation loc,
                                   SILBuilder &builder, ADContext &context) {
+  // See if the type is a builtin float. If so, we don't do protocol
+  // conformance-based conversion.
+  if (auto fpType = type->getAs<BuiltinFloatType>()) {
+    auto one = builder.createFloatLiteral(
+      loc, SILType::getPrimitiveObjectType(type),
+      APFloat(fpType->getAPFloatSemantics(), value));
+    auto access = builder.createBeginAccess(loc, seedBuf, SILAccessKind::Init,
+                                            SILAccessEnforcement::Static,
+                                            /*noNestedConflict*/ true,
+                                            /*fromBuiltin*/ false);
+    builder.createStore(loc, one, seedBuf,
+                        getBufferSOQ(type, context.getModule()));
+    builder.createEndAccess(loc, access, /*aborted*/ false);
+    return;
+  }
+  
   auto *targetTypeDecl = type->getAnyNominal();
   assert(targetTypeDecl && "Target type must be a nominal type");
   auto &astCtx = context.getASTContext();
   auto &module = context.getModule();
   auto &typeConv = context.getTypeConverter();
-  // If it's vector differentiation, call `VectorNumeric.init(_:)`.
-  if (context.supportsVectorDifferentiation(type)) {
-    // Create a scalar value from the specified integer literal.
-    DeclName scalarDeclName(astCtx.getIdentifier("ScalarElement"));
-    auto currencyDeclLookupResult =
-      targetTypeDecl->lookupDirect(scalarDeclName);
-    auto *scalarElemAlias = cast<TypeAliasDecl>(currencyDeclLookupResult[0]);
-    auto scalarTy =
-      scalarElemAlias->getDeclaredInterfaceType()->getCanonicalType();
-    auto currencySubMap =
-      type->getMemberSubstitutionMap(module.getSwiftModule(), scalarElemAlias);
-    scalarTy = scalarTy.subst(currencySubMap)->getCanonicalType();
-    auto *scalarTyDecl = scalarTy.getAnyNominal();
-    assert(scalarTyDecl && "ScalarElement must be a nominal type");
-    // %0 = ... : $<scalar type>
-    auto scalarBuf =
-      builder.createAllocStack(loc, SILType::getPrimitiveObjectType(scalarTy));
-    convertFromIntegerLiteral( value, scalarTyDecl, scalarBuf,
-                              loc, builder, context);
-    auto scalarLOQ = typeConv.getTypeLowering(scalarTy).isTrivial() ?
-      LoadOwnershipQualifier::Trivial : LoadOwnershipQualifier::Take;
-    auto scalarVal = builder.createLoad(loc, scalarBuf, scalarLOQ);
-    // dealloc_stacl %0 : $*<scalar type>
-    builder.createDeallocStack(loc, scalarBuf);
-    // %1 = metatype $<scalar type>.Type
-    auto metatypeTy = SILType::getPrimitiveObjectType(
-      CanMetatypeType::get(type, MetatypeRepresentation::Thick));
-    auto *metatype = builder.createMetatype(loc, metatypeTy);
-    // Call `init(_:)` through `VectorNumeric` protocol.
-    DeclName initName(astCtx, DeclBaseName::createConstructor(),
-                      {Identifier()});
-    // Allocate buffer for passing the indirect scalar value.
-    // %2 = alloc_stack $<scalar type>
-    auto scalarValBuf =
-      builder.createAllocStack(loc, typeConv.getLoweredType(scalarTy));
-    SWIFT_DEFER {
-      // dealloc_stack %2 : $<scalar type>
-      builder.createDeallocStack(loc, scalarValBuf);
-    };
-    auto scalarSOQ = typeConv.getTypeLowering(scalarTy).isTrivial()
-      ? StoreOwnershipQualifier::Trivial : StoreOwnershipQualifier::Init;
-    // store %0 : $<scalar type> to $*<scalar type>
-    builder.createStore(loc, scalarVal, scalarValBuf, scalarSOQ);
-    auto *vecNumProto = context.getVectorNumericProtocol();
-    auto *reqr =
-      cast<ConstructorDecl>(vecNumProto->lookupDirect(initName).front());
-    SILDeclRef reqrRef(reqr, SILDeclRef::Kind::Allocator);
-    auto silInitTy = context.getTypeConverter().getConstantType(reqrRef);
-    // Get scalar's conformance to `FloatingPoint`.
-    auto conf = astCtx.getConformance(type, vecNumProto,
-                                      targetTypeDecl->getLoc(), targetTypeDecl,
-                                      ProtocolConformanceState::Complete);
-    ProtocolConformanceRef confRef(conf);
-    // $4 = witness_method ...
-    auto initFnRef =
-      builder.createWitnessMethod(loc, type, confRef, reqrRef, silInitTy);
-    auto subMap =
-      SubstitutionMap::getProtocolSubstitutions(vecNumProto, type, confRef);
-    // %5 = apply %4(%3, %2, %1)
-    builder.createApply(loc, initFnRef, subMap,
-                      { seedBuf, scalarValBuf, metatype },
-                      /*isNonThrowing*/ false);
-  }
   // If it's scalar differentiation, just convert the literal to the requested
   // type.
-  else if (context.supportsFloatingPointDifferentiation(type)) {
-    convertFromIntegerLiteral(value, targetTypeDecl, seedBuf,
-                              loc, builder, context);
+  if (context.supportsScalarDifferentiation(type)) {
+    convertIntToIndirectExpressible(value, targetTypeDecl, seedBuf,
+                                    loc, builder, context);
+    return;
   }
-  else {
-    llvm_unreachable("Unsupported type for differentiation");
-  }
+  // Otherwise it must be vector differentiation, call
+  // `VectorNumeric.init(_:)`.
+  assert(context.supportsVectorDifferentiation(type));
+  // Create a scalar value from the specified integer literal.
+  DeclName scalarDeclName(astCtx.getIdentifier("ScalarElement"));
+  auto currencyDeclLookupResult =
+    targetTypeDecl->lookupDirect(scalarDeclName);
+  auto *scalarElemAlias = cast<TypeAliasDecl>(currencyDeclLookupResult[0]);
+  auto scalarTy =
+    scalarElemAlias->getDeclaredInterfaceType()->getCanonicalType();
+  auto currencySubMap =
+    type->getMemberSubstitutionMap(module.getSwiftModule(), scalarElemAlias);
+  scalarTy = scalarTy.subst(currencySubMap)->getCanonicalType();
+  auto *scalarTyDecl = scalarTy.getAnyNominal();
+  assert(scalarTyDecl && "ScalarElement must be a nominal type");
+  // %0 = ... : $<scalar type>
+  auto scalarBuf =
+    builder.createAllocStack(loc, SILType::getPrimitiveObjectType(scalarTy));
+  convertIntToIndirectExpressible(value, scalarTyDecl, scalarBuf,
+                                  loc, builder, context);
+  auto scalarLOQ = getBufferLOQ(scalarTy, module);
+  auto scalarVal = builder.createLoad(loc, scalarBuf, scalarLOQ);
+  // dealloc_stack %0 : $*<scalar type>
+  builder.createDeallocStack(loc, scalarBuf);
+  // %1 = metatype $<scalar type>.Type
+  auto metatypeTy = SILType::getPrimitiveObjectType(
+    CanMetatypeType::get(type, MetatypeRepresentation::Thick));
+  auto *metatype = builder.createMetatype(loc, metatypeTy);
+  // Call `init(_:)` through `VectorNumeric` protocol.
+  DeclName initName(astCtx, DeclBaseName::createConstructor(), { Identifier() });
+  // Allocate buffer for passing the indirect scalar value.
+  // %2 = alloc_stack $<scalar type>
+  auto scalarValBuf =
+    builder.createAllocStack(loc, typeConv.getLoweredType(scalarTy));
+  SWIFT_DEFER {
+    // dealloc_stack %2 : $<scalar type>
+    builder.createDeallocStack(loc, scalarValBuf);
+  };
+  auto *bufAccess = builder.createBeginAccess(loc, scalarValBuf,
+                                              SILAccessKind::Init,
+                                              SILAccessEnforcement::Static,
+                                              /*noNestedConflict*/ true,
+                                              /*fromBuiltin*/ false);
+  // store %0 : $<scalar type> to $*<scalar type>
+  builder.createStore(loc, scalarVal, scalarValBuf,
+                      getBufferSOQ(scalarTy, module));
+  builder.createEndAccess(loc, bufAccess, /*aborted*/ false);
+  auto *vecNumProto = context.getVectorNumericProtocol();
+  auto *reqr =
+    cast<ConstructorDecl>(vecNumProto->lookupDirect(initName).front());
+  SILDeclRef reqrRef(reqr, SILDeclRef::Kind::Allocator);
+  auto silInitTy = context.getTypeConverter().getConstantType(reqrRef);
+  // Get scalar's conformance to `FloatingPoint`.
+  auto conf = astCtx.getConformance(type, vecNumProto,
+                                    targetTypeDecl->getLoc(), targetTypeDecl,
+                                    ProtocolConformanceState::Complete);
+  ProtocolConformanceRef confRef(conf);
+  // $4 = witness_method ...
+  auto initFnRef =
+    builder.createWitnessMethod(loc, type, confRef, reqrRef, silInitTy);
+  auto initSubMap =
+    SubstitutionMap::getProtocolSubstitutions(vecNumProto, type, confRef);
+  // %5 = apply %4(%3, %2, %1)
+  builder.createApply(loc, initFnRef, initSubMap,
+                      { seedBuf, scalarValBuf, metatype },
+                      /*isNonThrowing*/ false);
 }
 
-/// Given a function, gather all of its formal results (as SSA values) in the
-/// body (both direct and indirect) in an order defined by its result type. Note
-/// that "formal results" refer to result values in the body of the function,
-/// not at call sites.
-static
-void collectAllFormalResultsInTypeOrder(SILFunction &function,
-                                        SmallVectorImpl<SILValue> &results) {
-  SILFunctionConventions convs(function.getLoweredFunctionType(),
-                               function.getModule());
-  auto indResults = function.getIndirectResults();
-  auto *retInst = cast<ReturnInst>(function.findReturnBB()->getTerminator());
-  auto retVal = retInst->getOperand();
-  SmallVector<SILValue, 8> dirResults;
-  if (auto *tupleInst =
-        dyn_cast_or_null<TupleInst>(retVal->getDefiningInstruction()))
-    dirResults.append(tupleInst->getElements().begin(),
-                      tupleInst->getElements().end());
-  else
-    dirResults.push_back(retVal);
-  unsigned indResIdx = 0, dirResIdx = 0;
-  for (auto &resInfo : convs.getResults())
-    results.push_back(resInfo.isFormalDirect()
-      ? dirResults[dirResIdx++] : indResults[indResIdx++]);
-}
+//===----------------------------------------------------------------------===//
+// PrimalGen - generates primal functions for each differentiation task in
+// the SIL module.
+//===----------------------------------------------------------------------===//
+
+namespace {
+class PrimalGen {
+  friend class PrimalGenCloner;
+private:
+  /// The global AD context.
+  ADContext &context;
+
+public:
+  explicit PrimalGen(ADContext &context) : context(context) {}
+
+};
+} // end anonymous namespace
+
+
+//===----------------------------------------------------------------------===//
+// AdjointGen - generates an adjoint function for each differentiation task
+// in a SIL module.
+//===----------------------------------------------------------------------===//
+
+/// The adjoint generator for all gradient functions. Executed after PrimalGen.
+namespace {
+
+class AdjointGen {
+  friend class AdjointEmitter;
+private:
+  /// The global AD context.
+  ADContext &context;
+
+public:
+  explicit AdjointGen(ADContext &context) : context(context) {}
+
+};
+} // end anonymous namespace
 
 //===----------------------------------------------------------------------===//
 // Differentiation pass implementation
 //===----------------------------------------------------------------------===//
 
+/// Given a `gradient` instruction, find the corresponding differential operator
+/// used in the AST. If no differential operator is found, return nullptr.
+static ReverseAutoDiffExpr *findDifferentialOperator(GradientInst *inst) {
+  return inst->getLoc().getAsASTNode<ReverseAutoDiffExpr>();
+}
+
 // Retrieve or create an empty gradient function based on a `gradient`
 // instruction and replace all users of the `gradient` instruction with the
 // gradient function. Returns the gradient function.
-static SILFunction *getOrCreateGradient(
-  ADContext &context, GradientInst *gradInst, SILFunction *original,
-  SmallVectorImpl<DifferentiationTask> &worklist) {
+static SILFunction *lookupOrSynthesizeGradient(
+  ADContext &context, GradientInst *gradInst, SILFunction *original) {
   auto &module = original->getModule();
   auto &astCtx = module.getASTContext();
   auto origTy = original->getLoweredFunctionType();
-  auto config = gradInst->getConfiguration();
+  auto config = gradInst->getConfig();
 
   // Creates a gradient function based on the configuration.
-  auto createGradFunction = [&](SILReverseAutoDiffConfiguration &config) {
+  auto createGradFunction = [&](const SILReverseAutoDiffConfig &config) {
     auto gradType = origTy->getGradientType(config, module);
     std::string gradName =
-    original->getName().str() + "__" + mangleADConfig(config);
+      original->getName().str() + "__" + mangleADConfig(config);
     auto gradNameId = astCtx.getIdentifier(gradName);
     auto *gradFn = module.createFunction(original->getLinkage(),
                                          gradNameId.str(), gradType,
@@ -1485,36 +1543,29 @@ static SILFunction *getOrCreateGradient(
     return gradFn;
   };
 
-  // Step 1: Make sure the `[differentiable]` attribute exists. Based on this
-  // attribute, create a differentiation task.
-  SILReverseDifferentiableAttr *attr =
-    context.getOrCreateReverseDifferentiableAttr(original, config.indices);
-  DifferentiationTask newTask { original, attr };
-  // Update config's parameter indices to not depend on GradientInst's storage
-  // because it will be removed.
-  config.indices.parameters = attr->getIndices().parameters;
-
-  // Step 2: Get or create a seedable, result-preserving gradient function. If
-  // this function exists, return it.
+  // Find the canonical gradient.
   SILFunction *canonicalGrad = nullptr;
   // The master AD config corresponds to the canonical gradient.
-  auto masterConfig =
-    SILReverseAutoDiffConfiguration::getMaster(config.indices);
-  // If it already exists, we'll simply use the existing one.
+  auto masterConfig = config.getWithCanonicalOptions();
+  // If the canonical gradient already exists, we'll simply use it. No
+  // differentiation is needed.
   if (auto *existingGrad = context.lookupGradient({original, masterConfig}))
     canonicalGrad = existingGrad;
-  // Otherwise, create an empty function and push a differentiation task to the
-  // worklist.
+  // Otherwise, create a canonical gradient and enqueue a differentiation task.
   else {
+    // Create a canonical gradient.
     canonicalGrad = createGradFunction(masterConfig);
-    // Cache the canonical gradient.
     context.insertGradient({original, masterConfig}, canonicalGrad);
-    worklist.push_back(newTask);
+    // Enqueue a new differentiation task in the global context.
+    if (auto *diffOp = findDifferentialOperator(gradInst))
+      context.registerDifferentiationTask(original, config.indices, diffOp);
+    else
+      context.registerDifferentiationTask(original, config.indices, gradInst);
   }
 
-  // Step 3. If the requested gradient is not *both seedable and
-  // result-preserving*, emit wrapper function, emit a call to the canonical
-  // gradient function inside, and cache it.
+  // If the requested gradient is not *both seedable and result-preserving*,
+  // emit wrapper function, emit a call to the canonical gradient function
+  // inside, and cache it. Otherwise, it's just the canonical gradient.
   SILFunction *gradFn = nullptr;
   if (config.isMaster())
     gradFn = canonicalGrad;
@@ -1556,8 +1607,7 @@ static SILFunction *getOrCreateGradient(
           ? LoadOwnershipQualifier::Trivial : LoadOwnershipQualifier::Take;
         auto seedBufAccess = builder.createBeginAccess(
             loc, seedBuf, SILAccessKind::Read, SILAccessEnforcement::Static,
-            /*noNestedConflict=*/false,
-            /*fromBuiltin=*/false);
+            /*noNestedConflict*/ false, /*fromBuiltin=*/ false);
         auto seed = builder.createLoad(loc, seedBufAccess, loq);
         builder.createEndAccess(loc, seedBufAccess, /*aborted*/ false);
         args.push_back(seed);
@@ -1593,7 +1643,7 @@ static SILFunction *getOrCreateGradient(
         result = builder.createTupleExtract(loc, resultAndGrad, 1);
       else {
         SmallVector<SILValue, 8> grads;
-        for (unsigned i = 1; i != numDirResults; ++i)
+        for (unsigned i : range(1, numDirResults))
           grads.push_back(builder.createTupleExtract(loc, resultAndGrad, i));
         result = builder.createTuple(loc, gradConv.getSILResultType(), grads);
       }
@@ -1618,16 +1668,16 @@ static SILFunction *getOrCreateGradient(
 /// In the canonical gradient function, we simply call the primal and the
 /// adjoint, and return a tuple of the original result and the gradient values.
 static void fillCanonicalGradient(SILFunction &canGrad,
-                                  DifferentiationTask task,
+                                  const DifferentiationTask *task,
                                   ADContext &context) {
   assert(canGrad.empty() && "The gradient function must be empty");
   auto &module = context.getModule();
   auto canGradTy = canGrad.getLoweredFunctionType();
   auto loc = canGrad.getLocation();
-  auto *primal = context.lookupPrimal(task.attr);
+  auto *primal = task->getPrimal();
   assert(primal && "Primal does not exist?");
   auto primalTy = primal->getLoweredFunctionType();
-  auto *adjoint = context.lookupAdjoint(task.attr);
+  auto *adjoint = task->getAdjoint();
   assert(adjoint && "Adjoint does not exist?");
   auto adjointTy = adjoint->getLoweredFunctionType();
   SILFunctionConventions primalConv(primalTy, module),
@@ -1664,8 +1714,7 @@ static void fillCanonicalGradient(SILFunction &canGrad,
     primalResults.push_back(primalApply);
   else {
     auto tupleSILTy = primalConv.getSILResultType();
-    for (unsigned i = 0, n = primalConv.getNumDirectSILResults();
-         i != n; ++i) {
+    for (unsigned i : range(primalConv.getNumDirectSILResults())) {
       auto val = builder.createTupleExtract(loc, primalApply, i,
                                             tupleSILTy.getTupleElementType(i));
       primalResults.push_back(val);
@@ -1677,15 +1726,11 @@ static void fillCanonicalGradient(SILFunction &canGrad,
   // gradient's arguments except the seed, which is the last argument.
   for (auto arg : canGrad.getArguments().drop_back())
     adjointArgs.push_back(arg);
-  // Add primal checkpoints and the original result (all returned by primal).
-  auto primIndResIdx = primalConv.getSILArgIndexOfFirstIndirectResult();
-  auto primDirResIdx = 0;
-  for (auto result : primalConv.getResults()) {
-    if (result.isFormalDirect())
-      adjointArgs.push_back(primalResults[primDirResIdx++]);
-    else
-      adjointArgs.push_back(primalArgs[primIndResIdx++]);
-  }
+  // Add primal values and the original result (all returned by primal).
+  unsigned indResIdx = 0, dirResIdx = 0;
+  for (auto &resInfo : primalConv.getResults())
+    adjointArgs.push_back(resInfo.isFormalDirect()
+      ? primalResults[dirResIdx++] : primalArgs[indResIdx++]);
   // Add seed.
   adjointArgs.push_back(canGrad.getArguments().back());
   // %2 = function_ref @adjoint
@@ -1709,8 +1754,7 @@ static void fillCanonicalGradient(SILFunction &canGrad,
     directResults.push_back(adjApply);
   else {
     auto tupleSILTy = adjApply->getType();
-    for (unsigned i = 0, n = adjointConv.getNumDirectSILResults();
-         i != n; ++i) {
+    for (unsigned i : range(adjointConv.getNumDirectSILResults())) {
       auto val = builder.createTupleExtract(loc, adjApply, i,
                                             tupleSILTy.getTupleElementType(i));
       directResults.push_back(val);
@@ -1728,8 +1772,53 @@ class Differentiation : public SILModuleTransform {
 public:
   Differentiation() : SILModuleTransform() {}
   void run() override;
+private:
+  void processGradientInst(GradientInst *gi, ADContext &context);
 };
 } // end anonymous namespace
+
+void Differentiation::processGradientInst(GradientInst *gi,
+                                          ADContext &context) {
+  SILFunction *parent = gi->getFunction();
+  auto operand = gi->getOperand(0);
+  SILFunction *gradFn = nullptr;
+  // If it traces back to a `function_ref`, differentiate that.
+  if (auto *originalFRI = findReferenceToVisibleFunction(operand)) {
+    auto *original = originalFRI->getReferencedFunction();
+    gradFn = lookupOrSynthesizeGradient(context, gi, original);
+    
+    // If `gradFn` is still null, errors must have occurred.
+    if (!gradFn) return;
+    
+    // Replace the `gradient` instruction with the reference to the specified
+    // function.
+    SILBuilder builder(gi);
+    auto loc = parent->getLocation();
+    SILValue gradRef = builder.createFunctionRef(loc, gradFn);
+    // Traverse from the `gradient` instruction to the original
+    // `function_ref`. If there's any function convertion, do the same
+    // convertion for the gradient.
+    auto convertedGradFn = reapplyFunctionConversion(gradRef, originalFRI,
+                                                     gi->getOriginal(),
+                                                     builder, loc);
+    // Replace uses of the `gradient` instruction with the converted (if
+    // necessary) gradient function value.
+    gi->replaceAllUsesWith(convertedGradFn);
+  }
+  // Differentiating opaque functions is not supported yet.
+  else {
+    if (auto loc = gi->getLoc()) {
+      auto *expr = loc.castToASTNode<ReverseAutoDiffExpr>();
+      context.diagnose(expr->getOriginalExpr()->getLoc(),
+                       diag::autodiff_opaque_function_unsupported);
+    }
+    context.setErrorOccurred();
+    return;
+  }
+  // We invalidate analyses on the parent function because the `gradient`
+  // instruction is transformed.
+  PM->invalidateAnalysis(parent, SILAnalysis::InvalidationKind::FunctionBody);
+}
 
 /// AD pass entry.
 void Differentiation::run() {
@@ -1758,10 +1847,6 @@ void Differentiation::run() {
   // A global differentiation context.
   ADContext context(module, *PM);
 
-  // A list of differentiation tasks, each of which specifies the
-  // differentiation job to perform.
-  SmallVector<DifferentiationTask, 16> worklist;
-
   // Lower each gradient instruction to a function reference and replaces its
   // uses with a function reference to its gradient.
   //
@@ -1772,89 +1857,40 @@ void Differentiation::run() {
   // infrastructure support for this yet and currently it'll error out, but
   // we'll look into adding a new function convention so that the primal and the
   // adjoint can be passed along with the function.
-  for (auto *gi : gradInsts) {
-    SILFunction *parent = gi->getFunction();
-    auto operand = gi->getOperand(0);
-    SILFunction *gradFn = nullptr;
-    // If it traces back to a `function_ref`, differentiate that.
-    if (auto *originalFRI = findReferenceToVisibleFunction(operand)) {
-      auto *original = originalFRI->getReferencedFunction();
-      gradFn = getOrCreateGradient(context, gi, original, worklist);
+  for (auto *gi : gradInsts)
+    processGradientInst(gi, context);
 
-      // If `gradFn` is still null, errors must have occurred.
-      if (!gradFn) return;
-
-      // Replace the `gradient` instruction with the reference to the specified
-      // function.
-      SILBuilder builder(gi);
-      auto loc = parent->getLocation();
-      SILValue gradRef = builder.createFunctionRef(loc, gradFn);
-      // Traverse from the `gradient` instruction to the original
-      // `function_ref`. If there's any function convertion, do the same
-      // convertion for the gradient.
-      std::function<SILValue(SILValue)> convertGradRefLikeOriginal;
-      convertGradRefLikeOriginal = [&](SILValue originalVal) -> SILValue {
-        auto *inst = originalVal->getDefiningInstruction();
-        if (inst == originalFRI) return gradRef;
-        if (auto *tttfi = dyn_cast<ThinToThickFunctionInst>(inst)) {
-          auto thickTy = gradFn->getLoweredFunctionType()
-            ->getWithRepresentation(SILFunctionTypeRepresentation::Thick);
-          auto silThickTy = SILType::getPrimitiveObjectType(thickTy);
-          return builder.createThinToThickFunction(
-            loc, convertGradRefLikeOriginal(tttfi->getOperand()), silThickTy);
-        }
-        llvm_unreachable("Unhandled function convertion instruction");
-      };
-      // Replace uses of the `gradient` instruction with the converted (if
-      // necessary) gradient function value.
-      gi->replaceAllUsesWith(convertGradRefLikeOriginal(gi->getOriginal()));
-      gi->eraseFromParent();
-    }
-    // Differentiating opaque functions is not supported yet.
-    else {
-      if (auto loc = gi->getLoc()) {
-        auto *expr = loc.castToASTNode<ReverseAutoDiffExpr>();
-        context.diagnose(expr->getOriginalExpr()->getLoc(),
-                         diag::autodiff_opaque_function_unsupported);
-      }
-      context.setErrorOccurred();
-    }
-    // We invalide analyses on the parent function because the `gradient`
-    // instruciton is transformed.
-    PM->invalidateAnalysis(parent, SILAnalysis::InvalidationKind::FunctionBody);
-  }
+  // TODO: Run primal generation.
+  PrimalGen primalGen(context);
+  // primalGen.run();
 
   // If there were any error, back out.
   if (context.hasErrorOccurred())
     return;
 
-  // Run primal generation.
-  PrimalGen primalGen(worklist, context);
-  primalGen.generate();
+  // TODO: Run adjoint generation.
+  AdjointGen adjointGen(context);
+  // adjointGen.run();
 
   // If there were any error, back out.
   if (context.hasErrorOccurred())
     return;
 
-  // Run adjoint generation.
-  AdjointGen adjointGen(worklist, context);
-  adjointGen.generate();
-
-  // If there were any error, back out.
-  if (context.hasErrorOccurred())
-    return;
-
-  // Fill the body of the empty canonical gradient function corresponding to
-  // each differentiation task, and we are done!
-  for (auto &task : worklist) {
-    auto *canGradFn = context.lookupCanonicalGradient(task);
+  // Fill the body of each empty canonical gradient function corresponding to
+  // each differentiation task.
+  for (auto &task : context.getDifferentiationTasks()) {
+    auto *canGradFn = context.lookupCanonicalGradient(task.get());
     assert(canGradFn && "Cannot find the canonical gradient function");
-    fillCanonicalGradient(*canGradFn, task, context);
+    fillCanonicalGradient(*canGradFn, task.get(), context);
   }
+
+  // Remove all remaining `gradient` instructions.
+  for (auto *gi : gradInsts)
+    recursivelyDeleteTriviallyDeadInstructions(gi);
 }
 
 //===----------------------------------------------------------------------===//
-// Pass registration requirements
+// Pass creation
 //===----------------------------------------------------------------------===//
 
 SILTransform *swift::createDifferentiation() {

@@ -58,14 +58,14 @@ void SILFunction::addSpecializeAttr(SILSpecializeAttr *Attr) {
 
 /// SWIFT_ENABLE_TENSORFLOW
 SILReverseDifferentiableAttr::
-SILReverseDifferentiableAttr(SILReverseAutoDiffIndices indices,
+SILReverseDifferentiableAttr(const SILReverseAutoDiffIndices &indices,
                              StringRef primalName,
                              StringRef adjointName)
   : indices(indices), PrimalName(primalName), AdjointName(adjointName) {}
 
 SILReverseDifferentiableAttr *
 SILReverseDifferentiableAttr::create(SILModule &M,
-                                     SILReverseAutoDiffIndices indices,
+                                     const SILReverseAutoDiffIndices &indices,
                                      StringRef primalName,
                                      StringRef adjointName) {
   void *mem = M.allocate(sizeof(SILReverseDifferentiableAttr),

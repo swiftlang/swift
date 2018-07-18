@@ -137,19 +137,19 @@ static inline SILGradientOptions operator|(SILGradientFlags lhs,
 }
 
 /// SIL-level automatic differentiation configuration.
-struct SILReverseAutoDiffConfiguration {
+struct SILReverseAutoDiffConfig {
   SILReverseAutoDiffIndices indices;
   SILGradientOptions options;
 
   /*implicit*/
-  SILReverseAutoDiffConfiguration(SILReverseAutoDiffIndices indices,
+  SILReverseAutoDiffConfig(const SILReverseAutoDiffIndices &indices,
                                   SILGradientOptions options)
     : indices(indices), options(options) {}
 
   /*implicit*/
-  SILReverseAutoDiffConfiguration(SILReverseAutoDiffIndices indices,
+  SILReverseAutoDiffConfig(const SILReverseAutoDiffIndices &indices,
                                   bool seedable, bool preservingResult)
-    : SILReverseAutoDiffConfiguration(indices, getCanonicalGradientOptions()) {}
+    : SILReverseAutoDiffConfig(indices, getCanonicalGradientOptions()) {}
 
   unsigned getSourceIndex() const {
     return indices.source;
@@ -182,14 +182,15 @@ struct SILReverseAutoDiffConfiguration {
   /// Returns the "master" configuration, which all variants with the same
   /// parameter indices can derive from.
   static
-  SILReverseAutoDiffConfiguration getMaster(SILReverseAutoDiffIndices indices) {
+  SILReverseAutoDiffConfig getMaster(
+      const SILReverseAutoDiffIndices &indices) {
     return {
       indices,
       getCanonicalGradientOptions()
     };
   }
 
-  SILReverseAutoDiffConfiguration getWithCanonicalOptions() const {
+  SILReverseAutoDiffConfig getWithCanonicalOptions() const {
     return getMaster(indices);
   }
 
@@ -197,7 +198,7 @@ struct SILReverseAutoDiffConfiguration {
     return options.toRaw() == getCanonicalGradientOptions().toRaw();
   }
 
-  bool operator==(const SILReverseAutoDiffConfiguration &other) const {
+  bool operator==(const SILReverseAutoDiffConfig &other) const {
     return indices == other.indices &&
            options.toRaw() == other.options.toRaw();
   }
@@ -208,7 +209,7 @@ struct SILReverseAutoDiffConfiguration {
 namespace llvm {
 
 using swift::SILReverseAutoDiffIndices;
-using swift::SILReverseAutoDiffConfiguration;
+using swift::SILReverseAutoDiffConfig;
 using swift::SILGradientFlags;
 using swift::OptionSet;
 
@@ -238,27 +239,27 @@ template<> struct DenseMapInfo<SILReverseAutoDiffIndices> {
   }
 };
 
-template<> struct DenseMapInfo<SILReverseAutoDiffConfiguration> {
-  static SILReverseAutoDiffConfiguration getEmptyKey() {
+template<> struct DenseMapInfo<SILReverseAutoDiffConfig> {
+  static SILReverseAutoDiffConfig getEmptyKey() {
     return { DenseMapInfo<SILReverseAutoDiffIndices>::getEmptyKey(), None };
   }
 
-  static SILReverseAutoDiffConfiguration getTombstoneKey() {
+  static SILReverseAutoDiffConfig getTombstoneKey() {
     return {
       DenseMapInfo<SILReverseAutoDiffIndices>::getTombstoneKey(),
       SILGradientFlags::Delayed
     };
   }
 
-  static unsigned getHashValue(const SILReverseAutoDiffConfiguration &Val) {
+  static unsigned getHashValue(const SILReverseAutoDiffConfig &Val) {
     return hash_combine(
       DenseMapInfo<SILReverseAutoDiffIndices>::getHashValue(Val.indices),
       DenseMapInfo<unsigned>::getHashValue(Val.options.toRaw())
     );
   }
 
-  static bool isEqual(const SILReverseAutoDiffConfiguration &LHS,
-                      const SILReverseAutoDiffConfiguration &RHS) {
+  static bool isEqual(const SILReverseAutoDiffConfig &LHS,
+                      const SILReverseAutoDiffConfig &RHS) {
     return DenseMapInfo<SILReverseAutoDiffIndices>
              ::isEqual(LHS.indices, RHS.indices) &&
            LHS.options.toRaw() == RHS.options.toRaw();

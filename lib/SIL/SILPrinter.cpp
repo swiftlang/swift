@@ -1151,7 +1151,7 @@ public:
 
   /// SWIFT_ENABLE_TENSORFLOW
   void visitGradientInst(GradientInst *GI) {
-    auto indices = GI->getIndices();
+    auto &indices = GI->getIndices();
     *this << "[source " << indices.source << "] ";
     if (!indices.parameters.empty()) {
       *this << "[wrt ";
@@ -1162,10 +1162,13 @@ public:
       });
       *this << "] ";
     }
-    if (GI->isSeedable())
+    auto options = GI->getOptions();
+    if (options.contains(SILGradientFlags::Seedable))
       *this << "[seedable] ";
-    if (GI->isPreservingResult())
+    if (options.contains(SILGradientFlags::PreservingResult))
       *this << "[preserving_result] ";
+    if (options.contains(SILGradientFlags::Delayed))
+      *this << "[delayed] ";
     *this << getIDAndType(GI->getOriginal());
   }
 
@@ -3177,7 +3180,7 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
 
 /// SWIFT_ENABLE_TENSORFLOW
 void SILReverseDifferentiableAttr::print(llvm::raw_ostream &OS) const {
-  auto indices = getIndices();
+  auto &indices = getIndices();
   OS << "source " << indices.source << " wrt ";
   interleave(indices.parameters.set_bits(),
              [&](unsigned index) { OS << index; },

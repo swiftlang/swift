@@ -2869,8 +2869,9 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     SILValue original = getLocalValue(originalName, originalTy, InstLoc, B);
     if (parseSILDebugLocation(InstLoc, B))
       return true;
-    SILReverseAutoDiffIndices indices(sourceIndex, paramIndices);
-    ResultVal = B.createGradient(InstLoc, original, indices, existingOptions);
+    SILReverseAutoDiffConfig config(
+      {sourceIndex, paramIndices}, existingOptions);
+    ResultVal = B.createGradient(InstLoc, original, config);
     break;
   }
 
