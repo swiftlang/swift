@@ -1861,19 +1861,12 @@ Constraint *ConstraintSystem::selectDisjunction() {
 
   collectDisjunctions(disjunctions);
 
-  // Pick the disjunction with the lowest disjunction number in order
-  // to solve them in the order they were created (which should be
-  // stable within an expression).
+  // Pick the disjunction with the smallest number of active choices.
   auto minDisjunction =
       std::min_element(disjunctions.begin(), disjunctions.end(),
                        [&](Constraint *first, Constraint *second) -> bool {
-                         auto firstFound = DisjunctionNumber.find(first);
-                         auto secondFound = DisjunctionNumber.find(second);
-
-                         assert(firstFound != DisjunctionNumber.end() &&
-                                secondFound != DisjunctionNumber.end());
-
-                         return firstFound->second < secondFound->second;
+                         return first->countActiveNestedConstraints() <
+                                second->countActiveNestedConstraints();
                        });
 
   if (minDisjunction != disjunctions.end())
