@@ -220,9 +220,11 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
       return concrete->getDeclaredInterfaceType().subst(subMap);
     }
 
-    if (auto superclass = baseEquivClass->superclass) {
-      return superclass->getTypeOfMember(
-                                       DC->getParentModule(), concrete,
+    Type baseType = baseEquivClass->concreteType ? baseEquivClass->concreteType
+                                                 : baseEquivClass->superclass;
+
+    if (baseType) {
+      return baseType->getTypeOfMember(DC->getParentModule(), concrete,
                                        concrete->getDeclaredInterfaceType());
     }
 

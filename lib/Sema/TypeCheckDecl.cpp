@@ -3666,8 +3666,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   // up to the caller, who must call hasValidSignature() to
   // check that validateDecl() returned a fully-formed decl.
   if (D->hasValidationStarted()) {
-    if (!(D->isBeingValidated() || D->hasValidSignature()))
-      D->dump();
     // If this isn't reentrant (i.e. D has already been validated), the
     // signature better be valid.
     assert(D->isBeingValidated() || D->hasValidSignature());

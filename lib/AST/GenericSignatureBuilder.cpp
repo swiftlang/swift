@@ -2167,17 +2167,19 @@ TypeDecl *EquivalenceClass::lookupNestedType(
     }
   }
 
-  // If we haven't found anything yet but have a superclass, look for a type
-  // in the superclass.
-  // FIXME: Shouldn't we always look in the superclass?
-  if (!bestAssocType && concreteDecls.empty() && superclass) {
-    if (auto classDecl = superclass->getClassOrBoundGenericClass()) {
-      SmallVector<ValueDecl *, 2> superclassMembers;
-      classDecl->getParentModule()->lookupQualified(
-          superclass, name,
+  // If we haven't found anything yet but have a concrete type or a superclass,
+  // look for a type in that.
+  // FIXME: Shouldn't we always look here?
+  if (!bestAssocType && concreteDecls.empty()) {
+    Type typeToSearch = concreteType ? concreteType : superclass;
+    auto *decl = typeToSearch ? typeToSearch->getAnyNominal() : nullptr;
+    if (decl) {
+      SmallVector<ValueDecl *, 2> foundMembers;
+      decl->getParentModule()->lookupQualified(
+          typeToSearch, name,
           NL_QualifiedDefault | NL_OnlyTypes | NL_ProtocolMembers, nullptr,
-          superclassMembers);
-      for (auto member : superclassMembers) {
+          foundMembers);
+      for (auto member : foundMembers) {
         if (auto type = dyn_cast<TypeDecl>(member)) {
           // Resolve the signature of this type.
           if (!type->hasInterfaceType()) {
@@ -3938,11 +3940,13 @@ static Type substituteConcreteType(GenericSignatureBuilder &builder,
     type = type.subst(subMap, SubstFlags::UseErrorType);
   } else {
     // Substitute in the superclass type.
-    parentType = basePA->getEquivalenceClassIfPresent()->superclass;
-    auto superclassDecl = parentType->getClassOrBoundGenericClass();
+    auto parentPA = basePA->getEquivalenceClassIfPresent();
+    parentType =
+        parentPA->concreteType ? parentPA->concreteType : parentPA->superclass;
+    auto parentDecl = parentType->getAnyNominal();
 
-    subMap = parentType->getMemberSubstitutionMap(
-                           superclassDecl->getParentModule(), concreteDecl);
+    subMap = parentType->getMemberSubstitutionMap(parentDecl->getParentModule(),
+                                                  concreteDecl);
     type = type.subst(subMap, SubstFlags::UseErrorType);
   }
 
