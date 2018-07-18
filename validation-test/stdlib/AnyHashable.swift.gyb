@@ -757,9 +757,8 @@ AnyHashableTests.test("AnyHashable(MinimalHashableRCSwiftError)/Hashable") {
     xs,
     equalityOracle: { $0 / 2 == $1 / 2 },
     hashEqualityOracle: { $0 / 4 == $1 / 4 })
-  let mapped = xs.map(AnyHashable.init)
   checkHashable(
-    mapped,
+    xs.map(AnyHashable.init),
     equalityOracle: { $0 / 2 == $1 / 2 },
     hashEqualityOracle: { $0 / 4 == $1 / 4 })
 }
