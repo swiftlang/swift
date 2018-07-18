@@ -104,8 +104,22 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 		return try body(contentPtr)
 	}
 
+	@available(swift 4.2)
+	public func enumerateBytes(
+		_ block: (_ buffer: UnsafeBufferPointer<UInt8>, _ byteIndex: Int, _ stop: inout Bool) -> Void)
+	{
+		enumerateBytesCommon(block)
+	}
+
+	@available(swift, obsoleted: 4.2, renamed: "enumerateBytes(_:)")
 	public func enumerateBytes(
 		block: (_ buffer: UnsafeBufferPointer<UInt8>, _ byteIndex: Int, _ stop: inout Bool) -> Void)
+	{
+		enumerateBytesCommon(block)
+	}
+
+	private func enumerateBytesCommon(
+		_ block: (_ buffer: UnsafeBufferPointer<UInt8>, _ byteIndex: Int, _ stop: inout Bool) -> Void)
 	{
 		_swift_dispatch_data_apply(__wrapped) { (_, offset: Int, ptr: UnsafeRawPointer, size: Int) in
             let bytePtr = ptr.bindMemory(to: UInt8.self, capacity: size)
