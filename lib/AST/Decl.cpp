@@ -369,9 +369,44 @@ case DeclKind::ID: return cast<ID##Decl>(this)->getSourceRange();
 
 SourceRange Decl::getSourceRangeIncludingAttrs() const {
   auto Range = getSourceRange();
+
+  // Attributes on AccessorDecl may syntactically belong to PatternBindingDecl.
+  // e.g. 'override'.
+  if (auto *AD = dyn_cast<AccessorDecl>(this)) {
+    // If this is implicit getter, accessor range should not include attributes.
+    if (!AD->getAccessorKeywordLoc().isValid())
+      return Range;
+
+    // Otherwise, include attributes directly attached to the accessor.
+    SourceLoc VarLoc = AD->getStorage()->getStartLoc();
+    for (auto Attr : getAttrs()) {
+      if (!Attr->getRange().isValid())
+        continue;
+
+      SourceLoc AttrStartLoc = Attr->getRangeWithAt().Start;
+      if (getASTContext().SourceMgr.isBeforeInBuffer(VarLoc, AttrStartLoc))
+        Range.widen(AttrStartLoc);
+    }
+    return Range;
+  }
+
+  // Attributes on VarDecl syntactically belong to PatternBindingDecl.
+  if (isa<VarDecl>(this))
+    return Range;
+
+  // Attributes on PatternBindingDecls are attached to VarDecls in AST.
+  if (auto *PBD = dyn_cast<PatternBindingDecl>(this)) {
+    for (auto Entry : PBD->getPatternList())
+      Entry.getPattern()->forEachVariable([&](VarDecl *VD) {
+        for (auto Attr : VD->getAttrs())
+          if (Attr->getRange().isValid())
+            Range.widen(Attr->getRangeWithAt());
+      });
+  }
+
   for (auto Attr : getAttrs()) {
     if (Attr->getRange().isValid())
-      Range.widen(Attr->getRange());
+      Range.widen(Attr->getRangeWithAt());
   }
   return Range;
 }
