@@ -758,8 +758,8 @@ One explicit way to allow such operations in a type-safe manner is to introduce 
 
 ```Swift
 if let storedInE1 = e1 openas T { // T is the type of storedInE1, a copy of the value stored in e1
-  if let storedInE2 = e2 as? T {  // does e2 have type T? if so, copy its value to storedInE2
-    if storedInE1 == storedInE2 { ... } // okay: storedInT1 and storedInE2 are both of type T, which we know is Equatable
+  if let storedInE2 = e2 as? T {  // Does e2 have type T? If so, copy its value to storedInE2
+    if storedInE1 == storedInE2 { ... } // Okay: storedInT1 and storedInE2 are both of type T, which we know is Equatable
   }
 }
 ```
