@@ -1881,9 +1881,58 @@ GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
         break;
       }
       case SymbolicValue::Array: {
-        // FIXME: Handle array attributes.
+        CanType elementType;
+        auto rawElements = attrValue.getArrayValue(elementType);
+        SmallVector<SymbolicValue, 4> elements;
+        elements.reserve(rawElements.size());
+        for (auto elt : rawElements)
+          elements.push_back(elt.lookThroughSingleElementAggregates());
+
+        auto elementTypeString = elementType->getString();
+
+        // TODO: TF_SetAttrTypeList
+
+        if (elementTypeString == "String") {
+          SmallVector<const void*, 4> pointers;
+          SmallVector<size_t, 4> sizes;
+          for (auto elt : elements) {
+            auto bytes = elt.getStringValue();
+            pointers.push_back(bytes.data());
+            sizes.push_back(bytes.size());
+          }
+          TF_SetAttrStringList(op, name.c_str(), pointers.data(), sizes.data(),
+                               elements.size());
+          break;
+        }
+        if (StringRef(elementTypeString).startswith("Int")) {
+          SmallVector<int64_t, 4> values;
+          for (auto elt : elements)
+            values.push_back(elt.getIntegerValue().getLimitedValue());
+          TF_SetAttrIntList(op, name.c_str(), values.data(), values.size());
+          break;
+        }
+        if (elementTypeString == "Float" || elementTypeString == "Double") {
+          SmallVector<float, 4> values;
+          for (auto elt : elements) {
+            auto value = elt.getFloatValue();
+            bool losesInfo = false;
+            value.convert(APFloat::IEEEsingle(), APFloat::rmNearestTiesToEven,
+                          &losesInfo);
+            values.push_back(value.convertToFloat());
+          }
+          TF_SetAttrFloatList(op, name.c_str(), values.data(), values.size());
+          break;
+        }
+        if (elementTypeString == "Bool") {
+          SmallVector<unsigned char, 4> values;
+          for (auto elt : elements)
+            values.push_back(elt.getIntegerValue().getLimitedValue() != 0);
+          TF_SetAttrBoolList(op, name.c_str(), values.data(), values.size());
+          break;
+        }
+
         internalError(getUserSourceLocation(inst->getDebugLocation()),
-                      "FIXME: Handle array attributes");
+                      "unknown array attribute");
         return GLStatus::Error;
       }
       }
@@ -1915,8 +1964,12 @@ GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
           elements.push_back(intVal);
         } else {
           assert(value.getKind() == SymbolicValue::Float);
-          auto castedIntVal = value.getFloatValue().bitcastToAPInt();
-          elements.push_back(castedIntVal);
+          // TensorFlow always uses float32 attributes.
+          auto floatValue = value.getFloatValue();
+          bool losesInfo = false;
+          floatValue.convert(APFloat::IEEEsingle(), APFloat::rmNearestTiesToEven,
+                             &losesInfo);
+          elements.push_back(floatValue.bitcastToAPInt());
         }
       };
 
@@ -1951,13 +2004,11 @@ GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
 
     case SILTensorOpInfo::OperandClass::ShapeArray:
       // TODO: TF_SetAttrShapeList
-    case SILTensorOpInfo::OperandClass::Array:
-      // TODO: TF_SetAttrTypeList, TF_SetAttrStringList, TF_SetAttrIntList,
-      // TF_SetAttrFloatList, TF_SetAttrBoolList
       internalError(getUserSourceLocation(inst->getDebugLocation()),
                     "FIXME: Handle array and shapearray attributes");
       return GLStatus::Error;
 
+    case SILTensorOpInfo::OperandClass::Array:      // Handled as 'normal'
     case SILTensorOpInfo::OperandClass::ArrayElement:
       llvm_unreachable("This is a legacy class that shouldn't happen");
     }
