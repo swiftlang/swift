@@ -509,7 +509,7 @@ Type TypeChecker::applyUnboundGenericArguments(
   // generic arguments.
   auto resultType = decl->getDeclaredInterfaceType();
 
-  bool hasTypeParameterOrVariable = false;
+  bool hasTypeVariable = false;
 
   // Get the substitutions for outer generic parameters from the parent
   // type.
@@ -526,9 +526,7 @@ Type TypeChecker::applyUnboundGenericArguments(
     }
 
     subs = parentType->getContextSubstitutions(decl->getDeclContext());
-
-    hasTypeParameterOrVariable |=
-      (parentType->hasTypeParameter() || parentType->hasTypeVariable());
+    hasTypeVariable |= parentType->hasTypeVariable();
   }
 
   SourceLoc noteLoc = decl->getLoc();
@@ -545,13 +543,12 @@ Type TypeChecker::applyUnboundGenericArguments(
     subs[origTy->getCanonicalType()->castTo<GenericTypeParamType>()] =
       substTy;
 
-    hasTypeParameterOrVariable |=
-      (substTy->hasTypeParameter() || substTy->hasTypeVariable());
+    hasTypeVariable |= substTy->hasTypeVariable();
   }
 
   // Check the generic arguments against the requirements of the declaration's
   // generic signature.
-  if (!hasTypeParameterOrVariable) {
+  if (!hasTypeVariable) {
     auto result =
       checkGenericArguments(dc, loc, noteLoc, unboundType,
                             genericSig->getGenericParams(),

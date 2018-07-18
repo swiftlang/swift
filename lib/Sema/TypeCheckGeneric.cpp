@@ -1344,6 +1344,8 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
   SmallVector<RequirementSet, 8> pendingReqs;
   pendingReqs.push_back({requirements, {}});
 
+  auto *env = dc->getGenericEnvironmentOfContext();
+
   while (!pendingReqs.empty()) {
     auto current = pendingReqs.pop_back_val();
 
@@ -1363,10 +1365,21 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
       auto kind = req.getKind();
       Type rawFirstType = rawReq.getFirstType();
       Type firstType = req.getFirstType();
+      if (firstType->hasTypeParameter()) {
+        if (!env)
+          continue;
+        firstType = env->mapTypeIntoContext(firstType);
+      }
+
       Type rawSecondType, secondType;
       if (kind != RequirementKind::Layout) {
         rawSecondType = rawReq.getSecondType();
         secondType = req.getSecondType();
+        if (secondType->hasTypeParameter()) {
+          if (!env)
+            continue;
+          secondType = env->mapTypeIntoContext(secondType);
+        }
       }
 
       // Don't do further checking on error types.
