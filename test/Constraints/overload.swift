@@ -251,6 +251,38 @@ func coalesce() {
 
 // Ensure that we do not select the (T?, T) -> T version of ??, which
 // would result in a warning about RHS never being selected.
-func rdar19748710(_ value: Int?) -> Int? {
+func rdar19748710_0(_ value: Int?) -> Int? {
   return value ?? value
+}
+
+// Again, ensure we do not select (T?, T) -> T, despite forcing the result.
+func rdar19748710_1(_ value: Int?) -> Int? {
+  return (value ?? value)!
+}
+
+// FIXME: We choose to inject the LHS, which really doesn't seem like
+// the reasonable choice here. It seems more predictable and safe to
+// either inject the result of ??, or treat this as an error since the
+// current behavior will result in .some(nil) being force-unwrapped
+// rather than the RHS value. The diagnostic is problematic, too,
+// since it claims 'Int?' is a non-optional type.
+func rdar19748710_2(_ value: Int?) -> Int? {
+  return (value ?? value)!! // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'Int?', so the right side is never used}}
+}
+
+// Ensure that we select the more closely matching function between
+// the two _g overloads.
+func giveAny() -> Any { fatalError() }
+func giveAnyOptional() -> Any? { fatalError() }
+func takeAny(_ a: Any?) -> Any? { fatalError() }
+func takeAny(_ a: Any) -> Any { fatalError() }
+
+func testAnyOptional() {
+  let r = takeAny(giveAnyOptional())
+  let _ = r!
+}
+
+func testAny() {
+  let r = takeAny(giveAny())
+  let _ = r! // expected-error {{cannot force unwrap value of non-optional type 'Any'}}
 }

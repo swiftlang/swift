@@ -683,6 +683,9 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
       }
     }
 
+    if (!argType->isAny())
+      cs.increaseScore(ScoreKind::SK_EmptyExistentialConversion);
+
     return cs.getTypeMatchSuccess();
   }
 

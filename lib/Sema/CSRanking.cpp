@@ -656,7 +656,8 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
           Type objType2 = paramType2->lookThroughAllOptionalTypes(optionals2);
           auto numOptionals2 = optionals2.size();
 
-          if (numOptionals1 > numOptionals2 && objType2->is<TypeVariableType>())
+          if (numOptionals1 > numOptionals2 &&
+              (objType2->is<TypeVariableType>() || objType2->isAny()))
             return false;
 
           // Check whether the first parameter is a subtype of the second.
