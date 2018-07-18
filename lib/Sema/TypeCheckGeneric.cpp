@@ -576,7 +576,7 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
   return badType;
 }
 
-void TypeChecker::revertGenericFuncSignature(AbstractFunctionDecl *func) {
+static void revertGenericFuncSignature(AbstractFunctionDecl *func) {
   // Revert the result type.
   if (auto fn = dyn_cast<FuncDecl>(func))
     if (!fn->getBodyResultTypeLoc().isNull())
@@ -1047,7 +1047,7 @@ static bool checkGenericSubscriptSignature(TypeChecker &tc,
   return badType;
 }
 
-void TypeChecker::revertGenericSubscriptSignature(SubscriptDecl *subscript) {
+static void revertGenericSubscriptSignature(SubscriptDecl *subscript) {
   // Revert the element type.
   if (!subscript->getElementTypeLoc().isNull())
     revertDependentTypeLoc(subscript->getElementTypeLoc());

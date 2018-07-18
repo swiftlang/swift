@@ -1278,11 +1278,6 @@ public:
   /// of a generic function.
   void validateGenericFuncSignature(AbstractFunctionDecl *func);
 
-  /// Revert the signature of a generic function to its pre-type-checked state,
-  /// so that it can be type checked again when we have resolved its generic
-  /// parameters.
-  void revertGenericFuncSignature(AbstractFunctionDecl *func);
-
   /// Check the generic parameters in the given generic parameter list (and its
   /// parent generic parameter lists) according to the given resolver.
   void checkGenericParamList(GenericSignatureBuilder *builder,
@@ -1293,11 +1288,6 @@ public:
   /// Compute the generic signature, generic environment and interface type
   /// of a generic subscript.
   void validateGenericSubscriptSignature(SubscriptDecl *subscript);
-
-  /// Revert the signature of a generic function to its pre-type-checked state,
-  /// so that it can be type checked again when we have resolved its generic
-  /// parameters.
-  void revertGenericSubscriptSignature(SubscriptDecl *subscript);
 
   /// Configure the interface type of a subscript declaration.
   void configureInterfaceType(SubscriptDecl *subscript,
