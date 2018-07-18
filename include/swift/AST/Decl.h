@@ -819,9 +819,11 @@ public:
     case ValidationState::Unchecked:
     case ValidationState::Checked:
       return false;
-    default:
+    case ValidationState::Checking:
+    case ValidationState::CheckingWithValidSignature:
       return true;
     }
+    llvm_unreachable("Unknown ValidationState");
   }
 
   /// Update the validation state for the declaration to allow access to the
