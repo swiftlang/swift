@@ -69,6 +69,19 @@ static void deleteInstAndAbandonedUses(SILInstruction *inst) {
   inst->eraseFromParent();
 }
 
+/// Return true if this apply instruction is to a function that can be
+/// conditionally hoisted into the graph, but don't check the operands to
+/// see if they are actually constants we can handle.
+static bool isDecodableApply(ApplyInst *apply) {
+  auto fn = apply->getCalleeFunction();
+  if (!fn) return false;
+
+  auto name = fn->getName();
+  return name == "__tf_tensor_from_scalars" ||
+         name == "__tf_tensor_from_scalars_1d";
+}
+
+
 namespace {
   /// This class wraps the state and logic necessary to deabstract code into one
   /// specific SIL function, which has been designated as a potential top-level
@@ -510,7 +523,6 @@ static bool explodeAggregateInst(SILInstruction *inst,
   return true;
 }
 
-
 /// Identify all of the tensor operations in the current function, and scan them
 /// to see if there are any indirect arguments, where the address of a stack
 /// allocation is passed to the builtin.  These occur when the tensor op was in
@@ -561,7 +573,7 @@ void TFDeabstraction::simplifyTensorOperands() {
       // deabstract.  This ensures that we deabstract its operands, which makes
       // it possible to tell if it is getting a variable or constant value.
       if (auto *apply = dyn_cast<ApplyInst>(inst)) {
-        if (SILTensorOpInfo::isDecodableApply(apply)) {
+        if (isDecodableApply(apply)) {
           logIfFirstChange();
           // Remember this for later passes.
           tensorOps.push_back(apply);
@@ -1703,22 +1715,6 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
                                                           deviceConfiguration))
           inst = result;
         continue;
-      }
-    }
-  }
-
-  if (!TFStrictDeabstraction) {
-    for (auto &BB : fn) {
-      for (auto I = BB.begin(), E = BB.end(); I != E; ) {
-        // Manually move iterator to avoid invalidation if we replace 'inst'.
-        auto *inst = &*I++;
-
-        // If this is a well known function that can be transformed into an op,
-        // do so first.
-        // FIXME: This should take into consideration the constants we just
-        // computed!
-        if (auto apply = dyn_cast<ApplyInst>(inst))
-          inst = SILTensorOpInfo::decodeApply(apply);
       }
     }
   }
