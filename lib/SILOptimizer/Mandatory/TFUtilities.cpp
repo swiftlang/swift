@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "TFUtilities"
 #include "TFUtilities.h"
 #include "TFConstExpr.h"
+#include "TFDeviceSupport.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/GenericSignatureBuilder.h"
@@ -20,7 +21,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+// #include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/CommandLine.h"
@@ -42,16 +43,6 @@ diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag, U &&...args) {
 static llvm::cl::opt<bool>
 TFDumpIntermediates("tf-dump-intermediates", llvm::cl::init(false),
               llvm::cl::desc("Dump intermediate results in TensorFlow passes"));
-
-
-static llvm::cl::opt<bool> TFTargetTPU(
-    "tf-target-tpu", llvm::cl::init(false),
-    llvm::cl::desc("If true, target TPU in the generated TF graph. This flag "
-                   "is used for unit testing only"));
-static llvm::cl::opt<bool> TFTargetGPU(
-    "tf-target-gpu", llvm::cl::init(false),
-    llvm::cl::desc("If true, target GPU in the generated TF graph. This flag "
-                   "is used for unit testing only"));
 
 // For Mac builds, default to saving logging files to /tmp since debugging in
 // Xcode and the REPL is so challenging.
@@ -1272,8 +1263,8 @@ SILValue getTensorProtocolHandleMember(SILValue v, SILLocation loc,
 /// scalars they reference.  This potentially replaces the builtin
 /// instruction, so it returns the right one to use.
 // TODO(clattner): Remove this when deabstraction has subsumed it.
-SILInstruction *SILTensorOpInfo::
-canonicalizeOperands(GraphGlobalConfiguration &configuration) {
+SILInstruction *
+SILTensorOpInfo::canonicalizeOperands(GraphFunctionDeviceInfo &deviceInfo) {
   // TODO: Canonicalize metatypes into constants!
 
   SmallVector<SILValue, 8> operands;
@@ -1392,8 +1383,8 @@ canonicalizeOperands(GraphGlobalConfiguration &configuration) {
   } else {
     changed = true;
   }
-  configuration.handleDevicePlacement(opName, opDevice, B, inst->getLoc(),
-                                      operands, name);
+  deviceInfo.handleDevicePlacementLegacy(opName, opDevice, B, inst->getLoc(),
+                                         operands, name);
 
   // If everything is already copasetic, just return our existing instruction.
   if (!changed)
@@ -1510,123 +1501,6 @@ std::string GraphOperationInfo::getStringAttr(unsigned attrIdx,
   assert(attrInfo.first == attrName);
   auto attrValue = attr.value;
   return attrValue.getStringValue().str();
-}
-
-//===----------------------------------------------------------------------===//
-// Device Partitioning Utilities
-//===----------------------------------------------------------------------===//
-
-/// Scan the specified function, looking for logic that configures the current
-/// graph.
-GraphGlobalConfiguration
-GraphGlobalConfiguration::getForFunction(SILFunction &fn,
-                                         bool removeConfigInst) {
-  DeviceType deviceType = DeviceType::CPU;
-  bool isTPUInfeedEnabled = false;
-
-  SILInstruction *firstFound = nullptr;
-  SmallVector<SILInstruction *, 4> configureInsts;
-  for (auto &bb : fn) {
-    for (auto &inst : bb) {
-      // Scan for the device configuration ops if present.
-      auto tfopInfo = SILTensorOpInfo::decode(&inst);
-      if (!tfopInfo) continue;
-      bool isConfigOp = tfopInfo->opName == "tfc.configureTPU" ||
-                        tfopInfo->opName == "tfc.configureGPU";
-      if (!isConfigOp) continue;
-
-      configureInsts.push_back(&inst);
-
-      // If we found one, make sure we don't have more than one.
-      if (firstFound) {
-        diagnose(fn.getASTContext(), inst.getLoc().getSourceLoc(),
-                 diag::tf_multiple_device);
-        diagnose(fn.getASTContext(), firstFound->getLoc().getSourceLoc(),
-                 diag::tf_multiple_device_prev);
-        continue;
-      }
-
-      // Otherwise, remember this one and decode it.
-      firstFound = &inst;
-
-      // Eventually we'll support multiple different configuration ops, so
-      // we recheck the opcode here.
-      if (tfopInfo->opName == "tfc.configureTPU") {
-        // Decode: tfc.configureTPU(isInfeedEnabled: bool)
-        deviceType = DeviceType::TPU;
-        auto infeedEnabled =
-          cast<IntegerLiteralInst>(tfopInfo->getAttrOperand(0));
-        isTPUInfeedEnabled = !infeedEnabled->getValue().isNullValue();
-      } else {
-        assert(tfopInfo->opName == "tfc.configureGPU" &&
-               "unknown device configuration op");
-        deviceType = DeviceType::GPU;
-      }
-    }
-  }
-
-  // If the program didn't specify, fall back to the command line option.
-  if (!firstFound) {
-    // At most one of these test-only flags should be set.
-    // FIXME: Change this to a mutually exclusive flag setting an enum.
-    assert(!TFTargetTPU || !TFTargetGPU);
-    if (TFTargetTPU)
-      deviceType = DeviceType::TPU;
-    if (TFTargetGPU)
-      deviceType = DeviceType::GPU;
-  } else if (auto *outs = getTFDumpIntermediateStream()) {
-    *outs << "Targeting device " << getDeviceString(deviceType)
-          << " for accelerator program, based on config: \n";
-    firstFound->print(*outs);
-  }
-
-  // These instructions are not relevant to later compiler passes in TFPartition
-  // and TFLowerGraph. Removing them so that the later passes need not deal with
-  // this special builtin type.
-  if (removeConfigInst) {
-    for (auto *configureInst : configureInsts) {
-      assert(!configureInst->hasUsesOfAnyResult());
-      recursivelyDeleteTriviallyDeadInstructions(configureInst, /*Force*/ true);
-    }
-  }
-  return GraphGlobalConfiguration(deviceType, isTPUInfeedEnabled);
-}
-
-void GraphGlobalConfiguration::handleDevicePlacement(
-    StringRef opType, StringRef opDevice, SILBuilder &B, SILLocation loc,
-    SmallVectorImpl<GraphOperationAttribute> &attributes) {
-  // No device placement for this special-case "pseudo-op" for
-  // scalar-to-tensor promotion. It will later be translated by compiler (in
-  // PartitionCloner) into real TF ops, where device placement is handled at
-  // that time.
-  if (opType == "tfc.scalarToTensor") {
-    assert(opDevice.empty());
-    return;
-  }
-
-  DeviceType chosenDevice;
-  if (!opDevice.empty())
-    chosenDevice = getOpDeviceType(opDevice);
-  else
-    chosenDevice = chooseDevice(opType);
-
-  markDeviceUsed(chosenDevice);
-
-  // Example output SIL:
-  // %2 = string_literal utf8 "/device:GPU:0"        // user: %3
-  // %3 = builtin "__tfop_Const,dtype,value$tensor,__device"(%0 : $@thin
-  // %Float.Type, %1 : $Builtin.FPIEEE64, %2 : $Builtin.RawPointer) :
-  // %$TensorHandle<Float> // user: %4
-  //
-  // Note we generate the StringLiteral inst for op device even when the input
-  // `opDevice` is not empty. This is redundant but keeps the code simple, and
-  // we expect the original StringLiteral inst for the op device to get DCE'd
-  // in a later compiler pass.
-  auto deviceString = getDeviceString(chosenDevice);
-  auto &ctx = B.getModule().getASTContext();
-  attributes.push_back(
-      {ctx.getIdentifier(DEVICE_ATTR),
-       SymbolicValue::getString(deviceString, ctx.getAllocator())});
 }
 
 //===----------------------------------------------------------------------===//

@@ -37,15 +37,15 @@ public func test1SendWithParam(x: Float) {
   _hostOp(a.toHost())
 }
 
-// GPU function takes the input arg of x.
-// CHECK-LABEL: --- TFDevicePartition Per-Device Function Extraction Result: {{.*}}test1SendWithParam{{.*}}GPU{{.*}}
-// CHECK: bb0(%0 : $TensorHandle
-// CHECK: graph_op "tfc.D2DTensorSend
-
 // CPU function takes no input arg.
 // CHECK-LABEL: --- TFDevicePartition Per-Device Function Extraction Result: {{.*}}test1SendWithParam{{.*}}CPU{{.*}}
 // CHECK: bb0:
 // CHECK: graph_op "tfc.D2DTensorRecv
+
+// GPU function takes the input arg of x.
+// CHECK-LABEL: --- TFDevicePartition Per-Device Function Extraction Result: {{.*}}test1SendWithParam{{.*}}GPU{{.*}}
+// CHECK: bb0(%0 : $TensorHandle
+// CHECK: graph_op "tfc.D2DTensorSend
 
 // The _Send node should be hooked up as a control dependency on the return
  // node, so that Sends gets run before the function returns.
@@ -256,11 +256,11 @@ public func test1RecvScalarGPU() {
 // CHECK:      graph_op "tfc.RecvFromHost
 // CHECK-NEXT: graph_op "tfc.TensorTransfer
 
-// CHECK-LABEL: --- TFDevicePartition Per-Device Function Extraction Result: {{.*}}test1RecvScalarGPU{{.*}}GPU{{.*}}
-// CHECK: graph_op "tfc.D2DTensorRecv
-
 // CHECK-LABEL: --- TFDevicePartition Per-Device Function Extraction Result: {{.*}}test1RecvScalarGPU{{.*}}CPU{{.*}}
 // CHECK: graph_op "tfc.D2DTensorSend
+
+// CHECK-LABEL: --- TFDevicePartition Per-Device Function Extraction Result: {{.*}}test1RecvScalarGPU{{.*}}GPU{{.*}}
+// CHECK: graph_op "tfc.D2DTensorRecv
 
 public func test1RecvScalarTPU() {
   TensorFlow.enableTPU()
@@ -323,7 +323,7 @@ public func test1RecvTensorCPU() {
 
 public func test1RecvTensorTPU() {
   TensorFlow.enableTPU()
-  let a_tpu_h: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: Float(1.0), __device: "TPU_SYSTEM")
+  let a_tpu_h: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: 1.0, __device: "TPU_SYSTEM")
   let a_tpu = Tensor<Float>(handle: a_tpu_h)
   // Tensor transfer for the param of atariSim(): TPU->CPU, and then CPU->host.
   let a_host = a_tpu.toHost(shape: TensorShape())
@@ -336,7 +336,7 @@ public func test1RecvTensorTPU() {
 public func test1RecvTensorTPU_ToHostNoShape_Error() {
   TensorFlow.enableTPU()
   // expected-error @+1 {{TPU outfeed dequeue supports dequeuing a single tensor -- did you specify shape?}}
-  let a_tpu_h: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: Float(1.0), __device: "TPU_SYSTEM")
+  let a_tpu_h: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: 1.0, __device: "TPU_SYSTEM")
   let a_tpu = Tensor<Float>(handle: a_tpu_h)
   // Tensor transfer for the param of atariSim(): TPU->CPU, and then CPU->host.
   let a_host = a_tpu.toHost()
@@ -348,10 +348,10 @@ public func test1RecvTensorTPU_ToHostNoShape_Error() {
 
 // TODO: fix the wrong diagnostic location, due to an invalid SILLocation value
 // in a graph op
-// expected-error @+1 {{TPU infeed dequeue supports dequeuing a single tensor -- did you specify shape?}}
+// expected-error @+1 {{TPU infeed enqueue supports enqueuing a single tensor -- did you specify shape?}}
 public func test1RecvTensorTPU_ToAcceleratorNoShape_Error() {
   TensorFlow.enableTPU()
-  let a_tpu_h: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: Float(1.0), __device: "TPU_SYSTEM")
+  let a_tpu_h: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: 1.0, __device: "TPU_SYSTEM")
   let a_tpu = Tensor<Float>(handle: a_tpu_h)
   // Tensor transfer for the param of atariSim(): TPU->CPU, and then CPU->host.
   let a_host = a_tpu.toHost(shape: TensorShape())
@@ -366,7 +366,7 @@ public func test1RecvTensorTPU_ToAcceleratorNoShape_Error() {
 // Specifying shapes for CPU<->GPU sends/recvs should not hurt.
 public func test1RecvTensorGPU_WithShapes() {
   TensorFlow.enableGPU()
-  let a_gpu_h: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: Float(1.0), __device: "/device:CPU:0")
+  let a_gpu_h: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: 1.0, __device: "/device:CPU:0")
   let a_gpu = Tensor<Float>(handle: a_gpu_h)
   // One send.
   // Tensor transfer for the param of atariSim(): GPU->CPU, and then CPU->host.
