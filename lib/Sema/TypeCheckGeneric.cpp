@@ -923,16 +923,6 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func,
   }
 
   auto paramLists = func->getParameterLists();
-  SmallVector<ParameterList*, 4> storedParamLists;
-
-  // FIXME: Destructors don't have the '()' pattern in their signature, so
-  // paste it here.
-  if (isa<DestructorDecl>(func)) {
-    assert(paramLists.size() == 1 && "Only the self paramlist");
-    storedParamLists.push_back(paramLists[0]);
-    storedParamLists.push_back(ParameterList::createEmpty(Context));
-    paramLists = storedParamLists;
-  }
 
   bool hasSelf = func->getDeclContext()->isTypeContext();
   for (unsigned i = 0, e = paramLists.size(); i != e; ++i) {

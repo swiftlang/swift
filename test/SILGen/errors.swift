@@ -965,12 +965,12 @@ class SomeErrorClass : Error { }
 
 // CHECK-LABEL: sil_vtable SomeErrorClass
 // CHECK-NEXT:   #SomeErrorClass.init!initializer.1: {{.*}} : @$S6errors14SomeErrorClassCACycfc
-// CHECK-NEXT:   #SomeErrorClass.deinit!deallocator: @$S6errors14SomeErrorClassCfD
+// CHECK-NEXT:   #SomeErrorClass.deinit!deallocator.1: @$S6errors14SomeErrorClassCfD
 // CHECK-NEXT: }
 
 class OtherErrorSub : OtherError { }
 
 // CHECK-LABEL: sil_vtable OtherErrorSub {
 // CHECK-NEXT:  #OtherError.init!initializer.1: {{.*}} : @$S6errors13OtherErrorSubCACycfc [override]     // OtherErrorSub.init()
-// CHECK-NEXT:  #OtherErrorSub.deinit!deallocator: @$S6errors13OtherErrorSubCfD        // OtherErrorSub.__deallocating_deinit
+// CHECK-NEXT:  #OtherErrorSub.deinit!deallocator.1: @$S6errors13OtherErrorSubCfD        // OtherErrorSub.__deallocating_deinit
 // CHECK-NEXT:}

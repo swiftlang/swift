@@ -6096,21 +6096,20 @@ public:
 /// }
 /// \endcode
 class DestructorDecl : public AbstractFunctionDecl {
-  ParameterList *SelfParameter;
+  ParameterList *ParameterLists[2];
+
 public:
   DestructorDecl(SourceLoc DestructorLoc, ParamDecl *selfDecl,
                  DeclContext *Parent);
-  
+
   void setSelfDecl(ParamDecl *selfDecl);
 
   MutableArrayRef<ParameterList *> getParameterLists() {
-    return { &SelfParameter, 1 };
+    return { ParameterLists, 2 };
   }
   ArrayRef<const ParameterList *> getParameterLists() const {
-    return { &SelfParameter, 1 };
+    return { ParameterLists, 2 };
   }
-
-
   
   SourceLoc getDestructorLoc() const { return getNameLoc(); }
   SourceLoc getStartLoc() const { return getDestructorLoc(); }

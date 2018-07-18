@@ -587,7 +587,7 @@ class Sub : Base {
 // CHECK-NEXT: #Base.value!setter.1: (Base) -> (Int32) -> () : @$S10addressors4BaseC5values5Int32Vvs
 // CHECK-NEXT: #Base.value!materializeForSet.1: (Base) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, Builtin.RawPointer?) : @$S10addressors4BaseC5values5Int32Vvm
 // CHECK-NEXT: #Base.init!initializer.1: (Base.Type) -> () -> Base : @$S10addressors4BaseCACycfc
-// CHECK-NEXT: #Base.deinit!deallocator: @$S10addressors4BaseCfD
+// CHECK-NEXT: #Base.deinit!deallocator.1: @$S10addressors4BaseCfD
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_vtable Sub {
@@ -598,5 +598,5 @@ class Sub : Base {
 // CHECK-NEXT: #Base.value!setter.1: (Base) -> (Int32) -> () : @$S10addressors3SubC5values5Int32Vvs
 // CHECK-NEXT: #Base.value!materializeForSet.1: (Base) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, Builtin.RawPointer?) : @$S10addressors3SubC5values5Int32Vvm
 // CHECK-NEXT: #Base.init!initializer.1: (Base.Type) -> () -> Base : @$S10addressors3SubCACycfc
-// CHECK-NEXT: #Sub.deinit!deallocator: @$S10addressors3SubCfD
+// CHECK-NEXT: #Sub.deinit!deallocator.1: @$S10addressors3SubCfD
 // CHECK-NEXT: }

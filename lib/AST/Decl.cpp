@@ -5379,16 +5379,17 @@ DestructorDecl::DestructorDecl(SourceLoc DestructorLoc, ParamDecl *selfDecl,
   : AbstractFunctionDecl(DeclKind::Destructor, Parent,
                          DeclBaseName::createDestructor(), DestructorLoc,
                          /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-                         /*NumParameterLists=*/1, nullptr) {
+                         /*NumParameterLists=*/2, nullptr) {
   setSelfDecl(selfDecl);
+  ParameterLists[1] = ParameterList::createEmpty(Parent->getASTContext());
 }
 
 void DestructorDecl::setSelfDecl(ParamDecl *selfDecl) {
   if (selfDecl) {
-    SelfParameter = ParameterList::createWithoutLoc(selfDecl);
-    SelfParameter->setDeclContextOfParamDecls(this);
+    ParameterLists[0] = ParameterList::createWithoutLoc(selfDecl);
+    ParameterLists[0]->setDeclContextOfParamDecls(this);
   } else {
-    SelfParameter = nullptr;
+    ParameterLists[0] = nullptr;
   }
 }
 
