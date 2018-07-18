@@ -840,6 +840,9 @@ static void checkReferencedGenericParams(GenericContext *dc,
 void TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   bool invalid = false;
 
+  if (auto *selfDecl = func->getImplicitSelfDecl())
+    invalid |= selfDecl->getInterfaceType()->hasError();
+
   auto *dc = func->getDeclContext();
 
   GenericSignature *sig;

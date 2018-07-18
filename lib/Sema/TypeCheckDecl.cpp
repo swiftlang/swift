@@ -1195,20 +1195,9 @@ static void configureImplicitSelf(TypeChecker &tc,
   selfDecl->setSpecifier(specifier);
 
   selfDecl->setInterfaceType(selfParam.getPlainType());
-}
 
-/// Record the context type of 'self' after the generic environment of
-/// the function has been determined.
-static void recordSelfContextType(AbstractFunctionDecl *func) {
-  auto selfDecl = func->getImplicitSelfDecl();
-  auto selfParam = computeSelfParam(func, /*isInitializingCtor*/true,
-                                    /*wantDynamicSelf*/true);
-
-  auto selfTy = func->mapTypeIntoContext(selfParam.getType());
-  if (selfParam.getParameterFlags().isInOut()) {
-    selfDecl->setSpecifier(VarDecl::Specifier::InOut);
-  }
-  selfDecl->setType(selfTy->getInOutObjectType());
+  if (selfParam.getPlainType()->is<ErrorType>())
+    selfDecl->setInvalid();
 }
 
 static void recordParamContextTypes(AbstractFunctionDecl *func) {
@@ -4177,59 +4166,21 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       configureImplicitSelf(*this, FD);
 
     // If we have generic parameters, check the generic signature now.
-    if (auto gp = FD->getGenericParams()) {
+    if (FD->getGenericParams() || !isa<AccessorDecl>(FD)) {
       validateGenericFuncSignature(FD);
-    } else if (auto genericSig =
-                 FD->getDeclContext()->getGenericSignatureOfContext()) {
-      if (!isa<AccessorDecl>(FD)) {
-        validateGenericFuncSignature(FD);
-      } else {
-        // We've inherited all of the type information already.
-        configureInterfaceType(FD, genericSig);
+      recordParamContextTypes(FD);
+    } else {
+      // We've inherited all of the type information already.
+      configureInterfaceType(FD,
+        FD->getDeclContext()->getGenericSignatureOfContext());
 
-        if (FD->isInvalid() || FD->getInterfaceType()->hasError()) {
-          FD->setInterfaceType(ErrorType::get(Context));
-          FD->setInvalid();
-        }
-
-        FD->setGenericEnvironment(
-          FD->getDeclContext()->getGenericEnvironmentOfContext());
-      }
-    }
-
-    if (!FD->getGenericSignatureOfContext()) {
-      // Set the context type of 'self'.
-      if (FD->getDeclContext()->isTypeContext())
-        recordSelfContextType(FD);
-
-      // Type check the parameters and return type again, now with archetypes.
-      GenericTypeToArchetypeResolver resolver(FD);
-
-      revertGenericFuncSignature(FD);
-
-      bool badType = false;
-      if (!FD->getBodyResultTypeLoc().isNull()) {
-        TypeResolutionOptions options = TypeResolutionFlags::AllowIUO;
-        if (FD->hasDynamicSelf())
-          options |= TypeResolutionFlags::DynamicSelfResult;
-
-        if (validateType(FD->getBodyResultTypeLoc(), FD, options,
-                         &resolver)) {
-          badType = true;
-        }
-      }
-
-      badType |= typeCheckParameterLists(FD, resolver);
-
-      if (badType) {
+      if (FD->getInterfaceType()->hasError()) {
         FD->setInterfaceType(ErrorType::get(Context));
         FD->setInvalid();
-        break;
       }
 
-      configureInterfaceType(FD, FD->getGenericSignature());
-    } else {
-      recordParamContextTypes(FD);
+      FD->setGenericEnvironment(
+        FD->getDeclContext()->getGenericEnvironmentOfContext());
     }
 
     if (!isa<AccessorDecl>(FD) || cast<AccessorDecl>(FD)->isGetter()) {
@@ -4394,31 +4345,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     if (CD->getDeclContext()->isTypeContext())
       configureImplicitSelf(*this, CD);
 
-    if (auto gp = CD->getGenericParams()) {
-      validateGenericFuncSignature(CD);
-    } else if (CD->getDeclContext()->getGenericSignatureOfContext()) {
-      validateGenericFuncSignature(CD);
-    }
-
-    if (!CD->getDeclContext()->getGenericSignatureOfContext()) {
-      // Set the context type of 'self'.
-      if (CD->getDeclContext()->isTypeContext())
-        recordSelfContextType(CD);
-
-      revertGenericFuncSignature(CD);
-
-      // Type check the constructor parameters.
-      GenericTypeToArchetypeResolver resolver(CD);
-      if (typeCheckParameterLists(CD, resolver) || CD->isInvalid()) {
-        CD->setInterfaceType(ErrorType::get(Context));
-        CD->setInvalid();
-      } else {
-        if (!CD->getGenericSignatureOfContext())
-          configureInterfaceType(CD, CD->getGenericSignature());
-      }
-    } else {
-      recordParamContextTypes(CD);
-    }
+    validateGenericFuncSignature(CD);
+    recordParamContextTypes(CD);
 
     // We want the constructor to be available for name lookup as soon
     // as it has a valid interface type.
@@ -4472,20 +4400,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     configureImplicitSelf(*this, DD);
 
-    if (DD->getDeclContext()->getGenericSignatureOfContext()) {
-      validateGenericFuncSignature(DD);
-    }
-
+    validateGenericFuncSignature(DD);
     recordParamContextTypes(DD);
-
-    GenericTypeToArchetypeResolver resolver(DD);
-    if (typeCheckParameterLists(DD, resolver)) {
-      DD->setInterfaceType(ErrorType::get(Context));
-      DD->setInvalid();
-    }
-
-    if (!DD->getGenericSignatureOfContext())
-      configureInterfaceType(DD, DD->getGenericSignature());
 
     DD->setSignatureIsValidated();
 
@@ -4507,37 +4423,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     DeclValidationRAII IBV(SD);
 
-    auto dc = SD->getDeclContext();
-
-    if (auto gp = SD->getGenericParams()) {
-      validateGenericSubscriptSignature(SD);
-    } else if (dc->getGenericSignatureOfContext()) {
-      validateGenericSubscriptSignature(SD);
-    }
-
-    if (!SD->getGenericSignatureOfContext()) {
-      // Type check the subscript parameters.
-      GenericTypeToArchetypeResolver resolver(SD);
-
-      bool isInvalid = validateType(SD->getElementTypeLoc(), SD,
-                                    TypeResolutionFlags::AllowIUO,
-                                    &resolver);
-      TypeResolutionOptions options;
-      options |= TypeResolutionFlags::SubscriptParameters;
-
-      isInvalid |= typeCheckParameterList(SD->getIndices(), SD,
-                                          options,
-                                          resolver);
-
-      if (isInvalid || SD->isInvalid()) {
-        SD->setInterfaceType(ErrorType::get(Context));
-        SD->setInvalid();
-      } else {
-        configureInterfaceType(SD, SD->getGenericSignature());
-      }
-    } else {
-      recordIndexContextTypes(SD);
-    }
+    validateGenericSubscriptSignature(SD);
+    recordIndexContextTypes(SD);
 
     SD->setSignatureIsValidated();
 
@@ -4553,7 +4440,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     }
 
     // Member subscripts need some special validation logic.
-    if (dc->isTypeContext()) {
+    if (SD->getDeclContext()->isTypeContext()) {
       // If this is a class member, mark it final if the class is final.
       inferFinalAndDiagnoseIfNeeded(*this, SD, StaticSpellingKind::None);
 
