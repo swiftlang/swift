@@ -2814,7 +2814,10 @@ static bool tryIntegerCastFixIts(InFlightDiagnostic &diag, ConstraintSystem &CS,
   if (!isIntegerType(fromType, CS) || !isIntegerType(toType, CS))
     return false;
 
-  auto getInnerCastedExpr = [&]() -> Expr* {
+  auto getInnerCastedExpr = [&]() -> Expr * {
+    if (auto *CE = dyn_cast<CoerceExpr>(expr))
+      return CE->getSubExpr();
+
     auto *CE = dyn_cast<CallExpr>(expr);
     if (!CE)
       return nullptr;

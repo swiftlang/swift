@@ -974,6 +974,10 @@ namespace {
     /// Simplify a key path expression into a canonical form.
     void resolveKeyPathExpr(KeyPathExpr *KPE);
 
+    /// Simplify constructs like `UInt32(1)` into `1 as UInt32` if
+    /// the type conforms to the expected literal protocol.
+    Expr *simplifyTypeConstructionWithLiteralArg(Expr *E);
+
   public:
     PreCheckExpression(TypeChecker &tc, DeclContext *dc, Expr *parent)
         : TC(tc), DC(dc), ParentExpr(parent) {}
@@ -1216,6 +1220,9 @@ namespace {
         resolveKeyPathExpr(KPE);
         return KPE;
       }
+
+      if (auto *simplified = simplifyTypeConstructionWithLiteralArg(expr))
+        return simplified;
 
       return expr;
     }
@@ -1822,6 +1829,66 @@ void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
 
   KPE->setRootType(rootType);
   KPE->resolveComponents(TC.Context, components);
+}
+
+Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
+  // If constructor call is expected to produce an optional let's not attempt
+  // this optimization because literal initializers aren't failable.
+  if (!TC.getLangOpts().isSwiftVersionAtLeast(5)) {
+    if (!ExprStack.empty()) {
+      auto *parent = ExprStack.back();
+      if (isa<BindOptionalExpr>(parent) || isa<ForceValueExpr>(parent))
+        return nullptr;
+    }
+  }
+
+  auto *call = dyn_cast<CallExpr>(E);
+  if (!call || call->getNumArguments() != 1)
+    return nullptr;
+
+  auto *typeExpr = dyn_cast<TypeExpr>(call->getFn());
+  if (!typeExpr)
+    return nullptr;
+
+  auto *argExpr = call->getArg()->getSemanticsProvidingExpr();
+  auto *literal = dyn_cast<LiteralExpr>(argExpr);
+  if (!literal)
+    return nullptr;
+
+  auto *protocol = TC.getLiteralProtocol(literal);
+  if (!protocol)
+    return nullptr;
+
+  Type type;
+  if (typeExpr->getTypeLoc().wasValidated()) {
+    type = typeExpr->getTypeLoc().getType();
+  } else if (auto *rep = typeExpr->getTypeRepr()) {
+    TypeResolutionOptions options;
+    options |= TypeResolutionFlags::AllowUnboundGenerics;
+    options |= TypeResolutionFlags::InExpression;
+    type = TC.resolveType(rep, DC, options);
+    typeExpr->getTypeLoc().setType(type);
+  }
+
+  if (!type)
+    return nullptr;
+
+  // Don't bother to convert deprecated selector syntax.
+  if (auto selectorTy = TC.getObjCSelectorType(DC)) {
+    if (type->isEqual(selectorTy))
+      return nullptr;
+  }
+
+  ConformanceCheckOptions options;
+  options |= ConformanceCheckFlags::InExpression;
+  options |= ConformanceCheckFlags::SkipConditionalRequirements;
+
+  auto result = TC.conformsToProtocol(type, protocol, DC, options);
+  if (!result || !result->isConcrete())
+    return nullptr;
+
+  return CoerceExpr::forLiteralInit(TC.Context, argExpr, call->getSourceRange(),
+                                    typeExpr->getTypeLoc());
 }
 
 /// \brief Clean up the given ill-formed expression, removing any references
