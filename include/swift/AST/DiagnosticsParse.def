@@ -1698,8 +1698,10 @@ ERROR(sil_const_expected_fp_datatype,PointsToFirstBadToken,
       "expected floating point datatype ('f32' or 'f64')", ())
 ERROR(sil_const_expected_fp_value,PointsToFirstBadToken,
       "expected floating point value in SIL constant value", ())
-ERROR(sil_const_aggregate_expected_rsquare,PointsToFirstBadToken,
-      "expected ']' at end of aggregate 'SymbolicValue'", ())
+ERROR(sil_const_array_expected_rsquare,PointsToFirstBadToken,
+      "expected ']' at end of array 'SymbolicValue'", ())
+ERROR(sil_const_aggregate_expected_rparen,PointsToFirstBadToken,
+      "expected ')' at end of aggregate 'SymbolicValue'", ())
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

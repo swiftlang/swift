@@ -718,6 +718,14 @@ ConstExprFunctionState::computeOpaqueCallResult(ApplyInst *apply,
                                    UnknownReason::Default);
 }
 
+/// If the specified type is a Swift.Array of some element type, then return the
+/// element type.  Otherwise, return a null Type.
+static Type getArrayElementType(Type ty) {
+  if (auto bgst = ty->getAs<BoundGenericStructType>())
+    if (bgst->getDecl() == bgst->getASTContext().getArrayDecl())
+      return bgst->getGenericArgs()[0];
+  return Type();
+}
 
 // TODO: Refactor this to someplace common, this is defined in Devirtualize.cpp.
 SubstitutionMap
@@ -825,10 +833,13 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
     }
 
     auto arrayType = apply->getType().castTo<TupleType>()->getElementType(0);
+    auto arrayEltType = getArrayElementType(arrayType);
+    assert(arrayEltType && "Couldn't understand Swift.Array type?");
 
     // Build this value as an array of elements.  Wrap it up into a memory
     // object with an address refering to it.
     auto arrayVal = SymbolicValue::getArray(elementConstants,
+                                            arrayEltType->getCanonicalType(),
                                             evaluator.getAllocator());
 
     auto *memObject =
@@ -956,15 +967,6 @@ SymbolicValue ConstExprFunctionState::getConstantValue(SILValue value) {
   return calculatedValues[value] = result;
 }
 
-/// If the specified type is a Swift.Array of some element type, then return the
-/// element type.  Otherwise, return a null Type.
-static Type getArrayElementType(Type ty) {
-  if (auto bgst = ty->getAs<BoundGenericStructType>())
-    if (bgst->getDecl() == bgst->getASTContext().getArrayDecl())
-      return bgst->getGenericArgs()[0];
-  return Type();
-}
-
 /// Given an aggregate value like {{1, 2}, 3} and an access path like [0,1], and
 /// a scalar like 4, return the aggregate value with the indexed element
 /// replaced with its specified scalar, producing {{1, 4}, 3} in this case.
@@ -1000,35 +1002,37 @@ static bool updateIndexedElement(SymbolicValue &aggregate,
     aggregate = SymbolicValue::getAggregate(newElts, allocator);
   }
 
+  unsigned elementNo = indices.front();
+
   // If we have a non-aggregate then fail.
   if (aggregate.getKind() != SymbolicValue::Aggregate &&
       aggregate.getKind() != SymbolicValue::Array)
     return true;
 
-  unsigned elementNo = indices.front();
+  ArrayRef<SymbolicValue> oldElts;
   Type eltType;
 
   // We need to have an array, struct or a tuple type.
-  if (auto ty = getArrayElementType(type)) {
-    eltType = ty;
-  } else if (auto *decl = type->getStructOrBoundGenericStruct()) {
-    auto it = decl->getStoredProperties().begin();
-    std::advance(it, elementNo);
-    eltType = (*it)->getType();
-  } else if (auto tuple = type->getAs<TupleType>()) {
-    assert(elementNo < tuple->getNumElements() && "invalid index");
-    eltType = tuple->getElement(elementNo).getType();
-  } else  {
-    return true;
+  if (aggregate.getKind() == SymbolicValue::Array) {
+    CanType arrayEltTy;
+    oldElts = aggregate.getArrayValue(arrayEltTy);
+    eltType = arrayEltTy;
+  } else {
+    oldElts = aggregate.getAggregateValue();
+
+    if (auto *decl = type->getStructOrBoundGenericStruct()) {
+      auto it = decl->getStoredProperties().begin();
+      std::advance(it, elementNo);
+      eltType = (*it)->getType();
+    } else if (auto tuple = type->getAs<TupleType>()) {
+      assert(elementNo < tuple->getNumElements() && "invalid index");
+      eltType = tuple->getElement(elementNo).getType();
+    } else {
+      return true;
+    }
   }
 
   // Update the indexed element of the aggregate.
-  ArrayRef<SymbolicValue> oldElts;
-  if (aggregate.getKind() == SymbolicValue::Aggregate)
-    oldElts = aggregate.getAggregateValue();
-  else
-    oldElts = aggregate.getArrayValue();
-
   SmallVector<SymbolicValue, 4> newElts(oldElts.begin(), oldElts.end());
   if (updateIndexedElement(newElts[elementNo], indices.drop_front(),
                            scalar, eltType, allocator))
@@ -1037,7 +1041,8 @@ static bool updateIndexedElement(SymbolicValue &aggregate,
   if (aggregate.getKind() == SymbolicValue::Aggregate)
     aggregate = SymbolicValue::getAggregate(newElts, allocator);
   else
-    aggregate = SymbolicValue::getArray(newElts, allocator);
+    aggregate = SymbolicValue::getArray(newElts, eltType->getCanonicalType(),
+                                        allocator);
   return false;
 }
 

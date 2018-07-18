@@ -134,3 +134,7 @@ public func testConvolution(x: Tensor<Float>, filter: Tensor<Float>) -> Tensor<F
                                        strides: (1, 2, 3, 4), padding: .same)
 }
 
+/* CHECK-LABEL: ---- INPUT FUNCTION {{.*}}testConvolution
+ * CHECK: graph_op "Conv2D,i,i"({{.*}} : $TensorHandle<Float>, {{.*}} : $TensorHandle<Float>) {T: $Float, strides: [$Int: (i32 1), [i32 2], [i32 3], [i32 4]], use_cudnn_on_gpu: i1 -1, padding: "SAME", data_format: "NHWC", dilations: [ [i32 1], [i32 1], [i32 1], [i32 1]],
+ * CHECK-LABEL: ---- END OF
+*/
