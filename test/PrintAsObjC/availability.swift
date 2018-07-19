@@ -45,15 +45,21 @@
 // CHECK-DAG: SWIFT_AVAILABILITY(ios_app_extension,unavailable)
 // CHECK-DAG: SWIFT_AVAILABILITY(tvos_app_extension,unavailable)
 // CHECK-DAG: SWIFT_AVAILABILITY(watchos_app_extension,unavailable)
-// CHECK-NEXT: + (void)creditCardFormViewControllerWithPublicKey:(NSInteger)publicKey;
-// CHECK-NEXT: + (void)makeCreditCardFormViewControllerWithPublicKey:(NSInteger)publicKey SWIFT_DEPRECATED_MSG("use something else", "creditCardFormViewControllerWithPublicKey:");
+// CHECK-NEXT: + (void)deprecatedAvailabilityWithValue:(NSInteger)value;
+// CHECK-NEXT: + (void)makeDeprecatedAvailabilityWithValue:(NSInteger)value SWIFT_DEPRECATED_MSG("use something else", "deprecatedAvailabilityWithValue:");
+// CHECK-NEXT: + (void)unavailableAvailabilityWithValue:(NSInteger)value;
+// CHECK-NEXT: + (void)makeUnavailableAvailabilityWithValue:(NSInteger)value
+// CHECK-DAG: SWIFT_UNAVAILABLE_MSG("'__makeUnavailableAvailability' has been renamed to 'unavailableAvailabilityWithValue:': use something else");
 // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: - (nonnull instancetype)initWithX:(NSInteger)_ OBJC_DESIGNATED_INITIALIZER SWIFT_AVAILABILITY(macos,introduced=10.10);
 // CHECK-NEXT: @property (nonatomic, readonly) NSInteger simpleProperty;
 // CHECK-NEXT: @property (nonatomic) NSInteger alwaysUnavailableProperty SWIFT_UNAVAILABLE_MSG("'alwaysUnavailableProperty' has been renamed to 'baz': whatever");
 // CHECK-NEXT: @property (nonatomic, readonly) NSInteger alwaysDeprecatedProperty SWIFT_DEPRECATED_MSG("use something else", "quux");
-// CHECK-NEXT: @property (nonatomic, readonly) NSInteger numberOfAlwaysDeprecatedObjCProperty SWIFT_DEPRECATED_MSG("use something else", "replaceForDeprecatedObjCProperty");
+// CHECK-NEXT: @property (nonatomic, readonly) NSInteger numberOfReplacableDeprecatedObjCProperty SWIFT_DEPRECATED_MSG("use something else", "replaceForDeprecatedObjCProperty");
 // CHECK-NEXT: @property (nonatomic, readonly) NSInteger replaceForDeprecatedObjCProperty;
+// CHECK-NEXT: @property (nonatomic, readonly) NSInteger numberOfReplacableUnavailableObjCProperty
+// CHECK-DAG: SWIFT_UNAVAILABLE_MSG("'replacableUnavailableObjCProperty' has been renamed to 'replaceForUnavailableObjCProperty': use something else");
+// CHECK-NEXT: @property (nonatomic, readonly) NSInteger replaceForUnavailableObjCProperty;
 // CHECK-NEXT: @property (nonatomic, readonly, strong) Availability * _Null_unspecified singlePlatCombinedPropertyClass SWIFT_AVAILABILITY(macos,introduced=10.7,deprecated=10.9,obsoleted=10.10);
 // CHECK-NEXT: @property (nonatomic, readonly) NSInteger platformUnavailableRenameWithMessageProperty SWIFT_AVAILABILITY(macos,unavailable,message="'platformUnavailableRenameWithMessageProperty' has been renamed to 'anotherPlea': still trapped");
 // CHECK-NEXT: @end
@@ -68,6 +74,20 @@
 // CHECK-NEXT: - (nonnull instancetype)init SWIFT_UNAVAILABLE;
 // CHECK-NEXT: + (nonnull instancetype)new SWIFT_DEPRECATED_MSG("-init is unavailable");
 // CHECK-NEXT: - (nonnull instancetype)initWithX:(NSInteger)_ SWIFT_UNAVAILABLE;
+// CHECK-NEXT: @end
+
+// CHECK-LABEL: @interface DeprecatedAvailability
+// CHECK-NEXT: - (void)deprecatedMethodInDeprecatedClassWithFirst:(NSInteger)first second:(NSInteger)second
+// CHECK-DAG: SWIFT_DEPRECATED_MSG("use method in another class instead", "ReplacementAvailable.methodInDeprecatedClass(first:second:)")
+// CHECK-NEXT: @end
+
+// CHECK-LABEL: @interface SWTReplacementAvailable
+// CHECK-NEXT: - (void)methodReplacingInDeprecatedClassWithFirst:(NSInteger)first second:(NSInteger)second;
+// CHECK-NEXT: @end
+
+// CHECK-LABEL: @interface UnavailableAvailability
+// CHECK-NEXT: - (void)unavailableMethodInUnavailableClassWithFirst:(NSInteger)first second:(NSInteger)second
+// CHECK-DAG: SWIFT_UNAVAILABLE_MSG("'unavailableMethodInUnavailableClass' has been renamed to 'ReplacementAvailable.methodInDeprecatedClass(first:second:)': use method in another class instead")
 // CHECK-NEXT: @end
 
 // CHECK-LABEL: SWIFT_CLASS("{{.+}}WholeClassAvailability") 
@@ -86,7 +106,7 @@
 
 @objc class Availability {
     @objc func alwaysAvailable() {}
-
+    
     @available(*, unavailable)
     @objc func alwaysUnavailable() {}
     @available(*, unavailable, message: "stuff happened")
@@ -95,7 +115,7 @@
     @objc func alwaysUnavailableThree() {}
     @available(*, unavailable, message: "whatever", renamed: "baz")
     @objc func alwaysUnavailableFour() {}
-
+    
     @available(*, deprecated)
     @objc func alwaysDeprecated() {}
     @available(*, deprecated, message: "it's old")
@@ -104,17 +124,17 @@
     @objc func alwaysDeprecatedThree() {}
     @available(*, deprecated, message: "use something else", renamed: "quux")
     @objc func alwaysDeprecatedFour() {}
-
+    
     @available(*, deprecated, message: "one\ntwo\tthree\rfour\\ \"five\"")
     @objc func escapeMessage() {}
     @available(*, deprecated, message: "über")
     @objc func unicodeMessage() {}
-
+    
     @available(macOS 10.10, *)
     @objc func singlePlatShorthand() {}
     @available(macOS 10.11, iOS 9.0, tvOS 9.0, watchOS 3.0, *)
     @objc func multiPlatShorthand() {}
-
+    
     @available(iOS, introduced: 9.0)
     @objc func singlePlatIntroduced() {}
     @available(macOS, deprecated: 10.10)
@@ -135,95 +155,116 @@
     @objc func singlePlatObsoleted() {}
     @available(macOS, introduced: 10.7, deprecated: 10.9, obsoleted: 10.10)
     @objc func singlePlatCombined() {}
-
+    
     @available(macOS, introduced: 10.6, deprecated: 10.8, obsoleted: 10.9)
     @available(iOS, introduced: 7.0, deprecated: 9.0, obsoleted: 10.0)
     @objc func multiPlatCombined() {}
-
+    
     @available(macOS, unavailable, message: "help I'm trapped in an availability factory")
     @objc func platUnavailableMessage() {}
     @available(macOS, unavailable, renamed: "plea")
     @objc func platUnavailableRename() {}
     @available(macOS, unavailable, renamed: "anotherPlea", message: "still trapped")
     @objc func platUnavailableRenameWithMessage() {}
-
+    
     @available(macOSApplicationExtension, unavailable)
     @available(iOSApplicationExtension, unavailable)
     @available(tvOSApplicationExtension, unavailable)
     @available(watchOSApplicationExtension, unavailable)
     @objc func extensionUnavailable() {}
+    
+    @objc(deprecatedAvailabilityWithValue:)
+    public class func makeDeprecatedAvailability(withValue value: Int) {}
+    
+    @available(*, deprecated,
+    message: "use something else",
+    renamed: "makeDeprecatedAvailability(withValue:)")
+    @objc(makeDeprecatedAvailabilityWithValue:) public class func __makeDeprecatedAvailability(withValue value: Int) {}
   
-  @objc(creditCardFormViewControllerWithPublicKey:)
-  public class func makeCreditCardFormViewController(withPublicKey publicKey: Int) {}
+    @objc(unavailableAvailabilityWithValue:)
+    public class func makeUnavailableAvailability(withValue value: Int) {}
   
-  @available(*, deprecated,
-  message: "use something else",
-  renamed: "makeCreditCardFormViewController(withPublicKey:)")
-  @objc(makeCreditCardFormViewControllerWithPublicKey:) public class func __makeCreditCardForm(withPublicKey publicKey: Int) {}
-
-
+    @available(*, unavailable,
+    message: "use something else",
+    renamed: "makeUnavailableAvailability(withValue:)")
+    @objc(makeUnavailableAvailabilityWithValue:) public class func __makeUnavailableAvailability(withValue value: Int) {}
+  
+  
     @objc init() {}
     @available(macOS 10.10, *)
     @objc init(x _: Int) {}
-
+    
     @objc var simpleProperty: Int {
-	get {
-		return 100
-	    }
+        get {
+            return 100
+        }
     }
     @available(*, unavailable, message: "whatever", renamed: "baz")
     @objc var alwaysUnavailableProperty: Int {
-	get {
-		return 100
-	    }
-	set {
-	    }
+        get {
+            return 100
+        }
+        set {
+        }
     }
     @available(*, deprecated, message: "use something else", renamed: "quux")
     @objc var alwaysDeprecatedProperty: Int {
-	get {
-		return -1
-	    }
+        get {
+            return -1
+        }
     }
-  @available(*, deprecated, message: "use something else", renamed: "__replaceForDeprecatedObjCProperty")
-  @objc(numberOfAlwaysDeprecatedObjCProperty) var alwaysDeprecatedObjCProperty: Int {
-    get {
-      return -1
+    @available(*, deprecated, message: "use something else", renamed: "__replaceForDeprecatedObjCProperty")
+    @objc(numberOfReplacableDeprecatedObjCProperty) var replacableDeprecatedObjCProperty: Int {
+        get {
+            return -1
+        }
     }
-  }
-
-  @objc(replaceForDeprecatedObjCProperty) var __replaceForDeprecatedObjCProperty: Int {
-    get {
-      return -1
+    
+    @objc(replaceForDeprecatedObjCProperty) var __replaceForDeprecatedObjCProperty: Int {
+        get {
+            return -1
+        }
     }
-  }
-
+  
+    @available(*, unavailable, message: "use something else", renamed: "__replaceForUnavailableObjCProperty")
+    @objc(numberOfReplacableUnavailableObjCProperty) var replacableUnavailableObjCProperty: Int {
+      get {
+        return -1
+      }
+    }
+  
+    @objc(replaceForUnavailableObjCProperty) var __replaceForUnavailableObjCProperty: Int {
+      get {
+        return -1
+      }
+    }
+  
     @available(macOS, introduced: 10.7, deprecated: 10.9, obsoleted: 10.10)
     @objc var singlePlatCombinedPropertyClass: Availability! {
-	get {
-		return nil
-	    }
+        get {
+            return nil
+        }
     }
     @available(macOS, unavailable, renamed: "anotherPlea", message: "still trapped")
     @objc var platformUnavailableRenameWithMessageProperty: Int {
-	get {
-		return -1
-	    }
+        get {
+            return -1
+        }
     }
 }
 
 // Deliberately a high number that the default deployment target will not reach.
 @available(macOS 999, *)
 extension Availability {
-  @objc func extensionAvailability(_: WholeClassAvailability) {}
-
-
-  @available(macOS, deprecated: 10.10)
-  @objc var propertyDeprecatedInsideExtension: Int {
-	  get {
-		  return 0
-	  }
-  }
+    @objc func extensionAvailability(_: WholeClassAvailability) {}
+    
+    
+    @available(macOS, deprecated: 10.10)
+    @objc var propertyDeprecatedInsideExtension: Int {
+        get {
+            return 0
+        }
+    }
 }
 
 @objc class AvailabilitySub: Availability {
@@ -235,10 +276,29 @@ extension Availability {
 
 @available(macOS 999, *)
 @objc @objcMembers class WholeClassAvailability {
-  func wholeClassAvailability(_: WholeProtoAvailability) {}
+    func wholeClassAvailability(_: WholeProtoAvailability) {}
 }
 
 @available(macOS 999, *)
 @objc protocol WholeProtoAvailability {
-  func wholeProtoAvailability(_: WholeClassAvailability)
+    func wholeProtoAvailability(_: WholeClassAvailability)
 }
+
+
+@objc(SWTReplacementAvailable) class ReplacementAvailable {
+    @objc(methodReplacingInDeprecatedClassWithFirst:second:) func methodReplacingInDeprecatedClass(first: Int, second: Int) -> Void {}
+}
+
+@available(macOS, deprecated, renamed: "ReplacementAvailable")
+@objc class DeprecatedAvailability {
+    @available(*, deprecated, message: "use method in another class instead", renamed: "ReplacementAvailable.methodInDeprecatedClass(first:second:)")
+    @objc func deprecatedMethodInDeprecatedClass(first: Int, second: Int) -> Void {}
+}
+
+@available(macOS, unavailable, renamed: "ReplacementAvailable")
+@objc class UnavailableAvailability {
+  @available(*, unavailable, message: "use method in another class instead", renamed: "ReplacementAvailable.methodInDeprecatedClass(first:second:)")
+  @objc func unavailableMethodInUnavailableClass(first: Int, second: Int) -> Void {}
+}
+
+
