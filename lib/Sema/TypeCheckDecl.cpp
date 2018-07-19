@@ -2620,7 +2620,10 @@ public:
   }
   
   void visitAssociatedTypeDecl(AssociatedTypeDecl *AT) {
+    TC.checkDeclAttributesEarly(AT);
+
     TC.validateDecl(AT);
+    TC.checkDeclAttributes(AT);
 
     TC.checkInheritanceClause(AT);
 
@@ -3124,6 +3127,8 @@ public:
   }
 
   void visitEnumElementDecl(EnumElementDecl *EED) {
+    TC.checkDeclAttributesEarly(EED);
+
     TC.validateDecl(EED);
     TC.checkDeclAttributes(EED);
 
@@ -3799,8 +3804,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     DeclValidationRAII IBV(assocType);
 
-    checkDeclAttributesEarly(assocType);
-
     // Check the default definition, if there is one.
     TypeLoc &defaultDefinition = assocType->getDefaultDefinitionLoc();
     if (!defaultDefinition.isNull()) {
@@ -3827,7 +3830,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     if (!assocType->hasInterfaceType())
       assocType->computeType();
 
-    checkDeclAttributes(assocType);
     break;
   }
 
@@ -4386,7 +4388,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     auto *EED = cast<EnumElementDecl>(D);
     EnumDecl *ED = EED->getParentEnum();
 
-    checkDeclAttributesEarly(EED);
     validateAttributes(*this, EED);
 
     DeclValidationRAII IBV(EED);

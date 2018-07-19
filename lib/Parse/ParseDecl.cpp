@@ -4223,8 +4223,9 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
 
     // Parse the body.
     Scope S(this, ScopeKind::FunctionBody);
-    for (auto PL : accessor->getParameterLists())
-      addParametersToScope(PL);
+    if (auto *P = accessor->getImplicitSelfDecl())
+      addToScope(P);
+    addParametersToScope(accessor->getParameters());
 
     if (accessor->isGeneric())
       for (auto *GP : accessor->getGenericParams()->getParams())
@@ -4232,8 +4233,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
 
     // Establish the new context.
     ParseFunctionBody CC(*this, accessor);
-    for (auto PL : accessor->getParameterLists())
-      setLocalDiscriminatorToParamList(PL);
+    setLocalDiscriminatorToParamList(accessor->getParameters());
 
     // Parse the body.
     SmallVector<ASTNode, 16> Entries;
@@ -4321,8 +4321,7 @@ void Parser::parseAccessorBodyDelayed(AbstractFunctionDecl *AFD) {
   // Re-enter the lexical scope.
   Scope S(this, AccessorParserState->takeScope());
   ParseFunctionBody CC(*this, AFD);
-  for (auto PL : AFD->getParameterLists())
-    setLocalDiscriminatorToParamList(PL);
+  setLocalDiscriminatorToParamList(AFD->getParameters());
 
   SmallVector<ASTNode, 16> Entries;
   parseBraceItems(Entries);
@@ -4337,13 +4336,13 @@ static void fillInAccessorTypeErrors(Parser &P, FuncDecl *accessor,
   if (!accessor) return;
 
   // Fill in the parameter types.
-  for (auto paramList : accessor->getParameterLists()) {
-    for (auto param : *paramList) {
-      if (param->getTypeLoc().isNull()) {
-        param->getTypeLoc().setInvalidType(P.Context);
-      }
-    }
-  }
+  if (auto *param = accessor->getImplicitSelfDecl())
+    if (param->getTypeLoc().isNull())
+      param->getTypeLoc().setInvalidType(P.Context);
+
+  for (auto *param : *accessor->getParameters())
+    if (param->getTypeLoc().isNull())
+      param->getTypeLoc().setInvalidType(P.Context);
 
   // Fill in the result type.
   switch (kind) {
@@ -4663,7 +4662,7 @@ Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
                            AddressorKind::NotAddressor, nullptr);
 
     auto argFunc = (WillSet ? WillSet : DidSet);
-    auto argLoc = argFunc->getParameterLists().back()->getStartLoc();
+    auto argLoc = argFunc->getParameters()->getStartLoc();
 
     auto argument = createSetterAccessorArgument(
         argLoc, Identifier(), AccessorKind::Set, P, elementTy);
@@ -5311,14 +5310,14 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
       CodeCompletion->setParsedDecl(FD);
 
     DefaultArgs.setFunctionContext(FD, FD->getParameterLists());
-    for (auto PL : FD->getParameterLists())
-      addParametersToScope(PL);
+    if (auto *P = FD->getImplicitSelfDecl())
+      addToScope(P);
+    addParametersToScope(FD->getParameters());
     setLocalDiscriminator(FD);
     
     // Establish the new context.
     ParseFunctionBody CC(*this, FD);
-    for (auto PL : FD->getParameterLists())
-      setLocalDiscriminatorToParamList(PL);
+    setLocalDiscriminatorToParamList(FD->getParameters());
 
     // Check to see if we have a "{" to start a brace statement.
     if (Tok.is(tok::l_brace)) {
@@ -5389,8 +5388,7 @@ bool Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
   // Re-enter the lexical scope.
   Scope S(this, FunctionParserState->takeScope());
   ParseFunctionBody CC(*this, AFD);
-  for (auto PL : AFD->getParameterLists())
-    setLocalDiscriminatorToParamList(PL);
+  setLocalDiscriminatorToParamList(AFD->getParameters());
 
   ParserResult<BraceStmt> Body =
       parseBraceItemList(diag::func_decl_without_brace);
@@ -6253,8 +6251,7 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     } else {
       // Parse the body.
       ParseFunctionBody CC(*this, CD);
-      for (auto PL : CD->getParameterLists())
-        setLocalDiscriminatorToParamList(PL);
+      setLocalDiscriminatorToParamList(CD->getParameters());
 
       if (!isDelayedParsingEnabled()) {
         if (Context.Stats)

@@ -62,6 +62,6 @@ bb0(%0 : $*Any):
 }
 
 sil_vtable XXX {
-  #XXX.deinit!deallocator: @XXX_dtor
+  #XXX.deinit!deallocator.1: @XXX_dtor
   #XXX.init!initializer.1: @XXX_ctor
 }

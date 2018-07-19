@@ -666,13 +666,13 @@ sil @SomeChildItem_destructor : $@convention(method) (@owned SomeChildItem) -> (
 sil_vtable SomeItem {
   #SomeItem.init!allocator.1: @SomeItem_allocator
   #SomeItem.init!initializer.1: @SomeItem_initializer
-  #SomeItem.deinit!deallocator: @SomeItem_destructor
+  #SomeItem.deinit!deallocator.1: @SomeItem_destructor
 }
 
 sil_vtable SomeChildItem {
   #SomeItem.init!allocator.1: @SomeChildItem_allocator
   #SomeItem.init!initializer.1: @SomeChildItem_initializer
-  #SomeChildItem.deinit!deallocator: @SomeChildItem_destructor
+  #SomeChildItem.deinit!deallocator.1: @SomeChildItem_destructor
 }
 
 public protocol PublicProtocol {

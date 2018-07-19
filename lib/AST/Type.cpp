@@ -3437,8 +3437,7 @@ Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
     type = type->replaceSelfParameterType(this);
     if (auto func = dyn_cast<FuncDecl>(baseDecl)) {
       if (func->hasDynamicSelf()) {
-        type = type->replaceCovariantResultType(this,
-                                                func->getNumParameterLists());
+        type = type->replaceCovariantResultType(this, /*uncurryLevel=*/2);
       }
     } else if (isa<ConstructorDecl>(baseDecl)) {
       type = type->replaceCovariantResultType(this, /*uncurryLevel=*/2);

@@ -733,8 +733,10 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             localVal.visit(AFD->getBody());
             if (shouldReturnBasedOnResults())
               return;
-            for (auto *PL : AFD->getParameterLists())
-              localVal.checkParameterList(PL);
+
+            if (auto *P = AFD->getImplicitSelfDecl())
+              localVal.checkValueDecl(P, DeclVisibilityKind::FunctionParameter);
+            localVal.checkParameterList(AFD->getParameters());
             if (shouldReturnBasedOnResults())
               return;
           }

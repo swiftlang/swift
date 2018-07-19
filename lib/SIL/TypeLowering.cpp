@@ -1673,9 +1673,10 @@ static CanAnyFunctionType getDestructorInterfaceType(TypeConverter &TC,
   CanType resultTy = (isDeallocating
                       ? TupleType::getEmpty(C)
                       : C.TheNativeObjectType);
+  CanType methodTy = CanFunctionType::get(TupleType::getEmpty(C), resultTy);
 
   auto sig = TC.getEffectiveGenericSignature(dd);
-  return CanAnyFunctionType::get(sig, classType, resultTy, extInfo);
+  return CanAnyFunctionType::get(sig, classType, methodTy, extInfo);
 }
 
 /// Retrieve the type of the ivar initializer or destroyer method for
