@@ -2689,19 +2689,19 @@ Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
        ImplicitlyUnwrappedOptionalTypeRepr *repr,
        TypeResolutionOptions options) {
   if (!options.contains(TypeResolutionFlags::AllowIUO)) {
-    if (options.contains(TypeResolutionFlags::AllowIUODeprecated)) {
+    // Prior to Swift 5, we allow 'as T!' and turn it into a disjunction.
+    if (TC.Context.isSwiftVersionAtLeast(5)) {
+      TC.diagnose(repr->getStartLoc(),
+                  diag::implicitly_unwrapped_optional_in_illegal_position)
+          .fixItReplace(repr->getExclamationLoc(), "?");
+    } else if (options.contains(TypeResolutionFlags::InCastOrCoercionExpression)) {
       TC.diagnose(
           repr->getStartLoc(),
           diag::implicitly_unwrapped_optional_deprecated_in_this_position);
-    } else if (!TC.Context.isSwiftVersionAtLeast(5)) {
-      TC.diagnose(
-            repr->getStartLoc(),
-            diag::
-                implicitly_unwrapped_optional_in_illegal_position_interpreted_as_optional)
-          .fixItReplace(repr->getExclamationLoc(), "?");
     } else {
-      TC.diagnose(repr->getStartLoc(),
-                  diag::implicitly_unwrapped_optional_in_illegal_position)
+      TC.diagnose(
+          repr->getStartLoc(),
+          diag::implicitly_unwrapped_optional_in_illegal_position_interpreted_as_optional)
           .fixItReplace(repr->getExclamationLoc(), "?");
     }
   }
