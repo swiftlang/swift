@@ -21,6 +21,7 @@
 #include "swift/AST/SimpleRequest.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/TinyPtrVector.h"
 
 namespace swift {
 
@@ -119,6 +120,89 @@ public:
   bool isCached() const { return true; }
   Optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
+};
+
+/// Request to determine the set of declarations that were are overridden
+/// by the given declaration.
+class OverriddenDeclsRequest
+  : public SimpleRequest<OverriddenDeclsRequest,
+                         CacheKind::SeparatelyCached,
+                         llvm::TinyPtrVector<ValueDecl *>,
+                         ValueDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend class SimpleRequest;
+
+  // Evaluation.
+  llvm::TinyPtrVector<ValueDecl *> evaluate(Evaluator &evaluator,
+                                            ValueDecl *decl) const;
+
+public:
+  // Cycle handling
+  llvm::TinyPtrVector<ValueDecl *> breakCycle() const { return { }; }
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<llvm::TinyPtrVector<ValueDecl *>> getCachedResult() const;
+  void cacheResult(llvm::TinyPtrVector<ValueDecl *> value) const;
+};
+
+/// Determine whether the given declaration is exposed to Objective-C.
+class IsObjCRequest :
+    public SimpleRequest<IsObjCRequest,
+                         CacheKind::SeparatelyCached,
+                         bool,
+                         ValueDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend class SimpleRequest;
+
+  // Evaluation.
+  bool evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+
+public:
+  // Cycle handling
+  bool breakCycle() const;
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
+};
+
+/// Determine whether the given declaration is 'dynamic''.
+class IsDynamicRequest :
+    public SimpleRequest<IsDynamicRequest,
+                         CacheKind::SeparatelyCached,
+                         bool,
+                         ValueDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend class SimpleRequest;
+
+  // Evaluation.
+  bool evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+
+public:
+  // Cycle handling
+  bool breakCycle() const;
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
 };
 
 /// The zone number for the type checker.

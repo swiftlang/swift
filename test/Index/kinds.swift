@@ -225,18 +225,6 @@ class NonTestCase {
   // CHECK: [[@LINE-1]]:8 | instance-method/Swift | testMeNot() |
 }
 
-@objc class TargetForIBAction {}
-// CHECK: [[@LINE-1]]:13 | class/Swift | TargetForIBAction | [[TargetForIBAction_USR:.*]] | Def |
-class AttrAnnots {
-  @IBOutlet var iboutletString: AnyObject?
-  // CHECK: [[@LINE-1]]:17 | instance-property(IB)/Swift | iboutletString |
-  @IBAction func someibaction(o: TargetForIBAction) {}
-  // CHECK: [[@LINE-1]]:18 | instance-method(IB)/Swift | someibaction(o:) | {{.*}} | Def,Dyn,RelChild,RelIBType | rel: 2
-  // CHECK-NEXT: RelIBType | class/Swift | TargetForIBAction | [[TargetForIBAction_USR]]
-  @GKInspectable var gkString = "gk"
-  // CHECK: [[@LINE-1]]:22 | instance-property(GKI)/Swift | gkString |
-}
-
 // CHECK: [[@LINE+1]]:7 | class/Swift | C1 | [[C1_USR:.*]] | Def | rel: 0
 class C1 {}
 // CHECK: [[@LINE+1]]:11 | type-alias/Swift | C1Alias | [[C1Alias_USR:.*]] | Def | rel: 0

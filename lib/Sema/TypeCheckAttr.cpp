@@ -355,11 +355,6 @@ void AttributeEarlyChecker::visitMutationAttr(DeclAttribute *attr) {
 }
 
 void AttributeEarlyChecker::visitDynamicAttr(DynamicAttr *attr) {
-  // Only instance members of classes can be dynamic.
-  auto classDecl = D->getDeclContext()->getAsClassOrClassExtensionContext();
-  if (!classDecl)
-    diagnoseAndRemoveAttr(attr, diag::dynamic_not_in_class);
-    
   // Members cannot be both dynamic and final.
   if (D->getAttrs().hasAttribute<FinalAttr>())
     diagnoseAndRemoveAttr(attr, diag::dynamic_with_final);
@@ -1964,7 +1959,10 @@ void AttributeChecker::visitUsableFromInlineAttr(UsableFromInlineAttr *attr) {
   // Symbols of dynamically-dispatched declarations are never referenced
   // directly, so marking them as @usableFromInline does not make sense.
   if (VD->isDynamic()) {
-    diagnoseAndRemoveAttr(attr, diag::usable_from_inline_dynamic_not_supported);
+    if (attr->isImplicit())
+      attr->setInvalid();
+    else
+      diagnoseAndRemoveAttr(attr, diag::usable_from_inline_dynamic_not_supported);
     return;
   }
 

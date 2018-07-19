@@ -1431,7 +1431,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
       // Builtin.swift3ImplicitObjCEntrypoint() to enable runtime logging of
       // the uses of such entrypoints.
       if (attr->isSwift3Inferred() &&
-          !decl->getAttrs().hasAttribute<DynamicAttr>() &&
+          !decl->isDynamic() &&
           !getASTContext().LangOpts.isSwiftVersion3()) {
         
         // Get the starting source location of the declaration so we can say

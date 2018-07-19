@@ -157,8 +157,9 @@ static ConstructorComparison compareConstructors(ConstructorDecl *ctor1,
 }
 
 bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
-                                const ModuleDecl *curModule,
-                                LazyResolver *typeResolver) {
+                                const ModuleDecl *curModule) {
+  auto typeResolver = curModule->getASTContext().getLazyResolver();
+
   // Category declarations by their signatures.
   llvm::SmallDenseMap<std::pair<CanType, DeclBaseName>,
                       llvm::TinyPtrVector<ValueDecl *>>
@@ -478,6 +479,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 {
   ModuleDecl &M = *DC->getParentModule();
   ASTContext &Ctx = M.getASTContext();
+  if (!TypeResolver) TypeResolver = Ctx.getLazyResolver();
   const SourceManager &SM = Ctx.SourceMgr;
   DebuggerClient *DebugClient = M.getDebugClient();
 
@@ -1491,8 +1493,6 @@ void ClassDecl::recordObjCMethod(AbstractFunctionDecl *method) {
     createObjCMethodLookup();
   }
 
-  assert(method->isObjC() && "Not an Objective-C method");
-
   // Record the method.
   bool isInstanceMethod = method->isObjCInstanceMethod();
   auto selector = method->getObjCSelector();
@@ -1614,6 +1614,9 @@ bool DeclContext::lookupQualified(Type type,
   using namespace namelookup;
   assert(decls.empty() && "additive lookup not supported");
 
+  if (!typeResolver)
+    typeResolver = getASTContext().getLazyResolver();
+  
   auto checkLookupCascading = [this, options]() -> Optional<bool> {
     switch (static_cast<unsigned>(options & NL_KnownDependencyMask)) {
     case 0:
@@ -1885,9 +1888,6 @@ bool DeclContext::lookupQualified(Type type,
         continue;
 
       // If the declaration is not @objc, it cannot be called dynamically.
-      if (typeResolver)
-        typeResolver->resolveIsObjC(decl);
-
       if (!decl->isObjC())
         continue;
 
@@ -1920,7 +1920,7 @@ bool DeclContext::lookupQualified(Type type,
   // If we're supposed to remove shadowed/hidden declarations, do so now.
   ModuleDecl *M = getParentModule();
   if (options & NL_RemoveNonVisible)
-    removeShadowedDecls(decls, M, typeResolver);
+    removeShadowedDecls(decls, M);
 
   if (auto *debugClient = M->getDebugClient())
     filterForDiscriminator(decls, debugClient);

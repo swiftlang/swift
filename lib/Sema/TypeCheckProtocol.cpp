@@ -2270,14 +2270,15 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
 
   // Record type witnesses for any "overridden" associated types.
   llvm::SetVector<AssociatedTypeDecl *> overriddenAssocTypes;
-  overriddenAssocTypes.insert(assocType->getOverriddenDecls().begin(),
-                              assocType->getOverriddenDecls().end());
+  auto assocOverriddenDecls = assocType->getOverriddenDecls();
+  overriddenAssocTypes.insert(assocOverriddenDecls.begin(),
+                              assocOverriddenDecls.end());
   for (unsigned idx = 0; idx < overriddenAssocTypes.size(); ++idx) {
     auto overridden = overriddenAssocTypes[idx];
 
     // Note all of the newly-discovered overridden associated types.
-    overriddenAssocTypes.insert(overridden->getOverriddenDecls().begin(),
-                                overridden->getOverriddenDecls().end());
+    auto overriddenDecls = overridden->getOverriddenDecls();
+    overriddenAssocTypes.insert(overriddenDecls.begin(), overriddenDecls.end());
 
     // Find the conformance for this overridden protocol.
     auto overriddenConformance =
@@ -3966,16 +3967,15 @@ TypeChecker::LookUpConformance::operator()(
 /// These conformances might not appear in any substitution lists produced
 /// by Sema, since bridging is done at the SILGen level, so we have to
 /// force them here to ensure SILGen can find them.
-void TypeChecker::useObjectiveCBridgeableConformances(DeclContext *dc,
-                                                      Type type) {
+void swift::useObjectiveCBridgeableConformances(DeclContext *dc, Type type) {
   class Walker : public TypeWalker {
-    TypeChecker &TC;
+    ASTContext &Ctx;
     DeclContext *DC;
     ProtocolDecl *Proto;
 
   public:
-    Walker(TypeChecker &tc, DeclContext *dc, ProtocolDecl *proto)
-      : TC(tc), DC(dc), Proto(proto) { }
+    Walker(DeclContext *dc, ProtocolDecl *proto)
+      : Ctx(dc->getASTContext()), DC(dc), Proto(proto) { }
 
     Action walkToTypePre(Type ty) override {
       ConformanceCheckOptions options =
@@ -3989,23 +3989,27 @@ void TypeChecker::useObjectiveCBridgeableConformances(DeclContext *dc,
         if (isa<ClassDecl>(nominalDecl) || isa<ProtocolDecl>(nominalDecl))
           return Action::Continue;
 
-        (void)TC.conformsToProtocol(ty, Proto, DC, options,
+        auto lazyResolver = Ctx.getLazyResolver();
+        assert(lazyResolver &&
+               "Cannot do conforms-to-protocol check without a type checker");
+        TypeChecker &tc = *static_cast<TypeChecker *>(lazyResolver);
+        (void)tc.conformsToProtocol(ty, Proto, DC, options,
                                     /*ComplainLoc=*/SourceLoc());
 
         // Set and Dictionary bridging also requires the conformance
         // of the key type to Hashable.
-        if (nominalDecl == TC.Context.getSetDecl() ||
-            nominalDecl == TC.Context.getDictionaryDecl()) {
+        if (nominalDecl == Ctx.getSetDecl() ||
+            nominalDecl == Ctx.getDictionaryDecl()) {
           if (auto boundGeneric = ty->getAs<BoundGenericType>()) {
             auto args = boundGeneric->getGenericArgs();
             if (!args.empty()) {
               auto keyType = args[0];
               auto *hashableProto =
-                TC.Context.getProtocol(KnownProtocolKind::Hashable);
+                Ctx.getProtocol(KnownProtocolKind::Hashable);
               if (!hashableProto)
                 return Action::Stop;
 
-              auto result = TC.conformsToProtocol(
+              auto result = tc.conformsToProtocol(
                   keyType, hashableProto, DC, options,
                   /*ComplainLoc=*/SourceLoc());
             }
@@ -4017,18 +4021,18 @@ void TypeChecker::useObjectiveCBridgeableConformances(DeclContext *dc,
     }
   };
 
-  auto proto = getProtocol(SourceLoc(),
-                           KnownProtocolKind::ObjectiveCBridgeable);
+  auto proto =
+    dc->getASTContext().getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
   if (!proto) return;
 
-  Walker walker(*this, dc, proto);
+  Walker walker(dc, proto);
   type.walk(walker);
 }
 
-void TypeChecker::useObjectiveCBridgeableConformancesOfArgs(
+void swift::useObjectiveCBridgeableConformancesOfArgs(
        DeclContext *dc, BoundGenericType *bound) {
-  auto proto = getProtocol(SourceLoc(),
-                           KnownProtocolKind::ObjectiveCBridgeable);
+  ASTContext &ctx = dc->getASTContext();
+  auto proto = ctx.getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
   if (!proto) return;
 
   // Check whether the bound generic type itself is bridged to
@@ -4036,7 +4040,10 @@ void TypeChecker::useObjectiveCBridgeableConformancesOfArgs(
   ConformanceCheckOptions options =
     (ConformanceCheckFlags::InExpression |
      ConformanceCheckFlags::SuppressDependencyTracking);
-  (void)conformsToProtocol(
+  auto lazyResolver = ctx.getLazyResolver();
+  assert(lazyResolver && "Need a type checker to check conforms-to-protocol");
+  auto &tc = *static_cast<TypeChecker *>(lazyResolver);
+  (void)tc.conformsToProtocol(
       bound->getDecl()->getDeclaredType(), proto, dc,
       options, /*ComplainLoc=*/SourceLoc());
 }
@@ -4877,8 +4884,8 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
 }
 
 llvm::TinyPtrVector<ValueDecl *>
-TypeChecker::findWitnessedObjCRequirements(const ValueDecl *witness,
-                                           bool anySingleRequirement) {
+swift::findWitnessedObjCRequirements(const ValueDecl *witness,
+                                     bool anySingleRequirement) {
   llvm::TinyPtrVector<ValueDecl *> result;
 
   // Types don't infer @objc this way.
@@ -4910,6 +4917,7 @@ TypeChecker::findWitnessedObjCRequirements(const ValueDecl *witness,
     }
   }
 
+  ASTContext &ctx = nominal->getASTContext();
   for (auto proto : nominal->getAllProtocols()) {
     // We only care about Objective-C protocols.
     if (!proto->isObjC()) continue;
@@ -4923,7 +4931,7 @@ TypeChecker::findWitnessedObjCRequirements(const ValueDecl *witness,
       if (isa<TypeDecl>(req)) continue;
 
       // Skip unavailable requirements.
-      if (req->getAttrs().isUnavailable(Context)) continue;
+      if (req->getAttrs().isUnavailable(ctx)) continue;
 
       // Dig out the conformance.
       if (!conformance.hasValue()) {
@@ -4937,7 +4945,7 @@ TypeChecker::findWitnessedObjCRequirements(const ValueDecl *witness,
       }
       if (!*conformance) continue;
 
-      const Decl *found = (*conformance)->getWitnessDecl(req, this);
+      const Decl *found = (*conformance)->getWitnessDecl(req, nullptr);
 
       if (!found) {
         // If we have an optional requirement in an inherited conformance,
@@ -4961,7 +4969,10 @@ TypeChecker::findWitnessedObjCRequirements(const ValueDecl *witness,
         if (accessorKind)
           witnessToMatch = cast<AccessorDecl>(witness)->getStorage();
 
-        if (matchWitness(*this, proto, *conformance,
+        auto lazyResolver = ctx.getLazyResolver();
+        assert(lazyResolver && "Need a type checker to match witnesses");
+        auto &tc = *static_cast<TypeChecker *>(lazyResolver);
+        if (matchWitness(tc, proto, *conformance,
                          witnessToMatch->getDeclContext(), req,
                          const_cast<ValueDecl *>(witnessToMatch))
               .Kind == MatchKind::ExactMatch) {

@@ -2242,7 +2242,19 @@ class ValueDecl : public Decl {
     /// Whether there are any "overridden" declarations. The actual overridden
     /// declarations are kept in a side table in the ASTContext.
     unsigned hasOverridden : 1;
+
+    /// Whether the "isDynamic" bit has been computed yet.
+    unsigned isDynamicComputed : 1;
+
+    /// Whether this declaration is 'dynamic', meaning that all uses of
+    /// the declaration will go through an extra level of indirection that
+    /// allows the entity to be replaced at runtime.
+    unsigned isDynamic : 1;
   } LazySemanticInfo;
+
+  friend class OverriddenDeclsRequest;
+  friend class IsObjCRequest;
+  friend class IsDynamicRequest;
 
 protected:
   ValueDecl(DeclKind K,
@@ -2256,6 +2268,8 @@ protected:
     LazySemanticInfo.isObjC = false;
     LazySemanticInfo.hasOverriddenComputed = false;
     LazySemanticInfo.hasOverridden = false;
+    LazySemanticInfo.isDynamicComputed = false;
+    LazySemanticInfo.isDynamic = false;
   }
 
   // MemberLookupTable borrows a bit from this type
@@ -2468,18 +2482,15 @@ public:
   ValueDecl *getOverriddenDecl() const;
 
   /// Retrieve the declarations that this declaration overrides, if any.
-  ArrayRef<ValueDecl *> getOverriddenDecls() const;
+  llvm::TinyPtrVector<ValueDecl *> getOverriddenDecls() const;
 
   /// Set the declaration that this declaration overrides.
   void setOverriddenDecl(ValueDecl *overridden) {
-    (void)setOverriddenDecls(overridden);
+    setOverriddenDecls(overridden);
   }
 
   /// Set the declarations that this declaration overrides.
-  ///
-  /// \returns the ASTContext-allocated version of the array of overridden
-  /// declarations.
-  ArrayRef<ValueDecl *> setOverriddenDecls(ArrayRef<ValueDecl *> overridden);
+  void setOverriddenDecls(ArrayRef<ValueDecl *> overridden);
 
   /// Whether the overridden declarations have already been computed.
   bool overriddenDeclsComputed() const;
@@ -2507,8 +2518,14 @@ public:
   }
 
   /// Is this declaration marked with 'dynamic'?
-  bool isDynamic() const {
-    return getAttrs().hasAttribute<DynamicAttr>();
+  bool isDynamic() const;
+
+  /// Set whether this type is 'dynamic' or not.
+  void setIsDynamic(bool value);
+
+  /// Whether the 'dynamic' bit has been computed already.
+  bool isDynamicComputed() const {
+    return LazySemanticInfo.isDynamicComputed;
   }
 
   /// Returns true if this decl can be found by id-style dynamic lookup.
@@ -2884,11 +2901,7 @@ public:
 
   /// Retrieve the set of associated types overridden by this associated
   /// type.
-  CastArrayRefView<ValueDecl *, AssociatedTypeDecl>
-  getOverriddenDecls() const {
-    return CastArrayRefView<ValueDecl *, AssociatedTypeDecl>(
-        AbstractTypeParamDecl::getOverriddenDecls());
-  }
+  llvm::TinyPtrVector<AssociatedTypeDecl *> getOverriddenDecls() const;
 
   SourceLoc getStartLoc() const { return KeywordLoc; }
   SourceRange getSourceRange() const;
