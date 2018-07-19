@@ -9,6 +9,8 @@
 // RUN: %swift-syntax-test -deserialize-raw-tree -input-source-filename %t.dump -output-filename %t
 // RUN: diff -u %s %t
 
+let strings: [Strin[g]?
+
 // Function body without closing brace token.
 func foo() {
   var a = 2
