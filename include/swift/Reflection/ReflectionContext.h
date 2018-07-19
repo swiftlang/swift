@@ -189,8 +189,27 @@ public:
         LocalStartAddress,
         RemoteStartAddress};
 
-    savedBuffers.push_back(std::move(Buf));
     this->addReflectionInfo(info);
+
+    // Find the __DATA segment.
+    for (unsigned I = 0; I < NumCommands; ++I) {
+      auto CmdBuf = this->getReader().readBytes(
+          RemoteAddress(CmdStartAddress.getAddressData() + Offset),
+          SegmentCmdHdrSize);
+      auto CmdHdr = reinterpret_cast<typename T::SegmentCmd *>(CmdBuf.get());
+      if (strncmp(CmdHdr->segname, "__DATA", sizeof(CmdHdr->segname)) == 0) {
+        auto DataSegmentEnd =
+            ImageStart.getAddressData() + CmdHdr->vmaddr + CmdHdr->vmsize;
+        assert(DataSegmentEnd > ImageStart.getAddressData() &&
+               "invalid range for __DATA");
+        imageRanges.push_back(
+            std::make_tuple(ImageStart, RemoteAddress(DataSegmentEnd)));
+        break;
+      }
+      Offset += CmdHdr->cmdsize;
+    }
+
+    savedBuffers.push_back(std::move(Buf));
     return true;
   }
 
