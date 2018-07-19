@@ -1685,8 +1685,8 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
     // graphOp instruction.
     if (TFStrictDeabstraction) {
       if (auto opInfo = SILTensorOpInfo::decode(inst)) {
-        // Do not translate this special inst into a graph op, since otherwise
-        // it gets removed by the performance pipeline.
+        // Do not translate this special inst into a graph op, since it will get
+        // removed at the beginning of the partition pass.
         // TODO: remove this inst in the getForFunction() call above, once
         // the partition pass is folded into deabstraction.
         if (opInfo->opName == "tfc.configureTPU" ||
