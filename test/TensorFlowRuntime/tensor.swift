@@ -197,8 +197,14 @@ TensorTests.test("WholeTensorSlicing") {
 TensorTests.testAllBackends("Reduction") {
   // 2 x 5
   let x = Tensor<Float>([[1, 2, 3, 4, 5], [1, 2, 3, 4, 5]])
-  let sum = x.sum(squeezingAxes: 0)
-  expectEqual(ShapedArray(shape: [5], scalars: [2, 4, 6, 8, 10]), sum.array)
+  expectEqual(ShapedArray(shape: [5], scalars: [2, 4, 6, 8, 10]),
+              x.sum(squeezingAxes: 0).array)
+  expectEqual(ShapedArray(shape: [1, 5], scalars: [2, 4, 6, 8, 10]),
+              x.sum(alongAxes: 0).array)
+  expectEqual(ShapedArray(shape: [5], scalars: [1, 4, 9, 16, 25]),
+              x.product(squeezingAxes: 0).array)
+  expectEqual(ShapedArray(shape: [1, 5], scalars: [1, 4, 9, 16, 25]),
+              x.product(alongAxes: 0).array)
 }
 
 TensorTests.testAllBackends("Concatenation") {
