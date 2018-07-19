@@ -243,7 +243,8 @@ static bool emitLoadedModuleTraceIfNeeded(ASTContext &ctxt,
   std::string stringBuffer;
   {
     llvm::raw_string_ostream memoryBuffer(stringBuffer);
-    json::Output jsonOutput(memoryBuffer, /*PrettyPrint=*/false);
+    json::Output jsonOutput(memoryBuffer, /*UserInfo=*/{},
+                            /*PrettyPrint=*/false);
     json::jsonize(jsonOutput, trace, /*Required=*/true);
   }
   stringBuffer += "\n";
@@ -290,7 +291,7 @@ static bool emitSyntax(SourceFile *SF, LangOptions &LangOpts,
   auto os = getFileOutputStream(OutputFilename, SF->getASTContext());
   if (!os) return true;
 
-  json::Output jsonOut(*os, /*PrettyPrint=*/false);
+  json::Output jsonOut(*os, /*UserInfo=*/{}, /*PrettyPrint=*/false);
   auto Root = SF->getSyntaxRoot().getRaw();
   jsonOut << *Root;
   *os << "\n";
