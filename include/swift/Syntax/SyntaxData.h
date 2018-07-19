@@ -255,11 +255,11 @@ public:
 
   /// Calculate the absolute end position of this node, use cache of the immediate
   /// next node if populated.
-  AbsolutePosition getAbsoluteEndPosition() const;
+  AbsolutePosition getAbsoluteEndPositionAfterTrailingTrivia() const;
 
   /// Get the absolute position without skipping the leading trivia of this
   /// node.
-  AbsolutePosition getAbsolutePositionWithLeadingTrivia() const;
+  AbsolutePosition getAbsolutePositionBeforeLeadingTrivia() const;
 
   /// Returns true if the data node represents type syntax.
   bool isType() const;

@@ -477,7 +477,7 @@ bool verifyReusedRegions(ByteBasedSourceRangeSet ExpectedReparseRegions,
                          SourceFile *SF) {
   // We always expect the EOF token to be reparsed. Don't complain about it.
   auto Eof = SF->getSyntaxRoot().getChild(SourceFileSyntax::Cursor::EOFToken);
-  auto EofNodeStart = Eof->getAbsolutePositionWithLeadingTrivia().getOffset();
+  auto EofNodeStart = Eof->getAbsolutePositionBeforeLeadingTrivia().getOffset();
   if (ExpectedReparseRegions.Ranges.back().End >= EofNodeStart) {
     // If the last expected reparse region already covers part of the eof
     // leading trivia, extended it
