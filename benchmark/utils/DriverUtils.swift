@@ -83,30 +83,22 @@ struct TestConfig {
       return .help(validOptions)
     }
 
-    if let x = benchArgs.optionalArgsMap["--iter-scale"] {
-      if x.isEmpty { throw ArgumentError.missingValue("--iter-scale") }
-      iterationScale = Int(x)!
+    func optionalArg(_ name: String, _ action: (String) throws -> Void) throws {
+      if let value = benchArgs.optionalArgsMap[name] {
+        guard !value.isEmpty else { throw ArgumentError.missingValue(name) }
+        try action(value)
+      }
     }
-
-    if let x = benchArgs.optionalArgsMap["--num-iters"] {
-      if x.isEmpty { throw ArgumentError.missingValue("--num-iters") }
-      fixedNumIters = numericCast(Int(x)!)
-    }
-
-    if let x = benchArgs.optionalArgsMap["--num-samples"] {
-      if x.isEmpty { throw ArgumentError.missingValue("--num-samples") }
-      numSamples = Int(x)!
-    }
+    try optionalArg("--iter-scale") { iterationScale = Int($0)! }
+    try optionalArg("--num-iters") { fixedNumIters = UInt($0)! }
+    try optionalArg("--num-samples") { numSamples = Int($0)! }
 
     if let _ = benchArgs.optionalArgsMap["--verbose"] {
       verbose = true
       print("Verbose")
     }
 
-    if let x = benchArgs.optionalArgsMap["--delim"] {
-      if x.isEmpty { throw ArgumentError.missingValue("--delim") }
-      delim = x
-    }
+    try optionalArg("--delim") { delim = $0 }
 
     func parseCategory(tag: String) throws -> BenchmarkCategory {
       guard let category = BenchmarkCategory(rawValue: tag) else {
@@ -115,22 +107,21 @@ struct TestConfig {
       return category
     }
 
-    if let x = benchArgs.optionalArgsMap["--tags"] {
-      if x.isEmpty { throw ArgumentError.missingValue("--tags") }
+    try optionalArg("--tags") {
       // We support specifying multiple tags by splitting on comma, i.e.:
       //  --tags=Array,Dictionary
-      tags.formUnion(
-        try x.split(separator: ",").map(String.init).map(parseCategory))
+      tags = Set(
+        try $0.split(separator: ",").map(String.init).map(parseCategory))
     }
 
     if let x = benchArgs.optionalArgsMap["--skip-tags"] {
       // if the --skip-tags parameter is specified, we need to ignore the
       // default and start from a clean slate.
-      skipTags = []
+      // If the parameter's value is empty, $0.split maps into []
 
       // We support specifying multiple tags by splitting on comma, i.e.:
       //  --skip-tags=Array,Set,unstable,skip
-      skipTags.formUnion(
+      skipTags = Set(
         try x.split(separator: ",").map(String.init).map(parseCategory))
     }
 
