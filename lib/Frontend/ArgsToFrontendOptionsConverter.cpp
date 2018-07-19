@@ -72,6 +72,8 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.EnableTesting |= Args.hasArg(OPT_enable_testing);
   Opts.EnableResilience |= Args.hasArg(OPT_enable_resilience);
 
+  Opts.TrackSystemDeps |= Args.hasArg(OPT_track_system_dependencies);
+
   computePrintStatsOptions();
   computeDebugTimeOptions();
   computeTBDOptions();

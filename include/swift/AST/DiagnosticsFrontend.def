@@ -215,6 +215,9 @@ ERROR(error_formatting_invalid_range,none,
 WARNING(stats_disabled,none,
   "compiler was not built with support for collecting statistics", ())
 
+WARNING(tbd_only_supported_in_whole_module,none,
+  "TBD generation is only supported when the whole module can be seen", ())
+
 ERROR(symbol_in_tbd_not_in_ir,none,
       "symbol '%0' (%1) is in TBD file, but not in generated IR",
       (StringRef, StringRef))

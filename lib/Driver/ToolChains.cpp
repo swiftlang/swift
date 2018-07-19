@@ -792,6 +792,8 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
                    "-serialize-diagnostics-path");
   addOutputsOfType(Arguments, context.Output, context.Args,
                    file_types::TY_ObjCHeader, "-emit-objc-header-path");
+  addOutputsOfType(Arguments, context.Output, context.Args, file_types::TY_TBD,
+                   "-emit-tbd-path");
 
   context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
 

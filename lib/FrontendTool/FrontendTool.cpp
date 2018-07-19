@@ -771,9 +771,13 @@ static bool writeTBDIfNeeded(CompilerInvocation &Invocation,
   if (!frontendOpts.InputsAndOutputs.hasTBDPath())
     return false;
 
+  if (!frontendOpts.InputsAndOutputs.isWholeModule()) {
+    Instance.getDiags().diagnose(SourceLoc(),
+                                 diag::tbd_only_supported_in_whole_module);
+    return false;
+  }
+
   const std::string &TBDPath = Invocation.getTBDPathForWholeModule();
-  assert(!TBDPath.empty() &&
-         "If not WMO, getTBDPathForWholeModule should have failed");
 
   auto installName = frontendOpts.TBDInstallName.empty()
                          ? "lib" + Invocation.getModuleName().str() + ".dylib"
@@ -1807,7 +1811,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   if (Invocation.getFrontendOptions()
           .InputsAndOutputs.hasDependencyTrackerPath() ||
       !Invocation.getFrontendOptions().IndexStorePath.empty())
-    Instance->createDependencyTracker();
+    Instance->createDependencyTracker(Invocation.getFrontendOptions().TrackSystemDeps);
 
   if (Instance->setup(Invocation)) {
     return finishDiagProcessing(1);

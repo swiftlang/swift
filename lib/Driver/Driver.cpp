@@ -2185,11 +2185,11 @@ static bool hasExistingAdditionalOutput(CommandOutput &output,
   return false;
 }
 
-static void addAuxiliaryOutput(Compilation &C, CommandOutput &output,
-                               file_types::ID outputType, const OutputInfo &OI,
-                               const TypeToPathMap *outputMap,
-                               StringRef workingDirectory,
-                               StringRef outputPath = StringRef()) {
+static void addAuxiliaryOutput(
+    Compilation &C, CommandOutput &output, file_types::ID outputType,
+    const OutputInfo &OI, const TypeToPathMap *outputMap,
+    StringRef workingDirectory, StringRef outputPath = StringRef(),
+    llvm::opt::OptSpecifier requireArg = llvm::opt::OptSpecifier()) {
 
   if (hasExistingAdditionalOutput(output, outputType, outputPath))
     return;
@@ -2206,6 +2206,10 @@ static void addAuxiliaryOutput(Compilation &C, CommandOutput &output,
     output.setAdditionalOutputForType(outputType, outputMapPath);
   } else if (!outputPath.empty()) {
     output.setAdditionalOutputForType(outputType, outputPath);
+  } else if (requireArg.isValid() && !C.getArgs().getLastArg(requireArg)) {
+    // This auxiliary output only exists if requireArg is passed, but it
+    // wasn't this time.
+    return;
   } else {
     // Put the auxiliary output file next to "the" primary output file.
     //
@@ -2430,6 +2434,14 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
     if (C.getArgs().hasArg(options::OPT_serialize_diagnostics))
       chooseSerializedDiagnosticsPath(C, JA, OI, OutputMap, workingDirectory,
                                       Output.get());
+  }
+
+  if (isa<MergeModuleJobAction>(JA) ||
+      (isa<CompileJobAction>(JA) &&
+       OI.CompilerMode == OutputInfo::Mode::SingleCompile)) {
+    // An emit-tbd argument gets passed down to a job that sees the whole
+    // module, either the -merge-modules job or a -wmo compiler invocation.
+    chooseTBDPath(C, OI, OutputMap, workingDirectory, Buf, Output.get());
   }
 
   if (isa<CompileJobAction>(JA))
@@ -2751,7 +2763,6 @@ void Driver::chooseDependenciesOutputPaths(Compilation &C, const OutputInfo &OI,
                        workingDirectory);
   }
   chooseLoadedModuleTracePath(C, OI, workingDirectory, Buf, Output);
-  chooseTBDPath(C, OI, workingDirectory, Buf, Output);
 }
 
 void Driver::chooseLoadedModuleTracePath(Compilation &C, const OutputInfo &OI,
@@ -2788,22 +2799,18 @@ void Driver::chooseLoadedModuleTracePath(Compilation &C, const OutputInfo &OI,
 }
 
 void Driver::chooseTBDPath(Compilation &C, const OutputInfo &OI,
+                           const TypeToPathMap *OutputMap,
                            StringRef workingDirectory,
                            llvm::SmallString<128> &Buf,
                            CommandOutput *Output) const {
-  if (C.getArgs().hasArg(options::OPT_emit_tbd, options::OPT_emit_tbd_path)) {
-    if (OI.CompilerMode != OutputInfo::Mode::SingleCompile) {
-      llvm::outs() << "TBD emission has been disabled, because it requires a "
-                   << "single compiler invocation: consider enabling the "
-                   << "-whole-module-optimization flag.\n";
-    } else {
-      auto filename = *getOutputFilenameFromPathArgOrAsTopLevel(
-          OI, C.getArgs(), options::OPT_emit_tbd_path, file_types::TY_TBD,
-          /*TreatAsTopLevelOutput=*/true, workingDirectory, "tbd", Buf);
-
-      Output->setAdditionalOutputForType(file_types::TY_TBD, filename);
-    }
+  StringRef pathFromArgs;
+  if (const Arg *A = C.getArgs().getLastArg(options::OPT_emit_tbd_path)) {
+    pathFromArgs = A->getValue();
   }
+
+  addAuxiliaryOutput(C, *Output, file_types::TY_TBD, OI, OutputMap,
+                     workingDirectory, pathFromArgs,
+                     /*requireArg=*/options::OPT_emit_tbd);
 }
 
 void Driver::chooseOptimizationRecordPath(Compilation &C, const OutputInfo &OI,
