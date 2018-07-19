@@ -147,7 +147,7 @@ extension BidirectionalCollection {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  public func index(_ i: Index, offsetBy n: Int) -> Index {
+  internal func _index(_ i: Index, offsetBy n: Int) -> Index {
     if n >= 0 {
       return _advanceForward(i, by: n)
     }
@@ -159,7 +159,12 @@ extension BidirectionalCollection {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  public func index(
+  public func index(_ i: Index, offsetBy n: Int) -> Index {
+    return _index(i, offsetBy: n)
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  internal func _index(
     _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
     if n >= 0 {
@@ -173,6 +178,13 @@ extension BidirectionalCollection {
       formIndex(before: &i)
     }
     return i
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  public func index(
+    _ i: Index, offsetBy n: Int, limitedBy limit: Index
+  ) -> Index? {
+    return _index(i, offsetBy: n, limitedBy: limit)
   }
 
   @inlinable // FIXME(sil-serialize-all)
@@ -247,7 +259,9 @@ extension BidirectionalCollection where SubSequence == Self {
     _precondition(n >= 0, "Number of elements to remove should be non-negative")
     _precondition(count >= n,
       "Can't remove more items from a collection than it contains")
-    self = self[startIndex..<index(endIndex, offsetBy: -n)]
+    // FIXME: using non-_'d `index` incorrectly calls the Collection one for
+    // conditional conformances to BidirectionalCollections.
+    self = self[startIndex..<_index(endIndex, offsetBy: -n)]
   }
 }
 
@@ -273,7 +287,9 @@ extension BidirectionalCollection {
   public func dropLast(_ n: Int) -> SubSequence {
     _precondition(
       n >= 0, "Can't drop a negative number of elements from a collection")
-    let end = index(
+    // FIXME: using non-_'d `index` incorrectly calls the Collection one for
+    // conditional conformances to BidirectionalCollections.
+    let end = _index(
       endIndex,
       offsetBy: -n,
       limitedBy: startIndex) ?? startIndex
@@ -303,7 +319,9 @@ extension BidirectionalCollection {
     _precondition(
       maxLength >= 0,
       "Can't take a suffix of negative length from a collection")
-    let start = index(
+    // FIXME: using non-_'d `index` incorrectly calls the Collection one for
+    // conditional conformances to BidirectionalCollections.
+    let start = _index(
       endIndex,
       offsetBy: -maxLength,
       limitedBy: startIndex) ?? startIndex
