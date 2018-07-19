@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: mkdir %t/idx
+// XFAIL: CPU=powerpc64le
 
 // Before indexing, do a dry-run to ensure any clang modules are cached. We
 // want to isolate the error that comes from swift's indexing support, not

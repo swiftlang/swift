@@ -2,6 +2,7 @@
 // RUN: not env %env-ASAN_OPTIONS=abort_on_error=0 %target-run %t_asan-binary 2>&1 | %FileCheck %s
 // REQUIRES: executable_test
 // REQUIRES: asan_runtime
+// UNSUPPORTED: CPU=powerpc64le
 
 // Make sure we can handle swifterror. LLVM's address sanitizer pass needs to
 // ignore swifterror addresses.
