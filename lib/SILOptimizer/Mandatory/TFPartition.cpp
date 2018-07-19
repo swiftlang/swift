@@ -1083,11 +1083,10 @@ bool TFFunctionPartition::markBlock(SILBasicBlock *BB) {
         // out here.
         // FIXME: Consider using a different error code than `tf_op_misuse`.
         diagnose(hostFn.getASTContext(),
-                 getUserSourceLocation(pred->front().getDebugLocation())
-                     .getSourceLoc(),
+                 hostFn.getLocation().getSourceLoc(),
                  diag::tf_op_misuse,
-                 "Cannot partition function '" + hostFn.getName().str() +
-                     "' -- is there an infinite loop?");
+                 "Functions containing infinite loops are not supported by "
+                 "TensorFlow yet");
         return true;
       }
 
@@ -1103,11 +1102,10 @@ bool TFFunctionPartition::markBlock(SILBasicBlock *BB) {
           // out here.
           // FIXME: Consider using a different error code than `tf_op_misuse`.
           diagnose(hostFn.getASTContext(),
-                   getUserSourceLocation(succ->front().getDebugLocation())
-                       .getSourceLoc(),
+                   hostFn.getLocation().getSourceLoc(),
                    diag::tf_op_misuse,
-                   "Cannot partition function '" + hostFn.getName().str() +
-                       "' -- is there an infinite loop?");
+                   "Functions containing infinite loops are not supported by "
+                   "TensorFlow yet");
           return true;
         }
         if (tensorCodeBlocks.contains(succ))

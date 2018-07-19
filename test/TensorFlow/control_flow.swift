@@ -281,12 +281,12 @@ public func foo<T>(_ a: T) {
 // }
 
 // An infinite loop that we reject in partitioning.
+// expected-error @+1 {{Functions containing infinite loops are not supported by TensorFlow yet}}
 public func infLoop1() {
   let maxCount: Int32 = 100
   var a = Tensor<Int32>(0)
   let count: Int32 = 0 
   while count < maxCount {
-    // expected-error @+1 {{Cannot partition function}}
     a += a
   }
   a -= a
@@ -295,6 +295,7 @@ public func infLoop1() {
 
 // Another infinite loop that we reject in partitioning.
 // simplified from https://bugs.swift.org/browse/SR-8236
+// expected-error @+1 {{Functions containing infinite loops are not supported by TensorFlow yet}}
 public func infLoop2(maxCount: Int32) {
   var a = Tensor<Int32>(0)
   var count: Int32 = 0
@@ -307,7 +308,7 @@ public func infLoop2(maxCount: Int32) {
       // this causes trouble: infinite loop
       while i < maxCount {
         count += i
-      }  // expected-error {{Cannot partition function}}
+      }
       a = Tensor<Int32>(count)
       break
     }
