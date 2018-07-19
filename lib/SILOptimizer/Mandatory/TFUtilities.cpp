@@ -21,11 +21,9 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILModule.h"
-// #include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/FileSystem.h"
 #ifdef SWIFT_ENABLE_TENSORFLOW
 #include "tensorflow/c/c_api.h"
 #endif

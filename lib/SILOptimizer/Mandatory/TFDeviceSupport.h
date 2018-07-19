@@ -1,4 +1,4 @@
-//===--- TFUtilities.h - TensorFlow lowering utilities ----------*- C++ -*-===//
+//===--- TFDeviceSupport.h - TensorFlow device management -------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This defines the shared code that implements the various TensorFlow related
-// lowerings and other transformations.
+// This defines the abstractions for representing TF device types, device
+// placement for graph_op insts, and device partitioning API.
 //
 //===----------------------------------------------------------------------===//
 
@@ -112,14 +112,11 @@ static inline std::string getDeviceShortName(DeviceType deviceType) {
 
 /// Returns true if `attrName` is SHAPE_ARRAY_ATTR, `attrValue` is an array of
 /// TensorShape-typed elements.
-// TODO: move device related code out of this header file.
 bool isShapeArrayPseudoAttr(llvm::StringRef name, SymbolicValue attrValue);
 
 /// This struct holds information about the global configuration of the graph
 /// we are generating.  This can be different between distinct graphs in the
 /// same program though.
-//
-// TODO: rename this struct.
 struct GraphFunctionDeviceInfo {
   const DeviceType primaryDeviceType;
   const bool isTPUInfeedEnabled;
