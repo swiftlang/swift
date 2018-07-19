@@ -343,3 +343,8 @@ void RawSyntax::Profile(llvm::FoldingSetNodeID &ID, tok TokKind,
   for (auto &Piece : TrailingTrivia)
     Piece.Profile(ID);
 }
+
+llvm::raw_ostream &llvm::operator<<(raw_ostream &OS, AbsolutePosition Pos) {
+  Pos.printLineAndColumn(OS);
+  return OS;
+}

@@ -562,12 +562,12 @@ struct SwiftSyntaxMap {
 class SyntaxToSyntaxMapConverter : public SyntaxVisitor {
   SwiftSyntaxMap &SyntaxMap;
 
-  std::map<unsigned, SyntaxClassification> TokenClassifications;
+  std::map<SyntaxNodeId, SyntaxClassification> TokenClassifications;
 
 public:
   SyntaxToSyntaxMapConverter(
       SwiftSyntaxMap &SyntaxMap,
-      std::map<unsigned, SyntaxClassification> TokenClassifications)
+      std::map<SyntaxNodeId, SyntaxClassification> TokenClassifications)
       : SyntaxMap(SyntaxMap), TokenClassifications(TokenClassifications) {}
 
 private:
@@ -2013,18 +2013,6 @@ SwiftEditorDocument::getSyntaxTree() const {
   return Impl.SyntaxTree;
 }
 
-const SourceManager &SwiftEditorDocument::getSourceManager() const {
-  return Impl.SyntaxInfo->getSourceManager();
-}
-
-SourceManager &SwiftEditorDocument::getSourceManager() {
-  return Impl.SyntaxInfo->getSourceManager();
-}
-
-unsigned SwiftEditorDocument::getBufferID() const {
-  return Impl.SyntaxInfo->getBufferID();
-}
-
 std::string SwiftEditorDocument::getFilePath() const { return Impl.FilePath; }
 
 bool SwiftEditorDocument::hasUpToDateAST() const {
@@ -2371,7 +2359,6 @@ void SwiftLangSupport::editorReplaceText(StringRef Name,
     if (EditorDoc->getSyntaxTree().hasValue()) {
       SyntaxCache.emplace(EditorDoc->getSyntaxTree().getValue());
       SyntaxCache->addEdit(Offset, Offset + Length, Buf->getBufferSize());
-      SyntaxCache->setRecordReuseInformation();
     }
 
     SyntaxParsingCache *SyntaxCachePtr = nullptr;
@@ -2386,37 +2373,35 @@ void SwiftLangSupport::editorReplaceText(StringRef Name,
       // Avoid computing the reused ranges if the consumer doesn't care about
       // them
       if (Consumer.syntaxReuseInfoEnabled()) {
-        auto ReuseRegions = SyntaxCache->getReusedRanges();
+        auto &SyntaxTree = EditorDoc->getSyntaxTree();
+        auto ReuseRegions = SyntaxCache->getReusedRegions(*SyntaxTree);
+
+        // Abstract away from SyntaxReuseRegions to std::pair<unsigned, unsigned>
+        // so that SourceKit doesn't have to import swiftParse
         std::vector<SourceFileRange> ReuseRegionOffsets;
         ReuseRegionOffsets.reserve(ReuseRegions.size());
         for (auto ReuseRegion : ReuseRegions) {
-          auto Start = ReuseRegion.Start;
-          auto End = ReuseRegion.End;
+          auto Start = ReuseRegion.Start.getOffset();
+          auto End = ReuseRegion.End.getOffset();
           ReuseRegionOffsets.push_back({Start, End});
         }
         Consumer.handleSyntaxReuseRegions(ReuseRegionOffsets);
       }
       if (LogReuseRegions) {
+        auto &SyntaxTree = EditorDoc->getSyntaxTree();
+        auto ReuseRegions = SyntaxCache->getReusedRegions(*SyntaxTree);
         LOG_SECTION("SyntaxCache", InfoHighPrio) {
           Log->getOS() << "Reused ";
 
           bool FirstIteration = true;
-          unsigned LastPrintedBufferID;
-          for (auto ReuseRegion : SyntaxCache->getReusedRanges()) {
+          for (auto ReuseRegion : ReuseRegions) {
             if (!FirstIteration) {
               Log->getOS() << ", ";
             } else {
               FirstIteration = false;
             }
 
-            const SourceManager &SM = EditorDoc->getSourceManager();
-            unsigned BufferID = EditorDoc->getBufferID();
-            auto Start = SM.getLocForOffset(BufferID, ReuseRegion.Start);
-            auto End = SM.getLocForOffset(BufferID, ReuseRegion.End);
-
-            Start.print(Log->getOS(), SM, LastPrintedBufferID);
-            Log->getOS() << " - ";
-            End.print(Log->getOS(), SM, LastPrintedBufferID);
+            Log->getOS() << ReuseRegion.Start << " - " << ReuseRegion.End;
           }
         }
       }
