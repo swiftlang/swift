@@ -1682,8 +1682,8 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
     // graphOp instruction.
     if (TFStrictDeabstraction) {
       if (auto opInfo = SILTensorOpInfo::decode(inst)) {
-        // Do not translate this special inst into a graph op, since otherwise
-        // it gets removed by the performance pipeline.
+        // Do not translate this special inst into a graph op, since it will get
+        // removed at the beginning of the partition pass.
         // TODO: remove this inst in the getForFunction() call above, once
         // the partition pass is folded into deabstraction.
         if (opInfo->opName == "tfc.configureTPU" ||
@@ -2013,7 +2013,7 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
     }
 
     auto verifyShapeAttr = [&](SymbolicValue constValue) -> bool {
-      // strip-away the possible aggregate wrapper.
+      // strip away the possible aggregate wrapper.
       constValue = constValue.lookThroughSingleElementAggregates();
       if (constValue.getKind() != SymbolicValue::Array) {
         diagnoseInvalidAttr("requires an array");
@@ -2026,7 +2026,7 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
         return true;
       }
       for (auto elt : elements) {
-        // strip-away the possible aggregate wrapper.
+        // strip away the possible aggregate wrapper.
         elt = elt.lookThroughSingleElementAggregates();
         if (elt.getKind() != SymbolicValue::Integer) {
           diagnoseInvalidAttr("requires an array of ints");
@@ -2061,7 +2061,7 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
       CanType eltType;
       auto shapes = constValue.getArrayValue(eltType);
       if (eltType->getString() != "TensorShape")
-        return diagnoseInvalidAttr("requires an array of TensorShape objects");
+        return diagnoseInvalidAttr("requires an array of TensorShape values");
       for (auto shape : shapes) {
         if (verifyShapeAttr(shape))
           return; // error already emitted.
