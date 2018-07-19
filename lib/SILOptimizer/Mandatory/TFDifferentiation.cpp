@@ -1163,10 +1163,10 @@ isActive(SILValue value, const SILReverseAutoDiffIndices &indices) const {
   return isVaried(value, indices.parameters) && isUseful(value, indices.source);
 }
 
-static inline void dumpActivityInfo(SILValue value,
-                                    const SILReverseAutoDiffIndices &indices,
-                                    DifferentiableActivityInfo &activityInfo,
-                                    llvm::raw_ostream &s = llvm::dbgs()) {
+static void dumpActivityInfo(SILValue value,
+                             const SILReverseAutoDiffIndices &indices,
+                             DifferentiableActivityInfo &activityInfo,
+                             llvm::raw_ostream &s = llvm::dbgs()) {
   s << '[';
   if (activityInfo.isActive(value, indices))
     s << "ACTIVE";
@@ -1177,10 +1177,10 @@ static inline void dumpActivityInfo(SILValue value,
   s << "] " << value;
 }
 
-static inline void dumpActivityInfo(SILFunction &fn,
-                                    const SILReverseAutoDiffIndices &indices,
-                                    DifferentiableActivityInfo &activityInfo,
-                                    llvm::raw_ostream &s = llvm::dbgs()) {
+static void dumpActivityInfo(SILFunction &fn,
+                             const SILReverseAutoDiffIndices &indices,
+                             DifferentiableActivityInfo &activityInfo,
+                             llvm::raw_ostream &s = llvm::dbgs()) {
   s << "Activity info for " << fn.getName() << " at " << indices << '\n';
   for (auto &bb : fn) {
     for (auto *arg : bb.getArguments())
