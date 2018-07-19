@@ -100,15 +100,6 @@ namespace {
   typedef struct segment_command    macho_segment_command;
 #endif
 
-  struct patch_t {
-    const char *name;
-    const void *fn;
-
-    template<typename T>
-    patch_t(const char *newName, const T *newFn)
-      : name(newName), fn((const void*)newFn) { 
-    }
-  };
 } // end anonymous namespace
 
 /// Overwrite a cross-image symbol reference by directly editing symbol tables
@@ -121,7 +112,8 @@ namespace {
 ///
 /// Also, if the symbol being patched has references within the image where it
 /// was originaly defined, those references will \e not be patched.
-static void patchLazyPointers(const mach_header *mh, patch_t patch) {
+static void patchLazyPointers(const mach_header *mh, const char *symbolName,
+                              const void *newValue) {
   // Get linkEditBase
   const uint32_t cmd_count = mh->ncmds;
   const load_command * const cmds =
@@ -205,10 +197,10 @@ static void patchLazyPointers(const mach_header *mh, patch_t patch) {
           // Found symbol for this lazy pointer, now lookup address.
           const char *lazyTargetName = 
               &stringTable[symbolTable[symbolIndex].n_un.n_strx];
-          if (strcmp(patch.name, lazyTargetName) == 0) {
+          if (strcmp(symbolName, lazyTargetName) == 0) {
             // Can't use the value currently stored here because it may 
             // be a dyld stub binder that will undo our patch if called.
-            symbolPointers[lazyIndex] = (uintptr_t)patch.fn;
+            symbolPointers[lazyIndex] = (uintptr_t)newValue;
           }
         }
       }
@@ -256,8 +248,9 @@ static const char *patchedGetImageNameFromClassForOldOSs(Class _Nullable cls) {
 static void patchGetImageNameInImage(const struct mach_header *mh,
                                      intptr_t vmaddr_slide) {
   (void)vmaddr_slide;
-  patchLazyPointers(mh, patch_t("_class_getImageName",
-                                &patchedGetImageNameFromClassForOldOSs));
+  const void *newImplementationAddr =
+      reinterpret_cast<const void *>(&patchedGetImageNameFromClassForOldOSs);
+  patchLazyPointers(mh, "_class_getImageName", newImplementationAddr);
 }
 
 /***************************************************************************/
