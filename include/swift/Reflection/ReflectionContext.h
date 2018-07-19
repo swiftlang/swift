@@ -296,7 +296,6 @@ public:
       return {{nullptr, nullptr}, 0};
     };
 
-    // FIXME: there's no swift5_builtin and swift5_capture section on Linux.
     auto FieldMdSec = findELFSectionByName("swift5_fieldmd");
     auto AssocTySec = findELFSectionByName("swift5_assocty");
     auto BuiltinTySec = findELFSectionByName("swift5_builtin");
@@ -304,7 +303,8 @@ public:
     auto TypeRefMdSec = findELFSectionByName("swift5_typeref");
     auto ReflStrMdSec = findELFSectionByName("swift5_reflstr");
 
-    // At-least-once semantics.
+    // We succeed if at least one of the sections is present in the
+    // ELF executable.
     if (FieldMdSec.first.first == nullptr &&
         AssocTySec.first.first == nullptr &&
         BuiltinTySec.first.first == nullptr &&
