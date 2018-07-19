@@ -570,8 +570,8 @@ CollectionTypeTests.test("subscript(_: Range<Index>)/writeback") {
   // in non-generic code.  rdar://22109071
   var collection = MinimalMutableRandomAccessCollection(
     elements: [ 5, 4, 3, 2, 1, 0, -1, -2, -3, -4 ])
-  var i = collection.startIndex
-  var j = collection.index(i, offsetBy: 5)
+  let i = collection.startIndex
+  let j = collection.index(i, offsetBy: 5)
   collection[i..<j].sort()
   expectEqualSequence(
     [ 1, 2, 3, 4, 5, 0, -1, -2, -3, -4 ], collection)
@@ -748,7 +748,7 @@ extension Collection {
 //===----------------------------------------------------------------------===//
 
 CollectionTypeTests.test("Collection/split/dispatch") {
-  var tester = CollectionLog.dispatchTester([OpaqueValue(1)])
+  let tester = CollectionLog.dispatchTester([OpaqueValue(1)])
   _ = tester.split { $0.value == 1 }
   expectCustomizable(tester, tester.log.split)
 }
@@ -758,7 +758,7 @@ CollectionTypeTests.test("Collection/split/dispatch") {
 //===----------------------------------------------------------------------===//
 
 CollectionTypeTests.test("Collection/prefix(through:)/dispatch") {
-  var tester = CollectionLog.dispatchTester([1, 2, 3].map(OpaqueValue.init))
+  let tester = CollectionLog.dispatchTester([1, 2, 3].map(OpaqueValue.init))
   _ = tester.prefix(through: 1)
   expectCustomizable(tester, tester.log.prefixThrough)
 }
@@ -768,7 +768,7 @@ CollectionTypeTests.test("Collection/prefix(through:)/dispatch") {
 //===----------------------------------------------------------------------===//
 
 CollectionTypeTests.test("Collection/prefix(upTo:)/dispatch") {
-  var tester = CollectionLog.dispatchTester([OpaqueValue(1)])
+  let tester = CollectionLog.dispatchTester([OpaqueValue(1)])
   _ = tester.prefix(upTo: 1)
   expectCustomizable(tester, tester.log.prefixUpTo)
 }
@@ -778,7 +778,7 @@ CollectionTypeTests.test("Collection/prefix(upTo:)/dispatch") {
 //===----------------------------------------------------------------------===//
 
 CollectionTypeTests.test("Collection/suffix(from:)/dispatch") {
-  var tester = CollectionLog.dispatchTester([1, 2, 3].map(OpaqueValue.init))
+  let tester = CollectionLog.dispatchTester([1, 2, 3].map(OpaqueValue.init))
   _ = tester.suffix(from: 1)
   expectCustomizable(tester, tester.log.suffixFrom)
 }
