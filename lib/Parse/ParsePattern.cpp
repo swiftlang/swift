@@ -701,6 +701,9 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
     }
   }
 
+  if (BodyParams.size() - FirstBodyPatternIndex > 1)
+    BodyParams.resize(FirstBodyPatternIndex + 1);
+
   return status;
 }
 

@@ -990,14 +990,13 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
         namelookup::FindLocalVal(SM, Loc, Consumer).visit(AFD->getBody());
       }
 
-      for (auto *P : AFD->getParameterLists())
-        namelookup::FindLocalVal(SM, Loc, Consumer).checkParameterList(P);
+      if (auto *P = AFD->getImplicitSelfDecl()) {
+        namelookup::FindLocalVal(SM, Loc, Consumer).checkValueDecl(
+          const_cast<ParamDecl *>(P), DeclVisibilityKind::FunctionParameter);
+      }
 
-      // Constructors and destructors don't have 'self' in parameter patterns.
-      if (isa<ConstructorDecl>(AFD) || isa<DestructorDecl>(AFD))
-        if (auto *selfParam = AFD->getImplicitSelfDecl())
-          Consumer.foundDecl(const_cast<ParamDecl*>(selfParam),
-                             DeclVisibilityKind::FunctionParameter);
+      namelookup::FindLocalVal(SM, Loc, Consumer).checkParameterList(
+        AFD->getParameters());
 
       if (AFD->getDeclContext()->isTypeContext()) {
         ExtendedType = AFD->getDeclContext()->getSelfTypeInContext();

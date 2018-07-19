@@ -5220,6 +5220,12 @@ public:
   const ParameterList *getParameterList(unsigned i) const {
     return getParameterLists()[i];
   }
+  ParameterList *getParameters() {
+    return getParameterLists().back();
+  }
+  const ParameterList *getParameters() const {
+    return getParameterLists().back();
+  }
 
   /// \brief This method returns the implicit 'self' decl.
   ///
@@ -5437,6 +5443,12 @@ public:
   }
   const ParameterList *getParameterList(unsigned i) const {
     return getParameterLists()[i];
+  }
+  ParameterList *getParameters() {
+    return getParameterLists().back();
+  }
+  const ParameterList *getParameters() const {
+    return getParameterLists().back();
   }
   
   /// \returns true if this is non-mutating due to applying a 'mutating'
@@ -6096,21 +6108,20 @@ public:
 /// }
 /// \endcode
 class DestructorDecl : public AbstractFunctionDecl {
-  ParameterList *SelfParameter;
+  ParameterList *ParameterLists[2];
+
 public:
   DestructorDecl(SourceLoc DestructorLoc, ParamDecl *selfDecl,
                  DeclContext *Parent);
-  
+
   void setSelfDecl(ParamDecl *selfDecl);
 
   MutableArrayRef<ParameterList *> getParameterLists() {
-    return { &SelfParameter, 1 };
+    return { ParameterLists, 2 };
   }
   ArrayRef<const ParameterList *> getParameterLists() const {
-    return { &SelfParameter, 1 };
+    return { ParameterLists, 2 };
   }
-
-
   
   SourceLoc getDestructorLoc() const { return getNameLoc(); }
   SourceLoc getStartLoc() const { return getDestructorLoc(); }

@@ -482,16 +482,10 @@ bool Decl::isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic) const {
   };
 
   if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-    // Hide '~>' functions (but show the operator, because it defines
-    // precedence).
-    if (isa<FuncDecl>(AFD) && AFD->getNameStr() == "~>")
-      return true;
-
     // If it's a function with a parameter with leading underscore, it's a
     // private function.
-    for (auto *PL : AFD->getParameterLists())
-      if (hasInternalParameter(PL))
-        return true;
+    if (hasInternalParameter(AFD->getParameters()))
+      return true;
   }
 
   if (auto SubscriptD = dyn_cast<SubscriptDecl>(D)) {
@@ -1987,12 +1981,13 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
 
 CanType ValueDecl::getOverloadSignatureType() const {
   if (auto *afd = dyn_cast<AbstractFunctionDecl>(this)) {
+    bool isMethod = afd->getImplicitSelfDecl() != nullptr;
     return mapSignatureFunctionType(
                            getASTContext(), getInterfaceType(),
                            /*topLevelFunction=*/true,
-                           /*isMethod=*/afd->getImplicitSelfDecl() != nullptr,
+                           isMethod,
                            /*isInitializer=*/isa<ConstructorDecl>(afd),
-                           afd->getNumParameterLists())->getCanonicalType();
+                           isMethod ? 2 : 1)->getCanonicalType();
   }
 
   if (auto *asd = dyn_cast<AbstractStorageDecl>(this)) {
@@ -4814,7 +4809,7 @@ ParamDecl *AbstractFunctionDecl::getImplicitSelfDecl() {
 
   // "self" is always the first parameter list.
   auto paramLists = getParameterLists();
-  assert(paramLists.size() >= 1);
+  assert(paramLists.size() == 2);
   assert(paramLists[0]->size() == 1);
 
   auto selfParam = paramLists[0]->get(0);
@@ -4826,27 +4821,15 @@ ParamDecl *AbstractFunctionDecl::getImplicitSelfDecl() {
 
 std::pair<DefaultArgumentKind, Type>
 swift::getDefaultArgumentInfo(ValueDecl *source, unsigned Index) {
-  ArrayRef<const ParameterList *> paramLists;
+  const ParameterList *paramList;
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(source)) {
-    paramLists = AFD->getParameterLists();
-
-    // Skip the 'self' parameter; it is not counted.
-    if (AFD->getImplicitSelfDecl())
-      paramLists = paramLists.slice(1);
+    paramList = AFD->getParameters();
   } else {
-    paramLists = cast<EnumElementDecl>(source)->getParameterList();
+    paramList = cast<EnumElementDecl>(source)->getParameterList();
   }
 
-  for (auto paramList : paramLists) {
-    if (Index < paramList->size()) {
-      auto param = paramList->get(Index);
-      return { param->getDefaultArgumentKind(), param->getInterfaceType() };
-    }
-    
-    Index -= paramList->size();
-  }
-
-  llvm_unreachable("Invalid parameter index");
+  auto param = paramList->get(Index);
+  return { param->getDefaultArgumentKind(), param->getInterfaceType() };
 }
 
 Type AbstractFunctionDecl::getMethodInterfaceType() const {
@@ -4900,15 +4883,12 @@ SourceRange AbstractFunctionDecl::getSignatureSourceRange() const {
   if (isImplicit())
     return SourceRange();
 
-  auto paramLists = getParameterLists();
-  if (paramLists.empty())
-    return getNameLoc();
+  auto paramList = getParameters();
 
-  for (auto *paramList : reversed(paramLists)) {
-    auto endLoc = paramList->getSourceRange().End;
-    if (endLoc.isValid())
-      return SourceRange(getNameLoc(), endLoc);
-  }
+  auto endLoc = paramList->getSourceRange().End;
+  if (endLoc.isValid())
+    return SourceRange(getNameLoc(), endLoc);
+
   return getNameLoc();
 }
 
@@ -5292,20 +5272,17 @@ Type FuncDecl::getResultInterfaceType() const {
   if (resultTy->hasError())
     return resultTy;
 
-  for (unsigned i = 0, e = getNumParameterLists(); i != e; ++i)
+  if (getImplicitSelfDecl())
     resultTy = resultTy->castTo<AnyFunctionType>()->getResult();
 
-  if (!resultTy)
-    resultTy = TupleType::getEmpty(getASTContext());
-
-  return resultTy;
+  return resultTy->castTo<AnyFunctionType>()->getResult();
 }
 
 bool FuncDecl::isUnaryOperator() const {
   if (!isOperator())
     return false;
   
-  auto *params = getParameterList(getDeclContext()->isTypeContext());
+  auto *params = getParameters();
   return params->size() == 1 && !params->get(0)->isVariadic();
 }
 
@@ -5313,7 +5290,7 @@ bool FuncDecl::isBinaryOperator() const {
   if (!isOperator())
     return false;
   
-  auto *params = getParameterList(getDeclContext()->isTypeContext());
+  auto *params = getParameters();
   return params->size() == 2 &&
     !params->get(0)->isVariadic() &&
     !params->get(1)->isVariadic();
@@ -5367,7 +5344,7 @@ bool ConstructorDecl::isObjCZeroParameterWithLongSelector() const {
       getFullName().getArgumentNames()[0].empty())
     return false;
 
-  auto *params = getParameterList(1);
+  auto *params = getParameters();
   if (params->size() != 1)
     return false;
 
@@ -5379,16 +5356,17 @@ DestructorDecl::DestructorDecl(SourceLoc DestructorLoc, ParamDecl *selfDecl,
   : AbstractFunctionDecl(DeclKind::Destructor, Parent,
                          DeclBaseName::createDestructor(), DestructorLoc,
                          /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-                         /*NumParameterLists=*/1, nullptr) {
+                         /*NumParameterLists=*/2, nullptr) {
   setSelfDecl(selfDecl);
+  ParameterLists[1] = ParameterList::createEmpty(Parent->getASTContext());
 }
 
 void DestructorDecl::setSelfDecl(ParamDecl *selfDecl) {
   if (selfDecl) {
-    SelfParameter = ParameterList::createWithoutLoc(selfDecl);
-    SelfParameter->setDeclContextOfParamDecls(this);
+    ParameterLists[0] = ParameterList::createWithoutLoc(selfDecl);
+    ParameterLists[0]->setDeclContextOfParamDecls(this);
   } else {
-    SelfParameter = nullptr;
+    ParameterLists[0] = nullptr;
   }
 }
 
@@ -5421,7 +5399,7 @@ SourceRange FuncDecl::getSourceRange() const {
   if (hasThrows())
     return { StartLoc, getThrowsLoc() };
 
-  auto LastParamListEndLoc = getParameterLists().back()->getSourceRange().End;
+  auto LastParamListEndLoc = getParameters()->getSourceRange().End;
   if (LastParamListEndLoc.isValid())
     return { StartLoc, LastParamListEndLoc };
   return StartLoc;

@@ -28,12 +28,12 @@ Class.firstMethod()
 // CHECK-NEXT:   #Class.firstMethod!1: (Class.Type) -> () -> () : @$S28vtable_deserialization_input5ClassC11firstMethodyyFZ
 // CHECK-NEXT:   #Class.secondMethod!1: (Class.Type) -> () -> () : @$S28vtable_deserialization_input5ClassC12secondMethodyyFZ
 // CHECK-NEXT:   #Class.thirdMethod!1: (Class.Type) -> () -> () : @$S28vtable_deserialization_input5ClassC11thirdMethodyyFZ
-// CHECK-NEXT:   #Class.deinit!deallocator: @$S28vtable_deserialization_input5ClassCfD
+// CHECK-NEXT:   #Class.deinit!deallocator.1: @$S28vtable_deserialization_input5ClassCfD
 // CHECK-NEXT: }
 
 // OPT:      sil_vtable Class {
 // OPT-NEXT:   #Class.firstMethod!1: (Class.Type) -> () -> () : @$S28vtable_deserialization_input5ClassC11firstMethodyyFZ
 // OPT-NEXT:   #Class.secondMethod!1: (Class.Type) -> () -> () : @$S28vtable_deserialization_input5ClassC12secondMethodyyFZ
 // OPT-NEXT:   #Class.thirdMethod!1: (Class.Type) -> () -> () : @$S28vtable_deserialization_input5ClassC11thirdMethodyyFZ
-// OPT-NEXT:   #Class.deinit!deallocator: @$S28vtable_deserialization_input5ClassCfD
+// OPT-NEXT:   #Class.deinit!deallocator.1: @$S28vtable_deserialization_input5ClassCfD
 // OPT-NEXT: }
