@@ -4360,7 +4360,7 @@ static bool mayLieAboutNonOptionalReturn(SILModule &M, Expr *expr) {
       // Only consider a full application of a method. Partial applications
       // never lie.
       if (auto func = dyn_cast<AbstractFunctionDecl>(fnRef->getDecl()))
-        if (func->getParameterLists().size() == 1)
+        if (func->getImplicitSelfDecl() == nullptr)
           method = fnRef->getDecl();
     }
     if (method && mayLieAboutNonOptionalReturn(M, method))
