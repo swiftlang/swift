@@ -145,8 +145,6 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
   } else if (auto *ACE = baseLoc.dyn_cast<AbstractClosureExpr *>()) {
     loc = ACE;
     kind = Kind::Func;
-    assert(ACE->getParameterLists().size() >= 1 &&
-           "no param patterns for function?!");
   } else {
     llvm_unreachable("impossible SILDeclRef loc");
   }
@@ -810,7 +808,7 @@ unsigned SILDeclRef::getParameterListCount() const {
   auto *vd = getDecl();
 
   if (auto *func = dyn_cast<AbstractFunctionDecl>(vd)) {
-    return func->getParameterLists().size();
+    return func->getImplicitSelfDecl() ? 2 : 1;
   } else if (auto *ed = dyn_cast<EnumElementDecl>(vd)) {
     return ed->hasAssociatedValues() ? 2 : 1;
   } else if (isa<ClassDecl>(vd)) {
