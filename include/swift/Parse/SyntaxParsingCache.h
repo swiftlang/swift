@@ -62,7 +62,7 @@ class SyntaxParsingCache {
   llvm::SmallVector<SourceEdit, 4> Edits;
 
   /// The IDs of all syntax nodes that got reused are collected in this vector.
-  std::unordered_set<unsigned> ReusedNodeIds;
+  std::unordered_set<SyntaxNodeId> ReusedNodeIds;
 
 public:
   SyntaxParsingCache(SourceFileSyntax OldSyntaxTree)
@@ -80,7 +80,7 @@ public:
   /// reused for a new syntax tree.
   llvm::Optional<Syntax> lookUp(size_t NewPosition, SyntaxKind Kind);
 
-  const std::unordered_set<unsigned> &getReusedNodeIds() const {
+  const std::unordered_set<SyntaxNodeId> &getReusedNodeIds() const {
     return ReusedNodeIds;
   }
 

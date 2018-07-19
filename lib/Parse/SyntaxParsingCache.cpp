@@ -94,15 +94,15 @@ std::vector<SyntaxReuseRegion>
 SyntaxParsingCache::getReusedRegions(const SourceFileSyntax &SyntaxTree) const {
   /// Determines the reused source regions from reused syntax node IDs
   class ReusedRegionsCollector : public SyntaxVisitor {
-    std::unordered_set<unsigned> ReusedNodeIds;
+    std::unordered_set<SyntaxNodeId> ReusedNodeIds;
     std::vector<SyntaxReuseRegion> ReusedRegions;
 
-    bool didReuseNode(unsigned NodeId) {
+    bool didReuseNode(SyntaxNodeId NodeId) {
       return ReusedNodeIds.count(NodeId) > 0;
     }
 
   public:
-    ReusedRegionsCollector(std::unordered_set<unsigned> ReusedNodeIds)
+    ReusedRegionsCollector(std::unordered_set<SyntaxNodeId> ReusedNodeIds)
         : ReusedNodeIds(ReusedNodeIds) {}
 
     const std::vector<SyntaxReuseRegion> &getReusedRegions() {

@@ -562,12 +562,12 @@ struct SwiftSyntaxMap {
 class SyntaxToSyntaxMapConverter : public SyntaxVisitor {
   SwiftSyntaxMap &SyntaxMap;
 
-  std::map<unsigned, SyntaxClassification> TokenClassifications;
+  std::map<SyntaxNodeId, SyntaxClassification> TokenClassifications;
 
 public:
   SyntaxToSyntaxMapConverter(
       SwiftSyntaxMap &SyntaxMap,
-      std::map<unsigned, SyntaxClassification> TokenClassifications)
+      std::map<SyntaxNodeId, SyntaxClassification> TokenClassifications)
       : SyntaxMap(SyntaxMap), TokenClassifications(TokenClassifications) {}
 
 private:

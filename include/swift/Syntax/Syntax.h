@@ -85,7 +85,7 @@ public:
   RC<RawSyntax> getRaw() const;
 
   /// Get an ID for this node that is stable across incremental parses
-  unsigned getId() const { return getRaw()->getId(); }
+  SyntaxNodeId getId() const { return getRaw()->getId(); }
 
   /// Get the number of child nodes in this piece of syntax, not including
   /// tokens.

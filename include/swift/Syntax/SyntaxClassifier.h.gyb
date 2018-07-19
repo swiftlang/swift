@@ -69,7 +69,7 @@ class SyntaxClassifier: public SyntaxVisitor {
         ForceClassification(ForceClassification) {}
   };
 
-  std::map<unsigned, SyntaxClassification> ClassifiedTokens;
+  std::map<SyntaxNodeId, SyntaxClassification> ClassifiedTokens;
   /// The top classification of this stack determines the color of identifiers
   std::stack<ContextStackEntry, llvm::SmallVector<ContextStackEntry, 16>> ContextStack;
 
@@ -101,7 +101,7 @@ class SyntaxClassifier: public SyntaxVisitor {
 % end
 
 public:
-  std::map<unsigned, SyntaxClassification> classify(Syntax Node) {
+  std::map<SyntaxNodeId, SyntaxClassification> classify(Syntax Node) {
     // Clean up the environment
     ContextStack = std::stack<ContextStackEntry, llvm::SmallVector<ContextStackEntry, 16>>();
     ContextStack.push({SyntaxClassification::None, false});
