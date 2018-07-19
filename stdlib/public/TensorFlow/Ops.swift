@@ -924,13 +924,22 @@ public extension Tensor where Scalar : Numeric {
     return _TFGetScalarOrDie(Raw.sum(self, reductionIndices: axes).handle)
   }
 
+  // NOTE: This overload is necessary, otherwise `sum()` would refer
+  // to the variadic method `sum(squeezingAxes:)` with zero indices.
+  @inlinable @inline(__always)
+  func product() -> Scalar {
+    let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
+    return _TFGetScalarOrDie(Raw.prod(self, reductionIndices: axes).handle)
+  }
+
   /// Returns the arithmetic mean along the specified axes. The reduced
   /// dimensions are removed.
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank...rank`.
   @inlinable @inline(__always)
   func mean(squeezingAxes axes: Int32...) -> Tensor {
-    return Raw.mean(self, reductionIndices: Tensor<Int32>(axes), keepDims: false)
+    return Raw.mean(self, reductionIndices: Tensor<Int32>(axes),
+                    keepDims: false)
   }
 
   /// Returns the sum along the specified axes. The reduced dimensions are
@@ -942,6 +951,16 @@ public extension Tensor where Scalar : Numeric {
     return Raw.sum(self, reductionIndices: Tensor<Int32>(axes), keepDims: false)
   }
 
+  /// Returns the product along the specified axes. The reduced dimensions are
+  /// removed.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank...rank`.
+  @inlinable @inline(__always)
+  func product(squeezingAxes axes: Int32...) -> Tensor {
+    return Raw.prod(self, reductionIndices: Tensor<Int32>(axes),
+                    keepDims: false)
+  }
+
   /// Returns the arithmetic mean along the specified axes. The reduced
   /// dimensions are retained with value 1.
   /// - Parameter axes: The dimensions to reduce.
@@ -951,13 +970,22 @@ public extension Tensor where Scalar : Numeric {
     return Raw.mean(self, reductionIndices: Tensor<Int32>(axes), keepDims: true)
   }
 
-  /// Returns the arithmetic mean along the specified axes. The reduced
-  /// dimensions are retained with value 1.
+  /// Returns the sum along the specified axes. The reduced dimensions are
+  /// retained with value 1.
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
   func sum(alongAxes axes: Int32...) -> Tensor {
     return Raw.sum(self, reductionIndices: Tensor<Int32>(axes), keepDims: true)
+  }
+
+  /// Returns the product along the specified axes. The reduced dimensions are
+  /// retained with value 1.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
+  @inlinable @inline(__always)
+  func product(alongAxes axes: Int32...) -> Tensor {
+    return Raw.prod(self, reductionIndices: Tensor<Int32>(axes), keepDims: true)
   }
 }
 
