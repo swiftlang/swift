@@ -2383,19 +2383,17 @@ void PartitionCloner::visitCondBranchInst(CondBranchInst *inst) {
   if (auto eltTy = getTensorHandleElementType(condTy)) {
     // The TensorHandle's element type here could be Bool or Builtin.il.
     // In either case, we eventually get Builtin.il to create GraphOp.
-    CanType i1CanTy;
-    if (eltTy->isBool()) {
-      i1CanTy = getSingleElementDeclFieldType(eltTy->getAnyNominal());
-    } else {
-      assert(eltTy->isBuiltinIntegerType(1) && "expected Tensor<i1>");
-      i1CanTy = eltTy->getCanonicalType();
-    }
+    auto &ctx = B.getASTContext();
+    if (eltTy->isBool())
+      eltTy = SILType::getBuiltinIntegerType(/*bitWidth*/ 1, ctx).getASTType();
 
-    auto name = B.getASTContext().getIdentifier("tf_tensor_to_i1");
+    assert(eltTy->isBuiltinIntegerType(1) && "expected Tensor<i1>");
+
+    auto name = ctx.getIdentifier("tf_tensor_to_i1");
     cond = getSingleValueResult(B.createGraphOperation(
         getOpLocation(inst->getLoc()), name,
         /*operands*/ {cond}, /*attributes*/ {},
-        {SILType::getPrimitiveObjectType(i1CanTy)}));
+        {SILType::getPrimitiveObjectType(eltTy->getCanonicalType())}));
   }
 
   doPostProcess(inst,
