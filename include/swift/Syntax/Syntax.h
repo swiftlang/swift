@@ -200,16 +200,15 @@ public:
     return Data->getAbsolutePosition();
   }
 
-  /// Get the absolute end position (exclusively) of this raw syntax: its offset,
-  /// line, and column.
-  AbsolutePosition getAbsoluteEndPosition() const {
-    return Data->getAbsoluteEndPosition();
+  /// Get the absolute end position (exclusively) where the trailing trivia of
+  /// this node ends.
+  AbsolutePosition getAbsoluteEndPositionAfterTrailingTrivia() const {
+    return Data->getAbsoluteEndPositionAfterTrailingTrivia();
   }
 
-  /// Get the absolute position without skipping the leading trivia of this
-  /// node.
-  AbsolutePosition getAbsolutePositionWithLeadingTrivia() const {
-    return Data->getAbsolutePositionWithLeadingTrivia();
+  /// Get the absolute position at which the leading trivia of this node starts.
+  AbsolutePosition getAbsolutePositionBeforeLeadingTrivia() const {
+    return Data->getAbsolutePositionBeforeLeadingTrivia();
   }
 
   // TODO: hasSameStructureAs ?

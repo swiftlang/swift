@@ -655,7 +655,7 @@ private:
       return;
 
     auto LeadingTriviaOffset =
-        Token.getAbsolutePositionWithLeadingTrivia().getOffset();
+        Token.getAbsolutePositionBeforeLeadingTrivia().getOffset();
     visitTrivia(Token.getLeadingTrivia(), LeadingTriviaOffset);
 
     SyntaxClassification Classification = TokenClassifications[Token.getId()];
