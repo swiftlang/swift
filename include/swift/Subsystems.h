@@ -61,6 +61,7 @@ namespace swift {
   class SILParserTUState;
   class SourceFile;
   class SourceManager;
+  class SyntaxParsingCache;
   class Token;
   class TopLevelContext;
   struct TypeLoc;
@@ -327,7 +328,8 @@ namespace swift {
   class ParserUnit {
   public:
     ParserUnit(SourceManager &SM, unsigned BufferID,
-               const LangOptions &LangOpts, StringRef ModuleName);
+               const LangOptions &LangOpts, StringRef ModuleName,
+               SyntaxParsingCache *SyntaxCache = nullptr);
     ParserUnit(SourceManager &SM, unsigned BufferID);
     ParserUnit(SourceManager &SM, unsigned BufferID,
                unsigned Offset, unsigned EndOffset);
