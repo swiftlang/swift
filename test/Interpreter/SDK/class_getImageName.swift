@@ -22,9 +22,18 @@ func check(_ cls: AnyClass, in library: String) {
              "wrong library for \(cls)")
 }
 
-let isMissingObjCRuntimeHook =
-    (nil == dlsym(UnsafeMutableRawPointer(bitPattern: -2),
-                  "objc_setHook_getImageName"))
+var cannotUseObjCRuntimeHook = false
+#if targetEnvironment(device) && !os(macOS)
+if #available(iOS 12, tvOS 12, watchOS 5, *) {
+  // The only place these tests will fail is on early versions of the 2018 OSs.
+  // The final versions will have 'objc_setHook_getImageName'; anything earlier
+  // will be handled by manually overwriting the original implementation of
+  // 'class_getImageName'.
+  cannotUseObjCRuntimeHook =
+      (nil == dlsym(UnsafeMutableRawPointer(bitPattern: -2),
+                    "objc_setHook_getImageName"))
+}
+#endif // targetEnvironment(device) && !os(macOS)
 
 var testSuite = TestSuite("class_getImageName")
 
@@ -34,7 +43,7 @@ testSuite.test("Simple") {
 }
 
 testSuite.test("Generic")
-    .xfail(.custom({ isMissingObjCRuntimeHook },
+    .xfail(.custom({ cannotUseObjCRuntimeHook },
                    reason: "hook for class_getImageName not present"))
     .code {
   check(GenericSwiftObject<Int>.self, in: "libGetImageNameHelper.dylib")
@@ -45,7 +54,7 @@ testSuite.test("Generic")
 }
 
 testSuite.test("GenericAncestry")
-    .xfail(.custom({ isMissingObjCRuntimeHook },
+    .xfail(.custom({ cannotUseObjCRuntimeHook },
                    reason: "hook for class_getImageName not present"))
     .code {
   check(GenericAncestrySwiftObject.self, in: "libGetImageNameHelper.dylib")

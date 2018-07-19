@@ -55,8 +55,7 @@
 #endif
 
 #if SWIFT_OBJC_INTEROP
-#include <dlfcn.h>
-#include <objc/runtime.h>
+#include "ObjCRuntimeGetImageNameFromClass.h"
 #endif
 
 #include <cstdio>
@@ -2019,45 +2018,6 @@ swift::swift_relocateClassMetadata(ClassMetadata *self,
   return self;
 }
 
-#if SWIFT_OBJC_INTEROP
-
-// FIXME: This is from a later version of <objc/runtime.h>. Once the declaration
-// is available in SDKs, we can remove this typedef.
-typedef BOOL (*objc_hook_getImageName)(
-    Class _Nonnull cls, const char * _Nullable * _Nonnull outImageName);
-
-/// \see customGetImageNameFromClass
-static objc_hook_getImageName defaultGetImageNameFromClass = nullptr;
-
-/// A custom implementation of Objective-C's class_getImageName for Swift
-/// classes, which knows how to handle dynamically-initialized class metadata.
-///
-/// Per the documentation for objc_setHook_getImageName, any non-Swift classes
-/// will still go through the normal implementation of class_getImageName,
-/// which is stored in defaultGetImageNameFromClass.
-static BOOL
-customGetImageNameFromClass(Class _Nonnull objcClass,
-                            const char * _Nullable * _Nonnull outImageName) {
-  auto *classAsMetadata = reinterpret_cast<const ClassMetadata *>(objcClass);
-
-  // Is this a Swift class?
-  if (classAsMetadata->isTypeMetadata() &&
-      !classAsMetadata->isArtificialSubclass()) {
-    const void *descriptor = classAsMetadata->getDescription();
-    assert(descriptor &&
-           "all non-artificial Swift classes should have a descriptor");
-    Dl_info imageInfo = {};
-    if (!dladdr(descriptor, &imageInfo))
-      return NO;
-    *outImageName = imageInfo.dli_fname;
-    return imageInfo.dli_fname != nullptr;
-  }
-
-  // If not, fall back to the default implementation.
-  return defaultGetImageNameFromClass(objcClass, outImageName);
-}
-#endif
-
 /// Initialize the field offset vector for a dependent-layout class, using the
 /// "Universal" layout strategy.
 void
@@ -2071,15 +2031,7 @@ swift::swift_initClassMetadata(ClassMetadata *self,
   static swift_once_t onceToken;
   swift_once(&onceToken, [](void *unused) {
     (void)unused;
-    // FIXME: This is from a later version of <objc/runtime.h>. Once the
-    // declaration is available in SDKs, we can access this directly instead of
-    // using dlsym.
-    if (void *setHookPtr = dlsym(RTLD_DEFAULT, "objc_setHook_getImageName")) {
-      auto setHook = reinterpret_cast<
-          void(*)(objc_hook_getImageName _Nonnull,
-                  objc_hook_getImageName _Nullable * _Nonnull)>(setHookPtr);
-      setHook(customGetImageNameFromClass, &defaultGetImageNameFromClass);
-    }
+    setUpObjCRuntimeGetImageNameFromClass();
   }, nullptr);
 #endif
 
