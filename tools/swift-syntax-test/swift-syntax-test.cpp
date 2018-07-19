@@ -143,6 +143,11 @@ IncrementalReuseLog("incremental-reuse-log",
                                    "describes all the nodes reused during "
                                    "incremental parsing."));
 
+static llvm::cl::opt<bool>
+OmitNodeIds("omit-node-ids",
+            llvm::cl::desc("If specified, the serialized syntax tree will not "
+                           "include the IDs of the serialized nodes."));
+
 static llvm::cl::opt<std::string>
 OutputFilename("output-filename",
                llvm::cl::desc("Path to the output file"));
@@ -684,6 +689,17 @@ int doFullParseRoundTrip(const char *MainExecutablePath,
 int doSerializeRawTree(const char *MainExecutablePath,
                        const StringRef InputFile) {
   return parseFile(MainExecutablePath, InputFile, [](SourceFile *SF) -> int {
+    auto SerializeTree = [](llvm::raw_ostream &os, RC<RawSyntax> Root) {
+      swift::json::Output::UserInfoMap JsonUserInfo;
+      if (options::OmitNodeIds) {
+        JsonUserInfo[swift::json::DontSerializeNodeIdsUserInfoKey] =
+            (void *)true;
+      }
+      swift::json::Output out(os, JsonUserInfo);
+      out << *Root;
+      os << "\n";
+    };
+
     auto Root = SF->getSyntaxRoot().getRaw();
 
     if (!options::OutputFilename.empty()) {
@@ -692,13 +708,9 @@ int doSerializeRawTree(const char *MainExecutablePath,
                               llvm::sys::fs::F_None);
       assert(!errorCode && "Couldn't open output file");
 
-      swift::json::Output out(os);
-      out << *Root;
-      os << "\n";
+      SerializeTree(os, Root);
     } else {
-      swift::json::Output out(llvm::outs());
-      out << *Root;
-      llvm::outs() << "\n";
+      SerializeTree(llvm::outs(), Root);
     }
     return EXIT_SUCCESS;
   });
