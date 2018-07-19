@@ -531,6 +531,7 @@ static AccessorDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
                      /*GenericParams=*/nullptr, params,
                      TypeLoc::withoutLoc(rawTy), enumDecl);
   getterDecl->setImplicit();
+  getterDecl->setIsObjC(false);
 
   auto type = ParameterList::getFullInterfaceType(rawTy, params, C);
 
@@ -615,6 +616,7 @@ static AccessorDecl *makeStructRawValueGetter(
                      /*GenericParams=*/nullptr, params,
                      TypeLoc::withoutLoc(computedType), structDecl);
   getterDecl->setImplicit();
+  getterDecl->setIsObjC(false);
 
   auto type = ParameterList::getFullInterfaceType(computedType, params, C);
 
@@ -684,6 +686,7 @@ static AccessorDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
                      /*GenericParams=*/nullptr, params,
                      TypeLoc::withoutLoc(getterType), importedDecl, clangNode);
   getterDecl->setAccess(AccessLevel::Public);
+  getterDecl->setIsObjC(false);
 
   auto type = ParameterList::getFullInterfaceType(getterType, params, C);
   getterDecl->setInterfaceType(type);
@@ -725,6 +728,7 @@ static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
                      /*ThrowsLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr, params,
                      TypeLoc::withoutLoc(voidTy), importedDecl, clangNode);
+  setterDecl->setIsObjC(false);
 
   auto type = ParameterList::getFullInterfaceType(voidTy, params, C);
   setterDecl->setInterfaceType(type);
@@ -1883,6 +1887,7 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
                      TypeLoc::withoutLoc(stringTy), swiftDecl);
   getterDecl->setInterfaceType(toStringTy);
   getterDecl->setValidationToChecked();
+  getterDecl->setIsObjC(false);
 
   swiftDecl->addMember(errorDomainPropertyDecl);
   swiftDecl->addMember(getterDecl);
@@ -3445,6 +3450,7 @@ namespace {
                        Impl.importSourceLoc(decl->getLocStart()),
                        name, dc->mapTypeIntoContext(type), dc);
       result->setInterfaceType(type);
+      result->setIsObjC(false);
       Impl.recordImplicitUnwrapForDecl(result,
                                        importedType.isImplicitlyUnwrapped());
 
@@ -3579,6 +3585,7 @@ namespace {
 
       result->setInterfaceType(type);
       result->setValidationToChecked();
+      result->setIsObjC(false);
       Impl.recordImplicitUnwrapForDecl(result,
                                        importedType.isImplicitlyUnwrapped());
 
@@ -3672,6 +3679,7 @@ namespace {
                               /*IsCaptureList*/false,
                               Impl.importSourceLoc(decl->getLocation()),
                               name, dc->mapTypeIntoContext(type), dc);
+      result->setIsObjC(false);
       result->setInterfaceType(type);
       Impl.recordImplicitUnwrapForDecl(result,
                                        importedType.isImplicitlyUnwrapped());
@@ -3757,6 +3765,7 @@ namespace {
                        /*IsCaptureList*/false,
                        Impl.importSourceLoc(decl->getLocation()),
                        name, dc->mapTypeIntoContext(type), dc);
+      result->setIsObjC(false);
       result->setInterfaceType(type);
       Impl.recordImplicitUnwrapForDecl(result,
                                        importedType.isImplicitlyUnwrapped());
@@ -5675,6 +5684,8 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
   result->setInterfaceType(allocType);
   Impl.recordImplicitUnwrapForDecl(result,
                                    importedType.isImplicitlyUnwrapped());
+  result->setOverriddenDecls({ });
+  result->setIsObjC(false);
 
   finishFuncDecl(decl, result);
   if (correctSwiftName)
@@ -5921,6 +5932,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
       VarDecl::Specifier::Var, /*IsCaptureList*/false, SourceLoc(),
       propertyName, dc->mapTypeIntoContext(swiftPropertyType), dc);
   property->setInterfaceType(swiftPropertyType);
+  property->setIsObjC(false);
   Impl.recordImplicitUnwrapForDecl(property,
                                    importedType.isImplicitlyUnwrapped());
 
@@ -6389,13 +6401,10 @@ void SwiftDeclConverter::recordObjCOverride(AbstractFunctionDecl *decl) {
   // Make sure that we always set the overriden declarations.
   SWIFT_DEFER {
     if (!decl->overriddenDeclsComputed())
-      (void)decl->setOverriddenDecls({ });
+      decl->setOverriddenDecls({ });
   };
 
   // Figure out the class in which this method occurs.
-  if (!decl->getDeclContext()->isTypeContext())
-    return;
-
   auto classDecl = decl->getDeclContext()->getAsClassOrClassExtensionContext();
   if (!classDecl)
     return;
@@ -8323,6 +8332,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   }
 
   var->setInterfaceType(type);
+  var->setIsObjC(false);
 
   // Form the argument patterns.
   SmallVector<ParameterList*, 3> getterArgs;
@@ -8357,6 +8367,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   func->setAccess(getOverridableAccessLevel(dc));
   func->setValidationToChecked();
   func->setImplicit();
+  func->setIsObjC(false);
 
   // If we're not done type checking, build the getter body.
   if (!hasFinishedTypeChecking()) {
@@ -8433,6 +8444,7 @@ createUnavailableDecl(Identifier name, DeclContext *dc, Type type,
                                               VarDecl::Specifier::Var,
                                               /*IsCaptureList*/false,
                                               SourceLoc(), name, type, dc);
+  var->setIsObjC(false);
   var->setInterfaceType(type);
   markUnavailable(var, UnavailableMessage);
 

@@ -3542,10 +3542,6 @@ EffectiveClangContext ClangImporter::Implementation::getEffectiveClangContext(
     return EffectiveClangContext();
   }
 
-  // Resolve the type.
-  if (auto typeResolver = getTypeResolver())
-    typeResolver->resolveIsObjC(const_cast<NominalTypeDecl *>(nominal));
-
   // If it's an @objc entity, go look for it.
   if (nominal->isObjC()) {
     // Map the name. If we can't represent the Swift name in Clang.

@@ -858,6 +858,28 @@ AssociatedTypeDecl *getReferencedAssocTypeOfProtocol(Type type,
 /// the noescape-to-escaping adjustment.
 Type adjustInferredAssociatedType(Type type, bool &noescapeToEscaping);
 
+/// Find the @objc requirement that are witnessed by the given
+/// declaration.
+///
+/// \param anySingleRequirement If true, returns at most a single requirement,
+/// which might be any of the requirements that match.
+///
+/// \returns the set of requirements to which the given witness is a
+/// witness.
+llvm::TinyPtrVector<ValueDecl *> findWitnessedObjCRequirements(
+                                     const ValueDecl *witness,
+                                     bool anySingleRequirement = false);
+
+/// Mark any _ObjectiveCBridgeable conformances in the given type as "used".
+void useObjectiveCBridgeableConformances(
+                      DeclContext *dc, Type type);
+
+/// If this bound-generic type is bridged, mark any
+/// _ObjectiveCBridgeable conformances in the generic arguments of
+/// the given type as "used".
+void useObjectiveCBridgeableConformancesOfArgs(
+                      DeclContext *dc, BoundGenericType *bound);
+
 }
 
 #endif // SWIFT_SEMA_PROTOCOL_H

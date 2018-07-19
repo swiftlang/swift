@@ -1117,12 +1117,6 @@ void swift::makeFinal(ASTContext &ctx, ValueDecl *D) {
   }
 }
 
-void swift::makeDynamic(ASTContext &ctx, ValueDecl *D) {
-  if (D && !D->isDynamic()) {
-    D->getAttrs().add(new (ctx) DynamicAttr(/*IsImplicit=*/true));
-  }
-}
-
 namespace {
 // The raw values of this enum must be kept in sync with
 // diag::implicitly_final_cannot_be_open.
@@ -1222,61 +1216,108 @@ static void recordIndexContextTypes(SubscriptDecl *subscript) {
   }
 }
 
-/// If we need to infer 'dynamic', do so now.
+/// Try to make the given declaration 'dynamic', checking any semantic
+/// constraints before doing so.
 ///
-/// This occurs when
-/// - it is implied by an attribute like @NSManaged
-/// - when we have an override of an imported method
-/// - we need to dynamically dispatch to a method in an extension
-///
-/// FIXME: The latter reason is a hack. We should figure out how to safely
-/// put extension methods into the class vtable.
-static void inferDynamic(ASTContext &ctx, ValueDecl *D) {
+/// \returns true if it can be made dynamic, false otherwise.
+static bool makeDynamic(ValueDecl *decl) {
+  // Only  members of classes can be dynamic.
+  auto classDecl = decl->getDeclContext()->getAsClassOrClassExtensionContext();
+  if (!classDecl) {
+    auto attr = decl->getAttrs().getAttribute<DynamicAttr>();
+    decl->diagnose(diag::dynamic_not_in_class)
+      .fixItRemove(attr ? SourceRange(attr->getLocation()) : SourceRange());
+    return false;
+  }
+
+  // 'dynamic' is only supported through the Objective-C runtime.
+  if (!decl->isObjC()) {
+    decl->diagnose(diag::dynamic_requires_objc,
+                   decl->getDescriptiveKind(), decl->getFullName())
+      .fixItInsert(decl->getAttributeInsertionLoc(/*forModifier=*/false),
+                   "@objc ");
+    return false;
+  }
+
+  // If there isn't already a 'dynamic' attribute, add an inferred one.
+  if (!decl->getAttrs().hasAttribute<DynamicAttr>()) {
+    auto attr = new (decl->getASTContext()) DynamicAttr(/*implicit=*/true);
+    decl->getAttrs().add(attr);
+  }
+
+  return true;
+}
+
+bool IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // If we can't infer dynamic here, don't.
-  if (!DeclAttribute::canAttributeAppearOnDecl(DAK_Dynamic, D))
-    return;
+  if (!DeclAttribute::canAttributeAppearOnDecl(DAK_Dynamic, decl))
+    return false;
 
-  // The presence of 'dynamic' blocks the inference of 'dynamic'.
-  if (D->isDynamic())
-    return;
+  // If 'dynamic' was explicitly specified, check it.
+  if (auto dynamicAttr = decl->getAttrs().getAttribute<DynamicAttr>()) {
+    return makeDynamic(decl);
+  }
 
-  // Only 'objc' declarations use 'dynamic'.
-  if (!D->isObjC() || D->hasClangNode())
-    return;
+  // Runtime-replacable accessors are dynamic when their storage declaration
+  // is dynamic. Other accessors are never dynamic.
+  if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
+    switch (accessor->getAccessorKind()) {
+    case AccessorKind::Get:
+    case AccessorKind::Set:
+      if (evaluator(IsDynamicRequest{accessor->getStorage()}))
+        return makeDynamic(decl);
 
-  bool overridesImportedMethod =
-    (D->getOverriddenDecl() &&
-     D->getOverriddenDecl()->hasClangNode());
+      return false;
 
-  bool overridesDyanmic =
-    (D->getOverriddenDecl() &&
-     D->getOverriddenDecl()->isDynamic());
+    case AccessorKind::Address:
+    case AccessorKind::DidSet:
+    case AccessorKind::MaterializeForSet:
+    case AccessorKind::MutableAddress:
+    case AccessorKind::WillSet:
+      return false;
+    }
+  }
 
-  bool isNSManaged = D->getAttrs().hasAttribute<NSManagedAttr>();
-
-  bool isExtension = isa<ExtensionDecl>(D->getDeclContext());
-
-  // We only infer 'dynamic' in these three cases.
-  if (!isExtension && !isNSManaged && !overridesImportedMethod &&
-      !overridesDyanmic)
-    return;
+  // The 'NSManaged' attribute implies 'dynamic'.
+  // FIXME: Use a semantic check for NSManaged rather than looking for the
+  // attribute (which could be ill-formed).
+  if (decl->getAttrs().hasAttribute<NSManagedAttr>()) {
+    return makeDynamic(decl);
+  }
 
   // The presence of 'final' blocks the inference of 'dynamic'.
-  if (D->isFinal() && !isNSManaged)
-    return;
+  if (decl->isFinal())
+    return false;
 
-  // Accessors should not infer 'dynamic' on their own; they can get it from
-  // their storage decls.
-  if (isa<AccessorDecl>(D))
-    return;
+  // Types are never 'dynamic'.
+  if (isa<TypeDecl>(decl))
+    return false;
 
-  // Only classes can use 'dynamic'.
-  auto classDecl = D->getDeclContext()->getAsClassOrClassExtensionContext();
-  if (!classDecl)
-    return;
+  // A non-@objc entity is never 'dynamic'.
+  if (!decl->isObjC())
+    return false;
 
-  // Add the 'dynamic' attribute.
-  D->getAttrs().add(new (ctx) DynamicAttr(/*IsImplicit=*/true));
+  // @objc declarations in class extensions are implicitly dynamic.
+  // This is intended to enable overriding the declarations.
+  auto dc = decl->getDeclContext();
+  if (isa<ExtensionDecl>(dc) && dc->getAsClassOrClassExtensionContext()) {
+    return makeDynamic(decl);
+  }
+
+  // If any of the declarations overridden by this declaration are dynamic
+  // or were imported from Objective-C, this declaration is dynamic.
+  // Don't do this if the declaration is not exposed to Objective-C; that's
+  // currently the (only) manner in which one can make an override of a
+  // dynamic declaration non-dynamic.
+  for (auto overridden : evaluator(OverriddenDeclsRequest{decl})) {
+    if (overridden->isDynamic())
+      return makeDynamic(decl);
+
+    if (overridden->hasClangNode())
+      return makeDynamic(decl);
+  }
+
+  return false;
 }
 
 namespace {
@@ -2227,16 +2268,6 @@ static void validateAbstractStorageDecl(TypeChecker &TC,
   // Add any mandatory accessors now.
   maybeAddAccessorsToStorage(TC, storage);
 
-  // We can't delay validation of getters and setters on @objc properties,
-  // because if they never get validated at all then conformance checkers
-  // will complain about selector mismatches.
-  if (storage->isObjC()) {
-    if (auto *getter = storage->getGetter())
-      TC.validateDecl(getter);
-    if (auto *setter = storage->getSetter())
-      TC.validateDecl(setter);
-  }
-
   // Everything else about the accessors can wait until finalization.
   // This will validate all the accessors.
   TC.DeclsToFinalize.insert(storage);
@@ -2267,7 +2298,10 @@ public:
 
     if (auto VD = dyn_cast<ValueDecl>(decl)) {
       checkRedeclaration(TC, VD);
-      
+
+      (void)VD->isObjC();
+      (void)VD->isDynamic();
+
       // If this is a member of a nominal type, don't allow it to have a name of
       // "Type" or "Protocol" since we reserve the X.Type and X.Protocol
       // expressions to mean something builtin to the language.  We *do* allow
@@ -2382,7 +2416,7 @@ public:
       }
     }
 
-    if (!checkOverrides(TC, VD)) {
+    if (!checkOverrides(VD)) {
       // If a property has an override attribute but does not override
       // anything, complain.
       auto overridden = VD->getOverriddenDecl();
@@ -2398,6 +2432,24 @@ public:
     TC.checkDeclAttributes(VD);
 
     triggerAccessorSynthesis(TC, VD);
+
+    // Under the Swift 3 inference rules, if we have @IBInspectable or
+    // @GKInspectable but did not infer @objc, warn that the attribute is
+    if (!VD->isObjC() && TC.Context.LangOpts.EnableSwift3ObjCInference) {
+      if (auto attr = VD->getAttrs().getAttribute<IBInspectableAttr>()) {
+        TC.diagnose(attr->getLocation(),
+                    diag::attribute_meaningless_when_nonobjc,
+                    attr->getAttrName())
+          .fixItRemove(attr->getRange());
+      }
+
+      if (auto attr = VD->getAttrs().getAttribute<GKInspectableAttr>()) {
+        TC.diagnose(attr->getLocation(),
+                    diag::attribute_meaningless_when_nonobjc,
+                    attr->getAttrName())
+          .fixItRemove(attr->getRange());
+      }
+    }
   }
 
 
@@ -2540,7 +2592,7 @@ public:
     AccessControlChecker::checkAccessControl(TC, SD);
     UsableFromInlineChecker::checkUsableFromInline(TC, SD);
 
-    if (!checkOverrides(TC, SD)) {
+    if (!checkOverrides(SD)) {
       // If a subscript has an override attribute but does not override
       // anything, complain.
       if (auto *OA = SD->getAttrs().getAttribute<OverrideAttr>()) {
@@ -3042,7 +3094,7 @@ public:
     AccessControlChecker::checkAccessControl(TC, FD);
     UsableFromInlineChecker::checkUsableFromInline(TC, FD);
 
-    if (!checkOverrides(TC, FD)) {
+    if (!checkOverrides(FD)) {
       // If a method has an 'override' keyword but does not
       // override anything, complain.
       if (auto *OA = FD->getAttrs().getAttribute<OverrideAttr>()) {
@@ -3183,7 +3235,7 @@ public:
 
     // Check whether this initializer overrides an initializer in its
     // superclass.
-    if (!checkOverrides(TC, CD)) {
+    if (!checkOverrides(CD)) {
       // If an initializer has an override attribute but does not override
       // anything or overrides something that doesn't need an 'override'
       // keyword (e.g., a convenience initializer), complain.
@@ -3801,10 +3853,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     validateAttributes(*this, D);
 
     if (auto CD = dyn_cast<ClassDecl>(nominal)) {
-      // Mark a class as @objc. This must happen before checking its members.
-      Optional<ObjCReason> isObjC = shouldMarkAsObjC(*this, CD);
-      markAsObjC(*this, CD, isObjC);
-
       // Determine whether we require in-class initializers.
       if (CD->getAttrs().hasAttribute<RequiresStoredPropertyInitsAttr>() ||
           (CD->hasSuperclass() &&
@@ -3824,7 +3872,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     if (auto *ED = dyn_cast<EnumDecl>(nominal)) {
       // @objc enums use their raw values as the value representation, so we
       // need to force the values to be checked.
-      resolveIsObjC(ED);
       if (ED->isObjC())
         checkEnumRawValues(*this, ED);
     }
@@ -3879,25 +3926,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     resolveTrailingWhereClause(proto);
 
     validateAttributes(*this, D);
-
-    // If the protocol is @objc, it may only refine other @objc protocols.
-    // FIXME: Revisit this restriction.
-    if (proto->getAttrs().hasAttribute<ObjCAttr>()) {
-      Optional<ObjCReason> isObjC = ObjCReason(ObjCReason::ImplicitlyObjC);
-
-      for (auto inherited : proto->getInheritedProtocols()) {
-        if (!inherited->isObjC()) {
-          diagnose(proto->getLoc(),
-                   diag::objc_protocol_inherits_non_objc_protocol,
-                   proto->getDeclaredType(), inherited->getDeclaredType());
-          diagnose(inherited->getLoc(), diag::kind_identifier_declared_here,
-                   DescriptiveDeclKind::Protocol, inherited->getName());
-          isObjC = None;
-        }
-      }
-
-      markAsObjC(*this, proto, isObjC);
-    }
 
     // FIXME: IRGen likes to emit @objc protocol descriptors even if the
     // protocol comes from a different module or translation unit.
@@ -3975,33 +4003,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // Properties need some special validation logic.
     if (auto *nominalDecl = VD->getDeclContext()
             ->getAsNominalTypeOrNominalTypeExtensionContext()) {
-      // If this is a property, check if it needs to be exposed to
-      // Objective-C.
-      Optional<ObjCReason> isObjC = shouldMarkAsObjC(*this, VD);
-
-      if (isObjC && !swift::isRepresentableInObjC(VD, *isObjC))
-        isObjC = None;
-
-      markAsObjC(*this, VD, isObjC);
-
-      // Under the Swift 3 inference rules, if we have @IBInspectable or
-      // @GKInspectable but did not infer @objc, warn that the attribute is
-      if (!isObjC && Context.LangOpts.EnableSwift3ObjCInference) {
-        if (auto attr = VD->getAttrs().getAttribute<IBInspectableAttr>()) {
-          diagnose(attr->getLocation(),
-                   diag::attribute_meaningless_when_nonobjc,
-                   attr->getAttrName())
-            .fixItRemove(attr->getRange());
-        }
-
-        if (auto attr = VD->getAttrs().getAttribute<GKInspectableAttr>()) {
-          diagnose(attr->getLocation(),
-                   diag::attribute_meaningless_when_nonobjc,
-                   attr->getAttrName())
-            .fixItRemove(attr->getRange());
-        }
-      }
-
       // If this variable is a class member, mark it final if the
       // class is final, or if it was declared with 'let'.
       auto staticSpelling =
@@ -4021,9 +4022,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
           fixItAccess(inFlightDiag, D, AccessLevel::Public);
         }
       }
-
-      // Infer 'dynamic' after 'final' but before touching accessors.
-      inferDynamic(Context, VD);
     }
 
     // Perform accessor-related validation.
@@ -4206,15 +4204,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       if (FD->isOperator())
         checkMemberOperator(*this, FD);
 
-      Optional<ObjCReason> isObjC = shouldMarkAsObjC(*this, FD);
       auto accessor = dyn_cast<AccessorDecl>(FD);
-
-      auto *protocolContext = dyn_cast<ProtocolDecl>(
-          FD->getDeclContext());
-      if (protocolContext && accessor) {
-        if (isObjC)
-          isObjC = ObjCReason::Accessor;
-      }
 
       if (accessor && accessor->isGetterOrSetter()) {
         // If the property decl is an instance property, its accessors will
@@ -4224,48 +4214,12 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
         AbstractStorageDecl *storage = accessor->getStorage();
 
-        if (storage->getAttrs().hasAttribute<NonObjCAttr>())
-          isObjC = None;
-        else if (storage->isObjC()) {
-          if (!isObjC) {
-            // Make this accessor @objc because its property is @objc.
-            isObjC = ObjCReason::Accessor;
-          } else if (auto storageObjCAttr =
-                       storage->getAttrs().getAttribute<ObjCAttr>()) {
-            // If @objc on the storage declaration was inferred using a
-            // deprecated rule, but this accessor is @objc in its own right,
-            // complain.
-            ;
-            if (storageObjCAttr && storageObjCAttr->isSwift3Inferred() &&
-                shouldDiagnoseObjCReason(*isObjC, Context)) {
-              diagnose(storage, diag::accessor_swift3_objc_inference,
-                       storage->getDescriptiveKind(), storage->getFullName(),
-                       isa<SubscriptDecl>(storage), accessor->isSetter())
-                .fixItInsert(storage->getAttributeInsertionLoc(
-                                                      /*forModifier=*/false),
-                             "@objc ");
-            }
-          }
-        }
-
-        // If the storage is dynamic or final, propagate to this accessor.
-        if (isObjC &&
-            storage->isDynamic())
-          makeDynamic(Context, FD);
-
+        // If the storage is final, propagate to this accessor.
         if (storage->isFinal())
           makeFinal(Context, FD);
       }
 
-      Optional<ForeignErrorConvention> errorConvention;
-      if (isObjC &&
-          (FD->isInvalid() || !isRepresentableInObjC(FD, *isObjC,
-                                                     errorConvention)))
-        isObjC = None;
-      markAsObjC(*this, FD, isObjC, errorConvention);
-
       inferFinalAndDiagnoseIfNeeded(*this, FD, FD->getStaticSpelling());
-      inferDynamic(Context, FD);
     }
 
     // If the function is exported to C, it must be representable in (Obj-)C.
@@ -4354,22 +4308,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     validateAttributes(*this, CD);
 
-    // An initializer is ObjC-compatible if it's explicitly @objc or a member
-    // of an ObjC-compatible class.
-    if (CD->getDeclContext()->isTypeContext()) {
-      Optional<ObjCReason> isObjC = shouldMarkAsObjC(*this, CD,
-          /*allowImplicit=*/true);
-
-      Optional<ForeignErrorConvention> errorConvention;
-      if (isObjC &&
-          (CD->isInvalid() ||
-           !isRepresentableInObjC(CD, *isObjC, errorConvention)))
-        isObjC = None;
-      markAsObjC(*this, CD, isObjC, errorConvention);
-    }
-
-    inferDynamic(Context, CD);
-
     if (CD->getFailability() == OTK_ImplicitlyUnwrappedOptional) {
       auto &C = CD->getASTContext();
       CD->getAttrs().add(
@@ -4405,16 +4343,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     DD->setSignatureIsValidated();
 
-    // Do this before markAsObjC() to diagnose @nonobjc better
     validateAttributes(*this, DD);
-
-    // Destructors are always @objc, because their Objective-C entry point is
-    // -dealloc.
-    if (Context.LangOpts.EnableObjCInterop)
-      markAsObjC(*this, DD, ObjCReason(ObjCReason::ImplicitlyObjC));
-    else
-      DD->setIsObjC(false);
-
     break;
   }
 
@@ -4443,17 +4372,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     if (SD->getDeclContext()->isTypeContext()) {
       // If this is a class member, mark it final if the class is final.
       inferFinalAndDiagnoseIfNeeded(*this, SD, StaticSpellingKind::None);
-
-      // A subscript is ObjC-compatible if it's explicitly @objc, or a
-      // member of an ObjC-compatible class or protocol.
-      Optional<ObjCReason> isObjC = shouldMarkAsObjC(*this, SD);
-
-      if (isObjC && !swift::isRepresentableInObjC(SD, *isObjC))
-        isObjC = None;
-      markAsObjC(*this, SD, isObjC);
-
-      // Infer 'dynamic' before touching accessors.
-      inferDynamic(Context, SD);
     }
 
     // Perform accessor-related validation.
@@ -4673,6 +4591,28 @@ void TypeChecker::requestMemberLayout(ValueDecl *member) {
     requestNominalLayout(classDecl);
   if (auto *protocolDecl = dyn_cast<ProtocolDecl>(dc))
     requestNominalLayout(protocolDecl);
+
+  // Compute overrides.
+  (void)member->getOverriddenDecls();
+
+  // Check whether the member is @objc or dynamic.
+  (void)member->isObjC();
+  (void)member->isDynamic();
+
+  // If this represents (abstract) storage, form the appropriate accessors.
+  if (auto storage = dyn_cast<AbstractStorageDecl>(member)) {
+    validateAbstractStorageDecl(*this, storage);
+
+    // Request layout of the accessors for an @objc declaration.
+    // We can't delay validation of getters and setters on @objc properties,
+    // because if they never get validated at all then conformance checkers
+    // will complain about selector mismatches.
+    if (storage->isObjC()) {
+      for (auto accessor : storage->getAllAccessors()) {
+        requestMemberLayout(accessor);
+      }
+    }
+  }
 }
 
 void TypeChecker::requestNominalLayout(NominalTypeDecl *nominalDecl) {
@@ -4707,6 +4647,8 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
       continue;
 
     TC.validateDecl(VD);
+
+    TC.requestMemberLayout(VD);
 
     // The only thing left to do is synthesize storage for lazy variables.
     auto *prop = dyn_cast<VarDecl>(D);

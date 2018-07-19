@@ -1676,7 +1676,6 @@ class HasIBAction {
 
   @IBAction func badAction(_ sender: PlainStruct?) { }
   // expected-error@-1{{argument to @IBAction method cannot have non-object type 'PlainStruct?'}}
-  // expected-error@-2{{method cannot be marked @IBAction because the type of the parameter cannot be represented in Objective-C}}
 }
 
 //===---
@@ -1716,6 +1715,7 @@ class HasNSManaged {
   var badManaged: PlainStruct
   // expected-error@-1 {{property cannot be marked @NSManaged because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
+  // expected-error@-3{{'dynamic' var 'badManaged' must also be '@objc'}}
   // CHECK-LABEL: {{^}}  @NSManaged var badManaged: PlainStruct
 }
 

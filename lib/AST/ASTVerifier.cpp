@@ -181,6 +181,16 @@ struct LazyGenericEnvironment {
   }
 };
 
+namespace {
+  /// Retrieve the "overridden" declaration of this declaration, but only if
+  // it's already been computed.
+  template<typename T>
+  T *getOverriddenDeclIfAvailable(T *decl) {
+    if (!decl->overriddenDeclsComputed()) return nullptr;
+
+    return cast_or_null<T>(decl->getOverriddenDecl());
+  }
+}
 class Verifier : public ASTWalker {
   PointerUnion<ModuleDecl *, SourceFile *> M;
   ASTContext &Ctx;
@@ -841,7 +851,7 @@ public:
         }
       }
 
-      if (auto Overridden = D->getOverriddenDecl()) {
+      if (auto Overridden = getOverriddenDeclIfAvailable(D)) {
         if (D->getDeclContext() == Overridden->getDeclContext()) {
           PrettyStackTraceDecl debugStack("verifying overridden", D);
           Out << "cannot override a decl in the same DeclContext";
@@ -2230,42 +2240,6 @@ public:
                  " with whether mutable addressor is mutating";
           abort();
         }
-      }
-
-      // Make sure we consistently set accessor overrides.
-      if (auto *baseASD = ASD->getOverriddenDecl()) {
-        if (ASD->getGetter() && baseASD->getGetter())
-          assert(ASD->getGetter()->getOverriddenDecl() ==
-                 baseASD->getGetter() &&
-                 "Storage overrides but getter does not");
-        if (ASD->getSetter() && baseASD->getSetter() &&
-            baseASD->isSetterAccessibleFrom(ASD->getDeclContext()))
-          assert(ASD->getSetter()->getOverriddenDecl() ==
-                 baseASD->getSetter() &&
-                 "Storage overrides but setter does not");
-        if (ASD->getMaterializeForSetFunc() &&
-            baseASD->getMaterializeForSetFunc() &&
-            baseASD->isSetterAccessibleFrom(ASD->getDeclContext())) {
-          if (baseASD->getMaterializeForSetFunc()->hasForcedStaticDispatch()) {
-            assert(ASD->getMaterializeForSetFunc()->getOverriddenDecl() == nullptr
-                   && "Forced static dispatch materializeForSet should not be "
-                   "overridden");
-          } else {
-            assert(ASD->getMaterializeForSetFunc()->getOverriddenDecl() ==
-                   baseASD->getMaterializeForSetFunc() &&
-                   "Storage override but materializeForSet does not");
-          }
-        }
-      } else {
-        if (ASD->getGetter())
-          assert(!ASD->getGetter()->getOverriddenDecl() &&
-                 "Storage does not override but getter does");
-        if (ASD->getSetter())
-          assert(!ASD->getSetter()->getOverriddenDecl() &&
-                 "Storage does not override but setter does");
-        if (ASD->getMaterializeForSetFunc())
-          assert(!ASD->getMaterializeForSetFunc()->getOverriddenDecl() &&
-                 "Storage does not override but materializeForSet does");
       }
 
       verifyCheckedBase(ASD);

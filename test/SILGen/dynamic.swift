@@ -545,7 +545,6 @@ public class ConcreteDerived : GenericBase<Int> {
 
 // No vtable entry for override of @objc extension property
 // CHECK-LABEL: sil_vtable [serialized] SubExt {
-// CHECK-NEXT: #BaseExt.init!initializer.1: (BaseExt.Type) -> () -> BaseExt : @$S7dynamic6SubExtCACycfc [override] // dynamic.SubExt.init() -> dynamic.SubExt
 // CHECK-NEXT: #SubExt.deinit!deallocator: @$S7dynamic6SubExtCfD // dynamic.SubExt.__deallocating_deinit
 // CHECK-NEXT: }
 

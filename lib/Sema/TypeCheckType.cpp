@@ -18,6 +18,7 @@
 #include "TypeChecker.h"
 #include "GenericTypeResolver.h"
 #include "TypeCheckAvailability.h"
+#include "TypeCheckProtocol.h"
 
 #include "swift/Strings.h"
 #include "swift/AST/ASTVisitor.h"
@@ -2623,7 +2624,7 @@ Type TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
 
   if (!options.contains(TypeResolutionFlags::ResolveStructure)) {
     // Check for _ObjectiveCBridgeable conformances in the element type.
-    TC.useObjectiveCBridgeableConformances(DC, baseTy);
+    useObjectiveCBridgeableConformances(DC, baseTy);
   }
 
   return sliceTy;
@@ -2658,8 +2659,8 @@ Type TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
 
       // Check for _ObjectiveCBridgeable conformances in the key and value
       // types.
-      TC.useObjectiveCBridgeableConformances(DC, keyTy);
-      TC.useObjectiveCBridgeableConformances(DC, valueTy);
+      useObjectiveCBridgeableConformances(DC, keyTy);
+      useObjectiveCBridgeableConformances(DC, valueTy);
     }
 
     return dictTy;

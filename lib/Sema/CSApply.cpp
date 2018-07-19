@@ -18,6 +18,7 @@
 
 #include "ConstraintSystem.h"
 #include "MiscDiagnostics.h"
+#include "TypeCheckProtocol.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -558,6 +559,7 @@ namespace {
                        FunctionRefKind functionRefKind,
                        AccessSemantics semantics) {
       auto *decl = choice.getDecl();
+
       // Determine the declaration selected for this overloaded reference.
       auto &ctx = cs.getASTContext();
       
@@ -900,6 +902,7 @@ namespace {
                          FunctionRefKind functionRefKind,
                          AccessSemantics semantics, bool isDynamic) {
       ValueDecl *member = choice.getDecl();
+
       auto &tc = cs.getTypeChecker();
       auto &context = tc.Context;
 
@@ -4610,8 +4613,7 @@ namespace {
 
       // Mark any _ObjectiveCBridgeable conformances as 'used'.
       if (result) {
-        auto &tc = cs.getTypeChecker();
-        tc.useObjectiveCBridgeableConformances(cs.DC, cs.getType(result));
+        useObjectiveCBridgeableConformances(cs.DC, cs.getType(result));
       }
 
       assert(expr == ExprStack.back());
