@@ -1805,7 +1805,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   if (Invocation.getFrontendOptions()
           .InputsAndOutputs.hasDependencyTrackerPath() ||
       !Invocation.getFrontendOptions().IndexStorePath.empty())
-    Instance->createDependencyTracker();
+    Instance->createDependencyTracker(Invocation.getFrontendOptions().TrackSystemDeps);
 
   if (Instance->setup(Invocation)) {
     return finishDiagProcessing(1);

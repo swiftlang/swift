@@ -421,9 +421,9 @@ public:
     Diagnostics.addConsumer(*DC);
   }
 
-  void createDependencyTracker() {
+  void createDependencyTracker(bool TrackSystemDeps) {
     assert(!Context && "must be called before setup()");
-    DepTracker = llvm::make_unique<DependencyTracker>();
+    DepTracker = llvm::make_unique<DependencyTracker>(TrackSystemDeps);
   }
   DependencyTracker *getDependencyTracker() { return DepTracker.get(); }
 
