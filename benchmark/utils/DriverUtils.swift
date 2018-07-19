@@ -99,30 +99,28 @@ struct TestConfig {
       }
     }
 
-    try optionalArg("--iter-scale", \.iterationScale) { Int($0) }
-    try optionalArg("--num-iters", \.fixedNumIters) { UInt($0) }
-    try optionalArg("--num-samples", \.numSamples)  { Int($0) }
-    try optionalArg("--verbose", \.verbose, defaultValue: true)
-    try optionalArg("--delim", \.delim) { $0 }
-
-    func parseCategory(tag: String) throws -> BenchmarkCategory {
+    func tag(tag: String) throws -> BenchmarkCategory {
       guard let category = BenchmarkCategory(rawValue: tag) else {
         throw ArgumentError.invalidType(
           value: tag, type: "BenchmarkCategory", argument: nil)
       }
       return category
     }
-
-    try optionalArg("--tags", \.tags) {
+    func tags(tags: String) throws -> Set<BenchmarkCategory> {
       // We support specifying multiple tags by splitting on comma, i.e.:
       //  --tags=Array,Dictionary
-      Set(try $0.split(separator: ",").map(String.init).map(parseCategory))
-    }
-    try optionalArg("--skip-tags", \.skipTags, defaultValue: []) {
-      // We support specifying multiple tags by splitting on comma, i.e.:
       //  --skip-tags=Array,Set,unstable,skip
-      Set(try $0.split(separator: ",").map(String.init).map(parseCategory))
+      return Set(
+        try tags.split(separator: ",").map(String.init).map(tag))
     }
+
+    try optionalArg("--iter-scale", \.iterationScale) { Int($0) }
+    try optionalArg("--num-iters", \.fixedNumIters) { UInt($0) }
+    try optionalArg("--num-samples", \.numSamples)  { Int($0) }
+    try optionalArg("--verbose", \.verbose, defaultValue: true)
+    try optionalArg("--delim", \.delim) { $0 }
+    try optionalArg("--tags", \.tags, parser: tags)
+    try optionalArg("--skip-tags", \.skipTags, defaultValue: [], parser: tags)
     try optionalArg("--sleep", \.afterRunSleep) { Int($0) }
     try optionalArg("--list", \.action, defaultValue: .listTests)
     try optionalArg("--help", \.action, defaultValue: .help(validOptions))
