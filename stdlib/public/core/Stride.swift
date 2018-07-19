@@ -1,4 +1,4 @@
-//===--- Stride.swift.gyb - Components for stride(...) iteration ----------===//
+//===--- Stride.swift - Components for stride(...) iteration --------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -162,68 +162,6 @@ extension Strideable {
     return x.distance(to: y) == 0
   }
 }
-
-//===----------------------------------------------------------------------===//
-
-%{
-  # Strideable used to provide + and - unconditionally. With the updated
-  # collection indexing model of Swift 3 this became unnecessary for integer
-  # types, and was deprecated, as it was a way to write mixed-type arithmetic
-  # expressions, that are otherwise are not allowed.
-}%
-% for Base, VersionInfo in [
-%   ('Strideable where Self : _Pointer', None),
-%   ('Strideable', 'deprecated: 3, obsoleted: 4'),
-%   ]:
-%   Availability = '@available(swift, %s, message: "Please use explicit type conversions or Strideable methods for mixed-type arithmetics.")' % (VersionInfo) if VersionInfo else ''
-
-extension ${Base} {
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
-  ${Availability}
-  public static func + (lhs: Self, rhs: Self.Stride) -> Self {
-    return lhs.advanced(by: rhs)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
-  ${Availability}
-  public static func + (lhs: Self.Stride, rhs: Self) -> Self {
-    return rhs.advanced(by: lhs)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
-  ${Availability}
-  public static func - (lhs: Self, rhs: Self.Stride) -> Self {
-    return lhs.advanced(by: -rhs)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
-  ${Availability}
-  public static func - (lhs: Self, rhs: Self) -> Self.Stride {
-    return rhs.distance(to: lhs)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
-  ${Availability}
-  public static func += (lhs: inout Self, rhs: Self.Stride) {
-    lhs = lhs.advanced(by: rhs)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
-  ${Availability}
-  public static func -= (lhs: inout Self, rhs: Self.Stride) {
-    lhs = lhs.advanced(by: -rhs)
-  }
-}
-
-% end
-
-//===----------------------------------------------------------------------===//
 
 extension Strideable {
   @inlinable // protocol-only
@@ -718,7 +656,3 @@ public func stride<T>(
 ) -> StrideThrough<T> {
   return StrideThrough(_start: start, end: end, stride: stride)
 }
-
-// ${'Local Variables'}:
-// eval: (read-only-mode 1)
-// End:

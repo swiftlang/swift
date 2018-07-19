@@ -198,8 +198,8 @@ struct ByteBasedSourceRange {
   ByteBasedSourceRange(unsigned Start, unsigned End) : Start(Start), End(End) {
     assert(Start <= End);
   }
-  ByteBasedSourceRange(std::pair<unsigned, unsigned> Pair)
-      : ByteBasedSourceRange(Pair.first, Pair.second) {}
+  ByteBasedSourceRange(SyntaxReuseRegion Pair)
+      : ByteBasedSourceRange(Pair.Start, Pair.End) {}
   ByteBasedSourceRange() : ByteBasedSourceRange(0, 0) {}
 
   ByteBasedSourceRange intersect(const ByteBasedSourceRange &Other) {
@@ -228,8 +228,7 @@ struct ByteBasedSourceRangeSet {
 
   ByteBasedSourceRangeSet() {}
 
-  ByteBasedSourceRangeSet(
-      std::vector<std::pair<unsigned, unsigned>> PairVector) {
+  ByteBasedSourceRangeSet(std::vector<SyntaxReuseRegion> PairVector) {
     for (auto Pair : PairVector) {
       addRange(Pair);
     }
@@ -439,11 +438,11 @@ void printVisualNodeReuseInformation(SourceManager &SourceMgr,
 
   for (auto ReuseRange : Cache->getReusedRanges()) {
     // Print region that was not reused
-    PrintReparsedRegion(SourceText, CurrentOffset, ReuseRange.first);
+    PrintReparsedRegion(SourceText, CurrentOffset, ReuseRange.Start);
 
-    llvm::outs() << SourceText.substr(ReuseRange.first,
-                                      ReuseRange.second - ReuseRange.first);
-    CurrentOffset = ReuseRange.second;
+    llvm::outs() << SourceText.substr(ReuseRange.Start,
+                                      ReuseRange.End - ReuseRange.Start);
+    CurrentOffset = ReuseRange.End;
   }
   PrintReparsedRegion(SourceText, CurrentOffset, SourceText.size());
   if (useColoredOutput())
@@ -460,8 +459,8 @@ void saveReuseLog(SourceManager &SourceMgr, unsigned BufferID,
   assert(!ErrorCode && "Unable to open incremental usage log");
 
   for (auto ReuseRange : Cache->getReusedRanges()) {
-    SourceLoc Start = SourceMgr.getLocForOffset(BufferID, ReuseRange.first);
-    SourceLoc End = SourceMgr.getLocForOffset(BufferID, ReuseRange.second);
+    SourceLoc Start = SourceMgr.getLocForOffset(BufferID, ReuseRange.Start);
+    SourceLoc End = SourceMgr.getLocForOffset(BufferID, ReuseRange.End);
 
     ReuseLog << "Reused ";
     Start.printLineAndColumn(ReuseLog, SourceMgr, BufferID);

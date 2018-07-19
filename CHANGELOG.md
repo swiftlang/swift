@@ -24,9 +24,14 @@ CHANGELOG
 Swift 5.0
 ---------
 
-- [SR-419][]
+* Notable bug fix: unowned and unowned(unsafe) variables now support optional
+  types.
 
-  In Swift 5 mode, when setting a property from within its own `didSet` or `willSet` observer, the observer will now only avoid being recursively called if the property is set on `self` (either implicitly or explicitly).
+* [SR-419][]
+
+  In Swift 5 mode, when setting a property from within its own `didSet` or
+  `willSet` observer, the observer will now only avoid being recursively called
+  if the property is set on `self` (either implicitly or explicitly).
 
   For example:
   ```swift

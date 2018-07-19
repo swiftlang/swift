@@ -1,4 +1,5 @@
 // RUN: %target-swift-ide-test -print-ast-typechecked -source-filename=%s -print-implicit-attrs -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// REQUIRES: objc_interop
 
 @objc class Super {
   @objc dynamic func baseFoo() {}
@@ -36,17 +37,17 @@ extension Sub {
 
   // CHECK: @objc override dynamic var prop: Super
   override var prop: Super {
-    // CHECK: @objc override dynamic get
+    // CHECK: @objc dynamic get
     get { return Super() }
-    // CHECK: @objc override dynamic set
+    // CHECK: @objc dynamic set
     set { }
   }
 
   // CHECK: @objc override dynamic subscript(sup: Super) -> Super
   override subscript(sup: Super) -> Super {
-    // CHECK: @objc override dynamic get
+    // CHECK: @objc dynamic get
     get { return sup }
-    // CHECK: @objc override dynamic set
+    // CHECK: @objc dynamic set
     set { }
   }
 
@@ -64,17 +65,17 @@ extension FinalTests {
 
   // CHECK: @objc final var prop: Super
   @objc final var prop: Super {
-    // CHECK: @objc final get
+    // CHECK: final get
     get { return Super() }
-    // CHECK: @objc final set
+    // CHECK: final set
     set { }
   }
 
   // CHECK: @objc final subscript(sup: Super) -> Super
   @objc final subscript(sup: Super) -> Super {
-    // CHECK: @objc final get
+    // CHECK: final get
     get { return sup }
-    // CHECK: @objc final set
+    // CHECK: final set
     set { }
   }
 

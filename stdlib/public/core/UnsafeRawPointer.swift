@@ -280,7 +280,6 @@ public struct UnsafeRawPointer: _Pointer {
   ///   region is bound to `T`, but has not been modified in any other way.
   ///   The number of bytes in this region is
   ///   `count * MemoryLayout<T>.stride`.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @discardableResult
   public func bindMemory<T>(
@@ -627,7 +626,6 @@ public struct UnsafeMutableRawPointer: _Pointer {
   ///   region is bound to `T`, but has not been modified in any other way.
   ///   The number of bytes in this region is
   ///   `count * MemoryLayout<T>.stride`.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @discardableResult
   public func bindMemory<T>(
@@ -968,19 +966,4 @@ extension OpaquePointer {
     guard let unwrapped = from else { return nil }
     self._rawValue = unwrapped._rawValue
   }
-}
-
-
-extension UnsafeMutableRawPointer {
-  @available(*, unavailable, renamed: "init(mutating:)")
-  public init(_ from : UnsafeRawPointer) { Builtin.unreachable() }
-
-  @available(*, unavailable, renamed: "init(mutating:)")
-  public init?(_ from : UnsafeRawPointer?) { Builtin.unreachable(); return nil }
-
-  @available(*, unavailable, renamed: "init(mutating:)")
-  public init<T>(_ from : UnsafePointer<T>) { Builtin.unreachable() }
-
-  @available(*, unavailable, renamed: "init(mutating:)")
-  public init?<T>(_ from : UnsafePointer<T>?) { Builtin.unreachable(); return nil }
 }

@@ -44,5 +44,6 @@ ANALYSIS(ProtocolConformance)
 ANALYSIS(RCIdentity)
 ANALYSIS(SideEffect)
 ANALYSIS(TypeExpansion)
+ANALYSIS(PassManagerVerifier)
 
 #undef ANALYSIS

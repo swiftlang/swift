@@ -469,6 +469,10 @@ ProtocolConformanceRef ModuleFile::readConformance(
 
   unsigned kind = Cursor.readRecord(next.ID, scratch);
   switch (kind) {
+  case INVALID_PROTOCOL_CONFORMANCE: {
+    return ProtocolConformanceRef::forInvalid();
+  }
+
   case ABSTRACT_PROTOCOL_CONFORMANCE: {
     DeclID protoID;
     AbstractProtocolConformanceLayout::readRecord(scratch, protoID);
@@ -2705,7 +2709,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
         overriddenAssocTypes.push_back(overriddenAssocType);
       }
     }
-    (void)assocType->setOverriddenDecls(overriddenAssocTypes);
+    assocType->setOverriddenDecls(overriddenAssocTypes);
 
     break;
   }
@@ -4006,7 +4010,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     declOrOffset.get()->getAttrs().setRawAttributeChain(DAttrs);
 
   auto decl = declOrOffset.get();
-  decl->setValidationStarted();
+  decl->setValidationToChecked();
   return decl;
 }
 

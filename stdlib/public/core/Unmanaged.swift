@@ -19,8 +19,7 @@ public struct Unmanaged<Instance : AnyObject> {
   @usableFromInline
   internal unowned(unsafe) var _value: Instance
 
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal init(_private: Instance) { _value = _private }
 
   /// Unsafely turns an opaque C pointer into an unmanaged class reference.

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -157,8 +157,9 @@ static ConstructorComparison compareConstructors(ConstructorDecl *ctor1,
 }
 
 bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
-                                const ModuleDecl *curModule,
-                                LazyResolver *typeResolver) {
+                                const ModuleDecl *curModule) {
+  auto typeResolver = curModule->getASTContext().getLazyResolver();
+
   // Category declarations by their signatures.
   llvm::SmallDenseMap<std::pair<CanType, DeclBaseName>,
                       llvm::TinyPtrVector<ValueDecl *>>
@@ -478,6 +479,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 {
   ModuleDecl &M = *DC->getParentModule();
   ASTContext &Ctx = M.getASTContext();
+  if (!TypeResolver) TypeResolver = Ctx.getLazyResolver();
   const SourceManager &SM = Ctx.SourceMgr;
   DebuggerClient *DebugClient = M.getDebugClient();
 
@@ -693,10 +695,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
             ExtendedType = DC->getSelfTypeInContext();
             MetaBaseDC = DC;
-            if (Ctx.isSwiftVersion3())
-              BaseDC = MetaBaseDC;
-            else
-              BaseDC = PBI;
+            BaseDC = PBI;
 
             isTypeLookup = PBD->isStatic();
           }
@@ -756,7 +755,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             // might be type checking a default argument expression and
             // performing name lookup from there), the base declaration
             // is the nominal type, not 'self'.
-            if ((Ctx.isSwiftVersion3() || !AFD->isImplicit()) &&
+            if (!AFD->isImplicit() &&
                 Loc.isValid() &&
                 AFD->getBodySourceRange().isValid() &&
                 !SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc)) {
@@ -831,23 +830,6 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           bool FoundAny = false;
           auto startIndex = Results.size();
           for (auto Result : Lookup) {
-            // In Swift 3 mode, unqualified lookup skips static methods when
-            // performing lookup from instance context.
-            //
-            // We don't want to carry this forward to Swift 4, since it makes
-            // for poor diagnostics.
-            //
-            // Also, it was quite a special case and not as general as it
-            // should be -- it didn't apply to properties or subscripts, and
-            // the opposite case where we're in static context and an instance
-            // member shadows the module member wasn't handled either.
-            if (Ctx.isSwiftVersion3() &&
-                !isTypeLookup &&
-                isa<FuncDecl>(Result) &&
-                cast<FuncDecl>(Result)->isStatic()) {
-              continue;
-            }
-
             // Classify this declaration.
             FoundAny = true;
 
@@ -1511,8 +1493,6 @@ void ClassDecl::recordObjCMethod(AbstractFunctionDecl *method) {
     createObjCMethodLookup();
   }
 
-  assert(method->isObjC() && "Not an Objective-C method");
-
   // Record the method.
   bool isInstanceMethod = method->isObjCInstanceMethod();
   auto selector = method->getObjCSelector();
@@ -1634,6 +1614,9 @@ bool DeclContext::lookupQualified(Type type,
   using namespace namelookup;
   assert(decls.empty() && "additive lookup not supported");
 
+  if (!typeResolver)
+    typeResolver = getASTContext().getLazyResolver();
+  
   auto checkLookupCascading = [this, options]() -> Optional<bool> {
     switch (static_cast<unsigned>(options & NL_KnownDependencyMask)) {
     case 0:
@@ -1905,9 +1888,6 @@ bool DeclContext::lookupQualified(Type type,
         continue;
 
       // If the declaration is not @objc, it cannot be called dynamically.
-      if (typeResolver)
-        typeResolver->resolveIsObjC(decl);
-
       if (!decl->isObjC())
         continue;
 
@@ -1940,7 +1920,7 @@ bool DeclContext::lookupQualified(Type type,
   // If we're supposed to remove shadowed/hidden declarations, do so now.
   ModuleDecl *M = getParentModule();
   if (options & NL_RemoveNonVisible)
-    removeShadowedDecls(decls, M, typeResolver);
+    removeShadowedDecls(decls, M);
 
   if (auto *debugClient = M->getDebugClient())
     filterForDiscriminator(decls, debugClient);

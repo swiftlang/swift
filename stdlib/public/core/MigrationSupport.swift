@@ -869,6 +869,52 @@ extension UnsafeMutablePointer {
   }
 }
 
+extension Strideable {
+  @available(swift, deprecated: 3, obsoleted: 4, message: "Please use explicit type conversions or Strideable methods for mixed-type arithmetics.")
+  public static func + (lhs: Self, rhs: Self.Stride) -> Self {
+    return lhs.advanced(by: rhs)
+  }
+
+  @available(swift, deprecated: 3, obsoleted: 4, message: "Please use explicit type conversions or Strideable methods for mixed-type arithmetics.")
+  public static func + (lhs: Self.Stride, rhs: Self) -> Self {
+    return rhs.advanced(by: lhs)
+  }
+
+  @available(swift, deprecated: 3, obsoleted: 4, message: "Please use explicit type conversions or Strideable methods for mixed-type arithmetics.")
+  public static func - (lhs: Self, rhs: Self.Stride) -> Self {
+    return lhs.advanced(by: -rhs)
+  }
+
+  @available(swift, deprecated: 3, obsoleted: 4, message: "Please use explicit type conversions or Strideable methods for mixed-type arithmetics.")
+  public static func - (lhs: Self, rhs: Self) -> Self.Stride {
+    return rhs.distance(to: lhs)
+  }
+
+  @available(swift, deprecated: 3, obsoleted: 4, message: "Please use explicit type conversions or Strideable methods for mixed-type arithmetics.")
+  public static func += (lhs: inout Self, rhs: Self.Stride) {
+    lhs = lhs.advanced(by: rhs)
+  }
+
+  @available(swift, deprecated: 3, obsoleted: 4, message: "Please use explicit type conversions or Strideable methods for mixed-type arithmetics.")
+  public static func -= (lhs: inout Self, rhs: Self.Stride) {
+    lhs = lhs.advanced(by: -rhs)
+  }
+}
+
+extension UnsafeMutableRawPointer {
+  @available(*, unavailable, renamed: "init(mutating:)")
+  public init(_ from : UnsafeRawPointer) { Builtin.unreachable() }
+
+  @available(*, unavailable, renamed: "init(mutating:)")
+  public init?(_ from : UnsafeRawPointer?) { Builtin.unreachable() }
+
+  @available(*, unavailable, renamed: "init(mutating:)")
+  public init<T>(_ from : UnsafePointer<T>) { Builtin.unreachable() }
+
+  @available(*, unavailable, renamed: "init(mutating:)")
+  public init?<T>(_ from : UnsafePointer<T>?) { Builtin.unreachable() }
+}
+
 extension UnsafeRawPointer : _CustomPlaygroundQuickLookable {
   internal var summary: String {
     let ptrValue = UInt64(

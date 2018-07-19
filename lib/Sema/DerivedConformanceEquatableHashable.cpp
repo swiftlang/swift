@@ -675,7 +675,7 @@ deriveEquatable_eq(DerivedConformance &derived, Identifier generatedIdentifier,
   }
   eqDecl->setInterfaceType(interfaceTy);
   eqDecl->copyFormalAccessFrom(derived.Nominal, /*sourceIsParentContext*/ true);
-  eqDecl->setValidationStarted();
+  eqDecl->setValidationToChecked();
 
   C.addSynthesizedDecl(eqDecl);
 
@@ -809,7 +809,7 @@ deriveHashable_hashInto(DerivedConformance &derived,
   }
   hashDecl->setInterfaceType(interfaceType);
   hashDecl->copyFormalAccessFrom(derived.Nominal);
-  hashDecl->setValidationStarted();
+  hashDecl->setValidationToChecked();
 
   C.addSynthesizedDecl(hashDecl);
 
@@ -1132,14 +1132,14 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
                                       AnyFunctionType::ExtInfo());
 
   getterDecl->setInterfaceType(interfaceType);
-  getterDecl->setValidationStarted();
+  getterDecl->setValidationToChecked();
   getterDecl->copyFormalAccessFrom(derived.Nominal,
                                    /*sourceIsParentContext*/ true);
 
   // Finish creating the property.
   hashValueDecl->setImplicit();
   hashValueDecl->setInterfaceType(intType);
-  hashValueDecl->setValidationStarted();
+  hashValueDecl->setValidationToChecked();
   hashValueDecl->setAccessors(StorageImplInfo::getImmutableComputed(),
                               SourceLoc(), {getterDecl}, SourceLoc());
   hashValueDecl->copyFormalAccessFrom(derived.Nominal,

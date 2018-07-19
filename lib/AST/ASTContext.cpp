@@ -35,6 +35,7 @@
 #include "swift/AST/RawComment.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/SILLayout.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
@@ -1594,53 +1595,47 @@ GenericEnvironment *ASTContext::getOrCreateCanonicalGenericEnvironment(
   return env;
 }
 
-ArrayRef<ValueDecl *> ValueDecl::getOverriddenDecls() const {
-  // Check whether the overrides have already been computed.
-  if (LazySemanticInfo.hasOverriddenComputed) {
-    // If there are no overridden declarations (the common case), return.
-    if (!LazySemanticInfo.hasOverridden) return { };
+Optional<llvm::TinyPtrVector<ValueDecl *>>
+OverriddenDeclsRequest::getCachedResult() const {
+  auto decl = std::get<0>(getStorage());
+  if (!decl->LazySemanticInfo.hasOverriddenComputed)
+    return None;
 
-    // Look up the overridden declarations in the ASTContext.
-    auto known = getASTContext().getImpl().Overrides.find(this);
-    assert(known != getASTContext().getImpl().Overrides.end());
-    return known->second;
-  }
+  // If there are no overridden declarations (the common case), return.
+  llvm::TinyPtrVector<ValueDecl *> overridden;
+  if (!decl->LazySemanticInfo.hasOverridden) return overridden;
 
-  ASTContext &ctx = getASTContext();
-  if (auto resolver = ctx.getLazyResolver()) {
-    resolver->resolveOverriddenDecl(const_cast<ValueDecl *>(this));
-    assert(LazySemanticInfo.hasOverriddenComputed);
-    return getOverriddenDecls();
-  }
-
-  // FIXME: Shouldn't need this fallback.
-  return { };
+  // Retrieve the set of overrides from the ASTContext.
+  ASTContext &ctx = decl->getASTContext();
+  auto known = ctx.getImpl().Overrides.find(decl);
+  assert(known != ctx.getImpl().Overrides.end());
+  overridden.insert(overridden.end(),
+                    known->second.begin(), known->second.end());
+  return overridden;
 }
 
-ArrayRef<ValueDecl *> ValueDecl::setOverriddenDecls(
-                                            ArrayRef<ValueDecl *> overridden) {
-  LazySemanticInfo.hasOverriddenComputed = true;
+void OverriddenDeclsRequest::cacheResult(
+                                llvm::TinyPtrVector<ValueDecl *> value) const {
+  auto decl = std::get<0>(getStorage());
+  decl->LazySemanticInfo.hasOverriddenComputed = true;
+  decl->LazySemanticInfo.hasOverridden = !value.empty();
 
-  // If the set of overridden declarations is empty, note that.
-  if (overridden.empty()) {
-    LazySemanticInfo.hasOverridden = false;
-    return { };
-  }
+  if (value.empty())
+    return;
 
   // Sanity-check the declarations we were given.
-  for (auto decl : overridden) {
-    assert(decl->getKind() == this->getKind() &&
+  for (auto overriddenDecl : value) {
+    assert(overriddenDecl->getKind() == decl->getKind() &&
            "Overridden decl kind mismatch");
-    if (auto func = dyn_cast<AbstractFunctionDecl>(decl))
+    if (auto func = dyn_cast<AbstractFunctionDecl>(overriddenDecl))
       func->setIsOverridden();
   }
 
   // Record the overrides in the context.
-  auto &ctx = getASTContext();
-  LazySemanticInfo.hasOverridden = true;
-  auto overriddenCopy = ctx.AllocateCopy(overridden);
-  (void)ctx.getImpl().Overrides.insert({this, overriddenCopy});
-  return overriddenCopy;
+  auto &ctx = decl->getASTContext();
+  auto overriddenCopy =
+    ctx.AllocateCopy(value.operator ArrayRef<ValueDecl *>());
+  (void)ctx.getImpl().Overrides.insert({decl, overriddenCopy});
 }
 
 bool ASTContext::canImportModule(std::pair<Identifier, SourceLoc> ModulePath) {
@@ -1784,24 +1779,26 @@ ASTContext::getConformance(Type conformingType,
 /// that instead.
 static ProtocolConformance *collapseSpecializedConformance(
                                              Type type,
-                                             ProtocolConformance *conformance) {
+                                             ProtocolConformance *conformance,
+                                             SubstitutionMap substitutions) {
   while (true) {
-    // If the conformance matches, return it.
-    if (conformance->getType()->isEqual(type))
-      return conformance;
-
     switch (conformance->getKind()) {
-    case ProtocolConformanceKind::Inherited:
-      conformance = cast<InheritedProtocolConformance>(conformance)
-                      ->getInheritedConformance();
-      break;
-
     case ProtocolConformanceKind::Specialized:
       conformance = cast<SpecializedProtocolConformance>(conformance)
                       ->getGenericConformance();
       break;
 
     case ProtocolConformanceKind::Normal:
+    case ProtocolConformanceKind::Inherited:
+      // If the conformance matches, return it.
+      if (conformance->getType()->isEqual(type)) {
+        for (auto subConformance : substitutions.getConformances())
+          if (!subConformance.isAbstract())
+            return nullptr;
+
+        return conformance;
+      }
+
       return nullptr;
     }
   }
@@ -1814,7 +1811,8 @@ ASTContext::getSpecializedConformance(Type type,
   // If we are performing a substitution that would get us back to the
   // a prior conformance (e.g., mapping into and then out of a conformance),
   // return the existing conformance.
-  if (auto existing = collapseSpecializedConformance(type, generic)) {
+  if (auto existing = collapseSpecializedConformance(type, generic,
+                                                     substitutions)) {
     ++NumCollapsedSpecializedProtocolConformances;
     return existing;
   }
@@ -2369,8 +2367,6 @@ void AbstractFunctionDecl::setForeignErrorConvention(
 
 Optional<ForeignErrorConvention>
 AbstractFunctionDecl::getForeignErrorConvention() const {
-  if (!isObjC() && !getAttrs().hasAttribute<CDeclAttr>())
-    return None;
   if (!hasThrows())
     return None;
   auto &conventionsMap = getASTContext().getImpl().ForeignErrorConventions;
@@ -3397,8 +3393,6 @@ ReferenceStorageType *ReferenceStorageType::get(Type T,
     assert(!T->getOptionalObjectType() && "optional type is disallowed");
     break;
   case ReferenceOwnershipOptionality::Allowed:
-    break;
-  case ReferenceOwnershipOptionality::AllowedIfImporting:
     break;
   case ReferenceOwnershipOptionality::Required:
     assert(T->getOptionalObjectType() && "optional type is required");

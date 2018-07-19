@@ -279,7 +279,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(MaterializeForSet, "materializeForSet accessor");
   ENTRY(Addressor, "address accessor");
   ENTRY(MutableAddressor, "mutableAddress accessor");
-  ENTRY(EnumElement, "enum element");
+  ENTRY(EnumElement, "enum case");
   ENTRY(Module, "module");
   ENTRY(MissingMember, "missing member placeholder");
   ENTRY(Requirement, "requirement");
@@ -2022,13 +2022,20 @@ CanType ValueDecl::getOverloadSignatureType() const {
   return CanType();
 }
 
-bool ValueDecl::isObjC() const {
-  if (LazySemanticInfo.isObjCComputed)
-    return LazySemanticInfo.isObjC;
+llvm::TinyPtrVector<ValueDecl *> ValueDecl::getOverriddenDecls() const {
+  ASTContext &ctx = getASTContext();
+  return ctx.evaluator(OverriddenDeclsRequest{const_cast<ValueDecl *>(this)});
+}
 
-  // Fallback: look for an @objc attribute.
-  // FIXME: This should become an error, eventually.
-  return getAttrs().hasAttribute<ObjCAttr>();
+void ValueDecl::setOverriddenDecls(ArrayRef<ValueDecl *> overridden) {
+  llvm::TinyPtrVector<ValueDecl *> overriddenVec(overridden);
+  OverriddenDeclsRequest request{const_cast<ValueDecl *>(this)};
+  request.cacheResult(overriddenVec);
+}
+
+bool ValueDecl::isObjC() const {
+  ASTContext &ctx = getASTContext();
+  return ctx.evaluator(IsObjCRequest{const_cast<ValueDecl *>(this)});
 }
 
 void ValueDecl::setIsObjC(bool value) {
@@ -2041,6 +2048,24 @@ void ValueDecl::setIsObjC(bool value) {
 
   LazySemanticInfo.isObjCComputed = true;
   LazySemanticInfo.isObjC = value;
+}
+
+bool ValueDecl::isDynamic() const {
+  ASTContext &ctx = getASTContext();
+  return ctx.evaluator(IsDynamicRequest{const_cast<ValueDecl *>(this)});
+}
+
+void ValueDecl::setIsDynamic(bool value) {
+  assert(!LazySemanticInfo.isDynamicComputed ||
+         LazySemanticInfo.isDynamic == value);
+
+  if (LazySemanticInfo.isDynamicComputed) {
+    assert(LazySemanticInfo.isDynamic == value);
+    return;
+  }
+
+  LazySemanticInfo.isDynamicComputed = true;
+  LazySemanticInfo.isDynamic = value;
 }
 
 bool ValueDecl::canBeAccessedByDynamicLookup() const {
@@ -2123,7 +2148,11 @@ void ValueDecl::setInterfaceType(Type type) {
 }
 
 bool ValueDecl::hasValidSignature() const {
-  return hasInterfaceType() && !isBeingValidated();
+  if (!hasInterfaceType())
+    return false;
+  // FIXME -- The build blows up if the correct code is used:
+  // return getValidationState() > ValidationState::CheckingWithValidSignature;
+  return getValidationState() != ValidationState::Checking;
 }
 
 Optional<ObjCSelector> ValueDecl::getObjCRuntimeName() const {
@@ -2727,7 +2756,7 @@ SourceRange TypeAliasDecl::getSourceRange() const {
 }
 
 void TypeAliasDecl::setUnderlyingType(Type underlying) {
-  setValidationStarted();
+  setValidationToChecked();
 
   // lldb creates global typealiases containing archetypes
   // sometimes...
@@ -2862,6 +2891,24 @@ SourceRange AssociatedTypeDecl::getSourceRange() const {
   return SourceRange(KeywordLoc, endLoc);
 }
 
+llvm::TinyPtrVector<AssociatedTypeDecl *>
+AssociatedTypeDecl::getOverriddenDecls() const {
+  // FIXME: Performance hack because we end up looking at the overridden
+  // declarations of an associated type a *lot*.
+  OverriddenDeclsRequest request{const_cast<AssociatedTypeDecl *>(this)};
+  llvm::TinyPtrVector<ValueDecl *> overridden;
+  if (auto cached = request.getCachedResult())
+    overridden = std::move(*cached);
+  else
+    overridden = AbstractTypeParamDecl::getOverriddenDecls();
+
+  llvm::TinyPtrVector<AssociatedTypeDecl *> assocTypes;
+  for (auto decl : overridden) {
+    assocTypes.push_back(cast<AssociatedTypeDecl>(decl));
+  }
+  return assocTypes;
+}
+
 AssociatedTypeDecl *AssociatedTypeDecl::getAssociatedTypeAnchor() const {
   auto overridden = getOverriddenDecls();
 
@@ -2945,7 +2992,7 @@ void ClassDecl::addImplicitDestructor() {
   auto *DD = new (ctx) DestructorDecl(getLoc(), selfDecl, this);
 
   DD->setImplicit();
-  DD->setValidationStarted();
+  DD->setValidationToChecked();
 
   // Create an empty body for the destructor.
   DD->setBody(BraceStmt::create(ctx, getLoc(), { }, getLoc(), true));
@@ -3038,7 +3085,9 @@ ObjCClassKind ClassDecl::checkObjCAncestry() const {
     if (CD->isGenericContext())
       genericAncestry = true;
 
-    if (CD->isObjC())
+    // FIXME: Checking isObjC() introduces cyclic dependencies here, but this
+    // doesn't account for ill-formed @objc.
+    if (CD->getAttrs().hasAttribute<ObjCAttr>())
       isObjC = true;
 
     if (!CD->hasSuperclass())
@@ -4527,7 +4576,7 @@ ParamDecl *ParamDecl::createSelf(SourceLoc loc, DeclContext *DC,
                                      Identifier(), loc, C.Id_self, Type(), DC);
   selfDecl->setImplicit();
   selfDecl->setInterfaceType(selfInterfaceType);
-  selfDecl->setValidationStarted();
+  selfDecl->setValidationToChecked();
   return selfDecl;
 }
 
@@ -4865,6 +4914,10 @@ SourceRange AbstractFunctionDecl::getSignatureSourceRange() const {
 
 ObjCSelector
 AbstractFunctionDecl::getObjCSelector(DeclName preferredName) const {
+  // FIXME: Forces computation of the Objective-C selector.
+  if (getASTContext().getLazyResolver())
+    (void)isObjC();
+
   // If there is an @objc attribute with a name, use that name.
   auto *objc = getAttrs().getAttribute<ObjCAttr>();
   if (auto name = getNameFromObjcAttribute(objc, preferredName)) {
@@ -5016,7 +5069,7 @@ static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
 
   // Final members are always be called directly.
   // Dynamic methods are always accessed by objc_msgSend().
-  if (decl->isFinal() || decl->isDynamic())
+  if (decl->isFinal() || decl->isDynamic() || decl->hasClangNode())
     return false;
 
   if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
@@ -5042,7 +5095,7 @@ static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
   }
 
   auto base = decl->getOverriddenDecl();
-  if (!base || base->hasClangNode())
+  if (!base || base->hasClangNode() || base->isDynamic())
     return true;
 
   // If the method overrides something, we only need a new entry if the
@@ -5398,8 +5451,8 @@ bool EnumElementDecl::computeType() {
 
   // The type of the enum element is either (T) -> T or (T) -> ArgType -> T.
   if (auto *PL = getParameterList()) {
-    auto paramTy = PL->getType(getASTContext());
-    resultTy = FunctionType::get(paramTy->mapTypeOutOfContext(), resultTy);
+    auto paramTy = PL->getInterfaceType(getASTContext());
+    resultTy = FunctionType::get(paramTy, resultTy);
   }
 
   if (auto *genericSig = ED->getGenericSignatureOfContext())

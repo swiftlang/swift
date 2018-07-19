@@ -99,6 +99,14 @@ private:
   bool handleSourceText(StringRef Text) override { return false; }
   bool handleSerializedSyntaxTree(StringRef Text) override { return false; }
   bool syntaxTreeEnabled() override { return false; }
+  bool forceLibSyntaxBasedProcessing() override { return false; }
+
+  bool syntaxReuseInfoEnabled() override { return false; }
+
+  bool handleSyntaxReuseRegions(
+      std::vector<SourceFileRange> ReuseRegions) override {
+    return false;
+  }
 };
 
 struct DocUpdateMutexState {

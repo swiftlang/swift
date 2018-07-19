@@ -16,11 +16,13 @@
 //===----------------------------------------------------------------------===//
 #include "TypeCheckObjC.h"
 #include "TypeChecker.h"
+#include "TypeCheckProtocol.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/StringExtras.h"
 using namespace swift;
 
@@ -232,6 +234,11 @@ static bool isParamListRepresentableInObjC(const AbstractFunctionDecl *AFD,
   ASTContext &ctx = AFD->getASTContext();
   auto &diags = ctx.Diags;
 
+  if (!AFD->hasInterfaceType()) {
+    ctx.getLazyResolver()->resolveDeclSignature(
+                                      const_cast<AbstractFunctionDecl *>(AFD));
+  }
+
   bool Diagnose = shouldDiagnoseObjCReason(Reason, ctx);
   bool IsObjC = true;
   unsigned NumParams = PL->size();
@@ -262,6 +269,9 @@ static bool isParamListRepresentableInObjC(const AbstractFunctionDecl *AFD,
       return false;
     }
 
+    if (param->getType()->hasError())
+      return false;
+    
     if (param->getType()->isRepresentableIn(
           ForeignLanguage::ObjectiveC,
           const_cast<AbstractFunctionDecl *>(AFD)))
@@ -434,7 +444,8 @@ bool swift::isRepresentableInObjC(
     // Global computed properties may however @_cdecl their accessors.
     auto storage = accessor->getStorage();
     if (!storage->isObjC() && Reason != ObjCReason::ExplicitlyCDecl &&
-        Reason != ObjCReason::WitnessToObjC) {
+        Reason != ObjCReason::WitnessToObjC &&
+        Reason != ObjCReason::MemberOfObjCProtocol) {
       if (Diagnose) {
         auto error = accessor->isGetter()
                   ? (isa<VarDecl>(storage)
@@ -498,10 +509,7 @@ bool swift::isRepresentableInObjC(
       !isParamListRepresentableInObjC(AFD,
                                       AFD->getParameterLists().back(),
                                       Reason)) {
-    if (!Diagnose) {
-      // Return as soon as possible if we are not producing diagnostics.
-      return false;
-    }
+    return false;
   }
 
   if (auto FD = dyn_cast<FuncDecl>(AFD)) {
@@ -742,6 +750,11 @@ bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   if (VD->isInvalid())
     return false;
 
+  if (!VD->hasInterfaceType()) {
+    VD->getASTContext().getLazyResolver()->resolveDeclSignature(
+                                              const_cast<VarDecl *>(VD));
+  }
+
   Type T = VD->getDeclContext()->mapTypeIntoContext(VD->getInterfaceType());
   if (auto *RST = T->getAs<ReferenceStorageType>()) {
     // In-memory layout of @weak and @unowned does not correspond to anything
@@ -786,6 +799,11 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
 
   if (checkObjCInForeignClassContext(SD, Reason))
     return false;
+
+  if (!SD->hasInterfaceType()) {
+    SD->getASTContext().getLazyResolver()->resolveDeclSignature(
+                                              const_cast<SubscriptDecl *>(SD));
+  }
 
   // Figure out the type of the indices.
   Type IndicesType = SD->getIndicesInterfaceType()->getWithoutImmediateLabel();
@@ -1010,12 +1028,18 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
 }
 
 /// Figure out if a declaration should be exported to Objective-C.
-Optional<ObjCReason> swift::shouldMarkAsObjC(TypeChecker &TC,
-                                             const ValueDecl *VD,
-                                             bool allowImplicit) {
+Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
+  // If Objective-C interoperability is disabled, nothing gets marked as @objc.
+  if (!VD->getASTContext().LangOpts.EnableObjCInterop)
+    return None;
+
   if (auto classDecl = dyn_cast<ClassDecl>(VD)) {
     return shouldMarkClassAsObjC(classDecl);
   }
+
+  // Destructors are always @objc, with -dealloc as their entry point.
+  if (auto deinit = dyn_cast<DestructorDecl>(VD))
+    return ObjCReason(ObjCReason::ImplicitlyObjC);
 
   ProtocolDecl *protocolContext =
       dyn_cast<ProtocolDecl>(VD->getDeclContext());
@@ -1042,6 +1066,16 @@ Optional<ObjCReason> swift::shouldMarkAsObjC(TypeChecker &TC,
   // explicitly declared @objc.
   if (VD->getAttrs().hasAttribute<ObjCAttr>())
     return ObjCReason(ObjCReason::ExplicitlyObjC);
+  // Getter or setter for an @objc property or subscript.
+  if (auto accessor = dyn_cast<AccessorDecl>(VD)) {
+    if (accessor->getAccessorKind() == AccessorKind::Get ||
+        accessor->getAccessorKind() == AccessorKind::Set) {
+      if (accessor->getStorage()->isObjC())
+        return ObjCReason(ObjCReason::Accessor);
+
+      return None;
+    }
+  }
   // @IBOutlet, @IBAction, @NSManaged, and @GKInspectable imply @objc.
   //
   // @IBInspectable and @GKInspectable imply @objc quietly in Swift 3
@@ -1076,23 +1110,18 @@ Optional<ObjCReason> swift::shouldMarkAsObjC(TypeChecker &TC,
   // A witness to an @objc protocol requirement is implicitly @objc.
   if (VD->getDeclContext()->getAsClassOrClassExtensionContext()) {
     auto requirements =
-      TC.findWitnessedObjCRequirements(VD, /*anySingleRequirement=*/true);
+      findWitnessedObjCRequirements(VD, /*anySingleRequirement=*/true);
     if (!requirements.empty())
       return ObjCReason::witnessToObjC(requirements.front());
   }
 
   ASTContext &ctx = VD->getASTContext();
 
-  // Infer '@objc' for 'dynamic' members.
+  // Under Swift 3's @objc inference rules, 'dynamic' infers '@objc'.
   if (auto attr = VD->getAttrs().getAttribute<DynamicAttr>()) {
-    // For implicit 'dynamic', just infer '@objc' implicitly.
-    if (attr->isImplicit())
-      return ObjCReason(ObjCReason::ImplicitlyObjC);
-
     bool isGetterOrSetter =
       isa<AccessorDecl>(VD) && cast<AccessorDecl>(VD)->isGetterOrSetter();
 
-    // Under Swift 3's @objc inference rules, 'dynamic' infers '@objc'.
     if (ctx.LangOpts.EnableSwift3ObjCInference) {
       // If we've been asked to warn about deprecated @objc inference, do so
       // now.
@@ -1112,10 +1141,8 @@ Optional<ObjCReason> swift::shouldMarkAsObjC(TypeChecker &TC,
     // anyway for better recovery.
     VD->diagnose(diag::dynamic_requires_objc,
                  VD->getDescriptiveKind(), VD->getFullName())
-      .highlight(attr->getRange())
       .fixItInsert(VD->getAttributeInsertionLoc(/*forModifier=*/false),
-                   "@objc ");
-
+                 "@objc ");
     return ObjCReason(ObjCReason::ImplicitlyObjC);
   }
 
@@ -1140,8 +1167,7 @@ Optional<ObjCReason> swift::shouldMarkAsObjC(TypeChecker &TC,
       return None;
 
     if (classDecl->checkObjCAncestry() != ObjCClassKind::NonObjC) {
-      return VD->isImplicit() ? ObjCReason(ObjCReason::ImplicitlyObjC)
-                              : ObjCReason(ObjCReason::MemberOfObjCSubclass);
+      return ObjCReason(ObjCReason::MemberOfObjCSubclass);
     }
   }
 
@@ -1223,47 +1249,118 @@ static bool isEnumObjC(EnumDecl *enumDecl) {
   return true;
 }
 
-void TypeChecker::resolveIsObjC(ValueDecl *VD) {
+/// Record that a declaration is @objc.
+static void markAsObjC(ValueDecl *D, ObjCReason reason,
+                       Optional<ForeignErrorConvention> errorConvention);
+
+
+bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
   auto dc = VD->getDeclContext();
-  if (dc->getAsClassOrClassExtensionContext()) {
+  Optional<ObjCReason> isObjC;
+  if (dc->getAsClassOrClassExtensionContext() && !isa<TypeDecl>(VD)) {
     // Members of classes can be @objc.
+    isObjC = shouldMarkAsObjC(VD, isa<ConstructorDecl>(VD));
   }
   else if (isa<ClassDecl>(VD)) {
     // Classes can be @objc.
 
     // Protocols and enums can also be @objc, but this is covered by the
-    // isObjC() check at the beginning.
+    // isObjC() check a the beginning.;
+    isObjC = shouldMarkAsObjC(VD, /*allowImplicit=*/false);
   } else if (auto enumDecl = dyn_cast<EnumDecl>(VD)) {
     // Enums can be @objc so long as they have a raw type that is representable
     // as an arithmetic type in C.
-    auto isObjC = isEnumObjC(enumDecl);
-    VD->setIsObjC(isObjC);
-    if (!isObjC) {
-      if (auto objcAttr = enumDecl->getAttrs().getAttribute<ObjCAttr>()) {
-        objcAttr->setInvalid();
+    if (isEnumObjC(enumDecl))
+      isObjC = ObjCReason(ObjCReason::ExplicitlyObjC);
+  } else if (auto proto = dyn_cast<ProtocolDecl>(VD)) {
+    if (proto->getAttrs().hasAttribute<ObjCAttr>()) {
+      isObjC = ObjCReason(ObjCReason::ExplicitlyObjC);
+
+      // If the protocol is @objc, it may only refine other @objc protocols.
+      // FIXME: Revisit this restriction.
+      for (auto inherited : proto->getInheritedProtocols()) {
+        if (!inherited->isObjC()) {
+          proto->diagnose(diag::objc_protocol_inherits_non_objc_protocol,
+                          proto->getDeclaredType(),
+                          inherited->getDeclaredType());
+          inherited->diagnose(diag::kind_identifier_declared_here,
+                              DescriptiveDeclKind::Protocol,
+                              inherited->getName());
+          isObjC = None;
+        }
       }
     }
   } else if (isa<ProtocolDecl>(dc) && cast<ProtocolDecl>(dc)->isObjC()) {
     // Members of @objc protocols are @objc.
+    isObjC = shouldMarkAsObjC(VD, isa<ConstructorDecl>(VD));
   } else {
-    // Cannot be @objc; do nothing.
-    return;
+    // Cannot be @objc.
   }
 
-  // Short-circuit this operation if we already know that the entity is @objc.
-  if (VD->isObjC()) return;
+  // Perform some icky stateful hackery to mark this declaration as
+  // not being @objc.
+  auto makeNotObjC = [&] {
+    if (auto objcAttr = VD->getAttrs().getAttribute<ObjCAttr>()) {
+      objcAttr->setInvalid();
+    }
+  };
 
+  // If this declaration should not be exposed to Objective-C, we're done.
+  if (!isObjC) {
+    makeNotObjC();
+    return false;
+  }
 
-  // FIXME: Narrow this computation to just the @objc bits.
-  validateDeclForNameLookup(VD);
+  if (auto accessor = dyn_cast<AccessorDecl>(VD)) {
+    auto storage = accessor->getStorage();
+    if (auto storageObjCAttr = storage->getAttrs().getAttribute<ObjCAttr>()) {
+      // If @objc on the storage declaration was inferred using a
+      // deprecated rule, but this accessor is @objc in its own right,
+      // complain.
+      ASTContext &ctx = dc->getASTContext();
+      if (storageObjCAttr && storageObjCAttr->isSwift3Inferred() &&
+          shouldDiagnoseObjCReason(*isObjC, ctx)) {
+        storage->diagnose(diag::accessor_swift3_objc_inference,
+                 storage->getDescriptiveKind(), storage->getFullName(),
+                 isa<SubscriptDecl>(storage), accessor->isSetter())
+          .fixItInsert(storage->getAttributeInsertionLoc(/*forModifier=*/false),
+                       "@objc ");
+      }
+    }
+  }
+
+  // If needed, check whether this declaration is representable in Objective-C.
+  Optional<ForeignErrorConvention> errorConvention;
+  if (auto var = dyn_cast<VarDecl>(VD)) {
+    if (!isRepresentableInObjC(var, *isObjC)) {
+      makeNotObjC();
+      return false;
+    }
+  } else if (auto subscript = dyn_cast<SubscriptDecl>(VD)) {
+    if (!isRepresentableInObjC(subscript, *isObjC)) {
+      makeNotObjC();
+      return false;
+    }
+  } else if (isa<DestructorDecl>(VD)) {
+    // Destructors need no additional checking.
+  } else if (auto func = dyn_cast<AbstractFunctionDecl>(VD)) {
+    if (!isRepresentableInObjC(func, *isObjC, errorConvention)) {
+      makeNotObjC();
+      return false;
+    }
+  }
+
+  // Note that this declaration is exposed to Objective-C.
+  markAsObjC(VD, *isObjC, errorConvention);
+
+  return true;
 }
 
 /// Infer the Objective-C name for a given declaration.
-static void inferObjCName(TypeChecker &tc, ValueDecl *decl) {
+static void inferObjCName(ValueDecl *decl) {
   if (isa<DestructorDecl>(decl))
     return;
 
-  assert(decl->isObjC() && "Must be known to be @objc");
   auto attr = decl->getAttrs().getAttribute<ObjCAttr>();
 
   /// Set the @objc name.
@@ -1356,7 +1453,7 @@ static void inferObjCName(TypeChecker &tc, ValueDecl *decl) {
   // requirements for which this declaration is a witness.
   Optional<ObjCSelector> requirementObjCName;
   ValueDecl *firstReq = nullptr;
-  for (auto req : tc.findWitnessedObjCRequirements(decl)) {
+  for (auto req : findWitnessedObjCRequirements(decl)) {
     // If this is the first requirement, take its name.
     if (!requirementObjCName) {
       requirementObjCName = req->getObjCRuntimeName();
@@ -1402,35 +1499,31 @@ static void inferObjCName(TypeChecker &tc, ValueDecl *decl) {
 ///
 /// If the declaration has a @nonobjc attribute, diagnose an error
 /// using the given Reason, if present.
-void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
-                       Optional<ObjCReason> isObjC,
-                       Optional<ForeignErrorConvention> errorConvention) {
-  D->setIsObjC(isObjC.hasValue());
-
-  if (!isObjC) {
-    // FIXME: For now, only @objc declarations can be dynamic.
-    if (auto attr = D->getAttrs().getAttribute<DynamicAttr>())
-      attr->setInvalid();
-    return;
-  }
-
+void markAsObjC(ValueDecl *D, ObjCReason reason,
+                Optional<ForeignErrorConvention> errorConvention) {
   ASTContext &ctx = D->getASTContext();
 
   // By now, the caller will have handled the case where an implicit @objc
   // could be overridden by @nonobjc. If we see a @nonobjc and we are trying
   // to add an @objc for whatever reason, diagnose an error.
   if (auto *attr = D->getAttrs().getAttribute<NonObjCAttr>()) {
-    if (!shouldDiagnoseObjCReason(*isObjC, ctx))
-      isObjC = ObjCReason::ImplicitlyObjC;
+    if (!shouldDiagnoseObjCReason(reason, ctx))
+      reason = ObjCReason::ImplicitlyObjC;
 
     D->diagnose(diag::nonobjc_not_allowed,
-                getObjCDiagnosticAttrKind(*isObjC));
+                getObjCDiagnosticAttrKind(reason));
 
     attr->setInvalid();
   }
 
-  TC.useObjectiveCBridgeableConformances(D->getInnermostDeclContext(),
-                                         D->getInterfaceType());
+  if (!D->hasInterfaceType()) {
+    ctx.getLazyResolver()->resolveDeclSignature(D);
+  }
+
+  if (!isa<AccessorDecl>(D)) {
+    useObjectiveCBridgeableConformances(D->getInnermostDeclContext(),
+                                        D->getInterfaceType());
+  }
 
   // Record the name of this Objective-C method in its class.
   if (auto classDecl
@@ -1458,7 +1551,7 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
       }
 
       // Infer the Objective-C name for this method.
-      inferObjCName(TC, method);
+      inferObjCName(method);
 
       // ... then record it.
       classDecl->recordObjCMethod(method);
@@ -1500,7 +1593,7 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
       }
     } else if (isa<VarDecl>(D)) {
       // Infer the Objective-C name for this property.
-      inferObjCName(TC, D);
+      inferObjCName(D);
     }
   } else if (auto method = dyn_cast<AbstractFunctionDecl>(D)) {
     if (method->hasThrows()) {
@@ -1520,7 +1613,7 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
 
   // Special handling for Swift 3 @objc inference rules that are no longer
   // present in later versions of Swift.
-  if (*isObjC == ObjCReason::MemberOfObjCSubclass) {
+  if (reason == ObjCReason::MemberOfObjCSubclass) {
     // If we've been asked to unconditionally warn about these deprecated
     // @objc inference rules, do so now. However, we don't warn about
     // accessors---just the main storage declarations.

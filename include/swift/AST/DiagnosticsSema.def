@@ -117,7 +117,7 @@ ERROR(could_not_use_type_member_on_instance,none,
       "static member %1 cannot be used on instance of type %0",
       (Type, DeclName))
 ERROR(could_not_use_enum_element_on_instance,none,
-      "enum element %0 cannot be referenced as an instance member",
+      "enum case %0 cannot be used as an instance member",
       (DeclName))
 ERROR(could_not_use_type_member_on_protocol_metatype,none,
       "static member %1 cannot be used on protocol metatype %0",
@@ -1848,9 +1848,6 @@ ERROR(circular_protocol_def,none,
       "protocol %0 refines itself", (Identifier))
 ERROR(objc_protocol_inherits_non_objc_protocol,none,
       "@objc protocol %0 cannot refine non-@objc protocol %1", (Type, Type))
-WARNING(protocol_composition_with_postfix,none,
-        "protocol-constrained type with postfix '%0' is ambiguous "
-        "and will be rejected in future version of Swift", (StringRef))
 
 ERROR(protocol_where_clause_self_requirement,none,
       "constraint with subject type of 'Self' is not supported; "

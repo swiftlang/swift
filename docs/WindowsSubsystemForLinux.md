@@ -1,4 +1,4 @@
-# Windows Subsystem for Linux (WSL)
+# Swift on the Windows Subsystem for Linux (WSL)
 
 - Note that all compiled Swift binaries are only executable within Bash on
   Windows and are Ubuntu, not Windows, executables (WSL can natively run Ubuntu
@@ -7,7 +7,7 @@
 
 ###  1. Install WSL
 Install and run the latest version of [Bash on Ubuntu on
-Windows](https://msdn.microsoft.com/en-gb/commandline/wsl/about) installed on
+Windows](https://docs.microsoft.com/en-us/windows/wsl/about) installed on
 your PC.
 ```
 bash

@@ -27,6 +27,10 @@
 namespace swift {
 namespace json {
 
+/// The associated value will be interpreted as \c bool. If \c true the node IDs
+/// will not be included in the serialized JSON.
+static void *DontSerializeNodeIdsUserInfoKey = &DontSerializeNodeIdsUserInfoKey;
+
 /// Serialization traits for SourcePresence.
 template <>
 struct ScalarEnumerationTraits<syntax::SourcePresence> {
@@ -141,6 +145,12 @@ struct ObjectTraits<syntax::RawSyntax> {
     }
     auto presence = value.getPresence();
     out.mapRequired("presence", presence);
+
+    bool omitNodeId = (bool)out.getUserInfo()[DontSerializeNodeIdsUserInfoKey];
+    if (!omitNodeId) {
+      auto nodeId = value.getId();
+      out.mapRequired("id", nodeId);
+    }
   }
 };
 

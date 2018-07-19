@@ -253,9 +253,11 @@ bool conflicting(ASTContext &ctx,
 
 /// Decl - Base class for all declarations in Swift.
 class alignas(1 << DeclAlignInBits) Decl {
+public:
   enum class ValidationState {
     Unchecked,
     Checking,
+    CheckingWithValidSignature,
     Checked,
   };
 
@@ -796,33 +798,53 @@ public:
     Bits.Decl.EarlyAttrValidation = validated;
   }
   
-  /// Whether the declaration has a valid interface type and
-  /// generic signature.
-  bool isBeingValidated() const {
-    return Bits.Decl.ValidationState == unsigned(ValidationState::Checking);
+  /// Get the validation state.
+  ValidationState getValidationState() const {
+    return ValidationState(Bits.Decl.ValidationState);
   }
 
-  /// Toggle whether or not the declaration is being validated.
-  void setIsBeingValidated(bool ibv = true) {
-    if (ibv) {
-      assert(Bits.Decl.ValidationState == unsigned(ValidationState::Unchecked));
-      Bits.Decl.ValidationState = unsigned(ValidationState::Checking);
-    } else {
-      assert(Bits.Decl.ValidationState == unsigned(ValidationState::Checking));
-      Bits.Decl.ValidationState = unsigned(ValidationState::Checked);
+private:
+  friend class DeclValidationRAII;
+
+  /// Set the validation state.
+  void setValidationState(ValidationState VS) {
+    assert(VS > getValidationState() && "Validation is unidirectional");
+    Bits.Decl.ValidationState = unsigned(VS);
+  }
+
+public:
+  /// Whether the declaration is in the middle of validation or not.
+  bool isBeingValidated() const {
+    switch (getValidationState()) {
+    case ValidationState::Unchecked:
+    case ValidationState::Checked:
+      return false;
+    case ValidationState::Checking:
+    case ValidationState::CheckingWithValidSignature:
+      return true;
     }
+    llvm_unreachable("Unknown ValidationState");
+  }
+
+  /// Update the validation state for the declaration to allow access to the
+  /// generic signature.
+  void setSignatureIsValidated() {
+    assert(getValidationState() == ValidationState::Checking);
+    setValidationState(ValidationState::CheckingWithValidSignature);
   }
 
   bool hasValidationStarted() const {
-    return Bits.Decl.ValidationState >= unsigned(ValidationState::Checking);
+    return getValidationState() > ValidationState::Unchecked;
   }
 
-  /// Manually indicate that validation has started for the declaration.
+  /// Manually indicate that validation is complete for the declaration. For
+  /// example: during importing, code synthesis, or derived conformances.
   ///
-  /// This is implied by setIsBeingValidated(true) (i.e. starting validation)
-  /// and so rarely needs to be called directly.
-  void setValidationStarted() {
-    if (Bits.Decl.ValidationState != unsigned(ValidationState::Checking))
+  /// For normal code validation, please use DeclValidationRAII instead.
+  ///
+  /// FIXME -- Everything should use DeclValidationRAII instead of this.
+  void setValidationToChecked() {
+    if (!isBeingValidated())
       Bits.Decl.ValidationState = unsigned(ValidationState::Checked);
   }
 
@@ -921,6 +943,25 @@ public:
   void *operator new(size_t Bytes, void *Mem) { 
     assert(Mem); 
     return Mem; 
+  }
+};
+
+/// \brief Use RAII to track Decl validation progress and non-reentrancy.
+class DeclValidationRAII {
+  Decl *D;
+
+public:
+  DeclValidationRAII(const DeclValidationRAII &) = delete;
+  DeclValidationRAII(DeclValidationRAII &&) = delete;
+  void operator =(const DeclValidationRAII &) = delete;
+  void operator =(DeclValidationRAII &&) = delete;
+
+  DeclValidationRAII(Decl *decl) : D(decl) {
+    D->setValidationState(Decl::ValidationState::Checking);
+  }
+
+  ~DeclValidationRAII() {
+    D->setValidationState(Decl::ValidationState::Checked);
   }
 };
 
@@ -1677,9 +1718,9 @@ public:
   /// Retrieve one of the types listed in the "inherited" clause.
   Type getInheritedType(unsigned index) const;
 
-  /// Whether we have fully checked the extension.
+  /// Whether we have fully checked the extension signature.
   bool hasValidSignature() const {
-    return hasValidationStarted() && !isBeingValidated();
+    return getValidationState() > ValidationState::CheckingWithValidSignature;
   }
 
   bool hasDefaultAccessLevel() const {
@@ -2201,7 +2242,19 @@ class ValueDecl : public Decl {
     /// Whether there are any "overridden" declarations. The actual overridden
     /// declarations are kept in a side table in the ASTContext.
     unsigned hasOverridden : 1;
+
+    /// Whether the "isDynamic" bit has been computed yet.
+    unsigned isDynamicComputed : 1;
+
+    /// Whether this declaration is 'dynamic', meaning that all uses of
+    /// the declaration will go through an extra level of indirection that
+    /// allows the entity to be replaced at runtime.
+    unsigned isDynamic : 1;
   } LazySemanticInfo;
+
+  friend class OverriddenDeclsRequest;
+  friend class IsObjCRequest;
+  friend class IsDynamicRequest;
 
 protected:
   ValueDecl(DeclKind K,
@@ -2215,6 +2268,8 @@ protected:
     LazySemanticInfo.isObjC = false;
     LazySemanticInfo.hasOverriddenComputed = false;
     LazySemanticInfo.hasOverridden = false;
+    LazySemanticInfo.isDynamicComputed = false;
+    LazySemanticInfo.isDynamic = false;
   }
 
   // MemberLookupTable borrows a bit from this type
@@ -2427,18 +2482,15 @@ public:
   ValueDecl *getOverriddenDecl() const;
 
   /// Retrieve the declarations that this declaration overrides, if any.
-  ArrayRef<ValueDecl *> getOverriddenDecls() const;
+  llvm::TinyPtrVector<ValueDecl *> getOverriddenDecls() const;
 
   /// Set the declaration that this declaration overrides.
   void setOverriddenDecl(ValueDecl *overridden) {
-    (void)setOverriddenDecls(overridden);
+    setOverriddenDecls(overridden);
   }
 
   /// Set the declarations that this declaration overrides.
-  ///
-  /// \returns the ASTContext-allocated version of the array of overridden
-  /// declarations.
-  ArrayRef<ValueDecl *> setOverriddenDecls(ArrayRef<ValueDecl *> overridden);
+  void setOverriddenDecls(ArrayRef<ValueDecl *> overridden);
 
   /// Whether the overridden declarations have already been computed.
   bool overriddenDeclsComputed() const;
@@ -2466,8 +2518,14 @@ public:
   }
 
   /// Is this declaration marked with 'dynamic'?
-  bool isDynamic() const {
-    return getAttrs().hasAttribute<DynamicAttr>();
+  bool isDynamic() const;
+
+  /// Set whether this type is 'dynamic' or not.
+  void setIsDynamic(bool value);
+
+  /// Whether the 'dynamic' bit has been computed already.
+  bool isDynamicComputed() const {
+    return LazySemanticInfo.isDynamicComputed;
   }
 
   /// Returns true if this decl can be found by id-style dynamic lookup.
@@ -2843,11 +2901,7 @@ public:
 
   /// Retrieve the set of associated types overridden by this associated
   /// type.
-  CastArrayRefView<ValueDecl *, AssociatedTypeDecl>
-  getOverriddenDecls() const {
-    return CastArrayRefView<ValueDecl *, AssociatedTypeDecl>(
-        AbstractTypeParamDecl::getOverriddenDecls());
-  }
+  llvm::TinyPtrVector<AssociatedTypeDecl *> getOverriddenDecls() const;
 
   SourceLoc getStartLoc() const { return KeywordLoc; }
   SourceRange getSourceRange() const;

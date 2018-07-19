@@ -18,6 +18,7 @@
 
 #include "ConstraintSystem.h"
 #include "MiscDiagnostics.h"
+#include "TypeCheckProtocol.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -558,6 +559,7 @@ namespace {
                        FunctionRefKind functionRefKind,
                        AccessSemantics semantics) {
       auto *decl = choice.getDecl();
+
       // Determine the declaration selected for this overloaded reference.
       auto &ctx = cs.getASTContext();
       
@@ -900,6 +902,7 @@ namespace {
                          FunctionRefKind functionRefKind,
                          AccessSemantics semantics, bool isDynamic) {
       ValueDecl *member = choice.getDecl();
+
       auto &tc = cs.getTypeChecker();
       auto &context = tc.Context;
 
@@ -3621,6 +3624,36 @@ namespace {
 
       auto &tc = cs.getTypeChecker();
 
+      // Since this is literal initialization, we don't
+      // really need to keep wrapping coercion around.
+      if (expr->isLiteralInit()) {
+        auto *literalInit = expr->getSubExpr();
+        // If literal got converted into constructor call
+        // lets put proper source information in place.
+        if (auto *call = dyn_cast<CallExpr>(literalInit)) {
+          call->getFn()->forEachChildExpr([&](Expr *subExpr) -> Expr * {
+            auto *TE = dyn_cast<TypeExpr>(subExpr);
+            if (!TE)
+              return subExpr;
+
+            auto type = TE->getInstanceType(
+                [&](const Expr *expr) { return cs.hasType(expr); },
+                [&](const Expr *expr) { return cs.getType(expr); });
+
+            assert(!type->hasError());
+
+            if (!type->isEqual(toType))
+              return subExpr;
+
+            return cs.cacheType(new (tc.Context)
+                                    TypeExpr(expr->getCastTypeLoc()));
+          });
+        }
+
+        literalInit->setImplicit(false);
+        return literalInit;
+      }
+
       // Turn the subexpression into an rvalue.
       auto rvalueSub = cs.coerceToRValue(expr->getSubExpr());
       expr->setSubExpr(rvalueSub);
@@ -4580,8 +4613,7 @@ namespace {
 
       // Mark any _ObjectiveCBridgeable conformances as 'used'.
       if (result) {
-        auto &tc = cs.getTypeChecker();
-        tc.useObjectiveCBridgeableConformances(cs.DC, cs.getType(result));
+        useObjectiveCBridgeableConformances(cs.DC, cs.getType(result));
       }
 
       assert(expr == ExprStack.back());
@@ -8176,11 +8208,13 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
 Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
                                       Type convertType,
                                       bool discardedExpr,
-                                      bool suppressDiagnostics,
                                       bool skipClosures) {
   // If any fixes needed to be applied to arrive at this solution, resolve
   // them to specific expressions.
   if (!solution.Fixes.empty()) {
+    if (shouldSuppressDiagnostics())
+      return nullptr;
+
     // If we can diagnose the problem with the fixits that we've pre-assumed,
     // do so now.
     if (applySolutionFixes(expr, solution))
@@ -8196,7 +8230,7 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
   for (auto &e : solution.Conformances)
     TC.markConformanceUsed(e.second, DC);
 
-  ExprRewriter rewriter(*this, solution, suppressDiagnostics);
+  ExprRewriter rewriter(*this, solution, shouldSuppressDiagnostics());
   ExprWalker walker(rewriter);
 
   // Apply the solution to the expression.

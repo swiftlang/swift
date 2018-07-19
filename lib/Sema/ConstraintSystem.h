@@ -456,6 +456,8 @@ enum ScoreKind {
   SK_CollectionUpcastConversion,
   /// A value-to-optional conversion.
   SK_ValueToOptional,
+  /// Instantiating a function with archetype T as an Optional value.
+  SK_BindOptionalToArchetype,
   /// A conversion to an empty existential type ('Any' or '{}').
   SK_EmptyExistentialConversion,
   /// A key path application subscript.
@@ -790,6 +792,16 @@ enum class ConstraintSystemFlags {
   /// If set, this is going to prevent constraint system from erasing all
   /// discovered solutions except the best one.
   ReturnAllDiscoveredSolutions = 0x04,
+
+  /// Set if the client wants diagnostics suppressed.
+  SuppressDiagnostics = 0x08,
+
+  /// If set, the client wants a best-effort solution to the constraint system,
+  /// but can tolerate a solution where all of the constraints are solved, but
+  /// not all type variables have been determined.  In this case, the constraint
+  /// system is not applied to the expression AST, but the ConstraintSystem is
+  /// left in-tact.
+  AllowUnresolvedTypeVariables = 0x10,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -913,6 +925,13 @@ public:
 
   /// The original CS if this CS was created as a simplification of another CS
   ConstraintSystem *baseCS = nullptr;
+
+  /// \brief The total number of disjunctions created.
+  unsigned CountDisjunctions = 0;
+
+  /// \brief Map from disjunction to the number indicating the order it
+  //         was created in.
+  llvm::DenseMap<Constraint *, unsigned> DisjunctionNumber;
 
 private:
 
@@ -1725,6 +1744,10 @@ public:
     return !solverState || solverState->recordFixes;
   }
 
+  bool shouldSuppressDiagnostics() {
+    return Options.contains(ConstraintSystemFlags::SuppressDiagnostics);
+  }
+
   /// \brief Log and record the application of the fix. Return true iff any
   /// subsequent solution would be worse than the best known solution.
   bool recordFix(Fix fix, ConstraintLocatorBuilder locator);
@@ -1867,6 +1890,11 @@ public:
   void addExplicitConversionConstraint(Type fromType, Type toType,
                                        bool allowFixes,
                                        ConstraintLocatorBuilder locator);
+
+  void noteNewDisjunction(Constraint *constraint) {
+    assert(constraint->getKind() == ConstraintKind::Disjunction);
+    DisjunctionNumber[constraint] = CountDisjunctions++;
+  }
 
   /// \brief Add a disjunction constraint.
   void addDisjunctionConstraint(ArrayRef<Constraint *> constraints,
@@ -2933,11 +2961,16 @@ private:
   /// \brief Collect the current inactive disjunction constraints.
   void collectDisjunctions(SmallVectorImpl<Constraint *> &disjunctions);
 
+  /// \brief Attempt to solve for the choices in the given disjunction.
+  ///
+  /// \returns true if we found at least one solution.
+  bool
+  solveForDisjunctionChoices(Constraint *disjunction,
+                             SmallVectorImpl<Solution> &solutions,
+                             FreeTypeVariableBinding allowFreeTypeVariables);
+
   /// \brief Solve the system of constraints after it has already been
   /// simplified.
-  ///
-  /// \param disjunction The disjunction to try and solve using simplified
-  /// constraint system.
   ///
   /// \param solutions The set of solutions to this system of constraints.
   ///
@@ -2945,8 +2978,7 @@ private:
   /// the solution.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool solveSimplified(Constraint *disjunction,
-                       SmallVectorImpl<Solution> &solutions,
+  bool solveSimplified(SmallVectorImpl<Solution> &solutions,
                        FreeTypeVariableBinding allowFreeTypeVariables);
 
   /// \brief Find reduced domains of disjunction constraints for given
@@ -2958,15 +2990,10 @@ private:
   /// \param expr The expression to find reductions for.
   void shrink(Expr *expr);
 
-  /// \brief Pick a disjunction from the given list, which,
-  /// based on the associated constraints, is the most viable to
-  /// reduce depth of the search tree.
+  /// \brief Pick a disjunction from the InactiveConstraints list.
   ///
-  /// \param disjunctions A collection of disjunctions to examine.
-  ///
-  /// \returns The disjunction with most weight relative to others, based
-  /// on the number of constraints associated with it, or nullptr otherwise.
-  Constraint *selectDisjunction(SmallVectorImpl<Constraint *> &disjunctions);
+  /// \returns The selected disjunction.
+  Constraint *selectDisjunction();
 
   bool simplifyForConstraintPropagation();
   void collectNeighboringBindOverloadDisjunctions(
@@ -2978,7 +3005,6 @@ private:
                                      bool *foundConsistent);
   bool areBindPairConsistent(Constraint *first, Constraint *second);
 
-public:
   /// \brief Solve the system of constraints generated from provided expression.
   ///
   /// \param expr The expression to generate constraints from.
@@ -2990,12 +3016,34 @@ public:
   ///
   /// \returns Error is an error occurred, Solved is system is consistent
   /// and solutions were found, Unsolved otherwise.
-  SolutionKind solve(Expr *&expr,
-                     Type convertType,
-                     ExprTypeCheckListener *listener,
-                     SmallVectorImpl<Solution> &solutions,
-                     FreeTypeVariableBinding allowFreeTypeVariables
-                       = FreeTypeVariableBinding::Disallow);
+  SolutionKind solveImpl(Expr *&expr,
+                         Type convertType,
+                         ExprTypeCheckListener *listener,
+                         SmallVectorImpl<Solution> &solutions,
+                         FreeTypeVariableBinding allowFreeTypeVariables
+                          = FreeTypeVariableBinding::Disallow);
+
+public:
+  /// \brief Solve the system of constraints generated from provided expression.
+  ///
+  /// The expression should have already been pre-checked with
+  /// preCheckExpression().
+  ///
+  /// \param expr The expression to generate constraints from.
+  /// \param convertType The expected type of the expression.
+  /// \param listener The callback to check solving progress.
+  /// \param solutions The set of solutions to the system of constraints.
+  /// \param allowFreeTypeVariables How to bind free type variables in
+  /// the solution.
+  ///
+  /// \returns true is an error occurred, false is system is consistent
+  /// and solutions were found.
+  bool solve(Expr *&expr,
+             Type convertType,
+             ExprTypeCheckListener *listener,
+             SmallVectorImpl<Solution> &solutions,
+             FreeTypeVariableBinding allowFreeTypeVariables
+             = FreeTypeVariableBinding::Disallow);
 
   /// \brief Solve the system of constraints.
   ///
@@ -3083,7 +3131,6 @@ public:
   /// non-single expression closures.
   Expr *applySolution(Solution &solution, Expr *expr,
                       Type convertType, bool discardedExpr,
-                      bool suppressDiagnostics,
                       bool skipClosures);
 
   /// \brief Apply a given solution to the expression to the top-level
@@ -3361,8 +3408,7 @@ public:
       llvm::SaveAndRestore<ConstraintSystem::SolverScope *>
           partialSolutionScope(cs.solverState->PartialSolutionScope, &scope);
 
-      failed = cs.solveSimplified(cs.selectDisjunction(Disjunctions), solutions,
-                                  allowFreeTypeVariables);
+      failed = cs.solveSimplified(solutions, allowFreeTypeVariables);
     }
 
     // Put the constraints back into their original bucket.

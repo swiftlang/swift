@@ -341,8 +341,7 @@ public func _getBridgedNonVerbatimObjectiveCType<T>(_: T.Type) -> Any.Type?
 
 // -- Pointer argument bridging
 
-@inlinable // FIXME(sil-serialize-all)
-@_transparent
+@usableFromInline @_transparent
 internal var _nilNativeObject: AnyObject? {
   return nil
 }
@@ -438,7 +437,7 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   ///
   /// - Warning: Accessing `pointee` as a type that is unrelated to
   ///   the underlying memory's bound type is undefined.
-  @_transparent
+  @usableFromInline @_transparent
   internal init<U>(_ from: UnsafePointer<U>) {
     self._rawValue = from._rawValue
   }
@@ -452,7 +451,7 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   ///
   /// - Warning: Accessing `pointee` as a type that is unrelated to
   ///   the underlying memory's bound type is undefined.
-  @_transparent
+  @usableFromInline @_transparent
   internal init?<U>(_ from: UnsafePointer<U>?) {
     guard let unwrapped = from else { return nil }
     self.init(unwrapped)
@@ -540,8 +539,7 @@ internal struct _CocoaFastEnumerationStackBuf {
   @usableFromInline // FIXME(sil-serialize-all)
   internal var _item15: UnsafeRawPointer?
 
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal var count: Int {
     return 16
   }

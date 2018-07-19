@@ -326,7 +326,7 @@ DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
                                       FunctionType::ExtInfo());
   getterDecl->setInterfaceType(interfaceType);
   getterDecl->copyFormalAccessFrom(property);
-  getterDecl->setValidationStarted();
+  getterDecl->setValidationToChecked();
 
   tc.Context.addSynthesizedDecl(getterDecl);
 
@@ -347,7 +347,7 @@ DerivedConformance::declareDerivedProperty(Identifier name,
   propDecl->setImplicit();
   propDecl->copyFormalAccessFrom(Nominal, /*sourceIsParentContext*/ true);
   propDecl->setInterfaceType(propertyInterfaceType);
-  propDecl->setValidationStarted();
+  propDecl->setValidationToChecked();
 
   // If this is supposed to be a final property, mark it as such.
   assert(isFinal || !parentDC->getAsClassOrClassExtensionContext());

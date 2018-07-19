@@ -75,6 +75,10 @@ struct SKEditorConsumerOptions {
   bool EnableDiagnostics = false;
   bool EnableSyntaxTree = false;
   bool SyntacticOnly = false;
+  bool EnableSyntaxReuseInfo = false;
+  // FIXME: This is just for bootstrapping incremental syntax tree parsing.
+  // Remove it once when we are able to incrementally transfer the syntax tree
+  bool ForceLibSyntaxBasedProcessing = false;
 };
 
 } // anonymous namespace
@@ -435,6 +439,12 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     Req.getInt64(KeyEnableSyntaxTree, EnableSyntaxTree, /*isOptional=*/true);
     int64_t SyntacticOnly = false;
     Req.getInt64(KeySyntacticOnly, SyntacticOnly, /*isOptional=*/true);
+    int64_t ForceLibSyntaxBasedProcessing = false;
+    Req.getInt64(KeyForceLibSyntaxBasedProcessing,
+                 ForceLibSyntaxBasedProcessing, /*isOptional=*/true);
+    int64_t EnableSyntaxReuseInfo = false;
+    Req.getInt64(KeyEnableSyntaxReuseRegions, EnableSyntaxReuseInfo,
+                 /*isOptional=*/true);
 
     SKEditorConsumerOptions Opts;
     Opts.EnableSyntaxMap = EnableSyntaxMap;
@@ -442,6 +452,8 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     Opts.EnableDiagnostics = EnableDiagnostics;
     Opts.EnableSyntaxTree = EnableSyntaxTree;
     Opts.SyntacticOnly = SyntacticOnly;
+    Opts.EnableSyntaxReuseInfo = EnableSyntaxReuseInfo;
+    Opts.ForceLibSyntaxBasedProcessing = ForceLibSyntaxBasedProcessing;
     return Rec(editorOpen(*Name, InputBuf.get(), Opts, Args));
   }
   if (ReqUID == RequestEditorClose) {
@@ -476,6 +488,13 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     Req.getInt64(KeyEnableSyntaxTree, EnableSyntaxTree, /*isOptional=*/true);
     int64_t SyntacticOnly = false;
     Req.getInt64(KeySyntacticOnly, SyntacticOnly, /*isOptional=*/true);
+    int64_t ForceLibSyntaxBasedProcessing = false;
+    Req.getInt64(KeyForceLibSyntaxBasedProcessing,
+                 ForceLibSyntaxBasedProcessing,
+                 /*isOptional=*/true);
+    int64_t EnableSyntaxReuseInfo = false;
+    Req.getInt64(KeyEnableSyntaxReuseRegions, EnableSyntaxReuseInfo,
+                 /*isOptional=*/true);
 
     SKEditorConsumerOptions Opts;
     Opts.EnableSyntaxMap = EnableSyntaxMap;
@@ -483,6 +502,8 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     Opts.EnableDiagnostics = EnableDiagnostics;
     Opts.EnableSyntaxTree = EnableSyntaxTree;
     Opts.SyntacticOnly = SyntacticOnly;
+    Opts.EnableSyntaxReuseInfo = EnableSyntaxReuseInfo;
+    Opts.ForceLibSyntaxBasedProcessing = ForceLibSyntaxBasedProcessing;
 
     return Rec(editorReplaceText(*Name, InputBuf.get(), Offset, Length, Opts));
   }
@@ -2060,17 +2081,26 @@ public:
   bool handleSourceText(StringRef Text) override;
   bool handleSerializedSyntaxTree(StringRef Text) override;
   bool syntaxTreeEnabled() override { return Opts.EnableSyntaxTree; }
+
+  bool syntaxReuseInfoEnabled() override { return Opts.EnableSyntaxReuseInfo; }
+  bool handleSyntaxReuseRegions(
+      std::vector<SourceFileRange> ReuseRegions) override;
+
   void finished() override {
     if (RespReceiver)
       RespReceiver(createResponse());
+  }
+
+  virtual bool forceLibSyntaxBasedProcessing() override {
+    return Opts.ForceLibSyntaxBasedProcessing;
   }
 };
 
 } // end anonymous namespace
 
 static sourcekitd_response_t
-editorOpen(StringRef Name, llvm::MemoryBuffer *Buf, SKEditorConsumerOptions Opts,
-           ArrayRef<const char *> Args) {
+editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
+           SKEditorConsumerOptions Opts, ArrayRef<const char *> Args) {
   SKEditorConsumer EditC(Opts);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.editorOpen(Name, Buf, EditC, Args);
@@ -2398,6 +2428,20 @@ bool SKEditorConsumer::handleSourceText(StringRef Text) {
 bool SKEditorConsumer::handleSerializedSyntaxTree(StringRef Text) {
   if (syntaxTreeEnabled())
     Dict.set(KeySerializedSyntaxTree, Text);
+  return true;
+}
+
+bool SKEditorConsumer::handleSyntaxReuseRegions(
+    std::vector<SourceFileRange> ReuseRegions) {
+  if (Opts.EnableSyntaxReuseInfo) {
+    auto Array = Dict.setArray(KeySyntaxReuseRegions);
+
+    for (auto Region : ReuseRegions) {
+      auto SubDict = Array.appendDictionary();
+      SubDict.set(KeyOffset, Region.Start);
+      SubDict.set(KeyLength, Region.End - Region.Start);
+    }
+  }
   return true;
 }
 

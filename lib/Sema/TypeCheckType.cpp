@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -18,6 +18,7 @@
 #include "TypeChecker.h"
 #include "GenericTypeResolver.h"
 #include "TypeCheckAvailability.h"
+#include "TypeCheckProtocol.h"
 
 #include "swift/Strings.h"
 #include "swift/AST/ASTVisitor.h"
@@ -341,7 +342,7 @@ static bool isPointerToVoid(ASTContext &Ctx, Type Ty, bool &IsMutable) {
   return BGT->getGenericArgs().front()->isVoid();
 }
 
-Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
+Type TypeChecker::applyGenericArguments(Type type,
                                         SourceLoc loc, DeclContext *dc,
                                         GenericIdentTypeRepr *generic,
                                         TypeResolutionOptions options,
@@ -355,10 +356,7 @@ Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
   }
 
   // We must either have an unbound generic type, or a generic type alias.
-  if (!type->is<UnboundGenericType>() &&
-      !(isa<TypeAliasDecl>(decl) &&
-        cast<TypeAliasDecl>(decl)->getGenericParams())) {
-
+  if (!type->is<UnboundGenericType>()) {
     auto diag = diagnose(loc, diag::not_a_generic_type, type);
 
     // Don't add fixit on module type; that isn't the right type regardless
@@ -376,24 +374,7 @@ Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
   }
 
   auto *unboundType = type->castTo<UnboundGenericType>();
-
-  // If we have a non-generic type alias, we have an unbound generic type.
-  // Grab the decl from the unbound generic type.
-  //
-  // The idea is if you write:
-  //
-  // typealias Foo = Bar.Baz
-  //
-  // Then 'Foo<Int>' applies arguments to Bar.Baz, whereas if you write:
-  //
-  // typealias Foo<T> = Bar.Baz<T>
-  //
-  // Then 'Foo<Int>' applies arguments to Foo itself.
-  //
-  if (isa<TypeAliasDecl>(decl) &&
-      !cast<TypeAliasDecl>(decl)->getGenericParams()) {
-    decl = unboundType->getDecl();
-  }
+  auto *decl = unboundType->getDecl();
 
   // Make sure we have the right number of generic arguments.
   // FIXME: If we have fewer arguments than we need, that might be okay, if
@@ -509,7 +490,7 @@ Type TypeChecker::applyUnboundGenericArguments(
   // generic arguments.
   auto resultType = decl->getDeclaredInterfaceType();
 
-  bool hasTypeParameterOrVariable = false;
+  bool hasTypeVariable = false;
 
   // Get the substitutions for outer generic parameters from the parent
   // type.
@@ -526,9 +507,7 @@ Type TypeChecker::applyUnboundGenericArguments(
     }
 
     subs = parentType->getContextSubstitutions(decl->getDeclContext());
-
-    hasTypeParameterOrVariable |=
-      (parentType->hasTypeParameter() || parentType->hasTypeVariable());
+    hasTypeVariable |= parentType->hasTypeVariable();
   }
 
   SourceLoc noteLoc = decl->getLoc();
@@ -545,13 +524,12 @@ Type TypeChecker::applyUnboundGenericArguments(
     subs[origTy->getCanonicalType()->castTo<GenericTypeParamType>()] =
       substTy;
 
-    hasTypeParameterOrVariable |=
-      (substTy->hasTypeParameter() || substTy->hasTypeVariable());
+    hasTypeVariable |= substTy->hasTypeVariable();
   }
 
   // Check the generic arguments against the requirements of the declaration's
   // generic signature.
-  if (!hasTypeParameterOrVariable) {
+  if (!hasTypeVariable) {
     auto result =
       checkGenericArguments(dc, loc, noteLoc, unboundType,
                             genericSig->getGenericParams(),
@@ -695,7 +673,7 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
 
   if (generic && !options.contains(TypeResolutionFlags::ResolveStructure)) {
     // Apply the generic arguments to the type.
-    type = TC.applyGenericArguments(type, typeDecl, loc, fromDC, generic,
+    type = TC.applyGenericArguments(type, loc, fromDC, generic,
                                     options, resolver);
     if (!type)
       return nullptr;
@@ -1149,6 +1127,26 @@ static Type resolveNestedIdentTypeComponent(
               TypeResolutionOptions options,
               bool diagnoseErrors,
               GenericTypeResolver *resolver) {
+  auto maybeApplyGenericArgs = [&](Type memberType) {
+    // If there are generic arguments, apply them now.
+    if (!options.contains(TypeResolutionFlags::ResolveStructure)) {
+      if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp)) {
+        return TC.applyGenericArguments(memberType, comp->getIdLoc(),
+                                        DC, genComp, options, resolver);
+      }
+    }
+
+    if (memberType->is<UnboundGenericType>() &&
+        !options.contains(TypeResolutionFlags::AllowUnboundGenerics) &&
+        !options.contains(TypeResolutionFlags::TypeAliasUnderlyingType) &&
+        !options.contains(TypeResolutionFlags::ResolveStructure)) {
+      diagnoseUnboundGenericType(TC, memberType, comp->getLoc());
+      return ErrorType::get(TC.Context);
+    }
+
+    return memberType;
+  };
+
   auto maybeDiagnoseBadMemberType = [&](TypeDecl *member, Type memberType,
                                         AssociatedTypeDecl *inferredAssocType) {
     // Diagnose invalid cases.
@@ -1198,22 +1196,7 @@ static Type resolveNestedIdentTypeComponent(
       return memberType;
 
     // If there are generic arguments, apply them now.
-    if (!options.contains(TypeResolutionFlags::ResolveStructure)) {
-      if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp)) {
-        return TC.applyGenericArguments(memberType, member, comp->getIdLoc(),
-                                        DC, genComp, options, resolver);
-      }
-    }
-
-    if (memberType->is<UnboundGenericType>() &&
-        !options.contains(TypeResolutionFlags::AllowUnboundGenerics) &&
-        !options.contains(TypeResolutionFlags::TypeAliasUnderlyingType) &&
-        !options.contains(TypeResolutionFlags::ResolveStructure)) {
-      diagnoseUnboundGenericType(TC, memberType, comp->getLoc());
-      return ErrorType::get(TC.Context);
-    }
-
-    return memberType;
+    return maybeApplyGenericArgs(memberType);
   };
 
   // Short-circuiting.
@@ -1223,8 +1206,18 @@ static Type resolveNestedIdentTypeComponent(
   // and we skip much of the work below.
   if (parentTy->isTypeParameter()) {
     if (auto memberType = resolver->resolveDependentMemberType(
-            parentTy, DC, parentRange, comp))
+            parentTy, DC, parentRange, comp)) {
+      // Hack -- if we haven't resolved this to a declaration yet, don't
+      // attempt to apply generic arguments, since this will emit a
+      // diagnostic, and its possible that this type will become a concrete
+      // type later on.
+      if (!memberType->is<DependentMemberType>() ||
+          memberType->castTo<DependentMemberType>()->getAssocType()) {
+        return maybeApplyGenericArgs(memberType);
+      }
+
       return memberType;
+    }
   }
 
   // Phase 2: If a declaration has already been bound, use it.
@@ -1942,14 +1935,9 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   // Handle @escaping
   if (hasFunctionAttr && ty->is<FunctionType>()) {
     if (attrs.has(TAK_escaping)) {
-      // For compatibility with 3.0, we don't emit an error if it appears on a
-      // variadic argument list.
-      bool skipDiagnostic =
-          isVariadicFunctionParam && Context.isSwiftVersion3();
-
       // The attribute is meaningless except on parameter types.
       bool isEnum = options.contains(TypeResolutionFlags::EnumCase);
-      if ((isEnum || !isParam) && !skipDiagnostic) {
+      if (isEnum || !isParam) {
         auto loc = attrs.getLoc(TAK_escaping);
         auto attrRange = getTypeAttrRangeWithAt(TC, loc);
 
@@ -2636,7 +2624,7 @@ Type TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
 
   if (!options.contains(TypeResolutionFlags::ResolveStructure)) {
     // Check for _ObjectiveCBridgeable conformances in the element type.
-    TC.useObjectiveCBridgeableConformances(DC, baseTy);
+    useObjectiveCBridgeableConformances(DC, baseTy);
   }
 
   return sliceTy;
@@ -2671,8 +2659,8 @@ Type TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
 
       // Check for _ObjectiveCBridgeable conformances in the key and value
       // types.
-      TC.useObjectiveCBridgeableConformances(DC, keyTy);
-      TC.useObjectiveCBridgeableConformances(DC, valueTy);
+      useObjectiveCBridgeableConformances(DC, keyTy);
+      useObjectiveCBridgeableConformances(DC, valueTy);
     }
 
     return dictTy;
@@ -2784,108 +2772,8 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
   return TupleType::get(elements, Context);
 }
 
-/// Restore Swift3 behavior of ambiguous composition for source compatibility.
-///
-/// Currently, 'P1 & P2.Type' is parsed as (composition P1, (metatype P2))
-/// In Swift3, that was (metatype (composition P1, P2)).
-/// For source compatibility, before resolving Type of that, reconstruct
-/// TypeRepr as so, and emit a warning with fix-it to enclose it with
-/// parenthesis; '(P1 & P2).Type'
-//
-/// \param Comp The type composition to be checked and fixed.
-///
-/// \returns Fixed TypeRepr, or nullptr that indicates no need to fix.
-static TypeRepr *fixCompositionWithPostfix(TypeChecker &TC,
-                                           CompositionTypeRepr *Comp) {
-  // Only for Swift3
-  if (!TC.Context.isSwiftVersion3())
-    return nullptr;
-
-  auto Types = Comp->getTypes();
-  TypeRepr *LastType = nullptr;
-  for (auto i = Types.begin(), e = Types.end(); i != e; ++i) {
-    if (!isa<IdentTypeRepr>(*i)) {
-      // Found non-IdentType not at the last, can't help.
-      if (i + 1 != e)
-        return nullptr;
-      LastType = *i;
-    }
-  }
-  // Only IdentType(s) it's OK.
-  if (!LastType)
-    return nullptr;
-
-  // Strip off the postfix type repr.
-  SmallVector<TypeRepr *, 2> Postfixes;
-  while (true) {
-    if (auto T = dyn_cast<ProtocolTypeRepr>(LastType)) {
-      Postfixes.push_back(LastType);
-      LastType = T->getBase();
-    } else if (auto T = dyn_cast<MetatypeTypeRepr>(LastType)) {
-      Postfixes.push_back(LastType);
-      LastType = T->getBase();
-    } else if (auto T = dyn_cast<OptionalTypeRepr>(LastType)) {
-      Postfixes.push_back(LastType);
-      LastType = T->getBase();
-    } else if (auto T =
-        dyn_cast<ImplicitlyUnwrappedOptionalTypeRepr>(LastType)) {
-      Postfixes.push_back(LastType);
-      LastType = T->getBase();
-    } else if (!isa<IdentTypeRepr>(LastType)) {
-      // Found non-IdentTypeRepr, can't help;
-      return nullptr;
-    } else {
-      break;
-    }
-  }
-  assert(!Postfixes.empty() && isa<IdentTypeRepr>(LastType));
-
-  // Now, we know we can fix-it. do it.
-  SmallVector<TypeRepr *, 4> Protocols(Types.begin(), Types.end() - 1);
-  Protocols.push_back(LastType);
-
-  // Emit fix-it to enclose composition part into parentheses.
-  TypeRepr *InnerMost = Postfixes.back();
-  TC.diagnose(InnerMost->getLoc(), diag::protocol_composition_with_postfix,
-      isa<ProtocolTypeRepr>(InnerMost) ? ".Protocol" :
-      isa<MetatypeTypeRepr>(InnerMost) ? ".Type" :
-      isa<OptionalTypeRepr>(InnerMost) ? "?" :
-      isa<ImplicitlyUnwrappedOptionalTypeRepr>(InnerMost) ? "!" :
-      /* unreachable */"")
-    .highlight({Comp->getStartLoc(), LastType->getEndLoc()})
-    .fixItInsert(Comp->getStartLoc(), "(")
-    .fixItInsertAfter(LastType->getEndLoc(), ")");
-
-  // Reconstruct postfix type repr with collected protocols.
-  TypeRepr *Fixed = CompositionTypeRepr::create(
-    TC.Context, Protocols, Comp->getStartLoc(),
-    {Comp->getCompositionRange().Start, LastType->getEndLoc()});
-
-  // Add back postix TypeRepr(s) to the composition.
-  while (Postfixes.size()) {
-    auto Postfix = Postfixes.pop_back_val();
-    if (auto T = dyn_cast<ProtocolTypeRepr>(Postfix))
-      Fixed = new (TC.Context) ProtocolTypeRepr(Fixed, T->getProtocolLoc());
-    else if (auto T = dyn_cast<MetatypeTypeRepr>(Postfix))
-      Fixed = new (TC.Context) MetatypeTypeRepr(Fixed, T->getMetaLoc());
-    else if (auto T = dyn_cast<OptionalTypeRepr>(Postfix))
-      Fixed = new (TC.Context) OptionalTypeRepr(Fixed, T->getQuestionLoc());
-    else if (auto T = dyn_cast<ImplicitlyUnwrappedOptionalTypeRepr>(Postfix))
-      Fixed = new (TC.Context)
-        ImplicitlyUnwrappedOptionalTypeRepr(Fixed, T->getExclamationLoc());
-    else
-      llvm_unreachable("unexpected type repr");
-  }
-
-  return Fixed;
-}
-
 Type TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
                                           TypeResolutionOptions options) {
-
-  // Fix 'P1 & P2.Type' to '(P1 & P2).Type' for Swift3
-  if (auto fixed = fixCompositionWithPostfix(TC, repr))
-    return resolveType(fixed, options);
 
   // Note that the superclass type will appear as part of one of the
   // types in 'Members', so it's not used when constructing the

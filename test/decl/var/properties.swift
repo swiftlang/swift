@@ -1068,11 +1068,13 @@ class OwnershipBase {
   class var defaultObject: AnyObject { fatalError("") }
 
   var strongVar: AnyObject? // expected-note{{overridden declaration is here}}
-  weak var weakVar: AnyObject?
+  weak var weakVar: AnyObject? // expected-note{{overridden declaration is here}}
 
   // FIXME: These should be optional to properly test overriding.
   unowned var unownedVar: AnyObject = defaultObject
+  unowned var optUnownedVar: AnyObject? = defaultObject
   unowned(unsafe) var unownedUnsafeVar: AnyObject = defaultObject // expected-note{{overridden declaration is here}}
+  unowned(unsafe) var optUnownedUnsafeVar: AnyObject? = defaultObject
 }
 
 class OwnershipExplicitSub : OwnershipBase {
@@ -1085,7 +1087,13 @@ class OwnershipExplicitSub : OwnershipBase {
   override unowned var unownedVar: AnyObject {
     didSet {}
   }
+  override unowned var optUnownedVar: AnyObject? {
+    didSet {}
+  }
   override unowned(unsafe) var unownedUnsafeVar: AnyObject {
+    didSet {}
+  }
+  override unowned(unsafe) var optUnownedUnsafeVar: AnyObject? {
     didSet {}
   }
 }
@@ -1100,7 +1108,13 @@ class OwnershipImplicitSub : OwnershipBase {
   override unowned var unownedVar: AnyObject {
     didSet {}
   }
+  override unowned var optUnownedVar: AnyObject? {
+    didSet {}
+  }
   override unowned(unsafe) var unownedUnsafeVar: AnyObject {
+    didSet {}
+  }
+  override unowned(unsafe) var optUnownedUnsafeVar: AnyObject? {
     didSet {}
   }
 }
@@ -1109,7 +1123,7 @@ class OwnershipBadSub : OwnershipBase {
   override weak var strongVar: AnyObject? { // expected-error {{cannot override 'strong' property with 'weak' property}}
     didSet {}
   }
-  override unowned var weakVar: AnyObject? { // expected-error {{'unowned' variable cannot have optional type}}
+  override unowned var weakVar: AnyObject? { // expected-error {{cannot override 'weak' property with 'unowned' property}}
     didSet {}
   }
   override weak var unownedVar: AnyObject { // expected-error {{'weak' variable should have optional type 'AnyObject?'}}

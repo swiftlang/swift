@@ -218,10 +218,6 @@ static AccessorDecl *createGetterPrototype(TypeChecker &TC,
   if (storage->isStatic())
     getter->setStatic();
 
-  if (auto *overridden = storage->getOverriddenDecl())
-    if (auto *overriddenAccessor = overridden->getGetter())
-      getter->setOverriddenDecl(overriddenAccessor);
-
   // Always add the getter to the context immediately after the storage.
   addMemberToContextIfNeeded(getter, storage->getDeclContext(), storage);
 
@@ -273,14 +269,6 @@ static AccessorDecl *createSetterPrototype(TypeChecker &TC,
 
   if (isStatic)
     setter->setStatic();
-
-  if (auto *overridden = storage->getOverriddenDecl()) {
-    auto *overriddenAccessor = overridden->getSetter();
-    if (overriddenAccessor &&
-        overridden->isSetterAccessibleFrom(storage->getDeclContext())) {
-      setter->setOverriddenDecl(overriddenAccessor);
-    }
-  }
 
   // Always add the setter to the context immediately after the getter.
   if (!getter) getter = storage->getGetter();
@@ -427,14 +415,6 @@ createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   // materializeForSet is final if the storage is.
   if (storage->isFinal())
     makeFinal(ctx, materializeForSet);
-
-  if (auto *overridden = storage->getOverriddenDecl()) {
-    auto *overriddenAccessor = overridden->getMaterializeForSetFunc();
-    if (overriddenAccessor && !overriddenAccessor->hasForcedStaticDispatch() &&
-        overridden->isSetterAccessibleFrom(storage->getDeclContext())) {
-      materializeForSet->setOverriddenDecl(overriddenAccessor);
-    }
-  }
 
   // If the storage is dynamic or ObjC-native, we can't add a dynamically-
   // dispatched method entry for materializeForSet, so force it to be
@@ -1521,7 +1501,7 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
 
   Parameter->setInterfaceType(SubstInterfaceTy);
   Parameter->setGenericEnvironment(genericEnv);
-  Parameter->setValidationStarted();
+  Parameter->setValidationToChecked();
 
   // Mark the method to be final, implicit, and private.  In a class, this
   // prevents it from being dynamically dispatched.
@@ -2414,25 +2394,16 @@ static void configureDesignatedInitAttributes(TypeChecker &tc,
   ctor->getAttrs().add(new (ctx) OverrideAttr(/*IsImplicit=*/true));
   ctor->setOverriddenDecl(superclassCtor);
 
-  if (superclassCtor->isObjC()) {
-    // Inherit the @objc name from the superclass initializer, if it
-    // has one.
-    if (auto objcAttr = superclassCtor->getAttrs().getAttribute<ObjCAttr>()) {
-      if (objcAttr->hasName()) {
-        auto *clonedAttr = objcAttr->clone(ctx);
-        clonedAttr->setImplicit(true);
-        ctor->getAttrs().add(clonedAttr);
-      }
-    }
-
-    auto errorConvention = superclassCtor->getForeignErrorConvention();
-    markAsObjC(tc, ctor, ObjCReason(ObjCReason::ImplicitlyObjC),
-               errorConvention);
-  }
   if (superclassCtor->isRequired())
     ctor->getAttrs().add(new (ctx) RequiredAttr(/*IsImplicit=*/true));
-  if (superclassCtor->isDynamic())
-    ctor->getAttrs().add(new (ctx) DynamicAttr(/*IsImplicit*/true));
+
+  // If the superclass constructor is @objc but the subclass constructor is
+  // not representable in Objective-C, add @nonobjc implicitly.
+  Optional<ForeignErrorConvention> errorConvention;
+  if (superclassCtor->isObjC() &&
+      !isRepresentableInObjC(ctor, ObjCReason::MemberOfObjCSubclass,
+                             errorConvention))
+    ctor->getAttrs().add(new (ctx) NonObjCAttr(/*isImplicit=*/true));
 }
 
 ConstructorDecl *
@@ -2510,7 +2481,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   ctor->setGenericEnvironment(genericEnv);
 
   tc.configureInterfaceType(ctor, genericSig);
-  ctor->setValidationStarted();
+  ctor->setValidationToChecked();
 
   configureDesignatedInitAttributes(tc, classDecl,
                                     ctor, superclassCtor);

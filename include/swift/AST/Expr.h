@@ -4306,6 +4306,11 @@ public:
 ///
 /// Spelled 'a as T' and produces a value of type 'T'.
 class CoerceExpr : public ExplicitCastExpr {
+  /// Since there is already `asLoc` location,
+  /// we use it to store `start` of the initializer
+  /// call source range to save some storage.
+  SourceLoc InitRangeEnd;
+
 public:
   CoerceExpr(Expr *sub, SourceLoc asLoc, TypeLoc type)
     : ExplicitCastExpr(ExprKind::Coerce, sub, asLoc, type, type.getType())
@@ -4314,6 +4319,29 @@ public:
   CoerceExpr(SourceLoc asLoc, TypeLoc type)
     : CoerceExpr(nullptr, asLoc, type)
   { }
+
+private:
+  CoerceExpr(SourceRange initRange, Expr *literal, TypeLoc type)
+    : ExplicitCastExpr(ExprKind::Coerce, literal, initRange.Start,
+                       type, type.getType()), InitRangeEnd(initRange.End)
+  { setImplicit(); }
+
+public:
+  /// Create an implicit coercion expression for literal initialization
+  /// preserving original source information, this way original call
+  /// could be recreated if needed.
+  static CoerceExpr *forLiteralInit(ASTContext &ctx, Expr *literal,
+                                    SourceRange range, TypeLoc literalType) {
+    return new (ctx) CoerceExpr(range, literal, literalType);
+  }
+
+  bool isLiteralInit() const { return InitRangeEnd.isValid(); }
+
+  SourceRange getSourceRange() const {
+    return isLiteralInit()
+            ? SourceRange(getAsLoc(), InitRangeEnd)
+            : ExplicitCastExpr::getSourceRange();
+  }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Coerce;

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -3542,10 +3542,6 @@ EffectiveClangContext ClangImporter::Implementation::getEffectiveClangContext(
     return EffectiveClangContext();
   }
 
-  // Resolve the type.
-  if (auto typeResolver = getTypeResolver())
-    typeResolver->resolveIsObjC(const_cast<NominalTypeDecl *>(nominal));
-
   // If it's an @objc entity, go look for it.
   if (nominal->isObjC()) {
     // Map the name. If we can't represent the Swift name in Clang.
@@ -3610,7 +3606,7 @@ bool ClangImporter::isInOverlayModuleForImportedModule(
   importedDC = importedDC->getModuleScopeContext();
 
   auto importedClangModuleUnit = dyn_cast<ClangModuleUnit>(importedDC);
-  if (!importedClangModuleUnit)
+  if (!importedClangModuleUnit || !importedClangModuleUnit->getClangModule())
     return false;
 
   auto overlayModule = overlayDC->getParentModule();

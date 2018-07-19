@@ -1167,6 +1167,7 @@ namespace {
       if (!E->isActivated())
         return Type();
 
+      CS.Options |= ConstraintSystemFlags::SuppressDiagnostics;
       return CS.createTypeVariable(CS.getConstraintLocator(E),
                                    TVO_CanBindToLValue);
     }
@@ -1393,11 +1394,12 @@ namespace {
     Type visitTypeExpr(TypeExpr *E) {
       Type type;
       // If this is an implicit TypeExpr, don't validate its contents.
-      if (auto *rep = E->getTypeRepr()) {
-        type = resolveTypeReferenceInExpression(rep);
-      } else {
+      if (E->getTypeLoc().wasValidated()) {
         type = E->getTypeLoc().getType();
+      } else if (auto *rep = E->getTypeRepr()) {
+        type = resolveTypeReferenceInExpression(rep);
       }
+
       if (!type || type->hasError()) return Type();
       
       auto locator = CS.getConstraintLocator(E);
@@ -2058,7 +2060,6 @@ namespace {
             ty = CS.createTypeVariable(CS.getConstraintLocator(locator));
           return CS.getTypeChecker().getOptionalType(var->getLoc(), ty);
         case ReferenceOwnershipOptionality::Allowed:
-        case ReferenceOwnershipOptionality::AllowedIfImporting:
         case ReferenceOwnershipOptionality::Disallowed:
           break;
         }
@@ -3562,6 +3563,8 @@ public:
   }
 
   Type visitCodeCompletionExpr(CodeCompletionExpr *Expr) override {
+    auto &cs = getConstraintSystem();
+    cs.Options |= ConstraintSystemFlags::SuppressDiagnostics;
     return createFreeTypeVariableType(Expr);
   }
 

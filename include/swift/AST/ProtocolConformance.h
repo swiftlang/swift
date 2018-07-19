@@ -316,6 +316,11 @@ public:
   /// Substitute the conforming type and produce a ProtocolConformance that
   /// applies to the substituted type.
   ProtocolConformance *subst(Type substType,
+                             SubstitutionMap subMap) const;
+
+  /// Substitute the conforming type and produce a ProtocolConformance that
+  /// applies to the substituted type.
+  ProtocolConformance *subst(Type substType,
                              TypeSubstitutionFn subs,
                              LookupConformanceFn conformances) const;
 

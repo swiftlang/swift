@@ -1044,15 +1044,15 @@ extension Collection {
   ///     let randomName = names.randomElement()!
   ///     // randomName == "Amani"
   ///
-  /// This method uses the default random generator, `Random.default`. The call
-  /// to `names.randomElement()` above is equivalent to calling
-  /// `names.randomElement(using: &Random.default)`.
+  /// This method is equivalent to calling the version that takes a generator, 
+  /// passing in the system's default random generator.
   ///
   /// - Returns: A random element from the collection. If the collection is
   ///   empty, the method returns `nil`.
   @inlinable
   public func randomElement() -> Element? {
-    return randomElement(using: &Random.default)
+    var g = SystemRandomNumberGenerator()
+    return randomElement(using: &g)
   }
 
   /// Do not use this method directly; call advanced(by: n) instead.

@@ -360,7 +360,7 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx)
   setInterfaceType(ModuleType::get(this));
 
   // validateDecl() should return immediately given a ModuleDecl.
-  setValidationStarted();
+  setValidationToChecked();
 
   setAccess(AccessLevel::Public);
 }

@@ -1046,7 +1046,6 @@ public:
   /// to be in a correct and valid form.
   ///
   /// \param type The generic type to which to apply arguments.
-  /// \param decl The declaration of the type.
   /// \param loc The source location for diagnostic reporting.
   /// \param dc The context where the arguments are applied.
   /// \param generic The arguments to apply with the angle bracket range for
@@ -1058,7 +1057,7 @@ public:
   /// error.
   ///
   /// \see applyUnboundGenericArguments
-  Type applyGenericArguments(Type type, TypeDecl *decl, SourceLoc loc,
+  Type applyGenericArguments(Type type, SourceLoc loc,
                              DeclContext *dc, GenericIdentTypeRepr *generic,
                              TypeResolutionOptions options,
                              GenericTypeResolver *resolver);
@@ -1235,12 +1234,6 @@ public:
     validateDeclForNameLookup(VD);
   }
 
-  /// Resolve the "overridden" declaration of the given declaration.
-  virtual void resolveOverriddenDecl(ValueDecl *VD) override;
-
-  /// Resolve the "is Objective-C" bit for the given declaration.
-  virtual void resolveIsObjC(ValueDecl *VD) override;
-
   virtual void bindExtension(ExtensionDecl *ext) override;
 
   virtual void resolveExtension(ExtensionDecl *ext) override {
@@ -1275,15 +1268,9 @@ public:
   void configureInterfaceType(AbstractFunctionDecl *func,
                               GenericSignature *sig);
 
-  /// Validate the signature of a generic function.
-  ///
-  /// \param func The generic function.
-  GenericSignature *validateGenericFuncSignature(AbstractFunctionDecl *func);
-
-  /// Revert the signature of a generic function to its pre-type-checked state,
-  /// so that it can be type checked again when we have resolved its generic
-  /// parameters.
-  void revertGenericFuncSignature(AbstractFunctionDecl *func);
+  /// Compute the generic signature, generic environment and interface type
+  /// of a generic function.
+  void validateGenericFuncSignature(AbstractFunctionDecl *func);
 
   /// Check the generic parameters in the given generic parameter list (and its
   /// parent generic parameter lists) according to the given resolver.
@@ -1292,15 +1279,9 @@ public:
                              GenericSignature *parentSig,
                              GenericTypeResolver *resolver);
 
-  /// Validate the signature of a generic subscript.
-  ///
-  /// \param subscript The generic subscript.
-  GenericSignature *validateGenericSubscriptSignature(SubscriptDecl *subscript);
-
-  /// Revert the signature of a generic function to its pre-type-checked state,
-  /// so that it can be type checked again when we have resolved its generic
-  /// parameters.
-  void revertGenericSubscriptSignature(SubscriptDecl *subscript);
+  /// Compute the generic signature, generic environment and interface type
+  /// of a generic subscript.
+  void validateGenericSubscriptSignature(SubscriptDecl *subscript);
 
   /// Configure the interface type of a subscript declaration.
   void configureInterfaceType(SubscriptDecl *subscript,
@@ -1486,22 +1467,6 @@ public:
   /// Pre-check the expression, validating any types that occur in the
   /// expression and folding sequence expressions.
   bool preCheckExpression(Expr *&expr, DeclContext *dc);
-
-  /// Sets up and solves the constraint system \p cs to type check the given
-  /// expression.
-  ///
-  /// The expression should have already been pre-checked with
-  /// preCheckExpression().
-  ///
-  /// \returns true if an error occurred, false otherwise.
-  ///
-  /// \see typeCheckExpression
-  bool solveForExpression(Expr *&expr, DeclContext *dc, Type convertType,
-                          FreeTypeVariableBinding allowFreeTypeVariables,
-                          ExprTypeCheckListener *listener,
-                          constraints::ConstraintSystem &cs,
-                          SmallVectorImpl<constraints::Solution> &viable,
-                          TypeCheckExprOptions options);
 
   /// \name Name lookup
   ///
@@ -1954,28 +1919,6 @@ public:
   /// Return true if there was an error.
   bool checkConformanceToNSCopying(VarDecl *var);
 
-  /// Find the @objc requirement that are witnessed by the given
-  /// declaration.
-  ///
-  /// \param anySingleRequirement If true, returns at most a single requirement,
-  /// which might be any of the requirements that match.
-  ///
-  /// \returns the set of requirements to which the given witness is a
-  /// witness.
-  llvm::TinyPtrVector<ValueDecl *> findWitnessedObjCRequirements(
-                                     const ValueDecl *witness,
-                                     bool anySingleRequirement = false);
-
-  /// Mark any _ObjectiveCBridgeable conformances in the given type as "used".
-  void useObjectiveCBridgeableConformances(
-                        DeclContext *dc, Type type);
-
-  /// If this bound-generic type is bridged, mark any
-  /// _ObjectiveCBridgeable conformances in the generic arguments of
-  /// the given type as "used".
-  void useObjectiveCBridgeableConformancesOfArgs(
-                        DeclContext *dc, BoundGenericType *bound);
-
   /// Mark any _BridgedNSError/_BridgedStoredNSError/related
   /// conformances in the given type as "used".
   void useBridgedNSErrorConformances(DeclContext *dc, Type type);
@@ -2018,9 +1961,10 @@ public:
   /// \param name The name of the entity to look for.
   /// \param loc The source location at which name lookup occurs.
   /// \param options Options that control name lookup.
-  LookupResult lookupUnqualified(DeclContext *dc, DeclName name, SourceLoc loc,
-                                 NameLookupOptions options
-                                   = defaultUnqualifiedLookupOptions);
+  static LookupResult lookupUnqualified(DeclContext *dc, DeclName name,
+                                        SourceLoc loc,
+                                        NameLookupOptions options
+                                          = defaultUnqualifiedLookupOptions);
 
   /// Perform unqualified type lookup at the given source location
   /// within a particular declaration context.
@@ -2030,9 +1974,9 @@ public:
   /// \param loc The source location at which name lookup occurs.
   /// \param options Options that control name lookup.
   LookupResult
-  lookupUnqualifiedType(DeclContext *dc, DeclName name, SourceLoc loc,
-                        NameLookupOptions options
-                          = defaultUnqualifiedLookupOptions);
+  static lookupUnqualifiedType(DeclContext *dc, DeclName name, SourceLoc loc,
+                               NameLookupOptions options
+                                 = defaultUnqualifiedLookupOptions);
 
   /// \brief Lookup a member in the given type.
   ///
@@ -2042,9 +1986,9 @@ public:
   /// \param options Options that control name lookup.
   ///
   /// \returns The result of name lookup.
-  LookupResult lookupMember(DeclContext *dc, Type type, DeclName name,
-                            NameLookupOptions options
-                              = defaultMemberLookupOptions);
+  static LookupResult lookupMember(DeclContext *dc, Type type, DeclName name,
+                                   NameLookupOptions options
+                                     = defaultMemberLookupOptions);
 
   /// \brief Check whether the given declaration can be written as a
   /// member of the given base type.

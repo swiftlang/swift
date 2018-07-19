@@ -761,7 +761,7 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
   }
 
   encodeDecl->setInterfaceType(interfaceType);
-  encodeDecl->setValidationStarted();
+  encodeDecl->setValidationToChecked();
   encodeDecl->copyFormalAccessFrom(derived.Nominal,
                                    /*sourceIsParentContext*/ true);
 
@@ -1097,7 +1097,7 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
   }
 
   initDecl->setInterfaceType(interfaceType);
-  initDecl->setValidationStarted();
+  initDecl->setValidationToChecked();
   initDecl->setInitializerInterfaceType(initializerType);
   initDecl->copyFormalAccessFrom(derived.Nominal,
                                  /*sourceIsParentContext*/ true);
