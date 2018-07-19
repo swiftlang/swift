@@ -3562,7 +3562,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     ConstraintLocatorBuilder locatorB) {
   // Resolve the base type, if we can. If we can't resolve the base type,
   // then we can't solve this constraint.
-  // FIXME: simplifyType() call here could be getFixedTypeRecursive?
   baseTy = simplifyType(baseTy, flags);
   Type baseObjTy = baseTy->getRValueType();
 
@@ -3610,14 +3609,43 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
   if (shouldAttemptFixes() && baseObjTy->getOptionalObjectType()) {
     // If the base type was an optional, look through it.
 
-    // We're unwrapping the base to perform a member access.
-    if (recordFix(Fix::getUnwrapOptionalBase(*this, member), locator))
-      return SolutionKind::Error;
-    
+    // If the base type is optional because we haven't chosen to force an
+    // implicit optional, don't try to fix it. The IUO will be forced instead.
+    if (auto dotExpr = dyn_cast<UnresolvedDotExpr>(locator->getAnchor())) {
+      auto baseExpr = dotExpr->getBase();
+      auto resolvedOverload = getResolvedOverloadSets();
+      while (resolvedOverload) {
+        if (resolvedOverload->Locator->getAnchor() == baseExpr) {
+          if (resolvedOverload->Choice.isImplicitlyUnwrappedValueOrReturnValue())
+            return SolutionKind::Error;
+          break;
+        }
+        resolvedOverload = resolvedOverload->Previous;
+      }
+    }
+
+    // The result of the member access can either be the expected member type
+    // (for '!' or optional members with '?'), or the original member type with
+    // one extra level of optionality ('?' with non-optional members).
+    auto innerTV =
+        createTypeVariable(locator, TVO_CanBindToLValue);
+    Type optTy = getTypeChecker().getOptionalType(
+        locator->getAnchor()->getSourceRange().Start, innerTV);
+    SmallVector<Constraint *, 2> optionalities;
+    auto nonoptionalResult = Constraint::createFixed(
+        *this, ConstraintKind::Bind, Fix::getUnwrapOptionalBase(*this, member),
+        innerTV, memberTy, locator);
+    auto optionalResult = Constraint::createFixed(
+        *this, ConstraintKind::Bind, Fix::getUnwrapOptionalBase(*this, member),
+        optTy, memberTy, locator);
+    optionalities.push_back(nonoptionalResult);
+    optionalities.push_back(optionalResult);
+    addDisjunctionConstraint(optionalities, locator);
+
     // Look through one level of optional.
-    addValueMemberConstraint(baseObjTy->getOptionalObjectType(),
-                             member, memberTy, useDC, functionRefKind,
-                             outerAlternatives, locator);
+    addValueMemberConstraint(baseObjTy->getOptionalObjectType(), member,
+                             innerTV, useDC, functionRefKind, outerAlternatives,
+                             locator);
     return SolutionKind::Solved;
   }
   return SolutionKind::Error;
@@ -4919,8 +4947,7 @@ ConstraintSystem::simplifyFixConstraint(Fix fix, Type type1, Type type2,
   TypeMatchOptions subflags =
     getDefaultDecompositionOptions(flags) | TMF_ApplyingFix;
   switch (fix.getKind()) {
-  case FixKind::ForceOptional:
-  case FixKind::UnwrapOptionalBase: {
+  case FixKind::ForceOptional: {
     // Assume that we've unwrapped the first type.
     auto result =
         matchTypes(type1->getRValueObjectType()->getOptionalObjectType(), type2,
@@ -4931,6 +4958,15 @@ ConstraintSystem::simplifyFixConstraint(Fix fix, Type type1, Type type2,
 
     return result;
   }
+
+  case FixKind::UnwrapOptionalBase: {
+    if (recordFix(fix, locator))
+      return SolutionKind::Error;
+
+    // First type already appropriately set.
+    return matchTypes(type1, type2, matchKind, subflags, locator);
+  }
+
   case FixKind::ForceDowncast:
     // These work whenever they are suggested.
     if (recordFix(fix, locator))

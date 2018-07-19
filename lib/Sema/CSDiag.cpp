@@ -8150,6 +8150,7 @@ bool FailureDiagnosis::diagnoseMemberFailures(
 
       if (!optionalResult.ViableCandidates.empty()) {
         if (diagnoseBaseUnwrapForMemberAccess(baseExpr, baseObjTy, memberName,
+                                              /* additionalOptional= */ false,
                                               memberRange))
           return true;
       }
@@ -9115,6 +9116,7 @@ bool swift::diagnoseUnwrap(TypeChecker &TC, DeclContext *DC,
 
 bool swift::diagnoseBaseUnwrapForMemberAccess(Expr *baseExpr, Type baseType,
                                               DeclName memberName,
+                                              bool resultOptional,
                                               SourceRange memberRange) {
   auto unwrappedBaseType = baseType->getOptionalObjectType();
   if (!unwrappedBaseType)
@@ -9125,9 +9127,16 @@ bool swift::diagnoseBaseUnwrapForMemberAccess(Expr *baseExpr, Type baseType,
   diags.diagnose(baseExpr->getLoc(), diag::optional_base_not_unwrapped,
                  baseType, memberName, unwrappedBaseType);
 
+  // FIXME: It would be nice to immediately offer "base?.member ?? defaultValue"
+  // for non-optional results where that would be appropriate. For the moment
+  // always offering "?" means that if the user chooses chaining, we'll end up
+  // in diagnoseUnwrap() to offer a default value during the next compile.
   diags.diagnose(baseExpr->getLoc(), diag::optional_base_chain, memberName)
     .fixItInsertAfter(baseExpr->getEndLoc(), "?");
-  diags.diagnose(baseExpr->getLoc(), diag::unwrap_with_force_value)
-    .fixItInsertAfter(baseExpr->getEndLoc(), "!");
+
+  if (!resultOptional) {
+    diags.diagnose(baseExpr->getLoc(), diag::unwrap_with_force_value)
+        .fixItInsertAfter(baseExpr->getEndLoc(), "!");
+  }
   return true;
 }
