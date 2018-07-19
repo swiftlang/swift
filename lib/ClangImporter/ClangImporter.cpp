@@ -1424,8 +1424,9 @@ void ClangImporter::collectSubModuleNames(
   auto &clangHeaderSearch = Impl.getClangPreprocessor().getHeaderSearchInfo();
 
   // Look up the top-level module first.
-  clang::Module *clangModule =
-  clangHeaderSearch.lookupModule(path.front().first.str());
+  clang::Module *clangModule = clangHeaderSearch.lookupModule(
+      path.front().first.str(), /*AllowSearch=*/true,
+      /*AllowExtraModuleMapSearch=*/true);
   if (!clangModule)
     return;
   clang::Module *submodule = clangModule;
@@ -1451,7 +1452,8 @@ bool ClangImporter::canImportModule(std::pair<Identifier, SourceLoc> moduleID) {
   // FIXME: This only works with top-level modules.
   auto &clangHeaderSearch = Impl.getClangPreprocessor().getHeaderSearchInfo();
   clang::Module *clangModule =
-    clangHeaderSearch.lookupModule(moduleID.first.str());
+      clangHeaderSearch.lookupModule(moduleID.first.str(), /*AllowSearch=*/true,
+                                     /*AllowExtraModuleMapSearch=*/true);
   if (!clangModule) {
     return false;
   }
@@ -1470,8 +1472,9 @@ ModuleDecl *ClangImporter::loadModule(
   auto &clangHeaderSearch = Impl.getClangPreprocessor().getHeaderSearchInfo();
 
   // Look up the top-level module first, to see if it exists at all.
-  clang::Module *clangModule =
-    clangHeaderSearch.lookupModule(path.front().first.str());
+  clang::Module *clangModule = clangHeaderSearch.lookupModule(
+      path.front().first.str(), /*AllowSearch=*/true,
+      /*AllowExtraModuleMapSearch=*/true);
   if (!clangModule)
     return nullptr;
 
