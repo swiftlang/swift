@@ -67,6 +67,8 @@ struct TestConfig {
   /// The list of tests to run.
   var tests = [(index: String, info: BenchmarkInfo)]()
 
+  var action: TestAction = .run
+
   mutating func processArguments() throws -> TestAction {
     let validOptions = [
       "--iter-scale", "--num-samples", "--num-iters",
@@ -79,33 +81,28 @@ struct TestConfig {
 
     filters = benchArgs.positionalArgs
 
-    if benchArgs.optionalArgsMap["--help"] != nil {
-      return .help(validOptions)
-    }
-
     func optionalArg<T>(
       _ name: String,
       _ property: WritableKeyPath<TestConfig, T>,
-      parser parse: (String) throws -> T?)
-      throws {
+      defaultValue: T? = nil,
+      parser parse: (String) throws -> T? = { _ in nil }
+    ) throws {
       if let value = benchArgs.optionalArgsMap[name] {
-        guard !value.isEmpty else { throw ArgumentError.missingValue(name) }
-        guard let typedValue = try parse(value) else {
+        guard !value.isEmpty || defaultValue != nil
+          else { throw ArgumentError.missingValue(name) }
+        guard let typedValue = (value.isEmpty) ? defaultValue
+          : try parse(value) else {
           throw ArgumentError.invalidType(
             value: value, type: String(describing: T.self), argument: name)
         }
         self[keyPath: property] = typedValue
       }
     }
+
     try optionalArg("--iter-scale", \.iterationScale) { Int($0) }
     try optionalArg("--num-iters", \.fixedNumIters) { UInt($0) }
     try optionalArg("--num-samples", \.numSamples)  { Int($0) }
-
-    if let _ = benchArgs.optionalArgsMap["--verbose"] {
-      verbose = true
-      print("Verbose")
-    }
-
+    try optionalArg("--verbose", \.verbose, defaultValue: true)
     try optionalArg("--delim", \.delim) { $0 }
 
     func parseCategory(tag: String) throws -> BenchmarkCategory {
@@ -121,25 +118,16 @@ struct TestConfig {
       //  --tags=Array,Dictionary
       Set(try $0.split(separator: ",").map(String.init).map(parseCategory))
     }
-
-    if let x = benchArgs.optionalArgsMap["--skip-tags"] {
-      // if the --skip-tags parameter is specified, we need to ignore the
-      // default and start from a clean slate.
-      // If the parameter's value is empty, $0.split maps into []
-
+    try optionalArg("--skip-tags", \.skipTags, defaultValue: []) {
       // We support specifying multiple tags by splitting on comma, i.e.:
       //  --skip-tags=Array,Set,unstable,skip
-      skipTags = Set(
-        try x.split(separator: ",").map(String.init).map(parseCategory))
+      Set(try $0.split(separator: ",").map(String.init).map(parseCategory))
     }
-
     try optionalArg("--sleep", \.afterRunSleep) { Int($0) }
+    try optionalArg("--list", \.action, defaultValue: .listTests)
+    try optionalArg("--help", \.action, defaultValue: .help(validOptions))
 
-    if let _ = benchArgs.optionalArgsMap["--list"] {
-      return .listTests
-    }
-
-    return .run
+    return action
   }
 
   mutating func findTestsToRun() {
@@ -448,7 +436,7 @@ public func main() {
     }
   } catch let error as ArgumentError {
     fflush(stdout)
-    fputs(error.description, stderr)
+    fputs("\(error)\n", stderr)
     fflush(stderr)
     exit(1)
   } catch {
