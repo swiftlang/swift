@@ -446,9 +446,24 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                            /*resolver*/nullptr,
                            results);
     assert(!results.empty() && "couldn't find UIApplicationMain in UIKit");
-    assert(results.size() == 1 && "more than one UIApplicationMain?");
 
-    auto mainRef = SILDeclRef(results.front()).asForeign();
+    // We want the original UIApplicationMain() declaration from Objective-C,
+    // not any overlay overloads.
+    ValueDecl *UIApplicationMainDecl = nullptr;
+    for (auto *result : results) {
+      if (result->hasClangNode()) {
+        assert(!UIApplicationMainDecl
+               && "more than one UIApplicationMain defined in ObjC?!");
+        UIApplicationMainDecl = result;
+#ifndef NDEBUG
+        break;
+#endif
+      }
+    }
+    
+    assert(UIApplicationMainDecl && "no UIApplicationMain defined in ObjC?!");
+
+    auto mainRef = SILDeclRef(UIApplicationMainDecl).asForeign();
     auto UIApplicationMainFn = SGM.M.getOrCreateFunction(mainClass, mainRef,
                                                          NotForDefinition);
     auto fnTy = UIApplicationMainFn->getLoweredFunctionType();

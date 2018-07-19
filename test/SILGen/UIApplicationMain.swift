@@ -1,8 +1,12 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
+// RUN: %build-silgen-test-overlays-ios
 
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-silgen -parse-as-library %s | %FileCheck %s
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-ir -parse-as-library %s | %FileCheck %s -check-prefix=IR
+
+// RUN: %target-swift-frontend(mock-sdk: -DSILGEN_TEST_UIAPPLICATIONMAIN_NULLABILITY -sdk %S/Inputs -I %t) -emit-silgen -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -DSILGEN_TEST_UIAPPLICATIONMAIN_NULLABILITY -sdk %S/Inputs -I %t) -emit-ir -parse-as-library %s | %FileCheck %s -check-prefix=IR
 
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-silgen -parse-as-library %s -D REFERENCE | %FileCheck %s
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-ir -parse-as-library %s -D REFERENCE | %FileCheck %s -check-prefix=IR
