@@ -2873,8 +2873,9 @@ public:
                        DescriptiveDeclKind::Class, path);
     }
 
-    for (Decl *Member : CD->getMembers())
+    for (Decl *Member : CD->getMembers()) {
       visit(Member);
+    }
 
     // If this class requires all of its stored properties to have
     // in-class initializers, diagnose this now.
@@ -2983,6 +2984,11 @@ public:
 
     TC.checkDeclCircularity(CD);
     TC.ConformanceContexts.push_back(CD);
+
+    for (auto Member : CD->getMembers()) {
+      if (auto VD = dyn_cast<ValueDecl>(Member))
+        TC.requestMemberLayout(VD);
+    }
   }
 
   void visitProtocolDecl(ProtocolDecl *PD) {
@@ -5531,6 +5537,9 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
                         *this, classDecl, superclassCtor, kind)) {
         Context.addSynthesizedDecl(ctor);
         classDecl->addMember(ctor);
+
+        if (classDecl->hasValidatedLayout())
+          requestMemberLayout(ctor);
       }
     }
 

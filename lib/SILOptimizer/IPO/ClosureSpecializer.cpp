@@ -908,6 +908,37 @@ static void markReabstractionPartialApplyAsUsed(
   llvm_unreachable("Unexpect instruction");
 }
 
+/// Returns true if the \p closureArgIdx argument of \p callee is called in
+/// \p callee or any function called by callee.
+static bool isClosureAppliedIn(SILFunction *Callee, unsigned closureArgIdx,
+                               SmallPtrSetImpl<SILFunction *> &HandledFuncs) {
+  // Limit the number of recursive calls to not go into exponential behavior in
+  // corner cases.
+  const int RecursionBudget = 8;
+
+  SILValue Arg = Callee->getArgument(closureArgIdx);
+  for (Operand *ArgUse : Arg->getUses()) {
+    if (auto UserAI = FullApplySite::isa(ArgUse->getUser())) {
+      if (UserAI.getCallee() == Arg)
+        return true;
+
+      assert(UserAI.isArgumentOperand(*ArgUse) &&
+             "any other non-argument operands than the callee?");
+
+      SILFunction *ApplyCallee = UserAI.getReferencedFunction();
+      if (ApplyCallee && !ApplyCallee->isExternalDeclaration() &&
+          HandledFuncs.count(ApplyCallee) == 0 &&
+          HandledFuncs.size() < RecursionBudget) {
+        HandledFuncs.insert(ApplyCallee);
+        if (isClosureAppliedIn(UserAI.getReferencedFunction(),
+                               UserAI.getCalleeArgIndex(*ArgUse), HandledFuncs))
+          return true;
+      }
+    }
+  }
+  return false;
+}
+
 bool SILClosureSpecializerTransform::gatherCallSites(
     SILFunction *Caller,
     llvm::SmallVectorImpl<ClosureInfo*> &ClosureCandidates,
@@ -1018,43 +1049,23 @@ bool SILClosureSpecializerTransform::gatherCallSites(
         if (mayBindDynamicSelf(ApplyCallee))
           return CFGChanged;
 
+        // Check if the closure is passed as an argument (and not called).
+        if (!AI.isArgumentOperand(*Use))
+          continue;
+
+        unsigned ClosureIndex = AI.getCalleeArgIndex(*Use);
+
         // Ok, we know that we can perform the optimization but not whether or
-        // not the optimization is profitable. Find the index of the argument
-        // corresponding to our partial apply.
-        Optional<unsigned> ClosureIndex;
-        for (unsigned i = 0, e = AI.getNumArguments(); i != e; ++i) {
-          if (AI.getArgument(i) != Use->get())
-            continue;
-          ClosureIndex = i;
-          LLVM_DEBUG(llvm::dbgs() << "    Found callsite with closure argument at "
-                << i << ": " << *AI.getInstruction());
-          break;
-        }
-
-        // If we did not find an index, there is nothing further to do,
-        // continue.
-        if (!ClosureIndex.hasValue())
+        // not the optimization is profitable. Check if the closure is actually
+        // called in the callee (or in a function called by the callee).
+        SmallPtrSet<SILFunction *, 8> HandledFuncs;
+        if (!isClosureAppliedIn(ApplyCallee, ClosureIndex, HandledFuncs))
           continue;
-
-        // Make sure that the Closure is invoked in the Apply's callee. We only
-        // want to perform closure specialization if we know that we will be
-        // able to change a partial_apply into an apply.
-        //
-        // TODO: Maybe just call the function directly instead of moving the
-        // partial apply?
-        SILValue Arg = ApplyCallee->getArgument(ClosureIndex.getValue());
-        if (std::none_of(Arg->use_begin(), Arg->use_end(),
-                         [&Arg](Operand *Op) -> bool {
-                           auto UserAI = FullApplySite::isa(Op->getUser());
-                           return UserAI && UserAI.getCallee() == Arg;
-                         })) {
-          continue;
-        }
 
         unsigned firstParamArgIdx =
             AI.getSubstCalleeConv().getSILArgIndexOfFirstParam();
-        assert(ClosureIndex.getValue() >= firstParamArgIdx);
-        auto ClosureParamIndex = ClosureIndex.getValue() - firstParamArgIdx;
+        assert(ClosureIndex >= firstParamArgIdx);
+        auto ClosureParamIndex = ClosureIndex - firstParamArgIdx;
 
         auto ParamInfo = AI.getSubstCalleeType()->getParameters();
         SILParameterInfo ClosureParamInfo = ParamInfo[ClosureParamIndex];
@@ -1097,7 +1108,7 @@ bool SILClosureSpecializerTransform::gatherCallSites(
         // Now we know that CSDesc is profitable to specialize. Add it to our
         // call site list.
         CInfo->CallSites.push_back(
-          CallSiteDescriptor(CInfo, AI, ClosureIndex.getValue(),
+          CallSiteDescriptor(CInfo, AI, ClosureIndex,
                              ClosureParamInfo, std::move(NonFailureExitBBs)));
       }
       if (CInfo) {
