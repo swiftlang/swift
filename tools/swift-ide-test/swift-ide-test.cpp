@@ -960,7 +960,7 @@ public:
 class ColoredSyntaxTreePrinter : public SyntaxVisitor {
   llvm::raw_ostream &OS;
 
-  std::map<unsigned, SyntaxClassification> TokenClassifications;
+  std::map<SyntaxNodeId, SyntaxClassification> TokenClassifications;
 
   /// The name of the tag that is currently open
   StringRef CurrentTag;
@@ -972,7 +972,7 @@ class ColoredSyntaxTreePrinter : public SyntaxVisitor {
 public:
   ColoredSyntaxTreePrinter(
       llvm::raw_ostream &OS,
-      std::map<unsigned, SyntaxClassification> TokenClassifications)
+      std::map<SyntaxNodeId, SyntaxClassification> TokenClassifications)
       : OS(OS), TokenClassifications(TokenClassifications) {}
 
 private:
