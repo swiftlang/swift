@@ -313,9 +313,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       visitGenericParamList(AFD->getGenericParams());
     }
 
-    for (auto PL : AFD->getParameterLists()) {
-      visit(PL);
-    }
+    if (auto *PD = AFD->getImplicitSelfDecl())
+      visit(PD);
+    visit(AFD->getParameters());
 
     if (auto *FD = dyn_cast<FuncDecl>(AFD))
       if (!isa<AccessorDecl>(FD))

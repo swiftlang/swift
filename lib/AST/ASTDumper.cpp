@@ -1020,12 +1020,16 @@ namespace {
     }
 
     void printAbstractFunctionDecl(AbstractFunctionDecl *D) {
-      for (auto pl : D->getParameterLists()) {
+      Indent += 2;
+      if (auto *P = D->getImplicitSelfDecl()) {
         OS << '\n';
-        Indent += 2;
-        printParameterList(pl, &D->getASTContext());
-        Indent -= 2;
-     }
+        printParameter(P);
+      }
+
+      OS << '\n';
+      printParameterList(D->getParameters(), &D->getASTContext());
+      Indent -= 2;
+
       if (auto FD = dyn_cast<FuncDecl>(D)) {
         if (FD->getBodyResultTypeLoc().getTypeRepr()) {
           OS << '\n';
