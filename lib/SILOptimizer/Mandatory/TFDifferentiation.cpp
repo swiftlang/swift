@@ -56,7 +56,7 @@ using llvm::SmallSet;
 //===----------------------------------------------------------------------===//
 
 /// Prints an "[AD] " prefix to `llvm::dbgs()` and returns the debug stream.
-/// This is being used to print short debug messages with the AD pass.
+/// This is being used to print short debug messages within the AD pass.
 static raw_ostream &getADDebugStream() {
   return llvm::dbgs() << "[AD] ";
 }
@@ -809,7 +809,7 @@ void ADContext::emitNondifferentiabilityError(SILInstruction *inst,
 
   // For indirect differentiation, emit a "not differentiable" note on the
   // expression first. Then emit an error at the source invoker of
-  // differentiation, and a "when differentiating this"  note at each indirect
+  // differentiation, and a "when differentiating this" note at each indirect
   // invoker.
   case DifferentiationInvoker::Kind::IndirectDifferentiation: {
     // Emit a default note at the innermost differentiation invoker.
@@ -825,7 +825,7 @@ void ADContext::emitNondifferentiabilityError(SILInstruction *inst,
       if (applyLoc.isValid())
         diagnose(applyLoc, diag::autodiff_when_differentiating_function_call);
     }
-    // Now we've reached a direct task, recursive once to emit an error.
+    // Now we've reached a direct task, recurse once to emit an error.
     emitNondifferentiabilityError(inst, outerTask);
     return;
   }
