@@ -620,7 +620,7 @@ public:
   /// For partitionable functions, map the SIL host function names to the
   /// lowered TF graph artifacts.
   DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>> &graphFunctions;
-  GraphGlobalConfiguration configuration; // Device placement info.
+  GraphFunctionDeviceInfo deviceInfo; // Device placement info.
   DominanceInfo &DI;
   BlocksReachingTensorCode tensorCodeBlocks;
 
@@ -725,9 +725,9 @@ public:
         graphFunctions(graphFunctions),
         // TODO: remote this call once partition pass is folded into
         // deabstraction.
-        configuration(GraphGlobalConfiguration::getForFunction(
-            hostFn,
-            /*removeConfigInst*/ true)),
+        deviceInfo(
+            GraphFunctionDeviceInfo::getForFunction(hostFn,
+                                                    /*removeConfigInst*/ true)),
         DI(*PM->getAnalysis<DominanceAnalysis>()->get(&Fn)),
         tensorCodeBlocks(Fn) {}
 
@@ -1982,11 +1982,8 @@ bool TFFunctionPartition::markFunction(bool &hasTensorOps) {
         tensorOps.push_back(inst);
         tensorOpsSet.insert(inst);
 
-        // tfc.scalarToTensor doesn't get a device.
-        if (!graphOp->getName().is("tfc.scalarToTensor,s")) {
-          auto opDevice = GraphOperationInfo(graphOp).getDeviceType();
-          configuration.markDeviceUsed(opDevice);
-        }
+        auto opDevice = GraphOperationInfo(graphOp).getDeviceType();
+        deviceInfo.markDeviceUsed(opDevice);
         continue;
       }
 
@@ -2018,7 +2015,7 @@ bool TFFunctionPartition::markFunction(bool &hasTensorOps) {
       // partitioning pass and data flow analysis code doesn't have to reason
       // about it.
       // TODO(clattner): Remove this when deabstraction subsumes it.
-      inst = opInfo->canonicalizeOperands(configuration);
+      inst = opInfo->canonicalizeOperands(deviceInfo);
       bbi = SILBasicBlock::iterator(inst);
 
       tensorOps.push_back(inst);
@@ -2408,6 +2405,9 @@ void PartitionCloner::visitGraphOperationInst(GraphOperationInst *inst) {
     // need a TensorHandle<Int32>. If that is the case, we insert an
     // UncheckedRefCast to get it to the right type.  These are treated as noops
     // by GraphGen.
+    //
+    // For this special op, we ignore any device placement. Logically, this
+    // means this op is always placed on ALL devices.
     auto result = remapValue(inst->getOperand(0));
     auto S2TResult = inst->getResult(0);
     if (!S2TResult->getType().getASTType()->isEqual(
@@ -2605,11 +2605,11 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
   // To minimize sends/recvs, place promoted scalars on all devices. If they are
   // consumed only on some devices, the promoted scalars on those other devices
   // should get pruned away in the later graph lowering pass.
-  FP.configuration.handleDevicePlacement(
-      opInfo.first, /*opDevice*/ getDeviceString(DeviceType::ALL), B, loc,
-      attributes);
+  FP.deviceInfo.handleDevicePlacement(
+      opInfo.first, /*opDevice*/ getDeviceString(DeviceType::ALL),
+      B.getModule().getASTContext(), attributes);
 
-  if (FP.configuration.primaryDeviceType == DeviceType::TPU)
+  if (FP.deviceInfo.primaryDeviceType == DeviceType::TPU)
     addScalarShapeArrayAttr(attributes, ctx);
 
   auto *result =
@@ -2694,10 +2694,10 @@ static SILValue createIntValue(intmax_t value, SILBuilder &B, SILLocation loc,
 /// recvFromHost has type <T> (tensorId$int, device$string) -> (T)
 //
 // TODO: Remove this function after migration to GraphOpInst.
-static SILValue
-createAcceleratorReceive(SILBuilder &B, SILLocation loc, SILType valueTy,
-                         bool isScalar, unsigned idNumber,
-                         GraphGlobalConfiguration &configuration) {
+static SILValue createAcceleratorReceive(SILBuilder &B, SILLocation loc,
+                                         SILType valueTy, bool isScalar,
+                                         unsigned idNumber,
+                                         GraphFunctionDeviceInfo &deviceInfo) {
   auto &ctx = B.getASTContext();
   auto opType = "tfc.RecvFromHost";
   std::string instName = opType;
@@ -2705,8 +2705,8 @@ createAcceleratorReceive(SILBuilder &B, SILLocation loc, SILType valueTy,
   SmallVector<GraphOperationAttribute, 3> attributes;
   attributes.push_back(
       {ctx.getIdentifier("tensorId"), SymbolicValue::getInteger(idNumber, 32)});
-  configuration.handleDevicePlacement(opType, /*opDevice*/ "", B, loc,
-                                      attributes);
+  deviceInfo.handleDevicePlacement(opType, /*opDevice*/ "",
+                                   B.getModule().getASTContext(), attributes);
 
   // For XLA compilation, and when receiving a promoted scalar from the host,
   // add a __shapes pseudo-attr to assist the XLA compiler. This special case is
@@ -2715,8 +2715,8 @@ createAcceleratorReceive(SILBuilder &B, SILLocation loc, SILType valueTy,
   // compiler is synthesizing a tensor.
   //
   // TODO: Do this also for XLA-based GPU (and CPU) execution. Consider
-  // extending `configuration` with a bool indicating if we are targeting XLA.
-  if (configuration.primaryDeviceType == DeviceType::TPU && isScalar)
+  // extending `deviceInfo` with a bool indicating if we are targeting XLA.
+  if (deviceInfo.primaryDeviceType == DeviceType::TPU && isScalar)
     addScalarShapeArrayAttr(attributes, ctx);
   auto name = ctx.getIdentifier(instName);
   return getSingleValueResult(B.createGraphOperation(loc, name,
@@ -2788,7 +2788,7 @@ static SILValue createHostReceive(SILBuilder &B, SILLocation loc,
 // SendToHost has type <T> (input$T, tensorId$int, device$string) -> ()
 void createAcceleratorSend(SILBuilder &B, SILLocation loc, SILValue value,
                            unsigned idNumber,
-                           GraphGlobalConfiguration &configuration) {
+                           GraphFunctionDeviceInfo &deviceInfo) {
   auto &ctx = B.getASTContext();
   auto voidTy = B.getModule().Types.getEmptyTupleType();
   auto opType = "tfc.SendToHost";
@@ -2797,8 +2797,8 @@ void createAcceleratorSend(SILBuilder &B, SILLocation loc, SILValue value,
   SmallVector<GraphOperationAttribute, 2> attributes;
   attributes.push_back(
       {ctx.getIdentifier("tensorId"), SymbolicValue::getInteger(idNumber, 32)});
-  configuration.handleDevicePlacement(opType, /*opDevice*/ "", B, loc,
-                                      attributes);
+  deviceInfo.handleDevicePlacement(opType, /*opDevice*/ "",
+                                   B.getModule().getASTContext(), attributes);
   B.createGraphOperation(loc, ctx.getIdentifier(instName),
                          /*operands*/ {value}, attributes, {voidTy});
 }
@@ -3063,7 +3063,7 @@ void PartitionCloner::handleSendRecvForTerminator(TermInst *inst) {
   auto loc = remapLocation(getUserSourceLocation(inst->getDebugLocation()));
   auto receivedCaseId =
       createAcceleratorReceive(BA, loc, remapType(int32SILType),
-                               /*isScalar*/ true, nextSendID, FP.configuration);
+                               /*isScalar*/ true, nextSendID, FP.deviceInfo);
 
   // Let K be the total # cases (including the optional default case). Create a
   // chain of K-1 BB's with cond_br, to dispatch to the K cases.
@@ -3076,9 +3076,9 @@ void PartitionCloner::handleSendRecvForTerminator(TermInst *inst) {
       SmallVector<GraphOperationAttribute, 2> attributes;
       createConstTensorAttrsOnAccel(SymbolicValue::getInteger(caseId, 32),
                                     int32SILType, ctx, attributes);
-      FP.configuration.handleDevicePlacement(
-          "Const", /*opDevice*/ getDeviceString(DeviceType::ALL), BA, loc,
-          attributes);
+      FP.deviceInfo.handleDevicePlacement(
+          "Const", /*opDevice*/ getDeviceString(DeviceType::ALL),
+          BA.getModule().getASTContext(), attributes);
       auto tensorHandleInt32Ty =
           convertElementTypeToTensorValueType(int32SILType);
       auto *caseIdInst = BA.createGraphOperation(
@@ -3104,9 +3104,9 @@ void PartitionCloner::handleSendRecvForTerminator(TermInst *inst) {
           convertElementTypeToTensorValueType(boolFieldSILType);
 
       SmallVector<GraphOperationAttribute, 2> attributes;
-      FP.configuration.handleDevicePlacement(
-          "Equal", /*opDevice*/ getDeviceString(DeviceType::ALL), BA, loc,
-          attributes);
+      FP.deviceInfo.handleDevicePlacement(
+          "Equal", /*opDevice*/ getDeviceString(DeviceType::ALL),
+          BA.getModule().getASTContext(), attributes);
 
       auto *equalComparisonInst = BA.createGraphOperation(
           loc, ctx.getIdentifier(equalOpName),
@@ -3171,7 +3171,7 @@ void PartitionCloner::insertSend(SILInstruction &inst) {
     // a unique ID to associate one with the other.
     this->ValueMap[result] =
         createAcceleratorReceive(BA, loc, remapType(result->getType()),
-                                 isScalar, nextSendID, FP.configuration);
+                                 isScalar, nextSendID, FP.deviceInfo);
 
     // if `result` is a scalar, we need to convert it to TensorHandle<T>,
     // before sending that value to accelerator. We pass such a function
@@ -3231,8 +3231,7 @@ bool PartitionCloner::insertReceive(SILValue value, SILLocation loc) {
 
   // Create the send in the accelerator code.  Each send/receive pair gets
   // a unique ID to associate one with the other.
-  createAcceleratorSend(BA, loc, remapValue(value), nextSendID,
-                        FP.configuration);
+  createAcceleratorSend(BA, loc, remapValue(value), nextSendID, FP.deviceInfo);
 
   // Create the receive in the host code.
   auto newVal = createHostReceive(BH, loc, value->getType(), tensorComputation,
@@ -3851,7 +3850,7 @@ void TFFunctionPartition::insertTensorComputationStartEndTerminate(
   // Pass zero as a place holder for now; they will be filled in later.
   IntegerLiteralInst *programLengthPlaceholder = nullptr;
   auto programLength = createIntValue(0, B, loc, &programLengthPlaceholder);
-  // We cannot yet use `configuration.usedDeviceTypes` to set
+  // We cannot yet use `deviceInfo.usedDeviceTypes` to set
   // `helperFunctionCount`, because Swift<->TF tensor transfers are handled in
   // the later PartitionCloner logic, which could be adding a TF CPU device as
   // the impl (queueing) mechanism for such tensor transfers.
@@ -4325,10 +4324,10 @@ bool TFFunctionPartition::partition(bool isTest) {
 bool TFFunctionPartition::lowerGraph(bool isTest) {
   assert(acceleratorFn);
   if (isAcceleratorOnly(hostFn)) {
-    assert(configuration.usedDeviceTypes.size() == 1 &&
+    assert(deviceInfo.numUsedDeviceTypes == 1 &&
            "An accelerator-only SIL function must be lowered to a single TF "
            "device.");
-    if (lowerTFFunction(hostFn.getName(), acceleratorFn, configuration,
+    if (lowerTFFunction(hostFn.getName(), acceleratorFn, deviceInfo,
                         graphFunctions))
       return true;
 
@@ -4336,8 +4335,7 @@ bool TFFunctionPartition::lowerGraph(bool isTest) {
     // compiler flow.
     hostFn.getModule().eraseFunction(&hostFn);
   } else {
-    if (lowerTFGraph(hostFn.getName(), acceleratorFn, configuration,
-                     graphFunctions
+    if (lowerTFGraph(hostFn.getName(), acceleratorFn, deviceInfo, graphFunctions
                      /*entryFnBaseName, pendingGraphFnNames*/))
       return true;
   }
@@ -4375,7 +4373,7 @@ void TFFunctionPartition::finalizeGraphLowering(StringRef entryFnBaseName,
   auto helperFunctionCount = B.createIntegerLiteral(
       hostFn.getLocation(),
       tensorProgram.helperFunctionCountPlaceholder->getType(),
-      configuration.usedDeviceTypes.size() - 1);
+      deviceInfo.numUsedDeviceTypes - 1);
   tensorProgram.programPlaceholder->replaceAllUsesWith(data);
   tensorProgram.programPlaceholder->eraseFromParent();
   tensorProgram.programLengthPlaceholder->replaceAllUsesWith(len);
