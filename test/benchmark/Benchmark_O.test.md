@@ -142,9 +142,9 @@ RUN: not %Benchmark_O --iter-scale= \
 RUN:         2>&1 | %FileCheck %s --check-prefix EMPTYVAL
 EMPTYVAL: --iter-scale requires a value
 
-RUN: not --crash %Benchmark_O --iter-scale=NaN \
+RUN: not %Benchmark_O --iter-scale=NaN \
 RUN:         2>&1 | %FileCheck %s --check-prefix NANVALUE
-NANVALUE: Illegal instruction
+NANVALUE: 'NaN' is not a valid 'Int' for '--iter-scale'
 
 RUN: not %Benchmark_O --num-iters \
 RUN:         2>&1 | %FileCheck %s --check-prefix NUMITERS
@@ -156,8 +156,7 @@ NUMSAMPLES: --num-samples requires a value
 
 RUN: not %Benchmark_O --sleep \
 RUN:         2>&1 | %FileCheck %s --check-prefix SLEEP
-SLEEP: --sleep requires a
-SLEEP-SAME: value
+SLEEP: --sleep requires a value
 
 RUN: not %Benchmark_O --delim \
 RUN:         2>&1 | %FileCheck %s --check-prefix DELIM
@@ -165,10 +164,10 @@ DELIM: --delim requires a value
 
 RUN: not %Benchmark_O --tags=bogus \
 RUN:         2>&1 | %FileCheck %s --check-prefix BADTAG
-BADTAG: Unknown benchmark category: 'bogus'
+BADTAG: 'bogus' is not a valid 'BenchmarkCategory'
 
 RUN: not %Benchmark_O --skip-tags=bogus \
 RUN:         2>&1 | %FileCheck %s --check-prefix BADSKIPTAG
-BADSKIPTAG: Unknown benchmark category: 'bogus'
+BADSKIPTAG: 'bogus' is not a valid 'BenchmarkCategory'
 
 ````

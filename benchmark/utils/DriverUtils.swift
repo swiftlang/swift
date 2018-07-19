@@ -83,35 +83,43 @@ struct TestConfig {
       return .help(validOptions)
     }
 
-    func optionalArg(_ name: String, _ action: (String) throws -> Void) throws {
+    func optionalArg<T>(
+      _ name: String,
+      _ property: WritableKeyPath<TestConfig, T>,
+      parser parse: (String) throws -> T?)
+      throws {
       if let value = benchArgs.optionalArgsMap[name] {
         guard !value.isEmpty else { throw ArgumentError.missingValue(name) }
-        try action(value)
+        guard let typedValue = try parse(value) else {
+          throw ArgumentError.invalidType(
+            value: value, type: String(describing: T.self), argument: name)
+        }
+        self[keyPath: property] = typedValue
       }
     }
-    try optionalArg("--iter-scale") { iterationScale = Int($0)! }
-    try optionalArg("--num-iters") { fixedNumIters = UInt($0)! }
-    try optionalArg("--num-samples") { numSamples = Int($0)! }
+    try optionalArg("--iter-scale", \.iterationScale) { Int($0) }
+    try optionalArg("--num-iters", \.fixedNumIters) { UInt($0) }
+    try optionalArg("--num-samples", \.numSamples)  { Int($0) }
 
     if let _ = benchArgs.optionalArgsMap["--verbose"] {
       verbose = true
       print("Verbose")
     }
 
-    try optionalArg("--delim") { delim = $0 }
+    try optionalArg("--delim", \.delim) { $0 }
 
     func parseCategory(tag: String) throws -> BenchmarkCategory {
       guard let category = BenchmarkCategory(rawValue: tag) else {
-        throw ArgumentError.general("Unknown benchmark category: '\(tag)'")
+        throw ArgumentError.invalidType(
+          value: tag, type: "BenchmarkCategory", argument: nil)
       }
       return category
     }
 
-    try optionalArg("--tags") {
+    try optionalArg("--tags", \.tags) {
       // We support specifying multiple tags by splitting on comma, i.e.:
       //  --tags=Array,Dictionary
-      tags = Set(
-        try $0.split(separator: ",").map(String.init).map(parseCategory))
+      Set(try $0.split(separator: ",").map(String.init).map(parseCategory))
     }
 
     if let x = benchArgs.optionalArgsMap["--skip-tags"] {
@@ -125,12 +133,7 @@ struct TestConfig {
         try x.split(separator: ",").map(String.init).map(parseCategory))
     }
 
-    if let x = benchArgs.optionalArgsMap["--sleep"] {
-      guard let v = Int(x) else {
-        throw ArgumentError.missingValue("--sleep")
-      }
-      afterRunSleep = v
-    }
+    try optionalArg("--sleep", \.afterRunSleep) { Int($0) }
 
     if let _ = benchArgs.optionalArgsMap["--list"] {
       return .listTests

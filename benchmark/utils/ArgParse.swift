@@ -26,6 +26,7 @@ public struct Arguments {
 
 enum ArgumentError: Error {
   case missingValue(String)
+  case invalidType(value: String, type: String, argument: String?)
   case general(String)
 }
 
@@ -34,6 +35,10 @@ extension ArgumentError: CustomStringConvertible {
     switch self {
     case let .missingValue(key):
       return "\(key) requires a value" //"Missing value for `\(key)`"
+    case let .invalidType(value, type, argument):
+      return (argument == nil)
+        ? "'\(value)' is not a valid '\(type)'"
+        : "'\(value)' is not a valid '\(type)' for '\(argument!)'"
     case let .general(description):
       return "\(description)"
     }
