@@ -1475,20 +1475,16 @@ static SDKNode *constructTypeNode(SDKContext &Ctx, Type T,
 }
 
 static std::vector<SDKNode*>
-createParameterNodes(SDKContext &Ctx, ArrayRef<ParameterList*> AllParamLists) {
+createParameterNodes(SDKContext &Ctx, ParameterList *PL) {
   std::vector<SDKNode*> Result;
-  for (auto PL: AllParamLists) {
-    for (auto param: *PL) {
-      if (param->isSelfParameter())
-        continue;
-      TypeInitInfo TypeInfo;
-      TypeInfo.IsImplicitlyUnwrappedOptional = param->getAttrs().
-        hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
-      TypeInfo.hasDefaultArgument = param->getDefaultArgumentKind() !=
-        DefaultArgumentKind::None;
-      Result.push_back(constructTypeNode(Ctx, param->getInterfaceType(),
-                                         TypeInfo));
-    }
+  for (auto param: *PL) {
+    TypeInitInfo TypeInfo;
+    TypeInfo.IsImplicitlyUnwrappedOptional = param->getAttrs().
+      hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+    TypeInfo.hasDefaultArgument = param->getDefaultArgumentKind() !=
+      DefaultArgumentKind::None;
+    Result.push_back(constructTypeNode(Ctx, param->getInterfaceType(),
+                                       TypeInfo));
   }
   return Result;
 }
@@ -1504,7 +1500,7 @@ static SDKNode *constructFunctionNode(SDKContext &Ctx, FuncDecl* FD,
   TypeInfo.IsImplicitlyUnwrappedOptional = FD->getAttrs().
     hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
   Func->addChild(constructTypeNode(Ctx, FD->getResultInterfaceType(), TypeInfo));
-  for (auto *Node : createParameterNodes(Ctx, FD->getParameterLists()))
+  for (auto *Node : createParameterNodes(Ctx, FD->getParameters()))
     Func->addChild(Node);
   return Func;
 }
@@ -1512,7 +1508,7 @@ static SDKNode *constructFunctionNode(SDKContext &Ctx, FuncDecl* FD,
 static SDKNode* constructInitNode(SDKContext &Ctx, ConstructorDecl *CD) {
   auto Func = SDKNodeInitInfo(Ctx, CD).createSDKNode(SDKNodeKind::DeclConstructor);
   Func->addChild(constructTypeNode(Ctx, CD->getResultInterfaceType()));
-  for (auto *Node : createParameterNodes(Ctx, CD->getParameterLists()))
+  for (auto *Node : createParameterNodes(Ctx, CD->getParameters()))
     Func->addChild(Node);
   return Func;
 }

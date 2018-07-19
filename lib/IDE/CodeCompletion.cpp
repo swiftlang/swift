@@ -2148,8 +2148,7 @@ public:
   static bool hasInterestingDefaultValues(const AbstractFunctionDecl *func) {
     if (!func) return false;
 
-    bool isMemberOfType = func->getDeclContext()->isTypeContext();
-    for (auto param : *func->getParameterList(isMemberOfType ? 1 : 0)) {
+    for (auto param : *func->getParameters()) {
       switch (param->getDefaultArgumentKind()) {
       case DefaultArgumentKind::Normal:
       case DefaultArgumentKind::Inherited: // FIXME: include this?
@@ -2168,18 +2167,21 @@ public:
                                    bool includeDefaultArgs = true) {
 
     const ParameterList *BodyParams = nullptr;
+    const ParamDecl *SelfDecl = nullptr;
+
     if (AFD) {
-      BodyParams = AFD->getParameterList(AFD->getImplicitSelfDecl() ? 1 : 0);
+      BodyParams = AFD->getParameters();
 
       // FIXME: Hack because we don't know which parameter list we're
       // actually working with.
       const unsigned expectedNumParams = AFT->getParams().size();
       if (expectedNumParams != BodyParams->size()) {
+        BodyParams = nullptr;
+
         // Adjust to the "self" list if that is present, otherwise give up.
         if (expectedNumParams == 1 && AFD->getImplicitSelfDecl())
-          BodyParams = AFD->getParameterList(0);
-        else
-          BodyParams = nullptr;
+          SelfDecl = AFD->getImplicitSelfDecl();
+        BodyParams = nullptr;
       }
     }
 
@@ -2228,8 +2230,9 @@ public:
 
       if (NeedComma)
         Builder.addComma();
-      if (BodyParams) {
-        auto *PD = BodyParams->get(i);
+      if (BodyParams || SelfDecl) {
+        auto *PD = (BodyParams ? BodyParams->get(i) : SelfDecl);
+
         // If we have a local name for the parameter, pass in that as well.
         auto argName = PD->getArgumentName();
         auto bodyName = PD->getName();
@@ -2395,13 +2398,23 @@ public:
     StringRef Name = FD->getName().get();
     assert(!Name.empty() && "name should not be empty");
 
-    unsigned FirstIndex = 0;
-    if (!IsImplicitlyCurriedInstanceMethod && FD->getImplicitSelfDecl())
-      FirstIndex = 1;
     Type FunctionType = getTypeOfMember(FD);
     assert(FunctionType);
-    if (FirstIndex != 0 && FunctionType->is<AnyFunctionType>())
-      FunctionType = FunctionType->castTo<AnyFunctionType>()->getResult();
+
+    unsigned NumParamLists;
+    if (FD->getImplicitSelfDecl()) {
+      if (IsImplicitlyCurriedInstanceMethod)
+        NumParamLists = 2;
+      else {
+        NumParamLists = 1;
+
+        // Strip off 'self'
+        if (FunctionType->is<AnyFunctionType>())
+          FunctionType = FunctionType->castTo<AnyFunctionType>()->getResult();
+      }
+    } else {
+      NumParamLists = 1;
+    }
 
     bool trivialTrailingClosure = false;
     if (!IsImplicitlyCurriedInstanceMethod &&
@@ -2458,8 +2471,7 @@ public:
       // Build type annotation.
       {
         llvm::raw_svector_ostream OS(TypeStr);
-        for (unsigned i = FirstIndex + 1, e = FD->getParameterLists().size();
-             i != e; ++i) {
+        for (unsigned i = 0; i < NumParamLists - 1; ++i) {
           ResultType->castTo<AnyFunctionType>()->printParams(OS);
           ResultType = ResultType->castTo<AnyFunctionType>()->getResult();
           OS << " -> ";

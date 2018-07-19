@@ -1028,8 +1028,8 @@ bool IndexSwiftASTWalker::initFuncDeclIndexSymbol(FuncDecl *D,
 
   if (D->getAttrs().hasAttribute<IBActionAttr>()) {
     // Relate with type of the first parameter using RelationIBTypeOf.
-    if (D->getParameterLists().size() >= 2) {
-      auto paramList = D->getParameterList(1);
+    if (D->getImplicitSelfDecl()) {
+      auto paramList = D->getParameters();
       if (!paramList->getArray().empty()) {
         auto param = paramList->get(0);
         if (auto nominal = param->getType()->getAnyNominal()) {

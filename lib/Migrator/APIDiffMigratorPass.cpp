@@ -71,13 +71,9 @@ public:
       return {SourceRange(), false, false, false};
     }
 
-    for (auto *Params: Parent->getParameterLists()) {
-      for (auto *Param: Params->getArray()) {
-        if (Param->isImplicit())
-          continue;
-        if (!--NextIndex) {
-          return findChild(Param->getTypeLoc());
-        }
+    for (auto *Param: *Parent->getParameters()) {
+      if (!--NextIndex) {
+        return findChild(Param->getTypeLoc());
       }
     }
     llvm_unreachable("child index out of bounds");
@@ -1131,13 +1127,8 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
 
   static void collectParamters(AbstractFunctionDecl *AFD,
                                SmallVectorImpl<ParamDecl*> &Results) {
-    for (auto PL : AFD->getParameterLists()) {
-      for (auto *PD: *PL) {
-        // Self parameter should not be updated.
-        if (PD->isSelfParameter())
-          continue;
-        Results.push_back(PD);
-      }
+    for (auto PD : *AFD->getParameters()) {
+      Results.push_back(PD);
     }
   }
 
