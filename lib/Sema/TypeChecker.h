@@ -537,8 +537,8 @@ enum class TypeResolutionFlags : unsigned {
   /// Is it okay to resolve an IUO sigil ("!") here?
   AllowIUO = 1 << 24,
 
-  /// Is it okay to resolve an IUO sigil ("!") here with a deprecation warning?
-  AllowIUODeprecated = 1 << 25,
+  /// Whether this type is being used in a cast or coercion expression.
+  InCastOrCoercionExpression = 1 << 25,
 
   /// Whether we are in a requirement of a generic declaration
   GenericRequirement = 1 << 26,
