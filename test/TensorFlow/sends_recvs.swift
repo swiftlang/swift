@@ -326,9 +326,9 @@ public func test1RecvTensorTPU() {
   let a_tpu_h: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: Float(1.0), __device: "TPU_SYSTEM")
   let a_tpu = Tensor<Float>(handle: a_tpu_h)
   // Tensor transfer for the param of atariSim(): TPU->CPU, and then CPU->host.
-  let a_host = a_tpu.toHost(shape: TensorShape())
+  let a_host = a_tpu.toHost(shape: [])
   // For the result of atariSim(): host -> CPU, and then CPU->TPU.
-  var b = atariSim(a_host).toAccelerator(shape: TensorShape())
+  var b = atariSim(a_host).toAccelerator(shape: [])
   b += a_tpu
   _hostOp(b)
 }
@@ -341,7 +341,7 @@ public func test1RecvTensorTPU_ToHostNoShape_Error() {
   // Tensor transfer for the param of atariSim(): TPU->CPU, and then CPU->host.
   let a_host = a_tpu.toHost()
   // For the result of atariSim(): host -> CPU, and then CPU->TPU.
-  var b = atariSim(a_host).toAccelerator(shape: TensorShape())
+  var b = atariSim(a_host).toAccelerator(shape: [])
   b += a_tpu
   _hostOp(b)
 }
@@ -354,7 +354,7 @@ public func test1RecvTensorTPU_ToAcceleratorNoShape_Error() {
   let a_tpu_h: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: Float(1.0), __device: "TPU_SYSTEM")
   let a_tpu = Tensor<Float>(handle: a_tpu_h)
   // Tensor transfer for the param of atariSim(): TPU->CPU, and then CPU->host.
-  let a_host = a_tpu.toHost(shape: TensorShape())
+  let a_host = a_tpu.toHost(shape: [])
   // For the result of atariSim(): host -> CPU, and then CPU->TPU.
   var b = atariSim(a_host).toAccelerator()
   // This is the correct location
@@ -370,10 +370,10 @@ public func test1RecvTensorGPU_WithShapes() {
   let a_gpu = Tensor<Float>(handle: a_gpu_h)
   // One send.
   // Tensor transfer for the param of atariSim(): GPU->CPU, and then CPU->host.
-  let a_host = a_gpu.toHost(shape: TensorShape())
+  let a_host = a_gpu.toHost(shape: [])
   // One recv.
   // For the result of atariSim(): host -> CPU, and then CPU->GPU.
-  var b = atariSim(a_host).toAccelerator(shape: TensorShape())
+  var b = atariSim(a_host).toAccelerator(shape: [])
   b += a_gpu
   _hostOp(b)
 }

@@ -938,7 +938,7 @@ static void decodeShapeAttr(SymbolicValue attr,
   for (auto elt : attr.getArrayValue(eltType)) {
     elt = elt.lookThroughSingleElementAggregates();
     result.push_back(elt.getIntegerValue().getLimitedValue());
-    }
+  }
 }
 
 // (graphOpInfo, /*attrIdx*/ 3, dims, numDims, dimPtrs) {
@@ -1096,7 +1096,6 @@ TFGraphLowering::visitGraphOpRecvFromHostInst(GraphOperationInfo &graphOpInfo) {
   assert(inst->getNumOperands() == 0);
   assert(inst->getNumAttributes() >= 2);
 
-  // int tensorId = graphOpInfo.getIntAttrOperand(0, "tensorId");
   assert(graphOpInfo.getDeviceString() == DEFAULT_CPU_DEVICE &&
          "SendToHost must run on CPU device");
   int tensorId = inst->getAttributeNamed("tensorId")
