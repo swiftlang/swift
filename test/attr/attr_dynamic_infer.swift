@@ -1,4 +1,5 @@
 // RUN: %target-swift-ide-test -print-ast-typechecked -source-filename=%s -print-implicit-attrs -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// REQUIRES: objc_interop
 
 @objc class Super {
   @objc dynamic func baseFoo() {}
