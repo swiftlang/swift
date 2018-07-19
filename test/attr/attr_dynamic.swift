@@ -57,3 +57,9 @@ class InheritsDynamic: Foo {
   // CHECK: {{^}} override func notDynamic()
   override func notDynamic() {}
 }
+
+// SR-5317
+@objcMembers
+class ObjCMemberCheck {
+  dynamic var s = NotObjCAble(c: Foo()) // expected-error{{'dynamic' var 's' must also be '@objc'}}
+}
