@@ -184,19 +184,21 @@ struct TestConfig {
     skipTags: Set<BenchmarkCategory>
   ) -> [(index: String, info: BenchmarkInfo)] {
     let indices = Dictionary(uniqueKeysWithValues:
-      zip(registeredBenchmarks.sorted().map{ $0.name },
+      zip(registeredBenchmarks.sorted().map { $0.name },
           (1...).lazy.map { String($0) } ))
-    let benchmarkNamesOrIndices = Set(filters)
+    let specifiedTests = Set(filters)
 
-    return registeredBenchmarks.filter { benchmark in
-      if benchmarkNamesOrIndices.isEmpty {
-        return benchmark.tags.isSuperset(of: tags) &&
-          benchmark.tags.isDisjoint(with: skipTags)
-      } else {
-        return benchmarkNamesOrIndices.contains(benchmark.name) ||
-          benchmarkNamesOrIndices.contains(indices[benchmark.name]!)
-      }
-    }.map { (index: indices[$0.name]!, info: $0) }
+    func byTags(b: BenchmarkInfo) -> Bool {
+      return b.tags.isSuperset(of: tags) &&
+        b.tags.isDisjoint(with: skipTags)
+    }
+    func byNamesOrIndices(b: BenchmarkInfo) -> Bool {
+      return specifiedTests.contains(b.name) ||
+        specifiedTests.contains(indices[b.name]!)
+    } // !! "All registeredBenchmarks have been assigned an index"
+    return registeredBenchmarks
+      .filter(filters.isEmpty ? byTags : byNamesOrIndices)
+      .map { (index: indices[$0.name]!, info: $0) }
   }
 }
 
