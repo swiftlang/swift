@@ -767,18 +767,18 @@ private:
                !FD->getAttrs().hasAttribute<DiscardableResultAttr>()) {
       os << " SWIFT_WARN_UNUSED_RESULT";
     }
-    
+
     printAvailability(FD);
     
     os << ';';
   }
-  
+
   enum class PrintLeadingSpace : bool {
     No = false,
     Yes = true
   };
-    
-    /// Returns \c true if anything was printed.
+
+  /// Returns \c true if anything was printed.
   bool printAvailability(
       const Decl *D,
       PrintLeadingSpace printLeadingSpace = PrintLeadingSpace::Yes) {
@@ -1905,7 +1905,7 @@ private:
   Optional<ValueDecl *> findRenamedDecl(const swift::AvailableAttr *AvAttr, const swift::Decl *D) {
     if (!isa<ValueDecl>(D) || isa<ClassDecl>(D))
       return None;
-      
+    
     SmallVector<ValueDecl *, 4> lookupResults;
     auto renamedParsedDeclName = swift::parseDeclName(AvAttr->Rename);
     auto renamedDeclName = renamedParsedDeclName.formDeclName(D->getASTContext());
@@ -1936,7 +1936,7 @@ private:
     
     return renamedFuncDecl;
   }
-    
+
   /// RAII class for printing multi-part C types, such as functions and arrays.
   class PrintMultiPartType {
     ObjCPrinter &Printer;

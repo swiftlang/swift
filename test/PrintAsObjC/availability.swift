@@ -106,7 +106,7 @@
 
 @objc class Availability {
     @objc func alwaysAvailable() {}
-    
+
     @available(*, unavailable)
     @objc func alwaysUnavailable() {}
     @available(*, unavailable, message: "stuff happened")
@@ -115,7 +115,7 @@
     @objc func alwaysUnavailableThree() {}
     @available(*, unavailable, message: "whatever", renamed: "baz")
     @objc func alwaysUnavailableFour() {}
-    
+
     @available(*, deprecated)
     @objc func alwaysDeprecated() {}
     @available(*, deprecated, message: "it's old")
@@ -124,17 +124,17 @@
     @objc func alwaysDeprecatedThree() {}
     @available(*, deprecated, message: "use something else", renamed: "quux")
     @objc func alwaysDeprecatedFour() {}
-    
+
     @available(*, deprecated, message: "one\ntwo\tthree\rfour\\ \"five\"")
     @objc func escapeMessage() {}
     @available(*, deprecated, message: "über")
     @objc func unicodeMessage() {}
-    
+
     @available(macOS 10.10, *)
     @objc func singlePlatShorthand() {}
     @available(macOS 10.11, iOS 9.0, tvOS 9.0, watchOS 3.0, *)
     @objc func multiPlatShorthand() {}
-    
+
     @available(iOS, introduced: 9.0)
     @objc func singlePlatIntroduced() {}
     @available(macOS, deprecated: 10.10)
@@ -155,45 +155,45 @@
     @objc func singlePlatObsoleted() {}
     @available(macOS, introduced: 10.7, deprecated: 10.9, obsoleted: 10.10)
     @objc func singlePlatCombined() {}
-    
+
     @available(macOS, introduced: 10.6, deprecated: 10.8, obsoleted: 10.9)
     @available(iOS, introduced: 7.0, deprecated: 9.0, obsoleted: 10.0)
     @objc func multiPlatCombined() {}
-    
+
     @available(macOS, unavailable, message: "help I'm trapped in an availability factory")
     @objc func platUnavailableMessage() {}
     @available(macOS, unavailable, renamed: "plea")
     @objc func platUnavailableRename() {}
     @available(macOS, unavailable, renamed: "anotherPlea", message: "still trapped")
     @objc func platUnavailableRenameWithMessage() {}
-    
+
     @available(macOSApplicationExtension, unavailable)
     @available(iOSApplicationExtension, unavailable)
     @available(tvOSApplicationExtension, unavailable)
     @available(watchOSApplicationExtension, unavailable)
     @objc func extensionUnavailable() {}
-    
+
     @objc(deprecatedAvailabilityWithValue:)
     public class func makeDeprecatedAvailability(withValue value: Int) {}
-    
+
     @available(*, deprecated,
     message: "use something else",
     renamed: "makeDeprecatedAvailability(withValue:)")
     @objc(makeDeprecatedAvailabilityWithValue:) public class func __makeDeprecatedAvailability(withValue value: Int) {}
-  
+
     @objc(unavailableAvailabilityWithValue:)
     public class func makeUnavailableAvailability(withValue value: Int) {}
-  
+
     @available(*, unavailable,
     message: "use something else",
     renamed: "makeUnavailableAvailability(withValue:)")
     @objc(makeUnavailableAvailabilityWithValue:) public class func __makeUnavailableAvailability(withValue value: Int) {}
-  
-  
+
+
     @objc init() {}
     @available(macOS 10.10, *)
     @objc init(x _: Int) {}
-    
+
     @objc var simpleProperty: Int {
         get {
             return 100
