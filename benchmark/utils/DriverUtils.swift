@@ -69,7 +69,7 @@ struct TestConfig {
 
   var action: TestAction = .run
 
-  mutating func processArguments() throws -> TestAction {
+  init() throws {
     let validOptions = [
       "--iter-scale", "--num-samples", "--num-iters",
       "--verbose", "--delim", "--list", "--sleep",
@@ -127,7 +127,6 @@ struct TestConfig {
     try optionalArg("--list", \.action, defaultValue: .listTests)
     try optionalArg("--help", \.action, defaultValue: .help(validOptions))
 
-    return action
   }
 
   mutating func findTestsToRun() {
@@ -410,9 +409,9 @@ func runBenchmarks(_ c: TestConfig) {
 }
 
 public func main() {
-  var config = TestConfig()
   do {
-    switch (try config.processArguments()) {
+    var config = try TestConfig()
+    switch (config.action) {
     case let .help(validOptions):
       print("Valid options:")
       for v in validOptions {
