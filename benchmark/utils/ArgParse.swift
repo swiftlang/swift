@@ -119,23 +119,39 @@ func checked<T>(
 
 class ArgumentParser<U> {
     var result: U
-    let validOptions: [String]
-    private let benchArgs: Arguments
+    var validOptions: [String] = []
+    private var benchArgs: Arguments!
+    private var parsers: [() throws -> ()] = []
 
-    init(into result: U, validOptions: [String]) throws {
+    init(into result: U) throws {
         self.result = result
-        self.validOptions = validOptions
-        guard let benchArgs = parseArgs(validOptions) else {
-          throw ArgumentError.general("Failed to parse arguments")
-        }
-        self.benchArgs = benchArgs
     }
 
-    func parseArg<T>(
+    func parse() throws -> U {
+      guard let benchArgs = parseArgs(validOptions) else {
+        throw ArgumentError.general("Failed to parse arguments")
+      }
+      self.benchArgs = benchArgs
+      try parsers.forEach { try $0() } // parse all arguments
+      return result
+    }
+
+    func addArgument<T>(
       _ name: String?,
       _ property: WritableKeyPath<U, T>,
       defaultValue: T? = nil,
-      parser parse: (String) throws -> T? = { _ in nil }
+      parser: @escaping (String) throws -> T? = { _ in nil }
+    ) {
+      if let name = name { validOptions.append(name) }
+      parsers.append(
+        { try self.parseArgument(name, property, defaultValue, parser) })
+    }
+
+    func parseArgument<T>(
+      _ name: String?,
+      _ property: WritableKeyPath<U, T>,
+      _ defaultValue: T?,
+      _ parse: (String) throws -> T?
     ) throws {
       if let name = name, let value = benchArgs.optionalArgsMap[name] {
         guard !value.isEmpty || defaultValue != nil
@@ -143,7 +159,7 @@ class ArgumentParser<U> {
 
         result[keyPath: property] = (value.isEmpty)
           ? defaultValue!
-          : try checked(parse, value, argument:name)
+          : try checked(parse, value, argument: name)
       } else if name == nil {
         result[keyPath: property] = benchArgs.positionalArgs as! T
       }

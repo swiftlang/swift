@@ -72,12 +72,6 @@ struct TestConfig {
       var tests: [String]?
     }
 
-    let p = try ArgumentParser(into: PartialTestConfig(), validOptions: [
-      "--iter-scale", "--num-samples", "--num-iters",
-      "--verbose", "--delim", "--list", "--sleep",
-      "--tags", "--skip-tags", "--help"
-    ])
-
     func tags(tags: String) throws -> Set<BenchmarkCategory> {
       // We support specifying multiple tags by splitting on comma, i.e.:
       //  --tags=Array,Dictionary
@@ -87,21 +81,22 @@ struct TestConfig {
           try checked({ BenchmarkCategory(rawValue: $0) }, $0) })
     }
 
-    // Parse command line arguments
-    try p.parseArg("--iter-scale", \.iterationScale) { Int($0) }
-    try p.parseArg("--num-iters", \.fixedNumIters) { UInt($0) }
-    try p.parseArg("--num-samples", \.numSamples)  { Int($0) }
-    try p.parseArg("--verbose", \.verbose, defaultValue: true)
-    try p.parseArg("--delim", \.delim) { $0 }
-    try p.parseArg("--tags", \PartialTestConfig.tags, parser: tags)
-    try p.parseArg("--skip-tags", \PartialTestConfig.skipTags,
+    // Configure the command line argument parser
+    let p = try ArgumentParser(into: PartialTestConfig())
+    p.addArgument("--iter-scale", \.iterationScale) { Int($0) }
+    p.addArgument("--num-iters", \.fixedNumIters) { UInt($0) }
+    p.addArgument("--num-samples", \.numSamples)  { Int($0) }
+    p.addArgument("--verbose", \.verbose, defaultValue: true)
+    p.addArgument("--delim", \.delim) { $0 }
+    p.addArgument("--tags", \PartialTestConfig.tags, parser: tags)
+    p.addArgument("--skip-tags", \PartialTestConfig.skipTags,
                     defaultValue: [], parser: tags)
-    try p.parseArg("--sleep", \.afterRunSleep) { Int($0) }
-    try p.parseArg("--list", \.action, defaultValue: .listTests)
-    try p.parseArg("--help", \.action, defaultValue: .help(p.validOptions))
-    try p.parseArg(nil, \.tests) // positional arguments
+    p.addArgument("--sleep", \.afterRunSleep) { Int($0) }
+    p.addArgument("--list", \.action, defaultValue: .listTests)
+    p.addArgument("--help", \.action, defaultValue: .help(p.validOptions))
+    p.addArgument(nil, \.tests) // positional arguments
 
-    let c = p.result
+    let c = try p.parse()
 
     // Configure from the command line arguments, filling in the defaults.
     delim = c.delim ?? ","
