@@ -1903,7 +1903,7 @@ private:
   }
   
   Optional<ValueDecl *> findRenamedDecl(const swift::AvailableAttr *AvAttr, const swift::Decl *D) {
-    if (!isa<ValueDecl>(D) || isa<ClassDecl>(D))
+    if (!isa<ValueDecl>(D))
       return None;
     
     SmallVector<ValueDecl *, 4> lookupResults;
@@ -1911,27 +1911,32 @@ private:
     auto renamedDeclName = renamedParsedDeclName.formDeclName(D->getASTContext());
     
     auto declContext = D->getDeclContext();
-    declContext->lookupQualified(declContext->getSelfTypeInContext(),
-                                 renamedDeclName, NL_QualifiedDefault, NULL,
-                                 lookupResults);
     Optional<ValueDecl *>renamedFuncDecl = None;
-    
-    for (auto candidate : lookupResults) {
-      if (!shouldInclude(candidate))
-        continue;
-      
-      if (candidate->getKind() != D->getKind())
-        continue;
-      
-      if (candidate->getKind() == DeclKind::Func && isa<FuncDecl>(candidate)
-          && cast<FuncDecl>(candidate)->getParameterLists().size() !=
-          cast<FuncDecl>(D)->getParameterLists().size())
-        continue;
-      
-      if (renamedFuncDecl)
-      /* TODO: Diagnose to compiler to tell the user that we found multiple candidates */;
-      
-      renamedFuncDecl = candidate;
+
+    if (isa<ClassDecl>(D) || isa<ProtocolDecl>(D)) {
+      UnqualifiedLookup lookup(renamedDeclName.getBaseIdentifier(), declContext->getModuleScopeContext(), nullptr);
+      renamedFuncDecl = lookup.getSingleTypeResult();
+    } else {
+      declContext->lookupQualified(declContext->getSelfTypeInContext(),
+                                   renamedDeclName, NL_QualifiedDefault, NULL,
+                                   lookupResults);
+      for (auto candidate : lookupResults) {
+        if (!shouldInclude(candidate))
+          continue;
+        
+        if (candidate->getKind() != D->getKind())
+          continue;
+        
+        if (candidate->getKind() == DeclKind::Func && isa<FuncDecl>(candidate)
+            && cast<FuncDecl>(candidate)->getParameterLists().size() !=
+            cast<FuncDecl>(D)->getParameterLists().size())
+          continue;
+        
+        if (renamedFuncDecl)
+        /* TODO: Diagnose to compiler to tell the user that we found multiple candidates */;
+        
+        renamedFuncDecl = candidate;
+      }
     }
     
     return renamedFuncDecl;
