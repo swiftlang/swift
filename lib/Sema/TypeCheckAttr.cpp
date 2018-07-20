@@ -1510,15 +1510,21 @@ void AttributeChecker::visitAccessControlAttr(AccessControlAttr *attr) {
       return;
     }
 
-    auto extAttr = extension->getAttrs().getAttribute<AccessControlAttr>();
-    if (extAttr && attr->getAccess() > extAttr->getAccess()) {
-      auto diag = TC.diagnose(attr->getLocation(),
-                              diag::access_control_ext_member_more,
-                              attr->getAccess(),
-                              D->getDescriptiveKind(),
-                              extAttr->getAccess());
-      swift::fixItAccess(diag, cast<ValueDecl>(D), extAttr->getAccess());
-      return;
+    if (auto extAttr =
+        extension->getAttrs().getAttribute<AccessControlAttr>()) {
+      // Extensions are top level declarations, for which the literally lowest
+      // access level `private` is equivalent to `fileprivate`.
+      AccessLevel extAccess = std::max(extAttr->getAccess(),
+                                       AccessLevel::FilePrivate);
+      if (attr->getAccess() > extAccess) {
+        auto diag = TC.diagnose(attr->getLocation(),
+                                diag::access_control_ext_member_more,
+                                attr->getAccess(),
+                                D->getDescriptiveKind(),
+                                extAttr->getAccess());
+        swift::fixItAccess(diag, cast<ValueDecl>(D), extAccess);
+        return;
+      }
     }
   }
 
