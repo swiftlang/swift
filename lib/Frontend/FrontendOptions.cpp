@@ -122,6 +122,7 @@ void FrontendOptions::forAllOutputPaths(
       input.getPrimarySpecificPaths().SupplementaryOutputs;
   const std::string *outputs[] = {&outs.ModuleOutputPath,
                                   &outs.ModuleDocOutputPath,
+                                  &outs.ModuleInterfaceOutputPath,
                                   &outs.ObjCHeaderOutputPath};
   for (const std::string *next : outputs) {
     if (!next->empty())
@@ -346,6 +347,38 @@ bool FrontendOptions::canActionEmitModule(ActionType action) {
 
 bool FrontendOptions::canActionEmitModuleDoc(ActionType action) {
   return canActionEmitModule(action);
+}
+
+bool FrontendOptions::canActionEmitInterface(ActionType action) {
+  switch (action) {
+  case ActionType::NoneAction:
+  case ActionType::Parse:
+  case ActionType::ResolveImports:
+  case ActionType::Typecheck:
+  case ActionType::DumpParse:
+  case ActionType::DumpInterfaceHash:
+  case ActionType::DumpAST:
+  case ActionType::EmitSyntax:
+  case ActionType::PrintAST:
+  case ActionType::EmitPCH:
+  case ActionType::DumpScopeMaps:
+  case ActionType::DumpTypeRefinementContexts:
+  case ActionType::EmitSILGen:
+  case ActionType::EmitSIBGen:
+  case ActionType::Immediate:
+  case ActionType::REPL:
+  case ActionType::EmitImportedModules:
+    return false;
+  case ActionType::MergeModules:
+  case ActionType::EmitModuleOnly:
+  case ActionType::EmitSIL:
+  case ActionType::EmitSIB:
+  case ActionType::EmitIR:
+  case ActionType::EmitBC:
+  case ActionType::EmitAssembly:
+  case ActionType::EmitObject:
+    return true;
+  }
 }
 
 bool FrontendOptions::doesActionProduceOutput(ActionType action) {

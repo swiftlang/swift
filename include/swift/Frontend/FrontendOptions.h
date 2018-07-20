@@ -302,6 +302,7 @@ private:
   static bool canActionEmitLoadedModuleTrace(ActionType);
   static bool canActionEmitModule(ActionType);
   static bool canActionEmitModuleDoc(ActionType);
+  static bool canActionEmitInterface(ActionType);
 
 public:
   static bool doesActionProduceOutput(ActionType);

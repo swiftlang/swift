@@ -291,10 +291,13 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
   auto loadedModuleTrace = getSupplementaryFilenamesFromArguments(
       options::OPT_emit_loaded_module_trace_path);
   auto TBD = getSupplementaryFilenamesFromArguments(options::OPT_emit_tbd_path);
+  auto moduleInterfaceOutput = getSupplementaryFilenamesFromArguments(
+      options::OPT_emit_interface_path);
 
   if (!objCHeaderOutput || !moduleOutput || !moduleDocOutput ||
       !dependenciesFile || !referenceDependenciesFile ||
-      !serializedDiagnostics || !fixItsOutput || !loadedModuleTrace || !TBD) {
+      !serializedDiagnostics || !fixItsOutput || !loadedModuleTrace || !TBD ||
+      !moduleInterfaceOutput) {
     return None;
   }
   std::vector<SupplementaryOutputPaths> result;
@@ -312,6 +315,7 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
     sop.FixItsOutputPath = (*fixItsOutput)[i];
     sop.LoadedModuleTracePath = (*loadedModuleTrace)[i];
     sop.TBDPath = (*TBD)[i];
+    sop.ModuleInterfaceOutputPath = (*moduleInterfaceOutput)[i];
 
     result.push_back(sop);
   }
@@ -382,6 +386,9 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
       SERIALIZED_MODULE_DOC_EXTENSION, "",
       defaultSupplementaryOutputPathExcludingExtension);
 
+  // There is no non-path form of -emit-interface-path
+  auto moduleInterfaceOutputPath = pathsFromArguments.ModuleInterfaceOutputPath;
+
   ID emitModuleOption;
   std::string moduleExtension;
   std::string mainOutputIfUsableForModule;
@@ -403,6 +410,7 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   sop.FixItsOutputPath = fixItsOutputPath;
   sop.LoadedModuleTracePath = loadedModuleTracePath;
   sop.TBDPath = tbdPath;
+  sop.ModuleInterfaceOutputPath = moduleInterfaceOutputPath;
   return sop;
 }
 
@@ -475,7 +483,9 @@ createFromTypeToPathMap(const TypeToPathMap *map) {
       {file_types::TY_SwiftDeps, paths.ReferenceDependenciesFilePath},
       {file_types::TY_SerializedDiagnostics, paths.SerializedDiagnosticsPath},
       {file_types::TY_ModuleTrace, paths.LoadedModuleTracePath},
-      {file_types::TY_TBD, paths.TBDPath}};
+      {file_types::TY_TBD, paths.TBDPath},
+      {file_types::TY_SwiftModuleInterfaceFile,paths.ModuleInterfaceOutputPath}
+  };
   for (const std::pair<file_types::ID, std::string &> &typeAndString :
        typesAndStrings) {
     auto const out = map->find(typeAndString.first);
