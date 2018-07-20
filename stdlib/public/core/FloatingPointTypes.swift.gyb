@@ -1017,7 +1017,18 @@ extension ${Self}: BinaryFloatingPoint {
       _value = Builtin.int_ceil_FPIEEE${bits}(_value)
     case .down:
       _value = Builtin.int_floor_FPIEEE${bits}(_value)
+    @unknown default:
+      self._roundSlowPath(rule)
     }
+  }
+  
+  // Slow path for new cases that might have been inlined into an old
+  // ABI-stable version of round(_:) called from a newer version. If this is
+  // the case, this non-inlinable function will call into the _newer_ version
+  // which _will_ support this rounding rule.
+  @usableFromInline
+  internal mutating func _roundSlowPath(_ rule: FloatingPointRoundingRule) {
+    self.round(rule)
   }
 
   /// Replaces this value with its additive inverse.
