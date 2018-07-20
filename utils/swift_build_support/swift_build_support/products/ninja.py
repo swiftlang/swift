@@ -35,7 +35,7 @@ class Ninja(product.Product):
 
         env = None
         if platform.system() == 'Darwin':
-            sysroot = os.environ.get('SDKROOT', xcrun.sdk_path('macosx'))
+            sysroot = xcrun.sdk_path('macosx')
             assert sysroot is not None
 
             osx_version_min = self.args.darwin_deployment_version_osx
