@@ -71,50 +71,12 @@ struct TestConfig {
       var action: TestAction?
       var tests: [String]?
     }
-    var c = PartialTestConfig()
 
-    let validOptions = [
+    let p = try ArgumentParser(into: PartialTestConfig(), validOptions: [
       "--iter-scale", "--num-samples", "--num-iters",
       "--verbose", "--delim", "--list", "--sleep",
       "--tags", "--skip-tags", "--help"
-    ]
-    guard let benchArgs = parseArgs(validOptions) else {
-      throw ArgumentError.general("Failed to parse arguments")
-    }
-
-    func checked<T>(
-      _ parse: (String) throws -> T?,
-      _ value: String,
-      argument: String? = nil
-    ) throws -> T {
-      if let t = try parse(value)  { return t }
-      var type = "\(T.self)"
-      if type.starts(with: "Optional<") {
-          let s = type.index(after: type.index(of:"<")!)
-          let e = type.index(before: type.endIndex) // ">"
-          type = String(type[s..<e]) // strip Optional< >
-      }
-      throw ArgumentError.invalidType(
-        value: value, type: type, argument: argument)
-    }
-
-    func parseArg<T>(
-      _ name: String?,
-      _ property: WritableKeyPath<PartialTestConfig, T>,
-      defaultValue: T? = nil,
-      parser parse: (String) throws -> T? = { _ in nil }
-    ) throws {
-      if let name = name, let value = benchArgs.optionalArgsMap[name] {
-        guard !value.isEmpty || defaultValue != nil
-          else { throw ArgumentError.missingValue(name) }
-
-        c[keyPath: property] = (value.isEmpty)
-          ? defaultValue!
-          : try checked(parse, value, argument:name)
-      } else if name == nil {
-        c[keyPath: property] = benchArgs.positionalArgs as! T
-      }
-    }
+    ])
 
     func tags(tags: String) throws -> Set<BenchmarkCategory> {
       // We support specifying multiple tags by splitting on comma, i.e.:
@@ -126,18 +88,20 @@ struct TestConfig {
     }
 
     // Parse command line arguments
-    try parseArg("--iter-scale", \.iterationScale) { Int($0) }
-    try parseArg("--num-iters", \.fixedNumIters) { UInt($0) }
-    try parseArg("--num-samples", \.numSamples)  { Int($0) }
-    try parseArg("--verbose", \.verbose, defaultValue: true)
-    try parseArg("--delim", \.delim) { $0 }
-    try parseArg("--tags", \PartialTestConfig.tags, parser: tags)
-    try parseArg("--skip-tags", \PartialTestConfig.skipTags,
+    try p.parseArg("--iter-scale", \.iterationScale) { Int($0) }
+    try p.parseArg("--num-iters", \.fixedNumIters) { UInt($0) }
+    try p.parseArg("--num-samples", \.numSamples)  { Int($0) }
+    try p.parseArg("--verbose", \.verbose, defaultValue: true)
+    try p.parseArg("--delim", \.delim) { $0 }
+    try p.parseArg("--tags", \PartialTestConfig.tags, parser: tags)
+    try p.parseArg("--skip-tags", \PartialTestConfig.skipTags,
                     defaultValue: [], parser: tags)
-    try parseArg("--sleep", \.afterRunSleep) { Int($0) }
-    try parseArg("--list", \.action, defaultValue: .listTests)
-    try parseArg("--help", \.action, defaultValue: .help(validOptions))
-    try parseArg(nil, \.tests) // positional arguments
+    try p.parseArg("--sleep", \.afterRunSleep) { Int($0) }
+    try p.parseArg("--list", \.action, defaultValue: .listTests)
+    try p.parseArg("--help", \.action, defaultValue: .help(p.validOptions))
+    try p.parseArg(nil, \.tests) // positional arguments
+
+    let c = p.result
 
     // Configure from the command line arguments, filling in the defaults.
     delim = c.delim ?? ","

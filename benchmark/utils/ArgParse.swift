@@ -97,3 +97,55 @@ public func parseArgs(_ validOptions: [String]? = nil)
 
   return Arguments(progName, positionalArgs, optionalArgsMap)
 }
+
+/// Returns the argument value converted to the type T using the parser.
+/// If the parser cannot create the value of specified type, throw an invalid
+/// type argument error.
+func checked<T>(
+  _ parse: (String) throws -> T?,
+  _ value: String,
+  argument: String? = nil
+) throws -> T {
+  if let t = try parse(value)  { return t }
+  var type = "\(T.self)"
+  if type.starts(with: "Optional<") {
+      let s = type.index(after: type.index(of:"<")!)
+      let e = type.index(before: type.endIndex) // ">"
+      type = String(type[s..<e]) // strip Optional< >
+  }
+  throw ArgumentError.invalidType(
+    value: value, type: type, argument: argument)
+}
+
+class ArgumentParser<U> {
+    var result: U
+    let validOptions: [String]
+    private let benchArgs: Arguments
+
+    init(into result: U, validOptions: [String]) throws {
+        self.result = result
+        self.validOptions = validOptions
+        guard let benchArgs = parseArgs(validOptions) else {
+          throw ArgumentError.general("Failed to parse arguments")
+        }
+        self.benchArgs = benchArgs
+    }
+
+    func parseArg<T>(
+      _ name: String?,
+      _ property: WritableKeyPath<U, T>,
+      defaultValue: T? = nil,
+      parser parse: (String) throws -> T? = { _ in nil }
+    ) throws {
+      if let name = name, let value = benchArgs.optionalArgsMap[name] {
+        guard !value.isEmpty || defaultValue != nil
+          else { throw ArgumentError.missingValue(name) }
+
+        result[keyPath: property] = (value.isEmpty)
+          ? defaultValue!
+          : try checked(parse, value, argument:name)
+      } else if name == nil {
+        result[keyPath: property] = benchArgs.positionalArgs as! T
+      }
+    }
+}
