@@ -43,6 +43,15 @@ extension Gizmo : Bells {
 // CHECK:   [[INIT:%[0-9]+]] = function_ref @$SSo5GizmoC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (Int, @thick Gizmo.Type) -> @owned Optional<Gizmo>
 // CHECK:   [[IUO_RESULT:%[0-9]+]] = apply [[INIT]]([[I]], [[META]]) : $@convention(method) (Int, @thick Gizmo.Type) -> @owned Optional<Gizmo>
 // CHECK:   switch_enum [[IUO_RESULT]]
+// CHECK: bb1:
+// CHECK-NEXT:   [[FILESTR:%.*]] = string_literal utf8 "
+// CHECK-NEXT:   [[FILESIZ:%.*]] = integer_literal $Builtin.Word, 
+// CHECK-NEXT:   [[FILEASC:%.*]] = integer_literal $Builtin.Int1, 
+// CHECK-NEXT:   [[LINE:%.*]] = integer_literal $Builtin.Word, 
+// CHECK-NEXT:   [[COLUMN:%.*]] = integer_literal $Builtin.Word, 
+// CHECK-NEXT:   [[IMPLICIT:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK:   [[PRECOND:%.*]] = function_ref @$Ss30_diagnoseUnexpectedNilOptional{{[_0-9a-zA-Z]*}}F
+// CHECK:   apply [[PRECOND]]([[FILESTR]], [[FILESIZ]], [[FILEASC]], [[LINE]], [[IMPLICIT]])
 // CHECK: bb2([[UNWRAPPED_RESULT:%.*]] : @owned $Gizmo):
 // CHECK:   store [[UNWRAPPED_RESULT]] to [init] [[SELF]] : $*Gizmo
 

@@ -819,17 +819,17 @@ public func expectNotNil<T>(_ value: T?,
   return value
 }
 
-public func expectCrashLater() {
+public func expectCrashLater(withMessage message: String = "") {
   print("\(_stdlibUnittestStreamPrefix);expectCrash;\(_anyExpectFailed)")
 
   var stderr = _Stderr()
-  print("\(_stdlibUnittestStreamPrefix);expectCrash", to: &stderr)
+  print("\(_stdlibUnittestStreamPrefix);expectCrash;\(message)", to: &stderr)
 
   _seenExpectCrash = true
 }
 
-public func expectCrash(executing: () -> Void) -> Never {
-  expectCrashLater()
+public func expectCrash(withMessage message: String = "", executing: () -> Void) -> Never {
+  expectCrashLater(withMessage: message)
   executing()
   expectUnreachable()
   fatalError()
@@ -1080,6 +1080,7 @@ struct _ParentProcess {
 
     var stdoutSeenCrashDelimiter = false
     var stderrSeenCrashDelimiter = false
+    var expectingPreCrashMessage = ""
     var stdoutEnd = false
     var stderrEnd = false
     var capturedCrashStdout: [Substring] = []
@@ -1090,7 +1091,8 @@ struct _ParentProcess {
       var line = line[...]
       if let index = findSubstring(line, _stdlibUnittestStreamPrefix) {
         let controlMessage =
-            line[index..<line.endIndex].split(separator: ";")
+            line[index..<line.endIndex].split(separator: ";",
+                              omittingEmptySubsequences: false)
         switch controlMessage[1] {
         case "expectCrash":
           if isStdout {
@@ -1098,6 +1100,7 @@ struct _ParentProcess {
             anyExpectFailedInChild = controlMessage[2] == "true"
           } else {
             stderrSeenCrashDelimiter = true
+            expectingPreCrashMessage = String(controlMessage[2])
           }
         case "end":
           if isStdout {
@@ -1114,6 +1117,11 @@ struct _ParentProcess {
           return (done: stdoutEnd && stderrEnd, ())
         }
       }
+      if !expectingPreCrashMessage.isEmpty
+          && findSubstring(line, expectingPreCrashMessage) != nil {
+        line = "OK: saw expected pre-crash message in \"\(line)\""[...]
+        expectingPreCrashMessage = ""
+      }
       if isStdout {
         if stdoutSeenCrashDelimiter {
           capturedCrashStdout.append(line)
@@ -1122,7 +1130,16 @@ struct _ParentProcess {
         if stderrSeenCrashDelimiter {
           capturedCrashStderr.append(line)
           if findSubstring(line, _crashedPrefix) != nil {
-            line = "OK: saw expected \"\(line.lowercased())\""[...]
+            if !expectingPreCrashMessage.isEmpty {
+              line = """
+                      FAIL: saw expected "\(line.lowercased())", but without \
+                      message "\(expectingPreCrashMessage)" before it
+                      """[...]
+              anyExpectFailedInChild = true
+            }
+            else {
+              line = "OK: saw expected \"\(line.lowercased())\""[...]
+            }
           }
         }
       }
@@ -1152,8 +1169,8 @@ struct _ParentProcess {
       }
       return (
         anyExpectFailedInChild,
-        stdoutSeenCrashDelimiter || stderrSeenCrashDelimiter, status,
-        capturedCrashStdout, capturedCrashStderr)
+        stdoutSeenCrashDelimiter || stderrSeenCrashDelimiter,
+        status, capturedCrashStdout, capturedCrashStderr)
     }
 
     // We reached EOF on stdout and stderr and we did not see "end" markers, so
@@ -1163,8 +1180,8 @@ struct _ParentProcess {
     let status = _waitForChild()
     return (
       anyExpectFailedInChild,
-      stdoutSeenCrashDelimiter || stderrSeenCrashDelimiter, status,
-      capturedCrashStdout, capturedCrashStderr)
+      stdoutSeenCrashDelimiter || stderrSeenCrashDelimiter,
+      status, capturedCrashStdout, capturedCrashStderr)
   }
 
   internal mutating func _shutdownChild() -> (failed: Bool, Void) {
