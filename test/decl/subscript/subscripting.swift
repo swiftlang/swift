@@ -92,7 +92,7 @@ protocol ProtocolGetSet1 {
   subscript(i: Int) -> Int { get }
 }
 protocol ProtocolGetSet2 {
-  subscript(i: Int) -> Int { set } // expected-error {{subscript declarations must have a getter}}
+  subscript(i: Int) -> Int { set } // expected-error {{subscript with a setter must also have a getter}}
 }
 protocol ProtocolGetSet3 {
   subscript(i: Int) -> Int { get set }
@@ -116,7 +116,7 @@ protocol ProtocolWillSetDidSet4 {
 
 class DidSetInSubscript {
   subscript(_: Int) -> Int {
-    didSet { // expected-error {{didSet is not allowed in subscripts}}
+    didSet { // expected-error {{'didSet' is not allowed in subscripts}}
       print("eek")
     }
     get {}
@@ -125,7 +125,7 @@ class DidSetInSubscript {
 
 class WillSetInSubscript {
   subscript(_: Int) -> Int {
-    willSet { // expected-error {{willSet is not allowed in subscripts}}
+    willSet { // expected-error {{'willSet' is not allowed in subscripts}}
       print("eek")
     }
     get {}
@@ -175,8 +175,8 @@ struct MissingGetterSubscript1 {
   } // expected-error {{subscript must have accessors specified}}
 }
 struct MissingGetterSubscript2 {
-  subscript (i : Int, j : Int) -> Int { // expected-error{{subscript declarations must have a getter}}
-    set {}
+  subscript (i : Int, j : Int) -> Int {
+    set {} // expected-error{{subscript with a setter must also have a getter}}
   }
 }
 
