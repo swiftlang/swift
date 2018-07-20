@@ -127,8 +127,7 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
     _abstract()
   }
   
-  public // @testable
-  static func _create(
+  internal static func _create(
     capacityInBytes bytes: Int,
     initializedBy body: (UnsafeMutableRawBufferPointer) -> Void
   ) -> Self {
