@@ -494,8 +494,10 @@ class RestateFilteringConsumer : public VisibleDeclConsumer {
     // replace the equivalent if the found decl has a higher access level.
     auto existingDecl = Map.find(Key);
 
-    if ((existingDecl == Map.end()) ||
-        (Map[Key].first->getFormalAccess() < FD.first->getFormalAccess())) {
+    if (existingDecl == Map.end() ||
+        (!isa<GenericTypeParamDecl>(existingDecl->second.first) &&
+         !isa<GenericTypeParamDecl>(FD.first) &&
+         existingDecl->second.first->getFormalAccess() < FD.first->getFormalAccess())) {
       if (existingDecl != Map.end())
         declsToReport.erase({existingDecl->getSecond().first});
       Map[Key] = FD;

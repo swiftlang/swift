@@ -2337,6 +2337,8 @@ AccessLevel ValueDecl::getEffectiveAccess() const {
 
 AccessLevel ValueDecl::getFormalAccess(const DeclContext *useDC,
                                        bool treatUsableFromInlineAsPublic) const {
+  assert(!isa<GenericTypeParamDecl>(this));
+
   ASTContext &ctx = getASTContext();
   AccessLevel result = ctx.evaluator(AccessLevelRequest{const_cast<ValueDecl *>(this)});
   if (treatUsableFromInlineAsPublic &&
