@@ -1065,11 +1065,7 @@ public:
                                          AccessKind accessKind);
 
   // FIXME: demote this to private state.
-  ManagedValue maybeEmitAddressOfNonMemberVarDecl(SILLocation loc,
-                                                  VarDecl *var,
-                                                  CanType formalRValueType,
-                                                  AccessKind accessKind,
-                                                  AccessSemantics semantics);
+  ManagedValue maybeEmitValueOfLocalVarDecl(VarDecl *var);
 
   /// Produce an RValue for a reference to the specified declaration,
   /// with the given type and in response to the specified expression.  Try to

@@ -73,3 +73,53 @@ func generate_int() -> Int { return 0 }
 func assign_bound_optional_lvalue(_ x: inout Int?) {
   x? = generate_int()
 }
+
+struct ComputedOptional {
+  var computedOptional : Int? {
+    get {}
+    set {}
+  }
+}
+
+// CHECK-LABEL: sil hidden @$S15optional_lvalue013assign_bound_a10_computed_B0yyAA16ComputedOptionalVzF
+// CHECK:  [[SELF:%.*]] = begin_access [modify] [unknown] %0 : $*ComputedOptional
+// CHECK:  [[TEMP:%.*]] = alloc_stack $Optional<Int>
+// CHECK:  [[T0:%.*]] = load [trivial] [[SELF]] : $*ComputedOptional
+// CHECK:  [[GETTER:%.*]] = function_ref @$S15optional_lvalue16ComputedOptionalV08computedD0SiSgvg
+// CHECK:  [[VALUE:%.*]] = apply [[GETTER]]([[T0]])
+// CHECK:  store [[VALUE]] to [trivial] [[TEMP]] : $*Optional<Int>
+// CHECK:  select_enum_addr [[TEMP]] : $*Optional<Int>
+// CHECK:  cond_br
+// CHECK:  [[VALUE_ADDR:%.*]] = unchecked_take_enum_data_addr [[TEMP]] : $*Optional<Int>
+// CHECK:  [[GENERATOR:%.*]] = function_ref @$S15optional_lvalue12generate_intSiyF
+// CHECK:  [[VALUE:%.*]] = apply [[GENERATOR]]()
+// CHECK:  assign [[VALUE]] to [[VALUE_ADDR]] : $*Int
+// CHECK:  [[OPTVALUE:%.*]] = load [trivial] [[TEMP]] : $*Optional<Int>
+// CHECK:  [[SETTER:%.*]] = function_ref @$S15optional_lvalue16ComputedOptionalV08computedD0SiSgvs
+// CHECK:  apply [[SETTER]]([[OPTVALUE]], [[SELF]])
+// CHECK:  end_access [[SELF]]
+// CHECK:  dealloc_stack [[TEMP]]
+func assign_bound_optional_computed_lvalue(_ co: inout ComputedOptional) {
+  co.computedOptional? = generate_int()
+}
+
+// CHECK-LABEL: sil hidden @$S15optional_lvalue014assign_forced_a10_computed_B0yyAA16ComputedOptionalVzF
+// CHECK:  [[GENERATOR:%.*]] = function_ref @$S15optional_lvalue12generate_intSiyF
+// CHECK:  [[VALUE:%.*]] = apply [[GENERATOR]]()
+// CHECK:  [[SELF:%.*]] = begin_access [modify] [unknown] %0 : $*ComputedOptional
+// CHECK:  [[TEMP:%.*]] = alloc_stack $Optional<Int>
+// CHECK:  [[T0:%.*]] = load [trivial] [[SELF]] : $*ComputedOptional
+// CHECK:  [[GETTER:%.*]] = function_ref @$S15optional_lvalue16ComputedOptionalV08computedD0SiSgvg
+// CHECK:  [[OPTVALUE:%.*]] = apply [[GETTER]]([[T0]])
+// CHECK:  store [[OPTVALUE]] to [trivial] [[TEMP]]
+// CHECK:  switch_enum_addr [[TEMP]]
+// CHECK:  [[VALUE_ADDR:%.*]] = unchecked_take_enum_data_addr [[TEMP]] : $*Optional<Int>
+// CHECK:  assign [[VALUE]] to [[VALUE_ADDR]] : $*Int
+// CHECK:  [[OPTVALUE:%.*]] = load [trivial] [[TEMP]] : $*Optional<Int>
+// CHECK:  [[SETTER:%.*]] = function_ref @$S15optional_lvalue16ComputedOptionalV08computedD0SiSgvs
+// CHECK:  apply [[SETTER]]([[OPTVALUE]], [[SELF]])
+// CHECK:  end_access [[SELF]]
+// CHECK:  dealloc_stack [[TEMP]]
+func assign_forced_optional_computed_lvalue(_ co: inout ComputedOptional) {
+  co.computedOptional! = generate_int()
+}

@@ -5364,9 +5364,14 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
                             optionalCallback, callbackStorage);
 }
 
-SILDeclRef SILGenModule::getAddressorDeclRef(AbstractStorageDecl *storage,
-                                             AccessKind accessKind) {
-  FuncDecl *addressorFunc = storage->getAddressorForAccess(accessKind);
+SILDeclRef SILGenModule::getAddressorDeclRef(AbstractStorageDecl *storage) {
+  FuncDecl *addressorFunc = storage->getAddressor();
+  return SILDeclRef(addressorFunc, SILDeclRef::Kind::Func);
+}
+
+SILDeclRef SILGenModule::getMutableAddressorDeclRef(
+                                                 AbstractStorageDecl *storage) {
+  FuncDecl *addressorFunc = storage->getMutableAddressor();
   return SILDeclRef(addressorFunc, SILDeclRef::Kind::Func);
 }
 

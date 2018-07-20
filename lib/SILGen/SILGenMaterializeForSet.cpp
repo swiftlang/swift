@@ -494,9 +494,8 @@ public:
 
     // Drill down to the member storage.
     lv.addMemberComponent(SGF, loc, WitnessStorage, WitnessSubs,
-                          LValueOptions(), IsSuper,
-                          accessKind, TheAccessSemantics, strategy,
-                          SubstStorageType, std::move(indices));
+                          LValueOptions(), IsSuper, strategy, SubstStorageType,
+                          std::move(indices), /*index expr for diags*/ nullptr);
 
     SILType expectedTy = SGM.Types.getLoweredType(
         lv.getOrigFormalType(),
@@ -824,8 +823,7 @@ SILValue MaterializeForSetEmitter::emitUsingAddressor(SILGenFunction &SGF,
   bool isDirect = (TheAccessSemantics != AccessSemantics::Ordinary);
 
   // Call the mutable addressor.
-  auto addressor = SGF.SGM.getAddressorDeclRef(WitnessStorage,
-                                               AccessKind::ReadWrite);
+  auto addressor = SGF.SGM.getMutableAddressorDeclRef(WitnessStorage);
   std::pair<ManagedValue, ManagedValue> result;
   {
     FormalEvaluationScope Scope(SGF);
