@@ -460,7 +460,13 @@ SingleExitLoopTransformer::createNewHeader() {
   for (const auto &escapingValue : escapingValues) {
     SILValue newValue = newHeader->createPHIArgument(
         escapingValue->getType(), escapingValue.getOwnershipKind());
-    escapingValue->replaceAllUsesWith(newValue);
+    // Replace uses *outside* of the loop with the new value.
+    for (Operand *use : escapingValue->getUses()) {
+      if (loop->contains(use->getUser()->getParent())) {
+        continue;
+      }
+      use->set(newValue);
+    }
   }
   // An integer to identify the exit edge.
   SILValue exitIndexArg = newHeader->createPHIArgument(
