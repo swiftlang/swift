@@ -305,7 +305,7 @@ deriveBodyEquatable_enum_uninhabited_eq(AbstractFunctionDecl *eqDecl) {
   auto parentDC = eqDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
-  auto args = eqDecl->getParameterLists().back();
+  auto args = eqDecl->getParameters();
   auto aParam = args->get(0);
   auto bParam = args->get(1);
 
@@ -336,7 +336,7 @@ deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl) {
   auto parentDC = eqDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
-  auto args = eqDecl->getParameterLists().back();
+  auto args = eqDecl->getParameters();
   auto aParam = args->get(0);
   auto bParam = args->get(1);
 
@@ -391,7 +391,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl) {
   auto parentDC = eqDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
-  auto args = eqDecl->getParameterLists().back();
+  auto args = eqDecl->getParameters();
   auto aParam = args->get(0);
   auto bParam = args->get(1);
 
@@ -505,7 +505,7 @@ static void deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl) {
   auto parentDC = eqDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
-  auto args = eqDecl->getParameterLists().back();
+  auto args = eqDecl->getParameters();
   auto aParam = args->get(0);
   auto bParam = args->get(1);
 
@@ -833,7 +833,7 @@ deriveBodyHashable_compat_hashInto(AbstractFunctionDecl *hashIntoDecl) {
   auto hashValueExpr = new (C) UnresolvedDotExpr(selfRef, SourceLoc(),
                                                  C.Id_hashValue, DeclNameLoc(),
                                                  /*implicit*/ true);
-  auto hasherParam = hashIntoDecl->getParameterList(1)->get(0);
+  auto hasherParam = hashIntoDecl->getParameters()->get(0);
   auto hasherExpr = createHasherCombineCall(C, hasherParam, hashValueExpr);
 
   auto body = BraceStmt::create(C, SourceLoc(), {ASTNode(hasherExpr)},
@@ -862,7 +862,7 @@ deriveBodyHashable_enum_rawValue_hashInto(
                                                 /*Implicit=*/true);
 
   // generate: hasher.combine(discriminator)
-  auto hasherParam = hashIntoDecl->getParameterList(1)->get(0);
+  auto hasherParam = hashIntoDecl->getParameters()->get(0);
   ASTNode combineStmt = createHasherCombineCall(C, hasherParam, rawValueRef);
 
   auto body = BraceStmt::create(C, SourceLoc(), combineStmt, SourceLoc(),
@@ -903,7 +903,7 @@ deriveBodyHashable_enum_noAssociatedValues_hashInto(
                                               selfDecl, hashIntoDecl,
                                               "discriminator");
   // generate: hasher.combine(discriminator)
-  auto hasherParam = hashIntoDecl->getParameterList(1)->get(0);
+  auto hasherParam = hashIntoDecl->getParameters()->get(0);
   auto combineStmt = createHasherCombineCall(C, hasherParam, discriminatorExpr);
   stmts.push_back(combineStmt);
 
@@ -943,7 +943,7 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
   Type enumType = selfDecl->getType();
 
   // Extract the decl for the hasher parameter.
-  auto hasherParam = hashIntoDecl->getParameterList(1)->get(0);
+  auto hasherParam = hashIntoDecl->getParameters()->get(0);
 
   unsigned index = 0;
   SmallVector<ASTNode, 4> cases;
@@ -1022,7 +1022,7 @@ deriveBodyHashable_struct_hashInto(AbstractFunctionDecl *hashIntoDecl) {
   auto selfDecl = hashIntoDecl->getImplicitSelfDecl();
 
   // Extract the decl for the hasher parameter.
-  auto hasherParam = hashIntoDecl->getParameterList(1)->get(0);
+  auto hasherParam = hashIntoDecl->getParameters()->get(0);
 
   auto storedProperties =
     structDecl->getStoredProperties(/*skipInaccessible=*/true);

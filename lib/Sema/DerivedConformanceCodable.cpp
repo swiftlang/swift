@@ -570,7 +570,7 @@ static void deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl) {
   // `let container` (containerExpr) is generated above.
 
   // encoder
-  auto encoderParam = encodeDecl->getParameterList(1)->get(0);
+  auto encoderParam = encodeDecl->getParameters()->get(0);
   auto *encoderExpr = new (C) DeclRefExpr(ConcreteDeclRef(encoderParam),
                                           DeclNameLoc(), /*Implicit=*/true);
 
@@ -831,7 +831,7 @@ static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl) {
     // `let container` (containerExpr) is generated above.
 
     // decoder
-    auto decoderParam = initDecl->getParameterList(1)->get(0);
+    auto decoderParam = initDecl->getParameters()->get(0);
     auto *decoderExpr = new (C) DeclRefExpr(ConcreteDeclRef(decoderParam),
                                             DeclNameLoc(), /*Implicit=*/true);
 

@@ -2206,8 +2206,7 @@ bool DisjunctionChoice::isSymmetricOperator() const {
     return false;
 
   auto func = dyn_cast<FuncDecl>(decl);
-  auto paramList =
-      func->getParameterList(func->getDeclContext()->isTypeContext());
+  auto paramList = func->getParameters();
   if (paramList->size() != 2)
     return true;
 

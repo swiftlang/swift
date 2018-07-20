@@ -367,8 +367,7 @@ static Type getAdjustedParamType(const AnyFunctionType::Param &param) {
 // declared to be an IUO?
 static bool paramIsIUO(Decl *decl, int paramNum) {
   if (auto *fn = dyn_cast<AbstractFunctionDecl>(decl)) {
-    auto *paramList =
-        fn->getParameterList(fn->getDeclContext()->isTypeContext());
+    auto *paramList = fn->getParameters();
     auto *param = paramList->get(paramNum);
     return param->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
   }

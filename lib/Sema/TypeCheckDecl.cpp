@@ -1196,13 +1196,19 @@ static void configureImplicitSelf(TypeChecker &tc,
 
 static void recordParamContextTypes(AbstractFunctionDecl *func) {
   auto *env = func->getGenericEnvironment();
-  for (auto paramList : func->getParameterLists()) {
-    for (auto param : *paramList) {
-      if (!env)
-        param->setType(param->getInterfaceType());
-      else
-        param->setType(env->mapTypeIntoContext(param->getInterfaceType()));
-    }
+
+  if (auto *selfDecl = func->getImplicitSelfDecl()) {
+    if (!env)
+      selfDecl->setType(selfDecl->getInterfaceType());
+    else
+      selfDecl->setType(env->mapTypeIntoContext(selfDecl->getInterfaceType()));
+  }
+
+  for (auto param : *func->getParameters()) {
+    if (!env)
+      param->setType(param->getInterfaceType());
+    else
+      param->setType(env->mapTypeIntoContext(param->getInterfaceType()));
   }
 }
 
@@ -3553,7 +3559,7 @@ void bindFuncDeclToOperator(TypeChecker &TC, FuncDecl *FD) {
 
 void checkMemberOperator(TypeChecker &TC, FuncDecl *FD) {
   // Check that member operators reference the type of 'Self'.
-  if (FD->getNumParameterLists() != 2 || FD->isInvalid()) return;
+  if (FD->isInvalid()) return;
 
   auto *DC = FD->getDeclContext();
   auto selfNominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
@@ -3561,7 +3567,7 @@ void checkMemberOperator(TypeChecker &TC, FuncDecl *FD) {
 
   // Check the parameters for a reference to 'Self'.
   bool isProtocol = isa<ProtocolDecl>(selfNominal);
-  for (auto param : *FD->getParameterList(1)) {
+  for (auto param : *FD->getParameters()) {
     auto paramType = param->getInterfaceType();
     if (!paramType) break;
 
@@ -4096,8 +4102,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       // are sometimes different from the rules elsewhere; for example,
       // function types default to non-escaping.
 
-      auto valueParams =
-        accessor->getParameterList(accessor->getParent()->isTypeContext());
+      auto valueParams = accessor->getParameters();
 
       // Determine the value type.
       Type valueIfaceTy, valueTy;
@@ -5804,7 +5809,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
         // We have a function. Make sure that the number of parameters
         // matches the "number of colons" in the name.
         auto func = cast<AbstractFunctionDecl>(D);
-        auto params = func->getParameterList(1);
+        auto params = func->getParameters();
         unsigned numParameters = params->size();
         if (auto CD = dyn_cast<ConstructorDecl>(func))
           if (CD->isObjCZeroParameterWithLongSelector())

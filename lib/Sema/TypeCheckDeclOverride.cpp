@@ -487,8 +487,8 @@ static bool parameterTypesMatch(const ValueDecl *derivedDecl,
     auto *base = dyn_cast<AbstractFunctionDecl>(baseDecl);
     if (!base)
       return false;
-    baseParams = base->getParameterList(1);
-    derivedParams = derived->getParameterList(1);
+    baseParams = base->getParameters();
+    derivedParams = derived->getParameters();
   } else {
     auto *base = dyn_cast<SubscriptDecl>(baseDecl);
     if (!base)
@@ -896,8 +896,8 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
         resultTL = methodAsFunc->getBodyResultTypeLoc();
 
       emittedMatchError |= diagnoseMismatchedOptionals(
-          method, method->getParameterList(1), resultTL, baseDecl,
-          cast<AbstractFunctionDecl>(baseDecl)->getParameterList(1),
+          method, method->getParameters(), resultTL, baseDecl,
+          cast<AbstractFunctionDecl>(baseDecl)->getParameters(),
           owningTy, mayHaveMismatchedOptionals);
     }
   } else if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {

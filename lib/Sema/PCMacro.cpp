@@ -197,7 +197,7 @@ public:
       // if (FD->getBodyResultTypeLoc().hasLocation()) {
       //   EndLoc = FD->getBodyResultTypeLoc().getSourceRange().End;
       // } else {
-      //   EndLoc = FD->getParameterLists().back()->getSourceRange().End;
+      //   EndLoc = FD->getParameters()->getSourceRange().End;
       // }
 
       if (StartLoc.isValid() && EndLoc.isValid()) {
@@ -314,7 +314,7 @@ public:
         if (FD->getBodyResultTypeLoc().hasLocation()) {
           EndLoc = FD->getBodyResultTypeLoc().getSourceRange().End;
         } else {
-          EndLoc = FD->getParameterLists().back()->getSourceRange().End;
+          EndLoc = FD->getParameters()->getSourceRange().End;
         }
 
         if (EndLoc.isValid())
