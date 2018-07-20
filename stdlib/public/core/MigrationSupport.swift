@@ -688,13 +688,13 @@ extension String.UTF8View {
   }
 }
 
-@available(swift,deprecated: 5.0, renamed: "Unicode.UTF8")
+// @available(swift,deprecated: 5.0, renamed: "Unicode.UTF8")
 public typealias UTF8 = Unicode.UTF8
-@available(swift, deprecated: 5.0, renamed: "Unicode.UTF16")
+// @available(swift, deprecated: 5.0, renamed: "Unicode.UTF16")
 public typealias UTF16 = Unicode.UTF16
-@available(swift, deprecated: 5.0, renamed: "Unicode.UTF32")
+// @available(swift, deprecated: 5.0, renamed: "Unicode.UTF32")
 public typealias UTF32 = Unicode.UTF32
-@available(swift, deprecated: 5.0, renamed: "Unicode.Scalar")
+// @available(swift, deprecated: 5.0, renamed: "Unicode.Scalar")
 public typealias UnicodeScalar = Unicode.Scalar
 
 
