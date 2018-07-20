@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+
+  <Type Name="Swift::Int">
+    <DisplayString>{_value}</DisplayString>
+    <Expand HideRawView="true"></Expand>
+  </Type>
+  <Type Name="Swift::Int8">
+    <DisplayString>{_value}</DisplayString>
+    <Expand HideRawView="true"></Expand>
+  </Type>
+  <Type Name="Swift::Int16">
+    <DisplayString>{_value}</DisplayString>
+    <Expand HideRawView="true"></Expand>
+  </Type>
+  <Type Name="Swift::Int32">
+    <DisplayString>{_value}</DisplayString>
+    <Expand HideRawView="true"></Expand>
+  </Type>
+  <Type Name="Swift::Int64">
+    <DisplayString>{_value}</DisplayString>
+    <Expand HideRawView="true"></Expand>
+  </Type>
+
+  <Type Name="Swift::UInt">
+    <DisplayString>{_value}</DisplayString>
+    <Expand HideRawView="true"></Expand>
+  </Type>
+  <Type Name="Swift::UInt8">
+    <DisplayString>{_value}</DisplayString>
+    <Expand HideRawView="true"></Expand>
+  </Type>
+  <Type Name="Swift::UInt16">
+    <DisplayString>{_value}</DisplayString>
+    <Expand HideRawView="true"></Expand>
+  </Type>
+  <Type Name="Swift::UInt32">
+    <DisplayString>{_value}</DisplayString>
+    <Expand HideRawView="true"></Expand>
+  </Type>
+  <Type Name="Swift::UInt64">
+    <DisplayString>{_value}</DisplayString>
+    <Expand HideRawView="true"></Expand>
+  </Type>
+
+  <Type Name="Swift::Bool">
+    <DisplayString>{_value}</DisplayString>
+    <Expand HideRawView="true"></Expand>
+  </Type>
+
+  <Type Name="Swift::Float">
+    <DisplayString>{_value}</DisplayString>
+    <Expand HideRawView="true"></Expand>
+  </Type>
+  <Type Name="Swift::Float32">
+    <DisplayString>{_value}</DisplayString>
+    <Expand HideRawView="true"></Expand>
+  </Type>
+  <Type Name="Swift::Float64">
+    <DisplayString>{_value}</DisplayString>
+    <Expand HideRawView="true"></Expand>
+  </Type>
+
+  <Type Name="Swift::Double">
+    <DisplayString>{_value}</DisplayString>
+    <Expand HideRawView="true"></Expand>
+  </Type>
+
+  <!--
+    TODO: It would be better to recognize ``Swift::[*]`` as a Swift Array,
+    but it looks like natvis will only recognize the type this way.
+  -->
+  <Type Name="Swift::Array&lt;*&gt;">
+    <!-- See lldb/source/Plugins/Language/Swift/SwiftArray.cpp -->
+    <DisplayString Condition="(_storage == 0) || (_storage->_count == 0)">
+      0 values
+    </DisplayString>
+    <DisplayString Condition="_storage->_count == 1">1 value</DisplayString>
+    <DisplayString>{_storage->_count} values</DisplayString>
+    <Expand HideRawView="true">
+      <ArrayItems>
+        <Size>_storage->_count</Size>
+        <ValuePointer>&amp;_storage->_firstElement</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+
+  <!--
+    Currently, this will only tell you the number of characters in the string.
+    While it is probably possible to view the string, it would be very
+    difficult to maintain and natvis is probably not the best tool for this.
+    However, there is an extension for WinDbg that allows users to view Swift
+    Strings.
+  -->
+  <Type Name="Swift::String">
+    <!-- See lldb/source/Plugins/Language/Swift/SwiftFormatters.cpp -->
+
+    <!-- Swift Native string -->
+    <DisplayString Condition="!((long long)_guts._object._object &amp; 0x6000000000000000)">
+      Count = {_guts._otherBits._value &amp; ((1ULL &lt;&lt; 48) - 1)}
+    </DisplayString>
+
+    <!-- NSStrings pointer -->
+    <DisplayString Condition="((long long)_guts._object._object &amp; 0x4000000000000000)
+                  &amp;&amp; !((long long)_guts._object._object &amp; 0x8000000000000000)">
+      Viewing NSString strings is not yet implemented
+    </DisplayString>
+
+    <!-- NSStrings inlined -->
+    <DisplayString Condition="((long long)_guts._object._object &amp; 0xC000000000000000)
+                  &amp;&amp; !((long long)_guts._object._object &amp; 0x2000000000000000)">
+      Viewing NSString inlined strings is not yet implemented
+    </DisplayString>
+
+    <!-- Small UTF-8 string -->
+    <DisplayString Condition="(long long)_guts._object._object &amp; 0xE000000000000000">
+      Count = {((long long)_guts._object._object &amp; 0x0F00000000000000) &gt;&gt; 56}
+    </DisplayString>
+
+    <Expand HideRawView="true">
+      <Item Name="Note">
+        "Viewing Swift Strings in Visual Studio is not yet implemented"
+      </Item>
+    </Expand>
+  </Type>
+
+  <!-- See lldb/source/Plugins/Language/Swift/SwiftOptional.cpp -->
+  <!--
+    FIXME: Optional enums with raw values are a special case and
+           do not render correctly.
+  -->
+  <Type Name="Swift::Optional&lt;Bool&gt;">
+    <!-- It looks like `Bool?` is a special case -->
+    <DisplayString Condition="*(long long *)this == 0">false</DisplayString>
+    <DisplayString Condition="*(long long *)this == 1">true</DisplayString>
+    <DisplayString>nil</DisplayString>
+    <Expand HideRawView="true"></Expand>
+  </Type>
+  <Type Name="Swift::Optional&lt;*&gt;">
+    <DisplayString Condition="*(long long *)this == 0">nil</DisplayString>
+    <DisplayString>{some}</DisplayString>
+    <Expand HideRawView="true">
+      <ExpandedItem Condition="*(long long *)this != 0">some</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!--
+    FIXME: This does not work in some cases, e.g., `[Float:Int?]`.
+  -->
+  <Type Name="Swift::Dictionary&lt;*&gt;">
+    <DisplayString Condition="_storage == 0 || _storage->count == 0">
+      0 key/value pairs
+    </DisplayString>
+    <DisplayString Condition="_storage->count == 1">
+      1 key/value pair
+    </DisplayString>
+    <DisplayString>{_storage->count} key/value pairs</DisplayString>
+    <Expand HideRawView="true">
+      <CustomListItems Condition="_storage != 0">
+        <Variable Name="index" InitialValue="(long long)0"/>
+        <Variable Name="HasKeyAtIndex" InitialValue="false"/>
+        <Variable Name="Word" InitialValue="(long long)0"/>
+        <Variable Name="BitMask" InitialValue="(long long)0"/>
+
+        <Size>_storage->count</Size>
+        <Loop>
+          <Break Condition="index &gt;= _storage->bucketCount"/>
+          <Exec>Word = index / 64</Exec>
+          <Exec>BitMask = 1ULL &lt;&lt; (index % 64)</Exec>
+          <Exec>
+            HasKeyAtIndex = _storage->initializedEntries[Word] &amp; BitMask
+          </Exec>
+          <If Condition="HasKeyAtIndex">
+            <Item Name="{_storage->keys[index]}">_storage->values[index]</Item>
+          </If>
+          <Exec>index++</Exec>
+        </Loop>
+      </CustomListItems>
+    </Expand>
+  </Type>
+</AutoVisualizer>

@@ -29,6 +29,7 @@
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Demangling/ManglingMacros.h"
+#include "swift/Demangling/Demangle.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -657,13 +658,25 @@ private:
     SmallVector<llvm::Metadata *, 16> Elements;
     unsigned OffsetInBits = 0;
     auto genericSig = IGM.getSILTypes().getCurGenericContext();
-    for (auto ElemTy : TupleTy->getElementTypes()) {
+    for (unsigned ElemIdx = 0; ElemIdx < TupleTy->getNumElements(); ElemIdx++) {
+      auto Elem = TupleTy->getElement(ElemIdx);
+      auto ElemTy = Elem.getType();
       auto &elemTI = IGM.getTypeInfoForUnlowered(
           AbstractionPattern(genericSig, ElemTy->getCanonicalType()), ElemTy);
       auto DbgTy =
           DebugTypeInfo::getFromTypeInfo(DeclContext, GE, ElemTy, elemTI);
-      Elements.push_back(createMemberType(DbgTy, StringRef(), OffsetInBits,
-                                          Scope, File, Flags));
+      // Give this member the same name as what is used to access this element
+      // of the tuple: either the name of the element (if it was specified) or
+      // the index of the element. The name will be ignored by LLDB (I think),
+      // but provides helpful information to CodeView.
+      llvm::SmallString<8> Buf;
+      llvm::raw_svector_ostream ElemNameOS(Buf);
+      if (Elem.getName().empty())
+        ElemNameOS << ElemIdx;
+      else
+        ElemNameOS << Elem.getName();
+      Elements.push_back(createMemberType(DbgTy, ElemNameOS.str(),
+                                          OffsetInBits, Scope, File, Flags));
     }
     SizeInBits = OffsetInBits;
     return DBuilder.getOrCreateArray(Elements);
@@ -727,6 +740,15 @@ private:
     return DITy;
   }
 
+  llvm::DINodeArray getEnumRawElements(EnumDecl *ED) {
+    SmallVector<llvm::Metadata *, 16> Elements;
+    unsigned ElemIdx = 0;
+    for (auto *ElemDecl : ED->getAllElements())
+      Elements.push_back(DBuilder.createEnumerator(ElemDecl->getName().str(),
+                                                   ElemIdx++));
+    return DBuilder.getOrCreateArray(Elements);
+  }
+
   llvm::DINodeArray getEnumElements(DebugTypeInfo DbgTy, EnumDecl *ED,
                                     llvm::DIScope *Scope, llvm::DIFile *File,
                                     llvm::DINode::DIFlags Flags) {
@@ -782,21 +804,89 @@ private:
     unsigned SizeInBits = DbgTy.size.getValue() * SizeOfByte;
     // Default, since Swift doesn't allow specifying a custom alignment.
     unsigned AlignInBits = 0;
+    StringRef Name = Decl->getName().str();
 
+    if (Opts.DebugInfoFormat == IRGenDebugInfoFormat::CodeView &&
+        Decl->hasOnlyCasesWithoutAssociatedValues()) {
+      // In CodeView, we emit a DW_TAG_enumeration_type when it does not have
+      // associated values. One downsize is that the user will not be able to
+      // view the raw value of the Swift enum in WinDbg or Visual Studio, but
+      // the user will see the name of the Swift enum member.
+      auto IntTy = BuiltinIntegerType::get(SizeInBits,
+                                           DbgTy.getType()->getASTContext());
+      auto IntDbgTy = DebugTypeInfo::getFromTypeInfo(
+            DbgTy.getDeclContext(),
+            DbgTy.getDeclContext()->getGenericEnvironmentOfContext(),
+            IntTy, IGM.getTypeInfoForUnlowered(IntTy));
+      return DBuilder.createEnumerationType(
+            Scope, Name, File, Line, SizeInBits, AlignInBits,
+            getEnumRawElements(Decl), getOrCreateType(IntDbgTy), MangledName);
+    }
     // FIXME: Is DW_TAG_union_type the right thing here?
     // Consider using a DW_TAG_variant_type instead.
     auto FwdDecl = llvm::TempDIType(DBuilder.createReplaceableCompositeType(
-        llvm::dwarf::DW_TAG_union_type, MangledName, Scope, File, Line,
-        llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits, Flags,
-        MangledName));
+        Opts.DebugInfoFormat == IRGenDebugInfoFormat::CodeView
+              ? llvm::dwarf::DW_TAG_structure_type
+              : llvm::dwarf::DW_TAG_union_type,
+        Name, Scope, File, Line, llvm::dwarf::DW_LANG_Swift, SizeInBits,
+        AlignInBits, Flags, MangledName));
 
     auto TH = llvm::TrackingMDNodeRef(FwdDecl.get());
     DITypeCache[DbgTy.getType()] = TH;
 
-    auto DITy = DBuilder.createUnionType(
-        Scope, Decl->getName().str(), File, Line, SizeInBits, AlignInBits,
-        Flags, getEnumElements(DbgTy, Decl, Scope, File, Flags),
-        llvm::dwarf::DW_LANG_Swift, MangledName);
+    llvm::DICompositeType * DITy;
+    if (Opts.DebugInfoFormat == IRGenDebugInfoFormat::CodeView) {
+      // We emit a Swift enum with associated values as a structure with a
+      // union and an enum. `Case` shows the user the type of the currently
+      // stored value and `AssociatedValue` is shown as a union representing
+      // the associated value of the enum. This allows for viewing of Swift
+      // enums in WinDbg and Visual Studio without any work. Unfortunately
+      // this expects the user to have some prior knowledge of how a Swift enum
+      // is stored and what a union is. Extensions and debugging tools could
+      // be created to make enums easier to view in Windows.
+      unsigned EnumSizeInBits = 8;
+      unsigned UnionSizeInBits = SizeInBits - EnumSizeInBits;
+      llvm::SmallString<16> EnumNameBuf, UnionNameBuf, UnionMangledBuf;
+      llvm::raw_svector_ostream EnumNameOS(EnumNameBuf),
+                                UnionNameOS(UnionNameBuf),
+                                UnionMangledOS(UnionMangledBuf);
+      EnumNameOS << Name.str() << "::Enum";
+      UnionNameOS << Name.str() << "::Union";
+      UnionMangledOS << MangledName.str() << "::Union";
+      auto IntTy = BuiltinIntegerType::get(EnumSizeInBits,
+                                           DbgTy.getType()->getASTContext());
+      auto IntDbgTy = DebugTypeInfo::getFromTypeInfo(
+            DbgTy.getDeclContext(),
+            DbgTy.getDeclContext()->getGenericEnvironmentOfContext(),
+            IntTy, IGM.getTypeInfoForUnlowered(IntTy));
+
+      auto EnumType = DBuilder.createEnumerationType(
+            Scope, EnumNameOS.str(), File, Line, EnumSizeInBits, 0,
+            getEnumRawElements(Decl), getOrCreateType(IntDbgTy));
+
+      // Without a unique mangled name, CodeView does not recognize this union.
+      auto UnionType = DBuilder.createUnionType(
+            Scope, UnionNameOS.str(), File, Line, UnionSizeInBits, 0,
+            Flags, getEnumElements(DbgTy, Decl, Scope, File, Flags),
+            llvm::dwarf::DW_LANG_Swift, UnionMangledOS.str());
+
+      SmallVector<llvm::Metadata *, 2> Members = {
+        DBuilder.createMemberType(Scope, "Case", File, Line,
+                                  EnumSizeInBits, 0, /*Offset*/ UnionSizeInBits,
+                                  Flags, EnumType),
+        DBuilder.createMemberType(Scope, "AssociatedValue", File, Line,
+                                  UnionSizeInBits, 0, /*Offset*/ 0,
+                                  Flags, UnionType)
+      };
+      DITy = DBuilder.createStructType(
+            Scope, Name, File, Line, SizeInBits, AlignInBits, Flags, nullptr,
+            DBuilder.getOrCreateArray(Members), llvm::dwarf::DW_LANG_Swift,
+            nullptr, MangledName);
+    } else
+      DITy = DBuilder.createUnionType(
+            Scope, Name, File, Line, SizeInBits, AlignInBits,
+            Flags, getEnumElements(DbgTy, Decl, Scope, File, Flags),
+            llvm::dwarf::DW_LANG_Swift, MangledName);
 
     DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
     return DITy;
@@ -829,7 +919,8 @@ private:
                                          llvm::DIFile *File, unsigned Line,
                                          llvm::DINode::DIFlags Flags,
                                          StringRef MangledName) {
-    if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes) {
+    if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes ||
+        Opts.DebugInfoFormat == IRGenDebugInfoFormat::CodeView) {
       auto FwdDecl = DBuilder.createForwardDecl(
           llvm::dwarf::DW_TAG_structure_type, Name, Scope, File, Line,
           llvm::dwarf::DW_LANG_Swift, 0, 0);
@@ -932,8 +1023,15 @@ private:
                             StringRef MangledName) {
     TypeBase *BaseTy = DbgTy.getType();
     auto *TupleTy = BaseTy->castTo<TupleType>();
+    StringRef Name = MangledName;
+    std::string DemangledName; // This cannot be destroyed before Name is used.
+    if (Opts.DebugInfoFormat == IRGenDebugInfoFormat::CodeView) {
+      // We demangle the type name for a human readable type name in WinDbg.
+      DemangledName = swift::Demangle::demangleSymbolAsString(Name.str());
+      Name = StringRef(DemangledName);
+    }
     auto FwdDecl = llvm::TempDINode(DBuilder.createReplaceableCompositeType(
-        llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, MainFile, 0,
+        llvm::dwarf::DW_TAG_structure_type, Name, Scope, MainFile, 0,
         llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits, Flags,
         MangledName));
 
@@ -948,7 +1046,7 @@ private:
       RealSize = SizeInBits;
 
     auto DITy = DBuilder.createStructType(
-        Scope, MangledName, MainFile, 0, RealSize, AlignInBits, Flags,
+        Scope, Name, MainFile, 0, RealSize, AlignInBits, Flags,
         nullptr, // DerivedFrom
         Elements, llvm::dwarf::DW_LANG_Swift, nullptr, MangledName);
 
@@ -966,6 +1064,157 @@ private:
         /* DerivedFrom */ nullptr,
         DBuilder.getOrCreateArray(ArrayRef<llvm::Metadata *>()),
         llvm::dwarf::DW_LANG_Swift, nullptr, MangledName);
+  }
+
+  llvm::DIType *createArrayType(
+          DebugTypeInfo DbgTy, llvm::DIScope *Scope, llvm::DIFile *File,
+          unsigned SizeInBits, unsigned AlignInBits,
+          llvm::DINode::DIFlags Flags, StringRef MangledName) {
+    // FIXME: Find a way to automatically emit this structure, possibly
+    //        by using `ASTContext::getArrayDecl()`.
+    // We emit a Swift Array as a structure containing a pointer to a structure
+    // resembling ``_ContiguousArrayBuffer``, which has members ``_count`` and
+    // ``_firstElement``. Debuggers can use ``_firstElement`` to find the type
+    // and the location of the elements.
+    unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
+    auto DC = DbgTy.getDeclContext();
+    auto GE = DC->getGenericEnvironmentOfContext();
+    auto *ArrayTy = cast<ArraySliceType>(DbgTy.getType());
+    Type ElemTy = ArrayTy->getBaseType();
+    llvm::SmallString<16> NameBuf, SNameBuf;
+    llvm::raw_svector_ostream NameOS(NameBuf), SNameOS(SNameBuf);
+    // ``Array<ELEMTYPE>`` is the name of the Swift Array structure so that
+    // Visual Studio can use natvis to recognize ``Swift::Array<*>`` as a
+    // Swift Array.
+    NameOS << "Array<" << ElemTy.getStringAsComponent() << ">";
+    // ``Array<ELEMTYPE>_storage`` is the name of the structure resembling
+    // ``_ContiguousArrayBuffer``.
+    SNameOS << NameOS.str() << "_storage";
+    StringRef Name(NameOS.str()), SName(SNameOS.str());
+    auto Int64 = BuiltinIntegerType::get(64, DbgTy.getType()->getASTContext());
+    auto Int64DbgTy = DebugTypeInfo::getFromTypeInfo(
+                DC, GE, Int64, IGM.getTypeInfoForUnlowered(Int64));
+    auto ElemDbgTy = DebugTypeInfo::getFromTypeInfo(
+                DC, GE, ElemTy, IGM.getTypeInfoForUnlowered(ElemTy));
+
+    SmallVector<llvm::Metadata *, 2> Members = {
+      DBuilder.createMemberType(Scope, "_count", File, 0, /*Size*/ 64, 0,
+                                /*Offset*/ 128, Flags,
+                                getOrCreateType(Int64DbgTy)),
+      DBuilder.createMemberType(Scope, "_firstElement", File, 0, /*Size*/ 0, 0,
+                                /*Offset*/ 256, Flags,
+                                getOrCreateType(ElemDbgTy))};
+
+    // Create a structure resembling ``_ContiguousArrayBuffer``.
+    auto ArrayStorageDITy = DBuilder.createStructType(
+                Scope, SName, File, 0, /*Size*/ 256, 0, Flags,
+                /*DerivedFrom*/ nullptr, DBuilder.getOrCreateArray(Members),
+                llvm::dwarf::DW_LANG_Swift);
+    // Create a structure containing a pointer to the structure we just created.
+    auto ArrayStoragePtrDITy = DBuilder.createPointerType(ArrayStorageDITy,
+                                                          PtrSize);
+    auto ArrayMember = DBuilder.createMemberType(
+                Scope, "_storage", File, 0, PtrSize, 0, /*Offset*/ 0, Flags,
+                ArrayStoragePtrDITy);
+    return DBuilder.createStructType(
+                Scope, Name, File, 0, SizeInBits, AlignInBits, Flags,
+                /*DerivedFrom*/ nullptr, DBuilder.getOrCreateArray(ArrayMember),
+                llvm::dwarf::DW_LANG_Swift, nullptr, MangledName);
+  }
+
+  llvm::DIType *createOptionalType(
+          DebugTypeInfo DbgTy, llvm::DIScope *Scope, llvm::DIFile *File,
+          unsigned SizeInBits, unsigned AlignInBits,
+          llvm::DINode::DIFlags Flags, StringRef MangledName) {
+    // FIXME: Find a way to automatically emit this structure, possibly
+    //        by using `ASTContext::getOptionalDecl()`.
+    uint64_t SizeOfByte = CI.getTargetInfo().getCharWidth();
+    auto *OptionalTy = cast<OptionalType>(DbgTy.getType());
+    Type BaseTy = OptionalTy->getBaseType();
+    auto BaseDbgTy = DebugTypeInfo::getFromTypeInfo(
+            DbgTy.getDeclContext(), DbgTy.getGenericEnvironment(),
+            BaseTy, IGM.getTypeInfoForUnlowered(BaseTy));
+    llvm::SmallString<16> Buf;
+    llvm::raw_svector_ostream OS(Buf);
+    // `Optional<Wrapped>` is the name of the Swift optional type so that
+    // Visual Studio can use natvis to recognize `Swift::Optional<*>`.
+    OS << "Optional<" << BaseTy->getStringAsComponent() << ">";
+    // We know Optional<Wrapped> is an `enum` with cases named `none` and
+    // `some`. `none` is unused, but we want to make sure `some` has type
+    // `Wrapped` so that Visual Studio can display it.
+    auto Member = DBuilder.createMemberType(
+            Scope, "some", File, 0, BaseDbgTy.size.getValue() * SizeOfByte,
+            BaseDbgTy.align.getValue() * SizeOfByte, 0, Flags,
+            getOrCreateType(BaseDbgTy));
+    return DBuilder.createUnionType(
+            Scope, OS.str(), File, 0, SizeInBits, AlignInBits, Flags,
+            DBuilder.getOrCreateArray({Member}),
+            llvm::dwarf::DW_LANG_Swift, MangledName);
+  }
+
+  llvm::DIType *createDictionaryType(
+          DebugTypeInfo DbgTy, llvm::DIScope *Scope, llvm::DIFile *File,
+          unsigned SizeInBits, unsigned AlignInBits,
+          llvm::DINode::DIFlags Flags, StringRef MangledName) {
+    // FIXME: Find a way to automatically emit this structure, possibly
+    //        by using `ASTContext::getDictionaryDecl()`.
+    // FIXME: Assumes Native Swift Dictionary
+    unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
+    auto DC = DbgTy.getDeclContext();
+    auto GE = DC->getGenericEnvironmentOfContext();
+    auto *DictTy = cast<DictionaryType>(DbgTy.getType());
+    Type KeyTy = DictTy->getKeyType();
+    Type ValueTy = DictTy->getValueType();
+    auto KeyDbgTy = DebugTypeInfo::getFromTypeInfo(
+            DC, GE, KeyTy, IGM.getTypeInfoForUnlowered(KeyTy));
+    auto ValueDbgTy = DebugTypeInfo::getFromTypeInfo(
+            DC, GE, ValueTy, IGM.getTypeInfoForUnlowered(ValueTy));
+    // We need to make sure both the key and value types get emitted.
+    llvm::DIType *KeyDIType = getOrCreateType(KeyDbgTy);
+    llvm::DIType *ValueDIType = getOrCreateType(ValueDbgTy);
+    llvm::SmallString<32> NameBuf, RNameBuf;
+    llvm::raw_svector_ostream NameOS(NameBuf), RNameOS(RNameBuf);
+    // `Dictionary<Key,Value>` is the name of the Swift dictionary type so
+    // Visual Studio can use natvis to recognize `Swift::Dictionary<*>`.
+    NameOS << "Dictionary<" << KeyTy->getStringAsComponent() << ","
+                            << ValueTy->getStringAsComponent() << ">";
+    RNameOS << "_RawNativeDictionaryStorage<"
+            << KeyTy->getStringAsComponent() << ","
+            << ValueTy->getStringAsComponent() << ">";
+    // We create a struture that resembles a native swift dictionary.
+    // See stdlib/public/core/Dictionary.swift
+    auto Int64 = BuiltinIntegerType::get(64, DbgTy.getType()->getASTContext());
+    auto Int64DbgTy = DebugTypeInfo::getFromTypeInfo(
+                DC, GE, Int64, IGM.getTypeInfoForUnlowered(Int64));
+    auto Int64DITy = getOrCreateType(Int64DbgTy);
+
+    SmallVector<llvm::Metadata *, 5> RawStorageMembers = {
+      DBuilder.createMemberType(Scope, "bucketCount", File, 0, /*Size*/ 64,
+                                0, /*Offset*/ 128, Flags, Int64DITy),
+      DBuilder.createMemberType(Scope, "count", File, 0, /*Size*/ 64,
+                                0, /*Offset*/ 192, Flags, Int64DITy),
+      DBuilder.createMemberType(
+              Scope, "initializedEntries", File, 0, PtrSize, 0, /*Offset*/ 256,
+              Flags, DBuilder.createPointerType(Int64DITy, PtrSize)),
+      DBuilder.createMemberType(
+              Scope, "keys", File, 0, PtrSize, 0, /*Offset*/ 384,
+              Flags, DBuilder.createPointerType(KeyDIType, PtrSize)),
+      DBuilder.createMemberType(
+              Scope, "values", File, 0, PtrSize, 0, /*Offset*/ 448,
+              Flags, DBuilder.createPointerType(ValueDIType, PtrSize)),
+    };
+
+    auto RawStorageTy = DBuilder.createStructType(
+            Scope, RNameOS.str(), File, 0, /*Size*/ 576, 0, Flags, nullptr,
+            DBuilder.getOrCreateArray(RawStorageMembers),
+            llvm::dwarf::DW_LANG_Swift);
+    auto DictMember = DBuilder.createMemberType(
+            Scope, "_storage", File, 0, PtrSize, 0, /*Offset*/ 0, Flags,
+            DBuilder.createPointerType(RawStorageTy, PtrSize));
+    return DBuilder.createStructType(
+            Scope, NameOS.str(), File, 0, SizeInBits, AlignInBits, Flags,
+            /*DerivedFrom*/nullptr, DBuilder.getOrCreateArray({DictMember}),
+            llvm::dwarf::DW_LANG_Swift, nullptr, MangledName);
   }
 
   llvm::DIType *createType(DebugTypeInfo DbgTy, StringRef MangledName,
@@ -1002,6 +1251,18 @@ private:
     case TypeKind::BuiltinInteger: {
       Encoding = llvm::dwarf::DW_ATE_unsigned;
       SizeInBits = getSizeOfBasicType(DbgTy);
+      if (Opts.DebugInfoFormat == IRGenDebugInfoFormat::CodeView) {
+        if (SizeInBits == 1) {
+          // FIXME: Is there a better way to check for `Builtin.Int1`?
+          // `Swift::Bool` has a `Builtin.Int1` member, but CodeView will only
+          // recognize a bool if it is encoded as DW_ATE_boolean and has 8 bits.
+          SizeInBits = 8;
+          Encoding = llvm::dwarf::DW_ATE_boolean;
+        } else if (SizeInBits == 63)
+          // CodeView does not recognize 63-bit integral types, which are used
+          // by ``Swift::Character::Representation.smallUTF16``.
+          SizeInBits = 64;
+      }
       break;
     }
 
@@ -1071,7 +1332,8 @@ private:
         L.Filename = ClangSM.getBufferName(ClangSrcLoc);
       }
       auto *File = getOrCreateFile(L.Filename);
-      if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes)
+      if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes ||
+          Opts.DebugInfoFormat == IRGenDebugInfoFormat::CodeView)
         return createStructType(DbgTy, Decl, StructTy, Scope, File, L.Line,
                                 SizeInBits, AlignInBits, Flags,
                                 nullptr, // DerivedFrom
@@ -1157,7 +1419,8 @@ private:
 
     case TypeKind::Tuple: {
       // Tuples are also represented as structs.
-      if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes)
+      if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes ||
+          Opts.DebugInfoFormat == IRGenDebugInfoFormat::CodeView)
         return createTuple(DbgTy, Scope, SizeInBits, AlignInBits, Flags,
                            MangledName);
       else
@@ -1177,6 +1440,12 @@ private:
         auto DT = getOrCreateDesugaredType(ObjectTy, DbgTy);
         return createPointerSizedStruct(Scope, Name, DT, File, 0, Flags,
                                         MangledName);
+      } else if (Opts.DebugInfoFormat == IRGenDebugInfoFormat::CodeView) {
+        // In CodeView, an inout type is emitted as a reference to the
+        // appropriate type.
+        auto DT = getOrCreateDesugaredType(ObjectTy, DbgTy);
+        return DBuilder.createReferenceType(llvm::dwarf::DW_TAG_reference_type,
+                                            DT, SizeInBits);
       } else
         return createOpaqueStruct(Scope, Name, File, 0, SizeInBits, AlignInBits,
                                   Flags, MangledName);
@@ -1230,7 +1499,8 @@ private:
     case TypeKind::SILFunction:
     case TypeKind::Function:
     case TypeKind::GenericFunction: {
-      if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes)
+      if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes ||
+          Opts.DebugInfoFormat == IRGenDebugInfoFormat::CodeView)
         return createFunctionPointer(DbgTy, Scope, SizeInBits, AlignInBits,
                                      Flags, MangledName);
       else
@@ -1243,7 +1513,8 @@ private:
       auto *Decl = EnumTy->getDecl();
       auto L = getDebugLoc(*this, Decl);
       auto *File = getOrCreateFile(L.Filename);
-      if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes)
+      if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes ||
+          Opts.DebugInfoFormat == IRGenDebugInfoFormat::CodeView)
         return createEnumType(DbgTy, Decl, MangledName, Scope, File, L.Line,
                               Flags);
       else
@@ -1256,7 +1527,8 @@ private:
       auto *Decl = EnumTy->getDecl();
       auto L = getDebugLoc(*this, Decl);
       auto *File = getOrCreateFile(L.Filename);
-      if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes)
+      if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes ||
+          Opts.DebugInfoFormat == IRGenDebugInfoFormat::CodeView)
         return createEnumType(DbgTy, Decl, MangledName, Scope, File, L.Line,
                               Flags);
       else
@@ -1314,9 +1586,26 @@ private:
     }
 
     // SyntaxSugarType derivations.
-    case TypeKind::Dictionary:
-    case TypeKind::ArraySlice:
+    case TypeKind::Dictionary: {
+      if (Opts.DebugInfoFormat == IRGenDebugInfoFormat::CodeView)
+        return createDictionaryType(
+              DbgTy, Scope, File, SizeInBits, AlignInBits, Flags, MangledName);
+      auto *SyntaxSugarTy = cast<SyntaxSugarType>(BaseTy);
+      auto *CanTy = SyntaxSugarTy->getSinglyDesugaredType();
+      return getOrCreateDesugaredType(CanTy, DbgTy);
+    }
+    case TypeKind::ArraySlice: {
+      if (Opts.DebugInfoFormat == IRGenDebugInfoFormat::CodeView)
+        return createArrayType(
+              DbgTy, Scope, File, SizeInBits, AlignInBits, Flags, MangledName);
+      auto *SyntaxSugarTy = cast<SyntaxSugarType>(BaseTy);
+      auto *CanTy = SyntaxSugarTy->getSinglyDesugaredType();
+      return getOrCreateDesugaredType(CanTy, DbgTy);
+    }
     case TypeKind::Optional: {
+      if (Opts.DebugInfoFormat == IRGenDebugInfoFormat::CodeView)
+        return createOptionalType(
+              DbgTy, Scope, File, SizeInBits, AlignInBits, Flags, MangledName);
       auto *SyntaxSugarTy = cast<SyntaxSugarType>(BaseTy);
       auto *CanTy = SyntaxSugarTy->getSinglyDesugaredType();
       return getOrCreateDesugaredType(CanTy, DbgTy);
