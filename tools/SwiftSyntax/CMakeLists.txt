@@ -28,3 +28,8 @@ add_swift_library(swiftSwiftSyntax SHARED
   INSTALL_IN_COMPONENT swift-syntax
   TARGET_SDKS OSX
   IS_STDLIB)
+
+add_custom_target(swiftSwiftSyntax
+    DEPENDS swiftSwiftSyntax-macosx
+      swiftSwiftSyntax-macosx-x86_64
+      swiftSwiftSyntax-swiftmodule-macosx-x86_64)
