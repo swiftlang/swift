@@ -286,10 +286,17 @@ private:
                                               const ConcreteExistentialInfo &CEI,
                                               SILBuilderContext &BuilderCtx);
 
-  SILInstruction *
+  bool
   propagateConcreteTypeOfInitExistential(FullApplySite Apply,
                                          WitnessMethodInst *WMI);
   SILInstruction *propagateConcreteTypeOfInitExistential(FullApplySite Apply);
+
+  // Common utility function to replace the WitnessMethodInst using a
+  // BuilderCtx.
+  void replaceWitnessMethodInst(FullApplySite Apply, WitnessMethodInst *WMI,
+                                SILBuilderContext &BuilderCtx,
+                                const CanType &ConcreteType,
+                                ProtocolConformanceRef &ConformanceRef);
 
   /// Perform one SILCombine iteration.
   bool doOneIteration(SILFunction &F, unsigned Iteration);
