@@ -69,7 +69,7 @@ struct TestConfig {
       var fixedNumIters: UInt?
       var verbose: Bool?
       var action: TestAction?
-      var filters: [String]?
+      var tests: [String]?
     }
     var c = PartialTestConfig()
 
@@ -98,19 +98,21 @@ struct TestConfig {
         value: value, type: type, argument: argument)
     }
 
-    func optionalArg<T>(
-      _ name: String,
+    func parseArg<T>(
+      _ name: String?,
       _ property: WritableKeyPath<PartialTestConfig, T>,
       defaultValue: T? = nil,
       parser parse: (String) throws -> T? = { _ in nil }
     ) throws {
-      if let value = benchArgs.optionalArgsMap[name] {
+      if let name = name, let value = benchArgs.optionalArgsMap[name] {
         guard !value.isEmpty || defaultValue != nil
           else { throw ArgumentError.missingValue(name) }
 
         c[keyPath: property] = (value.isEmpty)
           ? defaultValue!
           : try checked(parse, value, argument:name)
+      } else if name == nil {
+        c[keyPath: property] = benchArgs.positionalArgs as! T
       }
     }
 
@@ -124,19 +126,18 @@ struct TestConfig {
     }
 
     // Parse command line arguments
-    try optionalArg("--iter-scale", \.iterationScale) { Int($0) }
-    try optionalArg("--num-iters", \.fixedNumIters) { UInt($0) }
-    try optionalArg("--num-samples", \.numSamples)  { Int($0) }
-    try optionalArg("--verbose", \.verbose, defaultValue: true)
-    try optionalArg("--delim", \.delim) { $0 }
-    try optionalArg("--tags", \PartialTestConfig.tags, parser: tags)
-    try optionalArg("--skip-tags", \PartialTestConfig.skipTags,
+    try parseArg("--iter-scale", \.iterationScale) { Int($0) }
+    try parseArg("--num-iters", \.fixedNumIters) { UInt($0) }
+    try parseArg("--num-samples", \.numSamples)  { Int($0) }
+    try parseArg("--verbose", \.verbose, defaultValue: true)
+    try parseArg("--delim", \.delim) { $0 }
+    try parseArg("--tags", \PartialTestConfig.tags, parser: tags)
+    try parseArg("--skip-tags", \PartialTestConfig.skipTags,
                     defaultValue: [], parser: tags)
-    try optionalArg("--sleep", \.afterRunSleep) { Int($0) }
-    try optionalArg("--list", \.action, defaultValue: .listTests)
-    try optionalArg("--help", \.action, defaultValue: .help(validOptions))
-
-    c.filters = benchArgs.positionalArgs
+    try parseArg("--sleep", \.afterRunSleep) { Int($0) }
+    try parseArg("--list", \.action, defaultValue: .listTests)
+    try parseArg("--help", \.action, defaultValue: .help(validOptions))
+    try parseArg(nil, \.tests) // positional arguments
 
     // Configure from the command line arguments, filling in the defaults.
     delim = c.delim ?? ","
@@ -147,7 +148,7 @@ struct TestConfig {
     afterRunSleep = c.afterRunSleep
     action = c.action ?? .run
     tests = TestConfig.filterTests(registeredBenchmarks,
-                                    filters: c.filters ?? [],
+                                    specifiedTests: Set(c.tests ?? []),
                                     tags: c.tags ?? [],
                                     skipTags: c.skipTags ?? [.unstable, .skip])
 
@@ -159,7 +160,7 @@ struct TestConfig {
             Verbose: \(verbose)
             IterScale: \(iterationScale)
             FixedIters: \(fixedNumIters)
-            Tests Filter: \(c.filters ?? [])
+            Tests Filter: \(c.tests ?? [])
             Tests to run: \(testList)
 
             --- DATA ---\n
@@ -171,7 +172,7 @@ struct TestConfig {
   ///
   /// - Parameters:
   ///   - registeredBenchmarks: List of all performance tests to be filtered.
-  ///   - filters: List of explicitly specified tests to run. These can be
+  ///   - specifiedTests: List of explicitly specified tests to run. These can be
   ///     specified either by a test name or a test number.
   ///   - tags: Run tests tagged with all of these categories.
   ///   - skipTags: Don't run tests tagged with any of these categories.
@@ -179,14 +180,13 @@ struct TestConfig {
   ///     specified filtering conditions.
   static func filterTests(
     _ registeredBenchmarks: [BenchmarkInfo],
-    filters: [String],
+    specifiedTests: Set<String>,
     tags: Set<BenchmarkCategory>,
     skipTags: Set<BenchmarkCategory>
   ) -> [(index: String, info: BenchmarkInfo)] {
     let indices = Dictionary(uniqueKeysWithValues:
       zip(registeredBenchmarks.sorted().map { $0.name },
           (1...).lazy.map { String($0) } ))
-    let specifiedTests = Set(filters)
 
     func byTags(b: BenchmarkInfo) -> Bool {
       return b.tags.isSuperset(of: tags) &&
@@ -197,7 +197,7 @@ struct TestConfig {
         specifiedTests.contains(indices[b.name]!)
     } // !! "All registeredBenchmarks have been assigned an index"
     return registeredBenchmarks
-      .filter(filters.isEmpty ? byTags : byNamesOrIndices)
+      .filter(specifiedTests.isEmpty ? byTags : byNamesOrIndices)
       .map { (index: indices[$0.name]!, info: $0) }
   }
 }
