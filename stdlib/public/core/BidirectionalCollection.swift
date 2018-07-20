@@ -255,9 +255,7 @@ extension BidirectionalCollection where SubSequence == Self {
     _precondition(n >= 0, "Number of elements to remove should be non-negative")
     _precondition(count >= n,
       "Can't remove more items from a collection than it contains")
-    // FIXME: using non-_'d `index` incorrectly calls the Collection one for
-    // conditional conformances to BidirectionalCollections.
-    self = self[startIndex..<_index(endIndex, offsetBy: -n)]
+    self = self[startIndex..<index(endIndex, offsetBy: -n)]
   }
 }
 
@@ -283,9 +281,7 @@ extension BidirectionalCollection {
   public func dropLast(_ n: Int) -> SubSequence {
     _precondition(
       n >= 0, "Can't drop a negative number of elements from a collection")
-    // FIXME: using non-_'d `index` incorrectly calls the Collection one for
-    // conditional conformances to BidirectionalCollections.
-    let end = _index(
+    let end = index(
       endIndex,
       offsetBy: -n,
       limitedBy: startIndex) ?? startIndex
@@ -315,9 +311,7 @@ extension BidirectionalCollection {
     _precondition(
       maxLength >= 0,
       "Can't take a suffix of negative length from a collection")
-    // FIXME: using non-_'d `index` incorrectly calls the Collection one for
-    // conditional conformances to BidirectionalCollections.
-    let start = _index(
+    let start = index(
       endIndex,
       offsetBy: -maxLength,
       limitedBy: startIndex) ?? startIndex
