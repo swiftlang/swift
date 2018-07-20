@@ -26,6 +26,8 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/Defer.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILVisitor.h"
 #include "llvm/ADT/ScopedHashTable.h"
@@ -437,8 +439,14 @@ public:
 
   TF_DataType getTensorFlowDataType(SILType type, SILLocation loc);
 
+  /// Creates a constant node for an undef value in the input function.
+  /// These values will never be used for any calculations and therefore,
+  /// can be an any arbitrary value.
+  TF_Output createUndefNode(SILType type);
+
   TF_Output createParameter(SILOpResult value, TF_Output passedValue,
                             GraphFunctionBody &fn);
+
 
   /// Add an available value for the specified SILOpResult (a SILValue+result#)
   /// to the value mapping.  This defaults to setting its scope to the current
@@ -489,6 +497,9 @@ public:
   /// SILValue+result #).  Note that this can return a null value if an error
   /// occurred lowering the operand in question.
   TF_Output getOperandValue(SILOpResult v) {
+    if (isa<SILUndef>(v.first) ) {
+      return createUndefNode(v.first->getType());
+    }
     std::pair<TF_Output, unsigned> valueInfo = valueMapping.lookup(v);
     assert(valueInfo.first.oper != nullptr && "didn't find live-in value?");
 
@@ -813,6 +824,89 @@ static TF_Tensor *convertValuesToTensor(ArrayRef<APInt> elts,
   }
 
   return tensor;
+}
+
+TF_Output TFGraphLowering::createUndefNode(SILType type) {
+  // Create some magic constant. Actual value does not matter as it will
+  // not be used in any calculations.
+  // FIXME: Is there a better way to model undefs in TF Graph if we
+  // don't have a way of getting rid of undefs during canonicalization.
+  APInt value;
+  TF_DataType dtype = getTensorFlowDataType(type, SILFn.getLocation());
+  switch (dtype) {
+  case TF_FLOAT:
+    value = APFloat((float)1.0).bitcastToAPInt();
+    break;
+  case TF_DOUBLE:
+    value = APFloat((double)2.0).bitcastToAPInt();
+    break;
+  case TF_BOOL:
+    value = APInt(1, "0", 10);
+    break;
+  case TF_INT8:
+  case TF_UINT8:
+    value = APInt(8, "aa", 16);
+    break;
+  case TF_INT16:
+  case TF_UINT16:
+    value = APInt(16, "aaaa", 16);
+    break;
+  case TF_INT32:
+  case TF_UINT32:
+    value = APInt(32, "aaaaaa", 16);
+    break;
+  case TF_INT64:
+  case TF_UINT64:
+    value = APInt(64, "aaaaaaaa", 16);
+    break;
+  case TF_STRING:
+  case TF_COMPLEX64:  // Single-precision complex
+  case TF_QINT8:      // Quantized int8
+  case TF_QUINT8:     // Quantized uint8
+  case TF_QINT32:     // Quantized int32
+  case TF_BFLOAT16:   // Float32 truncated to 16 bits.  Only for cast ops.
+  case TF_QINT16:     // Quantized int16
+  case TF_QUINT16:    // Quantized uint16
+  case TF_COMPLEX128: // Double-precision complex
+  case TF_HALF:
+  case TF_RESOURCE:
+  case TF_VARIANT:
+    llvm_unreachable("Cannot deal with other undef node types at this point");
+  }
+
+  // Create a graph node
+  auto &graphFn = getCurrentGraphFunction();
+  std::string nodeName("UndefConst" + type.getAsString());
+  // escape the node name.
+  for (std::string::size_type i = 0; i < nodeName.size(); ++i) {
+    switch (nodeName[i]) {
+    case '$':
+      nodeName[i] = 'D';
+      break;
+    case '<':
+      nodeName[i] = 'L';
+      break;
+    case '>':
+      nodeName[i] = 'G';
+      break;
+    }
+  }
+  auto *result = TF_NewOperation(graphFn.getGraph(), "Const", nodeName.c_str());
+  TF_SetAttrType(result, "dtype", dtype);
+
+  // Make an uninitialized tensor that is big enough for our value.
+  SmallVector<int64_t, 4> shape; // 0d shape
+  auto dtypeSize = TF_DataTypeSize(dtype);
+  auto *tensor =
+      TF_AllocateTensor(dtype, shape.data(), shape.size(), dtypeSize);
+
+  // Set up its contents, element-wise.
+  memcpy((char *)TF_TensorData(tensor), value.getRawData(), dtypeSize);
+  TF_SetAttrTensor(result, "value", tensor, status);
+  TF_Operation *finalResult =
+      graphFn.finishOp(result, /*hasSideEffects*/ false,
+                       /*isEligibleForTPU*/ true, status);
+  return {finalResult, 0};
 }
 
 //===----------------------------------------------------------------------===//
@@ -3492,4 +3586,47 @@ bool tf::lowerTFGraph(
   return lowerTFGraphOrFunction(hostFnName, fn, entryFnBaseName,
                                 /*isAcceleratorOnly*/ false, deviceInfo,
                                 graphFunctions);
+}
+
+
+//===----------------------------------------------------------------------===//
+// TFLowerGraphTestPass
+//===----------------------------------------------------------------------===//
+
+namespace {
+/// This is a SIL pass that drives the TF Graph generation process.  This is not
+/// used by the compiler proper, it just exists so we can drive it through
+/// sil-opt and write testcases.
+struct TFLowerGraphTestPass : public SILFunctionTransform {
+
+  /// The entry point to the transformation.
+  void run() override {
+    auto fn = getFunction();
+    auto deviceInfo = GraphFunctionDeviceInfo::getForFunction(
+        *fn, /*removeConfigInst*/ true);
+    llvm::DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>>
+        graphFunctions;
+    if (lowerTFGraph(fn->getName(), fn, deviceInfo, graphFunctions)) {
+      llvm::errs() << "Failed to generate TFGraph for " << fn->getName()
+                   << "\n";
+      return;
+    }
+    for (const auto &kv : graphFunctions) {
+      const LoweredGraphFunction* resultGraph = kv.second.get();
+      size_t len;
+      const char *content = TF_GraphDebugString(resultGraph->graph.get(), &len);
+      llvm::outs() << "--- TFPartition GraphDef Proto: " << fn->getName()
+                   << "\n";
+      llvm::outs() << content << "\n";
+      llvm::outs() << "----\n";
+      llvm::outs().flush();
+      free((void*)content);
+    }
+  }
+};
+
+} // end anonymous namespace.
+
+SILTransform *swift::createTFLowerGraph() {
+  return new TFLowerGraphTestPass();
 }

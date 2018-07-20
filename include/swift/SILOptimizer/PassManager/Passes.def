@@ -283,6 +283,8 @@ PASS(TFPartitionTest, "tf-partition",
      "Partition accelerator operations out of mainline control flow")
 PASS(TFXLACFGCanonicalize, "tf-xla-cfg-canonicalize",
      "Canonicalize the control flow graph into SESE region for XLA")
+PASS(TFLowerGraph, "tf-lower-graph",
+     "Lower the given control flow graph into a TF graph")
 // SWIFT_ENABLE_TENSORFLOW End
 PASS(UnsafeGuaranteedPeephole, "unsafe-guaranteed-peephole",
      "SIL retain/release Peephole Removal for Builtin.unsafeGuaranteed")

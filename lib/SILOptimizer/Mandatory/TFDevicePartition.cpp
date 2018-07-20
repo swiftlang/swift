@@ -841,6 +841,8 @@ class DevicePartitionerImpl
 
     // BB args are replicated on all devices, so no transfer is needed.
     if (isa<SILArgument>(opValue)) return;
+    // Undefs will be handled later.
+    if (isa<SILUndef>(opValue)) return;
 
     auto *operandInst = opValue->getDefiningInstruction();
     assert(operandInst && "value must be defined by an instruction");
