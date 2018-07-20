@@ -17,7 +17,7 @@ bb0:
 // CHECK: library {
 // CHECK:  function {
 // CHECK:  node_def {
-// CHECK:      name: "UndefConst$TensorHandle<Bool>"
+// CHECK:      name: "UndefConstDTensorHandleLBoolG"
 // CHECK:      op: "Const"
 // CHECK:      attr {
 // CHECK:        key: "dtype"
@@ -48,7 +48,7 @@ bb0:
 // CHECK: library {
 // CHECK:  function {
 // CHECK:  node_def {
-// CHECK:      name: "UndefConst$TensorHandle<Int8>"
+// CHECK:      name: "UndefConstDTensorHandleLInt8G"
 // CHECK:      op: "Const"
 // CHECK:      attr {
 // CHECK:        key: "dtype"
@@ -79,7 +79,7 @@ bb0:
 // CHECK: library {
 // CHECK:  function {
 // CHECK:  node_def {
-// CHECK:      name: "UndefConst$TensorHandle<UInt8>"
+// CHECK:      name: "UndefConstDTensorHandleLUInt8G"
 // CHECK:      op: "Const"
 // CHECK:      attr {
 // CHECK:        key: "dtype"
@@ -110,7 +110,7 @@ bb0:
 // CHECK: library {
 // CHECK:  function {
 // CHECK:  node_def {
-// CHECK:      name: "UndefConst$TensorHandle<Int16>"
+// CHECK:      name: "UndefConstDTensorHandleLInt16G"
 // CHECK:      op: "Const"
 // CHECK:      attr {
 // CHECK:        key: "dtype"
@@ -141,7 +141,7 @@ bb0:
 // CHECK: library {
 // CHECK:  function {
 // CHECK:  node_def {
-// CHECK:      name: "UndefConst$TensorHandle<UInt16>"
+// CHECK:      name: "UndefConstDTensorHandleLUInt16G"
 // CHECK:      op: "Const"
 // CHECK:      attr {
 // CHECK:        key: "dtype"
@@ -173,7 +173,7 @@ bb0:
 // CHECK: library {
 // CHECK:  function {
 // CHECK:  node_def {
-// CHECK:      name: "UndefConst$TensorHandle<Int32>"
+// CHECK:      name: "UndefConstDTensorHandleLInt32G"
 // CHECK:      op: "Const"
 // CHECK:      attr {
 // CHECK:        key: "dtype"
@@ -204,7 +204,7 @@ bb0:
 // CHECK: library {
 // CHECK:  function {
 // CHECK:  node_def {
-// CHECK:      name: "UndefConst$TensorHandle<UInt32>"
+// CHECK:      name: "UndefConstDTensorHandleLUInt32G"
 // CHECK:      op: "Const"
 // CHECK:      attr {
 // CHECK:        key: "dtype"
@@ -235,7 +235,7 @@ bb0:
 // CHECK: library {
 // CHECK:  function {
 // CHECK:  node_def {
-// CHECK:      name: "UndefConst$TensorHandle<Int64>"
+// CHECK:      name: "UndefConstDTensorHandleLInt64G"
 // CHECK:      op: "Const"
 // CHECK:      attr {
 // CHECK:        key: "dtype"
@@ -266,7 +266,7 @@ bb0:
 // CHECK: library {
 // CHECK:  function {
 // CHECK:  node_def {
-// CHECK:      name: "UndefConst$TensorHandle<UInt64>"
+// CHECK:      name: "UndefConstDTensorHandleLUInt64G"
 // CHECK:      op: "Const"
 // CHECK:      attr {
 // CHECK:        key: "dtype"
@@ -298,7 +298,7 @@ bb0:
 // CHECK: library {
 // CHECK:  function {
 // CHECK:  node_def {
-// CHECK:      name: "UndefConst$TensorHandle<Float>"
+// CHECK:      name: "UndefConstDTensorHandleLFloatG"
 // CHECK:      op: "Const"
 // CHECK:      attr {
 // CHECK:        key: "dtype"
@@ -329,7 +329,7 @@ bb0:
 // CHECK: library {
 // CHECK:  function {
 // CHECK:  node_def {
-// CHECK:      name: "UndefConst$TensorHandle<Double>"
+// CHECK:      name: "UndefConstDTensorHandleLDoubleG"
 // CHECK:      op: "Const"
 // CHECK:      attr {
 // CHECK:        key: "dtype"
@@ -352,8 +352,4 @@ bb0:
 // CHECK:  }
 // CHECK:}
 
-sil @$undefTFIntdd : $@convention(thin) () -> TensorHandle<UInt64>  {
-bb0:
- return undef : $TensorHandle<UInt64>
-}
 
