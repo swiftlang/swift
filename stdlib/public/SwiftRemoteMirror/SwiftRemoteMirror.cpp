@@ -16,10 +16,6 @@
 #include "swift/Runtime/Unreachable.h"
 #include "swift/SwiftRemoteMirror/SwiftRemoteMirror.h"
 
-#if defined(__APPLE__) && defined(__MACH__)
-#include <mach-o/getsect.h>
-#endif
-
 using namespace swift;
 using namespace swift::reflection;
 using namespace swift::remote;
@@ -118,36 +114,12 @@ swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
   Context->addReflectionInfo(*reinterpret_cast<ReflectionInfo *>(&Info));
 }
 
-#if defined(__APPLE__) && defined(__MACH__)
-#ifndef __LP64__
-typedef const struct mach_header MachHeader;
-#else
-typedef const struct mach_header_64 MachHeader;
-#endif
-
-template <typename Section>
-static bool findSection(MachHeader *Header, const char *Name,
-                        Section &Sect) {
-  unsigned long Size;
-  auto Address = getsectiondata(Header, "__TEXT", Name, &Size);
-  if (!Address)
-    return false;
-  
-  Sect.section.Begin = Address;
-  auto End = reinterpret_cast<uintptr_t>(Address) + Size;
-  Sect.section.End = reinterpret_cast<void *>(End);
-  Sect.offset = 0;
-  
-  return true;
-}
-
 int
 swift_reflection_addImage(SwiftReflectionContextRef ContextRef,
                           swift_addr_t imageStart) {
   auto Context = ContextRef->nativeContext;
   return Context->addImage(RemoteAddress(imageStart));
 }
-#endif
 
 int
 swift_reflection_readIsaMask(SwiftReflectionContextRef ContextRef,
