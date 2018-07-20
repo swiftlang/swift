@@ -32,44 +32,56 @@ enum TestAction {
 
 struct TestConfig {
   /// The delimiter to use when printing output.
-  var delim: String  = ","
+  let delim: String
 
   /// The filters applied to our test names.
-  var filters = [String]()
+  let filters: [String]
 
   /// The tags that we want to run
-  var tags = Set<BenchmarkCategory>()
+  let tags: Set<BenchmarkCategory>
 
   /// Tests tagged with any of these will not be executed
-  var skipTags: Set<BenchmarkCategory> = [.unstable, .skip]
+  let skipTags: Set<BenchmarkCategory>
 
   /// The scalar multiple of the amount of times a test should be run. This
   /// enables one to cause tests to run for N iterations longer than they
   /// normally would. This is useful when one wishes for a test to run for a
   /// longer amount of time to perform performance analysis on the test in
   /// instruments.
-  var iterationScale: Int = 1
+  let iterationScale: Int
 
   /// If we are asked to have a fixed number of iterations, the number of fixed
   /// iterations.
-  var fixedNumIters: UInt = 0
+  let fixedNumIters: UInt
 
   /// The number of samples we should take of each test.
-  var numSamples: Int = 1
+  let numSamples: Int
 
   /// Is verbose output enabled?
-  var verbose: Bool = false
+  let verbose: Bool
 
   /// After we run the tests, should the harness sleep to allow for utilities
   /// like leaks that require a PID to run on the test harness.
-  var afterRunSleep: Int?
+  let afterRunSleep: Int?
 
   /// The list of tests to run.
   var tests = [(index: String, info: BenchmarkInfo)]()
 
-  var action: TestAction = .run
+  let action: TestAction
 
   init() throws {
+
+    struct PartialTestConfig {
+      var delim: String?
+      var filters: [String]?
+      var tags, skipTags: Set<BenchmarkCategory>?
+      var iterationScale, numSamples, afterRunSleep: Int?
+      var fixedNumIters: UInt?
+      var verbose: Bool?
+      var action: TestAction?
+    }
+    var c = PartialTestConfig()
+
     let validOptions = [
       "--iter-scale", "--num-samples", "--num-iters",
       "--verbose", "--delim", "--list", "--sleep",
@@ -87,13 +99,19 @@ struct TestConfig {
       argument: String? = nil
     ) throws -> T {
       if let t = try parse(value)  { return t }
+      var type = "\(T.self)"
+      if type.starts(with: "Optional<") {
+          let s = type.index(after: type.index(of:"<")!)
+          let e = type.index(before: type.endIndex) // ">"
+          type = String(type[s..<e]) // strip Optional< >
+      }
       throw ArgumentError.invalidType(
-        value: value, type: "\(T.self)", argument: argument)
+        value: value, type: type, argument: argument)
     }
 
     func optionalArg<T>(
       _ name: String,
-      _ property: WritableKeyPath<TestConfig, T>,
+      _ property: WritableKeyPath<PartialTestConfig, T>,
       defaultValue: T? = nil,
       parser parse: (String) throws -> T? = { _ in nil }
     ) throws {
@@ -101,7 +119,7 @@ struct TestConfig {
         guard !value.isEmpty || defaultValue != nil
           else { throw ArgumentError.missingValue(name) }
 
-        self[keyPath: property] = (value.isEmpty)
+        c[keyPath: property] = (value.isEmpty)
           ? defaultValue!
           : try checked(parse, value, argument:name)
       }
@@ -121,12 +139,24 @@ struct TestConfig {
     try optionalArg("--num-samples", \.numSamples)  { Int($0) }
     try optionalArg("--verbose", \.verbose, defaultValue: true)
     try optionalArg("--delim", \.delim) { $0 }
-    try optionalArg("--tags", \.tags, parser: tags)
-    try optionalArg("--skip-tags", \.skipTags, defaultValue: [], parser: tags)
+    try optionalArg("--tags", \PartialTestConfig.tags, parser: tags)
+    try optionalArg("--skip-tags", \PartialTestConfig.skipTags,
+                    defaultValue: [], parser: tags)
     try optionalArg("--sleep", \.afterRunSleep) { Int($0) }
     try optionalArg("--list", \.action, defaultValue: .listTests)
     try optionalArg("--help", \.action, defaultValue: .help(validOptions))
 
+    // Configure from the command line arguments, filling in the defaults.
+    delim = c.delim ?? ","
+    self.tags = c.tags ?? []
+    skipTags = c.skipTags ?? [.unstable, .skip]
+    iterationScale = c.iterationScale ?? 1
+    fixedNumIters = c.fixedNumIters ?? 0
+    numSamples = c.numSamples ?? 1
+    verbose = c.verbose ?? false
+    afterRunSleep = c.afterRunSleep
+    action = c.action ?? .run
+    // TODO: filters, tests
   }
 
   mutating func findTestsToRun() {
