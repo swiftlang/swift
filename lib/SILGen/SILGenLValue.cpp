@@ -1233,6 +1233,7 @@ namespace {
 
       // If the declaration is dynamically dispatched through a class,
       // we have to use materializeForSet.
+      // FIXME: here
       if (auto *classDecl = dyn_cast<ClassDecl>(decl->getDeclContext())) {
         if (decl->isFinal() || classDecl->isFinal())
           return false;

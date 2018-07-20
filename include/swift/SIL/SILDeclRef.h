@@ -57,7 +57,8 @@ enum class MethodDispatch {
 };
 
 /// Get the method dispatch mechanism for a method.
-MethodDispatch getMethodDispatch(AbstractFunctionDecl *method);
+MethodDispatch getMethodDispatch(const AbstractFunctionDecl *method,
+                                 const SILFunction &callingFunction);
 
 /// True if calling the given method or property should use ObjC dispatch.
 bool requiresForeignEntryPoint(ValueDecl *vd);

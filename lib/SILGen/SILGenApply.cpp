@@ -123,33 +123,7 @@ getDynamicMethodLoweredType(SILModule &M,
 static bool canUseStaticDispatch(SILGenFunction &SGF,
                                  SILDeclRef constant) {
   auto *funcDecl = cast<AbstractFunctionDecl>(constant.getDecl());
-
-  if (funcDecl->isFinal())
-    return true;
-  // Extension methods currently must be statically dispatched, unless they're
-  // @objc or dynamic.
-  if (funcDecl->getDeclContext()->isExtensionContext()
-      && !constant.isForeign)
-    return true;
-
-  // We cannot form a direct reference to a method body defined in
-  // Objective-C.
-  if (constant.isForeign)
-    return false;
-
-  // If we cannot form a direct reference due to resilience constraints,
-  // we have to dynamic dispatch.
-  if (SGF.F.isSerialized())
-    return false;
-
-  // If the method is defined in the same module, we can reference it
-  // directly.
-  auto thisModule = SGF.SGM.M.getSwiftModule();
-  if (thisModule == funcDecl->getModuleContext())
-    return true;
-
-  // Otherwise, we must dynamic dispatch.
-  return false;
+  return getMethodDispatch(funcDecl, SGF.F) == MethodDispatch::Static;
 }
 
 static SILValue getOriginalSelfValue(SILValue selfValue) {
@@ -281,6 +255,12 @@ private:
   /// *NOTE* This should never be non-null if IndirectValue is non-null.
   SILDeclRef Constant;
 
+  /// Used to decide whether a class method can be called statically, or whether
+  /// it must use dynamic dispatch.
+  ///
+  /// Only set when Constant is non-null.
+  const SILFunction *CallingFunction;
+
   /// The abstraction pattern of the callee.
   AbstractionPattern OrigFormalInterfaceType;
 
@@ -316,6 +296,7 @@ private:
          SILLocation l)
     : kind(Kind::IndirectValue),
       IndirectValue(indirectValue),
+      CallingFunction(nullptr),
       OrigFormalInterfaceType(origFormalType),
       SubstFormalInterfaceType(substFormalType),
       Loc(l)
@@ -327,6 +308,7 @@ private:
          CanAnyFunctionType substFormalType,
          SubstitutionMap subs, SILLocation l)
     : kind(Kind::StandaloneFunction), Constant(standaloneFunction),
+      CallingFunction(&SGF.F),
       OrigFormalInterfaceType(origFormalType),
       SubstFormalInterfaceType(getSubstFormalInterfaceType(substFormalType,
                                                            subs)),
@@ -341,6 +323,7 @@ private:
          AbstractionPattern origFormalType, CanAnyFunctionType substFormalType,
          SubstitutionMap subs, SILLocation l)
       : kind(methodKind), Constant(methodName),
+        CallingFunction(&SGF.F),
         OrigFormalInterfaceType(origFormalType),
         SubstFormalInterfaceType(
             getSubstFormalInterfaceType(substFormalType, subs)),
@@ -512,7 +495,8 @@ public:
       // make sure we emit the right set of thunks.
       if (kind == Kind::StandaloneFunction) {
         if (auto func = Constant.getAbstractFunctionDecl()) {
-          if (getMethodDispatch(func) == MethodDispatch::Class) {
+          if (getMethodDispatch(func, *CallingFunction) ==
+              MethodDispatch::Class) {
             return constant.asDirectReference(true);
           }
         }
@@ -895,8 +879,9 @@ public:
     if (e->getAccessSemantics() != AccessSemantics::Ordinary)
       return false;
 
-    if (getMethodDispatch(afd) == MethodDispatch::Static)
+    if (getMethodDispatch(afd, SGF.F) == MethodDispatch::Static) {
       return false;
+    }
 
     if (auto ctor = dyn_cast<ConstructorDecl>(afd)) {
       // Non-required initializers are statically dispatched.
@@ -1308,7 +1293,7 @@ public:
       setCallee(Callee::forWitnessMethod(
           SGF, self.getType().getASTType(),
           constant, subs, expr));
-    } else if (getMethodDispatch(ctorRef->getDecl())
+    } else if (getMethodDispatch(ctorRef->getDecl(), SGF.F)
                  == MethodDispatch::Class) {
       // Dynamic dispatch to the initializer.
       Scope S(SGF, expr);
@@ -4935,20 +4920,12 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &SGF,
         constant, subs, loc);
   }
 
-  bool isClassDispatch = false;
-  if (!isDirectUse) {
-    switch (getMethodDispatch(decl)) {
-    case MethodDispatch::Class:
-      isClassDispatch = true;
-      break;
-    case MethodDispatch::Static:
-      isClassDispatch = false;
-      break;
-    }
-  }
+  auto methodDispatch = MethodDispatch::Static;
+  if (!isDirectUse)
+    methodDispatch = getMethodDispatch(decl, SGF.F);
 
   // Dispatch in a struct/enum or to a final method is always direct.
-  if (!isClassDispatch)
+  if (methodDispatch != MethodDispatch::Class)
     return Callee::forDirect(SGF, constant, subs, loc);
 
   // Otherwise, if we have a non-final class dispatch to a normal method,
