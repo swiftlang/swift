@@ -305,7 +305,7 @@ TEST(MetadataTest, getExistentialMetadata) {
       EXPECT_EQ(MetadataKind::Existential, any->getKind());
       EXPECT_EQ(0U, any->Flags.getNumWitnessTables());
       EXPECT_EQ(ProtocolClassConstraint::Any, any->Flags.getClassConstraint());
-      EXPECT_EQ(0U, any->Protocols.NumProtocols);
+      EXPECT_EQ(0U, any->NumProtocols);
       EXPECT_EQ(SpecialProtocol::None,
                 any->Flags.getSpecialProtocol());
       EXPECT_EQ(nullptr,
@@ -324,8 +324,9 @@ TEST(MetadataTest, getExistentialMetadata) {
       EXPECT_EQ(MetadataKind::Existential, a->getKind());
       EXPECT_EQ(1U, a->Flags.getNumWitnessTables());
       EXPECT_EQ(ProtocolClassConstraint::Any, a->Flags.getClassConstraint());
-      EXPECT_EQ(1U, a->Protocols.NumProtocols);
-      EXPECT_EQ(&ProtocolA, a->Protocols[0]);
+      EXPECT_EQ(1U, a->NumProtocols);
+      EXPECT_EQ(&ProtocolA,
+                a->getProtocols()[0].getProtocolDescriptorUnchecked());
       EXPECT_EQ(SpecialProtocol::None,
                 a->Flags.getSpecialProtocol());
       EXPECT_EQ(nullptr,
@@ -345,8 +346,9 @@ TEST(MetadataTest, getExistentialMetadata) {
       EXPECT_EQ(MetadataKind::Existential, b->getKind());
       EXPECT_EQ(1U, b->Flags.getNumWitnessTables());
       EXPECT_EQ(ProtocolClassConstraint::Any, b->Flags.getClassConstraint());
-      EXPECT_EQ(1U, b->Protocols.NumProtocols);
-      EXPECT_EQ(&ProtocolB, b->Protocols[0]);
+      EXPECT_EQ(1U, b->NumProtocols);
+      EXPECT_EQ(&ProtocolB,
+                b->getProtocols()[0].getProtocolDescriptorUnchecked());
       EXPECT_EQ(SpecialProtocol::None,
                 b->Flags.getSpecialProtocol());
       EXPECT_EQ(nullptr,
@@ -367,10 +369,11 @@ TEST(MetadataTest, getExistentialMetadata) {
       EXPECT_EQ(1U, classConstrained->Flags.getNumWitnessTables());
       EXPECT_EQ(ProtocolClassConstraint::Class,
                 classConstrained->Flags.getClassConstraint());
-      EXPECT_EQ(1U, classConstrained->Protocols.NumProtocols);
+      EXPECT_EQ(1U, classConstrained->NumProtocols);
       EXPECT_EQ(SpecialProtocol::None,
                 classConstrained->Flags.getSpecialProtocol());
-      EXPECT_EQ(&ProtocolClassConstrained, classConstrained->Protocols[0]);
+      EXPECT_EQ(&ProtocolClassConstrained,
+                classConstrained->getProtocols()[0].getProtocolDescriptorUnchecked());
       EXPECT_EQ(nullptr,
                 classConstrained->getSuperclassConstraint());
       return classConstrained;
@@ -389,10 +392,11 @@ TEST(MetadataTest, getExistentialMetadata) {
       EXPECT_EQ(0U, noWitnessTable->Flags.getNumWitnessTables());
       EXPECT_EQ(ProtocolClassConstraint::Class,
                 noWitnessTable->Flags.getClassConstraint());
-      EXPECT_EQ(1U, noWitnessTable->Protocols.NumProtocols);
+      EXPECT_EQ(1U, noWitnessTable->NumProtocols);
       EXPECT_EQ(SpecialProtocol::None,
                 noWitnessTable->Flags.getSpecialProtocol());
-      EXPECT_EQ(&ProtocolNoWitnessTable, noWitnessTable->Protocols[0]);
+      EXPECT_EQ(&ProtocolNoWitnessTable,
+                noWitnessTable->getProtocols()[0].getProtocolDescriptorUnchecked());
       EXPECT_EQ(nullptr,
                 noWitnessTable->getSuperclassConstraint());
       return noWitnessTable;
@@ -414,7 +418,7 @@ TEST(MetadataTest, getExistentialMetadata) {
       EXPECT_EQ(2U, mixedWitnessTable->Flags.getNumWitnessTables());
       EXPECT_EQ(ProtocolClassConstraint::Class,
                 mixedWitnessTable->Flags.getClassConstraint());
-      EXPECT_EQ(3U, mixedWitnessTable->Protocols.NumProtocols);
+      EXPECT_EQ(3U, mixedWitnessTable->NumProtocols);
       EXPECT_EQ(SpecialProtocol::None,
                 mixedWitnessTable->Flags.getSpecialProtocol());
       EXPECT_EQ(nullptr,
@@ -622,8 +626,8 @@ TEST(MetadataTest, getExistentialTypeMetadata_subclass) {
       EXPECT_TRUE(ex1->getValueWitnesses()->isBitwiseTakable());
       EXPECT_EQ(ProtocolClassConstraint::Class,
                 ex1->Flags.getClassConstraint());
-      EXPECT_EQ(1U, ex1->Protocols.NumProtocols);
-      EXPECT_EQ(&OpaqueProto1, ex1->Protocols[0]);
+      EXPECT_EQ(1U, ex1->NumProtocols);
+      EXPECT_EQ(&OpaqueProto1, ex1->getProtocols()[0].getProtocolDescriptorUnchecked());
       EXPECT_EQ(&MetadataTest2, ex1->getSuperclassConstraint());
       return ex1;
     });
@@ -645,9 +649,11 @@ TEST(MetadataTest, getExistentialTypeMetadata_subclass) {
       EXPECT_TRUE(ex2->getValueWitnesses()->isBitwiseTakable());
       EXPECT_EQ(ProtocolClassConstraint::Class,
                 ex2->Flags.getClassConstraint());
-      EXPECT_EQ(2U, ex2->Protocols.NumProtocols);
-      EXPECT_TRUE(ex2->Protocols[0] == &OpaqueProto1 &&
-                  ex2->Protocols[1] == &ClassProto1);
+      EXPECT_EQ(2U, ex2->NumProtocols);
+      EXPECT_TRUE(ex2->getProtocols()[0].getProtocolDescriptorUnchecked()
+                    == &OpaqueProto1 &&
+                  ex2->getProtocols()[1].getProtocolDescriptorUnchecked()
+                    == &ClassProto1);
       EXPECT_EQ(&MetadataTest2, ex2->getSuperclassConstraint());
       return ex2;
     });

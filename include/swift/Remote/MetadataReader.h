@@ -351,17 +351,16 @@ public:
       BuiltType SuperclassType = BuiltType();
       if (Exist->Flags.hasSuperclassConstraint()) {
         // The superclass is stored after the list of protocols.
-        SuperclassType = readTypeFromMetadata(
-                                              Exist->Protocols[Exist->Protocols.NumProtocols]);
+        SuperclassType = readTypeFromMetadata(Exist->getSuperclassConstraint());
         if (!SuperclassType) return BuiltType();
 
         HasExplicitAnyObject = true;
       }
 
       std::vector<BuiltProtocolDecl> Protocols;
-      for (size_t i = 0; i < Exist->Protocols.NumProtocols; ++i) {
-        auto ProtocolAddress = Exist->Protocols[i];
-        auto ProtocolDescriptor = readProtocolDescriptor(ProtocolAddress);
+      for (auto ProtocolAddress : Exist->getProtocols()) {
+        auto ProtocolDescriptor = readProtocolDescriptor(
+            ProtocolAddress.getProtocolDescriptorUnchecked());
         if (!ProtocolDescriptor)
           return BuiltType();
 
@@ -868,14 +867,15 @@ protected:
         StoredPointer flagsAddress = address +
           sizeof(StoredPointer);
 
-        StoredPointer flags;
+        ExistentialTypeFlags::int_type flagsData;
         if (!Reader->readInteger(RemoteAddress(flagsAddress),
-                                 &flags))
+                                 &flagsData))
           return nullptr;
 
-        StoredPointer numProtocolsAddress = address +
-          TargetExistentialTypeMetadata<Runtime>::OffsetToNumProtocols;
-        StoredPointer numProtocols;
+        ExistentialTypeFlags flags(flagsData);
+
+        StoredPointer numProtocolsAddress = flagsAddress + sizeof(flagsData);
+        uint32_t numProtocols;
         if (!Reader->readInteger(RemoteAddress(numProtocolsAddress),
                                  &numProtocols))
           return nullptr;
@@ -888,7 +888,7 @@ protected:
           + numProtocols *
           sizeof(ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor>);
 
-        if (ExistentialTypeFlags(flags).hasSuperclassConstraint())
+        if (flags.hasSuperclassConstraint())
           totalSize += sizeof(StoredPointer);
 
         return _readMetadata(address, totalSize);

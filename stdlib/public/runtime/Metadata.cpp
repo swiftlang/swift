@@ -2372,7 +2372,7 @@ public:
   struct Key {
     const Metadata *SuperclassConstraint;
     ProtocolClassConstraint ClassConstraint : 1;
-    size_t NumProtocols : 31;
+    uint32_t NumProtocols : 31;
     const ProtocolDescriptor * const *Protocols;
   };
 
@@ -2392,11 +2392,14 @@ public:
       return result;
 
     if (auto result = compareIntegers(key.NumProtocols,
-                                      Data.Protocols.NumProtocols))
+                                      Data.NumProtocols))
       return result;
 
+    auto dataProtocols = Data.getProtocols();
     for (size_t i = 0; i != key.NumProtocols; ++i) {
-      if (auto result = comparePointers(key.Protocols[i], Data.Protocols[i]))
+      if (auto result =
+            comparePointers(key.Protocols[i],
+                            dataProtocols[i].getProtocolDescriptorUnchecked()))
         return result;
     }
 
@@ -2404,16 +2407,15 @@ public:
   }
 
   static size_t getExtraAllocationSize(Key key) {
-    return (sizeof(const ProtocolDescriptor *) * key.NumProtocols +
-            (key.SuperclassConstraint != nullptr
-             ? sizeof(const Metadata *)
-             : 0));
+    return ExistentialTypeMetadata::additionalSizeToAlloc<
+             const Metadata *, ProtocolDescriptorRef
+           >(key.SuperclassConstraint != nullptr, key.NumProtocols);
   }
+
   size_t getExtraAllocationSize() const {
-    return (sizeof(const ProtocolDescriptor *) * Data.Protocols.NumProtocols +
-            (Data.Flags.hasSuperclassConstraint()
-             ? sizeof(const Metadata *)
-             : 0));
+    return ExistentialTypeMetadata::additionalSizeToAlloc<
+             const Metadata *, ProtocolDescriptorRef
+           >(Data.Flags.hasSuperclassConstraint(), Data.NumProtocols);
   }
 };
 
@@ -2851,7 +2853,7 @@ swift::swift_getExistentialTypeMetadata(
          (!superclassConstraint &&
           !anyProtocolIsClassBound(numProtocols, protocols)));
   ExistentialCacheEntry::Key key = {
-    superclassConstraint, classConstraint, numProtocols, protocols
+    superclassConstraint, classConstraint, (uint32_t)numProtocols, protocols
   };
   return &ExistentialTypes.getOrInsert(key).first->Data;
 }
@@ -2883,18 +2885,15 @@ ExistentialCacheEntry::ExistentialCacheEntry(Key key) {
 
   if (key.SuperclassConstraint != nullptr) {
     Data.Flags = Data.Flags.withHasSuperclass(true);
-
-    // Get a pointer to tail-allocated storage for this metadata record.
-    auto Pointer = reinterpret_cast<
-      const Metadata **>(&Data + 1);
-
-    // The superclass immediately follows the list of protocol descriptors.
-    Pointer[key.NumProtocols] = key.SuperclassConstraint;
+    Data.setSuperclassConstraint(key.SuperclassConstraint);
   }
 
-  Data.Protocols.NumProtocols = key.NumProtocols;
-  for (size_t i = 0; i < key.NumProtocols; ++i)
-    Data.Protocols[i] = key.Protocols[i];
+  Data.NumProtocols = key.NumProtocols;
+  auto dataProtocols = Data.getMutableProtocols();
+  for (size_t i = 0; i < key.NumProtocols; ++i) {
+    dataProtocols[i] = ProtocolDescriptorRef(key.Protocols[i],
+                                             key.Protocols[i]->Flags.getDispatchStrategy());
+  }
 }
 
 /// \brief Perform a copy-assignment from one existential container to another.

@@ -77,10 +77,10 @@ public:
 
 #if SWIFT_OBJC_INTEROP
   bool objectConformsToObjCProtocol(const void *theObject,
-                                    const ProtocolDescriptor *theProtocol);
+                                    ProtocolDescriptorRef protocol);
   
   bool classConformsToObjCProtocol(const void *theClass,
-                                    const ProtocolDescriptor *theProtocol);
+                                   ProtocolDescriptorRef protocol);
 #endif
 
   /// Is the given value a valid alignment mask?

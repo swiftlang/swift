@@ -1621,7 +1621,7 @@ public:
     storage = reinterpret_cast<StoredPointer>(protocol)
       | (dispatchStrategy == ProtocolDispatchStrategy::ObjC ? IsObjCBit : 0);
 #else
-    assert(!isObjC);
+    assert(dispatchStrategy == ProtocolDispatchStrategy::Swift);
     storage = reinterpret_cast<StoredPointer>(protocol);
 #endif
   }
@@ -1683,7 +1683,7 @@ public:
     // FIXME: Once we are consistently setting the IsObjC bit, check that
     // here. For now, check the runtime flags.
     // return (storage & IsObjCBit) != 0;
-    return storage && !getProtocolDescriptorUnchecked()->Flags.isSwift();
+    return !getProtocolDescriptorUnchecked()->Flags.needsWitnessTable();
   }
 
   /// Retrieve the Objective-C protocol.
@@ -1891,26 +1891,53 @@ enum class ExistentialTypeRepresentation {
 
 /// The structure of existential type metadata.
 template <typename Runtime>
-struct TargetExistentialTypeMetadata : public TargetMetadata<Runtime> {
+struct TargetExistentialTypeMetadata
+  : TargetMetadata<Runtime>,
+    swift::ABI::TrailingObjects<
+      TargetExistentialTypeMetadata<Runtime>,
+      ConstTargetMetadataPointer<Runtime, TargetMetadata>,
+      TargetProtocolDescriptorRef<Runtime>> {
+
+private:
+  using ProtocolDescriptorRef = TargetProtocolDescriptorRef<Runtime>;
+  using MetadataPointer = ConstTargetMetadataPointer<Runtime, TargetMetadata>;
+  using TrailingObjects =
+          swift::ABI::TrailingObjects<
+          TargetExistentialTypeMetadata<Runtime>,
+          MetadataPointer,
+          ProtocolDescriptorRef>;
+  friend TrailingObjects;
+
+  template<typename T>
+  using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
+
+  size_t numTrailingObjects(OverloadToken<ProtocolDescriptorRef>) const {
+    return NumProtocols;
+  }
+
+  size_t numTrailingObjects(OverloadToken<MetadataPointer>) const {
+    return Flags.hasSuperclassConstraint() ? 1 : 0;
+  }
+
+public:
   using StoredPointer = typename Runtime::StoredPointer;
   /// The number of witness tables and class-constrained-ness of the type.
   ExistentialTypeFlags Flags;
-  /// The protocol constraints.
-  TargetProtocolDescriptorList<Runtime> Protocols;
-  
-  /// NB: Protocols has a tail-emplaced array; additional fields cannot follow.
-  
+
+  /// The number of protocols.
+  uint32_t NumProtocols;
+
   constexpr TargetExistentialTypeMetadata()
     : TargetMetadata<Runtime>(MetadataKind::Existential),
-      Flags(ExistentialTypeFlags()), Protocols() {}
+      Flags(ExistentialTypeFlags()), NumProtocols(0) {}
   
   explicit constexpr TargetExistentialTypeMetadata(ExistentialTypeFlags Flags)
     : TargetMetadata<Runtime>(MetadataKind::Existential),
-      Flags(Flags), Protocols() {}
+      Flags(Flags), NumProtocols(0) {}
 
   /// Get the representation form this existential type uses.
   ExistentialTypeRepresentation getRepresentation() const;
-  
+
   /// True if it's valid to take ownership of the value in the existential
   /// container if we own the container.
   bool mayTakeValue(const OpaqueValue *container) const;
@@ -1946,25 +1973,35 @@ struct TargetExistentialTypeMetadata : public TargetMetadata<Runtime> {
     return Flags.getClassConstraint() == ProtocolClassConstraint::Class;
   }
 
-  const TargetMetadata<Runtime> *getSuperclassConstraint() const {
+  /// Retrieve the set of protocols required by the existential.
+  ArrayRef<ProtocolDescriptorRef> getProtocols() const {
+    return { this->template getTrailingObjects<ProtocolDescriptorRef>(),
+             NumProtocols };
+  }
+
+  MetadataPointer getSuperclassConstraint() const {
     if (!Flags.hasSuperclassConstraint())
-      return nullptr;
+      return MetadataPointer();
 
-    // Get a pointer to tail-allocated storage for this metadata record.
-    auto Pointer = reinterpret_cast<
-      ConstTargetMetadataPointer<Runtime, TargetMetadata> const *>(this + 1);
+    return this->template getTrailingObjects<MetadataPointer>()[0];
+  }
 
-    // The superclass immediately follows the list of protocol descriptors.
-    return Pointer[Protocols.NumProtocols];
+  /// Retrieve the set of protocols required by the existential.
+  MutableArrayRef<ProtocolDescriptorRef> getMutableProtocols() {
+    return { this->template getTrailingObjects<ProtocolDescriptorRef>(),
+             NumProtocols };
+  }
+
+  /// Set the superclass.
+  void setSuperclassConstraint(MetadataPointer superclass) {
+    assert(Flags.hasSuperclassConstraint());
+    assert(superclass != nullptr);
+    this->template getTrailingObjects<MetadataPointer>()[0] = superclass;
   }
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
     return metadata->getKind() == MetadataKind::Existential;
   }
-
-  static constexpr StoredPointer
-  OffsetToNumProtocols = sizeof(TargetMetadata<Runtime>) + sizeof(ExistentialTypeFlags);
-
 };
 using ExistentialTypeMetadata
   = TargetExistentialTypeMetadata<InProcess>;
