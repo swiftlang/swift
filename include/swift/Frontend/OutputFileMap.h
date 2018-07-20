@@ -30,6 +30,11 @@ namespace swift {
 
 using TypeToPathMap = llvm::DenseMap<file_types::ID, std::string>;
 
+/// A two-tiered map used to specify paths for multiple output files associated
+/// with each input file in a compilation job.
+///
+/// The structure is a map from input paths to sub-maps, each of which maps
+/// file types to output paths.
 class OutputFileMap {
 private:
   llvm::StringMap<TypeToPathMap> InputToOutputsMap;
@@ -73,7 +78,10 @@ public:
   /// Dump the OutputFileMap to the given \p os.
   void dump(llvm::raw_ostream &os, bool Sort = false) const;
 
-  /// Write the OutputFilemap for the \p inputs so it can be parsed.
+  /// Write the OutputFileMap for the \p inputs so it can be parsed.
+  ///
+  /// It is not an error if the map does not contain an entry for a particular
+  /// input. Instead, an empty sub-map will be written into the output.
   void write(llvm::raw_ostream &os, ArrayRef<StringRef> inputs) const;
 
 private:
