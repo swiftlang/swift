@@ -19,6 +19,8 @@
 #define SWIFT_REFLECTION_REFLECTIONCONTEXT_H
 
 #include "llvm/BinaryFormat/MachO.h"
+#include "llvm/BinaryFormat/ELF.h"
+
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Remote/MetadataReader.h"
 #include "swift/Reflection/Records.h"
@@ -227,8 +229,114 @@ public:
       return readMachOSections<MachOTraits<8>>(ImageStart);
     return false;
   }
-#endif // defined(__APPLE__) && defined(__MACH__)
-  
+#else // ELF platforms.
+  bool addImage(RemoteAddress ImageStart) {
+    auto Buf =
+        this->getReader().readBytes(ImageStart, sizeof(llvm::ELF::Elf64_Ehdr));
+
+    // Read the header.
+    auto Hdr = reinterpret_cast<const llvm::ELF::Elf64_Ehdr *>(Buf.get());
+
+    if (!Hdr->checkMagic())
+      return false;
+
+    // From the header, grab informations about the section header table.
+    auto SectionHdrAddress = ImageStart.getAddressData() + Hdr->e_shoff;
+    auto SectionHdrNumEntries = Hdr->e_shnum;
+    auto SectionEntrySize = Hdr->e_shentsize;
+
+    // Collect all the section headers, we need them to look up the
+    // reflection sections (by name) and the string table.
+    std::vector<const llvm::ELF::Elf64_Shdr *> SecHdrVec;
+    for (unsigned I = 0; I < SectionHdrNumEntries; ++I) {
+      auto SecBuf = this->getReader().readBytes(
+          RemoteAddress(SectionHdrAddress + (I * SectionEntrySize)),
+          SectionEntrySize);
+      auto SecHdr =
+          reinterpret_cast<const llvm::ELF::Elf64_Shdr *>(SecBuf.get());
+      SecHdrVec.push_back(SecHdr);
+    }
+
+    // This provides quick access to the section header string table index.
+    // We also here handle the unlikely even where the section index overflows
+    // and it's just a pointer to secondary storage (SHN_XINDEX).
+    uint32_t SecIdx = Hdr->e_shstrndx;
+    if (SecIdx == llvm::ELF::SHN_XINDEX) {
+      assert(!SecHdrVec.empty() && "malformed ELF object");
+      SecIdx = SecHdrVec[0]->sh_link;
+    }
+
+    assert(SecIdx < SecHdrVec.size() && "malformed ELF object");
+
+    const llvm::ELF::Elf64_Shdr *SecHdrStrTab = SecHdrVec[SecIdx];
+    llvm::ELF::Elf64_Off StrTabOffset = SecHdrStrTab->sh_offset;
+    llvm::ELF::Elf64_Xword StrTabSize = SecHdrStrTab->sh_size;
+
+    auto StrTabStart =
+        RemoteAddress(ImageStart.getAddressData() + StrTabOffset);
+    auto StrTabBuf = this->getReader().readBytes(StrTabStart, StrTabSize);
+    auto StrTab = reinterpret_cast<const char *>(StrTabBuf.get());
+
+    auto findELFSectionByName = [&](std::string Name)
+        -> std::pair<std::pair<const char *, const char *>, uint32_t> {
+      // Now for all the sections, find their name.
+      for (const llvm::ELF::Elf64_Shdr *Hdr : SecHdrVec) {
+        uint32_t Offset = Hdr->sh_name;
+        auto SecName = std::string(StrTab + Offset);
+        if (SecName != Name)
+          continue;
+        auto SecStart =
+            RemoteAddress(ImageStart.getAddressData() + Hdr->sh_offset);
+        auto SecSize = Hdr->sh_size;
+        auto SecBuf = this->getReader().readBytes(SecStart, SecSize);
+        auto SecContents = reinterpret_cast<const char *>(SecBuf.get());
+        return {{SecContents, SecContents + SecSize},
+                Hdr->sh_addr - Hdr->sh_offset};
+      }
+      return {{nullptr, nullptr}, 0};
+    };
+
+    auto FieldMdSec = findELFSectionByName("swift5_fieldmd");
+    auto AssocTySec = findELFSectionByName("swift5_assocty");
+    auto BuiltinTySec = findELFSectionByName("swift5_builtin");
+    auto CaptureSec = findELFSectionByName("swift5_capture");
+    auto TypeRefMdSec = findELFSectionByName("swift5_typeref");
+    auto ReflStrMdSec = findELFSectionByName("swift5_reflstr");
+
+    // We succeed if at least one of the sections is present in the
+    // ELF executable.
+    if (FieldMdSec.first.first == nullptr &&
+        AssocTySec.first.first == nullptr &&
+        BuiltinTySec.first.first == nullptr &&
+        CaptureSec.first.first == nullptr &&
+        TypeRefMdSec.first.first == nullptr &&
+        ReflStrMdSec.first.first == nullptr)
+      return false;
+
+    auto LocalStartAddress = reinterpret_cast<uintptr_t>(Buf.get());
+    auto RemoteStartAddress =
+        static_cast<uintptr_t>(ImageStart.getAddressData());
+
+    ReflectionInfo info = {
+        {{FieldMdSec.first.first, FieldMdSec.first.second}, FieldMdSec.second},
+        {{AssocTySec.first.first, AssocTySec.first.second}, AssocTySec.second},
+        {{BuiltinTySec.first.first, BuiltinTySec.first.second},
+         BuiltinTySec.second},
+        {{CaptureSec.first.first, CaptureSec.first.second}, CaptureSec.second},
+        {{TypeRefMdSec.first.first, TypeRefMdSec.first.second},
+         TypeRefMdSec.second},
+        {{ReflStrMdSec.first.first, ReflStrMdSec.first.second},
+         ReflStrMdSec.second},
+        LocalStartAddress,
+        RemoteStartAddress};
+
+    this->addReflectionInfo(info);
+
+    savedBuffers.push_back(std::move(Buf));
+    return true;
+  }
+#endif
+
   void addReflectionInfo(ReflectionInfo I) {
     getBuilder().addReflectionInfo(I);
   }
