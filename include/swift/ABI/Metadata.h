@@ -1577,6 +1577,126 @@ using TupleTypeMetadata = TargetTupleTypeMetadata<InProcess>;
   
 template <typename Runtime> struct TargetProtocolDescriptor;
 
+/// A reference to a protocol within the runtime, which may be either
+/// a Swift protocol or (when Objective-C interoperability is enabled) an
+/// Objective-C protocol.
+///
+/// This type always contains a single target pointer, whose lowest bit is
+/// used to distinguish between a Swift protocol referent and an Objective-C
+/// protocol referent.
+template <typename Runtime>
+class TargetProtocolDescriptorRef {
+  using StoredPointer = typename Runtime::StoredPointer;
+  using ProtocolDescriptorPointer =
+    ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor>;
+
+  enum : StoredPointer {
+    // The bit used to indicate whether this is an Objective-C protocol.
+    IsObjCBit = 0x1U,
+  };
+
+  /// A direct pointer to a protocol descriptor for either an Objective-C
+  /// protocol (if the low bit is set) or a Swift protocol (if the low bit
+  /// is clear).
+  StoredPointer storage;
+
+public:
+  /// Retrieve the protocol descriptor without checking whether we have an
+  /// Objective-C or Swift protocol.
+  /// FIXME: Temporarily public while we roll out TargetProtocolDescriptorRef.
+  ProtocolDescriptorPointer getProtocolDescriptorUnchecked() const {
+    return reinterpret_cast<ProtocolDescriptorPointer>(storage & ~IsObjCBit);
+  }
+
+public:
+  constexpr TargetProtocolDescriptorRef() : storage() { }
+  constexpr TargetProtocolDescriptorRef(nullptr_t) : storage() { }
+
+  TargetProtocolDescriptorRef(
+                        ProtocolDescriptorPointer protocol,
+                        ProtocolDispatchStrategy dispatchStrategy) {
+#if SWIFT_OBJC_INTEROP
+    assert(!protocol ||
+           protocol->Flags.getDispatchStrategy() == dispatchStrategy);
+    storage = reinterpret_cast<StoredPointer>(protocol)
+      | (dispatchStrategy == ProtocolDispatchStrategy::ObjC ? IsObjCBit : 0);
+#else
+    assert(!isObjC);
+    storage = reinterpret_cast<StoredPointer>(protocol);
+#endif
+  }
+
+  explicit constexpr operator bool() const {
+    return storage != 0;
+  }
+
+  /// The name of the protocol.
+  TargetPointer<Runtime, const char> getName() const {
+    return getProtocolDescriptorUnchecked()->Name;
+  }
+
+  /// Determine what kind of protocol this is, Swift or Objective-C.
+  ProtocolDispatchStrategy getDispatchStrategy() const {
+#if SWIFT_OBJC_INTEROP
+    if (isObjC()) {
+      return ProtocolDispatchStrategy::ObjC;
+    }
+#endif
+
+    return ProtocolDispatchStrategy::Swift;
+  }
+
+  /// Determine whether this protocol has a 'class' constraint.
+  ProtocolClassConstraint getClassConstraint() const {
+#if SWIFT_OBJC_INTEROP
+    if (isObjC()) {
+      return ProtocolClassConstraint::Class;
+    }
+#endif
+
+    return getProtocolDescriptorUnchecked()->Flags.getClassConstraint();
+  }
+
+  /// Determine whether this protocol needs a witness table.
+  bool needsWitnessTable() const {
+#if SWIFT_OBJC_INTEROP
+    if (isObjC()) {
+      return false;
+    }
+#endif
+
+    return getProtocolDescriptorUnchecked()->Flags.needsWitnessTable();
+  }
+
+  /// Retrieve the Swift protocol descriptor.
+  ProtocolDescriptorPointer getSwiftProtocol() const {
+#if SWIFT_OBJC_INTEROP
+    assert(!isObjC());
+#endif
+
+    return getProtocolDescriptorUnchecked();
+  }
+
+#if SWIFT_OBJC_INTEROP
+  /// Whether this references an Objective-C protocol.
+  constexpr bool isObjC() const {
+    // FIXME: Once we are consistently setting the IsObjC bit, check that
+    // here. For now, check the runtime flags.
+    // return (storage & IsObjCBit) != 0;
+    return storage && !getProtocolDescriptorUnchecked()->Flags.isSwift();
+  }
+
+  /// Retrieve the Objective-C protocol.
+  Protocol *getObjCProtocol() const {
+    assert(isObjC());
+    return reinterpret_cast<Protocol *>(storage & ~IsObjCBit);
+  }
+#endif
+};
+
+using ProtocolDescriptorRef = TargetProtocolDescriptorRef<InProcess>;
+
+
 /// An array of protocol descriptors with a header and tail-allocated elements.
 template <typename Runtime>
 struct TargetProtocolDescriptorList {
