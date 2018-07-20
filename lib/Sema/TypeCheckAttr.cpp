@@ -129,7 +129,7 @@ public:
         range.End = range.End.getAdvancedLoc(1);
       diag.fixItRemove(range);
 
-      auto *last = FD->getParameterList(FD->getNumParameterLists() - 1);
+      auto *last = FD->getParameters();
 
       // If the declaration already has a result type, we're going
       // to change it to 'Never'.
@@ -987,7 +987,7 @@ void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {
     return;
   }
 
-  auto paramList = FD->getParameterList(1);
+  auto paramList = FD->getParameters();
   bool relaxedIBActionUsedOnOSX = false;
   bool Valid = true;
   switch (paramList->size()) {
@@ -1463,12 +1463,11 @@ void AttributeChecker::visitRethrowsAttr(RethrowsAttr *attr) {
   // 'rethrows' only applies to functions that take throwing functions
   // as parameters.
   auto fn = cast<AbstractFunctionDecl>(D);
-  for (auto paramList : fn->getParameterLists()) {
-    for (auto param : *paramList)
-      if (hasThrowingFunctionParameter(param->getType()
-              ->lookThroughAllOptionalTypes()
-              ->getCanonicalType()))
-        return;
+  for (auto param : *fn->getParameters()) {
+    if (hasThrowingFunctionParameter(param->getType()
+            ->lookThroughAllOptionalTypes()
+            ->getCanonicalType()))
+      return;
   }
 
   TC.diagnose(attr->getLocation(), diag::rethrows_without_throwing_parameter);

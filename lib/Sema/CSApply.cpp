@@ -711,7 +711,7 @@ namespace {
       if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
         // For functions, close the existential once the function
         // has been fully applied.
-        return func->getNumParameterLists();
+        return 2;
       } else {
         // For storage, close the existential either when it's
         // accessed (if it's an rvalue only) or when it is loaded or
@@ -980,11 +980,9 @@ namespace {
                cast<FuncDecl>(func)->hasDynamicSelf()) ||
               (isa<ConstructorDecl>(func) &&
                containerTy->getClassOrBoundGenericClass())) {
-            refTy = refTy->replaceCovariantResultType(
-                containerTy, func->getNumParameterLists());
+            refTy = refTy->replaceCovariantResultType(containerTy, 2);
             if (!baseTy->isEqual(containerTy)) {
-              dynamicSelfFnType = refTy->replaceCovariantResultType(
-                  baseTy, func->getNumParameterLists());
+              dynamicSelfFnType = refTy->replaceCovariantResultType(baseTy, 2);
             }
           }
         }
@@ -1673,8 +1671,7 @@ namespace {
       // Also replace the result type with the base type, so that calls
       // to constructors defined in a superclass will know to cast the
       // result to the derived type.
-      resultTy = resultTy->replaceCovariantResultType(
-        selfTy, ctor->getNumParameterLists());
+      resultTy = resultTy->replaceCovariantResultType(selfTy, 2);
 
       ParameterTypeFlags flags;
       if (!selfTy->hasReferenceSemantics())
@@ -1691,10 +1688,8 @@ namespace {
 
       // Wrap in covariant `Self` return if needed.
       if (selfTy->hasReferenceSemantics()) {
-        auto covariantTy = resultTy
-          ->replaceCovariantResultType(cs.getType(base)
-                                           ->getWithoutSpecifierType(),
-                                       ctor->getNumParameterLists());
+        auto covariantTy = resultTy->replaceCovariantResultType(
+          cs.getType(base)->getWithoutSpecifierType(), 2);
         if (!covariantTy->isEqual(resultTy))
           ctorRef = cs.cacheType(
                new (ctx) CovariantFunctionConversionExpr(ctorRef, covariantTy));
@@ -8219,11 +8214,7 @@ Expr *Solution::coerceToType(Expr *expr, Type toType,
 
 // Determine whether this is a variadic witness.
 static bool isVariadicWitness(AbstractFunctionDecl *afd) {
-  unsigned index = 0;
-  if (afd->getImplicitSelfDecl())
-    ++index;
-
-  for (auto param : *afd->getParameterList(index))
+  for (auto param : *afd->getParameters())
     if (param->isVariadic())
       return true;
 

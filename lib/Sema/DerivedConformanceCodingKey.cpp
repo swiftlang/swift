@@ -68,7 +68,7 @@ static void deriveRawValueInit(AbstractFunctionDecl *initDecl) {
 
   // Get the param from init({string,int}Value:). self is the first param in the
   // list; stringValue is the second.
-  auto *valueParam = initDecl->getParameterList(1)->get(0);
+  auto *valueParam = initDecl->getParameters()->get(0);
   auto *valueParamExpr = new (C) DeclRefExpr(ConcreteDeclRef(valueParam),
                                              DeclNameLoc(), /*Implicit=*/true);
 
@@ -347,7 +347,7 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl) {
                                    /*HasBoundDecls=*/false, SourceLoc(),
                                    SourceLoc(), dfltBody));
 
-  auto *stringValueDecl = initDecl->getParameterList(1)->get(0);
+  auto *stringValueDecl = initDecl->getParameters()->get(0);
   auto *stringValueRef = new (C) DeclRefExpr(stringValueDecl, DeclNameLoc(),
                                              /*Implicit=*/true);
   auto *switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(),

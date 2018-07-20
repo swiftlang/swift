@@ -400,7 +400,7 @@ tryDiagnoseTrailingClosureAmbiguity(TypeChecker &tc,
     if (!callee)
       return false;
 
-    const ParameterList *paramList = callee->getParameterLists().back();
+    const ParameterList *paramList = callee->getParameters();
     const ParamDecl *param = paramList->getArray().back();
 
     // Sanity-check that the trailing closure corresponds to this parameter.
@@ -3402,7 +3402,7 @@ static bool isSymmetricBinaryOperator(const CalleeCandidateInfo &CCI) {
       return false;
 
     // It must have exactly two parameters.
-    auto params = decl->getParameterLists().back();
+    auto params = decl->getParameters();
     if (params->size() != 2) return false;
 
     // Require the types to be the same.

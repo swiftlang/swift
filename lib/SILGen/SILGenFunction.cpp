@@ -390,8 +390,8 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
 void SILGenFunction::emitFunction(FuncDecl *fd) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(fd);
 
-  emitProlog(fd, fd->getParameterLists(), fd->getResultInterfaceType(),
-             fd->hasThrows());
+  emitProlog(fd, fd->getParameters(), fd->getImplicitSelfDecl(),
+             fd->getResultInterfaceType(), fd->hasThrows());
   Type resultTy = fd->mapTypeIntoContext(fd->getResultInterfaceType());
   prepareEpilog(resultTy, fd->hasThrows(), CleanupLocation(fd));
 
@@ -405,8 +405,8 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(ace);
 
   auto resultIfaceTy = ace->getResultType()->mapTypeOutOfContext();
-  emitProlog(ace, ace->getParameters(), resultIfaceTy,
-             ace->isBodyThrowing());
+  emitProlog(ace, ace->getParameters(), /*selfParam=*/nullptr,
+             resultIfaceTy, ace->isBodyThrowing());
   prepareEpilog(ace->getResultType(), ace->isBodyThrowing(),
                 CleanupLocation(ace));
   emitProfilerIncrement(ace);
@@ -631,7 +631,8 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value) {
 
   auto *dc = function.getDecl()->getInnermostDeclContext();
   auto interfaceType = value->getType()->mapTypeOutOfContext();
-  emitProlog({}, interfaceType, dc, false);
+  emitProlog(/*paramList=*/nullptr, /*selfParam=*/nullptr, interfaceType,
+             dc, false);
   prepareEpilog(value->getType(), false, CleanupLocation::get(Loc));
   emitReturnExpr(Loc, value);
   emitEpilog(Loc);

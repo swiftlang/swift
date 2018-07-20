@@ -515,17 +515,16 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
                          &resolver);
 
   // Check the parameter patterns.
-  for (auto params : func->getParameterLists()) {
-    // Check the pattern.
-    if (tc.typeCheckParameterList(params, func, TypeResolutionOptions(),
-                                  resolver))
-      badType = true;
+  auto params = func->getParameters();
 
-    // Infer requirements from the pattern.
-    if (builder) {
-      builder->inferRequirements(*func->getParentModule(), params,
-                                 genericParams);
-    }
+  if (tc.typeCheckParameterList(params, func, TypeResolutionOptions(),
+                                resolver))
+    badType = true;
+
+  // Infer requirements from the pattern.
+  if (builder) {
+    builder->inferRequirements(*func->getParentModule(), params,
+                               genericParams);
   }
 
   // If there is a declared result type, check that as well.
@@ -583,11 +582,8 @@ static void revertGenericFuncSignature(AbstractFunctionDecl *func) {
       revertDependentTypeLoc(fn->getBodyResultTypeLoc());
 
   // Revert the body parameter types.
-  for (auto paramList : func->getParameterLists()) {
-    for (auto &param : *paramList) {
-      revertDependentTypeLoc(param->getTypeLoc());
-    }
-  }
+  for (auto &param : *func->getParameters())
+    revertDependentTypeLoc(param->getTypeLoc());
 }
 
 /// Determine whether the given type is \c Self, an associated type of \c Self,
@@ -890,24 +886,27 @@ void TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
 
 void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func,
                                          GenericSignature *sig) {
-  Type funcTy;
-  Type initFuncTy = Type();
+  bool hasSelf = func->getDeclContext()->isTypeContext();
 
+  // Result
+  Type resultTy;
   if (auto fn = dyn_cast<FuncDecl>(func)) {
-    funcTy = fn->getBodyResultTypeLoc().getType();
-    if (!funcTy)
-      funcTy = TupleType::getEmpty(Context);
+    resultTy = fn->getBodyResultTypeLoc().getType();
+    if (!resultTy)
+      resultTy = TupleType::getEmpty(Context);
 
   } else if (auto ctor = dyn_cast<ConstructorDecl>(func)) {
     auto *dc = ctor->getDeclContext();
 
-    funcTy = dc->getSelfInterfaceType();
-    if (!funcTy)
-      funcTy = ErrorType::get(Context);
+    if (hasSelf)
+      resultTy = dc->getSelfInterfaceType();
+
+    if (!resultTy)
+      resultTy = ErrorType::get(Context);
 
     // Adjust result type for failability.
     if (ctor->getFailability() != OTK_None)
-      funcTy = OptionalType::get(funcTy);
+      resultTy = OptionalType::get(resultTy);
 
     // Set the IUO attribute on the decl if this was declared with !.
     if (ctor->getFailability() == OTK_ImplicitlyUnwrappedOptional) {
@@ -915,65 +914,61 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func,
           new (Context) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true);
       ctor->getAttrs().add(forceAttr);
     }
-
-    initFuncTy = funcTy;
   } else {
     assert(isa<DestructorDecl>(func));
-    funcTy = TupleType::getEmpty(Context);
+    resultTy = TupleType::getEmpty(Context);
   }
 
-  auto paramLists = func->getParameterLists();
+  // (Args...) -> Result
+  Type funcTy;
 
-  bool hasSelf = func->getDeclContext()->isTypeContext();
-  for (unsigned i = 0, e = paramLists.size(); i != e; ++i) {
+  {
     SmallVector<AnyFunctionType::Param, 4> argTy;
-    SmallVector<AnyFunctionType::Param, 4> initArgTy;
-    
-    if (i == e-1 && hasSelf) {      
-      // Substitute in our own 'self' parameter.
-      
-      argTy.push_back(computeSelfParam(func));
-      if (initFuncTy) {
-        initArgTy.push_back(computeSelfParam(func, /*isInitializingCtor=*/true));
-      }
-    } else {
-      AnyFunctionType::decomposeInput(paramLists[e - i - 1]->getInterfaceType(Context), argTy);
-
-      if (initFuncTy)
-        initArgTy = argTy;
-    }
+    AnyFunctionType::decomposeInput(
+      func->getParameters()->getInterfaceType(Context), argTy);
 
     // 'throws' only applies to the innermost function.
     AnyFunctionType::ExtInfo info;
-    if (i == 0) {
-      info = info.withThrows(func->hasThrows());
-      // Defer bodies must not escape.
-      if (auto fd = dyn_cast<FuncDecl>(func))
-        info = info.withNoEscape(fd->isDeferBody());
-    }
-    
-    assert(std::all_of(argTy.begin(), argTy.end(), [](const AnyFunctionType::Param &aty){
-      return !aty.getType()->hasArchetype();
-    }));
-    assert(!funcTy->hasArchetype());
-    if (initFuncTy)
-      assert(!initFuncTy->hasArchetype());
+    info = info.withThrows(func->hasThrows());
+    // Defer bodies must not escape.
+    if (auto fd = dyn_cast<FuncDecl>(func))
+      info = info.withNoEscape(fd->isDeferBody());
 
-    if (sig && i == e-1) {
-      funcTy = GenericFunctionType::get(sig, argTy, funcTy, info);
-      if (initFuncTy)
-        initFuncTy = GenericFunctionType::get(sig, initArgTy, initFuncTy, info);
+    if (sig && !hasSelf) {
+      funcTy = GenericFunctionType::get(sig, argTy, resultTy, info);
     } else {
+      funcTy = FunctionType::get(argTy, resultTy, info);
+    }
+  }
+
+  Type initFuncTy;
+
+  // (Self) -> (Args...) -> Result
+  if (hasSelf) {
+    SmallVector<AnyFunctionType::Param, 1> argTy;
+    SmallVector<AnyFunctionType::Param, 1> initArgTy;
+
+    // Substitute in our own 'self' parameter.
+    argTy.push_back(computeSelfParam(func));
+    if (isa<ConstructorDecl>(func))
+      initArgTy.push_back(computeSelfParam(func, /*isInitializingCtor=*/true));
+
+    AnyFunctionType::ExtInfo info;
+    if (sig) {
+      if (isa<ConstructorDecl>(func))
+        initFuncTy = GenericFunctionType::get(sig, initArgTy, funcTy, info);
+      funcTy = GenericFunctionType::get(sig, argTy, funcTy, info);
+    } else {
+      if (isa<ConstructorDecl>(func))
+        initFuncTy = FunctionType::get(initArgTy, funcTy, info);
       funcTy = FunctionType::get(argTy, funcTy, info);
-      if (initFuncTy)
-        initFuncTy = FunctionType::get(initArgTy, initFuncTy, info);
     }
   }
 
   // Record the interface type.
   func->setInterfaceType(funcTy);
-  if (initFuncTy)
-    cast<ConstructorDecl>(func)->setInitializerInterfaceType(initFuncTy);
+  if (auto *ctor = dyn_cast<ConstructorDecl>(func))
+    ctor->setInitializerInterfaceType(initFuncTy);
 
   // We get bogus errors here with generic subscript materializeForSet.
   if (!isa<AccessorDecl>(func) ||
