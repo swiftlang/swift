@@ -313,47 +313,87 @@ static bool writeSIL(SILModule &SM, const PrimarySpecificPaths &PSPs,
                   PSPs.OutputFilename, opts.EmitSortedSIL);
 }
 
-static bool printAsObjCIfNeeded(StringRef outputPath, ModuleDecl *M,
-                                StringRef bridgingHeader, bool moduleIsPublic) {
-  using namespace llvm::sys;
-
+/// Invokes \p action with a raw_ostream that refers to a temporary file, which
+/// is then renamed into place as \p outputPath when the action completes.
+///
+/// If a temporary file cannot be created for whatever reason, \p action will
+/// be invoked with a stream directly opened at \p outputPath. Otherwise, if
+/// there is already a file at \p outputPath, it will not be overwritten if
+/// the new contents are identical.
+///
+/// If the process is interrupted with a signal, any temporary file will be
+/// removed.
+///
+/// As a special case, an output path of "-" is treated as referring to stdout.
+///
+/// If an error occurs, it is reported via \p diags.
+static bool atomicallyWritingToTextFile(
+    StringRef outputPath, DiagnosticEngine &diags,
+    llvm::function_ref<bool(llvm::raw_pwrite_stream &)> action) {
   if (outputPath.empty())
     return false;
 
-  clang::CompilerInstance Clang;
-
   std::string tmpFilePath;
-  std::error_code EC;
-  std::unique_ptr<llvm::raw_pwrite_stream> out =
-    Clang.createOutputFile(outputPath, EC,
-                           /*Binary=*/false,
-                           /*RemoveFileOnSignal=*/true,
-                           /*BaseInput=*/"",
-                           path::extension(outputPath),
-                           /*UseTemporary=*/true,
-                           /*CreateMissingDirectories=*/false,
-                           /*ResultPathName=*/nullptr,
-                           &tmpFilePath);
+  bool hadError;
+  {
+    clang::CompilerInstance Clang;
 
-  if (!out) {
-    M->getASTContext().Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                                      tmpFilePath, EC.message());
-    return true;
+    std::error_code EC;
+    std::unique_ptr<llvm::raw_pwrite_stream> out =
+      Clang.createOutputFile(outputPath, EC,
+                             /*Binary=*/false,
+                             /*RemoveFileOnSignal=*/true,
+                             /*BaseInput=*/"",
+                             llvm::sys::path::extension(outputPath),
+                             /*UseTemporary=*/true,
+                             /*CreateMissingDirectories=*/false,
+                             /*ResultPathName=*/nullptr,
+                             &tmpFilePath);
+
+    if (!out) {
+      diags.diagnose(SourceLoc(), diag::error_opening_output,
+                     tmpFilePath, EC.message());
+      return true;
+    }
+
+    hadError = action(*out);
   }
 
-  auto requiredAccess = moduleIsPublic ? AccessLevel::Public
-                                       : AccessLevel::Internal;
-  bool hadError = printAsObjC(*out, M, bridgingHeader, requiredAccess);
-  out->flush();
-
-  EC = swift::moveFileIfDifferent(tmpFilePath, outputPath);
-  if (EC) {
-    M->getASTContext().Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                                      outputPath, EC.message());
-    return true;
+  if (!tmpFilePath.empty()) {
+    if (auto EC = swift::moveFileIfDifferent(tmpFilePath, outputPath)) {
+      diags.diagnose(SourceLoc(), diag::error_opening_output,
+                     outputPath, EC.message());
+      return true;
+    }
   }
 
   return hadError;
+}
+
+static bool printAsObjCIfNeeded(StringRef outputPath, ModuleDecl *M,
+                                StringRef bridgingHeader, bool moduleIsPublic) {
+  return atomicallyWritingToTextFile(outputPath, M->getDiags(),
+                                 [&](raw_ostream &out) -> bool {
+    auto requiredAccess = moduleIsPublic ? AccessLevel::Public
+                                         : AccessLevel::Internal;
+    return printAsObjC(out, M, bridgingHeader, requiredAccess);
+  });
+}
+
+static bool printModuleInterfaceIfNeeded(StringRef outputPath, ModuleDecl *M) {
+  return atomicallyWritingToTextFile(outputPath, M->getDiags(),
+                                 [&](raw_ostream &out) -> bool {
+    auto printOptions = PrintOptions::printTextualInterfaceFile();
+    SmallVector<Decl *, 16> topLevelDecls;
+    M->getTopLevelDecls(topLevelDecls);
+    for (const Decl *D : topLevelDecls) {
+      if (!D->shouldPrintInContext(printOptions))
+        continue;
+      D->print(out, printOptions);
+      out << "\n";
+    }
+    return false;
+  });
 }
 
 /// Returns the OutputKind for the given Action.
@@ -1320,6 +1360,10 @@ static bool performCompileStepsPostSILGen(
   (void)printAsObjCIfNeeded(PSPs.SupplementaryOutputs.ObjCHeaderOutputPath,
                             Instance.getMainModule(),
                             opts.ImplicitObjCHeaderPath, moduleIsPublic);
+
+  (void)printModuleInterfaceIfNeeded(
+      PSPs.SupplementaryOutputs.ModuleInterfaceOutputPath,
+      Instance.getMainModule());
 
   if (Action == FrontendOptions::ActionType::EmitSIB)
     return serializeSIB(SM.get(), PSPs, Instance.getASTContext(), MSF);

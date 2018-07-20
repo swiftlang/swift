@@ -424,6 +424,8 @@ struct PrintOptions {
     return result;
   }
 
+  static PrintOptions printTextualInterfaceFile();
+
   static PrintOptions printModuleInterface();
   static PrintOptions printTypeInterface(Type T);
 
