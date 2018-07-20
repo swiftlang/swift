@@ -2979,11 +2979,6 @@ public:
 
     TC.checkDeclCircularity(CD);
     TC.ConformanceContexts.push_back(CD);
-
-    for (auto Member : CD->getMembers()) {
-      if (auto VD = dyn_cast<ValueDecl>(Member))
-        TC.requestMemberLayout(VD);
-    }
   }
 
   void visitProtocolDecl(ProtocolDecl *PD) {
@@ -4598,13 +4593,6 @@ void TypeChecker::requestMemberLayout(ValueDecl *member) {
   if (auto *protocolDecl = dyn_cast<ProtocolDecl>(dc))
     requestNominalLayout(protocolDecl);
 
-  // Compute overrides.
-  (void)member->getOverriddenDecls();
-
-  // Check whether the member is @objc or dynamic.
-  (void)member->isObjC();
-  (void)member->isDynamic();
-
   // If this represents (abstract) storage, form the appropriate accessors.
   if (auto storage = dyn_cast<AbstractStorageDecl>(member)) {
     validateAbstractStorageDecl(*this, storage);
@@ -4640,9 +4628,20 @@ void TypeChecker::requestSuperclassLayout(ClassDecl *classDecl) {
   }
 }
 
+/// "Finalize" the type so that SILGen can make copies of it, call
+/// methods on it, etc. This requires forcing enough computation so
+/// that (for example) a class can layout its vtable or a struct can
+/// be laid out in memory.
 static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
   assert(!nominal->hasClangNode());
   assert(isa<SourceFile>(nominal->getModuleScopeContext()));
+
+  if (auto *CD = dyn_cast<ClassDecl>(nominal)) {
+    // We need to add implicit initializers and dtors because it
+    // affects vtable layout.
+    TC.addImplicitConstructors(CD);
+    CD->addImplicitDestructor();
+  }
 
   for (auto *D : nominal->getMembers()) {
     auto VD = dyn_cast<ValueDecl>(D);
@@ -4654,7 +4653,12 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
 
     TC.validateDecl(VD);
 
-    TC.requestMemberLayout(VD);
+    // Compute overrides.
+    (void)VD->getOverriddenDecls();
+
+    // Check whether the member is @objc or dynamic.
+    (void)VD->isObjC();
+    (void)VD->isDynamic();
 
     // The only thing left to do is synthesize storage for lazy variables.
     auto *prop = dyn_cast<VarDecl>(D);
@@ -4669,11 +4673,6 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
   }
 
   if (auto *CD = dyn_cast<ClassDecl>(nominal)) {
-    // We need to add implicit initializers and dtors because it
-    // affects vtable layout.
-    TC.addImplicitConstructors(CD);
-    CD->addImplicitDestructor();
-
     // We need the superclass vtable layout as well.
     TC.requestSuperclassLayout(CD);
 
@@ -5534,9 +5533,6 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
                         *this, classDecl, superclassCtor, kind)) {
         Context.addSynthesizedDecl(ctor);
         classDecl->addMember(ctor);
-
-        if (classDecl->hasValidatedLayout())
-          requestMemberLayout(ctor);
       }
     }
 
