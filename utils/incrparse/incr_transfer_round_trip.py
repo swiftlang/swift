@@ -57,10 +57,8 @@ def main():
         '--swift-syntax-test', required=True,
         help='The path to swift-syntax-test')
     parser.add_argument(
-        '--print-visual-reuse-info', default=False, action='store_true',
-        help='Print visual reuse information about the incremental parse \
-              instead of diffing the syntax trees. This option is intended \
-              for debug purposes only.')
+        '--swift-swiftsyntax-test', required=True,
+        help='The path to swift-swiftsyntax-test')
 
     args = parser.parse_args(sys.argv[1:])
 
@@ -69,45 +67,57 @@ def main():
     test_case = args.test_case
     temp_dir = args.temp_dir
     swift_syntax_test = args.swift_syntax_test
-    visual_reuse_info = args.print_visual_reuse_info
+    swift_swiftsyntax_test = args.swift_swiftsyntax_test
 
     if not os.path.exists(temp_dir):
         os.makedirs(temp_dir)
 
-    incremental_serialized_file = temp_dir + '/' + test_file_name + '.' \
-        + test_case + '.postViaIncr.json'
-    post_edit_serialized_file = temp_dir + '/' + test_file_name + '.' \
-        + test_case + '.post.json'
+    pre_edit_tree_file = temp_dir + '/' + test_file_name + '.' \
+        + test_case + '.pre.json'
+    incremental_tree_file = temp_dir + '/' + test_file_name + '.' \
+        + test_case + '.incr.json'
+    post_edit_source_file = temp_dir + '/' + test_file_name + '.' \
+        + test_case + '.post.swift'
+    after_roundtrip_source_file = temp_dir + '/' + test_file_name + '.' \
+        + test_case + '.post_after_roundtrip.swift'
 
     # Generate the syntax tree once incrementally and once from scratch
     try:
         serializeIncrParseMarkupFile(test_file=test_file, 
                                      test_case=test_case, 
-                                     mode='incremental', 
+                                     mode='pre-edit', 
                                      serialization_mode='full',
-                                     omit_node_ids=True,
-                                     output_file=incremental_serialized_file, 
-                                     temp_dir=temp_dir + '/temp', 
+                                     omit_node_ids=False,
+                                     output_file=pre_edit_tree_file, 
+                                     temp_dir=temp_dir, 
                                      swift_syntax_test=swift_syntax_test, 
-                                     print_visual_reuse_info=visual_reuse_info)
-        if visual_reuse_info:
-            # If we just want the reuse info, we don't need to parse the file 
-            # from scratch or validate it
-            sys.exit(0)
+                                     print_visual_reuse_info=False)
 
         serializeIncrParseMarkupFile(test_file=test_file, 
                                      test_case=test_case, 
-                                     mode='post-edit', 
-                                     serialization_mode='full',
-                                     omit_node_ids=True,
-                                     output_file=post_edit_serialized_file, 
-                                     temp_dir=temp_dir + '/temp', 
+                                     mode='incremental', 
+                                     serialization_mode='incremental',
+                                     omit_node_ids=False,
+                                     output_file=incremental_tree_file, 
+                                     temp_dir=temp_dir, 
                                      swift_syntax_test=swift_syntax_test, 
-                                     print_visual_reuse_info=visual_reuse_info)
+                                     print_visual_reuse_info=False)
     except TestFailedError as e:
         print('Test case "%s" of %s FAILed' % (test_case, test_file), 
               file=sys.stderr)
         print(e.message, file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        run_command([swift_swiftsyntax_test, '--deserialize-incremental'] + 
+                    ['--pre-edit-tree', pre_edit_tree_file] +
+                    ['--incr-tree', incremental_tree_file] + 
+                    ['--out', after_roundtrip_source_file])
+    except subprocess.CalledProcessError as e:
+        print('Test case "%s" of %s FAILed' % (test_case, test_file), 
+              file=sys.stderr)
+        print('Deserializing the swift file failed:\n', file=sys.stderr)
+        print(e.output, file=sys.stderr)
         sys.exit(1)
 
     # Check if the two syntax trees are the same
@@ -115,14 +125,15 @@ def main():
         run_command(
             [
                 'diff', '-u',
-                incremental_serialized_file,
-                post_edit_serialized_file
+                post_edit_source_file,
+                after_roundtrip_source_file
             ])
     except subprocess.CalledProcessError as e:
         print('Test case "%s" of %s FAILed' % (test_case, test_file), 
               file=sys.stderr)
-        print('Syntax tree of incremental parsing does not match '
-              'from-scratch parsing of post-edit file:\n\n', file=sys.stderr)
+        print('Source file after incrementally transferring the syntax tree '
+              'to swiftSyntax does not match post-edit source file:\n\n', 
+              file=sys.stderr)
         print(e.output, file=sys.stderr)
         sys.exit(1)
 
