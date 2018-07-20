@@ -2363,8 +2363,9 @@ void PartitionCloner::visitBranchInst(BranchInst *inst) {
 }
 
 /// For conditional branches, we do exactly what the normal cloner does, except
-/// that if we see a branch on a Tensor<Int1>, we unwrap it into an Int1.  We
-/// know (by construction) that this only happens when the Tensor is a 0D value.
+/// that if we see a branch on a Tensor<Int1>/Tensor<Bool>, we unwrap it into
+/// an Int1. We know (by construction) that this only happens when the Tensor
+/// is a 0D value.
 void PartitionCloner::visitCondBranchInst(CondBranchInst *inst) {
   auto TrueArgs = getOpValueArray<8>(inst->getTrueArgs());
   auto FalseArgs = getOpValueArray<8>(inst->getFalseArgs());
@@ -2375,9 +2376,15 @@ void PartitionCloner::visitCondBranchInst(CondBranchInst *inst) {
   auto condTy = cond->getType().getASTType();
 
   if (auto eltTy = getTensorHandleElementType(condTy)) {
+    // The TensorHandle's element type here could be Bool or Builtin.il.
+    // In either case, we eventually get Builtin.il to create GraphOp.
+    auto &ctx = B.getASTContext();
+    if (eltTy->isBool())
+      eltTy = SILType::getBuiltinIntegerType(/*bitWidth*/ 1, ctx).getASTType();
+
     assert(eltTy->isBuiltinIntegerType(1) && "expected Tensor<i1>");
 
-    auto name = B.getASTContext().getIdentifier("tf_tensor_to_i1");
+    auto name = ctx.getIdentifier("tf_tensor_to_i1");
     cond = getSingleValueResult(B.createGraphOperation(
         getOpLocation(inst->getLoc()), name,
         /*operands*/ {cond}, /*attributes*/ {},
