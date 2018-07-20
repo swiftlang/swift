@@ -677,7 +677,6 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         DeclContext *MetaBaseDC = nullptr;
         GenericParamList *GenericParams = nullptr;
         Type ExtendedType;
-        bool isTypeLookup = false;
 
         if (auto *PBI = dyn_cast<PatternBindingInitializer>(DC)) {
           auto *PBD = PBI->getBinding();
@@ -696,8 +695,6 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             ExtendedType = DC->getSelfTypeInContext();
             MetaBaseDC = DC;
             BaseDC = PBI;
-
-            isTypeLookup = PBD->isStatic();
           }
           // Initializers for stored properties of types perform static
           // lookup into the surrounding context.
@@ -707,8 +704,6 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             ExtendedType = DC->getSelfTypeInContext();
             MetaBaseDC = DC;
             BaseDC = MetaBaseDC;
-
-            isTypeLookup = PBD->isStatic(); // FIXME
 
             isCascadingUse = DC->isCascadingContextForLookup(false);
           }
@@ -748,10 +743,6 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             BaseDC = AFD;
             MetaBaseDC = AFD->getDeclContext();
             DC = DC->getParent();
-
-            if (auto *FD = dyn_cast<FuncDecl>(AFD))
-              if (FD->isStatic())
-                isTypeLookup = true;
 
             // If we're not in the body of the function (for example, we
             // might be type checking a default argument expression and
