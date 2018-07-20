@@ -58,7 +58,7 @@ public:
   struct Constraint {
     Constraint(SILBasicBlock *BB, SILValue L, SILValue R, ValueRelation Rel) :
       DominatingBlock(BB), Left(L), Right(R), Relationship(Rel) {
-      DEBUG(dump());
+      LLVM_DEBUG(dump());
     }
 
     /// The constraint is valid in blocks dominated by this block.
@@ -108,7 +108,7 @@ public:
   /// and return True if and instructions were removed.
   bool removeCollectedRedundantInstructions() {
     if (ToRemove.size()) {
-      DEBUG(llvm::dbgs()<<"Removing "<<ToRemove.size()<<" condfails in "
+      LLVM_DEBUG(llvm::dbgs()<<"Removing "<<ToRemove.size()<<" condfails in "
                   <<getFunction()->getName()<<"\n");
 
       for (auto *CF : ToRemove) {

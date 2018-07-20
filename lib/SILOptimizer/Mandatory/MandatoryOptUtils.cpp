@@ -40,7 +40,7 @@ using namespace swift;
 /// a live-in value can be provided to optimize out the reload.
 void swift::lowerAssignInstruction(SILBuilderWithScope &B, AssignInst *Inst,
                                    PartialInitializationKind isInitialization) {
-  DEBUG(llvm::dbgs() << "  *** Lowering [isInit=" << unsigned(isInitialization)
+  LLVM_DEBUG(llvm::dbgs() << "  *** Lowering [isInit=" << unsigned(isInitialization)
                      << "]: " << *Inst << "\n");
 
   ++NumAssignRewritten;

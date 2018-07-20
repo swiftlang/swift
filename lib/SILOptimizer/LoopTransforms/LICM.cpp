@@ -53,7 +53,7 @@ static bool mayWriteTo(AliasAnalysis *AA, WriteSet &MayWrites,
                        UnaryInstructionBase<K, T> *Inst) {
   for (auto *W : MayWrites)
     if (AA->mayWriteToMemory(W, Inst->getOperand())) {
-      DEBUG(llvm::dbgs() << "  mayWriteTo\n" << *W << " to " << *Inst << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "  mayWriteTo\n" << *W << " to " << *Inst << "\n");
       return true;
     }
   return false;
@@ -83,7 +83,7 @@ static bool mayWriteTo(AliasAnalysis *AA, SideEffectAnalysis *SEA,
     // Check if the memory addressed by the argument may alias any writes.
     for (auto *W : MayWrites) {
       if (AA->mayWriteToMemory(W, Arg)) {
-        DEBUG(llvm::dbgs() << "  mayWriteTo\n" << *W << " to " << *AI << "\n");
+        LLVM_DEBUG(llvm::dbgs() << "  mayWriteTo\n" << *W << " to " << *AI << "\n");
         return true;
       }
     }
@@ -128,7 +128,7 @@ static void getDominatingBlocks(SmallVectorImpl<SILBasicBlock *> &domBlocks,
                      [=](SILBasicBlock *ExitBB) {
           return DT->dominates(CurBB, ExitBB);
         })) {
-      DEBUG(llvm::dbgs() << "  skipping conditional block " << *CurBB << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "  skipping conditional block " << *CurBB << "\n");
       It.skipChildren();
       continue;
     }
@@ -141,7 +141,7 @@ static void getDominatingBlocks(SmallVectorImpl<SILBasicBlock *> &domBlocks,
 static bool hoistInstruction(DominanceInfo *DT, SILInstruction *Inst,
                              SILLoop *Loop, SILBasicBlock *&Preheader) {
   if (!hasLoopInvariantOperands(Inst, Loop)) {
-    DEBUG(llvm::dbgs() << "   loop variant operands\n");
+    LLVM_DEBUG(llvm::dbgs() << "   loop variant operands\n");
     return false;
   }
 
@@ -157,7 +157,7 @@ static bool hoistInstruction(DominanceInfo *DT, SILInstruction *Inst,
 
 static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT,
                               InstSet &HoistUpSet) {
-  DEBUG(llvm::dbgs() << " Hoisting instructions.\n");
+  LLVM_DEBUG(llvm::dbgs() << " Hoisting instructions.\n");
   auto Preheader = Loop->getLoopPreheader();
   assert(Preheader && "Expected a preheader");
   bool Changed = false;
@@ -169,14 +169,14 @@ static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT,
     for (auto InstIt = CurBB->begin(), E = CurBB->end(); InstIt != E;) {
       SILInstruction *Inst = &*InstIt;
       ++InstIt;
-      DEBUG(llvm::dbgs() << "  looking at " << *Inst);
+      LLVM_DEBUG(llvm::dbgs() << "  looking at " << *Inst);
       if (!HoistUpSet.count(Inst)) {
         continue;
       }
       if (!hoistInstruction(DT, Inst, Loop, Preheader)) {
         continue;
       }
-      DEBUG(llvm::dbgs() << "Hoisted " << *Inst);
+      LLVM_DEBUG(llvm::dbgs() << "Hoisted " << *Inst);
       Changed = true;
     }
   }
@@ -260,14 +260,14 @@ static bool sinkInstruction(DominanceInfo *DT,
       };
       if (std::find_if(OutsideBB->begin(), OutsideBB->end(), matchPred) !=
           OutsideBB->end()) {
-        DEBUG(llvm::errs() << "  instruction already at exit BB " << *Inst);
+        LLVM_DEBUG(llvm::errs() << "  instruction already at exit BB " << *Inst);
         ExitBB = nullptr;
       } else if (ExitBB) {
         // easy case
-        DEBUG(llvm::errs() << "  moving instruction to exit BB " << *Inst);
+        LLVM_DEBUG(llvm::errs() << "  moving instruction to exit BB " << *Inst);
         Inst->moveBefore(&*OutsideBB->begin());
       } else {
-        DEBUG(llvm::errs() << "  cloning instruction to exit BB " << *Inst);
+        LLVM_DEBUG(llvm::errs() << "  cloning instruction to exit BB " << *Inst);
         Inst->clone(&*OutsideBB->begin());
       }
       Changed = true;
@@ -286,7 +286,7 @@ static bool sinkInstructions(std::unique_ptr<LoopNestSummary> &LoopSummary,
                              DominanceInfo *DT, SILLoopInfo *LI,
                              InstSet &SinkDownSet) {
   auto *Loop = LoopSummary->Loop;
-  DEBUG(llvm::errs() << " Sink instructions attempt\n");
+  LLVM_DEBUG(llvm::errs() << " Sink instructions attempt\n");
   SmallVector<SILBasicBlock *, 8> domBlocks;
   getDominatingBlocks(domBlocks, Loop, DT);
 
@@ -319,7 +319,7 @@ static bool
 hoistSpecialInstruction(std::unique_ptr<LoopNestSummary> &LoopSummary,
                         DominanceInfo *DT, SILLoopInfo *LI, InstSet &Special) {
   auto *Loop = LoopSummary->Loop;
-  DEBUG(llvm::errs() << " Hoist and Sink pairs attempt\n");
+  LLVM_DEBUG(llvm::errs() << " Hoist and Sink pairs attempt\n");
   auto Preheader = Loop->getLoopPreheader();
   assert(Preheader && "Expected a preheader");
 
@@ -333,13 +333,13 @@ hoistSpecialInstruction(std::unique_ptr<LoopNestSummary> &LoopSummary,
     if (!hoistInstruction(DT, BI, Loop, Preheader)) {
       continue;
     }
-    DEBUG(llvm::dbgs() << "Hoisted " << *BI);
+    LLVM_DEBUG(llvm::dbgs() << "Hoisted " << *BI);
     for (auto *instSink : Ends) {
       if (!sinkInstruction(DT, LoopSummary, instSink, LI)) {
         llvm_unreachable("LICM: Could not perform must-sink instruction");
       }
     }
-    DEBUG(llvm::errs() << " Successfully hosited and sank pair\n");
+    LLVM_DEBUG(llvm::errs() << " Successfully hosited and sank pair\n");
     Changed = true;
   }
 
@@ -406,7 +406,7 @@ bool LoopTreeOptimization::optimize() {
   // Process loops bottom up in the loop tree.
   while (!BotUpWorkList.empty()) {
     SILLoop *CurrentLoop = BotUpWorkList.pop_back_val();
-    DEBUG(llvm::dbgs() << "Processing loop " << *CurrentLoop);
+    LLVM_DEBUG(llvm::dbgs() << "Processing loop " << *CurrentLoop);
 
     // Collect all summary of all sub loops of the current loop. Since we
     // process the loop tree bottom up they are guaranteed to be available in
@@ -560,7 +560,7 @@ void LoopTreeOptimization::analyzeCurrentLoop(
     std::unique_ptr<LoopNestSummary> &CurrSummary) {
   WriteSet &MayWrites = CurrSummary->MayWrites;
   SILLoop *Loop = CurrSummary->Loop;
-  DEBUG(llvm::dbgs() << " Analyzing accesses.\n");
+  LLVM_DEBUG(llvm::dbgs() << " Analyzing accesses.\n");
 
   // Contains function calls in the loop, which only read from memory.
   SmallVector<ApplyInst *, 8> ReadOnlyApplies;
@@ -651,8 +651,8 @@ void LoopTreeOptimization::analyzeCurrentLoop(
   }
   for (auto *BI : BeginAccesses) {
     if (!handledEndAccesses(BI, Loop)) {
-      DEBUG(llvm::dbgs() << "Skipping: " << *BI);
-      DEBUG(llvm::dbgs() << "Some end accesses can't be handled"
+      LLVM_DEBUG(llvm::dbgs() << "Skipping: " << *BI);
+      LLVM_DEBUG(llvm::dbgs() << "Some end accesses can't be handled"
                          << "\n");
       continue;
     }
@@ -700,7 +700,7 @@ public:
     SILLoopInfo *LoopInfo = LA->get(F);
 
     if (LoopInfo->empty()) {
-      DEBUG(llvm::dbgs() << "No loops in " << F->getName() << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "No loops in " << F->getName() << "\n");
       return;
     }
 
@@ -709,7 +709,7 @@ public:
     SideEffectAnalysis *SEA = PM->getAnalysis<SideEffectAnalysis>();
     DominanceInfo *DomTree = nullptr;
 
-    DEBUG(llvm::dbgs() << "Processing loops in " << F->getName() << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Processing loops in " << F->getName() << "\n");
     bool Changed = false;
 
     for (auto *TopLevelLoop : *LoopInfo) {
