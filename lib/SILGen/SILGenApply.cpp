@@ -1869,7 +1869,10 @@ public:
     /// A string r-value needs to be converted to a pointer type.
     RValueStringToPointer,
     
-    LastRVKind = RValueStringToPointer,
+    /// A function conversion needs to occur.
+    FunctionConversion,
+    
+    LastRVKind = FunctionConversion,
     
     /// A default argument that needs to be evaluated.
     DefaultArgument,
@@ -2040,6 +2043,7 @@ public:
     case LValueArrayToPointer:
     case RValueArrayToPointer:
     case RValueStringToPointer:
+    case FunctionConversion:
       args[argIndex] = finishOriginalArgument(SGF);
       return;
     case DefaultArgument:
@@ -2123,7 +2127,8 @@ private:
     // Done with the recursive cases.  Make sure we handled everything.
     assert(isa<InOutToPointerExpr>(expr) ||
            isa<ArrayToPointerExpr>(expr) ||
-           isa<StringToPointerExpr>(expr));
+           isa<StringToPointerExpr>(expr) ||
+           isa<FunctionConversionExpr>(expr));
 
     switch (Kind) {
     case InOut:
@@ -2155,6 +2160,17 @@ private:
         emitBindOptionals(SGF, optStringValue, pointerExpr->getSubExpr());
       return SGF.emitStringToPointer(pointerExpr, stringValue,
                                      pointerExpr->getType());
+    }
+    case FunctionConversion: {
+      auto funcConv = cast<FunctionConversionExpr>(expr);
+      auto optFuncValue = RV().RV;
+      auto funcValue =
+        emitBindOptionals(SGF, optFuncValue, funcConv->getSubExpr());
+      return {SGF.emitTransformedValue(funcConv, funcValue,
+                          funcConv->getSubExpr()->getType()->getCanonicalType(),
+                          funcConv->getType()->getCanonicalType(),
+                          SGFContext()),
+              ManagedValue()};
     }
     }
     llvm_unreachable("bad kind");
@@ -2739,6 +2755,37 @@ private:
     if (auto stringToPointer = dyn_cast<StringToPointerExpr>(expr)) {
       return emitDelayedConversion(stringToPointer, original);
     }
+    
+    // Delay function conversions involving the opened Self type of an
+    // existential whose opening is itself delayed.
+    //
+    // This comes up when invoking protocol methods on an existential that
+    // have covariant arguments of function type with Self arguments, e.g.:
+    //
+    //    protocol P {
+    //      mutating func foo(_: (Self) -> Void)
+    //    }
+    //
+    //    func bar(x: inout P) {
+    //      x.foo { y in return }
+    //    }
+    //
+    // Although the type-erased method is presented as formally taking an
+    // argument of the existential type P, it still has a conversion thunk to
+    // perform type erasure on the argument coming from the underlying
+    // implementation. Since the `self` argument is inout, it isn't formally
+    // opened until late when formal accesses begin, so this closure conversion
+    // must also be deferred until after that occurs.
+    if (auto funcConv = dyn_cast<FunctionConversionExpr>(expr)) {
+      auto destTy = funcConv->getType()->castTo<AnyFunctionType>();
+      auto srcTy = funcConv->getSubExpr()->getType()->castTo<AnyFunctionType>();
+      
+      if (destTy->hasOpenedExistential()
+          && !srcTy->hasOpenedExistential()
+          && destTy->getRepresentation() == srcTy->getRepresentation()) {
+        return emitDelayedConversion(funcConv, original);
+      }
+    }
 
     // Any recursive cases we handle here need to be handled in
     // DelayedArgument::finishOriginalExpr.
@@ -2816,6 +2863,16 @@ private:
     auto rvalueExpr = lookThroughBindOptionals(pointerExpr->getSubExpr());
     ManagedValue value = SGF.emitRValueAsSingleValue(rvalueExpr);
     DelayedArguments.emplace_back(DelayedArgument::RValueStringToPointer,
+                                  value, original);
+    Args.push_back(ManagedValue());
+    return true;
+  }
+  
+  bool emitDelayedConversion(FunctionConversionExpr *funcConv,
+                             OriginalArgument original) {
+    auto rvalueExpr = lookThroughBindOptionals(funcConv->getSubExpr());
+    ManagedValue value = SGF.emitRValueAsSingleValue(rvalueExpr);
+    DelayedArguments.emplace_back(DelayedArgument::FunctionConversion,
                                   value, original);
     Args.push_back(ManagedValue());
     return true;
