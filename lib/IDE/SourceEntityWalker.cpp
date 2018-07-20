@@ -247,6 +247,8 @@ static SemaReferenceKind getReferenceKind(Expr *Parent, Expr *E) {
 }
 
 std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
+  assert(E);
+
   if (isDone())
     return { false, nullptr };
 
@@ -409,11 +411,11 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       llvm::SaveAndRestore<Optional<AccessKind>>
         C(this->OpAccess, AccessKind::Write);
 
-      if (!AE->getDest()->walk(*this))
+      if (AE->getDest() && !AE->getDest()->walk(*this))
         return { false, nullptr };
     }
 
-    if (!AE->getSrc()->walk(*this))
+    if (AE->getSrc() && !AE->getSrc()->walk(*this))
       return { false, nullptr };
 
     // We already visited the children.
