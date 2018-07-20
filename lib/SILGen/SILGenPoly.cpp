@@ -398,7 +398,11 @@ ManagedValue Transform::transform(ManagedValue v,
   // optional or Any, force it.
   if (inputIsOptional && !outputIsOptional &&
       !outputSubstType->isExistentialType()) {
+    // isImplicitUnwrap is hardcoded true because the looseness in types of
+    // @objc witnesses/overrides that we're handling here only allows IUOs,
+    // not explicit Optionals.
     v = SGF.emitCheckedGetOptionalValueFrom(Loc, v,
+                                            /*isImplicitUnwrap*/ true, 
                                             SGF.getTypeLowering(v.getType()),
                                             SGFContext());
 

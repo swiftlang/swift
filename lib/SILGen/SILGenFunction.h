@@ -815,13 +815,15 @@ public:
   /// _diagnoseUnexpectedNilOptional if the optional has no value. Return the
   /// MangedValue resulting from the success case.
   ManagedValue emitPreconditionOptionalHasValue(SILLocation loc,
-                                                ManagedValue optional);
+                                                ManagedValue optional,
+                                                bool isImplicitUnwrap);
 
   /// \brief Emit a call to the library intrinsic _getOptionalValue
   /// given the address of the optional, which checks that an optional contains
   /// some value and either returns the value or traps if there is none.
   ManagedValue emitCheckedGetOptionalValueFrom(SILLocation loc,
                                                ManagedValue addr,
+                                               bool isImplicitUnwrap,
                                                const TypeLowering &optTL,
                                                SGFContext C);
   

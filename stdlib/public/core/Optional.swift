@@ -299,9 +299,12 @@ public // COMPILER_INTRINSIC
 func _diagnoseUnexpectedNilOptional(_filenameStart: Builtin.RawPointer,
                                     _filenameLength: Builtin.Word,
                                     _filenameIsASCII: Builtin.Int1,
-                                    _line: Builtin.Word) {
+                                    _line: Builtin.Word,
+                                    _isImplicitUnwrap: Builtin.Int1) {
   _preconditionFailure(
-    "Unexpectedly found nil while unwrapping an Optional value",
+    Bool(_isImplicitUnwrap)
+      ? "Unexpectedly found nil while implicitly unwrapping an Optional value"
+      : "Unexpectedly found nil while unwrapping an Optional value",
     file: StaticString(_start: _filenameStart,
                        utf8CodeUnitCount: _filenameLength,
                        isASCII: _filenameIsASCII),

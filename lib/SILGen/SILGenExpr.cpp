@@ -5157,7 +5157,9 @@ RValue RValueEmitter::emitForceValue(ForceValueExpr *loc, Expr *E,
   // If this is an implicit force of an ImplicitlyUnwrappedOptional,
   // and we're emitting into an unbridging conversion, try adjusting the
   // context.
-  if (loc->isImplicit() && loc->isForceOfImplicitlyUnwrappedOptional()) {
+  bool isImplicitUnwrap = loc->isImplicit() &&
+    loc->isForceOfImplicitlyUnwrappedOptional();
+  if (isImplicitUnwrap) {
     if (auto conv = C.getAsConversion()) {
       if (auto adjusted = conv->getConversion().adjustForInitialForceValue()) {
         auto value =
@@ -5174,7 +5176,7 @@ RValue RValueEmitter::emitForceValue(ForceValueExpr *loc, Expr *E,
   const TypeLowering &optTL = SGF.getTypeLowering(E->getType());
   ManagedValue opt = SGF.emitRValueAsSingleValue(E);
   ManagedValue V =
-    SGF.emitCheckedGetOptionalValueFrom(loc, opt, optTL, C);
+    SGF.emitCheckedGetOptionalValueFrom(loc, opt, isImplicitUnwrap, optTL, C);
   return RValue(SGF, loc, valueType->getCanonicalType(), V);
 }
 
@@ -5681,8 +5683,10 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
 
     for (auto &FVE : reversed(forceValueExprs)) {
       const TypeLowering &optTL = getTypeLowering(FVE->getSubExpr()->getType());
+      bool isImplicitUnwrap = FVE->isImplicit() &&
+          FVE->isForceOfImplicitlyUnwrappedOptional();
       value = emitCheckedGetOptionalValueFrom(
-          FVE, value, optTL, SGFContext::AllowImmediatePlusZero);
+          FVE, value, isImplicitUnwrap, optTL, SGFContext::AllowImmediatePlusZero);
     }
     return;
   }
