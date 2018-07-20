@@ -34,15 +34,6 @@ struct TestConfig {
   /// The delimiter to use when printing output.
   let delim: String
 
-  /// The filters applied to our test names.
-  let filters: [String]
-
-  /// The tags that we want to run
-  let tags: Set<BenchmarkCategory>
-
-  /// Tests tagged with any of these will not be executed
-  let skipTags: Set<BenchmarkCategory>
-
   /// The scalar multiple of the amount of times a test should be run. This
   /// enables one to cause tests to run for N iterations longer than they
   /// normally would. This is useful when one wishes for a test to run for a
@@ -65,20 +56,20 @@ struct TestConfig {
   let afterRunSleep: Int?
 
   /// The list of tests to run.
-  var tests = [(index: String, info: BenchmarkInfo)]()
+  let tests: [(index: String, info: BenchmarkInfo)]
 
   let action: TestAction
 
-  init() throws {
+  init(_ registeredBenchmarks: [BenchmarkInfo]) throws {
 
     struct PartialTestConfig {
       var delim: String?
-      var filters: [String]?
       var tags, skipTags: Set<BenchmarkCategory>?
       var iterationScale, numSamples, afterRunSleep: Int?
       var fixedNumIters: UInt?
       var verbose: Bool?
       var action: TestAction?
+      var filters: [String]?
     }
     var c = PartialTestConfig()
 
@@ -90,8 +81,6 @@ struct TestConfig {
     guard let benchArgs = parseArgs(validOptions) else {
       throw ArgumentError.general("Failed to parse arguments")
     }
-
-    filters = benchArgs.positionalArgs
 
     func checked<T>(
       _ parse: (String) throws -> T?,
@@ -134,6 +123,7 @@ struct TestConfig {
           try checked({ BenchmarkCategory(rawValue: $0) }, $0) })
     }
 
+    // Parse command line arguments
     try optionalArg("--iter-scale", \.iterationScale) { Int($0) }
     try optionalArg("--num-iters", \.fixedNumIters) { UInt($0) }
     try optionalArg("--num-samples", \.numSamples)  { Int($0) }
@@ -146,32 +136,62 @@ struct TestConfig {
     try optionalArg("--list", \.action, defaultValue: .listTests)
     try optionalArg("--help", \.action, defaultValue: .help(validOptions))
 
+    c.filters = benchArgs.positionalArgs
+
     // Configure from the command line arguments, filling in the defaults.
     delim = c.delim ?? ","
-    self.tags = c.tags ?? []
-    skipTags = c.skipTags ?? [.unstable, .skip]
     iterationScale = c.iterationScale ?? 1
     fixedNumIters = c.fixedNumIters ?? 0
     numSamples = c.numSamples ?? 1
     verbose = c.verbose ?? false
     afterRunSleep = c.afterRunSleep
     action = c.action ?? .run
-    // TODO: filters, tests
+    tests = TestConfig.filterTests(registeredBenchmarks,
+                                    filters: c.filters ?? [],
+                                    tags: c.tags ?? [],
+                                    skipTags: c.skipTags ?? [.unstable, .skip])
+
+    if verbose {
+      let testList = tests.map({ $0.1.name }).joined(separator: ", ")
+      print("""
+            --- CONFIG ---
+            NumSamples: \(numSamples)
+            Verbose: \(verbose)
+            IterScale: \(iterationScale)
+            FixedIters: \(fixedNumIters)
+            Tests Filter: \(c.filters ?? [])
+            Tests to run: \(testList)
+
+            --- DATA ---\n
+            """)
+    }
   }
 
-  mutating func findTestsToRun() {
-    registeredBenchmarks.sort()
+  /// Returns the list of tests to run.
+  ///
+  /// - Parameters:
+  ///   - registeredBenchmarks: List of all performance tests to be filtered.
+  ///   - filters: List of explicitly specified tests to run. These can be
+  ///     specified either by a test name or a test number.
+  ///   - tags: Run tests tagged with all of these categories.
+  ///   - skipTags: Don't run tests tagged with any of these categories.
+  /// - Returns: An array of test number and benchmark info tuples satisfying
+  ///     specified filtering conditions.
+  static func filterTests(
+    _ registeredBenchmarks: [BenchmarkInfo],
+    filters: [String],
+    tags: Set<BenchmarkCategory>,
+    skipTags: Set<BenchmarkCategory>
+  ) -> [(index: String, info: BenchmarkInfo)] {
     let indices = Dictionary(uniqueKeysWithValues:
-      zip(registeredBenchmarks.map{ $0.name },
+      zip(registeredBenchmarks.sorted().map{ $0.name },
           (1...).lazy.map { String($0) } ))
     let benchmarkNamesOrIndices = Set(filters)
-    // needed so we don't capture an ivar of a mutable inout self.
-    let (_tags, _skipTags) = (tags, skipTags)
 
-    tests = registeredBenchmarks.filter { benchmark in
+    return registeredBenchmarks.filter { benchmark in
       if benchmarkNamesOrIndices.isEmpty {
-        return benchmark.tags.isSuperset(of: _tags) &&
-          benchmark.tags.isDisjoint(with: _skipTags)
+        return benchmark.tags.isSuperset(of: tags) &&
+          benchmark.tags.isDisjoint(with: skipTags)
       } else {
         return benchmarkNamesOrIndices.contains(benchmark.name) ||
           benchmarkNamesOrIndices.contains(indices[benchmark.name]!)
@@ -384,23 +404,6 @@ func runBench(_ test: BenchmarkInfo, _ c: TestConfig) -> BenchResults? {
                       maxRSS: UInt64(sampler.measureMemoryUsage()))
 }
 
-func printRunInfo(_ c: TestConfig) {
-  if c.verbose {
-    print("--- CONFIG ---")
-    print("NumSamples: \(c.numSamples)")
-    print("Verbose: \(c.verbose)")
-    print("IterScale: \(c.iterationScale)")
-    if c.fixedNumIters != 0 {
-      print("FixedIters: \(c.fixedNumIters)")
-    }
-    print("Tests Filter: \(c.filters)")
-    print("Tests to run: ", terminator: "")
-    print(c.tests.map({ $0.1.name }).joined(separator: ", "))
-    print("")
-    print("--- DATA ---")
-  }
-}
-
 /// Execute benchmarks and continuously report the measurement results.
 func runBenchmarks(_ c: TestConfig) {
   let withUnit = {$0 + "(us)"}
@@ -440,7 +443,7 @@ func runBenchmarks(_ c: TestConfig) {
 
 public func main() {
   do {
-    var config = try TestConfig()
+    let config = try TestConfig(registeredBenchmarks)
     switch (config.action) {
     case let .help(validOptions):
       print("Valid options:")
@@ -448,7 +451,6 @@ public func main() {
         print("    \(v)")
       }
     case .listTests:
-      config.findTestsToRun()
       print("#\(config.delim)Test\(config.delim)[Tags]")
       for (index, t) in config.tests {
       let testDescription = [String(index), t.name, t.tags.sorted().description]
@@ -456,8 +458,6 @@ public func main() {
       print(testDescription)
       }
     case .run:
-      config.findTestsToRun()
-      printRunInfo(config)
       runBenchmarks(config)
       if let x = config.afterRunSleep {
         sleep(UInt32(x))
