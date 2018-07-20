@@ -751,6 +751,7 @@ internal struct RawKeyPathComponent {
     internal static var optionalForcePayload: UInt32 {
       return _SwiftKeyPathComponentHeader_OptionalForcePayload
     }
+
     internal static var endOfReferencePrefixFlag: UInt32 {
       return _SwiftKeyPathComponentHeader_EndOfReferencePrefixFlag
     }
@@ -766,20 +767,36 @@ internal struct RawKeyPathComponent {
     internal static var maximumOffsetPayload: UInt32 {
       return _SwiftKeyPathComponentHeader_MaximumOffsetPayload
     }
+
     internal static var computedMutatingFlag: UInt32 {
       return _SwiftKeyPathComponentHeader_ComputedMutatingFlag
     }
+    internal var isComputedMutating: Bool {
+      _sanityCheck(kind == .computed)
+      return _value & Header.computedMutatingFlag != 0
+    }
+
     internal static var computedSettableFlag: UInt32 {
       return _SwiftKeyPathComponentHeader_ComputedSettableFlag
     }
+    internal var isComputedSettable: Bool {
+      _sanityCheck(kind == .computed)
+      return _value & Header.computedSettableFlag != 0
+    }
+
     internal static var computedIDByStoredPropertyFlag: UInt32 {
       return _SwiftKeyPathComponentHeader_ComputedIDByStoredPropertyFlag
     }
     internal static var computedIDByVTableOffsetFlag: UInt32 {
       return _SwiftKeyPathComponentHeader_ComputedIDByVTableOffsetFlag
     }
+
     internal static var computedHasArgumentsFlag: UInt32 {
       return _SwiftKeyPathComponentHeader_ComputedHasArgumentsFlag
+    }
+    internal var hasComputedArguments: Bool {
+      _sanityCheck(kind == .computed)
+      return _value & Header.computedHasArgumentsFlag != 0
     }
 
     internal static var computedIDResolutionMask: UInt32 {
@@ -880,12 +897,12 @@ internal struct RawKeyPathComponent {
         // The body holds at minimum the id and getter.
         var size = Header.pointerAlignmentSkew + MemoryLayout<Int>.size * 2
         // If settable, it also holds the setter.
-        if payload & Header.computedSettableFlag != 0 {
+        if isComputedSettable {
           size += MemoryLayout<Int>.size
         }
         // If there are arguments, there's also a layout function,
         // witness table, and initializer function.
-        if payload & Header.computedHasArgumentsFlag != 0 {
+        if hasComputedArguments {
           size += MemoryLayout<Int>.size * 3
         }
 
@@ -914,11 +931,11 @@ internal struct RawKeyPathComponent {
       // align to pointer, minimum two pointers for id and get
       var total = Header.pointerAlignmentSkew + ptrSize * 2
       // additional word for a setter
-      if header.payload & Header.computedSettableFlag != 0 {
+      if header.isComputedSettable {
         total += ptrSize
       }
       // include the argument size
-      if header.payload & Header.computedHasArgumentsFlag != 0 {
+      if header.hasComputedArguments {
         // two words for argument header: size, witnesses
         total += ptrSize * 2
         // size of argument area
@@ -967,9 +984,7 @@ internal struct RawKeyPathComponent {
   }
 
   internal var _computedSetter: UnsafeRawPointer {
-    _sanityCheck(header.kind == .computed,
-                 "not a computed property")
-    _sanityCheck(header.payload & Header.computedSettableFlag != 0,
+    _sanityCheck(header.isComputedSettable,
                  "not a settable property")
 
     return body.load(
@@ -984,15 +999,12 @@ internal struct RawKeyPathComponent {
      _ instanceArguments: UnsafeMutableRawPointer) -> ()
 
   internal var _computedArgumentHeaderPointer: UnsafeRawPointer {
-    _sanityCheck(header.kind == .computed,
-                 "not a computed property")
-    _sanityCheck(header.payload & Header.computedHasArgumentsFlag != 0,
-                 "no arguments")
+    _sanityCheck(header.hasComputedArguments, "no arguments")
 
     return body.baseAddress.unsafelyUnwrapped
       + Header.pointerAlignmentSkew
       + MemoryLayout<Int>.size *
-         (header.payload & Header.computedSettableFlag != 0 ? 3 : 2)
+         (header.isComputedSettable ? 3 : 2)
   }
 
   internal var _computedArgumentSize: Int {
@@ -1025,15 +1037,15 @@ internal struct RawKeyPathComponent {
     case .optionalWrap:
       return .optionalWrap
     case .computed:
-      let isSettable = header.payload & Header.computedSettableFlag != 0
-      let isMutating = header.payload & Header.computedMutatingFlag != 0
+      let isSettable = header.isComputedSettable
+      let isMutating = header.isComputedMutating
 
       let id = _computedID
       let get = _computedGetter
       // Argument value is unused if there are no arguments, so pick something
       // likely to already be in a register as a default.
       let argument: KeyPathComponent.ArgumentRef?
-      if header.payload & Header.computedHasArgumentsFlag != 0 {
+      if header.hasComputedArguments {
         argument = KeyPathComponent.ArgumentRef(
           data: UnsafeRawBufferPointer(start: _computedArguments,
                                        count: _computedArgumentSize),
@@ -1074,7 +1086,7 @@ internal struct RawKeyPathComponent {
       break
     case .computed:
       // Run destructor, if any
-      if header.payload & Header.computedHasArgumentsFlag != 0,
+      if header.hasComputedArguments,
          let destructor = _computedArgumentWitnesses.pointee.destroy {
         destructor(_computedMutableArguments, _computedArgumentSize)
       }
@@ -1115,14 +1127,14 @@ internal struct RawKeyPathComponent {
 
       var addedSize = MemoryLayout<Int>.size * 2
 
-      if header.payload & Header.computedSettableFlag != 0 {
+      if header.isComputedSettable {
         buffer.storeBytes(of: _computedSetter,
                           toByteOffset: MemoryLayout<Int>.size * 3,
                           as: UnsafeRawPointer.self)
         addedSize += MemoryLayout<Int>.size
       }
 
-      if header.payload & Header.computedHasArgumentsFlag != 0 {
+      if header.hasComputedArguments {
         let argumentSize = _computedArgumentSize
         buffer.storeBytes(of: argumentSize,
                           toByteOffset: addedSize + MemoryLayout<Int>.size,
@@ -2157,10 +2169,8 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
     }())
 
     func setComputedCapability(for header: RawKeyPathComponent.Header) {
-      let settable =
-        header.payload & RawKeyPathComponent.Header.computedSettableFlag != 0
-      let mutating =
-        header.payload & RawKeyPathComponent.Header.computedMutatingFlag != 0
+      let settable = header.isComputedSettable
+      let mutating = header.isComputedMutating
 
       switch (settable, mutating) {
       case (false, false):
@@ -2252,8 +2262,7 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
         // arguments, then we have to build a bit of a chimera. The canonical
         // identity and accessors come from the descriptor, but the argument
         // handling is still as described in the local candidate.
-        if descriptorHeader.payload &
-                      RawKeyPathComponent.Header.computedHasArgumentsFlag != 0 {
+        if descriptorHeader.hasComputedArguments {
           fatalError("to be implemented")
         }
 
@@ -2289,10 +2298,8 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
       }
 
     case .computed:
-      let settable =
-        header.payload & RawKeyPathComponent.Header.computedSettableFlag != 0
-      let hasArguments =
-        header.payload & RawKeyPathComponent.Header.computedHasArgumentsFlag != 0
+      let settable = header.isComputedSettable
+      let hasArguments = header.hasComputedArguments
 
       setComputedCapability(for: header)
 
@@ -2498,8 +2505,7 @@ internal func _instantiateKeyPathBuffer(
                               argsBuffer: inout KeyPathBuffer) {
       // A nonmutating settable property can end the reference prefix and
       // makes the following key path potentially reference-writable.
-      if header.payload & RawKeyPathComponent.Header.computedSettableFlag != 0
-         && header.payload & RawKeyPathComponent.Header.computedMutatingFlag == 0 {
+      if header.isComputedSettable && !header.isComputedMutating {
         endOfReferencePrefixComponent = previousComponentAddr
       }
 
@@ -2525,15 +2531,14 @@ internal func _instantiateKeyPathBuffer(
       // Carry over the accessors.
       let getter = accessorsBuffer.pop(UnsafeRawPointer.self)
       pushDest(getter)
-      if header.payload & RawKeyPathComponent.Header.computedSettableFlag != 0{
+      if header.isComputedSettable {
         let setter = accessorsBuffer.pop(UnsafeRawPointer.self)
         pushDest(setter)
       }
       _sanityCheck(accessorsBuffer.data.isEmpty)
 
       // Carry over the arguments.
-      if header.payload
-          & RawKeyPathComponent.Header.computedHasArgumentsFlag != 0 {
+      if header.hasComputedArguments {
         let getLayoutRaw = argsBuffer.pop(UnsafeRawPointer.self)
         let getLayout = unsafeBitCast(getLayoutRaw,
           to: RawKeyPathComponent.ComputedArgumentLayoutFn.self)
@@ -2589,7 +2594,7 @@ internal func _instantiateKeyPathBuffer(
     case .computed:
       // Slice off the accessors.
       let accessorSize: Int
-      if header.payload & RawKeyPathComponent.Header.computedSettableFlag != 0 {
+      if header.isComputedSettable {
         accessorSize = 3
       } else {
         accessorSize = 2
@@ -2657,8 +2662,7 @@ internal func _instantiateKeyPathBuffer(
         // arguments, then we have to build a bit of a chimera. The canonical
         // identity and accessors come from the descriptor, but the argument
         // handling is still as described in the local candidate.
-        if descriptorHeader.payload
-                    & RawKeyPathComponent.Header.computedHasArgumentsFlag != 0 {
+        if descriptorHeader.hasComputedArguments {
           fatalError("to be implemented")
         }
         
