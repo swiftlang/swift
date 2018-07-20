@@ -81,6 +81,16 @@ struct TestConfig {
 
     filters = benchArgs.positionalArgs
 
+    func checked<T>(
+      _ parse: (String) throws -> T?,
+      _ value: String,
+      argument: String? = nil
+    ) throws -> T {
+      if let t = try parse(value)  { return t }
+      throw ArgumentError.invalidType(
+        value: value, type: "\(T.self)", argument: argument)
+    }
+
     func optionalArg<T>(
       _ name: String,
       _ property: WritableKeyPath<TestConfig, T>,
@@ -90,28 +100,20 @@ struct TestConfig {
       if let value = benchArgs.optionalArgsMap[name] {
         guard !value.isEmpty || defaultValue != nil
           else { throw ArgumentError.missingValue(name) }
-        guard let typedValue = (value.isEmpty) ? defaultValue
-          : try parse(value) else {
-          throw ArgumentError.invalidType(
-            value: value, type: String(describing: T.self), argument: name)
-        }
-        self[keyPath: property] = typedValue
+
+        self[keyPath: property] = (value.isEmpty)
+          ? defaultValue!
+          : try checked(parse, value, argument:name)
       }
     }
 
-    func tag(tag: String) throws -> BenchmarkCategory {
-      guard let category = BenchmarkCategory(rawValue: tag) else {
-        throw ArgumentError.invalidType(
-          value: tag, type: "BenchmarkCategory", argument: nil)
-      }
-      return category
-    }
     func tags(tags: String) throws -> Set<BenchmarkCategory> {
       // We support specifying multiple tags by splitting on comma, i.e.:
       //  --tags=Array,Dictionary
       //  --skip-tags=Array,Set,unstable,skip
       return Set(
-        try tags.split(separator: ",").map(String.init).map(tag))
+        try tags.split(separator: ",").map(String.init).map {
+          try checked({ BenchmarkCategory(rawValue: $0) }, $0) })
     }
 
     try optionalArg("--iter-scale", \.iterationScale) { Int($0) }
