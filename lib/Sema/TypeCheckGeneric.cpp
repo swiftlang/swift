@@ -531,7 +531,8 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
   if (auto fn = dyn_cast<FuncDecl>(func)) {
     if (!fn->getBodyResultTypeLoc().isNull()) {
       // Check the result type of the function.
-      TypeResolutionOptions options = TypeResolutionFlags::AllowIUO;
+      TypeResolutionOptions options = TypeResolutionFlags::FunctionResult;
+      options |= TypeResolutionFlags::Direct;
       if (fn->hasDynamicSelf())
         options |= TypeResolutionFlags::DynamicSelfResult;
 
@@ -899,8 +900,10 @@ static bool checkGenericSubscriptSignature(TypeChecker &tc,
                     &resolver);
 
   // Check the element type.
+  TypeResolutionOptions elementOptions = TypeResolutionFlags::Direct;
+  elementOptions |= TypeResolutionFlags::FunctionResult;
   badType |= tc.validateType(subscript->getElementTypeLoc(), subscript,
-                             TypeResolutionFlags::AllowIUO, &resolver);
+                             elementOptions, &resolver);
 
   // Infer requirements from it.
   if (genericParams && builder) {

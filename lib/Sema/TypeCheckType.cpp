@@ -319,7 +319,6 @@ adjustOptionsForGenericArgs(TypeResolutionOptions options) {
   options -= TypeResolutionFlags::FunctionInput;
   options -= TypeResolutionFlags::TypeAliasUnderlyingType;
   options -= TypeResolutionFlags::AllowUnavailableProtocol;
-  options -= TypeResolutionFlags::AllowIUO;
 
   return options;
 }
@@ -1515,7 +1514,8 @@ namespace {
     Type resolveOptionalType(OptionalTypeRepr *repr,
                              TypeResolutionOptions options);
     Type resolveImplicitlyUnwrappedOptionalType(ImplicitlyUnwrappedOptionalTypeRepr *repr,
-                                      TypeResolutionOptions options);
+                                                TypeResolutionOptions options,
+                                                bool isDirect);
     Type resolveTupleType(TupleTypeRepr *repr,
                           TypeResolutionOptions options);
     Type resolveCompositionType(CompositionTypeRepr *repr,
@@ -1567,13 +1567,20 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
   // them.
   if (!isa<SpecifierTypeRepr>(repr) && !isa<TupleTypeRepr>(repr) &&
       !isa<AttributedTypeRepr>(repr) && !isa<FunctionTypeRepr>(repr) &&
-      !isa<IdentTypeRepr>(repr)) {
+      !isa<IdentTypeRepr>(repr) &&
+      !isa<ImplicitlyUnwrappedOptionalTypeRepr>(repr)) {
     options -= TypeResolutionFlags::FunctionInput;
     options -= TypeResolutionFlags::TypeAliasUnderlyingType;
   }
 
   if (Context.LangOpts.DisableAvailabilityChecking)
     options |= TypeResolutionFlags::AllowUnavailable;
+
+  bool isDirect = false;
+  if ((options & TypeResolutionFlags::Direct) && !isa<SpecifierTypeRepr>(repr)){
+    isDirect = true;
+    options -= TypeResolutionFlags::Direct;
+  }
 
   switch (repr->getKind()) {
   case TypeReprKind::Error:
@@ -1616,10 +1623,10 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
   case TypeReprKind::Optional:
     return resolveOptionalType(cast<OptionalTypeRepr>(repr), options);
 
-  case TypeReprKind::ImplicitlyUnwrappedOptional:
-    return resolveImplicitlyUnwrappedOptionalType(
-             cast<ImplicitlyUnwrappedOptionalTypeRepr>(repr),
-             options);
+  case TypeReprKind::ImplicitlyUnwrappedOptional: {
+    auto iuoRepr = cast<ImplicitlyUnwrappedOptionalTypeRepr>(repr);
+    return resolveImplicitlyUnwrappedOptionalType(iuoRepr, options, isDirect);
+  }
 
   case TypeReprKind::Tuple:
     return resolveTupleType(cast<TupleTypeRepr>(repr), options);
@@ -2100,9 +2107,10 @@ bool TypeResolver::resolveASTFunctionTypeParams(
 Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
                                           TypeResolutionOptions options,
                                           FunctionType::ExtInfo extInfo) {
+  options -= TypeResolutionFlags::Direct;
   options -= TypeResolutionFlags::FunctionInput;
+  options -= TypeResolutionFlags::FunctionResult;
   options -= TypeResolutionFlags::TypeAliasUnderlyingType;
-  options -= TypeResolutionFlags::AllowIUO;
 
   SmallVector<AnyFunctionType::Param, 8> params;
   if (resolveASTFunctionTypeParams(repr->getArgsTypeRepr(), options,
@@ -2597,9 +2605,11 @@ Type TypeResolver::resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
     return ErrorType::get(Context);
   }
 
-  // Anything within the inout isn't a parameter anymore.
-  options -= TypeResolutionFlags::FunctionInput;
-  options -= TypeResolutionFlags::TypeAliasUnderlyingType;
+  if (!isa<ImplicitlyUnwrappedOptionalTypeRepr>(repr->getBase())) {
+    // Anything within the inout isn't a parameter anymore.
+    options -= TypeResolutionFlags::FunctionInput;
+    options -= TypeResolutionFlags::TypeAliasUnderlyingType;
+  }
 
   Type ty = resolveType(repr->getBase(), options);
   if (!ty || ty->hasError()) return ty;
@@ -2682,9 +2692,15 @@ Type TypeResolver::resolveOptionalType(OptionalTypeRepr *repr,
 }
 
 Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
-       ImplicitlyUnwrappedOptionalTypeRepr *repr,
-       TypeResolutionOptions options) {
-  if (!options.contains(TypeResolutionFlags::AllowIUO)) {
+      ImplicitlyUnwrappedOptionalTypeRepr *repr,
+      TypeResolutionOptions options,
+      bool isDirect) {
+  TypeResolutionOptions allowIUO = TypeResolutionFlags::SILType;
+  allowIUO |= TypeResolutionFlags::FunctionInput;
+  allowIUO |= TypeResolutionFlags::FunctionResult;
+  allowIUO |= TypeResolutionFlags::PatternBindingEntry;
+
+  if (!isDirect || !(options & allowIUO)) {
     // Prior to Swift 5, we allow 'as T!' and turn it into a disjunction.
     if (TC.Context.isSwiftVersionAtLeast(5)) {
       TC.diagnose(repr->getStartLoc(),
@@ -2724,11 +2740,9 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
   SmallVector<TupleTypeElt, 8> elements;
   elements.reserve(repr->getNumElements());
   
-
   auto elementOptions = options;
   if (repr->isParenType()) {
-    // We also want to disallow IUO within even a paren.
-    elementOptions -= TypeResolutionFlags::AllowIUO;
+    elementOptions -= TypeResolutionFlags::Direct;
   } else {
     elementOptions = withoutContext(elementOptions, true);
   }
