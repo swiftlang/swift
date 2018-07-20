@@ -24,8 +24,8 @@
 #ifndef SWIFT_SILOPTIMIZER_TF_CONSTEXPR_H
 #define SWIFT_SILOPTIMIZER_TF_CONSTEXPR_H
 
-#include "llvm/Support/Allocator.h"
 #include "swift/Basic/LLVM.h"
+#include "llvm/Support/Allocator.h"
 
 namespace swift {
   class ApplyInst;
@@ -45,6 +45,7 @@ class ConstExprEvaluator {
 
   ConstExprEvaluator(const ConstExprEvaluator &) = delete;
   void operator=(const ConstExprEvaluator &) = delete;
+
 public:
   explicit ConstExprEvaluator(SILModule &m);
   ~ConstExprEvaluator();
