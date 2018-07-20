@@ -277,7 +277,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
                                    /*HasBoundDecls=*/false, SourceLoc(),
                                    SourceLoc(), dfltBody));
 
-  auto rawDecl = initDecl->getParameterList(1)->get(0);
+  auto rawDecl = initDecl->getParameters()->get(0);
   auto rawRef = new (C) DeclRefExpr(rawDecl, DeclNameLoc(), /*implicit*/true);
   Expr *switchArg = rawRef;
   if (isStringEnum) {

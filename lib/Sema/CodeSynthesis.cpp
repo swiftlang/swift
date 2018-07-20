@@ -68,7 +68,7 @@ static void addMemberToContextIfNeeded(Decl *D, DeclContext *DC,
 }
 
 static ParamDecl *getParamDeclAtIndex(FuncDecl *fn, unsigned index) {
-  return fn->getParameterLists().back()->get(index);
+  return fn->getParameters()->get(index);
 }
 
 static VarDecl *getFirstParamDecl(FuncDecl *fn) {
@@ -489,7 +489,7 @@ static Expr *buildSubscriptIndexReference(ASTContext &ctx,
   // Pull out the body parameters, which we should have cloned
   // previously to be forwardable.  Drop the initial buffer/value
   // parameter in accessors that have one.
-  auto params = accessor->getParameterLists().back()->getArray();
+  auto params = accessor->getParameters()->getArray();
   auto accessorKind = accessor->getAccessorKind();
 
   // Ignore the value/buffer parameter.
@@ -1030,7 +1030,7 @@ static void synthesizeObservedSetterBody(TypeChecker &TC, AccessorDecl *Set,
   // Okay, the getter is done, create the setter now.  Start by finding the
   // decls for 'self' and 'value'.
   auto *SelfDecl = Set->getImplicitSelfDecl();
-  VarDecl *ValueDecl = Set->getParameterLists().back()->get(0);
+  VarDecl *ValueDecl = Set->getParameters()->get(0);
 
   // The setter loads the oldValue, invokes willSet with the incoming value,
   // does a direct store, then invokes didSet with the oldValue.
@@ -1461,11 +1461,10 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
     ParamLists.back()->get(0)->setImplicit();
   }
   
-  assert(BehaviorParameter->getParameterLists().size() == 2);
   SmallVector<ParamDecl *, 4> Params;
   SmallVector<Identifier, 4> NameComponents;
   
-  auto *DeclaredParams = BehaviorParameter->getParameterList(1);
+  auto *DeclaredParams = BehaviorParameter->getParameters();
   for (unsigned i : indices(*DeclaredParams)) {
     auto declaredParam = DeclaredParams->get(i);
     auto declaredParamTy = declaredParam->getInterfaceType();
@@ -2449,7 +2448,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   // Create the initializer parameter patterns.
   OptionSet<ParameterList::CloneFlags> options = ParameterList::Implicit;
   options |= ParameterList::Inherited;
-  auto *bodyParams = superclassCtor->getParameterList(1)->clone(ctx, options);
+  auto *bodyParams = superclassCtor->getParameters()->clone(ctx, options);
 
   // If the superclass is generic, we need to map the superclass constructor's
   // parameter types into the generic context of our class.

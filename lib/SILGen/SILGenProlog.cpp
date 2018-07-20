@@ -335,14 +335,18 @@ static void makeArgument(Type ty, ParamDecl *decl,
 }
 
 
+void SILGenFunction::bindParameterForForwarding(ParamDecl *param,
+                                     SmallVectorImpl<SILValue> &parameters) {
+  Type type = (param->hasType()
+               ? param->getType()
+               : F.mapTypeIntoContext(param->getInterfaceType()));
+  makeArgument(type->eraseDynamicSelfType(), param, parameters, *this);
+}
+
 void SILGenFunction::bindParametersForForwarding(const ParameterList *params,
                                      SmallVectorImpl<SILValue> &parameters) {
-  for (auto param : *params) {
-    Type type = (param->hasType()
-                 ? param->getType()
-                 : F.mapTypeIntoContext(param->getInterfaceType()));
-    makeArgument(type->eraseDynamicSelfType(), param, parameters, *this);
-  }
+  for (auto param : *params)
+    bindParameterForForwarding(param, parameters);
 }
 
 static void emitCaptureArguments(SILGenFunction &SGF,
@@ -431,9 +435,10 @@ static void emitCaptureArguments(SILGenFunction &SGF,
 }
 
 void SILGenFunction::emitProlog(AnyFunctionRef TheClosure,
-                                ArrayRef<ParameterList*> paramPatterns,
+                                ParameterList *paramList,
+                                ParamDecl *selfParam,
                                 Type resultType, bool throws) {
-  uint16_t ArgNo = emitProlog(paramPatterns, resultType,
+  uint16_t ArgNo = emitProlog(paramList, selfParam, resultType,
                               TheClosure.getAsDeclContext(), throws);
 
   // Emit the capture argument variables. These are placed last because they
@@ -485,8 +490,10 @@ static void emitIndirectResultParameters(SILGenFunction &SGF, Type resultType,
   (void)arg;
 }
 
-uint16_t SILGenFunction::emitProlog(ArrayRef<ParameterList *> paramLists,
-                                    Type resultType, DeclContext *DC,
+uint16_t SILGenFunction::emitProlog(ParameterList *paramList,
+                                    ParamDecl *selfParam,
+                                    Type resultType,
+                                    DeclContext *DC,
                                     bool throws) {
   // Create the indirect result parameters.
   auto *genericSig = DC->getGenericSignatureOfContext();
@@ -497,12 +504,13 @@ uint16_t SILGenFunction::emitProlog(ArrayRef<ParameterList *> paramLists,
   // Emit the argument variables in calling convention order.
   ArgumentInitHelper emitter(*this, F);
 
-  for (ParameterList *paramList : reversed(paramLists)) {
-    // Add the SILArguments and use them to initialize the local argument
-    // values.
-    for (auto &param : *paramList)
+  // Add the SILArguments and use them to initialize the local argument
+  // values.
+  if (paramList)
+    for (auto *param : *paramList)
       emitter.emitParam(param);
-  }
+  if (selfParam)
+    emitter.emitParam(selfParam);
 
   // Record the ArgNo of the artificial $error inout argument. 
   unsigned ArgNo = emitter.getNumArgs();

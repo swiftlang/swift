@@ -86,7 +86,6 @@ areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
   // Bail out conservatively if this isn't a function declaration.
   auto fn = dyn_cast<AbstractFunctionDecl>(decl);
   if (!fn) return true;
-  assert(parameterDepth < fn->getNumParameterLists());
   
   auto *fTy = fn->getInterfaceType()->castTo<AnyFunctionType>();
   

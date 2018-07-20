@@ -1228,7 +1228,7 @@ public:
   void checkReferenceOwnershipAttr(VarDecl *D, ReferenceOwnershipAttr *attr);
 
   /// Check the default arguments that occur within this value decl.
-  void checkDefaultArguments(ArrayRef<ParameterList *> params, ValueDecl *VD);
+  void checkDefaultArguments(ParameterList *params, ValueDecl *VD);
 
   virtual void resolveDeclSignature(ValueDecl *VD) override {
     validateDeclForNameLookup(VD);
@@ -1682,10 +1682,6 @@ public:
   bool typeCheckParameterList(ParameterList *PL, DeclContext *dc,
                               TypeResolutionOptions options,
                               GenericTypeResolver &resolver);
-
-  /// Type check all parameter lists of a function.
-  bool typeCheckParameterLists(AbstractFunctionDecl *fd,
-                               GenericTypeResolver &resolver);
 
   /// Coerce a pattern to the given type.
   ///

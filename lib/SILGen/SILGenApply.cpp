@@ -4720,10 +4720,8 @@ static RValue emitApplyAllocatingInitializer(SILGenFunction &SGF,
   bool requiresDowncast = false;
   if (ctor->isRequired() && overriddenSelfType) {
     CanType substResultType = substFormalType;
-    for (unsigned i : range(ctor->getNumParameterLists())) {
-      (void)i;
-      substResultType = cast<FunctionType>(substResultType).getResult();
-    }
+    substResultType = cast<FunctionType>(substResultType).getResult();
+    substResultType = cast<FunctionType>(substResultType).getResult();
 
     if (!substResultType->isEqual(overriddenSelfType))
       requiresDowncast = true;

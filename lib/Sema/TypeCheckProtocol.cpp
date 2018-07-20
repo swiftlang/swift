@@ -346,7 +346,7 @@ static bool checkObjCWitnessSelector(TypeChecker &tc, ValueDecl *req,
 
 static ParameterList *getParameterList(ValueDecl *value) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(value))
-    return func->getParameterList(func->getDeclContext()->isTypeContext());
+    return func->getParameters();
 
   auto subscript = cast<SubscriptDecl>(value);
   return subscript->getIndices();
@@ -1760,10 +1760,7 @@ SourceLoc OptionalAdjustment::getOptionalityLoc(ValueDecl *witness) const {
   // For parameter adjustments, dig out the pattern.
   ParameterList *params = nullptr;
   if (auto func = dyn_cast<AbstractFunctionDecl>(witness)) {
-    auto bodyParamLists = func->getParameterLists();
-    if (func->getDeclContext()->isTypeContext())
-      bodyParamLists = bodyParamLists.slice(1);
-    params = bodyParamLists[0];
+    params = func->getParameters();
   } else if (auto subscript = dyn_cast<SubscriptDecl>(witness)) {
     params = subscript->getIndices();
   } else {
@@ -4347,7 +4344,7 @@ static bool isGeneric(ValueDecl *decl) {
 static bool isUnlabeledInitializerOrSubscript(ValueDecl *value) {
   ParameterList *paramList = nullptr;
   if (auto constructor = dyn_cast<ConstructorDecl>(value))
-    paramList = constructor->getParameterList(1);
+    paramList = constructor->getParameters();
   else if (auto subscript = dyn_cast<SubscriptDecl>(value))
     paramList = subscript->getIndices();
   else

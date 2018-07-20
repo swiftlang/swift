@@ -838,7 +838,7 @@ makeIndirectFieldAccessors(ClangImporter::Implementation &Impl,
     lhs = new (C) MemberRefExpr(lhs, SourceLoc(), anonymousInnerFieldDecl,
                                 DeclNameLoc(), /*implicit*/true);
 
-    auto newValueDecl = setterDecl->getParameterList(1)->get(0);
+    auto newValueDecl = setterDecl->getParameters()->get(0);
 
     auto rhs = new (C) DeclRefExpr(newValueDecl, DeclNameLoc(),
                                    /*implicit*/ true);
@@ -922,7 +922,7 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
     auto inoutSelf = new (C) InOutExpr(SourceLoc(), inoutSelfRef,
       importedUnionDecl->getDeclaredType(), /*implicit*/ true);
 
-    auto newValueDecl = setterDecl->getParameterList(1)->get(0);
+    auto newValueDecl = setterDecl->getParameters()->get(0);
 
     auto newValueRef = new (C) DeclRefExpr(newValueDecl, DeclNameLoc(),
                                            /*implicit*/ true);
@@ -1463,8 +1463,7 @@ static ConstructorDecl *createRawValueBridgingConstructor(
                                      /*wantBody=*/false);
   // Insert our custom init body
   if (wantBody) {
-    auto selfDecl = init->getParameterList(0)->get(0);
-
+    auto selfDecl = init->getImplicitSelfDecl();
     auto storedType = storedRawValue->getInterfaceType();
 
     // Construct left-hand side.
@@ -1479,7 +1478,7 @@ static ConstructorDecl *createRawValueBridgingConstructor(
 
     // Construct right-hand side.
     // FIXME: get the parameter from the init, and plug it in here.
-    auto *paramDecl = init->getParameterList(1)->get(0);
+    auto *paramDecl = init->getParameters()->get(0);
     auto *paramRef = new (ctx) DeclRefExpr(
         paramDecl, DeclNameLoc(), /*Implicit=*/true);
     paramRef->setType(paramDecl->getType());
@@ -1672,7 +1671,7 @@ buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
   //
   // Build a setter thunk with the latter signature that maps to the
   // former.
-  auto valueIndex = setter->getParameterList(1);
+  auto valueIndex = setter->getParameters();
 
   // 'self'
   auto selfDecl = ParamDecl::createSelf(SourceLoc(), dc);
@@ -1728,7 +1727,7 @@ buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
 /// Retrieve the element interface type and key param decl of a subscript
 /// setter.
 static std::pair<Type, ParamDecl *> decomposeSubscriptSetter(FuncDecl *setter) {
-  auto *PL = setter->getParameterList(1);
+  auto *PL = setter->getParameters();
   if (PL->size() != 2)
     return {nullptr, nullptr};
 
@@ -4810,8 +4809,8 @@ namespace {
       // different (usually in something like nullability), but for Swift it's
       // an AST invariant that's assumed and asserted elsewhere. If the type is
       // different, just drop the setter, and leave the property as get-only.
-      assert(setter->getParameterLists().back()->size() == 1);
-      const ParamDecl *param = setter->getParameterLists().back()->get(0);
+      assert(setter->getParameters()->size() == 1);
+      const ParamDecl *param = setter->getParameters()->get(0);
       if (!param->getInterfaceType()->isEqual(original->getInterfaceType()))
         return;
 
@@ -6621,7 +6620,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   // Find the getter indices and make sure they match.
   ParamDecl *getterIndex;
   {
-    auto params = getter->getParameterList(1);
+    auto params = getter->getParameters();
     if (params->size() != 1)
       return nullptr;
     getterIndex = params->get(0);
@@ -6630,11 +6629,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   // Compute the element type based on the getter, looking through
   // the implicit 'self' parameter and the normal function
   // parameters.
-  auto elementTy = getter->getInterfaceType()
-                       ->castTo<AnyFunctionType>()
-                       ->getResult()
-                       ->castTo<AnyFunctionType>()
-                       ->getResult();
+  auto elementTy = getter->getResultInterfaceType();
   auto elementContextTy = getter->mapTypeIntoContext(elementTy);
 
   // Local function to mark the setter unavailable.
