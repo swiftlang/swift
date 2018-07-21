@@ -45,6 +45,10 @@
 // CHECK-DAG: SWIFT_AVAILABILITY(ios_app_extension,unavailable)
 // CHECK-DAG: SWIFT_AVAILABILITY(tvos_app_extension,unavailable)
 // CHECK-DAG: SWIFT_AVAILABILITY(watchos_app_extension,unavailable)
+// CHECK-DAG: ;
+// CHECK-NEXT: - (void)methodRenamedToOverloadMethod1WithFirst:(NSInteger)first second:(NSInteger)second SWIFT_DEPRECATED_MSG("", "overloadMethodWithFirst:second:");
+// CHECK-NEXT: - (void)overloadMethodWithFirst:(NSInteger)first second:(NSInteger)second;
+// CHECK-NEXT: - (void)overloadMethod2WithFirst:(double)first second:(double)second;
 // CHECK-NEXT: + (void)deprecatedAvailabilityWithValue:(NSInteger)value;
 // CHECK-NEXT: + (void)makeDeprecatedAvailabilityWithValue:(NSInteger)value SWIFT_DEPRECATED_MSG("use something else", "deprecatedAvailabilityWithValue:");
 // CHECK-NEXT: + (void)unavailableAvailabilityWithValue:(NSInteger)value;
@@ -190,6 +194,12 @@
     @available(tvOSApplicationExtension, unavailable)
     @available(watchOSApplicationExtension, unavailable)
     @objc func extensionUnavailable() {}
+  
+    @available(*, deprecated, renamed: "overloadMethod1(first:second:)")
+    @objc func methodRenamedToOverloadMethod1(first: Int, second: Int) {}
+  
+    @objc(overloadMethodWithFirst:second:) func overloadMethod1(first: Int, second: Int) {}
+    @objc func overloadMethod2(first: Double, second: Double) {}
 
     @objc(deprecatedAvailabilityWithValue:)
     public class func makeDeprecatedAvailability(withValue value: Int) {}
