@@ -2828,6 +2828,17 @@ public:
         abort();
       }
 
+      // Check that type members have an interface type of the form
+      // (Self) -> (Args...) -> Result.
+      if (AFD->getImplicitSelfDecl()) {
+        if (!interfaceTy->castTo<AnyFunctionType>()
+              ->getResult()->is<FunctionType>()) {
+          Out << "Interface type of method must return a function";
+          interfaceTy->dump(Out);
+          abort();
+        }
+      }
+
       // Throwing @objc methods must have a foreign error convention.
       if (AFD->isObjC() &&
           static_cast<bool>(AFD->getForeignErrorConvention())
