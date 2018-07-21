@@ -2373,7 +2373,7 @@ public:
     const Metadata *SuperclassConstraint;
     ProtocolClassConstraint ClassConstraint : 1;
     uint32_t NumProtocols : 31;
-    const ProtocolDescriptor * const *Protocols;
+    const ProtocolDescriptorRef *Protocols;
   };
 
   ExistentialCacheEntry(Key key);
@@ -2397,9 +2397,8 @@ public:
 
     auto dataProtocols = Data.getProtocols();
     for (size_t i = 0; i != key.NumProtocols; ++i) {
-      if (auto result =
-            comparePointers(key.Protocols[i],
-                            dataProtocols[i].getProtocolDescriptorUnchecked()))
+      if (auto result = compareIntegers(key.Protocols[i].getRawData(),
+                                        dataProtocols[i].getRawData()))
         return result;
     }
 
@@ -2813,10 +2812,9 @@ ExistentialTypeMetadata::getWitnessTable(const OpaqueValue *container,
 /// Determine whether any of the given protocols is class-bound.
 static bool anyProtocolIsClassBound(
                                 size_t numProtocols,
-                                const ProtocolDescriptor * const *protocols) {
+                                const ProtocolDescriptorRef *protocols) {
   for (unsigned i = 0; i != numProtocols; ++i) {
-    if (protocols[i]->Flags.getClassConstraint()
-          == ProtocolClassConstraint::Class)
+    if (protocols[i].getClassConstraint() == ProtocolClassConstraint::Class)
       return true;
   }
 
@@ -2831,7 +2829,7 @@ swift::swift_getExistentialTypeMetadata(
                                   ProtocolClassConstraint classConstraint,
                                   const Metadata *superclassConstraint,
                                   size_t numProtocols,
-                                  const ProtocolDescriptor * const *protocols) {
+                                  const ProtocolDescriptorRef *protocols) {
 
   // The empty compositions Any and AnyObject have fixed metadata.
   if (numProtocols == 0 && !superclassConstraint) {
@@ -2863,7 +2861,7 @@ ExistentialCacheEntry::ExistentialCacheEntry(Key key) {
   // protocol set.
   unsigned numWitnessTables = 0;
   for (auto p : make_range(key.Protocols, key.Protocols + key.NumProtocols)) {
-    if (p->Flags.needsWitnessTable())
+    if (p.needsWitnessTable())
       ++numWitnessTables;
   }
 
@@ -2871,7 +2869,7 @@ ExistentialCacheEntry::ExistentialCacheEntry(Key key) {
   // Protocol compositions are currently never special.
   auto special = SpecialProtocol::None;
   if (key.NumProtocols == 1)
-    special = key.Protocols[0]->Flags.getSpecialProtocol();
+    special = key.Protocols[0].getSpecialProtocol();
 
   Data.setKind(MetadataKind::Existential);
   Data.ValueWitnesses = getExistentialValueWitnesses(key.ClassConstraint,
@@ -2891,8 +2889,7 @@ ExistentialCacheEntry::ExistentialCacheEntry(Key key) {
   Data.NumProtocols = key.NumProtocols;
   auto dataProtocols = Data.getMutableProtocols();
   for (size_t i = 0; i < key.NumProtocols; ++i) {
-    dataProtocols[i] = ProtocolDescriptorRef(key.Protocols[i],
-                                             key.Protocols[i]->Flags.getDispatchStrategy());
+    dataProtocols[i] = key.Protocols[i];
   }
 }
 

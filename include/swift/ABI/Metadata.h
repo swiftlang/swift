@@ -1608,6 +1608,9 @@ public:
     return reinterpret_cast<ProtocolDescriptorPointer>(storage & ~IsObjCBit);
   }
 
+  constexpr TargetProtocolDescriptorRef(StoredPointer storage)
+    : storage(storage) { }
+
 public:
   constexpr TargetProtocolDescriptorRef() : storage() { }
   constexpr TargetProtocolDescriptorRef(nullptr_t) : storage() { }
@@ -1625,6 +1628,19 @@ public:
     storage = reinterpret_cast<StoredPointer>(protocol);
 #endif
   }
+
+  const static TargetProtocolDescriptorRef forSwift(
+                                          ProtocolDescriptorPointer protocol) {
+    return TargetProtocolDescriptorRef{
+        reinterpret_cast<StoredPointer>(protocol)};
+  }
+
+#if SWIFT_OBJC_INTEROP
+  constexpr static TargetProtocolDescriptorRef forObjC(Protocol *objcProtocol) {
+    return TargetProtocolDescriptorRef{
+        reinterpret_cast<StoredPointer>(objcProtocol) | IsObjCBit};
+  }
+#endif
 
   explicit constexpr operator bool() const {
     return storage != 0;
@@ -1668,6 +1684,16 @@ public:
     return getProtocolDescriptorUnchecked()->Flags.needsWitnessTable();
   }
 
+  SpecialProtocol getSpecialProtocol() const {
+#if SWIFT_OBJC_INTEROP
+    if (isObjC()) {
+      return SpecialProtocol::None;
+    }
+#endif
+
+    return getProtocolDescriptorUnchecked()->Flags.getSpecialProtocol();
+  }
+
   /// Retrieve the Swift protocol descriptor.
   ProtocolDescriptorPointer getSwiftProtocol() const {
 #if SWIFT_OBJC_INTEROP
@@ -1677,13 +1703,17 @@ public:
     return getProtocolDescriptorUnchecked();
   }
 
+  /// Retrieve the raw stored pointer and discriminator bit.
+  constexpr StoredPointer getRawData() const {
+    return storage;
+  }
+
 #if SWIFT_OBJC_INTEROP
   /// Whether this references an Objective-C protocol.
-  constexpr bool isObjC() const {
-    // FIXME: Once we are consistently setting the IsObjC bit, check that
-    // here. For now, check the runtime flags.
-    // return (storage & IsObjCBit) != 0;
-    return !getProtocolDescriptorUnchecked()->Flags.needsWitnessTable();
+  bool isObjC() const {
+    assert(static_cast<bool>(storage & IsObjCBit) !=
+             getProtocolDescriptorUnchecked()->Flags.needsWitnessTable());
+    return (storage & IsObjCBit) != 0;
   }
 
   /// Retrieve the Objective-C protocol.

@@ -643,9 +643,10 @@ FUNCTION(GetForeignTypeMetadata, swift_getForeignTypeMetadata, C_CC,
          ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadNone)) // only writes to runtime-private fields
 
-// WitnessTable *swift_getForeignWitnessTable(const WitnessTable *candidate,
-//                                            const TypeContextDescriptor
-//                                            *forType);
+// WitnessTable *swift_getForeignWitnessTable(
+//                                  const WitnessTable *candidate,
+//                                  const TypeContextDescriptor *forType,
+//                                  const ProtocolDescriptor *forProtocol);
 FUNCTION(GetForeignWitnessTable, swift_getForeignWitnessTable, C_CC,
          RETURNS(WitnessTablePtrTy),
          ARGS(WitnessTablePtrTy, TypeContextDescriptorPtrTy,
@@ -762,14 +763,14 @@ FUNCTION(GetTupleMetadata3, swift_getTupleTypeMetadata3, SwiftCC,
 //                              ProtocolClassConstraint classConstraint,
 //                              const Metadata *superclassConstraint,
 //                              size_t numProtocols,
-//                              const protocol_descriptor_t * const *protocols);
+//                              const ProtocolDescriptorRef *protocols);
 //
 // Note: ProtocolClassConstraint::Class is 0, ::Any is 1.
 FUNCTION(GetExistentialMetadata,
          swift_getExistentialTypeMetadata, C_CC,
          RETURNS(TypeMetadataPtrTy),
          ARGS(Int1Ty, TypeMetadataPtrTy, SizeTy,
-              ProtocolDescriptorPtrTy->getPointerTo()),
+              ProtocolDescriptorRefTy->getPointerTo()),
          ATTRS(NoUnwind, ReadOnly))
 
 // Metadata *swift_relocateClassMetadata(Metadata *self,

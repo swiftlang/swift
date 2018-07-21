@@ -313,8 +313,8 @@ TEST(MetadataTest, getExistentialMetadata) {
       return any;
     });
 
-  const ProtocolDescriptor *protoList2[] = {
-    &ProtocolA
+  ProtocolDescriptorRef protoList2[] = {
+    ProtocolDescriptorRef::forSwift(&ProtocolA)
   };
   auto exA = RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
@@ -334,8 +334,8 @@ TEST(MetadataTest, getExistentialMetadata) {
       return a;
     });
 
-  const ProtocolDescriptor *protoList3[] = {
-    &ProtocolB
+  ProtocolDescriptorRef protoList3[] = {
+    ProtocolDescriptorRef::forSwift(&ProtocolB)
   };
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
@@ -356,8 +356,8 @@ TEST(MetadataTest, getExistentialMetadata) {
       return b;
     });
 
-  const ProtocolDescriptor *protoList6[] = {
-    &ProtocolClassConstrained,
+  ProtocolDescriptorRef protoList6[] = {
+    ProtocolDescriptorRef::forSwift(&ProtocolClassConstrained)
   };
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
@@ -379,8 +379,8 @@ TEST(MetadataTest, getExistentialMetadata) {
       return classConstrained;
     });
 
-  const ProtocolDescriptor *protoList7[] = {
-    &ProtocolNoWitnessTable
+  ProtocolDescriptorRef protoList7[] = {
+    ProtocolDescriptorRef::forObjC((Protocol *)&ProtocolNoWitnessTable)
   };
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
@@ -404,10 +404,10 @@ TEST(MetadataTest, getExistentialMetadata) {
 
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
-      const ProtocolDescriptor *protoList8[] = {
-        &ProtocolNoWitnessTable,
-        &ProtocolA,
-        &ProtocolB
+      ProtocolDescriptorRef protoList8[] = {
+        ProtocolDescriptorRef::forObjC((Protocol*)&ProtocolNoWitnessTable),
+        ProtocolDescriptorRef::forSwift(&ProtocolA),
+        ProtocolDescriptorRef::forSwift(&ProtocolB)
       };
 
       auto mixedWitnessTable
@@ -433,8 +433,8 @@ TEST(MetadataTest, getExistentialMetadata) {
   ExpectedErrorValueWitnesses = &VALUE_WITNESS_SYM(Bo);
 #endif
 
-  const ProtocolDescriptor *protoList9[] = {
-    &ProtocolError
+  ProtocolDescriptorRef protoList9[] = {
+    ProtocolDescriptorRef::forSwift(&ProtocolError)
   };
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
@@ -455,9 +455,9 @@ TEST(MetadataTest, getExistentialMetadata) {
 
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
-      const ProtocolDescriptor *protoList10[] = {
-        &ProtocolError,
-        &ProtocolA
+      ProtocolDescriptorRef protoList10[] = {
+        ProtocolDescriptorRef::forSwift(&ProtocolError),
+        ProtocolDescriptorRef::forSwift(&ProtocolA)
       };
 
       auto special
@@ -499,8 +499,8 @@ static ProtocolDescriptor ClassProto1 = { "ClassProto1", nullptr,
 };
 
 TEST(MetadataTest, getExistentialTypeMetadata_opaque) {
-  const ProtocolDescriptor *protoList1[] = {
-    &OpaqueProto1
+  ProtocolDescriptorRef protoList1[] = {
+    ProtocolDescriptorRef::forSwift(&OpaqueProto1)
   };
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
@@ -517,8 +517,9 @@ TEST(MetadataTest, getExistentialTypeMetadata_opaque) {
       return ex1;
     });
 
-  const ProtocolDescriptor *protoList2[] = {
-    &OpaqueProto1, &OpaqueProto2
+  ProtocolDescriptorRef protoList2[] = {
+    ProtocolDescriptorRef::forSwift(&OpaqueProto1),
+    ProtocolDescriptorRef::forSwift(&OpaqueProto2)
   };
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
@@ -535,8 +536,10 @@ TEST(MetadataTest, getExistentialTypeMetadata_opaque) {
       return ex2;
     });
 
-  const ProtocolDescriptor *protoList3[] = {
-    &OpaqueProto1, &OpaqueProto2, &OpaqueProto3
+  ProtocolDescriptorRef protoList3[] = {
+    ProtocolDescriptorRef::forSwift(&OpaqueProto1),
+    ProtocolDescriptorRef::forSwift(&OpaqueProto2),
+    ProtocolDescriptorRef::forSwift(&OpaqueProto3)
   };
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
@@ -555,8 +558,8 @@ TEST(MetadataTest, getExistentialTypeMetadata_opaque) {
 }
 
 TEST(MetadataTest, getExistentialTypeMetadata_class) {
-  const ProtocolDescriptor *protoList1[] = {
-    &ClassProto1
+  ProtocolDescriptorRef protoList1[] = {
+    ProtocolDescriptorRef::forSwift(&ClassProto1)
   };
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
@@ -573,8 +576,9 @@ TEST(MetadataTest, getExistentialTypeMetadata_class) {
       return ex1;
     });
 
-  const ProtocolDescriptor *protoList2[] = {
-    &OpaqueProto1, &ClassProto1
+  ProtocolDescriptorRef protoList2[] = {
+    ProtocolDescriptorRef::forSwift(&OpaqueProto1),
+    ProtocolDescriptorRef::forSwift(&ClassProto1)
   };
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
@@ -591,8 +595,10 @@ TEST(MetadataTest, getExistentialTypeMetadata_class) {
       return ex2;
     });
 
-  const ProtocolDescriptor *protoList3[] = {
-    &OpaqueProto1, &OpaqueProto2, &ClassProto1
+  ProtocolDescriptorRef protoList3[] = {
+    ProtocolDescriptorRef::forSwift(&OpaqueProto1),
+    ProtocolDescriptorRef::forSwift(&OpaqueProto2),
+    ProtocolDescriptorRef::forSwift(&ClassProto1)
   };
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
@@ -613,8 +619,8 @@ TEST(MetadataTest, getExistentialTypeMetadata_class) {
 TEST(MetadataTest, getExistentialTypeMetadata_subclass) {
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
-      const ProtocolDescriptor *protoList1[] = {
-        &OpaqueProto1
+      ProtocolDescriptorRef protoList1[] = {
+        ProtocolDescriptorRef::forSwift(&OpaqueProto1)
       };
       auto ex1 = swift_getExistentialTypeMetadata(ProtocolClassConstraint::Class,
                                                   /*superclass=*/&MetadataTest2,
@@ -635,9 +641,9 @@ TEST(MetadataTest, getExistentialTypeMetadata_subclass) {
 
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
-      const ProtocolDescriptor *protoList2[] = {
-        &OpaqueProto1,
-        &ClassProto1
+      ProtocolDescriptorRef protoList2[] = {
+        ProtocolDescriptorRef::forSwift(&OpaqueProto1),
+        ProtocolDescriptorRef::forSwift(&ClassProto1)
       };
       auto ex2 = swift_getExistentialTypeMetadata(ProtocolClassConstraint::Class,
                                                   /*superclass=*/&MetadataTest2,
