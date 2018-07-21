@@ -655,6 +655,59 @@
           ]
         }
       ]
+    },
+    {
+      "kind": "TypeDecl",
+      "name": "Int",
+      "printedName": "Int",
+      "declKind": "Struct",
+      "usr": "s:Si",
+      "location": "",
+      "moduleName": "Swift",
+      "conformingProtocols": [
+        "Comparable",
+        "SignedInteger",
+        "_ExpressibleByBuiltinIntegerLiteral",
+        "BinaryInteger",
+        "LosslessStringConvertible",
+        "SignedNumeric",
+        "Numeric",
+        "CustomStringConvertible",
+        "Strideable",
+        "ExpressibleByIntegerLiteral",
+        "FixedWidthInteger",
+        "Decodable",
+        "Encodable",
+        "Hashable",
+        "Equatable",
+        "_HasCustomAnyHashableRepresentation",
+        "CustomReflectable",
+        "_CustomPlaygroundQuickLookable",
+        "MirrorPath",
+        "CVarArg"
+      ],
+      "declAttributes": [
+        "fixedLayout"
+      ],
+      "children": [
+        {
+          "kind": "Function",
+          "name": "foo",
+          "printedName": "foo()",
+          "declKind": "Func",
+          "usr": "s:Si4cakeE3fooyyF",
+          "location": "",
+          "moduleName": "cake",
+          "parentExtensionReqs": [],
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Void",
+              "printedName": "()"
+            }
+          ]
+        }
+      ]
     }
   ]
 }
