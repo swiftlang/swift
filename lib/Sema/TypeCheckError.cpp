@@ -41,7 +41,7 @@ private:
   };
   unsigned TheKind : 2;
   unsigned IsRethrows : 1;
-  unsigned ParamCount : 28;
+  unsigned ParamCount : 2;
 
 public:
   explicit AbstractFunction(Kind kind, Expr *fn)
@@ -54,7 +54,7 @@ public:
   explicit AbstractFunction(AbstractFunctionDecl *fn)
     : TheKind(Kind::Function),
       IsRethrows(fn->getAttrs().hasAttribute<RethrowsAttr>()),
-      ParamCount(fn->getNumParameterLists()) {
+      ParamCount(fn->getImplicitSelfDecl() ? 2 : 1) {
     TheFunction = fn;
   }
 
@@ -926,7 +926,7 @@ public:
     }
 
     return Context(getKindForFunctionBody(
-        D->getInterfaceType(), D->getNumParameterLists()));
+        D->getInterfaceType(), D->getImplicitSelfDecl() ? 2 : 1));
   }
 
   static Context forInitializer(Initializer *init) {
