@@ -117,14 +117,33 @@ func checked<T>(
     value: value, type: type, argument: argument)
 }
 
+struct Argument {
+  let name: String?
+  let apply: () throws -> ()
+}
+
 class ArgumentParser<U> {
     var result: U
-    var validOptions: [String] = []
+    var validOptions: [String] {
+      return arguments.compactMap { $0.name }
+    }
     private var benchArgs: Arguments!
-    private var parsers: [() throws -> ()] = []
+    private var arguments: [Argument] = []
 
     init(into result: U) throws {
-        self.result = result
+      self.result = result
+      self.arguments += [
+        Argument(name: "--help", apply: printUsage)
+      ]
+    }
+
+    func printUsage() {
+      guard let _ = benchArgs.optionalArgsMap["--help"] else { return }
+      print("Valid options:")
+      for v in validOptions {
+        print("    \(v)")
+      }
+      exit(0)
     }
 
     func parse() throws -> U {
@@ -132,7 +151,7 @@ class ArgumentParser<U> {
         throw ArgumentError.general("Failed to parse arguments")
       }
       self.benchArgs = benchArgs
-      try parsers.forEach { try $0() } // parse all arguments
+      try arguments.forEach { try $0.apply() } // parse all arguments
       return result
     }
 
@@ -142,8 +161,7 @@ class ArgumentParser<U> {
       defaultValue: T? = nil,
       parser: @escaping (String) throws -> T? = { _ in nil }
     ) {
-      if let name = name { validOptions.append(name) }
-      parsers.append(
+      arguments.append(Argument(name: name)
         { try self.parseArgument(name, property, defaultValue, parser) })
     }
 

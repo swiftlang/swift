@@ -27,7 +27,6 @@ public var registeredBenchmarks: [BenchmarkInfo] = []
 enum TestAction {
   case run
   case listTests
-  case help([String])
 }
 
 struct TestConfig {
@@ -93,7 +92,6 @@ struct TestConfig {
                     defaultValue: [], parser: tags)
     p.addArgument("--sleep", \.afterRunSleep) { Int($0) }
     p.addArgument("--list", \.action, defaultValue: .listTests)
-    p.addArgument("--help", \.action, defaultValue: .help(p.validOptions))
     p.addArgument(nil, \.tests) // positional arguments
 
     let c = try p.parse()
@@ -406,11 +404,6 @@ public func main() {
   do {
     let config = try TestConfig(registeredBenchmarks)
     switch (config.action) {
-    case let .help(validOptions):
-      print("Valid options:")
-      for v in validOptions {
-        print("    \(v)")
-      }
     case .listTests:
       print("#\(config.delim)Test\(config.delim)[Tags]")
       for (index, t) in config.tests {

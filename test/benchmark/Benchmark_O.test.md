@@ -171,3 +171,14 @@ RUN:         2>&1 | %FileCheck %s --check-prefix BADSKIPTAG
 BADSKIPTAG: 'bogus' is not a valid 'BenchmarkCategory'
 
 ````
+
+## Usage
+
+````
+RUN: %Benchmark_O --help | %FileCheck %s --check-prefix OPTIONS
+OPTIONS: Valid options:
+OPTIONS: --verbose
+OPTIONS: --delim
+OPTIONS: --tags
+OPTIONS: --list
+````
