@@ -943,7 +943,7 @@ private:
         if (!shouldInclude(candidate))
           continue;
         
-        if (candidate->getKind() != D->getKind() &&
+        if (candidate->getKind() != D->getKind() ||
             (candidate->isInstanceMember() !=
              cast<ValueDecl>(D)->isInstanceMember()))
           continue;
