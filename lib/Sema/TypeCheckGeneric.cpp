@@ -886,7 +886,7 @@ void TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
 
 void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func,
                                          GenericSignature *sig) {
-  bool hasSelf = func->getDeclContext()->isTypeContext();
+  bool hasSelf = func->hasImplicitSelfDecl();
 
   // Result
   Type resultTy;

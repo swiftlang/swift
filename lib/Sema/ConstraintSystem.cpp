@@ -899,7 +899,7 @@ static unsigned getNumRemovedArgumentLabels(TypeChecker &TC, ValueDecl *decl,
   // Only applicable to functions. Nothing else should have argument labels in
   // the type.
   } else if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-    numParameterLists = func->getImplicitSelfDecl() ? 2 : 1;
+    numParameterLists = func->hasImplicitSelfDecl() ? 2 : 1;
   } else {
     return 0;
   }

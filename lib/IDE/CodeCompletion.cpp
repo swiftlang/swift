@@ -2402,7 +2402,7 @@ public:
     assert(FunctionType);
 
     unsigned NumParamLists;
-    if (FD->getImplicitSelfDecl()) {
+    if (FD->hasImplicitSelfDecl()) {
       if (IsImplicitlyCurriedInstanceMethod)
         NumParamLists = 2;
       else {

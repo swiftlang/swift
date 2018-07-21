@@ -782,7 +782,7 @@ static void diagnoseSubElementFailure(Expr *destExpr,
     message += "'";
 
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
-      if (AFD->getImplicitSelfDecl()) {
+      if (AFD->hasImplicitSelfDecl()) {
         message += " is a method";
         diagID = diag::assignment_lhs_is_immutable_variable;
       } else {
@@ -3421,7 +3421,7 @@ static bool candidatesHaveAnyDefaultValues(
     auto function = dyn_cast_or_null<AbstractFunctionDecl>(cand.getDecl());
     if (!function) continue;
 
-    if (function->getImplicitSelfDecl()) {
+    if (function->hasImplicitSelfDecl()) {
       if (cand.level != 1)
         return false;
     } else {
@@ -3460,7 +3460,7 @@ static Optional<unsigned> getElementForScalarInitOfArg(
   auto function = dyn_cast_or_null<AbstractFunctionDecl>(cand.getDecl());
   if (!function) return getElementForScalarInitSimple(tupleTy);
 
-  if (function->getImplicitSelfDecl()) {
+  if (function->hasImplicitSelfDecl()) {
     if (cand.level != 1)
       return getElementForScalarInitSimple(tupleTy);
   } else {

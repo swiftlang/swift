@@ -643,7 +643,7 @@ findNextParameter(AbstractFunctionDecl *func, unsigned listIndex,
                   unsigned paramIndex) {
   unsigned paramOffset = 1;
 
-  if (func->getImplicitSelfDecl()) {
+  if (func->hasImplicitSelfDecl()) {
     if (listIndex > 1)
       return None;
 
@@ -939,7 +939,7 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
                           parent->abstractFunctionParams.listIndex,
                           parent->abstractFunctionParams.paramIndex);
 
-    } else if (abstractFunction->getImplicitSelfDecl() ||
+    } else if (abstractFunction->hasImplicitSelfDecl() ||
                abstractFunction->getParameters()->size() > 0) {
       nextParameter = std::make_pair(0, 0);
     }

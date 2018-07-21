@@ -841,7 +841,7 @@ swift::computeDefaultMap(ArrayRef<AnyFunctionType::Param> params,
   // Find the corresponding parameter list.
   const ParameterList *paramList = nullptr;
   if (auto *func = dyn_cast<AbstractFunctionDecl>(paramOwner)) {
-    if (func->getImplicitSelfDecl()) {
+    if (func->hasImplicitSelfDecl()) {
       if (level == 1)
         paramList = func->getParameters();
     } else if (level == 0)

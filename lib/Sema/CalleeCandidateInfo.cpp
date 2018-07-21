@@ -90,7 +90,7 @@ ArrayRef<Identifier> UncurriedCandidate::getArgumentLabels(
   scratch.clear();
   if (auto decl = getDecl()) {
     if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-      if (func->getImplicitSelfDecl()) {
+      if (func->hasImplicitSelfDecl()) {
         if (level == 0) {
           scratch.push_back(Identifier());
           return scratch;
