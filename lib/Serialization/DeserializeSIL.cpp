@@ -798,9 +798,8 @@ static SILDeclRef getSILDeclRef(ModuleFile *MF,
          "Expect 4 numbers for SILDeclRef");
   SILDeclRef DRef(cast<ValueDecl>(MF->getDecl(ListOfValues[NextIdx])),
                   (SILDeclRef::Kind)ListOfValues[NextIdx+1],
-                  /*isCurried=*/false, ListOfValues[NextIdx+3] > 0);
-  if (ListOfValues[NextIdx+2] < DRef.getParameterListCount() - 1)
-    DRef = DRef.asCurried();
+                  /*isCurried=*/ListOfValues[NextIdx+2] > 0,
+                  /*isForeign=*/ListOfValues[NextIdx+3] > 0);
   NextIdx += 4;
   return DRef;
 }
