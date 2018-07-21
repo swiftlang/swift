@@ -46,7 +46,7 @@
 // CHECK-DAG: SWIFT_AVAILABILITY(tvos_app_extension,unavailable)
 // CHECK-DAG: SWIFT_AVAILABILITY(watchos_app_extension,unavailable)
 // CHECK-DAG: ;
-// CHECK-NEXT: - (void)methodRenamedToOverloadMethod1WithFirst:(NSInteger)first second:(NSInteger)second SWIFT_DEPRECATED_MSG("", "overloadMethodWithFirst:second:");
+// CHECK-NEXT: - (void)deprecatedMethodRenamedToOverloadMethod1WithFirst:(NSInteger)first second:(NSInteger)second SWIFT_DEPRECATED_MSG("", "overloadMethodWithFirst:second:");
 // CHECK-NEXT: - (void)overloadMethodWithFirst:(NSInteger)first second:(NSInteger)second;
 // CHECK-NEXT: - (void)overloadMethod2WithFirst:(double)first second:(double)second;
 // CHECK-NEXT: + (void)deprecatedAvailabilityWithValue:(NSInteger)value;
@@ -78,6 +78,8 @@
 // CHECK-NEXT: - (nonnull instancetype)init SWIFT_UNAVAILABLE;
 // CHECK-NEXT: + (nonnull instancetype)new SWIFT_DEPRECATED_MSG("-init is unavailable");
 // CHECK-NEXT: - (nonnull instancetype)initWithX:(NSInteger)_ SWIFT_UNAVAILABLE;
+// CHECK-NEXT: - (nonnull instancetype)initWithDeprecatedZ:(NSInteger)deprecatedZ OBJC_DESIGNATED_INITIALIZER SWIFT_DEPRECATED_MSG("init(deprecatedZ:) was deprecated. Use the new one instead", "initWithNewZ:")
+// CHECK-NEXT: - (nonnull instancetype)initWithNewZ:(NSInteger)z OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: @end
 
 // CHECK-LABEL: SWIFT_AVAILABILITY(macos,deprecated=0.0.1,message="'DeprecatedAvailability' has been renamed to 'SWTReplacementAvailable'")
@@ -196,7 +198,7 @@
     @objc func extensionUnavailable() {}
   
     @available(*, deprecated, renamed: "overloadMethod1(first:second:)")
-    @objc func methodRenamedToOverloadMethod1(first: Int, second: Int) {}
+    @objc func deprecatedMethodRenamedToOverloadMethod1(first: Int, second: Int) {}
   
     @objc(overloadMethodWithFirst:second:) func overloadMethod1(first: Int, second: Int) {}
     @objc func overloadMethod2(first: Double, second: Double) {}
@@ -216,7 +218,6 @@
     message: "use something else",
     renamed: "makeUnavailableAvailability(withValue:)")
     @objc(makeUnavailableAvailabilityWithValue:) public class func __makeUnavailableAvailability(withValue value: Int) {}
-
 
     @objc init() {}
     @available(macOS 10.10, *)
@@ -299,6 +300,9 @@ extension Availability {
     private override init() { super.init() }
     @available(macOS 10.10, *)
     private override init(x _: Int) { super.init() }
+    @available(*, deprecated, message: "init(deprecatedZ:) was deprecated. Use the new one instead", renamed: "init(z:)")
+    @objc init(deprecatedZ: Int) { super.init() }
+    @objc(initWithNewZ:) init(z: Int) { super.init() }
 }
 
 
