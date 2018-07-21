@@ -617,27 +617,51 @@ ASTScope *ASTScope::createRoot(SourceFile *sourceFile) {
   return scope;
 }
 
+// FIXME: This is a vestige of multiple parameter lists.
+static ParamDecl *getParameter(AbstractFunctionDecl *func,
+                               unsigned listIndex,
+                               unsigned paramIndex) {
+  // Dig out the actual parameter.
+  if (auto *selfDecl = func->getImplicitSelfDecl()) {
+    if (listIndex == 0) {
+      assert(paramIndex == 0);
+      return selfDecl;
+    }
+
+    assert(listIndex == 1);
+    return func->getParameters()->get(paramIndex);
+  }
+
+  assert(listIndex == 0);
+  return func->getParameters()->get(paramIndex);
+}
+
 /// Find the parameter list and parameter index (into that list) corresponding
 /// to the next parameter.
 static Optional<std::pair<unsigned, unsigned>>
 findNextParameter(AbstractFunctionDecl *func, unsigned listIndex,
                   unsigned paramIndex) {
-  auto paramLists = func->getParameterLists();
   unsigned paramOffset = 1;
-  while (listIndex < paramLists.size()) {
-    auto currentList = paramLists[listIndex];
 
-    // If there is a parameter in this list, return it.
-    if (paramIndex + paramOffset < currentList->size()) {
-      return std::make_pair(listIndex, paramIndex + paramOffset);
+  if (func->getImplicitSelfDecl()) {
+    if (listIndex > 1)
+      return None;
+
+    if (listIndex == 0) {
+      ++listIndex;
+      paramIndex = 0;
+      paramOffset = 0;
     }
 
-    // Move on to the next list.
-    ++listIndex;
-    paramIndex = 0;
-    paramOffset = 0;
+  } else {
+    if (listIndex > 0)
+      return None;
   }
 
+  if (paramIndex + paramOffset < func->getParameters()->size())
+    return std::make_pair(listIndex, paramIndex + paramOffset);
+
+  ++listIndex;
   return None;
 }
 
@@ -907,7 +931,7 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
     }
 
     // Figure out which parameter is next is the next one down.
-    Optional<std::pair<unsigned, unsigned>> nextParameter;
+    Optional<std::pair<unsigned, unsigned>> nextParameter = None;
     if (parent->getKind() == ASTScopeKind::AbstractFunctionParams &&
         parent->abstractFunctionParams.decl == decl) {
       nextParameter =
@@ -915,17 +939,15 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
                           parent->abstractFunctionParams.listIndex,
                           parent->abstractFunctionParams.paramIndex);
 
-    } else if (abstractFunction->getParameterList(0)->size() > 0) {
+    } else if (abstractFunction->getImplicitSelfDecl() ||
+               abstractFunction->getParameters()->size() > 0) {
       nextParameter = std::make_pair(0, 0);
-    } else {
-      nextParameter = findNextParameter(abstractFunction, 0, 0);
     }
 
     if (nextParameter) {
-      // Dig out the actual parameter.
-      ParamDecl *currentParam =
-        abstractFunction->getParameterList(nextParameter->first)
-          ->get(nextParameter->second);
+      auto *currentParam = getParameter(abstractFunction,
+                                        nextParameter->first,
+                                        nextParameter->second);
 
       // Determine whether there is a default argument.
       ASTScope *defaultArgumentScope = nullptr;
@@ -1405,15 +1427,14 @@ SourceRange ASTScope::getSourceRangeImpl() const {
       if (isa<DestructorDecl>(abstractFunctionParams.decl)) {
         startLoc = abstractFunctionParams.decl->getNameLoc();
       } else {
-        startLoc = abstractFunctionParams.decl->getParameterList(1)
+        startLoc = abstractFunctionParams.decl->getParameters()
                      ->getLParenLoc();
       }
       return SourceRange(startLoc, endLoc);
     }
 
     // Otherwise, find the end of this parameter.
-    auto param = abstractFunctionParams.decl->getParameterList(
-                   abstractFunctionParams.listIndex)
+    auto param = abstractFunctionParams.decl->getParameters()
                      ->get(abstractFunctionParams.paramIndex);
     return SourceRange(param->getEndLoc(), endLoc);
   }
@@ -1754,9 +1775,10 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
     break;
 
   case ASTScopeKind::AbstractFunctionParams:
-    result.push_back(abstractFunctionParams.decl->getParameterList(
-                         abstractFunctionParams.listIndex)
-                       ->get(abstractFunctionParams.paramIndex));
+    result.push_back(
+      getParameter(abstractFunctionParams.decl,
+                   abstractFunctionParams.listIndex,
+                   abstractFunctionParams.paramIndex));
     break;
 
   case ASTScopeKind::AfterPatternBinding:
