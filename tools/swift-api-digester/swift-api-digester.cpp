@@ -1564,14 +1564,34 @@ static bool shouldIgnore(Decl *D, const Decl* Parent) {
 }
 
 static void addMembersToRoot(SDKContext &Ctx, SDKNode *Root,
-                             IterableDeclContext *Context);
+                             IterableDeclContext *Context,
+                             std::set<ExtensionDecl*> &HandledExts);
 
-static SDKNode *constructTypeDeclNode(SDKContext &Ctx, NominalTypeDecl *NTD) {
+static SDKNode *constructTypeDeclNode(SDKContext &Ctx, NominalTypeDecl *NTD,
+                                      std::set<ExtensionDecl*> &HandledExts) {
   auto TypeNode = SDKNodeInitInfo(Ctx, NTD).createSDKNode(SDKNodeKind::DeclType);
-  addMembersToRoot(Ctx, TypeNode, NTD);
+  addMembersToRoot(Ctx, TypeNode, NTD, HandledExts);
   for (auto Ext : NTD->getExtensions()) {
-    addMembersToRoot(Ctx, TypeNode, Ext);
+    HandledExts.insert(Ext);
+    addMembersToRoot(Ctx, TypeNode, Ext, HandledExts);
   }
+  return TypeNode;
+}
+
+/// Create a node for stand-alone extensions. In the sdk dump, we don't have
+/// a specific node for extension. Members in extensions are inlined to the
+/// extended types. If the extended types are from a different module, we have to
+/// synthesize this type node to include those extension members, since these
+/// extension members are legit members of the module.
+static SDKNode *constructExternalExtensionNode(SDKContext &Ctx, SDKNode *Root,
+                                               ExtensionDecl *Ext,
+                                        std::set<ExtensionDecl*> &HandledExts) {
+  auto *TypeNode = SDKNodeInitInfo(Ctx,
+    Ext->getAsNominalTypeOrNominalTypeExtensionContext()).
+      createSDKNode(SDKNodeKind::DeclType);
+
+  // The members of the extension are the only members of this synthesized type.
+  addMembersToRoot(Ctx, TypeNode, Ext, HandledExts);
   return TypeNode;
 }
 
@@ -1597,7 +1617,8 @@ static SDKNode *constructTypeAliasNode(SDKContext &Ctx,TypeAliasDecl *TAD) {
 }
 
 static void addMembersToRoot(SDKContext &Ctx, SDKNode *Root,
-                             IterableDeclContext *Context) {
+                             IterableDeclContext *Context,
+                             std::set<ExtensionDecl*> &HandledExts) {
   for (auto *Member : Context->getMembers()) {
     if (shouldIgnore(Member, Context->getDecl()))
       continue;
@@ -1612,7 +1633,7 @@ static void addMembersToRoot(SDKContext &Ctx, SDKNode *Root,
     } else if (auto EED = dyn_cast<EnumElementDecl>(Member)) {
       Root->addChild(constructVarNode(Ctx, EED));
     } else if (auto NTD = dyn_cast<NominalTypeDecl>(Member)) {
-      Root->addChild(constructTypeDeclNode(Ctx, NTD));
+      Root->addChild(constructTypeDeclNode(Ctx, NTD, HandledExts));
     }
   }
 }
@@ -1626,10 +1647,11 @@ class SwiftDeclCollector : public VisibleDeclConsumer {
   SDKContext &Ctx;
   std::vector<std::unique_ptr<llvm::MemoryBuffer>> OwnedBuffers;
   SDKNode *RootNode;
-  llvm::DenseSet<ValueDecl*> KnownDecls;
+  llvm::DenseSet<Decl*> KnownDecls;
   // Collected and sorted after we get all of them.
   std::vector<ValueDecl *> ClangMacros;
 
+  std::set<ExtensionDecl*> HandledExtensions;
 public:
   void visitAllRoots(SDKNodeVisitor &Visitor) {
     SDKNode::preorderVisit(RootNode, Visitor);
@@ -1666,10 +1688,15 @@ public:
 
 public:
   void lookupVisibleDecls(ArrayRef<ModuleDecl *> Modules) {
-    for (auto M : Modules) {
+    for (auto M: Modules) {
       llvm::SmallVector<Decl*, 512> Decls;
       M->getDisplayDecls(Decls);
       for (auto D : Decls) {
+        if (shouldIgnore(D, nullptr))
+          continue;
+        if (KnownDecls.count(D))
+          continue;
+        KnownDecls.insert(D);
         if (auto VD = dyn_cast<ValueDecl>(D))
           foundDecl(VD, DeclVisibilityKind::DynamicLookup);
       }
@@ -1686,16 +1713,24 @@ public:
 
     for (auto *VD : ClangMacros)
       processDecl(VD);
+
+    // For all known decls, collect those unhandled extensions and handle them
+    // separately.
+    for (auto *D: KnownDecls) {
+      if (auto *Ext = dyn_cast<ExtensionDecl>(D)) {
+        if (HandledExtensions.find(Ext) == HandledExtensions.end()) {
+          RootNode->addChild(constructExternalExtensionNode(Ctx, RootNode, Ext,
+                                                            HandledExtensions));
+        }
+      }
+    }
   }
 
   void processDecl(ValueDecl *VD) {
-    if (shouldIgnore(VD, nullptr))
-      return;
-
     if (auto FD = dyn_cast<FuncDecl>(VD)) {
       RootNode->addChild(constructFunctionNode(Ctx, FD, SDKNodeKind::DeclFunction));
     } else if (auto NTD = dyn_cast<NominalTypeDecl>(VD)) {
-      RootNode->addChild(constructTypeDeclNode(Ctx, NTD));
+      RootNode->addChild(constructTypeDeclNode(Ctx, NTD, HandledExtensions));
     }
     if (auto VAD = dyn_cast<VarDecl>(VD)) {
       RootNode->addChild(constructVarNode(Ctx, VAD));
@@ -1706,10 +1741,6 @@ public:
   }
 
   void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
-    if (KnownDecls.count(VD))
-      return;
-    KnownDecls.insert(VD);
-
     if (VD->getClangMacro()) {
       // Collect macros, we will sort them afterwards.
       ClangMacros.push_back(VD);
