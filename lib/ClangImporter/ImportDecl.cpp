@@ -164,6 +164,10 @@ static FuncDecl *createFuncOrAccessor(ASTContext &ctx, SourceLoc funcLoc,
                                       bool throws,
                                       DeclContext *dc,
                                       ClangNode clangNode) {
+  ParamDecl *selfDecl = nullptr;
+  if (bodyParams.size() == 2)
+    selfDecl = bodyParams[0]->get(0);
+
   TypeLoc resultTypeLoc = resultTy ? TypeLoc::withoutLoc(resultTy) : TypeLoc();
   if (accessorInfo) {
     return AccessorDecl::create(ctx, funcLoc,
@@ -176,14 +180,17 @@ static FuncDecl *createFuncOrAccessor(ASTContext &ctx, SourceLoc funcLoc,
                                 throws,
                                 /*ThrowsLoc=*/SourceLoc(),
                                 /*GenericParams=*/nullptr,
-                                bodyParams,
+                                selfDecl,
+                                bodyParams.back(),
                                 resultTypeLoc, dc, clangNode);
   } else {
     return FuncDecl::create(ctx, /*StaticLoc=*/SourceLoc(),
                             StaticSpellingKind::None,
                             funcLoc, name, nameLoc,
                             throws, /*ThrowsLoc=*/SourceLoc(),
-                            /*GenericParams=*/nullptr, bodyParams,
+                            /*GenericParams=*/nullptr,
+                            selfDecl,
+                            bodyParams.back(),
                             resultTypeLoc, dc, clangNode);
   }
 }
@@ -511,12 +518,8 @@ static AccessorDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
   auto rawTy = enumDecl->getRawType();
   auto enumTy = enumDecl->getDeclaredType();
 
-  auto selfDecl = ParamDecl::createSelf(SourceLoc(), enumDecl);
-  
-  ParameterList *params[] = {
-    ParameterList::createWithoutLoc(selfDecl),
-    ParameterList::createEmpty(C)
-  };
+  auto *selfDecl = ParamDecl::createSelf(SourceLoc(), enumDecl);
+  auto *params = ParameterList::createEmpty(C);
 
   auto getterDecl = AccessorDecl::create(C,
                      /*FuncLoc=*/SourceLoc(),
@@ -528,12 +531,16 @@ static AccessorDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
                      StaticSpellingKind::None,
                      /*Throws=*/false,
                      /*ThrowsLoc=*/SourceLoc(),
-                     /*GenericParams=*/nullptr, params,
+                     /*GenericParams=*/nullptr, selfDecl, params,
                      TypeLoc::withoutLoc(rawTy), enumDecl);
   getterDecl->setImplicit();
   getterDecl->setIsObjC(false);
 
-  auto type = ParameterList::getFullInterfaceType(rawTy, params, C);
+  ParameterList *paramLists[] = {
+    ParameterList::createWithoutLoc(selfDecl),
+    params
+  };
+  auto type = ParameterList::getFullInterfaceType(rawTy, paramLists, C);
 
   getterDecl->setInterfaceType(type);
   getterDecl->setValidationToChecked();
@@ -593,12 +600,8 @@ static AccessorDecl *makeStructRawValueGetter(
 
   ASTContext &C = Impl.SwiftContext;
   
-  auto selfDecl = ParamDecl::createSelf(SourceLoc(), structDecl);
-  
-  ParameterList *params[] = {
-    ParameterList::createWithoutLoc(selfDecl),
-    ParameterList::createEmpty(C)
-  };
+  auto *selfDecl = ParamDecl::createSelf(SourceLoc(), structDecl);
+  auto *params = ParameterList::createEmpty(C);
 
   auto computedType = computedVar->getInterfaceType();
   auto storedType = storedVar->getInterfaceType();
@@ -613,12 +616,16 @@ static AccessorDecl *makeStructRawValueGetter(
                      StaticSpellingKind::None,
                      /*Throws=*/false,
                      /*ThrowsLoc=*/SourceLoc(),
-                     /*GenericParams=*/nullptr, params,
+                     /*GenericParams=*/nullptr, selfDecl, params,
                      TypeLoc::withoutLoc(computedType), structDecl);
   getterDecl->setImplicit();
   getterDecl->setIsObjC(false);
 
-  auto type = ParameterList::getFullInterfaceType(computedType, params, C);
+  ParameterList *paramLists[] = {
+    ParameterList::createWithoutLoc(selfDecl),
+    params
+  };
+  auto type = ParameterList::getFullInterfaceType(computedType, paramLists, C);
 
   getterDecl->setInterfaceType(type);
   getterDecl->setValidationToChecked();
@@ -667,10 +674,7 @@ static AccessorDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
   auto &C = Impl.SwiftContext;
   auto selfDecl = ParamDecl::createSelf(SourceLoc(), importedDecl);
 
-  ParameterList *params[] = {
-    ParameterList::createWithoutLoc(selfDecl),
-    ParameterList::createEmpty(C)
-  };
+  auto *params = ParameterList::createEmpty(C);
   
   auto getterType = importedFieldDecl->getType();
   auto getterDecl = AccessorDecl::create(C,
@@ -683,12 +687,16 @@ static AccessorDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
                      StaticSpellingKind::None,
                      /*Throws=*/false,
                      /*ThrowsLoc=*/SourceLoc(),
-                     /*GenericParams=*/nullptr, params,
+                     /*GenericParams=*/nullptr, selfDecl, params,
                      TypeLoc::withoutLoc(getterType), importedDecl, clangNode);
   getterDecl->setAccess(AccessLevel::Public);
   getterDecl->setIsObjC(false);
 
-  auto type = ParameterList::getFullInterfaceType(getterType, params, C);
+  ParameterList *paramLists[] = {
+    ParameterList::createWithoutLoc(selfDecl),
+    params
+  };
+  auto type = ParameterList::getFullInterfaceType(getterType, paramLists, C);
   getterDecl->setInterfaceType(type);
   getterDecl->setValidationToChecked();
 
@@ -709,10 +717,7 @@ static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
                                         importedDecl);
   newValueDecl->setInterfaceType(importedFieldDecl->getInterfaceType());
 
-  ParameterList *params[] = {
-    ParameterList::createWithoutLoc(selfDecl),
-    ParameterList::createWithoutLoc(newValueDecl),
-  };
+  auto *params = ParameterList::createWithoutLoc(newValueDecl);
 
   auto voidTy = TupleType::getEmpty(C);
 
@@ -726,11 +731,15 @@ static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
                      StaticSpellingKind::None,
                      /*Throws=*/false,
                      /*ThrowsLoc=*/SourceLoc(),
-                     /*GenericParams=*/nullptr, params,
+                     /*GenericParams=*/nullptr, selfDecl, params,
                      TypeLoc::withoutLoc(voidTy), importedDecl, clangNode);
   setterDecl->setIsObjC(false);
 
-  auto type = ParameterList::getFullInterfaceType(voidTy, params, C);
+  ParameterList *paramLists[] = {
+    ParameterList::createWithoutLoc(selfDecl),
+    params
+  };
+  auto type = ParameterList::getFullInterfaceType(voidTy, paramLists, C);
   setterDecl->setInterfaceType(type);
   setterDecl->setValidationToChecked();
 
@@ -1616,12 +1625,16 @@ buildSubscriptGetterDecl(ClangImporter::Implementation &Impl,
   auto loc = getter->getLoc();
 
   // self & index.
-  ParameterList *getterArgs[] = {ParameterList::createSelf(SourceLoc(), dc),
-                                 ParameterList::create(C, index)};
+  auto *selfDecl = ParamDecl::createSelf(SourceLoc(), dc);
+  auto *params = ParameterList::create(C, index);
 
   // Form the type of the getter.
+  ParameterList *paramLists[] = {
+    ParameterList::createWithoutLoc(selfDecl),
+    params
+  };
   auto getterType =
-      ParameterList::getFullInterfaceType(elementTy, getterArgs, C);
+      ParameterList::getFullInterfaceType(elementTy, paramLists, C);
 
   auto interfaceType =
       getGenericMethodType(dc, getterType->castTo<AnyFunctionType>());
@@ -1637,7 +1650,8 @@ buildSubscriptGetterDecl(ClangImporter::Implementation &Impl,
                      StaticSpellingKind::None,
                      /*Throws=*/false,
                      /*ThrowsLoc=*/SourceLoc(),
-                     /*GenericParams=*/nullptr, getterArgs,
+                     /*GenericParams=*/nullptr,
+                     selfDecl, params,
                      TypeLoc::withoutLoc(elementTy), dc,
                      getter->getClangNode());
 
@@ -1686,11 +1700,9 @@ buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
 
   auto valueIndicesPL = ParameterList::create(C, {paramVarDecl, index});
 
-  // Form the argument lists.
+  // Form the type of the setter.
   ParameterList *setterArgs[] = {ParameterList::createWithoutLoc(selfDecl),
                                  valueIndicesPL};
-
-  // Form the type of the setter.
   Type setterType = ParameterList::getFullInterfaceType(TupleType::getEmpty(C),
                                                         setterArgs, C);
 
@@ -1708,7 +1720,8 @@ buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
                      StaticSpellingKind::None,
                      /*Throws=*/false,
                      /*ThrowsLoc=*/SourceLoc(),
-                     /*GenericParams=*/nullptr, setterArgs,
+                     /*GenericParams=*/nullptr,
+                     selfDecl, valueIndicesPL,
                      TypeLoc::withoutLoc(TupleType::getEmpty(C)), dc,
                      setter->getClangNode());
   thunk->setInterfaceType(interfaceType);
@@ -1866,11 +1879,13 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
 
   DeclRefExpr *domainDeclRef = new (C)
       DeclRefExpr(ConcreteDeclRef(swiftValueDecl), {}, isImplicit);
-  ParameterList *params[] = {
-      ParameterList::createWithoutLoc(
-          ParamDecl::createSelf(SourceLoc(), swiftDecl, isStatic)),
-      ParameterList::createEmpty(C)};
-  auto toStringTy = ParameterList::getFullInterfaceType(stringTy, params, C);
+  auto *selfDecl = ParamDecl::createSelf(SourceLoc(), swiftDecl, isStatic);
+  auto *params = ParameterList::createEmpty(C);
+  ParameterList *paramLists[] = {
+    ParameterList::createWithoutLoc(selfDecl),
+    params
+  };
+  auto toStringTy = ParameterList::getFullInterfaceType(stringTy, paramLists, C);
 
   auto getterDecl = AccessorDecl::create(C,
                      /*FuncLoc=*/SourceLoc(),
@@ -1882,7 +1897,8 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
                      StaticSpellingKind::None,
                      /*Throws=*/false,
                      /*ThrowsLoc=*/SourceLoc(),
-                     /*GenericParams=*/nullptr, params,
+                     /*GenericParams=*/nullptr,
+                     selfDecl, params,
                      TypeLoc::withoutLoc(stringTy), swiftDecl);
   getterDecl->setInterfaceType(toStringTy);
   getterDecl->setValidationToChecked();
@@ -8333,13 +8349,15 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   SmallVector<ParameterList*, 3> getterArgs;
   
   // 'self'
+  ParamDecl *selfDecl = nullptr;
+  auto *params = ParameterList::createEmpty(C);
   if (dc->isTypeContext()) {
-    auto *selfDecl = ParamDecl::createSelf(SourceLoc(), dc, isStatic);
+    selfDecl = ParamDecl::createSelf(SourceLoc(), dc, isStatic);
     getterArgs.push_back(ParameterList::createWithoutLoc(selfDecl));
   }
   
   // empty tuple
-  getterArgs.push_back(ParameterList::createEmpty(C));
+  getterArgs.push_back(params);
 
   // Form the type of the getter.
   auto getterType = ParameterList::getFullInterfaceType(type, getterArgs, C);
@@ -8355,7 +8373,8 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                      StaticSpellingKind::None,
                      /*Throws=*/false,
                      /*ThrowsLoc=*/SourceLoc(),
-                     /*GenericParams=*/nullptr, getterArgs,
+                     /*GenericParams=*/nullptr,
+                     selfDecl, params,
                      TypeLoc::withoutLoc(type), dc);
   func->setStatic(isStatic);
   func->setInterfaceType(getterType);
