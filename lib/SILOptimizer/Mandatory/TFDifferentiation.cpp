@@ -44,6 +44,7 @@
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/BreadthFirstIterator.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/STLExtras.h"
 
 using namespace swift;
 using llvm::DenseMap;
