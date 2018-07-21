@@ -41,6 +41,7 @@ struct TestConfig {
   let fixedNumIters: UInt
   let numSamples: Int
   let verbose: Bool
+  let logMemory: Bool
 
   /// After we run the tests, should the harness sleep to allow for utilities
   /// like leaks that require a PID to run on the test harness.
@@ -59,6 +60,7 @@ struct TestConfig {
       var iterationScale, numSamples, afterRunSleep: Int?
       var fixedNumIters: UInt?
       var verbose: Bool?
+      var logMemory: Bool?
       var action: TestAction?
       var tests: [String]?
     }
@@ -86,6 +88,8 @@ struct TestConfig {
                         "default: 1", parser: { Int($0) })
     p.addArgument("--verbose", \.verbose, defaultValue: true,
                   help: "increase output verbosity")
+    p.addArgument("--memory", \.logMemory, defaultValue: true,
+                  help: "log the change in maximum resident set size (MAX_RSS)")
     p.addArgument("--delim", \.delim,
                   help:"value delimiter used for log output; default: ,",
                   parser: { $0 })
@@ -112,6 +116,7 @@ struct TestConfig {
     fixedNumIters = c.fixedNumIters ?? 0
     numSamples = c.numSamples ?? 1
     verbose = c.verbose ?? false
+    logMemory = c.logMemory ?? false
     afterRunSleep = c.afterRunSleep
     action = c.action ?? .run
     tests = TestConfig.filterTests(registeredBenchmarks,
@@ -125,6 +130,7 @@ struct TestConfig {
             --- CONFIG ---
             NumSamples: \(numSamples)
             Verbose: \(verbose)
+            LogMemory: \(logMemory)
             IterScale: \(iterationScale)
             FixedIters: \(fixedNumIters)
             Tests Filter: \(c.tests ?? [])
@@ -379,7 +385,7 @@ func runBenchmarks(_ c: TestConfig) {
   let header = (
     ["#", "TEST", "SAMPLES"] +
     ["MIN", "MAX", "MEAN", "SD", "MEDIAN"].map(withUnit)
-    + ["MAX_RSS(B)"]
+    + (c.logMemory ? ["MAX_RSS(B)"] : [])
   ).joined(separator: c.delim)
   print(header)
 
@@ -387,8 +393,8 @@ func runBenchmarks(_ c: TestConfig) {
 
   func report(_ index: String, _ t: BenchmarkInfo, results: BenchResults?) {
     func values(r: BenchResults) -> [String] {
-      return [r.sampleCount, r.min, r.max, r.mean, r.sd, r.median, r.maxRSS]
-        .map { String($0) }
+      return ([r.sampleCount, r.min, r.max, r.mean, r.sd, r.median] +
+              (c.logMemory ? [r.maxRSS] : [])).map { String($0) }
     }
     let benchmarkStats = (
       [index, t.name] + (results.map(values) ?? ["Unsupported"])
