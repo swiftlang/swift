@@ -3770,16 +3770,10 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
                                      EndLoc);
   }
 
-
-  // Create the parameter list(s) for the getter.
-  SmallVector<ParameterList*, 4> Params;
-  
-  // Add the implicit 'self' to Params, if needed.
+  // Create the implicit 'self' if needed.
+  ParamDecl *SelfDecl = nullptr;
   if (Flags & Parser::PD_HasContainerType)
-    Params.push_back(ParameterList::createUnboundSelf(DeclLoc, P->CurDeclContext));
-  
-  // Add the "(value)" and subscript indices parameter clause.
-  Params.push_back(ValueArg);
+    SelfDecl = ParamDecl::createUnboundSelf(DeclLoc, P->CurDeclContext);
 
   // The typechecker will always fill this in.
   TypeLoc ReturnType;
@@ -3794,7 +3788,7 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
                                  (GenericParams
                                   ? GenericParams->clone(P->CurDeclContext)
                                   : nullptr),
-                                 Params, ReturnType,
+                                 SelfDecl, ValueArg, ReturnType,
                                  P->CurDeclContext);
 
   // Non-static set/willSet/didSet/materializeForSet/mutableAddress
@@ -5250,21 +5244,21 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   if (SignatureHasCodeCompletion && !CodeCompletion)
     return makeParserCodeCompletionStatus();
 
-  SmallVector<ParameterList*, 8> BodyParams;
-  
-  // If we're within a container, add an implicit first pattern to match the
-  // container type as an element named 'self'.
+  // If we're within a container, create a parameter to match the
+  // container type named 'self'.
   //
   // This turns an instance function "(int)->int" on FooTy into
   // "(inout self: FooTy)->(int)->int", and a static function
   // "(int)->int" on FooTy into "(self: FooTy.Type)->(int)->int".
   // Note that we can't actually compute the type here until Sema.
+  ParamDecl *SelfDecl = nullptr;
   if (HasContainerType)
-    BodyParams.push_back(ParameterList::createUnboundSelf(NameLoc, CurDeclContext));
+    SelfDecl = ParamDecl::createUnboundSelf(NameLoc, CurDeclContext);
 
   DefaultArgumentInfo DefaultArgs(HasContainerType);
   TypeRepr *FuncRetTy = nullptr;
   DeclName FullName;
+  ParameterList *BodyParams;
   SourceLoc throwsLoc;
   bool rethrows;
   ParserStatus SignatureStatus =
@@ -5283,7 +5277,8 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   auto *FD = FuncDecl::create(Context, StaticLoc, StaticSpelling,
                               FuncLoc, FullName, NameLoc,
                               /*Throws=*/throwsLoc.isValid(), throwsLoc,
-                              nullptr, BodyParams, FuncRetTy,
+                              /*GenericParams=*/nullptr,
+                              SelfDecl, BodyParams, FuncRetTy,
                               CurDeclContext);
 
   // Parse a 'where' clause if present, adding it to our GenericParamList.

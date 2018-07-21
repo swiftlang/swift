@@ -725,14 +725,13 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
                 SourceLoc(), C.Id_encoder, encoderType, conformanceDC);
   encoderParam->setInterfaceType(encoderType);
 
-  ParameterList *params[] = {ParameterList::createWithoutLoc(selfDecl),
-                             ParameterList::createWithoutLoc(encoderParam)};
+  ParameterList *params = ParameterList::createWithoutLoc(encoderParam);
 
   // Func name: encode(to: Encoder)
-  DeclName name(C, C.Id_encode, params[1]);
+  DeclName name(C, C.Id_encode, params);
   auto *encodeDecl = FuncDecl::create(
       C, SourceLoc(), StaticSpellingKind::None, SourceLoc(), name, SourceLoc(),
-      /*Throws=*/true, SourceLoc(), nullptr, params,
+      /*Throws=*/true, SourceLoc(), nullptr, selfDecl, params,
       TypeLoc::withoutLoc(returnType), conformanceDC);
   encodeDecl->setImplicit();
   encodeDecl->setSynthesized();
@@ -870,7 +869,7 @@ static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl) {
       // otherwise, we can just decode(T.self, forKey: ...).
       // This is also true if the type is an ImplicitlyUnwrappedOptional.
       auto varType = conformanceDC->mapTypeIntoContext(
-          varDecl->getType()->mapTypeOutOfContext());
+          varDecl->getInterfaceType());
       auto methodName = C.Id_decode;
       if (auto referenceType = varType->getAs<ReferenceStorageType>()) {
         // This is a weak/unowned/unmanaged var. Get the inner type before

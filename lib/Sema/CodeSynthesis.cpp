@@ -145,15 +145,11 @@ static AccessorDecl *createGetterPrototype(TypeChecker &TC,
 
   SourceLoc loc = storage->getLoc();
 
-  // Create the parameter list for the getter.
-  SmallVector<ParameterList*, 2> getterParams;
-
   GenericEnvironment *genericEnvironmentOfLazyAccessor = nullptr;
 
   // The implicit 'self' argument if in a type context.
+  ParamDecl *selfDecl = nullptr;
   if (storage->getDeclContext()->isTypeContext()) {
-    ParamDecl *selfDecl;
-
     // For lazy properties, steal the 'self' from the initializer context.
     if (storage->getAttrs().hasAttribute<LazyAttr>()) {
       // The getter is considered mutating if it's on a value type.
@@ -175,12 +171,10 @@ static AccessorDecl *createGetterPrototype(TypeChecker &TC,
                                        storage->getDeclContext(),
                                        /*isStatic*/false);
     }
-
-    getterParams.push_back(ParameterList::create(TC.Context, selfDecl));
   }
     
   // Add an index-forwarding clause.
-  getterParams.push_back(buildIndexForwardingParamList(storage, {}));
+  auto *getterParams = buildIndexForwardingParamList(storage, {});
 
   SourceLoc staticLoc;
   if (auto var = dyn_cast<VarDecl>(storage)) {
@@ -196,7 +190,8 @@ static AccessorDecl *createGetterPrototype(TypeChecker &TC,
       staticLoc, StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       /*GenericParams=*/nullptr,
-      getterParams, TypeLoc::withoutLoc(storageInterfaceType),
+      selfDecl, getterParams,
+      TypeLoc::withoutLoc(storageInterfaceType),
       storage->getDeclContext());
   getter->setImplicit();
 
@@ -232,18 +227,16 @@ static AccessorDecl *createSetterPrototype(TypeChecker &TC,
 
   SourceLoc loc = storage->getLoc();
 
-  // Create the parameter list for the setter.
-  SmallVector<ParameterList*, 2> params;
-
   bool isStatic = storage->isStatic();
   bool isMutating = storage->isSetterMutating();
 
   // The implicit 'self' argument if in a type context.
+  ParamDecl *selfDecl = nullptr;
   if (storage->getDeclContext()->isTypeContext()) {
-    params.push_back(ParameterList::createSelf(loc,
-                                               storage->getDeclContext(),
-                                               /*isStatic*/isStatic,
-                                               /*isInOut*/isMutating));
+    selfDecl = ParamDecl::createSelf(loc,
+                                     storage->getDeclContext(),
+                                     /*isStatic*/isStatic,
+                                     /*isInOut*/isMutating);
   }
   
   // Add a "(value : T, indices...)" argument list.
@@ -252,7 +245,7 @@ static AccessorDecl *createSetterPrototype(TypeChecker &TC,
   auto valueDecl = buildArgument(storage->getLoc(), storage->getDeclContext(),
                                  "value", storageType, storageInterfaceType,
                                  VarDecl::Specifier::Default);
-  params.push_back(buildIndexForwardingParamList(storage, valueDecl));
+  auto *params = buildIndexForwardingParamList(storage, valueDecl);
 
   Type setterRetTy = TupleType::getEmpty(TC.Context);
   auto setter = AccessorDecl::create(
@@ -260,7 +253,8 @@ static AccessorDecl *createSetterPrototype(TypeChecker &TC,
       AccessorKind::Set, AddressorKind::NotAddressor, storage,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-      /*GenericParams=*/nullptr, params, TypeLoc::withoutLoc(setterRetTy),
+      /*GenericParams=*/nullptr, selfDecl, params,
+      TypeLoc::withoutLoc(setterRetTy),
       storage->getDeclContext());
   setter->setImplicit();
 
@@ -351,13 +345,11 @@ createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   auto &ctx = storage->getASTContext();
   SourceLoc loc = storage->getLoc();
 
-  // Create the parameter list:
-  SmallVector<ParameterList*, 2> params;
-
   //  - The implicit 'self' argument if in a type context.
   auto DC = storage->getDeclContext();
+  ParamDecl *selfDecl = nullptr;
   if (DC->isTypeContext())
-    params.push_back(ParameterList::createSelf(loc, DC, /*isStatic*/false));
+    selfDecl = ParamDecl::createSelf(loc, DC, /*isStatic*/false);
 
   //  - The buffer parameter, (buffer: Builtin.RawPointer,
   //                           inout storage: Builtin.UnsafeValueBuffer,
@@ -367,7 +359,7 @@ createMaterializeForSetPrototype(AbstractStorageDecl *storage,
                     ctx.TheRawPointerType, VarDecl::Specifier::Default),
       buildArgument(loc, DC, "callbackStorage", ctx.TheUnsafeValueBufferType,
                     ctx.TheUnsafeValueBufferType, VarDecl::Specifier::InOut)};
-  params.push_back(buildIndexForwardingParamList(storage, bufferElements));
+  auto *params = buildIndexForwardingParamList(storage, bufferElements);
 
   // The accessor returns (temporary: Builtin.RawPointer,
   //                       callback: Optional<Builtin.RawPointer>),
@@ -394,7 +386,7 @@ createMaterializeForSetPrototype(AbstractStorageDecl *storage,
       (genericParams
        ? genericParams->clone(DC)
        : nullptr),
-      params, TypeLoc::withoutLoc(retTy), DC);
+      selfDecl, params, TypeLoc::withoutLoc(retTy), DC);
   materializeForSet->setImplicit();
   
   // Open-code the setMutating() calculation since we might run before
@@ -1453,14 +1445,12 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
   }
   
   // Borrow the parameters from the requirement declaration.
-  SmallVector<ParameterList *, 2> ParamLists;
+  ParamDecl *SelfDecl = nullptr;
   if (DC->isTypeContext()) {
-    auto self = ParamDecl::createSelf(SourceLoc(), DC);    
-    ParamLists.push_back(ParameterList::create(Context, SourceLoc(),
-                                               self, SourceLoc()));
-    ParamLists.back()->get(0)->setImplicit();
+    SelfDecl = ParamDecl::createSelf(SourceLoc(), DC);
+    SelfDecl->setImplicit();
   }
-  
+
   SmallVector<ParamDecl *, 4> Params;
   SmallVector<Identifier, 4> NameComponents;
   
@@ -1487,7 +1477,7 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
     Params.push_back(param);
     NameComponents.push_back(Identifier());
   }
-  ParamLists.push_back(ParameterList::create(Context, Params));
+  auto *ParamList = ParameterList::create(Context, Params);
 
   auto *Parameter =
     FuncDecl::create(Context, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
@@ -1495,7 +1485,7 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
                      DeclName(Context, ParameterBaseName, NameComponents),
                      /*NameLoc=*/SourceLoc(),
                      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-                     /*GenericParams=*/nullptr, ParamLists,
+                     /*GenericParams=*/nullptr, SelfDecl, ParamList,
                      TypeLoc::withoutLoc(SubstBodyResultTy), DC);
 
   Parameter->setInterfaceType(SubstInterfaceTy);
