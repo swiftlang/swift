@@ -876,33 +876,9 @@ public:
 
   void consumeGetSetBody(AbstractFunctionDecl *AFD, SourceLoc LBLoc);
 
-  struct ParsedAccessors {
-    SourceLoc LBLoc, RBLoc;
-    SmallVector<AccessorDecl*, 16> Accessors;
-
-#define ACCESSOR(ID) AccessorDecl *ID = nullptr;
-#include "swift/AST/AccessorKinds.def"
-
-    void record(Parser &P, AbstractStorageDecl *storage, bool invalid,
-                ParseDeclOptions flags, SourceLoc staticLoc,
-                const DeclAttributes &attrs,
-                TypeLoc elementTy, ParameterList *indices,
-                SmallVectorImpl<Decl *> &decls);
-
-    StorageImplInfo
-    classify(Parser &P, AbstractStorageDecl *storage, bool invalid,
-             ParseDeclOptions flags, SourceLoc staticLoc,
-             const DeclAttributes &attrs,
-             TypeLoc elementTy, ParameterList *indices);
-
-    /// Add an accessor.  If there's an existing accessor of this kind,
-    /// return it.  The new accessor is still remembered but will be
-    /// ignored.
-    AccessorDecl *add(AccessorDecl *accessor);
-  };
-
   void parseAccessorAttributes(DeclAttributes &Attributes);
 
+  struct ParsedAccessors;
   bool parseGetSetImpl(ParseDeclOptions Flags,
                        GenericParamList *GenericParams,
                        ParameterList *Indices,

@@ -274,7 +274,8 @@ public:
       return;
 
     case WriteImplKind::Set:
-      assert(readImpl == ReadImplKind::Get);
+      assert(readImpl == ReadImplKind::Get ||
+             readImpl == ReadImplKind::Address);
       assert(readWriteImpl == ReadWriteImplKind::MaterializeToTemporary ||
              readWriteImpl == ReadWriteImplKind::MaterializeForSet);
       return;

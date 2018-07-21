@@ -280,28 +280,28 @@ var (x3): X { // expected-error{{getter/setter can only be defined for a single 
 }
 
 var duplicateAccessors1: X {
-  get { // expected-note {{previous definition of getter is here}}
+  get { // expected-note {{previous definition of getter here}}
     return _x
   }
-  set { // expected-note {{previous definition of setter is here}}
+  set { // expected-note {{previous definition of setter here}}
     _x = newValue
   }
-  get { // expected-error {{duplicate definition of getter}}
+  get { // expected-error {{variable already has a getter}}
     return _x
   }
-  set(v) { // expected-error {{duplicate definition of setter}}
+  set(v) { // expected-error {{variable already has a setter}}
     _x = v
   }
 }
 
 var duplicateAccessors2: Int = 0 {
-  willSet { // expected-note {{previous definition of willSet is here}}
+  willSet { // expected-note {{previous definition of 'willSet' here}}
   }
-  didSet { // expected-note {{previous definition of didSet is here}}
+  didSet { // expected-note {{previous definition of 'didSet' here}}
   }
-  willSet { // expected-error {{duplicate definition of willSet}}
+  willSet { // expected-error {{variable already has 'willSet'}}
   }
-  didSet { // expected-error {{duplicate definition of didSet}}
+  didSet { // expected-error {{variable already has 'didSet'}}
   }
 }
 
@@ -328,10 +328,10 @@ var extraTokensInAccessorBlock5: X {
   set blah wibble // expected-error{{expected '{' to start setter definition}}
 }
 var extraTokensInAccessorBlock6: X { // expected-error{{non-member observing properties require an initializer}}
-  willSet blah wibble // expected-error{{expected '{' to start willSet definition}}
+  willSet blah wibble // expected-error{{expected '{' to start 'willSet' definition}}
 }
 var extraTokensInAccessorBlock7: X { // expected-error{{non-member observing properties require an initializer}}
-  didSet blah wibble // expected-error{{expected '{' to start didSet definition}}
+  didSet blah wibble // expected-error{{expected '{' to start 'didSet' definition}}
 }
 
 var extraTokensInAccessorBlock8: X {
@@ -724,19 +724,19 @@ struct WillSetDidSetProperties {
   }
 
   var d: Int {
-    didSet {
+    didSet { // expected-error {{'didSet' cannot be provided together with a getter}}
       markUsed("woot")
     }
-    get { // expected-error {{didSet variable must not also have a get specifier}}
+    get {
       return 4
     }
   }
 
   var e: Int {
-    willSet {
+    willSet { // expected-error {{'willSet' cannot be provided together with a setter}}
       markUsed("woot")
     }
-    set { // expected-error {{willSet variable must not also have a set specifier}}
+    set { // expected-error {{variable with a setter must also have a getter}}
       return 4 // expected-error {{unexpected non-void return value in void function}}
     }
   }
@@ -748,11 +748,11 @@ struct WillSetDidSetProperties {
 
   var g: Int {
     willSet(newValue 5) {} // expected-error {{expected ')' after willSet parameter name}} expected-note {{to match this opening '('}}
-    // expected-error@-1 {{expected '{' to start willSet definition}}
+    // expected-error@-1 {{expected '{' to start 'willSet' definition}}
   }
   var h: Int {
     didSet(oldValue ^) {} // expected-error {{expected ')' after didSet parameter name}} expected-note {{to match this opening '('}}
-    // expected-error@-1 {{expected '{' to start didSet definition}}
+    // expected-error@-1 {{expected '{' to start 'didSet' definition}}
   }
 
   // didSet/willSet with initializers.
@@ -817,13 +817,13 @@ struct WillSetDidSetProperties {
 struct WillSetDidSetDisambiguate1 {
   var willSet: Int
   var x: (() -> ()) -> Int = takeTrailingClosure {
-    willSet = 42 // expected-error {{expected '{' to start willSet definition}}
+    willSet = 42 // expected-error {{expected '{' to start 'willSet' definition}}
   }
 }
 struct WillSetDidSetDisambiguate1Attr {
   var willSet: Int
   var x: (() -> ()) -> Int = takeTrailingClosure {
-    willSet = 42 // expected-error {{expected '{' to start willSet definition}}
+    willSet = 42 // expected-error {{expected '{' to start 'willSet' definition}}
   }
 }
 
