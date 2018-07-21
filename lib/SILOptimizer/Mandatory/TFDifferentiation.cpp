@@ -717,8 +717,8 @@ public:
     const llvm::SmallBitVector *supersetParamIndices;
     const auto &indexSet = indices.parameters;
     for (auto *rda : original->getReverseDifferentiableAttrs())
-      if (all_of(rda->getIndices().parameters.set_bits(),
-                 [&](unsigned idx) -> bool { return indexSet[idx]; }))
+      if (llvm::all_of(rda->getIndices().parameters.set_bits(),
+                       [&](unsigned idx) -> bool { return indexSet[idx]; }))
         supersetParamIndices = &rda->getIndices().parameters;
     auto existing = enqueuedTaskIndices.find(
       {original, {indices.source, *supersetParamIndices}});
