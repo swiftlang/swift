@@ -61,7 +61,12 @@ class ArgumentParser<U> {
       return arguments.compactMap { $0.name }
     }
     private var arguments: [Argument] = []
-    private let progName = CommandLine.arguments[0]
+    private let programName: String = {
+      // Strip full path from the program name.
+      let r = CommandLine.arguments[0].reversed()
+      let ss = r[r.startIndex ..< (r.index(of:"/") ?? r.endIndex)]
+      return String(ss.reversed())
+    }()
     private var positionalArgs = [String]()
     private var optionalArgsMap = [String : String]()
 
@@ -70,6 +75,7 @@ class ArgumentParser<U> {
     // in the parsing result.
     struct Argument {
       let name: String?
+      let help: String?
       let apply: () throws -> ()
     }
 
@@ -78,16 +84,36 @@ class ArgumentParser<U> {
     init(into result: U) {
       self.result = result
       self.arguments += [
-        Argument(name: "--help", apply: printUsage)
+        Argument(name: "--help", help: "show this help message and exit",
+                 apply: printUsage)
       ]
     }
 
     private func printUsage() {
-      guard let _ = self.optionalArgsMap["--help"] else { return }
-      print("Valid options:")
-      for v in validOptions {
-        print("    \(v)")
-      }
+      guard let _ = optionalArgsMap["--help"] else { return }
+      let space = " "
+      let maxLength = arguments.compactMap({ $0.name?.count }).max()!
+      let padded = { (s: String) in
+        " \(s)\(String(repeating:space, count: maxLength - s.count))  " }
+      let f: (String, String) -> String = {
+        "\(padded($0))\($1)"
+          .split(separator: "\n")
+          .joined(separator: "\n" + padded(""))
+       }
+      let positional = f("TEST", "name or number of the benchmark to measure")
+      let optional =  arguments.filter { $0.name != nil }
+                                .map { f($0.name!, $0.help ?? "") }
+                                .joined(separator: "\n")
+      print(
+      """
+      usage: \(programName) [--argument=VALUE] [TEST [TEST ...]]
+
+      positional arguments:
+      \(positional)
+
+      optional arguments:
+      \(optional)
+      """)
       exit(0)
     }
 
@@ -158,9 +184,10 @@ class ArgumentParser<U> {
       _ name: String?,
       _ property: WritableKeyPath<U, T>,
       defaultValue: T? = nil,
+      help: String? = nil,
       parser: @escaping (String) throws -> T? = { _ in nil }
     ) {
-      arguments.append(Argument(name: name)
+      arguments.append(Argument(name: name, help: help)
         { try self.parseArgument(name, property, defaultValue, parser) })
     }
 

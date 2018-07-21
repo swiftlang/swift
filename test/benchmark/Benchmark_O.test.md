@@ -175,7 +175,10 @@ BADSKIPTAG: error: 'bogus' is not a valid 'BenchmarkCategory'
 
 ````
 RUN: %Benchmark_O --help | %FileCheck %s --check-prefix OPTIONS
-OPTIONS: Valid options:
+OPTIONS: usage: Benchmark_O [--argument=VALUE] [TEST [TEST ...]]
+OPTIONS: optional arguments:
+OPTIONS: --help
+OPTIONS-SAME: show this help message and exit
 OPTIONS: --verbose
 OPTIONS: --delim
 OPTIONS: --tags

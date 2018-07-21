@@ -30,7 +30,6 @@ enum TestAction {
 }
 
 struct TestConfig {
-  /// The delimiter to use when printing output.
   let delim: String
 
   /// The scalar multiple of the amount of times a test should be run. This
@@ -39,15 +38,8 @@ struct TestConfig {
   /// longer amount of time to perform performance analysis on the test in
   /// instruments.
   let iterationScale: Int
-
-  /// If we are asked to have a fixed number of iterations, the number of fixed
-  /// iterations.
   let fixedNumIters: UInt
-
-  /// The number of samples we should take of each test.
   let numSamples: Int
-
-  /// Is verbose output enabled?
   let verbose: Bool
 
   /// After we run the tests, should the harness sleep to allow for utilities
@@ -82,16 +74,34 @@ struct TestConfig {
 
     // Configure the command line argument parser
     let p = ArgumentParser(into: PartialTestConfig())
-    p.addArgument("--iter-scale", \.iterationScale) { Int($0) }
-    p.addArgument("--num-iters", \.fixedNumIters) { UInt($0) }
-    p.addArgument("--num-samples", \.numSamples)  { Int($0) }
-    p.addArgument("--verbose", \.verbose, defaultValue: true)
-    p.addArgument("--delim", \.delim) { $0 }
-    p.addArgument("--tags", \PartialTestConfig.tags, parser: tags)
-    p.addArgument("--skip-tags", \PartialTestConfig.skipTags,
-                    defaultValue: [], parser: tags)
-    p.addArgument("--sleep", \.afterRunSleep) { Int($0) }
-    p.addArgument("--list", \.action, defaultValue: .listTests)
+    p.addArgument("--num-samples", \.numSamples,
+                  help: "number of samples to take per benchmark; default: 1",
+                  parser: { Int($0) })
+    p.addArgument("--num-iters", \.fixedNumIters,
+                  help: "number of iterations averaged in the sample;\n" +
+                        "default: auto-scaled to measure for 1 second",
+                  parser: { UInt($0) })
+    p.addArgument("--iter-scale", \.iterationScale,
+                  help: "number of seconds used for num-iters calculation\n" +
+                        "default: 1", parser: { Int($0) })
+    p.addArgument("--verbose", \.verbose, defaultValue: true,
+                  help: "increase output verbosity")
+    p.addArgument("--delim", \.delim,
+                  help:"value delimiter used for log output; default: ,",
+                  parser: { $0 })
+    p.addArgument("--tags", \PartialTestConfig.tags,
+                  help: "run tests matching all the specified categories",
+                  parser: tags)
+    p.addArgument("--skip-tags", \PartialTestConfig.skipTags, defaultValue: [],
+                  help: "don't run tests matching any of the specified\n" +
+                        "categories; default: unstable,skip",
+                  parser: tags)
+    p.addArgument("--sleep", \.afterRunSleep,
+                  help: "number of seconds to sleep after benchmarking",
+                  parser: { Int($0) })
+    p.addArgument("--list", \.action, defaultValue: .listTests,
+                  help: "don't run the tests, just log the list of test \n" +
+                        "numbers, names and tags (respects specified filters)")
     p.addArgument(nil, \.tests) // positional arguments
 
     let c = p.parse()
