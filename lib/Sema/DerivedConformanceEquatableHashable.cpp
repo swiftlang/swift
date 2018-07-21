@@ -605,24 +605,21 @@ deriveEquatable_eq(DerivedConformance &derived, Identifier generatedIdentifier,
   auto selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC,
                                         /*isStatic=*/true);
 
-  ParameterList *params[] = {
-    ParameterList::createWithoutLoc(selfDecl),
-    ParameterList::create(C, {
-        getParamDecl("a"),
-        getParamDecl("b")
-    })
-  };
+  ParameterList *params = ParameterList::create(C, {
+    getParamDecl("a"),
+    getParamDecl("b")
+  });
 
   auto boolTy = C.getBoolDecl()->getDeclaredType();
 
-  DeclName name(C, generatedIdentifier, params[1]);
+  DeclName name(C, generatedIdentifier, params);
   auto eqDecl =
     FuncDecl::create(C, /*StaticLoc=*/SourceLoc(),
                      StaticSpellingKind::KeywordStatic,
                      /*FuncLoc=*/SourceLoc(), name, /*NameLoc=*/SourceLoc(),
                      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr,
-                     params,
+                     selfDecl, params,
                      TypeLoc::withoutLoc(boolTy),
                      parentDC);
   eqDecl->setImplicit();
@@ -651,7 +648,7 @@ deriveEquatable_eq(DerivedConformance &derived, Identifier generatedIdentifier,
   eqDecl->setBodySynthesizer(bodySynthesizer);
 
   // Compute the type.
-  Type paramsTy = params[1]->getType(C);
+  Type paramsTy = params->getInterfaceType(C);
 
   // Compute the interface type.
   Type interfaceTy;
@@ -659,12 +656,7 @@ deriveEquatable_eq(DerivedConformance &derived, Identifier generatedIdentifier,
   if (auto genericSig = parentDC->getGenericSignatureOfContext()) {
     eqDecl->setGenericEnvironment(parentDC->getGenericEnvironmentOfContext());
 
-    Type enumIfaceTy = parentDC->getDeclaredInterfaceType();
-    TupleTypeElt ifaceParamElts[] = {
-      enumIfaceTy, enumIfaceTy,
-    };
-    auto ifaceParamsTy = TupleType::get(ifaceParamElts, C);
-    interfaceTy = FunctionType::get(ifaceParamsTy, boolTy,
+    interfaceTy = FunctionType::get(paramsTy, boolTy,
                                     AnyFunctionType::ExtInfo());
     interfaceTy = GenericFunctionType::get(genericSig, {selfParam}, interfaceTy,
                                            AnyFunctionType::ExtInfo());
@@ -772,19 +764,18 @@ deriveHashable_hashInto(DerivedConformance &derived,
                                             C.Id_hasher, hasherType, parentDC);
   hasherParamDecl->setInterfaceType(hasherType);
 
-  ParameterList *params[] = {ParameterList::createWithoutLoc(selfDecl),
-                             ParameterList::createWithoutLoc(hasherParamDecl)};
+  ParameterList *params = ParameterList::createWithoutLoc(hasherParamDecl);
 
   // Return type: ()
   auto returnType = TupleType::getEmpty(C);
 
   // Func name: hash(into: inout Hasher) -> ()
-  DeclName name(C, C.Id_hash, params[1]);
+  DeclName name(C, C.Id_hash, params);
   auto *hashDecl = FuncDecl::create(C,
                                     SourceLoc(), StaticSpellingKind::None,
                                     SourceLoc(), name, SourceLoc(),
                                     /*Throws=*/false, SourceLoc(),
-                                    nullptr, params,
+                                    nullptr, selfDecl, params,
                                     TypeLoc::withoutLoc(returnType),
                                     parentDC);
   hashDecl->setImplicit();
@@ -1100,19 +1091,15 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
                     /*IsCaptureList*/false, SourceLoc(),
                     C.Id_hashValue, intType, parentDC);
 
-  auto selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC);
-
-  ParameterList *params[] = {
-    ParameterList::createWithoutLoc(selfDecl),
-    ParameterList::createEmpty(C)
-  };
+  auto *selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC);
+  ParameterList *params = ParameterList::createEmpty(C);
 
   AccessorDecl *getterDecl = AccessorDecl::create(C,
       /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
       AccessorKind::Get, AddressorKind::NotAddressor, hashValueDecl,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-      /*GenericParams=*/nullptr, params,
+      /*GenericParams=*/nullptr, selfDecl, params,
       TypeLoc::withoutLoc(intType), parentDC);
   getterDecl->setImplicit();
   getterDecl->setBodySynthesizer(&deriveBodyHashable_hashValue);

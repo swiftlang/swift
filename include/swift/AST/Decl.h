@@ -380,15 +380,15 @@ protected:
     DefaultArgumentResilienceExpansion : 1
   );
   
-  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+5+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+1+1+1+1+1+1+1,
     /// \see AbstractFunctionDecl::BodyKind
     BodyKind : 3,
 
     /// Import as member status.
     IAMStatus : 8,
 
-    /// Number of curried parameter lists.
-    NumParameterLists : 5,
+    /// Whether the function has an implicit 'self' parameter.
+    HasImplicitSelfDecl : 1,
 
     /// Whether we are overridden later.
     Overridden : 1,
@@ -5001,14 +5001,14 @@ protected:
 
   AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent, DeclName Name,
                        SourceLoc NameLoc, bool Throws, SourceLoc ThrowsLoc,
-                       unsigned NumParameterLists,
+                       bool HasImplicitSelfDecl,
                        GenericParamList *GenericParams)
       : GenericContext(DeclContextKind::AbstractFunctionDecl, Parent),
         ValueDecl(Kind, Parent, Name, NameLoc),
         Body(nullptr), ThrowsLoc(ThrowsLoc) {
     setBodyKind(BodyKind::None);
     setGenericParams(GenericParams);
-    Bits.AbstractFunctionDecl.NumParameterLists = NumParameterLists;
+    Bits.AbstractFunctionDecl.HasImplicitSelfDecl = HasImplicitSelfDecl;
     Bits.AbstractFunctionDecl.Overridden = false;
     Bits.AbstractFunctionDecl.Throws = Throws;
     Bits.AbstractFunctionDecl.NeedsNewVTableEntry = false;
@@ -5016,9 +5016,6 @@ protected:
     Bits.AbstractFunctionDecl.DefaultArgumentResilienceExpansion =
         unsigned(ResilienceExpansion::Maximal);
     Bits.AbstractFunctionDecl.Synthesized = false;
-
-    // Verify no bitfield truncation.
-    assert(Bits.AbstractFunctionDecl.NumParameterLists == NumParameterLists);
   }
 
   void setBodyKind(BodyKind K) {
@@ -5064,7 +5061,6 @@ public:
     Bits.AbstractFunctionDecl.IAMStatus = newValue.getRawValue();
   }
 
-public:
   /// Retrieve the location of the 'throws' keyword, if present.
   SourceLoc getThrowsLoc() const { return ThrowsLoc; }
 
@@ -5200,7 +5196,7 @@ public:
   /// function.  This value is one for free-standing functions, and two for
   /// methods.
   unsigned getNumParameterLists() const {
-    return Bits.AbstractFunctionDecl.NumParameterLists;
+    return Bits.AbstractFunctionDecl.HasImplicitSelfDecl ? 2 : 1;
   }
 
   /// \brief Returns the parameter pattern(s) for the function definition that
@@ -5226,6 +5222,9 @@ public:
   const ParameterList *getParameters() const {
     return getParameterLists().back();
   }
+
+  void setParameters(ParamDecl *SelfDecl,
+                     ParameterList *Params);
 
   /// \brief This method returns the implicit 'self' decl.
   ///
@@ -5341,19 +5340,18 @@ protected:
            SourceLoc FuncLoc,
            DeclName Name, SourceLoc NameLoc,
            bool Throws, SourceLoc ThrowsLoc,
-           unsigned NumParameterLists,
+           bool HasImplicitSelfDecl,
            GenericParamList *GenericParams, DeclContext *Parent)
     : AbstractFunctionDecl(Kind, Parent,
                            Name, NameLoc,
                            Throws, ThrowsLoc,
-                           NumParameterLists, GenericParams),
+                           HasImplicitSelfDecl, GenericParams),
       StaticLoc(StaticLoc), FuncLoc(FuncLoc) {
     assert(!Name.getBaseName().isSpecial());
 
     Bits.FuncDecl.IsStatic =
       StaticLoc.isValid() || StaticSpelling != StaticSpellingKind::None;
     Bits.FuncDecl.StaticSpelling = static_cast<unsigned>(StaticSpelling);
-    assert(NumParameterLists > 0 && "Must have at least an empty tuple arg");
 
     Bits.FuncDecl.HasDynamicSelf = false;
     Bits.FuncDecl.ForcedStaticDispatch = false;
@@ -5367,7 +5365,7 @@ private:
                               DeclName Name, SourceLoc NameLoc,
                               bool Throws, SourceLoc ThrowsLoc,
                               GenericParamList *GenericParams,
-                              unsigned NumParameterLists,
+                              bool HasImplicitSelfDecl,
                               DeclContext *Parent,
                               ClangNode ClangN);
 
@@ -5379,7 +5377,7 @@ public:
                                       DeclName Name, SourceLoc NameLoc,
                                       bool Throws, SourceLoc ThrowsLoc,
                                       GenericParamList *GenericParams,
-                                      unsigned NumParameterLists,
+                                      bool HasImplicitSelfDecl,
                                       DeclContext *Parent);
 
   static FuncDecl *create(ASTContext &Context, SourceLoc StaticLoc,
@@ -5388,7 +5386,8 @@ public:
                           DeclName Name, SourceLoc NameLoc,
                           bool Throws, SourceLoc ThrowsLoc,
                           GenericParamList *GenericParams,
-                          ArrayRef<ParameterList *> ParameterLists,
+                          ParamDecl *SelfDecl,
+                          ParameterList *ParameterList,
                           TypeLoc FnRetType, DeclContext *Parent,
                           ClangNode ClangN = ClangNode());
 
@@ -5454,9 +5453,6 @@ public:
   /// \returns true if this is non-mutating due to applying a 'mutating'
   /// attribute. For example a "mutating set" accessor.
   bool isExplicitNonMutating() const;
-
-  void setDeserializedSignature(ArrayRef<ParameterList *> ParameterLists,
-                                TypeLoc FnRetType);
 
   SourceLoc getStaticLoc() const { return StaticLoc; }
   SourceLoc getFuncLoc() const { return FuncLoc; }
@@ -5594,7 +5590,7 @@ class AccessorDecl final : public FuncDecl {
                                   SourceLoc staticLoc,
                                   StaticSpellingKind staticSpelling,
                                   bool throws, SourceLoc throwsLoc,
-                                  unsigned numParameterLists,
+                                  bool hasImplicitSelfDecl,
                                   GenericParamList *genericParams,
                                   DeclContext *parent,
                                   ClangNode clangNode);
@@ -5610,7 +5606,7 @@ public:
                               StaticSpellingKind staticSpelling,
                               bool throws, SourceLoc throwsLoc,
                               GenericParamList *genericParams,
-                              unsigned numParameterLists,
+                              bool hasImplicitSelfDecl,
                               DeclContext *parent);
 
   static AccessorDecl *create(ASTContext &ctx, SourceLoc declLoc,
@@ -5622,7 +5618,8 @@ public:
                               StaticSpellingKind staticSpelling,
                               bool throws, SourceLoc throwsLoc,
                               GenericParamList *genericParams,
-                              ArrayRef<ParameterList *> parameterLists,
+                              ParamDecl *selfDecl,
+                              ParameterList *parameterList,
                               TypeLoc fnRetType, DeclContext *parent,
                               ClangNode clangNode = ClangNode());
 
@@ -5923,8 +5920,6 @@ public:
                   GenericParamList *GenericParams, 
                   DeclContext *Parent);
 
-  void setParameterLists(ParamDecl *selfParam, ParameterList *bodyParams);
-
   SourceLoc getConstructorLoc() const { return getNameLoc(); }
   SourceLoc getStartLoc() const { return getConstructorLoc(); }
   SourceRange getSourceRange() const;
@@ -6113,8 +6108,6 @@ class DestructorDecl : public AbstractFunctionDecl {
 public:
   DestructorDecl(SourceLoc DestructorLoc, ParamDecl *selfDecl,
                  DeclContext *Parent);
-
-  void setSelfDecl(ParamDecl *selfDecl);
 
   MutableArrayRef<ParameterList *> getParameterLists() {
     return { ParameterLists, 2 };
