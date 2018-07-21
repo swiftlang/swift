@@ -4647,22 +4647,14 @@ void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
 }
 
 void DefaultArgumentInitializer::changeFunction(
-    DeclContext *parent, ArrayRef<ParameterList *> paramLists) {
+    DeclContext *parent, ParameterList *paramList) {
   if (parent->isLocalContext()) {
     setParent(parent);
   }
 
-  unsigned offset = getIndex();
-  for (auto list : paramLists) {
-    if (offset < list->size()) {
-      auto param = list->get(offset);
-      if (param->getDefaultValue())
-        param->setDefaultArgumentInitContext(this);
-      return;
-    }
-
-    offset -= list->size();
-  }
+  auto param = paramList->get(getIndex());
+  if (param->getDefaultValue())
+    param->setDefaultArgumentInitContext(this);
 }
 
 /// Determine whether the given Swift type is an integral type, i.e.,
