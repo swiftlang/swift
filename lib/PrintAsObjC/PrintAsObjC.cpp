@@ -928,7 +928,11 @@ private:
     Optional<ValueDecl *>renamedFuncDecl = None;
     
     if (isa<ClassDecl>(D) || isa<ProtocolDecl>(D)) {
-      UnqualifiedLookup lookup(renamedDeclName.getBaseIdentifier(), declContext->getModuleScopeContext(), nullptr);
+      UnqualifiedLookup lookup(renamedDeclName.getBaseIdentifier(),
+                               declContext->getModuleScopeContext(),
+                               nullptr,
+                               SourceLoc(),
+                               UnqualifiedLookup::Flags::TypeLookup);
       renamedFuncDecl = lookup.getSingleTypeResult();
     } else {
       SmallVector<ValueDecl *, 4> lookupResults;
