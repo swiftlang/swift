@@ -925,7 +925,7 @@ private:
     auto renamedDeclName = renamedParsedDeclName.formDeclName(D->getASTContext());
     
     auto declContext = D->getDeclContext();
-    Optional<ValueDecl *>renamedFuncDecl = None;
+    ValueDecl *renamedFuncDecl = nullptr;
     
     if (isa<ClassDecl>(D) || isa<ProtocolDecl>(D)) {
       UnqualifiedLookup lookup(renamedDeclName.getBaseIdentifier(),
@@ -960,10 +960,10 @@ private:
       }
     }
     
-    if (renamedFuncDecl.hasValue()) {
+    if (renamedFuncDecl) {
       SmallString<128> scratch;
-      auto renamedObjCRuntimeName = renamedFuncDecl.getValue()->
-      getObjCRuntimeName()->getString(scratch);
+      auto renamedObjCRuntimeName = renamedFuncDecl->getObjCRuntimeName()
+        ->getString(scratch);
       printEncodedString(renamedObjCRuntimeName, includeQuotes);
     } else {
       printEncodedString(AvAttr->Rename, includeQuotes);
