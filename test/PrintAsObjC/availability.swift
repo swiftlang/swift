@@ -50,8 +50,11 @@
 // CHECK-NEXT: - (void)overloadMethodWithFirst:(NSInteger)first second:(NSInteger)second;
 // CHECK-NEXT: - (void)overloadMethod2WithFirst:(double)first second:(double)second;
 // CHECK-NEXT: + (void)deprecatedAvailabilityWithValue:(NSInteger)value;
+// CHECK-NEXT: - (void)deprecatedInstanceMethodRenamedToClassMethodWithValue:(NSInteger)value SWIFT_DEPRECATED_MSG("This method has a renamed attribute point to class method instead of a instance method. It should show the Swift name here", "classMethodWithACustomObjCName(x:)");
+// CHECK-NEXT: + (void)deprecatedClassMethodRenamedToInstanceMethodWithValue:(NSInteger)value SWIFT_DEPRECATED_MSG("This method has a renamed attribute point to instance method instead of a class method. It should show the Swift name here", "instanceMethodWithACustomObjCName(x:)");
+// CHECK-NEXT: - (void)customObjCNameInstanceMethodWithX:(NSInteger)x;
+// CHECK-NEXT: + (void)customObjCNameClassMethodWithX:(NSInteger)x;
 // CHECK-NEXT: + (void)makeDeprecatedAvailabilityWithValue:(NSInteger)value SWIFT_DEPRECATED_MSG("use something else", "deprecatedAvailabilityWithValue:");
-// CHECK-Next: - (void)deprecatedInstanceMethodRenamedToClassMethodWithValue:(NSInteger)value SWIFT_DEPRECATED_MSG("This method has a renamed attribute point to class method instead of a class method. It should show the Swift name here", "makeDeprecatedAvailability(withValue:)");
 // CHECK-NEXT: + (void)unavailableAvailabilityWithValue:(NSInteger)value;
 // CHECK-NEXT: + (void)makeUnavailableAvailabilityWithValue:(NSInteger)value
 // CHECK-DAG: SWIFT_UNAVAILABLE_MSG("'__makeUnavailableAvailability' has been renamed to 'unavailableAvailabilityWithValue:': use something else");
@@ -207,8 +210,17 @@
     @objc(deprecatedAvailabilityWithValue:)
     public class func makeDeprecatedAvailability(withValue value: Int) {}
 
-    @available(*, deprecated, message: "This method has a renamed attribute point to class method instead of a class method. It should show the Swift name here", renamed: "makeDeprecatedAvailability(withValue:)")
-    public func deprecatedInstanceMethodRenamedToClassMethod(value: Int) {}
+    @available(*, deprecated, message: "This method has a renamed attribute point to class method instead of a instance method. It should show the Swift name here", renamed: "classMethodWithACustomObjCName(x:)")
+    @objc public func deprecatedInstanceMethodRenamedToClassMethod(value: Int) {}
+
+    @available(*, deprecated, message: "This method has a renamed attribute point to instance method instead of a class method. It should show the Swift name here", renamed: "instanceMethodWithACustomObjCName(x:)")
+    @objc public class func deprecatedClassMethodRenamedToInstanceMethod(value: Int) {}
+    
+    @objc(customObjCNameInstanceMethodWithX:)
+    public func instanceMethodWithACustomObjCName(x: Int) {}
+
+    @objc(customObjCNameClassMethodWithX:)
+    public class func classMethodWithACustomObjCName(x: Int) {}
 
     @available(*, deprecated,
     message: "use something else",
