@@ -865,7 +865,7 @@ extension ProcessTerminationStatus {
       // This default case is needed for standard library builds where
       // resilience is enabled.
       // FIXME: Add the .exit case when there is a way to suppress when not.
-      //   case .exit(_): return false
+      //   case .exit: return false
       return false
     }
   }
@@ -1272,11 +1272,11 @@ struct _ParentProcess {
       testPassed = false
       print("expecting a crash, but the test did not crash")
 
-    case (.some(_), false):
+    case (.some, false):
       testPassed = false
       print("the test crashed unexpectedly")
 
-    case (.some(_), true):
+    case (.some, true):
       testPassed = !_anyExpectFailed
     }
     if testPassed && t.crashOutputMatches.count > 0 {

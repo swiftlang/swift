@@ -292,7 +292,7 @@ extension _StringObject {
     @inline(__always)
     get {
 #if arch(i386) || arch(arm)
-      if case .strong(_) = _variant {
+      if case .strong = _variant {
         _sanityCheckFailure("internal error: expected a tagged String")
       }
       return _bits
@@ -557,7 +557,7 @@ extension _StringObject {
     @inline(__always)
     get {
 #if arch(i386) || arch(arm)
-      guard case .strong(_) = _variant else { return false }
+      guard case .strong = _variant else { return false }
       return _bits & _StringObject._isCocoaBit == 0
 #else
       return _variantBits == 0
@@ -571,7 +571,7 @@ extension _StringObject {
     @inline(__always)
     get {
 #if arch(i386) || arch(arm)
-      guard case .strong(_) = _variant else { return false }
+      guard case .strong = _variant else { return false }
       return _bits & _StringObject._isCocoaBit != 0
 #else
       return _variantBits == _StringObject._subVariantBit
@@ -599,7 +599,7 @@ extension _StringObject {
     get {
 #if arch(i386) || arch(arm)
       switch _variant {
-      case .strong(_): return false
+      case .strong: return false
       default:
         return true
       }
@@ -673,7 +673,7 @@ extension _StringObject {
     get {
 #if arch(i386) || arch(arm)
       switch _variant {
-      case .strong(_):
+      case .strong:
         return _bits & _StringObject._isOpaqueBit == 0
       case .unmanagedSingleByte, .unmanagedDoubleByte:
         return true
@@ -713,7 +713,7 @@ extension _StringObject {
     get {
 #if arch(i386) || arch(arm)
       switch _variant {
-      case .strong(_):
+      case .strong:
         return _bits & _StringObject._twoByteBit == 0
       case .unmanagedSingleByte, .smallSingleByte:
         return true
