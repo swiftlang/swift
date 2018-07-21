@@ -12,90 +12,25 @@
 
 import Foundation
 
-public struct Arguments {
-  public var progName: String
-  public var positionalArgs: [String]
-  public var optionalArgsMap: [String : String]
-
-  init(_ pName: String, _ posArgs: [String], _ optArgsMap: [String : String]) {
-    progName = pName
-    positionalArgs = posArgs
-    optionalArgsMap = optArgsMap
-  }
-}
-
 enum ArgumentError: Error {
   case missingValue(String)
   case invalidType(value: String, type: String, argument: String?)
-  case general(String)
+  case unsupportedArgument(String)
 }
 
 extension ArgumentError: CustomStringConvertible {
   public var description: String {
     switch self {
     case let .missingValue(key):
-      return "\(key) requires a value" //"Missing value for `\(key)`"
+      return "missing value for '\(key)'"
     case let .invalidType(value, type, argument):
       return (argument == nil)
         ? "'\(value)' is not a valid '\(type)'"
         : "'\(value)' is not a valid '\(type)' for '\(argument!)'"
-    case let .general(description):
-      return "\(description)"
+    case let .unsupportedArgument(argument):
+      return "unsupported argument '\(argument)'"
     }
   }
-}
-
-/// Using CommandLine.arguments, returns an Arguments struct describing
-/// the arguments to this program. If we fail to parse arguments, we
-/// return nil.
-///
-/// We assume that optional switch args are of the form:
-///
-/// --opt-name[=opt-value]
-/// -opt-name[=opt-value]
-///
-/// with opt-name and opt-value not containing any '=' signs. Any
-/// other option passed in is assumed to be a positional argument.
-public func parseArgs(_ validOptions: [String]? = nil)
-  -> Arguments? {
-  let progName = CommandLine.arguments[0]
-  var positionalArgs = [String]()
-  var optionalArgsMap = [String : String]()
-
-  // For each argument we are passed...
-  var passThroughArgs = false
-  for arg in CommandLine.arguments[1..<CommandLine.arguments.count] {
-    // If the argument doesn't match the optional argument pattern. Add
-    // it to the positional argument list and continue...
-    if passThroughArgs || !arg.starts(with: "-") {
-      positionalArgs.append(arg)
-      continue
-    }
-    if arg == "--" {
-      passThroughArgs = true
-      continue
-    }
-    // Attempt to split it into two components separated by an equals sign.
-    let components = arg.split(separator: "=")
-    let optionName = String(components[0])
-    if validOptions != nil && !validOptions!.contains(optionName) {
-      print("Invalid option: \(arg)")
-      return nil
-    }
-    var optionVal : String
-    switch components.count {
-      case 1: optionVal = ""
-      case 2: optionVal = String(components[1])
-      default:
-      // If we do not have two components at this point, we can not have
-      // an option switch. This is an invalid argument. Bail!
-      print("Invalid option: \(arg)")
-      return nil
-    }
-    optionalArgsMap[optionName] = optionVal
-  }
-
-  return Arguments(progName, positionalArgs, optionalArgsMap)
 }
 
 /// Returns the argument value converted to the type T using the parser.
@@ -117,19 +52,29 @@ func checked<T>(
     value: value, type: type, argument: argument)
 }
 
-struct Argument {
-  let name: String?
-  let apply: () throws -> ()
-}
-
+/// Parser that converts the program's command line arguments to typed values
+/// according to the parser's configuration, storing them in the provided
+/// instance of a value-holding type.
 class ArgumentParser<U> {
-    var result: U
-    var validOptions: [String] {
+    private var result: U
+    private var validOptions: [String] {
       return arguments.compactMap { $0.name }
     }
-    private var benchArgs: Arguments!
     private var arguments: [Argument] = []
+    private let progName = CommandLine.arguments[0]
+    private var positionalArgs = [String]()
+    private var optionalArgsMap = [String : String]()
 
+    // Argument holds the name of the command line parameter and the value
+    // processing closure used to convert it into given type and storing it
+    // in the parsing result.
+    struct Argument {
+      let name: String?
+      let apply: () throws -> ()
+    }
+
+    /// ArgumentParser is initialized with an instance of a type that holds
+    /// the results of the parsing of the individual command line arguments.
     init(into result: U) {
       self.result = result
       self.arguments += [
@@ -137,8 +82,8 @@ class ArgumentParser<U> {
       ]
     }
 
-    func printUsage() {
-      guard let _ = benchArgs.optionalArgsMap["--help"] else { return }
+    private func printUsage() {
+      guard let _ = self.optionalArgsMap["--help"] else { return }
       print("Valid options:")
       for v in validOptions {
         print("    \(v)")
@@ -146,17 +91,17 @@ class ArgumentParser<U> {
       exit(0)
     }
 
-    func parse() -> U {
+    /// Parses the command line arguments, returning the result filled with
+    /// specified argument values or report errors and exit the program if
+    /// the parsing fails.
+    public func parse() -> U {
       do {
-        guard let benchArgs = parseArgs(validOptions) else {
-          throw ArgumentError.general("Failed to parse arguments")
-        }
-        self.benchArgs = benchArgs
+        try parseArgs()
         try arguments.forEach { try $0.apply() } // parse all arguments
         return result
       } catch let error as ArgumentError {
         fflush(stdout)
-        fputs("\(error)\n", stderr)
+        fputs("error: \(error)\n", stderr)
         fflush(stderr)
         exit(1)
       } catch {
@@ -164,7 +109,52 @@ class ArgumentParser<U> {
       }
     }
 
-    func addArgument<T>(
+    /// Using CommandLine.arguments, parses the structure of optional and
+    /// positional arguments of this program. Failure to parse arguments
+    /// throws correspondding ArgumentError.
+    ///
+    /// We assume that optional switch args are of the form:
+    ///
+    /// --opt-name[=opt-value]
+    /// -opt-name[=opt-value]
+    ///
+    /// with opt-name and opt-value not containing any '=' signs. Any
+    /// other option passed in is assumed to be a positional argument.
+    private func parseArgs() throws {
+
+      // For each argument we are passed...
+      var passThroughArgs = false
+      for arg in CommandLine.arguments[1..<CommandLine.arguments.count] {
+        // If the argument doesn't match the optional argument pattern. Add
+        // it to the positional argument list and continue...
+        if passThroughArgs || !arg.starts(with: "-") {
+          positionalArgs.append(arg)
+          continue
+        }
+        if arg == "--" {
+          passThroughArgs = true
+          continue
+        }
+        // Attempt to split it into two components separated by an equals sign.
+        let components = arg.split(separator: "=")
+        let optionName = String(components[0])
+        guard validOptions.contains(optionName) else {
+          throw ArgumentError.unsupportedArgument(arg)
+        }
+        var optionVal : String
+        switch components.count {
+          case 1: optionVal = ""
+          case 2: optionVal = String(components[1])
+          default:
+          // If we do not have two components at this point, we can not have
+          // an option switch. This is an invalid argument. Bail!
+          throw ArgumentError.unsupportedArgument(arg)
+        }
+        optionalArgsMap[optionName] = optionVal
+      }
+    }
+
+    public func addArgument<T>(
       _ name: String?,
       _ property: WritableKeyPath<U, T>,
       defaultValue: T? = nil,
@@ -174,13 +164,13 @@ class ArgumentParser<U> {
         { try self.parseArgument(name, property, defaultValue, parser) })
     }
 
-    func parseArgument<T>(
+    private func parseArgument<T>(
       _ name: String?,
       _ property: WritableKeyPath<U, T>,
       _ defaultValue: T?,
       _ parse: (String) throws -> T?
     ) throws {
-      if let name = name, let value = benchArgs.optionalArgsMap[name] {
+      if let name = name, let value = optionalArgsMap[name] {
         guard !value.isEmpty || defaultValue != nil
           else { throw ArgumentError.missingValue(name) }
 
@@ -188,7 +178,7 @@ class ArgumentParser<U> {
           ? defaultValue!
           : try checked(parse, value, argument: name)
       } else if name == nil {
-        result[keyPath: property] = benchArgs.positionalArgs as! T
+        result[keyPath: property] = positionalArgs as! T
       }
     }
 }

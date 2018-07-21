@@ -131,44 +131,43 @@ LOGVERBOSE-LABEL: Running AngryPhonebook for 2 samples.
 ````
 RUN: not %Benchmark_O --bogus 2>&1 \
 RUN:              | %FileCheck %s --check-prefix ARGPARSE
-ARGPARSE: Invalid option: --bogus
-ARGPARSE: Failed to parse arguments
+ARGPARSE: error: unsupported argument '--bogus'
 
 RUN: not %Benchmark_O --iter-scale \
 RUN:         2>&1 | %FileCheck %s --check-prefix NOVALUE
-NOVALUE: --iter-scale requires a value
+NOVALUE: error: missing value for '--iter-scale'
 
 RUN: not %Benchmark_O --iter-scale= \
 RUN:         2>&1 | %FileCheck %s --check-prefix EMPTYVAL
-EMPTYVAL: --iter-scale requires a value
+EMPTYVAL: error: missing value for '--iter-scale'
 
 RUN: not %Benchmark_O --iter-scale=NaN \
 RUN:         2>&1 | %FileCheck %s --check-prefix NANVALUE
-NANVALUE: 'NaN' is not a valid 'Int' for '--iter-scale'
+NANVALUE: error: 'NaN' is not a valid 'Int' for '--iter-scale'
 
 RUN: not %Benchmark_O --num-iters \
 RUN:         2>&1 | %FileCheck %s --check-prefix NUMITERS
-NUMITERS: --num-iters requires a value
+NUMITERS: error: missing value for '--num-iters'
 
 RUN: not %Benchmark_O --num-samples \
 RUN:         2>&1 | %FileCheck %s --check-prefix NUMSAMPLES
-NUMSAMPLES: --num-samples requires a value
+NUMSAMPLES: error: missing value for '--num-samples'
 
 RUN: not %Benchmark_O --sleep \
 RUN:         2>&1 | %FileCheck %s --check-prefix SLEEP
-SLEEP: --sleep requires a value
+SLEEP: error: missing value for '--sleep'
 
 RUN: not %Benchmark_O --delim \
 RUN:         2>&1 | %FileCheck %s --check-prefix DELIM
-DELIM: --delim requires a value
+DELIM: error: missing value for '--delim'
 
 RUN: not %Benchmark_O --tags=bogus \
 RUN:         2>&1 | %FileCheck %s --check-prefix BADTAG
-BADTAG: 'bogus' is not a valid 'BenchmarkCategory'
+BADTAG: error: 'bogus' is not a valid 'BenchmarkCategory'
 
 RUN: not %Benchmark_O --skip-tags=bogus \
 RUN:         2>&1 | %FileCheck %s --check-prefix BADSKIPTAG
-BADSKIPTAG: 'bogus' is not a valid 'BenchmarkCategory'
+BADSKIPTAG: error: 'bogus' is not a valid 'BenchmarkCategory'
 
 ````
 
