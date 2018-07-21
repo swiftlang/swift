@@ -136,9 +136,9 @@ getBridgingFn(Optional<SILDeclRef> &cacheSlot,
   }
 
   LLVM_DEBUG(llvm::dbgs() << "bridging function "
-          << moduleName << '.' << functionName
-          << " mapped to ";
-        cacheSlot->print(llvm::dbgs()));
+                          << moduleName << '.' << functionName
+                          << " mapped to ";
+             cacheSlot->print(llvm::dbgs()));
 
   return *cacheSlot;
 }
@@ -645,24 +645,24 @@ void SILGenModule::preEmitFunction(SILDeclRef constant,
   F->setDebugScope(new (M) SILDebugScope(Loc, F));
 
   LLVM_DEBUG(llvm::dbgs() << "lowering ";
-        F->printName(llvm::dbgs());
-        llvm::dbgs() << " : ";
-        F->getLoweredType().print(llvm::dbgs());
-        llvm::dbgs() << '\n';
-        if (astNode) {
-          if (auto *decl = astNode.dyn_cast<ValueDecl *>())
-            decl->dump(llvm::dbgs());
-          else
-            astNode.get<Expr *>()->dump(llvm::dbgs());
-          llvm::dbgs() << '\n';
-        });
+             F->printName(llvm::dbgs());
+             llvm::dbgs() << " : ";
+             F->getLoweredType().print(llvm::dbgs());
+             llvm::dbgs() << '\n';
+             if (astNode) {
+               if (auto *decl = astNode.dyn_cast<ValueDecl *>())
+                 decl->dump(llvm::dbgs());
+               else
+                 astNode.get<Expr *>()->dump(llvm::dbgs());
+               llvm::dbgs() << '\n';
+             });
 }
 
 void SILGenModule::postEmitFunction(SILDeclRef constant,
                                     SILFunction *F) {
   assert(!F->isExternalDeclaration() && "did not emit any function body?!");
   LLVM_DEBUG(llvm::dbgs() << "lowered sil:\n";
-        F->print(llvm::dbgs()));
+             F->print(llvm::dbgs()));
   F->verify();
 }
 
@@ -1593,7 +1593,7 @@ public:
       delete &SGF;
 
       LLVM_DEBUG(llvm::dbgs() << "lowered toplevel sil:\n";
-            toplevel->print(llvm::dbgs()));
+                 toplevel->print(llvm::dbgs()));
       toplevel->verify();
     }
 

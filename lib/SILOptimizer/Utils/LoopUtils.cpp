@@ -120,7 +120,7 @@ static SILBasicBlock *insertBackedgeBlock(SILLoop *L, DominanceInfo *DT,
   SILBasicBlock *BEBlock = F->createBasicBlock(BackedgeBlocks.back());
 
   LLVM_DEBUG(llvm::dbgs() << "  Inserting unique backedge block " << *BEBlock
-        << "\n");
+                          << "\n");
 
   // Now that the block has been inserted into the function, create PHI nodes in
   // the backedge block which correspond to any PHI nodes in the header block.
@@ -210,11 +210,11 @@ static bool canonicalizeLoopExitBlocks(SILLoop *L, DominanceInfo *DT,
 
       // Split any critical edges in between exiting block and succ iter.
       if (splitCriticalEdge(ExitingBlock->getTerminator(), i, DT, LI)) {
-        LLVM_DEBUG(llvm::dbgs() << "Split critical edge from " << OldExitingBlockName
-                           << " NewID: ";
-              ExitingBlock->printAsOperand(llvm::dbgs());
-              llvm::dbgs() << " -> OldID: " << OldSuccBBName << " NewID: ";
-              SuccBB->printAsOperand(llvm::dbgs()); llvm::dbgs() << "\n");
+        LLVM_DEBUG(llvm::dbgs() << "Split critical edge from "
+                                << OldExitingBlockName << " NewID: ";
+                   ExitingBlock->printAsOperand(llvm::dbgs());
+                   llvm::dbgs() << " -> OldID: " << OldSuccBBName << " NewID: ";
+                   SuccBB->printAsOperand(llvm::dbgs()); llvm::dbgs() << "\n");
         Changed = true;
       }
     }

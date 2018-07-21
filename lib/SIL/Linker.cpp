@@ -75,7 +75,7 @@ void SILLinkerVisitor::addFunctionToWorklist(SILFunction *F) {
   assert(F->isExternalDeclaration());
 
   LLVM_DEBUG(llvm::dbgs() << "Imported function: "
-                     << F->getName() << "\n");
+                          << F->getName() << "\n");
   if (Mod.loadFunction(F)) {
     if (F->isExternalDeclaration())
       return;
@@ -384,7 +384,7 @@ void SILLinkerVisitor::process() {
     }
 
     LLVM_DEBUG(llvm::dbgs() << "Process imports in function: "
-                       << Fn->getName() << "\n");
+                            << Fn->getName() << "\n");
 
     for (auto &BB : *Fn) {
       for (auto &I : BB) {

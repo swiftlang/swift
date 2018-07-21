@@ -128,7 +128,7 @@ BottomUpDataflowRCStateVisitor<ARCState>::visitStrongDecrement(SILNode *N) {
   }
 
   LLVM_DEBUG(llvm::dbgs() << "    REF COUNT DECREMENT! Known Safe: "
-                     << (State.isKnownSafe() ? "yes" : "no") << "\n");
+                          << (State.isKnownSafe() ? "yes" : "no") << "\n");
 
   // Continue on to see if our reference decrement could potentially affect
   // any other pointers via a use or a decrement.
@@ -156,7 +156,7 @@ BottomUpDataflowRCStateVisitor<ARCState>::visitStrongIncrement(SILNode *N) {
     // Copy the current value of ref count state into the result map.
     IncToDecStateMap[I] = RefCountState;
     LLVM_DEBUG(llvm::dbgs() << "    MATCHING DECREMENT:"
-                       << RefCountState.getRCRoot());
+                            << RefCountState.getRCRoot());
 
     // Clear the ref count state so it can be used for future pairs we may
     // see.
@@ -166,10 +166,10 @@ BottomUpDataflowRCStateVisitor<ARCState>::visitStrongIncrement(SILNode *N) {
   else {
     if (RefCountState.isTrackingRefCountInst()) {
       LLVM_DEBUG(llvm::dbgs() << "    FAILED MATCH DECREMENT:"
-                         << RefCountState.getRCRoot());
+                              << RefCountState.getRCRoot());
     } else {
       LLVM_DEBUG(llvm::dbgs() << "    FAILED MATCH DECREMENT. Not tracking a "
-                            "decrement.\n");
+                                 "decrement.\n");
     }
   }
 #endif
@@ -218,7 +218,7 @@ TopDownDataflowRCStateVisitor<ARCState>::visitStrongDecrement(SILNode *N) {
     // Copy the current value of ref count state into the result map.
     DecToIncStateMap[I] = RefCountState;
     LLVM_DEBUG(llvm::dbgs() << "    MATCHING INCREMENT:\n"
-                       << RefCountState.getRCRoot());
+                            << RefCountState.getRCRoot());
 
     // Clear the ref count state in preparation for more pairs.
     RefCountState.clear();
@@ -227,7 +227,7 @@ TopDownDataflowRCStateVisitor<ARCState>::visitStrongDecrement(SILNode *N) {
   else {
     if (RefCountState.isTrackingRefCountInst()) {
       LLVM_DEBUG(llvm::dbgs() << "    FAILED MATCH INCREMENT:\n"
-                         << RefCountState.getValue());
+                              << RefCountState.getValue());
     } else {
       LLVM_DEBUG(llvm::dbgs() << "    FAILED MATCH. NO INCREMENT.\n");
     }
@@ -253,7 +253,7 @@ TopDownDataflowRCStateVisitor<ARCState>::visitStrongIncrement(SILNode *N) {
   bool NestingDetected = State.initWithMutatorInst(SetFactory.get(I), RCFI);
 
   LLVM_DEBUG(llvm::dbgs() << "    REF COUNT INCREMENT! Known Safe: "
-                     << (State.isKnownSafe() ? "yes" : "no") << "\n");
+                          << (State.isKnownSafe() ? "yes" : "no") << "\n");
 
   // Continue processing in case this increment could be a CanUse for a
   // different pointer.

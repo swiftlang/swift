@@ -320,8 +320,8 @@ public:
   ThreadInfo() = default;
 
   void threadEdge() {
-    LLVM_DEBUG(llvm::dbgs() << "thread edge from bb" << Src->getDebugID() <<
-          " to bb" << Dest->getDebugID() << '\n');
+    LLVM_DEBUG(llvm::dbgs() << "thread edge from bb" << Src->getDebugID()
+                            << " to bb" << Dest->getDebugID() << '\n');
     auto *SrcTerm = cast<BranchInst>(Src->getTerminator());
 
     EdgeThreadingCloner Cloner(SrcTerm);
@@ -1060,8 +1060,8 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   if (++NumThreaded > 16)
     return false;
 
-  LLVM_DEBUG(llvm::dbgs() << "jump thread from bb" << SrcBB->getDebugID() <<
-        " to bb" << DestBB->getDebugID() << '\n');
+  LLVM_DEBUG(llvm::dbgs() << "jump thread from bb" << SrcBB->getDebugID()
+                          << " to bb" << DestBB->getDebugID() << '\n');
 
   // Okay, it looks like we want to do this and we can.  Duplicate the
   // destination block into this one, rewriting uses of the BBArgs to use the
@@ -1230,8 +1230,8 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
   // If this block branches to a block with a single predecessor, then
   // merge the DestBB into this BB.
   if (BB != DestBB && DestBB->getSinglePredecessorBlock()) {
-    LLVM_DEBUG(llvm::dbgs() << "merge bb" << BB->getDebugID() << " with bb" <<
-          DestBB->getDebugID() << '\n');
+    LLVM_DEBUG(llvm::dbgs() << "merge bb" << BB->getDebugID() << " with bb"
+                            << DestBB->getDebugID() << '\n');
 
     // If there are any BB arguments in the destination, replace them with the
     // branch operands, since they must dominate the dest block.
@@ -1283,8 +1283,8 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
   // If the destination block is a simple trampoline (jump to another block)
   // then jump directly.
   if (SILBasicBlock *TrampolineDest = getTrampolineDest(DestBB)) {
-    LLVM_DEBUG(llvm::dbgs() << "jump to trampoline from bb" << BB->getDebugID() <<
-          " to bb" << TrampolineDest->getDebugID() << '\n');
+    LLVM_DEBUG(llvm::dbgs() << "jump to trampoline from bb" << BB->getDebugID()
+                            << " to bb" << TrampolineDest->getDebugID() <<'\n');
     SILBuilderWithScope(BI).createBranch(BI->getLoc(), TrampolineDest,
                                             BI->getArgs());
     // Eliminating the trampoline can expose opportunities to improve the
@@ -1485,8 +1485,9 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
   // then jump directly.
   SILBasicBlock *TrueTrampolineDest = getTrampolineDest(TrueSide);
   if (TrueTrampolineDest && TrueTrampolineDest != FalseSide) {
-    LLVM_DEBUG(llvm::dbgs() << "true-trampoline from bb" << ThisBB->getDebugID() <<
-          " to bb" << TrueTrampolineDest->getDebugID() << '\n');
+    LLVM_DEBUG(llvm::dbgs() << "true-trampoline from bb" << ThisBB->getDebugID()
+                            << " to bb" << TrueTrampolineDest->getDebugID()
+                            << '\n');
     SILBuilderWithScope(BI).createCondBranch(
         BI->getLoc(), BI->getCondition(), TrueTrampolineDest, TrueArgs,
         FalseSide, FalseArgs, BI->getTrueBBCount(), BI->getFalseBBCount());
@@ -1501,8 +1502,9 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
 
   SILBasicBlock *FalseTrampolineDest = getTrampolineDest(FalseSide);
   if (FalseTrampolineDest && FalseTrampolineDest != TrueSide) {
-    LLVM_DEBUG(llvm::dbgs() << "false-trampoline from bb" << ThisBB->getDebugID() <<
-          " to bb" << FalseTrampolineDest->getDebugID() << '\n');
+    LLVM_DEBUG(llvm::dbgs() << "false-trampoline from bb"
+                            << ThisBB->getDebugID() << " to bb"
+                            << FalseTrampolineDest->getDebugID() << '\n');
     SILBuilderWithScope(BI).createCondBranch(
         BI->getLoc(), BI->getCondition(), TrueSide, TrueArgs,
         FalseTrampolineDest, FalseArgs, BI->getTrueBBCount(),
@@ -1519,7 +1521,8 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
   // args.
   if (TrueArgs == FalseArgs && (TrueSide == FalseTrampolineDest ||
                                 FalseSide == TrueTrampolineDest)) {
-    LLVM_DEBUG(llvm::dbgs() << "replace cond_br with same dests with br: " << *BI);
+    LLVM_DEBUG(llvm::dbgs() << "replace cond_br with same dests with br: "
+                            << *BI);
     SILBuilderWithScope(BI).createBranch(BI->getLoc(),
                       TrueTrampolineDest ? FalseSide : TrueSide, TrueArgs);
     BI->eraseFromParent();
@@ -1532,8 +1535,10 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
   auto *TrueTrampolineBr = getTrampolineWithoutBBArgsTerminator(TrueSide);
   if (TrueTrampolineBr &&
       !wouldIntroduceCriticalEdge(BI, TrueTrampolineBr->getDestBB())) {
-    LLVM_DEBUG(llvm::dbgs() << "true-trampoline from bb" << ThisBB->getDebugID() <<
-          " to bb" << TrueTrampolineBr->getDestBB()->getDebugID() << '\n');
+    LLVM_DEBUG(llvm::dbgs() << "true-trampoline from bb" << ThisBB->getDebugID()
+                            << " to bb"
+                            << TrueTrampolineBr->getDestBB()->getDebugID()
+                            << '\n');
     SILBuilderWithScope(BI).createCondBranch(
         BI->getLoc(), BI->getCondition(), TrueTrampolineBr->getDestBB(),
         TrueTrampolineBr->getArgs(), FalseSide, FalseArgs, BI->getTrueBBCount(),
@@ -1550,8 +1555,10 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
   auto *FalseTrampolineBr = getTrampolineWithoutBBArgsTerminator(FalseSide);
   if (FalseTrampolineBr &&
       !wouldIntroduceCriticalEdge(BI, FalseTrampolineBr->getDestBB())) {
-    LLVM_DEBUG(llvm::dbgs() << "false-trampoline from bb" << ThisBB->getDebugID() <<
-          " to bb" << FalseTrampolineBr->getDestBB()->getDebugID() << '\n');
+    LLVM_DEBUG(llvm::dbgs() << "false-trampoline from bb"
+                            << ThisBB->getDebugID() << " to bb"
+                            << FalseTrampolineBr->getDestBB()->getDebugID()
+                            << '\n');
     SILBuilderWithScope(BI).createCondBranch(
         BI->getLoc(), BI->getCondition(), TrueSide, TrueArgs,
         FalseTrampolineBr->getDestBB(), FalseTrampolineBr->getArgs(),
@@ -1884,8 +1891,8 @@ bool SimplifyCFG::simplifyUnreachableBlock(UnreachableInst *UI) {
   // If this block was changed and it now consists of only the unreachable,
   // make sure we process its predecessors.
   if (Changed) {
-    LLVM_DEBUG(llvm::dbgs() << "remove dead insts in unreachable bb" <<
-          BB->getDebugID() << '\n');
+    LLVM_DEBUG(llvm::dbgs() << "remove dead insts in unreachable bb"
+                            << BB->getDebugID() << '\n');
     for (auto Dead : DeadInstrs)
       Dead->eraseFromParent();
 
@@ -2455,7 +2462,8 @@ static void removeArgumentFromTerminator(SILBasicBlock *BB, SILBasicBlock *Dest,
                                          int idx) {
   TermInst *Branch = BB->getTerminator();
   SILBuilderWithScope Builder(Branch);
-  LLVM_DEBUG(llvm::dbgs() << "remove dead argument " << idx << " from " << *Branch);
+  LLVM_DEBUG(llvm::dbgs() << "remove dead argument " << idx << " from "
+                          << *Branch);
 
   if (auto *CBI = dyn_cast<CondBranchInst>(Branch)) {
     SmallVector<SILValue, 8> TrueArgs;

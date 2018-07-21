@@ -171,7 +171,7 @@ static bool removeGuaranteedRetainReleasePairs(SILFunction &F,
       auto *UnsafeGuaranteedEndI =
           getUnsafeGuaranteedEndUser(UnsafeGuaranteedToken);
       if (!UnsafeGuaranteedEndI) {
-        LLVM_DEBUG(llvm::dbgs() << "  no single unsafeGuaranteedEnd use found\n");
+        LLVM_DEBUG(llvm::dbgs()<<"  no single unsafeGuaranteedEnd use found\n");
         continue;
       }
 
@@ -190,7 +190,8 @@ static bool removeGuaranteedRetainReleasePairs(SILFunction &F,
           UnsafeGuaranteedEndI, UnsafeGuaranteedI, UnsafeGuaranteedValue,
           UnsafeGuaranteedEndBB, RCIA);
       if (!LastRelease) {
-        LLVM_DEBUG(llvm::dbgs() << "  no release before/after unsafeGuaranteedEnd found\n");
+        LLVM_DEBUG(llvm::dbgs() << "  no release before/after "
+                                   "unsafeGuaranteedEnd found\n");
         continue;
       }
 

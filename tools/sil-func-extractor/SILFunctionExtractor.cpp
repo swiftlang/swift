@@ -179,8 +179,8 @@ void removeUnwantedFunctions(SILModule *M, ArrayRef<std::string> MangledNames,
         swift::Demangle::demangleSymbolAsString(MangledName);
     DemangledName = DemangledName.substr(0, DemangledName.find_first_of(" <("));
     LLVM_DEBUG(llvm::dbgs() << "Visiting New Func:\n"
-                       << "    Mangled: " << MangledName
-                       << "\n    Demangled: " << DemangledName << "\n");
+                            << "    Mangled: " << MangledName
+                            << "\n    Demangled: " << DemangledName << "\n");
 
     bool FoundMangledName = stringInSortedArray(MangledName, MangledNames,
                                                 std::less<std::string>());
@@ -329,15 +329,15 @@ int main(int argc, char **argv) {
                                        NumNames - NumMangled);
 
   LLVM_DEBUG(llvm::errs() << "MangledNames to keep:\n";
-        std::for_each(MangledNames.begin(), MangledNames.end(),
-                      [](const std::string &str) {
-                        llvm::errs() << "    " << str << '\n';
-                      }));
+             std::for_each(MangledNames.begin(), MangledNames.end(),
+                           [](const std::string &str) {
+                             llvm::errs() << "    " << str << '\n';
+                           }));
   LLVM_DEBUG(llvm::errs() << "DemangledNames to keep:\n";
-        std::for_each(DemangledNames.begin(), DemangledNames.end(),
-                      [](const std::string &str) {
-                        llvm::errs() << "    " << str << '\n';
-                      }));
+             std::for_each(DemangledNames.begin(), DemangledNames.end(),
+                           [](const std::string &str) {
+                             llvm::errs() << "    " << str << '\n';
+                           }));
 
   removeUnwantedFunctions(CI.getSILModule(), MangledNames, DemangledNames);
 

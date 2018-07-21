@@ -913,7 +913,7 @@ namespace driver {
           // aggressively by doubling partition count / halving size.
           NumPartitions *= 2;
           LLVM_DEBUG(llvm::dbgs()
-                << "Should have used a supplementary output file map.\n");
+                     << "Should have used a supplementary output file map.\n");
           return true;
         }
       }

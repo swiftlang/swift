@@ -3624,9 +3624,9 @@ public:
         F.mapTypeIntoContext(fnConv.getSILResultType());
     SILType instResultType = RI->getOperand()->getType();
     LLVM_DEBUG(llvm::dbgs() << "function return type: ";
-          functionResultType.dump();
-          llvm::dbgs() << "return inst type: ";
-          instResultType.dump(););
+               functionResultType.dump();
+               llvm::dbgs() << "return inst type: ";
+               instResultType.dump(););
     require(functionResultType == instResultType,
             "return value type does not match return type of function");
   }
@@ -3641,9 +3641,9 @@ public:
     SILType functionResultType = F.mapTypeIntoContext(fnConv.getSILErrorType());
     SILType instResultType = TI->getOperand()->getType();
     LLVM_DEBUG(llvm::dbgs() << "function error result type: ";
-          functionResultType.dump();
-          llvm::dbgs() << "throw operand type: ";
-          instResultType.dump(););
+               functionResultType.dump();
+               llvm::dbgs() << "throw operand type: ";
+               instResultType.dump(););
     require(functionResultType == instResultType,
             "throw operand type does not match error result type of function");
   }
@@ -4228,15 +4228,15 @@ public:
     require(entry->pred_empty(), "entry block cannot have predecessors");
 
     LLVM_DEBUG(llvm::dbgs() << "Argument types for entry point BB:\n";
-          for (auto *arg
-               : make_range(entry->args_begin(), entry->args_end()))
-              arg->getType()
-                  .dump();
-          llvm::dbgs() << "Input types for SIL function type ";
-          F.getLoweredFunctionType()->print(llvm::dbgs());
-          llvm::dbgs() << ":\n";
-          for (auto paramTy
-               : fnConv.getParameterSILTypes()) { paramTy.dump(); });
+               for (auto *arg
+                    : make_range(entry->args_begin(), entry->args_end()))
+                   arg->getType()
+                       .dump();
+               llvm::dbgs() << "Input types for SIL function type ";
+               F.getLoweredFunctionType()->print(llvm::dbgs());
+               llvm::dbgs() << ":\n";
+               for (auto paramTy
+                    : fnConv.getParameterSILTypes()) { paramTy.dump(); });
 
     require(entry->args_size() == (fnConv.getNumIndirectSILResults()
                                    + fnConv.getNumParameters()),
@@ -5036,7 +5036,7 @@ void SILModule::verify() const {
          "Cache size is not equal to true number of VTable entries");
 
   // Check all witness tables.
-  LLVM_DEBUG(llvm::dbgs() << "*** Checking witness tables for duplicates ***\n");
+  LLVM_DEBUG(llvm::dbgs() <<"*** Checking witness tables for duplicates ***\n");
   llvm::DenseSet<NormalProtocolConformance*> wtableConformances;
   for (const SILWitnessTable &wt : getWitnessTables()) {
     LLVM_DEBUG(llvm::dbgs() << "Witness Table:\n"; wt.dump());
@@ -5050,7 +5050,8 @@ void SILModule::verify() const {
   }
 
   // Check all default witness tables.
-  LLVM_DEBUG(llvm::dbgs() << "*** Checking default witness tables for duplicates ***\n");
+  LLVM_DEBUG(llvm::dbgs() << "*** Checking default witness tables for "
+             "duplicates ***\n");
   llvm::DenseSet<const ProtocolDecl *> defaultWitnessTables;
   for (const SILDefaultWitnessTable &wt : getDefaultWitnessTables()) {
     LLVM_DEBUG(llvm::dbgs() << "Default Witness Table:\n"; wt.dump());

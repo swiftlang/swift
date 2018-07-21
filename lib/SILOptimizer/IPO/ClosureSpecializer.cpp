@@ -1126,8 +1126,9 @@ bool SILClosureSpecializerTransform::gatherCallSites(
 
 bool SILClosureSpecializerTransform::specialize(SILFunction *Caller,
                     std::vector<SingleValueInstruction *> &PropagatedClosures) {
-  LLVM_DEBUG(llvm::dbgs() << "Optimizing callsites that take closure argument in "
-                     << Caller->getName() << '\n');
+  LLVM_DEBUG(llvm::dbgs() << "Optimizing callsites that take closure "
+                             "argument in "
+                          << Caller->getName() << '\n');
 
   // Collect all of the PartialApplyInsts that are used as arguments to
   // ApplyInsts. Check the profitability of specializing the closure argument.
@@ -1147,7 +1148,7 @@ bool SILClosureSpecializerTransform::specialize(SILFunction *Caller,
 
       auto NewFName = CSDesc.createName();
       LLVM_DEBUG(llvm::dbgs() << "    Perform optimizations with new name "
-                         << NewFName << '\n');
+                              << NewFName << '\n');
 
       // Then see if we already have a specialized version of this function in
       // our module.

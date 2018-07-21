@@ -1093,7 +1093,8 @@ void SILProfiler::assignRegionCounters() {
       CurrentFuncName, getEquivalentPGOLinkage(CurrentFuncLinkage),
       CurrentFileName);
 
-  LLVM_DEBUG(llvm::dbgs() << "Assigning counters to: " << CurrentFuncName << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "Assigning counters to: " << CurrentFuncName
+                          << "\n");
   Root.walk(Mapper);
 
   NumRegionCounters = Mapper.NextCounter;

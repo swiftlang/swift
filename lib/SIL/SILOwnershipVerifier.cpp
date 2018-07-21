@@ -1658,10 +1658,10 @@ bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses() {
   if (auto *ParentBlock = Value->getParentBlock()) {
     if (DEBlocks.isDeadEnd(ParentBlock)) {
       LLVM_DEBUG(llvm::dbgs() << "    Ignoring transitively unreachable value "
-                         << "without users!\n"
-                         << "    Function: '" << Value->getFunction()->getName()
-                         << "'\n"
-                         << "    Value: " << *Value << '\n');
+                              << "without users!\n"
+                              << "    Function: '"
+                              << Value->getFunction()->getName() << "'\n"
+                              << "    Value: " << *Value << '\n');
       return true;
     }
   }
@@ -1745,8 +1745,8 @@ bool SILValueOwnershipChecker::checkUses() {
     return false;
   }
 
-  LLVM_DEBUG(llvm::dbgs() << "    Found lifetime ending users! Performing initial "
-                        "checks\n");
+  LLVM_DEBUG(llvm::dbgs() << "    Found lifetime ending users! Performing "
+                             "initial checks\n");
 
   // See if we have a guaranteed function address. Guaranteed function addresses
   // should never have any lifetime ending uses.

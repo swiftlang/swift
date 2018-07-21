@@ -224,7 +224,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
   for (auto witness : checker.lookupValueWitnesses(req,
                                                    /*ignoringNames=*/nullptr)) {
     LLVM_DEBUG(llvm::dbgs() << "Inferring associated types from decl:\n";
-          witness->dump(llvm::dbgs()));
+               witness->dump(llvm::dbgs()));
 
     // If the potential witness came from an extension, and our `Self`
     // type can't use it regardless of what associated types we end up
@@ -246,9 +246,10 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
 }
       auto &result = witnessResult.Inferred[i];
 
-      LLVM_DEBUG(llvm::dbgs() << "Considering whether " << result.first->getName()
-                         << " can infer to:\n";
-            result.second->dump(llvm::dbgs()));
+      LLVM_DEBUG(llvm::dbgs() << "Considering whether "
+                              << result.first->getName()
+                              << " can infer to:\n";
+                 result.second->dump(llvm::dbgs()));
 
       // Filter out errors.
       if (result.second->hasError()) {
@@ -319,7 +320,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
                     });
                     canInferFromOtherAssociatedType = true;
                     LLVM_DEBUG(llvm::dbgs() << "++ we can same-type to:\n";
-                          result.second->dump(llvm::dbgs()));
+                               result.second->dump(llvm::dbgs()));
                     return false;
                   }
                 }
@@ -354,7 +355,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
             !newWitness->hasDependentMember() &&
             !existingWitness->isEqual(newWitness)) {
           LLVM_DEBUG(llvm::dbgs() << "** contradicts explicit type witness, "
-                                "rejecting inference from this decl\n");
+                                     "rejecting inference from this decl\n");
           goto next_witness;
         }
       }
@@ -1896,7 +1897,7 @@ auto AssociatedTypeInference::solve(ConformanceChecker &checker)
   inferred = inferTypeWitnessesViaValueWitnesses(checker,
                                                  unresolvedAssocTypes);
   LLVM_DEBUG(llvm::dbgs() << "Candidates for inference:\n";
-        dumpInferredAssociatedTypes(inferred));
+             dumpInferredAssociatedTypes(inferred));
 
   // Compute the set of solutions.
   SmallVector<InferredTypeWitnessesSolution, 4> solutions;
