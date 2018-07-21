@@ -2320,7 +2320,7 @@ public func checkEquatable<Instances : Collection>(
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
 ) where
-  Instances.Iterator.Element : Equatable
+  Instances.Element : Equatable
 {
   let indices = Array(instances.indices)
   _checkEquatableImpl(
@@ -2462,7 +2462,7 @@ public func checkHashable<Instances: Collection>(
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
-) where Instances.Iterator.Element: Hashable {
+) where Instances.Element: Hashable {
   checkHashable(
     instances,
     equalityOracle: equalityOracle,
@@ -2486,7 +2486,7 @@ public func checkHashable<Instances: Collection>(
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
 ) where
-  Instances.Iterator.Element: Hashable {
+  Instances.Element: Hashable {
   checkEquatable(
     instances,
     oracle: equalityOracle,
@@ -2645,7 +2645,7 @@ public func checkComparable<Instances : Collection>(
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
 ) where
-  Instances.Iterator.Element : Comparable {
+  Instances.Element : Comparable {
 
   // Also checks that equality is consistent with comparison and that
   // the oracle obeys the equality laws
@@ -2752,17 +2752,17 @@ public func checkComparable<T : Comparable>(
 public func checkStrideable<Instances : Collection, Strides : Collection>(
   _ instances: Instances, strides: Strides,
   distanceOracle:
-    (Instances.Index, Instances.Index) -> Strides.Iterator.Element,
+    (Instances.Index, Instances.Index) -> Strides.Element,
   advanceOracle:
-    (Instances.Index, Strides.Index) -> Instances.Iterator.Element,
+    (Instances.Index, Strides.Index) -> Instances.Element,
 
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
 ) where
-  Instances.Iterator.Element : Strideable,
-  Instances.Iterator.Element.Stride == Strides.Iterator.Element {
+  Instances.Element : Strideable,
+  Instances.Element.Stride == Strides.Element {
 
   checkComparable(
     instances,
@@ -2799,7 +2799,7 @@ public func nthIndex<C: Collection>(_ x: C, _ n: Int) -> C.Index {
   return x.index(x.startIndex, offsetBy: numericCast(n))
 }
 
-public func nth<C: Collection>(_ x: C, _ n: Int) -> C.Iterator.Element {
+public func nth<C: Collection>(_ x: C, _ n: Int) -> C.Element {
   return x[nthIndex(x, n)]
 }
 
@@ -2813,8 +2813,8 @@ public func expectEqualSequence<
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
 ) where
-  Expected.Iterator.Element == Actual.Iterator.Element,
-  Expected.Iterator.Element : Equatable {
+  Expected.Element == Actual.Element,
+  Expected.Element : Equatable {
 
   expectEqualSequence(expected, actual, message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line)) { $0 == $1 }
@@ -2832,8 +2832,8 @@ public func expectEqualSequence<
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
 ) where
-  Expected.Iterator.Element == Actual.Iterator.Element,
-  Expected.Iterator.Element == (T, U) {
+  Expected.Element == Actual.Element,
+  Expected.Element == (T, U) {
 
   expectEqualSequence(
     expected, actual, message(),
@@ -2852,9 +2852,9 @@ public func expectEqualSequence<
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line,
-  sameValue: (Expected.Iterator.Element, Expected.Iterator.Element) -> Bool
+  sameValue: (Expected.Element, Expected.Element) -> Bool
 ) where
-  Expected.Iterator.Element == Actual.Iterator.Element {
+  Expected.Element == Actual.Element {
 
   if !expected.elementsEqual(actual, by: sameValue) {
     expectationFailure("expected elements: \"\(expected)\"\n"
@@ -2873,14 +2873,14 @@ public func expectEqualsUnordered<
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line,
-  compare: @escaping (Expected.Iterator.Element, Expected.Iterator.Element)
+  compare: @escaping (Expected.Element, Expected.Element)
     -> ExpectedComparisonResult
 ) where
-  Expected.Iterator.Element == Actual.Iterator.Element {
+  Expected.Element == Actual.Element {
 
-  let x: [Expected.Iterator.Element] =
+  let x: [Expected.Element] =
     expected.sorted { compare($0, $1).isLT() }
-  let y: [Actual.Iterator.Element] =
+  let y: [Actual.Element] =
     actual.sorted { compare($0, $1).isLT() }
   expectEqualSequence(
     x, y, message(),
@@ -2897,8 +2897,8 @@ public func expectEqualsUnordered<
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
 ) where
-  Expected.Iterator.Element == Actual.Iterator.Element,
-  Expected.Iterator.Element : Comparable {
+  Expected.Element == Actual.Element,
+  Expected.Element : Comparable {
 
   expectEqualsUnordered(expected, actual, message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line)) {
@@ -2976,8 +2976,8 @@ public func expectEqualsUnordered<
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
 ) where
-  Actual.Iterator.Element == (key: T, value: T),
-  Expected.Iterator.Element == (T, T) {
+  Actual.Element == (key: T, value: T),
+  Expected.Element == (T, T) {
 
   func comparePairLess(_ lhs: (T, T), rhs: (T, T)) -> Bool {
     return [lhs.0, lhs.1].lexicographicallyPrecedes([rhs.0, rhs.1])

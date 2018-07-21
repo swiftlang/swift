@@ -409,7 +409,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
 
 @_fixed_layout
 @usableFromInline
-internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Element>
+internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Element>
 {
   @usableFromInline
   internal typealias Element = S.Element
