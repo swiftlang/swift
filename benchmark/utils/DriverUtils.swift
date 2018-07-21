@@ -59,7 +59,7 @@ struct TestConfig {
 
   let action: TestAction
 
-  init(_ registeredBenchmarks: [BenchmarkInfo]) throws {
+  init(_ registeredBenchmarks: [BenchmarkInfo]) {
 
     struct PartialTestConfig {
       var delim: String?
@@ -81,7 +81,7 @@ struct TestConfig {
     }
 
     // Configure the command line argument parser
-    let p = try ArgumentParser(into: PartialTestConfig())
+    let p = ArgumentParser(into: PartialTestConfig())
     p.addArgument("--iter-scale", \.iterationScale) { Int($0) }
     p.addArgument("--num-iters", \.fixedNumIters) { UInt($0) }
     p.addArgument("--num-samples", \.numSamples)  { Int($0) }
@@ -94,7 +94,7 @@ struct TestConfig {
     p.addArgument("--list", \.action, defaultValue: .listTests)
     p.addArgument(nil, \.tests) // positional arguments
 
-    let c = try p.parse()
+    let c = p.parse()
 
     // Configure from the command line arguments, filling in the defaults.
     delim = c.delim ?? ","
@@ -401,28 +401,19 @@ func runBenchmarks(_ c: TestConfig) {
 }
 
 public func main() {
-  do {
-    let config = try TestConfig(registeredBenchmarks)
-    switch (config.action) {
-    case .listTests:
-      print("#\(config.delim)Test\(config.delim)[Tags]")
-      for (index, t) in config.tests {
-      let testDescription = [String(index), t.name, t.tags.sorted().description]
-        .joined(separator: config.delim)
-      print(testDescription)
-      }
-    case .run:
-      runBenchmarks(config)
-      if let x = config.afterRunSleep {
-        sleep(UInt32(x))
-      }
+  let config = TestConfig(registeredBenchmarks)
+  switch (config.action) {
+  case .listTests:
+    print("#\(config.delim)Test\(config.delim)[Tags]")
+    for (index, t) in config.tests {
+    let testDescription = [String(index), t.name, t.tags.sorted().description]
+      .joined(separator: config.delim)
+    print(testDescription)
     }
-  } catch let error as ArgumentError {
-    fflush(stdout)
-    fputs("\(error)\n", stderr)
-    fflush(stderr)
-    exit(1)
-  } catch {
-    fatalError("\(error)")
+  case .run:
+    runBenchmarks(config)
+    if let x = config.afterRunSleep {
+      sleep(UInt32(x))
+    }
   }
 }

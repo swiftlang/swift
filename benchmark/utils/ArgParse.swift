@@ -130,7 +130,7 @@ class ArgumentParser<U> {
     private var benchArgs: Arguments!
     private var arguments: [Argument] = []
 
-    init(into result: U) throws {
+    init(into result: U) {
       self.result = result
       self.arguments += [
         Argument(name: "--help", apply: printUsage)
@@ -146,13 +146,22 @@ class ArgumentParser<U> {
       exit(0)
     }
 
-    func parse() throws -> U {
-      guard let benchArgs = parseArgs(validOptions) else {
-        throw ArgumentError.general("Failed to parse arguments")
+    func parse() -> U {
+      do {
+        guard let benchArgs = parseArgs(validOptions) else {
+          throw ArgumentError.general("Failed to parse arguments")
+        }
+        self.benchArgs = benchArgs
+        try arguments.forEach { try $0.apply() } // parse all arguments
+        return result
+      } catch let error as ArgumentError {
+        fflush(stdout)
+        fputs("\(error)\n", stderr)
+        fflush(stderr)
+        exit(1)
+      } catch {
+        fatalError("\(error)")
       }
-      self.benchArgs = benchArgs
-      try arguments.forEach { try $0.apply() } // parse all arguments
-      return result
     }
 
     func addArgument<T>(
