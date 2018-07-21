@@ -1277,8 +1277,8 @@ void FunctionSignaturePartialSpecializer::
       SpecializedGenericSig,
       [&](SubstitutableType *type) -> Type {
         LLVM_DEBUG(llvm::dbgs()
-                  << "Mapping specialized interface type to caller "
-                     "archetype:\n";
+                   << "Mapping specialized interface type to caller "
+                      "archetype:\n";
               llvm::dbgs() << "Interface type: "; type->dump();
               llvm::dbgs() << "Archetype: ";
               auto Archetype =
