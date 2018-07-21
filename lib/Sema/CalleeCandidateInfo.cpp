@@ -90,10 +90,18 @@ ArrayRef<Identifier> UncurriedCandidate::getArgumentLabels(
   scratch.clear();
   if (auto decl = getDecl()) {
     if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-      // Retrieve the argument labels of the corresponding parameter list.
-      if (level < func->getNumParameterLists()) {
-        auto paramList = func->getParameterList(level);
-        for (auto param : *paramList) {
+      if (func->getImplicitSelfDecl()) {
+        if (level == 0) {
+          scratch.push_back(Identifier());
+          return scratch;
+        }
+
+        --level;
+      }
+
+      if (level == 0) {
+        // Retrieve the argument labels of the corresponding parameter list.
+        for (auto param : *func->getParameters()) {
           scratch.push_back(param->getArgumentName());
         }
         return scratch;

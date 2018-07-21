@@ -3421,11 +3421,15 @@ static bool candidatesHaveAnyDefaultValues(
     auto function = dyn_cast_or_null<AbstractFunctionDecl>(cand.getDecl());
     if (!function) continue;
 
-    auto paramLists = function->getParameterLists();
-    if (cand.level >= paramLists.size()) continue;
+    if (function->getImplicitSelfDecl()) {
+      if (cand.level != 1)
+        return false;
+    } else {
+      if (cand.level != 0)
+        return false;
+    }
 
-    auto paramList = paramLists[cand.level];
-    for (auto param : *paramList) {
+    for (auto param : *function->getParameters()) {
       if (param->getDefaultArgumentKind() != DefaultArgumentKind::None)
         return true;
     }
@@ -3456,11 +3460,15 @@ static Optional<unsigned> getElementForScalarInitOfArg(
   auto function = dyn_cast_or_null<AbstractFunctionDecl>(cand.getDecl());
   if (!function) return getElementForScalarInitSimple(tupleTy);
 
-  auto paramLists = function->getParameterLists();
-  if (cand.level >= paramLists.size())
-    return getElementForScalarInitSimple(tupleTy);
+  if (function->getImplicitSelfDecl()) {
+    if (cand.level != 1)
+      return getElementForScalarInitSimple(tupleTy);
+  } else {
+    if (cand.level != 0)
+      return getElementForScalarInitSimple(tupleTy);
+  }
 
-  auto paramList = paramLists[cand.level];
+  auto paramList = function->getParameters();
   if (tupleTy->getNumElements() != paramList->size()) 
     return getElementForScalarInitSimple(tupleTy);
 
