@@ -30,7 +30,7 @@ public func run_Chars(_ N: Int) {
     "2", "a", "t", "i", "o", "e", "q", "n", "X", "Y", "Z", "?", "m", "Z", ","
     ]
 
-  for _ in 0...N {
+  for _ in 0..<N {
     for firstChar in alphabet {
       for middleChar in alphabet {
         for lastChar in alphabet {
