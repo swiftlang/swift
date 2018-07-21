@@ -4707,6 +4707,23 @@ Type SubscriptDecl::getElementInterfaceType() const {
   return elementTy->castTo<AnyFunctionType>()->getResult();
 }
 
+void SubscriptDecl::computeType() {
+  auto &ctx = getASTContext();
+
+  auto elementTy = getElementTypeLoc().getType();
+  auto indicesTy = getIndices()->getInterfaceType(ctx);
+  Type funcTy;
+
+  if (auto *sig = getGenericSignature())
+    funcTy = GenericFunctionType::get(sig, indicesTy, elementTy,
+                                      AnyFunctionType::ExtInfo());
+  else
+    funcTy = FunctionType::get(indicesTy, elementTy);
+
+  // Record the interface type.
+  setInterfaceType(funcTy);
+}
+
 ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind() const {
   auto indexTy = getIndicesInterfaceType();
 
@@ -5088,6 +5105,86 @@ void AbstractFunctionDecl::setParameters(ParamDecl *SelfDecl,
 
   Params = BodyParams;
   BodyParams->setDeclContextOfParamDecls(this);
+}
+
+void AbstractFunctionDecl::computeType(AnyFunctionType::ExtInfo info) {
+  auto &ctx = getASTContext();
+  auto *sig = getGenericSignature();
+  bool hasSelf = hasImplicitSelfDecl();
+
+  // Result
+  Type resultTy;
+  if (auto fn = dyn_cast<FuncDecl>(this)) {
+    resultTy = fn->getBodyResultTypeLoc().getType();
+    if (!resultTy)
+      resultTy = TupleType::getEmpty(ctx);
+
+  } else if (auto ctor = dyn_cast<ConstructorDecl>(this)) {
+    auto *dc = ctor->getDeclContext();
+
+    if (hasSelf)
+      resultTy = dc->getSelfInterfaceType();
+
+    if (!resultTy)
+      resultTy = ErrorType::get(ctx);
+
+    // Adjust result type for failability.
+    if (ctor->getFailability() != OTK_None)
+      resultTy = OptionalType::get(resultTy);
+  } else {
+    assert(isa<DestructorDecl>(this));
+    resultTy = TupleType::getEmpty(ctx);
+  }
+
+  // (Args...) -> Result
+  Type funcTy;
+
+  {
+    SmallVector<AnyFunctionType::Param, 4> argTy;
+    AnyFunctionType::decomposeInput(
+      getParameters()->getInterfaceType(ctx), argTy);
+
+    // 'throws' only applies to the innermost function.
+    info = info.withThrows(hasThrows());
+    // Defer bodies must not escape.
+    if (auto fd = dyn_cast<FuncDecl>(this))
+      info = info.withNoEscape(fd->isDeferBody());
+
+    if (sig && !hasSelf) {
+      funcTy = GenericFunctionType::get(sig, argTy, resultTy, info);
+    } else {
+      funcTy = FunctionType::get(argTy, resultTy, info);
+    }
+  }
+
+  Type initFuncTy;
+
+  // (Self) -> (Args...) -> Result
+  if (hasSelf) {
+    SmallVector<AnyFunctionType::Param, 1> argTy;
+    SmallVector<AnyFunctionType::Param, 1> initArgTy;
+
+    // Substitute in our own 'self' parameter.
+    argTy.push_back(computeSelfParam(this));
+    if (isa<ConstructorDecl>(this))
+      initArgTy.push_back(computeSelfParam(this, /*isInitializingCtor=*/true));
+
+    AnyFunctionType::ExtInfo info;
+    if (sig) {
+      if (isa<ConstructorDecl>(this))
+        initFuncTy = GenericFunctionType::get(sig, initArgTy, funcTy, info);
+      funcTy = GenericFunctionType::get(sig, argTy, funcTy, info);
+    } else {
+      if (isa<ConstructorDecl>(this))
+        initFuncTy = FunctionType::get(initArgTy, funcTy, info);
+      funcTy = FunctionType::get(argTy, funcTy, info);
+    }
+  }
+
+  // Record the interface type.
+  setInterfaceType(funcTy);
+  if (auto *ctor = dyn_cast<ConstructorDecl>(this))
+    ctor->setInitializerInterfaceType(initFuncTy);
 }
 
 FuncDecl *FuncDecl::createImpl(ASTContext &Context,

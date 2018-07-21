@@ -642,9 +642,9 @@ static bool checkProtocolSelfRequirements(GenericSignature *sig,
 /// All generic parameters of a generic function must be referenced in the
 /// declaration's type, otherwise we have no way to infer them.
 static void checkReferencedGenericParams(GenericContext *dc,
-                                         GenericSignature *sig,
                                          TypeChecker &TC) {
   auto *genericParams = dc->getGenericParams();
+  auto *genericSig = dc->getGenericSignatureOfContext();
   if (!genericParams)
     return;
 
@@ -752,8 +752,9 @@ static void checkReferencedGenericParams(GenericContext *dc,
 
   ArrayRef<Requirement> requirements;
 
-  auto FindReferencedGenericParamsInRequirements = [&requirements, sig, &reqTypesVisitor] {
-    requirements = sig->getRequirements();
+  auto FindReferencedGenericParamsInRequirements =
+    [&requirements, genericSig, &reqTypesVisitor] {
+    requirements = genericSig->getRequirements();
     // Try to find new referenced generic parameter types in requirements until
     // we reach a fix point. We need to iterate until a fix point, because we
     // may have e.g. chains of same-type requirements like:
@@ -780,7 +781,7 @@ static void checkReferencedGenericParams(GenericContext *dc,
 
   // Check that every generic parameter type from the signature is
   // among referencedGenericParams.
-  for (auto *genParam : sig->getGenericParams()) {
+  for (auto *genParam : genericSig->getGenericParams()) {
     auto *paramDecl = genParam->getDecl();
     if (paramDecl->getDepth() != fnGenericParamsDepth)
       continue;
@@ -876,104 +877,17 @@ void TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
     return;
   }
 
-  configureInterfaceType(func, sig);
+  func->computeType();
+
+  // We get bogus errors here with generic subscript materializeForSet.
+  if (!isa<AccessorDecl>(func) ||
+      !cast<AccessorDecl>(func)->isMaterializeForSet())
+    checkReferencedGenericParams(func, *this);
 
   // Make sure that there are no unresolved
   // dependent types in the generic signature.
   assert(func->getInterfaceType()->hasError() ||
          !func->getInterfaceType()->findUnresolvedDependentMemberType());
-}
-
-void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func,
-                                         GenericSignature *sig) {
-  bool hasSelf = func->hasImplicitSelfDecl();
-
-  // Result
-  Type resultTy;
-  if (auto fn = dyn_cast<FuncDecl>(func)) {
-    resultTy = fn->getBodyResultTypeLoc().getType();
-    if (!resultTy)
-      resultTy = TupleType::getEmpty(Context);
-
-  } else if (auto ctor = dyn_cast<ConstructorDecl>(func)) {
-    auto *dc = ctor->getDeclContext();
-
-    if (hasSelf)
-      resultTy = dc->getSelfInterfaceType();
-
-    if (!resultTy)
-      resultTy = ErrorType::get(Context);
-
-    // Adjust result type for failability.
-    if (ctor->getFailability() != OTK_None)
-      resultTy = OptionalType::get(resultTy);
-
-    // Set the IUO attribute on the decl if this was declared with !.
-    if (ctor->getFailability() == OTK_ImplicitlyUnwrappedOptional) {
-      auto *forceAttr =
-          new (Context) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true);
-      ctor->getAttrs().add(forceAttr);
-    }
-  } else {
-    assert(isa<DestructorDecl>(func));
-    resultTy = TupleType::getEmpty(Context);
-  }
-
-  // (Args...) -> Result
-  Type funcTy;
-
-  {
-    SmallVector<AnyFunctionType::Param, 4> argTy;
-    AnyFunctionType::decomposeInput(
-      func->getParameters()->getInterfaceType(Context), argTy);
-
-    // 'throws' only applies to the innermost function.
-    AnyFunctionType::ExtInfo info;
-    info = info.withThrows(func->hasThrows());
-    // Defer bodies must not escape.
-    if (auto fd = dyn_cast<FuncDecl>(func))
-      info = info.withNoEscape(fd->isDeferBody());
-
-    if (sig && !hasSelf) {
-      funcTy = GenericFunctionType::get(sig, argTy, resultTy, info);
-    } else {
-      funcTy = FunctionType::get(argTy, resultTy, info);
-    }
-  }
-
-  Type initFuncTy;
-
-  // (Self) -> (Args...) -> Result
-  if (hasSelf) {
-    SmallVector<AnyFunctionType::Param, 1> argTy;
-    SmallVector<AnyFunctionType::Param, 1> initArgTy;
-
-    // Substitute in our own 'self' parameter.
-    argTy.push_back(computeSelfParam(func));
-    if (isa<ConstructorDecl>(func))
-      initArgTy.push_back(computeSelfParam(func, /*isInitializingCtor=*/true));
-
-    AnyFunctionType::ExtInfo info;
-    if (sig) {
-      if (isa<ConstructorDecl>(func))
-        initFuncTy = GenericFunctionType::get(sig, initArgTy, funcTy, info);
-      funcTy = GenericFunctionType::get(sig, argTy, funcTy, info);
-    } else {
-      if (isa<ConstructorDecl>(func))
-        initFuncTy = FunctionType::get(initArgTy, funcTy, info);
-      funcTy = FunctionType::get(argTy, funcTy, info);
-    }
-  }
-
-  // Record the interface type.
-  func->setInterfaceType(funcTy);
-  if (auto *ctor = dyn_cast<ConstructorDecl>(func))
-    ctor->setInitializerInterfaceType(initFuncTy);
-
-  // We get bogus errors here with generic subscript materializeForSet.
-  if (!isa<AccessorDecl>(func) ||
-      !cast<AccessorDecl>(func)->isMaterializeForSet())
-    checkReferencedGenericParams(func, sig, *this);
 }
 
 ///
@@ -1107,25 +1021,9 @@ TypeChecker::validateGenericSubscriptSignature(SubscriptDecl *subscript) {
     return;
   }
 
-  configureInterfaceType(subscript, sig);
-}
+  subscript->computeType();
 
-void TypeChecker::configureInterfaceType(SubscriptDecl *subscript,
-                                         GenericSignature *sig) {
-  auto elementTy = subscript->getElementTypeLoc().getType();
-  auto indicesTy = subscript->getIndices()->getInterfaceType(Context);
-  Type funcTy;
-
-  if (sig)
-    funcTy = GenericFunctionType::get(sig, indicesTy, elementTy,
-                                      AnyFunctionType::ExtInfo());
-  else
-    funcTy = FunctionType::get(indicesTy, elementTy);
-
-  // Record the interface type.
-  subscript->setInterfaceType(funcTy);
-
-  checkReferencedGenericParams(subscript, sig, *this);
+  checkReferencedGenericParams(subscript, *this);
 }
 
 ///
