@@ -1232,13 +1232,13 @@ static SILValue reapplyFunctionConversion(
   // Handle a few instruction cases.
   // thin_to_thick_function
   if (auto *tttfi = dyn_cast<ThinToThickFunctionInst>(oldConvertedFunc)) {
-    auto operand = tttfi->getOperand();
-    auto operandFnTy = operand->getType().castTo<SILFunctionType>();
+    auto innerNewFunc = reapplyFunctionConversion(
+      newFunc, oldFunc, tttfi->getOperand(), builder, loc, substituteOperand);
+    auto operandFnTy = innerNewFunc->getType().castTo<SILFunctionType>();
     auto thickTy =
       operandFnTy->getWithRepresentation(SILFunctionTypeRepresentation::Thick);
     auto silTy = SILType::getPrimitiveObjectType(thickTy);
-    auto innerNewFunc = reapplyFunctionConversion(
-      newFunc, oldFunc, tttfi->getOperand(), builder, loc, substituteOperand);
+
     return builder.createThinToThickFunction(loc, innerNewFunc, silTy);
   }
   // partial_apply
@@ -1626,11 +1626,10 @@ static SILFunction *lookupOrSynthesizeGradient(
     // Clean up stack allocations made by seed passing when seed is addr-only.
     for (auto alloc : stackAllocsToCleanUp)
       builder.createDeallocStack(loc, alloc);
-    // If the config is result-preserving, or if the original result is
+    // If the config is result-preserving, or if all original results are
     // indirect, we can just return whatever direct results the canonical
     // gradient produces.
-    if (config.isPreservingResult() ||
-        canGradConv.getResults()[0].isFormalIndirect()) {
+    if (config.isPreservingResult() || origConv.getNumDirectSILResults() == 0) {
       builder.createReturn(loc, resultAndGrad);
     }
     // Otherwise, return every tuple element of `resultAndGrad` except the
