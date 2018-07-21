@@ -118,14 +118,14 @@ private:
   SILReverseAutoDiffIndices indices;
   /// The primal and adjoint function names.
   StringRef PrimalName, AdjointName;
-  /// Constructor, copying parameter indices to the trailing buffer.
-  SILReverseDifferentiableAttr(SILReverseAutoDiffIndices indices,
+  
+  SILReverseDifferentiableAttr(const SILReverseAutoDiffIndices &indices,
                                StringRef primalName,
                                StringRef adjointName);
 
 public:
   static SILReverseDifferentiableAttr *create(
-      SILModule &M, SILReverseAutoDiffIndices indices,
+      SILModule &M, const SILReverseAutoDiffIndices &indices,
       StringRef primalName = StringRef(), StringRef adjointName = StringRef());
   
   bool hasPrimal() const { return !PrimalName.empty(); }
@@ -136,7 +136,7 @@ public:
   StringRef getAdjointName() const { assert(hasAdjoint()); return AdjointName; }
   void setAdjointName(StringRef name) { AdjointName = name; }
 
-  SILReverseAutoDiffIndices getIndices() const { return indices; }
+  const SILReverseAutoDiffIndices &getIndices() const { return indices; }
 
   void print(llvm::raw_ostream &OS) const;
 };

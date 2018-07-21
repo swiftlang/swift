@@ -100,8 +100,8 @@ CanType SILFunctionType::getSelfInstanceType() const {
 
 /// SWIFT_ENABLE_TENSORFLOW
 CanSILFunctionType
-SILFunctionType::getGradientType(SILReverseAutoDiffConfiguration config,
-                                 SILModule &M) {
+SILFunctionType::getGradientType(
+    const SILReverseAutoDiffConfig &config, SILModule &M) {
   // FIXME: Handle `Delayed` gradient option.
   auto originalParams = getParameters();
   auto originalResult = getResults()[config.getSourceIndex()];

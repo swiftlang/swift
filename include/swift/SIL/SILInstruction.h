@@ -7839,29 +7839,26 @@ class GradientInst final
                            SingleValueInstruction> {
 private:
   friend SILBuilder;
-  /// The reverse-mode AD indices.
-  SILReverseAutoDiffIndices Indices;
-  /// Gradient options.
-  SILGradientOptions Options;
+  /// The reverse-mode AD configuration.
+  SILReverseAutoDiffConfig Config;
   /// Space for 1 operand: the original function to be differentiated.
   FixedOperandList<1> Operands;
 
   GradientInst(SILModule &module, SILDebugLocation debugLoc, SILValue original,
-               SILReverseAutoDiffIndices indices, SILGradientOptions options);
+               const SILReverseAutoDiffConfig &config);
 
   /// A utility function for computing the SIL type of the gradient of a
   /// function, given the specified differentiation configuration options.
-  static SILType getGradientSILType(SILModule &module, SILValue original,
-                                    SILReverseAutoDiffIndices indices,
-                                    SILGradientOptions options);
+  static SILType getGradientSILType(
+      SILModule &module, SILValue original,
+      const SILReverseAutoDiffConfig &config);
 
 public:
   ~GradientInst() {};
 
   static GradientInst *create(SILModule &M, SILDebugLocation debugLoc,
                               SILValue original,
-                              SILReverseAutoDiffIndices indices,
-                              SILGradientOptions options);
+                              const SILReverseAutoDiffConfig &config);
 
   SILValue getOriginal() const { return Operands[0].get(); }
 
@@ -7869,28 +7866,16 @@ public:
     return getOriginal()->getType().getAs<SILFunctionType>();
   }
 
+  const SILReverseAutoDiffConfig &getConfig() const {
+    return Config;
+  }
+
+  const SILReverseAutoDiffIndices &getIndices() const {
+    return Config.indices;
+  }
+
   SILGradientOptions getOptions() const {
-    return Options;
-  }
-
-  bool isSeedable() const {
-    return Options.contains(SILGradientFlags::Seedable);
-  }
-
-  bool isPreservingResult() const {
-    return Options.contains(SILGradientFlags::PreservingResult);
-  }
-
-  bool isDelayed() const {
-    return Options.contains(SILGradientFlags::Delayed);
-  }
-
-  SILReverseAutoDiffIndices getIndices() const {
-    return Indices;
-  }
-
-  SILReverseAutoDiffConfiguration getConfiguration() const {
-    return { Indices, Options };
+    return Config.options;
   }
 
   ArrayRef<Operand> getAllOperands() const {

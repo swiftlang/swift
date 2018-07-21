@@ -2811,9 +2811,10 @@ static RValue emitGradientInst(RValueEmitter &RVE, const SGFContext &C,
       RVE.SGF.SGM.getLoweredFunctionParameterIndex(param.index, origTy);
     loweredParamIndices.append(silParamIndices.begin(), silParamIndices.end());
   }
-  SILReverseAutoDiffIndices indices(/*sourceIndex*/ 0, loweredParamIndices);
-  auto gradInst = RVE.SGF.B.createGradient(loc, origVal.forward(RVE.SGF),
-                                           indices, options);
+  SILReverseAutoDiffConfig config(
+    {/*sourceIndex*/ 0, loweredParamIndices}, options);
+  auto gradInst =
+    RVE.SGF.B.createGradient(loc, origVal.forward(RVE.SGF), config);
   ManagedValue v = RVE.SGF.emitManagedRValueWithCleanup(gradInst);
   return RValue(RVE.SGF, E, v);
 }

@@ -581,23 +581,21 @@ TryApplyInst *TryApplyInst::create(
 
 /// SWIFT_ENABLE_TENSORFLOW
 GradientInst::GradientInst(SILModule &module, SILDebugLocation debugLoc,
-                           SILValue original, SILReverseAutoDiffIndices indices,
-                           SILGradientOptions options)
+                           SILValue original,
+                           const SILReverseAutoDiffConfig &config)
   : InstructionBase(debugLoc,
-                    getGradientSILType(module, original, indices, options)),
-    Indices(indices), Options(options),
-    Operands(this, original) {}
+                    getGradientSILType(module, original, config)),
+    Config(config), Operands(this, original) {}
 
-SILType GradientInst::getGradientSILType(SILModule &module, SILValue original,
-                                         SILReverseAutoDiffIndices indices,
-                                         SILGradientOptions options) {
+SILType GradientInst::getGradientSILType(
+    SILModule &module, SILValue original,
+    const SILReverseAutoDiffConfig &config) {
   // If parameter indices are empty, return an invalid type (empty tuple type).
   // An "empty parameter indices" will be produced during verification.
-  if (indices.parameters.none()) {
+  if (config.indices.parameters.none()) {
     auto invalidTy = TupleType::get({}, module.getASTContext());
     return SILType::getPrimitiveObjectType(CanType(invalidTy));
   }
-  SILReverseAutoDiffConfiguration config(indices, options);
   auto origFnTy = original->getType().castTo<SILFunctionType>();
   auto gradFnTy = origFnTy->getGradientType(config, module);
   return SILType::getPrimitiveObjectType(gradFnTy->getCanonicalType());
@@ -605,10 +603,10 @@ SILType GradientInst::getGradientSILType(SILModule &module, SILValue original,
 
 GradientInst *
 GradientInst::create(SILModule &M, SILDebugLocation debugLoc,
-                     SILValue original, SILReverseAutoDiffIndices indices,
-                     SILGradientOptions options) {
+                     SILValue original,
+                     const SILReverseAutoDiffConfig &config) {
   void *buffer = M.allocateInst(sizeof(GradientInst), alignof(GradientInst));
-  return ::new (buffer) GradientInst(M, debugLoc, original, indices, options);
+  return ::new (buffer) GradientInst(M, debugLoc, original, config);
 }
 
 FunctionRefInst::FunctionRefInst(SILDebugLocation Loc, SILFunction *F)
