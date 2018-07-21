@@ -867,17 +867,17 @@ void SILClosureSpecializerTransform::run() {
   if (EliminateDeadClosures) {
     // Otherwise, remove any local dead closures that are now dead since we
     // specialized all of their uses.
-    DEBUG(llvm::dbgs() << "Trying to remove dead closures!\n");
+    LLVM_DEBUG(llvm::dbgs() << "Trying to remove dead closures!\n");
     sortUnique(PropagatedClosures);
     for (auto *Closure : PropagatedClosures) {
-      DEBUG(llvm::dbgs() << "    Visiting: " << *Closure);
+      LLVM_DEBUG(llvm::dbgs() << "    Visiting: " << *Closure);
       if (!tryDeleteDeadClosure(Closure)) {
-        DEBUG(llvm::dbgs() << "        Failed to delete closure!\n");
+        LLVM_DEBUG(llvm::dbgs() << "        Failed to delete closure!\n");
         NumPropagatedClosuresNotEliminated++;
         continue;
       }
 
-      DEBUG(llvm::dbgs() << "        Deleted closure!\n");
+      LLVM_DEBUG(llvm::dbgs() << "        Deleted closure!\n");
       ++NumPropagatedClosuresEliminated;
     }
   }
@@ -1126,7 +1126,7 @@ bool SILClosureSpecializerTransform::gatherCallSites(
 
 bool SILClosureSpecializerTransform::specialize(SILFunction *Caller,
                     std::vector<SingleValueInstruction *> &PropagatedClosures) {
-  DEBUG(llvm::dbgs() << "Optimizing callsites that take closure argument in "
+  LLVM_DEBUG(llvm::dbgs() << "Optimizing callsites that take closure argument in "
                      << Caller->getName() << '\n');
 
   // Collect all of the PartialApplyInsts that are used as arguments to
@@ -1146,7 +1146,7 @@ bool SILClosureSpecializerTransform::specialize(SILFunction *Caller,
         continue;
 
       auto NewFName = CSDesc.createName();
-      DEBUG(llvm::dbgs() << "    Perform optimizations with new name "
+      LLVM_DEBUG(llvm::dbgs() << "    Perform optimizations with new name "
                          << NewFName << '\n');
 
       // Then see if we already have a specialized version of this function in

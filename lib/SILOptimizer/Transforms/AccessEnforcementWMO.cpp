@@ -215,7 +215,7 @@ void GlobalAccessRemoval::recordAccess(SILInstruction *beginAccess,
   if (!decl || module.isVisibleExternally(decl))
     return;
 
-  DEBUG(if (!hasNoNestedConflict) llvm::dbgs()
+  LLVM_DEBUG(if (!hasNoNestedConflict) llvm::dbgs()
         << "Nested conflict on " << decl->getName() << " at" << *beginAccess
         << "\n");
 
@@ -249,14 +249,14 @@ void GlobalAccessRemoval::removeNonreentrantAccess() {
       continue;
 
     VarDecl *decl = declAndInfo.first;
-    DEBUG(llvm::dbgs() << "Eliminating all formal access on " << decl->getName()
+    LLVM_DEBUG(llvm::dbgs() << "Eliminating all formal access on " << decl->getName()
                        << "\n");
     assert(!module.isVisibleExternally(decl));
     (void)decl;
 
     // Non-deterministic iteration, only used to set a flag.
     for (BeginAccessInst *beginAccess : info.beginAccessSet) {
-      DEBUG(llvm::dbgs() << "  Disabling access marker " << *beginAccess);
+      LLVM_DEBUG(llvm::dbgs() << "  Disabling access marker " << *beginAccess);
       beginAccess->setEnforcement(SILAccessEnforcement::Static);
     }
   }

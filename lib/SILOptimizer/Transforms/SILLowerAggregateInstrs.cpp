@@ -187,7 +187,7 @@ static bool expandReleaseValue(ReleaseValueInst *DV) {
   TL.emitLoweredDestroyValueMostDerivedDescendents(Builder, DV->getLoc(),
                                                    Value);
 
-  DEBUG(llvm::dbgs() << "    Expanding Destroy Value: " << *DV);
+  LLVM_DEBUG(llvm::dbgs() << "    Expanding Destroy Value: " << *DV);
 
   ++NumExpand;
   return true;
@@ -213,7 +213,7 @@ static bool expandRetainValue(RetainValueInst *CV) {
   auto &TL = Module.getTypeLowering(Type);
   TL.emitLoweredCopyValueMostDerivedDescendents(Builder, CV->getLoc(), Value);
 
-  DEBUG(llvm::dbgs() << "    Expanding Copy Value: " << *CV);
+  LLVM_DEBUG(llvm::dbgs() << "    Expanding Copy Value: " << *CV);
 
   ++NumExpand;
   return true;
@@ -230,7 +230,7 @@ static bool processFunction(SILFunction &Fn) {
     while (II != IE) {
       SILInstruction *Inst = &*II;
 
-      DEBUG(llvm::dbgs() << "Visiting: " << *Inst);
+      LLVM_DEBUG(llvm::dbgs() << "Visiting: " << *Inst);
 
       if (auto *CA = dyn_cast<CopyAddrInst>(Inst))
         if (expandCopyAddr(CA)) {
@@ -276,7 +276,7 @@ class SILLowerAggregate : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
     SILFunction *F = getFunction();
-    DEBUG(llvm::dbgs() << "***** LowerAggregate on function: " <<
+    LLVM_DEBUG(llvm::dbgs() << "***** LowerAggregate on function: " <<
           F->getName() << " *****\n");
     bool Changed = processFunction(*F);
     if (Changed) {

@@ -3618,12 +3618,12 @@ public:
   }
 
   void checkReturnInst(ReturnInst *RI) {
-    DEBUG(RI->print(llvm::dbgs()));
+    LLVM_DEBUG(RI->print(llvm::dbgs()));
 
     SILType functionResultType =
         F.mapTypeIntoContext(fnConv.getSILResultType());
     SILType instResultType = RI->getOperand()->getType();
-    DEBUG(llvm::dbgs() << "function return type: ";
+    LLVM_DEBUG(llvm::dbgs() << "function return type: ";
           functionResultType.dump();
           llvm::dbgs() << "return inst type: ";
           instResultType.dump(););
@@ -3632,7 +3632,7 @@ public:
   }
 
   void checkThrowInst(ThrowInst *TI) {
-    DEBUG(TI->print(llvm::dbgs()));
+    LLVM_DEBUG(TI->print(llvm::dbgs()));
 
     CanSILFunctionType fnType = F.getLoweredFunctionType();
     require(fnType->hasErrorResult(),
@@ -3640,7 +3640,7 @@ public:
 
     SILType functionResultType = F.mapTypeIntoContext(fnConv.getSILErrorType());
     SILType instResultType = TI->getOperand()->getType();
-    DEBUG(llvm::dbgs() << "function error result type: ";
+    LLVM_DEBUG(llvm::dbgs() << "function error result type: ";
           functionResultType.dump();
           llvm::dbgs() << "throw operand type: ";
           instResultType.dump(););
@@ -4227,7 +4227,7 @@ public:
   void verifyEntryBlock(SILBasicBlock *entry) {
     require(entry->pred_empty(), "entry block cannot have predecessors");
 
-    DEBUG(llvm::dbgs() << "Argument types for entry point BB:\n";
+    LLVM_DEBUG(llvm::dbgs() << "Argument types for entry point BB:\n";
           for (auto *arg
                : make_range(entry->args_begin(), entry->args_end()))
               arg->getType()
@@ -4644,9 +4644,9 @@ public:
         continue;
       }
       if (DS != LastSeenScope) {
-        DEBUG(llvm::dbgs() << "Broken instruction!\n"; SI.dump());
-        DEBUG(llvm::dbgs() << "Please report a bug on bugs.swift.org\n");
-        DEBUG(llvm::dbgs() <<
+        LLVM_DEBUG(llvm::dbgs() << "Broken instruction!\n"; SI.dump());
+        LLVM_DEBUG(llvm::dbgs() << "Please report a bug on bugs.swift.org\n");
+        LLVM_DEBUG(llvm::dbgs() <<
           "Pass -Xllvm -verify-di-holes=false to disable the verification\n");
         require(
             DS == LastSeenScope,
@@ -5036,10 +5036,10 @@ void SILModule::verify() const {
          "Cache size is not equal to true number of VTable entries");
 
   // Check all witness tables.
-  DEBUG(llvm::dbgs() << "*** Checking witness tables for duplicates ***\n");
+  LLVM_DEBUG(llvm::dbgs() << "*** Checking witness tables for duplicates ***\n");
   llvm::DenseSet<NormalProtocolConformance*> wtableConformances;
   for (const SILWitnessTable &wt : getWitnessTables()) {
-    DEBUG(llvm::dbgs() << "Witness Table:\n"; wt.dump());
+    LLVM_DEBUG(llvm::dbgs() << "Witness Table:\n"; wt.dump());
     auto conformance = wt.getConformance();
     if (!wtableConformances.insert(conformance).second) {
       llvm::errs() << "Witness table redefined: ";
@@ -5050,10 +5050,10 @@ void SILModule::verify() const {
   }
 
   // Check all default witness tables.
-  DEBUG(llvm::dbgs() << "*** Checking default witness tables for duplicates ***\n");
+  LLVM_DEBUG(llvm::dbgs() << "*** Checking default witness tables for duplicates ***\n");
   llvm::DenseSet<const ProtocolDecl *> defaultWitnessTables;
   for (const SILDefaultWitnessTable &wt : getDefaultWitnessTables()) {
-    DEBUG(llvm::dbgs() << "Default Witness Table:\n"; wt.dump());
+    LLVM_DEBUG(llvm::dbgs() << "Default Witness Table:\n"; wt.dump());
     if (!defaultWitnessTables.insert(wt.getProtocol()).second) {
       llvm::errs() << "Default witness table redefined: ";
       wt.dump();
@@ -5063,7 +5063,7 @@ void SILModule::verify() const {
   }
   
   // Check property descriptors.
-  DEBUG(llvm::dbgs() << "*** Checking property descriptors ***\n");
+  LLVM_DEBUG(llvm::dbgs() << "*** Checking property descriptors ***\n");
   for (auto &prop : getPropertyList()) {
     prop.verify(*this);
   }

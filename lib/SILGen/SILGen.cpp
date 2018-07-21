@@ -135,7 +135,7 @@ getBridgingFn(Optional<SILDeclRef> &cacheSlot,
     cacheSlot = c;
   }
 
-  DEBUG(llvm::dbgs() << "bridging function "
+  LLVM_DEBUG(llvm::dbgs() << "bridging function "
           << moduleName << '.' << functionName
           << " mapped to ";
         cacheSlot->print(llvm::dbgs()));
@@ -644,7 +644,7 @@ void SILGenModule::preEmitFunction(SILDeclRef constant,
   // Create a debug scope for the function using astNode as source location.
   F->setDebugScope(new (M) SILDebugScope(Loc, F));
 
-  DEBUG(llvm::dbgs() << "lowering ";
+  LLVM_DEBUG(llvm::dbgs() << "lowering ";
         F->printName(llvm::dbgs());
         llvm::dbgs() << " : ";
         F->getLoweredType().print(llvm::dbgs());
@@ -661,7 +661,7 @@ void SILGenModule::preEmitFunction(SILDeclRef constant,
 void SILGenModule::postEmitFunction(SILDeclRef constant,
                                     SILFunction *F) {
   assert(!F->isExternalDeclaration() && "did not emit any function body?!");
-  DEBUG(llvm::dbgs() << "lowered sil:\n";
+  LLVM_DEBUG(llvm::dbgs() << "lowered sil:\n";
         F->print(llvm::dbgs()));
   F->verify();
 }
@@ -1592,7 +1592,7 @@ public:
       SILFunction *toplevel = &SGF.getFunction();
       delete &SGF;
 
-      DEBUG(llvm::dbgs() << "lowered toplevel sil:\n";
+      LLVM_DEBUG(llvm::dbgs() << "lowered toplevel sil:\n";
             toplevel->print(llvm::dbgs()));
       toplevel->verify();
     }
