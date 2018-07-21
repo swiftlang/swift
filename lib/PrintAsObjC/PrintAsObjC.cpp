@@ -799,15 +799,7 @@ private:
             os << "SWIFT_UNAVAILABLE_MSG(\"'"
                << cast<ValueDecl>(D)->getBaseName()
                << "' has been renamed to '";
-            auto referencedDecl = findRenamedDecl(AvAttr, D);
-            if (referencedDecl.hasValue()) {
-              SmallString<128> scratch;
-              auto renamedObjCRuntimeName = referencedDecl.getValue()->
-              getObjCRuntimeName()->getString(scratch);
-              printEncodedString(renamedObjCRuntimeName, false);
-            } else {
-              printEncodedString(AvAttr->Rename, false);
-            }
+            printRenameForDecl(AvAttr, D, false);
             os << '\'';
             if (!AvAttr->Message.empty()) {
               os << ": ";
@@ -832,15 +824,7 @@ private:
             printEncodedString(AvAttr->Message);
             if (!AvAttr->Rename.empty()) {
               os << ", ";
-              auto referencedDecl = findRenamedDecl(AvAttr, D);
-              if (referencedDecl.hasValue()) {
-                SmallString<128> scratch;
-                auto renamedObjCRuntimeName = referencedDecl.getValue()->
-                  getObjCRuntimeName()->getString(scratch);
-                printEncodedString(renamedObjCRuntimeName);
-              } else {
-                printEncodedString(AvAttr->Rename);
-              }
+              printRenameForDecl(AvAttr, D, true);
             }
             os << ")";
           } else {
@@ -916,15 +900,7 @@ private:
       if (!AvAttr->Rename.empty() && isa<ValueDecl>(D)) {
         os << ",message=\"'" << cast<ValueDecl>(D)->getBaseName()
            << "' has been renamed to '";
-        auto referencedDecl = findRenamedDecl(AvAttr, D);
-        if (referencedDecl.hasValue()) {
-          SmallString<128> scratch;
-          auto renamedObjCRuntimeName = referencedDecl.getValue()->
-          getObjCRuntimeName()->getString(scratch);
-          printEncodedString(renamedObjCRuntimeName, false);
-        } else {
-          printEncodedString(AvAttr->Rename, false);
-        }
+        printRenameForDecl(AvAttr, D, false);
         os << '\'';
         if (!AvAttr->Message.empty()) {
           os << ": ";
@@ -938,6 +914,56 @@ private:
       os << ")";
     }
     return hasPrintedAnything;
+  }
+    
+  void printRenameForDecl(const AvailableAttr *AvAttr, const Decl *D,
+                          bool includeQuotes) {
+    if (AvAttr->Rename.empty() && isa<ValueDecl>(D))
+      return ;
+    
+    auto renamedParsedDeclName = parseDeclName(AvAttr->Rename);
+    auto renamedDeclName = renamedParsedDeclName.formDeclName(D->getASTContext());
+    
+    auto declContext = D->getDeclContext();
+    Optional<ValueDecl *>renamedFuncDecl = None;
+    
+    if (isa<ClassDecl>(D) || isa<ProtocolDecl>(D)) {
+      UnqualifiedLookup lookup(renamedDeclName.getBaseIdentifier(), declContext->getModuleScopeContext(), nullptr);
+      renamedFuncDecl = lookup.getSingleTypeResult();
+    } else {
+      SmallVector<ValueDecl *, 4> lookupResults;
+      declContext->lookupQualified(declContext->getSelfTypeInContext(),
+                                   renamedDeclName, NL_QualifiedDefault, NULL,
+                                   lookupResults);
+      for (auto candidate : lookupResults) {
+        if (!shouldInclude(candidate))
+          continue;
+        
+        if (candidate->getKind() != D->getKind() &&
+            (candidate->isInstanceMember() !=
+             cast<ValueDecl>(D)->isInstanceMember()))
+          continue;
+        
+        if (isa<FuncDecl>(candidate) &&
+            (cast<FuncDecl>(candidate)->getParameters()->size() !=
+             cast<FuncDecl>(D)->getParameters()->size()))
+          continue;
+        
+        if (renamedFuncDecl)
+        /* TODO: Diagnose to compiler to tell the user that we found multiple candidates */;
+        
+        renamedFuncDecl = candidate;
+      }
+    }
+    
+    if (renamedFuncDecl.hasValue()) {
+      SmallString<128> scratch;
+      auto renamedObjCRuntimeName = renamedFuncDecl.getValue()->
+      getObjCRuntimeName()->getString(scratch);
+      printEncodedString(renamedObjCRuntimeName, includeQuotes);
+    } else {
+      printEncodedString(AvAttr->Rename, includeQuotes);
+    }
   }
 
   void printSwift3ObjCDeprecatedInference(ValueDecl *VD) {
@@ -1902,46 +1928,6 @@ private:
     visitPart(RST->getReferentType(), optionalKind);
   }
   
-  Optional<ValueDecl *> findRenamedDecl(const swift::AvailableAttr *AvAttr, const swift::Decl *D) {
-    if (!isa<ValueDecl>(D))
-      return None;
-    
-    SmallVector<ValueDecl *, 4> lookupResults;
-    auto renamedParsedDeclName = swift::parseDeclName(AvAttr->Rename);
-    auto renamedDeclName = renamedParsedDeclName.formDeclName(D->getASTContext());
-    
-    auto declContext = D->getDeclContext();
-    Optional<ValueDecl *>renamedFuncDecl = None;
-
-    if (isa<ClassDecl>(D) || isa<ProtocolDecl>(D)) {
-      UnqualifiedLookup lookup(renamedDeclName.getBaseIdentifier(), declContext->getModuleScopeContext(), nullptr);
-      renamedFuncDecl = lookup.getSingleTypeResult();
-    } else {
-      declContext->lookupQualified(declContext->getSelfTypeInContext(),
-                                   renamedDeclName, NL_QualifiedDefault, NULL,
-                                   lookupResults);
-      for (auto candidate : lookupResults) {
-        if (!shouldInclude(candidate))
-          continue;
-        
-        if (candidate->getKind() != D->getKind())
-          continue;
-        
-        if (candidate->getKind() == DeclKind::Func && isa<FuncDecl>(candidate)
-            && cast<FuncDecl>(candidate)->getParameterLists().size() !=
-            cast<FuncDecl>(D)->getParameterLists().size())
-          continue;
-        
-        if (renamedFuncDecl)
-        /* TODO: Diagnose to compiler to tell the user that we found multiple candidates */;
-        
-        renamedFuncDecl = candidate;
-      }
-    }
-    
-    return renamedFuncDecl;
-  }
-
   /// RAII class for printing multi-part C types, such as functions and arrays.
   class PrintMultiPartType {
     ObjCPrinter &Printer;
