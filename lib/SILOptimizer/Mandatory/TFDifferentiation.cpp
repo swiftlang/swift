@@ -44,7 +44,6 @@
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/BreadthFirstIterator.h"
 #include "llvm/ADT/DenseSet.h"
-#include "llvm/ADT/STLExtras.h"
 
 using namespace swift;
 using llvm::DenseMap;
@@ -718,8 +717,7 @@ public:
     const llvm::SmallBitVector *supersetParamIndices;
     const auto &indexSet = indices.parameters;
     for (auto *rda : original->getReverseDifferentiableAttrs())
-      if (llvm::all_of(rda->getIndices().parameters.set_bits(),
-                       [&](unsigned idx) -> bool { return indexSet[idx]; }))
+      if (!indexSet.test(indexSet & rda->getIndices().parameters))
         supersetParamIndices = &rda->getIndices().parameters;
     auto existing = enqueuedTaskIndices.find(
       {original, {indices.source, *supersetParamIndices}});
