@@ -469,7 +469,7 @@ extension Optional {
   @_transparent
   public static func ~=(lhs: _OptionalNilComparisonType, rhs: Wrapped?) -> Bool {
     switch rhs {
-    case .some(_):
+    case .some:
       return false
     case .none:
       return true
@@ -503,7 +503,7 @@ extension Optional {
   @_transparent
   public static func ==(lhs: Wrapped?, rhs: _OptionalNilComparisonType) -> Bool {
     switch lhs {
-    case .some(_):
+    case .some:
       return false
     case .none:
       return true
@@ -534,7 +534,7 @@ extension Optional {
   @_transparent
   public static func !=(lhs: Wrapped?, rhs: _OptionalNilComparisonType) -> Bool {
     switch lhs {
-    case .some(_):
+    case .some:
       return true
     case .none:
       return false
@@ -565,7 +565,7 @@ extension Optional {
   @_transparent
   public static func ==(lhs: _OptionalNilComparisonType, rhs: Wrapped?) -> Bool {
     switch rhs {
-    case .some(_):
+    case .some:
       return false
     case .none:
       return true
@@ -596,7 +596,7 @@ extension Optional {
   @_transparent
   public static func !=(lhs: _OptionalNilComparisonType, rhs: Wrapped?) -> Bool {
     switch rhs {
-    case .some(_):
+    case .some:
       return true
     case .none:
       return false

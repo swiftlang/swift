@@ -1244,7 +1244,7 @@ extension Collection {
   /// - Complexity: Hopefully less than O(`count`).
   @inlinable
   public // dispatching
-  func _customIndexOfEquatableElement(_: Iterator.Element) -> Index?? {
+  func _customIndexOfEquatableElement(_: Element) -> Index?? {
     return nil
   }
 

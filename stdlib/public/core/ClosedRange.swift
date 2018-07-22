@@ -158,7 +158,7 @@ extension ClosedRange.Index : Comparable {
     switch (lhs, rhs) {
     case (.inRange(let l), .inRange(let r)):
       return l < r
-    case (.inRange(_), .pastEnd):
+    case (.inRange, .pastEnd):
       return true
     default:
       return false
