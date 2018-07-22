@@ -200,6 +200,14 @@ public:
 
   virtual void completeReturnStmt(CodeCompletionExpr *E) = 0;
 
+  /// Complete a yield statement.  A missing yield index means that the
+  /// completion immediately follows the 'yield' keyword; it may be either
+  /// an expresion or a parenthesized expression list.  A present yield
+  /// index means that the completion is within the parentheses and is
+  /// for a specific yield value.
+  virtual void completeYieldStmt(CodeCompletionExpr *E,
+                                 Optional<unsigned> yieldIndex) = 0;
+
   virtual void completeAfterPound(CodeCompletionExpr *E, StmtKind ParentKind) = 0;
 
   virtual void completeAfterIfStmt(bool hasElse) = 0;

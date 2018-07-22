@@ -234,6 +234,8 @@ SymbolSubKind index::getSubKindForAccessor(AccessorKind AK) {
   case AccessorKind::Address: return SymbolSubKind::SwiftAccessorAddressor;
   case AccessorKind::MutableAddress:
     return SymbolSubKind::SwiftAccessorMutableAddressor;
+  case AccessorKind::Read:      return SymbolSubKind::SwiftAccessorRead;
+  case AccessorKind::Modify:    return SymbolSubKind::SwiftAccessorModify;
   case AccessorKind::MaterializeForSet:
     llvm_unreachable("unexpected MaterializeForSet");
   }

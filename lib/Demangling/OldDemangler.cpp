@@ -1259,6 +1259,16 @@ private:
       entityKind = Node::Kind::DidSet;
       name = demangleDeclName();
       if (!name) return nullptr;
+    } else if (Mangled.nextIf('r')) {
+      wrapEntity = true;
+      entityKind = Node::Kind::ReadAccessor;
+      name = demangleDeclName();
+      if (!name) return nullptr;
+    } else if (Mangled.nextIf('M')) {
+      wrapEntity = true;
+      entityKind = Node::Kind::ModifyAccessor;
+      name = demangleDeclName();
+      if (!name) return nullptr;
     } else if (Mangled.nextIf('U')) {
       entityKind = Node::Kind::ExplicitClosure;
       name = demangleIndexAsNode();

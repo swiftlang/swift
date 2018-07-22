@@ -495,6 +495,7 @@ static uint8_t getRawReadImplKind(swift::ReadImplKind kind) {
   CASE(Get)
   CASE(Inherited)
   CASE(Address)
+  CASE(Read)
 #undef CASE
   }
   llvm_unreachable("bad kind");
@@ -511,6 +512,7 @@ static unsigned getRawWriteImplKind(swift::WriteImplKind kind) {
   CASE(StoredWithObservers)
   CASE(InheritedWithObservers)
   CASE(MutableAddress)
+  CASE(Modify)
 #undef CASE
   }
   llvm_unreachable("bad kind");
@@ -526,6 +528,7 @@ static unsigned getRawReadWriteImplKind(swift::ReadWriteImplKind kind) {
   CASE(MaterializeForSet)
   CASE(MutableAddress)
   CASE(MaterializeToTemporary)
+  CASE(Modify)
 #undef CASE
   }
   llvm_unreachable("bad kind");

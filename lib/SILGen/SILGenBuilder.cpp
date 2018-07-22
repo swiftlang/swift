@@ -106,6 +106,14 @@ SILGenBuilder::createTryApply(SILLocation loc, SILValue fn, SILType substFnTy,
   return SILBuilder::createTryApply(loc, fn, subs, args, normalBB, errorBB);
 }
 
+BeginApplyInst *
+SILGenBuilder::createBeginApply(SILLocation loc, SILValue fn,
+                                SubstitutionMap subs,
+                                ArrayRef<SILValue> args) {
+  getSILGenModule().useConformancesFromSubstitutions(subs);
+  return SILBuilder::createBeginApply(loc, fn, subs, args, false);
+}
+
 PartialApplyInst *
 SILGenBuilder::createPartialApply(SILLocation loc, SILValue fn,
                                   SILType substFnTy, SubstitutionMap subs,

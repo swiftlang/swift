@@ -1412,6 +1412,10 @@ void Remangler::mangleMetaclass(Node *node) {
   Buffer << "Mm";
 }
 
+void Remangler::mangleModifyAccessor(Node *node) {
+  mangleAbstractStorage(node->getFirstChild(), "M");
+}
+
 void Remangler::mangleModule(Node *node) {
   if (node->getText() == STDLIB_NAME) {
     Buffer << 's';
@@ -1629,6 +1633,10 @@ void Remangler::mangleReabstractionThunkHelper(Node *node) {
     mangleChildNodes(node);
   }
   Buffer << "TR";
+}
+
+void Remangler::mangleReadAccessor(Node *node) {
+  mangleAbstractStorage(node->getFirstChild(), "r");
 }
 
 void Remangler::mangleKeyPathGetterThunkHelper(Node *node) {

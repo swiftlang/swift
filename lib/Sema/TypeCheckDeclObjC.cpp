@@ -487,6 +487,14 @@ bool swift::isRepresentableInObjC(
         describeObjCReason(accessor, Reason);
       }
       return false;
+
+    case AccessorKind::Read:
+    case AccessorKind::Modify:
+      if (Diagnose) {
+        accessor->diagnose(diag::objc_coroutine_accessor);
+        describeObjCReason(accessor, Reason);
+      }
+      return false;
     }
     llvm_unreachable("bad kind");
   }

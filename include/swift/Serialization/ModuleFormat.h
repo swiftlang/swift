@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 428; // Removing multiple parameter lists
+const uint16_t VERSION_MINOR = 429; // Last change: coroutine accessors
 
 using DeclIDField = BCFixed<31>;
 
@@ -118,7 +118,8 @@ enum class ReadImplKind : uint8_t {
   Stored = 0,
   Get,
   Inherited,
-  Address
+  Address,
+  Read,
 };
 using ReadImplKindField = BCFixed<3>;
 
@@ -131,6 +132,7 @@ enum class WriteImplKind : uint8_t {
   InheritedWithObservers,
   Set,
   MutableAddress,
+  Modify,
 };
 using WriteImplKindField = BCFixed<3>;
 
@@ -142,6 +144,7 @@ enum class ReadWriteImplKind : uint8_t {
   MaterializeForSet,
   MutableAddress,
   MaterializeToTemporary,
+  Modify,
 };
 using ReadWriteImplKindField = BCFixed<3>;
 
@@ -208,7 +211,7 @@ enum OperatorKind : uint8_t {
   PrecedenceGroup,  // only for cross references
 };
 // This is currently required to have the same width as AccessorKindField.
-using OperatorKindField = BCFixed<3>;
+using OperatorKindField = BCFixed<4>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
@@ -220,8 +223,10 @@ enum AccessorKind : uint8_t {
   MaterializeForSet,
   Address,
   MutableAddress,
+  Read,
+  Modify,
 };
-using AccessorKindField = BCFixed<3>;
+using AccessorKindField = BCFixed<4>;
 
 using AccessorCountField = BCFixed<3>;
 

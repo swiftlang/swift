@@ -262,8 +262,6 @@ ERROR(duplicate_accessor,none,
 ERROR(conflicting_accessor,none,
       "%select{variable|subscript}0 cannot provide both %1 and %2",
       (unsigned, StringRef, StringRef))
-ERROR(modify_mutatingness_different_from_setter,none,
-      "mutating-ness of 'modify' accessor cannot differ from setter", ())
 NOTE(previous_accessor,none,
      "%select{|previous definition of }1%0 %select{defined |}1here", (StringRef, bool))
 ERROR(expected_accessor_name,none,
@@ -285,7 +283,7 @@ ERROR(missing_getter,none,
       (unsigned, StringRef))
 ERROR(missing_reading_accessor,none,
       "%select{variable|subscript}0 with %1 must also have "
-      "a getter or an addressor",
+      "a getter, addressor, or 'read' accessor",
       (unsigned, StringRef))
 ERROR(observing_accessor_conflicts_with_accessor,none,
       "%select{'willSet'|'didSet'}0 cannot be provided together with %1",
@@ -938,6 +936,10 @@ NOTE(indent_expression_to_silence,none,
 ERROR(expected_expr_throw,PointsToFirstBadToken,
       "expected expression in 'throw' statement", ())
 
+// Yield Statment
+ERROR(expected_expr_yield,PointsToFirstBadToken,
+      "expected expression in 'yield' statement", ())
+
 // Defer Statement
 ERROR(expected_lbrace_after_defer,PointsToFirstBadToken,
       "expected '{' after 'defer'", ())
@@ -1061,9 +1063,9 @@ ERROR(case_stmt_without_body,none,
 // 'try' on statements
 ERROR(try_on_stmt,none,
       "'try' cannot be used with '%0'", (StringRef))
-ERROR(try_on_return_throw,none,
-      "'try' must be placed on the %select{returned|thrown}0 expression",
-      (bool))
+ERROR(try_on_return_throw_yield,none,
+      "'try' must be placed on the %select{returned|thrown|yielded}0 expression",
+      (unsigned))
 ERROR(try_on_var_let,none,
       "'try' must be placed on the initial value expression", ())
 
