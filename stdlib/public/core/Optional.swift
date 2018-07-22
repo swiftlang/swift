@@ -252,9 +252,8 @@ public enum Optional<Wrapped> : ExpressibleByNilLiteral {
   ///
   /// This version is for internal stdlib use; it avoids any checking
   /// overhead for users, even in Debug builds.
-  @inlinable
-  public // SPI(SwiftExperimental)
-  var _unsafelyUnwrappedUnchecked: Wrapped {
+  @usableFromInline @inlinable
+  internal var _unsafelyUnwrappedUnchecked: Wrapped {
     @inline(__always)
     get {
       if let x = self {
