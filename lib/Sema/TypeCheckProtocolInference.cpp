@@ -1002,11 +1002,14 @@ static void sanitizeProtocolRequirements(
       if (auto depMemTy = dyn_cast<DependentMemberType>(type)) {
         if (!depMemTy->getAssocType() ||
             depMemTy->getAssocType()->getProtocol() != proto) {
+
           for (auto member : proto->lookupDirect(depMemTy->getName())) {
             if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-              return Type(DependentMemberType::get(
-                                           sanitizeType(depMemTy->getBase()),
-                                           assocType));
+              Type sanitizedBase = sanitizeType(depMemTy->getBase());
+              if (!sanitizedBase)
+                return Type();
+              return Type(DependentMemberType::get(sanitizedBase,
+                                                   assocType));
             }
           }
 
