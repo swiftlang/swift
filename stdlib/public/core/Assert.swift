@@ -253,8 +253,8 @@ public func _overflowChecked<T>(
 /// and abort.
 /// They are meant to be used when the check is not comprehensively checking for
 /// all possible errors.
-@_transparent
-public func _debugPrecondition(
+@usableFromInline @_transparent
+internal func _debugPrecondition(
   _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
@@ -267,8 +267,8 @@ public func _debugPrecondition(
   }
 }
 
-@_transparent
-public func _debugPreconditionFailure(
+@usableFromInline @_transparent
+internal func _debugPreconditionFailure(
   _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) -> Never {
