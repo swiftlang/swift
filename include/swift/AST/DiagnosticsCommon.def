@@ -54,7 +54,7 @@ NOTE(previous_decldef,none,
 NOTE(brace_stmt_suggest_do,none,
      "did you mean to use a 'do' statement?", ())
 
-NOTE(defer_stmt_at_block_end,none,
+WARNING(defer_stmt_at_block_end,none,
      "'defer' at the end of its scope is redundant and will execute immediately; "
      "replace it with 'do'", ())
 
