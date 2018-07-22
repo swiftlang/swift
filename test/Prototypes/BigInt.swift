@@ -244,13 +244,13 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
   ///
   /// - Precondition: `rhs <= self.magnitude`
   mutating func _unsignedSubtract(_ rhs: Word) {
-    _precondition(_data.count > 1 || _data[0] > rhs)
+    precondition(_data.count > 1 || _data[0] > rhs)
 
     // Quick return if `rhs == 0`
     guard rhs != 0 else { return }
 
     // If `isZero == true`, then `rhs` must also be zero.
-    _precondition(!isZero)
+    precondition(!isZero)
 
     var carry: Word
     (carry, _data[0]) = _data[0].subtractingWithBorrow(rhs)
@@ -332,7 +332,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
   /// Divides this instance by `rhs`, returning the remainder.
   @discardableResult
   mutating func divide(by rhs: Word) -> Word {
-    _precondition(rhs != 0, "divide by zero")
+    precondition(rhs != 0, "divide by zero")
 
     // No-op if `rhs == 1` or `self == 0`.
     if rhs == 1 || isZero {
@@ -413,7 +413,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
   /// - Precondition: `rhs.magnitude <= self.magnitude` (unchecked)
   /// - Precondition: `rhs._data.count <= self._data.count`
   mutating func _unsignedSubtract(_ rhs: _BigInt) {
-    _precondition(rhs._data.count <= _data.count)
+    precondition(rhs._data.count <= _data.count)
 
     var carry: Word = 0
     for i in 0..<rhs._data.count {
@@ -530,7 +530,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
   /// Divides this instance by `rhs`, returning the remainder.
   @discardableResult
   mutating func _internalDivide(by rhs: _BigInt) -> _BigInt {
-    _precondition(!rhs.isZero, "Divided by zero")
+    precondition(!rhs.isZero, "Divided by zero")
     defer { _checkInvariants() }
 
     // Handle quick cases that don't require division:

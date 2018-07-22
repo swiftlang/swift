@@ -64,13 +64,13 @@ extension SKWarpGeometryGrid {
     case (0, 0):
         self.init(__columns: columns, rows: rows, sourcePositions: nil, destPositions: nil)
     case (let dests, 0):
-        _precondition(dests == requiredElementsCount, "Mismatch found between rows/columns and positions.")
+        precondition(dests == requiredElementsCount, "Mismatch found between rows/columns and positions.")
         self.init(__columns: columns, rows: rows, sourcePositions: nil, destPositions: destinationPositions)
     case (0, let sources):
-        _precondition(sources == requiredElementsCount, "Mismatch found between rows/columns and positions.")
+        precondition(sources == requiredElementsCount, "Mismatch found between rows/columns and positions.")
         self.init(__columns: columns, rows: rows, sourcePositions: sourcePositions, destPositions: nil)
     case (let dests, let sources):
-        _precondition(dests == requiredElementsCount && sources == requiredElementsCount, "Mismatch found between rows/columns and positions.")
+        precondition(dests == requiredElementsCount && sources == requiredElementsCount, "Mismatch found between rows/columns and positions.")
         self.init(__columns: columns, rows: rows, sourcePositions: sourcePositions, destPositions: destinationPositions)
     }
   }

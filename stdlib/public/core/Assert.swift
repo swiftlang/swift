@@ -199,8 +199,8 @@ public func fatalError(
 /// building in fast mode they are disabled.  In release mode they don't print
 /// an error message but just trap. In debug mode they print an error message
 /// and abort.
-@_transparent
-public func _precondition(
+@usableFromInline @_transparent
+internal func _precondition(
   _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
@@ -216,8 +216,8 @@ public func _precondition(
   }
 }
 
-@_transparent
-public func _preconditionFailure(
+@usableFromInline @_transparent
+internal func _preconditionFailure(
   _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) -> Never {

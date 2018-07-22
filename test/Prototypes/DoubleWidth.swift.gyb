@@ -150,7 +150,7 @@ extension DoubleWidth : Numeric {
 
   public init<T : BinaryInteger>(_ source: T) {
     guard let result = DoubleWidth<Base>(exactly: source) else {
-      _preconditionFailure("Value is outside the representable range")
+      preconditionFailure("Value is outside the representable range")
     }
     self = result
   }
@@ -215,7 +215,7 @@ extension DoubleWidth: _ExpressibleByBuiltinIntegerLiteral {
       self |= DoubleWidth(UInt64(_value)) &<< DoubleWidth(lowWordCount * 64)
       overflow = Bool(_overflow)
     }
-    _precondition(!overflow, "Literal integer out of range for this type")
+    precondition(!overflow, "Literal integer out of range for this type")
   }
 }
 
@@ -298,7 +298,7 @@ extension DoubleWidth.Words: Collection {
 
   public subscript(_ i: Index) -> UInt {
     if Base.bitWidth < UInt.bitWidth {
-      _precondition(i == Index(.low(_low.startIndex)), "Invalid index")
+      precondition(i == Index(.low(_low.startIndex)), "Invalid index")
       assert(2 * Base.bitWidth <= UInt.bitWidth)
       return _low.first! | (_high.first! &<< Base.bitWidth._lowWord) 
     }
@@ -586,7 +586,7 @@ binaryOperators = [
     lhs: inout DoubleWidth, rhs: DoubleWidth
   ) {
     let (result, overflow) = lhs.${name}ReportingOverflow(${argumentLabel}rhs)
-    _precondition(!overflow, "Overflow in ${operator}=")
+    precondition(!overflow, "Overflow in ${operator}=")
     lhs = result
   }
 % end
