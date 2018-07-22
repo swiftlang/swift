@@ -396,3 +396,20 @@ extension SR6990: Sequence where T == Int {
     public typealias Iterator = IndexingIterator<[Float]>
     public func makeIterator() -> Iterator { fatalError() }
 }
+
+// SR-8324
+protocol ElementProtocol {
+  associatedtype BaseElement: BaseElementProtocol = Self
+}
+protocol BaseElementProtocol: ElementProtocol where BaseElement == Self {}
+protocol ArrayProtocol {
+  associatedtype Element: ElementProtocol
+}
+protocol NestedArrayProtocol: ArrayProtocol where Element: ArrayProtocol, Element.Element.BaseElement == Element.BaseElement {
+  associatedtype BaseElement = Element.BaseElement
+}
+extension Array: ArrayProtocol where Element: ElementProtocol {}
+extension Array: NestedArrayProtocol where Element: ElementProtocol, Element: ArrayProtocol, Element.Element.BaseElement == Element.BaseElement {
+  // with the typealias uncommented you do not get a crash.
+  // typealias BaseElement = Element.BaseElement
+}
