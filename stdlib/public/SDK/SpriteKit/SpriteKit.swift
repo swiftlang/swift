@@ -25,7 +25,7 @@ public typealias SKColor = UIColor
 // since that method only exists in a private header in SpriteKit, the lookup
 // mechanism by default fails to accept it as a valid AnyObject call
 @objc class _SpriteKitMethodProvider : NSObject {
-  override init() { _sanityCheckFailure("don't touch me") }
+  override init() { preconditionFailure("don't touch me") }
   @objc func _copyImageData() -> NSData! { return nil }
 }
 

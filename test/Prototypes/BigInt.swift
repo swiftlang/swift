@@ -120,7 +120,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
 
     // FIXME: This is broken on 32-bit arch w/ Word = UInt64
     let wordRatio = UInt.bitWidth / Word.bitWidth
-    _sanityCheck(wordRatio != 0)
+    assert(wordRatio != 0)
     for var sourceWord in source.words {
       for _ in 0..<wordRatio {
         _data.append(Word(truncatingIfNeeded: sourceWord))
@@ -260,7 +260,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
       if carry == 0 { break }
       (carry, _data[i]) = _data[i].subtractingWithBorrow(carry)
     }
-    _sanityCheck(carry == 0)
+    assert(carry == 0)
 
     _standardize()
   }
@@ -425,7 +425,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
       if carry == 0 { break }
       (carry, _data[i]) = _data[i].subtractingWithBorrow(carry)
     }
-    _sanityCheck(carry == 0)
+    assert(carry == 0)
 
     _standardize()
   }
@@ -476,7 +476,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     let (a, b) = lhs._data.count > rhs._data.count
       ? (lhs._data, rhs._data)
       : (rhs._data, lhs._data)
-    _sanityCheck(a.count >= b.count)
+    assert(a.count >= b.count)
 
     var carry: Word = 0
     for ai in 0..<a.count {
@@ -513,12 +513,12 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
         //      0b11111111 + (0b11111101_____00000010) + 0b11111111
         //                   (0b11111110_____00000001) + 0b11111111
         //                   (0b11111111_____00000000)
-        _sanityCheck(!product.high.addingReportingOverflow(carry).overflow)
+        assert(!product.high.addingReportingOverflow(carry).overflow)
         carry = product.high &+ carry
       }
 
       // Leftover `carry` is inserted in new highest word.
-      _sanityCheck(newData[ai + b.count] == 0)
+      assert(newData[ai + b.count] == 0)
       newData[ai + b.count] = carry
     }
 
@@ -659,7 +659,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
   }
 
   public var words: [UInt] {
-    _sanityCheck(UInt.bitWidth % Word.bitWidth == 0)
+    assert(UInt.bitWidth % Word.bitWidth == 0)
     let twosComplementData = _dataAsTwosComplement()
     var words: [UInt] = []
     words.reserveCapacity((twosComplementData.count * Word.bitWidth 
@@ -713,7 +713,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     }
 
     let i = _data.firstIndex(where: { $0 != 0 })!
-    _sanityCheck(_data[i] != 0)
+    assert(_data[i] != 0)
     return i * Word.bitWidth + _data[i].trailingZeroBitCount
   }
 

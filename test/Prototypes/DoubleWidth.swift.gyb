@@ -235,7 +235,7 @@ extension DoubleWidth {
       }
       self._high = value._storage.high.words
       self._low = value._storage.low.words
-      _sanityCheck(!_low.isEmpty)
+      assert(!_low.isEmpty)
     }
   }
 }
@@ -299,7 +299,7 @@ extension DoubleWidth.Words: Collection {
   public subscript(_ i: Index) -> UInt {
     if Base.bitWidth < UInt.bitWidth {
       _precondition(i == Index(.low(_low.startIndex)), "Invalid index")
-      _sanityCheck(2 * Base.bitWidth <= UInt.bitWidth)
+      assert(2 * Base.bitWidth <= UInt.bitWidth)
       return _low.first! | (_high.first! &<< Base.bitWidth._lowWord) 
     }
     switch i._value {
@@ -633,9 +633,9 @@ extension DoubleWidth : UnsignedInteger where Base : UnsignedInteger {
   ) -> (quotient: Low, remainder: Magnitude) {
     // The following invariants are guaranteed to hold by dividingFullWidth or
     // quotientAndRemainder before this method is invoked:
-    _sanityCheck(lhs.high != (0 as Low))
-    _sanityCheck(rhs.leadingZeroBitCount == 0)
-    _sanityCheck(Magnitude(lhs.high, lhs.mid) < rhs)
+    assert(lhs.high != (0 as Low))
+    assert(rhs.leadingZeroBitCount == 0)
+    assert(Magnitude(lhs.high, lhs.mid) < rhs)
 
     // Estimate the quotient.
     var quotient = lhs.high == rhs.high

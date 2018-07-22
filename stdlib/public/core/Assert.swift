@@ -284,8 +284,8 @@ public func _debugPreconditionFailure(
 /// standard library. They are only enable when the standard library is built
 /// with the build configuration INTERNAL_CHECKS_ENABLED enabled. Otherwise, the
 /// call to this function is a noop.
-@_transparent
-public func _sanityCheck(
+@usableFromInline @_transparent
+internal func _sanityCheck(
   _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
@@ -297,8 +297,8 @@ public func _sanityCheck(
 #endif
 }
 
-@_transparent
-public func _sanityCheckFailure(
+@usableFromInline @_transparent
+internal func _sanityCheckFailure(
   _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) -> Never {
