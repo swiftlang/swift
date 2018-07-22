@@ -329,7 +329,7 @@ def dump_hashes_config(args, config):
             h = shell.capture(["git", "rev-parse", "HEAD"],
                               echo=False).strip()
             repos[repo_name] = str(h)
-    print(json.dumps(new_config, indent=4))
+    json.dump(new_config, sys.stdout, indent=4)
 
 
 def validate_config(config):
