@@ -2292,7 +2292,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     if (auto *lvt = type1->getAs<LValueType>()) {
       if (auto *iot = type2->getAs<InOutType>()) {
         return matchTypes(lvt->getObjectType(), iot->getObjectType(),
-                          kind, subflags,
+                          ConstraintKind::Equal, subflags,
                           locator.withPathElement(
                                   ConstraintLocator::LValueConversion));
       }
