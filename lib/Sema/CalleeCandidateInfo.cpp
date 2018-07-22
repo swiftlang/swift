@@ -324,8 +324,17 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
     void missingArgument(unsigned paramIdx) override {
       result = CC_ArgumentCountMismatch;
     }
-    void missingLabel(unsigned paramIdx) override {
+    bool missingLabel(unsigned paramIdx) override {
       result = CC_ArgumentLabelMismatch;
+      return true;
+    }
+    bool extraneousLabel(unsigned paramIdx) override {
+      result = CC_ArgumentLabelMismatch;
+      return true;
+    }
+    bool incorrectLabel(unsigned paramIdx) override {
+      result = CC_ArgumentLabelMismatch;
+      return true;
     }
     void outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx) override {
       result = CC_ArgumentLabelMismatch;
