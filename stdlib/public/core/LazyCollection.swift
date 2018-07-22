@@ -94,20 +94,20 @@ extension LazyCollection : Sequence {
 
   @inlinable
   public func _copyToContiguousArray()
-     -> ContiguousArray<Base.Iterator.Element> {
+     -> ContiguousArray<Base.Element> {
     return _base._copyToContiguousArray()
   }
 
   @inlinable
   public func _copyContents(
-    initializing buf: UnsafeMutableBufferPointer<Iterator.Element>
-  ) -> (Iterator,UnsafeMutableBufferPointer<Iterator.Element>.Index) {
+    initializing buf: UnsafeMutableBufferPointer<Element>
+  ) -> (Iterator,UnsafeMutableBufferPointer<Element>.Index) {
     return _base._copyContents(initializing: buf)
   }
 
   @inlinable
   public func _customContainsEquatableElement(
-    _ element: Base.Iterator.Element
+    _ element: Base.Element
   ) -> Bool? {
     return _base._customContainsEquatableElement(element)
   }

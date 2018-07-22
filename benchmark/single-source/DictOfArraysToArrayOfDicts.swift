@@ -61,21 +61,14 @@ public func run_DictOfArraysToArrayOfDicts(_ N: Int) {
 //  "time"  : "0123",
 //  "content": "zxcvb"]]
 
-public func zip3 <A: Sequence,
-B: Sequence,
-C: Sequence> (_ a: A, _ b: B, _ c: C)
--> ZipSequence3<A, B, C> {
+public func zip3 <
+  A: Sequence,B: Sequence,C: Sequence
+> (_ a: A, _ b: B, _ c: C) -> ZipSequence3<A, B, C> {
   return ZipSequence3(a, b, c)
 }
 
 // Sequence of tuples created from values from three other sequences
-public struct ZipSequence3<A: Sequence,
-B: Sequence,
-C: Sequence>: Sequence {
-  public typealias Iterator = ZipGenerator3
-  <A.Iterator, B.Iterator, C.Iterator>
-  public typealias SubSequence = AnySequence<Iterator.Element>
-
+public struct ZipSequence3<A: Sequence,B: Sequence,C: Sequence> {
   private var a: A
   private var b: B
   private var c: C
@@ -84,30 +77,29 @@ C: Sequence>: Sequence {
     self.a = a
     self.b = b
     self.c = c
-  }
+  }  
+}
 
-  public func makeIterator() -> Iterator {
-    return ZipGenerator3(a.makeIterator(), b.makeIterator(), c.makeIterator())
+extension ZipSequence3 {
+  public struct Iterator {
+    private var a: A.Iterator
+    private var b: B.Iterator
+    private var c: C.Iterator
+
+    public init(_ a: A, _ b: B, _ c: C) {
+      self.a = a.makeIterator()
+      self.b = b.makeIterator()
+      self.c = c.makeIterator()
+    }
   }
 }
 
-// Iterator that creates tuples of values from three other generators
-public struct ZipGenerator3<A: IteratorProtocol,
-B: IteratorProtocol,
-C: IteratorProtocol>: IteratorProtocol {
-  private var a: A
-  private var b: B
-  private var c: C
-
-  public init(_ a: A, _ b: B, _ c: C) {
-    self.a = a
-    self.b = b
-    self.c = c
-  }
-
-  mutating public func next() -> (A.Element, B.Element, C.Element)? {
+extension ZipSequence3.Iterator: IteratorProtocol {
+  public typealias Element = (A.Element,B.Element,C.Element)
+  
+  public mutating func next() -> Element? {
     switch (a.next(), b.next(), c.next()) {
-    case let (.some(aValue), .some(bValue), .some(cValue)):
+    case let (aValue?, bValue?, cValue?):
       return (aValue, bValue, cValue)
     default:
       return nil
@@ -115,12 +107,23 @@ C: IteratorProtocol>: IteratorProtocol {
   }
 }
 
-func zipWith
-<S1: Sequence, S2: Sequence, S3: Sequence, T>
-(_ s1: S1, _ s2: S2, _ s3: S3, _ combine: (S1.Iterator.Element,
-    S2.Iterator.Element,
-    S3.Iterator.Element) -> T) -> [T] {
-  return zip3(s1,s2,s3).map(combine)
+extension ZipSequence3: Sequence {
+  public typealias Element = (A.Element,B.Element,C.Element)
+  public typealias SubSequence = AnySequence<Element>
+
+  public func makeIterator() -> Iterator {
+    return Iterator(a, b, c)
+  }
+}
+
+// Iterator that creates tuples of values from three other generators
+func zipWith<
+  A: Sequence, B: Sequence, C: Sequence, T
+>(
+  _ a: A, _ b: B, _ c: C, 
+  _ combine: (A.Element,B.Element,C.Element) -> T
+) -> [T] {
+  return zip3(a,b,c).map(combine)
 }
 
 extension Dictionary {
@@ -132,7 +135,7 @@ extension Dictionary {
   }
 
   // Merge a sequence of `(Key,Value)` tuples into the dictionary
-  mutating func merge<S: Sequence> (_ seq: S) where S.Iterator.Element == Element {
+  mutating func merge<S: Sequence> (_ seq: S) where S.Element == Element {
     var gen = seq.makeIterator()
     while let (k, v) = gen.next() {
       self[k] = v

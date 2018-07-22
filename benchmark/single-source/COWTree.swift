@@ -69,7 +69,7 @@ public struct Tree<T: Comparable> {
   public init() { }
 
   // constructor from a sequence
-  public init<S: Sequence>(_ seq: S) where S.Iterator.Element == T {
+  public init<S: Sequence>(_ seq: S) where S.Element == T {
     var g = seq.makeIterator()
     while let x = g.next() {
       self.insert(x)
