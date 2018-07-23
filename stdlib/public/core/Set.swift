@@ -3223,7 +3223,7 @@ extension Set._Variant {
 
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
-internal struct _NativeSetIndex<Element>: Comparable {
+internal struct _NativeSetIndex<Element> {
   @usableFromInline
   internal var offset: Int
 
@@ -3233,36 +3233,7 @@ internal struct _NativeSetIndex<Element>: Comparable {
   }
 }
 
-extension _NativeSetIndex {
-
-  @inlinable // FIXME(sil-serialize-all)
-  internal static func < (
-    lhs: _NativeSetIndex<Element>,
-    rhs: _NativeSetIndex<Element>
-  ) -> Bool {
-    return lhs.offset < rhs.offset
-  }
-  @inlinable // FIXME(sil-serialize-all)
-  internal static func <= (
-    lhs: _NativeSetIndex<Element>,
-    rhs: _NativeSetIndex<Element>
-  ) -> Bool {
-    return lhs.offset <= rhs.offset
-  }
-  @inlinable // FIXME(sil-serialize-all)
-  internal static func > (
-    lhs: _NativeSetIndex<Element>,
-    rhs: _NativeSetIndex<Element>
-  ) -> Bool {
-    return lhs.offset > rhs.offset
-  }
-  @inlinable // FIXME(sil-serialize-all)
-  internal static func >= (
-    lhs: _NativeSetIndex<Element>,
-    rhs: _NativeSetIndex<Element>
-  ) -> Bool {
-    return lhs.offset >= rhs.offset
-  }
+extension _NativeSetIndex: Equatable {
   @inlinable // FIXME(sil-serialize-all)
   internal static func == (
     lhs: _NativeSetIndex<Element>,
@@ -3272,10 +3243,20 @@ extension _NativeSetIndex {
   }
 }
 
+extension _NativeSetIndex: Comparable {
+  @inlinable // FIXME(sil-serialize-all)
+  internal static func < (
+    lhs: _NativeSetIndex<Element>,
+    rhs: _NativeSetIndex<Element>
+  ) -> Bool {
+    return lhs.offset < rhs.offset
+  }
+}
+
 #if _runtime(_ObjC)
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
-internal struct _CocoaSetIndex: Comparable {
+internal struct _CocoaSetIndex {
   // Assumption: we rely on NSDictionary.getObjects when being
   // repeatedly called on the same NSDictionary, returning items in the same
   // order every time.
@@ -3333,42 +3314,17 @@ internal struct _CocoaSetIndex: Comparable {
   }
 }
 
-extension _CocoaSetIndex {
-
+extension _CocoaSetIndex: Equatable {
   @inlinable // FIXME(sil-serialize-all)
-  internal static func < (
-    lhs: _CocoaSetIndex,
-    rhs: _CocoaSetIndex
-  ) -> Bool {
-    return lhs.currentKeyIndex < rhs.currentKeyIndex
-  }
-  @inlinable // FIXME(sil-serialize-all)
-  internal static func <= (
-    lhs: _CocoaSetIndex,
-    rhs: _CocoaSetIndex
-  ) -> Bool {
-    return lhs.currentKeyIndex <= rhs.currentKeyIndex
-  }
-  @inlinable // FIXME(sil-serialize-all)
-  internal static func > (
-    lhs: _CocoaSetIndex,
-    rhs: _CocoaSetIndex
-  ) -> Bool {
-    return lhs.currentKeyIndex > rhs.currentKeyIndex
-  }
-  @inlinable // FIXME(sil-serialize-all)
-  internal static func >= (
-    lhs: _CocoaSetIndex,
-    rhs: _CocoaSetIndex
-  ) -> Bool {
-    return lhs.currentKeyIndex >= rhs.currentKeyIndex
-  }
-  @inlinable // FIXME(sil-serialize-all)
-  internal static func == (
-    lhs: _CocoaSetIndex,
-    rhs: _CocoaSetIndex
-  ) -> Bool {
+  internal static func == (lhs: _CocoaSetIndex, rhs: _CocoaSetIndex) -> Bool {
     return lhs.currentKeyIndex == rhs.currentKeyIndex
+  }
+}
+
+extension _CocoaSetIndex: Comparable {
+  @inlinable // FIXME(sil-serialize-all)
+  internal static func < (lhs: _CocoaSetIndex, rhs: _CocoaSetIndex) -> Bool {
+    return lhs.currentKeyIndex < rhs.currentKeyIndex
   }
 }
 #endif
@@ -3394,7 +3350,7 @@ internal enum SetIndexRepresentation<Element: Hashable> {
 extension Set {
   /// The position of an element in a set.
   @_fixed_layout // FIXME(sil-serialize-all)
-  public struct Index: Comparable, Hashable {
+  public struct Index {
     // Index for native buffer is efficient.  Index for bridged NSSet is
     // not, because neither NSEnumerator nor fast enumeration support moving
     // backwards.  Even if they did, there is another issue: NSEnumerator does
@@ -3461,7 +3417,7 @@ extension Set {
 
 public typealias SetIndex<Element: Hashable> = Set<Element>.Index
 
-extension Set.Index {
+extension Set.Index: Equatable {
   @inlinable // FIXME(sil-serialize-all)
   public static func == (
     lhs: Set<Element>.Index,
@@ -3482,7 +3438,9 @@ extension Set.Index {
   #endif
     }
   }
+}
 
+extension Set.Index: Comparable {
   @inlinable // FIXME(sil-serialize-all)
   public static func < (
     lhs: Set<Element>.Index,
@@ -3503,7 +3461,9 @@ extension Set.Index {
   #endif
     }
   }
+}
 
+extension Set.Index: Hashable {
   /// Hashes the essential components of this value by feeding them into the
   /// given hasher.
   ///

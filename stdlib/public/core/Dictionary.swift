@@ -4012,7 +4012,7 @@ extension Dictionary._Variant {
 
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
-internal struct _NativeDictionaryIndex<Key, Value>: Comparable {
+internal struct _NativeDictionaryIndex<Key, Value> {
   @usableFromInline
   internal var offset: Int
 
@@ -4022,36 +4022,7 @@ internal struct _NativeDictionaryIndex<Key, Value>: Comparable {
   }
 }
 
-extension _NativeDictionaryIndex {
-
-  @inlinable // FIXME(sil-serialize-all)
-  internal static func < (
-    lhs: _NativeDictionaryIndex<Key, Value>,
-    rhs: _NativeDictionaryIndex<Key, Value>
-  ) -> Bool {
-    return lhs.offset < rhs.offset
-  }
-  @inlinable // FIXME(sil-serialize-all)
-  internal static func <= (
-    lhs: _NativeDictionaryIndex<Key, Value>,
-    rhs: _NativeDictionaryIndex<Key, Value>
-  ) -> Bool {
-    return lhs.offset <= rhs.offset
-  }
-  @inlinable // FIXME(sil-serialize-all)
-  internal static func > (
-    lhs: _NativeDictionaryIndex<Key, Value>,
-    rhs: _NativeDictionaryIndex<Key, Value>
-  ) -> Bool {
-    return lhs.offset > rhs.offset
-  }
-  @inlinable // FIXME(sil-serialize-all)
-  internal static func >= (
-    lhs: _NativeDictionaryIndex<Key, Value>,
-    rhs: _NativeDictionaryIndex<Key, Value>
-  ) -> Bool {
-    return lhs.offset >= rhs.offset
-  }
+extension _NativeDictionaryIndex: Equatable {
   @inlinable // FIXME(sil-serialize-all)
   internal static func == (
     lhs: _NativeDictionaryIndex<Key, Value>,
@@ -4061,10 +4032,20 @@ extension _NativeDictionaryIndex {
   }
 }
 
+extension _NativeDictionaryIndex: Comparable {
+  @inlinable // FIXME(sil-serialize-all)
+  internal static func < (
+    lhs: _NativeDictionaryIndex<Key, Value>,
+    rhs: _NativeDictionaryIndex<Key, Value>
+  ) -> Bool {
+    return lhs.offset < rhs.offset
+  }
+}
+
 #if _runtime(_ObjC)
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
-internal struct _CocoaDictionaryIndex: Comparable {
+internal struct _CocoaDictionaryIndex {
   // Assumption: we rely on NSDictionary.getObjects when being
   // repeatedly called on the same NSDictionary, returning items in the same
   // order every time.
@@ -4122,42 +4103,23 @@ internal struct _CocoaDictionaryIndex: Comparable {
   }
 }
 
-extension _CocoaDictionaryIndex {
-
-  @inlinable // FIXME(sil-serialize-all)
-  internal static func < (
-    lhs: _CocoaDictionaryIndex,
-    rhs: _CocoaDictionaryIndex
-  ) -> Bool {
-    return lhs.currentKeyIndex < rhs.currentKeyIndex
-  }
-  @inlinable // FIXME(sil-serialize-all)
-  internal static func <= (
-    lhs: _CocoaDictionaryIndex,
-    rhs: _CocoaDictionaryIndex
-  ) -> Bool {
-    return lhs.currentKeyIndex <= rhs.currentKeyIndex
-  }
-  @inlinable // FIXME(sil-serialize-all)
-  internal static func > (
-    lhs: _CocoaDictionaryIndex,
-    rhs: _CocoaDictionaryIndex
-  ) -> Bool {
-    return lhs.currentKeyIndex > rhs.currentKeyIndex
-  }
-  @inlinable // FIXME(sil-serialize-all)
-  internal static func >= (
-    lhs: _CocoaDictionaryIndex,
-    rhs: _CocoaDictionaryIndex
-  ) -> Bool {
-    return lhs.currentKeyIndex >= rhs.currentKeyIndex
-  }
+extension _CocoaDictionaryIndex: Equatable {
   @inlinable // FIXME(sil-serialize-all)
   internal static func == (
     lhs: _CocoaDictionaryIndex,
     rhs: _CocoaDictionaryIndex
   ) -> Bool {
     return lhs.currentKeyIndex == rhs.currentKeyIndex
+  }
+}
+
+extension _CocoaDictionaryIndex: Comparable {
+  @inlinable // FIXME(sil-serialize-all)
+  internal static func < (
+    lhs: _CocoaDictionaryIndex,
+    rhs: _CocoaDictionaryIndex
+  ) -> Bool {
+    return lhs.currentKeyIndex < rhs.currentKeyIndex
   }
 }
 #endif
@@ -4193,7 +4155,7 @@ extension Dictionary {
   ///
   ///        (k, v) = d[i]
   @_fixed_layout // FIXME(sil-serialize-all)
-  public struct Index: Comparable, Hashable {
+  public struct Index {
     // Index for native buffer is efficient.  Index for bridged NSDictionary is
     // not, because neither NSEnumerator nor fast enumeration support moving
     // backwards.  Even if they did, there is another issue: NSEnumerator does
@@ -4262,7 +4224,7 @@ extension Dictionary {
 public typealias DictionaryIndex<Key: Hashable, Value> =
   Dictionary<Key, Value>.Index
 
-extension Dictionary.Index {
+extension Dictionary.Index: Equatable {
   @inlinable // FIXME(sil-serialize-all)
   public static func == (
     lhs: Dictionary<Key, Value>.Index,
@@ -4283,7 +4245,9 @@ extension Dictionary.Index {
   #endif
     }
   }
+}
 
+extension Dictionary.Index: Comparable {
   @inlinable // FIXME(sil-serialize-all)
   public static func < (
     lhs: Dictionary<Key, Value>.Index,
@@ -4304,7 +4268,9 @@ extension Dictionary.Index {
   #endif
     }
   }
+}
 
+extension Dictionary.Index: Hashable {
   @inlinable
   public func hash(into hasher: inout Hasher) {
   #if _runtime(_ObjC)
