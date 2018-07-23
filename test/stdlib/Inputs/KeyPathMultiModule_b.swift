@@ -1,8 +1,24 @@
 public struct A {
   public var x: Int { return 0 }
 
-  public subscript<T: Hashable>(withGeneric index: T) -> T {
+  // NB: These declarations intentionally do not constrain the index type
+  // to be Hashable, to ensure that we get the Hashable conformance from
+  // the context where the key path was formed for equality while using the
+  // property descriptor's accessors.
+  public subscript<T>(withGeneric index: T) -> T {
     return index
+  }
+  public private(set) subscript<T>(withGenericPrivateSet index: T) -> T {
+    get {
+      return index
+    }
+    set { }
+  }
+  public subscript<T>(withGenericSettable index: T) -> T {
+    get {
+      return index
+    }
+    set { }
   }
 
   public var storedA: B<Int>
@@ -20,12 +36,38 @@ public struct A {
 }
 
 public struct B<U> {
+  public var x: Int { return 0 }
+  public var y: Int {
+    get { return 0 }
+    set { }
+  }
+  public private(set) var z: Int {
+    get { return 0 }
+    set { }
+  }
+
   public subscript(withInt i: Int) -> Int {
     return i
   }
 
-  public subscript<T: Hashable>(withGeneric i: T) -> T {
+  // NB: These declarations intentionally do not constrain the index type
+  // to be Hashable, to ensure that we get the Hashable conformance from
+  // the context where the key path was formed for equality while using the
+  // property descriptor's accessors.
+  public subscript<T>(withGeneric i: T) -> T {
     return i
+  }
+  public private(set) subscript<T>(withGenericPrivateSet index: T) -> T {
+    get {
+      return index
+    }
+    set { }
+  }
+  public subscript<T>(withGenericSettable index: T) -> T {
+    get {
+      return index
+    }
+    set { }
   }
 
   public var storedA: U
@@ -87,10 +129,42 @@ public func A_storedB_keypath() -> KeyPath<A, Double> {
   return \A.storedB
 }
 
+public func B_x_keypath<T>(_: T.Type) -> KeyPath<B<T>, Int> {
+  return \B<T>.x
+}
+
+public func B_y_keypath<T>(_: T.Type) -> KeyPath<B<T>, Int> {
+  return \B<T>.y
+}
+
+public func B_z_keypath<T>(_: T.Type) -> KeyPath<B<T>, Int> {
+  return \B<T>.z
+}
+
+public func B_Int_x_keypath() -> KeyPath<B<Int>, Int> {
+  return \B<Int>.x
+}
+
+public func B_Int_y_keypath() -> KeyPath<B<Int>, Int> {
+  return \B<Int>.y
+}
+
+public func B_Int_z_keypath() -> KeyPath<B<Int>, Int> {
+  return \B<Int>.z
+}
+
 public func B_storedA_keypath<T>(_: T.Type) -> KeyPath<B<T>, T> {
-  return \B.storedA
+  return \B<T>.storedA
 }
 
 public func B_storedB_keypath<T>(_: T.Type) -> KeyPath<B<T>, T> {
-  return \B.storedB
+  return \B<T>.storedB
+}
+
+public func B_Int_storedA_keypath() -> KeyPath<B<Int>, Int> {
+  return \B<Int>.storedA
+}
+
+public func B_Int_storedB_keypath() -> KeyPath<B<Int>, Int> {
+  return \B<Int>.storedB
 }
