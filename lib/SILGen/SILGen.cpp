@@ -1202,14 +1202,13 @@ TypeConverter::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl) {
                                           M.getSwiftModule());
   switch (strategy.getKind()) {
   case AccessStrategy::Storage: {
-    // If the stored value would need to be reabstracted in fully opaque
-    // context, then we have to treat the component as computed.
-    auto componentObjTy = decl->getStorageInterfaceType()
-                              ->getWithoutSpecifierType();
     // Keypaths rely on accessors to handle the special behavior of weak or
     // unowned properties.
-    if (componentObjTy->is<ReferenceStorageType>())
+    if (decl->getInterfaceType()->is<ReferenceStorageType>())
       return false;
+    // If the stored value would need to be reabstracted in fully opaque
+    // context, then we have to treat the component as computed.
+    auto componentObjTy = decl->getValueInterfaceType();
     if (auto genericEnv =
               decl->getInnermostDeclContext()->getGenericEnvironmentOfContext())
       componentObjTy = genericEnv->mapTypeIntoContext(componentObjTy);

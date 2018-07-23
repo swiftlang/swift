@@ -626,8 +626,7 @@ public:
       assert(CD->getInterfaceType());
       ty = CD->getResultInterfaceType();
     } else {
-      ty = cast<AbstractStorageDecl>(decl)->getValueInterfaceType()
-                                          ->getReferenceStorageReferent();
+      ty = cast<AbstractStorageDecl>(decl)->getValueInterfaceType();
     }
 #endif
 

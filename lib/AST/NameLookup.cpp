@@ -1511,18 +1511,6 @@ void ClassDecl::recordObjCMethod(AbstractFunctionDecl *method) {
   vec.push_back(method);
 }
 
-Type AbstractStorageDecl::getStorageInterfaceType() const {
-  if (auto var = dyn_cast<VarDecl>(this)) {
-    return var->getInterfaceType();
-  }
-  
-  if (auto sub = dyn_cast<SubscriptDecl>(this)) {
-    return sub->getElementInterfaceType();
-  }
-  
-  llvm_unreachable("unhandled storage decl kind");
-}
-
 /// Configure name lookup for the given declaration context and options.
 ///
 /// This utility is used by qualified name lookup.

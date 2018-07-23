@@ -4335,7 +4335,7 @@ SourceLoc AbstractStorageDecl::getOverrideLoc() const {
 
 Type AbstractStorageDecl::getValueInterfaceType() const {
   if (auto var = dyn_cast<VarDecl>(this))
-    return var->getInterfaceType();
+    return var->getInterfaceType()->getReferenceStorageReferent();
   return cast<SubscriptDecl>(this)->getElementInterfaceType();
 }
 
