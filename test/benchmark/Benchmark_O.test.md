@@ -137,17 +137,17 @@ RUN: not %Benchmark_O --bogus 2>&1 \
 RUN:              | %FileCheck %s --check-prefix ARGPARSE
 ARGPARSE: error: unsupported argument '--bogus'
 
-RUN: not %Benchmark_O --iter-scale \
+RUN: not %Benchmark_O --sample-time \
 RUN:         2>&1 | %FileCheck %s --check-prefix NOVALUE
-NOVALUE: error: missing value for '--iter-scale'
+NOVALUE: error: missing value for '--sample-time'
 
-RUN: not %Benchmark_O --iter-scale= \
+RUN: not %Benchmark_O --sample-time= \
 RUN:         2>&1 | %FileCheck %s --check-prefix EMPTYVAL
-EMPTYVAL: error: missing value for '--iter-scale'
+EMPTYVAL: error: missing value for '--sample-time'
 
-RUN: not %Benchmark_O --iter-scale=NaN \
+RUN: not %Benchmark_O --sample-time=NaN \
 RUN:         2>&1 | %FileCheck %s --check-prefix NANVALUE
-NANVALUE: error: 'NaN' is not a valid 'Int' for '--iter-scale'
+NANVALUE: error: 'NaN' is not a valid 'Double' for '--sample-time'
 
 RUN: not %Benchmark_O --num-iters \
 RUN:         2>&1 | %FileCheck %s --check-prefix NUMITERS

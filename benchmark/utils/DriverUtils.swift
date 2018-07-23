@@ -33,15 +33,17 @@ struct TestConfig {
   /// The delimiter to use when printing output.
   let delim: String
 
-  /// The scalar multiple of the amount of times a test should be run. This
-  /// enables one to cause tests to run for N iterations longer than they
-  /// normally would. This is useful when one wishes for a test to run for a
+  /// Duration of the test measurement in seconds.
+  ///
+  /// Used to compute the number of iterations, if no fixed amount is specified.
+  /// This is useful when one wishes for a test to run for a
   /// longer amount of time to perform performance analysis on the test in
   /// instruments.
-  let iterationScale: Int
+  let sampleTime: Double
 
   /// If we are asked to have a fixed number of iterations, the number of fixed
-  /// iterations.
+  /// iterations. The default value of 0 means: automatically compute the
+  /// number of iterations to measure the test for a specified sample time.
   let fixedNumIters: UInt
 
   /// The number of samples we should take of each test.
@@ -67,14 +69,16 @@ struct TestConfig {
     struct PartialTestConfig {
       var delim: String?
       var tags, skipTags: Set<BenchmarkCategory>?
-      var iterationScale, numSamples, afterRunSleep: Int?
+      var numSamples, afterRunSleep: Int?
       var fixedNumIters: UInt?
+      var sampleTime: Double?
       var verbose: Bool?
       var logMemory: Bool?
       var action: TestAction?
       var tests: [String]?
     }
 
+    // Custom value type parsers
     func tags(tags: String) throws -> Set<BenchmarkCategory> {
       // We support specifying multiple tags by splitting on comma, i.e.:
       //  --tags=Array,Dictionary
@@ -82,6 +86,9 @@ struct TestConfig {
       return Set(
         try tags.split(separator: ",").map(String.init).map {
           try checked({ BenchmarkCategory(rawValue: $0) }, $0) })
+    }
+    func finititeDouble(value: String) -> Double? {
+      return Double(value).flatMap { $0.isFinite ? $0 : nil }
     }
 
     // Configure the command line argument parser
@@ -91,11 +98,11 @@ struct TestConfig {
                   parser: { Int($0) })
     p.addArgument("--num-iters", \.fixedNumIters,
                   help: "number of iterations averaged in the sample;\n" +
-                        "default: auto-scaled to measure for 1 second",
+                        "default: auto-scaled to measure for `sample-time`",
                   parser: { UInt($0) })
-    p.addArgument("--iter-scale", \.iterationScale,
-                  help: "number of seconds used for num-iters calculation\n" +
-                        "default: 1", parser: { Int($0) })
+    p.addArgument("--sample-time", \.sampleTime,
+                  help: "duration of test measurement in seconds\ndefault: 1",
+                  parser: finititeDouble)
     p.addArgument("--verbose", \.verbose, defaultValue: true,
                   help: "increase output verbosity")
     p.addArgument("--memory", \.logMemory, defaultValue: true,
@@ -122,7 +129,7 @@ struct TestConfig {
 
     // Configure from the command line arguments, filling in the defaults.
     delim = c.delim ?? ","
-    iterationScale = c.iterationScale ?? 1
+    sampleTime = c.sampleTime ?? 1.0
     fixedNumIters = c.fixedNumIters ?? 0
     numSamples = c.numSamples ?? 1
     verbose = c.verbose ?? false
@@ -141,7 +148,7 @@ struct TestConfig {
             NumSamples: \(numSamples)
             Verbose: \(verbose)
             LogMemory: \(logMemory)
-            IterScale: \(iterationScale)
+            SampleTime: \(sampleTime)
             FixedIters: \(fixedNumIters)
             Tests Filter: \(c.tests ?? [])
             Tests to run: \(testList)
@@ -336,7 +343,8 @@ func runBench(_ test: BenchmarkInfo, _ c: TestConfig) -> BenchResults? {
   let sampler = SampleRunner(c)
   for s in 0..<c.numSamples {
     test.setUpFunction?()
-    let time_per_sample: UInt64 = 1_000_000_000 * UInt64(c.iterationScale)
+    let nsPerSecond = 1_000_000_000.0 // nanoseconds
+    let time_per_sample = UInt64(c.sampleTime * nsPerSecond)
 
     var scale : UInt
     var elapsed_time : UInt64 = 0
