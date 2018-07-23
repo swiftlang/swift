@@ -191,7 +191,7 @@ static bool aliasUnequalObjects(SILValue O1, SILValue O2) {
   // and uniquely identified, they cannot alias.
   if (areDistinctIdentifiableObjects(O1, O2)) {
     LLVM_DEBUG(llvm::dbgs() << "            Found two unequal identified "
-          "objects.\n");
+               "objects.\n");
     return true;
   }
 
@@ -205,7 +205,7 @@ static bool aliasUnequalObjects(SILValue O1, SILValue O2) {
   if ((isFunctionArgument(O1) && isIdentifiedFunctionLocal(O2)) ||
       (isFunctionArgument(O2) && isIdentifiedFunctionLocal(O1))) {
     LLVM_DEBUG(llvm::dbgs() << "            Found unequal function arg and "
-          "identified function local!\n");
+               "identified function local!\n");
     return true;
   }
 
@@ -575,7 +575,7 @@ AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
     return AliasResult::MustAlias;
 
   LLVM_DEBUG(llvm::dbgs() << "ALIAS ANALYSIS:\n    V1: " << *V1
-        << "    V2: " << *V2);
+             << "    V2: " << *V2);
 
   // Pass in both the TBAA types so we can perform typed access TBAA and the
   // actual types of V1, V2 so we can perform class based TBAA.
@@ -614,8 +614,8 @@ AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
   // Note that escape analysis must work with the original pointers and not the
   // underlying objects because it treats projections differently.
   if (!EA->canPointToSameMemory(V1, V2)) {
-    LLVM_DEBUG(llvm::dbgs() << "            Found not-aliased objects based on"
-                                      "escape analysis\n");
+    LLVM_DEBUG(llvm::dbgs() << "            Found not-aliased objects based on "
+                               "escape analysis\n");
     return AliasResult::NoAlias;
   }
 

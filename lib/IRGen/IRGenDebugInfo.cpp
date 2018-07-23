@@ -423,7 +423,7 @@ private:
     auto FnTy = SILTy.getAs<SILFunctionType>();
     if (!FnTy) {
       LLVM_DEBUG(llvm::dbgs() << "Unexpected function type: "; SILTy.dump();
-            llvm::dbgs() << "\n");
+                 llvm::dbgs() << "\n");
       return CanSILFunctionType();
     }
 
@@ -990,8 +990,9 @@ private:
     TypeBase *BaseTy = DbgTy.getType();
 
     if (!BaseTy) {
-      LLVM_DEBUG(llvm::dbgs() << "Type without TypeBase: "; DbgTy.getType()->dump();
-            llvm::dbgs() << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "Type without TypeBase: ";
+                 DbgTy.getType()->dump();
+                 llvm::dbgs() << "\n");
       if (!InternalType) {
         StringRef Name = "<internal>";
         InternalType = DBuilder.createForwardDecl(
@@ -1348,7 +1349,7 @@ private:
     case TypeKind::BuiltinUnsafeValueBuffer:
 
       LLVM_DEBUG(llvm::errs() << "Unhandled type: "; DbgTy.getType()->dump();
-            llvm::errs() << "\n");
+                 llvm::errs() << "\n");
       MangledName = "<unknown>";
     }
     return DBuilder.createBasicType(MangledName, SizeInBits, Encoding);

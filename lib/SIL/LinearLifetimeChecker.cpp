@@ -322,7 +322,7 @@ bool State::performDataflow(DeadEndBlocks &deBlocks) {
     // Grab the next block to visit.
     SILBasicBlock *block = worklist.pop_back_val();
     LLVM_DEBUG(llvm::dbgs() << "    Visiting Block: bb" << block->getDebugID()
-                       << '\n');
+                            << '\n');
 
     // Since the block is on our worklist, we know already that it is not a
     // block with lifetime ending uses, due to the invariants of our loop.

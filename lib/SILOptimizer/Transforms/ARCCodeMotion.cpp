@@ -1081,7 +1081,8 @@ public:
     if (DisableIfWithCriticalEdge && hasCriticalEdges(*F, false))
       return;
 
-    LLVM_DEBUG(llvm::dbgs() << "*** ARCCM on function: " << F->getName() << " ***\n");
+    LLVM_DEBUG(llvm::dbgs() << "*** ARCCM on function: " << F->getName()
+                            << " ***\n");
 
     PostOrderAnalysis *POA = PM->getAnalysis<PostOrderAnalysis>();
 

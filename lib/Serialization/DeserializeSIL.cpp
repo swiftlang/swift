@@ -499,7 +499,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   auto linkage = fromStableSILLinkage(rawLinkage);
   if (!linkage) {
     LLVM_DEBUG(llvm::dbgs() << "invalid linkage code " << rawLinkage
-                       << " for SILFunction\n");
+                            << " for SILFunction\n");
     MF->error();
     return nullptr;
   }
@@ -2493,7 +2493,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   auto linkage = fromStableSILLinkage(rawLinkage);
   if (!linkage) {
     LLVM_DEBUG(llvm::dbgs() << "invalid linkage code " << rawLinkage
-                       << " for SIL function " << Name << "\n");
+                            << " for SIL function " << Name << "\n");
     return false;
   }
 
@@ -2580,7 +2580,7 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
   auto linkage = fromStableSILLinkage(rawLinkage);
   if (!linkage) {
     LLVM_DEBUG(llvm::dbgs() << "invalid linkage code " << rawLinkage
-                       << " for SILGlobalVariable\n");
+                            << " for SILGlobalVariable\n");
     return nullptr;
   }
 
@@ -2692,7 +2692,7 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
     auto Linkage = fromStableSILLinkage(RawLinkage);
     if (!Linkage) {
       LLVM_DEBUG(llvm::dbgs() << "invalid linkage code " << RawLinkage
-            << " for VTable Entry\n");
+                              << " for VTable Entry\n");
       MF->error();
       return nullptr;
     }
@@ -2825,7 +2825,7 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
   auto Linkage = fromStableSILLinkage(RawLinkage);
   if (!Linkage) {
     LLVM_DEBUG(llvm::dbgs() << "invalid linkage code " << RawLinkage
-                       << " for SILFunction\n");
+                            << " for SILFunction\n");
     MF->error();
     return nullptr;
   }
@@ -3018,7 +3018,7 @@ readDefaultWitnessTable(DeclID WId, SILDefaultWitnessTable *existingWt) {
   auto entry = SILCursor.advance(AF_DontPopBlockAtEnd);
   if (entry.Kind == llvm::BitstreamEntry::Error) {
     LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in "
-          "readDefaultWitnessTable.\n");
+                               "readDefaultWitnessTable.\n");
     return nullptr;
   }
 
@@ -3035,7 +3035,7 @@ readDefaultWitnessTable(DeclID WId, SILDefaultWitnessTable *existingWt) {
   auto Linkage = fromStableSILLinkage(RawLinkage);
   if (!Linkage) {
     LLVM_DEBUG(llvm::dbgs() << "invalid linkage code " << RawLinkage
-                       << " for SILFunction\n");
+                            << " for SILFunction\n");
     MF->error();
     return nullptr;
   }

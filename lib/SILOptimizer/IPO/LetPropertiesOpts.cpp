@@ -157,7 +157,7 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
     return;
 
   LLVM_DEBUG(llvm::dbgs() << "Replacing access to property '" << *Property
-                     << "' by its constant initializer\n");
+                          << "' by its constant initializer\n");
 
   auto PropertyAccess = Property->getEffectiveAccess();
   auto TypeAccess = Ty->getEffectiveAccess();
@@ -173,14 +173,14 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
           Module->isWholeModule())) {
     CanRemove = true;
     LLVM_DEBUG(llvm::dbgs() << "Storage for property '" << *Property
-                       << "' can be eliminated\n");
+                            << "' can be eliminated\n");
   }
 
   if (CannotRemove.count(Property))
     CanRemove = false;
 
   if (!AccessMap.count(Property)) {
-    LLVM_DEBUG(llvm::dbgs() << "Property '" << *Property << "' is never read\n");
+    LLVM_DEBUG(llvm::dbgs() << "Property '" << *Property <<"' is never read\n");
     if (CanRemove) {
       // TODO: Remove the let property, because it is never accessed.
     }
@@ -237,7 +237,7 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
       // computed by this initializer.
       SILValue clonedInit = cloneInitAt(proj);
       proj->replaceAllUsesWith(clonedInit);
-      LLVM_DEBUG(llvm::dbgs() << "Access to " << *Property << " was replaced:\n";
+      LLVM_DEBUG(llvm::dbgs() << "Access to " << *Property <<" was replaced:\n";
             clonedInit->dumpInContext());
 
       proj->eraseFromParent();
@@ -247,7 +247,7 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
   }
 
   LLVM_DEBUG(llvm::dbgs() << "Access to " << *Property << " was replaced "
-                     << NumReplaced << " time(s)\n");
+                          << NumReplaced << " time(s)\n");
 
   if (CanRemove) {
     // TODO: Remove the let property, because it is never accessed.
@@ -310,13 +310,13 @@ static bool isAssignableExternally(VarDecl *Property, SILModule *Module) {
           (storedPropertyAccess <= AccessLevel::Internal &&
            Module->isWholeModule())) {
        LLVM_DEBUG(llvm::dbgs() << "Property " << *Property
-                       << " cannot be set externally\n");
+                               << " cannot be set externally\n");
        return false;
       }
     }
 
     LLVM_DEBUG(llvm::dbgs() << "Property " << *Property
-                       << " can be used externally\n");
+                            << " can be used externally\n");
     return true;
   }
 
@@ -329,7 +329,7 @@ static bool mayHaveUnknownUses(VarDecl *Property, SILModule *Module) {
   if (Property->getDeclContext()->getParentModule() !=
       Module->getSwiftModule()) {
     LLVM_DEBUG(llvm::dbgs() << "Property " << *Property
-                       << " is defined in a different module\n");
+                            << " is defined in a different module\n");
     // We don't see the bodies of initializers from a different module
     // unless all of them are fragile.
     // TODO: Support fragile initializers.
@@ -367,18 +367,18 @@ bool LetPropertiesOpt::isConstantLetProperty(VarDecl *Property) {
   // don't process it.
   if (mayHaveUnknownUses(Property, Module)) {
     LLVM_DEBUG(llvm::dbgs() << "Property '" << *Property
-                       << "' may have unknown uses\n");
+                            << "' may have unknown uses\n");
     SkipProcessing.insert(Property);
     return false;
   }
 
   LLVM_DEBUG(llvm::dbgs() << "Property '" << *Property
-                      << "' has no unknown uses\n");
+                          << "' has no unknown uses\n");
 
   // Only properties of simple types can be optimized.
   if (!isSimpleType(Module->Types.getLoweredType(Property->getType()), *Module)) {
      LLVM_DEBUG(llvm::dbgs() << "Property '" << *Property
-                       << "' is not of trivial type\n");
+                             << "' is not of trivial type\n");
     SkipProcessing.insert(Property);
     return false;
   }
@@ -426,7 +426,7 @@ LetPropertiesOpt::analyzeInitValue(SILInstruction *I, VarDecl *Property) {
     return false;
   } else {
     LLVM_DEBUG(llvm::dbgs() << "The value of property '" << *Property
-                       << "' is statically known so far\n");
+                            << "' is statically known so far\n");
     // Remember the statically known value.
     cachedSequence = std::move(sequence);
     return true;
@@ -463,14 +463,14 @@ void LetPropertiesOpt::collectStructPropertiesAccess(StructInst *SI,
 
     NominalTypeLetProperties[structDecl] = LetProps;
     LLVM_DEBUG(llvm::dbgs() << "Computed set of let properties for struct '"
-                       << structDecl->getName() << "'\n");
+                            << structDecl->getName() << "'\n");
   }
 
   auto &Props = NominalTypeLetProperties[structDecl];
 
-  LLVM_DEBUG(llvm::dbgs()
-            << "Found a struct instruction initializing some let properties: ";
-        SI->dumpInContext());
+  LLVM_DEBUG(llvm::dbgs() << "Found a struct instruction initializing some "
+                             "let properties: ";
+             SI->dumpInContext());
   // Figure out the initializing sequence for each
   // of the properties.
   for (auto Prop : Props) {
@@ -478,11 +478,11 @@ void LetPropertiesOpt::collectStructPropertiesAccess(StructInst *SI,
       continue;
     SILValue PropValue = SI->getOperandForField(Prop)->get();
     LLVM_DEBUG(llvm::dbgs() << "Check the value of property '" << *Prop
-                       << "' :" << PropValue << "\n");
+                            << "' :" << PropValue << "\n");
     if (!analyzeInitValue(SI, Prop)) {
       SkipProcessing.insert(Prop);
       LLVM_DEBUG(llvm::dbgs() << "The value of a let property '" << *Prop
-                         << "' is not statically known\n");
+                              << "' is not statically known\n");
     }
     (void) PropValue;
   }
@@ -518,9 +518,9 @@ void LetPropertiesOpt::collectPropertyAccess(SILInstruction *I,
   if (!isConstantLetProperty(Property))
     return;
 
-  LLVM_DEBUG(llvm::dbgs() << "Collecting property access for property '" << *Property
-                     << "':\n";
-        llvm::dbgs() << "The instructions are:\n"; I->dumpInContext());
+  LLVM_DEBUG(llvm::dbgs() << "Collecting property access for property '"
+                          << *Property << "':\n";
+             llvm::dbgs() << "The instructions are:\n"; I->dumpInContext());
 
   if (isa<RefElementAddrInst>(I) || isa<StructElementAddrInst>(I)
       || isa<BeginAccessInst>(I)) {

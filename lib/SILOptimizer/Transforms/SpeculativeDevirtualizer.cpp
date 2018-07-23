@@ -372,8 +372,8 @@ static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
       return NewInstPair.second.getInstruction() != nullptr;
     }
 
-    LLVM_DEBUG(llvm::dbgs() << "Inserting monomorphic speculative call for class " <<
-          CD->getName() << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Inserting monomorphic speculative call for "
+               "class " << CD->getName() << "\n");
     return !!speculateMonomorphicTarget(AI, SubType, LastCCBI);
   }
 
@@ -387,16 +387,16 @@ static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
   int NotHandledSubsNum = 0;
   if (Subs.size() > MaxNumSpeculativeTargets) {
     LLVM_DEBUG(llvm::dbgs() << "Class " << CD->getName() << " has too many ("
-                       << Subs.size() << ") subclasses. Performing speculative "
-                         "devirtualization only for the first "
-                       << MaxNumSpeculativeTargets << " of them.\n");
+                            << Subs.size() << ") subclasses. Performing "
+                              "speculative devirtualization only for the first "
+                            << MaxNumSpeculativeTargets << " of them.\n");
 
     NotHandledSubsNum += (Subs.size() - MaxNumSpeculativeTargets);
     Subs.erase(&Subs[MaxNumSpeculativeTargets], Subs.end());
   }
 
   LLVM_DEBUG(llvm::dbgs() << "Class " << CD->getName() << " is a superclass. "
-        "Inserting polymorphic speculative call.\n");
+             "Inserting polymorphic speculative call.\n");
 
   // Try to devirtualize the static class of instance
   // if it is possible.
@@ -454,7 +454,7 @@ static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
 
   for (auto S : Subs) {
     LLVM_DEBUG(llvm::dbgs() << "Inserting a speculative call for class "
-          << CD->getName() << " and subclass " << S->getName() << "\n");
+               << CD->getName() << " and subclass " << S->getName() << "\n");
 
     // FIXME: Add support for generic subclasses.
     if (S->isGenericContext()) {

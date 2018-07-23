@@ -242,8 +242,8 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
   if (auto *NewF = OrigF->getModule().lookUpFunction(Name)) {
     assert(NewF->isSerialized() == Serialized);
     LLVM_DEBUG(llvm::dbgs()
-              << "  Found an already specialized version of the callee: ";
-          NewF->printName(llvm::dbgs()); llvm::dbgs() << "\n");
+                 << "  Found an already specialized version of the callee: ";
+               NewF->printName(llvm::dbgs()); llvm::dbgs() << "\n");
     return NewF;
   }
 
@@ -266,7 +266,8 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
     NewF->setUnqualifiedOwnership();
   }
   LLVM_DEBUG(llvm::dbgs() << "  Specialize callee as ";
-        NewF->printName(llvm::dbgs()); llvm::dbgs() << " " << NewFTy << "\n");
+             NewF->printName(llvm::dbgs());
+             llvm::dbgs() << " " << NewFTy << "\n");
 
   LLVM_DEBUG(if (PAI->hasSubstitutions()) {
     llvm::dbgs() << "CapturePropagation of generic partial_apply:\n";
@@ -281,10 +282,11 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
 void CapturePropagation::rewritePartialApply(PartialApplyInst *OrigPAI,
                                              SILFunction *SpecialF) {
   LLVM_DEBUG(llvm::dbgs() << "\n  Rewriting a partial apply:\n";
-        OrigPAI->dumpInContext(); llvm::dbgs() << "   with special function: "
-                                               << SpecialF->getName() << "\n";
-        llvm::dbgs() << "\nThe function being rewritten is:\n";
-        OrigPAI->getFunction()->dump());
+             OrigPAI->dumpInContext();
+             llvm::dbgs() << "   with special function: "
+                          << SpecialF->getName() << "\n";
+             llvm::dbgs() << "\nThe function being rewritten is:\n";
+             OrigPAI->getFunction()->dump());
 
   SILBuilderWithScope Builder(OrigPAI);
   auto FuncRef = Builder.createFunctionRef(OrigPAI->getLoc(), SpecialF);
@@ -437,9 +439,9 @@ bool CapturePropagation::optimizePartialApply(PartialApplyInst *PAI) {
 
   if (PAI->hasSubstitutions() && PAI->getSubstitutionMap().hasArchetypes()) {
     LLVM_DEBUG(llvm::dbgs()
-              << "CapturePropagation: cannot handle partial specialization "
-                 "of partial_apply:\n";
-          PAI->dumpInContext());
+                 << "CapturePropagation: cannot handle partial specialization "
+                    "of partial_apply:\n";
+               PAI->dumpInContext());
     return false;
   }
 
@@ -466,8 +468,8 @@ bool CapturePropagation::optimizePartialApply(PartialApplyInst *PAI) {
     return false;
 
   LLVM_DEBUG(llvm::dbgs() << "Specializing closure for constant arguments:\n"
-                     << "  " << SubstF->getName() << "\n"
-                     << *PAI);
+                          << "  " << SubstF->getName() << "\n"
+                          << *PAI);
   ++NumCapturesPropagated;
   SILFunction *NewF = specializeConstClosure(PAI, SubstF);
   rewritePartialApply(PAI, NewF);

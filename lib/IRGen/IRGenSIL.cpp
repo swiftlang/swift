@@ -1625,9 +1625,9 @@ void IRGenModule::emitSILFunction(SILFunction *f) {
 
 void IRGenSILFunction::emitSILFunction() {
   LLVM_DEBUG(llvm::dbgs() << "emitting SIL function: ";
-        CurSILFn->printName(llvm::dbgs());
-        llvm::dbgs() << '\n';
-        CurSILFn->print(llvm::dbgs()));
+             CurSILFn->printName(llvm::dbgs());
+             llvm::dbgs() << '\n';
+             CurSILFn->print(llvm::dbgs()));
   
   assert(!CurSILFn->empty() && "function has no basic blocks?!");
 

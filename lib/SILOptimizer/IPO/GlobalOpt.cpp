@@ -482,8 +482,8 @@ ApplyInst *SILGlobalOpt::getHoistedApplyForInitializer(
 void SILGlobalOpt::placeInitializers(SILFunction *InitF,
                                      ArrayRef<ApplyInst *> Calls) {
   LLVM_DEBUG(llvm::dbgs() << "GlobalOpt: calls to "
-        << Demangle::demangleSymbolAsString(InitF->getName())
-        << " : " << Calls.size() << "\n");
+             << Demangle::demangleSymbolAsString(InitF->getName())
+             << " : " << Calls.size() << "\n");
   // Map each initializer-containing function to its final initializer call.
   llvm::DenseMap<SILFunction *, ApplyInst *> ParentFuncs;
   for (auto *AI : Calls) {
@@ -507,8 +507,9 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
     while (Node) {
       SILBasicBlock *DomParentBB = Node->getBlock();
       if (isAvailabilityCheck(DomParentBB)) {
-        LLVM_DEBUG(llvm::dbgs() << "  don't hoist above availability check at bb"
-                           << DomParentBB->getDebugID() << "\n");
+        LLVM_DEBUG(llvm::dbgs() << "  don't hoist above availability check "
+                                   "at bb"
+                                << DomParentBB->getDebugID() << "\n");
         break;
       }
       BB = DomParentBB;
@@ -520,8 +521,8 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
     if (BB == HoistAI->getParent()) {
       // BB is either unreachable or not in a loop.
       LLVM_DEBUG(llvm::dbgs() << "  skipping (not in a loop): " << *HoistAI
-                         << "  in " << HoistAI->getFunction()->getName()
-                         << "\n");
+                              << "  in " << HoistAI->getFunction()->getName()
+                              << "\n");
       continue;
     }
 
@@ -723,8 +724,8 @@ void SILGlobalOpt::optimizeInitializer(SILFunction *AddrF,
   if (!SILG)
     return;
 
-  LLVM_DEBUG(llvm::dbgs() << "GlobalOpt: use static initializer for " <<
-        SILG->getName() << '\n');
+  LLVM_DEBUG(llvm::dbgs() << "GlobalOpt: use static initializer for "
+                          << SILG->getName() << '\n');
 
   // Remove "once" call from the addressor.
   if (!isAssignedOnlyOnceInInitializer(SILG) || !SILG->getDecl()) {
@@ -846,8 +847,8 @@ void SILGlobalOpt::collectGlobalAccess(GlobalAddrInst *GAI) {
 // that returns the value of this variable.
 void SILGlobalOpt::optimizeGlobalAccess(SILGlobalVariable *SILG,
                                         StoreInst *SI) {
-  LLVM_DEBUG(llvm::dbgs() << "GlobalOpt: use static initializer for " <<
-        SILG->getName() << '\n');
+  LLVM_DEBUG(llvm::dbgs() << "GlobalOpt: use static initializer for "
+                          << SILG->getName() << '\n');
 
   if (GlobalVarSkipProcessing.count(SILG))
     return;

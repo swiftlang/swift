@@ -75,8 +75,8 @@ bool ARCPairingContext::performMatching(
     llvm::SmallVectorImpl<SILInstruction *> &DeadInsts) {
   bool MatchedPair = false;
 
-  LLVM_DEBUG(llvm::dbgs() << "**** Computing ARC Matching Sets for " << F.getName()
-                     << " ****\n");
+  LLVM_DEBUG(llvm::dbgs() << "**** Computing ARC Matching Sets for "
+                          << F.getName() << " ****\n");
 
   /// For each increment that we matched to a decrement, try to match it to a
   /// decrement -> increment pair.
@@ -225,7 +225,8 @@ processFunctionWithoutLoopSupport(SILFunction &F, bool FreezePostDomReleases,
       break;
 
     // Otherwise, perform another iteration.
-    LLVM_DEBUG(llvm::dbgs() << "\n<<< Made a Change! Reprocessing Function! >>>\n");
+    LLVM_DEBUG(llvm::dbgs() << "\n<<< Made a Change! "
+                               "Reprocessing Function! >>>\n");
   }
 
   LLVM_DEBUG(llvm::dbgs() << "\n");

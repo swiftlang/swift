@@ -521,8 +521,8 @@ static void diagnoseExclusivityViolation(const ConflictingAccess &Violation,
   SILFunction *F = FirstAccess.getInstruction()->getFunction();
 
   LLVM_DEBUG(llvm::dbgs() << "Conflict on " << *FirstAccess.getInstruction()
-                     << "\n  vs " << *SecondAccess.getInstruction()
-                     << "\n  in function " << *F);
+                          << "\n  vs " << *SecondAccess.getInstruction()
+                          << "\n  in function " << *F);
 
   // Can't have a conflict if both accesses are reads.
   assert(!(FirstAccess.getAccessKind() == SILAccessKind::Read &&

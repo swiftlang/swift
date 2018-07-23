@@ -355,17 +355,16 @@ FunctionSignatureTransformDescriptor::createOptimizedSILFunctionType() {
     if (!UsesGenerics) {
       // None of the generic type parameters are used.
       LLVM_DEBUG(llvm::dbgs() << "None of generic parameters are used by "
-                         << F->getName() << "\n";
-            llvm::dbgs() << "Interface params:\n";
-            for (auto Param : InterfaceParams) {
-              Param.getType().dump();
-            }
+                              << F->getName() << "\n";
+                 llvm::dbgs() << "Interface params:\n";
+                 for (auto Param : InterfaceParams) {
+                   Param.getType().dump();
+                 }
 
-            llvm::dbgs()
-            << "Interface results:\n";
-            for (auto Result : InterfaceResults) {
-              Result.getType().dump();
-            });
+                 llvm::dbgs() << "Interface results:\n";
+                 for (auto Result : InterfaceResults) {
+                   Result.getType().dump();
+                 });
     }
   }
 
@@ -481,7 +480,8 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   std::string Name = TransformDescriptor.createOptimizedSILFunctionName();
   SILLinkage linkage = getSpecializedLinkage(F, F->getLinkage());
 
-  LLVM_DEBUG(llvm::dbgs() << "  -> create specialized function " << Name << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "  -> create specialized function " << Name
+                          << "\n");
 
   auto NewFTy = TransformDescriptor.createOptimizedSILFunctionType();
   GenericEnvironment *NewFGenericEnv;
@@ -738,7 +738,8 @@ public:
       return;
 
     // This is the function to optimize.
-    LLVM_DEBUG(llvm::dbgs() << "*** FSO on function: " << F->getName() << " ***\n");
+    LLVM_DEBUG(llvm::dbgs() << "*** FSO on function: " << F->getName()
+                            << " ***\n");
 
     // Check the signature of F to make sure that it is a function that we
     // can specialize. These are conditions independent of the call graph.
