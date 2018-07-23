@@ -118,6 +118,7 @@ IDENTIFIER_WITH_NAME(value_, "_value")
 IDENTIFIER(with)
 
 // SWIFT_ENABLE_TENSORFLOW
+IDENTIFIER(TensorFlow)
 IDENTIFIER(Parameter)
 
 // Kinds of layout constraints

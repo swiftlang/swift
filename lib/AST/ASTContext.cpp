@@ -1742,7 +1742,7 @@ ASTContext::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath) {
           (ModulePath[0].first == StdlibModuleName ||
            ModulePath[0].first == Id_Foundation ||
            // SWIFT_ENABLE_TENSORFLOW
-           ModulePath[0].first == getIdentifier("TensorFlow")))
+           ModulePath[0].first == Id_TensorFlow))
         recordKnownProtocols(M);
       return M;
     }

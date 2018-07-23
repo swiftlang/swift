@@ -242,18 +242,14 @@ static ValueDecl *deriveParameterAggregate_update(DerivedConformance &derived) {
 
 ValueDecl *
 DerivedConformance::deriveParameterAggregate(ValueDecl *requirement) {
-  if (requirement->getBaseName() == TC.Context.getIdentifier("update"))
-    return deriveParameterAggregate_update(*this);
-  TC.diagnose(requirement->getLoc(),
-              diag::broken_parameter_aggregate_requirement);
-  return nullptr;
+  assert(requirement->getBaseName() == TC.Context.getIdentifier("update") &&
+         "Expected 'update' requirement for 'ParameterAggregate' protocol");
+  return deriveParameterAggregate_update(*this);
 }
 
 Type DerivedConformance::deriveParameterAggregate(
     AssociatedTypeDecl *requirement) {
-  if (requirement->getBaseName() == TC.Context.Id_Parameter)
-    return deriveParameterAggregate_Parameter(TC, Nominal);
-  TC.diagnose(requirement->getLoc(),
-              diag::broken_parameter_aggregate_requirement);
-  return nullptr;
+  assert(requirement->getBaseName() == TC.Context.Id_Parameter &&
+         "Expected 'Parameter' requirement for 'ParameterAggregate' protocol");
+  return deriveParameterAggregate_Parameter(TC, Nominal);
 }
