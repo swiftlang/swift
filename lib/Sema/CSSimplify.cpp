@@ -32,7 +32,13 @@ void MatchCallArgumentListener::extraArgument(unsigned argIdx) { }
 
 void MatchCallArgumentListener::missingArgument(unsigned paramIdx) { }
 
-void MatchCallArgumentListener::missingLabel(unsigned paramIdx) {}
+bool MatchCallArgumentListener::missingLabel(unsigned paramIdx) { return true; }
+bool MatchCallArgumentListener::extraneousLabel(unsigned paramIdx) {
+  return true;
+}
+bool MatchCallArgumentListener::incorrectLabel(unsigned paramIdx) {
+  return true;
+}
 
 void MatchCallArgumentListener::outOfOrderArgument(unsigned argIdx,
                                                    unsigned prevArgIdx) {
@@ -69,6 +75,11 @@ static Optional<unsigned> scoreParamAndArgNameTypo(StringRef paramName,
   // The distance can be zero due to the "with" transformation above.
   if (dist == 0)
     return 1;
+
+  // If this is just a single character label on both sides,
+  // simply return distance.
+  if (paramName.size() == 1 && argName.size() == 1)
+    return dist;
 
   // Only allow about one typo for every two properly-typed characters, which
   // prevents completely-wacky suggestions in many cases.
@@ -131,7 +142,7 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
                    MatchCallArgumentListener &listener,
                    SmallVectorImpl<ParamBinding> &parameterBindings) {
   assert(params.size() == defaultMap.size() && "Default map does not match");
-  
+
   // Keep track of the parameter we're matching and what argument indices
   // got bound to each parameter.
   unsigned paramIdx, numParams = params.size();
@@ -193,7 +204,8 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
   // Local function that retrieves the next unclaimed argument with the given
   // name (which may be empty). This routine claims the argument.
   auto claimNextNamed
-    = [&](Identifier name, bool ignoreNameMismatch) -> Optional<unsigned> {
+    = [&](Identifier name, bool ignoreNameMismatch,
+          bool forVariadic = false) -> Optional<unsigned> {
     // Skip over any claimed arguments.
     skipClaimedArgs();
 
@@ -201,31 +213,20 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
     if (numClaimedArgs == numArgs)
       return None;
 
-    // When the expected name is empty, we claim the next argument if it has
-    // no name.
-    if (name.empty()) {
-      // Nothing to claim.
-      if (nextArgIdx == numArgs ||
-          claimedArgs[nextArgIdx] ||
-          (!(args[nextArgIdx].getLabel().empty() || ignoreNameMismatch)))
-        return None;
-
-      return claim(name, nextArgIdx);
-    }
-
-    // If the name matches, claim this argument.
-    if (nextArgIdx != numArgs &&
-        (ignoreNameMismatch || args[nextArgIdx].getLabel() == name)) {
-      return claim(name, nextArgIdx);
-    }
-
-    // The name didn't match. Go hunting for an unclaimed argument whose name
-    // does match.
+    // Go hunting for an unclaimed argument whose name does match.
     Optional<unsigned> claimedWithSameName;
     for (unsigned i = nextArgIdx; i != numArgs; ++i) {
       // Skip arguments where the name doesn't match.
-      if (args[i].getLabel() != name)
+      if (args[i].getLabel() != name) {
+        // If this is an attempt to claim additional unlabeled arguments
+        // for variadic parameter, we have to stop at first labeled argument.
+        if (forVariadic)
+          return None;
+
+        // Otherwise we can continue trying to find argument which
+        // matches parameter with or without label.
         continue;
+      }
 
       // Skip claimed arguments.
       if (claimedArgs[i]) {
@@ -254,20 +255,25 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
     //     out the issue.
     //   - The argument might be unnamed, in which case we try to fix the
     //     problem by adding the name.
+    //   - The argument might have extraneous label, in which case we try to
+    //     fix the problem by removing such label.
     //   - The keyword argument might be a typo for an actual argument name, in
     //     which case we should find the closest match to correct to.
+
+    // Missing or extraneous label.
+    if (nextArgIdx != numArgs && ignoreNameMismatch) {
+      auto argLabel = args[nextArgIdx].getLabel();
+      // Claim this argument if we are asked to ignore labeling failure,
+      // only if argument doesn't have a label when parameter expected
+      // it to, or vice versa.
+      if (name.empty() || argLabel.empty())
+        return claim(name, nextArgIdx);
+    }
 
     // Redundant keyword arguments.
     if (claimedWithSameName) {
       // FIXME: We can provide better diagnostics here.
       return None;
-    }
-
-    // Missing a keyword argument name.
-    if (nextArgIdx != numArgs && args[nextArgIdx].getLabel().empty() &&
-       ignoreNameMismatch) {
-      // Claim the next argument.
-      return claim(name, nextArgIdx);
     }
 
     // Typo correction is handled in a later pass.
@@ -285,7 +291,7 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
       // Claim the next argument with the name of this parameter.
       auto claimed = claimNextNamed(param.getLabel(), ignoreNameMismatch);
 
-      // If there was no such argument, leave the argument unf
+      // If there was no such argument, leave the parameter unfulfilled.
       if (!claimed) {
         haveUnfulfilledParams = true;
         return;
@@ -294,11 +300,16 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
       // Record the first argument for the variadic.
       parameterBindings[paramIdx].push_back(*claimed);
 
-      // Claim any additional unnamed arguments.
-      while ((claimed = claimNextNamed(Identifier(), false))) {
-        parameterBindings[paramIdx].push_back(*claimed);
+      auto currentNextArgIdx = nextArgIdx;
+      {
+        nextArgIdx = *claimed;
+        // Claim any additional unnamed arguments.
+        while ((claimed = claimNextNamed(Identifier(), false, true))) {
+          parameterBindings[paramIdx].push_back(*claimed);
+        }
       }
 
+      nextArgIdx = currentNextArgIdx;
       skipClaimedArgs();
       return;
     }
@@ -329,7 +340,6 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
 
   // If we have any unclaimed arguments, complain about those.
   if (numClaimedArgs != numArgs) {
-
     // Find all of the named, unclaimed arguments.
     llvm::SmallVector<unsigned, 4> unclaimedNamedArgs;
     for (nextArgIdx = 0; skipClaimedArgs(), nextArgIdx != numArgs;
@@ -380,7 +390,10 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
             // Bind this parameter to the argument.
             nextArgIdx = argIdx;
             paramIdx = unfulfilledNamedParams[best];
-            bindNextParameter(true);
+            auto paramLabel = params[paramIdx].getLabel();
+
+            parameterBindings[paramIdx].push_back(claim(paramLabel, argIdx));
+            skipClaimedArgs();
 
             // Erase this parameter from the list of unfulfilled named
             // parameters, so we don't try to fulfill it again.
@@ -410,6 +423,29 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
           continue;
 
         bindNextParameter(true);
+      }
+    }
+
+    // If there are as many arguments as parameters but we still
+    // haven't claimed all of the arguments, it could mean that
+    // labels don't line up, if so let's try to claim arguments
+    // with incorrect labels, and let OoO/re-labeling logic diagnose that.
+    if (numArgs == numParams && numClaimedArgs != numArgs) {
+      for (unsigned i = 0; i < numArgs; ++i) {
+        if (claimedArgs[i] || !parameterBindings[i].empty())
+          continue;
+
+        // If parameter has a default value, we don't really
+        // now if label doesn't match because it's incorrect
+        // or argument belongs to some other parameter, so
+        // we just leave this parameter unfulfilled.
+        if (defaultMap.test(i))
+          continue;
+
+        // Looks like there was no parameter claimed at the same
+        // position, it could only mean that label is completely
+        // different, because typo correction has been attempted already.
+        parameterBindings[i].push_back(claim(params[i].getLabel(), i));
       }
     }
 
@@ -456,15 +492,10 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
     // our of order
     for (auto binding : parameterBindings) {
       for (auto boundArgIdx : binding) {
-        if (boundArgIdx == argIdx) {
-          // If the argument is in the right location, just continue
-          argIdx++;
-          continue;
-        }
-
-        // Otherwise, we've found the (first) parameter that has an out of order
-        // argument, and know the indices of the argument the needs to move
-        // (fromArgIdx) and the argument location it should move to (toArgItd).
+        // We've found the parameter that has an out of order
+        // argument, and know the indices of the argument that
+        // needs to move (fromArgIdx) and the argument location
+        // it should move to (toArgIdx).
         auto fromArgIdx = boundArgIdx;
         auto toArgIdx = argIdx;
 
@@ -473,19 +504,31 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
         // one argument requires label and another one doesn't, but caller
         // doesn't provide either, problem is going to be identified as
         // out-of-order argument instead of label mismatch.
-        auto &parameter = params[toArgIdx];
-        if (!parameter.getLabel().empty()) {
-          auto expectedLabel = parameter.getLabel();
-          auto argumentLabel = args[fromArgIdx].getLabel();
+        auto expectedLabel = params[toArgIdx].getLabel();
+        auto argumentLabel = args[fromArgIdx].getLabel();
 
-          // If there is a label but it's incorrect it can only mean
-          // situation like this: expected (x, _ y) got (y, _ x).
-          if (argumentLabel.empty() ||
-              (expectedLabel.compare(argumentLabel) != 0 &&
-               args[toArgIdx].getLabel().empty())) {
-            listener.missingLabel(toArgIdx);
+        if (argumentLabel != expectedLabel) {
+          // - The parameter is unnamed, in which case we try to fix the
+          //   problem by removing the name.
+          if (expectedLabel.empty()) {
+            if (listener.extraneousLabel(toArgIdx))
+              return true;
+          // - The argument is unnamed, in which case we try to fix the
+          //   problem by adding the name.
+          } else if (argumentLabel.empty()) {
+            if (listener.missingLabel(toArgIdx))
+              return true;
+          // - The argument label has a typo at the same position.
+          } else if (fromArgIdx == toArgIdx &&
+                     listener.incorrectLabel(toArgIdx)) {
             return true;
           }
+        }
+
+        if (boundArgIdx == argIdx) {
+          // If the argument is in the right location, just continue
+          argIdx++;
+          continue;
         }
 
         listener.outOfOrderArgument(fromArgIdx, toArgIdx);
