@@ -25,9 +25,10 @@ class Base : P {
 class Derived : Base {
 }
 
-func generic<T>(_: T) {}
-func generic<T>(_: T?) {}
-func genericOpt<T>(_: T?) {}
+func genericOverload<T>(_: T) {}
+func genericOverload<T>(_: T?) {}
+func genericOptional<T>(_: T?) {}
+func genericNoOptional<T>(_: T) {}
 
 // CHECK-LABEL: sil hidden @$S7ranking22propertyVersusFunctionyyAA1P_p_xtAaCRzlF
 func propertyVersusFunction<T : P>(_ p: P, _ t: T) {
@@ -45,17 +46,23 @@ func propertyVersusFunction<T : P>(_ p: P, _ t: T) {
   let _: Any? = p.p
 
   // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter.1
-  // CHECK: function_ref @$S7ranking7genericyyxlF
-  generic(p.p)
+  // CHECK: function_ref @$S7ranking15genericOverloadyyxlF
+  genericOverload(p.p)
   // CHECK: witness_method $@opened("{{.*}}") P, #P.q!getter.1
-  // CHECK: function_ref @$S7ranking7genericyyxSglF
-  generic(p.q)
+  // CHECK: function_ref @$S7ranking15genericOverloadyyxSglF
+  genericOverload(p.q)
   // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter.1
-  // CHECK: function_ref @$S7ranking10genericOptyyxSglF
-  genericOpt(p.p)
+  // CHECK: function_ref @$S7ranking15genericOptionalyyxSglF
+  genericOptional(p.p)
   // CHECK: witness_method $@opened("{{.*}}") P, #P.q!getter.1
-  // CHECK: function_ref @$S7ranking10genericOptyyxSglF
-  genericOpt(p.q)
+  // CHECK: function_ref @$S7ranking15genericOptionalyyxSglF
+  genericOptional(p.q)
+  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter.1
+  // CHECK: function_ref @$S7ranking17genericNoOptionalyyxlF
+  genericNoOptional(p.p)
+  // CHECK: witness_method $@opened("{{.*}}") P, #P.q!getter.1
+  // CHECK: function_ref @$S7ranking17genericNoOptionalyyxlF
+  genericNoOptional(p.q)
 
   // CHECK: witness_method $T, #P.p!getter.1
   let _ = t.p
@@ -71,17 +78,23 @@ func propertyVersusFunction<T : P>(_ p: P, _ t: T) {
   let _: Any? = t.p
 
   // CHECK: witness_method $T, #P.p!getter.1
-  // CHECK: function_ref @$S7ranking7genericyyxlF
-  generic(t.p)
+  // CHECK: function_ref @$S7ranking15genericOverloadyyxlF
+  genericOverload(t.p)
   // CHECK: witness_method $T, #P.q!getter.1
-  // CHECK: function_ref @$S7ranking7genericyyxSglF
-  generic(t.q)
+  // CHECK: function_ref @$S7ranking15genericOverloadyyxSglF
+  genericOverload(t.q)
   // CHECK: witness_method $T, #P.p!getter.1
-  // CHECK: function_ref @$S7ranking10genericOptyyxSglF
-  genericOpt(t.p)
+  // CHECK: function_ref @$S7ranking15genericOptionalyyxSglF
+  genericOptional(t.p)
   // CHECK: witness_method $T, #P.q!getter.1
-  // CHECK: function_ref @$S7ranking10genericOptyyxSglF
-  genericOpt(t.q)
+  // CHECK: function_ref @$S7ranking15genericOptionalyyxSglF
+  genericOptional(t.q)
+  // CHECK: witness_method $T, #P.p!getter.1
+  // CHECK: function_ref @$S7ranking17genericNoOptionalyyxlF
+  genericNoOptional(t.p)
+  // CHECK: witness_method $T, #P.q!getter.1
+  // CHECK: function_ref @$S7ranking17genericNoOptionalyyxlF
+  genericNoOptional(t.q)
 }
 
 extension P {
@@ -98,6 +111,25 @@ extension P {
     let _: Any = self.p
     // CHECK: witness_method $Self, #P.p!getter.1
     let _: Any? = self.p
+
+    // CHECK: witness_method $Self, #P.p!getter.1
+    // CHECK: function_ref @$S7ranking15genericOverloadyyxlF
+    genericOverload(self.p)
+    // CHECK: witness_method $Self, #P.q!getter.1
+    // CHECK: function_ref @$S7ranking15genericOverloadyyxSglF
+    genericOverload(self.q)
+    // CHECK: witness_method $Self, #P.p!getter.1
+    // CHECK: function_ref @$S7ranking15genericOptionalyyxSglF
+    genericOptional(self.p)
+    // CHECK: witness_method $Self, #P.q!getter.1
+    // CHECK: function_ref @$S7ranking15genericOptionalyyxSglF
+    genericOptional(self.q)
+    // CHECK: witness_method $Self, #P.p!getter.1
+    // CHECK: function_ref @$S7ranking17genericNoOptionalyyxlF
+    genericNoOptional(self.p)
+    // CHECK: witness_method $Self, #P.q!getter.1
+    // CHECK: function_ref @$S7ranking17genericNoOptionalyyxlF
+    genericNoOptional(self.q)
   }
 }
 
