@@ -1946,7 +1946,7 @@ internal class _RawNativeDictionaryStorage
   /// _NativeSelfNSEnumerator proper type parameters.
   @objc
   internal func enumerator() -> _NSEnumerator {
-    return _NativeDictionaryNSEnumerator<AnyObject, AnyObject>(
+    return _SwiftDictionaryNSEnumerator<AnyObject, AnyObject>(
         _NativeDictionary(_storage: self))
   }
 
@@ -2087,7 +2087,7 @@ final internal class _HashableTypedNativeDictionaryStorage<Key: Hashable, Value>
 
   @objc
   internal override func enumerator() -> _NSEnumerator {
-    return _NativeDictionaryNSEnumerator<Key, Value>(
+    return _SwiftDictionaryNSEnumerator<Key, Value>(
         _NativeDictionary(_storage: self))
   }
 
@@ -2759,14 +2759,12 @@ extension _NativeDictionary/*: _DictionaryBuffer */ where Key: Hashable {
 #if _runtime(_ObjC)
 /// An NSEnumerator that works with any _NativeDictionary of
 /// verbatim bridgeable elements. Used by the various NSDictionary impls.
-final internal class _NativeDictionaryNSEnumerator<Key, Value>
+final internal class _SwiftDictionaryNSEnumerator<Key, Value>
   : _SwiftNativeNSEnumerator, _NSEnumerator {
 
-  internal typealias Index = _NativeDictionaryIndex<Key, Value>
-
   internal var nativeDictionary: _NativeDictionary<Key, Value>
-  internal var nextIndex: Index
-  internal var endIndex: Index
+  internal var nextIndex: _NativeDictionary<Key, Value>.Index
+  internal var endIndex: _NativeDictionary<Key, Value>.Index
 
   internal override required init() {
     _sanityCheckFailure("don't call this designated initializer")
@@ -3031,8 +3029,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
   @objc
   internal func enumerator() -> _NSEnumerator {
     bridgeEverything()
-    return _NativeDictionaryNSEnumerator<AnyObject, AnyObject>(
-      bridgedDictionary)
+    return _SwiftDictionaryNSEnumerator<AnyObject, AnyObject>(bridgedDictionary)
   }
 
   @objc(countByEnumeratingWithState:objects:count:)
