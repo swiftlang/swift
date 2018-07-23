@@ -1157,9 +1157,11 @@ namespace {
             if (isa<IdentityExpr>(ancestor) ||
                 isa<ForceValueExpr>(ancestor) ||
                 isa<AnyTryExpr>(ancestor)) {
-              if (target)
-                target = ancestor;
-              continue;
+              if (!CallArgs.count(ancestor)) {
+                if (target)
+                  target = ancestor;
+                continue;
+              }
             }
 
             // No other expression kinds are permitted.
