@@ -83,6 +83,19 @@ struct delete_with_free {
   }
 };
 
+#if SWIFT_OBJC_INTEROP
+/// Layout of a small prefix of an Objective-C protocol, used only to
+/// directly extract the name of the protocol.
+template <typename Runtime>
+struct TargetObjCProtocolPrefix {
+  /// Unused by the Swift runtime.
+  TargetPointer<Runtime, const void> _ObjC_Isa;
+
+  /// The mangled name of the protocol.
+  TargetPointer<Runtime, const char> Name;
+};
+#endif
+
 /// A generic reader of metadata.
 ///
 /// BuilderType must implement a particular interface which is currently

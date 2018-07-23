@@ -1577,19 +1577,6 @@ using TupleTypeMetadata = TargetTupleTypeMetadata<InProcess>;
   
 template <typename Runtime> struct TargetProtocolDescriptor;
 
-#if SWIFT_OBJC_INTEROP
-/// Layout of a small prefix of an Objective-C protocol, used only to
-/// directly extract the name of the protocol.
-template <typename Runtime>
-struct TargetObjCProtocolPrefix {
-  /// Unused by the Swift runtime.
-  TargetPointer<Runtime, const void> _ObjC_Isa;
-
-  /// The mangled name of the protocol.
-  TargetPointer<Runtime, const char> Name;
-};
-#endif
-
 /// A reference to a protocol within the runtime, which may be either
 /// a Swift protocol or (when Objective-C interoperability is enabled) an
 /// Objective-C protocol.
@@ -1648,18 +1635,6 @@ public:
 
   explicit constexpr operator bool() const {
     return storage != 0;
-  }
-
-  /// The name of the protocol.
-  TargetPointer<Runtime, const char> getName() const {
-#if SWIFT_OBJC_INTEROP
-    if (isObjC()) {
-      return reinterpret_cast<TargetObjCProtocolPrefix<Runtime> *>(
-          getObjCProtocol())->Name;
-    }
-#endif
-
-    return getSwiftProtocol()->Name;
   }
 
   /// Determine what kind of protocol this is, Swift or Objective-C.
