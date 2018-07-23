@@ -431,24 +431,24 @@ class PrimalInfo {
 private:
   /// The primal value struct declaration.
   StructDecl *primalValueStruct = nullptr;
-  
+
   /// The SIL module;
   const SILModule &module;
-  
+
   /// The corresponding type of the primal value struct. This is initially
   /// null. After this field is computed, mutation of primal value will lead to
   /// unexpected behavior.
   StructType *primalValueStructType = nullptr;
-  
+
   /// Mapping from original values that are preserved as non-control-dependent
   /// primal values to declaration references in the primal value struct.
   DenseMap<SILValue, VarDecl *> staticPrimalValueMap;
-  
+
   /// Mapping from types of control-dependent direct primal values to distinct
   /// tapes. Tapes are uniqued by the element
   /// type.
   DenseMap<CanType, VarDecl *> directTapeTypeMap;
-  
+
   /// Mapping from non-control-dependent `apply` instructions in the original
   /// function to the primal values returned by the corresponding call in the
   /// primal function.
@@ -472,7 +472,7 @@ private:
   /// inserted into `nestedStaticPrimalValueMap`. Otherwise, it'll go to the
   /// corresponding tape of its type.
   DenseMap<ApplyInst *, VarDecl *> nestedStaticPrimalValueMap;
-  
+
   /// Mapping from types of control-dependent nested primal values to district
   /// tapes.
   DenseMap<CanType, VarDecl *> nestedTapeTypeMap;
@@ -487,14 +487,14 @@ private:
   /// on it to go to the adjoint block corresponding to the original precessor
   /// block. This hash map will be populated during primal synthesis.
   DenseMap<SILBasicBlock *, unsigned> originalBlockIDs;
-  
+
   /// Declaration reference of the tape in the primal value struct that stores
   /// a trace of predecessors for each block in the original function with 2 or
   /// more predecessors. This is non-null when the original function has control
   /// flow. This tape is guaranteed to have type
   /// `$Swift._AutoDiffTape<Builtin.Int64>`.
   VarDecl *predecessorTraceTapeDecl = nullptr;
-  
+
   /// Mangler for mangling types.
   Mangle::ASTMangler mangler;
 
@@ -515,7 +515,7 @@ private:
 public:
   PrimalInfo(const PrimalInfo &) = delete;
   PrimalInfo &operator=(const PrimalInfo &) = delete;
-  
+
   explicit PrimalInfo(StructDecl *primalValueStruct, const SILModule &module)
     : primalValueStruct(&*primalValueStruct), module(module) {}
 
@@ -524,7 +524,7 @@ public:
   StructDecl *getPrimalValueStruct() const {
     return primalValueStruct;
   }
-  
+
   /// Computes the primal value struct type.
   StructType *computePrimalValueStructType() {
     assert(!primalValueStructType &&
@@ -534,7 +534,7 @@ public:
                     primalValueStruct->getASTContext());
     return primalValueStructType;
   }
-  
+
   /// Returns the primal value struct type, assuming the primal value struct
   /// type has already been computed before.
   StructType *getPrimalValueStructType() const {
@@ -547,7 +547,7 @@ public:
   SILType getLoweredPrimalValueStructType() const {
     return module.Types.getLoweredType(getPrimalValueStructType());
   }
-  
+
   /// Add a primal value decl for a non-control-dependent (static) value in the
   /// original function.
   VarDecl *addStaticPrimalValueDecl(SILValue originalValue) {
@@ -556,7 +556,7 @@ public:
     staticPrimalValueMap.insert({originalValue, decl});
     return decl;
   }
-  
+
   /// Add a nested primal value decl for a non-control-dependent (static) primal
   /// value returned by the corresponding instruction in the primal function
   /// of an `apply` instruction in the original function.
@@ -573,7 +573,7 @@ public:
     auto lookup = staticPrimalValueMap.find(originalValue);
     return lookup == staticPrimalValueMap.end() ? nullptr : lookup->getSecond();
   }
-  
+
   /// Finds the primal value decl in the primal value struct for an `apply` in
   /// the original function.
   VarDecl *lookupNestedStaticPrimalValueDecl(ApplyInst *inst) {
@@ -581,7 +581,7 @@ public:
     return lookup == nestedStaticPrimalValueMap.end()
       ? nullptr : lookup->getSecond();
   }
-  
+
   /// Retrieves the tape decl in the primal value struct for the specified type.
   VarDecl *getOrCreateTapeDeclForType(CanType type) {
     auto &astCtx = primalValueStruct->getASTContext();
@@ -594,13 +594,13 @@ public:
     }
     return tapeDecl;
   }
-  
+
   /// Retrieves the tape decl in the primal value struct for a value in the
   /// original function. Tapes are uniqued by the element type.
   VarDecl *getOrCreateTapeDeclForValue(SILValue value) {
     return getOrCreateTapeDeclForType(value->getType().getASTType());
   }
-  
+
   /// Retrieves the 'predecessor trace' tape decl in the primal value struct for
   /// control flow support.
   VarDecl *getOrCreatePredecessorTraceTapeDecl() {
@@ -613,7 +613,7 @@ public:
     return predecessorTraceTapeDecl;
   }
 };
-  
+
 /// A differentiation task, specifying the original function and the
 /// `[reverse_differentiable]` attribute on the function. PrimalGen and
 /// AdjointGen will synthesize the primal and the adjoint for this task, filling
@@ -678,17 +678,17 @@ public:
   SILFunction *getOriginal() const { return original; }
   SILReverseDifferentiableAttr *getAttribute() const { return attr; }
   DifferentiationInvoker getInvoker() const { return invoker; }
-  
+
   PrimalInfo *getPrimalInfo() const {
     return primalInfo.get();
   }
-  
+
   /// Initialize primal info for primal synthesis.
   void initializePrimalInfo(StructDecl *pvStruct, const SILModule &module) {
     assert(!primalInfo && "Primal info was previously initialized");
     primalInfo = std::unique_ptr<PrimalInfo>(new PrimalInfo(pvStruct, module));
   }
-  
+
   const SILReverseAutoDiffIndices &getIndices() const {
     return attr->getIndices();
   }
@@ -700,7 +700,7 @@ public:
     assert(fn); primal = fn;
     attr->setPrimalName(fn->getName());
   }
-  
+
   void setAdjoint(SILFunction *fn) {
     assert(fn); adjoint = fn;
     attr->setAdjointName(fn->getName());
@@ -998,7 +998,7 @@ public:
     if (existing == enqueuedTaskIndices.end()) return nullptr;
     return differentiationTasks[existing->getSecond()].get();
   }
-  
+
   /// Finds a differentiation task on a function such that the task produces
   /// adjoints for the least number of parameters that is a superset of
   /// the parameter indices in `indices`.
@@ -1675,7 +1675,7 @@ static void convertToIndirectSeed(intmax_t value, CanType type,
     builder.createEndAccess(loc, access, /*aborted*/ false);
     return;
   }
-  
+
   auto *targetTypeDecl = type->getAnyNominal();
   assert(targetTypeDecl && "Target type must be a nominal type");
   auto &astCtx = context.getASTContext();
@@ -1940,7 +1940,7 @@ private:
 
   /// The dominator tree of the original function.
   /// const DominanceInfo &domInfo;
-  
+
   /// The postdominator tree of the original function.
   const PostDominanceInfo &postDomInfo;
 
@@ -1976,7 +1976,7 @@ private:
   PrimalInfo &getPrimalInfo() const {
     return *getDifferentiationTask()->getPrimalInfo();
   }
-  
+
 protected:
   /// Determine the kind of the given primal value. It is a BB argument, a
   /// cost-free conversion like `struct_extract`, a value to be recomputed in
@@ -2249,7 +2249,7 @@ public:
     extractAllElements(primalCall, builder, allDirResults);
     collectPrimalValuesAndOriginalResults(primalFnTy, primalCall, allDirResults,
                                           primVals, origResults);
-    
+
     // Get original direct results for cloning.
     SmallVector<SILValue, 8> origDirResults;
     for (auto origRes : origResults)
@@ -2259,19 +2259,19 @@ public:
       joinElements(origDirResults, builder, primalCall->getLoc());
     // Store the original result from primal to the value map.
     ValueMap.insert({ai, origDirResultFromPrimal});
-    
+
     // FIXME: Handle indirect passing. One possible way is to scan the entire
     // data flow to determine whether the primal value struct should be
     // indirect. Then use a flag to determine whether we'll use SSA operations
     // or address operations to perform checkpointing.
-    
+
     // Checkpoint nested primal values as a tuple.
     auto nestedPrimValDeclTy =
       joinElementTypesFromValues(primVals, getASTContext());
     getPrimalInfo().addNestedStaticPrimalValueDecl(ai, nestedPrimValDeclTy);
     auto primValAggr = joinElements(primVals, builder, primalCall->getLoc());
     staticPrimalValues.push_back(primValAggr);
-    
+
     // Checkpoint original results as a tuple.
     getPrimalInfo().addStaticPrimalValueDecl(ai);
     auto origResAggr = joinElements(origResults, builder, primalCall->getLoc());
@@ -2294,7 +2294,7 @@ public:
     getContext().emitNondifferentiabilityError(
       gi, getDifferentiationTask(), diag::autodiff_nested_not_supported);
   }
-  
+
   /// Primal has qualified ownership. We assign store ownership qualifier while
   /// cloning the `store` instruction.
   void visitStoreInst(StoreInst *si) {
@@ -2308,7 +2308,7 @@ public:
     getBuilder().createStore(loc, getOpValue(si->getSrc()),
                              getOpValue(si->getDest()), soq);
   }
-  
+
   /// Primal has qualified ownership. We assign load ownership qualified while
   /// cloning the `load` instruction.
   void visitLoadInst(LoadInst *li) {
@@ -2443,6 +2443,137 @@ public:
   explicit AdjointGen(ADContext &context) : context(context) {}
 
 };
+} // end anonymous namespace
+
+//===----------------------------------------------------------------------===//
+// AdjointValue - a symbolic representation for adjoint values that allows
+// for efficient differentiation of aggregates.
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// A symbolic adjoint value that is capable of representing zero gradient 0 and
+/// 1, in addition to a materialized SILValue. This is expected to be passed
+/// around by value in most cases, as it's two words long.
+class AdjointValue {
+public:
+  enum Kind {
+    /// An empty adjoint, i.e. zero. This case exists due to its special
+    /// mathematical properties: `0 + x = x`. This is a guaranteed optimization
+    /// when we combine a zero adjoint with another (e.g. differentiating a
+    /// fanout).
+    Zero,
+
+    /// A tuple of adjoint values.
+    Tuple,
+
+    /// A materialized SIL value.
+    Materialized,
+  };
+
+private:
+  union Value {
+    ArrayRef<AdjointValue> aggregate;
+    SILValue materialized;
+    Value(ArrayRef<AdjointValue> v) : aggregate(v) {}
+    Value(SILValue v) : materialized(v) {}
+    Value() {}
+  };
+
+  /// The kind of this adjoint value.
+  Kind kind;
+
+  /// The type of this value as if it were materialized as a SIL value.
+  SILType type;
+
+  /// The underlying value.
+  Value value;
+
+  AdjointValue(Kind kind, SILType type, Value value)
+    : kind(kind), type(type), value(value) {}
+
+public:
+  AdjointValue(SILValue materializedValue)
+    : AdjointValue(Kind::Materialized, materializedValue->getType(),
+                   materializedValue) {}
+  AdjointValue(SingleValueInstruction *svi)
+    : AdjointValue(SILValue(svi)) {}
+
+  Kind getKind() const { return kind; }
+  SILType getType() const { return type; }
+  Type getSwiftType() const { return type.getASTType(); }
+
+  NominalTypeDecl *getNominalType() const {
+    return getSwiftType()->getAnyNominal();
+  }
+
+  bool isZero() const { return kind == Kind::Zero; }
+  bool isTuple() const { return kind == Kind::Tuple; }
+  bool isMaterialized() const { return kind == Kind::Materialized; }
+
+  static AdjointValue getZero(SILType type) {
+    return { Kind::Zero, type, {} };
+  }
+
+  static AdjointValue getMaterialized(SILValue value) {
+    return { Kind::Materialized, value->getType(), value };
+  }
+
+  static AdjointValue getTuple(TupleType *type,
+                               ArrayRef<AdjointValue> elements,
+                               llvm::BumpPtrAllocator &allocator) {
+    auto silTy = SILType::getPrimitiveObjectType(type->getCanonicalType());
+    // Tuple type elements must match the type of each adjoint value element.
+    assert(llvm::all_of(llvm::zip(type->getElementTypes(), elements),
+      [](std::pair<Type, AdjointValue> pair) {
+        return pair.first->isEqual(pair.second.getType().getASTType());
+      }));
+    return getAggregate(Kind::Tuple, silTy, elements, allocator);
+  }
+
+  ArrayRef<AdjointValue> getTupleElements() const {
+    assert(isTuple());
+    return value.aggregate;
+  }
+
+  SILValue getMaterializedValue() const {
+    assert(isMaterialized());
+    return value.materialized;
+  }
+
+private:
+  /// Helper for creating aggregate values, such as tuples and structs.
+  static AdjointValue getAggregate(
+    Kind kind, SILType type, ArrayRef<AdjointValue> elements,
+    llvm::BumpPtrAllocator &allocator) {
+    AdjointValue *buf =
+      reinterpret_cast<AdjointValue *>(allocator.Allocate(
+        elements.size() * sizeof(AdjointValue),
+        alignof(AdjointValue)));
+    MutableArrayRef<AdjointValue> array(buf, elements.size());
+    std::uninitialized_copy(elements.begin(), elements.end(), array.begin());
+    return { kind, type, elements };
+  }
+
+public:
+  void print(llvm::raw_ostream &s = llvm::outs()) const {
+    switch (kind) {
+    case Kind::Zero:
+      s << "Zero";
+      break;
+    case Kind::Tuple:
+      s << "Tuple(";
+      interleave(getTupleElements(), [&s](AdjointValue elt) { elt.print(s); },
+                 [&s]{ s << ", "; });
+      s << ')';
+      break;
+    case Kind::Materialized:
+      s << "Materialized(" << getMaterializedValue() << ')';
+      break;
+    }
+  }
+};
+
 } // end anonymous namespace
 
 //===----------------------------------------------------------------------===//
@@ -2725,10 +2856,10 @@ void Differentiation::processGradientInst(GradientInst *gi,
   if (auto *originalFRI = findReferenceToVisibleFunction(operand)) {
     auto *original = originalFRI->getReferencedFunction();
     gradFn = lookupOrSynthesizeGradient(context, gi, original);
-    
+
     // If `gradFn` is still null, errors must have occurred.
     if (!gradFn) return;
-    
+
     // Replace the `gradient` instruction with the reference to the specified
     // function.
     SILBuilder builder(gi);
