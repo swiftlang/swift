@@ -4976,6 +4976,9 @@ public:
 
   using BodySynthesizer = void (*)(AbstractFunctionDecl *);
 
+private:
+  ParameterList *Params;
+
 protected:
   // If a function has a body at all, we have either a parsed body AST node or
   // we have saved the end location of the unparsed body.
@@ -5192,48 +5195,32 @@ public:
   /// depending on the function context.
   bool argumentNameIsAPIByDefault() const;
 
-  /// \brief Returns the "natural" number of argument clauses taken by this
-  /// function.  This value is one for free-standing functions, and two for
-  /// methods.
-  unsigned getNumParameterLists() const {
-    return Bits.AbstractFunctionDecl.HasImplicitSelfDecl ? 2 : 1;
-  }
-
-  /// \brief Returns the parameter pattern(s) for the function definition that
-  /// determine the parameter names bound in the function body.
-  ///
-  /// The number of "top-level" elements in this pattern will match the number
-  /// of argument names in the compound name of the function or constructor.
-  MutableArrayRef<ParameterList *> getParameterLists();
-  ArrayRef<const ParameterList *> getParameterLists() const {
-    auto paramLists =
-        const_cast<AbstractFunctionDecl *>(this)->getParameterLists();
-    return ArrayRef<const ParameterList *>(paramLists.data(),paramLists.size());
-  }
-  ParameterList *getParameterList(unsigned i) {
-    return getParameterLists()[i];
-  }
-  const ParameterList *getParameterList(unsigned i) const {
-    return getParameterLists()[i];
-  }
+  /// Retrieve the function's parameter list, not including 'self' if present.
   ParameterList *getParameters() {
-    return getParameterLists().back();
+    return Params;
   }
   const ParameterList *getParameters() const {
-    return getParameterLists().back();
+    return Params;
   }
 
   void setParameters(ParamDecl *SelfDecl,
                      ParameterList *Params);
 
-  /// \brief This method returns the implicit 'self' decl.
-  ///
-  /// Note that some functions don't have an implicit 'self' decl, for example,
-  /// free functions.  In this case nullptr is returned.
+  bool hasImplicitSelfDecl() const {
+    return Bits.AbstractFunctionDecl.HasImplicitSelfDecl;
+  }
+
+  ParamDecl **getImplicitSelfDeclStorage();
+
+  /// Retrieve the implicit 'self' parameter for methods, or nullptr for free
+  /// functions.
   const ParamDecl *getImplicitSelfDecl() const {
     return const_cast<AbstractFunctionDecl*>(this)->getImplicitSelfDecl();
   }
-  ParamDecl *getImplicitSelfDecl();
+  ParamDecl *getImplicitSelfDecl() {
+    auto **selfDecl = getImplicitSelfDeclStorage();
+    return (selfDecl == nullptr ? nullptr : *selfDecl);
+  }
 
   /// Retrieve the declaration that this method overrides, if any.
   AbstractFunctionDecl *getOverriddenDecl() const {
@@ -5330,11 +5317,6 @@ class FuncDecl : public AbstractFunctionDecl {
   OperatorDecl *Operator = nullptr;
 
 protected:
-  ParameterList **getParameterListBuffer(); // defined inline below
-  ParameterList * const *getParameterListBuffer() const {
-    return const_cast<FuncDecl*>(this)->getParameterListBuffer();
-  }
-
   FuncDecl(DeclKind Kind,
            SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
            SourceLoc FuncLoc,
@@ -5426,30 +5408,7 @@ public:
   void setSelfAccessKind(SelfAccessKind mod) {
     Bits.FuncDecl.SelfAccess = static_cast<unsigned>(mod);
   }
-      
-  /// \brief Returns the parameter lists(s) for the function definition.
-  ///
-  /// The number of "top-level" elements will match the number of argument names
-  /// in the compound name of the function or constructor.
-  MutableArrayRef<ParameterList *> getParameterLists() {
-    return {getParameterListBuffer(), getNumParameterLists()};
-  }
-  ArrayRef<const ParameterList *> getParameterLists() const {
-    return {getParameterListBuffer(), getNumParameterLists()};
-  }
-  ParameterList *getParameterList(unsigned i) {
-    return getParameterLists()[i];
-  }
-  const ParameterList *getParameterList(unsigned i) const {
-    return getParameterLists()[i];
-  }
-  ParameterList *getParameters() {
-    return getParameterLists().back();
-  }
-  const ParameterList *getParameters() const {
-    return getParameterLists().back();
-  }
-  
+
   /// \returns true if this is non-mutating due to applying a 'mutating'
   /// attribute. For example a "mutating set" accessor.
   bool isExplicitNonMutating() const;
@@ -5504,7 +5463,9 @@ public:
   void getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const {
     return getCaptureInfo().getLocalCaptures(Result);
   }
-  
+
+  ParamDecl **getImplicitSelfDeclStorage();
+
   /// Get the supertype method this method overrides, if any.
   FuncDecl *getOverriddenDecl() const {
     return cast_or_null<FuncDecl>(AbstractFunctionDecl::getOverriddenDecl());
@@ -5671,14 +5632,6 @@ public:
     return false;
   }
 };
-
-inline ParameterList **FuncDecl::getParameterListBuffer() {
-  if (!isa<AccessorDecl>(this)) {
-    assert(getKind() == DeclKind::Func && "no new kinds of functions");
-    return reinterpret_cast<ParameterList**>(this+1);
-  }
-  return reinterpret_cast<ParameterList**>(static_cast<AccessorDecl*>(this)+1);
-}
 
 inline AccessorDecl *
 AbstractStorageDecl::AccessorRecord::getAccessor(AccessorKind kind) const {
@@ -5903,7 +5856,7 @@ class ConstructorDecl : public AbstractFunctionDecl {
   /// The location of the '!' or '?' for a failable initializer.
   SourceLoc FailabilityLoc;
 
-  ParameterList *ParameterLists[2];
+  ParamDecl *SelfDecl;
 
   /// The interface type of the initializing constructor.
   Type InitializerInterfaceType;
@@ -5939,25 +5892,7 @@ public:
   Expr *getSuperInitCall() { return CallToSuperInit; }
   void setSuperInitCall(Expr *CallExpr) { CallToSuperInit = CallExpr; }
 
-  MutableArrayRef<ParameterList *> getParameterLists() {
-    return { ParameterLists, 2 };
-  }
-  ArrayRef<const ParameterList *> getParameterLists() const {
-    return AbstractFunctionDecl::getParameterLists();
-  }
-  ParameterList *getParameterList(unsigned i) {
-    return getParameterLists()[i];
-  }
-  const ParameterList *getParameterList(unsigned i) const {
-    return getParameterLists()[i];
-  }
-  
-  /// Returns the normal parameters to the initializer, not including self.
-  ParameterList *getParameters() { return ParameterLists[1]; }
-
-  /// Returns the normal parameters to the initializer, not including self.
-  const ParameterList *getParameters() const { return ParameterLists[1]; }
-
+  ParamDecl **getImplicitSelfDeclStorage() { return &SelfDecl; }
 
   /// Specifies the kind of initialization call performed within the body
   /// of the constructor, e.g., self.init or super.init.
@@ -6103,19 +6038,14 @@ public:
 /// }
 /// \endcode
 class DestructorDecl : public AbstractFunctionDecl {
-  ParameterList *ParameterLists[2];
+  ParamDecl *SelfDecl;
 
 public:
   DestructorDecl(SourceLoc DestructorLoc, ParamDecl *selfDecl,
                  DeclContext *Parent);
 
-  MutableArrayRef<ParameterList *> getParameterLists() {
-    return { ParameterLists, 2 };
-  }
-  ArrayRef<const ParameterList *> getParameterLists() const {
-    return { ParameterLists, 2 };
-  }
-  
+  ParamDecl **getImplicitSelfDeclStorage() { return &SelfDecl; }
+
   SourceLoc getDestructorLoc() const { return getNameLoc(); }
   SourceLoc getStartLoc() const { return getDestructorLoc(); }
   SourceRange getSourceRange() const;
@@ -6569,18 +6499,32 @@ inline bool AbstractStorageDecl::isStatic() const {
   return false;
 }
 
-inline MutableArrayRef<ParameterList *>
-AbstractFunctionDecl::getParameterLists() {
+/// Constructors and destructors always have a 'self' parameter,
+/// which is stored in an instance member. Functions only have a
+/// 'self' if they are declared inside of a nominal type or extension,
+/// in which case we tail-allocate storage for it.
+inline ParamDecl **AbstractFunctionDecl::getImplicitSelfDeclStorage() {
   switch (getKind()) {
   default: llvm_unreachable("Unknown AbstractFunctionDecl!");
   case DeclKind::Constructor:
-    return cast<ConstructorDecl>(this)->getParameterLists();
+    return cast<ConstructorDecl>(this)->getImplicitSelfDeclStorage();
   case DeclKind::Destructor:
-    return cast<DestructorDecl>(this)->getParameterLists();
+    return cast<DestructorDecl>(this)->getImplicitSelfDeclStorage();
   case DeclKind::Func:
   case DeclKind::Accessor:
-    return cast<FuncDecl>(this)->getParameterLists();
+    return cast<FuncDecl>(this)->getImplicitSelfDeclStorage();
   }
+}
+
+inline ParamDecl **FuncDecl::getImplicitSelfDeclStorage() {
+  if (!hasImplicitSelfDecl())
+    return nullptr;
+
+  if (!isa<AccessorDecl>(this)) {
+    assert(getKind() == DeclKind::Func && "no new kinds of functions");
+    return reinterpret_cast<ParamDecl **>(this+1);
+  }
+  return reinterpret_cast<ParamDecl **>(static_cast<AccessorDecl*>(this)+1);
 }
 
 inline DeclIterator &DeclIterator::operator++() {

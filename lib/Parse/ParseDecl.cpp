@@ -5255,7 +5255,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   if (HasContainerType)
     SelfDecl = ParamDecl::createUnboundSelf(NameLoc, CurDeclContext);
 
-  DefaultArgumentInfo DefaultArgs(HasContainerType);
+  DefaultArgumentInfo DefaultArgs;
   TypeRepr *FuncRetTy = nullptr;
   DeclName FullName;
   ParameterList *BodyParams;
@@ -5322,7 +5322,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     if (SignatureHasCodeCompletion)
       CodeCompletion->setParsedDecl(FD);
 
-    DefaultArgs.setFunctionContext(FD, FD->getParameterLists());
+    DefaultArgs.setFunctionContext(FD, FD->getParameters());
     if (auto *P = FD->getImplicitSelfDecl())
       addToScope(P);
     addParametersToScope(FD->getParameters());
@@ -6177,7 +6177,7 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     return makeParserCodeCompletionStatus();
 
   // Parse the parameters.
-  DefaultArgumentInfo DefaultArgs(/*inTypeContext*/true);
+  DefaultArgumentInfo DefaultArgs;
   llvm::SmallVector<Identifier, 4> namePieces;
   bool SignatureHasCodeCompletion = false;
   ParserResult<ParameterList> Params
@@ -6237,7 +6237,7 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   // No need to setLocalDiscriminator.
 
-  DefaultArgs.setFunctionContext(CD, CD->getParameterLists());
+  DefaultArgs.setFunctionContext(CD, CD->getParameters());
 
   // Pass the function signature to code completion.
   if (SignatureHasCodeCompletion)

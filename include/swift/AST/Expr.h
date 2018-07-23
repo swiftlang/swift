@@ -3447,14 +3447,6 @@ public:
   }
   enum : unsigned { InvalidDiscriminator = 0xFFFF };
 
-  ArrayRef<ParameterList *> getParameterLists() {
-    return parameterList ? parameterList : ArrayRef<ParameterList *>();
-  }
-  
-  ArrayRef<const ParameterList *> getParameterLists() const {
-    return parameterList ? parameterList : ArrayRef<const ParameterList *>();
-  }
-
   /// \brief Retrieve the result type of this closure.
   Type getResultType(llvm::function_ref<Type(const Expr *)> getType =
                          [](const Expr *E) -> Type {

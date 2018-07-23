@@ -2830,7 +2830,7 @@ public:
 
       // Check that type members have an interface type of the form
       // (Self) -> (Args...) -> Result.
-      if (AFD->getImplicitSelfDecl()) {
+      if (AFD->hasImplicitSelfDecl()) {
         if (!interfaceTy->castTo<AnyFunctionType>()
               ->getResult()->is<FunctionType>()) {
           Out << "Interface type of method must return a function";
@@ -2866,7 +2866,7 @@ public:
       // If a decl has the Throws bit set, the function type should throw,
       // and vice versa.
       auto fnTy = AFD->getInterfaceType()->castTo<AnyFunctionType>();
-      if (AFD->getImplicitSelfDecl())
+      if (AFD->hasImplicitSelfDecl())
         fnTy = fnTy->getResult()->castTo<FunctionType>();
 
       if (AFD->hasThrows() != fnTy->getExtInfo().throws()) {

@@ -57,7 +57,7 @@ static DefaultArgumentKind getDefaultArgKind(Expr *init) {
 }
 
 void Parser::DefaultArgumentInfo::setFunctionContext(
-    DeclContext *DC, ArrayRef<ParameterList *> paramList){
+    DeclContext *DC, ParameterList *paramList){
   for (auto context : ParsedContexts) {
     context->changeFunction(DC, paramList);
   }
