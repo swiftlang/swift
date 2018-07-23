@@ -2524,10 +2524,7 @@ public:
                                llvm::BumpPtrAllocator &allocator) {
     auto silTy = SILType::getPrimitiveObjectType(type->getCanonicalType());
     // Tuple type elements must match the type of each adjoint value element.
-    assert(llvm::all_of(llvm::zip(type->getElementTypes(), elements),
-      [](std::pair<Type, AdjointValue> pair) {
-        return pair.first->isEqual(pair.second.getType().getASTType());
-      }));
+    assert(aggregateElementTypesEqual(elements, type->getElementTypes()));
     return getAggregate(Kind::Tuple, silTy, elements, allocator);
   }
 
@@ -2542,6 +2539,15 @@ public:
   }
 
 private:
+  template<typename TypeRange>
+  static bool aggregateElementTypesEqual(ArrayRef<AdjointValue> elements,
+                                         TypeRange &&types) {
+    for (auto pair : llvm::zip(types, elements))
+      if (!std::get<0>(pair)->isEqual(std::get<1>(pair).getSwiftType()))
+        return false;
+    return true;
+  }
+  
   /// Helper for creating aggregate values, such as tuples and structs.
   static AdjointValue getAggregate(
     Kind kind, SILType type, ArrayRef<AdjointValue> elements,
