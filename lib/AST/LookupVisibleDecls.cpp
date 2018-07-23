@@ -340,17 +340,14 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
       case DeclKind::Accessor:
       case DeclKind::Func: {
         auto FD = cast<FuncDecl>(D);
-        assert(FD->getImplicitSelfDecl() && "should not find free functions");
+        assert(FD->hasImplicitSelfDecl() && "should not find free functions");
         (void)FD;
 
         if (FD->isInvalid())
           break;
 
         // Get the type without the first uncurry level with 'self'.
-        CanType T = D->getInterfaceType()
-                        ->castTo<AnyFunctionType>()
-                        ->getResult()
-                        ->getCanonicalType();
+        CanType T = FD->getMethodInterfaceType()->getCanonicalType();
 
         auto Signature = std::make_pair(D->getBaseName(), T);
         if (!FunctionsReported.insert(Signature).second)

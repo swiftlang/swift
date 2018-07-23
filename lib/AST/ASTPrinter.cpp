@@ -2333,7 +2333,7 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
   auto curTy = AFD->hasInterfaceType() ? AFD->getInterfaceType() : nullptr;
 
   // Skip over the implicit 'self'.
-  if (AFD->getImplicitSelfDecl()) {
+  if (AFD->hasImplicitSelfDecl()) {
     if (curTy)
       if (auto funTy = curTy->getAs<AnyFunctionType>())
         curTy = funTy->getResult();

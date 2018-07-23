@@ -4306,8 +4306,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       }
     }
 
-    if (CD->getDeclContext()->isTypeContext())
-      configureImplicitSelf(*this, CD);
+    configureImplicitSelf(*this, CD);
 
     validateGenericFuncSignature(CD);
     recordParamContextTypes(CD);

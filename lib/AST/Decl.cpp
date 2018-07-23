@@ -1981,7 +1981,7 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
 
 CanType ValueDecl::getOverloadSignatureType() const {
   if (auto *afd = dyn_cast<AbstractFunctionDecl>(this)) {
-    bool isMethod = afd->getImplicitSelfDecl() != nullptr;
+    bool isMethod = afd->hasImplicitSelfDecl();
     return mapSignatureFunctionType(
                            getASTContext(), getInterfaceType(),
                            /*topLevelFunction=*/true,
@@ -4647,22 +4647,14 @@ void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
 }
 
 void DefaultArgumentInitializer::changeFunction(
-    DeclContext *parent, ArrayRef<ParameterList *> paramLists) {
+    DeclContext *parent, ParameterList *paramList) {
   if (parent->isLocalContext()) {
     setParent(parent);
   }
 
-  unsigned offset = getIndex();
-  for (auto list : paramLists) {
-    if (offset < list->size()) {
-      auto param = list->get(offset);
-      if (param->getDefaultValue())
-        param->setDefaultArgumentInitContext(this);
-      return;
-    }
-
-    offset -= list->size();
-  }
+  auto param = paramList->get(getIndex());
+  if (param->getDefaultValue())
+    param->setDefaultArgumentInitContext(this);
 }
 
 /// Determine whether the given Swift type is an integral type, i.e.,
@@ -4797,26 +4789,6 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
   }
 
   return DeclName();
-}
-
-/// \brief This method returns the implicit 'self' decl.
-///
-/// Note that some functions don't have an implicit 'self' decl, for example,
-/// free functions.  In this case nullptr is returned.
-ParamDecl *AbstractFunctionDecl::getImplicitSelfDecl() {
-  if (!getDeclContext()->isTypeContext())
-    return nullptr;
-
-  // "self" is always the first parameter list.
-  auto paramLists = getParameterLists();
-  assert(paramLists.size() == 2);
-  assert(paramLists[0]->size() == 1);
-
-  auto selfParam = paramLists[0]->get(0);
-  assert(selfParam->getName() == getASTContext().Id_self);
-  assert(selfParam->isImplicit());
-
-  return selfParam;
 }
 
 std::pair<DefaultArgumentKind, Type>
@@ -5107,18 +5079,14 @@ void AbstractFunctionDecl::setParameters(ParamDecl *SelfDecl,
   assert(!Name || (Name.getArgumentNames().size() == BodyParams->size()));
 #endif
 
-  MutableArrayRef<ParameterList *> BodyParamsRef = getParameterLists();
+  assert(Bits.AbstractFunctionDecl.HasImplicitSelfDecl
+         == (SelfDecl != nullptr));
   if (SelfDecl) {
-    assert(Bits.AbstractFunctionDecl.HasImplicitSelfDecl);
-    BodyParamsRef[0] = ParameterList::create(getASTContext(), SelfDecl);
+    *getImplicitSelfDeclStorage() = SelfDecl;
     SelfDecl->setDeclContext(this);
-
-    BodyParamsRef[1] = BodyParams;
-  } else {
-    assert(!Bits.AbstractFunctionDecl.HasImplicitSelfDecl);
-    BodyParamsRef[0] = BodyParams;
   }
 
+  Params = BodyParams;
   BodyParams->setDeclContextOfParamDecls(this);
 }
 
@@ -5132,8 +5100,9 @@ FuncDecl *FuncDecl::createImpl(ASTContext &Context,
                                bool HasImplicitSelfDecl,
                                DeclContext *Parent,
                                ClangNode ClangN) {
-  unsigned NumParamPatterns = (HasImplicitSelfDecl ? 2 : 1);
-  size_t Size = sizeof(FuncDecl) + NumParamPatterns * sizeof(ParameterList *);
+  size_t Size = sizeof(FuncDecl) + (HasImplicitSelfDecl
+                                    ? sizeof(ParamDecl *)
+                                    : 0);
   void *DeclPtr = allocateMemoryForDecl<FuncDecl>(Context, Size,
                                                   !ClangN.isNull());
   auto D = ::new (DeclPtr)
@@ -5193,8 +5162,9 @@ AccessorDecl *AccessorDecl::createImpl(ASTContext &ctx,
                                        GenericParamList *genericParams,
                                        DeclContext *parent,
                                        ClangNode clangNode) {
-  unsigned numParamLists = hasImplicitSelfDecl ? 2 : 1;
-  size_t size = sizeof(AccessorDecl) + numParamLists * sizeof(ParameterList *);
+  size_t size = sizeof(AccessorDecl) + (hasImplicitSelfDecl
+                                        ? sizeof(ParamDecl *)
+                                        : 0);
   void *buffer = allocateMemoryForDecl<AccessorDecl>(ctx, size,
                                                      !clangNode.isNull());
   auto D = ::new (buffer)
@@ -5276,7 +5246,7 @@ Type FuncDecl::getResultInterfaceType() const {
   if (resultTy->hasError())
     return resultTy;
 
-  if (getImplicitSelfDecl())
+  if (hasImplicitSelfDecl())
     resultTy = resultTy->castTo<AnyFunctionType>()->getResult();
 
   return resultTy->castTo<AnyFunctionType>()->getResult();

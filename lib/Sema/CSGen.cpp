@@ -682,7 +682,7 @@ namespace {
     size_t nNoDefault = 0;
     
     if (auto AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
-      assert(AFD->getImplicitSelfDecl() == nullptr);
+      assert(!AFD->hasImplicitSelfDecl());
       for (auto param : *AFD->getParameters()) {
         if (!param->isDefaultArgument())
           nNoDefault++;
@@ -780,7 +780,7 @@ namespace {
         // Figure out the parameter type, accounting for the implicit 'self' if
         // necessary.
         if (auto *FD = dyn_cast<AbstractFunctionDecl>(value)) {
-          if (FD->getImplicitSelfDecl()) {
+          if (FD->hasImplicitSelfDecl()) {
             if (auto resFnTy = fnTy->getResult()->getAs<AnyFunctionType>()) {
               fnTy = resFnTy;
             }
