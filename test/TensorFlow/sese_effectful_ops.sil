@@ -37,38 +37,6 @@ bb3:                                              // Preds: bb2
 // CHECK:   block bb7
 // CHECK:   block bb4]
 
-// receiveFromHostBuiltin
-sil private @receiveFromHostBuiltin : $@convention(thin) @callee_owned () -> () {
-bb0:
-  br bb2                                          // id: %0
-
-bb1:                                              // Preds: bb2
-  br bb2                                          // id: %1
-
-bb2:                                              // Preds: bb1 bb0
-  %2 = integer_literal $Builtin.Int32, 0          // user: %4
-  %3 = string_literal utf8 "/device:CPU:0"        // user: %4
-  %4 = builtin "__tfop_tfc.RecvFromHost,tensorId,device"(%2 : $Builtin.Int32, %3 : $Builtin.RawPointer) : $Builtin.Int32 // user: %6
-  %5 = integer_literal $Builtin.Int32, 0          // user: %6
-  %6 = builtin "cmp_eq_Int32"(%4 : $Builtin.Int32, %5 : $Builtin.Int32) : $Builtin.Int1 // user: %7
-  cond_br %6, bb1, bb3                            // id: %7
-
-bb3:                                              // Preds: bb2
-  %8 = tuple ()                                   // user: %9
-  return %8 : $()                                 // id: %9
-} // end sil function 'receiveFromHostBuiltin'
-// CHECK-LABEL: --- XLA CFG Canonicalize: {{.*}}receiveFromHostBuiltin{{.*}}
-// CHECK: [sequence
-// CHECK:   <while Preheader: bb0, Header: bb5, exit: bb7
-// CHECK:     [sequence
-// CHECK:       {condition Header: bb2
-// CHECK:         block bb1
-// CHECK:         block bb3}
-// CHECK:       block bb6]>
-// CHECK:   block bb7
-// CHECK:   block bb4]
-
-
 // sendToHost
 sil private @sendToHost : $@convention(thin) @callee_owned () -> Builtin.Int32 {
 bb0:
