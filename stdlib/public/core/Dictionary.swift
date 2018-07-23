@@ -74,7 +74,7 @@ import SwiftShims
 //     +-+
 //       |     Dictionary<K,V>.Index (an enum)
 //   +---|-----------------------------------+
-//   |   |  _CocoaDictionaryIndex (a struct) |
+//   |   | _CocoaDictionary.Index (a struct) |
 //   | +-|-----------------------------+     |
 //   | | * [ all keys ] [ next index ] |     |
 //   | +-------------------------------+     |
@@ -609,7 +609,7 @@ extension Dictionary: Collection {
   /// - Complexity: Amortized O(1) if the dictionary does not wrap a bridged
   ///   `NSDictionary`. If the dictionary wraps a bridged `NSDictionary`, the
   ///   performance is unspecified.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var startIndex: Index {
     return _variant.startIndex
   }
@@ -621,12 +621,12 @@ extension Dictionary: Collection {
   ///
   /// - Complexity: Amortized O(1) if the dictionary does not wrap a bridged
   ///   `NSDictionary`; otherwise, the performance is unspecified.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var endIndex: Index {
     return _variant.endIndex
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func index(after i: Index) -> Index {
     return _variant.index(after: i)
   }
@@ -645,7 +645,7 @@ extension Dictionary: Collection {
   /// - Parameter key: The key to find in the dictionary.
   /// - Returns: The index for `key` and its associated value if `key` is in
   ///   the dictionary; otherwise, `nil`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @inline(__always)
   public func index(forKey key: Key) -> Index? {
     // Complexity: amortized O(1) for native dictionary, O(*n*) when wrapping an
@@ -678,7 +678,7 @@ extension Dictionary: Collection {
   ///   `endIndex`.
   /// - Returns: A two-element tuple with the key and value corresponding to
   ///   `position`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public subscript(position: Index) -> Element {
     return _variant.assertingGet(at: position)
   }
@@ -686,7 +686,7 @@ extension Dictionary: Collection {
   /// The number of key-value pairs in the dictionary.
   ///
   /// - Complexity: O(1).
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var count: Int {
     return _variant.count
   }
@@ -1120,7 +1120,7 @@ extension Dictionary {
   ///
   /// - Complexity: O(*n*), where *n* is the number of key-value pairs in the
   ///   dictionary.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @discardableResult
   public mutating func remove(at index: Index) -> Element {
     return _variant.remove(at: index)
@@ -1154,7 +1154,7 @@ extension Dictionary {
   ///
   /// - Complexity: O(*n*), where *n* is the number of key-value pairs in the
   ///   dictionary.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @discardableResult
   public mutating func removeValue(forKey key: Key) -> Value? {
     return _variant.removeValue(forKey: key)
@@ -1172,7 +1172,7 @@ extension Dictionary {
   ///
   /// - Complexity: O(*n*), where *n* is the number of key-value pairs in the
   ///   dictionary.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
     // The 'will not decrease' part in the documentation comment is worded very
     // carefully.  The capacity can increase if we replace Cocoa dictionary with
@@ -1429,7 +1429,7 @@ extension Dictionary: Equatable where Value: Equatable {
         if !found {
           return false
         }
-        if rhsNative.value(at: pos.offset) != v {
+        if rhsNative.value(at: pos.bucket) != v {
           return false
         }
       }
@@ -1601,8 +1601,9 @@ internal enum _MergeError: Error {
 /// Equivalent to `NSDictionary.allKeys`, but does not leave objects on the
 /// autorelease pool.
 @inlinable // FIXME(sil-serialize-all)
-internal func _stdlib_NSDictionary_allKeys(_ nsd: _NSDictionary)
-    -> _HeapBuffer<Int, AnyObject> {
+internal func _stdlib_NSDictionary_allKeys(
+  _ nsd: _NSDictionary
+) -> _HeapBuffer<Int, AnyObject> {
   let count = nsd.count
   let storage = _HeapBuffer<Int, AnyObject>(
     _HeapBufferStorage<Int, AnyObject>.self, count, count)
@@ -2102,7 +2103,7 @@ final internal class _HashableTypedNativeDictionaryStorage<Key: Hashable, Value>
       theState.state = 1 // Arbitrary non-zero value.
       theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
       theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
-      theState.extra.0 = CUnsignedLong(native.startIndex.offset)
+      theState.extra.0 = CUnsignedLong(native.startIndex.bucket)
     }
 
     // Test 'objects' rather than 'count' because (a) this is very rare anyway,
@@ -2113,8 +2114,8 @@ final internal class _HashableTypedNativeDictionaryStorage<Key: Hashable, Value>
     }
 
     let unmanagedObjects = _UnmanagedAnyObjectArray(objects!)
-    var currIndex = _NativeDictionaryIndex<Key, Value>(
-        offset: Int(theState.extra.0))
+    var currIndex = _NativeDictionary<Key, Value>.Index(
+        bucket: Int(theState.extra.0))
     let endIndex = native.endIndex
     var stored = 0
     for i in 0..<count {
@@ -2127,7 +2128,7 @@ final internal class _HashableTypedNativeDictionaryStorage<Key: Hashable, Value>
       stored += 1
       native.formIndex(after: &currIndex)
     }
-    theState.extra.0 = CUnsignedLong(currIndex.offset)
+    theState.extra.0 = CUnsignedLong(currIndex.bucket)
     state.pointee = theState
     return stored
   }
@@ -2220,8 +2221,6 @@ internal struct _NativeDictionary<Key, Value> {
   internal typealias Element = (key: Key, value: Value)
   @usableFromInline // FIXME(sil-serialize-all)
   internal typealias TypedStorage = _TypedNativeDictionaryStorage<Key, Value>
-  @usableFromInline // FIXME(sil-serialize-all)
-  internal typealias Index = _NativeDictionaryIndex<Key, Value>
 
   /// See this comments on _RawNativeDictionaryStorage and its subclasses to
   /// understand why we store an untyped storage here.
@@ -2352,7 +2351,7 @@ internal struct _NativeDictionary<Key, Value> {
   /// Intended for use with verbatim bridgeable keys.
   @inlinable // FIXME(sil-serialize-all)
   internal func bridgedKey(at index: Index) -> AnyObject {
-    let k = key(at: index.offset)
+    let k = key(at: index.bucket)
     return _bridgeAnythingToObjectiveC(k)
   }
 
@@ -2361,7 +2360,7 @@ internal struct _NativeDictionary<Key, Value> {
   /// Intended for use with verbatim bridgeable keys.
   @inlinable // FIXME(sil-serialize-all)
   internal func bridgedValue(at index: Index) -> AnyObject {
-    let v = value(at: index.offset)
+    let v = value(at: index.bucket)
     return _bridgeAnythingToObjectiveC(v)
   }
 #endif
@@ -2429,23 +2428,23 @@ internal struct _NativeDictionary<Key, Value> {
   internal var startIndex: Index {
     // We start at "index after -1" instead of "0" because we need to find the
     // first occupied slot.
-    return index(after: Index(offset: -1))
+    return index(after: Index(bucket: -1))
   }
 
   @inlinable // FIXME(sil-serialize-all)
   internal var endIndex: Index {
-    return Index(offset: bucketCount)
+    return Index(bucket: bucketCount)
   }
 
   @inlinable // FIXME(sil-serialize-all)
   internal func index(after i: Index) -> Index {
     _precondition(i != endIndex)
-    var idx = i.offset + 1
+    var idx = i.bucket + 1
     while idx < bucketCount && !isInitializedEntry(at: idx) {
       idx += 1
     }
 
-    return Index(offset: idx)
+    return Index(bucket: idx)
   }
 
   @inlinable // FIXME(sil-serialize-all)
@@ -2455,12 +2454,12 @@ internal struct _NativeDictionary<Key, Value> {
 
   @inlinable // FIXME(sil-serialize-all)
   internal func assertingGet(at i: Index) -> Element {
-    _precondition(i.offset >= 0 && i.offset < bucketCount)
+    _precondition(i.bucket >= 0 && i.bucket < bucketCount)
     _precondition(
-      isInitializedEntry(at: i.offset),
+      isInitializedEntry(at: i.bucket),
       "Attempting to access Dictionary elements using an invalid Index")
-    let key = self.key(at: i.offset)
-    return (key, self.value(at: i.offset))
+    let key = self.key(at: i.bucket)
+    return (key, self.value(at: i.bucket))
   }
 }
 
@@ -2582,10 +2581,10 @@ extension _NativeDictionary where Key: Hashable {
     while true {
       let isHole = !isInitializedEntry(at: bucket)
       if isHole {
-        return (Index(offset: bucket), false)
+        return (Index(bucket: bucket), false)
       }
       if self.key(at: bucket) == key {
-        return (Index(offset: bucket), true)
+        return (Index(bucket: bucket), true)
       }
       bucket = _index(after: bucket)
     }
@@ -2609,7 +2608,7 @@ extension _NativeDictionary where Key: Hashable {
     let (i, found) = _find(newKey, startBucket: _bucket(newKey))
     _precondition(
       !found, "Duplicate key found in Dictionary. Keys may have been mutated after insertion")
-    initializeKey(newKey, value: value, at: i.offset)
+    initializeKey(newKey, value: value, at: i.bucket)
   }
 
   @inlinable // FIXME(sil-serialize-all)
@@ -2626,7 +2625,7 @@ extension _NativeDictionary where Key: Hashable {
       let (i, found) =
         dictionary._find(key, startBucket: dictionary._bucket(key))
       _precondition(!found, "Dictionary literal contains duplicate keys")
-      dictionary.initializeKey(key, value: value, at: i.offset)
+      dictionary.initializeKey(key, value: value, at: i.bucket)
     }
     dictionary.count = elements.count
 
@@ -2636,19 +2635,20 @@ extension _NativeDictionary where Key: Hashable {
 
 extension _NativeDictionary where Key: Hashable {
   /// - parameter idealBucket: The ideal bucket for the element being deleted.
-  /// - parameter offset: The offset of the element that will be deleted.
-  /// Precondition: there should be an initialized entry at offset.
+  /// - parameter bucket: The bucket containing the element to be deleted.
+  /// Precondition: there should be an initialized entry in the specified
+  /// bucket.
   @inlinable // FIXME(sil-serialize-all)
-  internal mutating func _delete(idealBucket: Int, offset: Int) {
-    _sanityCheck(isInitializedEntry(at: offset), "expected initialized entry")
+  internal mutating func _delete(idealBucket: Int, bucket: Int) {
+    _sanityCheck(isInitializedEntry(at: bucket), "expected initialized entry")
 
     // remove the element
-    destroyEntry(at: offset)
+    destroyEntry(at: bucket)
     self.count -= 1
 
     // If we've put a hole in a chain of contiguous elements, some
     // element after the hole may belong where the new hole is.
-    var hole = offset
+    var hole = bucket
 
     // Find the first bucket in the contiguous chain
     var start = idealBucket
@@ -2715,7 +2715,7 @@ extension _NativeDictionary where Key: Hashable {
     var i = startIndex
     while i != endIndex {
       let (k, v) = assertingGet(at: i)
-      try result.initializeKey(k, value: transform(v), at: i.offset)
+      try result.initializeKey(k, value: transform(v), at: i.bucket)
       formIndex(after: &i)
     }
     result.count = self.count
@@ -2750,7 +2750,7 @@ extension _NativeDictionary/*: _DictionaryBuffer */ where Key: Hashable {
 
     let (i, found) = _find(key, startBucket: _bucket(key))
     if found {
-      return self.value(at: i.offset)
+      return self.value(at: i.bucket)
     }
     return nil
   }
@@ -3021,7 +3021,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
       nativeKey, startBucket: nativeDictionary._bucket(nativeKey))
     if found {
       bridgeEverything()
-      return bridgedDictionary.value(at: i.offset)
+      return bridgedDictionary.value(at: i.bucket)
     }
     return nil
   }
@@ -3043,7 +3043,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
       theState.state = 1 // Arbitrary non-zero value.
       theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
       theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
-      theState.extra.0 = CUnsignedLong(nativeDictionary.startIndex.offset)
+      theState.extra.0 = CUnsignedLong(nativeDictionary.startIndex.bucket)
     }
 
     // Test 'objects' rather than 'count' because (a) this is very rare anyway,
@@ -3054,8 +3054,8 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     }
 
     let unmanagedObjects = _UnmanagedAnyObjectArray(objects!)
-    var currIndex = _NativeDictionaryIndex<Key, Value>(
-        offset: Int(theState.extra.0))
+    var currIndex = _NativeDictionary<Key, Value>.Index(
+        bucket: Int(theState.extra.0))
     let endIndex = nativeDictionary.endIndex
     var stored = 0
 
@@ -3069,12 +3069,12 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
         break
       }
 
-      let bridgedKey = bridgedDictionary.key(at: currIndex.offset)
+      let bridgedKey = bridgedDictionary.key(at: currIndex.bucket)
       unmanagedObjects[i] = bridgedKey
       stored += 1
       nativeDictionary.formIndex(after: &currIndex)
     }
-    theState.extra.0 = CUnsignedLong(currIndex.offset)
+    theState.extra.0 = CUnsignedLong(currIndex.bucket)
     state.pointee = theState
     return stored
   }
@@ -3094,9 +3094,6 @@ internal struct _CocoaDictionary: _DictionaryBuffer {
   internal init(_ object: _NSDictionary) {
     self.object = object
   }
-
-  @usableFromInline
-  internal typealias Index = _CocoaDictionaryIndex
 
   @usableFromInline
   internal typealias Key = AnyObject
@@ -3207,12 +3204,7 @@ internal struct _CocoaDictionary: _DictionaryBuffer {
 extension Dictionary {
   @usableFromInline
   @_frozen
-  internal enum _Variant: _DictionaryBuffer {
-    @usableFromInline
-    internal typealias Element = (key: Key, value: Value)
-    @usableFromInline
-    internal typealias NativeIndex = _NativeDictionaryIndex<Key, Value>
-
+  internal enum _Variant {
     case native(_NativeDictionary<Key, Value>)
 #if _runtime(_ObjC)
     case cocoa(_CocoaDictionary)
@@ -3220,14 +3212,17 @@ extension Dictionary {
   }
 }
 
-extension Dictionary._Variant {
+extension Dictionary._Variant: _DictionaryBuffer {
+  @usableFromInline
+  internal typealias Element = (key: Key, value: Value)
+
   @usableFromInline
   @_transparent
   internal var guaranteedNative: Bool {
     return _canBeClass(Key.self) == 0 || _canBeClass(Value.self) == 0
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal mutating func isUniquelyReferenced() -> Bool {
     // Note that &self drills down through .native(_NativeDictionary) to the
     // first property in _NativeDictionary, which is the reference to the
@@ -3248,7 +3243,7 @@ extension Dictionary._Variant {
     }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal var asNative: _NativeDictionary<Key, Value> {
     get {
       switch self {
@@ -3265,7 +3260,7 @@ extension Dictionary._Variant {
     }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal mutating func ensureNative() {
 #if _runtime(_ObjC)
     if _fastPath(guaranteedNative) { return }
@@ -3276,7 +3271,7 @@ extension Dictionary._Variant {
   }
 
 #if _runtime(_ObjC)
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal var asCocoa: _CocoaDictionary {
     switch self {
     case .native:
@@ -3288,7 +3283,7 @@ extension Dictionary._Variant {
 #endif
 
   /// Return true if self is native.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal var _isNative: Bool {
 #if _runtime(_ObjC)
     switch self {
@@ -3384,7 +3379,7 @@ extension Dictionary._Variant {
 
   /// Reserves enough space for the specified number of elements to be stored
   /// without reallocating additional storage.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal mutating func reserveCapacity(_ capacity: Int) {
     _ = ensureUniqueNative(withCapacity: capacity)
   }
@@ -3414,9 +3409,9 @@ extension Dictionary._Variant {
   //
 
   @usableFromInline
-  internal typealias Index = DictionaryIndex<Key, Value>
+  internal typealias Index = Dictionary<Key, Value>.Index
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal var startIndex: Index {
     if _fastPath(guaranteedNative) {
       return ._native(asNative.startIndex)
@@ -3432,7 +3427,7 @@ extension Dictionary._Variant {
     }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal var endIndex: Index {
     if _fastPath(guaranteedNative) {
       return ._native(asNative.endIndex)
@@ -3448,29 +3443,29 @@ extension Dictionary._Variant {
     }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal func index(after i: Index) -> Index {
     if _fastPath(guaranteedNative) {
-      return ._native(asNative.index(after: i._nativeIndex))
+      return ._native(asNative.index(after: i._asNative))
     }
 
     switch self {
     case .native:
-      return ._native(asNative.index(after: i._nativeIndex))
+      return ._native(asNative.index(after: i._asNative))
 #if _runtime(_ObjC)
     case .cocoa(let cocoaDictionary):
-      return ._cocoa(cocoaDictionary.index(after: i._cocoaIndex))
+      return ._cocoa(cocoaDictionary.index(after: i._asCocoa))
 #endif
     }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal func formIndex(after i: inout Index) {
     // FIXME: swift-3-indexing-model: optimize if possible.
     i = index(after: i)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @inline(__always)
   internal func index(forKey key: Key) -> Index? {
     if _fastPath(guaranteedNative) {
@@ -3497,7 +3492,7 @@ extension Dictionary._Variant {
     }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @inline(__always)
   internal func containsKey(_ key: Key) -> Bool {
     if _fastPath(guaranteedNative) {
@@ -3514,18 +3509,18 @@ extension Dictionary._Variant {
     }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal func assertingGet(at i: Index) -> (key: Key, value: Value) {
     if _fastPath(guaranteedNative) {
-      return asNative.assertingGet(at: i._nativeIndex)
+      return asNative.assertingGet(at: i._asNative)
     }
 
     switch self {
     case .native:
-      return asNative.assertingGet(at: i._nativeIndex)
+      return asNative.assertingGet(at: i._asNative)
 #if _runtime(_ObjC)
     case .cocoa(let cocoaBuffer):
-      let (cocoaKey, cocoaValue) = cocoaBuffer.assertingGet(at: i._cocoaIndex)
+      let (cocoaKey, cocoaValue) = cocoaBuffer.assertingGet(at: i._asCocoa)
       let nativeKey = _forceBridgeFromObjectiveC(cocoaKey, Key.self)
       let nativeValue = _forceBridgeFromObjectiveC(cocoaValue, Value.self)
       return (nativeKey, nativeValue)
@@ -3548,7 +3543,7 @@ extension Dictionary._Variant {
   }
 #endif
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @inline(__always)
   internal func maybeGet(_ key: Key) -> Value? {
     if _fastPath(guaranteedNative) {
@@ -3582,11 +3577,11 @@ extension Dictionary._Variant {
       i = asNative._find(key, startBucket: asNative._bucket(key)).pos
     }
 
-    let oldValue: Value? = found ? asNative.value(at: i.offset) : nil
+    let oldValue: Value? = found ? asNative.value(at: i.bucket) : nil
     if found {
-      asNative.setKey(key, value: value, at: i.offset)
+      asNative.setKey(key, value: value, at: i.bucket)
     } else {
-      asNative.initializeKey(key, value: value, at: i.offset)
+      asNative.initializeKey(key, value: value, at: i.bucket)
       asNative.count += 1
     }
 
@@ -3621,7 +3616,7 @@ extension Dictionary._Variant {
     // unoptimized builds; see https://bugs.swift.org/browse/SR-6437
     let bucketCount = asNative.bucketCount
     _ = ensureUniqueNative(withBucketCount: bucketCount)
-    return asNative.values + i._nativeIndex.offset
+    return asNative.values + i._asNative.bucket
   }
 
   @inlinable // FIXME(sil-serialize-all)
@@ -3639,7 +3634,7 @@ extension Dictionary._Variant {
       // We have to migrate the data to native storage before we can return a
       // mutable pointer. But after we migrate, the Cocoa index becomes
       // useless, so get the key first.
-      let cocoaIndex = i._cocoaIndex
+      let cocoaIndex = i._asCocoa
       let cocoaKey = cocoaIndex.allKeys[cocoaIndex.currentKeyIndex]
       migrateToNative(cocoaStorage)
       let key = _forceBridgeFromObjectiveC(cocoaKey, Key.self)
@@ -3668,9 +3663,9 @@ extension Dictionary._Variant {
       i = asNative._find(key, startBucket: asNative._bucket(key)).pos
     }
 
-    asNative.initializeKey(key, value: defaultValue(), at: i.offset)
+    asNative.initializeKey(key, value: defaultValue(), at: i.bucket)
     asNative.count += 1
-    return (inserted: true, pointer: asNative.values + i.offset)
+    return (inserted: true, pointer: asNative.values + i.bucket)
   }
 
   @inlinable // FIXME(sil-serialize-all)
@@ -3688,7 +3683,7 @@ extension Dictionary._Variant {
 
     var (i, found) = asNative._find(key, startBucket: asNative._bucket(key))
     if found {
-      return (inserted: false, memberAfterInsert: asNative.value(at: i.offset))
+      return (inserted: false, memberAfterInsert: asNative.value(at: i.bucket))
     }
 
     let minCapacity = asNative.count + 1
@@ -3698,7 +3693,7 @@ extension Dictionary._Variant {
       i = asNative._find(key, startBucket: asNative._bucket(key)).pos
     }
 
-    asNative.initializeKey(key, value: value, at: i.offset)
+    asNative.initializeKey(key, value: value, at: i.bucket)
     asNative.count += 1
 
     return (inserted: true, memberAfterInsert: value)
@@ -3745,8 +3740,8 @@ extension Dictionary._Variant {
         let bucketCount = asNative.bucketCount
         _ = ensureUniqueNative(withBucketCount: bucketCount)
         do {
-          let newValue = try combine(asNative.value(at: i.offset), value)
-          asNative.setKey(key, value: newValue, at: i.offset)
+          let newValue = try combine(asNative.value(at: i.bucket), value)
+          asNative.setKey(key, value: newValue, at: i.bucket)
         } catch _MergeError.keyCollision {
           fatalError("Duplicate values for key: '\(key)'")
         }
@@ -3757,7 +3752,7 @@ extension Dictionary._Variant {
           i = asNative._find(key, startBucket: asNative._bucket(key)).pos
         }
 
-        asNative.initializeKey(key, value: value, at: i.offset)
+        asNative.initializeKey(key, value: value, at: i.bucket)
         asNative.count += 1
       }
     }
@@ -3782,7 +3777,7 @@ extension Dictionary._Variant {
       let key = try keyForValue(value)
       var (i, found) = asNative._find(key, startBucket: asNative._bucket(key))
       if found {
-        asNative.values[i.offset].append(value)
+        asNative.values[i.bucket].append(value)
       } else {
         let minCapacity = asNative.count + 1
         let (_, capacityChanged) = ensureUniqueNative(withCapacity: minCapacity)
@@ -3790,7 +3785,7 @@ extension Dictionary._Variant {
           i = asNative._find(key, startBucket: asNative._bucket(key)).pos
         }
 
-        asNative.initializeKey(key, value: [value], at: i.offset)
+        asNative.initializeKey(key, value: [value], at: i.bucket)
         asNative.count += 1
       }
     }
@@ -3817,13 +3812,15 @@ extension Dictionary._Variant {
       (index, found) = nativeDictionary._find(key, startBucket: idealBucket)
       _sanityCheck(found, "key was lost during buffer migration")
     }
-    let oldValue = nativeDictionary.value(at: index.offset)
-    nativeDictionary._delete(idealBucket: idealBucket, offset: index.offset)
+    let oldValue = nativeDictionary.value(at: index.bucket)
+    nativeDictionary._delete(idealBucket: idealBucket, bucket: index.bucket)
     return oldValue
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  internal mutating func nativeRemove(at index: NativeIndex) -> Element {
+  internal mutating func nativeRemove(
+    at index: _NativeDictionary<Key, Value>.Index
+  ) -> Element {
     // This is in a separate variable to make the uniqueness check work in
     // unoptimized builds; see https://bugs.swift.org/browse/SR-6437
     let bucketCount = asNative.bucketCount
@@ -3834,7 +3831,7 @@ extension Dictionary._Variant {
     let result = nativeDictionary.assertingGet(at: index)
     let key = result.0
     let idealBucket = nativeDictionary._bucket(key)
-    nativeDictionary._delete(idealBucket: idealBucket, offset: index.offset)
+    nativeDictionary._delete(idealBucket: idealBucket, bucket: index.bucket)
     return result
   }
 
@@ -3842,12 +3839,12 @@ extension Dictionary._Variant {
   @discardableResult
   internal mutating func remove(at index: Index) -> Element {
     if _fastPath(guaranteedNative) {
-      return nativeRemove(at: index._nativeIndex)
+      return nativeRemove(at: index._asNative)
     }
 
     switch self {
     case .native:
-      return nativeRemove(at: index._nativeIndex)
+      return nativeRemove(at: index._asNative)
 #if _runtime(_ObjC)
     case .cocoa(let cocoaDictionary):
       // We have to migrate the data first.  But after we do so, the Cocoa
@@ -3855,7 +3852,7 @@ extension Dictionary._Variant {
       //
       // FIXME(performance): fuse data migration and element deletion into one
       // operation.
-      let index = index._cocoaIndex
+      let index = index._asCocoa
       let cocoaKey = index.allKeys[index.currentKeyIndex]
       migrateToNative(cocoaDictionary)
       let key = _forceBridgeFromObjectiveC(cocoaKey, Key.self)
@@ -3963,137 +3960,123 @@ extension Dictionary._Variant {
   }
 }
 
-@_fixed_layout // FIXME(sil-serialize-all)
-@usableFromInline
-internal struct _NativeDictionaryIndex<Key, Value> {
+extension _NativeDictionary {
+  @_fixed_layout
   @usableFromInline
-  internal var offset: Int
+  internal struct Index {
+    @usableFromInline
+    internal var bucket: Int
 
-  @inlinable // FIXME(sil-serialize-all)
-  internal init(offset: Int) {
-    self.offset = offset
+    @inlinable
+    internal init(bucket: Int) {
+      self.bucket = bucket
+    }
   }
 }
 
-extension _NativeDictionaryIndex: Equatable {
-  @inlinable // FIXME(sil-serialize-all)
+extension _NativeDictionary.Index: Equatable {
+  @inlinable
   internal static func == (
-    lhs: _NativeDictionaryIndex<Key, Value>,
-    rhs: _NativeDictionaryIndex<Key, Value>
+    lhs: _NativeDictionary.Index,
+    rhs: _NativeDictionary.Index
   ) -> Bool {
-    return lhs.offset == rhs.offset
+    return lhs.bucket == rhs.bucket
   }
 }
 
-extension _NativeDictionaryIndex: Comparable {
-  @inlinable // FIXME(sil-serialize-all)
+extension _NativeDictionary.Index: Comparable {
+  @inlinable
   internal static func < (
-    lhs: _NativeDictionaryIndex<Key, Value>,
-    rhs: _NativeDictionaryIndex<Key, Value>
+    lhs: _NativeDictionary.Index,
+    rhs: _NativeDictionary.Index
   ) -> Bool {
-    return lhs.offset < rhs.offset
+    return lhs.bucket < rhs.bucket
   }
 }
 
 #if _runtime(_ObjC)
-@_fixed_layout // FIXME(sil-serialize-all)
-@usableFromInline
-internal struct _CocoaDictionaryIndex {
-  // Assumption: we rely on NSDictionary.getObjects when being
-  // repeatedly called on the same NSDictionary, returning items in the same
-  // order every time.
-  // Similarly, the same assumption holds for NSSet.allObjects.
+extension _CocoaDictionary {
+  @_fixed_layout // FIXME(sil-serialize-all)
+  @usableFromInline
+  internal struct Index {
+    // Assumption: we rely on NSDictionary.getObjects when being
+    // repeatedly called on the same NSDictionary, returning items in the same
+    // order every time.
+    // Similarly, the same assumption holds for NSSet.allObjects.
 
-  /// A reference to the NSDictionary, which owns members in `allObjects`,
-  /// or `allKeys`, for NSSet and NSDictionary respectively.
-  @usableFromInline // FIXME(sil-serialize-all)
-  internal let cocoaDictionary: _CocoaDictionary
-  // FIXME: swift-3-indexing-model: try to remove the cocoa reference, but make
-  // sure that we have a safety check for accessing `allKeys`.  Maybe move both
-  // into the dictionary/set itself.
+    /// A reference to the NSDictionary, which owns members in `allObjects`,
+    /// or `allKeys`, for NSSet and NSDictionary respectively.
+    @usableFromInline // FIXME(sil-serialize-all)
+    internal let cocoaDictionary: _CocoaDictionary
+    // FIXME: swift-3-indexing-model: try to remove the cocoa reference, but
+    // make sure that we have a safety check for accessing `allKeys`.  Maybe
+    // move both into the dictionary/set itself.
 
-  /// An unowned array of keys.
-  @usableFromInline // FIXME(sil-serialize-all)
-  internal var allKeys: _HeapBuffer<Int, AnyObject>
+    /// An unowned array of keys.
+    @usableFromInline // FIXME(sil-serialize-all)
+    internal var allKeys: _HeapBuffer<Int, AnyObject>
 
-  /// Index into `allKeys`
-  @usableFromInline // FIXME(sil-serialize-all)
-  internal var currentKeyIndex: Int
+    /// Index into `allKeys`
+    @usableFromInline // FIXME(sil-serialize-all)
+    internal var currentKeyIndex: Int
 
-  @inlinable // FIXME(sil-serialize-all)
-  internal init(cocoaDictionary: _CocoaDictionary, startIndex: ()) {
-    self.cocoaDictionary = cocoaDictionary
-    self.allKeys = _stdlib_NSDictionary_allKeys(cocoaDictionary.object)
-    self.currentKeyIndex = 0
-  }
+    @inlinable // FIXME(sil-serialize-all)
+    internal init(cocoaDictionary: _CocoaDictionary, startIndex: ()) {
+      self.cocoaDictionary = cocoaDictionary
+      self.allKeys = _stdlib_NSDictionary_allKeys(cocoaDictionary.object)
+      self.currentKeyIndex = 0
+    }
 
-  @inlinable // FIXME(sil-serialize-all)
-  internal init(cocoaDictionary: _CocoaDictionary, endIndex: ()) {
-    self.cocoaDictionary = cocoaDictionary
-    self.allKeys = _stdlib_NSDictionary_allKeys(cocoaDictionary.object)
-    self.currentKeyIndex = allKeys.value
-  }
+    @inlinable // FIXME(sil-serialize-all)
+    internal init(cocoaDictionary: _CocoaDictionary, endIndex: ()) {
+      self.cocoaDictionary = cocoaDictionary
+      self.allKeys = _stdlib_NSDictionary_allKeys(cocoaDictionary.object)
+      self.currentKeyIndex = allKeys.value
+    }
 
-  @inlinable // FIXME(sil-serialize-all)
-  internal init(_ cocoaDictionary: _CocoaDictionary,
-    _ allKeys: _HeapBuffer<Int, AnyObject>,
-    _ currentKeyIndex: Int
-  ) {
-    self.cocoaDictionary = cocoaDictionary
-    self.allKeys = allKeys
-    self.currentKeyIndex = currentKeyIndex
-  }
+    @inlinable // FIXME(sil-serialize-all)
+    internal init(_ cocoaDictionary: _CocoaDictionary,
+      _ allKeys: _HeapBuffer<Int, AnyObject>,
+      _ currentKeyIndex: Int
+    ) {
+      self.cocoaDictionary = cocoaDictionary
+      self.allKeys = allKeys
+      self.currentKeyIndex = currentKeyIndex
+    }
 
-  /// Returns the next consecutive value after `self`.
-  ///
-  /// - Precondition: The next value is representable.
-  @inlinable // FIXME(sil-serialize-all)
-  internal func successor() -> _CocoaDictionaryIndex {
-    // FIXME: swift-3-indexing-model: remove this method.
-    _precondition(
-      currentKeyIndex < allKeys.value, "Cannot increment endIndex")
-    return _CocoaDictionaryIndex(cocoaDictionary, allKeys, currentKeyIndex + 1)
+    /// Returns the next consecutive value after `self`.
+    ///
+    /// - Precondition: The next value is representable.
+    @inlinable // FIXME(sil-serialize-all)
+    internal func successor() -> Index {
+      // FIXME: swift-3-indexing-model: remove this method.
+      _precondition(
+        currentKeyIndex < allKeys.value, "Cannot increment endIndex")
+      return Index(cocoaDictionary, allKeys, currentKeyIndex + 1)
+    }
   }
 }
 
-extension _CocoaDictionaryIndex: Equatable {
-  @inlinable // FIXME(sil-serialize-all)
+extension _CocoaDictionary.Index: Equatable {
+  @inlinable
   internal static func == (
-    lhs: _CocoaDictionaryIndex,
-    rhs: _CocoaDictionaryIndex
+    lhs: _CocoaDictionary.Index,
+    rhs: _CocoaDictionary.Index
   ) -> Bool {
     return lhs.currentKeyIndex == rhs.currentKeyIndex
   }
 }
 
-extension _CocoaDictionaryIndex: Comparable {
-  @inlinable // FIXME(sil-serialize-all)
+extension _CocoaDictionary.Index: Comparable {
+  @inlinable
   internal static func < (
-    lhs: _CocoaDictionaryIndex,
-    rhs: _CocoaDictionaryIndex
+    lhs: _CocoaDictionary.Index,
+    rhs: _CocoaDictionary.Index
   ) -> Bool {
     return lhs.currentKeyIndex < rhs.currentKeyIndex
   }
 }
 #endif
-
-@_frozen // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
-internal enum DictionaryIndexRepresentation<Key: Hashable, Value> {
-  @usableFromInline
-  typealias _Index = DictionaryIndex<Key, Value>
-  @usableFromInline
-  typealias _NativeIndex = _Index._NativeIndex
-#if _runtime(_ObjC)
-  @usableFromInline
-  typealias _CocoaIndex = _Index._CocoaIndex
-#endif
-
-  case _native(_NativeIndex)
-#if _runtime(_ObjC)
-  case _cocoa(_CocoaIndex)
-#endif
-}
 
 extension Dictionary {
   /// The position of a key-value pair in a dictionary.
@@ -4107,7 +4090,7 @@ extension Dictionary {
   /// 2. Subscripting with an index, yielding a key-value pair:
   ///
   ///        (k, v) = d[i]
-  @_fixed_layout // FIXME(sil-serialize-all)
+  @_fixed_layout
   public struct Index {
     // Index for native dictionary is efficient.  Index for bridged NSDictionary
     // is not, because neither NSEnumerator nor fast enumeration support moving
@@ -4116,82 +4099,90 @@ extension Dictionary {
     // safe to copy the state.  So, we cannot implement Index that is a value
     // type for bridged NSDictionary in terms of Cocoa enumeration facilities.
 
+    @_frozen
     @usableFromInline
-    internal typealias _NativeIndex = _NativeDictionaryIndex<Key, Value>
+    internal enum _Variant {
+      case native(_NativeDictionary<Key, Value>.Index)
 #if _runtime(_ObjC)
+      case cocoa(_CocoaDictionary.Index)
+#endif
+    }
+
     @usableFromInline
-    internal typealias _CocoaIndex = _CocoaDictionaryIndex
-#endif
+    internal var _variant: _Variant
 
-    @inlinable // FIXME(sil-serialize-all)
-    internal init(_value: DictionaryIndexRepresentation<Key, Value>) {
-      self._value = _value
+    @inlinable
+    internal init(_variant: _Variant) {
+      self._variant = _variant
     }
-
-    @usableFromInline // FIXME(sil-serialize-all)
-    internal var _value: DictionaryIndexRepresentation<Key, Value>
-
-    @inlinable // FIXME(sil-serialize-all)
-    internal static func _native(_ index: _NativeIndex) -> Index {
-      return DictionaryIndex(_value: ._native(index))
-    }
-
-#if _runtime(_ObjC)
-    @inlinable // FIXME(sil-serialize-all)
-    internal static func _cocoa(_ index: _CocoaIndex) -> Index {
-      return DictionaryIndex(_value: ._cocoa(index))
-    }
-#endif
-
-    @usableFromInline @_transparent
-    internal var _guaranteedNative: Bool {
-      return _canBeClass(Key.self) == 0 && _canBeClass(Value.self) == 0
-    }
-
-    @usableFromInline @_transparent
-    internal var _nativeIndex: _NativeIndex {
-      switch _value {
-      case ._native(let nativeIndex):
-        return nativeIndex
-#if _runtime(_ObjC)
-      case ._cocoa:
-        _sanityCheckFailure("internal error: does not contain a native index")
-#endif
-      }
-    }
-
-#if _runtime(_ObjC)
-    @usableFromInline @_transparent
-    internal var _cocoaIndex: _CocoaIndex {
-      switch _value {
-      case ._native:
-        _sanityCheckFailure("internal error: does not contain a Cocoa index")
-      case ._cocoa(let cocoaIndex):
-        return cocoaIndex
-      }
-    }
-#endif
   }
+}
+
+extension Dictionary.Index {
+  @inlinable
+  internal static func _native(
+    _ index: _NativeDictionary<Key, Value>.Index
+  ) -> Dictionary.Index {
+    return Dictionary.Index(_variant: .native(index))
+  }
+
+#if _runtime(_ObjC)
+  @inlinable
+  internal static func _cocoa(
+    _ index: _CocoaDictionary.Index
+  ) -> Dictionary.Index {
+    return Dictionary.Index(_variant: .cocoa(index))
+  }
+#endif
+
+  @usableFromInline @_transparent
+  internal var _guaranteedNative: Bool {
+    return _canBeClass(Key.self) == 0 && _canBeClass(Value.self) == 0
+  }
+
+  @usableFromInline @_transparent
+  internal var _asNative: _NativeDictionary<Key, Value>.Index {
+    switch _variant {
+    case .native(let nativeIndex):
+      return nativeIndex
+#if _runtime(_ObjC)
+    case .cocoa:
+      _sanityCheckFailure("internal error: does not contain a native index")
+#endif
+    }
+  }
+
+#if _runtime(_ObjC)
+  @usableFromInline @_transparent
+  internal var _asCocoa: _CocoaDictionary.Index {
+    switch _variant {
+    case .native:
+      _sanityCheckFailure("internal error: does not contain a Cocoa index")
+    case .cocoa(let cocoaIndex):
+      return cocoaIndex
+    }
+  }
+#endif
 }
 
 public typealias DictionaryIndex<Key: Hashable, Value> =
   Dictionary<Key, Value>.Index
 
 extension Dictionary.Index: Equatable {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public static func == (
     lhs: Dictionary<Key, Value>.Index,
     rhs: Dictionary<Key, Value>.Index
   ) -> Bool {
     if _fastPath(lhs._guaranteedNative) {
-      return lhs._nativeIndex == rhs._nativeIndex
+      return lhs._asNative == rhs._asNative
     }
 
-    switch (lhs._value, rhs._value) {
-    case (._native(let lhsNative), ._native(let rhsNative)):
+    switch (lhs._variant, rhs._variant) {
+    case (.native(let lhsNative), .native(let rhsNative)):
       return lhsNative == rhsNative
   #if _runtime(_ObjC)
-    case (._cocoa(let lhsCocoa), ._cocoa(let rhsCocoa)):
+    case (.cocoa(let lhsCocoa), .cocoa(let rhsCocoa)):
       return lhsCocoa == rhsCocoa
     default:
       _preconditionFailure("Comparing indexes from different sets")
@@ -4201,20 +4192,20 @@ extension Dictionary.Index: Equatable {
 }
 
 extension Dictionary.Index: Comparable {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public static func < (
     lhs: Dictionary<Key, Value>.Index,
     rhs: Dictionary<Key, Value>.Index
   ) -> Bool {
     if _fastPath(lhs._guaranteedNative) {
-      return lhs._nativeIndex < rhs._nativeIndex
+      return lhs._asNative < rhs._asNative
     }
 
-    switch (lhs._value, rhs._value) {
-    case (._native(let lhsNative), ._native(let rhsNative)):
+    switch (lhs._variant, rhs._variant) {
+    case (.native(let lhsNative), .native(let rhsNative)):
       return lhsNative < rhsNative
   #if _runtime(_ObjC)
-    case (._cocoa(let lhsCocoa), ._cocoa(let rhsCocoa)):
+    case (.cocoa(let lhsCocoa), .cocoa(let rhsCocoa)):
       return lhsCocoa < rhsCocoa
     default:
       _preconditionFailure("Comparing indexes from different sets")
@@ -4229,19 +4220,19 @@ extension Dictionary.Index: Hashable {
   #if _runtime(_ObjC)
     if _fastPath(_guaranteedNative) {
       hasher.combine(0 as UInt8)
-      hasher.combine(_nativeIndex.offset)
+      hasher.combine(_asNative.bucket)
       return
     }
-    switch _value {
-    case ._native(let nativeIndex):
+    switch _variant {
+    case .native(let nativeIndex):
       hasher.combine(0 as UInt8)
-      hasher.combine(nativeIndex.offset)
-    case ._cocoa(let cocoaIndex):
+      hasher.combine(nativeIndex.bucket)
+    case .cocoa(let cocoaIndex):
       hasher.combine(1 as UInt8)
       hasher.combine(cocoaIndex.currentKeyIndex)
     }
   #else
-    hasher.combine(_nativeIndex.offset)
+    hasher.combine(_asNative.bucket)
   #endif
   }
 }
@@ -4362,7 +4353,7 @@ public struct DictionaryIterator<Key: Hashable, Value>: IteratorProtocol {
   // IteratorProtocol, which is being consumed as iteration proceeds.
 
   @usableFromInline
-  internal typealias _NativeIndex = _NativeDictionaryIndex<Key, Value>
+  internal typealias _NativeIndex = _NativeDictionary<Key, Value>.Index
 
   @usableFromInline
   internal var _state: DictionaryIteratorRepresentation<Key, Value>
