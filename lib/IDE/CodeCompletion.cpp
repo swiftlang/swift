@@ -3283,7 +3283,10 @@ public:
     // escape and there isn't a better way to allocate scratch Expr nodes.
     UnresolvedDeclRefExpr UDRE(op->getName(), DeclRefKind::PostfixOperator,
                                DeclNameLoc(expr->getSourceRange().End));
-    PostfixUnaryExpr opExpr(&UDRE, expr);
+    ParenExpr parenExpr(expr->getSourceRange().Start, expr,
+                        expr->getSourceRange().End,
+                        /*hasTrailingClosure=*/false);
+    PostfixUnaryExpr opExpr(&UDRE, &parenExpr);
     Expr *tempExpr = &opExpr;
     ConcreteDeclRef referencedDecl;
     if (auto T = getTypeOfCompletionContextExpr(
