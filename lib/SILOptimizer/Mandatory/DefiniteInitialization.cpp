@@ -2521,7 +2521,7 @@ putIntoWorkList(SILBasicBlock *BB, WorkListType &WorkList) {
   LiveOutBlockState &State = getBlockInfo(BB);
   if (!State.isInWorkList && State.containsUndefinedValues()) {
     LLVM_DEBUG(llvm::dbgs() << "    add block " << BB->getDebugID()
-          << " to worklist\n");
+                            << " to worklist\n");
     WorkList.push_back(BB);
     State.isInWorkList = true;
   }
@@ -2529,7 +2529,8 @@ putIntoWorkList(SILBasicBlock *BB, WorkListType &WorkList) {
 
 void LifetimeChecker::
 computePredsLiveOut(SILBasicBlock *BB) {
-  LLVM_DEBUG(llvm::dbgs() << "  Get liveness for block " << BB->getDebugID() << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "  Get liveness for block " << BB->getDebugID()
+                          << "\n");
   
   // Collect blocks for which we have to calculate the out-availability.
   // These are the paths from blocks with known out-availability to the BB.
@@ -2567,8 +2568,9 @@ computePredsLiveOut(SILBasicBlock *BB) {
       for (auto Pred : WorkBB->getPredecessorBlocks()) {
         changed |= BBState.mergeFromPred(getBlockInfo(Pred));
       }
-      LLVM_DEBUG(llvm::dbgs() << "      Block " << WorkBB->getDebugID() << " out: "
-            << BBState.OutAvailability << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "      Block " << WorkBB->getDebugID()
+                              << " out: "
+                              << BBState.OutAvailability << "\n");
 
       // Clear the worklist-flag for the next call to computePredsLiveOut().
       // This could be moved out of the outer loop, but doing it here avoids
@@ -2641,7 +2643,7 @@ AvailabilitySet LifetimeChecker::getLivenessAtInst(SILInstruction *Inst,
                                                    unsigned FirstElt,
                                                    unsigned NumElts) {
   LLVM_DEBUG(llvm::dbgs() << "Get liveness " << FirstElt << ", #" << NumElts
-                     << " at " << *Inst);
+                          << " at " << *Inst);
 
   AvailabilitySet Result(TheMemory.NumElements);
 
@@ -2845,7 +2847,7 @@ static bool processMemoryObject(MarkUninitializedInst *I) {
 /// properties.
 static bool checkDefiniteInitialization(SILFunction &Fn) {
   LLVM_DEBUG(llvm::dbgs() << "*** Definite Init visiting function: "
-                     <<  Fn.getName() << "\n");
+                          <<  Fn.getName() << "\n");
   bool Changed = false;
 
   for (auto &BB : Fn) {

@@ -55,7 +55,7 @@ public:
     RCIA = PM->getAnalysis<RCIdentityAnalysis>()->get(getFunction());
 
     LLVM_DEBUG(llvm::dbgs() << "*** Running Pin Removal on "
-                       << getFunction()->getName() << "\n");
+                            << getFunction()->getName() << "\n");
 
     bool Changed = false;
     for (auto &BB : *getFunction()) {
@@ -85,10 +85,12 @@ public:
           LLVM_DEBUG(llvm::dbgs() << "        RCID Source: " << *RCId);
           auto *PinDef = dyn_cast<StrongPinInst>(RCId);
           if (PinDef && AvailablePins.count(PinDef)) {
-            LLVM_DEBUG(llvm::dbgs() << "        Found matching pin: " << *PinDef);
+            LLVM_DEBUG(llvm::dbgs() << "        Found matching pin: "
+                                    << *PinDef);
             SmallVector<MarkDependenceInst *, 8> MarkDependentInsts;
             if (areSafePinUsers(PinDef, Unpin, MarkDependentInsts)) {
-              LLVM_DEBUG(llvm::dbgs() << "        Pin users are safe! Removing!\n");
+              LLVM_DEBUG(llvm::dbgs() << "        Pin users are safe! "
+                                         "Removing!\n");
               Changed = true;
               auto *Enum = SILBuilder(PinDef).createOptionalSome(
                   PinDef->getLoc(), PinDef->getOperand(), PinDef->getType());
@@ -100,12 +102,12 @@ public:
               ++NumPinPairsRemoved;
             } else {
               LLVM_DEBUG(llvm::dbgs()
-                    << "        Pin users are not safe! Cannot remove!\n");
+                         << "        Pin users are not safe! Cannot remove!\n");
             }
 
             continue;
           } else {
-            LLVM_DEBUG(llvm::dbgs() << "        Failed to find matching pin!\n");
+            LLVM_DEBUG(llvm::dbgs() <<"        Failed to find matching pin!\n");
           }
           // Otherwise, fall through. An unpin, through destruction of an object
           // can have arbitrary sideeffects.
@@ -130,7 +132,7 @@ public:
         if (isa<StrongReleaseInst>(CurInst) || isa<ReleaseValueInst>(CurInst)) {
           if (isReleaseEndOfGuaranteedSelfCallSequence(CurInst)) {
             LLVM_DEBUG(llvm::dbgs() << "        Ignoring exactly balanced "
-                                  "release.\n");
+                                       "release.\n");
             continue;
           }
         }
@@ -138,7 +140,7 @@ public:
         // In all other cases check whether this could be a potentially
         // releasing instruction.
         LLVM_DEBUG(llvm::dbgs()
-              << "        Checking if this inst invalidates pins.\n");
+                   << "        Checking if this inst invalidates pins.\n");
         invalidateAvailablePins(CurInst);
       }
     }

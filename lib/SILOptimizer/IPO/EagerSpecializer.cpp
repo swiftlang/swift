@@ -707,12 +707,13 @@ static SILFunction *eagerSpecialize(SILFunction *GenericFunc,
   LLVM_DEBUG(dbgs() << "Specializing " << GenericFunc->getName() << "\n");
 
   LLVM_DEBUG(auto FT = GenericFunc->getLoweredFunctionType();
-        dbgs() << "  Generic Sig:";
-        dbgs().indent(2); FT->getGenericSignature()->print(dbgs());
-        dbgs() << "  Generic Env:";
-        dbgs().indent(2); GenericFunc->getGenericEnvironment()->dump(dbgs());
-        dbgs() << "  Specialize Attr:";
-        SA.print(dbgs()); dbgs() << "\n");
+             dbgs() << "  Generic Sig:";
+             dbgs().indent(2); FT->getGenericSignature()->print(dbgs());
+             dbgs() << "  Generic Env:";
+             dbgs().indent(2);
+             GenericFunc->getGenericEnvironment()->dump(dbgs());
+             dbgs() << "  Specialize Attr:";
+             SA.print(dbgs()); dbgs() << "\n");
 
   IsSerialized_t Serialized = IsNotSerialized;
   if (GenericFunc->isSerialized())
@@ -737,7 +738,7 @@ void EagerSpecializerTransform::run() {
   for (auto &F : *getModule()) {
     if (!F.shouldOptimize()) {
       LLVM_DEBUG(dbgs() << "  Cannot specialize function " << F.getName()
-                   << " marked to be excluded from optimizations.\n");
+                        << " marked to be excluded from optimizations.\n");
       continue;
     }
     // Only specialize functions in their home module.

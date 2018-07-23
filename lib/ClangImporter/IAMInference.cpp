@@ -434,8 +434,8 @@ private:
       for (auto str : argStrs)
         argLabels.push_back(getIdentifier(str));
       LLVM_DEBUG((beforeOmit = {context,
-                           getHumbleBaseName(baseName, isInitializer),
-                           argLabels}));
+                                getHumbleBaseName(baseName, isInitializer),
+                                argLabels}));
     }
 
     SmallVector<OmissionTypeName, 8> paramTypeNames;
@@ -460,7 +460,7 @@ private:
     if (didOmit) {
       ++OmitNumTimes;
       LLVM_DEBUG(llvm::dbgs() << "omission detected: " << beforeOmit << " ==> "
-                         << ret << "\n");
+                              << ret << "\n");
     }
 
     return ret;

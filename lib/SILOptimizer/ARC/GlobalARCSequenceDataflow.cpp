@@ -133,7 +133,7 @@ void ARCSequenceDataflowEvaluator::mergePredecessors(
       continue;
 
     LLVM_DEBUG(llvm::dbgs() << "    Merging Pred: " << PredDataHandle->getID()
-                       << "\n");
+                            << "\n");
 
     // If the predecessor is the head of a backedge in our traversal, clear any
     // state we are tracking now and clear the state of the basic block. There
@@ -178,7 +178,8 @@ bool ARCSequenceDataflowEvaluator::processTopDown() {
     //
     // TODO: When data handles are introduced, print that instead. This code
     // should not be touching BBIDs directly.
-    LLVM_DEBUG(llvm::dbgs() << "Processing BB#: " << BBDataHandle.getID() << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Processing BB#: " << BBDataHandle.getID()
+                            << "\n");
 
     LLVM_DEBUG(llvm::dbgs() << "Merging Predecessors!\n");
     mergePredecessors(BBDataHandle);
@@ -381,7 +382,8 @@ bool ARCSequenceDataflowEvaluator::processBottomUp(
 
     // This will always succeed since we have an entry for each BB in our post
     // order.
-    LLVM_DEBUG(llvm::dbgs() << "Processing BB#: " << BBDataHandle.getID() << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Processing BB#: " << BBDataHandle.getID()
+                            << "\n");
 
     LLVM_DEBUG(llvm::dbgs() << "Merging Successors!\n");
     mergeSuccessors(BBDataHandle);

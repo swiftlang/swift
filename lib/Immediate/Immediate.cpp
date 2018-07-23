@@ -361,14 +361,14 @@ int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   }
 
   LLVM_DEBUG(llvm::dbgs() << "Module to be executed:\n";
-        Module->dump());
+             Module->dump());
 
   EE->finalizeObject();
   
   // Run the generated program.
   for (auto InitFn : InitFns) {
     LLVM_DEBUG(llvm::dbgs() << "Running initialization function "
-            << InitFn->getName() << '\n');
+                            << InitFn->getName() << '\n');
     EE->runFunctionAsMain(InitFn, CmdLine, nullptr);
   }
 

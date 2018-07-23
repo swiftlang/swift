@@ -430,8 +430,8 @@ static bool canPromoteAllocBox(AllocBoxInst *ABI,
     (void)User;
     // Otherwise, we have an unexpected use.
     LLVM_DEBUG(llvm::dbgs() << "*** Failed to promote alloc_box in @"
-          << ABI->getFunction()->getName() << ": " << *ABI
-          << "    Due to user: " << *User << "\n");
+               << ABI->getFunction()->getName() << ": " << *ABI
+               << "    Due to user: " << *User << "\n");
 
     return false;
   }
