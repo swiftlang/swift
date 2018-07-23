@@ -21,6 +21,7 @@
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/TypeDecoder.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Runtime/Unreachable.h"
@@ -81,6 +82,19 @@ struct delete_with_free {
     free(const_cast<void*>(memory));
   }
 };
+
+#if SWIFT_OBJC_INTEROP
+/// Layout of a small prefix of an Objective-C protocol, used only to
+/// directly extract the name of the protocol.
+template <typename Runtime>
+struct TargetObjCProtocolPrefix {
+  /// Unused by the Swift runtime.
+  TargetPointer<Runtime, const void> _ObjC_Isa;
+
+  /// The mangled name of the protocol.
+  TargetPointer<Runtime, const char> Name;
+};
+#endif
 
 /// A generic reader of metadata.
 ///
@@ -359,8 +373,31 @@ public:
 
       std::vector<BuiltProtocolDecl> Protocols;
       for (auto ProtocolAddress : Exist->getProtocols()) {
-        auto ProtocolDescriptor = readProtocolDescriptor(
-            ProtocolAddress.getProtocolDescriptorUnchecked());
+#if SWIFT_OBJC_INTEROP
+        // Check whether we have an Objective-C protocol.
+        if (ProtocolAddress.isObjC()) {
+          auto MangledNameStr =
+            readObjCProtocolName(ProtocolAddress.getObjCProtocol());
+
+          StringRef MangledName =
+            Demangle::dropSwiftManglingPrefix(MangledNameStr);
+
+          Demangle::Context DCtx;
+          auto Demangled = DCtx.demangleTypeAsNode(MangledName);
+          if (!Demangled)
+            return BuiltType();
+
+          auto Protocol = Builder.createProtocolDecl(Demangled);
+          if (!Protocol)
+            return BuiltType();
+
+          Protocols.push_back(Protocol);
+          continue;
+        }
+#endif
+
+        auto ProtocolDescriptor = readSwiftProtocolDescriptor(
+            ProtocolAddress.getSwiftProtocol());
         if (!ProtocolDescriptor)
           return BuiltType();
 
@@ -1270,7 +1307,7 @@ private:
   }
 
   OwnedProtocolDescriptorRef
-  readProtocolDescriptor(StoredPointer Address) {
+  readSwiftProtocolDescriptor(StoredPointer Address) {
     auto Size = sizeof(TargetProtocolDescriptor<Runtime>);
     auto Buffer = (uint8_t *)malloc(Size);
     if (!Reader->readBytes(RemoteAddress(Address), Buffer, Size)) {
@@ -1281,6 +1318,27 @@ private:
       = reinterpret_cast<TargetProtocolDescriptor<Runtime> *>(Buffer);
     return OwnedProtocolDescriptorRef(Casted);
   }
+
+#if SWIFT_OBJC_INTEROP
+  std::string readObjCProtocolName(StoredPointer Address) {
+    auto Size = sizeof(TargetObjCProtocolPrefix<Runtime>);
+    auto Buffer = (uint8_t *)malloc(Size);
+    SWIFT_DEFER {
+      free(Buffer);
+    };
+
+    if (!Reader->readBytes(RemoteAddress(Address), Buffer, Size))
+      return std::string();
+
+    auto ProtocolDescriptor
+      = reinterpret_cast<TargetObjCProtocolPrefix<Runtime> *>(Buffer);
+    std::string Name;
+    if (!Reader->readString(RemoteAddress(ProtocolDescriptor->Name), Name))
+      return std::string();
+
+    return Name;
+  }
+#endif
 
   // TODO: We need to be able to produce protocol conformances for each
   // substitution type as well in order to accurately rebuild bound generic

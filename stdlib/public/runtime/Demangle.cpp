@@ -393,7 +393,20 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
 
     for (auto protocol : protocols) {
       // The protocol name is mangled as a type symbol, with the _Tt prefix.
-      StringRef ProtoName(protocol.getName());
+      StringRef ProtoName;
+      std::string ProtoNameScratch;
+#if SWIFT_OBJC_INTEROP
+      // For Objective-C protocols, retrieve the protocol name from the
+      // runtime.
+      if (protocol.isObjC()) {
+        ProtoNameScratch = protocol_getName(protocol.getObjCProtocol());
+        ProtoName = ProtoNameScratch;
+      } else {
+        ProtoName = protocol.getSwiftProtocol()->Name;
+      }
+#else
+      ProtoName = protocol.getSwiftProtocol()->Name;
+#endif
       NodePointer protocolNode = Dem.demangleSymbol(ProtoName);
 
       // ObjC protocol names aren't mangled.

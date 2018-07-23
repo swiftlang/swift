@@ -1600,14 +1600,6 @@ class TargetProtocolDescriptorRef {
   /// is clear).
   StoredPointer storage;
 
-public:
-  /// Retrieve the protocol descriptor without checking whether we have an
-  /// Objective-C or Swift protocol.
-  /// FIXME: Temporarily public while we roll out TargetProtocolDescriptorRef.
-  ProtocolDescriptorPointer getProtocolDescriptorUnchecked() const {
-    return reinterpret_cast<ProtocolDescriptorPointer>(storage & ~IsObjCBit);
-  }
-
   constexpr TargetProtocolDescriptorRef(StoredPointer storage)
     : storage(storage) { }
 
@@ -1645,11 +1637,6 @@ public:
     return storage != 0;
   }
 
-  /// The name of the protocol.
-  TargetPointer<Runtime, const char> getName() const {
-    return getProtocolDescriptorUnchecked()->Name;
-  }
-
   /// Determine what kind of protocol this is, Swift or Objective-C.
   ProtocolDispatchStrategy getDispatchStrategy() const {
 #if SWIFT_OBJC_INTEROP
@@ -1669,7 +1656,7 @@ public:
     }
 #endif
 
-    return getProtocolDescriptorUnchecked()->Flags.getClassConstraint();
+    return getSwiftProtocol()->Flags.getClassConstraint();
   }
 
   /// Determine whether this protocol needs a witness table.
@@ -1680,7 +1667,7 @@ public:
     }
 #endif
 
-    return getProtocolDescriptorUnchecked()->Flags.needsWitnessTable();
+    return true;
   }
 
   SpecialProtocol getSpecialProtocol() const {
@@ -1690,7 +1677,7 @@ public:
     }
 #endif
 
-    return getProtocolDescriptorUnchecked()->Flags.getSpecialProtocol();
+    return getSwiftProtocol()->Flags.getSpecialProtocol();
   }
 
   /// Retrieve the Swift protocol descriptor.
@@ -1699,7 +1686,7 @@ public:
     assert(!isObjC());
 #endif
 
-    return getProtocolDescriptorUnchecked();
+    return reinterpret_cast<ProtocolDescriptorPointer>(storage & ~IsObjCBit);
   }
 
   /// Retrieve the raw stored pointer and discriminator bit.
@@ -1710,15 +1697,14 @@ public:
 #if SWIFT_OBJC_INTEROP
   /// Whether this references an Objective-C protocol.
   bool isObjC() const {
-    assert(static_cast<bool>(storage & IsObjCBit) !=
-             getProtocolDescriptorUnchecked()->Flags.needsWitnessTable());
     return (storage & IsObjCBit) != 0;
   }
 
   /// Retrieve the Objective-C protocol.
-  Protocol *getObjCProtocol() const {
+  TargetPointer<Runtime, Protocol> getObjCProtocol() const {
     assert(isObjC());
-    return reinterpret_cast<Protocol *>(storage & ~IsObjCBit);
+    return reinterpret_cast<TargetPointer<Runtime, Protocol> >(
+                                                         storage & ~IsObjCBit);
   }
 #endif
 };
