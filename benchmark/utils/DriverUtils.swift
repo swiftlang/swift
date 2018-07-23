@@ -30,6 +30,7 @@ enum TestAction {
 }
 
 struct TestConfig {
+  /// The delimiter to use when printing output.
   let delim: String
 
   /// The scalar multiple of the amount of times a test should be run. This
@@ -38,9 +39,18 @@ struct TestConfig {
   /// longer amount of time to perform performance analysis on the test in
   /// instruments.
   let iterationScale: Int
+
+  /// If we are asked to have a fixed number of iterations, the number of fixed
+  /// iterations.
   let fixedNumIters: UInt
+
+  /// The number of samples we should take of each test.
   let numSamples: Int
+
+  /// Is verbose output enabled?
   let verbose: Bool
+
+  // Should we log the test's memory usage?
   let logMemory: Bool
 
   /// After we run the tests, should the harness sleep to allow for utilities
@@ -256,20 +266,20 @@ class Timer {
 
 class SampleRunner {
   let timer = Timer()
-  let baseline = SampleRunner.usage()
+  let baseline = SampleRunner.getResourceUtilization()
   let c: TestConfig
 
   init(_ config: TestConfig) {
     self.c = config
   }
 
-  private static func usage() -> rusage {
+  private static func getResourceUtilization() -> rusage {
     var u = rusage(); getrusage(RUSAGE_SELF, &u); return u
   }
 
   /// Returns maximum resident set size (MAX_RSS) delta in bytes
   func measureMemoryUsage() -> Int {
-      var current = SampleRunner.usage()
+      var current = SampleRunner.getResourceUtilization()
       let maxRSS = current.ru_maxrss - baseline.ru_maxrss
 
       if c.verbose {
