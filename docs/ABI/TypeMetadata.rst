@@ -159,27 +159,32 @@ contain the following fields:
   describe the existential container layout used to represent
   values of the type. The word is laid out as follows:
 
-  * The **number of witness tables** is stored in the least significant 31 bits.
+  * The **number of witness tables** is stored in the least significant 24 bits.
     Values of the protocol type contain this number of witness table pointers
     in their layout.
+  * The **special protocol kind** is stored in 6 bits starting at
+    bit 24. Only one special protocol kind is defined: the `Error` protocol has
+    value 1.
+  * The **superclass constraint indicator** is stored at bit 30. When set, the
+    protocol type includes a superclass constraint (described below).
   * The **class constraint** is stored at bit 31. This bit is set if the type
     is **not** class-constrained, meaning that struct, enum, or class values
     can be stored in the type. If not set, then only class values can be stored
     in the type, and the type uses a more efficient layout.
 
-  Note that the field is pointer-sized, even though only the lowest 32 bits are
-  currently inhabited on all platforms. These values can be derived from the
-  `protocol descriptor`_ records, but are pre-calculated for convenience.
-
 - The **number of protocols** that make up the protocol composition is stored at
-  **offset 2**. For the "any" types ``Any`` or ``Any : class``, this
+  **offset 2**. For the "any" types ``Any`` or ``AnyObject``, this
   is zero. For a single-protocol type ``P``, this is one. For a protocol
   composition type ``P & Q & ...``, this is the number of protocols.
 
-- The **protocol descriptor vector** begins at **offset 3**. This is an inline
-  array of pointers to the `protocol descriptor`_ for every protocol in the
-  composition, or the single protocol descriptor for a protocol type. For
-  an "any" type, there is no protocol descriptor vector.
+- If the **superclass constraint indicator** is set, type metadata for the
+  superclass follows at the next offset.
+  
+- The **protocol vector** follows. This is an inline array of pointers to
+  descriptions of each protocol in the composition. Each pointer references
+  either a Swift `protocol descriptor`_ or an Objective-C `Protocol`; the low
+  bit will be set to indicate when it references an Objective-C protocol. For an
+  "any" or "AnyObject" type, there is no protocol descriptor vector.
 
 Metatype Metadata
 ~~~~~~~~~~~~~~~~~
