@@ -7803,14 +7803,31 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
       // arguments,
       // then we fail with a nice error message.
       if (!candidateArgTy) {
-        if (CS.getType(argExpr)->isVoid()) {
-          diagnose(E->getNameLoc(),
-                   diag::unexpected_parens_in_contextual_member, E->getName())
-              .fixItRemove(E->getArgument()->getSourceRange());
+        auto kind = candidateInfo[0].getDecl()->getDescriptiveKind();
+        bool isVoid = CS.getType(argExpr)->isVoid();
+        auto argumentRange = E->getArgument()->getSourceRange();
+        if (kind == DescriptiveDeclKind::EnumElement) {
+          if (isVoid) {
+            diagnose(E->getNameLoc(), diag::unexpected_arguments_in_enum_case,
+                     E->getName())
+                .fixItRemove(argumentRange);
+          } else {
+            diagnose(E->getNameLoc(), diag::unexpected_arguments_in_enum_case,
+                     E->getName())
+                .highlight(argumentRange);
+          }
         } else {
-          diagnose(E->getNameLoc(),
-                   diag::unexpected_argument_in_contextual_member, E->getName())
-              .highlight(E->getArgument()->getSourceRange());
+          if (isVoid) {
+            diagnose(E->getNameLoc(),
+                     diag::unexpected_arguments_in_contextual_member, kind,
+                     E->getName())
+                .fixItRemove(argumentRange);
+          } else {
+            diagnose(E->getNameLoc(),
+                     diag::unexpected_arguments_in_contextual_member, kind,
+                     E->getName())
+                .highlight(argumentRange);
+          }
         }
         return true;
       }

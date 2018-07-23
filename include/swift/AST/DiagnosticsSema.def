@@ -103,10 +103,10 @@ ERROR(expected_result_in_contextual_member,none,
       "member %0 in %2 produces result of type %1, but context expects %2",
       (DeclName, Type, Type))
 
-ERROR(unexpected_argument_in_contextual_member,none,
-      "member %0 takes no arguments", (DeclName))
-ERROR(unexpected_parens_in_contextual_member,none,
-      "member %0 is not a function", (DeclName))
+ERROR(unexpected_arguments_in_enum_case,none,
+      "enum case %0 has no associated values", (DeclName))
+ERROR(unexpected_arguments_in_contextual_member,none,
+      "%0 %1 is not a function", (DescriptiveDeclKind, DeclName))
 
 ERROR(could_not_use_value_member,none,
       "member %1 cannot be used on value of type %0", (Type, DeclName))
