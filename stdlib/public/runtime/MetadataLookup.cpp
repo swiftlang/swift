@@ -734,7 +734,7 @@ public:
     explicit operator bool() const { return !isNull(); }
   };
 
-  using BuiltProtocolDecl = const ProtocolDescriptor *;
+  using BuiltProtocolDecl = ProtocolDescriptorRef;
 
   Demangle::NodeFactory &getNodeFactory() { return demangler; }
 
@@ -756,11 +756,11 @@ public:
   BuiltProtocolDecl createProtocolDecl(
                                     const Demangle::NodePointer &node) const {
 #if SWIFT_OBJC_INTEROP
-    // If we have an Objective-C class name, call into the Objective-C
+    // If we have an Objective-C protocol name, call into the Objective-C
     // runtime to find them.
     if (auto objcProtocolName = getObjCClassOrProtocolName(node)) {
-      return (ProtocolDescriptor *)objc_getProtocol(
-                                              objcProtocolName->str().c_str());
+      return ProtocolDescriptorRef::forObjC(objc_getProtocol(
+                                              objcProtocolName->str().c_str()));
     }
 #endif
 
@@ -768,7 +768,7 @@ public:
 
     // Look for a Swift protocol with this mangled name.
     if (auto protocol = _findProtocolDescriptor(mangledName))
-      return protocol;
+      return ProtocolDescriptorRef::forSwift(protocol);
 
 #if SWIFT_OBJC_INTEROP
     // Look for a Swift-defined @objc protocol with the Swift 3 mangling that
@@ -776,10 +776,10 @@ public:
     std::string objcMangledName =
       "_TtP" + mangledName.substr(0, mangledName.size()-1) + "_";
     if (auto protocol = objc_getProtocol(objcMangledName.c_str()))
-      return (ProtocolDescriptor *)protocol;
+      return ProtocolDescriptorRef::forObjC(protocol);
 #endif
 
-    return nullptr;
+    return ProtocolDescriptorRef();
   }
 
   BuiltType createNominalType(BuiltNominalTypeDecl metadataOrTypeDecl,
@@ -942,8 +942,7 @@ public:
       classConstraint = ProtocolClassConstraint::Class;
     } else {
       for (auto protocol : protocols) {
-        if (protocol->Flags.getClassConstraint()
-              == ProtocolClassConstraint::Class) {
+        if (protocol.getClassConstraint() == ProtocolClassConstraint::Class) {
           classConstraint = ProtocolClassConstraint::Class;
           break;
         }
@@ -1001,8 +1000,13 @@ public:
 
   BuiltType createDependentMemberType(StringRef name, BuiltType base,
                                       BuiltProtocolDecl protocol) const {
+#if SWIFT_OBJC_INTEROP
+    if (protocol.isObjC())
+      return BuiltType();
+#endif
+
     if (lookupDependentMember)
-      return lookupDependentMember(base, name, protocol);
+      return lookupDependentMember(base, name, protocol.getSwiftProtocol());
 
     return BuiltType();
   }
