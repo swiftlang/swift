@@ -37,7 +37,7 @@ using namespace swift;
 using namespace tf;
 
 static llvm::cl::opt<bool> TFEnsureSingleLoopExit(
-    "tf-ensure-single-loop-exit", llvm::cl::init(false),
+    "tf-ensure-single-loop-exit", llvm::cl::init(true),
     llvm::cl::desc("Transform loops to have a single exit from header."));
 
 //===----------------------------------------------------------------------===//
