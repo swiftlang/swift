@@ -1613,14 +1613,6 @@ class TargetProtocolDescriptorRef {
   /// is clear).
   StoredPointer storage;
 
-public:
-  /// Retrieve the protocol descriptor without checking whether we have an
-  /// Objective-C or Swift protocol.
-  /// FIXME: Temporarily public while we roll out TargetProtocolDescriptorRef.
-  ProtocolDescriptorPointer getProtocolDescriptorUnchecked() const {
-    return reinterpret_cast<ProtocolDescriptorPointer>(storage & ~IsObjCBit);
-  }
-
   constexpr TargetProtocolDescriptorRef(StoredPointer storage)
     : storage(storage) { }
 
@@ -1719,7 +1711,7 @@ public:
     assert(!isObjC());
 #endif
 
-    return getProtocolDescriptorUnchecked();
+    return reinterpret_cast<ProtocolDescriptorPointer>(storage & ~IsObjCBit);
   }
 
   /// Retrieve the raw stored pointer and discriminator bit.
@@ -1734,9 +1726,10 @@ public:
   }
 
   /// Retrieve the Objective-C protocol.
-  Protocol *getObjCProtocol() const {
+  TargetPointer<Runtime, Protocol> getObjCProtocol() const {
     assert(isObjC());
-    return reinterpret_cast<Protocol *>(storage & ~IsObjCBit);
+    return reinterpret_cast<TargetPointer<Runtime, Protocol> >(
+                                                         storage & ~IsObjCBit);
   }
 #endif
 };
