@@ -241,15 +241,6 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
       return claim(name, i);
     }
 
-    if (nextArgIdx != numArgs && ignoreNameMismatch) {
-      auto argLabel = args[nextArgIdx].getLabel();
-      // Claim this argument if we are asked to ignore labeling failure,
-      // only if argument doesn't have a label when parameter expected
-      // it to, or vice versa.
-      if (name.empty() || argLabel.empty())
-        return claim(name, nextArgIdx);
-    }
-
     // If we're not supposed to attempt any fixes, we're done.
     if (!allowFixes)
       return None;
@@ -260,20 +251,25 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
     //     out the issue.
     //   - The argument might be unnamed, in which case we try to fix the
     //     problem by adding the name.
+    //   - The argument might have extraneous label, in which case we try to
+    //     fix the problem by removing such label.
     //   - The keyword argument might be a typo for an actual argument name, in
     //     which case we should find the closest match to correct to.
+
+    // Missing or extraneous label.
+    if (nextArgIdx != numArgs && ignoreNameMismatch) {
+      auto argLabel = args[nextArgIdx].getLabel();
+      // Claim this argument if we are asked to ignore labeling failure,
+      // only if argument doesn't have a label when parameter expected
+      // it to, or vice versa.
+      if (name.empty() || argLabel.empty())
+        return claim(name, nextArgIdx);
+    }
 
     // Redundant keyword arguments.
     if (claimedWithSameName) {
       // FIXME: We can provide better diagnostics here.
       return None;
-    }
-
-    // Missing a keyword argument name.
-    if (nextArgIdx != numArgs && args[nextArgIdx].getLabel().empty() &&
-       ignoreNameMismatch) {
-      // Claim the next argument.
-      return claim(name, nextArgIdx);
     }
 
     // Typo correction is handled in a later pass.
@@ -291,7 +287,7 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
       // Claim the next argument with the name of this parameter.
       auto claimed = claimNextNamed(param.getLabel(), ignoreNameMismatch);
 
-      // If there was no such argument, leave the argument unf
+      // If there was no such argument, leave the parameter unfulfilled.
       if (!claimed) {
         haveUnfulfilledParams = true;
         return;
