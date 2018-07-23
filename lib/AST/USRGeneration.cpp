@@ -226,7 +226,7 @@ bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
     return printObjCUSR(D, OS);
   }
 
-  if (!D->hasInterfaceType() || D->getInterfaceType()->is<ErrorType>())
+  if (!D->hasInterfaceType())
     return true;
 
   // Invalid code.
