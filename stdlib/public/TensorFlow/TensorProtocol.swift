@@ -27,15 +27,6 @@ public protocol TensorProtocol {
   init(handle: TensorHandle<Scalar>)
 }
 
-//===----------------------------------------------------------------------===//
-// Parameter aggregate
-//===----------------------------------------------------------------------===//
-
-public protocol ParameterAggregate {
-  associatedtype Scalar : FloatingPoint & AccelerableByTensorFlow
-  associatedtype Parameter = Tensor<Scalar>
-}
-
 // FIXME: Consider moving to CompilerProtocols.swift when the interaction
 // between compiler and runtime becomes general enough.
 //

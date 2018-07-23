@@ -64,6 +64,10 @@ bool DerivedConformance::derivesProtocolConformance(TypeChecker &TC,
     return canDeriveHashable(TC, Nominal);
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  if (*knownProtocol == KnownProtocolKind::ParameterAggregate)
+    return canDeriveParameterAggregate(TC, Nominal);
+
   if (auto *enumDecl = dyn_cast<EnumDecl>(Nominal)) {
     switch (*knownProtocol) {
         // The presence of a raw type is an explicit declaration that
@@ -217,6 +221,18 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
         return getRequirement(KnownProtocolKind::Hashable);
     }
 
+    // SWIFT_ENABLE_TENSORFLOW
+    // ParameterAggregate.update(withGradients:_:)
+    if (name.isCompoundName() &&
+        name.getBaseName() == ctx.getIdentifier("update")) {
+      auto argumentNames = name.getArgumentNames();
+      if (argumentNames.size() == 2 &&
+          argumentNames[0] == ctx.getIdentifier("withGradients") &&
+          argumentNames[1].empty()) {
+        return getRequirement(KnownProtocolKind::ParameterAggregate);
+      }
+    }
+
     return nullptr;
   }
 
@@ -250,6 +266,11 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
     // CaseIterable.AllCases
     if (name.isSimpleName(ctx.Id_AllCases))
       return getRequirement(KnownProtocolKind::CaseIterable);
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // ParameterAggregate.Parameter
+    if (name.isSimpleName(ctx.Id_Parameter))
+      return getRequirement(KnownProtocolKind::ParameterAggregate);
 
     return nullptr;
   }
