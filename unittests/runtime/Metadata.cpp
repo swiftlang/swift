@@ -287,6 +287,7 @@ ProtocolDescriptor ProtocolClassConstrained{
     .withDispatchStrategy(ProtocolDispatchStrategy::Swift)
 };
 
+#if SWIFT_OBJC_INTEROP
 ProtocolDescriptor ProtocolNoWitnessTable{
   "_TMp8Metadata22ProtocolNoWitnessTable",
   nullptr,
@@ -295,6 +296,7 @@ ProtocolDescriptor ProtocolNoWitnessTable{
     .withClassConstraint(ProtocolClassConstraint::Class)
     .withDispatchStrategy(ProtocolDispatchStrategy::ObjC)
 };
+#endif
 
 TEST(MetadataTest, getExistentialMetadata) {
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
@@ -379,6 +381,7 @@ TEST(MetadataTest, getExistentialMetadata) {
       return classConstrained;
     });
 
+#if SWIFT_OBJC_INTEROP
   ProtocolDescriptorRef protoList7[] = {
     ProtocolDescriptorRef::forObjC((Protocol *)&ProtocolNoWitnessTable)
   };
@@ -425,6 +428,7 @@ TEST(MetadataTest, getExistentialMetadata) {
                 mixedWitnessTable->getSuperclassConstraint());
       return mixedWitnessTable;
     });
+#endif
 
   const ValueWitnessTable *ExpectedErrorValueWitnesses;
 #if SWIFT_OBJC_INTEROP

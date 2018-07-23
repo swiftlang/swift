@@ -1613,7 +1613,6 @@ public:
 
 public:
   constexpr TargetProtocolDescriptorRef() : storage() { }
-  constexpr TargetProtocolDescriptorRef(nullptr_t) : storage() { }
 
   TargetProtocolDescriptorRef(
                         ProtocolDescriptorPointer protocol,
