@@ -2229,8 +2229,7 @@ static void createStubBody(TypeChecker &tc, ConstructorDecl *ctor) {
   ctor->setStubImplementation(true);
 }
 
-static std::tuple<GenericSignature *, GenericEnvironment *,
-                  GenericParamList *, SubstitutionMap>
+static std::tuple<GenericEnvironment *, GenericParamList *, SubstitutionMap>
 configureGenericDesignatedInitOverride(ASTContext &ctx,
                                        ClassDecl *classDecl,
                                        Type superclassTy,
@@ -2241,7 +2240,6 @@ configureGenericDesignatedInitOverride(ASTContext &ctx,
   auto subMap = superclassTy->getContextSubstitutionMap(
       moduleDecl, superclassDecl);
 
-  GenericSignature *genericSig;
   GenericEnvironment *genericEnv;
 
   // Inheriting initializers that have their own generic parameters
@@ -2321,14 +2319,13 @@ configureGenericDesignatedInitOverride(ASTContext &ctx,
     subMap = SubstitutionMap::get(superclassSig,
                                   substFn, lookupConformanceFn);
 
-    genericSig = std::move(builder).computeGenericSignature(SourceLoc());
+    auto *genericSig = std::move(builder).computeGenericSignature(SourceLoc());
     genericEnv = genericSig->createGenericEnvironment();
   } else {
     genericEnv = classDecl->getGenericEnvironment();
-    genericSig = classDecl->getGenericSignature();
   }
 
-  return std::make_tuple(genericSig, genericEnv, genericParams, subMap);
+  return std::make_tuple(genericEnv, genericParams, subMap);
 }
 
 static void configureDesignatedInitAttributes(TypeChecker &tc,
@@ -2419,12 +2416,11 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
     return nullptr;
   }
 
-  GenericSignature *genericSig;
   GenericEnvironment *genericEnv;
   GenericParamList *genericParams;
   SubstitutionMap subMap;
 
-  std::tie(genericSig, genericEnv, genericParams, subMap) =
+  std::tie(genericEnv, genericParams, subMap) =
       configureGenericDesignatedInitOverride(ctx,
                                              classDecl,
                                              superclassTy,
@@ -2468,8 +2464,13 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
 
   // Set the interface type of the initializer.
   ctor->setGenericEnvironment(genericEnv);
+  ctor->computeType();
 
-  tc.configureInterfaceType(ctor, genericSig);
+  if (ctor->getFailability() == OTK_ImplicitlyUnwrappedOptional) {
+    ctor->getAttrs().add(
+      new (ctx) ImplicitlyUnwrappedOptionalAttr(/*implicit=*/true));
+  }
+
   ctor->setValidationToChecked();
 
   configureDesignatedInitAttributes(tc, classDecl,
