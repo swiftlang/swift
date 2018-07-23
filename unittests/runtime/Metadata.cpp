@@ -23,6 +23,10 @@
 #include <thread>
 #include <condition_variable>
 
+#if SWIFT_OBJC_INTEROP
+#include <objc/runtime.h>
+#endif
+
 using namespace swift;
 
 // Race testing.
@@ -287,17 +291,6 @@ ProtocolDescriptor ProtocolClassConstrained{
     .withDispatchStrategy(ProtocolDispatchStrategy::Swift)
 };
 
-#if SWIFT_OBJC_INTEROP
-ProtocolDescriptor ProtocolNoWitnessTable{
-  "_TMp8Metadata22ProtocolNoWitnessTable",
-  nullptr,
-  ProtocolDescriptorFlags()
-    .withSwift(true)
-    .withClassConstraint(ProtocolClassConstraint::Class)
-    .withDispatchStrategy(ProtocolDispatchStrategy::ObjC)
-};
-#endif
-
 TEST(MetadataTest, getExistentialMetadata) {
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
@@ -327,8 +320,7 @@ TEST(MetadataTest, getExistentialMetadata) {
       EXPECT_EQ(1U, a->Flags.getNumWitnessTables());
       EXPECT_EQ(ProtocolClassConstraint::Any, a->Flags.getClassConstraint());
       EXPECT_EQ(1U, a->NumProtocols);
-      EXPECT_EQ(&ProtocolA,
-                a->getProtocols()[0].getProtocolDescriptorUnchecked());
+      EXPECT_EQ(&ProtocolA, a->getProtocols()[0].getSwiftProtocol());
       EXPECT_EQ(SpecialProtocol::None,
                 a->Flags.getSpecialProtocol());
       EXPECT_EQ(nullptr,
@@ -349,8 +341,7 @@ TEST(MetadataTest, getExistentialMetadata) {
       EXPECT_EQ(1U, b->Flags.getNumWitnessTables());
       EXPECT_EQ(ProtocolClassConstraint::Any, b->Flags.getClassConstraint());
       EXPECT_EQ(1U, b->NumProtocols);
-      EXPECT_EQ(&ProtocolB,
-                b->getProtocols()[0].getProtocolDescriptorUnchecked());
+      EXPECT_EQ(&ProtocolB, b->getProtocols()[0].getSwiftProtocol());
       EXPECT_EQ(SpecialProtocol::None,
                 b->Flags.getSpecialProtocol());
       EXPECT_EQ(nullptr,
@@ -375,15 +366,17 @@ TEST(MetadataTest, getExistentialMetadata) {
       EXPECT_EQ(SpecialProtocol::None,
                 classConstrained->Flags.getSpecialProtocol());
       EXPECT_EQ(&ProtocolClassConstrained,
-                classConstrained->getProtocols()[0].getProtocolDescriptorUnchecked());
+                classConstrained->getProtocols()[0].getSwiftProtocol());
       EXPECT_EQ(nullptr,
                 classConstrained->getSuperclassConstraint());
       return classConstrained;
     });
 
 #if SWIFT_OBJC_INTEROP
+#define EXAMPLE_OBJC_PROTOCOL_NAME "NSCopying"
+
   ProtocolDescriptorRef protoList7[] = {
-    ProtocolDescriptorRef::forObjC((Protocol *)&ProtocolNoWitnessTable)
+    ProtocolDescriptorRef::forObjC(objc_getProtocol(EXAMPLE_OBJC_PROTOCOL_NAME))
   };
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
@@ -398,8 +391,8 @@ TEST(MetadataTest, getExistentialMetadata) {
       EXPECT_EQ(1U, noWitnessTable->NumProtocols);
       EXPECT_EQ(SpecialProtocol::None,
                 noWitnessTable->Flags.getSpecialProtocol());
-      EXPECT_EQ(&ProtocolNoWitnessTable,
-                noWitnessTable->getProtocols()[0].getProtocolDescriptorUnchecked());
+      EXPECT_EQ(objc_getProtocol(EXAMPLE_OBJC_PROTOCOL_NAME),
+                noWitnessTable->getProtocols()[0].getObjCProtocol());
       EXPECT_EQ(nullptr,
                 noWitnessTable->getSuperclassConstraint());
       return noWitnessTable;
@@ -408,7 +401,8 @@ TEST(MetadataTest, getExistentialMetadata) {
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
       ProtocolDescriptorRef protoList8[] = {
-        ProtocolDescriptorRef::forObjC((Protocol*)&ProtocolNoWitnessTable),
+        ProtocolDescriptorRef::forObjC(
+            objc_getProtocol(EXAMPLE_OBJC_PROTOCOL_NAME)),
         ProtocolDescriptorRef::forSwift(&ProtocolA),
         ProtocolDescriptorRef::forSwift(&ProtocolB)
       };
@@ -637,7 +631,7 @@ TEST(MetadataTest, getExistentialTypeMetadata_subclass) {
       EXPECT_EQ(ProtocolClassConstraint::Class,
                 ex1->Flags.getClassConstraint());
       EXPECT_EQ(1U, ex1->NumProtocols);
-      EXPECT_EQ(&OpaqueProto1, ex1->getProtocols()[0].getProtocolDescriptorUnchecked());
+      EXPECT_EQ(&OpaqueProto1, ex1->getProtocols()[0].getSwiftProtocol());
       EXPECT_EQ(&MetadataTest2, ex1->getSuperclassConstraint());
       return ex1;
     });
@@ -660,10 +654,8 @@ TEST(MetadataTest, getExistentialTypeMetadata_subclass) {
       EXPECT_EQ(ProtocolClassConstraint::Class,
                 ex2->Flags.getClassConstraint());
       EXPECT_EQ(2U, ex2->NumProtocols);
-      EXPECT_TRUE(ex2->getProtocols()[0].getProtocolDescriptorUnchecked()
-                    == &OpaqueProto1 &&
-                  ex2->getProtocols()[1].getProtocolDescriptorUnchecked()
-                    == &ClassProto1);
+      EXPECT_TRUE(ex2->getProtocols()[0].getSwiftProtocol() == &OpaqueProto1 &&
+                  ex2->getProtocols()[1].getSwiftProtocol() == &ClassProto1);
       EXPECT_EQ(&MetadataTest2, ex2->getSuperclassConstraint());
       return ex2;
     });
