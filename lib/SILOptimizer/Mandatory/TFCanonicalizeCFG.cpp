@@ -262,10 +262,9 @@ SESERegionBuilder::processAcyclicRegionExcludingEnd(SILBasicBlock *startBB,
 
 /// Create a TF handle of the appropriate integer type for the given bitwith
 /// that is initialized to the given value.
-static SILValue
-createTFIntegerConst(GraphGlobalConfiguration &graphConfiguration,
-                     SILBuilder &builder, SILLocation location,
-                     unsigned bitwidth, intmax_t value) {
+static SILValue createTFIntegerConst(GraphFunctionDeviceInfo &deviceInfo,
+                                     SILBuilder &builder, SILLocation location,
+                                     unsigned bitwidth, intmax_t value) {
   ASTContext& context = builder.getASTContext();
   SILType intType =
       SILType::getBuiltinIntegerType(bitwidth, builder.getASTContext());
@@ -277,10 +276,10 @@ createTFIntegerConst(GraphGlobalConfiguration &graphConfiguration,
   attributes.push_back({context.getIdentifier("value$tensor"),
                         SymbolicValue::getInteger(APInt(bitwidth, value),
                                                   context.getAllocator())});
-  graphConfiguration.handleDevicePlacement(
+  deviceInfo.handleDevicePlacement(
       opName,
-      /*opDevice*/ getDeviceString(DeviceType::ALL), builder, location,
-      attributes);
+      /*opDevice*/ getDeviceString(DeviceType::ALL),
+      builder.getModule().getASTContext(), attributes);
   GraphOperationInst *constNode = builder.createGraphOperation(
       location, context.getIdentifier(opName), /*operands*/ {}, attributes,
       {convertElementTypeToTensorValueType(intType)});
@@ -291,9 +290,9 @@ createTFIntegerConst(GraphGlobalConfiguration &graphConfiguration,
 // A helper class to transform a loop to have a single exit from the header.
 class SingleExitLoopTransformer {
 public:
-  SingleExitLoopTransformer(GraphGlobalConfiguration *graphConfiguration,
+  SingleExitLoopTransformer(GraphFunctionDeviceInfo *deviceInfo,
                             SILLoopInfo *LI, DominanceInfo *DI, SILLoop *loop)
-      : graphConfiguration(graphConfiguration), DI(DI), LI(LI), loop(loop),
+      : deviceInfo(deviceInfo), DI(DI), LI(LI), loop(loop),
         header(loop->getHeader()), preheader(loop->getLoopPreheader()),
         latch(loop->getLoopLatch()), currentFn(header->getParent()) {
     assert(preheader && "Canonicalization should have given us one preheader");
@@ -344,7 +343,7 @@ private:
   }
 
   // Configuration for graph construction.
-  GraphGlobalConfiguration *graphConfiguration;
+  GraphFunctionDeviceInfo *deviceInfo;
   DominanceInfo *DI;
   SILLoopInfo *LI;
   SILLoop *loop;
@@ -461,7 +460,13 @@ SingleExitLoopTransformer::createNewHeader() {
   for (const auto &escapingValue : escapingValues) {
     SILValue newValue = newHeader->createPHIArgument(
         escapingValue->getType(), escapingValue.getOwnershipKind());
-    escapingValue->replaceAllUsesWith(newValue);
+    // Replace uses *outside* of the loop with the new value.
+    for (Operand *use : escapingValue->getUses()) {
+      if (loop->contains(use->getUser()->getParent())) {
+        continue;
+      }
+      use->set(newValue);
+    }
   }
   // An integer to identify the exit edge.
   SILValue exitIndexArg = newHeader->createPHIArgument(
@@ -565,13 +570,11 @@ SingleExitLoopTransformer::patchEdges(SILBasicBlock *newHeader,
       ++nextExitIndex;
     }
     auto kvPair = *emplaceResult.first;
-    newArgs.push_back(createTFIntegerConst(*graphConfiguration, builder,
-                                           location,
+    newArgs.push_back(createTFIntegerConst(*deviceInfo, builder, location,
                                            /*bitwidth*/ 32,
                                            /*exitIndex*/ kvPair.second));
     // `stayInLoop` flag
-    newArgs.push_back(createTFIntegerConst(*graphConfiguration, builder,
-                                           location,
+    newArgs.push_back(createTFIntegerConst(*deviceInfo, builder, location,
                                            /*bitwidth*/ 1, stayInLoop));
     appendArguments(src->getTerminator(), newTgt, newArgs);
   }
@@ -620,14 +623,14 @@ SILBasicBlock *SingleExitLoopTransformer::createNewExitBlockWithDemux(
     equalOpName +=
         GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
     SmallVector<GraphOperationAttribute, 2> attributes;
-    graphConfiguration->handleDevicePlacement(
-        "Equal", /*opDevice*/ getDeviceString(DeviceType::ALL), builder,
-        headerLocation, attributes);
+    deviceInfo->handleDevicePlacement(
+        "Equal", /*opDevice*/ getDeviceString(DeviceType::ALL),
+        builder.getModule().getASTContext(), attributes);
     GraphOperationInst *condTensorInst = builder.createGraphOperation(
         headerLocation, context.getIdentifier(equalOpName),
         /*operands*/
         {exitIndexArg,
-         createTFIntegerConst(*graphConfiguration, builder, headerLocation,
+         createTFIntegerConst(*deviceInfo, builder, headerLocation,
                               /*bitwidth*/ 32, exitIndices.lookup(trueBlock))},
         attributes,
         {convertElementTypeToTensorValueType(
@@ -698,8 +701,8 @@ bool SingleExitLoopTransformer::transform() {
 /// to the appropriate exit block. Updates the Dominanceinfo, PostDominanceinfo,
 /// and LoopInfo as well.
 void SESERegionBuilder::ensureSingleExitFromLoops() {
-  GraphGlobalConfiguration graphConfiguration(
-      GraphGlobalConfiguration::getForFunction(*F, /*removeConfigInst*/ false));
+  GraphFunctionDeviceInfo deviceInfo(
+      GraphFunctionDeviceInfo::getForFunction(*F, /*removeConfigInst*/ false));
   // Visit the loop nest hierarchy bottom up.
   bool changed = false;
   // The bool indicates whether the subloops are already processed.
@@ -718,7 +721,7 @@ void SESERegionBuilder::ensureSingleExitFromLoops() {
       }
       continue;
     }
-    SingleExitLoopTransformer transformer(&graphConfiguration, &LI, &DI, loop);
+    SingleExitLoopTransformer transformer(&deviceInfo, &LI, &DI, loop);
     changed |= transformer.transform();
   }
   if (changed) {

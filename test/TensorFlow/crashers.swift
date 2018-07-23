@@ -343,3 +343,17 @@ public func SR8228_unusedTensorBBArg(n: Int32, x: Tensor<Float>) {
     i += 1
   }
 }
+
+// When handling cond_br with ThensorHandle<Elem> in PartitionCloner, only Builtin.i1
+// was considered for Elem type. As a result, Elem of Bool type crashed the compiler.
+public func SR8222_cond_br_TensorHandle_Bool() {
+  let t = Tensor<Float>(1.0)
+  var i = Tensor<Int32>(0)
+  repeat {
+    let y = t + t
+    // expected-warning @-1{{implicitly copied to the host}}
+    print(y)
+    i += 1
+  } while i != Tensor<Int32>(10)
+  // expected-warning @-1{{implicitly copied to the host}}
+}

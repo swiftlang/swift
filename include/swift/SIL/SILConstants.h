@@ -26,12 +26,13 @@ class SILValue;
 class SILBuilder;
 class SerializedSILLoader;
 
-struct APIntSymbolicValue;
 struct APFloatSymbolicValue;
-struct EnumWithPayloadSymbolicValue;
+struct APIntSymbolicValue;
 struct ArraySymbolicValue;
 struct DerivedAddressValue;
+struct EnumWithPayloadSymbolicValue;
 struct SymbolicValueMemoryObject;
+struct UnknownSymbolicValue;
 
 /// When we fail to constant fold a value, this captures a reason why,
 /// allowing the caller to produce a specific diagnostic.  The "Unknown"
@@ -56,7 +57,6 @@ enum class UnknownReason {
   Trap,
 };
 
-
 /// This is the symbolic value tracked for each SILValue in a scope.  We
 /// support multiple representational forms for the constant node in order to
 /// avoid pointless memory bloat + copying.  This is intended to be a
@@ -66,6 +66,7 @@ enum class UnknownReason {
 /// symbolic values (e.g. to save memory).  It provides a simpler public
 /// interface though.
 class SymbolicValue {
+private:
   enum RepresentationKind {
     /// This value is an alloc stack that is has not (yet) been initialized
     /// by flow-sensitive analysis.
@@ -133,11 +134,9 @@ class SymbolicValue {
   };
 
   union {
-    /// When the value is Unknown, this contains the value that was the
+    /// When the value is Unknown, this contains information about the
     /// unfoldable part of the computation.
-    ///
-    /// TODO: make this a more rich representation.
-    SILNode *unknown;
+    UnknownSymbolicValue *unknown;
 
     /// This is always a SILType with an object category.  This is the value
     /// of the underlying instance type, not the MetatypeType.
@@ -217,7 +216,6 @@ class SymbolicValue {
   } aux;
 
 public:
-
   /// This enum is used to indicate the sort of value held by a SymbolicValue
   /// independent of its concrete representation.  This is the public
   /// interface to SymbolicValue.
@@ -270,25 +268,21 @@ public:
     return kind != Unknown && kind != UninitMemory;
   }
 
-  static SymbolicValue getUnknown(SILNode *node, UnknownReason reason) {
-    assert(node && "node must be present");
-    SymbolicValue result;
-    result.representationKind = RK_Unknown;
-    result.value.unknown = node;
-    result.aux.unknown_reason = reason;
-    return result;
-  }
+  static SymbolicValue getUnknown(SILNode *node, UnknownReason reason,
+                                  llvm::ArrayRef<SourceLoc> callStack,
+                                  llvm::BumpPtrAllocator &allocator);
 
-  bool isUnknown() const {
-    return getKind() == Unknown;
-  }
+  /// Return true if this represents an unknown result.
+  bool isUnknown() const { return getKind() == Unknown; }
 
-  /// Return information about an unknown result, including the SIL node that
-  /// is a problem, and the reason it is an issue.
-  std::pair<SILNode *, UnknownReason> getUnknownValue() const {
-    assert(representationKind == RK_Unknown);
-    return { value.unknown, aux.unknown_reason };
-  }
+  /// Return the call stack for an unknown result.
+  ArrayRef<SourceLoc> getUnknownCallStack() const;
+
+  /// Return the node that triggered an unknown result.
+  SILNode *getUnknownNode() const;
+
+  /// Return the reason an unknown result was generated.
+  UnknownReason getUnknownReason() const;
 
   static SymbolicValue getUninitMemory() {
     SymbolicValue result;
@@ -381,7 +375,6 @@ public:
 
   SymbolicValue getEnumPayloadValue() const;
 
-
   /// Return a symbolic value that represents the address of a memory object.
   static SymbolicValue getAddress(SymbolicValueMemoryObject *memoryObject) {
     SymbolicValue result;
@@ -405,11 +398,12 @@ public:
   SymbolicValueMemoryObject *getAddressValueMemoryObject() const;
 
   /// Produce an array of elements.
-  
+
   static SymbolicValue getArray(ArrayRef<SymbolicValue> elements,
                                 CanType elementType,
                                 llvm::BumpPtrAllocator &allocator);
-  static SymbolicValue getArrayAddress(SymbolicValueMemoryObject *memoryObject){
+  static SymbolicValue
+  getArrayAddress(SymbolicValueMemoryObject *memoryObject) {
     SymbolicValue result;
     result.representationKind = RK_ArrayAddress;
     result.value.directAddress = memoryObject;
@@ -439,7 +433,7 @@ public:
   void dump() const;
 };
 
-static_assert(sizeof(SymbolicValue) == 2*sizeof(void*),
+static_assert(sizeof(SymbolicValue) == 2 * sizeof(void *),
               "SymbolicValue should stay small and POD");
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os, SymbolicValue val) {
@@ -465,11 +459,10 @@ private:
   SymbolicValue value;
 
   SymbolicValueMemoryObject(Type type, SymbolicValue value)
-    : type(type), value(value) {}
-  SymbolicValueMemoryObject(const SymbolicValueMemoryObject&) = delete;
-  void operator=(const SymbolicValueMemoryObject&) = delete;
+      : type(type), value(value) {}
+  SymbolicValueMemoryObject(const SymbolicValueMemoryObject &) = delete;
+  void operator=(const SymbolicValueMemoryObject &) = delete;
 };
-
 
 /// SWIFT_ENABLE_TENSORFLOW
 /// A graph operation attribute, used by GraphOperationInst.

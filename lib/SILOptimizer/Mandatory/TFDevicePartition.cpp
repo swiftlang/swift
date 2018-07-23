@@ -15,16 +15,142 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "TFDeviceSupport.h"
 #include "TFUtilities.h"
 #ifdef SWIFT_ENABLE_TENSORFLOW
+#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/DepthFirstIterator.h"
+#include "llvm/Support/CommandLine.h"
 
 using namespace swift;
 using namespace tf;
+
+static llvm::cl::opt<bool> TFTargetTPU(
+    "tf-target-tpu", llvm::cl::init(false),
+    llvm::cl::desc("If true, target TPU in the generated TF graph. This flag "
+                   "is used for unit testing only"));
+static llvm::cl::opt<bool> TFTargetGPU(
+    "tf-target-gpu", llvm::cl::init(false),
+    llvm::cl::desc("If true, target GPU in the generated TF graph. This flag "
+                   "is used for unit testing only"));
+
+template <typename... T, typename... U>
+static InFlightDiagnostic diagnose(ASTContext &Context, SourceLoc loc,
+                                   Diag<T...> diag, U &&... args) {
+  return Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
+}
+
+//===----------------------------------------------------------------------===//
+// Device Partitioning Utilities
+//===----------------------------------------------------------------------===//
+
+/// Scan the specified function, looking for logic that configures the current
+/// graph.
+GraphFunctionDeviceInfo
+GraphFunctionDeviceInfo::getForFunction(SILFunction &fn,
+                                        bool removeConfigInst) {
+  DeviceType deviceType = DeviceType::CPU;
+  bool isTPUInfeedEnabled = false;
+
+  SILInstruction *firstFound = nullptr;
+  SmallVector<SILInstruction *, 4> configureInsts;
+  for (auto &bb : fn) {
+    for (auto &inst : bb) {
+      // Scan for the device configuration ops if present.
+      auto tfopInfo = SILTensorOpInfo::decode(&inst);
+      if (!tfopInfo)
+        continue;
+      bool isConfigOp = tfopInfo->opName == "tfc.configureTPU" ||
+                        tfopInfo->opName == "tfc.configureGPU";
+      if (!isConfigOp)
+        continue;
+
+      configureInsts.push_back(&inst);
+
+      // If we found one, make sure we don't have more than one.
+      if (firstFound) {
+        diagnose(fn.getASTContext(), inst.getLoc().getSourceLoc(),
+                 diag::tf_multiple_device);
+        diagnose(fn.getASTContext(), firstFound->getLoc().getSourceLoc(),
+                 diag::tf_multiple_device_prev);
+        continue;
+      }
+
+      // Otherwise, remember this one and decode it.
+      firstFound = &inst;
+
+      // Eventually we'll support multiple different configuration ops, so
+      // we recheck the opcode here.
+      if (tfopInfo->opName == "tfc.configureTPU") {
+        // Decode: tfc.configureTPU(isInfeedEnabled: bool)
+        deviceType = DeviceType::TPU;
+        auto infeedEnabled =
+            cast<IntegerLiteralInst>(tfopInfo->getAttrOperand(0));
+        isTPUInfeedEnabled = !infeedEnabled->getValue().isNullValue();
+      } else {
+        assert(tfopInfo->opName == "tfc.configureGPU" &&
+               "unknown device configuration op");
+        deviceType = DeviceType::GPU;
+      }
+    }
+  }
+
+  // If the program didn't specify, fall back to the command line option.
+  if (!firstFound) {
+    // At most one of these test-only flags should be set.
+    // FIXME: Change this to a mutually exclusive flag setting an enum.
+    assert(!TFTargetTPU || !TFTargetGPU);
+    if (TFTargetTPU)
+      deviceType = DeviceType::TPU;
+    if (TFTargetGPU)
+      deviceType = DeviceType::GPU;
+  } else if (auto *outs = getTFDumpIntermediateStream()) {
+    *outs << "Targeting device " << getDeviceString(deviceType)
+          << " for accelerator program, based on config: \n";
+    firstFound->print(*outs);
+  }
+
+  // These instructions are not relevant to later compiler passes in TFPartition
+  // and TFLowerGraph. Removing them so that the later passes need not deal with
+  // this special builtin type.
+  if (removeConfigInst) {
+    for (auto *configureInst : configureInsts) {
+      assert(!configureInst->hasUsesOfAnyResult());
+      recursivelyDeleteTriviallyDeadInstructions(configureInst, /*Force*/ true);
+    }
+  }
+  return GraphFunctionDeviceInfo(deviceType, isTPUInfeedEnabled);
+}
+
+void GraphFunctionDeviceInfo::handleDevicePlacement(
+    StringRef opType, StringRef opDevice, ASTContext &ctx,
+    SmallVectorImpl<GraphOperationAttribute> &attributes) {
+  DeviceType chosenDevice;
+  if (!opDevice.empty())
+    chosenDevice = getOpDeviceType(opDevice);
+  else
+    chosenDevice = chooseDevice(opType);
+
+  markDeviceUsed(chosenDevice);
+
+  // Example output SIL:
+  // graph_op "Const"() {dtype: $Float, value$tensor: f32 0x3F800000 /* 1 */,
+  //   __device: "/device:CPU:0"}
+  auto deviceString = getDeviceString(chosenDevice);
+  // TODO: Use integer device ID's instead of strings?
+  attributes.push_back(
+      {ctx.getIdentifier(DEVICE_ATTR),
+       SymbolicValue::getString(deviceString, ctx.getAllocator())});
+}
+
+//===----------------------------------------------------------------------===//
+// Device Partitioner and Cloner ClassesPartitioning Utilities
+//===----------------------------------------------------------------------===//
 
 namespace {
 
@@ -35,7 +161,7 @@ class DevicePartitionCloner
     : public SILClonerWithScopes<DevicePartitionCloner> {
   SILFunction& srcFn;
 
-  const GraphGlobalConfiguration &configuration;
+  const GraphFunctionDeviceInfo &deviceInfo;
 
   /// The device for us to extract the SIL computation in.
   const DeviceType thisDeviceType;
@@ -44,18 +170,15 @@ class DevicePartitionCloner
   const SmallPtrSetImpl<SILInstruction *> &targetOps;
 
  public:
-  DevicePartitionCloner(SILFunction &srcFn,
-                        const GraphGlobalConfiguration &configuration,
-                        DeviceType thisDeviceType,
-                        const SmallPtrSetImpl<SILInstruction *> &targetOps,
-                        SILFunction &NewFn)
-      : SILClonerWithScopes(NewFn),
-        srcFn(srcFn),
-        configuration(configuration),
-        thisDeviceType(thisDeviceType),
-        targetOps(targetOps) {
-    assert(thisDeviceType != DeviceType::ALL);
-  }
+   DevicePartitionCloner(SILFunction &srcFn,
+                         const GraphFunctionDeviceInfo &deviceInfo,
+                         DeviceType thisDeviceType,
+                         const SmallPtrSetImpl<SILInstruction *> &targetOps,
+                         SILFunction &NewFn)
+       : SILClonerWithScopes(NewFn), srcFn(srcFn), deviceInfo(deviceInfo),
+         thisDeviceType(thisDeviceType), targetOps(targetOps) {
+     assert(thisDeviceType != DeviceType::ALL);
+   }
 
   /// Extracts the device-specific computation into `NewFn` above.
   void cloneFunction();
@@ -125,7 +248,7 @@ class DevicePartitionCloner
 
  private:
   bool isPrimaryFn() const {
-    return configuration.primaryDeviceType == thisDeviceType;
+    return deviceInfo.primaryDeviceType == thisDeviceType;
   }
 
   /// Check to see if the argument was marked in a way that indicates we should
@@ -379,7 +502,7 @@ void DevicePartitionCloner::visitTensorTransferInst(
   }
 
   // Insert a D2DSend for each dest device that's different from src.
-  for (auto destDeviceForSend : configuration.usedDeviceTypes) {
+  for (auto destDeviceForSend : deviceInfo.getUsedDeviceTypes()) {
     if (destDeviceForSend == srcDevice) {
       // When dest is src, update the mapping, and do not send.
       ValueMap[getSingleValueResult(inst)] = remapValue(inst->getOperand(0));
@@ -467,9 +590,9 @@ namespace tf {
 class DevicePartitionerImpl
     : public SILInstructionVisitor<DevicePartitionerImpl> {
   SILFunction &srcFn;
-  const GraphGlobalConfiguration &configuration;
+  const GraphFunctionDeviceInfo &deviceInfo;
 
-  /// Maps a device type to the set of instructions that run on it.
+  /// Tracks for each device type, the set of instructions that run on it.
   ///
   /// For the "ALL" pseudo-device, all instruction running on it also have
   /// mapping entries for each invidiual real device. The map entry key'ed on
@@ -477,7 +600,7 @@ class DevicePartitionerImpl
   /// instructions.  For example, we create an int interal on ALL devices, use
   /// it to create a Const tfop on ALL devices, and in turn use that const as
   /// the upper bound for loop iteration, where the loop runs on all devices.
-  std::vector<SmallPtrSet<SILInstruction *, 8>> instByDevice;
+  SmallPtrSet<SILInstruction *, 8> instByDevice[NUM_DEVICE_TYPES];
 
   /// When a SIL value v on some device D1 is to be consumed by an instruction
   /// on another device D2, prepare() below inserts a TensorTransfer instruction
@@ -500,15 +623,14 @@ class DevicePartitionerImpl
   /// there is a single device, we choose to exercise them for test
   /// coverage. This can be optimized for compiler performance later if it turns
   /// out to matter.
-  DevicePartitionerImpl(SILFunction &srcFn,
-                        const GraphGlobalConfiguration &configuration)
-    : srcFn(srcFn), configuration(configuration) {
-    static_assert(
-        NUM_DEVICE_TYPES <= 8,
-        "3 bits are allocated in KeyByInstDestDevice to encode device types");
-    instByDevice.resize(NUM_DEVICE_TYPES);
-    markFunctionAndInsertTensorTransfers();
-  }
+   DevicePartitionerImpl(SILFunction &srcFn,
+                         const GraphFunctionDeviceInfo &deviceInfo)
+       : srcFn(srcFn), deviceInfo(deviceInfo) {
+     static_assert(
+         NUM_DEVICE_TYPES <= 8,
+         "3 bits are allocated in KeyByInstDestDevice to encode device types");
+     markFunctionAndInsertTensorTransfers();
+   }
 
   /// Returns a function extracted from `srcFn`, specialized on `deviceType`.
   ///
@@ -519,7 +641,7 @@ class DevicePartitionerImpl
   /// - The extracted function for CPU device has _Recv node from GPU to read
   ///   a, and adds its output with const tensor b to produce the sum result.
   SILFunction *extractFunctionForDevice(DeviceType deviceType) {
-    bool isPrimaryFn = deviceType == configuration.primaryDeviceType;
+    bool isPrimaryFn = deviceType == deviceInfo.primaryDeviceType;
     auto newFnType =
         isPrimaryFn ? srcFn.getLoweredFunctionType()
                     : SILFunctionType::get(
@@ -537,7 +659,7 @@ class DevicePartitionerImpl
         srcFn.getLocation(), resultFnName, SILLinkage::Private, newFnType,
         /*What's this*/ IsBare, IsNotTransparent, IsNotSerialized);
 
-    DevicePartitionCloner PC(srcFn, configuration, deviceType,
+    DevicePartitionCloner PC(srcFn, deviceInfo, deviceType,
                              instByDevice[(unsigned)deviceType], *resultFn);
 
     // Fill in the cloned function body.
@@ -592,11 +714,11 @@ class DevicePartitionerImpl
     // could be empty).  These become the results of the graph.
     if (auto *ti = dyn_cast<TupleInst>(inst->getOperand())) {
       for (unsigned i = 0, e = ti->getNumOperands(); i != e; ++i) {
-        makeOperandLocal(configuration.primaryDeviceType, ti, i);
+        makeOperandLocal(deviceInfo.primaryDeviceType, ti, i);
       }
     } else {
-      makeOperandLocal(configuration.primaryDeviceType, inst,
-                                     /*operandIdx*/ 0);
+      makeOperandLocal(deviceInfo.primaryDeviceType, inst,
+                       /*operandIdx*/ 0);
     }
   }
 
@@ -607,7 +729,7 @@ class DevicePartitionerImpl
       // Func args only live on the primary device, while other BB args are
       // replicated on all devices.
       operandDeviceType = inst->getParent() == srcFn.getEntryBlock()
-                              ? configuration.primaryDeviceType
+                              ? deviceInfo.primaryDeviceType
                               : DeviceType::ALL;
     } else {
       // Find an arbitrary device which hosts `opValue`, and do a tensor
@@ -719,6 +841,8 @@ class DevicePartitionerImpl
 
     // BB args are replicated on all devices, so no transfer is needed.
     if (isa<SILArgument>(opValue)) return;
+    // Undefs will be handled later.
+    if (isa<SILUndef>(opValue)) return;
 
     auto *operandInst = opValue->getDefiningInstruction();
     assert(operandInst && "value must be defined by an instruction");
@@ -730,8 +854,7 @@ class DevicePartitionerImpl
       return;
     // If `inst` runs on ALL devices but the graph only involves 1 device, can
     // also skip the send.
-    if (deviceType == DeviceType::ALL &&
-        configuration.usedDeviceTypes.size() == 1)
+    if (deviceType == DeviceType::ALL && deviceInfo.numUsedDeviceTypes == 1)
       return;
 
     assert(operandDeviceType != DeviceType::ALL);
@@ -748,7 +871,7 @@ class DevicePartitionerImpl
 
       // Now we create a TensorTransfer graph_op inst. This inst cannot have its
       // src device set to ALL, but dest device can be ALL.
-      assert(configuration.usedDeviceTypes.size() >= 2);
+      assert(deviceInfo.numUsedDeviceTypes >= 2);
 
       // This inst has type:
       // <T> (T) {transferId$int, srcDevice$str, destDevice$str} -> T
@@ -807,7 +930,7 @@ class DevicePartitionerImpl
     }
 
     Optional<DeviceType> operandDeviceType = None;
-    for (auto type : configuration.usedDeviceTypes) {
+    for (auto type : deviceInfo.getUsedDeviceTypes()) {
       if (instByDevice[(unsigned)type].count(inst)) {
         operandDeviceType = type;
         break;
@@ -829,16 +952,16 @@ class DevicePartitionerImpl
   }
 
   void markInstForAllDevices(SILInstruction *inst) {
-    for (auto deviceType : configuration.usedDeviceTypes) {
+    for (auto deviceType : deviceInfo.getUsedDeviceTypes()) {
       instByDevice[(unsigned)deviceType].insert(inst);
     }
     instByDevice[(unsigned)DeviceType::ALL].insert(inst);
   }
 };
 
-DevicePartitioner::DevicePartitioner(
-    SILFunction &srcFn, const GraphGlobalConfiguration &configuration)
-    : impl(new DevicePartitionerImpl(srcFn, configuration)) {}
+DevicePartitioner::DevicePartitioner(SILFunction &srcFn,
+                                     const GraphFunctionDeviceInfo &deviceInfo)
+    : impl(new DevicePartitionerImpl(srcFn, deviceInfo)) {}
 
 DevicePartitioner::~DevicePartitioner() { delete impl; }
 

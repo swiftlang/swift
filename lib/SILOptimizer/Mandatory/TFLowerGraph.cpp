@@ -26,6 +26,8 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/Defer.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILVisitor.h"
 #include "llvm/ADT/ScopedHashTable.h"
@@ -106,7 +108,7 @@ namespace {
   /// ops created that make it up.
   struct GraphFunctionBody {
     const DeviceType thisDeviceType;
-    const GraphGlobalConfiguration& configuration;
+    const GraphFunctionDeviceInfo &deviceInfo;
 
     /// This is the temporary Graph we use to build up the body of this
     /// function.  When we're done building the graph, we transform it into a
@@ -150,38 +152,37 @@ namespace {
     bool shouldLowerEffectfulOps = true;
 
    public:
-    GraphFunctionBody(DeviceType thisDeviceType,
-                      const GraphGlobalConfiguration& configuration)
-        : thisDeviceType(thisDeviceType),
-          configuration(configuration),
-          graph(TF_NewGraph(), &TF_DeleteGraph) {}
+     GraphFunctionBody(DeviceType thisDeviceType,
+                       const GraphFunctionDeviceInfo &deviceInfo)
+         : thisDeviceType(thisDeviceType), deviceInfo(deviceInfo),
+           graph(TF_NewGraph(), &TF_DeleteGraph) {}
 
-    TF_Graph *getGraph() const { return graph.get(); }
+     TF_Graph *getGraph() const { return graph.get(); }
 
-    /// "Finish" a tensorflow op under construction, and remember that it is
-    /// part of this graph function.
-    TF_Operation *finishOp(TF_OperationDescription *desc, bool hasSideEffects,
-                           bool isEligibleForTPU, TF_Status *status) {
-      // If this node has side effects and we've already emitted another node
-      // that does, make sure to connect them with control dependencies to
-      // preserve ordering.
-      if (hasSideEffects && controlDependenceValue)
-        TF_AddControlInput(desc, controlDependenceValue);
+     /// "Finish" a tensorflow op under construction, and remember that it is
+     /// part of this graph function.
+     TF_Operation *finishOp(TF_OperationDescription *desc, bool hasSideEffects,
+                            bool isEligibleForTPU, TF_Status *status) {
+       // If this node has side effects and we've already emitted another node
+       // that does, make sure to connect them with control dependencies to
+       // preserve ordering.
+       if (hasSideEffects && controlDependenceValue)
+         TF_AddControlInput(desc, controlDependenceValue);
 
-      // If this node should be put onto TPU, mark it with an attribute.
-      if (thisDeviceType == DeviceType::TPU && isEligibleForTPU) {
-        markNodeAsTPUReplicated(desc);
-      }
+       // If this node should be put onto TPU, mark it with an attribute.
+       if (thisDeviceType == DeviceType::TPU && isEligibleForTPU) {
+         markNodeAsTPUReplicated(desc);
+       }
 
-      auto result = TF_FinishOperation(desc, status);
-      operations.push_back(result);
+       auto result = TF_FinishOperation(desc, status);
+       operations.push_back(result);
 
-      // If this op has side effects, remember it in case we need to chain it to
-      // another one later.
-      if (hasSideEffects)
-        controlDependenceValue = result;
+       // If this op has side effects, remember it in case we need to chain it
+       // to another one later.
+       if (hasSideEffects)
+         controlDependenceValue = result;
 
-      return result;
+       return result;
     }
 
     // If there is a control dependence value, run it before producing an output
@@ -214,7 +215,7 @@ struct TFGraphLowering : public SILInstructionVisitor<TFGraphLowering, GLStatus>
   // The TF device to which the generated graph is targeting.
   const DeviceType thisDeviceType;
   const std::string thisDeviceTypeStr;
-  const GraphGlobalConfiguration &configuration;
+  const GraphFunctionDeviceInfo &deviceInfo;
   llvm::DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>>
       &graphFunctions;
   TF_Graph *resultGraph;
@@ -251,7 +252,7 @@ public:
   /// `thisDeviceType`, and add them to `resultGraph`.
   TFGraphLowering(
       SILFunction &fn, DeviceType thisDeviceType,
-      const GraphGlobalConfiguration &configuration,
+      const GraphFunctionDeviceInfo &deviceInfo,
       llvm::DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>>
           &graphFunctions,
       TF_Graph *resultGraph,
@@ -259,7 +260,7 @@ public:
       TF_Status *status)
       : SILFn(fn), thisDeviceType(thisDeviceType),
         thisDeviceTypeStr(getDeviceString(thisDeviceType)),
-        configuration(configuration), graphFunctions(graphFunctions),
+        deviceInfo(deviceInfo), graphFunctions(graphFunctions),
         resultGraph(resultGraph), status(status),
         pendingGraphFnNames(pendingGraphFnNames) {}
 
@@ -438,8 +439,14 @@ public:
 
   TF_DataType getTensorFlowDataType(SILType type, SILLocation loc);
 
+  /// Creates a constant node for an undef value in the input function.
+  /// These values will never be used for any calculations and therefore,
+  /// can be an any arbitrary value.
+  TF_Output createUndefNode(SILType type);
+
   TF_Output createParameter(SILOpResult value, TF_Output passedValue,
                             GraphFunctionBody &fn);
+
 
   /// Add an available value for the specified SILOpResult (a SILValue+result#)
   /// to the value mapping.  This defaults to setting its scope to the current
@@ -490,6 +497,9 @@ public:
   /// SILValue+result #).  Note that this can return a null value if an error
   /// occurred lowering the operand in question.
   TF_Output getOperandValue(SILOpResult v) {
+    if (isa<SILUndef>(v.first) ) {
+      return createUndefNode(v.first->getType());
+    }
     std::pair<TF_Output, unsigned> valueInfo = valueMapping.lookup(v);
     assert(valueInfo.first.oper != nullptr && "didn't find live-in value?");
 
@@ -816,6 +826,89 @@ static TF_Tensor *convertValuesToTensor(ArrayRef<APInt> elts,
   return tensor;
 }
 
+TF_Output TFGraphLowering::createUndefNode(SILType type) {
+  // Create some magic constant. Actual value does not matter as it will
+  // not be used in any calculations.
+  // FIXME: Is there a better way to model undefs in TF Graph if we
+  // don't have a way of getting rid of undefs during canonicalization.
+  APInt value;
+  TF_DataType dtype = getTensorFlowDataType(type, SILFn.getLocation());
+  switch (dtype) {
+  case TF_FLOAT:
+    value = APFloat((float)1.0).bitcastToAPInt();
+    break;
+  case TF_DOUBLE:
+    value = APFloat((double)2.0).bitcastToAPInt();
+    break;
+  case TF_BOOL:
+    value = APInt(1, "0", 10);
+    break;
+  case TF_INT8:
+  case TF_UINT8:
+    value = APInt(8, "aa", 16);
+    break;
+  case TF_INT16:
+  case TF_UINT16:
+    value = APInt(16, "aaaa", 16);
+    break;
+  case TF_INT32:
+  case TF_UINT32:
+    value = APInt(32, "aaaaaa", 16);
+    break;
+  case TF_INT64:
+  case TF_UINT64:
+    value = APInt(64, "aaaaaaaa", 16);
+    break;
+  case TF_STRING:
+  case TF_COMPLEX64:  // Single-precision complex
+  case TF_QINT8:      // Quantized int8
+  case TF_QUINT8:     // Quantized uint8
+  case TF_QINT32:     // Quantized int32
+  case TF_BFLOAT16:   // Float32 truncated to 16 bits.  Only for cast ops.
+  case TF_QINT16:     // Quantized int16
+  case TF_QUINT16:    // Quantized uint16
+  case TF_COMPLEX128: // Double-precision complex
+  case TF_HALF:
+  case TF_RESOURCE:
+  case TF_VARIANT:
+    llvm_unreachable("Cannot deal with other undef node types at this point");
+  }
+
+  // Create a graph node
+  auto &graphFn = getCurrentGraphFunction();
+  std::string nodeName("UndefConst" + type.getAsString());
+  // escape the node name.
+  for (std::string::size_type i = 0; i < nodeName.size(); ++i) {
+    switch (nodeName[i]) {
+    case '$':
+      nodeName[i] = 'D';
+      break;
+    case '<':
+      nodeName[i] = 'L';
+      break;
+    case '>':
+      nodeName[i] = 'G';
+      break;
+    }
+  }
+  auto *result = TF_NewOperation(graphFn.getGraph(), "Const", nodeName.c_str());
+  TF_SetAttrType(result, "dtype", dtype);
+
+  // Make an uninitialized tensor that is big enough for our value.
+  SmallVector<int64_t, 4> shape; // 0d shape
+  auto dtypeSize = TF_DataTypeSize(dtype);
+  auto *tensor =
+      TF_AllocateTensor(dtype, shape.data(), shape.size(), dtypeSize);
+
+  // Set up its contents, element-wise.
+  memcpy((char *)TF_TensorData(tensor), value.getRawData(), dtypeSize);
+  TF_SetAttrTensor(result, "value", tensor, status);
+  TF_Operation *finalResult =
+      graphFn.finishOp(result, /*hasSideEffects*/ false,
+                       /*isEligibleForTPU*/ true, status);
+  return {finalResult, 0};
+}
+
 //===----------------------------------------------------------------------===//
 // Helpers to create TensorFlow graph nodes.
 //===----------------------------------------------------------------------===//
@@ -938,7 +1031,7 @@ static void decodeShapeAttr(SymbolicValue attr,
   for (auto elt : attr.getArrayValue(eltType)) {
     elt = elt.lookThroughSingleElementAggregates();
     result.push_back(elt.getIntegerValue().getLimitedValue());
-    }
+  }
 }
 
 // (graphOpInfo, /*attrIdx*/ 3, dims, numDims, dimPtrs) {
@@ -1096,7 +1189,6 @@ TFGraphLowering::visitGraphOpRecvFromHostInst(GraphOperationInfo &graphOpInfo) {
   assert(inst->getNumOperands() == 0);
   assert(inst->getNumAttributes() >= 2);
 
-  // int tensorId = graphOpInfo.getIntAttrOperand(0, "tensorId");
   assert(graphOpInfo.getDeviceString() == DEFAULT_CPU_DEVICE &&
          "SendToHost must run on CPU device");
   int tensorId = inst->getAttributeNamed("tensorId")
@@ -1357,6 +1449,17 @@ GLStatus TFGraphLowering::addTPUEnqueueOp(SILInstruction *inst, bool isInfeed,
                     diag::tfop_invalid_tfop);
       return GLStatus::Error;
     }
+    if (numDims.size() != 1) {
+      // For InfeedEnqueueTuple, the shapes attr is optional and only used for
+      // error checking.
+      // Interestingly, OutfeedEnqueueTuple does not take a shapes attr
+      // (b/110538524).
+      internalError(getUserSourceLocation(inst->getDebugLocation()),
+                    "TPU infeed enqueue supports enqueuing a single tensor -- "
+                    "did you specify shape?",
+                    diag::tfop_invalid_tfop);
+      return GLStatus::Error;
+    }
   } else {
     assert(thisDeviceType == DeviceType::TPU);
   }
@@ -1383,10 +1486,6 @@ GLStatus TFGraphLowering::addTPUEnqueueOp(SILInstruction *inst, bool isInfeed,
   assert(tfType > 0);
   TF_SetAttrTypeList(desc, "dtypes", &tfType, 1);
   if (isInfeed && !numDims.empty()) {
-    // For InfeedEnqueueTuple, the shapes attr is optional and only used for
-    // error checking.
-    // Interestingly, OutfeedEnqueueTuple does not take a shapes attr
-    // (b/110538524).
     TF_SetAttrShapeList(desc, "shapes", dimPtrs.data(), numDims.data(),
                         numDims.size());
   }
@@ -1434,7 +1533,7 @@ GLStatus TFGraphLowering::visitGraphOpD2DTensorSendInst(
 
 GLStatus TFGraphLowering::visitTFDataset(BuiltinInst *inst) {
   // FIXME: Also support dataset/iterator outside of TPU context.
-  if (thisDeviceType != DeviceType::TPU || !configuration.isTPUInfeedEnabled) {
+  if (thisDeviceType != DeviceType::TPU || !deviceInfo.isTPUInfeedEnabled) {
     internalError(
         getUserSourceLocation(inst->getDebugLocation()),
         "Builtin tfc.makeIteratorGetNextWithDatasets can only be used when "
@@ -3026,7 +3125,7 @@ lowerToFunction(const std::function<void()> &body) {
   ValueMappingScopedHashTable::ScopeTy scope(valueMapping);
 
   /// Start a new graph function.
-  functionStack.push_back(GraphFunctionBody(thisDeviceType, configuration));
+  functionStack.push_back(GraphFunctionBody(thisDeviceType, deviceInfo));
 
   // Lower the code in the body however the caller wants to do it.
   body();
@@ -3353,7 +3452,7 @@ StringRef getTFCompatibleFuncName(SILFunction *fn) {
 static bool lowerTFGraphOrFunction(
     StringRef hostFnName, SILFunction *fn,
     const std::string &graphFnNameForCaller, bool isAcceleratorOnly,
-    const GraphGlobalConfiguration &configuration,
+    const GraphFunctionDeviceInfo &deviceInfo,
     llvm::DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>>
         &graphFunctions) {
 #ifndef SWIFT_ENABLE_TENSORFLOW
@@ -3390,21 +3489,20 @@ static bool lowerTFGraphOrFunction(
     TF_DeleteStatus(status);
   };
 
-  DevicePartitioner partitioner(*fn, configuration);
+  DevicePartitioner partitioner(*fn, deviceInfo);
   auto entryFnBaseName = graphFnNameForCaller;
   unsigned helperFuncId = 0;
   SmallVector<std::pair<StringRef, SILLocation>, 1> pendingGraphFnNames;
-  for (const auto deviceType : configuration.usedDeviceTypes) {
-    assert(deviceType != DeviceType::ALL);
+  for (auto deviceType : deviceInfo.getUsedDeviceTypes()) {
     auto *perDeviceFn = partitioner.extractFunctionForDevice(deviceType);
     SWIFT_DEFER {
       // Remove the partitioned function so it doesn't go through the normal
       // compiler flow.
       perDeviceFn->getModule().eraseFunction(perDeviceFn);
     };
-    bool isPrimaryFn = deviceType == configuration.primaryDeviceType;
+    bool isPrimaryFn = deviceType == deviceInfo.primaryDeviceType;
 
-    TFGraphLowering graphGen(*perDeviceFn, deviceType, configuration,
+    TFGraphLowering graphGen(*perDeviceFn, deviceType, deviceInfo,
                              graphFunctions, resultGraph.get(),
                              pendingGraphFnNames, status);
     GLStatus S = GLStatus::Success;
@@ -3468,24 +3566,67 @@ static bool lowerTFGraphOrFunction(
 
 bool tf::lowerTFFunction(
     StringRef hostFnName, SILFunction *fn,
-    const GraphGlobalConfiguration &configuration,
+    const GraphFunctionDeviceInfo &deviceInfo,
     llvm::DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>>
         &graphFunctions) {
   std::string graphFnName = getGraphFuncNameForFuncAttr(hostFnName);
   DEBUG(llvm::dbgs() << "Lowering accelerator-only host fn " << hostFnName
                      << " to graph function " << graphFnName << "\n");
   return lowerTFGraphOrFunction(hostFnName, fn, graphFnName,
-                                /*isAcceleratorOnly*/ true, configuration,
+                                /*isAcceleratorOnly*/ true, deviceInfo,
                                 graphFunctions);
 }
 
 bool tf::lowerTFGraph(
     StringRef hostFnName, SILFunction *fn,
-    const GraphGlobalConfiguration &configuration,
+    const GraphFunctionDeviceInfo &deviceInfo,
     llvm::DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>>
         &graphFunctions) {
   std::string entryFnBaseName = getTFCompatibleFuncName(fn);
   return lowerTFGraphOrFunction(hostFnName, fn, entryFnBaseName,
-                                /*isAcceleratorOnly*/ false, configuration,
+                                /*isAcceleratorOnly*/ false, deviceInfo,
                                 graphFunctions);
+}
+
+
+//===----------------------------------------------------------------------===//
+// TFLowerGraphTestPass
+//===----------------------------------------------------------------------===//
+
+namespace {
+/// This is a SIL pass that drives the TF Graph generation process.  This is not
+/// used by the compiler proper, it just exists so we can drive it through
+/// sil-opt and write testcases.
+struct TFLowerGraphTestPass : public SILFunctionTransform {
+
+  /// The entry point to the transformation.
+  void run() override {
+    auto fn = getFunction();
+    auto deviceInfo = GraphFunctionDeviceInfo::getForFunction(
+        *fn, /*removeConfigInst*/ true);
+    llvm::DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>>
+        graphFunctions;
+    if (lowerTFGraph(fn->getName(), fn, deviceInfo, graphFunctions)) {
+      llvm::errs() << "Failed to generate TFGraph for " << fn->getName()
+                   << "\n";
+      return;
+    }
+    for (const auto &kv : graphFunctions) {
+      const LoweredGraphFunction* resultGraph = kv.second.get();
+      size_t len;
+      const char *content = TF_GraphDebugString(resultGraph->graph.get(), &len);
+      llvm::outs() << "--- TFPartition GraphDef Proto: " << fn->getName()
+                   << "\n";
+      llvm::outs() << content << "\n";
+      llvm::outs() << "----\n";
+      llvm::outs().flush();
+      free((void*)content);
+    }
+  }
+};
+
+} // end anonymous namespace.
+
+SILTransform *swift::createTFLowerGraph() {
+  return new TFLowerGraphTestPass();
 }

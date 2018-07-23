@@ -138,7 +138,7 @@ namespace {
     void checkAttributesAndFormGraphOps();
     void formGraphOp(SILTensorOpInfo &opInfo,
                      DenseMap<SILValue, SymbolicValue> &constants,
-                     GraphGlobalConfiguration &deviceConfig);
+                     GraphFunctionDeviceInfo &deviceInfo);
     void cleanupDeadInstructions();
   };
 }  // end anonymous namespace
@@ -1505,10 +1505,9 @@ void TFDeabstraction::propagateTensorValues() {
 /// FIXME: This is a near duplication of the logic used by TFPartitioning in
 /// SILTensorOpInfo::decodeTensorFromScalars.  When constexpr propagation is
 /// done, we should remove the logic in SILTensorOpInfo.
-static GraphOperationInst *
-tryToPromoteTensorFromScalars(ApplyInst *inst,
-                           const DenseMap<SILValue, SymbolicValue> &constants,
-                              GraphGlobalConfiguration &deviceConfig) {
+static GraphOperationInst *tryToPromoteTensorFromScalars(
+    ApplyInst *inst, const DenseMap<SILValue, SymbolicValue> &constants,
+    GraphFunctionDeviceInfo &deviceInfo) {
   assert(inst->getNumOperands() == 3 && isTensorHandle(inst->getType()) &&
          "Unexpected type signature for __tf_tensor_from_scalars");
 
@@ -1556,9 +1555,9 @@ tryToPromoteTensorFromScalars(ApplyInst *inst,
   // into the correct Const operation.
   SILBuilder B(inst);
   B.setCurrentDebugScope(inst->getDebugScope());
-  auto result = createConstTensor(scalarsElementType, scalars, shape,
-                                  inst->getType(), inst->getLoc(),
-                                  deviceConfig.primaryDeviceType, B);
+  auto result =
+      createConstTensor(scalarsElementType, scalars, shape, inst->getType(),
+                        inst->getLoc(), deviceInfo.primaryDeviceType, B);
 
   // Replace the old instruction with the new one.
   inst->replaceAllUsesPairwiseWith(result);
@@ -1583,10 +1582,9 @@ tryToPromoteTensorFromScalars(ApplyInst *inst,
 /// On success, this removes the applyexpr and returns a pointer to the new
 /// instruction that it created.  On failure, it returns a nullptr.
 ///
-static GraphOperationInst *
-tryToPromoteTensorFromScalars1D(ApplyInst *inst,
-                          const DenseMap<SILValue, SymbolicValue> &constants,
-                                GraphGlobalConfiguration &deviceConfig) {
+static GraphOperationInst *tryToPromoteTensorFromScalars1D(
+    ApplyInst *inst, const DenseMap<SILValue, SymbolicValue> &constants,
+    GraphFunctionDeviceInfo &deviceInfo) {
   assert(inst->getNumOperands() == 2 && isTensorHandle(inst->getType()) &&
          "Unexpected type signature for __tf_tensor_from_scalars_1d");
 
@@ -1615,9 +1613,9 @@ tryToPromoteTensorFromScalars1D(ApplyInst *inst,
 
   SILBuilder B(inst);
   B.setCurrentDebugScope(inst->getDebugScope());
-  auto result = createConstTensor(scalarElementType, scalars, shape,
-                                  inst->getType(), inst->getLoc(),
-                                  deviceConfig.primaryDeviceType, B);
+  auto result =
+      createConstTensor(scalarElementType, scalars, shape, inst->getType(),
+                        inst->getLoc(), deviceInfo.primaryDeviceType, B);
 
   // Replace the old instruction with the new one.
   inst->replaceAllUsesPairwiseWith(result);
@@ -1630,15 +1628,14 @@ tryToPromoteTensorFromScalars1D(ApplyInst *inst,
   return result;
 }
 
-
 /// Canonicalize tensor ops, validating that attribute arguments are constant
 /// expressions, and transform the IR to use GraphOperationInst.
 void TFDeabstraction::checkAttributesAndFormGraphOps() {
   llvm::PrettyStackTraceFormat
   X("TFDeabstraction::checkAttributesAndFormGraphOps");
 
-  auto deviceConfiguration =
-    GraphGlobalConfiguration::getForFunction(fn, /*removeConfigInst*/false);
+  auto deviceInfo =
+      GraphFunctionDeviceInfo::getForFunction(fn, /*removeConfigInst*/ false);
 
   // Do a big sweep over all of the operands to tensor values, collecting ones
   // that we might be interested in being constants into a single list.
@@ -1685,14 +1682,14 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
     // graphOp instruction.
     if (TFStrictDeabstraction) {
       if (auto opInfo = SILTensorOpInfo::decode(inst)) {
-        // Do not translate this special inst into a graph op, since otherwise
-        // it gets removed by the performance pipeline.
+        // Do not translate this special inst into a graph op, since it will get
+        // removed at the beginning of the partition pass.
         // TODO: remove this inst in the getForFunction() call above, once
         // the partition pass is folded into deabstraction.
         if (opInfo->opName == "tfc.configureTPU" ||
             opInfo->opName == "tfc.configureGPU")
           continue;
-        formGraphOp(*opInfo, constants, deviceConfiguration);
+        formGraphOp(*opInfo, constants, deviceInfo);
       }
     }
 
@@ -1704,14 +1701,14 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
       auto callee = apply->getCalleeFunction();
 
       if (callee && callee->getName() == "__tf_tensor_from_scalars") {
-        if (auto result = tryToPromoteTensorFromScalars(apply, constants,
-                                                        deviceConfiguration))
+        if (auto result =
+                tryToPromoteTensorFromScalars(apply, constants, deviceInfo))
           inst = result;
         continue;
       }
       if (callee && callee->getName() == "__tf_tensor_from_scalars_1d") {
-        if (auto result = tryToPromoteTensorFromScalars1D(apply, constants,
-                                                          deviceConfiguration))
+        if (auto result =
+                tryToPromoteTensorFromScalars1D(apply, constants, deviceInfo))
           inst = result;
         continue;
       }
@@ -1861,10 +1858,9 @@ SILValue getTensorProtocolHandleMember(SILValue v, SILLocation loc,
 /// Replace the specified tensor operation with a GraphOperation instruction,
 /// emitting errors if attribute arguments could not be constant folded, or if
 /// the operand/attribute types are incorrect.
-void TFDeabstraction::
-formGraphOp(SILTensorOpInfo &opInfo,
-            DenseMap<SILValue, SymbolicValue> &constants,
-            GraphGlobalConfiguration &deviceConfig) {
+void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
+                                  DenseMap<SILValue, SymbolicValue> &constants,
+                                  GraphFunctionDeviceInfo &deviceInfo) {
   auto *inst = opInfo.inst;
   auto &context = inst->getFunction()->getASTContext();
   auto &allocator = context.getAllocator();
@@ -2017,7 +2013,7 @@ formGraphOp(SILTensorOpInfo &opInfo,
     }
 
     auto verifyShapeAttr = [&](SymbolicValue constValue) -> bool {
-      // strip-away the possible aggregate wrapper.
+      // strip away the possible aggregate wrapper.
       constValue = constValue.lookThroughSingleElementAggregates();
       if (constValue.getKind() != SymbolicValue::Array) {
         diagnoseInvalidAttr("requires an array");
@@ -2030,7 +2026,7 @@ formGraphOp(SILTensorOpInfo &opInfo,
         return true;
       }
       for (auto elt : elements) {
-        // strip-away the possible aggregate wrapper.
+        // strip away the possible aggregate wrapper.
         elt = elt.lookThroughSingleElementAggregates();
         if (elt.getKind() != SymbolicValue::Integer) {
           diagnoseInvalidAttr("requires an array of ints");
@@ -2065,7 +2061,7 @@ formGraphOp(SILTensorOpInfo &opInfo,
       CanType eltType;
       auto shapes = constValue.getArrayValue(eltType);
       if (eltType->getString() != "TensorShape")
-        return diagnoseInvalidAttr("requires an array of TensorShape objects");
+        return diagnoseInvalidAttr("requires an array of TensorShape values");
       for (auto shape : shapes) {
         if (verifyShapeAttr(shape))
           return; // error already emitted.
@@ -2132,19 +2128,10 @@ formGraphOp(SILTensorOpInfo &opInfo,
 
   // Finally, set a device attribute for this if there wasn't already one
   // specified.
-  if (opInfo.opName == "tfc.scalarToTensor") {
-    if (!opDevice.empty())
-      return diagnoseInvalid("device may not be specified for this op");
-  } else if (opDevice.empty()) {
-    auto deviceID = deviceConfig.chooseDevice(opInfo.opName);
-
-    // TODO: Use integer device ID's instead of strings?
-    auto constValue = SymbolicValue::getString(getDeviceString(deviceID),
-                                               allocator);
-    auto attrIdentifier = context.getIdentifier(DEVICE_ATTR);
-    attributes.push_back({ attrIdentifier, constValue });
+  if (opDevice.empty()) {
+    deviceInfo.handleDevicePlacement(opInfo.opName, opDevice, context,
+                                     attributes);
   }
-
   // Okay, if we got this far then we have all valid attributes and inputs.
   // Figure out the result list.
   SmallVector<SILType, 4> resultTypes;
