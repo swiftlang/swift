@@ -707,7 +707,8 @@ public:
       name += "$generator";
       generator = new (TC.Context)
         VarDecl(/*IsStatic*/false, VarDecl::Specifier::Var, /*IsCaptureList*/false,
-                S->getInLoc(), TC.Context.getIdentifier(name), generatorTy, DC);
+                S->getInLoc(), TC.Context.getIdentifier(name), DC);
+      generator->setType(generatorTy);
       generator->setInterfaceType(generatorTy->mapTypeOutOfContext());
       generator->setImplicit();
 

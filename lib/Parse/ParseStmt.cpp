@@ -1038,7 +1038,7 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
     auto var = new (P.Context) VarDecl(/*IsStatic*/false,
                                        VarDecl::Specifier::Let,
                                        /*IsCaptureList*/false, loc, errorName,
-                                       Type(), P.CurDeclContext);
+                                       P.CurDeclContext);
     var->setImplicit();
     auto namePattern = new (P.Context) NamedPattern(var);
     auto varPattern = new (P.Context) VarPattern(loc, /*isLet*/true,

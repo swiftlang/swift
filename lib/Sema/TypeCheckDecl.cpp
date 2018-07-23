@@ -1183,34 +1183,6 @@ static void configureImplicitSelf(TypeChecker &tc,
   selfDecl->setInterfaceType(selfParam.getPlainType());
 }
 
-static void recordParamContextTypes(AbstractFunctionDecl *func) {
-  auto *env = func->getGenericEnvironment();
-
-  if (auto *selfDecl = func->getImplicitSelfDecl()) {
-    if (!env)
-      selfDecl->setType(selfDecl->getInterfaceType());
-    else
-      selfDecl->setType(env->mapTypeIntoContext(selfDecl->getInterfaceType()));
-  }
-
-  for (auto param : *func->getParameters()) {
-    if (!env)
-      param->setType(param->getInterfaceType());
-    else
-      param->setType(env->mapTypeIntoContext(param->getInterfaceType()));
-  }
-}
-
-static void recordIndexContextTypes(SubscriptDecl *subscript) {
-  auto *env = subscript->getGenericEnvironment();
-  for (auto param : *subscript->getIndices()) {
-    if (!env)
-      param->setType(param->getInterfaceType());
-    else
-      param->setType(env->mapTypeIntoContext(param->getInterfaceType()));
-  }
-}
-
 /// Try to make the given declaration 'dynamic', checking any semantic
 /// constraints before doing so.
 ///
@@ -1862,8 +1834,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
         // Build the parameter witness method.
         TC.completePropertyBehaviorParameter(decl, func,
                                              conformance,
-                                             interfaceSubsMap,
-                                             contextSubsMap);
+                                             interfaceSubsMap);
         continue;
       }
     }
@@ -4127,14 +4098,12 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       auto valueParams = accessor->getParameters();
 
       // Determine the value type.
-      Type valueIfaceTy, valueTy;
+      Type valueIfaceTy;
       if (auto VD = dyn_cast<VarDecl>(storage)) {
         valueIfaceTy = VD->getInterfaceType()->getReferenceStorageReferent();
-        valueTy = VD->getType()->getReferenceStorageReferent();
       } else {
         auto SD = cast<SubscriptDecl>(storage);
         valueIfaceTy = SD->getElementInterfaceType();
-        valueTy = SD->mapTypeIntoContext(valueIfaceTy);
 
         // Copy the index types instead of re-validating them.
         auto indices = SD->getIndices();
@@ -4144,10 +4113,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
             continue;
 
           Type paramIfaceTy = subscriptParam->getInterfaceType();
-          Type paramTy = SD->mapTypeIntoContext(paramIfaceTy);
 
           auto accessorParam = valueParams->get(valueParams->size() - e + i);
-          accessorParam->setType(paramTy);
           accessorParam->setInterfaceType(paramIfaceTy);
           accessorParam->getTypeLoc().setType(paramIfaceTy);
         }
@@ -4173,9 +4140,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
       case AccessorKind::Set: {
         auto newValueParam = valueParams->get(0);
-        newValueParam->setType(valueTy);
         newValueParam->setInterfaceType(valueIfaceTy);
-        newValueParam->getTypeLoc().setType(valueTy);
+        newValueParam->getTypeLoc().setType(valueIfaceTy);
         break;
       }
 
@@ -4204,7 +4170,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // If we have generic parameters, check the generic signature now.
     if (FD->getGenericParams() || !isa<AccessorDecl>(FD)) {
       validateGenericFuncSignature(FD);
-      recordParamContextTypes(FD);
     } else {
       // We've inherited all of the type information already.
       FD->setGenericEnvironment(
@@ -4331,7 +4296,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     configureImplicitSelf(*this, CD);
 
     validateGenericFuncSignature(CD);
-    recordParamContextTypes(CD);
 
     // We want the constructor to be available for name lookup as soon
     // as it has a valid interface type.
@@ -4361,7 +4325,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     configureImplicitSelf(*this, DD);
 
     validateGenericFuncSignature(DD);
-    recordParamContextTypes(DD);
 
     DD->setSignatureIsValidated();
 
@@ -4375,7 +4338,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     DeclValidationRAII IBV(SD);
 
     validateGenericSubscriptSignature(SD);
-    recordIndexContextTypes(SD);
 
     SD->setSignatureIsValidated();
 

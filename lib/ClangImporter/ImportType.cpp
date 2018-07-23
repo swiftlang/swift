@@ -1697,7 +1697,6 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
         param, AccessLevel::Private,
         VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), name,
         importSourceLoc(param->getLocation()), bodyName,
-        dc->mapTypeIntoContext(swiftParamTy),
         ImportedHeaderUnit);
 
     paramInfo->setInterfaceType(swiftParamTy);
@@ -1716,7 +1715,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     auto param = new (SwiftContext) ParamDecl(VarDecl::Specifier::Default,
                                               SourceLoc(), SourceLoc(),
                                               Identifier(), SourceLoc(),
-                                              name, paramTy,
+                                              name,
                                               ImportedHeaderUnit);
     param->setInterfaceType(paramTy);
 
@@ -2018,7 +2017,7 @@ ImportedType ClangImporter::Implementation::importMethodType(
     auto type = TupleType::getEmpty(SwiftContext);
     auto var = new (SwiftContext) ParamDecl(VarDecl::Specifier::Default, SourceLoc(),
                                             SourceLoc(), argName,
-                                            SourceLoc(), argName, type,
+                                            SourceLoc(), argName,
                                             ImportedHeaderUnit);
     var->setInterfaceType(type);
     swiftParams.push_back(var);
@@ -2143,7 +2142,6 @@ ImportedType ClangImporter::Implementation::importMethodType(
                                            SourceLoc(), SourceLoc(), name,
                                            importSourceLoc(param->getLocation()),
                                            bodyName,
-                                           swiftParamTy,
                                            ImportedHeaderUnit);
     paramInfo->setInterfaceType(swiftParamTy->mapTypeOutOfContext());
     recordImplicitUnwrapForDecl(paramInfo, paramIsIUO);
@@ -2263,7 +2261,6 @@ ImportedType ClangImporter::Implementation::importAccessorMethodType(
                                            /*let loc*/SourceLoc(),
                                            /*label loc*/SourceLoc(),
                                            argLabel, nameLoc, bodyName,
-                                           propertyTy,
                                            /*dummy DC*/ImportedHeaderUnit);
     paramInfo->setInterfaceType(propertyTy->mapTypeOutOfContext());
 

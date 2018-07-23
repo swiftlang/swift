@@ -155,7 +155,7 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType,
   for (Type argType : argTypes) {
     auto PD = new (Context)
         ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
-                  Identifier(), SourceLoc(), Identifier(), argType, DC);
+                  Identifier(), SourceLoc(), Identifier(), DC);
     PD->setInterfaceType(argType);
     PD->setValidationToChecked();
     PD->setImplicit();
@@ -203,8 +203,7 @@ getBuiltinGenericFunction(Identifier Id,
     auto PD = new (Context) ParamDecl(specifier,
                                       SourceLoc(), SourceLoc(),
                                       Identifier(), SourceLoc(),
-                                      Identifier(),
-                                      Type(), DC);
+                                      Identifier(), DC);
     PD->setInterfaceType(paramIfaceType);
     PD->setValidationToChecked();
     PD->setImplicit();
