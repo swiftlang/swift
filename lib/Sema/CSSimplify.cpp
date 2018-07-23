@@ -76,9 +76,14 @@ static Optional<unsigned> scoreParamAndArgNameTypo(StringRef paramName,
   if (dist == 0)
     return 1;
 
+  // If this is just a single character label on both sides,
+  // simply return distance.
+  if (paramName.size() == 1 && argName.size() == 1)
+    return dist;
+
   // Only allow about one typo for every two properly-typed characters, which
   // prevents completely-wacky suggestions in many cases.
-  if (argName.size() > 1 && dist > (argName.size() + 1) / 3)
+  if (dist > (argName.size() + 1) / 3)
     return None;
 
   return dist;
@@ -425,7 +430,7 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
     // If there are as many arguments as parameters but we still
     // haven't claimed all of the arguments, it could mean that
     // labels don't line up, if so let's try to claim arguments
-    // with incorrect labels, and let OoO logic diagnose that.
+    // with incorrect labels, and let OoO/re-labeling logic diagnose that.
     if (numArgs == numParams && numClaimedArgs != numArgs) {
       for (unsigned i = 0; i < numArgs; ++i) {
         if (claimedArgs[i] || !parameterBindings[i].empty())
@@ -443,7 +448,6 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
         // different, because typo correction has been attempted already.
         parameterBindings[i].push_back(claim(params[i].getLabel(), i));
       }
-
     }
 
     // If we still haven't claimed all of the arguments, fail.
