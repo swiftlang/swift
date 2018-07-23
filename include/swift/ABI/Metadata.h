@@ -1669,7 +1669,7 @@ public:
     }
 #endif
 
-    return getProtocolDescriptorUnchecked()->Flags.getClassConstraint();
+    return getSwiftProtocol()->Flags.getClassConstraint();
   }
 
   /// Determine whether this protocol needs a witness table.
@@ -1680,7 +1680,7 @@ public:
     }
 #endif
 
-    return getProtocolDescriptorUnchecked()->Flags.needsWitnessTable();
+    return true;
   }
 
   SpecialProtocol getSpecialProtocol() const {
@@ -1690,7 +1690,7 @@ public:
     }
 #endif
 
-    return getProtocolDescriptorUnchecked()->Flags.getSpecialProtocol();
+    return getSwiftProtocol()->Flags.getSpecialProtocol();
   }
 
   /// Retrieve the Swift protocol descriptor.
@@ -1710,8 +1710,6 @@ public:
 #if SWIFT_OBJC_INTEROP
   /// Whether this references an Objective-C protocol.
   bool isObjC() const {
-    assert(static_cast<bool>(storage & IsObjCBit) !=
-             getProtocolDescriptorUnchecked()->Flags.needsWitnessTable());
     return (storage & IsObjCBit) != 0;
   }
 
