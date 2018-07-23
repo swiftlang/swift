@@ -87,7 +87,7 @@ struct TestConfig {
         try tags.split(separator: ",").map(String.init).map {
           try checked({ BenchmarkCategory(rawValue: $0) }, $0) })
     }
-    func finititeDouble(value: String) -> Double? {
+    func finiteDouble(value: String) -> Double? {
       return Double(value).flatMap { $0.isFinite ? $0 : nil }
     }
 
@@ -102,7 +102,7 @@ struct TestConfig {
                   parser: { UInt($0) })
     p.addArgument("--sample-time", \.sampleTime,
                   help: "duration of test measurement in seconds\ndefault: 1",
-                  parser: finititeDouble)
+                  parser: finiteDouble)
     p.addArgument("--verbose", \.verbose, defaultValue: true,
                   help: "increase output verbosity")
     p.addArgument("--memory", \.logMemory, defaultValue: true,

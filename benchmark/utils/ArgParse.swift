@@ -33,9 +33,11 @@ extension ArgumentError: CustomStringConvertible {
   }
 }
 
-/// Returns the argument value converted to the type T using the parser.
-/// If the parser cannot create the value of specified type, throw an invalid
-/// type argument error.
+/// Type-checked parsing of the argument value.
+///
+/// - Returns: Typed value of the argument converted using the `parse` function.
+///
+/// - Throws: `ArgumentError.invalidType` when the conversion fails.
 func checked<T>(
   _ parse: (String) throws -> T?,
   _ value: String,
@@ -46,7 +48,7 @@ func checked<T>(
   if type.starts(with: "Optional<") {
       let s = type.index(after: type.index(of:"<")!)
       let e = type.index(before: type.endIndex) // ">"
-      type = String(type[s..<e]) // strip Optional< >
+      type = String(type[s ..< e]) // strip Optional< >
   }
   throw ArgumentError.invalidType(
     value: value, type: type, argument: argument)
@@ -70,9 +72,13 @@ class ArgumentParser<U> {
     private var positionalArgs = [String]()
     private var optionalArgsMap = [String : String]()
 
-    // Argument holds the name of the command line parameter and the value
-    // processing closure used to convert it into given type and storing it
-    // in the parsing result.
+    /// Argument holds the name of the command line parameter, its help
+    /// desciption and a rule that's applied to process it.
+    ///
+    /// The the rule is typically a value processing closure used to convert it
+    /// into given type and storing it in the parsing result.
+    ///
+    /// See also: addArgument, parseArgument
     struct Argument {
       let name: String?
       let help: String?
@@ -122,43 +128,39 @@ class ArgumentParser<U> {
     /// the parsing fails.
     public func parse() -> U {
       do {
-        try parseArgs()
-        try arguments.forEach { try $0.apply() } // parse all arguments
+        try parseArgs() // parse the argument syntax
+        try arguments.forEach { try $0.apply() } // type-check and store values
         return result
       } catch let error as ArgumentError {
-        fflush(stdout)
         fputs("error: \(error)\n", stderr)
-        fflush(stderr)
         exit(1)
       } catch {
+        fflush(stdout)
         fatalError("\(error)")
       }
     }
 
     /// Using CommandLine.arguments, parses the structure of optional and
-    /// positional arguments of this program. Failure to parse arguments
-    /// throws correspondding ArgumentError.
+    /// positional arguments of this program.
     ///
     /// We assume that optional switch args are of the form:
     ///
-    /// --opt-name[=opt-value]
-    /// -opt-name[=opt-value]
+    ///     --opt-name[=opt-value]
+    ///     -opt-name[=opt-value]
     ///
-    /// with opt-name and opt-value not containing any '=' signs. Any
+    /// with `opt-name` and `opt-value` not containing any '=' signs. Any
     /// other option passed in is assumed to be a positional argument.
+    ///
+    /// - Throws: `ArgumentError.unsupportedArgument` on failure to parse
+    ///     the supported argument syntax.
     private func parseArgs() throws {
 
       // For each argument we are passed...
-      var passThroughArgs = false
       for arg in CommandLine.arguments[1..<CommandLine.arguments.count] {
         // If the argument doesn't match the optional argument pattern. Add
         // it to the positional argument list and continue...
-        if passThroughArgs || !arg.starts(with: "-") {
+        if !arg.starts(with: "-") {
           positionalArgs.append(arg)
-          continue
-        }
-        if arg == "--" {
-          passThroughArgs = true
           continue
         }
         // Attempt to split it into two components separated by an equals sign.
@@ -180,6 +182,18 @@ class ArgumentParser<U> {
       }
     }
 
+    /// Add a rule for parsing the specified argument.
+    ///
+    /// Stores the type-erased invocation of the `parseArgument` in `Argument`.
+    ///
+    /// Parameters:
+    ///   - name: Name of the command line argument. E.g.: `--opt-arg`.
+    ///       `nil` denotes positional arguments.
+    ///   - property: Property on the `result`, to store the value into.
+    ///   - defaultValue: Value used when the command line argument doesn't
+    ///       provide one.
+    ///   - help: Argument's description used when printing usage with `--help`.
+    ///   - parser: Function that converts the argument value to given type `T`.
     public func addArgument<T>(
       _ name: String?,
       _ property: WritableKeyPath<U, T>,
@@ -191,6 +205,19 @@ class ArgumentParser<U> {
         { try self.parseArgument(name, property, defaultValue, parser) })
     }
 
+    /// Process the specified command line argument.
+    ///
+    /// For optional arguments that have a value we attempt to convert it into
+    /// given type using the supplied parser, performing the type-checking with
+    /// the `checked` function.
+    /// If the value is empty the `defaultValue` is used instead.
+    /// The typed value is finally stored in the `result` into the specified
+    /// `property`.
+    ///
+    /// For the optional positional arguments, the [String] is simply assigned
+    /// to the specified property without any conversion.
+    ///
+    /// See `addArgument` for detailed parameter descriptions.
     private func parseArgument<T>(
       _ name: String?,
       _ property: WritableKeyPath<U, T>,
