@@ -2114,9 +2114,8 @@ private:
         unsigned NumBits = BuiltinIntTy->getWidth().getFixedWidth();
         Name += "_Int" + llvm::utostr(NumBits);
       }
-    }
-    else if (auto BuiltinFloatTy =
-                 dyn_cast<BuiltinFloatType>(OpdTy.getASTType())) {
+    } else if (auto BuiltinFloatTy =
+                   dyn_cast<BuiltinFloatType>(OpdTy.getASTType())) {
       Name += "_FP";
       switch (BuiltinFloatTy->getFPKind()) {
       case BuiltinFloatType::IEEE16: Name += "IEEE16"; break;
@@ -2126,8 +2125,7 @@ private:
       case BuiltinFloatType::IEEE128: Name += "IEEE128"; break;
       case BuiltinFloatType::PPC128: Name += "PPC128"; break;
       }
-    }
-    else {
+    } else {
       assert(OpdTy.getASTType() == getASTContext().TheRawPointerType);
       Name += "_RawPointer";
     }
