@@ -986,8 +986,10 @@ namespace {
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       // If this is a call, record the argument expression.
-      if (auto call = dyn_cast<CallExpr>(expr)) {
-        CallArgs.insert(call->getArg());
+      if (auto call = dyn_cast<ApplyExpr>(expr)) {
+        if (!isa<SelfApplyExpr>(expr)) {
+          CallArgs.insert(call->getArg());
+        }
       }
 
       // If this is an unresolved member with a call argument (e.g.,
