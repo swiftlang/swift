@@ -25,16 +25,16 @@ ControlFlowTests.testAllBackends("powerOfTwo") {
 
 func natSumWithBreak(_ breakIndex: Int32) -> Tensor<Int32> {
   var i: Int32 = 1
-  var sum = Tensor<Int32>(0);
+  var sum = Tensor<Int32>(0)
   let maxCount: Int32 = 100
   while i <= maxCount {
     sum += i
     if (i == breakIndex) {
-      break;
+      break
     }
     i += 1
   }
-  return sum;
+  return sum
 }
 
 ControlFlowTests.testAllBackends("natSumWithBreak") {
@@ -52,7 +52,7 @@ func sumOfProducts(_ M : Int32, _ N : Int32) -> Tensor<Float> {
     for j in 0..<N {
       // i + 1 and j + 1 is a workaround for
       // https://bugs.swift.org/browse/SR-8256
-      let prod = Tensor<Float>(Float((i + 1) * (j + 1)));
+      let prod = Tensor<Float>(Float((i + 1) * (j + 1)))
       sum += prod
     }
   }
@@ -73,10 +73,10 @@ outer_loop:for i in 0..<M {
     for j in 0..<N {
       // i + 1 and j + 1 is a workaround for
       // https://bugs.swift.org/browse/SR-8256
-      let prod = Tensor<Float>(Float((i + 1) * (j + 1)));
+      let prod = Tensor<Float>(Float((i + 1) * (j + 1)))
       sum += prod
       if (sum.scalarized() >= Bound) {
-        break outer_loop;
+        break outer_loop
       }
     }
   }

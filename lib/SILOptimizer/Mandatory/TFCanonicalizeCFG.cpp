@@ -461,8 +461,7 @@ SingleExitLoopTransformer::createNewHeader() {
     SILValue newValue = newHeader->createPHIArgument(
         escapingValue->getType(), escapingValue.getOwnershipKind());
     // Replace uses *outside* of the loop with the new value.
-    ValueBase::use_iterator UI = escapingValue->use_begin(),
-                            E = escapingValue->use_end();
+    auto UI = escapingValue->use_begin(), E = escapingValue->use_end();
     while (UI != E) {
       Operand *use = *UI;
       // Increment iterator before we invalidate it
