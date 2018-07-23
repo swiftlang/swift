@@ -34,9 +34,9 @@ import SwiftShims
 //
 //   Dictionary<K,V> (a struct)
 //   +------------------------------------------------+
-//   |  _VariantDictionaryBuffer<K,V> (an enum)      |
+//   |  Dictionary<K,V>._Variant (an enum)            |
 //   | +--------------------------------------------+ |
-//   | | [_NativeDictionaryBuffer<K,V> (a struct)] | |
+//   | | [_NativeDictionaryBuffer<K,V> (a struct)]  | |
 //   | +---|----------------------------------------+ |
 //   +----/-------------------------------------------+
 //       /
@@ -58,9 +58,9 @@ import SwiftShims
 //
 //   Dictionary<K,V> (a struct)
 //   +----------------------------------------------+
-//   | _VariantDictionaryBuffer<K,V> (an enum)     |
+//   | Dictionary<K,V>._Variant (an enum)           |
 //   | +----------------------------------------+   |
-//   | | [ _CocoaDictionaryBuffer (a struct) ] |   |
+//   | | [ _CocoaDictionaryBuffer (a struct) ]  |   |
 //   | +---|------------------------------------+   |
 //   +-----|----------------------------------------+
 //         |
@@ -381,11 +381,6 @@ import SwiftShims
 /// buffer.
 @_fixed_layout
 public struct Dictionary<Key: Hashable, Value> {
-
-  @usableFromInline
-  internal typealias _Self = Dictionary<Key, Value>
-  @usableFromInline
-  internal typealias _VariantBuffer = _VariantDictionaryBuffer<Key, Value>
   @usableFromInline
   internal typealias _NativeBuffer = _NativeDictionaryBuffer<Key, Value>
 
@@ -394,7 +389,7 @@ public struct Dictionary<Key: Hashable, Value> {
   public typealias Element = (key: Key, value: Value)
 
   @usableFromInline
-  internal var _variantBuffer: _VariantBuffer
+  internal var _variant: _Variant
 
   /// Creates an empty dictionary.
   @inlinable // FIXME(sil-serialize-all)
@@ -414,7 +409,7 @@ public struct Dictionary<Key: Hashable, Value> {
   ///   reallocating its storage buffer.
   @inlinable // FIXME(sil-serialize-all)
   public init(minimumCapacity: Int) {
-    _variantBuffer = .native(_NativeBuffer(minimumCapacity: minimumCapacity))
+    _variant = .native(_NativeBuffer(minimumCapacity: minimumCapacity))
   }
 
   /// Creates a new dictionary from the key-value pairs in the given sequence.
@@ -449,8 +444,8 @@ public struct Dictionary<Key: Hashable, Value> {
     } else {
       self = Dictionary(minimumCapacity: keysAndValues.underestimatedCount)
       // '_MergeError.keyCollision' is caught and handled with an appropriate
-      // error message one level down, inside _variantBuffer.merge(_:...).
-      try! _variantBuffer.merge(
+      // error message one level down, inside _variant.merge(_:...).
+      try! _variant.merge(
         keysAndValues,
         uniquingKeysWith: { _, _ in throw _MergeError.keyCollision})
     }
@@ -492,7 +487,7 @@ public struct Dictionary<Key: Hashable, Value> {
     uniquingKeysWith combine: (Value, Value) throws -> Value
   ) rethrows where S.Element == (Key, Value) {
     self = Dictionary(minimumCapacity: keysAndValues.underestimatedCount)
-    try _variantBuffer.merge(keysAndValues, uniquingKeysWith: combine)
+    try _variant.merge(keysAndValues, uniquingKeysWith: combine)
   }
 
   /// Creates a new dictionary whose keys are the groupings returned by the
@@ -523,18 +518,17 @@ public struct Dictionary<Key: Hashable, Value> {
     by keyForValue: (S.Element) throws -> Key
   ) rethrows where Value == [S.Element] {
     self = [:]
-    try _variantBuffer.nativeGroup(values, by: keyForValue)
+    try _variant.nativeGroup(values, by: keyForValue)
   }
 
   @inlinable // FIXME(sil-serialize-all)
   internal init(_nativeBuffer: _NativeDictionaryBuffer<Key, Value>) {
-    _variantBuffer =
-      .native(_nativeBuffer)
+    _variant = .native(_nativeBuffer)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  internal init(_variantBuffer: _VariantBuffer) {
-    self._variantBuffer = _variantBuffer
+  @inlinable
+  internal init(_variant: _Variant) {
+    self._variant = _variant
   }
 
 #if _runtime(_ObjC)
@@ -551,14 +545,14 @@ public struct Dictionary<Key: Hashable, Value> {
       _isBridgedVerbatimToObjectiveC(Key.self) &&
       _isBridgedVerbatimToObjectiveC(Value.self),
       "Dictionary can be backed by NSDictionary buffer only when both key and value are bridged verbatim to Objective-C")
-    _variantBuffer = .cocoa(
+    _variant = .cocoa(
       _CocoaDictionaryBuffer(cocoaDictionary: _immutableCocoaDictionary))
   }
 #endif
 }
 
 //
-// All APIs below should dispatch to `_variantBuffer`, without doing any
+// All APIs below should dispatch to `_variant`, without doing any
 // additional processing.
 //
 
@@ -583,7 +577,7 @@ extension Dictionary: Sequence {
   @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
   public func makeIterator() -> DictionaryIterator<Key, Value> {
-    return _variantBuffer.makeIterator()
+    return _variant.makeIterator()
   }
 }
 
@@ -621,7 +615,7 @@ extension Dictionary: Collection {
   ///   performance is unspecified.
   @inlinable // FIXME(sil-serialize-all)
   public var startIndex: Index {
-    return _variantBuffer.startIndex
+    return _variant.startIndex
   }
 
   /// The dictionary's "past the end" position---that is, the position one
@@ -633,12 +627,12 @@ extension Dictionary: Collection {
   ///   `NSDictionary`; otherwise, the performance is unspecified.
   @inlinable // FIXME(sil-serialize-all)
   public var endIndex: Index {
-    return _variantBuffer.endIndex
+    return _variant.endIndex
   }
 
   @inlinable // FIXME(sil-serialize-all)
   public func index(after i: Index) -> Index {
-    return _variantBuffer.index(after: i)
+    return _variant.index(after: i)
   }
 
   /// Returns the index for the given key.
@@ -660,7 +654,7 @@ extension Dictionary: Collection {
   public func index(forKey key: Key) -> Index? {
     // Complexity: amortized O(1) for native buffer, O(*n*) when wrapping an
     // NSDictionary.
-    return _variantBuffer.index(forKey: key)
+    return _variant.index(forKey: key)
   }
 
   /// Accesses the key-value pair at the specified position.
@@ -690,7 +684,7 @@ extension Dictionary: Collection {
   ///   `position`.
   @inlinable // FIXME(sil-serialize-all)
   public subscript(position: Index) -> Element {
-    return _variantBuffer.assertingGet(at: position)
+    return _variant.assertingGet(at: position)
   }
 
   /// The number of key-value pairs in the dictionary.
@@ -698,7 +692,7 @@ extension Dictionary: Collection {
   /// - Complexity: O(1).
   @inlinable // FIXME(sil-serialize-all)
   public var count: Int {
-    return _variantBuffer.count
+    return _variant.count
   }
 
   //
@@ -768,12 +762,12 @@ extension Dictionary {
   public subscript(key: Key) -> Value? {
     @inline(__always)
     get {
-      return _variantBuffer.maybeGet(key)
+      return _variant.maybeGet(key)
     }
     set(newValue) {
       if let x = newValue {
         // FIXME(performance): this loads and discards the old value.
-        _variantBuffer.updateValue(x, forKey: key)
+        _variant.updateValue(x, forKey: key)
       }
       else {
         // FIXME(performance): this loads and discards the old value.
@@ -864,13 +858,13 @@ extension Dictionary {
   ) -> Value {
     @inline(__always)
     get {
-      return _variantBuffer.maybeGet(key) ?? defaultValue()
+      return _variant.maybeGet(key) ?? defaultValue()
     }
     mutableAddressWithNativeOwner {
-      let (_, address) = _variantBuffer
-        .pointerToValue(forKey: key, insertingDefault: defaultValue)
-      return (address, Builtin.castToNativeObject(
-        _variantBuffer.asNative._storage))
+      let (_, address) = _variant.pointerToValue(
+        forKey: key,
+        insertingDefault: defaultValue)
+      return (address, Builtin.castToNativeObject(_variant.asNative._storage))
     }
   }
 
@@ -889,7 +883,7 @@ extension Dictionary {
     _ transform: (Value) throws -> T
   ) rethrows -> Dictionary<Key, T> {
     return try Dictionary<Key, T>(
-      _variantBuffer: _variantBuffer.mapValues(transform))
+      _variant: _variant.mapValues(transform))
   }
 
   /// Returns a new dictionary containing only the key-value pairs that have
@@ -967,7 +961,7 @@ extension Dictionary {
   public mutating func updateValue(
     _ value: Value, forKey key: Key
   ) -> Value? {
-    return _variantBuffer.updateValue(value, forKey: key)
+    return _variant.updateValue(value, forKey: key)
   }
 
   /// Merges the key-value pairs in the given sequence into the dictionary,
@@ -1002,7 +996,7 @@ extension Dictionary {
     _ other: S,
     uniquingKeysWith combine: (Value, Value) throws -> Value
   ) rethrows where S.Element == (Key, Value) {
-    try _variantBuffer.merge(other, uniquingKeysWith: combine)
+    try _variant.merge(other, uniquingKeysWith: combine)
   }
 
   /// Merges the given dictionary into this dictionary, using a combining
@@ -1037,7 +1031,7 @@ extension Dictionary {
     _ other: [Key: Value],
     uniquingKeysWith combine: (Value, Value) throws -> Value) rethrows
   {
-    try _variantBuffer.merge(
+    try _variant.merge(
       other.lazy.map { ($0, $1) }, uniquingKeysWith: combine)
   }
 
@@ -1075,7 +1069,7 @@ extension Dictionary {
     uniquingKeysWith combine: (Value, Value) throws -> Value
   ) rethrows -> [Key: Value] where S.Element == (Key, Value) {
     var result = self
-    try result._variantBuffer.merge(other, uniquingKeysWith: combine)
+    try result._variant.merge(other, uniquingKeysWith: combine)
     return result
   }
 
@@ -1134,7 +1128,7 @@ extension Dictionary {
   @inlinable // FIXME(sil-serialize-all)
   @discardableResult
   public mutating func remove(at index: Index) -> Element {
-    return _variantBuffer.remove(at: index)
+    return _variant.remove(at: index)
   }
 
   /// Removes the given key and its associated value from the dictionary.
@@ -1168,7 +1162,7 @@ extension Dictionary {
   @inlinable // FIXME(sil-serialize-all)
   @discardableResult
   public mutating func removeValue(forKey key: Key) -> Value? {
-    return _variantBuffer.removeValue(forKey: key)
+    return _variant.removeValue(forKey: key)
   }
 
   /// Removes all key-value pairs from the dictionary.
@@ -1188,7 +1182,7 @@ extension Dictionary {
     // The 'will not decrease' part in the documentation comment is worded very
     // carefully.  The capacity can increase if we replace Cocoa buffer with
     // native buffer.
-    _variantBuffer.removeAll(keepingCapacity: keepCapacity)
+    _variant.removeAll(keepingCapacity: keepCapacity)
   }
 }
 
@@ -1237,7 +1231,7 @@ extension Dictionary {
       return Values(self)
     }
     set {
-      self = Dictionary(_variantBuffer: newValue._variantBuffer)
+      self = Dictionary(_variant: newValue._variant)
     }
   }
 
@@ -1248,12 +1242,12 @@ extension Dictionary {
       CustomStringConvertible, CustomDebugStringConvertible {
     public typealias Element = Key
 
-    @usableFromInline // FIXME(sil-serialize-all)
-    internal var _variantBuffer: Dictionary._VariantBuffer
+    @usableFromInline
+    internal var _variant: Dictionary<Key, Value>._Variant
 
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     internal init(_ _dictionary: Dictionary) {
-      self._variantBuffer = _dictionary._variantBuffer
+      self._variant = _dictionary._variant
     }
 
     // Collection Conformance
@@ -1261,22 +1255,22 @@ extension Dictionary {
 
     @inlinable // FIXME(sil-serialize-all)
     public var startIndex: Index {
-      return _variantBuffer.startIndex
+      return _variant.startIndex
     }
 
     @inlinable // FIXME(sil-serialize-all)
     public var endIndex: Index {
-      return _variantBuffer.endIndex
+      return _variant.endIndex
     }
 
     @inlinable // FIXME(sil-serialize-all)
     public func index(after i: Index) -> Index {
-      return _variantBuffer.index(after: i)
+      return _variant.index(after: i)
     }
 
     @inlinable // FIXME(sil-serialize-all)
     public subscript(position: Index) -> Element {
-      return _variantBuffer.assertingGet(at: position).key
+      return _variant.assertingGet(at: position).key
     }
 
     // Customization
@@ -1287,7 +1281,7 @@ extension Dictionary {
     /// - Complexity: O(1).
     @inlinable // FIXME(sil-serialize-all)
     public var count: Int {
-      return _variantBuffer.count
+      return _variant.count
     }
 
     @inlinable // FIXME(sil-serialize-all)
@@ -1297,12 +1291,12 @@ extension Dictionary {
 
     @inlinable // FIXME(sil-serialize-all)
     public func _customContainsEquatableElement(_ element: Element) -> Bool? {
-      return _variantBuffer.containsKey(element)
+      return _variant.containsKey(element)
     }
 
     @inlinable // FIXME(sil-serialize-all)
     public func _customIndexOfEquatableElement(_ element: Element) -> Index?? {
-      return Optional(_variantBuffer.index(forKey: element))
+      return Optional(_variant.index(forKey: element))
     }
 
     @inlinable // FIXME(sil-serialize-all)
@@ -1314,9 +1308,8 @@ extension Dictionary {
     @inlinable // FIXME(sil-serialize-all)
     public static func ==(lhs: Keys, rhs: Keys) -> Bool {
       // Equal if the two dictionaries share storage.
-      if case (.native(let lhsNative), .native(let rhsNative)) =
-        (lhs._variantBuffer, rhs._variantBuffer),
-        lhsNative._storage === rhsNative._storage {
+      if case (.native(let ln), .native(let rn)) = (lhs._variant, rhs._variant),
+        ln._storage === rn._storage {
         return true
       }
 
@@ -1351,12 +1344,12 @@ extension Dictionary {
     : MutableCollection, CustomStringConvertible, CustomDebugStringConvertible {
     public typealias Element = Value
 
-    @usableFromInline // FIXME(sil-serialize-all)
-    internal var _variantBuffer: Dictionary._VariantBuffer
+    @usableFromInline
+    internal var _variant: Dictionary<Key, Value>._Variant
 
     @inlinable // FIXME(sil-serialize-all)
     internal init(_ _dictionary: Dictionary) {
-      self._variantBuffer = _dictionary._variantBuffer
+      self._variant = _dictionary._variant
     }
 
     // Collection Conformance
@@ -1364,28 +1357,27 @@ extension Dictionary {
 
     @inlinable // FIXME(sil-serialize-all)
     public var startIndex: Index {
-      return _variantBuffer.startIndex
+      return _variant.startIndex
     }
 
     @inlinable // FIXME(sil-serialize-all)
     public var endIndex: Index {
-      return _variantBuffer.endIndex
+      return _variant.endIndex
     }
 
     @inlinable // FIXME(sil-serialize-all)
     public func index(after i: Index) -> Index {
-      return _variantBuffer.index(after: i)
+      return _variant.index(after: i)
     }
 
     @inlinable // FIXME(sil-serialize-all)
     public subscript(position: Index) -> Element {
       get {
-        return _variantBuffer.assertingGet(at: position).value
+        return _variant.assertingGet(at: position).value
       }
       mutableAddressWithNativeOwner {
-        let address = _variantBuffer.pointerToValue(at: position)
-        return (address, Builtin.castToNativeObject(
-          _variantBuffer.asNative._storage))
+        let address = _variant.pointerToValue(at: position)
+        return (address, Builtin.castToNativeObject(_variant.asNative._storage))
       }
     }
 
@@ -1397,7 +1389,7 @@ extension Dictionary {
     /// - Complexity: O(1).
     @inlinable // FIXME(sil-serialize-all)
     public var count: Int {
-      return _variantBuffer.count
+      return _variant.count
     }
 
     @inlinable // FIXME(sil-serialize-all)
@@ -1419,7 +1411,7 @@ extension Dictionary {
 extension Dictionary: Equatable where Value: Equatable {
   @inlinable // FIXME(sil-serialize-all)
   public static func == (lhs: [Key: Value], rhs: [Key: Value]) -> Bool {
-    switch (lhs._variantBuffer, rhs._variantBuffer) {
+    switch (lhs._variant, rhs._variant) {
     case (.native(let lhsNative), .native(let rhsNative)):
 
       if lhsNative._storage === rhsNative._storage {
@@ -1731,7 +1723,7 @@ public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
   && _isClassOrObjCExistential(DerivedKey.self)
   && _isClassOrObjCExistential(DerivedValue.self) {
 
-    switch source._variantBuffer {
+    switch source._variant {
     case .native(let buffer):
       // Note: it is safe to treat the buffer as immutable here because
       // Dictionary will not mutate buffer with reference count greater than 1.
@@ -3132,11 +3124,10 @@ internal struct _CocoaDictionaryBuffer: _DictionaryBuffer {
 }
 #endif
 
-@usableFromInline
-@_frozen
-internal enum _VariantDictionaryBuffer<Key: Hashable, Value>
-  : _DictionaryBuffer {
-
+extension Dictionary {
+  @usableFromInline
+  @_frozen
+  internal enum _Variant: _DictionaryBuffer {
   @usableFromInline
   internal typealias NativeBuffer = _NativeDictionaryBuffer<Key, Value>
   @usableFromInline
@@ -3149,15 +3140,17 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>
   internal typealias SequenceElement = (key: Key, value: Value)
   @usableFromInline
   internal typealias SequenceElementWithoutLabels = (key: Key, value: Value)
-  @usableFromInline
-  internal typealias SelfType = _VariantDictionaryBuffer
 
   case native(NativeBuffer)
 #if _runtime(_ObjC)
   case cocoa(CocoaBuffer)
 #endif
+  }
+}
 
-  @usableFromInline @_transparent
+extension Dictionary._Variant {
+  @usableFromInline
+  @_transparent
   internal var guaranteedNative: Bool {
     return _canBeClass(Key.self) == 0 || _canBeClass(Value.self) == 0
   }
@@ -3445,8 +3438,8 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>
     case .native:
       return asNative.index(forKey: key) != nil
 #if _runtime(_ObjC)
-    case .cocoa(let cocoaBuffer):
-      return SelfType.maybeGetFromCocoaBuffer(cocoaBuffer, forKey: key) != nil
+    case .cocoa(let cocoa):
+      return Dictionary._Variant.maybeGetFromCocoa(cocoa, forKey: key) != nil
 #endif
     }
   }
@@ -3474,8 +3467,9 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>
 #if _runtime(_ObjC)
   @inline(never)
   @usableFromInline
-  internal static func maybeGetFromCocoaBuffer(
-    _ cocoaBuffer: CocoaBuffer, forKey key: Key
+  internal static func maybeGetFromCocoa(
+    _ cocoaBuffer: CocoaBuffer,
+    forKey key: Key
   ) -> Value? {
     let anyObjectKey: AnyObject = _bridgeAnythingToObjectiveC(key)
     if let anyObjectValue = cocoaBuffer.maybeGet(anyObjectKey) {
@@ -3496,8 +3490,8 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>
     case .native:
       return asNative.maybeGet(key)
 #if _runtime(_ObjC)
-    case .cocoa(let cocoaBuffer):
-      return SelfType.maybeGetFromCocoaBuffer(cocoaBuffer, forKey: key)
+    case .cocoa(let cocoa):
+      return Dictionary._Variant.maybeGetFromCocoa(cocoa, forKey: key)
 #endif
     }
   }
@@ -3657,7 +3651,7 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>
   @inlinable // FIXME(sil-serialize-all)
   internal func nativeMapValues<T>(
     _ transform: (Value) throws -> T
-  ) rethrows -> _VariantDictionaryBuffer<Key, T> {
+  ) rethrows -> Dictionary<Key, T>._Variant {
     var buffer = _NativeDictionaryBuffer<Key, T>(
       _exactBucketCount: asNative.bucketCount)
 
@@ -3678,7 +3672,7 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>
   @inlinable // FIXME(sil-serialize-all)
   internal func mapValues<T>(
     _ transform: (Value) throws -> T
-  ) rethrows -> _VariantDictionaryBuffer<Key, T> {
+  ) rethrows -> Dictionary<Key, T>._Variant {
     if _fastPath(guaranteedNative) {
       return try nativeMapValues(transform)
     }
@@ -3688,7 +3682,7 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>
       return try nativeMapValues(transform)
 #if _runtime(_ObjC)
     case .cocoa(let cocoaStorage):
-      var storage: _VariantDictionaryBuffer<Key, T> = .native(
+      var storage: Dictionary<Key, T>._Variant = .native(
         _NativeDictionaryBuffer<Key, T>(minimumCapacity: cocoaStorage.count))
 
       var i = cocoaStorage.startIndex
@@ -4564,7 +4558,7 @@ public struct _DictionaryBuilder<Key: Hashable, Value> {
   @inlinable // FIXME(sil-serialize-all)
   public init(count: Int) {
     _result = Dictionary<Key, Value>(minimumCapacity: count)
-    _nativeBuffer = _result._variantBuffer.asNative
+    _nativeBuffer = _result._variant.asNative
     _requestedCount = count
     _actualCount = 0
   }
@@ -4612,7 +4606,7 @@ extension Dictionary {
   /// allocating new storage.
   @inlinable // FIXME(sil-serialize-all)
   public var capacity: Int {
-    return _variantBuffer.capacity
+    return _variant.capacity
   }
 
   /// Reserves enough space to store the specified number of key-value pairs.
@@ -4630,7 +4624,7 @@ extension Dictionary {
   ///   store.
   @inlinable // FIXME(sil-serialize-all)
   public mutating func reserveCapacity(_ minimumCapacity: Int) {
-    _variantBuffer.reserveCapacity(minimumCapacity)
+    _variant.reserveCapacity(minimumCapacity)
     _sanityCheck(self.capacity >= minimumCapacity)
   }
 }
@@ -4641,10 +4635,10 @@ extension Dictionary {
 extension Dictionary {
   @inlinable // FIXME(sil-serialize-all)
   public func _bridgeToObjectiveCImpl() -> _NSDictionaryCore {
-    switch _variantBuffer {
-    case _VariantDictionaryBuffer.native(let buffer):
+    switch _variant {
+    case .native(let buffer):
       return buffer.bridged()
-    case _VariantDictionaryBuffer.cocoa(let cocoaBuffer):
+    case .cocoa(let cocoaBuffer):
       return cocoaBuffer.cocoaDictionary
     }
   }

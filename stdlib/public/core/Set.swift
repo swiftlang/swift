@@ -153,12 +153,10 @@ import SwiftShims
 @_fixed_layout
 public struct Set<Element: Hashable> {
   @usableFromInline
-  internal typealias _VariantBuffer = _VariantSetBuffer<Element>
-  @usableFromInline
   internal typealias _NativeBuffer = _NativeSetBuffer<Element>
 
   @usableFromInline
-  internal var _variantBuffer: _VariantBuffer
+  internal var _variant: _Variant
 }
 
 extension Set {
@@ -174,19 +172,17 @@ extension Set {
   ///   storage buffer.
   @inlinable // FIXME(sil-serialize-all)
   public init(minimumCapacity: Int) {
-    _variantBuffer =
-      _VariantBuffer.native(
-        _NativeBuffer(minimumCapacity: minimumCapacity))
+    _variant = _Variant.native(_NativeBuffer(minimumCapacity: minimumCapacity))
   }
 
   /// Private initializer.
   @inlinable // FIXME(sil-serialize-all)
   internal init(_nativeBuffer: _NativeSetBuffer<Element>) {
-    _variantBuffer = _VariantBuffer.native(_nativeBuffer)
+    _variant = _Variant.native(_nativeBuffer)
   }
 
   //
-  // All APIs below should dispatch to `_variantBuffer`, without doing any
+  // All APIs below should dispatch to `_variant`, without doing any
   // additional processing.
   //
 
@@ -201,9 +197,8 @@ extension Set {
   @inlinable // FIXME(sil-serialize-all)
   public init(_immutableCocoaSet: _NSSet) {
     _sanityCheck(_isBridgedVerbatimToObjectiveC(Element.self),
-      "Set can be backed by NSSet _variantBuffer only when the member type can be bridged verbatim to Objective-C")
-    _variantBuffer = _VariantSetBuffer.cocoa(
-      _CocoaSetBuffer(cocoaSet: _immutableCocoaSet))
+      "Set can be backed by NSSet _variant only when the member type can be bridged verbatim to Objective-C")
+    _variant = _Variant.cocoa(_CocoaSetBuffer(cocoaSet: _immutableCocoaSet))
   }
 #endif
 }
@@ -242,7 +237,7 @@ extension Set: Sequence {
   @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
   public func makeIterator() -> SetIterator<Element> {
-    return _variantBuffer.makeIterator()
+    return _variant.makeIterator()
   }
 
   /// Returns a Boolean value that indicates whether the given element exists
@@ -266,7 +261,7 @@ extension Set: Sequence {
   /// - Complexity: O(1)
   @inlinable // FIXME(sil-serialize-all)
   public func contains(_ member: Element) -> Bool {
-    return _variantBuffer.maybeGet(member) != nil
+    return _variant.maybeGet(member) != nil
   }
 
   @inlinable // FIXME(sil-serialize-all)
@@ -317,7 +312,7 @@ extension Set: Collection {
   /// If the set is empty, `startIndex` is equal to `endIndex`.
   @inlinable // FIXME(sil-serialize-all)
   public var startIndex: Index {
-    return _variantBuffer.startIndex
+    return _variant.startIndex
   }
 
   /// The "past the end" position for the set---that is, the position one
@@ -326,18 +321,18 @@ extension Set: Collection {
   /// If the set is empty, `endIndex` is equal to `startIndex`.
   @inlinable // FIXME(sil-serialize-all)
   public var endIndex: Index {
-    return _variantBuffer.endIndex
+    return _variant.endIndex
   }
 
   /// Accesses the member at the given position.
   @inlinable // FIXME(sil-serialize-all)
   public subscript(position: Index) -> Element {
-    return _variantBuffer.assertingGet(at: position)
+    return _variant.assertingGet(at: position)
   }
 
   @inlinable // FIXME(sil-serialize-all)
   public func index(after i: Index) -> Index {
-    return _variantBuffer.index(after: i)
+    return _variant.index(after: i)
   }
 
   // APINAMING: complexity docs are broadly missing in this file.
@@ -352,7 +347,7 @@ extension Set: Collection {
   /// - Complexity: O(1)
   @inlinable // FIXME(sil-serialize-all)
   public func firstIndex(of member: Element) -> Index? {
-    return _variantBuffer.index(forKey: member)
+    return _variant.index(forKey: member)
   }
 
   @inlinable // FIXME(sil-serialize-all)
@@ -375,7 +370,7 @@ extension Set: Collection {
   /// - Complexity: O(1).
   @inlinable // FIXME(sil-serialize-all)
   public var count: Int {
-    return _variantBuffer.count
+    return _variant.count
   }
 
   /// A Boolean value that indicates whether the set is empty.
@@ -429,7 +424,7 @@ extension Set: Equatable {
   ///   `false`.
   @inlinable // FIXME(sil-serialize-all)
   public static func == (lhs: Set<Element>, rhs: Set<Element>) -> Bool {
-    switch (lhs._variantBuffer, rhs._variantBuffer) {
+    switch (lhs._variant, rhs._variant) {
     case (.native(let lhsNative), .native(let rhsNative)):
 
       if lhsNative._storage === rhsNative._storage {
@@ -450,13 +445,10 @@ extension Set: Equatable {
       return true
 
   #if _runtime(_ObjC)
-    case (_VariantSetBuffer.cocoa(let lhsCocoa),
-        _VariantSetBuffer.cocoa(let rhsCocoa)):
+    case (_Variant.cocoa(let lhsCocoa), _Variant.cocoa(let rhsCocoa)):
       return _stdlib_NSObject_isEqual(lhsCocoa.cocoaSet, rhsCocoa.cocoaSet)
 
-    case (_VariantSetBuffer.native(let lhsNative),
-      _VariantSetBuffer.cocoa(let rhsCocoa)):
-
+    case (_Variant.native(let lhsNative), _Variant.cocoa(let rhsCocoa)):
       if lhsNative.count != rhsCocoa.count {
         return false
       }
@@ -478,7 +470,7 @@ extension Set: Equatable {
       }
       return true
 
-    case (_VariantSetBuffer.cocoa, _VariantSetBuffer.native):
+    case (_Variant.cocoa, _Variant.native):
       return rhs == lhs
   #endif
     }
@@ -595,7 +587,7 @@ extension Set: SetAlgebra {
   public mutating func insert(
     _ newMember: Element
   ) -> (inserted: Bool, memberAfterInsert: Element) {
-    return _variantBuffer.insert(newMember)
+    return _variant.insert(newMember)
   }
 
   /// Inserts the given element into the set unconditionally.
@@ -621,7 +613,7 @@ extension Set: SetAlgebra {
   @inlinable // FIXME(sil-serialize-all)
   @discardableResult
   public mutating func update(with newMember: Element) -> Element? {
-    return _variantBuffer.update(with: newMember)
+    return _variant.update(with: newMember)
   }
 
   /// Removes the specified element from the set.
@@ -641,7 +633,7 @@ extension Set: SetAlgebra {
   @inlinable // FIXME(sil-serialize-all)
   @discardableResult
   public mutating func remove(_ member: Element) -> Element? {
-    return _variantBuffer.remove(member)
+    return _variant.remove(member)
   }
 
   /// Removes the element at the given index of the set.
@@ -653,7 +645,7 @@ extension Set: SetAlgebra {
   @inlinable // FIXME(sil-serialize-all)
   @discardableResult
   public mutating func remove(at position: Index) -> Element {
-    return _variantBuffer.remove(at: position)
+    return _variant.remove(at: position)
   }
 
   /// Removes all members from the set.
@@ -663,7 +655,7 @@ extension Set: SetAlgebra {
   ///   default is `false`.
   @inlinable // FIXME(sil-serialize-all)
   public mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
-    _variantBuffer.removeAll(keepingCapacity: keepCapacity)
+    _variant.removeAll(keepingCapacity: keepCapacity)
   }
 
   /// Removes the first element of the set.
@@ -685,7 +677,7 @@ extension Set: SetAlgebra {
 
   //
   // APIs below this comment should be implemented strictly in terms of
-  // *public* APIs above.  `_variantBuffer` should not be accessed directly.
+  // *public* APIs above.  `_variant` should not be accessed directly.
   //
   // This separates concerns for testing.  Tests for the following APIs need
   // not to concern themselves with testing correctness of behavior of
@@ -738,12 +730,12 @@ extension Set: SetAlgebra {
       // If this sequence is actually a native `Set`, then we can quickly
       // adopt its native buffer and let COW handle uniquing only
       // if necessary.
-      switch s._variantBuffer {
+      switch s._variant {
         case .native(let buffer):
-          _variantBuffer = .native(buffer)
+          _variant = .native(buffer)
 #if _runtime(_ObjC)
         case .cocoa(let owner):
-          _variantBuffer = .cocoa(owner)
+          _variant = .cocoa(owner)
 #endif
       }
     } else {
@@ -1189,10 +1181,10 @@ public func _setDownCast<BaseValue, DerivedValue>(_ source: Set<BaseValue>)
 #if _runtime(_ObjC)
   if _isClassOrObjCExistential(BaseValue.self)
   && _isClassOrObjCExistential(DerivedValue.self) {
-    switch source._variantBuffer {
-    case _VariantSetBuffer.native(let buffer):
+    switch source._variant {
+    case .native(let buffer):
       return Set(_immutableCocoaSet: buffer.bridged())
-    case _VariantSetBuffer.cocoa(let cocoaBuffer):
+    case .cocoa(let cocoaBuffer):
       return Set(_immutableCocoaSet: cocoaBuffer.cocoaSet)
     }
   }
@@ -2572,26 +2564,26 @@ internal struct _CocoaSetBuffer: _SetBuffer {
 }
 #endif
 
-@usableFromInline
-@_frozen
-internal enum _VariantSetBuffer<Element: Hashable>: _SetBuffer {
-
+extension Set {
   @usableFromInline
-  internal typealias NativeBuffer = _NativeSetBuffer<Element>
-  @usableFromInline
-  internal typealias NativeIndex = _NativeSetIndex<Element>
+  @_frozen
+  internal enum _Variant: _SetBuffer {
+    @usableFromInline
+    internal typealias NativeBuffer = _NativeSetBuffer<Element>
+    @usableFromInline
+    internal typealias NativeIndex = _NativeSetIndex<Element>
 #if _runtime(_ObjC)
-  @usableFromInline
-  internal typealias CocoaBuffer = _CocoaSetBuffer
+    @usableFromInline
+    internal typealias CocoaBuffer = _CocoaSetBuffer
 #endif
-  @usableFromInline
-  internal typealias SelfType = _VariantSetBuffer
-
-  case native(NativeBuffer)
+    case native(NativeBuffer)
 #if _runtime(_ObjC)
-  case cocoa(CocoaBuffer)
+    case cocoa(CocoaBuffer)
 #endif
+  }
+}
 
+extension Set._Variant {
   @usableFromInline @_transparent
   internal var guaranteedNative: Bool {
     return _canBeClass(Element.self) == 0
@@ -2886,7 +2878,7 @@ internal enum _VariantSetBuffer<Element: Hashable>: _SetBuffer {
 #if _runtime(_ObjC)
   @inline(never)
   @usableFromInline
-  internal static func maybeGetFromCocoaBuffer(
+  internal static func maybeGetFromCocoa(
     _ cocoaBuffer: CocoaBuffer, forKey key: Element
   ) -> Element? {
     let anyObjectKey: AnyObject = _bridgeAnythingToObjectiveC(key)
@@ -2909,7 +2901,7 @@ internal enum _VariantSetBuffer<Element: Hashable>: _SetBuffer {
       return asNative.maybeGet(key)
 #if _runtime(_ObjC)
     case .cocoa(let cocoaBuffer):
-      return SelfType.maybeGetFromCocoaBuffer(cocoaBuffer, forKey: key)
+      return Set._Variant.maybeGetFromCocoa(cocoaBuffer, forKey: key)
 #endif
     }
   }
@@ -3764,7 +3756,7 @@ public struct _SetBuilder<Element: Hashable> {
   @inlinable // FIXME(sil-serialize-all)
   public init(count: Int) {
     _result = Set<Element>(minimumCapacity: count)
-    _nativeBuffer = _result._variantBuffer.asNative
+    _nativeBuffer = _result._variant.asNative
     _requestedCount = count
     _actualCount = 0
   }
@@ -3808,7 +3800,7 @@ extension Set {
   /// allocating new storage.
   @inlinable // FIXME(sil-serialize-all)
   public var capacity: Int {
-    return _variantBuffer.capacity
+    return _variant.capacity
   }
 
   /// Reserves enough space to store the specified number of elements.
@@ -3826,7 +3818,7 @@ extension Set {
   ///   store.
   @inlinable // FIXME(sil-serialize-all)
   public mutating func reserveCapacity(_ minimumCapacity: Int) {
-    _variantBuffer.reserveCapacity(minimumCapacity)
+    _variant.reserveCapacity(minimumCapacity)
     _sanityCheck(self.capacity >= minimumCapacity)
   }
 }
@@ -3837,10 +3829,10 @@ extension Set {
 extension Set {
   @inlinable // FIXME(sil-serialize-all)
   public func _bridgeToObjectiveCImpl() -> _NSSetCore {
-    switch _variantBuffer {
-    case _VariantSetBuffer.native(let buffer):
+    switch _variant {
+    case .native(let buffer):
       return buffer.bridged()
-    case _VariantSetBuffer.cocoa(let cocoaBuffer):
+    case .cocoa(let cocoaBuffer):
       return cocoaBuffer.cocoaSet
     }
   }
