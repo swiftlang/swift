@@ -1245,7 +1245,7 @@ class DifferentiableActivityInfo;
 /// does not matter for the final result.
 ///
 /// Reference:
-/// Laurent Hascoët. Automatic Differentiation by Program Transformation. 2017.
+/// Laurent Hascoët. Automatic Differentiation by Program Transformation. 2017.
 class DifferentiableActivityAnalysis
   : public FunctionAnalysisBase<DifferentiableActivityInfo> {
 private:

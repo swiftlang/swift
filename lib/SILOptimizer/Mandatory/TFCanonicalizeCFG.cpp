@@ -378,7 +378,7 @@ void SingleExitLoopTransformer::initialize() {
     auto saveEscaping = [this](SILValue value) {
       for (const auto *use : value->getUses()) {
         const SILInstruction *useInst = use->getUser();
-        if (!this->loop->contains(useInst->getParent())) {
+        if (!loop->contains(useInst->getParent())) {
           escapingValues.insert(value);
           break;
         }
@@ -461,7 +461,12 @@ SingleExitLoopTransformer::createNewHeader() {
     SILValue newValue = newHeader->createPHIArgument(
         escapingValue->getType(), escapingValue.getOwnershipKind());
     // Replace uses *outside* of the loop with the new value.
-    for (Operand *use : escapingValue->getUses()) {
+    auto UI = escapingValue->use_begin(), E = escapingValue->use_end();
+    while (UI != E) {
+      Operand *use = *UI;
+      // Increment iterator before we invalidate it
+      // when we invoke Operand::Set below.
+      ++UI;
       if (loop->contains(use->getUser()->getParent())) {
         continue;
       }
@@ -722,13 +727,16 @@ void SESERegionBuilder::ensureSingleExitFromLoops() {
       continue;
     }
     SingleExitLoopTransformer transformer(&deviceInfo, &LI, &DI, loop);
-    changed |= transformer.transform();
+    bool loopChanged = transformer.transform();
+    if (loopChanged) {
+      // Recalculate dominator information as it is stale now.
+      DI.recalculate(*F);
+      PDI.recalculate(*F);
+    }
+    changed |= loopChanged;
   }
   if (changed) {
     splitAllCondBrCriticalEdgesWithNonTrivialArgs(*F, nullptr, &LI);
-
-    DI.recalculate(*F);
-    PDI.recalculate(*F);
   }
 }
 
