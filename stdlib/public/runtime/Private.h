@@ -323,7 +323,7 @@ public:
   ///   table will be placed here
   bool _conformsToProtocol(const OpaqueValue *value,
                            const Metadata *type,
-                           const ProtocolDescriptor *protocol,
+                           ProtocolDescriptorRef protocol,
                            const WitnessTable **conformance);
 
   void _swift_getFieldAt(

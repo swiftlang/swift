@@ -711,7 +711,7 @@ bool swift::_checkGenericRequirements(
         return true;
 
       // If we need a witness table, add it.
-      if (req.getProtocol()->Flags.needsWitnessTable()) {
+      if (req.getProtocol().needsWitnessTable()) {
         assert(witnessTable);
         extraArguments.push_back(witnessTable);
       }

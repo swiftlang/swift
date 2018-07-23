@@ -2303,6 +2303,51 @@ using ProtocolRecord = TargetProtocolRecord<InProcess>;
 
 template<typename Runtime> class TargetGenericRequirementDescriptor;
 
+/// A relative pointer to a protocol descriptor, which provides the relative-
+/// pointer equivalent to \c TargetProtocolDescriptorRef.
+template <typename Runtime>
+class RelativeTargetProtocolDescriptorPointer {
+  union AnyProtocol {
+    TargetProtocolDescriptor<Runtime> descriptor;
+  };
+
+  /// The relative pointer itself.
+  ///
+  /// The \c AnyProtocol value type ensures that we can reference any
+  /// protocol descriptor; it will be reinterpret_cast to the appropriate
+  /// protocol descriptor type.
+  ///
+  /// The \c bool integer value will be false to indicate that the protocol
+  /// is a Swift protocol, or true to indicate that this references
+  /// an Objective-C protocol.
+  RelativeIndirectablePointerIntPair<AnyProtocol, bool> pointer;
+
+#if SWIFT_OBJC_INTEROP
+  bool isObjC() const {
+    return pointer.getInt();
+  }
+#endif
+
+public:
+  /// Retrieve a reference to the protocol.
+  TargetProtocolDescriptorRef<Runtime> getProtocol() const {
+#if SWIFT_OBJC_INTEROP
+    if (isObjC()) {
+      return TargetProtocolDescriptorRef<Runtime>::forObjC(
+          protocol_const_cast(pointer.getPointer()));
+    }
+#endif
+
+    return TargetProtocolDescriptorRef<Runtime>::forSwift(
+        reinterpret_cast<ConstTargetMetadataPointer<
+            Runtime, TargetProtocolDescriptor>>(pointer.getPointer()));
+  }
+
+  operator TargetProtocolDescriptorRef<Runtime>() const {
+    return getProtocol();
+  }
+};
+
 /// The structure of a protocol conformance.
 ///
 /// This contains enough static information to recover the witness table for a
@@ -2334,8 +2379,6 @@ public:
 
 private:
   /// The protocol being conformed to.
-  ///
-  /// The remaining low bit is reserved for future use.
   RelativeIndirectablePointer<ProtocolDescriptor> Protocol;
   
   // Some description of the type that conforms to the protocol.
@@ -2704,8 +2747,7 @@ private:
     /// The protocol the param is constrained to.
     ///
     /// Only valid if the requirement has Protocol kind.
-    RelativeIndirectablePointer<TargetProtocolDescriptor<Runtime>,
-                                /*nullable*/ false> Protocol;
+    RelativeTargetProtocolDescriptorPointer<Runtime> Protocol;
     
     /// The conformance the param is constrained to use.
     ///
@@ -2733,8 +2775,8 @@ public:
     return Param;
   }
 
-  /// Retrieve the protocol descriptor for a Protocol requirement.
-  const TargetProtocolDescriptor<Runtime> *getProtocol() const {
+  /// Retrieve the protocol for a Protocol requirement.
+  TargetProtocolDescriptorRef<Runtime> getProtocol() const {
     assert(getKind() == GenericRequirementKind::Protocol);
     return Protocol;
   }

@@ -69,7 +69,7 @@ static const char *class_getName(const ClassMetadata* type) {
 extern "C" const void *swift_dynamicCastObjCProtocolConditional(
                          const void *object,
                          size_t numProtocols,
-                         const ProtocolDescriptor * const *protocols);
+                         Protocol * const *protocols);
 #endif
 
 // Build a user-comprehensible name for a type.
@@ -303,7 +303,7 @@ swift_dynamicCastClassUnconditionalImpl(const void *object,
 
 #if SWIFT_OBJC_INTEROP
 static bool _unknownClassConformsToObjCProtocol(const OpaqueValue *value,
-                                          const ProtocolDescriptor *protocol) {
+                                                Protocol *protocol) {
   const void *object
     = *reinterpret_cast<const void * const *>(value);
   return swift_dynamicCastObjCProtocolConditional(object, 1, &protocol);
@@ -312,11 +312,11 @@ static bool _unknownClassConformsToObjCProtocol(const OpaqueValue *value,
 
 bool swift::_conformsToProtocol(const OpaqueValue *value,
                                 const Metadata *type,
-                                const ProtocolDescriptor *protocol,
+                                ProtocolDescriptorRef protocol,
                                 const WitnessTable **conformance) {
   // Look up the witness table for protocols that need them.
-  if (protocol->Flags.needsWitnessTable()) {
-    auto witness = swift_conformsToProtocol(type, protocol);
+  if (protocol.needsWitnessTable()) {
+    auto witness = swift_conformsToProtocol(type, protocol.getSwiftProtocol());
     if (!witness)
       return false;
     if (conformance)
@@ -330,10 +330,10 @@ bool swift::_conformsToProtocol(const OpaqueValue *value,
   case MetadataKind::Class:
 #if SWIFT_OBJC_INTEROP
     if (value) {
-      return _unknownClassConformsToObjCProtocol(value, protocol);
+      return _unknownClassConformsToObjCProtocol(value,
+                                                 protocol.getObjCProtocol());
     } else {
-      return classConformsToObjCProtocol(type,
-          ProtocolDescriptorRef(protocol, ProtocolDispatchStrategy::ObjC));
+      return classConformsToObjCProtocol(type, protocol);
     }
 #endif
     return false;
@@ -341,11 +341,11 @@ bool swift::_conformsToProtocol(const OpaqueValue *value,
   case MetadataKind::ObjCClassWrapper: {
 #if SWIFT_OBJC_INTEROP
     if (value) {
-      return _unknownClassConformsToObjCProtocol(value, protocol);
+      return _unknownClassConformsToObjCProtocol(value,
+                                                 protocol.getObjCProtocol());
     } else {
       auto wrapper = cast<ObjCClassWrapperMetadata>(type);
-      return classConformsToObjCProtocol(wrapper->Class,
-          ProtocolDescriptorRef(protocol, ProtocolDispatchStrategy::ObjC));
+      return classConformsToObjCProtocol(wrapper->Class, protocol);
     }
 #endif
     return false;
@@ -354,7 +354,8 @@ bool swift::_conformsToProtocol(const OpaqueValue *value,
   case MetadataKind::ForeignClass:
 #if SWIFT_OBJC_INTEROP
     if (value)
-      return _unknownClassConformsToObjCProtocol(value, protocol);
+      return _unknownClassConformsToObjCProtocol(value,
+                                                 protocol.getObjCProtocol());
     return false;
 #else
    return false;
@@ -387,9 +388,7 @@ static bool _conformsToProtocols(const OpaqueValue *value,
   }
 
   for (auto protocol : existentialType->getProtocols()) {
-    if (!_conformsToProtocol(value, type,
-                             protocol.getProtocolDescriptorUnchecked(),
-                             conformances))
+    if (!_conformsToProtocol(value, type, protocol, conformances))
       return false;
     if (protocol.needsWitnessTable()) {
       assert(*conformances != nullptr);
