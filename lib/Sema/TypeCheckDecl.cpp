@@ -4177,16 +4177,15 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       recordParamContextTypes(FD);
     } else {
       // We've inherited all of the type information already.
-      configureInterfaceType(FD,
-        FD->getDeclContext()->getGenericSignatureOfContext());
+      FD->setGenericEnvironment(
+        FD->getDeclContext()->getGenericEnvironmentOfContext());
+
+      FD->computeType();
 
       if (FD->getInterfaceType()->hasError()) {
         FD->setInterfaceType(ErrorType::get(Context));
         FD->setInvalid();
       }
-
-      FD->setGenericEnvironment(
-        FD->getDeclContext()->getGenericEnvironmentOfContext());
     }
 
     if (!isa<AccessorDecl>(FD) || cast<AccessorDecl>(FD)->isGetter()) {

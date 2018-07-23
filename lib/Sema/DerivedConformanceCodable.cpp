@@ -704,19 +704,8 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
   //                         output: ()
   // Create from the inside out:
 
-  // (to: Encoder)
   auto encoderType = C.getEncoderDecl()->getDeclaredInterfaceType();
-  auto inputTypeElt = TupleTypeElt(encoderType, C.Id_to);
-  auto inputType = TupleType::get(ArrayRef<TupleTypeElt>(inputTypeElt), C);
-
-  // throws
-  auto extInfo = FunctionType::ExtInfo(FunctionTypeRepresentation::Swift,
-                                       /*Throws=*/true);
-  // ()
   auto returnType = TupleType::getEmpty(C);
-
-  // (to: Encoder) throws -> ()
-  auto innerType = FunctionType::get(inputType, returnType, extInfo);
 
   // Params: (self [implicit], Encoder)
   auto *selfDecl = ParamDecl::createSelf(SourceLoc(), conformanceDC);
@@ -745,21 +734,10 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
     encodeDecl->getAttrs().add(attr);
   }
 
-  // Evaluate the type of Self in (Self) -> (Encoder) throws -> ().
-  Type selfType = conformanceDC->getDeclaredInterfaceType();
-  Type interfaceType;
-  if (auto sig = conformanceDC->getGenericSignatureOfContext()) {
-    // Evaluate the below, but in a generic environment (if Self is generic).
-    encodeDecl->setGenericEnvironment(
-        conformanceDC->getGenericEnvironmentOfContext());
-    interfaceType = GenericFunctionType::get(sig, selfType, innerType,
-                                             FunctionType::ExtInfo());
-  } else {
-    // (Self) -> innerType == (Encoder) throws -> ()
-    interfaceType = FunctionType::get(selfType, innerType);
-  }
+  if (auto env = conformanceDC->getGenericEnvironmentOfContext())
+    encodeDecl->setGenericEnvironment(env);
+  encodeDecl->computeType(FunctionType::ExtInfo().withThrows());
 
-  encodeDecl->setInterfaceType(interfaceType);
   encodeDecl->setValidationToChecked();
   encodeDecl->copyFormalAccessFrom(derived.Nominal,
                                    /*sourceIsParentContext*/ true);
@@ -1030,26 +1008,13 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
   //                         output: Self
   // Compute from the inside out:
 
-  // (from: Decoder)
-  auto decoderType = C.getDecoderDecl()->getDeclaredInterfaceType();
-  auto inputTypeElt = TupleTypeElt(decoderType, C.Id_from);
-  auto inputType = TupleType::get(ArrayRef<TupleTypeElt>(inputTypeElt), C);
-
-  // throws
-  auto extInfo = FunctionType::ExtInfo(FunctionTypeRepresentation::Swift,
-                                       /*Throws=*/true);
-
-  // (Self)
-  auto returnType = derived.Nominal->getDeclaredInterfaceType();
-
-  // (from: Decoder) throws -> (Self)
-  Type innerType = FunctionType::get(inputType, returnType, extInfo);
-
   // Params: (self [implicit], Decoder)
   // self should be inout if the type is a value type; not inout otherwise.
   auto *selfDecl = ParamDecl::createSelf(SourceLoc(), conformanceDC,
                                          /*isStatic=*/false,
                                          /*isInOut=*/!classDecl);
+
+  auto decoderType = C.getDecoderDecl()->getDeclaredInterfaceType();
   auto *decoderParamDecl = new (C) ParamDecl(
       VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), C.Id_from,
       SourceLoc(), C.Id_decoder, decoderType, conformanceDC);
@@ -1075,29 +1040,11 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
     initDecl->getAttrs().add(reqAttr);
   }
 
-  auto selfParam = computeSelfParam(initDecl);
-  auto initSelfParam = computeSelfParam(initDecl, /*init=*/true);
-  Type interfaceType;
-  Type initializerType;
-  if (auto sig = conformanceDC->getGenericSignatureOfContext()) {
-    // Evaluate the below, but in a generic environment (if Self is generic).
-    initDecl->setGenericEnvironment(
-        conformanceDC->getGenericEnvironmentOfContext());
-    interfaceType = GenericFunctionType::get(sig, {selfParam}, innerType,
-                                             FunctionType::ExtInfo());
-    initializerType = GenericFunctionType::get(sig, {initSelfParam}, innerType,
-                                               FunctionType::ExtInfo());
-  } else {
-    // (Self) -> (Decoder) throws -> (Self)
-    interfaceType = FunctionType::get({selfParam}, innerType,
-                                      FunctionType::ExtInfo());
-    initializerType = FunctionType::get({initSelfParam}, innerType,
-                                        FunctionType::ExtInfo());
-  }
+  if (auto env = conformanceDC->getGenericEnvironmentOfContext())
+    initDecl->setGenericEnvironment(env);
+  initDecl->computeType(AnyFunctionType::ExtInfo().withThrows());
 
-  initDecl->setInterfaceType(interfaceType);
   initDecl->setValidationToChecked();
-  initDecl->setInitializerInterfaceType(initializerType);
   initDecl->copyFormalAccessFrom(derived.Nominal,
                                  /*sourceIsParentContext*/ true);
 

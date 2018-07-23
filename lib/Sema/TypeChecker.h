@@ -1264,10 +1264,6 @@ public:
   /// Revert the dependent types within a set of requirements.
   void revertGenericRequirements(MutableArrayRef<RequirementRepr> requirements);
 
-  /// Configure the interface type of a function declaration.
-  void configureInterfaceType(AbstractFunctionDecl *func,
-                              GenericSignature *sig);
-
   /// Compute the generic signature, generic environment and interface type
   /// of a generic function.
   void validateGenericFuncSignature(AbstractFunctionDecl *func);
@@ -1282,10 +1278,6 @@ public:
   /// Compute the generic signature, generic environment and interface type
   /// of a generic subscript.
   void validateGenericSubscriptSignature(SubscriptDecl *subscript);
-
-  /// Configure the interface type of a subscript declaration.
-  void configureInterfaceType(SubscriptDecl *subscript,
-                              GenericSignature *sig);
 
   /// Construct a new generic environment for the given declaration context.
   ///

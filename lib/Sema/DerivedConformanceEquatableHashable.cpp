@@ -647,25 +647,11 @@ deriveEquatable_eq(DerivedConformance &derived, Identifier generatedIdentifier,
 
   eqDecl->setBodySynthesizer(bodySynthesizer);
 
-  // Compute the type.
-  Type paramsTy = params->getInterfaceType(C);
-
   // Compute the interface type.
-  Type interfaceTy;
-  auto selfParam = computeSelfParam(eqDecl);
-  if (auto genericSig = parentDC->getGenericSignatureOfContext()) {
-    eqDecl->setGenericEnvironment(parentDC->getGenericEnvironmentOfContext());
+  if (auto genericEnv = parentDC->getGenericEnvironmentOfContext())
+    eqDecl->setGenericEnvironment(genericEnv);
+  eqDecl->computeType();
 
-    interfaceTy = FunctionType::get(paramsTy, boolTy,
-                                    AnyFunctionType::ExtInfo());
-    interfaceTy = GenericFunctionType::get(genericSig, {selfParam}, interfaceTy,
-                                           AnyFunctionType::ExtInfo());
-  } else {
-    interfaceTy = FunctionType::get(paramsTy, boolTy);
-    interfaceTy = FunctionType::get({selfParam}, interfaceTy,
-                                    FunctionType::ExtInfo());
-  }
-  eqDecl->setInterfaceType(interfaceTy);
   eqDecl->copyFormalAccessFrom(derived.Nominal, /*sourceIsParentContext*/ true);
   eqDecl->setValidationToChecked();
 
@@ -781,24 +767,9 @@ deriveHashable_hashInto(DerivedConformance &derived,
   hashDecl->setImplicit();
   hashDecl->setBodySynthesizer(bodySynthesizer);
 
-  // Evaluate type of Self in (Self) -> (into: inout Hasher) -> ()
-  auto selfParam = computeSelfParam(hashDecl);
-  auto inoutFlag = ParameterTypeFlags().withInOut(true);
-  auto hasherParam = AnyFunctionType::Param(hasherType, C.Id_into, inoutFlag);
-  auto innerType = FunctionType::get({hasherParam}, returnType,
-                                     FunctionType::ExtInfo());
-
-  Type interfaceType;
-  if (auto sig = parentDC->getGenericSignatureOfContext()) {
-    hashDecl->setGenericEnvironment(parentDC->getGenericEnvironmentOfContext());
-    interfaceType = GenericFunctionType::get(sig, {selfParam}, innerType,
-                                             FunctionType::ExtInfo());
-  } else {
-    // (Self) -> innerType == (inout Hasher) -> ()
-    interfaceType = FunctionType::get({selfParam}, innerType,
-                                      FunctionType::ExtInfo());
-  }
-  hashDecl->setInterfaceType(interfaceType);
+  if (auto env = parentDC->getGenericEnvironmentOfContext())
+    hashDecl->setGenericEnvironment(env);
+  hashDecl->computeType();
   hashDecl->copyFormalAccessFrom(derived.Nominal);
   hashDecl->setValidationToChecked();
 
@@ -1104,21 +1075,11 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   getterDecl->setImplicit();
   getterDecl->setBodySynthesizer(&deriveBodyHashable_hashValue);
 
-  // Compute the type of hashValue().
-  Type methodType = FunctionType::get(TupleType::getEmpty(C), intType);
-
   // Compute the interface type of hashValue().
-  Type interfaceType;
-  auto selfParam = computeSelfParam(getterDecl);
-  if (auto sig = parentDC->getGenericSignatureOfContext()) {
-    getterDecl->setGenericEnvironment(parentDC->getGenericEnvironmentOfContext());
-    interfaceType = GenericFunctionType::get(sig, {selfParam}, methodType,
-                                             AnyFunctionType::ExtInfo());
-  } else
-    interfaceType = FunctionType::get({selfParam}, methodType,
-                                      AnyFunctionType::ExtInfo());
+  if (auto env = parentDC->getGenericEnvironmentOfContext())
+    getterDecl->setGenericEnvironment(env);
+  getterDecl->computeType();
 
-  getterDecl->setInterfaceType(interfaceType);
   getterDecl->setValidationToChecked();
   getterDecl->copyFormalAccessFrom(derived.Nominal,
                                    /*sourceIsParentContext*/ true);

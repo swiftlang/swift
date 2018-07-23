@@ -31,6 +31,7 @@
 #include "swift/AST/StorageImpl.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/TypeWalker.h"
+#include "swift/AST/Types.h"
 #include "swift/AST/Witness.h"
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/Compiler.h"
@@ -2880,8 +2881,8 @@ public:
     TrailingWhere = trailingWhereClause;
   }
 
-  /// computeType - Compute the type (and declared type) of this associated
-  /// type; can only be called after the alias type has been resolved.
+  /// Set the interface type of this associated type declaration to a dependen
+  /// member type of 'Self'.
   void computeType();
 
   /// Retrieve the associated type "anchor", which is the associated type
@@ -3083,7 +3084,8 @@ public:
     Bits.NominalTypeDecl.HasValidatedLayout = true;
   }
 
-  /// Compute the type of this nominal type.
+  /// Set the interface type of this nominal type to the metatype of the
+  /// declared interface type.
   void computeType();
 
   /// getDeclaredType - Retrieve the type declared by this entity, without
@@ -4884,6 +4886,10 @@ public:
   TypeLoc &getElementTypeLoc() { return ElementTy; }
   const TypeLoc &getElementTypeLoc() const { return ElementTy; }
 
+  /// Compute the interface type of this subscript from the parameter and
+  /// element types.
+  void computeType();
+
   /// \brief Returns whether the result of the subscript operation can be set.
   bool isSettable() const;
 
@@ -5175,6 +5181,10 @@ private:
   void computeNeedsNewVTableEntry();
 
 public:
+  /// Compute the interface type of this function declaration from the
+  /// parameter types.
+  void computeType(AnyFunctionType::ExtInfo Info = FunctionType::ExtInfo());
+
   /// Retrieve the source range of the function body.
   SourceRange getBodySourceRange() const;
 
@@ -5735,8 +5745,8 @@ public:
     return hasName() ? getBaseName().getIdentifier().str() : "_";
   }
 
-  /// \returns false if there was an error during the computation rendering the
-  /// EnumElementDecl invalid, true otherwise.
+  /// Set the interface type of this enum element to the constructor function
+  /// type; (Self) -> Result or (Self) -> (Args...) -> Result.
   bool computeType();
 
   Type getArgumentInterfaceType() const;
