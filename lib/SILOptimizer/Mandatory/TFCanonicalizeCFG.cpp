@@ -657,10 +657,31 @@ SILBasicBlock *SingleExitLoopTransformer::createNewExitBlockWithDemux(
 }
 
 bool SingleExitLoopTransformer::transform() {
-  // Return if the loop is already in the required form.
+  // Return if the loop is already in the required form and
+  // if the header has no side-effects.
   if (loop->getExitBlock() && loop->getExitingBlock() &&
-      loop->getExitingBlock() == loop->getHeader()) {
-    return false;
+      loop->getExitingBlock() == loop->getHeader())  {
+    constexpr char opSendToHost[] = "tfc.SendToHost";
+    constexpr char opRecvFromHost[] = "tfc.RecvFromHost";
+    bool hasEffectfulOps = false;
+    for (const SILInstruction& inst : *loop->getHeader()) {
+      if (auto builtin = dyn_cast<BuiltinInst>(&inst)) {
+        StringRef name = builtin->getName().str();
+        if (name.contains(opRecvFromHost)) {
+          hasEffectfulOps = true;
+          break;
+        }
+      } else if (auto graphOp = dyn_cast<GraphOperationInst>(&inst)) {
+        StringRef name = graphOp->getName().str();
+        if (name.startswith(opSendToHost) || name.startswith(opRecvFromHost)) {
+          hasEffectfulOps = true;
+          break;
+        }
+      }
+    }
+    if (!hasEffectfulOps) {
+      return false;
+    }
   }
   SILBuilder builder(header);
   ASTContext &context = builder.getASTContext();
