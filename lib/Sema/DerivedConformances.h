@@ -167,6 +167,22 @@ public:
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *deriveDecodable(ValueDecl *requirement);
 
+  /// Determine if a ParameterAggregate requirement can be derived for a type.
+  ///
+  /// \returns True if the requirement can be derived.
+  static bool canDeriveParameterAggregate(TypeChecker &tc,
+                                          NominalTypeDecl *type);
+
+  /// Derive a ParameterAggregate requirement for a nominal type.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  ValueDecl *deriveParameterAggregate(ValueDecl *requirement);
+
+  /// Derive a ParameterAggregate type witness for a nominal type.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  Type deriveParameterAggregate(AssociatedTypeDecl *assocType);
+
   /// Declare a read-only property.
   std::pair<VarDecl *, PatternBindingDecl *>
   declareDerivedProperty(Identifier name, Type propertyInterfaceType,

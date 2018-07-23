@@ -902,6 +902,7 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
     break;
   // SWIFT_ENABLE_TENSORFLOW
   case KnownProtocolKind::AccelerableByTensorFlow:
+  case KnownProtocolKind::ParameterAggregate:
   case KnownProtocolKind::TensorSendableReceivable:
   case KnownProtocolKind::TensorProtocol:
     M = getLoadedModule(getIdentifier("TensorFlow"));
@@ -1739,7 +1740,9 @@ ASTContext::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath) {
     if (ModuleDecl *M = importer->loadModule(moduleID.second, ModulePath)) {
       if (ModulePath.size() == 1 &&
           (ModulePath[0].first == StdlibModuleName ||
-           ModulePath[0].first == Id_Foundation))
+           ModulePath[0].first == Id_Foundation ||
+           // SWIFT_ENABLE_TENSORFLOW
+           ModulePath[0].first == getIdentifier("TensorFlow")))
         recordKnownProtocols(M);
       return M;
     }

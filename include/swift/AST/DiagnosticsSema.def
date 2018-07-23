@@ -2381,6 +2381,9 @@ ERROR(broken_encodable_requirement,none,
       "Encodable protocol is broken: unexpected requirement", ())
 ERROR(broken_decodable_requirement,none,
       "Decodable protocol is broken: unexpected requirement", ())
+// SWIFT_ENABLE_TENSORFLOW
+ERROR(broken_parameter_aggregate_requirement,none,
+      "ParameterAggregate protocol is broken: unexpected requirement", ())
 
 NOTE(codable_extraneous_codingkey_case_here,none,
      "CodingKey case %0 does not match any stored properties", (Identifier))

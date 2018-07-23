@@ -41,6 +41,7 @@ set(SOURCES
   Gradients.swift
   OpaqueHandles.swift
   Ops.swift
+  Parameterized.swift
   ShapedArray.swift
   Tensor.swift
   TensorHandle.swift
