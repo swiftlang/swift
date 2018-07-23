@@ -3355,10 +3355,17 @@ class SequenceExpr final : public Expr,
 
   SequenceExpr(ArrayRef<Expr*> elements)
     : Expr(ExprKind::Sequence, /*Implicit=*/false) {
+    // Make sure all elements in the SequenceExpr are not null
+    assert(llvm::find_if(elements, [](const Expr *expr) { return !expr; }) ==
+           elements.end() && "An element of the SequenceExpr is null");
     Bits.SequenceExpr.NumElements = elements.size();
     assert(Bits.SequenceExpr.NumElements > 0 && "zero-length sequence!");
     std::uninitialized_copy(elements.begin(), elements.end(),
                             getTrailingObjects<Expr*>());
+  }
+
+  MutableArrayRef<Expr *> getMutableElements() {
+    return {getTrailingObjects<Expr *>(), Bits.SequenceExpr.NumElements};
   }
 
 public:
@@ -3373,10 +3380,6 @@ public:
   
   unsigned getNumElements() const { return Bits.SequenceExpr.NumElements; }
 
-  MutableArrayRef<Expr*> getElements() {
-    return {getTrailingObjects<Expr*>(), Bits.SequenceExpr.NumElements};
-  }
-
   ArrayRef<Expr*> getElements() const {
     return {getTrailingObjects<Expr*>(), Bits.SequenceExpr.NumElements};
   }
@@ -3385,7 +3388,8 @@ public:
     return getElements()[i];
   }
   void setElement(unsigned i, Expr *e) {
-    getElements()[i] = e;
+    assert(e);
+    getMutableElements()[i] = e;
   }
 
   // Implement isa/cast/dyncast/etc.

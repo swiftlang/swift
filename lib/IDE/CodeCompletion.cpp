@@ -408,7 +408,7 @@ static Stmt *findNearestStmt(const AbstractFunctionDecl *AFD, SourceLoc Loc,
 /// the context, and later for checking more-specific things like unresolved
 /// members.  We should restructure code-completion type-checking so that we
 /// never typecheck more than once (or find a more principled way to do it).
-static void prepareForRetypechecking(Expr *E) {
+static Expr *prepareForRetypechecking(Expr *E) {
   assert(E);
   struct Eraser : public ASTWalker {
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
@@ -436,7 +436,7 @@ static void prepareForRetypechecking(Expr *E) {
     }
   };
 
-  E->walk(Eraser());
+  return E->walk(Eraser());
 }
 
 CodeCompletionString::CodeCompletionString(ArrayRef<Chunk> Chunks) {
@@ -3337,18 +3337,18 @@ public:
       addTypeAnnotation(builder, resultType);
   }
 
-  void tryInfixOperatorCompletion(InfixOperatorDecl *op, SequenceExpr *SE) {
+  void tryInfixOperatorCompletion(InfixOperatorDecl *op,
+                                  SmallVector<Expr *, 3> &sequence) {
     if (op->getName().str() == "~>")
       return;
 
-    MutableArrayRef<Expr *> sequence = SE->getElements();
-    assert(sequence.size() >= 3 && !sequence.back() &&
-           !sequence.drop_back(1).back() && "sequence not cleaned up");
+    assert(sequence.size() >= 3 && !sequence[sequence.size() - 1] &&
+           !sequence[sequence.size() - 2] && "sequence not cleaned up");
     assert((sequence.size() & 1) && "sequence expr ending with operator");
 
     // FIXME: these checks should apply to the LHS of the operator, not the
     // immediately left expression.  Move under the type-checking.
-    Expr *LHS = sequence.drop_back(2).back();
+    Expr *LHS = sequence[sequence.size() - 3];
     if (LHS->getType() && (LHS->getType()->is<MetatypeType>() ||
                            LHS->getType()->is<AnyFunctionType>()))
       return;
@@ -3360,18 +3360,23 @@ public:
     // escape and there isn't a better way to allocate scratch Expr nodes.
     UnresolvedDeclRefExpr UDRE(op->getName(), DeclRefKind::BinaryOperator,
                                DeclNameLoc(LHS->getEndLoc()));
-    sequence.drop_back(1).back() = &UDRE;
+    sequence[sequence.size() - 2] = &UDRE;
     CodeCompletionExpr CCE(LHS->getSourceRange());
     sequence.back() = &CCE;
 
     SWIFT_DEFER {
       // Reset sequence.
-      SE->setElement(SE->getNumElements() - 1, nullptr);
-      SE->setElement(SE->getNumElements() - 2, nullptr);
+      sequence[sequence.size() - 1] = nullptr;
+      sequence[sequence.size() - 2] = nullptr;
       LHS->setType(LHSTy);
-      prepareForRetypechecking(SE);
+      for (unsigned i = 0; i < sequence.size(); i++) {
+        if (sequence[i]) {
+          sequence[i] = prepareForRetypechecking(sequence[i]);
+        }
+      }
 
-      for (auto &element : sequence.drop_back(2)) {
+      for (unsigned i = 0; i < sequence.size() - 2; i++) {
+        auto &element = sequence[i];
         // Unfold AssignExpr for re-typechecking sequence.
         if (auto *AE = dyn_cast_or_null<AssignExpr>(element)) {
           AE->setSrc(nullptr);
@@ -3386,10 +3391,13 @@ public:
           operatorRef->setType(nullptr);
           element = operatorRef;
         }
+        sequence[i] = element;
       }
     };
 
-    Expr *expr = SE;
+    // FIXME: Deallocate this expression after typechecking is done
+    Expr *expr =
+        SequenceExpr::create(CurrDeclContext->getASTContext(), sequence);
     if (!typeCheckCompletionSequence(const_cast<DeclContext *>(CurrDeclContext),
                                      expr)) {
 
@@ -3474,8 +3482,11 @@ public:
     // operator, filling in the operator and dummy right-hand side.
     sequence.push_back(nullptr); // operator
     sequence.push_back(nullptr); // RHS
-    auto *SE = SequenceExpr::create(CurrDeclContext->getASTContext(), sequence);
-    prepareForRetypechecking(SE);
+    for (unsigned i = 0; i < sequence.size(); i++) {
+      if (sequence[i]) {
+        sequence[i] = prepareForRetypechecking(sequence[i]);
+      }
+    }
 
     for (auto op : operators) {
       switch (op->getKind()) {
@@ -3489,7 +3500,7 @@ public:
         break;
       case DeclKind::InfixOperator:
         if (seenInfixOperators.insert(op->getName()).second)
-          tryInfixOperatorCompletion(cast<InfixOperatorDecl>(op), SE);
+          tryInfixOperatorCompletion(cast<InfixOperatorDecl>(op), sequence);
         break;
       default:
         llvm_unreachable("unexpected operator kind");
