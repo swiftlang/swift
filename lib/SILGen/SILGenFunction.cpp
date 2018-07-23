@@ -441,30 +441,25 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     // we're getting away with it because the types are guaranteed to already
     // be imported.
     ASTContext &ctx = getASTContext();
-    ModuleDecl *UIKit = ctx.getLoadedModule(ctx.getIdentifier("UIKit"));
+    
+    std::pair<Identifier, SourceLoc> UIKitName =
+      {ctx.getIdentifier("UIKit"), SourceLoc()};
+    
+    ModuleDecl *UIKit = ctx
+      .getClangModuleLoader()
+      ->loadModule(SourceLoc(), UIKitName);
+    assert(UIKit && "couldn't find UIKit objc module?!");
     SmallVector<ValueDecl *, 1> results;
     UIKit->lookupQualified(UIKit->getInterfaceType(),
                            ctx.getIdentifier("UIApplicationMain"),
                            NL_QualifiedDefault,
                            /*resolver*/nullptr,
                            results);
-    assert(!results.empty() && "couldn't find UIApplicationMain in UIKit");
+    assert(results.size() == 1
+           && "couldn't find a unique UIApplicationMain in the UIKit ObjC "
+              "module?!");
 
-    // We want the original UIApplicationMain() declaration from Objective-C,
-    // not any overlay overloads.
-    ValueDecl *UIApplicationMainDecl = nullptr;
-    for (auto *result : results) {
-      if (result->hasClangNode()) {
-        assert(!UIApplicationMainDecl
-               && "more than one UIApplicationMain defined in ObjC?!");
-        UIApplicationMainDecl = result;
-#ifndef NDEBUG
-        break;
-#endif
-      }
-    }
-    
-    assert(UIApplicationMainDecl && "no UIApplicationMain defined in ObjC?!");
+    ValueDecl *UIApplicationMainDecl = results.front();
 
     auto mainRef = SILDeclRef(UIApplicationMainDecl).asForeign();
     auto UIApplicationMainFn = SGM.M.getOrCreateFunction(mainClass, mainRef,
