@@ -2682,8 +2682,12 @@ ERROR(tf_graph_attr_no_generic_functions,none,
       "@TensorFlowGraph cannot be applied to generic functions", ())
 
 // @TFParameter attribute
+ERROR(tfparameter_attr_tensorflow_not_imported,none,
+      "@%0 is available only when 'TensorFlow' is imported", (StringRef))
 ERROR(tfparameter_attr_instance_stored_property_only,none,
       "only instance stored properties can be declared @%0", (StringRef))
+ERROR(tfparameter_attr_not_in_parameterized,none,
+      "@%0 is allowed only in types that conform to 'Parameterized'", (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Expressions
