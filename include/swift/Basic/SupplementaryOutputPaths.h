@@ -121,7 +121,7 @@ struct SupplementaryOutputPaths {
   ///
   /// Currently only makes sense when the compiler has whole-module knowledge.
   ///
-  /// \sa ModuleOutputPath
+  /// \sa swift::emitModuleInterface
   std::string ModuleInterfaceOutputPath;
 
   SupplementaryOutputPaths() = default;

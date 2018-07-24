@@ -24,6 +24,7 @@
 #include "ImportedModules.h"
 #include "ReferenceDependencies.h"
 #include "TBD.h"
+#include "TextualInterfaceGeneration.h"
 
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTScope.h"
@@ -358,21 +359,14 @@ static bool printAsObjCIfNeeded(StringRef outputPath, ModuleDecl *M,
 /// ...unless \p outputPath is empty, in which case it does nothing.
 ///
 /// \returns true if there were any errors
+///
+/// \see swift::emitModuleInterface
 static bool printModuleInterfaceIfNeeded(StringRef outputPath, ModuleDecl *M) {
   if (outputPath.empty())
     return false;
   return atomicallyWritingToTextFile(outputPath, M->getDiags(),
-                                     [&](raw_ostream &out) -> bool {
-    auto printOptions = PrintOptions::printTextualInterfaceFile();
-    SmallVector<Decl *, 16> topLevelDecls;
-    M->getTopLevelDecls(topLevelDecls);
-    for (const Decl *D : topLevelDecls) {
-      if (!D->shouldPrintInContext(printOptions))
-        continue;
-      D->print(out, printOptions);
-      out << "\n";
-    }
-    return false;
+                                     [M](raw_ostream &out) -> bool {
+    return swift::emitModuleInterface(out, M);
   });
 }
 
