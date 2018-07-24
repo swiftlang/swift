@@ -53,6 +53,7 @@
 // CHECK-NEXT: + (void)deprecatedClassMethodRenamedToInstanceMethodWithValue:(NSInteger)value SWIFT_DEPRECATED_MSG("This method has a renamed attribute point to instance method instead of a class method. It should show the Swift name here", "instanceMethodWithACustomObjCName(x:)");
 // CHECK-NEXT: - (void)customObjCNameInstanceMethodWithX:(NSInteger)x;
 // CHECK-NEXT: + (void)customObjCNameClassMethodWithX:(NSInteger)x;
+// CHECK-NEXT: - (void)methodRenamedToMethodNotAvailableToObjC SWIFT_DEPRECATED_MSG("", "methodNotAvailableToObjC()");
 // CHECK-NEXT: + (void)makeDeprecatedAvailabilityWithValue:(NSInteger)value SWIFT_DEPRECATED_MSG("use something else", "deprecatedAvailabilityWithValue:");
 // CHECK-NEXT: + (void)unavailableAvailabilityWithValue:(NSInteger)value;
 // CHECK-NEXT: + (void)makeUnavailableAvailabilityWithValue:(NSInteger)value
@@ -220,6 +221,11 @@
 
     @objc(customObjCNameClassMethodWithX:)
     public class func classMethodWithACustomObjCName(x: Int) {}
+  
+    @nonobjc func methodNotAvailableToObjC() {}
+  
+    @available(*, deprecated, renamed: "methodNotAvailableToObjC()")
+    @objc public func methodRenamedToMethodNotAvailableToObjC() {}
 
     @available(*, deprecated,
     message: "use something else",
