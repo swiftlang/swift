@@ -18,11 +18,11 @@ import TestsUtils
 //
 
 public let RandomShuffle = [
-  BenchmarkInfo(name: "RandomShuffleDef", runFunction: run_RandomShuffleDef,
+  BenchmarkInfo(name: "RandomShuffleDef2", runFunction: run_RandomShuffleDef,
     tags: [.api],
     setUpFunction: { blackHole(numbersDef) },
     tearDownFunction: { numbersDef = nil }),
-  BenchmarkInfo(name: "RandomShuffleLCG", runFunction: run_RandomShuffleLCG,
+  BenchmarkInfo(name: "RandomShuffleLCG2", runFunction: run_RandomShuffleLCG,
     tags: [.api],
     setUpFunction: { blackHole(numbersLCG) },
     tearDownFunction: { numbersLCG = nil }),
@@ -43,8 +43,8 @@ struct LCRNG: RandomNumberGenerator {
   }
 }
 
-var numbersDef: [Int]! = Array(0...3_000_000)
-var numbersLCG: [Int]! = Array(0...3_000_000)
+var numbersDef: [Int]! = Array(0...10_000)
+var numbersLCG: [Int]! = Array(0...100_000)
 
 @inline(never)
 public func run_RandomShuffleDef(_ N: Int) {
