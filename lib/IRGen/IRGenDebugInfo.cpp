@@ -386,12 +386,6 @@ private:
         case AccessorKind::MutableAddress:
           Kind = ".mutableAddressor";
           break;
-        case AccessorKind::Read:
-          Kind = ".read";
-          break;
-        case AccessorKind::Modify:
-          Kind = ".modify";
-          break;
         }
 
         SmallVector<char, 64> Buf;

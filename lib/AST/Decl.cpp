@@ -199,12 +199,6 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
 
      case AccessorKind::MaterializeForSet:
        return DescriptiveDeclKind::MaterializeForSet;
-
-     case AccessorKind::Read:
-       return DescriptiveDeclKind::ReadAccessor;
-
-     case AccessorKind::Modify:
-       return DescriptiveDeclKind::ModifyAccessor;
      }
      llvm_unreachable("bad accessor kind");
    }
@@ -285,8 +279,6 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(MaterializeForSet, "materializeForSet accessor");
   ENTRY(Addressor, "address accessor");
   ENTRY(MutableAddressor, "mutableAddress accessor");
-  ENTRY(ReadAccessor, "_read accessor");
-  ENTRY(ModifyAccessor, "_modify accessor");
   ENTRY(EnumElement, "enum case");
   ENTRY(Module, "module");
   ENTRY(MissingMember, "missing member placeholder");
@@ -1426,9 +1418,6 @@ getDirectReadAccessStrategy(const AbstractStorageDecl *storage) {
   case ReadImplKind::Address:
     return AccessStrategy::getAccessor(AccessorKind::Address,
                                        /*dispatch*/ false);
-  case ReadImplKind::Read:
-    return AccessStrategy::getAccessor(AccessorKind::Read,
-                                       /*dispatch*/ false);
   }
   llvm_unreachable("bad impl kind");
 }
@@ -1456,9 +1445,6 @@ getDirectWriteAccessStrategy(const AbstractStorageDecl *storage) {
   case WriteImplKind::MutableAddress:
     return AccessStrategy::getAccessor(AccessorKind::MutableAddress,
                                        /*dispatch*/ false);
-  case WriteImplKind::Modify:
-    return AccessStrategy::getAccessor(AccessorKind::Modify,
-                                       /*dispatch*/ false);
   }
   llvm_unreachable("bad impl kind");
 }
@@ -1477,9 +1463,6 @@ getDirectReadWriteAccessStrategy(const AbstractStorageDecl *storage) {
                                        /*dispatch*/ false);
   case ReadWriteImplKind::MutableAddress:
     return AccessStrategy::getAccessor(AccessorKind::MutableAddress,
-                                       /*dispatch*/ false);
-  case ReadWriteImplKind::Modify:
-    return AccessStrategy::getAccessor(AccessorKind::Modify,
                                        /*dispatch*/ false);
   case ReadWriteImplKind::MaterializeToTemporary:
     return AccessStrategy::getMaterializeToTemporary(
@@ -3852,7 +3835,6 @@ void AbstractStorageDecl::configureAccessor(AccessorDecl *accessor) {
   switch (accessor->getAccessorKind()) {
   case AccessorKind::Get:
   case AccessorKind::Address:
-  case AccessorKind::Read:
     // Nothing to do.
     return;
 
@@ -3861,7 +3843,6 @@ void AbstractStorageDecl::configureAccessor(AccessorDecl *accessor) {
   case AccessorKind::WillSet:
   case AccessorKind::DidSet:
   case AccessorKind::MutableAddress:
-  case AccessorKind::Modify:
     // Propagate the setter access.
     if (auto setterAccess = Accessors.getInt()) {
       assert(!accessor->hasAccess() ||
@@ -4788,8 +4769,6 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
     case AccessorKind::Address:
     case AccessorKind::MutableAddress:
     case AccessorKind::Get:
-    case AccessorKind::Read:
-    case AccessorKind::Modify:
       return subscript ? subscript->getFullName()
                        : DeclName(ctx, storage->getBaseName(),
                                   ArrayRef<Identifier>());
@@ -5058,8 +5037,6 @@ static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
       break;
     case AccessorKind::Address:
     case AccessorKind::MutableAddress:
-    case AccessorKind::Read:
-    case AccessorKind::Modify:
       return false;
     case AccessorKind::MaterializeForSet:
       // Special case -- materializeForSet on dynamic storage is not

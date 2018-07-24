@@ -2133,7 +2133,6 @@ getActualReadImplKind(unsigned rawKind) {
   CASE(Get)
   CASE(Inherited)
   CASE(Address)
-  CASE(Read)
 #undef CASE
   }
   return None;
@@ -2151,7 +2150,6 @@ getActualWriteImplKind(unsigned rawKind) {
   CASE(StoredWithObservers)
   CASE(InheritedWithObservers)
   CASE(MutableAddress)
-  CASE(Modify)
 #undef CASE
   }
   return None;
@@ -2168,7 +2166,6 @@ getActualReadWriteImplKind(unsigned rawKind) {
   CASE(MaterializeForSet)
   CASE(MutableAddress)
   CASE(MaterializeToTemporary)
-  CASE(Modify)
 #undef CASE
   }
   return None;

@@ -1675,8 +1675,6 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
       case AccessorKind::DidSet:
       case AccessorKind::MutableAddress:
       case AccessorKind::WillSet:
-      case AccessorKind::Read:
-      case AccessorKind::Modify:
         return { };
     }
 

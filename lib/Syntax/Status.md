@@ -84,7 +84,6 @@
   * WhileStmt
   * ForInStmt
   * SwitchStmt
-  * YieldStmt
 
 ## Pattern
 ### Done:

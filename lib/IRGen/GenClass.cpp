@@ -1652,10 +1652,11 @@ namespace {
         return emitObjCSetterDescriptor(IGM, descriptors,
                                         accessor->getStorage());
 
-#define OBJC_ACCESSOR(ID, KEYWORD)
-#define ACCESSOR(ID) \
-      case AccessorKind::ID:
-#include "swift/AST/AccessorKinds.def"
+      case AccessorKind::WillSet:
+      case AccessorKind::DidSet:
+      case AccessorKind::MaterializeForSet:
+      case AccessorKind::Address:
+      case AccessorKind::MutableAddress:
         llvm_unreachable("shouldn't be trying to build this accessor");
       }
       llvm_unreachable("bad accessor kind");

@@ -506,7 +506,6 @@ DECL_NODES = [
                       'mutableAddressWithOwner', 
                       'mutableAddressWithNativeOwner', 
                       'mutableAddressWithPinnedNativeOwner',
-                      '_read', '_modify'
                    ]),
              Child('Parameter', kind='AccessorParameter', is_optional=True),
              Child('Body', kind='CodeBlock', is_optional=True),

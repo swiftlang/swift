@@ -151,8 +151,6 @@ enum class DescriptiveDeclKind : uint8_t {
   MaterializeForSet,
   Addressor,
   MutableAddressor,
-  ReadAccessor,
-  ModifyAccessor,
   WillSet,
   DidSet,
   EnumElement,
@@ -430,9 +428,9 @@ protected:
     SelfAccess : 2
   );
 
-  SWIFT_INLINE_BITFIELD(AccessorDecl, FuncDecl, 4+3,
+  SWIFT_INLINE_BITFIELD(AccessorDecl, FuncDecl, 3+3,
     /// The kind of accessor this is.
-    AccessorKind : 4,
+    AccessorKind : 3,
 
     /// The kind of addressor this is.
     AddressorKind : 3
@@ -4336,7 +4334,8 @@ public:
     return getAccessor(AccessorKind::Address);
   }
 
-  /// \brief Return the decl for the mutable accessor if it exists.
+  /// \brief Return the decl for the 'mutableAddress' accessors if
+  /// it exists; this is only valid on a declaration with addressors.
   AccessorDecl *getMutableAddressor() const {
     return getAccessor(AccessorKind::MutableAddress);
   }
@@ -4347,17 +4346,7 @@ public:
       return getAddressor();
     return getMutableAddressor();
   }
-
-  /// \brief Return the decl for the 'read' coroutine accessor if it exists.
-  AccessorDecl *getReadCoroutine() const {
-    return getAccessor(AccessorKind::Read);
-  }
-
-  /// \brief Return the decl for the 'modify' coroutine accessor if it exists.
-  AccessorDecl *getModifyCoroutine() const {
-    return getAccessor(AccessorKind::Modify);
-  }
-
+  
   /// \brief Return the decl for the willSet specifier if it exists, this is
   /// only valid on a declaration with Observing storage.
   AccessorDecl *getWillSetFunc() const {
@@ -5637,26 +5626,8 @@ public:
   bool isGetterOrSetter() const { return isGetter() || isSetter(); }
 
   bool isObservingAccessor() const {
-    switch (getAccessorKind()) {
-#define OBSERVING_ACCESSOR(ID, KEYWORD) \
-    case AccessorKind::ID: return true;
-#define ACCESSOR(ID) \
-    case AccessorKind::ID: return false;
-#include "swift/AST/AccessorKinds.def"
-    }
-    llvm_unreachable("bad accessor kind");
-  }
-
-  /// Is this accessor one of the kinds that's implicitly a coroutine?
-  bool isCoroutine() const {
-    switch (getAccessorKind()) {
-#define COROUTINE_ACCESSOR(ID, KEYWORD) \
-    case AccessorKind::ID: return true;
-#define ACCESSOR(ID) \
-    case AccessorKind::ID: return false;
-#include "swift/AST/AccessorKinds.def"
-    }
-    llvm_unreachable("bad accessor kind");
+    return getAccessorKind() == AccessorKind::DidSet ||
+           getAccessorKind() == AccessorKind::WillSet;
   }
 
   static bool classof(const Decl *D) {

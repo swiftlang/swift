@@ -1275,10 +1275,11 @@ bool IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
 
       return false;
 
-#define OBJC_ACCESSOR(ID, KEYWORD)
-#define ACCESSOR(ID) \
-    case AccessorKind::ID:
-#include "swift/AST/AccessorKinds.def"
+    case AccessorKind::Address:
+    case AccessorKind::DidSet:
+    case AccessorKind::MaterializeForSet:
+    case AccessorKind::MutableAddress:
+    case AccessorKind::WillSet:
       return false;
     }
   }
@@ -2235,9 +2236,6 @@ static bool computeIsGetterMutating(TypeChecker &TC,
 
   case ReadImplKind::Address:
     return validateAccessorIsMutating(TC, storage->getAddressor());
-
-  case ReadImplKind::Read:
-    return validateAccessorIsMutating(TC, storage->getReadCoroutine());
   }
 
   llvm_unreachable("bad impl kind");
@@ -2245,8 +2243,7 @@ static bool computeIsGetterMutating(TypeChecker &TC,
 
 static bool computeIsSetterMutating(TypeChecker &TC,
                                     AbstractStorageDecl *storage) {
-  auto impl = storage->getImplInfo();
-  switch (impl.getWriteImpl()) {
+  switch (storage->getWriteImpl()) {
   case WriteImplKind::Immutable:
   case WriteImplKind::Stored:
     // Instance member setters are mutating; static property setters and
@@ -2258,33 +2255,11 @@ static bool computeIsSetterMutating(TypeChecker &TC,
 
   case WriteImplKind::StoredWithObservers:
   case WriteImplKind::InheritedWithObservers:
-  case WriteImplKind::Set: {
-    auto result = validateAccessorIsMutating(TC, storage->getSetter());
-
-    // As a special extra check, if the user also gave us a modify
-    // coroutine, check that it has the same mutatingness as the setter.
-    // TODO: arguably this should require the spelling to match even when
-    // it's the implied value.
-    if (impl.getReadWriteImpl() == ReadWriteImplKind::Modify) {
-      auto modifyAccessor = storage->getModifyCoroutine();
-      auto modifyResult = validateAccessorIsMutating(TC, modifyAccessor);
-      if (result != modifyResult) {
-        TC.diagnose(modifyAccessor,
-                    diag::modify_mutatingness_differs_from_setter,
-                    modifyResult);
-        TC.diagnose(storage->getSetter(), diag::previous_accessor, "setter", 0);
-        modifyAccessor->setInvalid();
-      }
-    }
-
-    return result;
-  }
+  case WriteImplKind::Set:
+    return validateAccessorIsMutating(TC, storage->getSetter());
 
   case WriteImplKind::MutableAddress:
     return validateAccessorIsMutating(TC, storage->getMutableAddressor());
-
-  case WriteImplKind::Modify:
-    return validateAccessorIsMutating(TC, storage->getModifyCoroutine());
   }
   llvm_unreachable("bad storage kind");
 }
@@ -4186,11 +4161,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         }
         break;
 
-      // These don't mention the value type directly.
-      // If we add yield types to the function type, we'll need to update this.
+      // These don't mention the value types directly.
       case AccessorKind::MaterializeForSet:
-      case AccessorKind::Read:
-      case AccessorKind::Modify:
         break;
       }
     }

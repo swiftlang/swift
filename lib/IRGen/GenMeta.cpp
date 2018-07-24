@@ -140,10 +140,10 @@ static Flags getMethodDescriptorFlags(ValueDecl *fn) {
       return Flags::Kind::Setter;
     case AccessorKind::MaterializeForSet:
       return Flags::Kind::MaterializeForSet;
-#define OPAQUE_ACCESSOR(ID, KEYWORD)
-#define ACCESSOR(ID) \
-    case AccessorKind::ID:
-#include "swift/AST/AccessorKinds.def"
+    case AccessorKind::WillSet:
+    case AccessorKind::DidSet:
+    case AccessorKind::Address:
+    case AccessorKind::MutableAddress:
       llvm_unreachable("these accessors never appear in protocols or v-tables");
     }
     llvm_unreachable("bad kind");

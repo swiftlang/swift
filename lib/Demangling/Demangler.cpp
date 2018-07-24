@@ -2370,8 +2370,6 @@ NodePointer Demangler::demangleAccessor(NodePointer ChildNode) {
     case 'G': Kind = Node::Kind::GlobalGetter; break;
     case 'w': Kind = Node::Kind::WillSet; break;
     case 'W': Kind = Node::Kind::DidSet; break;
-    case 'r': Kind = Node::Kind::ReadAccessor; break;
-    case 'M': Kind = Node::Kind::ModifyAccessor; break;
     case 'a':
       switch (nextChar()) {
         case 'O': Kind = Node::Kind::OwningMutableAddressor; break;

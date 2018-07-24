@@ -234,8 +234,6 @@ static bool checkMutating(FuncDecl *requirement, FuncDecl *witness,
         return false;
       case ReadImplKind::Address:
         return storage->getAddressor()->isMutating();
-      case ReadImplKind::Read:
-        return storage->getReadCoroutine()->isMutating();
       case ReadImplKind::Inherited:
       case ReadImplKind::Get:
         llvm_unreachable("should have a getter");
@@ -254,8 +252,6 @@ static bool checkMutating(FuncDecl *requirement, FuncDecl *witness,
         return isStoredSetterMutating();
       case WriteImplKind::MutableAddress:
         return storage->getMutableAddressor()->isMutating();
-      case WriteImplKind::Modify:
-        return storage->getModifyCoroutine()->isMutating();
       case WriteImplKind::Immutable:
         llvm_unreachable("asking for setter for immutable storage");
       case WriteImplKind::Set:
@@ -271,8 +267,6 @@ static bool checkMutating(FuncDecl *requirement, FuncDecl *witness,
         return isStoredSetterMutating();
       case ReadWriteImplKind::MutableAddress:
         return storage->getMutableAddressor()->isMutating();
-      case ReadWriteImplKind::Modify:
-        return storage->getModifyCoroutine()->isMutating();
       case ReadWriteImplKind::MaterializeToTemporary:
         return isReadMutating() || isWriteMutating();
       case ReadWriteImplKind::Immutable:
@@ -4906,8 +4900,6 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
     case AccessorKind::Address:
     case AccessorKind::MutableAddress:
     case AccessorKind::MaterializeForSet:
-    case AccessorKind::Read:
-    case AccessorKind::Modify:
       // These accessors are never exposed to Objective-C.
       return result;
     case AccessorKind::DidSet:
