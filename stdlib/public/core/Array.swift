@@ -962,7 +962,10 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
   @inlinable
   public // @testable
   var _owner: AnyObject? {
-    return _buffer.owner
+    @inline(__always)
+    get {
+      return _buffer.owner      
+    }
   }
 
   /// If the elements are stored contiguously, a pointer to the first
