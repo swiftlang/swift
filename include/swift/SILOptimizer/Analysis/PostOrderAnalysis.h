@@ -44,14 +44,15 @@ protected:
 
 public:
   PostOrderAnalysis()
-      : FunctionAnalysisBase<PostOrderFunctionInfo>(AnalysisKind::PostOrder) {}
+      : FunctionAnalysisBase<PostOrderFunctionInfo>(
+            SILAnalysisKind::PostOrder) {}
 
   // This is a cache and shouldn't be copied around.
   PostOrderAnalysis(const PostOrderAnalysis &) = delete;
   PostOrderAnalysis &operator=(const PostOrderAnalysis &) = delete;
 
   static bool classof(const SILAnalysis *S) {
-    return S->getKind() == AnalysisKind::PostOrder;
+    return S->getKind() == SILAnalysisKind::PostOrder;
   }
 };
 

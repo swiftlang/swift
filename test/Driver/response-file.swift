@@ -24,7 +24,7 @@
 // RUN: %target-build-swift -typecheck @%t.4B.resp 2>&1 | %FileCheck %s -check-prefix=RECURSIVE
 // RECURSIVE: warning: result of call to 'abs' is unused
 
-// RUN: python -c 'for i in range(500001): print "-DTEST5_" + str(i)' > %t.5.resp
+// RUN: %{python} -c 'for i in range(500001): print "-DTEST5_" + str(i)' > %t.5.resp
 // RUN: %target-build-swift -typecheck @%t.5.resp %s 2>&1 | %FileCheck %s -check-prefix=LONG
 // LONG: warning: result of call to 'abs' is unused
 // RUN: %empty-directory(%t/tmp)

@@ -160,8 +160,7 @@ public struct StaticString
     self = ""
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal init(
     _start: Builtin.RawPointer,
     utf8CodeUnitCount: Builtin.Word,
@@ -177,8 +176,7 @@ public struct StaticString
       : (0x0 as UInt8)._value
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal init(
     unicodeScalar: Builtin.Int32
   ) {

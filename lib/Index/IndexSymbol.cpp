@@ -62,9 +62,7 @@ static bool isUnitTest(const ValueDecl *D) {
     return false;
 
   // 4. ...takes no parameters...
-  if (FD->getParameterLists().size() != 2)
-    return false;
-  if (FD->getParameterList(1)->size() != 0)
+  if (FD->getParameters()->size() != 0)
     return false;
 
   // 5. ...is of at least 'internal' access (unless we can use

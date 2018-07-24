@@ -208,13 +208,14 @@ static bool wantsObjCRuntime(const llvm::Triple &triple) {
   // When updating the versions listed here, please record the most recent
   // feature being depended on and when it was introduced:
   //
-  // - The hook to override class_getImageName (macOS 10.14 and equivalent)
+  // - Make assigning 'nil' to an NSMutableDictionary subscript delete the
+  //   entry, like it does for Swift.Dictionary, rather than trap.
   if (triple.isiOS())
-    return triple.isOSVersionLT(12);
+    return triple.isOSVersionLT(9);
   if (triple.isMacOSX())
-    return triple.isMacOSXVersionLT(10, 14);
+    return triple.isMacOSXVersionLT(10, 11);
   if (triple.isWatchOS())
-    return triple.isOSVersionLT(5);
+    return false;
   llvm_unreachable("unknown Darwin OS");
 }
 

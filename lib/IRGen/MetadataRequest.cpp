@@ -1151,7 +1151,7 @@ namespace {
 
       // Collect references to the protocol descriptors.
       auto descriptorArrayTy
-        = llvm::ArrayType::get(IGF.IGM.ProtocolDescriptorPtrTy,
+        = llvm::ArrayType::get(IGF.IGM.ProtocolDescriptorRefTy,
                                protocols.size());
       Address descriptorArray = IGF.createAlloca(descriptorArrayTy,
                                                  IGF.IGM.getPointerAlignment(),
@@ -1159,12 +1159,13 @@ namespace {
       IGF.Builder.CreateLifetimeStart(descriptorArray,
                                    IGF.IGM.getPointerSize() * protocols.size());
       descriptorArray = IGF.Builder.CreateBitCast(descriptorArray,
-                               IGF.IGM.ProtocolDescriptorPtrTy->getPointerTo());
+                               IGF.IGM.ProtocolDescriptorRefTy->getPointerTo());
       
       unsigned index = 0;
       for (auto *protoTy : protocols) {
         auto *protoDecl = protoTy->getDecl();
         llvm::Value *ref = emitProtocolDescriptorRef(IGF, protoDecl);
+
         Address slot = IGF.Builder.CreateConstArrayGEP(descriptorArray,
                                                index, IGF.IGM.getPointerSize());
         IGF.Builder.CreateStore(ref, slot);

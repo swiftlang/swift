@@ -257,13 +257,15 @@ ERROR(getset_nontrivial_pattern,none,
       "getter/setter can only be defined for a single variable", ())
 ERROR(expected_rbrace_in_getset,none,
       "expected '}' at end of variable get/set clause", ())
-ERROR(duplicate_property_accessor,none,
-      "duplicate definition of %0", (StringRef))
+ERROR(duplicate_accessor,none,
+      "%select{variable|subscript}0 already has %1", (unsigned, StringRef))
+ERROR(conflicting_accessor,none,
+      "%select{variable|subscript}0 cannot provide both %1 and %2",
+      (unsigned, StringRef, StringRef))
+ERROR(modify_mutatingness_different_from_setter,none,
+      "mutating-ness of 'modify' accessor cannot differ from setter", ())
 NOTE(previous_accessor,none,
-     "previous definition of %0 is here", (StringRef))
-ERROR(conflicting_property_addressor,none,
-      "%select{variable|subscript}0 already has a "
-      "%select{addressor|mutable addressor}1", (unsigned, unsigned))
+     "%select{|previous definition of }1%0 %select{defined |}1here", (StringRef, bool))
 ERROR(expected_accessor_name,none,
       "expected %select{%error|setter|%error|willSet|didSet}0 parameter name",
       (unsigned))
@@ -278,32 +280,22 @@ ERROR(expected_lbrace_accessor,PointsToFirstBadToken,
 ERROR(expected_accessor_kw,none,
       "expected 'get', 'set', 'willSet', or 'didSet' keyword to "
       "start an accessor definition",())
-ERROR(var_set_without_get,none,
-      "variable with a setter must also have a getter", ())
-ERROR(observingproperty_with_getset,none,
-      "%select{willSet|didSet}0 variable must not also have a "
-      "%select{get|set}1 specifier", (unsigned, unsigned))
-ERROR(observingproperty_with_address,none,
-      "variable with addressor may not have %select{willSet|didSet}0",
-      (unsigned))
-ERROR(observingproperty_in_subscript,none,
-      "%select{willSet|didSet}0 is not allowed in subscripts", (unsigned))
+ERROR(missing_getter,none,
+      "%select{variable|subscript}0 with %1 must also have a getter",
+      (unsigned, StringRef))
+ERROR(missing_reading_accessor,none,
+      "%select{variable|subscript}0 with %1 must also have "
+      "a getter or an addressor",
+      (unsigned, StringRef))
+ERROR(observing_accessor_conflicts_with_accessor,none,
+      "%select{'willSet'|'didSet'}0 cannot be provided together with %1",
+      (unsigned, StringRef))
+ERROR(observing_accessor_in_subscript,none,
+      "%select{'willSet'|'didSet'}0 is not allowed in subscripts", (unsigned))
 ERROR(getset_init,none,
       "variable with getter/setter cannot have an initial value", ())
 ERROR(getset_cannot_be_implied,none,
       "variable with implied type cannot have implied getter/setter", ())
-ERROR(mutableaddressor_without_address,none,
-      "%select{variable|subscript}0 must provide either a getter or "
-      "'address' if it provides 'mutableAddress'", (unsigned))
-ERROR(mutableaddressor_with_setter,none,
-      "%select{variable|subscript}0 cannot provide both 'mutableAddress' "
-      " and a setter", (unsigned))
-ERROR(addressor_with_getter,none,
-      "%select{variable|subscript}0 cannot provide both 'address' and "
-      "a getter", (unsigned))
-ERROR(addressor_with_setter,none,
-      "%select{variable|subscript}0 cannot provide both 'address' and "
-      "a setter; use an ordinary getter instead", (unsigned))
 ERROR(behavior_multiple_vars,none,
       "applying property behavior with parameter to multiple variables is "
       "not supported", ())

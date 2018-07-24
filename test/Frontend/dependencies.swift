@@ -39,6 +39,7 @@
 // CHECK-MULTIPLE-OUTPUTS-NOT: :
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -import-objc-header %S/Inputs/dependencies/extra-header.h -emit-dependencies-path - -resolve-imports %s | %FileCheck -check-prefix=CHECK-IMPORT %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -import-objc-header %S/Inputs/dependencies/extra-header.h -track-system-dependencies -emit-dependencies-path - -resolve-imports %s | %FileCheck -check-prefix=CHECK-IMPORT-TRACK-SYSTEM %s
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -import-objc-header %S/Inputs/dependencies/extra-header.h -emit-reference-dependencies-path - -typecheck -primary-file %s | %FileCheck -check-prefix=CHECK-IMPORT-YAML %s
 
 // CHECK-IMPORT-LABEL: - :
@@ -52,6 +53,27 @@
 // CHECK-IMPORT-DAG: Foundation.swift
 // CHECK-IMPORT-DAG: CoreGraphics.swift
 // CHECK-IMPORT-NOT: :
+
+// CHECK-IMPORT-TRACK-SYSTEM-LABEL: - :
+// CHECK-IMPORT-TRACK-SYSTEM: dependencies.swift
+// CHECK-IMPORT-TRACK-SYSTEM-DAG: CoreFoundation.swift
+// CHECK-IMPORT-TRACK-SYSTEM-DAG: CoreGraphics.swift
+// CHECK-IMPORT-TRACK-SYSTEM-DAG: Foundation.swift
+// CHECK-IMPORT-TRACK-SYSTEM-DAG: ObjectiveC.swift
+// CHECK-IMPORT-TRACK-SYSTEM-DAG: Inputs/dependencies/$$$$$$$$$$.h
+// CHECK-IMPORT-TRACK-SYSTEM-DAG: Inputs/dependencies/UserClangModule.h
+// CHECK-IMPORT-TRACK-SYSTEM-DAG: Inputs/dependencies/extra-header.h
+// CHECK-IMPORT-TRACK-SYSTEM-DAG: Inputs/dependencies/module.modulemap
+// CHECK-IMPORT-TRACK-SYSTEM-DAG: swift/shims/module.modulemap
+// CHECK-IMPORT-TRACK-SYSTEM-DAG: usr/include/CoreFoundation.h
+// CHECK-IMPORT-TRACK-SYSTEM-DAG: usr/include/CoreGraphics.apinotes
+// CHECK-IMPORT-TRACK-SYSTEM-DAG: usr/include/CoreGraphics.h
+// CHECK-IMPORT-TRACK-SYSTEM-DAG: usr/include/Foundation.h
+// CHECK-IMPORT-TRACK-SYSTEM-DAG: usr/include/objc/NSObject.h
+// CHECK-IMPORT-TRACK-SYSTEM-DAG: usr/include/objc/ObjectiveC.apinotes
+// CHECK-IMPORT-TRACK-SYSTEM-DAG: usr/include/objc/module.map
+// CHECK-IMPORT-TRACK-SYSTEM-DAG: usr/include/objc/objc.h
+// CHECK-IMPORT-TRACK-SYSTEM-NOT: :
 
 // CHECK-IMPORT-YAML-LABEL: depends-external:
 // CHECK-IMPORT-YAML-NOT: dependencies.swift

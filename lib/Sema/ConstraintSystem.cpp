@@ -885,7 +885,7 @@ void ConstraintSystem::recordOpenedTypes(
 static unsigned getNumRemovedArgumentLabels(TypeChecker &TC, ValueDecl *decl,
                                             bool isCurriedInstanceReference,
                                             FunctionRefKind functionRefKind) {
-  unsigned numParameterLists = 0;
+  unsigned numParameterLists;
 
   // Enum elements with associated values have to be treated
   // as regular function values.
@@ -897,19 +897,16 @@ static unsigned getNumRemovedArgumentLabels(TypeChecker &TC, ValueDecl *decl,
   // bar.map(E.foo)
   //
   // `E.foo` has to act as a regular function type passed as a value.
-  if (!TC.getLangOpts().isSwiftVersion3()) {
-    if (auto *EED = dyn_cast<EnumElementDecl>(decl)) {
-      numParameterLists = EED->hasAssociatedValues() ? 2 : 1;
-    }
-  }
+  if (auto *EED = dyn_cast<EnumElementDecl>(decl)) {
+    numParameterLists = EED->hasAssociatedValues() ? 2 : 1;
 
   // Only applicable to functions. Nothing else should have argument labels in
   // the type.
-  if (auto func = dyn_cast<AbstractFunctionDecl>(decl))
-    numParameterLists = func->getNumParameterLists();
-
-  if (numParameterLists == 0)
+  } else if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+    numParameterLists = func->hasImplicitSelfDecl() ? 2 : 1;
+  } else {
     return 0;
+  }
 
   switch (functionRefKind) {
   case FunctionRefKind::Unapplied:
@@ -969,9 +966,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
         auto params = openedFnType->getParams();
         assert(params.size() == 1);
         Type selfTy = params.front().getType()->getRValueInstanceType();
-        openedType = openedType->replaceCovariantResultType(
-                       selfTy,
-                       func->getNumParameterLists());
+        openedType = openedType->replaceCovariantResultType(selfTy, 2);
         openedFnType = openedType->castTo<FunctionType>();
       }
     } else {
@@ -1386,9 +1381,7 @@ ConstraintSystem::getTypeOfMemberReference(
     if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
       if ((isa<FuncDecl>(func) && cast<FuncDecl>(func)->hasDynamicSelf()) ||
           (isa<ConstructorDecl>(func) && !baseObjTy->getOptionalObjectType())) {
-        openedType = openedType->replaceCovariantResultType(
-          baseObjTy,
-            func->getNumParameterLists());
+        openedType = openedType->replaceCovariantResultType(baseObjTy, 2);
       }
     }
   } else {
@@ -2008,9 +2001,14 @@ Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
       Type lookupBaseType = newBase->getWithoutSpecifierType();
 
       if (lookupBaseType->mayHaveMembers()) {
-        auto subs = lookupBaseType->getContextSubstitutionMap(
-          cs.DC->getParentModule(),
-            assocType->getDeclContext());
+        auto *proto = assocType->getProtocol();
+        auto conformance = cs.DC->getParentModule()->lookupConformance(
+          lookupBaseType, proto);
+        if (!conformance)
+          return DependentMemberType::get(lookupBaseType, assocType);
+
+        auto subs = SubstitutionMap::getProtocolSubstitutions(
+          proto, lookupBaseType, *conformance);
         auto result = assocType->getDeclaredInterfaceType().subst(subs);
 
         if (result && !result->hasError())

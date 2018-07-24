@@ -17,11 +17,12 @@ RandomTests.test("_fill(bytes:)") {
     expectEqual(bytes1, zeros)
     expectEqual(bytes2, zeros)
     
-    bytes1.withUnsafeMutableBytes { Random.default._fill(bytes: $0) }
+    var g = SystemRandomNumberGenerator()
+    bytes1.withUnsafeMutableBytes { g._fill(bytes: $0) }
     expectNotEqual(bytes1, bytes2)
     expectNotEqual(bytes1, zeros)
     
-    bytes2.withUnsafeMutableBytes { Random.default._fill(bytes: $0) }
+    bytes2.withUnsafeMutableBytes { g._fill(bytes: $0) }
     expectNotEqual(bytes1, bytes2)
     expectNotEqual(bytes2, zeros)
   }

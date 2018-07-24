@@ -1031,9 +1031,11 @@ ParserUnit::ParserUnit(SourceManager &SM, unsigned BufferID)
 }
 
 ParserUnit::ParserUnit(SourceManager &SM, unsigned BufferID,
-                       const LangOptions &LangOpts, StringRef ModuleName)
-  : Impl(*new Implementation(SM, BufferID, LangOpts, ModuleName)) {
+                       const LangOptions &LangOpts, StringRef ModuleName,
+                       SyntaxParsingCache *SyntaxCache)
+    : Impl(*new Implementation(SM, BufferID, LangOpts, ModuleName)) {
 
+  Impl.SF->SyntaxParsingCache = SyntaxCache;
   Impl.TheParser.reset(new Parser(BufferID, *Impl.SF, nullptr));
 }
 

@@ -69,7 +69,7 @@ void SILCombiner::addReachableCodeToWorklist(SILBasicBlock *BB) {
       // DCE instruction if trivially dead.
       if (isInstructionTriviallyDead(Inst)) {
         ++NumDeadInst;
-        DEBUG(llvm::dbgs() << "SC: DCE: " << *Inst << '\n');
+        LLVM_DEBUG(llvm::dbgs() << "SC: DCE: " << *Inst << '\n');
 
         // We pass in false here since we need to signal to
         // eraseInstFromFunction to not add this instruction's operands to the
@@ -108,14 +108,14 @@ void SILCombineWorklist::add(SILInstruction *I) {
   if (!WorklistMap.insert(std::make_pair(I, Worklist.size())).second)
     return;
 
-  DEBUG(llvm::dbgs() << "SC: ADD: " << *I << '\n');
+  LLVM_DEBUG(llvm::dbgs() << "SC: ADD: " << *I << '\n');
   Worklist.push_back(I);
 }
 
 bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
   MadeChange = false;
 
-  DEBUG(llvm::dbgs() << "\n\nSILCOMBINE ITERATION #" << Iteration << " on "
+  LLVM_DEBUG(llvm::dbgs() << "\n\nSILCOMBINE ITERATION #" << Iteration << " on "
                      << F.getName() << "\n");
 
   // Add reachable instructions to our worklist.
@@ -135,7 +135,7 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
 
     // Check to see if we can DCE the instruction.
     if (isInstructionTriviallyDead(I)) {
-      DEBUG(llvm::dbgs() << "SC: DCE: " << *I << '\n');
+      LLVM_DEBUG(llvm::dbgs() << "SC: DCE: " << *I << '\n');
       eraseInstFromFunction(*I);
       ++NumDeadInst;
       MadeChange = true;
@@ -146,7 +146,7 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
     if (SILValue Result = simplifyInstruction(I)) {
       ++NumSimplified;
 
-      DEBUG(llvm::dbgs() << "SC: Simplify Old = " << *I << '\n'
+      LLVM_DEBUG(llvm::dbgs() << "SC: Simplify Old = " << *I << '\n'
                          << "    New = " << *Result << '\n');
 
       // Erase the simplified instruction and any instructions that end its
@@ -170,8 +170,8 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
 #ifndef NDEBUG
     std::string OrigI;
 #endif
-    DEBUG(llvm::raw_string_ostream SS(OrigI); I->print(SS); OrigI = SS.str(););
-    DEBUG(llvm::dbgs() << "SC: Visiting: " << OrigI << '\n');
+    LLVM_DEBUG(llvm::raw_string_ostream SS(OrigI); I->print(SS); OrigI = SS.str(););
+    LLVM_DEBUG(llvm::dbgs() << "SC: Visiting: " << OrigI << '\n');
 
     if (SILInstruction *Result = visit(I)) {
       ++NumCombined;
@@ -180,7 +180,7 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
         assert(&*std::prev(SILBasicBlock::iterator(I)) == Result &&
               "Expected new instruction inserted before existing instruction!");
 
-        DEBUG(llvm::dbgs() << "SC: Old = " << *I << '\n'
+        LLVM_DEBUG(llvm::dbgs() << "SC: Old = " << *I << '\n'
                            << "    New = " << *Result << '\n');
 
         // Everything uses the new instruction now.
@@ -192,7 +192,7 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
 
         eraseInstFromFunction(*I);
       } else {
-        DEBUG(llvm::dbgs() << "SC: Mod = " << OrigI << '\n'
+        LLVM_DEBUG(llvm::dbgs() << "SC: Mod = " << OrigI << '\n'
                      << "    New = " << *I << '\n');
 
         // If the instruction was modified, it's possible that it is now dead.
@@ -213,7 +213,7 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
     // the next iteration.
     auto &TrackingList = *Builder.getTrackingList();
     for (SILInstruction *I : TrackingList) {
-      DEBUG(llvm::dbgs() << "SC: add " << *I <<
+      LLVM_DEBUG(llvm::dbgs() << "SC: add " << *I <<
             " from tracking list to worklist\n");
       Worklist.add(I);
     }
@@ -228,7 +228,7 @@ void SILCombineWorklist::addInitialGroup(ArrayRef<SILInstruction *> List) {
   assert(Worklist.empty() && "Worklist must be empty to add initial group");
   Worklist.reserve(List.size()+16);
   WorklistMap.reserve(List.size());
-  DEBUG(llvm::dbgs() << "SC: ADDING: " << List.size()
+  LLVM_DEBUG(llvm::dbgs() << "SC: ADDING: " << List.size()
         << " instrs to worklist\n");
   while (!List.empty()) {
     SILInstruction *I = List.back();
@@ -271,7 +271,7 @@ SILInstruction *SILCombiner::insertNewInstBefore(SILInstruction *New,
 void SILCombiner::replaceInstUsesWith(SingleValueInstruction &I, ValueBase *V) {
   Worklist.addUsersToWorklist(&I);   // Add all modified instrs to worklist.
 
-  DEBUG(llvm::dbgs() << "SC: Replacing " << I << "\n"
+  LLVM_DEBUG(llvm::dbgs() << "SC: Replacing " << I << "\n"
         "    with " << *V << '\n');
 
   I.replaceAllUsesWith(V);
@@ -281,7 +281,7 @@ void SILCombiner::replaceInstUsesWith(SingleValueInstruction &I, ValueBase *V) {
 /// corresponding results of the new instruction.
 void SILCombiner::replaceInstUsesPairwiseWith(SILInstruction *oldI,
                                               SILInstruction *newI) {
-  DEBUG(llvm::dbgs() << "SC: Replacing " << *oldI << "\n"
+  LLVM_DEBUG(llvm::dbgs() << "SC: Replacing " << *oldI << "\n"
         "    with " << *newI << '\n');
 
   auto oldResults = oldI->getResults();
@@ -304,7 +304,7 @@ void SILCombiner::replaceInstUsesPairwiseWith(SILInstruction *oldI,
 SILInstruction *SILCombiner::eraseInstFromFunction(SILInstruction &I,
                                             SILBasicBlock::iterator &InstIter,
                                             bool AddOperandsToWorklist) {
-  DEBUG(llvm::dbgs() << "SC: ERASE " << I << '\n');
+  LLVM_DEBUG(llvm::dbgs() << "SC: ERASE " << I << '\n');
 
   assert(onlyHaveDebugUsesOfAllResults(&I) &&
          "Cannot erase instruction that is used!");
@@ -314,7 +314,7 @@ SILInstruction *SILCombiner::eraseInstFromFunction(SILInstruction &I,
   if (I.getNumOperands() < 8 && AddOperandsToWorklist) {
     for (auto &OpI : I.getAllOperands()) {
       if (auto *Op = OpI.get()->getDefiningInstruction()) {
-        DEBUG(llvm::dbgs() << "SC: add op " << *Op <<
+        LLVM_DEBUG(llvm::dbgs() << "SC: add op " << *Op <<
               " from erased inst to worklist\n");
         Worklist.add(Op);
       }

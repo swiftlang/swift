@@ -69,7 +69,7 @@ private:
   }
 
 public:
-  CallerAnalysis(SILModule *M) : SILAnalysis(AnalysisKind::Caller), Mod(*M) {
+  CallerAnalysis(SILModule *M) : SILAnalysis(SILAnalysisKind::Caller), Mod(*M) {
     // Make sure we compute everything first time called.
     for (auto &F : Mod) {
       FuncInfos.FindAndConstruct(&F);
@@ -78,7 +78,7 @@ public:
   }
 
   static bool classof(const SILAnalysis *S) {
-    return S->getKind() == AnalysisKind::Caller;
+    return S->getKind() == SILAnalysisKind::Caller;
   }
 
   /// Invalidate all information in this analysis.
@@ -104,14 +104,14 @@ public:
     RecomputeFunctionList.insert(F);
   }
 
-  /// Notify the analysis about a newly created function.
-  virtual void notifyAddFunction(SILFunction *F) override {
+  /// Notify the analysis about a newly created or modified function.
+  virtual void notifyAddedOrModifiedFunction(SILFunction *F) override {
     RecomputeFunctionList.insert(F);
   }
 
   /// Notify the analysis about a function which will be deleted from the
   /// module.
-  virtual void notifyDeleteFunction(SILFunction *F) override {
+  virtual void notifyWillDeleteFunction(SILFunction *F) override {
     invalidateExistingCalleeRelation(F);
     RecomputeFunctionList.remove(F);
   }

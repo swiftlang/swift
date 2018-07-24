@@ -243,6 +243,10 @@ public:
   /// variables by name when we print it out. This eases diffing of SIL files.
   bool EmitSortedSIL = false;
 
+  /// Indicates whether the dependency tracker should track system
+  /// dependencies as well.
+  bool TrackSystemDeps = false;
+
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {
     Default,        ///< Do the default validation for the current platform.

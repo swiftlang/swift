@@ -138,7 +138,7 @@ public:
         range.End = range.End.getAdvancedLoc(1);
       diag.fixItRemove(range);
 
-      auto *last = FD->getParameterList(FD->getNumParameterLists() - 1);
+      auto *last = FD->getParameters();
 
       // If the declaration already has a result type, we're going
       // to change it to 'Never'.
@@ -364,11 +364,6 @@ void AttributeEarlyChecker::visitMutationAttr(DeclAttribute *attr) {
 }
 
 void AttributeEarlyChecker::visitDynamicAttr(DynamicAttr *attr) {
-  // Only instance members of classes can be dynamic.
-  auto classDecl = D->getDeclContext()->getAsClassOrClassExtensionContext();
-  if (!classDecl)
-    diagnoseAndRemoveAttr(attr, diag::dynamic_not_in_class);
-    
   // Members cannot be both dynamic and final.
   if (D->getAttrs().hasAttribute<FinalAttr>())
     diagnoseAndRemoveAttr(attr, diag::dynamic_with_final);
@@ -1120,7 +1115,7 @@ void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {
     return;
   }
 
-  auto paramList = FD->getParameterList(1);
+  auto paramList = FD->getParameters();
   bool relaxedIBActionUsedOnOSX = false;
   bool Valid = true;
   switch (paramList->size()) {
@@ -1596,12 +1591,11 @@ void AttributeChecker::visitRethrowsAttr(RethrowsAttr *attr) {
   // 'rethrows' only applies to functions that take throwing functions
   // as parameters.
   auto fn = cast<AbstractFunctionDecl>(D);
-  for (auto paramList : fn->getParameterLists()) {
-    for (auto param : *paramList)
-      if (hasThrowingFunctionParameter(param->getType()
-              ->lookThroughAllOptionalTypes()
-              ->getCanonicalType()))
-        return;
+  for (auto param : *fn->getParameters()) {
+    if (hasThrowingFunctionParameter(param->getType()
+            ->lookThroughAllOptionalTypes()
+            ->getCanonicalType()))
+      return;
   }
 
   TC.diagnose(attr->getLocation(), diag::rethrows_without_throwing_parameter);
@@ -1644,15 +1638,21 @@ void AttributeChecker::visitAccessControlAttr(AccessControlAttr *attr) {
       return;
     }
 
-    auto extAttr = extension->getAttrs().getAttribute<AccessControlAttr>();
-    if (extAttr && attr->getAccess() > extAttr->getAccess()) {
-      auto diag = TC.diagnose(attr->getLocation(),
-                              diag::access_control_ext_member_more,
-                              attr->getAccess(),
-                              D->getDescriptiveKind(),
-                              extAttr->getAccess());
-      swift::fixItAccess(diag, cast<ValueDecl>(D), extAttr->getAccess());
-      return;
+    if (auto extAttr =
+        extension->getAttrs().getAttribute<AccessControlAttr>()) {
+      // Extensions are top level declarations, for which the literally lowest
+      // access level `private` is equivalent to `fileprivate`.
+      AccessLevel extAccess = std::max(extAttr->getAccess(),
+                                       AccessLevel::FilePrivate);
+      if (attr->getAccess() > extAccess) {
+        auto diag = TC.diagnose(attr->getLocation(),
+                                diag::access_control_ext_member_more,
+                                attr->getAccess(),
+                                D->getDescriptiveKind(),
+                                extAttr->getAccess());
+        swift::fixItAccess(diag, cast<ValueDecl>(D), extAccess);
+        return;
+      }
     }
   }
 
@@ -2092,7 +2092,10 @@ void AttributeChecker::visitUsableFromInlineAttr(UsableFromInlineAttr *attr) {
   // Symbols of dynamically-dispatched declarations are never referenced
   // directly, so marking them as @usableFromInline does not make sense.
   if (VD->isDynamic()) {
-    diagnoseAndRemoveAttr(attr, diag::usable_from_inline_dynamic_not_supported);
+    if (attr->isImplicit())
+      attr->setInvalid();
+    else
+      diagnoseAndRemoveAttr(attr, diag::usable_from_inline_dynamic_not_supported);
     return;
   }
 
@@ -2709,12 +2712,6 @@ void TypeChecker::checkReferenceOwnershipAttr(VarDecl *var,
   auto isOptional = bool(underlyingType);
 
   switch (optionalityOf(ownershipKind)) {
-  case ReferenceOwnershipOptionality::AllowedIfImporting:
-    // Allow SIL to emulate importing testing and debugging.
-    if (auto sourceFile = var->getDeclContext()->getParentSourceFile())
-      if (sourceFile->Kind == SourceFileKind::SIL)
-        break;
-    LLVM_FALLTHROUGH;
   case ReferenceOwnershipOptionality::Disallowed:
     if (isOptional) {
       diagnose(var->getStartLoc(), diag::invalid_ownership_with_optional,

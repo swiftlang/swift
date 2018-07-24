@@ -26,6 +26,7 @@ extension Unicode.Scalar {
       self._value = __swift_stdlib_UChar32(bitPattern: _scalar._value)
     }
 
+    @usableFromInline
     internal var _value: __swift_stdlib_UChar32
   }
 
@@ -40,7 +41,7 @@ extension Unicode.Scalar {
 /// ICU-specific).
 extension Unicode.Scalar.Properties {
 
-  @_transparent
+  @usableFromInline @_transparent
   internal func _hasBinaryProperty(
     _ property: __swift_stdlib_UProperty
   ) -> Bool {
@@ -671,7 +672,7 @@ extension Unicode.Scalar.Properties {
   /// The UTF-16 encoding of the scalar, represented as a tuple of 2 elements.
   ///
   /// If the scalar only encodes to one code unit, the second element is zero.
-  @_transparent
+  @usableFromInline @_transparent
   internal var _utf16CodeUnits: (UTF16.CodeUnit, UTF16.CodeUnit) {
     let utf16 = UnicodeScalar(UInt32(_value))!.utf16
     return (utf16[0], utf16.count > 1 ? utf16[1] : 0)

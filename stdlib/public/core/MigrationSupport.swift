@@ -369,27 +369,6 @@ extension LazyMapCollection {
   }
 }
 
-@available(*, unavailable, message: "use += 1")
-@discardableResult
-public prefix func ++ <F: FloatingPoint>(rhs: inout F) -> F {
-  fatalError("++ is not available")
-}
-@available(*, unavailable, message: "use -= 1")
-@discardableResult
-public prefix func -- <F: FloatingPoint>(rhs: inout F) -> F {
-  fatalError("-- is not available")
-}
-@available(*, unavailable, message: "use += 1")
-@discardableResult
-public postfix func ++ <F: FloatingPoint>(lhs: inout F) -> F {
-  fatalError("++ is not available")
-}
-@available(*, unavailable, message: "use -= 1")
-@discardableResult
-public postfix func -- <F: FloatingPoint>(lhs: inout F) -> F {
-  fatalError("-- is not available")
-}
-
 extension FloatingPoint {
   @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Please use the `abs(_:)` free function")
   public static func abs(_ x: Self) -> Self {
@@ -888,6 +867,52 @@ extension UnsafeMutablePointer {
     _precondition(remainders.next() == nil, "rhs underreported its count")
     _precondition(writtenUpTo == buf.endIndex, "rhs overreported its count")
   }
+}
+
+extension Strideable {
+  @available(swift, deprecated: 3, obsoleted: 4, message: "Please use explicit type conversions or Strideable methods for mixed-type arithmetics.")
+  public static func + (lhs: Self, rhs: Self.Stride) -> Self {
+    return lhs.advanced(by: rhs)
+  }
+
+  @available(swift, deprecated: 3, obsoleted: 4, message: "Please use explicit type conversions or Strideable methods for mixed-type arithmetics.")
+  public static func + (lhs: Self.Stride, rhs: Self) -> Self {
+    return rhs.advanced(by: lhs)
+  }
+
+  @available(swift, deprecated: 3, obsoleted: 4, message: "Please use explicit type conversions or Strideable methods for mixed-type arithmetics.")
+  public static func - (lhs: Self, rhs: Self.Stride) -> Self {
+    return lhs.advanced(by: -rhs)
+  }
+
+  @available(swift, deprecated: 3, obsoleted: 4, message: "Please use explicit type conversions or Strideable methods for mixed-type arithmetics.")
+  public static func - (lhs: Self, rhs: Self) -> Self.Stride {
+    return rhs.distance(to: lhs)
+  }
+
+  @available(swift, deprecated: 3, obsoleted: 4, message: "Please use explicit type conversions or Strideable methods for mixed-type arithmetics.")
+  public static func += (lhs: inout Self, rhs: Self.Stride) {
+    lhs = lhs.advanced(by: rhs)
+  }
+
+  @available(swift, deprecated: 3, obsoleted: 4, message: "Please use explicit type conversions or Strideable methods for mixed-type arithmetics.")
+  public static func -= (lhs: inout Self, rhs: Self.Stride) {
+    lhs = lhs.advanced(by: -rhs)
+  }
+}
+
+extension UnsafeMutableRawPointer {
+  @available(*, unavailable, renamed: "init(mutating:)")
+  public init(_ from : UnsafeRawPointer) { Builtin.unreachable() }
+
+  @available(*, unavailable, renamed: "init(mutating:)")
+  public init?(_ from : UnsafeRawPointer?) { Builtin.unreachable() }
+
+  @available(*, unavailable, renamed: "init(mutating:)")
+  public init<T>(_ from : UnsafePointer<T>) { Builtin.unreachable() }
+
+  @available(*, unavailable, renamed: "init(mutating:)")
+  public init?<T>(_ from : UnsafePointer<T>?) { Builtin.unreachable() }
 }
 
 extension UnsafeRawPointer : _CustomPlaygroundQuickLookable {

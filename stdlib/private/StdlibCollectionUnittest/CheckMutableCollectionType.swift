@@ -76,7 +76,7 @@ public func withInvalidOrderings(_ body: (@escaping (Int, Int) -> Bool) -> Void)
 
 internal func _mapInPlace<C : MutableCollection>(
   _ elements: inout C,
-  _ transform: (C.Iterator.Element) -> C.Iterator.Element
+  _ transform: (C.Element) -> C.Element
 ) {
   for i in elements.indices {
     elements[i] = transform(elements[i])
@@ -102,17 +102,17 @@ extension TestSuite {
     CollectionWithComparableElement : MutableCollection
   >(
     _ testNamePrefix: String = "",
-    makeCollection: @escaping ([C.Iterator.Element]) -> C,
-    wrapValue: @escaping (OpaqueValue<Int>) -> C.Iterator.Element,
-    extractValue: @escaping (C.Iterator.Element) -> OpaqueValue<Int>,
+    makeCollection: @escaping ([C.Element]) -> C,
+    wrapValue: @escaping (OpaqueValue<Int>) -> C.Element,
+    extractValue: @escaping (C.Element) -> OpaqueValue<Int>,
 
-    makeCollectionOfEquatable: @escaping ([CollectionWithEquatableElement.Iterator.Element]) -> CollectionWithEquatableElement,
-    wrapValueIntoEquatable: @escaping (MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
-    extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
+    makeCollectionOfEquatable: @escaping ([CollectionWithEquatableElement.Element]) -> CollectionWithEquatableElement,
+    wrapValueIntoEquatable: @escaping (MinimalEquatableValue) -> CollectionWithEquatableElement.Element,
+    extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Element) -> MinimalEquatableValue),
 
-    makeCollectionOfComparable: @escaping ([CollectionWithComparableElement.Iterator.Element]) -> CollectionWithComparableElement,
-    wrapValueIntoComparable: @escaping (MinimalComparableValue) -> CollectionWithComparableElement.Iterator.Element,
-    extractValueFromComparable: @escaping ((CollectionWithComparableElement.Iterator.Element) -> MinimalComparableValue),
+    makeCollectionOfComparable: @escaping ([CollectionWithComparableElement.Element]) -> CollectionWithComparableElement,
+    wrapValueIntoComparable: @escaping (MinimalComparableValue) -> CollectionWithComparableElement.Element,
+    extractValueFromComparable: @escaping ((CollectionWithComparableElement.Element) -> MinimalComparableValue),
 
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1,
@@ -121,8 +121,8 @@ extension TestSuite {
     isFixedLengthCollection: Bool,
     collectionIsBidirectional: Bool = false
   ) where
-    CollectionWithEquatableElement.Iterator.Element : Equatable,
-    CollectionWithComparableElement.Iterator.Element : Comparable {
+    CollectionWithEquatableElement.Element : Equatable,
+    CollectionWithComparableElement.Element : Comparable {
 
     var testNamePrefix = testNamePrefix
 
@@ -474,7 +474,7 @@ func checkSortedPredicateThrow(
     zip(sequence, 0..<sequence.count).map {
       OpaqueValue($0, identity: $1)
     }
-  var result: [C.Iterator.Element] = []
+  var result: [C.Element] = []
   let c = makeWrappedCollection(elements)
   let closureLifetimeTracker = LifetimeTracked(0)
   do {
@@ -842,17 +842,17 @@ self.test("\(testNamePrefix).partition/InvalidOrderings") {
     CollectionWithComparableElement : BidirectionalCollection & MutableCollection
   >(
     _ testNamePrefix: String = "",
-    makeCollection: @escaping ([C.Iterator.Element]) -> C,
-    wrapValue: @escaping (OpaqueValue<Int>) -> C.Iterator.Element,
-    extractValue: @escaping (C.Iterator.Element) -> OpaqueValue<Int>,
+    makeCollection: @escaping ([C.Element]) -> C,
+    wrapValue: @escaping (OpaqueValue<Int>) -> C.Element,
+    extractValue: @escaping (C.Element) -> OpaqueValue<Int>,
 
-    makeCollectionOfEquatable: @escaping ([CollectionWithEquatableElement.Iterator.Element]) -> CollectionWithEquatableElement,
-    wrapValueIntoEquatable: @escaping (MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
-    extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
+    makeCollectionOfEquatable: @escaping ([CollectionWithEquatableElement.Element]) -> CollectionWithEquatableElement,
+    wrapValueIntoEquatable: @escaping (MinimalEquatableValue) -> CollectionWithEquatableElement.Element,
+    extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Element) -> MinimalEquatableValue),
 
-    makeCollectionOfComparable: @escaping ([CollectionWithComparableElement.Iterator.Element]) -> CollectionWithComparableElement,
-    wrapValueIntoComparable: @escaping (MinimalComparableValue) -> CollectionWithComparableElement.Iterator.Element,
-    extractValueFromComparable: @escaping ((CollectionWithComparableElement.Iterator.Element) -> MinimalComparableValue),
+    makeCollectionOfComparable: @escaping ([CollectionWithComparableElement.Element]) -> CollectionWithComparableElement,
+    wrapValueIntoComparable: @escaping (MinimalComparableValue) -> CollectionWithComparableElement.Element,
+    extractValueFromComparable: @escaping ((CollectionWithComparableElement.Element) -> MinimalComparableValue),
 
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1,
@@ -860,8 +860,8 @@ self.test("\(testNamePrefix).partition/InvalidOrderings") {
     withUnsafeMutableBufferPointerIsSupported: Bool,
     isFixedLengthCollection: Bool
   ) where
-    CollectionWithEquatableElement.Iterator.Element : Equatable,
-    CollectionWithComparableElement.Iterator.Element : Comparable {
+    CollectionWithEquatableElement.Element : Equatable,
+    CollectionWithComparableElement.Element : Comparable {
 
     var testNamePrefix = testNamePrefix
 
@@ -986,17 +986,17 @@ self.test("\(testNamePrefix).partition/DispatchesThrough_withUnsafeMutableBuffer
     CollectionWithComparableElement : RandomAccessCollection & MutableCollection
   >(
     _ testNamePrefix: String = "",
-    makeCollection: @escaping ([C.Iterator.Element]) -> C,
-    wrapValue: @escaping (OpaqueValue<Int>) -> C.Iterator.Element,
-    extractValue: @escaping (C.Iterator.Element) -> OpaqueValue<Int>,
+    makeCollection: @escaping ([C.Element]) -> C,
+    wrapValue: @escaping (OpaqueValue<Int>) -> C.Element,
+    extractValue: @escaping (C.Element) -> OpaqueValue<Int>,
 
-    makeCollectionOfEquatable: @escaping ([CollectionWithEquatableElement.Iterator.Element]) -> CollectionWithEquatableElement,
-    wrapValueIntoEquatable: @escaping (MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
-    extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
+    makeCollectionOfEquatable: @escaping ([CollectionWithEquatableElement.Element]) -> CollectionWithEquatableElement,
+    wrapValueIntoEquatable: @escaping (MinimalEquatableValue) -> CollectionWithEquatableElement.Element,
+    extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Element) -> MinimalEquatableValue),
 
-    makeCollectionOfComparable: @escaping ([CollectionWithComparableElement.Iterator.Element]) -> CollectionWithComparableElement,
-    wrapValueIntoComparable: @escaping (MinimalComparableValue) -> CollectionWithComparableElement.Iterator.Element,
-    extractValueFromComparable: @escaping ((CollectionWithComparableElement.Iterator.Element) -> MinimalComparableValue),
+    makeCollectionOfComparable: @escaping ([CollectionWithComparableElement.Element]) -> CollectionWithComparableElement,
+    wrapValueIntoComparable: @escaping (MinimalComparableValue) -> CollectionWithComparableElement.Element,
+    extractValueFromComparable: @escaping ((CollectionWithComparableElement.Element) -> MinimalComparableValue),
 
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1,
@@ -1004,8 +1004,8 @@ self.test("\(testNamePrefix).partition/DispatchesThrough_withUnsafeMutableBuffer
     withUnsafeMutableBufferPointerIsSupported: Bool,
     isFixedLengthCollection: Bool
   ) where
-    CollectionWithEquatableElement.Iterator.Element : Equatable,
-    CollectionWithComparableElement.Iterator.Element : Comparable {
+    CollectionWithEquatableElement.Element : Equatable,
+    CollectionWithComparableElement.Element : Comparable {
 
     var testNamePrefix = testNamePrefix
 

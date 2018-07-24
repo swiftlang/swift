@@ -50,10 +50,6 @@ bool DependentGenericTypeResolver::areSameType(Type type1, Type type2) {
   return true;
 }
 
-void DependentGenericTypeResolver::recordParamType(ParamDecl *decl, Type type) {
-  // Do nothing
-}
-
 Type GenericTypeToArchetypeResolver::mapTypeIntoContext(Type type) {
   return GenericEnvironment::mapTypeIntoContext(GenericEnv, type);
 }
@@ -68,19 +64,6 @@ Type GenericTypeToArchetypeResolver::resolveDependentMemberType(
 
 bool GenericTypeToArchetypeResolver::areSameType(Type type1, Type type2) {
   return type1->isEqual(type2);
-}
-
-void GenericTypeToArchetypeResolver::recordParamType(ParamDecl *decl, Type type) {
-  decl->setType(type);
-
-  // When type checking a closure or subscript index, this is the only
-  // resolver that runs, so make sure we also set the interface type,
-  // if one was not already set.
-  //
-  // When type checking functions, the CompleteGenericTypeResolver sets
-  // the interface type.
-  if (!decl->hasInterfaceType())
-    decl->setInterfaceType(type->mapTypeOutOfContext());
 }
 
 Type ProtocolRequirementTypeResolver::mapTypeIntoContext(Type type) {
@@ -110,19 +93,16 @@ bool ProtocolRequirementTypeResolver::areSameType(Type type1, Type type2) {
   return areSameType(depMem1->getBase(), depMem2->getBase());
 }
 
-void ProtocolRequirementTypeResolver::recordParamType(ParamDecl *decl,
-                                                      Type type) {
-  llvm_unreachable(
-      "recording a param type of a protocol requirement doesn't make sense");
-}
-
 CompleteGenericTypeResolver::CompleteGenericTypeResolver(
                                               TypeChecker &tc,
                                               GenericSignature *genericSig)
-  : tc(tc), genericSig(genericSig),
-    builder(*tc.Context.getOrCreateGenericSignatureBuilder(
-                               genericSig->getCanonicalSignature()))
-{
+  : tc(tc), genericSig(genericSig) {
+  if (genericSig) {
+    builder = tc.Context.getOrCreateGenericSignatureBuilder(
+      genericSig->getCanonicalSignature());
+  } else {
+    builder = nullptr;
+  }
 }
 
 Type CompleteGenericTypeResolver::mapTypeIntoContext(Type type) {
@@ -135,14 +115,14 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
                                     SourceRange baseRange,
                                     ComponentIdentTypeRepr *ref) {
   auto baseEquivClass =
-    builder.resolveEquivalenceClass(
+    builder->resolveEquivalenceClass(
                                 baseTy,
                                 ArchetypeResolutionKind::CompleteWellFormed);
   assert(baseEquivClass && "Unknown base type?");
 
   // Look for a nested type with the given name.
   if (auto nestedType =
-          baseEquivClass->lookupNestedType(builder, ref->getIdentifier())) {
+          baseEquivClass->lookupNestedType(*builder, ref->getIdentifier())) {
     // Record the type we found.
     ref->setValue(nestedType, nullptr);
   } else {
@@ -153,7 +133,7 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
     tc.performTypoCorrection(DC, DeclRefKind::Ordinary,
                              MetatypeType::get(baseTy),
                              NameLookupFlags::ProtocolMembers,
-                             corrections, &builder);
+                             corrections, builder);
 
     // Check whether we have a single type result.
     auto singleType = cast_or_null<TypeDecl>(
@@ -220,9 +200,11 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
       return concrete->getDeclaredInterfaceType().subst(subMap);
     }
 
-    if (auto superclass = baseEquivClass->superclass) {
-      return superclass->getTypeOfMember(
-                                       DC->getParentModule(), concrete,
+    Type baseType = baseEquivClass->concreteType ? baseEquivClass->concreteType
+                                                 : baseEquivClass->superclass;
+
+    if (baseType) {
+      return baseType->getTypeOfMember(DC->getParentModule(), concrete,
                                        concrete->getDeclaredInterfaceType());
     }
 
@@ -235,11 +217,6 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
 bool CompleteGenericTypeResolver::areSameType(Type type1, Type type2) {
   return genericSig->getCanonicalTypeInContext(type1)
            == genericSig->getCanonicalTypeInContext(type2);
-}
-
-void
-CompleteGenericTypeResolver::recordParamType(ParamDecl *decl, Type type) {
-  decl->setInterfaceType(type);
 }
 
 ///
@@ -538,17 +515,16 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
                          &resolver);
 
   // Check the parameter patterns.
-  for (auto params : func->getParameterLists()) {
-    // Check the pattern.
-    if (tc.typeCheckParameterList(params, func, TypeResolutionOptions(),
-                                  resolver))
-      badType = true;
+  auto params = func->getParameters();
 
-    // Infer requirements from the pattern.
-    if (builder) {
-      builder->inferRequirements(*func->getParentModule(), params,
-                                 genericParams);
-    }
+  if (tc.typeCheckParameterList(params, func, TypeResolutionOptions(),
+                                resolver))
+    badType = true;
+
+  // Infer requirements from the pattern.
+  if (builder) {
+    builder->inferRequirements(*func->getParentModule(), params,
+                               genericParams);
   }
 
   // If there is a declared result type, check that as well.
@@ -599,18 +575,15 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
   return badType;
 }
 
-void TypeChecker::revertGenericFuncSignature(AbstractFunctionDecl *func) {
+static void revertGenericFuncSignature(AbstractFunctionDecl *func) {
   // Revert the result type.
   if (auto fn = dyn_cast<FuncDecl>(func))
     if (!fn->getBodyResultTypeLoc().isNull())
       revertDependentTypeLoc(fn->getBodyResultTypeLoc());
 
   // Revert the body parameter types.
-  for (auto paramList : func->getParameterLists()) {
-    for (auto &param : *paramList) {
-      revertDependentTypeLoc(param->getTypeLoc());
-    }
-  }
+  for (auto &param : *func->getParameters())
+    revertDependentTypeLoc(param->getTypeLoc());
 }
 
 /// Determine whether the given type is \c Self, an associated type of \c Self,
@@ -832,12 +805,17 @@ static void checkReferencedGenericParams(GenericContext *dc,
   }
 }
 
-GenericSignature *
-TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
+void TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   bool invalid = false;
+
+  if (auto *selfDecl = func->getImplicitSelfDecl())
+    invalid |= selfDecl->getInterfaceType()->hasError();
+
+  auto *dc = func->getDeclContext();
 
   GenericSignature *sig;
   if (auto gp = func->getGenericParams()) {
+    gp->setOuterParameters(dc->getGenericParamsOfContext());
     prepareGenericParamList(gp, func);
 
     // Create the generic signature builder.
@@ -857,8 +835,7 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
     // there might still be errors that have not yet been diagnosed. Revert the
     // generic function signature and type-check it again, completely.
     revertGenericFuncSignature(func);
-    if (gp)
-      revertGenericParamList(gp);
+    revertGenericParamList(gp);
 
     // Debugging of the generic signature.
     if (Context.LangOpts.DebugGenericSignatures) {
@@ -871,9 +848,19 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
       sig->getCanonicalSignature()->print(llvm::errs());
       llvm::errs() << "\n";
     }
+
+    GenericEnvironment *env;
+    if (auto accessor = dyn_cast<AccessorDecl>(func)) {
+      env = cast<SubscriptDecl>(accessor->getStorage())->getGenericEnvironment();
+      assert(env && "accessor has generics but subscript is not generic");
+    } else {
+      env = sig->createGenericEnvironment();
+    }
+    func->setGenericEnvironment(env);
   } else {
     // Inherit the signature of our environment.
-    sig = func->getDeclContext()->getGenericSignatureOfContext();
+    sig = dc->getGenericSignatureOfContext();
+    func->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
   }
 
   CompleteGenericTypeResolver completeResolver(*this, sig);
@@ -886,8 +873,7 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   if (invalid) {
     func->setInterfaceType(ErrorType::get(Context));
     func->setInvalid();
-    // null doesn't mean error here: callers still expect the signature.
-    return sig;
+    return;
   }
 
   configureInterfaceType(func, sig);
@@ -896,30 +882,31 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   // dependent types in the generic signature.
   assert(func->getInterfaceType()->hasError() ||
          !func->getInterfaceType()->findUnresolvedDependentMemberType());
-
-  return sig;
 }
 
 void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func,
                                          GenericSignature *sig) {
-  Type funcTy;
-  Type initFuncTy = Type();
+  bool hasSelf = func->hasImplicitSelfDecl();
 
+  // Result
+  Type resultTy;
   if (auto fn = dyn_cast<FuncDecl>(func)) {
-    funcTy = fn->getBodyResultTypeLoc().getType();
-    if (!funcTy)
-      funcTy = TupleType::getEmpty(Context);
+    resultTy = fn->getBodyResultTypeLoc().getType();
+    if (!resultTy)
+      resultTy = TupleType::getEmpty(Context);
 
   } else if (auto ctor = dyn_cast<ConstructorDecl>(func)) {
     auto *dc = ctor->getDeclContext();
 
-    funcTy = dc->getSelfInterfaceType();
-    if (!funcTy)
-      funcTy = ErrorType::get(Context);
+    if (hasSelf)
+      resultTy = dc->getSelfInterfaceType();
+
+    if (!resultTy)
+      resultTy = ErrorType::get(Context);
 
     // Adjust result type for failability.
     if (ctor->getFailability() != OTK_None)
-      funcTy = OptionalType::get(funcTy);
+      resultTy = OptionalType::get(resultTy);
 
     // Set the IUO attribute on the decl if this was declared with !.
     if (ctor->getFailability() == OTK_ImplicitlyUnwrappedOptional) {
@@ -927,75 +914,61 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func,
           new (Context) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true);
       ctor->getAttrs().add(forceAttr);
     }
-
-    initFuncTy = funcTy;
   } else {
     assert(isa<DestructorDecl>(func));
-    funcTy = TupleType::getEmpty(Context);
+    resultTy = TupleType::getEmpty(Context);
   }
 
-  auto paramLists = func->getParameterLists();
-  SmallVector<ParameterList*, 4> storedParamLists;
+  // (Args...) -> Result
+  Type funcTy;
 
-  // FIXME: Destructors don't have the '()' pattern in their signature, so
-  // paste it here.
-  if (isa<DestructorDecl>(func)) {
-    assert(paramLists.size() == 1 && "Only the self paramlist");
-    storedParamLists.push_back(paramLists[0]);
-    storedParamLists.push_back(ParameterList::createEmpty(Context));
-    paramLists = storedParamLists;
-  }
-
-  bool hasSelf = func->getDeclContext()->isTypeContext();
-  for (unsigned i = 0, e = paramLists.size(); i != e; ++i) {
+  {
     SmallVector<AnyFunctionType::Param, 4> argTy;
-    SmallVector<AnyFunctionType::Param, 4> initArgTy;
-    
-    if (i == e-1 && hasSelf) {      
-      // Substitute in our own 'self' parameter.
-      
-      argTy.push_back(computeSelfParam(func));
-      if (initFuncTy) {
-        initArgTy.push_back(computeSelfParam(func, /*isInitializingCtor=*/true));
-      }
-    } else {
-      AnyFunctionType::decomposeInput(paramLists[e - i - 1]->getInterfaceType(Context), argTy);
-
-      if (initFuncTy)
-        initArgTy = argTy;
-    }
+    AnyFunctionType::decomposeInput(
+      func->getParameters()->getInterfaceType(Context), argTy);
 
     // 'throws' only applies to the innermost function.
     AnyFunctionType::ExtInfo info;
-    if (i == 0) {
-      info = info.withThrows(func->hasThrows());
-      // Defer bodies must not escape.
-      if (auto fd = dyn_cast<FuncDecl>(func))
-        info = info.withNoEscape(fd->isDeferBody());
-    }
-    
-    assert(std::all_of(argTy.begin(), argTy.end(), [](const AnyFunctionType::Param &aty){
-      return !aty.getType()->hasArchetype();
-    }));
-    assert(!funcTy->hasArchetype());
-    if (initFuncTy)
-      assert(!initFuncTy->hasArchetype());
+    info = info.withThrows(func->hasThrows());
+    // Defer bodies must not escape.
+    if (auto fd = dyn_cast<FuncDecl>(func))
+      info = info.withNoEscape(fd->isDeferBody());
 
-    if (sig && i == e-1) {
-      funcTy = GenericFunctionType::get(sig, argTy, funcTy, info);
-      if (initFuncTy)
-        initFuncTy = GenericFunctionType::get(sig, initArgTy, initFuncTy, info);
+    if (sig && !hasSelf) {
+      funcTy = GenericFunctionType::get(sig, argTy, resultTy, info);
     } else {
+      funcTy = FunctionType::get(argTy, resultTy, info);
+    }
+  }
+
+  Type initFuncTy;
+
+  // (Self) -> (Args...) -> Result
+  if (hasSelf) {
+    SmallVector<AnyFunctionType::Param, 1> argTy;
+    SmallVector<AnyFunctionType::Param, 1> initArgTy;
+
+    // Substitute in our own 'self' parameter.
+    argTy.push_back(computeSelfParam(func));
+    if (isa<ConstructorDecl>(func))
+      initArgTy.push_back(computeSelfParam(func, /*isInitializingCtor=*/true));
+
+    AnyFunctionType::ExtInfo info;
+    if (sig) {
+      if (isa<ConstructorDecl>(func))
+        initFuncTy = GenericFunctionType::get(sig, initArgTy, funcTy, info);
+      funcTy = GenericFunctionType::get(sig, argTy, funcTy, info);
+    } else {
+      if (isa<ConstructorDecl>(func))
+        initFuncTy = FunctionType::get(initArgTy, funcTy, info);
       funcTy = FunctionType::get(argTy, funcTy, info);
-      if (initFuncTy)
-        initFuncTy = FunctionType::get(initArgTy, initFuncTy, info);
     }
   }
 
   // Record the interface type.
   func->setInterfaceType(funcTy);
-  if (initFuncTy)
-    cast<ConstructorDecl>(func)->setInitializerInterfaceType(initFuncTy);
+  if (auto *ctor = dyn_cast<ConstructorDecl>(func))
+    ctor->setInitializerInterfaceType(initFuncTy);
 
   // We get bogus errors here with generic subscript materializeForSet.
   if (!isa<AccessorDecl>(func) ||
@@ -1059,7 +1032,7 @@ static bool checkGenericSubscriptSignature(TypeChecker &tc,
   return badType;
 }
 
-void TypeChecker::revertGenericSubscriptSignature(SubscriptDecl *subscript) {
+static void revertGenericSubscriptSignature(SubscriptDecl *subscript) {
   // Revert the element type.
   if (!subscript->getElementTypeLoc().isNull())
     revertDependentTypeLoc(subscript->getElementTypeLoc());
@@ -1069,12 +1042,15 @@ void TypeChecker::revertGenericSubscriptSignature(SubscriptDecl *subscript) {
     revertDependentTypeLoc(param->getTypeLoc());
 }
 
-GenericSignature *
+void
 TypeChecker::validateGenericSubscriptSignature(SubscriptDecl *subscript) {
   bool invalid = false;
 
+  auto *dc = subscript->getDeclContext();
+
   GenericSignature *sig;
   if (auto *gp = subscript->getGenericParams()) {
+    gp->setOuterParameters(dc->getGenericParamsOfContext());
     prepareGenericParamList(gp, subscript);
 
     // Create the generic signature builder.
@@ -1109,9 +1085,12 @@ TypeChecker::validateGenericSubscriptSignature(SubscriptDecl *subscript) {
       sig->getCanonicalSignature()->print(llvm::errs());
       llvm::errs() << "\n";
     }
+
+    subscript->setGenericEnvironment(sig->createGenericEnvironment());
   } else {
     // Inherit the signature of our environment.
-    sig = subscript->getDeclContext()->getGenericSignatureOfContext();
+    sig = dc->getGenericSignatureOfContext();
+    subscript->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
   }
 
   CompleteGenericTypeResolver completeResolver(*this, sig);
@@ -1125,11 +1104,10 @@ TypeChecker::validateGenericSubscriptSignature(SubscriptDecl *subscript) {
     subscript->setInterfaceType(ErrorType::get(Context));
     subscript->setInvalid();
     // null doesn't mean error here: callers still expect the signature.
-    return sig;
+    return;
   }
 
   configureInterfaceType(subscript, sig);
-  return sig;
 }
 
 void TypeChecker::configureInterfaceType(SubscriptDecl *subscript,
@@ -1333,6 +1311,8 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
   SmallVector<RequirementSet, 8> pendingReqs;
   pendingReqs.push_back({requirements, {}});
 
+  auto *env = dc->getGenericEnvironmentOfContext();
+
   while (!pendingReqs.empty()) {
     auto current = pendingReqs.pop_back_val();
 
@@ -1352,10 +1332,21 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
       auto kind = req.getKind();
       Type rawFirstType = rawReq.getFirstType();
       Type firstType = req.getFirstType();
+      if (firstType->hasTypeParameter()) {
+        if (!env)
+          continue;
+        firstType = env->mapTypeIntoContext(firstType);
+      }
+
       Type rawSecondType, secondType;
       if (kind != RequirementKind::Layout) {
         rawSecondType = rawReq.getSecondType();
         secondType = req.getSecondType();
+        if (secondType->hasTypeParameter()) {
+          if (!env)
+            continue;
+          secondType = env->mapTypeIntoContext(secondType);
+        }
       }
 
       // Don't do further checking on error types.

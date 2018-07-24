@@ -7692,11 +7692,17 @@ public:
     }
   }
 
+  /// Returns true if \p oper is an argument operand and not the callee
+  /// operand.
+  bool isArgumentOperand(const Operand &oper) {
+    return oper.getOperandNumber() >= getOperandIndexOfFirstArgument();
+  }
+
   // Translate the index of the argument to the full apply or partial_apply into
   // to the corresponding index into the arguments of the called function.
   unsigned getCalleeArgIndex(const Operand &oper) {
     assert(oper.getUser() == Inst);
-    assert(oper.getOperandNumber() >= getOperandIndexOfFirstArgument());
+    assert(isArgumentOperand(oper));
 
     unsigned appliedArgIdx =
         oper.getOperandNumber() - getOperandIndexOfFirstArgument();

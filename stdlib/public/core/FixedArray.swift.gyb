@@ -79,8 +79,7 @@ extension _FixedArray${N} : RandomAccessCollection, MutableCollection {
     get {
       let count = self.count // for exclusive access
       _sanityCheck(i >= 0 && i < count)
-      var copy = storage
-      let res: T = withUnsafeBytes(of: &copy) {
+      let res: T = withUnsafeBytes(of: storage) {
         (rawPtr : UnsafeRawBufferPointer) -> T in
         let stride = MemoryLayout<T>.stride
         _sanityCheck(rawPtr.count == ${N}*stride, "layout mismatch?")

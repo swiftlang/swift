@@ -851,7 +851,7 @@ public protocol UnkeyedEncodingContainer {
   /// - parameter sequence: The sequences whose contents to encode.
   /// - throws: An error if any of the contained values throws an error.
   mutating func encode<T : Sequence>(
-    contentsOf sequence: T) throws where T.Iterator.Element == ${type}
+    contentsOf sequence: T) throws where T.Element == ${type}
 % end
 
   /// Encodes the elements of the given sequence.
@@ -859,7 +859,7 @@ public protocol UnkeyedEncodingContainer {
   /// - parameter sequence: The sequences whose contents to encode.
   /// - throws: An error if any of the contained values throws an error.
   mutating func encode<T : Sequence>(
-    contentsOf sequence: T) throws where T.Iterator.Element : Encodable
+    contentsOf sequence: T) throws where T.Element : Encodable
 
   /// Encodes a nested container keyed by the given type and returns it.
   ///
@@ -2138,7 +2138,7 @@ public extension UnkeyedEncodingContainer {
 % for type in codable_types:
   @inlinable // FIXME(sil-serialize-all)
   public mutating func encode<T : Sequence>(
-    contentsOf sequence: T) throws where T.Iterator.Element == ${type}
+    contentsOf sequence: T) throws where T.Element == ${type}
   {
     for element in sequence {
       try self.encode(element)
@@ -2148,7 +2148,7 @@ public extension UnkeyedEncodingContainer {
 
   @inlinable // FIXME(sil-serialize-all)
   public mutating func encode<T : Sequence>(
-    contentsOf sequence: T) throws where T.Iterator.Element : Encodable
+    contentsOf sequence: T) throws where T.Element : Encodable
   {
     for element in sequence {
       try self.encode(element)

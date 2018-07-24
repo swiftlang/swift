@@ -86,7 +86,6 @@ areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
   // Bail out conservatively if this isn't a function declaration.
   auto fn = dyn_cast<AbstractFunctionDecl>(decl);
   if (!fn) return true;
-  assert(parameterDepth < fn->getNumParameterLists());
   
   auto *fTy = fn->getInterfaceType()->castTo<AnyFunctionType>();
   
@@ -664,11 +663,8 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
     // Check if exactly one argument was passed to this function, otherwise
     // we obviously have a mismatch.
     if (auto tupleArgType = dyn_cast<TupleType>(argType.getPointer())) {
-      // Total hack: In Swift 3 mode, argument labels are ignored when calling
-      // function type with a single Any parameter.
       if (tupleArgType->getNumElements() != 1 ||
-          (!cs.getASTContext().isSwiftVersion3() &&
-           tupleArgType->getElement(0).hasName())) {
+          tupleArgType->getElement(0).hasName()) {
         return cs.getTypeMatchFailure(locator);
       }
     }
@@ -704,21 +700,6 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
   llvm::SmallBitVector defaultMap =
     computeDefaultMap(params, callee, calleeLevel);
   
-  if (callee && cs.getASTContext().isSwiftVersion3()
-      && argType->is<TupleType>()) {
-    // Hack: In Swift 3 mode, accept `foo(x, y)` for `foo((x, y))` when the
-    // callee is a function-typed property or an enum constructor whose
-    // argument is a single unlabeled type parameter.
-    if (auto *prop = dyn_cast<VarDecl>(callee)) {
-      auto *fnType = prop->getInterfaceType()->getAs<AnyFunctionType>();
-      if (fnType && fnType->getInput()->isTypeParameter())
-        argType = ParenType::get(cs.getASTContext(), argType);
-    } else if (auto *enumCtor = dyn_cast<EnumElementDecl>(callee)) {
-      if (enumCtor->getArgumentInterfaceType()->isTypeParameter())
-        argType = ParenType::get(cs.getASTContext(), argType);
-    }
-  }
-
   // Extract the arguments.
   auto args = decomposeArgType(argType, argLabels);
   
@@ -1154,7 +1135,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   // arity).
   auto func1Input = func1->getInput();
   auto func2Input = func2->getInput();
-  if (!getASTContext().isSwiftVersion3()) {
+  {
     SmallVector<LocatorPathElt, 4> path;
     locator.getLocatorParts(path);
 
@@ -1573,13 +1554,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // types of two function types, we have to be careful to preserve
   // ParenType sugar.
   bool isArgumentTupleMatch = isArgumentTupleConversion;
-  bool isSwiftVersion3 = getASTContext().isSwiftVersion3();
 
-  // ... but not in Swift 3 mode, where this behavior was broken.
-  if (!isSwiftVersion3)
-    if (auto elt = locator.last())
-      if (elt->getKind() == ConstraintLocator::FunctionArgument)
-        isArgumentTupleMatch = true;
+  if (auto elt = locator.last())
+    if (elt->getKind() == ConstraintLocator::FunctionArgument)
+      isArgumentTupleMatch = true;
 
   // If we have type variables that have been bound to fixed types, look through
   // to the fixed type.
@@ -1591,8 +1569,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   auto desugar1 = type1->getDesugaredType();
   auto desugar2 = type2->getDesugaredType();
   TypeVariableType *typeVar1, *typeVar2;
-  if (isArgumentTupleMatch &&
-      !isSwiftVersion3) {
+  if (isArgumentTupleMatch) {
     typeVar1 = dyn_cast<TypeVariableType>(type1.getPointer());
     typeVar2 = dyn_cast<TypeVariableType>(type2.getPointer());
 
@@ -1777,8 +1754,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     return formUnsolvedResult();
   }
 
-  if (isArgumentTupleMatch &&
-      !isSwiftVersion3) {
+  if (isArgumentTupleMatch) {
     if (!typeVar1 && !typeVar2) {
       if (type1->hasParenSugar() != type2->hasParenSugar()) {
         return getTypeMatchFailure(locator);
@@ -2316,7 +2292,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     if (auto *lvt = type1->getAs<LValueType>()) {
       if (auto *iot = type2->getAs<InOutType>()) {
         return matchTypes(lvt->getObjectType(), iot->getObjectType(),
-                          kind, subflags,
+                          ConstraintKind::Equal, subflags,
                           locator.withPathElement(
                                   ConstraintLocator::LValueConversion));
       }
@@ -2853,7 +2829,6 @@ ConstraintSystem::simplifyCheckedCastConstraint(
 
   case CheckedCastKind::Coercion:
   case CheckedCastKind::BridgingCoercion:
-  case CheckedCastKind::Swift3BridgingDowncast:
   case CheckedCastKind::Unresolved:
     llvm_unreachable("Not a valid result");
   }
@@ -3750,10 +3725,7 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
       // Bridging NSNumber to NSValue is one-way, since there are multiple Swift
       // value types that bridge to those object types. It requires a checked
       // cast to get back.
-      // We accepted these coercions in Swift 3 mode, so we have to live with
-      // them (but give a warning) in that language mode.
-      if (!TC.Context.LangOpts.isSwiftVersion3()
-          && TC.Context.isObjCClassWithMultipleSwiftBridgedTypes(objcClass))
+      if (TC.Context.isObjCClassWithMultipleSwiftBridgedTypes(objcClass))
         return SolutionKind::Error;
 
       // If the bridged value type is generic, the generic arguments

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -622,12 +622,11 @@ private:
   bool printASTNodes(const ArrayRef<ASTNode> &Elements, bool NeedIndent = true);
 
   void printOneParameter(const ParamDecl *param, ParameterTypeFlags paramFlags,
-                         bool Curried, bool ArgNameIsAPIByDefault);
+                         bool ArgNameIsAPIByDefault);
 
   void printParameterList(ParameterList *PL,
                           ArrayRef<AnyFunctionType::Param> params,
-                          bool isCurried,
-                          llvm::function_ref<bool()> isAPINameByDefault);
+                          bool isAPINameByDefault);
 
   /// \brief Print the function parameters in curried or selector style,
   /// to match the original function declaration.
@@ -2202,7 +2201,7 @@ void PrintAST::visitParamDecl(ParamDecl *decl) {
 }
 
 void PrintAST::printOneParameter(const ParamDecl *param,
-                                 ParameterTypeFlags paramFlags, bool Curried,
+                                 ParameterTypeFlags paramFlags,
                                  bool ArgNameIsAPIByDefault) {
   Printer.callPrintStructurePre(PrintStructureKind::FunctionParameter, param);
   SWIFT_DEFER {
@@ -2314,8 +2313,7 @@ void PrintAST::printOneParameter(const ParamDecl *param,
 
 void PrintAST::printParameterList(ParameterList *PL,
                                   ArrayRef<AnyFunctionType::Param> params,
-                                  bool isCurried,
-                                  llvm::function_ref<bool()> isAPINameByDefault) {
+                                  bool isAPINameByDefault) {
   Printer << "(";
   const unsigned paramSize = params.size();
   for (unsigned i = 0, e = PL->size(); i != e; ++i) {
@@ -2324,47 +2322,32 @@ void PrintAST::printParameterList(ParameterList *PL,
     auto paramFlags = (i < paramSize)
                     ? params[i].getParameterFlags()
                     : ParameterTypeFlags();
-    printOneParameter(PL->get(i), paramFlags, isCurried,
-                      isAPINameByDefault());
+    printOneParameter(PL->get(i), paramFlags,
+                      isAPINameByDefault);
   }
   Printer << ")";
 }
 
 void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
-  auto BodyParams = AFD->getParameterLists();
+  auto BodyParams = AFD->getParameters();
   auto curTy = AFD->hasInterfaceType() ? AFD->getInterfaceType() : nullptr;
 
   // Skip over the implicit 'self'.
-  if (AFD->getImplicitSelfDecl()) {
-    BodyParams = BodyParams.slice(1);
+  if (AFD->hasImplicitSelfDecl()) {
     if (curTy)
       if (auto funTy = curTy->getAs<AnyFunctionType>())
         curTy = funTy->getResult();
   }
 
-  SmallVector<ArrayRef<AnyFunctionType::Param>, 4> parameterListTypes;
-  for (unsigned i = 0; i < BodyParams.size(); ++i) {
-    if (curTy) {
-      if (auto funTy = curTy->getAs<AnyFunctionType>()) {
-        parameterListTypes.push_back(funTy->getParams());
-        if (i < BodyParams.size() - 1)
-          curTy = funTy->getResult();
-      }
+  ArrayRef<AnyFunctionType::Param> parameterListTypes;
+  if (curTy) {
+    if (auto funTy = curTy->getAs<AnyFunctionType>()) {
+      parameterListTypes = funTy->getParams();
     }
   }
 
-  for (unsigned CurrPattern = 0, NumPatterns = BodyParams.size();
-       CurrPattern != NumPatterns; ++CurrPattern) {
-    // Be extra careful in the event of printing mal-formed ASTs
-    auto paramListType = CurrPattern < parameterListTypes.size()
-                             ? parameterListTypes[CurrPattern]
-                             : ArrayRef<AnyFunctionType::Param>();
-    printParameterList(BodyParams[CurrPattern], paramListType,
-                       /*isCurried=*/CurrPattern > 0,
-                       [&]()->bool {
-      return CurrPattern > 0 || AFD->argumentNameIsAPIByDefault();
-    });
-  }
+  printParameterList(BodyParams, parameterListTypes,
+                     AFD->argumentNameIsAPIByDefault());
 
   if (AFD->hasThrows()) {
     if (AFD->getAttrs().hasAttribute<RethrowsAttr>())
@@ -2416,7 +2399,7 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
       [&]{
         Printer << getAccessorLabel(decl);
 
-        auto params = decl->getParameterLists().back();
+        auto params = decl->getParameters();
         if (params->size() != 0 && !params->get(0)->isImplicit()) {
           auto Name = params->get(0)->getName();
           if (!Name.empty()) {
@@ -2554,8 +2537,8 @@ void PrintAST::printEnumElement(EnumElementDecl *elt) {
                                       ->castTo<AnyFunctionType>()
                                       ->getParams();
     }
-    printParameterList(PL, params, /*isCurried=*/false,
-                       /*isAPINameByDefault*/[]()->bool{return true;});
+    printParameterList(PL, params,
+                       /*isAPINameByDefault*/true);
   }
 
   auto *raw = elt->getRawValueExpr();
@@ -2628,8 +2611,8 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
       // Walk to the params of the subscript's indices.
       params = decl->getInterfaceType()->castTo<AnyFunctionType>()->getParams();
     }
-    printParameterList(decl->getIndices(), params, /*isCurried=*/false,
-                       /*isAPINameByDefault*/[]()->bool{return false;});
+    printParameterList(decl->getIndices(), params,
+                       /*isAPINameByDefault*/false);
   });
   Printer << " -> ";
 
@@ -4017,8 +4000,6 @@ StringRef swift::getCheckedCastKindName(CheckedCastKind kind) {
     return "set_downcast";
   case CheckedCastKind::BridgingCoercion:
     return "bridging_coercion";
-  case CheckedCastKind::Swift3BridgingDowncast:
-    return "bridging_downcast";
   }
   llvm_unreachable("bad checked cast name");
 }

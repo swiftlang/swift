@@ -47,9 +47,8 @@ class ProtocolConformanceRef {
   using UnionType = llvm::PointerUnion<ProtocolDecl*, ProtocolConformance*>;
   UnionType Union;
 
-  explicit ProtocolConformanceRef(UnionType value) : Union(value) {
-    assert(value && "cannot construct ProtocolConformanceRef with null");
-  }
+  explicit ProtocolConformanceRef(UnionType value) : Union(value) {}
+
 public:
   /// Create an abstract protocol conformance reference.
   explicit ProtocolConformanceRef(ProtocolDecl *proto) : Union(proto) {
@@ -63,17 +62,30 @@ public:
            "cannot construct ProtocolConformanceRef with null");
   }
 
+  static ProtocolConformanceRef forInvalid() {
+    return ProtocolConformanceRef(UnionType((ProtocolDecl *)nullptr));
+  }
+
+  bool isInvalid() const {
+    return !Union;
+  }
+
   /// Create either a concrete or an abstract protocol conformance reference,
   /// depending on whether ProtocolConformance is null.
   explicit ProtocolConformanceRef(ProtocolDecl *protocol,
                                   ProtocolConformance *conf);
 
-  bool isConcrete() const { return Union.is<ProtocolConformance*>(); }
+  bool isConcrete() const {
+    return !isInvalid() && Union.is<ProtocolConformance*>();
+  }
   ProtocolConformance *getConcrete() const {
     return Union.get<ProtocolConformance*>();
   }
 
-  bool isAbstract() const { return Union.is<ProtocolDecl*>(); }
+  bool isAbstract() const {
+    return !isInvalid() && Union.is<ProtocolDecl*>();
+  }
+
   ProtocolDecl *getAbstract() const {
     return Union.get<ProtocolDecl*>();
   }
@@ -87,6 +99,10 @@ public:
   /// Return the protocol requirement.
   ProtocolDecl *getRequirement() const;
   
+  /// Apply a substitution to the conforming type.
+  ProtocolConformanceRef subst(Type origType,
+                               SubstitutionMap subMap) const;
+
   /// Apply a substitution to the conforming type.
   ProtocolConformanceRef subst(Type origType,
                                TypeSubstitutionFn subs,

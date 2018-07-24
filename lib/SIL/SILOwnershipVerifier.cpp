@@ -1419,7 +1419,7 @@ public:
     if (Result.hasValue())
       return Result.getValue();
 
-    DEBUG(llvm::dbgs() << "Verifying ownership of: " << *Value);
+    LLVM_DEBUG(llvm::dbgs() << "Verifying ownership of: " << *Value);
     Result = checkUses();
     if (!Result.getValue())
       return false;
@@ -1540,14 +1540,14 @@ void SILValueOwnershipChecker::gatherUsers(
 
     if (OwnershipCompatibilityUseChecker(Mod, *Op, Value, ErrorBehavior)
             .check(User)) {
-      DEBUG(llvm::dbgs() << "        Lifetime Ending User: " << *User);
+      LLVM_DEBUG(llvm::dbgs() << "        Lifetime Ending User: " << *User);
       if (auto *CBI = dyn_cast<CondBranchInst>(User)) {
         addCondBranchToList(LifetimeEndingUsers, CBI, Op->getOperandNumber());
       } else {
         LifetimeEndingUsers.emplace_back(User);
       }
     } else {
-      DEBUG(llvm::dbgs() << "        Regular User: " << *User);
+      LLVM_DEBUG(llvm::dbgs() << "        Regular User: " << *User);
       if (auto *CBI = dyn_cast<CondBranchInst>(User)) {
         addCondBranchToList(NonLifetimeEndingUsers, CBI,
                             Op->getOperandNumber());
@@ -1658,7 +1658,7 @@ bool SILValueOwnershipChecker::checkFunctionArgWithoutLifetimeEndingUses(
 }
 
 bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses() {
-  DEBUG(llvm::dbgs() << "    No lifetime ending users?! Bailing early.\n");
+  LLVM_DEBUG(llvm::dbgs() << "    No lifetime ending users?! Bailing early.\n");
   if (auto *Arg = dyn_cast<SILFunctionArgument>(Value)) {
     if (checkFunctionArgWithoutLifetimeEndingUses(Arg)) {
       return true;
@@ -1678,7 +1678,7 @@ bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses() {
 
   if (auto *ParentBlock = Value->getParentBlock()) {
     if (DEBlocks.isDeadEnd(ParentBlock)) {
-      DEBUG(llvm::dbgs() << "    Ignoring transitively unreachable value "
+      LLVM_DEBUG(llvm::dbgs() << "    Ignoring transitively unreachable value "
                          << "without users!\n"
                          << "    Function: '" << Value->getFunction()->getName()
                          << "'\n"
@@ -1740,7 +1740,7 @@ bool SILValueOwnershipChecker::isSubobjectProjectionWithLifetimeEndingUses(
 }
 
 bool SILValueOwnershipChecker::checkUses() {
-  DEBUG(llvm::dbgs() << "    Gathering and classifying uses!\n");
+  LLVM_DEBUG(llvm::dbgs() << "    Gathering and classifying uses!\n");
 
   // First go through V and gather up its uses. While we do this we:
   //
@@ -1766,7 +1766,7 @@ bool SILValueOwnershipChecker::checkUses() {
     return false;
   }
 
-  DEBUG(llvm::dbgs() << "    Found lifetime ending users! Performing initial "
+  LLVM_DEBUG(llvm::dbgs() << "    Found lifetime ending users! Performing initial "
                         "checks\n");
 
   // See if we have a guaranteed function address. Guaranteed function addresses

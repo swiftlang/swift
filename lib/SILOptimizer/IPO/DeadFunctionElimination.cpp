@@ -142,7 +142,7 @@ protected:
   /// Marks all contained functions and witness tables of a witness table as
   /// alive.
   void makeAlive(SILWitnessTable *WT) {
-    DEBUG(llvm::dbgs() << "    scan witness table " << WT->getName() << '\n');
+    LLVM_DEBUG(llvm::dbgs() << "    scan witness table " << WT->getName() << '\n');
 
     AliveFunctionsAndTables.insert(WT);
     for (const SILWitnessTable::Entry &entry : WT->getEntries()) {
@@ -340,7 +340,7 @@ protected:
   /// Scans all references inside a function.
   void scanFunction(SILFunction *F) {
 
-    DEBUG(llvm::dbgs() << "    scan function " << F->getName() << '\n');
+    LLVM_DEBUG(llvm::dbgs() << "    scan function " << F->getName() << '\n');
 
     // First scan all instructions of the function.
     for (SILBasicBlock &BB : *F) {
@@ -414,12 +414,12 @@ protected:
 
     for (SILFunction &F : *Module) {
       if (isAnchorFunction(&F)) {
-        DEBUG(llvm::dbgs() << "  anchor function: " << F.getName() << "\n");
+        LLVM_DEBUG(llvm::dbgs() << "  anchor function: " << F.getName() << "\n");
         ensureAlive(&F);
       }
 
       if (!F.shouldOptimize()) {
-        DEBUG(llvm::dbgs() << "  anchor a no optimization function: " << F.getName() << "\n");
+        LLVM_DEBUG(llvm::dbgs() << "  anchor a no optimization function: " << F.getName() << "\n");
         ensureAlive(&F);
       }
     }
@@ -432,7 +432,7 @@ public:
   /// The main entry point of the optimization.
   bool findAliveFunctions() {
 
-    DEBUG(llvm::dbgs() << "running function elimination\n");
+    LLVM_DEBUG(llvm::dbgs() << "running function elimination\n");
 
     // Find everything which may not be eliminated, e.g. because it is accessed
     // externally.
@@ -615,7 +615,7 @@ class DeadFunctionElimination : FunctionLivenessComputation {
       vTable.removeEntries_if([this, &changedTable]
                               (SILVTable::Entry &entry) -> bool {
         if (!isAlive(entry.Implementation)) {
-          DEBUG(llvm::dbgs() << "  erase dead vtable method " <<
+          LLVM_DEBUG(llvm::dbgs() << "  erase dead vtable method " <<
                 entry.Implementation->getName() << "\n");
           changedTable = true;
           return true;
@@ -631,7 +631,7 @@ class DeadFunctionElimination : FunctionLivenessComputation {
       WT->clearMethods_if([this, &changedTable]
                           (const SILWitnessTable::MethodWitness &MW) -> bool {
         if (!isAlive(MW.Witness)) {
-          DEBUG(llvm::dbgs() << "  erase dead witness method " <<
+          LLVM_DEBUG(llvm::dbgs() << "  erase dead witness method " <<
                 MW.Witness->getName() << "\n");
           changedTable = true;
           return true;
@@ -650,7 +650,7 @@ class DeadFunctionElimination : FunctionLivenessComputation {
         if (!MW)
           return false;
         if (!isAlive(MW)) {
-          DEBUG(llvm::dbgs() << "  erase dead default witness method "
+          LLVM_DEBUG(llvm::dbgs() << "  erase dead default witness method "
                              << MW->getName() << "\n");
           changedTable = true;
           return true;
@@ -668,7 +668,7 @@ public:
   /// The main entry point of the optimization.
   void eliminateFunctions(SILModuleTransform *DFEPass) {
 
-    DEBUG(llvm::dbgs() << "running dead function elimination\n");
+    LLVM_DEBUG(llvm::dbgs() << "running dead function elimination\n");
     findAliveFunctions();
 
     bool changedTables = removeDeadEntriesFromTables();
@@ -689,7 +689,7 @@ public:
       SILWitnessTable *Wt = &*Iter;
       Iter++;
       if (!isAlive(Wt)) {
-        DEBUG(llvm::dbgs() << "  erase dead witness table " << Wt->getName()
+        LLVM_DEBUG(llvm::dbgs() << "  erase dead witness table " << Wt->getName()
                            << '\n');
         Module->deleteWitnessTable(Wt);
       }
@@ -700,9 +700,9 @@ public:
       SILFunction *F = DeadFunctions.back();
       DeadFunctions.pop_back();
 
-      DEBUG(llvm::dbgs() << "  erase dead function " << F->getName() << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "  erase dead function " << F->getName() << "\n");
       NumDeadFunc++;
-      DFEPass->notifyDeleteFunction(F);
+      DFEPass->notifyWillDeleteFunction(F);
       Module->eraseFunction(F);
     }
     if (changedTables)
@@ -720,7 +720,7 @@ namespace {
 
 class SILDeadFuncElimination : public SILModuleTransform {
   void run() override {
-    DEBUG(llvm::dbgs() << "Running DeadFuncElimination\n");
+    LLVM_DEBUG(llvm::dbgs() << "Running DeadFuncElimination\n");
 
     // The deserializer caches functions that it deserializes so that if it is
     // asked to deserialize that function again, it does not do extra work. This

@@ -135,7 +135,7 @@ getBridgingFn(Optional<SILDeclRef> &cacheSlot,
     cacheSlot = c;
   }
 
-  DEBUG(llvm::dbgs() << "bridging function "
+  LLVM_DEBUG(llvm::dbgs() << "bridging function "
           << moduleName << '.' << functionName
           << " mapped to ";
         cacheSlot->print(llvm::dbgs()));
@@ -644,7 +644,7 @@ void SILGenModule::preEmitFunction(SILDeclRef constant,
   // Create a debug scope for the function using astNode as source location.
   F->setDebugScope(new (M) SILDebugScope(Loc, F));
 
-  DEBUG(llvm::dbgs() << "lowering ";
+  LLVM_DEBUG(llvm::dbgs() << "lowering ";
         F->printName(llvm::dbgs());
         llvm::dbgs() << " : ";
         F->getLoweredType().print(llvm::dbgs());
@@ -661,7 +661,7 @@ void SILGenModule::preEmitFunction(SILDeclRef constant,
 void SILGenModule::postEmitFunction(SILDeclRef constant,
                                     SILFunction *F) {
   assert(!F->isExternalDeclaration() && "did not emit any function body?!");
-  DEBUG(llvm::dbgs() << "lowered sil:\n";
+  LLVM_DEBUG(llvm::dbgs() << "lowered sil:\n";
         F->print(llvm::dbgs()));
   F->verify();
 }
@@ -762,11 +762,7 @@ static llvm::SmallBitVector getLoweredAutoDiffParameterIndices(
 
 void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
   // Emit any default argument generators.
-  if (!isa<DestructorDecl>(AFD)) {
-    unsigned paramListIndex = AFD->getDeclContext()->isTypeContext() ? 1 : 0;
-    auto *paramList = AFD->getParameterLists()[paramListIndex];
-    emitDefaultArgGenerators(AFD, paramList);
-  }
+  emitDefaultArgGenerators(AFD, AFD->getParameters());
 
   // If this is a function at global scope, it may close over a global variable.
   // If we're emitting top-level code, then emit a "mark_function_escape" that
@@ -1142,7 +1138,7 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
   ASTContext &C = M.getASTContext();
   auto *onceBuiltin =
       cast<FuncDecl>(getBuiltinValueDecl(C, C.getIdentifier("once")));
-  auto blockParam = onceBuiltin->getParameterLists()[0]->get(1);
+  auto blockParam = onceBuiltin->getParameters()->get(1);
   auto *type = blockParam->getType()->castTo<FunctionType>();
   Type initType = FunctionType::get(TupleType::getEmpty(C),
                                     TupleType::getEmpty(C), type->getExtInfo());
@@ -1710,7 +1706,7 @@ public:
       SILFunction *toplevel = &SGF.getFunction();
       delete &SGF;
 
-      DEBUG(llvm::dbgs() << "lowered toplevel sil:\n";
+      LLVM_DEBUG(llvm::dbgs() << "lowered toplevel sil:\n";
             toplevel->print(llvm::dbgs()));
       toplevel->verify();
     }

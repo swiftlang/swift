@@ -97,7 +97,6 @@ static inline bool isLessStrongThan(ReferenceOwnership left,
 enum class ReferenceOwnershipOptionality : uint8_t {
   Disallowed,
   Allowed,
-  AllowedIfImporting,
   Required,
 
   Last_Kind = Required
@@ -109,13 +108,11 @@ static inline ReferenceOwnershipOptionality
 optionalityOf(ReferenceOwnership ownership) {
   switch (ownership) {
   case ReferenceOwnership::Strong:
+  case ReferenceOwnership::Unowned:
+  case ReferenceOwnership::Unmanaged:
     return ReferenceOwnershipOptionality::Allowed;
   case ReferenceOwnership::Weak:
     return ReferenceOwnershipOptionality::Required;
-  case ReferenceOwnership::Unowned:
-    return ReferenceOwnershipOptionality::Disallowed;
-  case ReferenceOwnership::Unmanaged:
-    return ReferenceOwnershipOptionality::AllowedIfImporting;
   }
   llvm_unreachable("impossible");
 }

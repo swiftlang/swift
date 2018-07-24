@@ -224,7 +224,7 @@ SubstitutionMap SubstitutionMap::get(GenericSignature *genericSig,
     auto protoType = req.getSecondType()->castTo<ProtocolType>();
     auto proto = protoType->getDecl();
     auto conformance = lookupConformance(depTy, replacement, proto)
-                         .getValueOr(ProtocolConformanceRef(proto));
+                         .getValueOr(ProtocolConformanceRef::forInvalid());
     conformances.push_back(conformance);
   }
 
@@ -369,6 +369,9 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
       continue;
     }
 
+    if (conformance->isInvalid())
+      return conformance;
+
     // If we've hit an abstract conformance, everything from here on out is
     // abstract.
     // FIXME: This may not always be true, but it holds for now.
@@ -444,7 +447,7 @@ SubstitutionMap SubstitutionMap::subst(TypeSubstitutionFn subs,
         ProtocolDecl *proto) ->Optional<ProtocolConformanceRef> {
       auto conformance =
         lookupConformance(dependentType, proto)
-          .getValueOr(ProtocolConformanceRef(proto));
+          .getValueOr(ProtocolConformanceRef::forInvalid());
       auto substType = dependentType.subst(*this, SubstFlags::UseErrorType);
       return conformance.subst(substType, subs, conformances);
     });
@@ -609,6 +612,9 @@ void SubstitutionMap::verify() const {
       continue;
 
     auto conformance = getConformances()[conformanceIndex];
+
+    if (conformance.isInvalid())
+      continue;
 
     // An existential type can have an abstract conformance to
     // AnyObject or an @objc protocol.

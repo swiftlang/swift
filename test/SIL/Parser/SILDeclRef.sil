@@ -122,7 +122,7 @@ sil_vtable Derived1 {
   #Base.foo!1: (Base) -> (Int32) -> () : @_TFC10SILDeclRef8Derived13foofT1nVs5Int32_T_	// Derived1.foo(n : Int32) -> ()
   #Base.foo!1: (Base) -> (Float) -> Int32 : @_TFC10SILDeclRef8Derived13foofT1fSf_Vs5Int32	// Derived1.foo(f : Float) -> Int32
   #Base.init!initializer.1: (Base.Type) -> () -> Base : @_TFC10SILDeclRef8Derived1cfT_S0_	// Derived1.init() -> Derived1
-  #Derived1.deinit!deallocator: (Derived1) -> () -> () : @_TFC10SILDeclRef8Derived1D	// Derived1.__deallocating_deinit
+  #Derived1.deinit!deallocator.1: (Derived1) -> () -> () : @_TFC10SILDeclRef8Derived1D	// Derived1.__deallocating_deinit
 }
 
 sil_vtable Derived2 {
@@ -130,7 +130,7 @@ sil_vtable Derived2 {
   #Base.foo!1: (Base) -> (Int32) -> () : @_TFC10SILDeclRef8Derived23foofT1nVs5Int32_T_	// Derived2.foo(n : Int32) -> ()
   #Base.foo!1: (Base) -> (Float) -> Int32 : @_TFC10SILDeclRef8Derived23foofT1fSf_Vs5Int32	// Derived2.foo(f : Float) -> Int32
   #Base.init!initializer.1: (Base.Type) -> () -> Base : @_TFC10SILDeclRef8Derived2cfT_S0_	// Derived2.init() -> Derived2
-  #Derived2.deinit!deallocator: (Derived2) -> () -> () : @_TFC10SILDeclRef8Derived2D	// Derived2.__deallocating_deinit
+  #Derived2.deinit!deallocator.1: (Derived2) -> () -> () : @_TFC10SILDeclRef8Derived2D	// Derived2.__deallocating_deinit
 }
 
 sil_witness_table [serialized] Base: P module SILDeclRef {

@@ -187,9 +187,8 @@ FunctionSignatureTransformDescriptor::createOptimizedSILFunctionName() {
     Mangler.setReturnValueOwnedToUnowned();
   }
 
-  SILModule &M = F->getModule();
   auto MangledName = Mangler.mangle();
-  assert(!M.hasFunction(MangledName));
+  assert(!F->getModule().hasFunction(MangledName));
 
   return MangledName;
 }
@@ -357,7 +356,7 @@ FunctionSignatureTransformDescriptor::createOptimizedSILFunctionType() {
     // The set of used archetypes is complete now.
     if (!UsesGenerics) {
       // None of the generic type parameters are used.
-      DEBUG(llvm::dbgs() << "None of generic parameters are used by "
+      LLVM_DEBUG(llvm::dbgs() << "None of generic parameters are used by "
                          << F->getName() << "\n";
             llvm::dbgs() << "Interface params:\n";
             for (auto Param : InterfaceParams) {
@@ -423,7 +422,7 @@ void FunctionSignatureTransformDescriptor::computeOptimizedArgInterface(
     AD.ProjTree.getLiveLeafNodes(LeafNodes);
     for (auto Node : LeafNodes) {
       SILType Ty = Node->getType();
-      DEBUG(llvm::dbgs() << "                " << Ty << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "                " << Ty << "\n");
       // If Ty is trivial, just pass it directly.
       if (Ty.isTrivial(AD.Arg->getModule())) {
         SILParameterInfo NewInfo(Ty.getASTType(),
@@ -484,7 +483,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   std::string Name = TransformDescriptor.createOptimizedSILFunctionName();
   SILLinkage linkage = getSpecializedLinkage(F, F->getLinkage());
 
-  DEBUG(llvm::dbgs() << "  -> create specialized function " << Name << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "  -> create specialized function " << Name << "\n");
 
   auto NewFTy = TransformDescriptor.createOptimizedSILFunctionType();
   GenericEnvironment *NewFGenericEnv;
@@ -615,14 +614,14 @@ bool FunctionSignatureTransform::run(bool hasCaller) {
   SILFunction *F = TransformDescriptor.OriginalFunction;
 
   if (!hasCaller && canBeCalledIndirectly(F->getRepresentation())) {
-    DEBUG(llvm::dbgs() << "  function has no caller -> abort\n");
+    LLVM_DEBUG(llvm::dbgs() << "  function has no caller -> abort\n");
     return false;
   }
 
   // Run OwnedToGuaranteed optimization.
   if (OwnedToGuaranteedAnalyze()) {
     Changed = true;
-    DEBUG(llvm::dbgs() << "  transform owned-to-guaranteed\n");
+    LLVM_DEBUG(llvm::dbgs() << "  transform owned-to-guaranteed\n");
     OwnedToGuaranteedTransform();
   }
 
@@ -631,7 +630,7 @@ bool FunctionSignatureTransform::run(bool hasCaller) {
   // already created a thunk.
   if ((hasCaller || Changed) && DeadArgumentAnalyzeParameters()) {
     Changed = true;
-    DEBUG(llvm::dbgs() << "  remove dead arguments\n");
+    LLVM_DEBUG(llvm::dbgs() << "  remove dead arguments\n");
     DeadArgumentTransformFunction();
   }
 
@@ -705,7 +704,7 @@ bool FunctionSignatureTransform::removeDeadArgs(int minPartialAppliedArgs) {
     return false;
   }
 
-  DEBUG(llvm::dbgs() << "  remove dead arguments for partial_apply\n");
+  LLVM_DEBUG(llvm::dbgs() << "  remove dead arguments for partial_apply\n");
   DeadArgumentTransformFunction();
   createFunctionSignatureOptimizedFunction();
   return true;
@@ -741,7 +740,7 @@ public:
       return;
 
     // This is the function to optimize.
-    DEBUG(llvm::dbgs() << "*** FSO on function: " << F->getName() << " ***\n");
+    LLVM_DEBUG(llvm::dbgs() << "*** FSO on function: " << F->getName() << " ***\n");
 
     // Check the signature of F to make sure that it is a function that we
     // can specialize. These are conditions independent of the call graph.
@@ -749,7 +748,7 @@ public:
     // applies.
     if (!OptForPartialApply &&
         !canSpecializeFunction(F, nullptr, OptForPartialApply)) {
-      DEBUG(llvm::dbgs() << "  cannot specialize function -> abort\n");
+      LLVM_DEBUG(llvm::dbgs() << "  cannot specialize function -> abort\n");
       return;
     }
 
@@ -760,7 +759,7 @@ public:
     // can specialize. These are conditions independent of the call graph.
     if (OptForPartialApply &&
         !canSpecializeFunction(F, &FuncInfo, OptForPartialApply)) {
-      DEBUG(llvm::dbgs() << "  cannot specialize function -> abort\n");
+      LLVM_DEBUG(llvm::dbgs() << "  cannot specialize function -> abort\n");
       return;
     }
 

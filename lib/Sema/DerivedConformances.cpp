@@ -326,10 +326,7 @@ DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
   auto &C = tc.Context;
   auto parentDC = property->getDeclContext();
   auto selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC, isStatic);
-  ParameterList *params[] = {
-    ParameterList::createWithoutLoc(selfDecl),
-    ParameterList::createEmpty(C)
-  };
+  ParameterList *params = ParameterList::createEmpty(C);
 
   Type propertyInterfaceType = property->getInterfaceType();
   
@@ -338,7 +335,7 @@ DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
     AccessorKind::Get, AddressorKind::NotAddressor, property,
     /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
     /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-    /*GenericParams=*/nullptr, params,
+    /*GenericParams=*/nullptr, selfDecl, params,
     TypeLoc::withoutLoc(propertyInterfaceType), parentDC);
   getterDecl->setImplicit();
   getterDecl->setStatic(isStatic);
@@ -364,7 +361,7 @@ DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
                                       FunctionType::ExtInfo());
   getterDecl->setInterfaceType(interfaceType);
   getterDecl->copyFormalAccessFrom(property);
-  getterDecl->setValidationStarted();
+  getterDecl->setValidationToChecked();
 
   tc.Context.addSynthesizedDecl(getterDecl);
 
@@ -448,7 +445,7 @@ DerivedConformance::declareDerivedProperty(Identifier name,
   propDecl->setImplicit();
   propDecl->copyFormalAccessFrom(Nominal, /*sourceIsParentContext*/ true);
   propDecl->setInterfaceType(propertyInterfaceType);
-  propDecl->setValidationStarted();
+  propDecl->setValidationToChecked();
 
   // If this is supposed to be a final property, mark it as such.
   assert(isFinal || !parentDC->getAsClassOrClassExtensionContext());

@@ -1577,17 +1577,17 @@ extension TestSuite {
     SequenceWithEquatableElement : Sequence
   >(
     _ testNamePrefix: String = "",
-    makeSequence: @escaping ([S.Iterator.Element]) -> S,
-    wrapValue: @escaping (OpaqueValue<Int>) -> S.Iterator.Element,
-    extractValue: @escaping (S.Iterator.Element) -> OpaqueValue<Int>,
+    makeSequence: @escaping ([S.Element]) -> S,
+    wrapValue: @escaping (OpaqueValue<Int>) -> S.Element,
+    extractValue: @escaping (S.Element) -> OpaqueValue<Int>,
 
-    makeSequenceOfEquatable: @escaping ([SequenceWithEquatableElement.Iterator.Element]) -> SequenceWithEquatableElement,
-    wrapValueIntoEquatable: @escaping (MinimalEquatableValue) -> SequenceWithEquatableElement.Iterator.Element,
-    extractValueFromEquatable: @escaping ((SequenceWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
+    makeSequenceOfEquatable: @escaping ([SequenceWithEquatableElement.Element]) -> SequenceWithEquatableElement,
+    wrapValueIntoEquatable: @escaping (MinimalEquatableValue) -> SequenceWithEquatableElement.Element,
+    extractValueFromEquatable: @escaping ((SequenceWithEquatableElement.Element) -> MinimalEquatableValue),
 
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all
   ) where
-    SequenceWithEquatableElement.Iterator.Element : Equatable {
+    SequenceWithEquatableElement.Element : Equatable {
 
     var testNamePrefix = testNamePrefix
 

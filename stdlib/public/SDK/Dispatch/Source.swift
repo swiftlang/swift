@@ -152,60 +152,60 @@ public extension DispatchSource {
 	}
 
 	public class func makeMachSendSource(port: mach_port_t, eventMask: MachSendEvent, queue: DispatchQueue? = nil) -> DispatchSourceMachSend {
-		return __dispatch_source_create(
+		return _swift_dispatch_source_create(
 			_swift_dispatch_source_type_MACH_SEND(), UInt(port), eventMask.rawValue, queue) as DispatchSourceMachSend
 	}
 
 	public class func makeMachReceiveSource(port: mach_port_t, queue: DispatchQueue? = nil) -> DispatchSourceMachReceive {
-		return __dispatch_source_create(
+		return _swift_dispatch_source_create(
 			_swift_dispatch_source_type_MACH_RECV(), UInt(port), 0, queue) as DispatchSourceMachReceive
 	}
 
 	public class func makeMemoryPressureSource(eventMask: MemoryPressureEvent, queue: DispatchQueue? = nil) -> DispatchSourceMemoryPressure {
-		return __dispatch_source_create(
+		return _swift_dispatch_source_create(
 			_swift_dispatch_source_type_MEMORYPRESSURE(), 0, eventMask.rawValue, queue) as DispatchSourceMemoryPressure
 	}
 
 	public class func makeProcessSource(identifier: pid_t, eventMask: ProcessEvent, queue: DispatchQueue? = nil) -> DispatchSourceProcess {
-		return __dispatch_source_create(
+		return _swift_dispatch_source_create(
 			_swift_dispatch_source_type_PROC(), UInt(identifier), eventMask.rawValue, queue) as DispatchSourceProcess
 	}
 
 	public class func makeReadSource(fileDescriptor: Int32, queue: DispatchQueue? = nil) -> DispatchSourceRead {
-		return __dispatch_source_create(
+		return _swift_dispatch_source_create(
 			_swift_dispatch_source_type_READ(), UInt(fileDescriptor), 0, queue) as DispatchSourceRead
 	}
 
 	public class func makeSignalSource(signal: Int32, queue: DispatchQueue? = nil) -> DispatchSourceSignal {
-		return __dispatch_source_create(
+		return _swift_dispatch_source_create(
 			_swift_dispatch_source_type_SIGNAL(), UInt(signal), 0, queue) as DispatchSourceSignal
 	}
 
 	public class func makeTimerSource(flags: TimerFlags = [], queue: DispatchQueue? = nil) -> DispatchSourceTimer {
-		return __dispatch_source_create(_swift_dispatch_source_type_TIMER(), 0, flags.rawValue, queue) as DispatchSourceTimer
+		return _swift_dispatch_source_create(_swift_dispatch_source_type_TIMER(), 0, flags.rawValue, queue) as DispatchSourceTimer
 	}
 
 	public class func makeUserDataAddSource(queue: DispatchQueue? = nil) -> DispatchSourceUserDataAdd {
-		return __dispatch_source_create(_swift_dispatch_source_type_DATA_ADD(), 0, 0, queue) as DispatchSourceUserDataAdd
+		return _swift_dispatch_source_create(_swift_dispatch_source_type_DATA_ADD(), 0, 0, queue) as DispatchSourceUserDataAdd
 	}
 
 	public class func makeUserDataOrSource(queue: DispatchQueue? = nil) -> DispatchSourceUserDataOr {
-		return __dispatch_source_create(_swift_dispatch_source_type_DATA_OR(), 0, 0, queue) as DispatchSourceUserDataOr
+		return _swift_dispatch_source_create(_swift_dispatch_source_type_DATA_OR(), 0, 0, queue) as DispatchSourceUserDataOr
 	}
 
 	public class func makeUserDataReplaceSource(queue: DispatchQueue? = nil) -> DispatchSourceUserDataReplace {
-		return __dispatch_source_create(_swift_dispatch_source_type_DATA_REPLACE(), 0, 0, queue) as DispatchSourceUserDataReplace
+		return _swift_dispatch_source_create(_swift_dispatch_source_type_DATA_REPLACE(), 0, 0, queue) as DispatchSourceUserDataReplace
 	}
 
 	public class func makeFileSystemObjectSource(
 		fileDescriptor: Int32, eventMask: FileSystemEvent, queue: DispatchQueue? = nil) -> DispatchSourceFileSystemObject 
 	{
-		return __dispatch_source_create(
+		return _swift_dispatch_source_create(
 			_swift_dispatch_source_type_VNODE(), UInt(fileDescriptor), eventMask.rawValue, queue) as DispatchSourceFileSystemObject
 	}
 
 	public class func makeWriteSource(fileDescriptor: Int32, queue: DispatchQueue? = nil) -> DispatchSourceWrite {
-		return __dispatch_source_create(
+		return _swift_dispatch_source_create(
 			_swift_dispatch_source_type_WRITE(), UInt(fileDescriptor), 0, queue) as DispatchSourceWrite
 	}
 }
