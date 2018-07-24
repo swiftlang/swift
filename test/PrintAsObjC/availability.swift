@@ -45,10 +45,9 @@
 // CHECK-DAG: SWIFT_AVAILABILITY(ios_app_extension,unavailable)
 // CHECK-DAG: SWIFT_AVAILABILITY(tvos_app_extension,unavailable)
 // CHECK-DAG: SWIFT_AVAILABILITY(watchos_app_extension,unavailable)
-// CHECK-DAG: ;
-// CHECK-NEXT: - (void)deprecatedMethodRenamedToOverloadMethod1WithFirst:(NSInteger)first second:(NSInteger)second SWIFT_DEPRECATED_MSG("", "overloadMethodWithFirst:second:");
-// CHECK-NEXT: - (void)overloadMethodWithFirst:(NSInteger)first second:(NSInteger)second;
-// CHECK-NEXT: - (void)overloadMethod2WithFirst:(double)first second:(double)second;
+// CHECK-SAME: ;
+// CHECK-NEXT: - (void)deprecatedMethodRenamedToOverloadMethodWithFirst:(NSInteger)first second:(NSInteger)second SWIFT_DEPRECATED_MSG("", "overloadingMethodWithFirst:second:");
+// CHECK-NEXT: - (void)overloadingMethodWithFirst:(NSInteger)first second:(NSInteger)second;
 // CHECK-NEXT: + (void)deprecatedAvailabilityWithValue:(NSInteger)value;
 // CHECK-NEXT: - (void)deprecatedInstanceMethodRenamedToClassMethodWithValue:(NSInteger)value SWIFT_DEPRECATED_MSG("This method has a renamed attribute point to class method instead of a instance method. It should show the Swift name here", "classMethodWithACustomObjCName(x:)");
 // CHECK-NEXT: + (void)deprecatedClassMethodRenamedToInstanceMethodWithValue:(NSInteger)value SWIFT_DEPRECATED_MSG("This method has a renamed attribute point to instance method instead of a class method. It should show the Swift name here", "instanceMethodWithACustomObjCName(x:)");
@@ -57,7 +56,7 @@
 // CHECK-NEXT: + (void)makeDeprecatedAvailabilityWithValue:(NSInteger)value SWIFT_DEPRECATED_MSG("use something else", "deprecatedAvailabilityWithValue:");
 // CHECK-NEXT: + (void)unavailableAvailabilityWithValue:(NSInteger)value;
 // CHECK-NEXT: + (void)makeUnavailableAvailabilityWithValue:(NSInteger)value
-// CHECK-DAG: SWIFT_UNAVAILABLE_MSG("'__makeUnavailableAvailability' has been renamed to 'unavailableAvailabilityWithValue:': use something else");
+// CHECK-SAME: SWIFT_UNAVAILABLE_MSG("'__makeUnavailableAvailability' has been renamed to 'unavailableAvailabilityWithValue:': use something else");
 // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: - (nonnull instancetype)initWithX:(NSInteger)_ OBJC_DESIGNATED_INITIALIZER SWIFT_AVAILABILITY(macos,introduced=10.10);
 // CHECK-NEXT: @property (nonatomic, readonly) NSInteger simpleProperty;
@@ -66,7 +65,7 @@
 // CHECK-NEXT: @property (nonatomic, readonly) NSInteger numberOfReplacableDeprecatedObjCProperty SWIFT_DEPRECATED_MSG("use something else", "replaceForDeprecatedObjCProperty");
 // CHECK-NEXT: @property (nonatomic, readonly) NSInteger replaceForDeprecatedObjCProperty;
 // CHECK-NEXT: @property (nonatomic, readonly) NSInteger numberOfReplacableUnavailableObjCProperty
-// CHECK-DAG: SWIFT_UNAVAILABLE_MSG("'replacableUnavailableObjCProperty' has been renamed to 'replaceForUnavailableObjCProperty': use something else");
+// CHECK-SAME: SWIFT_UNAVAILABLE_MSG("'replacableUnavailableObjCProperty' has been renamed to 'replaceForUnavailableObjCProperty': use something else");
 // CHECK-NEXT: @property (nonatomic, readonly) NSInteger replaceForUnavailableObjCProperty;
 // CHECK-NEXT: @property (nonatomic, readonly, strong) Availability * _Null_unspecified singlePlatCombinedPropertyClass SWIFT_AVAILABILITY(macos,introduced=10.7,deprecated=10.9,obsoleted=10.10);
 // CHECK-NEXT: @property (nonatomic, readonly) NSInteger platformUnavailableRenameWithMessageProperty SWIFT_AVAILABILITY(macos,unavailable,message="'platformUnavailableRenameWithMessageProperty' has been renamed to 'anotherPlea': still trapped");
@@ -89,33 +88,33 @@
 // CHECK-LABEL: SWIFT_AVAILABILITY(macos,deprecated=0.0.1,message="'DeprecatedAvailability' has been renamed to 'SWTReplacementAvailable'")
 // CHECK-LABEL: @interface DeprecatedAvailability
 // CHECK-NEXT: - (void)deprecatedMethodInDeprecatedClassWithFirst:(NSInteger)first second:(NSInteger)second
-// CHECK-DAG: SWIFT_DEPRECATED_MSG("use method in another class instead", "ReplacementAvailable.methodInDeprecatedClass(first:second:)")
+// CHECK-SAME: SWIFT_DEPRECATED_MSG("use method in another class instead", "ReplacementAvailable.methodInDeprecatedClass(first:second:)")
 // CHECK-NEXT: @end
 
 // CHECK-LABEL: SWIFT_AVAILABILITY(macos,deprecated=0.0.1,message="'DeprecatedAvailabilityProtocol' has been renamed to 'SWTReplacementAvailableProtocol'")
 // CHECK-LABEL: @protocol DeprecatedAvailabilityProtocol
 // CHECK-NEXT: - (void)deprecatedMethodInDeprecatedClassWithFirst:(NSInteger)first second:(NSInteger)second
-// CHECK-DAG: SWIFT_DEPRECATED_MSG("use method in another class instead", "ReplacementAvailableProtocol.methodInDeprecatedClass(first:second:)")
+// CHECK-SAME: SWIFT_DEPRECATED_MSG("use method in another class instead", "ReplacementAvailableProtocol.methodInDeprecatedClass(first:second:)")
 // CHECK-NEXT: @end
 
 // CHECK-LABEL: @interface SWTReplacementAvailable
-// CHECK-NEXT: - (void)methodReplacingInDeprecatedClassWithFirst:(NSInteger)first second:(NSInteger)second;
+// CHECK-NEXT: - (void)replacingMethodInDeprecatedClassWithFirst:(NSInteger)first second:(NSInteger)second;
 // CHECK-NEXT: @end
 
 // CHECK-LABEL: @protocol SWTReplacementAvailableProtocol
-// CHECK-NEXT: - (void)methodReplacingInDeprecatedClassWithFirst:(NSInteger)first second:(NSInteger)second;
+// CHECK-NEXT: - (void)replacingMethodInDeprecatedClassWithFirst:(NSInteger)first second:(NSInteger)second;
 // CHECK-NEXT: @end
 
 // CHECK-LABEL: SWIFT_AVAILABILITY(macos,unavailable,message="'UnavailableAvailability' has been renamed to 'SWTReplacementAvailable'")
 // CHECK-LABEL: @interface UnavailableAvailability
 // CHECK-NEXT: - (void)unavailableMethodInUnavailableClassWithFirst:(NSInteger)first second:(NSInteger)second
-// CHECK-DAG: SWIFT_UNAVAILABLE_MSG("'unavailableMethodInUnavailableClass' has been renamed to 'ReplacementAvailable.methodInDeprecatedClass(first:second:)': use method in another class instead")
+// CHECK-SAME: SWIFT_UNAVAILABLE_MSG("'unavailableMethodInUnavailableClass' has been renamed to 'ReplacementAvailable.methodInDeprecatedClass(first:second:)': use method in another class instead")
 // CHECK-NEXT: @end
 
 // CHECK-LABEL: SWIFT_AVAILABILITY(macos,unavailable,message="'UnavailableAvailabilityProtocol' has been renamed to 'SWTReplacementAvailableProtocol'")
 // CHECK-LABEL: @protocol UnavailableAvailabilityProtocol
 // CHECK-NEXT: - (void)unavailableMethodInUnavailableClassWithFirst:(NSInteger)first second:(NSInteger)second
-// CHECK-DAG: SWIFT_UNAVAILABLE_MSG("'unavailableMethodInUnavailableClass' has been renamed to 'ReplacementAvailableProtocol.methodInDeprecatedClass(first:second:)': use method in another class instead")
+// CHECK-SAME: SWIFT_UNAVAILABLE_MSG("'unavailableMethodInUnavailableClass' has been renamed to 'ReplacementAvailableProtocol.methodInDeprecatedClass(first:second:)': use method in another class instead")
 // CHECK-NEXT: @end
 
 // CHECK-LABEL: SWIFT_CLASS("{{.+}}WholeClassAvailability") 
@@ -201,11 +200,11 @@
     @available(watchOSApplicationExtension, unavailable)
     @objc func extensionUnavailable() {}
   
-    @available(*, deprecated, renamed: "overloadMethod1(first:second:)")
-    @objc func deprecatedMethodRenamedToOverloadMethod1(first: Int, second: Int) {}
+    @available(*, deprecated, renamed: "overloadMethod(first:second:)")
+    @objc func deprecatedMethodRenamedToOverloadMethod(first: Int, second: Int) {}
   
-    @objc(overloadMethodWithFirst:second:) func overloadMethod1(first: Int, second: Int) {}
-    @objc func overloadMethod2(first: Double, second: Double) {}
+    @objc(overloadingMethodWithFirst:second:) func overloadMethod(first: Int, second: Int) {}
+    func overloadMethod(first: Double, second: Double) {}
 
     @objc(deprecatedAvailabilityWithValue:)
     public class func makeDeprecatedAvailability(withValue value: Int) {}
@@ -334,7 +333,7 @@ extension Availability {
 
 
 @objc(SWTReplacementAvailable) class ReplacementAvailable {
-    @objc(methodReplacingInDeprecatedClassWithFirst:second:) func methodReplacingInDeprecatedClass(first: Int, second: Int) -> Void {}
+    @objc(replacingMethodInDeprecatedClassWithFirst:second:) func methodReplacingInDeprecatedClass(first: Int, second: Int) -> Void {}
 }
 
 @available(macOS, deprecated, renamed: "ReplacementAvailable")
@@ -350,7 +349,7 @@ extension Availability {
 }
 
 @objc(SWTReplacementAvailableProtocol) protocol ReplacementAvailableProtocol {
-  @objc(methodReplacingInDeprecatedClassWithFirst:second:) func methodReplacingInDeprecatedClass(first: Int, second: Int) -> Void
+  @objc(replacingMethodInDeprecatedClassWithFirst:second:) func methodReplacingInDeprecatedClass(first: Int, second: Int) -> Void
 }
 
 @available(macOS, deprecated, renamed: "ReplacementAvailableProtocol")
