@@ -10,7 +10,7 @@ import StdlibUnittest
 
 var ParameterUpdateTests = TestSuite("ParameterUpdate")
 
-RawOpTests.test("UpdateParameters") {
+ParameterUpdateTests.test("UpdateParameters") {
   struct Foo : Parameterized {
     @TFParameter var w = Tensor<Float>(1)
     mutating func foo() {
