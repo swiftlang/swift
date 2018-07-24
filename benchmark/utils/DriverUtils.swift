@@ -341,8 +341,9 @@ func runBench(_ test: BenchmarkInfo, _ c: TestConfig) -> BenchResults? {
   }
 
   let sampler = SampleRunner(c)
+  test.setUpFunction?()
+
   for s in 0..<c.numSamples {
-    test.setUpFunction?()
     let nsPerSecond = 1_000_000_000.0 // nanoseconds
     let time_per_sample = UInt64(c.sampleTime * nsPerSecond)
 
@@ -385,8 +386,8 @@ func runBench(_ test: BenchmarkInfo, _ c: TestConfig) -> BenchResults? {
     if c.verbose {
       print("    Sample \(s),\(samples[s])")
     }
-    test.tearDownFunction?()
   }
+  test.tearDownFunction?()
 
   let (mean, sd) = internalMeanSD(samples)
 
