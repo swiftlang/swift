@@ -231,9 +231,9 @@ extension Set: ExpressibleByArrayLiteral {
 
 extension Set: Sequence {
   /// Returns an iterator over the members of the set.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @inline(__always)
-  public func makeIterator() -> SetIterator<Element> {
+  public func makeIterator() -> Set<Element>.Iterator {
     return _variant.makeIterator()
   }
 
@@ -256,12 +256,12 @@ extension Set: Sequence {
   /// - Returns: `true` if `member` exists in the set; otherwise, `false`.
   ///
   /// - Complexity: O(1)
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func contains(_ member: Element) -> Bool {
     return _variant.maybeGet(member) != nil
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func _customContainsEquatableElement(_ member: Element) -> Bool? {
     return contains(member)
   }
@@ -2575,7 +2575,7 @@ internal struct _CocoaSet: _SetBuffer {
     bucketCount: Int
   ) -> _NativeSet<Element> {
     var newNativeSet = _NativeSet<Element>(bucketCount: bucketCount)
-    let oldCocoaIterator = _CocoaSetIterator(self)
+    let oldCocoaIterator = _CocoaSet.Iterator(self)
     while let element = oldCocoaIterator.next() {
       newNativeSet.unsafeAddNew(
         key: _forceBridgeFromObjectiveC(element, Element.self))
@@ -3145,16 +3145,13 @@ extension Set._Variant: _SetBuffer {
   /// - Complexity: O(1).
   @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
-  internal func makeIterator() -> SetIterator<Element> {
+  internal func makeIterator() -> Set<Element>.Iterator {
     switch self {
     case .native(let nativeSet):
-      return ._native(
-        start: nativeSet.startIndex,
-        end: nativeSet.endIndex,
-        nativeSet: nativeSet)
+      return ._native(nativeSet.makeIterator())
 #if _runtime(_ObjC)
     case .cocoa(let cocoaSet):
-      return ._cocoa(cocoaSet)
+      return ._cocoa(cocoaSet.makeIterator())
 #endif
     }
   }
@@ -3423,49 +3420,99 @@ extension Set.Index: Hashable {
   }
 }
 
+extension _NativeSet {
+  @usableFromInline
+  @_fixed_layout
+  internal struct Iterator {
+    // For native buffer, we keep two indices to keep track of the iteration
+    // progress and the buffer owner to make the buffer non-uniquely
+    // referenced.
+    //
+    // Iterator is iterating over a frozen view of the collection
+    // state, so it should keep its own reference to the buffer.
+    @usableFromInline
+    internal var index: Index
+    @usableFromInline
+    internal var endIndex: Index
+    @usableFromInline
+    internal let nativeSet: _NativeSet
+
+    @inlinable
+    init(_ nativeSet: _NativeSet) {
+      self.index = nativeSet.startIndex
+      self.endIndex = nativeSet.endIndex
+      self.nativeSet = nativeSet
+    }
+  }
+
+  @inlinable
+  internal func makeIterator() -> Iterator {
+    return Iterator(self)
+  }
+}
+
+extension _NativeSet.Iterator: IteratorProtocol {
+  @inlinable
+  internal mutating func next() -> Element? {
+    guard index != endIndex else { return nil }
+    let result = nativeSet.assertingGet(at: index)
+    nativeSet.formIndex(after: &index)
+    return result
+  }
+}
+
 #if _runtime(_ObjC)
-@usableFromInline
-final internal class _CocoaSetIterator: IteratorProtocol {
+extension _CocoaSet {
+  @usableFromInline
+  final internal class Iterator {
+    // Cocoa Set iterator has to be a class, otherwise we cannot
+    // guarantee that the fast enumeration struct is pinned to a certain memory
+    // location.
+
+    // This stored property should be stored at offset zero.  There's code below
+    // relying on this.
+    internal var _fastEnumerationState: _SwiftNSFastEnumerationState =
+      _makeSwiftNSFastEnumerationState()
+
+    // This stored property should be stored right after
+    // `_fastEnumerationState`.  There's code below relying on this.
+    internal var _fastEnumerationStackBuf = _CocoaFastEnumerationStackBuf()
+
+    internal let cocoaSet: _CocoaSet
+
+    internal var _fastEnumerationStatePtr:
+      UnsafeMutablePointer<_SwiftNSFastEnumerationState> {
+      return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
+        to: _SwiftNSFastEnumerationState.self)
+    }
+
+    internal var _fastEnumerationStackBufPtr:
+      UnsafeMutablePointer<_CocoaFastEnumerationStackBuf> {
+      return UnsafeMutableRawPointer(_fastEnumerationStatePtr + 1)
+        .assumingMemoryBound(to: _CocoaFastEnumerationStackBuf.self)
+    }
+
+    // These members have to be word-sized integers, they cannot be limited to
+    // Int8 just because our storage holds 16 elements: fast enumeration is
+    // allowed to return inner pointers to the container, which can be much
+    // larger.
+    internal var itemIndex: Int = 0
+    internal var itemCount: Int = 0
+
+    internal init(_ cocoaSet: _CocoaSet) {
+      self.cocoaSet = cocoaSet
+    }
+  }
+
+  @usableFromInline
+  internal func makeIterator() -> Iterator {
+    return Iterator(self)
+  }
+}
+
+extension _CocoaSet.Iterator: IteratorProtocol {
   @usableFromInline
   internal typealias Element = AnyObject
-
-  // Cocoa Set iterator has to be a class, otherwise we cannot
-  // guarantee that the fast enumeration struct is pinned to a certain memory
-  // location.
-
-  // This stored property should be stored at offset zero.  There's code below
-  // relying on this.
-  internal var _fastEnumerationState: _SwiftNSFastEnumerationState =
-    _makeSwiftNSFastEnumerationState()
-
-  // This stored property should be stored right after `_fastEnumerationState`.
-  // There's code below relying on this.
-  internal var _fastEnumerationStackBuf = _CocoaFastEnumerationStackBuf()
-
-  internal let cocoaSet: _CocoaSet
-
-  internal var _fastEnumerationStatePtr:
-    UnsafeMutablePointer<_SwiftNSFastEnumerationState> {
-    return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
-      to: _SwiftNSFastEnumerationState.self)
-  }
-
-  internal var _fastEnumerationStackBufPtr:
-    UnsafeMutablePointer<_CocoaFastEnumerationStackBuf> {
-    return UnsafeMutableRawPointer(_fastEnumerationStatePtr + 1)
-      .assumingMemoryBound(to: _CocoaFastEnumerationStackBuf.self)
-  }
-
-  // These members have to be word-sized integers, they cannot be limited to
-  // Int8 just because our storage holds 16 elements: fast enumeration is
-  // allowed to return inner pointers to the container, which can be much
-  // larger.
-  internal var itemIndex: Int = 0
-  internal var itemCount: Int = 0
-
-  internal init(_ cocoaSet: _CocoaSet) {
-    self.cocoaSet = cocoaSet
-  }
 
   @usableFromInline
   internal func next() -> Element? {
@@ -3501,62 +3548,52 @@ final internal class _CocoaSetIterator: IteratorProtocol {
 }
 #endif
 
-@usableFromInline
-@_frozen // FIXME(sil-serialize-all)
-internal enum SetIteratorRepresentation<Element: Hashable> {
-  @usableFromInline
-  internal typealias _Iterator = SetIterator<Element>
-  @usableFromInline
-  internal typealias _NativeIndex = _Iterator._NativeIndex
+extension Set {
+  /// An iterator over the members of a `Set<Element>`.
+  @_fixed_layout
+  public struct Iterator {
+    // Set has a separate IteratorProtocol and Index because of efficiency
+    // and implementability reasons.
+    //
+    // Native sets have efficient indices.  Bridged NSSet instances don't.
+    //
+    // Even though fast enumeration is not suitable for implementing
+    // Index, which is multi-pass, it is suitable for implementing a
+    // IteratorProtocol, which is being consumed as iteration proceeds.
 
-  // For native buffer, we keep two indices to keep track of the iteration
-  // progress and the buffer owner to make the buffer non-uniquely
-  // referenced.
-  //
-  // Iterator is iterating over a frozen view of the collection
-  // state, so it should keep its own reference to the buffer.
-  case _native(
-    start: _NativeIndex, end: _NativeIndex, nativeSet: _NativeSet<Element>)
+    @usableFromInline
+    @_frozen
+    internal enum _Variant {
+      case native(_NativeSet<Element>.Iterator)
 #if _runtime(_ObjC)
-  case _cocoa(_CocoaSetIterator)
+      case cocoa(_CocoaSet.Iterator)
 #endif
+    }
+
+    @usableFromInline
+    internal var _variant: _Variant
+
+    @inlinable
+    internal init(_variant: _Variant) {
+      self._variant = _variant
+    }
+  }
 }
 
-/// An iterator over the members of a `Set<Element>`.
-@_fixed_layout // FIXME(sil-serialize-all)
-public struct SetIterator<Element: Hashable>: IteratorProtocol {
-  // Set has a separate IteratorProtocol and Index because of efficiency
-  // and implementability reasons.
-  //
-  // Native sets have efficient indices.  Bridged NSSet instances don't.
-  //
-  // Even though fast enumeration is not suitable for implementing
-  // Index, which is multi-pass, it is suitable for implementing a
-  // IteratorProtocol, which is being consumed as iteration proceeds.
+public typealias SetIterator<Element: Hashable> = Set<Element>.Iterator
 
-  @usableFromInline
-  internal typealias _NativeIndex = _NativeSet<Element>.Index
-
-  @usableFromInline
-  internal var _state: SetIteratorRepresentation<Element>
-
-  @inlinable // FIXME(sil-serialize-all)
-  internal init(_state: SetIteratorRepresentation<Element>) {
-    self._state = _state
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
+extension Set.Iterator {
+  @inlinable
   internal static func _native(
-    start: _NativeIndex, end: _NativeIndex, nativeSet: _NativeSet<Element>
-  ) -> SetIterator {
-    return SetIterator(
-      _state: ._native(start: start, end: end, nativeSet: nativeSet))
+    _ iterator: _NativeSet<Element>.Iterator
+  ) -> Set.Iterator {
+    return Set.Iterator(_variant: .native(iterator))
   }
+
 #if _runtime(_ObjC)
   @usableFromInline
-  internal static func _cocoa(_ cocoaSet: _CocoaSet) -> SetIterator {
-    let iterator = _CocoaSetIterator(cocoaSet)
-    return SetIterator(_state: ._cocoa(iterator))
+  internal static func _cocoa(_ iterator: _CocoaSet.Iterator) -> Set.Iterator {
+    return Set.Iterator(_variant: .cocoa(iterator))
   }
 #endif
 
@@ -3565,44 +3602,43 @@ public struct SetIterator<Element: Hashable>: IteratorProtocol {
     return _canBeClass(Element.self) == 0
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  internal mutating func _nativeNext() -> Element? {
-    switch _state {
-    case ._native(let startIndex, let endIndex, let nativeSet):
-      if startIndex == endIndex {
-        return nil
-      }
-      let result = nativeSet.assertingGet(at: startIndex)
-      _state = ._native(
-        start: nativeSet.index(after: startIndex),
-        end: endIndex,
-        nativeSet: nativeSet)
-      return result
+  @usableFromInline @_transparent
+  internal var _asNative: _NativeSet<Element>.Iterator {
+    get {
+      switch _variant {
+      case .native(let nativeIterator):
+        return nativeIterator
 #if _runtime(_ObjC)
-    case ._cocoa:
-      _sanityCheckFailure("internal error: not backed by NSSet")
+      case .cocoa:
+        _sanityCheckFailure("internal error: does not contain a native index")
 #endif
+      }
+    }
+    set {
+      self._variant = .native(newValue)
     }
   }
+}
 
+extension Set.Iterator: IteratorProtocol {
   /// Advances to the next element and returns it, or `nil` if no next element
   /// exists.
   ///
   /// Once `nil` has been returned, all subsequent calls return `nil`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @inline(__always)
   public mutating func next() -> Element? {
     if _fastPath(_guaranteedNative) {
-      return _nativeNext()
+      return _asNative.next()
     }
 
-    switch _state {
-    case ._native:
-      return _nativeNext()
+    switch _variant {
+    case .native:
+      return _asNative.next()
 #if _runtime(_ObjC)
-    case ._cocoa(let cocoaIterator):
-      if let anyObjectElement = cocoaIterator.next() {
-        return _forceBridgeFromObjectiveC(anyObjectElement, Element.self)
+    case .cocoa(let cocoaIterator):
+      if let cocoaElement = cocoaIterator.next() {
+        return _forceBridgeFromObjectiveC(cocoaElement, Element.self)
       }
       return nil
 #endif
@@ -3610,7 +3646,7 @@ public struct SetIterator<Element: Hashable>: IteratorProtocol {
   }
 }
 
-extension SetIterator: CustomReflectable {
+extension Set.Iterator: CustomReflectable {
   /// A mirror that reflects the iterator.
   public var customMirror: Mirror {
     return Mirror(

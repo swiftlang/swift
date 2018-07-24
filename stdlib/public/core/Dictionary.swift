@@ -570,9 +570,9 @@ extension Dictionary: Sequence {
   ///
   /// - Returns: An iterator over the dictionary with elements of type
   ///   `(key: Key, value: Value)`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @inline(__always)
-  public func makeIterator() -> DictionaryIterator<Key, Value> {
+  public func makeIterator() -> Dictionary<Key, Value>.Iterator {
     return _variant.makeIterator()
   }
 }
@@ -3158,7 +3158,7 @@ internal struct _CocoaDictionary: _DictionaryBuffer {
     bucketCount: Int
   ) -> _NativeDictionary<K, V> {
     var result = _NativeDictionary<K, V>(bucketCount: bucketCount)
-    let iterator = _CocoaDictionaryIterator(self)
+    let iterator = _CocoaDictionary.Iterator(self)
     while let (cocoaKey, cocoaValue) = iterator.next()  {
       result.unsafeAddNew(
         key: _forceBridgeFromObjectiveC(cocoaKey, K.self),
@@ -3173,7 +3173,7 @@ internal struct _CocoaDictionary: _DictionaryBuffer {
     _ transform: (Value) throws -> T
   ) rethrows -> _NativeDictionary<Key, T> {
     var result = _NativeDictionary<Key, T>(minimumCapacity: self.count)
-    let iterator = _CocoaDictionaryIterator(self)
+    let iterator = _CocoaDictionary.Iterator(self)
     while let (cocoaKey, cocoaValue) = iterator.next()  {
       try result.unsafeAddNew(
         key: _forceBridgeFromObjectiveC(cocoaKey, Key.self),
@@ -3929,16 +3929,13 @@ extension Dictionary._Variant: _DictionaryBuffer {
   /// - Complexity: O(1).
   @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
-  internal func makeIterator() -> DictionaryIterator<Key, Value> {
+  internal func makeIterator() -> Dictionary<Key, Value>.Iterator {
     switch self {
-    case .native(let nativeDictionary):
-      return ._native(
-        start: nativeDictionary.startIndex,
-        end: nativeDictionary.endIndex,
-        dictionary: nativeDictionary)
+    case .native(let dictionary):
+      return ._native(dictionary.makeIterator())
 #if _runtime(_ObjC)
-    case .cocoa(let cocoaDictionary):
-      return ._cocoa(cocoaDictionary)
+    case .cocoa(let dictionary):
+      return ._cocoa(dictionary.makeIterator())
 #endif
     }
   }
@@ -4221,49 +4218,103 @@ extension Dictionary.Index: Hashable {
   }
 }
 
-#if _runtime(_ObjC)
-@usableFromInline
-final internal class _CocoaDictionaryIterator: IteratorProtocol {
+extension _NativeDictionary {
   @usableFromInline
-  internal typealias Element = (AnyObject, AnyObject)
+  @_fixed_layout
+  internal struct Iterator {
+    // For native buffer, we keep two indices to keep track of the iteration
+    // progress and the buffer owner to make the buffer non-uniquely
+    // referenced.
+    //
+    // Iterator is iterating over a frozen view of the collection
+    // state, so it should keep its own reference to the buffer.
+    @usableFromInline
+    internal var index: Index
+    @usableFromInline
+    internal var endIndex: Index
+    @usableFromInline
+    internal let nativeDictionary: _NativeDictionary
 
-  // Cocoa Dictionary iterator has to be a class, otherwise we cannot
-  // guarantee that the fast enumeration struct is pinned to a certain memory
-  // location.
-
-  // This stored property should be stored at offset zero.  There's code below
-  // relying on this.
-  internal var _fastEnumerationState: _SwiftNSFastEnumerationState =
-    _makeSwiftNSFastEnumerationState()
-
-  // This stored property should be stored right after `_fastEnumerationState`.
-  // There's code below relying on this.
-  internal var _fastEnumerationStackBuf = _CocoaFastEnumerationStackBuf()
-
-  internal let cocoaDictionary: _CocoaDictionary
-
-  internal var _fastEnumerationStatePtr:
-    UnsafeMutablePointer<_SwiftNSFastEnumerationState> {
-    return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
-      to: _SwiftNSFastEnumerationState.self)
+    @inlinable
+    init(_ dictionary: _NativeDictionary) {
+      self.index = dictionary.startIndex
+      self.endIndex = dictionary.endIndex
+      self.nativeDictionary = dictionary
+    }
   }
 
-  internal var _fastEnumerationStackBufPtr:
-    UnsafeMutablePointer<_CocoaFastEnumerationStackBuf> {
-    return UnsafeMutableRawPointer(_fastEnumerationStatePtr + 1)
+  @inlinable
+  internal func makeIterator() -> Iterator {
+    return Iterator(self)
+  }
+}
+
+extension _NativeDictionary.Iterator: IteratorProtocol {
+  @usableFromInline
+  internal typealias Element = (key: Key, value: Value)
+
+  @inlinable
+  internal mutating func next() -> Element? {
+    guard index != endIndex else { return nil }
+    let result = nativeDictionary.assertingGet(at: index)
+    nativeDictionary.formIndex(after: &index)
+    return result
+  }
+}
+
+#if _runtime(_ObjC)
+extension _CocoaDictionary {
+  @usableFromInline
+  final internal class Iterator {
+    // Cocoa Dictionary iterator has to be a class, otherwise we cannot
+    // guarantee that the fast enumeration struct is pinned to a certain memory
+    // location.
+
+    // This stored property should be stored at offset zero.  There's code below
+    // relying on this.
+    internal var _fastEnumerationState: _SwiftNSFastEnumerationState =
+      _makeSwiftNSFastEnumerationState()
+
+    // This stored property should be stored right after
+    // `_fastEnumerationState`.  There's code below relying on this.
+    internal var _fastEnumerationStackBuf = _CocoaFastEnumerationStackBuf()
+
+    internal let cocoaDictionary: _CocoaDictionary
+
+    internal var _fastEnumerationStatePtr:
+      UnsafeMutablePointer<_SwiftNSFastEnumerationState> {
+      return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
+        to: _SwiftNSFastEnumerationState.self)
+    }
+
+    internal var _fastEnumerationStackBufPtr:
+      UnsafeMutablePointer<_CocoaFastEnumerationStackBuf> {
+      return UnsafeMutableRawPointer(_fastEnumerationStatePtr + 1)
       .assumingMemoryBound(to: _CocoaFastEnumerationStackBuf.self)
+    }
+
+    // These members have to be word-sized integers, they cannot be limited to
+    // Int8 just because our storage holds 16 elements: fast enumeration is
+    // allowed to return inner pointers to the container, which can be much
+    // larger.
+    internal var itemIndex: Int = 0
+    internal var itemCount: Int = 0
+
+    internal init(_ cocoaDictionary: _CocoaDictionary) {
+      self.cocoaDictionary = cocoaDictionary
+    }
   }
 
-  // These members have to be word-sized integers, they cannot be limited to
-  // Int8 just because our storage holds 16 elements: fast enumeration is
-  // allowed to return inner pointers to the container, which can be much
-  // larger.
-  internal var itemIndex: Int = 0
-  internal var itemCount: Int = 0
-
-  internal init(_ cocoaDictionary: _CocoaDictionary) {
-    self.cocoaDictionary = cocoaDictionary
+  @usableFromInline
+  @_effects(releasenone)
+  internal func makeIterator() -> Iterator {
+    return Iterator(self)
   }
+}
+
+extension _CocoaDictionary.Iterator: IteratorProtocol {
+  @usableFromInline
+  internal typealias Element = (key: AnyObject, value: AnyObject)
 
   @usableFromInline
   internal func next() -> Element? {
@@ -4300,70 +4351,56 @@ final internal class _CocoaDictionaryIterator: IteratorProtocol {
 }
 #endif
 
-@usableFromInline
-@_frozen // FIXME(sil-serialize-all)
-internal enum DictionaryIteratorRepresentation<Key: Hashable, Value> {
-  @usableFromInline
-  internal typealias _Iterator = DictionaryIterator<Key, Value>
-  @usableFromInline
-  internal typealias _NativeIndex = _Iterator._NativeIndex
+extension Dictionary {
+  /// An iterator over the members of a `Dictionary<Key, Value>`.
+  @_fixed_layout
+  public struct Iterator {
+    // Dictionary has a separate IteratorProtocol and Index because of
+    // efficiency and implementability reasons.
+    //
+    // Native dictionaries have efficient indices.
+    // Bridged NSDictionary instances don't.
+    //
+    // Even though fast enumeration is not suitable for implementing
+    // Index, which is multi-pass, it is suitable for implementing a
+    // IteratorProtocol, which is being consumed as iteration proceeds.
 
-  // For native buffer, we keep two indices to keep track of the iteration
-  // progress and the buffer owner to make the buffer non-uniquely
-  // referenced.
-  //
-  // Iterator is iterating over a frozen view of the collection
-  // state, so it should keep its own reference to the buffer.
-  case _native(
-    start: _NativeIndex,
-    end: _NativeIndex,
-    dictionary: _NativeDictionary<Key, Value>)
+    @usableFromInline
+    @_frozen
+    internal enum _Variant {
+      case native(_NativeDictionary<Key, Value>.Iterator)
 #if _runtime(_ObjC)
-  case _cocoa(_CocoaDictionaryIterator)
+      case cocoa(_CocoaDictionary.Iterator)
 #endif
+    }
+
+    @usableFromInline
+    internal var _variant: _Variant
+
+    @inlinable
+    internal init(_variant: _Variant) {
+      self._variant = _variant
+    }
+  }
 }
 
-/// An iterator over the members of a `Dictionary<Key, Value>`.
-@_fixed_layout // FIXME(sil-serialize-all)
-public struct DictionaryIterator<Key: Hashable, Value>: IteratorProtocol {
-  // Dictionary has a separate IteratorProtocol and Index because of efficiency
-  // and implementability reasons.
-  //
-  // Native dictionaries have efficient indices.
-  // Bridged NSDictionary instances don't.
-  //
-  // Even though fast enumeration is not suitable for implementing
-  // Index, which is multi-pass, it is suitable for implementing a
-  // IteratorProtocol, which is being consumed as iteration proceeds.
+public typealias DictionaryIterator<Key: Hashable, Value> =
+  Dictionary<Key, Value>.Iterator
 
-  @usableFromInline
-  internal typealias _NativeIndex = _NativeDictionary<Key, Value>.Index
-
-  @usableFromInline
-  internal var _state: DictionaryIteratorRepresentation<Key, Value>
-
-  @inlinable // FIXME(sil-serialize-all)
-  internal init(_state: DictionaryIteratorRepresentation<Key, Value>) {
-    self._state = _state
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
+extension Dictionary.Iterator {
+  @inlinable
   internal static func _native(
-    start: _NativeIndex,
-    end: _NativeIndex,
-    dictionary: _NativeDictionary<Key, Value>
-  ) -> DictionaryIterator {
-    return DictionaryIterator(
-      _state: ._native(start: start, end: end, dictionary: dictionary))
+    _ iterator: _NativeDictionary<Key, Value>.Iterator
+  ) -> Dictionary.Iterator {
+    return Dictionary.Iterator(_variant: .native(iterator))
   }
 
 #if _runtime(_ObjC)
-  @usableFromInline
+  @inlinable
   internal static func _cocoa(
-    _ cocoaDictionary: _CocoaDictionary
-  ) -> DictionaryIterator {
-    let iterator = _CocoaDictionaryIterator(cocoaDictionary)
-    return DictionaryIterator(_state: ._cocoa(iterator))
+    _ iterator: _CocoaDictionary.Iterator
+  ) -> Dictionary.Iterator {
+    return Dictionary.Iterator(_variant: .cocoa(iterator))
   }
 #endif
 
@@ -4372,42 +4409,41 @@ public struct DictionaryIterator<Key: Hashable, Value>: IteratorProtocol {
     return _canBeClass(Key.self) == 0 || _canBeClass(Value.self) == 0
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  internal mutating func _nativeNext() -> (key: Key, value: Value)? {
-    switch _state {
-    case ._native(let startIndex, let endIndex, let dictionary):
-      if startIndex == endIndex {
-        return nil
-      }
-      let result = dictionary.assertingGet(at: startIndex)
-      _state = ._native(
-        start: dictionary.index(after: startIndex),
-        end: endIndex,
-        dictionary: dictionary)
-      return result
+  @usableFromInline @_transparent
+  internal var _asNative: _NativeDictionary<Key, Value>.Iterator {
+    get {
+      switch _variant {
+      case .native(let nativeIterator):
+        return nativeIterator
 #if _runtime(_ObjC)
-    case ._cocoa:
-      _sanityCheckFailure("internal error: not backed by NSDictionary")
+      case .cocoa:
+        _sanityCheckFailure("internal error: does not contain a native index")
 #endif
+      }
+    }
+    set {
+      self._variant = .native(newValue)
     }
   }
+}
 
+extension Dictionary.Iterator: IteratorProtocol {
   /// Advances to the next element and returns it, or `nil` if no next element
   /// exists.
   ///
   /// Once `nil` has been returned, all subsequent calls return `nil`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @inline(__always)
   public mutating func next() -> (key: Key, value: Value)? {
     if _fastPath(_guaranteedNative) {
-      return _nativeNext()
+      return _asNative.next()
     }
 
-    switch _state {
-    case ._native:
-      return _nativeNext()
+    switch _variant {
+    case .native:
+      return _asNative.next()
 #if _runtime(_ObjC)
-    case ._cocoa(let cocoaIterator):
+    case .cocoa(let cocoaIterator):
       if let (cocoaKey, cocoaValue) = cocoaIterator.next() {
         let nativeKey = _forceBridgeFromObjectiveC(cocoaKey, Key.self)
         let nativeValue = _forceBridgeFromObjectiveC(cocoaValue, Value.self)
@@ -4419,7 +4455,7 @@ public struct DictionaryIterator<Key: Hashable, Value>: IteratorProtocol {
   }
 }
 
-extension DictionaryIterator: CustomReflectable {
+extension Dictionary.Iterator: CustomReflectable {
   /// A mirror that reflects the iterator.
   public var customMirror: Mirror {
     return Mirror(
