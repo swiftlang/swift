@@ -875,7 +875,8 @@ public:
   }
 };
 
-class TupleCache : public MetadataCache<TupleCacheEntry, false, TupleCache> {
+class TupleCacheStorage :
+  public LockingConcurrentMapStorage<TupleCacheEntry, false> {
 public:
 // FIXME: https://bugs.swift.org/browse/SR-1155
 #pragma clang diagnostic push
@@ -890,6 +891,10 @@ public:
     return const_cast<TupleCacheEntry*>(entry);
   }
 #pragma clang diagnostic pop
+};
+
+class TupleCache :
+  public LockingConcurrentMap<TupleCacheEntry, TupleCacheStorage> {
 };
 
 } // end anonymous namespace
@@ -1269,7 +1274,7 @@ TupleCacheEntry::TupleCacheEntry(const Key &key, MetadataRequest request,
   for (size_t i = 0, e = key.NumElements; i != e; ++i)
     Data.getElement(i).Type = key.Elements[i];
 
-  assert(TupleCache::resolveExistingEntry(&Data) == this);
+  assert(TupleCacheStorage::resolveExistingEntry(&Data) == this);
 }
 
 TupleCacheEntry::AllocationResult
@@ -3293,7 +3298,7 @@ public:
 } // end anonymous namespace
 
 using GenericWitnessTableCache =
-  LockingConcurrentMap<WitnessTableCacheEntry, /*destructor*/ false>;
+  MetadataCache<WitnessTableCacheEntry, /*destructor*/ false>;
 using LazyGenericWitnessTableCache = Lazy<GenericWitnessTableCache>;
 
 /// Fetch the cache for a generic witness-table structure.

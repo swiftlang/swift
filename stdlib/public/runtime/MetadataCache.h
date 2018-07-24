@@ -83,6 +83,41 @@ enum class ConcurrencyRequest {
 struct ConcurrencyControl {
   Mutex Lock;
   ConditionVariable Queue;
+
+  ConcurrencyControl() = default;
+};
+
+template <class EntryType, bool ProvideDestructor = true>
+class LockingConcurrentMapStorage {
+  ConcurrentMap<EntryType, ProvideDestructor, MetadataAllocator> Map;
+  StaticOwningPointer<ConcurrencyControl, ProvideDestructor> Concurrency;
+
+public:
+  LockingConcurrentMapStorage() : Concurrency(new ConcurrencyControl()) {}
+
+  MetadataAllocator &getAllocator() { return Map.getAllocator(); }
+
+  ConcurrencyControl &getConcurrency() { return *Concurrency; }
+
+  template <class KeyType, class... ArgTys>
+  std::pair<EntryType*, bool>
+  getOrInsert(KeyType key, ArgTys &&...args) {
+    return Map.getOrInsert(key, args...);
+  }
+
+  template <class KeyType>
+  EntryType *find(KeyType key) {
+    return Map.find(key);
+  }
+
+  /// A default implementation for resolveEntry that assumes that the
+  /// key type is a lookup key for the map.
+  template <class KeyType>
+  EntryType *resolveExistingEntry(KeyType key) {
+    auto entry = Map.find(key);
+    assert(entry && "entry doesn't already exist!");
+    return entry;
+  }
 };
 
 /// A map for which there is a phase of initialization that is guaranteed
@@ -122,38 +157,28 @@ struct ConcurrencyControl {
 ///   /// implemented if checkDependency is called on the map.
 ///   MetadataDependency checkDependency(ConcurrencyControl &concurrency,
 ///                                      ArgTys...);
-template <class EntryType, bool ProvideDestructor = true,
-          class OptImpl = void>
+template <class EntryType,
+          class StorageType = LockingConcurrentMapStorage<EntryType, true>>
 class LockingConcurrentMap {
-  ConcurrentMap<EntryType, ProvideDestructor, MetadataAllocator> Map;
-
-  StaticOwningPointer<ConcurrencyControl, ProvideDestructor> Concurrency;
-
-protected:
-  using Impl =
-    typename std::conditional<std::is_same<OptImpl, void>::value,
-                              LockingConcurrentMap,
-                              OptImpl>::type;
-  Impl &asImpl() { return static_cast<Impl&>(*this); }
-
+  StorageType Storage;
   using Status = typename EntryType::Status;
 
 public:
-  LockingConcurrentMap() : Concurrency(new ConcurrencyControl()) {}
+  LockingConcurrentMap() = default;
 
-  MetadataAllocator &getAllocator() { return Map.getAllocator(); }
+  MetadataAllocator &getAllocator() { return Storage.getAllocator(); }
 
   template <class KeyType, class... ArgTys>
   std::pair<EntryType*, Status>
   getOrInsert(KeyType key, ArgTys &&...args) {
-    auto result = Map.getOrInsert(key, args...);
+    auto result = Storage.getOrInsert(key, args...);
     auto entry = result.first;
 
     // If we are not inserting the entry, we need to potentially block on 
     // currently satisfies our conditions.
     if (!result.second) {
       auto status =
-        entry->await(*Concurrency, std::forward<ArgTys>(args)...);
+        entry->await(Storage.getConcurrency(), std::forward<ArgTys>(args)...);
       return { entry, status };
     }
 
@@ -162,66 +187,63 @@ public:
 
     // Allocation.  This can fast-path and bypass initialization by returning
     // a status.
-    if (auto status = entry->beginAllocation(*Concurrency, args...)) {
+    if (auto status =
+          entry->beginAllocation(Storage.getConcurrency(), args...)) {
       return { entry, *status };
     }
 
     // Initialization.
-    auto status = entry->beginInitialization(*Concurrency,
+    auto status = entry->beginInitialization(Storage.getConcurrency(),
                                              std::forward<ArgTys>(args)...);
     return { entry, status };
   }
 
   template <class KeyType>
   EntryType *find(KeyType key) {
-    return Map.find(key);
+    return Storage.find(key);
   }
 
   template <class KeyType, class... ArgTys>
   std::pair<EntryType*, Status>
   resumeInitialization(KeyType key, ArgTys &&...args) {
-    EntryType *entry = asImpl().resolveExistingEntry(key);
+    EntryType *entry = Storage.resolveExistingEntry(key);
     auto status =
-      entry->resumeInitialization(*Concurrency, std::forward<ArgTys>(args)...);
+      entry->resumeInitialization(Storage.getConcurrency(),
+                                  std::forward<ArgTys>(args)...);
     return { entry, status };
   }
 
   template <class KeyType, class... ArgTys>
   bool enqueue(KeyType key, ArgTys &&...args) {
-    EntryType *entry = asImpl().resolveExistingEntry(key);
-    return entry->enqueue(*Concurrency, std::forward<ArgTys>(args)...);
+    EntryType *entry = Storage.resolveExistingEntry(key);
+    return entry->enqueue(Storage.getConcurrency(),
+                          std::forward<ArgTys>(args)...);
   }
 
   /// Given that an entry already exists, await it.
   template <class KeyType, class... ArgTys>
   Status await(KeyType key, ArgTys &&...args) {
-    EntryType *entry = asImpl().resolveExistingEntry(key);
-    return entry->await(*Concurrency, std::forward<ArgTys>(args)...);
+    EntryType *entry = Storage.resolveExistingEntry(key);
+    return entry->await(Storage.getConcurrency(),
+                        std::forward<ArgTys>(args)...);
   }
 
   /// If an entry already exists, await it; otherwise report failure.
   template <class KeyType, class... ArgTys>
   Optional<Status> tryAwaitExisting(KeyType key, ArgTys &&...args) {
-    EntryType *entry = Map.find(key);
+    EntryType *entry = Storage.find(key);
     if (!entry) return None;
-    return entry->await(*Concurrency, std::forward<ArgTys>(args)...);
+    return entry->await(Storage.getConcurrency(),
+                        std::forward<ArgTys>(args)...);
   }
 
   /// Given that an entry already exists, check whether it has an active
   /// dependency.
   template <class KeyType, class... ArgTys>
   MetadataDependency checkDependency(KeyType key, ArgTys &&...args) {
-    EntryType *entry = asImpl().resolveExistingEntry(key);
-    return entry->checkDependency(*Concurrency, std::forward<ArgTys>(args)...);
-  }
-
-  /// A default implementation for resolveEntry that assumes that the
-  /// key type is a lookup key for the map.
-  template <class KeyType>
-  EntryType *resolveExistingEntry(KeyType key) {
-    auto entry = Map.find(key);
-    assert(entry && "entry doesn't already exist!");
-    return entry;
+    EntryType *entry = Storage.resolveExistingEntry(key);
+    return entry->checkDependency(Storage.getConcurrency(),
+                                  std::forward<ArgTys>(args)...);
   }
 };
 
@@ -1255,9 +1277,10 @@ public:
   }
 };
 
-template <class EntryType, bool ProvideDestructor = true, class OptImpl = void>
+template <class EntryType, bool ProvideDestructor = true>
 class MetadataCache :
-    public LockingConcurrentMap<EntryType, ProvideDestructor, OptImpl> {
+    public LockingConcurrentMap<EntryType,
+             LockingConcurrentMapStorage<EntryType, ProvideDestructor>> {
 };
 
 } // namespace swift
