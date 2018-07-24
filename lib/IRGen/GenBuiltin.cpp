@@ -1007,7 +1007,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
       getLoweredTypeAndTypeInfo(
         IGF.IGM, substitutions.getReplacementTypes().front());
     auto *metadata =
-      IGF.emitTypeMetadataRef(valueTy.first.getSwiftRValueType());
+      IGF.emitTypeMetadataRef(valueTy.first.getASTType());
     out.add(IGF.Builder.CreateCall(IGF.IGM.getAutoDiffCreateTapeFn(),
                                    { metadata }));
     return;
