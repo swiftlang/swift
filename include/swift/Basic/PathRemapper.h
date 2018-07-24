@@ -33,7 +33,6 @@
 namespace swift {
 
 class PathRemapper {
-private:
   SmallVector<std::pair<std::string, std::string>, 2> PathMappings;
 
 public:
