@@ -2693,8 +2693,8 @@ private:
 public:
   AdjointRematCloner(SILFunction &fn) : SILClonerWithScopes(fn) {}
   
-  void insertValueMapping(std::pair<SILValue, SILValue> valuePair) {
-    auto insertion = ValueMap.insert(valuePair);
+  void insertValueMapping(SILValue valueInOriginal, SILValue valueInAdjoint) {
+    auto insertion = ValueMap.insert({valueInOriginal, valueInAdjoint});
     assert(insertion.second && "The original value was mapped before");
   }
 
@@ -2877,7 +2877,7 @@ public:
     // parameters".
     for (auto pair : zip(original.getArgumentsWithoutIndirectResults(),
                          originalParametersInAdj))
-      rematCloner.insertValueMapping(pair);
+      rematCloner.insertValueMapping(std::get<0>(pair), std::get<1>(pair));
 
     // Assign adjoint to the return value.
     //   y = tuple (y0, ..., yn)
@@ -3022,7 +3022,7 @@ public:
     // Memorize this value mapping in the remat cloner, when we are not
     // extracting a nested primal value aggregate.
     if (!nested)
-      rematCloner.insertValueMapping({value, extracted});
+      rematCloner.insertValueMapping(value, extracted);
     return extracted;
   }
 
