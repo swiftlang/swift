@@ -550,6 +550,9 @@ enum class TypeResolutionFlags : unsigned {
 
   /// Whether we are in a protocol's where clause
   ProtocolWhereClause = 1 << 27,
+
+  /// Whether we should not produce diagnostics if the type is invalid.
+  SilenceErrors = 1 << 28,
 };
 
 /// Option set describing how type resolution should work.
@@ -937,7 +940,6 @@ public:
   Type resolveIdentifierType(DeclContext *DC,
                              IdentTypeRepr *IdType,
                              TypeResolutionOptions options,
-                             bool diagnoseErrors,
                              GenericTypeResolver *resolver);
 
   /// Bind an UnresolvedDeclRefExpr by performing name lookup and
