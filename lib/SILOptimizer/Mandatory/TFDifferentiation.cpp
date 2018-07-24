@@ -64,8 +64,8 @@ static raw_ostream &getADDebugStream() {
 /// Given a dumpable value, dumps it to `llvm::dbgs()`.
 template<typename T>
 static inline void debugDump(T &v) {
-  DEBUG(llvm::dbgs() << "\n==== BEGIN DEBUG DUMP ====\n" << v <<
-        "\n==== END DEBUG DUMP ====\n");
+  LLVM_DEBUG(llvm::dbgs() << "\n==== BEGIN DEBUG DUMP ====\n"
+                          << v << "\n==== END DEBUG DUMP ====\n");
 }
 
 /// Given a set of AD indices, mangles it into a textual form.
@@ -111,7 +111,7 @@ static void createEntryArguments(SILFunction *f) {
 /// Otherwise, attempt to link it from imported modules. Returns null if such
 /// function name does not exist.
 static SILFunction *lookupOrLinkFunction(StringRef name, SILModule &module) {
-  DEBUG(getADDebugStream() << "Looking up function " << name << '\n');
+  LLVM_DEBUG(getADDebugStream() << "Looking up function " << name << '\n');
   assert(!name.empty());
   if (auto *localFn = module.lookUpFunction(name))
     return localFn;
@@ -1087,9 +1087,10 @@ void ADContext::emitNondifferentiabilityError(SILInstruction *inst,
   auto srcLoc = inst->getLoc().getSourceLoc();
   if (srcLoc.isInvalid()) srcLoc = SourceLoc();
   auto invoker = task->getInvoker();
-  DEBUG(getADDebugStream() << "Diagnosing non-differentiability for value \n\t"
-        << *inst << "\n" << "while performing differentiation task\n\t" << task
-        << '\n');
+  LLVM_DEBUG(getADDebugStream()
+             << "Diagnosing non-differentiability for value \n\t" << *inst
+             << "\n"
+             << "while performing differentiation task\n\t" << task << '\n');
   switch (invoker.getKind()) {
   // For a gradient instruction that is not associated with any source
   // location, we emit a diagnostic without source location.
@@ -1197,8 +1198,9 @@ public:
 }
 
 bool ControlFlowCanonicalization::run() {
-  DEBUG(getADDebugStream() << "Running control flow canonicalization on "
-        "function " << function.getName() << '\n');
+  LLVM_DEBUG(getADDebugStream() << "Running control flow canonicalization on "
+                                   "function "
+                                << function.getName() << '\n');
   bool changed = false;
   assert(!function.isNoReturnFunction() && !function.isExternalDeclaration());
   assert(function.findReturnBB().getNodePtr());
@@ -1349,8 +1351,8 @@ static void collectVariedValues(SILValue value,
       if (auto *def =
             dyn_cast_or_null<BeginAccessInst>(buffer->getDefiningInstruction()))
         buffer = def->getOperand();
-      DEBUG(getADDebugStream() << "VARIED @ " << inputIndex << ":\n"
-            << buffer << '\n');
+      LLVM_DEBUG(getADDebugStream() << "VARIED @ " << inputIndex << ":\n"
+                                    << buffer << '\n');
       variedValues.insert(buffer);
       visited.insert(buffer);
       collectVariedValues(buffer, variedValues, inputIndex, visited);
@@ -1358,8 +1360,8 @@ static void collectVariedValues(SILValue value,
     }
     // For other instructions, consider their results varied.
     for (auto val : inst->getResults()) {
-      DEBUG(getADDebugStream() << "VARIED @ " << inputIndex << ":\n"
-            << val << '\n');
+      LLVM_DEBUG(getADDebugStream() << "VARIED @ " << inputIndex << ":\n"
+                                    << val << '\n');
       variedValues.insert(val);
       // Recursively collect.
       collectVariedValues(val, variedValues, inputIndex, visited);
@@ -1373,8 +1375,8 @@ static void collectVariedValues(SILValue value,
 static void collectUsefulValues(SILValue value,
                                 SmallDenseSet<SILValue> &usefulValues,
                                 unsigned outputIndex) {
-  DEBUG(getADDebugStream() << "USEFUL @ " << outputIndex << ":\n"
-        << value << '\n');
+  LLVM_DEBUG(getADDebugStream() << "USEFUL @ " << outputIndex << ":\n"
+                                << value << '\n');
   usefulValues.insert(value);
   if (auto *def = value->getDefiningInstruction())
     for (auto &op : def->getAllOperands())
@@ -1382,24 +1384,26 @@ static void collectUsefulValues(SILValue value,
 }
 
 void DifferentiableActivityInfo::analyze() {
-  DEBUG(getADDebugStream() << "Running activity analysis on @"
-        << function.getName() << '\n');
+  LLVM_DEBUG(getADDebugStream()
+             << "Running activity analysis on @" << function.getName() << '\n');
   // Inputs are just function's arguments, count `n`.
   auto paramArgs = function.getArgumentsWithoutIndirectResults();
   for (auto valueAndIndex : enumerate(paramArgs)) {
     inputValues.push_back(valueAndIndex.first);
   }
-  DEBUG({
+  LLVM_DEBUG({
     auto &s = getADDebugStream();
     s << "Inputs in @" << function.getName() << ":\n";
-    for (auto val : inputValues) s << val << '\n';
+    for (auto val : inputValues)
+      s << val << '\n';
   });
   // Outputs are indirect result buffers and return values, count `m`.
   collectAllFormalResultsInTypeOrder(function, outputValues);
-  DEBUG({
+  LLVM_DEBUG({
     auto &s = getADDebugStream();
     s << "Outputs in @" << function.getName() << ":\n";
-    for (auto val : outputValues) s << val << '\n';
+    for (auto val : outputValues)
+      s << val << '\n';
   });
   // Initialize sets to store useful values and varied values.
   usefulValueSets.append(outputValues.size(), {});
@@ -1816,11 +1820,12 @@ ADContext::createPrimalValueStructForFunction(SILFunction *function) {
     ctxStruct->setGenericParams(genParams->clone(ctxStruct));
   }
   file.addVisibleDecl(ctxStruct);
-  DEBUG({
+  LLVM_DEBUG({
     auto &s = getADDebugStream();
     s << "Primal value struct created for function "
       << function->getName() << '\n';
-    ctxStruct->print(s); s << '\n';
+    ctxStruct->print(s);
+    s << '\n';
   });
   return ctxStruct;
 }
@@ -2030,8 +2035,9 @@ public:
 
   /// Entry of primal generation for a function.
   void run() {
-    DEBUG(getADDebugStream() << "Cloning original @" << getOriginal()->getName()
-          << " to primal @" << synthesis.target->getName() << '\n');
+    LLVM_DEBUG(getADDebugStream()
+               << "Cloning original @" << getOriginal()->getName()
+               << " to primal @" << synthesis.target->getName() << '\n');
     // Kick off the cloner.
     visitSILFunction(getOriginal());
   }
@@ -2051,8 +2057,8 @@ public:
     case PrimalValueKind::StaticCheckpoint:
       for (auto resultPair :
              llvm::zip(orig->getResults(), cloned->getResults())) {
-        DEBUG(getADDebugStream() << "Found static checkpoint "
-              << *cloned << '\n');
+        LLVM_DEBUG(getADDebugStream()
+                   << "Found static checkpoint " << *cloned << '\n');
         SILValue origRes, clonedRes;
         std::tie(origRes, clonedRes) = resultPair;
         getPrimalInfo().addStaticPrimalValueDecl(origRes);
@@ -2060,8 +2066,9 @@ public:
       }
       break;
     }
-    DEBUG(getADDebugStream() << "Post-processing the clone of \n" << *orig
-          << "as\n" << *cloned << '\n');
+    LLVM_DEBUG(getADDebugStream() << "Post-processing the clone of \n"
+                                  << *orig << "as\n"
+                                  << *cloned << '\n');
   }
 
   void visitSILBasicBlock(SILBasicBlock *bb) {
@@ -2071,7 +2078,7 @@ public:
   }
 
   void visitSILFunction(SILFunction *original) {
-    DEBUG(getADDebugStream() << "Running PrimalGen on\n" << *original);
+    LLVM_DEBUG(getADDebugStream() << "Running PrimalGen on\n" << *original);
     // Create entry BB and arguments.
     auto *entry = getPrimal()->createBasicBlock();
     // Map the original's arguments to the new function's arguments.
@@ -2128,7 +2135,7 @@ public:
       retVal = builder.createTuple(loc, {primValsVal, origResInPrimal});
     }
     builder.createReturn(loc, retVal);
-    DEBUG({
+    LLVM_DEBUG({
       auto &s = getADDebugStream() << "Primal values in $"
       << getPrimalInfo().getPrimalValueStruct()->getName() << ":\n";
       for (auto *var : getPrimalInfo().getPrimalValueStruct()->getMembers()) {
@@ -2136,8 +2143,9 @@ public:
         s << '\n';
       }
     });
-    DEBUG(getADDebugStream() << "Finished PrimalGen for function " <<
-          original->getName() << ":\n" << *getPrimal());
+    LLVM_DEBUG(getADDebugStream() << "Finished PrimalGen for function "
+                                  << original->getName() << ":\n"
+                                  << *getPrimal());
   }
 
   /// General visitor for all instruction. If there is any error emitted by
@@ -2156,13 +2164,13 @@ public:
     // Special handling logic only applies when `apply` is active. If not, just
     // do standard cloning.
     if (!activityInfo.isActive(ai, synthesis.indices)) {
-      DEBUG(getADDebugStream() << "Not active:\n" << *ai << '\n');
+      LLVM_DEBUG(getADDebugStream() << "Not active:\n" << *ai << '\n');
       SILClonerWithScopes::visitApplyInst(ai);
       return;
     }
     // This instruction is active, replace it with a call to its primal.
     // Get the indices required for differentiating this function.
-    DEBUG(getADDebugStream() << "Primal-transforming:\n" << *ai << '\n');
+    LLVM_DEBUG(getADDebugStream() << "Primal-transforming:\n" << *ai << '\n');
     SmallVector<unsigned, 8> activeParamIndices;
     SmallVector<unsigned, 8> activeResultIndices;
     collectMinimalIndicesForFunctionCall(ai, synthesis.indices, activityInfo,
@@ -2170,7 +2178,7 @@ public:
                                          activeResultIndices);
     assert(!activeParamIndices.empty() && "Parameter indices cannot be empty");
     assert(!activeResultIndices.empty() && "Result indices cannot be empty");
-    DEBUG(
+    LLVM_DEBUG(
       auto &s = getADDebugStream() << "Active indices: params={";
       interleave(activeParamIndices.begin(), activeParamIndices.end(),
                  [&s](unsigned i) { s << i; }, [&s] { s << ", "; });
@@ -2344,7 +2352,7 @@ void PrimalGen::performSynthesis(FunctionSynthesisItem item) {
   // Canonicalize the orignal function's control flow.
   ControlFlowCanonicalization(*item.original, domInfo, loopInfo).run();
   // For debugging, dump the original function's activity analysis.
-  DEBUG(dumpActivityInfo(*item.original, item.task->getIndices(),
+  LLVM_DEBUG(dumpActivityInfo(*item.original, item.task->getIndices(),
                          activityInfo, getADDebugStream()));
   // Synthesize primal.
   PrimalGenCloner cloner(item, activityInfo, domInfo, pdomInfo,
@@ -2389,7 +2397,8 @@ PrimalGen::createEmptyPrimal(DifferentiationTask *task) {
                                             original->isBare(),
                                             original->isTransparent(),
                                             original->isSerialized());
-  DEBUG(getADDebugStream() << "Primal function created \n" << *primal << '\n');
+  LLVM_DEBUG(getADDebugStream() << "Primal function created \n"
+                                << *primal << '\n');
   task->setPrimal(primal);
   return { primal, primalValueStructDecl };
 }
@@ -2421,7 +2430,7 @@ void PrimalGen::run() {
     worklist.pop_back();
     performSynthesis(synthesis);
     synthesis.task->getPrimalInfo()->computePrimalValueStructType();
-    DEBUG(synthesis.target->verify());
+    LLVM_DEBUG(synthesis.target->verify());
   }
 }
 

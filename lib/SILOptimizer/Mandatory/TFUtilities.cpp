@@ -580,7 +580,8 @@ static bool tryToRemoveArrayValue(SILValue value) {
         }
 
         // Otherwise we don't know what this is, conservatively bail out.
-        DEBUG(llvm::dbgs() << "Could not remove array because of: " << *user);
+        LLVM_DEBUG(llvm::dbgs()
+                   << "Could not remove array because of: " << *user);
         return false;
       }
     }

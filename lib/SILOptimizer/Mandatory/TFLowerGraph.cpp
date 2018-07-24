@@ -1662,8 +1662,8 @@ static bool checkStatus(SILFunction &fn, SILLocation loc, TF_Status *status,
 static bool copyGraphFunctions(SILFunction &fn, SILLocation loc,
                                StringRef graphFuncName, TF_Graph *srcGraph,
                                TF_Graph *resultGraph, TF_Status *status) {
-  DEBUG(llvm::dbgs() << "Copying graph functions including " << graphFuncName
-                     << " to a caller graph.\n");
+  LLVM_DEBUG(llvm::dbgs() << "Copying graph functions including "
+                          << graphFuncName << " to a caller graph.\n");
   assert(srcGraph);
   // Now get the functions and copy them cover to `resultGraph`.
   auto funcCount = TF_GraphNumFunctions(srcGraph);
@@ -1716,13 +1716,13 @@ bool TFGraphLowering::handleFunctionAttribute(TF_OperationDescription *op,
                      graphFnName.size());
   auto findIt = graphFunctions.find(silFuncName);
   if (findIt == graphFunctions.end()) {
-    DEBUG(llvm::dbgs() << "Cannot find function " << silFuncName
-                       << " to use as attr.\n");
+    LLVM_DEBUG(llvm::dbgs() << "Cannot find function " << silFuncName
+                            << " to use as attr.\n");
     pendingGraphFnNames.push_back(std::make_pair(silFuncName, loc));
     return false;
   } else {
-    DEBUG(llvm::dbgs() << "Found function " << silFuncName
-                       << " to use as attr.\n");
+    LLVM_DEBUG(llvm::dbgs()
+               << "Found function " << silFuncName << " to use as attr.\n");
     auto &graphFunc = *findIt->second;
     assert(graphFnName == graphFunc.graphFnName);
     // Now that we are using 'graphFunc' as an attribute, copy over that
@@ -3336,7 +3336,7 @@ bool TFGraphLowering::buildGraphFunction(
     if (outputTypes) outputTypes->push_back(TF_OperationOutputType(outs[i]));
   }
 
-  DEBUG(llvm::dbgs() << "Creating graph function " << funcName << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "Creating graph function " << funcName << "\n");
   auto resultFn =
       TF_GraphToFunction(graphBody.getGraph(), funcName.str().c_str(),
                          /*append_hash_to_fn_name*/ false,
@@ -3550,8 +3550,8 @@ static bool lowerTFGraphOrFunction(
   }
 
   // Ok, we're done!
-  DEBUG(llvm::dbgs() << "Inserting a graph functions entry with host fn "
-                     << hostFnName << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "Inserting a graph functions entry with host fn "
+                          << hostFnName << "\n");
   assert(!graphFunctions.count(hostFnName));
   auto graphFn = llvm::make_unique<LoweredGraphFunction>(
       hostFnName, entryFnBaseName, std::move(resultGraph),
@@ -3570,8 +3570,8 @@ bool tf::lowerTFFunction(
     llvm::DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>>
         &graphFunctions) {
   std::string graphFnName = getGraphFuncNameForFuncAttr(hostFnName);
-  DEBUG(llvm::dbgs() << "Lowering accelerator-only host fn " << hostFnName
-                     << " to graph function " << graphFnName << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "Lowering accelerator-only host fn " << hostFnName
+                          << " to graph function " << graphFnName << "\n");
   return lowerTFGraphOrFunction(hostFnName, fn, graphFnName,
                                 /*isAcceleratorOnly*/ true, deviceInfo,
                                 graphFunctions);
