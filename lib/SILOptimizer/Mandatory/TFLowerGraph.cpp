@@ -2119,7 +2119,7 @@ GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
 
   // Remember each of the results.
   for (unsigned i = 0; i != numOpResults; ++i) {
-    addValueMapping({inst->getResult(0), 0}, {result, (int)i});
+    addValueMapping({inst->getResult(i), 0}, {result, (int)i});
   }
 
   return GLStatus::Success;
