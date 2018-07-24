@@ -1736,59 +1736,6 @@ public:
 
 using ProtocolDescriptorRef = TargetProtocolDescriptorRef<InProcess>;
 
-
-/// An array of protocol descriptors with a header and tail-allocated elements.
-template <typename Runtime>
-struct TargetProtocolDescriptorList {
-  using StoredPointer = typename Runtime::StoredPointer;
-  StoredPointer NumProtocols;
-
-  ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor> *
-  getProtocols() {
-    return reinterpret_cast<
-      ConstTargetMetadataPointer<
-        Runtime, TargetProtocolDescriptor> *>(this + 1);
-  }
-  
-  ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor> const *
-  getProtocols() const {
-    return reinterpret_cast<
-      ConstTargetMetadataPointer<
-        Runtime, TargetProtocolDescriptor> const *>(this + 1);
-  }
-  
-  ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor> const &
-  operator[](size_t i) const {
-    return getProtocols()[i];
-  }
-  
-  ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor> &
-  operator[](size_t i) {
-    return getProtocols()[i];
-  }
-
-  constexpr TargetProtocolDescriptorList() : NumProtocols(0) {}
-  
-protected:
-  constexpr TargetProtocolDescriptorList(StoredPointer NumProtocols)
-    : NumProtocols(NumProtocols) {}
-};
-using ProtocolDescriptorList = TargetProtocolDescriptorList<InProcess>;
-  
-/// A literal class for creating constant protocol descriptors in the runtime.
-template<typename Runtime, uintptr_t NUM_PROTOCOLS>
-struct TargetLiteralProtocolDescriptorList
-  : TargetProtocolDescriptorList<Runtime> {
-  const TargetProtocolDescriptorList<Runtime> *Protocols[NUM_PROTOCOLS];
-  
-  template<typename...DescriptorPointers>
-  constexpr TargetLiteralProtocolDescriptorList(DescriptorPointers...elements)
-    : TargetProtocolDescriptorList<Runtime>(NUM_PROTOCOLS),
-      Protocols{elements...}
-  {}
-};
-using LiteralProtocolDescriptorList = TargetProtocolDescriptorList<InProcess>;
-
 /// A protocol requirement descriptor. This describes a single protocol
 /// requirement in a protocol descriptor. The index of the requirement in
 /// the descriptor determines the offset of the witness in a witness table
