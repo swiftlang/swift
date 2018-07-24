@@ -2394,7 +2394,8 @@ collectAvailableRefactoringsAtCursor(SourceFile *SF, unsigned Line,
 
 static EnumDecl* getEnumDeclFromSwitchStmt(SwitchStmt *SwitchS) {
   if (auto SubjectTy = SwitchS->getSubjectExpr()->getType()) {
-    return SubjectTy->getAnyNominal()->getAsEnumOrEnumExtensionContext();
+    // FIXME: Support more complex subject like '(Enum1, Enum2)'.
+    return dyn_cast_or_null<EnumDecl>(SubjectTy->getAnyNominal());
   }
   return nullptr;
 }
