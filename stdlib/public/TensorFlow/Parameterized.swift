@@ -36,13 +36,18 @@ public protocol ParameterAggregate {
 /// A type whose values have parameters.
 ///
 /// Instances of `Parameterized` types have parameters, represented as stored
-/// properties. Stored properties are marked as parameters with the `@parameter`
-/// attribute. The Swift compiler automatically generates a member struct type
-/// `Parameters`, which includes all of the marked properties.
+/// properties marked with the `@TFParameter` attribute.
+///
+/// For types that conform to `Parameterized`, the Swift compiler can
+/// synthesize a member struct type `Parameters`, which includes all of the
+/// marked properties, and a computed instance `allParameters`.
+///
+/// If all parameters have the same type, the compiler also synthesizes a
+/// conformance of `Parameters` to `ParameterAggregate`.
 ///
 public protocol Parameterized {
   /// The type representing all parameters, synthesized from stored properties
-  /// marked with `@parameter`.
+  /// marked with `@TFParameter`.
   associatedtype Parameters
 
   /// A synthesized instance of `Parameters`.

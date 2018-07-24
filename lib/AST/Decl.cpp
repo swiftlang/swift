@@ -2699,6 +2699,19 @@ bool NominalTypeDecl::isOptionalDecl() const {
   return this == getASTContext().getOptionalDecl();
 }
 
+ArrayRef<VarDecl *>
+NominalTypeDecl::getAllTFParameters() {
+  if (TFParameters) return *TFParameters;
+  TFParameters = SmallVector<VarDecl *, 2>();
+  for (auto member : getMembers()) {
+    auto varDecl = dyn_cast<VarDecl>(member);
+    if (!varDecl) continue;
+    if (varDecl->getAttrs().hasAttribute<TFParameterAttr>())
+      TFParameters->push_back(varDecl);
+  }
+  return *TFParameters;
+}
+
 GenericTypeDecl::GenericTypeDecl(DeclKind K, DeclContext *DC,
                                  Identifier name, SourceLoc nameLoc,
                                  MutableArrayRef<TypeLoc> inherited,
