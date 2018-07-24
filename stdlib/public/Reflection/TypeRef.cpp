@@ -386,7 +386,7 @@ unsigned NominalTypeTrait::getDepth() const {
   return 0;
 }
 
-GenericArgumentMap TypeRef::getSubstMap() const {
+llvm::Optional<GenericArgumentMap> TypeRef::getSubstMap() const {
   GenericArgumentMap Substitutions;
   switch (getKind()) {
     case TypeRefKind::Nominal: {
@@ -399,11 +399,16 @@ GenericArgumentMap TypeRef::getSubstMap() const {
       auto BG = cast<BoundGenericTypeRef>(this);
       auto Depth = BG->getDepth();
       unsigned Index = 0;
-      for (auto Param : BG->getGenericParams())
+      for (auto Param : BG->getGenericParams()) {
+        if (!Param->isConcrete())
+          return None;
         Substitutions.insert({{Depth, Index++}, Param});
+      }
       if (auto Parent = BG->getParent()) {
         auto ParentSubs = Parent->getSubstMap();
-        Substitutions.insert(ParentSubs.begin(), ParentSubs.end());
+        if (!ParentSubs)
+          return None;
+        Substitutions.insert(ParentSubs->begin(), ParentSubs->end());
       }
       break;
     }
@@ -636,8 +641,7 @@ public:
       if (auto *Nominal = dyn_cast<NominalTypeRef>(SubstBase)) {
         TypeWitness = Builder.lookupTypeWitness(Nominal->getMangledName(),
                                                 Member, Protocol);
-      } else {
-        auto BG = cast<BoundGenericTypeRef>(SubstBase);
+      } else if (auto *BG = dyn_cast<BoundGenericTypeRef>(SubstBase)) {
         TypeWitness = Builder.lookupTypeWitness(BG->getMangledName(),
                                                 Member, Protocol);
       }
@@ -660,8 +664,15 @@ public:
                                                SubstBase,
                                                DM->getProtocol());
 
+    // Likewise if we can't get the substitution map.
+    auto SubstMap = SubstBase->getSubstMap();
+    if (!SubstMap)
+      return Builder.createDependentMemberType(DM->getMember(),
+                                               SubstBase,
+                                               DM->getProtocol());
+
     // Apply base type substitutions to get the fully-substituted nested type.
-    auto *Subst = TypeWitness->subst(Builder, SubstBase->getSubstMap());
+    auto *Subst = TypeWitness->subst(Builder, *SubstMap);
 
     // Same as above.
     return thickenMetatypes(Builder, Subst);
