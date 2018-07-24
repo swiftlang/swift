@@ -383,28 +383,9 @@ public:
         }
 #endif
 
-        // Read the protocol descriptor.
-        ContextDescriptorRef descriptor
-          = readContextDescriptor(ProtocolAddress.getSwiftProtocol());
-        if (!descriptor)
-          return BuiltType();
-
-        auto protocolBuffer =
-          reinterpret_cast<const TargetProtocolDescriptor<Runtime> *>
-            (descriptor.getLocalBuffer());
-
-        std::string mangledNameStr;
-        auto nameAddress = resolveRelativeField(descriptor,
-                                                protocolBuffer->Name);
-        if (!Reader->readString(RemoteAddress(nameAddress),
-                                mangledNameStr))
-          return BuiltType();
-
-        StringRef mangledName =
-          Demangle::dropSwiftManglingPrefix(mangledNameStr);
-
-        Demangle::Context DCtx;
-        auto Demangled = DCtx.demangleTypeAsNode(mangledName);
+        Demangle::Demangler Dem;
+        auto Demangled = readDemanglingForContextDescriptor(
+            ProtocolAddress.getSwiftProtocol(), Dem);
         if (!Demangled)
           return BuiltType();
 
@@ -1218,7 +1199,17 @@ private:
         nodeKind = Demangle::Node::Kind::Enum;
         isTypeContext = true;
         break;
+      case ContextDescriptorKind::Protocol: {
+        auto protocolBuffer =
+          reinterpret_cast<const TargetProtocolDescriptor<Runtime> *>
+            (parent.getLocalBuffer());
+        auto nameAddress = resolveRelativeField(parent, protocolBuffer->Name);
+        if (!Reader->readString(RemoteAddress(nameAddress), nodeName))
+          return nullptr;
 
+        nodeKind = Demangle::Node::Kind::Protocol;
+        break;
+      }
       case ContextDescriptorKind::Extension:
         // TODO: Remangle something about the extension context here.
         return nullptr;

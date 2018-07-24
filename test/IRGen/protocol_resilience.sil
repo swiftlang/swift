@@ -39,7 +39,7 @@ import resilient_protocol
 // CHECK-SAME: }
 
 // Protocol descriptor for ResilientProtocol
-// CHECK: [[RESILIENT_PROTOCOL_NAME:@.*]] = private constant [44 x i8] c"$S19protocol_resilience17ResilientProtocolP\00
+// CHECK: [[RESILIENT_PROTOCOL_NAME:@.*]] = private constant [18 x i8] c"ResilientProtocol\00
 // CHECK: [[ASSOCIATED_TYPES_T:@.*]] = private constant [2 x i8] c"T\00"
 // CHECK: @"$S19protocol_resilience17ResilientProtocolMp" = {{(dllexport )?}}{{(protected )?}}constant
 // CHECK-SAME:   i32 196675,

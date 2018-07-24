@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir -parse-stdlib -module-name Swift | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 public protocol Error {}
-// CHECK: [[ERROR_NAME:@.*]] = private constant [11 x i8] c"$Ss5ErrorP\00"
+// CHECK: [[ERROR_NAME:@.*]] = private constant [6 x i8] c"Error\00"
 
 // CHECK-LABEL: @"$Ss5ErrorMp" = {{(dllexport )?}}{{(protected )?}}constant
 // --                 0x0000_0047: special protocol 01, non-class, unique, protocol context

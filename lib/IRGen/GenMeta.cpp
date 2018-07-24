@@ -514,15 +514,7 @@ namespace {
     }
 
     void addName() {
-      // Include the _Tt prefix. The runtime is currently depending on this
-      // so the naming scheme matches up with @objc protocols.
-      // FIXME: We want to put the bare name here, because the context
-      // information is enough for us.
-      IRGenMangler mangler;
-      std::string Name =
-        mangler.mangleForProtocolDescriptor(Proto->getDeclaredType());
-
-      auto nameStr = IGM.getAddrOfGlobalString(Name,
+      auto nameStr = IGM.getAddrOfGlobalString(Proto->getName().str(),
                                            /*willBeRelativelyAddressed*/ true);
       B.addRelativeAddress(nameStr);
     }

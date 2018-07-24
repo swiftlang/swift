@@ -25,7 +25,7 @@ protocol ABO : A, B, O { func abo() }
 // CHECK-SAME: @_PROTOCOL_METHOD_TYPES__TtP17protocol_metadata1O_
 // CHECK-SAME: }
 
-// CHECK: [[A_NAME:@.*]] = private constant [25 x i8] c"$S17protocol_metadata1AP\00"
+// CHECK: [[A_NAME:@.*]] = private constant [2 x i8] c"A\00"
 
 // CHECK-LABEL: @"$S17protocol_metadata1AMp" = hidden constant
 // CHECK-SAME:   i32 65603,
@@ -36,7 +36,7 @@ protocol ABO : A, B, O { func abo() }
 // CHECK-SAME:   i32 0,
 // CHECK-SAME: }
 
-// CHECK: [[B_NAME:@.*]] = private constant [25 x i8] c"$S17protocol_metadata1BP\00"
+// CHECK: [[B_NAME:@.*]] = private constant [2 x i8] c"B\00"
 // CHECK-LABEL: @"$S17protocol_metadata1BMp" = hidden constant
 // CHECK-SAME:   i32 65603,
 // CHECK-SAME:   @"$S17protocol_metadataMXM"
@@ -45,7 +45,7 @@ protocol ABO : A, B, O { func abo() }
 // CHECK-SAME:   i32 1,
 // CHECK: }
 
-// CHECK: [[C_NAME:@.*]] = private constant [25 x i8] c"$S17protocol_metadata1CP\00"
+// CHECK: [[C_NAME:@.*]] = private constant [2 x i8] c"C\00"
 // CHECK-LABEL: @"$S17protocol_metadata1CMp" = hidden constant
 // CHECK-SAME:   i32 67,
 // CHECK-SAME:   @"$S17protocol_metadataMXM"
@@ -68,7 +68,7 @@ protocol ABO : A, B, O { func abo() }
 
 // -- inheritance lists for refined protocols
 
-// CHECK: [[AB_NAME:@.*]] = private constant [26 x i8] c"$S17protocol_metadata2ABP\00"
+// CHECK: [[AB_NAME:@.*]] = private constant [3 x i8] c"AB\00"
 // CHECK: @"$S17protocol_metadata2ABMp" = hidden constant
 // CHECK-SAME:   i32 65603,
 // CHECK-SAME:   @"$S17protocol_metadataMXM"

@@ -427,8 +427,7 @@ as follows:
   * **Bit 1** indicates that the protocol is **resilient**.
   * **Bits 2-7** indicate specify the **special protocol kind**. Only one
     special protocol kind is defined: the `Error` protocol has value 1.    
-- A pointer to the **name** of the protocol. FIXME: The name is currently
-  mangles, but will change to the (unmangled) name.
+- A pointer to the **name** of the protocol.
 - The number of generic requirements within the **requirement signature** of
   the protocol. The generic requirements themselves follow the fixed part
   of the protocol descriptor.
