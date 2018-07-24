@@ -1036,6 +1036,14 @@ void Remangler::mangleUnsafeAddressor(Node *node, EntityContext &ctx) {
   mangleAccessor(node->getFirstChild(), "lu", ctx);
 }
 
+void Remangler::mangleReadAccessor(Node *node, EntityContext &ctx) {
+  mangleAccessor(node->getFirstChild(), "r", ctx);
+}
+
+void Remangler::mangleModifyAccessor(Node *node, EntityContext &ctx) {
+  mangleAccessor(node->getFirstChild(), "M", ctx);
+}
+
 void Remangler::mangleExplicitClosure(Node *node, EntityContext &ctx) {
   mangleNamedAndTypedEntity(node, 'F', "U", ctx); // name is index
 }

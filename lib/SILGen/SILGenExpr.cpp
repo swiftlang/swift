@@ -958,9 +958,38 @@ static SILDeclRef getRValueAccessorDeclRef(SILGenFunction &SGF,
       return SGF.SGM.getAddressorDeclRef(storage);
     }
   }
-
   }
   llvm_unreachable("should already have been filtered out!");
+}
+
+static RValue getTargetRValue(SILGenFunction &SGF, SILLocation loc,
+                              ManagedValue value,
+                              AbstractionPattern origFormalType,
+                              CanType substFormalType,
+                              SGFContext C) {
+  SILType loweredSubstType = SGF.getLoweredType(substFormalType);
+
+  bool hasAbstraction =
+    (loweredSubstType.getObjectType() != value.getType().getObjectType());
+
+  if (value.isLValue() ||
+      (value.getType().isAddress() && !loweredSubstType.isAddress())) {
+    auto isTake =
+      IsTake_t(!value.isLValue() && !value.isPlusZeroRValueOrTrivial());
+    value = SGF.emitLoad(loc,
+                         (isTake ? value.forward(SGF)
+                                 : value.getUnmanagedValue()),
+                         SGF.getTypeLowering(value.getType()),
+                         (hasAbstraction ? SGFContext() : C),
+                         isTake);
+  }
+
+  RValue result(SGF, loc, substFormalType, value);
+  if (hasAbstraction) {
+    result = SGF.emitOrigToSubstValue(loc, std::move(result), origFormalType,
+                                      substFormalType, C);
+  }
+  return result;
 }
 
 static RValue
@@ -994,19 +1023,8 @@ emitRValueWithAccessor(SILGenFunction &SGF, SILLocation loc,
                               std::move(baseRV), isSuper, isDirectUse,
                               std::move(subscriptRV), storageType);
 
-  SILValue address = addressorResult.first.getLValueAddress();
-
-  SILType loweredSubstType =
-    SGF.getLoweredType(substFormalType).getAddressType();
-  bool hasAbstraction = (loweredSubstType != storageType);
-
-  RValue result(SGF, loc, substFormalType,
-    SGF.emitLoad(loc, address, storageTL,
-                 (hasAbstraction ? SGFContext() : C), IsNotTake));
-  if (hasAbstraction) {
-    result = SGF.emitOrigToSubstValue(loc, std::move(result), origFormalType,
-                                      substFormalType, C);
-  }
+  RValue result = getTargetRValue(SGF, loc, addressorResult.first,
+                                  origFormalType, substFormalType, C);
 
   switch (cast<AccessorDecl>(accessor.getDecl())->getAddressorKind()) {
   case AddressorKind::NotAddressor: llvm_unreachable("inconsistent");
