@@ -428,7 +428,7 @@ auto ReturnKW = SyntaxFactory::makeReturnKeyword({}, Trivia::spaces(1));
 auto Return = SyntaxFactory::makeReturnStmt(ReturnKW, Integer,
                                             /*Semicolon=*/ None);
 
-auto RightBrace = SyntaxFactory::makeLeftBraceToken({}, {});
+auto RightBrace = SyntaxFactory::makeRightBraceToken({}, {});
 
 auto Statements = SyntaxFactory::makeBlankStmtList()
   .addStmt(Return);
