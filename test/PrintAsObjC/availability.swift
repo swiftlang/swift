@@ -59,6 +59,8 @@
 // CHECK-NEXT: - (void)methodRenamedToMethodNotAvailableToObjC SWIFT_DEPRECATED_MSG("", "methodNotAvailableToObjC()");
 // CHECK-NEXT: - (void)methodRenamedToSimpleProperty SWIFT_DEPRECATED_MSG("", "simpleProperty");
 // CHECK-NEXT: - (NSInteger)methodReturningInt
+// CHECK-NEXT: - (NSInteger)methodRenamedToMethodWithouCustomObjCNameWithValue:(NSInteger)value SWIFT_WARN_UNUSED_RESULT SWIFT_DEPRECATED_MSG("", "methodWithoutCustomObjCNameWithValue:");
+// CHECK-NEXT: - (NSInteger)methodWithoutCustomObjCNameWithValue:(NSInteger)value SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: + (void)makeDeprecatedAvailabilityWithValue:(NSInteger)value SWIFT_DEPRECATED_MSG("use something else", "deprecatedAvailabilityWithValue:");
 // CHECK-NEXT: + (void)unavailableAvailabilityWithValue:(NSInteger)value;
 // CHECK-NEXT: + (void)makeUnavailableAvailabilityWithValue:(NSInteger)value
@@ -246,6 +248,10 @@
     @objc public func methodRenamedToSimpleProperty() {}
 
     @objc(methodReturningInt) public func simpleMethodReturningInt() -> Int { return -1 }
+  
+    @available(*, deprecated, renamed: "methodWithoutCustomObjCName(value:)")
+    @objc public func methodRenamedToMethodWithouCustomObjCName(value: Int) -> Int { return -1 }
+    @objc public func methodWithoutCustomObjCName(value: Int) -> Int { return -1 }
 
     @available(*, deprecated,
     message: "use something else",
