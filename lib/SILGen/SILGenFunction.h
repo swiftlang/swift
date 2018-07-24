@@ -240,6 +240,10 @@ public:
   /// The destination for throws.  The block will always be in the
   /// postmatter and takes a BB argument of the exception type.
   JumpDest ThrowDest = JumpDest::invalid();
+
+  /// The destination for coroutine unwinds.  The block will always
+  /// be in the postmatter.
+  JumpDest CoroutineUnwindDest = JumpDest::invalid();
     
   /// \brief The SIL location corresponding to the AST node being processed.
   SILLocation CurrentSILLoc;
@@ -684,6 +688,7 @@ public:
   ///                    cleanup instructions.
   void prepareEpilog(Type returnType, bool isThrowing, CleanupLocation L);
   void prepareRethrowEpilog(CleanupLocation l);
+  void prepareCoroutineUnwindEpilog(CleanupLocation l);
   
   /// \brief Branch to and emit the epilog basic block. This will fuse
   /// the epilog to the current basic block if the epilog bb has no predecessor.
@@ -718,6 +723,9 @@ public:
 
   /// \brief Emits the standard rethrow epilog using a Swift error result.
   void emitRethrowEpilog(SILLocation topLevelLoc);
+
+  /// \brief Emits the coroutine-unwind epilog.
+  void emitCoroutineUnwindEpilog(SILLocation topLevelLoc);
 
   /// emitSelfDecl - Emit a SILArgument for 'self', register it in varlocs, set
   /// up debug info, etc.  This returns the 'self' value.
@@ -1153,6 +1161,19 @@ public:
                         RValue &&optionalSubscripts,
                         SILType addressType);
 
+  CleanupHandle
+  emitCoroutineAccessor(SILLocation loc, SILDeclRef accessor,
+                        SubstitutionMap substitutions,
+                        ArgumentSource &&optionalSelfValue,
+                        bool isSuper, bool isDirectAccessorUse,
+                        RValue &&optionalSubscripts,
+                        SmallVectorImpl<ManagedValue> &yields);
+
+  RValue emitApplyConversionFunction(SILLocation loc,
+                                     Expr *funcExpr,
+                                     Type resultType,
+                                     RValue &&operand);
+
   ManagedValue emitManagedRetain(SILLocation loc, SILValue v);
   ManagedValue emitManagedRetain(SILLocation loc, SILValue v,
                                  const TypeLowering &lowering);
@@ -1286,6 +1307,10 @@ public:
   SILValue emitMetatypeOfValue(SILLocation loc, Expr *baseExpr);
   
   void emitReturnExpr(SILLocation loc, Expr *ret);
+
+  void emitYield(SILLocation loc, MutableArrayRef<ArgumentSource> yieldValues,
+                 ArrayRef<AbstractionPattern> origTypes,
+                 JumpDest unwindDest);
 
   RValue emitAnyHashableErasure(SILLocation loc,
                                 ManagedValue value,

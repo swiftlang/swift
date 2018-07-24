@@ -1465,6 +1465,8 @@ public:
   void completeAssignmentRHS(AssignExpr *E) override;
   void completeCallArg(CallExpr *E) override;
   void completeReturnStmt(CodeCompletionExpr *E) override;
+  void completeYieldStmt(CodeCompletionExpr *E,
+                         Optional<unsigned> yieldIndex) override;
   void completeAfterPound(CodeCompletionExpr *E, StmtKind ParentKind) override;
   void completeGenericParams(TypeLoc TL) override;
   void completeAfterIfStmt(bool hasElse) override;
@@ -4746,6 +4748,15 @@ void CodeCompletionCallbacksImpl::completeReturnStmt(CodeCompletionExpr *E) {
   Kind = CompletionKind::ReturnStmtExpr;
 }
 
+void CodeCompletionCallbacksImpl::completeYieldStmt(CodeCompletionExpr *E,
+                                                    Optional<unsigned> index) {
+  CurDeclContext = P.CurDeclContext;
+  CodeCompleteTokenExpr = E;
+  // TODO: use a different completion kind when completing without an index
+  // in a multiple-value context.
+  Kind = CompletionKind::YieldStmtExpr;
+}
+
 void CodeCompletionCallbacksImpl::completeAfterPound(CodeCompletionExpr *E,
                                                      StmtKind ParentKind) {
   CurDeclContext = P.CurDeclContext;
@@ -4890,6 +4901,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     LLVM_FALLTHROUGH;
   case CompletionKind::AssignmentRHS:
   case CompletionKind::ReturnStmtExpr:
+  case CompletionKind::YieldStmtExpr:
   case CompletionKind::PostfixExprBeginning:
   case CompletionKind::ForEachSequence:
     addSuperKeyword(Sink);
@@ -5473,6 +5485,18 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     if (auto FD = dyn_cast<AbstractFunctionDecl>(CurDeclContext)) {
       if (auto FT = FD->getInterfaceType()->getAs<FunctionType>()) {
         Lookup.setExpectedTypes(FT->getResult());
+      }
+    }
+    Lookup.getValueCompletionsInDeclContext(Loc);
+    break;
+  }
+
+  case CompletionKind::YieldStmtExpr: {
+    SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
+    if (auto FD = dyn_cast<AccessorDecl>(CurDeclContext)) {
+      if (FD->isCoroutine()) {
+        // TODO: handle multi-value yields.
+        Lookup.setExpectedTypes(FD->getStorage()->getValueInterfaceType());
       }
     }
     Lookup.getValueCompletionsInDeclContext(Loc);

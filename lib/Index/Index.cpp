@@ -53,6 +53,8 @@ printArtificialName(const swift::AbstractStorageDecl *ASD, AccessorKind AK, llvm
   case AccessorKind::MaterializeForSet:
   case AccessorKind::Address:
   case AccessorKind::MutableAddress:
+  case AccessorKind::Read:
+  case AccessorKind::Modify:
     return true;
   }
 

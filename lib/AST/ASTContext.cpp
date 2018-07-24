@@ -2087,11 +2087,10 @@ std::pair<unsigned, DeclName> swift::getObjCMethodDiagInfo(
 
   if (auto accessor = dyn_cast<AccessorDecl>(member)) {
     switch (accessor->getAccessorKind()) {
-    case AccessorKind::Address:
-    case AccessorKind::DidSet:
-    case AccessorKind::MaterializeForSet:
-    case AccessorKind::MutableAddress:
-    case AccessorKind::WillSet:
+#define OBJC_ACCESSOR(ID, KEYWORD)
+#define ACCESSOR(ID) \
+    case AccessorKind::ID:
+#include "swift/AST/AccessorKinds.def"
       llvm_unreachable("Not an Objective-C entry point");
 
     case AccessorKind::Get:

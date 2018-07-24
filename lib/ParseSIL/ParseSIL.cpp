@@ -1244,6 +1244,8 @@ static Optional<AccessorKind> getAccessorKind(StringRef ident) {
            .Case("addressor", AccessorKind::Address)
            .Case("mutableAddressor", AccessorKind::MutableAddress)
            .Case("materializeForSet", AccessorKind::MaterializeForSet)
+           .Case("read", AccessorKind::Read)
+           .Case("modify", AccessorKind::Modify)
            .Default(None);
 }
 

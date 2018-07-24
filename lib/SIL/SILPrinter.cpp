@@ -312,6 +312,14 @@ void SILDeclRef::print(raw_ostream &OS) const {
         printValueDecl(accessor->getStorage(), OS);
         OS << "!mutableAddressor";
         break;
+      case AccessorKind::Read:
+        printValueDecl(accessor->getStorage(), OS);
+        OS << "!read";
+        break;
+      case AccessorKind::Modify:
+        printValueDecl(accessor->getStorage(), OS);
+        OS << "!modify";
+        break;
       }
     }
   } else {

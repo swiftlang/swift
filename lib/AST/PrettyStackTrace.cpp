@@ -72,6 +72,12 @@ void swift::printDeclDescription(llvm::raw_ostream &out, const Decl *D,
         case AccessorKind::MutableAddress:
           out << "mutableAddressor";
           break;
+        case AccessorKind::Read:
+          out << "read";
+          break;
+        case AccessorKind::Modify:
+          out << "modify";
+          break;
         }
 
         out << " for " << ASD->getFullName();

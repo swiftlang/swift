@@ -3071,6 +3071,25 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
     nilDiag = diag::cannot_convert_default_arg_value_nil;
     break;
 
+  case CTP_YieldByReference:
+    if (auto contextualLV = contextualType->getAs<LValueType>())
+      contextualType = contextualLV->getObjectType();
+    if (auto exprLV = exprType->getAs<LValueType>()) {
+      diagnose(expr->getLoc(), diag::cannot_yield_wrong_type_by_reference,
+               exprLV->getObjectType(), contextualType);
+    } else if (exprType->isEqual(contextualType)) {
+      diagnose(expr->getLoc(), diag::cannot_yield_rvalue_by_reference_same_type,
+               exprType);
+    } else {
+      diagnose(expr->getLoc(), diag::cannot_yield_rvalue_by_reference,
+               exprType, contextualType);
+    }
+    return true;
+  case CTP_YieldByValue:
+    diagID = diag::cannot_convert_yield_value;
+    diagIDProtocol = diag::cannot_convert_yield_value_protocol;
+    nilDiag = diag::cannot_convert_yield_value_nil;
+    break;
   case CTP_CallArgument:
     diagID = diag::cannot_convert_argument_value;
     diagIDProtocol = diag::cannot_convert_argument_value_protocol;

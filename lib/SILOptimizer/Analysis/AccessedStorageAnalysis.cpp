@@ -284,6 +284,10 @@ transformCalleeStorage(const StorageAccessInfo &storage,
   }
   case AccessedStorage::Nested:
     llvm_unreachable("Unexpected nested access");
+  case AccessedStorage::Yield:
+    // Continue to hold on to yields from the callee because we don't have
+    // any better placeholder in the callee.
+    return storage;
   case AccessedStorage::Unidentified:
     // For unidentified storage, continue to reference the value in the callee
     // because we don't have any better placeholder for a callee-defined object.

@@ -129,6 +129,7 @@ getContextFreeClassificationForToken(TokenSyntax TokenNode) {
   case tok::comment:
     llvm_unreachable("Comments should be in trivia");
   case tok::contextual_keyword:
+  case tok::kw_yield:
     return SyntaxClassification::Keyword;
   case tok::string_segment:
     return SyntaxClassification::StringLiteral;
