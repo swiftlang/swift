@@ -2702,15 +2702,14 @@ bool NominalTypeDecl::isOptionalDecl() const {
 ArrayRef<VarDecl *>
 NominalTypeDecl::getAllTFParameters() {
   if (TFParameters) return *TFParameters;
-  SmallVector<VarDecl *, 2> parameters;
+  TFParameters = SmallVector<VarDecl *, 2>();
   for (auto member : getMembers()) {
     auto varDecl = dyn_cast<VarDecl>(member);
     if (!varDecl) continue;
     if (varDecl->getAttrs().hasAttribute<TFParameterAttr>())
-      parameters.push_back(varDecl);
+      TFParameters->push_back(varDecl);
   }
-  TFParameters = parameters;
-  return parameters;
+  return *TFParameters;
 }
 
 GenericTypeDecl::GenericTypeDecl(DeclKind K, DeclContext *DC,

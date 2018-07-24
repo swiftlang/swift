@@ -174,7 +174,7 @@ public:
   ValueDecl *deriveParameterized(ValueDecl *requirement);
 
   /// Derive a Parameterized type witness for a nominal type, if it has
-  /// parameters (stored properties marked with @parameter).
+  /// parameters (stored properties marked with @TFParameter).
   ///
   /// \returns the derived member, which will also be added to the type.
   Type deriveParameterized(AssociatedTypeDecl *assocType);

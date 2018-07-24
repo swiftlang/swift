@@ -74,6 +74,7 @@ static bool isValidParametersStruct(NominalTypeDecl *nominal,
       if (initDecl && initDecl->isMemberwiseInitializer())
         memberwiseInitDecl = initDecl;
     }
+    // Add `Parameters` struct stored properties to map.
     auto varDecl = dyn_cast<VarDecl>(member);
     if (!varDecl || varDecl->isStatic() || !varDecl->hasStorage())
       continue;

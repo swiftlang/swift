@@ -42,7 +42,7 @@ public protocol ParameterAggregate {
 /// synthesize a member struct type `Parameters`, which includes all of the
 /// marked properties, and a computed instance `allParameters`.
 ///
-/// If all parameter types are the same, the compiler also synthesizes a
+/// If all parameters have the same type, the compiler also synthesizes a
 /// conformance of `Parameters` to `ParameterAggregate`.
 ///
 public protocol Parameterized {
