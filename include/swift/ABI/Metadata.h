@@ -2891,17 +2891,15 @@ public:
 template<typename Runtime>
 struct TargetProtocolDescriptor final
     : TargetContextDescriptor<Runtime>,
-      TrailingGenericContextObjects<
+      swift::ABI::TrailingObjects<
         TargetProtocolDescriptor<Runtime>,
-        TargetGenericContextDescriptorHeader,
         TargetGenericRequirementDescriptor<Runtime>,
         TargetProtocolRequirement<Runtime>>
 {
 private:
   using TrailingObjects
-    = TrailingGenericContextObjects<
+    = swift::ABI::TrailingObjects<
         TargetProtocolDescriptor<Runtime>,
-        TargetGenericContextDescriptorHeader,
         TargetGenericRequirementDescriptor<Runtime>,
         TargetProtocolRequirement<Runtime>>;
 
@@ -2911,9 +2909,6 @@ private:
   using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
 
 public:
-  using TrailingObjects::getGenericContext;
-  using TrailingObjects::numTrailingObjects;
-
   size_t numTrailingObjects(
             OverloadToken<TargetGenericRequirementDescriptor<Runtime>>) const {
     return NumRequirementsInSignature;
