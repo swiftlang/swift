@@ -52,6 +52,7 @@ bool Parser::isStartOfStmt() {
   case tok::kw_switch:
   case tok::kw_case:
   case tok::kw_default:
+  case tok::kw_yield:
   case tok::pound_if:
   case tok::pound_warning:
   case tok::pound_error:
@@ -75,7 +76,6 @@ bool Parser::isStartOfStmt() {
     if (!peekToken().is(tok::colon)) {
       // "yield" in the right context begins a yield statement.
       if (isContextualYieldKeyword()) {
-        Tok.setKind(tok::kw_yield);
         return true;
       }
       return false;
@@ -550,6 +550,12 @@ ParserResult<Stmt> Parser::parseStmt() {
 
   SourceLoc tryLoc;
   (void)consumeIf(tok::kw_try, tryLoc);
+
+  // Claim contextual statement keywords now that we've committed
+  // to parsing a statement.
+  if (isContextualYieldKeyword()) {
+    Tok.setKind(tok::kw_yield);
+  }
   
   switch (Tok.getKind()) {
   case tok::pound_line:
