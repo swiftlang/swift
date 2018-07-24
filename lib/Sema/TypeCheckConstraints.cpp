@@ -2040,9 +2040,18 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables))
     allowFreeTypeVariables = FreeTypeVariableBinding::UnresolvedType;
 
+  Type convertTo = convertType.getType();
+  if (options.contains(TypeCheckExprFlags::ExpressionTypeMustBeOptional)) {
+    assert(!convertTo && "convertType and type check options conflict");
+    auto *convertTypeLocator = cs.getConstraintLocator(
+        cs.getConstraintLocator(expr), ConstraintLocator::ContextualType);
+    Type var = cs.createTypeVariable(convertTypeLocator);
+    convertTo = getOptionalType(expr->getLoc(), var);
+  }
+
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
-  if (cs.solve(expr, convertType.getType(), listener, viable,
+  if (cs.solve(expr, convertTo, listener, viable,
                allowFreeTypeVariables))
     return Type();
 
@@ -2439,6 +2448,8 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
   TypeLoc contextualType;
   auto contextualPurpose = CTP_Unused;
+  TypeCheckExprOptions flags = TypeCheckExprFlags::ConvertTypeIsOnlyAHint;
+
   if (pattern->hasType()) {
     contextualType = TypeLoc::withoutLoc(pattern->getType());
     contextualPurpose = CTP_Initialization;
@@ -2453,10 +2464,11 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       if (isa<NamedPattern>(inner) || isa<AnyPattern>(inner))
         contextualType = typedPattern->getTypeLoc();
     }
+  } else if (isa<OptionalSomePattern>(pattern)) {
+    flags |= TypeCheckExprFlags::ExpressionTypeMustBeOptional;
   }
     
   // Type-check the initializer.
-  TypeCheckExprOptions flags = TypeCheckExprFlags::ConvertTypeIsOnlyAHint;
   if (skipApplyingSolution)
     flags |= TypeCheckExprFlags::SkipApplyingSolution;
 

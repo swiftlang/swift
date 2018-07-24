@@ -312,6 +312,11 @@ void constraints::simplifyLocator(Expr *&anchor,
         }
       }
       break;
+
+    case ConstraintLocator::ContextualType:
+      // This was just for identifying purposes, strip it off.
+      path = path.slice(1);
+      continue;
         
     default:
       // FIXME: Lots of other cases to handle.

@@ -261,6 +261,10 @@ enum class TypeCheckExprFlags {
 
   /// This is an inout yield.
   IsInOutYield = 0x200,
+
+  /// If set, a conversion constraint should be specfied so that the result of
+  /// the expression is an optional type.
+  ExpressionTypeMustBeOptional = 0x400,
 };
 
 using TypeCheckExprOptions = OptionSet<TypeCheckExprFlags>;
