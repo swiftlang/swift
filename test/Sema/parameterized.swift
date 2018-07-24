@@ -19,7 +19,8 @@ struct TensorLayer : Parameterized {
   @TFParameter var w: Tensor<Float>
   @TFParameter var b: Tensor<Float>
 
-  // Non-stored-property members should not affect synthesis.
+  // Members that are not stored properties marked with @TFParameter should
+  // not affect synthesis.
   var stored: Tensor<Float>
   var computed: Float {
     return (w + b).scalarized()
