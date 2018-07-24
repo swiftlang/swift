@@ -392,9 +392,75 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   extendedNominal->addExtension(ED);
 }
 
+static void bindExtensions(SourceFile &SF, TypeChecker &TC) {
+  // Utility function to try and resolve the extended type without diagnosing.
+  // If we succeed, we go ahead and bind the extension. Otherwise, return false.
+  auto tryBindExtension = [&](ExtensionDecl *ext) -> bool {
+    auto *extendedTy = ext->getExtendedTypeLoc().getTypeRepr();
+    if (auto *identTy = dyn_cast_or_null<IdentTypeRepr>(extendedTy)) {
+      auto *dc = ext->getDeclContext();
+
+      GenericTypeToArchetypeResolver resolver(dc);
+
+      TypeResolutionOptions options;
+      options |= TypeResolutionFlags::AllowUnboundGenerics;
+      options |= TypeResolutionFlags::ExtensionBinding;
+      options |= TypeResolutionFlags::SilenceErrors;
+
+      auto type = TC.resolveIdentifierType(dc, identTy, options, &resolver);
+      if (type->is<ErrorType>())
+        return false;
+    }
+
+    bindExtensionDecl(ext, TC);
+    return true;
+  };
+
+  // Phase 1 - try to bind each extension, adding those whose type cannot be
+  // resolved to a worklist.
+  SmallVector<ExtensionDecl *, 8> worklist;
+
+  // FIXME: The current source file needs to be handled specially, because of
+  // private extensions.
+  SF.forAllVisibleModules([&](ModuleDecl::ImportedModule import) {
+    // FIXME: Respect the access path?
+    for (auto file : import.second->getFiles()) {
+      auto SF = dyn_cast<SourceFile>(file);
+      if (!SF)
+        continue;
+
+      for (auto D : SF->Decls) {
+        if (auto ED = dyn_cast<ExtensionDecl>(D))
+          if (!tryBindExtension(ED))
+            worklist.push_back(ED);
+      }
+    }
+  });
+
+  // Phase 2 - repeatedly go through the worklist and attempt to bind each
+  // extension there, removing it from the worklist if we succeed.
+  bool changed;
+  do {
+    changed = false;
+
+    auto last = std::remove_if(worklist.begin(), worklist.end(),
+                               tryBindExtension);
+    if (last != worklist.end()) {
+      worklist.erase(last, worklist.end());
+      changed = true;
+    }
+  } while(changed);
+
+  // Phase 3 - anything that remains on the worklist cannot be resolved, which
+  // means its invalid. Diagnose.
+  for (auto *ext : worklist)
+    bindExtensionDecl(ext, TC);
+}
+
 void TypeChecker::bindExtension(ExtensionDecl *ext) {
   ::bindExtensionDecl(ext, *this);
 }
+
 void TypeChecker::resolveExtensionForConformanceConstruction(
     ExtensionDecl *ext,
     SmallVectorImpl<ConformanceConstructionInfo> &protocols) {
@@ -653,23 +719,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     // Resolve extensions. This has to occur first during type checking,
     // because the extensions need to be wired into the AST for name lookup
     // to work.
-    // FIXME: We can have interesting ordering dependencies among the various
-    // extensions, so we'll need to be smarter here.
-    // FIXME: The current source file needs to be handled specially, because of
-    // private extensions.
-    SF.forAllVisibleModules([&](ModuleDecl::ImportedModule import) {
-      // FIXME: Respect the access path?
-      for (auto file : import.second->getFiles()) {
-        auto SF = dyn_cast<SourceFile>(file);
-        if (!SF)
-          continue;
-
-        for (auto D : SF->Decls) {
-          if (auto ED = dyn_cast<ExtensionDecl>(D))
-            bindExtensionDecl(ED, TC);
-        }
-      }
-    });
+    bindExtensions(SF, TC);
 
     // Look for bridging functions. This only matters when
     // -enable-source-import is provided.
