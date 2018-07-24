@@ -54,6 +54,8 @@
 // CHECK-NEXT: - (void)customObjCNameInstanceMethodWithX:(NSInteger)x;
 // CHECK-NEXT: + (void)customObjCNameClassMethodWithX:(NSInteger)x;
 // CHECK-NEXT: - (void)methodRenamedToMethodNotAvailableToObjC SWIFT_DEPRECATED_MSG("", "methodNotAvailableToObjC()");
+// CHECK-NEXT: - (void)methodRenamedToSimpleProperty SWIFT_DEPRECATED_MSG("", "simpleProperty");
+// CHECK-NEXT: - (NSInteger)methodReturningInt
 // CHECK-NEXT: + (void)makeDeprecatedAvailabilityWithValue:(NSInteger)value SWIFT_DEPRECATED_MSG("use something else", "deprecatedAvailabilityWithValue:");
 // CHECK-NEXT: + (void)unavailableAvailabilityWithValue:(NSInteger)value;
 // CHECK-NEXT: + (void)makeUnavailableAvailabilityWithValue:(NSInteger)value
@@ -70,6 +72,8 @@
 // CHECK-NEXT: @property (nonatomic, readonly) NSInteger replaceForUnavailableObjCProperty;
 // CHECK-NEXT: @property (nonatomic, readonly, strong) Availability * _Null_unspecified singlePlatCombinedPropertyClass SWIFT_AVAILABILITY(macos,introduced=10.7,deprecated=10.9,obsoleted=10.10);
 // CHECK-NEXT: @property (nonatomic, readonly) NSInteger platformUnavailableRenameWithMessageProperty SWIFT_AVAILABILITY(macos,unavailable,message="'platformUnavailableRenameWithMessageProperty' has been renamed to 'anotherPlea': still trapped");
+// CHECK-NEXT: @property (nonatomic, readonly) NSInteger propertyRenamedToMethod
+// CHECK-SAME: SWIFT_DEPRECATED_MSG("", "simpleMethodReturningInt()")
 // CHECK-NEXT: @end
 
 // CHECK-LABEL: {{^}}SWIFT_AVAILABILITY(macos,introduced=999){{$}}
@@ -227,6 +231,11 @@
     @available(*, deprecated, renamed: "methodNotAvailableToObjC()")
     @objc public func methodRenamedToMethodNotAvailableToObjC() {}
 
+    @available(*, deprecated, renamed: "simpleProperty")
+    @objc public func methodRenamedToSimpleProperty() {}
+
+    @objc(methodReturningInt) public func simpleMethodReturningInt() -> Int { return -1 }
+
     @available(*, deprecated,
     message: "use something else",
     renamed: "makeDeprecatedAvailability(withValue:)")
@@ -297,6 +306,13 @@
     }
     @available(macOS, unavailable, renamed: "anotherPlea", message: "still trapped")
     @objc var platformUnavailableRenameWithMessageProperty: Int {
+        get {
+            return -1
+        }
+    }
+    
+    @available(*, deprecated, renamed: "simpleMethodReturningInt()")
+    @objc var propertyRenamedToMethod: Int {
         get {
             return -1
         }
