@@ -1577,6 +1577,19 @@ using TupleTypeMetadata = TargetTupleTypeMetadata<InProcess>;
   
 template <typename Runtime> struct TargetProtocolDescriptor;
 
+#if SWIFT_OBJC_INTEROP
+/// Layout of a small prefix of an Objective-C protocol, used only to
+/// directly extract the name of the protocol.
+template <typename Runtime>
+struct TargetObjCProtocolPrefix {
+  /// Unused by the Swift runtime.
+  TargetPointer<Runtime, const void> _ObjC_Isa;
+
+  /// The mangled name of the protocol.
+  TargetPointer<Runtime, const char> Name;
+};
+#endif
+
 /// A reference to a protocol within the runtime, which may be either
 /// a Swift protocol or (when Objective-C interoperability is enabled) an
 /// Objective-C protocol.
@@ -1600,14 +1613,6 @@ class TargetProtocolDescriptorRef {
   /// is clear).
   StoredPointer storage;
 
-public:
-  /// Retrieve the protocol descriptor without checking whether we have an
-  /// Objective-C or Swift protocol.
-  /// FIXME: Temporarily public while we roll out TargetProtocolDescriptorRef.
-  ProtocolDescriptorPointer getProtocolDescriptorUnchecked() const {
-    return reinterpret_cast<ProtocolDescriptorPointer>(storage & ~IsObjCBit);
-  }
-
   constexpr TargetProtocolDescriptorRef(StoredPointer storage)
     : storage(storage) { }
 
@@ -1618,8 +1623,6 @@ public:
                         ProtocolDescriptorPointer protocol,
                         ProtocolDispatchStrategy dispatchStrategy) {
 #if SWIFT_OBJC_INTEROP
-    assert(!protocol ||
-           protocol->Flags.getDispatchStrategy() == dispatchStrategy);
     storage = reinterpret_cast<StoredPointer>(protocol)
       | (dispatchStrategy == ProtocolDispatchStrategy::ObjC ? IsObjCBit : 0);
 #else
@@ -1647,7 +1650,14 @@ public:
 
   /// The name of the protocol.
   TargetPointer<Runtime, const char> getName() const {
-    return getProtocolDescriptorUnchecked()->Name;
+#if SWIFT_OBJC_INTEROP
+    if (isObjC()) {
+      return reinterpret_cast<TargetObjCProtocolPrefix<Runtime> *>(
+          getObjCProtocol())->Name;
+    }
+#endif
+
+    return getSwiftProtocol()->Name;
   }
 
   /// Determine what kind of protocol this is, Swift or Objective-C.
@@ -1669,7 +1679,8 @@ public:
     }
 #endif
 
-    return getProtocolDescriptorUnchecked()->Flags.getClassConstraint();
+    return getSwiftProtocol()->getProtocolContextDescriptorFlags()
+        .getClassConstraint();
   }
 
   /// Determine whether this protocol needs a witness table.
@@ -1680,7 +1691,7 @@ public:
     }
 #endif
 
-    return getProtocolDescriptorUnchecked()->Flags.needsWitnessTable();
+    return true;
   }
 
   SpecialProtocol getSpecialProtocol() const {
@@ -1690,7 +1701,8 @@ public:
     }
 #endif
 
-    return getProtocolDescriptorUnchecked()->Flags.getSpecialProtocol();
+    return getSwiftProtocol()->getProtocolContextDescriptorFlags()
+        .getSpecialProtocol();
   }
 
   /// Retrieve the Swift protocol descriptor.
@@ -1699,7 +1711,7 @@ public:
     assert(!isObjC());
 #endif
 
-    return getProtocolDescriptorUnchecked();
+    return reinterpret_cast<ProtocolDescriptorPointer>(storage & ~IsObjCBit);
   }
 
   /// Retrieve the raw stored pointer and discriminator bit.
@@ -1710,73 +1722,19 @@ public:
 #if SWIFT_OBJC_INTEROP
   /// Whether this references an Objective-C protocol.
   bool isObjC() const {
-    assert(static_cast<bool>(storage & IsObjCBit) !=
-             getProtocolDescriptorUnchecked()->Flags.needsWitnessTable());
     return (storage & IsObjCBit) != 0;
   }
 
   /// Retrieve the Objective-C protocol.
-  Protocol *getObjCProtocol() const {
+  TargetPointer<Runtime, Protocol> getObjCProtocol() const {
     assert(isObjC());
-    return reinterpret_cast<Protocol *>(storage & ~IsObjCBit);
+    return reinterpret_cast<TargetPointer<Runtime, Protocol> >(
+                                                         storage & ~IsObjCBit);
   }
 #endif
 };
 
 using ProtocolDescriptorRef = TargetProtocolDescriptorRef<InProcess>;
-
-
-/// An array of protocol descriptors with a header and tail-allocated elements.
-template <typename Runtime>
-struct TargetProtocolDescriptorList {
-  using StoredPointer = typename Runtime::StoredPointer;
-  StoredPointer NumProtocols;
-
-  ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor> *
-  getProtocols() {
-    return reinterpret_cast<
-      ConstTargetMetadataPointer<
-        Runtime, TargetProtocolDescriptor> *>(this + 1);
-  }
-  
-  ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor> const *
-  getProtocols() const {
-    return reinterpret_cast<
-      ConstTargetMetadataPointer<
-        Runtime, TargetProtocolDescriptor> const *>(this + 1);
-  }
-  
-  ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor> const &
-  operator[](size_t i) const {
-    return getProtocols()[i];
-  }
-  
-  ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor> &
-  operator[](size_t i) {
-    return getProtocols()[i];
-  }
-
-  constexpr TargetProtocolDescriptorList() : NumProtocols(0) {}
-  
-protected:
-  constexpr TargetProtocolDescriptorList(StoredPointer NumProtocols)
-    : NumProtocols(NumProtocols) {}
-};
-using ProtocolDescriptorList = TargetProtocolDescriptorList<InProcess>;
-  
-/// A literal class for creating constant protocol descriptors in the runtime.
-template<typename Runtime, uintptr_t NUM_PROTOCOLS>
-struct TargetLiteralProtocolDescriptorList
-  : TargetProtocolDescriptorList<Runtime> {
-  const TargetProtocolDescriptorList<Runtime> *Protocols[NUM_PROTOCOLS];
-  
-  template<typename...DescriptorPointers>
-  constexpr TargetLiteralProtocolDescriptorList(DescriptorPointers...elements)
-    : TargetProtocolDescriptorList<Runtime>(NUM_PROTOCOLS),
-      Protocols{elements...}
-  {}
-};
-using LiteralProtocolDescriptorList = TargetProtocolDescriptorList<InProcess>;
 
 /// A protocol requirement descriptor. This describes a single protocol
 /// requirement in a protocol descriptor. The index of the requirement in
@@ -1805,76 +1763,7 @@ struct TargetProtocolRequirement {
 
 using ProtocolRequirement = TargetProtocolRequirement<InProcess>;
 
-/// A protocol descriptor. This is not type metadata, but is referenced by
-/// existential type metadata records to describe a protocol constraint.
-/// Its layout is compatible with the Objective-C runtime's 'protocol_t' record
-/// layout.
-template <typename Runtime>
-struct TargetProtocolDescriptor {
-  using StoredPointer = typename Runtime::StoredPointer;
-  /// Unused by the Swift runtime.
-  TargetPointer<Runtime, const void> _ObjC_Isa;
-  
-  /// The mangled name of the protocol.
-  TargetPointer<Runtime, const char> Name;
-  
-  /// The list of protocols this protocol refines.
-  ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptorList>
-    InheritedProtocols;
-  
-  /// Unused by the Swift runtime.
-  TargetPointer<Runtime, const void>
-    _ObjC_InstanceMethods,
-    _ObjC_ClassMethods,
-    _ObjC_OptionalInstanceMethods,
-    _ObjC_OptionalClassMethods,
-    _ObjC_InstanceProperties;
-  
-  /// Size of the descriptor record.
-  uint32_t DescriptorSize;
-  
-  /// Additional flags.
-  ProtocolDescriptorFlags Flags;
-
-  /// The number of requirements described by the Requirements array.
-  /// If any requirements beyond MinimumWitnessTableSizeInWords are present
-  /// in the witness table template, they will be not be overwritten with
-  /// defaults.
-  uint32_t NumRequirements;
-
-  /// Requirement descriptions.
-  RelativeDirectPointer<TargetProtocolRequirement<Runtime>> Requirements;
-
-  /// The superclass of which all conforming types must be a subclass.
-  RelativeDirectPointer<const TargetClassMetadata<Runtime>, /*Nullable=*/true>
-    Superclass;
-
-  /// Associated type names, as a space-separated list in the same order
-  /// as the requirements.
-  RelativeDirectPointer<const char, /*Nullable=*/true> AssociatedTypeNames;
-
-  // This is only used in unittests/Metadata.cpp.
-  constexpr TargetProtocolDescriptor<Runtime>(const char *Name,
-                      const TargetProtocolDescriptorList<Runtime> *Inherited,
-                      ProtocolDescriptorFlags Flags)
-    : _ObjC_Isa(nullptr), Name(Name), InheritedProtocols(Inherited),
-      _ObjC_InstanceMethods(nullptr), _ObjC_ClassMethods(nullptr),
-      _ObjC_OptionalInstanceMethods(nullptr),
-      _ObjC_OptionalClassMethods(nullptr),
-      _ObjC_InstanceProperties(nullptr),
-      DescriptorSize(sizeof(TargetProtocolDescriptor<Runtime>)),
-      Flags(Flags),
-      NumRequirements(0),
-      Requirements(nullptr),
-      Superclass(nullptr),
-      AssociatedTypeNames(nullptr)
-  {}
-
-#ifndef NDEBUG
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                            "only for use in the debugger");
-#endif
-};
+template<typename Runtime> struct TargetProtocolDescriptor;
 using ProtocolDescriptor = TargetProtocolDescriptor<InProcess>;
   
 /// A witness table for a protocol.
@@ -2987,6 +2876,95 @@ public:
 
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
     return cd->getKind() == ContextDescriptorKind::Anonymous;
+  }
+};
+
+/// A protocol descriptor.
+///
+/// Protocol descriptors contain information about the contents of a protocol:
+/// it's name, requirements, requirement signature, context, and so on. They
+/// are used both to identify a protocol and to reason about its contents.
+///
+/// Only Swift protocols are defined by a protocol descriptor, whereas
+/// Objective-C (including protocols defined in Swift as @objc) use the
+/// Objective-C protocol layout.
+template<typename Runtime>
+struct TargetProtocolDescriptor final
+    : TargetContextDescriptor<Runtime>,
+      swift::ABI::TrailingObjects<
+        TargetProtocolDescriptor<Runtime>,
+        TargetGenericRequirementDescriptor<Runtime>,
+        TargetProtocolRequirement<Runtime>>
+{
+private:
+  using TrailingObjects
+    = swift::ABI::TrailingObjects<
+        TargetProtocolDescriptor<Runtime>,
+        TargetGenericRequirementDescriptor<Runtime>,
+        TargetProtocolRequirement<Runtime>>;
+
+  friend TrailingObjects;
+
+  template<typename T>
+  using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
+
+public:
+  size_t numTrailingObjects(
+            OverloadToken<TargetGenericRequirementDescriptor<Runtime>>) const {
+    return NumRequirementsInSignature;
+  }
+
+  size_t numTrailingObjects(
+            OverloadToken<TargetProtocolRequirement<Runtime>>) const {
+    return NumRequirements;
+  }
+
+
+  /// The name of the protocol.
+  TargetRelativeDirectPointer<Runtime, const char, /*nullable*/ false> Name;
+
+  /// The number of generic requirements in the requirement signature of the
+  /// protocol.
+  uint32_t NumRequirementsInSignature;
+
+  /// The number of requirements in the protocol.
+  /// If any requirements beyond MinimumWitnessTableSizeInWords are present
+  /// in the witness table template, they will be not be overwritten with
+  /// defaults.
+  uint32_t NumRequirements;
+
+  /// Associated type names, as a space-separated list in the same order
+  /// as the requirements.
+  RelativeDirectPointer<const char, /*Nullable=*/true> AssociatedTypeNames;
+
+  ProtocolContextDescriptorFlags getProtocolContextDescriptorFlags() const {
+    return ProtocolContextDescriptorFlags(this->Flags.getKindSpecificFlags());
+  }
+
+  /// Retrieve the requirements that make up the requirement signature of
+  /// this protocol.
+  llvm::ArrayRef<TargetGenericRequirementDescriptor<Runtime>>
+  getRequirementSignature() const {
+    return {this->template getTrailingObjects<
+                             TargetGenericRequirementDescriptor<Runtime>>(),
+            NumRequirementsInSignature};
+  }
+
+  /// Retrieve the requirements of this protocol.
+  llvm::ArrayRef<TargetProtocolRequirement<Runtime>>
+  getRequirements() const {
+    return {this->template getTrailingObjects<
+                             TargetProtocolRequirement<Runtime>>(),
+            NumRequirements};
+  }
+
+#ifndef NDEBUG
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "only for use in the debugger");
+#endif
+
+  static bool classof(const TargetContextDescriptor<Runtime> *cd) {
+    return cd->getKind() == ContextDescriptorKind::Protocol;
   }
 };
 

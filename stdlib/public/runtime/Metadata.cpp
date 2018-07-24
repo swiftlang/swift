@@ -3339,7 +3339,7 @@ static void initializeResilientWitnessTable(GenericWitnessTable *genericTable,
                                             void **table) {
   auto protocol = genericTable->Protocol.get();
 
-  auto requirements = protocol->Requirements.get();
+  auto requirements = protocol->getRequirements();
   auto witnesses = genericTable->ResilientWitnesses->getWitnesses();
 
   for (size_t i = 0, e = protocol->NumRequirements; i < e; ++i) {
