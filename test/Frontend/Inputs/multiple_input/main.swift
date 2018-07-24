@@ -1,4 +1,3 @@
-// Used by emit-objc-header.swift and others.
 // This file should be inferred as the main source file from its name.
 
 var x = 4 + 5

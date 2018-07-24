@@ -498,6 +498,11 @@ bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module_doc);
     return true;
   }
+  if (!FrontendOptions::canActionEmitInterface(Opts.RequestedAction) &&
+      Opts.InputsAndOutputs.hasModuleInterfaceOutputPath()) {
+    Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_interface);
+    return true;
+  }
   return false;
 }
 
