@@ -2664,12 +2664,31 @@ void AttributeChecker::visitTensorFlowGraphAttr(TensorFlowGraphAttr *attr) {
 
 // SWIFT_ENABLE_TENSORFLOW
 void AttributeChecker::visitTFParameterAttr(TFParameterAttr *attr) {
-  VarDecl *VD = dyn_cast<VarDecl>(D);
-  if (!VD->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext() ||
-      !VD->hasStorage() || VD->isStatic())
+  // The `TensorFlow` module must be imported.
+  auto parameterizedProto =
+    TC.Context.getProtocol(KnownProtocolKind::Parameterized);
+  if (!parameterizedProto) {
+    diagnoseAndRemoveAttr(attr, diag::tfparameter_attr_tensorflow_not_imported,
+                          attr->getAttrName());
+    return;
+  }
+  // Declaration must be an instance stored property of a nominal type.
+  auto *VD = dyn_cast<VarDecl>(D);
+  auto *nominal =
+    VD->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+  if (!nominal || !VD->hasStorage() || VD->isStatic()) {
     diagnoseAndRemoveAttr(attr,
                           diag::tfparameter_attr_instance_stored_property_only,
                           attr->getAttrName());
+    return;
+  }
+  // The nominal type must conform to `Parameterized`.
+  if (!TC.conformsToProtocol(nominal->getDeclaredInterfaceType(),
+                             parameterizedProto, nominal->getDeclContext(),
+                             ConformanceCheckFlags::InExpression)) {
+    diagnoseAndRemoveAttr(attr, diag::tfparameter_attr_not_in_parameterized,
+                          attr->getAttrName());
+  }
 }
 
 void TypeChecker::checkDeclAttributes(Decl *D) {

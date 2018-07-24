@@ -30,7 +30,6 @@ tensorParams.update(withGradients: tensorParams) { p, g in p -= g }
 tensorParams.update(withGradients: tensorParams) { $0 -= 0.1 * $1 }
 
 // Test types with ParameterAggregate members.
-
 struct NestedParameters : ParameterAggregate {
   var params1: Parameters
   var params2: Parameters
@@ -52,7 +51,6 @@ veryNested.update(withGradients: veryNested) { p, g in p -= g }
 veryNested.update(withGradients: veryNested) { $0 -= 0.1 * $1 }
 
 // Test type in generic context.
-
 struct A<T> {
   struct B<U, V> {
     struct GenericContextParams : ParameterAggregate {
@@ -63,7 +61,6 @@ struct A<T> {
 }
 
 // Test manual conformances to ParameterAggregate.
-
 struct HeterogeneousParameters : ParameterAggregate {
   var float: Float
   var double: Double

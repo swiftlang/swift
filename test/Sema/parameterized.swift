@@ -32,7 +32,6 @@ struct TensorLayer : Parameterized {
 _ = TensorLayer.Parameters(w: [1], b: [2])
 
 // Test types with `Parameterized` members.
-
 struct Model : Parameterized {
   @TFParameter var layer1: DenseLayer
   @TFParameter var layer2: DenseLayer
@@ -48,13 +47,11 @@ model.updateParameters(withGradients: modelGradients) { p, g in p -= g }
 model.updateParameters(withGradients: modelGradients) { $0 -= 0.1 * $1 }
 
 // Test extension of synthesized `Parameters` struct.
-
 extension Model.Parameters {
   func foo() {}
 }
 
 // Test type in generic context.
-
 struct A<T> {
   struct B<U, V> {
     struct GenericContextModel : Parameterized {
@@ -65,7 +62,6 @@ struct A<T> {
 }
 
 // Test heterogenous parameter types.
-
 struct MixedParameterized : Parameterized {
   @TFParameter var int: Int
   @TFParameter var float: Float
@@ -85,16 +81,7 @@ extension MixedParameterized.Parameters : ParameterAggregate {
 }
 mixed.updateParameters(withGradients: mixed.allParameters, -=)
 
-// Test invalid `Parameters` struct.
-
-struct ModelWithInvalidParameters : Parameterized {
-  @TFParameter var layer: DenseLayer
-  @TFParameter var float: Float
-  struct Parameters {} // expected-error {{'Parameters' struct is invalid}}
-}
-
 // Test user-specified `Parameters` struct with reordered parameters.
-
 struct ModelWithReorderedParameters : Parameterized {
   @TFParameter var layer: DenseLayer
   @TFParameter var float: Float
@@ -106,3 +93,15 @@ struct ModelWithReorderedParameters : Parameterized {
 var reorderedModel = ModelWithReorderedParameters(layer: layer, float: 1)
 _ = reorderedModel.allParameters
 reorderedModel.updateParameters(withGradients: reorderedModel.allParameters, -=)
+
+// Test invalid `Parameters` struct.
+struct ModelWithInvalidParameters : Parameterized {
+  @TFParameter var layer: DenseLayer
+  @TFParameter var float: Float
+  struct Parameters {} // expected-error {{'Parameters' struct is invalid}}
+}
+
+// Test invalid `@TFParameter` usage outside of `Parameterized` type.
+struct NonParameterized {
+  @TFParameter var float: Float // expected-error {{@TFParameter is allowed only in types that conform to 'Parameterized'}}
+}
