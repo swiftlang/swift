@@ -2306,6 +2306,8 @@ static void validateAbstractStorageDecl(TypeChecker &TC,
 
 static void finalizeAbstractStorageDecl(TypeChecker &TC,
                                         AbstractStorageDecl *storage) {
+  TC.validateDecl(storage);
+
   for (auto accessor : storage->getAllAccessors()) {
     // Are there accessors we can safely ignore here, like maybe observers?
     TC.validateDecl(accessor);
@@ -2721,7 +2723,6 @@ public:
 
     checkUnsupportedNestedType(ED);
     TC.validateDecl(ED);
-    TC.DeclsToFinalize.remove(ED);
     ED->setHasValidatedLayout();
 
     {
@@ -2760,7 +2761,6 @@ public:
     checkUnsupportedNestedType(SD);
 
     TC.validateDecl(SD);
-    TC.DeclsToFinalize.remove(SD);
     SD->setHasValidatedLayout();
 
     TC.addImplicitConstructors(SD);
@@ -2891,7 +2891,6 @@ public:
 
     TC.validateDecl(CD);
     TC.requestSuperclassLayout(CD);
-    TC.DeclsToFinalize.remove(CD);
     CD->setHasValidatedLayout();
 
     {
@@ -4625,6 +4624,14 @@ void TypeChecker::requestMemberLayout(ValueDecl *member) {
   if (auto *protocolDecl = dyn_cast<ProtocolDecl>(dc))
     requestNominalLayout(protocolDecl);
 
+  if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
+    if (ext->getAsClassOrClassExtensionContext()) {
+      // Finalize members of class extensions, to ensure we compute their
+      // @objc and dynamic state.
+      DeclsToFinalize.insert(member);
+    }
+  }
+
   // If this represents (abstract) storage, form the appropriate accessors.
   if (auto storage = dyn_cast<AbstractStorageDecl>(member)) {
     validateAbstractStorageDecl(*this, storage);
@@ -4683,23 +4690,15 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
     if (!shouldValidateMemberDuringFinalization(nominal, VD))
       continue;
 
-    TC.validateDecl(VD);
-
-    // Compute overrides.
-    (void)VD->getOverriddenDecls();
-
-    // Check whether the member is @objc or dynamic.
-    (void)VD->isObjC();
-    (void)VD->isDynamic();
+    TC.DeclsToFinalize.insert(VD);
 
     // The only thing left to do is synthesize storage for lazy variables.
     auto *prop = dyn_cast<VarDecl>(D);
     if (!prop)
       continue;
 
-    if (prop->getAttrs().hasAttribute<LazyAttr>() && !prop->isStatic()
-                                                  && prop->getGetter()) {
-      assert(!prop->getGetter()->hasBody());
+    if (prop->getAttrs().hasAttribute<LazyAttr>() && !prop->isStatic() &&
+        prop->getGetter() && !prop->getGetter()->hasBody()) {
       TC.completeLazyVarImplementation(prop);
     }
   }
@@ -4739,18 +4738,20 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
 }
 
 void TypeChecker::finalizeDecl(ValueDecl *decl) {
+  validateDecl(decl);
+
   if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
     finalizeType(*this, nominal);
-  } else if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-    // We synthesize certain functions --- mostly accessors --- at
-    // times that can be inconvenient for immediate validation.  We add
-    // them to the list of declarations to finalize so that we can
-    // fully validate them at a more opportune time.
-    validateDecl(func);
-  } else {
-    auto storage = cast<AbstractStorageDecl>(decl);
+  } else if (auto storage = dyn_cast<AbstractStorageDecl>(decl)) {
     finalizeAbstractStorageDecl(*this, storage);
   }
+
+  // Compute overrides.
+  (void)decl->getOverriddenDecls();
+
+  // Check whether the member is @objc or dynamic.
+  (void)decl->isObjC();
+  (void)decl->isDynamic();
 }
 
 bool swift::isPassThroughTypealias(TypeAliasDecl *typealias) {
