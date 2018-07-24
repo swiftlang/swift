@@ -29,6 +29,7 @@
 
 using namespace swift;
 
+#if false
 // Race testing.
 
 template <typename T>
@@ -1394,3 +1395,4 @@ TEST(TestOpaqueExistentialBox, test_initWithTake_indirect) {
   EXPECT_EQ(existBox.buffer.PrivateData[0], refAndObjectAddr2.object);
   EXPECT_EQ(swift_retainCount(refAndObjectAddr2.object), 1u);
 }
+#endif

@@ -383,21 +383,28 @@ public:
         }
 #endif
 
-        auto ProtocolDescriptor = readSwiftProtocolDescriptor(
-            ProtocolAddress.getSwiftProtocol());
-        if (!ProtocolDescriptor)
+        // Read the protocol descriptor.
+        ContextDescriptorRef descriptor
+          = readContextDescriptor(ProtocolAddress.getSwiftProtocol());
+        if (!descriptor)
           return BuiltType();
 
-        std::string MangledNameStr;
-        if (!Reader->readString(RemoteAddress(ProtocolDescriptor->Name),
-                                MangledNameStr))
+        auto protocolBuffer =
+          reinterpret_cast<const TargetProtocolDescriptor<Runtime> *>
+            (descriptor.getLocalBuffer());
+
+        std::string mangledNameStr;
+        auto nameAddress = resolveRelativeField(descriptor,
+                                                protocolBuffer->Name);
+        if (!Reader->readString(RemoteAddress(nameAddress),
+                                mangledNameStr))
           return BuiltType();
 
-        StringRef MangledName =
-          Demangle::dropSwiftManglingPrefix(MangledNameStr);
+        StringRef mangledName =
+          Demangle::dropSwiftManglingPrefix(mangledNameStr);
 
         Demangle::Context DCtx;
-        auto Demangled = DCtx.demangleTypeAsNode(MangledName);
+        auto Demangled = DCtx.demangleTypeAsNode(mangledName);
         if (!Demangled)
           return BuiltType();
 
@@ -1090,6 +1097,9 @@ private:
       baseSize = sizeof(TargetStructDescriptor<Runtime>);
       genericHeaderSize = sizeof(TypeGenericContextDescriptorHeader);
       break;
+    case ContextDescriptorKind::Protocol:
+      baseSize = sizeof(TargetProtocolDescriptorRef<Runtime>);
+      break;
     default:
       // We don't know about this kind of context.
       return nullptr;
@@ -1291,19 +1301,6 @@ private:
       return BuiltNominalTypeDecl();
     BuiltNominalTypeDecl decl = Builder.createNominalTypeDecl(node);
     return decl;
-  }
-
-  OwnedProtocolDescriptorRef
-  readSwiftProtocolDescriptor(StoredPointer Address) {
-    auto Size = sizeof(TargetProtocolDescriptor<Runtime>);
-    auto Buffer = (uint8_t *)malloc(Size);
-    if (!Reader->readBytes(RemoteAddress(Address), Buffer, Size)) {
-      free(Buffer);
-      return nullptr;
-    }
-    auto Casted
-      = reinterpret_cast<TargetProtocolDescriptor<Runtime> *>(Buffer);
-    return OwnedProtocolDescriptorRef(Casted);
   }
 
 #if SWIFT_OBJC_INTEROP

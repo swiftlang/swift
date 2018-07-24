@@ -1623,8 +1623,6 @@ public:
                         ProtocolDescriptorPointer protocol,
                         ProtocolDispatchStrategy dispatchStrategy) {
 #if SWIFT_OBJC_INTEROP
-    assert(!protocol ||
-           protocol->Flags.getDispatchStrategy() == dispatchStrategy);
     storage = reinterpret_cast<StoredPointer>(protocol)
       | (dispatchStrategy == ProtocolDispatchStrategy::ObjC ? IsObjCBit : 0);
 #else
@@ -1681,7 +1679,8 @@ public:
     }
 #endif
 
-    return getSwiftProtocol()->Flags.getClassConstraint();
+    return getSwiftProtocol()->getProtocolContextDescriptorFlags()
+        .getClassConstraint();
   }
 
   /// Determine whether this protocol needs a witness table.
@@ -1702,7 +1701,8 @@ public:
     }
 #endif
 
-    return getSwiftProtocol()->Flags.getSpecialProtocol();
+    return getSwiftProtocol()->getProtocolContextDescriptorFlags()
+        .getSpecialProtocol();
   }
 
   /// Retrieve the Swift protocol descriptor.
@@ -1816,76 +1816,7 @@ struct TargetProtocolRequirement {
 
 using ProtocolRequirement = TargetProtocolRequirement<InProcess>;
 
-/// A protocol descriptor. This is not type metadata, but is referenced by
-/// existential type metadata records to describe a protocol constraint.
-/// Its layout is compatible with the Objective-C runtime's 'protocol_t' record
-/// layout.
-template <typename Runtime>
-struct TargetProtocolDescriptor {
-  using StoredPointer = typename Runtime::StoredPointer;
-  /// Unused by the Swift runtime.
-  TargetPointer<Runtime, const void> _ObjC_Isa;
-  
-  /// The mangled name of the protocol.
-  TargetPointer<Runtime, const char> Name;
-  
-  /// The list of protocols this protocol refines.
-  ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptorList>
-    InheritedProtocols;
-  
-  /// Unused by the Swift runtime.
-  TargetPointer<Runtime, const void>
-    _ObjC_InstanceMethods,
-    _ObjC_ClassMethods,
-    _ObjC_OptionalInstanceMethods,
-    _ObjC_OptionalClassMethods,
-    _ObjC_InstanceProperties;
-  
-  /// Size of the descriptor record.
-  uint32_t DescriptorSize;
-  
-  /// Additional flags.
-  ProtocolDescriptorFlags Flags;
-
-  /// The number of requirements described by the Requirements array.
-  /// If any requirements beyond MinimumWitnessTableSizeInWords are present
-  /// in the witness table template, they will be not be overwritten with
-  /// defaults.
-  uint32_t NumRequirements;
-
-  /// Requirement descriptions.
-  RelativeDirectPointer<TargetProtocolRequirement<Runtime>> Requirements;
-
-  /// The superclass of which all conforming types must be a subclass.
-  RelativeDirectPointer<const TargetClassMetadata<Runtime>, /*Nullable=*/true>
-    Superclass;
-
-  /// Associated type names, as a space-separated list in the same order
-  /// as the requirements.
-  RelativeDirectPointer<const char, /*Nullable=*/true> AssociatedTypeNames;
-
-  // This is only used in unittests/Metadata.cpp.
-  constexpr TargetProtocolDescriptor<Runtime>(const char *Name,
-                      const TargetProtocolDescriptorList<Runtime> *Inherited,
-                      ProtocolDescriptorFlags Flags)
-    : _ObjC_Isa(nullptr), Name(Name), InheritedProtocols(Inherited),
-      _ObjC_InstanceMethods(nullptr), _ObjC_ClassMethods(nullptr),
-      _ObjC_OptionalInstanceMethods(nullptr),
-      _ObjC_OptionalClassMethods(nullptr),
-      _ObjC_InstanceProperties(nullptr),
-      DescriptorSize(sizeof(TargetProtocolDescriptor<Runtime>)),
-      Flags(Flags),
-      NumRequirements(0),
-      Requirements(nullptr),
-      Superclass(nullptr),
-      AssociatedTypeNames(nullptr)
-  {}
-
-#ifndef NDEBUG
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                            "only for use in the debugger");
-#endif
-};
+template<typename Runtime> struct TargetProtocolDescriptor;
 using ProtocolDescriptor = TargetProtocolDescriptor<InProcess>;
   
 /// A witness table for a protocol.
@@ -2998,6 +2929,100 @@ public:
 
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
     return cd->getKind() == ContextDescriptorKind::Anonymous;
+  }
+};
+
+/// A protocol descriptor.
+///
+/// Protocol descriptors contain information about the contents of a protocol:
+/// it's name, requirements, requirement signature, context, and so on. They
+/// are used both to identify a protocol and to reason about its contents.
+///
+/// Only Swift protocols are defined by a protocol descriptor, whereas
+/// Objective-C (including protocols defined in Swift as @objc) use the
+/// Objective-C protocol layout.
+template<typename Runtime>
+struct TargetProtocolDescriptor final
+    : TargetContextDescriptor<Runtime>,
+      TrailingGenericContextObjects<
+        TargetProtocolDescriptor<Runtime>,
+        TargetGenericContextDescriptorHeader,
+        TargetGenericRequirementDescriptor<Runtime>,
+        TargetProtocolRequirement<Runtime>>
+{
+private:
+  using TrailingObjects
+    = TrailingGenericContextObjects<
+        TargetProtocolDescriptor<Runtime>,
+        TargetGenericContextDescriptorHeader,
+        TargetGenericRequirementDescriptor<Runtime>,
+        TargetProtocolRequirement<Runtime>>;
+
+  friend TrailingObjects;
+
+  template<typename T>
+  using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
+
+public:
+  using TrailingObjects::getGenericContext;
+  using TrailingObjects::numTrailingObjects;
+
+  size_t numTrailingObjects(
+            OverloadToken<TargetGenericRequirementDescriptor<Runtime>>) const {
+    return NumRequirementsInSignature;
+  }
+
+  size_t numTrailingObjects(
+            OverloadToken<TargetProtocolRequirement<Runtime>>) const {
+    return NumRequirements;
+  }
+
+
+  /// The name of the protocol.
+  TargetRelativeDirectPointer<Runtime, const char, /*nullable*/ false> Name;
+
+  /// The number of generic requirements in the requirement signature of the
+  /// protocol.
+  uint32_t NumRequirementsInSignature;
+
+  /// The number of requirements in the protocol.
+  /// If any requirements beyond MinimumWitnessTableSizeInWords are present
+  /// in the witness table template, they will be not be overwritten with
+  /// defaults.
+  uint32_t NumRequirements;
+
+  /// Associated type names, as a space-separated list in the same order
+  /// as the requirements.
+  RelativeDirectPointer<const char, /*Nullable=*/true> AssociatedTypeNames;
+
+  ProtocolContextDescriptorFlags getProtocolContextDescriptorFlags() const {
+    return ProtocolContextDescriptorFlags(this->Flags.getKindSpecificFlags());
+  }
+
+  /// Retrieve the requirements that make up the requirement signature of
+  /// this protocol.
+  llvm::ArrayRef<TargetGenericRequirementDescriptor<Runtime>>
+  getRequirementSignature() const {
+    return {this->template getTrailingObjects<
+                             TargetGenericRequirementDescriptor<Runtime>>(),
+            NumRequirementsInSignature};
+  }
+
+  /// Retrieve the requirements of this protocol.
+  llvm::ArrayRef<TargetProtocolRequirement<Runtime>>
+  getRequirements() const {
+    return {this->template getTrailingObjects<
+                             TargetProtocolRequirement<Runtime>>(),
+            NumRequirements};
+  }
+
+#ifndef NDEBUG
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "only for use in the debugger");
+#endif
+
+  static bool classof(const TargetContextDescriptor<Runtime> *cd) {
+    return cd->getKind() == ContextDescriptorKind::Protocol;
   }
 };
 

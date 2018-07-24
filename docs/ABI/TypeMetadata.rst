@@ -410,72 +410,36 @@ See the `protocol descriptor`_ description below.
 Protocol Descriptor
 ~~~~~~~~~~~~~~~~~~~
 
-`Protocol metadata` contains references to zero, one, or more **protocol
-descriptors** that describe the protocols values of the type are required to
-conform to. The protocol descriptor is laid out to be compatible with
-Objective-C ``Protocol`` objects. The layout is as follows:
+Protocol descriptors describe the requirements of a protocol, and act as a
+handle for the protocol itself. The are referenced by `Protocol metadata`_, as
+well as `Protocol Conformance Records`_ and generic requirements. Protocol
+descriptors are only created for non-`@objc` Swift protocols: `@objc` protocols
+are emitted as Objective-C metadata. The layout of Swift protocol descriptors is
+as follows:
 
-- An **isa** placeholder is stored at **offset 0**. This field is populated by
-  the Objective-C runtime.
-- The mangled **name** is referenced as a null-terminated C string at
-  **offset 1**.
-- If the protocol inherits one or more other protocols, a pointer to the
-  **inherited protocols list** is stored at **offset 2**. The list starts with
-  the number of inherited protocols as a pointer-sized integer, and is followed
-  by that many protocol descriptor pointers. If the protocol inherits no other
-  protocols, this pointer is null.
-- For an ObjC-compatible protocol, its **required instance methods** are stored
-  at **offset 3** as an ObjC-compatible method list. This is null for native
-  Swift protocols.
-- For an ObjC-compatible protocol, its **required class methods** are stored
-  at **offset 4** as an ObjC-compatible method list. This is null for native
-  Swift protocols.
-- For an ObjC-compatible protocol, its **optional instance methods** are stored
-  at **offset 5** as an ObjC-compatible method list. This is null for native
-  Swift protocols.
-- For an ObjC-compatible protocol, its **optional class methods** are stored
-  at **offset 6** as an ObjC-compatible method list. This is null for native
-  Swift protocols.
-- For an ObjC-compatible protocol, its **instance properties** are stored
-  at **offset 7** as an ObjC-compatible property list. This is null for native
-  Swift protocols.
-- The **size** of the protocol descriptor record is stored as a 32-bit integer
-  at **offset 8**. This is currently 72 on 64-bit platforms and 40 on 32-bit
-  platforms.
-- **Flags** are stored as a 32-bit integer after the size. The following bits
-  are currently used (counting from least significant bit zero):
-
-  * **Bit 0** is the **Swift bit**. It is set for all protocols defined in
-    Swift and unset for protocols defined in Objective-C.
-  * **Bit 1** is the **class constraint bit**. It is set if the protocol is
+- Protocol descriptors are context descriptors, so they are prefixed by context
+  descriptor metadata. (FIXME: these are not yet documented)
+- The 16-bit kind-specific flags of a protocol are defined as follows:
+  * **Bit 0** is the **class constraint bit**. It is set if the protocol is
     **not** class-constrained, meaning that any struct, enum, or class type
     may conform to the protocol. It is unset if only classes can conform to
-    the protocol. (The inverted meaning is for compatibility with Objective-C
-    protocol records, in which the bit is never set. Objective-C protocols can
-    only be conformed to by classes.)
-  * **Bit 2** is the **witness table bit**. It is set if dispatch to the
-    protocol's methods is done through a witness table, which is either passed
-    as an extra parameter to generic functions or included in the existential
-    container layout of protocol types. It is unset if dispatch is done
-    through ``objc_msgSend`` and requires no additional information to accompany
-    a value of conforming type.
-  * **Bit 31** is set by the Objective-C runtime when it has done its
-    initialization of the protocol record. It is unused by the Swift runtime.
-- **Number of mandatory requirements** is stored as a 16-bit integer after
-  the flags. It specifies the number of requirements that do not have default
-  implementations.
-- **Number of requirements** is stored as a 16-bit integer after the flags. It
-  specifies the total number of requirements for the protocol.
-- **Requirements pointer** stored as a 32-bit relative pointer to an array
-  of protocol requirements. The number of elements in the array is specified
-  by the preceding 16-bit integer.
-- **Superclass pointer** stored as a 32-bit relative pointer to class metadata,
-  describing the superclass bound of the protocol.
-- **Associated type names** stored as a 32-bit relative pointer to a
-  null-terminated string. The string contains the names of the associated
-  types, in the order they apparent in the requirements list, separated by
-  spaces.
-
+    the protocol.
+  * **Bit 1** indicates that the protocol is **resilient**.
+  * **Bits 2-7** indicate specify the **special protocol kind**. Only one
+    special protocol kind is defined: the `Error` protocol has value 1.    
+- A pointer to the **name** of the protocol. FIXME: The name is currently
+  mangles, but will change to the (unmangled) name.
+- The number of generic requirements within the **requirement signature** of
+  the protocol. The generic requirements themselves follow the fixed part
+  of the protocol descriptor.
+- The number of **protocol requirements** in the protocol. The protocol
+  requirements follow the generic reuqirements that form the **requirement
+  signature**.
+- A string containing the **associated type names**, a C string comprising the
+  names of all of the associated types in this protocol, separated by spaces,
+  and in the same order as they appear in the protocol requirements.
+- The **generic requirements** that form the **requirement signature**.
+- The **protocol requirements** of the protocol.
 
 Protocol Conformance Records
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

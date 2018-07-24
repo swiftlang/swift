@@ -451,7 +451,7 @@ _searchProtocolRecords(ProtocolMetadataPrivateState &C,
       if (auto protocol = record.Protocol.getPointer()) {
         // Drop the "S$" prefix from the protocol record. It's not used in
         // the type itself.
-        StringRef foundProtocolName = protocol->Name;
+        StringRef foundProtocolName = protocol->Name.get();
         assert(foundProtocolName.startswith("$S"));
         foundProtocolName = foundProtocolName.drop_front(2);
         if (foundProtocolName == protocolName)
@@ -644,9 +644,6 @@ namespace {
 /// the given name in the given protocol descriptor.
 Optional<unsigned> findAssociatedTypeByName(const ProtocolDescriptor *protocol,
                                             StringRef name) {
-  // Only Swift protocols have associated types.
-  if (!protocol->Flags.isSwift()) return None;
-
   // If we don't have associated type names, there's nothing to do.
   const char *associatedTypeNamesPtr = protocol->AssociatedTypeNames.get();
   if (!associatedTypeNamesPtr) return None;
@@ -672,7 +669,7 @@ Optional<unsigned> findAssociatedTypeByName(const ProtocolDescriptor *protocol,
   // type requirement.
   unsigned currentAssocTypeIdx = 0;
   unsigned numRequirements = protocol->NumRequirements;
-  const ProtocolRequirement *requirements = protocol->Requirements.get();
+  auto requirements = protocol->getRequirements();
   for (unsigned reqIdx = 0; reqIdx != numRequirements; ++reqIdx) {
     if (requirements[reqIdx].Flags.getKind() !=
         ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction)
