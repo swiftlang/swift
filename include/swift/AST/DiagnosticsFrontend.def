@@ -119,6 +119,8 @@ ERROR(error_mode_cannot_emit_module,none,
       "this mode does not support emitting modules", ())
 ERROR(error_mode_cannot_emit_module_doc,none,
       "this mode does not support emitting module documentation files", ())
+ERROR(error_mode_cannot_emit_interface,none,
+      "this mode does not support emitting textual interface files", ())
 
 WARNING(emit_reference_dependencies_without_primary_file,none,
   "ignoring -emit-reference-dependencies (requires -primary-file)", ())

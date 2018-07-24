@@ -60,6 +60,12 @@ struct SupplementaryOutputPaths {
   /// It is currently only used with WMO, but could be generalized.
   std::string TBDPath;
 
+  /// The path to which we should emit a textual module interface, which can be
+  /// used by a client source file to import this module.
+  ///
+  /// Currently only makes sense when the compiler has whole-module knowledge.
+  std::string ModuleInterfaceOutputPath;
+
   SupplementaryOutputPaths() = default;
   SupplementaryOutputPaths(const SupplementaryOutputPaths &) = default;
 
@@ -68,7 +74,7 @@ struct SupplementaryOutputPaths {
            ModuleDocOutputPath.empty() && DependenciesFilePath.empty() &&
            ReferenceDependenciesFilePath.empty() &&
            SerializedDiagnosticsPath.empty() && LoadedModuleTracePath.empty() &&
-           TBDPath.empty();
+           TBDPath.empty() && ModuleInterfaceOutputPath.empty();
   }
 };
 } // namespace swift

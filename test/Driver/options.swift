@@ -1,55 +1,6 @@
-// rdar://13723332 Crash on -emit-sil with no input files
-// RUN: not %target-swift-frontend -emit-sil 2>&1 | %FileCheck -check-prefix=NO_FILES %s
-// RUN: not %target-swift-frontend -emit-sil -parse-as-library 2>&1 | %FileCheck -check-prefix=NO_FILES %s
-// NO_FILES: this mode requires at least one input file
-
-// RUN: not %target-swift-frontend -parse-sil -emit-sil 2>&1 | %FileCheck -check-prefix=SIL_FILES %s
-// SIL_FILES: this mode requires a single input file
-
-// RUN: not %target-swift-frontend -parse-sil -emit-sil %s %s 2>&1 | %FileCheck -check-prefix=DUPLICATE_FILES %s
-// RUN: not %target-swift-frontend -parse-sil -emit-sil %s %S/../Inputs/empty.swift 2>&1 | %FileCheck -check-prefix=SIL_FILES %s
-// DUPLICATE_FILES: duplicate input file 'SOURCE_DIR/test/Driver/options.swift'
-
-
-// RUN: not %target-swift-frontend -emit-silgen -parse-as-library %S/Inputs/invalid-module-name.swift 2>&1 | %FileCheck -check-prefix=INVALID_MODULE_NAME %s
-// INVALID_MODULE_NAME: error: module name "invalid-module-name" is not a valid identifier; use -module-name flag to specify an alternate name
-
-// RUN: not %target-swift-frontend -emit-silgen -parse-as-library %S/Inputs/invalid.module.name.swift 2>&1 | %FileCheck -check-prefix=INVALID_MODULE_NAME2 %s
-// INVALID_MODULE_NAME2: error: module name "invalid.module.name" is not a valid identifier; use -module-name flag to specify an alternate name
-
-// RUN: not %target-swift-frontend -emit-silgen -parse-as-library %S/Inputs/invalid-module-name.swift -module-name still-invalid 2>&1 | %FileCheck -check-prefix=STILL_INVALID %s
-// STILL_INVALID: error: module name "still-invalid" is not a valid identifier{{$}}
-
-// RUN: not %target-swiftc_driver -emit-silgen -parse-as-library %s -module-name "Swift" 2>&1 | %FileCheck -check-prefix=STDLIB_MODULE %s
+// RUN: not %swiftc_driver -emit-silgen -parse-as-library %s -module-name "Swift" 2>&1 | %FileCheck -check-prefix=STDLIB_MODULE %s
 // RUN: %target-swiftc_driver -emit-silgen -parse-as-library %s -module-name "Swift" -parse-stdlib -###
 // STDLIB_MODULE: error: module name "Swift" is reserved for the standard library{{$}}
-
-// RUN: not %target-swift-frontend -typecheck -emit-module %s 2>&1 | %FileCheck -check-prefix=PARSE_NO_MODULE %s
-// PARSE_NO_MODULE: error: this mode does not support emitting modules{{$}}
-
-// RUN: not %target-swift-frontend -parse -emit-dependencies %s 2>&1 | %FileCheck -check-prefix=PARSE_NO_DEPS %s
-// PARSE_NO_DEPS: error: this mode does not support emitting dependency files{{$}}
-// RUN: not %target-swift-frontend -dump-ast -emit-dependencies %s 2>&1 | %FileCheck -check-prefix=DUMP_NO_DEPS %s
-// DUMP_NO_DEPS: error: this mode does not support emitting dependency files{{$}}
-
-// RUN: not %target-swift-frontend -parse -emit-reference-dependencies %s 2>&1 | %FileCheck -check-prefix=PARSE_NO_REFERENCE_DEPS %s
-// PARSE_NO_REFERENCE_DEPS: error: this mode does not support emitting reference dependency files{{$}}
-// RUN: not %target-swift-frontend -dump-ast -emit-reference-dependencies %s 2>&1 | %FileCheck -check-prefix=DUMP_NO_REFERENCE_DEPS %s
-// DUMP_NO_REFERENCE_DEPS: error: this mode does not support emitting reference dependency files{{$}}
-// RUN: not %target-swift-frontend -resolve-imports -emit-reference-dependencies %s 2>&1 | %FileCheck -check-prefix=RESOLVE_IMPORTS_NO_REFERENCE_DEPS %s
-// RESOLVE_IMPORTS_NO_REFERENCE_DEPS: error: this mode does not support emitting reference dependency files{{$}}
-
-// RUN: not %target-swift-frontend -parse -emit-objc-header %s 2>&1 | %FileCheck -check-prefix=PARSE_NO_OBJC_HEADER %s
-// PARSE_NO_OBJC_HEADER: error: this mode does not support emitting Objective-C headers{{$}}
-// RUN: not %target-swift-frontend -dump-ast -emit-objc-header %s 2>&1 | %FileCheck -check-prefix=DUMP_NO_OBJC_HEADER %s
-// DUMP_NO_OBJC_HEADER: error: this mode does not support emitting Objective-C headers{{$}}
-// RUN: not %target-swift-frontend -resolve-imports -emit-objc-header %s 2>&1 | %FileCheck -check-prefix=RESOLVE_IMPORTS_NO_OBJC_HEADER %s
-// RESOLVE_IMPORTS_NO_OBJC_HEADER: error: this mode does not support emitting Objective-C headers{{$}}
-
-// Should not fail with non-zero exit code.
-// RUN: %target-swift-frontend -emit-silgen %S/Inputs/invalid-module-name.swift > /dev/null
-// RUN: %target-swift-frontend -emit-silgen -parse-as-library %S/Inputs/invalid-module-name.swift -module-name foo > /dev/null
-// RUN: %target-swift-frontend -typecheck -parse-as-library %S/Inputs/invalid-module-name.swift -module-name foo
 
 // RUN: not %swiftc_driver -crazy-option-that-does-not-exist %s 2>&1 | %FileCheck -check-prefix=INVALID_OPTION %s
 // RUN: not %swift_driver -crazy-option-that-does-not-exist 2>&1 | %FileCheck -check-prefix=INVALID_OPTION %s
