@@ -5,13 +5,14 @@ func trapsAndOverflows() {
   // expected-error @+1 {{arithmetic operation '124 + 92' (on type 'Int8') results in an overflow}}
   #assert((124 as Int8) + 92 < 42)
 
+  // expected-error @+2 {{integer literal '123231' overflows when stored into 'Int8'}}
   // expected-error @+1 {{#assert condition not constant}}
   #assert(Int8(123231) > 42)
-  // expected-note @-1 {{trap detected}}
-
-  // expected-error @+1 {{#assert condition not constant}}
-  #assert(Int8(124) + 8 > 42)
   // expected-note @-1 {{integer overflow detected}}
+
+  // expected-error @+2 {{arithmetic operation '124 + 8' (on type 'Int8') results in an overflow}}
+  // expected-error @+1 {{assertion failed}}
+  #assert(Int8(124) + 8 > 42)
 
   // expected-error @+1 {{#assert condition not constant}}
   #assert({ () -> Int in fatalError(String()) }() > 42)
