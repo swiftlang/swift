@@ -175,6 +175,14 @@ areAllTransitiveMetadataComplete_cheap(const Metadata *metadata);
 static MetadataDependency
 checkTransitiveCompleteness(const Metadata *metadata);
 
+static PrivateMetadataState inferStateForMetadata(Metadata *metadata) {
+  if (metadata->getValueWitnesses()->isIncomplete())
+    return PrivateMetadataState::Abstract;
+
+  // TODO: internal vs. external layout-complete?
+  return PrivateMetadataState::LayoutComplete;
+}
+
 namespace {
   struct GenericCacheEntry final :
       VariadicMetadataCacheEntryBase<GenericCacheEntry> {
@@ -210,14 +218,6 @@ namespace {
       }
 
       return { metadata, state };
-    }
-
-    PrivateMetadataState inferStateForMetadata(Metadata *metadata) {
-      if (metadata->getValueWitnesses()->isIncomplete())
-        return PrivateMetadataState::Abstract;
-
-      // TODO: internal vs. external layout-complete?
-      return PrivateMetadataState::LayoutComplete;
     }
 
     static const TypeContextDescriptor *getDescription(Metadata *type) {
@@ -529,6 +529,169 @@ swift::swift_getGenericMetadata(MetadataRequest request,
   auto key = MetadataCacheKey(arguments, numGenericArgs);
   auto result =
     getCache(generics).getOrInsert(key, request, description, arguments);
+
+  return result.second;
+}
+
+/***************************************************************************/
+/*** In-place metadata initialization **************************************/
+/***************************************************************************/
+
+namespace {
+  /// A cache entry for "in-place" metadata initializations.
+  class InPlaceMetadataCacheEntry final
+      : public MetadataCacheEntryBase<InPlaceMetadataCacheEntry, int> {
+    ValueType Value = nullptr;
+
+    friend MetadataCacheEntryBase;
+    ValueType getValue() {
+      return Value;
+    }
+    void setValue(ValueType value) {
+      Value = value;
+    }
+
+  public:
+    // We have to give MetadataCacheEntryBase a non-empty list of trailing
+    // objects or else it gets annoyed.
+    static size_t numTrailingObjects(OverloadToken<int>) { return 0; }
+
+    static const char *getName() { return "InPlaceMetadataCache"; }
+
+    InPlaceMetadataCacheEntry() {}
+
+    AllocationResult allocate(const TypeContextDescriptor *description) {
+      auto valueTypeDescriptor = cast<ValueTypeDescriptor>(description);
+      auto &initialization =
+        valueTypeDescriptor->getInPlaceMetadataInitialization();
+
+      auto metadata = initialization.IncompleteMetadata.get();
+
+      auto state = inferStateForMetadata(metadata);
+      return { metadata, state };
+    }
+
+    static const TypeContextDescriptor *getDescription(Metadata *type) {
+      return cast<ValueMetadata>(type)->getDescription();
+    }
+
+    TryInitializeResult tryInitialize(Metadata *metadata,
+                                      PrivateMetadataState state,
+                               PrivateMetadataCompletionContext *context) {
+      assert(state != PrivateMetadataState::Complete);
+
+      // Finish the completion function.
+      if (state < PrivateMetadataState::NonTransitiveComplete) {
+        // Find a pattern.  Currently we always use the default pattern.
+        auto &initialization =
+          cast<ValueMetadata>(metadata)->getDescription()
+                                       ->getInPlaceMetadataInitialization();
+
+        // Complete the metadata's instantiation.
+        auto dependency =
+          initialization.CompletionFunction(metadata, &context->Public,
+                                            /*pattern*/ nullptr);
+
+        // If this failed with a dependency, infer the current metadata state
+        // and return.
+        if (dependency) {
+          return { inferStateForMetadata(metadata), dependency };
+        }
+      }
+
+      // Check for transitive completeness.
+      if (auto dependency = checkTransitiveCompleteness(metadata)) {
+        return { PrivateMetadataState::NonTransitiveComplete, dependency };
+      }
+
+      // We're done.
+      publishCompleteMetadata(metadata);
+      return { PrivateMetadataState::Complete, MetadataDependency() };
+    }
+
+    void publishCompleteMetadata(Metadata *metadata) {
+      auto &init = cast<ValueMetadata>(metadata)->getDescription()
+                                           ->getInPlaceMetadataInitialization();
+      auto &cache = *init.InitializationCache.get();
+      cache.Metadata.store(metadata, std::memory_order_release);
+    }
+  };
+
+  /// An implementation of LockingConcurrentMapStorage that's more
+  /// appropriate for the in-place metadata cache.
+  ///
+  /// TODO: delete the cache entry when initialization is complete.
+  class InPlaceMetadataCacheStorage {
+    ConcurrencyControl Concurrency;
+
+  public:
+    using KeyType = const TypeContextDescriptor *;
+    using EntryType = InPlaceMetadataCacheEntry;
+
+    ConcurrencyControl &getConcurrency() { return Concurrency; }
+
+    template <class... ArgTys>
+    std::pair<EntryType*, bool>
+    getOrInsert(KeyType key, ArgTys &&...args) {
+      auto &init =
+        cast<ValueTypeDescriptor>(key)->getInPlaceMetadataInitialization();
+      auto &cache = *init.InitializationCache.get();
+
+      // Check for an existing entry.
+      auto existingEntry = cache.Private.load(std::memory_order_acquire);
+
+      // If there isn't one there, optimistically create an entry and
+      // try to swap it in.
+      if (!existingEntry) {
+        auto allocatedEntry = new InPlaceMetadataCacheEntry();
+        if (cache.Private.compare_exchange_strong(existingEntry,
+                                                  allocatedEntry,
+                                                  std::memory_order_acq_rel,
+                                                  std::memory_order_acquire)) {
+          // If that succeeded, return the entry we allocated and tell the
+          // caller we allocated it.
+          return { allocatedEntry, true };
+        }
+
+        // Otherwise, use the new entry and destroy the one we allocated.
+        assert(existingEntry && "spurious failure of strong compare-exchange?");
+        delete allocatedEntry;
+      }
+
+      return { static_cast<InPlaceMetadataCacheEntry*>(existingEntry), false };
+    }
+
+    EntryType *find(KeyType key) {
+      auto &init =
+        cast<ValueTypeDescriptor>(key)->getInPlaceMetadataInitialization();
+
+      return static_cast<InPlaceMetadataCacheEntry*>(
+        init.InitializationCache->Private.load(std::memory_order_acquire));
+    }
+
+    /// A default implementation for resolveEntry that assumes that the
+    /// key type is a lookup key for the map.
+    EntryType *resolveExistingEntry(KeyType key) {
+      auto entry = find(key);
+      assert(entry && "entry doesn't already exist!");
+      return entry;
+    }
+  };
+
+  class InPlaceMetadataCache
+      : public LockingConcurrentMap<InPlaceMetadataCacheEntry,
+                                    InPlaceMetadataCacheStorage> {
+  };
+} // end anonymous namespace
+
+/// The cache of all in-place metadata initializations.
+static Lazy<InPlaceMetadataCache> InPlaceMetadata;
+
+MetadataResponse
+swift::swift_getInPlaceMetadata(MetadataRequest request,
+                                const TypeContextDescriptor *description) {
+  auto result = InPlaceMetadata.get().getOrInsert(description, request,
+                                                  description);
 
   return result.second;
 }
@@ -3474,6 +3637,10 @@ static Result performOnMetadataCache(const Metadata *metadata,
   }
 
   if (!description->isGeneric()) {
+    if (description->hasInPlaceMetadataInitialization()) {
+      return std::move(callbacks).forInPlaceMetadata(description);
+    }
+
     return std::move(callbacks).forOtherMetadata(metadata);
   }
 
@@ -3502,6 +3669,10 @@ bool swift::addToMetadataQueue(MetadataCompletionQueueEntry *queueEntry,
       return cache.enqueue(key, QueueEntry, Dependency);
     }
 
+    bool forInPlaceMetadata(const TypeContextDescriptor *description) && {
+      return InPlaceMetadata.get().enqueue(description, QueueEntry, Dependency);
+    }
+
     bool forTupleMetadata(const TupleTypeMetadata *metadata) {
       return TupleTypes.get().enqueue(metadata, QueueEntry, Dependency);
     }
@@ -3523,6 +3694,10 @@ void swift::resumeMetadataCompletion(MetadataCompletionQueueEntry *queueEntry) {
                             GenericMetadataCache &cache,
                             MetadataCacheKey key) && {
       cache.resumeInitialization(key, QueueEntry);
+    }
+
+    void forInPlaceMetadata(const TypeContextDescriptor *description) && {
+      InPlaceMetadata.get().resumeInitialization(description, QueueEntry);
     }
 
     void forTupleMetadata(const TupleTypeMetadata *metadata) {
@@ -3549,6 +3724,11 @@ MetadataResponse swift::swift_checkMetadataState(MetadataRequest request,
                                       GenericMetadataCache &cache,
                                       MetadataCacheKey key) && {
       return cache.await(key, Request);
+    }
+
+    MetadataResponse forInPlaceMetadata(
+                                  const TypeContextDescriptor *description) && {
+      return InPlaceMetadata.get().await(description, Request);
     }
 
     MetadataResponse forTupleMetadata(const TupleTypeMetadata *metadata) {
@@ -3631,6 +3811,11 @@ areAllTransitiveMetadataComplete_cheap(const Metadata *type) {
                               MetadataCacheKey key) && {
         // Metadata cache lookups aren't really cheap enough for this
         // optimization.
+        return true;
+      }
+
+      bool forInPlaceMetadata(const TypeContextDescriptor *description) && {
+        // TODO: this could be cheap enough.
         return true;
       }
 
@@ -3789,6 +3974,11 @@ checkMetadataDependency(MetadataDependency dependency) {
                                           GenericMetadataCache &cache,
                                           MetadataCacheKey key) && {
       return cache.checkDependency(key, Requirement);
+    }
+
+    MetadataDependency forInPlaceMetadata(
+                              const TypeContextDescriptor *description) && {
+      return InPlaceMetadata.get().checkDependency(description, Requirement);
     }
 
     MetadataDependency forTupleMetadata(const TupleTypeMetadata *metadata) {

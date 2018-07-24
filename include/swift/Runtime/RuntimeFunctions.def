@@ -652,6 +652,13 @@ FUNCTION(GetForeignWitnessTable, swift_getForeignWitnessTable, C_CC,
               ProtocolDescriptorPtrTy),
          ATTRS(NoUnwind, ReadNone))
 
+// MetadataResponse swift_getInPlaceMetadata(MetadataRequest request,
+//                                           TypeContextDescriptor *type);
+FUNCTION(GetInPlaceMetadata, swift_getInPlaceMetadata, SwiftCC,
+         RETURNS(TypeMetadataResponseTy),
+         ARGS(SizeTy, TypeContextDescriptorPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
 // MetadataResponse swift_getGenericMetadata(MetadataRequest request,
 //                                           const void * const *arguments,
 //                                           TypeContextDescriptor *type);

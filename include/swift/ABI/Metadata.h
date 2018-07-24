@@ -3158,6 +3158,14 @@ public:
     return TypeContextDescriptorFlags(this->Flags.getKindSpecificFlags());
   }
 
+  /// Does this type have non-trivial "in place" metadata initialization?
+  ///
+  /// The type of the initialization-control structure differs by subclass,
+  /// so it doesn't appear here.
+  bool hasInPlaceMetadataInitialization() const {
+    return getTypeContextDescriptorFlags().hasInPlaceMetadataInitialization();
+  }
+
   const TargetTypeGenericContextDescriptorHeader<Runtime> &
     getFullGenericContextHeader() const;
 
@@ -3503,10 +3511,49 @@ public:
 
 using ClassDescriptor = TargetClassDescriptor<InProcess>;
 
+/// The cache structure for non-trivial initialization of singleton value
+/// metadata.
+template <typename Runtime>
+struct TargetInPlaceValueMetadataCache {
+  /// The metadata pointer.  Clients can do dependency-ordered loads
+  /// from this, and if they see a non-zero value, it's a Complete
+  /// metadata.
+  std::atomic<TargetMetadataPointer<Runtime, TargetMetadata>> Metadata;
+
+  /// The private cache data.
+  std::atomic<TargetPointer<Runtime, void>> Private;
+};
+using InPlaceValueMetadataCache =
+  TargetInPlaceValueMetadataCache<InProcess>;
+
+/// The control structure for performing non-trivial initialization of
+/// singleton value metadata, which is required when e.g. a non-generic
+/// value type has a resilient component type.
+template <typename Runtime>
+struct TargetInPlaceValueMetadataInitialization {
+  /// The initialization cache.  Out-of-line because mutable.
+  TargetRelativeDirectPointer<Runtime,
+                              TargetInPlaceValueMetadataCache<Runtime>>
+    InitializationCache;
+
+  /// The incomplete metadata.
+  TargetRelativeDirectPointer<Runtime, TargetMetadata<Runtime>>
+    IncompleteMetadata;
+
+  /// The completion function.  The pattern will always be null.
+  TargetRelativeDirectPointer<Runtime, MetadataCompleter>
+    CompletionFunction;
+};
+
 template <typename Runtime>
 class TargetValueTypeDescriptor
     : public TargetTypeContextDescriptor<Runtime> {
 public:
+  using InPlaceMetadataInitialization =
+    TargetInPlaceValueMetadataInitialization<Runtime>;
+
+  const InPlaceMetadataInitialization &getInPlaceMetadataInitialization() const;
+
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
     return cd->getKind() == ContextDescriptorKind::Struct ||
            cd->getKind() == ContextDescriptorKind::Enum;
@@ -3518,15 +3565,29 @@ template <typename Runtime>
 class TargetStructDescriptor final
     : public TargetValueTypeDescriptor<Runtime>,
       public TrailingGenericContextObjects<TargetStructDescriptor<Runtime>,
-                            TargetTypeGenericContextDescriptorHeader> {
+                            TargetTypeGenericContextDescriptorHeader,
+                            TargetInPlaceValueMetadataInitialization<Runtime>> {
+public:
+  using InPlaceMetadataInitialization =
+    TargetInPlaceValueMetadataInitialization<Runtime>;
+
 private:
   using TrailingGenericContextObjects =
     TrailingGenericContextObjects<TargetStructDescriptor<Runtime>,
-                                  TargetTypeGenericContextDescriptorHeader>;
+                                  TargetTypeGenericContextDescriptorHeader,
+                                  InPlaceMetadataInitialization>;
 
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
   friend TrailingObjects;
+
+  template<typename T>
+  using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
+
+  using TrailingGenericContextObjects::numTrailingObjects;
+  size_t numTrailingObjects(OverloadToken<InPlaceMetadataInitialization>) const{
+    return this->hasInPlaceMetadataInitialization() ? 1 : 0;
+  }
 
 public:
   using TrailingGenericContextObjects::getGenericContext;
@@ -3546,6 +3607,11 @@ public:
   /// its stored properties.
   bool hasFieldOffsetVector() const { return FieldOffsetVectorOffset != 0; }
 
+  const InPlaceMetadataInitialization &getInPlaceMetadataInitialization() const{
+    assert(this->hasInPlaceMetadataInitialization());
+    return *this->template getTrailingObjects<InPlaceMetadataInitialization>();
+  }
+
   static constexpr int32_t getGenericArgumentOffset() {
     return TargetStructMetadata<Runtime>::getGenericArgumentOffset();
   }
@@ -3561,15 +3627,29 @@ template <typename Runtime>
 class TargetEnumDescriptor final
     : public TargetValueTypeDescriptor<Runtime>,
       public TrailingGenericContextObjects<TargetEnumDescriptor<Runtime>,
-                                     TargetTypeGenericContextDescriptorHeader> {
+                            TargetTypeGenericContextDescriptorHeader,
+                            TargetInPlaceValueMetadataInitialization<Runtime>> {
+public:
+  using InPlaceMetadataInitialization =
+    TargetInPlaceValueMetadataInitialization<Runtime>;
+
 private:
   using TrailingGenericContextObjects =
     TrailingGenericContextObjects<TargetEnumDescriptor<Runtime>,
-                                  TargetTypeGenericContextDescriptorHeader>;
+                                  TargetTypeGenericContextDescriptorHeader,
+                                  InPlaceMetadataInitialization>;
 
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
   friend TrailingObjects;
+
+  template<typename T>
+  using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
+
+  using TrailingGenericContextObjects::numTrailingObjects;
+  size_t numTrailingObjects(OverloadToken<InPlaceMetadataInitialization>) const{
+    return this->hasInPlaceMetadataInitialization() ? 1 : 0;
+  }
 
 public:
   using TrailingGenericContextObjects::getGenericContext;
@@ -3605,6 +3685,11 @@ public:
 
   static constexpr int32_t getGenericArgumentOffset() {
     return TargetEnumMetadata<Runtime>::getGenericArgumentOffset();
+  }
+
+  const InPlaceMetadataInitialization &getInPlaceMetadataInitialization() const{
+    assert(this->hasInPlaceMetadataInitialization());
+    return *this->template getTrailingObjects<InPlaceMetadataInitialization>();
   }
 
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
@@ -3692,6 +3777,21 @@ TargetTypeContextDescriptor<Runtime>::getGenericParams() const {
     return llvm::cast<TargetStructDescriptor<Runtime>>(this)->getGenericParams();
   default:
     swift_runtime_unreachable("Not a type context descriptor.");
+  }
+}
+
+template<typename Runtime>
+inline const TargetInPlaceValueMetadataInitialization<Runtime> &
+TargetValueTypeDescriptor<Runtime>::getInPlaceMetadataInitialization() const {
+  switch (this->getKind()) {
+  case ContextDescriptorKind::Enum:
+    return llvm::cast<TargetEnumDescriptor<Runtime>>(this)
+        ->getInPlaceMetadataInitialization();
+  case ContextDescriptorKind::Struct:
+    return llvm::cast<TargetStructDescriptor<Runtime>>(this)
+        ->getInPlaceMetadataInitialization();
+  default:
+    swift_runtime_unreachable("Not a value type descriptor.");
   }
 }
 

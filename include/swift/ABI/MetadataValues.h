@@ -1196,6 +1196,14 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
     /// declarations associated with the same declaration.
     IsSynthesizedRelatedEntity = 3,
 
+    /// Set if the type requires non-trivial but non-generic metadata
+    /// initialization.  It may or may not be truly "in place" depending
+    /// on the kind of metadata.
+    ///
+    /// Currently only meaningful for value descriptors, but will be
+    /// extended to class descriptors.
+    HasInPlaceMetadataInitialization = 4,
+
     /// Set if the context descriptor is includes metadata for dynamically
     /// constructing a class's vtables at metadata instantiation time.
     ///
@@ -1230,6 +1238,10 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(IsSynthesizedRelatedEntity,
                                 isSynthesizedRelatedEntity,
                                 setIsSynthesizedRelatedEntity)
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(HasInPlaceMetadataInitialization,
+                                hasInPlaceMetadataInitialization,
+                                setHasInPlaceMetadataInitialization)
 
   FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasVTable,
                                 class_hasVTable,
