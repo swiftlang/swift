@@ -3485,6 +3485,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::FloatingPoint:
   case KnownProtocolKind::Numeric:
   case KnownProtocolKind::ParameterAggregate:
+  case KnownProtocolKind::Parameterized:
   case KnownProtocolKind::TensorProtocol:
   case KnownProtocolKind::TensorSendableReceivable:
   case KnownProtocolKind::VectorNumeric:

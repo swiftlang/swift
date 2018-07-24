@@ -123,6 +123,7 @@ public:
   IGNORED_ATTR(Differentiable)
   IGNORED_ATTR(CompilerEvaluable)
   IGNORED_ATTR(TensorFlowGraph)
+  IGNORED_ATTR(TFParameter)
 #undef IGNORED_ATTR
 
   // @noreturn has been replaced with a 'Never' return type.
@@ -886,6 +887,7 @@ public:
   void visitDifferentiableAttr(DifferentiableAttr *attr);
   void visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr);
   void visitTensorFlowGraphAttr(TensorFlowGraphAttr *attr);
+  void visitTFParameterAttr(TFParameterAttr *attr);
 };
 } // end anonymous namespace
 
@@ -2658,6 +2660,16 @@ void AttributeChecker::visitTensorFlowGraphAttr(TensorFlowGraphAttr *attr) {
     fnTy->getExtInfo().withRepresentation(
       AnyFunctionType::Representation::TensorFlow));
   FD->setInterfaceType(newFnTy);
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+void AttributeChecker::visitTFParameterAttr(TFParameterAttr *attr) {
+  VarDecl *VD = dyn_cast<VarDecl>(D);
+  if (!VD->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext() ||
+      !VD->hasStorage() || VD->isStatic())
+    diagnoseAndRemoveAttr(attr,
+                          diag::tfparameter_attr_instance_stored_property_only,
+                          attr->getAttrName());
 }
 
 void TypeChecker::checkDeclAttributes(Decl *D) {

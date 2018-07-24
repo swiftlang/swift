@@ -2381,6 +2381,17 @@ ERROR(broken_encodable_requirement,none,
       "Encodable protocol is broken: unexpected requirement", ())
 ERROR(broken_decodable_requirement,none,
       "Decodable protocol is broken: unexpected requirement", ())
+// SWIFT_ENABLE_TENSORFLOW
+ERROR(broken_parameter_aggregate_requirement,none,
+      "ParameterAggregate protocol is broken: unexpected requirement", ())
+ERROR(broken_parameterized_requirement,none,
+      "Parameterized protocol is broken: unexpected requirement", ())
+ERROR(parameterized_no_parameters_struct,none,
+      "cannot automatically synthesize %0 because 'Parameters' struct does not "
+      "exist", (Type))
+ERROR(parameterized_invalid_parameters_struct,none,
+      "cannot automatically synthesize %0 because 'Parameters' struct is "
+      "invalid", (Type))
 
 NOTE(codable_extraneous_codingkey_case_here,none,
      "CodingKey case %0 does not match any stored properties", (Identifier))
@@ -2669,6 +2680,10 @@ ERROR(tf_graph_attr_function_tensorflow_value_only,none,
       "values", ())
 ERROR(tf_graph_attr_no_generic_functions,none,
       "@TensorFlowGraph cannot be applied to generic functions", ())
+
+// @TFParameter attribute
+ERROR(tfparameter_attr_instance_stored_property_only,none,
+      "only instance stored properties can be declared @%0", (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Expressions

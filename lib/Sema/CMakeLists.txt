@@ -25,6 +25,7 @@ add_swift_library(swiftSema STATIC
   DerivedConformanceError.cpp
   # SWIFT_ENABLE_TENSORFLOW
   DerivedConformanceParameterAggregate.cpp
+  DerivedConformanceParameterized.cpp
   DerivedConformanceRawRepresentable.cpp
   DerivedConformances.cpp
   InstrumenterSupport.cpp

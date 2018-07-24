@@ -65,6 +65,13 @@ bool DerivedConformance::derivesProtocolConformance(TypeChecker &TC,
   }
 
   // SWIFT_ENABLE_TENSORFLOW
+  // The only requirement for deriving Parameterized is that there exist some
+  // stored properties marked with @TFParameter. The `Parameters` struct can
+  // always be derived, even if parameters have different types.
+  if (*knownProtocol == KnownProtocolKind::Parameterized)
+    return !Nominal->getAllTFParameters().empty();
+
+  // SWIFT_ENABLE_TENSORFLOW
   if (*knownProtocol == KnownProtocolKind::ParameterAggregate)
     return canDeriveParameterAggregate(TC, Nominal);
 
@@ -199,6 +206,11 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
     if (name.isSimpleName(ctx.Id_intValue))
       return getRequirement(KnownProtocolKind::CodingKey);
 
+    // SWIFT_ENABLE_TENSORFLOW
+    // Parameterized.allParameters
+    if (name.isSimpleName(ctx.Id_allParameters))
+      return getRequirement(KnownProtocolKind::Parameterized);
+
     return nullptr;
   }
 
@@ -266,6 +278,11 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
     // CaseIterable.AllCases
     if (name.isSimpleName(ctx.Id_AllCases))
       return getRequirement(KnownProtocolKind::CaseIterable);
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // Parameterized.Parameters
+    if (name.isSimpleName(ctx.Id_Parameters))
+      return getRequirement(KnownProtocolKind::Parameterized);
 
     // SWIFT_ENABLE_TENSORFLOW
     // ParameterAggregate.Parameter
@@ -352,6 +369,69 @@ DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
   tc.Context.addSynthesizedDecl(getterDecl);
 
   return getterDecl;
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+AccessorDecl *
+DerivedConformance::declareDerivedPropertySetter(TypeChecker &tc,
+                                                 VarDecl *property,
+                                                 Type propertyContextType) {
+  bool isStatic = property->isStatic();
+  bool isFinal = property->isFinal();
+
+  auto &C = tc.Context;
+  auto parentDC = property->getDeclContext();
+  auto selfDecl =
+    ParamDecl::createSelf(SourceLoc(), parentDC, isStatic, /*isInOut*/ true);
+
+  auto propertyInterfaceType = property->getInterfaceType();
+  auto propertyParam = new (C)
+    ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+              Identifier(), property->getLoc(), C.getIdentifier("newValue"),
+              property->getType(), parentDC);
+  propertyParam->setInterfaceType(propertyInterfaceType);
+
+  ParameterList *params[] = {
+    ParameterList::createWithoutLoc(selfDecl),
+    ParameterList::create(C, propertyParam)
+  };
+
+  auto setterDecl = AccessorDecl::create(C,
+    /*FuncLoc*/ SourceLoc(), /*AccessorKeywordLoc*/ SourceLoc(),
+    AccessorKind::Set, AddressorKind::NotAddressor, property,
+    /*StaticLoc*/ SourceLoc(), StaticSpellingKind::None,
+    /*Throws*/ false, /*ThrowsLoc*/ SourceLoc(),
+    /*GenericParams*/ nullptr, params,
+    TypeLoc::withoutLoc(propertyInterfaceType), parentDC);
+  setterDecl->setImplicit();
+  setterDecl->setStatic(isStatic);
+  setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
+
+  // If this is supposed to be a final method, mark it as such.
+  assert(isFinal || !parentDC->getAsClassOrClassExtensionContext());
+  if (isFinal && parentDC->getAsClassOrClassExtensionContext() &&
+      !setterDecl->isFinal())
+    setterDecl->getAttrs().add(new (C) FinalAttr(/*Implicit*/ true));
+
+  // Compute the interface type of the setter.
+  Type interfaceType =
+  FunctionType::get(propertyInterfaceType, TupleType::getEmpty(C));
+  auto selfParam = computeSelfParam(setterDecl);
+  if (auto sig = parentDC->getGenericSignatureOfContext()) {
+    setterDecl->setGenericEnvironment(
+        parentDC->getGenericEnvironmentOfContext());
+    interfaceType = GenericFunctionType::get(sig, {selfParam}, interfaceType,
+                                             FunctionType::ExtInfo());
+  } else {
+    interfaceType =
+      FunctionType::get({selfParam}, interfaceType, FunctionType::ExtInfo());
+  }
+  setterDecl->setInterfaceType(interfaceType);
+  setterDecl->copyFormalAccessFrom(property);
+  setterDecl->setValidationStarted();
+
+  C.addSynthesizedDecl(setterDecl);
+  return setterDecl;
 }
 
 std::pair<VarDecl *, PatternBindingDecl *>
