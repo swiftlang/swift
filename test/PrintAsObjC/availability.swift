@@ -46,8 +46,11 @@
 // CHECK-DAG: SWIFT_AVAILABILITY(tvos_app_extension,unavailable)
 // CHECK-DAG: SWIFT_AVAILABILITY(watchos_app_extension,unavailable)
 // CHECK-SAME: ;
-// CHECK-NEXT: - (void)deprecatedMethodRenamedToOverloadMethodWithFirst:(NSInteger)first second:(NSInteger)second SWIFT_DEPRECATED_MSG("", "overloadingMethodWithFirst:second:");
 // CHECK-NEXT: - (void)overloadingMethodWithFirst:(NSInteger)first second:(NSInteger)second;
+// CHECK-NEXT: - (void)deprecatedMethodRenamedToOverloadMethodWithFirst:(NSInteger)first second:(NSInteger)second SWIFT_DEPRECATED_MSG("", "overloadingMethodWithFirst:second:");
+// CHECK-NEXT: - (void)firstOverloadingMethodWithDiffernceNameWithFirst:(NSInteger)first second:(NSInteger)second;
+// CHECK-NEXT: - (void)secondOverloadingMethodWithDiffernceNameWithFirst:(double)first second:(double)second;
+// CHECK-NEXT: - (void)deprecatedMethodRenamedToOverloadMethodWithDifferenceNameWithFirst:(NSInteger)first second:(NSInteger)second SWIFT_DEPRECATED_MSG("", "overloadMethodWithDifferenceObjCName(first:second:)");
 // CHECK-NEXT: + (void)deprecatedAvailabilityWithValue:(NSInteger)value;
 // CHECK-NEXT: - (void)deprecatedInstanceMethodRenamedToClassMethodWithValue:(NSInteger)value SWIFT_DEPRECATED_MSG("This method has a renamed attribute point to class method instead of a instance method. It should show the Swift name here", "classMethodWithACustomObjCName(x:)");
 // CHECK-NEXT: + (void)deprecatedClassMethodRenamedToInstanceMethodWithValue:(NSInteger)value SWIFT_DEPRECATED_MSG("This method has a renamed attribute point to instance method instead of a class method. It should show the Swift name here", "instanceMethodWithACustomObjCName(x:)");
@@ -205,11 +208,19 @@
     @available(watchOSApplicationExtension, unavailable)
     @objc func extensionUnavailable() {}
   
+    @objc(overloadingMethodWithFirst:second:) func overloadMethod(first: Int, second: Int) {}
+    func overloadMethod(first: Double, second: Double) {}
+
     @available(*, deprecated, renamed: "overloadMethod(first:second:)")
     @objc func deprecatedMethodRenamedToOverloadMethod(first: Int, second: Int) {}
   
-    @objc(overloadingMethodWithFirst:second:) func overloadMethod(first: Int, second: Int) {}
-    func overloadMethod(first: Double, second: Double) {}
+    @objc(firstOverloadingMethodWithDiffernceNameWithFirst:second:)
+    func overloadMethodWithDifferenceObjCName(first: Int, second: Int) {}
+    @objc(secondOverloadingMethodWithDiffernceNameWithFirst:second:)
+    func overloadMethodWithDifferenceObjCName(first: Double, second: Double) {}
+
+    @available(*, deprecated, renamed: "overloadMethodWithDifferenceObjCName(first:second:)")
+    @objc func deprecatedMethodRenamedToOverloadMethodWithDifferenceName(first: Int, second: Int) {}
 
     @objc(deprecatedAvailabilityWithValue:)
     public class func makeDeprecatedAvailability(withValue value: Int) {}
