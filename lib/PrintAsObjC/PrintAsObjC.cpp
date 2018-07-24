@@ -931,9 +931,23 @@ private:
                                UnqualifiedLookup::Flags::TypeLookup);
       renamedDecl = lookup.getSingleTypeResult();
     } else {
+      TypeDecl *typeDecl = declContext->getSelfNominalTypeDecl();
+      
+      if (!renamedDeclName.isSpecial()) {
+        auto contextIdentifier = D->getASTContext().getIdentifier(renamedParsedDeclName.ContextName);
+        UnqualifiedLookup specificTypeLookup(contextIdentifier,
+                                             declContext->getModuleScopeContext(),
+                                             nullptr,
+                                             SourceLoc(),
+                                             UnqualifiedLookup::Flags::TypeLookup);
+        if (specificTypeLookup.getSingleTypeResult()) {
+          typeDecl = specificTypeLookup.getSingleTypeResult();
+        }
+      }
+      
       SmallVector<ValueDecl *, 4> lookupResults;
       declContext->lookupQualified(
-        declContext->getSelfNominalTypeDecl(),
+        typeDecl,
         renamedDeclName, NL_QualifiedDefault, lookupResults);
       for (auto candidate : lookupResults) {
         if (!shouldInclude(candidate))
