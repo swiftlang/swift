@@ -1509,7 +1509,7 @@ internal protocol _SetBuffer { // FIXME: Remove or refactor for Set.
 // to provide a statically allocated empty singleton.
 // See stdlib/public/stubs/GlobalObjects.cpp for details.
 @_fixed_layout // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
+@usableFromInline
 @_objc_non_lazy_realization
 internal class _RawNativeSetStorage: _SwiftNativeNSSet, _NSSetCore {
   @usableFromInline // FIXME(sil-serialize-all)
@@ -1540,7 +1540,7 @@ internal class _RawNativeSetStorage: _SwiftNativeNSSet, _NSSetCore {
   /// The empty singleton that is used for every single Dictionary that is
   /// created without any elements. The contents of the storage should never
   /// be mutated.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @nonobjc
   internal static var empty: _RawNativeSetStorage {
     return Builtin.bridgeFromRawPointer(
@@ -1549,7 +1549,6 @@ internal class _RawNativeSetStorage: _SwiftNativeNSSet, _NSSetCore {
 
   // This type is made with allocWithTailElems, so no init is ever called.
   // But we still need to have an init to satisfy the compiler.
-  @inlinable // FIXME(sil-serialize-all)
   @nonobjc
   internal init(_doNotCallMe: ()) {
     _sanityCheckFailure("Only create this by using the `empty` singleton")
@@ -1568,13 +1567,11 @@ internal class _RawNativeSetStorage: _SwiftNativeNSSet, _NSSetCore {
     return _SwiftSetNSEnumerator<AnyObject>(_NativeSet(_storage: self))
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @objc(copyWithZone:)
   internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
     return self
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @objc(countByEnumeratingWithState:objects:count:)
   internal func countByEnumerating(
     with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
@@ -1594,13 +1591,11 @@ internal class _RawNativeSetStorage: _SwiftNativeNSSet, _NSSetCore {
     return 0
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @objc
   internal required init(objects: UnsafePointer<AnyObject?>, count: Int) {
     _sanityCheckFailure("don't call this designated initializer")
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @objc
   internal func member(_ object: AnyObject) -> AnyObject? {
     return nil
@@ -1634,14 +1629,12 @@ internal class _TypedNativeSetStorage<Element>: _RawNativeSetStorage {
 
   // This type is made with allocWithTailElems, so no init is ever called.
   // But we still need to have an init to satisfy the compiler.
-  @inlinable // FIXME(sil-serialize-all)
   @nonobjc
   override internal init(_doNotCallMe: ()) {
     _sanityCheckFailure("Only create this by calling Buffer's inits")
   }
 
 #if _runtime(_ObjC)
-  @inlinable // FIXME(sil-serialize-all)
   @objc
   internal required init(objects: UnsafePointer<AnyObject?>, count: Int) {
     _sanityCheckFailure("don't call this designated initializer")
@@ -1656,7 +1649,6 @@ final internal class _HashableTypedNativeSetStorage<Element: Hashable>
   : _TypedNativeSetStorage<Element> {
   // This type is made with allocWithTailElems, so no init is ever called.
   // But we still need to have an init to satisfy the compiler.
-  @inlinable // FIXME(sil-serialize-all)
   @nonobjc
   override internal init(_doNotCallMe: ()) {
     _sanityCheckFailure("Only create this by calling Buffer's inits'")
@@ -1665,7 +1657,6 @@ final internal class _HashableTypedNativeSetStorage<Element: Hashable>
 #if _runtime(_ObjC)
   // NSSet bridging:
 
-  @inlinable // FIXME(sil-serialize-all)
   internal var nativeSet: _NativeSet<Element> {
     return _NativeSet(_storage: self)
   }
@@ -1675,7 +1666,6 @@ final internal class _HashableTypedNativeSetStorage<Element: Hashable>
     return _SwiftSetNSEnumerator<Element>(_NativeSet(_storage: self))
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @objc(countByEnumeratingWithState:objects:count:)
   internal override func countByEnumerating(
     with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
@@ -1715,7 +1705,6 @@ final internal class _HashableTypedNativeSetStorage<Element: Hashable>
     return stored
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @nonobjc
   internal func getObjectFor(_ aKey: AnyObject) -> AnyObject? {
     guard let nativeKey = _conditionallyBridgeFromObjectiveC(aKey, Element.self)
@@ -1730,13 +1719,11 @@ final internal class _HashableTypedNativeSetStorage<Element: Hashable>
     return nil
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @objc
   internal required init(objects: UnsafePointer<AnyObject?>, count: Int) {
     _sanityCheckFailure("don't call this designated initializer")
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @objc
   override internal func member(_ object: AnyObject) -> AnyObject? {
     return getObjectFor(object)
