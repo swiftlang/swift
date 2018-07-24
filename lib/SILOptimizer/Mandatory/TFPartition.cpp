@@ -54,7 +54,16 @@ diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag, U &&...args) {
 
 /// Returns true if the partitioning pass should ignore this user.
 static bool isUserIgnoredByPartitioning(SILInstruction *inst) {
-  return isa<DebugValueInst>(inst) || isa<RefCountingInst>(inst);
+  auto optMode = inst->getFunction()->getEffectiveOptimizationMode();
+  // `debug_value` instructions are used for value inspection during debugging.
+  // For optimized builds, we ignored these instructions so that no send/receive
+  // will be emitted.
+  if (isa<DebugValueInst>(inst) &&
+      optMode != OptimizationMode::NoOptimization) {
+    return true;
+  }
+  // Reference counting instructions are always ignored.
+  return isa<RefCountingInst>(inst);
 }
 
 /// Given a decl for a struct that has a single field (typically because it is
