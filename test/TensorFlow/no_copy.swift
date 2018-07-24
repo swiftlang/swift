@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-strict-deabstraction -O -emit-sil -verify %s | %FileCheck %s -check-prefix=STRICTDA
 
 import TensorFlow
 
@@ -35,14 +36,21 @@ public func testSelect(conds1: Tensor<Bool>, x1: Tensor<Float>, y1: Tensor<Float
  CHECK-NEXT:  return %11 : $TensorHandle<Float>
  CHECK-NEXT:}
 */
+/*
+ STRICTDA-LABEL: --- TFPartition Accelerator Result: {{.*}}testSelect
+ STRICTDA: sil private @{{.*}}testSelect{{.*}} : $@callee_owned (TensorHandle<Float>, TensorHandle<Bool>, TensorHandle<Float>) -> TensorHandle<Float> {
+ STRICTDA: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Bool>, %2 : $TensorHandle<Float>):
+ STRICTDA:       [[A:%.*]] = graph_op "Add,i,i"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>
+ STRICTDA:       [[B:%.*]] = graph_op "Select,i,i,i"(%1 : $TensorHandle<Bool>, [[A]] : $TensorHandle<Float>, %2 : $TensorHandle<Float>
+ STRICTDA:      [[C:%.*]] = graph_op "Mul,i,i"([[B]] : $TensorHandle<Float>, %2 : $TensorHandle<Float>
+ STRICTDA-NEXT:  return [[C]] : $TensorHandle<Float>
+ STRICTDA-NEXT:}
+*/
+
 public func testEmptyScalarsArray() {
   let y = Tensor<Int32>(shape: [0, 20, 30], scalars: [])
   _ = y+y
 }
-
-// Strict deabstraction doesn't support the strides array yet.
-#if !STRICT_DA
-
 /*
  CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testEmptyScalarsArray
  CHECK: sil private @{{.*}}testEmptyScalarsArray{{.*}} : $@callee_owned () -> () {
@@ -50,13 +58,19 @@ public func testEmptyScalarsArray() {
  CHECK: graph_op "Const"() {dtype: $Int32, value$tensor: [$Int32: ], value$shape: [$Int32: (i32 0), (i32 20), (i32 30)],
  CHECK: builtin "__tfop_Add,$in,$in,T,__device"({{.*}} : $TensorHandle<Int32>, {{.*}} : $TensorHandle<Int32>
  */
+/*
+ STRICTDA-LABEL: --- TFPartition Accelerator Result: {{.*}}testEmptyScalarsArray
+ STRICTDA: sil private @{{.*}}testEmptyScalarsArray{{.*}} : $@callee_owned () -> () {
+ STRICTDA: bb0:
+ STRICTDA: graph_op "Const"() {dtype: $Int32, value$tensor: [$Int32: ], value$shape: [$Int32: (i32 0), (i32 20), (i32 30)],
+ STRICTDA: graph_op "Add,i,i"({{.*}} : $TensorHandle<Int32>, {{.*}} : $TensorHandle<Int32>
+ */
 
 // This tests the attributes necessary to get arrays of integers and strings going.
 public func testConvolution(x: Tensor<Float>, filter: Tensor<Float>) -> Tensor<Float> {
   return x.toAccelerator().convolved2D(withFilter: filter.toAccelerator(),
                        strides: (1, 2, 3, 4), padding: .same)
 }
-#endif
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testConvolution
 // CHECK: sil private @{{.*}}testConvolution{{.*}} : $@callee_owned (TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float> {
@@ -73,9 +87,12 @@ public func testConvolution(x: Tensor<Float>, filter: Tensor<Float>) -> Tensor<F
 // CHECK-NEXT:  return %17 : $TensorHandle<Float>
 // CHECK-NEXT:}
 
-
-// Strict deabstraction doesn't support the value array yet.
-#if !STRICT_DA
+// STRICTDA-LABEL: --- TFPartition Accelerator Result: {{.*}}testConvolution
+// STRICTDA: sil private @{{.*}}testConvolution{{.*}} : $@callee_owned (TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float> {
+// STRICTDA: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>):
+// STRICTDA: [[A:%.*]] = graph_op "Conv2D,i,i"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) {T: $Float, strides: [$Int32: (i32 1), (i32 2), (i32 3), (i32 4)], use_cudnn_on_gpu: i1 -1, padding: "SAME", data_format: "NHWC", dilations: [$Int32: (i32 1), (i32 1), (i32 1), (i32 1)], __device: "/device:CPU:0"} : $TensorHandle<Float> 
+// STRICTDA-NEXT:  return [[A]] : $TensorHandle<Float>
+// STRICTDA-NEXT:}
 
 // Testcase for an op that uses the $tensor and $shape modifiers.
 public func testConstantArray() -> TensorHandle<Float> {
@@ -93,7 +110,12 @@ public func testConstantArray() -> TensorHandle<Float> {
 // CHECK-NEXT:  %5 = integer_literal $Builtin.Int64, 2
 // CHECK:       %7 = builtin "__tfop_Const,dtype,value$tensor,$elt,$elt,value$shape,$elt,__device"(%0 : $@thin Float.Type, %1 : $@thin Double.Type, %2 : $Builtin.FPIEEE64, %3 : $Builtin.FPIEEE64, %4 : $@thin Int.Type, %5 : $Builtin.Int64
 // CHECK-NEXT:  return %7 : $TensorHandle<Float>
-#endif
+
+// STRICTDA-LABEL: --- TFPartition Accelerator Result: {{.*}}testConstantArray
+// STRICTDA: sil private @{{.*}}testConstantArray{{.*}} : $@callee_owned () -> TensorHandle<Float> {
+// STRICTDA: bb0:
+// STRICTDA:  %0 = graph_op "Const"() {dtype: $Float, value$tensor: [$Double: (f64 0x3FF0000000000000 /* 1 */), (f64 0x4000000000000000 /* 2 */)], value$shape: [$Int: (i64 2)], __device: "/device:CPU:0"} : $TensorHandle<Float> 
+// STRICTDA-NEXT:  return %0 : $TensorHandle<Float>
 
 // Sigmoid shouldn't cause copies.  This should compile with no copy warnings/errors.
 public func testSigmoid(x: Tensor<Float>, y: Tensor<Float>) -> (Tensor<Float>, Tensor<Float>) {
@@ -150,15 +172,11 @@ public func test75494462() {
   print(x.array)
 }
 
-// Strict deabstraction doesn't support arrays yet.
-#if !STRICT_DA
-
 public func paddingTuplesHoistable() {
   let matrix: Tensor<Float> = Tensor([[1, 2, 3], [4, 5, 6]]) + 1
   let padded = matrix.padded(forSizes: [(before: 1, after: 1), (before: 2, after: 2)]).toAccelerator()
   _ = padded.array
 }
-#endif
 
 // b/76184126
 public func rangeLiteral() -> Tensor<Float> {
