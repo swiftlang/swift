@@ -242,7 +242,7 @@ static FuncDecl *findAssociativeOperatorDeclInProtocol(
   for (auto *decl : plusLookup) {
     auto *fd = dyn_cast<FuncDecl>(decl);
     if (!fd || !fd->isBinaryOperator()) continue;
-    auto *paramList = fd->getParameterList(1);
+    auto *paramList = fd->getParameters();
     auto *protoSelfTy = fd->getProtocolSelfType();
     // Make sure parameters have `Self` type.
     for (auto *param : paramList->getArray())
@@ -1255,10 +1255,10 @@ private:
 
 public:
   explicit DifferentiableActivityAnalysis()
-    : FunctionAnalysisBase(AnalysisKind::DifferentiableActivity) {}
+    : FunctionAnalysisBase(SILAnalysisKind::DifferentiableActivity) {}
 
   static bool classof(const SILAnalysis *s) {
-    return s->getKind() == AnalysisKind::DifferentiableActivity;
+    return s->getKind() == SILAnalysisKind::DifferentiableActivity;
   }
 
   virtual bool shouldInvalidate(SILAnalysis::InvalidationKind k) override {

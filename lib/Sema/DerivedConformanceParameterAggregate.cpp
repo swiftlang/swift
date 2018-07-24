@@ -96,8 +96,8 @@ deriveBodyParameterAggregate_update(AbstractFunctionDecl *updateDecl) {
   Expr *selfDRE =
       new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*Implicit*/ true);
 
-  auto *gradientsDecl = updateDecl->getParameterList(1)->get(0);
-  auto *updaterDecl = updateDecl->getParameterList(1)->get(1);
+  auto *gradientsDecl = updateDecl->getParameters()->get(0);
+  auto *updaterDecl = updateDecl->getParameters()->get(1);
   Expr *gradientsDRE =
       new (C) DeclRefExpr(gradientsDecl, DeclNameLoc(), /*Implicit*/ true);
   Expr *updaterDRE =
@@ -204,14 +204,13 @@ static ValueDecl *deriveParameterAggregate_update(DerivedConformance &derived) {
       SourceLoc(), C.getIdentifier("updater"), updaterType, parentDC);
   updaterDecl->setInterfaceType(updaterType);
 
-  ParameterList *params[] = {
-      ParameterList::createWithoutLoc(selfDecl),
-      ParameterList::create(C, {gradientsDecl, updaterDecl})};
+  ParameterList *params =
+      ParameterList::create(C, {gradientsDecl, updaterDecl});
 
-  DeclName updateDeclName(C, C.getIdentifier("update"), params[1]);
+  DeclName updateDeclName(C, C.getIdentifier("update"), params);
   auto updateDecl = FuncDecl::create(
       C, SourceLoc(), StaticSpellingKind::None, SourceLoc(), updateDeclName,
-      SourceLoc(), /*Throws*/ false, SourceLoc(), nullptr, params,
+      SourceLoc(), /*Throws*/ false, SourceLoc(), nullptr, selfDecl, params,
       TypeLoc::withoutLoc(TupleType::getEmpty(C)), nominal);
   updateDecl->setImplicit();
   updateDecl->setSelfAccessKind(SelfAccessKind::Mutating);
@@ -219,7 +218,7 @@ static ValueDecl *deriveParameterAggregate_update(DerivedConformance &derived) {
 
   auto selfParam = computeSelfParam(updateDecl);
   Type interfaceType =
-    FunctionType::get(params[1]->getInterfaceType(C), TupleType::getEmpty(C),
+    FunctionType::get(params->getInterfaceType(C), TupleType::getEmpty(C),
                       FunctionType::ExtInfo());
   if (auto sig = nominal->getGenericSignatureOfContext()) {
     updateDecl->setGenericEnvironment(
@@ -232,7 +231,7 @@ static ValueDecl *deriveParameterAggregate_update(DerivedConformance &derived) {
   }
   updateDecl->setInterfaceType(interfaceType);
   updateDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
-  updateDecl->setValidationStarted();
+  updateDecl->setValidationToChecked();
 
   derived.addMembersToConformanceContext({ updateDecl });
   C.addSynthesizedDecl(updateDecl);

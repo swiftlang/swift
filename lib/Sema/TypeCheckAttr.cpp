@@ -946,7 +946,7 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *funcDecl, DeclContext *DC,
   //    `ExpressibleByStringLiteral`.
   //    `D.Value` and the return type can be arbitrary.
 
-  auto paramList = funcDecl->getParameterList(1);
+  auto paramList = funcDecl->getParameters();
   if (paramList->size() != 1 || paramList->get(0)->isVariadic()) return false;
   auto argType = paramList->get(0)->getType();
 
@@ -2245,7 +2245,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
 
   // If the original function has no parameters or returns the empty tuple
   // type, there's nothing to differentiate from or with-respect-to.
-  auto &originalParams = *original->getParameterList(selfDecl ? 1 : 0);
+  auto &originalParams = *original->getParameters();
   if (!isInstanceMethod && originalParams.size() == 0) {
     TC.diagnose(attr->getLocation(), diag::differentiable_attr_no_parameters,
                 original->getName())
@@ -2345,7 +2345,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       //   function's result type.
       auto primalSelfDecl = primalCandidate->getImplicitSelfDecl();
       auto primalParams =
-        primalCandidate->getParameterList(primalSelfDecl ? 1 : 0);
+        primalCandidate->getParameters();
       auto primalParamsTy = primalParams->getInterfaceType(ctx);
       if (!primalParamsTy->isEqual(originalParamsTy))
         return false;
@@ -2653,7 +2653,7 @@ void AttributeChecker::visitTensorFlowGraphAttr(TensorFlowGraphAttr *attr) {
   }
   // Only functions taking and returning TensorFlow values are permitted.
   if (!tf::isTensorFlowValueOrAggregate(
-        FD->getParameterList(0)->getType(FD->getASTContext())) ||
+        FD->getParameters()->getType(FD->getASTContext())) ||
       !tf::isTensorFlowValueOrAggregate(FD->getResultInterfaceType()))
     diagnoseAndRemoveAttr(attr,
                           diag::tf_graph_attr_function_tensorflow_value_only);

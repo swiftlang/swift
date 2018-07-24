@@ -388,17 +388,14 @@ DerivedConformance::declareDerivedPropertySetter(TypeChecker &tc,
               property->getType(), parentDC);
   propertyParam->setInterfaceType(propertyInterfaceType);
 
-  ParameterList *params[] = {
-    ParameterList::createWithoutLoc(selfDecl),
-    ParameterList::create(C, propertyParam)
-  };
+  ParameterList *params = ParameterList::create(C, propertyParam);
 
   auto setterDecl = AccessorDecl::create(C,
     /*FuncLoc*/ SourceLoc(), /*AccessorKeywordLoc*/ SourceLoc(),
     AccessorKind::Set, AddressorKind::NotAddressor, property,
     /*StaticLoc*/ SourceLoc(), StaticSpellingKind::None,
     /*Throws*/ false, /*ThrowsLoc*/ SourceLoc(),
-    /*GenericParams*/ nullptr, params,
+    /*GenericParams*/ nullptr, selfDecl, params,
     TypeLoc::withoutLoc(propertyInterfaceType), parentDC);
   setterDecl->setImplicit();
   setterDecl->setStatic(isStatic);
@@ -425,7 +422,7 @@ DerivedConformance::declareDerivedPropertySetter(TypeChecker &tc,
   }
   setterDecl->setInterfaceType(interfaceType);
   setterDecl->copyFormalAccessFrom(property);
-  setterDecl->setValidationStarted();
+  setterDecl->setValidationToChecked();
 
   C.addSynthesizedDecl(setterDecl);
   return setterDecl;
