@@ -799,7 +799,7 @@ private:
             os << "SWIFT_UNAVAILABLE_MSG(\"'"
                << cast<ValueDecl>(D)->getBaseName()
                << "' has been renamed to '";
-            printRenameForDecl(AvAttr, D, false);
+            printRenameForDecl(AvAttr, cast<ValueDecl>(D), false);
             os << '\'';
             if (!AvAttr->Message.empty()) {
               os << ": ";
@@ -824,7 +824,7 @@ private:
             printEncodedString(AvAttr->Message);
             if (!AvAttr->Rename.empty()) {
               os << ", ";
-              printRenameForDecl(AvAttr, D, true);
+              printRenameForDecl(AvAttr, cast<ValueDecl>(D), true);
             }
             os << ")";
           } else {
@@ -900,7 +900,7 @@ private:
       if (!AvAttr->Rename.empty() && isa<ValueDecl>(D)) {
         os << ",message=\"'" << cast<ValueDecl>(D)->getBaseName()
            << "' has been renamed to '";
-        printRenameForDecl(AvAttr, D, false);
+        printRenameForDecl(AvAttr, cast<ValueDecl>(D), false);
         os << '\'';
         if (!AvAttr->Message.empty()) {
           os << ": ";
@@ -916,10 +916,10 @@ private:
     return hasPrintedAnything;
   }
     
-  void printRenameForDecl(const AvailableAttr *AvAttr, const Decl *D,
+  void printRenameForDecl(const AvailableAttr *AvAttr, const ValueDecl *D,
                           bool includeQuotes) {
-    if (AvAttr->Rename.empty() && isa<ValueDecl>(D))
-      return ;
+    if (AvAttr->Rename.empty())
+      return;
     
     auto renamedParsedDeclName = parseDeclName(AvAttr->Rename);
     auto renamedDeclName = renamedParsedDeclName.formDeclName(D->getASTContext());
