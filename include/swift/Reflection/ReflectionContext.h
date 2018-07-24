@@ -80,6 +80,7 @@ public:
   using super::readIsaMask;
   using super::readTypeFromMetadata;
   using super::readGenericArgFromMetadata;
+  using super::readMetadataAndValueOpaqueExistential;
   using super::readMetadataFromInstance;
   using typename super::StoredPointer;
 
@@ -479,59 +480,20 @@ public:
       *OutInstanceAddress = ExistentialAddress;
       return true;
 
-    // Opaque existentials fall under two cases:
-    // If the value fits in three words, it starts at the beginning of the
-    // container. If it doesn't, the first word is a pointer to a heap box.
     case RecordKind::OpaqueExistential: {
-      auto Fields = ExistentialRecordTI->getFields();
-      auto ExistentialMetadataField = std::find_if(Fields.begin(), Fields.end(),
-                                   [](const FieldInfo &FI) -> bool {
-        return FI.Name.compare("metadata") == 0;
-      });
-      if (ExistentialMetadataField == Fields.end())
+      auto OptMetaAndValue =
+          readMetadataAndValueOpaqueExistential(ExistentialAddress);
+      if (!OptMetaAndValue)
         return false;
+      RemoteAddress MetadataAddress = OptMetaAndValue->first;
+      RemoteAddress ValueAddress = OptMetaAndValue->second;
 
-      // Get the metadata pointer for the contained instance type.
-      // This is equivalent to:
-      // auto PointerArray = reinterpret_cast<uintptr_t*>(ExistentialAddress);
-      // uintptr_t MetadataAddress = PointerArray[Offset];
-      auto MetadataAddressAddress
-        = RemoteAddress(ExistentialAddress.getAddressData() +
-                        ExistentialMetadataField->Offset);
-
-      StoredPointer MetadataAddress = 0;
-      if (!getReader().readInteger(MetadataAddressAddress, &MetadataAddress))
-        return false;
-
-      auto InstanceTR = readTypeFromMetadata(MetadataAddress);
+      auto InstanceTR = readTypeFromMetadata(MetadataAddress.getAddressData());
       if (!InstanceTR)
         return false;
 
       *OutInstanceTR = InstanceTR;
-
-      auto InstanceTI = getTypeInfo(InstanceTR);
-      if (!InstanceTI)
-        return false;
-
-      if (InstanceTI->getSize() <= ExistentialMetadataField->Offset) {
-        // The value fits in the existential container, so it starts at the
-        // start of the container.
-        *OutInstanceAddress = ExistentialAddress;
-      } else {
-        // Otherwise it's in a box somewhere off in the heap. The first word
-        // of the container has the address to that box.
-        StoredPointer BoxAddress = 0;
-
-        if (!getReader().readInteger(ExistentialAddress, &BoxAddress))
-          return false;
-
-        // Address = BoxAddress + (sizeof(HeapObject) + alignMask) & ~alignMask)
-        auto Alignment = InstanceTI->getAlignment();
-        auto StartOfValue = BoxAddress + getSizeOfHeapObject();
-        // Align.
-        StartOfValue += Alignment - StartOfValue % Alignment;
-        *OutInstanceAddress = RemoteAddress(StartOfValue);
-      }
+      *OutInstanceAddress = ValueAddress;
       return true;
     }
     case RecordKind::ErrorExistential: {
