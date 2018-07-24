@@ -45,7 +45,7 @@ unwind:
 }
 
 // CHECK-LABEL: sil @test_simple_call
-// CHECK: bb0(%0 : $Builtin.Int1):
+// CHECK: bb0(%0 : @trivial $Builtin.Int1):
 // CHECK:  [[IND_RES:%.*]] = alloc_stack $Indirect<SomeSubclass>
 // CHECK:  [[MARKER:%.*]] = function_ref @marker
 // CHECK:  [[MARKER2:%.*]] = function_ref @marker
@@ -70,7 +70,7 @@ unwind:
 // CHECK:  dealloc_stack [[TEMP]] : $*Indirect<SomeSubclass>
 // CHECK:  br bb7
 
-// CHECK: bb3([[WHICH_YIELD:%.*]] : $Builtin.Int32):
+// CHECK: bb3([[WHICH_YIELD:%.*]] : @trivial $Builtin.Int32):
 // CHECK:  destroy_addr [[IND_RES]] : $*Indirect<SomeSubclass>
 // CHECK:  cond_br %0, bb4, bb6
 
@@ -102,7 +102,7 @@ unwind:
 // CHECK:}
 
 sil @test_simple_call : $(Builtin.Int1) -> () {
-entry(%flag : $Builtin.Int1):
+entry(%flag : @trivial $Builtin.Int1):
   %marker = function_ref @marker : $@convention(thin) (Builtin.Int32) -> ()
   %0 = function_ref @test_one_yield : $@convention(thin) @yield_once <T: SomeClass> () -> (@yields @in Indirect<T>)
   (%value, %token) = begin_apply %0<SomeSubclass>() : $@convention(thin) @yield_once <T: SomeClass> () -> (@yields @in Indirect<T>)
@@ -131,7 +131,7 @@ cont:
 }
 
 sil [transparent] @test_two_yield : $@yield_once <C: SomeClass> (Builtin.Int1) -> (@yields @in Indirect<C>, @yields Builtin.Int64) {
-entry(%0 : $Builtin.Int1):
+entry(%0 : @trivial $Builtin.Int1):
   %marker = function_ref @marker : $@convention(thin) (Builtin.Int32) -> ()
   %1000 = integer_literal $Builtin.Int32, 1000
   apply %marker(%1000) : $@convention(thin) (Builtin.Int32) -> ()
@@ -174,7 +174,7 @@ unwind:
 }
 
 // CHECK-LABEL: sil @test_simple_call_two_yields : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> () {
-// CHECK: bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
+// CHECK: bb0(%0 : @trivial $Builtin.Int1, %1 : @trivial $Builtin.Int1):
 // CHECK:   %2 = alloc_stack $Indirect<SomeSubclass>
 // CHECK:   %3 = function_ref @marker : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK:   %4 = function_ref @marker : $@convention(thin) (Builtin.Int32) -> ()
@@ -222,7 +222,7 @@ unwind:
 // CHECK: bb8:
 // CHECK:   br bb5
 
-// CHECK: bb9(%33 : $Builtin.Int64, %34 : $Builtin.Int32):
+// CHECK: bb9(%33 : @trivial $Builtin.Int64, %34 : @trivial $Builtin.Int32):
 // CHECK:   destroy_addr %2 : $*Indirect<SomeSubclass>
 // CHECK:   cond_br %1, bb10, bb12
 
@@ -248,7 +248,7 @@ unwind:
 // CHECK:   return %45 : $()
 
 sil @test_simple_call_two_yields : $(Builtin.Int1, Builtin.Int1) -> () {
-entry(%flag : $Builtin.Int1, %flag2: $Builtin.Int1):
+entry(%flag : @trivial $Builtin.Int1, %flag2 : @trivial $Builtin.Int1):
   %marker = function_ref @marker : $@convention(thin) (Builtin.Int32) -> ()
   %0 = function_ref @test_two_yield : $@convention(thin) @yield_once <T: SomeClass> (Builtin.Int1) -> (@yields @in Indirect<T>, @yields Builtin.Int64)
   (%value, %value2, %token) = begin_apply %0<SomeSubclass>(%flag) : $@convention(thin) @yield_once <T: SomeClass> (Builtin.Int1) -> (@yields @in Indirect<T>, @yields Builtin.Int64)
@@ -269,7 +269,7 @@ cont:
 }
 
 // CHECK: sil @test_simple_call_yield_owned : $@convention(thin) (Builtin.Int1, @owned SomeClass) -> () {
-// CHECK: bb0(%0 : $Builtin.Int1, %1 : $SomeClass):
+// CHECK: bb0(%0 : @trivial $Builtin.Int1, %1 : @owned $SomeClass):
 // CHECK:   %2 = function_ref @marker
 // CHECK:   %3 = integer_literal $Builtin.Int32, 1000
 // CHECK:   %4 = apply %2(%3)
@@ -288,7 +288,7 @@ cont:
 // CHECK:   destroy_value %1 : $SomeClass
 // CHECK:   br bb7
 
-// CHECK: bb3(%16 : $SomeClass, %17 : $Builtin.Int32):
+// CHECK: bb3(%16 : @owned $SomeClass, %17 : @trivial $Builtin.Int32):
 // CHECK:   cond_br %0, bb4, bb6
 
 // CHECK: bb4:
@@ -310,7 +310,7 @@ cont:
 // CHECK:   return %25 : $()
 
 sil [transparent] @yield_owned : $@yield_once(@owned SomeClass) -> (@yields @owned SomeClass) {
-entry(%0 : $SomeClass):
+entry(%0 : @owned $SomeClass):
   %marker = function_ref @marker : $@convention(thin) (Builtin.Int32) -> ()
   %1000 = integer_literal $Builtin.Int32, 1000
   apply %marker(%1000) : $@convention(thin) (Builtin.Int32) -> ()
@@ -331,7 +331,7 @@ unwind:
 }
 
 sil @test_simple_call_yield_owned : $(Builtin.Int1, @owned SomeClass) -> () {
-entry(%flag : $Builtin.Int1, %c: $SomeClass):
+entry(%flag : @trivial $Builtin.Int1, %c: @owned $SomeClass):
   %0 = function_ref @yield_owned : $@convention(thin) @yield_once(@owned SomeClass) -> (@yields @owned SomeClass)
   (%value, %token) = begin_apply %0(%c) : $@convention(thin) @yield_once(@owned SomeClass) -> (@yields @owned SomeClass)
   cond_br %flag, yes, no

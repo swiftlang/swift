@@ -13,7 +13,7 @@ class SubscriptAsFunction {
 }
 
 sil hidden @$S4test19SubscriptAsFunctionC9subscriptyyF : $@convention(method) (@guaranteed SubscriptAsFunction) -> () {
-bb0(%0 : $SubscriptAsFunction):
+bb0(%0 : @guaranteed $SubscriptAsFunction):
   return undef : $()
 }
 
