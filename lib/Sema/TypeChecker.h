@@ -201,8 +201,6 @@ enum ContextualTypePurpose {
   CTP_Unused,           ///< No contextual type is specified.
   CTP_Initialization,   ///< Pattern binding initialization.
   CTP_ReturnStmt,       ///< Value specified to a 'return' statement.
-  CTP_YieldByValue,     ///< By-value yield operand.
-  CTP_YieldByReference, ///< By-reference yield operand.
   CTP_ThrowStmt,        ///< Value specified to a 'throw' statement.
   CTP_EnumCaseRawValue, ///< Raw value specified for "case X = 42" in enum.
   CTP_DefaultParameter, ///< Default value in parameter 'foo(a : Int = 42)'.
@@ -258,9 +256,6 @@ enum class TypeCheckExprFlags {
 
   /// If set, don't apply a solution.
   SkipApplyingSolution = 0x100,
-
-  /// This is an inout yield.
-  IsInOutYield = 0x200,
 };
 
 using TypeCheckExprOptions = OptionSet<TypeCheckExprFlags>;

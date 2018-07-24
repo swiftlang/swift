@@ -179,7 +179,6 @@ bool SourceKit::CodeCompletion::addCustomCompletions(
     case CompletionKind::AssignmentRHS:
     case CompletionKind::CallArg:
     case CompletionKind::ReturnStmtExpr:
-    case CompletionKind::YieldStmtExpr:
       if (custom.Contexts.contains(CustomCompletionInfo::Expr)) {
         changed = true;
         addCompletion(custom);

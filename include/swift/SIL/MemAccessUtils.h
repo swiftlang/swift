@@ -95,7 +95,6 @@ public:
     Global,
     Class,
     Argument,
-    Yield,
     Nested,
     Unidentified,
     NumKindBits = countBitsUsed(static_cast<unsigned>(Unidentified))
@@ -210,7 +209,6 @@ public:
     switch (getKind()) {
     case Box:
     case Stack:
-    case Yield:
     case Nested:
     case Unidentified:
       return value == other.value;
@@ -232,7 +230,6 @@ public:
     case Global:
     case Class:
     case Argument:
-    case Yield:
     case Nested:
     case Unidentified:
       return false;
@@ -247,7 +244,6 @@ public:
       return true;
     case Class:
     case Argument:
-    case Yield:
     case Nested:
     case Unidentified:
       return false;
@@ -299,7 +295,6 @@ template <> struct DenseMapInfo<swift::AccessedStorage> {
     case swift::AccessedStorage::Box:
     case swift::AccessedStorage::Stack:
     case swift::AccessedStorage::Nested:
-    case swift::AccessedStorage::Yield:
     case swift::AccessedStorage::Unidentified:
       return DenseMapInfo<swift::SILValue>::getHashValue(storage.getValue());
     case swift::AccessedStorage::Argument:
@@ -322,7 +317,6 @@ template <> struct DenseMapInfo<swift::AccessedStorage> {
     case swift::AccessedStorage::Box:
     case swift::AccessedStorage::Stack:
     case swift::AccessedStorage::Nested:
-    case swift::AccessedStorage::Yield:
     case swift::AccessedStorage::Unidentified:
       return LHS.getValue() == RHS.getValue();
     case swift::AccessedStorage::Argument:

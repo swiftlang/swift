@@ -835,16 +835,6 @@ static void synthesizeAddressedGetterBody(TypeChecker &TC,
   synthesizeTrivialGetterBody(TC, getter, TargetImpl::Implementation);
 }
 
-/// Synthesize the body of a getter which just delegates to a read
-/// coroutine accessor.
-static void synthesizeReadCoroutineGetterBody(TypeChecker &TC,
-                                              AccessorDecl *getter) {
-  assert(getter->getStorage()->getReadCoroutine());
-
-  // This should call the read coroutine.
-  synthesizeTrivialGetterBody(TC, getter, TargetImpl::Implementation);
-}
-
 /// Synthesize the body of a setter which just stores to the given storage
 /// declaration (which doesn't have to be the storage for the setter).
 static void synthesizeTrivialSetterBodyWithStorage(TypeChecker &TC,
@@ -915,20 +905,8 @@ static void convertStoredVarInProtocolToComputed(VarDecl *VD, TypeChecker &TC) {
   VD->overwriteImplInfo(StorageImplInfo::getImmutableComputed());
 }
 
-/// Synthesize the body of a setter which just delegates to a mutable
-/// addressor.
 static void synthesizeMutableAddressSetterBody(TypeChecker &TC,
                                                AccessorDecl *setter) {
-  // This should call the mutable addressor.
-  synthesizeTrivialSetterBodyWithStorage(TC, setter, TargetImpl::Implementation,
-                                         setter->getStorage());
-}
-
-/// Synthesize the body of a setter which just delegates to a modify
-/// coroutine accessor.
-static void synthesizeModifyCoroutineSetterBody(TypeChecker &TC,
-                                                AccessorDecl *setter) {
-  // This should call the modify coroutine.
   synthesizeTrivialSetterBodyWithStorage(TC, setter, TargetImpl::Implementation,
                                          setter->getStorage());
 }
@@ -1778,7 +1756,6 @@ void swift::triggerAccessorSynthesis(TypeChecker &TC,
   case ReadImplKind::Stored:
   case ReadImplKind::Inherited:
   case ReadImplKind::Address:
-  case ReadImplKind::Read:
     if (auto getter = storage->getGetter())
       triggerSynthesis(TC, getter, SynthesizedFunction::Getter);
     break;
@@ -1794,7 +1771,6 @@ void swift::triggerAccessorSynthesis(TypeChecker &TC,
   case WriteImplKind::StoredWithObservers:
   case WriteImplKind::InheritedWithObservers:
   case WriteImplKind::MutableAddress:
-  case WriteImplKind::Modify:
     if (auto setter = storage->getSetter())
       triggerSynthesis(TC, setter, SynthesizedFunction::Setter);
     break;
@@ -2060,10 +2036,6 @@ static void synthesizeGetterBody(TypeChecker &TC, AccessorDecl *getter) {
   case ReadImplKind::Address:
     synthesizeAddressedGetterBody(TC, getter);
     return;
-
-  case ReadImplKind::Read:
-    synthesizeReadCoroutineGetterBody(TC, getter);
-    return;
   }
   llvm_unreachable("bad ReadImplKind");
 }
@@ -2087,10 +2059,6 @@ static void synthesizeSetterBody(TypeChecker &TC, AccessorDecl *setter) {
 
   case WriteImplKind::MutableAddress:
     return synthesizeMutableAddressSetterBody(TC, setter);
-
-  case WriteImplKind::Modify:
-    synthesizeModifyCoroutineSetterBody(TC, setter);
-    return;
   }
   llvm_unreachable("bad ReadImplKind");
 }

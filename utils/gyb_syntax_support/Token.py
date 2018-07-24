@@ -88,7 +88,6 @@ SYNTAX_TOKENS = [
     Keyword('__FUNCTION__', '__FUNCTION__'),
     Keyword('__DSO_HANDLE__', '__DSO_HANDLE__'),
     Keyword('Wildcard', '_'),
-    Keyword('Yield', 'yield'),
     Token('PoundAvailable', 'pound_available', text='#available',
           is_keyword=True),
     Token('PoundEndif', 'pound_endif', text='#endif',

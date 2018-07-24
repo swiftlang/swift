@@ -84,10 +84,6 @@ public:
                                ArrayRef<SILValue> args, SILBasicBlock *normalBB,
                                SILBasicBlock *errorBB);
 
-  BeginApplyInst *createBeginApply(SILLocation loc, SILValue fn,
-                                   SubstitutionMap subs,
-                                   ArrayRef<SILValue> args);
-
   PartialApplyInst *createPartialApply(SILLocation loc, SILValue fn,
                                        SILType substFnTy, SubstitutionMap subs,
                                        ArrayRef<SILValue> args,

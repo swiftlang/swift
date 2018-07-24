@@ -224,8 +224,6 @@ StringRef swift::getReadImplKindName(ReadImplKind kind) {
     return "getter";
   case ReadImplKind::Address:
     return "addressor";
-  case ReadImplKind::Read:
-    return "read_coroutine";
   }
   llvm_unreachable("bad kind");
 }
@@ -244,8 +242,6 @@ StringRef swift::getWriteImplKindName(WriteImplKind kind) {
     return "setter";
   case WriteImplKind::MutableAddress:
     return "mutable_addressor";
-  case WriteImplKind::Modify:
-    return "modify_coroutine";
   }
   llvm_unreachable("bad kind");
 }
@@ -262,8 +258,6 @@ StringRef swift::getReadWriteImplKindName(ReadWriteImplKind kind) {
     return "mutable_addressor";
   case ReadWriteImplKind::MaterializeToTemporary:
     return "materialize_to_temporary";
-  case ReadWriteImplKind::Modify:
-    return "modify_coroutine";
   }
   llvm_unreachable("bad kind");
 }
@@ -1490,15 +1484,6 @@ public:
     if (S->hasResult()) {
       OS << '\n';
       printRec(S->getResult());
-    }
-    PrintWithColorRAII(OS, ParenthesisColor) << ')';
-  }
-
-  void visitYieldStmt(YieldStmt *S) {
-    printCommon(S, "yield_stmt");
-    for (auto yield : S->getYields()) {
-      OS << '\n';
-      printRec(yield);
     }
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }

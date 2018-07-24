@@ -380,7 +380,6 @@ private:
     case Node::Kind::MaterializeForSet:
     case Node::Kind::MergedFunction:
     case Node::Kind::Metaclass:
-    case Node::Kind::ModifyAccessor:
     case Node::Kind::NativeOwningAddressor:
     case Node::Kind::NativeOwningMutableAddressor:
     case Node::Kind::NativePinningAddressor:
@@ -409,7 +408,6 @@ private:
     case Node::Kind::ProtocolWitnessTablePattern:
     case Node::Kind::ReabstractionThunk:
     case Node::Kind::ReabstractionThunkHelper:
-    case Node::Kind::ReadAccessor:
     case Node::Kind::RelatedEntityDeclName:
     case Node::Kind::RetroactiveConformance:
     case Node::Kind::Setter:
@@ -1717,12 +1715,6 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::DidSet:
     return printAbstractStorage(Node->getFirstChild(), asPrefixContext,
                                 "didset");
-  case Node::Kind::ReadAccessor:
-    return printAbstractStorage(Node->getFirstChild(), asPrefixContext,
-                                "read");
-  case Node::Kind::ModifyAccessor:
-    return printAbstractStorage(Node->getFirstChild(), asPrefixContext,
-                                "modify");
   case Node::Kind::Allocator:
     return printEntity(Node, asPrefixContext, TypePrinting::FunctionStyle,
                        /*hasName*/false, isClassType(Node->getChild(0)) ?

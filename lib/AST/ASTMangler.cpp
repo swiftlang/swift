@@ -56,10 +56,6 @@ static StringRef getCodeForAccessorKind(AccessorKind kind,
     return "w";
   case AccessorKind::DidSet:
     return "W";
-  case AccessorKind::Read:
-    return "r";
-  case AccessorKind::Modify:
-    return "M";
   case AccessorKind::Address:
     // 'l' is for location. 'A' was taken.
     switch (addressorKind) {

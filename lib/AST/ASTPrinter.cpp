@@ -1397,7 +1397,6 @@ static bool isAccessorAssumedNonMutating(AccessorDecl *accessor) {
   switch (accessor->getAccessorKind()) {
   case AccessorKind::Get:
   case AccessorKind::Address:
-  case AccessorKind::Read:
     return true;
 
   case AccessorKind::Set:
@@ -1405,7 +1404,6 @@ static bool isAccessorAssumedNonMutating(AccessorDecl *accessor) {
   case AccessorKind::DidSet:
   case AccessorKind::MaterializeForSet:
   case AccessorKind::MutableAddress:
-  case AccessorKind::Modify:
     return false;
   }
   llvm_unreachable("bad addressor kind");
@@ -1567,9 +1565,6 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
     case ReadImplKind::Address:
       PrintAccessor(ASD->getAddressor());
       break;
-    case ReadImplKind::Read:
-      PrintAccessor(ASD->getReadCoroutine());
-      break;
     }
     switch (impl.getWriteImpl()) {
     case WriteImplKind::Immutable:
@@ -1583,16 +1578,12 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
       break;
     case WriteImplKind::Set:
       PrintAccessor(ASD->getSetter());
-      if (impl.getReadWriteImpl() == ReadWriteImplKind::Modify)
-        PrintAccessor(ASD->getModifyCoroutine());
+      // FIXME: ReadWriteImplKind::Modify
       break;
     case WriteImplKind::MutableAddress:
       PrintAccessor(ASD->getMutableAddressor());
       PrintAccessor(ASD->getWillSetFunc());
       PrintAccessor(ASD->getDidSetFunc());
-      break;
-    case WriteImplKind::Modify:
-      PrintAccessor(ASD->getModifyCoroutine());
       break;
     }
   }
@@ -2393,8 +2384,6 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
   switch (auto kind = decl->getAccessorKind()) {
   case AccessorKind::Get:
   case AccessorKind::Address:
-  case AccessorKind::Read:
-  case AccessorKind::Modify:
   case AccessorKind::DidSet:
   case AccessorKind::MaterializeForSet:
   case AccessorKind::MutableAddress:
@@ -2827,26 +2816,6 @@ void PrintAST::visitReturnStmt(ReturnStmt *stmt) {
     Printer << " ";
     // FIXME: print expression.
   }
-}
-
-void PrintAST::visitYieldStmt(YieldStmt *stmt) {
-  Printer.printKeyword("yield");
-  Printer << " ";
-  bool parens = (stmt->getYields().size() != 1
-                 || stmt->getLParenLoc().isValid());
-  if (parens) Printer << "(";
-  bool first = true;
-  for (auto yield : stmt->getYields()) {
-    if (first) {
-      first = false;
-    } else {
-      Printer << ", ";
-    }
-
-    // FIXME: print expression.
-    (void) yield;
-  }
-  if (parens) Printer << ")";
 }
 
 void PrintAST::visitThrowStmt(ThrowStmt *stmt) {

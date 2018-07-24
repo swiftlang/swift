@@ -1037,11 +1037,6 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Stmt *stmt) {
     return createIfNeeded(parent, returnStmt->getResult());
   }
 
-  case StmtKind::Yield: {
-    auto yieldStmt = cast<YieldStmt>(stmt);
-    return createIfNeeded(parent, yieldStmt->getYields());
-  }
-
   case StmtKind::Defer:
     return createIfNeeded(parent, cast<DeferStmt>(stmt)->getTempDecl());
 
@@ -1098,7 +1093,7 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Stmt *stmt) {
 
 /// Find all of the (non-nested) closures referenced within this expression.
 static void findClosures(Expr *expr, SmallVectorImpl<ClosureExpr *> &closures) {
-  assert(expr);
+  if (!expr) return;
 
   /// AST walker that finds top-level closures in an expression.
   class ClosureFinder : public ASTWalker {

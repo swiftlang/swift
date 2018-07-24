@@ -39,10 +39,6 @@ AccessedStorage::Kind AccessedStorage::classify(SILValue base) {
   }
   case ValueKind::RefElementAddrInst:
     return Class;
-  // A yield is effectively a nested access, enforced independently in
-  // the caller and callee.
-  case ValueKind::BeginApplyResult:
-    return Yield;
   // A function argument is effectively a nested access, enforced
   // independently in the caller and callee.
   case ValueKind::SILFunctionArgument:
@@ -71,10 +67,6 @@ AccessedStorage::AccessedStorage(SILValue base, Kind kind) {
     break;
   case Nested:
     assert(isa<BeginAccessInst>(base));
-    value = base;
-    break;
-  case Yield:
-    assert(isa<BeginApplyResult>(base));
     value = base;
     break;
   case Unidentified:
@@ -127,9 +119,6 @@ const ValueDecl *AccessedStorage::getDecl(SILFunction *F) const {
   case Argument:
     return getArgument(F)->getDecl();
 
-  case Yield:
-    return nullptr;
-
   case Nested:
     return nullptr;
 
@@ -150,8 +139,6 @@ const char *AccessedStorage::getKindName(AccessedStorage::Kind k) {
     return "Unidentified";
   case Argument:
     return "Argument";
-  case Yield:
-    return "Yield";
   case Global:
     return "Global";
   case Class:
@@ -165,7 +152,6 @@ void AccessedStorage::print(raw_ostream &os) const {
   case Box:
   case Stack:
   case Nested:
-  case Yield:
   case Unidentified:
     os << value;
     break;
@@ -448,9 +434,6 @@ bool swift::isPossibleFormalAccessBase(const AccessedStorage &storage,
     break;
   case AccessedStorage::Class:
     break;
-  case AccessedStorage::Yield:
-    // Yields are accessed by the caller.
-    return false;
   case AccessedStorage::Argument:
     // Function arguments are accessed by the caller.
     return false;

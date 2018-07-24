@@ -336,9 +336,6 @@ ERROR(cannot_throw_error_code,none,
       "thrown error code type %0 does not conform to 'Error'; construct an %1 "
       "instance", (Type, Type))
 
-ERROR(bad_yield_count,none,
-      "expected %0 yield value(s)", (unsigned))
-
 ERROR(cannot_throw_nil,none,
       "cannot infer concrete Error for thrown 'nil' value", ())
 
@@ -370,23 +367,6 @@ ERROR(cannot_convert_partial_argument_value_protocol,none,
 
 ERROR(cannot_convert_argument_value_nil,none,
       "'nil' is not compatible with expected argument type %0", (Type))
-
-ERROR(cannot_yield_rvalue_by_reference_same_type,none,
-      "cannot yield immutable value of type %0 as an inout yield", (Type))
-ERROR(cannot_yield_rvalue_by_reference,none,
-      "cannot yield immutable value of type %0 as an inout yield of type %1",
-      (Type,Type))
-ERROR(cannot_yield_wrong_type_by_reference,none,
-      "cannot yield reference to storage of type %0 as an inout yield of type %1",
-      (Type,Type))
-ERROR(cannot_convert_yield_value,none,
-      "cannot convert value of type %0 to expected yield type %1",
-      (Type,Type))
-ERROR(cannot_convert_yield_value_protocol,none,
-      "yielded type %0 does not conform to expected type %1",
-      (Type,Type))
-ERROR(cannot_convert_yield_value_nil,none,
-      "nil is not compatible with expected yield type %0", (Type))
 
 ERROR(cannot_convert_closure_result,none,
       "cannot convert value of type %0 to closure result type %1",
@@ -944,9 +924,6 @@ ERROR(missing_explicit_conversion,none,
 ERROR(missing_address_of,none,
       "passing value of type %0 to an inout parameter requires explicit '&'",
       (Type))
-ERROR(missing_address_of_yield,none,
-      "yielding mutable value of type %0 requires explicit '&'",
-      (Type))
 ERROR(extraneous_address_of,none,
       "use of extraneous '&'",
       ())
@@ -1101,10 +1078,6 @@ ERROR(functions_mutating_and_not,none,
       (unsigned, unsigned))
 ERROR(static_functions_not_mutating,none,
       "static functions must not be declared mutating", ())
-
-ERROR(modify_mutatingness_differs_from_setter,none,
-      "'modify' accessor cannot be %select{nonmutating|mutating}0 "
-      "when the setter is %select{mutating|nonmutating}0", (bool))
 
 ERROR(transparent_in_protocols_not_supported,none,
       "'@_transparent' attribute is not supported on declarations within protocols", ())
@@ -3659,8 +3632,6 @@ ERROR(objc_observing_accessor, none,
       "observing accessors are not allowed to be marked @objc", ())
 ERROR(objc_addressor, none,
       "addressors are not allowed to be marked @objc", ())
-ERROR(objc_coroutine_accessor, none,
-      "'read' and 'modify' accessors are not allowed to be marked @objc", ())
 ERROR(objc_invalid_on_func_variadic,none,
       "method cannot be %" OBJC_ATTR_SELECT "0 because it has a variadic "
       "parameter", (unsigned))

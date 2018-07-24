@@ -3797,14 +3797,12 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
   switch (Kind) {
   case AccessorKind::Address:
   case AccessorKind::Get:
-  case AccessorKind::Read:
     break;
 
   case AccessorKind::MutableAddress:
   case AccessorKind::Set:
   case AccessorKind::WillSet:
   case AccessorKind::DidSet:
-  case AccessorKind::Modify:
     if (D->isInstanceMember())
       D->setSelfAccessKind(SelfAccessKind::Mutating);
     break;
@@ -3969,10 +3967,6 @@ static StringRef getAccessorNameForDiagnostic(AccessorKind accessorKind,
     return article ? "an addressor" : "addressor";
   case AccessorKind::MutableAddress:
     return article ? "a mutable addressor" : "mutable addressor";
-  case AccessorKind::Read:
-    return article ? "a 'read' accessor" : "'read' accessor";
-  case AccessorKind::Modify:
-    return article ? "a 'modify' accessor" : "'modify' accessor";
   case AccessorKind::WillSet:
     return "'willSet'";
   case AccessorKind::DidSet:
@@ -4033,8 +4027,6 @@ static bool isAllowedInLimitedSyntax(AccessorKind kind) {
   case AccessorKind::MaterializeForSet:
   case AccessorKind::WillSet:
   case AccessorKind::DidSet:
-  case AccessorKind::Read:
-  case AccessorKind::Modify:
     return false;
   }
   llvm_unreachable("bad accessor kind");
@@ -4076,7 +4068,6 @@ struct Parser::ParsedAccessors {
   /// Find the first accessor that can be used to perform mutation.
   AccessorDecl *findFirstMutator() const {
     if (Set) return Set;
-    if (Modify) return Modify;
     if (MutableAddress) return MutableAddress;
     return nullptr;
   }
@@ -4390,8 +4381,6 @@ static void fillInAccessorTypeErrors(Parser &P, FuncDecl *accessor,
   case AccessorKind::Set:
   case AccessorKind::WillSet:
   case AccessorKind::DidSet:
-  case AccessorKind::Read:
-  case AccessorKind::Modify:
     return;
   }
   llvm_unreachable("bad kind");
@@ -4697,15 +4686,11 @@ Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
   // Okay, observers are out of the way.
   assert(!WillSet && !DidSet);
 
-  // 'get', 'read', and a non-mutable addressor are all exclusive.
+  // 'get' and a non-mutable addressor are exclusive.
   ReadImplKind readImpl;
   if (Get) {
-    diagnoseConflictingAccessors(P, Get, Read);
     diagnoseConflictingAccessors(P, Get, Address);
     readImpl = ReadImplKind::Get;
-  } else if (Read) {
-    diagnoseConflictingAccessors(P, Read, Address);
-    readImpl = ReadImplKind::Read;
   } else if (Address) {
     readImpl = ReadImplKind::Address;
 
@@ -4716,7 +4701,7 @@ Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
       P.diagnose(mutator->getLoc(),
                  // Don't mention the more advanced accessors if the user
                  // only provided a setter without a getter.
-                 (MutableAddress || Modify)
+                 MutableAddress
                    ? diag::missing_reading_accessor
                    : diag::missing_getter,
                  isa<SubscriptDecl>(storage),
@@ -4740,23 +4725,14 @@ Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
     readImpl = ReadImplKind::Stored;
   }
 
-  // A mutable addressor is exclusive with 'set' and 'modify', but
-  // 'set' and 'modify' can appear together.
-  // Prefer using 'set' and 'modify' over a mutable addressor.
+  // A mutable addressor is exclusive with 'set'.
+  // Prefer using 'set' over a mutable addressor.
   WriteImplKind writeImpl;
   ReadWriteImplKind readWriteImpl;
   if (Set) {
     diagnoseConflictingAccessors(P, Set, MutableAddress);
     writeImpl = WriteImplKind::Set;
-    if (Modify) {
-      readWriteImpl = ReadWriteImplKind::Modify;
-    } else {
-      readWriteImpl = ReadWriteImplKind::MaterializeToTemporary;
-    }
-  } else if (Modify) {
-    diagnoseConflictingAccessors(P, Modify, MutableAddress);
-    writeImpl = WriteImplKind::Modify;
-    readWriteImpl = ReadWriteImplKind::Modify;
+    readWriteImpl = ReadWriteImplKind::MaterializeToTemporary;
   } else if (MutableAddress) {
     writeImpl = WriteImplKind::MutableAddress;
     readWriteImpl = ReadWriteImplKind::MutableAddress;

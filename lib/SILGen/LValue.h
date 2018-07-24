@@ -100,7 +100,6 @@ public:
     OptionalObjectKind,         // optional projection
     OpenOpaqueExistentialKind,  // opened opaque existential
     AddressorKind,              // var/subscript addressor
-    CoroutineAccessorKind,      // coroutine accessor
     ValueKind,                  // random base pointer as an lvalue
     KeyPathApplicationKind,     // applying a key path
 

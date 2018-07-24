@@ -84,7 +84,6 @@ FormalEvaluationScope::FormalEvaluationScope(FormalEvaluationScope &&o)
       wasInFormalEvaluationScope(o.wasInFormalEvaluationScope),
       wasInInOutConversionScope(o.wasInInOutConversionScope) {
   o.savedDepth.reset();
-  assert(o.isPopped());
 }
 
 void FormalEvaluationScope::popImpl() {

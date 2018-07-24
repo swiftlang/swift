@@ -1415,11 +1415,6 @@ ConstraintSystem::solveImpl(Expr *&expr,
     if (getContextualTypePurpose() == CTP_CallArgument)
       constraintKind = ConstraintKind::ArgumentConversion;
 
-    // In a by-reference yield, we expect the contextual type to be an
-    // l-value type, so the result must be bound to that.
-    if (getContextualTypePurpose() == CTP_YieldByReference)
-      constraintKind = ConstraintKind::Bind;
-
     if (allowFreeTypeVariables == FreeTypeVariableBinding::UnresolvedType) {
       convertType = convertType.transform([&](Type type) -> Type {
         if (type->is<UnresolvedType>())

@@ -2234,24 +2234,10 @@ public:
           abort();
         }
       }
-      if (auto reader = ASD->getReadCoroutine()) {
-        if (reader->isMutating() != ASD->isGetterMutating()) {
-          Out << "AbstractStorageDecl::isGetterMutating is out of sync"
-                 " with whether read accessor is mutating";
-          abort();
-        }
-      }
       if (auto addressor = ASD->getMutableAddressor()) {
         if (addressor->isMutating() != ASD->isSetterMutating()) {
           Out << "AbstractStorageDecl::isSetterMutating is out of sync"
                  " with whether mutable addressor is mutating";
-          abort();
-        }
-      }
-      if (auto modifier = ASD->getModifyCoroutine()) {
-        if (modifier->isMutating() != ASD->isSetterMutating()) {
-          Out << "AbstractStorageDecl::isSetterMutating is out of sync"
-                 " with whether modify addressor is mutating";
           abort();
         }
       }
@@ -2988,8 +2974,6 @@ public:
       case AccessorKind::WillSet:
       case AccessorKind::DidSet:
       case AccessorKind::MaterializeForSet:
-      case AccessorKind::Read:
-      case AccessorKind::Modify:
         if (FD->getAddressorKind() != AddressorKind::NotAddressor) {
           Out << "non-addressor accessor has an addressor kind\n";
           abort();

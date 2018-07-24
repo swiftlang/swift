@@ -174,11 +174,8 @@ enum class ReadImplKind {
 
   /// There's an immutable addressor.
   Address,
-
-  /// There's a read coroutine.
-  Read,
 };
-enum { NumReadImplKindBits = 4 };
+enum { NumReadImplKindBits = 2 };
 
 StringRef getReadImplKindName(ReadImplKind kind);
 
@@ -202,11 +199,8 @@ enum class WriteImplKind {
 
   /// There's a mutable addressor.
   MutableAddress,
-
-  /// There's a modify coroutine.
-  Modify,
 };
-enum { NumWriteImplKindBits = 4 };
+enum { NumWriteImplKindBits = 3 };
 
 StringRef getWriteImplKindName(WriteImplKind kind);
 
@@ -227,11 +221,8 @@ enum class ReadWriteImplKind {
 
   /// Do a read into a temporary and then a write back.
   MaterializeToTemporary,
-
-  /// There's a modify coroutine.
-  Modify,
 };
-enum { NumReadWriteImplKindBits = 4 };
+enum { NumReadWriteImplKindBits = 3 };
 
 StringRef getReadWriteImplKindName(ReadWriteImplKind kind);
 
@@ -284,24 +275,14 @@ public:
 
     case WriteImplKind::Set:
       assert(readImpl == ReadImplKind::Get ||
-             readImpl == ReadImplKind::Address ||
-             readImpl == ReadImplKind::Read);
+             readImpl == ReadImplKind::Address);
       assert(readWriteImpl == ReadWriteImplKind::MaterializeToTemporary ||
-             readWriteImpl == ReadWriteImplKind::MaterializeForSet ||
-             readWriteImpl == ReadWriteImplKind::Modify);
-      return;
-
-    case WriteImplKind::Modify:
-      assert(readImpl == ReadImplKind::Get ||
-             readImpl == ReadImplKind::Address ||
-             readImpl == ReadImplKind::Read);
-      assert(readWriteImpl == ReadWriteImplKind::Modify);
+             readWriteImpl == ReadWriteImplKind::MaterializeForSet);
       return;
 
     case WriteImplKind::MutableAddress:
       assert(readImpl == ReadImplKind::Get ||
-             readImpl == ReadImplKind::Address ||
-             readImpl == ReadImplKind::Read);
+             readImpl == ReadImplKind::Address);
       assert(readWriteImpl == ReadWriteImplKind::MutableAddress);
       return;
     }

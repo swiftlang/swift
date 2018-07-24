@@ -2327,12 +2327,6 @@ public:
       case AccessorKind::MaterializeForSet:
         OS << "<materializeForSet for ";
         break;
-      case AccessorKind::Read:
-        OS << "<read accessor for ";
-        break;
-      case AccessorKind::Modify:
-        OS << "<modify accessor for ";
-        break;
       }
       printDeclName(storage);
       OS << ">";
