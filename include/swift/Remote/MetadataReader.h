@@ -1050,8 +1050,10 @@ private:
                            sizeof(flags)))
       return nullptr;
     
+    TypeContextDescriptorFlags typeFlags(flags.getKindSpecificFlags());
     unsigned baseSize = 0;
     unsigned genericHeaderSize = sizeof(GenericContextDescriptorHeader);
+    unsigned inPlaceInitSize = 0;
     bool hasVTable = false;
     switch (auto kind = flags.getKind()) {
     case ContextDescriptorKind::Module:
@@ -1067,16 +1069,23 @@ private:
     case ContextDescriptorKind::Class:
       baseSize = sizeof(TargetClassDescriptor<Runtime>);
       genericHeaderSize = sizeof(TypeGenericContextDescriptorHeader);
-      hasVTable = TypeContextDescriptorFlags(flags.getKindSpecificFlags())
-                    .class_hasVTable();
+      hasVTable = typeFlags.class_hasVTable();
       break;
     case ContextDescriptorKind::Enum:
       baseSize = sizeof(TargetEnumDescriptor<Runtime>);
       genericHeaderSize = sizeof(TypeGenericContextDescriptorHeader);
+      if (typeFlags.hasInPlaceMetadataInitialization()) {
+        inPlaceInitSize =
+          sizeof(TargetInPlaceValueMetadataInitialization<Runtime>);
+      }
       break;
     case ContextDescriptorKind::Struct:
       baseSize = sizeof(TargetStructDescriptor<Runtime>);
       genericHeaderSize = sizeof(TypeGenericContextDescriptorHeader);
+      if (typeFlags.hasInPlaceMetadataInitialization()) {
+        inPlaceInitSize =
+          sizeof(TargetInPlaceValueMetadataInitialization<Runtime>);
+      }
       break;
     case ContextDescriptorKind::Protocol:
       baseSize = sizeof(TargetProtocolDescriptorRef<Runtime>);
@@ -1122,7 +1131,7 @@ private:
         + header.VTableSize * sizeof(TargetMethodDescriptor<Runtime>);
     }
     
-    unsigned size = baseSize + genericsSize + vtableSize;
+    unsigned size = baseSize + genericsSize + vtableSize + inPlaceInitSize;
     auto buffer = (uint8_t *)malloc(size);
     if (!Reader->readBytes(RemoteAddress(address), buffer, size)) {
       free(buffer);
