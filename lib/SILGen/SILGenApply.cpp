@@ -2395,7 +2395,7 @@ class ArgEmitter {
 
   SILGenFunction &SGF;
   SILFunctionTypeRepresentation Rep;
-  const Optional<ForeignErrorConvention> &ForeignError;
+  Optional<ForeignErrorConvention> ForeignError;
   ImportAsMemberStatus ForeignSelf;
   ClaimedParamsRef ParamInfos;
   SmallVectorImpl<ManagedValue> &Args;
