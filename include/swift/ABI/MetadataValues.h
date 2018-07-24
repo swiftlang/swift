@@ -1074,7 +1074,10 @@ enum class ContextDescriptorKind : uint8_t {
   /// This context descriptor represents an anonymous possibly-generic context
   /// such as a function body.
   Anonymous = 2,
-  
+
+  /// This context descriptor represents a protocol context.
+  Protocol = 3,
+
   /// First kind that represents a type of any sort.
   Type_First = 16,
   
@@ -1249,6 +1252,41 @@ public:
                                  TypeMetadataRecordKind,
                                  class_getSuperclassReferenceKind,
                                  class_setSuperclassReferenceKind)
+};
+
+/// Flags for protocol context descriptors. These values are used as the
+/// kindSpecificFlags of the ContextDescriptorFlags for the protocol.
+class ProtocolContextDescriptorFlags : public FlagSet<uint16_t> {
+  enum {
+    /// Whether this protocol is class-constrained.
+    HasClassConstraint = 0,
+    HasClassConstraint_width = 1,
+
+    /// Whether this protocol is resilient.
+    IsResilient = 1,
+
+    /// Special protocol value.
+    SpecialProtocolKind = 2,
+    SpecialProtocolKind_width = 6,
+  };
+
+public:
+  explicit ProtocolContextDescriptorFlags(uint16_t bits) : FlagSet(bits) {}
+  constexpr ProtocolContextDescriptorFlags() {}
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(IsResilient, isResilient, setIsResilient)
+
+  FLAGSET_DEFINE_FIELD_ACCESSORS(HasClassConstraint,
+                                 HasClassConstraint_width,
+                                 ProtocolClassConstraint,
+                                 getClassConstraint,
+                                 setClassConstraint)
+
+  FLAGSET_DEFINE_FIELD_ACCESSORS(SpecialProtocolKind,
+                                 SpecialProtocolKind_width,
+                                 SpecialProtocol,
+                                 getSpecialProtocol,
+                                 setSpecialProtocol)
 };
 
 enum class GenericParamKind : uint8_t {

@@ -82,14 +82,14 @@ import Builtin
 //   --       param 0
 // CHECK-SAME: i32 0
 //   --       protocol Req1
-// CHECK-SAME: %swift.protocol* @"$S15generic_structs4Req1Mp"
+// CHECK-SAME: @"$S15generic_structs4Req1Mp"
 
 //   --       protocol requirement with key arg
 // CHECK-SAME: i32 128
 //   --       param 1
 // CHECK-SAME: i32 2
 //   --       protocol Req2
-// CHECK-SAME: %swift.protocol* @"$S15generic_structs4Req2Mp"
+// CHECK-SAME: @"$S15generic_structs4Req2Mp"
 // CHECK-SAME: }>
 
 // CHECK: @"$S15generic_structs23DynamicWithRequirementsVMP" = internal constant <{ {{.*}} }> <{

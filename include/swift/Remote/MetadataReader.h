@@ -21,6 +21,7 @@
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/TypeDecoder.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Runtime/Unreachable.h"
@@ -359,21 +360,32 @@ public:
 
       std::vector<BuiltProtocolDecl> Protocols;
       for (auto ProtocolAddress : Exist->getProtocols()) {
-        auto ProtocolDescriptor = readProtocolDescriptor(
-            ProtocolAddress.getProtocolDescriptorUnchecked());
-        if (!ProtocolDescriptor)
-          return BuiltType();
+#if SWIFT_OBJC_INTEROP
+        // Check whether we have an Objective-C protocol.
+        if (ProtocolAddress.isObjC()) {
+          auto MangledNameStr =
+            readObjCProtocolName(ProtocolAddress.getObjCProtocol());
 
-        std::string MangledNameStr;
-        if (!Reader->readString(RemoteAddress(ProtocolDescriptor->Name),
-                                MangledNameStr))
-          return BuiltType();
+          StringRef MangledName =
+            Demangle::dropSwiftManglingPrefix(MangledNameStr);
 
-        StringRef MangledName =
-          Demangle::dropSwiftManglingPrefix(MangledNameStr);
+          Demangle::Context DCtx;
+          auto Demangled = DCtx.demangleTypeAsNode(MangledName);
+          if (!Demangled)
+            return BuiltType();
 
-        Demangle::Context DCtx;
-        auto Demangled = DCtx.demangleTypeAsNode(MangledName);
+          auto Protocol = Builder.createProtocolDecl(Demangled);
+          if (!Protocol)
+            return BuiltType();
+
+          Protocols.push_back(Protocol);
+          continue;
+        }
+#endif
+
+        Demangle::Demangler Dem;
+        auto Demangled = readDemanglingForContextDescriptor(
+            ProtocolAddress.getSwiftProtocol(), Dem);
         if (!Demangled)
           return BuiltType();
 
@@ -1066,6 +1078,9 @@ private:
       baseSize = sizeof(TargetStructDescriptor<Runtime>);
       genericHeaderSize = sizeof(TypeGenericContextDescriptorHeader);
       break;
+    case ContextDescriptorKind::Protocol:
+      baseSize = sizeof(TargetProtocolDescriptorRef<Runtime>);
+      break;
     default:
       // We don't know about this kind of context.
       return nullptr;
@@ -1184,7 +1199,17 @@ private:
         nodeKind = Demangle::Node::Kind::Enum;
         isTypeContext = true;
         break;
+      case ContextDescriptorKind::Protocol: {
+        auto protocolBuffer =
+          reinterpret_cast<const TargetProtocolDescriptor<Runtime> *>
+            (parent.getLocalBuffer());
+        auto nameAddress = resolveRelativeField(parent, protocolBuffer->Name);
+        if (!Reader->readString(RemoteAddress(nameAddress), nodeName))
+          return nullptr;
 
+        nodeKind = Demangle::Node::Kind::Protocol;
+        break;
+      }
       case ContextDescriptorKind::Extension:
         // TODO: Remangle something about the extension context here.
         return nullptr;
@@ -1269,18 +1294,26 @@ private:
     return decl;
   }
 
-  OwnedProtocolDescriptorRef
-  readProtocolDescriptor(StoredPointer Address) {
-    auto Size = sizeof(TargetProtocolDescriptor<Runtime>);
+#if SWIFT_OBJC_INTEROP
+  std::string readObjCProtocolName(StoredPointer Address) {
+    auto Size = sizeof(TargetObjCProtocolPrefix<Runtime>);
     auto Buffer = (uint8_t *)malloc(Size);
-    if (!Reader->readBytes(RemoteAddress(Address), Buffer, Size)) {
+    SWIFT_DEFER {
       free(Buffer);
-      return nullptr;
-    }
-    auto Casted
-      = reinterpret_cast<TargetProtocolDescriptor<Runtime> *>(Buffer);
-    return OwnedProtocolDescriptorRef(Casted);
+    };
+
+    if (!Reader->readBytes(RemoteAddress(Address), Buffer, Size))
+      return std::string();
+
+    auto ProtocolDescriptor
+      = reinterpret_cast<TargetObjCProtocolPrefix<Runtime> *>(Buffer);
+    std::string Name;
+    if (!Reader->readString(RemoteAddress(ProtocolDescriptor->Name), Name))
+      return std::string();
+
+    return Name;
   }
+#endif
 
   // TODO: We need to be able to produce protocol conformances for each
   // substitution type as well in order to accurately rebuild bound generic

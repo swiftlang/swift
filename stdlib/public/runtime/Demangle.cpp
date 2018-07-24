@@ -122,6 +122,19 @@ swift::_buildDemanglingForContext(const ContextDescriptor *context,
       break;
     }
 
+    case ContextDescriptorKind::Protocol: {
+      auto protocol = llvm::cast<ProtocolDescriptor>(component);
+      auto name = protocol->Name.get();
+
+      auto protocolNode = Dem.createNode(Node::Kind::Protocol);
+      protocolNode->addChild(node, Dem);
+      auto nameNode = Dem.createNode(Node::Kind::Identifier, name);
+      protocolNode->addChild(nameNode, Dem);
+
+      node = protocolNode;
+      break;
+    }
+
     default:
       // Form a type context demangling for type contexts.
       if (auto type = llvm::dyn_cast<TypeContextDescriptor>(component)) {
@@ -392,37 +405,51 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     // its canonical ordering of protocols.
 
     for (auto protocol : protocols) {
-      // The protocol name is mangled as a type symbol, with the _Tt prefix.
-      StringRef ProtoName(protocol.getName());
-      NodePointer protocolNode = Dem.demangleSymbol(ProtoName);
+#if SWIFT_OBJC_INTEROP
+      if (protocol.isObjC()) {
+        // The protocol name is mangled as a type symbol, with the _Tt prefix.
+        StringRef ProtoName(protocol.getName());
+        NodePointer protocolNode = Dem.demangleSymbol(ProtoName);
 
-      // ObjC protocol names aren't mangled.
-      if (!protocolNode) {
-        auto module = Dem.createNode(Node::Kind::Module,
-                                          MANGLING_MODULE_OBJC);
-        auto node = Dem.createNode(Node::Kind::Protocol);
-        node->addChild(module, Dem);
-        node->addChild(Dem.createNode(Node::Kind::Identifier, ProtoName), Dem);
-        auto typeNode = Dem.createNode(Node::Kind::Type);
-        typeNode->addChild(node, Dem);
-        type_list->addChild(typeNode, Dem);
+        // ObjC protocol names aren't mangled.
+        if (!protocolNode) {
+          auto module = Dem.createNode(Node::Kind::Module,
+                                            MANGLING_MODULE_OBJC);
+          auto node = Dem.createNode(Node::Kind::Protocol);
+          node->addChild(module, Dem);
+          node->addChild(Dem.createNode(Node::Kind::Identifier, ProtoName),
+                         Dem);
+          auto typeNode = Dem.createNode(Node::Kind::Type);
+          typeNode->addChild(node, Dem);
+          type_list->addChild(typeNode, Dem);
+          continue;
+        }
+
+        // Dig out the protocol node.
+        // Global -> (Protocol|TypeMangling)
+        protocolNode = protocolNode->getChild(0);
+        if (protocolNode->getKind() == Node::Kind::TypeMangling) {
+          protocolNode = protocolNode->getChild(0); // TypeMangling -> Type
+          protocolNode = protocolNode->getChild(0); // Type -> ProtocolList
+          protocolNode = protocolNode->getChild(0); // ProtocolList -> TypeList
+          protocolNode = protocolNode->getChild(0); // TypeList -> Type
+
+          assert(protocolNode->getKind() == Node::Kind::Type);
+          assert(protocolNode->getChild(0)->getKind() == Node::Kind::Protocol);
+        } else {
+          assert(protocolNode->getKind() == Node::Kind::Protocol);
+        }
+
+        type_list->addChild(protocolNode, Dem);
         continue;
       }
+#endif
 
-      // Dig out the protocol node.
-      // Global -> (Protocol|TypeMangling)
-      protocolNode = protocolNode->getChild(0);
-      if (protocolNode->getKind() == Node::Kind::TypeMangling) {
-        protocolNode = protocolNode->getChild(0); // TypeMangling -> Type
-        protocolNode = protocolNode->getChild(0); // Type -> ProtocolList
-        protocolNode = protocolNode->getChild(0); // ProtocolList -> TypeList
-        protocolNode = protocolNode->getChild(0); // TypeList -> Type
-
-        assert(protocolNode->getKind() == Node::Kind::Type);
-        assert(protocolNode->getChild(0)->getKind() == Node::Kind::Protocol);
-      } else {
-        assert(protocolNode->getKind() == Node::Kind::Protocol);
-      }
+      auto protocolNode =
+          _buildDemanglingForContext(protocol.getSwiftProtocol(), { }, false,
+                                     Dem);
+      if (!protocolNode)
+        return nullptr;
 
       type_list->addChild(protocolNode, Dem);
     }

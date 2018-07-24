@@ -447,7 +447,187 @@ namespace {
       IGM.setTrueConstGlobal(var);
     }
   };
-  
+
+  class ProtocolDescriptorBuilder
+    : public ContextDescriptorBuilderBase<ProtocolDescriptorBuilder> {
+
+    using super = ContextDescriptorBuilderBase;
+
+    ProtocolDecl *Proto;
+    SILDefaultWitnessTable *DefaultWitnesses;
+
+    Optional<ConstantAggregateBuilderBase::PlaceholderPosition>
+      NumRequirementsInSignature,
+      NumRequirements;
+  public:
+    ProtocolDescriptorBuilder(IRGenModule &IGM, ProtocolDecl *Proto,
+                                     SILDefaultWitnessTable *defaultWitnesses)
+      : super(IGM), Proto(Proto), DefaultWitnesses(defaultWitnesses)
+    {
+    }
+
+    void layout() {
+      super::layout();
+    }
+
+    ConstantReference getParent() {
+      return IGM.getAddrOfParentContextDescriptor(Proto);
+    }
+
+    ContextDescriptorKind getContextKind() {
+      return ContextDescriptorKind::Protocol;
+    }
+
+    GenericSignature *getGenericSignature() {
+      return nullptr;
+    }
+
+    bool isUniqueDescriptor() {
+      return true;
+    }
+
+    uint16_t getKindSpecificFlags() {
+      ProtocolContextDescriptorFlags flags;
+      flags.setClassConstraint(Proto->requiresClass()
+                                 ? ProtocolClassConstraint::Class
+                                 : ProtocolClassConstraint::Any);
+      flags.setSpecialProtocol(getSpecialProtocolID(Proto));
+      flags.setIsResilient(DefaultWitnesses != nullptr);
+      return flags.getOpaqueValue();
+    }
+
+    void emit() {
+      asImpl().layout();
+      asImpl().addName();
+      NumRequirementsInSignature = B.addPlaceholderWithSize(IGM.Int32Ty);
+      NumRequirements = B.addPlaceholderWithSize(IGM.Int32Ty);
+      asImpl().addAssociatedTypeNames();
+      asImpl().addRequirementSignature();
+      asImpl().addRequirements();
+      auto addr = IGM.getAddrOfProtocolDescriptor(Proto,
+                                                  B.finishAndCreateFuture());
+      auto var = cast<llvm::GlobalVariable>(addr);
+
+      var->setConstant(true);
+      disableAddressSanitizer(IGM, var);
+      IGM.setTrueConstGlobal(var);
+    }
+
+    void addName() {
+      auto nameStr = IGM.getAddrOfGlobalString(Proto->getName().str(),
+                                           /*willBeRelativelyAddressed*/ true);
+      B.addRelativeAddress(nameStr);
+    }
+
+    void addRequirementSignature() {
+      auto metadata =
+        irgen::addGenericRequirements(IGM, B, Proto->getGenericSignature(),
+                                      Proto->getRequirementSignature());
+
+      B.fillPlaceholderWithInt(*NumRequirementsInSignature, IGM.Int32Ty,
+                               metadata.NumRequirements);
+    }
+
+    struct RequirementInfo {
+      ProtocolRequirementFlags Flags;
+      llvm::Constant *Thunk;
+      llvm::Constant *DefaultImpl;
+    };
+
+    /// Build the information which will go into a ProtocolRequirement entry.
+    RequirementInfo getRequirementInfo(const WitnessTableEntry &entry) {
+      using Flags = ProtocolRequirementFlags;
+      if (entry.isBase()) {
+        assert(entry.isOutOfLineBase());
+        auto flags = Flags(Flags::Kind::BaseProtocol);
+        return { flags, nullptr, nullptr };
+      }
+
+      if (entry.isAssociatedType()) {
+        auto flags = Flags(Flags::Kind::AssociatedTypeAccessFunction);
+        return { flags, nullptr, nullptr };
+      }
+
+      if (entry.isAssociatedConformance()) {
+        auto flags = Flags(Flags::Kind::AssociatedConformanceAccessFunction);
+        return { flags, nullptr, nullptr };
+      }
+
+      assert(entry.isFunction());
+      SILDeclRef func(entry.getFunction());
+
+      // Look up the dispatch thunk if the protocol is resilient.
+      llvm::Constant *thunk = nullptr;
+      if (IGM.isResilient(Proto, ResilienceExpansion::Minimal))
+        thunk = IGM.getAddrOfDispatchThunk(func, NotForDefinition);
+
+      // Classify the function.
+      auto flags = getMethodDescriptorFlags<Flags>(func.getDecl());
+
+      // Look for a default witness.
+      llvm::Constant *defaultImpl = findDefaultWitness(func);
+
+      return { flags, thunk, defaultImpl };
+    }
+
+    void addRequirements() {
+      auto &pi = IGM.getProtocolInfo(Proto);
+
+      B.fillPlaceholderWithInt(*NumRequirements, IGM.Int32Ty,
+                               pi.getNumWitnesses());
+
+      for (auto &entry : pi.getWitnessEntries()) {
+        auto reqt = B.beginStruct(IGM.ProtocolRequirementStructTy);
+
+        auto info = getRequirementInfo(entry);
+
+        // Flags.
+        reqt.addInt32(info.Flags.getIntValue());
+
+        // Dispatch thunk.
+        reqt.addRelativeAddressOrNull(info.Thunk);
+
+        // Default implementation.
+        reqt.addRelativeAddressOrNull(info.DefaultImpl);
+
+        reqt.finishAndAddTo(B);
+      }
+    }
+
+    llvm::Constant *findDefaultWitness(SILDeclRef func) {
+      if (!DefaultWitnesses) return nullptr;
+
+      for (auto &entry : DefaultWitnesses->getEntries()) {
+        if (!entry.isValid() || entry.getRequirement() != func)
+          continue;
+        return IGM.getAddrOfSILFunction(entry.getWitness(), NotForDefinition);
+      }
+
+      return nullptr;
+    }
+
+    void addAssociatedTypeNames() {
+      std::string AssociatedTypeNames;
+
+      auto &pi = IGM.getProtocolInfo(Proto);
+      for (auto &entry : pi.getWitnessEntries()) {
+        // Add the associated type name to the list.
+        if (entry.isAssociatedType()) {
+          if (!AssociatedTypeNames.empty())
+            AssociatedTypeNames += ' ';
+          AssociatedTypeNames += entry.getAssociatedType()->getName().str();
+        }
+      }
+
+      llvm::Constant *global = nullptr;
+      if (!AssociatedTypeNames.empty()) {
+        global = IGM.getAddrOfGlobalString(AssociatedTypeNames,
+                                           /*willBeRelativelyAddressed=*/true);
+      }
+      B.addRelativeAddressOrNull(global);
+    }
+  };
+
   template<class Impl>
   class TypeContextDescriptorBuilderBase
     : public ContextDescriptorBuilderBase<Impl> {
@@ -3484,233 +3664,6 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   llvm_unreachable("Not a valid KnownProtocolKind.");
 }
 
-namespace {
-  class ProtocolDescriptorBuilder {
-    IRGenModule &IGM;
-    ConstantStructBuilder &B;
-    ProtocolDecl *Protocol;
-    std::string AssociatedTypeNames;
-    SILDefaultWitnessTable *DefaultWitnesses;
-
-  public:
-    ProtocolDescriptorBuilder(IRGenModule &IGM, ProtocolDecl *protocol,
-                              ConstantStructBuilder &B,
-                              SILDefaultWitnessTable *defaultWitnesses)
-      : IGM(IGM), B(B), Protocol(protocol),
-        DefaultWitnesses(defaultWitnesses) {}
-
-    void layout() {
-      addObjCCompatibilityIsa();
-      addName();
-      addInherited();
-      addObjCCompatibilityTables();
-      addSize();
-      addFlags();
-      addRequirements();
-      addSuperclass();
-      addAssociatedTypeNames();
-
-      B.suggestType(IGM.ProtocolDescriptorStructTy);
-    }
-
-    void addObjCCompatibilityIsa() {
-      // The ObjC runtime will drop a reference to its magic Protocol class
-      // here.
-      B.addNullPointer(IGM.Int8PtrTy);
-    }
-    
-    void addName() {
-      // Include the _Tt prefix. Since Swift protocol descriptors are laid
-      // out to look like ObjC Protocol* objects, the name has to clearly be
-      // a Swift mangled name.
-
-      IRGenMangler mangler;
-      std::string Name =
-        mangler.mangleForProtocolDescriptor(Protocol->getDeclaredType());
-
-      auto global = IGM.getAddrOfGlobalString(Name);
-      B.add(global);
-    }
-    
-    void addInherited() {
-      // If there are no inherited protocols, produce null.
-      auto inherited = Protocol->getInheritedProtocols();
-      if (inherited.empty()) {
-        B.addNullPointer(IGM.Int8PtrTy);
-        return;
-      }
-      
-      // Otherwise, collect references to all of the inherited protocol
-      // descriptors.
-      SmallVector<llvm::Constant*, 4> inheritedDescriptors;
-      inheritedDescriptors.push_back(IGM.getSize(Size(inherited.size())));
-      
-      for (ProtocolDecl *p : inherited) {
-        auto descriptor = IGM.getAddrOfProtocolDescriptor(p);
-        inheritedDescriptors.push_back(descriptor);
-      }
-      
-      auto inheritedInit = llvm::ConstantStruct::getAnon(inheritedDescriptors);
-      auto inheritedVar = new llvm::GlobalVariable(IGM.Module,
-                                           inheritedInit->getType(),
-                                           /*isConstant*/ true,
-                                           llvm::GlobalValue::PrivateLinkage,
-                                           inheritedInit);
-      
-      B.addBitCast(inheritedVar, IGM.Int8PtrTy);
-    }
-    
-    void addObjCCompatibilityTables() {
-      // Required instance methods
-      B.addNullPointer(IGM.Int8PtrTy);
-      // Required class methods
-      B.addNullPointer(IGM.Int8PtrTy);
-      // Optional instance methods
-      B.addNullPointer(IGM.Int8PtrTy);
-      // Optional class methods
-      B.addNullPointer(IGM.Int8PtrTy);
-      // Properties
-      B.addNullPointer(IGM.Int8PtrTy);
-    }
-    
-    void addSize() {
-      // The number of fields so far in words, plus 4 bytes for size and
-      // 4 bytes for flags.
-      B.addInt32(B.getNextOffsetFromGlobal().getValue() + 4 + 4);
-    }
-    
-    void addFlags() {
-      auto flags = ProtocolDescriptorFlags()
-        .withSwift(true)
-        .withClassConstraint(Protocol->requiresClass()
-                               ? ProtocolClassConstraint::Class
-                               : ProtocolClassConstraint::Any)
-        .withDispatchStrategy(
-                Lowering::TypeConverter::getProtocolDispatchStrategy(Protocol))
-        .withSpecialProtocol(getSpecialProtocolID(Protocol));
-
-      if (DefaultWitnesses)
-        flags = flags.withResilient(true);
-
-      B.addInt32(flags.getIntValue());
-    }
-
-    void addRequirements() {
-      auto &pi = IGM.getProtocolInfo(Protocol);
-
-      B.addInt32(pi.getNumWitnesses());
-
-      // If there are no entries, just add a null reference and return.
-      if (pi.getNumWitnesses() == 0) {
-        B.addInt(IGM.RelativeAddressTy, 0);
-        return;
-      }
-
-      ConstantInitBuilder reqtBuilder(IGM);
-      auto reqtsArray = reqtBuilder.beginArray(IGM.ProtocolRequirementStructTy);
-      for (auto &entry : pi.getWitnessEntries()) {
-        auto reqt = reqtsArray.beginStruct(IGM.ProtocolRequirementStructTy);
-
-        auto info = getRequirementInfo(entry);
-
-        // Flags.
-        reqt.addInt32(info.Flags.getIntValue());
-
-        // Dispatch thunk.
-        reqt.addRelativeAddressOrNull(info.Thunk);
-
-        // Default implementation.
-        reqt.addRelativeAddressOrNull(info.DefaultImpl);
-
-        // Add the associated type name to the list.
-        if (entry.isAssociatedType()) {
-          if (!AssociatedTypeNames.empty())
-            AssociatedTypeNames += ' ';
-          AssociatedTypeNames += entry.getAssociatedType()->getName().str();
-        }
-
-        reqt.finishAndAddTo(reqtsArray);
-      }
-
-      auto global =
-        cast<llvm::GlobalVariable>(
-          IGM.getAddrOfProtocolRequirementArray(Protocol,
-                                                reqtsArray.finishAndCreateFuture()));
-      global->setConstant(true);
-      B.addRelativeOffset(IGM.Int32Ty, global);
-      IGM.setTrueConstGlobal(global);
-    }
-
-    struct RequirementInfo {
-      ProtocolRequirementFlags Flags;
-      llvm::Constant *Thunk;
-      llvm::Constant *DefaultImpl;
-    };
-
-    /// Build the information which will go into a ProtocolRequirement entry.
-    RequirementInfo getRequirementInfo(const WitnessTableEntry &entry) {
-      using Flags = ProtocolRequirementFlags;
-      if (entry.isBase()) {
-        assert(entry.isOutOfLineBase());
-        auto flags = Flags(Flags::Kind::BaseProtocol);
-        return { flags, nullptr, nullptr };
-      }
-
-      if (entry.isAssociatedType()) {
-        auto flags = Flags(Flags::Kind::AssociatedTypeAccessFunction);
-        return { flags, nullptr, nullptr };
-      }
-
-      if (entry.isAssociatedConformance()) {
-        auto flags = Flags(Flags::Kind::AssociatedConformanceAccessFunction);
-        return { flags, nullptr, nullptr };
-      }
-
-      assert(entry.isFunction());
-      SILDeclRef func(entry.getFunction());
-
-      // Look up the dispatch thunk if the protocol is resilient.
-      llvm::Constant *thunk = nullptr;
-      if (IGM.isResilient(Protocol, ResilienceExpansion::Minimal))
-        thunk = IGM.getAddrOfDispatchThunk(func, NotForDefinition);
-
-      // Classify the function.
-      auto flags = getMethodDescriptorFlags<Flags>(func.getDecl());
-
-      // Look for a default witness.
-      llvm::Constant *defaultImpl = findDefaultWitness(func);
-
-      return { flags, thunk, defaultImpl };
-    }
-
-    llvm::Constant *findDefaultWitness(SILDeclRef func) {
-      if (!DefaultWitnesses) return nullptr;
-
-      for (auto &entry : DefaultWitnesses->getEntries()) {
-        if (!entry.isValid() || entry.getRequirement() != func)
-          continue;
-        return IGM.getAddrOfSILFunction(entry.getWitness(), NotForDefinition);
-      }
-
-      return nullptr;
-    }
-
-    void addSuperclass() {
-      // FIXME: Implement.
-      B.addRelativeAddressOrNull(nullptr);
-    }
-
-    void addAssociatedTypeNames() {
-      llvm::Constant *global = nullptr;
-      if (!AssociatedTypeNames.empty()) {
-        global = IGM.getAddrOfGlobalString(AssociatedTypeNames,
-                                           /*willBeRelativelyAddressed=*/true);
-      }
-      B.addRelativeAddressOrNull(global);
-    }
-  };
-} // end anonymous namespace
-
 /// Emit global structures associated with the given protocol. This comprises
 /// the protocol descriptor, and for ObjC interop, references to the descriptor
 /// that the ObjC runtime uses for uniquing.
@@ -3739,15 +3692,10 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
   if (isResilient(protocol, ResilienceExpansion::Minimal))
     defaultWitnesses = getSILModule().lookUpDefaultWitnessTable(protocol);
 
-  ConstantInitBuilder initBuilder(*this);
-  auto init = initBuilder.beginStruct();
-  ProtocolDescriptorBuilder builder(*this, protocol, init, defaultWitnesses);
-  builder.layout();
-
-  auto var = cast<llvm::GlobalVariable>(
-          getAddrOfProtocolDescriptor(protocol, init.finishAndCreateFuture()));
-  var->setConstant(true);
-  disableAddressSanitizer(*this, var);
+  {
+    ProtocolDescriptorBuilder builder(*this, protocol, defaultWitnesses);
+    builder.emit();
+  }
 
   // Note that we emitted this protocol.
   SwiftProtocols.push_back(protocol);

@@ -233,7 +233,19 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
       node = node->getChild(0);
       break;
     }
-    
+
+    case ContextDescriptorKind::Protocol:
+      // Match a protocol context.
+      if (node->getKind() == Demangle::Node::Kind::Protocol) {
+        auto proto = llvm::cast<ProtocolDescriptor>(context);
+        auto nameNode = node->getChild(1);
+        if (nameNode->getText() == proto->Name.get()) {
+          node = node->getChild(0);
+          break;
+        }
+      }
+      return false;
+
     default:
       if (auto type = llvm::dyn_cast<TypeContextDescriptor>(context)) {
         switch (node->getKind()) {
@@ -290,7 +302,7 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
         return false;
 
       }
-      
+
       // We don't know about this kind of context, or it doesn't have a stable
       // name we can match to.
       return false;
@@ -445,16 +457,11 @@ void swift::swift_registerProtocols(const ProtocolRecord *begin,
 
 static const ProtocolDescriptor *
 _searchProtocolRecords(ProtocolMetadataPrivateState &C,
-                       const llvm::StringRef protocolName){
+                       const Demangle::NodePointer &node) {
   for (auto &section : C.SectionsToScan.snapshot()) {
     for (const auto &record : section) {
       if (auto protocol = record.Protocol.getPointer()) {
-        // Drop the "S$" prefix from the protocol record. It's not used in
-        // the type itself.
-        StringRef foundProtocolName = protocol->Name;
-        assert(foundProtocolName.startswith("$S"));
-        foundProtocolName = foundProtocolName.drop_front(2);
-        if (foundProtocolName == protocolName)
+        if (_contextDescriptorMatchesMangling(protocol, node))
           return protocol;
       }
     }
@@ -464,9 +471,27 @@ _searchProtocolRecords(ProtocolMetadataPrivateState &C,
 }
 
 static const ProtocolDescriptor *
-_findProtocolDescriptor(llvm::StringRef mangledName) {
+_findProtocolDescriptor(const Demangle::NodePointer &node,
+                        Demangle::Demangler &Dem,
+                        std::string &mangledName) {
   const ProtocolDescriptor *foundProtocol = nullptr;
   auto &T = Protocols.get();
+
+  // If we have a symbolic reference to a context, resolve it immediately.
+  NodePointer symbolicNode = node;
+  if (symbolicNode->getKind() == Node::Kind::Type)
+    symbolicNode = symbolicNode->getChild(0);
+  if (symbolicNode->getKind() == Node::Kind::SymbolicReference)
+    return cast<ProtocolDescriptor>(
+      (const ContextDescriptor *)symbolicNode->getIndex());
+
+  mangledName =
+    Demangle::mangleNode(node,
+                         [&](const void *context) -> NodePointer {
+                           return _buildDemanglingForContext(
+                               (const ContextDescriptor *) context,
+                               {}, false, Dem);
+                         });
 
   // Look for an existing entry.
   // Find the bucket for the metadata entry.
@@ -474,7 +499,7 @@ _findProtocolDescriptor(llvm::StringRef mangledName) {
     return Value->getDescription();
 
   // Check type metadata records
-  foundProtocol = _searchProtocolRecords(T, mangledName);
+  foundProtocol = _searchProtocolRecords(T, node);
 
   if (foundProtocol) {
     T.ProtocolCache.getOrInsert(mangledName, foundProtocol);
@@ -644,9 +669,6 @@ namespace {
 /// the given name in the given protocol descriptor.
 Optional<unsigned> findAssociatedTypeByName(const ProtocolDescriptor *protocol,
                                             StringRef name) {
-  // Only Swift protocols have associated types.
-  if (!protocol->Flags.isSwift()) return None;
-
   // If we don't have associated type names, there's nothing to do.
   const char *associatedTypeNamesPtr = protocol->AssociatedTypeNames.get();
   if (!associatedTypeNamesPtr) return None;
@@ -674,7 +696,7 @@ Optional<unsigned> findAssociatedTypeByName(const ProtocolDescriptor *protocol,
   // type requirement.
   unsigned currentAssocTypeIdx = 0;
   unsigned numRequirements = protocol->NumRequirements;
-  const ProtocolRequirement *requirements = protocol->Requirements.get();
+  auto requirements = protocol->getRequirements();
   for (unsigned reqIdx = 0; reqIdx != numRequirements; ++reqIdx) {
     if (requirements[reqIdx].Flags.getKind() !=
         ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction)
@@ -766,11 +788,10 @@ public:
     }
 #endif
 
-    auto mangledName = Demangle::mangleNode(node);
-
-    // Look for a Swift protocol with this mangled name.
-    if (auto protocol = _findProtocolDescriptor(mangledName))
-      return ProtocolDescriptorRef::forSwift(protocol);
+    // Look for a protocol descriptor based on its mangled name.
+    std::string mangledName;
+    if (auto protocol = _findProtocolDescriptor(node, demangler, mangledName))
+      return ProtocolDescriptorRef::forSwift(protocol);;
 
 #if SWIFT_OBJC_INTEROP
     // Look for a Swift-defined @objc protocol with the Swift 3 mangling that
