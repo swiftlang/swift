@@ -797,9 +797,61 @@ extension Unicode.Scalar.Properties {
 
 extension Unicode {
 
-  /// A version of the Unicode Standard represented by its `major.minor`
+  /// A version of the Unicode Standard represented by its `major.minor.update`
   /// components.
-  public typealias Version = (major: Int, minor: Int)
+  public struct Version: Comparable {
+
+    /// The major (first) component of the version.
+    public let major: Int
+
+    /// The minor (second) component of the version.
+    public let minor: Int
+
+    /// The update (third) component of the version.
+    public let update: Int
+
+    /// Creates a new version with the given major, minor, and update
+    /// components.
+    ///
+    /// - Parameters:
+    ///   - major: The major (first) component of the version.
+    ///   - minor: The minor (second) component of the version. If omitted, this
+    ///     component defaults to zero.
+    ///   - update: The update (third) component of the version. If omitted,
+    ///     this component defaults to zero.
+    public init(major: Int, minor: Int = 0, update: Int = 0) {
+      self.major = major
+      self.minor = minor
+      self.update = update
+    }
+
+    public static func < (lhs: Version, rhs: Version) -> Bool {
+      guard lhs.major == rhs.major else { return lhs.major < rhs.major }
+      guard lhs.minor == rhs.minor else { return lhs.minor < rhs.minor }
+      guard lhs.update == rhs.update else { return lhs.update < rhs.update }
+      return false
+    }
+  }
+
+  /// The version of the Unicode Standard that is supported by Swift on the
+  /// current platform.
+  ///
+  /// Clients can use this property to determine whether certain scalars or
+  /// properties are defined on the current platform.
+  public static var supportedVersion: Version {
+    var versionInfo: __swift_stdlib_UVersionInfo = (0, 0, 0, 0)
+    withUnsafeMutablePointer(to: &versionInfo) { tuplePtr in
+      tuplePtr.withMemoryRebound(to: UInt8.self, capacity: 4) {
+        versionInfoPtr in
+        __swift_stdlib_u_getUnicodeVersion(versionInfoPtr)
+      }
+    }
+    return Version(
+      major: Int(versionInfo.0),
+      minor: Int(versionInfo.1),
+      update: Int(versionInfo.2)
+    )
+  }
 }
 
 extension Unicode.Scalar.Properties {
@@ -820,7 +872,7 @@ extension Unicode.Scalar.Properties {
       }
     }
     guard versionInfo.0 != 0 else { return nil }
-    return (major: Int(versionInfo.0), minor: Int(versionInfo.1))
+    return Unicode.Version(major: Int(versionInfo.0), minor: Int(versionInfo.1))
   }
 }
 

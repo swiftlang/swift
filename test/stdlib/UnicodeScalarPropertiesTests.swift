@@ -7,6 +7,10 @@ var UnicodeScalarPropertiesTests = TestSuite("UnicodeScalarPropertiesTests")
 
 func us(_ scalar: Unicode.Scalar) -> Unicode.Scalar { return scalar }
 
+func uv(_ major: Int, _ minor: Int, _ update: Int) -> Unicode.Version {
+  return Unicode.Version(major: major, minor: minor, update: update)
+}
+
 UnicodeScalarPropertiesTests.test("properties.booleanProperties") {
   func expectBooleanProperty(
     _ keyPath: KeyPath<Unicode.Scalar.Properties, Bool>,
@@ -156,7 +160,7 @@ UnicodeScalarPropertiesTests.test("properties.nameAlias") {
 
 UnicodeScalarPropertiesTests.test("properties.age") {
   func expectAgeEqual(
-    _ expected: (Int, Int),
+    _ expected: Unicode.Version,
     _ scalar: Unicode.Scalar,
     _ message: String = "",
     file: String = #file,
@@ -168,10 +172,10 @@ UnicodeScalarPropertiesTests.test("properties.age") {
   }
 
   expectNil(us("\u{0378}").properties.age)
-  expectAgeEqual((1, 1), "\u{0040}")
-  expectAgeEqual((3, 0), "\u{3500}")
-  expectAgeEqual((3, 2), "\u{FE00}")
-  expectAgeEqual((6, 1), "\u{11180}")
+  expectAgeEqual(uv(1, 1, 0), "\u{0040}")
+  expectAgeEqual(uv(3, 0, 0), "\u{3500}")
+  expectAgeEqual(uv(3, 2, 0), "\u{FE00}")
+  expectAgeEqual(uv(6, 1, 0), "\u{11180}")
 }
 
 UnicodeScalarPropertiesTests.test("properties.generalCategory") {
@@ -246,6 +250,38 @@ UnicodeScalarPropertiesTests.test("properties.numericTypeAndValue") {
   // U+2463 CIRCLED DIGIT FOUR
   expectEqual(.digit, us("\u{2463}").properties.numericType)
   expectEqual(4, us("\u{2463}").properties.numericValue)
+}
+
+// We can't reliably test the `supportedVersion` property because its value
+// changes depending on the version of ICU linked. We can at least sanity-check
+// the `Version` structure, though.
+
+UnicodeScalarPropertiesTests.test("Unicode.Version.init") {
+  let v2_3_4 = Unicode.Version(major: 2, minor: 3, update: 4)
+  expectEqual(2, v2_3_4.major)
+  expectEqual(3, v2_3_4.minor)
+  expectEqual(4, v2_3_4.update)
+
+  let v2_0_0 = Unicode.Version(major: 2)
+  expectEqual(2, v2_0_0.major)
+  expectEqual(0, v2_0_0.minor)
+  expectEqual(0, v2_0_0.update)
+}
+
+UnicodeScalarPropertiesTests.test("Unicode.Version.==") {
+  expectTrue(uv(1, 2, 3) == uv(1, 2, 3))
+  expectFalse(uv(1, 2, 0) == uv(1, 2, 3))
+  expectFalse(uv(1, 0, 0) == uv(1, 2, 3))
+  expectFalse(uv(2, 0, 0) == uv(1, 2, 3))
+}
+
+UnicodeScalarPropertiesTests.test("Unicode.Version.<") {
+  expectTrue(uv(1, 2, 3) < uv(1, 2, 4))
+  expectFalse(uv(1, 2, 4) < uv(1, 2, 3))
+  expectTrue(uv(1, 2, 0) < uv(1, 2, 3))
+  expectTrue(uv(1, 0, 0) < uv(1, 2, 3))
+  expectFalse(uv(1, 2, 3) < uv(1, 2, 3))
+  expectFalse(uv(2, 0, 0) < uv(1, 2, 3))
 }
 
 runAllTests()
