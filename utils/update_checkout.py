@@ -297,19 +297,28 @@ def obtain_all_additional_swift_sources(args, config, with_ssh, scheme_name,
 
 
 def dump_repo_hashes(config):
-    max_len = reduce(lambda acc, x: max(acc, len(x)),
-                     config['repos'].keys(), 0)
-    fmt = "{:<%r}{}" % (max_len + 5)
+    """
+    Dumps the current state of the repo into a new config file that contains a
+    master branch scheme with the relevant branches set to the appropriate
+    hashes.
+    """
+    branch_scheme_name = 'repro'
+    new_config = {}
+    config_copy_keys = ['ssh-clone-pattern', 'https-clone-pattern', 'repos']
+    for config_copy_key in config_copy_keys:
+        new_config[config_copy_key] = config[config_copy_key]
+    repos = {}
+    branch_scheme = {'aliases': [branch_scheme_name], 'repos': repos}
+    new_config['branch-schemes'] = {branch_scheme_name: branch_scheme}
     for repo_name, repo_info in sorted(config['repos'].items(),
                                        key=lambda x: x[0]):
-        repo_path = os.path.join(SWIFT_SOURCE_ROOT, repo_name)
-        if os.path.isdir(repo_path):
-            with shell.pushd(repo_path, dry_run=False, echo=False):
-                h = shell.capture(["git", "log", "--oneline", "-n", "1"],
-                                  echo=False).strip()
-                print(fmt.format(repo_name, h))
-        else:
-            print(fmt.format(repo_name, "(not checked out)"))
+        with shell.pushd(os.path.join(SWIFT_SOURCE_ROOT, repo_name),
+                         dry_run=False,
+                         echo=False):
+            h = shell.capture(["git", "rev-parse", "HEAD"],
+                              echo=False).strip()
+            repos[repo_name] = str(h)
+    json.dump(new_config, sys.stdout, indent=4)
 
 
 def dump_hashes_config(args, config):
