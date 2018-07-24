@@ -36,12 +36,12 @@ entry:
 }
 
 sil hidden @$S13keypaths_objc1CC1xSo8NSStringCvgTo : $@convention(objc_method) (@guaranteed C) -> NSString {
-entry(%0 : $C):
+entry(%0 : @guaranteed $C):
   unreachable
 }
 
 sil hidden @$S13keypaths_objc1CCACycfcTo : $@convention(objc_method) (@objc_metatype C.Type) -> @owned C {
-entry(%0 : $@objc_metatype C.Type):
+entry(%0 : @trivial $@objc_metatype C.Type):
   unreachable
 }
 

@@ -9,7 +9,7 @@ import Builtin
 // CHECK-LABEL: sil [serialized] @test_unchecked_ownership_conversion : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 // CHECK: unchecked_ownership_conversion {{%.*}} : $Builtin.NativeObject, @guaranteed to @owned
 sil [serialized] @test_unchecked_ownership_conversion : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
+bb0(%0 : @guaranteed $Builtin.NativeObject):
   unchecked_ownership_conversion %0 : $Builtin.NativeObject, @guaranteed to @owned
   return undef : $()
 }
@@ -17,7 +17,7 @@ bb0(%0 : $Builtin.NativeObject):
 // CHECK-LABEL: sil [serialized] @test_end_lifetime : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 // CHECK: end_lifetime {{%.*}} : $Builtin.NativeObject
 sil [serialized] @test_end_lifetime : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
+bb0(%0 : @owned $Builtin.NativeObject):
   end_lifetime %0 : $Builtin.NativeObject
   return undef : $()
 }
@@ -38,7 +38,7 @@ struct Int32 {
 }
 
 sil @test_destructure_struct_tuple : $@convention(thin) (@owned (Builtin.NativeObject, Builtin.Int32), @owned TestArray2) -> @owned (Builtin.NativeObject, Builtin.Int32, TestArrayStorage, Int32, TestArrayStorage) {
-bb0(%0 : $(Builtin.NativeObject, Builtin.Int32), %1 : $TestArray2):
+bb0(%0 : @owned $(Builtin.NativeObject, Builtin.Int32), %1 : @owned $TestArray2):
   (%2, %3) = destructure_tuple %0 : $(Builtin.NativeObject, Builtin.Int32)
   (%4, %5, %6) = destructure_struct %1 : $TestArray2
   %7 = tuple(%2 : $Builtin.NativeObject, %3 : $Builtin.Int32, %4 : $TestArrayStorage, %5 : $Int32, %6 : $TestArrayStorage)
