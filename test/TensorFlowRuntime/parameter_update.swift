@@ -6,11 +6,6 @@
 // TensorFlow aggregate parameter update tests.
 
 import TensorFlow
-#if TPU
-import TensorFlowUnittestTPU
-#else
-import TensorFlowUnittest
-#endif
 import StdlibUnittest
 
 var ParameterUpdateTests = TestSuite("ParameterUpdate")
