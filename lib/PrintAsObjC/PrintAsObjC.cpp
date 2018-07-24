@@ -925,7 +925,7 @@ private:
     auto renamedDeclName = renamedParsedDeclName.formDeclName(D->getASTContext());
     
     auto declContext = D->getDeclContext();
-    ValueDecl *renamedFuncDecl = nullptr;
+    const ValueDecl *renamedFuncDecl = nullptr;
     
     if (isa<ClassDecl>(D) || isa<ProtocolDecl>(D)) {
       UnqualifiedLookup lookup(renamedDeclName.getBaseIdentifier(),
