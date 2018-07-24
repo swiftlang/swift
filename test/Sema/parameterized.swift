@@ -61,6 +61,13 @@ struct A<T> {
   }
 }
 
+func foo() {
+  struct NestedInFunction : Parameterized {
+    @TFParameter var layer: DenseLayer
+    @TFParameter var float: Float
+  }
+}
+
 // Test heterogenous parameter types.
 struct MixedParameterized : Parameterized {
   @TFParameter var int: Int
