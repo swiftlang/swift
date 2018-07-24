@@ -2480,6 +2480,7 @@ static bool checkAccessUsingAccessScopes(const DeclContext *useDC,
 static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
                         AccessLevel access, bool forConformance) {
   auto *sourceDC = VD->getDeclContext();
+  bool canUseFastPath = true;
 
   if (!forConformance) {
     if (auto *proto = sourceDC->getAsProtocolOrProtocolExtensionContext()) {
@@ -2496,9 +2497,16 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
         }
       }
 
-      // Skip the fast path below and just compare access scopes.
-      return checkAccessUsingAccessScopes(useDC, VD, access);
+      canUseFastPath = false;
     }
+
+    if (VD->isOperator())
+      canUseFastPath = false;
+  }
+
+  if (!canUseFastPath) {
+    // Skip the fast path below and just compare access scopes.
+    return checkAccessUsingAccessScopes(useDC, VD, access);
   }
 
   // Fast path: assume that the client context already has access to our parent
@@ -2534,15 +2542,10 @@ bool ValueDecl::isAccessibleFrom(const DeclContext *useDC,
   auto access = getFormalAccess();
   bool result = checkAccess(useDC, this, access, forConformance);
 
-  // For everything outside of protocols and operators, we should get the same
-  // result using either implementation of checkAccess, because useDC must
-  // already have access to this declaration's DeclContext.
-  // FIXME: Arguably, we're doing the wrong thing for operators here too,
-  // because we're finding internal operators within private types. Fortunately
-  // we have a requirement that a member operator take the enclosing type as an
-  // argument, so it won't ever match.
+  // For everything outside of protocols, we should get the same result using
+  // either implementation of checkAccess, because useDC must already have
+  // access to this declaration's DeclContext.
   assert(getDeclContext()->getAsProtocolOrProtocolExtensionContext() ||
-         isOperator() ||
          result == checkAccessUsingAccessScopes(useDC, this, access));
 
   return result;

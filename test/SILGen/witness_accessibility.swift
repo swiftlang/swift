@@ -1,21 +1,32 @@
 // RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle -enable-sil-ownership %s | %FileCheck %s
 
+prefix operator ^
+prefix operator ^^
+prefix operator ^^^
+
 public protocol P {
   func publicRequirement()
+  static prefix func ^(_: Self)
 }
 
 protocol Q : P {
   func internalRequirement()
+  static prefix func ^^(_: Self)
 }
 
 fileprivate protocol R : Q {
   func privateRequirement()
+  static prefix func ^^^(_: Self)
 }
 
 extension R {
   public func publicRequirement() {}
   func internalRequirement() {}
   func privateRequirement() {}
+
+  public static prefix func ^(_: Self) {}
+  static prefix func ^^(_: Self) {}
+  static prefix func ^^^(_: Self) {}
 }
 
 public struct S : R {}
