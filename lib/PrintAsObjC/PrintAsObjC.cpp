@@ -953,9 +953,11 @@ private:
              cast<FuncDecl>(D)->getParameters()->size()))
           continue;
         
-        if (renamedFuncDecl)
-        /* TODO: Diagnose to compiler to tell the user that we found multiple candidates */;
-        
+        if (renamedFuncDecl) {
+          // If we found a duplicated candidate then we would silently fail.
+          renamedFuncDecl = nullptr;
+          break;
+        }
         renamedFuncDecl = candidate;
       }
     }
