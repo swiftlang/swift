@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -module-name main -disable-sil-partial-apply -emit-sil -verify %s
+// RUN: %target-swift-frontend -module-name main -disable-sil-partial-apply -emit-sil -sil-verify-all %s
 sil_stage canonical
 import Builtin
 
@@ -13,7 +13,7 @@ sil @g_box_context : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Bu
 sil @g_class_context : $@convention(thin) (@guaranteed C) -> ()
 
 sil @limited_partial_applies : $@convention(thin) (Builtin.NativeObject, <τ_0_0> { var τ_0_0 } <Builtin.Word>, C) -> () {
-entry(%0 : $Builtin.NativeObject, %1 : $<τ_0_0> { var τ_0_0 } <Builtin.Word>, %2 : $C):
+entry(%0 : @unowned $Builtin.NativeObject, %1 : @unowned $<τ_0_0> { var τ_0_0 } <Builtin.Word>, %2 : @unowned $C):
   %a = function_ref @native_object_context : $@convention(thin) (@owned Builtin.NativeObject) -> ()
   %b = function_ref @box_context : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Builtin.Word>) -> ()
   %c = function_ref @class_context : $@convention(thin) (@owned C) -> ()

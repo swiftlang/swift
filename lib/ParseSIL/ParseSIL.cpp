@@ -5092,7 +5092,6 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
         if (!F->getModule()
                  .getOptions()
                  .AssumeUnqualifiedOwnershipWhenParsing &&
-            F->getModule().getOptions().EnableSILOwnership &&
             parseSILOwnership(OwnershipKind))
           return true;
 

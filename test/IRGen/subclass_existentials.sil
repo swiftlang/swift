@@ -27,7 +27,7 @@ protocol R {}
 // CHECK-NEXT:   ret void
 
 sil @checkRefcounting : $@convention(thin) (@owned C & P, @owned AnyObject & P) -> () {
-bb0(%0 : $C & P, %1 : $AnyObject & P):
+bb0(%0 : @owned $C & P, %1 : @owned $AnyObject & P):
   destroy_value %1 : $AnyObject & P
   destroy_value %0 : $C & P
   %6 = tuple ()
@@ -76,7 +76,7 @@ bb0:
 // CHECK-NEXT:  [[RESULT2:%.*]] = insertvalue { %T21subclass_existentials1CC*, i8** } [[RESULT1]], i8** @"$S21subclass_existentials1DCAA1PAAWP", 1
 // CHECK-NEXT:  ret { %T21subclass_existentials1CC*, i8** } [[RESULT2]]
 sil @eraseToExistential : $@convention(thin) (@owned D) -> @owned C & P {
-bb0(%0 : $D):
+bb0(%0 : @owned $D):
   %2 = init_existential_ref %0 : $D : $D, $C & P
   return %2 : $C & P
 }
@@ -87,14 +87,14 @@ bb0(%0 : $D):
 // CHECK-NEXT:  [[RESULT2:%.*]] = insertvalue { %T21subclass_existentials1GC*, i8** } [[RESULT1]], i8** @"$S21subclass_existentials1ECyxGAA1PAAWP", 1
 // CHECK-NEXT:  ret { %T21subclass_existentials1GC*, i8** } [[RESULT2]]
 sil @eraseToExistentialWithGeneric : $@convention(thin) <τ_0_0> (@owned E<τ_0_0>) -> @owned G<τ_0_0> & P {
-bb0(%0 : $E<τ_0_0>):
+bb0(%0 : @owned $E<τ_0_0>):
   %2 = init_existential_ref %0 : $E<τ_0_0> : $E<τ_0_0>, $G<τ_0_0> & P
   return %2 : $G<τ_0_0> & P
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @checkExistentialDowncast(%T21subclass_existentials1CC*, %T21subclass_existentials1CC*, i8**)
 sil @checkExistentialDowncast : $@convention(thin) (@owned C, @owned C & P) -> () {
-bb0(%0 : $C, %1 : $C & P):
+bb0(%0 : @owned $C, %1 : @owned $C & P):
 
 // CHECK:       [[METATYPE_PTR:%.*]] = bitcast %T21subclass_existentials1CC* %0 to %swift.type**
 // CHECK-NEXT:  [[METATYPE:%.*]] = load %swift.type*, %swift.type** [[METATYPE_PTR]], align {{4|8}}
@@ -146,7 +146,7 @@ bb0(%0 : $C, %1 : $C & P):
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @checkExistentialSameClassDowncast(%T21subclass_existentials1CC*)
 sil @checkExistentialSameClassDowncast : $@convention(thin) (@owned C) -> () {
-bb0(%0 : $C):
+bb0(%0 : @owned $C):
 
 // CHECK:       [[METATYPE_PTR:%.*]] = bitcast %T21subclass_existentials1CC* %0 to %swift.type**
 // CHECK-NEXT:  [[METATYPE:%.*]] = load %swift.type*, %swift.type** [[METATYPE_PTR]], align {{4|8}}
@@ -182,7 +182,7 @@ bb0(%0 : $C):
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @checkExistentialMetatypeDowncast(%swift.type*, %swift.type*, i8**)
 sil @checkExistentialMetatypeDowncast : $@convention(thin) (@owned @thick C.Type, @owned @thick (C & P).Type) -> () {
-bb0(%0 : $@thick C.Type, %1 : $@thick (C & P).Type):
+bb0(%0 : @trivial $@thick C.Type, %1 : @trivial $@thick (C & P).Type):
 
 // CHECK:       [[METATYPE:%.*]] = bitcast %swift.type* %0 to i8*
 // CHECK-NEXT:  [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S21subclass_existentials1DCMa"([[INT]] 0)
@@ -203,7 +203,7 @@ bb0(%0 : $@thick C.Type, %1 : $@thick (C & P).Type):
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @checkExistentialSameClassMetatypeDowncast(%swift.type*)
 sil @checkExistentialSameClassMetatypeDowncast : $@convention(thin) (@owned @thick C.Type) -> () {
-bb0(%0 : $@thick C.Type):
+bb0(%0 : @trivial $@thick C.Type):
 
 // CHECK:       [[METATYPE:%.*]] = bitcast %swift.type* %0 to i8*
 // CHECK-NEXT:  [[RESULT:%.*]] = call { i8*, i8** } @dynamic_cast_existential_1_unconditional(i8* [[METATYPE]], %swift.type* %0, %swift.protocol* @"$S21subclass_existentials1PMp")

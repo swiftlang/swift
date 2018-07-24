@@ -13,7 +13,7 @@ class C {}
 sil_vtable C {}
 
 sil @_TFC21autorelease_optimized1Cd : $@convention(method) (@owned C) -> @owned Builtin.NativeObject {
-bb0(%0 : $C):
+bb0(%0 : @owned $C):
   %1 = unchecked_ref_cast %0 : $C to $Builtin.NativeObject // user: %2
   return %1 : $Builtin.NativeObject              // id: %2
 }
@@ -22,7 +22,7 @@ sil public_external @foo : $@convention(thin) (@owned C) -> @autoreleased C
 sil public_external @bar : $@convention(thin) (@owned C) -> ()
 
 sil @baz : $@convention(thin) (@owned C) -> () {
-bb0(%0 : $C):
+bb0(%0 : @owned $C):
   %1 = function_ref @foo : $@convention(thin) (@owned C) -> @autoreleased C
   %2 = apply %1(%0) : $@convention(thin) (@owned C) -> @autoreleased C
 

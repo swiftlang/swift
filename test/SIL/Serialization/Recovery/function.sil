@@ -13,7 +13,7 @@ import Types
 // CHECK-LABEL: sil @missingParam : $@convention(thin) (SoonToBeMissing) -> () {
 // CHECK-RECOVERY-NEGATIVE-NOT: sil @missingParam
 sil @missingParam : $@convention(thin) (SoonToBeMissing) -> () {
-entry(%arg: $SoonToBeMissing):
+entry(%arg : @unowned $SoonToBeMissing):
   %9999 = tuple()
   return %9999 : $()
 }
