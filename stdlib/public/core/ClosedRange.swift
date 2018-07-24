@@ -232,24 +232,24 @@ where Bound : Strideable, Bound.Stride : SignedInteger
   }
 
   @inlinable
-  public func index(_ i: Index, offsetBy n: Int) -> Index {
+  public func index(_ i: Index, offsetBy distance: Int) -> Index {
     switch i {
     case .inRange(let x):
       let d = x.distance(to: upperBound)
-      if n <= d {
-        let newPosition = x.advanced(by: numericCast(n))
+      if distance <= d {
+        let newPosition = x.advanced(by: numericCast(distance))
         _precondition(newPosition >= lowerBound,
           "Advancing past start index")
         return .inRange(newPosition)
       }
-      if d - -1 == n { return .pastEnd }
+      if d - -1 == distance { return .pastEnd }
       _preconditionFailure("Advancing past end index")
     case .pastEnd:
-      if n == 0 {
+      if distance == 0 {
         return i
       } 
-      if n < 0 {
-        return index(.inRange(upperBound), offsetBy: numericCast(n + 1))
+      if distance < 0 {
+        return index(.inRange(upperBound), offsetBy: numericCast(distance + 1))
       }
       _preconditionFailure("Advancing past end index")
     }

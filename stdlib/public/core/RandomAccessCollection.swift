@@ -93,6 +93,8 @@ where SubSequence: RandomAccessCollection, Indices: RandomAccessCollection
   ///
   /// - Parameter bounds: A range of the collection's indices. The bounds of
   ///   the range must be valid indices of the collection.
+  ///
+  /// - Complexity: O(1)
   subscript(bounds: Range<Index>) -> SubSequence { get }
 
   // FIXME(ABI): Associated type inference requires this.
@@ -104,9 +106,6 @@ where SubSequence: RandomAccessCollection, Indices: RandomAccessCollection
   // FIXME(ABI): Associated type inference requires this.
   var endIndex: Index { get }
 }
-
-// TODO: swift-3-indexing-model - Make sure RandomAccessCollection has
-// documented complexity guarantees, e.g. for index(_:offsetBy:).
 
 // TODO: swift-3-indexing-model - (By creating an ambiguity?), try to
 // make sure RandomAccessCollection models implement
@@ -138,31 +137,32 @@ extension RandomAccessCollection {
   ///     print(j)
   ///     // Prints "nil"
   ///
-  /// The value passed as `n` must not offset `i` beyond the bounds of the
-  /// collection, unless the index passed as `limit` prevents offsetting
+  /// The value passed as `distance` must not offset `i` beyond the bounds of
+  /// the collection, unless the index passed as `limit` prevents offsetting
   /// beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the array.
-  ///   - n: The distance to offset `i`.
-  ///   - limit: A valid index of the collection to use as a limit. If `n > 0`,
-  ///     `limit` should be greater than `i` to have any effect. Likewise, if
-  ///     `n < 0`, `limit` should be less than `i` to have any effect.
-  /// - Returns: An index offset by `n` from the index `i`, unless that index
-  ///   would be beyond `limit` in the direction of movement. In that case,
-  ///   the method returns `nil`.
+  ///   - distance: The distance to offset `i`.
+  ///   - limit: A valid index of the collection to use as a limit. If
+  ///     `distance > 0`, `limit` should be greater than `i` to have any
+  ///     effect. Likewise, if `distance < 0`, `limit` should be less than `i`
+  ///     to have any effect.
+  /// - Returns: An index offset by `distance` from the index `i`, unless that
+  ///   index would be beyond `limit` in the direction of movement. In that
+  ///   case, the method returns `nil`.
   ///
   /// - Complexity: O(1)
   @inlinable
   public func index(
-    _ i: Index, offsetBy n: Int, limitedBy limit: Index
+    _ i: Index, offsetBy distance: Int, limitedBy limit: Index
   ) -> Index? {
     // FIXME: swift-3-indexing-model: tests.
-    let l = distance(from: i, to: limit)
-    if n > 0 ? l >= 0 && l < n : l <= 0 && n < l {
+    let l = self.distance(from: i, to: limit)
+    if distance > 0 ? l >= 0 && l < distance : l <= 0 && distance < l {
       return nil
     }
-    return index(i, offsetBy: n)
+    return index(i, offsetBy: distance)
   }
 }
 
@@ -222,21 +222,22 @@ where Index : Strideable,
   ///     print(numbers[i])
   ///     // Prints "50"
   ///
-  /// The value passed as `n` must not offset `i` beyond the bounds of the
-  /// collection.
+  /// The value passed as `distance` must not offset `i` beyond the bounds of
+  /// the collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
-  ///   - n: The distance to offset `i`.
-  /// - Returns: An index offset by `n` from the index `i`. If `n` is positive,
-  ///   this is the same value as the result of `n` calls to `index(after:)`.
-  ///   If `n` is negative, this is the same value as the result of `-n` calls
-  ///   to `index(before:)`.
+  ///   - distance: The distance to offset `i`.
+  /// - Returns: An index offset by `distance` from the index `i`. If
+  ///   `distance` is positive, this is the same value as the result of
+  ///   `distance` calls to `index(after:)`. If `distance` is negative, this
+  ///   is the same value as the result of `abs(distance)` calls to
+  ///   `index(before:)`.
   ///
   /// - Complexity: O(1)
   @inlinable
-  public func index(_ i: Index, offsetBy n: Index.Stride) -> Index {
-    let result = i.advanced(by: n)
+  public func index(_ i: Index, offsetBy distance: Index.Stride) -> Index {
+    let result = i.advanced(by: distance)
     // This range check is not precise, tighter bounds exist based on `n`.
     // Unfortunately, we would need to perform index manipulation to
     // compute those bounds, which is probably too slow in the general
