@@ -4476,33 +4476,29 @@ extension Dictionary: CustomReflectable {
 ///
 /// Using a builder can be faster than inserting members into an empty
 /// `Dictionary`.
-@_fixed_layout // FIXME(sil-serialize-all)
+@_fixed_layout
 public struct _DictionaryBuilder<Key: Hashable, Value> {
-
-  @usableFromInline // FIXME(sil-serialize-all)
-  internal var _result: Dictionary<Key, Value>
-  @usableFromInline // FIXME(sil-serialize-all)
-  internal var _native: _NativeDictionary<Key, Value>
-  @usableFromInline // FIXME(sil-serialize-all)
+  @usableFromInline
+  internal var _target: _NativeDictionary<Key, Value>
+  @usableFromInline
   internal let _requestedCount: Int
-  @usableFromInline // FIXME(sil-serialize-all)
+  @usableFromInline
   internal var _actualCount: Int
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public init(count: Int) {
-    _result = Dictionary<Key, Value>(minimumCapacity: count)
-    _native = _result._variant.asNative
+    _target = _NativeDictionary(minimumCapacity: count)
     _requestedCount = count
     _actualCount = 0
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public mutating func add(key newKey: Key, value: Value) {
-    _native.unsafeAddNew(key: newKey, value: value)
+    _target.unsafeAddNew(key: newKey, value: value)
     _actualCount += 1
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public mutating func take() -> Dictionary<Key, Value> {
     _precondition(_actualCount >= 0,
       "Cannot take the result twice")
@@ -4510,11 +4506,13 @@ public struct _DictionaryBuilder<Key: Hashable, Value> {
       "The number of members added does not match the promised count")
 
     // Finish building the `Dictionary`.
-    _native.count = _requestedCount
+    _target.count = _actualCount
 
     // Prevent taking the result twice.
     _actualCount = -1
-    return _result
+    var result = _NativeDictionary<Key, Value>()
+    swap(&result, &_target)
+    return Dictionary(_nativeDictionary: result)
   }
 }
 

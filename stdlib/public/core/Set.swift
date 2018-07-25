@@ -3667,32 +3667,29 @@ extension Set: CustomReflectable {
 ///
 /// Using a builder can be faster than inserting members into an empty
 /// `Set`.
-@_fixed_layout // FIXME(sil-serialize-all)
+@_fixed_layout
 public struct _SetBuilder<Element: Hashable> {
-  @usableFromInline // FIXME(sil-serialize-all)
-  internal var _result: Set<Element>
-  @usableFromInline // FIXME(sil-serialize-all)
-  internal var _nativeSet: _NativeSet<Element>
-  @usableFromInline // FIXME(sil-serialize-all)
+  @usableFromInline
+  internal var _target: _NativeSet<Element>
+  @usableFromInline
   internal let _requestedCount: Int
-  @usableFromInline // FIXME(sil-serialize-all)
+  @usableFromInline
   internal var _actualCount: Int
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public init(count: Int) {
-    _result = Set<Element>(minimumCapacity: count)
-    _nativeSet = _result._variant.asNative
+    _target = _NativeSet(minimumCapacity: count)
     _requestedCount = count
     _actualCount = 0
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public mutating func add(member: Element) {
-    _nativeSet.unsafeAddNew(key: member)
+    _target.unsafeAddNew(key: member)
     _actualCount += 1
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public mutating func take() -> Set<Element> {
     _precondition(_actualCount >= 0,
       "Cannot take the result twice")
@@ -3700,11 +3697,13 @@ public struct _SetBuilder<Element: Hashable> {
       "The number of members added does not match the promised count")
 
     // Finish building the `Set`.
-    _nativeSet.count = _requestedCount
+    _target.count = _actualCount
 
     // Prevent taking the result twice.
     _actualCount = -1
-    return _result
+    var result = _NativeSet<Element>()
+    swap(&result, &_target)
+    return Set(_nativeSet: result)
   }
 }
 
