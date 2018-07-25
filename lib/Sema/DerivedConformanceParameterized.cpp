@@ -306,7 +306,6 @@ deriveParameterized_allParameters(DerivedConformance &derived) {
   auto *setterDecl =
       derived.declareDerivedPropertySetter(derived.TC, allParamsDecl, returnTy);
   setterDecl->setBodySynthesizer(&derivedBody_allParametersSetter);
-  allParamsDecl->setSetterAccess(nominal->getFormalAccess());
   allParamsDecl->setAccessors(StorageImplInfo::getMutableComputed(),
                               SourceLoc(), {getterDecl, setterDecl},
                               SourceLoc());
