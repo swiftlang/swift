@@ -18,11 +18,12 @@
 #ifndef SWIFT_SYNTAX_SERIALIZATION_SYNTAXSERIALIZATION_H
 #define SWIFT_SYNTAX_SERIALIZATION_SYNTAXSERIALIZATION_H
 
-#include "swift/Syntax/RawSyntax.h"
 #include "swift/Basic/JSONSerialization.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Syntax/RawSyntax.h"
 #include "llvm/ADT/StringSwitch.h"
 #include <forward_list>
+#include <unordered_set>
 
 namespace swift {
 namespace json {
@@ -30,6 +31,10 @@ namespace json {
 /// The associated value will be interpreted as \c bool. If \c true the node IDs
 /// will not be included in the serialized JSON.
 static void *DontSerializeNodeIdsUserInfoKey = &DontSerializeNodeIdsUserInfoKey;
+
+/// The user info key pointing to a std::unordered_set of IDs of nodes that
+/// shall be omitted when the tree gets serialized
+static void *OmitNodesUserInfoKey = &OmitNodesUserInfoKey;
 
 /// Serialization traits for SourcePresence.
 template <>
@@ -125,6 +130,22 @@ struct ObjectTraits<TokenDescription> {
 template<>
 struct ObjectTraits<syntax::RawSyntax> {
   static void mapping(Output &out, syntax::RawSyntax &value) {
+    bool dontSerializeIds =
+        (bool)out.getUserInfo()[DontSerializeNodeIdsUserInfoKey];
+    if (!dontSerializeIds) {
+      auto nodeId = value.getId();
+      out.mapRequired("id", nodeId);
+    }
+
+    auto omitNodes =
+        (std::unordered_set<unsigned> *)out.getUserInfo()[OmitNodesUserInfoKey];
+
+    if (omitNodes && omitNodes->count(value.getId()) > 0) {
+      bool omitted = true;
+      out.mapRequired("omitted", omitted);
+      return;
+    }
+
     if (value.isToken()) {
       auto tokenKind = value.getTokenKind();
       auto text = value.getTokenText();
@@ -145,12 +166,6 @@ struct ObjectTraits<syntax::RawSyntax> {
     }
     auto presence = value.getPresence();
     out.mapRequired("presence", presence);
-
-    bool omitNodeId = (bool)out.getUserInfo()[DontSerializeNodeIdsUserInfoKey];
-    if (!omitNodeId) {
-      auto nodeId = value.getId();
-      out.mapRequired("id", nodeId);
-    }
   }
 };
 
