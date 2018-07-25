@@ -155,3 +155,23 @@ func testDerived(b: B) {
   f0(f1(b))
   // CHECK: end sil function '$S7ranking11testDerived1byAA1BC_tF'
 }
+
+protocol X {
+  var z: Int { get }
+}
+
+class Y {
+  var z: Int = 0
+}
+
+// CHECK-LABEL: sil hidden @$S7ranking32testGenericPropertyProtocolClassyyxAA1YCRbzAA1XRzlF
+func testGenericPropertyProtocolClass<T : X & Y>(_ t: T) {
+  // CHECK: class_method {{%.*}} : $Y, #Y.z!getter.1
+  _ = t.z
+}
+
+// CHECK-LABEL: sil hidden @$S7ranking36testExistentialPropertyProtocolClassyyAA1X_AA1YCXcF
+func testExistentialPropertyProtocolClass(_ t: X & Y) {
+  // CHECK: class_method {{%.*}} : $Y, #Y.z!getter.1
+  _ = t.z
+}
