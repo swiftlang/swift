@@ -901,13 +901,9 @@ void Lexer::lexDollarIdent() {
   }
 
   if (CurPtr == tokStart + 1) {
-    // It is always an error to see a standalone '$' when not in Swift 3
-    // compatibility mode.
-    if (!LangOpts.isSwiftVersion3()) {
-      // Offer to replace '$' with '`$`'.
-      diagnose(tokStart, diag::standalone_dollar_identifier)
-        .fixItReplaceChars(getSourceLoc(tokStart), getSourceLoc(CurPtr), "`$`");
-    }
+    // It is an error to see a standalone '$'. Offer to replace '$' with '`$`'.
+    diagnose(tokStart, diag::standalone_dollar_identifier)
+      .fixItReplaceChars(getSourceLoc(tokStart), getSourceLoc(CurPtr), "`$`");
     return formToken(tok::identifier, tokStart);
   }
 
