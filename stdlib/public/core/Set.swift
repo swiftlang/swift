@@ -1743,9 +1743,6 @@ final internal class _HashableTypedNativeSetStorage<Element: Hashable>
 @usableFromInline
 @_fixed_layout
 internal struct _NativeSet<Element> {
-  @usableFromInline
-  internal typealias TypedStorage = _TypedNativeSetStorage<Element>
-
   /// See this comments on _RawNativeSetStorage and its subclasses to
   /// understand why we store an untyped storage here.
   @usableFromInline
@@ -1768,9 +1765,10 @@ internal struct _NativeSet<Element> {
   @inlinable // FIXME(sil-serialize-all)
   internal init(_exactBucketCount bucketCount: Int, unhashable: ()) {
     let bitmapWordCount = _UnsafeBitMap.sizeInWords(forSizeInBits: bucketCount)
-    let storage = Builtin.allocWithTailElems_2(TypedStorage.self,
-        bitmapWordCount._builtinWordValue, UInt.self,
-        bucketCount._builtinWordValue, Element.self)
+    let storage = Builtin.allocWithTailElems_2(
+      _TypedNativeSetStorage<Element>.self,
+      bitmapWordCount._builtinWordValue, UInt.self,
+      bucketCount._builtinWordValue, Element.self)
     self.init(_exactBucketCount: bucketCount, storage: storage)
   }
 
@@ -1974,9 +1972,6 @@ internal struct _NativeSet<Element> {
 }
 
 extension _NativeSet/*: _SetBuffer*/ where Element: Hashable {
-  @usableFromInline
-  internal typealias HashTypedStorage = _HashableTypedNativeSetStorage<Element>
-
   @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
   internal init(minimumCapacity: Int) {
@@ -2001,9 +1996,10 @@ extension _NativeSet/*: _SetBuffer*/ where Element: Hashable {
   @inlinable // FIXME(sil-serialize-all)
   internal init(_exactBucketCount bucketCount: Int) {
     let bitmapWordCount = _UnsafeBitMap.sizeInWords(forSizeInBits: bucketCount)
-    let storage = Builtin.allocWithTailElems_2(HashTypedStorage.self,
-        bitmapWordCount._builtinWordValue, UInt.self,
-        bucketCount._builtinWordValue, Element.self)
+    let storage = Builtin.allocWithTailElems_2(
+      _HashableTypedNativeSetStorage<Element>.self,
+      bitmapWordCount._builtinWordValue, UInt.self,
+      bucketCount._builtinWordValue, Element.self)
     self.init(_exactBucketCount: bucketCount, storage: storage)
   }
 

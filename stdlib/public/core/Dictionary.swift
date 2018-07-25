@@ -2197,8 +2197,6 @@ final internal class _HashableTypedNativeDictionaryStorage<Key: Hashable, Value>
 internal struct _NativeDictionary<Key, Value> {
   @usableFromInline
   internal typealias Element = (key: Key, value: Value)
-  @usableFromInline // FIXME(sil-serialize-all)
-  internal typealias TypedStorage = _TypedNativeDictionaryStorage<Key, Value>
 
   /// See this comments on _RawNativeDictionaryStorage and its subclasses to
   /// understand why we store an untyped storage here.
@@ -2222,10 +2220,11 @@ internal struct _NativeDictionary<Key, Value> {
   @inlinable // FIXME(sil-serialize-all)
   internal init(_exactBucketCount bucketCount: Int, unhashable: ()) {
     let bitmapWordCount = _UnsafeBitMap.sizeInWords(forSizeInBits: bucketCount)
-    let storage = Builtin.allocWithTailElems_3(TypedStorage.self,
-        bitmapWordCount._builtinWordValue, UInt.self,
-        bucketCount._builtinWordValue, Key.self,
-        bucketCount._builtinWordValue, Value.self)
+    let storage = Builtin.allocWithTailElems_3(
+      _TypedNativeDictionaryStorage<Key, Value>.self,
+      bitmapWordCount._builtinWordValue, UInt.self,
+      bucketCount._builtinWordValue, Key.self,
+      bucketCount._builtinWordValue, Value.self)
     self.init(_exactBucketCount: bucketCount, storage: storage)
   }
 
@@ -2441,10 +2440,6 @@ internal struct _NativeDictionary<Key, Value> {
 }
 
 extension _NativeDictionary where Key: Hashable {
-  @usableFromInline
-  internal typealias HashTypedStorage =
-    _HashableTypedNativeDictionaryStorage<Key, Value>
-
   @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
   internal init(minimumCapacity: Int) {
@@ -2469,10 +2464,11 @@ extension _NativeDictionary where Key: Hashable {
   @inlinable // FIXME(sil-serialize-all)
   internal init(_exactBucketCount bucketCount: Int) {
     let bitmapWordCount = _UnsafeBitMap.sizeInWords(forSizeInBits: bucketCount)
-    let storage = Builtin.allocWithTailElems_3(HashTypedStorage.self,
-        bitmapWordCount._builtinWordValue, UInt.self,
-        bucketCount._builtinWordValue, Key.self,
-        bucketCount._builtinWordValue, Value.self)
+    let storage = Builtin.allocWithTailElems_3(
+      _HashableTypedNativeDictionaryStorage<Key, Value>.self,
+      bitmapWordCount._builtinWordValue, UInt.self,
+      bucketCount._builtinWordValue, Key.self,
+      bucketCount._builtinWordValue, Value.self)
     self.init(_exactBucketCount: bucketCount, storage: storage)
   }
 
