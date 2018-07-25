@@ -2723,7 +2723,6 @@ public:
 
     checkUnsupportedNestedType(ED);
     TC.validateDecl(ED);
-    ED->setHasValidatedLayout();
 
     {
       // Check for circular inheritance of the raw type.
@@ -2761,7 +2760,6 @@ public:
     checkUnsupportedNestedType(SD);
 
     TC.validateDecl(SD);
-    SD->setHasValidatedLayout();
 
     TC.addImplicitConstructors(SD);
 
@@ -2891,7 +2889,6 @@ public:
 
     TC.validateDecl(CD);
     TC.requestSuperclassLayout(CD);
-    CD->setHasValidatedLayout();
 
     {
       // Check for circular inheritance.
@@ -4649,11 +4646,6 @@ void TypeChecker::requestMemberLayout(ValueDecl *member) {
 }
 
 void TypeChecker::requestNominalLayout(NominalTypeDecl *nominalDecl) {
-  if (nominalDecl->hasValidatedLayout())
-    return;
-
-  nominalDecl->setHasValidatedLayout();
-
   if (isa<SourceFile>(nominalDecl->getModuleScopeContext()))
     DeclsToFinalize.insert(nominalDecl);
 }
