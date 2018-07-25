@@ -861,47 +861,46 @@ tests.test("signum/concrete") {
 
 tests.test("binaryLogarithm/generic") {
   expectEqual(
-    Int((42 as MockBinaryInteger<Int8>)._binaryLogarithm()),
-    Int((42 as Int8)._binaryLogarithm()))
+    (42 as MockBinaryInteger<Int8>)._binaryLogarithm(),
+    (42 as Int8)._binaryLogarithm())
   expectEqual(
-    Int((42 as MockBinaryInteger<UInt8>)._binaryLogarithm()),
-    Int((42 as UInt8)._binaryLogarithm()))
+    (42 as MockBinaryInteger<UInt8>)._binaryLogarithm(),
+    (42 as UInt8)._binaryLogarithm())
   expectEqual(
-    Int((42 as MockBinaryInteger<Int16>)._binaryLogarithm()),
-    Int((42 as Int16)._binaryLogarithm()))
+    (42 as MockBinaryInteger<Int16>)._binaryLogarithm(),
+    (42 as Int16)._binaryLogarithm())
   expectEqual(
-    Int((42 as MockBinaryInteger<UInt16>)._binaryLogarithm()),
-    Int((42 as UInt16)._binaryLogarithm()))
+    (42 as MockBinaryInteger<UInt16>)._binaryLogarithm(),
+    (42 as UInt16)._binaryLogarithm())
   expectEqual(
-    Int((42 as MockBinaryInteger<Int32>)._binaryLogarithm()),
-    Int((42 as Int32)._binaryLogarithm()))
+    (42 as MockBinaryInteger<Int32>)._binaryLogarithm(),
+    (42 as Int32)._binaryLogarithm())
   expectEqual(
-    Int((42 as MockBinaryInteger<UInt32>)._binaryLogarithm()),
-    Int((42 as UInt32)._binaryLogarithm()))
+    (42 as MockBinaryInteger<UInt32>)._binaryLogarithm(),
+    (42 as UInt32)._binaryLogarithm())
   expectEqual(
-    Int((42 as MockBinaryInteger<Int64>)._binaryLogarithm()),
-    Int((42 as Int64)._binaryLogarithm()))
+    (42 as MockBinaryInteger<Int64>)._binaryLogarithm(),
+    (42 as Int64)._binaryLogarithm())
   expectEqual(
-    Int((42 as MockBinaryInteger<UInt64>)._binaryLogarithm()),
-    Int((42 as UInt64)._binaryLogarithm()))
+    (42 as MockBinaryInteger<UInt64>)._binaryLogarithm(),
+    (42 as UInt64)._binaryLogarithm())
   expectEqual(
-    Int((42 as MockBinaryInteger<Int>)._binaryLogarithm()),
+    (42 as MockBinaryInteger<Int>)._binaryLogarithm(),
     (42 as Int)._binaryLogarithm())
   expectEqual(
-    Int((42 as MockBinaryInteger<UInt>)._binaryLogarithm()),
-    Int((42 as UInt)._binaryLogarithm()))
+    (42 as MockBinaryInteger<UInt>)._binaryLogarithm(),
+    (42 as UInt)._binaryLogarithm())
 // FIXME: DoubleWidth is no longer part of the standard library
 #if false
   expectEqual(
-    Int((42 as MockBinaryInteger<DoubleWidth<Int>>)._binaryLogarithm()),
-    Int((42 as DoubleWidth<Int>)._binaryLogarithm()))
+    (42 as MockBinaryInteger<DoubleWidth<Int>>)._binaryLogarithm(),
+    (42 as DoubleWidth<Int>)._binaryLogarithm())
   expectEqual(
-    Int((42 as MockBinaryInteger<DoubleWidth<UInt>>)._binaryLogarithm()),
-    Int((42 as DoubleWidth<UInt>)._binaryLogarithm()))
+    (42 as MockBinaryInteger<DoubleWidth<UInt>>)._binaryLogarithm(),
+    (42 as DoubleWidth<UInt>)._binaryLogarithm())
   expectEqual(
-    Int((42 as MockBinaryInteger<DoubleWidth<DoubleWidth<Int>>>)
-      ._binaryLogarithm()),
-    Int((42 as DoubleWidth<DoubleWidth<Int>>)._binaryLogarithm()))
+    (42 as MockBinaryInteger<DoubleWidth<DoubleWidth<Int>>>)._binaryLogarithm(),
+    (42 as DoubleWidth<DoubleWidth<Int>>)._binaryLogarithm())
 #endif
 }
 

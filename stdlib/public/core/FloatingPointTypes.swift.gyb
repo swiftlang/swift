@@ -750,8 +750,7 @@ extension ${Self}: BinaryFloatingPoint {
     let provisional = Int(exponentBitPattern) - Int(${Self}._exponentBias)
     if isNormal { return provisional }
     let shift =
-      ${Self}.significandBitCount -
-        Int(significandBitPattern._binaryLogarithm())
+      ${Self}.significandBitCount - significandBitPattern._binaryLogarithm()
     return provisional + 1 - shift
   }
 
@@ -793,8 +792,7 @@ extension ${Self}: BinaryFloatingPoint {
     }
     if isSubnormal {
       let shift =
-        ${RawSignificand}(${Self}.significandBitCount) -
-          significandBitPattern._binaryLogarithm()
+        ${Self}.significandBitCount - significandBitPattern._binaryLogarithm()
       return ${Self}(sign: .plus,
         exponentBitPattern: ${Self}._exponentBias,
         significandBitPattern: significandBitPattern &<< shift)
