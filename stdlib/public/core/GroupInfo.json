@@ -16,6 +16,7 @@
     "StringBridge.swift",
     "StringComparable.swift",
     "StringComparison.swift",
+    "StringCreate.swift",
     "StringObject.swift",
     "StringGuts.swift",
     "StringGutsVisitor.swift",

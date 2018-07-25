@@ -127,6 +127,7 @@ set(SWIFTLIB_ESSENTIAL
   StringBridge.swift
   StringComparable.swift
   StringComparison.swift
+  StringCreate.swift
   StringGuts.swift
   StringGutsVisitor.swift
   StringObject.swift
