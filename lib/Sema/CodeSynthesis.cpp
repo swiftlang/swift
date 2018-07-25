@@ -2360,10 +2360,12 @@ configureGenericDesignatedInitOverride(ASTContext &ctx,
   return std::make_tuple(genericEnv, genericParams, subMap);
 }
 
-static void configureDesignatedInitAttributes(TypeChecker &tc,
-                                              ClassDecl *classDecl,
-                                              ConstructorDecl *ctor,
-                                              ConstructorDecl *superclassCtor) {
+static void
+configureInheritedDesignatedInitAttributes(TypeChecker &tc,
+                                           ClassDecl *classDecl,
+                                           ConstructorDecl *ctor,
+                                           ConstructorDecl *superclassCtor) {
+  assert(ctor->getDeclContext() == classDecl);
   auto &ctx = tc.Context;
 
   AccessLevel access = classDecl->getFormalAccess();
@@ -2372,24 +2374,18 @@ static void configureDesignatedInitAttributes(TypeChecker &tc,
 
   ctor->setAccess(access);
 
-  // Inherit the @inlinable attribute.
-  if (superclassCtor->getFormalAccess(/*useDC=*/nullptr,
-                                      /*treatUsableFromInlineAsPublic=*/true)
-      >= AccessLevel::Public) {
+  AccessScope superclassInliningAccessScope =
+      superclassCtor->getFormalAccessScope(/*useDC*/nullptr,
+                                           /*usableFromInlineAsPublic=*/true);
+
+  if (superclassInliningAccessScope.isPublic()) {
     if (superclassCtor->getAttrs().hasAttribute<InlinableAttr>()) {
+      // Inherit the @inlinable attribute.
       auto *clonedAttr = new (ctx) InlinableAttr(/*implicit=*/true);
       ctor->getAttrs().add(clonedAttr);
-    }
-  }
 
-  // Inherit the @usableFromInline attribute. We need better abstractions
-  // for dealing with @usableFromInline.
-  if (superclassCtor->getFormalAccess(/*useDC=*/nullptr,
-                                      /*treatUsableFromInlineAsPublic=*/true)
-        >= AccessLevel::Public) {
-    if (access == AccessLevel::Internal &&
-        !superclassCtor->isDynamic() &&
-        !ctor->getAttrs().hasAttribute<InlinableAttr>()) {
+    } else if (access == AccessLevel::Internal && !superclassCtor->isDynamic()){
+      // Inherit the @usableFromInline attribute.
       auto *clonedAttr = new (ctx) UsableFromInlineAttr(/*implicit=*/true);
       ctor->getAttrs().add(clonedAttr);
     }
@@ -2505,8 +2501,8 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
 
   ctor->setValidationToChecked();
 
-  configureDesignatedInitAttributes(tc, classDecl,
-                                    ctor, superclassCtor);
+  configureInheritedDesignatedInitAttributes(tc, classDecl, ctor,
+                                             superclassCtor);
 
   if (kind == DesignatedInitKind::Stub) {
     // Make this a stub implementation.
