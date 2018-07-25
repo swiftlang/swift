@@ -1123,7 +1123,7 @@ static void tuple_destroy(OpaqueValue *tuple, const Metadata *_metadata) {
 
 // The operation doesn't have to be initializeWithCopy, but they all
 // have basically the same type.
-typedef value_witness_types::initializeWithCopy forEachOperation;
+typedef ValueWitnessTypes::initializeWithCopy forEachOperation;
 
 /// Perform an operation for each field of two tuples.
 static OpaqueValue *tuple_forEachField(OpaqueValue *destTuple,
@@ -1726,7 +1726,7 @@ static OpaqueValue *pod_indirect_initializeBufferWithCopyOfBuffer(
 static void pod_noop(void *object, const Metadata *self) {
 }
 #define pod_direct_destroy \
-  pointer_function_cast<value_witness_types::destroy>(pod_noop)
+  pointer_function_cast<ValueWitnessTypes::destroy>(pod_noop)
 #define pod_indirect_destroy pod_direct_destroy
 
 static OpaqueValue *pod_direct_initializeWithCopy(OpaqueValue *dest,
@@ -1737,7 +1737,7 @@ static OpaqueValue *pod_direct_initializeWithCopy(OpaqueValue *dest,
 }
 #define pod_indirect_initializeWithCopy pod_direct_initializeWithCopy
 #define pod_direct_initializeBufferWithCopyOfBuffer \
-  pointer_function_cast<value_witness_types::initializeBufferWithCopyOfBuffer> \
+  pointer_function_cast<ValueWitnessTypes::initializeBufferWithCopyOfBuffer> \
     (pod_direct_initializeWithCopy)
 #define pod_direct_assignWithCopy pod_direct_initializeWithCopy
 #define pod_indirect_assignWithCopy pod_direct_initializeWithCopy

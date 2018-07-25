@@ -136,7 +136,10 @@ using ConstTargetMetadataPointer
   
 template <typename Runtime, typename T>
 using TargetPointer = typename Runtime::template Pointer<T>;
-  
+
+template <typename Runtime, typename T>
+using ConstTargetPointer = typename Runtime::template Pointer<const T>;
+
 template <typename Runtime, template <typename> class Pointee,
           bool Nullable = true>
 using ConstTargetFarRelativeDirectPointer
@@ -257,21 +260,28 @@ constexpr inline bool canBeInline(bool isBitwiseTakable) {
   return canBeInline(isBitwiseTakable, sizeof(T), alignof(T));
 }
 
-struct ValueWitnessTable;
+template <typename Runtime> struct TargetValueWitnessTable;
+using ValueWitnessTable = TargetValueWitnessTable<InProcess>;
 
-namespace value_witness_types {
+template <typename Runtime> class TargetValueWitnessTypes;
+using ValueWitnessTypes = TargetValueWitnessTypes<InProcess>;
+
+template <typename Runtime>
+class TargetValueWitnessTypes {
+public:
+  using StoredPointer = typename Runtime::StoredPointer;
 
 // Note that, for now, we aren't strict about 'const'.
 #define WANT_ALL_VALUE_WITNESSES
 #define DATA_VALUE_WITNESS(lowerId, upperId, type)
 #define FUNCTION_VALUE_WITNESS(lowerId, upperId, returnType, paramTypes) \
-  typedef returnType (*lowerId) paramTypes;
-#define MUTABLE_VALUE_TYPE OpaqueValue *
-#define IMMUTABLE_VALUE_TYPE const OpaqueValue *
-#define MUTABLE_BUFFER_TYPE ValueBuffer *
-#define IMMUTABLE_BUFFER_TYPE const ValueBuffer *
-#define TYPE_TYPE const Metadata *
-#define SIZE_TYPE size_t
+  typedef TargetPointer<Runtime, returnType paramTypes> lowerId;
+#define MUTABLE_VALUE_TYPE TargetPointer<Runtime, OpaqueValue>
+#define IMMUTABLE_VALUE_TYPE ConstTargetPointer<Runtime, OpaqueValue>
+#define MUTABLE_BUFFER_TYPE TargetPointer<Runtime, ValueBuffer>
+#define IMMUTABLE_BUFFER_TYPE ConstTargetPointer<Runtime, ValueBuffer>
+#define TYPE_TYPE ConstTargetPointer<Runtime, Metadata>
+#define SIZE_TYPE StoredSize
 #define INT_TYPE int
 #define UINT_TYPE unsigned
 #define VOID_TYPE void
@@ -284,7 +294,7 @@ namespace value_witness_types {
   typedef size_t stride;
   typedef ExtraInhabitantFlags extraInhabitantFlags;
 
-} // end namespace value_witness_types
+};
 
 struct TypeLayout;
 
@@ -292,14 +302,16 @@ struct TypeLayout;
 /// the requirements of some specific type.  The information in
 /// a value-witness table is intended to be sufficient to lay out
 /// and manipulate values of an arbitrary type.
-struct ValueWitnessTable {
+template <typename Runtime> struct TargetValueWitnessTable {
   // For the meaning of all of these witnesses, consult the comments
   // on their associated typedefs, above.
 
 #define WANT_ONLY_REQUIRED_VALUE_WITNESSES
 #define VALUE_WITNESS(LOWER_ID, UPPER_ID) \
-  value_witness_types::LOWER_ID LOWER_ID;
+  typename TargetValueWitnessTypes<Runtime>::LOWER_ID LOWER_ID;
 #include "swift/ABI/ValueWitness.def"
+
+  using StoredSize = typename Runtime::StoredSize;
 
   /// Is the external type layout of this type incomplete?
   bool isIncomplete() const {
@@ -308,9 +320,10 @@ struct ValueWitnessTable {
 
   /// Would values of a type with the given layout requirements be
   /// allocated inline?
-  static bool isValueInline(bool isBitwiseTakable, size_t size, size_t alignment) {
-    return (isBitwiseTakable && size <= sizeof(ValueBuffer) &&
-            alignment <= alignof(ValueBuffer));
+  static bool isValueInline(bool isBitwiseTakable, StoredSize size,
+                            StoredSize alignment) {
+    return (isBitwiseTakable && size <= sizeof(TargetValueBuffer<Runtime>) &&
+            alignment <= alignof(TargetValueBuffer<Runtime>));
   }
 
   /// Are values of this type allocated inline?
@@ -331,18 +344,18 @@ struct ValueWitnessTable {
   /// Return the size of this type.  Unlike in C, this has not been
   /// padded up to the alignment; that value is maintained as
   /// 'stride'.
-  size_t getSize() const {
+  StoredSize getSize() const {
     return size;
   }
 
   /// Return the stride of this type.  This is the size rounded up to
   /// be a multiple of the alignment.
-  size_t getStride() const {
+  StoredSize getStride() const {
     return stride;
   }
 
   /// Return the alignment required by this type, in bytes.
-  size_t getAlignment() const {
+  StoredSize getAlignment() const {
     return flags.getAlignment();
   }
 
@@ -352,7 +365,7 @@ struct ValueWitnessTable {
   ///
   /// For example, if the type needs to be 8-byte aligned, the value
   /// of this witness is 0x7.
-  size_t getAlignmentMask() const {
+  StoredSize getAlignmentMask() const {
     return flags.getAlignmentMask();
   }
   
@@ -583,7 +596,7 @@ public:
   #define WANT_ONLY_REQUIRED_VALUE_WITNESSES
   #define FUNCTION_VALUE_WITNESS(WITNESS, UPPER, RET_TYPE, PARAM_TYPES)    \
     template<typename...A>                                                 \
-    _ResultOf<value_witness_types::WITNESS>::type                          \
+    _ResultOf<ValueWitnessTypes::WITNESS>::type                            \
     vw_##WITNESS(A &&...args) const {                                      \
       return getValueWitnesses()->WITNESS(std::forward<A>(args)..., this); \
     }
