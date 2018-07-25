@@ -313,3 +313,19 @@ func test_40956846(
 // RDAR_40956846-DAG: Decl[LocalVar]/Local:               arg_40956846_3[#(() -> Int)!#]; name=arg_40956846_3
 // RDAR_40956846-DAG: Decl[LocalVar]/Local:               arg_40956846_4[#inout ((Int) -> Int)!#]; name=arg_40956846_4
 // RDAR_40956846: End completions
+
+// rdar://problem/42452085
+// RUN: %target-swift-ide-test -code-completion -code-completion-token=RDAR_42452085_1 -source-filename=%s | %FileCheck %s -check-prefix=RDAR_42452085
+// RUN: %target-swift-ide-test -code-completion -code-completion-token=RDAR_42452085_2 -source-filename=%s | %FileCheck %s -check-prefix=RDAR_42452085
+// RUN: %target-swift-ide-test -code-completion -code-completion-token=RDAR_42452085_3 -source-filename=%s | %FileCheck %s -check-prefix=RDAR_42452085
+class cls_42452085 {
+  var value: Any
+  func canThrow() throws -> Int { return 1 }
+}
+func test_42452085(any: Any, obj: cls_42452085?) throws {
+  var object: Any? = nil
+  object = (any as? String) #^RDAR_42452085_1^#
+  obj?.value = any #^RDAR_42452085_2^#
+  _ = try obj?.canThrow() #^RDAR_42452085_3^#
+}
+// RDAR_42452085: Begin completions
