@@ -420,6 +420,7 @@ as follows:
 - Protocol descriptors are context descriptors, so they are prefixed by context
   descriptor metadata. (FIXME: these are not yet documented)
 - The 16-bit kind-specific flags of a protocol are defined as follows:
+
   * **Bit 0** is the **class constraint bit**. It is set if the protocol is
     **not** class-constrained, meaning that any struct, enum, or class type
     may conform to the protocol. It is unset if only classes can conform to
@@ -427,6 +428,7 @@ as follows:
   * **Bit 1** indicates that the protocol is **resilient**.
   * **Bits 2-7** indicate specify the **special protocol kind**. Only one
     special protocol kind is defined: the `Error` protocol has value 1.    
+
 - A pointer to the **name** of the protocol.
 - The number of generic requirements within the **requirement signature** of
   the protocol. The generic requirements themselves follow the fixed part
