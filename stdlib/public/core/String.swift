@@ -744,7 +744,6 @@ extension String {
   }
 
   @inlinable
-  @usableFromInline
   static func _fromWellFormedUTF16CodeUnits<C : RandomAccessCollection>(
     _ input: C, repair: Bool = false
   ) -> String where C.Element == UTF16.CodeUnit {

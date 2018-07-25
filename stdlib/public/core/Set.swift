@@ -3562,6 +3562,7 @@ extension Set.Index {
 #if _runtime(_ObjC)
 @usableFromInline
 final internal class _CocoaSetIterator: IteratorProtocol {
+  @usableFromInline
   internal typealias Element = AnyObject
 
   // Cocoa Set iterator has to be a class, otherwise we cannot
