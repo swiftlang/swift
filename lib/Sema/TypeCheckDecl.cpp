@@ -2982,8 +2982,7 @@ public:
       // already complained about the class being inherently
       // un-subclassable.
       if (!isInvalidSuperclass &&
-          Super->getFormalAccess(CD->getDeclContext())
-            < AccessLevel::Open &&
+          !Super->hasOpenAccess(CD->getDeclContext()) &&
           Super->getModuleContext() != CD->getModuleContext()) {
         TC.diagnose(CD, diag::superclass_not_open, superclassTy);
         isInvalidSuperclass = true;
