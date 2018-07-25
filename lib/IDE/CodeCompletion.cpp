@@ -2481,16 +2481,17 @@ public:
         // What's left is the result type.
         if (ResultType->isVoid()) {
           OS << "Void";
-        } else if (!IsImplicitlyCurriedInstanceMethod
-                   && FD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
+        } else {
           // As we did with parameters in addParamPatternFromFunction,
           // for regular methods we'll print '!' after implicitly
           // unwrapped optional results.
-          auto ObjectType = ResultType->getOptionalObjectType();
-          OS << ObjectType->getStringAsComponent();
-          OS << "!";
-        } else {
-          ResultType.print(OS);
+          bool IsIUO =
+              !IsImplicitlyCurriedInstanceMethod &&
+              FD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+
+          PrintOptions PO;
+          PO.PrintOptionalAsImplicitlyUnwrapped = IsIUO;
+          ResultType.print(OS, PO);
         }
       }
       Builder.addTypeAnnotation(TypeStr);
