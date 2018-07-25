@@ -569,7 +569,7 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
     // FIXME: If we're not planning to run SILGen, this is wasted effort.
     while (TC.NextDeclToFinalize < TC.DeclsToFinalize.size()) {
       auto decl = TC.DeclsToFinalize[TC.NextDeclToFinalize++];
-      if (decl->isInvalid() || TC.Context.hadError())
+      if (decl->isInvalid())
         continue;
 
       TC.finalizeDecl(decl);

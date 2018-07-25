@@ -2332,8 +2332,8 @@ public:
     if (auto VD = dyn_cast<ValueDecl>(decl)) {
       checkRedeclaration(TC, VD);
 
-      (void)VD->isObjC();
-      (void)VD->isDynamic();
+      // Make sure we finalize this declaration.
+      TC.DeclsToFinalize.insert(VD);
 
       // If this is a member of a nominal type, don't allow it to have a name of
       // "Type" or "Protocol" since we reserve the X.Type and X.Protocol
@@ -4683,6 +4683,17 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
       continue;
 
     TC.DeclsToFinalize.insert(VD);
+
+    // The only thing left to do is synthesize storage for lazy variables.
+    auto *prop = dyn_cast<VarDecl>(D);
+    if (!prop)
+      continue;
+
+    if (prop->getAttrs().hasAttribute<LazyAttr>() && !prop->isStatic() &&
+        (!prop->getGetter() || !prop->getGetter()->hasBody())) {
+      finalizeAbstractStorageDecl(TC, prop);
+      TC.completeLazyVarImplementation(prop);
+    }
   }
 
   if (auto *CD = dyn_cast<ClassDecl>(nominal)) {
@@ -4726,18 +4737,7 @@ void TypeChecker::finalizeDecl(ValueDecl *decl) {
     finalizeType(*this, nominal);
   } else if (auto storage = dyn_cast<AbstractStorageDecl>(decl)) {
     finalizeAbstractStorageDecl(*this, storage);
-
-    // Synthesize storage for lazy variables, if still needed.
-    if (auto var = dyn_cast<VarDecl>(decl)) {
-      if (var->getAttrs().hasAttribute<LazyAttr>() && !var->isStatic() &&
-          var->getGetter() && !var->getGetter()->hasBody()) {
-        completeLazyVarImplementation(var);
-      }
-    }
   }
-
-  // Ensure that we've computed access.
-  (void)decl->getFormalAccess();
 
   // Compute overrides.
   (void)decl->getOverriddenDecls();
