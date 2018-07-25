@@ -141,8 +141,8 @@ set(SWIFTLIB_ESSENTIAL
   StringIndexConversions.swift
   StringNormalization.swift
   StringUnicodeScalarView.swift
-  StringUTF16.swift
-  StringUTF8.swift
+  StringUTF16View.swift
+  StringUTF8View.swift
   StringVariant.swift
   Substring.swift.gyb
   SwiftNativeNSArray.swift
