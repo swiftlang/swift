@@ -479,10 +479,10 @@ private:
       return subregion_iterator(Subregions.end(), &Subloops);
     }
     subregion_reverse_iterator rbegin() const {
-      return subregion_reverse_iterator(begin());
+      return subregion_reverse_iterator(end());
     }
     subregion_reverse_iterator rend() const {
-      return subregion_reverse_iterator(end());
+      return subregion_reverse_iterator(begin());
     }
 
     unsigned size() const { return Subregions.size(); }
