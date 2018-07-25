@@ -64,5 +64,10 @@ public func testDevice() {
   TensorFlow.enableTPU()
   let a = Tensor<Float>(1.0)
   _ = a+a
+
+  // TODO: remove the extra code below once TPU execution supports 0 output
+  // tensors (b/111123797)
+  let extra = Tensor<Float>(1.0)
+  _hostOp(extra)
 }
 

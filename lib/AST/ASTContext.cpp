@@ -768,7 +768,7 @@ ClassDecl *ASTContext::getTensorHandleDecl() const {
     return getImpl().TensorHandleDecl;
 
   // See if the TensorFlow module was imported.  If not, return null.
-  auto tfModule = getLoadedModule(getIdentifier("TensorFlow"));
+  auto tfModule = getLoadedModule(Id_TensorFlow);
   if (!tfModule)
     return nullptr;
 
@@ -789,7 +789,7 @@ StructDecl *ASTContext::getTensorShapeDecl() const {
     return getImpl().TensorShapeDecl;
 
   // See if the TensorFlow module was imported.  If not, return null.
-  auto tfModule = getLoadedModule(getIdentifier("TensorFlow"));
+  auto tfModule = getLoadedModule(Id_TensorFlow);
   if (!tfModule)
     return nullptr;
 
@@ -903,9 +903,10 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   // SWIFT_ENABLE_TENSORFLOW
   case KnownProtocolKind::AccelerableByTensorFlow:
   case KnownProtocolKind::ParameterAggregate:
+  case KnownProtocolKind::Parameterized:
   case KnownProtocolKind::TensorSendableReceivable:
   case KnownProtocolKind::TensorProtocol:
-    M = getLoadedModule(getIdentifier("TensorFlow"));
+    M = getLoadedModule(Id_TensorFlow);
     break;
   default:
     M = getStdlibModule();

@@ -167,6 +167,18 @@ public:
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *deriveDecodable(ValueDecl *requirement);
 
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Derive a Parameterized requirement for a nominal type.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  ValueDecl *deriveParameterized(ValueDecl *requirement);
+
+  /// Derive a Parameterized type witness for a nominal type, if it has
+  /// parameters (stored properties marked with @TFParameter).
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  Type deriveParameterized(AssociatedTypeDecl *assocType);
+
   /// Determine if a ParameterAggregate requirement can be derived for a type.
   ///
   /// \returns True if the requirement can be derived.
@@ -196,6 +208,13 @@ public:
   /// Declare a getter for a derived property.
   /// The getter will not be added to the property yet.
   static AccessorDecl *declareDerivedPropertyGetter(TypeChecker &tc,
+                                                    VarDecl *property,
+                                                    Type propertyContextType);
+
+  /// SWIFT_ENABLE_TENSORFLOW
+  /// Declare a setter for a derived property.
+  /// The setter will not be added to the property yet.
+  static AccessorDecl *declareDerivedPropertySetter(TypeChecker &tc,
                                                     VarDecl *property,
                                                     Type propertyContextType);
 

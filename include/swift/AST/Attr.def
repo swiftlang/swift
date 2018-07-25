@@ -387,6 +387,8 @@ SIMPLE_DECL_ATTR(compilerEvaluable, CompilerEvaluable,
                  /* Not serialized */ 79)
 SIMPLE_DECL_ATTR(TensorFlowGraph, TensorFlowGraph,
                  OnFunc, 80)
+SIMPLE_DECL_ATTR(TFParameter, TFParameter,
+                 OnVar, 81)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
