@@ -1,6 +1,9 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-run-strict-da-swift
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize
+//
+// Compiler-only testing for TPU graph lowering (e.g. shape requirements by XLA).
+// RUN: %target-swift-frontend -Xllvm -tf-strict-deabstraction -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-target-tpu -O -emit-sil %s >/dev/null
 //
 // Loop tests.
 
@@ -45,6 +48,7 @@ LoopsTests.testAllBackends("simpleCounterLoop_ab") {
 }
 
 LoopsTests.testAllBackends("SR8164") {
+  @inline(never)
   func SR8164(count: Int32, expectedVal: Int32) {
     var a = Tensor<Int32>(count)
     let b = Tensor<Int32>(count)
@@ -71,7 +75,7 @@ LoopsTests.testAllBackends("SR-8191") {
   var i = 0
   repeat {
     let y = t + t
-    print(y)
+    _hostOp(y.toHost(shape: []))
     i += 1
   } while i < 10
 }

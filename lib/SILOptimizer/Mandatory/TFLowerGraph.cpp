@@ -1034,22 +1034,13 @@ static void decodeShapeAttr(SymbolicValue attr,
   }
 }
 
-// (graphOpInfo, /*attrIdx*/ 3, dims, numDims, dimPtrs) {
-/// Decode the shape array attribute from attr `attrIdx` in the graph_op
-/// instruction, into `dims`, `numDims` and `dimPtrs`.
-static void decodeShapeArray(const GraphOperationInfo &graphOpInfo,
-                             StringRef attrName, unsigned attrIdx,
+/// Decode the shape array in `attrValue` into `dims`, `numDims` and `dimPtrs`.
+static void decodeShapeArray(SymbolicValue attrValue,
                              SmallVectorImpl<int64_t> &dims,
                              SmallVectorImpl<int> &numDims,
                              SmallVectorImpl<int64_t *> &dimPtrs) {
-  auto *inst = graphOpInfo.inst;
-  auto attr = inst->getAttribute(attrIdx);
-  auto attrInfo = GraphOperationInfo::decodeAttributeName(attr.name);
-  assert(attrInfo.second == SILTensorOpInfo::OperandClass::Normal ||
-         attrInfo.second == SILTensorOpInfo::OperandClass::ShapeArray);
-  assert(attrInfo.first == attrName);
   CanType eltType;
-  auto shapeArray = attr.value.getArrayValue(eltType);
+  auto shapeArray = attrValue.getArrayValue(eltType);
   assert(eltType->getString() == "TensorShape");
   auto numShapes = shapeArray.size();
   for (unsigned shapeIdx = 0; shapeIdx != numShapes; ++shapeIdx) {
@@ -1067,6 +1058,22 @@ static void decodeShapeArray(const GraphOperationInfo &graphOpInfo,
     dimPtrs.push_back(dimPtr);
     dimPtr += numDims[shapeIdx];
   }
+}
+
+/// Decode the shape array attribute at attr `attrIdx` in the graph_op
+/// instruction, into `dims`, `numDims` and `dimPtrs`.
+static void decodeShapeArrayAtAttr(const GraphOperationInfo &graphOpInfo,
+                                   StringRef attrName, unsigned attrIdx,
+                                   SmallVectorImpl<int64_t> &dims,
+                                   SmallVectorImpl<int> &numDims,
+                                   SmallVectorImpl<int64_t *> &dimPtrs) {
+  auto *inst = graphOpInfo.inst;
+  auto attr = inst->getAttribute(attrIdx);
+  auto attrInfo = GraphOperationInfo::decodeAttributeName(attr.name);
+  assert(attrInfo.second == SILTensorOpInfo::OperandClass::Normal ||
+         attrInfo.second == SILTensorOpInfo::OperandClass::ShapeArray);
+  assert(attrInfo.first == attrName);
+  decodeShapeArray(attr.value, dims, numDims, dimPtrs);
 }
 
 GLStatus
@@ -1394,8 +1401,8 @@ GLStatus TFGraphLowering::visitGraphOpD2DTensorRecvInst(
   SmallVector<int64_t*, 8> dimPtrs;
   if (inst->getNumAttributes() == 4) {
     // 3 is the attr idx for the optional shape array attr.
-    decodeShapeArray(graphOpInfo, SHAPE_ARRAY_ATTR, /*attrIdx*/ 3, dims,
-                     numDims, dimPtrs);
+    decodeShapeArrayAtAttr(graphOpInfo, SHAPE_ARRAY_ATTR, /*attrIdx*/ 3, dims,
+                           numDims, dimPtrs);
   }
   if (thisDeviceType == DeviceType::TPU) {
     return addTPUDequeueOp(inst, /* isInfeed */ true, transferId, dims, numDims,
@@ -1450,8 +1457,8 @@ GLStatus TFGraphLowering::addTPUEnqueueOp(SILInstruction *inst, bool isInfeed,
       return GLStatus::Error;
     }
     if (numDims.size() != 1) {
-      // For InfeedEnqueueTuple, the shapes attr is optional and only used for
-      // error checking.
+      // For InfeedEnqueueTuple, the shapes attr is only used for
+      // error checking but is still a required attr.
       // Interestingly, OutfeedEnqueueTuple does not take a shapes attr
       // (b/110538524).
       internalError(getUserSourceLocation(inst->getDebugLocation()),
@@ -1518,8 +1525,8 @@ GLStatus TFGraphLowering::visitGraphOpD2DTensorSendInst(
   SmallVector<int64_t*, 8> dimPtrs;
   if (inst->getNumAttributes() == 4)
     // 3 is the attr idx for the optional shape array attr.
-    decodeShapeArray(graphOpInfo, SHAPE_ARRAY_ATTR, /*attrIdx*/ 3, dims,
-                     numDims, dimPtrs);
+    decodeShapeArrayAtAttr(graphOpInfo, SHAPE_ARRAY_ATTR, /*attrIdx*/ 3, dims,
+                           numDims, dimPtrs);
   if (thisDeviceType == DeviceType::TPU) {
     return addTPUEnqueueOp(inst, /* isInfeed */ false, transferId, dims, numDims,
                     dimPtrs);
@@ -1913,14 +1920,34 @@ GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
 
         CanType elementType;
         auto rawElements = attrValue.getArrayValue(elementType);
+        auto elementTypeString = elementType->getString();
+
+        if (elementTypeString == "TensorShape") {
+          SmallVector<int64_t, 8> dims;
+          SmallVector<int, 3> numDims;
+          SmallVector<int64_t *, 8> dimPtrs;
+          decodeShapeArray(attrValue, dims, numDims, dimPtrs);
+          TF_SetAttrShapeList(op, name.c_str(), dimPtrs.data(), numDims.data(),
+                              numDims.size());
+          break;
+        }
+
         SmallVector<SymbolicValue, 4> elements;
         elements.reserve(rawElements.size());
         for (auto elt : rawElements)
           elements.push_back(elt.lookThroughSingleElementAggregates());
 
-        auto elementTypeString = elementType->getString();
+        if (elementType->is<MetatypeType>()) {
+          SmallVector<TF_DataType, 4> types;
+          for (auto elt : elements) {
+            auto dtype = convertSwiftTypeToTF(elt.getMetatypeValue());
+            assert(dtype && "expected a valid tensorflow type");
+            types.push_back((TF_DataType)dtype);
+          }
 
-        // TODO: TF_SetAttrTypeList
+          TF_SetAttrTypeList(op, name.c_str(), types.data(), types.size());
+          break;
+        }
 
         if (elementTypeString == "String") {
           SmallVector<const void*, 4> pointers;
