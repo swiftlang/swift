@@ -691,7 +691,7 @@ sil [reabstraction_thunk] @withoutActuallyEscapingThunk : $@convention(thin) (@n
 
 sil hidden @closureThatModifiesCapture_1: $@convention(thin) (@inout_aliasable Int) -> () {
 bb0(%0 : @trivial $*Int):
-  %1 = begin_access [modify] [unknown] %0 : $*Int // expected-note 2{{conflicting access is here}}
+  %1 = begin_access [modify] [unknown] %0 : $*Int // expected-note 3{{conflicting access is here}}
   end_access %1 : $*Int
   %2 = tuple ()
   return %2 : $()
@@ -915,7 +915,7 @@ bb0(%0 : @trivial $Int):
 
 sil private @closureForDirectPartialApplyTakingInout : $@convention(thin) (@inout Int, @inout_aliasable Int) -> () {
 bb0(%0 : @trivial $*Int, %1 : @trivial $*Int):
-  %access = begin_access [read] [unknown] %1 : $*Int // expected-note {{conflicting access is here}}
+  %access = begin_access [read] [unknown] %1 : $*Int // expected-note 3 {{conflicting access is here}}
   %val = load [trivial] %access : $*Int
   end_access %access : $*Int
   %v = tuple ()
@@ -1130,6 +1130,157 @@ bb0(%0 : @guaranteed $(UnsafeMutablePointer<Int>, Optional<AnyObject>)):
   %access = begin_access [modify] [static] %dep : $*Int
   %f = function_ref @takeInoutInt : $@convention(thin) (@inout Int) -> ()
   %call = apply %f(%access) : $@convention(thin) (@inout Int) -> ()
+  end_access %access : $*Int
+  %v = tuple ()
+  return %v : $()
+}
+
+// Test a conflict on a noescape closure where multiple closures may be conditionally stored in an ObjC block.
+sil hidden @noEscapeClosureWithConditionalBlockStorage : $@convention(thin) (Int) -> () {
+bb0(%0 : @trivial $Int):
+  %box = alloc_box ${ var Int }
+  %boxadr = project_box %box : ${ var Int }, 0
+  store %0 to [trivial] %boxadr : $*Int
+  %closure = function_ref @closureThatModifiesCapture_1 : $@convention(thin) (@inout_aliasable Int) -> ()
+  %pa = partial_apply [callee_guaranteed] %closure(%boxadr) : $@convention(thin) (@inout_aliasable Int) -> ()
+  %conv = convert_escape_to_noescape %pa : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  %thunk = function_ref @withoutActuallyEscapingThunk : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  %sentinel = partial_apply [callee_guaranteed] %thunk(%conv) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  %sentinel2 = mark_dependence %sentinel : $@callee_guaranteed () -> () on %conv : $@noescape @callee_guaranteed () -> ()
+  %sentinel3 = copy_value %sentinel2 : $@callee_guaranteed () -> ()
+  %calleethunk = function_ref @thunkForCalleeGuaranteed : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  %bs1 = alloc_stack $@block_storage @callee_guaranteed () -> ()
+  %pbs1 = project_block_storage %bs1 : $*@block_storage @callee_guaranteed () -> ()
+  store %sentinel3 to [init] %pbs1 : $*@callee_guaranteed () -> ()
+  %initblock1 = init_block_storage_header %bs1 : $*@block_storage @callee_guaranteed () -> (), invoke %calleethunk : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> (), type $@convention(block) @noescape () -> ()
+  %copyblock1 = copy_block %initblock1 : $@convention(block) @noescape () -> ()
+  destroy_addr %pbs1 : $*@callee_guaranteed() -> ()
+  dealloc_stack %bs1 : $*@block_storage @callee_guaranteed () -> ()
+  br bb3(%copyblock1 : $@convention(block) @noescape () -> ())
+
+bb2:
+  %bs2 = alloc_stack $@block_storage @callee_guaranteed () -> ()
+  %pbs2 = project_block_storage %bs2 : $*@block_storage @callee_guaranteed () -> ()
+  store %sentinel3 to [init] %pbs2 : $*@callee_guaranteed () -> ()
+  %initblock2 = init_block_storage_header %bs2 : $*@block_storage @callee_guaranteed () -> (), invoke %calleethunk : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> (), type $@convention(block) @noescape () -> ()
+  %copyblock2 = copy_block %initblock2 : $@convention(block) @noescape () -> ()
+  destroy_addr %pbs2 : $*@callee_guaranteed() -> ()
+  dealloc_stack %bs2 : $*@block_storage @callee_guaranteed () -> ()
+  br bb3(%copyblock2 : $@convention(block) @noescape () -> ())
+
+bb3(%block : @owned $@convention(block) @noescape () -> ()):
+  %access = begin_access [modify] [unknown] %boxadr : $*Int // expected-error {{overlapping accesses, but modification requires exclusive access; consider copying to a local variable}}
+  %f = function_ref @takesInoutAndNoEscapeBlockClosure : $@convention(thin) (@inout Int, @owned @convention(block) @noescape () -> ()) -> ()
+  %call = apply %f(%access, %block) : $@convention(thin) (@inout Int, @owned @convention(block) @noescape () -> ()) -> ()
+  end_access %access : $*Int
+  destroy_value %box : ${ var Int }
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// -----------------------------------------------------------------------------
+// <rdar://problem/42242406> [SR-8266]: Compiler crash when checking
+// exclusivity of inout alias:
+// closureWithNoCapture
+// closureWithConflict,
+// partialApplyPhiThunk
+// testPartialApplyPhi.
+// testDirectPartialApplyPhi.
+//
+// Test that 'checkNoEscapePartialApply' does not assert on a noescape
+// closure passed through a block argument.
+
+sil hidden @closureWithNoCapture : $@convention(thin) (Int) -> () {
+bb0(%0 : @trivial $Int):
+  %2 = tuple ()
+  return %2 : $()
+}
+
+sil hidden @closureWithConflict : $@convention(thin) (Int, @inout_aliasable Int) -> () {
+bb0(%0 : @trivial $Int, %1 : @trivial $*Int):
+  %2 = begin_access [modify] [unknown] %1 : $*Int // expected-note {{conflicting access is here}}
+  end_access %2 : $*Int
+  %v = tuple ()
+  return %v : $()
+}
+
+sil shared [transparent] [serializable] [reabstraction_thunk] @partialApplyPhiThunk : $@convention(thin) (@in_guaranteed Int, @guaranteed @noescape @callee_guaranteed (Int) -> (@error Error)) -> (@error Error) {
+bb0(%0 : @trivial $*Int, %1 : @trivial $@noescape @callee_guaranteed (Int) -> (@error Error)):
+  %val = load [trivial] %0 : $*Int
+  try_apply %1(%val) : $@noescape @callee_guaranteed (Int) -> (@error Error), normal bb1, error bb2
+
+bb1(%v : @trivial $()):
+  return %v : $()
+
+bb2(%5 : @owned $Error):
+  throw %5 : $Error
+}
+
+sil @takeGenericNoEscapeFunction : $@convention(method) <τ_0_0> (@inout τ_0_0, @noescape @callee_guaranteed (@in_guaranteed τ_0_0) -> (@error Error)) -> (@error Error)
+
+// CHECK-LABEL: sil @testPartialApplyPhi
+sil @testPartialApplyPhi : $@convention(thin) (Int, @inout Int) -> (@error Error) {
+bb0(%0 : @trivial $Int, %1 : @trivial $*Int):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %f1 = function_ref @closureWithNoCapture : $@convention(thin) (Int) -> ()
+  %pa1 = partial_apply [callee_guaranteed] %f1() : $@convention(thin) (Int) -> ()
+  br bb3(%pa1 : $@callee_guaranteed (Int) -> ())
+
+bb2:
+  %f2 = function_ref @closureWithConflict : $@convention(thin) (Int, @inout_aliasable Int) -> ()
+  %pa2 = partial_apply [callee_guaranteed] %f2(%1) : $@convention(thin) (Int, @inout_aliasable Int) -> ()
+  br bb3(%pa2 : $@callee_guaranteed (Int) -> ())
+
+bb3(%pa3 : @owned $@callee_guaranteed (Int) -> ()):
+  %cvt3 = convert_function %pa3 : $@callee_guaranteed (Int) -> () to $@callee_guaranteed (Int) -> (@error Error)
+  %esc3 = convert_escape_to_noescape [not_guaranteed] %cvt3 : $@callee_guaranteed (Int) -> (@error Error) to $@noescape @callee_guaranteed (Int) -> (@error Error)
+
+  %f3 = function_ref @partialApplyPhiThunk : $@convention(thin) (@in_guaranteed Int, @guaranteed @noescape @callee_guaranteed (Int) -> (@error Error)) -> (@error Error)
+  %pa4 = partial_apply [callee_guaranteed] %f3(%esc3) : $@convention(thin) (@in_guaranteed Int, @guaranteed @noescape @callee_guaranteed (Int) -> (@error Error)) -> (@error Error)
+  %esc4 = convert_escape_to_noescape [not_guaranteed] %pa4 : $@callee_guaranteed (@in_guaranteed Int) -> (@error Error) to $@noescape @callee_guaranteed (@in_guaranteed Int) -> (@error Error)
+
+  // ClosureLifetimeFixup has not run yet, so these destroys are "incorrect".
+  destroy_value %pa4 : $@callee_guaranteed (@in_guaranteed Int) -> (@error Error)
+  destroy_value %cvt3 : $@callee_guaranteed (Int) -> (@error Error)
+
+  %access = begin_access [modify] [static] %1 : $*Int   // expected-error {{overlapping accesses, but modification requires exclusive access; consider copying to a local variable}}
+  %f4 = function_ref @takeGenericNoEscapeFunction : $@convention(method) <τ_0_0> (@inout τ_0_0, @noescape @callee_guaranteed (@in_guaranteed τ_0_0) -> (@error Error)) -> (@error Error)
+  try_apply %f4<Int>(%access, %esc4) : $@convention(method) <τ_0_0> (@inout τ_0_0, @noescape @callee_guaranteed (@in_guaranteed τ_0_0) -> (@error Error)) -> (@error Error), normal bb4, error bb5
+
+bb4(%v : @trivial $()):
+  end_access %access : $*Int
+  return %v : $()
+
+bb5(%e : @owned $Error):
+  end_access %access : $*Int
+  throw %e : $Error
+}
+
+// CHECK-LABEL: sil @testDirectPartialApplyPhi
+sil @testDirectPartialApplyPhi : $@convention(thin) (@inout Int) -> (@error Error) {
+bb0(%0 : @trivial $*Int):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %f1 = function_ref @closureForDirectPartialApplyTakingInout : $@convention(thin) (@inout Int, @inout_aliasable Int) -> ()
+  %pa1 = partial_apply [callee_guaranteed] %f1(%0) : $@convention(thin) (@inout Int, @inout_aliasable Int) -> ()
+  br bb3(%pa1 : $@callee_guaranteed (@inout Int) -> ())
+
+bb2:
+  %f2 = function_ref @closureForDirectPartialApplyTakingInout : $@convention(thin) (@inout Int, @inout_aliasable Int) -> ()
+  %pa2 = partial_apply [callee_guaranteed] %f2(%0) : $@convention(thin) (@inout Int, @inout_aliasable Int) -> ()
+  br bb3(%pa2 : $@callee_guaranteed (@inout Int) -> ())
+
+bb3(%pa3 : @owned $@callee_guaranteed (@inout Int) -> ()):
+  %esc3 = convert_escape_to_noescape [not_guaranteed] %pa3 : $@callee_guaranteed (@inout Int) -> () to $@noescape @callee_guaranteed (@inout Int) -> ()
+  destroy_value %pa3 : $@callee_guaranteed (@inout Int) -> ()
+  %access = begin_access [modify] [static] %0 : $*Int   // expected-error 2 {{overlapping accesses, but modification requires exclusive access; consider copying to a local variable}}
+  %call = apply %esc3(%access) : $@noescape @callee_guaranteed (@inout Int) -> ()
   end_access %access : $*Int
   %v = tuple ()
   return %v : $()
