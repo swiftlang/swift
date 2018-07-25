@@ -69,6 +69,7 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
   SourceManager &SM;
   llvm::DIBuilder DBuilder;
   IRGenModule &IGM;
+  const PathRemapper &DebugPrefixMap;
 
   /// Used for caching SILDebugScopes without inline information.
   using LocalScopeHash = std::pair<const void *, const void *>;
@@ -338,7 +339,8 @@ private:
     StringRef File = llvm::sys::path::filename(Filename);
     llvm::SmallString<512> Path(Filename);
     llvm::sys::path::remove_filename(Path);
-    llvm::DIFile *F = DBuilder.createFile(File, Path);
+    llvm::DIFile *F = DBuilder.createFile(DebugPrefixMap.remapPath(File),
+                                          DebugPrefixMap.remapPath(Path));
 
     // Cache it.
     DIFileCache[Filename] = llvm::TrackingMDNodeRef(F);
@@ -540,8 +542,9 @@ private:
       return cast<llvm::DIModule>(Val->second);
 
     StringRef Sysroot = IGM.Context.SearchPathOpts.SDKPath;
-    auto M =
-        DBuilder.createModule(Parent, Name, ConfigMacros, IncludePath, Sysroot);
+    auto M = DBuilder.createModule(
+        Parent, Name, ConfigMacros, DebugPrefixMap.remapPath(IncludePath),
+        Sysroot);
     DIModuleCache.insert({Key, llvm::TrackingMDNodeRef(M)});
     return M;
   }
@@ -1457,18 +1460,15 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
                                        llvm::Module &M,
                                        StringRef MainOutputFilenameForDebugInfo)
     : Opts(Opts), CI(CI), SM(IGM.Context.SourceMgr), DBuilder(M),
-      IGM(IGM), MetadataTypeDecl(nullptr), InternalType(nullptr),
-      LastDebugLoc({}), LastScope(nullptr) {
+      IGM(IGM), DebugPrefixMap(Opts.DebugPrefixMap), MetadataTypeDecl(nullptr),
+      InternalType(nullptr), LastDebugLoc({}), LastScope(nullptr) {
   assert(Opts.DebugInfoKind > IRGenDebugInfoKind::None &&
          "no debug info should be generated");
-  StringRef SourceFileName = MainOutputFilenameForDebugInfo;
-  llvm::SmallString<256> AbsMainFile;
-  if (SourceFileName.empty())
-    AbsMainFile = "<unknown>";
-  else {
-    AbsMainFile = SourceFileName;
-    llvm::sys::fs::make_absolute(AbsMainFile);
-  }
+  llvm::SmallString<256> SourcePath;
+  if (MainOutputFilenameForDebugInfo.empty())
+    SourcePath = "<unknown>";
+  else
+    SourcePath = MainOutputFilenameForDebugInfo;
 
   unsigned Lang = llvm::dwarf::DW_LANG_Swift;
   std::string Producer = version::getSwiftFullVersion(
@@ -1483,12 +1483,14 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
   // Note that File + Dir need not result in a valid path.
   // Clang is doing the same thing here.
   TheCU = DBuilder.createCompileUnit(
-      Lang, DBuilder.createFile(AbsMainFile, Opts.DebugCompilationDir),
+      Lang, DBuilder.createFile(
+          DebugPrefixMap.remapPath(SourcePath),
+          DebugPrefixMap.remapPath(Opts.DebugCompilationDir)),
       Producer, Opts.shouldOptimize(), Flags, MajorRuntimeVersion, SplitName,
       Opts.DebugInfoKind > IRGenDebugInfoKind::LineTables
           ? llvm::DICompileUnit::FullDebug
           : llvm::DICompileUnit::LineTablesOnly);
-  MainFile = getOrCreateFile(BumpAllocatedString(AbsMainFile));
+  MainFile = getOrCreateFile(BumpAllocatedString(SourcePath));
 
   // Because the swift compiler relies on Clang to setup the Module,
   // the clang CU is always created first.  Several dwarf-reading
@@ -1505,8 +1507,8 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
 
   // Create a module for the current compile unit.
   auto *MDecl = IGM.getSwiftModule();
-  llvm::sys::path::remove_filename(AbsMainFile);
-  MainModule = getOrCreateModule(MDecl, TheCU, Opts.ModuleName, AbsMainFile);
+  llvm::sys::path::remove_filename(SourcePath);
+  MainModule = getOrCreateModule(MDecl, TheCU, Opts.ModuleName, SourcePath);
   DBuilder.createImportedModule(MainFile, MainModule, MainFile, 0);
 
   // Macro definitions that were defined by the user with "-Xcc -D" on the

@@ -220,6 +220,9 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);
 
+  // Pass on file paths that should be remapped in debug info.
+  inputArgs.AddAllArgs(arguments, options::OPT_debug_prefix_map);
+
   // Pass through the values passed to -Xfrontend.
   inputArgs.AddAllArgValues(arguments, options::OPT_Xfrontend);
 
