@@ -46,10 +46,15 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/IRGen/Linking.h"
 
 using namespace swift;
 using namespace irgen;
+
+#define DEBUG_TYPE "IRGen key paths"
+STATISTIC(NumTrivialPropertyDescriptors, "# of trivial property descriptors");
+STATISTIC(NumNonTrivialPropertyDescriptors, "# of nontrivial property descriptors");
 
 enum KeyPathAccessor {
   Getter,
@@ -1207,6 +1212,7 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
 
 void IRGenModule::emitSILProperty(SILProperty *prop) {
   if (prop->isTrivial()) {
+    ++NumTrivialPropertyDescriptors;
     // All trivial property descriptors can share a single definition in the
     // translation unit.
     if (!TheTrivialPropertyDescriptor) {
@@ -1232,6 +1238,8 @@ void IRGenModule::emitSILProperty(SILProperty *prop) {
     }
     return;
   }
+
+  ++NumNonTrivialPropertyDescriptors;
 
   ConstantInitBuilder builder(*this);
   ConstantStructBuilder fields = builder.beginStruct();
