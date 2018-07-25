@@ -342,9 +342,9 @@ func test_defer(_ a : Int) {
 
   // Not ok.
   while false { defer { break } }   // expected-error {{'break' cannot transfer control out of a defer statement}}
-  // expected-warning@-1 {{'defer' at the end of its scope is redundant and will execute immediately}}{{17-22=do}}
+  // expected-warning@-1 {{'defer' statement before end of scope always executes immediately}}{{17-22=do}}
   defer { return }  // expected-error {{'return' cannot transfer control out of a defer statement}}
-  // expected-warning@-1 {{'defer' at the end of its scope is redundant and will execute immediately}}{{3-8=do}}
+  // expected-warning@-1 {{'defer' statement before end of scope always executes immediately}}{{3-8=do}}
 }
 
 class SomeTestClass {
@@ -352,7 +352,7 @@ class SomeTestClass {
   
   func method() {
     defer { x = 97 }  // self. not required here!
-    // expected-warning@-1 {{'defer' at the end of its scope is redundant and will execute immediately}}{{5-10=do}}
+    // expected-warning@-1 {{'defer' statement before end of scope always executes immediately}}{{5-10=do}}
   }
 }
 

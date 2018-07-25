@@ -54,10 +54,6 @@ NOTE(previous_decldef,none,
 NOTE(brace_stmt_suggest_do,none,
      "did you mean to use a 'do' statement?", ())
 
-WARNING(defer_stmt_at_block_end,none,
-     "'defer' at the end of its scope is redundant and will execute immediately; "
-     "replace it with 'do'", ())
-
 // Generic disambiguation
 NOTE(while_parsing_as_left_angle_bracket,none,
      "while parsing this '<' as a type parameter bracket", ())
