@@ -7910,21 +7910,43 @@ Expr *ConstraintSystem::coerceToRValue(Expr *expr) {
 /// Emit the fixes computed as part of the solution, returning true if we were
 /// able to emit an error message, or false if none of the fixits worked out.
 bool ConstraintSystem::applySolutionFixes(Expr *E, const Solution &solution) {
-  bool diagnosed = false;
-  for (unsigned i = 0, e = solution.Fixes.size(); i != e; ++i)
-    diagnosed |= applySolutionFix(E, solution, i);
+  llvm::SmallDenseMap<Expr *,
+                      SmallVector<std::pair<Fix, ConstraintLocator *>, 4>>
+      fixesPerExpr;
 
+  for (const auto &fix : solution.Fixes)
+    fixesPerExpr[fix.second->getAnchor()].push_back(fix);
+
+  auto diagnoseExprFailures = [&](Expr *expr) -> bool {
+    auto fixes = fixesPerExpr.find(expr);
+    if (fixes == fixesPerExpr.end())
+      return false;
+
+    bool diagnosed = false;
+    for (auto &fix : fixes->second)
+      diagnosed |= applySolutionFix(expr, solution, fix);
+    return diagnosed;
+  };
+
+  bool diagnosed = false;
+  E->forEachChildExpr([&](Expr *subExpr) -> Expr * {
+    // Diagnose root expression at the end to
+    // preserve ordering.
+    if (subExpr != E)
+      diagnosed |= diagnoseExprFailures(subExpr);
+    return subExpr;
+  });
+
+  diagnosed |= diagnoseExprFailures(E);
   return diagnosed;
 }
 
-/// \brief Apply the specified Fix # to this solution, producing a fixit hint
-/// diagnostic for it and returning true.  If the fixit hint turned out to be
+/// \brief Apply the specified Fix to this solution, producing a fix-it hint
+/// diagnostic for it and returning true.  If the fix-it hint turned out to be
 /// bogus, this returns false and doesn't emit anything.
-bool ConstraintSystem::applySolutionFix(Expr *expr,
-                                        const Solution &solution,
-                                        unsigned fixNo) {
-  auto &fix = solution.Fixes[fixNo];
-  
+bool ConstraintSystem::applySolutionFix(
+    Expr *expr, const Solution &solution,
+    std::pair<Fix, ConstraintLocator *> &fix) {
   // Some fixes need more information from the locator.
   ConstraintLocator *locator = fix.second;
 

@@ -1518,10 +1518,11 @@ private:
   /// able to emit an error message, or false if none of the fixits worked out.
   bool applySolutionFixes(Expr *E, const Solution &solution);
 
-  /// \brief Apply the specified Fix # to this solution, producing a fixit hint
-  /// diagnostic for it and returning true.  If the fixit hint turned out to be
+  /// \brief Apply the specified Fix to this solution, producing a fix-it hint
+  /// diagnostic for it and returning true.  If the fix-it hint turned out to be
   /// bogus, this returns false and doesn't emit anything.
-  bool applySolutionFix(Expr *expr, const Solution &solution, unsigned fixNo);
+  bool applySolutionFix(Expr *expr, const Solution &solution,
+                        std::pair<Fix, ConstraintLocator *> &fix);
 
   /// \brief If there is more than one viable solution,
   /// attempt to pick the best solution and remove all of the rest.
