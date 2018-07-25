@@ -1583,11 +1583,18 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     return getSILLinkage(linkage, forDefinition);
   }
 
+  case Kind::PropertyDescriptor: {
+    // Return the linkage of the getter, which may be more permissive than the
+    // property itself (for instance, with a private/internal property whose
+    // accessor is @inlinable or @usableFromInline)
+    auto getterDecl = cast<AbstractStorageDecl>(getDecl())->getGetter();
+    return getSILLinkage(getDeclLinkage(getterDecl), forDefinition);
+  }
+
   case Kind::ObjCClass:
   case Kind::ObjCMetaclass:
   case Kind::SwiftMetaclassStub:
   case Kind::NominalTypeDescriptor:
-  case Kind::PropertyDescriptor:
   case Kind::ClassMetadataBaseOffset:
   case Kind::ProtocolDescriptor:
     return getSILLinkage(getDeclLinkage(getDecl()), forDefinition);
