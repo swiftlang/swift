@@ -918,8 +918,7 @@ private:
     
   void printRenameForDecl(const AvailableAttr *AvAttr, const ValueDecl *D,
                           bool includeQuotes) {
-    if (AvAttr->Rename.empty())
-      return;
+    assert(!AvAttr->Rename.empty());
     
     auto renamedParsedDeclName = parseDeclName(AvAttr->Rename);
     auto renamedDeclName = renamedParsedDeclName.formDeclName(D->getASTContext());
