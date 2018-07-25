@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir -gdwarf-types -o - | %FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -gdwarf-types -o - | %FileCheck %s -allow-deprecated-dag-overlap
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s --check-prefix=AST
 
 // CHECK-DAG: ![[SINODE:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Int64",{{.*}} identifier: [[SI:.*]])
