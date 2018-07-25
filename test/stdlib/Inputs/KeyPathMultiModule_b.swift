@@ -1,3 +1,5 @@
+import StdlibUnittest
+
 public struct A {
   public var x: Int { return 0 }
 
@@ -91,6 +93,16 @@ public func A_subscript_withGeneric_keypath<T: Hashable>(index: T)
   return \A.[withGeneric: index]
 }
 
+public func A_subscript_withGenericSettable_keypath<T: Hashable>(index: T)
+    -> KeyPath<A, T> {
+  return \A.[withGenericSettable: index]
+}
+
+public func A_subscript_withGenericPrivateSet_keypath<T: Hashable>(index: T)
+    -> KeyPath<A, T> {
+  return \A.[withGenericPrivateSet: index]
+}
+
 public func A_subscript_withGeneric_butt_keypath()
     -> KeyPath<A, String> {
   return \A.[withGeneric: "pomeranian's big butt"]
@@ -110,6 +122,18 @@ public func B_subscript_withGeneric_keypath<T, U: Hashable>(
   _: T.Type, index: U
 ) -> KeyPath<B<T>, U> {
   return \B<T>.[withGeneric: index]
+}
+
+public func B_subscript_withGenericSettable_keypath<T, U: Hashable>(
+  _: T.Type, index: U
+) -> KeyPath<B<T>, U> {
+  return \B<T>.[withGenericSettable: index]
+}
+
+public func B_subscript_withGenericPrivateSet_keypath<T, U: Hashable>(
+  _: T.Type, index: U
+) -> KeyPath<B<T>, U> {
+  return \B<T>.[withGenericPrivateSet: index]
 }
 
 public func B_Double_subscript_withGeneric_butt_keypath()
@@ -167,4 +191,14 @@ public func B_Int_storedA_keypath() -> KeyPath<B<Int>, Int> {
 
 public func B_Int_storedB_keypath() -> KeyPath<B<Int>, Int> {
   return \B<Int>.storedB
+}
+
+extension Int {
+  public var appendTest: Int { return self }
+}
+extension String {
+  public var appendTest: String { return self }
+}
+extension LifetimeTracked {
+  public var appendTest: LifetimeTracked { return self }
 }

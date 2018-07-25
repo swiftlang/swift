@@ -91,6 +91,9 @@ static const __swift_uint32_t _SwiftKeyPathComponentHeader_ComputedIDByVTableOff
   = 0x00100000U;
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_ComputedHasArgumentsFlag
   = 0x00080000U;
+// Not ABI, used internally by key path runtime implementation
+static const __swift_uint32_t _SwiftKeyPathComponentHeader_ComputedInstantiatedFromExternalWithArgumentsFlag
+  = 0x00000010U;
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_ComputedIDResolutionMask
   = 0x0000000FU;
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_ComputedIDResolved

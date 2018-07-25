@@ -16,58 +16,121 @@ import StdlibUnittest
 
 var keyPathMultiModule = TestSuite("key paths across multiple modules")
 
+func expectEqualWithHashes<T: Hashable>(_ x: T, _ y: T,
+                                        file: String = #file,
+                                        line: UInt = #line) {
+  expectEqual(x, y, file: file, line: line)
+  expectEqual(x.hashValue, y.hashValue, file: file, line: line)
+}
+
 keyPathMultiModule.test("identity across multiple modules") {
-  expectEqual(A_x_keypath(), \A.x)
-  expectEqual(A_y_keypath(), \A.y)
-  expectEqual(A_z_keypath(), \A.z)
-  expectEqual(A_subscript_withGeneric_keypath(index: 0), \A.[withGeneric: 0])
-  expectEqual(A_subscript_withGeneric_keypath(index: "butt"),
-              \A.[withGeneric: "butt"])
-  expectEqual(A_subscript_withGeneric_butt_keypath(),
-              \A.[withGeneric: "pomeranian's big butt"])
+  // Do this twice, to ensure that fully constant key paths remain stable
+  // after one-time instantiation of the object
+  for _ in 1...2 {
+    expectEqualWithHashes(A_x_keypath(), \A.x)
+    expectEqualWithHashes(A_y_keypath(), \A.y)
+    expectEqualWithHashes(A_z_keypath(), \A.z)
+    expectEqualWithHashes(A_subscript_withGeneric_keypath(index: 0), \A.[withGeneric: 0])
+    expectEqualWithHashes(A_subscript_withGeneric_keypath(index: "butt"),
+                \A.[withGeneric: "butt"])
+    expectEqualWithHashes(A_subscript_withGeneric_butt_keypath(),
+                \A.[withGeneric: "pomeranian's big butt"])
 
-  expectEqual(B_x_keypath(Double.self), \B<Double>.x)
-  expectEqual(B_Int_x_keypath(), \B<Int>.x)
-  expectEqual(B_y_keypath(Double.self), \B<Double>.y)
-  expectEqual(B_Int_y_keypath(), \B<Int>.y)
-  expectEqual(B_z_keypath(Double.self), \B<Double>.z)
-  expectEqual(B_Int_z_keypath(), \B<Int>.z)
-  expectEqual(B_subscript_withInt_keypath(Double.self, index: 1738),
-              \B<Double>.[withInt: 1738])
-  expectEqual(B_subscript_withInt_keypath(Double.self, index: 679),
-              \B<Double>.[withInt: 679])
-  expectEqual(B_Double_subscript_withInt_0_keypath(),
-              \B<Double>.[withInt: 0])
-  expectEqual(B_subscript_withGeneric_keypath(Double.self, index: "buttt"),
-              \B<Double>.[withGeneric: "buttt"])
-  expectEqual(B_Double_subscript_withGeneric_butt_keypath(),
-              \B<Double>.[withGeneric: "Never is the universal butt type"])
+    expectEqualWithHashes(A_subscript_withGenericSettable_keypath(index: 0),
+                \A.[withGenericSettable: 0])
+    expectEqualWithHashes(A_subscript_withGenericSettable_keypath(index: "butt"),
+                \A.[withGenericSettable: "butt"])
 
-  expectEqual(A_storedA_keypath(), \A.storedA)
-  expectEqual(A_storedA_storedB_keypath(), \A.storedA.storedB)
-  expectEqual(A_storedB_keypath(), \A.storedB)
-  expectEqual(B_storedA_keypath(Double.self), \B<Double>.storedA)
-  expectEqual(B_storedB_keypath(Double.self), \B<Double>.storedB)
-  expectEqual(B_Int_storedA_keypath(), \B<Int>.storedA)
-  expectEqual(B_Int_storedB_keypath(), \B<Int>.storedB)
+    expectEqualWithHashes(A_subscript_withGenericPrivateSet_keypath(index: 0),
+                \A.[withGenericPrivateSet: 0])
+    expectEqualWithHashes(A_subscript_withGenericPrivateSet_keypath(index: "butt"),
+                \A.[withGenericPrivateSet: "butt"])
 
-  func testInGenericContext<X, Y: Hashable>(x: X, y: Y) {
-    expectEqual(A_subscript_withGeneric_keypath(index: y), \A.[withGeneric: y])
 
-    expectEqual(B_x_keypath(X.self), \B<X>.x)
-    //TODO expectEqual(B_y_keypath(X.self), \B<X>.y)
-    //TODO expectEqual(B_z_keypath(X.self), \B<X>.z)
-    expectEqual(B_subscript_withInt_keypath(X.self, index: 0),
-                \B<X>.[withInt: 0])
-    expectEqual(B_subscript_withGeneric_keypath(X.self, index: y),
-                \B<X>.[withGeneric: y])
+    do {
+      let lifetimeTracker = LifetimeTracked(679)
+      expectEqualWithHashes(A_subscript_withGeneric_keypath(index: lifetimeTracker),
+                  \A.[withGeneric: lifetimeTracker])
+      expectEqualWithHashes(A_subscript_withGenericSettable_keypath(index: lifetimeTracker),
+                  \A.[withGenericSettable: lifetimeTracker])
+      expectEqualWithHashes(A_subscript_withGenericPrivateSet_keypath(index: lifetimeTracker),
+                  \A.[withGenericPrivateSet: lifetimeTracker])
 
-    expectEqual(B_storedA_keypath(X.self), \B<X>.storedA)
-    expectEqual(B_storedB_keypath(X.self), \B<X>.storedB)
+      expectEqualWithHashes(\A.[withGeneric: lifetimeTracker].appendTest,
+                  (\A.[withGeneric: lifetimeTracker])
+                    .appending(path: \LifetimeTracked.appendTest))
+      expectEqualWithHashes(\A.[withGenericSettable: lifetimeTracker].appendTest,
+                  (\A.[withGenericSettable: lifetimeTracker])
+                    .appending(path: \LifetimeTracked.appendTest))
+      expectEqualWithHashes(\A.[withGenericPrivateSet: lifetimeTracker].appendTest,
+                  (\A.[withGenericPrivateSet: lifetimeTracker])
+                    .appending(path: \LifetimeTracked.appendTest))
+    }
+
+    expectEqualWithHashes(B_x_keypath(Double.self), \B<Double>.x)
+    expectEqualWithHashes(B_Int_x_keypath(), \B<Int>.x)
+    expectEqualWithHashes(B_y_keypath(Double.self), \B<Double>.y)
+    expectEqualWithHashes(B_Int_y_keypath(), \B<Int>.y)
+    expectEqualWithHashes(B_z_keypath(Double.self), \B<Double>.z)
+    expectEqualWithHashes(B_Int_z_keypath(), \B<Int>.z)
+    expectEqualWithHashes(B_subscript_withInt_keypath(Double.self, index: 1738),
+                \B<Double>.[withInt: 1738])
+    expectEqualWithHashes(B_subscript_withInt_keypath(Double.self, index: 679),
+                \B<Double>.[withInt: 679])
+    expectEqualWithHashes(B_Double_subscript_withInt_0_keypath(),
+                \B<Double>.[withInt: 0])
+    expectEqualWithHashes(B_subscript_withGeneric_keypath(Double.self, index: "buttt"),
+                \B<Double>.[withGeneric: "buttt"])
+    expectEqualWithHashes(B_Double_subscript_withGeneric_butt_keypath(),
+                \B<Double>.[withGeneric: "Never is the universal butt type"])
+
+    expectEqualWithHashes(A_storedA_keypath(), \A.storedA)
+    expectEqualWithHashes(A_storedA_storedB_keypath(), \A.storedA.storedB)
+    expectEqualWithHashes(A_storedB_keypath(), \A.storedB)
+    expectEqualWithHashes(B_storedA_keypath(Double.self), \B<Double>.storedA)
+    expectEqualWithHashes(B_storedB_keypath(Double.self), \B<Double>.storedB)
+    expectEqualWithHashes(B_Int_storedA_keypath(), \B<Int>.storedA)
+    expectEqualWithHashes(B_Int_storedB_keypath(), \B<Int>.storedB)
+
+    func testInGenericContext<X, Y: Hashable, Z>(x: X, y: Y,
+                                              appending: KeyPath<Y, Z>) {
+      expectEqualWithHashes(A_subscript_withGeneric_keypath(index: y),
+                            \A.[withGeneric: y])
+      expectEqualWithHashes(A_subscript_withGenericSettable_keypath(index: y),
+                            \A.[withGenericSettable: y])
+      expectEqualWithHashes(A_subscript_withGenericPrivateSet_keypath(index: y),
+                            \A.[withGenericPrivateSet: y])
+
+      _ = (\A.[withGeneric: y]).appending(path: appending)
+      _ = (\A.[withGenericSettable: y]).appending(path: appending)
+      _ = (\A.[withGenericPrivateSet: y]).appending(path: appending)
+
+      expectEqualWithHashes(B_x_keypath(X.self), \B<X>.x)
+      expectEqualWithHashes(B_y_keypath(X.self), \B<X>.y)
+      expectEqualWithHashes(B_z_keypath(X.self), \B<X>.z)
+      expectEqualWithHashes(B_subscript_withInt_keypath(X.self, index: 0),
+                  \B<X>.[withInt: 0])
+      expectEqualWithHashes(B_subscript_withGeneric_keypath(X.self, index: y),
+                  \B<X>.[withGeneric: y])
+      expectEqualWithHashes(B_subscript_withGenericSettable_keypath(X.self, index: y),
+                  \B<X>.[withGenericSettable: y])
+      expectEqualWithHashes(B_subscript_withGenericPrivateSet_keypath(X.self, index: y),
+                  \B<X>.[withGenericPrivateSet: y])
+
+      _ = (\B<X>.[withGeneric: y]).appending(path: appending)
+      _ = (\B<X>.[withGenericSettable: y]).appending(path: appending)
+      _ = (\B<X>.[withGenericPrivateSet: y]).appending(path: appending)
+
+      expectEqualWithHashes(B_storedA_keypath(X.self), \B<X>.storedA)
+      expectEqualWithHashes(B_storedB_keypath(X.self), \B<X>.storedB)
+    }
+
+    testInGenericContext(x: 0.0, y: 42, appending: \Int.appendTest)
+    testInGenericContext(x: "pomeranian", y: "big butt",
+                         appending: \String.appendTest)
+    testInGenericContext(x: LifetimeTracked(17), y: LifetimeTracked(38),
+                         appending: \LifetimeTracked.appendTest)
   }
-
-  testInGenericContext(x: 0.0, y: 42)
-  testInGenericContext(x: "pomeranian", y: "big butt")
 }
 
 runAllTests()

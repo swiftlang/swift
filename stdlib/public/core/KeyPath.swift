@@ -464,14 +464,17 @@ internal enum KeyPathComponent: Hashable {
   internal struct ArgumentRef {
     internal init(
       data: UnsafeRawBufferPointer,
-      witnesses: UnsafePointer<ComputedArgumentWitnesses>
+      witnesses: UnsafePointer<ComputedArgumentWitnesses>,
+      witnessSizeAdjustment: Int
     ) {
       self.data = data
       self.witnesses = witnesses
+      self.witnessSizeAdjustment = witnessSizeAdjustment
     }
 
     internal var data: UnsafeRawBufferPointer
     internal var witnesses: UnsafePointer<ComputedArgumentWitnesses>
+    internal var witnessSizeAdjustment: Int
   }
 
   /// The keypath projects within the storage of the outer value, like a
@@ -526,7 +529,7 @@ internal enum KeyPathComponent: Hashable {
         return arg1.witnesses.pointee.equals(
           arg1.data.baseAddress.unsafelyUnwrapped,
           arg2.data.baseAddress.unsafelyUnwrapped,
-          arg1.data.count)
+          arg1.data.count - arg1.witnessSizeAdjustment)
       }
       // If only one component has arguments, that should indicate that the
       // only arguments in that component were generic captures and therefore
@@ -552,7 +555,7 @@ internal enum KeyPathComponent: Hashable {
       if let argument = argument {
         let hash = argument.witnesses.pointee.hash(
           argument.data.baseAddress.unsafelyUnwrapped,
-          argument.data.count)
+          argument.data.count - argument.witnessSizeAdjustment)
         // Returning 0 indicates that the arguments should not impact the
         // hash value of the overall key path.
         // FIXME(hasher): hash witness should just mutate hasher directly
@@ -799,6 +802,31 @@ internal struct RawKeyPathComponent {
       return _value & Header.computedHasArgumentsFlag != 0
     }
 
+    // If a computed component is instantiated from an external property
+    // descriptor, and both components carry arguments, we need to carry some
+    // extra matter to be able to map between the client and external generic
+    // contexts.
+    internal static var computedInstantiatedFromExternalWithArgumentsFlag: UInt32 {
+      return _SwiftKeyPathComponentHeader_ComputedInstantiatedFromExternalWithArgumentsFlag
+    }
+    internal var isComputedInstantiatedFromExternalWithArguments: Bool {
+      get {
+        _sanityCheck(kind == .computed)
+        return
+          _value & Header.computedInstantiatedFromExternalWithArgumentsFlag != 0
+      }
+      set {
+        _sanityCheck(kind == .computed)
+        _value =
+            _value & ~Header.computedInstantiatedFromExternalWithArgumentsFlag
+          | (newValue ? Header.computedInstantiatedFromExternalWithArgumentsFlag
+                      : 0)
+      }
+    }
+    internal static var externalWithArgumentsExtraSize: Int {
+      return MemoryLayout<Int>.size
+    }
+
     internal static var computedIDResolutionMask: UInt32 {
       return _SwiftKeyPathComponentHeader_ComputedIDResolutionMask
     }
@@ -952,6 +980,9 @@ internal struct RawKeyPathComponent {
         total += ptrSize * 2
         // size of argument area
         total += _computedArgumentSize
+        if header.isComputedInstantiatedFromExternalWithArguments {
+          total += Header.externalWithArgumentsExtraSize
+        }
       }
       return total
     }
@@ -1030,10 +1061,26 @@ internal struct RawKeyPathComponent {
   }
 
   internal var _computedArguments: UnsafeRawPointer {
-    return _computedArgumentHeaderPointer + MemoryLayout<Int>.size * 2
+    var base = _computedArgumentHeaderPointer + MemoryLayout<Int>.size * 2
+    // If the component was instantiated from an external property descriptor
+    // with its own arguments, we include some additional capture info to
+    // be able to map to the original argument context by adjusting the size
+    // passed to the witness operations.
+    if header.isComputedInstantiatedFromExternalWithArguments {
+      base += Header.externalWithArgumentsExtraSize
+    }
+    return base
   }
   internal var _computedMutableArguments: UnsafeMutableRawPointer {
     return UnsafeMutableRawPointer(mutating: _computedArguments)
+  }
+  internal var _computedArgumentWitnessSizeAdjustment: Int {
+    if header.isComputedInstantiatedFromExternalWithArguments {
+      return _computedArguments.load(
+        fromByteOffset: -Header.externalWithArgumentsExtraSize,
+        as: Int.self)
+    }
+    return 0
   }
 
   internal var value: KeyPathComponent {
@@ -1054,14 +1101,14 @@ internal struct RawKeyPathComponent {
 
       let id = _computedID
       let get = _computedGetter
-      // Argument value is unused if there are no arguments, so pick something
-      // likely to already be in a register as a default.
+      // Argument value is unused if there are no arguments.
       let argument: KeyPathComponent.ArgumentRef?
       if header.hasComputedArguments {
         argument = KeyPathComponent.ArgumentRef(
           data: UnsafeRawBufferPointer(start: _computedArguments,
                                        count: _computedArgumentSize),
-          witnesses: _computedArgumentWitnesses)
+          witnesses: _computedArgumentWitnesses,
+          witnessSizeAdjustment: _computedArgumentWitnessSizeAdjustment)
       } else {
         argument = nil
       }
@@ -1100,7 +1147,8 @@ internal struct RawKeyPathComponent {
       // Run destructor, if any
       if header.hasComputedArguments,
          let destructor = _computedArgumentWitnesses.pointee.destroy {
-        destructor(_computedMutableArguments, _computedArgumentSize)
+        destructor(_computedMutableArguments,
+                 _computedArgumentSize - _computedArgumentWitnessSizeAdjustment)
       }
     case .external:
       _sanityCheckFailure("should have been instantiated away")
@@ -1131,38 +1179,60 @@ internal struct RawKeyPathComponent {
       // Fields are pointer-aligned after the header
       componentSize += Header.pointerAlignmentSkew
       buffer.storeBytes(of: _computedIDValue,
-                        toByteOffset: MemoryLayout<Int>.size,
+                        toByteOffset: componentSize,
                         as: Int.self)
+      componentSize += MemoryLayout<Int>.size
       buffer.storeBytes(of: _computedGetter,
-                        toByteOffset: 2 * MemoryLayout<Int>.size,
+                        toByteOffset: componentSize,
                         as: UnsafeRawPointer.self)
+      componentSize += MemoryLayout<Int>.size
 
-      var addedSize = MemoryLayout<Int>.size * 2
 
       if header.isComputedSettable {
         buffer.storeBytes(of: _computedSetter,
                           toByteOffset: MemoryLayout<Int>.size * 3,
                           as: UnsafeRawPointer.self)
-        addedSize += MemoryLayout<Int>.size
+        componentSize += MemoryLayout<Int>.size
       }
 
       if header.hasComputedArguments {
+        let arguments = _computedArguments
         let argumentSize = _computedArgumentSize
         buffer.storeBytes(of: argumentSize,
-                          toByteOffset: addedSize + MemoryLayout<Int>.size,
+                          toByteOffset: componentSize,
                           as: Int.self)
+        componentSize += MemoryLayout<Int>.size
         buffer.storeBytes(of: _computedArgumentWitnesses,
-                          toByteOffset: addedSize + MemoryLayout<Int>.size * 2,
+                          toByteOffset: componentSize,
                           as: UnsafePointer<ComputedArgumentWitnesses>.self)
+        componentSize += MemoryLayout<Int>.size
+
+        if header.isComputedInstantiatedFromExternalWithArguments {
+          // Include the extra matter for components instantiated from
+          // external property descriptors with arguments.
+          buffer.storeBytes(of: _computedArgumentWitnessSizeAdjustment,
+                            toByteOffset: componentSize,
+                            as: Int.self)
+          componentSize += MemoryLayout<Int>.size
+        }
+        let adjustedSize = argumentSize - _computedArgumentWitnessSizeAdjustment
+        let argumentDest =
+          buffer.baseAddress.unsafelyUnwrapped + componentSize
         _computedArgumentWitnesses.pointee.copy(
-          _computedArguments,
-          buffer.baseAddress.unsafelyUnwrapped + addedSize
-                                               + MemoryLayout<Int>.size * 3,
-          argumentSize)
-        addedSize += MemoryLayout<Int>.size * 2 + argumentSize
+          arguments,
+          argumentDest,
+          adjustedSize)
+        if header.isComputedInstantiatedFromExternalWithArguments {
+          // The extra information for external property descriptor arguments
+          // can always be memcpy'd.
+          _memcpy(dest: argumentDest + adjustedSize,
+                  src: arguments + adjustedSize,
+                  size: UInt(_computedArgumentWitnessSizeAdjustment))
+        }
+
+        componentSize += argumentSize
       }
 
-      componentSize += addedSize
     case .external:
       _sanityCheckFailure("should have been instantiated away")
     }
@@ -2312,20 +2382,56 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
 
       case .computed:
         // The final component will be an instantiation of the computed
-        // component. 
+        // component.
         setComputedCapability(for: descriptorHeader)
         // With no arguments, the instantiated size will be the
         // same as the pattern size.
-        size += descriptorHeader.patternComponentBodySize
+        size += descriptorHeader.propertyDescriptorBodySize
 
         // If the external declaration is computed, and it takes captured
         // arguments, then we have to build a bit of a chimera. The canonical
         // identity and accessors come from the descriptor, but the argument
         // handling is still as described in the local candidate.
         if descriptorHeader.hasComputedArguments {
+          // We always start with the buffer size and witnesses.
+          var argumentBufferSize = MemoryLayout<Int>.size * 2
+
+          let alignmentMask = MemoryLayout<Int>.alignment - 1
           if localCandidateHeader.kind == .computed
-            && localCandidateHeader.hasComputedArguments {
-            fatalError("to be implemented")
+              && localCandidateHeader.hasComputedArguments {
+            // We don't need the local candidate's accessors.
+            _ /*id*/ = buffer.pop(UnsafeRawPointer.self)
+            _ /*getter*/ = buffer.pop(UnsafeRawPointer.self)
+            if localCandidateHeader.isComputedSettable {
+              _ /*setter*/ = buffer.pop(UnsafeRawPointer.self)
+            }
+
+            // Get the instantiated size of the component's own argument
+            // file.
+            let getLayoutRaw = buffer.pop(UnsafeRawPointer.self)
+            let _ /*witnesses*/ = buffer.pop(UnsafeRawPointer.self)
+            let _ /*initializer*/ = buffer.pop(UnsafeRawPointer.self)
+
+            let getLayout = unsafeBitCast(getLayoutRaw,
+              to: RawKeyPathComponent.ComputedArgumentLayoutFn.self)
+
+            let (addedSize, addedAlignmentMask) = getLayout(arguments)
+            // TODO: Handle over-aligned values
+            _sanityCheck(addedAlignmentMask < MemoryLayout<Int>.alignment,
+                         "overaligned computed property element not supported")
+
+            argumentBufferSize += addedSize
+
+            // If the property descriptor also has generic arguments, we need
+            // to store the size so we can invoke the local witnesses on
+            // the arguments. We'll also store those generic arguments at
+            // pointer alignment after the local candidate's arguments.
+            if genericParamCount > 0 {
+              argumentBufferSize =
+                (argumentBufferSize + alignmentMask) & ~alignmentMask
+              argumentBufferSize +=
+                RawKeyPathComponent.Header.externalWithArgumentsExtraSize
+            }
           } else {
             // If the local candidate has no arguments, then things are a
             // little easier. We only need to instantiate the generic arguments
@@ -2333,14 +2439,14 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
             // Discard the local candidate.
             _ = buffer.popRaw(size: localCandidateSize,
                               alignment: MemoryLayout<UInt32>.alignment)
-
-            // The argument vector will consist of the generic arguments to
-            // the descriptor, which replaces the space taken by the initializer
-            // in the pattern.
-            let alignmentMask = MemoryLayout<Int>.alignment - 1
-            size += (MemoryLayout<Int>.size * (genericParamCount - 1)
-                     + alignmentMask) & ~alignmentMask
           }
+
+          // Add the property descriptor's generic arguments to the end, if
+          // any.
+          if genericParamCount > 0 {
+            argumentBufferSize += MemoryLayout<Int>.size * genericParamCount
+          }
+          size = (size + alignmentMask) & ~alignmentMask + argumentBufferSize
         } else {
           // If there aren't any captured arguments expected in the external
           // component, then we only need to adopt its accessors.
@@ -2595,11 +2701,10 @@ internal func _instantiateKeyPathBuffer(
       }
     }
 
-    func tryToResolveComputedArguments(header: RawKeyPathComponent.Header,
-                                       argsBuffer: inout KeyPathBuffer) {
-      guard header.hasComputedArguments else { return }
-
-      // Carry over the arguments.
+    func readComputedArgumentBuffer(argsBuffer: inout KeyPathBuffer)
+        -> (getLayout: RawKeyPathComponent.ComputedArgumentLayoutFn,
+            witnesses: UnsafePointer<ComputedArgumentWitnesses>,
+            initializer: RawKeyPathComponent.ComputedArgumentInitializerFn) {
       let getLayoutRaw = argsBuffer.pop(UnsafeRawPointer.self)
       let getLayout = unsafeBitCast(getLayoutRaw,
         to: RawKeyPathComponent.ComputedArgumentLayoutFn.self)
@@ -2615,6 +2720,16 @@ internal func _instantiateKeyPathBuffer(
       let initializer = unsafeBitCast(initializerRaw,
         to: RawKeyPathComponent.ComputedArgumentInitializerFn.self)
 
+      return (getLayout, witnesses, initializer)
+    }
+
+    func tryToResolveComputedArguments(argsBuffer: inout KeyPathBuffer) {
+      guard header.hasComputedArguments else { return }
+
+      let (getLayout, witnesses, initializer)
+        = readComputedArgumentBuffer(argsBuffer: &argsBuffer)
+
+      // Carry over the arguments.
       let (size, alignmentMask) = getLayout(arguments)
       _sanityCheck(alignmentMask < MemoryLayout<Int>.alignment,
                    "overaligned computed arguments not implemented yet")
@@ -2654,14 +2769,13 @@ internal func _instantiateKeyPathBuffer(
     case .computed:
       tryToResolveComputedAccessors(header: header,
                                     accessorsBuffer: &patternBuffer)
-      tryToResolveComputedArguments(header: header,
-                                    argsBuffer: &patternBuffer)
+      tryToResolveComputedArguments(argsBuffer: &patternBuffer)
     case .external:
       // Look at the external property descriptor to see if we should take it
       // over the component given in the pattern.
       let genericParamCount = Int(header.payload)
       let descriptor = patternBuffer.pop(UnsafeRawPointer.self)
-      let descriptorHeader = descriptor.load(as: RawKeyPathComponent.Header.self)
+      var descriptorHeader = descriptor.load(as: RawKeyPathComponent.Header.self)
 
       // Save the generic arguments to the external descriptor.
       let descriptorGenericArgsBuf = patternBuffer.popRaw(
@@ -2720,47 +2834,100 @@ internal func _instantiateKeyPathBuffer(
         // identity and accessors come from the descriptor, but the argument
         // handling is still as described in the local candidate.
         if descriptorHeader.hasComputedArguments {
-          if localCandidateHeader.kind == .computed
-            && localCandidateHeader.hasComputedArguments {
-            fatalError("to be implemented")
+          // Loop through instantiating all the property descriptor's
+          // generic arguments. We don't write
+          // these immediately, because the computed header and accessors
+          // come first, and if we're instantiating in-place,
+          // they will overwrite the information in the pattern.
+          let genericArgs: [UnsafeRawPointer]
+            = (0 ..< genericParamCount).map {
+              let instantiationFn = descriptorGenericArgsBuf
+                .load(fromByteOffset: MemoryLayout<Int>.size * $0,
+                      as: MetadataAccessor.self)
+              return instantiationFn(arguments)
+            }
+
+          // If the descriptor has generic arguments, record this in the
+          // header. We'll store the size of the external generic arguments
+          // so we can invoke the local candidate's argument witnesses.
+          let localCandidateHasArguments =
+            localCandidateHeader.kind == .computed
+              && localCandidateHeader.hasComputedArguments
+          let descriptorHasArguments = genericParamCount > 0
+          if localCandidateHasArguments && descriptorHasArguments {
+            descriptorHeader.isComputedInstantiatedFromExternalWithArguments =
+              true
+          }
+
+          // Bring in the accessors from the descriptor.
+          tryToResolveComputedAccessors(header: descriptorHeader,
+                                        accessorsBuffer: &descriptorBuffer)
+          _sanityCheck(descriptorBuffer.data.isEmpty)
+
+          if localCandidateHasArguments {
+            // We don't need the local candidate's accessors.
+            _ /*id*/ = patternBuffer.pop(UnsafeRawPointer.self)
+            _ /*getter*/ = patternBuffer.pop(UnsafeRawPointer.self)
+            if localCandidateHeader.isComputedSettable {
+              _ /*setter*/ = patternBuffer.pop(UnsafeRawPointer.self)
+            }
+
+            // Instantiate the arguments from the local candidate.
+            let (getLayout, witnesses, initializer) =
+              readComputedArgumentBuffer(argsBuffer: &patternBuffer)
+
+            // Carry over the arguments.
+            let (baseSize, alignmentMask) = getLayout(arguments)
+            _sanityCheck(alignmentMask < MemoryLayout<Int>.alignment,
+                         "overaligned computed arguments not implemented yet")
+
+            // The real buffer stride will be rounded up to alignment.
+            var totalSize = (baseSize + alignmentMask) & ~alignmentMask
+
+            // If the descriptor also has arguments, they'll be added to the
+            // end with pointer alignment.
+            if descriptorHasArguments {
+              let pointerAlignMask = MemoryLayout<Int>.alignment - 1
+              totalSize = (totalSize + pointerAlignMask) & ~pointerAlignMask
+              totalSize += MemoryLayout<Int>.size * genericParamCount
+            }
+
+            pushDest(totalSize)
+            pushDest(witnesses)
+
+            // If the descriptor has arguments, store the size of its specific
+            // arguments here, so we can drop them when trying to invoke
+            // the component's witnesses.
+            if descriptorHasArguments {
+              pushDest(genericParamCount * MemoryLayout<Int>.size)
+            }
+
+            // Initialize the local candidate arguments here.
+            _sanityCheck(Int(bitPattern: destData.baseAddress) & alignmentMask == 0,
+                         "argument destination not aligned")
+            initializer(arguments, destData.baseAddress.unsafelyUnwrapped)
+
+            destData = UnsafeMutableRawBufferPointer(
+              start: destData.baseAddress.unsafelyUnwrapped + baseSize,
+              count: destData.count - baseSize)
+
           } else {
             // If the local candidate has no arguments, then things are a
             // little easier. We only need to instantiate the generic arguments
             // for the external component's accessors.
-
-            // Loop through instantiating all the arguments. We don't write
-            // these immediately, because the computed header and accessors
-            // come first, and if we're instantiating in-place,
-            // they will overwrite the information in the pattern.
-            let genericArgs: [UnsafeRawPointer]
-              = (0 ..< genericParamCount).map {
-                let instantiationFn = descriptorGenericArgsBuf
-                  .load(fromByteOffset: MemoryLayout<Int>.size * $0,
-                        as: MetadataAccessor.self)
-                return instantiationFn(arguments)
-              }
-
-            // Bring in the accessors.
-            tryToResolveComputedAccessors(header: descriptorHeader,
-                                          accessorsBuffer: &descriptorBuffer)
-            _sanityCheck(descriptorBuffer.data.isEmpty)
-
-            // Instantiate the arguments, which will be an array of the
-            // instantiated generic arguments to the descriptor.
-            // Start with the header, with the instantiated size and
-            // witnesses.
-            let stride = MemoryLayout<Int>.size * genericParamCount
-            pushDest(stride)
-            pushDest(__swift_keyPathGenericWitnessTable_addr())
-
-            // Write the arguments.
-            for arg in genericArgs {
-              pushDest(arg)
-            }
-
             // Discard the local candidate.
             _ = patternBuffer.popRaw(size: localCandidateSize,
                                      alignment: MemoryLayout<UInt32>.alignment)
+
+            // Write out the header with the instantiated size and
+            // witnesses of the descriptor.
+            let stride = MemoryLayout<Int>.size * genericParamCount
+            pushDest(stride)
+            pushDest(__swift_keyPathGenericWitnessTable_addr())
+          }
+          // Write the descriptor's generic arguments.
+          for arg in genericArgs {
+            pushDest(arg)
           }
         } else {
           // Discard the local candidate.
