@@ -2413,7 +2413,7 @@ extension FixedWidthInteger {
   @inlinable // FIXME(sil-serialize-all)
   public func _binaryLogarithm() -> Int {
     _precondition(self > (0 as Self))
-    return Self(Self.bitWidth &- (leadingZeroBitCount &+ 1))
+    return Self.bitWidth &- (leadingZeroBitCount &+ 1)
   }
 
   /// Creates an integer from its little-endian representation, changing the
