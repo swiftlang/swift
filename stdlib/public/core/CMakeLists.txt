@@ -145,7 +145,7 @@ set(SWIFTLIB_ESSENTIAL
   StringUTF16View.swift
   StringUTF8View.swift
   StringVariant.swift
-  Substring.swift.gyb
+  Substring.swift
   SwiftNativeNSArray.swift
   ThreadLocalStorage.swift
   UIntBuffer.swift
