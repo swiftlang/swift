@@ -713,6 +713,14 @@ public:
     return !CS.shouldAttemptFixes();
   }
 
+  bool extraneousLabel(unsigned paramIndex) override {
+    return !CS.shouldAttemptFixes();
+  }
+
+  bool incorrectLabel(unsigned paramIndex) override {
+    return !CS.shouldAttemptFixes();
+  }
+
   bool relabelArguments(ArrayRef<Identifier> newLabels) override {
     if (!CS.shouldAttemptFixes())
       return true;

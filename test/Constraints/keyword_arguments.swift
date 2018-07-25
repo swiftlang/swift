@@ -8,7 +8,9 @@ struct X1 {
   init(_ a: Int) { }
   func f1(_ a: Int) {}
 }
-X1(a: 5).f1(b: 5) // expected-error{{extraneous argument label 'a:' in call}}{{4-7=}}
+X1(a: 5).f1(b: 5) 
+// expected-error@-1 {{extraneous argument label 'a:' in call}} {{4-7=}}
+// expected-error@-2 {{extraneous argument label 'b:' in call}} {{13-16=}}
 
 // <rdar://problem/16801056>
 enum Policy {
