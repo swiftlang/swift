@@ -7360,9 +7360,8 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
           return cs.getType(E);
         };
 
-        auto callSubExpr = CallExpr::create(tc.Context, body, escapable, {}, {},
-                                            /*trailing closure*/ false,
-                                            /*implicit*/ true, Type(), getType);
+        auto callSubExpr = CallExpr::createImplicit(tc.Context, body, {escapable}, {}, getType);
+        cs.cacheSubExprTypes(callSubExpr);
         cs.setType(callSubExpr, resultType);
         
         auto replacement = new (tc.Context)
@@ -7414,10 +7413,8 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
           return cs.getType(E);
         };
 
-        auto callSubExpr = CallExpr::create(tc.Context, body, opaqueValue, {},
-                                            {}, /*trailing closure*/ false,
-                                            /*implicit*/ true,
-                                            Type(), getType);
+        auto callSubExpr = CallExpr::createImplicit(tc.Context, body, {opaqueValue}, {}, getType);
+        cs.cacheSubExprTypes(callSubExpr);
         cs.setType(callSubExpr, resultTy);
         
         auto replacement = new (tc.Context)
