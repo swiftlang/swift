@@ -23,7 +23,7 @@ struct Foo : Parameterized {
 ParameterUpdateTests.test("UpdateParameters") {
   var f = Foo()
   f.foo()
-  expectEqual(Tensor<Float>(2), f.w)
+  expectEqual(2, f.w.scalar!)
 }
 
 runAllTests()
