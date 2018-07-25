@@ -64,7 +64,6 @@ public func lowerGraphCrash(x: Tensor<Int32>) {
 
   _ = x*x  // expected-note {{value used here}}
   for _ in 0..<1000 {
-    // expected-error @+1{{FIXME: cannot lower a Host->TF tensor transfer in a loop header}}
     _ = x+someGlobal // expected-warning {{value implicitly copied to the accelerator}}
   }
 }
