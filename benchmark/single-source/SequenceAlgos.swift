@@ -64,11 +64,11 @@ let y = AnySequence(0..<n)
 let s = sequence(first: 0, next: { $0 < n&-1 ? $0&+1 : nil})
 
 func buildWorkload() {
-  _ = l.makeIterator()
-  _ = c.makeIterator()
-  _ = a.makeIterator()
-  _ = y.makeIterator()
-  _ = s.makeIterator()
+  blackHole(l.makeIterator())
+  blackHole(c.makeIterator())
+  blackHole(a.makeIterator())
+  blackHole(y.makeIterator())
+  blackHole(s.makeIterator())
 }
 
 func benchmarkEquatableSequenceAlgos<S: Sequence>(s: S, n: Int) where S.Element == Int, S: Equatable {
