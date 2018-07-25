@@ -677,7 +677,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
           if (baseType->isAnyObject())
             baseType = Type();
 
-          if (baseType) {
+          if (baseType && !baseType->hasUnresolvedType()) {
             C.entityType = baseType->getTypeOfMember(CS.DC->getParentModule(),
                                                      C.getDecl(), nullptr);
             C.substituted = true;
@@ -883,7 +883,7 @@ CalleeCandidateInfo::CalleeCandidateInfo(Type baseType,
       if (substType->isAnyObject())
         substType = Type();
 
-      if (substType && selfAlreadyApplied)
+      if (substType && selfAlreadyApplied && !substType->hasUnresolvedType())
         substType =
           substType->getTypeOfMember(CS.DC->getParentModule(), decl, nullptr);
       if (substType) {
