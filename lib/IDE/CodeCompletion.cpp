@@ -3522,24 +3522,38 @@ public:
       flattenBinaryExpr(assignExpr->getSrc(), sequence);
       assignExpr->setDest(nullptr);
       assignExpr->setSrc(nullptr);
+    } else if (auto tryExpr = dyn_cast<AnyTryExpr>(expr)) {
+      // Strip out try expression. It doesn't affect completion.
+      flattenBinaryExpr(tryExpr->getSubExpr(), sequence);
+    } else if (auto optEval = dyn_cast<OptionalEvaluationExpr>(expr)){
+      // Strip out optional evaluation expression. It doesn't affect completion.
+      flattenBinaryExpr(optEval->getSubExpr(), sequence);
     } else {
       sequence.push_back(expr);
     }
   }
 
   void typeCheckLeadingSequence(SmallVectorImpl<Expr *> &sequence) {
+
+    // Strip out try and optional evaluation expr because foldSequence() mutates
+    // hierarchy of these expressions. They don't affect completion anyway.
+    for (auto &element : sequence) {
+      if (auto *tryExpr = dyn_cast<AnyTryExpr>(element))
+        element = tryExpr->getSubExpr();
+      if (auto *optEval = dyn_cast<OptionalEvaluationExpr>(element))
+        element = optEval->getSubExpr();
+    }
+
     Expr *expr =
         SequenceExpr::create(CurrDeclContext->getASTContext(), sequence);
     prepareForRetypechecking(expr);
     // Take advantage of the fact the type-checker leaves the types on the AST.
     if (!typeCheckExpression(const_cast<DeclContext *>(CurrDeclContext),
                              expr)) {
-      if (isa<BinaryExpr>(expr) || isa<AssignExpr>(expr)) {
-        // Rebuild the sequence from the type-checked version.
-        sequence.clear();
-        flattenBinaryExpr(expr, sequence);
-        return;
-      }
+      // Rebuild the sequence from the type-checked version.
+      sequence.clear();
+      flattenBinaryExpr(expr, sequence);
+      return;
     }
 
     // Fall back to just using the immediate LHS.
