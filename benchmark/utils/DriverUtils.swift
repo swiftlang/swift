@@ -141,6 +141,16 @@ struct TestConfig {
                                     tags: c.tags ?? [],
                                     skipTags: c.skipTags ?? [.unstable, .skip])
 
+    if logMemory && tests.count > 1 {
+      print(
+      """
+      warning: The memory usage of a test, reported as the change in MAX_RSS,
+               is based on measuring the peak memory used by the whole process.
+               These results are meaningful only when running a single test,
+               not in the batch mode!
+      """)
+    }
+
     if verbose {
       let testList = tests.map({ $0.1.name }).joined(separator: ", ")
       print("""
@@ -174,8 +184,9 @@ struct TestConfig {
     tags: Set<BenchmarkCategory>,
     skipTags: Set<BenchmarkCategory>
   ) -> [(index: String, info: BenchmarkInfo)] {
+    let allTests = registeredBenchmarks.sorted()
     let indices = Dictionary(uniqueKeysWithValues:
-      zip(registeredBenchmarks.sorted().map { $0.name },
+      zip(allTests.map { $0.name },
           (1...).lazy.map { String($0) } ))
 
     func byTags(b: BenchmarkInfo) -> Bool {
@@ -185,8 +196,8 @@ struct TestConfig {
     func byNamesOrIndices(b: BenchmarkInfo) -> Bool {
       return specifiedTests.contains(b.name) ||
         specifiedTests.contains(indices[b.name]!)
-    } // !! "All registeredBenchmarks have been assigned an index"
-    return registeredBenchmarks
+    } // !! "`allTests` have been assigned an index"
+    return allTests
       .filter(specifiedTests.isEmpty ? byTags : byNamesOrIndices)
       .map { (index: indices[$0.name]!, info: $0) }
   }
