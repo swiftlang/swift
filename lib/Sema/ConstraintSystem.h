@@ -1008,6 +1008,9 @@ private:
   /// Declaration names used in fixes.
   std::vector<DeclName> FixedDeclNames;
 
+  /// Argument labels fixed by the constraint solver.
+  SmallVector<std::vector<Identifier>, 4> FixedArgLabels;
+
   /// \brief The set of remembered disjunction choices used to reach
   /// the current constraint system.
   SmallVector<std::pair<ConstraintLocator*, unsigned>, 32>

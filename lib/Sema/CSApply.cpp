@@ -8101,6 +8101,13 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
                 getASTContext().TheAnyType);
     return true;
   }
+
+  case FixKind::RelabelArguments: {
+    auto *call = cast<CallExpr>(locator->getAnchor());
+    return diagnoseArgumentLabelError(getASTContext(), call->getArg(),
+                                      fix.first.getArgumentLabels(*this),
+                                      isa<SubscriptExpr>(call->getFn()));
+  }
   }
 
   // FIXME: It would be really nice to emit a follow-up note showing where

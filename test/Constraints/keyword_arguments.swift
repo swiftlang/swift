@@ -33,7 +33,9 @@ struct X2 {
   init(a: Int) { }
   func f2(b: Int) { }
 }
-X2(5).f2(5) // expected-error{{missing argument label 'a:' in call}}{{4-4=a: }}
+X2(5).f2(5)
+// expected-error@-1 {{missing argument label 'a:' in call}} {{4-4=a: }}
+// expected-error@-2 {{missing argument label 'b:' in call}} {{10-10=b: }}
 
 
 // -------------------------------------------
@@ -401,3 +403,8 @@ _ = acceptTuple2(tuple1)
 _ = acceptTuple2((1, "hello", 3.14159))
 
 
+func generic_and_missing_label(x: Int) {}
+func generic_and_missing_label<T>(x: T) {}
+
+generic_and_missing_label(42)
+// expected-error@-1 {{missing argument label 'x:' in call}} {{27-27=x: }}
