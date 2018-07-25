@@ -50,6 +50,8 @@ LoopsTests.testAllBackends("simpleCounterLoop_ab") {
 LoopsTests.testAllBackends("SR8164") {
   @inline(never)
   func SR8164(count: Int32, expectedVal: Int32) {
+    // TODO(b/111815938): Fix this test for google internal CUDA setup.
+    #if !CUDA
     var a = Tensor<Int32>(count)
     let b = Tensor<Int32>(count)
     if (count == 100) {
@@ -63,6 +65,7 @@ LoopsTests.testAllBackends("SR8164") {
     }
     a -= b
     expectEqualWithScalarTensor(expectedVal, a)
+    #endif //!CUDA
   }
 
   SR8164(count: 100, expectedVal: 100)

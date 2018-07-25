@@ -202,6 +202,8 @@ TensorTests.test("WholeTensorSlicing") {
 }
 
 TensorTests.testAllBackends("Reduction") {
+  // TODO(b/111815968): triage and fix this TPU issue
+  #if !TPU
   // 2 x 5
   let x = Tensor<Float>([[1, 2, 3, 4, 5], [1, 2, 3, 4, 5]])
   expectEqual(ShapedArray(shape: [5], scalars: [2, 4, 6, 8, 10]),
@@ -212,6 +214,7 @@ TensorTests.testAllBackends("Reduction") {
               x.product(squeezingAxes: 0).toHost(shape: []).array)
   expectEqual(ShapedArray(shape: [1, 5], scalars: [1, 4, 9, 16, 25]),
               x.product(alongAxes: 0).toHost(shape: []).array)
+  #endif // !TPU
 }
 
 TensorTests.testAllBackends("Concatenation") {
