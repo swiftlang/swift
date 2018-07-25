@@ -384,6 +384,9 @@ extension Set: Collection {
   /// If the set is empty, the value of this property is `nil`.
   @inlinable
   public var first: Element? {
+    // FIXME: It'd better to use an iterator than to subscript with startIndex,
+    // because startIndex is currently O(n) in bridged sets. However,
+    // enumerators aren't guaranteed to have the same element order as allKeys.
     return count > 0 ? self[startIndex] : nil
   }
 }
