@@ -30,13 +30,13 @@ public func withOverriddenLocaleCurrentLocale<Result>(
   guard let oldMethod = class_getClassMethod(
     NSLocale.self, #selector(getter: NSLocale.current)) as Optional
   else {
-    _preconditionFailure("Could not find +[Locale currentLocale]")
+    preconditionFailure("Could not find +[Locale currentLocale]")
   }
 
   guard let newMethod = class_getClassMethod(
     NSLocale.self, #selector(NSLocale._swiftUnittest_currentLocale)) as Optional
   else {
-    _preconditionFailure("Could not find +[Locale _swiftUnittest_currentLocale]")
+    preconditionFailure("Could not find +[Locale _swiftUnittest_currentLocale]")
   }
 
   precondition(_temporaryLocaleCurrentLocale == nil,

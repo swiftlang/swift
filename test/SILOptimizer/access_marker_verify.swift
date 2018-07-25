@@ -960,7 +960,7 @@ extension UsesSelf {
 // --- autoclosure
 struct StructWithLayout {
   internal init() {
-    _sanityCheck(MemoryLayout.size(ofValue: self) >= 0)
+    assert(MemoryLayout.size(ofValue: self) >= 0)
   }
 }
 // CHECK-LABEL: sil hidden @$S20access_marker_verify16StructWithLayoutVACycfC : $@convention(method) (@thin StructWithLayout.Type) -> StructWithLayout {
@@ -975,7 +975,6 @@ struct StructWithLayout {
 // call UInt.init(_builtinIntegerLiteral:)
 // CHECK: apply
 // call default argument
-// CHECK: apply %{{.*}}() : $@convention(thin) () -> StaticString
 // call _sanityCheck(_:_:file:line:)
 // CHECK: apply %{{.*}}([[CLOSURE]], {{.*}})
 // CHECK: load [trivial] [[PROJ]] : $*StructWithLayout

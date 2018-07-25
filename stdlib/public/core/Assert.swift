@@ -199,8 +199,8 @@ public func fatalError(
 /// building in fast mode they are disabled.  In release mode they don't print
 /// an error message but just trap. In debug mode they print an error message
 /// and abort.
-@_transparent
-public func _precondition(
+@usableFromInline @_transparent
+internal func _precondition(
   _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
@@ -216,8 +216,8 @@ public func _precondition(
   }
 }
 
-@_transparent
-public func _preconditionFailure(
+@usableFromInline @_transparent
+internal func _preconditionFailure(
   _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) -> Never {
@@ -253,8 +253,8 @@ public func _overflowChecked<T>(
 /// and abort.
 /// They are meant to be used when the check is not comprehensively checking for
 /// all possible errors.
-@_transparent
-public func _debugPrecondition(
+@usableFromInline @_transparent
+internal func _debugPrecondition(
   _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
@@ -267,8 +267,8 @@ public func _debugPrecondition(
   }
 }
 
-@_transparent
-public func _debugPreconditionFailure(
+@usableFromInline @_transparent
+internal func _debugPreconditionFailure(
   _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) -> Never {
@@ -284,8 +284,8 @@ public func _debugPreconditionFailure(
 /// standard library. They are only enable when the standard library is built
 /// with the build configuration INTERNAL_CHECKS_ENABLED enabled. Otherwise, the
 /// call to this function is a noop.
-@_transparent
-public func _sanityCheck(
+@usableFromInline @_transparent
+internal func _sanityCheck(
   _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
@@ -297,8 +297,8 @@ public func _sanityCheck(
 #endif
 }
 
-@_transparent
-public func _sanityCheckFailure(
+@usableFromInline @_transparent
+internal func _sanityCheckFailure(
   _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) -> Never {
