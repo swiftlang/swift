@@ -1469,6 +1469,9 @@ NodePointer Demangler::demangleMetatype() {
       return createWithPoppedType(Node::Kind::TypeMetadataInstantiationFunction);
     case 'r':
       return createWithPoppedType(Node::Kind::TypeMetadataCompletionFunction);
+    case 'l':
+      return createWithPoppedType(
+                            Node::Kind::TypeMetadataInPlaceInitializationCache);
     case 'L':
       return createWithPoppedType(Node::Kind::TypeMetadataLazyCache);
     case 'm':

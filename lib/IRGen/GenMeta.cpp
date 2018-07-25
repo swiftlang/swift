@@ -122,6 +122,73 @@ void IRGenModule::setTrueConstGlobal(llvm::GlobalVariable *var) {
 }
 
 /*****************************************************************************/
+/** Metadata completion ******************************************************/
+/*****************************************************************************/
+
+/// Does the metadata for the given type, which we are currently emitting,
+/// require in-place metadata initialiation structures and functions?
+static bool needsInPlaceMetadataInitialization(IRGenModule &IGM,
+                                               NominalTypeDecl *typeDecl) {
+  // Generic types never have in-place metadata initialization.
+  if (typeDecl->isGenericContext())
+    return false;
+
+  assert(isa<StructDecl>(typeDecl) || isa<EnumDecl>(typeDecl));
+
+  // If the type is known to be fixed-layout, we can emit its metadata such
+  // that it doesn't need dynamic initialization.
+  auto &ti = IGM.getTypeInfoForUnlowered(typeDecl->getDeclaredTypeInContext());
+  if (ti.isFixedSize(ResilienceExpansion::Maximal))
+    return false;
+
+  return true;
+}
+
+using MetadataCompletionBodyEmitter =
+  void (IRGenFunction &IGF,
+        llvm::Value *metadata,
+        MetadataDependencyCollector *collector);
+
+static void emitMetadataCompletionFunction(IRGenModule &IGM,
+                                           NominalTypeDecl *typeDecl,
+                       llvm::function_ref<MetadataCompletionBodyEmitter> body) {
+  llvm::Function *f =
+    IGM.getAddrOfTypeMetadataCompletionFunction(typeDecl, ForDefinition);
+  f->setAttributes(IGM.constructInitialAttributes());
+
+  IRGenFunction IGF(IGM, f);
+
+  // Skip instrumentation when building for TSan to avoid false positives.
+  // The synchronization for this happens in the Runtime and we do not see it.
+  if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Thread)
+    f->removeFnAttr(llvm::Attribute::SanitizeThread);
+
+  if (IGM.DebugInfo)
+    IGM.DebugInfo->emitArtificialFunction(IGF, f);
+
+  Explosion params = IGF.collectParameters();
+  llvm::Value *metadata = params.claimNext();
+  llvm::Value *context = params.claimNext();
+  llvm::Value *templatePointer = params.claimNext();
+
+  // TODO: use these?
+  (void) context;
+  (void) templatePointer;
+
+  MetadataDependencyCollector collector;
+
+  body(IGF, metadata, &collector);
+
+  // At the current insertion point, the metadata is now complete.
+
+  // Merge with any metadata dependencies we may have collected.
+  auto dependency = collector.finish(IGF);
+  auto returnValue = dependency.combine(IGF);
+
+  IGF.Builder.CreateRet(returnValue);
+}
+
+/*****************************************************************************/
 /** Nominal Type Descriptor Emission *****************************************/
 /*****************************************************************************/
 
@@ -457,6 +524,7 @@ namespace {
   protected:
     NominalTypeDecl *Type;
     RequireMetadata_t HasMetadata;
+    bool HasInPlaceMetadataInitialization;
     
     using super::IGM;
     using super::B;
@@ -468,8 +536,10 @@ namespace {
     TypeContextDescriptorBuilderBase(IRGenModule &IGM, NominalTypeDecl *Type,
                                      RequireMetadata_t requireMetadata)
       : super(IGM), Type(Type),
-        HasMetadata(requireMetadata)
-    {}
+        HasMetadata(requireMetadata),
+        HasInPlaceMetadataInitialization(
+                                    computeHasInPlaceMetadataInitialization()) {
+    }
     
     void layout() {
       super::layout();
@@ -478,6 +548,7 @@ namespace {
       // ABI TODO: layout info should be superseded by remote mirror metadata
       asImpl().addLayoutInfo();
       asImpl().addGenericSignature();
+      asImpl().maybeAddInPlaceMetadataInitialization();
     }
     
     void addName() {
@@ -587,6 +658,61 @@ namespace {
           flags.setIsCTypedef(true);
         }
       }
+    }
+
+    bool computeHasInPlaceMetadataInitialization() {
+      // Not if we don't have metadata.
+      if (!HasMetadata)
+        return false;
+
+      // Only struct and enums for now.  Classes currently use an eager
+      // mechanism that doesn't properly support recursive dependencies, so
+      // their equivalent of in-place initialization does not yet use this
+      // infrastructure.
+      if (!isa<StructDecl>(Type) && !isa<EnumDecl>(Type))
+        return false;
+
+      return needsInPlaceMetadataInitialization(IGM, Type);
+    }
+
+    bool hasInPlaceMetadataInitialization() {
+      return HasInPlaceMetadataInitialization;
+    }
+
+    void setHasInPlaceMetadataInitialization(TypeContextDescriptorFlags &flags){
+      flags.setHasInPlaceMetadataInitialization(
+                                              HasInPlaceMetadataInitialization);
+    }
+
+    void maybeAddInPlaceMetadataInitialization() {
+      if (!HasInPlaceMetadataInitialization)
+        return;
+
+      if (isa<StructDecl>(Type) || isa<EnumDecl>(Type)) {
+        asImpl().addInPlaceValueMetadataInitialization();
+      } else {
+        llvm_unreachable("unexpected type allowing in-place initialization");
+      }
+    }
+
+    /// Add an InPlaceValueMetadataInitialization structure to the descriptor.
+    void addInPlaceValueMetadataInitialization() {
+      // Relative pointer to the initialization cache.
+      // Note that we trigger the definition of it when emitting the
+      // completion function.
+      auto cache = IGM.getAddrOfTypeMetadataInPlaceInitializationCache(Type,
+                                                              NotForDefinition);
+      B.addRelativeAddress(cache);
+
+      // Relative pointer to the metadata.
+      auto type = Type->getDeclaredTypeInContext()->getCanonicalType();
+      auto metadata = IGM.getAddrOfTypeMetadata(type);
+      B.addRelativeAddress(metadata);
+
+      // Completion function.
+      auto completionFunction =
+        IGM.getAddrOfTypeMetadataCompletionFunction(Type, NotForDefinition);
+      B.addRelativeAddress(completionFunction);
     }
 
     // Subclasses should provide:
@@ -705,6 +831,8 @@ namespace {
       flags.setIsReflectable(
                             !IGM.shouldEmitOpaqueTypeMetadataRecord(getType()));
 
+      setHasInPlaceMetadataInitialization(flags);
+
       getClangImportedFlags(flags);
       return flags.getOpaqueValue();
     }
@@ -762,6 +890,8 @@ namespace {
       TypeContextDescriptorFlags flags;
 
       flags.setIsReflectable(Strategy.isReflectable());
+
+      setHasInPlaceMetadataInitialization(flags);
 
       getClangImportedFlags(flags);
       return flags.getOpaqueValue();
@@ -1167,53 +1297,26 @@ namespace {
       //   MetadataDependency(Metadata *type,
       //                      MetadataCompletionContext *context,
       //                      const GenericMetadataPattern *pattern);
-      llvm::Function *f =
-        IGM.getAddrOfTypeMetadataCompletionFunction(Target, ForDefinition);
-      f->setAttributes(IGM.constructInitialAttributes());
+      emitMetadataCompletionFunction(IGM, Target,
+        [&](IRGenFunction &IGF, llvm::Value *metadata,
+            MetadataDependencyCollector *collector) {
+        // Bind the generic arguments.
+        // FIXME: this will be problematic if we ever try to bind superclass
+        // types from type metadata!
+        if (Target->isGenericContext()) {
+          auto type = Target->getDeclaredTypeInContext()->getCanonicalType();
+          IGF.bindLocalTypeDataFromTypeMetadata(type, IsExact, metadata,
+                                                MetadataState::Abstract);
+        }
 
-      IRGenFunction IGF(IGM, f);
+        // A dependent VWT means that we have dependent metadata.
+        if (HasDependentVWT)
+          HasDependentMetadata = true;
 
-      // Skip instrumentation when building for TSan to avoid false positives.
-      // The synchronization for this happens in the Runtime and we do not see it.
-      if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Thread)
-        f->removeFnAttr(llvm::Attribute::SanitizeThread);
-
-      if (IGM.DebugInfo)
-        IGM.DebugInfo->emitArtificialFunction(IGF, f);
-
-      Explosion params = IGF.collectParameters();
-      llvm::Value *metadata = params.claimNext();
-      llvm::Value *context = params.claimNext();
-      llvm::Value *templatePointer = params.claimNext();
-
-      (void) context;
-      (void) templatePointer;
-
-      // Bind the generic arguments.
-      // FIXME: this will be problematic if we ever try to bind superclass
-      // types from type metadata!
-      if (Target->isGenericContext()) {
-        auto type = Target->getDeclaredTypeInContext()->getCanonicalType();
-        IGF.bindLocalTypeDataFromTypeMetadata(type, IsExact, metadata,
-                                              MetadataState::Abstract);
-      }
-
-      // A dependent VWT means that we have dependent metadata.
-      if (HasDependentVWT)
-        HasDependentMetadata = true;
-
-      MetadataDependencyCollector collector;
-
-      if (HasDependentMetadata) {
-        asImpl().emitInitializeMetadata(IGF, metadata, false, &collector);
-      }
-      
-      // The metadata is now complete.  Finalize any metadata dependencies
-      // we may have collected.
-      auto dependency = collector.finish(IGF);
-      auto returnValue = dependency.combine(IGF);
-
-      IGF.Builder.CreateRet(returnValue);
+        if (HasDependentMetadata) {
+          asImpl().emitInitializeMetadata(IGF, metadata, false, collector);
+        }
+      });
     }
 
     /// The information necessary to fill in a GenericMetadataPartialPattern
@@ -2080,6 +2183,7 @@ namespace {
       auto type =cast<ClassType>(Target->getDeclaredType()->getCanonicalType());
 
       (void) getTypeMetadataAccessFunction(IGM, type, ForDefinition,
+                                           CacheStrategy::Lazy,
       [&](IRGenFunction &IGF, DynamicMetadataRequest request,
           llvm::Constant *cacheVar) -> MetadataResponse {
         // There's an interesting special case where we can do the
@@ -2095,17 +2199,17 @@ namespace {
         }
 
         // Otherwise, use the generic path.
-        return emitInPlaceTypeMetadataAccessFunctionBody(IGF, type, cacheVar,
+        return emitOnceTypeMetadataAccessFunctionBody(IGF, type, cacheVar,
           [&](IRGenFunction &IGF, llvm::Value *metadata) {
-            return emitInPlaceMetadataInitialization(IGF, type, metadata);
+            return emitOnceMetadataInitialization(IGF, type, metadata);
           });
       });
     }
 
   private:
-    llvm::Value *emitInPlaceMetadataInitialization(IRGenFunction &IGF,
-                                                   CanClassType type,
-                                                   llvm::Value *metadata) {
+    llvm::Value *emitOnceMetadataInitialization(IRGenFunction &IGF,
+                                                CanClassType type,
+                                                llvm::Value *metadata) {
       // Many of the things done by generic instantiation are unnecessary here:
       //   initializing the metaclass pointer
       //   initializing the ro-data pointer
@@ -2527,10 +2631,38 @@ IRGenFunction::emitValueWitnessTableRef(SILType type,
 // Value types (structs and enums)
 //===----------------------------------------------------------------------===//
 
+namespace {
+  /// A helper class for laying out value metadata.
+  template <class Base>
+  class ValueMetadataBuilderBase : public Base {
+  protected:
+    using Base::IGM;
+    using Base::Target;
+    using Base::asImpl;
+
+    using Base::Base;
+
+  public:
+    /// Create the runtime data structures and functions necessary to
+    /// support in-place metadata initialization on this type.
+    void maybeCreateInPlaceMetadataInitialization() {
+      if (!needsInPlaceMetadataInitialization(IGM, Target))
+        return;
+
+      emitMetadataCompletionFunction(IGM, Target,
+        [&](IRGenFunction &IGF, llvm::Value *metadata,
+            MetadataDependencyCollector *collector) {
+        asImpl().emitInitializeMetadata(IGF, metadata, /*vwt mutable*/true,
+                                        collector);
+      });
+    }
+  };
+}
+
 static llvm::Value *
-emitInPlaceValueTypeMetadataInitialization(IRGenFunction &IGF,
-                                           CanNominalType type,
-                                           llvm::Value *metadata,
+emitOnceValueTypeMetadataInitialization(IRGenFunction &IGF,
+                                        CanNominalType type,
+                                        llvm::Value *metadata,
                                    MetadataDependencyCollector *collector) {
   // All the value types are basically similar, as are foreign types.
   assert(isa<StructType>(type) || isa<EnumType>(type) ||
@@ -2553,26 +2685,45 @@ emitInPlaceValueTypeMetadataInitialization(IRGenFunction &IGF,
   return metadata;
 }
 
-/// Create an access function for the type metadata of the given
-/// non-generic nominal type.
-static void createInPlaceValueTypeMetadataAccessFunction(IRGenModule &IGM,
-                                                      NominalTypeDecl *typeDecl) {
+/// Create an access function for the given type which triggers the
+/// in-place initialization path.
+static void
+createInPlaceInitializationMetadataAccessFunction(IRGenModule &IGM,
+                                                  NominalTypeDecl *typeDecl,
+                                                  CanType type) {
   assert(!typeDecl->isGenericContext());
-  auto type =
-    cast<NominalType>(typeDecl->getDeclaredType()->getCanonicalType());
 
   (void) getTypeMetadataAccessFunction(IGM, type, ForDefinition,
+                                       CacheStrategy::InPlaceInitialization,
                                        [&](IRGenFunction &IGF,
                                            DynamicMetadataRequest request,
                                            llvm::Constant *cacheVariable) {
-    return emitInPlaceTypeMetadataAccessFunctionBody(IGF, type, cacheVariable,
-      [&](IRGenFunction &IGF, llvm::Value *metadata) {
-        MetadataDependencyCollector *collector = nullptr; // FIXME
-        return emitInPlaceValueTypeMetadataInitialization(IGF, type, metadata,
-                                                          collector);
-      });
+    llvm::Value *descriptor =
+      IGF.IGM.getAddrOfTypeContextDescriptor(typeDecl, RequireMetadata);
+    auto responsePair =
+      IGF.Builder.CreateCall(IGF.IGM.getGetInPlaceMetadataFn(),
+                             {request.get(IGF), descriptor});
+    return MetadataResponse::handle(IGF, request, responsePair);
   });
 }
+
+/// Create an access function for the given non-generic type.
+static void createNonGenericMetadataAccessFunction(IRGenModule &IGM,
+                                                   NominalTypeDecl *typeDecl) {
+  assert(!typeDecl->isGenericContext());
+  auto type = typeDecl->getDeclaredType()->getCanonicalType();
+
+  // If the type requires the in-place initialization pattern, use it.
+  if (needsInPlaceMetadataInitialization(IGM, typeDecl)) {
+    createInPlaceInitializationMetadataAccessFunction(IGM, typeDecl, type);
+    return;
+  }
+
+  // Otherwise, use the lazy pattern, which should be emitted using a
+  // direct reference to the metadata.
+  (void) getTypeMetadataAccessFunction(IGM, type, ForDefinition);
+}
+
 
 //===----------------------------------------------------------------------===//
 // Structs
@@ -2581,8 +2732,9 @@ static void createInPlaceValueTypeMetadataAccessFunction(IRGenModule &IGM,
 namespace {
   /// An adapter for laying out struct metadata.
   template <class Impl>
-  class StructMetadataBuilderBase : public StructMetadataVisitor<Impl> {
-    using super = StructMetadataVisitor<Impl>;
+  class StructMetadataBuilderBase
+         : public ValueMetadataBuilderBase<StructMetadataVisitor<Impl>> {
+    using super = ValueMetadataBuilderBase<StructMetadataVisitor<Impl>>;
 
   protected:
     ConstantStructBuilder &B;
@@ -2657,6 +2809,18 @@ namespace {
     void addGenericWitnessTable(CanType type, ProtocolConformanceRef conf) {
       B.addNullPointer(IGM.WitnessTablePtrTy);
     }
+
+    void emitInitializeMetadata(IRGenFunction &IGF,
+                                llvm::Value *metadata,
+                                bool isVWTMutable,
+                                MetadataDependencyCollector *collector) {
+      auto loweredTy = getLoweredType();
+      auto &fixedTI = IGM.getTypeInfo(loweredTy);
+      if (isa<FixedTypeInfo>(fixedTI)) return;
+
+      emitInitializeFieldOffsetVector(IGF, loweredTy, metadata, isVWTMutable,
+                                      collector);
+    }
   };
 
   class StructMetadataBuilder :
@@ -2677,7 +2841,8 @@ namespace {
     }
 
     void createMetadataAccessFunction() {
-      createInPlaceValueTypeMetadataAccessFunction(IGM, Target);
+      createNonGenericMetadataAccessFunction(IGM, Target);
+      maybeCreateInPlaceMetadataInitialization();
     }
   };
   
@@ -2784,18 +2949,6 @@ namespace {
     bool hasCompletionFunction() {
       return !isa<FixedTypeInfo>(IGM.getTypeInfo(getLoweredType()));
     }
-
-    void emitInitializeMetadata(IRGenFunction &IGF,
-                                llvm::Value *metadata,
-                                bool isVWTMutable,
-                                MetadataDependencyCollector *collector) {
-      auto loweredTy = getLoweredType();
-      auto &fixedTI = IGM.getTypeInfo(loweredTy);
-      if (isa<FixedTypeInfo>(fixedTI)) return;
-
-      emitInitializeFieldOffsetVector(IGF, loweredTy, metadata, isVWTMutable,
-                                      collector);
-    }
   };
 } // end anonymous namespace
 
@@ -2851,8 +3004,9 @@ void IRGenerator::noteUseOfAnyParentTypeMetadata(NominalTypeDecl *type) {
 namespace {
 
   template<class Impl>
-  class EnumMetadataBuilderBase : public EnumMetadataVisitor<Impl> {
-    using super = EnumMetadataVisitor<Impl>;
+  class EnumMetadataBuilderBase
+         : public ValueMetadataBuilderBase<EnumMetadataVisitor<Impl>> {
+    using super = ValueMetadataBuilderBase<EnumMetadataVisitor<Impl>>;
 
   protected:
     ConstantStructBuilder &B;
@@ -2920,6 +3074,18 @@ namespace {
       auto &strategy = getEnumImplStrategy(IGM, enumTy);
       return Size(strategy.getPayloadSizeForMetadata());
     }
+
+    void emitInitializeMetadata(IRGenFunction &IGF,
+                                llvm::Value *metadata,
+                                bool isVWTMutable,
+                                MetadataDependencyCollector *collector) {
+      // Nominal types are always preserved through SIL lowering.
+      auto enumTy = getLoweredType();
+
+      auto &strategy = getEnumImplStrategy(IGF.IGM, enumTy);
+      strategy.initializeMetadata(IGF, metadata, isVWTMutable, enumTy,
+                                  collector);
+    }
   };
 
   class EnumMetadataBuilder
@@ -2930,8 +3096,6 @@ namespace {
     EnumMetadataBuilder(IRGenModule &IGM, EnumDecl *theEnum,
                         ConstantStructBuilder &B)
       : EnumMetadataBuilderBase(IGM, theEnum, B) {}
-
-
 
     void addPayloadSize() {
       auto payloadSize = getConstantPayloadSize();
@@ -2949,7 +3113,8 @@ namespace {
     }
 
     void createMetadataAccessFunction() {
-      createInPlaceValueTypeMetadataAccessFunction(IGM, Target);
+      createNonGenericMetadataAccessFunction(IGM, Target);
+      maybeCreateInPlaceMetadataInitialization();
     }
   };
 
@@ -3000,18 +3165,6 @@ namespace {
 
     bool hasCompletionFunction() {
       return !isa<FixedTypeInfo>(IGM.getTypeInfo(getLoweredType()));
-    }
-
-    void emitInitializeMetadata(IRGenFunction &IGF,
-                                llvm::Value *metadata,
-                                bool isVWTMutable,
-                                MetadataDependencyCollector *collector) {
-      // Nominal types are always preserved through SIL lowering.
-      auto enumTy = getLoweredType();
-
-      auto &strategy = getEnumImplStrategy(IGF.IGM, enumTy);
-      strategy.initializeMetadata(IGF, metadata, isVWTMutable, enumTy,
-                                  collector);
     }
   };
 
@@ -3166,15 +3319,15 @@ namespace {
       auto type = cast<NominalType>(asImpl().getTargetType());
 
       (void) getTypeMetadataAccessFunction(IGM, type, ForDefinition,
+                                           CacheStrategy::Lazy,
                                            [&](IRGenFunction &IGF,
                                                DynamicMetadataRequest request,
                                                llvm::Constant *cacheVariable) {
-        return emitInPlaceTypeMetadataAccessFunctionBody(IGF, type,
-                                                         cacheVariable,
+        return emitOnceTypeMetadataAccessFunctionBody(IGF, type, cacheVariable,
           [&](IRGenFunction &IGF, llvm::Value *candidate) {
             MetadataDependencyCollector *collector = nullptr;
             auto metadata = uniqueForeignTypeMetadataRef(IGF, candidate);
-            return emitInPlaceValueTypeMetadataInitialization(IGF, type,
+            return emitOnceValueTypeMetadataInitialization(IGF, type,
                                                               metadata,
                                                               collector);
           });
