@@ -1507,7 +1507,7 @@ func stopTrackingObjects(_: UnsafePointer<CChar>) -> Int
 public final class TestSuite {
   public init(_ name: String) {
     self.name = name
-    _precondition(
+    precondition(
       _testNameToIndex[name] == nil,
       "test suite with the same name already exists")
     _allTestSuites.append(self)
@@ -1543,12 +1543,12 @@ public final class TestSuite {
   }
 
   public func setUp(_ code: @escaping () -> Void) {
-    _precondition(_testSetUpCode == nil, "set-up code already set")
+    precondition(_testSetUpCode == nil, "set-up code already set")
     _testSetUpCode = code
   }
 
   public func tearDown(_ code: @escaping () -> Void) {
-    _precondition(_testTearDownCode == nil, "tear-down code already set")
+    precondition(_testTearDownCode == nil, "tear-down code already set")
     _testTearDownCode = code
   }
 

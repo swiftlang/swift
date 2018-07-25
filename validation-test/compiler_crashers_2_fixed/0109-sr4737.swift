@@ -528,7 +528,7 @@ extension _UTFEncoding {
     }
     // Buffering mode.
     // Fill buffer back to 4 bytes (or as many as are left in the iterator).
-    _sanityCheck(buffer._bitCount < BufferStorage.bitWidth)
+    assert(buffer._bitCount < BufferStorage.bitWidth)
     repeat {
       if let codeUnit = input.next() {
         buffer.append(codeUnit)
@@ -588,7 +588,7 @@ extension Unicode.UTF8 : UnicodeEncoding {
       value    |= (bits & 0b0________________________________0000_1111) &<< 12
       return UnicodeScalar(_unchecked: value)
     default:
-      _sanityCheck(source.count == 4)
+      assert(source.count == 4)
       var value = (bits & 0b0_11_1111__0000_0000__0000_0000__0000_0000) &>> 24
       value    |= (bits & 0b0____________11_1111__0000_0000__0000_0000) &>> 10
       value    |= (bits & 0b0_______________________11_1111__0000_0000) &<< 4
@@ -634,7 +634,7 @@ extension Unicode.UTF8.ReverseDecoder : _UTF8Decoder {
   
   public // @testable
   func _parseMultipleCodeUnits() -> Unicode.ParseResult<EncodedScalar> {
-    _sanityCheck(buffer._storage & 0x80 != 0) // this case handled elsewhere
+    assert(buffer._storage & 0x80 != 0) // this case handled elsewhere
 
     if buffer._storage                & 0b0__1110_0000__1100_0000
                                      == 0b0__1100_0000__1000_0000 {
@@ -737,7 +737,7 @@ extension Unicode.UTF8.ForwardDecoder : _UTF8Decoder {
   
   public // @testable
   func _parseMultipleCodeUnits() -> Unicode.ParseResult<EncodedScalar> {
-    _sanityCheck(buffer._storage & 0x80 != 0) // this case handled elsewhere
+    assert(buffer._storage & 0x80 != 0) // this case handled elsewhere
     
     if buffer._storage & 0b0__1100_0000__1110_0000
                       == 0b0__1000_0000__1100_0000 {
@@ -813,7 +813,7 @@ extension _UTF16Decoder {
   }
   
   internal mutating func _consume(bitCount: UInt8) -> EncodedScalar {
-    _sanityCheck(bitCount == 16)
+    assert(bitCount == 16)
     let s = buffer._storage
     buffer._storage = 0
     buffer._bitCount = 0
@@ -822,7 +822,7 @@ extension _UTF16Decoder {
   
   public // @testable
   func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8) {
-    _sanityCheck(  // this case handled elsewhere
+    assert(  // this case handled elsewhere
       !Self._isScalar(UInt16(truncatingIfNeeded: buffer._storage)))
     
     if _fastPath(buffer._storage & 0xFC00_FC00 == Self._surrogatePattern) {
@@ -855,7 +855,7 @@ extension Unicode.UTF16 : UnicodeEncoding {
     if _fastPath(source._bitCount == 16) {
       return UnicodeScalar(_unchecked: bits & 0xffff)
     }
-    _sanityCheck(source._bitCount == 32)
+    assert(source._bitCount == 32)
     let value = 0x10000 + (bits >> 16 & 0x03ff | (bits & 0x03ff) << 10)
     return UnicodeScalar(_unchecked: value)
   }  

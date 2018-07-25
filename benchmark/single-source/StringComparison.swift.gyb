@@ -65,7 +65,7 @@ public func setup_StringComparison_${Name}() {
 
 @inline(never)
 public func run_StringComparison_${Name}(_ N: Int) {
-  let workload = Workload_${Name}._unsafelyUnwrappedUnchecked
+  let workload = Workload_${Name}.unsafelyUnwrapped
   let tripCount = workload.tripCount
   let payload = workload.payload
   for _ in 1...tripCount*N {

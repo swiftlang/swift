@@ -130,7 +130,7 @@ public func setup_StringComparison_ascii() {
 
 @inline(never)
 public func run_StringComparison_ascii(_ N: Int) {
-  let workload = Workload_ascii._unsafelyUnwrappedUnchecked
+  let workload = Workload_ascii.unsafelyUnwrapped
   let tripCount = workload.tripCount
   let payload = workload.payload
   for _ in 1...tripCount*N {
@@ -167,7 +167,7 @@ public func setup_StringComparison_latin1() {
 
 @inline(never)
 public func run_StringComparison_latin1(_ N: Int) {
-  let workload = Workload_latin1._unsafelyUnwrappedUnchecked
+  let workload = Workload_latin1.unsafelyUnwrapped
   let tripCount = workload.tripCount
   let payload = workload.payload
   for _ in 1...tripCount*N {
@@ -204,7 +204,7 @@ public func setup_StringComparison_fastPrenormal() {
 
 @inline(never)
 public func run_StringComparison_fastPrenormal(_ N: Int) {
-  let workload = Workload_fastPrenormal._unsafelyUnwrappedUnchecked
+  let workload = Workload_fastPrenormal.unsafelyUnwrapped
   let tripCount = workload.tripCount
   let payload = workload.payload
   for _ in 1...tripCount*N {
@@ -241,7 +241,7 @@ public func setup_StringComparison_slowerPrenormal() {
 
 @inline(never)
 public func run_StringComparison_slowerPrenormal(_ N: Int) {
-  let workload = Workload_slowerPrenormal._unsafelyUnwrappedUnchecked
+  let workload = Workload_slowerPrenormal.unsafelyUnwrapped
   let tripCount = workload.tripCount
   let payload = workload.payload
   for _ in 1...tripCount*N {
@@ -278,7 +278,7 @@ public func setup_StringComparison_nonBMPSlowestPrenormal() {
 
 @inline(never)
 public func run_StringComparison_nonBMPSlowestPrenormal(_ N: Int) {
-  let workload = Workload_nonBMPSlowestPrenormal._unsafelyUnwrappedUnchecked
+  let workload = Workload_nonBMPSlowestPrenormal.unsafelyUnwrapped
   let tripCount = workload.tripCount
   let payload = workload.payload
   for _ in 1...tripCount*N {
@@ -315,7 +315,7 @@ public func setup_StringComparison_emoji() {
 
 @inline(never)
 public func run_StringComparison_emoji(_ N: Int) {
-  let workload = Workload_emoji._unsafelyUnwrappedUnchecked
+  let workload = Workload_emoji.unsafelyUnwrapped
   let tripCount = workload.tripCount
   let payload = workload.payload
   for _ in 1...tripCount*N {
@@ -352,7 +352,7 @@ public func setup_StringComparison_abnormal() {
 
 @inline(never)
 public func run_StringComparison_abnormal(_ N: Int) {
-  let workload = Workload_abnormal._unsafelyUnwrappedUnchecked
+  let workload = Workload_abnormal.unsafelyUnwrapped
   let tripCount = workload.tripCount
   let payload = workload.payload
   for _ in 1...tripCount*N {
@@ -389,7 +389,7 @@ public func setup_StringComparison_zalgo() {
 
 @inline(never)
 public func run_StringComparison_zalgo(_ N: Int) {
-  let workload = Workload_zalgo._unsafelyUnwrappedUnchecked
+  let workload = Workload_zalgo.unsafelyUnwrapped
   let tripCount = workload.tripCount
   let payload = workload.payload
   for _ in 1...tripCount*N {
@@ -426,7 +426,7 @@ public func setup_StringComparison_longSharedPrefix() {
 
 @inline(never)
 public func run_StringComparison_longSharedPrefix(_ N: Int) {
-  let workload = Workload_longSharedPrefix._unsafelyUnwrappedUnchecked
+  let workload = Workload_longSharedPrefix.unsafelyUnwrapped
   let tripCount = workload.tripCount
   let payload = workload.payload
   for _ in 1...tripCount*N {
