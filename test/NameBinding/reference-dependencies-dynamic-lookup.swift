@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: cp %s %t/main.swift
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -primary-file %t/main.swift -emit-reference-dependencies-path - > %t.swiftdeps
-// RUN: %FileCheck %s < %t.swiftdeps
+// RUN: %FileCheck %s -allow-deprecated-dag-overlap < %t.swiftdeps
 // RUN: %FileCheck -check-prefix=NEGATIVE %s < %t.swiftdeps
 
 // Check that the output is deterministic.

@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name generic_args -primary-file %s -emit-ir -verify -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend -module-name generic_args -primary-file %s -emit-ir -verify -g -o - | %FileCheck %s -allow-deprecated-dag-overlap
 
 func markUsed<T>(_ t: T) {}
 

@@ -12,10 +12,10 @@
 // RUN: %FileCheck %s -check-prefix=STRUCT_INSTANCE < %t.types.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSOCIATED_TYPES_UNQUAL_1 > %t.types.txt
-// RUN: %FileCheck %s -check-prefix=ASSOCIATED_TYPES_UNQUAL < %t.types.txt
+// RUN: %FileCheck %s -allow-deprecated-dag-overlap -check-prefix=ASSOCIATED_TYPES_UNQUAL < %t.types.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSOCIATED_TYPES_UNQUAL_2 > %t.types.txt
-// RUN: %FileCheck %s -check-prefix=ASSOCIATED_TYPES_UNQUAL < %t.types.txt
+// RUN: %FileCheck %s -allow-deprecated-dag-overlap -check-prefix=ASSOCIATED_TYPES_UNQUAL < %t.types.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BROKEN_CONFORMANCE_1 > %t.types.txt
 // RUN: %FileCheck %s -check-prefix=BROKEN_CONFORMANCE_1 < %t.types.txt
