@@ -1046,10 +1046,10 @@ static void decodeShapeArray(SymbolicValue attrValue,
   CanType eltType;
   auto shapeArray = attrValue.getArrayValue(eltType);
   assert(eltType->getString() == "TensorShape");
-  auto numShapes = shapes.size();
+  auto numShapes = shapeArray.size();
   for (unsigned shapeIdx = 0; shapeIdx != numShapes; ++shapeIdx) {
     auto prevNumDims = dims.size();
-    auto shape = shapes[shapeIdx];
+    auto shape = shapeArray[shapeIdx];
     decodeShapeAttr(shape, dims);
     numDims.push_back(int(dims.size() - prevNumDims));
   }
@@ -1568,8 +1568,7 @@ GLStatus TFGraphLowering::createDatasetCreationContext(
   SmallVector<int64_t, 8> dims;
   SmallVector<int, 3> numDims;
   SmallVector<int64_t*, 8> dimPtrs;
-  decodeShapeArray(graphOpInfo, attr.name.str(), /*attrIdx*/ 3, dims, numDims,
-                   dimPtrs);
+  decodeShapeArray(attr.value, dims, numDims, dimPtrs);
 
   // Even when this built-in returns multiple tensors, they are always presented
   // by a single tuple.
