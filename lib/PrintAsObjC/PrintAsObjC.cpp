@@ -925,7 +925,7 @@ private:
     auto renamedDeclName = renamedParsedDeclName.formDeclName(D->getASTContext());
     
     auto declContext = D->getDeclContext();
-    const ValueDecl *renamedFuncDecl = nullptr;
+    const ValueDecl *renamedDecl = nullptr;
     
     if (isa<ClassDecl>(D) || isa<ProtocolDecl>(D)) {
       UnqualifiedLookup lookup(renamedDeclName.getBaseIdentifier(),
@@ -933,7 +933,7 @@ private:
                                nullptr,
                                SourceLoc(),
                                UnqualifiedLookup::Flags::TypeLookup);
-      renamedFuncDecl = lookup.getSingleTypeResult();
+      renamedDecl = lookup.getSingleTypeResult();
     } else {
       SmallVector<ValueDecl *, 4> lookupResults;
       declContext->lookupQualified(declContext->getSelfTypeInContext(),
@@ -953,18 +953,18 @@ private:
              cast<FuncDecl>(D)->getParameters()->size()))
           continue;
         
-        if (renamedFuncDecl) {
+        if (renamedDecl) {
           // If we found a duplicated candidate then we would silently fail.
-          renamedFuncDecl = nullptr;
+          renamedDecl = nullptr;
           break;
         }
-        renamedFuncDecl = candidate;
+        renamedDecl = candidate;
       }
     }
     
-    if (renamedFuncDecl) {
+    if (renamedDecl) {
       SmallString<128> scratch;
-      auto renamedObjCRuntimeName = renamedFuncDecl->getObjCRuntimeName()
+      auto renamedObjCRuntimeName = renamedDecl->getObjCRuntimeName()
         ->getString(scratch);
       printEncodedString(renamedObjCRuntimeName, includeQuotes);
     } else {
