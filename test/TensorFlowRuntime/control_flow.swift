@@ -1,11 +1,18 @@
 // RUN: %target-run-strict-da-swift
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize
+//
+// Compiler-only testing for TPU graph lowering (e.g. shape requirements by XLA).
+// RUN: %target-swift-frontend -Xllvm -tf-strict-deabstraction -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-target-tpu -O -emit-sil %s >/dev/null
 
 // Control flow related tests.
 
 import TensorFlow
+#if TPU
+import TensorFlowUnittestTPU
+#else
 import TensorFlowUnittest
+#endif
 import StdlibUnittest
 
 var ControlFlowTests = TestSuite("ControlFlow")
@@ -15,13 +22,24 @@ public enum Pet {
 }
 
 // Enumerated all cases.
+@inline(never)
 public func weighPet(_ pet: Pet,
                      _ expectedVal: Float) {
   var weight = Tensor<Float>(1.0)
   switch pet {
-  case .bird: weight += 1.0
-  case .cat: weight += 5.0
-  case .dog: weight += 10.0
+  case .bird:
+    weight += 1.0
+    // Currently we make this call and the ones below to declare a shape,
+    // because when targeitng TPU, the bb arg for `weight` gets replicated onto
+    // both CPU and TPU devices.
+    // TODO: Remove these calls once we do bb arg pruning via dataflow analysis.
+    weight = _scalarTensorWithShape(weight)
+  case .cat:
+    weight += 5.0
+    weight = _scalarTensorWithShape(weight)
+  case .dog:
+    weight += 10.0
+    weight = _scalarTensorWithShape(weight)
   case .fish: break // no tensor code here
   }
   // This is needed to work-around the current TF limitation where the `If` op
@@ -37,12 +55,17 @@ ControlFlowTests.testAllBackends("weighPet") {
   weighPet(.fish, 1.0)
 }
 
+@inline(never)
 public func weighPetWithDefault(_ pet: Pet,
                                 _ expectedVal: Float) {
   var weight = Tensor<Float>(1.0)
   switch pet {
-  case .cat: weight += 5.0
-  default: weight += 3.0
+  case .cat:
+    weight += 5.0
+    weight = _scalarTensorWithShape(weight)
+  default:
+    weight += 3.0
+    weight = _scalarTensorWithShape(weight)
   }
   // This is needed to work-around the current TF limitation where the `If` op
   // must produce some output tensors.
@@ -65,27 +88,26 @@ public enum EnumWithPayload {
   indirect case d(EnumWithPayload)
 }
 
+@inline(never)
 public func testEnumWithPayload(_ x: EnumWithPayload, _ expectedVal: Float) {
   var val = Tensor<Float>(2.0)
   switch x {
   case .a(let x):
     val += 1.0
+    val = _scalarTensorWithShape(val)
     print(x)
   case .b(let x):
     print(x)
     let tx = Tensor<Float>(x).toAccelerator(shape: [])
     val += tx
-    // val += Tensor<Float>(x)
-    // val = _addScalarTensorsWithShape(val, Tensor<Float>(x))
+    val = _scalarTensorWithShape(val)
   case .c(let x, let y):
-    let tx = Tensor<Float>(x).toAccelerator(shape: [])
-    let ty = Tensor<Float>(y).toAccelerator(shape: [])
-    val *= tx + ty
-    // let z = _addScalarTensorsWithShape(x, y)
-    // val *= z
+    val *= x.toAccelerator(shape: []) + y.toAccelerator(shape: [])
+    val = _scalarTensorWithShape(val)
     print(x, y)
   case .d(let f):
     val += 10.0
+    val = _scalarTensorWithShape(val)
     print(f)
   }
   val += 0.0
@@ -121,7 +143,7 @@ public func testSwitchEnum(_ a: Tensor<Float>?,
   var b = Tensor<Float>(2.0)
   if let a = a {
     b += a.toAccelerator(shape: [])
-    // b = _addScalarTensorsWithShape(b, a)
+    b = _scalarTensorWithShape(b)
   }
   b -= 1.0
   expectNearlyEqualWithScalarTensor(expectedVal, b)
@@ -145,6 +167,7 @@ public func testSwitchEnumAddr(_ a: EnumAddr,
   switch a {
   case .A:
       b += 1.0
+      b = _scalarTensorWithShape(b)
   default:
       break
   }
@@ -174,6 +197,7 @@ public func testTryApply(_ a: Int,
   do {
     try foo(a)
     b += 1.0
+    b = _scalarTensorWithShape(b)
   } catch { }
   b -= 1.0
   expectNearlyEqualWithScalarTensor(expectedVal, b)
@@ -191,6 +215,7 @@ public func testCheckedCastBranch(_ a: AnyObject,
   var b = Tensor<Float>(2.0)
   if a is X {
     b += 1.0
+    b = _scalarTensorWithShape(b)
   }
   b -= 1.0
   expectNearlyEqualWithScalarTensor(expectedVal, b)
@@ -208,6 +233,7 @@ public func testCheckedCastAddrBranch(_ p: P,
   var b = Tensor<Float>(2.0)
   if let _ = p as? S {
     b += 1.0
+    b = _scalarTensorWithShape(b)
   }
   b -= 1.0
   expectNearlyEqualWithScalarTensor(expectedVal, b)

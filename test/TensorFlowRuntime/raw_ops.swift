@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-run-strict-da-swift
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize
 // REQUIRES: tensorflow_swift_bindings

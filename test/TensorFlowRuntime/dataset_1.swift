@@ -1,8 +1,11 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-run-strict-da-swift
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize
 //
-// Retain/release tests.
+// Compiler-only testing for TPU graph lowering (e.g. shape requirements by XLA).
+// RUN: %target-swift-frontend -Xllvm -tf-strict-deabstraction -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-target-tpu -O -emit-sil %s >/dev/null
+//
+// Dataset tests.
 
 import TensorFlow
 
@@ -60,15 +63,15 @@ public func model() {
     output_shapes: [TensorShape()]
   )
 
-  let one = getNextScalarFloatTensor(iterator)
+  let one = getNextScalarFloatTensor(iterator).toHost(shape: [])
   _hostOp(one)
   expectNearlyEqualWithScalarTensor(1.0, one)
 
-  let two = getNextScalarFloatTensor(iterator)
+  let two = getNextScalarFloatTensor(iterator).toHost(shape: [])
   _hostOp(two)
   expectNearlyEqualWithScalarTensor(2.0, two)
 
-  let three = getNextScalarFloatTensor(iterator)
+  let three = getNextScalarFloatTensor(iterator).toHost(shape: [])
   _hostOp(three)
   expectNearlyEqualWithScalarTensor(3.0, three)
 

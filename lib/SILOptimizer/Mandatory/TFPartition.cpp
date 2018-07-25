@@ -4240,10 +4240,17 @@ bool TFFunctionPartition::partition(bool isTest) {
   }
 
   if (!isAcceleratorOnly(hostFn)) {
+    // TODO(b/111123797): Lift this restriction.
+    if (resultValues.empty() &&
+        deviceInfo.primaryDeviceType == DeviceType::TPU) {
+      diagnose(hostFn.getASTContext(), hostFn.getLocation().getSourceLoc(),
+               diag::tfop_incorrect_definition,
+               "TPU execution cannot yet handle a graph that produces no "
+               "result tensors.");
+      return true;
+    }
+
     // Insert the start/finish and any terminate runtime calls.
-    // FIXME: Order resultValues based on the ordering of their defining
-    // instructions first, so that the generated tensor program has a
-    // deterministic output tensor ordering.
     insertTensorComputationStartEndTerminate(resultValues);
 
     // If the TensorFlow module is malformed, bail out without breaking the
