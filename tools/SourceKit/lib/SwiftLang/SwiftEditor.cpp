@@ -2413,7 +2413,7 @@ void SwiftLangSupport::editorReplaceText(StringRef Name,
     }
 
     if (Consumer.syntaxTreeEnabled()) {
-      std::unordered_set<unsigned> ReusedNodeIds = {};
+      std::unordered_set<unsigned> ReusedNodeIds;
       if (SyntaxCache.hasValue()) {
         auto &ReusedVector = SyntaxCache->getReusedNodeIds();
         ReusedNodeIds = std::unordered_set<unsigned>(ReusedVector.begin(),
