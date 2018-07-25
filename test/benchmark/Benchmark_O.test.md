@@ -86,6 +86,19 @@ ORSKIPTAGS: Fibonacci
 ORSKIPTAGS-NOT: RomanNumbers
 ````
 
+Alphabetic sorting of tests
+
+````
+RUN: %Benchmark_O --list \
+RUN:             | %FileCheck %s --check-prefix ALPHASORT
+ALPHASORT: COWArrayGuaranteedParameterOverhead
+ALPHASORT: COWTree
+ALPHASORT: ChainedFilterMap
+ALPHASORT: Chars
+ALPHASORT: FatCompactMap
+
+````
+
 ## Running Benchmarks
 Each real benchmark execution takes about a second per sample. If possible,
 multiple checks are combined into one run to minimize the test time.
@@ -173,6 +186,14 @@ RUN: not %Benchmark_O --skip-tags=bogus \
 RUN:         2>&1 | %FileCheck %s --check-prefix BADSKIPTAG
 BADSKIPTAG: error: 'bogus' is not a valid 'BenchmarkCategory'
 
+````
+
+Measuring memory use of a test with our method is valid only for single test.
+
+````
+RUN: %Benchmark_O 1 2 --memory --list \
+RUN:         2>&1 | %FileCheck %s --check-prefix WARNMEMORY
+WARNMEMORY: warning:
 ````
 
 ## Usage
