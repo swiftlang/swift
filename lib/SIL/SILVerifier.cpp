@@ -61,9 +61,16 @@ static llvm::cl::opt<bool> AbortOnFailure(
                               "verify-abort-on-failure",
                               llvm::cl::init(true));
 
+// SWIFT_ENABLE_TENSORFLOW
+// This flag is temporarily set to false because debug scope verification does
+// not handle inlined call sites. This is problematic for deabstraction, which
+// does performance inlining at -Onone.
+// When debug scope verification handles inlined call sites, set this flag to
+// true.
+// Documented at SR-8114.
 static llvm::cl::opt<bool> VerifyDIHoles(
                               "verify-di-holes",
-                              llvm::cl::init(true));
+                              llvm::cl::init(false));
 
 static llvm::cl::opt<bool> SkipConvertEscapeToNoescapeAttributes(
     "verify-skip-convert-escape-to-noescape-attributes", llvm::cl::init(false));
@@ -4743,14 +4750,6 @@ public:
       // map and go on.
       auto *DS = SI.getDebugScope();
       assert(DS && "Each instruction should have a debug scope");
-
-      // SWIFT_ENABLE_TENSORFLOW
-      // If debug scope has an inlined call site, skip it.
-      // TODO: Inlined call sites should be verified to ensure that the inliner
-      // handles scopes correctly.
-      if (DS->InlinedCallSite)
-        continue;
-
       if (!AlreadySeenScopes.count(DS)) {
         AlreadySeenScopes.insert(DS);
         LastSeenScope = DS;
