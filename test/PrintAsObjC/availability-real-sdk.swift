@@ -9,15 +9,17 @@
 
 // CHECK-LABEL: @interface NSArray<ObjectType> (SWIFT_EXTENSION(main))
 // CHECK-NEXT: - (id _Nonnull)methodDeprecatedInFavorOfReverseObjectEnumerator SWIFT_WARN_UNUSED_RESULT
-// CHECK-SAME: SWIFT_DEPRECATED_MSG("", "reverseObjectEnumerator");
+// CHECK-SAME: SWIFT_DEPRECATED_MSG("This method is deprecated in favor to the old reverseObjectEnumerator method", "reverseObjectEnumerator");
 // CHECK-NEXT: - (NSArray * _Nonnull)methodDeprecatedInFavorOfAddingObjectWithObject:(id _Nonnull)object SWIFT_WARN_UNUSED_RESULT
-// CHECK-SAME: SWIFT_DEPRECATED_MSG("", "arrayByAddingObject:");
+// CHECK-SAME: SWIFT_DEPRECATED_MSG("This method is deprecated in favor to the old adding method", "arrayByAddingObject:");
 
 // CHECK-NEXT: @end
 
 // CHECK-LABEL: @interface SubClassOfSet : NSSet
 // CHECK-NEXT: - (id _Nonnull)methodDeprecatedInFavorOfAnyObject SWIFT_WARN_UNUSED_RESULT
-// CHECK-SAME: SWIFT_DEPRECATED_MSG("", "anyObject");
+// CHECK-SAME: SWIFT_DEPRECATED_MSG("This method is deprecated in favor to the old anyObject method", "anyObject");
+// CHECK-NEXT: @property (nonatomic, readonly) NSInteger deprecatedPropertyInFavorOfCount
+// CHECK-SAME: SWIFT_DEPRECATED_MSG("This property is deprecated in favor to the old count property", "count");
 // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: - (nonnull instancetype)initWithObjects:(id _Nonnull const * _Nullable)objects count:(NSUInteger)cnt OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: - (nullable instancetype)initWithCoder:(NSCoder * _Nonnull)aDecoder OBJC_DESIGNATED_INITIALIZER;
@@ -28,16 +30,31 @@ import Foundation
 
 
 public class SubClassOfSet: NSSet {
-  @available(*, deprecated, renamed: "anyObject()")
+  @available(*, deprecated,
+  message: "This method is deprecated in favor to the old anyObject method",
+  renamed: "anyObject()")
   @objc func methodDeprecatedInFavorOfAnyObject() -> Any { return 0 }
+  
+  @available(*, deprecated,
+  message: "This property is deprecated in favor to the old count property",
+  renamed: "count")
+  @objc var deprecatedPropertyInFavorOfCount: Int {
+    get {
+      return 0
+    }
+  }
 }
 
 
 extension NSArray {
-  @available(*, deprecated, renamed: "reverseObjectEnumerator()")
+  @available(*, deprecated,
+  message: "This method is deprecated in favor to the old reverseObjectEnumerator method",
+  renamed: "reverseObjectEnumerator()")
   @objc func methodDeprecatedInFavorOfReverseObjectEnumerator() -> Any { return 0 }
   
-  @available(*, deprecated, renamed: "adding(_:)")
+  @available(*, deprecated,
+  message: "This method is deprecated in favor to the old adding method",
+  renamed: "adding(_:)")
   @objc func methodDeprecatedInFavorOfAddingObject(object: Any) -> NSArray {
     return self.adding(object) as NSArray
   }
