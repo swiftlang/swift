@@ -2343,9 +2343,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       // - has the same generic signature as the original function, and
       // - returns a 2-tuple where the second element type is the original
       //   function's result type.
-      auto primalSelfDecl = primalCandidate->getImplicitSelfDecl();
-      auto primalParams =
-        primalCandidate->getParameters();
+      auto primalParams = primalCandidate->getParameters();
       auto primalParamsTy = primalParams->getInterfaceType(ctx);
       if (!primalParamsTy->isEqual(originalParamsTy))
         return false;

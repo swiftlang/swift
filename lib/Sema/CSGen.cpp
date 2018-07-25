@@ -1505,7 +1505,7 @@ namespace {
           assert(adjointDecl->isInstanceMember() || adjointDecl->isStatic() &&
                  "Expected adjoint to be an instance/static method");
           auto methodContext = CurDC->getInnermostMethodContext();
-          baseType = methodContext->getParameters()->get(0)->getType();
+          baseType = methodContext->getImplicitSelfDecl()->getType();
         }
         if (adjointDecl->isInstanceMember())
           baseType = MetatypeType::get(baseType, ctx);
