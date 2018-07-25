@@ -175,10 +175,6 @@ class LinkEntity {
     /// The pointer is a ProtocolDecl*.
     ProtocolDescriptor,
 
-    /// An array of protocol requirement descriptors for a protocol.
-    /// The pointer is a ProtocolDecl*.
-    ProtocolRequirementArray,
-
     /// A SIL function. The pointer is a SILFunction*.
     SILFunction,
 
@@ -292,7 +288,7 @@ class LinkEntity {
   }
 
   static bool isDeclKind(Kind k) {
-    return k <= Kind::ProtocolRequirementArray;
+    return k <= Kind::ProtocolDescriptor;
   }
   static bool isTypeKind(Kind k) {
     return k >= Kind::ProtocolWitnessTableLazyAccessFunction;
@@ -576,12 +572,6 @@ public:
   static LinkEntity forProtocolDescriptor(ProtocolDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::ProtocolDescriptor, decl);
-    return entity;
-  }
-
-  static LinkEntity forProtocolRequirementArray(ProtocolDecl *decl) {
-    LinkEntity entity;
-    entity.setForDecl(Kind::ProtocolRequirementArray, decl);
     return entity;
   }
 

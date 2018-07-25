@@ -1186,8 +1186,6 @@ public:
   ConstantReference getAddrOfParentContextDescriptor(DeclContext *from);
   llvm::Constant *getAddrOfProtocolDescriptor(ProtocolDecl *D,
                                       ConstantInit definition = ConstantInit());
-  llvm::Constant *getAddrOfProtocolRequirementArray(ProtocolDecl *D,
-                                                    ConstantInit definition);
   llvm::Constant *getAddrOfProtocolConformanceDescriptor(
                                   const NormalProtocolConformance *conformance,
                                   ConstantInit definition = ConstantInit());
