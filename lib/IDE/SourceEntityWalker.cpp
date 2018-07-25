@@ -217,8 +217,9 @@ std::pair<bool, Stmt *> SemaAnnotator::walkToStmtPre(Stmt *S) {
       // walk into the body.
       if (auto *FD = DeferS->getTempDecl()) {
         auto *RetS = FD->getBody()->walk(*this);
+        if (!RetS)
+          return { false, nullptr };
         assert(RetS == FD->getBody());
-        (void)RetS;
       }
       bool Continue = SEWalker.walkToStmtPost(DeferS);
       if (!Continue)

@@ -32,14 +32,14 @@ public enum SyntaxFactory {
                  leadingTrivia: Trivia = [],
                  trailingTrivia: Trivia = []) -> TokenSyntax {
     let data = SyntaxData(raw: .token(kind, leadingTrivia,
-                                      trailingTrivia, presence))
+                                      trailingTrivia, presence, nil))
     return TokenSyntax(root: data, data: data)
   }
 
   public static func makeUnknownSyntax(tokens: [TokenSyntax]) -> Syntax {
     let data = SyntaxData(raw: .node(.unknown, 
                                      tokens.map { $0.data.raw },
-                                     .present))
+                                     .present, nil))
     return UnknownSyntax(root: data, data: data)
   }
 
@@ -65,14 +65,15 @@ public enum SyntaxFactory {
       ${child.swift_name}.data.raw,
 %       end
 %     end
-    ], .present))
+    ], .present, nil))
     return ${node.name}(root: data, data: data)
   }
 %   elif node.is_syntax_collection():
   public static func make${node.syntax_kind}(
     _ elements: [${node.collection_element_type}]) -> ${node.name} {
     let data = SyntaxData(raw: .node(.${node.swift_syntax_kind},
-                                     elements.map { $0.data.raw }, .present))
+                                     elements.map { $0.data.raw }, .present,
+                                     nil))
     return ${node.name}(root: data, data: data)
   }
 %   end
@@ -83,7 +84,7 @@ public enum SyntaxFactory {
 %     for child in node.children:
       ${make_missing_swift_child(child)},
 %     end
-    ], .present))
+    ], .present, nil))
     return ${node.name}(root: data, data: data)
   }
 %   end

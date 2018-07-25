@@ -283,33 +283,36 @@ public struct TokenSyntax: _SyntaxBase, Hashable {
   /// Returns a new TokenSyntax with its kind replaced
   /// by the provided token kind.
   public func withKind(_ tokenKind: TokenKind) -> TokenSyntax {
-    guard case let .token(_, leadingTrivia, trailingTrivia, presence) = raw else {
+    guard case let .token(_, leadingTrivia, trailingTrivia, presence, _) = raw else {
       fatalError("TokenSyntax must have token as its raw")
     }
     let (root, newData) = data.replacingSelf(.token(tokenKind, leadingTrivia,
-                                                    trailingTrivia, presence))
+                                                    trailingTrivia, presence,
+                                                    nil))
     return TokenSyntax(root: root, data: newData)
   }
 
   /// Returns a new TokenSyntax with its leading trivia replaced
   /// by the provided trivia.
   public func withLeadingTrivia(_ leadingTrivia: Trivia) -> TokenSyntax {
-    guard case let .token(kind, _, trailingTrivia, presence) = raw else {
+    guard case let .token(kind, _, trailingTrivia, presence, _) = raw else {
       fatalError("TokenSyntax must have token as its raw")
     }
     let (root, newData) = data.replacingSelf(.token(kind, leadingTrivia,
-                                                    trailingTrivia, presence))
+                                                    trailingTrivia, presence,
+                                                    nil))
     return TokenSyntax(root: root, data: newData)
   }
 
   /// Returns a new TokenSyntax with its trailing trivia replaced
   /// by the provided trivia.
   public func withTrailingTrivia(_ trailingTrivia: Trivia) -> TokenSyntax {
-    guard case let .token(kind, leadingTrivia, _, presence) = raw else {
+    guard case let .token(kind, leadingTrivia, _, presence, _) = raw else {
       fatalError("TokenSyntax must have token as its raw")
     }
     let (root, newData) = data.replacingSelf(.token(kind, leadingTrivia,
-                                                    trailingTrivia, presence))
+                                                    trailingTrivia, presence,
+                                                    nil))
     return TokenSyntax(root: root, data: newData)
   }
 
@@ -330,7 +333,7 @@ public struct TokenSyntax: _SyntaxBase, Hashable {
 
   /// The leading trivia (spaces, newlines, etc.) associated with this token.
   public var leadingTrivia: Trivia {
-    guard case .token(_, let leadingTrivia, _, _) = raw else {
+    guard case .token(_, let leadingTrivia, _, _, _) = raw else {
       fatalError("TokenSyntax must have token as its raw")
     }
     return leadingTrivia
@@ -338,7 +341,7 @@ public struct TokenSyntax: _SyntaxBase, Hashable {
 
   /// The trailing trivia (spaces, newlines, etc.) associated with this token.
   public var trailingTrivia: Trivia {
-    guard case .token(_, _, let trailingTrivia, _) = raw else {
+    guard case .token(_, _, let trailingTrivia, _, _) = raw else {
       fatalError("TokenSyntax must have token as its raw")
     }
     return trailingTrivia
@@ -346,7 +349,7 @@ public struct TokenSyntax: _SyntaxBase, Hashable {
 
   /// The kind of token this node represents.
   public var tokenKind: TokenKind {
-    guard case .token(let kind, _, _, _) = raw else {
+    guard case .token(let kind, _, _, _, _) = raw else {
       fatalError("TokenSyntax must have token as its raw")
     }
     return kind
