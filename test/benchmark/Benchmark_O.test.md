@@ -188,6 +188,14 @@ BADSKIPTAG: error: 'bogus' is not a valid 'BenchmarkCategory'
 
 ````
 
+Measuring memory use of a test with our method is valid only for single test.
+
+````
+RUN: %Benchmark_O 1 2 --memory --list \
+RUN:         2>&1 | %FileCheck %s --check-prefix WARNMEMORY
+WARNMEMORY: warning:
+````
+
 ## Usage
 
 ````
