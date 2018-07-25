@@ -167,13 +167,13 @@ extension Set {
   /// - Parameter minimumCapacity: The minimum number of elements that the
   ///   newly created set should be able to store without reallocating its
   ///   storage buffer.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public init(minimumCapacity: Int) {
     _variant = .native(_NativeSet(minimumCapacity: minimumCapacity))
   }
 
   /// Private initializer.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal init(_nativeSet: _NativeSet<Element>) {
     _variant = .native(_nativeSet)
   }
@@ -191,7 +191,7 @@ extension Set {
   /// * it is statically known that the given `NSSet` is immutable;
   /// * `Element` is bridged verbatim to Objective-C (i.e.,
   ///   is a reference type).
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public init(_immutableCocoaSet: _NSSet) {
     _sanityCheck(_isBridgedVerbatimToObjectiveC(Element.self),
       "Set can be backed by NSSet _variant only when the member type can be bridged verbatim to Objective-C")
@@ -223,7 +223,7 @@ extension Set: ExpressibleByArrayLiteral {
   ///     // Prints "Whatever it is, it's bound to be delicious!"
   ///
   /// - Parameter elements: A variadic list of elements of the new set.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public init(arrayLiteral elements: Element...) {
     self.init(_nativeSet: _NativeSet.fromArray(elements))
   }
@@ -393,8 +393,10 @@ extension Set: Collection {
 ///
 /// (isSubset: lhs ⊂ rhs, isEqual: lhs ⊂ rhs and |lhs| = |rhs|)
 @inlinable
-internal func _compareSets<Element>(_ lhs: Set<Element>, _ rhs: Set<Element>)
-  -> (isSubset: Bool, isEqual: Bool) {
+internal func _compareSets<Element>(
+  _ lhs: Set<Element>,
+  _ rhs: Set<Element>
+) -> (isSubset: Bool, isEqual: Bool) {
   // FIXME(performance): performance could be better if we start by comparing
   // counts.
   for member in lhs {
@@ -579,7 +581,7 @@ extension Set: SetAlgebra {
   ///   element that was equal to `newMember`. In some cases, `oldMember` may
   ///   be distinguishable from `newMember` by identity comparison or some
   ///   other means.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @discardableResult
   public mutating func insert(
     _ newMember: Element
@@ -607,7 +609,7 @@ extension Set: SetAlgebra {
   ///   such a member; otherwise, `nil`. In some cases, the returned element
   ///   may be distinguishable from `newMember` by identity comparison or some
   ///   other means.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @discardableResult
   public mutating func update(with newMember: Element) -> Element? {
     return _variant.update(with: newMember)
@@ -627,7 +629,7 @@ extension Set: SetAlgebra {
   /// - Parameter member: The element to remove from the set.
   /// - Returns: The value of the `member` parameter if it was a member of the
   ///   set; otherwise, `nil`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @discardableResult
   public mutating func remove(_ member: Element) -> Element? {
     return _variant.remove(member)
@@ -639,7 +641,7 @@ extension Set: SetAlgebra {
   ///   be a valid index of the set, and must not be equal to the set's end
   ///   index.
   /// - Returns: The element that was removed from the set.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @discardableResult
   public mutating func remove(at position: Index) -> Element {
     return _variant.remove(at: position)
@@ -650,7 +652,7 @@ extension Set: SetAlgebra {
   /// - Parameter keepingCapacity: If `true`, the set's buffer capacity is
   ///   preserved; if `false`, the underlying buffer is released. The
   ///   default is `false`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
     _variant.removeAll(keepingCapacity: keepCapacity)
   }
@@ -665,7 +667,7 @@ extension Set: SetAlgebra {
   ///   If the set wraps a bridged `NSSet`, the performance is unspecified.
   ///
   /// - Returns: A member of the set.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @discardableResult
   public mutating func removeFirst() -> Element {
     _precondition(!isEmpty, "Can't removeFirst from an empty Set")
@@ -694,7 +696,7 @@ extension Set: SetAlgebra {
   ///     emptySet = []
   ///     print(emptySet.isEmpty)
   ///     // Prints "true"
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public init() {
     self = Set<Element>(_nativeSet: _NativeSet())
   }
@@ -719,7 +721,7 @@ extension Set: SetAlgebra {
   ///     // Prints "[17, 19, 23, 11, 13]"
   ///
   /// - Parameter sequence: The elements to use as members of the new set.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public init<Source: Sequence>(_ sequence: Source)
     where Source.Element == Element {
     self.init(minimumCapacity: sequence.underestimatedCount)
@@ -828,7 +830,7 @@ extension Set: SetAlgebra {
   ///   `possibleStrictSubset` must be finite.
   /// - Returns: `true` if the set is a strict superset of
   ///   `possibleStrictSubset`; otherwise, `false`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func isStrictSuperset<S: Sequence>(of possibleStrictSubset: S) -> Bool
     where S.Element == Element {
     let other = Set(possibleStrictSubset)
@@ -849,7 +851,7 @@ extension Set: SetAlgebra {
   /// - Parameter other: A sequence of elements. `other` must be finite.
   /// - Returns: `true` if the set has no elements in common with `other`;
   ///   otherwise, `false`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func isDisjoint<S: Sequence>(with other: S) -> Bool
     where S.Element == Element {
     // FIXME(performance): Don't need to build a set.
@@ -929,7 +931,7 @@ extension Set: SetAlgebra {
     return self._subtracting(other)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal func _subtracting<S: Sequence>(_ other: S) -> Set<Element>
     where S.Element == Element {
     var newSet = self
@@ -950,13 +952,13 @@ extension Set: SetAlgebra {
   ///     // Prints "["Chris", "Diana", "Alicia"]"
   ///
   /// - Parameter other: A sequence of elements. `other` must be finite.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public mutating func subtract<S: Sequence>(_ other: S)
     where S.Element == Element {
     _subtract(other)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal mutating func _subtract<S: Sequence>(_ other: S)
     where S.Element == Element {
     for item in other {
@@ -1069,7 +1071,7 @@ extension Set: SetAlgebra {
 
 extension Set: CustomStringConvertible, CustomDebugStringConvertible {
   /// A string that represents the contents of the set.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var description: String {
     return _makeCollectionDescription(for: self, withTypeName: nil)
   }
@@ -1082,13 +1084,13 @@ extension Set: CustomStringConvertible, CustomDebugStringConvertible {
 
 #if _runtime(_ObjC)
 @_silgen_name("swift_stdlib_CFSetGetValues")
-@usableFromInline // FIXME(sil-serialize-all)
+@usableFromInline
 internal
 func _stdlib_CFSetGetValues(_ nss: _NSSet, _: UnsafeMutablePointer<AnyObject>)
 
 /// Equivalent to `NSSet.allObjects`, but does not leave objects on the
 /// autorelease pool.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 internal func _stdlib_NSSet_allObjects(
   _ nss: _NSSet
 ) -> _HeapBuffer<Int, AnyObject> {
@@ -1106,7 +1108,7 @@ internal func _stdlib_NSSet_allObjects(
 ///
 /// - Precondition: `BaseValue` is a base class or base `@objc`
 ///   protocol (such as `AnyObject`) of `DerivedValue`.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 public func _setUpCast<DerivedValue, BaseValue>(_ source: Set<DerivedValue>)
   -> Set<BaseValue> {
   var builder = _SetBuilder<BaseValue>(count: source.count)
@@ -1124,7 +1126,7 @@ public func _setUpCast<DerivedValue, BaseValue>(_ source: Set<DerivedValue>)
 ///
 /// - Precondition: `SwiftValue` is bridged to Objective-C
 ///   and requires non-trivial bridging.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 public func _setBridgeToObjectiveC<SwiftValue, ObjCValue>(
   _ source: Set<SwiftValue>
 ) -> Set<ObjCValue> {
@@ -1165,7 +1167,7 @@ internal func _setDownCastIndirect<SourceValue, TargetValue>(
 ///
 /// - Precondition: `DerivedValue` is a subtype of `BaseValue` and both
 ///   are reference types.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 public func _setDownCast<BaseValue, DerivedValue>(_ source: Set<BaseValue>)
   -> Set<DerivedValue> {
 
@@ -1203,7 +1205,7 @@ internal func _setDownCastConditionalIndirect<SourceValue, TargetValue>(
 ///
 /// - Precondition: `DerivedValue` is a subtype of `BaseValue` and both
 ///   are reference types.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 public func _setDownCastConditional<BaseValue, DerivedValue>(
   _ source: Set<BaseValue>
 ) -> Set<DerivedValue>? {
@@ -1224,7 +1226,7 @@ public func _setDownCastConditional<BaseValue, DerivedValue>(
 ///
 /// - Precondition: At least one of `SwiftValue` is a bridged value
 ///   type, and the corresponding `ObjCValue` is a reference type.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 public func _setBridgeFromObjectiveC<ObjCValue, SwiftValue>(
   _ source: Set<ObjCValue>
 ) -> Set<SwiftValue> {
@@ -1240,7 +1242,7 @@ public func _setBridgeFromObjectiveC<ObjCValue, SwiftValue>(
 ///
 /// - Precondition: At least one of `SwiftValue` is a bridged value
 ///   type, and the corresponding `ObjCValue` is a reference type.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 public func _setBridgeFromObjectiveCConditional<
   ObjCValue, SwiftValue
 >(
@@ -1291,7 +1293,7 @@ extension Set {
   ///     // Prints "["Diana", "Chris", "Alicia"]"
   ///
   /// - Parameter other: Another set.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public mutating func subtract(_ other: Set<Element>) {
     _subtract(other)
   }
@@ -1746,8 +1748,20 @@ internal struct _NativeSet<Element> {
 
   /// See this comments on _RawNativeSetStorage and its subclasses to
   /// understand why we store an untyped storage here.
-  @usableFromInline // FIXME(sil-serialize-all)
+  @usableFromInline
   internal var _storage: _RawNativeSetStorage
+
+  /// Constructs an instance from the empty singleton.
+  @inlinable
+  internal init() {
+    self._storage = _RawNativeSetStorage.empty
+  }
+
+  /// Constructs a native set adopting the given storage.
+  @inlinable
+  internal init(_storage: _RawNativeSetStorage) {
+    self._storage = _storage
+  }
 
   /// Creates a Buffer with a storage that is typed, but doesn't understand
   /// Hashing. Mostly for bridging; prefer `init(minimumCapacity:)`.
@@ -1803,12 +1817,12 @@ internal struct _NativeSet<Element> {
 
   // Forwarding the individual fields of the storage in various forms
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal var bucketCount: Int {
     return _assumeNonNegative(_storage.bucketCount)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal var count: Int {
     set {
       _storage.count = newValue
@@ -1818,34 +1832,22 @@ internal struct _NativeSet<Element> {
     }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal
   var _initializedHashtableEntriesBitMapBuffer: UnsafeMutablePointer<UInt> {
     return _storage._initializedHashtableEntriesBitMapBuffer
   }
 
   // This API is unsafe and needs a `_fixLifetime` in the caller.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal var keys: UnsafeMutablePointer<Element> {
     return _storage.keys.assumingMemoryBound(to: Element.self)
-  }
-
-  /// Constructs a native set adopting the given storage.
-  @inlinable // FIXME(sil-serialize-all)
-  internal init(_storage: _RawNativeSetStorage) {
-    self._storage = _storage
-  }
-
-  /// Constructs an instance from the empty singleton.
-  @inlinable // FIXME(sil-serialize-all)
-  internal init() {
-    self._storage = _RawNativeSetStorage.empty
   }
 
   // Most of the implementation of the _SetBuffer protocol,
   // but only the parts that don't actually rely on hashing.
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @inline(__always)
   internal func key(at i: Int) -> Element {
     _sanityCheck(i >= 0 && i < bucketCount)
@@ -1860,7 +1862,7 @@ internal struct _NativeSet<Element> {
   /// Returns the key at the given Index, bridged.
   ///
   /// Intended for use with verbatim bridgeable keys.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal func bridgedKey(at index: Index) -> AnyObject {
     let k = key(at: index.bucket)
     return _bridgeAnythingToObjectiveC(k)
@@ -1869,14 +1871,14 @@ internal struct _NativeSet<Element> {
   /// Returns the value at the given Index, bridged.
   ///
   /// Intended for use with verbatim bridgeable keys.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal func bridgedValue(at index: Index) -> AnyObject {
     let v = value(at: index.bucket)
     return _bridgeAnythingToObjectiveC(v)
   }
 #endif
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal func isInitializedEntry(at i: Int) -> Bool {
     _sanityCheck(i >= 0 && i < bucketCount)
     defer { _fixLifetime(self) }
@@ -1923,7 +1925,7 @@ internal struct _NativeSet<Element> {
     return key(at: i)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal func setKey(_ key: Element, at i: Int) {
     _sanityCheck(i >= 0 && i < bucketCount)
     _sanityCheck(isInitializedEntry(at: i))
@@ -1932,19 +1934,19 @@ internal struct _NativeSet<Element> {
     (keys + i).pointee = key
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal var startIndex: Index {
     // We start at "index after -1" instead of "0" because we need to find the
     // first occupied slot.
     return index(after: Index(bucket: -1))
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal var endIndex: Index {
     return Index(bucket: bucketCount)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal func index(after i: Index) -> Index {
     _precondition(i != endIndex)
     var idx = i.bucket + 1
@@ -1955,12 +1957,12 @@ internal struct _NativeSet<Element> {
     return Index(bucket: idx)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal func formIndex(after i: inout Index) {
     i = index(after: i)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal func assertingGet(at i: Index) -> Element {
     _precondition(i.bucket >= 0 && i.bucket < bucketCount)
     _precondition(
@@ -2503,33 +2505,33 @@ internal struct _CocoaSet: _SetBuffer {
   @usableFromInline
   internal let object: _NSSet
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal init(_ object: _NSSet) {
     self.object = object
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal var startIndex: Index {
     return Index(self, startIndex: ())
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal var endIndex: Index {
     return Index(self, endIndex: ())
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal func index(after i: Index) -> Index {
     return i.successor()
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal func formIndex(after i: inout Index) {
     // FIXME: swift-3-indexing-model: optimize if possible.
     i = i.successor()
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal func index(forKey key: AnyObject) -> Index? {
     // Fast path that does not involve creating an array of all keys.  In case
     // the key is present, this lookup is a penalty for the slow path, but the

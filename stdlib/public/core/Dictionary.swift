@@ -389,7 +389,7 @@ public struct Dictionary<Key: Hashable, Value> {
   internal var _variant: _Variant
 
   /// Creates an empty dictionary.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public init() {
     self.init(_nativeDictionary: _NativeDictionary())
   }
@@ -404,7 +404,7 @@ public struct Dictionary<Key: Hashable, Value> {
   /// - Parameter minimumCapacity: The minimum number of key-value pairs that
   ///   the newly created dictionary should be able to store without
   ///   reallocating its storage buffer.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public init(minimumCapacity: Int) {
     _variant = .native(_NativeDictionary(minimumCapacity: minimumCapacity))
   }
@@ -432,7 +432,7 @@ public struct Dictionary<Key: Hashable, Value> {
   /// - Returns: A new dictionary initialized with the elements of
   ///   `keysAndValues`.
   /// - Precondition: The sequence must not have duplicate keys.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public init<S: Sequence>(
     uniqueKeysWithValues keysAndValues: S
   ) where S.Element == (Key, Value) {
@@ -478,7 +478,7 @@ public struct Dictionary<Key: Hashable, Value> {
   ///   - combine: A closure that is called with the values for any duplicate
   ///     keys that are encountered. The closure returns the desired value for
   ///     the final dictionary.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public init<S: Sequence>(
     _ keysAndValues: S,
     uniquingKeysWith combine: (Value, Value) throws -> Value
@@ -509,7 +509,7 @@ public struct Dictionary<Key: Hashable, Value> {
   ///   - values: A sequence of values to group into a dictionary.
   ///   - keyForValue: A closure that returns a key for each element in
   ///     `values`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public init<S: Sequence>(
     grouping values: S,
     by keyForValue: (S.Element) throws -> Key
@@ -518,7 +518,7 @@ public struct Dictionary<Key: Hashable, Value> {
     try _variant.nativeGroup(values, by: keyForValue)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal init(_nativeDictionary: _NativeDictionary<Key, Value>) {
     _variant = .native(_nativeDictionary)
   }
@@ -536,7 +536,7 @@ public struct Dictionary<Key: Hashable, Value> {
   /// * it is statically known that the given `NSDictionary` is immutable;
   /// * `Key` and `Value` are bridged verbatim to Objective-C (i.e.,
   ///   are reference types).
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public init(_immutableCocoaDictionary: _NSDictionary) {
     _sanityCheck(
       _isBridgedVerbatimToObjectiveC(Key.self) &&
@@ -703,7 +703,7 @@ extension Dictionary: Collection {
   ///     var frequencies: [String: Int] = [:]
   ///     print(frequencies.isEmpty)
   ///     // Prints "true"
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var isEmpty: Bool {
     return count == 0
   }
@@ -754,7 +754,7 @@ extension Dictionary {
   /// - Parameter key: The key to find in the dictionary.
   /// - Returns: The value associated with `key` if `key` is in the dictionary;
   ///   otherwise, `nil`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public subscript(key: Key) -> Value? {
     @inline(__always)
     get {
@@ -790,7 +790,7 @@ extension Dictionary: ExpressibleByDictionaryLiteral {
   ///
   /// - Parameter elements: The key-value pairs that will make up the new
   ///   dictionary. Each key in `elements` must be unique.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @_effects(readonly)
   public init(dictionaryLiteral elements: (Key, Value)...) {
     self.init(_nativeDictionary: _NativeDictionary.fromArray(elements))
@@ -848,7 +848,7 @@ extension Dictionary {
   ///     dictionary.
   /// - Returns: The value associated with `key` in the dictionary`; otherwise,
   ///   `defaultValue`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public subscript(
     key: Key, default defaultValue: @autoclosure () -> Value
   ) -> Value {
@@ -874,7 +874,7 @@ extension Dictionary {
   ///   this dictionary.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the dictionary.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func mapValues<T>(
     _ transform: (Value) throws -> T
   ) rethrows -> Dictionary<Key, T> {
@@ -907,7 +907,7 @@ extension Dictionary {
   ///
   /// - Complexity: O(*m* + *n*), where *n* is the length of the original
   ///   dictionary and *m* is the length of the resulting dictionary.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func compactMapValues<T>(
     _ transform: (Value) throws -> T?
   ) rethrows -> Dictionary<Key, T> {
@@ -951,7 +951,7 @@ extension Dictionary {
   ///     is added.
   /// - Returns: The value that was replaced, or `nil` if a new key-value pair
   ///   was added.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @discardableResult
   public mutating func updateValue(
     _ value: Value, forKey key: Key
@@ -986,7 +986,7 @@ extension Dictionary {
   ///   - combine: A closure that takes the current and new values for any
   ///     duplicate keys. The closure returns the desired value for the final
   ///     dictionary.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public mutating func merge<S: Sequence>(
     _ other: S,
     uniquingKeysWith combine: (Value, Value) throws -> Value
@@ -1021,7 +1021,7 @@ extension Dictionary {
   ///   - combine: A closure that takes the current and new values for any
   ///     duplicate keys. The closure returns the desired value for the final
   ///     dictionary.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public mutating func merge(
     _ other: [Key: Value],
     uniquingKeysWith combine: (Value, Value) throws -> Value) rethrows
@@ -1058,7 +1058,7 @@ extension Dictionary {
   ///     dictionary.
   /// - Returns: A new dictionary with the combined keys and values of this
   ///   dictionary and `other`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func merging<S: Sequence>(
     _ other: S,
     uniquingKeysWith combine: (Value, Value) throws -> Value
@@ -1098,7 +1098,7 @@ extension Dictionary {
   ///     dictionary.
   /// - Returns: A new dictionary with the combined keys and values of this
   ///   dictionary and `other`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func merging(
     _ other: [Key: Value],
     uniquingKeysWith combine: (Value, Value) throws -> Value
@@ -1198,7 +1198,7 @@ extension Dictionary {
   ///     // Prints "BR"
   ///     // Prints "JP"
   ///     // Prints "GH"
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @available(swift, introduced: 4.0)
   public var keys: Keys {
     return Keys(self)
@@ -1219,7 +1219,7 @@ extension Dictionary {
   ///     // Prints "Brazil"
   ///     // Prints "Japan"
   ///     // Prints "Ghana"
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @available(swift, introduced: 4.0)
   public var values: Values {
     get {
@@ -1231,7 +1231,7 @@ extension Dictionary {
   }
 
   /// A view of a dictionary's keys.
-  @_fixed_layout // FIXME(sil-serialize-all)
+  @_fixed_layout
   public struct Keys
     : Collection, Equatable,
       CustomStringConvertible, CustomDebugStringConvertible {
@@ -1248,22 +1248,22 @@ extension Dictionary {
     // Collection Conformance
     // ----------------------
 
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     public var startIndex: Index {
       return _variant.startIndex
     }
 
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     public var endIndex: Index {
       return _variant.endIndex
     }
 
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     public func index(after i: Index) -> Index {
       return _variant.index(after: i)
     }
 
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     public subscript(position: Index) -> Element {
       return _variant.assertingGet(at: position).key
     }
@@ -1274,33 +1274,33 @@ extension Dictionary {
     /// The number of keys in the dictionary.
     ///
     /// - Complexity: O(1).
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     public var count: Int {
       return _variant.count
     }
 
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     public var isEmpty: Bool {
       return count == 0
     }
 
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     public func _customContainsEquatableElement(_ element: Element) -> Bool? {
       return _variant.containsKey(element)
     }
 
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     public func _customIndexOfEquatableElement(_ element: Element) -> Index?? {
       return Optional(_variant.index(forKey: element))
     }
 
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     public func _customLastIndexOfEquatableElement(_ element: Element) -> Index?? {
       // The first and last elements are the same because each element is unique.
       return _customIndexOfEquatableElement(element)
     }
 
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     public static func ==(lhs: Keys, rhs: Keys) -> Bool {
       // Equal if the two dictionaries share storage.
       if case (.native(let ln), .native(let rn)) = (lhs._variant, rhs._variant),
@@ -1323,18 +1323,20 @@ extension Dictionary {
       return true
     }
 
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     public var description: String {
       return _makeCollectionDescription(for: self, withTypeName: nil)
     }
 
     public var debugDescription: String {
-      return _makeCollectionDescription(for: self, withTypeName: "Dictionary.Keys")
+      return _makeCollectionDescription(
+        for: self,
+        withTypeName: "Dictionary.Keys")
     }
   }
 
   /// A view of a dictionary's values.
-  @_fixed_layout // FIXME(sil-serialize-all)
+  @_fixed_layout
   public struct Values
     : MutableCollection, CustomStringConvertible, CustomDebugStringConvertible {
     public typealias Element = Value
@@ -1342,7 +1344,7 @@ extension Dictionary {
     @usableFromInline
     internal var _variant: Dictionary<Key, Value>._Variant
 
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     internal init(_ _dictionary: Dictionary) {
       self._variant = _dictionary._variant
     }
@@ -1350,22 +1352,22 @@ extension Dictionary {
     // Collection Conformance
     // ----------------------
 
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     public var startIndex: Index {
       return _variant.startIndex
     }
 
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     public var endIndex: Index {
       return _variant.endIndex
     }
 
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     public func index(after i: Index) -> Index {
       return _variant.index(after: i)
     }
 
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     public subscript(position: Index) -> Element {
       get {
         return _variant.assertingGet(at: position).value
@@ -1382,29 +1384,31 @@ extension Dictionary {
     /// The number of values in the dictionary.
     ///
     /// - Complexity: O(1).
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     public var count: Int {
       return _variant.count
     }
 
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     public var isEmpty: Bool {
       return count == 0
     }
 
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     public var description: String {
       return _makeCollectionDescription(for: self, withTypeName: nil)
     }
 
     public var debugDescription: String {
-      return _makeCollectionDescription(for: self, withTypeName: "Dictionary.Values")
+      return _makeCollectionDescription(
+        for: self,
+        withTypeName: "Dictionary.Values")
     }
   }
 }
 
 extension Dictionary: Equatable where Value: Equatable {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public static func == (lhs: [Key: Value], rhs: [Key: Value]) -> Bool {
     switch (lhs._variant, rhs._variant) {
     case (.native(let lhsNative), .native(let rhsNative)):
@@ -1418,18 +1422,8 @@ extension Dictionary: Equatable where Value: Equatable {
       }
 
       for (k, v) in lhs {
-        let (pos, found) = rhsNative._find(k, startBucket: rhsNative._bucket(k))
-        // FIXME: Can't write the simple code pending
-        // <rdar://problem/15484639> Refcounting bug
-        /*
-        if !found || rhs[pos].value != lhsElement.value {
-          return false
-        }
-        */
-        if !found {
-          return false
-        }
-        if rhsNative.value(at: pos.bucket) != v {
+        let (i, found) = rhsNative._find(k, startBucket: rhsNative._bucket(k))
+        if !found || rhsNative.value(at: i.bucket) != v {
           return false
         }
       }
@@ -1469,7 +1463,7 @@ extension Dictionary: Equatable where Value: Equatable {
     }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public static func != (lhs: [Key: Value], rhs: [Key: Value]) -> Bool {
     return !(lhs == rhs)
   }
@@ -1556,7 +1550,7 @@ internal struct _DictionaryAnyHashableBox<Key: Hashable, Value: Hashable>
 }
 
 extension Dictionary: CustomStringConvertible, CustomDebugStringConvertible {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal func _makeDescription() -> String {
     if count == 0 {
       return "[:]"
@@ -1579,7 +1573,7 @@ extension Dictionary: CustomStringConvertible, CustomDebugStringConvertible {
   }
 
   /// A string that represents the contents of the dictionary.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var description: String {
     return _makeDescription()
   }
@@ -1591,8 +1585,8 @@ extension Dictionary: CustomStringConvertible, CustomDebugStringConvertible {
   }
 }
 
-@usableFromInline // FIXME(sil-serialize-all)
-@_frozen // FIXME(sil-serialize-all)
+@usableFromInline
+@_frozen
 internal enum _MergeError: Error {
   case keyCollision
 }
@@ -1600,7 +1594,7 @@ internal enum _MergeError: Error {
 #if _runtime(_ObjC)
 /// Equivalent to `NSDictionary.allKeys`, but does not leave objects on the
 /// autorelease pool.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 internal func _stdlib_NSDictionary_allKeys(
   _ nsd: _NSDictionary
 ) -> _HeapBuffer<Int, AnyObject> {
@@ -1620,7 +1614,7 @@ internal func _stdlib_NSDictionary_allKeys(
 /// - Precondition: `BaseKey` and `BaseValue` are base classes or base `@objc`
 ///   protocols (such as `AnyObject`) of `DerivedKey` and `DerivedValue`,
 ///   respectively.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 public func _dictionaryUpCast<DerivedKey, DerivedValue, BaseKey, BaseValue>(
     _ source: Dictionary<DerivedKey, DerivedValue>
 ) -> Dictionary<BaseKey, BaseValue> {
@@ -1707,7 +1701,7 @@ internal func _dictionaryDownCastIndirect<SourceKey, SourceValue,
 ///
 /// - Precondition: `DerivedKey` is a subtype of `BaseKey`, `DerivedValue` is
 ///   a subtype of `BaseValue`, and all of these types are reference types.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
   _ source: Dictionary<BaseKey, BaseValue>
 ) -> Dictionary<DerivedKey, DerivedValue> {
@@ -1753,7 +1747,7 @@ internal func _dictionaryDownCastConditionalIndirect<SourceKey, SourceValue,
 ///
 /// - Precondition: `DerivedKey` is a subtype of `BaseKey`, `DerivedValue` is
 ///   a subtype of `BaseValue`, and all of these types are reference types.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 public func _dictionaryDownCastConditional<
   BaseKey, BaseValue, DerivedKey, DerivedValue
 >(
@@ -1774,7 +1768,7 @@ public func _dictionaryDownCastConditional<
 ///
 /// - Precondition: At least one of `SwiftKey` or `SwiftValue` is a bridged value
 ///   type, and the corresponding `ObjCKey` or `ObjCValue` is a reference type.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 public func _dictionaryBridgeFromObjectiveC<
   ObjCKey, ObjCValue, SwiftKey, SwiftValue
 >(
@@ -1793,7 +1787,7 @@ public func _dictionaryBridgeFromObjectiveC<
 ///
 /// - Precondition: At least one of `SwiftKey` or `SwiftValue` is a bridged value
 ///   type, and the corresponding `ObjCKey` or `ObjCValue` is a reference type.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 public func _dictionaryBridgeFromObjectiveCConditional<
   ObjCKey, ObjCValue, SwiftKey, SwiftValue
 >(
@@ -2208,8 +2202,20 @@ internal struct _NativeDictionary<Key, Value> {
 
   /// See this comments on _RawNativeDictionaryStorage and its subclasses to
   /// understand why we store an untyped storage here.
-  @usableFromInline // FIXME(sil-serialize-all)
+  @usableFromInline
   internal var _storage: _RawNativeDictionaryStorage
+
+  /// Constructs an instance from the empty singleton.
+  @inlinable
+  internal init() {
+    self._storage = _RawNativeDictionaryStorage.empty
+  }
+
+  /// Constructs a dictionary adopting the given storage.
+  @inlinable
+  internal init(_storage: _RawNativeDictionaryStorage) {
+    self._storage = _storage
+  }
 
   /// Creates a native dictionary with a storage that is typed, but doesn't
   /// understand Hashing. Mostly for bridging; prefer `init(minimumCapacity:)`.
@@ -2266,19 +2272,6 @@ internal struct _NativeDictionary<Key, Value> {
     let perturbation = bucketCount
     _storage.seed = (seed.0 ^ UInt64(truncatingIfNeeded: perturbation), seed.1)
   }
-
-  /// Constructs a dictionary adopting the given storage.
-  @inlinable // FIXME(sil-serialize-all)
-  internal init(_storage: _RawNativeDictionaryStorage) {
-    self._storage = _storage
-  }
-
-  /// Constructs an instance from the empty singleton.
-  @inlinable // FIXME(sil-serialize-all)
-  internal init() {
-    self._storage = _RawNativeDictionaryStorage.empty
-  }
-
 
   // Forwarding the individual fields of the storage in various forms
 
