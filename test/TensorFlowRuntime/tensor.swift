@@ -1,6 +1,9 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-run-strict-da-swift
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize
+//
+// Compiler-only testing for TPU graph lowering (e.g. shape requirements by XLA).
+// RUN: %target-swift-frontend -Xllvm -tf-strict-deabstraction -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-target-tpu -O -emit-sil %s >/dev/null
 //
 // Tensor API tests.
 
@@ -46,6 +49,10 @@ TensorTests.testAllBackends("NumericInitializers") {
 TensorTests.testAllBackends("RandomInitializer") {
   let _ = Tensor<Float>(randomUniform: [3, 4])
   let _ = Tensor<Float>(randomNormal: [3, 4])
+  // TODO: remove the extra code below once TPU execution supports 0 output
+  // tensors (b/111123797)
+  let extra = Tensor<Float>(1.0)
+  _hostOp(extra)
 }
 
 TensorTests.testAllBackends("ScalarToTensorConversion") {
@@ -195,16 +202,19 @@ TensorTests.test("WholeTensorSlicing") {
 }
 
 TensorTests.testAllBackends("Reduction") {
+  // TODO(b/111815968): triage and fix this TPU issue
+  #if !TPU
   // 2 x 5
   let x = Tensor<Float>([[1, 2, 3, 4, 5], [1, 2, 3, 4, 5]])
   expectEqual(ShapedArray(shape: [5], scalars: [2, 4, 6, 8, 10]),
-              x.sum(squeezingAxes: 0).array)
+              x.sum(squeezingAxes: 0).toHost(shape: []).array)
   expectEqual(ShapedArray(shape: [1, 5], scalars: [2, 4, 6, 8, 10]),
-              x.sum(alongAxes: 0).array)
+              x.sum(alongAxes: 0).toHost(shape: []).array)
   expectEqual(ShapedArray(shape: [5], scalars: [1, 4, 9, 16, 25]),
-              x.product(squeezingAxes: 0).array)
+              x.product(squeezingAxes: 0).toHost(shape: []).array)
   expectEqual(ShapedArray(shape: [1, 5], scalars: [1, 4, 9, 16, 25]),
-              x.product(alongAxes: 0).array)
+              x.product(alongAxes: 0).toHost(shape: []).array)
+  #endif // !TPU
 }
 
 TensorTests.testAllBackends("Concatenation") {
@@ -249,6 +259,11 @@ TensorTests.testAllBackends("ReductionToScalar") {
   // expectEqual(x.mean(), 3)
   // TODO: Test other reduction ops here. Currently code motion isn't
   // smart enough to avoid send/receive.
+
+  // TODO: remove the extra code below once TPU execution supports 0 output
+  // tensors (b/111123797)
+  let extra = Tensor<Float>(1.0)
+  _hostOp(extra)
 }
 
 TensorTests.testAllBackends("BatchNormalization") {

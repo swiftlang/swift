@@ -26,7 +26,8 @@ public protocol ParameterAggregate {
   /// Update parameters with their gradient values, using an updater function.
   mutating func update(
     withGradients gradients: Self,
-    _ updater: (inout Parameter, Parameter) -> Void)
+    _ updater: (inout Parameter, Parameter) -> Void
+  )
 }
 
 //===----------------------------------------------------------------------===//
@@ -56,6 +57,7 @@ public protocol Parameterized {
 
 public extension Parameterized where Parameters : ParameterAggregate {
   /// Update parameters with their gradient values, using an updater function.
+  @inlinable
   mutating func updateParameters(
     withGradients gradients: Parameters,
     _ updater: (inout Parameters.Parameter, Parameters.Parameter) -> Void
