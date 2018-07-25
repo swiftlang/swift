@@ -67,7 +67,7 @@ ControlFlowTests.testAllBackends("sumOfProducts") {
 func sumOfProductsWithBound(_ M : Int32, _ N : Int32, _ Bound : Float) -> Tensor<Float> {
   // Effectively computes natSum(M)*natSum(N) upto Bound
   var sum = Tensor<Float>(0)
-outer_loop:for i in 1...M {
+  outer_loop: for i in 1...M {
     for j in 1...N {
       let prod = Tensor<Float>(Float(i * j))
       sum += prod
