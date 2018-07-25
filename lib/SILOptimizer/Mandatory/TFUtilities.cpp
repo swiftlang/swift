@@ -42,17 +42,9 @@ static llvm::cl::opt<bool>
 TFDumpIntermediates("tf-dump-intermediates", llvm::cl::init(false),
               llvm::cl::desc("Dump intermediate results in TensorFlow passes"));
 
-// For Mac builds, default to saving logging files to /tmp since debugging in
-// Xcode and the REPL is so challenging.
-#if __APPLE__
-#define DEFAULT_TO_TMP_LOGGING true
-#else
-#define DEFAULT_TO_TMP_LOGGING false
-#endif
-
 static llvm::cl::opt<bool>
 TFDumpIntermediatesToTmp("tf-dump-intermediates-tmp",
-                         llvm::cl::init(DEFAULT_TO_TMP_LOGGING),
+                         llvm::cl::init(false),
                          llvm::cl::desc("Dump intermediate results in "
                                         "TensorFlow passes to files in /tmp"));
 
