@@ -174,8 +174,9 @@ struct TestConfig {
     tags: Set<BenchmarkCategory>,
     skipTags: Set<BenchmarkCategory>
   ) -> [(index: String, info: BenchmarkInfo)] {
+    let allTests = registeredBenchmarks.sorted()
     let indices = Dictionary(uniqueKeysWithValues:
-      zip(registeredBenchmarks.sorted().map { $0.name },
+      zip(allTests.map { $0.name },
           (1...).lazy.map { String($0) } ))
 
     func byTags(b: BenchmarkInfo) -> Bool {
@@ -186,7 +187,7 @@ struct TestConfig {
       return specifiedTests.contains(b.name) ||
         specifiedTests.contains(indices[b.name]!)
     } // !! "All registeredBenchmarks have been assigned an index"
-    return registeredBenchmarks
+    return allTests
       .filter(specifiedTests.isEmpty ? byTags : byNamesOrIndices)
       .map { (index: indices[$0.name]!, info: $0) }
   }

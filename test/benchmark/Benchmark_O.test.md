@@ -86,6 +86,19 @@ ORSKIPTAGS: Fibonacci
 ORSKIPTAGS-NOT: RomanNumbers
 ````
 
+Alphabetic sorting of tests
+
+````
+RUN: %Benchmark_O --list \
+RUN:             | %FileCheck %s --check-prefix ALPHASORT
+ALPHASORT: COWArrayGuaranteedParameterOverhead
+ALPHASORT: COWTree
+ALPHASORT: ChainedFilterMap
+ALPHASORT: Chars
+ALPHASORT: FatCompactMap
+
+````
+
 ## Running Benchmarks
 Each real benchmark execution takes about a second per sample. If possible,
 multiple checks are combined into one run to minimize the test time.
