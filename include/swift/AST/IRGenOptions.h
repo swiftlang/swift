@@ -19,6 +19,7 @@
 #define SWIFT_AST_IRGENOPTIONS_H
 
 #include "swift/AST/LinkLibrary.h"
+#include "swift/Basic/PathRemapper.h"
 #include "swift/Basic/Sanitizers.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/OptimizationMode.h"
@@ -108,6 +109,9 @@ public:
 
   /// What type of debug info to generate.
   IRGenDebugInfoFormat DebugInfoFormat : 2;
+
+  /// Path prefixes that should be rewritten in debug info.
+  PathRemapper DebugPrefixMap;
 
   /// \brief Whether we're generating IR for the JIT.
   unsigned UseJIT : 1;
