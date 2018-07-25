@@ -1092,8 +1092,8 @@ getWitnessTableLazyAccessFunction(IRGenModule &IGM,
   auto cacheVariable =
       cast<llvm::GlobalVariable>(IGM.getAddrOfWitnessTableLazyCacheVariable(
           rootConformance, conformingType, ForDefinition));
-  emitLazyCacheAccessFunction(IGM, accessor, cacheVariable,
-                              [&](IRGenFunction &IGF, Explosion &params) {
+  emitCacheAccessFunction(IGM, accessor, cacheVariable, CacheStrategy::Lazy,
+                          [&](IRGenFunction &IGF, Explosion &params) {
     llvm::Value *conformingMetadataCache = nullptr;
     return MetadataResponse::forComplete(
              emitWitnessTableAccessorCall(IGF, conformance,

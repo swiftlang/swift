@@ -82,6 +82,11 @@ public:
     return mangleNominalTypeSymbol(Decl, "Mi");
   }
 
+  std::string mangleTypeMetadataInPlaceInitializationCache(
+                                                  const NominalTypeDecl *Decl) {
+    return mangleNominalTypeSymbol(Decl, "Ml");
+  }
+
   std::string mangleTypeMetadataCompletionFunction(const NominalTypeDecl *Decl){
     return mangleNominalTypeSymbol(Decl, "Mr");
   }

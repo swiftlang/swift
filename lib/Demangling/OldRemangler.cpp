@@ -716,6 +716,11 @@ void Remangler::mangleTypeMetadataInstantiationFunction(Node *node) {
   mangleSingleChildNode(node); // type
 }
 
+void Remangler::mangleTypeMetadataInPlaceInitializationCache(Node *node) {
+  Out << "Ml";
+  mangleSingleChildNode(node); // type
+}
+
 void Remangler::mangleTypeMetadataCompletionFunction(Node *node) {
   Out << "Mr";
   mangleSingleChildNode(node); // type

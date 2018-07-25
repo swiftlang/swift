@@ -476,9 +476,21 @@ using MetadataAccessGenerator =
                                       DynamicMetadataRequest request,
                                       llvm::Constant *cache)>;
 
+enum class CacheStrategy {
+  /// No cache.
+  None,
+
+  /// A simple lazy cache.
+  Lazy,
+
+  /// An InPlaceValueMetadataCache initialization cache.
+  InPlaceInitialization,
+};
+
 llvm::Function *getTypeMetadataAccessFunction(IRGenModule &IGM,
                                               CanType type,
                                               ForDefinition_t shouldDefine,
+                                              CacheStrategy cacheStrategy,
                                              MetadataAccessGenerator generator);
 
 llvm::Function *
@@ -491,27 +503,28 @@ getRequiredTypeMetadataAccessFunction(IRGenModule &IGM,
                                       NominalTypeDecl *theDecl,
                                       ForDefinition_t shouldDefine);
 
-using InPlaceMetadataInitializer =
+using OnceMetadataInitializer =
   llvm::function_ref<llvm::Value*(IRGenFunction &IGF, llvm::Value *metadata)>;
 
 MetadataResponse
-emitInPlaceTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
-                                          CanNominalType type,
-                                          llvm::Constant *cacheVariable,
-                                    InPlaceMetadataInitializer &&initializer);
+emitOnceTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
+                                       CanNominalType type,
+                                       llvm::Constant *cacheVariable,
+                                       OnceMetadataInitializer initializer);
 
 llvm::Value *uniqueForeignTypeMetadataRef(IRGenFunction &IGF,
                                           llvm::Value *candidate);
 
-using LazyCacheEmitter =
+using CacheEmitter =
   llvm::function_ref<MetadataResponse(IRGenFunction &IGF, Explosion &params)>;
 
 /// Emit the body of a lazy cache access function.
-void emitLazyCacheAccessFunction(IRGenModule &IGM,
-                                 llvm::Function *accessor,
-                                 llvm::GlobalVariable *cache,
-                                 LazyCacheEmitter getValue,
-                                 bool isReadNone = true);
+void emitCacheAccessFunction(IRGenModule &IGM,
+                             llvm::Function *accessor,
+                             llvm::Constant *cache,
+                             CacheStrategy cacheStrategy,
+                             CacheEmitter getValue,
+                             bool isReadNone = true);
 
 /// Emit a declaration reference to a metatype object.
 void emitMetatypeRef(IRGenFunction &IGF, CanMetatypeType type,
