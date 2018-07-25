@@ -56,6 +56,7 @@ Globals
   global ::= nominal-type 'Mr'           // generic type completion function
   global ::= nominal-type 'Mi'           // generic type instantiation function
   global ::= nominal-type 'MI'           // generic type instantiation cache
+  global ::= nominal-type 'Ml'           // in-place type initialization cache
   global ::= nominal-type 'Mm'           // class metaclass
   global ::= nominal-type 'Mn'           // nominal type descriptor
   global ::= module 'MXM'                // module descriptor

@@ -136,7 +136,10 @@ using ConstTargetMetadataPointer
   
 template <typename Runtime, typename T>
 using TargetPointer = typename Runtime::template Pointer<T>;
-  
+
+template <typename Runtime, typename T>
+using ConstTargetPointer = typename Runtime::template Pointer<const T>;
+
 template <typename Runtime, template <typename> class Pointee,
           bool Nullable = true>
 using ConstTargetFarRelativeDirectPointer
@@ -257,21 +260,28 @@ constexpr inline bool canBeInline(bool isBitwiseTakable) {
   return canBeInline(isBitwiseTakable, sizeof(T), alignof(T));
 }
 
-struct ValueWitnessTable;
+template <typename Runtime> struct TargetValueWitnessTable;
+using ValueWitnessTable = TargetValueWitnessTable<InProcess>;
 
-namespace value_witness_types {
+template <typename Runtime> class TargetValueWitnessTypes;
+using ValueWitnessTypes = TargetValueWitnessTypes<InProcess>;
+
+template <typename Runtime>
+class TargetValueWitnessTypes {
+public:
+  using StoredPointer = typename Runtime::StoredPointer;
 
 // Note that, for now, we aren't strict about 'const'.
 #define WANT_ALL_VALUE_WITNESSES
 #define DATA_VALUE_WITNESS(lowerId, upperId, type)
 #define FUNCTION_VALUE_WITNESS(lowerId, upperId, returnType, paramTypes) \
-  typedef returnType (*lowerId) paramTypes;
-#define MUTABLE_VALUE_TYPE OpaqueValue *
-#define IMMUTABLE_VALUE_TYPE const OpaqueValue *
-#define MUTABLE_BUFFER_TYPE ValueBuffer *
-#define IMMUTABLE_BUFFER_TYPE const ValueBuffer *
-#define TYPE_TYPE const Metadata *
-#define SIZE_TYPE size_t
+  typedef TargetPointer<Runtime, returnType paramTypes> lowerId;
+#define MUTABLE_VALUE_TYPE TargetPointer<Runtime, OpaqueValue>
+#define IMMUTABLE_VALUE_TYPE ConstTargetPointer<Runtime, OpaqueValue>
+#define MUTABLE_BUFFER_TYPE TargetPointer<Runtime, ValueBuffer>
+#define IMMUTABLE_BUFFER_TYPE ConstTargetPointer<Runtime, ValueBuffer>
+#define TYPE_TYPE ConstTargetPointer<Runtime, Metadata>
+#define SIZE_TYPE StoredSize
 #define INT_TYPE int
 #define UINT_TYPE unsigned
 #define VOID_TYPE void
@@ -284,7 +294,7 @@ namespace value_witness_types {
   typedef size_t stride;
   typedef ExtraInhabitantFlags extraInhabitantFlags;
 
-} // end namespace value_witness_types
+};
 
 struct TypeLayout;
 
@@ -292,14 +302,16 @@ struct TypeLayout;
 /// the requirements of some specific type.  The information in
 /// a value-witness table is intended to be sufficient to lay out
 /// and manipulate values of an arbitrary type.
-struct ValueWitnessTable {
+template <typename Runtime> struct TargetValueWitnessTable {
   // For the meaning of all of these witnesses, consult the comments
   // on their associated typedefs, above.
 
 #define WANT_ONLY_REQUIRED_VALUE_WITNESSES
 #define VALUE_WITNESS(LOWER_ID, UPPER_ID) \
-  value_witness_types::LOWER_ID LOWER_ID;
+  typename TargetValueWitnessTypes<Runtime>::LOWER_ID LOWER_ID;
 #include "swift/ABI/ValueWitness.def"
+
+  using StoredSize = typename Runtime::StoredSize;
 
   /// Is the external type layout of this type incomplete?
   bool isIncomplete() const {
@@ -308,9 +320,10 @@ struct ValueWitnessTable {
 
   /// Would values of a type with the given layout requirements be
   /// allocated inline?
-  static bool isValueInline(bool isBitwiseTakable, size_t size, size_t alignment) {
-    return (isBitwiseTakable && size <= sizeof(ValueBuffer) &&
-            alignment <= alignof(ValueBuffer));
+  static bool isValueInline(bool isBitwiseTakable, StoredSize size,
+                            StoredSize alignment) {
+    return (isBitwiseTakable && size <= sizeof(TargetValueBuffer<Runtime>) &&
+            alignment <= alignof(TargetValueBuffer<Runtime>));
   }
 
   /// Are values of this type allocated inline?
@@ -331,18 +344,18 @@ struct ValueWitnessTable {
   /// Return the size of this type.  Unlike in C, this has not been
   /// padded up to the alignment; that value is maintained as
   /// 'stride'.
-  size_t getSize() const {
+  StoredSize getSize() const {
     return size;
   }
 
   /// Return the stride of this type.  This is the size rounded up to
   /// be a multiple of the alignment.
-  size_t getStride() const {
+  StoredSize getStride() const {
     return stride;
   }
 
   /// Return the alignment required by this type, in bytes.
-  size_t getAlignment() const {
+  StoredSize getAlignment() const {
     return flags.getAlignment();
   }
 
@@ -352,7 +365,7 @@ struct ValueWitnessTable {
   ///
   /// For example, if the type needs to be 8-byte aligned, the value
   /// of this witness is 0x7.
-  size_t getAlignmentMask() const {
+  StoredSize getAlignmentMask() const {
     return flags.getAlignmentMask();
   }
   
@@ -583,7 +596,7 @@ public:
   #define WANT_ONLY_REQUIRED_VALUE_WITNESSES
   #define FUNCTION_VALUE_WITNESS(WITNESS, UPPER, RET_TYPE, PARAM_TYPES)    \
     template<typename...A>                                                 \
-    _ResultOf<value_witness_types::WITNESS>::type                          \
+    _ResultOf<ValueWitnessTypes::WITNESS>::type                            \
     vw_##WITNESS(A &&...args) const {                                      \
       return getValueWitnesses()->WITNESS(std::forward<A>(args)..., this); \
     }
@@ -3364,6 +3377,14 @@ public:
     return TypeContextDescriptorFlags(this->Flags.getKindSpecificFlags());
   }
 
+  /// Does this type have non-trivial "in place" metadata initialization?
+  ///
+  /// The type of the initialization-control structure differs by subclass,
+  /// so it doesn't appear here.
+  bool hasInPlaceMetadataInitialization() const {
+    return getTypeContextDescriptorFlags().hasInPlaceMetadataInitialization();
+  }
+
   const TargetTypeGenericContextDescriptorHeader<Runtime> &
     getFullGenericContextHeader() const;
 
@@ -3709,10 +3730,49 @@ public:
 
 using ClassDescriptor = TargetClassDescriptor<InProcess>;
 
+/// The cache structure for non-trivial initialization of singleton value
+/// metadata.
+template <typename Runtime>
+struct TargetInPlaceValueMetadataCache {
+  /// The metadata pointer.  Clients can do dependency-ordered loads
+  /// from this, and if they see a non-zero value, it's a Complete
+  /// metadata.
+  std::atomic<TargetMetadataPointer<Runtime, TargetMetadata>> Metadata;
+
+  /// The private cache data.
+  std::atomic<TargetPointer<Runtime, void>> Private;
+};
+using InPlaceValueMetadataCache =
+  TargetInPlaceValueMetadataCache<InProcess>;
+
+/// The control structure for performing non-trivial initialization of
+/// singleton value metadata, which is required when e.g. a non-generic
+/// value type has a resilient component type.
+template <typename Runtime>
+struct TargetInPlaceValueMetadataInitialization {
+  /// The initialization cache.  Out-of-line because mutable.
+  TargetRelativeDirectPointer<Runtime,
+                              TargetInPlaceValueMetadataCache<Runtime>>
+    InitializationCache;
+
+  /// The incomplete metadata.
+  TargetRelativeDirectPointer<Runtime, TargetMetadata<Runtime>>
+    IncompleteMetadata;
+
+  /// The completion function.  The pattern will always be null.
+  TargetRelativeDirectPointer<Runtime, MetadataCompleter>
+    CompletionFunction;
+};
+
 template <typename Runtime>
 class TargetValueTypeDescriptor
     : public TargetTypeContextDescriptor<Runtime> {
 public:
+  using InPlaceMetadataInitialization =
+    TargetInPlaceValueMetadataInitialization<Runtime>;
+
+  const InPlaceMetadataInitialization &getInPlaceMetadataInitialization() const;
+
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
     return cd->getKind() == ContextDescriptorKind::Struct ||
            cd->getKind() == ContextDescriptorKind::Enum;
@@ -3724,15 +3784,29 @@ template <typename Runtime>
 class TargetStructDescriptor final
     : public TargetValueTypeDescriptor<Runtime>,
       public TrailingGenericContextObjects<TargetStructDescriptor<Runtime>,
-                            TargetTypeGenericContextDescriptorHeader> {
+                            TargetTypeGenericContextDescriptorHeader,
+                            TargetInPlaceValueMetadataInitialization<Runtime>> {
+public:
+  using InPlaceMetadataInitialization =
+    TargetInPlaceValueMetadataInitialization<Runtime>;
+
 private:
   using TrailingGenericContextObjects =
     TrailingGenericContextObjects<TargetStructDescriptor<Runtime>,
-                                  TargetTypeGenericContextDescriptorHeader>;
+                                  TargetTypeGenericContextDescriptorHeader,
+                                  InPlaceMetadataInitialization>;
 
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
   friend TrailingObjects;
+
+  template<typename T>
+  using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
+
+  using TrailingGenericContextObjects::numTrailingObjects;
+  size_t numTrailingObjects(OverloadToken<InPlaceMetadataInitialization>) const{
+    return this->hasInPlaceMetadataInitialization() ? 1 : 0;
+  }
 
 public:
   using TrailingGenericContextObjects::getGenericContext;
@@ -3752,6 +3826,11 @@ public:
   /// its stored properties.
   bool hasFieldOffsetVector() const { return FieldOffsetVectorOffset != 0; }
 
+  const InPlaceMetadataInitialization &getInPlaceMetadataInitialization() const{
+    assert(this->hasInPlaceMetadataInitialization());
+    return *this->template getTrailingObjects<InPlaceMetadataInitialization>();
+  }
+
   static constexpr int32_t getGenericArgumentOffset() {
     return TargetStructMetadata<Runtime>::getGenericArgumentOffset();
   }
@@ -3767,15 +3846,29 @@ template <typename Runtime>
 class TargetEnumDescriptor final
     : public TargetValueTypeDescriptor<Runtime>,
       public TrailingGenericContextObjects<TargetEnumDescriptor<Runtime>,
-                                     TargetTypeGenericContextDescriptorHeader> {
+                            TargetTypeGenericContextDescriptorHeader,
+                            TargetInPlaceValueMetadataInitialization<Runtime>> {
+public:
+  using InPlaceMetadataInitialization =
+    TargetInPlaceValueMetadataInitialization<Runtime>;
+
 private:
   using TrailingGenericContextObjects =
     TrailingGenericContextObjects<TargetEnumDescriptor<Runtime>,
-                                  TargetTypeGenericContextDescriptorHeader>;
+                                  TargetTypeGenericContextDescriptorHeader,
+                                  InPlaceMetadataInitialization>;
 
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
   friend TrailingObjects;
+
+  template<typename T>
+  using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
+
+  using TrailingGenericContextObjects::numTrailingObjects;
+  size_t numTrailingObjects(OverloadToken<InPlaceMetadataInitialization>) const{
+    return this->hasInPlaceMetadataInitialization() ? 1 : 0;
+  }
 
 public:
   using TrailingGenericContextObjects::getGenericContext;
@@ -3811,6 +3904,11 @@ public:
 
   static constexpr int32_t getGenericArgumentOffset() {
     return TargetEnumMetadata<Runtime>::getGenericArgumentOffset();
+  }
+
+  const InPlaceMetadataInitialization &getInPlaceMetadataInitialization() const{
+    assert(this->hasInPlaceMetadataInitialization());
+    return *this->template getTrailingObjects<InPlaceMetadataInitialization>();
   }
 
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
@@ -3898,6 +3996,21 @@ TargetTypeContextDescriptor<Runtime>::getGenericParams() const {
     return llvm::cast<TargetStructDescriptor<Runtime>>(this)->getGenericParams();
   default:
     swift_runtime_unreachable("Not a type context descriptor.");
+  }
+}
+
+template<typename Runtime>
+inline const TargetInPlaceValueMetadataInitialization<Runtime> &
+TargetValueTypeDescriptor<Runtime>::getInPlaceMetadataInitialization() const {
+  switch (this->getKind()) {
+  case ContextDescriptorKind::Enum:
+    return llvm::cast<TargetEnumDescriptor<Runtime>>(this)
+        ->getInPlaceMetadataInitialization();
+  case ContextDescriptorKind::Struct:
+    return llvm::cast<TargetStructDescriptor<Runtime>>(this)
+        ->getInPlaceMetadataInitialization();
+  default:
+    swift_runtime_unreachable("Not a value type descriptor.");
   }
 }
 

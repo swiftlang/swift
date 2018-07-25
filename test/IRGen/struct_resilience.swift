@@ -196,18 +196,20 @@ public func resilientAny(s : ResilientWeakRef) {
 // CHECK: ret %swift.metadata_response { %swift.type* bitcast ([[INT]]* getelementptr inbounds {{.*}} @"$S17struct_resilience6MySizeVMf", i32 0, i32 1) to %swift.type*), [[INT]] 0 }
 
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} private void @initialize_metadata_StructWithResilientStorage(i8*)
+// CHECK-LABEL:  define internal swiftcc %swift.metadata_response @"$S17struct_resilience26StructWithResilientStorageVMr"(%swift.type*, i8*, i8**)
 // CHECK: [[FIELDS:%.*]] = alloca [4 x i8**]
 
 // CHECK: [[FIELDS_ADDR:%.*]] = getelementptr inbounds [4 x i8**], [4 x i8**]* [[FIELDS]], i32 0, i32 0
 
 // public let s: Size
 
+// CHECK: call swiftcc %swift.metadata_response @"$S16resilient_struct4SizeVMa"([[INT]] 319)
 // CHECK: [[FIELD_1:%.*]] = getelementptr inbounds i8**, i8*** [[FIELDS_ADDR]], i32 0
 // CHECK: store i8** [[SIZE_AND_ALIGNMENT:%.*]], i8*** [[FIELD_1]]
 
 // public let ss: (Size, Size)
 
+// CHECK: call swiftcc %swift.metadata_response @swift_getTupleTypeMetadata2([[INT]] 319,
 // CHECK: [[FIELD_2:%.*]] = getelementptr inbounds i8**, i8*** [[FIELDS_ADDR]], i32 1
 // CHECK: store i8** [[SIZE_AND_ALIGNMENT:%.*]], i8*** [[FIELD_2]]
 
@@ -219,9 +221,8 @@ public func resilientAny(s : ResilientWeakRef) {
 
 // Resilient aggregate with one field -- make sure we don't look inside it
 // public let i: ResilientInt
+// CHECK: call swiftcc %swift.metadata_response @"$S16resilient_struct12ResilientIntVMa"([[INT]] 319)
 // CHECK: [[FIELD_4:%.*]] = getelementptr inbounds i8**, i8*** [[FIELDS_ADDR]], i32 3
 // CHECK: store i8** [[SIZE_AND_ALIGNMENT:%.*]], i8*** [[FIELD_4]]
 
 // CHECK: call void @swift_initStructMetadata(%swift.type* {{.*}}, [[INT]] 256, [[INT]] 4, i8*** [[FIELDS_ADDR]], i32* {{.*}})
-// CHECK: store atomic %swift.type* {{.*}} @"$S17struct_resilience26StructWithResilientStorageVMf{{.*}}, %swift.type** @"$S17struct_resilience26StructWithResilientStorageVML" release,
-// CHECK: ret void
