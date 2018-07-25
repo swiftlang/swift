@@ -3653,7 +3653,10 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
     [&]() -> bool {
       return getASTContext().LangOpts.EnableKeyPathResilience
         && !forPropertyDescriptor
-        && storage->getModuleContext() != SwiftModule;
+        && storage->getModuleContext() != SwiftModule
+        // Properties that only dispatch via ObjC lookup do not have nor need
+        // property descriptors, since the selector identifies the storage.
+        && !getGetterDeclRef(storage).isForeign;
     };
   
   auto strategy = storage->getAccessStrategy(AccessSemantics::Ordinary,
