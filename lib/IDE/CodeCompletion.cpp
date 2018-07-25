@@ -3386,10 +3386,13 @@ public:
       prepareForRetypechecking(SE);
 
       for (auto &element : sequence.drop_back(2)) {
-        // Unfold AssignExpr for re-typechecking sequence.
-        if (auto *AE = dyn_cast_or_null<AssignExpr>(element)) {
-          AE->setSrc(nullptr);
-          AE->setDest(nullptr);
+        // Unfold expressions for re-typechecking sequence.
+        if (auto *assignExpr = dyn_cast_or_null<AssignExpr>(element)) {
+          assignExpr->setSrc(nullptr);
+          assignExpr->setDest(nullptr);
+        } else if (auto *ifExpr = dyn_cast_or_null<IfExpr>(element)) {
+          ifExpr->setCondExpr(nullptr);
+          ifExpr->setElseExpr(nullptr);
         }
 
         // Reset any references to operators in types, so they are properly
@@ -3440,6 +3443,12 @@ public:
       flattenBinaryExpr(assignExpr->getSrc(), sequence);
       assignExpr->setDest(nullptr);
       assignExpr->setSrc(nullptr);
+    } else if (auto ifExpr = dyn_cast<IfExpr>(expr)) {
+      flattenBinaryExpr(ifExpr->getCondExpr(), sequence);
+      sequence.push_back(ifExpr);
+      flattenBinaryExpr(ifExpr->getElseExpr(), sequence);
+      ifExpr->setCondExpr(nullptr);
+      ifExpr->setElseExpr(nullptr);
     } else if (auto tryExpr = dyn_cast<AnyTryExpr>(expr)) {
       // Strip out try expression. It doesn't affect completion.
       flattenBinaryExpr(tryExpr->getSubExpr(), sequence);

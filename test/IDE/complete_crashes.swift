@@ -220,9 +220,11 @@ protocol Bar_38149042 {
 func foo_38149042(bar: Bar_38149042) {
   _ = bar.foo? #^RDAR_38149042^# .x
 }
-// RDAR_38149042: Begin completions, 2 items
+// RDAR_38149042: Begin completions
 // RDAR_38149042-DAG: Decl[InstanceVar]/CurrNominal:                  .x[#Int#]; name=x
 // RDAR_38149042-DAG: Keyword[self]/CurrNominal: .self[#Baz_38149042#]; name=self
+// RDAR_38149042-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: [' ']=== {#AnyObject?#}[#Bool#]; name==== AnyObject?
+// RDAR_38149042-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: [' ']!== {#AnyObject?#}[#Bool#]; name=!== AnyObject?
 // RDAR_38149042: End completions
 
 // rdar://problem/38272904
@@ -274,7 +276,8 @@ func foo(x: RDAR41159258_MyResult1) {
 
 
 // rdar://problem/41232519
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=RDAR41232519 | %FileCheck %s -check-prefix=RDAR_41232519
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=RDAR41232519_1 | %FileCheck %s -check-prefix=RDAR_41232519
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=RDAR41232519_2 | %FileCheck %s -check-prefix=RDAR_41232519
 public protocol IntProvider {
   func nextInt() -> Int
 }
@@ -282,10 +285,13 @@ public protocol IntProvider {
 public final class IntStore {
   public var myInt: Int = 0
   func readNextInt(from provider: IntProvider) {
-      myInt = provider.nextInt() #^RDAR41232519^#
+      myInt = provider.nextInt() #^RDAR41232519_1^#
+      _ = true ? 1 : provider.nextInt() #^RDAR41232519_2^#
   }
 }
 // RDAR_41232519: Begin completions
+// RDAR_41232519: Decl[InfixOperatorFunction]/OtherModule[Swift]: [' ']+ {#Int#}[#Int#]; name=+ Int
+// RDAR_41232519: End completions
 
 // rdar://problem/28188259
 // RUN: %target-swift-ide-test -code-completion -code-completion-token=RDAR_28188259 -source-filename=%s | %FileCheck %s -check-prefix=RDAR_28188259
