@@ -64,7 +64,6 @@ Globals
   global ::= context identifier 'MXY'    // anonymous context descriptor
   global ::= type assoc_type_path 'MXA'  // generic parameter ref
   global ::= protocol 'Mp'               // protocol descriptor
-  global ::= protocol 'WR'               // protocol requirement table
 
   global ::= nominal-type 'Mo'           // class metadata immediate member base offset
 
