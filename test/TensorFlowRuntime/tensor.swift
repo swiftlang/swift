@@ -49,6 +49,10 @@ TensorTests.testAllBackends("NumericInitializers") {
 TensorTests.testAllBackends("RandomInitializer") {
   let _ = Tensor<Float>(randomUniform: [3, 4])
   let _ = Tensor<Float>(randomNormal: [3, 4])
+  // TODO: remove the extra code below once TPU execution supports 0 output
+  // tensors (b/111123797)
+  let extra = Tensor<Float>(1.0)
+  _hostOp(extra)
 }
 
 TensorTests.testAllBackends("ScalarToTensorConversion") {
@@ -252,6 +256,11 @@ TensorTests.testAllBackends("ReductionToScalar") {
   // expectEqual(x.mean(), 3)
   // TODO: Test other reduction ops here. Currently code motion isn't
   // smart enough to avoid send/receive.
+
+  // TODO: remove the extra code below once TPU execution supports 0 output
+  // tensors (b/111123797)
+  let extra = Tensor<Float>(1.0)
+  _hostOp(extra)
 }
 
 TensorTests.testAllBackends("BatchNormalization") {

@@ -78,6 +78,10 @@ LoopsTests.testAllBackends("SR-8191") {
     _hostOp(y.toHost(shape: []))
     i += 1
   } while i < 10
+  // TODO: remove the extra code below once TPU execution supports 0 output
+  // tensors (b/111123797)
+  let extra = Tensor<Float>(1.0)
+  _hostOp(extra)
 }
 
 // FIXME: Compiler bug (b/73607740)

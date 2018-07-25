@@ -8,7 +8,11 @@
 // Control flow related tests.
 
 import TensorFlow
+#if TPU
+import TensorFlowUnittestTPU
+#else
 import TensorFlowUnittest
+#endif
 import StdlibUnittest
 
 var ControlFlowTests = TestSuite("ControlFlow")

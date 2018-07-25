@@ -86,10 +86,8 @@ func testSendsInALoop() {
 }
 SendsRecvsTests.testAllBackends("testSendsInALoop", testSendsInALoop)
 
-// b(111123797): Renable the test when TPU/XlA supports running target nodes.
 @inline(never)
 func testSendsInALoopWithNoResultTensor() {
-#if !TPU
   let maxCount = 10
   var count = 1
   var a = Tensor<Float>(1.0)
@@ -99,7 +97,11 @@ func testSendsInALoopWithNoResultTensor() {
     print(a.toHost())
     count += 1
   }
-#endif // !TPU
+
+  // TODO: remove the extra code below once TPU execution supports 0 output
+  // tensors (b/111123797)
+  let extra = Tensor<Float>(1.0)
+  _hostOp(extra)
 }
 SendsRecvsTests.testAllBackends("testSendsInALoopWithNoResultTensor",
                                 testSendsInALoopWithNoResultTensor)
