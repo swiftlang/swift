@@ -198,6 +198,12 @@ static void validateDebugInfoArgs(DiagnosticEngine &diags,
                      diag::verify_debug_info_requires_debug_option);
     }
   }
+
+  // Check for any -debug-prefix-map options that aren't of the form
+  // 'original=remapped' (either side can be empty, however).
+  for (auto A : args.getAllArgValues(options::OPT_debug_prefix_map))
+    if (A.find('=') == StringRef::npos)
+      diags.diagnose(SourceLoc(), diag::error_invalid_debug_prefix_map, A);
 }
 
 static void validateCompilationConditionArgs(DiagnosticEngine &diags,
