@@ -43,7 +43,7 @@ extension Sequence {
   /// list consisting of indices of names with five or fewer letters.
   ///
   ///     let names: Set = ["Sofia", "Camilla", "Martina", "Mateo", "Nicolás"]
-  ///     var shorterIndices: [SetIndex<String>] = []
+  ///     var shorterIndices: [Set<String>.Index] = []
   ///     for (i, name) in zip(names.indices, names) {
   ///         if name.count <= 5 {
   ///             shorterIndices.append(i)

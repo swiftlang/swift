@@ -3346,8 +3346,6 @@ extension Set.Index {
 #endif
 }
 
-public typealias SetIndex<Element: Hashable> = Set<Element>.Index
-
 extension Set.Index: Equatable {
   @inlinable
   public static func == (
@@ -3582,8 +3580,6 @@ extension Set {
   }
 }
 
-public typealias SetIterator<Element: Hashable> = Set<Element>.Iterator
-
 extension Set.Iterator {
   @inlinable
   internal static func _native(
@@ -3788,3 +3784,6 @@ extension Set {
   }
 }
 #endif
+
+public typealias SetIndex<Element: Hashable> = Set<Element>.Index
+public typealias SetIterator<Element: Hashable> = Set<Element>.Iterator

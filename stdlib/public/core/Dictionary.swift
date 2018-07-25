@@ -4139,9 +4139,6 @@ extension Dictionary.Index {
 #endif
 }
 
-public typealias DictionaryIndex<Key: Hashable, Value> =
-  Dictionary<Key, Value>.Index
-
 extension Dictionary.Index: Equatable {
   @inlinable
   public static func == (
@@ -4377,9 +4374,6 @@ extension Dictionary {
   }
 }
 
-public typealias DictionaryIterator<Key: Hashable, Value> =
-  Dictionary<Key, Value>.Iterator
-
 extension Dictionary.Iterator {
   @inlinable
   internal static func _native(
@@ -4594,3 +4588,8 @@ extension Dictionary {
   }
 }
 #endif
+
+public typealias DictionaryIndex<Key: Hashable, Value> =
+  Dictionary<Key, Value>.Index
+public typealias DictionaryIterator<Key: Hashable, Value> =
+  Dictionary<Key, Value>.Iterator
