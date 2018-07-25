@@ -125,6 +125,7 @@ set(SWIFTLIB_ESSENTIAL
   StringHashable.swift  # ORDER DEPENDENCY: Must precede String.swift
   String.swift
   StringBridge.swift
+  StringCharacterView.swift
   StringComparable.swift
   StringComparison.swift
   StringCreate.swift
