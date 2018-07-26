@@ -11,10 +11,17 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "constant-propagation"
+#include "TFConstExpr.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/ConstantFolding.h"
+#include "llvm/Support/CommandLine.h"
 
 using namespace swift;
+
+static llvm::cl::opt<bool>
+ConstantPropagationUseNewFolder(
+    "constant-propagation-use-new-folder", llvm::cl::init(false),
+    llvm::cl::desc("Use new folder in ConstantPropagation passes"));
 
 //===----------------------------------------------------------------------===//
 //                              Top Level Driver
@@ -32,10 +39,17 @@ public:
 private:
   /// The entry point to the transformation.
   void run() override {
+    SILAnalysis::InvalidationKind Invalidation;
 
-    ConstantFolder Folder(getOptions().AssertConfig, EnableDiagnostics);
-    Folder.initializeWorklist(*getFunction());
-    auto Invalidation = Folder.processWorkList();
+    if (ConstantPropagationUseNewFolder) {
+      tf::ConstExprEvaluator evaluator(getFunction()->getModule());
+      Invalidation = evaluator.propagateConstants(*getFunction(),
+                                                  EnableDiagnostics);
+    } else {
+      ConstantFolder Folder(getOptions().AssertConfig, EnableDiagnostics);
+      Folder.initializeWorklist(*getFunction());
+      Invalidation = Folder.processWorkList();
+    }
 
     if (Invalidation != SILAnalysis::InvalidationKind::Nothing) {
       invalidateAnalysis(Invalidation);

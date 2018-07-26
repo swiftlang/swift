@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "TFConstExpr"
 #include "TFConstExpr.h"
+#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Defer.h"
@@ -19,6 +20,7 @@
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILConstants.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/Serialization/SerializedSILLoader.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/Support/CommandLine.h"
@@ -111,6 +113,10 @@ public:
                          unsigned &numInstEvaluated)
       : evaluator(evaluator), fn(fn), substitutionMap(substitutionMap),
         numInstEvaluated(numInstEvaluated) {}
+
+  void eraseValue(SILValue value) {
+    calculatedValues.erase(value);
+  }
 
   void setValue(SILValue value, SymbolicValue symVal) {
     calculatedValues.insert({value, symVal});
@@ -304,8 +310,13 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
     if (callResult.hasValue())
       return callResult.getValue();
 
-    assert(calculatedValues.count(apply));
-    return calculatedValues[apply];
+    if (calculatedValues.count(apply)) {
+      return calculatedValues[apply];
+    } else {
+      assert(apply->getSubstCalleeConv().getNumDirectSILResults() == 0);
+      assert(apply->use_empty());
+      return evaluator.getUnknown(value, UnknownReason::Default);
+    }
   }
 
   if (auto *enumVal = dyn_cast<EnumInst>(value)) {
@@ -1442,7 +1453,7 @@ static llvm::Optional<SymbolicValue> evaluateAndCacheCall(
 // ConstExprEvaluator implementation.
 //===----------------------------------------------------------------------===//
 
-ConstExprEvaluator::ConstExprEvaluator(SILModule &m) {}
+ConstExprEvaluator::ConstExprEvaluator(SILModule &m) : M(m) {}
 
 ConstExprEvaluator::~ConstExprEvaluator() {}
 
@@ -1472,6 +1483,125 @@ void ConstExprEvaluator::computeConstantValues(
     // at.  We don't want lots of constants folded to trigger a limit.
     numInstEvaluated = 0;
   }
+}
+
+/// Creates an instruction that builds the specified constant value from
+/// scratch. Returns the created instruction.
+///
+/// Some constant values are not supported. Does nothing and returns nullptr for
+/// unsupported values.
+static SingleValueInstruction *
+emitConstantInst(SymbolicValue symVal, SILType type, SILLocation loc,
+                        SILBuilder &B) {
+  assert(symVal.isConstant() && "Not a constant value");
+
+  switch (symVal.getKind()) {
+  case SymbolicValue::Unknown:
+  case SymbolicValue::UninitMemory:
+    assert(0 && "Shouldn't happen");
+
+  case SymbolicValue::Metatype:
+  case SymbolicValue::Function:
+  case SymbolicValue::String:
+  case SymbolicValue::Aggregate:
+  case SymbolicValue::Enum:
+  case SymbolicValue::EnumWithPayload:
+  case SymbolicValue::Address:
+  case SymbolicValue::Array:
+    return nullptr;
+
+  case SymbolicValue::Integer:
+    return B.createIntegerLiteral(loc, type, symVal.getIntegerValue());
+  case SymbolicValue::Float:
+    return B.createFloatLiteral(loc, type, symVal.getFloatValue());
+  }
+}
+
+/// If `value` is guaranteed to trap (e.g. overflow), then emit a diagnostic.
+/// TODO: More diagnostics, and more detailed diagnostics.
+static void
+emitConstantPropagationDiagnostic(SILValue value, SymbolicValue symVal,
+                                  DiagnosticEngine &diags,
+                                  ConstExprEvaluator &evaluator,
+                                  ConstExprFunctionState &state) {
+  if (!symVal.isUnknown())
+    return;
+
+  if (symVal.getUnknownReason() == UnknownReason::Overflow) {
+    diags.diagnose(value.getLoc().getSourceLoc(), diag::new_folder_overflow);
+
+    // Change the UnknownReason to Default, so that later uses of this value do
+    // not also emit diagnostics.
+    // TODO: This is hacky. A better way would be to inspect the Unknown to
+    // determine if this is a first use where we should emit a diagnostic.
+    state.eraseValue(value);
+    state.setValue(value, evaluator.getUnknown(value, UnknownReason::Default));
+  }
+}
+
+/// Propagates constants through the passed-in function, mutating the function
+/// wherever it can replace instructions with constant instructions.
+///
+/// If EnableDiagnostics is true, then emits diagnostics on operations that are
+/// guaranteed to trap (e.g. operations that cause overflows).
+SILAnalysis::InvalidationKind
+ConstExprEvaluator::propagateConstants(SILFunction &F, bool EnableDiagnostics) {
+  bool InvalidateInstructions = false;
+
+  unsigned numInstEvaluated = 0;
+  ConstExprFunctionState state(*this, nullptr, {}, numInstEvaluated);
+
+  llvm::SetVector<SILInstruction *> FoldedInstructions;
+
+  for (auto &BB : F) {
+    for (auto &I : BB) {
+      auto value = SILValue(dyn_cast<SingleValueInstruction>(&I));
+      if (!value)
+        continue;
+
+      // Try to compute a constant value for the instruction.
+      numInstEvaluated = 0;
+      auto symVal = state.getConstantValue(value);
+
+      if (EnableDiagnostics) {
+        emitConstantPropagationDiagnostic(value, symVal,
+                                          M.getASTContext().Diags, *this,
+                                          state);
+      }
+
+      // If it's possible and useful to replace the original instruction with
+      // something that builds the value from scratch, then do.
+
+      // If the original instruction doesn't have a constant value, then it's
+      // not possible to replace it.
+      if (!symVal.isConstant())
+        continue;
+
+      // If the original instruction builds the value from scratch, then it's
+      // not useful to replace it.
+      if (I.getNumOperands() == 0)
+        continue;
+
+      SILBuilder B(&I);
+      auto newInst = emitConstantInst(symVal, value->getType(), I.getLoc(), B);
+      if (!newInst)
+        continue;
+
+      value->replaceAllUsesWith(SILValue(newInst));
+      FoldedInstructions.insert(&I);
+      InvalidateInstructions = true;
+    }
+  }
+
+  // Delete dead instructions after finishing, to avoid invalidating iterators.
+  recursivelyDeleteTriviallyDeadInstructions(FoldedInstructions.getArrayRef());
+
+  using InvalidationKind = SILAnalysis::InvalidationKind;
+
+  unsigned Inv = InvalidationKind::Nothing;
+  if (InvalidateInstructions) Inv |= (unsigned) InvalidationKind::Instructions;
+
+  return InvalidationKind(Inv);
 }
 
 /// Analyze the array users of an _allocateUninitialized call, to see if they

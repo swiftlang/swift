@@ -26,6 +26,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "llvm/Support/Allocator.h"
 
 namespace swift {
@@ -48,6 +49,8 @@ class ConstExprEvaluator {
 
   /// The current call stack, used for providing accurate diagnostics.
   llvm::SmallVector<SourceLoc, 4> callStack;
+
+  SILModule &M;
 
   ConstExprEvaluator(const ConstExprEvaluator &) = delete;
   void operator=(const ConstExprEvaluator &) = delete;
@@ -81,6 +84,14 @@ public:
   /// that occur after after folding them.
   void computeConstantValues(ArrayRef<SILValue> values,
                              SmallVectorImpl<SymbolicValue> &results);
+
+  /// Propagates constants through the passed-in function, mutating the function
+  /// wherever it can replace instructions with constant instructions.
+  ///
+  /// If EnableDiagnostics is true, then emits diagnostics on operations that are
+  /// guaranteed to trap (e.g. operations that cause overflows).
+  SILAnalysis::InvalidationKind
+  propagateConstants(SILFunction &F, bool EnableDiagnostics);
 
   /// Try to decode the specified apply of the _allocateUninitializedArray
   /// function in the standard library.  This attempts to figure out what the

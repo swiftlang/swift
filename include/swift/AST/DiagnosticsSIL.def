@@ -342,6 +342,12 @@ ERROR(wrong_non_negative_assumption,none,
 ERROR(shifting_all_significant_bits,none,
       "shift amount is greater than or equal to type size in bits", ())
 
+// Arithmetic diagnostics from the new constant folder.
+// These are temporarily less detailed than the diagnostics from the old
+// constant folder, so that we can incrementally work on the new one.
+ERROR(new_folder_overflow,none,
+      "operation overflows", ())
+
 // FIXME: We won't need this as it will be replaced with user-generated strings.
 // staticReport diagnostics.
 ERROR(static_report_error, none,
