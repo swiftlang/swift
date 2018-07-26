@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil %s -o -
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil %s -verify | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-strict-deabstraction -O -emit-sil %s -o -
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-strict-deabstraction -O -emit-sil %s -verify | %FileCheck %s
 
 import TensorFlow
 
@@ -96,11 +96,11 @@ public func testBalancedRetainReleases() {
 // CHECK: function_ref @_swift_tfc_FinishTensorComputation
 // CHECK: [[H:%.*]] = alloc_ref $TensorHandle<Float>
 //
-// Currently we generate a retain for the use of __tf_receive below
-// CHECK: strong_retain [[H]] : $TensorHandle<Float>
-//
 // __tf_receive is called here
 // CHECK: [[RECV:%.*]] = function_ref @__tf_receive
+//
+// Currently we generate a retain for the use of apply below
+// CHECK: strong_retain [[H]] : $TensorHandle<Float>
 // CHECK: apply [[RECV]]<Float>([[H]])
 //
 // CHECK: strong_release [[H]] : $TensorHandle<Float>
