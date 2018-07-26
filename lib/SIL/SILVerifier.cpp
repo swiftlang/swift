@@ -232,11 +232,15 @@ void verifyKeyPathComponent(SILModule &M,
               && !component.getSubscriptIndexEquals()
               && !component.getSubscriptIndexHash(),
               "property descriptor should not have index information");
+      
+      require(component.getExternalDecl() == nullptr
+              && component.getExternalSubstitutions().empty(),
+              "property descriptor should not refer to another external decl");
     } else {
       require(hasIndices == !component.getSubscriptIndices().empty(),
               "component for subscript should have indices");
     }
-  
+    
     ParameterConvention normalArgConvention;
     if (M.getOptions().EnableGuaranteedNormalArguments)
       normalArgConvention = ParameterConvention::Indirect_In_Guaranteed;

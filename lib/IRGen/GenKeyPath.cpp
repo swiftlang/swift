@@ -702,6 +702,27 @@ emitMetadataGeneratorForKeyPath(IRGenModule &IGM,
     });
 };
 
+static llvm::Function *
+emitWitnessTableGeneratorForKeyPath(IRGenModule &IGM,
+                                    CanType type,
+                                    ProtocolConformanceRef conformance,
+                                    GenericEnvironment *genericEnv,
+                                    ArrayRef<GenericRequirement> requirements) {
+  // TODO: Use the standard conformance accessor when there are no arguments
+  // and the conformance accessor is defined.
+  return emitGeneratorForKeyPath(IGM, "keypath_get_witness_table", type,
+    IGM.WitnessTablePtrTy,
+    genericEnv, requirements,
+    [&](IRGenFunction &IGF, CanType substType) {
+      if (type->hasTypeParameter())
+        conformance = conformance.subst(type,
+          QueryInterfaceTypeSubstitutions(genericEnv),
+          LookUpConformanceInSignature(*genericEnv->getGenericSignature()));
+      auto ret = emitWitnessTableRef(IGF, substType, conformance);
+      IGF.Builder.CreateRet(ret);
+    });
+}
+
 static void
 emitKeyPathComponent(IRGenModule &IGM,
                      ConstantStructBuilder &fields,
@@ -815,6 +836,46 @@ emitKeyPathComponent(IRGenModule &IGM,
   }
   case KeyPathPatternComponent::Kind::GettableProperty:
   case KeyPathPatternComponent::Kind::SettableProperty: {
+    // If the component references an external property, encode that in a
+    // header before the local attempt header, so that we can consult the
+    // external descriptor at instantiation time.
+    if (auto externalDecl = component.getExternalDecl()) {
+      SmallVector<llvm::Constant *, 4> externalSubArgs;
+      auto componentSig = externalDecl->getInnermostDeclContext()
+        ->getGenericSignatureOfContext();
+      auto subs = component.getExternalSubstitutions();
+      if (!subs.empty()) {
+        enumerateGenericSignatureRequirements(
+          componentSig->getCanonicalSignature(),
+          [&](GenericRequirement reqt) {
+            auto substType = reqt.TypeParameter.subst(subs)
+              ->getCanonicalType();
+            if (!reqt.Protocol) {
+              // Type requirement.
+              externalSubArgs.push_back(
+                emitMetadataGeneratorForKeyPath(IGM, substType,
+                                                genericEnv, requirements));
+            } else {
+              // Protocol requirement.
+              auto conformance = subs.lookupConformance(
+                           reqt.TypeParameter->getCanonicalType(), reqt.Protocol);
+              externalSubArgs.push_back(
+                emitWitnessTableGeneratorForKeyPath(IGM, substType,
+                                                    *conformance,
+                                                    genericEnv, requirements));
+            }
+          });
+      }
+      fields.addInt32(
+        KeyPathComponentHeader::forExternalComponent(externalSubArgs.size())
+          .getData());
+      fields.addAlignmentPadding(IGM.getPointerAlignment());
+      auto descriptor = IGM.getAddrOfPropertyDescriptor(externalDecl);
+      fields.add(descriptor);
+      for (auto *arg : externalSubArgs)
+        fields.add(arg);
+    }
+  
     // Encode the settability.
     bool settable = kind == KeyPathPatternComponent::Kind::SettableProperty;
     KeyPathComponentHeader::ComputedPropertyKind componentKind;
