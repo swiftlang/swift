@@ -1,4 +1,4 @@
-//===--- FileTypes.h - Input & Temporary Driver Types -----------*- C++ -*-===//
+//===--- FileTypes.h - Input & output formats used by the tools -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_FRONTEND_FILETYPES_H
-#define SWIFT_FRONTEND_FILETYPES_H
+#ifndef SWIFT_BASIC_FILETYPES_H
+#define SWIFT_BASIC_FILETYPES_H
 
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/DenseMapInfo.h"
@@ -22,7 +22,7 @@ namespace swift {
 namespace file_types {
 enum ID : uint8_t {
 #define TYPE(NAME, ID, EXTENSION, FLAGS) TY_##ID,
-#include "swift/Frontend/Types.def"
+#include "swift/Basic/FileTypes.def"
 #undef TYPE
   TY_INVALID
 };

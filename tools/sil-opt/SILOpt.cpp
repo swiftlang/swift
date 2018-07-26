@@ -15,14 +15,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/SILOptions.h"
+#include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/LLVMContext.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
-#include "swift/Frontend/FileTypes.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"

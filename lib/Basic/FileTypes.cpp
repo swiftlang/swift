@@ -1,4 +1,4 @@
-//===--- Types.cpp - Driver input & temporary type information ------------===//
+//===--- FileTypes.cpp - Input & output formats used by the tools ---------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Frontend/FileTypes.h"
+#include "swift/Basic/FileTypes.h"
 
 #include "swift/Strings.h"
 #include "llvm/ADT/STLExtras.h"
@@ -29,7 +29,7 @@ struct TypeInfo {
 static const TypeInfo TypeInfos[] = {
 #define TYPE(NAME, ID, TEMP_SUFFIX, FLAGS) \
   { NAME, FLAGS, TEMP_SUFFIX },
-#include "swift/Frontend/Types.def"
+#include "swift/Basic/FileTypes.def"
 };
 
 static const TypeInfo &getInfo(unsigned Id) {
@@ -50,7 +50,7 @@ ID file_types::lookupTypeForExtension(StringRef Ext) {
   return llvm::StringSwitch<file_types::ID>(Ext.drop_front())
 #define TYPE(NAME, ID, SUFFIX, FLAGS) \
            .Case(SUFFIX, TY_##ID)
-#include "swift/Frontend/Types.def"
+#include "swift/Basic/FileTypes.def"
       .Default(TY_INVALID);
 }
 
@@ -58,7 +58,7 @@ ID file_types::lookupTypeForName(StringRef Name) {
   return llvm::StringSwitch<file_types::ID>(Name)
 #define TYPE(NAME, ID, SUFFIX, FLAGS) \
            .Case(NAME, TY_##ID)
-#include "swift/Frontend/Types.def"
+#include "swift/Basic/FileTypes.def"
       .Default(TY_INVALID);
 }
 

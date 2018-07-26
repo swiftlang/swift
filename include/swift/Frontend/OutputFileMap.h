@@ -13,8 +13,8 @@
 #ifndef SWIFT_DRIVER_OUTPUTFILEMAP_H
 #define SWIFT_DRIVER_OUTPUTFILEMAP_H
 
+#include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Frontend/FileTypes.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSet.h"

@@ -13,10 +13,10 @@
 #ifndef SWIFT_DRIVER_TOOLCHAIN_H
 #define SWIFT_DRIVER_TOOLCHAIN_H
 
+#include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Driver/Action.h"
 #include "swift/Driver/Job.h"
-#include "swift/Frontend/FileTypes.h"
 #include "swift/Option/Options.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Option/Option.h"
