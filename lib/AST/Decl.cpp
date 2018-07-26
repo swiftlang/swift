@@ -2504,13 +2504,10 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
       // marked 'public' if the protocol was '@_versioned' (now
       // '@usableFromInline'). Which works at the ABI level, so let's keep
       // supporting that here by explicitly checking for it.
-      if (access == AccessLevel::Public) {
-        assert(proto->getDeclContext()->isModuleScopeContext() &&
-               "if we get nested protocols, this should not apply to them");
-        if (proto->getFormalAccess() == AccessLevel::Internal &&
-            proto->isUsableFromInline()) {
-          return true;
-        }
+      if (access == AccessLevel::Public &&
+          proto->getFormalAccess() == AccessLevel::Internal &&
+          proto->isUsableFromInline()) {
+        return true;
       }
 
       // Skip the fast path below and just compare access scopes.
