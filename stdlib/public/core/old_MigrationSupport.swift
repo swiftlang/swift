@@ -13,136 +13,136 @@
 // This file contains only support for types deprecated from previous versions
 // of Swift
 
-@available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "BidirectionalCollection")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "BidirectionalCollection", message: "it will be removed in Swift 5.0.  Please use 'BidirectionalCollection' instead")
 public typealias BidirectionalIndexable = BidirectionalCollection
-@available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "Collection")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "Collection", message: "it will be removed in Swift 5.0.  Please use 'Collection' instead")
 public typealias IndexableBase = Collection
-@available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "Collection")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "Collection", message: "it will be removed in Swift 5.0.  Please use 'Collection' instead")
 public typealias Indexable = Collection
-@available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "MutableCollection")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "MutableCollection", message: "it will be removed in Swift 5.0.  Please use 'MutableCollection' instead")
 public typealias MutableIndexable = MutableCollection
-@available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "RandomAccessCollection")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "RandomAccessCollection", message: "it will be removed in Swift 5.0.  Please use 'RandomAccessCollection' instead")
 public typealias RandomAccessIndexable = RandomAccessCollection
-@available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "RangeReplaceableIndexable")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "RangeReplaceableIndexable", message: "it will be removed in Swift 5.0.  Please use 'RangeReplaceableCollection' instead")
 public typealias RangeReplaceableIndexable = RangeReplaceableCollection
-@available(swift, deprecated: 4.2, renamed: "EnumeratedSequence.Iterator")
+@available(*, deprecated: 4.2, renamed: "EnumeratedSequence.Iterator")
 public typealias EnumeratedIterator<T: Sequence> = EnumeratedSequence<T>.Iterator
-@available(swift,deprecated: 4.2, obsoleted: 5.0, renamed: "CollectionOfOne.Iterator")
+@available(*,deprecated: 4.2/*, obsoleted: 5.0*/, renamed: "CollectionOfOne.Iterator")
 public typealias IteratorOverOne<T> = CollectionOfOne<T>.Iterator
-@available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "EmptyCollection.Iterator")
+@available(*, deprecated: 4.2/*, obsoleted: 5.0*/, renamed: "EmptyCollection.Iterator")
 public typealias EmptyIterator<T> = EmptyCollection<T>.Iterator
-@available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "LazyFilterSequence.Iterator")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "LazyFilterSequence.Iterator")
 public typealias LazyFilterIterator<T: Sequence> = LazyFilterSequence<T>.Iterator
-@available(swift, deprecated: 3.1, obsoleted: 5.0, message: "Use Base.Index")
+@available(swift, deprecated: 3.1/*, obsoleted: 5.0*/, message: "Use Base.Index")
 public typealias LazyFilterIndex<Base: Collection> = Base.Index
-@available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "LazyDropWhileSequence.Iterator")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "LazyDropWhileSequence.Iterator")
 public typealias LazyDropWhileIterator<T> = LazyDropWhileSequence<T>.Iterator where T: Sequence
-@available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "LazyDropWhileCollection.Index")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "LazyDropWhileCollection.Index")
 public typealias LazyDropWhileIndex<T> = LazyDropWhileCollection<T>.Index where T: Collection
-@available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "LazyDropWhileCollection")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "LazyDropWhileCollection")
 public typealias LazyDropWhileBidirectionalCollection<T> = LazyDropWhileCollection<T> where T: BidirectionalCollection
-@available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "LazyFilterCollection")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "LazyFilterCollection")
 public typealias LazyFilterBidirectionalCollection<T> = LazyFilterCollection<T> where T : BidirectionalCollection
-@available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "LazyMapSequence.Iterator")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "LazyMapSequence.Iterator")
 public typealias LazyMapIterator<T, E> = LazyMapSequence<T, E>.Iterator where T: Sequence
-@available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "LazyMapCollection")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "LazyMapCollection")
 public typealias LazyMapBidirectionalCollection<T, E> = LazyMapCollection<T, E> where T : BidirectionalCollection
-@available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "LazyMapCollection")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "LazyMapCollection")
 public typealias LazyMapRandomAccessCollection<T, E> = LazyMapCollection<T, E> where T : RandomAccessCollection
-@available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "LazyCollection")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "LazyCollection")
 public typealias LazyBidirectionalCollection<T> = LazyCollection<T> where T : BidirectionalCollection
-@available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "LazyCollection")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "LazyCollection")
 public typealias LazyRandomAccessCollection<T> = LazyCollection<T> where T : RandomAccessCollection
-@available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "FlattenCollection.Index")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "FlattenCollection.Index")
 public typealias FlattenCollectionIndex<T> = FlattenCollection<T>.Index where T : Collection, T.Element : Collection
-@available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "FlattenCollection.Index")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "FlattenCollection.Index")
 public typealias FlattenBidirectionalCollectionIndex<T> = FlattenCollection<T>.Index where T : BidirectionalCollection, T.Element : BidirectionalCollection
-@available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "FlattenCollection")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "FlattenCollection")
 public typealias FlattenBidirectionalCollection<T> = FlattenCollection<T> where T : BidirectionalCollection, T.Element : BidirectionalCollection
-@available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "JoinedSequence.Iterator")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "JoinedSequence.Iterator")
 public typealias JoinedIterator<T: Sequence> = JoinedSequence<T>.Iterator where T.Element: Sequence
-@available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "Zip2Sequence.Iterator")
+@available(*, deprecated: 4.2/*, obsoleted: 5.0*/, renamed: "Zip2Sequence.Iterator")
 public typealias Zip2Iterator<T, U> = Zip2Sequence<T, U>.Iterator where T: Sequence, U: Sequence
-@available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "LazyDropWhileSequence.Iterator")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "LazyDropWhileSequence.Iterator")
 public typealias LazyPrefixWhileIterator<T> = LazyPrefixWhileSequence<T>.Iterator where T: Sequence
-@available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "LazyDropWhileCollection.Index")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "LazyDropWhileCollection.Index")
 public typealias LazyPrefixWhileIndex<T> = LazyPrefixWhileCollection<T>.Index where T: Collection
-@available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "LazyPrefixWhileCollection")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "LazyPrefixWhileCollection")
 public typealias LazyPrefixWhileBidirectionalCollection<T> = LazyPrefixWhileCollection<T> where T: BidirectionalCollection
-@available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "ReversedCollection")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "ReversedCollection")
 public typealias ReversedRandomAccessCollection<T: RandomAccessCollection> = ReversedCollection<T>
-@available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "ReversedCollection.Index")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "ReversedCollection.Index")
 public typealias ReversedIndex<T: BidirectionalCollection> = ReversedCollection<T>
-@available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "Slice")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "Slice")
 public typealias BidirectionalSlice<T> = Slice<T> where T : BidirectionalCollection
-@available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "Slice")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "Slice")
 public typealias RandomAccessSlice<T> = Slice<T> where T : RandomAccessCollection
-@available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "Slice")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "Slice")
 public typealias RangeReplaceableSlice<T> = Slice<T> where T : RangeReplaceableCollection
-@available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "Slice")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "Slice")
 public typealias RangeReplaceableBidirectionalSlice<T> = Slice<T> where T : RangeReplaceableCollection & BidirectionalCollection
-@available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "Slice")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "Slice")
 public typealias RangeReplaceableRandomAccessSlice<T> = Slice<T> where T : RangeReplaceableCollection & RandomAccessCollection
-@available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "Slice")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "Slice")
 public typealias MutableSlice<T> = Slice<T> where T : MutableCollection
-@available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "Slice")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "Slice")
 public typealias MutableBidirectionalSlice<T> = Slice<T> where T : MutableCollection & BidirectionalCollection
-@available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "Slice")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "Slice")
 public typealias MutableRandomAccessSlice<T> = Slice<T> where T : MutableCollection & RandomAccessCollection
-@available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "Slice")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "Slice")
 public typealias MutableRangeReplaceableSlice<T> = Slice<T> where T : MutableCollection & RangeReplaceableCollection
-@available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "Slice")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "Slice")
 public typealias MutableRangeReplaceableBidirectionalSlice<T> = Slice<T> where T : MutableCollection & RangeReplaceableCollection & BidirectionalCollection
-@available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "Slice")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "Slice")
 public typealias MutableRangeReplaceableRandomAccessSlice<T> = Slice<T> where T : MutableCollection & RangeReplaceableCollection & RandomAccessCollection
-@available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "DefaultIndices")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "DefaultIndices")
 public typealias DefaultBidirectionalIndices<T> = DefaultIndices<T> where T : BidirectionalCollection
-@available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "DefaultIndices")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "DefaultIndices")
 public typealias DefaultRandomAccessIndices<T> = DefaultIndices<T> where T : RandomAccessCollection
 
 // Deprecated by SE-0115.
-@available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "ExpressibleByNilLiteral")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "ExpressibleByNilLiteral")
 public typealias NilLiteralConvertible = ExpressibleByNilLiteral
-@available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "_ExpressibleByBuiltinIntegerLiteral")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "_ExpressibleByBuiltinIntegerLiteral")
 public typealias _BuiltinIntegerLiteralConvertible = _ExpressibleByBuiltinIntegerLiteral
-@available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "ExpressibleByIntegerLiteral")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "ExpressibleByIntegerLiteral")
 public typealias IntegerLiteralConvertible = ExpressibleByIntegerLiteral
-@available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "_ExpressibleByBuiltinFloatLiteral")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "_ExpressibleByBuiltinFloatLiteral")
 public typealias _BuiltinFloatLiteralConvertible = _ExpressibleByBuiltinFloatLiteral
-@available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "ExpressibleByFloatLiteral")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "ExpressibleByFloatLiteral")
 public typealias FloatLiteralConvertible = ExpressibleByFloatLiteral
-@available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "_ExpressibleByBuiltinBooleanLiteral")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "_ExpressibleByBuiltinBooleanLiteral")
 public typealias _BuiltinBooleanLiteralConvertible = _ExpressibleByBuiltinBooleanLiteral
-@available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "ExpressibleByBooleanLiteral")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "ExpressibleByBooleanLiteral")
 public typealias BooleanLiteralConvertible = ExpressibleByBooleanLiteral
-@available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "_ExpressibleByBuiltinUnicodeScalarLiteral")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "_ExpressibleByBuiltinUnicodeScalarLiteral")
 public typealias _BuiltinUnicodeScalarLiteralConvertible = _ExpressibleByBuiltinUnicodeScalarLiteral
-@available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "ExpressibleByUnicodeScalarLiteral")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "ExpressibleByUnicodeScalarLiteral")
 public typealias UnicodeScalarLiteralConvertible = ExpressibleByUnicodeScalarLiteral
-@available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "_ExpressibleByBuiltinExtendedGraphemeClusterLiteral")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "_ExpressibleByBuiltinExtendedGraphemeClusterLiteral")
 public typealias _BuiltinExtendedGraphemeClusterLiteralConvertible = _ExpressibleByBuiltinExtendedGraphemeClusterLiteral
-@available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "ExpressibleByExtendedGraphemeClusterLiteral")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "ExpressibleByExtendedGraphemeClusterLiteral")
 public typealias ExtendedGraphemeClusterLiteralConvertible = ExpressibleByExtendedGraphemeClusterLiteral
-@available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "_ExpressibleByBuiltinStringLiteral")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "_ExpressibleByBuiltinStringLiteral")
 public typealias _BuiltinStringLiteralConvertible = _ExpressibleByBuiltinStringLiteral
-@available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "_ExpressibleByBuiltinUTF16StringLiteral")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "_ExpressibleByBuiltinUTF16StringLiteral")
 public typealias _BuiltinUTF16StringLiteralConvertible = _ExpressibleByBuiltinUTF16StringLiteral
-@available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "ExpressibleByStringLiteral")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "ExpressibleByStringLiteral")
 public typealias StringLiteralConvertible = ExpressibleByStringLiteral
-@available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "ExpressibleByArrayLiteral")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "ExpressibleByArrayLiteral")
 public typealias ArrayLiteralConvertible = ExpressibleByArrayLiteral
-@available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "ExpressibleByDictionaryLiteral")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "ExpressibleByDictionaryLiteral")
 public typealias DictionaryLiteralConvertible = ExpressibleByDictionaryLiteral
-@available(swift, deprecated: 3.0, obsoleted: 5.0, message: "it will be replaced or redesigned in Swift 4.0.  Instead of conforming to 'StringInterpolationConvertible', consider adding an 'init(_:String)'")
+@available(*, deprecated, message: "it will be replaced or redesigned in Swift 4.0.  Instead of conforming to 'StringInterpolationConvertible', consider adding an 'init(_:String)'")
 public typealias StringInterpolationConvertible = ExpressibleByStringInterpolation
-@available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "_ExpressibleByColorLiteral")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "_ExpressibleByColorLiteral")
 public typealias _ColorLiteralConvertible = _ExpressibleByColorLiteral
-@available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "_ExpressibleByImageLiteral")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "_ExpressibleByImageLiteral")
 public typealias _ImageLiteralConvertible = _ExpressibleByImageLiteral
-@available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "_ExpressibleByFileReferenceLiteral")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "_ExpressibleByFileReferenceLiteral")
 public typealias _FileReferenceLiteralConvertible = _ExpressibleByFileReferenceLiteral
 
-@available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "ClosedRange.Index")
+@available(*, deprecated, obsoleted: 5.0, renamed: "ClosedRange.Index")
 public typealias ClosedRangeIndex<T> = ClosedRange<T>.Index where T: Strideable, T.Stride: SignedInteger
 
 /// An optional type that allows implicit member access.
@@ -307,7 +307,7 @@ extension Range where Bound: Strideable, Bound.Stride : SignedInteger {
   /// Now that Range is conditionally a collection when Bound: Strideable,
   /// CountableRange is no longer needed. This is a deprecated initializer
   /// for any remaining uses of Range(countableRange).
-  @available(swift, deprecated: 4.2, obsoleted: 5.0, message: "CountableRange is now a Range. No need to convert any more.")
+  @available(*, deprecated: 4.2/*, obsoleted: 5.0*/, message: "CountableRange is now a Range. No need to convert any more.")
   public init(_ other: Range<Bound>) {
     self = other
   }  
@@ -317,7 +317,7 @@ extension ClosedRange where Bound: Strideable, Bound.Stride : SignedInteger {
   /// Now that Range is conditionally a collection when Bound: Strideable,
   /// CountableRange is no longer needed. This is a deprecated initializer
   /// for any remaining uses of Range(countableRange).
-  @available(swift, deprecated: 4.2, obsoleted: 5.0, message: "CountableClosedRange is now a ClosedRange. No need to convert any more.")
+  @available(*, deprecated: 4.2/*, obsoleted: 5.0*/, message: "CountableClosedRange is now a ClosedRange. No need to convert any more.")
   public init(_ other: ClosedRange<Bound>) {
     self = other
   }  
@@ -330,14 +330,11 @@ extension _ExpressibleByColorLiteral {
   }
 }
 
-@available(swift, deprecated: 5.0, renamed: "KeyValuePairs")
-public typealias DictionaryLiteral<Key, Value> = KeyValuePairs<Key, Value>
-
 extension LazySequenceProtocol {
   /// Returns the non-`nil` results of mapping the given transformation over
   /// this sequence.
   ///
-  /// Use this method to receive a sequence of non-optional values when your
+  /// Use this method to receive a sequence of nonoptional values when your
   /// transformation produces an optional value.
   ///
   /// - Parameter transform: A closure that accepts an element of this sequence
@@ -383,44 +380,20 @@ extension FixedWidthInteger {
   /// The empty bitset.
   @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Use 0")
   public static var allZeros: Self { return 0 }
-  
-  @available(*, unavailable, message:
-    "Use operators or addingReportingOverflow instead.")
-  public func unsafeAdding(_ other: Self) -> Self {
-    fatalError("unavailable")
-  }
-  
-  @available(*, unavailable, message:
-    "Use operators or subtractingReportingOverflow instead.")
-  public func unsafeSubtracting(_ other: Self) -> Self {
-    fatalError("unavailable")
-  }
-  
-  @available(*, unavailable, message:
-    "Use operators or multipliedReportingOverflow(by:) instead.")
-  public func unsafeMultiplied(by other: Self) -> Self {
-    fatalError("unavailable")
-  }
-  
-  @available(*, unavailable, message:
-    "Use operators or dividedReportingOverflow(by:) instead.")
-  public func unsafeDivided(by other: Self) -> Self {
-    fatalError("unavailable")
-  }
 }
 
 extension LazyCollectionProtocol {
   /// Returns the non-`nil` results of mapping the given transformation over
   /// this collection.
   ///
-  /// Use this method to receive a collection of non-optional values when your
+  /// Use this method to receive a collection of nonoptional values when your
   /// transformation produces an optional value.
   ///
   /// - Parameter transform: A closure that accepts an element of this
   ///   collection as its argument and returns an optional value.
   ///
   /// - Complexity: O(1)
-  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "compactMap(_:)",
+  @available(swift, deprecated: 4.1/*, obsoleted: 5.0*/, renamed: "compactMap(_:)",
     message: "Please use compactMap(_:) for the case where closure returns an optional value")
   public func flatMap<ElementOfResult>(
     _ transform: @escaping (Elements.Element) -> ElementOfResult?
@@ -462,7 +435,7 @@ extension String {
   /// Previous versions of Swift provided this view since String
   /// itself was not a collection. String is now a collection of
   /// characters, so this type is now just an alias for String.
-  @available(swift, deprecated: 3.2, obsoleted: 5.0, message: "Please mutate the String directly")
+  @available(swift, deprecated: 3.2/*, obsoleted: 5.0*/, message: "Please mutate the String directly")
   public mutating func withMutableCharacters<R>(
     _ body: (inout String) -> R
   ) -> R {
@@ -471,13 +444,34 @@ extension String {
 
   @available(swift, deprecated: 3.2, obsoleted: 4.0)
   public init?(_ utf16: UTF16View) {
-    Builtin.unreachable()
+    // Attempt to recover the whole string, the better to implement the actual
+    // Swift 3.1 semantics, which are not as documented above!  Full Swift 3.1
+    // semantics may be impossible to preserve in the case of string literals,
+    // since we no longer have access to the length of the original string when
+    // there is no owner and elements are dropped from the end.
+    let wholeString = String(utf16._guts)
+    guard
+      let start = UTF16Index(encodedOffset: utf16._offset)
+        .samePosition(in: wholeString),
+      let end = UTF16Index(encodedOffset: utf16._offset + utf16._length)
+        .samePosition(in: wholeString)
+      else
+    {
+        return nil
+    }
+    self = String(wholeString[start..<end])
   }
-
+  
   @available(swift, deprecated: 3.2, message: "Failable initializer was removed in Swift 4. When upgrading to Swift 4, please use non-failable String.init(_:UTF8View)")
   @available(swift, obsoleted: 4.0, message: "Please use non-failable String.init(_:UTF8View) instead")
   public init?(_ utf8: UTF8View) {
-    Builtin.unreachable()
+    if utf8.startIndex.transcodedOffset != 0
+      || utf8.endIndex.transcodedOffset != 0
+      || utf8._legacyPartialCharacters.start
+      || utf8._legacyPartialCharacters.end {
+      return nil
+    }
+    self = String(utf8._guts)
   }
 }
 
@@ -489,23 +483,12 @@ extension String { // RangeReplaceableCollection
   // compile as Swift 4.
   @available(swift, obsoleted: 4, message: "String.init(_:String) is no longer failable")
   public init?(_ other: String, obsoletedInSwift4: () = ()) {
-    Builtin.unreachable()
+    self.init(other._guts)
   }
 }
-
-@available(*, unavailable, renamed: "TextOutputStream")
-public typealias OutputStreamType = TextOutputStream
-
-extension TextOutputStreamable {
-  @available(*, unavailable, renamed: "write(to:)")
-  public func writeTo<Target : TextOutputStream>(_ target: inout Target) {
-    Builtin.unreachable()
-  }
-}
-
 
 extension String.UnicodeScalarView : _CustomPlaygroundQuickLookable {
-  @available(swift, deprecated: 4.2/*, obsoleted: 5.0*/, message: "UnicodeScalarView.customPlaygroundQuickLook will be removed in Swift 5.0")
+  @available(*, deprecated/*, obsoleted: 5.0*/, message: "UnicodeScalarView.customPlaygroundQuickLook will be removed in Swift 5.0")
   public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text(description)
   }
@@ -515,19 +498,19 @@ extension String.UnicodeScalarView : _CustomPlaygroundQuickLookable {
 extension String.UnicodeScalarView {
   @available(swift, obsoleted: 4.0, message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
   public func index(after i: Index?) -> Index {
-    Builtin.unreachable()
+    return index(after: i!)
   }
   @available(swift, obsoleted: 4.0, message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
   public func index(_ i: Index?,  offsetBy n: Int) -> Index {
-    Builtin.unreachable()
+    return index(i!, offsetBy: n)
   }
   @available(swift, obsoleted: 4.0, message: "Any String view index conversion can fail in Swift 4; please unwrap the optional indices")
   public func distance(from i: Index?, to j: Index?) -> Int {
-    Builtin.unreachable()
+    return distance(from: i!, to: j!)
   }
   @available(swift, obsoleted: 4.0, message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
   public subscript(i: Index?) -> Unicode.Scalar {
-    Builtin.unreachable()
+    return self[i!]
   }
 }
 
@@ -535,19 +518,19 @@ extension String.UnicodeScalarView {
 extension String.UTF16View {
   @available(swift, obsoleted: 4.0, message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
   public func index(after i: Index?) -> Index {
-    Builtin.unreachable()
+    return index(after: i!)
   }
   @available(swift, obsoleted: 4.0, message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
   public func index(_ i: Index?, offsetBy n: Int) -> Index {
-    Builtin.unreachable()
+    return index(i!, offsetBy: n)
   }
   @available(swift, obsoleted: 4.0, message: "Any String view index conversion can fail in Swift 4; please unwrap the optional indices")
   public func distance(from i: Index?, to j: Index?) -> Int {
-    Builtin.unreachable()
+    return distance(from: i!, to: j!)
   }
   @available(swift, obsoleted: 4.0, message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
   public subscript(i: Index?) -> Unicode.UTF16.CodeUnit {
-    Builtin.unreachable()
+    return self[i!]
   }
 }
 
@@ -555,19 +538,19 @@ extension String.UTF16View {
 extension String.UTF8View {
   @available(swift, obsoleted: 4.0, message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
   public func index(after i: Index?) -> Index {
-    Builtin.unreachable()
+    return index(after: i!)
   }
   @available(swift, obsoleted: 4.0, message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
   public func index(_ i: Index?, offsetBy n: Int) -> Index {
-    Builtin.unreachable()
+    return index(i!, offsetBy: n)
   }
   @available(swift, obsoleted: 4.0, message: "Any String view index conversion can fail in Swift 4; please unwrap the optional indices")
   public func distance(from i: Index?, to j: Index?) -> Int {
-    Builtin.unreachable()
+    return distance(from: i!, to: j!)
   }
   @available(swift, obsoleted: 4.0, message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
   public subscript(i: Index?) -> Unicode.UTF8.CodeUnit {
-    Builtin.unreachable()
+    return self[i!]
   }
 }
 
@@ -583,15 +566,19 @@ extension String {
   @available(swift, obsoleted: 4)
   public subscript(bounds: Range<Index>) -> String {
     _boundsCheck(bounds)
-    return String(self[bounds])
+    return String(Substring(_slice: Slice(base: self, bounds: bounds)))
   }
 
   @available(swift, obsoleted: 4)
   public subscript(bounds: ClosedRange<Index>) -> String {
-    _boundsCheck(bounds)
-    return String(self[bounds])
+    let r = bounds.relative(to: self)
+    _boundsCheck(r)
+    return String(Substring(_slice: Slice(
+          base: self,
+          bounds: r)))
   }
 }
+
 
 //===--- Slicing Support --------------------------------------------------===//
 // In Swift 3.2, in the absence of type context,
@@ -604,14 +591,22 @@ extension String {
 // more-specific Swift-3-only `subscript` overload that continues to produce
 // `String.UnicodeScalarView`.
 extension String.UnicodeScalarView {
+  private subscript(_bounds bounds: Range<Index>) -> String.UnicodeScalarView {
+    let rawSubRange: Range<Int> =
+      _toCoreIndex(bounds.lowerBound)..<_toCoreIndex(bounds.upperBound)
+    return String.UnicodeScalarView(
+      _guts._extractSlice(rawSubRange),
+      coreOffset: bounds.lowerBound.encodedOffset)
+  }
+
   @available(swift, obsoleted: 4)
   public subscript(bounds: Range<Index>) -> String.UnicodeScalarView {
-    Builtin.unreachable()
+    return self[_bounds: bounds]
   }
 
   @available(swift, obsoleted: 4)
   public subscript(bounds: ClosedRange<Index>) -> String.UnicodeScalarView {
-    Builtin.unreachable()
+    return self[_bounds: bounds.relative(to: self)]
   }
 }
 
@@ -624,14 +619,21 @@ extension String.UnicodeScalarView {
 // Swift-3-only `subscript` overload that continues to produce
 // `String.UTF16View`.
 extension String.UTF16View {
+  private subscript(_bounds bounds: Range<Index>) -> String.UTF16View {
+    return String.UTF16View(
+      _guts,
+      offset: _internalIndex(at: bounds.lowerBound.encodedOffset),
+      length: bounds.upperBound.encodedOffset - bounds.lowerBound.encodedOffset)
+  }
+
   @available(swift, obsoleted: 4)
   public subscript(bounds: Range<Index>) -> String.UTF16View {
-    Builtin.unreachable()
+    return self[_bounds: bounds]
   }
 
   @available(swift, obsoleted: 4)
   public subscript(bounds: ClosedRange<Index>) -> String.UTF16View {
-    Builtin.unreachable()
+    return self[_bounds: bounds.relative(to: self)]
   }
 }
 
@@ -644,15 +646,45 @@ extension String.UTF16View {
 /// Swift-3-only `subscript` overload that continues to produce
 /// `String.UTF8View`.
 extension String.UTF8View {
+  private subscript(_bounds bounds: Range<Index>) -> String.UTF8View {
+    let wholeString = String(_guts)
+    let legacyPartialCharacters = (
+      (self._legacyPartialCharacters.start &&
+        bounds.lowerBound.encodedOffset == 0) ||
+      bounds.lowerBound.samePosition(in: wholeString) == nil,
+      (self._legacyPartialCharacters.end &&
+        bounds.upperBound.encodedOffset == _guts.count) ||
+      bounds.upperBound.samePosition(in: wholeString) == nil)
+
+    if bounds.upperBound.transcodedOffset == 0 {
+      return String.UTF8View(
+        _guts._extractSlice(
+        bounds.lowerBound.encodedOffset..<bounds.upperBound.encodedOffset),
+        legacyOffsets: (bounds.lowerBound.transcodedOffset, 0),
+        legacyPartialCharacters: legacyPartialCharacters)
+    }
+
+    let b0 = bounds.upperBound.utf8Buffer!.first!
+    let scalarLength8 = (~b0).leadingZeroBitCount
+    let scalarLength16 = scalarLength8 == 4 ? 2 : 1
+    let coreEnd = bounds.upperBound.encodedOffset + scalarLength16
+    return String.UTF8View(
+      _guts._extractSlice(bounds.lowerBound.encodedOffset..<coreEnd),
+      legacyOffsets: (
+        bounds.lowerBound.transcodedOffset,
+        bounds.upperBound.transcodedOffset - scalarLength8),
+      legacyPartialCharacters: legacyPartialCharacters)
+  }
+  
   @available(swift, obsoleted: 4)
   public subscript(bounds: Range<Index>) -> String.UTF8View {
-    Builtin.unreachable()
+    return self[_bounds: bounds]
   }
-
+  
 
   @available(swift, obsoleted: 4)
   public subscript(bounds: ClosedRange<Index>) -> String.UTF8View {
-    Builtin.unreachable()
+    return self[_bounds: bounds.relative(to: self)]
   }
 }
 
@@ -671,26 +703,34 @@ public typealias UnicodeScalar = Unicode.Scalar
 extension String {
   @available(swift, deprecated: 3.2, obsoleted: 4, message: "Please use 'first', 'dropFirst()', or 'Substring.popFirst()'.")
   public mutating func popFirst() -> String.Element? {
-    Builtin.unreachable()
+    guard !isEmpty else { return nil }
+    let element = first!
+    let nextIdx = self.index(after: self.startIndex)
+    self = String(self[nextIdx...])
+    return element
   }
 }
 
 extension String.UnicodeScalarView {
   @available(swift, deprecated: 3.2, obsoleted: 4, message: "Please use 'first', 'dropFirst()', or 'Substring.UnicodeScalarView.popFirst()'.")
   public mutating func popFirst() -> String.UnicodeScalarView.Element? {
-    Builtin.unreachable()
+    guard !isEmpty else { return nil }
+    let element = first!
+    let nextIdx = self.index(after: self.startIndex)
+    self = String(self[nextIdx...]).unicodeScalars
+    return element
   }
 }
 
 extension String.UTF16View : _CustomPlaygroundQuickLookable {
-  @available(swift, deprecated: 4.2/*, obsoleted: 5.0*/, message: "UTF16View.customPlaygroundQuickLook will be removed in Swift 5.0")
+  @available(*, deprecated/*, obsoleted: 5.0*/, message: "UTF16View.customPlaygroundQuickLook will be removed in Swift 5.0")
   public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text(description)
   }
 }
 
 extension String.UTF8View : _CustomPlaygroundQuickLookable {
-  @available(swift, deprecated: 4.2/*, obsoleted: 5.0*/, message: "UTF8View.customPlaygroundQuickLook will be removed in Swift 5.0")
+  @available(*, deprecated/*, obsoleted: 5.0*/, message: "UTF8View.customPlaygroundQuickLook will be removed in Swift 5.0")
   public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text(description)
   }
@@ -730,28 +770,28 @@ extension Substring {
   /// Previous versions of Swift provided this view since String
   /// itself was not a collection. String is now a collection of
   /// characters, so this type is now just an alias for String.
-  @available(swift, deprecated: 3.2, obsoleted: 5.0, message: "Please mutate the Substring directly")
+  @available(swift, deprecated: 3.2/*, obsoleted: 5.0*/, message: "Please mutate the Substring directly")
   public mutating func withMutableCharacters<R>(
     _ body: (inout Substring) -> R
   ) -> R {
     return body(&self)
   }
-
+  
   private func _boundsCheck(_ range: Range<Index>) {
     _precondition(range.lowerBound >= startIndex,
       "String index range is out of bounds")
     _precondition(range.upperBound <= endIndex,
       "String index range is out of bounds")
   }
-
+  
   @available(swift, obsoleted: 4)
   public subscript(bounds: ClosedRange<Index>) -> String {
-    Builtin.unreachable()
+    return String(self[bounds.relative(to: self)])
   }
 }
 
 extension Substring : _CustomPlaygroundQuickLookable {
-  @available(swift, deprecated: 4.2/*, obsoleted: 5.0*/, message: "Substring.customPlaygroundQuickLook will be removed in Swift 5.0")
+  @available(*, deprecated/*, obsoleted: 5.0*/, message: "Substring.customPlaygroundQuickLook will be removed in Swift 5.0")
   public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return String(self).customPlaygroundQuickLook
   }
@@ -767,23 +807,23 @@ extension Collection {
   @available(swift, deprecated: 3.2, obsoleted: 5.0, renamed: "Element")
   public typealias _Element = Element
 
-  @available(swift, deprecated: 4.0, obsoleted: 5.0, message: "all index distances are now of type Int")
+  @available(*, deprecated/*, obsoleted: 5.0*/, message: "all index distances are now of type Int")
   public func index<T: BinaryInteger>(_ i: Index, offsetBy n: T) -> Index {
     return index(i, offsetBy: Int(n))
   }
-  @available(swift, deprecated: 4.0, obsoleted: 5.0, message: "all index distances are now of type Int")
+  @available(*, deprecated/*, obsoleted: 5.0*/, message: "all index distances are now of type Int")
   public func formIndex<T: BinaryInteger>(_ i: inout Index, offsetBy n: T) {
     return formIndex(&i, offsetBy: Int(n))
   }
-  @available(swift, deprecated: 4.0, obsoleted: 5.0, message: "all index distances are now of type Int")
+  @available(*, deprecated/*, obsoleted: 5.0*/, message: "all index distances are now of type Int")
   public func index<T: BinaryInteger>(_ i: Index, offsetBy n: T, limitedBy limit: Index) -> Index? {
     return index(i, offsetBy: Int(n), limitedBy: limit)
   }
-  @available(swift, deprecated: 4.0, obsoleted: 5.0, message: "all index distances are now of type Int")
+  @available(*, deprecated/*, obsoleted: 5.0*/, message: "all index distances are now of type Int")
   public func formIndex<T: BinaryInteger>(_ i: inout Index, offsetBy n: T, limitedBy limit: Index) -> Bool {
     return formIndex(&i, offsetBy: Int(n), limitedBy: limit)
   }
-  @available(swift, deprecated: 4.0, obsoleted: 5.0, message: "all index distances are now of type Int")
+  @available(*, deprecated/*, obsoleted: 5.0*/, message: "all index distances are now of type Int")
   public func distance<T: BinaryInteger>(from start: Index, to end: Index) -> T {
     return numericCast(distance(from: start, to: end) as Int)
   }
@@ -791,18 +831,18 @@ extension Collection {
 
 
 extension UnsafeMutablePointer {
-  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "initialize(repeating:count:)")
+  @available(swift, deprecated: 4.1/*, obsoleted: 5.0*/, renamed: "initialize(repeating:count:)")
   public func initialize(to newValue: Pointee, count: Int = 1) { 
     initialize(repeating: newValue, count: count)
   }
 
-  @available(swift, deprecated: 4.1, obsoleted: 5.0, message: "the default argument to deinitialize(count:) has been removed, please specify the count explicitly") 
+  @available(swift, deprecated: 4.1/*, obsoleted: 5.0*/, message: "the default argument to deinitialize(count:) has been removed, please specify the count explicitly") 
   @discardableResult
   public func deinitialize() -> UnsafeMutableRawPointer {
     return deinitialize(count: 1)
   }
   
-  @available(swift, deprecated: 4.1, obsoleted: 5.0, message: "Swift currently only supports freeing entire heap blocks, use deallocate() instead")
+  @available(swift, deprecated: 4.1/*, obsoleted: 5.0*/, message: "Swift currently only supports freeing entire heap blocks, use deallocate() instead")
   public func deallocate(capacity _: Int) { 
     self.deallocate()
   }
@@ -818,7 +858,7 @@ extension UnsafeMutablePointer {
   /// - Parameter source: A collection of elements of the pointer's `Pointee`
   ///   type.
   // This is fundamentally unsafe since collections can underreport their count.
-  @available(swift, deprecated: 4.2, obsoleted: 5.0, message: "it will be removed in Swift 5.0.  Please use 'UnsafeMutableBufferPointer.initialize(from:)' instead")
+  @available(*, deprecated/*, obsoleted: 5.0*/, message: "it will be removed in Swift 5.0.  Please use 'UnsafeMutableBufferPointer.initialize(from:)' instead")
   public func initialize<C : Collection>(from source: C)
     where C.Element == Pointee {
     let buf = UnsafeMutableBufferPointer(start: self, count: numericCast(source.count))
@@ -884,7 +924,7 @@ extension UnsafeRawPointer : _CustomPlaygroundQuickLookable {
     : "UnsafeRawPointer(0x\(_uint64ToString(ptrValue, radix:16, uppercase:true)))"
   }
 
-  @available(swift, deprecated: 4.2/*, obsoleted: 5.0*/, message: "UnsafeRawPointer.customPlaygroundQuickLook will be removed in a future Swift version")
+  @available(*, deprecated/*, obsoleted: 5.0*/, message: "UnsafeRawPointer.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text(summary)
   }
@@ -899,7 +939,7 @@ extension UnsafeMutableRawPointer : _CustomPlaygroundQuickLookable {
     : "UnsafeMutableRawPointer(0x\(_uint64ToString(ptrValue, radix:16, uppercase:true)))"
   }
 
-  @available(swift, deprecated: 4.2/*, obsoleted: 5.0*/, message: "UnsafeMutableRawPointer.customPlaygroundQuickLook will be removed in a future Swift version")
+  @available(*, deprecated/*, obsoleted: 5.0*/, message: "UnsafeMutableRawPointer.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text(summary)
   }
@@ -913,7 +953,7 @@ extension UnsafePointer: _CustomPlaygroundQuickLookable {
     : "UnsafePointer(0x\(_uint64ToString(ptrValue, radix:16, uppercase:true)))"
   }
 
-  @available(swift, deprecated: 4.2/*, obsoleted: 5.0*/, message: "UnsafePointer.customPlaygroundQuickLook will be removed in a future Swift version")
+  @available(*, deprecated/*, obsoleted: 5.0*/, message: "UnsafePointer.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .text(summary)
   }
@@ -927,28 +967,28 @@ extension UnsafeMutablePointer: _CustomPlaygroundQuickLookable {
     : "UnsafeMutablePointer(0x\(_uint64ToString(ptrValue, radix:16, uppercase:true)))"
   }
 
-  @available(swift, deprecated: 4.2/*, obsoleted: 5.0*/, message: "UnsafeMutablePointer.customPlaygroundQuickLook will be removed in a future Swift version")
+  @available(*, deprecated/*, obsoleted: 5.0*/, message: "UnsafeMutablePointer.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .text(summary)
   }
 }
 
-@available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "UnsafeBufferPointer.Iterator")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "UnsafeBufferPointer.Iterator")
 public typealias UnsafeBufferPointerIterator<T> = UnsafeBufferPointer<T>.Iterator
-@available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "UnsafeRawBufferPointer.Iterator")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "UnsafeRawBufferPointer.Iterator")
 public typealias UnsafeRawBufferPointerIterator<T> = UnsafeBufferPointer<T>.Iterator
-@available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "UnsafeRawBufferPointer.Iterator")
+@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "UnsafeRawBufferPointer.Iterator")
 public typealias UnsafeMutableRawBufferPointerIterator<T> = UnsafeBufferPointer<T>.Iterator
 
 extension UnsafeMutableRawPointer {
-  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "allocate(byteCount:alignment:)")
+  @available(swift, deprecated: 4.1/*, obsoleted: 5.0*/, renamed: "allocate(byteCount:alignment:)")
   public static func allocate(
     bytes size: Int, alignedTo alignment: Int
   ) -> UnsafeMutableRawPointer {
     return UnsafeMutableRawPointer.allocate(byteCount: size, alignment: alignment)
   }
   
-  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "deallocate()", message: "Swift currently only supports freeing entire heap blocks, use deallocate() instead")
+  @available(swift, deprecated: 4.1/*, obsoleted: 5.0*/, renamed: "deallocate()", message: "Swift currently only supports freeing entire heap blocks, use deallocate() instead")
   public func deallocate(bytes _: Int, alignedTo _: Int) { 
     self.deallocate()
   }
@@ -958,7 +998,7 @@ extension UnsafeMutableRawPointer {
     copyMemory(from: source, byteCount: count)
   }
 
-  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "initializeMemory(as:repeating:count:)")
+  @available(swift, deprecated: 4.1/*, obsoleted: 5.0*/, renamed: "initializeMemory(as:repeating:count:)")
   @discardableResult
   public func initializeMemory<T>(
     as type: T.Type, at offset: Int = 0, count: Int = 1, to repeatedValue: T
@@ -967,7 +1007,7 @@ extension UnsafeMutableRawPointer {
       as: type, repeating: repeatedValue, count: count)
   }
 
-  @available(swift, deprecated: 4.1, obsoleted: 5.0, message: "it will be removed in Swift 5.0.  Please use 'UnsafeMutableRawBufferPointer.initialize(from:)' instead")
+  @available(*, deprecated/*, obsoleted: 5.0*/, message: "it will be removed in Swift 5.0.  Please use 'UnsafeMutableRawBufferPointer.initialize(from:)' instead")
   @discardableResult
   public func initializeMemory<C : Collection>(
     as type: C.Element.Type, from source: C
@@ -984,13 +1024,13 @@ extension UnsafeMutableRawPointer {
 }
 
 extension UnsafeMutableRawBufferPointer {
-  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "allocate(byteCount:alignment:)")
+  @available(swift, deprecated: 4.1/*, obsoleted: 5.0*/, renamed: "allocate(byteCount:alignment:)")
   public static func allocate(count: Int) -> UnsafeMutableRawBufferPointer { 
     return UnsafeMutableRawBufferPointer.allocate(
       byteCount: count, alignment: MemoryLayout<UInt>.alignment)
   }
 
-  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "copyMemory(from:)")
+  @available(swift, deprecated: 4.1/*, obsoleted: 5.0*/, renamed: "copyMemory(from:)")
   public func copyBytes(from source: UnsafeRawBufferPointer) {
     copyMemory(from: source)
   }
@@ -1030,28 +1070,6 @@ extension Collection {
     _ transform: (Element) throws -> String?
   ) rethrows -> [String] {
     return try _compactMap(transform)
-  }
-}
-
-extension Collection {
-  /// Returns the first index in which an element of the collection satisfies
-  /// the given predicate.
-  @available(swift, deprecated: 5.0, renamed: "firstIndex(where:)")
-  @inlinable
-  public func index(
-    where _predicate: (Element) throws -> Bool
-  ) rethrows -> Index? {
-    return try firstIndex(where: _predicate)
-  }
-}
-
-extension Collection where Element: Equatable {
-  /// Returns the first index where the specified value appears in the
-  /// collection.
-  @available(swift, deprecated: 5.0, renamed: "firstIndex(of:)")
-  @inlinable
-  public func index(of element: Element) -> Index? {
-    return firstIndex(of: element)
   }
 }
 
@@ -1095,9 +1113,9 @@ extension Optional where Wrapped == String.Index {
 }
 
 extension Zip2Sequence {
-  @available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "Sequence1.Iterator")
+  @available(*, deprecated/*, obsoleted: 5.0*/, renamed: "Sequence1.Iterator")
   public typealias Stream1 = Sequence1.Iterator
-  @available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "Sequence2.Iterator")
+  @available(*, deprecated/*, obsoleted: 5.0*/, renamed: "Sequence2.Iterator")
   public typealias Stream2 = Sequence2.Iterator
 }
 
@@ -1122,7 +1140,7 @@ extension Zip2Sequence {
 ///         // With Swift 4.0 and Swift 3.2 and earlier, use PlaygroundQuickLook
 ///         // and the CustomPlaygroundQuickLookable protocol.
 ///     #endif
-@available(swift, deprecated: 4.2, message: "PlaygroundQuickLook will be removed in a future Swift version. For customizing how types are presented in playgrounds, use CustomPlaygroundDisplayConvertible instead.")
+@available(*, deprecated, message: "PlaygroundQuickLook will be removed in a future Swift version. For customizing how types are presented in playgrounds, use CustomPlaygroundDisplayConvertible instead.")
 public typealias PlaygroundQuickLook = _PlaygroundQuickLook
 
 @_frozen // rdar://problem/38719739 - needed by LLDB
@@ -1192,7 +1210,7 @@ extension Dictionary {
   }
 
   @available(swift, obsoleted: 4.0)
-  public __consuming func filter(
+  public func filter(
     _ isIncluded: (Element) throws -> Bool, obsoletedInSwift4: () = ()
   ) rethrows -> [Element] {
     var result: [Element] = []
@@ -1207,7 +1225,7 @@ extension Dictionary {
 
 extension Set {
   @available(swift, obsoleted: 4.0)
-  public __consuming func filter(
+  public func filter(
     _ isIncluded: (Element) throws -> Bool, obsoletedInSwift4: () = ()
   ) rethrows -> [Element] {
     var result: [Element] = []
@@ -1235,12 +1253,12 @@ extension _PlaygroundQuickLook {
   ///
   /// - Parameter subject: The instance to represent with the resulting Quick
   ///   Look.
-  @available(swift, deprecated: 4.2, obsoleted: 5.0, message: "PlaygroundQuickLook will be removed in a future Swift version.")
+  @available(*, deprecated, message: "PlaygroundQuickLook will be removed in a future Swift version.")
   public init(reflecting subject: Any) {
-    if let customized = subject as? _CustomPlaygroundQuickLookable {
+    if let customized = subject as? CustomPlaygroundQuickLookable {
       self = customized.customPlaygroundQuickLook
     }
-    else if let customized = subject as? __DefaultCustomPlaygroundQuickLookable {
+    else if let customized = subject as? _DefaultCustomPlaygroundQuickLookable {
       self = customized._defaultCustomPlaygroundQuickLook
     }
     else {
@@ -1273,10 +1291,9 @@ extension _PlaygroundQuickLook {
 ///         // conform to CustomPlaygroundQuickLookable.
 ///         extension MyType: CustomPlaygroundQuickLookable { /*...*/ }
 ///     #endif
-@available(swift, deprecated: 4.2, obsoleted: 5.0, message: "CustomPlaygroundQuickLookable will be removed in a future Swift version. For customizing how types are presented in playgrounds, use CustomPlaygroundDisplayConvertible instead.")
+@available(*, deprecated/*, obsoleted: 5.0*/, message: "CustomPlaygroundQuickLookable will be removed in a future Swift version. For customizing how types are presented in playgrounds, use CustomPlaygroundDisplayConvertible instead.")
 public typealias CustomPlaygroundQuickLookable = _CustomPlaygroundQuickLookable
 
-//@available(swift, obsoleted: 5.0)
 public protocol _CustomPlaygroundQuickLookable {
   /// A custom playground Quick Look for this instance.
   ///
@@ -1288,10 +1305,9 @@ public protocol _CustomPlaygroundQuickLookable {
 // Double-underscored real version allows us to keep using this in AppKit while
 // warning for non-SDK use. This is probably overkill but it doesn't cost
 // anything.
-@available(swift, deprecated: 4.2, obsoleted: 5.0, message: "_DefaultCustomPlaygroundQuickLookable will be removed in a future Swift version. For customizing how types are presented in playgrounds, use CustomPlaygroundDisplayConvertible instead.")
+@available(*, deprecated/*, obsoleted: 5.0*/, message: "_DefaultCustomPlaygroundQuickLookable will be removed in a future Swift version. For customizing how types are presented in playgrounds, use CustomPlaygroundDisplayConvertible instead.")
 public typealias _DefaultCustomPlaygroundQuickLookable = __DefaultCustomPlaygroundQuickLookable
 
-// @available(swift, obsoleted: 5.0)
 public protocol __DefaultCustomPlaygroundQuickLookable {
   var _defaultCustomPlaygroundQuickLook: _PlaygroundQuickLook { get }
 }

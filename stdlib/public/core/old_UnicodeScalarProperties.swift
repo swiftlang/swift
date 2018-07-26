@@ -20,33 +20,32 @@ extension Unicode.Scalar {
   /// A value that provides access to properties of a Unicode scalar that are
   /// defined by the Unicode standard.
   public struct Properties {
+    internal init(_scalar: Unicode.Scalar) {
+      // We convert the value to the underlying UChar32 type here and store it
+      // in that form to make calling the ICU APIs cleaner below.
+      self._value = __swift_stdlib_UChar32(bitPattern: _scalar._value)
+    }
+
     @usableFromInline
-    internal var _scalar: Unicode.Scalar
-
-    internal init(_ scalar: Unicode.Scalar) {
-      self._scalar = scalar
-    }
-
-    // Provide the value as UChar32 to make calling the ICU APIs cleaner
-    internal var icuValue: __swift_stdlib_UChar32 {
-      return __swift_stdlib_UChar32(bitPattern: self._scalar._value)
-    }
+    internal var _value: __swift_stdlib_UChar32
   }
 
   /// A value that provides access to properties of the Unicode scalar that are
   /// defined by the Unicode standard.
   public var properties: Properties {
-    return Properties(self)
+    return Properties(_scalar: self)
   }
 }
 
 /// Boolean properties that are defined by the Unicode Standard (i.e., not
 /// ICU-specific).
 extension Unicode.Scalar.Properties {
+
+  @usableFromInline @_transparent
   internal func _hasBinaryProperty(
     _ property: __swift_stdlib_UProperty
   ) -> Bool {
-    return __swift_stdlib_u_hasBinaryProperty(icuValue, property) != 0
+    return __swift_stdlib_u_hasBinaryProperty(_value, property) != 0
   }
 
   /// A Boolean property indicating whether the scalar is alphabetic.
@@ -623,7 +622,6 @@ extension Unicode.Scalar.Properties {
   ///
   /// This property corresponds to the `Emoji` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
-  @available(macOS 10.12.2, iOS 10.2, tvOS 10.1, watchOS 3.1.1, *)
   public var isEmoji: Bool {
     return _hasBinaryProperty(__swift_stdlib_UCHAR_EMOJI)
   }
@@ -640,7 +638,6 @@ extension Unicode.Scalar.Properties {
   ///
   /// This property corresponds to the `Emoji_Presentation` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
-  @available(macOS 10.12.2, iOS 10.2, tvOS 10.1, watchOS 3.1.1, *)
   public var isEmojiPresentation: Bool {
     return _hasBinaryProperty(__swift_stdlib_UCHAR_EMOJI_PRESENTATION)
   }
@@ -654,7 +651,6 @@ extension Unicode.Scalar.Properties {
   ///
   /// This property corresponds to the `Emoji_Modifier` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
-  @available(macOS 10.12.2, iOS 10.2, tvOS 10.1, watchOS 3.1.1, *)
   public var isEmojiModifier: Bool {
     return _hasBinaryProperty(__swift_stdlib_UCHAR_EMOJI_MODIFIER)
   }
@@ -664,7 +660,6 @@ extension Unicode.Scalar.Properties {
   ///
   /// This property corresponds to the `Emoji_Modifier_Base` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
-  @available(macOS 10.12.2, iOS 10.2, tvOS 10.1, watchOS 3.1.1, *)
   public var isEmojiModifierBase: Bool {
     return _hasBinaryProperty(__swift_stdlib_UCHAR_EMOJI_MODIFIER_BASE)
   }
@@ -673,6 +668,16 @@ extension Unicode.Scalar.Properties {
 
 /// Case mapping properties.
 extension Unicode.Scalar.Properties {
+
+  /// The UTF-16 encoding of the scalar, represented as a tuple of 2 elements.
+  ///
+  /// If the scalar only encodes to one code unit, the second element is zero.
+  @usableFromInline @_transparent
+  internal var _utf16CodeUnits: (UTF16.CodeUnit, UTF16.CodeUnit) {
+    let utf16 = UnicodeScalar(UInt32(_value))!.utf16
+    return (utf16[0], utf16.count > 1 ? utf16[1] : 0)
+  }
+
   // The type of ICU case conversion functions.
   internal typealias _U_StrToX = (
     /* dest */ UnsafeMutablePointer<__swift_stdlib_UChar>,
@@ -692,15 +697,36 @@ extension Unicode.Scalar.Properties {
   internal func _applyMapping(_ u_strTo: _U_StrToX) -> String {
     let utf16Length = UnicodeScalar(UInt32(_value))!.utf16.count
     var utf16 = _utf16CodeUnits
-
-    // TODO(UTF8 perf): Stack buffer first and then detect real count
-    let count = 64
-    var array = Array<UInt16>(repeating: 0, count: count)
-    let len: Int = array.withUnsafeMutableBufferPointer { bufPtr in
-      return withUnsafePointer(to: &utf16) {
-        (tuplePtr) -> Int in
+    var scratchBuffer = _Normalization._SegmentOutputBuffer(allZeros: ())
+    let count = scratchBuffer.withUnsafeMutableBufferPointer { bufPtr -> Int in
+      return withUnsafePointer(to: &utf16) { tuplePtr in
         return tuplePtr.withMemoryRebound(to: UInt16.self, capacity: 2) {
-          (utf16Pointer) -> Int in
+          utf16Pointer in
+          var err = __swift_stdlib_U_ZERO_ERROR
+          let correctSize = u_strTo(
+            bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
+            Int32(bufPtr.count),
+            utf16Pointer,
+            Int32(utf16Length),
+            "",
+            &err)
+          guard err.isSuccess ||
+                err == __swift_stdlib_U_BUFFER_OVERFLOW_ERROR else {
+            fatalError("Unexpected error case-converting Unicode scalar.")
+          }
+          return Int(correctSize)
+        }
+      }
+    }
+    if _fastPath(count <= scratchBuffer.count) {
+      scratchBuffer.count = count
+      return String._fromWellFormedUTF16CodeUnits(scratchBuffer)
+    }
+    var array = Array<UInt16>(repeating: 0, count: count)
+    array.withUnsafeMutableBufferPointer { bufPtr in
+      withUnsafePointer(to: &utf16) { tuplePtr in
+        tuplePtr.withMemoryRebound(to: UInt16.self, capacity: 2) {
+          utf16Pointer in
           var err = __swift_stdlib_U_ZERO_ERROR
           let correctSize = u_strTo(
             bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
@@ -712,15 +738,11 @@ extension Unicode.Scalar.Properties {
           guard err.isSuccess else {
             fatalError("Unexpected error case-converting Unicode scalar.")
           }
-          // TODO: _sanityCheck(count == correctSize, "inconsistent ICU behavior")
-          return Int(correctSize)
+          _sanityCheck(count == correctSize, "inconsistent ICU behavior")
         }
       }
     }
-    // TODO: replace `len` with `count`
-    return array[..<len].withUnsafeBufferPointer {
-      return String._uncheckedFromUTF16($0)
-    }
+    return String._fromWellFormedUTF16CodeUnits(array[..<count])
   }
 
   /// The lowercase mapping of the scalar.
@@ -789,7 +811,7 @@ extension Unicode.Scalar.Properties {
     withUnsafeMutablePointer(to: &versionInfo) { tuplePtr in
       tuplePtr.withMemoryRebound(to: UInt8.self, capacity: 4) {
         versionInfoPtr in
-        __swift_stdlib_u_charAge(icuValue, versionInfoPtr)
+        __swift_stdlib_u_charAge(_value, versionInfoPtr)
       }
     }
     guard versionInfo.0 != 0 else { return nil }
@@ -1064,9 +1086,8 @@ extension Unicode.Scalar.Properties {
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var generalCategory: Unicode.GeneralCategory {
     let rawValue = __swift_stdlib_UCharCategory(
-      __swift_stdlib_UCharCategory.RawValue(
-      __swift_stdlib_u_getIntPropertyValue(
-        icuValue, __swift_stdlib_UCHAR_GENERAL_CATEGORY)))
+      UInt32(__swift_stdlib_u_getIntPropertyValue(
+        _value, __swift_stdlib_UCHAR_GENERAL_CATEGORY)))
     return Unicode.GeneralCategory(rawValue: rawValue)
   }
 }
@@ -1077,7 +1098,7 @@ extension Unicode.Scalar.Properties {
     _ choice: __swift_stdlib_UCharNameChoice
   ) -> String? {
     var err = __swift_stdlib_U_ZERO_ERROR
-    let count = Int(__swift_stdlib_u_charName(icuValue, choice, nil, 0, &err))
+    let count = Int(__swift_stdlib_u_charName(_value, choice, nil, 0, &err))
     guard count > 0 else { return nil }
 
     // ICU writes a trailing null, so we have to save room for it as well.
@@ -1085,7 +1106,7 @@ extension Unicode.Scalar.Properties {
     return array.withUnsafeMutableBufferPointer { bufPtr in
       var err = __swift_stdlib_U_ZERO_ERROR
       let correctSize = __swift_stdlib_u_charName(
-        icuValue,
+        _value,
         choice,
         UnsafeMutableRawPointer(bufPtr.baseAddress._unsafelyUnwrappedUnchecked)
           .assumingMemoryBound(to: Int8.self),
@@ -1261,7 +1282,7 @@ extension Unicode.Scalar.Properties {
   /// the [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var canonicalCombiningClass: Unicode.CanonicalCombiningClass {
     let rawValue = UInt8(__swift_stdlib_u_getIntPropertyValue(
-      icuValue, __swift_stdlib_UCHAR_CANONICAL_COMBINING_CLASS))
+      _value, __swift_stdlib_UCHAR_CANONICAL_COMBINING_CLASS))
     return Unicode.CanonicalCombiningClass(rawValue: rawValue)
   }
 }
@@ -1342,9 +1363,8 @@ extension Unicode.Scalar.Properties {
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var numericType: Unicode.NumericType? {
     let rawValue = __swift_stdlib_UNumericType(
-      __swift_stdlib_UNumericType.RawValue(
-      __swift_stdlib_u_getIntPropertyValue(
-        icuValue, __swift_stdlib_UCHAR_NUMERIC_TYPE)))
+      UInt32(__swift_stdlib_u_getIntPropertyValue(
+        _value, __swift_stdlib_UCHAR_NUMERIC_TYPE)))
     return Unicode.NumericType(rawValue: rawValue)
   }
 
@@ -1371,7 +1391,7 @@ extension Unicode.Scalar.Properties {
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var numericValue: Double? {
     let icuNoNumericValue: Double = -123456789
-    let result = __swift_stdlib_u_getNumericValue(icuValue)
+    let result = __swift_stdlib_u_getNumericValue(_value)
     return result != icuNoNumericValue ? result : nil
   }
 }
