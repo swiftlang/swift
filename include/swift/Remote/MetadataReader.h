@@ -24,6 +24,8 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Runtime/ExistentialContainer.h"
+#include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Unreachable.h"
 
 #include <vector>
@@ -261,7 +263,64 @@ public:
 
     return start;
   }
-  
+
+  /// Given a pointer to the metadata, attempt to read the value
+  /// witness table.
+  llvm::Optional<TargetValueWitnessTable<Runtime>>
+  readValueWitnessTable(StoredPointer MetadataAddress) {
+    // The value witness table pointer is at offset -1 from the metadata
+    // pointer, that is, the pointer-sized word immediately before the
+    // pointer's referenced address.
+    TargetValueWitnessTable<Runtime> VWT;
+    auto ValueWitnessTableAddrAddr = MetadataAddress - sizeof(StoredPointer);
+    StoredPointer ValueWitnessTableAddr;
+    if (!Reader->readInteger(RemoteAddress(ValueWitnessTableAddrAddr),
+                             &ValueWitnessTableAddr))
+      return llvm::None;
+    if (!Reader->readBytes(RemoteAddress(ValueWitnessTableAddr),
+                           (uint8_t *)&VWT, sizeof(VWT)))
+      return llvm::None;
+    return VWT;
+  }
+
+  /// Given a known-opaque existential, attemp to discover the pointer to its
+  /// metadata address and its value.
+  llvm::Optional<std::pair<RemoteAddress, RemoteAddress>>
+  readMetadataAndValueOpaqueExistential(RemoteAddress ExistentialAddress) {
+    // OpaqueExistentialContainer is the layout of an opaque existential.
+    // `Type` is the pointer to the metadata.
+    TargetOpaqueExistentialContainer<Runtime> Container;
+    if (!Reader->readBytes(RemoteAddress(ExistentialAddress),
+                           (uint8_t *)&Container, sizeof(Container)))
+      return llvm::None;
+    auto MetadataAddress = reinterpret_cast<StoredPointer>(Container.Type);
+    auto Metadata = readMetadata(MetadataAddress);
+    if (!Metadata)
+      return llvm::None;
+
+    auto VWT = readValueWitnessTable(MetadataAddress);
+    if (!VWT)
+      return llvm::None;
+
+    // Inline representation (the value fits in the existential container).
+    // So, the value starts at the first word of the container.
+    if (VWT->isValueInline())
+      return llvm::Optional<std::pair<RemoteAddress, RemoteAddress>>(
+          {RemoteAddress(MetadataAddress), ExistentialAddress});
+
+    // Non-inline (box'ed) representation.
+    // The first word of the container stores the address to the box.
+    StoredPointer BoxAddress;
+    if (!Reader->readInteger(ExistentialAddress, &BoxAddress))
+      return llvm::None;
+
+    auto AlignmentMask = VWT->getAlignmentMask();
+    auto Offset = (sizeof(HeapObject) + AlignmentMask) & ~AlignmentMask;
+    auto StartOfValue = BoxAddress + Offset;
+    return llvm::Optional<std::pair<RemoteAddress, RemoteAddress>>(
+        {RemoteAddress(MetadataAddress), RemoteAddress(StartOfValue)});
+  }
+
   /// Given a remote pointer to metadata, attempt to turn it into a type.
   BuiltType readTypeFromMetadata(StoredPointer MetadataAddress,
                                  bool skipArtificialSubclasses = false) {
