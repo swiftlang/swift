@@ -571,9 +571,8 @@ EXPR_NODES = [
          ]),
 
     # SWIFT_ENABLE_TENSORFLOW
-    # Expression generalizing #gradient and #valueAndGradient.
-    # e.g. #gradient(foo(_:_:), wrt: .0, .1)
-    Node('GradientExpr', kind='Expr',
+    # e.g. "#gradient(foo(_:_:), wrt: .0, .1)"
+    Node('ReverseAutoDiffExpr', kind='Expr',
          traits=['Parenthesized'],
          children=[
              Child('Identifier', kind='Token',
@@ -587,19 +586,19 @@ EXPR_NODES = [
              Child('WrtLabel', kind='IdentifierToken', is_optional=True,
                    text_choices=['wrt']),
              Child('Colon', kind='ColonToken', is_optional=True),
-             Child('DiffParams', kind='GradientExprParamList',
+             Child('DiffParams', kind='ReverseAutoDiffExprParamList',
                    is_optional=True),
              Child('RightParen', kind='RightParenToken'),
          ]),
 
-    # gradient-expr-diff-param-list ->
+    # reverse-autodiff-expr-param-list ->
     #     gradient-expr-diff-param gradient-expr-diff-param-list?
-    Node('GradientExprParamList', kind='SyntaxCollection',
-         element='GradientExprDiffParam'),
+    Node('ReverseAutoDiffExprParamList', kind='SyntaxCollection',
+         element='ReverseAutoDiffExprParam'),
 
-    # gradient-expr-diff-param ->
+    # reverse-autodiff-expr-param ->
     #     differentiation-index-param ','?
-    Node('GradientExprDiffParam', kind='Syntax',
+    Node('ReverseAutoDiffExprParam', kind='Syntax',
          description='''
          A differentiation parameter: a period followed by an unsigned integer \
          (e.g. `.0`).
