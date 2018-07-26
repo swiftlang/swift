@@ -1116,7 +1116,7 @@ bool TFFunctionPartition::markBlock(SILBasicBlock *BB) {
           ++numTensorSuccs;
         else {
           assert(succ->getSinglePredecessorBlock() &&
-                 "Need to split critical edges??");
+                 "Critical edges should've been split");
           tensorKillBlocks.insert(succ);
         }
       }
@@ -1968,7 +1968,7 @@ bool TFFunctionPartition::markFunction(bool &hasTensorOps) {
     }
   };
   
-  // Split all critical edges for partitioning.
+  // Split all critical edges for block marking.
   splitAllCondBrCriticalEdgesWithNonTrivialArgs(hostFn, &DI, &LI);
 
   // We walk the function in depth first order so that we only visit reachable

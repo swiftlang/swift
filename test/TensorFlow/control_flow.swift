@@ -330,3 +330,12 @@ public func infLoop2(maxCount: Int32) {
 //     i += 1
 //   }
 // }
+
+
+// SR-8373: Critical edges should be split.
+public func testCriticalEdges() {
+  _ = Tensor(1).scalars[0..<5 * Int(2)]
+  for _ in 1...5 {
+    Tensor(1).scalars.forEach { _ in }
+  }
+}
