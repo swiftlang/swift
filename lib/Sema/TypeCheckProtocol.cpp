@@ -2158,8 +2158,7 @@ bool ConformanceChecker::checkObjCTypeErasedGenerics(
 
 void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                            Type type,
-                                           TypeDecl *typeDecl,
-                                           bool performRedeclarationCheck) {
+                                           TypeDecl *typeDecl) {
 
   // If we already recoded this type witness, there's nothing to do.
   if (Conformance->hasTypeWitness(assocType)) {
@@ -2210,26 +2209,6 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     }
   } else {
     // If there was no type declaration, synthesize one.
-
-    // If we're just setting an error, double-check that nobody has
-    // introduced a type declaration since we deduced one. This can
-    // happen when type-checking a different conformance deduces a
-    // different type witness with the same name. For non-error cases,
-    // the caller handles this.
-    if (performRedeclarationCheck && type->hasError()) {
-      switch (resolveTypeWitnessViaLookup(assocType)) {
-      case ResolveWitnessResult::Success:
-      case ResolveWitnessResult::ExplicitFailed:
-        // A type witness has shown up, and will have been
-        // recorded. There is nothing more to do.
-        return;
-
-      case ResolveWitnessResult::Missing:
-        // The type witness is still missing: create a new one.
-        break;
-      }
-    }
-
     auto aliasDecl = new (TC.Context) TypeAliasDecl(SourceLoc(),
                                                     SourceLoc(),
                                                     assocType->getName(),
@@ -2294,8 +2273,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     auto overriddenRootConformance =
       overriddenConformance->getConcrete()->getRootNormalConformance();
     ConformanceChecker(TC, overriddenRootConformance, GlobalMissingWitnesses)
-      .recordTypeWitness(overridden, type, typeDecl,
-                         /*performRedeclarationCheck=*/true);
+      .recordTypeWitness(overridden, type, typeDecl);
   }
 }
 
@@ -3197,12 +3175,12 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
     auto interfaceType = viable.front().MemberType;
     if (interfaceType->hasArchetype())
       interfaceType = interfaceType->mapTypeOutOfContext();
-    recordTypeWitness(assocType, interfaceType, viable.front().Member, true);
+    recordTypeWitness(assocType, interfaceType, viable.front().Member);
     return ResolveWitnessResult::Success;
   }
 
   // Record an error.
-  recordTypeWitness(assocType, ErrorType::get(TC.Context), nullptr, false);
+  recordTypeWitness(assocType, ErrorType::get(TC.Context), nullptr);
 
   // If we had multiple viable types, diagnose the ambiguity.
   if (!viable.empty()) {
