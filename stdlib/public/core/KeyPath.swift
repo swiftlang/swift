@@ -2248,24 +2248,6 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
   while true {
     let header = buffer.pop(RawKeyPathComponent.Header.self)
 
-    func popOffset() {
-      if header.payload == RawKeyPathComponent.Header.unresolvedFieldOffsetPayload
-        || header.payload == RawKeyPathComponent.Header.outOfLineOffsetPayload {
-        _ = buffer.pop(UInt32.self)
-      }
-      if header.payload == RawKeyPathComponent.Header.unresolvedIndirectOffsetPayload {
-        _ = buffer.pop(Int.self)
-        // On 64-bit systems the pointer to the ivar offset variable is
-        // pointer-sized and -aligned, but the resulting offset ought to be
-        // 32 bits only and fit into padding between the 4-byte header and
-        // pointer-aligned type word. We don't need this space after
-        // instantiation.
-        if MemoryLayout<Int>.size == 8 {
-          size -= MemoryLayout<UnsafeRawPointer>.size
-        }
-      }
-    }
-
     // Ensure that we pop an amount of data consistent with what
     // RawKeyPathComponent.Header.patternComponentBodySize computes.
     var bufferSizeBefore = 0
@@ -2297,17 +2279,32 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
     }
 
     switch header.kind {
+    case .class:
+      // The rest of the key path could be reference-writable.
+      capability = .reference
+      fallthrough
     case .struct:
       // No effect on the capability.
       // TODO: we should dynamically prevent "let" properties from being
       // reassigned.
-      popOffset()
-    case .class:
-      // The rest of the key path could be reference-writable.
-      // TODO: we should dynamically prevent "let" properties from being
-      // reassigned.
-      capability = .reference
-      popOffset()
+
+      // Check the final instantiated size of the offset.
+      if header.payload == RawKeyPathComponent.Header.unresolvedFieldOffsetPayload
+        || header.payload == RawKeyPathComponent.Header.outOfLineOffsetPayload {
+        _ = buffer.pop(UInt32.self)
+      }
+      if header.payload == RawKeyPathComponent.Header.unresolvedIndirectOffsetPayload {
+        _ = buffer.pop(Int.self)
+        // On 64-bit systems the pointer to the ivar offset variable is
+        // pointer-sized and -aligned, but the resulting offset ought to be
+        // 32 bits only and fit into padding between the 4-byte header and
+        // pointer-aligned type word. We don't need this space after
+        // instantiation.
+        if MemoryLayout<Int>.size == 8 {
+          size -= MemoryLayout<UnsafeRawPointer>.size
+        }
+      }
+
     case .external:
       // Look at the external property descriptor to see if we should take it
       // over the component given in the pattern.
@@ -2365,17 +2362,16 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
         // line after the header.
         if descriptorHeader.payload
             > RawKeyPathComponent.Header.maximumOffsetPayload {
-          newComponentSize = 2 * MemoryLayout<UInt32>.size
+          newComponentSize = MemoryLayout<RawKeyPathComponent.Header>.size
+                           + MemoryLayout<UInt32>.size
         } else {
-          newComponentSize = MemoryLayout<UInt32>.size
+          newComponentSize = MemoryLayout<RawKeyPathComponent.Header>.size
         }
 
       case .computed:
         // The final component will be an instantiation of the computed
         // component.
         setComputedCapability(for: descriptorHeader)
-        // With no arguments, the instantiated size will be the
-        // same as the pattern size.
 
         // If the external declaration is computed, and it takes captured
         // arguments, then we have to build a bit of a chimera. The canonical
@@ -2434,7 +2430,8 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
           if genericParamCount > 0 {
             argumentBufferSize += MemoryLayout<Int>.size * genericParamCount
           }
-          newComponentSize = descriptorHeader.propertyDescriptorBodySize
+          newComponentSize = MemoryLayout<RawKeyPathComponent.Header>.size
+                           + descriptorHeader.propertyDescriptorBodySize
                            + argumentBufferSize
         } else {
           // If there aren't any captured arguments expected in the external
@@ -2442,7 +2439,10 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
           // Discard the local candidate.
           _ = buffer.popRaw(size: localCandidateSize,
                             alignment: UInt32.self)
-          newComponentSize = descriptorHeader.propertyDescriptorBodySize
+          // With no arguments, the instantiated size will be the
+          // same as the pattern size.
+          newComponentSize = MemoryLayout<RawKeyPathComponent.Header>.size
+                           + descriptorHeader.propertyDescriptorBodySize
         }
 
       case .external, .optionalChain, .optionalForce, .optionalWrap:
