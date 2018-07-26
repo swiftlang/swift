@@ -265,7 +265,8 @@ public:
   }
 
   /// Given a pointer to the metadata, attempt to read the value
-  /// witness table.
+  /// witness table. Note that it's not safe to access any non-mandatory
+  /// members of the value witness table, like extra inhabitants or enum members.
   llvm::Optional<TargetValueWitnessTable<Runtime>>
   readValueWitnessTable(StoredPointer MetadataAddress) {
     // The value witness table pointer is at offset -1 from the metadata
@@ -281,6 +282,72 @@ public:
                            (uint8_t *)&VWT, sizeof(VWT)))
       return llvm::None;
     return VWT;
+  }
+
+  /// Given a pointer to a known-error existential, attempt to discover the
+  /// pointer to its metadata address and its value address.
+  llvm::Optional<std::pair<RemoteAddress, RemoteAddress>>
+  readMetadataAndValueErrorExistential(RemoteAddress ExistentialAddress) {
+    // An pointer to an error existential is always an heap object.
+    auto MetadataAddress =
+        readMetadataFromInstance(ExistentialAddress.getAddressData());
+    if (!MetadataAddress)
+      return llvm::None;
+
+    bool isObjC = false;
+
+    // If we can determine the Objective-C class name, this is probably an
+    // error existential with NSError-compatible layout.
+    std::string ObjCClassName;
+    if (readObjCClassName(*MetadataAddress, ObjCClassName)) {
+      if (ObjCClassName == "_SwiftNativeNSError")
+        isObjC = true;
+    } else {
+      // Otherwise, we can check to see if this is a class metadata with the
+      // kind value's least significant bit set, which indicates a pure
+      // Swift class.
+      auto Meta = readMetadata(*MetadataAddress);
+      auto ClassMeta = dyn_cast<TargetClassMetadata<Runtime>>(Meta);
+      if (!ClassMeta)
+        return llvm::None;
+
+      isObjC = ClassMeta->isPureObjC();
+    }
+
+    // In addition to the isa pointer and two 32-bit reference counts, if the
+    // error existential is layout-compatible with NSError, we also need to
+    // skip over its three word-sized fields: the error code, the domain,
+    // and userInfo.
+    StoredPointer InstanceMetadataAddressAddress =
+        ExistentialAddress.getAddressData() +
+        (isObjC ? 5 : 2) * sizeof(StoredPointer);
+
+    // We need to get the instance's alignment info so we can get the exact
+    // offset of the start of its data in the class.
+    auto InstanceMetadataAddress =
+        readMetadataFromInstance(InstanceMetadataAddressAddress);
+    if (!InstanceMetadataAddress)
+      return llvm::None;
+
+    // Read the value witness table.
+    auto VWT = readValueWitnessTable(*InstanceMetadataAddress);
+    if (!VWT)
+      return llvm::None;
+
+    // Now we need to skip over the instance metadata pointer and instance's
+    // conformance pointer for Swift.Error.
+    StoredPointer InstanceAddress =
+        InstanceMetadataAddressAddress + 2 * sizeof(StoredPointer);
+
+    // Round up to alignment, and we have the start address of the
+    // instance payload.
+    auto AlignmentMask = VWT->getAlignmentMask();
+    auto Offset = (sizeof(HeapObject) + AlignmentMask) & ~AlignmentMask;
+    InstanceAddress += Offset;
+
+    return llvm::Optional<std::pair<RemoteAddress, RemoteAddress>>(
+        {RemoteAddress(*InstanceMetadataAddress),
+         RemoteAddress(InstanceAddress)});
   }
 
   /// Given a known-opaque existential, attemp to discover the pointer to its

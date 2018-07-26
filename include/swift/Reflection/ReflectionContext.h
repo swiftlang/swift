@@ -77,11 +77,12 @@ class ReflectionContext
 public:
   using super::getBuilder;
   using super::readDemanglingForContextDescriptor;
-  using super::readIsaMask;
-  using super::readTypeFromMetadata;
   using super::readGenericArgFromMetadata;
+  using super::readIsaMask;
+  using super::readMetadataAndValueErrorExistential;
   using super::readMetadataAndValueOpaqueExistential;
   using super::readMetadataFromInstance;
+  using super::readTypeFromMetadata;
   using typename super::StoredPointer;
 
   explicit ReflectionContext(std::shared_ptr<MemoryReader> reader)
@@ -497,70 +498,21 @@ public:
       return true;
     }
     case RecordKind::ErrorExistential: {
-      // We have a pointer to an error existential, which is always heap object.
-
-      auto MetadataAddress
-        = readMetadataFromInstance(ExistentialAddress.getAddressData());
-
-      if (!MetadataAddress)
+      auto OptMetaAndValue =
+          readMetadataAndValueErrorExistential(ExistentialAddress);
+      if (!OptMetaAndValue)
         return false;
 
-      bool isObjC = false;
+      RemoteAddress InstanceMetadataAddress = OptMetaAndValue->first;
+      RemoteAddress InstanceAddress = OptMetaAndValue->second;
 
-      // If we can determine the Objective-C class name, this is probably an
-      // error existential with NSError-compatible layout.
-      std::string ObjCClassName;
-      if (readObjCClassName(*MetadataAddress, ObjCClassName)) {
-        if (ObjCClassName == "_SwiftNativeNSError")
-          isObjC = true;
-      } else {
-        // Otherwise, we can check to see if this is a class metadata with the
-        // kind value's least significant bit set, which indicates a pure
-        // Swift class.
-        auto Meta = readMetadata(*MetadataAddress);
-        auto ClassMeta = dyn_cast<TargetClassMetadata<Runtime>>(Meta);
-        if (!ClassMeta)
-          return false;
-
-        isObjC = ClassMeta->isPureObjC();
-      }
-
-      // In addition to the isa pointer and two 32-bit reference counts, if the
-      // error existential is layout-compatible with NSError, we also need to
-      // skip over its three word-sized fields: the error code, the domain,
-      // and userInfo.
-      StoredPointer InstanceMetadataAddressAddress
-        = ExistentialAddress.getAddressData() +
-          (isObjC ? 5 : 2) * sizeof(StoredPointer);
-
-      // We need to get the instance's alignment info so we can get the exact
-      // offset of the start of its data in the class.
-      auto InstanceMetadataAddress =
-        readMetadataFromInstance(InstanceMetadataAddressAddress);
-      if (!InstanceMetadataAddress)
-        return false;
-
-      auto InstanceTR = readTypeFromMetadata(*InstanceMetadataAddress);
+      auto InstanceTR =
+          readTypeFromMetadata(InstanceMetadataAddress.getAddressData());
       if (!InstanceTR)
         return false;
 
-      auto InstanceTI = getTypeInfo(InstanceTR);
-      if (!InstanceTI)
-        return false;
-
-      // Now we need to skip over the instance metadata pointer and instance's
-      // conformance pointer for Swift.Error.
-      StoredPointer InstanceAddress = InstanceMetadataAddressAddress +
-        2 * sizeof(StoredPointer);
-
-      // Round up to alignment, and we have the start address of the
-      // instance payload.
-      auto Alignment = InstanceTI->getAlignment();
-      InstanceAddress += Alignment - InstanceAddress % Alignment;
-
       *OutInstanceTR = InstanceTR;
       *OutInstanceAddress = RemoteAddress(InstanceAddress);
-
       return true;
     }
     default:
