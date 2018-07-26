@@ -293,30 +293,6 @@ public func infLoop1() {
   _hostOp(a)
 }
 
-// Another infinite loop that we reject in partitioning.
-// simplified from https://bugs.swift.org/browse/SR-8236
-// expected-error @+1 {{Functions containing infinite loops are not supported by TensorFlow yet}}
-public func infLoop2(maxCount: Int32) {
-  var a = Tensor<Int32>(0)
-  var count: Int32 = 0
-  // expected-warning @+1 {{implicitly copied to the accelerator}}
-  while count < maxCount {
-    a += a
-    count += 1
-    if count == 50 {
-      let i: Int32 = 0
-      // this causes trouble: infinite loop
-      while i < maxCount {
-        count += i
-      }
-      a = Tensor<Int32>(count)
-      break
-    }
-  }
-  a -= a
-  _hostOp(a)
-}
-
 // TODO: Enable this test when we fix
 // SESE FIXME: Imperfect loop exits not handled yet!
 // public func SR8256(_ cond: Int?) {
@@ -330,3 +306,12 @@ public func infLoop2(maxCount: Int32) {
 //     i += 1
 //   }
 // }
+
+
+// SR-8373: Critical edges should be split.
+public func testCriticalEdges() {
+  _ = Tensor(1).scalars[0..<5 * Int(2)]
+  for _ in 1...5 {
+    Tensor(1).scalars.forEach { _ in }
+  }
+}

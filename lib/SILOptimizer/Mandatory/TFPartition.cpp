@@ -29,8 +29,10 @@
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILConstants.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/BitVector.h"
 #ifdef SWIFT_ENABLE_TENSORFLOW
@@ -622,6 +624,7 @@ public:
   DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>> &graphFunctions;
   GraphFunctionDeviceInfo deviceInfo; // Device placement info.
   DominanceInfo &DI;
+  SILLoopInfo &LI;
   BlocksReachingTensorCode tensorCodeBlocks;
 
   /// These are all the tensor ops found in the initial scan over the function.
@@ -729,6 +732,7 @@ public:
             GraphFunctionDeviceInfo::getForFunction(hostFn,
                                                     /*removeConfigInst*/ true)),
         DI(*PM->getAnalysis<DominanceAnalysis>()->get(&Fn)),
+        LI(*PM->getAnalysis<SILLoopAnalysis>()->get(&Fn)),
         tensorCodeBlocks(Fn) {}
 
   ~TFFunctionPartition() {
@@ -1112,7 +1116,7 @@ bool TFFunctionPartition::markBlock(SILBasicBlock *BB) {
           ++numTensorSuccs;
         else {
           assert(succ->getSinglePredecessorBlock() &&
-                 "Need to split critical edges??");
+                 "Critical edges should've been split");
           tensorKillBlocks.insert(succ);
         }
       }
@@ -1963,6 +1967,9 @@ bool TFFunctionPartition::markFunction(bool &hasTensorOps) {
       loggedInput = true;
     }
   };
+  
+  // Split all critical edges for block marking.
+  splitAllCondBrCriticalEdgesWithNonTrivialArgs(hostFn, &DI, &LI);
 
   // We walk the function in depth first order so that we only visit reachable
   // blocks and to slightly improve compile time performance of the 'marking'
