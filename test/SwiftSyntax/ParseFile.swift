@@ -32,7 +32,8 @@ ParseFile.test("ParseSingleFile") {
   expectDoesNotThrow({
     let fileContents = try String(contentsOf: currentFile)
     let syntaxTreeData = try SwiftLang.parse(source: fileContents).data(using: .utf8)!
-    let parsed = try SyntaxTreeDeserializer().deserialize(syntaxTreeData)
+    let parsed = try SyntaxTreeDeserializer().deserialize(syntaxTreeData,
+                     serializationFormat: .json)
     expectEqual("\(parsed)", fileContents)
   })
 }
@@ -41,7 +42,8 @@ ParseFile.test("ParseBuffer") {
   expectDoesNotThrow({
     let content = "func foo() {}"
     let syntaxTreeData = try SwiftLang.parse(source: content).data(using: .utf8)!
-    let parsed = try SyntaxTreeDeserializer().deserialize(syntaxTreeData)
+    let parsed = try SyntaxTreeDeserializer().deserialize(syntaxTreeData,
+                     serializationFormat: .json)
     expectEqual("\(parsed)", content)
   })
 }
