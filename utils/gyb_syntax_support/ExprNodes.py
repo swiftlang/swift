@@ -578,7 +578,7 @@ EXPR_NODES = [
              Child('Identifier', kind='Token',
                    token_choices=[
                        'PoundGradientToken',
-                       'ChainableGradientToken',
+                       'PoundChainableGradientToken',
                        'PoundValueAndGradientToken',
                    ]),
              Child('LeftParen', kind='LeftParenToken'),
