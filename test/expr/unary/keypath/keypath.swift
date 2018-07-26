@@ -652,6 +652,13 @@ func testSubtypeKeypathProtocol(_ keyPath: ReferenceWritableKeyPath<PP, Int>) {
   testSubtypeKeypathProtocol(\Base.i) // expected-error {{type 'PP' has no member 'i'}}
 }
 
+// rdar://problem/32057712
+struct Container {
+  let base: Base? = Base()
+}
+
+var rdar32057712 = \Container.base?.i
+
 func testSyntaxErrors() { // expected-note{{}}
   _ = \.  ; // expected-error{{expected member name following '.'}}
   _ = \.a ;
