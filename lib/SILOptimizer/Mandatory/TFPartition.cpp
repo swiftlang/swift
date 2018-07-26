@@ -32,8 +32,8 @@
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/CFG.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/BitVector.h"
 #ifdef SWIFT_ENABLE_TENSORFLOW
 #include "tensorflow/c/c_api.h"
