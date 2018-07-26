@@ -652,6 +652,10 @@ public:
   /// we can hand them off to SILGen etc.
   llvm::SetVector<ValueDecl *> DeclsToFinalize;
 
+  /// Track the index of the next declaration that needs to be finalized,
+  /// from the \c DeclsToFinalize set.
+  unsigned NextDeclToFinalize = 0;
+
   /// The list of functions that need to have their bodies synthesized.
   llvm::MapVector<FuncDecl*, SynthesizedFunction> FunctionsToSynthesize;
 

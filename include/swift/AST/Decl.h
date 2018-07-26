@@ -480,17 +480,13 @@ protected:
     IsDebuggerAlias : 1
   );
 
-  SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1+1,
+  SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1,
     /// Whether we have already added implicitly-defined initializers
     /// to this declaration.
     AddedImplicitInitializers : 1,
 
     /// Whether there is are lazily-loaded conformances for this nominal type.
-    HasLazyConformances : 1,
-
-    /// Whether we have already validated all members of the type that
-    /// affect layout.
-    HasValidatedLayout : 1
+    HasLazyConformances : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+2+8+16,
@@ -3029,7 +3025,6 @@ protected:
     Bits.NominalTypeDecl.AddedImplicitInitializers = false;
     ExtensionGeneration = 0;
     Bits.NominalTypeDecl.HasLazyConformances = false;
-    Bits.NominalTypeDecl.HasValidatedLayout = false;
   }
 
   friend class ProtocolType;
@@ -3065,18 +3060,6 @@ public:
   /// Note that we have attempted to add implicit initializers.
   void setAddedImplicitInitializers() {
     Bits.NominalTypeDecl.AddedImplicitInitializers = true;
-  }
-
-  /// Determine whether we have already validated any members
-  /// which affect layout.
-  bool hasValidatedLayout() const {
-    return Bits.NominalTypeDecl.HasValidatedLayout;
-  }
-
-  /// Note that we have attempted to validate any members
-  /// which affect layout.
-  void setHasValidatedLayout() {
-    Bits.NominalTypeDecl.HasValidatedLayout = true;
   }
 
   /// Set the interface type of this nominal type to the metatype of the

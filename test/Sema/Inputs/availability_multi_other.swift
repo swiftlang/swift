@@ -32,17 +32,18 @@ class OtherIntroduced10_51 {
     return OtherIntroduced10_52()
   }
 
-  func takes10_52(o: OtherIntroduced10_52) { 
+  func takes10_52(o: OtherIntroduced10_52) {
   }
-
+  // expected-error@-2{{'OtherIntroduced10_52' is only available on OS X 10.52 or newer}}
+  // expected-note@-3{{add @available attribute to enclosing instance method}}
+  
   @available(OSX, introduced: 10.52)
   func takes10_52Introduced10_52(o: OtherIntroduced10_52) {
   }
 
+  // expected-error@+1{{'OtherIntroduced10_52' is only available on OS X 10.52 or newer}}
   var propOf10_52: OtherIntroduced10_52 = 
-
-
-      OtherIntroduced10_52() // We don't expect an error here because the initializer is not type checked (by design).
+      OtherIntroduced10_52()
 
   @available(OSX, introduced: 10.52)
   var propOf10_52Introduced10_52: OtherIntroduced10_52 = OtherIntroduced10_52()
