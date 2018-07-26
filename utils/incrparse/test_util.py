@@ -110,9 +110,9 @@ def parseLine(line, line_no, test_case, incremental_edit_args, reparse_args,
 
 
 def serializeIncrParseMarkupFile(test_file, test_case, mode, 
-                                 serialization_mode, omit_node_ids, 
-                                 output_file, temp_dir, swift_syntax_test, 
-                                 print_visual_reuse_info):
+                                 serialization_mode, serialization_format, 
+                                 omit_node_ids, output_file, temp_dir, 
+                                 swift_syntax_test, print_visual_reuse_info):
     test_file_name = os.path.basename(test_file)
     pre_edit_file = temp_dir + '/' + test_file_name + '.' + test_case + \
         '.pre.swift'
@@ -178,7 +178,17 @@ def serializeIncrParseMarkupFile(test_file, test_case, mode,
         elif serialization_mode == 'incremental':
             command.extend(['-incremental-serialization'])
         else:
-            raise ValueError('Unknown serialization mode "%s"' % mode)
+            raise ValueError('Unknown serialization mode "%s"' % 
+                             serialization_mode)
+
+        if serialization_format == 'json':
+            # Nothing to do. This is the default behaviour of swift-syntax-test
+            pass 
+        elif serialization_format == 'byteTree':
+            command.extend(['-serialize-byte-tree'])
+        else:
+            raise ValueError('Unknown serialization format "%s"' % 
+                             serialization_format)
 
         if mode == 'pre-edit':
             command.extend(['-input-source-filename', pre_edit_file])
@@ -263,6 +273,11 @@ def main():
     entire tree or use the incremental transfer mode. Default is `full`.
     ''')
     parser.add_argument(
+        '--serialization-format', choices=['json', 'byteTree'], 
+        default='json', help='''
+    The format in which the syntax tree shall be serialized.
+    ''')
+    parser.add_argument(
         '--omit-node-ids', default=False, action='store_true',
         help='Don\'t include the ids of the nodes in the serialized syntax \
         tree')
@@ -288,6 +303,7 @@ def main():
     test_case = args.test_case
     mode = args.mode
     serialization_mode = args.serialization_mode
+    serialization_format = args.serialization_format
     omit_node_ids = args.omit_node_ids
     output_file = args.output_file
     temp_dir = args.temp_dir
@@ -299,6 +315,7 @@ def main():
                                      test_case=test_case, 
                                      mode=mode, 
                                      serialization_mode=serialization_mode,
+                                     serialization_format=serialization_format,
                                      omit_node_ids=omit_node_ids,
                                      output_file=output_file, 
                                      temp_dir=temp_dir, 
