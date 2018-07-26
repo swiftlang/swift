@@ -642,20 +642,25 @@ namespace {
       IGM.setTrueConstGlobal(var);
       return var;
     }
+
+    void setCommonFlags(TypeContextDescriptorFlags &flags) {
+      setClangImportedFlags(flags);
+      setMetadataInitializationKind(flags);
+    }
     
     /// Flags to indicate Clang-imported declarations so we mangle them
     /// consistently at runtime.
-    void getClangImportedFlags(TypeContextDescriptorFlags &flags) const {
+    void setClangImportedFlags(TypeContextDescriptorFlags &flags) {
       if (Type->getAttrs().getAttribute<ClangImporterSynthesizedTypeAttr>()) {
         flags.setIsSynthesizedRelatedEntity(true);
       }
       
       if (auto clangDecl = Mangle::ASTMangler::getClangDeclForMangling(Type)) {
         if (isa<clang::TagDecl>(clangDecl)) {
-          flags.setIsCTag(true);
+          flags.setImportNamespace(TypeContextDescriptorFlags::CTag);
         } else if (isa<clang::TypedefNameDecl>(clangDecl)
                    || isa<clang::ObjCCompatibleAliasDecl>(clangDecl)) {
-          flags.setIsCTypedef(true);
+          flags.setImportNamespace(TypeContextDescriptorFlags::CTypedef);
         }
       }
     }
@@ -679,9 +684,11 @@ namespace {
       return HasInPlaceMetadataInitialization;
     }
 
-    void setHasInPlaceMetadataInitialization(TypeContextDescriptorFlags &flags){
-      flags.setHasInPlaceMetadataInitialization(
-                                              HasInPlaceMetadataInitialization);
+    void setMetadataInitializationKind(TypeContextDescriptorFlags &flags) {
+      if (HasInPlaceMetadataInitialization) {
+        flags.setMetadataInitialization(
+                     TypeContextDescriptorFlags::InPlaceMetadataInitialization);
+      }
     }
 
     void maybeAddInPlaceMetadataInitialization() {
@@ -831,9 +838,7 @@ namespace {
       flags.setIsReflectable(
                             !IGM.shouldEmitOpaqueTypeMetadataRecord(getType()));
 
-      setHasInPlaceMetadataInitialization(flags);
-
-      getClangImportedFlags(flags);
+      setCommonFlags(flags);
       return flags.getOpaqueValue();
     }
   };
@@ -891,9 +896,7 @@ namespace {
 
       flags.setIsReflectable(Strategy.isReflectable());
 
-      setHasInPlaceMetadataInitialization(flags);
-
-      getClangImportedFlags(flags);
+      setCommonFlags(flags);
       return flags.getOpaqueValue();
     }
   };
@@ -950,6 +953,8 @@ namespace {
       // Classes are always reflectable.
       flags.setIsReflectable(true);
 
+      setCommonFlags(flags);
+
       if (!getType()->isForeign()) {
         if (MetadataLayout->areImmediateMembersNegative())
           flags.class_setAreImmediateMembersNegative(true);
@@ -964,8 +969,6 @@ namespace {
       if (SuperClassRef) {
         flags.class_setSuperclassReferenceKind(SuperClassRef->getKind());
       }
-      
-      getClangImportedFlags(flags);
       
       return flags.getOpaqueValue();
     }
