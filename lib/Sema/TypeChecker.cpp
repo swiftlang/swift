@@ -572,6 +572,12 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
       if (decl->isInvalid())
         continue;
 
+      // If we've already encountered an error, don't finalize declarations
+      // from other source files.
+      if (TC.Context.hadError() &&
+          decl->getDeclContext()->getParentSourceFile() != &SF)
+        continue;
+
       TC.finalizeDecl(decl);
     }
 
