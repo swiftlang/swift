@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -21,7 +21,7 @@
 namespace swift {
 namespace file_types {
 enum ID : uint8_t {
-#define TYPE(NAME, ID, TEMP_SUFFIX, FLAGS) TY_##ID,
+#define TYPE(NAME, ID, EXTENSION, FLAGS) TY_##ID,
 #include "swift/Frontend/Types.def"
 #undef TYPE
   TY_INVALID
@@ -30,9 +30,9 @@ enum ID : uint8_t {
 /// Return the name of the type for \p Id.
 StringRef getTypeName(ID Id);
 
-/// Return the suffix to use when creating a temp file of this type,
-/// or null if unspecified.
-StringRef getTypeTempSuffix(ID Id);
+/// Return the extension to use when creating a file of this type,
+/// or an empty string if unspecified.
+StringRef getExtension(ID Id);
 
 /// Lookup the type to use for the file extension \p Ext.
 /// If the extension is empty or is otherwise not recognized, return

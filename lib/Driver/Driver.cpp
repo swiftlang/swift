@@ -724,7 +724,7 @@ createStatsReporter(const llvm::opt::InputArgList *ArgList,
   if (Inputs.size() == 1) {
     InputName = Inputs[0].second->getSpelling();
   }
-  StringRef OutputType = file_types::getTypeTempSuffix(OI.CompilerOutputType);
+  StringRef OutputType = file_types::getExtension(OI.CompilerOutputType);
   return llvm::make_unique<UnifiedStatsReporter>("swift-driver",
                                                  OI.ModuleName,
                                                  InputName,
@@ -2054,7 +2054,7 @@ static StringRef assignOutputName(Compilation &C, const JobAction *JA,
   // We should output to a temporary file, since we're not at the top level
   // (or are generating a bridging PCH, which is currently always a temp).
   StringRef Stem = llvm::sys::path::stem(BaseName);
-  StringRef Suffix = file_types::getTypeTempSuffix(JA->getType());
+  StringRef Suffix = file_types::getExtension(JA->getType());
   std::error_code EC = llvm::sys::fs::createTemporaryFile(Stem, Suffix, Buffer);
   if (EC) {
     Diags.diagnose(SourceLoc(), diag::error_unable_to_make_temporary_file,
@@ -2128,7 +2128,7 @@ static StringRef getOutputFilename(Compilation &C,
   if (isa<GenerateDSYMJobAction>(JA)) {
     Buffer = PrimaryInput;
     Buffer.push_back('.');
-    Buffer.append(file_types::getTypeTempSuffix(JA->getType()));
+    Buffer.append(file_types::getExtension(JA->getType()));
     return Buffer.str();
   }
 
@@ -2171,7 +2171,7 @@ static StringRef getOutputFilename(Compilation &C,
     return Buffer.str();
   }
 
-  StringRef Suffix = file_types::getTypeTempSuffix(JA->getType());
+  StringRef Suffix = file_types::getExtension(JA->getType());
   assert(Suffix.data() &&
          "All types used for output should have a suffix.");
 
@@ -2241,7 +2241,7 @@ static void addAuxiliaryOutput(
 
     bool isTempFile = C.isTemporaryFile(path);
     llvm::sys::path::replace_extension(
-        path, file_types::getTypeTempSuffix(outputType));
+        path, file_types::getExtension(outputType));
     output.setAdditionalOutputForType(outputType, path);
     if (isTempFile)
       C.addTemporaryFile(path);
@@ -2264,7 +2264,7 @@ static void addDiagFileOutputForPersistentPCHAction(
   StringRef headerPath = output.getBaseInput(JA->getInputIndex());
   StringRef stem = llvm::sys::path::stem(headerPath);
   StringRef suffix =
-      file_types::getTypeTempSuffix(file_types::TY_SerializedDiagnostics);
+      file_types::getExtension(file_types::TY_SerializedDiagnostics);
   SmallString<256> outPathBuf;
 
   if (const Arg *A = C.getArgs().getLastArg(options::OPT_emit_module_path)) {
@@ -2724,7 +2724,8 @@ void Driver::chooseRemappingOutputPath(Compilation &C,
   } else {
     llvm::SmallString<128> Path(Output->getPrimaryOutputFilenames()[0]);
     bool isTempFile = C.isTemporaryFile(Path);
-    llvm::sys::path::replace_extension(Path, "remap");
+    llvm::sys::path::replace_extension(Path,
+        file_types::getExtension(file_types::ID::TY_Remapping));
     Output->setAdditionalOutputForType(file_types::ID::TY_Remapping, Path);
     if (isTempFile)
       C.addTemporaryFile(Path);

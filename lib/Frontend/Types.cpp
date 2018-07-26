@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -22,7 +22,7 @@ using namespace swift::file_types;
 struct TypeInfo {
   const char *Name;
   const char *Flags;
-  const char *TempSuffix;
+  const char *Extension;
 };
 
 static const TypeInfo TypeInfos[] = {
@@ -38,8 +38,8 @@ static const TypeInfo &getInfo(unsigned Id) {
 
 StringRef file_types::getTypeName(ID Id) { return getInfo(Id).Name; }
 
-StringRef file_types::getTypeTempSuffix(ID Id) {
-  return getInfo(Id).TempSuffix;
+StringRef file_types::getExtension(ID Id) {
+  return getInfo(Id).Extension;
 }
 
 ID file_types::lookupTypeForExtension(StringRef Ext) {
