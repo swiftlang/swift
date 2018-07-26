@@ -1642,14 +1642,17 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
   SmallVector<SILValue, 32> valuesToCheck;
 
   for (auto *op : tensorOps) {
-    for (auto &operand : op->getAllOperands()) {
+    auto opInfo = SILTensorOpInfo::decode(op);
+    for (unsigned i = 0; i < op->getNumOperands(); ++i) {
       // Dump anything that might be an attribute into the list without too much
-      // filtering.  We take out TensorFlow values since they are the most
-      // obvious ones we don't care about later, but there may be other minor
-      // things we over-query on.
-      auto value = operand.get();
-      if (!isTensorFlowValue(value->getType()))
+      // filtering.  We take out TensorFlow values that are known as $in, since
+      // they are the most obvious ones we don't care about later, but there may
+      // be other minor things we over-query on.
+      const SILValue &value = op->getOperand(i);
+      bool isInput = opInfo && opInfo->isInput(i);
+      if (!isInput || !isTensorFlowValue(value->getType())) {
         valuesToCheck.push_back(value);
+      }
     }
   }
 
