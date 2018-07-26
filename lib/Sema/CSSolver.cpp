@@ -2032,13 +2032,14 @@ bool ConstraintSystem::solveForDisjunctionChoices(
     // short-circuit the disjunction.
     if (lastSolvedChoice) {
       Constraint *lastChoice = lastSolvedChoice->first;
-      auto &score = lastSolvedChoice->second;
-      bool hasUnavailableOverloads = score.Data[SK_Unavailable] > 0;
-      bool hasFixes = score.Data[SK_Fix] > 0;
+      auto delta = lastSolvedChoice->second - CurrentScore;
+      bool hasUnavailableOverloads = delta.Data[SK_Unavailable] > 0;
+      bool hasFixes = delta.Data[SK_Fix] > 0;
 
-      // Attempt to short-circuit disjunction only if score indicates
-      // that there are no unavailable overload choices present in the
-      // solution, and the solution does not involve fixes.
+      // Attempt to short-circuit evaluation of this disjunction only
+      // if the disjunction choice we are comparing to did not involve
+      // selecting unavailable overloads or result in fixes being
+      // applied to reach a solution.
       if (!hasUnavailableOverloads && !hasFixes &&
           shortCircuitDisjunctionAt(currentChoice, lastChoice, getASTContext()))
         break;
