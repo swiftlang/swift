@@ -18,11 +18,11 @@
 #define SWIFT_DRIVER_DRIVER_H
 
 #include "swift/AST/IRGenOptions.h"
+#include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/Sanitizers.h"
 #include "swift/Driver/Util.h"
-#include "swift/Frontend/FileTypes.h"
 #include "swift/Frontend/OutputFileMap.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"

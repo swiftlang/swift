@@ -164,7 +164,7 @@ private:
   /// \return empty string if no output file.
   std::string determineSupplementaryOutputFilename(
       options::ID emitOpt, std::string pathFromArgumentsOrFilelists,
-      StringRef extension, StringRef mainOutputIfUsable,
+      file_types::ID type, StringRef mainOutputIfUsable,
       StringRef defaultSupplementaryOutputPathExcludingExtension) const;
 
   void deriveModulePathParameters(options::ID &emitOption,

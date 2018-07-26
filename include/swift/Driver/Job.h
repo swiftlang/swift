@@ -13,10 +13,10 @@
 #ifndef SWIFT_DRIVER_JOB_H
 #define SWIFT_DRIVER_JOB_H
 
+#include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Driver/Action.h"
 #include "swift/Driver/Util.h"
-#include "swift/Frontend/FileTypes.h"
 #include "swift/Frontend/OutputFileMap.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
