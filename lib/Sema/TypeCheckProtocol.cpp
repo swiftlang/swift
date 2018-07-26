@@ -3663,26 +3663,29 @@ static void diagnoseConformanceFailure(TypeChecker &TC, Type T,
   if (T->hasError())
     return;
 
+  ASTContext &ctx = DC->getASTContext();
+  auto &diags = ctx.Diags;
+
   // If we're checking conformance of an existential type to a protocol,
   // do a little bit of extra work to produce a better diagnostic.
   if (T->isExistentialType() &&
       TC.containsProtocol(T, Proto, DC, None)) {
 
     if (!T->isObjCExistentialType()) {
-      TC.diagnose(ComplainLoc, diag::protocol_does_not_conform_objc,
-                  T, Proto->getDeclaredType());
+      diags.diagnose(ComplainLoc, diag::protocol_does_not_conform_objc,
+                     T, Proto->getDeclaredType());
       return;
     }
 
-    TC.diagnose(ComplainLoc, diag::protocol_does_not_conform_static,
-                T, Proto->getDeclaredType());
+    diags.diagnose(ComplainLoc, diag::protocol_does_not_conform_static,
+                   T, Proto->getDeclaredType());
     return;
   }
 
   // Special case: diagnose conversion to ExpressibleByNilLiteral, since we
   // know this is something involving 'nil'.
   if (Proto->isSpecificProtocol(KnownProtocolKind::ExpressibleByNilLiteral)) {
-    TC.diagnose(ComplainLoc, diag::cannot_use_nil_with_this_type, T);
+    diags.diagnose(ComplainLoc, diag::cannot_use_nil_with_this_type, T);
     return;
   }
 
@@ -3697,20 +3700,19 @@ static void diagnoseConformanceFailure(TypeChecker &TC, Type T,
 
       auto rawType = enumDecl->getRawType();
 
-      TC.diagnose(enumDecl->getInherited()[0].getSourceRange().Start,
-                  diag::enum_raw_type_nonconforming_and_nonsynthable,
-                  T, rawType);
+      diags.diagnose(enumDecl->getInherited()[0].getSourceRange().Start,
+                     diag::enum_raw_type_nonconforming_and_nonsynthable,
+                     T, rawType);
 
       // If the reason is that the raw type does not conform to
       // Equatable, say so.
-      auto equatableProto = TC.getProtocol(enumDecl->getLoc(),
-                                           KnownProtocolKind::Equatable);
+      auto equatableProto = ctx.getProtocol(KnownProtocolKind::Equatable);
       if (!equatableProto)
         return;
 
       if (!TC.conformsToProtocol(rawType, equatableProto, enumDecl, None)) {
         SourceLoc loc = enumDecl->getInherited()[0].getSourceRange().Start;
-        TC.diagnose(loc, diag::enum_raw_type_not_equatable, rawType);
+        diags.diagnose(loc, diag::enum_raw_type_not_equatable, rawType);
         return;
       }
 
@@ -3718,8 +3720,8 @@ static void diagnoseConformanceFailure(TypeChecker &TC, Type T,
     }
   }
 
-  TC.diagnose(ComplainLoc, diag::type_does_not_conform,
-              T, Proto->getDeclaredType());
+  diags.diagnose(ComplainLoc, diag::type_does_not_conform,
+                 T, Proto->getDeclaredType());
 }
 
 void ConformanceChecker::diagnoseOrDefer(
