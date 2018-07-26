@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -verify %s | %FileCheck %s
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -verify -Xllvm -tf-strict-deabstraction %s | %FileCheck %s -check-prefix=STRICTDA
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -verify -Xllvm -tf-strict-deabstraction %s | %FileCheck %s --check-prefix=STRICTDA
 
 import TensorFlow
 
@@ -15,39 +14,6 @@ public func testTensor(a: Tensor<Float>, b: Tensor<Float>) {
   y += y
   print(y)
 }
-
-// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testTensor{{.*}}
-// CHECK:  sil private @{{.*}}testTensor{{.*}} : $@callee_owned (TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float> {
-// CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>):
-// CHECK-NEXT:   %2 = metatype $@thick Float.Type
-// CHECK-NEXT:   %3 = string_literal utf8 "/device:CPU:0"
-// CHECK-NEXT:   %4 = builtin "__tfop_Add,$in,$in,T,__device"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>, %2 : $@thick Float.Type, %3 : $Builtin.RawPointer) : $TensorHandle<Float>
-// CHECK-NEXT:   %5 = metatype $@thick Float.Type
-// CHECK-NEXT:   %6 = string_literal utf8 "/device:CPU:0"
-// CHECK-NEXT:   %7 = builtin "__tfop_Sub,$in,$in,T,__device"(%4 : $TensorHandle<Float>, %4 : $TensorHandle<Float>, %5 : $@thick Float.Type, %6 : $Builtin.RawPointer) : $TensorHandle<Float>
-// CHECK:        graph_op "tfc.SendToHost
-// CHECK-NEXT:   metatype $@thick Float.Type
-// CHECK-NEXT:   string_literal utf8 "/device:CPU:0"
-// CHECK:        [[RESULT:%.*]] = builtin "__tfop_Add,$in,$in,T,__device"(%1 : $TensorHandle<Float>, %1 : $TensorHandle<Float>
-// CHECK-NEXT:   return [[RESULT]] : $TensorHandle<Float>
-
-
-// CHECK-LABEL: --- TFPartition Host Result: {{.*}}testTensor{{.*}}
-// CHECK: @{{.*}}testTensor{{.*}} : $@convention(thin) (@guaranteed Tensor<Float>, @guaranteed Tensor<Float>) -> () {
-
-// Graph lowering should succeed, producing a serialized program of 10+ bytes.
-// CHECK: string_literal bytes
-// CHECK-NEXT:  integer_literal $Builtin.Int64, {{[1-9][0-9]+}}
-// CHECK-NOT: = apply
-
-// We're passing two TensorHandle's in.
-// CHECK: [[ALLOC:%.*]] = alloc_stack $(OpaquePointer, OpaquePointer)
-// CHECK: ref_element_addr
-// CHECK: begin_access [read] [static] [[ALLOC]] : $*(OpaquePointer, OpaquePointer)
-// CHECK: [[STARTFN:%.*]] = function_ref @_swift_tfc_StartTensorComputation
-// CHECK-NEXT: [[PROGRAM:%.*]] = apply [[STARTFN:%.*]](
-// CHECK: [[FINISHFN:%.*]] = function_ref @_swift_tfc_FinishTensorComputation
-// CHECK-NEXT: apply [[FINISHFN]]([[PROGRAM]],
 
 // STRICTDA-LABEL: --- TFPartition Accelerator Result: {{.*}}testTensor{{.*}}
 // STRICTDA:  sil private @{{.*}}testTensor{{.*}} : $@callee_owned (TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float> {
@@ -84,34 +50,6 @@ public func testScalar(f: Float) { // expected-warning {{'f' implicitly copied t
   x += x
   print(x)
 }
-
-// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testScalar{{.*}}
-// CHECK: sil private @{{.*}}testScalar{{.*}} : $@callee_owned (TensorHandle<Builtin.FPIEEE32>) -> TensorHandle<Float> {
-// CHECK: bb0(%0 : $TensorHandle<Builtin.FPIEEE32>):
-// CHECK-NEXT:   %1 = unchecked_ref_cast %0 : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
-// CHECK:        [[CONST:%.*]] = graph_op "Const"() {dtype$dtype: $Builtin.FPIEEE32, value$tensor: f32 0x3F800000 /* 1 */, __device: "ALL_DEVICES"} : $TensorHandle<Builtin.FPIEEE32>
-// CHECK-NEXT:   [[CAST:%.*]] = unchecked_ref_cast [[CONST]] : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
-// CHECK:        [[ADD1:%.*]] = builtin "__tfop_Add,$in,$in,T,__device"(%1 : $TensorHandle<Float>, [[CAST]] : $TensorHandle<Float>, {{.*}}) : $TensorHandle<Float>
-// CHECK:        [[ADD2:%.*]] = builtin "__tfop_Add,$in,$in,T,__device"([[ADD1]] : $TensorHandle<Float>, [[ADD1:%.*]] : $TensorHandle<Float>, {{.*}}) : $TensorHandle<Float>
-// CHECK-NEXT:   return [[ADD2]] : $TensorHandle<Float>
-// CHECK-NEXT: }
-
-
-// CHECK-LABEL: --- TFPartition Host Result: {{.*}}testScalar{{.*}}
-// CHECK: sil @{{.*}}testScalar{{.*}} : $@convention(thin) (Float) -> () {
-
-// Graph lowering succeeds on this function
-// CHECK: string_literal bytes "{{.....}}
-// CHECK-NEXT:  integer_literal $Builtin.Int64, {{[1-9]}}
-
-// StartTensorComputation is called with one input tensor
-// CHECK: [[TENSORS:%.*]] = struct $UnsafePointer<OpaquePointer> ({{%.*}} : $Builtin.RawPointer)
-// CHECK-NEXT: [[TENSOR_COUNT:%.*]] = integer_literal $Builtin.Int64, 1
-// CHECK-NEXT: [[TENSOR_COUNT_STRUCT:%.*]] = struct $Int ([[TENSOR_COUNT]] : $Builtin.Int64)
-// CHECK: [[STARTFN:%.*]] = function_ref @_swift_tfc_StartTensorComputation
-// CHECK-NEXT: [[PROGRAM:%.*]] = apply [[STARTFN]]({{%.*}}, {{%.*}}, [[TENSORS]], [[TENSOR_COUNT_STRUCT]]
-// CHECK: [[FINISHFN:%.*]] = function_ref @_swift_tfc_FinishTensorComputation
-// CHECK-NEXT: apply [[FINISHFN]]([[PROGRAM]],
 
 // STRICTDA-LABEL: --- TFPartition Accelerator Result: {{.*}}testScalar{{.*}}
 // STRICTDA: sil private @{{.*}}testScalar{{.*}} : $@callee_owned (TensorHandle<Builtin.FPIEEE32>) -> TensorHandle<Float> {
@@ -154,35 +92,6 @@ public func testExitBranch1(i: Int) {
 
 // The tensor program should have no branch.
 
-// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testExitBranch1{{.*}}
-// CHECK: sil private @{{.*}}testExitBranch1{{.*}} : $@callee_owned () -> TensorHandle<Float> {
-// CHECK: bb0:
-// CHECK-NEXT:   [[CONST:%.*]] = graph_op "Const"() {dtype$dtype: $Builtin.FPIEEE32, value$tensor: f32 0x3F800000 /* 1 */, __device: "ALL_DEVICES"} : $TensorHandle<Builtin.FPIEEE32>
-// CHECK-NEXT:   [[TH:%.*]] = unchecked_ref_cast [[CONST]] : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
-// CHECK:        [[RET:%.*]] = builtin "__tfop_Add,$in,$in,T,__device"([[TH]] : $TensorHandle<Float>, [[TH]] : $TensorHandle<Float>, {{.*}}) : $TensorHandle<Float>
-// CHECK-NEXT:   return [[RET]] : $TensorHandle<Float>
-// CHECK-NEXT: }
-
-
-// The host program should kill the tensor program if the early exit happens,
-// and finish it on the normal path.
-
-// CHECK-LABEL: --- TFPartition Host Result: {{.*}}testExitBranch1{{.*}}
-// CHECK: [[STARTFN:%.*]] = function_ref @_swift_tfc_StartTensorComputation
-// CHECK-NEXT: [[PROGRAM:%.*]] = apply [[STARTFN]](
-// CHECK: cond_br
-
-// CHECK: bb1:
-// CHECK: [[TERMFN:%.*]] = function_ref @_swift_tfc_TerminateTensorComputation
-// CHECK-NEXT: apply [[TERMFN]]([[PROGRAM]]) : $@convention(thin) (@guaranteed _TensorComputation) -> ()
-// CHECK: unreachable
-
-// CHECK: [[FINISHFN:%.*]] = function_ref @_swift_tfc_FinishTensorComputation
-// CHECK-NEXT: apply [[FINISHFN]]([[PROGRAM]],
-
-
-// The tensor program should have no branch.
-
 // STRICTDA-LABEL: --- TFPartition Accelerator Result: {{.*}}testExitBranch1{{.*}}
 // STRICTDA: sil private @{{.*}}testExitBranch1{{.*}} : $@callee_owned () -> TensorHandle<Float> {
 // STRICTDA: bb0:
@@ -222,22 +131,6 @@ public func testExitBranch2(i: Int) {
   print(x)  // expected-note {{value used here}}
 }
 
-// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testExitBranch2{{.*}}
-// CHECK: sil private @{{.*}}testExitBranch2{{.*}} : $@callee_owned (TensorHandle<Builtin.Int1>) -> () {
-// CHECK: bb0(%0 : $TensorHandle<Builtin.Int1>):
-// CHECK:  graph_op "Const"()
-// CHECK:  cond_br {{.*}}, bb2, bb1
-
-// CHECK:      bb1:
-// CHECK:        builtin "__tfop_Add,$in,$in,T,__device"(
-// CHECK:        graph_op "tfc.SendToHost
-// CHECK-NEXT:   br bb2
-
-// CHECK: bb2:
-// CHECK-NEXT: tuple ()
-// CHECK-NEXT:  return
-// }
-
 // STRICTDA-LABEL: --- TFPartition Accelerator Result: {{.*}}testExitBranch2{{.*}}
 // STRICTDA: sil private @{{.*}}testExitBranch2{{.*}} : $@callee_owned (TensorHandle<Builtin.Int1>) -> () {
 // STRICTDA: bb0(%0 : $TensorHandle<Builtin.Int1>):
@@ -268,24 +161,6 @@ public func test_bool_param(cond: Bool, // expected-warning {{'cond' implicitly 
   print(a.toHost())
 }
 
-// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}test_bool_param{{.*}}
-// CHECK: sil private @{{.*}}test_bool_param{{.*}} : $@callee_owned (TensorHandle<Builtin.Int1>, TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float>
-// CHECK: bb0(%0 : $TensorHandle<Builtin.Int1>, %1 : $TensorHandle<Float>, %2 : $TensorHandle<Float>):
-// CHECK: %3 = graph_op "tf_tensor_to_i1"(%0 : $TensorHandle<Builtin.Int1>) : $Builtin.Int1
-// CHECK: cond_br %3, bb2, bb1
-
-
-// CHECK-LABEL: --- TFPartition Host Result: {{.*}}test_bool_param{{.*}}
-// CHECK: = function_ref @_swift_tfc_CreateCTensorHandle : $@convention(thin)
-// CHECK-NEXT: = integer_literal $Builtin.Int32, 10
-// CHECK-NEXT: = struct $UInt32 ({{.*}} : $Builtin.Int32)
-// CHECK-NEXT:  = struct $TF_DataType ({{.*}} : $UInt32)
-// CHECK-NEXT:  = alloc_stack $Builtin.Int1
-// CHECK-NEXT: store
-// CHECK-NEXT:  = begin_access [read] [static]
-// CHECK-NEXT:  = apply {{.*}}<Builtin.Int1>({{.*}}, {{.*}}) : $@convention(thin)
-// CHECK-NEXT:  end_access
-// CHECK-NEXT:  dealloc_stack
 
 // STRICTDA-LABEL: --- TFPartition Accelerator Result: {{.*}}test_bool_param{{.*}}
 // STRICTDA: sil private @{{.*}}test_bool_param{{.*}} : $@callee_owned (TensorHandle<Builtin.Int1>, TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float>
@@ -319,25 +194,6 @@ public func test_bool_param2(cond: Bool, // expected-warning {{'cond' implicitly
   a += b
   print(a.toHost())
 }
-
-// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}test_bool_param2{{.*}}
-// CHECK: sil private @{{.*}}test_bool_param2{{.*}}
-// CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>, %2 : $TensorHandle<Builtin.Int1>):
-// CHECK:         builtin "__tfop_Add,$in,$in,T,__device"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>, {{.*}}) : $TensorHandle<Float>
-// CHECK-NEXT:    [[BOOL:%.*]] = graph_op "tf_tensor_to_i1"(%2 : $TensorHandle<Builtin.Int1>) : $Builtin.Int1
-// CHECK-NEXT:    cond_br [[BOOL]]
-// ...
-// CHECK: }
-
-// CHECK-LABEL: --- TFPartition Host Result: {{.*}}test_bool_param2{{.*}}
-// CHECK: bb0(%0 : $Bool, %1 : $Tensor<Float>, %2 : $Tensor<Float>):
-// CHECK: [[BOOLVAL:%.*]] = struct_extract %0 : $Bool, #Bool._value
-// CHECK: function_ref @_swift_tfc_CreateCTensorHandle
-// CHECK: [[BOOLADDR:%.*]] = alloc_stack $Builtin.Int1
-// CHECK-NEXT: store [[BOOLVAL]] to [[BOOLADDR]] : $*Builtin.Int1
-// CHECK: [[STARTFN:%.*]] = function_ref @_swift_tfc_StartTensorComputation
-// CHECK-NEXT: [[PROGRAM:%.*]] = apply [[STARTFN:%.*]](
-// CHECK: cond_br [[BOOLVAL]],
 
 // STRICTDA-LABEL: --- TFPartition Accelerator Result: {{.*}}test_bool_param2{{.*}}
 // STRICTDA: sil private @{{.*}}test_bool_param2{{.*}}
@@ -374,16 +230,6 @@ public func test_multiple_ifs(status: Bool) {
   _hostOp(a)
 }
 
-// CHECK-LABEL: --- XLA CFG Canonicalize: {{.*}}test_multiple_ifs{{.*}}
-// CHECK-NEXT: [sequence
-// CHECK-NEXT:   {condition Header: bb0
-// CHECK-NEXT:     block bb2
-// CHECK-NEXT:     block bb1}
-// CHECK-NEXT:   {condition Header: bb3
-// CHECK-NEXT:     block bb5
-// CHECK-NEXT:     block bb4}
-// CHECK-NEXT:   block bb6]
-
 // The results are different here because compiler optimizes well
 // in the presence of graph_ops.
 // STRICTDA-LABEL: --- XLA CFG Canonicalize: {{.*}}test_multiple_ifs{{.*}}
@@ -409,35 +255,6 @@ public func test_while1(maxCount: Int,  // expected-warning {{'maxCount' implici
   a += b
   print(a.toHost())
 }
-
-// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}test_while1{{.*}}
-// CHECK: sil private @{{.*}}test_while1{{.*}}
-// CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>, %2 : $TensorHandle<Builtin.Int1>, %3 : $TensorHandle<Builtin.Int64>):
-// CHECK-NEXT: graph_op "Const"() {dtype$dtype: $Builtin.Int64, value$tensor: i64 0
-// CHECK:      builtin "__tfop_Add,$in,$in,T,__device"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>
-// CHECK-NEXT: graph_op "tf_tensor_to_i1"(
-// CHECK-NEXT: cond_br {{.*}}, bb2, bb1
-
-// CHECK: bb3([[A:%.*]] : $TensorHandle<Float>, [[COUNT:%.*]] : $TensorHandle<Builtin.Int64>):
-// CHECK:       [[NEXTA:%.*]] = builtin "__tfop_Sub,$in,$in,T,__device"([[A]] : $TensorHandle<Float>, %1 : $TensorHandle<Float>, {{.*}}) : $TensorHandle<Float>
-// CHECK:       [[NEXTCOUNT:%.*]] = graph_op "Add,i,i"([[COUNT]] : $TensorHandle<Builtin.Int64>
-// CHECK:       [[CONDT:%.*]] = graph_op "Less,i,i"([[NEXTCOUNT]] : $TensorHandle<Builtin.Int64>
-// CHECK-NEXT:   [[COND:%.*]] = graph_op "tf_tensor_to_i1"([[CONDT]] : $TensorHandle<Builtin.Int1>) : $Builtin.Int1
-// CHECK-NEXT:   cond_br [[COND]], bb5, bb4
-
-// CHECK: bb5:
-// CHECK-NEXT: br bb3([[NEXTA]] : $TensorHandle<Float>, [[NEXTCOUNT]] : $TensorHandle<Builtin.Int64>)
-
-
-// CHECK-LABEL: --- XLA CFG Canonicalize: {{.*}}test_while1{{.*}}
-// CHECK-NEXT: [sequence
-// CHECK-NEXT:   {condition Header: bb0
-// CHECK-NEXT:     [sequence
-// CHECK-NEXT:       <while Preheader: bb2, Header: bb3, exit: bb4
-// CHECK-NEXT:         block bb5>
-// CHECK-NEXT:       block bb4]
-// CHECK-NEXT:     block bb1}
-// CHECK-NEXT:   block bb6]
 
 // STRICTDA-LABEL: --- TFPartition Accelerator Result: {{.*}}test_while1{{.*}}
 // STRICTDA: sil private @{{.*}}test_while1{{.*}}
@@ -485,23 +302,6 @@ public func scalar_manipulation(a : Float) -> Tensor<Float> {
   return z+z
 }
 
-// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}scalar_manipulation{{.*}}
-// CHECK: sil private @{{.*}}scalar_manipulation{{.*}} : $@callee_owned (TensorHandle<Builtin.FPIEEE32>) -> TensorHandle<Float> {
-// CHECK: bb0(%0 : $TensorHandle<Builtin.FPIEEE32>):
-// CHECK-NEXT:  %1 = unchecked_ref_cast %0 : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
-// CHECK-NEXT:  [[CONST:%.*]] = graph_op "Const"() {dtype$dtype: $Builtin.FPIEEE32, value$tensor: f32 0x3F800000 /* 1 */, __device: "ALL_DEVICES"} : $TensorHandle<Builtin.FPIEEE32>
-// CHECK-NEXT:  [[CAST:%.*]] = unchecked_ref_cast [[CONST]] : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
-
-// CHECK:       builtin "__tfop_Add,$in,$in,T,__device"(%1 : $TensorHandle<Float>, [[CAST]] : $TensorHandle<Float>, {{.*}}) : $TensorHandle<Float>
-// CHECK:       graph_op "tfc.SendToHost
-// CHECK-NEXT:  graph_op "Const"()
-// CHECK:       graph_op "tfc.RecvFromHost
-// CHECK:       graph_op "Add,i,i"
-// CHECK-NEXT:  unchecked_ref_cast {{.*}} : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
-// CHECK:       builtin "__tfop_Add,$in,$in,T,__device"(
-// CHECK-NEXT:  return
-// CHECK-NEXT:}
-
 // STRICTDA-LABEL: --- TFPartition Accelerator Result: {{.*}}scalar_manipulation{{.*}}
 // STRICTDA: sil private @{{.*}}scalar_manipulation{{.*}} : $@callee_owned (TensorHandle<Builtin.FPIEEE32>) -> TensorHandle<Float> {
 // STRICTDA: bb0(%0 : $TensorHandle<Builtin.FPIEEE32>):
@@ -525,14 +325,6 @@ public func testCast(x: Tensor<Float>) -> Tensor<Int32> {
   return Tensor<Int32>(x+x)  // expected-note {{value used here}}
 }
 
-// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testCast
-// CHECK: sil private @{{.*}}testCast{{.*}} : $@callee_owned (TensorHandle<Float>) -> TensorHandle<Int32> {
-// CHECK: bb0(%0 : $TensorHandle<Float>):
-// CHECK:   %3 = builtin "__tfop_Add,$in,$in,T,__device"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>, {{.*}}) : $TensorHandle<Float>
-// CHECK:   %5 = metatype $@thick Int32.Type
-// CHECK:   %7 = builtin "__tfop_Cast,$in,SrcT,DstT,__device"(%3 : $TensorHandle<Float>, %4 : $@thick Float.Type, %5 : $@thick Int32.Type, {{.*}}) : $TensorHandle<Int32>
-// CHECK:   return %7 : $TensorHandle<Int32>
-
 // STRICTDA-LABEL: --- TFPartition Accelerator Result: {{.*}}testCast
 // STRICTDA: sil private @{{.*}}testCast{{.*}} : $@callee_owned (TensorHandle<Float>) -> TensorHandle<Int32> {
 // STRICTDA: bb0(%0 : $TensorHandle<Float>):
@@ -548,19 +340,6 @@ public func testInputListArguments(a: TensorHandle<Float>, b: Tensor<Float>) -> 
   let y: TensorHandle<Float> = #tfop("Pack", [b, b, b])  // expected-note {{value used here}}
   return (Tensor(handle: x)+Tensor(handle: y)).toHost()
 }
-
-/*
- CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testInputListArguments
- CHECK: sil private @{{.*}}testInputListArguments{{.*}} : $@callee_owned (TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float> {
- CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>):
- CHECK:   %2 = metatype $@thin TensorHandle<Float>.Type
- CHECK:   [[PACK1:%.*]] = builtin "__tfop_Pack,$in,$inelt,$inelt,$inelt,__device"(%2 : $@thin TensorHandle<Float>.Type, %0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>, {{.*}}) : $TensorHandle<Float>
- CHECK:  [[TYPE:%.*]] = metatype $@thin Tensor<Float>.Type
- CHECK:  [[PACK2:%.*]] = builtin "__tfop_Pack,$in,$inelt,$inelt,$inelt,__device"([[TYPE]] : $@thin Tensor<Float>.Type, %1 : $TensorHandle<Float>, %1 : $TensorHandle<Float>, %1 : $TensorHandle<Float>, {{.*}}) : $TensorHandle<Float>
- CHECK:  [[RET:%.*]] = builtin "__tfop_Add,$in,$in,T,__device"([[PACK1]] : $TensorHandle<Float>, [[PACK2]] : $TensorHandle<Float>, {{.*}}) : $TensorHandle<Float>
- CHECK:  return [[RET]] : $TensorHandle<Float>
- CHECK: }
-*/
 
 /*
  STRICTDA-LABEL: --- TFPartition Accelerator Result: {{.*}}testInputListArguments
@@ -582,26 +361,6 @@ public func liveOutTest(
 ) -> Tensor<Float> {
   return a+b+c // expected-note 3 {{value used here}}
 }
-
-/*
- CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}liveOutTest
- CHECK: sil private @{{.*}}liveOutTest{{.*}} : $@callee_owned (TensorHandle<Float>, TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float> {
- CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>, %2 : $TensorHandle<Float>):
- CHECK:  return {{.*}} : $TensorHandle<Float>
- CHECK-LABEL: }
- */
-
-/*
- CHECK-LABEL: --- TFPartition Host Result: {{.*}}liveOutTest{{.*}}
- CHECK: @{{.*}}liveOutTest{{.*}} : $@convention(thin) (@guaranteed Tensor<Float>, @guaranteed Tensor<Float>, @guaranteed Tensor<Float>) -> @owned Tensor<Float> {
-
- // [[RESULTBUF:%.*]] = alloc_stack $OpaquePointer
- // [[RESULTACCESS:%.*]] = begin_access [modify] [static] [[RESULTBUF]] : $*OpaquePointer
- // [[RESULTPTR:%.*]] = address_to_pointer [[RESULTACCESS]] : $*OpaquePointer to $Builtin.RawPointer
- // [[RESULTMP:%.*]] = struct $UnsafeMutablePointer<OpaquePointer> ([[RESULTPTR]] : $Builtin.RawPointer)
- // [[FINISHFN:%.*]] = function_ref @_swift_tfc_FinishTensorComputation : $@convention(thin) (@owned _TensorComputation, UnsafeMutablePointer<OpaquePointer>, Int) -> ()
- // %53 = apply [[FINISHFN]]({{.*}}, [[RESULTMP]], {{.*}}) : $@convention(thin) (@owned _TensorComputation, UnsafeMutablePointer<OpaquePointer>, Int) -> ()
-*/
 
 /*
 STRICTDA-LABEL: --- TFPartition Accelerator Result: {{.*}}liveOutTest
@@ -654,15 +413,6 @@ public func testResourceAndVariants() {
   () = #tfop("MakeIterator", dataset, iterator)
 }
 
-/*
-CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testResourceAndVariantsyyF
-CHECK:  [[values:%.*]] = graph_op "Const"() {dtype: $Float, value$tensor: [$Float: (f32 0x3F800000 /* 1 */), (f32 0x40000000 /* 2 */),
-CHECK:  [[dataset:%.*]] = builtin "__tfop_TensorDataSet,$in,Toutput_types$array,$elt,output_shapes$shapearray,$shape,$elt,__device"([[values]] : $TensorHandle<Float>
-CHECK:  [[iterator:%.*]] = builtin "__tfop_Iterator,shared_name,container,output_types$array,$elt,output_shapes$shapearray,$shape,$elt,__device"({{.*}} : $Builtin.RawPointer, {{.*}} : $Builtin.RawPointer
-CHECK:  builtin "__tfop_MakeIterator,$in,$in,__device"([[dataset]] : $VariantHandle, [[iterator]] : $ResourceHandle, {{.*}}) : $()
-CHECK-LABEL: ----
-*/
-
 // STRICTDA-LABEL: --- TFPartition Accelerator Result: {{.*}}testResourceAndVariantsyyF
 // STRICTDA:  [[VALUES:%.*]] = graph_op "Const"() {dtype: $Float, value$tensor: [$Float: (f32 0x3F800000 /* 1 */), (f32 0x40000000 /* 2 */),
 // STRICTDA:  [[DATASET:%.*]] = graph_op "TensorDataSet,i"([[VALUES]] : $TensorHandle<Float>
@@ -680,12 +430,6 @@ func shouldntInline(_ a: Tensor<Float>) -> Tensor<Float> {
   return (b*b).toHost()
 }
 
-// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}shouldntInline
-// CHECK: bb0(%0 : $TensorHandle<Float>):
-// CHECK:  %3 = builtin "__tfop_Mul,$in,$in,T,__device"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>, {{.*}}) : $TensorHandle<Float>
-// CHECK:  return %3 : $TensorHandle<Float>
-// CHECK-LABEL: ----
-
 // STRICTDA-LABEL: --- TFPartition Accelerator Result: {{.*}}shouldntInline
 // STRICTDA: bb0(%0 : $TensorHandle<Float>):
 // STRICTDA:  [[RET:%.*]] = graph_op "Mul,i,i"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>) {{.*}} : $TensorHandle<Float>
@@ -696,16 +440,6 @@ public func testNotInlined() {
   let a = Tensor<Float>([1,2])+1
   _ = shouldntInline(a.toHost())
 }
-
-// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testNotInlined
-// CHECK: = graph_op "Const"()
-// CHECK: [[RESULT:%.*]] = builtin "__tfop_Add,
-// CHECK: return [[RESULT]]
-// CHECK-LABEL: ---
-
-// CHECK-LABEL: --- TFPartition Host Result: {{.*}}testNotInlined
-// CHECK: [[FN:%.*]] = function_ref @{{.*}}shouldntInline
-// CHECK: = apply [[FN]](
 
 // STRICTDA-LABEL: --- TFPartition Accelerator Result: {{.*}}testNotInlined
 // STRICTDA: = graph_op "Const"()
@@ -746,17 +480,7 @@ public func testNoInlineUser() {
     noInlineUser(x)
 }
 
-// CHECK-LABEL: --- TFPartition Host Result: {{.*}}testNoInlineUser
-// CHECK: [[X:%.*]] = alloc_ref $TensorHandle<Float>
-// CHECK: [[XS:%.*]] = struct $Tensor<Float> ([[X]] : $TensorHandle<Float>)
-// CHECK:  strong_retain [[SOME_T:%.*]] : $TensorHandle<Float>
-// CHECK-NEXT:  strong_release [[SOME_T]] : $TensorHandle<Float>
-// CHECK:  [[FN:%.*]] = function_ref @${{.*}}noInlineUser
-// CHECK-NEXT: apply [[FN]]([[XS]])
-// CHECK-NEXT: apply [[FN]]([[XS]])
-// CHECK-LABEL: } // end sil function{{.*}}testNoInlineUser
-
-// NOTE: the output for STRICT_DA does not even have strong_retain or release.
+// NOTE: the output for STRICT_DA does not have strong_retain or release.
 // The output should be verified and updated once the bug is fixed.
 //
 // STRICTDA-LABEL: --- TFPartition Host Result: {{.*}}testNoInlineUser
@@ -773,13 +497,6 @@ public func test77437755(_ hiddenSize: Float) {
   let t1 = Tensor<Float>(shape: [5], scalars: [1.0, 2.0, 3.0, 4.0, 5.0])
   _ = t1 * stddev  // expected-note {{value used here}}
 }
-
-// CHECK-LABEL: ---- INPUT FUNCTION {{.*}}test77437755{{.*}} ----------
-// CHECK: [[STDDEV:%.*]] = builtin "fdiv_FPIEEE32"
-// CHECK: [[STDDEVT:%.*]] = builtin "__tfop_tfc.scalarToTensor,$in"([[STDDEV]] : $Builtin.FPIEEE32) : $TensorHandle<Float>
-// CHECK:  builtin "__tfop_Mul,$in,$in,T"({{.*}} : $TensorHandle<Float>, [[STDDEVT]] : $TensorHandle<Float>, {{.*}})
-// CHECK-LABEL: ---- END OF INPUT FUNCTION ----------
-
 
 // STRICTDA-LABEL: ---- INPUT FUNCTION {{.*}}test77437755{{.*}} ----------
 // STRICTDA: [[STDDEV:%.*]] = builtin "fdiv_FPIEEE32"
