@@ -564,7 +564,7 @@ class ConformanceChecker : public WitnessChecker {
   ///
   /// \param typeDecl The decl the witness type came from; can be null.
   void recordTypeWitness(AssociatedTypeDecl *assocType, Type type,
-                         TypeDecl *typeDecl, bool performRedeclarationCheck);
+                         TypeDecl *typeDecl);
 
   /// Enforce restrictions on non-final classes witnessing requirements
   /// involving the protocol 'Self' type.
