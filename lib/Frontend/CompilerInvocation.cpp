@@ -966,6 +966,20 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   for (const auto &Lib : Args.getAllArgValues(options::OPT_autolink_library))
     Opts.LinkLibraries.push_back(LinkLibrary(Lib, LibraryKind::Library));
 
+  if (const Arg *A = Args.getLastArg(OPT_type_info_dump_filter_EQ)) {
+    StringRef mode(A->getValue());
+    if (mode == "all")
+      Opts.TypeInfoFilter = IRGenOptions::TypeInfoDumpFilter::All;
+    else if (mode == "resilient")
+      Opts.TypeInfoFilter = IRGenOptions::TypeInfoDumpFilter::Resilient;
+    else if (mode == "fragile")
+      Opts.TypeInfoFilter = IRGenOptions::TypeInfoDumpFilter::Fragile;
+    else {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+    }
+  }
+
   return false;
 }
 

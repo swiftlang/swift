@@ -1359,6 +1359,9 @@ static bool performCompileStepsPostSILGen(
 
   runSILLoweringPasses(*SM);
 
+  if (Action == FrontendOptions::ActionType::DumpTypeInfo)
+    return performDumpTypeInfo(IRGenOpts, *SM, getGlobalLLVMContext());
+
   // TODO: remove once the frontend understands what action it should perform
   IRGenOpts.OutputKind = getOutputKind(Action);
   if (Action == FrontendOptions::ActionType::Immediate)
@@ -1366,7 +1369,8 @@ static bool performCompileStepsPostSILGen(
         Invocation, Instance, std::move(SM), MSF, observer, ReturnValue);
 
   StringRef OutputFilename = PSPs.OutputFilename;
-  std::vector<std::string> ParallelOutputFilenames = Invocation.getFrontendOptions().InputsAndOutputs.copyOutputFilenames();
+  std::vector<std::string> ParallelOutputFilenames =
+    Invocation.getFrontendOptions().InputsAndOutputs.copyOutputFilenames();
   std::unique_ptr<llvm::Module> IRModule;
   llvm::GlobalVariable *HashGlobal;
   generateIR(

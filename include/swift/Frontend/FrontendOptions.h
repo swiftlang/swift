@@ -139,6 +139,8 @@ public:
     EmitIR,       ///< Emit LLVM IR
     EmitBC,       ///< Emit LLVM BC
     EmitObject,   ///< Emit object file
+
+    DumpTypeInfo, ///< Dump IRGen type info
   };
 
   /// Indicates the action the user requested that the frontend perform.
