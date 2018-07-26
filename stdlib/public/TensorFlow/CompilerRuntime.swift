@@ -87,7 +87,8 @@ public enum _RuntimeConfig {
 
   /// When true, run the entire tensor computation in
   /// _TFCStartTensorComputation(), instead of running it on a separate thread.
-  /// - Note: Set to true only for debugging purposes.
+  /// - Note: Set to true only for debugging purposes, as it has limited
+  /// functionality (e.g. no sends/recvs support).
   static public var usesSynchronousExecution = false
 
   /// For CPU and GPU execution without XLA, use the auto mode. For XLA and/or
@@ -466,6 +467,8 @@ extension TFState {
     inputTensors.append(cTensor!)
   }
 
+  /// Run the tensor program. Abort the process on error, and emit an error
+  /// string to STDERR.
   /// See the comment on _TensorComputation.helperFunctionCount on the concept
   /// of a "helper function".
   func execute(_ entryFunctionBaseName: String,
@@ -547,7 +550,10 @@ extension TFState {
       targetNodeSpecs, Int32(targetNodeSpecs.count),
       /*run_metadata*/nil, status
     )
-    checkOk(status)
+    if (TF_GetCode(status) != TF_OK) {
+      logToStderr(String(cString: TF_Message(status)))
+      exit(-1)
+    }
     debugLog("Done running TF computation.")
 
     // Delete input tensors.
@@ -715,7 +721,7 @@ public final class _TensorComputation {
       // TODO(hongm): do error handling.
       internalConsistencyCheck(creationStatus == 0)
     }
-    // If it's asynchronous, we call execute() on the main thread directly.
+    // If it's synchronous, we call execute() on the main thread directly.
     else {
       // Log a debug message to differentiate from async computation.
       debugLog("Running tensor computation synchronously.")
@@ -731,6 +737,8 @@ public final class _TensorComputation {
 }
 
 private extension _TensorComputation {
+  /// Run the tensor program. Abort the process on error, and emit an error
+  /// string to STDERR.
   // NOTE: This is to be called by the initializer. The computation gets
   // executed on initialization, thus this method will not be exposed to users.
   private func execute() {
@@ -758,6 +766,7 @@ public extension _TensorComputation {
 
   /// Waits for completion the computation as given by 'program', and returns
   /// output handles, whose underlying tensors may live on CPU or GPU.
+  /// Abort the process on error, and emit an error string to STDERR.
   func finish() -> [CTensorHandle] {
     debugLog("Calling _TensorComputation.finish().")
     if let pthread = pthread {
@@ -799,7 +808,7 @@ extension _TensorComputation {
 // user code, so they are generally just wrappers around the implementation
 // above.
 
-/// Loads the TF computation from a binary TF FunctionDef proto given by 'bytes'
+/// Load the TF computation from a binary TF FunctionDef proto given by 'bytes'
 /// and 'size', start the computation, and return a _TensorComputation object as
 /// a unique identifier for that computation.
 ///
@@ -840,8 +849,9 @@ public func _TFCStartTensorComputation(
                             resultCount: resultCount)
 }
 
-/// Waits for completion of the computation as given by `computation`, and
-/// returns results.
+/// Wait for completion of the computation as given by `computation`, and
+/// return results.
+/// Abort the process on error, and emit an error string to STDERR.
 ///
 /// - Parameters:
 ///   - computation: The tensor computation to finish.
@@ -877,7 +887,7 @@ public func _TFCTerminateTensorComputation(_ computation: _TensorComputation) {
   computation.terminate()
 }
 
-/// Creates a scalar CTensorHandle value for the given data type.
+/// Create a scalar CTensorHandle value for the given data type.
 ///
 /// - Parameters:
 ///   - value: The scalar value.

@@ -75,11 +75,14 @@ public func model() {
   _hostOp(three)
   expectNearlyEqualWithScalarTensor(3.0, three)
 
-  // TODO: do not crash when TF emits "Fatal error: End of sequence"
-  // let error: TensorHandle<Float> = #tfop("IteratorGetNext",
-  //                                      iterator,
-  //                                      output_types: [Float.self],
-  //                                      output_shapes: [TensorShape()])
+  // Running the commented-out code below will cause the process to exit, with
+  // TF error message "End of sequence" printed on STDERR. The code is commented
+  // out because running it will unfortunately cause the test to fail.
+
+  // let _: TensorHandle<Float> = #tfop("IteratorGetNext",
+  //                                    iterator,
+  //                                    output_types: [Float.self],
+  //                                    output_shapes: [TensorShape()])
 }
 
 DatasetTests.testAllBackends("Basic") {
