@@ -18,8 +18,8 @@ public func testTensor(a: Tensor<Float>, b: Tensor<Float>) {
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testTensor{{.*}}
 // CHECK:  sil private @{{.*}}testTensor{{.*}} : $@callee_owned (TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float> {
 // CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>):
-// CHECK-NEXT:   [[A:%.*]] = graph_op "Add,i,i"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>)
-// CHECK-NEXT:   {{.*}} = graph_op "Sub,i,i"([[A]] : $TensorHandle<Float>, [[A]] : $TensorHandle<Float>)
+// CHECK-NEXT:   [[A:%.*]] = graph_op "Add,i,i"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>) {T: $Float, __device: "/device:CPU:0"} : $TensorHandle<Float>
+// CHECK-NEXT:   {{.*}} = graph_op "Sub,i,i"([[A]] : $TensorHandle<Float>, [[A]] : $TensorHandle<Float>) {T: $Float, __device: "/device:CPU:0"} : $TensorHandle<Float>
 // CHECK:        graph_op "tfc.SendToHost
 // CHECK:        [[RESULT:%.*]] = graph_op "Add,i,i"(%1 : $TensorHandle<Float>, %1 : $TensorHandle<Float>
 // CHECK-NEXT:   return [[RESULT]] : $TensorHandle<Float>
@@ -223,7 +223,8 @@ public func test_multiple_ifs(status: Bool) {
     a += b
   }
   a += b
-  if status {
+  // expected-warning @+1 {{value implicitly copied to the host, use .toHost() to make transfer explicit}}
+  if a.scalarized() > 10 {
     a += b
   }
   a -= b
@@ -237,7 +238,10 @@ public func test_multiple_ifs(status: Bool) {
 // CHECK-NEXT:   {condition Header: bb0
 // CHECK-NEXT:     block bb2
 // CHECK-NEXT:     block bb1}
-// CHECK-NEXT:   block bb3]
+// CHECK-NEXT:   {condition Header: bb3
+// CHECK-NEXT:     block bb5
+// CHECK-NEXT:     block bb4}
+// CHECK-NEXT:   block bb6]
 
 public func test_while1(maxCount: Int,  // expected-warning {{'maxCount' implicitly copied to the accelerator}}
                         arg1: Tensor<Float>, arg2: Tensor<Float>) {
