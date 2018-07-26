@@ -20,15 +20,17 @@
 using namespace swift;
 using namespace swift::file_types;
 
+namespace {
 struct TypeInfo {
   const char *Name;
   const char *Flags;
   const char *Extension;
 };
+} // end anonymous namespace
 
 static const TypeInfo TypeInfos[] = {
-#define TYPE(NAME, ID, TEMP_SUFFIX, FLAGS) \
-  { NAME, FLAGS, TEMP_SUFFIX },
+#define TYPE(NAME, ID, EXTENSION, FLAGS) \
+  { NAME, FLAGS, EXTENSION },
 #include "swift/Basic/FileTypes.def"
 };
 
@@ -48,15 +50,15 @@ ID file_types::lookupTypeForExtension(StringRef Ext) {
     return TY_INVALID;
   assert(Ext.front() == '.' && "not a file extension");
   return llvm::StringSwitch<file_types::ID>(Ext.drop_front())
-#define TYPE(NAME, ID, SUFFIX, FLAGS) \
-           .Case(SUFFIX, TY_##ID)
+#define TYPE(NAME, ID, EXTENSION, FLAGS) \
+           .Case(EXTENSION, TY_##ID)
 #include "swift/Basic/FileTypes.def"
       .Default(TY_INVALID);
 }
 
 ID file_types::lookupTypeForName(StringRef Name) {
   return llvm::StringSwitch<file_types::ID>(Name)
-#define TYPE(NAME, ID, SUFFIX, FLAGS) \
+#define TYPE(NAME, ID, EXTENSION, FLAGS) \
            .Case(NAME, TY_##ID)
 #include "swift/Basic/FileTypes.def"
       .Default(TY_INVALID);

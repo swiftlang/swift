@@ -15,8 +15,8 @@
 
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/DenseMapInfo.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
-#include <functional>
 
 namespace swift {
 namespace file_types {
@@ -58,8 +58,12 @@ bool isAfterLLVM(ID Id);
 /// These need to be passed to the Swift frontend
 bool isPartOfSwiftCompilation(ID Id);
 
-template <typename Fn> void forAllTypes(const Fn &fn);
-} // namespace file_types
+static inline void forAllTypes(llvm::function_ref<void(file_types::ID)> fn) {
+  for (uint8_t i = 0; i < static_cast<uint8_t>(TY_INVALID); ++i)
+    fn(static_cast<ID>(i));
+}
+
+} // end namespace file_types
 } // end namespace swift
 
 namespace llvm {
@@ -72,14 +76,6 @@ template <> struct DenseMapInfo<swift::file_types::ID> {
   static unsigned getHashValue(ID Val) { return (unsigned)Val * 37U; }
   static bool isEqual(ID LHS, ID RHS) { return LHS == RHS; }
 };
-} // namespace llvm
-
-template <typename Fn> void swift::file_types::forAllTypes(const Fn &fn) {
-  static_assert(
-      std::is_constructible<std::function<void(file_types::ID)>, Fn>::value,
-      "must have the signature 'void(file_types::ID)'");
-  for (uint8_t i = 0; i < static_cast<uint8_t>(TY_INVALID); ++i)
-    fn(static_cast<ID>(i));
-}
+} // end namespace llvm
 
 #endif
