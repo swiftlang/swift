@@ -103,6 +103,129 @@ where SubSequence: RandomAccessCollection, Indices: RandomAccessCollection
 
   // FIXME(ABI): Associated type inference requires this.
   var endIndex: Index { get }
+
+  /// Returns the position immediately before the given index.
+  ///
+  /// - Parameter i: A valid index of the collection. `i` must be greater than
+  ///   `startIndex`.
+  /// - Returns: The index value immediately before `i`.
+  func index(before i: Index) -> Index
+
+  /// Replaces the given index with its predecessor.
+  ///
+  /// - Parameter i: A valid index of the collection. `i` must be greater than
+  ///   `startIndex`.
+  func formIndex(before i: inout Index)
+
+  /// Returns the position immediately after the given index.
+  ///
+  /// The successor of an index must be well defined. For an index `i` into a
+  /// collection `c`, calling `c.index(after: i)` returns the same index every
+  /// time.
+  ///
+  /// - Parameter i: A valid index of the collection. `i` must be less than
+  ///   `endIndex`.
+  /// - Returns: The index value immediately after `i`.
+  func index(after i: Index) -> Index
+
+  /// Replaces the given index with its successor.
+  ///
+  /// - Parameter i: A valid index of the collection. `i` must be less than
+  ///   `endIndex`.
+  func formIndex(after i: inout Index)
+
+  /// Returns an index that is the specified distance from the given index.
+  ///
+  /// The following example obtains an index advanced four positions from a
+  /// string's starting index and then prints the character at that position.
+  ///
+  ///     let s = "Swift"
+  ///     let i = s.index(s.startIndex, offsetBy: 4)
+  ///     print(s[i])
+  ///     // Prints "t"
+  ///
+  /// The value passed as `distance` must not offset `i` beyond the bounds of
+  /// the collection.
+  ///
+  /// - Parameters:
+  ///   - i: A valid index of the collection.
+  ///   - distance: The distance to offset `i`. `distance` must not be negative
+  ///     unless the collection conforms to the `BidirectionalCollection`
+  ///     protocol.
+  /// - Returns: An index offset by `distance` from the index `i`. If
+  ///   `distance` is positive, this is the same value as the result of
+  ///   `distance` calls to `index(after:)`. If `distance` is negative, this
+  ///   is the same value as the result of `abs(distance)` calls to
+  ///   `index(before:)`.
+  ///
+  /// - Complexity: O(1) if the collection conforms to
+  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the absolute
+  ///   value of `distance`.
+  func index(_ i: Index, offsetBy distance: Int) -> Index
+
+  /// Returns an index that is the specified distance from the given index,
+  /// unless that distance is beyond a given limiting index.
+  ///
+  /// The following example obtains an index advanced four positions from a
+  /// string's starting index and then prints the character at that position.
+  /// The operation doesn't require going beyond the limiting `s.endIndex`
+  /// value, so it succeeds.
+  ///
+  ///     let s = "Swift"
+  ///     if let i = s.index(s.startIndex, offsetBy: 4, limitedBy: s.endIndex) {
+  ///         print(s[i])
+  ///     }
+  ///     // Prints "t"
+  ///
+  /// The next example attempts to retrieve an index six positions from
+  /// `s.startIndex` but fails, because that distance is beyond the index
+  /// passed as `limit`.
+  ///
+  ///     let j = s.index(s.startIndex, offsetBy: 6, limitedBy: s.endIndex)
+  ///     print(j)
+  ///     // Prints "nil"
+  ///
+  /// The value passed as `distance` must not offset `i` beyond the bounds of
+  /// the collection, unless the index passed as `limit` prevents offsetting
+  /// beyond those bounds.
+  ///
+  /// - Parameters:
+  ///   - i: A valid index of the collection.
+  ///   - distance: The distance to offset `i`. `distance` must not be negative
+  ///     unless the collection conforms to the `BidirectionalCollection`
+  ///     protocol.
+  ///   - limit: A valid index of the collection to use as a limit. If
+  ///     `distance > 0`, a limit that is less than `i` has no effect.
+  ///     Likewise, if `distance < 0`, a limit that is greater than `i` has no
+  ///     effect.
+  /// - Returns: An index offset by `distance` from the index `i`, unless that
+  ///   index would be beyond `limit` in the direction of movement. In that
+  ///   case, the method returns `nil`.
+  ///
+  /// - Complexity: O(1) if the collection conforms to
+  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the absolute
+  ///   value of `distance`.
+  func index(
+    _ i: Index, offsetBy distance: Int, limitedBy limit: Index
+  ) -> Index?
+
+  /// Returns the distance between two indices.
+  ///
+  /// Unless the collection conforms to the `BidirectionalCollection` protocol,
+  /// `start` must be less than or equal to `end`.
+  ///
+  /// - Parameters:
+  ///   - start: A valid index of the collection.
+  ///   - end: Another valid index of the collection. If `end` is equal to
+  ///     `start`, the result is zero.
+  /// - Returns: The distance between `start` and `end`. The result can be
+  ///   negative only if the collection conforms to the
+  ///   `BidirectionalCollection` protocol.
+  ///
+  /// - Complexity: O(1) if the collection conforms to
+  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the
+  ///   resulting distance.
+  func distance(from start: Index, to end: Index) -> Int
 }
 
 // TODO: swift-3-indexing-model - Make sure RandomAccessCollection has
