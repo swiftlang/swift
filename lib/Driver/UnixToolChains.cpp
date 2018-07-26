@@ -210,6 +210,9 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
   SmallString<128> StaticRuntimeLibPath;
   getRuntimeLibraryPath(StaticRuntimeLibPath, context.Args, /*Shared=*/false);
 
+  context.Args.AddAllArgs(Arguments, options::OPT_Xlinker);
+  context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
+
   // Add the runtime library link path, which is platform-specific and found
   // relative to the compiler.
   if (!(staticExecutable || staticStdlib) && shouldProvideRPathToLinker()) {
@@ -316,9 +319,6 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
     Arguments.push_back(context.Args.MakeArgString(
         Twine("-u", llvm::getInstrProfRuntimeHookVarName())));
   }
-
-  context.Args.AddAllArgs(Arguments, options::OPT_Xlinker);
-  context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
 
   // Run clang++ in verbose mode if "-v" is set
   if (context.Args.hasArg(options::OPT_v)) {

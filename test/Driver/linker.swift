@@ -43,6 +43,12 @@
 // RUN: %FileCheck %s < %t.complex.txt
 // RUN: %FileCheck -check-prefix COMPLEX %s < %t.complex.txt
 
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-ios7.1 -Xlinker -rpath -Xlinker customrpath %s 2>&1 > %t.simple.txt
+// RUN: %FileCheck -check-prefix IOS-custom-rpath %s < %t.simple.txt
+
+// RUN: %swiftc_driver -driver-print-jobs -target armv7-unknown-linux-gnueabihf -Xlinker -rpath -Xlinker customrpath %s 2>&1 > %t.linux.txt
+// RUN: %FileCheck -check-prefix LINUX-custom-rpath %s < %t.linux.txt
+
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -g %s | %FileCheck -check-prefix DEBUG %s
 
 // RUN: %empty-directory(%t)
@@ -276,6 +282,7 @@
 // LINUX_DYNLIB-x86_64: clang++{{"? }}
 // LINUX_DYNLIB-x86_64-DAG: -shared
 // LINUX_DYNLIB-x86_64-DAG: -fuse-ld=gold
+// LINUX_DYNLIB-x86_64-DAG: -L bar
 // LINUX_DYNLIB-x86_64-NOT: -pie
 // LINUX_DYNLIB-x86_64-DAG: -Xlinker -rpath -Xlinker [[STDLIB_PATH:[^ ]+/lib/swift/linux]]
 // LINUX_DYNLIB-x86_64: [[STDLIB_PATH]]/x86_64/swiftrt.o
@@ -283,8 +290,21 @@
 // LINUX_DYNLIB-x86_64-DAG: @[[AUTOLINKFILE]]
 // LINUX_DYNLIB-x86_64-DAG: [[STDLIB_PATH]]
 // LINUX_DYNLIB-x86_64-DAG: -lswiftCore
-// LINUX_DYNLIB-x86_64-DAG: -L bar
 // LINUX_DYNLIB-x86_64: -o dynlib.out
+
+// IOS-custom-rpath: swift
+// IOS-custom-rpath: -o [[OBJECTFILE:.*]]
+
+// IOS-custom-rpath: bin/ld{{"? }}
+// IOS-custom-rpath: -rpath customrpath
+// IOS-custom-rpath: -rpath [[STDLIB_PATH:[^ ]+/lib/swift/iphonesimulator]]
+
+// LINUX-custom-rpath: swift
+// LINUX-custom-rpath: -o [[OBJECTFILE:.*]]
+
+// LINUX-custom-rpath: clang++{{"? }}
+// LINUX-custom-rpath: -Xlinker -rpath -Xlinker customrpath
+// LINUX-custom-rpath: -Xlinker -rpath -Xlinker [[STDLIB_PATH:[^ ]+/lib/swift/linux]]
 
 // DEBUG: bin/swift
 // DEBUG-NEXT: bin/swift
