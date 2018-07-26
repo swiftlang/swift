@@ -141,7 +141,7 @@ extension BidirectionalCollection {
   ///
   ///     let numbers = [3, 7, 4, -2, 9, -6, 10, 1]
   ///     if let lastNegative = numbers.last(where: { $0 < 0 }) {
-  ///         print("The last negative number is \(firstNegative).")
+  ///         print("The last negative number is \(lastNegative).")
   ///     }
   ///     // Prints "The last negative number is -6."
   ///
@@ -165,7 +165,7 @@ extension BidirectionalCollection {
   /// You can use the predicate to find an element of a type that doesn't
   /// conform to the `Equatable` protocol or to find an element that matches
   /// particular criteria. This example finds the index of the last name that
-  /// begins with the letter "A":
+  /// begins with the letter *A:*
   ///
   ///     let students = ["Kofi", "Abena", "Peter", "Kweku", "Akosua"]
   ///     if let i = students.lastIndex(where: { $0.hasPrefix("A") }) {
@@ -213,7 +213,7 @@ extension BidirectionalCollection where Element : Equatable {
   ///
   /// - Parameter element: An element to search for in the collection.
   /// - Returns: The last index where `element` is found. If `element` is not
-  ///   found in the collection, returns `nil`.
+  ///   found in the collection, this method returns `nil`.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable

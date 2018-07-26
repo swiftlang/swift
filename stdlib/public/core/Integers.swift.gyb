@@ -240,12 +240,12 @@ def operatorComment(operator, fixedWidth):
   ///   - rhs: The value to divide `lhs` by. `rhs` must not be zero.
 """,
         '&+': """\
-  /// Returns the sum of the two given values, discarding any overflow.
+  /// Returns the sum of the two given values, wrapping any overflow.
   ///
-  /// The masking addition operator (`&+`) silently discards any overflow that
+  /// The masking addition operator (`&+`) silently wraps any overflow that
   /// occurs during the operation. In the following example, the sum of `100`
   /// and `121` is greater than the maximum representable `Int8` value, so the
-  /// result is the overflowed value:
+  /// result is the wrapped overflow value:
   ///
   ///     let x: Int8 = 10 &+ 21
   ///     // x == 31
@@ -257,12 +257,12 @@ def operatorComment(operator, fixedWidth):
   ///   - rhs: The second value to add.
 """,
         '&-': """\
-  /// Returns the difference of the two given values, discarding any overflow.
+  /// Returns the difference of the two given values, wrapping any overflow.
   ///
-  /// The masking subtraction operator (`&-`) silently discards any overflow
+  /// The masking subtraction operator (`&-`) silently wraps any overflow
   /// that occurs during the operation. In the following example, the
   /// difference of `10` and `21` is less than zero, the minimum representable
-  /// `UInt` value, so the result is the overflowed value:
+  /// `UInt` value, so the result is the wrapped overflow value:
   ///
   ///     let x: UInt8 = 21 &- 10
   ///     // x == 11
@@ -274,12 +274,12 @@ def operatorComment(operator, fixedWidth):
   ///   - rhs: The value to subtract from `lhs`.
 """,
         '&*': """\
-  /// Returns the product of the two given values, discarding any overflow.
+  /// Returns the product of the two given values, wrapping any overflow.
   ///
-  /// The masking multiplication operator (`&*`) silently discards any overflow
+  /// The masking multiplication operator (`&*`) silently wraps any overflow
   /// that occurs during the operation. In the following example, the product
   /// of `10` and `50` is greater than the maximum representable `Int8` value,
-  /// so the result is the overflowed value:
+  /// so the result is the wrapped overflow value:
   ///
   ///     let x: Int8 = 10 &* 5
   ///     // x == 50
@@ -605,13 +605,13 @@ def assignmentOperatorComment(operator, fixedWidth):
   ///   - rhs: The value to divide `lhs` by. `rhs` must not be zero.
 """,
         '&+': """\
-  /// Adds two values and stores the result in the left-hand-side variable, 
-  /// discarding any overflow.
+  /// Adds two values and stores the result in the left-hand-side variable,
+  /// wrapping any overflow.
   ///
-  /// The masking addition assignment operator (`&+=`) silently discards any 
-  /// overflow that occurs during the operation. In the following example, the 
-  /// sum of `100` and `121` is greater than the maximum representable `Int8` 
-  /// value, so the result is the overflowed value:
+  /// The masking addition assignment operator (`&+=`) silently wraps any
+  /// overflow that occurs during the operation. In the following example, the
+  /// sum of `100` and `121` is greater than the maximum representable `Int8`
+  /// value, so the result is the wrapped overflow value:
   ///
   ///     var x: Int8 = 10
   ///     x &+= 21
@@ -626,12 +626,12 @@ def assignmentOperatorComment(operator, fixedWidth):
 """,
         '&-': """\
   /// Subtracts the second value from the first and stores the difference in the
-  /// left-hand-side variable, discarding any overflow.
+  /// left-hand-side variable, wrapping any overflow.
   ///
-  /// The masking subtraction assignment operator (`&-=`) silently discards any
+  /// The masking subtraction assignment operator (`&-=`) silently wraps any
   /// overflow that occurs during the operation. In the following example, the
   /// difference of `10` and `21` is less than zero, the minimum representable
-  /// `UInt` value, so the result is the overflowed value:
+  /// `UInt` value, so the result is the wrapped overflow value:
   ///
   ///     var x: Int8 = 21
   ///     x &-= 10
@@ -646,12 +646,12 @@ def assignmentOperatorComment(operator, fixedWidth):
 """,
         '&*': """\
   /// Multiplies two values and stores the result in the left-hand-side
-  /// variable, discarding any overflow.
+  /// variable, wrapping any overflow.
   ///
-  /// The masking multiplication assignment operator (`&*=`) silently discards 
-  /// any overflow that occurs during the operation. In the following example, 
-  /// the product of `10` and `50` is greater than the maximum representable 
-  /// `Int8` value, so the result is the overflowed value:
+  /// The masking multiplication assignment operator (`&*=`) silently wraps
+  /// any overflow that occurs during the operation. In the following example,
+  /// the product of `10` and `50` is greater than the maximum representable
+  /// `Int8` value, so the result is the wrapped overflow value:
   ///
   ///     var x: Int8 = 10
   ///     x &*= 5
@@ -1199,6 +1199,14 @@ public protocol SignedNumeric : Numeric {
   ///     var x = 21
   ///     x.negate()
   ///     // x == -21
+  ///
+  /// The resulting value must be representable within the value's type. In
+  /// particular, negating a signed, fixed-width integer type's minimum
+  /// results in a value that cannot be represented.
+  ///
+  ///     var y = Int8.min
+  ///     y.negate()
+  ///     // Overflow error
   mutating func negate()
 }
 
@@ -1235,6 +1243,14 @@ extension SignedNumeric {
   ///     var x = 21
   ///     x.negate()
   ///     // x == -21
+  ///
+  /// The resulting value must be representable within the value's type. In
+  /// particular, negating a signed, fixed-width integer type's minimum
+  /// results in a value that cannot be represented.
+  ///
+  ///     var y = Int8.min
+  ///     y.negate()
+  ///     // Overflow error
   @_transparent
   public mutating func negate() {
     self = 0 - self

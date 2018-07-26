@@ -244,7 +244,7 @@ public struct UnsafePointer<Pointee>: _Pointer {
   ///
   /// Use this method when you have a pointer to memory bound to one type and
   /// you need to access that memory as instances of another type. Accessing
-  /// memory as type `T` requires that the memory be bound to that type. A
+  /// memory as a type `T` requires that the memory be bound to that type. A
   /// memory location may only be bound to one type at a time, so accessing
   /// the same memory as an unrelated type without first rebinding the memory
   /// is undefined.
@@ -279,7 +279,7 @@ public struct UnsafePointer<Pointee>: _Pointer {
   ///   - type: The type to temporarily bind the memory referenced by this
   ///     pointer. The type `T` must be the same size and be layout compatible
   ///     with the pointer's `Pointee` type.
-  ///   - count: The number of instances of `T` to bind to `type`.
+  ///   - count: The number of instances of `Pointee` to bind to `type`.
   ///   - body: A closure that takes a  typed pointer to the
   ///     same memory as this pointer, only bound to type `T`. The closure's
   ///     pointer argument is valid only for the duration of the closure's
@@ -852,7 +852,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   ///
   /// Use this method when you have a pointer to memory bound to one type and
   /// you need to access that memory as instances of another type. Accessing
-  /// memory as type `T` requires that the memory be bound to that type. A
+  /// memory as a type `T` requires that the memory be bound to that type. A
   /// memory location may only be bound to one type at a time, so accessing
   /// the same memory as an unrelated type without first rebinding the memory
   /// is undefined.
@@ -887,7 +887,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   ///   - type: The type to temporarily bind the memory referenced by this
   ///     pointer. The type `T` must be the same size and be layout compatible
   ///     with the pointer's `Pointee` type.
-  ///   - count: The number of instances of `T` to bind to `type`.
+  ///   - count: The number of instances of `Pointee` to bind to `type`.
   ///   - body: A closure that takes a mutable typed pointer to the
   ///     same memory as this pointer, only bound to type `T`. The closure's
   ///     pointer argument is valid only for the duration of the closure's
