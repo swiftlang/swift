@@ -252,7 +252,7 @@ public enum Optional<Wrapped> : ExpressibleByNilLiteral {
   ///
   /// This version is for internal stdlib use; it avoids any checking
   /// overhead for users, even in Debug builds.
-  @usableFromInline @inlinable
+  @inlinable
   internal var _unsafelyUnwrappedUnchecked: Wrapped {
     @inline(__always)
     get {

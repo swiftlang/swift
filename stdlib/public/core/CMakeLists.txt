@@ -125,8 +125,10 @@ set(SWIFTLIB_ESSENTIAL
   StringHashable.swift  # ORDER DEPENDENCY: Must precede String.swift
   String.swift
   StringBridge.swift
+  StringCharacterView.swift
   StringComparable.swift
   StringComparison.swift
+  StringCreate.swift
   StringGuts.swift
   StringGutsVisitor.swift
   StringObject.swift
@@ -140,10 +142,10 @@ set(SWIFTLIB_ESSENTIAL
   StringIndexConversions.swift
   StringNormalization.swift
   StringUnicodeScalarView.swift
-  StringUTF16.swift
-  StringUTF8.swift
+  StringUTF16View.swift
+  StringUTF8View.swift
   StringVariant.swift
-  Substring.swift.gyb
+  Substring.swift
   SwiftNativeNSArray.swift
   ThreadLocalStorage.swift
   UIntBuffer.swift
