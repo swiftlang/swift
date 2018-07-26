@@ -48,12 +48,12 @@ import resilient_struct
 // CHECK-SAME: internal global { %swift.type*, i8* } zeroinitializer, align
 
 // CHECK: @"$S15enum_resilience24EnumWithResilientPayloadOMn" = {{.*}}constant
-//   1310802 == 0x00140052
-//              0x0010      - HasInPlaceMetadataInitialization
-//              0x0014      - IsReflectable
+//    196690 == 0x00030052
+//              0x0002      - InPlaceMetadataInitialization
+//              0x0001      - IsReflectable
 //              0x    0040  - IsUnique
 //              0x    0012  - Enum
-// CHECK-SAME: i32 1310802,
+// CHECK-SAME: i32 196690,
 // CHECK-SAME: @"$S15enum_resilience24EnumWithResilientPayloadOMl"
 // CHECK-SAME: @"$S15enum_resilience24EnumWithResilientPayloadOMf", i32 0, i32 1)
 // CHECK-SAME: @"$S15enum_resilience24EnumWithResilientPayloadOMr"
