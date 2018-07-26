@@ -12,11 +12,11 @@
 
 #include "swift/Driver/ParseableOutput.h"
 
+#include "swift/Basic/FileTypes.h"
 #include "swift/Basic/JSONSerialization.h"
 #include "swift/Basic/TaskQueue.h"
 #include "swift/Driver/Action.h"
 #include "swift/Driver/Job.h"
-#include "swift/Frontend/FileTypes.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Support/raw_ostream.h"
 

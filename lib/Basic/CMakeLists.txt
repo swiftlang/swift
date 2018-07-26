@@ -72,6 +72,7 @@ add_swift_library(swiftBasic STATIC
   Edit.cpp
   EditorPlaceholder.cpp
   FileSystem.cpp
+  FileTypes.cpp
   JSONSerialization.cpp
   LangOptions.cpp
   LLVMContext.cpp

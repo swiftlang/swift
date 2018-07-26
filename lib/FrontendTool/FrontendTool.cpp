@@ -25,7 +25,6 @@
 #include "ReferenceDependencies.h"
 #include "TBD.h"
 
-#include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTScope.h"
 #include "swift/AST/DiagnosticsFrontend.h"
@@ -225,8 +224,8 @@ static bool emitLoadedModuleTraceIfNeeded(ASTContext &ctxt,
     // Decide if this is a swiftmodule based on the extension of the raw
     // dependency path, as the true file may have a different one.
     auto ext = llvm::sys::path::extension(dep);
-    if (ext.startswith(".") &&
-        ext.drop_front() == SERIALIZED_MODULE_EXTENSION) {
+    if (file_types::lookupTypeForExtension(ext) ==
+          file_types::TY_SwiftModuleFile) {
       swiftModules.push_back(realPath);
     }
   }

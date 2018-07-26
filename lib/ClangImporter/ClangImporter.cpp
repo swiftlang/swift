@@ -36,7 +36,6 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Config.h"
-#include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Mangle.h"
 #include "clang/Basic/CharInfo.h"
@@ -419,7 +418,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
   auto languageVersion = ctx.LangOpts.EffectiveLanguageVersion;
 
   if (llvm::sys::path::extension(importerOpts.BridgingHeader)
-          .endswith(PCH_EXTENSION)) {
+          .endswith(file_types::getExtension(file_types::TY_PCH))) {
     invocationArgStrs.insert(invocationArgStrs.end(), {
         "-include-pch", importerOpts.BridgingHeader
     });
@@ -788,7 +787,7 @@ Optional<std::string>
 ClangImporter::getPCHFilename(const ClangImporterOptions &ImporterOptions,
                               StringRef SwiftPCHHash, bool &isExplicit) {
   if (llvm::sys::path::extension(ImporterOptions.BridgingHeader)
-        .endswith(PCH_EXTENSION)) {
+        .endswith(file_types::getExtension(file_types::TY_PCH))) {
     isExplicit = true;
     return ImporterOptions.BridgingHeader;
   }
@@ -879,8 +878,8 @@ ClangImporter::create(ASTContext &ctx,
   for (auto &argStr : invocationArgStrs)
     invocationArgs.push_back(argStr.c_str());
 
-  if (llvm::sys::path::extension(importerOpts.BridgingHeader).endswith(
-        PCH_EXTENSION)) {
+  if (llvm::sys::path::extension(importerOpts.BridgingHeader)
+        .endswith(file_types::getExtension(file_types::TY_PCH))) {
     importer->Impl.setSinglePCHImport(importerOpts.BridgingHeader);
     importer->Impl.IsReadingBridgingPCH = true;
     if (tracker) {
@@ -1289,7 +1288,8 @@ bool ClangImporter::importBridgingHeader(StringRef header, ModuleDecl *adapter,
                                          SourceLoc diagLoc,
                                          bool trackParsedSymbols,
                                          bool implicitImport) {
-  if (llvm::sys::path::extension(header).endswith(PCH_EXTENSION)) {
+  if (llvm::sys::path::extension(header)
+        .endswith(file_types::getExtension(file_types::TY_PCH))) {
     Impl.ImportedHeaderOwners.push_back(adapter);
     // We already imported this with -include-pch above, so we should have
     // collected a bunch of PCH-encoded module imports that we just need to

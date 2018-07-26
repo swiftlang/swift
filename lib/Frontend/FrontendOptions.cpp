@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -130,11 +130,13 @@ void FrontendOptions::forAllOutputPaths(
   }
 }
 
-StringRef
-FrontendOptions::suffixForPrincipalOutputFileForAction(ActionType action) {
+file_types::ID
+FrontendOptions::formatForPrincipalOutputFileForAction(ActionType action) {
+  using namespace file_types;
+
   switch (action) {
   case ActionType::NoneAction:
-    return StringRef();
+    return TY_Nothing;
 
   case ActionType::Parse:
   case ActionType::ResolveImports:
@@ -146,42 +148,46 @@ FrontendOptions::suffixForPrincipalOutputFileForAction(ActionType action) {
   case ActionType::PrintAST:
   case ActionType::DumpScopeMaps:
   case ActionType::DumpTypeRefinementContexts:
-    return StringRef();
+    return TY_Nothing;
 
   case ActionType::EmitPCH:
-    return PCH_EXTENSION;
+    return TY_PCH;
 
   case ActionType::EmitSILGen:
+    return TY_RawSIL;
+
   case ActionType::EmitSIL:
-    return SIL_EXTENSION;
+    return TY_SIL;
 
   case ActionType::EmitSIBGen:
+    return TY_RawSIB;
+
   case ActionType::EmitSIB:
-    return SIB_EXTENSION;
+    return TY_SIB;
 
   case ActionType::MergeModules:
   case ActionType::EmitModuleOnly:
-    return SERIALIZED_MODULE_EXTENSION;
+    return TY_SwiftModuleFile;
 
   case ActionType::Immediate:
   case ActionType::REPL:
     // These modes have no frontend-generated output.
-    return StringRef();
+    return TY_Nothing;
 
   case ActionType::EmitAssembly:
-    return "s";
+    return TY_Assembly;
 
   case ActionType::EmitIR:
-    return "ll";
+    return TY_LLVM_IR;
 
   case ActionType::EmitBC:
-    return "bc";
+    return TY_LLVM_BC;
 
   case ActionType::EmitObject:
-    return "o";
+    return TY_Object;
 
   case ActionType::EmitImportedModules:
-    return "importedmodules";
+    return TY_ImportedModules;
   }
 }
 

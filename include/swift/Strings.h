@@ -18,21 +18,6 @@
 
 namespace swift {
 
-/// The extension for serialized modules.
-constexpr static const char SERIALIZED_MODULE_EXTENSION[] = "swiftmodule";
-/// The extension for serialized documentation comments.
-constexpr static const char SERIALIZED_MODULE_DOC_EXTENSION[] = "swiftdoc";
-/// The extension for PCH files.
-constexpr static const char PCH_EXTENSION[] = "pch";
-/// The extension for replacement map files.
-constexpr static const char REMAP_EXTENSION[] = "remap";
-/// The extension for SIL files.
-constexpr static const char SIL_EXTENSION[] = "sil";
-/// The extension for SIB files.
-constexpr static const char SIB_EXTENSION[] = "sib";
-/// The extension for LLVM IR files.
-constexpr static const char LLVM_BC_EXTENSION[] = "bc";
-constexpr static const char LLVM_IR_EXTENSION[] = "ll";
 /// The name of the standard library, which is a reserved module name.
 constexpr static const char STDLIB_NAME[] = "Swift";
 /// The name of the Onone support library, which is a reserved module name.

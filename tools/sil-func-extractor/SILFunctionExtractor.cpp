@@ -20,7 +20,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-func-extractor"
-#include "swift/Strings.h"
+#include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Demangling/Demangle.h"
@@ -347,10 +347,12 @@ int main(int argc, char **argv) {
       OutputFile = OutputFilename;
     } else if (ModuleName.size()) {
       OutputFile = ModuleName;
-      llvm::sys::path::replace_extension(OutputFile, SIB_EXTENSION);
+      llvm::sys::path::replace_extension(
+          OutputFile, file_types::getExtension(file_types::TY_SIB));
     } else {
       OutputFile = CI.getMainModule()->getName().str();
-      llvm::sys::path::replace_extension(OutputFile, SIB_EXTENSION);
+      llvm::sys::path::replace_extension(
+          OutputFile, file_types::getExtension(file_types::TY_SIB));
     }
 
     SerializationOptions serializationOpts;

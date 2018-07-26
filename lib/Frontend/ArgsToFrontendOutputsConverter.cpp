@@ -117,11 +117,14 @@ OutputFilesComputer::create(const llvm::opt::ArgList &args,
     return None;
   }
 
+  const file_types::ID outputType =
+      FrontendOptions::formatForPrincipalOutputFileForAction(requestedAction);
+
   return OutputFilesComputer(
       diags, inputsAndOutputs, std::move(outputFileArguments),
       outputDirectoryArgument, firstInput, requestedAction,
       args.getLastArg(options::OPT_module_name),
-      FrontendOptions::suffixForPrincipalOutputFileForAction(requestedAction),
+      file_types::getExtension(outputType),
       FrontendOptions::doesActionProduceTextualOutput(requestedAction));
 }
 
@@ -354,36 +357,41 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   using namespace options;
 
   auto dependenciesFilePath = determineSupplementaryOutputFilename(
-      OPT_emit_dependencies, pathsFromArguments.DependenciesFilePath, "d", "",
+      OPT_emit_dependencies, pathsFromArguments.DependenciesFilePath,
+      file_types::TY_Dependencies, "",
       defaultSupplementaryOutputPathExcludingExtension);
 
   auto referenceDependenciesFilePath = determineSupplementaryOutputFilename(
       OPT_emit_reference_dependencies,
-      pathsFromArguments.ReferenceDependenciesFilePath, "swiftdeps", "",
+      pathsFromArguments.ReferenceDependenciesFilePath,
+      file_types::TY_SwiftDeps, "",
       defaultSupplementaryOutputPathExcludingExtension);
 
   auto serializedDiagnosticsPath = determineSupplementaryOutputFilename(
       OPT_serialize_diagnostics, pathsFromArguments.SerializedDiagnosticsPath,
-      "dia", "", defaultSupplementaryOutputPathExcludingExtension);
+      file_types::TY_SerializedDiagnostics, "",
+      defaultSupplementaryOutputPathExcludingExtension);
 
   // There is no non-path form of -emit-fixits-path
   auto fixItsOutputPath = pathsFromArguments.FixItsOutputPath;
 
   auto objcHeaderOutputPath = determineSupplementaryOutputFilename(
-      OPT_emit_objc_header, pathsFromArguments.ObjCHeaderOutputPath, "h", "",
+      OPT_emit_objc_header, pathsFromArguments.ObjCHeaderOutputPath,
+      file_types::TY_ObjCHeader, "",
       defaultSupplementaryOutputPathExcludingExtension);
 
   auto loadedModuleTracePath = determineSupplementaryOutputFilename(
       OPT_emit_loaded_module_trace, pathsFromArguments.LoadedModuleTracePath,
-      "trace.json", "", defaultSupplementaryOutputPathExcludingExtension);
+      file_types::TY_ModuleTrace, "",
+      defaultSupplementaryOutputPathExcludingExtension);
 
   auto tbdPath = determineSupplementaryOutputFilename(
-      OPT_emit_tbd, pathsFromArguments.TBDPath, "tbd", "",
+      OPT_emit_tbd, pathsFromArguments.TBDPath, file_types::TY_TBD, "",
       defaultSupplementaryOutputPathExcludingExtension);
 
   auto moduleDocOutputPath = determineSupplementaryOutputFilename(
       OPT_emit_module_doc, pathsFromArguments.ModuleDocOutputPath,
-      SERIALIZED_MODULE_DOC_EXTENSION, "",
+      file_types::TY_SwiftModuleDocFile, "",
       defaultSupplementaryOutputPathExcludingExtension);
 
   // There is no non-path form of -emit-interface-path
@@ -396,8 +404,8 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
                              mainOutputIfUsableForModule);
 
   auto moduleOutputPath = determineSupplementaryOutputFilename(
-      emitModuleOption, pathsFromArguments.ModuleOutputPath, moduleExtension,
-      mainOutputIfUsableForModule,
+      emitModuleOption, pathsFromArguments.ModuleOutputPath,
+      file_types::TY_SwiftModuleFile, mainOutputIfUsableForModule,
       defaultSupplementaryOutputPathExcludingExtension);
 
   SupplementaryOutputPaths sop;
@@ -429,7 +437,7 @@ StringRef SupplementaryOutputPathsComputer::
 
 std::string
 SupplementaryOutputPathsComputer::determineSupplementaryOutputFilename(
-    options::ID emitOpt, std::string pathFromArguments, StringRef extension,
+    options::ID emitOpt, std::string pathFromArguments, file_types::ID type,
     StringRef mainOutputIfUsable,
     StringRef defaultSupplementaryOutputPathExcludingExtension) const {
 
@@ -444,7 +452,7 @@ SupplementaryOutputPathsComputer::determineSupplementaryOutputFilename(
   }
 
   llvm::SmallString<128> path(defaultSupplementaryOutputPathExcludingExtension);
-  llvm::sys::path::replace_extension(path, extension);
+  llvm::sys::path::replace_extension(path, file_types::getExtension(type));
   return path.str().str();
 };
 
@@ -464,7 +472,8 @@ void SupplementaryOutputPathsComputer::deriveModulePathParameters(
       RequestedAction == FrontendOptions::ActionType::MergeModules ||
       RequestedAction == FrontendOptions::ActionType::EmitModuleOnly || isSIB;
 
-  extension = isSIB ? SIB_EXTENSION : SERIALIZED_MODULE_EXTENSION;
+  extension = file_types::getExtension(
+      isSIB ? file_types::TY_SIB : file_types::TY_SwiftModuleFile);
 
   mainOutputIfUsable =
       canUseMainOutputForModule && !OutputFiles.empty() ? OutputFiles[0] : "";
