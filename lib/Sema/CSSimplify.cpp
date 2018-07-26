@@ -499,6 +499,15 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
         auto fromArgIdx = boundArgIdx;
         auto toArgIdx = argIdx;
 
+        // If there is no re-ordering going on, and index is past
+        // the number of parameters, it could only mean that this
+        // is variadic parameter, so let's just move on.
+        if (fromArgIdx == toArgIdx && toArgIdx >= params.size()) {
+          assert(args[fromArgIdx].getLabel().empty());
+          argIdx++;
+          continue;
+        }
+
         // First let's double check if out-of-order argument is nothing
         // more than a simple label mismatch, because in situation where
         // one argument requires label and another one doesn't, but caller
@@ -692,6 +701,40 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
   return std::make_tuple(nullptr, 0, argLabels, hasTrailingClosure);
 }
 
+class ArgumentFailureTracker : public MatchCallArgumentListener {
+  ConstraintSystem &CS;
+  ConstraintLocatorBuilder Locator;
+
+public:
+  ArgumentFailureTracker(ConstraintSystem &cs, ConstraintLocatorBuilder locator)
+    : CS(cs), Locator(locator) {}
+
+  bool missingLabel(unsigned paramIndex) override {
+    return !CS.shouldAttemptFixes();
+  }
+
+  bool extraneousLabel(unsigned paramIndex) override {
+    return !CS.shouldAttemptFixes();
+  }
+
+  bool incorrectLabel(unsigned paramIndex) override {
+    return !CS.shouldAttemptFixes();
+  }
+
+  bool relabelArguments(ArrayRef<Identifier> newLabels) override {
+    if (!CS.shouldAttemptFixes())
+      return true;
+
+    auto *anchor = Locator.getBaseLocator()->getAnchor();
+    if (!anchor || !isa<CallExpr>(anchor))
+      return true;
+
+    CS.recordFix(Fix::fixArgumentLabels(CS, newLabels),
+                 CS.getConstraintLocator(anchor));
+    return false;
+  }
+};
+
 // Match the argument of a call to the parameter.
 static ConstraintSystem::TypeMatchResult
 matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
@@ -747,7 +790,7 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
   auto args = decomposeArgType(argType, argLabels);
   
   // Match up the call arguments to the parameters.
-  MatchCallArgumentListener listener;
+  ArgumentFailureTracker listener(cs, locator);
   SmallVector<ParamBinding, 4> parameterBindings;
   if (constraints::matchCallArguments(args, params,
                                       defaultMap,
@@ -4910,6 +4953,7 @@ ConstraintSystem::simplifyFixConstraint(Fix fix, Type type1, Type type2,
   case FixKind::ExplicitlyEscaping:
   case FixKind::ExplicitlyEscapingToAny:
   case FixKind::CoerceToCheckedCast:
+  case FixKind::RelabelArguments:
     llvm_unreachable("handled elsewhere");
   }
 
