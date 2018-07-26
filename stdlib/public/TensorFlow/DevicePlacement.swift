@@ -14,20 +14,25 @@
 //
 //===----------------------------------------------------------------------===//
 
-// If `serverAddress` is nil, use local session (good for forge testing).
-//
+/// Executes code in the current scope on GPU.
+///
+/// - Parameter serverAddress: The address to the TPU server where a remote
+///   session is alive. If `nil`, use a local session.
+///
 // FIXME: We need transparent here because deabstraction isn't inlining this
 // function.  We need to inline if a callee contains tensor ops, not only if
 // it takes and returns a TensorFlow value.
 @_transparent
-public func enableTPU(serverAddress: String? = nil, infeed: Bool = true) {
+public func enableTPU(serverAddress: String? = nil) {
   _RuntimeConfig.executionMode = .tpu
   if let serverAddress = serverAddress {
     _RuntimeConfig.session = .remote(grpcAddress: serverAddress)
   }
-  #tfop("tfc.configureTPU", enableInfeed: infeed) as Void
+  #tfop("tfc.configureTPU", enableInfeed: true) as Void
 }
 
+/// Executes code in the current scope on GPU.
+///
 // FIXME: Extend the interface to support multiple GPU devices, and unify it
 // with enableTPU() above.
 @_transparent
@@ -35,11 +40,12 @@ public func enableGPU() {
   #tfop("tfc.configureGPU") as Void
 }
 
-// Executes a closure on GPU.
-//
-// - Parameter body: The closure to execute.
-// - Throws: The error that the body throws, if any.
-// - Returns: The value returned by the closure, if any.
+/// Executes a closure on GPU.
+///
+/// - Parameter body: The closure to execute.
+/// - Throws: The error that the body throws, if any.
+/// - Returns: The value returned by the closure, if any.
+///
 @inlinable @inline(__always)
 public func withGPU<Result>(
   execute body: () throws -> Result
