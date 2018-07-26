@@ -7498,6 +7498,11 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     cs.setType(apply, fnType->getResult());
     apply->setIsSuper(isSuper);
 
+    // We need the layout of nominal types returned from a function call.
+    if (auto nominalResult = fnType->getResult()->getAnyNominal()) {
+      tc.requestNominalLayout(nominalResult);
+    }
+
     cs.setExprTypes(apply);
     Expr *result = tc.substituteInputSugarTypeForResult(apply);
     cs.cacheExprTypes(result);
