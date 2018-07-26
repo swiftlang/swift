@@ -1764,6 +1764,10 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   case tok::pound_gradient:
     return parseExprGradientBody(ExprKind::Gradient);
     break;
+      
+  case tok::pound_chainableGradient:
+    return parseExprGradientBody(ExprKind::ChainableGradient);
+    break;
 
   case tok::pound_valueAndGradient:
     return parseExprGradientBody(ExprKind::ValueAndGradient);

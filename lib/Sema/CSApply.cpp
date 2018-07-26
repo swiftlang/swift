@@ -2439,6 +2439,10 @@ namespace {
     Expr *visitGradientExpr(GradientExpr *expr) {
       return handleReverseAutoDiffExpr(expr, /*preservingOriginalResult=*/false);
     }
+    
+    Expr *visitChainableGradientExpr(ChainableGradientExpr *expr) {
+      llvm_unreachable("Unhandled");
+    }
 
     Expr *visitValueAndGradientExpr(ValueAndGradientExpr *expr) {
       return handleReverseAutoDiffExpr(expr, /*preservingOriginalResult=*/true);
