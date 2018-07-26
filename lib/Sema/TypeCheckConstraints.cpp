@@ -2106,11 +2106,20 @@ bool TypeChecker::typeCheckCompletionSequence(Expr *&expr, DeclContext *DC) {
   expr = foldSequence(SE, DC);
 
   // Find the code-completion expression and operator again.
-  BinaryExpr *exprAsBinOp = nullptr;
-  while (auto *binExpr = dyn_cast<BinaryExpr>(expr)) {
-    auto *RHS = binExpr->getArg()->getElement(1);
+  Expr *exprAsBinOp = nullptr;
+  while (true) {
+    Expr *RHS;
+    if (auto *binExpr = dyn_cast<BinaryExpr>(expr))
+      RHS = binExpr->getArg()->getElement(1);
+    else if (auto *assignExpr = dyn_cast<AssignExpr>(expr))
+      RHS = assignExpr->getSrc();
+    else if (auto *ifExpr = dyn_cast<IfExpr>(expr))
+      RHS = ifExpr->getElseExpr();
+    else
+      break;
+
     if (RHS == CCE) {
-      exprAsBinOp = binExpr;
+      exprAsBinOp = expr;
       break;
     }
     expr = RHS;
@@ -2119,7 +2128,7 @@ bool TypeChecker::typeCheckCompletionSequence(Expr *&expr, DeclContext *DC) {
     return true;
 
   // Ensure the output expression is up to date.
-  assert(exprAsBinOp == expr && "found wrong expr?");
+  assert(exprAsBinOp == expr && isa<BinaryExpr>(expr) && "found wrong expr?");
 
   // Add type variable for the code-completion expression.
   auto tvRHS =
