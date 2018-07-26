@@ -1573,7 +1573,7 @@ GLStatus TFGraphLowering::createDatasetCreationContext(
   // Even when this built-in returns multiple tensors, they are always presented
   // by a single tuple.
   std::vector<TF_DataType> outputTypes;
-  for (const SILValue& result : inst->getResults()) {
+  for (const SILValue &result : inst->getResults()) {
     auto outputType = result->getType().getASTType();
     auto tfType = getTFDataTypeFromTensorGenericType(outputType);
     if (tfType == 0) {
