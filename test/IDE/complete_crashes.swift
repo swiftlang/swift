@@ -308,7 +308,7 @@ func test_28188259(x: ((Int) -> Void) -> Void) {
 func test_40956846(
   arg_40956846_1: inout Int!,
   arg_40956846_2: Void!,
-  arg_40956846_3: (() -> Int)!,
+  arg_40956846_3: (() -> Int?)!,
   arg_40956846_4: inout ((Int) -> Int)!
 ) {
   let y = #^RDAR_40956846^#
@@ -316,9 +316,19 @@ func test_40956846(
 // RDAR_40956846: Begin completions
 // RDAR_40956846-DAG: Decl[LocalVar]/Local:               arg_40956846_1[#inout Int!#]; name=arg_40956846_1
 // RDAR_40956846-DAG: Decl[LocalVar]/Local:               arg_40956846_2[#Void!#]; name=arg_40956846_2
-// RDAR_40956846-DAG: Decl[LocalVar]/Local:               arg_40956846_3[#(() -> Int)!#]; name=arg_40956846_3
+// RDAR_40956846-DAG: Decl[LocalVar]/Local:               arg_40956846_3[#(() -> Int?)!#]; name=arg_40956846_3
 // RDAR_40956846-DAG: Decl[LocalVar]/Local:               arg_40956846_4[#inout ((Int) -> Int)!#]; name=arg_40956846_4
 // RDAR_40956846: End completions
+
+// rdar://problem/42443512
+// RUN: %target-swift-ide-test -code-completion -code-completion-token=RDAR_42443512 -source-filename=%s | %FileCheck %s -check-prefix=RDAR_42443512
+class test_42443512 {
+  func foo(x: Int!) { }
+  static func test() {
+    self.foo#^RDAR_42443512^#
+  }
+}
+// RDAR_42443512: Begin completions
 
 // rdar://problem/42452085
 // RUN: %target-swift-ide-test -code-completion -code-completion-token=RDAR_42452085_1 -source-filename=%s | %FileCheck %s -check-prefix=RDAR_42452085
