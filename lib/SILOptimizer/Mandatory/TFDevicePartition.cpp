@@ -881,7 +881,8 @@ class DevicePartitionerImpl
           GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
 
       auto loc = inst->getLoc();
-      SILBuilder B(inst);
+      // Insert the transfer right after the operandInst.
+      SILBuilder B(std::next(operandInst->getIterator()));
       auto &ctx = B.getASTContext();
 
       auto &allocator = ctx.getAllocator();
