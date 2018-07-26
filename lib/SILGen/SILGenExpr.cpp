@@ -3679,6 +3679,16 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
       }
     }
   }
+  
+  auto isSettableInComponent = [&]() -> bool {
+    // For storage we reference by a property descriptor, the descriptor will
+    // supply the settability if needed. We only reference it here if the
+    // setter is public.
+    if (shouldUseExternalKeyPathComponent())
+      return storage->isSettable(M.getSwiftModule())
+        && storage->isSetterAccessibleFrom(M.getSwiftModule());
+    return storage->isSettable(storage->getDeclContext());
+  };
 
   if (auto var = dyn_cast<VarDecl>(storage)) {
     CanType componentTy;
@@ -3729,7 +3739,7 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
                {},
                baseTy, componentTy);
       
-      if (var->isSettable(var->getDeclContext())) {
+      if (isSettableInComponent()) {
         auto setter = getOrCreateKeyPathSetter(*this, loc,
                var, subs,
                needsGenericContext ? genericEnv : nullptr,
@@ -3783,7 +3793,7 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
              baseTy, componentTy);
   
     auto indexPatternsCopy = getASTContext().AllocateCopy(indexPatterns);
-    if (decl->isSettable()) {
+    if (isSettableInComponent()) {
       auto setter = getOrCreateKeyPathSetter(*this, loc,
              decl, subs,
              needsGenericContext ? genericEnv : nullptr,
