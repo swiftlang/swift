@@ -38,6 +38,7 @@ set(SOURCES
   CompilerRuntime.swift
   CompositeMath.swift
   DataTypes.swift
+  DevicePlacement.swift
   Gradients.swift
   OpaqueHandles.swift
   Ops.swift

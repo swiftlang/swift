@@ -27,6 +27,16 @@ public func explicitDeviceConfigGPU() {
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}explicitDeviceConfigGPU{{.*}}
 // CHECK: graph_op "Const"() {dtype$dtype: $Builtin.FPIEEE32, value$tensor: f32 0x3F800000 /* 1 */, __device: "ALL_DEVICES"
 
+public func closureDeviceConfigGPU() {
+  withGPU {
+    let x = Tensor<Float>(1.0)
+    _hostOp(x)
+  }
+}
+
+// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}closureDeviceConfigGPU{{.*}}
+// CHECK: graph_op "Const"() {dtype$dtype: $Builtin.FPIEEE32, value$tensor: f32 0x3F800000 /* 1 */, __device: "ALL_DEVICES"
+
 // Check that in the TF graph, both the function node itself, and ops in the
 // function, are placed on GPU.
 //
