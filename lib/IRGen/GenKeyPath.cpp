@@ -910,17 +910,30 @@ emitKeyPathComponent(IRGenModule &IGM,
         idValue = IGM.getAddrOfObjCSelectorRef(declRef);
         idResolved = false;
       } else {
-        idKind = KeyPathComponentHeader::VTableOffset;
+        if (auto overridden = declRef.getOverriddenVTableEntry())
+          declRef = overridden;
+
         auto dc = declRef.getDecl()->getDeclContext();
+
+        // If the method context is resilient, use the dispatch thunk as a
+        // stable identifier for the storage.
+        if (IGM.isResilient(cast<NominalTypeDecl>(dc),
+                            ResilienceExpansion::Minimal)) {
+          idKind = KeyPathComponentHeader::Pointer;
+          idValue = IGM.getAddrOfDispatchThunk(declRef, NotForDefinition);
+          idResolved = true;
+          break;
+        }
+      
+        idKind = KeyPathComponentHeader::VTableOffset;
         if (isa<ClassDecl>(dc) && !cast<ClassDecl>(dc)->isForeign()) {
-          auto overridden = declRef.getOverriddenVTableEntry();
           auto declaringClass =
-            cast<ClassDecl>(overridden.getDecl()->getDeclContext());
+            cast<ClassDecl>(declRef.getDecl()->getDeclContext());
           auto &metadataLayout = IGM.getClassMetadataLayout(declaringClass);
           // FIXME: Resilience. We don't want vtable layout to be ABI, so this
           // should be encoded as a reference to the method dispatch thunk
           // instead.
-          auto offset = metadataLayout.getStaticMethodOffset(overridden);
+          auto offset = metadataLayout.getStaticMethodOffset(declRef);
           idValue = llvm::ConstantInt::get(IGM.SizeTy, offset.getValue());
           idResolved = true;
         } else if (auto methodProto = dyn_cast<ProtocolDecl>(dc)) {

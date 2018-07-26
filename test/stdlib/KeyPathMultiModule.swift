@@ -23,6 +23,22 @@ func expectEqualWithHashes<T: Hashable>(_ x: T, _ y: T,
   expectEqual(x.hashValue, y.hashValue, file: file, line: line)
 }
 
+class LocalSub: ResilientSub {
+  override var virtual: String {
+    get {
+      return "bas"
+    }
+    set {
+    }
+  }
+
+  final var storedD: String = "zim"
+
+  var localSub: String {
+    get { return "zang" }
+  }
+}
+
 keyPathMultiModule.test("identity across multiple modules") {
   // Do this twice, to ensure that fully constant key paths remain stable
   // after one-time instantiation of the object
@@ -45,7 +61,6 @@ keyPathMultiModule.test("identity across multiple modules") {
                 \A.[withGenericPrivateSet: 0])
     expectEqualWithHashes(A_subscript_withGenericPrivateSet_keypath(index: "butt"),
                 \A.[withGenericPrivateSet: "butt"])
-
 
     do {
       let lifetimeTracker = LifetimeTracked(679)
@@ -130,6 +145,51 @@ keyPathMultiModule.test("identity across multiple modules") {
                          appending: \String.appendTest)
     testInGenericContext(x: LifetimeTracked(17), y: LifetimeTracked(38),
                          appending: \LifetimeTracked.appendTest)
+
+    expectEqualWithHashes(ResilientRoot_storedA_keypath(),
+                          \ResilientRoot.storedA)
+    expectEqualWithHashes(ResilientRoot_storedB_keypath(),
+                          \ResilientRoot.storedB)
+    expectEqualWithHashes(ResilientRoot_virtual_keypath(),
+                          \ResilientRoot.virtual)
+    expectEqualWithHashes(ResilientRoot_virtualRO_keypath(),
+                          \ResilientRoot.virtualRO)
+    expectEqualWithHashes(ResilientRoot_final_keypath(),
+                          \ResilientRoot.final)
+    expectEqualWithHashes(ResilientSub_storedA_keypath(),
+                          \ResilientSub.storedA)
+    expectEqualWithHashes(ResilientSub_storedB_keypath(),
+                          \ResilientSub.storedB)
+    expectEqualWithHashes(ResilientSub_storedC_keypath(),
+                          \ResilientSub.storedC)
+    expectEqualWithHashes(ResilientSub_virtual_keypath(),
+                          \ResilientSub.virtual)
+    expectEqualWithHashes(ResilientSub_virtualRO_keypath(),
+                          \ResilientSub.virtualRO)
+    expectEqualWithHashes(ResilientSub_final_keypath(),
+                          \ResilientSub.final)
+    expectEqualWithHashes(ResilientSub_sub_keypath(),
+                          \ResilientSub.sub)
+    expectEqualWithHashes(ResilientSub_subRO_keypath(),
+                          \ResilientSub.subRO)
+
+    // Ensure that we can instantiate key paths on a local subclass of a
+    // resilient class.
+    expectEqual(\LocalSub.storedA, \LocalSub.storedA)
+    expectEqual(\LocalSub.storedB, \LocalSub.storedB)
+    expectEqual(\LocalSub.storedC, \LocalSub.storedC)
+    //TODO expectEqual(\LocalSub.storedD, \LocalSub.storedD)
+    expectEqual(\LocalSub.virtual, \LocalSub.virtual)
+    //TODO expectEqual(\LocalSub.localSub, \LocalSub.localSub)
+
+    func testInGenericContext2<W: ResilientSubProto>(_: W.Type) {
+      expectEqualWithHashes(ResilientRootProto_root_keypath(W.self),
+                            \W.root)
+      expectEqualWithHashes(ResilientSubProto_sub_keypath(W.self),
+                            \W.sub)
+    }
+
+    testInGenericContext2(Int.self)
   }
 }
 
