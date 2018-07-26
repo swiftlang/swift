@@ -12,6 +12,7 @@
 
 #include "swift/Frontend/FileTypes.h"
 
+#include "swift/Strings.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/ErrorHandling.h"

@@ -13,6 +13,7 @@
 #ifndef SWIFT_FRONTEND_FRONTENDOPTIONS_H
 #define SWIFT_FRONTEND_FRONTENDOPTIONS_H
 
+#include "swift/Frontend/FileTypes.h"
 #include "swift/Frontend/FrontendInputsAndOutputs.h"
 #include "swift/Frontend/InputFile.h"
 #include "llvm/ADT/Hashing.h"
@@ -312,7 +313,7 @@ public:
   static bool doesActionProduceOutput(ActionType);
   static bool doesActionProduceTextualOutput(ActionType);
   static bool needsProperModuleName(ActionType);
-  static StringRef suffixForPrincipalOutputFileForAction(ActionType);
+  static file_types::ID formatForPrincipalOutputFileForAction(ActionType);
 };
 
 }

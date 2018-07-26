@@ -22,6 +22,7 @@
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/LLVMContext.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
+#include "swift/Frontend/FileTypes.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
@@ -452,10 +453,12 @@ int main(int argc, char **argv) {
       OutputFile = OutputFilename;
     } else if (ModuleName.size()) {
       OutputFile = ModuleName;
-      llvm::sys::path::replace_extension(OutputFile, SIB_EXTENSION);
+      llvm::sys::path::replace_extension(
+          OutputFile, file_types::getExtension(file_types::TY_SIB));
     } else {
       OutputFile = CI.getMainModule()->getName().str();
-      llvm::sys::path::replace_extension(OutputFile, SIB_EXTENSION);
+      llvm::sys::path::replace_extension(
+          OutputFile, file_types::getExtension(file_types::TY_SIB));
     }
 
     SerializationOptions serializationOpts;
