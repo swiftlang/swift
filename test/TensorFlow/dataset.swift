@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -O -emit-sil -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-strict-deabstraction -O -emit-sil -verify %s | %FileCheck %s --check-prefix=STRICTDA
 import TensorFlow
 
 public func testDatasetWithFakeData() {
@@ -18,6 +19,12 @@ public func testDatasetWithFakeData() {
 // CHECK:        [[GETNEXT:%[0-9]+]] = builtin "__tfop_tfc.makeIteratorGetNextWithDatasets{{.*}} : $TensorHandle<Float>
 // CHECK:        [[RESULT:%[0-9]+]] = builtin "__tfop_Add,$in,$in,T,__device"([[GETNEXT]] : $TensorHandle<Float>, {{.*}} : $TensorHandle<Float>
 // CHECK-NEXT:   return [[RESULT]] : $TensorHandle<Float>
+
+// STRICTDA-LABEL: --- TFPartition Accelerator Result: {{.*}}testDatasetWithFakeData{{.*}}
+// STRICTDA: bb0:
+// STRICTDA:        [[GETNEXT:%[0-9]+]] = graph_op "tfc.makeIteratorGetNextWithDatasets{{.*}} : $TensorHandle<Float>
+// STRICTDA:        [[RESULT:%[0-9]+]] = graph_op "Add,i,i"([[GETNEXT]] : $TensorHandle<Float>, {{.*}} : $TensorHandle<Float>
+// STRICTDA-NEXT:   return [[RESULT]] : $TensorHandle<Float>
 
 public func testDatasetWithMNIST() {
   TensorFlow.enableTPU(infeed: true)
@@ -47,6 +54,14 @@ public func testDatasetWithMNIST() {
 // CHECK:  [[RESULT:%.*]] = tuple ({{.*}} : $TensorHandle<{{.*}}>, {{.*}} : $TensorHandle<{{.*}}>)
 // CHECK-NEXT:  return [[RESULT]] : $(TensorHandle<{{.*}}>, TensorHandle<{{.*}}>)
 
+// STRICTDA-LABEL: --- TFPartition Accelerator Result: {{.*}}testDatasetWithMNIST{{.*}}
+// STRICTDA: bb0:
+// STRICTDA:  (%0, %1) = graph_op "tfc.makeIteratorGetNextWithDatasets{{.*}} : $TensorHandle<Float>, $TensorHandle<Int32>
+// STRICTDA: graph_op "Add,i,i"(
+// STRICTDA: graph_op "Add,i,i"(
+// The operands can appear in arbitrary order here.
+// STRICTDA:  [[RESULT:%.*]] = tuple ({{.*}} : $TensorHandle<{{.*}}>, {{.*}} : $TensorHandle<{{.*}}>)
+// STRICTDA-NEXT:  return [[RESULT]] : $(TensorHandle<{{.*}}>, TensorHandle<{{.*}}>)
 
 // Creates a dataset, which produces one float scalar value in each get next
 // call.
@@ -79,6 +94,16 @@ public func createMockDataSet() -> VariantHandle {
 // CHECK-NEXT:        name: "op_createmockdataset{{.*}}"
 // CHECK-NEXT:        type: DT_VARIANT
 // CHECK-NEXT:      }
+
+// STRICTDA-LABEL: --- TFPartition Accelerator Result: {{.*}}createMockDataSet{{.*}}
+// STRICTDA-NOT:   node {
+// STRICTDA:       function {
+// STRICTDA-NEXT:    signature {
+// STRICTDA-NEXT:      name: "{{.*}}createMockDataSet{{.*}}.tf_only"
+// STRICTDA:           output_arg {
+// STRICTDA-NEXT:        name: "op_createmockdataset{{.*}}"
+// STRICTDA-NEXT:        type: DT_VARIANT
+// STRICTDA-NEXT:      }
 
 // TODO: support taking the following function typed parameter.
 // _ datasetCreator : @convention(tensorflow) () -> VariantHandle
@@ -125,3 +150,14 @@ public func model() {
 // CHECK:       function {
 // CHECK:       function {
 // CHECK-NOT:   function {
+
+// STRICTDA-LABEL: --- TFPartition Accelerator Result: {{.*}}model{{.*}}
+// STRICTDA:      node {
+// STRICTDA-NEXT:   name: "{{.*}}model{{.*}}"
+// STRICTDA-NEXT:   op: "{{.*}}model{{.*}}.tf_CPU.device_partition"
+// STRICTDA:      node {
+// STRICTDA-NEXT:  name: "tfc_output_0_{{.*}}model{{.*}}"
+
+// STRICTDA:       function {
+// STRICTDA:       function {
+// STRICTDA-NOT:   function {
