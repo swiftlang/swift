@@ -701,7 +701,7 @@ int doSerializeRawTree(const char *MainExecutablePath,
     [](SourceFile *SF, SyntaxParsingCache *SyntaxCache) -> int {
     auto SerializeTree = [](llvm::raw_ostream &os, RC<RawSyntax> Root,
                             SyntaxParsingCache *SyntaxCache) {
-      std::unordered_set<unsigned> ReusedNodeIds = {};
+      std::unordered_set<unsigned> ReusedNodeIds;
       if (options::IncrementalSerialization && SyntaxCache) {
         ReusedNodeIds = SyntaxCache->getReusedNodeIds();
       }
