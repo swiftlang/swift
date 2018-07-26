@@ -14,44 +14,20 @@
 #include "GlobalLoopARCSequenceDataflow.h"
 #include "ARCRegionState.h"
 #include "RCStateTransitionVisitors.h"
+#include "swift/SIL/CFG.h"
+#include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILSuccessor.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
-#include "swift/SIL/SILInstruction.h"
-#include "swift/SIL/SILFunction.h"
-#include "swift/SIL/SILSuccessor.h"
-#include "swift/SIL/CFG.h"
-#include "swift/SIL/SILModule.h"
+#include "swift/SILOptimizer/Utils/LoopUtils.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
-
-//===----------------------------------------------------------------------===//
-//                                  Utility
-//===----------------------------------------------------------------------===//
-
-/// Returns true if it is defined to perform a bottom up from \p Succ to \p
-/// Pred.
-///
-/// This is interesting because in such cases, we must pessimistically assume
-/// that we are merging in the empty set from Succ into Pred or vis-a-versa.
-static bool isDefinedMerge(const LoopRegion *Succ, const LoopRegion *Pred) {
-  // If the predecessor region is an unknown control flow edge tail, the
-  // dataflow that enters into the region bottom up is undefined in our model.
-  if (Pred->isUnknownControlFlowEdgeTail())
-    return false;
-
-  // If the successor region is an unknown control flow edge head, the dataflow
-  // that leaves the region bottom up is considered to be undefined in our
-  // model.
-  if (Succ->isUnknownControlFlowEdgeHead())
-    return false;
-
-  // Otherwise it is defined to perform the merge.
-  return true;
-}
 
 //===----------------------------------------------------------------------===//
 //                             Top Down Dataflow

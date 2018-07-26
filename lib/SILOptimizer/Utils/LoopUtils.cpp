@@ -18,6 +18,7 @@
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SILOptimizer/Analysis/LoopRegionAnalysis.h"
 #include "swift/SILOptimizer/Utils/CFG.h"
 #include "llvm/Support/Debug.h"
 
@@ -269,6 +270,22 @@ bool swift::canonicalizeAllLoops(DominanceInfo *DT, SILLoopInfo *LI) {
   }
 
   return MadeChange;
+}
+
+bool swift::isDefinedMerge(const LoopRegion *Succ, const LoopRegion *Pred) {
+  // If the predecessor region is an unknown control flow edge tail, the
+  // dataflow that enters into the region bottom up is undefined in our model.
+  if (Pred->isUnknownControlFlowEdgeTail())
+    return false;
+
+  // If the successor region is an unknown control flow edge head, the dataflow
+  // that leaves the region bottom up is considered to be undefined in our
+  // model.
+  if (Succ->isUnknownControlFlowEdgeHead())
+    return false;
+
+  // Otherwise it is defined to perform the merge.
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
