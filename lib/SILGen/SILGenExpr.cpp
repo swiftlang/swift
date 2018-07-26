@@ -480,6 +480,7 @@ namespace {
                                               SGFContext C);
     // SWIFT_ENABLE_TENSORFLOW
     RValue visitGradientExpr(GradientExpr *E, SGFContext C);
+    RValue visitChainableGradientExpr(ChainableGradientExpr *E, SGFContext C);
     RValue visitValueAndGradientExpr(ValueAndGradientExpr *E, SGFContext C);
     RValue visitAdjointExpr(AdjointExpr *E, SGFContext C);
     RValue visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C);
@@ -2822,6 +2823,11 @@ static RValue emitGradientInst(RValueEmitter &RVE, const SGFContext &C,
 RValue RValueEmitter::
 visitGradientExpr(GradientExpr *E, SGFContext C) {
   return emitGradientInst(*this, C, E);
+}
+
+RValue RValueEmitter::
+visitChainableGradientExpr(ChainableGradientExpr *E, SGFContext C) {
+  return emitGradientInst(*this, C, E, SILGradientFlags::Seedable);
 }
 
 RValue RValueEmitter::

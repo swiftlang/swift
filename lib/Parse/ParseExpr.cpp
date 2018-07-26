@@ -1764,6 +1764,10 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   case tok::pound_gradient:
     return parseExprGradientBody(ExprKind::Gradient);
     break;
+      
+  case tok::pound_chainableGradient:
+    return parseExprGradientBody(ExprKind::ChainableGradient);
+    break;
 
   case tok::pound_valueAndGradient:
     return parseExprGradientBody(ExprKind::ValueAndGradient);
@@ -3663,7 +3667,8 @@ ParserResult<Expr> Parser::parseExprTypeOf() {
 ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
   SyntaxParsingContext GradientContext(SyntaxContext, SyntaxKind::GradientExpr);
 
-  assert(Tok.is(tok::pound_gradient) || Tok.is(tok::pound_valueAndGradient));
+  assert(Tok.isAny(tok::pound_gradient, tok::pound_valueAndGradient,
+                   tok::pound_chainableGradient));
   auto poundGradLoc = consumeToken();
   SourceLoc lParenLoc;
   SourceLoc rParenLoc;
@@ -3672,6 +3677,9 @@ ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
   switch (kind) {
   case ExprKind::Gradient:
     exprName = "#gradient";
+    break;
+  case ExprKind::ChainableGradient:
+    exprName = "#chainableGradient";
     break;
   case ExprKind::ValueAndGradient:
     exprName = "#valueAndGradient";
@@ -3763,6 +3771,11 @@ ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
     result = GradientExpr::create(Context, poundGradLoc, lParenLoc,
                                   originalFnParseResult.get(), params,
                                   rParenLoc);
+    break;
+  case ExprKind::ChainableGradient:
+    result = ChainableGradientExpr::create(Context, poundGradLoc, lParenLoc,
+                                           originalFnParseResult.get(), params,
+                                           rParenLoc);
     break;
   case ExprKind::ValueAndGradient:
     result = ValueAndGradientExpr::create(Context, poundGradLoc, lParenLoc,
