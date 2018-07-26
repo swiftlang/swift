@@ -114,9 +114,7 @@ public:
       : evaluator(evaluator), fn(fn), substitutionMap(substitutionMap),
         numInstEvaluated(numInstEvaluated) {}
 
-  void eraseValue(SILValue value) {
-    calculatedValues.erase(value);
-  }
+  void eraseValue(SILValue value) { calculatedValues.erase(value); }
 
   void setValue(SILValue value, SymbolicValue symVal) {
     calculatedValues.insert({value, symVal});
@@ -1490,9 +1488,9 @@ void ConstExprEvaluator::computeConstantValues(
 ///
 /// Some constant values are not supported. Does nothing and returns nullptr for
 /// unsupported values.
-static SingleValueInstruction *
-emitConstantInst(SymbolicValue symVal, SILType type, SILLocation loc,
-                        SILBuilder &B) {
+static SingleValueInstruction *emitConstantInst(SymbolicValue symVal,
+                                                SILType type, SILLocation loc,
+                                                SILBuilder &B) {
   assert(symVal.isConstant() && "Not a constant value");
 
   switch (symVal.getKind()) {
@@ -1519,11 +1517,11 @@ emitConstantInst(SymbolicValue symVal, SILType type, SILLocation loc,
 
 /// If `value` is guaranteed to trap (e.g. overflow), then emit a diagnostic.
 /// TODO: More diagnostics, and more detailed diagnostics.
-static void
-emitConstantPropagationDiagnostic(SILValue value, SymbolicValue symVal,
-                                  DiagnosticEngine &diags,
-                                  ConstExprEvaluator &evaluator,
-                                  ConstExprFunctionState &state) {
+static void emitConstantPropagationDiagnostic(SILValue value,
+                                              SymbolicValue symVal,
+                                              DiagnosticEngine &diags,
+                                              ConstExprEvaluator &evaluator,
+                                              ConstExprFunctionState &state) {
   if (!symVal.isUnknown())
     return;
 
@@ -1564,9 +1562,8 @@ ConstExprEvaluator::propagateConstants(SILFunction &F, bool EnableDiagnostics) {
       auto symVal = state.getConstantValue(value);
 
       if (EnableDiagnostics) {
-        emitConstantPropagationDiagnostic(value, symVal,
-                                          M.getASTContext().Diags, *this,
-                                          state);
+        emitConstantPropagationDiagnostic(
+            value, symVal, M.getASTContext().Diags, *this, state);
       }
 
       // If it's possible and useful to replace the original instruction with
@@ -1599,7 +1596,8 @@ ConstExprEvaluator::propagateConstants(SILFunction &F, bool EnableDiagnostics) {
   using InvalidationKind = SILAnalysis::InvalidationKind;
 
   unsigned Inv = InvalidationKind::Nothing;
-  if (InvalidateInstructions) Inv |= (unsigned) InvalidationKind::Instructions;
+  if (InvalidateInstructions)
+    Inv |= (unsigned)InvalidationKind::Instructions;
 
   return InvalidationKind(Inv);
 }

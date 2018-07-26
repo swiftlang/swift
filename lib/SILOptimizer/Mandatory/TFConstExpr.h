@@ -88,10 +88,10 @@ public:
   /// Propagates constants through the passed-in function, mutating the function
   /// wherever it can replace instructions with constant instructions.
   ///
-  /// If EnableDiagnostics is true, then emits diagnostics on operations that are
-  /// guaranteed to trap (e.g. operations that cause overflows).
-  SILAnalysis::InvalidationKind
-  propagateConstants(SILFunction &F, bool EnableDiagnostics);
+  /// If EnableDiagnostics is true, then emits diagnostics on operations that
+  /// are guaranteed to trap (e.g. operations that cause overflows).
+  SILAnalysis::InvalidationKind propagateConstants(SILFunction &F,
+                                                   bool EnableDiagnostics);
 
   /// Try to decode the specified apply of the _allocateUninitializedArray
   /// function in the standard library.  This attempts to figure out what the

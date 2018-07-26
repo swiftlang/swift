@@ -18,8 +18,7 @@
 
 using namespace swift;
 
-static llvm::cl::opt<bool>
-ConstantPropagationUseNewFolder(
+static llvm::cl::opt<bool> ConstantPropagationUseNewFolder(
     "constant-propagation-use-new-folder", llvm::cl::init(false),
     llvm::cl::desc("Use new folder in ConstantPropagation passes"));
 
@@ -43,8 +42,8 @@ private:
 
     if (ConstantPropagationUseNewFolder) {
       tf::ConstExprEvaluator evaluator(getFunction()->getModule());
-      Invalidation = evaluator.propagateConstants(*getFunction(),
-                                                  EnableDiagnostics);
+      Invalidation =
+          evaluator.propagateConstants(*getFunction(), EnableDiagnostics);
     } else {
       ConstantFolder Folder(getOptions().AssertConfig, EnableDiagnostics);
       Folder.initializeWorklist(*getFunction());
