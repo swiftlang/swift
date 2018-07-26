@@ -15,7 +15,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "../SwiftShims/UnicodeShims.h"
+#include "swift/Basic/Lazy.h"
+#include "swift/Runtime/Config.h"
+#include "swift/Runtime/Debug.h"
 
+#include <algorithm>
+#include <mutex>
+#include <assert.h>
 #include <stdint.h>
 
 #if defined(__APPLE__)
@@ -28,12 +34,13 @@ typedef struct UBreakIterator UBreakIterator;
 typedef struct UText UText;
 typedef struct UBreakIterator UNormalizer2;
 typedef enum UBreakIteratorType {} UBreakIteratorType;
-typedef enum UErrorCode {} UErrorCode;
 typedef enum UCharNameChoice {} UCharNameChoice;
+typedef enum UNormalization2Mode {} UNormalization2Mode;
 typedef uint16_t UChar;
 typedef int32_t UChar32;
 typedef int8_t UBool;
 typedef swift::__swift_stdlib_UProperty UProperty;
+typedef swift::__swift_stdlib_UErrorCode UErrorCode;
 
 #define U_MAX_VERSION_LENGTH 4
 typedef uint8_t UVersionInfo[U_MAX_VERSION_LENGTH];
@@ -55,7 +62,14 @@ int32_t unorm2_spanQuickCheckYes(const UNormalizer2 *, const UChar *, int32_t,
                                  UErrorCode *);
 int32_t unorm2_normalize(const UNormalizer2 *, const UChar *, int32_t, UChar *,
                          int32_t, UErrorCode *);
+const UNormalizer2 *unorm2_getNFDInstance(UErrorCode *);
 const UNormalizer2 *unorm2_getNFCInstance(UErrorCode *);
+const UNormalizer2 *unorm2_getNFKDInstance(UErrorCode *);
+const UNormalizer2 *unorm2_getNFKCInstance(UErrorCode *);
+const UNormalizer2 *unorm2_getNFKCCasefoldInstance(UErrorCode *);
+const UNormalizer2 *unorm2_getInstance(const char *, const char *,
+                                       UNormalization2Mode, UErrorCode *);
+
 UBool unorm2_hasBoundaryBefore(const UNormalizer2 *norm2, UChar32 c);
 UBool u_hasBinaryProperty(UChar32, UProperty);
 void u_charAge(UChar32, UVersionInfo);
@@ -67,6 +81,8 @@ int32_t u_strToTitle(UChar *, int32_t, const UChar *, int32_t,
                      UBreakIterator *, const char *, UErrorCode *);
 int32_t u_strToUpper(UChar *, int32_t, const UChar *, int32_t, const char *,
                      UErrorCode *);
+int32_t u_strFoldCase(UChar *, int32_t, const UChar *, int32_t, uint32_t,
+                      UErrorCode *);
 double u_getNumericValue(UChar32);
 }
 
@@ -81,6 +97,7 @@ double u_getNumericValue(UChar32);
 #include <unicode/uiter.h>
 #include <unicode/ubrk.h>
 #include <unicode/uchar.h>
+#include <unicode/unorm2.h>
 #include <unicode/ustring.h>
 #include <unicode/uvernum.h>
 #include <unicode/uversion.h>
@@ -90,14 +107,6 @@ double u_getNumericValue(UChar32);
 #endif
 
 #if !defined(__APPLE__)
-#include "swift/Basic/Lazy.h"
-#include "swift/Runtime/Config.h"
-#include "swift/Runtime/Debug.h"
-
-#include <algorithm>
-#include <mutex>
-#include <assert.h>
-
 /// Convert the unicode string to uppercase. This function will return the
 /// required buffer length as a result. If this length does not match the
 /// 'DestinationCapacity' this function must be called again with a buffer of
@@ -114,7 +123,7 @@ swift::_swift_stdlib_unicode_strToUpper(uint16_t *Destination,
                                        SourceLength,
                                        "", &ErrorCode);
   if (U_FAILURE(ErrorCode) && ErrorCode != U_BUFFER_OVERFLOW_ERROR) {
-    swift::crash("u_strToUpper: Unexpected error uppercasing unicode string.");
+    swift::crash("u_strToUpper: Unexpected error uppercasing Unicode string.");
   }
   return OutputLength;
 }
@@ -135,11 +144,34 @@ swift::_swift_stdlib_unicode_strToLower(uint16_t *Destination,
                                        SourceLength,
                                        "", &ErrorCode);
   if (U_FAILURE(ErrorCode) && ErrorCode != U_BUFFER_OVERFLOW_ERROR) {
-    swift::crash("u_strToLower: Unexpected error lowercasing unicode string.");
+    swift::crash("u_strToLower: Unexpected error lowercasing Unicode string.");
   }
   return OutputLength;
 }
 #endif
+
+/// Case-fold the unicode string. This function will return the required buffer
+/// length as a result. If this length does not match the 'DestinationCapacity'
+/// this function must be called again with a buffer of the required length to
+/// get a case-folded version of the string.
+int32_t
+swift::_swift_stdlib_unicode_strFoldCase(uint16_t *Destination,
+                                         int32_t DestinationCapacity,
+                                         const uint16_t *Source,
+                                         int32_t SourceLength) {
+  UErrorCode ErrorCode = static_cast<UErrorCode>(__swift_stdlib_U_ZERO_ERROR);
+  uint32_t OutputLength = u_strFoldCase(reinterpret_cast<UChar *>(Destination),
+                                        DestinationCapacity,
+                                        reinterpret_cast<const UChar *>(Source),
+                                        SourceLength,
+                                        0, &ErrorCode);
+  if (ErrorCode > static_cast<UErrorCode>(__swift_stdlib_U_ZERO_ERROR) &&
+      ErrorCode !=
+          static_cast<UErrorCode>(__swift_stdlib_U_BUFFER_OVERFLOW_ERROR)) {
+    swift::crash("u_strFoldCase: Unexpected error case-folding Unicode string.");
+  }
+  return OutputLength;
+}
 
 namespace {
 template <typename T, typename U> T *ptr_cast(U *p) {
@@ -214,10 +246,53 @@ swift::__swift_stdlib_UBool swift::__swift_stdlib_unorm2_hasBoundaryBefore(
     const __swift_stdlib_UNormalizer2 *ptr, __swift_stdlib_UChar32 char32) {
   return unorm2_hasBoundaryBefore(ptr_cast<UNormalizer2>(ptr), char32);
 }
+
+const swift::__swift_stdlib_UNormalizer2 *
+swift::__swift_stdlib_unorm2_getNFDInstance(__swift_stdlib_UErrorCode *err) {
+  return ptr_cast<__swift_stdlib_UNormalizer2>(
+      unorm2_getNFDInstance(ptr_cast<UErrorCode>(err)));
+}
+
 const swift::__swift_stdlib_UNormalizer2 *
 swift::__swift_stdlib_unorm2_getNFCInstance(__swift_stdlib_UErrorCode *err) {
   return ptr_cast<__swift_stdlib_UNormalizer2>(
       unorm2_getNFCInstance(ptr_cast<UErrorCode>(err)));
+}
+
+const swift::__swift_stdlib_UNormalizer2 *
+swift::__swift_stdlib_unorm2_getNFKDInstance(__swift_stdlib_UErrorCode *err) {
+  return ptr_cast<__swift_stdlib_UNormalizer2>(
+      unorm2_getNFKDInstance(ptr_cast<UErrorCode>(err)));
+}
+
+const swift::__swift_stdlib_UNormalizer2 *
+swift::__swift_stdlib_unorm2_getNFKCInstance(__swift_stdlib_UErrorCode *err) {
+  return ptr_cast<__swift_stdlib_UNormalizer2>(
+      unorm2_getNFKCInstance(ptr_cast<UErrorCode>(err)));
+}
+
+const swift::__swift_stdlib_UNormalizer2 *
+swift::__swift_stdlib_unorm2_getNFKCCasefoldInstance(
+                                               __swift_stdlib_UErrorCode *err) {
+  return ptr_cast<__swift_stdlib_UNormalizer2>(
+      unorm2_getNFKCCasefoldInstance(ptr_cast<UErrorCode>(err)));
+}
+
+const swift::__swift_stdlib_UNormalizer2 *
+swift::__swift_stdlib_unorm2_getFCDInstance(__swift_stdlib_UErrorCode *err) {
+  return ptr_cast<__swift_stdlib_UNormalizer2>(
+      unorm2_getInstance(nullptr, "nfc",
+          static_cast<UNormalization2Mode>(__swift_stdlib_UNORM2_FCD),
+          ptr_cast<UErrorCode>(err)));
+}
+
+const swift::__swift_stdlib_UNormalizer2 *
+swift::__swift_stdlib_unorm2_getFCCInstance(__swift_stdlib_UErrorCode *err) {
+  return ptr_cast<__swift_stdlib_UNormalizer2>(
+      unorm2_getInstance(nullptr, "nfc",
+          static_cast<UNormalization2Mode>(
+              __swift_stdlib_UNORM2_COMPOSE_CONTIGUOUS),
+          ptr_cast<UErrorCode>(err)));
 }
 
 int32_t swift::__swift_stdlib_unorm2_normalize(

@@ -139,6 +139,12 @@ extension MyString : StringProtocol {
   func uppercased() -> String {
     return base.uppercased()
   }
+  func caseFolded() -> String {
+    return base.caseFolded()
+  }
+  func normalized(_ form: Unicode.NormalizationForm) -> String {
+    return base.normalized(form)
+  }
 
   init<C: Collection, Encoding: Unicode.Encoding>(
     decoding codeUnits: C, as sourceEncoding: Encoding.Type

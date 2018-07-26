@@ -72,6 +72,11 @@ __swift_int32_t _swift_stdlib_unicode_strToLower(
   __swift_uint16_t *Destination, __swift_int32_t DestinationCapacity,
   const __swift_uint16_t *Source, __swift_int32_t SourceLength);
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
+__swift_int32_t _swift_stdlib_unicode_strFoldCase(
+  __swift_uint16_t *Destination, __swift_int32_t DestinationCapacity,
+  const __swift_uint16_t *Source, __swift_int32_t SourceLength);
+
 typedef enum __swift_stdlib_UProperty {
   __swift_stdlib_UCHAR_ALPHABETIC = 0,
   __swift_stdlib_UCHAR_BINARY_START = __swift_stdlib_UCHAR_ALPHABETIC,
@@ -420,6 +425,13 @@ typedef enum __swift_stdlib_UCharNameChoice {
 #endif
 } __swift_stdlib_UCharNameChoice;
 
+typedef enum __swift_stdlib_UNormalization2Mode {
+  __swift_stdlib_UNORM2_COMPOSE,
+  __swift_stdlib_UNORM2_DECOMPOSE,
+  __swift_stdlib_UNORM2_FCD,
+  __swift_stdlib_UNORM2_COMPOSE_CONTIGUOUS
+} __swift_stdlib_UNormalization2Mode;
+
 typedef enum __swift_stdlib_UNumericType {
   __swift_stdlib_U_NT_NONE,
   __swift_stdlib_U_NT_DECIMAL,
@@ -496,7 +508,31 @@ __swift_stdlib_unorm2_hasBoundaryBefore(const __swift_stdlib_UNormalizer2 *,
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
 const __swift_stdlib_UNormalizer2 *
+__swift_stdlib_unorm2_getNFDInstance(__swift_stdlib_UErrorCode *);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+const __swift_stdlib_UNormalizer2 *
 __swift_stdlib_unorm2_getNFCInstance(__swift_stdlib_UErrorCode *);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+const __swift_stdlib_UNormalizer2 *
+__swift_stdlib_unorm2_getNFKDInstance(__swift_stdlib_UErrorCode *);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+const __swift_stdlib_UNormalizer2 *
+__swift_stdlib_unorm2_getNFKCInstance(__swift_stdlib_UErrorCode *);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+const __swift_stdlib_UNormalizer2 *
+__swift_stdlib_unorm2_getNFKCCasefoldInstance(__swift_stdlib_UErrorCode *);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+const __swift_stdlib_UNormalizer2 *
+__swift_stdlib_unorm2_getFCDInstance(__swift_stdlib_UErrorCode *);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+const __swift_stdlib_UNormalizer2 *
+__swift_stdlib_unorm2_getFCCInstance(__swift_stdlib_UErrorCode *);
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_int32_t
