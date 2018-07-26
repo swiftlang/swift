@@ -16,7 +16,7 @@ import Swift
 
 // CHECK-LABEL: @"$S15generic_classes11RootGenericCMn" =
 // --       flags: class, generic, unique, reflectable, has vtable
-// CHECK-SAME:   <i32 0x8004_00D0>
+// CHECK-SAME:   <i32 0x8001_00D0>
 // --       name
 // CHECK-SAME:   [12 x i8]* [[ROOTGENERIC_NAME]]
 // --       negative size in words
@@ -80,7 +80,7 @@ import Swift
 // CHECK: [[ROOTNONGENERIC_NAME:@.*]] = private constant [15 x i8] c"RootNonGeneric\00"
 // CHECK: @"$S15generic_classes14RootNonGenericCMn" = hidden constant <{ {{.*}} %swift.method_descriptor }> <{
 // --       flags: class, unique, has vtable, reflectable
-// CHECK-SAME:   <i32 0x8004_0050>
+// CHECK-SAME:   <i32 0x8001_0050>
 // --       name
 // CHECK-SAME:   [15 x i8]* [[ROOTNONGENERIC_NAME]]
 // --       num fields
