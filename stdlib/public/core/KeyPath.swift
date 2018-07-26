@@ -2333,7 +2333,8 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
       }
 
       // Drop this external reference...
-      size -= header.patternComponentBodySize
+      size -= (header.patternComponentBodySize
+               + MemoryLayout<RawKeyPathComponent.Header>.size)
       _ = buffer.popRaw(size: MemoryLayout<Int>.size * genericParamCount,
                         alignment: MemoryLayout<Int>.alignment)
       // ...and the local candidate, which is the component following this
@@ -2354,6 +2355,7 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
       }())
 
       // Measure the instantiated size of the external component.
+      let newComponentSize: Int
       switch descriptorHeader.kind {
       case .class:
         // A stored class property is reference-writable.
@@ -2371,13 +2373,9 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
         // line after the header.
         if descriptorHeader.payload
             > RawKeyPathComponent.Header.maximumOffsetPayload {
-          size += MemoryLayout<UInt32>.size
-        }
-
-        // Pad to pointer alignment if there are following components.
-        if !buffer.data.isEmpty {
-          let alignMask = MemoryLayout<Int>.alignment - 1
-          size = (size + alignMask) & ~alignMask
+          newComponentSize = 2 * MemoryLayout<UInt32>.size
+        } else {
+          newComponentSize = MemoryLayout<UInt32>.size
         }
 
       case .computed:
@@ -2386,7 +2384,6 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
         setComputedCapability(for: descriptorHeader)
         // With no arguments, the instantiated size will be the
         // same as the pattern size.
-        size += descriptorHeader.propertyDescriptorBodySize
 
         // If the external declaration is computed, and it takes captured
         // arguments, then we have to build a bit of a chimera. The canonical
@@ -2446,18 +2443,27 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
           if genericParamCount > 0 {
             argumentBufferSize += MemoryLayout<Int>.size * genericParamCount
           }
-          size = (size + alignmentMask) & ~alignmentMask + argumentBufferSize
+          newComponentSize = descriptorHeader.propertyDescriptorBodySize
+                           + argumentBufferSize
         } else {
           // If there aren't any captured arguments expected in the external
           // component, then we only need to adopt its accessors.
           // Discard the local candidate.
           _ = buffer.popRaw(size: localCandidateSize,
                             alignment: MemoryLayout<UInt32>.alignment)
-
+          newComponentSize = descriptorHeader.propertyDescriptorBodySize
         }
 
       case .external, .optionalChain, .optionalForce, .optionalWrap:
         _sanityCheckFailure("should not appear as property descriptor")
+      }
+
+      // Round up to pointer alignment if there are following components.
+      if !buffer.data.isEmpty {
+        let alignMask = MemoryLayout<Int>.alignment - 1
+        size += (newComponentSize + alignMask) & ~alignMask
+      } else {
+        size += newComponentSize
       }
 
     case .computed:
