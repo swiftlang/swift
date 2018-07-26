@@ -95,6 +95,8 @@ where SubSequence: MutableCollection
   /// - Parameter position: The position of the element to access. `position`
   ///   must be a valid index of the collection that is not equal to the
   ///   `endIndex` property.
+  ///
+  /// - Complexity: O(1)
   subscript(position: Index) -> Element { get set }
 
   /// Accesses a contiguous subrange of the collection's elements.
@@ -119,6 +121,8 @@ where SubSequence: MutableCollection
   ///
   /// - Parameter bounds: A range of the collection's indices. The bounds of
   ///   the range must be valid indices of the collection.
+  ///
+  /// - Complexity: O(1)
   subscript(bounds: Range<Index>) -> SubSequence { get set }
 
   /// Reorders the elements of the collection such that all the elements
@@ -156,7 +160,7 @@ where SubSequence: MutableCollection
   ///   collection match `belongsInSecondPartition`, the returned index is
   ///   equal to the collection's `endIndex`.
   ///
-  /// - Complexity: O(*n*)
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
   mutating func partition(
     by belongsInSecondPartition: (Element) throws -> Bool
   ) rethrows -> Index
@@ -170,6 +174,8 @@ where SubSequence: MutableCollection
   /// - Parameters:
   ///   - i: The index of the first value to swap.
   ///   - j: The index of the second value to swap.
+  ///
+  /// - Complexity: O(1)
   mutating func swapAt(_ i: Index, _ j: Index)
   
   /// Call `body(p)`, where `p` is a pointer to the collection's
@@ -218,6 +224,8 @@ extension MutableCollection {
   ///
   /// - Parameter bounds: A range of the collection's indices. The bounds of
   ///   the range must be valid indices of the collection.
+  ///
+  /// - Complexity: O(1)
   @inlinable
   public subscript(bounds: Range<Index>) -> Slice<Self> {
     get {
@@ -238,6 +246,8 @@ extension MutableCollection {
   /// - Parameters:
   ///   - i: The index of the first value to swap.
   ///   - j: The index of the second value to swap.
+  ///
+  /// - Complexity: O(1)
   @inlinable
   public mutating func swapAt(_ i: Index, _ j: Index) {
     guard i != j else { return }

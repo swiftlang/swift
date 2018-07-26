@@ -161,20 +161,21 @@ extension String : StringProtocol, RangeReplaceableCollection {
   ///     print(s[i])
   ///     // Prints "t"
   ///
-  /// The value passed as `n` must not offset `i` beyond the bounds of the
-  /// collection.
+  /// The value passed as `distance` must not offset `i` beyond the bounds of
+  /// the collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
-  ///   - n: The distance to offset `i`.
-  /// - Returns: An index offset by `n` from the index `i`. If `n` is positive,
-  ///   this is the same value as the result of `n` calls to `index(after:)`.
-  ///   If `n` is negative, this is the same value as the result of `-n` calls
-  ///   to `index(before:)`.
+  ///   - distance: The distance to offset `i`.
+  /// - Returns: An index offset by `distance` from the index `i`. If
+  ///   `distance` is positive, this is the same value as the result of
+  ///   `distance` calls to `index(after:)`. If `distance` is negative, this
+  ///   is the same value as the result of `abs(distance)` calls to
+  ///   `index(before:)`.
   ///
-  /// - Complexity: O(*n*), where *n* is the absolute value of `n`.
-  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
-    return _visitGuts(_guts, args: (i, n),
+  /// - Complexity: O(*k*), where *k* is the absolute value of `distance`.
+  public func index(_ i: Index, offsetBy distance: IndexDistance) -> Index {
+    return _visitGuts(_guts, args: (i, distance),
       ascii: { ascii, args in let (i, n) = args
         return ascii.characterIndex(i, offsetBy: n) },
       utf16: { utf16, args in let (i, n) = args
@@ -205,25 +206,25 @@ extension String : StringProtocol, RangeReplaceableCollection {
   ///     print(j)
   ///     // Prints "nil"
   ///
-  /// The value passed as `n` must not offset `i` beyond the bounds of the
+  /// The value passed as `distance` must not offset `i` beyond the bounds of the
   /// collection, unless the index passed as `limit` prevents offsetting
   /// beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
-  ///   - n: The distance to offset `i`.
-  ///   - limit: A valid index of the collection to use as a limit. If `n > 0`,
-  ///     a limit that is less than `i` has no effect. Likewise, if `n < 0`, a
+  ///   - distance: The distance to offset `i`.
+  ///   - limit: A valid index of the collection to use as a limit. If `distance > 0`,
+  ///     a limit that is less than `i` has no effect. Likewise, if `distance < 0`, a
   ///     limit that is greater than `i` has no effect.
-  /// - Returns: An index offset by `n` from the index `i`, unless that index
+  /// - Returns: An index offset by `distance` from the index `i`, unless that index
   ///   would be beyond `limit` in the direction of movement. In that case,
   ///   the method returns `nil`.
   ///
-  /// - Complexity: O(*n*), where *n* is the absolute value of `n`.
+  /// - Complexity: O(*k*), where *k* is the absolute value of `distance`.
   public func index(
-    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
+    _ i: Index, offsetBy distance: IndexDistance, limitedBy limit: Index
   ) -> Index? {
-    return _visitGuts(_guts, args: (i, n, limit),
+    return _visitGuts(_guts, args: (i, distance, limit),
       ascii: { ascii, args in let (i, n, limit) = args
         return ascii.characterIndex(i, offsetBy: n, limitedBy: limit) },
       utf16: { utf16, args in let (i, n, limit) = args
@@ -240,7 +241,7 @@ extension String : StringProtocol, RangeReplaceableCollection {
   ///     `start`, the result is zero.
   /// - Returns: The distance between `start` and `end`.
   ///
-  /// - Complexity: O(*n*), where *n* is the resulting distance.
+  /// - Complexity: O(*k*), where *k* is the resulting distance.
   public func distance(from start: Index, to end: Index) -> IndexDistance {
     return _visitGuts(_guts, args: (start, end),
       ascii: { ascii, args in let (start, end) = args
