@@ -364,10 +364,12 @@ public:
 
   StmtChecker(TypeChecker &TC, DeclContext *DC)
       : TC(TC), TheFunc(), DC(DC), IsREPL(false),
-        IsBraceStmtFromTopLevelDecl(true) {
+        IsBraceStmtFromTopLevelDecl(false) {
     if (const SourceFile *SF = DC->getParentSourceFile())
       if (SF->Kind == SourceFileKind::REPL)
         IsREPL = true;
+
+    IsBraceStmtFromTopLevelDecl = isa<TopLevelCodeDecl>(DC);
   }
 
   //===--------------------------------------------------------------------===//
