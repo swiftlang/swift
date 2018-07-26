@@ -1642,17 +1642,14 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
   SmallVector<SILValue, 32> valuesToCheck;
 
   for (auto *op : tensorOps) {
-    auto opInfo = SILTensorOpInfo::decode(op);
-    for (unsigned i = 0; i < op->getNumOperands(); ++i) {
+    for (auto &operand : op->getAllOperands()) {
       // Dump anything that might be an attribute into the list without too much
-      // filtering.  We take out TensorFlow values that are known as $in, since
-      // they are the most obvious ones we don't care about later, but there may
-      // be other minor things we over-query on.
-      const SILValue &value = op->getOperand(i);
-      bool isInput = opInfo && opInfo->isInput(i);
-      if (!isInput || !isTensorFlowValue(value->getType())) {
+      // filtering.  We take out TensorFlow values since they are the most
+      // obvious ones we don't care about later, but there may be other minor
+      // things we over-query on.
+      auto value = operand.get();
+      if (!isTensorFlowValue(value->getType()))
         valuesToCheck.push_back(value);
-      }
     }
   }
 
@@ -1977,9 +1974,7 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
     // Ok, we have an attribute operand, we should have been able to fold it
     // through our constexpr evaluation logic.
     auto it = constants.find(operand);
-    assert(it != constants.end() && "out of sync with constant scanning loop");
-
-    if (!it->second.isConstant()) {
+    if (it == constants.end() || !it->second.isConstant()) {
       // TODO: improve the diagnostic to talk about the parameter label in
       // the user code, not the internal op attribute.  The bookkeeping for
       // this isn't obvious though.
@@ -1987,7 +1982,8 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
 
       // If we have more specific information about what went wrong, emit
       // notes.
-      if (it->second.getKind() == SymbolicValue::Unknown)
+      if (it != constants.end() &&
+          it->second.getKind() == SymbolicValue::Unknown)
         it->second.emitUnknownDiagnosticNotes(opInfo.inst->getLoc());
       return;
     }
