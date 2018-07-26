@@ -95,9 +95,6 @@ public enum SyntaxTreeParser {
   public static func parse(_ url: URL) throws -> SourceFileSyntax {
     let swiftcRunner = try SwiftcRunner(sourceFile: url)
     let result = try swiftcRunner.invoke()
-    guard result.wasSuccessful else {
-      throw ParserError.swiftcFailed(result.exitCode, result.stderr)
-    }
     let syntaxTreeData = result.stdoutData
     let deserializer = SyntaxTreeDeserializer()
     return try deserializer.deserialize(syntaxTreeData)
