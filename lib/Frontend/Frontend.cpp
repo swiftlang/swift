@@ -20,6 +20,7 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Module.h"
+#include "swift/Basic/FileTypes.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Parse/DelayedParsingCallbacks.h"
@@ -345,8 +346,9 @@ CompilerInstance::getInputBufferAndModuleDocBufferIfPresent(
 Optional<std::unique_ptr<llvm::MemoryBuffer>>
 CompilerInstance::openModuleDoc(const InputFile &input) {
   llvm::SmallString<128> moduleDocFilePath(input.file());
-  llvm::sys::path::replace_extension(moduleDocFilePath,
-                                     SERIALIZED_MODULE_DOC_EXTENSION);
+  llvm::sys::path::replace_extension(
+      moduleDocFilePath,
+      file_types::getExtension(file_types::TY_SwiftModuleDocFile));
   using FileOrError = llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>;
   FileOrError moduleDocFileOrErr =
       llvm::MemoryBuffer::getFileOrSTDIN(moduleDocFilePath);

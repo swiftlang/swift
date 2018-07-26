@@ -46,10 +46,8 @@ TYPE("object",              Object,                    "o",               "")
 TYPE("dSYM",                dSYM,                      "dSYM",            "")
 TYPE("dependencies",        Dependencies,              "d",               "")
 TYPE("autolink",            AutolinkFile,              "autolink",        "")
-TYPE("swiftmodule",         SwiftModuleFile,
-                              SERIALIZED_MODULE_EXTENSION,                "")
-TYPE("swiftdoc",            SwiftModuleDocFile,
-                              SERIALIZED_MODULE_DOC_EXTENSION,            "")
+TYPE("swiftmodule",         SwiftModuleFile,           "swiftmodule",     "")
+TYPE("swiftdoc",            SwiftModuleDocFile,        "swiftdoc",        "")
 TYPE("swiftinterface",      SwiftModuleInterfaceFile,  "swiftinterface",  "")
 TYPE("assembly",            Assembly,                  "s",               "")
 TYPE("raw-sil",             RawSIL,                    "sil",             "")
@@ -68,7 +66,7 @@ TYPE("opt-record",          OptRecord,                 "opt.yaml",        "")
 
 // Misc types
 TYPE("pcm",                 ClangModuleFile,           "pcm",             "")
-TYPE("pch",                 PCH,                       PCH_EXTENSION,     "")
+TYPE("pch",                 PCH,                       "pch",             "")
 TYPE("none",                Nothing,                   "",                "")
 
 #undef TYPE
