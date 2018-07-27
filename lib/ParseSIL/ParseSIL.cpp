@@ -2380,6 +2380,10 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     // Drop the double quotes.
     StringRef rawString = P.Tok.getText().drop_front().drop_back();
 
+    P.consumeToken(tok::string_literal);
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+
     // Ask the lexer to interpret the entire string as a literal segment.
     SmallVector<char, 128> stringBuffer;
 
@@ -2407,9 +2411,6 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     }
 
     StringRef string = P.L->getEncodedStringSegment(rawString, stringBuffer);
-    P.consumeToken(tok::string_literal);
-    if (parseSILDebugLocation(InstLoc, B))
-      return true;
     ResultVal = B.createStringLiteral(InstLoc, string, encoding);
     break;
   }
