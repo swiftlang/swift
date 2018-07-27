@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-strict-deabstraction -Xllvm -tf-ensure-single-loop-exit=false -Xllvm -tf-module-level-graph=false -O -emit-sil %s -verify | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-strict-deabstraction -Xllvm -tf-module-level-graph=false -O -emit-sil %s -verify | %FileCheck %s
 
 // In this file, send means accelerator->host, and recv means the opposite.
 
@@ -165,7 +165,6 @@ public func testSendsInALoopTPU() {
 // CHECK-LABEL: --- TFDevicePartition Per-Device Function Extraction Result: {{.*}}testSendsInALoopTPU{{.*}}TPU{{.*}}
 // CHECK: bb1
 // CHECK:   graph_op "tfc.D2DTensorSend
-// CHECK: bb2
 // CHECK:   graph_op "tfc.D2DTensorSend
 
 public func testSendsInALoopWithNoResultTensor() {
@@ -384,7 +383,6 @@ public func testRecvsInALoop() {
   var a = Tensor<Float>(1.0)
   while count < maxCount {
     // One recv.
-    // expected-error @+1 {{tfop invalid: FIXME: cannot lower a Host->TF tensor transfer in a loop header}}
     let b = atariSim(a.toHost()).toAccelerator()
     a += b
     count += 1

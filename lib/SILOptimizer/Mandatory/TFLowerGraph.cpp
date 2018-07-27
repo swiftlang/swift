@@ -695,12 +695,6 @@ std::string TFGraphFunctionLowering::getUniqueName(SILDebugLocation loc,
         break;
 
       auto lineCol = SM.getLineAndColumn(ds->Loc.getSourceLoc());
-      auto fnName = F->getName();
-
-      // Drop ".device_partition" suffix off function names.
-      if (fnName.endswith(".device_partition"))
-        fnName = fnName.drop_back(strlen(".device_partition"));
-
       // Separate functions using '/' so that TensorBoard can treat it as a
       // hierarchical separator.
       name += '/';
@@ -718,6 +712,11 @@ std::string TFGraphFunctionLowering::getUniqueName(SILDebugLocation loc,
         else
           uniqueNames.insert({afd, 1});
       } else {
+        auto fnName = F->getName();
+        // Drop ".device_partition" suffix off function names.
+        if (fnName.endswith(".device_partition")) {
+          fnName = fnName.drop_back(strlen(".device_partition"));
+        }
         funcName = fnName.str();
       }
 
@@ -737,6 +736,10 @@ std::string TFGraphFunctionLowering::getUniqueName(SILDebugLocation loc,
       name += "." + llvm::utostr(lineCol.second);
     }
   }
+
+  // Append device type to ensure the name is unique across all devices.
+  name += ':';
+  name += thisDeviceTypeStr;
 
   // Escape op name.
   escapeOpName(name);
