@@ -677,6 +677,12 @@ def deprecated_integrated_repl : Flag<["-"], "deprecated-integrated-repl">,
   Flags<[FrontendOption, NoBatchOption]>, ModeOpt;
 def i : Flag<["-"], "i">, ModeOpt; // only used to provide diagnostics.
 
+def execute : Separate<["-"], "execute">,
+  HelpText<"Execute the passed Swift code immediately">,
+  Flags<[NoBatchOption]>;
+def e : Separate<["-"], "e">, Alias<execute>,
+  Flags<[NoBatchOption]>, ModeOpt;
+
 def whole_module_optimization : Flag<["-"], "whole-module-optimization">,
   HelpText<"Optimize input files together instead of individually">,
   Flags<[FrontendOption, NoInteractiveOption]>;

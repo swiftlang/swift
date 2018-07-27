@@ -795,8 +795,9 @@ Driver::buildCompilation(const ToolChain &TC,
 
   validateEmbedBitcode(*TranslatedArgList, OI, Diags);
 
-  if (OI.CompilerMode == OutputInfo::Mode::REPL)
-    // REPL mode expects no input files, so suppress the error.
+  // REPL and execute modes expect no input files, so suppress the error.
+  if (OI.CompilerMode == OutputInfo::Mode::REPL ||
+      ArgList->hasArg(options::OPT_execute))
     SuppressNoInputFilesError = true;
 
   Optional<OutputFileMap> OFM =
@@ -1584,6 +1585,9 @@ Driver::computeCompilerMode(const DerivedArgList &Args,
                             const InputFileList &Inputs,
                             bool &BatchModeOut) const {
 
+  if (Args.hasArg(options::OPT_execute))
+    return OutputInfo::Mode::Immediate;
+
   if (driverKind == Driver::DriverKind::Interactive)
     return Inputs.empty() ? OutputInfo::Mode::REPL
                           : OutputInfo::Mode::Immediate;
@@ -1805,17 +1809,48 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
     llvm_unreachable("Batch mode should not be used to build actions");
   }
   case OutputInfo::Mode::Immediate: {
-    if (Inputs.empty())
-      return;
-
     assert(OI.CompilerOutputType == file_types::TY_Nothing);
     auto *CA = C.createAction<InterpretJobAction>();
-    for (const InputPair &Input : Inputs) {
-      file_types::ID InputType = Input.first;
-      const Arg *InputArg = Input.second;
 
-      CA->addInput(C.createAction<InputAction>(*InputArg, InputType));
+    if (Args.hasArg(options::OPT_execute)) {
+      SmallString<128> Buffer;
+      std::error_code EC =
+        llvm::sys::fs::createTemporaryFile("execute", "swift", Buffer);
+
+      if (EC) {
+        Diags.diagnose(SourceLoc(),
+            diag::error_unable_to_make_temporary_file,
+            EC.message());
+        return;
+      }
+
+      llvm::raw_fd_ostream OS(Buffer.str(), EC, llvm::sys::fs::F_None);
+      for (const Arg *A : Args.filtered(options::OPT_execute)) {
+        A->claim();
+        OS << A->getValue();
+        OS << "\n";
+      }
+
+      OS.flush();
+
+      const Arg *A = Args.getLastArg(options::OPT_execute);
+      const Arg *InputArg = new Arg(
+          Opts->getOption(options::OPT_INPUT), A->getValue(),
+          A->getIndex(), Args.MakeArgString(Buffer.str()));
+      InputArg->claim();
+      CA->addInput(
+          C.createAction<InputAction>(*InputArg, file_types::TY_Swift));
+    } else if (!Inputs.empty()) {
+      for (const InputPair &Input : Inputs) {
+        file_types::ID InputType = Input.first;
+        const Arg *InputArg = Input.second;
+
+        CA->addInput(C.createAction<InputAction>(*InputArg, InputType));
+      }
+    } else {
+      llvm_unreachable("Immediate mode must have sources or -e");
     }
+
     TopLevelActions.push_back(CA);
     return;
   }

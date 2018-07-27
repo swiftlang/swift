@@ -13,6 +13,9 @@
 // RUN: %swift_driver -### -parse-stdlib | %FileCheck -check-prefix PARSE_STDLIB %s
 // PARSE_STDLIB: -parse-stdlib
 
+// RUN: %swift_driver -### -e "foo bar" -e "baz" | %FileCheck -check-prefix EXECUTE_IMMEDIATELY %s
+// EXECUTE_IMMEDIATELY: -frontend -interpret
+// EXECUTE_IMMEDIATELY: {{[^ ]+.swift}}
 
 // RUN: %swift_driver -### -target x86_64-apple-macosx10.9 -resource-dir /RSRC/ %s | %FileCheck -check-prefix=CHECK-RESOURCE-DIR-ONLY %s
 // CHECK-RESOURCE-DIR-ONLY: # DYLD_LIBRARY_PATH=/RSRC/macosx{{$}}
