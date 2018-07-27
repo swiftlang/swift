@@ -345,3 +345,15 @@ func test_42452085(any: Any, obj: cls_42452085?) throws {
   _ = try obj?.canThrow() #^RDAR_42452085_3^#
 }
 // RDAR_42452085: Begin completions
+
+// rdar://problem/41234606
+// RUN: %target-swift-ide-test -code-completion -code-completion-token=RDAR_41234606 -source-filename=%s | %FileCheck %s -check-prefix=RDAR_41234606
+#if false
+extension Foo {
+  func foo<T: Collection #^RDAR_41234606^#>(x: T) {}
+}
+#endif
+// RDAR_41234606: Begin completion
+// RDAR_41234606-DAG: Decl[AssociatedType]/Super:         .Element; name=Element
+// RDAR_41234606-DAG: Decl[AssociatedType]/Super:         .Iterator; name=Iterator
+// RDAR_41234606: End completions
