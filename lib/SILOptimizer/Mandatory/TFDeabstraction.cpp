@@ -2043,7 +2043,27 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
     switch (operandClass.second) {
     case SILTensorOpInfo::OperandClass::Input:
     case SILTensorOpInfo::OperandClass::InputElt:
+      assert(0 && "Input classes cannot exist for attributes");
     case SILTensorOpInfo::OperandClass::Normal:  // No modifier.
+      switch (constValue.getKind()) {
+      case SymbolicValue::Unknown:
+      case SymbolicValue::UninitMemory:
+      case SymbolicValue::Address:
+        assert(0 && "Cannot happen");
+
+      case SymbolicValue::Enum:
+      case SymbolicValue::EnumWithPayload:
+      case SymbolicValue::Aggregate:
+        return diagnoseInvalidAttr("cannot be an enum, struct, or tuple");
+
+      case SymbolicValue::Integer:
+      case SymbolicValue::Float:
+      case SymbolicValue::Metatype:
+      case SymbolicValue::String:
+      case SymbolicValue::Function:
+      case SymbolicValue::Array:
+        break;
+      }
       break;
     case SILTensorOpInfo::OperandClass::DType:
       // This integer value is a dtype.

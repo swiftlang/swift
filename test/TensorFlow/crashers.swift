@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil %s -verify
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-strict-deabstraction -O -emit-sil %s -verify
 
 // This file contains various regression tests that crashed the compiler.
 
@@ -166,12 +166,6 @@ public func testGenericThing() {
 }
 
 
-// b/75247714: #tfop crashes when attribute argument is a tuple
-public func test75247714() {
-  // expected-error @+1 {{attribute 'bar' requires a constant argument}}
-  let _ : () = #tfop("foo", bar: (1, 2))
-}
-
 // b/76058387: Deabstraction crasher
 public func testPropagateScalarOperands() {
   let bounds = 0..<10
@@ -192,18 +186,6 @@ public func tensorEndPointComputation() -> Int {
   } while i < 10
 
   return retval
-}
-
-
-// b/76115311
-func genericMethod76115311<Scalar : Numeric>(with value: Scalar = 0) -> Tensor<Scalar> {
-  // expected-error @+1 {{operand has unrecognized type}}
-  return #tfop("FooOp", value)
-}
-
-public func b76115311() {
-  let matrix: Tensor<Float> = genericMethod76115311()
-  _ = matrix+matrix
 }
 
 
@@ -331,7 +313,7 @@ public func SR8226(n: Float, m: Float, cond: Bool, cond2: Bool) {
 // expected-warning @+1{{implicitly copied to the accelerator}}
 public func SR8228_unusedTensorBBArg(n: Int32, x: Tensor<Float>) {
   var a = Tensor<Float>(1.0)
-  // expected-warning @+1{{variable 'b' was written to, but never read}}  
+  // expected-warning @+1{{variable 'b' was written to, but never read}}
   var b = x
   var i: Int32 = 0
   // expected-warning @+2{{implicitly copied to the accelerator}}
