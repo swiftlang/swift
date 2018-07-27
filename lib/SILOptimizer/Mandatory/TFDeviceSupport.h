@@ -114,9 +114,8 @@ static inline std::string getDeviceShortName(DeviceType deviceType) {
 /// TensorShape-typed elements.
 bool isShapeArrayPseudoAttr(llvm::StringRef name, SymbolicValue attrValue);
 
-/// This struct holds information about the global configuration of the graph
-/// we are generating.  This can be different between distinct graphs in the
-/// same program though.
+/// This struct holds information about the deviceInfo of the graph we are
+/// generating.
 struct GraphFunctionDeviceInfo {
   const DeviceType primaryDeviceType;
   const bool isTPUInfeedEnabled;
@@ -187,7 +186,7 @@ struct GraphFunctionDeviceInfo {
     return DeviceTypeMgr(usedDeviceTypes);
   }
 
-  /// Return the configuration for the specified function.
+  /// Return the deviceInfo for the specified function.
   static GraphFunctionDeviceInfo getForFunction(SILFunction &fn,
                                                 bool removeConfigInst);
 
@@ -204,7 +203,7 @@ struct GraphFunctionDeviceInfo {
   // `usedDeviceTypes`.
   //
   // If `opDevice` is already set, respects that device choice. Otherwise,
-  // chooses a device based on this configuration and op kernel device
+  // chooses a device based on this deviceInfo and op kernel device
   // availability.
   //
   // For some tfops (e.g. "tfc.scalarToTensor"), device placement is handled
@@ -255,7 +254,7 @@ struct GraphFunctionDeviceInfo {
   // `usedDeviceTypes`.
   //
   // If `opDevice` is already set, respects that device choice. Otherwise,
-  // chooses a device based on this configuration and op kernel device
+  // chooses a device based on this deviceInfo and op kernel device
   // availability.
   //
   // Caller should avoid adding duplicate device attributes (e.g. calling
@@ -280,7 +279,7 @@ private:
     if (opType == "tfc.RecvFromHost" || opType == "tfc.SendToHost")
       return DeviceType::CPU;
 
-    // Place this inst on the device given by this configuration.
+    // Place this inst on the device given by this deviceInfo.
     // FIXME: Use the op kernel device availability info to select a device for
     // `opType` -- if that op has no available kernel on `primaryDeviceType`, a
     // different device should be returned.
@@ -299,7 +298,8 @@ class DevicePartitioner {
 
 public:
   DevicePartitioner(SILFunction &srcFn,
-                    const GraphFunctionDeviceInfo &configuration);
+                    const GraphFunctionDeviceInfo &deviceInfo,
+                    int &nextTensorTransferId);
 
   ~DevicePartitioner();
 
