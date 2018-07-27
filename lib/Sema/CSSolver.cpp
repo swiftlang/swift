@@ -17,6 +17,7 @@
 #include "ConstraintSystem.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeWalker.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -93,7 +94,7 @@ Optional<Type> ConstraintSystem::checkTypeOfBinding(TypeVariableType *typeVar,
       *isNilLiteral = false;
 
       // Look for a literal-conformance constraint on the type variable.
-      SmallPtrSet<Constraint *, 8> constraints;
+      llvm::SetVector<Constraint *> constraints;
       getConstraintGraph().gatherConstraints(
           bindingTypeVar, constraints,
           ConstraintGraph::GatheringKind::EquivalenceClass,
@@ -1917,7 +1918,7 @@ static Constraint *selectBestBindingDisjunction(
                    ->getAs<TypeVariableType>();
     assert(tv);
 
-    SmallPtrSet<Constraint *, 8> constraints;
+    llvm::SetVector<Constraint *> constraints;
     cs.getConstraintGraph().gatherConstraints(
         tv, constraints, ConstraintGraph::GatheringKind::EquivalenceClass,
         [](Constraint *constraint) {
@@ -2247,7 +2248,7 @@ void DisjunctionChoice::propagateConversionInfo() const {
     return;
 
   auto conversionType = bindings.Bindings[0].BindingType;
-  SmallPtrSet<Constraint *, 4> constraints;
+  llvm::SetVector<Constraint *> constraints;
   CS->CG.gatherConstraints(typeVar, constraints,
                            ConstraintGraph::GatheringKind::EquivalenceClass,
                            [](Constraint *constraint) -> bool {

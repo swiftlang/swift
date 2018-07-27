@@ -19,6 +19,7 @@
 #include "ConstraintGraphScope.h"
 #include "ConstraintSystem.h"
 #include "swift/Basic/Statistic.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include <algorithm>
@@ -467,7 +468,7 @@ void ConstraintGraph::unbindTypeVariable(TypeVariableType *typeVar, Type fixed){
 }
 
 void ConstraintGraph::gatherConstraints(
-    TypeVariableType *typeVar, SmallPtrSetImpl<Constraint *> &constraints,
+    TypeVariableType *typeVar, llvm::SetVector<Constraint *> &constraints,
     GatheringKind kind,
     llvm::function_ref<bool(Constraint *)> acceptConstraint) {
   auto &reprNode = (*this)[CS.getRepresentative(typeVar)];

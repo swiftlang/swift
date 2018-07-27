@@ -23,6 +23,7 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/APInt.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 #include <utility>
@@ -574,7 +575,7 @@ namespace {
     // being applied, and the only constraint attached to it should
     // be the disjunction constraint for the overload group.
     auto &CG = CS.getConstraintGraph();
-    SmallPtrSet<Constraint *, 4> disjunctions;
+    llvm::SetVector<Constraint *> disjunctions;
     CG.gatherConstraints(tyvarType, disjunctions,
                          ConstraintGraph::GatheringKind::EquivalenceClass,
                          [](Constraint *constraint) -> bool {

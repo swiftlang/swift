@@ -22,6 +22,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Compiler.h"
 #include <functional>
@@ -223,7 +224,7 @@ public:
   /// gets merged or bound to a fixed type.
   void
   gatherConstraints(TypeVariableType *typeVar,
-                    SmallPtrSetImpl<Constraint *> &constraints,
+                    llvm::SetVector<Constraint *> &constraints,
                     GatheringKind kind,
                     llvm::function_ref<bool(Constraint *)> acceptConstraint =
                         [](Constraint *constraint) { return true; });

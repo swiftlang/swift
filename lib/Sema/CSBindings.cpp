@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 #include "ConstraintGraph.h"
 #include "ConstraintSystem.h"
+#include "llvm/ADT/SetVector.h"
 #include <tuple>
 
 using namespace swift;
@@ -361,7 +362,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
   assert(!typeVar->getImpl().getFixedType(nullptr) && "has a fixed type");
 
   // Gather the constraints associated with this type variable.
-  SmallPtrSet<Constraint *, 8> constraints;
+  llvm::SetVector<Constraint *> constraints;
   getConstraintGraph().gatherConstraints(
       typeVar, constraints, ConstraintGraph::GatheringKind::EquivalenceClass);
 

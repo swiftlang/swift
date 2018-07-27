@@ -19,6 +19,7 @@
 #include "ConstraintGraph.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/Basic/Statistic.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Format.h"
@@ -213,7 +214,7 @@ void ConstraintSystem::setMustBeMaterializableRecursive(Type type)
 void ConstraintSystem::addTypeVariableConstraintsToWorkList(
        TypeVariableType *typeVar) {
   // Gather the constraints affected by a change to this type variable.
-  SmallPtrSet<Constraint *, 8> inactiveConstraints;
+  llvm::SetVector<Constraint *> inactiveConstraints;
   CG.gatherConstraints(
       typeVar, inactiveConstraints, ConstraintGraph::GatheringKind::AllMentions,
       [](Constraint *constraint) { return !constraint->isActive(); });

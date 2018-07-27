@@ -21,6 +21,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Compiler.h"
 
 using namespace swift;
@@ -5050,7 +5051,7 @@ ConstraintSystem::addKeyPathApplicationRootConstraint(Type root, ConstraintLocat
   if (!typeVar)
     return;
 
-  SmallPtrSet<Constraint *, 4> constraints;
+  llvm::SetVector<Constraint *> constraints;
   CG.gatherConstraints(
       typeVar, constraints, ConstraintGraph::GatheringKind::EquivalenceClass,
       [&keyPathExpr](Constraint *constraint) -> bool {
