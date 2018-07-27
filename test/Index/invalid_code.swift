@@ -12,3 +12,15 @@ class CrashTest {
 }
 // CHECK: [[@LINE+1]]:13 | instance-method/Swift | returnSelf
 CrashTest().returnSelf(["": 0]).something()
+
+class CrashTest2 {
+// CHECK: [[@LINE+1]]:8 | instance-method/Swift | bar
+  func bar() {
+    someClosure { [weak self] in
+      guard let sSelf = self else { return }
+
+      let newDataProvider = Foo()
+      newDataProvider.delegate = sSelf
+    }
+  }
+}
