@@ -565,7 +565,7 @@ func bar<GenericParameterClause><<GenericParameter>T : <SimpleTypeIdentifier>Num
 
 #gradient(<IdentifierExpr>foo</IdentifierExpr>)</ReverseAutoDiffExpr><ReverseAutoDiffExpr>
 #gradient(<IdentifierExpr>foo</IdentifierExpr>, wrt: <ReverseAutoDiffExprParam><DifferentiationIndexParam>.0</DifferentiationIndexParam>, </ReverseAutoDiffExprParam><ReverseAutoDiffExprParam><DifferentiationIndexParam>.1</DifferentiationIndexParam></ReverseAutoDiffExprParam>)</ReverseAutoDiffExpr><ReverseAutoDiffExpr>
-#chainableGradient(<IdentifierExpr>foo</IdentifierExpr>, wrt: <ReverseAutoDiffExprParam><DifferentiationIndexParam>.0</DifferentiationIndexParam>, </ReverseAutoDiffExprParam><ReverseAutoDiffExprParam><DifferentiationIndexParam>.1</DifferentiationIndexParam></ReverseAutoDiffExprParam>)</ReverseAutoDiffExpr><AdjointExpr>
+#chainableGradient(<IdentifierExpr>foo</IdentifierExpr>, wrt: <ReverseAutoDiffExprParam><DifferentiationIndexParam>.0</DifferentiationIndexParam>, </ReverseAutoDiffExprParam><ReverseAutoDiffExprParam><DifferentiationIndexParam>.1</DifferentiationIndexParam></ReverseAutoDiffExprParam>)</ReverseAutoDiffExpr><ReverseAutoDiffExpr>
 #valueAndGradient(<IdentifierExpr>foo</IdentifierExpr>, wrt: <ReverseAutoDiffExprParam><DifferentiationIndexParam>.0</DifferentiationIndexParam>, </ReverseAutoDiffExprParam><ReverseAutoDiffExprParam><DifferentiationIndexParam>.1</DifferentiationIndexParam></ReverseAutoDiffExprParam>)</ReverseAutoDiffExpr><AdjointExpr>
 
 #adjoint(+)</AdjointExpr><AdjointExpr>
