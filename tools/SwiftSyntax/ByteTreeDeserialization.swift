@@ -215,12 +215,30 @@ class ByteTreeReader {
     return result
   }
 
-  /// Read the number of fields in an object or the binary length of a scalar
-  /// field.
+  private func readFieldLength() -> (isObject: Bool, length: Int) {
+    let raw = UInt32(littleEndian: readRaw(UInt32.self))
+    let isObject = (raw & (UInt32(1) << 31)) != 0
+    let length = Int(raw & ~(UInt32(1) << 31))
+    return (isObject, length)
+  }
+
+
+  /// Read the number of fields in an object.
   ///
-  /// - Returns: The read value
-  private func readFieldLength() -> Int {
-    return Int(UInt32(littleEndian: readRaw(UInt32.self)))
+  /// - Returns: The number of fields in the following object
+  private func readObjectLength() -> Int {
+    let (isObject, length) = readFieldLength()
+    assert(isObject)
+    return length
+  }
+
+  /// Read the size of a scalar in bytes
+  ///
+  /// - Returns: The size of the following scalar in bytes
+  private func readScalarLength() -> Int {
+    let (isObject, length) = readFieldLength()
+    assert(!isObject)
+    return length
   }
 
   /// Read the protocol version and validate that it can be read using the given
@@ -246,7 +264,7 @@ class ByteTreeReader {
   fileprivate func read<T: ByteTreeObjectDecodable>(
     _ objectType: T.Type
   ) -> T {
-    let numFields = readFieldLength()
+    let numFields = readObjectLength()
     let objectReader = ByteTreeObjectReader(reader: self,
                                             numFields: numFields)
     return T.read(from: objectReader, numFields: numFields, userInfo: userInfo)
@@ -259,7 +277,7 @@ class ByteTreeReader {
   fileprivate func read<T: ByteTreeScalarDecodable>(
     _ scalarType: T.Type
   ) -> T {
-    let fieldSize = readFieldLength()
+    let fieldSize = readScalarLength()
     defer {
       pointer = pointer.advanced(by: fieldSize)
     }
@@ -268,10 +286,16 @@ class ByteTreeReader {
 
   /// Discard the next scalar field, advancing the pointer to the next field
   fileprivate func discardField() {
-    // FIXME: This can currently only discard scalar fields. Object fields
-    // should also be discardable
-    let fieldSize = readFieldLength()
-    pointer = pointer.advanced(by: fieldSize)
+    let (isObject, length) = readFieldLength()
+    if isObject {
+      // Discard object by discarding all its objects
+      for _ in 0..<length {
+        discardField()
+      }
+    } else {
+      // Discard scalar
+      pointer = pointer.advanced(by: length)
+    }
   }
 }
 
