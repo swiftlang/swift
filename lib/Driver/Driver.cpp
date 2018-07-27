@@ -1815,12 +1815,11 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
     if (Args.hasArg(options::OPT_execute)) {
       SmallString<128> Buffer;
       std::error_code EC =
-        llvm::sys::fs::createTemporaryFile("execute", "swift", Buffer);
+          llvm::sys::fs::createTemporaryFile("execute", "swift", Buffer);
 
       if (EC) {
-        Diags.diagnose(SourceLoc(),
-            diag::error_unable_to_make_temporary_file,
-            EC.message());
+        Diags.diagnose(SourceLoc(), diag::error_unable_to_make_temporary_file,
+                       EC.message());
         return;
       }
 
@@ -1834,9 +1833,9 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       OS.flush();
 
       const Arg *A = Args.getLastArg(options::OPT_execute);
-      const Arg *InputArg = new Arg(
-          Opts->getOption(options::OPT_INPUT), A->getValue(),
-          A->getIndex(), Args.MakeArgString(Buffer.str()));
+      const Arg *InputArg =
+          new Arg(Opts->getOption(options::OPT_INPUT), A->getValue(),
+                  A->getIndex(), Args.MakeArgString(Buffer.str()));
       InputArg->claim();
       CA->addInput(
           C.createAction<InputAction>(*InputArg, file_types::TY_Swift));
