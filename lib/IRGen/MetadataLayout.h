@@ -249,12 +249,9 @@ public:
 
   MethodInfo getMethodInfo(IRGenFunction &IGF, SILDeclRef method) const;
 
-  /// Assuming that the given method is at a static offset in the metadata,
-  /// return that static offset.
-  ///
-  /// DEPRECATED: callers should be updated to handle this in a
-  /// more arbitrary fashion.
-  Size getStaticMethodOffset(SILDeclRef method) const;
+  /// Return the information necessary to compute the offset of a method's
+  /// vtable entry in the class object.
+  StoredOffset getMethodOffsetInfo(SILDeclRef method) const;
 
   Offset getFieldOffset(IRGenFunction &IGF, VarDecl *field) const;
 

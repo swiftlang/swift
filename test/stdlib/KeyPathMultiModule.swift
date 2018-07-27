@@ -33,9 +33,13 @@ class LocalSub: ResilientSub {
   }
 
   final var storedD: String = "zim"
+  final var storedE: String = "zang"
 
-  var localSub: String {
-    get { return "zang" }
+  var localSubA: String {
+    get { return "zung" }
+  }
+  var localSubB: String {
+    get { return "zipiti" }
   }
 }
 
@@ -174,13 +178,25 @@ keyPathMultiModule.test("identity across multiple modules") {
                           \ResilientSub.subRO)
 
     // Ensure that we can instantiate key paths on a local subclass of a
-    // resilient class.
-    expectEqual(\LocalSub.storedA, \LocalSub.storedA)
-    expectEqual(\LocalSub.storedB, \LocalSub.storedB)
-    expectEqual(\LocalSub.storedC, \LocalSub.storedC)
-    //TODO expectEqual(\LocalSub.storedD, \LocalSub.storedD)
-    expectEqual(\LocalSub.virtual, \LocalSub.virtual)
-    //TODO expectEqual(\LocalSub.localSub, \LocalSub.localSub)
+    // resilient class, and that they have distinct values.
+    let kps: [PartialKeyPath<LocalSub>] = [
+      \LocalSub.storedA,
+      \LocalSub.storedB,
+      \LocalSub.storedC,
+      \LocalSub.storedD,
+      \LocalSub.storedE,
+      \LocalSub.virtual,
+      \LocalSub.sub,
+      \LocalSub.localSubA,
+      \LocalSub.localSubB,
+    ]
+
+    for i in kps.indices {
+      for j in kps.indices {
+        if i == j { continue }
+        expectNotEqual(kps[i], kps[j])
+      }
+    }
 
     func testInGenericContext2<W: ResilientSubProto>(_: W.Type) {
       expectEqualWithHashes(ResilientRootProto_root_keypath(W.self),

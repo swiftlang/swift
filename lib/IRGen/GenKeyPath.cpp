@@ -930,16 +930,23 @@ emitKeyPathComponent(IRGenModule &IGM,
           auto declaringClass =
             cast<ClassDecl>(declRef.getDecl()->getDeclContext());
           auto &metadataLayout = IGM.getClassMetadataLayout(declaringClass);
-          // FIXME: Resilience. We don't want vtable layout to be ABI, so this
-          // should be encoded as a reference to the method dispatch thunk
-          // instead.
-          auto offset = metadataLayout.getStaticMethodOffset(declRef);
+
+          // For a class method, we don't necessarily need the absolute offset,
+          // only an offset that's unique to this method. For a class with
+          // resilient ancestry, all of the superclass methods will be
+          // identified by their dispatch thunk (see above), so we can use
+          // relative offsets from the dynamic base offset to identify the local
+          // class's own methods.
+          auto methodInfo = metadataLayout.getMethodOffsetInfo(declRef);
+          Size offset;
+          if (methodInfo.isStatic())
+            offset = methodInfo.getStaticOffset();
+          else
+            offset = methodInfo.getRelativeOffset();
+
           idValue = llvm::ConstantInt::get(IGM.SizeTy, offset.getValue());
           idResolved = true;
         } else if (auto methodProto = dyn_cast<ProtocolDecl>(dc)) {
-          // FIXME: Resilience. We don't want witness table layout to be ABI,
-          // so this should be encoded as a reference to the method dispatch
-          // thunk instead.
           auto &protoInfo = IGM.getProtocolInfo(methodProto);
           auto index = protoInfo.getFunctionIndex(
                                cast<AbstractFunctionDecl>(declRef.getDecl()));
