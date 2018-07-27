@@ -7,7 +7,7 @@ public func basicDebugValues(_ x: Tensor<Float>) {
   let z = y.squared()
 }
 
-// FIXME: `debug_value_addr` for is not currently preserved due to SSA promotion in deabstraction.
+// FIXME: `debug_value_addr` for `z` is not currently preserved due to SSA promotion in deabstraction.
 public func debugValuesInLoop(_ x: Tensor<Float>) {
   var z = x.squared()
   for i in 0..<10 {
