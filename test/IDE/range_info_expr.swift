@@ -24,6 +24,13 @@ func foo1(_ c : CC) -> CC{
   return c.getSelf()
 }
 
+protocol Foo {
+  var bar: String { get }
+}
+func foo(x: Foo) {
+  _ = x.bar
+}
+
 // RUN: %target-swift-ide-test -range -pos=7:8 -end-pos=7:19 -source-filename %s | %FileCheck %s -check-prefix=CHECK-BOOL
 // CHECK-BOOL: <Type>Bool</Type>
 
@@ -36,6 +43,8 @@ func foo1(_ c : CC) -> CC{
 // RUN: %target-swift-ide-test -range -pos=23:31 -end-pos=23:41 -source-filename %s | %FileCheck %s -check-prefix=CHECK-PART-EXPR1
 // RUN: %target-swift-ide-test -range -pos=23:20 -end-pos=23:30 -source-filename %s | %FileCheck %s -check-prefix=CHECK-PART-EXPR1
 // RUN: %target-swift-ide-test -range -pos=23:9 -end-pos=23:19 -source-filename %s | %FileCheck %s -check-prefix=CHECK-PART-EXPR1
+
+// RUN: %target-swift-ide-test -range -pos=31:7 -end-pos=31:12 -source-filename %s | %FileCheck %s -check-prefix=CHECK-OEE-EXPR
 
 // CHECK-PART-EXPR: <Kind>PartOfExpression</Kind>
 // CHECK-PART-EXPR-NEXT: <Content>getSelf()</Content>
@@ -50,3 +59,10 @@ func foo1(_ c : CC) -> CC{
 // CHECK-PART-EXPR2: <Parent>Call</Parent>
 // CHECK-PART-EXPR2: <ASTNodes>2</ASTNodes>
 // CHECK-PART-EXPR2: <end>
+
+// CHECK-OEE-EXPR: <Kind>SingleExpression</Kind>
+// CHECK-OEE-EXPR-NEXT: <Content>x.bar</Content>
+// CHECK-OEE-EXPR-NEXT: <Type>String</Type><Exit>false</Exit>
+// CHECK-OEE-EXPR-NEXT: <Context>swift_ide_test.(file).foo(x:)</Context>
+// CHECK-OEE-EXPR-NEXT: <ASTNodes>1</ASTNodes>
+// CHECK-OEE-EXPR-NEXT: <end>
