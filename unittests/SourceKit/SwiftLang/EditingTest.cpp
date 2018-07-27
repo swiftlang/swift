@@ -41,6 +41,8 @@ private:
     llvm_unreachable("unexpected error");
   }
 
+  bool syntaxMapEnabled() override { return true; }
+
   bool handleSyntaxMap(unsigned Offset, unsigned Length, UIdent Kind) override {
     return false;
   }
@@ -49,6 +51,8 @@ private:
                                 UIdent Kind, bool isSystem) override {
     return false;
   }
+  
+  bool documentStructureEnabled() override { return false; }
 
   bool beginDocumentSubStructure(unsigned Offset, unsigned Length,
                                  UIdent Kind, UIdent AccessLevel,
@@ -109,8 +113,6 @@ private:
       std::vector<SourceFileRange> ReuseRegions) override {
     return false;
   }
-
-  bool forceLibSyntaxBasedProcessing() override { return false; }
 };
 
 struct DocUpdateMutexState {
