@@ -350,13 +350,9 @@ namespace tf {
   /// more functions beyond `graphFnName`, if that function calls into other
   /// graph functions (e.g. if it has functional If/While ops).
   struct LoweredGraphFunction {
-    LoweredGraphFunction(
-        const std::string &silHostFnName, const std::string &graphFnName,
-        std::unique_ptr<TF_Graph, decltype(&TF_DeleteGraph)> graph,
-        SmallVector<std::pair<StringRef, SILLocation>, 1> pendingGraphFnNames)
-        : silHostFnName(silHostFnName), graphFnName(graphFnName),
-          graph(std::move(graph)),
-          pendingGraphFnNames(std::move(pendingGraphFnNames)) {}
+    LoweredGraphFunction(const std::string &silHostFnName,
+                         const std::string &graphFnName)
+        : silHostFnName(silHostFnName), graphFnName(graphFnName) {}
 
     LoweredGraphFunction(LoweredGraphFunction &&) = delete;
 
@@ -364,58 +360,72 @@ namespace tf {
     std::string silHostFnName;
 
     std::string graphFnName;
-
-    std::unique_ptr<TF_Graph, decltype(&TF_DeleteGraph)> graph;
-
-    /// Each entry track a "pending" graph function F (via its host function
-    /// name) referenced by this function, along with the source location
-    /// indicating where this function references F.
-    /// "Pending" means the graph definition of F is not yet available. Once it
-    /// is generated later, it will be copied over to `graph` so that `graph`
-    /// becomes self-contained.
-    SmallVector<std::pair<StringRef, SILLocation>, 1> pendingGraphFnNames;
   };
 
-  /// Lower the accelerator-only function `fn` (which was formed by the
-  /// partitioner) into a TensorFlow graph function, and add an entry to
-  /// `graphFunctions`, keyed on `hostFnName`. This way another graph function
-  /// foo() can call/use this function, if the corresponding SIL code of foo()
-  /// calls/uses `hostFnName`.
-  bool lowerTFFunction(
-      StringRef hostFnName, SILFunction *fn,
-      const GraphFunctionDeviceInfo &deviceInfo,
-      llvm::DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>>
-          &graphFunctions);
+  /// Each object lowers a set of accelerator functions into a single TF graph.
+  class TFGraphLowering {
+    llvm::DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>>
+        &graphFunctions;
+    std::unique_ptr<TF_Graph, decltype(&TF_DeleteGraph)> graph;
+    TF_Operation *metadataNodeForTPU = nullptr;
 
-  /// Similar to the function above, except it handles a non-accelerator-only
-  /// function, which can be lowered to graph functions on a set of TF devices.
-  ///
-  /// When deviceInfo.usedDeviceTypes has N>1 devices, in addition to
-  /// generating a graph function whose name is
-  /// LoweredGraphFunction::graphFnName (referred to as `entryFnBaseName`), also
-  /// generate another N-1 nodes named `entryFnBaseName_helper_{i}`, with i
-  /// ranging from 0 to N-2. These N nodes correspond to the N per-device graph
-  /// functions, and must be called by the runtime in a single SessionRun()
-  /// call. Those N-1 helper functions take no input or output tensors, and are
-  /// executed for their side-effects of sending/receiving tensors with the
-  /// function of `entryFnBaseName`.
-  bool
-  lowerTFGraph(StringRef hostFnName, SILFunction *fn,
-               const GraphFunctionDeviceInfo &deviceInfo,
-               llvm::DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>>
-                   &graphFunctions);
+    /// This is a counter we use to give each cross-device send/receive
+    /// operation a unique ID.
+    int nextTensorTransferId = 0;
 
-  /// Copy the graphs functions in `srcGraph` to `resultGraph`, and verify that
-  /// `graphFuncName` must be one of the graph functions to copy over. Return
-  /// true on error, with error already emitted on `fn` and `loc`.
-  bool copyGraphFunctions(SILFunction &fn, SILLocation loc,
-                          StringRef graphFuncName, TF_Graph *srcGraph,
-                          TF_Graph *resultGraph);
+  public:
+    TFGraphLowering(
+        llvm::DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>>
+            &graphFunctions);
 
-  /// Serialize `resultGraph` into a binary protobuf into `bytes`.
-  /// Return true on error, with a error diagnostic already emitted.
-  bool serializeGraphProtoBuf(SILFunction &SILFn, TF_Graph *resultGraph,
-                              std::vector<char> &bytes);
+    /// Lower the accelerator-only function `fn` (which was formed by the
+    /// partitioner) into a TensorFlow graph function, and add an entry to
+    /// `graphFunctions`, keyed on `hostFnName`. This way another graph
+    /// function foo() can call/use this function, if the corresponding SIL
+    /// code of foo() calls/uses `hostFnName`.
+    bool lowerTFFunction(StringRef hostFnName, SILFunction *fn,
+                         const GraphFunctionDeviceInfo &deviceInfo);
+
+    /// Similar to the function above, except it handles a
+    /// non-accelerator-only function, which can be lowered to graph functions
+    /// on a set of TF devices.
+    ///
+    /// When deviceInfo.usedDeviceTypes has N>1 devices, in addition to
+    /// generating a graph function whose name is
+    /// LoweredGraphFunction::graphFnName (referred to as `entryFnBaseName`),
+    /// also generate another N-1 nodes named `entryFnBaseName_helper_{i}`,
+    /// with i ranging from 0 to N-2. These N nodes correspond to the N
+    /// per-device graph functions, and must be called by the runtime in a
+    /// single SessionRun() call. Those N-1 helper functions take no input or
+    /// output tensors, and are executed for their side-effects of
+    /// sending/receiving tensors with the function of `entryFnBaseName`.
+    bool lowerTFGraph(StringRef hostFnName, SILFunction *fn,
+                      const GraphFunctionDeviceInfo &deviceInfo);
+
+    /// Serialize `graph` into a binary protobuf into `bytes`.
+    /// Return true on error, with an error diagnostic already emitted at
+    /// `errorLoc`.
+    bool serializeGraphProtoBuf(ASTContext &ctx, SILLocation errorLoc,
+                                std::vector<char> &bytes);
+
+    /// Return the graph for debug printing.
+    TF_Graph *getGraphDebug() { return graph.get(); }
+
+  private:
+    /// This is a helper function to unify the implementation of
+    /// lowerTFFunction() and lowerTFGraph(). The former calls this method with
+    /// `isAcceleratorOnly` set to true, and the latter false. See their doc
+    /// comments on the semantics.
+    ///
+    ///  `graphFnNameForCaller` provides for the caller with a name to call this
+    /// lowered graph function. If `isAcceleratorOnly` is true, it is the graph
+    /// function name for a TF graph node to call; otherwise, it is a function
+    /// name for the host runtime to call.
+    bool lowerTFGraphOrFunction(StringRef hostFnName, SILFunction *fn,
+                                const std::string &graphFnNameForCaller,
+                                bool isAcceleratorOnly,
+                                const GraphFunctionDeviceInfo &deviceInfo);
+  };
 
 } // end namespace tf
 } // end namespace swift

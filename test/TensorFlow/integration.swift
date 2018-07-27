@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -verify -Xllvm -tf-strict-deabstraction %s | %FileCheck %s 
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -verify -Xllvm -tf-strict-deabstraction -Xllvm -tf-module-level-graph=false %s | %FileCheck %s 
 
 import TensorFlow
 
