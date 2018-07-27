@@ -152,9 +152,7 @@ where SubSequence: RandomAccessCollection, Indices: RandomAccessCollection
   ///   is the same value as the result of `abs(distance)` calls to
   ///   `index(before:)`.
   ///
-  /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the absolute
-  ///   value of `distance`.
+  /// - Complexity: O(1)
   func index(_ i: Index, offsetBy distance: Int) -> Index
 
   /// Returns an index that is the specified distance from the given index,
@@ -196,9 +194,7 @@ where SubSequence: RandomAccessCollection, Indices: RandomAccessCollection
   ///   index would be beyond `limit` in the direction of movement. In that
   ///   case, the method returns `nil`.
   ///
-  /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the absolute
-  ///   value of `distance`.
+  /// - Complexity: O(1)
   func index(
     _ i: Index, offsetBy distance: Int, limitedBy limit: Index
   ) -> Index?
@@ -216,9 +212,7 @@ where SubSequence: RandomAccessCollection, Indices: RandomAccessCollection
   ///   negative only if the collection conforms to the
   ///   `BidirectionalCollection` protocol.
   ///
-  /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the
-  ///   resulting distance.
+  /// - Complexity: O(1)
   func distance(from start: Index, to end: Index) -> Int
 }
 
