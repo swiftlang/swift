@@ -1752,16 +1752,6 @@ GLStatus TFGraphLowering::visitTFDataset(Inst *inst) {
   return GLStatus::Success;
 }
 
-/// Check whether the specified TensorFlow status object is valid or not.  If
-/// valid return false.  If invalid, emit a diagnostic and return true.
-static bool checkStatus(SILFunction &fn, SILLocation loc, TF_Status *status,
-                        Diag<StringRef> id = diag::tf_lowering_error) {
-  if (TF_GetCode(status) == TF_OK)
-    return false;
-  diagnose(fn, loc, id, TF_Message(status));
-  return true;
-}
-
 /// Copy the graphs functions in `srcGraph` to `resultGraph`, and verify that
 /// `graphFuncName` must be one of the graph functions to copy over. Return true
 /// on error, with error already emitted on `fn` and `loc`.
