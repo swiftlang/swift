@@ -46,8 +46,9 @@ public struct ${Builder} {
     if let list = layout[idx] {
       layout[idx] = list.appending(elt.raw)
     } else {
-      layout[idx] = RawSyntax.node(
-        .${child.swift_syntax_kind}, [elt.raw], .present, nil)
+      layout[idx] = RawSyntax(kind: SyntaxKind.${child.swift_syntax_kind},
+                              layout: [elt.raw],
+                              presence: SourcePresence.present)
     }
   }
 %       else:
@@ -68,8 +69,8 @@ public struct ${Builder} {
 %       end
 %     end
 
-    return SyntaxData(raw: .node(.${node.swift_syntax_kind},
-                                 layout, .present, nil))
+    return SyntaxData(raw: RawSyntax(kind: .${node.swift_syntax_kind},
+                                     layout: layout, presence: .present))
   }
 }
 

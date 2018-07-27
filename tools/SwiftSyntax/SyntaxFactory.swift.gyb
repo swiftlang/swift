@@ -31,15 +31,16 @@ public enum SyntaxFactory {
   public static func makeToken(_ kind: TokenKind, presence: SourcePresence,
                  leadingTrivia: Trivia = [],
                  trailingTrivia: Trivia = []) -> TokenSyntax {
-    let data = SyntaxData(raw: .token(kind, leadingTrivia,
-                                      trailingTrivia, presence, nil))
+    let raw = RawSyntax(kind: kind, leadingTrivia: leadingTrivia,
+                        trailingTrivia: trailingTrivia, presence: presence)
+    let data = SyntaxData(raw: raw)
     return TokenSyntax(root: data, data: data)
   }
 
   public static func makeUnknownSyntax(tokens: [TokenSyntax]) -> Syntax {
-    let data = SyntaxData(raw: .node(.unknown, 
-                                     tokens.map { $0.data.raw },
-                                     .present, nil))
+    let raw = RawSyntax(kind: .unknown, layout: tokens.map { $0.data.raw },
+                        presence: .present)
+    let data = SyntaxData(raw: raw)
     return UnknownSyntax(root: data, data: data)
   }
 
@@ -57,7 +58,7 @@ public enum SyntaxFactory {
 %         child_params.append("%s: %s" % (child.swift_name, param_type))
 %     child_params = ', '.join(child_params)
   public static func make${node.syntax_kind}(${child_params}) -> ${node.name} {
-    let data = SyntaxData(raw: .node(.${node.swift_syntax_kind}, [
+    let layout: [RawSyntax?] = [
 %     for child in node.children:
 %       if child.is_optional:
       ${child.swift_name}?.data.raw ?? ${make_missing_swift_child(child)},
@@ -65,26 +66,31 @@ public enum SyntaxFactory {
       ${child.swift_name}.data.raw,
 %       end
 %     end
-    ], .present, nil))
+    ]
+    let raw = RawSyntax(kind: SyntaxKind.${node.swift_syntax_kind},
+                        layout: layout, presence: SourcePresence.present)
+    let data = SyntaxData(raw: raw)
     return ${node.name}(root: data, data: data)
   }
 %   elif node.is_syntax_collection():
   public static func make${node.syntax_kind}(
     _ elements: [${node.collection_element_type}]) -> ${node.name} {
-    let data = SyntaxData(raw: .node(.${node.swift_syntax_kind},
-                                     elements.map { $0.data.raw }, .present,
-                                     nil))
+    let raw = RawSyntax(kind: SyntaxKind.${node.swift_syntax_kind},
+                        layout: elements.map { $0.data.raw },
+                        presence: SourcePresence.present)
+    let data = SyntaxData(raw: raw)
     return ${node.name}(root: data, data: data)
   }
 %   end
 
 %   if not node.is_base():
   public static func makeBlank${node.syntax_kind}() -> ${node.name} {
-    let data = SyntaxData(raw: .node(.${node.swift_syntax_kind}, [
+    let data = SyntaxData(raw: RawSyntax(kind: .${node.swift_syntax_kind},
+                                         layout: [
 %     for child in node.children:
       ${make_missing_swift_child(child)},
 %     end
-    ], .present, nil))
+    ], presence: .present))
     return ${node.name}(root: data, data: data)
   }
 %   end
