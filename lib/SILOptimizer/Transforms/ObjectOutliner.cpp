@@ -11,11 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "objectoutliner"
+#include "swift/AST/ASTMangler.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Local.h"
-#include "swift/AST/ASTMangler.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
 
@@ -431,7 +432,8 @@ void ObjectOutliner::replaceFindStringCall(ApplyInst *FindStringCall) {
     return;
 
   SILDeclRef declRef(FD, SILDeclRef::Kind::Func);
-  SILFunction *replacementFunc = Module->getOrCreateFunction(
+  SILFunctionBuilder builder(*Module);
+  SILFunction *replacementFunc = builder.getOrCreateFunction(
       FindStringCall->getLoc(), declRef, NotForDefinition);
 
   SILFunctionType *FTy = replacementFunc->getLoweredFunctionType();
