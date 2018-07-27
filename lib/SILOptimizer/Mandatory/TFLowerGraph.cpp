@@ -226,7 +226,6 @@ struct TFGraphFunctionLowering
   const std::string &funcNodeBaseName;
   llvm::DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>>
       &graphFunctions;
-  llvm::DenseMap<SILType, TF_Output> undefGraphNodes;
   TF_Graph *resultGraph;
   TF_Status *status;
 
@@ -859,10 +858,6 @@ static bool checkStatus(SILFunction &fn, SILLocation loc, TF_Status *status,
 
 /// On error, return a "NULL" value, and emit an error diagnostic.
 TF_Output TFGraphFunctionLowering::createUndefNode(SILType type) {
-  auto iter = undefGraphNodes.find(type);
-  if (iter != undefGraphNodes.end()) {
-    return iter->second;
-  }
   // Create some magic constant. Actual value does not matter as it will
   // not be used in any calculations.
   // FIXME: Is there a better way to model undefs in TF Graph if we
@@ -944,8 +939,6 @@ TF_Output TFGraphFunctionLowering::createUndefNode(SILType type) {
                        /*isEligibleForTPU*/ true, status);
   if (::checkStatus(SILFn, SILFn.getLocation(), status))
     return {nullptr, 0};
-  // Update cache
-  undefGraphNodes[type] = {finalResult, 0};
   return {finalResult, 0};
 }
 
