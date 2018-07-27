@@ -97,9 +97,9 @@ struct ReferenceStorageTypeLayout<T, Native : C, Unknown : AnyObject> {
   // CHECK-32: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_4_4_[[REF_XI]]_pod, i32 0, i32 0)
   unowned(unsafe) var aou:  AnyObject
   // CHECK-native-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_8_8_[[REF_XI]]_bt, i32 0, i32 0)
-  // CHECK-objc-64:   store i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @type_layout_8_8_0, i32 0, i32 0)
+  // CHECK-objc-64:   store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_8_8_1, i32 0, i32 0)
   // CHECK-native-32: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_4_4_[[REF_XI]]_bt, i32 0, i32 0)
-  // CHECK-objc-32:   store i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @type_layout_4_4_0, i32 0, i32 0)
+  // CHECK-objc-32:   store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_4_4_1, i32 0, i32 0)
   unowned(safe)   var aos:  AnyObject
   // CHECK-64: store i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @type_layout_8_8_0, i32 0, i32 0)
   // CHECK-32: store i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @type_layout_4_4_0, i32 0, i32 0)
