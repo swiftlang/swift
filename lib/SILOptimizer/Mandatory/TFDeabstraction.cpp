@@ -2020,8 +2020,10 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
       switch (constValue.getKind()) {
       case SymbolicValue::Unknown:
       case SymbolicValue::UninitMemory:
+        assert(0 && "earlier code should have ruled out non-constant values");
+
       case SymbolicValue::Address:
-        assert(0 && "Cannot happen");
+        assert(0 && "it's impossible to pass an address as an attr");
 
       case SymbolicValue::Enum:
       case SymbolicValue::EnumWithPayload:
