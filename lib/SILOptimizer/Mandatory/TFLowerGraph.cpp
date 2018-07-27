@@ -478,6 +478,7 @@ public:
 
   /// Return the TensorFlow operand for the specified value.  Note that this can
   /// return a null value if an error occurred lowering the operand in question.
+  /// On error, return a "NULL" value, and emit an error diagnostic.
   TF_Output getOperandValue(SILValue v) {
     // ops can produce multiple values, and we support tuple_extract
     // instructions that access them.  Check to see if this is referring to a
@@ -496,6 +497,7 @@ public:
   /// Return the TensorFlow operand for the specified SILOpResult (a
   /// SILValue+result #).  Note that this can return a null value if an error
   /// occurred lowering the operand in question.
+  /// On error, return a "NULL" value, and emit an error diagnostic.
   TF_Output getOperandValue(SILOpResult v) {
     if (isa<SILUndef>(v.first) ) {
       return createUndefNode(v.first->getType());
@@ -830,6 +832,17 @@ static TF_Tensor *convertValuesToTensor(ArrayRef<APInt> elts,
   return tensor;
 }
 
+/// Check whether the specified TensorFlow status object is valid or not.  If
+/// valid return false.  If invalid, emit a diagnostic and return true.
+static bool checkStatus(SILFunction &fn, SILLocation loc, TF_Status *status,
+                        Diag<StringRef> id = diag::tf_lowering_error) {
+  if (TF_GetCode(status) == TF_OK)
+    return false;
+  diagnose(fn, loc, id, TF_Message(status));
+  return true;
+}
+
+/// On error, return a "NULL" value, and emit an error diagnostic.
 TF_Output TFGraphLowering::createUndefNode(SILType type) {
   // Create some magic constant. Actual value does not matter as it will
   // not be used in any calculations.
@@ -910,6 +923,8 @@ TF_Output TFGraphLowering::createUndefNode(SILType type) {
   TF_Operation *finalResult =
       graphFn.finishOp(result, /*hasSideEffects*/ false,
                        /*isEligibleForTPU*/ true, status);
+  if (::checkStatus(SILFn, SILFn.getLocation(), status))
+    return {nullptr, 0};
   return {finalResult, 0};
 }
 
@@ -3174,6 +3189,7 @@ GLStatus TFGraphLowering::lowerRegion(SESERegionTree *region) {
 /// indicates the value that is passed in to fulfill this parameter from the
 /// next outer scope.  For the top-level parameters to the SIL function, the
 /// passedValue can be null.
+/// On error, return a "NULL" value, and emit an error diagnostic.
 TF_Output TFGraphLowering::
 createParameter(SILOpResult value, TF_Output passedValue,
                 GraphFunctionBody &fn) {

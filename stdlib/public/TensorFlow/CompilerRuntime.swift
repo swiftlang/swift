@@ -840,6 +840,8 @@ public func _TFCStartTensorComputation(
     \(helperFunctionCount) helper functions, and \(resultCount) output tensors.
     """)
 
+  internalConsistencyCheck(programByteCount > 0, "Cannot run an empty graph!")
+  
   return _TensorComputation(programByteAddress: programByteAddress,
                             programByteCount: programByteCount,
                             entryFunctionBaseNameAddress: entryFunctionBaseNameAddress,
