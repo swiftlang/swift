@@ -9,7 +9,7 @@
 
 public func foo(_ f: (Void) -> ()) {}
 
-// CHECK-REMAP: "offset": 632,
+// CHECK-REMAP: "offset": 581,
 // CHECK-REMAP: "remove": 5,
 // CHECK-REMAP: "text": "("
 
