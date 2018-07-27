@@ -206,7 +206,8 @@ unsigned tf::convertSwiftTypeToTF(Type ty) {
 
 /// `ty` must be a valid TensorFlow element type "T", like Builtin.Int32. Turn
 /// it into a TensorHandle<T> type.
-SILType tf::convertElementTypeToTensorValueType(Type ty, const ASTContext& ctx) {
+SILType tf::convertElementTypeToTensorValueType(Type ty,
+                                                const ASTContext& ctx) {
   assert(isValidTensorFlowElementType(ty));
   auto decl = ctx.getTensorHandleDecl();
   auto tensorType = BoundGenericClassType::get(decl, /*parent*/ Type(), ty);
@@ -221,27 +222,19 @@ SILType tf::convertElementTypeToTensorValueType(SILType ty) {
   if (isTensorFlowValue(ty))
     return ty;
 
-  return convertElementTypeToTensorValueType(ty.getASTType(), ty.getASTContext());
+  return convertElementTypeToTensorValueType(ty.getASTType(),
+                                             ty.getASTContext());
 }
 
 /// Looks up a function in the current module. If it exists, returns it.
 /// Otherwise, attempt to link it from imported modules. Returns null if such
 /// function name does not exist.
 SILFunction *tf::lookupOrLinkFunction(StringRef name, SILModule &module) {
-  auto *fn = module.lookUpFunction(name);
-  if (!fn)
-    fn = module.findFunction(name, SILLinkage::PublicExternal);
-  assert(fn);
-  if (fn->isExternalDeclaration()) {
-    bool loaded = module.loadFunction(fn);
-    assert(loaded);
-    (void)loaded;
-    // linkFunction() can return false if this function has already been
-    // deserialized and its body available in `module`.
-    module.linkFunction(fn);
-  }
-  assert(!fn->isExternalDeclaration());
-  assert(fn->isDefinition());
+  assert(!name.empty());
+  if (auto *localFn = module.lookUpFunction(name))
+    return localFn;
+  auto *fn = module.findFunction(name, SILLinkage::PublicExternal);
+  module.loadFunction(fn);
   return fn;
 }
 
