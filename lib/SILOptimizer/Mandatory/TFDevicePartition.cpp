@@ -615,22 +615,24 @@ class DevicePartitionerImpl
 
   /// This is a counter we use to give each cross-device send/receive operation
   /// a unique ID.
-  int nextTensorTransferId = 0;
+  int &nextTensorTransferId;
 
- public:
+public:
   /// Impl note: Although we can short-circuit
   /// markFunctionAndInsertTensorTransfers() and extractFunctionForDevice() when
   /// there is a single device, we choose to exercise them for test
   /// coverage. This can be optimized for compiler performance later if it turns
   /// out to matter.
-   DevicePartitionerImpl(SILFunction &srcFn,
-                         const GraphFunctionDeviceInfo &deviceInfo)
-       : srcFn(srcFn), deviceInfo(deviceInfo) {
-     static_assert(
-         NUM_DEVICE_TYPES <= 8,
-         "3 bits are allocated in KeyByInstDestDevice to encode device types");
-     markFunctionAndInsertTensorTransfers();
-   }
+  DevicePartitionerImpl(SILFunction &srcFn,
+                        const GraphFunctionDeviceInfo &deviceInfo,
+                        int &nextTensorTransferId)
+      : srcFn(srcFn), deviceInfo(deviceInfo),
+        nextTensorTransferId(nextTensorTransferId) {
+    static_assert(
+        NUM_DEVICE_TYPES <= 8,
+        "3 bits are allocated in KeyByInstDestDevice to encode device types");
+    markFunctionAndInsertTensorTransfers();
+  }
 
   /// Returns a function extracted from `srcFn`, specialized on `deviceType`.
   ///
@@ -881,7 +883,8 @@ class DevicePartitionerImpl
           GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
 
       auto loc = inst->getLoc();
-      SILBuilder B(inst);
+      // Insert the transfer right after the operandInst.
+      SILBuilder B(std::next(operandInst->getIterator()));
       auto &ctx = B.getASTContext();
 
       auto &allocator = ctx.getAllocator();
@@ -960,8 +963,10 @@ class DevicePartitionerImpl
 };
 
 DevicePartitioner::DevicePartitioner(SILFunction &srcFn,
-                                     const GraphFunctionDeviceInfo &deviceInfo)
-    : impl(new DevicePartitionerImpl(srcFn, deviceInfo)) {}
+                                     const GraphFunctionDeviceInfo &deviceInfo,
+                                     int &nextTensorTransferId)
+    : impl(new DevicePartitionerImpl(srcFn, deviceInfo, nextTensorTransferId)) {
+}
 
 DevicePartitioner::~DevicePartitioner() { delete impl; }
 

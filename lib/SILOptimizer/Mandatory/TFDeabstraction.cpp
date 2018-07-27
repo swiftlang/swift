@@ -1974,9 +1974,7 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
     // Ok, we have an attribute operand, we should have been able to fold it
     // through our constexpr evaluation logic.
     auto it = constants.find(operand);
-    assert(it != constants.end() && "out of sync with constant scanning loop");
-
-    if (!it->second.isConstant()) {
+    if (it == constants.end() || !it->second.isConstant()) {
       // TODO: improve the diagnostic to talk about the parameter label in
       // the user code, not the internal op attribute.  The bookkeeping for
       // this isn't obvious though.
@@ -1984,7 +1982,8 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
 
       // If we have more specific information about what went wrong, emit
       // notes.
-      if (it->second.getKind() == SymbolicValue::Unknown)
+      if (it != constants.end() &&
+          it->second.getKind() == SymbolicValue::Unknown)
         it->second.emitUnknownDiagnosticNotes(opInfo.inst->getLoc());
       return;
     }
