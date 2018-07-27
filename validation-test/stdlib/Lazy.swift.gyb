@@ -12,12 +12,6 @@
 // RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
-// <rdar://35797159> [Associated Type Inference]
-// heap-use-after-free ASTContext::getSpecializedConformance
-// llvm::FoldingSetBase::InsertNode
-// OR corrupted doubly linked list
-// REQUIRES: OS=macosx
-
 import StdlibUnittest
 import StdlibCollectionUnittest
 
