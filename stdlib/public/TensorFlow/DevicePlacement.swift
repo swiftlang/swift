@@ -14,6 +14,16 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// A TensorFlow device kind.
+public enum DeviceKind {
+  /// Default device.
+  case `default`
+  /// Graphics processing units.
+  case gpu
+  /// Tensor processing units.
+  case tpu
+}
+
 /// Executes code in the current scope on GPU.
 ///
 /// - Parameter serverAddress: The address to the TPU server where a remote
@@ -46,10 +56,9 @@ public func enableGPU() {
 /// - Throws: The error that the body throws, if any.
 /// - Returns: The value returned by the closure, if any.
 ///
-@inlinable @inline(__always)
-public func withGPU<Result>(
-  execute body: () throws -> Result
+@_semantics("tf.withDevice(_:execute:)") @_optimize(none) @inline(never)
+public func withDevice<Result>(
+  _ kind: DeviceKind, execute body: () throws -> Result
 ) rethrows -> Result {
-  enableGPU()
-  return execute()
+  return body()
 }
