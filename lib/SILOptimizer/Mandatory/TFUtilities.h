@@ -73,7 +73,7 @@ namespace tf {
   /// Looks up a function in `module`, which must exist.
   /// If needed, load and link it, so that the function body is available to the
   /// caller.
-  SILFunction *lookupOrLoadFunction(StringRef name, SILModule &module);
+  SILFunction *lookupOrLinkFunction(StringRef name, SILModule &module);
 
   /// Looks up a function by `name` in the context of `typeDecl`, `proto` and
   /// `module`, and returns that function.
