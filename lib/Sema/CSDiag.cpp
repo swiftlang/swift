@@ -8727,7 +8727,7 @@ bool FailureDiagnosis::diagnoseArchetypeAmbiguity() {
     // because type B would have no constraints associated with it.
     unsigned numConstraints = 0;
     {
-      llvm::SmallVector<Constraint *, 2> constraints;
+      llvm::SmallPtrSet<Constraint *, 2> constraints;
       CS.getConstraintGraph().gatherConstraints(
           tv, constraints, ConstraintGraph::GatheringKind::EquivalenceClass);
 

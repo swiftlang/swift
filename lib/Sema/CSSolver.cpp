@@ -93,7 +93,7 @@ Optional<Type> ConstraintSystem::checkTypeOfBinding(TypeVariableType *typeVar,
       *isNilLiteral = false;
 
       // Look for a literal-conformance constraint on the type variable.
-      SmallVector<Constraint *, 8> constraints;
+      SmallPtrSet<Constraint *, 8> constraints;
       getConstraintGraph().gatherConstraints(
           bindingTypeVar, constraints,
           ConstraintGraph::GatheringKind::EquivalenceClass);
@@ -1914,7 +1914,7 @@ static Constraint *selectBestBindingDisjunction(
                    ->getAs<TypeVariableType>();
     assert(tv);
 
-    SmallVector<Constraint *, 8> constraints;
+    SmallPtrSet<Constraint *, 8> constraints;
     cs.getConstraintGraph().gatherConstraints(
         tv, constraints, ConstraintGraph::GatheringKind::EquivalenceClass);
 
@@ -2244,7 +2244,7 @@ void DisjunctionChoice::propagateConversionInfo() const {
     return;
 
   auto conversionType = bindings.Bindings[0].BindingType;
-  SmallVector<Constraint *, 4> constraints;
+  SmallPtrSet<Constraint *, 4> constraints;
   CS->CG.gatherConstraints(typeVar, constraints,
                            ConstraintGraph::GatheringKind::EquivalenceClass);
 

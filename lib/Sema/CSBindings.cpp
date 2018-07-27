@@ -361,8 +361,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
   assert(!typeVar->getImpl().getFixedType(nullptr) && "has a fixed type");
 
   // Gather the constraints associated with this type variable.
-  SmallVector<Constraint *, 8> constraints;
-  llvm::SmallPtrSet<Constraint *, 4> visitedConstraints;
+  SmallPtrSet<Constraint *, 8> constraints;
   getConstraintGraph().gatherConstraints(
       typeVar, constraints, ConstraintGraph::GatheringKind::EquivalenceClass);
 
@@ -377,10 +376,6 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
   bool hasNonDependentMemberRelationalConstraints = false;
   bool hasDependentMemberRelationalConstraints = false;
   for (auto constraint : constraints) {
-    // Only visit each constraint once.
-    if (!visitedConstraints.insert(constraint).second)
-      continue;
-
     switch (constraint->getKind()) {
     case ConstraintKind::Bind:
     case ConstraintKind::Equal:

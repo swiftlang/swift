@@ -467,9 +467,8 @@ void ConstraintGraph::unbindTypeVariable(TypeVariableType *typeVar, Type fixed){
 }
 
 void ConstraintGraph::gatherConstraints(
-       TypeVariableType *typeVar,
-       SmallVectorImpl<Constraint *> &constraints,
-       GatheringKind kind) {
+    TypeVariableType *typeVar, SmallPtrSetImpl<Constraint *> &constraints,
+    GatheringKind kind) {
   auto &reprNode = (*this)[CS.getRepresentative(typeVar)];
   auto equivClass = reprNode.getEquivalenceClass();
   llvm::SmallPtrSet<TypeVariableType *, 4> typeVars;
@@ -478,7 +477,7 @@ void ConstraintGraph::gatherConstraints(
       continue;
 
     for (auto constraint : (*this)[typeVar].getConstraints())
-      constraints.push_back(constraint);
+      constraints.insert(constraint);
 
     auto &node = (*this)[typeVar];
 
@@ -511,7 +510,7 @@ void ConstraintGraph::gatherConstraints(
           continue;
 
         for (auto constraint : (*this)[adjTypeVarEquiv].getConstraints())
-          constraints.push_back(constraint);
+          constraints.insert(constraint);
       }
     }
   }

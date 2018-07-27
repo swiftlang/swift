@@ -5049,8 +5049,8 @@ ConstraintSystem::addKeyPathApplicationRootConstraint(Type root, ConstraintLocat
   auto typeVar = getType(keyPathExpr)->getAs<TypeVariableType>();
   if (!typeVar)
     return;
-  
-  SmallVector<Constraint *, 4> constraints;
+
+  SmallPtrSet<Constraint *, 4> constraints;
   CG.gatherConstraints(typeVar, constraints,
                        ConstraintGraph::GatheringKind::EquivalenceClass);
   

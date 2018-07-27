@@ -574,7 +574,7 @@ namespace {
     // being applied, and the only constraint attached to it should
     // be the disjunction constraint for the overload group.
     auto &CG = CS.getConstraintGraph();
-    SmallVector<Constraint *, 4> constraints;
+    SmallPtrSet<Constraint *, 4> constraints;
     CG.gatherConstraints(tyvarType, constraints,
                          ConstraintGraph::GatheringKind::EquivalenceClass);
     if (constraints.empty())
