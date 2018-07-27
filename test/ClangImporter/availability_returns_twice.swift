@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s
+// RUN: %target-typecheck-verify-swift
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
   import Darwin
