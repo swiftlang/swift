@@ -96,12 +96,15 @@ Optional<Type> ConstraintSystem::checkTypeOfBinding(TypeVariableType *typeVar,
       SmallPtrSet<Constraint *, 8> constraints;
       getConstraintGraph().gatherConstraints(
           bindingTypeVar, constraints,
-          ConstraintGraph::GatheringKind::EquivalenceClass);
+          ConstraintGraph::GatheringKind::EquivalenceClass,
+          [](Constraint *constraint) -> bool {
+            return constraint->getKind() == ConstraintKind::LiteralConformsTo &&
+                   constraint->getProtocol()->isSpecificProtocol(
+                       KnownProtocolKind::ExpressibleByNilLiteral);
+          });
+
       for (auto constraint : constraints) {
-        if (constraint->getKind() == ConstraintKind::LiteralConformsTo &&
-            constraint->getProtocol()->isSpecificProtocol(
-                KnownProtocolKind::ExpressibleByNilLiteral) &&
-            simplifyType(constraint->getFirstType())->isEqual(bindingTypeVar)) {
+        if (simplifyType(constraint->getFirstType())->isEqual(bindingTypeVar)) {
           *isNilLiteral = true;
           break;
         }
@@ -1916,12 +1919,12 @@ static Constraint *selectBestBindingDisjunction(
 
     SmallPtrSet<Constraint *, 8> constraints;
     cs.getConstraintGraph().gatherConstraints(
-        tv, constraints, ConstraintGraph::GatheringKind::EquivalenceClass);
+        tv, constraints, ConstraintGraph::GatheringKind::EquivalenceClass,
+        [](Constraint *constraint) {
+          return constraint->getKind() == ConstraintKind::Conversion;
+        });
 
     for (auto *constraint : constraints) {
-      if (constraint->getKind() != ConstraintKind::Conversion)
-        continue;
-
       auto toType =
           cs.simplifyType(constraint->getSecondType())->getRValueType();
       auto *toTV = toType->getAs<TypeVariableType>();
@@ -2246,24 +2249,21 @@ void DisjunctionChoice::propagateConversionInfo() const {
   auto conversionType = bindings.Bindings[0].BindingType;
   SmallPtrSet<Constraint *, 4> constraints;
   CS->CG.gatherConstraints(typeVar, constraints,
-                           ConstraintGraph::GatheringKind::EquivalenceClass);
+                           ConstraintGraph::GatheringKind::EquivalenceClass,
+                           [](Constraint *constraint) -> bool {
+                             switch (constraint->getKind()) {
+                             case ConstraintKind::Conversion:
+                             case ConstraintKind::Defaultable:
+                             case ConstraintKind::ConformsTo:
+                             case ConstraintKind::LiteralConformsTo:
+                               return false;
 
-  bool viableForBinding = true;
-  for (auto adjacent : constraints) {
-    switch (adjacent->getKind()) {
-    case ConstraintKind::Conversion:
-    case ConstraintKind::Defaultable:
-    case ConstraintKind::ConformsTo:
-    case ConstraintKind::LiteralConformsTo:
-      break;
+                             default:
+                               return true;
+                             }
+                           });
 
-    default:
-      viableForBinding = false;
-      break;
-    }
-  }
-
-  if (viableForBinding)
+  if (constraints.empty())
     CS->addConstraint(ConstraintKind::Bind, typeVar, conversionType,
                       Choice->getLocator());
 }

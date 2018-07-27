@@ -574,18 +574,19 @@ namespace {
     // being applied, and the only constraint attached to it should
     // be the disjunction constraint for the overload group.
     auto &CG = CS.getConstraintGraph();
-    SmallPtrSet<Constraint *, 4> constraints;
-    CG.gatherConstraints(tyvarType, constraints,
-                         ConstraintGraph::GatheringKind::EquivalenceClass);
-    if (constraints.empty())
+    SmallPtrSet<Constraint *, 4> disjunctions;
+    CG.gatherConstraints(tyvarType, disjunctions,
+                         ConstraintGraph::GatheringKind::EquivalenceClass,
+                         [](Constraint *constraint) -> bool {
+                           return constraint->getKind() ==
+                                  ConstraintKind::Disjunction;
+                         });
+    if (disjunctions.empty())
       return;
     
     // Look for the disjunction that binds the overload set.
-    for (auto constraint : constraints) {
-      if (constraint->getKind() != ConstraintKind::Disjunction)
-        continue;
-      
-      auto oldConstraints = constraint->getNestedConstraints();
+    for (auto *disjunction : disjunctions) {
+      auto oldConstraints = disjunction->getNestedConstraints();
       auto csLoc = CS.getConstraintLocator(expr->getFn());
       
       // Only replace the disjunctive overload constraint.
@@ -633,8 +634,8 @@ namespace {
 
       // Remove the original constraint from the inactive constraint
       // list and add the new one.
-      CS.removeInactiveConstraint(constraint);
-      
+      CS.removeInactiveConstraint(disjunction);
+
       // Create the disjunction of favored constraints.
       auto favoredConstraintsDisjunction =
           Constraint::createDisjunction(CS,

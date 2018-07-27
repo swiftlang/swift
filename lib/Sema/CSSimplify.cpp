@@ -5051,15 +5051,17 @@ ConstraintSystem::addKeyPathApplicationRootConstraint(Type root, ConstraintLocat
     return;
 
   SmallPtrSet<Constraint *, 4> constraints;
-  CG.gatherConstraints(typeVar, constraints,
-                       ConstraintGraph::GatheringKind::EquivalenceClass);
-  
+  CG.gatherConstraints(
+      typeVar, constraints, ConstraintGraph::GatheringKind::EquivalenceClass,
+      [&keyPathExpr](Constraint *constraint) -> bool {
+        return constraint->getKind() == ConstraintKind::KeyPath &&
+               constraint->getLocator()->getAnchor() == keyPathExpr;
+      });
+
   for (auto constraint : constraints) {
-    if (constraint->getKind() == ConstraintKind::KeyPath &&
-        constraint->getLocator()->getAnchor() == keyPathExpr) {
-      auto keyPathRootTy = constraint->getSecondType();
-      addConstraint(ConstraintKind::Subtype, root->getWithoutSpecifierType(), keyPathRootTy, locator);
-    }
+    auto keyPathRootTy = constraint->getSecondType();
+    addConstraint(ConstraintKind::Subtype, root->getWithoutSpecifierType(),
+                  keyPathRootTy, locator);
   }
 }
 

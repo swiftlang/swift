@@ -213,17 +213,16 @@ void ConstraintSystem::setMustBeMaterializableRecursive(Type type)
 void ConstraintSystem::addTypeVariableConstraintsToWorkList(
        TypeVariableType *typeVar) {
   // Gather the constraints affected by a change to this type variable.
-  SmallPtrSet<Constraint *, 8> constraints;
-  CG.gatherConstraints(typeVar, constraints,
-                       ConstraintGraph::GatheringKind::AllMentions);
+  SmallPtrSet<Constraint *, 8> inactiveConstraints;
+  CG.gatherConstraints(
+      typeVar, inactiveConstraints, ConstraintGraph::GatheringKind::AllMentions,
+      [](Constraint *constraint) { return !constraint->isActive(); });
 
   // Add any constraints that aren't already active to the worklist.
-  for (auto constraint : constraints) {
-    if (!constraint->isActive()) {
-      ActiveConstraints.splice(ActiveConstraints.end(),
-                               InactiveConstraints, constraint);
-      constraint->setActive(true);
-    }
+  for (auto constraint : inactiveConstraints) {
+    ActiveConstraints.splice(ActiveConstraints.end(), InactiveConstraints,
+                             constraint);
+    constraint->setActive(true);
   }
 }
 
