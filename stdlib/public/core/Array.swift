@@ -1125,6 +1125,19 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
     _buffer.count = oldCount + 1
     (_buffer.firstElementAddress + oldCount).initialize(to: newElement)
   }
+  
+  @inlinable
+  public mutating func swapAt(_ i: Int, _ j: Int) {
+     guard i != j else { return }
+     _checkIndex(i)
+     _checkIndex(j)
+     _makeUniqueAndReserveCapacityIfNotUnique()
+     let pi = (_buffer.firstElementAddress + i)
+     let pj = (_buffer.firstElementAddress + j)
+     let tmp = pi.move()
+     pi.moveInitialize(from: pj, count: 1)
+     pj.initialize(to: tmp)
+  }
 
   /// Adds a new element at the end of the array.
   ///
