@@ -3,8 +3,7 @@
 // RUN: %empty-directory(%t/rth)
 // RUN: env PYTHONPATH=%S/Inputs %gyb < %s > %t/test_keypaths.swift
 // RUN: env PYTHONPATH=%S/Inputs %gyb < %S/Inputs/keypaths.swift.gyb > %t/Inputs/keypaths.swift
-// FIXME implement key path resilience
-// RUN: not %rth --target-build-swift "%target-build-swift" --target-run "%target-run" --t "%t/rth" --S "%t" --s "%t/test_keypaths.swift" --lib-prefix "lib" --lib-suffix ".%target-dylib-extension" --target-codesign "%target-codesign"
+// RUN: %rth --target-build-swift "%target-build-swift" --target-run "%target-run" --t "%t/rth" --S "%t" --s "%t/test_keypaths.swift" --lib-prefix "lib" --lib-suffix ".%target-dylib-extension" --target-codesign "%target-codesign"
 
 // REQUIRES: executable_test
 
@@ -17,7 +16,11 @@ from keypaths_gyb import testCases
 
 var tests = TestSuite("key path resilience")
 
-% for (name, kind, before, after) in testCases:
+% for (name, kind, before, after, addsAPI) in testCases:
+
+%  if addsAPI:
+#if BEFORE
+%  end
 
 %  if kind == "mutating" or kind == "nonmutating":
 
@@ -33,9 +36,18 @@ tests.test("AnEnum.${name}") {
 %  else:
      %{ raise ValueError("improper test case kind") }%
 %  end
+
+%  if addsAPI:
+#endif // BEFORE
+%  end
+
 % end
 
-% for (name, kind, before, after) in testCases:
+% for (name, kind, before, after, addsAPI) in testCases:
+
+%  if addsAPI:
+#if BEFORE
+%  end
 
 %  if kind == "mutating" or kind == "nonmutating" or kind == "stored":
 
@@ -49,9 +61,18 @@ tests.test("AStruct.${name}") {
 %  else:
      %{ raise ValueError("improper test case kind") }%
 %  end
+
+%  if addsAPI:
+#endif // BEFORE
+%  end
+
 % end
 
-% for (name, kind, before, after) in testCases:
+% for (name, kind, before, after, addsAPI) in testCases:
+
+%  if addsAPI:
+#if BEFORE
+%  end
 
 %  if kind == "nonmutating" or kind == "stored":
 
@@ -62,11 +83,23 @@ tests.test("AClass.${name}") {
   expectEqual(fromModule, formedLocally)
 }
 
+tests.test("AFinalClass.${name}") {
+  let fromModule = AFinalClass.keyPath_${name}
+  let formedLocally = \AFinalClass.${name}
+
+  expectEqual(fromModule, formedLocally)
+}
+
 %  elif kind == "mutating":
 
 %  else:
      %{ raise ValueError("improper test case kind") }%
 %  end
+
+%  if addsAPI:
+#endif
+%  end
+
 % end
 
 runAllTests()
