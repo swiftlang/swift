@@ -816,7 +816,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             return;
         }
 
-        if (BaseDC && !ExtendedType->hasError()) {
+        if (BaseDC && ExtendedType && !ExtendedType->hasError()) {
           NLOptions options = baseNLOptions;
           if (isCascadingUse.getValue())
             options |= NL_KnownCascadingDependency;
