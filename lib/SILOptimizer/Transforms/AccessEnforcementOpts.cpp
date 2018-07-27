@@ -73,8 +73,11 @@
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/Analysis/AccessedStorageAnalysis.h"
+#include "swift/SILOptimizer/Analysis/LoopRegionAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/LoopUtils.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SmallBitVector.h"
 
 using namespace swift;
@@ -619,6 +622,367 @@ removeLocalNonNestedAccess(const AccessConflictAnalysis::Result &result,
   return changed;
 }
 
+static bool distinctFrom(BeginAccessInst *i1, BeginAccessInst *i2,
+                         const AccessConflictAnalysis::Result &ACAResult) {
+  const AccessInfo &ai1 = ACAResult.getAccessInfo(i1);
+  const AccessInfo &ai2 = ACAResult.getAccessInfo(i2);
+  return ai1.isDistinctFrom(ai2);
+}
+
+static bool identicalTo(BeginAccessInst *i1, BeginAccessInst *i2,
+                        const AccessConflictAnalysis::Result &ACAResult) {
+  const AccessInfo &ai1 = ACAResult.getAccessInfo(i1);
+  const AccessInfo &ai2 = ACAResult.getAccessInfo(i2);
+  return ai1.hasIdenticalBase(ai2);
+}
+
+// Region Access summary info
+class RegionAccessSummary {
+  const AccessConflictAnalysis::Result &ACAResult;
+  /// Tracks the accesses at the end of each region, for the purpose of
+  /// finding nested conflicts.
+  /// For each storage loaation, maintains only a single entry.
+  using AccessUnordedSet = llvm::SmallDenseSet<BeginAccessInst *>;
+  using RegionToAccessesMap = llvm::SmallDenseMap<unsigned, AccessUnordedSet>;
+  RegionToAccessesMap regionToAccessesMap;
+  RegionToAccessesMap regionToConflictMap;
+  using SubLoopsSet = llvm::SmallDenseSet<unsigned>;
+  using RegionToSubRegionMap = llvm::SmallDenseMap<unsigned, SubLoopsSet>;
+  RegionToSubRegionMap regionToSubregionMap;
+
+public:
+  /// Iterate over in-region, conflict free storage locations.
+  class ConflictFreeStorageIterator {
+    const RegionAccessSummary &regionSummary;
+    unsigned id;
+    AccessUnordedSet::const_iterator denseIter;
+
+  public:
+    ConflictFreeStorageIterator(const RegionAccessSummary &summary, unsigned id)
+        : regionSummary(summary), id(id),
+          denseIter(
+              regionSummary.regionToAccessesMap.find(id)->getSecond().begin()) {
+    }
+
+    BeginAccessInst *next() {
+      auto end = regionSummary.regionToAccessesMap.find(id)->getSecond().end();
+      while (denseIter != end) {
+        auto *beginAccess = *denseIter;
+        ++denseIter;
+        if (!regionSummary.containsConflict(id, beginAccess)) {
+          return beginAccess;
+        }
+      }
+      return nullptr;
+    }
+  };
+
+  RegionAccessSummary(const AccessConflictAnalysis::Result &result)
+      : ACAResult(result) {}
+
+  bool containsRegion(unsigned id) const {
+    return regionToAccessesMap.count(id) != 0;
+  }
+
+  void addRegion(unsigned id) {
+    assert(!containsRegion(id) && "Can't add two sets for region");
+    regionToAccessesMap[id];
+    regionToSubregionMap[id];
+    regionToConflictMap[id];
+  }
+
+  bool containsStorage(unsigned id, BeginAccessInst *inst) const {
+    assert(containsRegion(id) && "Expected region in map");
+    for (auto *otherInst : regionToAccessesMap.find(id)->getSecond()) {
+      if (identicalTo(inst, otherInst, ACAResult)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool addStorage(unsigned id, BeginAccessInst *inst) {
+    if (containsStorage(id, inst)) {
+      return false;
+    }
+    regionToAccessesMap[id].insert(inst);
+    return true;
+  }
+
+  bool containsConflict(unsigned id, BeginAccessInst *inst) const {
+    assert(containsStorage(id, inst) && "Storage should be in access set");
+    for (auto *otherInst : regionToConflictMap.find(id)->getSecond()) {
+      if (!distinctFrom(inst, otherInst, ACAResult)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool addConflict(unsigned id, BeginAccessInst *inst) {
+    if (containsConflict(id, inst)) {
+      return false;
+    }
+    regionToConflictMap[id].insert(inst);
+    return true;
+  }
+
+  void addSubRegion(unsigned id, unsigned subID) {
+    auto regionIt = regionToSubregionMap.find(id);
+    assert(regionIt != regionToSubregionMap.end() && "Expected region in map");
+    auto &subRegionSet = regionIt->getSecond();
+    assert(subRegionSet.count(subID) == 0 && "Can't add sub region twice");
+    subRegionSet.insert(subID);
+  }
+
+  void summerizeRegion(unsigned id);
+};
+
+void RegionAccessSummary::summerizeRegion(unsigned id) {
+  // Walk the sub-regions
+  for (auto subRegionID : regionToSubregionMap[id]) {
+    // For each storage there:
+    for (auto *storage : regionToAccessesMap[subRegionID]) {
+      // If not in current scope - add it
+      addStorage(id, storage);
+      // Mark it as conflicting in current scope
+      addConflict(id, storage);
+    }
+  }
+}
+
+// Ideally, we'd want to use a list
+// but this should be so small in size that we can use anything:
+using SmallAccessList = DenseAccessSet;
+
+class AccessMergeAnalysis {
+public:
+  using MergeableMap = llvm::MapVector<BeginAccessInst *, BeginAccessInst *>;
+
+private:
+  LoopRegionFunctionInfo *LRFI;
+  AccessedStorageAnalysis *ASA;
+  RegionAccessSummary regionSummary;
+  const AccessConflictAnalysis::Result &ACAResult;
+
+  MergeableMap mergeableAccesses;
+
+public:
+  AccessMergeAnalysis(LoopRegionFunctionInfo *LRFI,
+                      AccessedStorageAnalysis *ASA,
+                      const AccessConflictAnalysis::Result &result)
+      : LRFI(LRFI), ASA(ASA), regionSummary(result), ACAResult(result) {}
+
+  MergeableMap &&analyze() &&;
+
+protected:
+  void calcBottomUpOrder(LoopRegion *region,
+                         llvm::SmallVectorImpl<unsigned> &worklist);
+  void processRegion(unsigned id);
+  void visitFullApply(unsigned currRegion, FullApplySite fullApply);
+  void visitEndAccess(unsigned currRegion, EndAccessInst *endAccess,
+                      MergeableMap &regionMap, SmallAccessList &unmatchedInst);
+  void visitBeginAccess(unsigned currRegion, BeginAccessInst *beginAccess);
+  void visitBlock(unsigned currRegion, SILBasicBlock *bb,
+                  MergeableMap &regionMap, SmallAccessList &unmatchedInst);
+  // If we analyzed *all* predecessors, i.e. they are loops
+  // and they are mergeable, copy info from there to current region
+  // Else, play it safe and don't copy anything
+  // which will result in less optimization potential
+  // Merging predecessors only makes sense if/when we
+  // use this analysis for in-scope accesses / optimizations
+  bool canMergePred(LoopRegion *region);
+};
+
+bool AccessMergeAnalysis::canMergePred(LoopRegion *region) {
+  for (auto predID : region->getPreds()) {
+    if (!regionSummary.containsRegion(predID)) {
+      return false;
+    }
+    auto *predRegion = LRFI->getRegion(predID);
+    if (!isDefinedMerge(region, predRegion)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+void AccessMergeAnalysis::visitFullApply(unsigned currRegion,
+                                         FullApplySite fullApply) {
+  FunctionAccessedStorage callSiteAccesses;
+  ASA->getCallSiteEffects(callSiteAccesses, fullApply);
+  // Get the current conflict-free storage locations:
+  RegionAccessSummary::ConflictFreeStorageIterator accessIter(regionSummary,
+                                                              currRegion);
+  // Set the access kind we are checking against
+  // We are being safe and pessimistic:
+  // Assume it is a modify access, even if it is read
+  // that's because we might want to merge a read and a
+  // modify we will see later on in the loop
+  SILAccessKind accessKind = SILAccessKind::Modify;
+  // Check with conflicts with apply side effects:
+  while (auto *beginAccess = accessIter.next()) {
+    const AccessInfo &ai = ACAResult.getAccessInfo(beginAccess);
+    if (!callSiteAccesses.mayConflictWith(accessKind, ai))
+      continue;
+
+    LLVM_DEBUG(llvm::dbgs()
+                   << *fullApply.getInstruction() << "  call site access: ";
+               callSiteAccesses.dump(); llvm::dbgs() << " prevents merge of:\n";
+               ai.dump());
+
+    regionSummary.addConflict(currRegion, beginAccess);
+  }
+}
+
+static bool insertToMap(BeginAccessInst *beginAccess,
+                        BeginAccessInst *otherInst,
+                        AccessMergeAnalysis::MergeableMap &regionMap,
+                        const AccessConflictAnalysis::Result &ACAResult) {
+  if (!identicalTo(beginAccess, otherInst, ACAResult)) {
+    return false;
+  }
+  regionMap.insert(std::make_pair(otherInst, beginAccess));
+  LLVM_DEBUG(llvm::dbgs() << "Found potential pair: " << *otherInst << ", "
+                          << *beginAccess
+                          << " with no conflicts seen (so far)\n");
+  return true;
+}
+
+void AccessMergeAnalysis::visitEndAccess(unsigned currRegion,
+                                         EndAccessInst *endAccess,
+                                         MergeableMap &regionMap,
+                                         SmallAccessList &unmatchedInst) {
+  auto *beginAccess = endAccess->getBeginAccess();
+  if (beginAccess->getEnforcement() != SILAccessEnforcement::Dynamic)
+    return;
+  if (!regionSummary.containsStorage(currRegion, beginAccess)) {
+    // not in the same region - nothing to see here
+    return;
+  }
+
+  if (regionSummary.containsConflict(currRegion, beginAccess))
+    return;
+
+  LLVM_DEBUG(llvm::dbgs() << "Got out of scope from " << *beginAccess << " to "
+                          << *endAccess
+                          << " with no conflicts seen (so far)\n");
+
+  // If we have a matching storage location in unmatchedInst,
+  // take both out and add to map:
+  for (auto it = unmatchedInst.begin(); it != unmatchedInst.end(); ++it) {
+    auto *otherInst = *it;
+    if (insertToMap(beginAccess, otherInst, regionMap, ACAResult)) {
+      // remove other from list of unmatched pairs:
+      unmatchedInst.erase(it);
+      return;
+    }
+  }
+  // If we have a matching location already inside the map,
+  // create a pair from what's inside to current beginAccess:
+  for (auto pairIt = regionMap.rbegin(); pairIt != regionMap.rend(); ++pairIt) {
+    auto *otherInst = (*pairIt).second;
+    if (insertToMap(beginAccess, otherInst, regionMap, ACAResult)) {
+      return;
+    }
+  }
+  // We did not find a match - add to unmatchedInst instead
+  unmatchedInst.push_back(beginAccess);
+}
+
+void AccessMergeAnalysis::visitBeginAccess(unsigned currRegion,
+                                           BeginAccessInst *beginAccess) {
+  if (beginAccess->getEnforcement() != SILAccessEnforcement::Dynamic)
+    return;
+
+  regionSummary.addStorage(currRegion, beginAccess);
+  const AccessInfo &ai = ACAResult.getAccessInfo(beginAccess);
+  if (ai.seenNestedConflict()) {
+    regionSummary.addConflict(currRegion, beginAccess);
+  }
+}
+
+void AccessMergeAnalysis::visitBlock(unsigned currRegion, SILBasicBlock *bb,
+                                     MergeableMap &regionMap,
+                                     SmallAccessList &unmatchedInst) {
+  for (auto &I : *bb) {
+    if (auto *BAI = dyn_cast<BeginAccessInst>(&I)) {
+      visitBeginAccess(currRegion, BAI);
+      continue;
+    }
+    if (auto *EAI = dyn_cast<EndAccessInst>(&I)) {
+      visitEndAccess(currRegion, EAI, regionMap, unmatchedInst);
+      continue;
+    }
+    if (auto fullApply = FullApplySite::isa(&I)) {
+      visitFullApply(currRegion, fullApply);
+    }
+  }
+}
+
+void AccessMergeAnalysis::processRegion(unsigned id) {
+  MergeableMap inProgressRegionMap;
+  SmallAccessList inProgressUnmatchedInsts;
+  assert(!regionSummary.containsRegion(id) && "Can't process a region twice");
+  auto *region = LRFI->getRegion(id);
+  assert(!region->isBlock() && "Did not expect a block");
+  regionSummary.addRegion(id);
+  for (auto blockID : region->getSubregions()) {
+    auto *subRegion = LRFI->getRegion(blockID);
+    if (!subRegion->isBlock()) {
+      assert(subRegion->isLoop() && "Expected a loop");
+      regionSummary.addSubRegion(id, blockID);
+      continue;
+    }
+    auto *block = subRegion->getBlock();
+    visitBlock(id, block, inProgressRegionMap, inProgressUnmatchedInsts);
+  }
+  regionSummary.summerizeRegion(id);
+  // At this point we know for sure if the out-of-scope accesses
+  // in the temporary map conflict with any sub-regions
+  // copy the non conflicting ones the Analysis' output map
+  // while maintaining order
+  std::for_each(
+      inProgressRegionMap.begin(), inProgressRegionMap.end(),
+      [&](const std::pair<BeginAccessInst *, BeginAccessInst *> &pair) {
+        auto *storageLoc = pair.first;
+        assert(regionSummary.containsStorage(id, storageLoc) &&
+               "Expected storage in summary");
+        if (!regionSummary.containsConflict(id, storageLoc)) {
+          LLVM_DEBUG(llvm::dbgs() << "Found mergable pair: " << *storageLoc
+                                  << ", " << *pair.second << "\n");
+          mergeableAccesses.insert(pair);
+        }
+      });
+}
+
+void AccessMergeAnalysis::calcBottomUpOrder(
+    LoopRegion *region, llvm::SmallVectorImpl<unsigned> &worklist) {
+  worklist.push_back(region->getID());
+  for (auto regionIndex : region->getReverseSubregions()) {
+    auto *region = LRFI->getRegion(regionIndex);
+    if (region->isBlock())
+      continue;
+    calcBottomUpOrder(region, worklist);
+  }
+}
+
+// Top-level driver for AccessMergeAnalysis.
+AccessMergeAnalysis::MergeableMap &&AccessMergeAnalysis::analyze() && {
+  // calculate the order in which we should work
+  // on the function / loop sub-regions
+  llvm::SmallVector<unsigned, 16> bottomUpWorklist;
+  auto *topRegion = LRFI->getTopLevelRegion();
+  calcBottomUpOrder(topRegion, bottomUpWorklist);
+
+  while (!bottomUpWorklist.empty()) {
+    auto id = bottomUpWorklist.pop_back_val();
+    processRegion(id);
+  }
+
+  return std::move(mergeableAccesses);
+}
+
 namespace {
 struct AccessEnforcementOpts : public SILFunctionTransform {
   void run() override {
@@ -652,6 +1016,9 @@ struct AccessEnforcementOpts : public SILFunctionTransform {
     const FunctionAccessedStorage &functionAccess = ASA->getEffects(F);
     if (removeLocalNonNestedAccess(result, functionAccess))
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+
+    LoopRegionFunctionInfo *LRFI = getAnalysis<LoopRegionAnalysis>()->get(F);
+    auto mergeMap = AccessMergeAnalysis(LRFI, ASA, result).analyze();
   }
 };
 } // namespace
