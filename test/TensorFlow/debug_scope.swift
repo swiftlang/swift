@@ -6,5 +6,6 @@
 
 import TensorFlow
 func test() {
-  _ = Tensor(1)
+  let x: Tensor<Float> = [1, 2, 3, 4] // expected-error {{array input is not a constant array of tensors}}
+  print(matmul(x, x) + x) // expected-error {{attribute 'transpose_a' requires a constant argument}}
 }

@@ -1390,6 +1390,10 @@ namespace {
     Type visitGradientExpr(GradientExpr *GE) {
       return handleReverseAutoDiffExpr(GE, /*preservingOriginalResult=*/false);
     }
+    
+    Type visitChainableGradientExpr(ChainableGradientExpr *CGE) {
+      llvm_unreachable("Unhandled");
+    }
 
     Type visitValueAndGradientExpr(ValueAndGradientExpr *VGE) {
       return handleReverseAutoDiffExpr(VGE, /*preservingOriginalResult=*/true);

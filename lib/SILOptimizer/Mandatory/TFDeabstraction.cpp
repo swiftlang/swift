@@ -1735,7 +1735,7 @@ namespace {
 /// deleted if all references to them are removed.
 struct ArrayElementDecoder {
   SmallVector<SILValue, 4> elements;
-  SmallPtrSet<SILInstruction*, 8> arrayInsts;
+  SmallPtrSet<SILInstruction *, 8> arrayInsts;
 
   /// Given a SILValue that may be an array, attempt to decode it into the
   /// literal values that make up its elements.  This returns the element type
@@ -1776,14 +1776,9 @@ struct ArrayElementDecoder {
   }
 
   /// Try to remove the instructions that make up the array initialization.
-  void removeInstructionsIfPossible(SILBasicBlock::iterator &it) {
+  void removeInstructionsIfPossible() {
     if (arrayInsts.empty())
       return;
-
-    // If the iterator is pointing to an instruction we're about to remove,
-    // advance it to avoid invalidation.
-    while (arrayInsts.count(&*it))
-      ++it;
 
     // If we can remove it, drop all inter-dependent references.
     for (auto inst : arrayInsts)
@@ -1799,14 +1794,12 @@ struct ArrayElementDecoder {
 
 /// A reference to the specified array was just dropped.  If it was a literal
 /// array and this was the last use, clean up the instructions that fed it.
-///
-static void removeArrayValueIfPossible(ApplyInst *array,
-                                       SILBasicBlock::iterator &it) {
+static void removeArrayValueIfPossible(ApplyInst *array) {
   // If this array is a literal that we can decode, remove the instructions that
   // it came from.
   ArrayElementDecoder decoder;
   if (decoder.decodeApply(array))
-    decoder.removeInstructionsIfPossible(it);
+    decoder.removeInstructionsIfPossible();
 }
 
 /// Deabstraction can leave around lots of dead instructions from the attributes
@@ -1817,37 +1810,47 @@ void TFDeabstraction::cleanupDeadInstructions() {
   llvm::PrettyStackTraceFormat
   X("TFDeabstraction::cleanupDeadInstructions");
 
-  for (auto &block : fn) {
-    for (auto instIt = block.begin(), e = block.end(); instIt != e; ) {
-      // Manually move iterator to avoid invalidation if we remove 'inst'.
-      auto *inst = &*instIt++;
+  SmallVector<SILInstruction *, 16> deadInsts;
+  SmallVector<ApplyInst *, 8> arrayAllocUninitInsts;
 
-      // Do a quick job to remove obvious dead instructions.  Don't delete debug
-      // instructions.
-      if (isa<SingleValueInstruction>(inst) &&
-          isInstructionTriviallyDead(inst)) {
-        recursivelyDeleteTriviallyDeadInstructions(inst);
-        continue;
-      }
-
-      // The original call took the array at +0, so we don't need to destroy it.
-      // however, we want to clean up the mess to make the resultant IR simpler.
-      // Do so now if possible.
-      if (auto *apply = dyn_cast<ApplyInst>(inst)) {
-        removeArrayValueIfPossible(apply, instIt);
-        continue;
-      }
-
-      // TODO: Remove dead stack slots for tensors being passed as input lists.
-
-      // TODO: need to delete TensorShape.init and other methods that we
-      // shouldn't bake in special knowledge of.  Needs integration with
-      // ConstExpr.
-
-      // TODO: Handle String.init and other stuff.  Refactor this when ConstExpr
-      // handling subsumes ConstantPropagation.
+  auto markInstructionForRemoval = [&](SILInstruction *inst) {
+    // Mark trivially dead instructions.
+    if (isa<SingleValueInstruction>(inst) &&
+        isInstructionTriviallyDead(inst)) {
+      deadInsts.push_back(inst);
+      return;
     }
-  }
+
+    // Mark instructions applying the _allocateUninitialized function.
+    if (auto *apply = dyn_cast<ApplyInst>(inst)) {
+      SILValue tmp;
+      if (isArrayAllocUninit(apply, tmp)) {
+        arrayAllocUninitInsts.push_back(apply);
+        return;
+      }
+    }
+
+    // TODO: Mark dead stack slots for tensors being passed as input lists.
+
+    // TODO: Mark TensorShape.init and other methods that we shouldn't bake in
+    // special knowledge of. Needs integration with ConstExpr.
+
+    // TODO: Handle String.init and other stuff. Refactor this when ConstExpr
+    // handling subsumes ConstantPropagation.
+  };
+
+  // Mark instructions for removal.
+  for (auto &bb : fn)
+    for (auto &inst : bb)
+      markInstructionForRemoval(&inst);
+
+  // Remove dead instructions. Debug instructions are not deleted.
+  for (auto *inst : deadInsts)
+    recursivelyDeleteTriviallyDeadInstructions(inst);
+
+  // Clean up instructions related to array literal initialization, if possible.
+  for (auto *inst : arrayAllocUninitInsts)
+    removeArrayValueIfPossible(inst);
 }
 
 
@@ -1971,9 +1974,7 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
     // Ok, we have an attribute operand, we should have been able to fold it
     // through our constexpr evaluation logic.
     auto it = constants.find(operand);
-    assert(it != constants.end() && "out of sync with constant scanning loop");
-
-    if (!it->second.isConstant()) {
+    if (it == constants.end() || !it->second.isConstant()) {
       // TODO: improve the diagnostic to talk about the parameter label in
       // the user code, not the internal op attribute.  The bookkeeping for
       // this isn't obvious though.
@@ -1981,7 +1982,8 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
 
       // If we have more specific information about what went wrong, emit
       // notes.
-      if (it->second.getKind() == SymbolicValue::Unknown)
+      if (it != constants.end() &&
+          it->second.getKind() == SymbolicValue::Unknown)
         it->second.emitUnknownDiagnosticNotes(opInfo.inst->getLoc());
       return;
     }

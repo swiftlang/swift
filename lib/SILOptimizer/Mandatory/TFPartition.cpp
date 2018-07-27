@@ -29,8 +29,10 @@
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILConstants.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/BitVector.h"
 #ifdef SWIFT_ENABLE_TENSORFLOW
@@ -44,6 +46,17 @@ using namespace swift;
 using namespace tf;
 using llvm::DenseMap;
 
+/// This is a counter we use to give each send/receive operation a unique ID.
+static int nextSendID = 0;
+
+static llvm::cl::opt<bool> TFModuleLevelGraph(
+    "tf-module-level-graph", llvm::cl::init(true),
+    llvm::cl::desc(
+        "When true, generate 1 TF graph per module. Otherwise generate 1 TF "
+        "graph per partitionable function, for ease of writing tests and "
+        "verifying test outputs. Only set to false in unit tests,"
+        "and when the unit tests do not involve function-typed attributes."));
+
 template<typename...T, typename...U>
 static InFlightDiagnostic
 diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag, U &&...args) {
@@ -52,7 +65,16 @@ diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag, U &&...args) {
 
 /// Returns true if the partitioning pass should ignore this user.
 static bool isUserIgnoredByPartitioning(SILInstruction *inst) {
-  return isa<DebugValueInst>(inst) || isa<RefCountingInst>(inst);
+  auto optMode = inst->getFunction()->getEffectiveOptimizationMode();
+  // `debug_value` instructions are used for value inspection during debugging.
+  // For optimized builds, we ignored these instructions so that no send/receive
+  // will be emitted.
+  if (isa<DebugValueInst>(inst) &&
+      optMode != OptimizationMode::NoOptimization) {
+    return true;
+  }
+  // Reference counting instructions are always ignored.
+  return isa<RefCountingInst>(inst);
 }
 
 /// Given a decl for a struct that has a single field (typically because it is
@@ -617,11 +639,13 @@ class TFFunctionPartition {
 public:
   SILFunction &hostFn;
   ModuleDecl &tensorFlowModule;  // TensorFlow standard library.
+  TFGraphLowering *const graphLowering;
   /// For partitionable functions, map the SIL host function names to the
   /// lowered TF graph artifacts.
   DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>> &graphFunctions;
   GraphFunctionDeviceInfo deviceInfo; // Device placement info.
   DominanceInfo &DI;
+  SILLoopInfo &LI;
   BlocksReachingTensorCode tensorCodeBlocks;
 
   /// These are all the tensor ops found in the initial scan over the function.
@@ -719,16 +743,18 @@ public:
 public:
   TFFunctionPartition(SILFunction &Fn, SILPassManager *PM,
                       ModuleDecl &tensorFlowModule,
+                      TFGraphLowering *graphLowering,
                       DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>>
                           &graphFunctions)
       : hostFn(Fn), tensorFlowModule(tensorFlowModule),
-        graphFunctions(graphFunctions),
+        graphLowering(graphLowering), graphFunctions(graphFunctions),
         // TODO: remote this call once partition pass is folded into
         // deabstraction.
         deviceInfo(
             GraphFunctionDeviceInfo::getForFunction(hostFn,
                                                     /*removeConfigInst*/ true)),
         DI(*PM->getAnalysis<DominanceAnalysis>()->get(&Fn)),
+        LI(*PM->getAnalysis<SILLoopAnalysis>()->get(&Fn)),
         tensorCodeBlocks(Fn) {}
 
   ~TFFunctionPartition() {
@@ -741,16 +767,18 @@ public:
   /// Run the marking/analysis phase on this function. Return true on error.
   bool markFunction(bool &hasTensorOps);
 
+  TFGraphLowering *getGraphLoweringTest() { return graphLowering; }
+
   /// Partition and lower this function to a graph, and add an entry to
   /// `graphFunctions`.  Return true on error.
   ///
   /// Should only be called when markFunction() succeeds.
   bool partitionAndLowerGraph(bool isTest);
 
-  // Complete graph lowering by serializing it into a protobuf. For a
-  // non-accelerator-only function, also complete the host function rewrite, by
-  // "installing" the serialized protobuf bytes into that function.
-  void finalizeGraphLowering(StringRef entryFnBaseName, TF_Graph *graph);
+  /// For a non-accelerator-only function, complete the host function
+  /// rewrite, by "installing" the serialized protobuf bytes into that function.
+  void finalizeHostFunction(const std::vector<char> &bytes,
+                            StringRef entryFnBaseName);
 
   void diagnoseCopyToAccelerator(SILValue value, SILInstruction *user,
                                  bool isTensorProgramArgument);
@@ -1112,7 +1140,7 @@ bool TFFunctionPartition::markBlock(SILBasicBlock *BB) {
           ++numTensorSuccs;
         else {
           assert(succ->getSinglePredecessorBlock() &&
-                 "Need to split critical edges??");
+                 "Critical edges should've been split");
           tensorKillBlocks.insert(succ);
         }
       }
@@ -1964,6 +1992,9 @@ bool TFFunctionPartition::markFunction(bool &hasTensorOps) {
     }
   };
 
+  // Split all critical edges for block marking.
+  splitAllCondBrCriticalEdgesWithNonTrivialArgs(hostFn, &DI, &LI);
+
   // We walk the function in depth first order so that we only visit reachable
   // blocks and to slightly improve compile time performance of the 'marking'
   // operation.
@@ -2192,9 +2223,6 @@ class PartitionCloner : public SILClonerWithScopes<PartitionCloner> {
   /// This is a basic block on the newly created function which represents the
   /// exit node of the function.
   SILBasicBlock *exitBB;
-
-  /// This is a counter we use to give each send/receive operation a unique ID.
-  int nextSendID = 0;
 
   /// This is the set of instructions that should be removed from the host code
   /// after the cloning operation is complete.
@@ -4339,28 +4367,25 @@ bool TFFunctionPartition::lowerGraph(bool isTest) {
     assert(deviceInfo.numUsedDeviceTypes == 1 &&
            "An accelerator-only SIL function must be lowered to a single TF "
            "device.");
-    if (lowerTFFunction(hostFn.getName(), acceleratorFn, deviceInfo,
-                        graphFunctions))
+    if (graphLowering->lowerTFFunction(hostFn.getName(), acceleratorFn,
+                                       deviceInfo))
       return true;
 
     // Remove the host function so it doesn't go through the normal
     // compiler flow.
     hostFn.getModule().eraseFunction(&hostFn);
   } else {
-    if (lowerTFGraph(hostFn.getName(), acceleratorFn, deviceInfo, graphFunctions
-                     /*entryFnBaseName, pendingGraphFnNames*/))
+    if (graphLowering->lowerTFGraph(hostFn.getName(), acceleratorFn,
+                                    deviceInfo))
       return true;
   }
 
   return false;
 }
 
-void TFFunctionPartition::finalizeGraphLowering(StringRef entryFnBaseName,
-                                                TF_Graph *graph) {
+void TFFunctionPartition::finalizeHostFunction(const std::vector<char> &bytes,
+                                               StringRef entryFnBaseName) {
   assert(!entryFnBaseName.startswith("$"));
-  std::vector<char> bytes;
-  if (serializeGraphProtoBuf(hostFn, graph, bytes))
-    return; // error already emitted
 
   if (isAcceleratorOnly(hostFn))
     return;
@@ -4423,11 +4448,16 @@ class TFPartition : public SILModuleTransform {
   /// `LoweredGraphFunction::silHostFnName` in that object.
   DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>> graphFunctions;
 
+  // Mutually exclusive, based on flag value TFModuleLevelGraph.
+  TFGraphLowering moduleGraphLowering; // Used when the flag is true.
+  SmallVector<TFGraphLowering, 16> testGraphLowerings; // Used when false.
+
   using HostPartitionContext =
       std::pair<SILFunction *, std::unique_ptr<TFFunctionPartition>>;
 
 public:
-  TFPartition(bool isTest) : isTest(isTest) {}
+  TFPartition(bool isTest)
+      : isTest(isTest), moduleGraphLowering(TFGraphLowering(graphFunctions)) {}
 
   /// The entry point to the transformation.
   void run() override;
@@ -4490,30 +4520,32 @@ void TFPartition::run() {
       continue; // error already emitted, but continue processing other
                 // functions.
 
+  if (hostPartitionContexts.empty() || !TFModuleLevelGraph)
+    return;
+
   // In the second pass, we know all partitionable functions have had their
   // graph function bodies generated. When a function foo() references another
   // function bar() as a function-typed attribute, but bar()'s graph function
   // body is not avilable during the first pass, we will be copying the graph
   // function body of bar() into the graph function body of foo() in this pass.
+
+  std::vector<char> bytes;
+  auto errorLoc = hostPartitionContexts.front().first->getLocation();
+  if (TFModuleLevelGraph &&
+      moduleGraphLowering.serializeGraphProtoBuf(ctx, errorLoc, bytes))
+    return; // error already emitted
+
   for (auto &context : hostPartitionContexts) {
     auto *hostFn = context.first;
     auto *partitioner = context.second.get();
     assert(graphFunctions.count(hostFn->getName()));
     auto &thisGraphFunc = *graphFunctions[hostFn->getName()];
-    auto *resultGraph = thisGraphFunc.graph.get();
-    for (auto pair : thisGraphFunc.pendingGraphFnNames) {
-      auto silHostFnName = pair.first;
-      auto loc = pair.second;
-      // TODO: Support the case where `silHostFnName` is defined in another
-      // module if that's important.
-      assert(graphFunctions.count(silHostFnName));
-      auto &srcGraphFunc = graphFunctions[silHostFnName];
-      auto *srcGraph = srcGraphFunc->graph.get();
-      if (copyGraphFunctions(*hostFn, loc, srcGraphFunc->graphFnName, srcGraph,
-                             resultGraph))
-        return; // error already emitted.
-    }
-    partitioner->finalizeGraphLowering(thisGraphFunc.graphFnName, resultGraph);
+
+    // TODO: Currently the byte buffer is local to the host function, so
+    // multiple partitionable functions that share the same graphDef could have
+    // replicated byte buffers. Can move to a global byte buffer if this helps
+    // with performance.
+    partitioner->finalizeHostFunction(bytes, thisGraphFunc.graphFnName);
   }
 }
 
@@ -4524,14 +4556,24 @@ bool TFPartition::processFunction(
   if (partitionFunction(hostFn, partitioner)) {
     return true; // error already emitted.
   } else if (partitioner) {
-    assert(graphFunctions.count(hostFn->getName()));
-    auto &thisGraphFunc = *graphFunctions[hostFn->getName()];
-    if (thisGraphFunc.pendingGraphFnNames.empty()) {
-      // The lowered graph is self-contained, so we can serialize it and
-      // complete the host function rewrite here.
-      auto *resultGraph = thisGraphFunc.graph.get();
-      partitioner->finalizeGraphLowering(thisGraphFunc.graphFnName,
-                                         resultGraph);
+    if (!TFModuleLevelGraph) {
+      // In this test mode, for code simplicity we eagerly serialize the graph
+      // def, without first copying over any graph functions that this graph
+      // function depends on (in its function-typed attributes), so this test
+      // mode is only robust when there are no function-typed attributes.
+      assert(graphFunctions.count(hostFn->getName()));
+      auto &thisGraphFunc = *graphFunctions[hostFn->getName()];
+
+      std::vector<char> bytes;
+      auto errorLoc = hostFn->getLocation();
+      if (partitioner->getGraphLoweringTest()->serializeGraphProtoBuf(
+              getModule()->getASTContext(), errorLoc, bytes))
+        return true; // error already emitted
+      partitioner->finalizeHostFunction(bytes, thisGraphFunc.graphFnName);
+
+      // Reset the tensor id counter for host-TF sends/recvs, so that each test
+      // starts with a nice 0 as the id.
+      nextSendID = 0;
     } else {
       // The lowered graph references some other graph functions whose
       // bodies are not yet available -- track it for continued processing
@@ -4572,8 +4614,14 @@ bool TFPartition::partitionFunction(
 
   LLVM_DEBUG(llvm::dbgs() << "  " << hostFn->getName()
                           << " should be partitioned.\n");
-  partitioner = llvm::make_unique<TFFunctionPartition>(*hostFn, PM, *tfModule,
-                                                       graphFunctions);
+  TFGraphLowering *graphLowering = &moduleGraphLowering;
+  if (!TFModuleLevelGraph) {
+    testGraphLowerings.emplace_back(TFGraphLowering(graphFunctions));
+    graphLowering = &testGraphLowerings.back();
+  }
+  partitioner = llvm::make_unique<TFFunctionPartition>(
+      *hostFn, PM, *tfModule, graphLowering, graphFunctions);
+
   bool hasTensorOps = false;
   if (partitioner->markFunction(hasTensorOps))
     return true; // We've encountered an error.

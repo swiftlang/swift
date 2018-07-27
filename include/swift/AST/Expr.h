@@ -3803,7 +3803,8 @@ public:
 };
 
 /// SWIFT_ENABLE_TENSORFLOW
-/// Base class for #gradient and #valueAndGradient expressions.
+/// Base class for differential operators, such as `#gradient`,
+/// `#chainableGradient`, and `#valueAndGradient`.
 class ReverseAutoDiffExpr : public Expr {
 public:
   Expr *getOriginalExpr() const {
@@ -3878,6 +3879,36 @@ private:
                         SourceLoc rParenLoc)
     : ReverseAutoDiffExpr(ExprKind::Gradient, loc, lParenLoc, originalExpr,
                           params, rParenLoc) {}
+};
+  
+/// Chainable gradient expression - An expression that produces the
+/// automatically differentiated function that computes the gradient (or
+/// vector-Jacobian products) with respect to specified parameters, taking an
+/// extra result-typed argument representing the seed, i.e. the backpropagated
+/// adjoint.
+/// Examples:
+///   #chainableGradient(baz)
+///   #chainableGradient(bar, wrt: .0, .1)
+///   #chainableGradient(foo(_:_:), wrt: .0)
+///
+class ChainableGradientExpr : public ReverseAutoDiffExpr {
+public:
+  static ChainableGradientExpr *create(ASTContext &ctx, SourceLoc loc,
+                                       SourceLoc lParenLoc, Expr *originalExpr,
+                                   ArrayRef<AutoDiffIndexParameter> parameters,
+                                       SourceLoc rParenLoc);
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ChainableGradient;
+  }
+  
+private:
+  explicit ChainableGradientExpr(SourceLoc loc, SourceLoc lParenLoc,
+                                 Expr *originalExpr,
+                                 ArrayRef<AutoDiffIndexParameter> params,
+                                 SourceLoc rParenLoc)
+  : ReverseAutoDiffExpr(ExprKind::ChainableGradient, loc, lParenLoc,
+                        originalExpr, params, rParenLoc) {}
 };
 
 /// ValueAndGradient expression - An expression that produces an automatically

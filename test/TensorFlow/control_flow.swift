@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -O -emit-sil %s -verify -enable-objc-interop -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-strict-deabstraction -O -emit-sil %s -verify -enable-objc-interop -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 import TensorFlow
 
@@ -285,33 +285,9 @@ public func foo<T>(_ a: T) {
 public func infLoop1() {
   let maxCount: Int32 = 100
   var a = Tensor<Int32>(0)
-  let count: Int32 = 0 
+  let count: Int32 = 0
   while count < maxCount {
     a += a
-  }
-  a -= a
-  _hostOp(a)
-}
-
-// Another infinite loop that we reject in partitioning.
-// simplified from https://bugs.swift.org/browse/SR-8236
-// expected-error @+1 {{Functions containing infinite loops are not supported by TensorFlow yet}}
-public func infLoop2(maxCount: Int32) {
-  var a = Tensor<Int32>(0)
-  var count: Int32 = 0
-  // expected-warning @+1 {{implicitly copied to the accelerator}}
-  while count < maxCount {
-    a += a
-    count += 1
-    if count == 50 {
-      let i: Int32 = 0
-      // this causes trouble: infinite loop
-      while i < maxCount {
-        count += i
-      }
-      a = Tensor<Int32>(count)
-      break
-    }
   }
   a -= a
   _hostOp(a)
@@ -330,3 +306,12 @@ public func infLoop2(maxCount: Int32) {
 //     i += 1
 //   }
 // }
+
+
+// SR-8373: Critical edges should be split.
+public func testCriticalEdges() {
+  _ = Tensor(1).scalars[0..<5 * Int(2)]
+  for _ in 1...5 {
+    Tensor(1).scalars.forEach { _ in }
+  }
+}

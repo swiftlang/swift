@@ -1861,6 +1861,11 @@ public:
     printCommon(E, "gradient_expr");
     printReverseAutoDiffExpr(E);
   }
+  
+  void visitChainableGradientExpr(ChainableGradientExpr *E) {
+    printCommon(E, "chainable_gradient_expr");
+    printReverseAutoDiffExpr(E);
+  }
 
   void visitValueAndGradientExpr(ValueAndGradientExpr *E) {
     printCommon(E, "value_and_gradient_expr");

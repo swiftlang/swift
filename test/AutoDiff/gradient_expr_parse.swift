@@ -8,6 +8,8 @@
 #gradient(foo, wrt: .0, self) // expected-error {{expected a parameter, which must be }}
 #gradient(foo, wrt: .0, .1) // okay
 
+#chainableGradient(foo, wrt: .0, .1) // okay
+
 #valueAndGradient(foo, wrt: .0, .1) // okay
 
 #adjoint(foo(_:_:)) // okay

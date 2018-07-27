@@ -64,7 +64,6 @@ public func lowerGraphCrash(x: Tensor<Int32>) {
 
   _ = x*x  // expected-note {{value used here}}
   for _ in 0..<1000 {
-    // expected-error @+1{{FIXME: cannot lower a Host->TF tensor transfer in a loop header}}
     _ = x+someGlobal // expected-warning {{value implicitly copied to the accelerator}}
   }
 }
@@ -356,4 +355,17 @@ public func SR8222_cond_br_TensorHandle_Bool() {
     i += 1
   } while i != Tensor<Int32>(10)
   // expected-warning @-1{{implicitly copied to the host}}
+}
+
+// Previously, dead instruction cleanup during deabstraction crashed while
+// compiling the following code. (Instructions were deleted from a basic block
+// while traversing the basic block, causing iterator invalidation).
+func SR8316_helper() -> Tensor<Int32> {
+  return Tensor(1)
+}
+func SR8316_main() {
+  // It is important that `float` is let-bound so that a debug_value
+  // instruction is produced, which is what triggered the original crash.
+  let float: Float = 0.1 // expected-warning {{immutable value 'float' was never used}}
+  _ = SR8316_helper()
 }

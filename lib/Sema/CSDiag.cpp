@@ -1091,8 +1091,7 @@ private:
   bool diagnoseSubscriptErrors(SubscriptExpr *SE, bool performingSet);
 
   // SWIFT_ENABLE_TENSORFLOW
-  bool diagnoseReverseAutoDiffExpr(ReverseAutoDiffExpr *GE,
-                                   bool preservingPrimalResult);
+  bool diagnoseReverseAutoDiffExpr(ReverseAutoDiffExpr *GE);
 
   /// Diagnose the usage of 'subscript' instead of the operator when calling
   /// a subscript and offer a fixit if the inputs are compatible.
@@ -1123,8 +1122,7 @@ private:
   bool visitClosureExpr(ClosureExpr *CE);
   bool visitKeyPathExpr(KeyPathExpr *KPE);
   // SWIFT_ENABLE_TENSORFLOW
-  bool visitGradientExpr(GradientExpr *GE);
-  bool visitValueAndGradientExpr(ValueAndGradientExpr *GE);
+  bool visitReverseAutoDiffExpr(ReverseAutoDiffExpr *RADE);
   bool visitPoundAssertExpr(PoundAssertExpr *PAE);
 };
 } // end anonymous namespace
@@ -7476,11 +7474,10 @@ bool FailureDiagnosis::visitKeyPathExpr(KeyPathExpr *KPE) {
 
 // SWIFT_ENABLE_TENSORFLOW
 bool FailureDiagnosis::
-diagnoseReverseAutoDiffExpr(ReverseAutoDiffExpr *GE,
-                            bool preservingPrimalResult) {
+diagnoseReverseAutoDiffExpr(ReverseAutoDiffExpr *RADE) {
   // TODO: Sema diagnostics for gradient expressions could be improved by
   // diagnosing non-differentiable arguments/non-differentiable constraints.
-  auto gradType = CS.getType(GE);
+  auto gradType = CS.getType(RADE);
   auto gradFnType = gradType->getAs<AnyFunctionType>();
   assert(gradFnType && "Gradient expression should have function type.");
 
@@ -7491,7 +7488,7 @@ diagnoseReverseAutoDiffExpr(ReverseAutoDiffExpr *GE,
   // If gradient expression has a generic primal, then conversion to the
   // contextual type was not possible.
   if (gradType->hasTypeVariable()) {
-    diagnose(GE->getLoc(), diag::gradient_expr_incompatible_contextual_type,
+    diagnose(RADE->getLoc(), diag::gradient_expr_incompatible_contextual_type,
              contextualType);
     return true;
   }
@@ -7499,12 +7496,8 @@ diagnoseReverseAutoDiffExpr(ReverseAutoDiffExpr *GE,
   return false;
 }
 
-bool FailureDiagnosis::visitGradientExpr(GradientExpr *GE) {
-  return diagnoseReverseAutoDiffExpr(GE, /*preservingPrimalResult=*/false);
-}
-
-bool FailureDiagnosis::visitValueAndGradientExpr(ValueAndGradientExpr *GE) {
-  return diagnoseReverseAutoDiffExpr(GE, /*preservingPrimalResult=*/true);
+bool FailureDiagnosis::visitReverseAutoDiffExpr(ReverseAutoDiffExpr *RADE) {
+  return diagnoseReverseAutoDiffExpr(RADE);
 }
 
 bool FailureDiagnosis::visitPoundAssertExpr(PoundAssertExpr *PAE) {
