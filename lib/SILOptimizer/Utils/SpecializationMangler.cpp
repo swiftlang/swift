@@ -231,6 +231,7 @@ FunctionSignatureSpecializationMangler::mangleConstantProp(LiteralInst *LI) {
 
     ArgOpBuffer << 's';
     switch (SLI->getEncoding()) {
+      case StringLiteralInst::Encoding::Bytes: ArgOpBuffer << 'B'; break;
       case StringLiteralInst::Encoding::UTF8: ArgOpBuffer << 'b'; break;
       case StringLiteralInst::Encoding::UTF16: ArgOpBuffer << 'w'; break;
       case StringLiteralInst::Encoding::ObjCSelector: ArgOpBuffer << 'c'; break;
