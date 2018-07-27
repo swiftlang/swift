@@ -44,7 +44,7 @@ TFDumpDeabstractionDetails("tf-dump-deabstraction-details",
            llvm::cl::desc("Dump extra details about TensorFlow deabstraction"));
 
 static llvm::cl::opt<bool>
-TFStrictDeabstraction("tf-strict-deabstraction", llvm::cl::init(false),
+TFStrictDeabstraction("tf-strict-deabstraction", llvm::cl::init(true),
        llvm::cl::desc("Verify #tfop's are valid without the perf optimizer"));
 
 template<typename...T, typename...U>
