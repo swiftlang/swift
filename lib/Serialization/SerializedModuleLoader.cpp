@@ -417,11 +417,12 @@ FileUnit *SerializedModuleLoader::loadAST(
   case serialization::Status::NameMismatch: {
     // FIXME: This doesn't handle a non-debugger REPL, which should also treat
     // this as a non-fatal error.
-    auto diagKind = diag::serialization_name_mismatch;
     if (Ctx.LangOpts.DebuggerSupport)
-      diagKind = diag::serialization_name_mismatch_repl;
-    Ctx.Diags.diagnose(*diagLoc, diagKind,
-                       loadInfo.name, M.getName());
+      Ctx.Diags.diagnose(*diagLoc, diag::serialization_name_mismatch_repl,
+          loadInfo.name, M.getName());
+    else
+      Ctx.Diags.diagnose(*diagLoc, diag::serialization_name_mismatch,
+          loadInfo.name, M.getName()).fixItReplace(*diagLoc, loadInfo.name);
     break;
   }
 
