@@ -562,10 +562,6 @@ bool ConstraintSystem::tryTypeVariableBindings(
   auto &tc = getTypeChecker();
   ++solverState->NumTypeVariablesBound;
 
-  // If we've already explored a lot of potential solutions, bail.
-  if (getExpressionTooComplex(solutions))
-    return true;
-
   for (unsigned tryCount = 0; !anySolved && !bindings.empty(); ++tryCount) {
     // Try each of the bindings in turn.
     ++solverState->NumTypeVariableBindings;
@@ -1459,15 +1455,7 @@ ConstraintSystem::solveImpl(Expr *&expr,
 
   // If there are no solutions let's mark system as unsolved,
   // and solved otherwise even if there are multiple solutions still present.
-
-  // There was a Swift 3 bug that allowed us to return Solved if we
-  // had found at least one solution before deciding an expression was
-  // "too complex". Maintain that behavior, but for Swift > 3 return
-  // Unsolved in these cases.
-  auto tooComplex = getExpressionTooComplex(solutions);
-  auto unsolved = tooComplex || solutions.empty();
-
-  return unsolved ? SolutionKind::Unsolved : SolutionKind::Solved;
+  return solutions.empty() ? SolutionKind::Unsolved : SolutionKind::Solved;
 }
 
 bool ConstraintSystem::solve(Expr *const expr,
@@ -1498,8 +1486,8 @@ bool ConstraintSystem::solve(Expr *const expr,
   if (!retainAllSolutions())
     filterSolutions(solutions, state.ExprWeights);
 
-  // We fail if there is no solution.
-  return solutions.empty();
+  // We fail if there is no solution or the expression was too complex.
+  return solutions.empty() || getExpressionTooComplex(solutions);
 }
 
 bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
@@ -2042,10 +2030,6 @@ bool ConstraintSystem::solveForDisjunctionChoices(
         break;
     }
 
-    // If the expression was deemed "too complex", stop now and salvage.
-    if (getExpressionTooComplex(solutions))
-      break;
-
     // Try to solve the system with this option in the disjunction.
     SolverScope scope(*this);
     ++solverState->NumDisjunctionTerms;
@@ -2116,6 +2100,10 @@ bool ConstraintSystem::solveSimplified(
 
   auto bestBindings = determineBestBindings();
 
+  // If we've already explored a lot of potential solutions, bail.
+  if (getExpressionTooComplex(solutions))
+    return true;
+
   // If we have a binding that does not involve type variables, and is
   // not fully bound, or we have no disjunction to attempt instead,
   // go ahead and try the bindings for this type variable.
@@ -2127,13 +2115,8 @@ bool ConstraintSystem::solveSimplified(
   }
 
   if (disjunction) {
-    bool foundSolution = solveForDisjunctionChoices(disjunction, solutions,
-                                                    allowFreeTypeVariables);
-
-    // If we are exiting due to an expression that is too complex, do
-    // not allow our caller to continue as if we have been successful.
-    auto tooComplex = getExpressionTooComplex(solutions);
-    return tooComplex || !foundSolution;
+    return !solveForDisjunctionChoices(disjunction, solutions,
+                                       allowFreeTypeVariables);
   }
 
   // If there are no disjunctions we can't solve this system unless we have
