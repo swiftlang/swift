@@ -1,11 +1,41 @@
 // RUN: %target-sil-opt -tf-xla-cfg-canonicalize -tf-ensure-single-loop-exit -assume-parsing-unqualified-ownership-sil %s -o /dev/null | %FileCheck %s
 
-// Checks that the loop canonicalization is done if header has communication
-// with the host even if the loop is in the desired form.
 
 import Builtin
 import Swift
 import TensorFlow
+
+//--------------------------------------------------------------------------
+// A test to make sure that SESE canonicalization works correctly when
+// any of the backedges or exit edges are critical edges.
+sil private @$loopWithCriticalEdge : $@callee_owned () -> () {
+bb0:
+  br bb1                                          // id: %0
+
+bb1:                                              // Preds: bb1 bb0
+  %1 = graph_op "tfc.RecvFromHost"() : $Builtin.Int1 // user: %2
+  cond_br %1, bb1, bb2                            // id: %2
+
+bb2:                                              // Preds: bb1
+  %3 = tuple ()                                   // user: %4
+  return %3 : $()                                 // id: %4
+} // end sil function '$loopWithCriticalEdge'
+
+// CHECK-LABEL: --- XLA CFG Canonicalize: $loopWithCriticalEdge
+// CHECK: [sequence
+// CHECK:   <while Preheader: bb0, Header: bb5, exit: bb7
+// CHECK:     [sequence
+// CHECK:       {condition Header: bb1
+// CHECK:         block bb3
+// CHECK:         block bb2}
+// CHECK:       block bb6]>
+// CHECK:   block bb7
+// CHECK:   block bb4]
+// CHECK: --- XLA CFG Canonicalize end
+
+//--------------------------------------------------------------------------
+// Following tests Check that the loop canonicalization is done if header has
+// communication with the host even if the loop is in the desired form.
 
 // receiveFromHostGraphOp
 sil private @receiveFromHostGraphOp : $@convention(thin) @callee_owned () -> () {
