@@ -4394,11 +4394,6 @@ void TFFunctionPartition::finalizeHostFunction(const std::vector<char> &bytes,
   // the placeholder instructions for the data + length with the actual bits
   // we want to use.
   // This effectively emits the encoded graph as a global symbol.
-  //
-  // TODO: Currently the byte buffer is local to the host function, so multiple
-  // partitionable functions that share the same graphDef could have replicated
-  // byte buffers. Can move to a global byte buffer if this helps with
-  // performance.
   SILBuilder B(tensorProgram.programPlaceholder);
   auto data = B.createStringLiteral(hostFn.getLocation(),
                                     StringRef(bytes.data(), bytes.size()),
@@ -4546,6 +4541,10 @@ void TFPartition::run() {
     assert(graphFunctions.count(hostFn->getName()));
     auto &thisGraphFunc = *graphFunctions[hostFn->getName()];
 
+    // TODO: Currently the byte buffer is local to the host function, so
+    // multiple partitionable functions that share the same graphDef could have
+    // replicated byte buffers. Can move to a global byte buffer if this helps
+    // with performance.
     partitioner->finalizeHostFunction(bytes, thisGraphFunc.graphFnName);
   }
 }

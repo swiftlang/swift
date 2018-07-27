@@ -633,7 +633,7 @@ private: // Helpers to create TensorFlow graph nodes.
   // with a graph function name derived from `silFuncName` under the following
   // naming convention: Let `silFuncName` be "$foo", then the corresponding
   // graph function name is "foo.tf_only".
-  bool handleFunctionAttribute(TF_OperationDescription *op,
+  void handleFunctionAttribute(TF_OperationDescription *op,
                                const std::string &opName, SILLocation loc,
                                StringRef silFuncName);
 };
@@ -1772,13 +1772,12 @@ static std::string getGraphFuncNameForFuncAttr(StringRef fnName) {
   return std::string(fnName) + ".tf_only";
 }
 
-bool TFGraphFunctionLowering::handleFunctionAttribute(
+void TFGraphFunctionLowering::handleFunctionAttribute(
     TF_OperationDescription *op, const std::string &opName, SILLocation loc,
     StringRef silFuncName) {
   auto graphFnName = getGraphFuncNameForFuncAttr(silFuncName);
   TF_SetAttrFuncName(op, opName.c_str(), graphFnName.data(),
                      graphFnName.size());
-  return false;
 }
 
 /// Lower a graph_op into the TensorFlow op node.
@@ -1953,8 +1952,7 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
       }
       case SymbolicValue::Function: {
         auto silFuncName = attrValue.getFunctionValue()->getName();
-        if (handleFunctionAttribute(op, name, inst->getLoc(), silFuncName))
-          return GLStatus::Error;
+        handleFunctionAttribute(op, name, inst->getLoc(), silFuncName);
         break;
       }
       case SymbolicValue::Array: {
@@ -2338,8 +2336,7 @@ GLStatus TFGraphFunctionLowering::visitTFOpInst(BuiltinInst *inst) {
         TF_SetAttrType(op, name.c_str(), (TF_DataType)dtype);
       } else if (auto *fri = dyn_cast<FunctionRefInst>(operand)) {
         auto silFuncName = fri->getReferencedFunction()->getName();
-        if (handleFunctionAttribute(op, name, inst->getLoc(), silFuncName))
-          return GLStatus::Error;
+        handleFunctionAttribute(op, name, inst->getLoc(), silFuncName);
       } else {
         llvm_unreachable("unexpected attribute instruction");
       }
