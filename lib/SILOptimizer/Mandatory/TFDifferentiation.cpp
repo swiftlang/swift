@@ -2541,7 +2541,7 @@ void AdjointGen::run() {
     auto synthesis = worklist.back();
     worklist.pop_back();
     performSynthesis(synthesis);
-    DEBUG(synthesis.target->verify());
+    LLVM_DEBUG(synthesis.target->verify());
   }
 }
 
@@ -2837,7 +2837,7 @@ protected:
   /// value
   AdjointValue &addAdjointValue(SILValue originalValue,
                                 AdjointValue adjointValue) {
-    DEBUG(getADDebugStream() << "Adding adjoint for " << originalValue);
+    LLVM_DEBUG(getADDebugStream() << "Adding adjoint for " << originalValue);
     auto insertion = adjointMap.try_emplace(originalValue, adjointValue);
     auto inserted = insertion.second;
     auto &value = insertion.first->getSecond();
@@ -2857,7 +2857,7 @@ public:
     auto &original = getOriginal();
     auto &adjoint = getAdjoint();
     auto adjLoc = getAdjoint().getLocation();
-    DEBUG(getADDebugStream() << "Running AdjointGen on\n" << original);
+    LLVM_DEBUG(getADDebugStream() << "Running AdjointGen on\n" << original);
     auto origTy = original.getLoweredFunctionType();
     // Create entry BB and arguments.
     auto *adjointEntry = getAdjoint().createBasicBlock();
@@ -2900,7 +2900,7 @@ public:
     collectAllFormalResultsInTypeOrder(original, formalResults);
     auto srcIdx = getDifferentiationTask()->getIndices().source;
     addAdjointValue(formalResults[srcIdx], AdjointValue::getMaterialized(seed));
-    DEBUG(getADDebugStream() << "Assigned seed " << *seed
+    LLVM_DEBUG(getADDebugStream() << "Assigned seed " << *seed
           << " as the adjoint of " << formalResults[srcIdx]);
     
     // From the original exit, emit a reverse control flow graph and perform
