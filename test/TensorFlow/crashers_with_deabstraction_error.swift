@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-print-pass-name -Xllvm -tf-strict-deabstraction -emit-sil %s -verify
+// RUN: %target-swift-frontend -Xllvm -tf-strict-deabstraction -emit-sil %s -verify
 
 // This file contains tests that used to be in ./crashers.swift that produced
 // expected errors in the deabstraction pass, which prevented partitioning from

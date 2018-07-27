@@ -2015,6 +2015,34 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
         return diagnoseInvalidAttr("may not use this device name");
     }
 
+    // Emits a diagnostic and returns true if the value is invalid for a shape
+    // attr.
+    auto verifyNormalAttr = [&](SymbolicValue constValue) -> bool {
+      switch (constValue.getKind()) {
+      case SymbolicValue::Unknown:
+      case SymbolicValue::UninitMemory:
+      case SymbolicValue::Address:
+        assert(0 && "Cannot happen");
+
+      case SymbolicValue::Enum:
+      case SymbolicValue::EnumWithPayload:
+      case SymbolicValue::Aggregate:
+        diagnoseInvalidAttr("cannot be an enum, struct, or tuple");
+        return true;
+
+      case SymbolicValue::Integer:
+      case SymbolicValue::Float:
+      case SymbolicValue::Metatype:
+      case SymbolicValue::String:
+      case SymbolicValue::Function:
+      case SymbolicValue::Array:
+        break;
+      }
+      return false;
+    };
+
+    // Emits a diagnostic and returns true if the value is invalid for a shape
+    // attr.
     auto verifyShapeAttr = [&](SymbolicValue constValue) -> bool {
       // strip away the possible aggregate wrapper.
       constValue = constValue.lookThroughSingleElementAggregates();
@@ -2038,6 +2066,7 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
       }
       return false;
     };
+
     // Verify that the type of this attribute is ok for the OperandClass we
     // have.
     switch (operandClass.second) {
@@ -2045,25 +2074,8 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
     case SILTensorOpInfo::OperandClass::InputElt:
       assert(0 && "Input classes cannot exist for attributes");
     case SILTensorOpInfo::OperandClass::Normal:  // No modifier.
-      switch (constValue.getKind()) {
-      case SymbolicValue::Unknown:
-      case SymbolicValue::UninitMemory:
-      case SymbolicValue::Address:
-        assert(0 && "Cannot happen");
-
-      case SymbolicValue::Enum:
-      case SymbolicValue::EnumWithPayload:
-      case SymbolicValue::Aggregate:
-        return diagnoseInvalidAttr("cannot be an enum, struct, or tuple");
-
-      case SymbolicValue::Integer:
-      case SymbolicValue::Float:
-      case SymbolicValue::Metatype:
-      case SymbolicValue::String:
-      case SymbolicValue::Function:
-      case SymbolicValue::Array:
-        break;
-      }
+      if (verifyNormalAttr(constValue))
+        return; // error already emitted.
       break;
     case SILTensorOpInfo::OperandClass::DType:
       // This integer value is a dtype.
