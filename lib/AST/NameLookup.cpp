@@ -1523,21 +1523,29 @@ Type AbstractStorageDecl::getStorageInterfaceType() const {
   llvm_unreachable("unhandled storage decl kind");
 }
 
-bool DeclContext::lookupQualified(Type type,
-                                  DeclName member,
-                                  NLOptions options,
-                                  LazyResolver *typeResolver,
-                                  SmallVectorImpl<ValueDecl *> &decls) const {
-  using namespace namelookup;
-  assert(decls.empty() && "additive lookup not supported");
+/// Configure name lookup for the given declaration context and options.
+///
+/// This utility is used by qualified name lookup.
+static void configureLookup(const DeclContext *dc,
+                            NLOptions &options,
+                            ReferencedNameTracker *&tracker,
+                            bool &isLookupCascading) {
+  auto &ctx = dc->getASTContext();
+  if (!ctx.LangOpts.EnableAccessControl)
+    options |= NL_IgnoreAccessControl;
 
-  if (!typeResolver)
-    typeResolver = getASTContext().getLazyResolver();
-  
-  auto checkLookupCascading = [this, options]() -> Optional<bool> {
+  // Find the dependency tracker we'll need for this lookup.
+  tracker = nullptr;
+  if (auto containingSourceFile =
+          dyn_cast<SourceFile>(dc->getModuleScopeContext())) {
+    tracker = containingSourceFile->getReferencedNameTracker();
+  }
+
+  auto checkLookupCascading = [dc, options]() -> Optional<bool> {
     switch (static_cast<unsigned>(options & NL_KnownDependencyMask)) {
     case 0:
-      return isCascadingContextForLookup(/*functionsAreNonCascading=*/false);
+      return dc->isCascadingContextForLookup(
+               /*functionsAreNonCascading=*/false);
     case NL_KnownNonCascadingDependency:
       return false;
     case NL_KnownCascadingDependency:
@@ -1554,14 +1562,93 @@ bool DeclContext::lookupQualified(Type type,
     }
   };
 
+  // Determine whether a lookup here will cascade.
+  isLookupCascading = false;
+  if (tracker) {
+    if (auto maybeLookupCascade = checkLookupCascading())
+      isLookupCascading = maybeLookupCascade.getValue();
+    else
+      tracker = nullptr;
+  }
+}
+
+/// Determine whether the given declaration is an acceptable lookup
+/// result when searching from the given DeclContext.
+static bool isAcceptableLookupResult(const DeclContext *dc,
+                                     NLOptions options,
+                                     ValueDecl *decl,
+                                     bool onlyCompleteObjectInits) {
+  // Filter out designated initializers, if requested.
+  if (onlyCompleteObjectInits) {
+    if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
+      if (isa<ClassDecl>(ctor->getDeclContext()) && !ctor->isInheritable())
+        return false;
+    } else {
+      return false;
+    }
+  }
+
+  // Ignore stub implementations.
+  if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
+    if (ctor->hasStubImplementation())
+      return false;
+  }
+
+  // Check access.
+  if (!(options & NL_IgnoreAccessControl)) {
+    return decl->isAccessibleFrom(dc);
+  }
+
+  return true;
+}
+
+/// Only name lookup has gathered a set of results, perform any necessary
+/// steps to prune the result set before returning it to the caller.
+static bool finishLookup(const DeclContext *dc, NLOptions options,
+                         SmallVectorImpl<ValueDecl *> &decls) {
+  // If we're supposed to remove overridden declarations, do so now.
+  if (options & NL_RemoveOverridden)
+    removeOverriddenDecls(decls);
+
+  // If we're supposed to remove shadowed/hidden declarations, do so now.
+  ModuleDecl *M = dc->getParentModule();
+  if (options & NL_RemoveNonVisible)
+    removeShadowedDecls(decls, M);
+
+  if (auto *debugClient = M->getDebugClient())
+    filterForDiscriminator(decls, debugClient);
+
+  // We're done. Report success/failure.
+  return !decls.empty();
+}
+
+bool DeclContext::lookupQualified(Type type,
+                                  DeclName member,
+                                  NLOptions options,
+                                  LazyResolver *typeResolver,
+                                  SmallVectorImpl<ValueDecl *> &decls) const {
+  using namespace namelookup;
+  assert(decls.empty() && "additive lookup not supported");
+
+  // Handle AnyObject lookup.
+  if (type->isAnyObject())
+    return lookupAnyObject(member, options, decls);
+
+  if (!typeResolver)
+    typeResolver = getASTContext().getLazyResolver();
+
+  // Configure lookup and dig out the tracker.
+  ReferencedNameTracker *tracker = nullptr;
+  bool isLookupCascading;
+  configureLookup(this, options, tracker, isLookupCascading);
+
   // Look for module references.
   if (auto moduleTy = type->getAs<ModuleType>()) {
     ModuleDecl *module = moduleTy->getModule();
     auto topLevelScope = getModuleScopeContext();
     if (module == topLevelScope->getParentModule()) {
-      if (auto maybeLookupCascade = checkLookupCascading()) {
-        recordLookupOfTopLevelName(topLevelScope, member,
-                                   maybeLookupCascade.getValue());
+      if (tracker) {
+        recordLookupOfTopLevelName(topLevelScope, member, isLookupCascading);
       }
       lookupInModule(module, /*accessPath=*/{}, member, decls,
                      NLKind::QualifiedLookup, ResolutionKind::Overloadable,
@@ -1603,10 +1690,6 @@ bool DeclContext::lookupQualified(Type type,
     return !decls.empty();
   }
 
-  auto &ctx = getASTContext();
-  if (!ctx.LangOpts.EnableAccessControl)
-    options |= NL_IgnoreAccessControl;
-
   // The set of nominal type declarations we should (and have) visited.
   SmallVector<NominalTypeDecl *, 4> stack;
   llvm::SmallPtrSet<NominalTypeDecl *, 4> visited;
@@ -1622,7 +1705,6 @@ bool DeclContext::lookupQualified(Type type,
 
   // Handle nominal types.
   bool wantProtocolMembers = (options & NL_ProtocolMembers);
-  bool wantLookupInAllClasses = false;
   if (auto nominal = type->getAnyNominal()) {
     visited.insert(nominal);
     stack.push_back(nominal);
@@ -1647,10 +1729,6 @@ bool DeclContext::lookupQualified(Type type,
   else if (auto compositionTy = type->getAs<ProtocolCompositionType>()) {
     auto layout = compositionTy->getExistentialLayout();
 
-    if (layout.isAnyObject() &&
-        (options & NL_DynamicLookup))
-      wantLookupInAllClasses = true;
-
     for (auto proto : layout.getProtocols()) {
       auto *protoDecl = proto->getDecl();
       if (visited.insert(protoDecl).second)
@@ -1666,46 +1744,8 @@ bool DeclContext::lookupQualified(Type type,
     llvm_unreachable("Bad type for qualified lookup");
   }
 
-  // Allow filtering of the visible declarations based on various
-  // criteria.
+  // Whether we only want to return complete object initializers.
   bool onlyCompleteObjectInits = false;
-  auto isAcceptableDecl = [&](NominalTypeDecl *current, ValueDecl *decl) -> bool {
-    // Filter out designated initializers, if requested.
-    if (onlyCompleteObjectInits) {
-      if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
-        if (isa<ClassDecl>(ctor->getDeclContext()) &&
-            !ctor->isInheritable())
-          return false;
-      } else {
-        return false;
-      }
-    }
-
-    // Ignore stub implementations.
-    if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
-      if (ctor->hasStubImplementation())
-        return false;
-    }
-
-    // Check access.
-    if (!(options & NL_IgnoreAccessControl)) {
-      return decl->isAccessibleFrom(this);
-    }
-
-    return true;
-  };
-
-  ReferencedNameTracker *tracker = nullptr;
-  if (auto containingSourceFile = dyn_cast<SourceFile>(getModuleScopeContext()))
-    tracker = containingSourceFile->getReferencedNameTracker();
-
-  bool isLookupCascading;
-  if (tracker) {
-    if (auto maybeLookupCascade = checkLookupCascading())
-      isLookupCascading = maybeLookupCascade.getValue();
-    else
-      tracker = nullptr;
-  }
 
   // Visit all of the nominal types we know about, discovering any others
   // we need along the way.
@@ -1732,7 +1772,8 @@ bool DeclContext::lookupQualified(Type type,
       if ((options & NL_OnlyTypes) && !isa<TypeDecl>(decl))
         continue;
 
-      if (isAcceptableDecl(current, decl))
+      if (isAcceptableLookupResult(this, options, decl,
+                                   onlyCompleteObjectInits))
         decls.push_back(decl);
     }
 
@@ -1784,66 +1825,58 @@ bool DeclContext::lookupQualified(Type type,
       wantProtocolMembers = false;
   }
 
-  // If we want to perform lookup into all classes, do so now.
-  if (wantLookupInAllClasses) {
-    if (tracker)
-      tracker->addDynamicLookupName(member.getBaseName(), isLookupCascading);
+  return finishLookup(this, options, decls);
+}
 
-    // Collect all of the visible declarations.
-    SmallVector<ValueDecl *, 4> allDecls;
-    forAllVisibleModules(this, [&](ModuleDecl::ImportedModule import) {
-      import.second->lookupClassMember(import.first, member, allDecls);
-    });
+bool DeclContext::lookupAnyObject(DeclName member, NLOptions options,
+                                  SmallVectorImpl<ValueDecl *> &decls) const {
+  // Configure lookup and dig out the tracker.
+  ReferencedNameTracker *tracker = nullptr;
+  bool isLookupCascading;
+  configureLookup(this, options, tracker, isLookupCascading);
 
-    // For each declaration whose context is not something we've
-    // already visited above, add it to the list of declarations.
-    llvm::SmallPtrSet<ValueDecl *, 4> knownDecls;
-    for (auto decl : allDecls) {
-      // If we're performing a type lookup, don't even attempt to validate
-      // the decl if its not a type.
-      if ((options & NL_OnlyTypes) && !isa<TypeDecl>(decl))
-        continue;
+  // Record this lookup.
+  if (tracker)
+    tracker->addDynamicLookupName(member.getBaseName(), isLookupCascading);
 
-      // If the declaration is not @objc, it cannot be called dynamically.
-      if (!decl->isObjC())
-        continue;
+  // Type-only lookup won't find anything on AnyObject.
+  if (options & NL_OnlyTypes)
+    return false;
 
-      // If the declaration has an override, name lookup will also have
-      // found the overridden method. Skip this declaration, because we
-      // prefer the overridden method.
-      if (decl->getOverriddenDecl())
-        continue;
+  // Collect all of the visible declarations.
+  SmallVector<ValueDecl *, 4> allDecls;
+  forAllVisibleModules(this, [&](ModuleDecl::ImportedModule import) {
+    import.second->lookupClassMember(import.first, member, allDecls);
+  });
 
-      auto dc = decl->getDeclContext();
-      auto nominal = dyn_cast<NominalTypeDecl>(dc);
-      if (!nominal) {
-        auto ext = cast<ExtensionDecl>(dc);
-        nominal = ext->getExtendedType()->getAnyNominal();
-        assert(nominal && "Couldn't find nominal type?");
-      }
+  // For each declaration whose context is not something we've
+  // already visited above, add it to the list of declarations.
+  llvm::SmallPtrSet<ValueDecl *, 4> knownDecls;
+  for (auto decl : allDecls) {
+    // If the declaration is not @objc, it cannot be called dynamically.
+    if (!decl->isObjC())
+      continue;
 
-      // If we didn't visit this nominal type above, add this
-      // declaration to the list.
-      if (!visited.count(nominal) && knownDecls.insert(decl).second &&
-          isAcceptableDecl(nominal, decl))
-        decls.push_back(decl);
-    }
+    // If the declaration has an override, name lookup will also have
+    // found the overridden method. Skip this declaration, because we
+    // prefer the overridden method.
+    if (decl->getOverriddenDecl())
+      continue;
+
+    auto dc = decl->getDeclContext();
+    auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
+    assert(nominal && "Couldn't find nominal type?");
+
+    // If we didn't see this declaration before, and it's an acceptable
+    // result, add it to the list.
+    // declaration to the list.
+    if (knownDecls.insert(decl).second &&
+        isAcceptableLookupResult(this, options, decl,
+                                 /*onlyCompleteObjectInits=*/false))
+      decls.push_back(decl);
   }
 
-  // If we're supposed to remove overridden declarations, do so now.
-  if (options & NL_RemoveOverridden)
-    removeOverriddenDecls(decls);
-
-  // If we're supposed to remove shadowed/hidden declarations, do so now.
-  ModuleDecl *M = getParentModule();
-  if (options & NL_RemoveNonVisible)
-    removeShadowedDecls(decls, M);
-
-  if (auto *debugClient = M->getDebugClient())
-    filterForDiscriminator(decls, debugClient);
-
-  // We're done. Report success/failure.
-  return !decls.empty();
+  return finishLookup(this, options, decls);
 }
 
 void DeclContext::lookupAllObjCMethods(
