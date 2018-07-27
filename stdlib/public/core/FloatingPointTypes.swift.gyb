@@ -986,7 +986,7 @@ extension ${Self}: BinaryFloatingPoint {
   ///     // z == 6.0
   ///
   /// For more information about the available rounding rules, see the
-  /// `FloatingPointRoundingRule` enumeration. To round a value using the
+  /// `RoundingRule` enumeration. To round a value using the
   /// default "schoolbook rounding", you can use the shorter `round()` method
   /// instead.
   ///
@@ -996,7 +996,7 @@ extension ${Self}: BinaryFloatingPoint {
   ///
   /// - Parameter rule: The rounding rule to use.
   @_transparent
-  public mutating func round(_ rule: FloatingPointRoundingRule) {
+  public mutating func round(_ rule: RoundingRule) {
     switch rule {
     case .toNearestOrAwayFromZero:
       _value = Builtin.int_round_FPIEEE${bits}(_value)
@@ -1025,7 +1025,7 @@ extension ${Self}: BinaryFloatingPoint {
   // the case, this non-inlinable function will call into the _newer_ version
   // which _will_ support this rounding rule.
   @usableFromInline
-  internal mutating func _roundSlowPath(_ rule: FloatingPointRoundingRule) {
+  internal mutating func _roundSlowPath(_ rule: RoundingRule) {
     self.round(rule)
   }
 

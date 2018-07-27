@@ -936,16 +936,16 @@ public protocol FloatingPoint : SignedNumeric, Strideable, Hashable
   ///     // Prints "6.0"
   ///
   /// For more information about the available rounding rules, see the
-  /// `FloatingPointRoundingRule` enumeration. To round a value using the
-  /// default "schoolbook rounding", you can use the shorter `rounded()`
-  /// method instead.
+  /// `RoundingRule` enumeration. To round a value using the default
+  /// "schoolbook rounding", you can use the shorter `rounded()` method
+  /// instead.
   ///
   ///     print(x.rounded())
   ///     // Prints "7.0"
   ///
   /// - Parameter rule: The rounding rule to use.
   /// - Returns: The integral value found by rounding using `rule`.
-  func rounded(_ rule: FloatingPointRoundingRule) -> Self
+  func rounded(_ rule: RoundingRule) -> Self
 
   /// Rounds the value to an integral value using the specified rounding rule.
   ///
@@ -972,8 +972,8 @@ public protocol FloatingPoint : SignedNumeric, Strideable, Hashable
   ///     // z == 6.0
   ///
   /// For more information about the available rounding rules, see the
-  /// `FloatingPointRoundingRule` enumeration. To round a value using the
-  /// default "schoolbook rounding", you can use the shorter `round()` method
+  /// `RoundingRule` enumeration. To round a value using the default
+  /// "schoolbook rounding", you can use the shorter `round()` method
   /// instead.
   ///
   ///     var w1 = 6.5
@@ -981,7 +981,7 @@ public protocol FloatingPoint : SignedNumeric, Strideable, Hashable
   ///     // w1 == 7.0
   ///
   /// - Parameter rule: The rounding rule to use.
-  mutating func round(_ rule: FloatingPointRoundingRule)
+  mutating func round(_ rule: RoundingRule)
 
   /// The least representable value that compares greater than this value.
   ///
@@ -1287,133 +1287,6 @@ public enum FloatingPointClassification {
   case positiveInfinity
 }
 
-/// A rule for rounding a floating-point number.
-public enum FloatingPointRoundingRule {
-  /// Round to the closest allowed value; if two values are equally close, the
-  /// one with greater magnitude is chosen.
-  ///
-  /// This rounding rule is also known as "schoolbook rounding." The following
-  /// example shows the results of rounding numbers using this rule:
-  ///
-  ///     (5.2).rounded(.toNearestOrAwayFromZero)
-  ///     // 5.0
-  ///     (5.5).rounded(.toNearestOrAwayFromZero)
-  ///     // 6.0
-  ///     (-5.2).rounded(.toNearestOrAwayFromZero)
-  ///     // -5.0
-  ///     (-5.5).rounded(.toNearestOrAwayFromZero)
-  ///     // -6.0
-  ///
-  /// This rule is equivalent to the C `round` function and implements the
-  /// `roundToIntegralTiesToAway` operation defined by the [IEEE 754
-  /// specification][spec].
-  ///
-  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
-  case toNearestOrAwayFromZero
-
-  /// Round to the closest allowed value; if two values are equally close, the
-  /// even one is chosen.
-  ///
-  /// This rounding rule is also known as "bankers rounding," and is the
-  /// default IEEE 754 rounding mode for arithmetic. The following example
-  /// shows the results of rounding numbers using this rule:
-  ///
-  ///     (5.2).rounded(.toNearestOrEven)
-  ///     // 5.0
-  ///     (5.5).rounded(.toNearestOrEven)
-  ///     // 6.0
-  ///     (4.5).rounded(.toNearestOrEven)
-  ///     // 4.0
-  ///
-  /// This rule implements the `roundToIntegralTiesToEven` operation defined by
-  /// the [IEEE 754 specification][spec].
-  ///
-  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
-  case toNearestOrEven
-
-  /// Round to the closest allowed value that is greater than or equal to the
-  /// source.
-  ///
-  /// The following example shows the results of rounding numbers using this
-  /// rule:
-  ///
-  ///     (5.2).rounded(.up)
-  ///     // 6.0
-  ///     (5.5).rounded(.up)
-  ///     // 6.0
-  ///     (-5.2).rounded(.up)
-  ///     // -5.0
-  ///     (-5.5).rounded(.up)
-  ///     // -5.0
-  ///
-  /// This rule is equivalent to the C `ceil` function and implements the
-  /// `roundToIntegralTowardPositive` operation defined by the [IEEE 754
-  /// specification][spec].
-  ///
-  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
-  case up
-
-  /// Round to the closest allowed value that is less than or equal to the
-  /// source.
-  ///
-  /// The following example shows the results of rounding numbers using this
-  /// rule:
-  ///
-  ///     (5.2).rounded(.down)
-  ///     // 5.0
-  ///     (5.5).rounded(.down)
-  ///     // 5.0
-  ///     (-5.2).rounded(.down)
-  ///     // -6.0
-  ///     (-5.5).rounded(.down)
-  ///     // -6.0
-  ///
-  /// This rule is equivalent to the C `floor` function and implements the
-  /// `roundToIntegralTowardNegative` operation defined by the [IEEE 754
-  /// specification][spec].
-  ///
-  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
-  case down
-
-  /// Round to the closest allowed value whose magnitude is less than or equal
-  /// to that of the source.
-  ///
-  /// The following example shows the results of rounding numbers using this
-  /// rule:
-  ///
-  ///     (5.2).rounded(.towardZero)
-  ///     // 5.0
-  ///     (5.5).rounded(.towardZero)
-  ///     // 5.0
-  ///     (-5.2).rounded(.towardZero)
-  ///     // -5.0
-  ///     (-5.5).rounded(.towardZero)
-  ///     // -5.0
-  ///
-  /// This rule is equivalent to the C `trunc` function and implements the
-  /// `roundToIntegralTowardZero` operation defined by the [IEEE 754
-  /// specification][spec].
-  ///
-  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
-  case towardZero
-
-  /// Round to the closest allowed value whose magnitude is greater than or
-  /// equal to that of the source.
-  ///
-  /// The following example shows the results of rounding numbers using this
-  /// rule:
-  ///
-  ///     (5.2).rounded(.awayFromZero)
-  ///     // 6.0
-  ///     (5.5).rounded(.awayFromZero)
-  ///     // 6.0
-  ///     (-5.2).rounded(.awayFromZero)
-  ///     // -6.0
-  ///     (-5.5).rounded(.awayFromZero)
-  ///     // -6.0
-  case awayFromZero
-}
-
 extension FloatingPoint {
   @_transparent
   public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -1654,9 +1527,9 @@ extension FloatingPoint {
   ///     // Prints "6.0"
   ///
   /// For more information about the available rounding rules, see the
-  /// `FloatingPointRoundingRule` enumeration. To round a value using the
-  /// default "schoolbook rounding", you can use the shorter `rounded()`
-  /// method instead.
+  /// `RoundingRule` enumeration. To round a value using the default
+  /// "schoolbook rounding", you can use the shorter `rounded()` method
+  /// instead.
   ///
   ///     print(x.rounded())
   ///     // Prints "7.0"
@@ -1664,7 +1537,7 @@ extension FloatingPoint {
   /// - Parameter rule: The rounding rule to use.
   /// - Returns: The integral value found by rounding using `rule`.
   @_transparent
-  public func rounded(_ rule: FloatingPointRoundingRule) -> Self {
+  public func rounded(_ rule: RoundingRule) -> Self {
     var lhs = self
     lhs.round(rule)
     return lhs

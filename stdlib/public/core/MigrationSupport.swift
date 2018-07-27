@@ -265,6 +265,9 @@ extension BinaryFloatingPoint {
 @available(*, unavailable, renamed: "FloatingPoint")
 public typealias FloatingPointType = FloatingPoint
 
+@available(swift, deprecated: 5, renamed: "RoundingRule")
+public typealias FloatingPointRoundingRule = RoundingRule
+
 // Swift 3 compatibility APIs
 @available(swift, obsoleted: 4, renamed: "BinaryInteger")
 public typealias Integer = BinaryInteger

@@ -107,6 +107,7 @@ set(SWIFTLIB_ESSENTIAL
   Repeat.swift
   REPL.swift
   Reverse.swift
+  RoundingRule.swift
   Runtime.swift.gyb
   RuntimeFunctionCounters.swift
   SipHash.swift

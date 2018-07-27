@@ -138,6 +138,7 @@
   "Math": [
     "SetAlgebra.swift",
     "BuiltinMath.swift",
+    "RoundingRule.swift",
     {
     "Integers": [
       "Integers.swift",
