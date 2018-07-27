@@ -4,10 +4,38 @@ import Builtin
 import Swift
 import TensorFlow
 
-// sil @$undefInt32 : $@convention(thin) () -> Builtin.Int32  {
-// bb0:
-//  return undef : $Builtin.Int32
-// }
+sil @$undefDuplicates : $@convention(thin) () -> TensorHandle<Bool>  {
+bb0:
+  br bb1(undef : $TensorHandle<Bool>)
+bb1(%0 : $TensorHandle<Bool>):
+  return undef : $TensorHandle<Bool>
+}
+// CHECK-LABEL: --- TFPartition GraphDef Proto: $undefDuplicates
+// CHECK: library {
+// CHECK:  function {
+// CHECK:  node_def {
+// CHECK:      name: "UndefConstDTensorHandleLBoolG"
+// CHECK:      op: "Const"
+// CHECK:      attr {
+// CHECK:        key: "dtype"
+// CHECK:        value {
+// CHECK:          type: DT_BOOL
+// CHECK:        }
+// CHECK:      }
+// CHECK:      attr {
+// CHECK:        key: "value"
+// CHECK:        value {
+// CHECK:          tensor {
+// CHECK:            dtype: DT_BOOL
+// CHECK:            tensor_shape {
+// CHECK:            }
+// CHECK:            bool_val: false
+// CHECK:          }
+// CHECK:        }
+// CHECK:      }
+// CHECK:    }
+// CHECK:  }
+// CHECK:}
 
 sil @$undefTFBool : $@convention(thin) () -> TensorHandle<Bool>  {
 bb0:
