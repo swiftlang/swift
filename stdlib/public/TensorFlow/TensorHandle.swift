@@ -97,12 +97,15 @@ extension TensorHandle : TensorSendableReceivable {
   ) -> TensorHandle<Scalar> {
     debugLog("Receiving tensor of id \(tensorId) and type \(Scalar.self).")
     let status = TF_NewStatus()
-    let cTensor: CTensor = TF_DequeueNamedTensor(
+    let cTensor: CTensor? = TF_DequeueNamedTensor(
       computation.cSession, Int32(tensorId), status)
     checkOk(status)
+    internalConsistencyCheck(
+      cTensor != nil,
+      "TF_DequeueNamedTensor() cannot return nil when the status is OK.")
     TF_DeleteStatus(status)
-    let tensorHandle = TensorHandle<Scalar>(copyingFromCTensor: cTensor)
-    TF_DeleteTensor(cTensor)
+    let tensorHandle = TensorHandle<Scalar>(copyingFromCTensor: cTensor!)
+    TF_DeleteTensor(cTensor!)
     if _RuntimeConfig.printsDebugLog {
       debugLog("The received tensor of id \(tensorId) has content:")
       dumpTensorContent(tensorHandle.cTensorHandle, Scalar.self)
