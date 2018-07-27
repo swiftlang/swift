@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -emit-sil %s -verify
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-strict-deabstraction=false -emit-sil %s -verify
 
 // This test checks that deabstraction passes debug scope verification with -Onone.
 // Prior to https://github.com/apple/swift/pull/17797, this test failed with:
