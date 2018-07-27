@@ -3578,7 +3578,7 @@ bool diagnoseUnwrap(TypeChecker &TC, DeclContext *DC, Expr *expr, Type type);
 ///
 /// \returns true if a diagnostic was produced.
 bool diagnoseBaseUnwrapForMemberAccess(Expr *baseExpr, Type baseType,
-                                       DeclName memberName,
+                                       DeclName memberName, bool resultOptional,
                                        SourceRange memberRange);
 
 // Return true if, when replacing "<expr>" with "<expr> ?? T", parentheses need
