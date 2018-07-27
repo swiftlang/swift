@@ -82,7 +82,7 @@ func call_yield() {
 struct YieldInDefer {
   var property: String {
     _read {
-      defer {
+      defer { // expected-warning {{'defer' statement before end of scope always executes immediately}}{{7-12=do}}
         // FIXME: this recovery is terrible
         yield ""
         // expected-error@-1 {{expression resolves to an unused function}}
