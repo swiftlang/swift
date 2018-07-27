@@ -229,12 +229,13 @@ SILType tf::convertElementTypeToTensorValueType(SILType ty) {
 /// Looks up a function in the current module. If it exists, returns it.
 /// Otherwise, attempt to link it from imported modules. Returns null if such
 /// function name does not exist.
-SILFunction *tf::lookupOrLinkFunction(StringRef name, SILModule &module) {
+SILFunction *tf::lookupOrLoadFunction(StringRef name, SILModule &module) {
   assert(!name.empty());
   if (auto *localFn = module.lookUpFunction(name))
     return localFn;
   auto *fn = module.findFunction(name, SILLinkage::PublicExternal);
   module.loadFunction(fn);
+  assert(fn->isDefinition());
   return fn;
 }
 
@@ -264,7 +265,7 @@ SILFunction *tf::findSILFunctionForRequiredProtocolMember(
   lookupProtocolRequiredMembers(typeDecl, proto, name, module, results);
   for (auto *result : results) {
     std::string name = SILDeclRef(result).mangle();
-    if (auto *fn = lookupOrLinkFunction(name, silModule))
+    if (auto *fn = lookupOrLoadFunction(name, silModule))
       return fn;
   }
   return nullptr;

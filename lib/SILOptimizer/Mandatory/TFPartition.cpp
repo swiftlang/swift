@@ -97,7 +97,7 @@ static CanType getSingleElementDeclFieldType(NominalTypeDecl *decl) {
 static SubstitutionMap
 getSingleSubstitutionMapForFunction(SILFunction *f, Type ty,
                                     SILModule &userModule) {
-  auto *loadedFunc = lookupOrLinkFunction(f->getName(), userModule);
+  auto *loadedFunc = lookupOrLoadFunction(f->getName(), userModule);
   assert(loadedFunc->getGenericEnvironment());
   auto *genericSig = loadedFunc->getGenericEnvironment()->getGenericSignature();
   return getSingleSubstitutionMapForElementTypeAndSignature(ty, genericSig);
