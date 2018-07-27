@@ -282,7 +282,6 @@
 // LINUX_DYNLIB-x86_64: clang++{{"? }}
 // LINUX_DYNLIB-x86_64-DAG: -shared
 // LINUX_DYNLIB-x86_64-DAG: -fuse-ld=gold
-// LINUX_DYNLIB-x86_64-DAG: -L bar
 // LINUX_DYNLIB-x86_64-NOT: -pie
 // LINUX_DYNLIB-x86_64-DAG: -Xlinker -rpath -Xlinker [[STDLIB_PATH:[^ ]+/lib/swift/linux]]
 // LINUX_DYNLIB-x86_64: [[STDLIB_PATH]]/x86_64/swiftrt.o
@@ -290,21 +289,24 @@
 // LINUX_DYNLIB-x86_64-DAG: @[[AUTOLINKFILE]]
 // LINUX_DYNLIB-x86_64-DAG: [[STDLIB_PATH]]
 // LINUX_DYNLIB-x86_64-DAG: -lswiftCore
+// LINUX_DYNLIB-x86_64-DAG: -L bar
 // LINUX_DYNLIB-x86_64: -o dynlib.out
 
 // IOS-custom-rpath: swift
 // IOS-custom-rpath: -o [[OBJECTFILE:.*]]
 
 // IOS-custom-rpath: bin/ld{{"? }}
-// IOS-custom-rpath: -rpath customrpath
 // IOS-custom-rpath: -rpath [[STDLIB_PATH:[^ ]+/lib/swift/iphonesimulator]]
+// IOS-custom-rpath: -rpath customrpath
+// IOS-custom-rpath: -o {{.*}}
 
 // LINUX-custom-rpath: swift
 // LINUX-custom-rpath: -o [[OBJECTFILE:.*]]
 
 // LINUX-custom-rpath: clang++{{"? }}
+// LINUX-custom-rpath: -Xlinker -rpath -Xlinker {{[^ ]+/lib/swift/linux}}
 // LINUX-custom-rpath: -Xlinker -rpath -Xlinker customrpath
-// LINUX-custom-rpath: -Xlinker -rpath -Xlinker [[STDLIB_PATH:[^ ]+/lib/swift/linux]]
+// LINUX-custom-rpath: -o {{.*}}
 
 // DEBUG: bin/swift
 // DEBUG-NEXT: bin/swift
