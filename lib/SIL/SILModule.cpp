@@ -663,8 +663,9 @@ SILModule::lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
 
   // If no witness table was found, bail.
   if (!Ret) {
-    DEBUG(llvm::dbgs() << "        Failed speculative lookup of witness for: ";
-          C.dump(); Requirement.dump());
+    LLVM_DEBUG(llvm::dbgs() << "        Failed speculative lookup of "
+               "witness for: ";
+               C.dump(); Requirement.dump());
     return std::make_pair(nullptr, nullptr);
   }
 
@@ -701,9 +702,9 @@ SILModule::lookUpFunctionInDefaultWitnessTable(const ProtocolDecl *Protocol,
   // FIXME: Could be an assert if we fix non-single-frontend mode to link
   // together serialized SIL emitted by each translation unit.
   if (!Ret) {
-    DEBUG(llvm::dbgs() << "        Failed speculative lookup of default "
-          "witness for " << Protocol->getName() << " ";
-          Requirement.dump());
+    LLVM_DEBUG(llvm::dbgs() << "        Failed speculative lookup of default "
+               "witness for " << Protocol->getName() << " ";
+               Requirement.dump());
     return std::make_pair(nullptr, nullptr);
   }
 
@@ -849,9 +850,28 @@ void SILModule::setOptRecordStream(
 SILProperty *SILProperty::create(SILModule &M,
                                  bool Serialized,
                                  AbstractStorageDecl *Decl,
-                                 KeyPathPatternComponent Component) {
+                                 Optional<KeyPathPatternComponent> Component) {
   auto prop = new (M) SILProperty(Serialized, Decl, Component);
   M.properties.push_back(prop);
   return prop;
 }
 
+// Definition from SILLinkage.h.
+SILLinkage swift::getDeclSILLinkage(const ValueDecl *decl) {
+  AccessLevel access = decl->getEffectiveAccess();
+  SILLinkage linkage;
+  switch (access) {
+  case AccessLevel::Private:
+  case AccessLevel::FilePrivate:
+    linkage = SILLinkage::Private;
+    break;
+  case AccessLevel::Internal:
+    linkage = SILLinkage::Hidden;
+    break;
+  case AccessLevel::Public:
+  case AccessLevel::Open:
+    linkage = SILLinkage::Public;
+    break;
+  }
+  return linkage;
+}

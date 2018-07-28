@@ -372,8 +372,8 @@ static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
       return NewInstPair.second.getInstruction() != nullptr;
     }
 
-    DEBUG(llvm::dbgs() << "Inserting monomorphic speculative call for class " <<
-          CD->getName() << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Inserting monomorphic speculative call for "
+               "class " << CD->getName() << "\n");
     return !!speculateMonomorphicTarget(AI, SubType, LastCCBI);
   }
 
@@ -386,17 +386,17 @@ static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
   // Number of subclasses which cannot be handled by checked_cast_br checks.
   int NotHandledSubsNum = 0;
   if (Subs.size() > MaxNumSpeculativeTargets) {
-    DEBUG(llvm::dbgs() << "Class " << CD->getName() << " has too many ("
-                       << Subs.size() << ") subclasses. Performing speculative "
-                         "devirtualization only for the first "
-                       << MaxNumSpeculativeTargets << " of them.\n");
+    LLVM_DEBUG(llvm::dbgs() << "Class " << CD->getName() << " has too many ("
+                            << Subs.size() << ") subclasses. Performing "
+                              "speculative devirtualization only for the first "
+                            << MaxNumSpeculativeTargets << " of them.\n");
 
     NotHandledSubsNum += (Subs.size() - MaxNumSpeculativeTargets);
     Subs.erase(&Subs[MaxNumSpeculativeTargets], Subs.end());
   }
 
-  DEBUG(llvm::dbgs() << "Class " << CD->getName() << " is a superclass. "
-        "Inserting polymorphic speculative call.\n");
+  LLVM_DEBUG(llvm::dbgs() << "Class " << CD->getName() << " is a superclass. "
+             "Inserting polymorphic speculative call.\n");
 
   // Try to devirtualize the static class of instance
   // if it is possible.
@@ -453,8 +453,8 @@ static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
   // the most probable alternatives could be checked first.
 
   for (auto S : Subs) {
-    DEBUG(llvm::dbgs() << "Inserting a speculative call for class "
-          << CD->getName() << " and subclass " << S->getName() << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Inserting a speculative call for class "
+               << CD->getName() << " and subclass " << S->getName() << "\n");
 
     // FIXME: Add support for generic subclasses.
     if (S->isGenericContext()) {

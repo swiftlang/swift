@@ -195,16 +195,16 @@ test+++
 //===----------------------------------------------------------------------===//
 
 func forwardReference() {
-  x = 0 // expected-error{{use of local variable 'x' before its declaration}}
-  var x: Float = 0.0 // expected-note{{'x' declared here}}
+  v = 0 // expected-error{{use of local variable 'v' before its declaration}}
+  var v: Float = 0.0 // expected-note{{'v' declared here}}
 }
 
 class ForwardReference {
   var x: Int = 0
 
   func test() {
-    x = 0 // expected-error{{use of local variable 'x' before its declaration}}
-    var x: Float = 0.0 // expected-note{{'x' declared here}}
+    x = 0
+    var x: Float = 0.0 // expected-warning{{variable 'x' was never used; consider replacing with '_' or removing it}}
   }
 }
 

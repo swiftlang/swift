@@ -1,5 +1,4 @@
 
-// RUN: %target-swift-emit-silgen -module-name default_arguments_generic -enable-sil-ownership -swift-version 3 %s | %FileCheck %s
 // RUN: %target-swift-emit-silgen -module-name default_arguments_generic -enable-sil-ownership -swift-version 4 %s | %FileCheck %s
 
 func foo<T: ExpressibleByIntegerLiteral>(_: T.Type, x: T = 0) { }

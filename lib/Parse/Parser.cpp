@@ -778,23 +778,16 @@ void Parser::StructureMarkerRAII::diagnoseOverflow() {
 bool Parser::parseIdentifier(Identifier &Result, SourceLoc &Loc,
                              const Diagnostic &D) {
   switch (Tok.getKind()) {
-  case tok::kw_throws:
-  case tok::kw_rethrows:
-    if (!Context.isSwiftVersion3())
-      break;
-    // Swift3 accepts 'throws' and 'rethrows'
-    LLVM_FALLTHROUGH;
   case tok::kw_self:
   case tok::kw_Self:
   case tok::identifier:
     Loc = consumeIdentifier(&Result);
     return false;
   default:
-    break;
+    checkForInputIncomplete();
+    diagnose(Tok, D);
+    return true;
   }
-  checkForInputIncomplete();
-  diagnose(Tok, D);
-  return true;
 }
 
 bool Parser::parseSpecificIdentifier(StringRef expected, SourceLoc &loc,
@@ -1018,9 +1011,11 @@ ParserUnit::ParserUnit(SourceManager &SM, unsigned BufferID)
 }
 
 ParserUnit::ParserUnit(SourceManager &SM, unsigned BufferID,
-                       const LangOptions &LangOpts, StringRef ModuleName)
-  : Impl(*new Implementation(SM, BufferID, LangOpts, ModuleName)) {
+                       const LangOptions &LangOpts, StringRef ModuleName,
+                       SyntaxParsingCache *SyntaxCache)
+    : Impl(*new Implementation(SM, BufferID, LangOpts, ModuleName)) {
 
+  Impl.SF->SyntaxParsingCache = SyntaxCache;
   Impl.TheParser.reset(new Parser(BufferID, *Impl.SF, nullptr));
 }
 

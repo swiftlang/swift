@@ -32,22 +32,9 @@ using namespace swift;
 
 #ifndef NDEBUG
 template <> void ProtocolDescriptor::dump() const {
-  unsigned NumInheritedProtocols =
-      InheritedProtocols ? InheritedProtocols->NumProtocols : 0;
-
   printf("TargetProtocolDescriptor.\n"
-         "Name: \"%s\".\n"
-         "ObjC Isa: %p.\n",
-         Name, _ObjC_Isa);
-  Flags.dump();
-  printf("Has Inherited Protocols: %s.\n",
-         (NumInheritedProtocols ? "true" : "false"));
-  if (NumInheritedProtocols) {
-    printf("Inherited Protocol List:\n");
-    for (unsigned i = 0, e = NumInheritedProtocols; i != e; ++i) {
-      printf("%s\n", (*InheritedProtocols)[i]->Name);
-    }
-  }
+         "Name: \"%s\".\n",
+         Name.get());
 }
 
 void ProtocolDescriptorFlags::dump() const {
@@ -711,7 +698,7 @@ bool swift::_checkGenericRequirements(
         return true;
 
       // If we need a witness table, add it.
-      if (req.getProtocol()->Flags.needsWitnessTable()) {
+      if (req.getProtocol().needsWitnessTable()) {
         assert(witnessTable);
         extraArguments.push_back(witnessTable);
       }

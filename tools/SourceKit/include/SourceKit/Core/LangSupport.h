@@ -188,9 +188,24 @@ struct DiagnosticEntryInfo : DiagnosticEntryInfoBase {
   SmallVector<DiagnosticEntryInfoBase, 1> Notes;
 };
 
+struct SourceFileRange {
+  /// The byte offset at which the range begins
+  uintptr_t Start;
+  /// The byte offset at which the end ends
+  uintptr_t End;
+};
+
+enum class SyntaxTreeTransferMode {
+  /// Don't transfer the syntax tree
+  Off,
+  /// Transfer the syntax tree incrementally
+  Incremental,
+  /// Always transfer the entire syntax tree
+  Full
+};
+
 class EditorConsumer {
   virtual void anchor();
-
 public:
   virtual ~EditorConsumer() { }
 
@@ -239,9 +254,20 @@ public:
   virtual bool handleSourceText(StringRef Text) = 0;
 
   virtual bool handleSerializedSyntaxTree(StringRef Text) = 0;
-  virtual bool syntaxTreeEnabled() = 0;
+  virtual bool syntaxTreeEnabled() {
+    return syntaxTreeTransferMode() != SyntaxTreeTransferMode::Off;
+  }
+  virtual SyntaxTreeTransferMode syntaxTreeTransferMode() = 0;
+
+  virtual bool syntaxReuseInfoEnabled() = 0;
+  virtual bool handleSyntaxReuseRegions(
+      std::vector<SourceFileRange> ReuseRegions) = 0;
 
   virtual void finished() {}
+
+  // FIXME: This is just for bootstrapping incremental syntax tree parsing.
+  // Remove it once when we are able to incrementally transfer the syntax tree
+  virtual bool forceLibSyntaxBasedProcessing() = 0;
 };
 
 class OptionsDictionary {
@@ -518,7 +544,6 @@ public:
   codeCompleteSetCustom(ArrayRef<CustomCompletionInfo> completions) = 0;
 
   virtual void editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
-                          bool EnableSyntaxMap,
                           EditorConsumer &Consumer,
                           ArrayRef<const char *> Args) = 0;
 

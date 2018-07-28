@@ -10,14 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A type that provides subscript access to its elements.
-///
-/// In most cases, it's best to ignore this protocol and use the
-/// `MutableCollection` protocol instead, because it has a more complete
-/// interface.
-@available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'MutableCollection' instead")
-public typealias MutableIndexable = MutableCollection
-
 /// A collection that supports subscript assignment.
 ///
 /// Collections that conform to `MutableCollection` gain the ability to
@@ -95,6 +87,8 @@ where SubSequence: MutableCollection
   /// - Parameter position: The position of the element to access. `position`
   ///   must be a valid index of the collection that is not equal to the
   ///   `endIndex` property.
+  ///
+  /// - Complexity: O(1)
   subscript(position: Index) -> Element { get set }
 
   /// Accesses a contiguous subrange of the collection's elements.
@@ -119,6 +113,8 @@ where SubSequence: MutableCollection
   ///
   /// - Parameter bounds: A range of the collection's indices. The bounds of
   ///   the range must be valid indices of the collection.
+  ///
+  /// - Complexity: O(1)
   subscript(bounds: Range<Index>) -> SubSequence { get set }
 
   /// Reorders the elements of the collection such that all the elements
@@ -156,7 +152,7 @@ where SubSequence: MutableCollection
   ///   collection match `belongsInSecondPartition`, the returned index is
   ///   equal to the collection's `endIndex`.
   ///
-  /// - Complexity: O(*n*)
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
   mutating func partition(
     by belongsInSecondPartition: (Element) throws -> Bool
   ) rethrows -> Index
@@ -170,6 +166,8 @@ where SubSequence: MutableCollection
   /// - Parameters:
   ///   - i: The index of the first value to swap.
   ///   - j: The index of the second value to swap.
+  ///
+  /// - Complexity: O(1)
   mutating func swapAt(_ i: Index, _ j: Index)
   
   /// Call `body(p)`, where `p` is a pointer to the collection's
@@ -218,6 +216,8 @@ extension MutableCollection {
   ///
   /// - Parameter bounds: A range of the collection's indices. The bounds of
   ///   the range must be valid indices of the collection.
+  ///
+  /// - Complexity: O(1)
   @inlinable
   public subscript(bounds: Range<Index>) -> Slice<Self> {
     get {
@@ -238,6 +238,8 @@ extension MutableCollection {
   /// - Parameters:
   ///   - i: The index of the first value to swap.
   ///   - j: The index of the second value to swap.
+  ///
+  /// - Complexity: O(1)
   @inlinable
   public mutating func swapAt(_ i: Index, _ j: Index) {
     guard i != j else { return }
@@ -247,4 +249,32 @@ extension MutableCollection {
   }
 }
 
+// the legacy swap free function
+//
+/// Exchanges the values of the two arguments.
+///
+/// The two arguments must not alias each other. To swap two elements of a
+/// mutable collection, use the `swapAt(_:_:)` method of that collection
+/// instead of this function.
+///
+/// - Parameters:
+///   - a: The first value to swap.
+///   - b: The second value to swap.
+@inlinable
+public func swap<T>(_ a: inout T, _ b: inout T) {
+  // Semantically equivalent to (a, b) = (b, a).
+  // Microoptimized to avoid retain/release traffic.
+  let p1 = Builtin.addressof(&a)
+  let p2 = Builtin.addressof(&b)
+  _debugPrecondition(
+    p1 != p2,
+    "swapping a location with itself is not supported")
+
+  // Take from P1.
+  let tmp: T = Builtin.take(p1)
+  // Transfer P2 into P1.
+  Builtin.initialize(Builtin.take(p2) as T, p1)
+  // Initialize P2.
+  Builtin.initialize(tmp, p2)
+}
 

@@ -87,13 +87,16 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     // message.
     struct PartialApplication {
       enum : unsigned {
-        Function,
         MutatingMethod,
         SuperInit,
         SelfInit,
       };
-      // 'kind' before 'level' is better for code gen.
-      unsigned kind : 3;
+      enum : unsigned {
+        Error,
+        CompatibilityWarning,
+      };
+      unsigned compatibilityWarning: 1;
+      unsigned kind : 2;
       unsigned level : 29;
     };
 
@@ -105,49 +108,18 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     ~DiagnoseWalker() override {
       for (auto &unapplied : InvalidPartialApplications) {
         unsigned kind = unapplied.second.kind;
-        TC.diagnose(unapplied.first->getLoc(),
-                    diag::partial_application_of_function_invalid,
-                    kind);
+        if (unapplied.second.compatibilityWarning) {
+          TC.diagnose(unapplied.first->getLoc(),
+                      diag::partial_application_of_function_invalid_swift4,
+                      kind);
+        } else {
+          TC.diagnose(unapplied.first->getLoc(),
+                      diag::partial_application_of_function_invalid,
+                      kind);
+        }
       }
     }
 
-    /// If this is an application of a function that cannot be partially
-    /// applied, arrange for us to check that it gets fully applied.
-    void recordUnsupportedPartialApply(ApplyExpr *expr, Expr *fnExpr) {
-
-      if (isa<OtherConstructorDeclRefExpr>(fnExpr)) {
-        auto kind = expr->getArg()->isSuperExpr()
-                  ? PartialApplication::SuperInit
-                  : PartialApplication::SelfInit;
-
-        // Partial applications of delegated initializers aren't allowed, and
-        // don't really make sense to begin with.
-        InvalidPartialApplications.insert({ expr, {kind, 1} });
-        return;
-      }
-
-      auto fnDeclRef = dyn_cast<DeclRefExpr>(fnExpr);
-      if (!fnDeclRef)
-        return;
-
-      auto fn = dyn_cast<FuncDecl>(fnDeclRef->getDecl());
-      if (!fn)
-        return;
-
-      unsigned kind =
-        fn->isInstanceMember() ? PartialApplication::MutatingMethod
-                               : PartialApplication::Function;
-      
-      // Functions with inout parameters cannot be partially applied.
-      if (!expr->getArg()->getType()->isMaterializable()) {
-        // We need to apply all argument clauses.
-        InvalidPartialApplications.insert({
-          fnExpr, {kind, fn->getNumParameterLists()}
-        });
-      }
-    }
-
-    /// This method is called in post-order over the AST to validate that
     /// methods are fully applied when they can't support partial application.
     void checkInvalidPartialApplication(Expr *E) {
       if (auto AE = dyn_cast<ApplyExpr>(E)) {
@@ -158,8 +130,18 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
           fnExpr = dotSyntaxExpr->getRHS();
 
         // Check to see if this is a potentially unsupported partial
-        // application.
-        recordUnsupportedPartialApply(AE, fnExpr);
+        // application of a constructor delegation.
+        if (isa<OtherConstructorDeclRefExpr>(fnExpr)) {
+          auto kind = AE->getArg()->isSuperExpr()
+                    ? PartialApplication::SuperInit
+                    : PartialApplication::SelfInit;
+
+          // Partial applications of delegated initializers aren't allowed, and
+          // don't really make sense to begin with.
+          InvalidPartialApplications.insert(
+            {E, {PartialApplication::Error, kind, 1}});
+          return;
+        }
 
         // If this is adding a level to an active partial application, advance
         // it to the next level.
@@ -173,11 +155,35 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         InvalidPartialApplications.erase(foundApplication);
         if (level > 1) {
           // We have remaining argument clauses.
-          InvalidPartialApplications.insert({ AE, {kind, level - 1} });
+          // Partial applications were always diagnosed in Swift 4 and before,
+          // so there's no need to preserve the compatibility warning bit.
+          InvalidPartialApplications.insert(
+            {AE, {PartialApplication::Error, kind, level - 1}});
         }
         return;
       }
+      
+      /// If this is a reference to a mutating method, it cannot be partially
+      /// applied or even referenced without full application, so arrange for
+      /// us to check that it gets fully applied.
+      auto fnDeclRef = dyn_cast<DeclRefExpr>(E);
+      if (!fnDeclRef)
+        return;
 
+      auto fn = dyn_cast<FuncDecl>(fnDeclRef->getDecl());
+      if (!fn || !fn->isInstanceMember() || !fn->isMutating())
+        return;
+
+      // Swift 4 and earlier failed to diagnose a reference to a mutating method
+      // without any applications at all, which would get miscompiled into a
+      // function with undefined behavior. Warn for source compatibility.
+      auto errorBehavior = TC.Context.LangOpts.isSwiftVersionAtLeast(5)
+        ? PartialApplication::Error
+        : PartialApplication::CompatibilityWarning;
+
+      InvalidPartialApplications.insert(
+        {fnDeclRef, {errorBehavior,
+                     PartialApplication::MutatingMethod, 2}});
     }
 
     // Not interested in going outside a basic expression.
@@ -263,14 +269,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         // Warn about surprising implicit optional promotions.
         checkOptionalPromotions(Call);
         
-        // Check for tuple splat.
-        //
-        // Note that in Swift 4 mode, this is rejected much earlier in
-        // the constraint solver; this check only exists to preserve the
-        // behavior of the earlier, incomplete implementation of SE-0110.
-        if (TC.Context.isSwiftVersion3())
-          checkTupleSplat(Call);
-
         // Check the callee, looking through implicit conversions.
         auto base = Call->getFn();
         unsigned uncurryLevel = 0;
@@ -536,33 +534,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     }
 
 
-    /// Warn on tuple splat, which is deprecated.  For example:
-    ///
-    ///     func f(a : Int, _ b : Int) {}
-    ///     let x = (1,2)
-    ///     f(x)
-    ///
-    void checkTupleSplat(ApplyExpr *Call) {
-      auto FT = Call->getFn()->getType()->getAs<AnyFunctionType>();
-      // If this wasn't type checked correctly then don't worry about it.
-      if (!FT) return;
-
-      // If we're passing multiple parameters, then this isn't a tuple splat.
-      auto arg = Call->getArg()->getSemanticsProvidingExpr();
-      if (isa<TupleExpr>(arg) || isa<TupleShuffleExpr>(arg))
-        return;
-
-      // We care about whether the parameter list of the callee syntactically
-      // has more than one argument.  It has to *syntactically* have a tuple
-      // type as its argument.  A ParenType wrapping a TupleType is a single
-      // parameter.
-      auto params = FT->getParams();
-      if (params.size() > 1) {
-        TC.diagnose(Call->getLoc(), diag::tuple_splat_use, params.size())
-          .highlight(Call->getArg()->getSourceRange());
-      }
-    }
-
     void checkUseOfModule(DeclRefExpr *E) {
       // Allow module values as a part of:
       // - ignored base expressions;
@@ -667,11 +638,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       if (!noescapeArgument) return;
 
-      // In Swift 3, this is just a warning.
       TC.diagnose(apply->getLoc(),
-                  TC.Context.isSwiftVersion3()
-                    ? diag::warn_noescape_param_call
-                    : diag::err_noescape_param_call,
+                  diag::err_noescape_param_call,
                   noescapeArgument.getDecl()->getName(),
                   noescapeArgument.isDeclACapture())
         .highlight(problematicArg->getSourceRange());
@@ -732,38 +700,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       }
     }
 
-    // Swift 3 mode produces a warning + Fix-It for the missing ".self"
-    // in certain cases.
-    bool shouldWarnOnMissingSelf(Expr *E) {
-      if (!TC.Context.isSwiftVersion3())
-        return false;
-
-      if (auto *TE = dyn_cast<TypeExpr>(E)) {
-        if (auto *TR = TE->getTypeRepr()) {
-          if (auto *ITR = dyn_cast<IdentTypeRepr>(TR)) {
-            auto range = ITR->getComponentRange();
-            assert(!range.empty());
-
-            // Swift 3 did not consistently diagnose identifier type reprs
-            // with multiple components.
-            if (range.front() != range.back())
-              return true;
-          }
-        }
-      }
-
-      auto *ParentExpr = Parent.getAsExpr();
-
-      // Swift 3 did not diagnose missing '.self' in argument lists.
-      if (ParentExpr &&
-          (isa<ParenExpr>(ParentExpr) ||
-           isa<TupleExpr>(ParentExpr)) &&
-          CallArgs.count(ParentExpr) > 0)
-        return true;
-
-      return false;
-    }
-
     // Diagnose metatype values that don't appear as part of a property,
     // method, or constructor reference.
     void checkUseOfMetaTypeName(Expr *E) {
@@ -788,19 +724,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
             isa<OpenExistentialExpr>(ParentExpr)) {
           return;
         }
-      }
-
-      if (shouldWarnOnMissingSelf(E)) {
-        auto diag = TC.diagnose(E->getEndLoc(),
-                                diag::warn_value_of_metatype_missing_self,
-                                E->getType()->getRValueInstanceType());
-        if (E->canAppendPostfixExpression()) {
-          diag.fixItInsertAfter(E->getEndLoc(), ".self");
-        } else {
-          diag.fixItInsert(E->getStartLoc(), "(");
-          diag.fixItInsertAfter(E->getEndLoc(), ").self");
-        }
-        return;
       }
 
       // Is this a protocol metatype?
@@ -1586,7 +1509,7 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
       if (auto *DRE = dyn_cast<DeclRefExpr>(subExpr)) {
         if (DRE->getDecl() == Var) {
           // Handle local and top-level computed variables.
-          if (DRE->getAccessSemantics() != AccessSemantics::DirectToStorage) {
+          if (DRE->getAccessSemantics() == AccessSemantics::Ordinary) {
             bool shouldDiagnose = false;
             // Warn about any property access in the getter.
             if (Accessor->isGetter())
@@ -1623,7 +1546,7 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
             isa<DeclRefExpr>(MRE->getBase()) &&
             isImplicitSelfUse(MRE->getBase())) {
           
-          if (MRE->getAccessSemantics() != AccessSemantics::DirectToStorage) {
+          if (MRE->getAccessSemantics() == AccessSemantics::Ordinary) {
             bool shouldDiagnose = false;
             // Warn about any property access in the getter.
             if (Accessor->isGetter())
@@ -1830,7 +1753,8 @@ bool TypeChecker::getDefaultGenericArgumentsString(
 
 /// Diagnose an argument labeling issue, returning true if we successfully
 /// diagnosed the issue.
-bool swift::diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
+bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
+                                       const Expr *expr,
                                        ArrayRef<Identifier> newNames,
                                        bool isSubscript,
                                        InFlightDiagnostic *existingDiag) {
@@ -1841,6 +1765,7 @@ bool swift::diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
     return *diagOpt;
   };
 
+  auto &diags = ctx.Diags;
   auto tuple = dyn_cast<TupleExpr>(expr);
   if (!tuple) {
     llvm::SmallString<16> str;
@@ -1861,9 +1786,10 @@ bool swift::diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
             str = ".";
             str += field.getName().str();
             if (!existingDiag) {
-              diagOpt.emplace(TC.diagnose(expr->getStartLoc(),
-                                          diag::extra_named_single_element_tuple,
-                                          field.getName().str()));
+              diagOpt.emplace(
+                          diags.diagnose(expr->getStartLoc(),
+                                         diag::extra_named_single_element_tuple,
+                                         field.getName().str()));
             }
             getDiag().fixItInsertAfter(expr->getEndLoc(), str);
             return true;
@@ -1887,9 +1813,10 @@ bool swift::diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
     str += newNames[0].str();
     str += ": ";
     if (!existingDiag) {
-      diagOpt.emplace(TC.diagnose(expr->getStartLoc(),
-                                  diag::missing_argument_labels,
-                                  false, str.str().drop_back(), isSubscript));
+      diagOpt.emplace(diags.diagnose(expr->getStartLoc(),
+                                     diag::missing_argument_labels,
+                                     false, str.str().drop_back(),
+                                     isSubscript));
     }
     getDiag().fixItInsert(expr->getStartLoc(), str);
     return true;
@@ -1955,17 +1882,21 @@ bool swift::diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
 
       StringRef haveStr = haveBuffer;
       StringRef expectedStr = expectedBuffer;
-      diagOpt.emplace(TC.diagnose(expr->getLoc(), diag::wrong_argument_labels,
-                                  plural, haveStr, expectedStr, isSubscript));
+      diagOpt.emplace(diags.diagnose(expr->getLoc(),
+                                     diag::wrong_argument_labels,
+                                     plural, haveStr, expectedStr,
+                                     isSubscript));
     } else if (numMissing > 0) {
       StringRef missingStr = missingBuffer;
-      diagOpt.emplace(TC.diagnose(expr->getLoc(), diag::missing_argument_labels,
-                                  plural, missingStr, isSubscript));
+      diagOpt.emplace(diags.diagnose(expr->getLoc(),
+                                     diag::missing_argument_labels,
+                                     plural, missingStr, isSubscript));
     } else {
       assert(numExtra > 0);
       StringRef extraStr = extraBuffer;
-      diagOpt.emplace(TC.diagnose(expr->getLoc(), diag::extra_argument_labels,
-                                  plural, extraStr, isSubscript));
+      diagOpt.emplace(diags.diagnose(expr->getLoc(),
+                                     diag::extra_argument_labels,
+                                     plural, extraStr, isSubscript));
     }
   }
 
@@ -2085,14 +2016,10 @@ static void diagnoseUnownedImmediateDeallocationImpl(TypeChecker &TC,
     return;
 
   // Only diagnose for non-owning ownerships such as 'weak' and 'unowned'.
-  switch (ownershipAttr->get()) {
-  case ReferenceOwnership::Strong:
+  // Zero is the default/strong ownership strength.
+  if (ReferenceOwnership::Strong == ownershipAttr->get() ||
+      isLessStrongThan(ReferenceOwnership::Strong, ownershipAttr->get()))
     return;
-  case ReferenceOwnership::Weak:
-  case ReferenceOwnership::Unowned:
-  case ReferenceOwnership::Unmanaged:
-    break;
-  }
 
   // Try to find a call to a constructor.
   initExpr = lookThroughExprsToImmediateDeallocation(initExpr);
@@ -2160,6 +2087,7 @@ void swift::diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
 
 void swift::diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
                                                  const Pattern *pattern,
+                                                 SourceLoc equalLoc,
                                                  const Expr *initExpr) {
   pattern = pattern->getSemanticsProvidingPattern();
 
@@ -2175,15 +2103,13 @@ void swift::diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
         const Pattern *subPattern = elt.getPattern();
         Expr *subInitExpr = TE->getElement(i);
 
-        diagnoseUnownedImmediateDeallocation(TC, subPattern, subInitExpr);
+        diagnoseUnownedImmediateDeallocation(TC, subPattern, equalLoc,
+                                             subInitExpr);
       }
     }
   } else if (auto *NP = dyn_cast<NamedPattern>(pattern)) {
-    // FIXME: Ideally the diagnostic location should be on the equals '=' token
-    // of the pattern binding rather than at the start of the initializer
-    // expression (matching the above diagnostic logic for an assignment).
     diagnoseUnownedImmediateDeallocationImpl(TC, NP->getDecl(), initExpr,
-                                             initExpr->getStartLoc(),
+                                             equalLoc,
                                              initExpr->getSourceRange());
   }
 }
@@ -2298,10 +2224,10 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
   if (auto *fn = dyn_cast<AbstractFunctionDecl>(decl)) {
     auto *baseFn = cast<AbstractFunctionDecl>(base);
     bool fixedAny = false;
-    if (fn->getParameterLists().back()->size() ==
-        baseFn->getParameterLists().back()->size()) {
-      for_each(*fn->getParameterLists().back(),
-               *baseFn->getParameterLists().back(),
+    if (fn->getParameters()->size() ==
+        baseFn->getParameters()->size()) {
+      for_each(*fn->getParameters(),
+               *baseFn->getParameters(),
                [&](ParamDecl *param, const ParamDecl *baseParam) {
         fixedAny |= fixItOverrideDeclarationTypes(diag, param, baseParam);
       });
@@ -2393,7 +2319,7 @@ public:
     if (auto FD = dyn_cast<AccessorDecl>(AFD)) {
       if (FD->getAccessorKind() == AccessorKind::Set) {
         if (auto getter = dyn_cast<VarDecl>(FD->getStorage())) {
-          auto arguments = FD->getParameterLists().back();
+          auto arguments = FD->getParameters();
           VarDecls[arguments->get(0)] = 0;
           AssociatedGetter = getter;
         }
@@ -3024,9 +2950,7 @@ static void checkSwitch(TypeChecker &TC, const SwitchStmt *stmt) {
   // We want to warn about "case .Foo, .Bar where 1 != 100:" since the where
   // clause only applies to the second case, and this is surprising.
   for (auto cs : stmt->getCases()) {
-    // We forgot to do this in Swift 3
-    if (!TC.Context.isSwiftVersion3())
-      TC.checkUnsupportedProtocolType(cs);
+    TC.checkUnsupportedProtocolType(cs);
 
     // The case statement can have multiple case items, each can have a where.
     // If we find a "where", and there is a preceding item without a where, and
@@ -3524,6 +3448,8 @@ public:
           case AccessorKind::MaterializeForSet:
           case AccessorKind::Address:
           case AccessorKind::MutableAddress:
+          case AccessorKind::Read:
+          case AccessorKind::Modify:
             llvm_unreachable("cannot be @objc");
           }
         } else {
@@ -3927,6 +3853,67 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
   const_cast<Expr *>(E)->walk(Walker);
 }
 
+static void diagnoseDeprecatedWritableKeyPath(TypeChecker &TC, const Expr *E,
+                                              const DeclContext *DC) {
+  if (!E || isa<ErrorExpr>(E) || !E->getType())
+    return;
+
+  class DeprecatedWritableKeyPathWalker : public ASTWalker {
+    TypeChecker &TC;
+    const DeclContext *DC;
+
+    void visitKeyPathApplicationExpr(KeyPathApplicationExpr *E) {
+      bool isWrite = false;
+      if (auto *P = Parent.getAsExpr())
+        if (auto *AE = dyn_cast<AssignExpr>(P))
+          if (AE->getDest() == E)
+            isWrite = true;
+
+      if (!isWrite)
+        return;
+
+      if (auto *keyPathExpr = dyn_cast<KeyPathExpr>(E->getKeyPath())) {
+        auto *decl = keyPathExpr->getType()->getNominalOrBoundGenericNominal();
+        if (decl != TC.Context.getWritableKeyPathDecl() &&
+            decl != TC.Context.getReferenceWritableKeyPathDecl())
+          return;
+
+        assert(keyPathExpr->getComponents().size() > 0);
+        auto &component = keyPathExpr->getComponents().back();
+        if (component.getKind() == KeyPathExpr::Component::Kind::Property) {
+          auto *storage =
+            cast<AbstractStorageDecl>(component.getDeclRef().getDecl());
+          if (!storage->isSettable(nullptr) ||
+              !storage->isSetterAccessibleFrom(DC)) {
+            TC.diagnose(keyPathExpr->getLoc(),
+                        swift::diag::expr_deprecated_writable_keypath,
+                        storage->getFullName());
+          }
+        }
+      }
+    }
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (!E || isa<ErrorExpr>(E) || !E->getType())
+        return {false, E};
+
+      if (auto *KPAE = dyn_cast<KeyPathApplicationExpr>(E)) {
+        visitKeyPathApplicationExpr(KPAE);
+        return {true, E};
+      }
+
+      return {true, E};
+    }
+
+  public:
+    DeprecatedWritableKeyPathWalker(TypeChecker &TC, const DeclContext *DC)
+        : TC(TC), DC(DC) {}
+  };
+
+  DeprecatedWritableKeyPathWalker Walker(TC, DC);
+  const_cast<Expr *>(E)->walk(Walker);
+}
+
 //===----------------------------------------------------------------------===//
 // High-level entry points.
 //===----------------------------------------------------------------------===//
@@ -3940,6 +3927,8 @@ void swift::performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
   diagRecursivePropertyAccess(TC, E, DC);
   diagnoseImplicitSelfUseInClosure(TC, E, DC);
   diagnoseUnintendedOptionalBehavior(TC, E, DC);
+  if (!TC.Context.isSwiftVersionAtLeast(5))
+    diagnoseDeprecatedWritableKeyPath(TC, E, DC);
   if (!TC.getLangOpts().DisableAvailabilityChecking)
     diagAvailability(TC, E, const_cast<DeclContext*>(DC));
   if (TC.Context.LangOpts.EnableObjCInterop)
@@ -4167,7 +4156,7 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
   SmallVector<OmissionTypeName, 4> paramTypes;
 
   // Always look at the parameters in the last parameter list.
-  for (auto param : *afd->getParameterLists().back()) {
+  for (auto param : *afd->getParameters()) {
     paramTypes.push_back(getTypeNameForOmission(param->getInterfaceType())
                          .withDefaultArgument(param->isDefaultArgument()));
   }
@@ -4188,7 +4177,7 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
 
   // Figure out the first parameter name.
   StringRef firstParamName;
-  auto params = afd->getParameterList(afd->getImplicitSelfDecl() ? 1 : 0);
+  auto params = afd->getParameters();
   if (params->size() != 0 && !params->get(0)->getName().empty())
     firstParamName = params->get(0)->getName().str();
 

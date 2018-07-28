@@ -48,7 +48,7 @@ class SILPassManager {
   llvm::SmallVector<SILTransform *, 16> Transformations;
 
   /// A list of registered analysis.
-  llvm::SmallVector<SILAnalysis *, 16> Analysis;
+  llvm::SmallVector<SILAnalysis *, 16> Analyses;
 
   /// An entry in the FunctionWorkList.
   struct WorklistEntry {
@@ -122,7 +122,7 @@ public:
   /// analysis. If the analysis is not found, the program terminates.
   template<typename T>
   T *getAnalysis() {
-    for (SILAnalysis *A : Analysis)
+    for (SILAnalysis *A : Analyses)
       if (auto *R = llvm::dyn_cast<T>(A))
         return R;
 
@@ -145,7 +145,7 @@ public:
   /// \brief Iterate over all analysis and invalidate them.
   void invalidateAllAnalysis() {
     // Invalidate the analysis (unless they are locked)
-    for (auto AP : Analysis)
+    for (auto AP : Analyses)
       if (!AP->isLocked())
         AP->invalidate();
 
@@ -163,21 +163,23 @@ public:
   /// is derived. This is used to avoid an infinite amount of functions pushed
   /// on the worklist (e.g. caused by a bug in a specializing optimization).
   void addFunctionToWorklist(SILFunction *F, SILFunction *DerivedFrom);
-  
+
   /// \brief Iterate over all analysis and notify them of the function.
+  ///
   /// This function does not necessarily have to be newly created function. It
   /// is the job of the analysis to make sure no extra work is done if the
   /// particular analysis has been done on the function.
   void notifyAnalysisOfFunction(SILFunction *F) {
-    for (auto AP : Analysis)
-      AP->notifyAddFunction(F);
+    for (auto AP : Analyses) {
+      AP->notifyAddedOrModifiedFunction(F);
+    }
   }
 
   /// \brief Broadcast the invalidation of the function to all analysis.
   void invalidateAnalysis(SILFunction *F,
                           SILAnalysis::InvalidationKind K) {
     // Invalidate the analysis (unless they are locked)
-    for (auto AP : Analysis)
+    for (auto AP : Analyses)
       if (!AP->isLocked())
         AP->invalidate(F, K);
     
@@ -190,7 +192,7 @@ public:
   /// or vtables.
   void invalidateFunctionTables() {
     // Invalidate the analysis (unless they are locked)
-    for (auto AP : Analysis)
+    for (auto AP : Analyses)
       if (!AP->isLocked())
         AP->invalidateFunctionTables();
 
@@ -201,12 +203,12 @@ public:
   }
 
   /// \brief Iterate over all analysis and notify them of a deleted function.
-  void notifyDeleteFunction(SILFunction *F) {
+  void notifyWillDeleteFunction(SILFunction *F) {
     // Invalidate the analysis (unless they are locked)
-    for (auto AP : Analysis)
+    for (auto AP : Analyses)
       if (!AP->isLocked())
-        AP->notifyDeleteFunction(F);
-    
+        AP->notifyWillDeleteFunction(F);
+
     CurrentPassHasInvalidated = true;
     // Any change let all passes run again.
     CompletedPassesMap[F].reset();
@@ -231,7 +233,7 @@ public:
 
   /// Verify all analyses.
   void verifyAnalyses() const {
-    for (auto *A : Analysis) {
+    for (auto *A : Analyses) {
       A->verify();
     }
   }
@@ -243,7 +245,7 @@ public:
   /// this. If no override is provided the SILAnalysis should just call the
   /// normal verify method.
   void verifyAnalyses(SILFunction *F) const {
-    for (auto *A : Analysis) {
+    for (auto *A : Analyses) {
       A->verify(F);
     }
   }

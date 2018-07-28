@@ -4,7 +4,6 @@
 
 // RUN: cd %t && %target-swiftc_driver -driver-show-job-lifecycle -output-file-map %t/output-file-map.json -incremental main.swift file1.swift file2.swift -j1 2>&1 | %FileCheck -check-prefix=CHECK-INITIAL %s
 
-// CHECK-INITIAL-NOT: warning
 // CHECK-INITIAL: Job finished: {compile: main.o <= main.swift}
 // CHECK-INITIAL: Job finished: {compile: file1.o <= file1.swift}
 // CHECK-INITIAL: Job finished: {compile: file2.o <= file2.swift}

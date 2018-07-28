@@ -2,14 +2,15 @@
 // RUN: if [ %target-runtime == "objc" ]; \
 // RUN: then \
 // RUN:   %target-clang -fobjc-arc %S/Inputs/NSSlowString/NSSlowString.m -c -o %t/NSSlowString.o && \
-// RUN:   %target-build-swift -I %S/Inputs/NSSlowString/ %t/NSSlowString.o %s -Xfrontend -disable-access-control -o %t/String; \
+// RUN:   %target-build-swift -I %S/Inputs/NSSlowString/ %t/NSSlowString.o %s -Xfrontend -disable-access-control -o %t/String -swift-version 3; \
 // RUN: else \
-// RUN:   %target-build-swift %s -Xfrontend -disable-access-control -o %t/String; \
+// RUN:   %target-build-swift %s -Xfrontend -disable-access-control -o %t/String -swift-version 3; \
 // RUN: fi
 
 // RUN: %target-run %t/String
 // REQUIRES: executable_test
 // XFAIL: interpret
+// <rdar://problem/41372546> Migrate validation-test/stdlib/String.swift off Swift 3
 
 import StdlibUnittest
 import StdlibCollectionUnittest
@@ -27,15 +28,6 @@ extension Collection {
   internal func index(_nthLast n: Int) -> Index {
     precondition(n >= 0)
     return index(endIndex, offsetBy: -numericCast(n))
-  }
-}
-
-extension String {
-  internal func index(_nth n: Int) -> Index {
-    return characters.index(_nth: n)
-  }
-  internal func index(_nthLast n: Int) -> Index {
-    return characters.index(_nthLast: n)
   }
 }
 
@@ -139,13 +131,12 @@ StringTests.test("AssociatedTypes-UnicodeScalarView") {
 }
 
 StringTests.test("AssociatedTypes-CharacterView") {
-  typealias View = String.CharacterView
   expectCollectionAssociatedTypes(
-    collectionType: View.self,
-    iteratorType: IndexingIterator<View>.self,
-    subSequenceType: View.self,
-    indexType: View.Index.self,
-    indicesType: DefaultIndices<View>.self)
+    collectionType: String.self,
+    iteratorType: IndexingIterator<String>.self,
+    subSequenceType: Substring.self,
+    indexType: String.Index.self,
+    indicesType: DefaultIndices<String>.self)
 }
 
 func checkUnicodeScalarViewIteration(
@@ -912,6 +903,7 @@ StringTests.test("stringGutsReserve")
   .skip(.nativeRuntime("Foundation dependency"))
   .code {
 #if _runtime(_ObjC)
+  guard #available(iOS 11.0, *) else { return }
   for k in 0...7 {
     var base: String
     var startedNative: Bool
@@ -1013,27 +1005,6 @@ StringTests.test("StringGutsReplace") {
       checkRangeReplaceable(
         { StringGutsCollection(g1) },
         { Array(StringGutsCollection(g2))[0..<$0] }
-      )
-    }
-  }
-}
-
-StringTests.test("CharacterViewReplace") {
-  let narrow = "01234567890"
-  let wide = "ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩⅪ"
-  
-  for s1 in [narrow, wide] {
-    for s2 in [narrow, wide] {
-      let g1 = makeStringGuts(s1)
-      let g2 = makeStringGuts(s2 + s2)
-      checkRangeReplaceable(
-        { () -> String._CharacterView in
-          String._CharacterView(String(g1)) },
-        { String._CharacterView(String(g2._extractSlice(0..<$0))) }
-      )
-      checkRangeReplaceable(
-        { String._CharacterView(String(g1)) },
-        { Array(String._CharacterView(String(g2)))[0..<$0] }
       )
     }
   }

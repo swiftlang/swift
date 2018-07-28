@@ -21,8 +21,11 @@
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/TypeDecoder.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Runtime/ExistentialContainer.h"
+#include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Unreachable.h"
 
 #include <vector>
@@ -260,7 +263,131 @@ public:
 
     return start;
   }
-  
+
+  /// Given a pointer to the metadata, attempt to read the value
+  /// witness table. Note that it's not safe to access any non-mandatory
+  /// members of the value witness table, like extra inhabitants or enum members.
+  llvm::Optional<TargetValueWitnessTable<Runtime>>
+  readValueWitnessTable(StoredPointer MetadataAddress) {
+    // The value witness table pointer is at offset -1 from the metadata
+    // pointer, that is, the pointer-sized word immediately before the
+    // pointer's referenced address.
+    TargetValueWitnessTable<Runtime> VWT;
+    auto ValueWitnessTableAddrAddr = MetadataAddress - sizeof(StoredPointer);
+    StoredPointer ValueWitnessTableAddr;
+    if (!Reader->readInteger(RemoteAddress(ValueWitnessTableAddrAddr),
+                             &ValueWitnessTableAddr))
+      return llvm::None;
+    if (!Reader->readBytes(RemoteAddress(ValueWitnessTableAddr),
+                           (uint8_t *)&VWT, sizeof(VWT)))
+      return llvm::None;
+    return VWT;
+  }
+
+  /// Given a pointer to a known-error existential, attempt to discover the
+  /// pointer to its metadata address and its value address.
+  llvm::Optional<std::pair<RemoteAddress, RemoteAddress>>
+  readMetadataAndValueErrorExistential(RemoteAddress ExistentialAddress) {
+    // An pointer to an error existential is always an heap object.
+    auto MetadataAddress =
+        readMetadataFromInstance(ExistentialAddress.getAddressData());
+    if (!MetadataAddress)
+      return llvm::None;
+
+    bool isObjC = false;
+
+    // If we can determine the Objective-C class name, this is probably an
+    // error existential with NSError-compatible layout.
+    std::string ObjCClassName;
+    if (readObjCClassName(*MetadataAddress, ObjCClassName)) {
+      if (ObjCClassName == "_SwiftNativeNSError")
+        isObjC = true;
+    } else {
+      // Otherwise, we can check to see if this is a class metadata with the
+      // kind value's least significant bit set, which indicates a pure
+      // Swift class.
+      auto Meta = readMetadata(*MetadataAddress);
+      auto ClassMeta = dyn_cast<TargetClassMetadata<Runtime>>(Meta);
+      if (!ClassMeta)
+        return llvm::None;
+
+      isObjC = ClassMeta->isPureObjC();
+    }
+
+    // In addition to the isa pointer and two 32-bit reference counts, if the
+    // error existential is layout-compatible with NSError, we also need to
+    // skip over its three word-sized fields: the error code, the domain,
+    // and userInfo.
+    StoredPointer InstanceMetadataAddressAddress =
+        ExistentialAddress.getAddressData() +
+        (isObjC ? 5 : 2) * sizeof(StoredPointer);
+
+    // We need to get the instance's alignment info so we can get the exact
+    // offset of the start of its data in the class.
+    auto InstanceMetadataAddress =
+        readMetadataFromInstance(InstanceMetadataAddressAddress);
+    if (!InstanceMetadataAddress)
+      return llvm::None;
+
+    // Read the value witness table.
+    auto VWT = readValueWitnessTable(*InstanceMetadataAddress);
+    if (!VWT)
+      return llvm::None;
+
+    // Now we need to skip over the instance metadata pointer and instance's
+    // conformance pointer for Swift.Error.
+    StoredPointer InstanceAddress =
+        InstanceMetadataAddressAddress + 2 * sizeof(StoredPointer);
+
+    // Round up to alignment, and we have the start address of the
+    // instance payload.
+    auto AlignmentMask = VWT->getAlignmentMask();
+    auto Offset = (sizeof(HeapObject) + AlignmentMask) & ~AlignmentMask;
+    InstanceAddress += Offset;
+
+    return llvm::Optional<std::pair<RemoteAddress, RemoteAddress>>(
+        {RemoteAddress(*InstanceMetadataAddress),
+         RemoteAddress(InstanceAddress)});
+  }
+
+  /// Given a known-opaque existential, attemp to discover the pointer to its
+  /// metadata address and its value.
+  llvm::Optional<std::pair<RemoteAddress, RemoteAddress>>
+  readMetadataAndValueOpaqueExistential(RemoteAddress ExistentialAddress) {
+    // OpaqueExistentialContainer is the layout of an opaque existential.
+    // `Type` is the pointer to the metadata.
+    TargetOpaqueExistentialContainer<Runtime> Container;
+    if (!Reader->readBytes(RemoteAddress(ExistentialAddress),
+                           (uint8_t *)&Container, sizeof(Container)))
+      return llvm::None;
+    auto MetadataAddress = reinterpret_cast<StoredPointer>(Container.Type);
+    auto Metadata = readMetadata(MetadataAddress);
+    if (!Metadata)
+      return llvm::None;
+
+    auto VWT = readValueWitnessTable(MetadataAddress);
+    if (!VWT)
+      return llvm::None;
+
+    // Inline representation (the value fits in the existential container).
+    // So, the value starts at the first word of the container.
+    if (VWT->isValueInline())
+      return llvm::Optional<std::pair<RemoteAddress, RemoteAddress>>(
+          {RemoteAddress(MetadataAddress), ExistentialAddress});
+
+    // Non-inline (box'ed) representation.
+    // The first word of the container stores the address to the box.
+    StoredPointer BoxAddress;
+    if (!Reader->readInteger(ExistentialAddress, &BoxAddress))
+      return llvm::None;
+
+    auto AlignmentMask = VWT->getAlignmentMask();
+    auto Offset = (sizeof(HeapObject) + AlignmentMask) & ~AlignmentMask;
+    auto StartOfValue = BoxAddress + Offset;
+    return llvm::Optional<std::pair<RemoteAddress, RemoteAddress>>(
+        {RemoteAddress(MetadataAddress), RemoteAddress(StartOfValue)});
+  }
+
   /// Given a remote pointer to metadata, attempt to turn it into a type.
   BuiltType readTypeFromMetadata(StoredPointer MetadataAddress,
                                  bool skipArtificialSubclasses = false) {
@@ -351,30 +478,40 @@ public:
       BuiltType SuperclassType = BuiltType();
       if (Exist->Flags.hasSuperclassConstraint()) {
         // The superclass is stored after the list of protocols.
-        SuperclassType = readTypeFromMetadata(
-                                              Exist->Protocols[Exist->Protocols.NumProtocols]);
+        SuperclassType = readTypeFromMetadata(Exist->getSuperclassConstraint());
         if (!SuperclassType) return BuiltType();
 
         HasExplicitAnyObject = true;
       }
 
       std::vector<BuiltProtocolDecl> Protocols;
-      for (size_t i = 0; i < Exist->Protocols.NumProtocols; ++i) {
-        auto ProtocolAddress = Exist->Protocols[i];
-        auto ProtocolDescriptor = readProtocolDescriptor(ProtocolAddress);
-        if (!ProtocolDescriptor)
-          return BuiltType();
+      for (auto ProtocolAddress : Exist->getProtocols()) {
+#if SWIFT_OBJC_INTEROP
+        // Check whether we have an Objective-C protocol.
+        if (ProtocolAddress.isObjC()) {
+          auto MangledNameStr =
+            readObjCProtocolName(ProtocolAddress.getObjCProtocol());
 
-        std::string MangledNameStr;
-        if (!Reader->readString(RemoteAddress(ProtocolDescriptor->Name),
-                                MangledNameStr))
-          return BuiltType();
+          StringRef MangledName =
+            Demangle::dropSwiftManglingPrefix(MangledNameStr);
 
-        StringRef MangledName =
-          Demangle::dropSwiftManglingPrefix(MangledNameStr);
+          Demangle::Context DCtx;
+          auto Demangled = DCtx.demangleTypeAsNode(MangledName);
+          if (!Demangled)
+            return BuiltType();
 
-        Demangle::Context DCtx;
-        auto Demangled = DCtx.demangleTypeAsNode(MangledName);
+          auto Protocol = Builder.createProtocolDecl(Demangled);
+          if (!Protocol)
+            return BuiltType();
+
+          Protocols.push_back(Protocol);
+          continue;
+        }
+#endif
+
+        Demangle::Demangler Dem;
+        auto Demangled = readDemanglingForContextDescriptor(
+            ProtocolAddress.getSwiftProtocol(), Dem);
         if (!Demangled)
           return BuiltType();
 
@@ -868,14 +1005,15 @@ protected:
         StoredPointer flagsAddress = address +
           sizeof(StoredPointer);
 
-        StoredPointer flags;
+        ExistentialTypeFlags::int_type flagsData;
         if (!Reader->readInteger(RemoteAddress(flagsAddress),
-                                 &flags))
+                                 &flagsData))
           return nullptr;
 
-        StoredPointer numProtocolsAddress = address +
-          TargetExistentialTypeMetadata<Runtime>::OffsetToNumProtocols;
-        StoredPointer numProtocols;
+        ExistentialTypeFlags flags(flagsData);
+
+        StoredPointer numProtocolsAddress = flagsAddress + sizeof(flagsData);
+        uint32_t numProtocols;
         if (!Reader->readInteger(RemoteAddress(numProtocolsAddress),
                                  &numProtocols))
           return nullptr;
@@ -888,7 +1026,7 @@ protected:
           + numProtocols *
           sizeof(ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor>);
 
-        if (ExistentialTypeFlags(flags).hasSuperclassConstraint())
+        if (flags.hasSuperclassConstraint())
           totalSize += sizeof(StoredPointer);
 
         return _readMetadata(address, totalSize);
@@ -1038,8 +1176,10 @@ private:
                            sizeof(flags)))
       return nullptr;
     
+    TypeContextDescriptorFlags typeFlags(flags.getKindSpecificFlags());
     unsigned baseSize = 0;
     unsigned genericHeaderSize = sizeof(GenericContextDescriptorHeader);
+    unsigned inPlaceInitSize = 0;
     bool hasVTable = false;
     switch (auto kind = flags.getKind()) {
     case ContextDescriptorKind::Module:
@@ -1055,16 +1195,26 @@ private:
     case ContextDescriptorKind::Class:
       baseSize = sizeof(TargetClassDescriptor<Runtime>);
       genericHeaderSize = sizeof(TypeGenericContextDescriptorHeader);
-      hasVTable = TypeContextDescriptorFlags(flags.getKindSpecificFlags())
-                    .class_hasVTable();
+      hasVTable = typeFlags.class_hasVTable();
       break;
     case ContextDescriptorKind::Enum:
       baseSize = sizeof(TargetEnumDescriptor<Runtime>);
       genericHeaderSize = sizeof(TypeGenericContextDescriptorHeader);
+      if (typeFlags.hasInPlaceMetadataInitialization()) {
+        inPlaceInitSize =
+          sizeof(TargetInPlaceValueMetadataInitialization<Runtime>);
+      }
       break;
     case ContextDescriptorKind::Struct:
       baseSize = sizeof(TargetStructDescriptor<Runtime>);
       genericHeaderSize = sizeof(TypeGenericContextDescriptorHeader);
+      if (typeFlags.hasInPlaceMetadataInitialization()) {
+        inPlaceInitSize =
+          sizeof(TargetInPlaceValueMetadataInitialization<Runtime>);
+      }
+      break;
+    case ContextDescriptorKind::Protocol:
+      baseSize = sizeof(TargetProtocolDescriptorRef<Runtime>);
       break;
     default:
       // We don't know about this kind of context.
@@ -1107,7 +1257,7 @@ private:
         + header.VTableSize * sizeof(TargetMethodDescriptor<Runtime>);
     }
     
-    unsigned size = baseSize + genericsSize + vtableSize;
+    unsigned size = baseSize + genericsSize + vtableSize + inPlaceInitSize;
     auto buffer = (uint8_t *)malloc(size);
     if (!Reader->readBytes(RemoteAddress(address), buffer, size)) {
       free(buffer);
@@ -1138,12 +1288,13 @@ private:
   Demangle::NodePointer
   buildNominalTypeMangling(ContextDescriptorRef descriptor,
                            Demangle::NodeFactory &nodeFactory) {
-    std::vector<std::pair<Demangle::Node::Kind, std::string>>
+    std::vector<std::pair<Demangle::Node::Kind, Demangle::NodePointer>>
       nameComponents;
     ContextDescriptorRef parent = descriptor;
     
     while (parent) {
       std::string nodeName;
+      std::string relatedTag;
       Demangle::Node::Kind nodeKind;
       
       auto getTypeName = [&]() -> bool {
@@ -1151,7 +1302,16 @@ private:
           reinterpret_cast<const TargetTypeContextDescriptor<Runtime> *>
             (parent.getLocalBuffer());
         auto nameAddress = resolveRelativeField(parent, typeBuffer->Name);
-        return Reader->readString(RemoteAddress(nameAddress), nodeName);
+        if (!Reader->readString(RemoteAddress(nameAddress), nodeName))
+          return false;
+        
+        if (typeBuffer->isSynthesizedRelatedEntity()) {
+          nameAddress += nodeName.size() + 1;
+          if (!Reader->readString(RemoteAddress(nameAddress), relatedTag))
+            return false;
+        }
+        
+        return true;
       };
       
       bool isTypeContext = false;
@@ -1174,7 +1334,17 @@ private:
         nodeKind = Demangle::Node::Kind::Enum;
         isTypeContext = true;
         break;
+      case ContextDescriptorKind::Protocol: {
+        auto protocolBuffer =
+          reinterpret_cast<const TargetProtocolDescriptor<Runtime> *>
+            (parent.getLocalBuffer());
+        auto nameAddress = resolveRelativeField(parent, protocolBuffer->Name);
+        if (!Reader->readString(RemoteAddress(nameAddress), nodeName))
+          return nullptr;
 
+        nodeKind = Demangle::Node::Kind::Protocol;
+        break;
+      }
       case ContextDescriptorKind::Extension:
         // TODO: Remangle something about the extension context here.
         return nullptr;
@@ -1210,8 +1380,17 @@ private:
         else if (typeFlags.isCTypedef())
           nodeKind = Demangle::Node::Kind::TypeAlias;
       }
+      
+      auto nameNode = nodeFactory.createNode(Node::Kind::Identifier,
+                                             nodeName);
+      if (!relatedTag.empty()) {
+        auto relatedNode =
+          nodeFactory.createNode(Node::Kind::RelatedEntityDeclName, relatedTag);
+        relatedNode->addChild(nameNode, nodeFactory);
+        nameNode = relatedNode;
+      }
 
-      nameComponents.emplace_back(nodeKind, nodeName);
+      nameComponents.emplace_back(nodeKind, nameNode);
       
       parent = readParentContextDescriptor(parent);
     }
@@ -1224,13 +1403,11 @@ private:
     auto moduleInfo = std::move(nameComponents.back());
     nameComponents.pop_back();
     auto demangling =
-      nodeFactory.createNode(Node::Kind::Module, moduleInfo.second);
+      nodeFactory.createNode(Node::Kind::Module, moduleInfo.second->getText());
     for (auto &component : reversed(nameComponents)) {
-      auto name = nodeFactory.createNode(Node::Kind::Identifier,
-                                         component.second);
       auto parent = nodeFactory.createNode(component.first);
       parent->addChild(demangling, nodeFactory);
-      parent->addChild(name, nodeFactory);
+      parent->addChild(component.second, nodeFactory);
       demangling = parent;
     }
     
@@ -1252,18 +1429,26 @@ private:
     return decl;
   }
 
-  OwnedProtocolDescriptorRef
-  readProtocolDescriptor(StoredPointer Address) {
-    auto Size = sizeof(TargetProtocolDescriptor<Runtime>);
+#if SWIFT_OBJC_INTEROP
+  std::string readObjCProtocolName(StoredPointer Address) {
+    auto Size = sizeof(TargetObjCProtocolPrefix<Runtime>);
     auto Buffer = (uint8_t *)malloc(Size);
-    if (!Reader->readBytes(RemoteAddress(Address), Buffer, Size)) {
+    SWIFT_DEFER {
       free(Buffer);
-      return nullptr;
-    }
-    auto Casted
-      = reinterpret_cast<TargetProtocolDescriptor<Runtime> *>(Buffer);
-    return OwnedProtocolDescriptorRef(Casted);
+    };
+
+    if (!Reader->readBytes(RemoteAddress(Address), Buffer, Size))
+      return std::string();
+
+    auto ProtocolDescriptor
+      = reinterpret_cast<TargetObjCProtocolPrefix<Runtime> *>(Buffer);
+    std::string Name;
+    if (!Reader->readString(RemoteAddress(ProtocolDescriptor->Name), Name))
+      return std::string();
+
+    return Name;
   }
+#endif
 
   // TODO: We need to be able to produce protocol conformances for each
   // substitution type as well in order to accurately rebuild bound generic

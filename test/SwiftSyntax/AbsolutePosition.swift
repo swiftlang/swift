@@ -16,6 +16,11 @@ func getInput(_ file: String) -> URL {
   return result
 }
 
+func getSyntaxTree(_ url: URL) throws -> SourceFileSyntax {
+  let content = try SwiftLang.parse(url).data(using: .utf8)!
+  return try SyntaxTreeDeserializer().deserialize(content)
+}
+
 
 class FuncRenamer: SyntaxRewriter {
   override func visit(_ node: FunctionDeclSyntax) ->DeclSyntax {
@@ -28,9 +33,8 @@ var PositionTests = TestSuite("AbsolutePositionTests")
 
 PositionTests.test("Visitor") {
   expectDoesNotThrow({
-    let content = try SwiftLang.parse(getInput("visitor.swift"))
     let source = try String(contentsOf: getInput("visitor.swift"))
-    let parsed = try SourceFileSyntax.decodeSourceFileSyntax(content)
+    let parsed = try getSyntaxTree(getInput("visitor.swift"))
     expectEqual(0, parsed.position.utf8Offset)
     expectEqual(source.count,
       parsed.eofToken.positionAfterSkippingLeadingTrivia.utf8Offset)
@@ -41,9 +45,8 @@ PositionTests.test("Visitor") {
 
 PositionTests.test("Closure") {
   expectDoesNotThrow({
-    let content = try SwiftLang.parse(getInput("closure.swift"))
     let source = try String(contentsOf: getInput("closure.swift"))
-    let parsed = try SourceFileSyntax.decodeSourceFileSyntax(content)
+    let parsed = try getSyntaxTree(getInput("closure.swift"))
     expectEqual(source.count, 
       parsed.eofToken.positionAfterSkippingLeadingTrivia.utf8Offset)
     expectEqual(0, parsed.position.utf8Offset)
@@ -53,8 +56,7 @@ PositionTests.test("Closure") {
 
 PositionTests.test("Rename") {
   expectDoesNotThrow({
-    let content = try SwiftLang.parse(getInput("visitor.swift"))
-    let parsed = try SourceFileSyntax.decodeSourceFileSyntax(content)
+    let parsed = try getSyntaxTree(getInput("visitor.swift"))
     let renamed = FuncRenamer().visit(parsed) as! SourceFileSyntax
     let renamedSource = renamed.description
     expectEqual(renamedSource.count, 
@@ -65,8 +67,7 @@ PositionTests.test("Rename") {
 
 PositionTests.test("CurrentFile") {
   expectDoesNotThrow({
-    let content = try SwiftLang.parse(URL(fileURLWithPath: #file))
-    let parsed = try SourceFileSyntax.decodeSourceFileSyntax(content)
+    let parsed = try getSyntaxTree(URL(fileURLWithPath: #file))
     class Visitor: SyntaxVisitor {
       override func visitPre(_ node: Syntax) {
         _ = node.position

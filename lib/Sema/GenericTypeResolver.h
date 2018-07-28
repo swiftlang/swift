@@ -36,6 +36,8 @@ class GenericTypeResolver {
 public:
   virtual ~GenericTypeResolver();
 
+  virtual bool usesArchetypes() = 0;
+
   /// Resolve the given interface type to a contextual type if necessary.
   virtual Type mapTypeIntoContext(Type type) = 0;
 
@@ -55,9 +57,6 @@ public:
   /// Determine whether the given types are equivalent within the generic
   /// context.
   virtual bool areSameType(Type type1, Type type2) = 0;
-
-  /// Set the contextual type or the interface type of the parameter.
-  virtual void recordParamType(ParamDecl *decl, Type ty) = 0;
 };
 
 /// Generic type resolver that leaves all generic types dependent.
@@ -66,6 +65,8 @@ public:
 /// and only trivially resolves dependent member types.
 class DependentGenericTypeResolver : public GenericTypeResolver {
 public:
+  virtual bool usesArchetypes() { return false; }
+
   virtual Type mapTypeIntoContext(Type type);
 
   virtual Type resolveDependentMemberType(Type baseTy,
@@ -74,8 +75,6 @@ public:
                                           ComponentIdentTypeRepr *ref);
 
   virtual bool areSameType(Type type1, Type type2);
-
-  virtual void recordParamType(ParamDecl *decl, Type ty);
 };
 
 /// Generic type resolver that maps a generic type parameter type to its
@@ -93,6 +92,8 @@ public:
   explicit GenericTypeToArchetypeResolver(DeclContext *dc)
       : GenericEnv(dc->getGenericEnvironmentOfContext()) { }
 
+  virtual bool usesArchetypes() { return true; }
+
   virtual Type mapTypeIntoContext(Type type);
 
   virtual Type resolveDependentMemberType(Type baseTy, DeclContext *DC,
@@ -100,8 +101,6 @@ public:
                                           ComponentIdentTypeRepr *ref);
 
   virtual bool areSameType(Type type1, Type type2);
-
-  virtual void recordParamType(ParamDecl *decl, Type ty);
 };
 
 /// Generic type resolver that only handles what can appear in a protocol
@@ -111,6 +110,8 @@ public:
 /// protocols.
 class ProtocolRequirementTypeResolver : public GenericTypeResolver {
 public:
+  virtual bool usesArchetypes() { return false; }
+
   virtual Type mapTypeIntoContext(Type type);
 
   virtual Type resolveDependentMemberType(Type baseTy, DeclContext *DC,
@@ -118,8 +119,6 @@ public:
                                           ComponentIdentTypeRepr *ref);
 
   virtual bool areSameType(Type type1, Type type2);
-
-  virtual void recordParamType(ParamDecl *decl, Type ty);
 };
 
 /// Generic type resolver that performs complete resolution of dependent
@@ -132,10 +131,12 @@ public:
 class CompleteGenericTypeResolver : public GenericTypeResolver {
   TypeChecker &tc;
   GenericSignature *genericSig;
-  GenericSignatureBuilder &builder;
+  GenericSignatureBuilder *builder;
 
 public:
   CompleteGenericTypeResolver(TypeChecker &tc, GenericSignature *genericSig);
+
+  virtual bool usesArchetypes() { return false; }
 
   virtual Type mapTypeIntoContext(Type type);
 
@@ -145,8 +146,6 @@ public:
                                           ComponentIdentTypeRepr *ref);
 
   virtual bool areSameType(Type type1, Type type2);
-
-  virtual void recordParamType(ParamDecl *decl, Type ty);
 };
 
 } // end namespace swift

@@ -31,10 +31,10 @@ class Foo: Proto {
   }
 
   // dynamic, so it has only an ObjC entry point
-  dynamic init(dynamic: Int) {}
-  dynamic func dynamicMethod() {}
-  dynamic var dynamicProp: Int = 0
-  dynamic subscript(dynamic dynamic: Int) -> Int {
+  @objc dynamic init(dynamic: Int) {}
+  @objc dynamic func dynamicMethod() {}
+  @objc dynamic var dynamicProp: Int = 0
+  @objc dynamic subscript(dynamic dynamic: Int) -> Int {
     get { return dynamic }
     set {}
   }
@@ -233,7 +233,7 @@ class Subclass: Foo {
     // CHECK:         objc_super_method {{%.*}} : $Subclass, #Foo.subscript!setter.1.foreign :
   }
 
-  dynamic override func overriddenByDynamic() {}
+  @objc dynamic override func overriddenByDynamic() {}
 }
 
 class SubclassWithInheritedInits: Foo {
@@ -347,11 +347,11 @@ extension Gizmo {
   }
 
   @objc func foreignObjCExtension() { }
-  dynamic func foreignDynamicExtension() { }
+  @objc dynamic func foreignDynamicExtension() { }
 }
 
 // CHECK-LABEL: sil hidden @$S7dynamic24foreignExtensionDispatchyySo5GizmoCF
-// CHECK: bb0([[ARG:%.*]] : $Gizmo):
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $Gizmo):
 func foreignExtensionDispatch(_ g: Gizmo) {
   // CHECK: objc_method [[ARG]] : $Gizmo, #Gizmo.foreignObjCExtension!1.foreign : (Gizmo)
   g.foreignObjCExtension()
@@ -438,12 +438,12 @@ func dynamicExtensionMethods(_ obj: ObjCOtherFile) {
 }
 
 public class Base {
-  dynamic var x: Bool { return false }
+  @objc dynamic var x: Bool { return false }
 }
 
 public class Sub : Base {
   // CHECK-LABEL: sil hidden @$S7dynamic3SubC1xSbvg : $@convention(method) (@guaranteed Sub) -> Bool {
-  // CHECK: bb0([[SELF:%.*]] : $Sub):
+  // CHECK: bb0([[SELF:%.*]] : @guaranteed $Sub):
   // CHECK:     [[AUTOCLOSURE:%.*]] = function_ref @$S7dynamic3SubC1xSbvgSbyKXKfu_ : $@convention(thin) (@guaranteed Sub) -> (Bool, @error Error)
   // CHECK:     [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:     = partial_apply [callee_guaranteed] [[AUTOCLOSURE]]([[SELF_COPY]])
@@ -451,7 +451,7 @@ public class Sub : Base {
   // CHECK: } // end sil function '$S7dynamic3SubC1xSbvg'
 
   // CHECK-LABEL: sil private [transparent] @$S7dynamic3SubC1xSbvgSbyKXKfu_ : $@convention(thin) (@guaranteed Sub) -> (Bool, @error Error) {
-  // CHECK: bb0([[VALUE:%.*]] : $Sub):
+  // CHECK: bb0([[VALUE:%.*]] : @guaranteed $Sub):
   // CHECK:     [[VALUE_COPY:%.*]] = copy_value [[VALUE]]
   // CHECK:     [[CASTED_VALUE_COPY:%.*]] = upcast [[VALUE_COPY]]
   // CHECK:     [[BORROWED_CASTED_VALUE_COPY:%.*]] = begin_borrow [[CASTED_VALUE_COPY]]
@@ -483,7 +483,7 @@ public class GenericBase<T> {
 }
 
 public class ConcreteDerived : GenericBase<Int> {
-  public override dynamic func method(_: Int) {}
+  @objc public override dynamic func method(_: Int) {}
 }
 
 // The dynamic override has a different calling convention than the base,
@@ -491,7 +491,7 @@ public class ConcreteDerived : GenericBase<Int> {
 // thunk.
 
 // CHECK-LABEL: sil private @$S7dynamic15ConcreteDerivedC6methodyySiFAA11GenericBaseCADyyxFTV : $@convention(method) (@in_guaranteed Int, @guaranteed ConcreteDerived) -> ()
-// CHECK: bb0(%0 : $*Int, %1 : $ConcreteDerived):
+// CHECK: bb0(%0 : @trivial $*Int, %1 : @guaranteed $ConcreteDerived):
 // CHECK-NEXT:  [[VALUE:%.*]] = load [trivial] %0 : $*Int
 // CHECK:       [[DYNAMIC_THUNK:%.*]] = function_ref @$S7dynamic15ConcreteDerivedC6methodyySiFTD : $@convention(method) (Int, @guaranteed ConcreteDerived) -> ()
 // CHECK-NEXT:  apply [[DYNAMIC_THUNK]]([[VALUE]], %1) : $@convention(method) (Int, @guaranteed ConcreteDerived) -> ()
@@ -516,7 +516,7 @@ public class ConcreteDerived : GenericBase<Int> {
 // CHECK-NEXT:   #Foo.subscript!setter.1: {{.*}} : @$S7dynamic3FooC4objcSiyXl_tcis // dynamic.Foo.subscript.setter : (objc: Swift.AnyObject) -> Swift.Int
 // CHECK-NEXT:   #Foo.subscript!materializeForSet
 // CHECK-NEXT:   #Foo.overriddenByDynamic!1: {{.*}} : @$S7dynamic3FooC19overriddenByDynamic{{[_0-9a-zA-Z]*}}
-// CHECK-NEXT:   #Foo.deinit!deallocator: {{.*}}
+// CHECK-NEXT:   #Foo.deinit!deallocator.1: {{.*}}
 // CHECK-NEXT: }
 
 // Vtable uses a dynamic thunk for dynamic overrides
@@ -545,13 +545,12 @@ public class ConcreteDerived : GenericBase<Int> {
 
 // No vtable entry for override of @objc extension property
 // CHECK-LABEL: sil_vtable [serialized] SubExt {
-// CHECK-NEXT: #BaseExt.init!initializer.1: (BaseExt.Type) -> () -> BaseExt : @$S7dynamic6SubExtCACycfc [override] // dynamic.SubExt.init() -> dynamic.SubExt
-// CHECK-NEXT: #SubExt.deinit!deallocator: @$S7dynamic6SubExtCfD // dynamic.SubExt.__deallocating_deinit
+// CHECK-NEXT: #SubExt.deinit!deallocator.1: @$S7dynamic6SubExtCfD // dynamic.SubExt.__deallocating_deinit
 // CHECK-NEXT: }
 
 // Dynamic thunk + vtable re-abstraction
 // CHECK-LABEL: sil_vtable [serialized] ConcreteDerived {
 // CHECK-NEXT: #GenericBase.method!1: <T> (GenericBase<T>) -> (T) -> () : public @$S7dynamic15ConcreteDerivedC6methodyySiFAA11GenericBaseCADyyxFTV [override]     // vtable thunk for dynamic.GenericBase.method(A) -> () dispatching to dynamic.ConcreteDerived.method(Swift.Int) -> ()
 // CHECK-NEXT: #GenericBase.init!initializer.1: <T> (GenericBase<T>.Type) -> () -> GenericBase<T> : @$S7dynamic15ConcreteDerivedCACycfc [override]      // dynamic.ConcreteDerived.init() -> dynamic.ConcreteDerived
-// CHECK-NEXT: #ConcreteDerived.deinit!deallocator: @$S7dynamic15ConcreteDerivedCfD  // dynamic.ConcreteDerived.__deallocating_deinit
+// CHECK-NEXT: #ConcreteDerived.deinit!deallocator.1: @$S7dynamic15ConcreteDerivedCfD  // dynamic.ConcreteDerived.__deallocating_deinit
 // CHECK-NEXT: }

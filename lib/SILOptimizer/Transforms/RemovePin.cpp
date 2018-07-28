@@ -54,8 +54,8 @@ public:
     AA = PM->getAnalysis<AliasAnalysis>();
     RCIA = PM->getAnalysis<RCIdentityAnalysis>()->get(getFunction());
 
-    DEBUG(llvm::dbgs() << "*** Running Pin Removal on "
-                       << getFunction()->getName() << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "*** Running Pin Removal on "
+                            << getFunction()->getName() << "\n");
 
     bool Changed = false;
     for (auto &BB : *getFunction()) {
@@ -63,32 +63,34 @@ public:
       // This is only a BB local analysis for now.
       AvailablePins.clear();
 
-      DEBUG(llvm::dbgs() << "Visiting new BB!\n");
+      LLVM_DEBUG(llvm::dbgs() << "Visiting new BB!\n");
 
       for (auto InstIt = BB.begin(), End = BB.end(); InstIt != End; ) {
         auto *CurInst = &*InstIt;
         ++InstIt;
 
-        DEBUG(llvm::dbgs() << "    Visiting: " << *CurInst);
+        LLVM_DEBUG(llvm::dbgs() << "    Visiting: " << *CurInst);
 
         // Add StrongPinInst to available pins.
         if (auto pin = dyn_cast<StrongPinInst>(CurInst)) {
-          DEBUG(llvm::dbgs() << "        Found pin!\n");
+          LLVM_DEBUG(llvm::dbgs() << "        Found pin!\n");
           AvailablePins.insert(pin);
           continue;
         }
 
         // Try to remove StrongUnpinInst if its input is available.
         if (auto *Unpin = dyn_cast<StrongUnpinInst>(CurInst)) {
-          DEBUG(llvm::dbgs() << "        Found unpin!\n");
+          LLVM_DEBUG(llvm::dbgs() << "        Found unpin!\n");
           SILValue RCId = RCIA->getRCIdentityRoot(Unpin->getOperand());
-          DEBUG(llvm::dbgs() << "        RCID Source: " << *RCId);
+          LLVM_DEBUG(llvm::dbgs() << "        RCID Source: " << *RCId);
           auto *PinDef = dyn_cast<StrongPinInst>(RCId);
           if (PinDef && AvailablePins.count(PinDef)) {
-            DEBUG(llvm::dbgs() << "        Found matching pin: " << *PinDef);
+            LLVM_DEBUG(llvm::dbgs() << "        Found matching pin: "
+                                    << *PinDef);
             SmallVector<MarkDependenceInst *, 8> MarkDependentInsts;
             if (areSafePinUsers(PinDef, Unpin, MarkDependentInsts)) {
-              DEBUG(llvm::dbgs() << "        Pin users are safe! Removing!\n");
+              LLVM_DEBUG(llvm::dbgs() << "        Pin users are safe! "
+                                         "Removing!\n");
               Changed = true;
               auto *Enum = SILBuilder(PinDef).createOptionalSome(
                   PinDef->getLoc(), PinDef->getOperand(), PinDef->getType());
@@ -99,13 +101,13 @@ public:
               AvailablePins.erase(PinDef);
               ++NumPinPairsRemoved;
             } else {
-              DEBUG(llvm::dbgs()
-                    << "        Pin users are not safe! Cannot remove!\n");
+              LLVM_DEBUG(llvm::dbgs()
+                         << "        Pin users are not safe! Cannot remove!\n");
             }
 
             continue;
           } else {
-            DEBUG(llvm::dbgs() << "        Failed to find matching pin!\n");
+            LLVM_DEBUG(llvm::dbgs() <<"        Failed to find matching pin!\n");
           }
           // Otherwise, fall through. An unpin, through destruction of an object
           // can have arbitrary sideeffects.
@@ -129,16 +131,16 @@ public:
         // of the callsite).
         if (isa<StrongReleaseInst>(CurInst) || isa<ReleaseValueInst>(CurInst)) {
           if (isReleaseEndOfGuaranteedSelfCallSequence(CurInst)) {
-            DEBUG(llvm::dbgs() << "        Ignoring exactly balanced "
-                                  "release.\n");
+            LLVM_DEBUG(llvm::dbgs() << "        Ignoring exactly balanced "
+                                       "release.\n");
             continue;
           }
         }
 
         // In all other cases check whether this could be a potentially
         // releasing instruction.
-        DEBUG(llvm::dbgs()
-              << "        Checking if this inst invalidates pins.\n");
+        LLVM_DEBUG(llvm::dbgs()
+                   << "        Checking if this inst invalidates pins.\n");
         invalidateAvailablePins(CurInst);
       }
     }
@@ -249,12 +251,12 @@ public:
     }
 
     if (RemovePin.empty()) {
-      DEBUG(llvm::dbgs() << "        No pins to invalidate!\n");
+      LLVM_DEBUG(llvm::dbgs() << "        No pins to invalidate!\n");
       return;
     }
 
     for (auto *P : RemovePin) {
-      DEBUG(llvm::dbgs() << "        Invalidating Pin: " << *P);
+      LLVM_DEBUG(llvm::dbgs() << "        Invalidating Pin: " << *P);
       AvailablePins.erase(P);
     }
   }

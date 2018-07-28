@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s
+// RUN: %target-typecheck-verify-swift
 
 // Check that all combinations of key paths produce the expected result type
 // and choose the expected overloads.

@@ -159,7 +159,8 @@ extension VersionedProtocol {
 }
 
 enum InternalEnum {
-// expected-note@-1 2{{enum 'InternalEnum' is not '@usableFromInline' or public}}
+  // expected-note@-1 2{{enum 'InternalEnum' is not '@usableFromInline' or public}}
+  // expected-note@-2 {{type declared here}}
   case apple
   case orange
 }
@@ -174,8 +175,8 @@ enum InternalEnum {
 @usableFromInline enum VersionedEnum {
   case apple
   case orange
-  // FIXME: Should this be banned?
   case pear(InternalEnum)
+  // expected-warning@-1 {{type of enum case in '@usableFromInline' enum should be '@usableFromInline' or public}}
   case persimmon(String)
 }
 
@@ -250,4 +251,14 @@ public struct PublicResilientStructWithInit {
 public struct PublicFixedStructWithInit {
   var x = internalGlobal // expected-error {{let 'internalGlobal' is internal and cannot be referenced from a property initializer in a '@_fixed_layout' type}}
   var y = publicGlobal // OK
+}
+
+public struct KeypathStruct {
+  var x: Int
+  // expected-note@-1 {{var 'x' is not '@usableFromInline' or public}}
+
+  @inlinable public func usesKeypath() {
+    _ = \KeypathStruct.x
+    // expected-error@-1 {{var 'x' is internal and cannot be referenced from an '@inlinable' function}}
+  }
 }

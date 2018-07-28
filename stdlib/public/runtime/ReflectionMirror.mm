@@ -257,11 +257,21 @@ struct TupleImpl : ReflectionMirrorImpl {
 
 // Implementation for structs.
 struct StructImpl : ReflectionMirrorImpl {
+  bool isReflectable() {
+    const auto *Struct = static_cast<const StructMetadata *>(type);
+    const auto &Description = Struct->getDescription();
+    return Description->getTypeContextDescriptorFlags().isReflectable();
+  }
+
   char displayStyle() {
     return 's';
   }
   
   intptr_t count() {
+    if (!isReflectable()) {
+      return 0;
+    }
+
     auto *Struct = static_cast<const StructMetadata *>(type);
     return Struct->getDescription()->NumFields;
   }
@@ -399,11 +409,20 @@ struct EnumImpl : ReflectionMirrorImpl {
 
 // Implementation for classes.
 struct ClassImpl : ReflectionMirrorImpl {
+  bool isReflectable() {
+    const auto *Class = static_cast<const ClassMetadata *>(type);
+    const auto &Description = Class->getDescription();
+    return Description->getTypeContextDescriptorFlags().isReflectable();
+  }
+
   char displayStyle() {
     return 'c';
   }
   
   intptr_t count() {
+    if (!isReflectable())
+      return 0;
+
     auto *Clas = static_cast<const ClassMetadata*>(type);
     auto count = Clas->getDescription()->NumFields;
 
@@ -539,7 +558,6 @@ auto call(OpaqueValue *passedValue, const Metadata *T, const Metadata *passedTyp
     impl->type = type;
     impl->value = value;
     auto result = f(impl);
-    SWIFT_CC_PLUSONE_GUARD(T->vw_destroy(passedValue));
     return result;
   };
   

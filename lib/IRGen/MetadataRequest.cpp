@@ -561,8 +561,28 @@ bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
     if (nominalDecl->isGenericContext())
       return false;
 
+    auto expansion = ResilienceExpansion::Maximal;
+
+    // Normally, if a value type is known to have a fixed layout to us, we will
+    // have emitted fully initialized metadata for it, including a payload size
+    // field for enum metadata for example, allowing the type metadata to be
+    // used in other resilience domains without initialization.
+    //
+    // However, when -enable-resilience-bypass is on, we might be using a value
+    // type from another module built with resilience enabled. In that case, the
+    // type looks like it has fixed size to us, since we're bypassing resilience,
+    // but the metadata still requires runtime initialization, so its incorrect
+    // to reference it directly.
+    //
+    // While unconditionally using minimal expansion is correct, it is not as
+    // efficient as it should be, so only do so if -enable-resilience-bypass is on.
+    //
+    // FIXME: All of this goes away once lldb supports resilience.
+    if (IGM.IRGen.Opts.EnableResilienceBypass)
+      expansion = ResilienceExpansion::Minimal;
+
     // Resiliently-sized metadata access always requires an accessor.
-    return (IGM.getTypeInfoForUnlowered(type).isFixedSize());
+    return (IGM.getTypeInfoForUnlowered(type).isFixedSize(expansion));
   }
 
   // The empty tuple type has a singleton metadata.
@@ -1129,7 +1149,7 @@ namespace {
 
       // Collect references to the protocol descriptors.
       auto descriptorArrayTy
-        = llvm::ArrayType::get(IGF.IGM.ProtocolDescriptorPtrTy,
+        = llvm::ArrayType::get(IGF.IGM.ProtocolDescriptorRefTy,
                                protocols.size());
       Address descriptorArray = IGF.createAlloca(descriptorArrayTy,
                                                  IGF.IGM.getPointerAlignment(),
@@ -1137,12 +1157,13 @@ namespace {
       IGF.Builder.CreateLifetimeStart(descriptorArray,
                                    IGF.IGM.getPointerSize() * protocols.size());
       descriptorArray = IGF.Builder.CreateBitCast(descriptorArray,
-                               IGF.IGM.ProtocolDescriptorPtrTy->getPointerTo());
+                               IGF.IGM.ProtocolDescriptorRefTy->getPointerTo());
       
       unsigned index = 0;
       for (auto *protoTy : protocols) {
         auto *protoDecl = protoTy->getDecl();
         llvm::Value *ref = emitProtocolDescriptorRef(IGF, protoDecl);
+
         Address slot = IGF.Builder.CreateConstArrayGEP(descriptorArray,
                                                index, IGF.IGM.getPointerSize());
         IGF.Builder.CreateStore(ref, slot);
@@ -1155,9 +1176,9 @@ namespace {
                                !layout.requiresClass());
       llvm::Value *superclassConstraint =
         llvm::ConstantPointerNull::get(IGF.IGM.TypeMetadataPtrTy);
-      if (layout.superclass) {
+      if (auto superclass = layout.explicitSuperclass) {
         superclassConstraint = IGF.emitAbstractTypeMetadataRef(
-          CanType(layout.superclass));
+          CanType(superclass));
       }
 
       auto call = IGF.Builder.CreateCall(IGF.IGM.getGetExistentialMetadataFn(),
@@ -1263,16 +1284,18 @@ static bool isLoadFrom(llvm::Value *value, Address address) {
   return false;
 }
 
-/// Emit the body of a lazy cache accessor.
+/// Emit the body of a cache accessor.
 ///
 /// If cacheVariable is null, we perform the direct access every time.
 /// This is used for metadata accessors that come about due to resilience,
 /// where the direct access is completely trivial.
-void irgen::emitLazyCacheAccessFunction(IRGenModule &IGM,
-                                        llvm::Function *accessor,
-                                        llvm::GlobalVariable *cacheVariable,
-                                        LazyCacheEmitter getValue,
-                                        bool isReadNone) {
+void irgen::emitCacheAccessFunction(IRGenModule &IGM,
+                                    llvm::Function *accessor,
+                                    llvm::Constant *cacheVariable,
+                                    CacheStrategy cacheStrategy,
+                                    CacheEmitter getValue,
+                                    bool isReadNone) {
+  assert((cacheStrategy == CacheStrategy::None) == (cacheVariable == nullptr));
   accessor->setDoesNotThrow();
 
   // This function is logically 'readnone': the caller does not need
@@ -1289,8 +1312,10 @@ void irgen::emitLazyCacheAccessFunction(IRGenModule &IGM,
   bool returnsResponse =
     (accessor->getReturnType() == IGM.TypeMetadataResponseTy);
 
+  switch (cacheStrategy) {
+
   // If there's no cache variable, just perform the direct access.
-  if (cacheVariable == nullptr) {
+  case CacheStrategy::None: {
     auto response = getValue(IGF, parameters);
     llvm::Value *ret;
     if (returnsResponse) {
@@ -1304,13 +1329,22 @@ void irgen::emitLazyCacheAccessFunction(IRGenModule &IGM,
     return;
   }
 
-  // Set up the cache variable.
+  // For in-place initialization, drill to the first element of the cache.
+  case CacheStrategy::InPlaceInitialization:
+    cacheVariable =
+      llvm::ConstantExpr::getBitCast(cacheVariable,
+                                     IGM.TypeMetadataPtrTy->getPointerTo());
+    break;
+
+  case CacheStrategy::Lazy:
+    break;
+  }
+
   llvm::Constant *null =
     llvm::ConstantPointerNull::get(
-                        cast<llvm::PointerType>(cacheVariable->getValueType()));
+      cast<llvm::PointerType>(
+        cacheVariable->getType()->getPointerElementType()));
 
-  cacheVariable->setInitializer(null);
-  cacheVariable->setAlignment(IGM.getPointerAlignment().getValue());
   Address cache(cacheVariable, IGM.getPointerAlignment());
 
   // Okay, first thing, check the cache variable.
@@ -1360,33 +1394,41 @@ void irgen::emitLazyCacheAccessFunction(IRGenModule &IGM,
 
   // Emit a branch around the caching code if we're working with responses
   // and the fetched result is not complete.  We can avoid doing this if
-  // the response is statically known to be complete.
+  // the response is statically known to be complete, and we don't need to
+  // do it if this is an in-place initiazation cache because the store
+  // is done within the runtime.
   llvm::BasicBlock *completionCheckBB = nullptr;
   llvm::Value *directState = nullptr;
-  if (returnsResponse && !response.isStaticallyKnownComplete()) {
-    completionCheckBB = IGF.Builder.GetInsertBlock();
+  if (cacheStrategy == CacheStrategy::InPlaceInitialization) {
     directState = response.getDynamicState();
+    completionCheckBB = IGF.Builder.GetInsertBlock();
+  } else {
+    if (returnsResponse &&
+        !response.isStaticallyKnownComplete()) {
+      completionCheckBB = IGF.Builder.GetInsertBlock();
+      directState = response.getDynamicState();
 
-    auto isCompleteBB = IGF.createBasicBlock("is_complete");
-    auto isComplete =
-      IGF.Builder.CreateICmpEQ(directState, completedState);
+      auto isCompleteBB = IGF.createBasicBlock("is_complete");
+      auto isComplete =
+        IGF.Builder.CreateICmpEQ(directState, completedState);
 
-    IGF.Builder.CreateCondBr(isComplete, isCompleteBB, contBB);
-    IGF.Builder.emitBlock(isCompleteBB);
-  } 
+      IGF.Builder.CreateCondBr(isComplete, isCompleteBB, contBB);
+      IGF.Builder.emitBlock(isCompleteBB);
+    }
 
-  // Store it back to the cache variable.  This needs to be a store-release
-  // because it needs to propagate memory visibility to the other threads
-  // that can access the cache: the initializing stores might be visible
-  // to this thread, but they aren't transitively guaranteed to be visible
-  // to other threads unless this is a store-release.
-  //
-  // However, we can skip this if the value was actually loaded from the
-  // cache.  This is a simple, if hacky, peephole that's useful for the
-  // code in emitInPlaceTypeMetadataAccessFunctionBody.
-  if (!isLoadFrom(directResult, cache)) {
-    IGF.Builder.CreateStore(directResult, cache)
-      ->setAtomic(llvm::AtomicOrdering::Release);
+    // Store it back to the cache variable.  This needs to be a store-release
+    // because it needs to propagate memory visibility to the other threads
+    // that can access the cache: the initializing stores might be visible
+    // to this thread, but they aren't transitively guaranteed to be visible
+    // to other threads unless this is a store-release.
+    //
+    // However, we can skip this if the value was actually loaded from the
+    // cache.  This is a simple, if hacky, peephole that's useful for the
+    // code in emitOnceTypeMetadataAccessFunctionBody.
+    if (!isLoadFrom(directResult, cache)) {
+      IGF.Builder.CreateStore(directResult, cache)
+        ->setAtomic(llvm::AtomicOrdering::Release);
+    }
   }
 
   IGF.Builder.CreateBr(contBB);
@@ -1403,12 +1445,14 @@ void irgen::emitLazyCacheAccessFunction(IRGenModule &IGM,
   // Add a phi for the metadata state if we're returning a response.
   llvm::Value *stateToReturn = nullptr;
   if (directState) {
-    phi->addIncoming(directResult, completionCheckBB);
+    if (storeBB != completionCheckBB)
+      phi->addIncoming(directResult, completionCheckBB);
 
     auto completionStatePHI = IGF.Builder.CreatePHI(IGM.SizeTy, 3);
     completionStatePHI->addIncoming(completedState, loadBB);
     completionStatePHI->addIncoming(directState, completionCheckBB);
-    completionStatePHI->addIncoming(completedState, storeBB);
+    if (storeBB != completionCheckBB)
+      completionStatePHI->addIncoming(completedState, storeBB);
     stateToReturn = completionStatePHI;
   } else if (returnsResponse) {
     stateToReturn = completedState;
@@ -1544,11 +1588,11 @@ emitGenericTypeMetadataAccessFunction(IRGenFunction &IGF,
 /// Emit a helper function for swift_once that performs in-place
 /// initialization of the given nominal type.
 static llvm::Constant *
-createInPlaceMetadataInitializationFunction(IRGenModule &IGM, 
-                                            CanNominalType type,
-                                            llvm::Constant *metadata,
-                                            llvm::Constant *cacheVariable,
-                                     InPlaceMetadataInitializer &&initialize) {
+createOnceMetadataInitializationFunction(IRGenModule &IGM, 
+                                         CanNominalType type,
+                                         llvm::Constant *metadata,
+                                         llvm::Constant *cacheVariable,
+                                         OnceMetadataInitializer initialize) {
   // There's an ignored i8* parameter.
   auto fnTy = llvm::FunctionType::get(IGM.VoidTy, {IGM.Int8PtrTy},
                                       /*variadic*/ false);
@@ -1582,12 +1626,12 @@ createInPlaceMetadataInitializationFunction(IRGenModule &IGM,
 }
 
 /// Emit the function body for the type metadata accessor of a nominal type
-/// that might require in-place initialization.
+/// that uses swift_once to control in-place initialization.
 MetadataResponse
-irgen::emitInPlaceTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
-                                                 CanNominalType type,
-                                                 llvm::Constant *cacheVariable,
-                                    InPlaceMetadataInitializer &&initializer) {
+irgen::emitOnceTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
+                                              CanNominalType type,
+                                              llvm::Constant *cacheVariable,
+                                          OnceMetadataInitializer initializer) {
   llvm::Constant *metadata =
     IGF.IGM.requiresForeignTypeMetadata(type)
       ? IGF.IGM.getAddrOfForeignTypeMetadataCandidate(type)
@@ -1614,9 +1658,9 @@ irgen::emitInPlaceTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
 
   // Create the protected function.  swift_once wants this as an i8*.
   llvm::Value *onceFn =
-    createInPlaceMetadataInitializationFunction(IGF.IGM, type, metadata,
-                                                cacheVariable,
-                                                std::move(initializer));
+    createOnceMetadataInitializationFunction(IGF.IGM, type, metadata,
+                                             cacheVariable,
+                                             std::move(initializer));
   onceFn = IGF.Builder.CreateBitCast(onceFn, IGF.IGM.Int8PtrTy);
   auto context = llvm::UndefValue::get(IGF.IGM.Int8PtrTy);
 
@@ -1632,7 +1676,7 @@ irgen::emitInPlaceTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
   if (IGF.IGM.IRGen.Opts.Sanitizers & SanitizerKind::Thread)
     relocatedMetadata->setOrdering(llvm::AtomicOrdering::Acquire);
 
-  // emitLazyCacheAccessFunction will see that the value was loaded from
+  // emitCacheAccessFunction will see that the value was loaded from
   // the guard variable and skip the redundant store back.
   return MetadataResponse::forComplete(relocatedMetadata);
 }
@@ -1707,6 +1751,7 @@ llvm::Function *
 irgen::getTypeMetadataAccessFunction(IRGenModule &IGM,
                                      CanType type,
                                      ForDefinition_t shouldDefine,
+                                     CacheStrategy cacheStrategy,
                                      MetadataAccessGenerator generator) {
   assert(!type->hasArchetype());
   // Type should be bound unless it's type erased.
@@ -1723,20 +1768,37 @@ irgen::getTypeMetadataAccessFunction(IRGenModule &IGM,
     return accessor;
 
   // Okay, define the accessor.
-  llvm::GlobalVariable *cacheVariable = nullptr;
+  llvm::Constant *cacheVariable = nullptr;
 
   // If our preferred access method is to go via an accessor, it means
   // there is some non-trivial computation that needs to be cached.
-  if (!isTypeMetadataAccessTrivial(IGM, type)) {
-    cacheVariable = cast<llvm::GlobalVariable>(
-        IGM.getAddrOfTypeMetadataLazyCacheVariable(type, ForDefinition));
+  if (isTypeMetadataAccessTrivial(IGM, type)) {
+    cacheStrategy = CacheStrategy::None;
+  } else {
+    switch (cacheStrategy) {
+    // Nothing to do.
+    case CacheStrategy::None:
+      break;
+
+    // For lazy initialization, the cache variable is just a pointer.
+    case CacheStrategy::Lazy:
+      cacheVariable =
+        IGM.getAddrOfTypeMetadataLazyCacheVariable(type, ForDefinition);
+      break;
+
+    // For in-place initialization, drill down to the first element.
+    case CacheStrategy::InPlaceInitialization:
+      cacheVariable = IGM.getAddrOfTypeMetadataInPlaceInitializationCache(
+                                          type->getAnyNominal(), ForDefinition);
+      break;
+    }
 
     if (IGM.getOptions().optimizeForSize())
       accessor->addFnAttr(llvm::Attribute::NoInline);
   }
 
-  emitLazyCacheAccessFunction(IGM, accessor, cacheVariable,
-                              [&](IRGenFunction &IGF, Explosion &params) {
+  emitCacheAccessFunction(IGM, accessor, cacheVariable, cacheStrategy,
+                          [&](IRGenFunction &IGF, Explosion &params) {
     auto request = DynamicMetadataRequest(params.claimNext());
     return generator(IGF, request, cacheVariable);
   });
@@ -1749,6 +1811,7 @@ llvm::Function *irgen::getTypeMetadataAccessFunction(IRGenModule &IGM,
                                                      CanType type,
                                                  ForDefinition_t shouldDefine) {
   return getTypeMetadataAccessFunction(IGM, type, shouldDefine,
+                                       CacheStrategy::Lazy,
                                        [&](IRGenFunction &IGF,
                                            DynamicMetadataRequest request,
                                            llvm::Constant *cacheVariable) {
@@ -1784,12 +1847,12 @@ irgen::getGenericTypeMetadataAccessFunction(IRGenModule &IGM,
   bool isReadNone =
       (genericArgs.Types.size() <= NumDirectGenericTypeMetadataAccessFunctionArgs);
 
-  emitLazyCacheAccessFunction(IGM, accessor, /*cacheVariable=*/nullptr,
-                              [&](IRGenFunction &IGF, Explosion &params) {
-                                return emitGenericTypeMetadataAccessFunction(
+  emitCacheAccessFunction(IGM, accessor, /*cache*/nullptr, CacheStrategy::None,
+                          [&](IRGenFunction &IGF, Explosion &params) {
+                            return emitGenericTypeMetadataAccessFunction(
                                     IGF, params, nominal, genericArgs);
-                              },
-                              isReadNone);
+                          },
+                          isReadNone);
 
   return accessor;
 }
@@ -2255,23 +2318,15 @@ namespace {
       // object.
 
       auto &C = IGF.IGM.Context;
-      CanType referent;
-      switch (type->getOwnership()) {
-      case ReferenceOwnership::Strong:
-        llvm_unreachable("shouldn't be a ReferenceStorageType");
-      case ReferenceOwnership::Weak:
-        referent = type.getReferentType().getOptionalObjectType();
-        break;
-      case ReferenceOwnership::Unmanaged:
-      case ReferenceOwnership::Unowned:
-        referent = type.getReferentType();
-        break;
-      }
+      CanType referent = type.getReferentType();
+      CanType underlyingTy = referent;
+      if (auto Ty = referent.getOptionalObjectType())
+        underlyingTy = Ty;
 
       // Reference storage types with witness tables need open-coded layouts.
       // TODO: Maybe we could provide prefabs for 1 witness table.
-      if (referent.isExistentialType()) {
-        auto layout = referent.getExistentialLayout();
+      if (underlyingTy.isExistentialType()) {
+        auto layout = underlyingTy.getExistentialLayout();
         for (auto *protoTy : layout.getProtocols()) {
           auto *protoDecl = protoTy->getDecl();
           if (IGF.getSILTypes().protocolRequiresWitnessTable(protoDecl))
@@ -2290,7 +2345,7 @@ namespace {
       }
 
       CanType valueWitnessReferent;
-      switch (getReferenceCountingForType(IGF.IGM, referent)) {
+      switch (getReferenceCountingForType(IGF.IGM, underlyingTy)) {
       case ReferenceCounting::Unknown:
       case ReferenceCounting::Block:
       case ReferenceCounting::ObjC:
@@ -2311,7 +2366,7 @@ namespace {
 
       // Get the reference storage type of the builtin object whose value
       // witness we can borrow.
-      if (type->getOwnership() == ReferenceOwnership::Weak)
+      if (referent->getOptionalObjectType())
         valueWitnessReferent = OptionalType::get(valueWitnessReferent)
           ->getCanonicalType();
 

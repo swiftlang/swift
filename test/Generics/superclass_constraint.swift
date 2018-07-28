@@ -92,12 +92,11 @@ func superclassConformance3<T>(t: T) where T : C, T : P4, T : C2 {}
 // expected-warning@-3{{redundant conformance constraint 'T': 'P4'}}
 // expected-note@-4{{conformance constraint 'T': 'P4' implied here}}
 
-protocol P5: A { } // expected-error{{non-class type 'P5' cannot inherit from class 'A'}}
+protocol P5: A { }
 
 protocol P6: A, Other { } // expected-error {{protocol 'P6' cannot be a subclass of both 'Other' and 'A'}}
-// expected-error@-1{{non-class type 'P6' cannot inherit from class 'A'}}
-// expected-error@-2{{non-class type 'P6' cannot inherit from class 'Other'}}
-// expected-note@-3{{superclass constraint 'Self' : 'A' written here}}
+// expected-error@-1{{multiple inheritance from classes 'A' and 'Other'}}
+// expected-note@-2 {{superclass constraint 'Self' : 'A' written here}}
 
 func takeA(_: A) { }
 func takeP5<T: P5>(_ t: T) {

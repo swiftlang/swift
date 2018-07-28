@@ -267,12 +267,11 @@ public:
 class AccessFilteringDeclConsumer final : public VisibleDeclConsumer {
   const DeclContext *DC;
   VisibleDeclConsumer &ChainedConsumer;
-  LazyResolver *TypeResolver;
+
 public:
   AccessFilteringDeclConsumer(const DeclContext *DC,
-                              VisibleDeclConsumer &consumer,
-                              LazyResolver *typeResolver)
-    : DC(DC), ChainedConsumer(consumer), TypeResolver(typeResolver) {}
+                              VisibleDeclConsumer &consumer)
+    : DC(DC), ChainedConsumer(consumer) {}
 
   void foundDecl(ValueDecl *D, DeclVisibilityKind reason) override;
 };
@@ -288,12 +287,10 @@ bool removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls);
 ///
 /// \param decls The set of declarations being considered.
 /// \param curModule The current module.
-/// \param typeResolver Used to resolve overload types.
 ///
 /// \returns true if any shadowed declarations were removed.
 bool removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
-                         const ModuleDecl *curModule,
-                         LazyResolver *typeResolver);
+                         const ModuleDecl *curModule);
 
 /// Finds decls visible in the given context and feeds them to the given
 /// VisibleDeclConsumer.  If the current DeclContext is nested in a function,

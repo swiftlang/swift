@@ -828,16 +828,13 @@ ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
       replacement += TrailingContent;
     }
 
-    auto isThree = Context.isSwiftVersion3();
-#define THREEIFY(MESSAGE) (isThree ? diag::swift3_##MESSAGE : diag::MESSAGE)
     // Replace 'protocol<T1, T2>' with 'T1 & T2'
     diagnose(ProtocolLoc,
-      IsEmpty              ? THREEIFY(deprecated_any_composition) :
-      Protocols.size() > 1 ? THREEIFY(deprecated_protocol_composition) :
-                             THREEIFY(deprecated_protocol_composition_single))
+      IsEmpty              ? diag::deprecated_any_composition :
+      Protocols.size() > 1 ? diag::deprecated_protocol_composition :
+                             diag::deprecated_protocol_composition_single)
       .highlight(composition->getSourceRange())
       .fixItReplace(composition->getSourceRange(), replacement);
-#undef THREEIFY
   }
 
   return makeParserResult(Status, composition);
@@ -1180,11 +1177,17 @@ Parser::parseTypeOptional(TypeRepr *base) {
   auto TyR = new (Context) OptionalTypeRepr(base, questionLoc);
   llvm::Optional<TypeSyntax> SyntaxNode;
   if (SyntaxContext->isEnabled()) {
-    OptionalTypeSyntaxBuilder Builder(Context.getSyntaxArena());
-    Builder
-      .useQuestionMark(SyntaxContext->popToken())
-      .useWrappedType(SyntaxContext->popIf<TypeSyntax>().getValue());
-    SyntaxNode.emplace(Builder.build());
+    auto QuestionMark = SyntaxContext->popToken();
+    if (auto WrappedType = SyntaxContext->popIf<TypeSyntax>()) {
+      OptionalTypeSyntaxBuilder Builder(Context.getSyntaxArena());
+      Builder
+        .useQuestionMark(QuestionMark)
+        .useWrappedType(WrappedType.getValue());
+      SyntaxNode.emplace(Builder.build());
+    } else {
+      // Undo the popping of the question mark
+      SyntaxContext->addSyntax(QuestionMark);
+    }
   }
   return makeSyntaxResult(SyntaxNode, TyR);
 }

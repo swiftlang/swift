@@ -53,34 +53,12 @@ public:
   virtual void resolveWitness(const NormalProtocolConformance *conformance,
                               ValueDecl *requirement) = 0;
 
-  /// Resolve the access of a value.
-  ///
-  /// It does no type-checking.
-  virtual void resolveAccessControl(ValueDecl *VD) = 0;
-
   /// Resolve the type and declaration attributes of a value.
   ///
   /// This can be called when the type or signature of a value is needed.
   /// It does not perform full type-checking, only checks for basic
   /// consistency and provides the value a type.
   virtual void resolveDeclSignature(ValueDecl *VD) = 0;
-
-  /// Resolve the "overridden" declaration of the given declaration.
-  virtual void resolveOverriddenDecl(ValueDecl *VD) = 0;
-
-  /// Resolve the "is Objective-C" bit for the given declaration.
-  virtual void resolveIsObjC(ValueDecl *VD) = 0;
-
-  /// Retrieve the superclass of the given class.
-  virtual Type getSuperclass(const ClassDecl *classDecl) = 0;
-
-  /// Resolve the raw type of the given enum.
-  virtual Type getRawType(EnumDecl *enumDecl) = 0;
-
-  /// Get a specific inherited type from the given declaration.
-  virtual Type getInheritedType(
-                        llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-                        unsigned index) = 0;
 
   /// Resolve the trailing where clause of the given protocol in-place.
   virtual void resolveTrailingWhereClause(ProtocolDecl *proto) = 0;

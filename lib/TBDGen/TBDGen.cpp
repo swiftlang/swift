@@ -46,7 +46,7 @@ void TBDGenVisitor::visitPatternBindingDecl(PatternBindingDecl *PBD) {
     auto *var = entry.getAnchoringVarDecl();
 
     // Non-global variables might have an explicit initializer symbol.
-    if (entry.getInit() && !isGlobalOrStaticVar(var)) {
+    if (entry.getNonLazyInit() && !isGlobalOrStaticVar(var)) {
       auto declRef =
           SILDeclRef(var, SILDeclRef::Kind::StoredPropertyInitializer);
       // Stored property initializers for public properties are currently
@@ -141,17 +141,10 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   // functions) are public symbols, as the default values are computed at the
   // call site.
   auto index = 0;
-  auto paramLists = AFD->getParameterLists();
-  // Skip the first arguments, which contains Self (etc.), can't be defaulted,
-  // and are ignored for the purposes of default argument indices.
-  if (AFD->getDeclContext()->isTypeContext())
-    paramLists = paramLists.slice(1);
-  for (auto *paramList : paramLists) {
-    for (auto *param : *paramList) {
-      if (param->getDefaultValue())
-        addSymbol(SILDeclRef::getDefaultArgGenerator(AFD, index));
-      index++;
-    }
+  for (auto *param : *AFD->getParameters()) {
+    if (param->getDefaultValue())
+      addSymbol(SILDeclRef::getDefaultArgGenerator(AFD, index));
+    index++;
   }
 }
 
@@ -163,8 +156,14 @@ void TBDGenVisitor::visitAccessorDecl(AccessorDecl *AD) {
 }
 
 void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
+  // Add the property descriptor if the decl needs it.
+  if (SwiftModule->getASTContext().LangOpts.EnableKeyPathResilience
+      && ASD->exportsPropertyDescriptor()) {
+    addSymbol(LinkEntity::forPropertyDescriptor(ASD));
+  }
+
   // Explicitly look at each accessor here: see visitAccessorDecl.
-  for (auto accessor : ASD->getAllAccessorFunctions()) {
+  for (auto accessor : ASD->getAllAccessors()) {
     visitAbstractFunctionDecl(accessor);
   }
 }

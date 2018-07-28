@@ -207,7 +207,7 @@ var a = {() in
   OptionSetTaker5([.#^UNRESOLVED_18^#], .Option4, .South, .West)
 }
 var Container = OptionTakerContainer1()
-Container.OptionSetTaker1(.#^UNRESOLVED_19^#
+Container.OptionSetTaker1(.#^UNRESOLVED_19^#)
 Container.EnumTaker1(.#^UNRESOLVED_20^#
 
 func parserSync() {}

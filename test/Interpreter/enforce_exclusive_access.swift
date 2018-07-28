@@ -305,7 +305,7 @@ ExclusiveAccessTestSuite.test("SequentialKeyPathWritesDontOverlap") {
 
   c[keyPath: getF] = 7
   c[keyPath: getF] = 8 // no-trap
-  c[keyPath: getF] += c[keyPath: getF] + 1 // no-trap
+  c[keyPath: getF] += c[keyPath: getF] // no-trap
 }
 
 ExclusiveAccessTestSuite.test("KeyPathInoutKeyPathWriteClassStoredProp")

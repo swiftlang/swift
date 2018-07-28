@@ -6110,25 +6110,26 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
   };
 
   if (auto fixedTI = dyn_cast<FixedTypeInfo>(ti)) {
-    DEBUG(llvm::dbgs() << "Layout for enum ";
-          type->print(llvm::dbgs());
-          llvm::dbgs() << ":\n";);
+    LLVM_DEBUG(llvm::dbgs() << "Layout for enum ";
+               type->print(llvm::dbgs());
+               llvm::dbgs() << ":\n";);
 
     SpareBitVector spareBits;
     fixedTI->applyFixedSpareBitsMask(spareBits);
 
     auto bitMask = strategy->getBitMaskForNoPayloadElements();
     assert(bitMask.size() == fixedTI->getFixedSize().getValueInBits());
-    DEBUG(llvm::dbgs() << "  no-payload mask:\t";
-          displayBitMask(bitMask));
-    DEBUG(llvm::dbgs() << "  spare bits mask:\t";
-          displayBitMask(spareBits));
+    LLVM_DEBUG(llvm::dbgs() << "  no-payload mask:\t";
+               displayBitMask(bitMask));
+    LLVM_DEBUG(llvm::dbgs() << "  spare bits mask:\t";
+               displayBitMask(spareBits));
 
     for (auto &elt : strategy->getElementsWithNoPayload()) {
       auto bitPattern = strategy->getBitPatternForNoPayloadElement(elt.decl);
       assert(bitPattern.size() == fixedTI->getFixedSize().getValueInBits());
-      DEBUG(llvm::dbgs() << "  no-payload case " << elt.decl->getName().str()
-                         << ":\t";
+      LLVM_DEBUG(llvm::dbgs() << "  no-payload case "
+                              << elt.decl->getName().str()
+                              << ":\t";
             displayBitMask(bitPattern));
 
       auto maskedBitPattern = bitPattern;
@@ -6139,8 +6140,8 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
     assert(tagBits.count() >= 32
             || static_cast<size_t>(static_cast<size_t>(1) << tagBits.count())
                >= strategy->getElementsWithPayload().size());
-    DEBUG(llvm::dbgs() << "  payload tag bits:\t";
-          displayBitMask(tagBits));
+    LLVM_DEBUG(llvm::dbgs() << "  payload tag bits:\t";
+               displayBitMask(tagBits));
 
     tagBits &= spareBits;
     assert(tagBits.none() && "tag bits overlap spare bits?!");

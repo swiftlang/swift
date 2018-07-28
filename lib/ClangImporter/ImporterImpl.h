@@ -28,8 +28,8 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/Basic/FileTypes.h"
 #include "swift/Basic/StringExtras.h"
-#include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclVisitor.h"
 #include "clang/Basic/IdentifierTable.h"
@@ -625,11 +625,9 @@ public:
     } else if (auto *CD = dyn_cast<ConstructorDecl>(decl)) {
       assert(CD->getInterfaceType());
       ty = CD->getResultInterfaceType();
-    } else if (auto *SD = dyn_cast<SubscriptDecl>(decl)) {
-      ty = SD->getElementInterfaceType();
     } else {
-      auto *VD = cast<VarDecl>(decl);
-      ty = VD->getInterfaceType()->getReferenceStorageReferent();
+      ty = cast<AbstractStorageDecl>(decl)->getValueInterfaceType()
+                                          ->getReferenceStorageReferent();
     }
 #endif
 
@@ -1291,7 +1289,7 @@ public:
     if (auto ASD = dyn_cast<AbstractStorageDecl>(D))
       ASD->setSetterAccess(access);
     // All imported decls are constructed fully validated.
-    D->setValidationStarted();
+    D->setValidationToChecked();
     if (auto AFD = dyn_cast<AbstractFunctionDecl>(static_cast<Decl *>(D)))
       AFD->setNeedsNewVTableEntry(false);
     return D;
@@ -1362,7 +1360,7 @@ public:
   void setSinglePCHImport(Optional<std::string> PCHFilename) {
     if (PCHFilename.hasValue()) {
       assert(llvm::sys::path::extension(PCHFilename.getValue())
-                 .endswith(PCH_EXTENSION) &&
+                 .endswith(file_types::getExtension(file_types::TY_PCH)) &&
              "Single PCH imported filename doesn't have .pch extension!");
     }
     SinglePCHImport = PCHFilename;

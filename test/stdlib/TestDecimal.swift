@@ -244,7 +244,7 @@ class TestDecimal : TestDecimalSuper {
                     var failed: Bool = false
                     var count = 0
                     let SIG_FIG = 14
-                    for (a, b) in zip(answerDescription.characters, approximationDescription.characters) {
+                    for (a, b) in zip(answerDescription, approximationDescription) {
                         if a != b {
                             failed = true
                             break
@@ -299,33 +299,36 @@ class TestDecimal : TestDecimalSuper {
         expectEqual(Decimal(1.234), abs(Decimal(1.234)))
         expectEqual(Decimal(1.234), abs(Decimal(-1.234)))
         var a = Decimal(1234)
-        expectEqual(.noError, NSDecimalMultiplyByPowerOf10(&a, &a, 1, .plain))
-        expectEqual(Decimal(12340), a)
+        var r = a
+        expectEqual(.noError, NSDecimalMultiplyByPowerOf10(&r, &a, 1, .plain))
+        expectEqual(Decimal(12340), r)
         a = Decimal(1234)
-        expectEqual(.noError, NSDecimalMultiplyByPowerOf10(&a, &a, 2, .plain))
-        expectEqual(Decimal(123400), a)
-        expectEqual(.overflow, NSDecimalMultiplyByPowerOf10(&a, &a, 128, .plain))
-        expectTrue(a.isNaN)
+        expectEqual(.noError, NSDecimalMultiplyByPowerOf10(&r, &a, 2, .plain))
+        expectEqual(Decimal(123400), r)
+        expectEqual(.overflow, NSDecimalMultiplyByPowerOf10(&r, &a, 128, .plain))
+        expectTrue(r.isNaN)
         a = Decimal(1234)
-        expectEqual(.noError, NSDecimalMultiplyByPowerOf10(&a, &a, -2, .plain))
-        expectEqual(Decimal(12.34), a)
-        expectEqual(.underflow, NSDecimalMultiplyByPowerOf10(&a, &a, -128, .plain))
-        expectTrue(a.isNaN)
+        expectEqual(.noError, NSDecimalMultiplyByPowerOf10(&r, &a, -2, .plain))
+        expectEqual(Decimal(12.34), r)
+        var ur = r
+        expectEqual(.underflow, NSDecimalMultiplyByPowerOf10(&ur, &r, -128, .plain))
+        expectTrue(ur.isNaN)
         a = Decimal(1234)
-        expectEqual(.noError, NSDecimalPower(&a, &a, 0, .plain))
-        expectEqual(Decimal(1), a)
+        expectEqual(.noError, NSDecimalPower(&r, &a, 0, .plain))
+        expectEqual(Decimal(1), r)
         a = Decimal(8)
-        expectEqual(.noError, NSDecimalPower(&a, &a, 2, .plain))
-        expectEqual(Decimal(64), a)
+        expectEqual(.noError, NSDecimalPower(&r, &a, 2, .plain))
+        expectEqual(Decimal(64), r)
         a = Decimal(-2)
-        expectEqual(.noError, NSDecimalPower(&a, &a, 3, .plain))
-        expectEqual(Decimal(-8), a)
+        expectEqual(.noError, NSDecimalPower(&r, &a, 3, .plain))
+        expectEqual(Decimal(-8), r)
         for i in -2...10 {
             for j in 0...5 {
                 var actual = Decimal(i)
-                expectEqual(.noError, NSDecimalPower(&actual, &actual, j, .plain))
+                var result = actual
+                expectEqual(.noError, NSDecimalPower(&result, &actual, j, .plain))
                 let expected = Decimal(pow(Double(i), Double(j)))
-                expectEqual(expected, actual, "\(actual) == \(i)^\(j)")
+                expectEqual(expected, result, "\(result) == \(i)^\(j)")
             }
         }
     }
@@ -510,8 +513,9 @@ class TestDecimal : TestDecimalSuper {
         for testCase in testCases {
             let (expected, start, scale, mode) = testCase
             var num = Decimal(start)
-            NSDecimalRound(&num, &num, scale, mode)
-            expectEqual(Decimal(expected), num)
+            var r = num
+            NSDecimalRound(&r, &num, scale, mode)
+            expectEqual(Decimal(expected), r)
             let numnum = NSDecimalNumber(decimal:Decimal(start))
             let behavior = NSDecimalNumberHandler(roundingMode: mode, scale: Int16(scale), raiseOnExactness: false, raiseOnOverflow: true, raiseOnUnderflow: true, raiseOnDivideByZero: true)
             let result = numnum.rounding(accordingToBehavior:behavior)

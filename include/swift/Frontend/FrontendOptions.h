@@ -13,6 +13,7 @@
 #ifndef SWIFT_FRONTEND_FRONTENDOPTIONS_H
 #define SWIFT_FRONTEND_FRONTENDOPTIONS_H
 
+#include "swift/Basic/FileTypes.h"
 #include "swift/Frontend/FrontendInputsAndOutputs.h"
 #include "swift/Frontend/InputFile.h"
 #include "llvm/ADT/Hashing.h"
@@ -70,6 +71,10 @@ public:
   /// The path to which we should store indexing data, if any.
   std::string IndexStorePath;
 
+  /// The path to which we should emit GraphViz output for the complete
+  /// request-evaluator graph.
+  std::string RequestEvaluatorGraphVizPath;
+
   /// Emit index data for imported serialized swift system modules.
   bool IndexSystemModules = false;
 
@@ -101,6 +106,7 @@ public:
   enum class ActionType {
     NoneAction,        ///< No specific action
     Parse,             ///< Parse only
+    ResolveImports,    ///< Parse and resolve imports only
     Typecheck,         ///< Parse and type-check only
     DumpParse,         ///< Parse only and dump AST
     DumpInterfaceHash, ///< Parse and dump the interface token hash.
@@ -238,15 +244,20 @@ public:
   /// variables by name when we print it out. This eases diffing of SIL files.
   bool EmitSortedSIL = false;
 
+  /// Indicates whether the dependency tracker should track system
+  /// dependencies as well.
+  bool TrackSystemDeps = false;
+
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {
+    Default,        ///< Do the default validation for the current platform.
     None,           ///< Do no validation.
     MissingFromTBD, ///< Only check for symbols that are in IR but not TBD.
     All, ///< Check for symbols that are in IR but not TBD and TBD but not IR.
   };
 
   /// Compare the symbols in the IR against the TBD file we would generate.
-  TBDValidationMode ValidateTBDAgainstIR = TBDValidationMode::None;
+  TBDValidationMode ValidateTBDAgainstIR = TBDValidationMode::Default;
 
   /// The install_name to use in the TBD file.
   std::string TBDInstallName;
@@ -291,16 +302,18 @@ public:
 
 private:
   static bool canActionEmitDependencies(ActionType);
+  static bool canActionEmitReferenceDependencies(ActionType);
   static bool canActionEmitObjCHeader(ActionType);
   static bool canActionEmitLoadedModuleTrace(ActionType);
   static bool canActionEmitModule(ActionType);
   static bool canActionEmitModuleDoc(ActionType);
+  static bool canActionEmitInterface(ActionType);
 
 public:
   static bool doesActionProduceOutput(ActionType);
   static bool doesActionProduceTextualOutput(ActionType);
   static bool needsProperModuleName(ActionType);
-  static StringRef suffixForPrincipalOutputFileForAction(ActionType);
+  static file_types::ID formatForPrincipalOutputFileForAction(ActionType);
 };
 
 }

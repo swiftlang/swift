@@ -72,6 +72,9 @@ toolchains::Windows::constructInvocation(const LinkJobAction &job,
   if (!Linker.empty())
     Arguments.push_back(context.Args.MakeArgString("-fuse-ld=" + Linker));
 
+  if (context.OI.DebugInfoFormat == IRGenDebugInfoFormat::CodeView)
+      Arguments.push_back("-Wl,/DEBUG");
+
   // Configure the toolchain.
   // By default, use the system clang++ to link.
   const char *Clang = nullptr;
@@ -163,10 +166,18 @@ toolchains::Windows::constructInvocation(const LinkJobAction &job,
   context.Args.AddAllArgs(Arguments, options::OPT_Xlinker);
   context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
 
+  // Run clang++ in verbose mode if "-v" is set
+  if (context.Args.hasArg(options::OPT_v)) {
+    Arguments.push_back("-v");
+  }
+
   // This should be the last option, for convenience in checking output.
   Arguments.push_back("-o");
   Arguments.push_back(
       context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
 
-  return {Clang, Arguments};
+  InvocationInfo II{Clang, Arguments};
+  II.allowsResponseFiles = true;
+
+  return II;
 }

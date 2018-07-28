@@ -13,6 +13,8 @@
 #ifndef __OS_THUNKS_H__
 #define __OS_THUNKS_H__
 
+#include <stdlib.h>
+
 #ifndef os_fastpath
 #define os_fastpath(x) ((__typeof__(x))OS_EXPECT((long)(x), ~0l))
 #endif

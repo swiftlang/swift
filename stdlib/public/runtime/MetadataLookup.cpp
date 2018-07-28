@@ -233,7 +233,19 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
       node = node->getChild(0);
       break;
     }
-    
+
+    case ContextDescriptorKind::Protocol:
+      // Match a protocol context.
+      if (node->getKind() == Demangle::Node::Kind::Protocol) {
+        auto proto = llvm::cast<ProtocolDescriptor>(context);
+        auto nameNode = node->getChild(1);
+        if (nameNode->getText() == proto->Name.get()) {
+          node = node->getChild(0);
+          break;
+        }
+      }
+      return false;
+
     default:
       if (auto type = llvm::dyn_cast<TypeContextDescriptor>(context)) {
         switch (node->getKind()) {
@@ -264,16 +276,33 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
         }
 
         auto nameNode = node->getChild(1);
-        if (nameNode->getKind() == Demangle::Node::Kind::PrivateDeclName)
-          return false;
-
-        if (nameNode->getText() != type->Name.get())
-          return false;
         
-        node = node->getChild(0);
-        break;
+        // Declarations synthesized by the Clang importer get a small tag
+        // string in addition to their name.
+        if (nameNode->getKind() == Demangle::Node::Kind::RelatedEntityDeclName){
+          if (nameNode->getText() != type->getSynthesizedDeclRelatedEntityTag())
+            return false;
+          
+          nameNode = nameNode->getChild(0);
+        } else if (type->isSynthesizedRelatedEntity()) {
+          return false;
+        }
+        
+        // We should only match public or internal declarations with stable
+        // names. The runtime metadata for private declarations would be
+        // anonymized.
+        if (nameNode->getKind() == Demangle::Node::Kind::Identifier) {
+          if (nameNode->getText() != type->Name.get())
+            return false;
+          
+          node = node->getChild(0);
+          break;
+        }
+        
+        return false;
+
       }
-      
+
       // We don't know about this kind of context, or it doesn't have a stable
       // name we can match to.
       return false;
@@ -428,16 +457,11 @@ void swift::swift_registerProtocols(const ProtocolRecord *begin,
 
 static const ProtocolDescriptor *
 _searchProtocolRecords(ProtocolMetadataPrivateState &C,
-                       const llvm::StringRef protocolName){
+                       const Demangle::NodePointer &node) {
   for (auto &section : C.SectionsToScan.snapshot()) {
     for (const auto &record : section) {
       if (auto protocol = record.Protocol.getPointer()) {
-        // Drop the "S$" prefix from the protocol record. It's not used in
-        // the type itself.
-        StringRef foundProtocolName = protocol->Name;
-        assert(foundProtocolName.startswith("$S"));
-        foundProtocolName = foundProtocolName.drop_front(2);
-        if (foundProtocolName == protocolName)
+        if (_contextDescriptorMatchesMangling(protocol, node))
           return protocol;
       }
     }
@@ -447,9 +471,27 @@ _searchProtocolRecords(ProtocolMetadataPrivateState &C,
 }
 
 static const ProtocolDescriptor *
-_findProtocolDescriptor(llvm::StringRef mangledName) {
+_findProtocolDescriptor(const Demangle::NodePointer &node,
+                        Demangle::Demangler &Dem,
+                        std::string &mangledName) {
   const ProtocolDescriptor *foundProtocol = nullptr;
   auto &T = Protocols.get();
+
+  // If we have a symbolic reference to a context, resolve it immediately.
+  NodePointer symbolicNode = node;
+  if (symbolicNode->getKind() == Node::Kind::Type)
+    symbolicNode = symbolicNode->getChild(0);
+  if (symbolicNode->getKind() == Node::Kind::SymbolicReference)
+    return cast<ProtocolDescriptor>(
+      (const ContextDescriptor *)symbolicNode->getIndex());
+
+  mangledName =
+    Demangle::mangleNode(node,
+                         [&](const void *context) -> NodePointer {
+                           return _buildDemanglingForContext(
+                               (const ContextDescriptor *) context,
+                               {}, false, Dem);
+                         });
 
   // Look for an existing entry.
   // Find the bucket for the metadata entry.
@@ -457,7 +499,7 @@ _findProtocolDescriptor(llvm::StringRef mangledName) {
     return Value->getDescription();
 
   // Check type metadata records
-  foundProtocol = _searchProtocolRecords(T, mangledName);
+  foundProtocol = _searchProtocolRecords(T, node);
 
   if (foundProtocol) {
     T.ProtocolCache.getOrInsert(mangledName, foundProtocol);
@@ -627,9 +669,6 @@ namespace {
 /// the given name in the given protocol descriptor.
 Optional<unsigned> findAssociatedTypeByName(const ProtocolDescriptor *protocol,
                                             StringRef name) {
-  // Only Swift protocols have associated types.
-  if (!protocol->Flags.isSwift()) return None;
-
   // If we don't have associated type names, there's nothing to do.
   const char *associatedTypeNamesPtr = protocol->AssociatedTypeNames.get();
   if (!associatedTypeNamesPtr) return None;
@@ -655,7 +694,7 @@ Optional<unsigned> findAssociatedTypeByName(const ProtocolDescriptor *protocol,
   // type requirement.
   unsigned currentAssocTypeIdx = 0;
   unsigned numRequirements = protocol->NumRequirements;
-  const ProtocolRequirement *requirements = protocol->Requirements.get();
+  auto requirements = protocol->getRequirements();
   for (unsigned reqIdx = 0; reqIdx != numRequirements; ++reqIdx) {
     if (requirements[reqIdx].Flags.getKind() !=
         ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction)
@@ -717,7 +756,7 @@ public:
     explicit operator bool() const { return !isNull(); }
   };
 
-  using BuiltProtocolDecl = const ProtocolDescriptor *;
+  using BuiltProtocolDecl = ProtocolDescriptorRef;
 
   Demangle::NodeFactory &getNodeFactory() { return demangler; }
 
@@ -739,19 +778,18 @@ public:
   BuiltProtocolDecl createProtocolDecl(
                                     const Demangle::NodePointer &node) const {
 #if SWIFT_OBJC_INTEROP
-    // If we have an Objective-C class name, call into the Objective-C
+    // If we have an Objective-C protocol name, call into the Objective-C
     // runtime to find them.
     if (auto objcProtocolName = getObjCClassOrProtocolName(node)) {
-      return (ProtocolDescriptor *)objc_getProtocol(
-                                              objcProtocolName->str().c_str());
+      return ProtocolDescriptorRef::forObjC(objc_getProtocol(
+                                              objcProtocolName->str().c_str()));
     }
 #endif
 
-    auto mangledName = Demangle::mangleNode(node);
-
-    // Look for a Swift protocol with this mangled name.
-    if (auto protocol = _findProtocolDescriptor(mangledName))
-      return protocol;
+    // Look for a protocol descriptor based on its mangled name.
+    std::string mangledName;
+    if (auto protocol = _findProtocolDescriptor(node, demangler, mangledName))
+      return ProtocolDescriptorRef::forSwift(protocol);;
 
 #if SWIFT_OBJC_INTEROP
     // Look for a Swift-defined @objc protocol with the Swift 3 mangling that
@@ -759,10 +797,10 @@ public:
     std::string objcMangledName =
       "_TtP" + mangledName.substr(0, mangledName.size()-1) + "_";
     if (auto protocol = objc_getProtocol(objcMangledName.c_str()))
-      return (ProtocolDescriptor *)protocol;
+      return ProtocolDescriptorRef::forObjC(protocol);
 #endif
 
-    return nullptr;
+    return ProtocolDescriptorRef();
   }
 
   BuiltType createNominalType(BuiltNominalTypeDecl metadataOrTypeDecl,
@@ -925,8 +963,7 @@ public:
       classConstraint = ProtocolClassConstraint::Class;
     } else {
       for (auto protocol : protocols) {
-        if (protocol->Flags.getClassConstraint()
-              == ProtocolClassConstraint::Class) {
+        if (protocol.getClassConstraint() == ProtocolClassConstraint::Class) {
           classConstraint = ProtocolClassConstraint::Class;
           break;
         }
@@ -984,26 +1021,23 @@ public:
 
   BuiltType createDependentMemberType(StringRef name, BuiltType base,
                                       BuiltProtocolDecl protocol) const {
+#if SWIFT_OBJC_INTEROP
+    if (protocol.isObjC())
+      return BuiltType();
+#endif
+
     if (lookupDependentMember)
-      return lookupDependentMember(base, name, protocol);
+      return lookupDependentMember(base, name, protocol.getSwiftProtocol());
 
     return BuiltType();
   }
 
-  BuiltType createUnownedStorageType(BuiltType base) {
-    ReferenceOwnership.setUnowned();
-    return base;
+#define REF_STORAGE(Name, ...) \
+  BuiltType create##Name##StorageType(BuiltType base) { \
+    ReferenceOwnership.set##Name(); \
+    return base; \
   }
-
-  BuiltType createUnmanagedStorageType(BuiltType base) {
-    ReferenceOwnership.setUnmanaged();
-    return base;
-  }
-
-  BuiltType createWeakStorageType(BuiltType base) {
-    ReferenceOwnership.setWeak();
-    return base;
-  }
+#include "swift/AST/ReferenceStorage.def"
 
   BuiltType createSILBoxType(BuiltType base) const {
     // FIXME: Implement.
@@ -1166,7 +1200,7 @@ void swift::_swift_getFieldAt(
     if (typeInfo == nullptr) {
       typeInfo = TypeInfo(&METADATA_SYM(EMPTY_TUPLE_MANGLING), {});
       warning(0, "SWIFT RUNTIME BUG: unable to demangle type of field '%*s'. "
-                 "mangled type name is '%*s'",
+                 "mangled type name is '%*s'\n",
                  (int)name.size(), name.data(),
                  (int)typeName.size(), typeName.data());
     }
@@ -1214,6 +1248,17 @@ void swift::_swift_getFieldAt(
         return;
     }
   }
+
+  // If we failed to find the field descriptor metadata for the type, fall
+  // back to returning an empty tuple as a standin.
+  auto typeName = swift_getTypeName(base, /*qualified*/ true);
+  warning(0, "SWIFT RUNTIME BUG: unable to find field metadata for type '%*s'\n",
+             (int)typeName.length, typeName.data);
+  callback("unknown",
+           FieldType()
+             .withType(TypeInfo(&METADATA_SYM(EMPTY_TUPLE_MANGLING), {}))
+             .withIndirect(false)
+             .withWeak(false));
 }
 
 #define OVERRIDE_METADATALOOKUP COMPATIBILITY_OVERRIDE

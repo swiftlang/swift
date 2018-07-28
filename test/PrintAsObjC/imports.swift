@@ -41,19 +41,19 @@ import MostlyPrivate1_Private
 import MostlyPrivate2_Private
 
 @objc class Test {
-  let word: DWORD = 0
-  let number: TimeInterval = 0.0
+  @objc let word: DWORD = 0
+  @objc let number: TimeInterval = 0.0
 
-  let baseI: BaseI = 0
-  let baseII: BaseII = 0
-  let baseIE: BaseIE = 0
-  let baseE: BaseE = 0
-  let baseEI: BaseEI = 0
-  let baseEE: BaseEE = 0
+  @objc let baseI: BaseI = 0
+  @objc let baseII: BaseII = 0
+  @objc let baseIE: BaseIE = 0
+  @objc let baseE: BaseE = 0
+  @objc let baseEI: BaseEI = 0
+  @objc let baseEE: BaseEE = 0
 
   // Deliberately use the private type before the public type.
-  let mp1priv: MP1PrivateType = 0
-  let mp1pub: MP1PublicType = 0
+  @objc let mp1priv: MP1PrivateType = 0
+  @objc let mp1pub: MP1PublicType = 0
 
-  let mp2priv: MP2PrivateType = 0
+  @objc let mp2priv: MP2PrivateType = 0
 }

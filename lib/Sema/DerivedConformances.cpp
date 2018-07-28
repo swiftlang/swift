@@ -61,7 +61,7 @@ bool DerivedConformance::derivesProtocolConformance(TypeChecker &TC,
     // We can always complete a partial Hashable implementation, and we can
     // synthesize a full Hashable implementation for structs and enums with
     // Hashable components.
-    return canDeriveHashable(TC, Nominal);
+    return canDeriveHashable(Nominal);
   }
 
   if (auto *enumDecl = dyn_cast<EnumDecl>(Nominal)) {
@@ -272,7 +272,7 @@ addGetterToReadOnlyDerivedProperty(TypeChecker &tc,
   auto getter =
     declareDerivedPropertyGetter(tc, property, propertyContextType);
 
-  property->setAccessors(VarDecl::Computed,
+  property->setAccessors(StorageImplInfo::getImmutableComputed(),
                          SourceLoc(), {getter}, SourceLoc());
 
   return getter;
@@ -288,10 +288,7 @@ DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
   auto &C = tc.Context;
   auto parentDC = property->getDeclContext();
   auto selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC, isStatic);
-  ParameterList *params[] = {
-    ParameterList::createWithoutLoc(selfDecl),
-    ParameterList::createEmpty(C)
-  };
+  ParameterList *params = ParameterList::createEmpty(C);
 
   Type propertyInterfaceType = property->getInterfaceType();
   
@@ -300,7 +297,7 @@ DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
     AccessorKind::Get, AddressorKind::NotAddressor, property,
     /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
     /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-    /*GenericParams=*/nullptr, params,
+    /*GenericParams=*/nullptr, selfDecl, params,
     TypeLoc::withoutLoc(propertyInterfaceType), parentDC);
   getterDecl->setImplicit();
   getterDecl->setStatic(isStatic);
@@ -312,21 +309,12 @@ DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
     getterDecl->getAttrs().add(new (C) FinalAttr(/*IsImplicit=*/true));
 
   // Compute the interface type of the getter.
-  Type interfaceType = FunctionType::get(TupleType::getEmpty(C),
-                                         propertyInterfaceType);
-  auto selfParam = computeSelfParam(getterDecl);
-  if (auto sig = parentDC->getGenericSignatureOfContext()) {
-    getterDecl->setGenericEnvironment(
-        parentDC->getGenericEnvironmentOfContext());
-    interfaceType = GenericFunctionType::get(sig, {selfParam},
-                                             interfaceType,
-                                             FunctionType::ExtInfo());
-  } else
-    interfaceType = FunctionType::get({selfParam}, interfaceType,
-                                      FunctionType::ExtInfo());
-  getterDecl->setInterfaceType(interfaceType);
+  if (auto env = parentDC->getGenericEnvironmentOfContext())
+    getterDecl->setGenericEnvironment(env);
+  getterDecl->computeType();
+
   getterDecl->copyFormalAccessFrom(property);
-  getterDecl->setValidationStarted();
+  getterDecl->setValidationToChecked();
 
   tc.Context.addSynthesizedDecl(getterDecl);
 
@@ -347,7 +335,7 @@ DerivedConformance::declareDerivedProperty(Identifier name,
   propDecl->setImplicit();
   propDecl->copyFormalAccessFrom(Nominal, /*sourceIsParentContext*/ true);
   propDecl->setInterfaceType(propertyInterfaceType);
-  propDecl->setValidationStarted();
+  propDecl->setValidationToChecked();
 
   // If this is supposed to be a final property, mark it as such.
   assert(isFinal || !parentDC->getAsClassOrClassExtensionContext());
@@ -363,12 +351,8 @@ DerivedConformance::declareDerivedProperty(Identifier name,
                                  /*implicit*/ true);
   propPat->setType(propertyContextType);
 
-  auto pbDecl = PatternBindingDecl::create(C, SourceLoc(),
-                                           StaticSpellingKind::None,
-                                           SourceLoc(), propPat, nullptr,
-                                           parentDC);
-  pbDecl->setImplicit();
-
+  auto *pbDecl = PatternBindingDecl::createImplicit(
+      C, StaticSpellingKind::None, propPat, /*InitExpr*/ nullptr, parentDC);
   return {propDecl, pbDecl};
 }
 

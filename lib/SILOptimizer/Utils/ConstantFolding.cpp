@@ -1087,7 +1087,8 @@ bool isHexLiteralInSource(FloatLiteralInst *flitInst) {
 }
 
 bool maybeExplicitFPCons(BuiltinInst *BI, const BuiltinInfo &Builtin) {
-  assert(Builtin.ID == BuiltinValueKind::FPTrunc);
+  assert(Builtin.ID == BuiltinValueKind::FPTrunc ||
+         Builtin.ID == BuiltinValueKind::IntToFPWithOverflow);
 
   auto *callExpr = BI->getLoc().getAsASTNode<CallExpr>();
   if (!callExpr || !dyn_cast<ConstructorRefCallExpr>(callExpr->getFn()))
@@ -1253,21 +1254,38 @@ case BuiltinValueKind::id:
     SILLocation Loc = BI->getLoc();
     const ApplyExpr *CE = Loc.getAsASTNode<ApplyExpr>();
 
-    // Check for overflow.
-    if (ConversionStatus & APFloat::opOverflow) {
-      // If we overflow and are not asked for diagnostics, just return nullptr.
-      if (!ResultsInError.hasValue())
+    bool overflow = ConversionStatus & APFloat::opOverflow;
+    bool inexact = ConversionStatus & APFloat::opInexact;
+
+    if (overflow || inexact) {
+      // Check if diagnostics is enabled. If so, make sure to suppress
+      // warnings for conversions through explicit initializers,
+      // but do not suppress errors.
+      if (ResultsInError.hasValue() &&
+          (overflow || !maybeExplicitFPCons(BI, Builtin))) {
+        SmallString<10> SrcAsString;
+        SrcVal.toString(SrcAsString, /*radix*/ 10, true /*isSigned*/);
+
+        if (overflow) {
+          diagnose(M.getASTContext(), Loc.getSourceLoc(),
+                   diag::integer_literal_overflow, CE ? CE->getType() : DestTy,
+                   SrcAsString);
+        } else {
+          SmallString<10> destStr;
+          unsigned srcBitWidth = SrcVal.getBitWidth();
+          // Display the 'TruncVal' like an integer in order to make the
+          // imprecision due to floating-point representation obvious.
+          TruncVal.toString(destStr, srcBitWidth, srcBitWidth);
+          diagnose(M.getASTContext(), Loc.getSourceLoc(),
+                   diag::warning_int_to_fp_inexact, CE ? CE->getType() : DestTy,
+                   SrcAsString, destStr);
+        }
+        ResultsInError = Optional<bool>(true);
+      }
+      // If there is an overflow, just return nullptr as this is undefined
+      // behavior. Otherwise, continue folding as in the normal workflow.
+      if (overflow)
         return nullptr;
-
-      SmallString<10> SrcAsString;
-      SrcVal.toString(SrcAsString, /*radix*/10, true /*isSigned*/);
-
-      // Otherwise emit our diagnostics and then return nullptr.
-      diagnose(M.getASTContext(), Loc.getSourceLoc(),
-               diag::integer_literal_overflow,
-               CE ? CE->getType() : DestTy, SrcAsString);
-      ResultsInError = Optional<bool>(true);
-      return nullptr;
     }
 
     // The call to the builtin should be replaced with the constant value.
@@ -1442,7 +1460,7 @@ void ConstantFolder::initializeWorklist(SILFunction &F) {
 
 SILAnalysis::InvalidationKind
 ConstantFolder::processWorkList() {
-  DEBUG(llvm::dbgs() << "*** ConstPropagation processing: \n");
+  LLVM_DEBUG(llvm::dbgs() << "*** ConstPropagation processing: \n");
 
   // This is the list of traits that this transformation might preserve.
   bool InvalidateBranches = false;
@@ -1481,7 +1499,7 @@ ConstantFolder::processWorkList() {
     SILInstruction *I = WorkList.pop_back_val();
     assert(I->getParent() && "SILInstruction must have parent.");
 
-    DEBUG(llvm::dbgs() << "Visiting: " << *I);
+    LLVM_DEBUG(llvm::dbgs() << "Visiting: " << *I);
 
     Callback(I);
 
@@ -1566,7 +1584,7 @@ ConstantFolder::processWorkList() {
     FoldedUsers.clear();
     for (auto Use : cast<SingleValueInstruction>(I)->getUses()) {
       SILInstruction *User = Use->getUser();
-      DEBUG(llvm::dbgs() << "    User: " << *User);
+      LLVM_DEBUG(llvm::dbgs() << "    User: " << *User);
 
       // It is possible that we had processed this user already. Do not try
       // to fold it again if we had previously produced an error while folding

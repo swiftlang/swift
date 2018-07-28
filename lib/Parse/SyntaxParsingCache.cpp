@@ -11,13 +11,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Parse/SyntaxParsingCache.h"
+#include "swift/Syntax/SyntaxVisitor.h"
 
 using namespace swift;
 using namespace swift::syntax;
 
 bool SyntaxParsingCache::nodeCanBeReused(const Syntax &Node, size_t Position,
                                          SyntaxKind Kind) const {
-  auto NodeStart = Node.getAbsolutePositionWithLeadingTrivia().getOffset();
+  auto NodeStart = Node.getAbsolutePositionBeforeLeadingTrivia().getOffset();
   if (NodeStart != Position)
     return false;
   if (Node.getKind() != Kind)
@@ -60,7 +61,8 @@ llvm::Optional<Syntax> SyntaxParsingCache::lookUpFrom(const Syntax &Node,
     if (!Child.hasValue()) {
       continue;
     }
-    auto ChildStart = Child->getAbsolutePositionWithLeadingTrivia().getOffset();
+    auto ChildStart =
+        Child->getAbsolutePositionBeforeLeadingTrivia().getOffset();
     auto ChildEnd = ChildStart + Child->getTextLength();
     if (ChildStart <= Position && Position < ChildEnd) {
       return lookUpFrom(Child.getValue(), Position, Kind);
@@ -83,10 +85,54 @@ llvm::Optional<Syntax> SyntaxParsingCache::lookUp(size_t NewPosition,
 
   auto Node = lookUpFrom(OldSyntaxTree, OldPosition, Kind);
   if (Node.hasValue()) {
-    if (RecordReuseInformation) {
-      ReusedRanges.push_back(
-          {NewPosition, NewPosition + Node->getTextLength()});
-    }
+    ReusedNodeIds.insert(Node->getId());
   }
   return Node;
+}
+
+std::vector<SyntaxReuseRegion>
+SyntaxParsingCache::getReusedRegions(const SourceFileSyntax &SyntaxTree) const {
+  /// Determines the reused source regions from reused syntax node IDs
+  class ReusedRegionsCollector : public SyntaxVisitor {
+    std::unordered_set<SyntaxNodeId> ReusedNodeIds;
+    std::vector<SyntaxReuseRegion> ReusedRegions;
+
+    bool didReuseNode(SyntaxNodeId NodeId) {
+      return ReusedNodeIds.count(NodeId) > 0;
+    }
+
+  public:
+    ReusedRegionsCollector(std::unordered_set<SyntaxNodeId> ReusedNodeIds)
+        : ReusedNodeIds(ReusedNodeIds) {}
+
+    const std::vector<SyntaxReuseRegion> &getReusedRegions() {
+      std::sort(ReusedRegions.begin(), ReusedRegions.end(),
+                [](const SyntaxReuseRegion &Lhs,
+                   const SyntaxReuseRegion &Rhs) -> bool {
+                  return Lhs.Start.getOffset() < Rhs.Start.getOffset();
+                });
+      return ReusedRegions;
+    }
+
+    void visit(Syntax Node) override {
+      if (didReuseNode(Node.getId())) {
+        // Node has been reused, add it to the list
+        auto Start = Node.getAbsolutePositionBeforeLeadingTrivia();
+        auto End = Node.getAbsoluteEndPositionAfterTrailingTrivia();
+        ReusedRegions.push_back({Start, End});
+      } else {
+        SyntaxVisitor::visit(Node);
+      }
+    }
+
+    void collectReusedRegions(SourceFileSyntax Node) {
+      assert(ReusedRegions.empty() &&
+             "ReusedRegionsCollector cannot be reused");
+      Node.accept(*this);
+    }
+  };
+
+  ReusedRegionsCollector ReuseRegionsCollector(getReusedNodeIds());
+  ReuseRegionsCollector.collectReusedRegions(SyntaxTree);
+  return ReuseRegionsCollector.getReusedRegions();
 }

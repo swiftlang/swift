@@ -159,6 +159,18 @@ SourceLoc ReturnStmt::getEndLoc() const {
   return ReturnLoc;
 }
 
+YieldStmt *YieldStmt::create(const ASTContext &ctx, SourceLoc yieldLoc,
+                             SourceLoc lpLoc, ArrayRef<Expr*> yields,
+                             SourceLoc rpLoc) {
+  void *buffer = ctx.Allocate(totalSizeToAlloc<Expr*>(yields.size()),
+                              alignof(YieldStmt));
+  return ::new(buffer) YieldStmt(yieldLoc, lpLoc, yields, rpLoc);
+}
+
+SourceLoc YieldStmt::getEndLoc() const {
+  return RPLoc.isInvalid() ? getYields()[0]->getEndLoc() : RPLoc;
+}
+
 SourceLoc ThrowStmt::getEndLoc() const { return SubExpr->getEndLoc(); }
 
 

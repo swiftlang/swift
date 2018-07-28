@@ -122,6 +122,73 @@ void IRGenModule::setTrueConstGlobal(llvm::GlobalVariable *var) {
 }
 
 /*****************************************************************************/
+/** Metadata completion ******************************************************/
+/*****************************************************************************/
+
+/// Does the metadata for the given type, which we are currently emitting,
+/// require in-place metadata initialiation structures and functions?
+static bool needsInPlaceMetadataInitialization(IRGenModule &IGM,
+                                               NominalTypeDecl *typeDecl) {
+  // Generic types never have in-place metadata initialization.
+  if (typeDecl->isGenericContext())
+    return false;
+
+  assert(isa<StructDecl>(typeDecl) || isa<EnumDecl>(typeDecl));
+
+  // If the type is known to be fixed-layout, we can emit its metadata such
+  // that it doesn't need dynamic initialization.
+  auto &ti = IGM.getTypeInfoForUnlowered(typeDecl->getDeclaredTypeInContext());
+  if (ti.isFixedSize(ResilienceExpansion::Maximal))
+    return false;
+
+  return true;
+}
+
+using MetadataCompletionBodyEmitter =
+  void (IRGenFunction &IGF,
+        llvm::Value *metadata,
+        MetadataDependencyCollector *collector);
+
+static void emitMetadataCompletionFunction(IRGenModule &IGM,
+                                           NominalTypeDecl *typeDecl,
+                       llvm::function_ref<MetadataCompletionBodyEmitter> body) {
+  llvm::Function *f =
+    IGM.getAddrOfTypeMetadataCompletionFunction(typeDecl, ForDefinition);
+  f->setAttributes(IGM.constructInitialAttributes());
+
+  IRGenFunction IGF(IGM, f);
+
+  // Skip instrumentation when building for TSan to avoid false positives.
+  // The synchronization for this happens in the Runtime and we do not see it.
+  if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Thread)
+    f->removeFnAttr(llvm::Attribute::SanitizeThread);
+
+  if (IGM.DebugInfo)
+    IGM.DebugInfo->emitArtificialFunction(IGF, f);
+
+  Explosion params = IGF.collectParameters();
+  llvm::Value *metadata = params.claimNext();
+  llvm::Value *context = params.claimNext();
+  llvm::Value *templatePointer = params.claimNext();
+
+  // TODO: use these?
+  (void) context;
+  (void) templatePointer;
+
+  MetadataDependencyCollector collector;
+
+  body(IGF, metadata, &collector);
+
+  // At the current insertion point, the metadata is now complete.
+
+  // Merge with any metadata dependencies we may have collected.
+  auto dependency = collector.finish(IGF);
+  auto returnValue = dependency.combine(IGF);
+
+  IGF.Builder.CreateRet(returnValue);
+}
+
+/*****************************************************************************/
 /** Nominal Type Descriptor Emission *****************************************/
 /*****************************************************************************/
 
@@ -140,10 +207,10 @@ static Flags getMethodDescriptorFlags(ValueDecl *fn) {
       return Flags::Kind::Setter;
     case AccessorKind::MaterializeForSet:
       return Flags::Kind::MaterializeForSet;
-    case AccessorKind::WillSet:
-    case AccessorKind::DidSet:
-    case AccessorKind::Address:
-    case AccessorKind::MutableAddress:
+#define OPAQUE_ACCESSOR(ID, KEYWORD)
+#define ACCESSOR(ID) \
+    case AccessorKind::ID:
+#include "swift/AST/AccessorKinds.def"
       llvm_unreachable("these accessors never appear in protocols or v-tables");
     }
     llvm_unreachable("bad kind");
@@ -447,7 +514,187 @@ namespace {
       IGM.setTrueConstGlobal(var);
     }
   };
-  
+
+  class ProtocolDescriptorBuilder
+    : public ContextDescriptorBuilderBase<ProtocolDescriptorBuilder> {
+
+    using super = ContextDescriptorBuilderBase;
+
+    ProtocolDecl *Proto;
+    SILDefaultWitnessTable *DefaultWitnesses;
+
+    Optional<ConstantAggregateBuilderBase::PlaceholderPosition>
+      NumRequirementsInSignature,
+      NumRequirements;
+  public:
+    ProtocolDescriptorBuilder(IRGenModule &IGM, ProtocolDecl *Proto,
+                                     SILDefaultWitnessTable *defaultWitnesses)
+      : super(IGM), Proto(Proto), DefaultWitnesses(defaultWitnesses)
+    {
+    }
+
+    void layout() {
+      super::layout();
+    }
+
+    ConstantReference getParent() {
+      return IGM.getAddrOfParentContextDescriptor(Proto);
+    }
+
+    ContextDescriptorKind getContextKind() {
+      return ContextDescriptorKind::Protocol;
+    }
+
+    GenericSignature *getGenericSignature() {
+      return nullptr;
+    }
+
+    bool isUniqueDescriptor() {
+      return true;
+    }
+
+    uint16_t getKindSpecificFlags() {
+      ProtocolContextDescriptorFlags flags;
+      flags.setClassConstraint(Proto->requiresClass()
+                                 ? ProtocolClassConstraint::Class
+                                 : ProtocolClassConstraint::Any);
+      flags.setSpecialProtocol(getSpecialProtocolID(Proto));
+      flags.setIsResilient(DefaultWitnesses != nullptr);
+      return flags.getOpaqueValue();
+    }
+
+    void emit() {
+      asImpl().layout();
+      asImpl().addName();
+      NumRequirementsInSignature = B.addPlaceholderWithSize(IGM.Int32Ty);
+      NumRequirements = B.addPlaceholderWithSize(IGM.Int32Ty);
+      asImpl().addAssociatedTypeNames();
+      asImpl().addRequirementSignature();
+      asImpl().addRequirements();
+      auto addr = IGM.getAddrOfProtocolDescriptor(Proto,
+                                                  B.finishAndCreateFuture());
+      auto var = cast<llvm::GlobalVariable>(addr);
+
+      var->setConstant(true);
+      disableAddressSanitizer(IGM, var);
+      IGM.setTrueConstGlobal(var);
+    }
+
+    void addName() {
+      auto nameStr = IGM.getAddrOfGlobalString(Proto->getName().str(),
+                                           /*willBeRelativelyAddressed*/ true);
+      B.addRelativeAddress(nameStr);
+    }
+
+    void addRequirementSignature() {
+      auto metadata =
+        irgen::addGenericRequirements(IGM, B, Proto->getGenericSignature(),
+                                      Proto->getRequirementSignature());
+
+      B.fillPlaceholderWithInt(*NumRequirementsInSignature, IGM.Int32Ty,
+                               metadata.NumRequirements);
+    }
+
+    struct RequirementInfo {
+      ProtocolRequirementFlags Flags;
+      llvm::Constant *Thunk;
+      llvm::Constant *DefaultImpl;
+    };
+
+    /// Build the information which will go into a ProtocolRequirement entry.
+    RequirementInfo getRequirementInfo(const WitnessTableEntry &entry) {
+      using Flags = ProtocolRequirementFlags;
+      if (entry.isBase()) {
+        assert(entry.isOutOfLineBase());
+        auto flags = Flags(Flags::Kind::BaseProtocol);
+        return { flags, nullptr, nullptr };
+      }
+
+      if (entry.isAssociatedType()) {
+        auto flags = Flags(Flags::Kind::AssociatedTypeAccessFunction);
+        return { flags, nullptr, nullptr };
+      }
+
+      if (entry.isAssociatedConformance()) {
+        auto flags = Flags(Flags::Kind::AssociatedConformanceAccessFunction);
+        return { flags, nullptr, nullptr };
+      }
+
+      assert(entry.isFunction());
+      SILDeclRef func(entry.getFunction());
+
+      // Look up the dispatch thunk if the protocol is resilient.
+      llvm::Constant *thunk = nullptr;
+      if (IGM.isResilient(Proto, ResilienceExpansion::Minimal))
+        thunk = IGM.getAddrOfDispatchThunk(func, NotForDefinition);
+
+      // Classify the function.
+      auto flags = getMethodDescriptorFlags<Flags>(func.getDecl());
+
+      // Look for a default witness.
+      llvm::Constant *defaultImpl = findDefaultWitness(func);
+
+      return { flags, thunk, defaultImpl };
+    }
+
+    void addRequirements() {
+      auto &pi = IGM.getProtocolInfo(Proto);
+
+      B.fillPlaceholderWithInt(*NumRequirements, IGM.Int32Ty,
+                               pi.getNumWitnesses());
+
+      for (auto &entry : pi.getWitnessEntries()) {
+        auto reqt = B.beginStruct(IGM.ProtocolRequirementStructTy);
+
+        auto info = getRequirementInfo(entry);
+
+        // Flags.
+        reqt.addInt32(info.Flags.getIntValue());
+
+        // Dispatch thunk.
+        reqt.addRelativeAddressOrNull(info.Thunk);
+
+        // Default implementation.
+        reqt.addRelativeAddressOrNull(info.DefaultImpl);
+
+        reqt.finishAndAddTo(B);
+      }
+    }
+
+    llvm::Constant *findDefaultWitness(SILDeclRef func) {
+      if (!DefaultWitnesses) return nullptr;
+
+      for (auto &entry : DefaultWitnesses->getEntries()) {
+        if (!entry.isValid() || entry.getRequirement() != func)
+          continue;
+        return IGM.getAddrOfSILFunction(entry.getWitness(), NotForDefinition);
+      }
+
+      return nullptr;
+    }
+
+    void addAssociatedTypeNames() {
+      std::string AssociatedTypeNames;
+
+      auto &pi = IGM.getProtocolInfo(Proto);
+      for (auto &entry : pi.getWitnessEntries()) {
+        // Add the associated type name to the list.
+        if (entry.isAssociatedType()) {
+          if (!AssociatedTypeNames.empty())
+            AssociatedTypeNames += ' ';
+          AssociatedTypeNames += entry.getAssociatedType()->getName().str();
+        }
+      }
+
+      llvm::Constant *global = nullptr;
+      if (!AssociatedTypeNames.empty()) {
+        global = IGM.getAddrOfGlobalString(AssociatedTypeNames,
+                                           /*willBeRelativelyAddressed=*/true);
+      }
+      B.addRelativeAddressOrNull(global);
+    }
+  };
+
   template<class Impl>
   class TypeContextDescriptorBuilderBase
     : public ContextDescriptorBuilderBase<Impl> {
@@ -457,6 +704,7 @@ namespace {
   protected:
     NominalTypeDecl *Type;
     RequireMetadata_t HasMetadata;
+    bool HasInPlaceMetadataInitialization;
     
     using super::IGM;
     using super::B;
@@ -468,8 +716,10 @@ namespace {
     TypeContextDescriptorBuilderBase(IRGenModule &IGM, NominalTypeDecl *Type,
                                      RequireMetadata_t requireMetadata)
       : super(IGM), Type(Type),
-        HasMetadata(requireMetadata)
-    {}
+        HasMetadata(requireMetadata),
+        HasInPlaceMetadataInitialization(
+                                    computeHasInPlaceMetadataInitialization()) {
+    }
     
     void layout() {
       super::layout();
@@ -478,14 +728,25 @@ namespace {
       // ABI TODO: layout info should be superseded by remote mirror metadata
       asImpl().addLayoutInfo();
       asImpl().addGenericSignature();
+      asImpl().maybeAddInPlaceMetadataInitialization();
     }
     
     void addName() {
+      SmallString<32> nameBuf;
       StringRef name;
-      
+
+      // Use the original name with tag for synthesized decls. The tag comes
+      // after the null terminator for the name.
+      if (auto *synthesizedTypeAttr =
+            Type->getAttrs().getAttribute<ClangImporterSynthesizedTypeAttr>()) {
+        nameBuf.append(synthesizedTypeAttr->originalTypeName);
+        nameBuf.push_back('\0');
+        nameBuf.append(synthesizedTypeAttr->getManglingName());
+        
+        name = nameBuf;
       // Try to use the Clang name if there is one.
-      if (auto namedClangDecl =
-                             Mangle::ASTMangler::getClangDeclForMangling(Type)) {
+      } else if (auto namedClangDecl =
+                            Mangle::ASTMangler::getClangDeclForMangling(Type)) {
         name = namedClangDecl->getName();
       } else {
         name = Type->getName().str();
@@ -561,26 +822,84 @@ namespace {
       IGM.setTrueConstGlobal(var);
       return var;
     }
+
+    void setCommonFlags(TypeContextDescriptorFlags &flags) {
+      setClangImportedFlags(flags);
+      setMetadataInitializationKind(flags);
+    }
     
     /// Flags to indicate Clang-imported declarations so we mangle them
     /// consistently at runtime.
-    void getClangImportedFlags(TypeContextDescriptorFlags &flags) const {
-      auto clangDecl = Mangle::ASTMangler::getClangDeclForMangling(Type);
-      if (!clangDecl)
-        return;
-      
-      if (isa<clang::TagDecl>(clangDecl)) {
-        flags.setIsCTag(true);
-        return;
+    void setClangImportedFlags(TypeContextDescriptorFlags &flags) {
+      if (Type->getAttrs().getAttribute<ClangImporterSynthesizedTypeAttr>()) {
+        flags.setIsSynthesizedRelatedEntity(true);
       }
       
-      if (isa<clang::TypedefNameDecl>(clangDecl)
-          || isa<clang::ObjCCompatibleAliasDecl>(clangDecl)) {
-        flags.setIsCTypedef(true);
-        return;
+      if (auto clangDecl = Mangle::ASTMangler::getClangDeclForMangling(Type)) {
+        if (isa<clang::TagDecl>(clangDecl)) {
+          flags.setImportNamespace(TypeContextDescriptorFlags::CTag);
+        } else if (isa<clang::TypedefNameDecl>(clangDecl)
+                   || isa<clang::ObjCCompatibleAliasDecl>(clangDecl)) {
+          flags.setImportNamespace(TypeContextDescriptorFlags::CTypedef);
+        }
       }
-      
-      return;
+    }
+
+    bool computeHasInPlaceMetadataInitialization() {
+      // Not if we don't have metadata.
+      if (!HasMetadata)
+        return false;
+
+      // Only struct and enums for now.  Classes currently use an eager
+      // mechanism that doesn't properly support recursive dependencies, so
+      // their equivalent of in-place initialization does not yet use this
+      // infrastructure.
+      if (!isa<StructDecl>(Type) && !isa<EnumDecl>(Type))
+        return false;
+
+      return needsInPlaceMetadataInitialization(IGM, Type);
+    }
+
+    bool hasInPlaceMetadataInitialization() {
+      return HasInPlaceMetadataInitialization;
+    }
+
+    void setMetadataInitializationKind(TypeContextDescriptorFlags &flags) {
+      if (HasInPlaceMetadataInitialization) {
+        flags.setMetadataInitialization(
+                     TypeContextDescriptorFlags::InPlaceMetadataInitialization);
+      }
+    }
+
+    void maybeAddInPlaceMetadataInitialization() {
+      if (!HasInPlaceMetadataInitialization)
+        return;
+
+      if (isa<StructDecl>(Type) || isa<EnumDecl>(Type)) {
+        asImpl().addInPlaceValueMetadataInitialization();
+      } else {
+        llvm_unreachable("unexpected type allowing in-place initialization");
+      }
+    }
+
+    /// Add an InPlaceValueMetadataInitialization structure to the descriptor.
+    void addInPlaceValueMetadataInitialization() {
+      // Relative pointer to the initialization cache.
+      // Note that we trigger the definition of it when emitting the
+      // completion function.
+      auto cache = IGM.getAddrOfTypeMetadataInPlaceInitializationCache(Type,
+                                                              NotForDefinition);
+      B.addRelativeAddress(cache);
+
+      // Relative pointer to the metadata.
+      auto type = Type->getDeclaredTypeInContext()->getCanonicalType();
+      auto metadata = IGM.getAddrOfTypeMetadata(type);
+      B.addRelativeAddress(metadata);
+
+      // Completion function.
+      auto completionFunction =
+        IGM.getAddrOfTypeMetadataCompletionFunction(Type, NotForDefinition);
+      B.addRelativeAddress(completionFunction);
     }
 
     // Subclasses should provide:
@@ -694,9 +1013,12 @@ namespace {
     uint16_t getKindSpecificFlags() {
       TypeContextDescriptorFlags flags;
 
-      flags.setIsReflectable(true); // struct always reflectable
+      // Structs are reflectable unless we emit them with opaque reflection
+      // metadata.
+      flags.setIsReflectable(
+                            !IGM.shouldEmitOpaqueTypeMetadataRecord(getType()));
 
-      getClangImportedFlags(flags);
+      setCommonFlags(flags);
       return flags.getOpaqueValue();
     }
   };
@@ -754,7 +1076,7 @@ namespace {
 
       flags.setIsReflectable(Strategy.isReflectable());
 
-      getClangImportedFlags(flags);
+      setCommonFlags(flags);
       return flags.getOpaqueValue();
     }
   };
@@ -811,6 +1133,8 @@ namespace {
       // Classes are always reflectable.
       flags.setIsReflectable(true);
 
+      setCommonFlags(flags);
+
       if (!getType()->isForeign()) {
         if (MetadataLayout->areImmediateMembersNegative())
           flags.class_setAreImmediateMembersNegative(true);
@@ -825,8 +1149,6 @@ namespace {
       if (SuperClassRef) {
         flags.class_setSuperclassReferenceKind(SuperClassRef->getKind());
       }
-      
-      getClangImportedFlags(flags);
       
       return flags.getOpaqueValue();
     }
@@ -869,7 +1191,7 @@ namespace {
       auto *dc = fn.getDecl()->getDeclContext();
       assert(!isa<ExtensionDecl>(dc));
 
-      if (fn.getDecl()->getDeclContext() == getType()) {
+      if (dc == getType()) {
         if (auto entry = VTable->getEntry(IGM.getSILModule(), fn)) {
           assert(entry->TheKind == SILVTable::Entry::Kind::Normal);
           auto *implFn = IGM.getAddrOfSILFunction(entry->Implementation,
@@ -1158,53 +1480,26 @@ namespace {
       //   MetadataDependency(Metadata *type,
       //                      MetadataCompletionContext *context,
       //                      const GenericMetadataPattern *pattern);
-      llvm::Function *f =
-        IGM.getAddrOfTypeMetadataCompletionFunction(Target, ForDefinition);
-      f->setAttributes(IGM.constructInitialAttributes());
+      emitMetadataCompletionFunction(IGM, Target,
+        [&](IRGenFunction &IGF, llvm::Value *metadata,
+            MetadataDependencyCollector *collector) {
+        // Bind the generic arguments.
+        // FIXME: this will be problematic if we ever try to bind superclass
+        // types from type metadata!
+        if (Target->isGenericContext()) {
+          auto type = Target->getDeclaredTypeInContext()->getCanonicalType();
+          IGF.bindLocalTypeDataFromTypeMetadata(type, IsExact, metadata,
+                                                MetadataState::Abstract);
+        }
 
-      IRGenFunction IGF(IGM, f);
+        // A dependent VWT means that we have dependent metadata.
+        if (HasDependentVWT)
+          HasDependentMetadata = true;
 
-      // Skip instrumentation when building for TSan to avoid false positives.
-      // The synchronization for this happens in the Runtime and we do not see it.
-      if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Thread)
-        f->removeFnAttr(llvm::Attribute::SanitizeThread);
-
-      if (IGM.DebugInfo)
-        IGM.DebugInfo->emitArtificialFunction(IGF, f);
-
-      Explosion params = IGF.collectParameters();
-      llvm::Value *metadata = params.claimNext();
-      llvm::Value *context = params.claimNext();
-      llvm::Value *templatePointer = params.claimNext();
-
-      (void) context;
-      (void) templatePointer;
-
-      // Bind the generic arguments.
-      // FIXME: this will be problematic if we ever try to bind superclass
-      // types from type metadata!
-      if (Target->isGenericContext()) {
-        auto type = Target->getDeclaredTypeInContext()->getCanonicalType();
-        IGF.bindLocalTypeDataFromTypeMetadata(type, IsExact, metadata,
-                                              MetadataState::Abstract);
-      }
-
-      // A dependent VWT means that we have dependent metadata.
-      if (HasDependentVWT)
-        HasDependentMetadata = true;
-
-      MetadataDependencyCollector collector;
-
-      if (HasDependentMetadata) {
-        asImpl().emitInitializeMetadata(IGF, metadata, false, &collector);
-      }
-      
-      // The metadata is now complete.  Finalize any metadata dependencies
-      // we may have collected.
-      auto dependency = collector.finish(IGF);
-      auto returnValue = dependency.combine(IGF);
-
-      IGF.Builder.CreateRet(returnValue);
+        if (HasDependentMetadata) {
+          asImpl().emitInitializeMetadata(IGF, metadata, false, collector);
+        }
+      });
     }
 
     /// The information necessary to fill in a GenericMetadataPartialPattern
@@ -2032,7 +2327,7 @@ namespace {
       AddressPoint = B.getNextOffsetFromGlobal();
     }
 
-    void addSuperClass() {
+    void addSuperclass() {
       // If this is a root class, use SwiftObject as our formal parent.
       if (!Target->hasSuperclass()) {
         // This is only required for ObjC interoperation.
@@ -2071,6 +2366,7 @@ namespace {
       auto type =cast<ClassType>(Target->getDeclaredType()->getCanonicalType());
 
       (void) getTypeMetadataAccessFunction(IGM, type, ForDefinition,
+                                           CacheStrategy::Lazy,
       [&](IRGenFunction &IGF, DynamicMetadataRequest request,
           llvm::Constant *cacheVar) -> MetadataResponse {
         // There's an interesting special case where we can do the
@@ -2086,17 +2382,17 @@ namespace {
         }
 
         // Otherwise, use the generic path.
-        return emitInPlaceTypeMetadataAccessFunctionBody(IGF, type, cacheVar,
+        return emitOnceTypeMetadataAccessFunctionBody(IGF, type, cacheVar,
           [&](IRGenFunction &IGF, llvm::Value *metadata) {
-            return emitInPlaceMetadataInitialization(IGF, type, metadata);
+            return emitOnceMetadataInitialization(IGF, type, metadata);
           });
       });
     }
 
   private:
-    llvm::Value *emitInPlaceMetadataInitialization(IRGenFunction &IGF,
-                                                   CanClassType type,
-                                                   llvm::Value *metadata) {
+    llvm::Value *emitOnceMetadataInitialization(IRGenFunction &IGF,
+                                                CanClassType type,
+                                                llvm::Value *metadata) {
       // Many of the things done by generic instantiation are unnecessary here:
       //   initializing the metaclass pointer
       //   initializing the ro-data pointer
@@ -2518,10 +2814,38 @@ IRGenFunction::emitValueWitnessTableRef(SILType type,
 // Value types (structs and enums)
 //===----------------------------------------------------------------------===//
 
+namespace {
+  /// A helper class for laying out value metadata.
+  template <class Base>
+  class ValueMetadataBuilderBase : public Base {
+  protected:
+    using Base::IGM;
+    using Base::Target;
+    using Base::asImpl;
+
+    using Base::Base;
+
+  public:
+    /// Create the runtime data structures and functions necessary to
+    /// support in-place metadata initialization on this type.
+    void maybeCreateInPlaceMetadataInitialization() {
+      if (!needsInPlaceMetadataInitialization(IGM, Target))
+        return;
+
+      emitMetadataCompletionFunction(IGM, Target,
+        [&](IRGenFunction &IGF, llvm::Value *metadata,
+            MetadataDependencyCollector *collector) {
+        asImpl().emitInitializeMetadata(IGF, metadata, /*vwt mutable*/true,
+                                        collector);
+      });
+    }
+  };
+}
+
 static llvm::Value *
-emitInPlaceValueTypeMetadataInitialization(IRGenFunction &IGF,
-                                           CanNominalType type,
-                                           llvm::Value *metadata,
+emitOnceValueTypeMetadataInitialization(IRGenFunction &IGF,
+                                        CanNominalType type,
+                                        llvm::Value *metadata,
                                    MetadataDependencyCollector *collector) {
   // All the value types are basically similar, as are foreign types.
   assert(isa<StructType>(type) || isa<EnumType>(type) ||
@@ -2544,26 +2868,45 @@ emitInPlaceValueTypeMetadataInitialization(IRGenFunction &IGF,
   return metadata;
 }
 
-/// Create an access function for the type metadata of the given
-/// non-generic nominal type.
-static void createInPlaceValueTypeMetadataAccessFunction(IRGenModule &IGM,
-                                                      NominalTypeDecl *typeDecl) {
+/// Create an access function for the given type which triggers the
+/// in-place initialization path.
+static void
+createInPlaceInitializationMetadataAccessFunction(IRGenModule &IGM,
+                                                  NominalTypeDecl *typeDecl,
+                                                  CanType type) {
   assert(!typeDecl->isGenericContext());
-  auto type =
-    cast<NominalType>(typeDecl->getDeclaredType()->getCanonicalType());
 
   (void) getTypeMetadataAccessFunction(IGM, type, ForDefinition,
+                                       CacheStrategy::InPlaceInitialization,
                                        [&](IRGenFunction &IGF,
                                            DynamicMetadataRequest request,
                                            llvm::Constant *cacheVariable) {
-    return emitInPlaceTypeMetadataAccessFunctionBody(IGF, type, cacheVariable,
-      [&](IRGenFunction &IGF, llvm::Value *metadata) {
-        MetadataDependencyCollector *collector = nullptr; // FIXME
-        return emitInPlaceValueTypeMetadataInitialization(IGF, type, metadata,
-                                                          collector);
-      });
+    llvm::Value *descriptor =
+      IGF.IGM.getAddrOfTypeContextDescriptor(typeDecl, RequireMetadata);
+    auto responsePair =
+      IGF.Builder.CreateCall(IGF.IGM.getGetInPlaceMetadataFn(),
+                             {request.get(IGF), descriptor});
+    return MetadataResponse::handle(IGF, request, responsePair);
   });
 }
+
+/// Create an access function for the given non-generic type.
+static void createNonGenericMetadataAccessFunction(IRGenModule &IGM,
+                                                   NominalTypeDecl *typeDecl) {
+  assert(!typeDecl->isGenericContext());
+  auto type = typeDecl->getDeclaredType()->getCanonicalType();
+
+  // If the type requires the in-place initialization pattern, use it.
+  if (needsInPlaceMetadataInitialization(IGM, typeDecl)) {
+    createInPlaceInitializationMetadataAccessFunction(IGM, typeDecl, type);
+    return;
+  }
+
+  // Otherwise, use the lazy pattern, which should be emitted using a
+  // direct reference to the metadata.
+  (void) getTypeMetadataAccessFunction(IGM, type, ForDefinition);
+}
+
 
 //===----------------------------------------------------------------------===//
 // Structs
@@ -2572,8 +2915,9 @@ static void createInPlaceValueTypeMetadataAccessFunction(IRGenModule &IGM,
 namespace {
   /// An adapter for laying out struct metadata.
   template <class Impl>
-  class StructMetadataBuilderBase : public StructMetadataVisitor<Impl> {
-    using super = StructMetadataVisitor<Impl>;
+  class StructMetadataBuilderBase
+         : public ValueMetadataBuilderBase<StructMetadataVisitor<Impl>> {
+    using super = ValueMetadataBuilderBase<StructMetadataVisitor<Impl>>;
 
   protected:
     ConstantStructBuilder &B;
@@ -2648,6 +2992,18 @@ namespace {
     void addGenericWitnessTable(CanType type, ProtocolConformanceRef conf) {
       B.addNullPointer(IGM.WitnessTablePtrTy);
     }
+
+    void emitInitializeMetadata(IRGenFunction &IGF,
+                                llvm::Value *metadata,
+                                bool isVWTMutable,
+                                MetadataDependencyCollector *collector) {
+      auto loweredTy = getLoweredType();
+      auto &fixedTI = IGM.getTypeInfo(loweredTy);
+      if (isa<FixedTypeInfo>(fixedTI)) return;
+
+      emitInitializeFieldOffsetVector(IGF, loweredTy, metadata, isVWTMutable,
+                                      collector);
+    }
   };
 
   class StructMetadataBuilder :
@@ -2668,7 +3024,8 @@ namespace {
     }
 
     void createMetadataAccessFunction() {
-      createInPlaceValueTypeMetadataAccessFunction(IGM, Target);
+      createNonGenericMetadataAccessFunction(IGM, Target);
+      maybeCreateInPlaceMetadataInitialization();
     }
   };
   
@@ -2775,18 +3132,6 @@ namespace {
     bool hasCompletionFunction() {
       return !isa<FixedTypeInfo>(IGM.getTypeInfo(getLoweredType()));
     }
-
-    void emitInitializeMetadata(IRGenFunction &IGF,
-                                llvm::Value *metadata,
-                                bool isVWTMutable,
-                                MetadataDependencyCollector *collector) {
-      auto loweredTy = getLoweredType();
-      auto &fixedTI = IGM.getTypeInfo(loweredTy);
-      if (isa<FixedTypeInfo>(fixedTI)) return;
-
-      emitInitializeFieldOffsetVector(IGF, loweredTy, metadata, isVWTMutable,
-                                      collector);
-    }
   };
 } // end anonymous namespace
 
@@ -2842,8 +3187,9 @@ void IRGenerator::noteUseOfAnyParentTypeMetadata(NominalTypeDecl *type) {
 namespace {
 
   template<class Impl>
-  class EnumMetadataBuilderBase : public EnumMetadataVisitor<Impl> {
-    using super = EnumMetadataVisitor<Impl>;
+  class EnumMetadataBuilderBase
+         : public ValueMetadataBuilderBase<EnumMetadataVisitor<Impl>> {
+    using super = ValueMetadataBuilderBase<EnumMetadataVisitor<Impl>>;
 
   protected:
     ConstantStructBuilder &B;
@@ -2911,6 +3257,18 @@ namespace {
       auto &strategy = getEnumImplStrategy(IGM, enumTy);
       return Size(strategy.getPayloadSizeForMetadata());
     }
+
+    void emitInitializeMetadata(IRGenFunction &IGF,
+                                llvm::Value *metadata,
+                                bool isVWTMutable,
+                                MetadataDependencyCollector *collector) {
+      // Nominal types are always preserved through SIL lowering.
+      auto enumTy = getLoweredType();
+
+      auto &strategy = getEnumImplStrategy(IGF.IGM, enumTy);
+      strategy.initializeMetadata(IGF, metadata, isVWTMutable, enumTy,
+                                  collector);
+    }
   };
 
   class EnumMetadataBuilder
@@ -2921,8 +3279,6 @@ namespace {
     EnumMetadataBuilder(IRGenModule &IGM, EnumDecl *theEnum,
                         ConstantStructBuilder &B)
       : EnumMetadataBuilderBase(IGM, theEnum, B) {}
-
-
 
     void addPayloadSize() {
       auto payloadSize = getConstantPayloadSize();
@@ -2940,7 +3296,8 @@ namespace {
     }
 
     void createMetadataAccessFunction() {
-      createInPlaceValueTypeMetadataAccessFunction(IGM, Target);
+      createNonGenericMetadataAccessFunction(IGM, Target);
+      maybeCreateInPlaceMetadataInitialization();
     }
   };
 
@@ -2991,18 +3348,6 @@ namespace {
 
     bool hasCompletionFunction() {
       return !isa<FixedTypeInfo>(IGM.getTypeInfo(getLoweredType()));
-    }
-
-    void emitInitializeMetadata(IRGenFunction &IGF,
-                                llvm::Value *metadata,
-                                bool isVWTMutable,
-                                MetadataDependencyCollector *collector) {
-      // Nominal types are always preserved through SIL lowering.
-      auto enumTy = getLoweredType();
-
-      auto &strategy = getEnumImplStrategy(IGF.IGM, enumTy);
-      strategy.initializeMetadata(IGF, metadata, isVWTMutable, enumTy,
-                                  collector);
     }
   };
 
@@ -3157,15 +3502,15 @@ namespace {
       auto type = cast<NominalType>(asImpl().getTargetType());
 
       (void) getTypeMetadataAccessFunction(IGM, type, ForDefinition,
+                                           CacheStrategy::Lazy,
                                            [&](IRGenFunction &IGF,
                                                DynamicMetadataRequest request,
                                                llvm::Constant *cacheVariable) {
-        return emitInPlaceTypeMetadataAccessFunctionBody(IGF, type,
-                                                         cacheVariable,
+        return emitOnceTypeMetadataAccessFunctionBody(IGF, type, cacheVariable,
           [&](IRGenFunction &IGF, llvm::Value *candidate) {
             MetadataDependencyCollector *collector = nullptr;
             auto metadata = uniqueForeignTypeMetadataRef(IGF, candidate);
-            return emitInPlaceValueTypeMetadataInitialization(IGF, type,
+            return emitOnceValueTypeMetadataInitialization(IGF, type,
                                                               metadata,
                                                               collector);
           });
@@ -3237,7 +3582,7 @@ namespace {
 
     void noteStartOfSuperClass() { }
 
-    void addSuperClass() {
+    void addSuperclass() {
       auto superclassDecl = Target->getSuperclassDecl();
       if (!superclassDecl || !superclassDecl->isForeign()) {
         B.addNullPointer(IGM.TypeMetadataPtrTy);
@@ -3475,233 +3820,6 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   llvm_unreachable("Not a valid KnownProtocolKind.");
 }
 
-namespace {
-  class ProtocolDescriptorBuilder {
-    IRGenModule &IGM;
-    ConstantStructBuilder &B;
-    ProtocolDecl *Protocol;
-    std::string AssociatedTypeNames;
-    SILDefaultWitnessTable *DefaultWitnesses;
-
-  public:
-    ProtocolDescriptorBuilder(IRGenModule &IGM, ProtocolDecl *protocol,
-                              ConstantStructBuilder &B,
-                              SILDefaultWitnessTable *defaultWitnesses)
-      : IGM(IGM), B(B), Protocol(protocol),
-        DefaultWitnesses(defaultWitnesses) {}
-
-    void layout() {
-      addObjCCompatibilityIsa();
-      addName();
-      addInherited();
-      addObjCCompatibilityTables();
-      addSize();
-      addFlags();
-      addRequirements();
-      addSuperclass();
-      addAssociatedTypeNames();
-
-      B.suggestType(IGM.ProtocolDescriptorStructTy);
-    }
-
-    void addObjCCompatibilityIsa() {
-      // The ObjC runtime will drop a reference to its magic Protocol class
-      // here.
-      B.addNullPointer(IGM.Int8PtrTy);
-    }
-    
-    void addName() {
-      // Include the _Tt prefix. Since Swift protocol descriptors are laid
-      // out to look like ObjC Protocol* objects, the name has to clearly be
-      // a Swift mangled name.
-
-      IRGenMangler mangler;
-      std::string Name =
-        mangler.mangleForProtocolDescriptor(Protocol->getDeclaredType());
-
-      auto global = IGM.getAddrOfGlobalString(Name);
-      B.add(global);
-    }
-    
-    void addInherited() {
-      // If there are no inherited protocols, produce null.
-      auto inherited = Protocol->getInheritedProtocols();
-      if (inherited.empty()) {
-        B.addNullPointer(IGM.Int8PtrTy);
-        return;
-      }
-      
-      // Otherwise, collect references to all of the inherited protocol
-      // descriptors.
-      SmallVector<llvm::Constant*, 4> inheritedDescriptors;
-      inheritedDescriptors.push_back(IGM.getSize(Size(inherited.size())));
-      
-      for (ProtocolDecl *p : inherited) {
-        auto descriptor = IGM.getAddrOfProtocolDescriptor(p);
-        inheritedDescriptors.push_back(descriptor);
-      }
-      
-      auto inheritedInit = llvm::ConstantStruct::getAnon(inheritedDescriptors);
-      auto inheritedVar = new llvm::GlobalVariable(IGM.Module,
-                                           inheritedInit->getType(),
-                                           /*isConstant*/ true,
-                                           llvm::GlobalValue::PrivateLinkage,
-                                           inheritedInit);
-      
-      B.addBitCast(inheritedVar, IGM.Int8PtrTy);
-    }
-    
-    void addObjCCompatibilityTables() {
-      // Required instance methods
-      B.addNullPointer(IGM.Int8PtrTy);
-      // Required class methods
-      B.addNullPointer(IGM.Int8PtrTy);
-      // Optional instance methods
-      B.addNullPointer(IGM.Int8PtrTy);
-      // Optional class methods
-      B.addNullPointer(IGM.Int8PtrTy);
-      // Properties
-      B.addNullPointer(IGM.Int8PtrTy);
-    }
-    
-    void addSize() {
-      // The number of fields so far in words, plus 4 bytes for size and
-      // 4 bytes for flags.
-      B.addInt32(B.getNextOffsetFromGlobal().getValue() + 4 + 4);
-    }
-    
-    void addFlags() {
-      auto flags = ProtocolDescriptorFlags()
-        .withSwift(true)
-        .withClassConstraint(Protocol->requiresClass()
-                               ? ProtocolClassConstraint::Class
-                               : ProtocolClassConstraint::Any)
-        .withDispatchStrategy(
-                Lowering::TypeConverter::getProtocolDispatchStrategy(Protocol))
-        .withSpecialProtocol(getSpecialProtocolID(Protocol));
-
-      if (DefaultWitnesses)
-        flags = flags.withResilient(true);
-
-      B.addInt32(flags.getIntValue());
-    }
-
-    void addRequirements() {
-      auto &pi = IGM.getProtocolInfo(Protocol);
-
-      B.addInt32(pi.getNumWitnesses());
-
-      // If there are no entries, just add a null reference and return.
-      if (pi.getNumWitnesses() == 0) {
-        B.addInt(IGM.RelativeAddressTy, 0);
-        return;
-      }
-
-      ConstantInitBuilder reqtBuilder(IGM);
-      auto reqtsArray = reqtBuilder.beginArray(IGM.ProtocolRequirementStructTy);
-      for (auto &entry : pi.getWitnessEntries()) {
-        auto reqt = reqtsArray.beginStruct(IGM.ProtocolRequirementStructTy);
-
-        auto info = getRequirementInfo(entry);
-
-        // Flags.
-        reqt.addInt32(info.Flags.getIntValue());
-
-        // Dispatch thunk.
-        reqt.addRelativeAddressOrNull(info.Thunk);
-
-        // Default implementation.
-        reqt.addRelativeAddressOrNull(info.DefaultImpl);
-
-        // Add the associated type name to the list.
-        if (entry.isAssociatedType()) {
-          if (!AssociatedTypeNames.empty())
-            AssociatedTypeNames += ' ';
-          AssociatedTypeNames += entry.getAssociatedType()->getName().str();
-        }
-
-        reqt.finishAndAddTo(reqtsArray);
-      }
-
-      auto global =
-        cast<llvm::GlobalVariable>(
-          IGM.getAddrOfProtocolRequirementArray(Protocol,
-                                                reqtsArray.finishAndCreateFuture()));
-      global->setConstant(true);
-      B.addRelativeOffset(IGM.Int32Ty, global);
-      IGM.setTrueConstGlobal(global);
-    }
-
-    struct RequirementInfo {
-      ProtocolRequirementFlags Flags;
-      llvm::Constant *Thunk;
-      llvm::Constant *DefaultImpl;
-    };
-
-    /// Build the information which will go into a ProtocolRequirement entry.
-    RequirementInfo getRequirementInfo(const WitnessTableEntry &entry) {
-      using Flags = ProtocolRequirementFlags;
-      if (entry.isBase()) {
-        assert(entry.isOutOfLineBase());
-        auto flags = Flags(Flags::Kind::BaseProtocol);
-        return { flags, nullptr, nullptr };
-      }
-
-      if (entry.isAssociatedType()) {
-        auto flags = Flags(Flags::Kind::AssociatedTypeAccessFunction);
-        return { flags, nullptr, nullptr };
-      }
-
-      if (entry.isAssociatedConformance()) {
-        auto flags = Flags(Flags::Kind::AssociatedConformanceAccessFunction);
-        return { flags, nullptr, nullptr };
-      }
-
-      assert(entry.isFunction());
-      SILDeclRef func(entry.getFunction());
-
-      // Look up the dispatch thunk if the protocol is resilient.
-      llvm::Constant *thunk = nullptr;
-      if (IGM.isResilient(Protocol, ResilienceExpansion::Minimal))
-        thunk = IGM.getAddrOfDispatchThunk(func, NotForDefinition);
-
-      // Classify the function.
-      auto flags = getMethodDescriptorFlags<Flags>(func.getDecl());
-
-      // Look for a default witness.
-      llvm::Constant *defaultImpl = findDefaultWitness(func);
-
-      return { flags, thunk, defaultImpl };
-    }
-
-    llvm::Constant *findDefaultWitness(SILDeclRef func) {
-      if (!DefaultWitnesses) return nullptr;
-
-      for (auto &entry : DefaultWitnesses->getEntries()) {
-        if (!entry.isValid() || entry.getRequirement() != func)
-          continue;
-        return IGM.getAddrOfSILFunction(entry.getWitness(), NotForDefinition);
-      }
-
-      return nullptr;
-    }
-
-    void addSuperclass() {
-      // FIXME: Implement.
-      B.addRelativeAddressOrNull(nullptr);
-    }
-
-    void addAssociatedTypeNames() {
-      llvm::Constant *global = nullptr;
-      if (!AssociatedTypeNames.empty()) {
-        global = IGM.getAddrOfGlobalString(AssociatedTypeNames,
-                                           /*willBeRelativelyAddressed=*/true);
-      }
-      B.addRelativeAddressOrNull(global);
-    }
-  };
-} // end anonymous namespace
-
 /// Emit global structures associated with the given protocol. This comprises
 /// the protocol descriptor, and for ObjC interop, references to the descriptor
 /// that the ObjC runtime uses for uniquing.
@@ -3730,15 +3848,10 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
   if (isResilient(protocol, ResilienceExpansion::Minimal))
     defaultWitnesses = getSILModule().lookUpDefaultWitnessTable(protocol);
 
-  ConstantInitBuilder initBuilder(*this);
-  auto init = initBuilder.beginStruct();
-  ProtocolDescriptorBuilder builder(*this, protocol, init, defaultWitnesses);
-  builder.layout();
-
-  auto var = cast<llvm::GlobalVariable>(
-          getAddrOfProtocolDescriptor(protocol, init.finishAndCreateFuture()));
-  var->setConstant(true);
-  disableAddressSanitizer(*this, var);
+  {
+    ProtocolDescriptorBuilder builder(*this, protocol, defaultWitnesses);
+    builder.emit();
+  }
 
   // Note that we emitted this protocol.
   SwiftProtocols.push_back(protocol);
@@ -3844,7 +3957,15 @@ GenericRequirementsMetadata irgen::addGenericRequirements(
         IGM.getConstantReferenceForProtocolDescriptor(protocol);
       addGenericRequirement(IGM, B, metadata, sig, flags,
                             requirement.getFirstType(),
-        [&]{ B.addRelativeAddress(descriptorRef); });
+        [&]{
+          unsigned tag = unsigned(descriptorRef.isIndirect());
+          if (protocol->isObjC())
+            tag |= 0x02;
+          
+          B.addTaggedRelativeOffset(IGM.RelativeAddressTy,
+                                    descriptorRef.getValue(),
+                                    tag);
+        });
       break;
     }
 

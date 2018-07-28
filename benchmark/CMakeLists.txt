@@ -65,6 +65,8 @@ set(SWIFT_BENCH_MODULES
     single-source/DictTest4
     single-source/DictTest4Legacy
     single-source/DictionaryBridge
+    single-source/DictionaryBridgeToObjC
+    single-source/DictionaryCompactMapValues
     single-source/DictionaryCopy
     single-source/DictionaryGroup
     single-source/DictionaryKeysContains
@@ -111,7 +113,6 @@ set(SWIFT_BENCH_MODULES
     single-source/ObserverUnappliedMethod
     single-source/OpaqueConsumingUsers
     single-source/OpenClose
-    single-source/PartialApplyDynamicType
     single-source/Phonebook
     single-source/PointerArithmetics
     single-source/PolymorphicCalls

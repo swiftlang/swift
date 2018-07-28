@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -487,17 +487,50 @@ Fix Fix::getForcedDowncast(ConstraintSystem &cs, Type toType) {
   return Fix(FixKind::ForceDowncast, index);
 }
 
+Fix Fix::getUnwrapOptionalBase(ConstraintSystem &cs, DeclName memberName) {
+  unsigned index = cs.FixedDeclNames.size();
+  cs.FixedDeclNames.push_back(memberName);
+  return Fix(FixKind::UnwrapOptionalBase, index);
+}
+
+Fix Fix::fixArgumentLabels(ConstraintSystem &cs,
+                           ArrayRef<Identifier> newLabels) {
+  unsigned index = cs.FixedArgLabels.size();
+  cs.FixedArgLabels.push_back(newLabels);
+  return Fix(FixKind::RelabelArguments, index);
+}
+
 Type Fix::getTypeArgument(ConstraintSystem &cs) const {
   assert(getKind() == FixKind::ForceDowncast);
   return cs.FixedTypes[Data];
+}
+
+/// If this fix has a name argument, retrieve it.
+DeclName Fix::getDeclNameArgument(ConstraintSystem &cs) const {
+  assert(getKind() == FixKind::UnwrapOptionalBase);
+  return cs.FixedDeclNames[Data];
+}
+
+ArrayRef<Identifier> Fix::getArgumentLabels(ConstraintSystem &cs) const {
+  assert(getKind() == FixKind::RelabelArguments);
+  return cs.FixedArgLabels[Data];
+}
+
+/// If this fix has optional result info, retrieve it.
+bool Fix::isUnwrapOptionalBaseByOptionalChaining(ConstraintSystem &cs) const {
+  assert(getKind() == FixKind::UnwrapOptionalBase);
+
+  // Assumes that these fixes are always created in pairs, with the first
+  // created non-optional and the second with an added optional.
+  return (Data % 2) == 1;
 }
 
 StringRef Fix::getName(FixKind kind) {
   switch (kind) {
   case FixKind::ForceOptional:
     return "fix: force optional";
-  case FixKind::OptionalChaining:
-    return "fix: optional chaining";
+  case FixKind::UnwrapOptionalBase:
+    return "fix: unwrap optional base of member lookup";
   case FixKind::ForceDowncast:
     return "fix: force downcast";
   case FixKind::AddressOf:
@@ -507,6 +540,8 @@ StringRef Fix::getName(FixKind kind) {
   case FixKind::ExplicitlyEscaping:
   case FixKind::ExplicitlyEscapingToAny:
     return "fix: add @escaping";
+  case FixKind::RelabelArguments:
+    return "fix: re-label argument(s)";
   }
 
   llvm_unreachable("Unhandled FixKind in switch.");
@@ -786,6 +821,7 @@ Constraint *Constraint::createDisjunction(ConstraintSystem &cs,
   auto disjunction =  new (mem) Constraint(ConstraintKind::Disjunction,
                               cs.allocateCopy(constraints), locator, typeVars);
   disjunction->RememberChoice = (bool) rememberChoice;
+  cs.noteNewDisjunction(disjunction);
   return disjunction;
 }
 

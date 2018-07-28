@@ -311,10 +311,3 @@ extension LazyCollectionProtocol {
       _base: self.elements, predicate: predicate)
   }
 }
-
-@available(*, deprecated, renamed: "LazyDropWhileSequence.Iterator")
-public typealias LazyPrefixWhileIterator<T> = LazyPrefixWhileSequence<T>.Iterator where T: Sequence
-@available(*, deprecated, renamed: "LazyDropWhileCollection.Index")
-public typealias LazyPrefixWhileIndex<T> = LazyPrefixWhileCollection<T>.Index where T: Collection
-@available(*, deprecated, renamed: "LazyPrefixWhileCollection")
-public typealias LazyPrefixWhileBidirectionalCollection<T> = LazyPrefixWhileCollection<T> where T: BidirectionalCollection

@@ -10,22 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A type that provides subscript access to its elements, with forward
-/// index traversal.
-///
-/// In most cases, it's best to ignore this protocol and use the `Collection`
-/// protocol instead, because it has a more complete interface.
-@available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'Collection' instead")
-public typealias IndexableBase = Collection
-
-/// A type that provides subscript access to its elements, with forward index
-/// traversal.
-///
-/// In most cases, it's best to ignore this protocol and use the `Collection`
-/// protocol instead, because it has a more complete interface.
-@available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'Collection' instead")
-public typealias Indexable = Collection
-
 /// A type that iterates over a collection using its indices.
 ///
 /// The `IndexingIterator` type is the default iterator for any collection that
@@ -349,6 +333,11 @@ extension IndexingIterator: IteratorProtocol, Sequence {
 /// the number of contained elements, accessing its `count` property is an
 /// O(*n*) operation.
 public protocol Collection: Sequence where SubSequence: Collection {
+  // FIXME: ideally this would be in MigrationSupport.swift, but it needs
+  // to be on the protocol instead of as an extension
+  @available(*, deprecated/*, obsoleted: 5.0*/, message: "all index distances are now of type Int")
+  typealias IndexDistance = Int  
+
   // FIXME(ABI): Associated type inference requires this.
   associatedtype Element
 
@@ -628,7 +617,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// or `Optional(nil)` if an element was determined to be missing;
   /// otherwise, `nil`.
   ///
-  /// - Complexity: O(*n*)
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
   func _customIndexOfEquatableElement(_ element: Element) -> Index??
 
   /// Customization point for `Collection.lastIndex(of:)`.
@@ -669,22 +658,24 @@ public protocol Collection: Sequence where SubSequence: Collection {
   ///     print(s[i])
   ///     // Prints "t"
   ///
-  /// The value passed as `n` must not offset `i` beyond the bounds of the
-  /// collection.
+  /// The value passed as `distance` must not offset `i` beyond the bounds of
+  /// the collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
-  ///   - n: The distance to offset `i`. `n` must not be negative unless the
-  ///     collection conforms to the `BidirectionalCollection` protocol.
-  /// - Returns: An index offset by `n` from the index `i`. If `n` is positive,
-  ///   this is the same value as the result of `n` calls to `index(after:)`.
-  ///   If `n` is negative, this is the same value as the result of `-n` calls
-  ///   to `index(before:)`.
+  ///   - distance: The distance to offset `i`. `distance` must not be negative
+  ///     unless the collection conforms to the `BidirectionalCollection`
+  ///     protocol.
+  /// - Returns: An index offset by `distance` from the index `i`. If
+  ///   `distance` is positive, this is the same value as the result of
+  ///   `distance` calls to `index(after:)`. If `distance` is negative, this
+  ///   is the same value as the result of `abs(distance)` calls to
+  ///   `index(before:)`.
   ///
   /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the absolute
-  ///   value of `n`.
-  func index(_ i: Index, offsetBy n: Int) -> Index
+  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the absolute
+  ///   value of `distance`.
+  func index(_ i: Index, offsetBy distance: Int) -> Index
 
   /// Returns an index that is the specified distance from the given index,
   /// unless that distance is beyond a given limiting index.
@@ -708,26 +699,28 @@ public protocol Collection: Sequence where SubSequence: Collection {
   ///     print(j)
   ///     // Prints "nil"
   ///
-  /// The value passed as `n` must not offset `i` beyond the bounds of the
-  /// collection, unless the index passed as `limit` prevents offsetting
+  /// The value passed as `distance` must not offset `i` beyond the bounds of
+  /// the collection, unless the index passed as `limit` prevents offsetting
   /// beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
-  ///   - n: The distance to offset `i`. `n` must not be negative unless the
-  ///     collection conforms to the `BidirectionalCollection` protocol.
-  ///   - limit: A valid index of the collection to use as a limit. If `n > 0`,
-  ///     a limit that is less than `i` has no effect. Likewise, if `n < 0`, a
-  ///     limit that is greater than `i` has no effect.
-  /// - Returns: An index offset by `n` from the index `i`, unless that index
-  ///   would be beyond `limit` in the direction of movement. In that case,
-  ///   the method returns `nil`.
+  ///   - distance: The distance to offset `i`. `distance` must not be negative
+  ///     unless the collection conforms to the `BidirectionalCollection`
+  ///     protocol.
+  ///   - limit: A valid index of the collection to use as a limit. If
+  ///     `distance > 0`, a limit that is less than `i` has no effect.
+  ///     Likewise, if `distance < 0`, a limit that is greater than `i` has no
+  ///     effect.
+  /// - Returns: An index offset by `distance` from the index `i`, unless that
+  ///   index would be beyond `limit` in the direction of movement. In that
+  ///   case, the method returns `nil`.
   ///
   /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the absolute
-  ///   value of `n`.
+  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the absolute
+  ///   value of `distance`.
   func index(
-    _ i: Index, offsetBy n: Int, limitedBy limit: Index
+    _ i: Index, offsetBy distance: Int, limitedBy limit: Index
   ) -> Index?
 
   /// Returns the distance between two indices.
@@ -744,7 +737,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   ///   `BidirectionalCollection` protocol.
   ///
   /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the
+  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the
   ///   resulting distance.
   func distance(from start: Index, to end: Index) -> Int
 
@@ -807,28 +800,6 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// - Parameter i: A valid index of the collection. `i` must be less than
   ///   `endIndex`.
   func formIndex(after i: inout Index)
-
-  /// Returns a random element of the collection, using the given generator as
-  /// a source for randomness.
-  ///
-  /// You use this method to select a random element from a collection when you
-  /// are using a custom random number generator. For example, call
-  /// `randomElement(using:)` to select a random element from an array of names.
-  ///
-  ///     let names = ["Zoey", "Chloe", "Amani", "Amaia"]
-  ///     let randomName = names.randomElement(using: &myGenerator)!
-  ///     // randomName == "Amani"
-  ///
-  /// - Parameter generator: The random number generator to use when choosing
-  ///   a random element.
-  /// - Returns: A random element from the collection. If the collection is
-  ///   empty, the method returns `nil`.
-  __consuming func randomElement<T: RandomNumberGenerator>(
-    using generator: inout T
-  ) -> Element?
-
-  @available(*, deprecated, message: "all index distances are now of type Int")
-  typealias IndexDistance = Int
 }
 
 /// Default implementation for forward collections.
@@ -837,7 +808,7 @@ extension Collection {
   ///
   /// - Parameter i: A valid index of the collection. `i` must be less than
   ///   `endIndex`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // protocol-only
   @inline(__always)
   public func formIndex(after i: inout Index) {
     i = index(after: i)
@@ -892,24 +863,26 @@ extension Collection {
   ///     print(s[i])
   ///     // Prints "t"
   ///
-  /// The value passed as `n` must not offset `i` beyond the bounds of the
-  /// collection.
+  /// The value passed as `distance` must not offset `i` beyond the bounds of
+  /// the collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
-  ///   - n: The distance to offset `i`. `n` must not be negative unless the
-  ///     collection conforms to the `BidirectionalCollection` protocol.
-  /// - Returns: An index offset by `n` from the index `i`. If `n` is positive,
-  ///   this is the same value as the result of `n` calls to `index(after:)`.
-  ///   If `n` is negative, this is the same value as the result of `-n` calls
-  ///   to `index(before:)`.
+  ///   - distance: The distance to offset `i`. `distance` must not be negative
+  ///     unless the collection conforms to the `BidirectionalCollection`
+  ///     protocol.
+  /// - Returns: An index offset by `distance` from the index `i`. If
+  ///   `distance` is positive, this is the same value as the result of
+  ///   `distance` calls to `index(after:)`. If `distance` is negative, this
+  ///   is the same value as the result of `abs(distance)` calls to
+  ///   `index(before:)`.
   ///
   /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the absolute
-  ///   value of `n`.
+  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the absolute
+  ///   value of `distance`.
   @inlinable
-  public func index(_ i: Index, offsetBy n: Int) -> Index {
-    return self._advanceForward(i, by: n)
+  public func index(_ i: Index, offsetBy distance: Int) -> Index {
+    return self._advanceForward(i, by: distance)
   }
 
   /// Returns an index that is the specified distance from the given index,
@@ -934,75 +907,80 @@ extension Collection {
   ///     print(j)
   ///     // Prints "nil"
   ///
-  /// The value passed as `n` must not offset `i` beyond the bounds of the
-  /// collection, unless the index passed as `limit` prevents offsetting
+  /// The value passed as `distance` must not offset `i` beyond the bounds of
+  /// the collection, unless the index passed as `limit` prevents offsetting
   /// beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
-  ///   - n: The distance to offset `i`. `n` must not be negative unless the
-  ///     collection conforms to the `BidirectionalCollection` protocol.
-  ///   - limit: A valid index of the collection to use as a limit. If `n > 0`,
-  ///     a limit that is less than `i` has no effect. Likewise, if `n < 0`, a
-  ///     limit that is greater than `i` has no effect.
-  /// - Returns: An index offset by `n` from the index `i`, unless that index
-  ///   would be beyond `limit` in the direction of movement. In that case,
-  ///   the method returns `nil`.
+  ///   - distance: The distance to offset `i`. `distance` must not be negative
+  ///     unless the collection conforms to the `BidirectionalCollection`
+  ///     protocol.
+  ///   - limit: A valid index of the collection to use as a limit. If
+  ///     `distance > 0`, a limit that is less than `i` has no effect.
+  ///     Likewise, if `distance < 0`, a limit that is greater than `i` has no
+  ///     effect.
+  /// - Returns: An index offset by `distance` from the index `i`, unless that
+  ///   index would be beyond `limit` in the direction of movement. In that
+  ///   case, the method returns `nil`.
   ///
   /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the absolute
-  ///   value of `n`.
+  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the absolute
+  ///   value of `distance`.
   @inlinable
   public func index(
-    _ i: Index, offsetBy n: Int, limitedBy limit: Index
+    _ i: Index, offsetBy distance: Int, limitedBy limit: Index
   ) -> Index? {
-    return self._advanceForward(i, by: n, limitedBy: limit)
+    return self._advanceForward(i, by: distance, limitedBy: limit)
   }
 
   /// Offsets the given index by the specified distance.
   ///
-  /// The value passed as `n` must not offset `i` beyond the bounds of the
-  /// collection.
+  /// The value passed as `distance` must not offset `i` beyond the bounds of
+  /// the collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
-  ///   - n: The distance to offset `i`. `n` must not be negative unless the
-  ///     collection conforms to the `BidirectionalCollection` protocol.
+  ///   - distance: The distance to offset `i`. `distance` must not be negative
+  ///     unless the collection conforms to the `BidirectionalCollection`
+  ///     protocol.
   ///
   /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the absolute
-  ///   value of `n`.
+  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the absolute
+  ///   value of `distance`.
   @inlinable
-  public func formIndex(_ i: inout Index, offsetBy n: Int) {
-    i = index(i, offsetBy: n)
+  public func formIndex(_ i: inout Index, offsetBy distance: Int) {
+    i = index(i, offsetBy: distance)
   }
 
   /// Offsets the given index by the specified distance, or so that it equals
   /// the given limiting index.
   ///
-  /// The value passed as `n` must not offset `i` beyond the bounds of the
-  /// collection, unless the index passed as `limit` prevents offsetting
+  /// The value passed as `distance` must not offset `i` beyond the bounds of
+  /// the collection, unless the index passed as `limit` prevents offsetting
   /// beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
-  ///   - n: The distance to offset `i`. `n` must not be negative unless the
-  ///     collection conforms to the `BidirectionalCollection` protocol.
-  ///   - limit: A valid index of the collection to use as a limit. If `n > 0`,
-  ///     a limit that is less than `i` has no effect. Likewise, if `n < 0`, a
-  ///     limit that is greater than `i` has no effect.
-  /// - Returns: `true` if `i` has been offset by exactly `n` steps without
-  ///   going beyond `limit`; otherwise, `false`. When the return value is
-  ///   `false`, the value of `i` is equal to `limit`.
+  ///   - distance: The distance to offset `i`. `distance` must not be negative
+  ///     unless the collection conforms to the `BidirectionalCollection`
+  ///     protocol.
+  ///   - limit: A valid index of the collection to use as a limit. If
+  ///     `distance > 0`, a limit that is less than `i` has no effect.
+  ///     Likewise, if `distance < 0`, a limit that is greater than `i` has no
+  ///     effect.
+  /// - Returns: `true` if `i` has been offset by exactly `distance` steps
+  ///   without going beyond `limit`; otherwise, `false`. When the return
+  ///   value is `false`, the value of `i` is equal to `limit`.
   ///
   /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the absolute
-  ///   value of `n`.
+  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the absolute
+  ///   value of `distance`.
   @inlinable
   public func formIndex(
-    _ i: inout Index, offsetBy n: Int, limitedBy limit: Index
+    _ i: inout Index, offsetBy distance: Int, limitedBy limit: Index
   ) -> Bool {
-    if let advancedIndex = index(i, offsetBy: n, limitedBy: limit) {
+    if let advancedIndex = index(i, offsetBy: distance, limitedBy: limit) {
       i = advancedIndex
       return true
     }
@@ -1024,7 +1002,7 @@ extension Collection {
   ///   `BidirectionalCollection` protocol.
   ///
   /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the
+  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the
   ///   resulting distance.
   @inlinable
   public func distance(from start: Index, to end: Index) -> Int {
@@ -1055,6 +1033,10 @@ extension Collection {
   ///   a random element.
   /// - Returns: A random element from the collection. If the collection is
   ///   empty, the method returns `nil`.
+  ///
+  /// - Complexity: O(1) if the collection conforms to
+  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length of
+  ///   the collection.
   @inlinable
   public func randomElement<T: RandomNumberGenerator>(
     using generator: inout T
@@ -1077,15 +1059,19 @@ extension Collection {
   ///     let randomName = names.randomElement()!
   ///     // randomName == "Amani"
   ///
-  /// This method uses the default random generator, `Random.default`. The call
-  /// to `names.randomElement()` above is equivalent to calling
-  /// `names.randomElement(using: &Random.default)`.
+  /// This method is equivalent to calling the version that takes a generator, 
+  /// passing in the system's default random generator.
   ///
   /// - Returns: A random element from the collection. If the collection is
   ///   empty, the method returns `nil`.
+  ///
+  /// - Complexity: O(1) if the collection conforms to
+  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length of
+  ///   the collection.
   @inlinable
   public func randomElement() -> Element? {
-    return randomElement(using: &Random.default)
+    var g = SystemRandomNumberGenerator()
+    return randomElement(using: &g)
   }
 
   /// Do not use this method directly; call advanced(by: n) instead.
@@ -1127,7 +1113,7 @@ extension Collection {
 /// `IndexingIterator<Self>`.
 extension Collection where Iterator == IndexingIterator<Self> {
   /// Returns an iterator over the elements of the collection.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // trivial-implementation
   @inline(__always)
   public func makeIterator() -> IndexingIterator<Self> {
     return IndexingIterator(_elements: self)
@@ -1277,7 +1263,7 @@ extension Collection {
   /// - Complexity: Hopefully less than O(`count`).
   @inlinable
   public // dispatching
-  func _customIndexOfEquatableElement(_: Iterator.Element) -> Index?? {
+  func _customIndexOfEquatableElement(_: Element) -> Index?? {
     return nil
   }
 
@@ -1356,18 +1342,19 @@ extension Collection {
   ///     print(numbers.dropFirst(10))
   ///     // Prints "[]"
   ///
-  /// - Parameter n: The number of elements to drop from the beginning of
-  ///   the collection. `n` must be greater than or equal to zero.
+  /// - Parameter k: The number of elements to drop from the beginning of
+  ///   the collection. `k` must be greater than or equal to zero.
   /// - Returns: A subsequence starting after the specified number of
   ///   elements.
   ///
-  /// - Complexity: O(*n*), where *n* is the number of elements to drop from
-  ///   the beginning of the collection.
+  /// - Complexity: O(1) if the collection conforms to
+  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the number of
+  ///   elements to drop from the beginning of the collection.
   @inlinable
-  public func dropFirst(_ n: Int) -> SubSequence {
-    _precondition(n >= 0, "Can't drop a negative number of elements from a collection")
+  public func dropFirst(_ k: Int) -> SubSequence {
+    _precondition(k >= 0, "Can't drop a negative number of elements from a collection")
     let start = index(startIndex,
-      offsetBy: n, limitedBy: endIndex) ?? endIndex
+      offsetBy: k, limitedBy: endIndex) ?? endIndex
     return self[start..<endIndex]
   }
 
@@ -1383,17 +1370,19 @@ extension Collection {
   ///     print(numbers.dropLast(10))
   ///     // Prints "[]"
   ///
-  /// - Parameter n: The number of elements to drop off the end of the
-  ///   collection. `n` must be greater than or equal to zero.
+  /// - Parameter k: The number of elements to drop off the end of the
+  ///   collection. `k` must be greater than or equal to zero.
   /// - Returns: A subsequence that leaves off the specified number of elements
   ///   at the end.
   ///
-  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  /// - Complexity: O(1) if the collection conforms to
+  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length of
+  ///   the collection.
   @inlinable
-  public func dropLast(_ n: Int) -> SubSequence {
+  public func dropLast(_ k: Int) -> SubSequence {
     _precondition(
-      n >= 0, "Can't drop a negative number of elements from a collection")
-    let amount = Swift.max(0, count - n)
+      k >= 0, "Can't drop a negative number of elements from a collection")
+    let amount = Swift.max(0, count - k)
     let end = index(startIndex,
       offsetBy: amount, limitedBy: endIndex) ?? endIndex
     return self[startIndex..<end]
@@ -1435,6 +1424,10 @@ extension Collection {
   ///   `maxLength` must be greater than or equal to zero.
   /// - Returns: A subsequence starting at the beginning of this collection
   ///   with at most `maxLength` elements.
+  ///
+  /// - Complexity: O(1) if the collection conforms to
+  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the number of
+  ///   elements to select from the beginning of the collection.
   @inlinable
   public func prefix(_ maxLength: Int) -> SubSequence {
     _precondition(
@@ -1482,7 +1475,9 @@ extension Collection {
   /// - Returns: A subsequence terminating at the end of the collection with at
   ///   most `maxLength` elements.
   ///
-  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  /// - Complexity: O(1) if the collection conforms to
+  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length of
+  ///   the collection.
   @inlinable
   public func suffix(_ maxLength: Int) -> SubSequence {
     _precondition(
@@ -1651,6 +1646,8 @@ extension Collection {
   ///     split at that element.
   /// - Returns: An array of subsequences, split from this collection's
   ///   elements.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
   public func split(
     maxSplits: Int = Int.max,
@@ -1744,6 +1741,8 @@ extension Collection where Element : Equatable {
   ///     subsequences are returned. The default value is `true`.
   /// - Returns: An array of subsequences, split from this collection's
   ///   elements.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
   public func split(
     separator: Element,
@@ -1779,19 +1778,20 @@ extension Collection where SubSequence == Self {
   /// Removes the specified number of elements from the beginning of the
   /// collection.
   ///
-  /// - Parameter n: The number of elements to remove. `n` must be greater than
+  /// - Parameter k: The number of elements to remove. `k` must be greater than
   ///   or equal to zero, and must be less than or equal to the number of
   ///   elements in the collection.
   ///
   /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*n*).
+  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the specified
+  ///   number of elements.
   @inlinable
-  public mutating func removeFirst(_ n: Int) {
-    if n == 0 { return }
-    _precondition(n >= 0, "Number of elements to remove should be non-negative")
-    _precondition(count >= n,
+  public mutating func removeFirst(_ k: Int) {
+    if k == 0 { return }
+    _precondition(k >= 0, "Number of elements to remove should be non-negative")
+    _precondition(count >= k,
       "Can't remove more items from a collection than it contains")
-    self = self[index(startIndex, offsetBy: n)..<endIndex]
+    self = self[index(startIndex, offsetBy: k)..<endIndex]
   }
 }
 
@@ -1801,37 +1801,5 @@ extension Collection {
     _ preprocess: () throws -> R
   ) rethrows -> R? {
     return try preprocess()
-  }
-}
-
-extension Collection {
-  // FIXME: <rdar://problem/34142121>
-  // This typealias should be removed as it predates the source compatibility
-  // guarantees of Swift 3, but it cannot due to a bug.
-  @available(*, unavailable, renamed: "Iterator")
-  public typealias Generator = Iterator
-
-  @available(swift, deprecated: 3.2, renamed: "Element")
-  public typealias _Element = Element
-
-  @available(*, deprecated, message: "all index distances are now of type Int")
-  public func index<T: BinaryInteger>(_ i: Index, offsetBy n: T) -> Index {
-    return index(i, offsetBy: Int(n))
-  }
-  @available(*, deprecated, message: "all index distances are now of type Int")
-  public func formIndex<T: BinaryInteger>(_ i: inout Index, offsetBy n: T) {
-    return formIndex(&i, offsetBy: Int(n))
-  }
-  @available(*, deprecated, message: "all index distances are now of type Int")
-  public func index<T: BinaryInteger>(_ i: Index, offsetBy n: T, limitedBy limit: Index) -> Index? {
-    return index(i, offsetBy: Int(n), limitedBy: limit)
-  }
-  @available(*, deprecated, message: "all index distances are now of type Int")
-  public func formIndex<T: BinaryInteger>(_ i: inout Index, offsetBy n: T, limitedBy limit: Index) -> Bool {
-    return formIndex(&i, offsetBy: Int(n), limitedBy: limit)
-  }
-  @available(*, deprecated, message: "all index distances are now of type Int")
-  public func distance<T: BinaryInteger>(from start: Index, to end: Index) -> T {
-    return numericCast(distance(from: start, to: end) as Int)
   }
 }

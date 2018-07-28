@@ -17,9 +17,10 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Timer.h"
+#include "swift/Demangling/Demangle.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Parse/Parser.h"
 #include "swift/Parse/ParseSILSupport.h"
+#include "swift/Parse/Parser.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
@@ -28,8 +29,8 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
-#include "swift/Syntax/SyntaxKind.h"
 #include "swift/Subsystems.h"
+#include "swift/Syntax/SyntaxKind.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/SaveAndRestore.h"
 
@@ -98,6 +99,12 @@ SILParserState::SILParserState(SILModule *M)
     : Impl(M ? llvm::make_unique<SILParserTUState>(*M) : nullptr) {}
 
 SILParserState::~SILParserState() = default;
+
+void PrettyStackTraceParser::print(llvm::raw_ostream &out) const {
+  out << "With parser at source location: ";
+  P.Tok.getLoc().print(out, P.Context.SourceMgr);
+  out << '\n';
+}
 
 bool swift::parseIntoSourceFile(SourceFile &SF,
                                 unsigned BufferID,
@@ -840,6 +847,7 @@ void SILParser::convertRequirements(SILFunction *F,
 
   auto *GenericEnv = F->getGenericEnvironment();
   assert(GenericEnv);
+  (void)GenericEnv;
 
   IdentTypeReprLookup PerformLookup(P);
   // Use parser lexical scopes to resolve references
@@ -912,6 +920,8 @@ static bool parseDeclSILOptional(bool *isTransparent,
       *isCanonical = true;
     else if (isThunk && SP.P.Tok.getText() == "thunk")
       *isThunk = IsThunk;
+    else if (isThunk && SP.P.Tok.getText() == "signature_optimized_thunk")
+      *isThunk = IsSignatureOptimizedThunk;
     else if (isThunk && SP.P.Tok.getText() == "reabstraction_thunk")
       *isThunk = IsReabstractionThunk;
     else if (isGlobalInit && SP.P.Tok.getText() == "global_init")
@@ -1234,6 +1244,8 @@ static Optional<AccessorKind> getAccessorKind(StringRef ident) {
            .Case("addressor", AccessorKind::Address)
            .Case("mutableAddressor", AccessorKind::MutableAddress)
            .Case("materializeForSet", AccessorKind::MaterializeForSet)
+           .Case("read", AccessorKind::Read)
+           .Case("modify", AccessorKind::Modify)
            .Default(None);
 }
 
@@ -1292,7 +1304,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
                  (accessorKind = getAccessorKind(Id.str())).hasValue()) {
         auto storageDecl = dyn_cast<AbstractStorageDecl>(VD);
         auto accessor = (storageDecl
-                           ? storageDecl->getAccessorFunction(*accessorKind)
+                           ? storageDecl->getAccessor(*accessorKind)
                            : nullptr);
         if (!accessor) {
           P.diagnose(IdLoc, diag::referenced_value_no_accessor, 0);
@@ -1303,8 +1315,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
         // Update values for this accessor kind.
         for (unsigned I = 0, E = values.size(); I < E; I++)
           if (auto otherDecl = dyn_cast<AbstractStorageDecl>(values[I]))
-            if (auto otherAccessor =
-                  otherDecl->getAccessorFunction(*accessorKind))
+            if (auto otherAccessor = otherDecl->getAccessor(*accessorKind))
               values[I] = otherAccessor;
         ParseState = 1;
       } else if (!ParseState && Id.str() == "allocator") {
@@ -1934,79 +1945,6 @@ SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
     component =
       KeyPathPatternComponent::forStoredProperty(cast<VarDecl>(prop), ty);
     return false;
-  } else if (componentKind.str() == "external") {
-    ValueDecl *externalDecl;
-    SmallVector<ParsedSubstitution, 4> parsedSubs;
-    SmallVector<KeyPathPatternComponent::Index, 4> indexes;
-    CanType ty;
-
-    if (parseSILDottedPath(externalDecl)
-        || parseSubstitutions(parsedSubs, patternEnv))
-      return true;
-
-    if (P.consumeIf(tok::l_square)) {
-      if (parseComponentIndices(indexes))
-        return true;
-    }
-    
-    if (P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":")
-        || P.parseToken(tok::sil_dollar,
-                        diag::expected_tok_in_sil_instr, "$")
-        || parseASTType(ty, patternEnv))
-      return true;
-
-    SILFunction *equals = nullptr;
-    SILFunction *hash = nullptr;
-
-    while (P.consumeIf(tok::comma)) {
-      Identifier subKind;
-      SourceLoc subKindLoc;
-      if (parseSILIdentifier(subKind, subKindLoc,
-                             diag::sil_keypath_expected_component_kind))
-        return true;
-
-      if (subKind.str() == "indices_equals") {
-        if (parseSILFunctionRef(InstLoc, equals))
-          return true;
-      } else if (subKind.str() == "indices_hash") {
-        if (parseSILFunctionRef(InstLoc, hash))
-          return true;
-      } else {
-        P.diagnose(subKindLoc, diag::sil_keypath_unknown_component_kind,
-                   subKind);
-        return true;
-      }
-    }
-
-    if (!indexes.empty() != (equals && hash)) {
-      P.diagnose(componentLoc,
-                 diag::sil_keypath_external_missing_part);
-      return true;
-    }
-
-    SubstitutionMap subsMap;
-    if (!parsedSubs.empty()) {
-      auto genericEnv = externalDecl->getInnermostDeclContext()
-                                    ->getGenericEnvironmentOfContext();
-      if (!genericEnv) {
-        P.diagnose(P.Tok,
-                   diag::sil_substitutions_on_non_polymorphic_type);
-        return true;
-      }
-      subsMap = getApplySubstitutionsFromParsed(*this, genericEnv, parsedSubs);
-      if (!subsMap) return true;
-
-      // Map the substitutions out of the pattern context so that they
-      // use interface types.
-      subsMap = subsMap.mapReplacementTypesOutOfContext().getCanonical();
-    }
-
-    auto indexesCopy = P.Context.AllocateCopy(indexes);
-
-    component = KeyPathPatternComponent::forExternal(
-        cast<AbstractStorageDecl>(externalDecl),
-        subsMap, indexesCopy, equals, hash, ty);
-    return false;
   } else if (componentKind.str() == "gettable_property"
              || componentKind.str() == "settable_property") {
     bool isSettable = componentKind.str()[0] == 's';
@@ -2024,6 +1962,8 @@ SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
     SILFunction *setter = nullptr;
     SILFunction *equals = nullptr;
     SILFunction *hash = nullptr;
+    AbstractStorageDecl *externalDecl = nullptr;
+    SubstitutionMap externalSubs;
     SmallVector<KeyPathPatternComponent::Index, 4> indexes;
     while (true) {
       Identifier subKind;
@@ -2069,6 +2009,34 @@ SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
       } else if (subKind.str() == "indices_hash") {
         if (parseSILFunctionRef(InstLoc, hash))
           return true;
+      } else if (subKind.str() == "external") {
+        ValueDecl *parsedExternalDecl;
+        SmallVector<ParsedSubstitution, 4> parsedSubs;
+
+        if (parseSILDottedPath(parsedExternalDecl)
+            || parseSubstitutions(parsedSubs, patternEnv))
+          return true;
+
+        externalDecl = cast<AbstractStorageDecl>(parsedExternalDecl);
+
+        if (!parsedSubs.empty()) {
+          auto genericEnv = externalDecl->getInnermostDeclContext()
+                                        ->getGenericEnvironmentOfContext();
+          if (!genericEnv) {
+            P.diagnose(P.Tok,
+                       diag::sil_substitutions_on_non_polymorphic_type);
+            return true;
+          }
+          externalSubs = getApplySubstitutionsFromParsed(*this, genericEnv,
+                                                         parsedSubs);
+          if (!externalSubs) return true;
+
+          // Map the substitutions out of the pattern context so that they
+          // use interface types.
+          externalSubs =
+            externalSubs.mapReplacementTypesOutOfContext().getCanonical();
+        }
+
       } else {
         P.diagnose(subKindLoc, diag::sil_keypath_unknown_component_kind,
                    subKind);
@@ -2117,11 +2085,13 @@ SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
     if (isSettable) {
       component = KeyPathPatternComponent::forComputedSettableProperty(
                              id, getter, setter,
-                             indexesCopy, equals, hash, componentTy);
+                             indexesCopy, equals, hash,
+                             externalDecl, externalSubs, componentTy);
     } else {
       component = KeyPathPatternComponent::forComputedGettableProperty(
                              id, getter,
-                             indexesCopy, equals, hash, componentTy);
+                             indexesCopy, equals, hash,
+                             externalDecl, externalSubs, componentTy);
     }
     return false;
   } else if (componentKind.str() == "optional_wrap"
@@ -2681,7 +2651,6 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     UNARY_INSTRUCTION(IsUniqueOrPinned)
     UNARY_INSTRUCTION(DestroyAddr)
     UNARY_INSTRUCTION(CopyValue)
-    UNARY_INSTRUCTION(CopyUnownedValue)
     UNARY_INSTRUCTION(DestroyValue)
     UNARY_INSTRUCTION(CondFail)
     UNARY_INSTRUCTION(EndBorrowArgument)
@@ -2694,15 +2663,18 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     REFCOUNTING_INSTRUCTION(StrongRetain)
     REFCOUNTING_INSTRUCTION(StrongRelease)
     REFCOUNTING_INSTRUCTION(StrongUnpin)
-    REFCOUNTING_INSTRUCTION(StrongRetainUnowned)
-    REFCOUNTING_INSTRUCTION(UnownedRetain)
-    REFCOUNTING_INSTRUCTION(UnownedRelease)
     REFCOUNTING_INSTRUCTION(AutoreleaseValue)
     REFCOUNTING_INSTRUCTION(SetDeallocating)
     REFCOUNTING_INSTRUCTION(ReleaseValue)
     REFCOUNTING_INSTRUCTION(RetainValue)
     REFCOUNTING_INSTRUCTION(ReleaseValueAddr)
     REFCOUNTING_INSTRUCTION(RetainValueAddr)
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+    REFCOUNTING_INSTRUCTION(StrongRetain##Name) \
+    REFCOUNTING_INSTRUCTION(Name##Retain) \
+    REFCOUNTING_INSTRUCTION(Name##Release) \
+    UNARY_INSTRUCTION(Copy##Name##Value)
+#include "swift/AST/ReferenceStorage.def"
 #undef UNARY_INSTRUCTION
 #undef REFCOUNTING_INSTRUCTION
 
@@ -2789,32 +2761,22 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
    break;
  }
 
- case SILInstructionKind::LoadUnownedInst:
- case SILInstructionKind::LoadWeakInst: {
-   bool isTake = false;
-   SourceLoc addrLoc;
-   if (parseSILOptional(isTake, *this, "take") ||
-       parseTypedValueRef(Val, addrLoc, B) ||
-       parseSILDebugLocation(InstLoc, B))
-     return true;
-
-   if (Opcode == SILInstructionKind::LoadUnownedInst) {
-     if (!Val->getType().is<UnownedStorageType>()) {
-       P.diagnose(addrLoc, diag::sil_operand_not_unowned_address, "source",
-                  OpcodeName);
-     }
-     ResultVal = B.createLoadUnowned(InstLoc, Val, IsTake_t(isTake));
-
-   } else {
-     if (!Val->getType().is<WeakStorageType>()) {
-       P.diagnose(addrLoc, diag::sil_operand_not_weak_address, "source",
-                  OpcodeName);
-     }
-     ResultVal = B.createLoadWeak(InstLoc, Val, IsTake_t(isTake));
-   }
-
-   break;
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case SILInstructionKind::Load##Name##Inst: { \
+    bool isTake = false; \
+    SourceLoc addrLoc; \
+    if (parseSILOptional(isTake, *this, "take") || \
+        parseTypedValueRef(Val, addrLoc, B) || \
+        parseSILDebugLocation(InstLoc, B)) \
+      return true; \
+    if (!Val->getType().is<Name##StorageType>()) { \
+      P.diagnose(addrLoc, diag::sil_operand_not_ref_storage_address, \
+                 "source", OpcodeName, ReferenceOwnership::Name); \
+    } \
+    ResultVal = B.createLoad##Name(InstLoc, Val, IsTake_t(isTake)); \
+    break; \
   }
+#include "swift/AST/ReferenceStorage.def"
 
   case SILInstructionKind::CopyBlockWithoutEscapingInst: {
     SILValue Closure;
@@ -2979,10 +2941,10 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
   case SILInstructionKind::BridgeObjectToWordInst:
   case SILInstructionKind::RefToRawPointerInst:
   case SILInstructionKind::RawPointerToRefInst:
-  case SILInstructionKind::RefToUnownedInst:
-  case SILInstructionKind::UnownedToRefInst:
-  case SILInstructionKind::RefToUnmanagedInst:
-  case SILInstructionKind::UnmanagedToRefInst:
+#define LOADABLE_REF_STORAGE(Name, ...) \
+  case SILInstructionKind::RefTo##Name##Inst: \
+  case SILInstructionKind::Name##ToRefInst:
+#include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::ThinFunctionToPointerInst:
   case SILInstructionKind::PointerToThinFunctionInst:
   case SILInstructionKind::ThinToThickFunctionInst:
@@ -3061,18 +3023,14 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     case SILInstructionKind::RawPointerToRefInst:
       ResultVal = B.createRawPointerToRef(InstLoc, Val, Ty);
       break;
-    case SILInstructionKind::RefToUnownedInst:
-      ResultVal = B.createRefToUnowned(InstLoc, Val, Ty);
+#define LOADABLE_REF_STORAGE(Name, ...) \
+    case SILInstructionKind::RefTo##Name##Inst: \
+      ResultVal = B.createRefTo##Name(InstLoc, Val, Ty); \
+      break; \
+    case SILInstructionKind::Name##ToRefInst: \
+      ResultVal = B.create##Name##ToRef(InstLoc, Val, Ty); \
       break;
-    case SILInstructionKind::UnownedToRefInst:
-      ResultVal = B.createUnownedToRef(InstLoc, Val, Ty);
-      break;
-    case SILInstructionKind::RefToUnmanagedInst:
-      ResultVal = B.createRefToUnmanaged(InstLoc, Val, Ty);
-      break;
-    case SILInstructionKind::UnmanagedToRefInst:
-      ResultVal = B.createUnmanagedToRef(InstLoc, Val, Ty);
-      break;
+#include "swift/AST/ReferenceStorage.def"
     case SILInstructionKind::ThinFunctionToPointerInst:
       ResultVal = B.createThinFunctionToPointer(InstLoc, Val, Ty);
       break;
@@ -3560,11 +3518,16 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     break;
   }
 
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case SILInstructionKind::Store##Name##Inst:
+#include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::StoreBorrowInst:
-  case SILInstructionKind::AssignInst:
-  case SILInstructionKind::StoreUnownedInst:
-  case SILInstructionKind::StoreWeakInst: {
+  case SILInstructionKind::AssignInst: {
     UnresolvedValueName from;
+    bool isRefStorage = false;
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+    isRefStorage |= Opcode == SILInstructionKind::Store##Name##Inst;
+#include "swift/AST/ReferenceStorage.def"
 
     SourceLoc toLoc, addrLoc;
     Identifier toToken;
@@ -3573,9 +3536,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     if (parseValueName(from) ||
         parseSILIdentifier(toToken, toLoc,
                            diag::expected_tok_in_sil_instr, "to") ||
-        ((Opcode == SILInstructionKind::StoreWeakInst ||
-          Opcode == SILInstructionKind::StoreUnownedInst) &&
-         parseSILOptional(isInit, *this, "initialization")) ||
+        (isRefStorage && parseSILOptional(isInit, *this, "initialization")) ||
         parseTypedValueRef(addrVal, addrLoc, B) ||
         parseSILDebugLocation(InstLoc, B))
       return true;
@@ -3598,33 +3559,21 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       break;
     }
 
-    if (Opcode == SILInstructionKind::StoreUnownedInst) {
-      auto refType = addrVal->getType().getAs<UnownedStorageType>();
-      if (!refType) {
-        P.diagnose(addrLoc, diag::sil_operand_not_unowned_address,
-                   "destination", OpcodeName);
-        return true;
-      }
-      auto valueTy = SILType::getPrimitiveObjectType(refType.getReferentType());
-      ResultVal = B.createStoreUnowned(InstLoc,
-                                       getLocalValue(from, valueTy, InstLoc, B),
-                                       addrVal, IsInitialization_t(isInit));
-      break;
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+    if (Opcode == SILInstructionKind::Store##Name##Inst) { \
+      auto refType = addrVal->getType().getAs<Name##StorageType>(); \
+      if (!refType) { \
+        P.diagnose(addrLoc, diag::sil_operand_not_ref_storage_address, \
+                   "destination", OpcodeName, ReferenceOwnership::Name); \
+        return true; \
+      } \
+      auto valueTy =SILType::getPrimitiveObjectType(refType.getReferentType());\
+      ResultVal = B.createStore##Name(InstLoc, \
+                                      getLocalValue(from, valueTy, InstLoc, B),\
+                                      addrVal, IsInitialization_t(isInit)); \
+      break; \
     }
-
-    if (Opcode == SILInstructionKind::StoreWeakInst) {
-      auto refType = addrVal->getType().getAs<WeakStorageType>();
-      if (!refType) {
-        P.diagnose(addrLoc, diag::sil_operand_not_weak_address,
-                   "destination", OpcodeName);
-        return true;
-      }
-      auto valueTy = SILType::getPrimitiveObjectType(refType.getReferentType());
-      ResultVal = B.createStoreWeak(InstLoc,
-                                    getLocalValue(from, valueTy, InstLoc, B),
-                                    addrVal, IsInitialization_t(isInit));
-      break;
-    }
+#include "swift/AST/ReferenceStorage.def"
 
     SILType ValType = addrVal->getType().getObjectType();
 
@@ -5143,7 +5092,6 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
         if (!F->getModule()
                  .getOptions()
                  .AssumeUnqualifiedOwnershipWhenParsing &&
-            F->getModule().getOptions().EnableSILOwnership &&
             parseSILOwnership(OwnershipKind))
           return true;
 
@@ -5372,6 +5320,53 @@ bool SILParserTUState::parseDeclSILStage(Parser &P) {
   return false;
 }
 
+/// Lookup a global variable declaration from its demangled name.
+///
+/// A variable declaration exists for all sil_global variables defined in
+/// Swift. A Swift global defined outside this module will be exposed
+/// via an addressor rather than as a sil_global. Globals imported
+/// from clang will produce a sil_global but will not have any corresponding
+/// VarDecl.
+///
+/// FIXME: lookupGlobalDecl() can handle collisions between private or
+/// fileprivate global variables in the same SIL Module, but the typechecker
+/// will still incorrectly diagnose this as an "invalid redeclaration" and give
+/// all but the first declaration an error type.
+static Optional<VarDecl *> lookupGlobalDecl(Identifier GlobalName,
+                                            SILLinkage GlobalLinkage,
+                                            SILType GlobalType, Parser &P) {
+  // Create a set of DemangleOptions to produce the global variable's
+  // identifier, which is used as a search key in the declaration context.
+  Demangle::DemangleOptions demangleOpts;
+  demangleOpts.QualifyEntities = false;
+  demangleOpts.ShowPrivateDiscriminators = false;
+  demangleOpts.DisplayEntityTypes = false;
+  std::string GlobalDeclName = Demangle::demangleSymbolAsString(
+    GlobalName.str(), demangleOpts);
+
+  SmallVector<ValueDecl *, 4> CurModuleResults;
+  P.SF.getParentModule()->lookupValue(
+      {}, P.Context.getIdentifier(GlobalDeclName), NLKind::UnqualifiedLookup,
+      CurModuleResults);
+  // Bail-out on clang-imported globals.
+  if (CurModuleResults.empty())
+    return nullptr;
+
+  // private and fileprivate globals of the same name may be merged into a
+  // single SIL module. Find the declaration with the correct type and
+  // linkage. (If multiple globals have the same type and linkage then it
+  // doesn't matter which declaration we use).
+  for (ValueDecl *ValDecl : CurModuleResults) {
+    auto *VD = cast<VarDecl>(ValDecl);
+    CanType DeclTy = VD->getType()->getCanonicalType();
+    if (DeclTy == GlobalType.getASTType()
+        && getDeclSILLinkage(VD) == GlobalLinkage) {
+      return VD;
+    }
+  }
+  return None;
+}
+
 /// decl-sil-global: [[only in SIL mode]]
 ///   'sil_global' sil-linkage @name : sil-type [external]
 bool SILParserTUState::parseSILGlobal(Parser &P) {
@@ -5404,11 +5399,16 @@ bool SILParserTUState::parseSILGlobal(Parser &P) {
   if (!GlobalLinkage.hasValue())
     GlobalLinkage = SILLinkage::DefaultForDefinition;
 
-  // FIXME: check for existing global variable?
-  auto *GV = SILGlobalVariable::create(M, GlobalLinkage.getValue(),
-                                       isSerialized,
-                                       GlobalName.str(),GlobalType,
-                                       RegularLocation(NameLoc));
+  // Lookup the global variable declaration for this sil_global.
+  auto VD =
+      lookupGlobalDecl(GlobalName, GlobalLinkage.getValue(), GlobalType, P);
+  if (!VD) {
+    P.diagnose(NameLoc, diag::sil_global_variable_not_found, GlobalName);
+    return true;
+  }
+  auto *GV = SILGlobalVariable::create(
+      M, GlobalLinkage.getValue(), isSerialized, GlobalName.str(), GlobalType,
+      RegularLocation(NameLoc), VD.getValue());
 
   GV->setLet(isLet);
   // Parse static initializer if exists.
@@ -5464,18 +5464,25 @@ bool SILParserTUState::parseSILProperty(Parser &P) {
   }
 
   Identifier ComponentKind;
-  KeyPathPatternComponent Component;
+  Optional<KeyPathPatternComponent> Component;
   SourceLoc ComponentLoc;
   SmallVector<SILType, 4> OperandTypes;
 
-  if (P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "(")
-      || P.parseIdentifier(ComponentKind, ComponentLoc,
-                           diag::expected_tok_in_sil_instr, "component kind")
-      || SP.parseKeyPathPatternComponent(Component, OperandTypes,
-               ComponentLoc, ComponentKind, InstLoc,
-               patternEnv)
-      || P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr, ")"))
+  if (P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "("))
     return true;
+  
+  if (!P.consumeIf(tok::r_paren)) {
+    KeyPathPatternComponent parsedComponent;
+    if (P.parseIdentifier(ComponentKind, ComponentLoc,
+                          diag::expected_tok_in_sil_instr, "component kind")
+        || SP.parseKeyPathPatternComponent(parsedComponent, OperandTypes,
+                 ComponentLoc, ComponentKind, InstLoc,
+                 patternEnv)
+        || P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr, ")"))
+      return true;
+    
+    Component = std::move(parsedComponent);
+  }
   
   SILProperty::create(M, Serialized,
                       cast<AbstractStorageDecl>(VD), Component);

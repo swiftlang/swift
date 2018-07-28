@@ -645,7 +645,7 @@ emitArgumentConversion(SmallVectorImpl<SILValue> &CallArgs) {
     unsigned ArgIdx = OrigArg->getIndex();
 
     auto CastArg = emitArgumentCast(SubstitutedType, OrigArg, ArgIdx);
-    DEBUG(dbgs() << "  Cast generic arg: "; CastArg->print(dbgs()));
+    LLVM_DEBUG(dbgs() << "  Cast generic arg: "; CastArg->print(dbgs()));
 
     if (!substConv.useLoweredAddresses()) {
       CallArgs.push_back(CastArg);
@@ -704,15 +704,16 @@ public:
 static SILFunction *eagerSpecialize(SILFunction *GenericFunc,
                                     const SILSpecializeAttr &SA,
                                     const ReabstractionInfo &ReInfo) {
-  DEBUG(dbgs() << "Specializing " << GenericFunc->getName() << "\n");
+  LLVM_DEBUG(dbgs() << "Specializing " << GenericFunc->getName() << "\n");
 
-  DEBUG(auto FT = GenericFunc->getLoweredFunctionType();
-        dbgs() << "  Generic Sig:";
-        dbgs().indent(2); FT->getGenericSignature()->print(dbgs());
-        dbgs() << "  Generic Env:";
-        dbgs().indent(2); GenericFunc->getGenericEnvironment()->dump(dbgs());
-        dbgs() << "  Specialize Attr:";
-        SA.print(dbgs()); dbgs() << "\n");
+  LLVM_DEBUG(auto FT = GenericFunc->getLoweredFunctionType();
+             dbgs() << "  Generic Sig:";
+             dbgs().indent(2); FT->getGenericSignature()->print(dbgs());
+             dbgs() << "  Generic Env:";
+             dbgs().indent(2);
+             GenericFunc->getGenericEnvironment()->dump(dbgs());
+             dbgs() << "  Specialize Attr:";
+             SA.print(dbgs()); dbgs() << "\n");
 
   IsSerialized_t Serialized = IsNotSerialized;
   if (GenericFunc->isSerialized())
@@ -724,7 +725,7 @@ static SILFunction *eagerSpecialize(SILFunction *GenericFunc,
 
   SILFunction *NewFunc = FuncSpecializer.trySpecialization();
   if (!NewFunc)
-    DEBUG(dbgs() << "  Failed. Cannot specialize function.\n");
+    LLVM_DEBUG(dbgs() << "  Failed. Cannot specialize function.\n");
   return NewFunc;
 }
 
@@ -736,8 +737,8 @@ void EagerSpecializerTransform::run() {
   // Process functions in any order.
   for (auto &F : *getModule()) {
     if (!F.shouldOptimize()) {
-      DEBUG(dbgs() << "  Cannot specialize function " << F.getName()
-                   << " marked to be excluded from optimizations.\n");
+      LLVM_DEBUG(dbgs() << "  Cannot specialize function " << F.getName()
+                        << " marked to be excluded from optimizations.\n");
       continue;
     }
     // Only specialize functions in their home module.

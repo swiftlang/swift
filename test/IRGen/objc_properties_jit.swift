@@ -3,11 +3,11 @@
 import Foundation
 
 extension NSString {
-  class var classProp: Int {
+  @objc class var classProp: Int {
     get { fatalError() }
     set { fatalError() }
   }
-  var instanceProp: Int {
+  @objc var instanceProp: Int {
     get { fatalError() }
     set { fatalError() }
   }

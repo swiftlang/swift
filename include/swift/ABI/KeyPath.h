@@ -190,7 +190,7 @@ public:
                       bool resolvedID) {
     return KeyPathComponentHeader(
       (_SwiftKeyPathComponentHeader_ComputedTag
-      << _SwiftKeyPathComponentHeader_DiscriminatorShift)
+        << _SwiftKeyPathComponentHeader_DiscriminatorShift)
       | (kind != GetOnly
            ? _SwiftKeyPathComponentHeader_ComputedSettableFlag : 0)
       | (kind == SettableMutating
@@ -205,10 +205,14 @@ public:
   }
   
   constexpr static KeyPathComponentHeader
-  forExternalComponent() {
-    return KeyPathComponentHeader(
-      _SwiftKeyPathComponentHeader_ExternalTag
-      << _SwiftKeyPathComponentHeader_DiscriminatorShift);
+  forExternalComponent(unsigned numSubstitutions) {
+    return assert(numSubstitutions <
+        (1u << _SwiftKeyPathComponentHeader_DiscriminatorShift) - 1u
+        && "too many substitutions"),
+      KeyPathComponentHeader(
+        (_SwiftKeyPathComponentHeader_ExternalTag
+          << _SwiftKeyPathComponentHeader_DiscriminatorShift)
+        | numSubstitutions);
   }
   
   constexpr uint32_t getData() const { return Data; }

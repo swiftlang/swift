@@ -29,13 +29,13 @@ struct AnArray<T> : _ObjectiveCBridgeable {
     _ x: AnNSArray,
     result: inout AnArray?
   ) {
-    _preconditionFailure("implement")
+    preconditionFailure("implement")
   }
   static func _conditionallyBridgeFromObjectiveC(
     _ x: AnNSArray,
     result: inout AnArray?
   ) -> Bool {
-    _preconditionFailure("implement")
+    preconditionFailure("implement")
   }
 }
 

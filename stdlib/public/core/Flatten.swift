@@ -85,6 +85,8 @@ extension FlattenSequence.Iterator: IteratorProtocol {
   }
 }
 
+extension FlattenSequence.Iterator: Sequence { }
+
 extension FlattenSequence: Sequence {
   /// Returns an iterator over the elements of this sequence.
   ///
@@ -525,10 +527,3 @@ extension LazyCollectionProtocol
     return FlattenCollection(elements).lazy
   }
 }
-
-// @available(*, deprecated, renamed: "FlattenCollection.Index")
-public typealias FlattenCollectionIndex<T> = FlattenCollection<T>.Index where T : Collection, T.Element : Collection
-@available(*, deprecated, renamed: "FlattenCollection.Index")
-public typealias FlattenBidirectionalCollectionIndex<T> = FlattenCollection<T>.Index where T : BidirectionalCollection, T.Element : BidirectionalCollection
-@available(*, deprecated, renamed: "FlattenCollection")
-public typealias FlattenBidirectionalCollection<T> = FlattenCollection<T> where T : BidirectionalCollection, T.Element : BidirectionalCollection

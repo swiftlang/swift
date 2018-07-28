@@ -6,22 +6,30 @@
 // RUN: %target-build-swift %S/Inputs/extension_types.swift -module-name ExtensionTypes -emit-module -emit-module-path %t/types/ExtensionTypes.swiftmodule
 // This module is both not resilient:
 // RUN: %target-swift-frontend -emit-ir -o%t/not_not.ll -parse-as-library -module-name test -validate-tbd-against-ir=all -I %t/types %t/main.swift
+// RUN: %target-swift-frontend -emit-ir -o%t/not_not.ll -parse-as-library -module-name test -validate-tbd-against-ir=all -I %t/types %t/main.swift -O
 // ... and resilient:
 // RUN: %target-swift-frontend -emit-ir -o%t/not_resilient.ll -parse-as-library -module-name test -validate-tbd-against-ir=all -I %t/types %t/main.swift -enable-resilience
+// RUN: %target-swift-frontend -emit-ir -o%t/not_resilient.ll -parse-as-library -module-name test -validate-tbd-against-ir=all -I %t/types %t/main.swift -enable-resilience -O
 // The same, but with -enable-testing:
 // RUN: %target-swift-frontend -emit-ir -o%t/not_not.ll -parse-as-library -module-name test -validate-tbd-against-ir=all -I %t/types %t/main.swift -enable-testing
+// RUN: %target-swift-frontend -emit-ir -o%t/not_not.ll -parse-as-library -module-name test -validate-tbd-against-ir=all -I %t/types %t/main.swift -enable-testing -O
 // RUN: %target-swift-frontend -emit-ir -o%t/not_resilient.ll -parse-as-library -module-name test -validate-tbd-against-ir=all -I %t/types %t/main.swift -enable-resilience -enable-testing
+// RUN: %target-swift-frontend -emit-ir -o%t/not_resilient.ll -parse-as-library -module-name test -validate-tbd-against-ir=all -I %t/types %t/main.swift -enable-resilience -enable-testing -O
 
 // Other module is resilient:
 // RUN: %empty-directory(%t/types)
 // RUN: %target-build-swift %S/Inputs/extension_types.swift -module-name ExtensionTypes -emit-module -emit-module-path %t/types/ExtensionTypes.swiftmodule -Xfrontend -enable-resilience
 // This module is both not resilient:
 // RUN: %target-swift-frontend -emit-ir -o%t/resilient_not.ll -parse-as-library -module-name test -validate-tbd-against-ir=missing -I %t/types %t/main.swift
+// RUN: %target-swift-frontend -emit-ir -o%t/resilient_not.ll -parse-as-library -module-name test -validate-tbd-against-ir=missing -I %t/types %t/main.swift -O
 // ... and resilient:
 // RUN: %target-swift-frontend -emit-ir -o%t/resilient_resilient.ll -parse-as-library -module-name test -validate-tbd-against-ir=missing -I %t/types %t/main.swift -enable-resilience
+// RUN: %target-swift-frontend -emit-ir -o%t/resilient_resilient.ll -parse-as-library -module-name test -validate-tbd-against-ir=missing -I %t/types %t/main.swift -enable-resilience -O
 // The same but with -enable-testing:
 // RUN: %target-swift-frontend -emit-ir -o%t/resilient_not.ll -parse-as-library -module-name test -validate-tbd-against-ir=missing -I %t/types %t/main.swift -enable-testing
+// RUN: %target-swift-frontend -emit-ir -o%t/resilient_not.ll -parse-as-library -module-name test -validate-tbd-against-ir=missing -I %t/types %t/main.swift -enable-testing -O
 // RUN: %target-swift-frontend -emit-ir -o%t/resilient_resilient.ll -parse-as-library -module-name test -validate-tbd-against-ir=missing -I %t/types %t/main.swift -enable-resilience -enable-testing
+// RUN: %target-swift-frontend -emit-ir -o%t/resilient_resilient.ll -parse-as-library -module-name test -validate-tbd-against-ir=missing -I %t/types %t/main.swift -enable-resilience -enable-testing -O
 
 
 import ExtensionTypes

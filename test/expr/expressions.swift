@@ -256,7 +256,7 @@ func test_lambda() {
 
 func test_lambda2() {
   { () -> protocol<Int> in
-    // expected-warning @-1 {{'protocol<...>' composition syntax is deprecated and not needed here}} {{11-24=Int}}
+    // expected-error @-1 {{'protocol<...>' composition syntax has been removed and is not needed here}} {{11-24=Int}}
     // expected-error @-2 {{non-protocol, non-class type 'Int' cannot be used within a protocol-constrained type}}
     // expected-warning @-3 {{result of call to closure returning 'Any' is unused}}
     return 1
@@ -910,3 +910,10 @@ Sr3439: do {
   let obj = C();
   _ = obj[#column] // Ok.
 }
+
+// rdar://problem/23672697 - No way to express literal integers larger than Int without using type ascription
+let _: Int64 = 0xFFF_FFFF_FFFF_FFFF
+let _: Int64 = Int64(0xFFF_FFFF_FFFF_FFFF)
+let _: Int64 = 0xFFF_FFFF_FFFF_FFFF as Int64
+let _ = Int64(0xFFF_FFFF_FFFF_FFFF)
+let _ = 0xFFF_FFFF_FFFF_FFFF as Int64

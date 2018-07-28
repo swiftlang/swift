@@ -483,7 +483,7 @@ extension Hoozit {
     other()
   }
 
-  func foof() {}
+  @objc func foof() {}
   // CHECK-LABEL: sil hidden [thunk] @$S11objc_thunks6HoozitC4foofyyFTo : $@convention(objc_method) (Hoozit) -> () {
 
   var extensionProperty: Int { return 0 }

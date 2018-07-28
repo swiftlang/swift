@@ -561,7 +561,7 @@ func test_multiple_patterns1() {
     // CHECK:   [[SECOND_MATCH_CASE]]:
     // CHECK:     debug_value [[SECOND_X:%.*]] :
     // CHECK:     br [[CASE_BODY]]([[SECOND_X]] : $Int)
-    // CHECK:   [[CASE_BODY]]([[BODY_VAR:%.*]] : $Int):
+    // CHECK:   [[CASE_BODY]]([[BODY_VAR:%.*]] : @trivial $Int):
     // CHECK:     [[A:%.*]] = function_ref @$S10switch_var1a1xySi_tF
     // CHECK:     apply [[A]]([[BODY_VAR]])
     a(x: x)
@@ -618,23 +618,23 @@ func test_multiple_patterns3() {
   switch f {
     // CHECK:   switch_enum {{%.*}} : $Foo, case #Foo.A!enumelt.1: [[A:bb[0-9]+]], case #Foo.B!enumelt.1: [[B:bb[0-9]+]], case #Foo.C!enumelt.1: [[C:bb[0-9]+]]
   case .A(let x, let n), .B(let n, let x), .C(_, let x, let n):
-    // CHECK:   [[A]]({{%.*}} : $(Int, Double)):
+    // CHECK:   [[A]]({{%.*}} : @trivial $(Int, Double)):
     // CHECK:     [[A_X:%.*]] = tuple_extract
     // CHECK:     [[A_N:%.*]] = tuple_extract
     // CHECK:     br [[CASE_BODY:bb[0-9]+]]([[A_X]] : $Int, [[A_N]] : $Double)
     
-    // CHECK:   [[B]]({{%.*}} : $(Double, Int)):
+    // CHECK:   [[B]]({{%.*}} : @trivial $(Double, Int)):
     // CHECK:     [[B_N:%.*]] = tuple_extract
     // CHECK:     [[B_X:%.*]] = tuple_extract
     // CHECK:     br [[CASE_BODY]]([[B_X]] : $Int, [[B_N]] : $Double)
 
-    // CHECK:   [[C]]({{%.*}} : $(Int, Int, Double)):
+    // CHECK:   [[C]]({{%.*}} : @trivial $(Int, Int, Double)):
     // CHECK:     [[C__:%.*]] = tuple_extract
     // CHECK:     [[C_X:%.*]] = tuple_extract
     // CHECK:     [[C_N:%.*]] = tuple_extract
     // CHECK:     br [[CASE_BODY]]([[C_X]] : $Int, [[C_N]] : $Double)
 
-    // CHECK:   [[CASE_BODY]]([[BODY_X:%.*]] : $Int, [[BODY_N:%.*]] : $Double):
+    // CHECK:   [[CASE_BODY]]([[BODY_X:%.*]] : @trivial $Int, [[BODY_N:%.*]] : @trivial $Double):
     // CHECK:     [[FUNC_A:%.*]] = function_ref @$S10switch_var1a1xySi_tF
     // CHECK:     apply [[FUNC_A]]([[BODY_X]])
     a(x: x)
@@ -652,30 +652,30 @@ func test_multiple_patterns4() {
   switch b {
     // CHECK:   switch_enum {{%.*}} : $Bar, case #Bar.Y!enumelt.1: [[Y:bb[0-9]+]], case #Bar.Z!enumelt.1: [[Z:bb[0-9]+]]
   case .Y(.A(let x, _), _), .Y(.B(_, let x), _), .Y(.C, let x), .Z(let x, _):
-    // CHECK:   [[Y]]({{%.*}} : $(Foo, Int)):
+    // CHECK:   [[Y]]({{%.*}} : @trivial $(Foo, Int)):
     // CHECK:     [[Y_F:%.*]] = tuple_extract
     // CHECK:     [[Y_X:%.*]] = tuple_extract
     // CHECK:     switch_enum [[Y_F]] : $Foo, case #Foo.A!enumelt.1: [[A:bb[0-9]+]], case #Foo.B!enumelt.1: [[B:bb[0-9]+]], case #Foo.C!enumelt.1: [[C:bb[0-9]+]]
     
-    // CHECK:   [[A]]({{%.*}} : $(Int, Double)):
+    // CHECK:   [[A]]({{%.*}} : @trivial $(Int, Double)):
     // CHECK:     [[A_X:%.*]] = tuple_extract
     // CHECK:     [[A_N:%.*]] = tuple_extract
     // CHECK:     br [[CASE_BODY:bb[0-9]+]]([[A_X]] : $Int)
     
-    // CHECK:   [[B]]({{%.*}} : $(Double, Int)):
+    // CHECK:   [[B]]({{%.*}} : @trivial $(Double, Int)):
     // CHECK:     [[B_N:%.*]] = tuple_extract
     // CHECK:     [[B_X:%.*]] = tuple_extract
     // CHECK:     br [[CASE_BODY]]([[B_X]] : $Int)
     
-    // CHECK:   [[C]]({{%.*}} : $(Int, Int, Double)):
+    // CHECK:   [[C]]({{%.*}} : @trivial $(Int, Int, Double)):
     // CHECK:     br [[CASE_BODY]]([[Y_X]] : $Int)
 
-    // CHECK:   [[Z]]({{%.*}} : $(Int, Foo)):
+    // CHECK:   [[Z]]({{%.*}} : @trivial $(Int, Foo)):
     // CHECK:     [[Z_X:%.*]] = tuple_extract
     // CHECK:     [[Z_F:%.*]] = tuple_extract
     // CHECK:     br [[CASE_BODY]]([[Z_X]] : $Int)
 
-    // CHECK:   [[CASE_BODY]]([[BODY_X:%.*]] : $Int):
+    // CHECK:   [[CASE_BODY]]([[BODY_X:%.*]] : @trivial $Int):
     // CHECK:     [[FUNC_A:%.*]] = function_ref @$S10switch_var1a1xySi_tF
     // CHECK:     apply [[FUNC_A]]([[BODY_X]])
     a(x: x)
@@ -690,30 +690,30 @@ func test_multiple_patterns5() {
   switch b {
     // CHECK:   switch_enum {{%.*}} : $Bar, case #Bar.Y!enumelt.1: [[Y:bb[0-9]+]], case #Bar.Z!enumelt.1: [[Z:bb[0-9]+]]
   case .Y(.A(var x, _), _), .Y(.B(_, var x), _), .Y(.C, var x), .Z(var x, _):
-    // CHECK:   [[Y]]({{%.*}} : $(Foo, Int)):
+    // CHECK:   [[Y]]({{%.*}} : @trivial $(Foo, Int)):
     // CHECK:     [[Y_F:%.*]] = tuple_extract
     // CHECK:     [[Y_X:%.*]] = tuple_extract
     // CHECK:     switch_enum [[Y_F]] : $Foo, case #Foo.A!enumelt.1: [[A:bb[0-9]+]], case #Foo.B!enumelt.1: [[B:bb[0-9]+]], case #Foo.C!enumelt.1: [[C:bb[0-9]+]]
     
-    // CHECK:   [[A]]({{%.*}} : $(Int, Double)):
+    // CHECK:   [[A]]({{%.*}} : @trivial $(Int, Double)):
     // CHECK:     [[A_X:%.*]] = tuple_extract
     // CHECK:     [[A_N:%.*]] = tuple_extract
     // CHECK:     br [[CASE_BODY:bb[0-9]+]]([[A_X]] : $Int)
     
-    // CHECK:   [[B]]({{%.*}} : $(Double, Int)):
+    // CHECK:   [[B]]({{%.*}} : @trivial $(Double, Int)):
     // CHECK:     [[B_N:%.*]] = tuple_extract
     // CHECK:     [[B_X:%.*]] = tuple_extract
     // CHECK:     br [[CASE_BODY]]([[B_X]] : $Int)
     
-    // CHECK:   [[C]]({{%.*}} : $(Int, Int, Double)):
+    // CHECK:   [[C]]({{%.*}} : @trivial $(Int, Int, Double)):
     // CHECK:     br [[CASE_BODY]]([[Y_X]] : $Int)
     
-    // CHECK:   [[Z]]({{%.*}} : $(Int, Foo)):
+    // CHECK:   [[Z]]({{%.*}} : @trivial $(Int, Foo)):
     // CHECK:     [[Z_X:%.*]] = tuple_extract
     // CHECK:     [[Z_F:%.*]] = tuple_extract
     // CHECK:     br [[CASE_BODY]]([[Z_X]] : $Int)
     
-    // CHECK:   [[CASE_BODY]]([[BODY_X:%.*]] : $Int):
+    // CHECK:   [[CASE_BODY]]([[BODY_X:%.*]] : @trivial $Int):
     // CHECK:     store [[BODY_X]] to [trivial] [[BOX_X:%.*]] : $*Int
     // CHECK:     [[WRITE:%.*]] = begin_access [modify] [unknown] [[BOX_X]]
     // CHECK:     [[FUNC_AAA:%.*]] = function_ref @$S10switch_var3aaa1xySiz_tF

@@ -12,10 +12,10 @@
 
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/ModuleFile.h"
-#include "swift/Strings.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/FileTypes.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Version.h"
@@ -27,6 +27,7 @@
 #include <system_error>
 
 using namespace swift;
+using swift::version::Version;
 
 namespace {
 using AccessPathElem = std::pair<Identifier, SourceLoc>;
@@ -105,8 +106,8 @@ static void addDiagnosticInfoForArchitectureMismatch(ASTContext &ctx,
     auto entry = *directoryIterator;
     StringRef filePath(entry.path());
     StringRef extension = llvm::sys::path::extension(filePath);
-    if (extension.startswith(".") &&
-        extension.drop_front() == SERIALIZED_MODULE_EXTENSION) {
+    if (file_types::lookupTypeForExtension(extension) ==
+          file_types::TY_SwiftModuleFile) {
       foundArchs = foundArchs + (foundArchs.length() > 0 ? ", " : "") +
                    llvm::sys::path::stem(filePath).str();
     }
@@ -124,11 +125,12 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
   llvm::SmallString<64> moduleName(moduleID.first.str());
   llvm::SmallString<64> moduleFilename(moduleName);
   moduleFilename += '.';
-  moduleFilename += SERIALIZED_MODULE_EXTENSION;
+  moduleFilename += file_types::getExtension(file_types::TY_SwiftModuleFile);
 
   llvm::SmallString<64> moduleDocFilename(moduleID.first.str());
   moduleDocFilename += '.';
-  moduleDocFilename += SERIALIZED_MODULE_DOC_EXTENSION;
+  moduleDocFilename +=
+      file_types::getExtension(file_types::TY_SwiftModuleDocFile);
 
   // FIXME: Which name should we be using here? Do we care about CPU subtypes?
   // FIXME: At the very least, don't hardcode "arch".
@@ -138,10 +140,10 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
   llvm::SmallString<16> archDocFile{archName};
   if (!archFile.empty()) {
     archFile += '.';
-    archFile += SERIALIZED_MODULE_EXTENSION;
+    archFile += file_types::getExtension(file_types::TY_SwiftModuleFile);
 
     archDocFile += '.';
-    archDocFile += SERIALIZED_MODULE_DOC_EXTENSION;
+    archDocFile += file_types::getExtension(file_types::TY_SwiftModuleDocFile);
   }
 
   llvm::SmallString<128> scratch;
@@ -293,7 +295,7 @@ FileUnit *SerializedModuleLoader::loadAST(
 
     SmallString<32> versionBuf;
     llvm::raw_svector_ostream versionString(versionBuf);
-    versionString << Ctx.LangOpts.EffectiveLanguageVersion;
+    versionString << Version::getCurrentLanguageVersion();
     if (versionString.str() == shortVersion)
       return false;
 

@@ -51,12 +51,12 @@ class Test2 : Gizmo {
 // CHECK:    call {{.*}} @objc_release
 // CHECK:    ret void
 
-  dynamic func bar() {}
+  @objc dynamic func bar() {}
 }
 
 // Test @nonobjc.
 class Contrarian : Blammo {
-  func acquiesce() {}
+  @objc func acquiesce() {}
   @nonobjc func disharmonize() {}
   @nonobjc func eviscerate() {}
 }

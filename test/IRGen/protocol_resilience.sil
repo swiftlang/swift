@@ -38,50 +38,55 @@ import resilient_protocol
 
 // CHECK-SAME: }
 
+// Protocol descriptor for ResilientProtocol
+// CHECK: [[RESILIENT_PROTOCOL_NAME:@.*]] = private constant [18 x i8] c"ResilientProtocol\00
+// CHECK: [[ASSOCIATED_TYPES_T:@.*]] = private constant [2 x i8] c"T\00"
+// CHECK: @"$S19protocol_resilience17ResilientProtocolMp" = {{(dllexport )?}}{{(protected )?}}constant
+// CHECK-SAME:   i32 196675,
+// CHECK-SAME:   @"$S19protocol_resilienceMXM"
+// CHECK-SAME:   [[RESILIENT_PROTOCOL_NAME]]
+// CHECK-SAME:   i32 1,
+// CHECK-SAME:   i32 8,
+// CHECK-SAME:   [[ASSOCIATED_TYPES_T]]
 
-// Protocol requirements for ResilientProtocol
+// Requirement signature
+// CHECK-SAME:   i32 128,
+// CHECK-SAME:   @"$Sx1T_MXA"
+// CHECK-SAME:   @"$S19protocol_resilience17ResilientProtocolMp"
 
-// CHECK: [[RP_REQTS:@"\$S19protocol_resilience17ResilientProtocolWR"]] = internal constant [8 x %swift.protocol_requirement]
-// CHECK-SAME:  [%swift.protocol_requirement { i32 6, i32 0, i32 0 },
+// Protocol requirements
+// CHECK-SAME:   %swift.protocol_requirement { i32 6, i32 0, i32 0 },
 // CHECK-SAME:   %swift.protocol_requirement { i32 7, i32 0, i32 0 },
 
 // CHECK-SAME:   %swift.protocol_requirement { i32 17,
-// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @"$S19protocol_resilience17ResilientProtocolP10noDefaultAyyFTj" to [[INT]]), [[INT]] ptrtoint (i32* getelementptr inbounds ([8 x %swift.protocol_requirement], [8 x %swift.protocol_requirement]* [[RP_REQTS]], i32 0, i32 2, i32 1) to [[INT]])){{,| to i32\),}}
+// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @"$S19protocol_resilience17ResilientProtocolP10noDefaultAyyFTj" to [[INT]]),
 // CHECK-SAME:     i32 0
 // CHECK-SAME:   },
 
 // CHECK-SAME:   %swift.protocol_requirement { i32 17,
-// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @"$S19protocol_resilience17ResilientProtocolP10noDefaultByyFTj" to [[INT]]), [[INT]] ptrtoint (i32* getelementptr inbounds ([8 x %swift.protocol_requirement], [8 x %swift.protocol_requirement]* [[RP_REQTS]], i32 0, i32 3, i32 1) to [[INT]])){{,| to i32\),}}
+// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @"$S19protocol_resilience17ResilientProtocolP10noDefaultByyFTj" to [[INT]]),
 // CHECK-SAME:     i32 0
 // CHECK-SAME:   },
 
 // CHECK-SAME:   %swift.protocol_requirement { i32 17,
-// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @"$S19protocol_resilience17ResilientProtocolP8defaultCyyFTj" to [[INT]]), [[INT]] ptrtoint (i32* getelementptr inbounds ([8 x %swift.protocol_requirement], [8 x %swift.protocol_requirement]* [[RP_REQTS]], i32 0, i32 4, i32 1) to [[INT]])){{,| to i32\),}}
-// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @defaultC to [[INT]]), [[INT]] ptrtoint (i32* getelementptr inbounds ([8 x %swift.protocol_requirement], [8 x %swift.protocol_requirement]* [[RP_REQTS]], i32 0, i32 4, i32 2) to [[INT]])){{ | to i32\) }}
+// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @"$S19protocol_resilience17ResilientProtocolP8defaultCyyFTj" to [[INT]]),
+// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @defaultC to [[INT]]),
 // CHECK-SAME:   },
 
 // CHECK-SAME:   %swift.protocol_requirement { i32 17,
-// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @"$S19protocol_resilience17ResilientProtocolP8defaultDyyFTj" to [[INT]]), [[INT]] ptrtoint (i32* getelementptr inbounds ([8 x %swift.protocol_requirement], [8 x %swift.protocol_requirement]* [[RP_REQTS]], i32 0, i32 5, i32 1) to [[INT]])){{,| to i32\),}}
-// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @defaultD to [[INT]]), [[INT]] ptrtoint (i32* getelementptr inbounds ([8 x %swift.protocol_requirement], [8 x %swift.protocol_requirement]* [[RP_REQTS]], i32 0, i32 5, i32 2) to [[INT]])){{ | to i32\) }}
+// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @"$S19protocol_resilience17ResilientProtocolP8defaultDyyFTj" to [[INT]]),
+// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @defaultD to [[INT]]),
 // CHECK-SAME:   },
 
 // CHECK-SAME:   %swift.protocol_requirement { i32 1,
-// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.type*, %swift.type*, i8**)* @"$S19protocol_resilience17ResilientProtocolP8defaultEyyFZTj" to [[INT]]), [[INT]] ptrtoint (i32* getelementptr inbounds ([8 x %swift.protocol_requirement], [8 x %swift.protocol_requirement]* [[RP_REQTS]], i32 0, i32 6, i32 1) to [[INT]])){{,| to i32\),}}
-// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.type*, %swift.type*, i8**)* @defaultE to [[INT]]), [[INT]] ptrtoint (i32* getelementptr inbounds ([8 x %swift.protocol_requirement], [8 x %swift.protocol_requirement]* [[RP_REQTS]], i32 0, i32 6, i32 2) to [[INT]])){{ | to i32\) }}
+// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.type*, %swift.type*, i8**)* @"$S19protocol_resilience17ResilientProtocolP8defaultEyyFZTj" to [[INT]]),
+// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.type*, %swift.type*, i8**)* @defaultE to [[INT]]),
 // CHECK-SAME:   },
 
 // CHECK-SAME:   %swift.protocol_requirement { i32 1,
-// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.type*, %swift.type*, i8**)* @"$S19protocol_resilience17ResilientProtocolP8defaultFyyFZTj" to [[INT]]), [[INT]] ptrtoint (i32* getelementptr inbounds ([8 x %swift.protocol_requirement], [8 x %swift.protocol_requirement]* [[RP_REQTS]], i32 0, i32 7, i32 1) to [[INT]])){{,| to i32\),}}
-// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.type*, %swift.type*, i8**)* @defaultF to [[INT]]), [[INT]] ptrtoint (i32* getelementptr inbounds ([8 x %swift.protocol_requirement], [8 x %swift.protocol_requirement]* [[RP_REQTS]], i32 0, i32 7, i32 2) to [[INT]])){{ | to i32\) }}
+// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.type*, %swift.type*, i8**)* @"$S19protocol_resilience17ResilientProtocolP8defaultFyyFZTj" to [[INT]]),
+// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.type*, %swift.type*, i8**)* @defaultF to [[INT]]),
 // CHECK-SAME:   }
-// CHECK-SAME: ]
-
-// Protocol descriptor for ResilientProtocol
-
-// CHECK: @"$S19protocol_resilience17ResilientProtocolMp" = {{(dllexport )?}}{{(protected )?}}constant %swift.protocol {
-// CHECK-SAME:   i32 1031,
-// CHECK-SAME:   i32 8,
-// CHECK-SAME:   i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint ([8 x %swift.protocol_requirement]* [[RP_REQTS]] to [[INT]]), [[INT]] ptrtoint (i32* getelementptr inbounds (%swift.protocol, %swift.protocol* @"$S19protocol_resilience17ResilientProtocolMp", i32 0
 // CHECK-SAME: }
 
 public protocol ResilientProtocol {
@@ -98,10 +103,12 @@ public protocol ResilientProtocol {
 
 // Protocol is not public -- doesn't need default witness table
 
-// CHECK: @"$S19protocol_resilience16InternalProtocolMp" = hidden constant %swift.protocol {
-// CHECK-SAME:   i32 7,
+// CHECK: @"$S19protocol_resilience16InternalProtocolMp" = hidden constant
+// CHECK-SAME:   i32 65603,
+// CHECK-SAME:   @"$S19protocol_resilienceMXM"
+// CHECK-SAME:   i32 0,
 // CHECK-SAME:   i32 1,
-// CHECK-SAME:   i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint ([1 x %swift.protocol_requirement]* [[IP_REQTS:@.*]] to [[INT]]), [[INT]] ptrtoint (i32* getelementptr inbounds (%swift.protocol, %swift.protocol* @"$S19protocol_resilience16InternalProtocolMp", i32 0
+// CHECK-SAME:   i32 0,
 // CHECK-SAME: }
 
 protocol InternalProtocol {

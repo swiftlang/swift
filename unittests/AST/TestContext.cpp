@@ -13,6 +13,7 @@
 #include "TestContext.h"
 #include "swift/AST/Module.h"
 #include "swift/Strings.h"
+#include "swift/Subsystems.h"
 
 using namespace swift;
 using namespace swift::unittest;
@@ -34,6 +35,7 @@ static void declareOptionalType(ASTContext &ctx, SourceFile *fileForLookups,
 
 TestContext::TestContext(ShouldDeclareOptionalTypes optionals)
     : Ctx(*ASTContext::get(LangOpts, SearchPathOpts, SourceMgr, Diags)) {
+  registerTypeCheckerRequestFunctions(Ctx.evaluator);
   auto stdlibID = Ctx.getIdentifier(STDLIB_NAME);
   auto *module = ModuleDecl::create(stdlibID, Ctx);
   Ctx.LoadedModules[stdlibID] = module;

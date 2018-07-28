@@ -233,8 +233,8 @@ enum class FixKind : uint8_t {
   /// Introduce a '!' to force an optional unwrap.
   ForceOptional,
 
-  /// Introduce a '?.' to begin optional chaining.
-  OptionalChaining,
+  /// Unwrap an optional base when we have a member access.
+  UnwrapOptionalBase,
 
   /// Append 'as! T' to force a downcast to the specified type.
   ForceDowncast,
@@ -249,6 +249,10 @@ enum class FixKind : uint8_t {
   ExplicitlyEscaping,
   /// Mark function type as explicitly '@escaping' to be convertable to 'Any'.
   ExplicitlyEscapingToAny,
+
+  /// Arguments have labeling failures - missing/extraneous or incorrect
+  /// labels attached to the, fix it by suggesting proper labels.
+  RelabelArguments,
 };
 
 /// Describes a fix that can be applied to a constraint before visiting it.
@@ -265,16 +269,36 @@ class Fix {
 public:
   Fix(FixKind kind) : Kind(kind), Data(0) {
     assert(kind != FixKind::ForceDowncast && "Use getForceDowncast()");
+    assert(kind != FixKind::UnwrapOptionalBase &&
+           "Use getUnwrapOptionalBase()");
   }
 
   /// Produce a new fix that performs a forced downcast to the given type.
   static Fix getForcedDowncast(ConstraintSystem &cs, Type toType);
+
+  /// Produce a new fix that unwraps an optional base for an access to a member
+  /// with the given name.
+  static Fix getUnwrapOptionalBase(ConstraintSystem &cs, DeclName memberName);
+
+  /// Produce a new fix that re-labels existing arguments so they much
+  /// what parameters expect.
+  static Fix fixArgumentLabels(ConstraintSystem &cs,
+                               ArrayRef<Identifier> newLabels);
 
   /// Retrieve the kind of fix.
   FixKind getKind() const { return Kind; }
 
   /// If this fix has a type argument, retrieve it.
   Type getTypeArgument(ConstraintSystem &cs) const;
+
+  /// If this fix has a name argument, retrieve it.
+  DeclName getDeclNameArgument(ConstraintSystem &cs) const;
+
+  /// If this fix is an argument re-labeling, retrieve new labels.
+  ArrayRef<Identifier> getArgumentLabels(ConstraintSystem &cs) const;
+
+  /// If this fix has optional result info, retrieve it.
+  bool isUnwrapOptionalBaseByOptionalChaining(ConstraintSystem &cs) const;
 
   /// Return a string representation of a fix.
   static llvm::StringRef getName(FixKind kind);

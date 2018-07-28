@@ -365,7 +365,7 @@ public:
   }
   
   /// Returns the ASTContext for the referenced Swift type.
-  const ASTContext &getASTContext() const {
+  ASTContext &getASTContext() const {
     return getASTType()->getASTContext();
   }
 

@@ -208,3 +208,49 @@ bool SILModule::isTypeABIAccessible(SILType type) {
   // Otherwise, we need to be able to fetch layout-metadata for the type.
   return isTypeMetadataForLayoutAccessible(*this, type);
 }
+
+bool AbstractStorageDecl::exportsPropertyDescriptor() const {
+  // The storage needs a descriptor if it sits at a module's ABI boundary,
+  // meaning it has public linkage.
+  
+  // TODO: Global and static properties ought to eventually be referenceable
+  // as key paths from () or T.Type too.
+  if (!getDeclContext()->isTypeContext() || isStatic())
+    return false;
+  
+  // Any property that's potentially resilient should have accessors
+  // synthesized.
+  if (!getGetter())
+    return false;
+
+  // If the getter is mutating, we cannot form a keypath to it at all.
+  if (isGetterMutating())
+    return false;
+
+  // TODO: If previous versions of an ABI-stable binary needed the descriptor,
+  // then we still do.
+
+  auto getter = SILDeclRef(getGetter());
+  auto getterLinkage = getter.getLinkage(ForDefinition);
+  
+  switch (getterLinkage) {
+  case SILLinkage::Public:
+  case SILLinkage::PublicNonABI:
+    // We may need a descriptor.
+    break;
+    
+  case SILLinkage::Shared:
+  case SILLinkage::Private:
+  case SILLinkage::Hidden:
+    // Don't need a public descriptor.
+    return false;
+    
+  case SILLinkage::HiddenExternal:
+  case SILLinkage::PrivateExternal:
+  case SILLinkage::PublicExternal:
+  case SILLinkage::SharedExternal:
+    llvm_unreachable("should be definition linkage?");
+  }
+
+  return true;
+}

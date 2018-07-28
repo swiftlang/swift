@@ -46,7 +46,7 @@ public func run_LuhnAlgoLazy(_ N: Int) {
 // sequence and the transform function
 struct MapSomeSequenceView<Base: Sequence, T> {
     fileprivate let _base: Base
-    fileprivate let _transform: (Base.Iterator.Element) -> T?
+    fileprivate let _transform: (Base.Element) -> T?
 }
 
 // extend it to implement Sequence
@@ -77,7 +77,7 @@ extension LazyCollectionProtocol {
     // I might be missing a trick with this super-ugly return type, is there a
     // better way?
     func mapSome<U>(
-        _ transform: @escaping (Elements.Iterator.Element) -> U?
+        _ transform: @escaping (Elements.Element) -> U?
     ) -> LazySequence<MapSomeSequenceView<Elements, U>> {
         return MapSomeSequenceView(_base: elements, _transform: transform).lazy
     }
@@ -97,12 +97,12 @@ func isMultipleOf<T: FixedWidthInteger>(_ of: T)->(T)->Bool {
 extension LazySequenceProtocol {
   func mapEveryN(
     _ n: Int,
-    _ transform: @escaping (Iterator.Element) -> Iterator.Element
-  ) -> LazyMapSequence<EnumeratedSequence<Self>, Iterator.Element> {
+    _ transform: @escaping (Element) -> Element
+  ) -> LazyMapSequence<EnumeratedSequence<Self>, Element> {
     let isNth = isMultipleOf(n)
     func transform2(
-      _ pair: EnumeratedSequence<Self>.Iterator.Element
-    ) -> Iterator.Element {
+      _ pair: EnumeratedSequence<Self>.Element
+    ) -> Element {
       return isNth(pair.0 + 1) ? transform(pair.1) : pair.1
     }
     return self.enumerated().lazy.map(transform2)
@@ -168,15 +168,15 @@ func mapSome<C: LazyCollectionProtocol, U>(
 
 func mapEveryN<S: LazySequenceProtocol>(
     _ source: S, _ n: Int,
-    _ transform: @escaping (S.Iterator.Element)->S.Iterator.Element
-) -> LazyMapSequence<EnumeratedSequence<S>, S.Iterator.Element> {
+    _ transform: @escaping (S.Element)->S.Element
+) -> LazyMapSequence<EnumeratedSequence<S>, S.Element> {
     return source.mapEveryN(n, transform)
 }
 
 // Non-lazy version of mapSome:
 func mapSome<S: Sequence, C: RangeReplaceableCollection>(
     _ source: S,
-    _ transform: @escaping (S.Iterator.Element)->C.Iterator.Element?
+    _ transform: @escaping (S.Element)->C.Element?
 ) -> C {
     var result = C()
     for x in source {
@@ -191,7 +191,7 @@ func mapSome<S: Sequence, C: RangeReplaceableCollection>(
 // forcing the user having to specify:
 func mapSome<S: Sequence,U>(
     _ source: S,
-    _ transform: @escaping (S.Iterator.Element
+    _ transform: @escaping (S.Element
 )->U?)->[U] {
     // just calls the more generalized version
     return mapSome(source, transform)
@@ -200,11 +200,11 @@ func mapSome<S: Sequence,U>(
 // Non-lazy version of mapEveryN:
 func mapEveryN<S: Sequence>(
     _ source: S, _ n: Int,
-    _ transform: @escaping (S.Iterator.Element) -> S.Iterator.Element
-) -> [S.Iterator.Element] {
+    _ transform: @escaping (S.Element) -> S.Element
+) -> [S.Element] {
     let isNth = isMultipleOf(n)
     return source.enumerated().map {
-        (pair: (index: Int, elem: S.Iterator.Element)) in
+        (pair: (index: Int, elem: S.Element)) in
         isNth(pair.index+1)
             ? transform(pair.elem)
             : pair.elem

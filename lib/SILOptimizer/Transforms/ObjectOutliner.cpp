@@ -331,8 +331,8 @@ bool ObjectOutliner::optimizeObjectAllocation(
       return false;
   }
 
-  DEBUG(llvm::dbgs() << "Outline global variable in " <<
-        ARI->getFunction()->getName() << '\n');
+  LLVM_DEBUG(llvm::dbgs() << "Outline global variable in "
+                          << ARI->getFunction()->getName() << '\n');
 
   SILModule *Module = &ARI->getFunction()->getModule();
   assert(!Cl->isResilient(Module->getSwiftModule(),

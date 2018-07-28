@@ -1,4 +1,3 @@
-// RUN: %target-swift-frontend -module-name main -typecheck -verify -swift-version 3 %s
 // RUN: %target-swift-frontend -module-name main -typecheck -verify -swift-version 4 %s
 
 // Some convenient test points to escape closures to
