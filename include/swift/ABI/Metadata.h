@@ -2150,32 +2150,37 @@ private:
   union {
     /// A direct reference to a nominal type descriptor.
     RelativeDirectPointerIntPair<TargetTypeContextDescriptor<Runtime>,
-                                 TypeMetadataRecordKind>
+                                 TypeReferenceKind>
       DirectNominalTypeDescriptor;
 
     /// An indirect reference to a nominal type descriptor.
     RelativeDirectPointerIntPair<TargetTypeContextDescriptor<Runtime> * const,
-                                 TypeMetadataRecordKind>
+                                 TypeReferenceKind>
       IndirectNominalTypeDescriptor;
+
+    // We only allow a subset of the TypeReferenceKinds here.
+    // Should we just acknowledge that this is a different enum?
   };
 
 public:
-  TypeMetadataRecordKind getTypeKind() const {
+  TypeReferenceKind getTypeKind() const {
     return DirectNominalTypeDescriptor.getInt();
   }
   
   const TargetTypeContextDescriptor<Runtime> *
   getTypeContextDescriptor() const {
     switch (getTypeKind()) {
-    case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
+    case TypeReferenceKind::DirectNominalTypeDescriptor:
       return DirectNominalTypeDescriptor.getPointer();
 
-    case TypeMetadataRecordKind::Reserved:
-    case TypeMetadataRecordKind::IndirectObjCClass:
-      return nullptr;
-
-    case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
+    case TypeReferenceKind::IndirectNominalTypeDescriptor:
       return *IndirectNominalTypeDescriptor.getPointer();
+
+    // These types (and any others we might add to TypeReferenceKind
+    // in the future) are just never used in these lists.
+    case TypeReferenceKind::DirectObjCClassName:
+    case TypeReferenceKind::IndirectObjCClass:
+      return nullptr;
     }
     
     return nullptr;
@@ -2250,6 +2255,66 @@ public:
   }
 };
 
+/// A referenc to a type.
+template <typename Runtime>
+struct TargetTypeReference {
+  union {
+    /// A direct reference to a nominal type descriptor.
+    RelativeDirectPointer<TargetTypeContextDescriptor<Runtime>>
+      DirectNominalTypeDescriptor;
+
+    /// An indirect reference to a nominal type descriptor.
+    RelativeDirectPointer<
+        ConstTargetMetadataPointer<Runtime, TargetTypeContextDescriptor>>
+      IndirectNominalTypeDescriptor;
+
+    /// An indirect reference to an Objective-C class.
+    RelativeDirectPointer<
+        ConstTargetMetadataPointer<Runtime, TargetClassMetadata>>
+      IndirectObjCClass;
+
+    /// A direct reference to an Objective-C class name.
+    RelativeDirectPointer<const char>
+      DirectObjCClassName;
+  };
+
+  const TargetTypeContextDescriptor<Runtime> *
+  getTypeContextDescriptor(TypeReferenceKind kind) const {
+    switch (kind) {
+    case TypeReferenceKind::DirectNominalTypeDescriptor:
+      return DirectNominalTypeDescriptor;
+
+    case TypeReferenceKind::IndirectNominalTypeDescriptor:
+      return *IndirectNominalTypeDescriptor;
+
+    case TypeReferenceKind::DirectObjCClassName:
+    case TypeReferenceKind::IndirectObjCClass:
+      return nullptr;
+    }
+
+    return nullptr;
+  }
+
+#if SWIFT_OBJC_INTEROP
+  /// If this type reference is one of the kinds that supports ObjC
+  /// references,
+  const TargetClassMetadata<Runtime> *
+  getObjCClass(TypeReferenceKind kind) const;
+#endif
+
+  const TargetClassMetadata<Runtime> * const *
+  getIndirectObjCClass(TypeReferenceKind kind) const {
+    assert(kind == TypeReferenceKind::IndirectObjCClass);
+    return IndirectObjCClass.get();
+  }
+
+  const char *getDirectObjCClassName(TypeReferenceKind kind) const {
+    assert(kind == TypeReferenceKind::DirectObjCClassName);
+    return DirectObjCClassName.get();
+  }
+};
+using TypeReference = TargetTypeReference<InProcess>;
+
 /// The structure of a protocol conformance.
 ///
 /// This contains enough static information to recover the witness table for a
@@ -2284,21 +2349,7 @@ private:
   RelativeIndirectablePointer<ProtocolDescriptor> Protocol;
   
   // Some description of the type that conforms to the protocol.
-  union {
-    /// A direct reference to a nominal type descriptor.
-    RelativeDirectPointer<TargetTypeContextDescriptor<Runtime>>
-      DirectNominalTypeDescriptor;
-
-    /// An indirect reference to a nominal type descriptor.
-    RelativeDirectPointer<
-        ConstTargetMetadataPointer<Runtime, TargetTypeContextDescriptor>>
-      IndirectNominalTypeDescriptor;
-
-    /// An indirect reference to the metadata.
-    RelativeDirectPointer<
-        ConstTargetMetadataPointer<Runtime, TargetClassMetadata>>
-      IndirectObjCClass;
-  };
+  TargetTypeReference<Runtime> TypeRef;
 
   // The conformance, or a generator function for the conformance.
   union {
@@ -2318,45 +2369,24 @@ public:
     return Protocol;
   }
 
-  TypeMetadataRecordKind getTypeKind() const {
+  TypeReferenceKind getTypeKind() const {
     return Flags.getTypeReferenceKind();
   }
 
   typename ConformanceFlags::ConformanceKind getConformanceKind() const {
     return Flags.getConformanceKind();
   }
-  
+
+  const char *getDirectObjCClassName() const {
+    return TypeRef.getDirectObjCClassName(getTypeKind());
+  }
+
   const TargetClassMetadata<Runtime> * const *getIndirectObjCClass() const {
-    switch (getTypeKind()) {
-    case TypeMetadataRecordKind::IndirectObjCClass:
-      break;
-
-    case TypeMetadataRecordKind::Reserved:
-      return nullptr;
-
-    case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
-    case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
-      assert(false && "not indirect class object");
-    }
-    
-    return IndirectObjCClass.get();
+    return TypeRef.getIndirectObjCClass(getTypeKind());
   }
   
-  const TargetTypeContextDescriptor<Runtime> *
-  getTypeContextDescriptor() const {
-    switch (getTypeKind()) {
-    case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
-      return DirectNominalTypeDescriptor;
-
-    case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
-      return *IndirectNominalTypeDescriptor;
-
-    case TypeMetadataRecordKind::Reserved:
-    case TypeMetadataRecordKind::IndirectObjCClass:
-      return nullptr;
-    }
-    
-    return nullptr;
+  const TargetTypeContextDescriptor<Runtime> *getTypeContextDescriptor() const {
+    return TypeRef.getTypeContextDescriptor(getTypeKind());
   }
 
   /// Retrieve the context of a retroactive conformance.
@@ -2418,7 +2448,7 @@ public:
   ///
   /// We currently check that the descriptor:
   ///
-  /// 1. Has a valid TypeMetadataRecordKind.
+  /// 1. Has a valid TypeReferenceKind.
   /// 2. Has a valid conformance kind.
   void verify() const LLVM_ATTRIBUTE_USED;
 #endif
@@ -3563,7 +3593,7 @@ public:
     return !Superclass.isNull();
   }
 
-  TypeMetadataRecordKind getSuperclassReferenceKind() const {
+  TypeReferenceKind getSuperclassReferenceKind() const {
     return getTypeContextDescriptorFlags().class_getSuperclassReferenceKind();
   }
 

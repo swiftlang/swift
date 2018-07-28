@@ -71,19 +71,19 @@ template<> void ProtocolConformanceDescriptor::dump() const {
   };
 
   switch (auto kind = getTypeKind()) {
-    case TypeMetadataRecordKind::Reserved:
-      printf("unknown (reserved)");
-      break;
+  case TypeReferenceKind::DirectObjCClassName:
+    printf("direct Objective-C class name %s", getDirectObjCClassName());
+    break;
 
-    case TypeMetadataRecordKind::IndirectObjCClass:
-      printf("indirect Objective-C class %s",
-             class_getName(*getIndirectObjCClass()));
-      break;
-      
-    case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
-    case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
-      printf("unique nominal type descriptor %s", symbolName(getTypeContextDescriptor()));
-      break;
+  case TypeReferenceKind::IndirectObjCClass:
+    printf("indirect Objective-C class %s",
+           class_getName(*getIndirectObjCClass()));
+    break;
+
+  case TypeReferenceKind::DirectNominalTypeDescriptor:
+  case TypeReferenceKind::IndirectNominalTypeDescriptor:
+    printf("unique nominal type descriptor %s", symbolName(getTypeContextDescriptor()));
+    break;
   }
   
   printf(" => ");
@@ -107,8 +107,8 @@ template<> void ProtocolConformanceDescriptor::dump() const {
 #ifndef NDEBUG
 template<> void ProtocolConformanceDescriptor::verify() const {
   auto typeKind = unsigned(getTypeKind());
-  assert(((unsigned(TypeMetadataRecordKind::First_Kind) <= typeKind) &&
-          (unsigned(TypeMetadataRecordKind::Last_Kind) >= typeKind)) &&
+  assert(((unsigned(TypeReferenceKind::First_Kind) <= typeKind) &&
+          (unsigned(TypeReferenceKind::Last_Kind) >= typeKind)) &&
          "Corrupted type metadata record kind");
 
   auto confKind = unsigned(getConformanceKind());
@@ -119,6 +119,26 @@ template<> void ProtocolConformanceDescriptor::verify() const {
 }
 #endif
 
+#if SWIFT_OBJC_INTEROP
+template <>
+const ClassMetadata *TypeReference::getObjCClass(TypeReferenceKind kind) const {
+  switch (kind) {
+  case TypeReferenceKind::IndirectObjCClass:
+    return *getIndirectObjCClass(kind);
+
+  case TypeReferenceKind::DirectObjCClassName:
+    return reinterpret_cast<const ClassMetadata *>(
+              objc_lookUpClass(getDirectObjCClassName(kind)));
+
+  case TypeReferenceKind::DirectNominalTypeDescriptor:
+  case TypeReferenceKind::IndirectNominalTypeDescriptor:
+    return nullptr;
+  }
+
+  swift_runtime_unreachable("Unhandled TypeReferenceKind in switch.");
+}
+#endif
+
 /// Take the type reference inside a protocol conformance record and fetch the
 /// canonical metadata pointer for the type it refers to.
 /// Returns nil for universal or generic type references.
@@ -126,22 +146,23 @@ template <>
 const Metadata *
 ProtocolConformanceDescriptor::getCanonicalTypeMetadata() const {
   switch (getTypeKind()) {
-  case TypeMetadataRecordKind::Reserved:
-    return nullptr;
-  case TypeMetadataRecordKind::IndirectObjCClass:
+  case TypeReferenceKind::IndirectObjCClass:
+  case TypeReferenceKind::DirectObjCClassName:
+#if SWIFT_OBJC_INTEROP
     // The class may be ObjC, in which case we need to instantiate its Swift
     // metadata. The class additionally may be weak-linked, so we have to check
     // for null.
-    if (auto *ClassMetadata = *getIndirectObjCClass())
-      return getMetadataForClass(ClassMetadata);
+    if (auto cls = TypeRef.getObjCClass(getTypeKind()))
+      return getMetadataForClass(cls);
+#endif
     return nullptr;
-      
-  case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
-  case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
+
+  case TypeReferenceKind::DirectNominalTypeDescriptor:
+  case TypeReferenceKind::IndirectNominalTypeDescriptor:
     return nullptr;
   }
 
-  swift_runtime_unreachable("Unhandled TypeMetadataRecordKind in switch.");
+  swift_runtime_unreachable("Unhandled TypeReferenceKind in switch.");
 }
 
 template<>
@@ -601,9 +622,9 @@ swift_conformsToProtocolImpl(const Metadata * const type,
       // An accessor function might still be necessary even if the witness table
       // can be shared.
       } else if (descriptor.getTypeKind()
-                   == TypeMetadataRecordKind::DirectNominalTypeDescriptor ||
+                   == TypeReferenceKind::DirectNominalTypeDescriptor ||
                  descriptor.getTypeKind()
-                  == TypeMetadataRecordKind::IndirectNominalTypeDescriptor) {
+                  == TypeReferenceKind::IndirectNominalTypeDescriptor) {
         auto R = descriptor.getTypeContextDescriptor();
         auto P = descriptor.getProtocol();
 
