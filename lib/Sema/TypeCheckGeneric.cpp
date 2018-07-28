@@ -1210,7 +1210,7 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
   pendingReqs.push_back({requirements, {}});
 
   auto *env = dc->getGenericEnvironmentOfContext();
-
+  ASTContext &ctx = dc->getASTContext();
   while (!pendingReqs.empty()) {
     auto current = pendingReqs.pop_back_val();
 
@@ -1342,7 +1342,7 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
 
       if (loc.isValid()) {
         // FIXME: Poor source-location information.
-        diagnose(loc, diagnostic, owner, firstType, secondType);
+        ctx.Diags.diagnose(loc, diagnostic, owner, firstType, secondType);
 
         std::string genericParamBindingsText;
         if (!genericParams.empty()) {
@@ -1350,11 +1350,11 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
             gatherGenericParamBindingsText(
               {rawFirstType, rawSecondType}, genericParams, substitutions);
         }
-        diagnose(noteLoc, diagnosticNote, rawFirstType, rawSecondType,
-                 genericParamBindingsText);
+        ctx.Diags.diagnose(noteLoc, diagnosticNote, rawFirstType, rawSecondType,
+                           genericParamBindingsText);
 
-        ParentConditionalConformance::diagnoseConformanceStack(Diags, noteLoc,
-                                                               current.Parents);
+        ParentConditionalConformance::diagnoseConformanceStack(
+            ctx.Diags, noteLoc, current.Parents);
       }
 
       return RequirementCheckResult::Failure;

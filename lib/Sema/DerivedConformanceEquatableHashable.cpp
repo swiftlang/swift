@@ -665,7 +665,9 @@ deriveEquatable_eq(DerivedConformance &derived, Identifier generatedIdentifier,
 
 bool DerivedConformance::canDeriveEquatable(TypeChecker &tc, DeclContext *DC,
                                             NominalTypeDecl *type) {
-  auto equatableProto = tc.Context.getProtocol(KnownProtocolKind::Equatable);
+  ASTContext &ctx = DC->getASTContext();
+  auto equatableProto = ctx.getProtocol(KnownProtocolKind::Equatable);
+  if (!equatableProto) return false;
   return canDeriveConformance(tc, DC, type, equatableProto);
 }
 
@@ -1135,8 +1137,7 @@ getHashableConformance(Decl *parentDecl) {
   return nullptr;
 }
 
-bool DerivedConformance::canDeriveHashable(TypeChecker &tc,
-                                           NominalTypeDecl *type) {
+bool DerivedConformance::canDeriveHashable(NominalTypeDecl *type) {
   if (!isa<EnumDecl>(type) && !isa<StructDecl>(type) && !isa<ClassDecl>(type))
     return false;
   // FIXME: This is not actually correct. We cannot promise to always

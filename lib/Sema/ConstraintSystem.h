@@ -1453,9 +1453,6 @@ public:
     /// The scope number of this scope. Set when the scope is registered.
     unsigned scopeNumber = 0;
 
-    /// Time in fractional seconds at which we entered this scope.
-    double startTime;
-
     /// Constraint graph scope associated with this solver scope.
     ConstraintGraphScope CGScope;
 
@@ -1467,13 +1464,6 @@ public:
   public:
     explicit SolverScope(ConstraintSystem &cs);
     ~SolverScope();
-
-    Optional<double> getElapsedTimeInFractionalSeconds() {
-      if (!cs.Timer)
-        return None;
-
-      return cs.Timer->getElapsedProcessTimeInFractionalSeconds() - startTime;
-    }
   };
 
   ConstraintSystem(TypeChecker &tc, DeclContext *dc,
@@ -3578,7 +3568,7 @@ bool diagnoseUnwrap(TypeChecker &TC, DeclContext *DC, Expr *expr, Type type);
 ///
 /// \returns true if a diagnostic was produced.
 bool diagnoseBaseUnwrapForMemberAccess(Expr *baseExpr, Type baseType,
-                                       DeclName memberName,
+                                       DeclName memberName, bool resultOptional,
                                        SourceRange memberRange);
 
 // Return true if, when replacing "<expr>" with "<expr> ?? T", parentheses need

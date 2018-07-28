@@ -516,6 +516,15 @@ ArrayRef<Identifier> Fix::getArgumentLabels(ConstraintSystem &cs) const {
   return cs.FixedArgLabels[Data];
 }
 
+/// If this fix has optional result info, retrieve it.
+bool Fix::isUnwrapOptionalBaseByOptionalChaining(ConstraintSystem &cs) const {
+  assert(getKind() == FixKind::UnwrapOptionalBase);
+
+  // Assumes that these fixes are always created in pairs, with the first
+  // created non-optional and the second with an added optional.
+  return (Data % 2) == 1;
+}
+
 StringRef Fix::getName(FixKind kind) {
   switch (kind) {
   case FixKind::ForceOptional:
