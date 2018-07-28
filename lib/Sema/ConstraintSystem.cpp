@@ -518,8 +518,8 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
 
       if (auto *signature = decl->getGenericSignature()) {
         cs.openGenericRequirements(
-            extension, signature, /*skipProtocolSelfConstraint*/ true, locator,
-            [&](Type type) {
+            extension, signature->getRequirements(),
+            /*skipProtocolSelfConstraint*/ true, locator, [&](Type type) {
               // Why do we look in two substitution maps? We have to use the
               // context substitution map to find types, because we need to
               // avoid thinking about them when handling the constraints, or all
@@ -1166,17 +1166,39 @@ void ConstraintSystem::openGeneric(
 
   bindArchetypesFromContext(*this, outerDC, locatorPtr, replacements);
 
+  SmallVector<Requirement, 4> scratch;
+  auto requirements = sig->getRequirements();
+  // Let's try to open generic requirements only if they are
+  // unique to the current declaration otherwise we'd end up
+  // opening the same requirements multiple times.
+  auto reduceRequirements = [](DeclContext *outerDC, DeclContext *innerDC) {
+    if (outerDC->getAsProtocolOrProtocolExtensionContext())
+      return false;
+
+    auto *AFD = dyn_cast<AbstractFunctionDecl>(innerDC);
+    return !AFD || !AFD->isOperator();
+  };
+
+  if (reduceRequirements(outerDC, innerDC)) {
+    if (auto *parent =
+            outerDC->getAsNominalTypeOrNominalTypeExtensionContext()) {
+      if (auto *parentSig = parent->getGenericSignature()) {
+        scratch = sig->requirementsNotSatisfiedBy(parentSig);
+        requirements = scratch;
+      }
+    }
+  }
+
   // Add the requirements as constraints.
   openGenericRequirements(
-      outerDC, sig, skipProtocolSelfConstraint, locator,
+      outerDC, requirements, skipProtocolSelfConstraint, locator,
       [&](Type type) { return openType(type, replacements); });
 }
 
 void ConstraintSystem::openGenericRequirements(
-    DeclContext *outerDC, GenericSignature *signature,
+    DeclContext *outerDC, ArrayRef<Requirement> requirements,
     bool skipProtocolSelfConstraint, ConstraintLocatorBuilder locator,
     llvm::function_ref<Type(Type)> substFn) {
-  auto requirements = signature->getRequirements();
   for (unsigned pos = 0, n = requirements.size(); pos != n; ++pos) {
     const auto &req = requirements[pos];
 

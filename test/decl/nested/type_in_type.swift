@@ -377,8 +377,8 @@ protocol ExpressibleByDogLiteral {}
 struct Kitten : ExpressibleByCatLiteral {}
 struct Puppy : ExpressibleByDogLiteral {}
 
-struct Claws<A: ExpressibleByCatLiteral> {
-  struct Fangs<B: ExpressibleByDogLiteral> { }
+struct Claws<A: ExpressibleByCatLiteral> { // expected-note 2 {{'A' declared as parameter to type 'Claws'}}
+  struct Fangs<B: ExpressibleByDogLiteral> { } // expected-note {{'B' declared as parameter to type 'Claws.Fangs'}}
 }
 
 struct NotADog {}
@@ -402,6 +402,15 @@ func test() {
   let _: Claws.Fangs<NotADog> = something()
   // expected-error@-1 {{generic parameter 'T' could not be inferred}} // FIXME: bad diagnostic
   _ = Claws.Fangs<NotADog>()
+  // expected-error@-1 {{generic parameter 'A' could not be inferred}}
+  // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}}
+  _ = Claws.Fangs<Puppy>()
+  // expected-error@-1 {{generic parameter 'A' could not be inferred}}
+  // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}}
+  _ = Claws<Kitten>.Fangs()
+  // expected-error@-1 {{generic parameter 'B' could not be inferred}}
+  // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}}
+  _ = Claws<Kitten>.Fangs<NotADog>()
   // expected-error@-1 {{type 'NotADog' does not conform to protocol 'ExpressibleByDogLiteral'}}
 }
 
