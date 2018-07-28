@@ -258,3 +258,8 @@ public func testMultiOutputs() {
   _hostOp(y)
 }
 
+// TODO: Eliminate the sends/recvs when -Onone is enabled.
+public func SR8395() {
+  let x: Tensor<Float> = [[1, 2], [3, 4]]
+  print(matmul(x, x) + x)
+}
