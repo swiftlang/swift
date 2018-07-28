@@ -318,6 +318,13 @@ namespace {
         return { false, expr };
       }
       
+      // Don't walk into unresolved member expressions - we avoid merging type
+      // variables inside UnresolvedMemberExpr and those outside, since they
+      // should be allowed to behave independently in CS.
+      if (isa<UnresolvedMemberExpr>(expr)) {
+        return {false, expr };
+      }
+
       return { true, expr };
     }
     
