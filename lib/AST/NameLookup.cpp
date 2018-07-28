@@ -1622,6 +1622,49 @@ static bool finishLookup(const DeclContext *dc, NLOptions options,
   return !decls.empty();
 }
 
+/// Inspect the given type to determine which nominal type declarations it
+/// directly references, to facilitate name lookup into those types.
+static void extractDirectlyReferencedNominalTypes(
+              Type type, SmallVectorImpl<NominalTypeDecl *> &decls) {
+  if (auto nominal = type->getAnyNominal()) {
+    decls.push_back(nominal);
+    return;
+  }
+
+  if (auto archetypeTy = type->getAs<ArchetypeType>()) {
+    // Look in the protocols to which the archetype conforms (always).
+    for (auto proto : archetypeTy->getConformsTo())
+      decls.push_back(proto);
+
+    // Look into the superclasses of this archetype.
+    if (auto superclass = archetypeTy->getSuperclass()) {
+      if (auto superclassDecl = superclass->getClassOrBoundGenericClass())
+        decls.push_back(superclassDecl);
+    }
+
+    return;
+  }
+
+  if (auto compositionTy = type->getAs<ProtocolCompositionType>()) {
+    auto layout = compositionTy->getExistentialLayout();
+
+    for (auto proto : layout.getProtocols()) {
+      auto *protoDecl = proto->getDecl();
+      decls.push_back(protoDecl);
+    }
+
+    if (auto superclass = layout.explicitSuperclass) {
+      auto *superclassDecl = superclass->getClassOrBoundGenericClass();
+      if (superclassDecl)
+        decls.push_back(superclassDecl);
+    }
+
+    return;
+  }
+
+  llvm_unreachable("Not a type containing nominal types?");
+}
+
 bool DeclContext::lookupQualified(Type type,
                                   DeclName member,
                                   NLOptions options,
@@ -1638,66 +1681,79 @@ bool DeclContext::lookupQualified(Type type,
   if (auto moduleTy = type->getAs<ModuleType>())
     return lookupQualified(moduleTy->getModule(), member, options, decls);
 
-  if (!typeResolver)
-    typeResolver = getASTContext().getLazyResolver();
+  // Figure out which nominal types we will look into.
+  SmallVector<NominalTypeDecl *, 4> nominalTypesToLookInto;
+  extractDirectlyReferencedNominalTypes(type, nominalTypesToLookInto);
+
+  SmallVector<TypeDecl *, 4> declsToLookInto(nominalTypesToLookInto.begin(),
+                                             nominalTypesToLookInto.end());
+  return lookupQualified(declsToLookInto, member, options, decls);
+}
+
+bool DeclContext::lookupQualified(ArrayRef<TypeDecl *> typeDecls,
+                                  DeclName member,
+                                  NLOptions options,
+                                  SmallVectorImpl<ValueDecl *> &decls) const {
+  using namespace namelookup;
+  assert(decls.empty() && "additive lookup not supported");
+
+  // If we have a module, look in it.
+  if (typeDecls.size() == 1 && isa<ModuleDecl>(typeDecls[0])) {
+    return lookupQualified(cast<ModuleDecl>(typeDecls[0]), member, options,
+                           decls);
+  }
 
   // Configure lookup and dig out the tracker.
   ReferencedNameTracker *tracker = nullptr;
   bool isLookupCascading;
   configureLookup(this, options, tracker, isLookupCascading);
 
-  // The set of nominal type declarations we should (and have) visited.
+  // Tracking for the nominal types we'll visit.
   SmallVector<NominalTypeDecl *, 4> stack;
   llvm::SmallPtrSet<NominalTypeDecl *, 4> visited;
+  bool sawClassDecl = false;
 
-  // Note that we don't have to visit the superclass of a protocol.
-  // If we started with an archetype or existential, we'll visit the
-  // superclass because we will have added it to the stack upfront.
-  //
-  // If we started with a concrete class conforming to a protocol
-  // with a superclass, we will visit the superclass from the
-  // concrete type.
-  bool checkProtocolSuperclass = false;
+  // Add the given nominal type to the stack.
+  auto addNominalType = [&](NominalTypeDecl *nominal) {
+    if (!visited.insert(nominal).second)
+      return false;
 
-  // Handle nominal types.
-  bool wantProtocolMembers = (options & NL_ProtocolMembers);
-  if (auto nominal = type->getAnyNominal()) {
-    visited.insert(nominal);
+    if (isa<ClassDecl>(nominal))
+      sawClassDecl = true;
+
     stack.push_back(nominal);
+    return true;
+  };
 
-    if (isa<ProtocolDecl>(nominal))
-      checkProtocolSuperclass = true;
-  }
-  // Handle archetypes
-  else if (auto archetypeTy = type->getAs<ArchetypeType>()) {
-    // Look in the protocols to which the archetype conforms (always).
-    for (auto proto : archetypeTy->getConformsTo())
-      if (visited.insert(proto).second)
-        stack.push_back(proto);
-
-    // Look into the superclasses of this archetype.
-    if (auto superclass = archetypeTy->getSuperclass())
-      if (auto superclassDecl = superclass->getClassOrBoundGenericClass())
-        if (visited.insert(superclassDecl).second)
-          stack.push_back(superclassDecl);
-  }
-  // Handle protocol compositions.
-  else if (auto compositionTy = type->getAs<ProtocolCompositionType>()) {
-    auto layout = compositionTy->getExistentialLayout();
-
-    for (auto proto : layout.getProtocols()) {
-      auto *protoDecl = proto->getDecl();
-      if (visited.insert(protoDecl).second)
-        stack.push_back(protoDecl);
+  // Look through the type declarations we were given, resolving
+  ASTContext &ctx = getASTContext();
+  for (auto typeDecl : typeDecls) {
+    // Add nominal types directly.
+    if (auto nominal = dyn_cast<NominalTypeDecl>(typeDecl)) {
+      addNominalType(nominal);
+      continue;
     }
 
-    if (auto superclass = layout.explicitSuperclass) {
-      auto *superclassDecl = superclass->getClassOrBoundGenericClass();
-      if (visited.insert(superclassDecl).second)
-        stack.push_back(superclassDecl);
+    // For typealiases, extract nominal type declarations from the underlying
+    // type of the typealias.
+    if (auto typealias = dyn_cast<TypeAliasDecl>(typeDecl)) {
+      SmallVector<NominalTypeDecl *, 4> nominalTypeDecls;
+      if (!typealias->getUnderlyingTypeLoc().getType()) {
+        auto lazyResolver = ctx.getLazyResolver();
+        assert(lazyResolver && "Cannot resolve underlying type of typealias");
+        lazyResolver->resolveDeclSignature(typealias);
+      }
+
+      extractDirectlyReferencedNominalTypes(
+          typealias->getUnderlyingTypeLoc().getType(),
+          nominalTypeDecls);
+      for (auto nominal : nominalTypeDecls)
+        addNominalType(nominal);
+      continue;
     }
-  } else {
-    llvm_unreachable("Bad type for qualified lookup");
+
+    llvm_unreachable("Cannot look into multiple modules "
+                     "or any type parameter");
   }
 
   // Whether we only want to return complete object initializers.
@@ -1705,6 +1761,8 @@ bool DeclContext::lookupQualified(Type type,
 
   // Visit all of the nominal types we know about, discovering any others
   // we need along the way.
+  auto typeResolver = ctx.getLazyResolver();
+  bool wantProtocolMembers = (options & NL_ProtocolMembers);
   while (!stack.empty()) {
     auto current = stack.back();
     stack.pop_back();
@@ -1759,7 +1817,7 @@ bool DeclContext::lookupQualified(Type type,
     if (!wantProtocolMembers && !currentIsProtocol)
       continue;
 
-    if (checkProtocolSuperclass) {
+    if (!sawClassDecl) {
       if (auto *protoDecl = dyn_cast<ProtocolDecl>(current)) {
         if (auto superclassDecl = protoDecl->getSuperclassDecl()) {
           visited.insert(superclassDecl);
