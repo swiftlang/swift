@@ -2966,6 +2966,24 @@ private:
   /// \param expr The expression to find reductions for.
   void shrink(Expr *expr);
 
+  /// \brief Given a type variable representing a bind overload
+  ///        disjunction, return the concrete types that currently
+  ///        appear in the constraint graph in the first parameter of
+  ///        calls to the functions represented by the disjunction.
+  ///
+  /// In other words, for
+  ///  `(Float, Int) -> Double applicable fn $T0`
+  /// we would return Float.
+  void
+  collectKnownFirstParamTypesForBindOverload(TypeVariableType *typeVar,
+                                             SmallVectorImpl<Type> &knownTypes);
+
+  /// \brief Select an operator disjunction for which we know a
+  /// concrete type for the left hand side operand (for binary
+  /// operators) or the only operand (for unary operators).
+  Constraint *
+  selectOperatorDisjunction(SmallVectorImpl<Constraint *> &disjunctions);
+
   /// \brief Pick a disjunction from the InactiveConstraints list.
   ///
   /// \returns The selected disjunction.

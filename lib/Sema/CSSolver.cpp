@@ -1931,12 +1931,136 @@ static Constraint *selectBestBindingDisjunction(
   return nullptr;
 }
 
+// Given all the disjunctions in the constraint system, return a list
+// of the ones that appear to be disjunctions of binding constraints
+// of operators.
+void collectOperatorDisjunctions(
+    SmallVectorImpl<Constraint *> &operatorDisjunctions,
+    SmallVectorImpl<Constraint *> &disjunctions) {
+  assert(operatorDisjunctions.empty());
+
+  for (auto *disjunction : disjunctions) {
+    auto nested = disjunction->getNestedConstraints();
+    if (nested.empty())
+      continue;
+
+    auto *bindConstraint = nested.front();
+    // We assume that all the disjunctions are of the same form, and
+    // all the overloads are operators if any is an operator.
+    if (bindConstraint->getKind() != ConstraintKind::BindOverload)
+      continue;
+
+    auto choice = bindConstraint->getOverloadChoice();
+    if (!choice.isDecl())
+      continue;
+
+    auto *funcDecl = dyn_cast<FuncDecl>(choice.getDecl());
+    if (funcDecl && funcDecl->isOperator())
+      operatorDisjunctions.push_back(disjunction);
+  }
+}
+
+// For the given function type, attempt to return a concrete type for
+// the first parameter, or nullptr if we don't yet know what that
+// concrete type would be.
+static Type getConcreteTypeOfFirstParameter(AnyFunctionType *fnType,
+                                            ConstraintSystem &cs) {
+  auto paramType = fnType->getParams()[0].getType();
+  auto boundType = cs.getFixedTypeRecursive(paramType, /*wantRValue=*/false);
+  return !boundType->is<TypeVariableType>() ? boundType : Type();
+}
+
+void ConstraintSystem::collectKnownFirstParamTypesForBindOverload(
+    TypeVariableType *typeVar, SmallVectorImpl<Type> &knownTypes) {
+
+  // If this type variable already has a type, return it as long as it
+  // doesn't reference other type variables.
+  auto boundType = getFixedTypeRecursive(typeVar, /*wantRValue=*/false);
+  if (boundType && !boundType->is<TypeVariableType>()) {
+    if (auto firstParamType = getConcreteTypeOfFirstParameter(
+            boundType->castTo<AnyFunctionType>(), *this))
+      knownTypes.push_back(firstParamType);
+
+    return;
+  }
+
+  // Is the given constraint a function application with the applied
+  // function represented by the given type variable?
+  auto isApplicationOfDisjunction = [&](Constraint *constraint,
+                                        TypeVariableType *typeVar) -> bool {
+    assert(constraint->getKind() == ConstraintKind::ApplicableFunction);
+
+    auto *applicableTypeVar =
+        constraint->getSecondType()->getAs<TypeVariableType>();
+    assert(applicableTypeVar);
+
+    return getRepresentative(applicableTypeVar) == getRepresentative(typeVar);
+  };
+
+  // Otherwise we'll look at any applicable function constraints to
+  // see if we have concrete types.
+  llvm::SetVector<Constraint *> constraints;
+  CG.gatherConstraints(
+      typeVar, constraints, ConstraintGraph::GatheringKind::EquivalenceClass,
+      [](Constraint *constraint) {
+        return constraint->getKind() == ConstraintKind::ApplicableFunction;
+      });
+
+  for (auto *constraint : constraints) {
+    if (!isApplicationOfDisjunction(constraint, typeVar))
+      continue;
+
+    if (auto firstParamType = getConcreteTypeOfFirstParameter(
+            constraint->getFirstType()->castTo<AnyFunctionType>(), *this))
+      knownTypes.push_back(firstParamType);
+  }
+}
+
+// Select a disjunction of BindOverload constraints of operators where
+// the disjunction is one where we have a known concrete type for the
+// left hand side (for binary) or only operand (for unary).
+Constraint *ConstraintSystem::selectOperatorDisjunction(
+    SmallVectorImpl<Constraint *> &disjunctions) {
+  SmallVector<Constraint *, 4> operatorDisjunctions;
+
+  // Collect all overload disjunctions for operators.
+  collectOperatorDisjunctions(operatorDisjunctions, disjunctions);
+  if (operatorDisjunctions.empty())
+    return nullptr;
+
+  // For each overload disjunction for an operator, attempt to find a
+  // function application constraint for the disjunction where we have
+  // type information about either the left operand (for binary
+  // operators) or the only operand (for unary operators).
+  for (auto *disjunction : operatorDisjunctions) {
+    auto nested = disjunction->getNestedConstraints();
+    if (nested.empty())
+      continue;
+
+    auto *bindConstraint = nested.front();
+    assert(bindConstraint->getKind() == ConstraintKind::BindOverload);
+    auto *boundTypeVar =
+        bindConstraint->getFirstType()->getAs<TypeVariableType>();
+
+    SmallVector<Type, 4> knownTypes;
+    collectKnownFirstParamTypesForBindOverload(boundTypeVar, knownTypes);
+    if (!knownTypes.empty())
+      return disjunction;
+  }
+
+  return nullptr;
+}
+
 Constraint *ConstraintSystem::selectDisjunction() {
   SmallVector<Constraint *, 4> disjunctions;
 
   collectDisjunctions(disjunctions);
   if (auto *disjunction = selectBestBindingDisjunction(*this, disjunctions))
     return disjunction;
+
+  if (TC.getLangOpts().EnableNewOperatorPrototype)
+    if (auto *disjunction = selectOperatorDisjunction(disjunctions))
+      return disjunction;
 
   // Pick the disjunction with the smallest number of active choices.
   auto minDisjunction =
