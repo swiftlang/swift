@@ -8733,8 +8733,7 @@ bool FailureDiagnosis::diagnoseArchetypeAmbiguity() {
           tv, constraints, ConstraintGraph::GatheringKind::EquivalenceClass,
           [&](Constraint *constraint) -> bool {
             // We are not interested in ConformsTo constraints because
-            // such constraints specify restrictions on the archetypes
-            // themselves.
+            // we can't derive any concrete type information from them.
             if (constraint->getKind() == ConstraintKind::ConformsTo)
               return false;
 
