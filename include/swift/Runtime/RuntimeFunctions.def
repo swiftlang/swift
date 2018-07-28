@@ -638,9 +638,9 @@ FUNCTION(GetFunctionMetadata3, swift_getFunctionTypeMetadata3,
         ATTRS(NoUnwind, ReadNone))
 
 // Metadata *swift_getForeignTypeMetadata(Metadata *nonUnique);
-FUNCTION(GetForeignTypeMetadata, swift_getForeignTypeMetadata, C_CC,
-         RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeMetadataPtrTy),
+FUNCTION(GetForeignTypeMetadata, swift_getForeignTypeMetadata, SwiftCC,
+         RETURNS(TypeMetadataResponseTy),
+         ARGS(SizeTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadNone)) // only writes to runtime-private fields
 
 // WitnessTable *swift_getForeignWitnessTable(const WitnessTable *candidate,

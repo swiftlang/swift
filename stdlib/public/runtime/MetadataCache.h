@@ -787,6 +787,31 @@ public:
   Optional<Status>
   beginAllocation(ConcurrencyControl &concurrency, MetadataRequest request,
                   Args &&...args) {
+    // Returning a non-None value here will preempt initialization, so we
+    // should only do it if we're reached PrivateMetadataState::Complete.
+
+    // Fast-track out if flagAllocatedDuringConstruction was called.
+    if (Impl::MayFlagAllocatedDuringConstruction) {
+      // This can be a relaxed load because beginAllocation is called on the
+      // same thread that called the constructor.
+      auto trackingInfo =
+        PrivateMetadataTrackingInfo(
+          TrackingInfo.load(std::memory_order_relaxed));
+
+      // If we've already allocated metadata, we can skip the rest of
+      // allocation.
+      if (trackingInfo.hasAllocatedMetadata()) {
+        // Skip initialization, too, if we're fully complete.
+        if (trackingInfo.isComplete()) {
+          return Status{asImpl().getValue(), MetadataState::Complete};
+
+        // Otherwise go directly to the initialization phase.
+        } else {
+          return None;
+        }
+      }
+    }
+
     // Allocate the metadata.
     AllocationResult allocationResult =
       asImpl().allocate(std::forward<Args>(args)...);
@@ -802,6 +827,23 @@ public:
     }
 
     return None;
+  }
+
+  enum : bool { MayFlagAllocatedDuringConstruction = false };
+
+  /// As an alternative to allocate(), flag that allocation was
+  /// completed within the entry's constructor.  This should only be
+  /// called from within the constructor.
+  ///
+  /// If this is called, allocate() will not be called.
+  ///
+  /// If this is called, the subclass must define
+  ///   enum { MayFlagAllocatedDuringConstruction = true };
+  void flagAllocatedDuringConstruction(PrivateMetadataState state) {
+    assert(Impl::MayFlagAllocatedDuringConstruction);
+    assert(state != PrivateMetadataState::Allocating);
+    TrackingInfo.store(PrivateMetadataTrackingInfo(state).getRawValue(),
+                       std::memory_order_relaxed);
   }
 
   /// Begin initialization immediately after allocation.

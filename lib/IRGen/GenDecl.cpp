@@ -1488,8 +1488,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
       return getSILLinkage(FormalLinkage::PublicUnique, forDefinition);
 
     // Imported types.
-    if (getTypeMetadataAccessStrategy(type) ==
-          MetadataAccessStrategy::NonUniqueAccessor)
+    if (isAccessorLazilyGenerated(getTypeMetadataAccessStrategy(type)))
       return SILLinkage::Shared;
 
     // Everything else is only referenced inside its module.
@@ -1507,8 +1506,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     auto type = getType();
 
     // Imported types, non-primitive structural types.
-    if (getTypeMetadataAccessStrategy(type) ==
-          MetadataAccessStrategy::NonUniqueAccessor)
+    if (isAccessorLazilyGenerated(getTypeMetadataAccessStrategy(type)))
       return SILLinkage::Shared;
 
     // Everything else is only referenced inside its module.
@@ -1548,6 +1546,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
       return getSILLinkage(FormalLinkage::HiddenUnique, forDefinition);
     case MetadataAccessStrategy::PrivateAccessor:
       return getSILLinkage(FormalLinkage::Private, forDefinition);
+    case MetadataAccessStrategy::ForeignAccessor:
     case MetadataAccessStrategy::NonUniqueAccessor:
       return SILLinkage::Shared;
     }

@@ -1169,9 +1169,6 @@ public:
                                                ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfForeignTypeMetadataCandidate(CanType concreteType);
 
-  /// Determine whether the given type requires foreign type metadata.
-  bool requiresForeignTypeMetadata(CanType type);
-
   llvm::Constant *getAddrOfClassMetadataBounds(ClassDecl *D,
                                                ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfTypeContextDescriptor(NominalTypeDecl *D,
