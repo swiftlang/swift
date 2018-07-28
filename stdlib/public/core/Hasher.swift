@@ -90,10 +90,11 @@ internal struct _HasherTailBuffer {
   internal init(tail: UInt64, byteCount: UInt64) {
     // byteCount can be any value, but we only keep the lower 8 bits.  (The
     // lower three bits specify the count of bytes stored in this buffer.)
-    // FIXME: The "as UInt64" annotations here eliminate some exponential
+    // FIXME: This should be a single expression, but it causes exponential
     // behavior in the expression type checker <rdar://problem/42672946>.
-    _sanityCheck(tail & ~((1 as UInt64) << ((byteCount & (7 as UInt64))
-          << (3 as UInt64)) - (1 as UInt64)) == (0 as UInt64))
+    let shiftedByteCount: UInt64 = ((byteCount & 7) << 3)
+    let mask: UInt64 = (1 << shiftedByteCount - 1)
+    _sanityCheck(tail & ~mask == 0)
     self.value = (byteCount &<< 56 | tail)
   }
 
