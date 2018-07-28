@@ -98,7 +98,7 @@ namespace swift {
   class SourceLoc;
   class SourceFile;
   class Type;
-  enum class TypeMetadataRecordKind : unsigned;
+  enum class TypeReferenceKind : unsigned;
 
 namespace Lowering {
   class TypeConverter;
@@ -424,13 +424,13 @@ public:
 
 /// A reference to a declared type entity.
 class TypeEntityReference {
-  TypeMetadataRecordKind Kind;
+  TypeReferenceKind Kind;
   llvm::Constant *Value;
 public:
-  TypeEntityReference(TypeMetadataRecordKind kind, llvm::Constant *value)
+  TypeEntityReference(TypeReferenceKind kind, llvm::Constant *value)
     : Kind(kind), Value(value) {}
 
-  TypeMetadataRecordKind getKind() const { return Kind; }
+  TypeReferenceKind getKind() const { return Kind; }
   llvm::Constant *getValue() const { return Value; }
 };
 

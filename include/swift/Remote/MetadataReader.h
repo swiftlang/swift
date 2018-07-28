@@ -603,16 +603,23 @@ public:
           return llvm::None;
 
         return cls->getClassBoundsAsSwiftSuperclass();
+      },
+      [](StoredPointer objcClassName) -> llvm::Optional<ClassMetadataBounds> {
+        // We have no ability to look up an ObjC class by name.
+        // FIXME: add a query for this; clients may have a way to do it.
+        return llvm::None;
       });
   }
 
-  template <class Result, class DescriptorFn, class MetadataFn>
+  template <class Result, class DescriptorFn, class MetadataFn,
+            class ClassNameFn>
   llvm::Optional<Result>
-  forTypeReference(TypeMetadataRecordKind refKind, StoredPointer ref,
+  forTypeReference(TypeReferenceKind refKind, StoredPointer ref,
                    const DescriptorFn &descriptorFn,
-                   const MetadataFn &metadataFn) {
+                   const MetadataFn &metadataFn,
+                   const ClassNameFn &classNameFn) {
     switch (refKind) {
-    case TypeMetadataRecordKind::IndirectNominalTypeDescriptor: {
+    case TypeReferenceKind::IndirectNominalTypeDescriptor: {
       StoredPointer descriptorAddress = 0;
       if (!Reader->readInteger(RemoteAddress(ref), &descriptorAddress))
         return llvm::None;
@@ -621,7 +628,7 @@ public:
       LLVM_FALLTHROUGH;
     }
 
-    case TypeMetadataRecordKind::DirectNominalTypeDescriptor: {
+    case TypeReferenceKind::DirectNominalTypeDescriptor: {
       auto descriptor = readContextDescriptor(ref);
       if (!descriptor)
         return llvm::None;
@@ -629,7 +636,10 @@ public:
       return descriptorFn(descriptor);
     }
 
-    case TypeMetadataRecordKind::IndirectObjCClass: {
+    case TypeReferenceKind::DirectObjCClassName:
+      return classNameFn(ref);
+
+    case TypeReferenceKind::IndirectObjCClass: {
       StoredPointer classRef = 0;
       if (!Reader->readInteger(RemoteAddress(ref), &classRef))
         return llvm::None;
@@ -640,10 +650,9 @@ public:
 
       return metadataFn(metadata);
     }
-
-    default:
-      return llvm::None;
     }
+
+    return llvm::None;
   }
 
   /// Read a single generic type argument from a bound generic type
