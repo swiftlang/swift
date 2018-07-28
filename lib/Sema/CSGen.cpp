@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -75,7 +75,7 @@ static bool mergeRepresentativeEquivalenceClasses(ConstraintSystem &CS,
     auto rep2 = CS.getRepresentative(tyvar2);
 
     if (rep1 != rep2) {
-      auto fixedType2 = CS.getFixedType(rep2);
+      auto fixedType2 = CS.getBoundType(rep2);
 
       // If the there exists fixed type associated with the second
       // type variable, and we simply merge two types together it would

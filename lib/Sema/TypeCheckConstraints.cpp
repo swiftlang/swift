@@ -62,13 +62,13 @@ void TypeVariableType::Implementation::print(llvm::raw_ostream &OS) {
 }
 
 SavedTypeVariableBinding::SavedTypeVariableBinding(TypeVariableType *typeVar)
-  : TypeVarAndOptions(typeVar, typeVar->getImpl().getRawOptions()),
-    ParentOrFixed(typeVar->getImpl().ParentOrFixed) { }
+    : TypeVarAndOptions(typeVar, typeVar->getImpl().getRawOptions()),
+      ParentOrBound(typeVar->getImpl().ParentOrBound) {}
 
 void SavedTypeVariableBinding::restore() {
   auto *typeVar = getTypeVariable();
   typeVar->getImpl().setRawOptions(getOptions());
-  typeVar->getImpl().ParentOrFixed = ParentOrFixed;
+  typeVar->getImpl().ParentOrBound = ParentOrBound;
 }
 
 ArchetypeType *TypeVariableType::Implementation::getArchetype() const {
@@ -3480,9 +3480,9 @@ void ConstraintSystem::print(raw_ostream &out) {
       out << " [inout allowed]";
     auto rep = getRepresentative(tv);
     if (rep == tv) {
-      if (auto fixed = getFixedType(tv)) {
+      if (auto boundTy = getBoundType(tv)) {
         out << " as ";
-        fixed->print(out);
+        boundTy->print(out);
       } else {
         getPotentialBindings(tv).dump(out, 1);
       }

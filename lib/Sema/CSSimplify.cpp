@@ -683,9 +683,9 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
         // References to instance members on a metatype stay at level 0.
         // Everything else is level 1.
         if (!(function->isInstanceMember() &&
-              cs.getFixedTypeRecursive(choice->getBaseType(),
-                                       /*wantRValue=*/true)
-                ->is<AnyMetatypeType>()))
+              cs.resolveTypeVariable(choice->getBaseType(),
+                                     /*wantRValue=*/true)
+                  ->is<AnyMetatypeType>()))
           level = 1;
       } else if (isa<SubscriptDecl>(decl)) {
         // Subscript level 1 == the indices.
@@ -1624,7 +1624,7 @@ ConstraintSystem::matchTypesBindTypeVar(
     return getTypeMatchSuccess();
   }
 
-  assignFixedType(typeVar, type);
+  assignBoundType(typeVar, type);
 
   return getTypeMatchSuccess();
 }
@@ -1648,10 +1648,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
   // If we have type variables that have been bound to fixed types, look through
   // to the fixed type.
-  type1 = getFixedTypeRecursive(type1, flags, kind == ConstraintKind::Equal,
-                                isArgumentTupleMatch);
-  type2 = getFixedTypeRecursive(type2, flags, kind == ConstraintKind::Equal,
-                                isArgumentTupleMatch);
+  type1 = resolveTypeVariable(type1, flags, kind == ConstraintKind::Equal,
+                              isArgumentTupleMatch);
+  type2 = resolveTypeVariable(type2, flags, kind == ConstraintKind::Equal,
+                              isArgumentTupleMatch);
 
   auto desugar1 = type1->getDesugaredType();
   auto desugar2 = type2->getDesugaredType();
@@ -1756,9 +1756,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           return formUnsolvedResult();
 
         if (auto *iot = type1->getAs<InOutType>()) {
-          assignFixedType(typeVar2, LValueType::get(iot->getObjectType()));
+          assignBoundType(typeVar2, LValueType::get(iot->getObjectType()));
         } else {
-          assignFixedType(typeVar2, type1);
+          assignBoundType(typeVar2, type1);
         }
         return getTypeMatchSuccess();
       } else if (typeVar1 && !typeVar2) {
@@ -1774,7 +1774,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         // is wrapped in `inout` type to preserve inout/lvalue pairing.
         if (auto *lvt = type2->getAs<LValueType>()) {
           auto *tv = createTypeVariable(typeVar1->getImpl().getLocator());
-          assignFixedType(typeVar1, InOutType::get(tv));
+          assignBoundType(typeVar1, InOutType::get(tv));
 
           typeVar1 = tv;
           type2 = lvt->getObjectType();
@@ -2272,7 +2272,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
             if (auto inoutType1 = dyn_cast<InOutType>(desugar1)) {
               auto inoutBaseType = inoutType1->getInOutObjectType();
 
-              Type simplifiedInoutBaseType = getFixedTypeRecursive(
+              Type simplifiedInoutBaseType = resolveTypeVariable(
                   inoutBaseType, kind == ConstraintKind::Equal,
                   isArgumentTupleConversion);
 
@@ -2342,7 +2342,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                 // The pointer can be converted from a string, if the element
                 // type is compatible.
                 if (type1->isEqual(TC.getStringType(DC))) {
-                  auto baseTy = getFixedTypeRecursive(pointeeTy, false);
+                  auto baseTy = resolveTypeVariable(pointeeTy, false);
 
                   if (baseTy->isTypeVariableOrMember() ||
                       isStringCompatiblePointerBaseType(TC, DC, baseTy))
@@ -2669,7 +2669,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   }
 
   // Dig out the fixed type to which this type refers.
-  type = getFixedTypeRecursive(type, flags, /*wantRValue=*/true);
+  type = resolveTypeVariable(type, flags, /*wantRValue=*/true);
 
   return matchExistentialTypes(type, protocol, kind, flags, locator);
 }
@@ -2681,7 +2681,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
                                  ConstraintLocatorBuilder locator,
                                  TypeMatchOptions flags) {
   // Dig out the fixed type to which this type refers.
-  type = getFixedTypeRecursive(type, flags, /*wantRValue=*/true);
+  type = resolveTypeVariable(type, flags, /*wantRValue=*/true);
 
   // If we hit a type variable without a fixed type, we can't
   // solve this yet.
@@ -2818,7 +2818,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
 
   do {
     // Dig out the fixed type this type refers to.
-    fromType = getFixedTypeRecursive(fromType, flags, /*wantRValue=*/true);
+    fromType = resolveTypeVariable(fromType, flags, /*wantRValue=*/true);
 
     // If we hit a type variable without a fixed type, we can't
     // solve this yet.
@@ -2826,7 +2826,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
       return formUnsolved();
 
     // Dig out the fixed type this type refers to.
-    toType = getFixedTypeRecursive(toType, flags, /*wantRValue=*/true);
+    toType = resolveTypeVariable(toType, flags, /*wantRValue=*/true);
 
     // If we hit a type variable without a fixed type, we can't
     // solve this yet.
@@ -2929,10 +2929,10 @@ ConstraintSystem::simplifyOptionalObjectConstraint(
                                            TypeMatchOptions flags,
                                            ConstraintLocatorBuilder locator) {
   // Resolve the optional type.
-  Type optLValueTy = getFixedTypeRecursive(first, flags, /*wantRValue=*/false);
+  Type optLValueTy = resolveTypeVariable(first, flags, /*wantRValue=*/false);
   Type optTy = optLValueTy->getRValueType();
   if (optTy.getPointer() != optLValueTy.getPointer())
-    optTy = getFixedTypeRecursive(optTy, /*wantRValue=*/false);
+    optTy = resolveTypeVariable(optTy, /*wantRValue=*/false);
 
   if (optTy->isTypeVariableOrMember()) {
     if (flags.contains(TMF_GenerateConstraints)) {
@@ -3657,7 +3657,7 @@ ConstraintSystem::simplifyDefaultableConstraint(
                                             Type first, Type second,
                                             TypeMatchOptions flags,
                                             ConstraintLocatorBuilder locator) {
-  first = getFixedTypeRecursive(first, flags, true);
+  first = resolveTypeVariable(first, flags, true);
 
   if (first->isTypeVariableOrMember()) {
     if (flags.contains(TMF_GenerateConstraints)) {
@@ -3695,7 +3695,7 @@ ConstraintSystem::simplifyDynamicTypeOfConstraint(
   };
 
   // Solve forward.
-  type2 = getFixedTypeRecursive(type2, flags, /*wantRValue=*/true);
+  type2 = resolveTypeVariable(type2, flags, /*wantRValue=*/true);
   if (!type2->isTypeVariableOrMember()) {
     Type dynamicType2;
     if (type2->isAnyExistentialType()) {
@@ -3708,7 +3708,7 @@ ConstraintSystem::simplifyDynamicTypeOfConstraint(
   }
 
   // Okay, can't solve forward.  See what we can do backwards.
-  type1 = getFixedTypeRecursive(type1, flags, /*wantRValue=*/true);
+  type1 = resolveTypeVariable(type1, flags, /*wantRValue=*/true);
   if (type1->isTypeVariableOrMember())
     return formUnsolved();
 
@@ -3722,8 +3722,8 @@ ConstraintSystem::simplifyDynamicTypeOfConstraint(
   // If we have a normal metatype, we can't solve backwards unless we
   // know what kind of object it is.
   if (auto metatype1 = type1->getAs<MetatypeType>()) {
-    Type instanceType1 = getFixedTypeRecursive(metatype1->getInstanceType(),
-                                               true);
+    Type instanceType1 =
+        resolveTypeVariable(metatype1->getInstanceType(), true);
     if (instanceType1->isTypeVariableOrMember())
       return formUnsolved();
 
@@ -3764,14 +3764,15 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
       ++count;
 
       TypeMatchOptions unusedOptions;
-      type = getFixedTypeRecursive(objectType, unusedOptions, /*wantRValue=*/true);
+      type =
+          resolveTypeVariable(objectType, unusedOptions, /*wantRValue=*/true);
     }
 
     return { type, count };
   };
 
-  type1 = getFixedTypeRecursive(type1, flags, /*wantRValue=*/true);
-  type2 = getFixedTypeRecursive(type2, flags, /*wantRValue=*/true);
+  type1 = resolveTypeVariable(type1, flags, /*wantRValue=*/true);
+  type2 = resolveTypeVariable(type2, flags, /*wantRValue=*/true);
 
   if (type1->isTypeVariableOrMember() || type2->isTypeVariableOrMember())
     return formUnsolved();
@@ -3961,7 +3962,7 @@ ConstraintSystem::simplifyEscapableFunctionOfConstraint(
   };
 
 
-  type2 = getFixedTypeRecursive(type2, flags, /*wantRValue=*/true);
+  type2 = resolveTypeVariable(type2, flags, /*wantRValue=*/true);
   if (auto fn2 = type2->getAs<FunctionType>()) {
     // Solve forward by binding the other type variable to the escapable
     // variation of this type.
@@ -3972,7 +3973,7 @@ ConstraintSystem::simplifyEscapableFunctionOfConstraint(
     // We definitely don't have a function, so bail.
     return SolutionKind::Error;
   
-  type1 = getFixedTypeRecursive(type1, flags, /*wantRValue=*/true);
+  type1 = resolveTypeVariable(type1, flags, /*wantRValue=*/true);
   if (auto fn1 = type1->getAs<FunctionType>()) {
     // We should have the escaping end of the relation.
     if (fn1->getExtInfo().isNoEscape())
@@ -3996,7 +3997,7 @@ ConstraintSystem::simplifyOpenedExistentialOfConstraint(
                                         TypeMatchOptions flags,
                                         ConstraintLocatorBuilder locator) {
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
-  type2 = getFixedTypeRecursive(type2, flags, /*wantRValue=*/true);
+  type2 = resolveTypeVariable(type2, flags, /*wantRValue=*/true);
   if (type2->isAnyExistentialType()) {
     // We have the existential side. Produce an opened archetype and bind
     // type1 to it.
@@ -4018,7 +4019,7 @@ ConstraintSystem::simplifyOpenedExistentialOfConstraint(
   
   // If type1 is constrained to anything concrete, the constraint fails.
   // It can only be bound to a type we opened for it.
-  type1 = getFixedTypeRecursive(type1, flags, /*wantRValue=*/true);
+  type1 = resolveTypeVariable(type1, flags, /*wantRValue=*/true);
   if (!type1->isTypeVariableOrMember())
     return SolutionKind::Error;
   
@@ -4055,7 +4056,7 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
     }
   }
   
-  keyPathTy = getFixedTypeRecursive(keyPathTy, /*want rvalue*/ true);
+  keyPathTy = resolveTypeVariable(keyPathTy, /*want rvalue*/ true);
   auto tryMatchRootAndValueFromKeyPathType =
     [&](BoundGenericType *bgt, bool allowPartial) -> SolutionKind {
       Type boundRoot, boundValue;
@@ -4238,7 +4239,7 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
                                         TypeMatchOptions flags,
                                         ConstraintLocatorBuilder locator) {
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
-  keyPathTy = getFixedTypeRecursive(keyPathTy, flags, /*wantRValue=*/true);
+  keyPathTy = resolveTypeVariable(keyPathTy, flags, /*wantRValue=*/true);
   
   auto unsolved = [&]() -> SolutionKind {
     if (flags.contains(TMF_GenerateConstraints)) {
@@ -4267,7 +4268,7 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
     auto kpRootTy = bgt->getGenericArgs()[0];
     
     // Try to match the root type.
-    rootTy = getFixedTypeRecursive(rootTy, flags, /*wantRValue=*/false);
+    rootTy = resolveTypeVariable(rootTy, flags, /*wantRValue=*/false);
 
     auto matchRoot = [&](ConstraintKind kind) -> bool {
       auto rootMatches = matchTypes(rootTy, kpRootTy, kind,
@@ -4365,7 +4366,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   assert(type1->is<FunctionType>());
 
   // Drill down to the concrete type on the right hand side.
-  type2 = getFixedTypeRecursive(type2, flags, /*wantRValue=*/true);
+  type2 = resolveTypeVariable(type2, flags, /*wantRValue=*/true);
   auto desugar2 = type2->getDesugaredType();
 
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
@@ -4452,7 +4453,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
 
   // For a metatype, perform a construction.
   if (auto meta2 = dyn_cast<AnyMetatypeType>(desugar2)) {
-    auto instance2 = getFixedTypeRecursive(meta2->getInstanceType(), true);
+    auto instance2 = resolveTypeVariable(meta2->getInstanceType(), true);
     if (instance2->isTypeVariableOrMember())
       return formUnsolved();
 
@@ -4668,11 +4669,11 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     // Unwrap an inout type.
     auto obj1 = type1->getInOutObjectType();
     
-    obj1 = getFixedTypeRecursive(obj1, false, false);
+    obj1 = resolveTypeVariable(obj1, false, false);
     
     auto t2 = type2->getDesugaredType();
     
-    auto baseType1 = getFixedTypeRecursive(*isArrayType(obj1), false, false);
+    auto baseType1 = resolveTypeVariable(*isArrayType(obj1), false, false);
     auto baseType2 = getBaseTypeForPointer(*this, t2);
 
     increaseScore(ScoreKind::SK_ValueToPointerConversion);
@@ -4691,7 +4692,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     // TODO: Handle different encodings based on pointer element type, such as
     // UTF16 for [U]Int16 or UTF32 for [U]Int32. For now we only interop with
     // Int8 pointers using UTF8 encoding.
-    baseType2 = getFixedTypeRecursive(baseType2, false, false);
+    baseType2 = resolveTypeVariable(baseType2, false, false);
     // If we haven't resolved the element type, generate constraints.
     if (baseType2->isTypeVariableOrMember()) {
       if (flags.contains(TMF_GenerateConstraints)) {

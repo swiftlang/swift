@@ -134,7 +134,7 @@ Solution ConstraintSystem::finalize(
   }
 
   for (auto tv : TypeVariables) {
-    if (getFixedType(tv))
+    if (getBoundType(tv))
       continue;
 
     switch (allowFreeTypeVariables) {
@@ -145,7 +145,7 @@ Solution ConstraintSystem::finalize(
       break;
         
     case FreeTypeVariableBinding::UnresolvedType:
-      assignFixedType(tv, TC.Context.TheUnresolvedType);
+      assignBoundType(tv, TC.Context.TheUnresolvedType);
       break;
     }
   }
@@ -239,8 +239,8 @@ void ConstraintSystem::applySolution(const Solution &solution) {
 
     // If we don't already have a fixed type for this type variable,
     // assign the fixed type from the solution.
-    if (!getFixedType(binding.first) && !binding.second->hasTypeVariable())
-      assignFixedType(binding.first, binding.second, /*updateState=*/false);
+    if (!getBoundType(binding.first) && !binding.second->hasTypeVariable())
+      assignBoundType(binding.first, binding.second, /*updateState=*/false);
   }
 
   // Register overload choices.
@@ -2223,7 +2223,7 @@ void DisjunctionChoice::propagateConversionInfo() const {
 
   // If the representative already has a type assigned to it
   // we can't really do anything here.
-  if (typeVar->getImpl().getFixedType(nullptr))
+  if (typeVar->getImpl().getBoundType(nullptr))
     return;
 
   auto bindings = CS->getPotentialBindings(typeVar);

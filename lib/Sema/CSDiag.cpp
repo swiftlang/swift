@@ -6095,7 +6095,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
         if (locator->getAnchor() == callExpr) {
           argType = constraint->getSecondType();
           if (auto *typeVar = argType->getAs<TypeVariableType>())
-            argType = CS.getFixedType(typeVar);
+            argType = CS.getBoundType(typeVar);
         }
       }
     }
@@ -8481,8 +8481,8 @@ static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
 
       // ...but only if they were actually resolved by the constraint system
       // despite the failure.
-      Type maybeFixedType = cs.getFixedTypeRecursive(preferred,
-                                                     /*wantRValue*/true);
+      Type maybeFixedType = cs.resolveTypeVariable(preferred,
+                                                   /*wantRValue*/ true);
       if (maybeFixedType->hasTypeVariable() ||
           maybeFixedType->hasUnresolvedType()) {
         return Type();
@@ -8715,7 +8715,7 @@ bool FailureDiagnosis::diagnoseArchetypeAmbiguity() {
   for (auto tv : CS.getTypeVariables()) {
     auto &impl = tv->getImpl();
 
-    if (impl.hasRepresentativeOrFixed())
+    if (impl.hasRepresentativeOrBound())
       continue;
 
     // If this is a conversion to a type variable used to form an archetype,
