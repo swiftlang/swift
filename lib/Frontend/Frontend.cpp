@@ -136,7 +136,10 @@ void CompilerInstance::recordPrimarySourceFile(SourceFile *SF) {
 bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   Invocation = Invok;
 
-  setUpFileSystem();
+  // If initializing the overlay file system fails there's no sense in
+  // continuing because the compiler will read the wrong files.
+  if (setUpVirtualFileSystemOverlays())
+    return true;
   setUpLLVMArguments();
   setUpDiagnosticOptions();
 
@@ -167,37 +170,49 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   return setUpInputs();
 }
 
-void CompilerInstance::setUpFileSystem() {
+static bool loadAndValidateVFSOverlay(
+    const std::string &File,
+    const llvm::IntrusiveRefCntPtr<clang::vfs::FileSystem> &BaseFS,
+    const llvm::IntrusiveRefCntPtr<clang::vfs::OverlayFileSystem> &OverlayFS,
+    DiagnosticEngine &Diag) {
+  // FIXME: It should be possible to allow chained lookup of later VFS overlays
+  // through the mapping defined by earlier overlays.
+  // See rdar://problem/39440687
+  auto Buffer = BaseFS->getBufferForFile(File);
+  if (!Buffer) {
+    Diag.diagnose(SourceLoc(), diag::cannot_open_file, File,
+                         Buffer.getError().message());
+    return true;
+  }
+
+  auto VFS = clang::vfs::getVFSFromYAML(std::move(Buffer.get()),
+                                        nullptr, File);
+  if (!VFS) {
+    Diag.diagnose(SourceLoc(), diag::invalid_vfs_overlay_file, File);
+    return true;
+  }
+  OverlayFS->pushOverlay(VFS);
+  return false;
+}
+
+bool CompilerInstance::setUpVirtualFileSystemOverlays() {
   auto BaseFS = clang::vfs::getRealFileSystem();
-  auto Overlay = llvm::IntrusiveRefCntPtr<clang::vfs::OverlayFileSystem>(
+  auto OverlayFS = llvm::IntrusiveRefCntPtr<clang::vfs::OverlayFileSystem>(
                     new clang::vfs::OverlayFileSystem(BaseFS));
+  bool hadAnyFailure = false;
   for (const auto &File : Invocation.getSearchPathOptions().VFSOverlayFiles) {
-    auto Buffer = BaseFS->getBufferForFile(File);
-    if (!Buffer) {
-      continue;
-    }
-
-    auto FS = clang::vfs::getVFSFromYAML(std::move(Buffer.get()),
-                                         nullptr, File);
-    if (!FS) {
-      continue;
-    }
-    Overlay->pushOverlay(FS);
+    hadAnyFailure |=
+        loadAndValidateVFSOverlay(File, BaseFS, OverlayFS, Diagnostics);
   }
 
-  // If there weren't any overlays or we couldn't load any overlays then fall
-  // back to the local FS.
-  if (Overlay->overlays_begin() == Overlay->overlays_end()) {
-    FS = BaseFS;
-    return;
+  // If we successfully loaded all the overlays, let the source manager and
+  // diagnostic engine take advantage of the overlay file system.
+  if (!hadAnyFailure &&
+      (OverlayFS->overlays_begin() != OverlayFS->overlays_end())) {
+    SourceMgr.setFileSystem(OverlayFS);
   }
 
-  // Initialize the overlays file system.
-  FS = Overlay;
-
-  // Reset the source manager and diagnostic engine to take advantage of the
-  // overlay file system.
-  SourceMgr.setFileSystem(FS);
+  return hadAnyFailure;
 }
 
 void CompilerInstance::setUpLLVMArguments() {
