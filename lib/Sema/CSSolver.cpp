@@ -1417,16 +1417,19 @@ ConstraintSystem::solveImpl(Expr *&expr,
     if (getContextualTypePurpose() == CTP_YieldByReference)
       constraintKind = ConstraintKind::Bind;
 
+    auto *convertTypeLocator = getConstraintLocator(
+        getConstraintLocator(expr), ConstraintLocator::ContextualType);
+
     if (allowFreeTypeVariables == FreeTypeVariableBinding::UnresolvedType) {
       convertType = convertType.transform([&](Type type) -> Type {
         if (type->is<UnresolvedType>())
-          return createTypeVariable(getConstraintLocator(expr));
+          return createTypeVariable(convertTypeLocator);
         return type;
       });
     }
 
     addConstraint(constraintKind, getType(expr), convertType,
-                  getConstraintLocator(expr), /*isFavored*/ true);
+                  convertTypeLocator, /*isFavored*/ true);
   }
 
   // Notify the listener that we've built the constraint system.
