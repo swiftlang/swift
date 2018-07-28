@@ -184,6 +184,13 @@ public:
     return getLocForBufferStart(BufferID).getAdvancedLoc(Offset);
   }
 
+  /// Returns a buffer identifier suitable for display to the user containing
+  /// the given source location.
+  ///
+  /// This respects #line directives and the 'use-external-names' directive in
+  /// VFS overlay files.
+  StringRef getDisplayNameForLoc(SourceLoc Loc) const;
+
   /// Returns the identifier string for the buffer containing the given source
   /// location.
   ///
