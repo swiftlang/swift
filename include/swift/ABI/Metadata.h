@@ -2255,7 +2255,7 @@ public:
   }
 };
 
-/// A referenc to a type.
+/// A reference to a type.
 template <typename Runtime>
 struct TargetTypeReference {
   union {
