@@ -73,6 +73,7 @@
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/Analysis/AccessedStorageAnalysis.h"
+#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/LoopRegionAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Local.h"
@@ -983,6 +984,232 @@ AccessMergeAnalysis::MergeableMap &&AccessMergeAnalysis::analyze() && {
   return std::move(mergeableAccesses);
 }
 
+static LoopRegion *getParentRegion(LoopRegionFunctionInfo *LRFI,
+                                   SILInstruction *parentIns) {
+  auto *blockRegion = LRFI->getRegion(parentIns->getParent());
+  assert(blockRegion->isBlock() && "Expected a block region");
+  auto parentID = blockRegion->getParentID();
+  auto *parentRegion = LRFI->getRegion(parentID.getValue());
+  return parentRegion;
+}
+
+static void moveBeginIfNecessary(LoopRegionFunctionInfo *LRFI,
+                                 DominanceInfo *domTree,
+                                 BeginAccessInst *parentIns,
+                                 BeginAccessInst *childIns) {
+  auto *parentRegion = getParentRegion(LRFI, parentIns);
+  if (parentRegion->isFunction()) {
+    assert(domTree->dominates(parentIns, childIns) &&
+           "Expected parent instruction to dominate");
+    return;
+  }
+  assert(
+      parentRegion->isLoop() &&
+      "We only support moving the instruction if it is inside a loop reigon");
+  auto *loopRegion = parentRegion->getLoop();
+  auto *loopHeader = loopRegion->getHeader();
+  if (parentIns->getParent() == loopHeader) {
+    LLVM_DEBUG(llvm::dbgs()
+               << *parentIns << " not in the same block as " << *childIns
+               << ", but is inside loop header, no need to move it\n");
+    return;
+  }
+  if (domTree->dominates(parentIns, childIns)) {
+    LLVM_DEBUG(llvm::dbgs()
+               << *parentIns << " not in the same block as " << *childIns
+               << ", but it dominates it. keeping in-place\n");
+    return;
+  }
+  LLVM_DEBUG(llvm::dbgs() << *parentIns << " not in the same block as "
+                          << *childIns << ", moving begin to loop header\n");
+
+  auto mvBefore = loopHeader->getTerminator();
+  parentIns->moveBefore(mvBefore);
+}
+
+// TODO: support multi-end access cases
+static EndAccessInst *getSingleEndAccess(BeginAccessInst *inst) {
+  EndAccessInst *end = nullptr;
+  for (auto *currEnd : inst->getEndAccesses()) {
+    if (end == nullptr)
+      end = currEnd;
+    else
+      return nullptr;
+  }
+  return end;
+}
+
+static void mergeEndAccesses(LoopRegionFunctionInfo *LRFI,
+                             DominanceInfo *domTree, BeginAccessInst *parentIns,
+                             BeginAccessInst *childIns) {
+  auto *endP = getSingleEndAccess(parentIns);
+  if (!endP)
+    llvm_unreachable("not supported");
+  auto *endC = getSingleEndAccess(childIns);
+  if (!endC)
+    llvm_unreachable("not supported");
+
+  endC->setOperand(parentIns);
+  endP->eraseFromParent();
+  auto *parentRegion = getParentRegion(LRFI, parentIns);
+  if (parentRegion->isFunction()) {
+    assert(domTree->dominates(parentIns, childIns) &&
+           "Expected parent instruction to dominate");
+    return;
+  }
+  assert(
+      parentRegion->isLoop() &&
+      "We only support moving the instruction if it is inside a loop reigon");
+  if (domTree->dominates(parentIns, childIns)) {
+    // no need to move to exits, we already got the scope right
+    return;
+  }
+  auto *loopRegion = parentRegion->getLoop();
+  SmallVector<SILBasicBlock *, 8> exitingBBs;
+  loopRegion->getExitingBlocks(exitingBBs);
+  auto endCParent = endC->getParent();
+  for (auto *exitingBB : exitingBBs) {
+    if (exitingBB == endCParent)
+      continue;
+    auto mvBefore = exitingBB->getTerminator();
+    endC->clone(mvBefore);
+  }
+  if (std::find(exitingBBs.begin(), exitingBBs.end(), endCParent) !=
+      exitingBBs.end())
+    return;
+  assert(exitingBBs.size() > 0 &&
+         "Expected to have cloned the instruction to at least one BB");
+  endC->eraseFromParent();
+}
+
+static bool canMergeBegin(LoopRegionFunctionInfo *LRFI, DominanceInfo *domTree,
+                          BeginAccessInst *parentIns,
+                          BeginAccessInst *childIns) {
+  if (parentIns->getParent() == childIns->getParent())
+    return true;
+
+  auto *parentRegion = getParentRegion(LRFI, parentIns);
+  assert(!parentRegion->isBlock() && "Did not expect a block region");
+  if (parentRegion->isFunction()) {
+    // we can only merge if they dominate
+    return domTree->dominates(parentIns, childIns);
+  }
+  // Every loop got a header - we can move it there
+  // If and only if the operand dominates the header
+  auto op = parentIns->getOperand();
+  auto *opInst = op->castToSingleValueInstruction();
+  auto *loopRegion = parentRegion->getLoop();
+  auto *loopHeader = loopRegion->getHeader();
+  auto *termInst = &loopHeader->back();
+  if (!opInst || !termInst)
+    return false;
+  if (domTree->dominates(opInst, termInst))
+    return true;
+  // Else we can only perform the optimization
+  // If and only if the parentIns dominates
+  // the other instruction
+  if (domTree->dominates(parentIns, childIns))
+    return true;
+  return false;
+}
+
+static bool canMergeEnd(LoopRegionFunctionInfo *LRFI,
+                        BeginAccessInst *parentIns, BeginAccessInst *childIns) {
+  auto *endP = getSingleEndAccess(parentIns);
+  if (!endP)
+    return false;
+
+  auto *endC = getSingleEndAccess(childIns);
+  if (!endC)
+    return false;
+
+  if (endP->getParent() == endC->getParent())
+    return true;
+
+  auto *parentRegion = getParentRegion(LRFI, parentIns);
+  assert(!parentRegion->isBlock() && "Did not expect a block region");
+  if (parentRegion->isFunction()) {
+    // we can only merge if they are both in the same block:
+    // if we reached here they are not
+    return false;
+  }
+  return true;
+}
+
+static bool canMerge(LoopRegionFunctionInfo *LRFI, DominanceInfo *domTree,
+                     BeginAccessInst *parentIns, BeginAccessInst *childIns) {
+  if (!canMergeBegin(LRFI, domTree, parentIns, childIns))
+    return false;
+
+  return canMergeEnd(LRFI, parentIns, childIns);
+}
+
+static bool mergeAccesses(LoopRegionFunctionInfo *LRFI, DominanceInfo *domTree,
+                          const AccessMergeAnalysis::MergeableMap &mergeMap) {
+  bool changed = false;
+  // make a temporary reverse copy to work on:
+  AccessMergeAnalysis::MergeableMap workMap;
+  std::for_each(
+      mergeMap.rbegin(), mergeMap.rend(),
+      [&](const std::pair<BeginAccessInst *, BeginAccessInst *> &pair) {
+        workMap.insert(pair);
+      });
+
+  llvm::DenseMap<BeginAccessInst *, BeginAccessInst *> oldToNewMap;
+
+  while (!workMap.empty()) {
+    auto curr = workMap.back();
+    workMap.pop_back();
+    auto *parentIns = curr.first;
+    auto *childIns = curr.second;
+    if (oldToNewMap.count(parentIns) != 0) {
+      parentIns = oldToNewMap[parentIns];
+    }
+    assert(oldToNewMap.count(childIns) == 0 &&
+           "Can't have same child instruction twice in map");
+
+    // The optimization might not currently support every mergeable pair
+    // If the current pattern is not supported - skip
+    if (!canMerge(LRFI, domTree, parentIns, childIns))
+      continue;
+
+    LLVM_DEBUG(llvm::dbgs()
+               << "Merging: " << *childIns << " into " << *parentIns << "\n");
+
+    // If the parent instruction does not dominate the child,
+    // move it to a block that dominates both its current location
+    // and the child's location
+    // there should be such a block inside the current region
+    moveBeginIfNecessary(LRFI, domTree, parentIns, childIns);
+
+    // Change the type of access of parent:
+    // should be the worse between it and child
+    auto childAccess = childIns->getAccessKind();
+    if (parentIns->getAccessKind() < childAccess) {
+      parentIns->setAccessKind(childAccess);
+    }
+
+    // remove end accesses and create new ones that cover bigger scope:
+    mergeEndAccesses(LRFI, domTree, parentIns, childIns);
+
+    // In case the child instruction is at the map,
+    // updated the oldToNewMap to reflect that we are getting rid of it:
+    oldToNewMap.insert(std::make_pair(childIns, parentIns));
+
+    // Modify the users of child instruction to use the parent:
+    childIns->replaceAllUsesWith(parentIns);
+  }
+
+  // Delete all old instructions from parent scopes:
+  while (!oldToNewMap.empty()) {
+    auto curr = oldToNewMap.begin();
+    auto *oldIns = curr->getFirst();
+    oldToNewMap.erase(oldIns);
+    oldIns->eraseFromParent();
+  }
+  return changed;
+}
+
 namespace {
 struct AccessEnforcementOpts : public SILFunctionTransform {
   void run() override {
@@ -1019,6 +1246,15 @@ struct AccessEnforcementOpts : public SILFunctionTransform {
 
     LoopRegionFunctionInfo *LRFI = getAnalysis<LoopRegionAnalysis>()->get(F);
     auto mergeMap = AccessMergeAnalysis(LRFI, ASA, result).analyze();
+    DominanceAnalysis *domAnalysis = getAnalysis<DominanceAnalysis>();
+    // There are some cases wherein we need the dom-tree:
+    // consider two conditional accesses inside a loop.
+    // we can move them to the loop header and merge
+    // *UNLESS* their operand / storage is defined
+    // inside the conditional loop blocks
+    DominanceInfo *domTree = domAnalysis->get(F);
+    if (mergeAccesses(LRFI, domTree, mergeMap))
+      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 };
 } // namespace
