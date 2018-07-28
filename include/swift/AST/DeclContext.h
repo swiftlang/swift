@@ -486,6 +486,10 @@ public:
                        LazyResolver *typeResolver,
                        SmallVectorImpl<ValueDecl *> &decls) const;
 
+  /// Perform qualified lookup for the given member in the given module.
+  bool lookupQualified(ModuleDecl *module, DeclName member, NLOptions options,
+                       SmallVectorImpl<ValueDecl *> &decls) const;
+
   /// Perform \c AnyObject lookup for the given member.
   bool lookupAnyObject(DeclName member, NLOptions options,
                        SmallVectorImpl<ValueDecl *> &decls) const;

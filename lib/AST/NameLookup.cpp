@@ -1634,6 +1634,10 @@ bool DeclContext::lookupQualified(Type type,
   if (type->isAnyObject())
     return lookupAnyObject(member, options, decls);
 
+  // Handle lookup in a module.
+  if (auto moduleTy = type->getAs<ModuleType>())
+    return lookupQualified(moduleTy->getModule(), member, options, decls);
+
   if (!typeResolver)
     typeResolver = getASTContext().getLazyResolver();
 
@@ -1641,54 +1645,6 @@ bool DeclContext::lookupQualified(Type type,
   ReferencedNameTracker *tracker = nullptr;
   bool isLookupCascading;
   configureLookup(this, options, tracker, isLookupCascading);
-
-  // Look for module references.
-  if (auto moduleTy = type->getAs<ModuleType>()) {
-    ModuleDecl *module = moduleTy->getModule();
-    auto topLevelScope = getModuleScopeContext();
-    if (module == topLevelScope->getParentModule()) {
-      if (tracker) {
-        recordLookupOfTopLevelName(topLevelScope, member, isLookupCascading);
-      }
-      lookupInModule(module, /*accessPath=*/{}, member, decls,
-                     NLKind::QualifiedLookup, ResolutionKind::Overloadable,
-                     typeResolver, topLevelScope);
-    } else {
-      // Note: This is a lookup into another module. Unless we're compiling
-      // multiple modules at once, or if the other module re-exports this one,
-      // it shouldn't be possible to have a dependency from that module on
-      // anything in this one.
-
-      // Perform the lookup in all imports of this module.
-      forAllVisibleModules(this,
-                           [&](const ModuleDecl::ImportedModule &import) -> bool {
-        if (import.second != module)
-          return true;
-        lookupInModule(import.second, import.first, member, decls,
-                       NLKind::QualifiedLookup, ResolutionKind::Overloadable,
-                       typeResolver, topLevelScope);
-        // If we're able to do an unscoped lookup, we see everything. No need
-        // to keep going.
-        return !import.first.empty();
-      });
-    }
-
-    llvm::SmallPtrSet<ValueDecl *, 4> knownDecls;
-    decls.erase(std::remove_if(decls.begin(), decls.end(),
-                               [&](ValueDecl *vd) -> bool {
-      // If we're performing a type lookup, don't even attempt to validate
-      // the decl if its not a type.
-      if ((options & NL_OnlyTypes) && !isa<TypeDecl>(vd))
-        return true;
-
-      return !knownDecls.insert(vd).second;
-    }), decls.end());
-
-    if (auto *debugClient = topLevelScope->getParentModule()->getDebugClient())
-      filterForDiscriminator(decls, debugClient);
-    
-    return !decls.empty();
-  }
 
   // The set of nominal type declarations we should (and have) visited.
   SmallVector<NominalTypeDecl *, 4> stack;
@@ -1828,8 +1784,64 @@ bool DeclContext::lookupQualified(Type type,
   return finishLookup(this, options, decls);
 }
 
+bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
+                                  NLOptions options,
+                                  SmallVectorImpl<ValueDecl *> &decls) const {
+  using namespace namelookup;
+  assert(decls.empty() && "additive lookup not supported");
+
+  // Configure lookup and dig out the tracker.
+  ReferencedNameTracker *tracker = nullptr;
+  bool isLookupCascading;
+  configureLookup(this, options, tracker, isLookupCascading);
+
+  ASTContext &ctx = getASTContext();
+  auto topLevelScope = getModuleScopeContext();
+  if (module == topLevelScope->getParentModule()) {
+    if (tracker) {
+      recordLookupOfTopLevelName(topLevelScope, member, isLookupCascading);
+    }
+    lookupInModule(module, /*accessPath=*/{}, member, decls,
+                   NLKind::QualifiedLookup, ResolutionKind::Overloadable,
+                   ctx.getLazyResolver(), topLevelScope);
+  } else {
+    // Note: This is a lookup into another module. Unless we're compiling
+    // multiple modules at once, or if the other module re-exports this one,
+    // it shouldn't be possible to have a dependency from that module on
+    // anything in this one.
+
+    // Perform the lookup in all imports of this module.
+    forAllVisibleModules(this,
+                         [&](const ModuleDecl::ImportedModule &import) -> bool {
+      if (import.second != module)
+        return true;
+      lookupInModule(import.second, import.first, member, decls,
+                     NLKind::QualifiedLookup, ResolutionKind::Overloadable,
+                     ctx.getLazyResolver(), topLevelScope);
+      // If we're able to do an unscoped lookup, we see everything. No need
+      // to keep going.
+      return !import.first.empty();
+    });
+  }
+
+  llvm::SmallPtrSet<ValueDecl *, 4> knownDecls;
+  decls.erase(std::remove_if(decls.begin(), decls.end(),
+                             [&](ValueDecl *vd) -> bool {
+    // If we're performing a type lookup, skip non-types.
+    if ((options & NL_OnlyTypes) && !isa<TypeDecl>(vd))
+      return true;
+
+    return !knownDecls.insert(vd).second;
+  }), decls.end());
+
+  return finishLookup(this, options, decls);
+}
+
 bool DeclContext::lookupAnyObject(DeclName member, NLOptions options,
                                   SmallVectorImpl<ValueDecl *> &decls) const {
+  using namespace namelookup;
+  assert(decls.empty() && "additive lookup not supported");
+
   // Configure lookup and dig out the tracker.
   ReferencedNameTracker *tracker = nullptr;
   bool isLookupCascading;
