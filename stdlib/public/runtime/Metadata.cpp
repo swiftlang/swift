@@ -83,11 +83,19 @@ static void installGenericArguments(Metadata *metadata,
          generics.Base.getNumArguments() * sizeof(void*));
 }
 
+#if SWIFT_OBJC_INTEROP
+static ClassMetadataBounds computeMetadataBoundsForObjCClass(Class cls) {
+  cls = swift_getInitializedObjCClass(cls);
+  auto metadata = reinterpret_cast<const ClassMetadata *>(cls);
+  return metadata->getClassBoundsAsSwiftSuperclass();
+}
+#endif
+
 static ClassMetadataBounds
 computeMetadataBoundsForSuperclass(const void *ref,
-                                   TypeMetadataRecordKind refKind) {
+                                   TypeReferenceKind refKind) {
   switch (refKind) {
-  case TypeMetadataRecordKind::IndirectNominalTypeDescriptor: {
+  case TypeReferenceKind::IndirectNominalTypeDescriptor: {
     auto description = *reinterpret_cast<const ClassDescriptor * const *>(ref);
     if (!description) {
       swift::fatalError(0, "instantiating class metadata for class with "
@@ -96,25 +104,28 @@ computeMetadataBoundsForSuperclass(const void *ref,
     return description->getMetadataBounds();
   }
 
-  case TypeMetadataRecordKind::DirectNominalTypeDescriptor: {
+  case TypeReferenceKind::DirectNominalTypeDescriptor: {
     auto description = reinterpret_cast<const ClassDescriptor *>(ref);
     return description->getMetadataBounds();
   }
 
-  case TypeMetadataRecordKind::IndirectObjCClass:
+  case TypeReferenceKind::DirectObjCClassName: {
 #if SWIFT_OBJC_INTEROP
-    {
-      auto cls = *reinterpret_cast<const Class *>(ref);
-      cls = swift_getInitializedObjCClass(cls);
-      auto metadata = reinterpret_cast<const ClassMetadata *>(cls);
-      return metadata->getClassBoundsAsSwiftSuperclass();
-    }
+    auto cls = objc_lookUpClass(reinterpret_cast<const char *>(ref));
+    return computeMetadataBoundsForObjCClass(cls);
 #else
-    // fallthrough
-#endif
-
-  case TypeMetadataRecordKind::Reserved:
     break;
+#endif
+  }
+
+  case TypeReferenceKind::IndirectObjCClass: {
+#if SWIFT_OBJC_INTEROP
+    auto cls = *reinterpret_cast<const Class *>(ref);
+    return computeMetadataBoundsForObjCClass(cls);
+#else
+    break;
+#endif
+  }
   }
   swift_runtime_unreachable("unsupported superclass reference kind");
 }
