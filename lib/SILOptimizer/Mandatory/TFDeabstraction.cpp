@@ -2180,11 +2180,10 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
     resultTypes.push_back(inst->getType());
   }
 
-  auto op = B.createGraphOperation(inst->getLoc(),
+  auto op = B.createGraphOperation(getUserSourceLocation(inst),
                                    context.getIdentifier(opName), inputs,
                                    attributes, resultTypes);
-  op->setDebugLocation(inst->getDebugLocation());
-  
+
   if (auto tuple = inst->getType().getAs<TupleType>()) {
     SmallVector<SILValue, 4> elts;
     for (unsigned i = 0, e = tuple->getNumElements(); i != e; ++i)
