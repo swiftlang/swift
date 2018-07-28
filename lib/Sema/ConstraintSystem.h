@@ -3587,7 +3587,7 @@ public:
 /// that needs to be unwrapped.
 ///
 /// \returns true if a diagnostic was produced.
-bool diagnoseUnwrap(TypeChecker &TC, DeclContext *DC, Expr *expr, Type type);
+bool diagnoseUnwrap(constraints::ConstraintSystem &CS, Expr *expr, Type type);
 
 /// Diagnose an attempt to recover from a member access into a value of
 /// optional type which needed to be unwrapped for the member to be found.

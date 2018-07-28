@@ -929,6 +929,12 @@ NOTE(unwrap_with_default_value,none,
 NOTE(unwrap_with_force_value,none,
      "force-unwrap using '!' to abort execution if the optional value contains "
      "'nil'", ())
+NOTE(unwrap_iuo_initializer,none,
+     "value inferred to be type %0 when initialized with an implicitly "
+     "unwrapped value", (Type))
+NOTE(unwrap_with_guard,none,
+     "short-circuit using 'guard' to exit this function early "
+     "if the optional value contains 'nil'", ())
 ERROR(optional_base_not_unwrapped,none,
       "value of optional type %0 must be unwrapped to refer to member %1 of "
       "wrapped base type %2", (Type, DeclName, Type))
