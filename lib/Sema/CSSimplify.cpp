@@ -21,6 +21,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Compiler.h"
 
 using namespace swift;
@@ -5085,17 +5086,19 @@ ConstraintSystem::addKeyPathApplicationRootConstraint(Type root, ConstraintLocat
   auto typeVar = getType(keyPathExpr)->getAs<TypeVariableType>();
   if (!typeVar)
     return;
-  
-  SmallVector<Constraint *, 4> constraints;
-  CG.gatherConstraints(typeVar, constraints,
-                       ConstraintGraph::GatheringKind::EquivalenceClass);
-  
+
+  llvm::SetVector<Constraint *> constraints;
+  CG.gatherConstraints(
+      typeVar, constraints, ConstraintGraph::GatheringKind::EquivalenceClass,
+      [&keyPathExpr](Constraint *constraint) -> bool {
+        return constraint->getKind() == ConstraintKind::KeyPath &&
+               constraint->getLocator()->getAnchor() == keyPathExpr;
+      });
+
   for (auto constraint : constraints) {
-    if (constraint->getKind() == ConstraintKind::KeyPath &&
-        constraint->getLocator()->getAnchor() == keyPathExpr) {
-      auto keyPathRootTy = constraint->getSecondType();
-      addConstraint(ConstraintKind::Subtype, root->getWithoutSpecifierType(), keyPathRootTy, locator);
-    }
+    auto keyPathRootTy = constraint->getSecondType();
+    addConstraint(ConstraintKind::Subtype, root->getWithoutSpecifierType(),
+                  keyPathRootTy, locator);
   }
 }
 

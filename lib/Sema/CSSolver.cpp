@@ -17,6 +17,7 @@
 #include "ConstraintSystem.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeWalker.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -93,15 +94,18 @@ Optional<Type> ConstraintSystem::checkTypeOfBinding(TypeVariableType *typeVar,
       *isNilLiteral = false;
 
       // Look for a literal-conformance constraint on the type variable.
-      SmallVector<Constraint *, 8> constraints;
+      llvm::SetVector<Constraint *> constraints;
       getConstraintGraph().gatherConstraints(
           bindingTypeVar, constraints,
-          ConstraintGraph::GatheringKind::EquivalenceClass);
+          ConstraintGraph::GatheringKind::EquivalenceClass,
+          [](Constraint *constraint) -> bool {
+            return constraint->getKind() == ConstraintKind::LiteralConformsTo &&
+                   constraint->getProtocol()->isSpecificProtocol(
+                       KnownProtocolKind::ExpressibleByNilLiteral);
+          });
+
       for (auto constraint : constraints) {
-        if (constraint->getKind() == ConstraintKind::LiteralConformsTo &&
-            constraint->getProtocol()->isSpecificProtocol(
-                KnownProtocolKind::ExpressibleByNilLiteral) &&
-            simplifyType(constraint->getFirstType())->isEqual(bindingTypeVar)) {
+        if (simplifyType(constraint->getFirstType())->isEqual(bindingTypeVar)) {
           *isNilLiteral = true;
           break;
         }
@@ -1899,14 +1903,14 @@ static Constraint *selectBestBindingDisjunction(
                    ->getAs<TypeVariableType>();
     assert(tv);
 
-    SmallVector<Constraint *, 8> constraints;
+    llvm::SetVector<Constraint *> constraints;
     cs.getConstraintGraph().gatherConstraints(
-        tv, constraints, ConstraintGraph::GatheringKind::EquivalenceClass);
+        tv, constraints, ConstraintGraph::GatheringKind::EquivalenceClass,
+        [](Constraint *constraint) {
+          return constraint->getKind() == ConstraintKind::Conversion;
+        });
 
     for (auto *constraint : constraints) {
-      if (constraint->getKind() != ConstraintKind::Conversion)
-        continue;
-
       auto toType =
           cs.simplifyType(constraint->getSecondType())->getRValueType();
       auto *toTV = toType->getAs<TypeVariableType>();
@@ -2224,26 +2228,23 @@ void DisjunctionChoice::propagateConversionInfo() const {
     return;
 
   auto conversionType = bindings.Bindings[0].BindingType;
-  SmallVector<Constraint *, 4> constraints;
+  llvm::SetVector<Constraint *> constraints;
   CS->CG.gatherConstraints(typeVar, constraints,
-                           ConstraintGraph::GatheringKind::EquivalenceClass);
+                           ConstraintGraph::GatheringKind::EquivalenceClass,
+                           [](Constraint *constraint) -> bool {
+                             switch (constraint->getKind()) {
+                             case ConstraintKind::Conversion:
+                             case ConstraintKind::Defaultable:
+                             case ConstraintKind::ConformsTo:
+                             case ConstraintKind::LiteralConformsTo:
+                               return false;
 
-  bool viableForBinding = true;
-  for (auto adjacent : constraints) {
-    switch (adjacent->getKind()) {
-    case ConstraintKind::Conversion:
-    case ConstraintKind::Defaultable:
-    case ConstraintKind::ConformsTo:
-    case ConstraintKind::LiteralConformsTo:
-      break;
+                             default:
+                               return true;
+                             }
+                           });
 
-    default:
-      viableForBinding = false;
-      break;
-    }
-  }
-
-  if (viableForBinding)
+  if (constraints.empty())
     CS->addConstraint(ConstraintKind::Bind, typeVar, conversionType,
                       Choice->getLocator());
 }
