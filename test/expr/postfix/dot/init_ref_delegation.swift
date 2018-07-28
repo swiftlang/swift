@@ -294,8 +294,7 @@ func foo<T: C>(_ x: T, y: T.Type) where T: P {
   var cs2 = T.init(x: 0) // expected-error{{'required' initializer}}
   var cs3 = T.init() // expected-error{{'required' initializer}}
   var cs4 = T.init(proto: "")
-  var cs5 = T.init(notfound: "") // expected-error{{argument labels '(notfound:)' do not match any available overloads}}
-  // expected-note @-1 {{overloads for 'T.Type.init' exist with these partially matching parameter lists: (x: Int), (required: Double), (proto: String)}}
+  var cs5 = T.init(notfound: "") // expected-error{{incorrect argument label in call (have 'notfound:', expected 'proto:')}}
 
   var csf1: (Double) -> T = T.init
   var csf2: (Int) -> T    = T.init // expected-error{{'required' initializer}}

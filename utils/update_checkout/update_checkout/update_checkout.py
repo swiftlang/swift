@@ -414,7 +414,8 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         action='store_true')
     parser.add_argument(
         "--config",
-        default=os.path.join(SCRIPT_DIR, "update-checkout-config.json"),
+        default=os.path.join(SCRIPT_DIR, os.pardir,
+                             "update-checkout-config.json"),
         help="Configuration file to use")
     parser.add_argument(
         "--github-comment",
@@ -518,7 +519,3 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
     else:
         print("update-checkout succeeded")
     sys.exit(fail_count)
-
-
-if __name__ == "__main__":
-    main()

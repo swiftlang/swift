@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -typecheck -verify %s -import-objc-header %S/Inputs/sdk-bridging-header.h
+// RUN: %target-typecheck-verify-swift -import-objc-header %S/Inputs/sdk-bridging-header.h
 // RUN: not %target-swift-frontend -typecheck %s -import-objc-header %S/Inputs/bad-bridging-header.h 2>&1 | %FileCheck -check-prefix=CHECK-FATAL %s
 
-// RUN: %target-swift-frontend -typecheck -verify %s -Xcc -include -Xcc %S/Inputs/sdk-bridging-header.h -import-objc-header %S/../Inputs/empty.swift
+// RUN: %target-typecheck-verify-swift -Xcc -include -Xcc %S/Inputs/sdk-bridging-header.h -import-objc-header %S/../Inputs/empty.swift
 
 // RUN: not %target-swift-frontend -typecheck %s -Xcc -include -Xcc %S/Inputs/bad-bridging-header.h 2>&1 | %FileCheck -check-prefix=CHECK-INCLUDE %s
 // RUN: not %target-swift-frontend -typecheck %s -Xcc -include -Xcc %S/Inputs/bad-bridging-header.h -import-objc-header %S/../Inputs/empty.swift 2>&1 | %FileCheck -check-prefix=CHECK-INCLUDE %s

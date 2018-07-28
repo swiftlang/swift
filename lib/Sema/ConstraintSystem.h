@@ -1008,6 +1008,9 @@ private:
   /// Declaration names used in fixes.
   std::vector<DeclName> FixedDeclNames;
 
+  /// Argument labels fixed by the constraint solver.
+  SmallVector<std::vector<Identifier>, 4> FixedArgLabels;
+
   /// \brief The set of remembered disjunction choices used to reach
   /// the current constraint system.
   SmallVector<std::pair<ConstraintLocator*, unsigned>, 32>
@@ -1450,9 +1453,6 @@ public:
     /// The scope number of this scope. Set when the scope is registered.
     unsigned scopeNumber = 0;
 
-    /// Time in fractional seconds at which we entered this scope.
-    double startTime;
-
     /// Constraint graph scope associated with this solver scope.
     ConstraintGraphScope CGScope;
 
@@ -1464,13 +1464,6 @@ public:
   public:
     explicit SolverScope(ConstraintSystem &cs);
     ~SolverScope();
-
-    Optional<double> getElapsedTimeInFractionalSeconds() {
-      if (!cs.Timer)
-        return None;
-
-      return cs.Timer->getElapsedProcessTimeInFractionalSeconds() - startTime;
-    }
   };
 
   ConstraintSystem(TypeChecker &tc, DeclContext *dc,
@@ -1515,10 +1508,11 @@ private:
   /// able to emit an error message, or false if none of the fixits worked out.
   bool applySolutionFixes(Expr *E, const Solution &solution);
 
-  /// \brief Apply the specified Fix # to this solution, producing a fixit hint
-  /// diagnostic for it and returning true.  If the fixit hint turned out to be
+  /// \brief Apply the specified Fix to this solution, producing a fix-it hint
+  /// diagnostic for it and returning true.  If the fix-it hint turned out to be
   /// bogus, this returns false and doesn't emit anything.
-  bool applySolutionFix(Expr *expr, const Solution &solution, unsigned fixNo);
+  bool applySolutionFix(Expr *expr, const Solution &solution,
+                        std::pair<Fix, ConstraintLocator *> &fix);
 
   /// \brief If there is more than one viable solution,
   /// attempt to pick the best solution and remove all of the rest.
@@ -3574,7 +3568,7 @@ bool diagnoseUnwrap(TypeChecker &TC, DeclContext *DC, Expr *expr, Type type);
 ///
 /// \returns true if a diagnostic was produced.
 bool diagnoseBaseUnwrapForMemberAccess(Expr *baseExpr, Type baseType,
-                                       DeclName memberName,
+                                       DeclName memberName, bool resultOptional,
                                        SourceRange memberRange);
 
 // Return true if, when replacing "<expr>" with "<expr> ?? T", parentheses need

@@ -30,6 +30,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
 
@@ -8150,6 +8151,7 @@ bool FailureDiagnosis::diagnoseMemberFailures(
 
       if (!optionalResult.ViableCandidates.empty()) {
         if (diagnoseBaseUnwrapForMemberAccess(baseExpr, baseObjTy, memberName,
+                                              /* additionalOptional= */ false,
                                               memberRange))
           return true;
       }
@@ -8727,29 +8729,27 @@ bool FailureDiagnosis::diagnoseArchetypeAmbiguity() {
     // because type B would have no constraints associated with it.
     unsigned numConstraints = 0;
     {
-      llvm::SmallVector<Constraint *, 2> constraints;
+      llvm::SetVector<Constraint *> constraints;
       CS.getConstraintGraph().gatherConstraints(
-          tv, constraints, ConstraintGraph::GatheringKind::EquivalenceClass);
+          tv, constraints, ConstraintGraph::GatheringKind::EquivalenceClass,
+          [&](Constraint *constraint) -> bool {
+            // We are not interested in ConformsTo constraints because
+            // we can't derive any concrete type information from them.
+            if (constraint->getKind() == ConstraintKind::ConformsTo)
+              return false;
 
-      for (auto constraint : constraints) {
-        // We are not interested in ConformsTo constraints because
-        // such constraints specify restrictions on the archetypes themselves.
-        if (constraint->getKind() == ConstraintKind::ConformsTo)
-          continue;
+            if (constraint->getKind() == ConstraintKind::Bind) {
+              if (auto locator = constraint->getLocator()) {
+                auto anchor = locator->getAnchor();
+                if (anchor && isa<UnresolvedDotExpr>(anchor))
+                  return false;
+              }
+            }
 
-        // Some of the bind constraints specify relations between
-        // parent type and it's member fields/types, we are not
-        // interested in that, since it's not related to archetype resolution.
-        if (constraint->getKind() == ConstraintKind::Bind) {
-          if (auto locator = constraint->getLocator()) {
-            auto anchor = locator->getAnchor();
-            if (anchor && isa<UnresolvedDotExpr>(anchor))
-              continue;
-          }
-        }
+            return true;
+          });
 
-        numConstraints++;
-      }
+      numConstraints = constraints.size();
     }
 
     auto locator = impl.getLocator();
@@ -9115,6 +9115,7 @@ bool swift::diagnoseUnwrap(TypeChecker &TC, DeclContext *DC,
 
 bool swift::diagnoseBaseUnwrapForMemberAccess(Expr *baseExpr, Type baseType,
                                               DeclName memberName,
+                                              bool resultOptional,
                                               SourceRange memberRange) {
   auto unwrappedBaseType = baseType->getOptionalObjectType();
   if (!unwrappedBaseType)
@@ -9125,9 +9126,16 @@ bool swift::diagnoseBaseUnwrapForMemberAccess(Expr *baseExpr, Type baseType,
   diags.diagnose(baseExpr->getLoc(), diag::optional_base_not_unwrapped,
                  baseType, memberName, unwrappedBaseType);
 
+  // FIXME: It would be nice to immediately offer "base?.member ?? defaultValue"
+  // for non-optional results where that would be appropriate. For the moment
+  // always offering "?" means that if the user chooses chaining, we'll end up
+  // in diagnoseUnwrap() to offer a default value during the next compile.
   diags.diagnose(baseExpr->getLoc(), diag::optional_base_chain, memberName)
     .fixItInsertAfter(baseExpr->getEndLoc(), "?");
-  diags.diagnose(baseExpr->getLoc(), diag::unwrap_with_force_value)
-    .fixItInsertAfter(baseExpr->getEndLoc(), "!");
+
+  if (!resultOptional) {
+    diags.diagnose(baseExpr->getLoc(), diag::unwrap_with_force_value)
+        .fixItInsertAfter(baseExpr->getEndLoc(), "!");
+  }
   return true;
 }

@@ -21,7 +21,7 @@ defer { print(y) } // expected-error {{constant 'y' used in defer before being i
 // Test top-level functions.
 
 func testFunc() {       // expected-error {{variable 'x' used by function definition before being initialized}}
-  defer { print(x) }
+  defer { print(x) }    // expected-warning {{'defer' statement before end of scope always executes immediately}}{{3-8=do}}
 }
 
 // Test top-level closures.

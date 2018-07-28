@@ -1979,8 +1979,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
   if (auto inferred = inference.solve(*this)) {
     for (const auto &inferredWitness : *inferred) {
       recordTypeWitness(inferredWitness.first, inferredWitness.second,
-                        /*typeDecl=*/nullptr,
-                        /*performRedeclarationCheck=*/true);
+                        /*typeDecl=*/nullptr);
     }
 
     ensureRequirementsAreSatisfied(/*failUnsubstituted=*/false);
@@ -1997,7 +1996,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
     if (Conformance->hasTypeWitness(assocType))
       continue;
 
-    recordTypeWitness(assocType, ErrorType::get(TC.Context), nullptr, true);
+    recordTypeWitness(assocType, ErrorType::get(TC.Context), nullptr);
   }
 }
 

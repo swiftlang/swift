@@ -567,9 +567,15 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
     // Note: if we ever start putting extension members in vtables, we'll need
     // to validate those members too.
     // FIXME: If we're not planning to run SILGen, this is wasted effort.
-    while (!TC.DeclsToFinalize.empty()) {
-      auto decl = TC.DeclsToFinalize.pop_back_val();
-      if (decl->isInvalid() || TC.Context.hadError())
+    while (TC.NextDeclToFinalize < TC.DeclsToFinalize.size()) {
+      auto decl = TC.DeclsToFinalize[TC.NextDeclToFinalize++];
+      if (decl->isInvalid())
+        continue;
+
+      // If we've already encountered an error, don't finalize declarations
+      // from other source files.
+      if (TC.Context.hadError() &&
+          decl->getDeclContext()->getParentSourceFile() != &SF)
         continue;
 
       TC.finalizeDecl(decl);
@@ -603,7 +609,7 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
            currentExternalDef < TC.Context.ExternalDefinitions.size() ||
            currentSynthesizedDecl < SF.SynthesizedDecls.size() ||
            !TC.FunctionsToSynthesize.empty() ||
-           !TC.DeclsToFinalize.empty() ||
+           TC.NextDeclToFinalize < TC.DeclsToFinalize.size() ||
            !TC.ConformanceContexts.empty() ||
            !TC.DelayedRequirementSignatures.empty() ||
            !TC.UsedConformances.empty() ||

@@ -55,21 +55,22 @@ class Output;
 } // end namespace llvm
 
 namespace swift {
-  class AnyFunctionType;
-  class ASTContext;
-  class FileUnit;
-  class FuncDecl;
-  class KeyPathPattern;
-  class ModuleDecl;
-  class SILUndef;
-  class SourceFile;
-  class SerializedSILLoader;
 
-  namespace Lowering {
-    class SILGenModule;
-  }
+class AnyFunctionType;
+class ASTContext;
+class FileUnit;
+class FuncDecl;
+class KeyPathPattern;
+class ModuleDecl;
+class SILUndef;
+class SourceFile;
+class SerializedSILLoader;
 
-/// \brief A stage of SIL processing.
+namespace Lowering {
+class SILGenModule;
+} // namespace Lowering
+
+/// A stage of SIL processing.
 enum class SILStage {
   /// \brief "Raw" SIL, emitted by SILGen, but not yet run through guaranteed
   /// optimization and diagnostic passes.
@@ -730,13 +731,13 @@ public:
 
   /// Returns true if the default atomicity of the module is Atomic.
   bool isDefaultAtomic() const {
-    return ! getOptions().AssumeSingleThreaded;
+    return !getOptions().AssumeSingleThreaded;
   }
-  
+
   /// Returns true if SIL entities associated with declarations in the given
   /// declaration context ought to be serialized as part of this module.
-  bool shouldSerializeEntitiesAssociatedWithDeclContext(const DeclContext *DC)
-    const;
+  bool
+  shouldSerializeEntitiesAssociatedWithDeclContext(const DeclContext *DC) const;
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const SILModule &M){
@@ -745,11 +746,11 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const SILModule &M){
 }
 
 namespace Lowering {
-  /// Determine whether the given class will be allocated/deallocated
-  /// using the Objective-C runtime, i.e., +alloc and -dealloc.
-  LLVM_LIBRARY_VISIBILITY bool usesObjCAllocator(ClassDecl *theClass);
-}
+/// Determine whether the given class will be allocated/deallocated using the
+/// Objective-C runtime, i.e., +alloc and -dealloc.
+LLVM_LIBRARY_VISIBILITY bool usesObjCAllocator(ClassDecl *theClass);
+} // namespace Lowering
 
-} // end swift namespace
+} // namespace swift
 
 #endif

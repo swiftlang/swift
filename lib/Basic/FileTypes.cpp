@@ -1,8 +1,8 @@
-//===--- Types.cpp - Driver input & temporary type information ------------===//
+//===--- FileTypes.cpp - Input & output formats used by the tools ---------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,8 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Frontend/FileTypes.h"
+#include "swift/Basic/FileTypes.h"
 
+#include "swift/Strings.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -19,16 +20,18 @@
 using namespace swift;
 using namespace swift::file_types;
 
+namespace {
 struct TypeInfo {
   const char *Name;
   const char *Flags;
-  const char *TempSuffix;
+  const char *Extension;
 };
+} // end anonymous namespace
 
 static const TypeInfo TypeInfos[] = {
-#define TYPE(NAME, ID, TEMP_SUFFIX, FLAGS) \
-  { NAME, FLAGS, TEMP_SUFFIX },
-#include "swift/Frontend/Types.def"
+#define TYPE(NAME, ID, EXTENSION, FLAGS) \
+  { NAME, FLAGS, EXTENSION },
+#include "swift/Basic/FileTypes.def"
 };
 
 static const TypeInfo &getInfo(unsigned Id) {
@@ -38,8 +41,8 @@ static const TypeInfo &getInfo(unsigned Id) {
 
 StringRef file_types::getTypeName(ID Id) { return getInfo(Id).Name; }
 
-StringRef file_types::getTypeTempSuffix(ID Id) {
-  return getInfo(Id).TempSuffix;
+StringRef file_types::getExtension(ID Id) {
+  return getInfo(Id).Extension;
 }
 
 ID file_types::lookupTypeForExtension(StringRef Ext) {
@@ -47,17 +50,17 @@ ID file_types::lookupTypeForExtension(StringRef Ext) {
     return TY_INVALID;
   assert(Ext.front() == '.' && "not a file extension");
   return llvm::StringSwitch<file_types::ID>(Ext.drop_front())
-#define TYPE(NAME, ID, SUFFIX, FLAGS) \
-           .Case(SUFFIX, TY_##ID)
-#include "swift/Frontend/Types.def"
+#define TYPE(NAME, ID, EXTENSION, FLAGS) \
+           .Case(EXTENSION, TY_##ID)
+#include "swift/Basic/FileTypes.def"
       .Default(TY_INVALID);
 }
 
 ID file_types::lookupTypeForName(StringRef Name) {
   return llvm::StringSwitch<file_types::ID>(Name)
-#define TYPE(NAME, ID, SUFFIX, FLAGS) \
+#define TYPE(NAME, ID, EXTENSION, FLAGS) \
            .Case(NAME, TY_##ID)
-#include "swift/Frontend/Types.def"
+#include "swift/Basic/FileTypes.def"
       .Default(TY_INVALID);
 }
 
