@@ -951,6 +951,7 @@ ClangImporter::create(ASTContext &ctx,
   }
   auto &instance = *importer->Impl.Instance;
   instance.setInvocation(importer->Impl.Invocation);
+  instance.setVirtualFileSystem(ctx.SourceMgr.getFileSystem());
   if (tracker)
     instance.addDependencyCollector(tracker->getClangCollector());
 

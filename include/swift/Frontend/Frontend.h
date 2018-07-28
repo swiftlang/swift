@@ -43,6 +43,7 @@
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/Host.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "clang/Basic/FileManager.h"
 
 #include <memory>
 
@@ -409,6 +410,8 @@ public:
 
   DiagnosticEngine &getDiags() { return Diagnostics; }
 
+  clang::vfs::FileSystem &getFileSystem() { return *SourceMgr.getFileSystem(); }
+
   ASTContext &getASTContext() {
     return *Context;
   }
@@ -495,6 +498,7 @@ public:
   bool setup(const CompilerInvocation &Invocation);
 
 private:
+  void setUpFileSystem();
   void setUpLLVMArguments();
   void setUpDiagnosticOptions();
   bool setUpModuleLoaders();

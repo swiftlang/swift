@@ -136,6 +136,7 @@ void CompilerInstance::recordPrimarySourceFile(SourceFile *SF) {
 bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   Invocation = Invok;
 
+  setUpFileSystem();
   setUpLLVMArguments();
   setUpDiagnosticOptions();
 
@@ -164,6 +165,39 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
     Invocation.getLangOptions().EnableAccessControl = false;
 
   return setUpInputs();
+}
+
+void CompilerInstance::setUpFileSystem() {
+  auto BaseFS = clang::vfs::getRealFileSystem();
+  auto Overlay = llvm::IntrusiveRefCntPtr<clang::vfs::OverlayFileSystem>(
+                    new clang::vfs::OverlayFileSystem(BaseFS));
+  for (const auto &File : Invocation.getSearchPathOptions().VFSOverlayFiles) {
+    auto Buffer = BaseFS->getBufferForFile(File);
+    if (!Buffer) {
+      continue;
+    }
+
+    auto FS = clang::vfs::getVFSFromYAML(std::move(Buffer.get()),
+                                         nullptr, File);
+    if (!FS) {
+      continue;
+    }
+    Overlay->pushOverlay(FS);
+  }
+
+  // If there weren't any overlays or we couldn't load any overlays then fall
+  // back to the local FS.
+  if (Overlay->overlays_begin() == Overlay->overlays_end()) {
+    FS = BaseFS;
+    return;
+  }
+
+  // Initialize the overlays file system.
+  FS = Overlay;
+
+  // Reset the source manager and diagnostic engine to take advantage of the
+  // overlay file system.
+  SourceMgr.setFileSystem(FS);
 }
 
 void CompilerInstance::setUpLLVMArguments() {
@@ -326,7 +360,8 @@ CompilerInstance::getInputBufferAndModuleDocBufferIfPresent(
   // FIXME: Working with filenames is fragile, maybe use the real path
   // or have some kind of FileManager.
   using FileOrError = llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>;
-  FileOrError inputFileOrErr = llvm::MemoryBuffer::getFileOrSTDIN(input.file());
+  FileOrError inputFileOrErr = swift::vfs::getFileOrSTDIN(getFileSystem(),
+                                                          input.file());
   if (!inputFileOrErr) {
     Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file, input.file(),
                          inputFileOrErr.getError().message());
@@ -351,7 +386,7 @@ CompilerInstance::openModuleDoc(const InputFile &input) {
       file_types::getExtension(file_types::TY_SwiftModuleDocFile));
   using FileOrError = llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>;
   FileOrError moduleDocFileOrErr =
-      llvm::MemoryBuffer::getFileOrSTDIN(moduleDocFilePath);
+      swift::vfs::getFileOrSTDIN(getFileSystem(), moduleDocFilePath);
   if (moduleDocFileOrErr)
     return std::move(*moduleDocFileOrErr);
 

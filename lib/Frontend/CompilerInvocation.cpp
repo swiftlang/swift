@@ -463,6 +463,10 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
     Opts.LibrarySearchPaths.push_back(resolveSearchPath(A->getValue()));
   }
 
+  for (const Arg *A : Args.filtered(OPT_vfsoverlay)) {
+    Opts.VFSOverlayFiles.push_back(resolveSearchPath(A->getValue()));
+  }
+
   if (const Arg *A = Args.getLastArg(OPT_sdk))
     Opts.SDKPath = A->getValue();
 
