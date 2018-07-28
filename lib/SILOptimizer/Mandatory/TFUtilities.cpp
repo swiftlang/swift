@@ -226,16 +226,6 @@ SILType tf::convertElementTypeToTensorValueType(SILType ty) {
                                              ty.getASTContext());
 }
 
-/// Looks up a function in the current module. If it exists, returns it.
-/// Otherwise, attempt to link it from imported modules. Returns null if such
-/// function name does not exist.
-SILFunction *tf::lookupOrLinkFunction(StringRef name, SILModule &module) {
-  assert(!name.empty());
-  if (auto *localFn = module.lookUpFunction(name))
-    return localFn;
-  return module.findFunction(name, SILLinkage::PublicExternal);
-}
-
 /// Looks up members by `name` in the context of `typeDecl`, `proto` and
 /// `module`, and populates `results`.
 static void lookupProtocolRequiredMembers(
@@ -262,7 +252,7 @@ SILFunction *tf::findSILFunctionForRequiredProtocolMember(
   lookupProtocolRequiredMembers(typeDecl, proto, name, module, results);
   for (auto *result : results) {
     std::string name = SILDeclRef(result).mangle();
-    if (auto *fn = lookupOrLinkFunction(name, silModule))
+    if (auto *fn = silModule.findFunction(name, SILLinkage::PublicExternal))
       return fn;
   }
   return nullptr;
