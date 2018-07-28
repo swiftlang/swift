@@ -450,10 +450,29 @@ enum class MetadataAccessStrategy {
   /// There is a unique private accessor function for the given type metadata.
   PrivateAccessor,
 
+  /// The given type metadata is for a foreign type; its accessor function
+  /// is built as a side-effect of emitting a metadata candidate.
+  ForeignAccessor,
+
   /// There is no unique accessor function for the given type metadata, but
   /// one should be made automatically.
   NonUniqueAccessor
 };
+
+/// Does the given access strategy rely on an accessor that's generated
+/// on-demand and thus may be shared across object files?
+static inline bool isAccessorLazilyGenerated(MetadataAccessStrategy strategy) {
+  switch (strategy) {
+  case MetadataAccessStrategy::PublicUniqueAccessor:
+  case MetadataAccessStrategy::HiddenUniqueAccessor:
+  case MetadataAccessStrategy::PrivateAccessor:
+    return false;
+  case MetadataAccessStrategy::ForeignAccessor:
+  case MetadataAccessStrategy::NonUniqueAccessor:
+    return true;
+  }
+  llvm_unreachable("bad kind");
+}
 
 /// Is it basically trivial to access the given metadata?  If so, we don't
 /// need a cache variable in its accessor.
@@ -467,9 +486,16 @@ MetadataAccessStrategy getTypeMetadataAccessStrategy(CanType type);
 llvm::Function *getOrCreateTypeMetadataAccessFunction(IRGenModule &IGM,
                                                       CanType type);
 
-llvm::Function *getTypeMetadataAccessFunction(IRGenModule &IGM,
-                                              CanType type,
-                                              ForDefinition_t shouldDefine);
+/// Return the type metadata access function for the given type, given that
+/// some other code will be defining it.
+llvm::Function *
+getOtherwiseDefinedTypeMetadataAccessFunction(IRGenModule &IGM, CanType type);
+
+/// Emit a type metadata access function that just directly accesses
+/// the metadata.
+llvm::Function *
+createDirectTypeMetadataAccessFunction(IRGenModule &IGM, CanType type,
+                                       bool allowExistingDefinition);
 
 using MetadataAccessGenerator =
   llvm::function_ref<MetadataResponse(IRGenFunction &IGF,
@@ -487,21 +513,40 @@ enum class CacheStrategy {
   InPlaceInitialization,
 };
 
-llvm::Function *getTypeMetadataAccessFunction(IRGenModule &IGM,
-                                              CanType type,
-                                              ForDefinition_t shouldDefine,
-                                              CacheStrategy cacheStrategy,
-                                             MetadataAccessGenerator generator);
+/// Emit a type metadata access function using the given generator function.
+llvm::Function *
+createTypeMetadataAccessFunction(IRGenModule &IGM,
+                                 CanType type,
+                                 CacheStrategy cacheStrategy,
+                                 MetadataAccessGenerator generator,
+                                 bool allowExistingDefinition = false);
 
+/// Either create or return a reference to a generic type metadata
+/// access function.
+///
+/// Note that a generic type metadata access function is a somewhat
+/// different kind of thing from an ordinary type metadata access function:
+///
+///   - A generic type metadata access function is associated with a type
+///     object of kind `(...) -> type` --- typically, an unapplied
+///     generic type (like `Dictionary`, without any type arguments).
+///     It takes the concrete witnesses to the generic signature as
+///     parameters and builds an appropriately instantiated type for those
+///     arguments.
+///
+///   - An ordinary type metadata access function is associated with
+///     a type object of kind `type` --- which is to say, an ordinary type
+///     like `Float` or `Dictionary<String, Int>`.  There may be ordinary
+///     access functions for various specializations of generic types;
+///     these will be created on demand.
+///
+/// The definitions of generic type metadata access functions currently
+/// always follow the same pattern, so we don't need to take a closure to
+/// define the body.
 llvm::Function *
 getGenericTypeMetadataAccessFunction(IRGenModule &IGM,
                                      NominalTypeDecl *nominal,
                                      ForDefinition_t shouldDefine);
-
-llvm::Constant *
-getRequiredTypeMetadataAccessFunction(IRGenModule &IGM,
-                                      NominalTypeDecl *theDecl,
-                                      ForDefinition_t shouldDefine);
 
 using OnceMetadataInitializer =
   llvm::function_ref<llvm::Value*(IRGenFunction &IGF, llvm::Value *metadata)>;
@@ -511,9 +556,6 @@ emitOnceTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
                                        CanNominalType type,
                                        llvm::Constant *cacheVariable,
                                        OnceMetadataInitializer initializer);
-
-llvm::Value *uniqueForeignTypeMetadataRef(IRGenFunction &IGF,
-                                          llvm::Value *candidate);
 
 using CacheEmitter =
   llvm::function_ref<MetadataResponse(IRGenFunction &IGF, Explosion &params)>;

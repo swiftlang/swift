@@ -1188,8 +1188,22 @@ private:
     TypeContextDescriptorFlags typeFlags(flags.getKindSpecificFlags());
     unsigned baseSize = 0;
     unsigned genericHeaderSize = sizeof(GenericContextDescriptorHeader);
-    unsigned inPlaceInitSize = 0;
+    unsigned metadataInitSize = 0;
     bool hasVTable = false;
+
+    auto readMetadataInitSize = [&]() -> unsigned {
+      switch (typeFlags.getMetadataInitialization()) {
+      case TypeContextDescriptorFlags::NoMetadataInitialization:
+        return 0;
+      case TypeContextDescriptorFlags::InPlaceMetadataInitialization:
+        // FIXME: classes
+        return sizeof(TargetInPlaceValueMetadataInitialization<Runtime>);
+      case TypeContextDescriptorFlags::ForeignMetadataInitialization:
+        return sizeof(TargetForeignMetadataInitialization<Runtime>);
+      }
+      return 0;
+    };
+
     switch (auto kind = flags.getKind()) {
     case ContextDescriptorKind::Module:
       baseSize = sizeof(TargetModuleContextDescriptor<Runtime>);
@@ -1205,22 +1219,17 @@ private:
       baseSize = sizeof(TargetClassDescriptor<Runtime>);
       genericHeaderSize = sizeof(TypeGenericContextDescriptorHeader);
       hasVTable = typeFlags.class_hasVTable();
+      metadataInitSize = readMetadataInitSize();
       break;
     case ContextDescriptorKind::Enum:
       baseSize = sizeof(TargetEnumDescriptor<Runtime>);
       genericHeaderSize = sizeof(TypeGenericContextDescriptorHeader);
-      if (typeFlags.hasInPlaceMetadataInitialization()) {
-        inPlaceInitSize =
-          sizeof(TargetInPlaceValueMetadataInitialization<Runtime>);
-      }
+      metadataInitSize = readMetadataInitSize();
       break;
     case ContextDescriptorKind::Struct:
       baseSize = sizeof(TargetStructDescriptor<Runtime>);
       genericHeaderSize = sizeof(TypeGenericContextDescriptorHeader);
-      if (typeFlags.hasInPlaceMetadataInitialization()) {
-        inPlaceInitSize =
-          sizeof(TargetInPlaceValueMetadataInitialization<Runtime>);
-      }
+      metadataInitSize = readMetadataInitSize();
       break;
     case ContextDescriptorKind::Protocol:
       baseSize = sizeof(TargetProtocolDescriptorRef<Runtime>);
@@ -1229,7 +1238,7 @@ private:
       // We don't know about this kind of context.
       return nullptr;
     }
-    
+
     // Determine the full size of the descriptor. This is reimplementing a fair
     // bit of TrailingObjects but for out-of-process; maybe there's a way to
     // factor the layout stuff out...
@@ -1256,7 +1265,8 @@ private:
       TargetVTableDescriptorHeader<Runtime> header;
       auto headerAddr = address
         + baseSize
-        + genericsSize;
+        + genericsSize
+        + metadataInitSize;
       
       if (!Reader->readBytes(RemoteAddress(headerAddr),
                              (uint8_t*)&header, sizeof(header)))
@@ -1266,7 +1276,7 @@ private:
         + header.VTableSize * sizeof(TargetMethodDescriptor<Runtime>);
     }
     
-    unsigned size = baseSize + genericsSize + vtableSize + inPlaceInitSize;
+    unsigned size = baseSize + genericsSize + metadataInitSize + vtableSize;
     auto buffer = (uint8_t *)malloc(size);
     if (!Reader->readBytes(RemoteAddress(address), buffer, size)) {
       free(buffer);
