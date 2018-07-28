@@ -1453,9 +1453,6 @@ public:
     /// The scope number of this scope. Set when the scope is registered.
     unsigned scopeNumber = 0;
 
-    /// Time in fractional seconds at which we entered this scope.
-    double startTime;
-
     /// Constraint graph scope associated with this solver scope.
     ConstraintGraphScope CGScope;
 
@@ -1467,13 +1464,6 @@ public:
   public:
     explicit SolverScope(ConstraintSystem &cs);
     ~SolverScope();
-
-    Optional<double> getElapsedTimeInFractionalSeconds() {
-      if (!cs.Timer)
-        return None;
-
-      return cs.Timer->getElapsedProcessTimeInFractionalSeconds() - startTime;
-    }
   };
 
   ConstraintSystem(TypeChecker &tc, DeclContext *dc,
