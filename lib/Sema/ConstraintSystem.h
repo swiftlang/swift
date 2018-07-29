@@ -365,11 +365,8 @@ public:
     auto rep = getRepresentative(record);
     Implementation &repImpl = rep->getImpl();
 
-    // Check whether it has a fixed type.
-    if (auto type = repImpl.ParentOrFixed.dyn_cast<TypeBase *>())
-      return type;
-
-    return Type();
+    // Return the bound type if there is one, otherwise, null.
+    return repImpl.ParentOrFixed.dyn_cast<TypeBase *>();
   }
 
   /// \brief Assign a fixed type to this equivalence class.
