@@ -1354,29 +1354,31 @@ namespace {
 
       auto locator = CS.getConstraintLocator(E);
 
-      if (auto *param = dyn_cast<ParamDecl>(E->getDecl())) {
+      // If this is a 'var' or 'let' declaration with already
+      // resolved type, let's favor it.
+      if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
+        Type type;
+        if (VD->hasInterfaceType()) {
+          type = VD->getInterfaceType();
+          if (type->hasTypeParameter())
+            type = VD->getDeclContext()->mapTypeIntoContext(type);
+          CS.setFavoredType(E, type.getPointer());
+        }
+
         // This can only happen when failure diangostics is trying
         // to type-check expressions inside of a single-statement
         // closure which refer to anonymous parameters, in this case
         // let's either use type as written or allocate a fresh type
         // variable, just like we do for closure type.
-        if (!CS.hasType(param)) {
-          Type paramType;
-          if (param->hasInterfaceType()) {
-            paramType = param->getInterfaceType();
-            if (paramType->hasTypeParameter())
-              paramType =
-                  param->getDeclContext()->mapTypeIntoContext(paramType);
+        if (auto *PD = dyn_cast<ParamDecl>(VD)) {
+          if (!CS.hasType(PD)) {
+            if (type && type->hasUnboundGenericType())
+              type = CS.openUnboundGenericType(type, locator);
 
-            if (paramType->hasUnboundGenericType())
-              paramType = CS.openUnboundGenericType(paramType, locator);
-
-            CS.setFavoredType(E, paramType.getPointer());
-          } else {
-            paramType = CS.createTypeVariable(locator, TVO_CanBindToLValue);
+            CS.setType(
+                PD, type ? type
+                         : CS.createTypeVariable(locator, TVO_CanBindToLValue));
           }
-
-          CS.setType(param, paramType);
         }
       }
 
