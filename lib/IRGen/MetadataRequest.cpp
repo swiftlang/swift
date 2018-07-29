@@ -2126,6 +2126,23 @@ namespace {
       return emitFromValueWitnessTablePointer(vwtable);
     }
 
+    /// Given that the type is fixed-layout, emit the type layout by
+    /// emitting a global layout for it.
+    llvm::Value *emitFromFixedLayout(CanType t) {
+      auto layout = tryEmitFromFixedLayout(t);
+      assert(layout && "type must be fixed-size to call emitFromFixedLayout");
+      return layout;
+    }
+
+    /// If the type is fixed-layout, emit the type layout by
+    /// emitting a global layout for it.
+    llvm::Value *tryEmitFromFixedLayout(CanType t) {
+      auto &ti = IGF.getTypeInfo(SILType::getPrimitiveObjectType(t));
+      if (auto fixedTI = dyn_cast<FixedTypeInfo>(&ti))
+        return IGF.IGM.emitFixedTypeLayout(t, *fixedTI);
+      return nullptr;
+    }
+
     bool hasVisibleValueWitnessTable(CanType t) const {
       // Some builtin and structural types have value witnesses exported from
       // the runtime.
@@ -2233,7 +2250,7 @@ namespace {
       }
       case MetatypeRepresentation::Thick:
         if (isa<ExistentialMetatypeType>(type)) {
-          return emitFromTypeMetadata(type, request);
+          return emitFromFixedLayout(type);
         }
         // Otherwise, this is a metatype that looks like a pointer.
         LLVM_FALLTHROUGH;
@@ -2339,6 +2356,103 @@ namespace {
       auto valueWitnessType = CanReferenceStorageType::get(valueWitnessReferent,
                                                        type->getOwnership());
       return emitFromValueWitnessTable(valueWitnessType);
+    }
+
+    llvm::Value *visitTupleType(CanTupleType type,
+                                DynamicMetadataRequest request) {
+      // Single-element tuples have exactly the same layout as their elements.
+      if (type->getNumElements() == 1) {
+        return visit(type.getElementType(0), request);
+      }
+
+      // If the type is fixed-layout, use a global layout.
+      if (auto layout = tryEmitFromFixedLayout(type))
+        return layout;
+
+      // TODO: check for cached VWT / metadata for the type.
+
+      // Use swift_getTupleTypeLayout to compute a layout.
+
+      // Create a buffer to hold the result.  We don't have any reasonable
+      // way to scope the lifetime of this.
+      auto resultPtr = IGF.createAlloca(IGF.IGM.FullTypeLayoutTy,
+                                        IGF.IGM.getPointerAlignment())
+                          .getAddress();
+
+      switch (type->getNumElements()) {
+      case 0:
+      case 1:
+        llvm_unreachable("filtered out above");
+
+      case 2: {
+        auto elt0 = visit(type.getElementType(0), request);
+        auto elt1 = visit(type.getElementType(1), request);
+
+        // Ignore the offset.
+        auto call = IGF.Builder.CreateCall(IGF.IGM.getGetTupleLayout2Fn(),
+                                           {resultPtr, elt0, elt1});
+        call->setDoesNotThrow();
+
+        break;
+      }
+
+      case 3: {
+        auto elt0 = visit(type.getElementType(0), request);
+        auto elt1 = visit(type.getElementType(1), request);
+        auto elt2 = visit(type.getElementType(2), request);
+
+        // Ignore the offsets.
+        auto call = IGF.Builder.CreateCall(IGF.IGM.getGetTupleLayout3Fn(),
+                                           {resultPtr, elt0, elt1, elt2});
+        call->setDoesNotThrow();
+
+        break;
+      }
+
+      default: {
+        // Allocate a temporary array for the element layouts.
+        auto eltLayoutsArraySize =
+          IGF.IGM.getPointerSize() * type->getNumElements();
+        auto eltLayoutsArray =
+          IGF.createAlloca(IGF.IGM.Int8PtrPtrTy,
+                           IGF.IGM.getSize(Size(type->getNumElements())),
+                           IGF.IGM.getPointerAlignment());
+        IGF.Builder.CreateLifetimeStart(eltLayoutsArray, eltLayoutsArraySize);
+
+        // Emit layouts for all the elements and store them into the array.
+        for (auto i : indices(type.getElementTypes())) {
+          auto eltLayout = visit(type.getElementType(i), request);
+          auto eltLayoutSlot =
+            i == 0 ? eltLayoutsArray
+                   : IGF.Builder.CreateConstArrayGEP(eltLayoutsArray, i,
+                                                     IGF.IGM.getPointerSize());
+          IGF.Builder.CreateStore(eltLayout, eltLayoutSlot);
+        }
+
+        // Ignore the offsets.
+        auto offsetsPtr =
+          llvm::ConstantPointerNull::get(IGF.IGM.Int32Ty->getPointerTo());
+
+        // Flags.
+        auto flags = TupleTypeFlags().withNumElements(type->getNumElements());
+        auto flagsValue = IGF.IGM.getSize(Size(flags.getIntValue()));
+
+        // Compute the layout.
+        auto call = IGF.Builder.CreateCall(IGF.IGM.getGetTupleLayoutFn(),
+                                           {resultPtr, offsetsPtr, flagsValue,
+                                            eltLayoutsArray.getAddress()});
+        call->setDoesNotThrow();
+
+        // We're done with the buffer.
+        IGF.Builder.CreateLifetimeEnd(eltLayoutsArray, eltLayoutsArraySize);
+
+        break;
+      }
+      }
+
+      // Cast resultPtr to i8**, our general currency type for type layouts.
+      resultPtr = IGF.Builder.CreateBitCast(resultPtr, IGF.IGM.Int8PtrPtrTy);
+      return resultPtr;
     }
   };
 

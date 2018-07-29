@@ -331,21 +331,27 @@ public func constructFullyFixed() -> FullyFixedLayout {
 }
 
 // CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$S15enum_resilience24EnumWithResilientPayloadOMr"(%swift.type*, i8*, i8**)
+// CHECK:        [[TUPLE_LAYOUT:%.*]] = alloca %swift.full_type_layout
 // CHECK:        [[SIZE_RESPONSE:%.*]] = call swiftcc %swift.metadata_response @"$S16resilient_struct4SizeVMa"([[INT]] 319)
 // CHECK-NEXT:   [[SIZE_METADATA:%.*]] = extractvalue %swift.metadata_response [[SIZE_RESPONSE]], 0
 // CHECK-NEXT:   [[SIZE_STATE:%.*]] = extractvalue %swift.metadata_response [[SIZE_RESPONSE]], 1
 // CHECK-NEXT:   [[T0:%.*]] = icmp ule [[INT]] [[SIZE_STATE]], 63
 // CHECK-NEXT:   br i1 [[T0]], label %[[SATISFIED1:.*]], label
 // CHECK:      [[SATISFIED1]]:
-// CHECK:        [[TUPLE_RESPONSE:%.*]] = call swiftcc %swift.metadata_response @swift_getTupleTypeMetadata2([[INT]] 319, %swift.type* [[SIZE_METADATA]], %swift.type* [[SIZE_METADATA]], i8* null, i8** null)
-// CHECK-NEXT:   [[TUPLE_METADATA:%.*]] = extractvalue %swift.metadata_response [[TUPLE_RESPONSE]], 0
-// CHECK-NEXT:   [[TUPLE_STATE:%.*]] = extractvalue %swift.metadata_response [[TUPLE_RESPONSE]], 1
-// CHECK-NEXT:   [[T0:%.*]] = icmp ule [[INT]] [[TUPLE_STATE]], 63
-// CHECK-NEXT:   br i1 [[T0]], label %[[SATISFIED2:.*]], label
-// CHECK:      [[SATISFIED2]]:
+// CHECK-NEXT:   [[T0:%.*]] = bitcast %swift.type* [[SIZE_METADATA]] to i8***
+// CHECK-NEXT:   [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], [[INT]] -1
+// CHECK-NEXT:   [[SIZE_VWT:%.*]] = load i8**, i8*** [[T1]],
+// CHECK-NEXT:   [[SIZE_LAYOUT_1:%.*]] = getelementptr inbounds i8*, i8** [[SIZE_VWT]], i32 8
+// CHECK-NEXT:   store i8** [[SIZE_LAYOUT_1]],
+// CHECK-NEXT:   getelementptr
+// CHECK-NEXT:   [[SIZE_LAYOUT_2:%.*]] = getelementptr inbounds i8*, i8** [[SIZE_VWT]], i32 8
+// CHECK-NEXT:   [[SIZE_LAYOUT_3:%.*]] = getelementptr inbounds i8*, i8** [[SIZE_VWT]], i32 8
+// CHECK-NEXT:   call swiftcc [[INT]] @swift_getTupleTypeLayout2(%swift.full_type_layout* [[TUPLE_LAYOUT]], i8** [[SIZE_LAYOUT_2]], i8** [[SIZE_LAYOUT_3]])
+// CHECK-NEXT:   [[T0:%.*]] = bitcast %swift.full_type_layout* [[TUPLE_LAYOUT]] to i8**
+// CHECK-NEXT:   store i8** [[T0]],
 // CHECK:        call void @swift_initEnumMetadataMultiPayload
-// CHECK:        phi %swift.type* [ [[SIZE_METADATA]], %entry ], [ [[TUPLE_METADATA]], %[[SATISFIED1]] ], [ null, %[[SATISFIED2]] ]
-// CHECK:        phi [[INT]] [ 63, %entry ], [ 63, %[[SATISFIED1]] ], [ 0, %[[SATISFIED2]] ]
+// CHECK:        phi %swift.type* [ [[SIZE_METADATA]], %entry ], [ null, %[[SATISFIED1]] ]
+// CHECK:        phi [[INT]] [ 63, %entry ], [ 0, %[[SATISFIED1]] ]
 
 
 public protocol Prot {
