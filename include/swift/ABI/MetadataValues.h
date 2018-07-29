@@ -1268,6 +1268,10 @@ public:
     /// "in-place" code pattern.
     InPlaceMetadataInitialization = 1,
 
+    /// The type requires non-trivial singleton initialization using the
+    /// "foreign" code pattern.
+    ForeignMetadataInitialization = 2,
+
     // We only have two bits here, so if you add a third special kind,
     // include more flag bits in its out-of-line storage.
   };
@@ -1280,6 +1284,10 @@ public:
 
   bool hasInPlaceMetadataInitialization() const {
     return getMetadataInitialization() == InPlaceMetadataInitialization;
+  }
+
+  bool hasForeignMetadataInitialization() const {
+    return getMetadataInitialization() == ForeignMetadataInitialization;
   }
 
   enum ImportNamespaceKind {

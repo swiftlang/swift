@@ -613,8 +613,9 @@ ForeignClassMetadataLayout::ForeignClassMetadataLayout(IRGenModule &IGM,
             ForeignClassMetadataLayout &layout)
       : super(IGM, decl), Layout(layout) {}
 
-    void noteStartOfSuperClass() {
+    void addSuperclass() {
       Layout.SuperClassOffset = getNextOffset();
+      super::addSuperclass();
     }
 
     void layout() {

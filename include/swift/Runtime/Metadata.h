@@ -469,9 +469,10 @@ swift_getObjCClassFromObject(HeapObject *object);
 #endif
 
 /// \brief Fetch a unique type metadata object for a foreign type.
-SWIFT_RUNTIME_EXPORT
-const ForeignTypeMetadata *
-swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique);
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+MetadataResponse
+swift_getForeignTypeMetadata(MetadataRequest request,
+                             ForeignTypeMetadata *nonUnique);
 
 /// \brief Fetch a unique witness table for a foreign witness table.
 SWIFT_RUNTIME_EXPORT

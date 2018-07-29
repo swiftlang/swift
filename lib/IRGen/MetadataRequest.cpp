@@ -469,25 +469,6 @@ llvm::Value *irgen::emitObjCHeapMetadataRef(IRGenFunction &IGF,
                                 classObject);
 }
 
-/// Emit a reference to the type metadata for a foreign type.
-llvm::Value *irgen::uniqueForeignTypeMetadataRef(IRGenFunction &IGF,
-                                                 llvm::Value *candidate) {
-  auto call = IGF.Builder.CreateCall(IGF.IGM.getGetForeignTypeMetadataFn(),
-                                     candidate);
-  call->addAttribute(llvm::AttributeList::FunctionIndex,
-                     llvm::Attribute::NoUnwind);
-  call->addAttribute(llvm::AttributeList::FunctionIndex,
-                     llvm::Attribute::ReadNone);
-  return call;
-}
-
-/// Emit a reference to the type metadata for a foreign type.
-static llvm::Value *emitForeignTypeMetadataRef(IRGenFunction &IGF,
-                                               CanType type) {
-  llvm::Value *candidate = IGF.IGM.getAddrOfForeignTypeMetadataCandidate(type);
-  return uniqueForeignTypeMetadataRef(IGF, candidate);
-}
-
 /// Returns a metadata reference for a nominal type.
 ///
 /// This is only valid in a couple of special cases:
@@ -633,6 +614,9 @@ MetadataAccessStrategy irgen::getTypeMetadataAccessStrategy(CanType type) {
         return MetadataAccessStrategy::NonUniqueAccessor;
       assert(type->hasUnboundGenericType());
     }
+
+    if (requiresForeignTypeMetadata(nominal))
+      return MetadataAccessStrategy::ForeignAccessor;
 
     // If the type doesn't guarantee that it has an access function,
     // we might have to use a non-unique accessor.
@@ -1632,10 +1616,8 @@ irgen::emitOnceTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
                                               CanNominalType type,
                                               llvm::Constant *cacheVariable,
                                           OnceMetadataInitializer initializer) {
-  llvm::Constant *metadata =
-    IGF.IGM.requiresForeignTypeMetadata(type)
-      ? IGF.IGM.getAddrOfForeignTypeMetadataCandidate(type)
-      : IGF.IGM.getAddrOfTypeMetadata(type);
+  assert(!requiresForeignTypeMetadata(type));
+  llvm::Constant *metadata = IGF.IGM.getAddrOfTypeMetadata(type);
 
   // We might not have interesting initialization to do.
   assert((cacheVariable == nullptr) ==
@@ -1688,9 +1670,9 @@ irgen::emitOnceTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
 /// metadata-construction functions.  It is not used for the in-place
 /// initialization of non-generic nominal type metadata.
 static MetadataResponse
-emitTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
-                                   DynamicMetadataRequest request,
-                                   CanType type) {
+emitDirectTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
+                                         DynamicMetadataRequest request,
+                                         CanType type) {
   assert(!type->hasArchetype() &&
          "cannot emit metadata accessor for context-dependent type");
 
@@ -1718,54 +1700,61 @@ emitTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
   // metadata for it.)
   assert(!IGF.IGM.isResilient(typeDecl, ResilienceExpansion::Maximal));
 
-  // Non-native types are just wrapped in various ways.
-  if (auto classDecl = dyn_cast<ClassDecl>(typeDecl)) {
-    // We emit a completely different pattern for foreign classes.
-    if (classDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
-      return MetadataResponse::forComplete(
-                                         emitForeignTypeMetadataRef(IGF, type));
-    }
+  // We should never be emitting a metadata accessor for foreign type
+  // metadata using this function.
+  assert(!requiresForeignTypeMetadata(typeDecl));
 
-    // Classes that might not have Swift metadata use a different
-    // symbol name.
+  // Classes that might not have Swift metadata use a different
+  // access pattern.
+  if (auto classDecl = dyn_cast<ClassDecl>(typeDecl)) {
     if (!hasKnownSwiftMetadata(IGF.IGM, classDecl)) {
       return MetadataResponse::forComplete(emitObjCMetadataRef(IGF, classDecl));
     }
-
-  // Imported value types require foreign metadata uniquing.
-  } else if (isa<ClangModuleUnit>(typeDecl->getModuleScopeContext())) {
-    return MetadataResponse::forComplete(emitForeignTypeMetadataRef(IGF, type));
   }
-
-  // Okay, everything else is built from a Swift metadata object.
-  llvm::Constant *metadata = IGF.IGM.getAddrOfTypeMetadata(type);
 
   // We should not be doing more serious work along this path.
   assert(isTypeMetadataAccessTrivial(IGF.IGM, type));
 
+  // Okay, everything else is built from a Swift metadata object.
+  llvm::Constant *metadata = IGF.IGM.getAddrOfTypeMetadata(type);
+
   return MetadataResponse::forComplete(metadata);
 }
 
-/// Get or create an accessor function to the given non-dependent type.
-llvm::Function *
-irgen::getTypeMetadataAccessFunction(IRGenModule &IGM,
-                                     CanType type,
-                                     ForDefinition_t shouldDefine,
-                                     CacheStrategy cacheStrategy,
-                                     MetadataAccessGenerator generator) {
+static llvm::Function *getAccessFunctionPrototype(IRGenModule &IGM,
+                                                  CanType type,
+                                               ForDefinition_t forDefinition) {
   assert(!type->hasArchetype());
   // Type should be bound unless it's type erased.
   assert(isTypeErasedGenericClassType(type)
            ? !isa<BoundGenericType>(type)
            : !isa<UnboundGenericType>(type));
 
-  llvm::Function *accessor =
-    IGM.getAddrOfTypeMetadataAccessFunction(type, shouldDefine);
+  return IGM.getAddrOfTypeMetadataAccessFunction(type, forDefinition);
+}
+
+llvm::Function *
+irgen::getOtherwiseDefinedTypeMetadataAccessFunction(IRGenModule &IGM,
+                                                     CanType type) {
+  return getAccessFunctionPrototype(IGM, type, NotForDefinition);
+}
+
+/// Get or create an accessor function to the given non-dependent type.
+llvm::Function *
+irgen::createTypeMetadataAccessFunction(IRGenModule &IGM, CanType type,
+                                        CacheStrategy cacheStrategy,
+                                        MetadataAccessGenerator generator,
+                                        bool allowExistingDefinition) {
+  // Get the prototype.
+  auto accessor = getAccessFunctionPrototype(IGM, type, ForDefinition);
 
   // If we're not supposed to define the accessor, or if we already
   // have defined it, just return the pointer.
-  if (!shouldDefine || !accessor->empty())
+  if (!accessor->empty()) {
+    assert(allowExistingDefinition &&
+           "repeat definition of access function!");
     return accessor;
+  }
 
   // Okay, define the accessor.
   llvm::Constant *cacheVariable = nullptr;
@@ -1806,19 +1795,18 @@ irgen::getTypeMetadataAccessFunction(IRGenModule &IGM,
   return accessor;
 }
 
-/// Get or create an accessor function to the given non-dependent type.
-llvm::Function *irgen::getTypeMetadataAccessFunction(IRGenModule &IGM,
-                                                     CanType type,
-                                                 ForDefinition_t shouldDefine) {
-  return getTypeMetadataAccessFunction(IGM, type, shouldDefine,
-                                       CacheStrategy::Lazy,
-                                       [&](IRGenFunction &IGF,
-                                           DynamicMetadataRequest request,
-                                           llvm::Constant *cacheVariable) {
+/// Emit a standard accessor function to the given non-dependent type.
+llvm::Function *
+irgen::createDirectTypeMetadataAccessFunction(IRGenModule &IGM, CanType type,
+                                              bool allowExistingDefinition) {
+  return createTypeMetadataAccessFunction(IGM, type, CacheStrategy::Lazy,
+                                          [&](IRGenFunction &IGF,
+                                              DynamicMetadataRequest request,
+                                              llvm::Constant *cacheVariable) {
     // We should not be called with ForDefinition for nominal types
     // that require in-place initialization.
-    return emitTypeMetadataAccessFunctionBody(IGF, request, type);
-  });
+    return emitDirectTypeMetadataAccessFunctionBody(IGF, request, type);
+  }, allowExistingDefinition);
 }
 
 /// Get or create an accessor function to the given generic type.
@@ -1857,32 +1845,16 @@ irgen::getGenericTypeMetadataAccessFunction(IRGenModule &IGM,
   return accessor;
 }
 
-/// Return the type metadata access function for the given type, if it
-/// is guaranteed to exist.
-llvm::Constant *
-irgen::getRequiredTypeMetadataAccessFunction(IRGenModule &IGM,
-                                             NominalTypeDecl *theDecl,
-                                             ForDefinition_t shouldDefine) {
-  if (theDecl->isGenericContext()) {
-    return getGenericTypeMetadataAccessFunction(IGM, theDecl, shouldDefine);
-  }
-
-  CanType declaredType = theDecl->getDeclaredType()->getCanonicalType();
-  return getTypeMetadataAccessFunction(IGM, declaredType, shouldDefine);
-}
-
 /// Emit a call to the type metadata accessor for the given function.
 static MetadataResponse
-emitCallToTypeMetadataAccessFunction(IRGenFunction &IGF,
-                                     CanType type,
-                                     DynamicMetadataRequest request,
-                                     ForDefinition_t shouldDefine) {
+emitCallToTypeMetadataAccessFunction(IRGenFunction &IGF, CanType type,
+                                     DynamicMetadataRequest request) {
   // If we already cached the metadata, use it.
   if (auto local = IGF.tryGetLocalTypeMetadata(type, request))
     return local;
 
   llvm::Constant *accessor =
-    getTypeMetadataAccessFunction(IGF.IGM, type, shouldDefine);
+    getOrCreateTypeMetadataAccessFunction(IGF.IGM, type);
   llvm::CallInst *call = IGF.Builder.CreateCall(accessor, { request.get(IGF) });
   call->setCallingConv(IGF.IGM.SwiftCC);
   call->setDoesNotAccessMemory();
@@ -1917,17 +1889,7 @@ IRGenFunction::emitTypeMetadataRef(CanType type,
     return emitDirectTypeMetadataRef(*this, type, request);
   }
 
-  switch (getTypeMetadataAccessStrategy(type)) {
-  case MetadataAccessStrategy::PublicUniqueAccessor:
-  case MetadataAccessStrategy::HiddenUniqueAccessor:
-  case MetadataAccessStrategy::PrivateAccessor:
-    return emitCallToTypeMetadataAccessFunction(*this, type, request,
-                                                NotForDefinition);
-  case MetadataAccessStrategy::NonUniqueAccessor:
-    return emitCallToTypeMetadataAccessFunction(*this, type, request,
-                                                ForDefinition);
-  }
-  llvm_unreachable("bad type metadata access strategy");
+  return emitCallToTypeMetadataAccessFunction(*this, type, request);
 }
 
 /// Return the address of a function that will return type metadata 
@@ -1940,12 +1902,17 @@ llvm::Function *irgen::getOrCreateTypeMetadataAccessFunction(IRGenModule &IGM,
          "cannot create global function to return dependent type metadata");
 
   switch (getTypeMetadataAccessStrategy(type)) {
+  case MetadataAccessStrategy::ForeignAccessor:
+    // Force the foreign candidate to exist.
+    (void) IGM.getAddrOfForeignTypeMetadataCandidate(type);
+    LLVM_FALLTHROUGH;
   case MetadataAccessStrategy::PublicUniqueAccessor:
   case MetadataAccessStrategy::HiddenUniqueAccessor:
   case MetadataAccessStrategy::PrivateAccessor:
-    return getTypeMetadataAccessFunction(IGM, type, NotForDefinition);
+    return getOtherwiseDefinedTypeMetadataAccessFunction(IGM, type);
   case MetadataAccessStrategy::NonUniqueAccessor:
-    return getTypeMetadataAccessFunction(IGM, type, ForDefinition);
+    return createDirectTypeMetadataAccessFunction(IGM, type,
+                                                  /*allow existing*/true);
   }
   llvm_unreachable("bad type metadata access strategy");
 }
