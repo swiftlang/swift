@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -6110,7 +6110,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
 
   // Look for other imported constructors that occur in this context with
   // the same name.
-  Type allocParamType = oldFnType->getInput();
+  auto allocParams = oldFnType->getParams();
   bool ignoreNewExtensions = isa<ClassDecl>(dc);
   for (auto other : ownerNominal->lookupDirect(importedName.getDeclName(),
                                                ignoreNewExtensions)) {
@@ -6127,12 +6127,12 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
     // If the types don't match, this is a different constructor with
     // the same selector. This can happen when an overlay overloads an
     // existing selector with a Swift-only signature.
-    Type ctorParamType = ctor->getInterfaceType()
-                             ->castTo<AnyFunctionType>()
-                             ->getResult()
-                             ->castTo<AnyFunctionType>()
-                             ->getInput();
-    if (!ctorParamType->isEqual(allocParamType)) {
+    auto ctorParams = ctor->getInterfaceType()
+                          ->castTo<AnyFunctionType>()
+                          ->getResult()
+                          ->castTo<AnyFunctionType>()
+                          ->getParams();
+    if (!AnyFunctionType::equalParams(ctorParams, allocParams)) {
       continue;
     }
 
