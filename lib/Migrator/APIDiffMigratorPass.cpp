@@ -363,6 +363,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
 
   std::vector<ConversionFunctionInfo> HelperFuncInfo;
   SourceLoc FileEndLoc;
+  llvm::StringSet<> OverridingRemoveNames;
 
   /// For a given expression, check whether the type of this expression is
   /// name alias type, and the name alias type is known to change to raw
@@ -385,7 +386,8 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
   APIDiffMigratorPass(EditorAdapter &Editor, SourceFile *SF,
                       const MigratorOptions &Opts):
     ASTMigratorPass(Editor, SF, Opts), DiffStore(Diags),
-    FileEndLoc(SM.getRangeForBuffer(BufferID).getEnd()) {}
+    FileEndLoc(SM.getRangeForBuffer(BufferID).getEnd()),
+    OverridingRemoveNames(funcNamesForOverrideRemoval()) {}
 
   ~APIDiffMigratorPass() {
     Editor.disableCache();
@@ -1290,6 +1292,92 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     }
   }
 
+  llvm::StringSet<> funcNamesForOverrideRemoval() {
+    llvm::StringSet<> Results;
+    Results.insert("c:objc(cs)NSObject(im)application:delegateHandlesKey:");
+    Results.insert("c:objc(cs)NSObject(im)changeColor:");
+    Results.insert("c:objc(cs)NSObject(im)controlTextDidBeginEditing:");
+    Results.insert("c:objc(cs)NSObject(im)controlTextDidEndEditing:");
+    Results.insert("c:objc(cs)NSObject(im)controlTextDidChange:");
+    Results.insert("c:objc(cs)NSObject(im)changeFont:");
+    Results.insert("c:objc(cs)NSObject(im)validModesForFontPanel:");
+    Results.insert("c:objc(cs)NSObject(im)discardEditing");
+    Results.insert("c:objc(cs)NSObject(im)commitEditing");
+    Results.insert("c:objc(cs)NSObject(im)commitEditingWithDelegate:didCommitSelector:contextInfo:");
+    Results.insert("c:objc(cs)NSObject(im)commitEditingAndReturnError:");
+    Results.insert("c:objc(cs)NSObject(im)objectDidBeginEditing:");
+    Results.insert("c:objc(cs)NSObject(im)objectDidEndEditing:");
+    Results.insert("c:objc(cs)NSObject(im)validateMenuItem:");
+    Results.insert("c:objc(cs)NSObject(im)pasteboard:provideDataForType:");
+    Results.insert("c:objc(cs)NSObject(im)pasteboardChangedOwner:");
+    Results.insert("c:objc(cs)NSObject(im)validateToolbarItem:");
+    Results.insert("c:objc(cs)NSObject(im)layer:shouldInheritContentsScale:fromWindow:");
+    Results.insert("c:objc(cs)NSObject(im)view:stringForToolTip:point:userData:");
+    return Results;
+  }
+
+  SourceLoc shouldRemoveOverride(AbstractFunctionDecl *AFD) {
+    if (AFD->getKind() != DeclKind::Func)
+      return SourceLoc();
+    SourceLoc OverrideLoc;
+
+    // Get the location of override keyword.
+    if (auto *Override = AFD->getAttrs().getAttribute<OverrideAttr>()) {
+      if (Override->getRange().isValid()) {
+        OverrideLoc = Override->getLocation();
+      }
+    }
+    if (OverrideLoc.isInvalid())
+      return SourceLoc();
+    auto *OD = AFD->getOverriddenDecl();
+    llvm::SmallString<64> Buffer;
+    llvm::raw_svector_ostream OS(Buffer);
+    if (swift::ide::printDeclUSR(OD, OS))
+      return SourceLoc();
+    return OverridingRemoveNames.find(OS.str()) == OverridingRemoveNames.end() ?
+      SourceLoc() : OverrideLoc;
+  }
+
+  struct SuperRemoval: public ASTWalker {
+    EditorAdapter &Editor;
+    llvm::StringSet<> &USRs;
+    SuperRemoval(EditorAdapter &Editor, llvm::StringSet<> &USRs):
+      Editor(Editor), USRs(USRs) {}
+    bool isSuperExpr(Expr *E) {
+      if (E->isImplicit())
+	return false;
+      // Check if the expression is super.foo().
+      if (auto *CE = dyn_cast<CallExpr>(E)) {
+        if (auto *DSC = dyn_cast<DotSyntaxCallExpr>(CE->getFn())) {
+          if (DSC->getBase()->getKind() != ExprKind::SuperRef)
+            return false;
+          llvm::SmallString<64> Buffer;
+          llvm::raw_svector_ostream OS(Buffer);
+          auto *RD = DSC->getFn()->getReferencedDecl().getDecl();
+          if (swift::ide::printDeclUSR(RD, OS))
+            return false;
+          return USRs.find(OS.str()) != USRs.end();
+        }
+      }
+      // We should handle try super.foo() too.
+      if (auto *TE = dyn_cast<AnyTryExpr>(E)) {
+        return isSuperExpr(TE->getSubExpr());
+      }
+      return false;
+    }
+    std::pair<bool, Stmt*> walkToStmtPre(Stmt *S) override {
+      if (auto *BS = dyn_cast<BraceStmt>(S)) {
+	for(auto Ele: BS->getElements()) {
+	  if (Ele.is<Expr*>() && isSuperExpr(Ele.get<Expr*>())) {
+	    Editor.remove(Ele.getSourceRange());
+          }
+	}
+      }
+      // We only handle top-level expressions, so avoid visiting further.
+      return {false, S};
+    }
+  };
+
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
     if (D->isImplicit())
       return true;
@@ -1304,6 +1392,14 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
           else if (DiffItem->isStringRepresentableChange())
             handleLocalParameterBridge(AFD, DiffItem);
         }
+      }
+      auto OverrideLoc = shouldRemoveOverride(AFD);
+      if (OverrideLoc.isValid()) {
+        // Remove override keyword.
+        Editor.remove(OverrideLoc);
+        // Remove super-dot call.
+        SuperRemoval Removal(Editor, OverridingRemoveNames);
+        D->walk(Removal);
       }
     }
     return true;
