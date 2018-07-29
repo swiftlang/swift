@@ -84,3 +84,11 @@ func daddFloatingPoint<T : FloatingPoint>(_ x: T, _ y: T) -> (T, T) {
 func daddFloatingPointWithValue<T : FloatingPoint>(_ x: T, _ y: T) -> (value: T, gradient: (T, T)) {
   return #valueAndGradient(addNumeric)(x, y) // ok
 }
+
+var gloablFn: (Float) -> Float
+
+func noescapeArgument(_ f: (Float) -> Float) {
+  let dfdx = #gradient(f) // okay
+  // expected-error @+1 {{invalid conversion from non-escaping function of type '(Float) -> Float' to potentially escaping function type '(Float) -> Float'}}
+  gloablFn = dfdx
+}
