@@ -454,6 +454,39 @@ bool FrontendOptions::doesActionProduceTextualOutput(ActionType action) {
   }
 }
 
+bool FrontendOptions::doesActionRunSILPasses(ActionType action) {
+  switch (action) {
+  case ActionType::NoneAction:
+  case ActionType::Parse:
+  case ActionType::ResolveImports:
+  case ActionType::Typecheck:
+  case ActionType::DumpParse:
+  case ActionType::DumpInterfaceHash:
+  case ActionType::EmitSyntax:
+  case ActionType::DumpAST:
+  case ActionType::PrintAST:
+  case ActionType::DumpScopeMaps:
+  case ActionType::DumpTypeRefinementContexts:
+  case ActionType::EmitImportedModules:
+  case ActionType::EmitPCH:
+  case ActionType::EmitSILGen:
+    return false;
+  case ActionType::EmitSIL:
+  case ActionType::EmitModuleOnly:
+  case ActionType::MergeModules:
+  case ActionType::EmitSIBGen:
+  case ActionType::EmitSIB:
+  case ActionType::Immediate:
+  case ActionType::REPL:
+  case ActionType::EmitAssembly:
+  case ActionType::EmitIR:
+  case ActionType::EmitBC:
+  case ActionType::EmitObject:
+    return true;
+  }
+}
+
+
 const PrimarySpecificPaths &
 FrontendOptions::getPrimarySpecificPathsForAtMostOnePrimary() const {
   return InputsAndOutputs.getPrimarySpecificPathsForAtMostOnePrimary();
