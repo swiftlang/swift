@@ -525,6 +525,46 @@ swift_getTupleTypeMetadata3(MetadataRequest request,
                             const Metadata *elt2, const char *labels,
                             const ValueWitnessTable *proposedWitnesses);
 
+/// Perform layout as if for a tuple whose elements have the given layouts.
+///
+/// \param tupleLayout - A structure into which to write the tuple layout.
+///   Must be non-null.
+/// \param elementOffsets - An array into which to write the offsets of
+///   the elements.  May be null.  Must have space for all elements,
+///   including element 0 (which will always have offset 0).
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+void swift_getTupleTypeLayout(TypeLayout *tupleLayout,
+                              uint32_t *elementOffsets,
+                              TupleTypeFlags flags,
+                              const TypeLayout * const *elements);
+
+/// Perform layout as if for a two-element tuple whose elements have
+/// the given layouts.
+///
+/// \param tupleLayout - A structure into which to write the tuple layout.
+///   Must be non-null.
+/// \returns The offset of the second element.
+///   The first element always has offset 0.
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+size_t swift_getTupleTypeLayout2(TypeLayout *tupleLayout,
+                                 const TypeLayout *elt0,
+                                 const TypeLayout *elt1);
+
+struct OffsetPair { size_t First; size_t Second; };
+
+/// Perform layout as if for a three-element tuple whose elements have
+/// the given layouts.
+///
+/// \param tupleLayout - A structure into which to write the tuple layout.
+///   Must be non-null.
+/// \returns The offsets of the second and third elements.
+///   The first element always has offset 0.
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+OffsetPair swift_getTupleTypeLayout3(TypeLayout *tupleLayout,
+                                     const TypeLayout *elt0Layout,
+                                     const TypeLayout *elt1Layout,
+                                     const TypeLayout *elt2Layout);
+
 /// Initialize the value witness table and struct field offset vector for a
 /// struct, using the "Universal" layout strategy.
 SWIFT_RUNTIME_EXPORT

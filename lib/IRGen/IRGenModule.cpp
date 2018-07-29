@@ -199,6 +199,16 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     SizeTy
   });
 
+  OffsetPairTy = llvm::StructType::get(getLLVMContext(), { SizeTy, SizeTy });
+
+  // The TypeLayout structure, including all possible trailing components.
+  FullTypeLayoutTy = createStructType(*this, "swift.full_type_layout", {
+    SizeTy, // size
+    SizeTy, // flags
+    SizeTy, // alignment
+    SizeTy  // extra inhabitant flags (optional)
+  });
+
   // A protocol descriptor describes a protocol. It is not type metadata in
   // and of itself, but is referenced in the structure of existential type
   // metadata records.
