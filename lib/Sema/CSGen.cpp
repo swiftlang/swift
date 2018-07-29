@@ -25,6 +25,7 @@
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "TypeChecker.h"
 #include <utility>
 
 using namespace swift;
@@ -1146,6 +1147,10 @@ namespace {
 
     ConstraintSystem &getConstraintSystem() const { return CS; }
 
+    bool isPrunedSubexpression(Expr *E) {
+      return CS.prunedSubexpressions.count(E) > 0;
+    }
+
     void enterClosure(ClosureExpr *closure) {
       DCStack.push_back(CurDC);
       CurDC = closure;
@@ -1155,7 +1160,7 @@ namespace {
       assert(CurDC == closure);
       CurDC = DCStack.pop_back_val();
     }
-    
+
     virtual Type visitErrorExpr(ErrorExpr *E) {
       // FIXME: Can we do anything with error expressions at this point?
       return nullptr;
@@ -1702,7 +1707,51 @@ namespace {
                                      expr->getIndex(),
                                      decl);
     }
-    
+
+    void preVisitArrayExpr(ArrayExpr *expr) {
+      // An array expression can be of a type T that conforms to the
+      // ExpressibleByArrayLiteral protocol.
+      auto &tc = CS.getTypeChecker();
+      ProtocolDecl *arrayProto
+      = tc.getProtocol(expr->getLoc(),
+                       KnownProtocolKind::ExpressibleByArrayLiteral);
+      if (!arrayProto)
+        return;
+
+      // Assume that ExpressibleByArrayLiteral contains a single associated type.
+      AssociatedTypeDecl *elementAssocTy = nullptr;
+      for (auto decl : arrayProto->getMembers()) {
+        if ((elementAssocTy = dyn_cast<AssociatedTypeDecl>(decl)))
+          break;
+      }
+      if (!elementAssocTy)
+        return;
+
+      auto contextualType = CS.getContextualType(expr);
+      Type contextualArrayType = nullptr;
+      Type contextualArrayElementType = nullptr;
+
+      // If a contextual type exists for this expression, apply it directly.
+      Optional<Type> arrayElementType;
+      if (!contextualType ||
+          !(arrayElementType = ConstraintSystem::isArrayType(contextualType)))
+        return;
+
+        // Is the array type a contextual type
+        contextualArrayType = contextualType;
+        contextualArrayElementType = *arrayElementType;
+
+      if (contextualArrayElementType->hasTypeVariable())
+        return;
+
+      for (auto element : expr->getElements()) {
+        Type checkedType = CS.TC.typeCheckExpression(element, CS.DC, TypeLoc::withoutLoc(contextualArrayElementType), CTP_Initialization, TypeCheckExprFlags::SuppressDiagnostics, nullptr, &CS);
+        if (checkedType && checkedType->isEqual(contextualArrayElementType)) {
+          CS.prunedSubexpressions.insert(element);
+        }
+      }
+    }
+
     Type visitArrayExpr(ArrayExpr *expr) {
       // An array expression can be of a type T that conforms to the
       // ExpressibleByArrayLiteral protocol.
@@ -1739,9 +1788,14 @@ namespace {
         CS.addConstraint(ConstraintKind::LiteralConformsTo, contextualType,
                          arrayProto->getDeclaredType(),
                          locator);
-        
+
         unsigned index = 0;
         for (auto element : expr->getElements()) {
+          if (isPrunedSubexpression(element)) {
+            CS.cacheExprTypes(element);
+            index++;
+            continue;
+          }
           CS.addConstraint(ConstraintKind::Conversion,
                            CS.getType(element),
                            contextualArrayElementType,
@@ -3264,6 +3318,9 @@ namespace {
     ConstraintWalker(ConstraintGenerator &CG) : CG(CG) { }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      if (CG.isPrunedSubexpression(expr))
+        return { false, expr };
+
       // Note that the subexpression of a #selector expression is
       // unevaluated.
       if (auto sel = dyn_cast<ObjCSelectorExpr>(expr)) {
@@ -3311,6 +3368,10 @@ namespace {
           return { false, expr };
       }
 
+      if (auto arrayExpr = dyn_cast<ArrayExpr>(expr)) {
+        CG.preVisitArrayExpr(arrayExpr);
+        return { true, expr };
+      }
       return { true, expr };
     }
 
