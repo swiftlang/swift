@@ -22,6 +22,7 @@
 #include "ResultPlan.h"
 #include "SILGen.h"
 #include "SILGenDynamicCast.h"
+#include "SILGenFunctionBuilder.h"
 #include "Scope.h"
 #include "SwitchEnumBuilder.h"
 #include "Varargs.h"
@@ -40,7 +41,6 @@
 #include "swift/Basic/type_traits.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/SILArgument.h"
-#include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/STLExtras.h"
@@ -2999,7 +2999,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
   auto name = Mangle::ASTMangler()
     .mangleKeyPathGetterThunkHelper(property, genericSig, baseType,
                                     interfaceSubs);
-  SILFunctionBuilder builder(SGM.M);
+  SILGenFunctionBuilder builder(SGM);
   auto thunk = builder.getOrCreateSharedFunction(
       loc, name, signature, IsBare, IsNotTransparent, IsNotSerialized,
       ProfileCounter(), IsThunk);
@@ -3122,7 +3122,7 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
                                                                 baseType,
                                                                 interfaceSubs);
 
-  SILFunctionBuilder builder(SGM.M);
+  SILGenFunctionBuilder builder(SGM);
   auto thunk = builder.getOrCreateSharedFunction(
       loc, name, signature, IsBare, IsNotTransparent, IsNotSerialized,
       ProfileCounter(), IsThunk);
@@ -3278,7 +3278,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     
     auto name = Mangle::ASTMangler().mangleKeyPathEqualsHelper(indexTypes,
                                                                genericSig);
-    SILFunctionBuilder builder(SGM.M);
+    SILGenFunctionBuilder builder(SGM);
     equals = builder.getOrCreateSharedFunction(
         loc, name, signature, IsBare, IsNotTransparent, IsNotSerialized,
         ProfileCounter(), IsThunk);
@@ -3443,7 +3443,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     
     auto name = Mangle::ASTMangler().mangleKeyPathHashHelper(indexTypes,
                                                              genericSig);
-    SILFunctionBuilder builder(SGM.M);
+    SILGenFunctionBuilder builder(SGM);
     hash = builder.getOrCreateSharedFunction(loc, name, signature, IsBare,
                                              IsNotTransparent, IsNotSerialized,
                                              ProfileCounter(), IsThunk);
