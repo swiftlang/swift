@@ -490,17 +490,6 @@ swift::classifyDynamicCast(ModuleDecl *M,
           && sourceFunction.getResult() == targetFunction.getResult())
         return DynamicCastFeasibility::WillSucceed;
 
-      auto isSubstitutable = [](CanType a, CanType b) -> bool {
-        // FIXME: Unnecessarily conservative; should structurally check for
-        // substitutability.
-        return a == b || a->hasArchetype() || b->hasArchetype();
-      };
-    
-      if (isSubstitutable(sourceFunction.getInput(), targetFunction.getInput())
-          && isSubstitutable(targetFunction.getInput(),
-                             targetFunction.getResult()))
-        return DynamicCastFeasibility::MaySucceed;
-      
       return DynamicCastFeasibility::WillFail;
     }
   }
