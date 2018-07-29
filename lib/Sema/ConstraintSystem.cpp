@@ -700,33 +700,40 @@ bool ConstraintSystem::isAnyHashableType(Type type) {
   return false;
 }
 
+static Type withParens(ConstraintSystem &cs, Type type, ParenType *parenType) {
+  auto flags = parenType->getParameterFlags().withInOut(type->is<InOutType>());
+  return ParenType::get(cs.getASTContext(), type->getInOutObjectType(), flags);
+}
+
 Type ConstraintSystem::getFixedTypeRecursive(Type type,
                                              TypeMatchOptions &flags,
                                              bool wantRValue,
                                              bool retainParens) {
 
-  if (wantRValue)
-    type = type->getRValueType();
+  // FIXME: This function doesn't strictly honor retainParens
+  //        everywhere.
 
   if (retainParens) {
-    if (auto parenTy = dyn_cast<ParenType>(type.getPointer())) {
-      type = getFixedTypeRecursive(parenTy->getUnderlyingType(), flags,
-                                   wantRValue, retainParens);
-      auto flags = parenTy->getParameterFlags().withInOut(type->is<InOutType>());
-      return ParenType::get(getASTContext(), type->getInOutObjectType(), flags);
+    if (wantRValue)
+      type = type->getRValueType();
+
+    if (auto *parenTy = dyn_cast<ParenType>(type.getPointer())) {
+      auto fixed = getFixedTypeRecursive(parenTy->getUnderlyingType(), flags,
+                                         wantRValue, retainParens);
+      return withParens(*this, fixed, parenTy);
     }
   }
 
   while (true) {
+    if (wantRValue)
+      type = type->getRValueType();
+
     if (auto depMemType = type->getAs<DependentMemberType>()) {
       if (!depMemType->getBase()->isTypeVariableOrMember()) return type;
 
       // FIXME: Perform a more limited simplification?
       Type newType = simplifyType(type);
       if (newType.getPointer() == type.getPointer()) return type;
-
-      if (wantRValue)
-        newType = newType->getRValueType();
 
       type = newType;
 
@@ -736,35 +743,21 @@ Type ConstraintSystem::getFixedTypeRecursive(Type type,
       continue;
     }
 
-    if (auto typeVar = type->getAs<TypeVariableType>()) {
-      bool hasRepresentative = false;
-      if (auto *repr = getRepresentative(typeVar)) {
-        if (typeVar != repr) {
-          hasRepresentative = true;
-          typeVar = repr;
-        }
-      }
+    auto typeVar = type->getAs<TypeVariableType>();
+    if (!typeVar)
+      return type;
 
-      if (auto fixed = getFixedType(typeVar)) {
-        if (wantRValue)
-          fixed = fixed->getRValueType();
-
-        type = fixed;
-        continue;
-      }
-
-      // If type variable has a representative but
-      // no fixed type, reflect that in the type itself.
-      if (hasRepresentative)
-        type = typeVar;
-
-      break;
+    if (auto fixed = getFixedType(typeVar)) {
+      type = fixed;
+      continue;
     }
 
-    break;
-  }
+    if (retainParens)
+      if (auto *parenType = dyn_cast<ParenType>(type.getPointer()))
+        return withParens(*this, getRepresentative(typeVar), parenType);
 
-  return type;
+    return getRepresentative(typeVar);
+  }
 }
 
 /// Does a var or subscript produce an l-value?
@@ -2022,12 +2015,10 @@ Type ConstraintSystem::simplifyType(Type type) {
   return simplifyTypeImpl(
       *this, type,
       [&](TypeVariableType *tvt) -> Type {
-        tvt = getRepresentative(tvt);
-        if (auto fixed = getFixedType(tvt)) {
+        if (auto fixed = getFixedType(tvt))
           return simplifyType(fixed);
-        }
 
-        return tvt;
+        return getRepresentative(tvt);
       });
 }
 
