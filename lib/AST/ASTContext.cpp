@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -3597,6 +3597,18 @@ Type AnyFunctionType::composeInput(ASTContext &ctx, ArrayRef<Param> params,
 
 bool AnyFunctionType::equalParams(ArrayRef<AnyFunctionType::Param> a,
                                   ArrayRef<AnyFunctionType::Param> b) {
+  if (a.size() != b.size())
+    return false;
+
+  for (unsigned i = 0, n = a.size(); i != n; ++i) {
+    if (a[i] != b[i])
+      return false;
+  }
+
+  return true;
+}
+
+bool AnyFunctionType::equalParams(CanParamArrayRef a, CanParamArrayRef b) {
   if (a.size() != b.size())
     return false;
 
