@@ -786,7 +786,7 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
   
   llvm::SmallBitVector defaultMap =
     computeDefaultMap(params, callee, calleeLevel);
-  
+
   // Extract the arguments.
   auto args = decomposeArgType(argType, argLabels);
   

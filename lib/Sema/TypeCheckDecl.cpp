@@ -3968,18 +3968,16 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   }
 
   case DeclKind::Param: {
-    // FIXME: This case is hit when code completion occurs in a function
-    // parameter list. Previous parameters are definitely in scope, but
-    // we don't really know how to type-check them.
-    // We can also hit this when code-completing in a closure body.
-    //
-    // FIXME: Also, note that we don't call setValidationToChecked() here,
-    // because the ExprCleanser clears the type of ParamDecls, so we
-    // can end up here multiple times for the same ParamDecl.
     auto *PD = cast<ParamDecl>(D);
-    if (!PD->hasInterfaceType())
-      PD->markInvalid();
+    if (!PD->hasInterfaceType()) {
+      // Can't fallthough because parameter without a type doesn't have
+      // valid signature, but that shouldn't matter anyway.
+      return;
+    }
 
+    auto type = PD->getInterfaceType();
+    if (type->hasError())
+      PD->markInvalid();
     break;
   }
 
