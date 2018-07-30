@@ -587,7 +587,7 @@ class Renamer: SyntaxRewriter {
 // Parse a .swift file
 let currentFile = URL(fileURLWithPath: "/tmp/test.swift")
 let currentFileContents = try String(contentsOf: currentFile)
-let parsed = try SourceFileSyntax.parse(currentFile)
+let parsed = try SourceFileSyntax.parse(currentFileContents)
 
 // Print the original file
 print("\n//======== Original =========\n")
