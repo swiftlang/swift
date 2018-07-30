@@ -1378,6 +1378,43 @@ static void performBasicLayout(TypeLayout &layout,
   layout.stride = std::max(size_t(1), roundUpToAlignMask(size, alignMask));
 }
 
+
+size_t swift::swift_getTupleTypeLayout2(TypeLayout *result,
+                                        const TypeLayout *elt0,
+                                        const TypeLayout *elt1) {
+  const TypeLayout *elts[] = { elt0, elt1 };
+  uint32_t offsets[2];
+  swift_getTupleTypeLayout(result, offsets,
+                           TupleTypeFlags().withNumElements(2), elts);
+  assert(offsets[0] == 0);
+  return offsets[1];
+}
+
+OffsetPair swift::swift_getTupleTypeLayout3(TypeLayout *result,
+                                            const TypeLayout *elt0,
+                                            const TypeLayout *elt1,
+                                            const TypeLayout *elt2) {
+  const TypeLayout *elts[] = { elt0, elt1, elt2 };
+  uint32_t offsets[3];
+  swift_getTupleTypeLayout(result, offsets,
+                           TupleTypeFlags().withNumElements(3), elts);
+  assert(offsets[0] == 0);
+  return {offsets[1], offsets[2]};
+}
+
+void swift::swift_getTupleTypeLayout(TypeLayout *result,
+                                     uint32_t *elementOffsets,
+                                     TupleTypeFlags flags,
+                                     const TypeLayout * const *elements) {
+  *result = TypeLayout();
+  performBasicLayout(*result, elements, flags.getNumElements(),
+    [](const TypeLayout *elt) { return elt; },
+    [elementOffsets](size_t i, const TypeLayout *elt, size_t offset) {
+      if (elementOffsets)
+        elementOffsets[i] = uint32_t(offset);
+    });
+}
+
 MetadataResponse
 swift::swift_getTupleTypeMetadata(MetadataRequest request,
                                   TupleTypeFlags flags,

@@ -766,6 +766,34 @@ FUNCTION(GetTupleMetadata3, swift_getTupleTypeMetadata3, SwiftCC,
               Int8PtrTy, WitnessTablePtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
+// void swift_getTupleTypeLayout(TypeLayout *result,
+//                               uint32_t offsets,
+//                               TupleTypeFlags flags,
+//                               const TypeLayout * const *elts);
+FUNCTION(GetTupleLayout, swift_getTupleTypeLayout, SwiftCC,
+         RETURNS(VoidTy),
+         ARGS(FullTypeLayoutTy->getPointerTo(0), Int32Ty->getPointerTo(0),
+              SizeTy, Int8PtrPtrTy->getPointerTo(0)),
+         ATTRS(NoUnwind))
+
+// size_t swift_getTupleTypeLayout2(TypeLayout *layout,
+//                                  const TypeLayout *elt0,
+//                                  const TypeLayout *elt1);
+FUNCTION(GetTupleLayout2, swift_getTupleTypeLayout2, SwiftCC,
+         RETURNS(SizeTy),
+         ARGS(FullTypeLayoutTy->getPointerTo(0), Int8PtrPtrTy, Int8PtrPtrTy),
+         ATTRS(NoUnwind))
+
+// OffsetPair swift_getTupleTypeLayout3(TypeLayout *layout,
+//                                      const TypeLayout *elt0,
+//                                      const TypeLayout *elt1,
+//                                      const TypeLayout *elt2);
+FUNCTION(GetTupleLayout3, swift_getTupleTypeLayout3, SwiftCC,
+         RETURNS(OffsetPairTy),
+         ARGS(FullTypeLayoutTy->getPointerTo(0),
+              Int8PtrPtrTy, Int8PtrPtrTy, Int8PtrPtrTy),
+         ATTRS(NoUnwind))
+
 // Metadata *swift_getExistentialTypeMetadata(
 //                              ProtocolClassConstraint classConstraint,
 //                              const Metadata *superclassConstraint,
