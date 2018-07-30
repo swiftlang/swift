@@ -336,7 +336,6 @@ int main(int argc, char **argv) {
   SILOpts.EnableSILOwnership = EnableSILOwnershipOpt;
   SILOpts.AssumeUnqualifiedOwnershipWhenParsing =
     AssumeUnqualifiedOwnershipWhenParsing;
-  SILOpts.EnableGuaranteedNormalArguments &= !DisableGuaranteedNormalArguments;
 
   SILOpts.VerifyExclusivity = VerifyExclusivity;
   if (EnforceExclusivity.getNumOccurrences() != 0) {

@@ -99,9 +99,6 @@ public:
   /// Should we use a pass pipeline passed in via a json file? Null by default.
   llvm::StringRef ExternalPassPipelineFilename;
 
-  /// Emit normal function arguments using the +0 guaranteed convention.
-  bool EnableGuaranteedNormalArguments = true;
-
   /// Don't generate code using partial_apply in SIL generation.
   bool DisableSILPartialApply = false;
 
