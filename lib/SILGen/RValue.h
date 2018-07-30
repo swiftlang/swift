@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -315,10 +315,12 @@ public:
       // Allow function types to disagree about 'noescape'.
       if (auto lf = dyn_cast<FunctionType>(l)) {
         if (auto rf = dyn_cast<FunctionType>(r)) {
-          return lf.getInput() == rf.getInput()
-              && lf.getResult() == rf.getResult()
-              && lf->getExtInfo().withNoEscape(false) ==
-                 lf->getExtInfo().withNoEscape(false);
+          auto lParams = lf.getParams();
+          auto rParams = rf.getParams();
+          return AnyFunctionType::equalParams(lParams, rParams) &&
+                 lf.getResult() == rf.getResult() &&
+                 lf->getExtInfo().withNoEscape(false) ==
+                     lf->getExtInfo().withNoEscape(false);
         }
       }
       return false;
