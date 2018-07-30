@@ -3609,13 +3609,13 @@ void checkMemberOperator(TypeChecker &TC, FuncDecl *FD) {
               isProtocol, FD->getFullName());
 }
 
-bool checkDynamicSelfReturn(TypeChecker &TC, FuncDecl *func,
+bool checkDynamicSelfReturn(FuncDecl *func,
                             TypeRepr *typeRepr,
                             unsigned optionalDepth) {
   // Look through parentheses.
   if (auto parenRepr = dyn_cast<TupleTypeRepr>(typeRepr)) {
     if (!parenRepr->isParenType()) return false;
-    return checkDynamicSelfReturn(TC, func, parenRepr->getElementType(0),
+    return checkDynamicSelfReturn(func, parenRepr->getElementType(0),
                                   optionalDepth);
   }
 
@@ -3624,8 +3624,9 @@ bool checkDynamicSelfReturn(TypeChecker &TC, FuncDecl *func,
     TypeAttributes attrs = attrRepr->getAttrs();
     if (!attrs.empty())
       return false;
-    return checkDynamicSelfReturn(TC, func, attrRepr->getTypeRepr(),
+    return checkDynamicSelfReturn(func, attrRepr->getTypeRepr(),
                                   optionalDepth);
+
   }
 
   // Look through optional types.
@@ -3639,7 +3640,7 @@ bool checkDynamicSelfReturn(TypeChecker &TC, FuncDecl *func,
   if (base) {
     // But only one level.
     if (optionalDepth != 0) return false;
-    return checkDynamicSelfReturn(TC, func, base, optionalDepth + 1);
+    return checkDynamicSelfReturn(func, base, optionalDepth + 1);
   }
 
   // Check whether we have a simple identifier type.
@@ -3648,17 +3649,16 @@ bool checkDynamicSelfReturn(TypeChecker &TC, FuncDecl *func,
     return false;
 
   // Check whether it is 'Self'.
-  if (simpleRepr->getIdentifier() != TC.Context.Id_Self)
+  if (simpleRepr->getIdentifier() != func->getASTContext().Id_Self)
     return false;
 
   // Note that the function has a dynamic Self return type and set
   // the return type component to the dynamic self type.
-  func->setDynamicSelf(true);
-  return false;
+  return true;
 }
 
 /// Check for methods that return 'DynamicResult'.
-bool checkDynamicSelfReturn(TypeChecker &TC, FuncDecl *func) {
+bool checkDynamicSelfReturn(FuncDecl *func) {
   // Check whether we have a specified result type.
   auto typeRepr = func->getBodyResultTypeLoc().getTypeRepr();
   if (!typeRepr)
@@ -3674,7 +3674,7 @@ bool checkDynamicSelfReturn(TypeChecker &TC, FuncDecl *func) {
   if (isa<AccessorDecl>(func))
     return false;
 
-  return checkDynamicSelfReturn(TC, func, typeRepr, 0);
+  return checkDynamicSelfReturn(func, typeRepr, 0);
 }
 
 Type buildAddressorResultType(TypeChecker &TC,
@@ -4097,8 +4097,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     validateSelfAccessKind(*this, FD);
 
     // Check whether the return type is dynamic 'Self'.
-    if (checkDynamicSelfReturn(*this, FD))
-      FD->setInvalid();
+    FD->setDynamicSelf(checkDynamicSelfReturn(FD));
 
     // Accessors should pick up various parts of their type signatures
     // directly from the storage declaration instead of re-deriving them.
