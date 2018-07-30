@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -differentiation -sil-print-all %s | %FileCheck %s
+// RUN: %target-sil-opt -differentiation %s | %FileCheck %s
 
 import Builtin
 import Swift

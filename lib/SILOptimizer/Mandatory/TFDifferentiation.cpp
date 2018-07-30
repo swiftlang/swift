@@ -848,9 +848,6 @@ private:
   ProtocolDecl *floatingPointProtocol =
     astCtx.getProtocol(KnownProtocolKind::FloatingPoint);
 
-  /// Flag indicating whether an error occurred.
-  bool errorOccurred = false;
-
   /// `VectorNumeric.+` declaration.
   FuncDecl *cachedVectorPlusFn = nullptr;
   /// `Numeric.+` declaration.
@@ -1070,9 +1067,6 @@ public:
                                      Optional<Diag<>> diag = None) {
     emitNondifferentiabilityError(value->getDefiningInstruction(), task, diag);
   }
-
-  void setErrorOccurred() { errorOccurred = true; }
-  bool hasErrorOccurred() const { return errorOccurred; }
 };
 } // end anonymous namespace
 
@@ -1764,7 +1758,7 @@ private:
   SmallVector<FunctionSynthesisItem, 16> worklist;
 
   /// Flag indicating there was an error during primal generation.
-  bool errorOccurred;
+  bool errorOccurred = false;
 
 public:
   explicit PrimalGen(ADContext &context) : context(context) {}
@@ -1804,7 +1798,12 @@ ADContext::createPrimalValueStructForFunction(SILFunction *function) {
                             /*GenericParams*/ nullptr, // to be set later
                             /*DC*/ &file);
   pvStruct->computeType();
-  pvStruct->setAccess(AccessLevel::Internal);
+  if (auto *dc = function->getDeclContext()) {
+    if (auto *afd = dyn_cast<AbstractFunctionDecl>(dc))
+      pvStruct->setAccess(afd->getEffectiveAccess());
+  } else {
+    pvStruct->setAccess(AccessLevel::Internal);
+  }
   // If the original function has generic parameters, clone them.
   auto *genEnv = function->getGenericEnvironment();
   if (genEnv && genEnv->getGenericSignature()) {
@@ -2497,6 +2496,7 @@ AdjointGen::createEmptyAdjoint(DifferentiationTask *task) {
                                         original->isBare(),
                                         original->isTransparent(),
                                         original->isSerialized());
+  adjoint->setUnqualifiedOwnership();
   adjoint->setDebugScope(
     new (module) SILDebugScope(original->getLocation(), adjoint));
   task->setAdjoint(adjoint);
@@ -3619,6 +3619,7 @@ static SILFunction *lookupOrSynthesizeGradient(
                                          original->isBare(),
                                          original->isTransparent(),
                                          original->isSerialized());
+    gradFn->setUnqualifiedOwnership();
     gradFn->setDebugScope(
       new (module) SILDebugScope(original->getLocation(), gradFn));
     return gradFn;
@@ -3947,24 +3948,20 @@ void Differentiation::run() {
   // infrastructure support for this yet and currently it'll error out, but
   // we'll look into adding a new function convention so that the primal and the
   // adjoint can be passed along with the function.
+  bool errorOccurred = false;
   for (auto *gi : gradInsts)
-    processGradientInst(gi, context);
+    errorOccurred |= processGradientInst(gi, context);
+  if (errorOccurred)
+    return;
 
   // Run primal generation.
   PrimalGen primalGen(context);
   if (primalGen.run())
     return;
 
-  // If there were any error, back out.
-  if (context.hasErrorOccurred())
-    return;
-
   // Run adjoint generation.
   AdjointGen adjointGen(context);
-  adjointGen.run();
-
-  // If there were any error, back out.
-  if (context.hasErrorOccurred())
+  if (adjointGen.run())
     return;
 
   // Fill the body of each empty canonical gradient function corresponding to
