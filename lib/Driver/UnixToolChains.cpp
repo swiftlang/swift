@@ -322,9 +322,9 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
     Arguments.push_back("-v");
   }
 
-  // These custom arguments should be right before the object file at the end
-  context.Args.AddAllArgs(Arguments, options::OPT_Xlinker);
+  // These custom arguments should be right before the object file at the end.
   context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
+  context.Args.AddAllArgs(Arguments, options::OPT_Xlinker);
 
   // This should be the last option, for convenience in checking output.
   Arguments.push_back("-o");
