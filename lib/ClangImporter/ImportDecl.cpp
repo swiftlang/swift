@@ -1939,7 +1939,7 @@ static bool shouldAlsoImportAsClassMethod(FuncDecl *method) {
     return false;
 
   // The class must not have a superclass.
-  if (classDecl->getSuperclass())
+  if (classDecl->hasSuperclass())
     return false;
 
   // There must not already be a class method with the same
@@ -7173,10 +7173,9 @@ void SwiftDeclConverter::importInheritedConstructors(
   if (hasDesignatedInitializers(curObjCClass))
     kind = CtorInitializerKind::Convenience;
 
-  auto superclass =
-      cast<ClassDecl>(classDecl->getSuperclass()->getAnyNominal());
 
   // If we have a superclass, import from it.
+  auto superclass = classDecl->getSuperclassDecl();
   if (auto superclassClangDecl = superclass->getClangDecl()) {
     if (isa<clang::ObjCInterfaceDecl>(superclassClangDecl)) {
       inheritConstructors(superclass->lookupDirect(DeclBaseName::createConstructor()),

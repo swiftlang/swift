@@ -3206,8 +3206,7 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
 
   // If there's no superclass, there's nothing to inherit.
   ClassDecl *superclassDecl;
-  if (!getSuperclass() ||
-      !(superclassDecl = getSuperclass()->getClassOrBoundGenericClass())) {
+  if (!(superclassDecl = getSuperclassDecl())) {
     setAddedImplicitInitializers();
     return false;
   }
@@ -3253,7 +3252,7 @@ ObjCClassKind ClassDecl::checkObjCAncestry() const {
 
     if (!CD->hasSuperclass())
       break;
-    CD = CD->getSuperclass()->getClassOrBoundGenericClass();
+    CD = CD->getSuperclassDecl();
     // If we don't have a valid class here, we should have diagnosed
     // elsewhere.
     if (!CD)
@@ -3369,7 +3368,7 @@ ClassDecl::findImplementingMethod(const AbstractFunctionDecl *Method) const {
     // Check the superclass
     if (!C->hasSuperclass())
       break;
-    C = C->getSuperclass()->getClassOrBoundGenericClass();
+    C = C->getSuperclassDecl();
   }
   return nullptr;
 }
@@ -5880,7 +5879,7 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
   // gets an implicit chained initializer.
   if (Kind == BodyInitKind::None) {
     if (auto classDecl = getDeclContext()->getAsClassOrClassExtensionContext()) {
-      if (classDecl->getSuperclass())
+      if (classDecl->hasSuperclass())
         Kind = BodyInitKind::ImplicitChained;
     }
   }

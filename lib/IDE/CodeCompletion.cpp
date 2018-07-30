@@ -4451,9 +4451,9 @@ public:
     const auto *CD = dyn_cast_or_null<ClassDecl>(CurrTy->getAnyNominal());
     if (!CD)
       return;
-    if (!CD->getSuperclass())
+    if (!CD->getSuperclassDecl())
       return;
-    CD = CD->getSuperclass()->getClassOrBoundGenericClass();
+    CD = CD->getSuperclassDecl();
     for (const auto *Member : CD->getMembers()) {
       const auto *Constructor = dyn_cast<ConstructorDecl>(Member);
       if (!Constructor)

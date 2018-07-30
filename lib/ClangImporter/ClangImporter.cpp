@@ -3544,7 +3544,10 @@ EffectiveClangContext ClangImporter::Implementation::getEffectiveClangContext(
   }
 
   // If it's an @objc entity, go look for it.
-  if (nominal->isObjC()) {
+  // Note that we're stepping lightly here to avoid computing isObjC()
+  // too early.
+  if (nominal->getAttrs().hasAttribute<ObjCAttr>() ||
+      (!nominal->getParentSourceFile() && nominal->isObjC())) {
     // Map the name. If we can't represent the Swift name in Clang.
     // FIXME: We should be using the Objective-C name here!
     auto clangName = exportName(nominal->getName());

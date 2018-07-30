@@ -71,7 +71,7 @@ static bool canClassOrSuperclassesHaveExtensions(ClassDecl *CD,
     if (!CD->hasSuperclass())
       break;
 
-    CD = CD->getSuperclass()->getClassOrBoundGenericClass();
+    CD = CD->getSuperclassDecl();
   }
 
   return false;

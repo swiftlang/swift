@@ -338,8 +338,8 @@ private:
       os << "\n@interface " << customName;
     }
 
-    if (Type superTy = CD->getSuperclass())
-      os << " : " << getNameForObjC(superTy->getClassOrBoundGenericClass());
+    if (auto superDecl = CD->getSuperclassDecl())
+      os << " : " << getNameForObjC(superDecl);
     printProtocols(CD->getLocalProtocols(ConformanceLookupKind::OnlyExplicit));
     os << "\n";
     printMembers(CD->getMembers());
@@ -2354,8 +2354,7 @@ public:
     bool allRequirementsSatisfied = true;
 
     const ClassDecl *superclass = nullptr;
-    if (Type superTy = CD->getSuperclass()) {
-      superclass = superTy->getClassOrBoundGenericClass();
+    if ((superclass = CD->getSuperclassDecl())) {
       allRequirementsSatisfied &= require(superclass);
     }
     for (auto proto : CD->getLocalProtocols(

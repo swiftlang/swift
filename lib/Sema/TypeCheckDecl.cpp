@@ -2793,7 +2793,7 @@ public:
       if (!classDecl->hasSuperclass())
         return false;
 
-      classDecl = classDecl->getSuperclass()->getClassOrBoundGenericClass();
+      classDecl = classDecl->getSuperclassDecl();
     }
 
     // If all of the variables are @objc, we can use @NSManaged.
@@ -2865,8 +2865,7 @@ public:
           // If the superclass doesn't require in-class initial
           // values, the requirement was introduced at this point, so
           // stop here.
-          auto superclass = cast<ClassDecl>(
-                              source->getSuperclass()->getAnyNominal());
+          auto superclass = source->getSuperclassDecl();
           if (!superclass->requiresStoredPropertyInits())
             break;
 
@@ -3885,8 +3884,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       // Determine whether we require in-class initializers.
       if (CD->getAttrs().hasAttribute<RequiresStoredPropertyInitsAttr>() ||
           (CD->hasSuperclass() &&
-           CD->getSuperclass()->getClassOrBoundGenericClass()
-             ->requiresStoredPropertyInits()))
+           CD->getSuperclassDecl()->requiresStoredPropertyInits()))
         CD->setRequiresStoredPropertyInits(true);
 
       // Inherit @objcMembers.
@@ -4648,9 +4646,7 @@ void TypeChecker::requestNominalLayout(NominalTypeDecl *nominalDecl) {
 }
 
 void TypeChecker::requestSuperclassLayout(ClassDecl *classDecl) {
-  auto superclassTy = classDecl->getSuperclass();
-  if (superclassTy) {
-    auto *superclassDecl = superclassTy->getClassOrBoundGenericClass();
+  if (auto *superclassDecl = classDecl->getSuperclassDecl()) {
     if (superclassDecl)
       requestNominalLayout(superclassDecl);
   }
@@ -5454,7 +5450,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   // for all of the superclass's designated initializers.
   // FIXME: Currently skipping generic classes.
   auto classDecl = cast<ClassDecl>(decl);
-  if (classDecl->hasSuperclass()) {
+  if (Type superclassTy = classDecl->getSuperclass()) {
     bool canInheritInitializers = (!SuppressDefaultInitializer &&
                                    !FoundDesignatedInit);
 
@@ -5465,7 +5461,6 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
       return;
     }
 
-    auto superclassTy = classDecl->getSuperclass();
     auto *superclassDecl = superclassTy->getClassOrBoundGenericClass();
     assert(superclassDecl && "Superclass of class is not a class?");
     if (!superclassDecl->addedImplicitInitializers())
