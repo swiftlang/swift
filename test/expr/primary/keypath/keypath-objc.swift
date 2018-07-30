@@ -30,7 +30,7 @@ import Foundation
 }
 
 class C {
-  var nonObjC: String? // expected-note{{add '@objc' to expose this var to Objective-C}}{{3-3=@objc }}
+  var nonObjC: String? // expected-note{{add '@objc' to expose this property to Objective-C}}{{3-3=@objc }}
 }
 
 extension NSArray {
