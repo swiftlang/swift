@@ -3159,15 +3159,20 @@ public:
   
   /// \brief Determine if we've already explored too many paths in an
   /// attempt to solve this expression.
+  bool isExpressionAlreadyTooComplex = false;
   bool getExpressionTooComplex(SmallVectorImpl<Solution> const &solutions) {
+    if (isExpressionAlreadyTooComplex)
+      return true;
+
     auto used = TC.Context.getSolverMemory();
     for (auto const& s : solutions) {
       used += s.getTotalMemory();
     }
     MaxMemory = std::max(used, MaxMemory);
     auto threshold = TC.Context.LangOpts.SolverMemoryThreshold;
-    if (MaxMemory > threshold)
-      return true;
+    if (MaxMemory > threshold) {
+      return isExpressionAlreadyTooComplex= true;
+    }
 
     auto timeoutThresholdInMillis = TC.getExpressionTimeoutThresholdInSeconds();
     if (Timer && Timer->isExpired(timeoutThresholdInMillis)) {
@@ -3175,12 +3180,17 @@ public:
       // threshold since we're arbitrarily ending evaluation and
       // emitting an error.
       Timer->disableWarning();
-      return true;
+
+      return isExpressionAlreadyTooComplex = true;
     }
 
     // Bail out once we've looked at a really large number of
     // choices.
-    return CountScopes > TC.Context.LangOpts.SolverBindingThreshold;
+    if (CountScopes > TC.Context.LangOpts.SolverBindingThreshold) {
+      return isExpressionAlreadyTooComplex = true;
+    }
+
+    return false;
   }
   
   LLVM_ATTRIBUTE_DEPRECATED(

@@ -1349,6 +1349,12 @@ bool ConstraintSystem::solve(Expr *&expr,
     // The system was salvaged; continue on as if nothing happened.
   }
 
+  if (getExpressionTooComplex(solutions)) {
+    TC.diagnose(expr->getLoc(), diag::expression_too_complex).
+    highlight(expr->getSourceRange());
+    return true;
+  }
+
   if (TC.getLangOpts().DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
     if (solutions.size() == 1) {
