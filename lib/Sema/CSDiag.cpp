@@ -410,7 +410,8 @@ tryDiagnoseTrailingClosureAmbiguity(TypeChecker &tc,
     const ParamDecl *param = paramList->getArray().back();
 
     // Sanity-check that the trailing closure corresponds to this parameter.
-    if (!param->getInterfaceType()->is<AnyFunctionType>())
+    if (!param->hasValidSignature() ||
+        !param->getInterfaceType()->is<AnyFunctionType>())
       return false;
 
     Identifier trailingClosureLabel = param->getArgumentName();
@@ -2478,11 +2479,11 @@ typeCheckArbitrarySubExprIndependently(Expr *subExpr, TCCOptions options) {
     // none of its arguments are type variables.  If so, these type variables
     // would be accessible to name lookup of the subexpression and may thus leak
     // in.  Reset them to UnresolvedTypes for safe measures.
-    for (auto param : *CE->getParameters()) {
-      auto VD = param;
-      if (VD->getType()->hasTypeVariable() || VD->getType()->hasError()) {
-        VD->setType(CS.getASTContext().TheUnresolvedType);
-        VD->setInterfaceType(VD->getType());
+    for (auto *param : *CE->getParameters()) {
+      if (param->hasValidSignature()) {
+        auto type = param->getType();
+        assert(!type->hasTypeVariable() && !type->hasError());
+        (void)type;
       }
     }
   }
@@ -3826,8 +3827,6 @@ static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
   // Swift Standard Library called 'max' which does accept two arguments,
   // so user might have called that by mistake without realizing that
   // compiler would add implicit 'self.' prefix to the call of 'max'.
-  ExprCleaner cleanup(argExpr);
-
   auto argType = CS.getType(argExpr);
   // If argument wasn't properly type-checked, let's retry without changing AST.
   if (!argType || argType->hasUnresolvedType() || argType->hasTypeVariable() ||
@@ -6982,7 +6981,8 @@ bool FailureDiagnosis::diagnoseClosureExpr(
   //
   // Handle this by rewriting the arguments to UnresolvedType().
   for (auto VD : *CE->getParameters()) {
-    if (VD->getType()->hasTypeVariable() || VD->getType()->hasError()) {
+    if (VD->hasType() && (VD->getType()->hasTypeVariable() ||
+                          VD->getType()->hasError())) {
       VD->setType(CS.getASTContext().TheUnresolvedType);
       VD->setInterfaceType(VD->getType()->getInOutObjectType());
     }
@@ -7008,8 +7008,6 @@ bool FailureDiagnosis::diagnoseClosureExpr(
     // but it's not always reset.
 
     if (expectedResultType && !CE->hasExplicitResultType()) {
-      ExprCleaner cleaner(CE);
-
       auto closure = CE->getSingleExpressionBody();
       ConcreteDeclRef decl = nullptr;
       // Let's try to compute result type without mutating AST and
@@ -8645,7 +8643,8 @@ diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure) {
       resultExpr->forEachChildExpr([&](Expr *childExpr) -> Expr *{
         if (auto DRE = dyn_cast<DeclRefExpr>(childExpr)) {
           if (auto param = dyn_cast<ParamDecl>(DRE->getDecl())) {
-            auto paramType = param->hasType() ? param->getType() : Type();
+            auto paramType =
+                param->hasValidSignature() ? param->getType() : Type();
             if (!paramType || paramType->hasTypeVariable()) {
               hasUnresolvedParams = true;
               return nullptr;

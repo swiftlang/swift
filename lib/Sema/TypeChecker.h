@@ -1748,10 +1748,42 @@ public:
   /// \param base The optional base expression of this value reference
   ///
   /// \param wantInterfaceType Whether we want the interface type, if available.
+  ///
+  /// \param getType Optional callback to extract a type for given declaration.
+  Type getUnopenedTypeOfReference(VarDecl *value, Type baseType,
+                                  DeclContext *UseDC,
+                                  llvm::function_ref<Type(VarDecl *)> getType,
+                                  const DeclRefExpr *base = nullptr,
+                                  bool wantInterfaceType = false);
+
+  /// Return the type-of-reference of the given value.
+  ///
+  /// \param baseType if non-null, return the type of a member reference to
+  ///   this value when the base has the given type
+  ///
+  /// \param UseDC The context of the access.  Some variables have different
+  ///   types depending on where they are used.
+  ///
+  /// \param base The optional base expression of this value reference
+  ///
+  /// \param wantInterfaceType Whether we want the interface type, if available.
   Type getUnopenedTypeOfReference(VarDecl *value, Type baseType,
                                   DeclContext *UseDC,
                                   const DeclRefExpr *base = nullptr,
-                                  bool wantInterfaceType = false);
+                                  bool wantInterfaceType = false) {
+    return getUnopenedTypeOfReference(
+        value, baseType, UseDC,
+        [&](VarDecl *var) -> Type {
+          validateDecl(var);
+
+          if (!var->hasValidSignature() || var->isInvalid())
+            return ErrorType::get(Context);
+
+          return wantInterfaceType ? value->getInterfaceType()
+                                   : value->getType();
+        },
+        base, wantInterfaceType);
+  }
 
   /// \brief Retrieve the default type for the given protocol.
   ///
@@ -2306,25 +2338,6 @@ public:
   /// Check if the given decl has a @_semantics attribute that gives it
   /// special case type-checking behavior.
   DeclTypeCheckingSemantics getDeclTypeCheckingSemantics(ValueDecl *decl);
-};
-
-/// \brief RAII object that cleans up the given expression if not explicitly
-/// disabled.
-class CleanupIllFormedExpressionRAII {
-  Expr **expr;
-
-public:
-  CleanupIllFormedExpressionRAII(Expr *&expr)
-    : expr(&expr) { }
-
-  ~CleanupIllFormedExpressionRAII();
-
-  static void doIt(Expr *expr);
-
-  /// \brief Disable the cleanup of this expression; it doesn't need it.
-  void disable() {
-    expr = nullptr;
-  }
 };
 
 /// Temporary on-stack storage and unescaping for encoded diagnostic
