@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-strict-deabstraction=false -O -emit-sil -verify %s | %FileCheck %s
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-strict-deabstraction -O -emit-sil -verify %s | %FileCheck %s --check-prefix=STRICTDA
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -O -emit-sil -verify %s | %FileCheck %s --check-prefix=STRICTDA
 import TensorFlow
 
 public func testDatasetWithFakeData() {
@@ -13,12 +12,6 @@ public func testDatasetWithFakeData() {
   let y = Tensor<Float>(handle: x) + 1
   print(y.array.scalars[0])
 }
-
-// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testDatasetWithFakeData{{.*}}
-// CHECK: bb0:
-// CHECK:        [[GETNEXT:%[0-9]+]] = builtin "__tfop_tfc.makeIteratorGetNextWithDatasets{{.*}} : $TensorHandle<Float>
-// CHECK:        [[RESULT:%[0-9]+]] = builtin "__tfop_Add,$in,$in,T,__device"([[GETNEXT]] : $TensorHandle<Float>, {{.*}} : $TensorHandle<Float>
-// CHECK-NEXT:   return [[RESULT]] : $TensorHandle<Float>
 
 // STRICTDA-LABEL: --- TFPartition Accelerator Result: {{.*}}testDatasetWithFakeData{{.*}}
 // STRICTDA: bb0:
@@ -42,17 +35,6 @@ public func testDatasetWithMNIST() {
   print(imagesMod.array.scalars[0])
   print(labelsMod.array.scalars[0])
 }
-
-// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testDatasetWithMNIST{{.*}}
-// CHECK: bb0:
-// CHECK:  builtin "__tfop_tfc.makeIteratorGetNextWithDatasets{{.*}} : $(TensorHandle<Float>, TensorHandle<Int32>)
-// CHECK-NEXT:  tuple_extract {{.*}} : $(TensorHandle<Float>, TensorHandle<Int32>), 0
-// CHECK-NEXT:  tuple_extract {{.*}} : $(TensorHandle<Float>, TensorHandle<Int32>), 1
-// CHECK: builtin "__tfop_Add,$in,$in,T,__device"(
-// CHECK: builtin "__tfop_Add,$in,$in,T,__device"(
-// The operands can appear in arbitrary order here.
-// CHECK:  [[RESULT:%.*]] = tuple ({{.*}} : $TensorHandle<{{.*}}>, {{.*}} : $TensorHandle<{{.*}}>)
-// CHECK-NEXT:  return [[RESULT]] : $(TensorHandle<{{.*}}>, TensorHandle<{{.*}}>)
 
 // STRICTDA-LABEL: --- TFPartition Accelerator Result: {{.*}}testDatasetWithMNIST{{.*}}
 // STRICTDA: bb0:

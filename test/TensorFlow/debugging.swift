@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -emit-sil -Xllvm -tf-strict-deabstraction %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s
 
 import TensorFlow
 
