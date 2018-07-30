@@ -340,3 +340,19 @@ func dynamicInitCrash(ao: AnyObject.Type) {
   let sdk = ao.init(blahblah: ())
   // expected-error@-1 {{incorrect argument label in call (have 'blahblah:', expected 'toMemory:')}}
 }
+
+// Test that we correctly diagnose ambiguity for different typed properties available
+// through dynamic lookup.
+@objc protocol P3 {
+  var i: UInt { get } // expected-note {{found this candidate}}
+  var j: Int { get }
+}
+
+class C1 {
+  @objc var i: Int { return 0 } // expected-note {{found this candidate}}
+  @objc var j: Int { return 0 }
+}
+
+_ = (C1() as AnyObject).i // expected-error {{ambiguous use of 'i'}}
+_ = (C1() as AnyObject).j // okay
+
