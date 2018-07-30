@@ -41,6 +41,7 @@ add_swift_library(swiftAST STATIC
   ModuleLoader.cpp
   ModuleNameLookup.cpp
   NameLookup.cpp
+  NameLookupRequests.cpp
   Parameter.cpp
   Pattern.cpp
   PlatformKind.cpp

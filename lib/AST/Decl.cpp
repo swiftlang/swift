@@ -31,6 +31,7 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -3564,9 +3565,8 @@ Type ProtocolDecl::getSuperclass() const {
 }
 
 ClassDecl *ProtocolDecl::getSuperclassDecl() const {
-  if (auto superclass = getSuperclass())
-    return superclass->getClassOrBoundGenericClass();
-  return nullptr;
+  ASTContext &ctx = getASTContext();
+  return ctx.evaluator(SuperclassDeclRequest{const_cast<ProtocolDecl *>(this)});
 }
 
 void ProtocolDecl::setSuperclass(Type superclass) {
@@ -6005,9 +6005,8 @@ Type ClassDecl::getSuperclass() const {
 }
 
 ClassDecl *ClassDecl::getSuperclassDecl() const {
-  if (auto superclass = getSuperclass())
-    return superclass->getClassOrBoundGenericClass();
-  return nullptr;
+  ASTContext &ctx = getASTContext();
+  return ctx.evaluator(SuperclassDeclRequest{const_cast<ClassDecl *>(this)});
 }
 
 void ClassDecl::setSuperclass(Type superclass) {

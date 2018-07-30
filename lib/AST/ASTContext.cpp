@@ -514,6 +514,7 @@ ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
 
   // Register any request-evaluator functions available at the AST layer.
   registerAccessRequestFunctions(evaluator);
+  registerNameLookupRequestFunctions(evaluator);
 }
 
 ASTContext::~ASTContext() {
