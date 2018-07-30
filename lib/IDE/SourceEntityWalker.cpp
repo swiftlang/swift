@@ -33,6 +33,7 @@ class SemaAnnotator : public ASTWalker {
   SourceEntityWalker &SEWalker;
   SmallVector<ConstructorRefCallExpr *, 2> CtorRefs;
   SmallVector<ExtensionDecl *, 2> ExtDecls;
+  llvm::SmallDenseMap<OpaqueValueExpr *, Expr *, 4> OpaqueValueMap;
   bool Cancelled = false;
   Optional<AccessKind> OpAccess;
 
@@ -260,6 +261,10 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
 
   if (!isa<InOutExpr>(E) &&
       !isa<LoadExpr>(E) &&
+      !isa<OpenExistentialExpr>(E) &&
+      !isa<MakeTemporarilyEscapableExpr>(E) &&
+      !isa<CollectionUpcastConversionExpr>(E) &&
+      !isa<OpaqueValueExpr>(E) &&
       E->isImplicit())
     return { true, E };
 
@@ -422,6 +427,53 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     if (!walkToExprPost(E))
       return { false, nullptr };
     return { false, E };
+  } else if (auto OEE = dyn_cast<OpenExistentialExpr>(E)) {
+    // Record opaque value.
+    OpaqueValueMap[OEE->getOpaqueValue()] = OEE->getExistentialValue();
+    SWIFT_DEFER {
+      OpaqueValueMap.erase(OEE->getOpaqueValue());
+    };
+
+    if (!OEE->getSubExpr()->walk(*this))
+      return { false, nullptr };
+    if (!walkToExprPost(E))
+      return { false, nullptr };
+    return { false, E };
+  } else if (auto MTEE = dyn_cast<MakeTemporarilyEscapableExpr>(E)) {
+    // Manually walk to original arguments in order. We don't handle
+    // OpaqueValueExpr here.
+
+    // Original non-escaping closure.
+    if (!MTEE->getNonescapingClosureValue()->walk(*this))
+      return { false, nullptr };
+
+    // Body, which is called by synthesized CallExpr.
+    auto *callExpr = cast<CallExpr>(MTEE->getSubExpr());
+    if (!callExpr->getFn()->walk(*this))
+      return { false, nullptr };
+
+    if (!walkToExprPost(E))
+      return { false, nullptr };
+    return { false, E };
+  } else if (auto CUCE = dyn_cast<CollectionUpcastConversionExpr>(E)) {
+    // Ignore conversion expressions. We don't handle OpaqueValueExpr here
+    // because it's only in conversion expressions. Instead, just walk into
+    // sub expression.
+    if (!CUCE->getSubExpr()->walk(*this))
+      return { false, nullptr };
+    if (!walkToExprPost(E))
+      return { false, nullptr };
+    return { false, E };
+  } else if (auto OVE = dyn_cast<OpaqueValueExpr>(E)) {
+    // Walk into mapped value.
+    auto value = OpaqueValueMap.find(OVE);
+    if (value != OpaqueValueMap.end()) {
+      if (!value->second->walk(*this))
+        return { false, nullptr };
+      if (!walkToExprPost(E))
+        return { false, nullptr };
+      return { false, E };
+    }
   }
 
   return { true, E };
