@@ -646,6 +646,22 @@ getDriverBatchCount(llvm::opt::InputArgList &ArgList,
   return None;
 }
 
+static Optional<unsigned>
+getDriverBatchSizeLimit(llvm::opt::InputArgList &ArgList,
+                        DiagnosticEngine &Diags)
+{
+  if (const Arg *A = ArgList.getLastArg(options::OPT_driver_batch_size_limit)) {
+    unsigned Limit = 0;
+    if (StringRef(A->getValue()).getAsInteger(10, Limit)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(ArgList), A->getValue());
+    } else {
+      return Limit;
+    }
+  }
+  return None;
+}
+
 std::unique_ptr<Compilation>
 Driver::buildCompilation(const ToolChain &TC,
                          std::unique_ptr<llvm::opt::InputArgList> ArgList) {
@@ -671,6 +687,8 @@ Driver::buildCompilation(const ToolChain &TC,
     ArgList->hasArg(options::OPT_driver_show_job_lifecycle);
   unsigned DriverBatchSeed = getDriverBatchSeed(*ArgList, Diags);
   Optional<unsigned> DriverBatchCount = getDriverBatchCount(*ArgList, Diags);
+  Optional<unsigned> DriverBatchSizeLimit =
+    getDriverBatchSizeLimit(*ArgList, Diags);
   bool DriverForceOneBatchRepartition =
       ArgList->hasArg(options::OPT_driver_force_one_batch_repartition);
 
@@ -850,6 +868,7 @@ Driver::buildCompilation(const ToolChain &TC,
                       BatchMode,
                       DriverBatchSeed,
                       DriverBatchCount,
+                      DriverBatchSizeLimit,
                       DriverForceOneBatchRepartition,
                       DriverSkipExecution,
                       SaveTemps,
