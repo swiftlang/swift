@@ -179,8 +179,8 @@ internal func _conditionallyUnreachable() -> Never {
 }
 
 @inlinable // FIXME(sil-serialize-all)
-@_silgen_name("_swift_isClassOrObjCExistentialType")
-internal func _swift_isClassOrObjCExistentialType<T>(_ x: T.Type) -> Bool
+@_silgen_name("swift_isClassOrObjCExistentialType")
+internal func swift_isClassOrObjCExistentialType<T>(_ x: T.Type) -> Bool
 
 /// Returns `true` iff `T` is a class type or an `@objc` existential such as
 /// `AnyObject`.
@@ -197,7 +197,7 @@ internal func _isClassOrObjCExistential<T>(_ x: T.Type) -> Bool {
     return true
   // Maybe a class.
   default:
-    return _swift_isClassOrObjCExistentialType(x)
+    return swift_isClassOrObjCExistentialType(x)
   }
 }
 
@@ -604,14 +604,14 @@ internal func _makeBridgeObject(
   )
 }
 
-@_silgen_name("_swift_class_getSuperclass")
-internal func _swift_class_getSuperclass(_ t: AnyClass) -> AnyClass?
+@_silgen_name("swift_class_getSuperclass")
+internal func swift_class_getSuperclass(_ t: AnyClass) -> AnyClass?
 
 /// Returns the superclass of `t`, if any.  The result is `nil` if `t` is
 /// a root class or class protocol.
 public
 func _getSuperclass(_ t: AnyClass) -> AnyClass? {
-  return _swift_class_getSuperclass(t)
+  return swift_class_getSuperclass(t)
 }
 
 /// Returns the superclass of `t`, if any.  The result is `nil` if `t` is

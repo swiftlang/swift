@@ -613,7 +613,7 @@ extension _UnmanagedString where CodeUnit == UInt16 {
     into outputBuffer: UnsafeMutableBufferPointer<UInt16>
   ) -> Int? {
     var err = __swift_stdlib_U_ZERO_ERROR
-    let count = __swift_stdlib_unorm2_normalize(
+    let count = swift_stdlib_unorm2_normalize(
       _Normalization._nfcNormalizer,
       self.start,
       numericCast(self.count),
@@ -661,7 +661,7 @@ internal func _tryNormalize(
   into outputBuffer: UnsafeMutableBufferPointer<UInt16>
 ) -> Int? {
   var err = __swift_stdlib_U_ZERO_ERROR
-  let count = __swift_stdlib_unorm2_normalize(
+  let count = swift_stdlib_unorm2_normalize(
     _Normalization._nfcNormalizer,
     input.baseAddress._unsafelyUnwrappedUnchecked,
     numericCast(input.count),
@@ -684,7 +684,7 @@ extension _UnmanagedString where CodeUnit == UInt8 {
       return (self.count &- other.count).signum()
     }
     var cmp = Int(truncatingIfNeeded:
-      _stdlib_memcmp(
+      swift_stdlib_memcmp(
         self.rawStart, other.rawStart,
         Swift.min(self.count, other.count)))
     if cmp == 0 {

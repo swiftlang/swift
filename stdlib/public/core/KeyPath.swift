@@ -1927,8 +1927,8 @@ internal func _appendingKeyPaths<
 
       if let rootPtr = root._kvcKeyPathStringPtr,
          let leafPtr = leaf._kvcKeyPathStringPtr {
-        rootKVCLength = Int(_stdlib_strlen(rootPtr))
-        leafKVCLength = Int(_stdlib_strlen(leafPtr))
+        rootKVCLength = Int(swift_stdlib_strlen(rootPtr))
+        leafKVCLength = Int(swift_stdlib_strlen(leafPtr))
         // root + "." + leaf
         appendedKVCLength = rootKVCLength + 1 + leafKVCLength
       } else {
@@ -2198,7 +2198,7 @@ internal func _getKeyPath_instantiateInline(
   if instantiatedSize <= totalSize {
     _instantiateKeyPathBuffer(buffer, bufferData, rootType, bufferPtr)
 
-    _swift_instantiateInertHeapObject(objectPtr,
+    swift_instantiateInertHeapObject(objectPtr,
       unsafeBitCast(keyPathClass, to: OpaquePointer.self))
   } else {
     // Otherwise, we'll need to instantiate out-of-place.

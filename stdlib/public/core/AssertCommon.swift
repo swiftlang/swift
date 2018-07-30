@@ -88,7 +88,7 @@ internal func _assertionFailure(
       (message) -> Void in
       file.withUTF8Buffer {
         (file) -> Void in
-        _swift_stdlib_reportFatalErrorInFile(
+        swift_stdlib_reportFatalErrorInFile(
           prefix.baseAddress!, CInt(prefix.count),
           message.baseAddress!, CInt(message.count),
           file.baseAddress!, CInt(file.count), UInt32(line),
@@ -118,7 +118,7 @@ internal func _assertionFailure(
       (messageUTF8) -> Void in
       file.withUTF8Buffer {
         (file) -> Void in
-        _swift_stdlib_reportFatalErrorInFile(
+        swift_stdlib_reportFatalErrorInFile(
           prefix.baseAddress!, CInt(prefix.count),
           messageUTF8.baseAddress!, CInt(messageUTF8.count),
           file.baseAddress!, CInt(file.count), UInt32(line),
@@ -145,7 +145,7 @@ internal func _assertionFailure(
     (prefix) -> Void in
     message._withUnsafeBufferPointerToUTF8 {
       (messageUTF8) -> Void in
-      _swift_stdlib_reportFatalError(
+      swift_stdlib_reportFatalError(
         prefix.baseAddress!, CInt(prefix.count),
         messageUTF8.baseAddress!, CInt(messageUTF8.count),
         flags)
@@ -175,7 +175,7 @@ internal func _fatalErrorMessage(
       (message) in
       file.withUTF8Buffer {
         (file) in
-        _swift_stdlib_reportFatalErrorInFile(
+        swift_stdlib_reportFatalErrorInFile(
           prefix.baseAddress!, CInt(prefix.count),
           message.baseAddress!, CInt(message.count),
           file.baseAddress!, CInt(file.count), UInt32(line),
@@ -188,7 +188,7 @@ internal func _fatalErrorMessage(
     (prefix) in
     message.withUTF8Buffer {
       (message) in
-      _swift_stdlib_reportFatalError(
+      swift_stdlib_reportFatalError(
         prefix.baseAddress!, CInt(prefix.count),
         message.baseAddress!, CInt(message.count),
         flags)
@@ -221,7 +221,7 @@ func _unimplementedInitializer(className: StaticString,
         (initName) in
         file.withUTF8Buffer {
           (file) in
-          _swift_stdlib_reportUnimplementedInitializerInFile(
+          swift_stdlib_reportUnimplementedInitializerInFile(
             className.baseAddress!, CInt(className.count),
             initName.baseAddress!, CInt(initName.count),
             file.baseAddress!, CInt(file.count),
@@ -235,7 +235,7 @@ func _unimplementedInitializer(className: StaticString,
       (className) in
       initName.withUTF8Buffer {
         (initName) in
-        _swift_stdlib_reportUnimplementedInitializer(
+        swift_stdlib_reportUnimplementedInitializer(
           className.baseAddress!, CInt(className.count),
           initName.baseAddress!, CInt(initName.count),
           /*flags:*/ 0)

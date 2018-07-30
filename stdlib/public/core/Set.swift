@@ -465,7 +465,7 @@ extension Set: Equatable {
       var i = lhsNative.startIndex
       while i != endIndex {
         let key = lhsNative.assertingGet(at: i)
-        let bridgedKey: AnyObject = _bridgeAnythingToObjectiveC(key)
+        let bridgedKey: AnyObject = swift_bridgeAnythingToObjectiveC(key)
         let optRhsValue: AnyObject? = rhsCocoa.maybeGet(bridgedKey)
         if let rhsValue = optRhsValue {
           if key == _forceBridgeFromObjectiveC(rhsValue, Element.self) {
@@ -1158,7 +1158,7 @@ public func _setBridgeToObjectiveC<SwiftValue, ObjCValue>(
     if valueBridgesDirectly {
       bridgedMember = unsafeBitCast(member, to: ObjCValue.self)
     } else {
-      let bridged: AnyObject = _bridgeAnythingToObjectiveC(member)
+      let bridged: AnyObject = swift_bridgeAnythingToObjectiveC(member)
       bridgedMember = unsafeBitCast(bridged, to: ObjCValue.self)
     }
     result.insert(bridgedMember)
@@ -1914,7 +1914,7 @@ internal struct _NativeSetBuffer<Element> {
   @inlinable // FIXME(sil-serialize-all)
   internal func bridgedKey(at index: Index) -> AnyObject {
     let k = key(at: index.offset)
-    return _bridgeAnythingToObjectiveC(k)
+    return swift_bridgeAnythingToObjectiveC(k)
   }
 
   /// Returns the value at the given Index, bridged.
@@ -1923,7 +1923,7 @@ internal struct _NativeSetBuffer<Element> {
   @inlinable // FIXME(sil-serialize-all)
   internal func bridgedValue(at index: Index) -> AnyObject {
     let v = value(at: index.offset)
-    return _bridgeAnythingToObjectiveC(v)
+    return swift_bridgeAnythingToObjectiveC(v)
   }
 #endif
 
@@ -2407,7 +2407,7 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
     // Bridge everything.
     for i in 0..<nativeBuffer.bucketCount {
       if nativeBuffer.isInitializedEntry(at: i) {
-        let key = _bridgeAnythingToObjectiveC(nativeBuffer.key(at: i))
+        let key = swift_bridgeAnythingToObjectiveC(nativeBuffer.key(at: i))
         bridged.initializeKey(key, at: i)
       }
     }
@@ -2864,7 +2864,7 @@ internal enum _VariantSetBuffer<Element: Hashable>: _SetBuffer {
       return nil
 #if _runtime(_ObjC)
     case .cocoa(let cocoaBuffer):
-      let anyObjectKey: AnyObject = _bridgeAnythingToObjectiveC(key)
+      let anyObjectKey: AnyObject = swift_bridgeAnythingToObjectiveC(key)
       if let cocoaIndex = cocoaBuffer.index(forKey: anyObjectKey) {
         return ._cocoa(cocoaIndex)
       }
@@ -2897,7 +2897,7 @@ internal enum _VariantSetBuffer<Element: Hashable>: _SetBuffer {
   internal static func maybeGetFromCocoaBuffer(
     _ cocoaBuffer: CocoaBuffer, forKey key: Element
   ) -> Element? {
-    let anyObjectKey: AnyObject = _bridgeAnythingToObjectiveC(key)
+    let anyObjectKey: AnyObject = swift_bridgeAnythingToObjectiveC(key)
     if let anyObjectValue = cocoaBuffer.maybeGet(anyObjectKey) {
       return _forceBridgeFromObjectiveC(anyObjectValue, Element.self)
     }
@@ -3160,7 +3160,7 @@ internal enum _VariantSetBuffer<Element: Hashable>: _SetBuffer {
       return nativeRemove(member)
 #if _runtime(_ObjC)
     case .cocoa(let cocoaBuffer):
-      let cocoaMember = _bridgeAnythingToObjectiveC(member)
+      let cocoaMember = swift_bridgeAnythingToObjectiveC(member)
       if cocoaBuffer.maybeGet(cocoaMember) == nil {
         return nil
       }

@@ -559,8 +559,8 @@ bb0(%0 : $*S, %1 : $*S, %2 : $*S):
 // CHECK:   cond_br %22, bb5, bb1
 
 // CHECK: bb5:
-  // function_ref _swift_isClassOrObjCExistentialType
-// CHECK:   %24 = function_ref @_swift_isClassOrObjCExistentialType : $@convention(thin) <τ_0_0> (@thick τ_0_0.Type) -> Bool
+  // function_ref swift_isClassOrObjCExistentialType
+// CHECK:   %24 = function_ref @swift_isClassOrObjCExistentialType : $@convention(thin) <τ_0_0> (@thick τ_0_0.Type) -> Bool
 // CHECK:   %25 = apply %24<S>(%3) : $@convention(thin) <τ_0_0> (@thick τ_0_0.Type) -> Bool
 // CHECK:   %26 = struct_extract %25 : $Bool, #Bool._value
 // CHECK:   cond_br %26, bb3, bb1

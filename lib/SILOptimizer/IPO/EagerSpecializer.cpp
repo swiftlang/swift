@@ -293,7 +293,7 @@ public:
         Builder(*GenericFunc), Loc(GenericFunc->getLocation()) {
     Builder.setCurrentDebugScope(GenericFunc->getDebugScope());
     IsClassF = Builder.getModule().findFunction(
-      "_swift_isClassOrObjCExistentialType", SILLinkage::PublicExternal);
+      "swift_isClassOrObjCExistentialType", SILLinkage::PublicExternal);
     assert(IsClassF);
   }
 

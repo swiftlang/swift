@@ -1443,7 +1443,7 @@ extension Dictionary: Equatable where Value: Equatable {
       while index != endIndex {
         let (key, value) = lhsNative.assertingGet(at: index)
         let optRhsValue: AnyObject? =
-          rhsCocoa.maybeGet(_bridgeAnythingToObjectiveC(key))
+          rhsCocoa.maybeGet(swift_bridgeAnythingToObjectiveC(key))
 
         guard let rhsValue = optRhsValue,
           value == _forceBridgeFromObjectiveC(rhsValue, Value.self)
@@ -1663,7 +1663,7 @@ public func _dictionaryBridgeToObjectiveC<
     if keyBridgesDirectly {
       bridgedKey = unsafeBitCast(key, to: ObjCKey.self)
     } else {
-      let bridged: AnyObject = _bridgeAnythingToObjectiveC(key)
+      let bridged: AnyObject = swift_bridgeAnythingToObjectiveC(key)
       bridgedKey = unsafeBitCast(bridged, to: ObjCKey.self)
     }
 
@@ -1672,7 +1672,7 @@ public func _dictionaryBridgeToObjectiveC<
     if valueBridgesDirectly {
       bridgedValue = unsafeBitCast(value, to: ObjCValue.self)
     } else {
-      let bridged: AnyObject? = _bridgeAnythingToObjectiveC(value)
+      let bridged: AnyObject? = swift_bridgeAnythingToObjectiveC(value)
       bridgedValue = unsafeBitCast(bridged, to: ObjCValue.self)
     }
 
@@ -2178,15 +2178,15 @@ final internal class _HashableTypedNativeDictionaryStorage<Key: Hashable, Value>
       if let unmanagedObjects = _UnmanagedAnyObjectArray(objects) {
         // keys nonnull, objects nonnull
         for (key, value) in full {
-          unmanagedObjects[i] = _bridgeAnythingToObjectiveC(value)
-          unmanagedKeys[i] = _bridgeAnythingToObjectiveC(key)
+          unmanagedObjects[i] = swift_bridgeAnythingToObjectiveC(value)
+          unmanagedKeys[i] = swift_bridgeAnythingToObjectiveC(key)
           i += 1
           guard i < count else { break }
         }
       } else {
         // keys nonnull, objects null
         for (key, _) in full {
-          unmanagedKeys[i] = _bridgeAnythingToObjectiveC(key)
+          unmanagedKeys[i] = swift_bridgeAnythingToObjectiveC(key)
           i += 1
           guard i < count else { break }
         }
@@ -2195,7 +2195,7 @@ final internal class _HashableTypedNativeDictionaryStorage<Key: Hashable, Value>
       if let unmanagedObjects = _UnmanagedAnyObjectArray(objects) {
         // keys null, objects nonnull
         for (_, value) in full {
-          unmanagedObjects[i] = _bridgeAnythingToObjectiveC(value)
+          unmanagedObjects[i] = swift_bridgeAnythingToObjectiveC(value)
           i += 1
           guard i < count else { break }
         }
@@ -2356,7 +2356,7 @@ internal struct _NativeDictionaryBuffer<Key, Value> {
   @inlinable // FIXME(sil-serialize-all)
   internal func bridgedKey(at index: Index) -> AnyObject {
     let k = key(at: index.offset)
-    return _bridgeAnythingToObjectiveC(k)
+    return swift_bridgeAnythingToObjectiveC(k)
   }
 
   /// Returns the value at the given Index, bridged.
@@ -2365,7 +2365,7 @@ internal struct _NativeDictionaryBuffer<Key, Value> {
   @inlinable // FIXME(sil-serialize-all)
   internal func bridgedValue(at index: Index) -> AnyObject {
     let v = value(at: index.offset)
-    return _bridgeAnythingToObjectiveC(v)
+    return swift_bridgeAnythingToObjectiveC(v)
   }
 #endif
 
@@ -2912,8 +2912,8 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     // Bridge everything.
     for i in 0..<nativeBuffer.bucketCount {
       if nativeBuffer.isInitializedEntry(at: i) {
-        let key = _bridgeAnythingToObjectiveC(nativeBuffer.key(at: i))
-        let val = _bridgeAnythingToObjectiveC(nativeBuffer.value(at: i))
+        let key = swift_bridgeAnythingToObjectiveC(nativeBuffer.key(at: i))
+        let val = swift_bridgeAnythingToObjectiveC(nativeBuffer.value(at: i))
         bridged.initializeKey(key, value: val, at: i)
       }
     }
@@ -3412,7 +3412,7 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>
       return nil
 #if _runtime(_ObjC)
     case .cocoa(let cocoaBuffer):
-      let anyObjectKey: AnyObject = _bridgeAnythingToObjectiveC(key)
+      let anyObjectKey: AnyObject = swift_bridgeAnythingToObjectiveC(key)
       if let cocoaIndex = cocoaBuffer.index(forKey: anyObjectKey) {
         return ._cocoa(cocoaIndex)
       }
@@ -3464,7 +3464,7 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>
   internal static func maybeGetFromCocoaBuffer(
     _ cocoaBuffer: CocoaBuffer, forKey key: Key
   ) -> Value? {
-    let anyObjectKey: AnyObject = _bridgeAnythingToObjectiveC(key)
+    let anyObjectKey: AnyObject = swift_bridgeAnythingToObjectiveC(key)
     if let anyObjectValue = cocoaBuffer.maybeGet(anyObjectKey) {
       return _forceBridgeFromObjectiveC(anyObjectValue, Value.self)
     }
@@ -3938,7 +3938,7 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>
       return nativeRemoveObject(forKey: key)
 #if _runtime(_ObjC)
     case .cocoa(let cocoaBuffer):
-      let anyObjectKey: AnyObject = _bridgeAnythingToObjectiveC(key)
+      let anyObjectKey: AnyObject = swift_bridgeAnythingToObjectiveC(key)
       if cocoaBuffer.maybeGet(anyObjectKey) == nil {
         return nil
       }

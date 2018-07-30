@@ -708,7 +708,7 @@ extension Optional : _ObjectiveCBridgeable {
   // The object that represents `none` for an Optional of this type.
   @inlinable // FIXME(sil-serialize-all)
   internal static var _nilSentinel : AnyObject {
-    @_silgen_name("_swift_Foundation_getOptionalNilSentinelObject")
+    @_silgen_name("swift_Foundation_getOptionalNilSentinelObject")
     get
   }
 
@@ -716,7 +716,7 @@ extension Optional : _ObjectiveCBridgeable {
   public func _bridgeToObjectiveC() -> AnyObject {
     // Bridge a wrapped value by unwrapping.
     if let value = self {
-      return _bridgeAnythingToObjectiveC(value)
+      return swift_bridgeAnythingToObjectiveC(value)
     }
     // Bridge nil using a sentinel.
     return type(of: self)._nilSentinel

@@ -541,12 +541,12 @@ internal struct _Stdout : TextOutputStream {
 
   @inlinable // FIXME(sil-serialize-all)
   internal mutating func _lock() {
-    _swift_stdlib_flockfile_stdout()
+    swift_stdlib_flockfile_stdout()
   }
 
   @inlinable // FIXME(sil-serialize-all)
   internal mutating func _unlock() {
-    _swift_stdlib_funlockfile_stdout()
+    swift_stdlib_funlockfile_stdout()
   }
 
   @inlinable // FIXME(sil-serialize-all)
@@ -556,12 +556,12 @@ internal struct _Stdout : TextOutputStream {
     if _fastPath(string._guts.isASCII) {
       defer { _fixLifetime(string) }
       let ascii = string._guts._unmanagedASCIIView
-      _stdlib_fwrite_stdout(ascii.start, ascii.count, 1)
+      swift_stdlib_fwrite_stdout(ascii.start, ascii.count, 1)
       return
     }
 
     for c in string.utf8 {
-      _stdlib_putchar_unlocked(Int32(c))
+      swift_stdlib_putchar_unlocked(Int32(c))
     }
   }
 }

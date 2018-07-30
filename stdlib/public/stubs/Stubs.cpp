@@ -371,18 +371,18 @@ static const char *_swift_stdlib_strtoX_clocale_impl(
   return nptr + pos;
 }
 
-const char *swift::_swift_stdlib_strtold_clocale(
+const char *swift::swift_stdlib_strtold_clocale(
     const char *nptr, void *outResult) {
   return _swift_stdlib_strtoX_clocale_impl(
     nptr, static_cast<long double*>(outResult));
 }
 
-const char *swift::_swift_stdlib_strtod_clocale(
+const char *swift::swift_stdlib_strtod_clocale(
     const char * nptr, double *outResult) {
   return _swift_stdlib_strtoX_clocale_impl(nptr, outResult);
 }
 
-const char *swift::_swift_stdlib_strtof_clocale(
+const char *swift::swift_stdlib_strtof_clocale(
     const char * nptr, float *outResult) {
   return _swift_stdlib_strtoX_clocale_impl(nptr, outResult);
 }
@@ -413,26 +413,26 @@ static const char *_swift_stdlib_strtoX_clocale_impl(
   return EndPtr;
 }
     
-const char *swift::_swift_stdlib_strtold_clocale(
+const char *swift::swift_stdlib_strtold_clocale(
   const char * nptr, void *outResult) {
   return _swift_stdlib_strtoX_clocale_impl(
     nptr, static_cast<long double*>(outResult), HUGE_VALL, strtold_l);
 }
 
-const char *swift::_swift_stdlib_strtod_clocale(
+const char *swift::swift_stdlib_strtod_clocale(
     const char * nptr, double *outResult) {
   return _swift_stdlib_strtoX_clocale_impl(
     nptr, outResult, HUGE_VAL, strtod_l);
 }
 
-const char *swift::_swift_stdlib_strtof_clocale(
+const char *swift::swift_stdlib_strtof_clocale(
     const char * nptr, float *outResult) {
   return _swift_stdlib_strtoX_clocale_impl(
     nptr, outResult, HUGE_VALF, strtof_l);
 }
 #endif
 
-void swift::_swift_stdlib_flockfile_stdout() {
+void swift::swift_stdlib_flockfile_stdout() {
 #if defined(_WIN32)
   _lock_file(stdout);
 #else
@@ -440,7 +440,7 @@ void swift::_swift_stdlib_flockfile_stdout() {
 #endif
 }
 
-void swift::_swift_stdlib_funlockfile_stdout() {
+void swift::swift_stdlib_funlockfile_stdout() {
 #if defined(_WIN32)
   _unlock_file(stdout);
 #else
@@ -448,11 +448,11 @@ void swift::_swift_stdlib_funlockfile_stdout() {
 #endif
 }
 
-int swift::_swift_stdlib_putc_stderr(int C) {
+int swift::swift_stdlib_putc_stderr(int C) {
   return putc(C, stderr);
 }
 
-size_t swift::_swift_stdlib_getHardwareConcurrency() {
+size_t swift::swift_stdlib_getHardwareConcurrency() {
   return std::thread::hardware_concurrency();
 }
 

@@ -149,7 +149,7 @@ bool swift_swiftValueConformsTo(const Metadata *destinationType) {
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
-HeapObject *$Ss27_bridgeAnythingToObjectiveCyyXlxlF(OpaqueValue *src, const Metadata *srcType) {
+HeapObject *$Ss32swift_bridgeAnythingToObjectiveCyyXlxlF(OpaqueValue *src, const Metadata *srcType) {
   abort();
 }
 

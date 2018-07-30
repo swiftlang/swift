@@ -98,7 +98,7 @@ AnyHashableTests.test("AnyHashable(MinimalHashableValue, SwiftValue(MinimalHasha
 
   let boxedXs = xs.flatMap {
     [ AnyHashable($0),
-      AnyHashable(_bridgeAnythingToObjectiveC($0) as! NSObject) ]
+      AnyHashable(swift_bridgeAnythingToObjectiveC($0) as! NSObject) ]
   }
   for x in boxedXs {
     expectEqual(

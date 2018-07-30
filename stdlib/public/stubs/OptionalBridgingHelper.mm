@@ -89,7 +89,7 @@ static id getSentinelForDepth(unsigned depth) {
 /// Return the sentinel object to use to represent `nil` for a given Optional
 /// type.
 SWIFT_RUNTIME_STDLIB_API SWIFT_CC(swift)
-id _swift_Foundation_getOptionalNilSentinelObject(const Metadata *Wrapped) {
+id swift_Foundation_getOptionalNilSentinelObject(const Metadata *Wrapped) {
   // Figure out the depth of optionality we're working with.
   unsigned depth = 1;
   while (Wrapped->getKind() == MetadataKind::Optional) {

@@ -381,7 +381,7 @@ extension Unicode.UTF16 {
     let iterator = _ThreadLocalStorage.getUBreakIterator(
       start: buffer.baseAddress!,
       count: count)
-    let offset = __swift_stdlib_ubrk_following(iterator, 0)
+    let offset = swift_stdlib_ubrk_following(iterator, 0)
     // ubrk_following returns -1 (UBRK_DONE) when it hits the end of the buffer.
     if _fastPath(offset != -1) {
       // The offset into our buffer is the distance.
@@ -410,7 +410,7 @@ extension Unicode.UTF16 {
       start: start,
       count: count)
 
-    let offset = __swift_stdlib_ubrk_preceding(iterator, count)
+    let offset = swift_stdlib_ubrk_preceding(iterator, count)
     // ubrk_following returns -1 (UBRK_DONE) when it hits the end of the buffer.
     if _fastPath(offset != -1) {
       // The offset into our buffer is the distance.

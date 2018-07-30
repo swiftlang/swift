@@ -198,25 +198,25 @@ testCases = [
 BridgeAnything.test("${testName}") {
   autoreleasepool {
     let x: ${type} = ${valueExpr}
-    ${testFunc}(original: x, bridged: _bridgeAnythingToObjectiveC(x))
-    ${testFunc}(original: x, bridged: _bridgeAnythingNonVerbatimToObjectiveC(x))
+    ${testFunc}(original: x, bridged: swift_bridgeAnythingToObjectiveC(x))
+    ${testFunc}(original: x, bridged: swift_bridgeAnythingNonVerbatimToObjectiveC(x))
 
     // Bridge an array containing x.
     let xInArray = [x]
-    ${testFunc}(original: x, bridged: (_bridgeAnythingToObjectiveC(xInArray) as! [AnyObject])[0])
-    ${testFunc}(original: x, bridged: (_bridgeAnythingToObjectiveC(xInArray) as? [AnyObject])![0])
+    ${testFunc}(original: x, bridged: (swift_bridgeAnythingToObjectiveC(xInArray) as! [AnyObject])[0])
+    ${testFunc}(original: x, bridged: (swift_bridgeAnythingToObjectiveC(xInArray) as? [AnyObject])![0])
     if (x as? NSObject) != nil {
-      ${testFunc}(original: x, bridged: (_bridgeAnythingToObjectiveC(xInArray) as! [AnyObject])[0])
-      ${testFunc}(original: x, bridged: (_bridgeAnythingToObjectiveC(xInArray) as? [AnyObject])![0])
+      ${testFunc}(original: x, bridged: (swift_bridgeAnythingToObjectiveC(xInArray) as! [AnyObject])[0])
+      ${testFunc}(original: x, bridged: (swift_bridgeAnythingToObjectiveC(xInArray) as? [AnyObject])![0])
     }
 
     // Bridge a dictionary containing x as a value.
     let xInDictValue = ["key" : x]
-    ${testFunc}(original: x, bridged: (_bridgeAnythingToObjectiveC(xInDictValue) as! [String: AnyObject])["key"]!)
-    ${testFunc}(original: x, bridged: (_bridgeAnythingToObjectiveC(xInDictValue) as? [String: AnyObject])!["key"]!)
+    ${testFunc}(original: x, bridged: (swift_bridgeAnythingToObjectiveC(xInDictValue) as! [String: AnyObject])["key"]!)
+    ${testFunc}(original: x, bridged: (swift_bridgeAnythingToObjectiveC(xInDictValue) as? [String: AnyObject])!["key"]!)
     if (x as? NSObject) != nil {
-      ${testFunc}(original: x, bridged: (_bridgeAnythingToObjectiveC(xInDictValue) as! [String: NSObject])["key"]!)
-      ${testFunc}(original: x, bridged: (_bridgeAnythingToObjectiveC(xInDictValue) as? [String: NSObject])!["key"]!)
+      ${testFunc}(original: x, bridged: (swift_bridgeAnythingToObjectiveC(xInDictValue) as! [String: NSObject])["key"]!)
+      ${testFunc}(original: x, bridged: (swift_bridgeAnythingToObjectiveC(xInDictValue) as? [String: NSObject])!["key"]!)
     }
 
     %  if conformsToHashable:
@@ -224,38 +224,38 @@ BridgeAnything.test("${testName}") {
     let xInDictKey = [x : "value"] as [AnyHashable: String]
     // FIXME: need a way to express `AnyObject & Hashable`.
     // The NSObject version below can't test class LifetimeTracked.
-    // ${testFunc}(original: x, bridged: (_bridgeAnythingToObjectiveC(xInDictKey) as! [(AnyObject & Hashable): String]).keys.first!)
-    // ${testFunc}(original: x, bridged: (_bridgeAnythingToObjectiveC(xInDictKey) as? [(AnyObject & Hashable): String])!.keys.first!)
+    // ${testFunc}(original: x, bridged: (swift_bridgeAnythingToObjectiveC(xInDictKey) as! [(AnyObject & Hashable): String]).keys.first!)
+    // ${testFunc}(original: x, bridged: (swift_bridgeAnythingToObjectiveC(xInDictKey) as? [(AnyObject & Hashable): String])!.keys.first!)
     if (x as? NSObject) != nil {
-      ${testFunc}(original: x, bridged: (_bridgeAnythingToObjectiveC(xInDictKey) as! [NSObject: String]).keys.first!)
-      ${testFunc}(original: x, bridged: (_bridgeAnythingToObjectiveC(xInDictKey) as? [NSObject: String])!.keys.first!)
+      ${testFunc}(original: x, bridged: (swift_bridgeAnythingToObjectiveC(xInDictKey) as! [NSObject: String]).keys.first!)
+      ${testFunc}(original: x, bridged: (swift_bridgeAnythingToObjectiveC(xInDictKey) as? [NSObject: String])!.keys.first!)
     }
 
 %  end
 
     let xInAny: Any = x
-    let xInAnyBridged = _bridgeAnythingToObjectiveC(xInAny)
-    let xInAnyBridged2 = _bridgeAnythingNonVerbatimToObjectiveC(xInAny)
+    let xInAnyBridged = swift_bridgeAnythingToObjectiveC(xInAny)
+    let xInAnyBridged2 = swift_bridgeAnythingNonVerbatimToObjectiveC(xInAny)
     ${testFunc}(original: x, bridged: xInAnyBridged)
     ${testFunc}(original: x, bridged: xInAnyBridged2)
 
     let xInAnyInAny = wantonlyWrapInAny(xInAny)
-    let xInAnyInAnyBridged = _bridgeAnythingToObjectiveC(xInAnyInAny)
-    let xInAnyInAnyBridged2 = _bridgeAnythingNonVerbatimToObjectiveC(xInAnyInAny)
+    let xInAnyInAnyBridged = swift_bridgeAnythingToObjectiveC(xInAnyInAny)
+    let xInAnyInAnyBridged2 = swift_bridgeAnythingNonVerbatimToObjectiveC(xInAnyInAny)
     ${testFunc}(original: x, bridged: xInAnyInAnyBridged)
     ${testFunc}(original: x, bridged: xInAnyInAnyBridged2)
 
 %  if conformsToError:
     let xInError: Error = x
-    let xInErrorBridged = _bridgeAnythingToObjectiveC(xInError)
-    let xInErrorBridged2 = _bridgeAnythingNonVerbatimToObjectiveC(xInError)
+    let xInErrorBridged = swift_bridgeAnythingToObjectiveC(xInError)
+    let xInErrorBridged2 = swift_bridgeAnythingNonVerbatimToObjectiveC(xInError)
 
     ${testFunc}(original: x, bridged: xInErrorBridged)
     ${testFunc}(original: x, bridged: xInErrorBridged2)
 
     let xInErrorInAny = wantonlyWrapInAny(xInError)
-    let xInErrorInAnyBridged = _bridgeAnythingToObjectiveC(xInErrorInAny)
-    let xInErrorInAnyBridged2 = _bridgeAnythingNonVerbatimToObjectiveC(xInErrorInAny)
+    let xInErrorInAnyBridged = swift_bridgeAnythingToObjectiveC(xInErrorInAny)
+    let xInErrorInAnyBridged2 = swift_bridgeAnythingNonVerbatimToObjectiveC(xInErrorInAny)
     ${testFunc}(original: x, bridged: xInErrorInAnyBridged)
     ${testFunc}(original: x, bridged: xInErrorInAnyBridged)
 %  end
@@ -303,8 +303,8 @@ BridgeAnything.test("${testName}") {
 BridgeAnything.test("description of boxed values") {
   for x in [KnownUnbridged(), KnownUnbridgedWithDescription()] as [Any] {
     let summary = String(reflecting: x)
-    expectEqual(summary, _bridgeAnythingToObjectiveC(x).description)
-    expectEqual(summary, _bridgeAnythingToObjectiveC(x).debugDescription)
+    expectEqual(summary, swift_bridgeAnythingToObjectiveC(x).description)
+    expectEqual(summary, swift_bridgeAnythingToObjectiveC(x).debugDescription)
   }
 }
 
@@ -318,19 +318,19 @@ BridgeAnything.test("SwiftValue(mixed values)/Hashable") {
     }
     boxedXs.append(
       contentsOf: xs.map {
-        _bridgeAnythingToObjectiveC($0) as! NSObject
+        swift_bridgeAnythingToObjectiveC($0) as! NSObject
       })
   }
 % end
 
   boxedXs.append(
     contentsOf: [0, 0, 1, 1, 2, 2, 3, 3, 4, 4].map {
-      _bridgeAnythingToObjectiveC($0) as! NSObject
+      swift_bridgeAnythingToObjectiveC($0) as! NSObject
     })
 
   boxedXs.append(
     contentsOf: ["a", "a", "b", "b", "c", "c", "d", "d", "e", "e"].map {
-      _bridgeAnythingToObjectiveC($0) as! NSObject
+      swift_bridgeAnythingToObjectiveC($0) as! NSObject
     })
 
   func equalityOracle(_ lhs: Int, rhs: Int) -> Bool {

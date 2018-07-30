@@ -209,7 +209,7 @@ public struct AnyHashable {
     #if _runtime(_ObjC)
     // Bridge to Objective-C and then attempt the cast from there.
     // FIXME: This should also work without the Objective-C runtime.
-    if let value = _bridgeAnythingToObjectiveC(_box._base) as? T {
+    if let value = swift_bridgeAnythingToObjectiveC(_box._base) as? T {
       result.initialize(to: value)
       return true
     }

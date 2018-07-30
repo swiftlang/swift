@@ -18,7 +18,7 @@ internal enum _Normalization {
   // ICU's NFC unorm2 instance
   internal static var _nfcNormalizer: OpaquePointer = {
     var err = __swift_stdlib_U_ZERO_ERROR
-    let normalizer = __swift_stdlib_unorm2_getNFCInstance(&err)
+    let normalizer = swift_stdlib_unorm2_getNFCInstance(&err)
     guard err.isSuccess else {
       // This shouldn't be possible unless some deep (unrecoverable) system
       // invariants are violated
@@ -38,7 +38,7 @@ internal enum _Normalization {
     _ buffer: UnsafeBufferPointer<UInt16>
   ) -> Bool {
     var err = __swift_stdlib_U_ZERO_ERROR
-    let length = __swift_stdlib_unorm2_spanQuickCheckYes(
+    let length = swift_stdlib_unorm2_spanQuickCheckYes(
       _Normalization._nfcNormalizer,
       buffer.baseAddress._unsafelyUnwrappedUnchecked,
       Int32(buffer.count),
@@ -55,7 +55,7 @@ internal enum _Normalization {
     _ string: _UnmanagedString<UInt16>
   ) -> Bool {
     var err = __swift_stdlib_U_ZERO_ERROR
-    let length = __swift_stdlib_unorm2_spanQuickCheckYes(
+    let length = swift_stdlib_unorm2_spanQuickCheckYes(
       _Normalization._nfcNormalizer,
       string.start,
       Int32(string.count),
@@ -85,7 +85,7 @@ extension UnicodeScalar {
   internal var _hasNormalizationBoundaryBefore: Bool {
     _sanityCheck(Int32(exactly: self.value) != nil, "top bit shouldn't be set")
     let value = Int32(bitPattern: self.value)
-    return 0 != __swift_stdlib_unorm2_hasBoundaryBefore(
+    return 0 != swift_stdlib_unorm2_hasBoundaryBefore(
       _Normalization._nfcNormalizer, value)
   }
 }

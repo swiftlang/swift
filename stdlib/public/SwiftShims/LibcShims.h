@@ -66,34 +66,37 @@ typedef __swift_uint16_t __swift_mode_t;
 
 // General utilities <stdlib.h>
 // Memory management functions
-SWIFT_RUNTIME_STDLIB_INTERNAL
-void _stdlib_free(void *ptr);
+SWIFT_RUNTIME_STDLIB_API
+void swift_stdlib_free(void *ptr);
 
 // Input/output <stdio.h>
-SWIFT_RUNTIME_STDLIB_INTERNAL
-int _stdlib_putchar_unlocked(int c);
-SWIFT_RUNTIME_STDLIB_INTERNAL
-__swift_size_t _stdlib_fwrite_stdout(const void *ptr, __swift_size_t size,
+SWIFT_RUNTIME_STDLIB_API
+int swift_stdlib_putchar_unlocked(int c);
+
+SWIFT_RUNTIME_STDLIB_API
+__swift_size_t swift_stdlib_fwrite_stdout(const void *ptr, __swift_size_t size,
                                      __swift_size_t nitems);
 
 // String handling <string.h>
-SWIFT_READONLY SWIFT_RUNTIME_STDLIB_INTERNAL
-__swift_size_t _stdlib_strlen(const char *s);
+SWIFT_READONLY SWIFT_RUNTIME_STDLIB_API
+__swift_size_t swift_stdlib_strlen(const char *s);
 
-SWIFT_READONLY SWIFT_RUNTIME_STDLIB_INTERNAL
-__swift_size_t _stdlib_strlen_unsigned(const unsigned char *s);
+SWIFT_READONLY SWIFT_RUNTIME_STDLIB_API
+__swift_size_t swift_stdlib_strlen_unsigned(const unsigned char *s);
 
 SWIFT_READONLY
-SWIFT_RUNTIME_STDLIB_INTERNAL
-int _stdlib_memcmp(const void *s1, const void *s2, __swift_size_t n);
+SWIFT_RUNTIME_STDLIB_API
+int swift_stdlib_memcmp(const void *s1, const void *s2, __swift_size_t n);
 
 // <unistd.h>
-SWIFT_RUNTIME_STDLIB_INTERNAL
-__swift_ssize_t _stdlib_read(int fd, void *buf, __swift_size_t nbyte);
-SWIFT_RUNTIME_STDLIB_INTERNAL
-__swift_ssize_t _stdlib_write(int fd, const void *buf, __swift_size_t nbyte);
-SWIFT_RUNTIME_STDLIB_INTERNAL
-int _stdlib_close(int fd);
+SWIFT_RUNTIME_STDLIB_API
+__swift_ssize_t swift_stdlib_read(int fd, void *buf, __swift_size_t nbyte);
+
+SWIFT_RUNTIME_STDLIB_API
+__swift_ssize_t swift_stdlib_write(int fd, const void *buf, __swift_size_t nbyte);
+
+SWIFT_RUNTIME_STDLIB_API
+int swift_stdlib_close(int fd);
 
 // Semaphores <semaphore.h>
 #if !defined(_WIN32) || defined(__CYGWIN__)
@@ -140,14 +143,8 @@ SWIFT_RUNTIME_STDLIB_INTERNAL
 void _stdlib_setErrno(int value);
 
 // Non-standard extensions
-SWIFT_READNONE SWIFT_RUNTIME_STDLIB_INTERNAL
-__swift_size_t _stdlib_malloc_size(const void *ptr);
-
-// Random number <random>
-SWIFT_RUNTIME_STDLIB_INTERNAL
-__swift_uint32_t _stdlib_cxx11_mt19937(void);
-SWIFT_RUNTIME_STDLIB_INTERNAL
-__swift_uint32_t _stdlib_cxx11_mt19937_uniform(__swift_uint32_t upper_bound);
+SWIFT_READNONE SWIFT_RUNTIME_STDLIB_API
+__swift_size_t swift_stdlib_malloc_size(const void *ptr);
 
 // Random number for stdlib
 SWIFT_RUNTIME_STDLIB_INTERNAL
@@ -213,15 +210,15 @@ typedef int __swift_thread_key_t;
 typedef unsigned long __swift_thread_key_t;
 #endif
 
-SWIFT_RUNTIME_STDLIB_INTERNAL
-int _stdlib_thread_key_create(__swift_thread_key_t * _Nonnull key,
+SWIFT_RUNTIME_STDLIB_API
+int swift_stdlib_thread_key_create(__swift_thread_key_t * _Nonnull key,
                               void (* _Nullable destructor)(void * _Nullable));
 
-SWIFT_RUNTIME_STDLIB_INTERNAL
-void * _Nullable _stdlib_thread_getspecific(__swift_thread_key_t key);
+SWIFT_RUNTIME_STDLIB_API
+void * _Nullable swift_stdlib_thread_getspecific(__swift_thread_key_t key);
 
-SWIFT_RUNTIME_STDLIB_INTERNAL
-int _stdlib_thread_setspecific(__swift_thread_key_t key,
+SWIFT_RUNTIME_STDLIB_API
+int swift_stdlib_thread_setspecific(__swift_thread_key_t key,
                                const void * _Nullable value);
 
 #ifdef __cplusplus

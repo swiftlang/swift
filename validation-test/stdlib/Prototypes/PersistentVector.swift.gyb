@@ -1419,7 +1419,7 @@ struct _PVCollisionNodePointer<Key : LegacyHashable, Value>
         keyCount: layout.keyCount + 1)
       // Try to mutate in place.
       let newSize = _Self._nodeSize(newLayout)
-      if _swift_stdlib_malloc_size(_nodePointer) >= newSize {
+      if swift_stdlib_malloc_size(_nodePointer) >= newSize {
         // Size is sufficient, append the new key.
         keyCount = newLayout.keyCount
         initializeKey(

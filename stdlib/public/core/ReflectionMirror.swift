@@ -46,7 +46,7 @@ internal func getChild<T>(of value: T, type: Any.Type, index: Int) -> (label: St
 @_silgen_name("swift_reflectionMirror_quickLookObject")
 internal func _getQuickLookObject<T>(_: T) -> AnyObject?
 
-@_silgen_name("_swift_stdlib_NSObject_isKindOfClass")
+@_silgen_name("swift_stdlib_NSObject_isKindOfClass")
 internal func _isImpl(_ object: AnyObject, kindOf: AnyObject) -> Bool
 
 internal func _is(_ object: AnyObject, kindOf `class`: String) -> Bool {

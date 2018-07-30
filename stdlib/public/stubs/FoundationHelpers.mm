@@ -47,7 +47,7 @@ static CFRange cast(_swift_shims_CFRange value) {
   return { value.location, value.length };
 }
 
-void swift::_swift_stdlib_CFStringGetCharacters(
+void swift::swift_stdlib_CFStringGetCharacters(
                                          _swift_shims_CFStringRef theString,
                                          _swift_shims_CFRange range,
                                          _swift_shims_UniChar *buffer) {
@@ -55,12 +55,12 @@ void swift::_swift_stdlib_CFStringGetCharacters(
 }
 
 const _swift_shims_UniChar *
-swift::_swift_stdlib_CFStringGetCharactersPtr(
+swift::swift_stdlib_CFStringGetCharactersPtr(
                                          _swift_shims_CFStringRef theString) {
   return CFStringGetCharactersPtr(cast(theString));
 }
 
-_swift_shims_CFIndex swift::_swift_stdlib_CFStringGetBytes(
+_swift_shims_CFIndex swift::swift_stdlib_CFStringGetBytes(
     _swift_shims_CFStringRef theString, _swift_shims_CFRange range,
     _swift_shims_CFStringEncoding encoding, _swift_shims_UInt8 lossByte,
     _swift_shims_Boolean isExternalRepresentation, _swift_shims_UInt8 *buffer,
@@ -70,12 +70,12 @@ _swift_shims_CFIndex swift::_swift_stdlib_CFStringGetBytes(
 }
 
 _swift_shims_CFIndex
-swift::_swift_stdlib_CFStringGetLength(_swift_shims_CFStringRef theString) {
+swift::swift_stdlib_CFStringGetLength(_swift_shims_CFStringRef theString) {
   return CFStringGetLength(cast(theString));
 }
 
 _swift_shims_CFStringRef
-swift::_swift_stdlib_CFStringCreateWithSubstring(
+swift::swift_stdlib_CFStringCreateWithSubstring(
                                          _swift_shims_CFAllocatorRef alloc,
                                          _swift_shims_CFStringRef str,
                                          _swift_shims_CFRange range) {
@@ -83,19 +83,19 @@ swift::_swift_stdlib_CFStringCreateWithSubstring(
 }
 
 _swift_shims_UniChar
-swift::_swift_stdlib_CFStringGetCharacterAtIndex(_swift_shims_CFStringRef theString,
+swift::swift_stdlib_CFStringGetCharacterAtIndex(_swift_shims_CFStringRef theString,
                                                  _swift_shims_CFIndex idx) {
   return CFStringGetCharacterAtIndex(cast(theString), idx);
 }
 
 _swift_shims_CFStringRef
-swift::_swift_stdlib_CFStringCreateCopy(_swift_shims_CFAllocatorRef alloc,
+swift::swift_stdlib_CFStringCreateCopy(_swift_shims_CFAllocatorRef alloc,
                                         _swift_shims_CFStringRef theString) {
   return cast(CFStringCreateCopy(cast(alloc), cast(theString)));
 }
 
 _swift_shims_CFStringRef
-swift::_swift_stdlib_CFStringCreateWithBytes(
+swift::swift_stdlib_CFStringCreateWithBytes(
     _swift_shims_CFAllocatorRef _Nullable alloc, const uint8_t *bytes,
     _swift_shims_CFIndex numBytes, _swift_shims_CFStringEncoding encoding,
     _swift_shims_Boolean isExternalRepresentation) {
@@ -105,13 +105,13 @@ swift::_swift_stdlib_CFStringCreateWithBytes(
 }
 
 const char *
-swift::_swift_stdlib_CFStringGetCStringPtr(_swift_shims_CFStringRef theString,
+swift::swift_stdlib_CFStringGetCStringPtr(_swift_shims_CFStringRef theString,
                             _swift_shims_CFStringEncoding encoding) {
   return CFStringGetCStringPtr(cast(theString), cast(encoding));
 }
 
 _swift_shims_CFStringRef
-swift::_swift_stdlib_objcDebugDescription(id _Nonnull nsObject) {
+swift::swift_stdlib_objcDebugDescription(id _Nonnull nsObject) {
   return [nsObject debugDescription];
 }
 #endif

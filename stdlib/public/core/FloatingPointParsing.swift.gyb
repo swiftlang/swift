@@ -131,7 +131,7 @@ extension ${Self} : LosslessStringConvertible {
     let (result, n) : (${Self}, Int) = text.withCString { chars in
       var result: ${Self} = 0
       let endPtr = withUnsafeMutablePointer(to: &result) {
-        _swift_stdlib_strto${cFuncSuffix2[bits]}_clocale(chars, $0)
+        swift_stdlib_strto${cFuncSuffix2[bits]}_clocale(chars, $0)
       }
       return (result, endPtr == nil ? 0 : endPtr! - chars)
     }

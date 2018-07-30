@@ -23,12 +23,12 @@ public enum CommandLine {
   /// The backing static variable for arguments may come either from the
   /// entry point or it may need to be computed e.g. if we're in the REPL.
   ///
-  /// Care must be taken to ensure that `_swift_stdlib_getUnsafeArgvArgc` is
+  /// Care must be taken to ensure that `swift_stdlib_getUnsafeArgvArgc` is
   /// not invoked more times than is necessary (at most once).
   @usableFromInline
   internal static var _unsafeArgv:
     UnsafeMutablePointer<UnsafeMutablePointer<Int8>?>
-      =  _swift_stdlib_getUnsafeArgvArgc(&_argc)
+      =  swift_stdlib_getUnsafeArgvArgc(&_argc)
 
   /// Access to the raw argc value from C.
   @inlinable // FIXME(sil-serialize-all)

@@ -311,12 +311,12 @@ int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
 #if defined(_WIN32)
   auto module = static_cast<HMODULE>(stdlib);
   auto emplaceProcessArgs = reinterpret_cast<ArgOverride>(
-    GetProcAddress(module, "_swift_stdlib_overrideUnsafeArgvArgc"));
+    GetProcAddress(module, "swift_stdlib_overrideUnsafeArgvArgc"));
   if (emplaceProcessArgs == nullptr)
     return -1;
 #else
   auto emplaceProcessArgs
-          = (ArgOverride)dlsym(stdlib, "_swift_stdlib_overrideUnsafeArgvArgc");
+          = (ArgOverride)dlsym(stdlib, "swift_stdlib_overrideUnsafeArgvArgc");
   if (dlerror())
     return -1;
 #endif

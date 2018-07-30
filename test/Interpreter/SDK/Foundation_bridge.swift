@@ -10,21 +10,21 @@ import Foundation
 // CHECK: 17 bridges to 17
 do {
   var i = 17
-  let obj = _bridgeAnythingToObjectiveC(i)
+  let obj = swift_bridgeAnythingToObjectiveC(i)
   print("\(i) bridges to \(obj.description!)")
 }
 
 // CHECK: 3.14159 bridges to 3.14159
 do {
   var d = 3.14159
-  let obj = _bridgeAnythingToObjectiveC(d)
+  let obj = swift_bridgeAnythingToObjectiveC(d)
   print("\(d) bridges to \(obj.description!)")
 }
 
 // CHECK: Hello, world! bridges to Hello, world!
 do {
   var s = "Hello, world!"
-  let obj = _bridgeAnythingToObjectiveC(s)
+  let obj = swift_bridgeAnythingToObjectiveC(s)
   print("\(s) bridges to \(obj.description!)")
 }
 
@@ -35,7 +35,7 @@ do {
   // CHECK: )
 do {
   var a = [1, 2, 3]
-  let obj = _bridgeAnythingToObjectiveC(a)
+  let obj = swift_bridgeAnythingToObjectiveC(a)
   print("int array bridges to \(obj.description!)")
 }
 
@@ -46,7 +46,7 @@ do {
   // CHECK: )
 do {
   var aui: [UInt] = [1, 2, 3]
-  let obj = _bridgeAnythingToObjectiveC(aui)
+  let obj = swift_bridgeAnythingToObjectiveC(aui)
   print("uint array bridges to \(obj.description!)")
 }
 
@@ -57,7 +57,7 @@ do {
 // CHECK: )
 do {
   var af: [Float] = [1.5, 2.5, 3.5]
-  let obj = _bridgeAnythingToObjectiveC(af)
+  let obj = swift_bridgeAnythingToObjectiveC(af)
   print("float array bridges to \(obj.description!)")
 }
 
@@ -68,7 +68,7 @@ do {
 // CHECK: )
 do {
   var ad = [1.5, 2.5, 3.5]
-  let obj = _bridgeAnythingToObjectiveC(ad)
+  let obj = swift_bridgeAnythingToObjectiveC(ad)
   print("double array bridges to \(obj.description!)")
 }
 
@@ -79,7 +79,7 @@ do {
 // CHECK: )
 do {
   var a2 = ["Hello", "Swift", "World"]
-  let obj = _bridgeAnythingToObjectiveC(a2)
+  let obj = swift_bridgeAnythingToObjectiveC(a2)
   print("string array bridges to \(obj.description!)")
 }
 
@@ -90,7 +90,7 @@ do {
 // CHECK: )
 do {
   var ab = [false, true, false]
-  let obj = _bridgeAnythingToObjectiveC(ab)
+  let obj = swift_bridgeAnythingToObjectiveC(ab)
   print("bool array bridges to \(obj.description!)")
 }
 
@@ -101,7 +101,7 @@ do {
 // CHECK: )
 do {
   var a3 = [(1, 1), (1, 1), (1, 2)]
-  let obj = _bridgeAnythingToObjectiveC(a3)
+  let obj = swift_bridgeAnythingToObjectiveC(a3)
   print("tuple array bridges to \(obj.description!)")
 }
 
@@ -111,7 +111,7 @@ do {
 // CHECK: }
 do {
   var dict: Dictionary<NSNumber, NSString> = [1: "Hello", 2: "World"]
-  let obj = _bridgeAnythingToObjectiveC(dict)
+  let obj = swift_bridgeAnythingToObjectiveC(dict)
   print("dictionary bridges to \(obj.description!)")
 }
 
@@ -121,7 +121,7 @@ do {
 // CHECK: }
 do {
   var dict2 = [1: "Hello", 2: "World"]
-  let obj = _bridgeAnythingToObjectiveC(dict2)
+  let obj = swift_bridgeAnythingToObjectiveC(dict2)
   print("dictionary bridges to \(obj.description!)")
 }
 
@@ -131,7 +131,7 @@ do {
 // CHECK: }
 do {
   var dict3 = [1: ("Hello", 1), 2: ("World", 2)]
-  let obj = _bridgeAnythingToObjectiveC(dict3)
+  let obj = swift_bridgeAnythingToObjectiveC(dict3)
   print("dictionary bridges to \(obj)")
 }
 

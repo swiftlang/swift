@@ -228,26 +228,26 @@ Runtime.test("_canBeClass") {
 }
 
 Runtime.test("bridgeToObjectiveC") {
-  expectEqual(42, (_bridgeAnythingToObjectiveC(BridgedValueType(value: 42)) as! ClassA).value)
+  expectEqual(42, (swift_bridgeAnythingToObjectiveC(BridgedValueType(value: 42)) as! ClassA).value)
 
-  expectEqual(42, (_bridgeAnythingToObjectiveC(BridgedLargeValueType(value: 42)) as! ClassA).value)
+  expectEqual(42, (swift_bridgeAnythingToObjectiveC(BridgedLargeValueType(value: 42)) as! ClassA).value)
 
   var bridgedVerbatimRef = BridgedVerbatimRefType()
-  expectTrue(_bridgeAnythingToObjectiveC(bridgedVerbatimRef) === bridgedVerbatimRef)
+  expectTrue(swift_bridgeAnythingToObjectiveC(bridgedVerbatimRef) === bridgedVerbatimRef)
 }
 
 Runtime.test("bridgeToObjectiveC/NoLeak") {
   withSwiftObjectCanary(
     { BridgedValueType(value: 42) },
-    { expectEqual(42, (_bridgeAnythingToObjectiveC($0) as! ClassA).value) })
+    { expectEqual(42, (swift_bridgeAnythingToObjectiveC($0) as! ClassA).value) })
 
   withSwiftObjectCanary(
     { BridgedLargeValueType(value: 42) },
-    { expectEqual(42, (_bridgeAnythingToObjectiveC($0) as! ClassA).value) })
+    { expectEqual(42, (swift_bridgeAnythingToObjectiveC($0) as! ClassA).value) })
 
   withSwiftObjectCanary(
     { BridgedVerbatimRefType() },
-    { expectTrue(_bridgeAnythingToObjectiveC($0) === $0) })
+    { expectTrue(swift_bridgeAnythingToObjectiveC($0) === $0) })
 }
 
 Runtime.test("forceBridgeFromObjectiveC") {

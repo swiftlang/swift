@@ -56,7 +56,7 @@ FUNC_DECL(ConditionallyBridgeFromObjectiveCBridgeable,
           "_conditionallyBridgeFromObjectiveC_bridgeable")
 
 FUNC_DECL(BridgeAnythingToObjectiveC,
-          "_bridgeAnythingToObjectiveC")
+          "swift_bridgeAnythingToObjectiveC")
 FUNC_DECL(BridgeAnyObjectToAny,
           "_bridgeAnyObjectToAny")
 

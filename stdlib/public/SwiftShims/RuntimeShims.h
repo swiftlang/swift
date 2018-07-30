@@ -28,33 +28,36 @@ namespace swift { extern "C" {
 
 /// Return an NSString to be used as the Mirror summary of the object
 SWIFT_RUNTIME_STDLIB_API
-void *_swift_objCMirrorSummary(const void * nsObject);
+void *swift_objCMirrorSummary(const void * nsObject);
 
 /// Call strtold_l with the C locale, swapping argument and return
 /// types so we can operate on Float80.  Return NULL on overflow.
 SWIFT_RUNTIME_STDLIB_API
-const char *_swift_stdlib_strtold_clocale(const char *nptr, void *outResult);
+const char *swift_stdlib_strtold_clocale(const char *nptr, void *outResult);
+
 /// Call strtod_l with the C locale, swapping argument and return
 /// types so we can operate consistently on Float80.  Return NULL on
 /// overflow.
 SWIFT_RUNTIME_STDLIB_API
-const char *_swift_stdlib_strtod_clocale(const char *nptr, double *outResult);
+const char *swift_stdlib_strtod_clocale(const char *nptr, double *outResult);
+
 /// Call strtof_l with the C locale, swapping argument and return
 /// types so we can operate consistently on Float80.  Return NULL on
 /// overflow.
 SWIFT_RUNTIME_STDLIB_API
-const char *_swift_stdlib_strtof_clocale(const char *nptr, float *outResult);
+const char *swift_stdlib_strtof_clocale(const char *nptr, float *outResult);
 
 SWIFT_RUNTIME_STDLIB_API
-void _swift_stdlib_flockfile_stdout(void);
-SWIFT_RUNTIME_STDLIB_API
-void _swift_stdlib_funlockfile_stdout(void);
+void swift_stdlib_flockfile_stdout(void);
 
 SWIFT_RUNTIME_STDLIB_API
-int _swift_stdlib_putc_stderr(int C);
+void swift_stdlib_funlockfile_stdout(void);
 
 SWIFT_RUNTIME_STDLIB_API
-__swift_size_t _swift_stdlib_getHardwareConcurrency();
+int swift_stdlib_putc_stderr(int C);
+
+SWIFT_RUNTIME_STDLIB_API
+__swift_size_t swift_stdlib_getHardwareConcurrency();
 
 #ifdef __cplusplus
 }} // extern "C", namespace swift

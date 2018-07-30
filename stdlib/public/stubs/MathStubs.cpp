@@ -68,7 +68,7 @@ extern "C" {
 
 SWIFT_RUNTIME_STDLIB_API
 ti_int
-__muloti4(ti_int a, ti_int b, int* overflow)
+swift__muloti4(ti_int a, ti_int b, int* overflow)
 {
     const int N = (int)(sizeof(ti_int) * CHAR_BIT);
     const ti_int MIN = (ti_int)1 << (N-1);
@@ -122,7 +122,7 @@ __muloti4(ti_int a, ti_int b, int* overflow)
 
 SWIFT_RUNTIME_STDLIB_API
 di_int
-__mulodi4(di_int a, di_int b, int* overflow)
+swift__mulodi4(di_int a, di_int b, int* overflow)
 {
     const int N = (int)(sizeof(di_int) * CHAR_BIT);
     const di_int MIN = (di_int)1 << (N-1);
@@ -165,7 +165,7 @@ __mulodi4(di_int a, di_int b, int* overflow)
 #if defined(_WIN32)
 
 tu_int
-__udivmodti4(tu_int a, tu_int b, tu_int* rem)
+swift__udivmodti4(tu_int a, tu_int b, tu_int* rem)
 {
     const unsigned n_udword_bits = sizeof(du_int) * CHAR_BIT;
     const unsigned n_utword_bits = sizeof(tu_int) * CHAR_BIT;
@@ -379,23 +379,23 @@ __udivmodti4(tu_int a, tu_int b, tu_int* rem)
 
 SWIFT_RUNTIME_STDLIB_API
 tu_int
-__udivti3(tu_int a, tu_int b)
+swift__udivti3(tu_int a, tu_int b)
 {
-    return __udivmodti4(a, b, NULL);
+    return swift__udivmodti4(a, b, NULL);
 }
 
 SWIFT_RUNTIME_STDLIB_API
 tu_int
-__umodti3(tu_int a, tu_int b)
+swift__umodti3(tu_int a, tu_int b)
 {
     tu_int r;
-    __udivmodti4(a, b, &r);
+    swift__udivmodti4(a, b, &r);
     return r;
 }
 
 SWIFT_RUNTIME_STDLIB_API
 ti_int
-__divti3(ti_int a, ti_int b)
+swift__divti3(ti_int a, ti_int b)
 {
     const int bits_in_tword_m1 = (int)(sizeof(ti_int) * CHAR_BIT) - 1;
     ti_int s_a = a >> bits_in_tword_m1;                   /* s_a = a < 0 ? -1 : 0 */
@@ -403,12 +403,12 @@ __divti3(ti_int a, ti_int b)
     a = (a ^ s_a) - s_a;                                  /* negate if s_a == -1 */
     b = (b ^ s_b) - s_b;                                  /* negate if s_b == -1 */
     s_a ^= s_b;                                           /* sign of quotient */
-    return (__udivmodti4(a, b, (tu_int*)0) ^ s_a) - s_a;  /* negate if s_a == -1 */
+    return (swift__udivmodti4(a, b, (tu_int*)0) ^ s_a) - s_a;  /* negate if s_a == -1 */
 }
 
 SWIFT_RUNTIME_STDLIB_API
 ti_int
-__modti3(ti_int a, ti_int b)
+swift__modti3(ti_int a, ti_int b)
 {
     const int bits_in_tword_m1 = (int)(sizeof(ti_int) * CHAR_BIT) - 1;
     ti_int s = b >> bits_in_tword_m1;  /* s = b < 0 ? -1 : 0 */
@@ -416,7 +416,7 @@ __modti3(ti_int a, ti_int b)
     s = a >> bits_in_tword_m1;         /* s = a < 0 ? -1 : 0 */
     a = (a ^ s) - s;                   /* negate if s == -1 */
     tu_int r;
-    __udivmodti4(a, b, &r);
+    swift__udivmodti4(a, b, &r);
     return ((ti_int)r ^ s) - s;        /* negate if s == -1 */
 }
 

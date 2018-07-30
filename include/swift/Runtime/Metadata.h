@@ -749,7 +749,7 @@ void swift_registerFieldDescriptors(const reflection::FieldDescriptor **records,
 /// classes and class protocol types.
 SWIFT_CC(swift)
 SWIFT_RUNTIME_STDLIB_API
-const Metadata *_swift_class_getSuperclass(const Metadata *theClass);
+const Metadata *swift_class_getSuperclass(const Metadata *theClass);
 
 SWIFT_CC(swift)
 SWIFT_RUNTIME_STDLIB_API

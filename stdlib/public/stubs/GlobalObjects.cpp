@@ -129,7 +129,7 @@ SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
 
 
 SWIFT_RUNTIME_STDLIB_API
-void swift::_swift_instantiateInertHeapObject(void *address,
+void swift::swift_instantiateInertHeapObject(void *address,
                                               const HeapMetadata *metadata) {
   ::new (address) HeapObject{metadata};
 }

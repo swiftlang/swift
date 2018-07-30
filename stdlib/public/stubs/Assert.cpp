@@ -39,7 +39,7 @@ static void logPrefixAndMessageToDebugger(
   free(debuggerMessage);
 }
 
-void swift::_swift_stdlib_reportFatalErrorInFile(
+void swift::swift_stdlib_reportFatalErrorInFile(
     const unsigned char *prefix, int prefixLength,
     const unsigned char *message, int messageLength,
     const unsigned char *file, int fileLength,
@@ -61,7 +61,7 @@ void swift::_swift_stdlib_reportFatalErrorInFile(
   free(log);
 }
 
-void swift::_swift_stdlib_reportFatalError(
+void swift::swift_stdlib_reportFatalError(
     const unsigned char *prefix, int prefixLength,
     const unsigned char *message, int messageLength,
     uint32_t flags
@@ -78,7 +78,7 @@ void swift::_swift_stdlib_reportFatalError(
   free(log);
 }
 
-void swift::_swift_stdlib_reportUnimplementedInitializerInFile(
+void swift::swift_stdlib_reportUnimplementedInitializerInFile(
     const unsigned char *className, int classNameLength,
     const unsigned char *initName, int initNameLength,
     const unsigned char *file, int fileLength,
@@ -99,7 +99,7 @@ void swift::_swift_stdlib_reportUnimplementedInitializerInFile(
   free(log);
 }
 
-void swift::_swift_stdlib_reportUnimplementedInitializer(
+void swift::swift_stdlib_reportUnimplementedInitializer(
     const unsigned char *className, int classNameLength,
     const unsigned char *initName, int initNameLength,
     uint32_t flags

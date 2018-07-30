@@ -91,7 +91,7 @@ static const Metadata *findHashableBaseTypeImpl(const Metadata *type) {
   const Metadata *baseTypeThatConformsToHashable = type;
   while (true) {
     const Metadata *superclass =
-        _swift_class_getSuperclass(baseTypeThatConformsToHashable);
+        swift_class_getSuperclass(baseTypeThatConformsToHashable);
     if (!superclass)
       break;
     if (!swift_conformsToProtocol(superclass, &HashableProtocolDescriptor))

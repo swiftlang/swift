@@ -25,7 +25,7 @@ public // @testable
 func _stdlib_binary_CFStringCreateCopy(
   _ source: _CocoaString
 ) -> _CocoaString {
-  let result = _swift_stdlib_CFStringCreateCopy(nil, source) as AnyObject
+  let result = swift_stdlib_CFStringCreateCopy(nil, source) as AnyObject
   return result
 }
 
@@ -35,7 +35,7 @@ public // @testable
 func _stdlib_binary_CFStringGetLength(
   _ source: _CocoaString
 ) -> Int {
-  return _swift_stdlib_CFStringGetLength(source)
+  return swift_stdlib_CFStringGetLength(source)
 }
 
 @inlinable // FIXME(sil-serialize-all)
@@ -44,7 +44,7 @@ func _stdlib_binary_CFStringGetCharactersPtr(
   _ source: _CocoaString
 ) -> UnsafeMutablePointer<UTF16.CodeUnit>? {
   return UnsafeMutablePointer(
-    mutating: _swift_stdlib_CFStringGetCharactersPtr(source))
+    mutating: swift_stdlib_CFStringGetCharactersPtr(source))
 }
 
 /// Loading Foundation initializes these function variables
@@ -57,9 +57,9 @@ func _stdlib_binary_CFStringGetCharactersPtr(
 internal func _cocoaStringReadAll(
   _ source: _CocoaString, _ destination: UnsafeMutablePointer<UTF16.CodeUnit>
 ) {
-  _swift_stdlib_CFStringGetCharacters(
+  swift_stdlib_CFStringGetCharacters(
     source, _swift_shims_CFRange(
-      location: 0, length: _swift_stdlib_CFStringGetLength(source)), destination)
+      location: 0, length: swift_stdlib_CFStringGetLength(source)), destination)
 }
 
 /// Copies a slice of a _CocoaString into contiguous storage of
@@ -71,7 +71,7 @@ internal func _cocoaStringCopyCharacters(
   range: Range<Int>,
   into destination: UnsafeMutablePointer<UTF16.CodeUnit>
 ) {
-  _swift_stdlib_CFStringGetCharacters(
+  swift_stdlib_CFStringGetCharacters(
     source,
     _swift_shims_CFRange(location: range.lowerBound, length: range.count),
     destination)
@@ -85,10 +85,10 @@ internal func _cocoaStringSlice(
   let cfSelf: _swift_shims_CFStringRef = target
 
   _sanityCheck(
-    _swift_stdlib_CFStringGetCharactersPtr(cfSelf) == nil,
+    swift_stdlib_CFStringGetCharactersPtr(cfSelf) == nil,
     "Known contiguously stored strings should already be converted to Swift")
 
-  let cfResult = _swift_stdlib_CFStringCreateWithSubstring(
+  let cfResult = swift_stdlib_CFStringCreateWithSubstring(
     nil, cfSelf, _swift_shims_CFRange(
       location: bounds.lowerBound, length: bounds.count)) as AnyObject
 
@@ -102,10 +102,10 @@ internal func _cocoaStringSubscript(
 ) -> UTF16.CodeUnit {
   let cfSelf: _swift_shims_CFStringRef = target
 
-  _sanityCheck(_swift_stdlib_CFStringGetCharactersPtr(cfSelf) == nil,
+  _sanityCheck(swift_stdlib_CFStringGetCharactersPtr(cfSelf) == nil,
     "Known contiguously stored strings should already be converted to Swift")
 
-  return _swift_stdlib_CFStringGetCharacterAtIndex(cfSelf, position)
+  return swift_stdlib_CFStringGetCharacterAtIndex(cfSelf, position)
 }
 
 //
@@ -130,7 +130,7 @@ internal func _bridgeASCIICocoaString(
     to: UInt8.self)
   let length = _stdlib_binary_CFStringGetLength(cocoa)
   var count = 0
-  let numCharWritten = _swift_stdlib_CFStringGetBytes(
+  let numCharWritten = swift_stdlib_CFStringGetBytes(
     cocoa, _swift_shims_CFRange(location: 0, length: length),
     kCFStringEncodingUTF8, 0, 0, ptr, bufPtr.count, &count)
   return length == numCharWritten ? count : nil
@@ -139,7 +139,7 @@ internal func _bridgeASCIICocoaString(
 public // @testable
 func _bridgeToCocoa(_ small: _SmallUTF8String) -> _CocoaString {
   return small.withUTF8CodeUnits { bufPtr in
-      return _swift_stdlib_CFStringCreateWithBytes(
+      return swift_stdlib_CFStringCreateWithBytes(
           nil, bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
           bufPtr.count,
           small.isASCII ? kCFStringEncodingASCII : kCFStringEncodingUTF8, 0)
@@ -154,7 +154,7 @@ internal func _getCocoaStringPointer(
   // Note: the code in clownfish appears to guarantee
   // nul-termination, but I'm waiting for an answer from Chris Kane
   // about whether we can count on it for all time or not.
-  let nulTerminatedASCII = _swift_stdlib_CFStringGetCStringPtr(
+  let nulTerminatedASCII = swift_stdlib_CFStringGetCStringPtr(
     cfImmutableValue, kCFStringEncodingASCII)
 
   // start will hold the base pointer of contiguous storage, if it
@@ -162,7 +162,7 @@ internal func _getCocoaStringPointer(
   var start: UnsafeRawPointer?
   let isUTF16 = (nulTerminatedASCII == nil)
   if isUTF16 {
-    let utf16Buf = _swift_stdlib_CFStringGetCharactersPtr(cfImmutableValue)
+    let utf16Buf = swift_stdlib_CFStringGetCharactersPtr(cfImmutableValue)
     start = UnsafeRawPointer(utf16Buf)
   } else {
     start = UnsafeRawPointer(nulTerminatedASCII)

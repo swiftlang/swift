@@ -33,11 +33,11 @@ swift_stdlib_readLine_stdin(unsigned char * _Nullable * _Nonnull LinePtr);
 
 SWIFT_RUNTIME_STDLIB_API
 char * _Nullable * _Nonnull
-_swift_stdlib_getUnsafeArgvArgc(int * _Nonnull outArgLen);
+swift_stdlib_getUnsafeArgvArgc(int * _Nonnull outArgLen);
   
 SWIFT_RUNTIME_STDLIB_API
 void
-_swift_stdlib_overrideUnsafeArgvArgc(char * _Nullable * _Nonnull argv, int argc);
+swift_stdlib_overrideUnsafeArgvArgc(char * _Nullable * _Nonnull argv, int argc);
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
 

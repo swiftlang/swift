@@ -265,7 +265,7 @@ func testForcedPropertyValue(dummy: DummyClass) {
 // CHECK-LABEL: sil hidden @$S22objc_bridging_peephole23testNonnullSubscriptGet6object5indexySo0eF0C_yXltF
 func testNonnullSubscriptGet(object: NonnullSubscript, index: AnyObject) {
   // CHECK:   bb0([[SELF:%.*]] : @guaranteed $NonnullSubscript,
-  // CHECK:      [[BRIDGE_TO_ID:%.*]] = function_ref @$Ss27_bridgeAnythingToObjectiveCyyXlxlF
+  // CHECK:      [[BRIDGE_TO_ID:%.*]] = function_ref @$Ss32swift_bridgeAnythingToObjectiveCyyXlxlF
   // CHECK-NEXT: [[INDEX:%.*]] = apply [[BRIDGE_TO_ID]]
   // CHECK:      [[METHOD:%.*]] = objc_method
   // CHECK:      [[RESULT:%.*]] = apply [[METHOD]]([[INDEX]], [[SELF]])
@@ -275,7 +275,7 @@ func testNonnullSubscriptGet(object: NonnullSubscript, index: AnyObject) {
   // CHECK-NEXT: apply [[USE]]([[BORROWED_RESULT]])
   useOptNS(object[index] as NSString?)
 
-  // CHECK:      [[BRIDGE_TO_ID:%.*]] = function_ref @$Ss27_bridgeAnythingToObjectiveCyyXlxlF
+  // CHECK:      [[BRIDGE_TO_ID:%.*]] = function_ref @$Ss32swift_bridgeAnythingToObjectiveCyyXlxlF
   // CHECK-NEXT: [[INDEX:%.*]] = apply [[BRIDGE_TO_ID]]
   // CHECK:      [[METHOD:%.*]] = objc_method
   // CHECK:      [[RESULT:%.*]] = apply [[METHOD]]([[INDEX]], [[SELF]])
@@ -294,7 +294,7 @@ func testNonnullSubscriptGet(object: NonnullSubscript, index: AnyObject) {
 // CHECK-LABEL: sil hidden @$S22objc_bridging_peephole24testNullableSubscriptGet6object5indexySo0eF0C_yXltF
 func testNullableSubscriptGet(object: NullableSubscript, index: AnyObject) {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $NullableSubscript,
-  // CHECK:      [[BRIDGE_TO_ID:%.*]] = function_ref @$Ss27_bridgeAnythingToObjectiveCyyXlxlF
+  // CHECK:      [[BRIDGE_TO_ID:%.*]] = function_ref @$Ss32swift_bridgeAnythingToObjectiveCyyXlxlF
   // CHECK-NEXT: [[INDEX:%.*]] = apply [[BRIDGE_TO_ID]]
   // CHECK:      [[METHOD:%.*]] = objc_method
   // CHECK:      [[RESULT:%.*]] = apply [[METHOD]]([[INDEX]], [[SELF]])
@@ -310,7 +310,7 @@ func testNullableSubscriptGet(object: NullableSubscript, index: AnyObject) {
 // CHECK-LABEL: sil hidden @$S22objc_bridging_peephole25testNullproneSubscriptGet6object5indexySo0eF0C_yXltF
 func testNullproneSubscriptGet(object: NullproneSubscript, index: AnyObject) {
   // CHECK:   bb0([[ARG:%.*]] : @guaranteed $NullproneSubscript,
-  // CHECK:      [[BRIDGE_TO_ID:%.*]] = function_ref @$Ss27_bridgeAnythingToObjectiveCyyXlxlF
+  // CHECK:      [[BRIDGE_TO_ID:%.*]] = function_ref @$Ss32swift_bridgeAnythingToObjectiveCyyXlxlF
   // CHECK-NEXT: [[INDEX:%.*]] = apply [[BRIDGE_TO_ID]]
   // CHECK:      [[METHOD:%.*]] = objc_method
   // CHECK:      [[RESULT:%.*]] = apply [[METHOD]]([[INDEX]], [[SELF]])
@@ -320,7 +320,7 @@ func testNullproneSubscriptGet(object: NullproneSubscript, index: AnyObject) {
   // CHECK-NEXT: apply [[USE]]([[BORROWED_RESULT]])
   useOptNS(object[index] as NSString?)
 
-  // CHECK:      [[BRIDGE_TO_ID:%.*]] = function_ref @$Ss27_bridgeAnythingToObjectiveCyyXlxlF
+  // CHECK:      [[BRIDGE_TO_ID:%.*]] = function_ref @$Ss32swift_bridgeAnythingToObjectiveCyyXlxlF
   // CHECK-NEXT: [[INDEX:%.*]] = apply [[BRIDGE_TO_ID]]
   // CHECK:      [[METHOD:%.*]] = objc_method
   // CHECK:      [[RESULT:%.*]] = apply [[METHOD]]([[INDEX]], [[SELF]])
@@ -494,7 +494,7 @@ func testNonnullSubscriptSet(object: NonnullSubscript, index: AnyObject) {
   // CHECK: bb0([[SELF:%.*]] : @guaranteed $NonnullSubscript,
   // CHECK:      [[MAKE:%.*]] = function_ref @$S22objc_bridging_peephole6makeNSSo8NSStringCyF
   // CHECK-NEXT: [[ARG:%.*]] = apply [[MAKE]]()
-  // CHECK:      [[BRIDGE_TO_ID:%.*]] = function_ref @$Ss27_bridgeAnythingToObjectiveCyyXlxlF
+  // CHECK:      [[BRIDGE_TO_ID:%.*]] = function_ref @$Ss32swift_bridgeAnythingToObjectiveCyyXlxlF
   // CHECK-NEXT: [[INDEX:%.*]] = apply [[BRIDGE_TO_ID]]
   // CHECK:      [[METHOD:%.*]] = objc_method
   // CHECK:      apply [[METHOD]]([[ARG]], [[INDEX]], [[SELF]])
@@ -511,7 +511,7 @@ func testNullableSubscriptSet(object: NullableSubscript, index: AnyObject) {
   // CHECK:      [[MAKE:%.*]] = function_ref @$S22objc_bridging_peephole6makeNSSo8NSStringCyF
   // CHECK-NEXT: [[ARG:%.*]] = apply [[MAKE]]()
   // CHECK-NEXT: [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[ARG]]
-  // CHECK:      [[BRIDGE_TO_ID:%.*]] = function_ref @$Ss27_bridgeAnythingToObjectiveCyyXlxlF
+  // CHECK:      [[BRIDGE_TO_ID:%.*]] = function_ref @$Ss32swift_bridgeAnythingToObjectiveCyyXlxlF
   // CHECK-NEXT: [[INDEX:%.*]] = apply [[BRIDGE_TO_ID]]
   // CHECK:      [[METHOD:%.*]] = objc_method
   // CHECK:      apply [[METHOD]]([[OPTARG]], [[INDEX]], [[SELF]])
@@ -522,7 +522,7 @@ func testNullableSubscriptSet(object: NullableSubscript, index: AnyObject) {
   // CHECK:      [[MAKE:%.*]] = function_ref @$S22objc_bridging_peephole6makeNSSo8NSStringCyF
   // CHECK-NEXT: [[ARG:%.*]] = apply [[MAKE]]()
   // CHECK-NEXT: [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[ARG]]
-  // CHECK:      [[BRIDGE_TO_ID:%.*]] = function_ref @$Ss27_bridgeAnythingToObjectiveCyyXlxlF
+  // CHECK:      [[BRIDGE_TO_ID:%.*]] = function_ref @$Ss32swift_bridgeAnythingToObjectiveCyyXlxlF
   // CHECK-NEXT: [[INDEX:%.*]] = apply [[BRIDGE_TO_ID]]
   // CHECK:      [[METHOD:%.*]] = objc_method
   // CHECK:      apply [[METHOD]]([[OPTARG]], [[INDEX]], [[SELF]])
@@ -532,7 +532,7 @@ func testNullableSubscriptSet(object: NullableSubscript, index: AnyObject) {
 
   // CHECK:      [[MAKE:%.*]] = function_ref @$S22objc_bridging_peephole9makeOptNSSo8NSStringCSgyF
   // CHECK-NEXT: [[ARG:%.*]] = apply [[MAKE]]()
-  // CHECK:      [[BRIDGE_TO_ID:%.*]] = function_ref @$Ss27_bridgeAnythingToObjectiveCyyXlxlF
+  // CHECK:      [[BRIDGE_TO_ID:%.*]] = function_ref @$Ss32swift_bridgeAnythingToObjectiveCyyXlxlF
   // CHECK-NEXT: [[INDEX:%.*]] = apply [[BRIDGE_TO_ID]]
   // CHECK:      [[METHOD:%.*]] = objc_method
   // CHECK:      apply [[METHOD]]([[ARG]], [[INDEX]], [[SELF]])
@@ -549,7 +549,7 @@ func testNullproneSubscriptSet(object: NullproneSubscript, index: AnyObject) {
   // CHECK:      [[MAKE:%.*]] = function_ref @$S22objc_bridging_peephole6makeNSSo8NSStringCyF
   // CHECK-NEXT: [[ARG:%.*]] = apply [[MAKE]]()
   // CHECK-NEXT: [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[ARG]]
-  // CHECK:      [[BRIDGE_TO_ID:%.*]] = function_ref @$Ss27_bridgeAnythingToObjectiveCyyXlxlF
+  // CHECK:      [[BRIDGE_TO_ID:%.*]] = function_ref @$Ss32swift_bridgeAnythingToObjectiveCyyXlxlF
   // CHECK-NEXT: [[INDEX:%.*]] = apply [[BRIDGE_TO_ID]]
   // CHECK:      [[METHOD:%.*]] = objc_method
   // CHECK:      apply [[METHOD]]([[OPTARG]], [[INDEX]], [[SELF]])
@@ -560,7 +560,7 @@ func testNullproneSubscriptSet(object: NullproneSubscript, index: AnyObject) {
   // CHECK:      [[MAKE:%.*]] = function_ref @$S22objc_bridging_peephole6makeNSSo8NSStringCyF
   // CHECK-NEXT: [[ARG:%.*]] = apply [[MAKE]]()
   // CHECK-NEXT: [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[ARG]]
-  // CHECK:      [[BRIDGE_TO_ID:%.*]] = function_ref @$Ss27_bridgeAnythingToObjectiveCyyXlxlF
+  // CHECK:      [[BRIDGE_TO_ID:%.*]] = function_ref @$Ss32swift_bridgeAnythingToObjectiveCyyXlxlF
   // CHECK-NEXT: [[INDEX:%.*]] = apply [[BRIDGE_TO_ID]]
   // CHECK:      [[METHOD:%.*]] = objc_method
   // CHECK:      apply [[METHOD]]([[OPTARG]], [[INDEX]], [[SELF]])
@@ -570,7 +570,7 @@ func testNullproneSubscriptSet(object: NullproneSubscript, index: AnyObject) {
 
   // CHECK:      [[MAKE:%.*]] = function_ref @$S22objc_bridging_peephole9makeOptNSSo8NSStringCSgyF
   // CHECK-NEXT: [[ARG:%.*]] = apply [[MAKE]]()
-  // CHECK:      [[BRIDGE_TO_ID:%.*]] = function_ref @$Ss27_bridgeAnythingToObjectiveCyyXlxlF
+  // CHECK:      [[BRIDGE_TO_ID:%.*]] = function_ref @$Ss32swift_bridgeAnythingToObjectiveCyyXlxlF
   // CHECK-NEXT: [[INDEX:%.*]] = apply [[BRIDGE_TO_ID]]
   // CHECK:      [[METHOD:%.*]] = objc_method
   // CHECK:      apply [[METHOD]]([[ARG]], [[INDEX]], [[SELF]])

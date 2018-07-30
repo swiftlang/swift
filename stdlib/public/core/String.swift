@@ -980,7 +980,7 @@ internal func _nativeUnicodeLowercaseString(_ str: String) -> String {
     count: utf16.count)
 
   // Try to write it out to the same length.
-  let z = _swift_stdlib_unicode_strToLower(
+  let z = swift_stdlib_unicode_strToLower(
     storage.start, Int32(storage.capacity), // FIXME: handle overflow case
     utf16.start, Int32(utf16.count))
   let correctSize = Int(z)
@@ -990,7 +990,7 @@ internal func _nativeUnicodeLowercaseString(_ str: String) -> String {
     storage = _SwiftStringStorage<UTF16.CodeUnit>.create(
       capacity: correctSize,
       count: correctSize)
-    _swift_stdlib_unicode_strToLower(
+    swift_stdlib_unicode_strToLower(
       storage.start, Int32(storage.capacity), // FIXME: handle overflow case
       utf16.start, Int32(utf16.count))
   }
@@ -1011,7 +1011,7 @@ internal func _nativeUnicodeUppercaseString(_ str: String) -> String {
     count: utf16.count)
 
   // Try to write it out to the same length.
-  let z = _swift_stdlib_unicode_strToUpper(
+  let z = swift_stdlib_unicode_strToUpper(
     storage.start, Int32(storage.capacity), // FIXME: handle overflow case
     utf16.start, Int32(utf16.count))
   let correctSize = Int(z)
@@ -1021,7 +1021,7 @@ internal func _nativeUnicodeUppercaseString(_ str: String) -> String {
     storage = _SwiftStringStorage<UTF16.CodeUnit>.create(
       capacity: correctSize,
       count: correctSize)
-    _swift_stdlib_unicode_strToUpper(
+    swift_stdlib_unicode_strToUpper(
       storage.start, Int32(storage.capacity), // FIXME: handle overflow case
       utf16.start, Int32(utf16.count))
   }

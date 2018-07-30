@@ -16,7 +16,7 @@ public func _stdlib_getHardwareConcurrency() -> Int {
   // This is effectively a re-export of this shims function
   // for consumers of the unstable library (like unittest) to
   // use.
-  return _swift_stdlib_getHardwareConcurrency()
+  return swift_stdlib_getHardwareConcurrency()
 }
 
 /// An atomic counter for contended applications.

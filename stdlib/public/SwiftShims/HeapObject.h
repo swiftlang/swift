@@ -68,7 +68,7 @@ extern "C" {
 #endif
 
 SWIFT_RUNTIME_STDLIB_API
-void _swift_instantiateInertHeapObject(void *address,
+void swift_instantiateInertHeapObject(void *address,
                                        const HeapMetadata *metadata);
 
 SWIFT_RUNTIME_STDLIB_API

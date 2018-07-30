@@ -83,7 +83,7 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
 
   // CHECK:   [[COPY:%.*]] = alloc_stack $U
   // CHECK:   copy_addr [[GENERIC]] to [initialization] [[COPY]]
-  // CHECK:   // function_ref _bridgeAnythingToObjectiveC
+  // CHECK:   // function_ref swift_bridgeAnythingToObjectiveC
   // CHECK:   [[BRIDGE_ANYTHING:%.*]] = function_ref
   // CHECK:   [[ANYOBJECT:%.*]] = apply [[BRIDGE_ANYTHING]]<U>([[COPY]])
   // CHECK:   dealloc_stack [[COPY]]
@@ -97,7 +97,7 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   // CHECK:   [[OPENED_COPY:%.*]] = open_existential_addr immutable_access [[COPY]] : $*P to $*[[OPENED_TYPE:@opened.*P]],
   // CHECK:   [[TMP:%.*]] = alloc_stack $[[OPENED_TYPE]]
   // CHECK:   copy_addr [[OPENED_COPY]] to [initialization] [[TMP]]
-  // CHECK:   // function_ref _bridgeAnythingToObjectiveC
+  // CHECK:   // function_ref swift_bridgeAnythingToObjectiveC
   // CHECK:   [[BRIDGE_ANYTHING:%.*]] = function_ref
   // CHECK:   [[ANYOBJECT:%.*]] = apply [[BRIDGE_ANYTHING]]<[[OPENED_TYPE]]>([[TMP]])
   // CHECK:   dealloc_stack [[TMP]]
@@ -112,7 +112,7 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   // CHECK:   [[ERROR_BOX:%[0-9]+]] = open_existential_box [[ERROR_COPY]] : $Error to $*@opened([[ERROR_ARCHETYPE:"[^"]*"]]) Error
   // CHECK:   [[ERROR_STACK:%[0-9]+]] = alloc_stack $@opened([[ERROR_ARCHETYPE]]) Error
   // CHECK:   copy_addr [[ERROR_BOX]] to [initialization] [[ERROR_STACK]] : $*@opened([[ERROR_ARCHETYPE]]) Error
-  // CHECK:   [[BRIDGE_FUNCTION:%[0-9]+]] = function_ref @$Ss27_bridgeAnythingToObjectiveCyyXlxlF
+  // CHECK:   [[BRIDGE_FUNCTION:%[0-9]+]] = function_ref @$Ss32swift_bridgeAnythingToObjectiveCyyXlxlF
   // CHECK:   [[BRIDGED_ERROR:%[0-9]+]] = apply [[BRIDGE_FUNCTION]]<@opened([[ERROR_ARCHETYPE]]) Error>([[ERROR_STACK]])
   // CHECK:   dealloc_stack [[ERROR_STACK]] : $*@opened([[ERROR_ARCHETYPE]]) Error
   // CHECK:   destroy_value [[ERROR_COPY]] : $Error
@@ -126,7 +126,7 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   // CHECK:   [[OPENED_COPY:%.*]] = open_existential_addr immutable_access [[COPY]] : $*Any to $*[[OPENED_TYPE:@opened.*Any]],
   // CHECK:   [[TMP:%.*]] = alloc_stack $[[OPENED_TYPE]]
   // CHECK:   copy_addr [[OPENED_COPY]] to [initialization] [[TMP]]
-  // CHECK:   // function_ref _bridgeAnythingToObjectiveC
+  // CHECK:   // function_ref swift_bridgeAnythingToObjectiveC
   // CHECK:   [[BRIDGE_ANYTHING:%.*]] = function_ref
   // CHECK:   [[ANYOBJECT:%.*]] = apply [[BRIDGE_ANYTHING]]<[[OPENED_TYPE]]>([[TMP]])
   // CHECK:   destroy_addr [[COPY]]
@@ -138,7 +138,7 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
 
   // CHECK:   [[TMP:%.*]] = alloc_stack $KnownUnbridged
   // CHECK:   store [[KNOWN_UNBRIDGED]] to [trivial] [[TMP]]
-  // CHECK:   [[BRIDGE_ANYTHING:%.*]] = function_ref @$Ss27_bridgeAnythingToObjectiveC{{.*}}F
+  // CHECK:   [[BRIDGE_ANYTHING:%.*]] = function_ref @$Ss32swift_bridgeAnythingToObjectiveC{{.*}}F
   // CHECK:   [[ANYOBJECT:%.*]] = apply [[BRIDGE_ANYTHING]]<KnownUnbridged>([[TMP]])
   // CHECK:   [[METHOD:%.*]] = objc_method [[SELF]] : $NSIdLover,
   // CHECK:   apply [[METHOD]]([[ANYOBJECT]], [[SELF]])
@@ -182,7 +182,7 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
 // Once upon a time, as a workaround for rdar://problem/28318984, we had
 // to skip the peephole for types with nontrivial SIL lowerings because we
 // didn't correctly form the substitutions for a generic
-// _bridgeAnythingToObjectiveC call.  That's not true anymore.
+// swift_bridgeAnythingToObjectiveC call.  That's not true anymore.
 func zim() {}
 struct Zang {}
 // CHECK-LABEL: sil hidden @$S17objc_bridging_any27typesWithNontrivialLowering8receiverySo9NSIdLoverC_tF
@@ -290,7 +290,7 @@ func passingToNullableId<T: CP, U>(receiver: NSIdLover,
 
   // CHECK-NEXT: [[COPY:%.*]] = alloc_stack $U
   // CHECK-NEXT: copy_addr [[GENERIC]] to [initialization] [[COPY]]
-  // CHECK-NEXT: // function_ref _bridgeAnythingToObjectiveC
+  // CHECK-NEXT: // function_ref swift_bridgeAnythingToObjectiveC
   // CHECK-NEXT: [[BRIDGE_ANYTHING:%.*]] = function_ref
   // CHECK-NEXT: [[ANYOBJECT:%.*]] = apply [[BRIDGE_ANYTHING]]<U>([[COPY]])
   // CHECK-NEXT: [[OPT_ANYOBJECT:%.*]] = enum {{.*}} [[ANYOBJECT]]
@@ -306,7 +306,7 @@ func passingToNullableId<T: CP, U>(receiver: NSIdLover,
   // CHECK-NEXT: [[OPENED_COPY:%.*]] = open_existential_addr immutable_access [[COPY]] : $*P to $*[[OPENED_TYPE:@opened.*P]],
   // CHECK: [[TMP:%.*]] = alloc_stack $[[OPENED_TYPE]]
   // CHECK: copy_addr [[OPENED_COPY]] to [initialization] [[TMP]]
-  // CHECK-NEXT: // function_ref _bridgeAnythingToObjectiveC
+  // CHECK-NEXT: // function_ref swift_bridgeAnythingToObjectiveC
   // CHECK-NEXT: [[BRIDGE_ANYTHING:%.*]] = function_ref
   // CHECK-NEXT: [[ANYOBJECT:%.*]] = apply [[BRIDGE_ANYTHING]]<[[OPENED_TYPE]]>([[TMP]])
   // CHECK-NEXT: [[OPT_ANYOBJECT:%.*]] = enum {{.*}} [[ANYOBJECT]]
@@ -323,7 +323,7 @@ func passingToNullableId<T: CP, U>(receiver: NSIdLover,
   // CHECK-NEXT: [[ERROR_BOX:%[0-9]+]] = open_existential_box [[ERROR_COPY]] : $Error to $*@opened([[ERROR_ARCHETYPE:"[^"]*"]]) Error
   // CHECK-NEXT: [[ERROR_STACK:%[0-9]+]] = alloc_stack $@opened([[ERROR_ARCHETYPE]]) Error
   // CHECK-NEXT: copy_addr [[ERROR_BOX]] to [initialization] [[ERROR_STACK]] : $*@opened([[ERROR_ARCHETYPE]]) Error
-  // CHECK: [[BRIDGE_FUNCTION:%[0-9]+]] = function_ref @$Ss27_bridgeAnythingToObjectiveCyyXlxlF
+  // CHECK: [[BRIDGE_FUNCTION:%[0-9]+]] = function_ref @$Ss32swift_bridgeAnythingToObjectiveCyyXlxlF
   // CHECK-NEXT: [[BRIDGED_ERROR:%[0-9]+]] = apply [[BRIDGE_FUNCTION]]<@opened([[ERROR_ARCHETYPE]]) Error>([[ERROR_STACK]])
   // CHECK-NEXT: [[BRIDGED_ERROR_OPT:%[0-9]+]] = enum $Optional<AnyObject>, #Optional.some!enumelt.1, [[BRIDGED_ERROR]] : $AnyObject
   // CHECK-NEXT: destroy_addr [[ERROR_STACK]]
@@ -339,7 +339,7 @@ func passingToNullableId<T: CP, U>(receiver: NSIdLover,
   // CHECK-NEXT: [[OPENED_COPY:%.*]] = open_existential_addr immutable_access [[COPY]] : $*Any to $*[[OPENED_TYPE:@opened.*Any]],
   // CHECK: [[TMP:%.*]] = alloc_stack $[[OPENED_TYPE]]
   // CHECK: copy_addr [[OPENED_COPY]] to [initialization] [[TMP]]
-  // CHECK-NEXT: // function_ref _bridgeAnythingToObjectiveC
+  // CHECK-NEXT: // function_ref swift_bridgeAnythingToObjectiveC
   // CHECK-NEXT: [[BRIDGE_ANYTHING:%.*]] = function_ref
   // CHECK-NEXT: [[ANYOBJECT:%.*]] = apply [[BRIDGE_ANYTHING]]<[[OPENED_TYPE]]>([[TMP]])
   // CHECK-NEXT: [[OPT_ANYOBJECT:%.*]] = enum {{.*}} [[ANYOBJECT]]
@@ -354,7 +354,7 @@ func passingToNullableId<T: CP, U>(receiver: NSIdLover,
 
   // CHECK: [[TMP:%.*]] = alloc_stack $KnownUnbridged
   // CHECK: store [[KNOWN_UNBRIDGED]] to [trivial] [[TMP]]
-  // CHECK: [[BRIDGE_ANYTHING:%.*]] = function_ref @$Ss27_bridgeAnythingToObjectiveC{{.*}}F
+  // CHECK: [[BRIDGE_ANYTHING:%.*]] = function_ref @$Ss32swift_bridgeAnythingToObjectiveC{{.*}}F
   // CHECK: [[ANYOBJECT:%.*]] = apply [[BRIDGE_ANYTHING]]<KnownUnbridged>([[TMP]])
   // CHECK: [[OPT_ANYOBJECT:%.*]] = enum {{.*}} [[ANYOBJECT]]
   // CHECK: [[METHOD:%.*]] = objc_method [[SELF]] : $NSIdLover,
@@ -434,7 +434,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK:   [[OPEN_RESULT:%.*]] = open_existential_addr immutable_access [[NATIVE_RESULT]]
 	// CHECK:   [[TMP:%.*]] = alloc_stack
   // CHECK:   copy_addr [[OPEN_RESULT]] to [initialization] [[TMP]]
-  // CHECK:   [[BRIDGE_ANYTHING:%.*]] = function_ref @$Ss27_bridgeAnythingToObjectiveC{{.*}}F
+  // CHECK:   [[BRIDGE_ANYTHING:%.*]] = function_ref @$Ss32swift_bridgeAnythingToObjectiveC{{.*}}F
   // CHECK:   [[OBJC_RESULT:%.*]] = apply [[BRIDGE_ANYTHING]]<{{.*}}>([[TMP]])
   // CHECK:   return [[OBJC_RESULT]]
   // CHECK: } // end sil function '$S17objc_bridging_any12SwiftIdLoverC18methodReturningAnyypyFTo'
@@ -442,7 +442,7 @@ class SwiftIdLover : NSObject, Anyable {
   @objc func methodReturningOptionalAny() -> Any? { fatalError() }
   // CHECK-LABEL: sil hidden @$S17objc_bridging_any12SwiftIdLoverC26methodReturningOptionalAnyypSgyF
   // CHECK-LABEL: sil hidden [thunk] @$S17objc_bridging_any12SwiftIdLoverC26methodReturningOptionalAnyypSgyFTo
-  // CHECK:       function_ref @$Ss27_bridgeAnythingToObjectiveC{{.*}}F
+  // CHECK:       function_ref @$Ss32swift_bridgeAnythingToObjectiveC{{.*}}F
 
   @objc func methodTakingAny(a: Any) { fatalError() }
   // CHECK-LABEL: sil hidden [thunk] @$S17objc_bridging_any12SwiftIdLoverC15methodTakingAny1ayyp_tFTo : $@convention(objc_method) (AnyObject, SwiftIdLover) -> ()
@@ -479,7 +479,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  [[OPENED_ANY:%.*]] = open_existential_addr immutable_access [[ANY]] : $*Any to $*[[OPENED_TYPE:@opened.*Any]],
 	// CHECK:   [[TMP:%.*]] = alloc_stack
   // CHECK:   copy_addr [[OPENED_ANY]] to [initialization] [[TMP]]
-  // CHECK-NEXT:  // function_ref _bridgeAnythingToObjectiveC
+  // CHECK-NEXT:  // function_ref swift_bridgeAnythingToObjectiveC
   // CHECK-NEXT:  [[BRIDGE_ANYTHING:%.*]] = function_ref
   // CHECK-NEXT:  [[BRIDGED:%.*]] = apply [[BRIDGE_ANYTHING]]<[[OPENED_TYPE]]>([[TMP]])
   // CHECK-NEXT:  apply [[BLOCK]]([[BRIDGED]])
@@ -603,7 +603,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  [[OPENED:%.*]] = open_existential_addr immutable_access [[RESULT]] : $*Any to $*[[OPENED_TYPE:@opened.*Any]],
   // CHECK:       [[TMP:%.*]] = alloc_stack $[[OPENED_TYPE]]
   // CHECK:       copy_addr [[OPENED]] to [initialization] [[TMP]]
-  // CHECK-NEXT:  // function_ref _bridgeAnythingToObjectiveC
+  // CHECK-NEXT:  // function_ref swift_bridgeAnythingToObjectiveC
   // CHECK-NEXT:  [[BRIDGE_ANYTHING:%.*]] = function_ref
   // CHECK-NEXT:  [[BRIDGED:%.*]] = apply [[BRIDGE_ANYTHING]]<[[OPENED_TYPE]]>([[TMP]])
   // CHECK-NEXT:  destroy_addr [[TMP]]
@@ -619,7 +619,7 @@ class SwiftIdLover : NSObject, Anyable {
 
   @objc func methodReturningBlockReturningOptionalAny() -> (() -> Any?) { fatalError() }
   // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$SypSgIegr_yXlSgIeyBa_TR
-  // CHECK: function_ref @$Ss27_bridgeAnythingToObjectiveC{{.*}}F
+  // CHECK: function_ref @$Ss32swift_bridgeAnythingToObjectiveC{{.*}}F
 
   override init() { fatalError() }
   @objc dynamic required convenience init(any: Any) { fatalError() }

@@ -91,7 +91,7 @@ static NSOperatingSystemVersion getOSVersion() {
 
 /// Return the version of the operating system currently running for use in
 /// API availability queries.
-_SwiftNSOperatingSystemVersion swift::_swift_stdlib_operatingSystemVersion() {
+_SwiftNSOperatingSystemVersion swift::swift_stdlib_operatingSystemVersion() {
   NSOperatingSystemVersion version = SWIFT_LAZY_CONSTANT(getOSVersion());
 
   return { version.majorVersion, version.minorVersion, version.patchVersion };

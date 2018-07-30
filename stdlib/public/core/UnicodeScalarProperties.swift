@@ -756,7 +756,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the `Lowercase_Mapping` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var lowercaseMapping: String {
-    return _applyMapping(__swift_stdlib_u_strToLower)
+    return _applyMapping(swift_stdlib_u_strToLower)
   }
 
   /// The titlecase mapping of the scalar.
@@ -771,7 +771,7 @@ extension Unicode.Scalar.Properties {
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var titlecaseMapping: String {
     return _applyMapping { ptr, cap, src, len, locale, err in
-      return __swift_stdlib_u_strToTitle(ptr, cap, src, len, nil, locale, err)
+      return swift_stdlib_u_strToTitle(ptr, cap, src, len, nil, locale, err)
     }
   }
 
@@ -786,7 +786,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the `Uppercase_Mapping` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var uppercaseMapping: String {
-    return _applyMapping(__swift_stdlib_u_strToUpper)
+    return _applyMapping(swift_stdlib_u_strToUpper)
   }
 }
 
@@ -811,7 +811,7 @@ extension Unicode.Scalar.Properties {
     withUnsafeMutablePointer(to: &versionInfo) { tuplePtr in
       tuplePtr.withMemoryRebound(to: UInt8.self, capacity: 4) {
         versionInfoPtr in
-        __swift_stdlib_u_charAge(_value, versionInfoPtr)
+        swift_stdlib_u_charAge(_value, versionInfoPtr)
       }
     }
     guard versionInfo.0 != 0 else { return nil }
@@ -1086,7 +1086,7 @@ extension Unicode.Scalar.Properties {
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var generalCategory: Unicode.GeneralCategory {
     let rawValue = __swift_stdlib_UCharCategory(
-      UInt32(__swift_stdlib_u_getIntPropertyValue(
+      UInt32(swift_stdlib_u_getIntPropertyValue(
         _value, __swift_stdlib_UCHAR_GENERAL_CATEGORY)))
     return Unicode.GeneralCategory(rawValue: rawValue)
   }
@@ -1098,14 +1098,14 @@ extension Unicode.Scalar.Properties {
     _ choice: __swift_stdlib_UCharNameChoice
   ) -> String? {
     var err = __swift_stdlib_U_ZERO_ERROR
-    let count = Int(__swift_stdlib_u_charName(_value, choice, nil, 0, &err))
+    let count = Int(swift_stdlib_u_charName(_value, choice, nil, 0, &err))
     guard count > 0 else { return nil }
 
     // ICU writes a trailing null, so we have to save room for it as well.
     var array = Array<UInt8>(repeating: 0, count: count + 1)
     return array.withUnsafeMutableBufferPointer { bufPtr in
       var err = __swift_stdlib_U_ZERO_ERROR
-      let correctSize = __swift_stdlib_u_charName(
+      let correctSize = swift_stdlib_u_charName(
         _value,
         choice,
         UnsafeMutableRawPointer(bufPtr.baseAddress._unsafelyUnwrappedUnchecked)
@@ -1281,7 +1281,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the `Canonical_Combining_Class` property in
   /// the [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var canonicalCombiningClass: Unicode.CanonicalCombiningClass {
-    let rawValue = UInt8(__swift_stdlib_u_getIntPropertyValue(
+    let rawValue = UInt8(swift_stdlib_u_getIntPropertyValue(
       _value, __swift_stdlib_UCHAR_CANONICAL_COMBINING_CLASS))
     return Unicode.CanonicalCombiningClass(rawValue: rawValue)
   }
@@ -1363,7 +1363,7 @@ extension Unicode.Scalar.Properties {
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var numericType: Unicode.NumericType? {
     let rawValue = __swift_stdlib_UNumericType(
-      UInt32(__swift_stdlib_u_getIntPropertyValue(
+      UInt32(swift_stdlib_u_getIntPropertyValue(
         _value, __swift_stdlib_UCHAR_NUMERIC_TYPE)))
     return Unicode.NumericType(rawValue: rawValue)
   }
@@ -1391,7 +1391,7 @@ extension Unicode.Scalar.Properties {
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var numericValue: Double? {
     let icuNoNumericValue: Double = -123456789
-    let result = __swift_stdlib_u_getNumericValue(_value)
+    let result = swift_stdlib_u_getNumericValue(_value)
     return result != icuNoNumericValue ? result : nil
   }
 }

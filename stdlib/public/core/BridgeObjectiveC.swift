@@ -163,15 +163,15 @@ public struct _BridgeableMetatype: _ObjectiveCBridgeable {
 ///
 /// COMPILER_INTRINSIC
 @inlinable // FIXME(sil-serialize-all)
-public func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
+public func swift_bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return unsafeBitCast(x, to: AnyObject.self)
   }
-  return _bridgeAnythingNonVerbatimToObjectiveC(x)
+  return swift_bridgeAnythingNonVerbatimToObjectiveC(x)
 }
 
 @_silgen_name("")
-public func _bridgeAnythingNonVerbatimToObjectiveC<T>(_ x: __owned T) -> AnyObject
+public func swift_bridgeAnythingNonVerbatimToObjectiveC<T>(_ x: __owned T) -> AnyObject
 
 /// Convert a purportedly-nonnull `id` value from Objective-C into an Any.
 ///
@@ -206,7 +206,7 @@ public func _forceBridgeFromObjectiveC<T>(_ x: AnyObject, _: T.Type) -> T {
   }
 
   var result: T?
-  _bridgeNonVerbatimFromObjectiveC(x, T.self, &result)
+  swift_bridgeNonVerbatimFromObjectiveC(x, T.self, &result)
   return result!
 }
 
@@ -245,7 +245,7 @@ public func _conditionallyBridgeFromObjectiveC<T>(
   }
 
   var result: T?
-  _ = _bridgeNonVerbatimFromObjectiveCConditional(x, T.self, &result)
+  _ = swift_bridgeNonVerbatimFromObjectiveCConditional(x, T.self, &result)
   return result
 }
 
@@ -263,7 +263,7 @@ public func _conditionallyBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeabl
 }
 
 @_silgen_name("")
-public func _bridgeNonVerbatimFromObjectiveC<T>(
+public func swift_bridgeNonVerbatimFromObjectiveC<T>(
   _ x: AnyObject,
   _ nativeType: T.Type,
   _ result: inout T?
@@ -296,7 +296,7 @@ internal func _bridgeNonVerbatimBoxedValue<NativeType>(
 ///
 /// - Returns: `true` to indicate success, `false` to indicate failure.
 @_silgen_name("")
-public func _bridgeNonVerbatimFromObjectiveCConditional<T>(
+public func swift_bridgeNonVerbatimFromObjectiveCConditional<T>(
   _ x: AnyObject,
   _ nativeType: T.Type,
   _ result: inout T?
@@ -312,11 +312,11 @@ public func _isBridgedToObjectiveC<T>(_: T.Type) -> Bool {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return true
   }
-  return _isBridgedNonVerbatimToObjectiveC(T.self)
+  return swift_isBridgedNonVerbatimToObjectiveC(T.self)
 }
 
 @_silgen_name("")
-public func _isBridgedNonVerbatimToObjectiveC<T>(_: T.Type) -> Bool
+public func swift_isBridgedNonVerbatimToObjectiveC<T>(_: T.Type) -> Bool
 
 /// A type that's bridged "verbatim" does not conform to
 /// `_ObjectiveCBridgeable`, and can have its bits reinterpreted as an
@@ -333,11 +333,11 @@ public func _getBridgedObjectiveCType<T>(_: T.Type) -> Any.Type? {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return T.self
   }
-  return _getBridgedNonVerbatimObjectiveCType(T.self)
+  return swift_getBridgedNonVerbatimObjectiveCType(T.self)
 }
 
 @_silgen_name("")
-public func _getBridgedNonVerbatimObjectiveCType<T>(_: T.Type) -> Any.Type?
+public func swift_getBridgedNonVerbatimObjectiveCType<T>(_: T.Type) -> Any.Type?
 
 // -- Pointer argument bridging
 
@@ -705,7 +705,7 @@ func _makeSwiftValue(_ value: Any) -> AnyObject {
 ///
 /// COMPILER_INTRINSIC
 @inlinable // FIXME(sil-serialize-all)
-public func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
+public func swift_bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
   var done = false
   var result: AnyObject!
   

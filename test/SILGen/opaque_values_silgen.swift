@@ -935,7 +935,7 @@ func s460______________foo<Element>(p: UnsafePointer<Element>) -> UnsafeBufferPo
 // CHECK-objc [[SRC:%.*]] = copy_value [[BORROW]] : $Any
 // CHECK-objc [[OPEN:%.*]] = open_existential_opaque [[SRC]] : $Any to $@opened
 // CHECK-objc [[COPY:%.*]] = copy_value [[OPEN]] : $@opened
-// CHECK-objc [[F:%.*]] = function_ref @$Ss27_bridgeAnythingToObjectiveCyyXlxlF : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @owned AnyObject
+// CHECK-objc [[F:%.*]] = function_ref @$Ss32swift_bridgeAnythingToObjectiveCyyXlxlF : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @owned AnyObject
 // CHECK-objc [[RET:%.*]] = apply [[F]]<@opened("{{.*}}") Any>([[COPY]]) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @owned AnyObject
 // CHECK-objc destroy_value [[SRC]] : $Any
 // CHECK-objc destroy_value %0 : $Any

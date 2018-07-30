@@ -251,10 +251,10 @@ process start and the function returns.
 should be implementable in the standard library now.
 
 ```
-0000000000003c80 T _swift_bridgeNonVerbatimFromObjectiveCConditional
+0000000000003c80 T swift_bridgeNonVerbatimFromObjectiveCConditional
 00000000000037e0 T _swift_bridgeNonVerbatimToObjectiveC
-00000000000039c0 T _swift_getBridgedNonVerbatimObjectiveCType
-0000000000003d90 T _swift_isBridgedNonVerbatimToObjectiveC
+00000000000039c0 T swift_getBridgedNonVerbatimObjectiveCType
+0000000000003d90 T swift_isBridgedNonVerbatimToObjectiveC
 ```
 
 ## Code generation
@@ -328,12 +328,12 @@ runtime.
 0000000000022fb0 T _swift_getObjectType
 00000000000006f0 T _swift_getTypeName
 00000000000040c0 T _swift_isClassType
-0000000000003f50 T _swift_isClassOrObjCExistentialType
+0000000000003f50 T swift_isClassOrObjCExistentialType
 0000000000004130 T _swift_isOptionalType
 00000000000279f0 T _swift_objc_class_usesNativeSwiftReferenceCounting
 000000000002b340 T _swift_objc_class_unknownGetInstanceExtents
 000000000002b350 T _swift_class_getInstanceExtents
-0000000000004080 T _swift_class_getSuperclass
+0000000000004080 T swift_class_getSuperclass
 ```
 
 **ABI TODO**: getTypeByName entry point.
