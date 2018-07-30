@@ -1664,8 +1664,8 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
 
           SmallVector<ValueDecl *, 8> Decls;
           TopLevelModule->lookupQualified(
-              ModuleType::get(TopLevelModule), ScopeID,
-              NL_QualifiedDefault | NL_KnownNoDependency, nullptr, Decls);
+              TopLevelModule, ScopeID,
+              NL_QualifiedDefault | NL_KnownNoDependency, Decls);
           Optional<ImportKind> FoundKind = ImportDecl::findBestImportKind(Decls);
           assert(FoundKind.hasValue() &&
                  "deserialized imports should not be ambiguous");

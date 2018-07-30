@@ -1685,23 +1685,15 @@ bool DeclContext::lookupQualified(Type type,
   SmallVector<NominalTypeDecl *, 4> nominalTypesToLookInto;
   extractDirectlyReferencedNominalTypes(type, nominalTypesToLookInto);
 
-  SmallVector<TypeDecl *, 4> declsToLookInto(nominalTypesToLookInto.begin(),
-                                             nominalTypesToLookInto.end());
-  return lookupQualified(declsToLookInto, member, options, decls);
+  return lookupQualified(nominalTypesToLookInto, member, options, decls);
 }
 
-bool DeclContext::lookupQualified(ArrayRef<TypeDecl *> typeDecls,
+bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
                                   DeclName member,
                                   NLOptions options,
                                   SmallVectorImpl<ValueDecl *> &decls) const {
   using namespace namelookup;
   assert(decls.empty() && "additive lookup not supported");
-
-  // If we have a module, look in it.
-  if (typeDecls.size() == 1 && isa<ModuleDecl>(typeDecls[0])) {
-    return lookupQualified(cast<ModuleDecl>(typeDecls[0]), member, options,
-                           decls);
-  }
 
   // Configure lookup and dig out the tracker.
   ReferencedNameTracker *tracker = nullptr;
@@ -1727,33 +1719,8 @@ bool DeclContext::lookupQualified(ArrayRef<TypeDecl *> typeDecls,
 
   // Look through the type declarations we were given, resolving
   ASTContext &ctx = getASTContext();
-  for (auto typeDecl : typeDecls) {
-    // Add nominal types directly.
-    if (auto nominal = dyn_cast<NominalTypeDecl>(typeDecl)) {
-      addNominalType(nominal);
-      continue;
-    }
-
-    // For typealiases, extract nominal type declarations from the underlying
-    // type of the typealias.
-    if (auto typealias = dyn_cast<TypeAliasDecl>(typeDecl)) {
-      SmallVector<NominalTypeDecl *, 4> nominalTypeDecls;
-      if (!typealias->getUnderlyingTypeLoc().getType()) {
-        auto lazyResolver = ctx.getLazyResolver();
-        assert(lazyResolver && "Cannot resolve underlying type of typealias");
-        lazyResolver->resolveDeclSignature(typealias);
-      }
-
-      extractDirectlyReferencedNominalTypes(
-          typealias->getUnderlyingTypeLoc().getType(),
-          nominalTypeDecls);
-      for (auto nominal : nominalTypeDecls)
-        addNominalType(nominal);
-      continue;
-    }
-
-    llvm_unreachable("Cannot look into multiple modules "
-                     "or any type parameter");
+  for (auto nominal : typeDecls) {
+    addNominalType(nominal);
   }
 
   // Whether we only want to return complete object initializers.

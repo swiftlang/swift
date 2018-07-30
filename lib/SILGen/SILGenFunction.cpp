@@ -450,10 +450,9 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
       ->loadModule(SourceLoc(), UIKitName);
     assert(UIKit && "couldn't find UIKit objc module?!");
     SmallVector<ValueDecl *, 1> results;
-    UIKit->lookupQualified(UIKit->getInterfaceType(),
+    UIKit->lookupQualified(UIKit,
                            ctx.getIdentifier("UIApplicationMain"),
                            NL_QualifiedDefault,
-                           /*resolver*/nullptr,
                            results);
     assert(results.size() == 1
            && "couldn't find a unique UIApplicationMain in the UIKit ObjC "
