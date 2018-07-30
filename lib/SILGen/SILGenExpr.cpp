@@ -3635,7 +3635,13 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
     [&]() -> bool {
       return getASTContext().LangOpts.EnableKeyPathResilience
         && !forPropertyDescriptor
-        && storage->getModuleContext() != SwiftModule;
+        && storage->getModuleContext() != SwiftModule
+        // Protocol requirements don't have nor need property descriptors.
+        && !isa<ProtocolDecl>(storage->getDeclContext())
+        // Properties that only dispatch via ObjC lookup do not have nor need
+        // property descriptors, since the selector identifies the storage.
+        && (!storage->hasAnyAccessors()
+            || !getGetterDeclRef(storage).isForeign);
     };
   
   auto strategy = storage->getAccessStrategy(AccessSemantics::Ordinary,
