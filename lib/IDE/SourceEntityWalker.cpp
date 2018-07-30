@@ -262,6 +262,7 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
   if (!isa<InOutExpr>(E) &&
       !isa<LoadExpr>(E) &&
       !isa<OpenExistentialExpr>(E) &&
+      !isa<MakeTemporarilyEscapableExpr>(E) &&
       !isa<CollectionUpcastConversionExpr>(E) &&
       !isa<OpaqueValueExpr>(E) &&
       E->isImplicit())
@@ -435,6 +436,22 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
 
     if (!OEE->getSubExpr()->walk(*this))
       return { false, nullptr };
+    if (!walkToExprPost(E))
+      return { false, nullptr };
+    return { false, E };
+  } else if (auto MTEE = dyn_cast<MakeTemporarilyEscapableExpr>(E)) {
+    // Manually walk to original arguments in order. We don't handle
+    // OpaqueValueExpr here.
+
+    // Original non-escaping closure.
+    if (!MTEE->getNonescapingClosureValue()->walk(*this))
+      return { false, nullptr };
+
+    // Body, which is called by synthesized CallExpr.
+    auto *callExpr = cast<CallExpr>(MTEE->getSubExpr());
+    if (!callExpr->getFn()->walk(*this))
+      return { false, nullptr };
+
     if (!walkToExprPost(E))
       return { false, nullptr };
     return { false, E };
