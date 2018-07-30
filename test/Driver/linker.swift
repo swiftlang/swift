@@ -43,11 +43,11 @@
 // RUN: %FileCheck %s < %t.complex.txt
 // RUN: %FileCheck -check-prefix COMPLEX %s < %t.complex.txt
 
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-ios7.1 -Xlinker -rpath -Xlinker customrpath %s 2>&1 > %t.simple.txt
-// RUN: %FileCheck -check-prefix IOS-custom-rpath %s < %t.simple.txt
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-ios7.1 -Xlinker -rpath -Xlinker customrpath -L foo %s 2>&1 > %t.simple.txt
+// RUN: %FileCheck -check-prefix IOS-linker-order %s < %t.simple.txt
 
-// RUN: %swiftc_driver -driver-print-jobs -target armv7-unknown-linux-gnueabihf -Xlinker -rpath -Xlinker customrpath %s 2>&1 > %t.linux.txt
-// RUN: %FileCheck -check-prefix LINUX-custom-rpath %s < %t.linux.txt
+// RUN: %swiftc_driver -driver-print-jobs -target armv7-unknown-linux-gnueabihf -Xlinker -rpath -Xlinker customrpath -L foo %s 2>&1 > %t.linux.txt
+// RUN: %FileCheck -check-prefix LINUX-linker-order %s < %t.linux.txt
 
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -g %s | %FileCheck -check-prefix DEBUG %s
 
@@ -292,21 +292,23 @@
 // LINUX_DYNLIB-x86_64-DAG: -L bar
 // LINUX_DYNLIB-x86_64: -o dynlib.out
 
-// IOS-custom-rpath: swift
-// IOS-custom-rpath: -o [[OBJECTFILE:.*]]
+// IOS-linker-order: swift
+// IOS-linker-order: -o [[OBJECTFILE:.*]]
 
-// IOS-custom-rpath: bin/ld{{"? }}
-// IOS-custom-rpath: -rpath [[STDLIB_PATH:[^ ]+/lib/swift/iphonesimulator]]
-// IOS-custom-rpath: -rpath customrpath
-// IOS-custom-rpath: -o {{.*}}
+// IOS-linker-order: bin/ld{{"? }}
+// IOS-linker-order: -rpath [[STDLIB_PATH:[^ ]+/lib/swift/iphonesimulator]]
+// IOS-linker-order: -L foo
+// IOS-linker-order: -rpath customrpath
+// IOS-linker-order: -o {{.*}}
 
-// LINUX-custom-rpath: swift
-// LINUX-custom-rpath: -o [[OBJECTFILE:.*]]
+// LINUX-linker-order: swift
+// LINUX-linker-order: -o [[OBJECTFILE:.*]]
 
-// LINUX-custom-rpath: clang++{{"? }}
-// LINUX-custom-rpath: -Xlinker -rpath -Xlinker {{[^ ]+/lib/swift/linux}}
-// LINUX-custom-rpath: -Xlinker -rpath -Xlinker customrpath
-// LINUX-custom-rpath: -o {{.*}}
+// LINUX-linker-order: clang++{{"? }}
+// LINUX-linker-order: -Xlinker -rpath -Xlinker {{[^ ]+/lib/swift/linux}}
+// LINUX-linker-order: -L foo
+// LINUX-linker-order: -Xlinker -rpath -Xlinker customrpath
+// LINUX-linker-order: -o {{.*}}
 
 // DEBUG: bin/swift
 // DEBUG-NEXT: bin/swift
