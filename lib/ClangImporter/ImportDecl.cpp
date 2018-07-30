@@ -525,6 +525,7 @@ static AccessorDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
                      TypeLoc::withoutLoc(rawTy), enumDecl);
   getterDecl->setImplicit();
   getterDecl->setIsObjC(false);
+  getterDecl->setIsDynamic(false);
 
   getterDecl->computeType();
   getterDecl->setValidationToChecked();
@@ -604,6 +605,7 @@ static AccessorDecl *makeStructRawValueGetter(
                      TypeLoc::withoutLoc(computedType), structDecl);
   getterDecl->setImplicit();
   getterDecl->setIsObjC(false);
+  getterDecl->setIsDynamic(false);
 
   getterDecl->computeType();
   getterDecl->setValidationToChecked();
@@ -669,6 +671,7 @@ static AccessorDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
                      TypeLoc::withoutLoc(getterType), importedDecl, clangNode);
   getterDecl->setAccess(AccessLevel::Public);
   getterDecl->setIsObjC(false);
+  getterDecl->setIsDynamic(false);
 
   getterDecl->computeType();
   getterDecl->setValidationToChecked();
@@ -707,6 +710,7 @@ static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
                      /*GenericParams=*/nullptr, selfDecl, params,
                      TypeLoc::withoutLoc(voidTy), importedDecl, clangNode);
   setterDecl->setIsObjC(false);
+  setterDecl->setIsDynamic(false);
   setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
 
   setterDecl->computeType();
@@ -1593,6 +1597,7 @@ buildSubscriptGetterDecl(ClangImporter::Implementation &Impl,
   if (auto objcAttr = getter->getAttrs().getAttribute<ObjCAttr>())
     thunk->getAttrs().add(objcAttr->clone(C));
   thunk->setIsObjC(getter->isObjC());
+  thunk->setIsDynamic(getter->isDynamic());
   // FIXME: Should we record thunks?
 
   return thunk;
@@ -1653,6 +1658,7 @@ buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
   if (auto objcAttr = setter->getAttrs().getAttribute<ObjCAttr>())
     thunk->getAttrs().add(objcAttr->clone(C));
   thunk->setIsObjC(setter->isObjC());
+  thunk->setIsDynamic(setter->isDynamic());
 
   return thunk;
 }
@@ -1819,6 +1825,7 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
   getterDecl->computeType();
   getterDecl->setValidationToChecked();
   getterDecl->setIsObjC(false);
+  getterDecl->setIsDynamic(false);
 
   swiftDecl->addMember(errorDomainPropertyDecl);
   swiftDecl->addMember(getterDecl);
@@ -3382,6 +3389,7 @@ namespace {
                        name, dc->mapTypeIntoContext(type), dc);
       result->setInterfaceType(type);
       result->setIsObjC(false);
+      result->setIsDynamic(false);
       Impl.recordImplicitUnwrapForDecl(result,
                                        importedType.isImplicitlyUnwrapped());
 
@@ -3518,6 +3526,7 @@ namespace {
       result->setInterfaceType(type);
       result->setValidationToChecked();
       result->setIsObjC(false);
+      result->setIsDynamic(false);
       Impl.recordImplicitUnwrapForDecl(result,
                                        importedType.isImplicitlyUnwrapped());
 
@@ -3612,6 +3621,7 @@ namespace {
                               Impl.importSourceLoc(decl->getLocation()),
                               name, dc->mapTypeIntoContext(type), dc);
       result->setIsObjC(false);
+      result->setIsDynamic(false);
       result->setInterfaceType(type);
       Impl.recordImplicitUnwrapForDecl(result,
                                        importedType.isImplicitlyUnwrapped());
@@ -3698,6 +3708,7 @@ namespace {
                        Impl.importSourceLoc(decl->getLocation()),
                        name, dc->mapTypeIntoContext(type), dc);
       result->setIsObjC(false);
+      result->setIsDynamic(false);
       result->setInterfaceType(type);
       Impl.recordImplicitUnwrapForDecl(result,
                                        importedType.isImplicitlyUnwrapped());
@@ -3760,6 +3771,7 @@ namespace {
                                               /*implicitName=*/true));
       }
       decl->setIsObjC(true);
+      decl->setIsDynamic(true);
 
       // If the declaration we attached the 'objc' attribute to is within a
       // class, record it in the class.
@@ -5596,6 +5608,7 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
                                    importedType.isImplicitlyUnwrapped());
   result->setOverriddenDecls({ });
   result->setIsObjC(false);
+  result->setIsDynamic(false);
 
   finishFuncDecl(decl, result);
   if (correctSwiftName)
@@ -5838,6 +5851,8 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
       propertyName, dc->mapTypeIntoContext(swiftPropertyType), dc);
   property->setInterfaceType(swiftPropertyType);
   property->setIsObjC(false);
+  property->setIsDynamic(false);
+
   Impl.recordImplicitUnwrapForDecl(property,
                                    importedType.isImplicitlyUnwrapped());
 
@@ -8194,6 +8209,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
 
   var->setInterfaceType(type);
   var->setIsObjC(false);
+  var->setIsDynamic(false);
 
   // 'self'
   ParamDecl *selfDecl = nullptr;
@@ -8221,6 +8237,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   func->setValidationToChecked();
   func->setImplicit();
   func->setIsObjC(false);
+  func->setIsDynamic(false);
 
   // If we're not done type checking, build the getter body.
   if (!hasFinishedTypeChecking()) {
@@ -8298,6 +8315,7 @@ createUnavailableDecl(Identifier name, DeclContext *dc, Type type,
                                               /*IsCaptureList*/false,
                                               SourceLoc(), name, type, dc);
   var->setIsObjC(false);
+  var->setIsDynamic(false);
   var->setInterfaceType(type);
   markUnavailable(var, UnavailableMessage);
 
