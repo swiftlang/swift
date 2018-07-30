@@ -241,11 +241,7 @@ void verifyKeyPathComponent(SILModule &M,
               "component for subscript should have indices");
     }
     
-    ParameterConvention normalArgConvention;
-    if (M.getOptions().EnableGuaranteedNormalArguments)
-      normalArgConvention = ParameterConvention::Indirect_In_Guaranteed;
-    else
-      normalArgConvention = ParameterConvention::Indirect_In;
+    auto normalArgConvention = ParameterConvention::Indirect_In_Guaranteed;
   
     // Getter should be <Sig...> @convention(thin) (@in_guaranteed Base) -> @out Result
     {

@@ -1306,9 +1306,7 @@ getSILFunctionTypeForAbstractCFunction(SILModule &M,
 /// If EnableGuaranteedNormalArguments is set, return a default convention that
 /// uses guaranteed.
 static DefaultConventions getNormalArgumentConvention(SILModule &M) {
-  if (M.getOptions().EnableGuaranteedNormalArguments)
-    return DefaultConventions(NormalParameterConvention::Guaranteed);
-  return DefaultConventions(NormalParameterConvention::Owned);
+  return DefaultConventions(NormalParameterConvention::Guaranteed);
 }
 
 static CanSILFunctionType getNativeSILFunctionType(
