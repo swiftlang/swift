@@ -3607,12 +3607,15 @@ bool ClangImporter::isInOverlayModuleForImportedModule(
   importedDC = importedDC->getModuleScopeContext();
 
   auto importedClangModuleUnit = dyn_cast<ClangModuleUnit>(importedDC);
-  if (!importedClangModuleUnit || !importedClangModuleUnit->getClangModule())
+  if (!importedClangModuleUnit)
     return false;
 
   auto overlayModule = overlayDC->getParentModule();
   if (overlayModule == importedClangModuleUnit->getAdapterModule())
     return true;
+
+  if (!importedClangModuleUnit->getClangModule())
+    return false;
 
   // Is this a private module that's re-exported to the public (overlay) name?
   auto clangModule =
