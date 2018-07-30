@@ -4761,52 +4761,54 @@ namespace {
       if (shouldImportPropertyAsAccessors(decl))
         return nullptr;
 
-      // Check whether there is a function with the same name as this
-      // property. If so, suppress the property; the user will have to use
-      // the methods directly, to avoid ambiguities.
-      Type containerTy = dc->getDeclaredInterfaceType();
-      Type lookupContextTy = containerTy;
-      if (auto *classDecl = dyn_cast<ClassDecl>(dc)) {
-        // If we're importing into the primary @interface for something, as
-        // opposed to an extension, make sure we don't try to load any
-        // categories...by just looking into the super type.
-        lookupContextTy = classDecl->getSuperclass();
-      }
-
       VarDecl *overridden = nullptr;
-      if (lookupContextTy) {
-        SmallVector<ValueDecl *, 2> lookup;
-        dc->lookupQualified(lookupContextTy, name,
-                            NL_QualifiedDefault | NL_KnownNoDependency,
-                            Impl.getTypeResolver(), lookup);
-        for (auto result : lookup) {
-          if (isa<FuncDecl>(result) &&
-              result->isInstanceMember() == decl->isInstanceProperty() &&
-              result->getFullName().getArgumentNames().empty())
-            return nullptr;
+      if (dc->getAsClassOrClassExtensionContext()) {
+        // Check whether there is a function with the same name as this
+        // property. If so, suppress the property; the user will have to use
+        // the methods directly, to avoid ambiguities.
+        Type containerTy = dc->getDeclaredInterfaceType();
+        Type lookupContextTy = containerTy;
+        if (auto *classDecl = dyn_cast<ClassDecl>(dc)) {
+          // If we're importing into the primary @interface for something, as
+          // opposed to an extension, make sure we don't try to load any
+          // categories...by just looking into the super type.
+          lookupContextTy = classDecl->getSuperclass();
+        }
 
-          if (auto var = dyn_cast<VarDecl>(result)) {
-            // If the selectors of the getter match in Objective-C, we have an
-            // override.
-            if (var->isInstanceMember() == decl->isInstanceProperty() &&
-                var->getObjCGetterSelector() ==
-                  Impl.importSelector(decl->getGetterName()))
-              overridden = var;
+        if (lookupContextTy) {
+          SmallVector<ValueDecl *, 2> lookup;
+          dc->lookupQualified(lookupContextTy, name,
+                              NL_QualifiedDefault | NL_KnownNoDependency,
+                              Impl.getTypeResolver(), lookup);
+          for (auto result : lookup) {
+            if (isa<FuncDecl>(result) &&
+                result->isInstanceMember() == decl->isInstanceProperty() &&
+                result->getFullName().getArgumentNames().empty())
+              return nullptr;
+
+            if (auto var = dyn_cast<VarDecl>(result)) {
+              // If the selectors of the getter match in Objective-C, we have an
+              // override.
+              if (var->isInstanceMember() == decl->isInstanceProperty() &&
+                  var->getObjCGetterSelector() ==
+                    Impl.importSelector(decl->getGetterName()))
+                overridden = var;
+            }
           }
         }
-      }
 
-      if (overridden) {
-        const DeclContext *overrideContext = overridden->getDeclContext();
-        // It's okay to compare interface types directly because Objective-C
-        // does not have constrained extensions.
-        if (overrideContext != dc && overridden->hasClangNode() &&
-            overrideContext->getDeclaredInterfaceType()->isEqual(containerTy)) {
-          // We've encountered a redeclaration of the property.
-          // HACK: Just update the original declaration instead of importing a
-          // second property.
-          handlePropertyRedeclaration(overridden, decl);
-          return nullptr;
+        if (overridden) {
+          const DeclContext *overrideContext = overridden->getDeclContext();
+          // It's okay to compare interface types directly because Objective-C
+          // does not have constrained extensions.
+          if (overrideContext != dc && overridden->hasClangNode() &&
+              overrideContext->getDeclaredInterfaceType()->isEqual(containerTy)) {
+            // We've encountered a redeclaration of the property.
+            // HACK: Just update the original declaration instead of importing a
+            // second property.
+            handlePropertyRedeclaration(overridden, decl);
+            return nullptr;
+          }
         }
       }
 
@@ -4871,6 +4873,7 @@ namespace {
                                       OptionalAttr(/*implicit*/false));
       // FIXME: Handle IBOutletCollection.
 
+      // Only record overrides of class members.
       if (overridden) {
         result->setOverriddenDecl(overridden);
         getter->setOverriddenDecl(overridden->getGetter());
