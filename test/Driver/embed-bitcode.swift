@@ -119,3 +119,15 @@
 // RUN: %target-swiftc_driver -embed-bitcode -emit-assembly %s 2>&1 -### | %FileCheck %s -check-prefix=WARN-EMBED-BITCODE
 // WARN-EMBED-BITCODE: warning: ignoring -embed-bitcode since no object file is being generated
 // WARN-EMBED-BITCODE-NOT: -embed-bitcode
+
+// RUN: %target-swiftc_driver -embed-bitcode-marker -emit-module %s 2>&1 -### | %FileCheck %s -check-prefix=WARN-EMBED-BITCODE-MARKER
+// RUN: %target-swiftc_driver -embed-bitcode-marker -emit-module-path a.swiftmodule %s 2>&1 -### | %FileCheck %s -check-prefix=WARN-EMBED-BITCODE-MARKER
+// RUN: %target-swiftc_driver -embed-bitcode-marker -emit-sib %s 2>&1 -### | %FileCheck %s -check-prefix=WARN-EMBED-BITCODE-MARKER
+// RUN: %target-swiftc_driver -embed-bitcode-marker -emit-sibgen %s 2>&1 -### | %FileCheck %s -check-prefix=WARN-EMBED-BITCODE-MARKER
+// RUN: %target-swiftc_driver -embed-bitcode-marker -emit-sil %s 2>&1 -### | %FileCheck %s -check-prefix=WARN-EMBED-BITCODE-MARKER
+// RUN: %target-swiftc_driver -embed-bitcode-marker -emit-silgen %s 2>&1 -### | %FileCheck %s -check-prefix=WARN-EMBED-BITCODE-MARKER
+// RUN: %target-swiftc_driver -embed-bitcode-marker -emit-ir %s 2>&1 -### | %FileCheck %s -check-prefix=WARN-EMBED-BITCODE-MARKER
+// RUN: %target-swiftc_driver -embed-bitcode-marker -emit-bc %s 2>&1 -### | %FileCheck %s -check-prefix=WARN-EMBED-BITCODE-MARKER
+// RUN: %target-swiftc_driver -embed-bitcode-marker -emit-assembly %s 2>&1 -### | %FileCheck %s -check-prefix=WARN-EMBED-BITCODE-MARKER
+// WARN-EMBED-BITCODE-MARKER: warning: ignoring -embed-bitcode-marker since no object file is being generated
+// WARN-EMBED-BITCODE-MARKER-NOT: -embed-bitcode-marker

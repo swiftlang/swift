@@ -618,6 +618,12 @@ static void validateEmbedBitcode(DerivedArgList &Args, const OutputInfo &OI,
     Diags.diagnose(SourceLoc(), diag::warn_ignore_embed_bitcode);
     Args.eraseArg(options::OPT_embed_bitcode);
   }
+
+  if (Args.hasArg(options::OPT_embed_bitcode_marker) &&
+      OI.CompilerOutputType != file_types::TY_Object) {
+    Diags.diagnose(SourceLoc(), diag::warn_ignore_embed_bitcode_marker);
+    Args.eraseArg(options::OPT_embed_bitcode_marker);
+  }
 }
 
 /// Gets the filelist threshold to use. Diagnoses and returns true on error.
