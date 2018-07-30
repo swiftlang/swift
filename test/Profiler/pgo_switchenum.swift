@@ -1,16 +1,16 @@
 
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -Xfrontend -enable-sil-ownership -profile-generate -Xfrontend -disable-incremental-llvm-codegen -module-name pgo_switchenum -o %t/main
+// RUN: %target-build-swift %s -Xfrontend -enable-sil-ownership-verifier -profile-generate -Xfrontend -disable-incremental-llvm-codegen -module-name pgo_switchenum -o %t/main
 // RUN: env LLVM_PROFILE_FILE=%t/default.profraw %target-run %t/main
 // RUN: %llvm-profdata merge %t/default.profraw -o %t/default.profdata
 // need to move counts attached to expr for this
-// RUN: %target-swift-frontend %s -Xllvm -sil-full-demangle -profile-use=%t/default.profdata -enable-sil-ownership -emit-sorted-sil -emit-sil -module-name pgo_switchenum -o - | %FileCheck %s --check-prefix=SIL
+// RUN: %target-swift-frontend %s -Xllvm -sil-full-demangle -profile-use=%t/default.profdata -enable-sil-ownership-verifier -emit-sorted-sil -emit-sil -module-name pgo_switchenum -o - | %FileCheck %s --check-prefix=SIL
 // need to lower switch_enum(addr) into IR for this
-// %target-swift-frontend %s -enable-sil-ownership -Xllvm -sil-full-demangle -profile-use=%t/default.profdata -emit-ir -module-name pgo_switchenum -o - | %FileCheck %s --check-prefix=IR
+// %target-swift-frontend %s -enable-sil-ownership-verifier -Xllvm -sil-full-demangle -profile-use=%t/default.profdata -emit-ir -module-name pgo_switchenum -o - | %FileCheck %s --check-prefix=IR
 // need to check Opt support
-// %target-swift-frontend %s -enable-sil-ownership -Xllvm -sil-full-demangle -profile-use=%t/default.profdata -O -emit-sorted-sil -emit-sil -module-name pgo_switchenum -o - | %FileCheck %s --check-prefix=SIL-OPT
+// %target-swift-frontend %s -enable-sil-ownership-verifier -Xllvm -sil-full-demangle -profile-use=%t/default.profdata -O -emit-sorted-sil -emit-sil -module-name pgo_switchenum -o - | %FileCheck %s --check-prefix=SIL-OPT
 // need to lower switch_enum(addr) into IR for this
-// %target-swift-frontend -enable-sil-ownership %s -Xllvm -sil-full-demangle -profile-use=%t/default.profdata -O -emit-ir -module-name pgo_switchenum -o - | %FileCheck %s --check-prefix=IR-OPT
+// %target-swift-frontend -enable-sil-ownership-verifier %s -Xllvm -sil-full-demangle -profile-use=%t/default.profdata -O -emit-ir -module-name pgo_switchenum -o - | %FileCheck %s --check-prefix=IR-OPT
 
 // REQUIRES: profile_runtime
 // REQUIRES: OS=macosx

@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name foreach -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name foreach -enable-sil-ownership-verifier %s | %FileCheck %s
 
 //////////////////
 // Declarations //

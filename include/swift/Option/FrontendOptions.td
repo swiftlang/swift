@@ -267,7 +267,7 @@ def emit_pch : Flag<["-"], "emit-pch">,
 def pch_disable_validation : Flag<["-"], "pch-disable-validation">,
   HelpText<"Disable validating the persistent PCH">;
 
-def enable_sil_ownership : Flag<["-"], "enable-sil-ownership">,
+def enable_sil_ownership_verifier : Flag<["-"], "enable-sil-ownership-verifier">,
   HelpText<"Enable the SIL Ownership Model">;
 
 def disable_guaranteed_normal_arguments : Flag<["-"], "disable-guaranteed-normal-arguments">,

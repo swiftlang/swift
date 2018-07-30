@@ -242,7 +242,7 @@ function(_compile_swift_files
   endif()
 
   if(SWIFT_STDLIB_ENABLE_SIL_OWNERSHIP AND SWIFTFILE_IS_STDLIB)
-    list(APPEND swift_flags "-Xfrontend" "-enable-sil-ownership")
+    list(APPEND swift_flags "-Xfrontend" "-enable-sil-ownership-verifier")
   endif()
 
   if(SWIFT_EMIT_SORTED_SIL_OUTPUT)

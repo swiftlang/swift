@@ -1,7 +1,7 @@
 
-// RUN: %target-swift-frontend -module-name access_marker_verify -enable-verify-exclusivity -enforce-exclusivity=checked -enable-sil-ownership -emit-silgen -swift-version 4 -parse-as-library %s | %FileCheck %s
-// RUN: %target-swift-frontend -module-name access_marker_verify -enable-verify-exclusivity -enforce-exclusivity=checked -enable-sil-ownership -Onone -emit-sil -swift-version 4 -parse-as-library %s -o /dev/null
-// RUN: %target-swift-frontend -module-name access_marker_verify -enable-verify-exclusivity -enforce-exclusivity=checked -enable-sil-ownership -O -emit-sil -swift-version 4 -parse-as-library %s -o /dev/null
+// RUN: %target-swift-frontend -module-name access_marker_verify -enable-verify-exclusivity -enforce-exclusivity=checked -enable-sil-ownership-verifier -emit-silgen -swift-version 4 -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name access_marker_verify -enable-verify-exclusivity -enforce-exclusivity=checked -enable-sil-ownership-verifier -Onone -emit-sil -swift-version 4 -parse-as-library %s -o /dev/null
+// RUN: %target-swift-frontend -module-name access_marker_verify -enable-verify-exclusivity -enforce-exclusivity=checked -enable-sil-ownership-verifier -O -emit-sil -swift-version 4 -parse-as-library %s -o /dev/null
 // REQUIRES: asserts
 
 // Test the combination of SILGen + DiagnoseStaticExclusivity with verification.

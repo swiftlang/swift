@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-sil-ownership -sil-verify-all -emit-sil %s -o /dev/null -verify
+// RUN: %target-swift-frontend -enable-sil-ownership-verifier -sil-verify-all -emit-sil %s -o /dev/null -verify
 // REQUIRES: objc_interop
 
 import Foundation

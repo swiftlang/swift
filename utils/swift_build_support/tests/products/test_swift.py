@@ -55,7 +55,7 @@ class SwiftTestCase(unittest.TestCase):
             benchmark=False,
             benchmark_num_onone_iterations=3,
             benchmark_num_o_iterations=3,
-            enable_sil_ownership=False,
+            enable_sil_ownership_verifier=False,
             disable_guaranteed_normal_arguments=True,
             force_optimized_typechecker=False,
             enable_stdlibcore_exclusivity_checking=False)
@@ -284,7 +284,7 @@ class SwiftTestCase(unittest.TestCase):
             [x for x in swift.cmake_options if 'SWIFT_BENCHMARK_NUM' in x])
 
     def test_sil_ownership_flags(self):
-        self.args.enable_sil_ownership = True
+        self.args.enable_sil_ownership_verifier = True
         swift = Swift(
             args=self.args,
             toolchain=self.toolchain,

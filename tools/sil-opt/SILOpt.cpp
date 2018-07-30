@@ -77,8 +77,8 @@ EnableResilience("enable-resilience",
                                 "default"));
 
 static llvm::cl::opt<bool>
-EnableSILOwnershipOpt("enable-sil-ownership",
-                 llvm::cl::desc("Compile the module with sil-ownership initially enabled for all functions"));
+EnableSILOwnershipOpt("enable-sil-ownership-verifier",
+                 llvm::cl::desc("Compile the module with sil-ownership verifier enabled"));
 
 static llvm::cl::opt<bool>
 EnableSILOpaqueValues("enable-sil-opaque-values",

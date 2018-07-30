@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name access_marker_mandatory -enable-sil-ownership -parse-as-library -Xllvm -sil-full-demangle -emit-sil -Onone -enforce-exclusivity=checked %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name access_marker_mandatory -enable-sil-ownership-verifier -parse-as-library -Xllvm -sil-full-demangle -emit-sil -Onone -enforce-exclusivity=checked %s | %FileCheck %s
 
 public struct S {
   var i: Int

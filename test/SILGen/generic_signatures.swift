@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-sil-ownership -parse-stdlib %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership-verifier -parse-stdlib %s
 
 protocol P {
   associatedtype Assoc

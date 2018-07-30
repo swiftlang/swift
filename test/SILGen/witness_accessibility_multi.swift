@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module-path %t/witness_accessibility_other.swiftmodule %S/Inputs/witness_accessibility_other.swift
-// RUN: %target-swift-emit-silgen -I %t  -enable-sil-ownership %s | %FileCheck %s
-// RUN: %target-swift-emit-sil -I %t -enable-sil-ownership %s
+// RUN: %target-swift-emit-silgen -I %t  -enable-sil-ownership-verifier %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -I %t -enable-sil-ownership-verifier %s
 
 import witness_accessibility_other
 

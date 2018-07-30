@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name existential_erasure -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name existential_erasure -enable-sil-ownership-verifier %s | %FileCheck %s
 
 protocol P {
   func downgrade(_ m68k: Bool) -> Self

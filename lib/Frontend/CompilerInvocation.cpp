@@ -678,7 +678,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EmitProfileCoverageMapping |= Args.hasArg(OPT_profile_coverage_mapping);
   Opts.DisableSILPartialApply |=
     Args.hasArg(OPT_disable_sil_partial_apply);
-  Opts.EnableSILOwnership |= Args.hasArg(OPT_enable_sil_ownership);
+  Opts.EnableSILOwnership |= Args.hasArg(OPT_enable_sil_ownership_verifier);
   Opts.AssumeUnqualifiedOwnershipWhenParsing
     |= Args.hasArg(OPT_assume_parsing_unqualified_ownership_sil);
   Opts.EnableMandatorySemanticARCOpts |=

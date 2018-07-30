@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-sil-ownership -emit-verbose-sil %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership-verifier -emit-verbose-sil %s | %FileCheck %s
 
 protocol OwnershipProto {
   __consuming func elided(_ default: String, _ shared: __shared String, _ owned: __owned String)

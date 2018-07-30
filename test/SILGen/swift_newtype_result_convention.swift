@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -import-objc-header %S/Inputs/swift_newtype_result_convention.h -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -import-objc-header %S/Inputs/swift_newtype_result_convention.h -enable-sil-ownership-verifier %s | %FileCheck %s
 // REQUIRES: objc_interop
 
 import Foundation

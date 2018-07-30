@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -parse-as-library -enable-sil-ownership  %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -parse-as-library -enable-sil-ownership-verifier  %s | %FileCheck %s
 
 func use<T>(_: T) {}
 

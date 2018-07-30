@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen -module-name foo -enable-sil-ownership %s | %FileCheck %s
-// RUN: %target-swift-emit-sil -module-name foo -enable-sil-ownership -verify %s
+// RUN: %target-swift-emit-silgen -module-name foo -enable-sil-ownership-verifier %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -module-name foo -enable-sil-ownership-verifier -verify %s
 
 // CHECK-LABEL: sil @main
 

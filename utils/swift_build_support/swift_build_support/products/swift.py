@@ -111,7 +111,7 @@ updated without updating swift.py?")
 
     @property
     def _sil_ownership_flags(self):
-        if not self.args.enable_sil_ownership:
+        if not self.args.enable_sil_ownership_verifier:
             return ["-DSWIFT_STDLIB_ENABLE_SIL_OWNERSHIP=FALSE"]
         return ["-DSWIFT_STDLIB_ENABLE_SIL_OWNERSHIP=TRUE"]
 

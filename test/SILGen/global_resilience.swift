@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -enable-sil-ownership -enable-resilience -emit-module-path=%t/resilient_global.swiftmodule -module-name=resilient_global %S/../Inputs/resilient_global.swift
-// RUN: %target-swift-emit-silgen -I %t -enable-resilience -enable-sil-ownership -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-module -enable-sil-ownership-verifier -enable-resilience -emit-module-path=%t/resilient_global.swiftmodule -module-name=resilient_global %S/../Inputs/resilient_global.swift
+// RUN: %target-swift-emit-silgen -I %t -enable-resilience -enable-sil-ownership-verifier -parse-as-library %s | %FileCheck %s
 // RUN: %target-swift-emit-sil -I %t -O -enable-resilience -parse-as-library %s | %FileCheck --check-prefix=CHECK-OPT %s
 
 import resilient_global

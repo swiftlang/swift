@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-sil-ownership -verify %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership-verifier -verify %s
 
 protocol P {}
 

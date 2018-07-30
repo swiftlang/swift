@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership-verifier %s | %FileCheck %s
 
 // CHECK-LABEL: sil private @$S26closure_inline_initializer3FooV3fooSivpfiSiyXEfU_
 

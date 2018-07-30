@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership-verifier %s | %FileCheck %s
 
 struct Foo {}
 class Bar {}

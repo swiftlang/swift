@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -enable-sil-ownership -emit-sil -O -Xllvm -sil-fso-enable-generics=false %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-sil-ownership-verifier -emit-sil -O -Xllvm -sil-fso-enable-generics=false %s | %FileCheck %s
 
 sil_stage raw
 

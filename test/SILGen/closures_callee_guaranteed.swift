@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-sil-ownership -parse-stdlib -parse-as-library  %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership-verifier -parse-stdlib -parse-as-library  %s | %FileCheck %s
 import Swift
 
 // CHECK-LABEL: sil @{{.*}}apply{{.*}} : $@convention(thin) (@noescape @callee_guaranteed () -> Int)

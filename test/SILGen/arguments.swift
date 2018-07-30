@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -module-name Swift -enable-sil-ownership -parse-stdlib %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name Swift -enable-sil-ownership-verifier -parse-stdlib %s | %FileCheck %s
 
 struct Int {}
 struct Float {}

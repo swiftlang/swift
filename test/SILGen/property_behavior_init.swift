@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-property-behaviors -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-experimental-property-behaviors -emit-silgen -enable-sil-ownership-verifier %s | %FileCheck %s
 protocol diBehavior {
   associatedtype Value
   var storage: Value { get set }
