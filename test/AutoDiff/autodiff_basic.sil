@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -differentiation -sil-print-all %s | %FileCheck %s
+// RUN: %target-sil-opt -differentiation %s | %FileCheck %s
 
 import Builtin
 import Swift
@@ -59,7 +59,7 @@ bb0(%0 : $Float):
 // CHECK:   %9 = apply %8<Float>(%1, %5, %7) : $@convention(witness_method: ExpressibleByIntegerLiteral) <τ_0_0 where τ_0_0 : ExpressibleByIntegerLiteral> (@in τ_0_0.IntegerLiteralType, @thick τ_0_0.Type) -> @out τ_0_0
 // CHECK:   dealloc_stack %5 : $*Int64
 // CHECK:   %11 = begin_access [read] [static] %1 : $*Float
-// CHECK:   %12 = load [trivial] %11 : $*Float
+// CHECK:   %12 = load %11 : $*Float
 // CHECK:   end_access %11 : $*Float
 // CHECK:   dealloc_stack %1 : $*Float
 // CHECK:   %15 = function_ref @foo__grad_src_0_wrt_0_s_p : $@convention(thin) (Float, Float) -> (Float, Float)
@@ -81,7 +81,7 @@ bb0(%0 : $Float):
 // CHECK:   %9 = apply %8<Float>(%1, %5, %7) : $@convention(witness_method: ExpressibleByIntegerLiteral) <τ_0_0 where τ_0_0 : ExpressibleByIntegerLiteral> (@in τ_0_0.IntegerLiteralType, @thick τ_0_0.Type) -> @out τ_0_0
 // CHECK:   dealloc_stack %5 : $*Int64
 // CHECK:   %11 = begin_access [read] [static] %1 : $*Float
-// CHECK:   %12 = load [trivial] %11 : $*Float
+// CHECK:   %12 = load %11 : $*Float
 // CHECK:   end_access %11 : $*Float
 // CHECK:   dealloc_stack %1 : $*Float
 // CHECK:   %15 = function_ref @foo__grad_src_0_wrt_0_s_p : $@convention(thin) (Float, Float) -> (Float, Float)

@@ -354,6 +354,8 @@ ERROR(pound_assert_failure,none,
        "%0", (StringRef))
 
 // Automatic differentiation diagnostics
+ERROR(autodiff_internal_swift_not_imported,none,
+      "AD internal error: the Swift module is not imported", ())
 ERROR(autodiff_opaque_function_unsupported,none,
       "differentiating an opaque function is not supported yet", ())
 ERROR(autodiff_cannot_synthesize_primal_yet,none,
@@ -363,16 +365,11 @@ ERROR(autodiff_unsupported_type,none,
       "differentiating '%0' is not supported yet", (Type))
 ERROR(autodiff_function_not_differentiable,none,
       "function is not differentiable", ())
-ERROR(autodiff_differential_operator_applied_to_nondifferentiable,none,
-      "applying differential operator on a non-differentiable function", ())
-ERROR(autodiff_differentiable_attr_applied_to_nondifferentiable,none,
-      "This function is not differentiable but marked "
-      "'@differentiable(reverse)', would you like to make it differentiable by "
-      "defining a custom adjoint using '@differentiable(reverse, adjoint:)'?",
-      ())
-NOTE(autodiff_when_differentiating_function_call, none,
+NOTE(autodiff_value_defined_here,none,
+     "value defined here", ())
+NOTE(autodiff_when_differentiating_function_call,none,
      "when differentiating this function call", ())
-NOTE(autodiff_expression_is_not_differentiable, none,
+NOTE(autodiff_expression_is_not_differentiable,none,
      "expression is not differentiable", ())
 NOTE(autodiff_nested_function_call_multiple_return_active,none,
      "function call is being differentiated from multiple return values", ())
