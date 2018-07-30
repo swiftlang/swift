@@ -205,9 +205,28 @@ void FileSpecificDiagnosticConsumer::
     tellSubconsumersToInformDriverOfIncompleteBatchModeCompilation() const {
   if (!HasAnErrorBeenConsumed)
     return;
+  // If *every* primary has only errors in other files, must report them
+  // somehow, so don't truncate one of them.
+  bool foundACompleteBatchModeCompilation = false;
+  DiagnosticConsumer *mostRecentIncompleteBatchModeCompilationConsumer =
+      nullptr;
+
   for (auto &info : ConsumersOrderedByRange) {
-    if (!info.hasAnErrorBeenEmitted && info.consumer)
-      info.consumer->informDriverOfIncompleteBatchModeCompilation();
+    if (!info.consumer)
+      continue;
+    if (info.hasAnErrorBeenEmitted) {
+      foundACompleteBatchModeCompilation = true;
+      continue;
+    }
+    if (mostRecentIncompleteBatchModeCompilationConsumer) {
+      mostRecentIncompleteBatchModeCompilationConsumer
+          ->informDriverOfIncompleteBatchModeCompilation();
+    }
+    mostRecentIncompleteBatchModeCompilationConsumer = info.consumer;
+  }
+  if (foundACompleteBatchModeCompilation) {
+    mostRecentIncompleteBatchModeCompilationConsumer
+        ->informDriverOfIncompleteBatchModeCompilation();
   }
 }
 
