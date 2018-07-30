@@ -213,8 +213,11 @@ public:
 
   virtual void handleRequestError(const char *Description) = 0;
 
+  virtual bool syntaxMapEnabled() = 0;
   virtual bool handleSyntaxMap(unsigned Offset, unsigned Length,
                                UIdent Kind) = 0;
+
+  virtual bool documentStructureEnabled() = 0;
 
   virtual bool handleSemanticAnnotation(unsigned Offset, unsigned Length,
                                         UIdent Kind, bool isSystem) = 0;
@@ -264,10 +267,6 @@ public:
       std::vector<SourceFileRange> ReuseRegions) = 0;
 
   virtual void finished() {}
-
-  // FIXME: This is just for bootstrapping incremental syntax tree parsing.
-  // Remove it once when we are able to incrementally transfer the syntax tree
-  virtual bool forceLibSyntaxBasedProcessing() = 0;
 };
 
 class OptionsDictionary {
