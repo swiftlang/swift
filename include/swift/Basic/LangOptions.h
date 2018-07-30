@@ -226,7 +226,7 @@ namespace swift {
     bool EnableSILOpaqueValues = false;
     
     /// Enables key path resilience.
-    bool EnableKeyPathResilience = false;
+    bool EnableKeyPathResilience = true;
 
     /// If set to true, the diagnosis engine can assume the emitted diagnostics
     /// will be used in editor. This usually leads to more aggressive fixit.

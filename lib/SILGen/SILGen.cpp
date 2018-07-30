@@ -1286,20 +1286,17 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
   
   Type baseTy;
   if (decl->getDeclContext()->isTypeContext()) {
+    // TODO: Static properties should eventually be referenceable as
+    // keypaths from T.Type -> Element, viz `baseTy = MetatypeType::get(baseTy)`
+    assert(!decl->isStatic());
+    
     baseTy = decl->getDeclContext()->getSelfInterfaceType()
                  ->getCanonicalType(decl->getInnermostDeclContext()
                                         ->getGenericSignatureOfContext());
-    if (decl->isStatic()) {
-      // TODO: Static properties should eventually be referenceable as
-      // keypaths from T.Type -> Element
-      //baseTy = MetatypeType::get(baseTy);
-      return;
-    }
   } else {
     // TODO: Global variables should eventually be referenceable as
-    // key paths from ()
-    //baseTy = TupleType::getEmpty(getASTContext());
-    return;
+    // key paths from (), viz. baseTy = TupleType::getEmpty(getASTContext());
+    llvm_unreachable("should not export a property descriptor yet");
   }
 
   auto genericEnv = decl->getInnermostDeclContext()
@@ -1316,33 +1313,6 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
   if (genericEnv)
     subs = genericEnv->getForwardingSubstitutionMap();
   
-  if (auto sub = dyn_cast<SubscriptDecl>(decl)) {
-    for (auto *index : *sub->getIndices()) {
-      // Keypaths can't capture inout indices.
-      if (index->isInOut())
-        return;
-
-      // TODO: Handle reabstraction and tuple explosion in thunk generation.
-      // This wasn't previously a concern because anything that was Hashable
-      // had only one abstraction level and no explosion.
-      auto indexTy = index->getInterfaceType();
-      
-      if (isa<TupleType>(indexTy->getCanonicalType(sub->getGenericSignature())))
-        return;
-      
-      if (genericEnv)
-        indexTy = genericEnv->mapTypeIntoContext(indexTy);
-      
-      auto indexLoweredTy = Types.getLoweredType(indexTy);
-      auto indexOpaqueLoweredTy =
-        Types.getLoweredType(AbstractionPattern::getOpaque(), indexTy);
-      
-      if (indexOpaqueLoweredTy.getAddressType()
-             != indexLoweredTy.getAddressType())
-        return;
-    }
-  }
-
   auto component = emitKeyPathComponentForDecl(SILLocation(decl),
                                                genericEnv,
                                                baseOperand, needsGenericContext,
