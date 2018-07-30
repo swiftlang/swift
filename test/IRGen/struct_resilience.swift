@@ -198,20 +198,29 @@ public func resilientAny(s : ResilientWeakRef) {
 
 // CHECK-LABEL:  define internal swiftcc %swift.metadata_response @"$S17struct_resilience26StructWithResilientStorageVMr"(%swift.type*, i8*, i8**)
 // CHECK: [[FIELDS:%.*]] = alloca [4 x i8**]
+// CHECK: [[TUPLE_LAYOUT:%.*]] = alloca %swift.full_type_layout,
 
 // CHECK: [[FIELDS_ADDR:%.*]] = getelementptr inbounds [4 x i8**], [4 x i8**]* [[FIELDS]], i32 0, i32 0
 
 // public let s: Size
 
-// CHECK: call swiftcc %swift.metadata_response @"$S16resilient_struct4SizeVMa"([[INT]] 319)
+// CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S16resilient_struct4SizeVMa"([[INT]] 319)
+// CHECK: [[SIZE_METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// CHECK: [[T0:%.*]] = bitcast %swift.type* [[SIZE_METADATA]] to i8***
+// CHECK: [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], [[INT]] -1
+// CHECK: [[SIZE_VWT:%.*]] = load i8**, i8*** [[T1]],
+// CHECK: [[SIZE_LAYOUT_1:%.*]] = getelementptr inbounds i8*, i8** [[SIZE_VWT]], i32 8
 // CHECK: [[FIELD_1:%.*]] = getelementptr inbounds i8**, i8*** [[FIELDS_ADDR]], i32 0
-// CHECK: store i8** [[SIZE_AND_ALIGNMENT:%.*]], i8*** [[FIELD_1]]
+// CHECK: store i8** [[SIZE_LAYOUT_1:%.*]], i8*** [[FIELD_1]]
 
 // public let ss: (Size, Size)
 
-// CHECK: call swiftcc %swift.metadata_response @swift_getTupleTypeMetadata2([[INT]] 319,
+// CHECK: [[SIZE_LAYOUT_2:%.*]] = getelementptr inbounds i8*, i8** [[SIZE_VWT]], i32 8
+// CHECK: [[SIZE_LAYOUT_3:%.*]] = getelementptr inbounds i8*, i8** [[SIZE_VWT]], i32 8
+// CHECK: call swiftcc [[INT]] @swift_getTupleTypeLayout2(%swift.full_type_layout* [[TUPLE_LAYOUT]], i8** [[SIZE_LAYOUT_2]], i8** [[SIZE_LAYOUT_3]])
+// CHECK: [[T0:%.*]] = bitcast %swift.full_type_layout* [[TUPLE_LAYOUT]] to i8**
 // CHECK: [[FIELD_2:%.*]] = getelementptr inbounds i8**, i8*** [[FIELDS_ADDR]], i32 1
-// CHECK: store i8** [[SIZE_AND_ALIGNMENT:%.*]], i8*** [[FIELD_2]]
+// CHECK: store i8** [[T0]], i8*** [[FIELD_2]]
 
 // Fixed-layout aggregate -- we can reference a static value witness table
 // public let n: Int

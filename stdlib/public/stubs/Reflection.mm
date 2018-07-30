@@ -16,7 +16,7 @@
 #import <Foundation/Foundation.h>
 
 SWIFT_CC(swift)
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 bool _swift_stdlib_NSObject_isKindOfClass(
     id _Nonnull object,
     NSString * _Nonnull className) {

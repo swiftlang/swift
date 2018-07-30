@@ -66,7 +66,7 @@ extern "C" {
     (defined(__linux__) && defined(__s390x__)) || \
     (defined(__ANDROID__) && defined(__arm64__))
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 ti_int
 __muloti4(ti_int a, ti_int b, int* overflow)
 {
@@ -120,7 +120,7 @@ __muloti4(ti_int a, ti_int b, int* overflow)
 // missing.  Perhaps relevant bug report:
 // FIXME: https://llvm.org/bugs/show_bug.cgi?id=14469
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 di_int
 __mulodi4(di_int a, di_int b, int* overflow)
 {
@@ -377,14 +377,14 @@ __udivmodti4(tu_int a, tu_int b, tu_int* rem)
     return q.all;
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 tu_int
 __udivti3(tu_int a, tu_int b)
 {
     return __udivmodti4(a, b, NULL);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 tu_int
 __umodti3(tu_int a, tu_int b)
 {
@@ -393,7 +393,7 @@ __umodti3(tu_int a, tu_int b)
     return r;
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 ti_int
 __divti3(ti_int a, ti_int b)
 {
@@ -406,7 +406,7 @@ __divti3(ti_int a, ti_int b)
     return (__udivmodti4(a, b, (tu_int*)0) ^ s_a) - s_a;  /* negate if s_a == -1 */
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 ti_int
 __modti3(ti_int a, ti_int b)
 {

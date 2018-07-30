@@ -59,12 +59,12 @@ static_assert(std::is_same<mode_t, swift::__swift_mode_t>::value,
               "__swift_mode_t must be defined as equivalent to mode_t in LibcShims.h");
 #endif
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 void swift::_stdlib_free(void *ptr) {
   free(ptr);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 int swift::_stdlib_putchar_unlocked(int c) {
 #if defined(_WIN32)
   return _putc_nolock(c, stdout);
@@ -73,30 +73,30 @@ int swift::_stdlib_putchar_unlocked(int c) {
 #endif
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 __swift_size_t swift::_stdlib_fwrite_stdout(const void *ptr,
                                          __swift_size_t size,
                                          __swift_size_t nitems) {
     return fwrite(ptr, size, nitems, stdout);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 __swift_size_t swift::_stdlib_strlen(const char *s) {
     return strlen(s);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 __swift_size_t swift::_stdlib_strlen_unsigned(const unsigned char *s) {
   return strlen(reinterpret_cast<const char *>(s));
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 int swift::_stdlib_memcmp(const void *s1, const void *s2,
                        __swift_size_t n) {
   return memcmp(s1, s2, n);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 __swift_ssize_t
 swift::_stdlib_read(int fd, void *buf, __swift_size_t nbyte) {
 #if defined(_WIN32)
@@ -106,7 +106,7 @@ swift::_stdlib_read(int fd, void *buf, __swift_size_t nbyte) {
 #endif
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 __swift_ssize_t
 swift::_stdlib_write(int fd, const void *buf, __swift_size_t nbyte) {
 #if defined(_WIN32)
@@ -116,7 +116,7 @@ swift::_stdlib_write(int fd, const void *buf, __swift_size_t nbyte) {
 #endif
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 int swift::_stdlib_close(int fd) {
 #if defined(_WIN32)
   return _close(fd);
@@ -210,7 +210,7 @@ void swift::_stdlib_setErrno(int value) {
 static_assert(std::is_same<__swift_thread_key_t, DWORD>::value,
               "__swift_thread_key_t is not a DWORD");
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 void _stdlib_destroyTLS(void *);
 
 static void
@@ -221,7 +221,7 @@ destroyTLS_CCAdjustmentThunk(void *ptr) {
   _stdlib_destroyTLS(ptr);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 int
 swift::_stdlib_thread_key_create(__swift_thread_key_t * _Nonnull key,
                               void (* _Nullable destructor)(void *)) {
@@ -229,13 +229,13 @@ swift::_stdlib_thread_key_create(__swift_thread_key_t * _Nonnull key,
   return *key != FLS_OUT_OF_INDEXES;
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 void * _Nullable
 swift::_stdlib_thread_getspecific(__swift_thread_key_t key) {
   return FlsGetValue(key);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 int swift::_stdlib_thread_setspecific(__swift_thread_key_t key,
                                    const void * _Nullable value) {
   return FlsSetValue(key, const_cast<void *>(value)) == TRUE;
@@ -248,20 +248,20 @@ static_assert(std::is_same<__swift_thread_key_t, pthread_key_t>::value,
               "fix __swift_pthread_key_t's typedef in LibcShims.h by adding an "
               "#if guard and definition for your platform");
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 int
 swift::_stdlib_thread_key_create(__swift_thread_key_t * _Nonnull key,
                               void (* _Nullable destructor)(void *)) {
   return pthread_key_create(key, destructor);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 void * _Nullable
 swift::_stdlib_thread_getspecific(__swift_thread_key_t key) {
   return pthread_getspecific(key);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 int swift::_stdlib_thread_setspecific(__swift_thread_key_t key,
                                       const void * _Nullable value) {
   return pthread_setspecific(key, value);
@@ -270,7 +270,7 @@ int swift::_stdlib_thread_setspecific(__swift_thread_key_t key,
 
 #if defined(__APPLE__)
 #include <malloc/malloc.h>
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 size_t swift::_stdlib_malloc_size(const void *ptr) {
   return malloc_size(ptr);
 }
@@ -279,19 +279,19 @@ size_t swift::_stdlib_malloc_size(const void *ptr) {
 #define _GNU_SOURCE
 #endif
 #include <malloc.h>
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 size_t swift::_stdlib_malloc_size(const void *ptr) {
   return malloc_usable_size(const_cast<void *>(ptr));
 }
 #elif defined(_WIN32)
 #include <malloc.h>
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 size_t swift::_stdlib_malloc_size(const void *ptr) {
   return _msize(const_cast<void *>(ptr));
 }
 #elif defined(__FreeBSD__)
 #include <malloc_np.h>
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 size_t swift::_stdlib_malloc_size(const void *ptr) {
   return malloc_usable_size(const_cast<void *>(ptr));
 }
@@ -305,12 +305,12 @@ static std::mt19937 &getGlobalMT19937() {
   return theGlobalMT19937.get();
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 __swift_uint32_t swift::_stdlib_cxx11_mt19937() {
   return getGlobalMT19937()();
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 __swift_uint32_t
 swift::_stdlib_cxx11_mt19937_uniform(__swift_uint32_t upper_bound) {
   if (upper_bound > 0)

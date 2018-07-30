@@ -3059,7 +3059,7 @@ bool _isBridgedNonVerbatimToObjectiveC(const Metadata *value,
 }
 
 // func _isClassOrObjCExistential<T>(x: T.Type) -> Bool
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 bool _swift_isClassOrObjCExistentialType(const Metadata *value,
                                                     const Metadata *T) {
   return swift_isClassOrObjCExistentialTypeImpl(T);
