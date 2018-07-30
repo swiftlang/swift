@@ -837,11 +837,6 @@ bool ConstraintSystem::Candidate::solve(
   // Set up expression type checker timer for the candidate.
   cs.Timer.emplace(E, cs);
 
-  // Cleanup after constraint system generation/solving,
-  // because it would assign types to expressions, which
-  // might interfere with solving higher-level expressions.
-  ExprCleaner cleaner(E);
-
   // Generate constraints for the new system.
   if (auto generatedExpr = cs.generateConstraints(E)) {
     E = generatedExpr;
