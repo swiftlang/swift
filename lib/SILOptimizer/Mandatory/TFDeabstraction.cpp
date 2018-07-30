@@ -1905,8 +1905,31 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
                           "' is not allowed");
           return;
         }
+
+        // Check to see if it was constant foldable.  If so, we can turn this
+        // into a Const node to avoid a send.
+        auto it = constants.find(operand);
+        if (it != constants.end()) {
+          // Dig the element type out of the TensorHandle result type.
+          auto eltType =
+            getTensorHandleElementType(inst->getType().getASTType());
+          auto int32Ty =
+            context.getInt32Decl()->getDeclaredType()->getCanonicalType();
+
+          auto constant =
+            createConstTensor(eltType, it->second,
+                              SymbolicValue::getArray({}, int32Ty,
+                                                      allocator),
+                              inst->getType(),  inst->getLoc(),
+                              DeviceType::ALL, B);
+          inst->replaceAllUsesWith(constant->getResult(0));
+          inst->eraseFromParent();
+          return;
+        }
+
         opName +=
           GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Scalar);
+
         inputs.push_back(operand);
         continue;
       }
