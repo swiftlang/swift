@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1837,20 +1837,15 @@ private:
   /// "(A) -> ((B) -> C)" becomes "C (^ (^)(A))(B)".
   void finishFunctionType(const FunctionType *FT) {
     os << ")(";
-    Type paramsTy = FT->getInput();
-    if (auto tupleTy = paramsTy->getAs<TupleType>()) {
-      if (FT->getParams().empty()) {
-        os << "void";
-      } else {
-        interleave(tupleTy->getElements(),
-                   [this](TupleTypeElt elt) {
-                     print(elt.getType(), OTK_None, elt.getName(),
-                           IsFunctionParam);
-                   },
-                   [this] { os << ", "; });
-      }
+    if (!FT->getParams().empty()) {
+      interleave(FT->getParams(),
+                 [this](const AnyFunctionType::Param &param) {
+                   print(param.getType(), OTK_None, param.getLabel(),
+                         IsFunctionParam);
+                 },
+                 [this] { os << ", "; });
     } else {
-      print(paramsTy, OTK_None, Identifier(), IsFunctionParam);
+      os << "void";
     }
     os << ")";
   }
@@ -1993,7 +1988,8 @@ class ReferencedTypeFinder : public TypeVisitor<ReferencedTypeFinder> {
   }
 
   void visitAnyFunctionType(AnyFunctionType *fnTy) {
-    visit(fnTy->getInput());
+    for (auto &param : fnTy->getParams())
+      visit(param.getType());
     visit(fnTy->getResult());
   }
 
