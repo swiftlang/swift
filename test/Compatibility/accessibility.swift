@@ -183,7 +183,7 @@ internal extension Base {
 public class PublicSub: Base {
   private required init() {} // expected-error {{'required' initializer must be accessible wherever class 'PublicSub' can be subclassed}} {{3-10=internal}}
   override func foo() {} // expected-error {{overriding instance method must be as accessible as the declaration it overrides}} {{12-12=public }}
-  override var bar: Int { // expected-error {{overriding var must be as accessible as the declaration it overrides}} {{12-12=public }}
+  override var bar: Int { // expected-error {{overriding property must be as accessible as the declaration it overrides}} {{12-12=public }}
     get { return 0 }
     set {}
   }
@@ -197,7 +197,7 @@ public class PublicSubGood: Base {
 internal class InternalSub: Base {
   required private init() {} // expected-error {{'required' initializer must be accessible wherever class 'InternalSub' can be subclassed}} {{12-19=internal}}
   private override func foo() {} // expected-error {{overriding instance method must be as accessible as its enclosing type}} {{3-10=internal}}
-  private override var bar: Int { // expected-error {{overriding var must be as accessible as its enclosing type}} {{3-10=internal}}
+  private override var bar: Int { // expected-error {{overriding property must be as accessible as its enclosing type}} {{3-10=internal}}
     get { return 0 }
     set {}
   }
@@ -216,7 +216,7 @@ internal class InternalSubGood: Base {
 
 internal class InternalSubPrivateSet: Base {
   required init() {}
-  private(set) override var bar: Int { // expected-error {{overriding var must be as accessible as its enclosing type}} {{3-16=}}
+  private(set) override var bar: Int { // expected-error {{overriding property must be as accessible as its enclosing type}} {{3-16=}}
     get { return 0 }
     set {}
   }
@@ -229,7 +229,7 @@ internal class InternalSubPrivateSet: Base {
 fileprivate class FilePrivateSub: Base {
   required private init() {} // expected-error {{'required' initializer must be accessible wherever class 'FilePrivateSub' can be subclassed}} {{12-19=fileprivate}}
   private override func foo() {} // expected-error {{overriding instance method must be as accessible as its enclosing type}} {{3-10=fileprivate}}
-  private override var bar: Int { // expected-error {{overriding var must be as accessible as its enclosing type}} {{3-10=fileprivate}}
+  private override var bar: Int { // expected-error {{overriding property must be as accessible as its enclosing type}} {{3-10=fileprivate}}
     get { return 0 }
     set {}
   }
@@ -258,7 +258,7 @@ fileprivate class FilePrivateSubGood2: Base {
 
 fileprivate class FilePrivateSubPrivateSet: Base {
   required init() {}
-  private(set) override var bar: Int { // expected-error {{overriding var must be as accessible as its enclosing type}} {{3-10=fileprivate}}
+  private(set) override var bar: Int { // expected-error {{overriding property must be as accessible as its enclosing type}} {{3-10=fileprivate}}
     get { return 0 }
     set {}
   }
@@ -271,7 +271,7 @@ fileprivate class FilePrivateSubPrivateSet: Base {
 private class PrivateSub: Base {
   required private init() {} // expected-error {{'required' initializer must be accessible wherever class 'PrivateSub' can be subclassed}} {{12-19=fileprivate}}
   private override func foo() {} // expected-error {{overriding instance method must be as accessible as its enclosing type}} {{3-10=fileprivate}}
-  private override var bar: Int { // expected-error {{overriding var must be as accessible as its enclosing type}} {{3-10=fileprivate}}
+  private override var bar: Int { // expected-error {{overriding property must be as accessible as its enclosing type}} {{3-10=fileprivate}}
     get { return 0 }
     set {}
   }
@@ -291,7 +291,7 @@ private class PrivateSubGood: Base {
 private class PrivateSubPrivateSet: Base {
   required fileprivate init() {}
   fileprivate override func foo() {}
-  private(set) override var bar: Int { // expected-error {{setter of overriding var must be as accessible as its enclosing type}}
+  private(set) override var bar: Int { // expected-error {{setter of overriding property must be as accessible as its enclosing type}}
     get { return 0 }
     set {}
   }
@@ -522,7 +522,7 @@ internal protocol InternalMutationOperations {
 }
 
 public struct AccessorsControl : InternalMutationOperations {
-  private var size = 0 // expected-error {{property 'size' must be declared internal because it matches a requirement in internal protocol 'InternalMutationOperations'}} {{none}} expected-note {{mark the var as 'internal' to satisfy the requirement}} {{3-10=internal}}
+  private var size = 0 // expected-error {{property 'size' must be declared internal because it matches a requirement in internal protocol 'InternalMutationOperations'}} {{none}} expected-note {{mark the property as 'internal' to satisfy the requirement}} {{3-10=internal}}
   private subscript (_: Int) -> Int { // expected-error {{subscript must be declared internal because it matches a requirement in internal protocol 'InternalMutationOperations'}} {{none}} expected-note {{mark the subscript as 'internal' to satisfy the requirement}} {{3-10=internal}}
     get { return 42 }
     set {}
@@ -531,7 +531,7 @@ public struct AccessorsControl : InternalMutationOperations {
 
 public struct PrivateSettersPublic : InternalMutationOperations {
   // Please don't change the formatting here; it's a precise fix-it test.
-  public private(set) var size = 0 // expected-error {{setter for property 'size' must be declared internal because it matches a requirement in internal protocol 'InternalMutationOperations'}} {{none}} expected-note {{mark the var as 'internal' to satisfy the requirement}} {{10-17=internal}}
+  public private(set) var size = 0 // expected-error {{setter for property 'size' must be declared internal because it matches a requirement in internal protocol 'InternalMutationOperations'}} {{none}} expected-note {{mark the property as 'internal' to satisfy the requirement}} {{10-17=internal}}
   public private(set) subscript (_: Int) -> Int { // expected-error {{subscript setter must be declared internal because it matches a requirement in internal protocol 'InternalMutationOperations'}} {{none}} expected-note {{mark the subscript as 'internal' to satisfy the requirement}} {{10-17=internal}}
     get { return 42 }
     set {}
@@ -540,7 +540,7 @@ public struct PrivateSettersPublic : InternalMutationOperations {
 
 internal struct PrivateSettersInternal : PublicMutationOperations {
   // Please don't change the formatting here; it's a precise fix-it test.
-  private(set)var size = 0 // expected-error {{setter for property 'size' must be as accessible as its enclosing type because it matches a requirement in protocol 'PublicMutationOperations'}} {{none}} expected-note {{mark the var as 'internal' to satisfy the requirement}} {{3-15=}}
+  private(set)var size = 0 // expected-error {{setter for property 'size' must be as accessible as its enclosing type because it matches a requirement in protocol 'PublicMutationOperations'}} {{none}} expected-note {{mark the property as 'internal' to satisfy the requirement}} {{3-15=}}
 
   internal private(set)subscript (_: Int) -> Int { // expected-error {{subscript setter must be as accessible as its enclosing type because it matches a requirement in protocol 'PublicMutationOperations'}} {{none}} expected-note {{mark the subscript as 'internal' to satisfy the requirement}} {{12-24=}}
     get { return 42 }

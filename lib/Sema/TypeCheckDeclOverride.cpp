@@ -1495,8 +1495,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     // FIXME: Customize message to the kind of thing.
     auto baseKind = base->getDescriptiveKind();
     switch (baseKind) {
-    case DescriptiveDeclKind::StaticLet:
-    case DescriptiveDeclKind::StaticVar:
+    case DescriptiveDeclKind::StaticProperty:
     case DescriptiveDeclKind::StaticMethod:
       override->diagnose(diag::override_static, baseKind);
       break;
