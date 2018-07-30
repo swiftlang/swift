@@ -3948,20 +3948,30 @@ void Differentiation::run() {
   // infrastructure support for this yet and currently it'll error out, but
   // we'll look into adding a new function convention so that the primal and the
   // adjoint can be passed along with the function.
-  bool errorOccurred = false;
+  //
+  // If any error occurs during `gradient` instruction processing, it won't be
+  // turned into a differentiation task. But we don't back out just yet - primal
+  // synthesis and adjoint synthesis for newly created differentiation tasks
+  // should still run because they will diagnose more errors.
+  bool errorProcessingGradInsts = false;
   for (auto *gi : gradInsts)
-    errorOccurred |= processGradientInst(gi, context);
-  if (errorOccurred)
-    return;
+    errorProcessingGradInsts |= processGradientInst(gi, context);
 
-  // Run primal generation.
+  // Run primal generation for newly created differentiation tasks. If any error
+  // occurs, back out.
   PrimalGen primalGen(context);
   if (primalGen.run())
     return;
 
-  // Run adjoint generation.
+  // Run adjoint generation for differentiation tasks. If any error occurs, back
+  // out.
   AdjointGen adjointGen(context);
   if (adjointGen.run())
+    return;
+
+  // If there was any error that occurred during `gradient` instruction
+  // processing, back out.
+  if (errorProcessingGradInsts)
     return;
 
   // Fill the body of each empty canonical gradient function corresponding to
