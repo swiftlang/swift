@@ -12,7 +12,15 @@
 // COMPLEX_MAPPING_ERROR: {{.*}}/triple-mapped-swift-file.swift:2:17: error:
 
 // The Clang Importer should inherit Swift's VFS
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %t -DTEST_VFS_CLANG_IMPORTER -import-objc-header %t/VFSMappedModule.h -vfsoverlay %t/overlay.yaml -typecheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %t -DTEST_VFS_CLANG_IMPORTER -vfsoverlay %t/overlay.yaml -typecheck %s
+
+// Just -Xcc -ivfsoverlay should work fine too
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %t -DTEST_VFS_CLANG_IMPORTER -Xcc -ivfsoverlay -Xcc %t/overlay.yaml -typecheck %s
+
+// If we see -ivfsoverlay and -vfsoverlay, we'll clobber Clang's VFS with our own.
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %t -DTEST_VFS_CLANG_IMPORTER -vfsoverlay %t/overlay.yaml -Xcc -ivfsoverlay -Xcc %t/overlay.yaml -typecheck %s  2>&1 | %FileCheck -check-prefix=WARN_VFS_CLOBBERED %s
+
+// WARN_VFS_CLOBBERED: warning: ignoring '-ivfsoverlay' options provided to '-Xcc' in favor of '-vfsoverlay'
 
 #if TEST_VFS_CLANG_IMPORTER
 import VFSMappedModule
