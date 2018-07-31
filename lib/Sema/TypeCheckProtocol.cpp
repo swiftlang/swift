@@ -4540,10 +4540,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
   Decl *currentDecl = nullptr;
   AccessLevel defaultAccess;
   if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-    Type extendedTy = ext->getExtendedType();
-    if (!extendedTy)
-      return;
-    const NominalTypeDecl *nominal = extendedTy->getAnyNominal();
+    const NominalTypeDecl *nominal = ext->getExtendedNominal();
     if (!nominal)
       return;
     defaultAccess = nominal->getFormalAccess();

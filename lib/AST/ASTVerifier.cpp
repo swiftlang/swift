@@ -2471,7 +2471,7 @@ public:
       } else {
         auto ext = cast<ExtensionDecl>(decl);
         conformingDC = ext;
-        nominal = ext->getExtendedType()->getAnyNominal();
+        nominal = ext->getExtendedNominal();
       }
 
       auto proto = conformance->getProtocol();
@@ -3491,7 +3491,7 @@ void swift::verify(SourceFile &SF) {
 bool swift::shouldVerify(const Decl *D, const ASTContext &Context) {
 #if !(defined(NDEBUG) || defined(SWIFT_DISABLE_AST_VERIFIER))
   if (const auto *ED = dyn_cast<ExtensionDecl>(D)) {
-    return shouldVerify(ED->getExtendedType()->getAnyNominal(), Context);
+    return shouldVerify(ED->getExtendedNominal(), Context);
   }
 
   const auto *VD = dyn_cast<ValueDecl>(D);

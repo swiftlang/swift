@@ -1761,7 +1761,7 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
       break;
 
     // Bind this extension, if we haven't done so already.
-    if (!extension->getExtendedType())
+    if (!extension->getExtendedNominal())
       if (auto resolver = extension->getASTContext().getLazyResolver())
         resolver->bindExtension(extension);
 
@@ -1915,8 +1915,8 @@ void ASTScope::print(llvm::raw_ostream &out, unsigned level,
     out << " extension of '";
     if (auto typeRepr = extension->getExtendedTypeLoc().getTypeRepr())
       typeRepr->print(out);
-    else
-      extension->getExtendedType()->print(out);
+    else if (auto nominal = extension->getExtendedNominal())
+      out << nominal->getName();
     out << "'";
     printRange();
     break;

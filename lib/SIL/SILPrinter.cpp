@@ -192,34 +192,8 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
   }
 
   case DeclContextKind::ExtensionDecl: {
-    Type Ty = cast<ExtensionDecl>(Context)->getExtendedType();
-    TypeBase *Base = Ty->getCanonicalType().getPointer();
-    const NominalTypeDecl *ExtNominal = nullptr;
-    switch (Base->getKind()) {
-      default:
-        llvm_unreachable("unhandled context kind in SILPrint!");
-      case TypeKind::Protocol:
-        ExtNominal = cast<ProtocolType>(Base)->getDecl();
-        break;
-      case TypeKind::Enum:
-        ExtNominal = cast<EnumType>(Base)->getDecl();
-        break;
-      case TypeKind::Struct:
-        ExtNominal = cast<StructType>(Base)->getDecl();
-        break;
-      case TypeKind::Class:
-        ExtNominal = cast<ClassType>(Base)->getDecl();
-        break;
-      case TypeKind::BoundGenericEnum:
-        ExtNominal = cast<BoundGenericEnumType>(Base)->getDecl();
-        break;
-      case TypeKind::BoundGenericStruct:
-        ExtNominal = cast<BoundGenericStructType>(Base)->getDecl();
-        break;
-      case TypeKind::BoundGenericClass:
-        ExtNominal = cast<BoundGenericClassType>(Base)->getDecl();
-        break;
-    }
+    const NominalTypeDecl *ExtNominal =
+      cast<ExtensionDecl>(Context)->getExtendedNominal();
     printFullContext(ExtNominal->getDeclContext(), Buffer);
     Buffer << ExtNominal->getName() << ".";
     return;

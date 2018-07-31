@@ -206,12 +206,9 @@ DefaultAndMaxAccessLevelRequest::evaluate(Evaluator &evaluator,
 
   AccessLevel maxAccess = AccessLevel::Public;
 
-  if (!ED->getExtendedType().isNull() &&
-      !ED->getExtendedType()->hasError()) {
-    if (NominalTypeDecl *nominal = ED->getExtendedType()->getAnyNominal()) {
-      maxAccess = std::max(nominal->getFormalAccess(),
-                           AccessLevel::FilePrivate);
-    }
+  if (NominalTypeDecl *nominal = ED->getExtendedNominal()) {
+    maxAccess = std::max(nominal->getFormalAccess(),
+                         AccessLevel::FilePrivate);
   }
 
   if (const GenericParamList *genericParams = ED->getGenericParams()) {

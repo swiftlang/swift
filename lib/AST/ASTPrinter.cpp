@@ -1817,8 +1817,7 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
     recordDeclLoc(decl, [&]{
       // We cannot extend sugared types.
       Type extendedType = decl->getExtendedType();
-      NominalTypeDecl *nominal = extendedType ? extendedType->getAnyNominal() : nullptr;
-      if (!nominal) {
+      if (!extendedType || !extendedType->getAnyNominal()) {
         // Fallback to TypeRepr.
         printTypeLoc(decl->getExtendedTypeLoc());
         return;

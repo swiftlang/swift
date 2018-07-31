@@ -30,5 +30,3 @@ extension P5 {
   // CHECK-NEXT: <τ_0_0, τ_1_0 where τ_0_0 : P5, τ_1_0 : P3>
   func testSR7097<M>(_: S0<M>.Type) {}
 }
-
-

@@ -981,6 +981,36 @@ ExtensionDecl::takeConformanceLoaderSlow() {
   return { contextInfo->loader, contextInfo->allConformancesData };
 }
 
+NominalTypeDecl *ExtensionDecl::getExtendedNominal() const {
+  if (ExtendedNominal)
+    return ExtendedNominal;
+
+  if (auto extendedTy = getExtendedType()) {
+    while (true) {
+      // expected case: we reference a nominal type (potentially through sugar)
+      ExtendedNominal = extendedTy->getAnyNominal();
+      if (ExtendedNominal)
+        return ExtendedNominal;
+
+      // early type checking case: we have a typealias reference that is still
+      // unsugared, so explicitly look through the underlying type if there is
+      // one.
+      // FIXME: This should be replaced with the new name-lookup requests.
+      if (auto typealias =
+            dyn_cast_or_null<TypeAliasDecl>(extendedTy->getAnyGeneric())) {
+        extendedTy = typealias->getUnderlyingTypeLoc().getType();
+        if (!extendedTy) return nullptr;
+
+        continue;
+      }
+
+      return nullptr;
+    }
+  }
+
+  return nullptr;
+}
+
 Type ExtensionDecl::getInheritedType(unsigned index) const {
   ASTContext &ctx = getASTContext();
   return ctx.evaluator(InheritedTypeRequest{const_cast<ExtensionDecl *>(this),
@@ -992,7 +1022,7 @@ bool ExtensionDecl::isConstrainedExtension() const {
   if (!getGenericSignature())
     return false;
 
-  auto nominal = getExtendedType()->getAnyNominal();
+  auto nominal = getExtendedNominal();
   assert(nominal);
 
   // If the generic signature differs from that of the nominal type, it's a
@@ -1002,7 +1032,7 @@ bool ExtensionDecl::isConstrainedExtension() const {
 }
 
 bool ExtensionDecl::isEquivalentToExtendedContext() const {
-  auto decl = getExtendedType()->getAnyNominal();
+  auto decl = getExtendedNominal();
   return getParentModule() == decl->getParentModule()
     && !isConstrainedExtension()
     && !getDeclaredInterfaceType()->isExistentialType();
@@ -2373,11 +2403,9 @@ AccessLevel ValueDecl::getEffectiveAccess() const {
   } else if (auto enclosingExt = dyn_cast<ExtensionDecl>(getDeclContext())) {
     // Just check the base type. If it's a constrained extension, Sema should
     // have already enforced access more strictly.
-    if (auto extendedTy = enclosingExt->getExtendedType()) {
-      if (auto nominal = extendedTy->getAnyNominal()) {
-        effectiveAccess =
-            restrictToEnclosing(effectiveAccess, nominal->getEffectiveAccess());
-      }
+    if (auto nominal = enclosingExt->getExtendedNominal()) {
+      effectiveAccess =
+          restrictToEnclosing(effectiveAccess, nominal->getEffectiveAccess());
     }
 
   } else if (getDeclContext()->isLocalContext()) {
@@ -2430,13 +2458,11 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
     } else if (auto enclosingExt = dyn_cast<ExtensionDecl>(resultDC)) {
       // Just check the base type. If it's a constrained extension, Sema should
       // have already enforced access more strictly.
-      if (auto extendedTy = enclosingExt->getExtendedType()) {
-        if (auto nominal = extendedTy->getAnyNominal()) {
-          auto nominalAccess =
-              getAdjustedFormalAccess(nominal, useDC,
-                                      treatUsableFromInlineAsPublic);
-          access = std::min(access, nominalAccess);
-        }
+      if (auto nominal = enclosingExt->getExtendedNominal()) {
+        auto nominalAccess =
+            getAdjustedFormalAccess(nominal, useDC,
+                                    treatUsableFromInlineAsPublic);
+        access = std::min(access, nominalAccess);
       }
 
     } else {

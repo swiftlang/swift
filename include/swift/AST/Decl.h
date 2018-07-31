@@ -1640,7 +1640,10 @@ class ExtensionDecl final : public GenericContext, public Decl,
 
   /// The type being extended.
   TypeLoc ExtendedType;
-  
+
+  /// The nominal type being extended.
+  mutable NominalTypeDecl *ExtendedNominal = nullptr;
+
   MutableArrayRef<TypeLoc> Inherited;
 
   /// \brief The next extension in the linked list of extensions.
@@ -1698,7 +1701,14 @@ public:
   void setBraces(SourceRange braces) { Braces = braces; }
 
   /// Retrieve the type being extended.
+  ///
+  /// Only use this entry point when the complete type, as spelled in the source,
+  /// is required. For most clients, \c getExtendedNominal(), which provides
+  /// only the \c NominalTypeDecl, will suffice.
   Type getExtendedType() const { return ExtendedType.getType(); }
+
+  /// Retrieve the nominal type declaration that is being extended.
+  NominalTypeDecl *getExtendedNominal() const;
 
   /// Retrieve the extended type location.
   TypeLoc &getExtendedTypeLoc() { return ExtendedType; }

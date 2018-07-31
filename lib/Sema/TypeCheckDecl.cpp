@@ -3194,18 +3194,16 @@ public:
     }
 
     TC.checkInheritanceClause(ED);
-    if (auto extendedTy = ED->getExtendedType()) {
-      if (auto nominal = extendedTy->getAnyNominal()) {
-        TC.validateDecl(nominal);
-        if (auto *classDecl = dyn_cast<ClassDecl>(nominal))
-          TC.requestNominalLayout(classDecl);
+    if (auto nominal = ED->getExtendedNominal()) {
+      TC.validateDecl(nominal);
+      if (auto *classDecl = dyn_cast<ClassDecl>(nominal))
+        TC.requestNominalLayout(classDecl);
 
-        // Check the raw values of an enum, since we might synthesize
-        // RawRepresentable while checking conformances on this extension.
-        if (auto enumDecl = dyn_cast<EnumDecl>(nominal)) {
-          if (enumDecl->hasRawType())
-            checkEnumRawValues(TC, enumDecl);
-        }
+      // Check the raw values of an enum, since we might synthesize
+      // RawRepresentable while checking conformances on this extension.
+      if (auto enumDecl = dyn_cast<EnumDecl>(nominal)) {
+        if (enumDecl->hasRawType())
+          checkEnumRawValues(TC, enumDecl);
       }
     }
 

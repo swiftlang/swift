@@ -1918,9 +1918,9 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
 
   case DeclContextKind::ExtensionDecl: {
     auto ext = cast<ExtensionDecl>(DC);
-    Type baseTy = ext->getExtendedType();
-    assert(!baseTy->hasUnboundGenericType());
-    writeCrossReference(baseTy->getAnyNominal(), pathLen + 1);
+    auto nominal = ext->getExtendedNominal();
+    assert(nominal);
+    writeCrossReference(nominal, pathLen + 1);
 
     abbrCode = DeclTypeAbbrCodes[XRefExtensionPathPieceLayout::Code];
     CanGenericSignature genericSig(nullptr);
@@ -4894,9 +4894,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC,
         topLevelDecls[VD->getBaseName()]
           .push_back({ getKindForTable(D), addDeclRef(D) });
       } else if (auto ED = dyn_cast<ExtensionDecl>(D)) {
-        Type extendedTy = ED->getExtendedType();
-        assert(!extendedTy->hasUnboundGenericType());
-        const NominalTypeDecl *extendedNominal = extendedTy->getAnyNominal();
+        const NominalTypeDecl *extendedNominal = ED->getExtendedNominal();
         extensionDecls[extendedNominal->getName()]
           .push_back({ extendedNominal, addDeclRef(D) });
       } else if (auto OD = dyn_cast<OperatorDecl>(D)) {
