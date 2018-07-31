@@ -4780,7 +4780,7 @@ namespace {
           SmallVector<ValueDecl *, 2> lookup;
           dc->lookupQualified(lookupContext, name,
                               NL_QualifiedDefault | NL_KnownNoDependency,
-                              Impl.getTypeResolver(), lookup);
+                              lookup);
           for (auto result : lookup) {
             if (isa<FuncDecl>(result) &&
                 result->isInstanceMember() == decl->isInstanceProperty() &&
@@ -4804,7 +4804,7 @@ namespace {
           // does not have constrained extensions.
           if (overrideContext != dc && overridden->hasClangNode() &&
               overrideContext->getAsNominalTypeOrNominalTypeExtensionContext()
-                == lookupContext) {
+                == dc->getAsNominalTypeOrNominalTypeExtensionContext()) {
             // We've encountered a redeclaration of the property.
             // HACK: Just update the original declaration instead of importing a
             // second property.

@@ -4451,7 +4451,7 @@ public:
     const auto *CD = dyn_cast_or_null<ClassDecl>(CurrTy->getAnyNominal());
     if (!CD)
       return;
-    if (!CD->getSuperclassDecl())
+    if (!CD->hasSuperclass())
       return;
     CD = CD->getSuperclassDecl();
     for (const auto *Member : CD->getMembers()) {

@@ -3245,9 +3245,10 @@ ObjCClassKind ClassDecl::checkObjCAncestry() const {
     if (CD->isGenericContext())
       genericAncestry = true;
 
-    // FIXME: Checking isObjC() introduces cyclic dependencies here, but this
-    // doesn't account for ill-formed @objc.
-    if (CD->getAttrs().hasAttribute<ObjCAttr>())
+    // Is this class @objc? For the current class, only look at the attribute
+    // to avoid cycles; for superclasses, compute @objc completely.
+    if ((CD == this && CD->getAttrs().hasAttribute<ObjCAttr>()) ||
+        (CD != this && CD->isObjC()))
       isObjC = true;
 
     if (!CD->hasSuperclass())

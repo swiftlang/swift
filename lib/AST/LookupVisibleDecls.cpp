@@ -695,6 +695,10 @@ static void lookupVisibleMemberDeclsImpl(
     // If we have a class type, look into its superclass.
     auto *CurClass = dyn_cast<ClassDecl>(CurNominal);
 
+    // FIXME: We check `getSuperclass()` here because we'll be using the
+    // superclass Type below, and in ill-formed code `hasSuperclass()` could
+    // be true while `getSuperclass()` returns null, because the latter
+    // looks for a declaration.
     if (CurClass && CurClass->getSuperclass()) {
       // FIXME: This path is no substitute for an actual circularity check.
       // The real fix is to check that the superclass doesn't introduce a
