@@ -514,6 +514,7 @@ ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
 
   // Register any request-evaluator functions available at the AST layer.
   registerAccessRequestFunctions(evaluator);
+  registerNameLookupRequestFunctions(evaluator);
 }
 
 ASTContext::~ASTContext() {
@@ -2296,16 +2297,14 @@ void ASTContext::recordObjCMethod(AbstractFunctionDecl *func) {
 }
 
 /// Lookup for an Objective-C method with the given selector in the
-/// given class type or any of its superclasses.
-static AbstractFunctionDecl *lookupObjCMethodInType(
-                               Type classType,
+/// given class or any of its superclasses.
+static AbstractFunctionDecl *lookupObjCMethodInClass(
+                               ClassDecl *classDecl,
                                ObjCSelector selector,
                                bool isInstanceMethod,
                                bool isInitializer,
                                SourceManager &srcMgr,
                                bool inheritingInits = true) {
-  // Dig out the declaration of the class.
-  auto classDecl = classType->getClassOrBoundGenericClass();
   if (!classDecl)
     return nullptr;
 
@@ -2346,9 +2345,9 @@ static AbstractFunctionDecl *lookupObjCMethodInType(
   if (isInitializer && !inheritingInits)
     return nullptr;
 
-  return lookupObjCMethodInType(classDecl->getSuperclass(), selector,
-                                isInstanceMethod, isInitializer, srcMgr,
-                                inheritingInits);
+  return lookupObjCMethodInClass(classDecl->getSuperclassDecl(), selector,
+                                 isInstanceMethod, isInitializer, srcMgr,
+                                 inheritingInits);
 }
 
 void AbstractFunctionDecl::setForeignErrorConvention(
@@ -2434,11 +2433,11 @@ bool ASTContext::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {
     // extensions for many other reasons.
     auto selector = method->getObjCSelector();
     AbstractFunctionDecl *overriddenMethod
-      = lookupObjCMethodInType(classDecl->getSuperclass(),
-                               selector,
-                               method->isObjCInstanceMethod(),
-                               isa<ConstructorDecl>(method),
-                               SourceMgr);
+      = lookupObjCMethodInClass(classDecl->getSuperclassDecl(),
+                                selector,
+                                method->isObjCInstanceMethod(),
+                                isa<ConstructorDecl>(method),
+                                SourceMgr);
     if (!overriddenMethod)
       continue;
 

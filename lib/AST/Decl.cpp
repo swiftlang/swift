@@ -31,6 +31,7 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -3205,8 +3206,7 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
 
   // If there's no superclass, there's nothing to inherit.
   ClassDecl *superclassDecl;
-  if (!getSuperclass() ||
-      !(superclassDecl = getSuperclass()->getClassOrBoundGenericClass())) {
+  if (!(superclassDecl = getSuperclassDecl())) {
     setAddedImplicitInitializers();
     return false;
   }
@@ -3245,14 +3245,15 @@ ObjCClassKind ClassDecl::checkObjCAncestry() const {
     if (CD->isGenericContext())
       genericAncestry = true;
 
-    // FIXME: Checking isObjC() introduces cyclic dependencies here, but this
-    // doesn't account for ill-formed @objc.
-    if (CD->getAttrs().hasAttribute<ObjCAttr>())
+    // Is this class @objc? For the current class, only look at the attribute
+    // to avoid cycles; for superclasses, compute @objc completely.
+    if ((CD == this && CD->getAttrs().hasAttribute<ObjCAttr>()) ||
+        (CD != this && CD->isObjC()))
       isObjC = true;
 
     if (!CD->hasSuperclass())
       break;
-    CD = CD->getSuperclass()->getClassOrBoundGenericClass();
+    CD = CD->getSuperclassDecl();
     // If we don't have a valid class here, we should have diagnosed
     // elsewhere.
     if (!CD)
@@ -3368,7 +3369,7 @@ ClassDecl::findImplementingMethod(const AbstractFunctionDecl *Method) const {
     // Check the superclass
     if (!C->hasSuperclass())
       break;
-    C = C->getSuperclass()->getClassOrBoundGenericClass();
+    C = C->getSuperclassDecl();
   }
   return nullptr;
 }
@@ -3564,9 +3565,8 @@ Type ProtocolDecl::getSuperclass() const {
 }
 
 ClassDecl *ProtocolDecl::getSuperclassDecl() const {
-  if (auto superclass = getSuperclass())
-    return superclass->getClassOrBoundGenericClass();
-  return nullptr;
+  ASTContext &ctx = getASTContext();
+  return ctx.evaluator(SuperclassDeclRequest{const_cast<ProtocolDecl *>(this)});
 }
 
 void ProtocolDecl::setSuperclass(Type superclass) {
@@ -5881,7 +5881,7 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
   // gets an implicit chained initializer.
   if (Kind == BodyInitKind::None) {
     if (auto classDecl = getDeclContext()->getAsClassOrClassExtensionContext()) {
-      if (classDecl->getSuperclass())
+      if (classDecl->hasSuperclass())
         Kind = BodyInitKind::ImplicitChained;
     }
   }
@@ -6006,9 +6006,8 @@ Type ClassDecl::getSuperclass() const {
 }
 
 ClassDecl *ClassDecl::getSuperclassDecl() const {
-  if (auto superclass = getSuperclass())
-    return superclass->getClassOrBoundGenericClass();
-  return nullptr;
+  ASTContext &ctx = getASTContext();
+  return ctx.evaluator(SuperclassDeclRequest{const_cast<ClassDecl *>(this)});
 }
 
 void ClassDecl::setSuperclass(Type superclass) {

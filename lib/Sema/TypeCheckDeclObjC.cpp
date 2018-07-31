@@ -897,8 +897,7 @@ static Type getObjectiveCNominalType(Type &cache,
 
   SmallVector<ValueDecl *, 4> decls;
   NLOptions options = NL_QualifiedDefault | NL_OnlyTypes;
-  dc->lookupQualified(ModuleType::get(module), TypeName, options, nullptr,
-                      decls);
+  dc->lookupQualified(module, TypeName, options, decls);
   for (auto decl : decls) {
     if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
       cache = nominal->getDeclaredType();

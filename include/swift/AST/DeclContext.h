@@ -487,7 +487,7 @@ public:
                        SmallVectorImpl<ValueDecl *> &decls) const;
 
   /// Look for the set of declarations with the given name within the
-  /// given set of type declarations.
+  /// given set of nominal type declarations.
   ///
   /// \param types The type declarations to look into.
   ///
@@ -500,7 +500,7 @@ public:
   /// lookup.
   ///
   /// \returns true if anything was found.
-  bool lookupQualified(ArrayRef<TypeDecl *> types, DeclName member,
+  bool lookupQualified(ArrayRef<NominalTypeDecl *> types, DeclName member,
                        NLOptions options,
                        SmallVectorImpl<ValueDecl *> &decls) const;
 

@@ -451,7 +451,7 @@ bool Lowering::usesObjCAllocator(ClassDecl *theClass) {
     if (!theClass->hasSuperclass())
       return theClass->hasClangNode();
 
-    theClass = theClass->getSuperclass()->getClassOrBoundGenericClass();
+    theClass = theClass->getSuperclassDecl();
   }
 }
 
