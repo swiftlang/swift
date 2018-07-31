@@ -2818,7 +2818,7 @@ NameAliasType::NameAliasType(TypeAliasDecl *typealias, Type parent,
   }
 
   // Record the substitutions.
-  if (auto genericSig = substitutions.getGenericSignature()) {
+  if (substitutions) {
     Bits.NameAliasType.HasSubstitutionMap = true;
     *getTrailingObjects<SubstitutionMap>() = substitutions;
   } else {
