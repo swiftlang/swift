@@ -46,3 +46,23 @@ public func testDevice() {
   _hostOp(extra)
 }
 
+// This loop is unrolled, so we have multiple SIL values for `x`, but there
+// should be a single copy-to-host compiler warning.
+public func SR8412_CopyToHost() {
+  for _ in 0...10 {
+    let x = Tensor(1)  // expected-warning {{value implicitly copied to the host}}
+    _hostOp(x)
+  }
+}
+
+@inline(never)
+public func hostFunc() -> Tensor<Float> {
+  return Tensor<Float>(1.0)
+}
+
+public func SR8412_CopyToAccel(a: Int32) {
+  let x = Tensor<Float>(1.0)
+  for _ in 0...10 {
+    let _ = hostFunc() + x  // expected-warning {{value implicitly copied to the accelerator}}
+  }
+}

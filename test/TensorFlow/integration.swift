@@ -458,8 +458,8 @@ public struct NonInlineMethodExample {
   var b = Tensor<Float>(2.0)
 
   @inline(never)
-  public mutating func mutatingMethod() {  // expected-warning 2 {{value implicitly copied}}
-    a += b   // expected-note 2 {{value used here}}
+  public mutating func mutatingMethod() {  // expected-warning {{value implicitly copied}}
+    a += b   // expected-note {{value used here}}
     b += a
   }
 }

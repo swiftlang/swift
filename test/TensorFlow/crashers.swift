@@ -244,7 +244,6 @@ public func testMultiResultOp_send_recv() {
   // Accelerator -> Host
   _hostOp(x)
   x += [[2.0]]
-  // expected-warning @+2{{implicitly copied to the host}}
   // expected-warning @+1{{implicitly copied to the host}}
   let results = TensorFlow.Raw.softmaxCrossEntropyWithLogits(features: x, labels: x)
   // Accelerator -> Host
