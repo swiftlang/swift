@@ -1642,7 +1642,7 @@ class ExtensionDecl final : public GenericContext, public Decl,
   TypeLoc ExtendedType;
 
   /// The nominal type being extended.
-  mutable NominalTypeDecl *ExtendedNominal = nullptr;
+  NominalTypeDecl *ExtendedNominal = nullptr;
 
   MutableArrayRef<TypeLoc> Inherited;
 
@@ -1680,6 +1680,7 @@ class ExtensionDecl final : public GenericContext, public Decl,
   /// Slow path for \c takeConformanceLoader().
   std::pair<LazyMemberLoader *, uint64_t> takeConformanceLoaderSlow();
 
+  friend class ExtendedNominalRequest;
 public:
   using Decl::getASTContext;
 

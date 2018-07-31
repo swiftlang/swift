@@ -982,33 +982,9 @@ ExtensionDecl::takeConformanceLoaderSlow() {
 }
 
 NominalTypeDecl *ExtensionDecl::getExtendedNominal() const {
-  if (ExtendedNominal)
-    return ExtendedNominal;
-
-  if (auto extendedTy = getExtendedType()) {
-    while (true) {
-      // expected case: we reference a nominal type (potentially through sugar)
-      ExtendedNominal = extendedTy->getAnyNominal();
-      if (ExtendedNominal)
-        return ExtendedNominal;
-
-      // early type checking case: we have a typealias reference that is still
-      // unsugared, so explicitly look through the underlying type if there is
-      // one.
-      // FIXME: This should be replaced with the new name-lookup requests.
-      if (auto typealias =
-            dyn_cast_or_null<TypeAliasDecl>(extendedTy->getAnyGeneric())) {
-        extendedTy = typealias->getUnderlyingTypeLoc().getType();
-        if (!extendedTy) return nullptr;
-
-        continue;
-      }
-
-      return nullptr;
-    }
-  }
-
-  return nullptr;
+  ASTContext &ctx = getASTContext();
+  return ctx.evaluator(
+      ExtendedNominalRequest{const_cast<ExtensionDecl *>(this)});;
 }
 
 Type ExtensionDecl::getInheritedType(unsigned index) const {

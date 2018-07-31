@@ -157,6 +157,33 @@ public:
   void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
+/// Request the nominal declaration extended by a given extension declaration.
+class ExtendedNominalRequest :
+    public SimpleRequest<ExtendedNominalRequest,
+                         CacheKind::SeparatelyCached,
+                         NominalTypeDecl *,
+                         ExtensionDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend class SimpleRequest;
+
+  // Evaluation.
+  NominalTypeDecl *evaluate(Evaluator &evaluator, ExtensionDecl *ext) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<NominalTypeDecl *> getCachedResult() const;
+  void cacheResult(NominalTypeDecl *value) const;
+
+  // Cycle handling
+  NominalTypeDecl *breakCycle() const { return nullptr; }
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
 /// The zone number for name-lookup requests.
 #define SWIFT_NAME_LOOKUP_REQUESTS_TYPEID_ZONE 9
 

@@ -284,7 +284,7 @@ static GenericParamList *cloneGenericParams(ASTContext &ctx,
 
 static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   if (ED->getExtendedType())
-    return;
+    return; 
 
   // If we didn't parse a type, fill in an error type and bail out.
   if (!ED->getExtendedTypeLoc().getTypeRepr()) {
@@ -396,24 +396,12 @@ static void bindExtensions(SourceFile &SF, TypeChecker &TC) {
   // Utility function to try and resolve the extended type without diagnosing.
   // If we succeed, we go ahead and bind the extension. Otherwise, return false.
   auto tryBindExtension = [&](ExtensionDecl *ext) -> bool {
-    auto *extendedTy = ext->getExtendedTypeLoc().getTypeRepr();
-    if (auto *identTy = dyn_cast_or_null<IdentTypeRepr>(extendedTy)) {
-      auto *dc = ext->getDeclContext();
-
-      GenericTypeToArchetypeResolver resolver(dc);
-
-      TypeResolutionOptions options;
-      options |= TypeResolutionFlags::AllowUnboundGenerics;
-      options |= TypeResolutionFlags::ExtensionBinding;
-      options |= TypeResolutionFlags::SilenceErrors;
-
-      auto type = TC.resolveIdentifierType(dc, identTy, options, &resolver);
-      if (type->is<ErrorType>())
-        return false;
+    if (ext->getExtendedNominal()) {
+      bindExtensionDecl(ext, TC);
+      return true;
     }
 
-    bindExtensionDecl(ext, TC);
-    return true;
+    return false;
   };
 
   // Phase 1 - try to bind each extension, adding those whose type cannot be

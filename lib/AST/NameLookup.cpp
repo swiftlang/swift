@@ -2226,3 +2226,26 @@ ClassDecl *SuperclassDeclRequest::evaluate(Evaluator &evaluator,
 
   return nullptr;
 }
+
+NominalTypeDecl *ExtendedNominalRequest::evaluate(Evaluator &evaluator,
+                                                  ExtensionDecl *ext) const {
+  DirectlyReferencedTypeDecls referenced;
+  ASTContext &ctx = ext->getASTContext();
+
+  // Prefer syntactic information when we have it.
+  TypeLoc &typeLoc = ext->getExtendedTypeLoc();
+  if (auto typeRepr = typeLoc.getTypeRepr()) {
+    referenced = directReferencesForTypeRepr(evaluator, ctx, typeRepr, ext);
+  } else if (auto type = typeLoc.getType()) {
+    // Fall back to semantic types.
+    // FIXME: In the long run, we shouldn't need this. Non-syntactic results
+    // should be cached.
+    referenced = directReferencesForType(type);
+  }
+
+  // Resolve those type declarations to nominal type declarations.
+  SmallVector<ModuleDecl *, 2> modulesFound;
+  auto nominalTypes
+    = resolveTypeDeclsToNominal(evaluator, ctx, referenced, modulesFound);
+  return nominalTypes.empty() ? nullptr : nominalTypes.front();
+}
