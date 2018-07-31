@@ -314,6 +314,9 @@ public:
     }
   };
 
+  /// Is the given type imported from a C tag type?
+  bool isCImportedTagType(const TypeContextDescriptor *type);
+
   /// Check whether a type conforms to a protocol.
   ///
   /// \param value - can be null, in which case the question should

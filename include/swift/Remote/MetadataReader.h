@@ -1291,15 +1291,171 @@ private:
     return ContextDescriptorRef(address, descriptor);
   }
   
-  ContextDescriptorRef
+  /// Returns Optional(nullptr) if there's no parent descriptor.
+  /// Returns None if there was an error reading the parent descriptor.
+  Optional<ContextDescriptorRef>
   readParentContextDescriptor(ContextDescriptorRef base) {
     auto parentAddress =
                   resolveNullableRelativeIndirectableField(base, base->Parent);
+    if (!parentAddress)
+      return None;
+    if (!*parentAddress)
+      return ContextDescriptorRef(nullptr);
+    if (auto parentDescriptor = readContextDescriptor(*parentAddress))
+      return parentDescriptor;
+    return None;
+  }
 
-    if (parentAddress) {
-      return readContextDescriptor(*parentAddress);
+  static bool isCImportedContext(Demangle::NodePointer node) {
+    do {
+      if (node->getKind() == Demangle::Node::Kind::Module) {
+        return isCImportedModuleName(node->getText());
+      }
+
+      // Continue to the parent.
+      node = node->getChild(0);
+    } while (node);
+    return false;
+  }
+
+  Demangle::NodePointer
+  buildContextDescriptorMangling(ContextDescriptorRef descriptor,
+                                 Demangle::NodeFactory &nodeFactory) {
+    // Read the parent descriptor.
+    auto parentDescriptorResult = readParentContextDescriptor(descriptor);
+
+    // If there was a problem reading the parent descriptor, we're done.
+    if (!parentDescriptorResult) return nullptr;
+
+    // Try to produce a mangle-tree for the parent.
+    Demangle::NodePointer parentDemangling = nullptr;
+    if (auto parentDescriptor = *parentDescriptorResult) {
+      parentDemangling =
+        buildContextDescriptorMangling(parentDescriptor, nodeFactory);
+      if (!parentDemangling)
+        return nullptr;
     }
-    return nullptr;
+
+    std::string nodeName;
+    std::string relatedTag;
+    Demangle::Node::Kind nodeKind;
+    
+    auto getTypeName = [&]() -> bool {
+      auto typeBuffer =
+        reinterpret_cast<const TargetTypeContextDescriptor<Runtime> *>
+          (descriptor.getLocalBuffer());
+      auto nameAddress = resolveRelativeField(descriptor, typeBuffer->Name);
+      if (!Reader->readString(RemoteAddress(nameAddress), nodeName))
+        return false;
+      
+      if (typeBuffer->isSynthesizedRelatedEntity()) {
+        nameAddress += nodeName.size() + 1;
+        if (!Reader->readString(RemoteAddress(nameAddress), relatedTag))
+          return false;
+      }
+      
+      return true;
+    };
+    
+    bool isTypeContext = false;
+    switch (auto contextKind = descriptor->getKind()) {
+    case ContextDescriptorKind::Class:
+      if (!getTypeName())
+        return nullptr;
+      nodeKind = Demangle::Node::Kind::Class;
+      isTypeContext = true;
+      break;
+    case ContextDescriptorKind::Struct:
+      if (!getTypeName())
+        return nullptr;
+      nodeKind = Demangle::Node::Kind::Structure;
+      isTypeContext = true;
+      break;
+    case ContextDescriptorKind::Enum:
+      if (!getTypeName())
+        return nullptr;
+      nodeKind = Demangle::Node::Kind::Enum;
+      isTypeContext = true;
+      break;
+    case ContextDescriptorKind::Protocol: {
+      auto protocolBuffer =
+        reinterpret_cast<const TargetProtocolDescriptor<Runtime> *>
+          (descriptor.getLocalBuffer());
+      auto nameAddress = resolveRelativeField(descriptor, protocolBuffer->Name);
+      if (!Reader->readString(RemoteAddress(nameAddress), nodeName))
+        return nullptr;
+
+      nodeKind = Demangle::Node::Kind::Protocol;
+      break;
+    }
+    case ContextDescriptorKind::Extension:
+      // TODO: Remangle something about the extension context here.
+      return nullptr;
+      
+    case ContextDescriptorKind::Anonymous:
+      // TODO: Remangle something about the anonymous context here.
+      return nullptr;
+
+    case ContextDescriptorKind::Module: {
+      // Modules shouldn't have a parent.
+      if (parentDemangling) {
+        return nullptr;
+      }
+
+      nodeKind = Demangle::Node::Kind::Module;
+      auto moduleBuffer =
+        reinterpret_cast<const TargetModuleContextDescriptor<Runtime> *>
+          (descriptor.getLocalBuffer());
+      auto nameAddress
+        = resolveRelativeField(descriptor, moduleBuffer->Name);
+      if (!Reader->readString(RemoteAddress(nameAddress), nodeName))
+        return nullptr;
+
+      // The form of module contexts is a little different from other
+      // contexts; just create the node directly here and return.
+      return nodeFactory.createNode(nodeKind, std::move(nodeName));
+    }
+    
+    default:
+      // Not a kind of context we know about.
+      return nullptr;
+    }
+
+    // The root context should be a module context, which we handled directly
+    // in the switch, so if we got here without a parent, we're ill-formed.
+    if (!parentDemangling) {
+      return nullptr;
+    }
+
+    // Override the node kind if this was a Clang-imported type.
+    if (isTypeContext) {
+      auto typeFlags =
+        TypeContextDescriptorFlags(descriptor->Flags.getKindSpecificFlags());
+
+      if (typeFlags.isCTypedef())
+        nodeKind = Demangle::Node::Kind::TypeAlias;
+
+      // As a special case, always use the struct mangling for C-imported
+      // value types.
+      else if (nodeKind == Demangle::Node::Kind::Enum &&
+               !typeFlags.isSynthesizedRelatedEntity() &&
+               isCImportedContext(parentDemangling))
+        nodeKind = Demangle::Node::Kind::Structure;
+    }
+
+    auto nameNode = nodeFactory.createNode(Node::Kind::Identifier,
+                                           std::move(nodeName));
+    if (!relatedTag.empty()) {
+      auto relatedNode =
+        nodeFactory.createNode(Node::Kind::RelatedEntityDeclName, relatedTag);
+      relatedNode->addChild(nameNode, nodeFactory);
+      nameNode = relatedNode;
+    }
+
+    auto demangling = nodeFactory.createNode(nodeKind);
+    demangling->addChild(parentDemangling, nodeFactory);
+    demangling->addChild(nameNode, nodeFactory);
+    return demangling;
   }
 
   /// Given a read nominal type descriptor, attempt to build a demangling tree
@@ -1307,129 +1463,10 @@ private:
   Demangle::NodePointer
   buildNominalTypeMangling(ContextDescriptorRef descriptor,
                            Demangle::NodeFactory &nodeFactory) {
-    std::vector<std::pair<Demangle::Node::Kind, Demangle::NodePointer>>
-      nameComponents;
-    ContextDescriptorRef parent = descriptor;
-    
-    while (parent) {
-      std::string nodeName;
-      std::string relatedTag;
-      Demangle::Node::Kind nodeKind;
-      
-      auto getTypeName = [&]() -> bool {
-        auto typeBuffer =
-          reinterpret_cast<const TargetTypeContextDescriptor<Runtime> *>
-            (parent.getLocalBuffer());
-        auto nameAddress = resolveRelativeField(parent, typeBuffer->Name);
-        if (!Reader->readString(RemoteAddress(nameAddress), nodeName))
-          return false;
-        
-        if (typeBuffer->isSynthesizedRelatedEntity()) {
-          nameAddress += nodeName.size() + 1;
-          if (!Reader->readString(RemoteAddress(nameAddress), relatedTag))
-            return false;
-        }
-        
-        return true;
-      };
-      
-      bool isTypeContext = false;
-      switch (auto contextKind = parent->getKind()) {
-      case ContextDescriptorKind::Class:
-        if (!getTypeName())
-          return nullptr;
-        nodeKind = Demangle::Node::Kind::Class;
-        isTypeContext = true;
-        break;
-      case ContextDescriptorKind::Struct:
-        if (!getTypeName())
-          return nullptr;
-        nodeKind = Demangle::Node::Kind::Structure;
-        isTypeContext = true;
-        break;
-      case ContextDescriptorKind::Enum:
-        if (!getTypeName())
-          return nullptr;
-        nodeKind = Demangle::Node::Kind::Enum;
-        isTypeContext = true;
-        break;
-      case ContextDescriptorKind::Protocol: {
-        auto protocolBuffer =
-          reinterpret_cast<const TargetProtocolDescriptor<Runtime> *>
-            (parent.getLocalBuffer());
-        auto nameAddress = resolveRelativeField(parent, protocolBuffer->Name);
-        if (!Reader->readString(RemoteAddress(nameAddress), nodeName))
-          return nullptr;
-
-        nodeKind = Demangle::Node::Kind::Protocol;
-        break;
-      }
-      case ContextDescriptorKind::Extension:
-        // TODO: Remangle something about the extension context here.
-        return nullptr;
-        
-      case ContextDescriptorKind::Anonymous:
-        // TODO: Remangle something about the anonymous context here.
-        return nullptr;
-
-      case ContextDescriptorKind::Module: {
-        nodeKind = Demangle::Node::Kind::Module;
-        auto moduleBuffer =
-          reinterpret_cast<const TargetModuleContextDescriptor<Runtime> *>(
-            parent.getLocalBuffer());
-        auto nameAddress
-          = resolveRelativeField(parent, moduleBuffer->Name);
-        if (!Reader->readString(RemoteAddress(nameAddress), nodeName))
-          return nullptr;
-        break;
-      }
-      
-      default:
-        // Not a kind of context we know about.
-        return nullptr;
-      }
-
-      // Override the node kind if this was a Clang-imported type.
-      if (isTypeContext) {
-        auto typeFlags =
-          TypeContextDescriptorFlags(parent->Flags.getKindSpecificFlags());
-
-        if (typeFlags.isCTag())
-          nodeKind = Demangle::Node::Kind::Structure;
-        else if (typeFlags.isCTypedef())
-          nodeKind = Demangle::Node::Kind::TypeAlias;
-      }
-      
-      auto nameNode = nodeFactory.createNode(Node::Kind::Identifier,
-                                             nodeName);
-      if (!relatedTag.empty()) {
-        auto relatedNode =
-          nodeFactory.createNode(Node::Kind::RelatedEntityDeclName, relatedTag);
-        relatedNode->addChild(nameNode, nodeFactory);
-        nameNode = relatedNode;
-      }
-
-      nameComponents.emplace_back(nodeKind, nameNode);
-      
-      parent = readParentContextDescriptor(parent);
-    }
-    
-    // We should have made our way up to a module context.
-    if (nameComponents.empty())
+    auto demangling = buildContextDescriptorMangling(descriptor, nodeFactory);
+    if (!demangling)
       return nullptr;
-    if (nameComponents.back().first != Node::Kind::Module)
-      return nullptr;
-    auto moduleInfo = std::move(nameComponents.back());
-    nameComponents.pop_back();
-    auto demangling =
-      nodeFactory.createNode(Node::Kind::Module, moduleInfo.second->getText());
-    for (auto &component : reversed(nameComponents)) {
-      auto parent = nodeFactory.createNode(component.first);
-      parent->addChild(demangling, nodeFactory);
-      parent->addChild(component.second, nodeFactory);
-      demangling = parent;
-    }
-    
+
     auto top = nodeFactory.createNode(Node::Kind::Type);
     top->addChild(demangling, nodeFactory);
     return top;
