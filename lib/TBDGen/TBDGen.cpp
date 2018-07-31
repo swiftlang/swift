@@ -41,21 +41,6 @@ static bool isGlobalOrStaticVar(VarDecl *VD) {
   return VD->isStatic() || VD->getDeclContext()->isModuleScopeContext();
 }
 
-void TBDGenVisitor::visitPatternBindingDecl(PatternBindingDecl *PBD) {
-  for (auto &entry : PBD->getPatternList()) {
-    auto *var = entry.getAnchoringVarDecl();
-
-    // Non-global variables might have an explicit initializer symbol.
-    if (entry.getNonLazyInit() && !isGlobalOrStaticVar(var)) {
-      auto declRef =
-          SILDeclRef(var, SILDeclRef::Kind::StoredPropertyInitializer);
-      // Stored property initializers for public properties are currently
-      // public.
-      addSymbol(declRef);
-    }
-  }
-}
-
 void TBDGenVisitor::addSymbol(SILDeclRef declRef) {
   auto linkage = effectiveLinkageForClassMember(
     declRef.getLinkage(ForDefinition),
@@ -169,6 +154,17 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
 }
 
 void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
+  // Non-global variables might have an explicit initializer symbol, in
+  // non-resilient modules.
+  if (VD->getAttrs().hasAttribute<HasInitialValueAttr>() &&
+      SwiftModule->getResilienceStrategy() == ResilienceStrategy::Default &&
+      !isGlobalOrStaticVar(VD)) {
+    auto declRef = SILDeclRef(VD, SILDeclRef::Kind::StoredPropertyInitializer);
+    // Stored property initializers for public properties are currently
+    // public.
+    addSymbol(declRef);
+  }
+
   // statically/globally stored variables have some special handling.
   if (VD->hasStorage() && isGlobalOrStaticVar(VD)) {
     if (getDeclLinkage(VD) == FormalLinkage::PublicUnique) {
