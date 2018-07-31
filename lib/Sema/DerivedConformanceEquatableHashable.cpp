@@ -270,9 +270,9 @@ static GuardStmt *returnIfNotEqualGuard(ASTContext &C,
                                         Expr *lhsExpr,
                                         Expr *rhsExpr) {
   SmallVector<StmtConditionElement, 1> conditions;
-  SmallVector<ASTNode, 2> statements;
+  SmallVector<ASTNode, 1> statements;
 
-  // First, generate the statements for the body of the guard.
+  // First, generate the statement for the body of the guard.
   // return false
   auto falseExpr = new (C) BooleanLiteralExpr(false, SourceLoc(),
                                               /*Implicit*/true);
