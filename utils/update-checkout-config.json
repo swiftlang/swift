@@ -293,7 +293,7 @@
                 "llvm": "swift-DEVELOPMENT-SNAPSHOT-2018-07-23-a",
                 "clang": "swift-DEVELOPMENT-SNAPSHOT-2018-07-23-a",
                 "swift": "tensorflow",
-                "lldb": "tensorflow-merge",
+                "lldb": "tensorflow",
                 "cmark": "swift-DEVELOPMENT-SNAPSHOT-2018-07-23-a",
                 "llbuild": "swift-DEVELOPMENT-SNAPSHOT-2018-07-23-a",
                 "swiftpm": "swift-DEVELOPMENT-SNAPSHOT-2018-07-23-a",
