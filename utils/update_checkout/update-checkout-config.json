@@ -271,7 +271,7 @@
                 "clang": "swift-4.2-branch",
                 "compiler-rt": "swift-4.2-branch",
                 "swift": "swift-5.0-branch",
-                "lldb": "swift-4.2-branch",
+                "lldb": "swift-5.0-branch",
                 "cmark": "master",
                 "llbuild": "master",
                 "swiftpm": "master",
