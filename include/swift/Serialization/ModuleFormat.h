@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 429; // Last change: coroutine accessors
+const uint16_t VERSION_MINOR = 430; // Last change: ordered top-level decls
 
 using DeclIDField = BCFixed<31>;
 
@@ -1635,6 +1635,8 @@ namespace index_block {
     NESTED_TYPE_DECLS,
     DECL_MEMBER_NAMES,
 
+    ORDERED_TOP_LEVEL_DECLS,
+
     GENERIC_SIGNATURE_OFFSETS,
     SUBSTITUTION_MAP_OFFSETS,
     LastRecordKind = SUBSTITUTION_MAP_OFFSETS,
@@ -1688,6 +1690,11 @@ namespace index_block {
   using EntryPointLayout = BCRecordLayout<
     ENTRY_POINT,
     DeclIDField  // the ID of the main class; 0 if there was a main source file
+  >;
+
+  using OrderedDeclsLayout = BCGenericRecordLayout<
+    RecordIDField,        // record ID
+    BCArray<DeclIDField>  // list of decls by ID
   >;
 }
 

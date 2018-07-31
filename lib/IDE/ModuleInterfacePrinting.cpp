@@ -497,7 +497,7 @@ void swift::ide::printSubmoduleInterface(
   // If the group name is specified, we sort them according to their source order,
   // which is the order preserved by getTopLevelDecls.
   if (GroupNames.empty()) {
-    std::sort(SwiftDecls.begin(), SwiftDecls.end(),
+    std::stable_sort(SwiftDecls.begin(), SwiftDecls.end(),
       [&](Decl *LHS, Decl *RHS) -> bool {
         auto *LHSValue = dyn_cast<ValueDecl>(LHS);
         auto *RHSValue = dyn_cast<ValueDecl>(RHS);
