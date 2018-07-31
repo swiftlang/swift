@@ -605,7 +605,7 @@ SILPassPipelinePlan SILPassPipelinePlan::getOnonePassPipeline() {
 //                          TensorFlow Pass Pipeline
 //===----------------------------------------------------------------------===//
 
-SILPassPipelinePlan SILPassPipelinePlan::getTFParitionPassPipeline() {
+SILPassPipelinePlan SILPassPipelinePlan::getTFPartitionPassPipeline() {
   SILPassPipelinePlan P;
   P.startPipeline("TensorFlow Partitioning");
   P.addTFPartition();
