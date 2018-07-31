@@ -602,6 +602,31 @@ void BlocksReachingTensorCode::dump() {
 //                             FunctionPartitioner
 //===----------------------------------------------------------------------===//
 
+namespace llvm {
+template<typename T> struct DenseMapInfo;
+
+// An alternative is to SourceManager::getLineAndColumn() as the
+// DenseMap/DenseSet key type instead of SourceRange. That would require that
+// the call-site translate a SILLocation / SourceRange to line and column
+// numbers first.
+template<> struct DenseMapInfo<SourceRange> {
+  static SourceRange getEmptyKey() { return SourceRange(); }
+
+  static SourceRange getTombstoneKey() { return SourceRange(); }
+
+  static unsigned getHashValue(const SourceRange &Val) {
+    return hash_combine(
+        DenseMapInfo<const void *>::getHashValue(Val.Start.getOpaquePointerValue()),
+        DenseMapInfo<const void *>::getHashValue(Val.End.getOpaquePointerValue()));
+  }
+
+  static bool isEqual(const SourceRange &LHS,
+                      const SourceRange &RHS) {
+    return LHS == RHS;
+  }
+};
+} // end llvm namespace
+
 namespace {
 /// Marking values in the host program need to either be moved, copied, or have
 /// their results sent over to the accelerator.
@@ -688,6 +713,11 @@ public:
 
   /// Set of all of the __tf_send calls that silence copy-in warnings.
   SmallPtrSet<SILInstruction*, 8> explicitCopyMarkers;
+
+  /// Set of source locations where we have issued copy-to-host warnings.
+  llvm::DenseSet<SourceRange> copyToHostWarningLocs;
+  /// Set of source locations where we have issued copy-to-accelerator warnings.
+  llvm::DenseSet<SourceRange> copyToAccelWarningLocs;
 
   struct PartitionedTensorProgram {
     // Initialize all members to NULL.
@@ -938,7 +968,10 @@ diagnoseCopyToAccelerator(SILValue value, SILInstruction *user,
 
   auto &ctx = hostFn.getModule().getASTContext();
 
-  // Emit the warning.
+  // Emit the warning on this value, if that has not been done before.
+  if (!copyToAccelWarningLocs.insert(loc.getSourceRange()).second)
+    return;
+
   diagnose(ctx, loc.getSourceLoc(), diagID, description)
     .highlight(loc.getSourceRange());
   auto userLoc = getUserSourceLocation(user);
@@ -973,7 +1006,6 @@ diagnoseCopyToAccelerator(SILValue value, SILInstruction *user,
 /// otherwise emit a warning to tell the programmer that they are doing
 /// something that induces an implicit data transfer into their code.
 void TFFunctionPartition::diagnoseUsesFromHost(SILValue value, SILLocation loc){
-  bool diagnosed = false;
   for (auto *use : value->getUses()) {
     auto *user = use->getUser();
 
@@ -995,8 +1027,8 @@ void TFFunctionPartition::diagnoseUsesFromHost(SILValue value, SILLocation loc){
     if (hostFn.getName() == SWIFT_ENTRY_POINT_FUNCTION)
       continue;
 
-    // Only emit one warning per use.
-    if (!diagnosed)
+    // Only emit one warning per value, even if it has multiple host uses.
+    if (copyToHostWarningLocs.insert(loc.getSourceRange()).second)
       diagnoseCopyToHost(value, user, loc);
   }
 }
