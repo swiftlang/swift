@@ -567,7 +567,6 @@ private: // Helpers to create TensorFlow graph nodes.
   GLStatus visitBuiltinInst(BuiltinInst *inst);
 
   GLStatus visitTupleInst(TupleInst *inst);
-  GLStatus visitTupleExtractInst(TupleExtractInst *inst);
   GLStatus visitUncheckedRefCastInst(UncheckedRefCastInst *inst);
 
   GLStatus visitReturnInst(ReturnInst *inst);
@@ -2546,14 +2545,6 @@ GLStatus TFGraphFunctionLowering::visitTupleInst(TupleInst *inst) {
   // the return instruction.
   assert(inst->hasOneUse() && isa<ReturnInst>(inst->getSingleUse()->getUser())&&
          "Unexpected tuple_inst in GraphGen");
-  return GLStatus::Success;
-}
-
-GLStatus
-TFGraphFunctionLowering::visitTupleExtractInst(TupleExtractInst *inst) {
-  // tuple_extracts only exist as part of the handling for multi-result
-  // tensor operations.  This is handled as part of the 'getOperandValue'
-  // implementation.
   return GLStatus::Success;
 }
 

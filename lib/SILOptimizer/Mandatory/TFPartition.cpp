@@ -1377,29 +1377,19 @@ bool TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
   // If we are moving the instruction over, then we know it is a tensor op, and
   // it gets special attention.
 
-  // If we're moving a computation to the accelerator and we see a tuple_extract
-  // from a moved value, then we move the tuple_extract as well, to make sure
-  // that all copy-to-host or results are scalar values, not the multiple
-  // results of tensor ops.
+  // Sanity check that we never need to need with multi-result tensors encoded
+  // in a tuple.
+#ifndef NDEBUG
   for (auto result : inst.getResults())
     for (auto *use : result->getUses()) {
       auto user = use->getUser();
-
-      // FIXME: We should probably consider these as tensorops to make sure
-      // they get moved to the accelerator and we don't end up with any
-      // multi-result tensor operations being copied over.
-      if (isa<TupleExtractInst>(user)) {
-        // It is possible the tuple extract already got marked as a copy.  If
-        // so, remove its entry so we can upgrade it to a move.
-        markedInstructions.erase(user);
-        if (markInstruction(*user, Marking::Move))
-          return true;
-      }
+      assert(!isa<TupleExtractInst>(user) &&
+             "No result value of a graph_op inst should be a tuple!");
     }
-  // If this is a tuple_extract of a tensor op, then we already marked its
-  // operand.
-  if (isa<TupleExtractInst>(inst))
-    return false;
+#endif // NDEBUG
+
+  assert(!isa<TupleExtractInst>(inst) &&
+         "tuple_extract over a tensor value should not be marked!");
 
   // Okay, we know that the instruction is a tensor op.  Decode its argument
   // list so we know how to handle the operands.
@@ -2683,9 +2673,10 @@ void PartitionCloner::visitTupleExtractInst(TupleExtractInst *inst) {
     return;
   }
 
-  // Otherwise we have a normal tuple_exract from a tuple of TensorFlow values,
-  // which is the result of a TensorFlow op.
-  SILCloner::visitTupleExtractInst(inst);
+  // Note that tuple_exract from a tuple of TensorFlow values should not be
+  // marked and cloned over.
+  inst->dump();
+  llvm_unreachable("Cannot partition this tuple_extract inst!");
 }
 
 /// We clone over struct_extract(x, 0) into x's value.  The only time we mark
@@ -4209,18 +4200,8 @@ bool TFFunctionPartition::partition(bool isTest) {
       // the whole value.
       bool hasAnyNonResultUse = false, hasAnyUse = false;
       for (auto result : inst.getResults()) {
-        // If this is a tuple type and the tuple elements are tensor values
-        // that are consumed beyond the tensor end point, the TupleExtract
-        // insts that produce these tensor values are already marked for Move,
-        // which will make them result tensors.
-        // e.g. For SIL snippet
-        //   %12 = builtin "__tfop_SoftmaxCrossEntropyWithLogits"(...) :
-        //     $(loss: TensorHandle<Float>, backprop: TensorHandle<Float>)
-        //   %13 = tuple_extract %12 : $(...), 0
-        //   %16 = tuple_extract %12 : $(...), 1
-        // %13 and %16 can be the result tensors.
-        if (isa<TupleType>(result->getType().getASTType()))
-          continue;
+        assert(!isa<TupleType>(result->getType().getASTType()) &&
+               "No result value of a graph_op inst should be a tuple!");
 
         for (auto *operand : result->getUses()) {
           auto user = operand->getUser();
