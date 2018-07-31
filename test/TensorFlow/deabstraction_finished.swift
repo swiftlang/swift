@@ -33,15 +33,10 @@ public func constexprCall(a: Tensor<Float>, idx: Tensor<Int32>) -> Tensor<Float>
 
 /*
  CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}constexprCall
- CHECK: [[A:%.*]] = graph_op "Const"() {dtype$dtype: $Builtin.Int64, value$tensor: i64 0
- CHECK: [[AC:%.*]] = graph_op "Cast,i"
+ CHECK: [[A:%.*]] = graph_op "Const"() {dtype: $Int32, value$tensor: i32 0
  CHECK: [[B:%.*]] = graph_op "Const"
- CHECK: [[BC:%.*]] = graph_op "Cast,i"
  CHECK: [[C:%.*]] = graph_op "Const"
- CHECK: [[CX:%.*]] = unchecked_ref_cast [[C]] : $TensorHandle<Builtin.Int32> to $TensorHandle<Int32>
- CHECK: [[BX:%.*]] = unchecked_ref_cast [[BC]] : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
- CHECK: [[AX:%.*]] = unchecked_ref_cast [[AC]] : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
- CHECK: [[RESULT:%.*]] = graph_op "OneHot,i,i,i,i"(%0 : $TensorHandle<Int32>, [[CX]] : $TensorHandle<Int32>, [[BX]] : $TensorHandle<Float>, [[AX]] : $TensorHandle<Float>) {T: $Float, TI: $Int32, axis: i64 1, __device: "/device:CPU:0"} : $TensorHandle<Float>
+ CHECK: [[RESULT:%.*]] = graph_op "OneHot,i,i,i,i"(%0 : $TensorHandle<Int32>, [[A]] : $TensorHandle<Int32>, [[B]] : $TensorHandle<Float>, [[C]] : $TensorHandle<Float>) {T: $Float, TI: $Int32, axis: i64 1, __device: "/device:CPU:0"} : $TensorHandle<Float>
   CHECK: return [[RESULT]]
 */
 
@@ -117,10 +112,10 @@ public func test75407624() {
 /* CHECK-LABEL: ---- INPUT FUNCTION {{.*}}test75407624
  * CHECK: graph_op "Const"() {dtype: $Float, value$tensor: [$Float: (f32 0x3F800000 /* 1 */)], value$shape: [$Int32: i32 1]
  * CHECK: [[B1X:%.*]] = graph_op "Const"() {dtype: $Int32, value$tensor: [$Int32: (i32 1)], value$shape: [$Int32: i32 1],
- * CHECK: [[BX2:%.*]] = graph_op "tfc.scalarToTensor,s"(
+ * CHECK: [[BX2:%.*]] = graph_op "Const"() {dtype: $Float, value$tensor: f32 0x3F800000 /* 1 */
  * CHECK:  graph_op "Fill,i,i"([[B1X]] : $TensorHandle<Int32>, [[BX2]] : $TensorHandle<Float>)
  * CHECK: [[C1X:%.*]] = graph_op "Const"() {dtype: $Int32, value$tensor: [$Int32: (i32 1)], value$shape: [$Int32: i32 1],
- * CHECK: [[CX2:%.*]] = graph_op "tfc.scalarToTensor,s"(
+ * CHECK: [[CX2:%.*]] = graph_op "Const"() {dtype: $Float, value$tensor: f32 0x3F800000 /* 1 */
  * CHECK:  graph_op "Fill,i,i"([[C1X]] : $TensorHandle<Int32>, [[CX2]] : $TensorHandle<Float>)
  * CHECK: graph_op "Const"() {dtype: $Float, value$tensor: [$Float: (f32 0x3F800000 /* 1 */), (f32 0x40000000 /* 2 */), (f32 0x40400000 /* 3 */), (f32 0x40800000 /* 4 */)], value$shape: [$Int32: (i32 2), (i32 2)],
  * CHECK-LABEL: ---- END OF 

@@ -4,11 +4,6 @@ import Builtin
 import Swift
 import TensorFlow
 
-// sil @$undefInt32 : $@convention(thin) () -> Builtin.Int32  {
-// bb0:
-//  return undef : $Builtin.Int32
-// }
-
 sil @$undefTFBool : $@convention(thin) () -> TensorHandle<Bool>  {
 bb0:
  return undef : $TensorHandle<Bool>
@@ -17,7 +12,7 @@ bb0:
 // CHECK: library {
 // CHECK:  function {
 // CHECK:  node_def {
-// CHECK:      name: "UndefConstDTensorHandleLBoolG"
+// CHECK:      name: "UndefConstDTensorHandleLBoolG/device_CPU_0"
 // CHECK:      op: "Const"
 // CHECK:      attr {
 // CHECK:        key: "dtype"
@@ -48,7 +43,7 @@ bb0:
 // CHECK: library {
 // CHECK:  function {
 // CHECK:  node_def {
-// CHECK:      name: "UndefConstDTensorHandleLInt8G"
+// CHECK:      name: "UndefConstDTensorHandleLInt8G/device_CPU_0"
 // CHECK:      op: "Const"
 // CHECK:      attr {
 // CHECK:        key: "dtype"
@@ -79,7 +74,7 @@ bb0:
 // CHECK: library {
 // CHECK:  function {
 // CHECK:  node_def {
-// CHECK:      name: "UndefConstDTensorHandleLUInt8G"
+// CHECK:      name: "UndefConstDTensorHandleLUInt8G/device_CPU_0"
 // CHECK:      op: "Const"
 // CHECK:      attr {
 // CHECK:        key: "dtype"
@@ -110,7 +105,7 @@ bb0:
 // CHECK: library {
 // CHECK:  function {
 // CHECK:  node_def {
-// CHECK:      name: "UndefConstDTensorHandleLInt16G"
+// CHECK:      name: "UndefConstDTensorHandleLInt16G/device_CPU_0"
 // CHECK:      op: "Const"
 // CHECK:      attr {
 // CHECK:        key: "dtype"
@@ -141,7 +136,7 @@ bb0:
 // CHECK: library {
 // CHECK:  function {
 // CHECK:  node_def {
-// CHECK:      name: "UndefConstDTensorHandleLUInt16G"
+// CHECK:      name: "UndefConstDTensorHandleLUInt16G/device_CPU_0"
 // CHECK:      op: "Const"
 // CHECK:      attr {
 // CHECK:        key: "dtype"
@@ -173,7 +168,7 @@ bb0:
 // CHECK: library {
 // CHECK:  function {
 // CHECK:  node_def {
-// CHECK:      name: "UndefConstDTensorHandleLInt32G"
+// CHECK:      name: "UndefConstDTensorHandleLInt32G/device_CPU_0"
 // CHECK:      op: "Const"
 // CHECK:      attr {
 // CHECK:        key: "dtype"
@@ -204,7 +199,7 @@ bb0:
 // CHECK: library {
 // CHECK:  function {
 // CHECK:  node_def {
-// CHECK:      name: "UndefConstDTensorHandleLUInt32G"
+// CHECK:      name: "UndefConstDTensorHandleLUInt32G/device_CPU_0"
 // CHECK:      op: "Const"
 // CHECK:      attr {
 // CHECK:        key: "dtype"
@@ -235,7 +230,7 @@ bb0:
 // CHECK: library {
 // CHECK:  function {
 // CHECK:  node_def {
-// CHECK:      name: "UndefConstDTensorHandleLInt64G"
+// CHECK:      name: "UndefConstDTensorHandleLInt64G/device_CPU_0"
 // CHECK:      op: "Const"
 // CHECK:      attr {
 // CHECK:        key: "dtype"
@@ -266,7 +261,7 @@ bb0:
 // CHECK: library {
 // CHECK:  function {
 // CHECK:  node_def {
-// CHECK:      name: "UndefConstDTensorHandleLUInt64G"
+// CHECK:      name: "UndefConstDTensorHandleLUInt64G/device_CPU_0"
 // CHECK:      op: "Const"
 // CHECK:      attr {
 // CHECK:        key: "dtype"
@@ -298,7 +293,7 @@ bb0:
 // CHECK: library {
 // CHECK:  function {
 // CHECK:  node_def {
-// CHECK:      name: "UndefConstDTensorHandleLFloatG"
+// CHECK:      name: "UndefConstDTensorHandleLFloatG/device_CPU_0"
 // CHECK:      op: "Const"
 // CHECK:      attr {
 // CHECK:        key: "dtype"
@@ -329,7 +324,7 @@ bb0:
 // CHECK: library {
 // CHECK:  function {
 // CHECK:  node_def {
-// CHECK:      name: "UndefConstDTensorHandleLDoubleG"
+// CHECK:      name: "UndefConstDTensorHandleLDoubleG/device_CPU_0"
 // CHECK:      op: "Const"
 // CHECK:      attr {
 // CHECK:        key: "dtype"
@@ -352,4 +347,52 @@ bb0:
 // CHECK:  }
 // CHECK:}
 
-
+sil @$undefDuplicates : $@convention(thin) () -> TensorHandle<Bool>  {
+bb0:
+  br bb1(undef : $TensorHandle<Bool>)
+bb1(%0 : $TensorHandle<Bool>):
+  return undef : $TensorHandle<Bool>
+}
+// CHECK-LABEL: --- TFPartition GraphDef Proto: $undefDuplicates
+// CHECK:     node_def {
+// CHECK:       name: "UndefConstDTensorHandleLBoolG/device_CPU_0"
+// CHECK:       op: "Const"
+// CHECK:       attr {
+// CHECK:         key: "dtype"
+// CHECK:         value {
+// CHECK:           type: DT_BOOL
+// CHECK:         }
+// CHECK:       }
+// CHECK:       attr {
+// CHECK:         key: "value"
+// CHECK:         value {
+// CHECK:           tensor {
+// CHECK:             dtype: DT_BOOL
+// CHECK:             tensor_shape {
+// CHECK:             }
+// CHECK:             bool_val: false
+// CHECK:           }
+// CHECK:         }
+// CHECK:       }
+// CHECK:     }
+// CHECK:     node_def {
+// CHECK:       name: "UndefConstDTensorHandleLBoolG/device_CPU_0_1"
+// CHECK:       op: "Const"
+// CHECK:       attr {
+// CHECK:         key: "dtype"
+// CHECK:         value {
+// CHECK:           type: DT_BOOL
+// CHECK:         }
+// CHECK:       }
+// CHECK:       attr {
+// CHECK:         key: "value"
+// CHECK:         value {
+// CHECK:           tensor {
+// CHECK:             dtype: DT_BOOL
+// CHECK:             tensor_shape {
+// CHECK:             }
+// CHECK:             bool_val: false
+// CHECK:           }
+// CHECK:         }
+// CHECK:       }
+// CHECK:     }

@@ -249,6 +249,8 @@ struct TFGraphFunctionLowering
   /// name from the declaration. This will be used in `getUniqueName` to produce
   /// uniqued graph node names.
   llvm::SmallDenseMap<ValueDecl *, unsigned> uniqueNames;
+  /// To be used to generate unique undef names.
+  llvm::SmallDenseMap<SILType, unsigned> uniqueUndefNames;
 
   /// The set of graph functions that the generated graph use as
   /// function-typed attributes, but their definitions are not yet available,
@@ -922,6 +924,15 @@ TF_Output TFGraphFunctionLowering::createUndefNode(SILType type) {
       break;
     }
   }
+  nodeName += thisDeviceTypeStr;
+  escapeOpName(nodeName);
+  auto uniqueUndefLookup = uniqueUndefNames.find(type);
+  if (uniqueUndefLookup != uniqueUndefNames.end()) {
+    nodeName += "_" + llvm::itostr(uniqueUndefLookup->getSecond()++);
+  } else {
+    uniqueUndefNames.insert({type, 1});
+  }
+
   auto *result = TF_NewOperation(graphFn.getGraph(), "Const", nodeName.c_str());
   TF_SetAttrType(result, "dtype", dtype);
 
