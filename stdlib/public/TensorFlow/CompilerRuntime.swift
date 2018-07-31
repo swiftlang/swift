@@ -179,7 +179,7 @@ private func configureRuntimeFromEnvironment() {
     debugLog("Setting TF server address to \(address) from env.")
   }
   
-  if let value = getenv("SWIFT_TENSORFLOW_RUN_METADATA_OUTPUT") else {
+  if let value = getenv("SWIFT_TENSORFLOW_RUN_METADATA_OUTPUT") {
     let path = String(cString: value)
     _RuntimeConfig.runMetadataOutputPath = path
     debugLog("Setting run metadata output path to \(path) from env.")
@@ -315,7 +315,7 @@ public final class _ExecutionContext {
       checkOk(status)
       TF_DeleteGraph(graph)
     }
-    TFE_DeleteContext(cContext, status)
+    TFE_DeleteContext(cContext)
     checkOk(status)
     TF_DeleteBuffer(tensorFlowConfig)
     TF_DeleteStatus(status)
@@ -546,12 +546,12 @@ extension TFState {
         debugLog("Running enqueue with \(inputTensors.count) input tensors.")
       }
     }
-    var runOptions: UnsafePointer<TF_Buffer>? = nil
+    var runOptions: UnsafeMutablePointer<TF_Buffer>? = nil
     var runMetadataOutput: UnsafeMutablePointer<TF_Buffer>? = nil
     // When there's a run metadata output path specified, we enable `FULL_TRACE`
     // in run options and dump that to the specified path after execution.
     if _RuntimeConfig.runMetadataOutputPath != nil {
-      runOptions = UnsafePointer(TF_CreateRunOptions(/*enable_full_trace*/ 1))
+      runOptions = TF_CreateRunOptions(/*enable_full_trace*/ 1)
       runMetadataOutput = TF_NewBuffer()
     }
     debugLog("""
@@ -559,7 +559,7 @@ extension TFState {
       \(targetNodeSpecs.count) target nodes.
       """)
     TF_SessionRun(
-      cSession, runOptions,
+      cSession, UnsafePointer(runOptions),
       // input related parameters
       inputNodeSpecs, inputTensors, Int32(inputTensors.count),
       // output related parameters
@@ -577,9 +577,9 @@ extension TFState {
     // If run metadata path was set, dump the run metadata proto to a file.
     if let path = _RuntimeConfig.runMetadataOutputPath {
       TF_DeleteBuffer(runOptions)
+      debugLog("Writing run metadata to \"\(path)\".")
       writeContents(of: runMetadataOutput!, toFile: path)
       TF_DeleteBuffer(runMetadataOutput)
-      debugLog("Writing run metadata to \"\(path)\"")
     }
 
     // Delete input tensors.
