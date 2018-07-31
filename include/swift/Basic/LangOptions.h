@@ -122,6 +122,12 @@ namespace swift {
     /// completions.
     bool CodeCompleteCallPatternHeuristics = false;
 
+    /// Enables the new operator solving typechecking prototype.
+    ///
+    /// This is a staging option for experimental work in operator
+    /// type checking.
+    bool EnableNewOperatorPrototype = false;
+
     ///
     /// Flags for use by tests
     ///

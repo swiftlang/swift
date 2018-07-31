@@ -352,6 +352,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.UseDarwinPreStableABIBit = true;
 #endif
 
+  Opts.EnableNewOperatorPrototype |=
+      Args.hasArg(OPT_enable_new_operator_prototype);
+
   // Must be processed after any other language options that could affect
   // platform conditions.
   bool UnsupportedOS, UnsupportedArch;
