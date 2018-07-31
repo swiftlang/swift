@@ -5296,11 +5296,12 @@ void AbstractFunctionDecl::computeType(AnyFunctionType::ExtInfo info) {
   } else if (auto ctor = dyn_cast<ConstructorDecl>(this)) {
     auto *dc = ctor->getDeclContext();
 
-    if (hasSelf)
-      resultTy = dc->getSelfInterfaceType();
-
-    if (!resultTy)
-      resultTy = ErrorType::get(ctx);
+    if (hasSelf) {
+      if (!dc->isTypeContext())
+        resultTy = ErrorType::get(ctx);
+      else
+        resultTy = dc->getSelfInterfaceType();
+    }
 
     // Adjust result type for failability.
     if (ctor->getFailability() != OTK_None)
