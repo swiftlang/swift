@@ -1,14 +1,14 @@
 import Foundation
 
 public struct CommandLineArguments {
-  fileprivate struct MissingArgumentError: LocalizedError {
+  public struct MissingArgumentError: LocalizedError {
     let argName: String
 
     var errorDescription: String? {
       return "Missing required argument: \(argName)"
     }
   }
-  fileprivate struct UnkeyedArgumentError: LocalizedError {
+  public struct UnkeyedArgumentError: LocalizedError {
     let argName: String
 
     var errorDescription: String? {
@@ -16,7 +16,7 @@ public struct CommandLineArguments {
     }
   }
 
-  fileprivate let args: [String: String]
+  private let args: [String: String]
 
   public static func parse<T: Sequence>(_ args: T) throws -> CommandLineArguments
     where T.Element == String {
