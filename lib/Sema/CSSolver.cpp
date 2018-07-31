@@ -1956,6 +1956,86 @@ Constraint *ConstraintSystem::selectDisjunction() {
 }
 
 bool ConstraintSystem::solveForDisjunctionChoices(
+    ArrayRef<Constraint *> constraints, ConstraintLocator *disjunctionLocator,
+    SmallVectorImpl<Solution> &solutions,
+    FreeTypeVariableBinding allowFreeTypeVariables, bool explicitConversion) {
+  Optional<Score> bestNonGenericScore;
+  Optional<std::pair<DisjunctionChoice, Score>> lastSolvedChoice;
+
+  // Try each of the constraints within the disjunction.
+  for (auto index : indices(constraints)) {
+    auto currentChoice =
+        DisjunctionChoice(this, constraints[index], explicitConversion);
+    if (shouldSkipDisjunctionChoice(*this, currentChoice, bestNonGenericScore))
+      continue;
+
+    // We already have a solution; check whether we should
+    // short-circuit the disjunction.
+    if (lastSolvedChoice) {
+      Constraint *lastChoice = lastSolvedChoice->first;
+      auto delta = lastSolvedChoice->second - CurrentScore;
+      bool hasUnavailableOverloads = delta.Data[SK_Unavailable] > 0;
+      bool hasFixes = delta.Data[SK_Fix] > 0;
+
+      // Attempt to short-circuit evaluation of this disjunction only
+      // if the disjunction choice we are comparing to did not involve
+      // selecting unavailable overloads or result in fixes being
+      // applied to reach a solution.
+      if (!hasUnavailableOverloads && !hasFixes &&
+          shortCircuitDisjunctionAt(currentChoice, lastChoice, getASTContext()))
+        break;
+    }
+
+    // Try to solve the system with this option in the disjunction.
+    SolverScope scope(*this);
+    ++solverState->NumDisjunctionTerms;
+    if (TC.getLangOpts().DebugConstraintSolver) {
+      auto &log = getASTContext().TypeCheckerDebug->getStream();
+      log.indent(solverState->depth)
+        << "(assuming ";
+      currentChoice->print(log, &TC.Context.SourceMgr);
+      log << '\n';
+    }
+
+    // If the disjunction requested us to, remember which choice we
+    // took for it.
+
+    if (disjunctionLocator) {
+      DisjunctionChoices.push_back({disjunctionLocator, index});
+
+      // Implicit unwraps of optionals are worse solutions than those
+      // not involving implicit unwraps.
+      if (!disjunctionLocator->getPath().empty()) {
+        auto kind = disjunctionLocator->getPath().back().getKind();
+        if (kind == ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice ||
+            kind == ConstraintLocator::DynamicLookupResult) {
+          assert(index == 0 || index == 1);
+          if (index == 1)
+            increaseScore(SK_ForceUnchecked);
+        }
+      }
+    }
+
+    if (auto score = currentChoice.solve(solutions, allowFreeTypeVariables)) {
+      if (!currentChoice.isGenericOperator() &&
+          currentChoice.isSymmetricOperator()) {
+        if (!bestNonGenericScore || score < bestNonGenericScore)
+          bestNonGenericScore = score;
+      }
+
+      lastSolvedChoice = {currentChoice, *score};
+    }
+
+    if (TC.getLangOpts().DebugConstraintSolver) {
+      auto &log = getASTContext().TypeCheckerDebug->getStream();
+      log.indent(solverState->depth) << ")\n";
+    }
+  }
+
+  return !bool(lastSolvedChoice.hasValue());
+}
+
+bool ConstraintSystem::solveForDisjunction(
     Constraint *disjunction, SmallVectorImpl<Solution> &solutions,
     FreeTypeVariableBinding allowFreeTypeVariables) {
   assert(disjunction->getKind() == ConstraintKind::Disjunction);
@@ -2008,82 +2088,14 @@ bool ConstraintSystem::solveForDisjunctionChoices(
 
   bool hasDisabledChoices = pruneOverloadSet(disjunction);
 
-  Optional<std::pair<DisjunctionChoice, Score>> lastSolvedChoice;
-  Optional<Score> bestNonGenericScore;
-
   ++solverState->NumDisjunctions;
-  bool explicitConversion = isExplicitConversionConstraint(disjunction);
-  auto constraints = disjunction->getNestedConstraints();
-  // Try each of the constraints within the disjunction.
-  for (auto index : indices(constraints)) {
-    auto currentChoice =
-        DisjunctionChoice(this, constraints[index], explicitConversion);
-    if (shouldSkipDisjunctionChoice(*this, currentChoice, bestNonGenericScore))
-      continue;
+  auto *locator =
+      disjunction->shouldRememberChoice() ? disjunction->getLocator() : nullptr;
+  assert(!disjunction->shouldRememberChoice() || disjunction->getLocator());
 
-    // We already have a solution; check whether we should
-    // short-circuit the disjunction.
-    if (lastSolvedChoice) {
-      Constraint *lastChoice = lastSolvedChoice->first;
-      auto delta = lastSolvedChoice->second - CurrentScore;
-      bool hasUnavailableOverloads = delta.Data[SK_Unavailable] > 0;
-      bool hasFixes = delta.Data[SK_Fix] > 0;
-
-      // Attempt to short-circuit evaluation of this disjunction only
-      // if the disjunction choice we are comparing to did not involve
-      // selecting unavailable overloads or result in fixes being
-      // applied to reach a solution.
-      if (!hasUnavailableOverloads && !hasFixes &&
-          shortCircuitDisjunctionAt(currentChoice, lastChoice, getASTContext()))
-        break;
-    }
-
-    // Try to solve the system with this option in the disjunction.
-    SolverScope scope(*this);
-    ++solverState->NumDisjunctionTerms;
-    if (TC.getLangOpts().DebugConstraintSolver) {
-      auto &log = getASTContext().TypeCheckerDebug->getStream();
-      log.indent(solverState->depth)
-        << "(assuming ";
-      currentChoice->print(log, &TC.Context.SourceMgr);
-      log << '\n';
-    }
-
-    // If the disjunction requested us to, remember which choice we
-    // took for it.
-    if (disjunction->shouldRememberChoice()) {
-      auto locator = disjunction->getLocator();
-      assert(locator && "remembered disjunction doesn't have a locator?");
-      DisjunctionChoices.push_back({locator, index});
-
-      // Implicit unwraps of optionals are worse solutions than those
-      // not involving implicit unwraps.
-      if (!locator->getPath().empty()) {
-        auto kind = locator->getPath().back().getKind();
-        if (kind == ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice ||
-            kind == ConstraintLocator::DynamicLookupResult) {
-          assert(index == 0 || index == 1);
-          if (index == 1)
-            increaseScore(SK_ForceUnchecked);
-        }
-      }
-    }
-
-    if (auto score = currentChoice.solve(solutions, allowFreeTypeVariables)) {
-      if (!currentChoice.isGenericOperator() &&
-          currentChoice.isSymmetricOperator()) {
-        if (!bestNonGenericScore || score < bestNonGenericScore)
-          bestNonGenericScore = score;
-      }
-
-      lastSolvedChoice = {currentChoice, *score};
-    }
-
-    if (TC.getLangOpts().DebugConstraintSolver) {
-      auto &log = getASTContext().TypeCheckerDebug->getStream();
-      log.indent(solverState->depth) << ")\n";
-    }
-  }
+  auto noSolutions = solveForDisjunctionChoices(
+      disjunction->getNestedConstraints(), locator, solutions,
+      allowFreeTypeVariables, isExplicitConversionConstraint(disjunction));
 
   if (hasDisabledChoices) {
     // Re-enable previously disabled overload choices.
@@ -2097,7 +2109,7 @@ bool ConstraintSystem::solveForDisjunctionChoices(
   InactiveConstraints.insert(afterDisjunction, disjunction);
   CG.addConstraint(disjunction);
 
-  return bool(lastSolvedChoice.hasValue());
+  return noSolutions;
 }
 
 bool ConstraintSystem::solveSimplified(
@@ -2122,10 +2134,8 @@ bool ConstraintSystem::solveSimplified(
                                    allowFreeTypeVariables);
   }
 
-  if (disjunction) {
-    return !solveForDisjunctionChoices(disjunction, solutions,
-                                       allowFreeTypeVariables);
-  }
+  if (disjunction)
+    return solveForDisjunction(disjunction, solutions, allowFreeTypeVariables);
 
   // If there are no disjunctions we can't solve this system unless we have
   // free type variables and are allowing them in the solution.
