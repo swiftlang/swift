@@ -998,6 +998,11 @@ class WidelyAvailableBase {
 @available(OSX, introduced: 10.53)
 class EsotericSmallBatchHipsterThing : WidelyAvailableBase {}
 
+@available(OSX, introduced: 10.53)
+class NestedClassTest {
+  class InnerClass : WidelyAvailableBase {}
+}
+
 // Useless #available(...) checks
 
 func functionWithDefaultAvailabilityAndUselessCheck(_ p: Bool) {

@@ -3349,13 +3349,13 @@ void simplifyLocator(Expr *&anchor,
 
 class DisjunctionChoice {
   ConstraintSystem *CS;
-  Constraint *Disjunction;
   Constraint *Choice;
+  bool ExplicitConversion;
 
 public:
-  DisjunctionChoice(ConstraintSystem *const cs, Constraint *disjunction,
-                    Constraint *choice)
-      : CS(cs), Disjunction(disjunction), Choice(choice) {}
+  DisjunctionChoice(ConstraintSystem *const cs, Constraint *choice,
+                    bool explicitConversion)
+      : CS(cs), Choice(choice), ExplicitConversion(explicitConversion) {}
 
   Constraint *operator->() const { return Choice; }
 

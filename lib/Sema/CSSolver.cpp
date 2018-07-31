@@ -2007,11 +2007,12 @@ bool ConstraintSystem::solveForDisjunctionChoices(
   Optional<Score> bestNonGenericScore;
 
   ++solverState->NumDisjunctions;
+  bool explicitConversion = isExplicitConversionConstraint(disjunction);
   auto constraints = disjunction->getNestedConstraints();
   // Try each of the constraints within the disjunction.
   for (auto index : indices(constraints)) {
     auto currentChoice =
-        DisjunctionChoice(this, disjunction, constraints[index]);
+        DisjunctionChoice(this, constraints[index], explicitConversion);
     if (shouldSkipDisjunctionChoice(*this, currentChoice, bestNonGenericScore))
       continue;
 
@@ -2159,7 +2160,9 @@ DisjunctionChoice::solve(SmallVectorImpl<Solution> &solutions,
                          FreeTypeVariableBinding allowFreeTypeVariables) {
   CS->simplifyDisjunctionChoice(Choice);
 
-  propagateConversionInfo();
+  if (ExplicitConversion)
+    propagateConversionInfo();
+
   if (CS->solveRec(solutions, allowFreeTypeVariables))
     return None;
 
@@ -2204,8 +2207,7 @@ bool DisjunctionChoice::isSymmetricOperator() const {
 }
 
 void DisjunctionChoice::propagateConversionInfo() const {
-  if (!CS->isExplicitConversionConstraint(Disjunction))
-    return;
+  assert(ExplicitConversion);
 
   auto LHS = Choice->getFirstType();
   auto typeVar = LHS->getAs<TypeVariableType>();
