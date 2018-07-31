@@ -2169,8 +2169,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
 
       auto varType = var->getType()
         ->getReferenceStorageReferent();
-      auto varInterfaceType = var->getInterfaceType()
-        ->getReferenceStorageReferent();
+      auto varInterfaceType = var->getValueInterfaceType();
 
       // If var is a lazy property, its value is provided for the underlying
       // storage.  We thus take an optional of the properties type.  We only

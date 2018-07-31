@@ -4783,8 +4783,7 @@ void SILProperty::verify(const SILModule &M) const {
   auto sig = dc->getGenericSignatureOfContext();
   auto baseTy = dc->getInnermostTypeContext()->getSelfInterfaceType()
                   ->getCanonicalType(sig);
-  auto leafTy = decl->getStorageInterfaceType()->getReferenceStorageReferent()
-                    ->getCanonicalType(sig);
+  auto leafTy = decl->getValueInterfaceType()->getCanonicalType(sig);
   SubstitutionMap subs;
   if (sig) {
     auto env = dc->getGenericEnvironmentOfContext();
