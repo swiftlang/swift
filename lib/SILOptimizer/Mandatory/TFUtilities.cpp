@@ -1548,8 +1548,7 @@ tf::createConstTensor(Type elementType, SymbolicValue scalars,
   // Ensure that the array of initializer values is in the module's allocator.
   scalars = scalars.cloneInto(allocator);
   shape = shape.cloneInto(allocator);
-  assert(scalars.getKind() == SymbolicValue::Array &&
-         shape.getKind() == SymbolicValue::Array &&
+  assert(shape.getKind() == SymbolicValue::Array &&
          "expected array constants for scalars and shape");
 
   SmallVector<GraphOperationAttribute, 8> attributes;
@@ -1567,12 +1566,14 @@ tf::createConstTensor(Type elementType, SymbolicValue scalars,
     context.getIdentifier(std::string("value") + tensorSuffix), scalars
   });
 
-  // Add the value$shape attribute.
-  auto shapeSuffix =
-  SILTensorOpInfo::getOperandClassSuffix(SILTensorOpInfo::OperandClass::Shape);
-  attributes.push_back({
-    context.getIdentifier(std::string("value") + shapeSuffix), shape
-  });
+  // Add the value$shape attribute if we have an array value.
+  if (scalars.getKind() == SymbolicValue::Array) {
+    auto shapeId = SILTensorOpInfo::OperandClass::Shape;
+    auto shapeSuffix = SILTensorOpInfo::getOperandClassSuffix(shapeId);
+    attributes.push_back({
+      context.getIdentifier(std::string("value") + shapeSuffix), shape
+    });
+  }
 
   // All graph_op's get a device.
   attributes.push_back({

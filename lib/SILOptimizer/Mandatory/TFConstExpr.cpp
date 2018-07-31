@@ -1075,12 +1075,10 @@ ConstExprFunctionState::computeSingleStoreAddressValue(SILValue addr) {
     // Ignore markers, loads, and other things that aren't stores to this stack
     // value.
     if (isa<LoadInst>(user) || isa<DeallocStackInst>(user) ||
-        isa<DebugValueAddrInst>(user))
+        isa<DestroyAddrInst>(user) || isa<DebugValueAddrInst>(user))
       continue;
 
     // TODO: BeginAccess/EndAccess.
-
-    // TODO: CopyAddr.
 
     // If this is a store *to* the memory, analyze the input value.
     if (auto *si = dyn_cast<StoreInst>(user)) {
@@ -1097,6 +1095,26 @@ ConstExprFunctionState::computeSingleStoreAddressValue(SILValue addr) {
         memoryObject->setValue(result);
         continue;
       }
+    }
+
+    if (auto *cai = dyn_cast<CopyAddrInst>(user)) {
+      // If this is a copy_addr *from* the memory, then it is a load, ignore it.
+      if (use->getOperandNumber() == 0)
+        continue;
+
+      // If this is a copy_addr *to* the memory, analyze the input value.
+      assert(use->getOperandNumber() == 1 && "copy_addr has two operands");
+
+      // If we have already found a value for this stack slot then we're done:
+      // we don't support multiple assignment.
+      if (memoryObject->getValue().getKind() != SymbolicValue::UninitMemory)
+        return evaluator.getUnknown(addr, UnknownReason::Default);
+
+      auto result = computeLoadResult(cai->getOperand(0));
+      if (!result.isConstant())
+        return evaluator.getUnknown(addr, UnknownReason::Default);
+      memoryObject->setValue(result);
+      continue;
     }
 
     // If this is an apply_inst passing the memory address as an indirect
