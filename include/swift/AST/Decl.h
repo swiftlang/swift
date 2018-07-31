@@ -4392,13 +4392,6 @@ public:
   /// property from the given module?
   bool isResilient(ModuleDecl *M, ResilienceExpansion expansion) const;
 
-  /// Returns the interface type of elements of storage represented by this
-  /// declaration.
-  ///
-  /// For variables, this is the type of the variable itself.
-  /// For subscripts, this is the type of the subscript element.
-  Type getStorageInterfaceType() const;
-
   /// Does the storage use a behavior?
   bool hasBehavior() const {
     return BehaviorInfo.getPointer() != nullptr;

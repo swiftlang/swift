@@ -3687,7 +3687,7 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
   if (auto var = dyn_cast<VarDecl>(storage)) {
     CanType componentTy;
     if (!var->getDeclContext()->isTypeContext()) {
-      componentTy = storage->getStorageInterfaceType()->getCanonicalType();
+      componentTy = var->getInterfaceType()->getCanonicalType();
     } else {
       componentTy =
         GenericEnvironment::mapTypeIntoContext(genericEnv, baseTy)

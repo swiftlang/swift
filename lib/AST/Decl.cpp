@@ -4335,7 +4335,7 @@ SourceLoc AbstractStorageDecl::getOverrideLoc() const {
 
 Type AbstractStorageDecl::getValueInterfaceType() const {
   if (auto var = dyn_cast<VarDecl>(this))
-    return var->getInterfaceType();
+    return var->getInterfaceType()->getReferenceStorageReferent();
   return cast<SubscriptDecl>(this)->getElementInterfaceType();
 }
 
@@ -5296,11 +5296,12 @@ void AbstractFunctionDecl::computeType(AnyFunctionType::ExtInfo info) {
   } else if (auto ctor = dyn_cast<ConstructorDecl>(this)) {
     auto *dc = ctor->getDeclContext();
 
-    if (hasSelf)
-      resultTy = dc->getSelfInterfaceType();
-
-    if (!resultTy)
-      resultTy = ErrorType::get(ctx);
+    if (hasSelf) {
+      if (!dc->isTypeContext())
+        resultTy = ErrorType::get(ctx);
+      else
+        resultTy = dc->getSelfInterfaceType();
+    }
 
     // Adjust result type for failability.
     if (ctor->getFailability() != OTK_None)
@@ -5514,7 +5515,7 @@ Type FuncDecl::getResultInterfaceType() const {
     return nullptr;
 
   Type resultTy = getInterfaceType();
-  if (resultTy->hasError())
+  if (resultTy->is<ErrorType>())
     return resultTy;
 
   if (hasImplicitSelfDecl())
