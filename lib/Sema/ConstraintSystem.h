@@ -2975,13 +2975,24 @@ private:
   /// \brief Collect the current inactive disjunction constraints.
   void collectDisjunctions(SmallVectorImpl<Constraint *> &disjunctions);
 
-  /// \brief Attempt to solve for the choices in the given disjunction.
+  /// \brief Attempt find a solution involving the options in a
+  ///        disjunction.
   ///
-  /// \returns true if we found at least one solution.
-  bool
-  solveForDisjunctionChoices(Constraint *disjunction,
-                             SmallVectorImpl<Solution> &solutions,
-                             FreeTypeVariableBinding allowFreeTypeVariables);
+  /// \returns true if we failed to find any solutions, false otherwise.
+  bool solveForDisjunction(Constraint *disjunction,
+                           SmallVectorImpl<Solution> &solutions,
+                           FreeTypeVariableBinding allowFreeTypeVariables);
+
+  /// \brief Attempt to solve for some subset of the constraints in a
+  ///        disjunction, skipping constraints that we decide do not
+  ///        need to be solved for because they would not result in
+  ///        the best solution to the constraint system.
+  ///
+  /// \returns true if we failed to find any solutions, false otherwise.
+  bool solveForDisjunctionChoices(
+      ArrayRef<Constraint *> constraints, ConstraintLocator *disjunctionLocator,
+      SmallVectorImpl<Solution> &solutions,
+      FreeTypeVariableBinding allowFreeTypeVariables, bool explicitConversion);
 
   /// \brief Solve the system of constraints after it has already been
   /// simplified.
