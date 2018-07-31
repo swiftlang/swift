@@ -221,3 +221,12 @@ public func noTupleExtractOverTensorValues() {
   let e = c + d.1
   _hostOp(e)
 }
+
+// Non-top-level array element
+public func SR8399() {
+  let x = Tensor<Float>(ones: [2, 2])
+  let y = x.reshaped(toShape: Tensor<Int32>([4, Int32(1)]))
+  let z = x.reshaped(toShape: Tensor<Int32>([Int32(4), 1]))
+  print(y)
+  print(z)
+}

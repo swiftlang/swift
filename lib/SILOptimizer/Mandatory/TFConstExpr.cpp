@@ -1527,6 +1527,52 @@ static bool analyzeArrayInitUses(SILValue v,
   return false;
 }
 
+/// Generate a top level stack variable as an element value holder. Make the
+/// valueFeeder write to the stack variable instead of elemAddr, then generate
+/// a load-store pair to copy the element from stack to elemAddr. Return the
+/// store on success and nullptr on failure.
+static StoreInst *makeTopLevelVariableForArrayElement(
+    SingleValueInstruction *elemAddr,
+    ApplyInst *valueFeeder) {
+  // Get the operand index of elemAddr used in valueFeeder
+  unsigned opIndex = [&]() {
+    for (unsigned i = 1, e = valueFeeder->getNumOperands(); i != e; ++i) {
+      if (valueFeeder->getOperand(i) == elemAddr)
+        return i;
+    }
+    assert(false && "elemAddr must be used as an argument of apply_inst.");
+  }();
+
+  // We only handle the case if this is an out-parameter (i.e., like a store).
+  auto conventions = valueFeeder->getSubstCalleeConv();
+  unsigned numIndirectResults = conventions.getNumIndirectSILResults();
+  unsigned argIndex = opIndex - 1;
+  if (argIndex >= numIndirectResults)
+    return nullptr;
+
+  // Okay, we perform the code transformation as follows:
+  // Allocate a stack variable as a top level element holder.
+  SILBuilder B(valueFeeder);
+  auto loc = elemAddr->getLoc();
+  SILType ty = elemAddr->getType().getObjectType();
+  auto *alloc = B.createAllocStack(loc, ty);
+
+  // Replace the use of addr by alloc
+  valueFeeder->getAllOperands()[opIndex].set(alloc);
+
+  // Add a load-store pair to copy the element from stack to elemAddr.
+  B.setInsertionPoint(std::next(SILBasicBlock::iterator(valueFeeder)));
+  auto *load = B.createLoad(loc, alloc,
+                            LoadOwnershipQualifier::Unqualified);
+  auto *store = B.createStore(loc, load, elemAddr,
+                              StoreOwnershipQualifier::Unqualified);
+
+  // Deallocate the stack variable, which is no longer to be used.
+  B.createDeallocStack(loc, alloc);
+
+  return store;
+}
+
 /// Try to decode the specified apply of the _allocateUninitializedArray
 /// function in the standard library.  This attempts to figure out what the
 /// resulting elements will be.  This fills in the elements result and returns
@@ -1591,6 +1637,7 @@ bool ConstExprEvaluator::decodeAllocUninitializedArray(
     for (auto *use : pointer2addr->getUses()) {
       auto *user = use->getUser();
 
+      SingleValueInstruction *elemAddr = pointer2addr;
       uint64_t index = 0;
       if (auto *iai = dyn_cast<IndexAddrInst>(user)) {
         if (arrayInsts)
@@ -1600,14 +1647,26 @@ bool ConstExprEvaluator::decodeAllocUninitializedArray(
         if (!ili)
           return true;
 
+        elemAddr = iai;
         index = ili->getValue().getLimitedValue();
-        user = iai->getSingleUserOfType<StoreInst>();
+        user = iai->getSingleUserOfType<SILInstruction>();
       }
 
-      // Check to see if we have a store to a valid index that hasn't been
-      // stored to yet.
+      // Check to see if we have a valid index that hasn't been recorded yet.
+      if (index >= elements.size() || elements[index] != SILValue())
+        return true;
+
+      // If the element's address is not accessed by a store (with a top level
+      // value) but instead passed to a function call to get indirect result,
+      // we try to generate a top level stack variable to hold the result and
+      // then store it into this address.
+      if (auto *valueFeeder = dyn_cast<ApplyInst>(user)) {
+        user = makeTopLevelVariableForArrayElement(elemAddr, valueFeeder);
+      }
+
+      // Check to see if we have a valid store.
       auto *store = dyn_cast_or_null<StoreInst>(user);
-      if (!store || index >= elements.size() || elements[index] != SILValue())
+      if (!store)
         return true;
 
       if (arrayInsts)
