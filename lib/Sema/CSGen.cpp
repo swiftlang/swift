@@ -304,9 +304,12 @@ namespace {
 
       // Coercion exprs have a rigid type, so there's no use in gathering info
       // about them.
-      if (isa<CoerceExpr>(expr)) {
-        LTI.collectedTypes.insert(CS.getType(expr).getPointer());
-
+      if (auto *coercion = dyn_cast<CoerceExpr>(expr)) {
+        // Let's not collect information about types initialized by
+        // coercions just like we don't for regular initializer calls,
+        // because that might lead to overly eager type variable merging.
+        if (!coercion->isLiteralInit())
+          LTI.collectedTypes.insert(CS.getType(expr).getPointer());
         return { false, expr };
       }
 
