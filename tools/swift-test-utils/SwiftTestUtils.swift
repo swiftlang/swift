@@ -4,14 +4,14 @@ public struct CommandLineArguments {
   public struct MissingArgumentError: LocalizedError {
     let argName: String
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
       return "Missing required argument: \(argName)"
     }
   }
   public struct UnkeyedArgumentError: LocalizedError {
     let argName: String
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
       return "Unexpectedly found command line argument \(argName) without a key"
     }
   }
@@ -23,7 +23,7 @@ public struct CommandLineArguments {
       var parsedArgs: [String: String] = [:]
       var currentKey: String? = nil
       for arg in args {
-        if arg.hasPrefix("--") {
+        if arg.hasPrefix("-") {
           // Parse a new key
           if let currentKey = currentKey {
             // The last key didn't have a value. Just add it with an empty string as
