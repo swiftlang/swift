@@ -45,7 +45,7 @@ positions in several different contexts:
 Consider the example:
 
 ```
-func example<T>(Int, i, t: T) -> (Int, T) {
+func example<T>(i: Int, t: T) -> (Int, T) {
   let foo = { return ($0, t) }
   return foo(i)
 }
