@@ -1,5 +1,6 @@
 import SwiftSyntax
 import Foundation
+import TestUtils
 
 /// Print the given message to stderr
 func printerr(_ message: String, terminator: String = "\n") {
