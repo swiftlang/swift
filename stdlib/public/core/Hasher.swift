@@ -279,8 +279,10 @@ public struct Hasher {
 
   internal var _core: Core
 
-  /// Initialize a new hasher.  The hasher uses a per-execution seed value that
-  /// is set during process startup, usually from a high-quality random source.
+  /// Creates a new hasher.
+  ///
+  /// The hasher uses a per-execution seed value that is set during process
+  /// startup, usually from a high-quality random source.
   @_effects(releasenone)
   public init() {
     self._core = Core(seed: Hasher._seed)
@@ -323,8 +325,10 @@ public struct Hasher {
     }
   }
 
-  /// Feed `value` to this hasher, mixing its essential parts into
-  /// the hasher state.
+  /// Adds the given value to this hasher, mixing its essential parts into the
+  /// hasher state.
+  ///
+  /// - Parameter value: A value to add to the hasher.
   @inlinable
   @inline(__always)
   public mutating func combine<H: Hashable>(_ value: H) {
@@ -367,8 +371,10 @@ public struct Hasher {
     _core.combine(bytes: value, count: count)
   }
 
-  /// Feed the contents of `buffer` into this hasher, mixing it into the hasher
-  /// state.
+  /// Adds the contents of the given buffer to this hasher, mixing it into the
+  /// hasher state.
+  ///
+  /// - Parameter bytes: A raw memory buffer.
   @_effects(releasenone)
   public mutating func combine(bytes: UnsafeRawBufferPointer) {
     _core.combine(bytes: bytes)
@@ -383,7 +389,7 @@ public struct Hasher {
     return Int(truncatingIfNeeded: _core.finalize())
   }
 
-  /// Finalize the hasher state and return the hash value.
+  /// Finalizes the hasher state and returns the hash value.
   ///
   /// Finalizing consumes the hasher: it is illegal to finalize a hasher you
   /// don't own, or to perform operations on a finalized hasher. (These may
@@ -391,6 +397,8 @@ public struct Hasher {
   ///
   /// Hash values are not guaranteed to be equal across different executions of
   /// your program. Do not save hash values to use during a future execution.
+  ///
+  /// - Returns: The hash value calculated by the hasher.
   @_effects(releasenone)
   public __consuming func finalize() -> Int {
     var core = _core

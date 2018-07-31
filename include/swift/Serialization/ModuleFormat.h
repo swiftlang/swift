@@ -1291,6 +1291,11 @@ namespace decls_block {
     DeclIDField // the protocol
   >;
 
+  /// A placeholder for an invalid conformance.
+  using InvalidProtocolConformanceLayout = BCRecordLayout<
+    INVALID_PROTOCOL_CONFORMANCE
+  >;
+
   using NormalProtocolConformanceLayout = BCRecordLayout<
     NORMAL_PROTOCOL_CONFORMANCE,
     DeclIDField, // the protocol

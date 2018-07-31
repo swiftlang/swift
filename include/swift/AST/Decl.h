@@ -253,9 +253,11 @@ bool conflicting(ASTContext &ctx,
 
 /// Decl - Base class for all declarations in Swift.
 class alignas(1 << DeclAlignInBits) Decl {
+public:
   enum class ValidationState {
     Unchecked,
     Checking,
+    CheckingWithValidSignature,
     Checked,
   };
 
@@ -378,15 +380,15 @@ protected:
     DefaultArgumentResilienceExpansion : 1
   );
   
-  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+5+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+1+1+1+1+1+1+1,
     /// \see AbstractFunctionDecl::BodyKind
     BodyKind : 3,
 
     /// Import as member status.
     IAMStatus : 8,
 
-    /// Number of curried parameter lists.
-    NumParameterLists : 5,
+    /// Whether the function has an implicit 'self' parameter.
+    HasImplicitSelfDecl : 1,
 
     /// Whether we are overridden later.
     Overridden : 1,
@@ -796,33 +798,53 @@ public:
     Bits.Decl.EarlyAttrValidation = validated;
   }
   
-  /// Whether the declaration has a valid interface type and
-  /// generic signature.
-  bool isBeingValidated() const {
-    return Bits.Decl.ValidationState == unsigned(ValidationState::Checking);
+  /// Get the validation state.
+  ValidationState getValidationState() const {
+    return ValidationState(Bits.Decl.ValidationState);
   }
 
-  /// Toggle whether or not the declaration is being validated.
-  void setIsBeingValidated(bool ibv = true) {
-    if (ibv) {
-      assert(Bits.Decl.ValidationState == unsigned(ValidationState::Unchecked));
-      Bits.Decl.ValidationState = unsigned(ValidationState::Checking);
-    } else {
-      assert(Bits.Decl.ValidationState == unsigned(ValidationState::Checking));
-      Bits.Decl.ValidationState = unsigned(ValidationState::Checked);
+private:
+  friend class DeclValidationRAII;
+
+  /// Set the validation state.
+  void setValidationState(ValidationState VS) {
+    assert(VS > getValidationState() && "Validation is unidirectional");
+    Bits.Decl.ValidationState = unsigned(VS);
+  }
+
+public:
+  /// Whether the declaration is in the middle of validation or not.
+  bool isBeingValidated() const {
+    switch (getValidationState()) {
+    case ValidationState::Unchecked:
+    case ValidationState::Checked:
+      return false;
+    case ValidationState::Checking:
+    case ValidationState::CheckingWithValidSignature:
+      return true;
     }
+    llvm_unreachable("Unknown ValidationState");
+  }
+
+  /// Update the validation state for the declaration to allow access to the
+  /// generic signature.
+  void setSignatureIsValidated() {
+    assert(getValidationState() == ValidationState::Checking);
+    setValidationState(ValidationState::CheckingWithValidSignature);
   }
 
   bool hasValidationStarted() const {
-    return Bits.Decl.ValidationState >= unsigned(ValidationState::Checking);
+    return getValidationState() > ValidationState::Unchecked;
   }
 
-  /// Manually indicate that validation has started for the declaration.
+  /// Manually indicate that validation is complete for the declaration. For
+  /// example: during importing, code synthesis, or derived conformances.
   ///
-  /// This is implied by setIsBeingValidated(true) (i.e. starting validation)
-  /// and so rarely needs to be called directly.
-  void setValidationStarted() {
-    if (Bits.Decl.ValidationState != unsigned(ValidationState::Checking))
+  /// For normal code validation, please use DeclValidationRAII instead.
+  ///
+  /// FIXME -- Everything should use DeclValidationRAII instead of this.
+  void setValidationToChecked() {
+    if (!isBeingValidated())
       Bits.Decl.ValidationState = unsigned(ValidationState::Checked);
   }
 
@@ -921,6 +943,25 @@ public:
   void *operator new(size_t Bytes, void *Mem) { 
     assert(Mem); 
     return Mem; 
+  }
+};
+
+/// \brief Use RAII to track Decl validation progress and non-reentrancy.
+class DeclValidationRAII {
+  Decl *D;
+
+public:
+  DeclValidationRAII(const DeclValidationRAII &) = delete;
+  DeclValidationRAII(DeclValidationRAII &&) = delete;
+  void operator =(const DeclValidationRAII &) = delete;
+  void operator =(DeclValidationRAII &&) = delete;
+
+  DeclValidationRAII(Decl *decl) : D(decl) {
+    D->setValidationState(Decl::ValidationState::Checking);
+  }
+
+  ~DeclValidationRAII() {
+    D->setValidationState(Decl::ValidationState::Checked);
   }
 };
 
@@ -1677,9 +1718,9 @@ public:
   /// Retrieve one of the types listed in the "inherited" clause.
   Type getInheritedType(unsigned index) const;
 
-  /// Whether we have fully checked the extension.
+  /// Whether we have fully checked the extension signature.
   bool hasValidSignature() const {
-    return hasValidationStarted() && !isBeingValidated();
+    return getValidationState() > ValidationState::CheckingWithValidSignature;
   }
 
   bool hasDefaultAccessLevel() const {
@@ -2201,7 +2242,19 @@ class ValueDecl : public Decl {
     /// Whether there are any "overridden" declarations. The actual overridden
     /// declarations are kept in a side table in the ASTContext.
     unsigned hasOverridden : 1;
+
+    /// Whether the "isDynamic" bit has been computed yet.
+    unsigned isDynamicComputed : 1;
+
+    /// Whether this declaration is 'dynamic', meaning that all uses of
+    /// the declaration will go through an extra level of indirection that
+    /// allows the entity to be replaced at runtime.
+    unsigned isDynamic : 1;
   } LazySemanticInfo;
+
+  friend class OverriddenDeclsRequest;
+  friend class IsObjCRequest;
+  friend class IsDynamicRequest;
 
 protected:
   ValueDecl(DeclKind K,
@@ -2215,6 +2268,8 @@ protected:
     LazySemanticInfo.isObjC = false;
     LazySemanticInfo.hasOverriddenComputed = false;
     LazySemanticInfo.hasOverridden = false;
+    LazySemanticInfo.isDynamicComputed = false;
+    LazySemanticInfo.isDynamic = false;
   }
 
   // MemberLookupTable borrows a bit from this type
@@ -2427,18 +2482,15 @@ public:
   ValueDecl *getOverriddenDecl() const;
 
   /// Retrieve the declarations that this declaration overrides, if any.
-  ArrayRef<ValueDecl *> getOverriddenDecls() const;
+  llvm::TinyPtrVector<ValueDecl *> getOverriddenDecls() const;
 
   /// Set the declaration that this declaration overrides.
   void setOverriddenDecl(ValueDecl *overridden) {
-    (void)setOverriddenDecls(overridden);
+    setOverriddenDecls(overridden);
   }
 
   /// Set the declarations that this declaration overrides.
-  ///
-  /// \returns the ASTContext-allocated version of the array of overridden
-  /// declarations.
-  ArrayRef<ValueDecl *> setOverriddenDecls(ArrayRef<ValueDecl *> overridden);
+  void setOverriddenDecls(ArrayRef<ValueDecl *> overridden);
 
   /// Whether the overridden declarations have already been computed.
   bool overriddenDeclsComputed() const;
@@ -2466,8 +2518,14 @@ public:
   }
 
   /// Is this declaration marked with 'dynamic'?
-  bool isDynamic() const {
-    return getAttrs().hasAttribute<DynamicAttr>();
+  bool isDynamic() const;
+
+  /// Set whether this type is 'dynamic' or not.
+  void setIsDynamic(bool value);
+
+  /// Whether the 'dynamic' bit has been computed already.
+  bool isDynamicComputed() const {
+    return LazySemanticInfo.isDynamicComputed;
   }
 
   /// Returns true if this decl can be found by id-style dynamic lookup.
@@ -2843,11 +2901,7 @@ public:
 
   /// Retrieve the set of associated types overridden by this associated
   /// type.
-  CastArrayRefView<ValueDecl *, AssociatedTypeDecl>
-  getOverriddenDecls() const {
-    return CastArrayRefView<ValueDecl *, AssociatedTypeDecl>(
-        AbstractTypeParamDecl::getOverriddenDecls());
-  }
+  llvm::TinyPtrVector<AssociatedTypeDecl *> getOverriddenDecls() const;
 
   SourceLoc getStartLoc() const { return KeywordLoc; }
   SourceRange getSourceRange() const;
@@ -4932,6 +4986,9 @@ public:
 
   using BodySynthesizer = void (*)(AbstractFunctionDecl *);
 
+private:
+  ParameterList *Params;
+
 protected:
   // If a function has a body at all, we have either a parsed body AST node or
   // we have saved the end location of the unparsed body.
@@ -4957,14 +5014,14 @@ protected:
 
   AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent, DeclName Name,
                        SourceLoc NameLoc, bool Throws, SourceLoc ThrowsLoc,
-                       unsigned NumParameterLists,
+                       bool HasImplicitSelfDecl,
                        GenericParamList *GenericParams)
       : GenericContext(DeclContextKind::AbstractFunctionDecl, Parent),
         ValueDecl(Kind, Parent, Name, NameLoc),
         Body(nullptr), ThrowsLoc(ThrowsLoc) {
     setBodyKind(BodyKind::None);
     setGenericParams(GenericParams);
-    Bits.AbstractFunctionDecl.NumParameterLists = NumParameterLists;
+    Bits.AbstractFunctionDecl.HasImplicitSelfDecl = HasImplicitSelfDecl;
     Bits.AbstractFunctionDecl.Overridden = false;
     Bits.AbstractFunctionDecl.Throws = Throws;
     Bits.AbstractFunctionDecl.NeedsNewVTableEntry = false;
@@ -4972,9 +5029,6 @@ protected:
     Bits.AbstractFunctionDecl.DefaultArgumentResilienceExpansion =
         unsigned(ResilienceExpansion::Maximal);
     Bits.AbstractFunctionDecl.Synthesized = false;
-
-    // Verify no bitfield truncation.
-    assert(Bits.AbstractFunctionDecl.NumParameterLists == NumParameterLists);
   }
 
   void setBodyKind(BodyKind K) {
@@ -5020,7 +5074,6 @@ public:
     Bits.AbstractFunctionDecl.IAMStatus = newValue.getRawValue();
   }
 
-public:
   /// Retrieve the location of the 'throws' keyword, if present.
   SourceLoc getThrowsLoc() const { return ThrowsLoc; }
 
@@ -5152,39 +5205,32 @@ public:
   /// depending on the function context.
   bool argumentNameIsAPIByDefault() const;
 
-  /// \brief Returns the "natural" number of argument clauses taken by this
-  /// function.  This value is one for free-standing functions, and two for
-  /// methods.
-  unsigned getNumParameterLists() const {
-    return Bits.AbstractFunctionDecl.NumParameterLists;
+  /// Retrieve the function's parameter list, not including 'self' if present.
+  ParameterList *getParameters() {
+    return Params;
+  }
+  const ParameterList *getParameters() const {
+    return Params;
   }
 
-  /// \brief Returns the parameter pattern(s) for the function definition that
-  /// determine the parameter names bound in the function body.
-  ///
-  /// The number of "top-level" elements in this pattern will match the number
-  /// of argument names in the compound name of the function or constructor.
-  MutableArrayRef<ParameterList *> getParameterLists();
-  ArrayRef<const ParameterList *> getParameterLists() const {
-    auto paramLists =
-        const_cast<AbstractFunctionDecl *>(this)->getParameterLists();
-    return ArrayRef<const ParameterList *>(paramLists.data(),paramLists.size());
-  }
-  ParameterList *getParameterList(unsigned i) {
-    return getParameterLists()[i];
-  }
-  const ParameterList *getParameterList(unsigned i) const {
-    return getParameterLists()[i];
+  void setParameters(ParamDecl *SelfDecl,
+                     ParameterList *Params);
+
+  bool hasImplicitSelfDecl() const {
+    return Bits.AbstractFunctionDecl.HasImplicitSelfDecl;
   }
 
-  /// \brief This method returns the implicit 'self' decl.
-  ///
-  /// Note that some functions don't have an implicit 'self' decl, for example,
-  /// free functions.  In this case nullptr is returned.
+  ParamDecl **getImplicitSelfDeclStorage();
+
+  /// Retrieve the implicit 'self' parameter for methods, or nullptr for free
+  /// functions.
   const ParamDecl *getImplicitSelfDecl() const {
     return const_cast<AbstractFunctionDecl*>(this)->getImplicitSelfDecl();
   }
-  ParamDecl *getImplicitSelfDecl();
+  ParamDecl *getImplicitSelfDecl() {
+    auto **selfDecl = getImplicitSelfDeclStorage();
+    return (selfDecl == nullptr ? nullptr : *selfDecl);
+  }
 
   /// Retrieve the declaration that this method overrides, if any.
   AbstractFunctionDecl *getOverriddenDecl() const {
@@ -5281,29 +5327,23 @@ class FuncDecl : public AbstractFunctionDecl {
   OperatorDecl *Operator = nullptr;
 
 protected:
-  ParameterList **getParameterListBuffer(); // defined inline below
-  ParameterList * const *getParameterListBuffer() const {
-    return const_cast<FuncDecl*>(this)->getParameterListBuffer();
-  }
-
   FuncDecl(DeclKind Kind,
            SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
            SourceLoc FuncLoc,
            DeclName Name, SourceLoc NameLoc,
            bool Throws, SourceLoc ThrowsLoc,
-           unsigned NumParameterLists,
+           bool HasImplicitSelfDecl,
            GenericParamList *GenericParams, DeclContext *Parent)
     : AbstractFunctionDecl(Kind, Parent,
                            Name, NameLoc,
                            Throws, ThrowsLoc,
-                           NumParameterLists, GenericParams),
+                           HasImplicitSelfDecl, GenericParams),
       StaticLoc(StaticLoc), FuncLoc(FuncLoc) {
     assert(!Name.getBaseName().isSpecial());
 
     Bits.FuncDecl.IsStatic =
       StaticLoc.isValid() || StaticSpelling != StaticSpellingKind::None;
     Bits.FuncDecl.StaticSpelling = static_cast<unsigned>(StaticSpelling);
-    assert(NumParameterLists > 0 && "Must have at least an empty tuple arg");
 
     Bits.FuncDecl.HasDynamicSelf = false;
     Bits.FuncDecl.ForcedStaticDispatch = false;
@@ -5317,7 +5357,7 @@ private:
                               DeclName Name, SourceLoc NameLoc,
                               bool Throws, SourceLoc ThrowsLoc,
                               GenericParamList *GenericParams,
-                              unsigned NumParameterLists,
+                              bool HasImplicitSelfDecl,
                               DeclContext *Parent,
                               ClangNode ClangN);
 
@@ -5329,7 +5369,7 @@ public:
                                       DeclName Name, SourceLoc NameLoc,
                                       bool Throws, SourceLoc ThrowsLoc,
                                       GenericParamList *GenericParams,
-                                      unsigned NumParameterLists,
+                                      bool HasImplicitSelfDecl,
                                       DeclContext *Parent);
 
   static FuncDecl *create(ASTContext &Context, SourceLoc StaticLoc,
@@ -5338,7 +5378,8 @@ public:
                           DeclName Name, SourceLoc NameLoc,
                           bool Throws, SourceLoc ThrowsLoc,
                           GenericParamList *GenericParams,
-                          ArrayRef<ParameterList *> ParameterLists,
+                          ParamDecl *SelfDecl,
+                          ParameterList *ParameterList,
                           TypeLoc FnRetType, DeclContext *Parent,
                           ClangNode ClangN = ClangNode());
 
@@ -5377,30 +5418,10 @@ public:
   void setSelfAccessKind(SelfAccessKind mod) {
     Bits.FuncDecl.SelfAccess = static_cast<unsigned>(mod);
   }
-      
-  /// \brief Returns the parameter lists(s) for the function definition.
-  ///
-  /// The number of "top-level" elements will match the number of argument names
-  /// in the compound name of the function or constructor.
-  MutableArrayRef<ParameterList *> getParameterLists() {
-    return {getParameterListBuffer(), getNumParameterLists()};
-  }
-  ArrayRef<const ParameterList *> getParameterLists() const {
-    return {getParameterListBuffer(), getNumParameterLists()};
-  }
-  ParameterList *getParameterList(unsigned i) {
-    return getParameterLists()[i];
-  }
-  const ParameterList *getParameterList(unsigned i) const {
-    return getParameterLists()[i];
-  }
-  
+
   /// \returns true if this is non-mutating due to applying a 'mutating'
   /// attribute. For example a "mutating set" accessor.
   bool isExplicitNonMutating() const;
-
-  void setDeserializedSignature(ArrayRef<ParameterList *> ParameterLists,
-                                TypeLoc FnRetType);
 
   SourceLoc getStaticLoc() const { return StaticLoc; }
   SourceLoc getFuncLoc() const { return FuncLoc; }
@@ -5452,7 +5473,9 @@ public:
   void getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const {
     return getCaptureInfo().getLocalCaptures(Result);
   }
-  
+
+  ParamDecl **getImplicitSelfDeclStorage();
+
   /// Get the supertype method this method overrides, if any.
   FuncDecl *getOverriddenDecl() const {
     return cast_or_null<FuncDecl>(AbstractFunctionDecl::getOverriddenDecl());
@@ -5538,7 +5561,7 @@ class AccessorDecl final : public FuncDecl {
                                   SourceLoc staticLoc,
                                   StaticSpellingKind staticSpelling,
                                   bool throws, SourceLoc throwsLoc,
-                                  unsigned numParameterLists,
+                                  bool hasImplicitSelfDecl,
                                   GenericParamList *genericParams,
                                   DeclContext *parent,
                                   ClangNode clangNode);
@@ -5554,7 +5577,7 @@ public:
                               StaticSpellingKind staticSpelling,
                               bool throws, SourceLoc throwsLoc,
                               GenericParamList *genericParams,
-                              unsigned numParameterLists,
+                              bool hasImplicitSelfDecl,
                               DeclContext *parent);
 
   static AccessorDecl *create(ASTContext &ctx, SourceLoc declLoc,
@@ -5566,7 +5589,8 @@ public:
                               StaticSpellingKind staticSpelling,
                               bool throws, SourceLoc throwsLoc,
                               GenericParamList *genericParams,
-                              ArrayRef<ParameterList *> parameterLists,
+                              ParamDecl *selfDecl,
+                              ParameterList *parameterList,
                               TypeLoc fnRetType, DeclContext *parent,
                               ClangNode clangNode = ClangNode());
 
@@ -5618,14 +5642,6 @@ public:
     return false;
   }
 };
-
-inline ParameterList **FuncDecl::getParameterListBuffer() {
-  if (!isa<AccessorDecl>(this)) {
-    assert(getKind() == DeclKind::Func && "no new kinds of functions");
-    return reinterpret_cast<ParameterList**>(this+1);
-  }
-  return reinterpret_cast<ParameterList**>(static_cast<AccessorDecl*>(this)+1);
-}
 
 inline AccessorDecl *
 AbstractStorageDecl::AccessorRecord::getAccessor(AccessorKind kind) const {
@@ -5850,7 +5866,7 @@ class ConstructorDecl : public AbstractFunctionDecl {
   /// The location of the '!' or '?' for a failable initializer.
   SourceLoc FailabilityLoc;
 
-  ParameterList *ParameterLists[2];
+  ParamDecl *SelfDecl;
 
   /// The interface type of the initializing constructor.
   Type InitializerInterfaceType;
@@ -5866,8 +5882,6 @@ public:
                   ParamDecl *SelfParam, ParameterList *BodyParams,
                   GenericParamList *GenericParams, 
                   DeclContext *Parent);
-
-  void setParameterLists(ParamDecl *selfParam, ParameterList *bodyParams);
 
   SourceLoc getConstructorLoc() const { return getNameLoc(); }
   SourceLoc getStartLoc() const { return getConstructorLoc(); }
@@ -5888,25 +5902,7 @@ public:
   Expr *getSuperInitCall() { return CallToSuperInit; }
   void setSuperInitCall(Expr *CallExpr) { CallToSuperInit = CallExpr; }
 
-  MutableArrayRef<ParameterList *> getParameterLists() {
-    return { ParameterLists, 2 };
-  }
-  ArrayRef<const ParameterList *> getParameterLists() const {
-    return AbstractFunctionDecl::getParameterLists();
-  }
-  ParameterList *getParameterList(unsigned i) {
-    return getParameterLists()[i];
-  }
-  const ParameterList *getParameterList(unsigned i) const {
-    return getParameterLists()[i];
-  }
-  
-  /// Returns the normal parameters to the initializer, not including self.
-  ParameterList *getParameters() { return ParameterLists[1]; }
-
-  /// Returns the normal parameters to the initializer, not including self.
-  const ParameterList *getParameters() const { return ParameterLists[1]; }
-
+  ParamDecl **getImplicitSelfDeclStorage() { return &SelfDecl; }
 
   /// Specifies the kind of initialization call performed within the body
   /// of the constructor, e.g., self.init or super.init.
@@ -6052,22 +6048,14 @@ public:
 /// }
 /// \endcode
 class DestructorDecl : public AbstractFunctionDecl {
-  ParameterList *SelfParameter;
+  ParamDecl *SelfDecl;
+
 public:
   DestructorDecl(SourceLoc DestructorLoc, ParamDecl *selfDecl,
                  DeclContext *Parent);
-  
-  void setSelfDecl(ParamDecl *selfDecl);
 
-  MutableArrayRef<ParameterList *> getParameterLists() {
-    return { &SelfParameter, 1 };
-  }
-  ArrayRef<const ParameterList *> getParameterLists() const {
-    return { &SelfParameter, 1 };
-  }
+  ParamDecl **getImplicitSelfDeclStorage() { return &SelfDecl; }
 
-
-  
   SourceLoc getDestructorLoc() const { return getNameLoc(); }
   SourceLoc getStartLoc() const { return getDestructorLoc(); }
   SourceRange getSourceRange() const;
@@ -6521,18 +6509,32 @@ inline bool AbstractStorageDecl::isStatic() const {
   return false;
 }
 
-inline MutableArrayRef<ParameterList *>
-AbstractFunctionDecl::getParameterLists() {
+/// Constructors and destructors always have a 'self' parameter,
+/// which is stored in an instance member. Functions only have a
+/// 'self' if they are declared inside of a nominal type or extension,
+/// in which case we tail-allocate storage for it.
+inline ParamDecl **AbstractFunctionDecl::getImplicitSelfDeclStorage() {
   switch (getKind()) {
   default: llvm_unreachable("Unknown AbstractFunctionDecl!");
   case DeclKind::Constructor:
-    return cast<ConstructorDecl>(this)->getParameterLists();
+    return cast<ConstructorDecl>(this)->getImplicitSelfDeclStorage();
   case DeclKind::Destructor:
-    return cast<DestructorDecl>(this)->getParameterLists();
+    return cast<DestructorDecl>(this)->getImplicitSelfDeclStorage();
   case DeclKind::Func:
   case DeclKind::Accessor:
-    return cast<FuncDecl>(this)->getParameterLists();
+    return cast<FuncDecl>(this)->getImplicitSelfDeclStorage();
   }
+}
+
+inline ParamDecl **FuncDecl::getImplicitSelfDeclStorage() {
+  if (!hasImplicitSelfDecl())
+    return nullptr;
+
+  if (!isa<AccessorDecl>(this)) {
+    assert(getKind() == DeclKind::Func && "no new kinds of functions");
+    return reinterpret_cast<ParamDecl **>(this+1);
+  }
+  return reinterpret_cast<ParamDecl **>(static_cast<AccessorDecl*>(this)+1);
 }
 
 inline DeclIterator &DeclIterator::operator++() {

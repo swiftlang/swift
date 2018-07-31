@@ -590,13 +590,10 @@ private:
 
     os << ")";
 
-    auto paramLists = AFD->getParameterLists();
-    assert(paramLists.size() == 2 && "not an ObjC-compatible method");
-
     auto selector = AFD->getObjCSelector();
     ArrayRef<Identifier> selectorPieces = selector.getSelectorPieces();
     
-    const auto &params = paramLists[1]->getArray();
+    const auto &params = AFD->getParameters()->getArray();
     unsigned paramIndex = 0;
     for (unsigned i = 0, n = selectorPieces.size(); i != n; ++i) {
       if (i > 0) os << ' ';
@@ -744,8 +741,7 @@ private:
     
     os << ' ' << FD->getAttrs().getAttribute<CDeclAttr>()->Name << '(';
     
-    assert(FD->getParameterLists().size() == 1 && "not a C-compatible func");
-    auto params = FD->getParameterLists().back();
+    auto params = FD->getParameters();
     if (params->size()) {
       interleave(*params,
                  [&](const ParamDecl *param) {

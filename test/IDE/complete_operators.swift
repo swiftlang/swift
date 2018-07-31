@@ -210,8 +210,6 @@ func testInfix7(x: S2?) {
   x#^INFIX_7^#
 }
 // S2_INFIX_OPTIONAL: Begin completions
-// FIXME: rdar://problem/22996887 - shouldn't complete with optional LHS
-// S2_INFIX_OPTIONAL-DAG: Decl[InfixOperatorFunction]/CurrModule:   ** {#Int#}[#S2#]
 // S2_INFIX_OPTIONAL-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  != {#{{.*}}#}[#Bool#]
 // S2_INFIX_OPTIONAL-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  == {#{{.*}}#}[#Bool#]
 // S2_INFIX_OPTIONAL-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  ?? {#S2#}[#S2#]; name=?? S2

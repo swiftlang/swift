@@ -83,14 +83,19 @@ UnicodeScalarPropertiesTests.test("properties.booleanProperties") {
   expectBooleanProperty(\.changesWhenNFKCCaseFolded, trueFor: "A", falseFor: "!")
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-  // U+2708 AIRPLANE
-  expectBooleanProperty(\.isEmoji, trueFor: "\u{2708}", falseFor: "A")
-  // U+231A WATCH
-  expectBooleanProperty(\.isEmojiPresentation, trueFor: "\u{231A}", falseFor: "A")
-  // U+1F3FD EMOJI MODIFIER FITZPATRICK TYPE-4
-  expectBooleanProperty(\.isEmojiModifier, trueFor: "\u{1F3FD}", falseFor: "A")
-  // U+270B RAISED HAND
-  expectBooleanProperty(\.isEmojiModifierBase, trueFor: "\u{270B}", falseFor: "A")
+  if #available(iOS 10.2, *) {
+    // U+2708 AIRPLANE
+    expectBooleanProperty(\.isEmoji, trueFor: "\u{2708}", falseFor: "A")
+    // U+231A WATCH
+    expectBooleanProperty(
+      \.isEmojiPresentation, trueFor: "\u{231A}", falseFor: "A")
+    // U+1F3FD EMOJI MODIFIER FITZPATRICK TYPE-4
+    expectBooleanProperty(
+      \.isEmojiModifier, trueFor: "\u{1F3FD}", falseFor: "A")
+    // U+270B RAISED HAND
+    expectBooleanProperty(
+      \.isEmojiModifierBase, trueFor: "\u{270B}", falseFor: "A")
+  }
 #endif
 }
 

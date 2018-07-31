@@ -21,6 +21,12 @@ struct T {
 var mutT: T?
 let immT: T? = nil  // expected-note {{change 'let' to 'var' to make it mutable}} {{1-4=var}}
 
+postfix operator ++
+prefix operator ++
+
+public postfix func ++ <T>(rhs: inout T) -> T { fatalError() }
+public prefix func ++ <T>(rhs: inout T) -> T { fatalError() }
+
 mutT?.mutateT()
 immT?.mutateT() // expected-error{{cannot use mutating member on immutable value: 'immT' is a 'let' constant}}
 mutT?.mutS?.mutateS()

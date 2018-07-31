@@ -54,6 +54,7 @@
 #include "FixedTypeInfo.h"
 #include "Fulfillment.h"
 #include "GenArchetype.h"
+#include "GenCast.h"
 #include "GenClass.h"
 #include "GenEnum.h"
 #include "GenHeap.h"
@@ -3376,15 +3377,23 @@ IRGenModule::getAssociatedTypeWitnessTableAccessFunctionSignature() {
 /// For ObjC protocols, descriptors are uniqued at runtime by the ObjC runtime.
 /// We need to load the unique reference from a global variable fixed up at
 /// startup.
+///
+/// The result is always a ProtocolDescriptorRefTy whose low bit will be
+/// set to indicate when this is an Objective-C protocol.
 llvm::Value *irgen::emitProtocolDescriptorRef(IRGenFunction &IGF,
                                               ProtocolDecl *protocol) {
-  if (!protocol->isObjC())
-    return IGF.IGM.getAddrOfProtocolDescriptor(protocol);
-  
-  auto refVar = IGF.IGM.getAddrOfObjCProtocolRef(protocol, NotForDefinition);
-  llvm::Value *val
-    = IGF.Builder.CreateLoad(refVar, IGF.IGM.getPointerAlignment());
-  val = IGF.Builder.CreateBitCast(val,
-                          IGF.IGM.ProtocolDescriptorStructTy->getPointerTo());
+  if (!protocol->isObjC()) {
+    return IGF.Builder.CreatePtrToInt(
+      IGF.IGM.getAddrOfProtocolDescriptor(protocol),
+      IGF.IGM.ProtocolDescriptorRefTy);
+  }
+
+  llvm::Value *val = emitReferenceToObjCProtocol(IGF, protocol);
+  val = IGF.Builder.CreatePtrToInt(val, IGF.IGM.ProtocolDescriptorRefTy);
+
+  // Set the low bit to indicate that this is an Objective-C protocol.
+  auto *isObjCBit = llvm::ConstantInt::get(IGF.IGM.ProtocolDescriptorRefTy, 1);
+  val = IGF.Builder.CreateOr(val, isObjCBit);
+
   return val;
 }

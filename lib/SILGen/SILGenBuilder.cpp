@@ -70,6 +70,9 @@ MetatypeInst *SILGenBuilder::createMetatype(SILLocation loc, SILType metatype) {
       if (!decl)
         return false;
 
+      if (isa<ProtocolDecl>(decl))
+        return false;
+
       auto *genericSig = decl->getGenericSignature();
       if (!genericSig)
         return false;

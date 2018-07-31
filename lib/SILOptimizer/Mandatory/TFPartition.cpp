@@ -2012,7 +2012,7 @@ bool TFFunctionPartition::markFunction(bool &hasTensorOps) {
       loggedInput = true;
     }
   };
-  
+
   // Split all critical edges for block marking.
   splitAllCondBrCriticalEdgesWithNonTrivialArgs(hostFn, &DI, &LI);
 
@@ -3778,9 +3778,9 @@ void TFFunctionPartition::balanceRetainReleaseCount(SILValue oldResult,
         "Unhandled instruction type, as a use of a result tensor above");
   }
 
-  DEBUG(llvm::dbgs() << "Creating " << retainReleaseBalance
-                     << " retains for result tensor :\n");
-  DEBUG(oldResult->print(llvm::dbgs()));
+  LLVM_DEBUG(llvm::dbgs() << "Creating " << retainReleaseBalance
+                          << " retains for result tensor :\n");
+  LLVM_DEBUG(oldResult->print(llvm::dbgs()));
   assert(retainReleaseBalance >= 0);
   for (int i = 0; i < retainReleaseBalance; ++i) {
     B.createStrongRetain(oldResult.getLoc(), newResult, Atomicity::Atomic);
@@ -4617,20 +4617,20 @@ bool TFPartition::processFunction(
 bool TFPartition::partitionFunction(
     SILFunction *hostFn, std::unique_ptr<TFFunctionPartition> &partitioner) {
   if (isAcceleratorOnly(*hostFn)) {
-    DEBUG(llvm::dbgs() << "SIL function " << hostFn->getName()
-                       << " is accelerator-only.\n");
+    LLVM_DEBUG(llvm::dbgs() << "SIL function " << hostFn->getName()
+                            << " is accelerator-only.\n");
   }
 
   // If this function is a building block of larger tensor programs (e.g.
   // the ops defined in the TensorFlow module), then don't transform it in
   // isolation.
-  DEBUG(llvm::dbgs() << "Processing SIL function " << hostFn->getName()
-                     << " in TFPartition::partitionFunction().\n");
+  LLVM_DEBUG(llvm::dbgs() << "Processing SIL function " << hostFn->getName()
+                          << " in TFPartition::partitionFunction().\n");
   if (!tfc.shouldBePartitioned(hostFn))
     return false;
 
-  DEBUG(llvm::dbgs() << "  " << hostFn->getName()
-                     << " should be partitioned.\n");
+  LLVM_DEBUG(llvm::dbgs() << "  " << hostFn->getName()
+                          << " should be partitioned.\n");
   TFGraphLowering *graphLowering = &moduleGraphLowering;
   if (!TFModuleLevelGraph) {
     testGraphLowerings.emplace_back(TFGraphLowering(graphFunctions));
@@ -4638,6 +4638,7 @@ bool TFPartition::partitionFunction(
   }
   partitioner = llvm::make_unique<TFFunctionPartition>(
       *hostFn, PM, *tfModule, graphLowering, graphFunctions);
+
   bool hasTensorOps = false;
   if (partitioner->markFunction(hasTensorOps))
     return true; // We've encountered an error.
@@ -4646,8 +4647,8 @@ bool TFPartition::partitionFunction(
     return false;
   }
 
-  DEBUG(llvm::dbgs() << "  " << hostFn->getName()
-                     << " contains tensor op(s).\n");
+  LLVM_DEBUG(llvm::dbgs() << "  " << hostFn->getName()
+                          << " contains tensor op(s).\n");
 
   // Check to see if we cannot transform the function but should.  In this
   // case we emit a compiler error.  This is a limitation of the compiler that

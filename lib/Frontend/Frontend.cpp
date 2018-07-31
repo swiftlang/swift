@@ -103,7 +103,7 @@ CompilerInvocation::getSerializedDiagnosticsPathForAtMostOnePrimary() const {
 }
 std::string CompilerInvocation::getTBDPathForWholeModule() const {
   assert(getFrontendOptions().InputsAndOutputs.isWholeModule() &&
-         "TBDPath only makes sense in WMO mode");
+         "TBDPath only makes sense when the whole module can be seen");
   return getPrimarySpecificPathsForAtMostOnePrimary()
       .SupplementaryOutputs.TBDPath;
 }

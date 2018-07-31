@@ -374,8 +374,8 @@ private:
                                    CommandOutput *Output) const;
 
   void chooseTBDPath(Compilation &C, const OutputInfo &OI,
-                     StringRef workingDirectory, llvm::SmallString<128> &Buf,
-                     CommandOutput *Output) const;
+                     const TypeToPathMap *OutputMap, StringRef workingDirectory,
+                     llvm::SmallString<128> &Buf, CommandOutput *Output) const;
 
 public:
   /// Handle any arguments which should be treated before building actions or

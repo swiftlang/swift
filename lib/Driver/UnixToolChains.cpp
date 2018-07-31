@@ -348,6 +348,11 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
   context.Args.AddAllArgs(Arguments, options::OPT_Xlinker);
   context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
 
+  // Run clang++ in verbose mode if "-v" is set
+  if (context.Args.hasArg(options::OPT_v)) {
+    Arguments.push_back("-v");
+  }
+
   // This should be the last option, for convenience in checking output.
   Arguments.push_back("-o");
   Arguments.push_back(

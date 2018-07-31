@@ -17,3 +17,6 @@
 SWIFT_TYPEID(InheritedTypeRequest)
 SWIFT_TYPEID(SuperclassTypeRequest)
 SWIFT_TYPEID(EnumRawTypeRequest)
+SWIFT_TYPEID(OverriddenDeclsRequest)
+SWIFT_TYPEID(IsObjCRequest)
+SWIFT_TYPEID(IsDynamicRequest)

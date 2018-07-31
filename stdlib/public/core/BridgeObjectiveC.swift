@@ -341,8 +341,7 @@ public func _getBridgedNonVerbatimObjectiveCType<T>(_: T.Type) -> Any.Type?
 
 // -- Pointer argument bridging
 
-@inlinable // FIXME(sil-serialize-all)
-@_transparent
+@usableFromInline @_transparent
 internal var _nilNativeObject: AnyObject? {
   return nil
 }
@@ -422,42 +421,13 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   /// `self`.
   ///
   /// - Precondition: `self != nil`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // unsafe-performance
   public subscript(i: Int) -> Pointee {
     @_transparent
     get {
       // We can do a strong load normally.
       return (UnsafePointer<Pointee>(self) + i).pointee
     }
-  }
-
-  /// Explicit construction from an UnsafeMutablePointer.
-  ///
-  /// This is inherently unsafe; UnsafeMutablePointer assumes the
-  /// referenced memory has +1 strong ownership semantics, whereas
-  /// AutoreleasingUnsafeMutablePointer implies +0 semantics.
-  ///
-  /// - Warning: Accessing `pointee` as a type that is unrelated to
-  ///   the underlying memory's bound type is undefined.
-  @_transparent
-  public init<U>(_ from: UnsafeMutablePointer<U>) {
-    self._rawValue = from._rawValue
-  }
-
-  /// Explicit construction from an UnsafeMutablePointer.
-  ///
-  /// Returns nil if `from` is nil.
-  ///
-  /// This is inherently unsafe; UnsafeMutablePointer assumes the
-  /// referenced memory has +1 strong ownership semantics, whereas
-  /// AutoreleasingUnsafeMutablePointer implies +0 semantics.
-  ///
-  /// - Warning: Accessing `pointee` as a type that is unrelated to
-  ///   the underlying memory's bound type is undefined.
-  @_transparent
-  public init?<U>(_ from: UnsafeMutablePointer<U>?) {
-    guard let unwrapped = from else { return nil }
-    self.init(unwrapped)
   }
 
   /// Explicit construction from a UnsafePointer.
@@ -467,8 +437,7 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   ///
   /// - Warning: Accessing `pointee` as a type that is unrelated to
   ///   the underlying memory's bound type is undefined.
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal init<U>(_ from: UnsafePointer<U>) {
     self._rawValue = from._rawValue
   }
@@ -482,8 +451,7 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   ///
   /// - Warning: Accessing `pointee` as a type that is unrelated to
   ///   the underlying memory's bound type is undefined.
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal init?<U>(_ from: UnsafePointer<U>?) {
     guard let unwrapped = from else { return nil }
     self.init(unwrapped)
@@ -534,50 +502,30 @@ extension UnsafeRawPointer {
   }
 }
 
-@_fixed_layout
-@usableFromInline
 internal struct _CocoaFastEnumerationStackBuf {
   // Clang uses 16 pointers.  So do we.
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item0: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item1: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item2: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item3: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item4: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item5: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item6: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item7: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item8: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item9: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item10: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item11: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item12: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item13: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item14: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item15: UnsafeRawPointer?
 
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   internal var count: Int {
     return 16
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   internal init() {
     _item0 = nil
     _item1 = _item0

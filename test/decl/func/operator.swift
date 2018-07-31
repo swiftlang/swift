@@ -142,6 +142,9 @@ func test_14705150() {
 
 }
 
+postfix operator ++
+prefix operator ++
+
 prefix postfix func ++(x: Int) {} // expected-error {{'postfix' contradicts previous modifier 'prefix'}} {{8-16=}}
 postfix prefix func ++(x: Float) {} // expected-error {{'prefix' contradicts previous modifier 'postfix'}} {{9-16=}}
 postfix prefix infix func ++(x: Double) {} // expected-error {{'prefix' contradicts previous modifier 'postfix'}} {{9-16=}} expected-error {{'infix' contradicts previous modifier 'postfix'}} {{16-22=}}
@@ -355,13 +358,3 @@ class C6 {
     if x == x && x = x { } // expected-error{{expression is not assignable: '&&' returns immutable value}}
   }
 }
-
-_ = 1..<1 // OK
-_ = 1…1 // expected-error {{use of unresolved operator '…'; did you mean '...'?}} {{6-9=...}}
-_ = 1….1 // expected-error {{use of unresolved operator '…'; did you mean '...'?}} {{6-9=...}}
-_ = 1.…1 // expected-error {{use of unresolved operator '.…'; did you mean '...'?}} {{6-10=...}}
-_ = 1…<1 // expected-error {{use of unresolved operator '…<'; did you mean '..<'?}} {{6-10=..<}}
-_ = 1..1 // expected-error {{use of unresolved operator '..'; did you mean '...'?}} {{6-8=...}}
-_ = 1....1 // expected-error {{use of unresolved operator '....'; did you mean '...'?}} {{6-10=...}}
-_ = 1...<1 // expected-error {{use of unresolved operator '...<'; did you mean '..<'?}} {{6-10=..<}}
-_ = 1....<1 // expected-error {{use of unresolved operator '....<'; did you mean '..<'?}} {{6-11=..<}}

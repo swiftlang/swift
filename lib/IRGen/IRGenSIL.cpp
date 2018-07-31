@@ -848,6 +848,7 @@ public:
     SILType Type = SILVal->getType();
     auto &LTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(Type));
     auto Alloca = LTI.allocateStack(*this, Type, "debug.copy");
+    ArtificialLocation AutoRestore(Scope, IGM.DebugInfo, Builder);
     LTI.initialize(*this, e, Alloca.getAddress(), false /* isOutlined */);
     copy.push_back(Alloca.getAddressPointer());
   }
@@ -1267,7 +1268,7 @@ IRGenSILFunction::~IRGenSILFunction() {
   // Emit the fail BB if we have one.
   if (!FailBBs.empty())
     emitFailBB();
-  DEBUG(CurFn->print(llvm::dbgs()));
+  LLVM_DEBUG(CurFn->print(llvm::dbgs()));
 }
 
 template<typename ValueVector>
@@ -1633,7 +1634,7 @@ void IRGenModule::emitSILFunction(SILFunction *f) {
 }
 
 void IRGenSILFunction::emitSILFunction() {
-  DEBUG(llvm::dbgs() << "emitting SIL function: ";
+  LLVM_DEBUG(llvm::dbgs() << "emitting SIL function: ";
         CurSILFn->printName(llvm::dbgs());
         llvm::dbgs() << '\n';
         CurSILFn->print(llvm::dbgs()));
@@ -3898,12 +3899,22 @@ static const ReferenceTypeInfo &getReferentTypeInfo(IRGenFunction &IGF,
   void IRGenSILFunction::visitCopy##Name##ValueInst( \
                                             swift::Copy##Name##ValueInst *i) { \
     Explosion in = getLoweredExplosion(i->getOperand()); \
-    auto &ti = getReferentTypeInfo(*this, i->getOperand()->getType()); \
+    auto silTy = i->getOperand()->getType(); \
+    auto ty = cast<Name##StorageType>(silTy.getASTType()); \
+    auto isOptional = bool(ty.getReferentType()->getOptionalObjectType()); \
+    auto &ti = getReferentTypeInfo(*this, silTy); \
     ti.strongRetain##Name(*this, in, irgen::Atomicity::Atomic); \
     /* Semantically we are just passing through the input parameter but as a */\
     /* strong reference... at LLVM IR level these type differences don't */ \
     /* matter. So just set the lowered explosion appropriately. */ \
     Explosion output = getLoweredExplosion(i->getOperand()); \
+    if (isOptional) { \
+      auto values = output.claimAll(); \
+      output.reset(); \
+      for (auto value : values) { \
+        output.add(Builder.CreatePtrToInt(value, IGM.IntPtrTy)); \
+      } \
+    } \
     setLoweredExplosion(i, output); \
   }
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
@@ -5489,6 +5500,12 @@ void IRGenSILFunction::visitCondFailInst(swift::CondFailInst *i) {
   llvm::BasicBlock *contBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
   Builder.CreateCondBr(cond, failBB, contBB);
   Builder.emitBlock(failBB);
+  if (IGM.DebugInfo)
+    // If we are emitting DWARF, this does nothing. Otherwise the ``llvm.trap``
+    // instruction emitted from ``Builtin.condfail`` should have an inlined
+    // debug location. This is because zero is not an artificial line location
+    // in CodeView.
+    IGM.DebugInfo->setInlinedTrapLocation(Builder, i->getDebugScope());
   emitTrap(/*EmitUnreachable=*/true);
   Builder.emitBlock(contBB);
   FailBBs.push_back(failBB);

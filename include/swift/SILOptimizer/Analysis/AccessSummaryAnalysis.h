@@ -176,7 +176,7 @@ private:
   IndexTrieNode *SubPathTrie;
 
 public:
-  AccessSummaryAnalysis() : BottomUpIPAnalysis(AnalysisKind::AccessSummary) {
+  AccessSummaryAnalysis() : BottomUpIPAnalysis(SILAnalysisKind::AccessSummary) {
     SubPathTrie = new IndexTrieNode();
   }
 
@@ -198,14 +198,14 @@ public:
   virtual void initialize(SILPassManager *PM) override {}
   virtual void invalidate() override;
   virtual void invalidate(SILFunction *F, InvalidationKind K) override;
-  virtual void notifyAddFunction(SILFunction *F) override {}
-  virtual void notifyDeleteFunction(SILFunction *F) override {
+  virtual void notifyAddedOrModifiedFunction(SILFunction *F) override {}
+  virtual void notifyWillDeleteFunction(SILFunction *F) override {
     invalidate(F, InvalidationKind::Nothing);
   }
   virtual void invalidateFunctionTables() override {}
 
   static bool classof(const SILAnalysis *S) {
-    return S->getKind() == AnalysisKind::AccessSummary;
+    return S->getKind() == SILAnalysisKind::AccessSummary;
   }
 
   /// Returns a description of the subpath suitable for use in diagnostics.

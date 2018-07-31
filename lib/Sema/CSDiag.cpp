@@ -409,7 +409,7 @@ tryDiagnoseTrailingClosureAmbiguity(TypeChecker &tc,
     if (!callee)
       return false;
 
-    const ParameterList *paramList = callee->getParameterLists().back();
+    const ParameterList *paramList = callee->getParameters();
     const ParamDecl *param = paramList->getArray().back();
 
     // Sanity-check that the trailing closure corresponds to this parameter.
@@ -791,7 +791,7 @@ static void diagnoseSubElementFailure(Expr *destExpr,
     message += "'";
 
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
-      if (AFD->getImplicitSelfDecl()) {
+      if (AFD->hasImplicitSelfDecl()) {
         message += " is a method";
         diagID = diag::assignment_lhs_is_immutable_variable;
       } else {
@@ -2371,22 +2371,15 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
   // telling us that it knows what it is doing, then believe it.
   if (!options.contains(TCC_ForceRecheck)) {
     if (CS.TC.isExprBeingDiagnosed(subExpr)) {
-      auto exprAndCS = CS.TC.getExprBeingDiagnosed(subExpr);
-      auto *savedExpr = exprAndCS.first;
+      auto *savedExpr = CS.TC.getExprBeingDiagnosed(subExpr);
       if (subExpr == savedExpr)
         return subExpr;
 
-      auto *oldCS = exprAndCS.second;
-
-      // The types on the result might have already been cached into
-      // another CS, but likely not this one.
-      if (oldCS != &CS)
-        CS.transferExprTypes(oldCS, savedExpr);
-
+      CS.cacheExprTypes(savedExpr);
       return savedExpr;
     }
 
-    CS.TC.addExprForDiagnosis(subExpr, std::make_pair(subExpr, &CS));
+    CS.TC.addExprForDiagnosis(subExpr, subExpr);
   }
 
   // Validate contextual type before trying to use it.
@@ -2463,7 +2456,8 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
     SavedTypeData.restore();
   }
 
-  CS.TC.addExprForDiagnosis(preCheckedExpr, std::make_pair(subExpr, &CS));
+  if (preCheckedExpr != subExpr)
+    CS.TC.addExprForDiagnosis(preCheckedExpr, subExpr);
 
   return subExpr;
 }
@@ -2835,7 +2829,10 @@ static bool tryIntegerCastFixIts(InFlightDiagnostic &diag, ConstraintSystem &CS,
   if (!isIntegerType(fromType, CS) || !isIntegerType(toType, CS))
     return false;
 
-  auto getInnerCastedExpr = [&]() -> Expr* {
+  auto getInnerCastedExpr = [&]() -> Expr * {
+    if (auto *CE = dyn_cast<CoerceExpr>(expr))
+      return CE->getSubExpr();
+
     auto *CE = dyn_cast<CallExpr>(expr);
     if (!CE)
       return nullptr;
@@ -3420,7 +3417,7 @@ static bool isSymmetricBinaryOperator(const CalleeCandidateInfo &CCI) {
       return false;
 
     // It must have exactly two parameters.
-    auto params = decl->getParameterLists().back();
+    auto params = decl->getParameters();
     if (params->size() != 2) return false;
 
     // Require the types to be the same.
@@ -3439,11 +3436,15 @@ static bool candidatesHaveAnyDefaultValues(
     auto function = dyn_cast_or_null<AbstractFunctionDecl>(cand.getDecl());
     if (!function) continue;
 
-    auto paramLists = function->getParameterLists();
-    if (cand.level >= paramLists.size()) continue;
+    if (function->hasImplicitSelfDecl()) {
+      if (cand.level != 1)
+        return false;
+    } else {
+      if (cand.level != 0)
+        return false;
+    }
 
-    auto paramList = paramLists[cand.level];
-    for (auto param : *paramList) {
+    for (auto param : *function->getParameters()) {
       if (param->getDefaultArgumentKind() != DefaultArgumentKind::None)
         return true;
     }
@@ -3474,11 +3475,15 @@ static Optional<unsigned> getElementForScalarInitOfArg(
   auto function = dyn_cast_or_null<AbstractFunctionDecl>(cand.getDecl());
   if (!function) return getElementForScalarInitSimple(tupleTy);
 
-  auto paramLists = function->getParameterLists();
-  if (cand.level >= paramLists.size())
-    return getElementForScalarInitSimple(tupleTy);
+  if (function->hasImplicitSelfDecl()) {
+    if (cand.level != 1)
+      return getElementForScalarInitSimple(tupleTy);
+  } else {
+    if (cand.level != 0)
+      return getElementForScalarInitSimple(tupleTy);
+  }
 
-  auto paramList = paramLists[cand.level];
+  auto paramList = function->getParameters();
   if (tupleTy->getNumElements() != paramList->size()) 
     return getElementForScalarInitSimple(tupleTy);
 

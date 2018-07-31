@@ -501,6 +501,7 @@ public:
     llvm::IntegerType *MetadataKindTy;
     llvm::IntegerType *OnceTy;
     llvm::IntegerType *FarRelativeAddressTy;
+    llvm::IntegerType *ProtocolDescriptorRefTy;
   };
   llvm::IntegerType *ObjCBoolTy;       /// i8 or i1
   union {

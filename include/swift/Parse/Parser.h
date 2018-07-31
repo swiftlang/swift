@@ -896,33 +896,9 @@ public:
 
   void consumeGetSetBody(AbstractFunctionDecl *AFD, SourceLoc LBLoc);
 
-  struct ParsedAccessors {
-    SourceLoc LBLoc, RBLoc;
-    SmallVector<AccessorDecl*, 16> Accessors;
-
-#define ACCESSOR(ID) AccessorDecl *ID = nullptr;
-#include "swift/AST/AccessorKinds.def"
-
-    void record(Parser &P, AbstractStorageDecl *storage, bool invalid,
-                ParseDeclOptions flags, SourceLoc staticLoc,
-                const DeclAttributes &attrs,
-                TypeLoc elementTy, ParameterList *indices,
-                SmallVectorImpl<Decl *> &decls);
-
-    StorageImplInfo
-    classify(Parser &P, AbstractStorageDecl *storage, bool invalid,
-             ParseDeclOptions flags, SourceLoc staticLoc,
-             const DeclAttributes &attrs,
-             TypeLoc elementTy, ParameterList *indices);
-
-    /// Add an accessor.  If there's an existing accessor of this kind,
-    /// return it.  The new accessor is still remembered but will be
-    /// ignored.
-    AccessorDecl *add(AccessorDecl *accessor);
-  };
-
   void parseAccessorAttributes(DeclAttributes &Attributes);
 
+  struct ParsedAccessors;
   bool parseGetSetImpl(ParseDeclOptions Flags,
                        GenericParamList *GenericParams,
                        ParameterList *Indices,
@@ -1058,10 +1034,10 @@ public:
 
     /// Set the parsed context for all the initializers to the given
     /// function.
-    void setFunctionContext(DeclContext *DC, ArrayRef<ParameterList *> paramList);
+    void setFunctionContext(DeclContext *DC, ParameterList *paramList);
     
-    DefaultArgumentInfo(bool inTypeContext) {
-      NextIndex = inTypeContext ? 1 : 0;
+    DefaultArgumentInfo() {
+      NextIndex = 0;
       HasDefaultArgument = false;
     }
   };
@@ -1151,12 +1127,12 @@ public:
                           DefaultArgumentInfo *defaultArgs = nullptr);
 
   ParserStatus parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
-                                    SmallVectorImpl<ParameterList*> &BodyParams,
+                                      ParameterList *&BodyParams,
                                       ParameterContextKind paramContext,
                                       DefaultArgumentInfo &defaultArgs);
   ParserStatus parseFunctionSignature(Identifier functionName,
                                       DeclName &fullName,
-                              SmallVectorImpl<ParameterList *> &bodyParams,
+                                      ParameterList *&bodyParams,
                                       DefaultArgumentInfo &defaultArgs,
                                       SourceLoc &throws,
                                       bool &rethrows,

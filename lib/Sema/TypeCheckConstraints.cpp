@@ -429,6 +429,28 @@ static bool diagnoseRangeOperatorMisspell(UnresolvedDeclRefExpr *UDRE,
   return false;
 }
 
+static bool diagnoseIncDecOperator(UnresolvedDeclRefExpr *UDRE,
+                                   TypeChecker &TC) {
+  auto name = UDRE->getName().getBaseIdentifier();
+  if (!name.isOperator())
+    return false;
+
+  auto corrected = StringRef();
+  if (name.str() == "++")
+    corrected = "+= 1";
+  else if (name.str() == "--")
+    corrected = "-= 1";
+
+  if (!corrected.empty()) {
+    TC.diagnose(UDRE->getLoc(), diag::use_unresolved_identifier_corrected,
+                name, true, corrected)
+      .highlight(UDRE->getSourceRange());
+
+    return true;
+  }
+  return false;
+}
+
 static bool findNonMembers(TypeChecker &TC,
                            ArrayRef<LookupResultEntry> lookupResults,
                            DeclRefKind refKind, bool breakOnMember,
@@ -503,6 +525,7 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     // operator misspelling. Otherwise try to diagnose a juxtaposition
     // e.g. (x*-4) that needs whitespace.
     if (diagnoseRangeOperatorMisspell(UDRE, *this) ||
+        diagnoseIncDecOperator(UDRE, *this) ||
         diagnoseOperatorJuxtaposition(UDRE, DC, *this)) {
       return new (Context) ErrorExpr(UDRE->getSourceRange());
     }
@@ -951,6 +974,10 @@ namespace {
     /// Simplify a key path expression into a canonical form.
     void resolveKeyPathExpr(KeyPathExpr *KPE);
 
+    /// Simplify constructs like `UInt32(1)` into `1 as UInt32` if
+    /// the type conforms to the expected literal protocol.
+    Expr *simplifyTypeConstructionWithLiteralArg(Expr *E);
+
   public:
     PreCheckExpression(TypeChecker &tc, DeclContext *dc, Expr *parent)
         : TC(tc), DC(dc), ParentExpr(parent) {}
@@ -1130,9 +1157,11 @@ namespace {
             if (isa<IdentityExpr>(ancestor) ||
                 isa<ForceValueExpr>(ancestor) ||
                 isa<AnyTryExpr>(ancestor)) {
-              if (target)
-                target = ancestor;
-              continue;
+              if (!CallArgs.count(ancestor)) {
+                if (target)
+                  target = ancestor;
+                continue;
+              }
             }
 
             // No other expression kinds are permitted.
@@ -1193,6 +1222,9 @@ namespace {
         resolveKeyPathExpr(KPE);
         return KPE;
       }
+
+      if (auto *simplified = simplifyTypeConstructionWithLiteralArg(expr))
+        return simplified;
 
       return expr;
     }
@@ -1801,6 +1833,66 @@ void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
   KPE->resolveComponents(TC.Context, components);
 }
 
+Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
+  // If constructor call is expected to produce an optional let's not attempt
+  // this optimization because literal initializers aren't failable.
+  if (!TC.getLangOpts().isSwiftVersionAtLeast(5)) {
+    if (!ExprStack.empty()) {
+      auto *parent = ExprStack.back();
+      if (isa<BindOptionalExpr>(parent) || isa<ForceValueExpr>(parent))
+        return nullptr;
+    }
+  }
+
+  auto *call = dyn_cast<CallExpr>(E);
+  if (!call || call->getNumArguments() != 1)
+    return nullptr;
+
+  auto *typeExpr = dyn_cast<TypeExpr>(call->getFn());
+  if (!typeExpr)
+    return nullptr;
+
+  auto *argExpr = call->getArg()->getSemanticsProvidingExpr();
+  auto *literal = dyn_cast<LiteralExpr>(argExpr);
+  if (!literal)
+    return nullptr;
+
+  auto *protocol = TC.getLiteralProtocol(literal);
+  if (!protocol)
+    return nullptr;
+
+  Type type;
+  if (typeExpr->getTypeLoc().wasValidated()) {
+    type = typeExpr->getTypeLoc().getType();
+  } else if (auto *rep = typeExpr->getTypeRepr()) {
+    TypeResolutionOptions options;
+    options |= TypeResolutionFlags::AllowUnboundGenerics;
+    options |= TypeResolutionFlags::InExpression;
+    type = TC.resolveType(rep, DC, options);
+    typeExpr->getTypeLoc().setType(type);
+  }
+
+  if (!type)
+    return nullptr;
+
+  // Don't bother to convert deprecated selector syntax.
+  if (auto selectorTy = TC.getObjCSelectorType(DC)) {
+    if (type->isEqual(selectorTy))
+      return nullptr;
+  }
+
+  ConformanceCheckOptions options;
+  options |= ConformanceCheckFlags::InExpression;
+  options |= ConformanceCheckFlags::SkipConditionalRequirements;
+
+  auto result = TC.conformsToProtocol(type, protocol, DC, options);
+  if (!result || !result->isConcrete())
+    return nullptr;
+
+  return CoerceExpr::forLiteralInit(TC.Context, argExpr, call->getSourceRange(),
+                                    typeExpr->getTypeLoc());
+}
+
 /// \brief Clean up the given ill-formed expression, removing any references
 /// to type variables and setting error types on erroneous expression nodes.
 void CleanupIllFormedExpressionRAII::doIt(Expr *expr) {
@@ -1886,57 +1978,6 @@ bool GenericRequirementsCheckListener::diagnoseUnsatisfiedRequirement(
   return false;
 }
 
-bool TypeChecker::
-solveForExpression(Expr *&expr, DeclContext *dc, Type convertType,
-                   FreeTypeVariableBinding allowFreeTypeVariables,
-                   ExprTypeCheckListener *listener, ConstraintSystem &cs,
-                   SmallVectorImpl<Solution> &viable,
-                   TypeCheckExprOptions options) {
-  // Attempt to solve the constraint system.
-  auto solution = cs.solve(expr,
-                           convertType,
-                           listener,
-                           viable,
-                           allowFreeTypeVariables);
-
-  // The constraint system has failed
-  if (solution == ConstraintSystem::SolutionKind::Error)
-    return true;
-
-  // If the system is unsolved or there are multiple solutions present but
-  // type checker options do not allow unresolved types, let's try to salvage
-  if (solution == ConstraintSystem::SolutionKind::Unsolved
-      || (viable.size() != 1 &&
-          !options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables))) {
-    if (options.contains(TypeCheckExprFlags::SuppressDiagnostics))
-      return true;
-
-    // Try to provide a decent diagnostic.
-    if (cs.salvage(viable, expr)) {
-      // If salvage produced an error message, then it failed to salvage the
-      // expression, just bail out having reported the error.
-      return true;
-    }
-
-    // The system was salvaged; continue on as if nothing happened.
-  }
-
-  if (getLangOpts().DebugConstraintSolver) {
-    auto &log = Context.TypeCheckerDebug->getStream();
-    if (viable.size() == 1) {
-      log << "---Solution---\n";
-      viable[0].dump(log);
-    } else {
-      for (unsigned i = 0, e = viable.size(); i != e; ++i) {
-        log << "--- Solution #" << i << " ---\n";
-        viable[i].dump(log);
-      }
-    }
-  }
-
-  return false;
-}
-
 #pragma mark High-level entry points
 Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       TypeLoc convertType,
@@ -1953,6 +1994,13 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
 
   // Construct a constraint system from this expression.
   ConstraintSystemOptions csOptions = ConstraintSystemFlags::AllowFixes;
+
+  if (options.contains(TypeCheckExprFlags::SuppressDiagnostics))
+    csOptions |= ConstraintSystemFlags::SuppressDiagnostics;
+
+  if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables))
+    csOptions |= ConstraintSystemFlags::AllowUnresolvedTypeVariables;
+
   ConstraintSystem cs(*this, dc, csOptions);
   cs.baseCS = baseCS;
   CleanupIllFormedExpressionRAII cleanup(expr);
@@ -1984,9 +2032,6 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   // that we don't later treat it as an actual conversion constraint.
   if (options.contains(TypeCheckExprFlags::ConvertTypeIsOnlyAHint))
     convertType = TypeLoc();
-  
-  bool suppressDiagnostics =
-    options.contains(TypeCheckExprFlags::SuppressDiagnostics);
 
   // If the client can handle unresolved type variables, leave them in the
   // system.
@@ -1996,8 +2041,8 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
 
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
-  if (solveForExpression(expr, dc, convertType.getType(),
-                         allowFreeTypeVariables, listener, cs, viable, options))
+  if (cs.solve(expr, convertType.getType(), listener, viable,
+               allowFreeTypeVariables))
     return Type();
 
   // If the client allows the solution to have unresolved type expressions,
@@ -2023,11 +2068,10 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   }
 
   // Apply the solution to the expression.
-  bool isDiscarded = options.contains(TypeCheckExprFlags::IsDiscarded);
-  bool skipClosures = options.contains(TypeCheckExprFlags::SkipMultiStmtClosures);
-  result = cs.applySolution(solution, result, convertType.getType(),
-                            isDiscarded, suppressDiagnostics,
-                            skipClosures);
+  result = cs.applySolution(
+      solution, result, convertType.getType(),
+      options.contains(TypeCheckExprFlags::IsDiscarded),
+      options.contains(TypeCheckExprFlags::SkipMultiStmtClosures));
   if (!result) {
     // Failure already diagnosed, above, as part of applying the solution.
     return Type();
@@ -2049,7 +2093,7 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
 
   // Unless the client has disabled them, perform syntactic checks on the
   // expression now.
-  if (!suppressDiagnostics &&
+  if (!cs.shouldSuppressDiagnostics() &&
       !options.contains(TypeCheckExprFlags::DisableStructuralChecks)) {
     bool isExprStmt = options.contains(TypeCheckExprFlags::IsExprStmt);
     performSyntacticExprDiagnostics(*this, result, dc, isExprStmt);
@@ -2069,7 +2113,7 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
   referencedDecl = nullptr;
 
   // Construct a constraint system from this expression.
-  ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
+  ConstraintSystem cs(*this, dc, ConstraintSystemFlags::SuppressDiagnostics);
   CleanupIllFormedExpressionRAII cleanup(expr);
 
   // Attempt to solve the constraint system.
@@ -2085,9 +2129,8 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
   // re-check.
   if (needClearType)
     expr->setType(Type());
-  if (solveForExpression(expr, dc, /*convertType*/Type(),
-                         allowFreeTypeVariables, listener, cs, viable,
-                         TypeCheckExprFlags::SuppressDiagnostics)) {
+  if (cs.solve(expr, /*convertType*/Type(), listener, viable,
+               allowFreeTypeVariables)) {
     recoverOriginalType();
     return Type();
   }
@@ -2154,8 +2197,8 @@ void TypeChecker::getPossibleTypesOfExpressionWithoutApplying(
 
   // Construct a constraint system from this expression.
   ConstraintSystemOptions options;
-  options |= ConstraintSystemFlags::AllowFixes;
   options |= ConstraintSystemFlags::ReturnAllDiscoveredSolutions;
+  options |= ConstraintSystemFlags::SuppressDiagnostics;
 
   ConstraintSystem cs(*this, dc, options);
 
@@ -2171,9 +2214,8 @@ void TypeChecker::getPossibleTypesOfExpressionWithoutApplying(
     if (originalType && originalType->hasError())
       expr->setType(Type());
 
-    solveForExpression(expr, dc, /*convertType*/ Type(), allowFreeTypeVariables,
-                       listener, cs, viable,
-                       TypeCheckExprFlags::SuppressDiagnostics);
+    cs.solve(expr, /*convertType*/ Type(), listener, viable,
+             allowFreeTypeVariables);
   }
 
   for (auto &solution : viable) {
@@ -2187,7 +2229,7 @@ bool TypeChecker::typeCheckCompletionSequence(Expr *&expr, DeclContext *DC) {
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
   // Construct a constraint system from this expression.
-  ConstraintSystem CS(*this, DC, ConstraintSystemFlags::AllowFixes);
+  ConstraintSystem CS(*this, DC, ConstraintSystemFlags::SuppressDiagnostics);
   CleanupIllFormedExpressionRAII cleanup(expr);
 
   auto *SE = cast<SequenceExpr>(expr);
@@ -3593,10 +3635,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   if (toType->isAnyObject())
     return CheckedCastKind::BridgingCoercion;
   
-  // Do this check later in Swift 3 mode so that we check for NSNumber and
-  // NSValue casts (and container casts thereof) first.
-  if (!Context.LangOpts.isSwiftVersion3()
-      && isObjCBridgedTo(fromType, toType, dc, &unwrappedIUO) && !unwrappedIUO){
+  if (isObjCBridgedTo(fromType, toType, dc, &unwrappedIUO) && !unwrappedIUO){
     return CheckedCastKind::BridgingCoercion;
   }
 
@@ -3773,7 +3812,6 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
       return CheckedCastKind::ValueCast;
     }
 
-    case CheckedCastKind::Swift3BridgingDowncast:
     case CheckedCastKind::ArrayDowncast:
     case CheckedCastKind::DictionaryDowncast:
     case CheckedCastKind::SetDowncast:
@@ -3799,9 +3837,6 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
       case CheckedCastKind::BridgingCoercion:
         return CheckedCastKind::BridgingCoercion;
 
-      case CheckedCastKind::Swift3BridgingDowncast:
-        return CheckedCastKind::Swift3BridgingDowncast;
-
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::SetDowncast:
@@ -3817,7 +3852,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   if (auto toKeyValue = cs.isDictionaryType(toType)) {
     if (auto fromKeyValue = cs.isDictionaryType(fromType)) {
       bool hasCoercion = false;
-      enum { NoBridging, BridgingCoercion, Swift3BridgingDowncast }
+      enum { NoBridging, BridgingCoercion }
         hasBridgingConversion = NoBridging;
       bool hasCast = false;
       switch (typeCheckCheckedCast(fromKeyValue->first, toKeyValue->first,
@@ -3830,10 +3865,6 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
       case CheckedCastKind::BridgingCoercion:
         hasBridgingConversion = std::max(hasBridgingConversion,
                                          BridgingCoercion);
-        break;
-      case CheckedCastKind::Swift3BridgingDowncast:
-        hasBridgingConversion = std::max(hasBridgingConversion,
-                                         Swift3BridgingDowncast);
         break;
 
       case CheckedCastKind::ArrayDowncast:
@@ -3858,10 +3889,6 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         hasBridgingConversion = std::max(hasBridgingConversion,
                                          BridgingCoercion);
         break;
-      case CheckedCastKind::Swift3BridgingDowncast:
-        hasBridgingConversion = std::max(hasBridgingConversion,
-                                         Swift3BridgingDowncast);
-        break;
 
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
@@ -3880,8 +3907,6 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         break;
       case BridgingCoercion:
         return CheckedCastKind::BridgingCoercion;
-      case Swift3BridgingDowncast:
-        return CheckedCastKind::Swift3BridgingDowncast;
       }
       assert(hasCoercion && "Not a coercion?");
       return CheckedCastKind::Coercion;
@@ -3899,9 +3924,6 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
       case CheckedCastKind::BridgingCoercion:
         return CheckedCastKind::BridgingCoercion;
       
-      case CheckedCastKind::Swift3BridgingDowncast:
-        return CheckedCastKind::Swift3BridgingDowncast;
-
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::SetDowncast:
@@ -3914,19 +3936,6 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     }
   }
 
-  // We accepted `NSNumber`-to-`*Int*` and `NSValue`-to-struct as bridging
-  // conversions in Swift 3. For compatibility, we need to distinguish these
-  // cases so we can accept them as coercions (with a warning).
-  if (Context.LangOpts.isSwiftVersion3() && extraFromOptionals == 0) {
-    // Do the check for a bridging conversion now that we deferred above.
-    if (isObjCBridgedTo(fromType, toType, dc, &unwrappedIUO) && !unwrappedIUO) {
-      if (Context.isObjCClassWithMultipleSwiftBridgedTypes(fromType)) {
-        return CheckedCastKind::Swift3BridgingDowncast;
-      }
-      return CheckedCastKind::BridgingCoercion;
-    }
-  }
-  
   // If we can bridge through an Objective-C class, do so.
   if (Type bridgedToClass = getDynamicBridgedThroughObjCClass(dc, fromType,
                                                               toType)) {
@@ -3935,7 +3944,6 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
                                  nullptr, SourceRange())) {
     case CheckedCastKind::ArrayDowncast:
     case CheckedCastKind::BridgingCoercion:
-    case CheckedCastKind::Swift3BridgingDowncast:
     case CheckedCastKind::Coercion:
     case CheckedCastKind::DictionaryDowncast:
     case CheckedCastKind::SetDowncast:
@@ -3955,7 +3963,6 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
                                  nullptr, SourceRange())) {
     case CheckedCastKind::ArrayDowncast:
     case CheckedCastKind::BridgingCoercion:
-    case CheckedCastKind::Swift3BridgingDowncast:
     case CheckedCastKind::Coercion:
     case CheckedCastKind::DictionaryDowncast:
     case CheckedCastKind::SetDowncast:

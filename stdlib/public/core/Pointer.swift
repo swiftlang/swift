@@ -93,6 +93,34 @@ extension _Pointer {
     guard let unwrapped = other else { return nil }
     self.init(unwrapped._rawValue)
   }
+
+  // all pointers are creatable from mutable pointers
+  
+  /// Creates a new pointer from the given mutable pointer.
+  ///
+  /// Use this initializer to explicitly convert `other` to an `UnsafeRawPointer`
+  /// instance. This initializer creates a new pointer to the same address as
+  /// `other` and performs no allocation or copying.
+  ///
+  /// - Parameter other: The typed pointer to convert.
+  @_transparent
+  public init<T>(_ other: UnsafeMutablePointer<T>) {
+    self.init(other._rawValue)
+  }
+
+  /// Creates a new raw pointer from the given typed pointer.
+  ///
+  /// Use this initializer to explicitly convert `other` to an `UnsafeRawPointer`
+  /// instance. This initializer creates a new pointer to the same address as
+  /// `other` and performs no allocation or copying.
+  ///
+  /// - Parameter other: The typed pointer to convert. If `other` is `nil`, the
+  ///   result is `nil`.
+  @_transparent
+  public init?<T>(_ other: UnsafeMutablePointer<T>?) {
+    guard let unwrapped = other else { return nil }
+    self.init(unwrapped)
+  }
 }
 
 // well, this is pretty annoying
@@ -261,6 +289,39 @@ extension UInt {
     } else {
       self = 0
     }
+  }
+}
+
+// Pointer arithmetic operators (formerly via Strideable)
+extension Strideable where Self : _Pointer {
+  @_transparent
+  public static func + (lhs: Self, rhs: Self.Stride) -> Self {
+    return lhs.advanced(by: rhs)
+  }
+
+  @_transparent
+  public static func + (lhs: Self.Stride, rhs: Self) -> Self {
+    return rhs.advanced(by: lhs)
+  }
+
+  @_transparent
+  public static func - (lhs: Self, rhs: Self.Stride) -> Self {
+    return lhs.advanced(by: -rhs)
+  }
+
+  @_transparent
+  public static func - (lhs: Self, rhs: Self) -> Self.Stride {
+    return rhs.distance(to: lhs)
+  }
+
+  @_transparent
+  public static func += (lhs: inout Self, rhs: Self.Stride) {
+    lhs = lhs.advanced(by: rhs)
+  }
+
+  @_transparent
+  public static func -= (lhs: inout Self, rhs: Self.Stride) {
+    lhs = lhs.advanced(by: -rhs)
   }
 }
 

@@ -109,8 +109,5 @@ func testIntToFloatConversion() {
   let e2: Float80 =  18_446_744_073_709_551_617 // expected-warning {{'18446744073709551617' is not exactly representable as 'Float80'; it becomes '18446744073709551616'}}
   _blackHole(e2)
 
-  // No warnings are emitted for conversion through explicit constructor calls.
-  // Note that the error here is because of an implicit conversion of the input
-  // literal to 'Int'.
-  _blackHole(Float80(18_446_744_073_709_551_617)) // expected-error {{integer literal '18446744073709551617' overflows when stored into 'Int'}}
+  _blackHole(Float80(18_446_744_073_709_551_617)) // Ok
 }

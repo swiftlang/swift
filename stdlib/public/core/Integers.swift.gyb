@@ -223,8 +223,8 @@ def operatorComment(operator, fixedWidth):
         '%': """\
   /// Returns the remainder of dividing the first value by the second.
   ///
-  /// The result of the modulo operator (`%`) has the same sign as `lhs` and is
-  /// less than `rhs.magnitude`.
+  /// The result of the remainder operator (`%`) has the same sign as `lhs` and
+  /// is less than `rhs.magnitude`.
   ///
   ///     let x = 22 % 5
   ///     // x == 2
@@ -2122,7 +2122,6 @@ extension BinaryInteger {
   /// - Parameters:
   ///   - lhs: An integer to compare.
   ///   - rhs: Another integer to compare.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   //@inline(__always)
   @compilerEvaluable
@@ -2140,7 +2139,6 @@ extension BinaryInteger {
   /// - Parameters:
   ///   - lhs: An integer to compare.
   ///   - rhs: Another integer to compare.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   //@inline(__always)
   @compilerEvaluable
@@ -2158,7 +2156,6 @@ extension BinaryInteger {
   /// - Parameters:
   ///   - lhs: An integer to compare.
   ///   - rhs: Another integer to compare.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   //@inline(__always)
   @compilerEvaluable
@@ -2626,9 +2623,8 @@ extension FixedWidthInteger {
   ///     // Prints "64"
   ///     // Prints "5"
   ///
-  /// This method uses the default random generator, `Random.default`. The call
-  /// to `Int.random(in: ${exampleRange})` above is equivalent to calling
-  /// `Int.random(in: ${exampleRange}, using: &Random.default)`.
+  /// This method is equivalent to calling the version that takes a generator, 
+  /// passing in the system's default random generator.
   ///
   /// - Parameter range: The range in which to create a random value.
 %   if Range == 'Range':
@@ -2637,7 +2633,8 @@ extension FixedWidthInteger {
   /// - Returns: A random value within the bounds of `range`.
   @inlinable
   public static func random(in range: ${Range}<Self>) -> Self {
-    return Self.random(in: range, using: &Random.default)
+    var g = SystemRandomNumberGenerator()
+    return Self.random(in: range, using: &g)
   }
 }
 
@@ -2690,7 +2687,6 @@ ${operatorComment(x.nonMaskingOperator, True)}
     return lhs
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @_semantics("optimize.sil.specialize.generic.partial.never")
   @compilerEvaluable
@@ -3345,10 +3341,15 @@ public struct ${Self}
   /// - Parameter source: A floating-point value to convert to an integer.
   @_transparent
   public init?(exactly source: ${FloatType}) {
-    self._value = Builtin.fpto${u}i_FPIEEE${FloatBits}_${BuiltinName}(source._value)
-    if ${FloatType}(self) != source {
+    guard source > ${str(lower)}.0 && source < ${str(upper)}.0 else {
+      // The source is out of bounds (including infinities).
       return nil
     }
+    guard source == source.rounded(.towardZero) else {
+      // The source is a fraction or NaN.
+      return nil
+    }
+    self._value = Builtin.fpto${u}i_FPIEEE${FloatBits}_${BuiltinName}(source._value)
   }
 
 %     if FloatType == 'Float80':
@@ -3655,7 +3656,7 @@ ${assignmentOperatorComment(x.operator, True)}
   @_transparent
   public var magnitude: U${Self} {
     let base = U${Self}(_value)
-    return self < (0 as ${Self}) ? ~base + 1 : base
+    return self < (0 as ${Self}) ? ~base &+ 1 : base
   }
 % end
 

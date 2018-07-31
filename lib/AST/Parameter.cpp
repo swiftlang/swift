@@ -41,35 +41,6 @@ ParameterList::create(const ASTContext &C, SourceLoc LParenLoc,
   return PL;
 }
 
-/// Create an implicit 'self' decl for a method in the specified decl context.
-/// If 'static' is true, then this is self for a static method in the type.
-///
-/// Note that this decl is created, but it is returned with an incorrect
-/// DeclContext that needs to be set correctly.  This is automatically handled
-/// when a function is created with this as part of its argument list.
-/// For a generic context, this also gives the parameter an unbound generic
-/// type with the expectation that type-checking will fill in the context
-/// generic parameters.
-ParameterList *ParameterList::createUnboundSelf(SourceLoc loc,
-                                                DeclContext *DC) {
-  auto *PD = ParamDecl::createUnboundSelf(loc, DC);
-  return create(DC->getASTContext(), PD);
-}
-
-/// Create an implicit 'self' decl for a method in the specified decl context.
-/// If 'static' is true, then this is self for a static method in the type.
-///
-/// Note that this decl is created, but it is returned with an incorrect
-/// DeclContext that needs to be set correctly.  This is automatically handled
-/// when a function is created with this as part of its argument list.
-ParameterList *ParameterList::createSelf(SourceLoc loc,
-                                         DeclContext *DC,
-                                         bool isStaticMethod,
-                                         bool isInOut) {
-  auto *PD = ParamDecl::createSelf(loc, DC, isStaticMethod, isInOut);
-  return create(DC->getASTContext(), PD);
-}
-
 /// Change the DeclContext of any contained parameters to the specified
 /// DeclContext.
 void ParameterList::setDeclContextOfParamDecls(DeclContext *DC) {

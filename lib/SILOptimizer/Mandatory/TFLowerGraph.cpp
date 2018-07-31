@@ -3427,7 +3427,7 @@ bool TFGraphFunctionLowering::buildGraphFunction(
     if (outputTypes) outputTypes->push_back(TF_OperationOutputType(outs[i]));
   }
 
-  DEBUG(llvm::dbgs() << "Creating graph function " << funcName << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "Creating graph function " << funcName << "\n");
   auto resultFn =
       TF_GraphToFunction(graphBody.getGraph(), funcName.str().c_str(),
                          /*append_hash_to_fn_name*/ false,
@@ -3632,8 +3632,8 @@ bool TFGraphLowering::lowerTFGraphOrFunction(
   }
 
   // Ok, we're done!
-  DEBUG(llvm::dbgs() << "Inserting a graph functions entry with host fn "
-                     << hostFnName << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "Inserting a graph functions entry with host fn "
+                          << hostFnName << "\n");
   assert(!graphFunctions.count(hostFnName));
   auto graphFn =
       llvm::make_unique<LoweredGraphFunction>(hostFnName, entryFnBaseName);
@@ -3654,8 +3654,8 @@ bool TFGraphLowering::lowerTFFunction(
     StringRef hostFnName, SILFunction *fn,
     const GraphFunctionDeviceInfo &deviceInfo) {
   std::string graphFnName = getGraphFuncNameForFuncAttr(hostFnName);
-  DEBUG(llvm::dbgs() << "Lowering accelerator-only host fn " << hostFnName
-                     << " to graph function " << graphFnName << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "Lowering accelerator-only host fn " << hostFnName
+                          << " to graph function " << graphFnName << "\n");
   return lowerTFGraphOrFunction(hostFnName, fn, graphFnName,
                                 /*isAcceleratorOnly*/ true, deviceInfo);
 }

@@ -303,9 +303,12 @@ public // COMPILER_INTRINSIC
 func _diagnoseUnexpectedNilOptional(_filenameStart: Builtin.RawPointer,
                                     _filenameLength: Builtin.Word,
                                     _filenameIsASCII: Builtin.Int1,
-                                    _line: Builtin.Word) {
+                                    _line: Builtin.Word,
+                                    _isImplicitUnwrap: Builtin.Int1) {
   _preconditionFailure(
-    "Unexpectedly found nil while unwrapping an Optional value",
+    Bool(_isImplicitUnwrap)
+      ? "Unexpectedly found nil while implicitly unwrapping an Optional value"
+      : "Unexpectedly found nil while unwrapping an Optional value",
     file: StaticString(_start: _filenameStart,
                        utf8CodeUnitCount: _filenameLength,
                        isASCII: _filenameIsASCII),
@@ -474,7 +477,7 @@ extension Optional {
   @compilerEvaluable
   public static func ~=(lhs: _OptionalNilComparisonType, rhs: Wrapped?) -> Bool {
     switch rhs {
-    case .some(_):
+    case .some:
       return false
     case .none:
       return true
@@ -509,7 +512,7 @@ extension Optional {
   @compilerEvaluable
   public static func ==(lhs: Wrapped?, rhs: _OptionalNilComparisonType) -> Bool {
     switch lhs {
-    case .some(_):
+    case .some:
       return false
     case .none:
       return true
@@ -541,7 +544,7 @@ extension Optional {
   @compilerEvaluable
   public static func !=(lhs: Wrapped?, rhs: _OptionalNilComparisonType) -> Bool {
     switch lhs {
-    case .some(_):
+    case .some:
       return true
     case .none:
       return false
@@ -573,7 +576,7 @@ extension Optional {
   @compilerEvaluable
   public static func ==(lhs: _OptionalNilComparisonType, rhs: Wrapped?) -> Bool {
     switch rhs {
-    case .some(_):
+    case .some:
       return false
     case .none:
       return true
@@ -605,7 +608,7 @@ extension Optional {
   @compilerEvaluable
   public static func !=(lhs: _OptionalNilComparisonType, rhs: Wrapped?) -> Bool {
     switch rhs {
-    case .some(_):
+    case .some:
       return true
     case .none:
       return false

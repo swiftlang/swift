@@ -210,7 +210,7 @@ static void derivedBody_allParametersSetter(AbstractFunctionDecl *setterDecl) {
 
   auto *parametersDecl = getParametersStructDecl(nominal).first;
   assert(parametersDecl && "'Parameters' struct not found but should exist");
-  auto *newValueDecl = setterDecl->getParameterList(1)->get(0);
+  auto *newValueDecl = setterDecl->getParameters()->get(0);
   Expr *newValueDRE =
       new (C) DeclRefExpr(newValueDecl, DeclNameLoc(), /*Implicit*/ true);
 
@@ -360,11 +360,11 @@ static Type deriveParameterized_Parameters(DerivedConformance &derived) {
     parametersDecl->addMember(newParameter);
     newParameter->copyFormalAccessFrom(parameter,
                                        /*sourceIsParentContext*/ true);
-    newParameter->setValidationStarted();
+    newParameter->setValidationToChecked();
     newParameter->setSetterAccess(parameter->getFormalAccess());
     C.addSynthesizedDecl(newParameter);
   }
-  parametersDecl->setValidationStarted();
+  parametersDecl->setValidationToChecked();
 
   // Add conformance to the ParameterAggregate protocol, if possible.
   // The ParameterAggregate protocol requirements will be derived.

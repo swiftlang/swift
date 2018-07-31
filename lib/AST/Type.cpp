@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -841,8 +841,11 @@ swift::computeDefaultMap(ArrayRef<AnyFunctionType::Param> params,
   // Find the corresponding parameter list.
   const ParameterList *paramList = nullptr;
   if (auto *func = dyn_cast<AbstractFunctionDecl>(paramOwner)) {
-    if (level < func->getNumParameterLists())
-      paramList = func->getParameterList(level);
+    if (func->hasImplicitSelfDecl()) {
+      if (level == 1)
+        paramList = func->getParameters();
+    } else if (level == 0)
+      paramList = func->getParameters();
   } else if (auto *subscript = dyn_cast<SubscriptDecl>(paramOwner)) {
     if (level == 1)
       paramList = subscript->getIndices();
@@ -1154,6 +1157,18 @@ CanType TypeBase::computeCanonicalType() {
   case TypeKind::GenericTypeParam: {
     GenericTypeParamType *gp = cast<GenericTypeParamType>(this);
     auto gpDecl = gp->getDecl();
+
+    // If we haven't set a depth for this generic parameter, try to do so.
+    // FIXME: This is a dreadful hack.
+    if (gpDecl->getDepth() == GenericTypeParamDecl::InvalidDepth) {
+      auto resolver = gpDecl->getASTContext().getLazyResolver();
+      assert(resolver && "Need to resolve generic parameter depth");
+      if (auto decl =
+            gpDecl->getDeclContext()->getInnermostDeclarationDeclContext())
+        if (auto valueDecl = dyn_cast<ValueDecl>(decl))
+          resolver->resolveDeclSignature(valueDecl);
+    }
+
     assert(gpDecl->getDepth() != GenericTypeParamDecl::InvalidDepth &&
            "parameter hasn't been validated");
     Result = GenericTypeParamType::get(gpDecl->getDepth(), gpDecl->getIndex(),
@@ -1866,10 +1881,6 @@ getObjCObjectRepresentable(Type type, const DeclContext *dc) {
 
   // @objc classes.
   if (auto classDecl = type->getClassOrBoundGenericClass()) {
-    auto &ctx = classDecl->getASTContext();
-    if (auto resolver = ctx.getLazyResolver())
-      resolver->resolveIsObjC(classDecl);
-
     if (classDecl->isObjC())
       return ForeignRepresentableKind::Object;
   }
@@ -1997,15 +2008,6 @@ getForeignRepresentable(Type type, ForeignLanguage language,
                    : ForeignRepresentableKind::Trivial,
                    nullptr };
     };
-
-    // HACK: In Swift 3 mode, we accepted (Void) -> Void for () -> Void
-    if (dc->getASTContext().isSwiftVersion3()
-        && functionType->getParams().size() == 1
-        && functionType->getParams()[0].getLabel().empty()
-        && functionType->getParams()[0].getType()->isVoid()
-        && functionType->getResult()->isVoid()) {
-      return success(anyStaticBridged, anyBridged, isBlock);
-    }
 
     // Look at the result type.
     Type resultType = functionType->getResult();
@@ -2953,7 +2955,8 @@ Optional<ProtocolConformanceRef>
 MakeAbstractConformanceForGenericType::operator()(CanType dependentType,
                                        Type conformingReplacementType,
                                        ProtocolDecl *conformedProtocol) const {
-  assert((conformingReplacementType->is<SubstitutableType>()
+  assert((conformingReplacementType->is<ErrorType>()
+          || conformingReplacementType->is<SubstitutableType>()
           || conformingReplacementType->is<DependentMemberType>())
          && "replacement requires looking up a concrete conformance");
   return ProtocolConformanceRef(conformedProtocol);
@@ -3439,8 +3442,7 @@ Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
     type = type->replaceSelfParameterType(this);
     if (auto func = dyn_cast<FuncDecl>(baseDecl)) {
       if (func->hasDynamicSelf()) {
-        type = type->replaceCovariantResultType(this,
-                                                func->getNumParameterLists());
+        type = type->replaceCovariantResultType(this, /*uncurryLevel=*/2);
       }
     } else if (isa<ConstructorDecl>(baseDecl)) {
       type = type->replaceCovariantResultType(this, /*uncurryLevel=*/2);

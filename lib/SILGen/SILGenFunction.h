@@ -657,14 +657,19 @@ public:
   /// emitProlog - Generates prolog code to allocate and clean up mutable
   /// storage for closure captures and local arguments.
   void emitProlog(AnyFunctionRef TheClosure,
-                  ArrayRef<ParameterList *> paramPatterns, Type resultType,
-                  bool throws);
+                  ParameterList *paramList, ParamDecl *selfParam,
+                  Type resultType, bool throws);
   /// returns the number of variables in paramPatterns.
-  uint16_t emitProlog(ArrayRef<ParameterList *> paramPatterns, Type resultType,
-                      DeclContext *DeclCtx, bool throws);
+  uint16_t emitProlog(ParameterList *paramList, ParamDecl *selfParam,
+                      Type resultType, DeclContext *DeclCtx, bool throws);
+
+  /// Create SILArguments in the entry block that bind a single value
+  /// of the given parameter suitably for being forwarded.
+  void bindParameterForForwarding(ParamDecl *param,
+                                  SmallVectorImpl<SILValue> &parameters);
 
   /// Create SILArguments in the entry block that bind all the values
-  /// of the given pattern suitably for being forwarded.
+  /// of the given parameter list suitably for being forwarded.
   void bindParametersForForwarding(const ParameterList *params,
                                    SmallVectorImpl<SILValue> &parameters);
 
@@ -810,13 +815,15 @@ public:
   /// _diagnoseUnexpectedNilOptional if the optional has no value. Return the
   /// MangedValue resulting from the success case.
   ManagedValue emitPreconditionOptionalHasValue(SILLocation loc,
-                                                ManagedValue optional);
+                                                ManagedValue optional,
+                                                bool isImplicitUnwrap);
 
   /// \brief Emit a call to the library intrinsic _getOptionalValue
   /// given the address of the optional, which checks that an optional contains
   /// some value and either returns the value or traps if there is none.
   ManagedValue emitCheckedGetOptionalValueFrom(SILLocation loc,
                                                ManagedValue addr,
+                                               bool isImplicitUnwrap,
                                                const TypeLowering &optTL,
                                                SGFContext C);
   
@@ -1065,11 +1072,7 @@ public:
                                          AccessKind accessKind);
 
   // FIXME: demote this to private state.
-  ManagedValue maybeEmitAddressOfNonMemberVarDecl(SILLocation loc,
-                                                  VarDecl *var,
-                                                  CanType formalRValueType,
-                                                  AccessKind accessKind,
-                                                  AccessSemantics semantics);
+  ManagedValue maybeEmitValueOfLocalVarDecl(VarDecl *var);
 
   /// Produce an RValue for a reference to the specified declaration,
   /// with the given type and in response to the specified expression.  Try to

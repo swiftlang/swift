@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -802,20 +802,19 @@ static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
   return hadError;
 }
 
-/// Request nominal layout for any types that could be sources of typemetadata
+/// Request nominal layout for any types that could be sources of type metadata
 /// or conformances.
 void TypeChecker::requestRequiredNominalTypeLayoutForParameters(
     ParameterList *PL) {
   for (auto param : *PL) {
-    if (!param->hasType())
+    if (!param->hasInterfaceType())
       continue;
 
     // Generic types are sources for typemetadata and conformances. If a
     // parameter is of dependent type then the body of a function with said
     // parameter could potentially require the generic type's layout to
     // recover them.
-    if (auto *nominalDecl = dyn_cast_or_null<NominalTypeDecl>(
-            param->getType()->getAnyGeneric())) {
+    if (auto *nominalDecl = param->getInterfaceType()->getAnyNominal()) {
       requestNominalLayout(nominalDecl);
     }
   }
@@ -856,10 +855,9 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
       param->markInvalid();
       hadError = true;
     } else {
-      if (!type->isMaterializable()) {
+      if (type->is<InOutType>())
         param->setSpecifier(VarDecl::Specifier::InOut);
-      }
-      resolver.recordParamType(param, type->getInOutObjectType());
+      param->setInterfaceType(type->getInOutObjectType());
     }
     
     checkTypeModifyingDeclAttributes(param);
@@ -874,18 +872,6 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
     }
   }
   
-  return hadError;
-}
-
-bool TypeChecker::typeCheckParameterLists(AbstractFunctionDecl *fd,
-                                          GenericTypeResolver &resolver) {
-  bool hadError = false;
-  for (auto paramList : fd->getParameterLists()) {
-    hadError |= typeCheckParameterList(paramList, fd,
-                                       TypeResolutionOptions(),
-                                       resolver);
-  }
-
   return hadError;
 }
 
@@ -1337,7 +1323,6 @@ recur:
     }
 
     case CheckedCastKind::ValueCast:
-    case CheckedCastKind::Swift3BridgingDowncast:
       IP->setCastKind(castKind);
       break;
     }

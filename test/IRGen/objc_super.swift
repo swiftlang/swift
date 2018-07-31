@@ -97,7 +97,7 @@ class GenericRuncer<T> : Gizmo {
 // CHECK:   [[CLASS:%.*]] = and i64 [[ISA]], [[ISAMASK]]
 // CHECK:   [[TY:%.*]] = inttoptr i64 [[CLASS]] to %swift.type*
 // CHECK:   [[CAST:%.*]] = bitcast %swift.type* [[TY]] to i64*
-// CHECK:   [[OFFSETADDR:%.*]] = getelementptr inbounds i64, i64* [[CAST]], i64 19
+// CHECK:   [[OFFSETADDR:%.*]] = getelementptr inbounds i64, i64* [[CAST]], i64 17
 // CHECK:   [[FIELDOFFSET:%.*]] = load i64, i64* [[OFFSETADDR]]
 // CHECK:   [[BYTEADDR:%.*]] = bitcast %T10objc_super13GenericRuncerC* %0 to i8*
 // CHECK:   [[FIELDADDR:%.*]] = getelementptr inbounds i8, i8* [[BYTEADDR]], i64 [[FIELDOFFSET]]

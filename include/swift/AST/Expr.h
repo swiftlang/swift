@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -95,15 +95,8 @@ enum class CheckedCastKind : unsigned {
   SetDowncast,
   /// A bridging conversion that always succeeds.
   BridgingCoercion,
-  /// A bridging conversion that may fail, because there are multiple Swift
-  /// value types that bridge to the same Cocoa object type.
-  ///
-  /// This kind is only used for Swift 3 compatibility diagnostics and is
-  /// treated the same as 'BridgingCoercion' otherwise. In Swift 4 or later,
-  /// any conversions with this kind show up as ValueCasts.
-  Swift3BridgingDowncast,
 
-  Last_CheckedCastKind = Swift3BridgingDowncast,
+  Last_CheckedCastKind = BridgingCoercion,
 };
 
 /// What are the high-level semantics of this access?
@@ -3468,14 +3461,6 @@ public:
   }
   enum : unsigned { InvalidDiscriminator = 0xFFFF };
 
-  ArrayRef<ParameterList *> getParameterLists() {
-    return parameterList ? parameterList : ArrayRef<ParameterList *>();
-  }
-  
-  ArrayRef<const ParameterList *> getParameterLists() const {
-    return parameterList ? parameterList : ArrayRef<const ParameterList *>();
-  }
-
   /// \brief Retrieve the result type of this closure.
   Type getResultType(llvm::function_ref<Type(const Expr *)> getType =
                          [](const Expr *E) -> Type {
@@ -4521,6 +4506,11 @@ public:
 ///
 /// Spelled 'a as T' and produces a value of type 'T'.
 class CoerceExpr : public ExplicitCastExpr {
+  /// Since there is already `asLoc` location,
+  /// we use it to store `start` of the initializer
+  /// call source range to save some storage.
+  SourceLoc InitRangeEnd;
+
 public:
   CoerceExpr(Expr *sub, SourceLoc asLoc, TypeLoc type)
     : ExplicitCastExpr(ExprKind::Coerce, sub, asLoc, type, type.getType())
@@ -4529,6 +4519,29 @@ public:
   CoerceExpr(SourceLoc asLoc, TypeLoc type)
     : CoerceExpr(nullptr, asLoc, type)
   { }
+
+private:
+  CoerceExpr(SourceRange initRange, Expr *literal, TypeLoc type)
+    : ExplicitCastExpr(ExprKind::Coerce, literal, initRange.Start,
+                       type, type.getType()), InitRangeEnd(initRange.End)
+  { setImplicit(); }
+
+public:
+  /// Create an implicit coercion expression for literal initialization
+  /// preserving original source information, this way original call
+  /// could be recreated if needed.
+  static CoerceExpr *forLiteralInit(ASTContext &ctx, Expr *literal,
+                                    SourceRange range, TypeLoc literalType) {
+    return new (ctx) CoerceExpr(range, literal, literalType);
+  }
+
+  bool isLiteralInit() const { return InitRangeEnd.isValid(); }
+
+  SourceRange getSourceRange() const {
+    return isLiteralInit()
+            ? SourceRange(getAsLoc(), InitRangeEnd)
+            : ExplicitCastExpr::getSourceRange();
+  }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Coerce;

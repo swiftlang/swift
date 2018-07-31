@@ -55,8 +55,7 @@
 #endif
 
 #if SWIFT_OBJC_INTEROP
-#include <dlfcn.h>
-#include <objc/runtime.h>
+#include "ObjCRuntimeGetImageNameFromClass.h"
 #endif
 
 #include <cstdio>
@@ -1976,45 +1975,6 @@ swift::swift_relocateClassMetadata(ClassMetadata *self,
   return self;
 }
 
-#if SWIFT_OBJC_INTEROP
-
-// FIXME: This is from a later version of <objc/runtime.h>. Once the declaration
-// is available in SDKs, we can remove this typedef.
-typedef BOOL (*objc_hook_getImageName)(
-    Class _Nonnull cls, const char * _Nullable * _Nonnull outImageName);
-
-/// \see customGetImageNameFromClass
-static objc_hook_getImageName defaultGetImageNameFromClass = nullptr;
-
-/// A custom implementation of Objective-C's class_getImageName for Swift
-/// classes, which knows how to handle dynamically-initialized class metadata.
-///
-/// Per the documentation for objc_setHook_getImageName, any non-Swift classes
-/// will still go through the normal implementation of class_getImageName,
-/// which is stored in defaultGetImageNameFromClass.
-static BOOL
-customGetImageNameFromClass(Class _Nonnull objcClass,
-                            const char * _Nullable * _Nonnull outImageName) {
-  auto *classAsMetadata = reinterpret_cast<const ClassMetadata *>(objcClass);
-
-  // Is this a Swift class?
-  if (classAsMetadata->isTypeMetadata() &&
-      !classAsMetadata->isArtificialSubclass()) {
-    const void *descriptor = classAsMetadata->getDescription();
-    assert(descriptor &&
-           "all non-artificial Swift classes should have a descriptor");
-    Dl_info imageInfo = {};
-    if (!dladdr(descriptor, &imageInfo))
-      return NO;
-    *outImageName = imageInfo.dli_fname;
-    return imageInfo.dli_fname != nullptr;
-  }
-
-  // If not, fall back to the default implementation.
-  return defaultGetImageNameFromClass(objcClass, outImageName);
-}
-#endif
-
 /// Initialize the field offset vector for a dependent-layout class, using the
 /// "Universal" layout strategy.
 void
@@ -2028,15 +1988,7 @@ swift::swift_initClassMetadata(ClassMetadata *self,
   static swift_once_t onceToken;
   swift_once(&onceToken, [](void *unused) {
     (void)unused;
-    // FIXME: This is from a later version of <objc/runtime.h>. Once the
-    // declaration is available in SDKs, we can access this directly instead of
-    // using dlsym.
-    if (void *setHookPtr = dlsym(RTLD_DEFAULT, "objc_setHook_getImageName")) {
-      auto setHook = reinterpret_cast<
-          void(*)(objc_hook_getImageName _Nonnull,
-                  objc_hook_getImageName _Nullable * _Nonnull)>(setHookPtr);
-      setHook(customGetImageNameFromClass, &defaultGetImageNameFromClass);
-    }
+    setUpObjCRuntimeGetImageNameFromClass();
   }, nullptr);
 #endif
 
@@ -2420,8 +2372,8 @@ public:
   struct Key {
     const Metadata *SuperclassConstraint;
     ProtocolClassConstraint ClassConstraint : 1;
-    size_t NumProtocols : 31;
-    const ProtocolDescriptor * const *Protocols;
+    uint32_t NumProtocols : 31;
+    const ProtocolDescriptorRef *Protocols;
   };
 
   ExistentialCacheEntry(Key key);
@@ -2440,11 +2392,13 @@ public:
       return result;
 
     if (auto result = compareIntegers(key.NumProtocols,
-                                      Data.Protocols.NumProtocols))
+                                      Data.NumProtocols))
       return result;
 
+    auto dataProtocols = Data.getProtocols();
     for (size_t i = 0; i != key.NumProtocols; ++i) {
-      if (auto result = comparePointers(key.Protocols[i], Data.Protocols[i]))
+      if (auto result = compareIntegers(key.Protocols[i].getRawData(),
+                                        dataProtocols[i].getRawData()))
         return result;
     }
 
@@ -2452,16 +2406,15 @@ public:
   }
 
   static size_t getExtraAllocationSize(Key key) {
-    return (sizeof(const ProtocolDescriptor *) * key.NumProtocols +
-            (key.SuperclassConstraint != nullptr
-             ? sizeof(const Metadata *)
-             : 0));
+    return ExistentialTypeMetadata::additionalSizeToAlloc<
+             const Metadata *, ProtocolDescriptorRef
+           >(key.SuperclassConstraint != nullptr, key.NumProtocols);
   }
+
   size_t getExtraAllocationSize() const {
-    return (sizeof(const ProtocolDescriptor *) * Data.Protocols.NumProtocols +
-            (Data.Flags.hasSuperclassConstraint()
-             ? sizeof(const Metadata *)
-             : 0));
+    return ExistentialTypeMetadata::additionalSizeToAlloc<
+             const Metadata *, ProtocolDescriptorRef
+           >(Data.Flags.hasSuperclassConstraint(), Data.NumProtocols);
   }
 };
 
@@ -2859,10 +2812,9 @@ ExistentialTypeMetadata::getWitnessTable(const OpaqueValue *container,
 /// Determine whether any of the given protocols is class-bound.
 static bool anyProtocolIsClassBound(
                                 size_t numProtocols,
-                                const ProtocolDescriptor * const *protocols) {
+                                const ProtocolDescriptorRef *protocols) {
   for (unsigned i = 0; i != numProtocols; ++i) {
-    if (protocols[i]->Flags.getClassConstraint()
-          == ProtocolClassConstraint::Class)
+    if (protocols[i].getClassConstraint() == ProtocolClassConstraint::Class)
       return true;
   }
 
@@ -2877,7 +2829,7 @@ swift::swift_getExistentialTypeMetadata(
                                   ProtocolClassConstraint classConstraint,
                                   const Metadata *superclassConstraint,
                                   size_t numProtocols,
-                                  const ProtocolDescriptor * const *protocols) {
+                                  const ProtocolDescriptorRef *protocols) {
 
   // The empty compositions Any and AnyObject have fixed metadata.
   if (numProtocols == 0 && !superclassConstraint) {
@@ -2899,7 +2851,7 @@ swift::swift_getExistentialTypeMetadata(
          (!superclassConstraint &&
           !anyProtocolIsClassBound(numProtocols, protocols)));
   ExistentialCacheEntry::Key key = {
-    superclassConstraint, classConstraint, numProtocols, protocols
+    superclassConstraint, classConstraint, (uint32_t)numProtocols, protocols
   };
   return &ExistentialTypes.getOrInsert(key).first->Data;
 }
@@ -2909,7 +2861,7 @@ ExistentialCacheEntry::ExistentialCacheEntry(Key key) {
   // protocol set.
   unsigned numWitnessTables = 0;
   for (auto p : make_range(key.Protocols, key.Protocols + key.NumProtocols)) {
-    if (p->Flags.needsWitnessTable())
+    if (p.needsWitnessTable())
       ++numWitnessTables;
   }
 
@@ -2917,7 +2869,7 @@ ExistentialCacheEntry::ExistentialCacheEntry(Key key) {
   // Protocol compositions are currently never special.
   auto special = SpecialProtocol::None;
   if (key.NumProtocols == 1)
-    special = key.Protocols[0]->Flags.getSpecialProtocol();
+    special = key.Protocols[0].getSpecialProtocol();
 
   Data.setKind(MetadataKind::Existential);
   Data.ValueWitnesses = getExistentialValueWitnesses(key.ClassConstraint,
@@ -2931,18 +2883,14 @@ ExistentialCacheEntry::ExistentialCacheEntry(Key key) {
 
   if (key.SuperclassConstraint != nullptr) {
     Data.Flags = Data.Flags.withHasSuperclass(true);
-
-    // Get a pointer to tail-allocated storage for this metadata record.
-    auto Pointer = reinterpret_cast<
-      const Metadata **>(&Data + 1);
-
-    // The superclass immediately follows the list of protocol descriptors.
-    Pointer[key.NumProtocols] = key.SuperclassConstraint;
+    Data.setSuperclassConstraint(key.SuperclassConstraint);
   }
 
-  Data.Protocols.NumProtocols = key.NumProtocols;
-  for (size_t i = 0; i < key.NumProtocols; ++i)
-    Data.Protocols[i] = key.Protocols[i];
+  Data.NumProtocols = key.NumProtocols;
+  auto dataProtocols = Data.getMutableProtocols();
+  for (size_t i = 0; i < key.NumProtocols; ++i) {
+    dataProtocols[i] = key.Protocols[i];
+  }
 }
 
 /// \brief Perform a copy-assignment from one existential container to another.

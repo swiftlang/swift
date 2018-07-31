@@ -613,6 +613,47 @@ struct DidSetWillSetTests: ForceAccessors {
   // CHECK-NEXT: // function_ref {{.*}}.DidSetWillSetTests.a.didset : Swift.Int
   // CHECK-NEXT: [[DIDSETFN:%.*]] = function_ref @$S10properties010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vW : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
   // CHECK-NEXT: apply [[DIDSETFN]]([[OLDVAL]], [[WRITE]]) : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
+
+  // CHECK-LABEL: sil hidden @$S10properties010DidSetWillC5TestsV8testReadSiyF
+  // CHECK:         [[SELF:%.*]] = begin_access [read] [unknown] %0 : $*DidSetWillSetTests
+  // CHECK-NEXT:    [[PROP:%.*]] = struct_element_addr [[SELF]] : $*DidSetWillSetTests
+  // CHECK-NEXT:    [[LOAD:%.*]] = load [trivial] [[PROP]] : $*Int
+  // CHECK-NEXT:    end_access [[SELF]] : $*DidSetWillSetTests
+  // CHECK-NEXT:    return [[LOAD]] : $Int
+  mutating func testRead() -> Int {
+    return a
+  }
+
+  // CHECK-LABEL: sil hidden @$S10properties010DidSetWillC5TestsV9testWrite5inputySi_tF
+  // CHECK:         [[SELF:%.*]] = begin_access [modify] [unknown] %1 : $*DidSetWillSetTests
+  // CHECK-NEXT:    // function_ref properties.DidSetWillSetTests.a.setter
+  // CHECK-NEXT:    [[SETTER:%.*]] = function_ref @$S10properties010DidSetWillC5TestsV1aSivs
+  // CHECK-NEXT:    apply [[SETTER]](%0, [[SELF]])
+  // CHECK-NEXT:    end_access [[SELF]] : $*DidSetWillSetTests
+  // CHECK-NEXT:    [[RET:%.*]] = tuple ()
+  // CHECK-NEXT:    return [[RET]] : $()
+  mutating func testWrite(input: Int) {
+    a = input
+  }
+
+  // CHECK-LABEL: sil hidden @$S10properties010DidSetWillC5TestsV13testReadWrite5inputySi_tF
+  // CHECK:         [[SELF:%.*]] = begin_access [modify] [unknown] %1 : $*DidSetWillSetTests
+  // CHECK-NEXT:    [[TEMP:%.*]] = alloc_stack $Int
+  // CHECK-NEXT:    [[PROP:%.*]] = struct_element_addr [[SELF]] : $*DidSetWillSetTests
+  // CHECK-NEXT:    [[LOAD:%.*]] = load [trivial] [[PROP]] : $*Int
+  // CHECK-NEXT:    store [[LOAD]] to [trivial] [[TEMP]] : $*Int
+  // (modification goes here)
+  // CHECK:         [[RELOAD:%.*]] = load [trivial] [[TEMP]] : $*Int
+  // CHECK-NEXT:    // function_ref properties.DidSetWillSetTests.a.setter
+  // CHECK-NEXT:    [[SETTER:%.*]] = function_ref @$S10properties010DidSetWillC5TestsV1aSivs
+  // CHECK-NEXT:    apply [[SETTER]]([[RELOAD]], [[SELF]])
+  // CHECK-NEXT:    end_access [[SELF]] : $*DidSetWillSetTests
+  // CHECK-NEXT:    dealloc_stack [[TEMP]] : $*Int
+  // CHECK-NEXT:    [[RET:%.*]] = tuple ()
+  // CHECK-NEXT:    return [[RET]] : $()
+  mutating func testReadWrite(input: Int) {
+    a += input
+  }
 }
 
 

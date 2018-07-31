@@ -566,20 +566,18 @@ static unsigned getUnnamedParamIndex(const ParamDecl *D) {
     llvm_unreachable("param not found");
   }
 
-  ArrayRef<ParameterList *> ParamLists;
+  ParameterList *ParamList;
 
   if (auto AFD = dyn_cast<AbstractFunctionDecl>(D->getDeclContext())) {
-    ParamLists = AFD->getParameterLists();
+    ParamList = AFD->getParameters();
   } else {
     auto ACE = cast<AbstractClosureExpr>(D->getDeclContext());
-    ParamLists = ACE->getParameterLists();
+    ParamList = ACE->getParameters();
   }
 
   unsigned UnnamedIndex = 0;
-  for (auto ParamList : ParamLists) {
-    if (getUnnamedParamIndex(ParamList, D, UnnamedIndex))
-      return UnnamedIndex;
-  }
+  if (getUnnamedParamIndex(ParamList, D, UnnamedIndex))
+    return UnnamedIndex;
 
   llvm_unreachable("param not found");
 }

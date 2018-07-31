@@ -1577,6 +1577,155 @@ using TupleTypeMetadata = TargetTupleTypeMetadata<InProcess>;
   
 template <typename Runtime> struct TargetProtocolDescriptor;
 
+/// A reference to a protocol within the runtime, which may be either
+/// a Swift protocol or (when Objective-C interoperability is enabled) an
+/// Objective-C protocol.
+///
+/// This type always contains a single target pointer, whose lowest bit is
+/// used to distinguish between a Swift protocol referent and an Objective-C
+/// protocol referent.
+template <typename Runtime>
+class TargetProtocolDescriptorRef {
+  using StoredPointer = typename Runtime::StoredPointer;
+  using ProtocolDescriptorPointer =
+    ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor>;
+
+  enum : StoredPointer {
+    // The bit used to indicate whether this is an Objective-C protocol.
+    IsObjCBit = 0x1U,
+  };
+
+  /// A direct pointer to a protocol descriptor for either an Objective-C
+  /// protocol (if the low bit is set) or a Swift protocol (if the low bit
+  /// is clear).
+  StoredPointer storage;
+
+public:
+  /// Retrieve the protocol descriptor without checking whether we have an
+  /// Objective-C or Swift protocol.
+  /// FIXME: Temporarily public while we roll out TargetProtocolDescriptorRef.
+  ProtocolDescriptorPointer getProtocolDescriptorUnchecked() const {
+    return reinterpret_cast<ProtocolDescriptorPointer>(storage & ~IsObjCBit);
+  }
+
+  constexpr TargetProtocolDescriptorRef(StoredPointer storage)
+    : storage(storage) { }
+
+public:
+  constexpr TargetProtocolDescriptorRef() : storage() { }
+
+  TargetProtocolDescriptorRef(
+                        ProtocolDescriptorPointer protocol,
+                        ProtocolDispatchStrategy dispatchStrategy) {
+#if SWIFT_OBJC_INTEROP
+    assert(!protocol ||
+           protocol->Flags.getDispatchStrategy() == dispatchStrategy);
+    storage = reinterpret_cast<StoredPointer>(protocol)
+      | (dispatchStrategy == ProtocolDispatchStrategy::ObjC ? IsObjCBit : 0);
+#else
+    assert(dispatchStrategy == ProtocolDispatchStrategy::Swift);
+    storage = reinterpret_cast<StoredPointer>(protocol);
+#endif
+  }
+
+  const static TargetProtocolDescriptorRef forSwift(
+                                          ProtocolDescriptorPointer protocol) {
+    return TargetProtocolDescriptorRef{
+        reinterpret_cast<StoredPointer>(protocol)};
+  }
+
+#if SWIFT_OBJC_INTEROP
+  constexpr static TargetProtocolDescriptorRef forObjC(Protocol *objcProtocol) {
+    return TargetProtocolDescriptorRef{
+        reinterpret_cast<StoredPointer>(objcProtocol) | IsObjCBit};
+  }
+#endif
+
+  explicit constexpr operator bool() const {
+    return storage != 0;
+  }
+
+  /// The name of the protocol.
+  TargetPointer<Runtime, const char> getName() const {
+    return getProtocolDescriptorUnchecked()->Name;
+  }
+
+  /// Determine what kind of protocol this is, Swift or Objective-C.
+  ProtocolDispatchStrategy getDispatchStrategy() const {
+#if SWIFT_OBJC_INTEROP
+    if (isObjC()) {
+      return ProtocolDispatchStrategy::ObjC;
+    }
+#endif
+
+    return ProtocolDispatchStrategy::Swift;
+  }
+
+  /// Determine whether this protocol has a 'class' constraint.
+  ProtocolClassConstraint getClassConstraint() const {
+#if SWIFT_OBJC_INTEROP
+    if (isObjC()) {
+      return ProtocolClassConstraint::Class;
+    }
+#endif
+
+    return getProtocolDescriptorUnchecked()->Flags.getClassConstraint();
+  }
+
+  /// Determine whether this protocol needs a witness table.
+  bool needsWitnessTable() const {
+#if SWIFT_OBJC_INTEROP
+    if (isObjC()) {
+      return false;
+    }
+#endif
+
+    return getProtocolDescriptorUnchecked()->Flags.needsWitnessTable();
+  }
+
+  SpecialProtocol getSpecialProtocol() const {
+#if SWIFT_OBJC_INTEROP
+    if (isObjC()) {
+      return SpecialProtocol::None;
+    }
+#endif
+
+    return getProtocolDescriptorUnchecked()->Flags.getSpecialProtocol();
+  }
+
+  /// Retrieve the Swift protocol descriptor.
+  ProtocolDescriptorPointer getSwiftProtocol() const {
+#if SWIFT_OBJC_INTEROP
+    assert(!isObjC());
+#endif
+
+    return getProtocolDescriptorUnchecked();
+  }
+
+  /// Retrieve the raw stored pointer and discriminator bit.
+  constexpr StoredPointer getRawData() const {
+    return storage;
+  }
+
+#if SWIFT_OBJC_INTEROP
+  /// Whether this references an Objective-C protocol.
+  bool isObjC() const {
+    assert(static_cast<bool>(storage & IsObjCBit) !=
+             getProtocolDescriptorUnchecked()->Flags.needsWitnessTable());
+    return (storage & IsObjCBit) != 0;
+  }
+
+  /// Retrieve the Objective-C protocol.
+  Protocol *getObjCProtocol() const {
+    assert(isObjC());
+    return reinterpret_cast<Protocol *>(storage & ~IsObjCBit);
+  }
+#endif
+};
+
+using ProtocolDescriptorRef = TargetProtocolDescriptorRef<InProcess>;
+
+
 /// An array of protocol descriptors with a header and tail-allocated elements.
 template <typename Runtime>
 struct TargetProtocolDescriptorList {
@@ -1771,26 +1920,53 @@ enum class ExistentialTypeRepresentation {
 
 /// The structure of existential type metadata.
 template <typename Runtime>
-struct TargetExistentialTypeMetadata : public TargetMetadata<Runtime> {
+struct TargetExistentialTypeMetadata
+  : TargetMetadata<Runtime>,
+    swift::ABI::TrailingObjects<
+      TargetExistentialTypeMetadata<Runtime>,
+      ConstTargetMetadataPointer<Runtime, TargetMetadata>,
+      TargetProtocolDescriptorRef<Runtime>> {
+
+private:
+  using ProtocolDescriptorRef = TargetProtocolDescriptorRef<Runtime>;
+  using MetadataPointer = ConstTargetMetadataPointer<Runtime, TargetMetadata>;
+  using TrailingObjects =
+          swift::ABI::TrailingObjects<
+          TargetExistentialTypeMetadata<Runtime>,
+          MetadataPointer,
+          ProtocolDescriptorRef>;
+  friend TrailingObjects;
+
+  template<typename T>
+  using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
+
+  size_t numTrailingObjects(OverloadToken<ProtocolDescriptorRef>) const {
+    return NumProtocols;
+  }
+
+  size_t numTrailingObjects(OverloadToken<MetadataPointer>) const {
+    return Flags.hasSuperclassConstraint() ? 1 : 0;
+  }
+
+public:
   using StoredPointer = typename Runtime::StoredPointer;
   /// The number of witness tables and class-constrained-ness of the type.
   ExistentialTypeFlags Flags;
-  /// The protocol constraints.
-  TargetProtocolDescriptorList<Runtime> Protocols;
-  
-  /// NB: Protocols has a tail-emplaced array; additional fields cannot follow.
-  
+
+  /// The number of protocols.
+  uint32_t NumProtocols;
+
   constexpr TargetExistentialTypeMetadata()
     : TargetMetadata<Runtime>(MetadataKind::Existential),
-      Flags(ExistentialTypeFlags()), Protocols() {}
+      Flags(ExistentialTypeFlags()), NumProtocols(0) {}
   
   explicit constexpr TargetExistentialTypeMetadata(ExistentialTypeFlags Flags)
     : TargetMetadata<Runtime>(MetadataKind::Existential),
-      Flags(Flags), Protocols() {}
+      Flags(Flags), NumProtocols(0) {}
 
   /// Get the representation form this existential type uses.
   ExistentialTypeRepresentation getRepresentation() const;
-  
+
   /// True if it's valid to take ownership of the value in the existential
   /// container if we own the container.
   bool mayTakeValue(const OpaqueValue *container) const;
@@ -1826,25 +2002,35 @@ struct TargetExistentialTypeMetadata : public TargetMetadata<Runtime> {
     return Flags.getClassConstraint() == ProtocolClassConstraint::Class;
   }
 
-  const TargetMetadata<Runtime> *getSuperclassConstraint() const {
+  /// Retrieve the set of protocols required by the existential.
+  ArrayRef<ProtocolDescriptorRef> getProtocols() const {
+    return { this->template getTrailingObjects<ProtocolDescriptorRef>(),
+             NumProtocols };
+  }
+
+  MetadataPointer getSuperclassConstraint() const {
     if (!Flags.hasSuperclassConstraint())
-      return nullptr;
+      return MetadataPointer();
 
-    // Get a pointer to tail-allocated storage for this metadata record.
-    auto Pointer = reinterpret_cast<
-      ConstTargetMetadataPointer<Runtime, TargetMetadata> const *>(this + 1);
+    return this->template getTrailingObjects<MetadataPointer>()[0];
+  }
 
-    // The superclass immediately follows the list of protocol descriptors.
-    return Pointer[Protocols.NumProtocols];
+  /// Retrieve the set of protocols required by the existential.
+  MutableArrayRef<ProtocolDescriptorRef> getMutableProtocols() {
+    return { this->template getTrailingObjects<ProtocolDescriptorRef>(),
+             NumProtocols };
+  }
+
+  /// Set the superclass.
+  void setSuperclassConstraint(MetadataPointer superclass) {
+    assert(Flags.hasSuperclassConstraint());
+    assert(superclass != nullptr);
+    this->template getTrailingObjects<MetadataPointer>()[0] = superclass;
   }
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
     return metadata->getKind() == MetadataKind::Existential;
   }
-
-  static constexpr StoredPointer
-  OffsetToNumProtocols = sizeof(TargetMetadata<Runtime>) + sizeof(ExistentialTypeFlags);
-
 };
 using ExistentialTypeMetadata
   = TargetExistentialTypeMetadata<InProcess>;
@@ -2117,6 +2303,51 @@ using ProtocolRecord = TargetProtocolRecord<InProcess>;
 
 template<typename Runtime> class TargetGenericRequirementDescriptor;
 
+/// A relative pointer to a protocol descriptor, which provides the relative-
+/// pointer equivalent to \c TargetProtocolDescriptorRef.
+template <typename Runtime>
+class RelativeTargetProtocolDescriptorPointer {
+  union AnyProtocol {
+    TargetProtocolDescriptor<Runtime> descriptor;
+  };
+
+  /// The relative pointer itself.
+  ///
+  /// The \c AnyProtocol value type ensures that we can reference any
+  /// protocol descriptor; it will be reinterpret_cast to the appropriate
+  /// protocol descriptor type.
+  ///
+  /// The \c bool integer value will be false to indicate that the protocol
+  /// is a Swift protocol, or true to indicate that this references
+  /// an Objective-C protocol.
+  RelativeIndirectablePointerIntPair<AnyProtocol, bool> pointer;
+
+#if SWIFT_OBJC_INTEROP
+  bool isObjC() const {
+    return pointer.getInt();
+  }
+#endif
+
+public:
+  /// Retrieve a reference to the protocol.
+  TargetProtocolDescriptorRef<Runtime> getProtocol() const {
+#if SWIFT_OBJC_INTEROP
+    if (isObjC()) {
+      return TargetProtocolDescriptorRef<Runtime>::forObjC(
+          protocol_const_cast(pointer.getPointer()));
+    }
+#endif
+
+    return TargetProtocolDescriptorRef<Runtime>::forSwift(
+        reinterpret_cast<ConstTargetMetadataPointer<
+            Runtime, TargetProtocolDescriptor>>(pointer.getPointer()));
+  }
+
+  operator TargetProtocolDescriptorRef<Runtime>() const {
+    return getProtocol();
+  }
+};
+
 /// The structure of a protocol conformance.
 ///
 /// This contains enough static information to recover the witness table for a
@@ -2148,8 +2379,6 @@ public:
 
 private:
   /// The protocol being conformed to.
-  ///
-  /// The remaining low bit is reserved for future use.
   RelativeIndirectablePointer<ProtocolDescriptor> Protocol;
   
   // Some description of the type that conforms to the protocol.
@@ -2518,8 +2747,7 @@ private:
     /// The protocol the param is constrained to.
     ///
     /// Only valid if the requirement has Protocol kind.
-    RelativeIndirectablePointer<TargetProtocolDescriptor<Runtime>,
-                                /*nullable*/ false> Protocol;
+    RelativeTargetProtocolDescriptorPointer<Runtime> Protocol;
     
     /// The conformance the param is constrained to use.
     ///
@@ -2547,8 +2775,8 @@ public:
     return Param;
   }
 
-  /// Retrieve the protocol descriptor for a Protocol requirement.
-  const TargetProtocolDescriptor<Runtime> *getProtocol() const {
+  /// Retrieve the protocol for a Protocol requirement.
+  TargetProtocolDescriptorRef<Runtime> getProtocol() const {
     assert(getKind() == GenericRequirementKind::Protocol);
     return Protocol;
   }

@@ -677,18 +677,16 @@ namespace {
   /// Return a pair, containing the total parameter count of a function, coupled
   /// with the number of non-default parameters.
   std::pair<size_t, size_t> getParamCount(ValueDecl *VD) {
-    auto fTy = VD->getInterfaceType()->getAs<AnyFunctionType>();
-    assert(fTy && "attempting to count parameters of a non-function type");
+    auto fTy = VD->getInterfaceType()->castTo<AnyFunctionType>();
     
     size_t nOperands = fTy->getParams().size();
     size_t nNoDefault = 0;
     
     if (auto AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
-      for (auto params : AFD->getParameterLists()) {
-        for (auto param : *params) {
-          if (!param->isDefaultArgument())
-            nNoDefault++;
-        }
+      assert(!AFD->hasImplicitSelfDecl());
+      for (auto param : *AFD->getParameters()) {
+        if (!param->isDefaultArgument())
+          nNoDefault++;
       }
     } else {
       nNoDefault = nOperands;
@@ -783,7 +781,7 @@ namespace {
         // Figure out the parameter type, accounting for the implicit 'self' if
         // necessary.
         if (auto *FD = dyn_cast<AbstractFunctionDecl>(value)) {
-          if (FD->getImplicitSelfDecl()) {
+          if (FD->hasImplicitSelfDecl()) {
             if (auto resFnTy = fnTy->getResult()->getAs<AnyFunctionType>()) {
               fnTy = resFnTy;
             }
@@ -1168,6 +1166,7 @@ namespace {
       if (!E->isActivated())
         return Type();
 
+      CS.Options |= ConstraintSystemFlags::SuppressDiagnostics;
       return CS.createTypeVariable(CS.getConstraintLocator(E),
                                    TVO_CanBindToLValue);
     }
@@ -1510,7 +1509,7 @@ namespace {
           assert(adjointDecl->isInstanceMember() || adjointDecl->isStatic() &&
                  "Expected adjoint to be an instance/static method");
           auto methodContext = CurDC->getInnermostMethodContext();
-          baseType = methodContext->getParameterList(0)->get(0)->getType();
+          baseType = methodContext->getImplicitSelfDecl()->getType();
         }
         if (adjointDecl->isInstanceMember())
           baseType = MetatypeType::get(baseType, ctx);
@@ -1751,11 +1750,12 @@ namespace {
     Type visitTypeExpr(TypeExpr *E) {
       Type type;
       // If this is an implicit TypeExpr, don't validate its contents.
-      if (auto *rep = E->getTypeRepr()) {
-        type = resolveTypeReferenceInExpression(rep);
-      } else {
+      if (E->getTypeLoc().wasValidated()) {
         type = E->getTypeLoc().getType();
+      } else if (auto *rep = E->getTypeRepr()) {
+        type = resolveTypeReferenceInExpression(rep);
       }
+
       if (!type || type->hasError()) return Type();
       
       auto locator = CS.getConstraintLocator(E);
@@ -2416,7 +2416,6 @@ namespace {
             ty = CS.createTypeVariable(CS.getConstraintLocator(locator));
           return CS.getTypeChecker().getOptionalType(var->getLoc(), ty);
         case ReferenceOwnershipOptionality::Allowed:
-        case ReferenceOwnershipOptionality::AllowedIfImporting:
         case ReferenceOwnershipOptionality::Disallowed:
           break;
         }
@@ -2924,9 +2923,7 @@ namespace {
       // Validate the resulting type.
       TypeResolutionOptions options = TypeResolutionFlags::AllowUnboundGenerics;
       options |= TypeResolutionFlags::InExpression;
-      // Prior to Swift 5, we allow 'as T!' and turn it into a disjunction.
-      if (!CS.getASTContext().isSwiftVersionAtLeast(5))
-        options |= TypeResolutionFlags::AllowIUODeprecated;
+      options |= TypeResolutionFlags::InCastOrCoercionExpression;
       if (tc.validateType(expr->getCastTypeLoc(), CS.DC, options))
         return nullptr;
 
@@ -2956,9 +2953,7 @@ namespace {
       // Validate the resulting type.
       TypeResolutionOptions options = TypeResolutionFlags::AllowUnboundGenerics;
       options |= TypeResolutionFlags::InExpression;
-      // Prior to Swift 5, we allow 'as T!' and turn it into a disjunction.
-      if (!CS.getASTContext().isSwiftVersionAtLeast(5))
-        options |= TypeResolutionFlags::AllowIUODeprecated;
+      options |= TypeResolutionFlags::InCastOrCoercionExpression;
       if (tc.validateType(expr->getCastTypeLoc(), CS.DC, options))
         return nullptr;
 
@@ -2993,9 +2988,7 @@ namespace {
       // Validate the resulting type.
       TypeResolutionOptions options = TypeResolutionFlags::AllowUnboundGenerics;
       options |= TypeResolutionFlags::InExpression;
-      // Prior to Swift 5, we allow 'as T!' and turn it into a disjunction.
-      if (!CS.getASTContext().isSwiftVersionAtLeast(5))
-        options |= TypeResolutionFlags::AllowIUODeprecated;
+      options |= TypeResolutionFlags::InCastOrCoercionExpression;
       if (tc.validateType(expr->getCastTypeLoc(), CS.DC, options))
         return nullptr;
 
@@ -3920,6 +3913,8 @@ public:
   }
 
   Type visitCodeCompletionExpr(CodeCompletionExpr *Expr) override {
+    auto &cs = getConstraintSystem();
+    cs.Options |= ConstraintSystemFlags::SuppressDiagnostics;
     return createFreeTypeVariableType(Expr);
   }
 

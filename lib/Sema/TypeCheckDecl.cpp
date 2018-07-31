@@ -1104,8 +1104,7 @@ static void validatePatternBindingEntries(TypeChecker &tc,
   if (binding->hasValidationStarted())
     return;
 
-  binding->setIsBeingValidated();
-  SWIFT_DEFER { binding->setIsBeingValidated(false); };
+  DeclValidationRAII IBV(binding);
 
   for (unsigned i = 0, e = binding->getNumPatternEntries(); i != e; ++i)
     validatePatternBindingEntry(tc, binding, i);
@@ -1115,12 +1114,6 @@ void swift::makeFinal(ASTContext &ctx, ValueDecl *D) {
   if (D && !D->isFinal()) {
     assert(isa<ClassDecl>(D) || D->isPotentiallyOverridable());
     D->getAttrs().add(new (ctx) FinalAttr(/*IsImplicit=*/true));
-  }
-}
-
-void swift::makeDynamic(ASTContext &ctx, ValueDecl *D) {
-  if (D && !D->isDynamic()) {
-    D->getAttrs().add(new (ctx) DynamicAttr(/*IsImplicit=*/true));
   }
 }
 
@@ -1196,77 +1189,141 @@ static void configureImplicitSelf(TypeChecker &tc,
   selfDecl->setSpecifier(specifier);
 
   selfDecl->setInterfaceType(selfParam.getPlainType());
+
+  if (selfParam.getPlainType()->is<ErrorType>())
+    selfDecl->setInvalid();
 }
 
-/// Record the context type of 'self' after the generic environment of
-/// the function has been determined.
-static void recordSelfContextType(AbstractFunctionDecl *func) {
-  auto selfDecl = func->getImplicitSelfDecl();
-  auto selfParam = computeSelfParam(func, /*isInitializingCtor*/true,
-                                    /*wantDynamicSelf*/true);
+static void recordParamContextTypes(AbstractFunctionDecl *func) {
+  auto *env = func->getGenericEnvironment();
 
-  auto selfTy = func->mapTypeIntoContext(selfParam.getType());
-  if (selfParam.getParameterFlags().isInOut()) {
-    selfDecl->setSpecifier(VarDecl::Specifier::InOut);
+  if (auto *selfDecl = func->getImplicitSelfDecl()) {
+    if (!env)
+      selfDecl->setType(selfDecl->getInterfaceType());
+    else
+      selfDecl->setType(env->mapTypeIntoContext(selfDecl->getInterfaceType()));
   }
-  selfDecl->setType(selfTy->getInOutObjectType());
+
+  for (auto param : *func->getParameters()) {
+    if (!env)
+      param->setType(param->getInterfaceType());
+    else
+      param->setType(env->mapTypeIntoContext(param->getInterfaceType()));
+  }
 }
 
-/// If we need to infer 'dynamic', do so now.
+static void recordIndexContextTypes(SubscriptDecl *subscript) {
+  auto *env = subscript->getGenericEnvironment();
+  for (auto param : *subscript->getIndices()) {
+    if (!env)
+      param->setType(param->getInterfaceType());
+    else
+      param->setType(env->mapTypeIntoContext(param->getInterfaceType()));
+  }
+}
+
+/// Try to make the given declaration 'dynamic', checking any semantic
+/// constraints before doing so.
 ///
-/// This occurs when
-/// - it is implied by an attribute like @NSManaged
-/// - when we have an override of an imported method
-/// - we need to dynamically dispatch to a method in an extension
-///
-/// FIXME: The latter reason is a hack. We should figure out how to safely
-/// put extension methods into the class vtable.
-static void inferDynamic(ASTContext &ctx, ValueDecl *D) {
+/// \returns true if it can be made dynamic, false otherwise.
+static bool makeDynamic(ValueDecl *decl) {
+  // Only  members of classes can be dynamic.
+  auto classDecl = decl->getDeclContext()->getAsClassOrClassExtensionContext();
+  if (!classDecl) {
+    auto attr = decl->getAttrs().getAttribute<DynamicAttr>();
+    decl->diagnose(diag::dynamic_not_in_class)
+      .fixItRemove(attr ? SourceRange(attr->getLocation()) : SourceRange());
+    return false;
+  }
+
+  // 'dynamic' is only supported through the Objective-C runtime.
+  if (!decl->isObjC()) {
+    decl->diagnose(diag::dynamic_requires_objc,
+                   decl->getDescriptiveKind(), decl->getFullName())
+      .fixItInsert(decl->getAttributeInsertionLoc(/*forModifier=*/false),
+                   "@objc ");
+    return false;
+  }
+
+  // If there isn't already a 'dynamic' attribute, add an inferred one.
+  if (!decl->getAttrs().hasAttribute<DynamicAttr>()) {
+    auto attr = new (decl->getASTContext()) DynamicAttr(/*implicit=*/true);
+    decl->getAttrs().add(attr);
+  }
+
+  return true;
+}
+
+bool IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // If we can't infer dynamic here, don't.
-  if (!DeclAttribute::canAttributeAppearOnDecl(DAK_Dynamic, D))
-    return;
+  if (!DeclAttribute::canAttributeAppearOnDecl(DAK_Dynamic, decl))
+    return false;
 
-  // The presence of 'dynamic' blocks the inference of 'dynamic'.
-  if (D->isDynamic())
-    return;
+  // If 'dynamic' was explicitly specified, check it.
+  if (auto dynamicAttr = decl->getAttrs().getAttribute<DynamicAttr>()) {
+    return makeDynamic(decl);
+  }
 
-  // Only 'objc' declarations use 'dynamic'.
-  if (!D->isObjC() || D->hasClangNode())
-    return;
+  // Runtime-replacable accessors are dynamic when their storage declaration
+  // is dynamic. Other accessors are never dynamic.
+  if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
+    switch (accessor->getAccessorKind()) {
+    case AccessorKind::Get:
+    case AccessorKind::Set:
+      if (evaluator(IsDynamicRequest{accessor->getStorage()}))
+        return makeDynamic(decl);
 
-  bool overridesImportedMethod =
-    (D->getOverriddenDecl() &&
-     D->getOverriddenDecl()->hasClangNode());
+      return false;
 
-  bool overridesDyanmic =
-    (D->getOverriddenDecl() &&
-     D->getOverriddenDecl()->isDynamic());
+    case AccessorKind::Address:
+    case AccessorKind::DidSet:
+    case AccessorKind::MaterializeForSet:
+    case AccessorKind::MutableAddress:
+    case AccessorKind::WillSet:
+      return false;
+    }
+  }
 
-  bool isNSManaged = D->getAttrs().hasAttribute<NSManagedAttr>();
-
-  bool isExtension = isa<ExtensionDecl>(D->getDeclContext());
-
-  // We only infer 'dynamic' in these three cases.
-  if (!isExtension && !isNSManaged && !overridesImportedMethod &&
-      !overridesDyanmic)
-    return;
+  // The 'NSManaged' attribute implies 'dynamic'.
+  // FIXME: Use a semantic check for NSManaged rather than looking for the
+  // attribute (which could be ill-formed).
+  if (decl->getAttrs().hasAttribute<NSManagedAttr>()) {
+    return makeDynamic(decl);
+  }
 
   // The presence of 'final' blocks the inference of 'dynamic'.
-  if (D->isFinal() && !isNSManaged)
-    return;
+  if (decl->isFinal())
+    return false;
 
-  // Accessors should not infer 'dynamic' on their own; they can get it from
-  // their storage decls.
-  if (isa<AccessorDecl>(D))
-    return;
+  // Types are never 'dynamic'.
+  if (isa<TypeDecl>(decl))
+    return false;
 
-  // Only classes can use 'dynamic'.
-  auto classDecl = D->getDeclContext()->getAsClassOrClassExtensionContext();
-  if (!classDecl)
-    return;
+  // A non-@objc entity is never 'dynamic'.
+  if (!decl->isObjC())
+    return false;
 
-  // Add the 'dynamic' attribute.
-  D->getAttrs().add(new (ctx) DynamicAttr(/*IsImplicit=*/true));
+  // @objc declarations in class extensions are implicitly dynamic.
+  // This is intended to enable overriding the declarations.
+  auto dc = decl->getDeclContext();
+  if (isa<ExtensionDecl>(dc) && dc->getAsClassOrClassExtensionContext()) {
+    return makeDynamic(decl);
+  }
+
+  // If any of the declarations overridden by this declaration are dynamic
+  // or were imported from Objective-C, this declaration is dynamic.
+  // Don't do this if the declaration is not exposed to Objective-C; that's
+  // currently the (only) manner in which one can make an override of a
+  // dynamic declaration non-dynamic.
+  for (auto overridden : evaluator(OverriddenDeclsRequest{decl})) {
+    if (overridden->isDynamic())
+      return makeDynamic(decl);
+
+    if (overridden->hasClangNode())
+      return makeDynamic(decl);
+  }
+
+  return false;
 }
 
 namespace {
@@ -2026,8 +2083,7 @@ void TypeChecker::validateDecl(PrecedenceGroupDecl *PGD) {
 
   if (PGD->isInvalid() || PGD->hasValidationStarted())
     return;
-  PGD->setIsBeingValidated();
-  SWIFT_DEFER { PGD->setIsBeingValidated(false); };
+  DeclValidationRAII IBV(PGD);
 
   bool isInvalid = false;
 
@@ -2218,16 +2274,6 @@ static void validateAbstractStorageDecl(TypeChecker &TC,
   // Add any mandatory accessors now.
   maybeAddAccessorsToStorage(TC, storage);
 
-  // We can't delay validation of getters and setters on @objc properties,
-  // because if they never get validated at all then conformance checkers
-  // will complain about selector mismatches.
-  if (storage->isObjC()) {
-    if (auto *getter = storage->getGetter())
-      TC.validateDecl(getter);
-    if (auto *setter = storage->getSetter())
-      TC.validateDecl(setter);
-  }
-
   // Everything else about the accessors can wait until finalization.
   // This will validate all the accessors.
   TC.DeclsToFinalize.insert(storage);
@@ -2258,7 +2304,10 @@ public:
 
     if (auto VD = dyn_cast<ValueDecl>(decl)) {
       checkRedeclaration(TC, VD);
-      
+
+      (void)VD->isObjC();
+      (void)VD->isDynamic();
+
       // If this is a member of a nominal type, don't allow it to have a name of
       // "Type" or "Protocol" since we reserve the X.Type and X.Protocol
       // expressions to mean something builtin to the language.  We *do* allow
@@ -2373,7 +2422,7 @@ public:
       }
     }
 
-    if (!checkOverrides(TC, VD)) {
+    if (!checkOverrides(VD)) {
       // If a property has an override attribute but does not override
       // anything, complain.
       auto overridden = VD->getOverriddenDecl();
@@ -2389,6 +2438,24 @@ public:
     TC.checkDeclAttributes(VD);
 
     triggerAccessorSynthesis(TC, VD);
+
+    // Under the Swift 3 inference rules, if we have @IBInspectable or
+    // @GKInspectable but did not infer @objc, warn that the attribute is
+    if (!VD->isObjC() && TC.Context.LangOpts.EnableSwift3ObjCInference) {
+      if (auto attr = VD->getAttrs().getAttribute<IBInspectableAttr>()) {
+        TC.diagnose(attr->getLocation(),
+                    diag::attribute_meaningless_when_nonobjc,
+                    attr->getAttrName())
+          .fixItRemove(attr->getRange());
+      }
+
+      if (auto attr = VD->getAttrs().getAttribute<GKInspectableAttr>()) {
+        TC.diagnose(attr->getLocation(),
+                    diag::attribute_meaningless_when_nonobjc,
+                    attr->getAttrName())
+          .fixItRemove(attr->getRange());
+      }
+    }
   }
 
 
@@ -2531,7 +2598,7 @@ public:
     AccessControlChecker::checkAccessControl(TC, SD);
     UsableFromInlineChecker::checkUsableFromInline(TC, SD);
 
-    if (!checkOverrides(TC, SD)) {
+    if (!checkOverrides(SD)) {
       // If a subscript has an override attribute but does not override
       // anything, complain.
       if (auto *OA = SD->getAttrs().getAttribute<OverrideAttr>()) {
@@ -2557,7 +2624,10 @@ public:
   }
   
   void visitAssociatedTypeDecl(AssociatedTypeDecl *AT) {
+    TC.checkDeclAttributesEarly(AT);
+
     TC.validateDecl(AT);
+    TC.checkDeclAttributes(AT);
 
     TC.checkInheritanceClause(AT);
 
@@ -2807,8 +2877,9 @@ public:
                        DescriptiveDeclKind::Class, path);
     }
 
-    for (Decl *Member : CD->getMembers())
+    for (Decl *Member : CD->getMembers()) {
       visit(Member);
+    }
 
     // If this class requires all of its stored properties to have
     // in-class initializers, diagnose this now.
@@ -3033,7 +3104,7 @@ public:
     AccessControlChecker::checkAccessControl(TC, FD);
     UsableFromInlineChecker::checkUsableFromInline(TC, FD);
 
-    if (!checkOverrides(TC, FD)) {
+    if (!checkOverrides(FD)) {
       // If a method has an 'override' keyword but does not
       // override anything, complain.
       if (auto *OA = FD->getAttrs().getAttribute<OverrideAttr>()) {
@@ -3061,6 +3132,8 @@ public:
   }
 
   void visitEnumElementDecl(EnumElementDecl *EED) {
+    TC.checkDeclAttributesEarly(EED);
+
     TC.validateDecl(EED);
     TC.checkDeclAttributes(EED);
 
@@ -3174,7 +3247,7 @@ public:
 
     // Check whether this initializer overrides an initializer in its
     // superclass.
-    if (!checkOverrides(TC, CD)) {
+    if (!checkOverrides(CD)) {
       // If an initializer has an override attribute but does not override
       // anything or overrides something that doesn't need an 'override'
       // keyword (e.g., a convenience initializer), complain.
@@ -3481,7 +3554,7 @@ void bindFuncDeclToOperator(TypeChecker &TC, FuncDecl *FD) {
 
 void checkMemberOperator(TypeChecker &TC, FuncDecl *FD) {
   // Check that member operators reference the type of 'Self'.
-  if (FD->getNumParameterLists() != 2 || FD->isInvalid()) return;
+  if (FD->isInvalid()) return;
 
   auto *DC = FD->getDeclContext();
   auto selfNominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
@@ -3489,7 +3562,7 @@ void checkMemberOperator(TypeChecker &TC, FuncDecl *FD) {
 
   // Check the parameters for a reference to 'Self'.
   bool isProtocol = isa<ProtocolDecl>(selfNominal);
-  for (auto param : *FD->getParameterList(1)) {
+  for (auto param : *FD->getParameters()) {
     auto paramType = param->getInterfaceType();
     if (!paramType) break;
 
@@ -3734,10 +3807,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   case DeclKind::AssociatedType: {
     auto assocType = cast<AssociatedTypeDecl>(D);
 
-    assocType->setIsBeingValidated();
-    SWIFT_DEFER { assocType->setIsBeingValidated(false); };
-
-    checkDeclAttributesEarly(assocType);
+    DeclValidationRAII IBV(assocType);
 
     // Check the default definition, if there is one.
     TypeLoc &defaultDefinition = assocType->getDefaultDefinitionLoc();
@@ -3765,15 +3835,13 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     if (!assocType->hasInterfaceType())
       assocType->computeType();
 
-    checkDeclAttributes(assocType);
     break;
   }
 
   case DeclKind::TypeAlias: {
     auto typeAlias = cast<TypeAliasDecl>(D);
     // Check generic parameters, if needed.
-    typeAlias->setIsBeingValidated();
-    SWIFT_DEFER { typeAlias->setIsBeingValidated(false); };
+    DeclValidationRAII IBV(typeAlias);
 
     validateGenericTypeSignature(typeAlias);
     validateTypealiasType(*this, typeAlias);
@@ -3787,17 +3855,13 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     nominal->computeType();
 
     // Check generic parameters, if needed.
-    nominal->setIsBeingValidated();
+    DeclValidationRAII IBV(nominal);
     validateGenericTypeSignature(nominal);
-    nominal->setIsBeingValidated(false);
+    nominal->setSignatureIsValidated();
 
     validateAttributes(*this, D);
 
     if (auto CD = dyn_cast<ClassDecl>(nominal)) {
-      // Mark a class as @objc. This must happen before checking its members.
-      Optional<ObjCReason> isObjC = shouldMarkAsObjC(*this, CD);
-      markAsObjC(*this, CD, isObjC);
-
       // Determine whether we require in-class initializers.
       if (CD->getAttrs().hasAttribute<RequiresStoredPropertyInitsAttr>() ||
           (CD->hasSuperclass() &&
@@ -3817,7 +3881,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     if (auto *ED = dyn_cast<EnumDecl>(nominal)) {
       // @objc enums use their raw values as the value representation, so we
       // need to force the values to be checked.
-      resolveIsObjC(ED);
       if (ED->isObjC())
         checkEnumRawValues(*this, ED);
     }
@@ -3834,9 +3897,9 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       proto->computeType();
 
     // Validate the generic type signature, which is just <Self : P>.
-    proto->setIsBeingValidated();
+    DeclValidationRAII IBV(proto);
     validateGenericTypeSignature(proto);
-    proto->setIsBeingValidated(false);
+    proto->setSignatureIsValidated();
 
     // See the comment in validateDeclForNameLookup(); we may have validated
     // the alias before we built the protocol's generic environment.
@@ -3857,15 +3920,12 @@ void TypeChecker::validateDecl(ValueDecl *D) {
           (void) aliasDecl->getFormalAccess();
 
           // Check generic parameters, if needed.
-          bool validated = aliasDecl->hasValidationStarted();
-          if (!validated)
-            aliasDecl->setIsBeingValidated();
-          SWIFT_DEFER {
-            if (!validated)
-              aliasDecl->setIsBeingValidated(false);
-          };
-
-          validateTypealiasType(*this, aliasDecl);
+          if (aliasDecl->hasValidationStarted()) {
+            validateTypealiasType(*this, aliasDecl);
+          } else {
+            DeclValidationRAII IBV(aliasDecl);
+            validateTypealiasType(*this, aliasDecl);
+          }
         }
       }
     }
@@ -3875,25 +3935,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     resolveTrailingWhereClause(proto);
 
     validateAttributes(*this, D);
-
-    // If the protocol is @objc, it may only refine other @objc protocols.
-    // FIXME: Revisit this restriction.
-    if (proto->getAttrs().hasAttribute<ObjCAttr>()) {
-      Optional<ObjCReason> isObjC = ObjCReason(ObjCReason::ImplicitlyObjC);
-
-      for (auto inherited : proto->getInheritedProtocols()) {
-        if (!inherited->isObjC()) {
-          diagnose(proto->getLoc(),
-                   diag::objc_protocol_inherits_non_objc_protocol,
-                   proto->getDeclaredType(), inherited->getDeclaredType());
-          diagnose(inherited->getLoc(), diag::kind_identifier_declared_here,
-                   DescriptiveDeclKind::Protocol, inherited->getName());
-          isObjC = None;
-        }
-      }
-
-      markAsObjC(*this, proto, isObjC);
-    }
 
     // FIXME: IRGen likes to emit @objc protocol descriptors even if the
     // protocol comes from a different module or translation unit.
@@ -3912,7 +3953,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // we don't really know how to type-check them.
     // We can also hit this when code-completing in a closure body.
     //
-    // FIXME: Also, note that we don't call setValidationStarted() here,
+    // FIXME: Also, note that we don't call setValidationToChecked() here,
     // because the ExprCleanser clears the type of ParamDecls, so we
     // can end up here multiple times for the same ParamDecl.
     auto *PD = cast<ParamDecl>(D);
@@ -3931,7 +3972,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // 'for ... in ...' loop.
     if (PBD == nullptr) {
       if (!VD->hasInterfaceType()) {
-        VD->setValidationStarted();
+        VD->setValidationToChecked();
         VD->markInvalid();
       }
 
@@ -3944,7 +3985,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     if (PBD->isBeingValidated())
       return;
 
-    D->setIsBeingValidated();
+    DeclValidationRAII IBV(D);
 
     if (!VD->hasInterfaceType()) {
       // Attempt to infer the type using initializer expressions.
@@ -3963,7 +4004,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // We're not really done with processing the signature yet, but
     // @objc checking requires the declaration to call itself validated
     // so that it can be considered as a witness.
-    D->setIsBeingValidated(false);
+    D->setSignatureIsValidated();
 
     checkDeclAttributesEarly(VD);
     validateAttributes(*this, VD);
@@ -3971,33 +4012,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // Properties need some special validation logic.
     if (auto *nominalDecl = VD->getDeclContext()
             ->getAsNominalTypeOrNominalTypeExtensionContext()) {
-      // If this is a property, check if it needs to be exposed to
-      // Objective-C.
-      Optional<ObjCReason> isObjC = shouldMarkAsObjC(*this, VD);
-
-      if (isObjC && !swift::isRepresentableInObjC(VD, *isObjC))
-        isObjC = None;
-
-      markAsObjC(*this, VD, isObjC);
-
-      // Under the Swift 3 inference rules, if we have @IBInspectable or
-      // @GKInspectable but did not infer @objc, warn that the attribute is
-      if (!isObjC && Context.LangOpts.EnableSwift3ObjCInference) {
-        if (auto attr = VD->getAttrs().getAttribute<IBInspectableAttr>()) {
-          diagnose(attr->getLocation(),
-                   diag::attribute_meaningless_when_nonobjc,
-                   attr->getAttrName())
-            .fixItRemove(attr->getRange());
-        }
-
-        if (auto attr = VD->getAttrs().getAttribute<GKInspectableAttr>()) {
-          diagnose(attr->getLocation(),
-                   diag::attribute_meaningless_when_nonobjc,
-                   attr->getAttrName())
-            .fixItRemove(attr->getRange());
-        }
-      }
-
       // If this variable is a class member, mark it final if the
       // class is final, or if it was declared with 'let'.
       auto staticSpelling =
@@ -4017,9 +4031,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
           fixItAccess(inFlightDiag, D, AccessLevel::Public);
         }
       }
-
-      // Infer 'dynamic' after 'final' but before touching accessors.
-      inferDynamic(Context, VD);
     }
 
     // Perform accessor-related validation.
@@ -4043,7 +4054,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     checkDeclAttributesEarly(FD);
 
-    FD->setIsBeingValidated();
+    DeclValidationRAII IBV(FD);
 
     // Bind operator functions to the corresponding operator declaration.
     if (FD->isOperator())
@@ -4086,8 +4097,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       // are sometimes different from the rules elsewhere; for example,
       // function types default to non-escaping.
 
-      auto valueParams =
-        accessor->getParameterList(accessor->getParent()->isTypeContext());
+      auto valueParams = accessor->getParameters();
 
       // Determine the value type.
       Type valueIfaceTy, valueTy;
@@ -4112,7 +4122,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
           auto accessorParam = valueParams->get(valueParams->size() - e + i);
           accessorParam->setType(paramTy);
           accessorParam->setInterfaceType(paramIfaceTy);
-          accessorParam->getTypeLoc().setType(paramTy);
+          accessorParam->getTypeLoc().setType(paramIfaceTy);
         }
       }
 
@@ -4162,65 +4172,21 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       configureImplicitSelf(*this, FD);
 
     // If we have generic parameters, check the generic signature now.
-    if (auto gp = FD->getGenericParams()) {
-      gp->setOuterParameters(FD->getDeclContext()->getGenericParamsOfContext());
+    if (FD->getGenericParams() || !isa<AccessorDecl>(FD)) {
+      validateGenericFuncSignature(FD);
+      recordParamContextTypes(FD);
+    } else {
+      // We've inherited all of the type information already.
+      configureInterfaceType(FD,
+        FD->getDeclContext()->getGenericSignatureOfContext());
 
-      auto *sig = validateGenericFuncSignature(FD);
-
-      GenericEnvironment *env;
-      if (auto AD = dyn_cast<AccessorDecl>(FD)) {
-        env = cast<SubscriptDecl>(AD->getStorage())->getGenericEnvironment();
-        assert(env && "accessor has generics but subscript is not generic");
-      } else {
-        env = sig->createGenericEnvironment();
-      }
-      FD->setGenericEnvironment(env);
-
-      // Revert the types within the signature so it can be type-checked with
-      // archetypes below.
-      revertGenericFuncSignature(FD);
-    } else if (auto genericSig =
-                 FD->getDeclContext()->getGenericSignatureOfContext()) {
-      if (!isa<AccessorDecl>(FD)) {
-        (void)validateGenericFuncSignature(FD);
-
-        // Revert all of the types within the signature of the function.
-        revertGenericFuncSignature(FD);
-      } else {
-        // We've inherited all of the type information already.
-        configureInterfaceType(FD, genericSig);
+      if (FD->getInterfaceType()->hasError()) {
+        FD->setInterfaceType(ErrorType::get(Context));
+        FD->setInvalid();
       }
 
       FD->setGenericEnvironment(
-          FD->getDeclContext()->getGenericEnvironmentOfContext());
-    }
-
-    // Set the context type of 'self'.
-    if (FD->getDeclContext()->isTypeContext())
-      recordSelfContextType(FD);
-
-    // Type check the parameters and return type again, now with archetypes.
-    GenericTypeToArchetypeResolver resolver(FD);
-
-    bool badType = false;
-    if (!FD->getBodyResultTypeLoc().isNull()) {
-      TypeResolutionOptions options = TypeResolutionFlags::AllowIUO;
-      if (FD->hasDynamicSelf())
-        options |= TypeResolutionFlags::DynamicSelfResult;
-
-      if (validateType(FD->getBodyResultTypeLoc(), FD, options,
-                       &resolver)) {
-        badType = true;
-      }
-    }
-
-    badType |= typeCheckParameterLists(FD, resolver);
-
-    if (badType) {
-      FD->setInterfaceType(ErrorType::get(Context));
-      FD->setInvalid();
-      FD->setIsBeingValidated(false);
-      break;
+        FD->getDeclContext()->getGenericEnvironmentOfContext());
     }
 
     if (!isa<AccessorDecl>(FD) || cast<AccessorDecl>(FD)->isGetter()) {
@@ -4232,12 +4198,9 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       }
     }
 
-    if (!FD->getGenericSignatureOfContext())
-      configureInterfaceType(FD, FD->getGenericSignature());
-
     // We want the function to be available for name lookup as soon
     // as it has a valid interface type.
-    FD->setIsBeingValidated(false);
+    FD->setSignatureIsValidated();
 
     if (FD->isInvalid())
       break;
@@ -4249,15 +4212,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       if (FD->isOperator())
         checkMemberOperator(*this, FD);
 
-      Optional<ObjCReason> isObjC = shouldMarkAsObjC(*this, FD);
       auto accessor = dyn_cast<AccessorDecl>(FD);
-
-      auto *protocolContext = dyn_cast<ProtocolDecl>(
-          FD->getDeclContext());
-      if (protocolContext && accessor) {
-        if (isObjC)
-          isObjC = ObjCReason::Accessor;
-      }
 
       if (accessor && accessor->isGetterOrSetter()) {
         // If the property decl is an instance property, its accessors will
@@ -4266,52 +4221,13 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         // had an @objc or @iboutlet property.
 
         AbstractStorageDecl *storage = accessor->getStorage();
-        // Validate the subscript or property because it might not be type
-        // checked yet.
-        validateDecl(storage);
 
-        if (storage->getAttrs().hasAttribute<NonObjCAttr>())
-          isObjC = None;
-        else if (storage->isObjC()) {
-          if (!isObjC) {
-            // Make this accessor @objc because its property is @objc.
-            isObjC = ObjCReason::Accessor;
-          } else if (auto storageObjCAttr =
-                       storage->getAttrs().getAttribute<ObjCAttr>()) {
-            // If @objc on the storage declaration was inferred using a
-            // deprecated rule, but this accessor is @objc in its own right,
-            // complain.
-            ;
-            if (storageObjCAttr && storageObjCAttr->isSwift3Inferred() &&
-                shouldDiagnoseObjCReason(*isObjC, Context)) {
-              diagnose(storage, diag::accessor_swift3_objc_inference,
-                       storage->getDescriptiveKind(), storage->getFullName(),
-                       isa<SubscriptDecl>(storage), accessor->isSetter())
-                .fixItInsert(storage->getAttributeInsertionLoc(
-                                                      /*forModifier=*/false),
-                             "@objc ");
-            }
-          }
-        }
-
-        // If the storage is dynamic or final, propagate to this accessor.
-        if (isObjC &&
-            storage->isDynamic())
-          makeDynamic(Context, FD);
-
+        // If the storage is final, propagate to this accessor.
         if (storage->isFinal())
           makeFinal(Context, FD);
       }
 
-      Optional<ForeignErrorConvention> errorConvention;
-      if (isObjC &&
-          (FD->isInvalid() || !isRepresentableInObjC(FD, *isObjC,
-                                                     errorConvention)))
-        isObjC = None;
-      markAsObjC(*this, FD, isObjC, errorConvention);
-
       inferFinalAndDiagnoseIfNeeded(*this, FD, FD->getStaticSpelling());
-      inferDynamic(Context, FD);
     }
 
     // If the function is exported to C, it must be representable in (Obj-)C.
@@ -4334,7 +4250,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   case DeclKind::Constructor: {
     auto *CD = cast<ConstructorDecl>(D);
 
-    CD->setIsBeingValidated();
+    DeclValidationRAII IBV(CD);
 
     checkDeclAttributesEarly(CD);
 
@@ -4388,65 +4304,16 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       }
     }
 
-    if (CD->getDeclContext()->isTypeContext())
-      configureImplicitSelf(*this, CD);
+    configureImplicitSelf(*this, CD);
 
-    if (auto gp = CD->getGenericParams()) {
-      // Write up generic parameters and check the generic parameter list.
-      gp->setOuterParameters(CD->getDeclContext()->getGenericParamsOfContext());
-
-      auto *sig = validateGenericFuncSignature(CD);
-      auto *env = sig->createGenericEnvironment();
-      CD->setGenericEnvironment(env);
-
-      // Revert the types within the signature so it can be type-checked with
-      // archetypes below.
-      revertGenericFuncSignature(CD);
-    } else if (CD->getDeclContext()->getGenericSignatureOfContext()) {
-      (void)validateGenericFuncSignature(CD);
-
-      // Revert all of the types within the signature of the constructor.
-      revertGenericFuncSignature(CD);
-
-      CD->setGenericEnvironment(
-          CD->getDeclContext()->getGenericEnvironmentOfContext());
-    }
-
-    // Set the context type of 'self'.
-    if (CD->getDeclContext()->isTypeContext())
-      recordSelfContextType(CD);
-
-    // Type check the constructor parameters.
-    GenericTypeToArchetypeResolver resolver(CD);
-    if (typeCheckParameterLists(CD, resolver) || CD->isInvalid()) {
-      CD->setInterfaceType(ErrorType::get(Context));
-      CD->setInvalid();
-    } else {
-      if (!CD->getGenericSignatureOfContext())
-        configureInterfaceType(CD, CD->getGenericSignature());
-    }
+    validateGenericFuncSignature(CD);
+    recordParamContextTypes(CD);
 
     // We want the constructor to be available for name lookup as soon
     // as it has a valid interface type.
-    CD->setIsBeingValidated(false);
+    CD->setSignatureIsValidated();
 
     validateAttributes(*this, CD);
-
-    // An initializer is ObjC-compatible if it's explicitly @objc or a member
-    // of an ObjC-compatible class.
-    if (CD->getDeclContext()->isTypeContext()) {
-      Optional<ObjCReason> isObjC = shouldMarkAsObjC(*this, CD,
-          /*allowImplicit=*/true);
-
-      Optional<ForeignErrorConvention> errorConvention;
-      if (isObjC &&
-          (CD->isInvalid() ||
-           !isRepresentableInObjC(CD, *isObjC, errorConvention)))
-        isObjC = None;
-      markAsObjC(*this, CD, isObjC, errorConvention);
-    }
-
-    inferDynamic(Context, CD);
 
     if (CD->getFailability() == OTK_ImplicitlyUnwrappedOptional) {
       auto &C = CD->getASTContext();
@@ -4468,7 +4335,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       return;
     }
 
-    DD->setIsBeingValidated();
+    DeclValidationRAII IBV(DD);
 
     assert(DD->getDeclContext()->isTypeContext()
            && "Decl parsing must prevent destructors outside of types!");
@@ -4478,89 +4345,24 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     configureImplicitSelf(*this, DD);
 
-    if (DD->getDeclContext()->getGenericSignatureOfContext()) {
-      (void)validateGenericFuncSignature(DD);
-      DD->setGenericEnvironment(
-          DD->getDeclContext()->getGenericEnvironmentOfContext());
-    }
+    validateGenericFuncSignature(DD);
+    recordParamContextTypes(DD);
 
-    // Set the context type of 'self'.
-    recordSelfContextType(DD);
+    DD->setSignatureIsValidated();
 
-    GenericTypeToArchetypeResolver resolver(DD);
-    if (typeCheckParameterLists(DD, resolver)) {
-      DD->setInterfaceType(ErrorType::get(Context));
-      DD->setInvalid();
-    }
-
-    if (!DD->getGenericSignatureOfContext())
-      configureInterfaceType(DD, DD->getGenericSignature());
-
-    DD->setIsBeingValidated(false);
-
-    // Do this before markAsObjC() to diagnose @nonobjc better
     validateAttributes(*this, DD);
-
-    // Destructors are always @objc, because their Objective-C entry point is
-    // -dealloc.
-    if (Context.LangOpts.EnableObjCInterop)
-      markAsObjC(*this, DD, ObjCReason(ObjCReason::ImplicitlyObjC));
-    else
-      DD->setIsObjC(false);
-
     break;
   }
 
   case DeclKind::Subscript: {
     auto *SD = cast<SubscriptDecl>(D);
 
-    SD->setIsBeingValidated();
+    DeclValidationRAII IBV(SD);
 
-    auto dc = SD->getDeclContext();
+    validateGenericSubscriptSignature(SD);
+    recordIndexContextTypes(SD);
 
-    if (auto gp = SD->getGenericParams()) {
-      // Write up generic parameters and check the generic parameter list.
-      gp->setOuterParameters(dc->getGenericParamsOfContext());
-
-      auto *sig = validateGenericSubscriptSignature(SD);
-      auto *env = sig->createGenericEnvironment();
-      SD->setGenericEnvironment(env);
-
-      // Revert the types within the signature so it can be type-checked with
-      // archetypes below.
-      revertGenericSubscriptSignature(SD);
-    } else if (dc->getGenericSignatureOfContext()) {
-      (void)validateGenericSubscriptSignature(SD);
-
-      // Revert all of the types within the signature of the subscript.
-      revertGenericSubscriptSignature(SD);
-
-      SD->setGenericEnvironment(
-          SD->getDeclContext()->getGenericEnvironmentOfContext());
-    }
-
-    // Type check the subscript parameters.
-    GenericTypeToArchetypeResolver resolver(SD);
-
-    bool isInvalid = validateType(SD->getElementTypeLoc(), SD,
-                                  TypeResolutionFlags::AllowIUO,
-                                  &resolver);
-    TypeResolutionOptions options;
-    options |= TypeResolutionFlags::SubscriptParameters;
-
-    isInvalid |= typeCheckParameterList(SD->getIndices(), SD,
-                                        options,
-                                        resolver);
-
-    if (isInvalid || SD->isInvalid()) {
-      SD->setInterfaceType(ErrorType::get(Context));
-      SD->setInvalid();
-    } else {
-      if (!SD->getGenericSignatureOfContext())
-        configureInterfaceType(SD, SD->getGenericSignature());
-    }
-
-    SD->setIsBeingValidated(false);
+    SD->setSignatureIsValidated();
 
     checkDeclAttributesEarly(SD);
 
@@ -4574,20 +4376,9 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     }
 
     // Member subscripts need some special validation logic.
-    if (dc->isTypeContext()) {
+    if (SD->getDeclContext()->isTypeContext()) {
       // If this is a class member, mark it final if the class is final.
       inferFinalAndDiagnoseIfNeeded(*this, SD, StaticSpellingKind::None);
-
-      // A subscript is ObjC-compatible if it's explicitly @objc, or a
-      // member of an ObjC-compatible class or protocol.
-      Optional<ObjCReason> isObjC = shouldMarkAsObjC(*this, SD);
-
-      if (isObjC && !swift::isRepresentableInObjC(SD, *isObjC))
-        isObjC = None;
-      markAsObjC(*this, SD, isObjC);
-
-      // Infer 'dynamic' before touching accessors.
-      inferDynamic(Context, SD);
     }
 
     // Perform accessor-related validation.
@@ -4598,14 +4389,14 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
   case DeclKind::EnumElement: {
     auto *EED = cast<EnumElementDecl>(D);
+    EnumDecl *ED = EED->getParentEnum();
 
-    checkDeclAttributesEarly(EED);
     validateAttributes(*this, EED);
 
-    EED->setIsBeingValidated(true);
+    DeclValidationRAII IBV(EED);
 
     if (auto *PL = EED->getParameterList()) {
-      GenericTypeToArchetypeResolver resolver(EED->getParentEnum());
+      CompleteGenericTypeResolver resolver(*this, ED->getGenericSignature());
 
       bool isInvalid
         = typeCheckParameterList(PL, EED->getParentEnum(),
@@ -4621,7 +4412,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     // If we have a raw value, make sure there's a raw type as well.
     if (auto *rawValue = EED->getRawValueExpr()) {
-      EnumDecl *ED = EED->getParentEnum();
       if (!ED->hasRawType()) {
         diagnose(rawValue->getLoc(),diag::enum_raw_value_without_raw_type);
         // Recover by setting the raw type as this element's type.
@@ -4636,12 +4426,12 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       }
     }
 
-    EED->setIsBeingValidated(false);
-
     // Now that we have an argument type we can set the element's declared
     // type.
-    if (!EED->hasInterfaceType() && !EED->computeType())
-      break;
+    if (!EED->isInvalid())
+      EED->computeType();
+
+    EED->setSignatureIsValidated();
 
     // Require the carried type to be materializable.
     if (auto argTy = EED->getArgumentInterfaceType()) {
@@ -4727,36 +4517,37 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
       if (!typealias->getGenericParams()) {
         if (typealias->isBeingValidated()) return;
 
-        bool validated = typealias->hasValidationStarted();
+        auto helper = [&] {
+          (void) typealias->getFormalAccess();
 
-        if (!validated)
-          typealias->setIsBeingValidated();
-        SWIFT_DEFER {
-          if (!validated)
-            typealias->setIsBeingValidated(false);
+          ProtocolRequirementTypeResolver resolver;
+          TypeResolutionOptions options =
+            TypeResolutionFlags::TypeAliasUnderlyingType;
+          if (validateType(typealias->getUnderlyingTypeLoc(),
+                           typealias, options, &resolver)) {
+            typealias->setInvalid();
+            typealias->getUnderlyingTypeLoc().setInvalidType(Context);
+          }
+
+          typealias->setUnderlyingType(
+                                  typealias->getUnderlyingTypeLoc().getType());
+
+          // Note that this doesn't set the generic environment of the alias yet,
+          // because we haven't built one for the protocol.
+          //
+          // See how validateDecl() sets the generic environment on alias members
+          // explicitly.
+          //
+          // FIXME: Hopefully this can all go away with the ITC.
         };
 
-        (void) typealias->getFormalAccess();
-
-        ProtocolRequirementTypeResolver resolver;
-        TypeResolutionOptions options =
-          TypeResolutionFlags::TypeAliasUnderlyingType;
-        if (validateType(typealias->getUnderlyingTypeLoc(),
-                         typealias, options, &resolver)) {
-          typealias->setInvalid();
-          typealias->getUnderlyingTypeLoc().setInvalidType(Context);
+        if (typealias->hasValidationStarted()) {
+          helper();
+        } else {
+          DeclValidationRAII IBV(typealias);
+          helper();
         }
 
-        typealias->setUnderlyingType(
-                                typealias->getUnderlyingTypeLoc().getType());
-
-        // Note that this doesn't set the generic environment of the alias yet,
-        // because we haven't built one for the protocol.
-        //
-        // See how validateDecl() sets the generic environment on alias members
-        // explicitly.
-        //
-        // FIXME: Hopefully this can all go away with the ITC.
         return;
       }
     }
@@ -4806,6 +4597,21 @@ void TypeChecker::requestMemberLayout(ValueDecl *member) {
     requestNominalLayout(classDecl);
   if (auto *protocolDecl = dyn_cast<ProtocolDecl>(dc))
     requestNominalLayout(protocolDecl);
+
+  // If this represents (abstract) storage, form the appropriate accessors.
+  if (auto storage = dyn_cast<AbstractStorageDecl>(member)) {
+    validateAbstractStorageDecl(*this, storage);
+
+    // Request layout of the accessors for an @objc declaration.
+    // We can't delay validation of getters and setters on @objc properties,
+    // because if they never get validated at all then conformance checkers
+    // will complain about selector mismatches.
+    if (storage->isObjC()) {
+      for (auto accessor : storage->getAllAccessors()) {
+        requestMemberLayout(accessor);
+      }
+    }
+  }
 }
 
 void TypeChecker::requestNominalLayout(NominalTypeDecl *nominalDecl) {
@@ -4827,9 +4633,20 @@ void TypeChecker::requestSuperclassLayout(ClassDecl *classDecl) {
   }
 }
 
+/// "Finalize" the type so that SILGen can make copies of it, call
+/// methods on it, etc. This requires forcing enough computation so
+/// that (for example) a class can layout its vtable or a struct can
+/// be laid out in memory.
 static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
   assert(!nominal->hasClangNode());
   assert(isa<SourceFile>(nominal->getModuleScopeContext()));
+
+  if (auto *CD = dyn_cast<ClassDecl>(nominal)) {
+    // We need to add implicit initializers and dtors because it
+    // affects vtable layout.
+    TC.addImplicitConstructors(CD);
+    CD->addImplicitDestructor();
+  }
 
   for (auto *D : nominal->getMembers()) {
     auto VD = dyn_cast<ValueDecl>(D);
@@ -4840,6 +4657,13 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
       continue;
 
     TC.validateDecl(VD);
+
+    // Compute overrides.
+    (void)VD->getOverriddenDecls();
+
+    // Check whether the member is @objc or dynamic.
+    (void)VD->isObjC();
+    (void)VD->isDynamic();
 
     // The only thing left to do is synthesize storage for lazy variables.
     auto *prop = dyn_cast<VarDecl>(D);
@@ -4854,11 +4678,6 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
   }
 
   if (auto *CD = dyn_cast<ClassDecl>(nominal)) {
-    // We need to add implicit initializers and dtors because it
-    // affects vtable layout.
-    TC.addImplicitConstructors(CD);
-    CD->addImplicitDestructor();
-
     // We need the superclass vtable layout as well.
     TC.requestSuperclassLayout(CD);
 
@@ -5104,8 +4923,7 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
   if (ext->hasValidationStarted())
     return;
 
-  ext->setIsBeingValidated();
-  SWIFT_DEFER { ext->setIsBeingValidated(false); };
+  DeclValidationRAII IBV(ext);
 
   // If the extension is already known to be invalid, we're done.
   if (ext->isInvalid())
@@ -5986,7 +5804,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
         // We have a function. Make sure that the number of parameters
         // matches the "number of colons" in the name.
         auto func = cast<AbstractFunctionDecl>(D);
-        auto params = func->getParameterList(1);
+        auto params = func->getParameters();
         unsigned numParameters = params->size();
         if (auto CD = dyn_cast<ConstructorDecl>(func))
           if (CD->isObjCZeroParameterWithLongSelector())

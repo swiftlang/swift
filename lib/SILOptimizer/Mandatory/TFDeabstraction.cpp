@@ -319,7 +319,7 @@ void TFDeabstraction::inlineCalls() {
     if (callee->getRepresentation() ==SILFunctionTypeRepresentation::ObjCMethod)
       continue;
 
-    passManager->notifyDeleteFunction(callee);
+    passManager->notifyWillDeleteFunction(callee);
 
     // Okay, erase the function from the module.
     module.eraseFunction(callee);
