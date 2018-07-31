@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -Xllvm -tf-strict-deabstraction -verify %s
+// RUN: %target-swift-frontend -emit-sil -verify %s
 import TensorFlow
 
 public func SR8299(a: Tensor<Float>) {

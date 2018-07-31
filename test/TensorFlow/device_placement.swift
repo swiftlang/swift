@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph  -Xllvm -tf-strict-deabstraction -Xllvm -tf-module-level-graph=false -O -emit-sil -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-module-level-graph=false -O -emit-sil -verify %s | %FileCheck %s
+
 import TensorFlow
 
 public func implicitDevicePlacement() {
