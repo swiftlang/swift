@@ -977,6 +977,7 @@ namespace {
     ConstraintSystem &CS;
     DeclContext *CurDC;
     SmallVector<DeclContext*, 4> DCStack;
+    llvm::SmallPtrSet<TypeExpr *, 4> StaticBaseExprs;
 
     static const unsigned numEditorPlaceholderVariables = 2;
 
@@ -1146,6 +1147,13 @@ namespace {
       return outputTy;
     }
 
+    static TypeExpr *getTypeBaseIfPresent(CallExpr *call) {
+      auto *fnExpr = call->getFn();
+      if (auto *UDE = dyn_cast<UnresolvedDotExpr>(fnExpr))
+        fnExpr = UDE->getBase();
+      return dyn_cast<TypeExpr>(fnExpr);
+    }
+
   public:
     ConstraintGenerator(ConstraintSystem &CS) : CS(CS), CurDC(CS.DC) { }
     virtual ~ConstraintGenerator() {
@@ -1167,7 +1175,17 @@ namespace {
       assert(CurDC == closure);
       CurDC = DCStack.pop_back_val();
     }
-    
+
+    void enterCall(CallExpr *call) {
+      if (auto *TE = getTypeBaseIfPresent(call))
+        StaticBaseExprs.insert(TE);
+    }
+
+    void exitCall(CallExpr *call) {
+      if (auto *TE = getTypeBaseIfPresent(call))
+        StaticBaseExprs.erase(TE);
+    }
+
     virtual Type visitErrorExpr(ErrorExpr *E) {
       // FIXME: Can we do anything with error expressions at this point?
       return nullptr;
@@ -1428,7 +1446,8 @@ namespace {
       if (!type || type->hasError()) return Type();
       
       auto locator = CS.getConstraintLocator(E);
-      type = CS.openUnboundGenericType(type, locator);
+      type = CS.openUnboundGenericType(type, locator,
+                                       StaticBaseExprs.count(E) == 0);
       CS.setType(E->getTypeLoc(), type);
       return MetatypeType::get(type);
     }
@@ -3336,12 +3355,17 @@ namespace {
           return { false, expr };
       }
 
+      if (auto *call = dyn_cast<CallExpr>(expr))
+        CG.enterCall(call);
+
       return { true, expr };
     }
 
     /// \brief Once we've visited the children of the given expression,
     /// generate constraints from the expression.
     Expr *walkToExprPost(Expr *expr) override {
+      if (auto *call = dyn_cast<CallExpr>(expr))
+        CG.exitCall(call);
 
       // Handle the Builtin.type_join* family of calls by replacing
       // them with dot_self_expr of type_expr with the type being the

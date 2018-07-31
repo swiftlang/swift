@@ -2147,7 +2147,8 @@ public:
   /// \returns The opened type.
   Type openUnboundGenericType(UnboundGenericType *unbound,
                               ConstraintLocatorBuilder locator,
-                              OpenedTypeMap &replacements);
+                              OpenedTypeMap &replacements,
+                              bool openRequirements = true);
 
   /// \brief "Open" the given type by replacing any occurrences of unbound
   /// generic types with bound generic types with fresh type variables as
@@ -2156,7 +2157,8 @@ public:
   /// \param type The type to open.
   ///
   /// \returns The opened type.
-  Type openUnboundGenericType(Type type, ConstraintLocatorBuilder locator);
+  Type openUnboundGenericType(Type type, ConstraintLocatorBuilder locator,
+                              bool openRequirements = true);
 
   /// \brief "Open" the given type by replacing any occurrences of generic
   /// parameter types and dependent member types with fresh type variables.
@@ -2196,12 +2198,10 @@ public:
 
   /// Open the generic parameter list and its requirements, creating
   /// type variables for each of the type parameters.
-  void openGeneric(DeclContext *innerDC,
-                   DeclContext *outerDC,
-                   GenericSignature *signature,
-                   bool skipProtocolSelfConstraint,
+  void openGeneric(DeclContext *innerDC, DeclContext *outerDC,
+                   GenericSignature *signature, bool skipProtocolSelfConstraint,
                    ConstraintLocatorBuilder locator,
-                   OpenedTypeMap &replacements);
+                   OpenedTypeMap &replacements, bool openRequirements = true);
 
   /// Given generic signature open its generic requirements,
   /// using substitution function, and record them in the
