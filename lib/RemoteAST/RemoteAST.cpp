@@ -68,9 +68,7 @@ private:
     : IROpts(createIRGenOptions()),
       SILMod(SILModule::createEmptyModule(module, SILOpts)),
       IRGen(IROpts, *SILMod),
-      IGM(IRGen, IRGen.createTargetMachine(), /*SourceFile*/ nullptr,
-          LLVMContext, "<fake module name>", "<fake output filename>",
-          "<fake main input filename>") {}
+      IGM(IRGen, IRGen.createTargetMachine(), LLVMContext) {}
 
   static IRGenOptions createIRGenOptions() {
     IRGenOptions IROpts;

@@ -1062,8 +1062,8 @@ private:                            \
 //--- Generic ---------------------------------------------------------------
 public:
   llvm::Constant *getFixLifetimeFn();
-  
-  /// The constructor.
+
+  /// The constructor used when generating code.
   ///
   /// The \p SF is the source file for which the llvm module is generated when
   /// doing multi-threaded whole-module compilation. Otherwise it is null.
@@ -1071,6 +1071,14 @@ public:
               SourceFile *SF, llvm::LLVMContext &LLVMContext,
               StringRef ModuleName, StringRef OutputFilename,
               StringRef MainInputFilenameForDebugInfo);
+
+  /// The constructor used when we just need an IRGenModule for type lowering.
+  IRGenModule(IRGenerator &irgen, std::unique_ptr<llvm::TargetMachine> &&target,
+              llvm::LLVMContext &LLVMContext)
+    : IRGenModule(irgen, std::move(target), /*SF=*/nullptr, LLVMContext,
+                  "<fake module name>", "<fake output filename>",
+                  "<fake main input filename>") {}
+
   ~IRGenModule();
 
   llvm::LLVMContext &getLLVMContext() const { return LLVMContext; }

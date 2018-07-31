@@ -320,6 +320,11 @@ namespace swift {
                    StringRef OutputFilename,
                    UnifiedStatsReporter *Stats=nullptr);
 
+  /// Dump YAML describing all fixed-size types imported from the given module.
+  bool performDumpTypeInfo(IRGenOptions &Opts,
+                           SILModule &SILMod,
+                           llvm::LLVMContext &LLVMContext);
+
   /// Creates a TargetMachine from the IRGen opts and AST Context.
   std::unique_ptr<llvm::TargetMachine>
   createTargetMachine(IRGenOptions &Opts, ASTContext &Ctx);
