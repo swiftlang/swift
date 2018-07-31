@@ -401,13 +401,6 @@ static void addAdditionalInitialImportsTo(
   SF->addImports(additionalImports);
 }
 
-static bool shouldImportSwiftOnoneModuleIfNoneOrImplicitOptimization(
-    FrontendOptions::ActionType RequestedAction) {
-  return RequestedAction == FrontendOptions::ActionType::EmitObject ||
-         RequestedAction == FrontendOptions::ActionType::Immediate ||
-         RequestedAction == FrontendOptions::ActionType::EmitSIL;
-}
-
 /// Implicitly import the SwiftOnoneSupport module in non-optimized
 /// builds. This allows for use of popular specialized functions
 /// from the standard library, which makes the non-optimized builds
@@ -420,11 +413,14 @@ shouldImplicityImportSwiftOnoneSupportModule(CompilerInvocation &Invocation) {
   if (Invocation.getSILOptions().shouldOptimize())
     return false;
 
-  if (shouldImportSwiftOnoneModuleIfNoneOrImplicitOptimization(
-          Invocation.getFrontendOptions().RequestedAction)) {
-    return true;
-  }
-  return Invocation.getFrontendOptions().isCreatingSIL();
+  // If we are not going through the SIL Optimizer with the
+  // given frontend action, do not load SwiftOnoneSupport.
+  //
+  // This optimization is disabled by -track-system-dependencies to preserve
+  // the explicit dependency.
+  const auto &options = Invocation.getFrontendOptions();
+  return options.TrackSystemDeps
+      || FrontendOptions::doesActionRunSILPasses(options.RequestedAction);
 }
 
 void CompilerInstance::performParseAndResolveImportsOnly() {
