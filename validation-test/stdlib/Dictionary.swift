@@ -3429,6 +3429,12 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.getObjects:andKeys:count:") {
   }
 }
 
+DictionaryTestSuite.test("BridgedToObjC.Verbatim.getObjects:andKeys:count:/InvalidCount") {
+  expectCrashLater()
+  let d = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
+  checkGetObjectsAndKeys(d, count: -1)
+}
+
 //===---
 // Dictionary -> NSDictionary bridging tests.
 //
@@ -3532,6 +3538,12 @@ DictionaryTestSuite.test("BridgedToObjC.Custom.getObjects:andKeys:count:") {
   for count in 0 ..< d.count + 2 {
     checkGetObjectsAndKeys(d, count: count)
   }
+}
+
+DictionaryTestSuite.test("BridgedToObjC.Custom.getObjects:andKeys:count:/InvalidCount") {
+  expectCrashLater()
+  let d = getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged()
+  checkGetObjectsAndKeys(d, count: -1)
 }
 
 func getBridgedNSDictionaryOfKey_ValueTypeCustomBridged() -> NSDictionary {
@@ -4749,6 +4761,22 @@ DictionaryTestSuite.test("Hashable") {
 }
 
 DictionaryTestSuite.setUp {
+#if _runtime(_ObjC)
+  // Exercise ARC's autoreleased return value optimization in Foundation.
+  //
+  // On some platforms, when a new process is started, the optimization is
+  // expected to fail the first time it is used in each linked
+  // dylib. StdlibUnittest takes care of warming up ARC for the stdlib
+  // (libswiftCore.dylib), but for this particular test we also need to do it
+  // for Foundation, or there will be spurious leaks reported for tests
+  // immediately following a crash test.
+  //
+  // <rdar://problem/42069800> stdlib tests: expectCrashLater() interferes with
+  // counting autoreleased live objects
+  let d = NSDictionary(objects: [1 as NSNumber], forKeys: [1 as NSNumber])
+  _ = d.object(forKey: 1 as NSNumber)
+#endif
+
   resetLeaksOfDictionaryKeysValues()
 #if _runtime(_ObjC)
   resetLeaksOfObjCDictionaryKeysValues()
