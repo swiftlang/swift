@@ -2,8 +2,14 @@
 @_exported import CoreGraphics
 @_exported import Foundation
 
-public func == (lhs: NSObject, rhs: NSObject) -> Bool {
-  return lhs.isEqual(rhs)
+extension NSObject : Equatable, Hashable {
+  @objc open var hashValue: Int {
+    return hash
+  }
+
+  public static func == (lhs: NSObject, rhs: NSObject) -> Bool {
+    return lhs.isEqual(rhs)
+  }
 }
 
 public let NSUTF8StringEncoding: UInt = 8
