@@ -141,8 +141,6 @@ public:
     EmitObject,   ///< Emit object file
   };
 
-  bool isCreatingSIL() { return RequestedAction >= ActionType::EmitSILGen; }
-
   /// Indicates the action the user requested that the frontend perform.
   ActionType RequestedAction = ActionType::NoneAction;
 
@@ -310,6 +308,7 @@ private:
   static bool canActionEmitInterface(ActionType);
 
 public:
+  static bool doesActionRunSILPasses(ActionType);
   static bool doesActionProduceOutput(ActionType);
   static bool doesActionProduceTextualOutput(ActionType);
   static bool needsProperModuleName(ActionType);
