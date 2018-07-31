@@ -153,6 +153,24 @@ static const TypeContextDescriptor *
 _findNominalTypeDescriptor(Demangle::NodePointer node,
                            Demangle::Demangler &Dem);
 
+bool swift::isCImportedTagType(const TypeContextDescriptor *type) {
+  // Tag types are always imported as structs or enums.
+  if (type->getKind() != ContextDescriptorKind::Enum &&
+      type->getKind() != ContextDescriptorKind::Struct)
+    return false;
+
+  // Not a typedef imported as a nominal type.
+  if (type->getTypeContextDescriptorFlags().isCTypedef())
+    return false;
+
+  // Not a related entity.
+  if (type->isSynthesizedRelatedEntity())
+    return false;
+
+  // Imported from C.
+  return type->Parent->isCImportedContext();
+}
+
 bool
 swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
                                          Demangle::NodePointer node) {
@@ -254,8 +272,11 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
         case Demangle::Node::Kind::OtherNominalType:
           break;
         case Demangle::Node::Kind::Structure:
-          if (type->getKind() != ContextDescriptorKind::Struct
-              && !type->getTypeContextDescriptorFlags().isCTag())
+          // We allow non-structs to match Kind::Structure if they are
+          // imported C tag types.  This is necessary because we artificially
+          // make imported C tag types Kind::Structure.
+          if (type->getKind() != ContextDescriptorKind::Struct &&
+              !isCImportedTagType(type))
             return false;
           break;
         case Demangle::Node::Kind::Class:

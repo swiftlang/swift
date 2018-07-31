@@ -1321,9 +1321,6 @@ public:
                                  getImportNamespace,
                                  setImportNamespace)
 
-  bool isCTag() const {
-    return getImportNamespace() == CTag;
-  }
   bool isCTypedef() const {
     return getImportNamespace() == CTypedef;
   }
