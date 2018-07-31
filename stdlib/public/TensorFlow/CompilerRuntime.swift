@@ -99,6 +99,8 @@ public enum _RuntimeConfig {
   /// Otherwise, The entire GPU memory region is pre-allocated.
   // TODO: assess whether we should default to true.
   static public var gpuMemoryAllowGrowth = false
+  
+  static public var runMetadataOutputPath: String? = nil
 
   /// Specifies whether the TensorFlow computation runs in a local (in-process)
   /// session, or a remote session with the specified server address (must start
@@ -161,7 +163,7 @@ private func configureRuntimeFromEnvironment() {
 
   if let value = getenv("SWIFT_TENSORFLOW_SERVER_ADDRESS") {
     let address = String(cString: value)
-    debugLog("env var SWIFT_TENSORFLOW_SERVER_ADDRESS has value \(address).")
+    debugLog("Env var SWIFT_TENSORFLOW_SERVER_ADDRESS has value \(address).")
     if address == "local" {
       _RuntimeConfig.session = .local
       debugLog("Using local TF session.")
@@ -173,6 +175,12 @@ private func configureRuntimeFromEnvironment() {
     }
     _RuntimeConfig.session = .remote(grpcAddress: address)
     debugLog("Setting TF server address to \(address) from env.")
+  }
+  
+  if let value = getenv("SWIFT_TENSORFLOW_RUN_METADATA_OUTPUT") else {
+    let path = String(cString: value)
+    _RuntimeConfig.runMetadataOutputPath = path
+    debugLog("Setting run metadata output path to \(path) from env.")
   }
 }
 
@@ -443,10 +451,16 @@ private class TFState {
 
   /// The TF_Session to execute the function.
   fileprivate let cSession: CTFSession
+  
   /// The graph that contains the function to execute. Not owned.
   let graph: CTFGraph
+  
   /// The input tensors.
   var inputTensors: [CTensor?] = []
+  
+  /// The buffer that stores the run metadata during execution. This is non-nil
+  /// only when `_RuntimeConfig.runMetadataOutputPath` is non-nil.
+  private var runMetadataOutput: UnsafeMutablePointer<TF_Buffer>? = nil
 
   init(_ programByteAddress: UnsafeRawPointer, programByteCount: Int) {
     let context = _ExecutionContext.global
@@ -456,6 +470,7 @@ private class TFState {
 
   deinit {
     TF_DeleteStatus(status)
+    TF_DeleteBuffer(runMetadataOutput)
   }
 }
 
@@ -520,9 +535,9 @@ extension TFState {
 
     if returnValues.isEmpty {
         debugLog("""
-                   Function \(entryFunctionBaseName) has no result tensors, so \
-                   adding it as a target node.
-                   """)
+          Function \(entryFunctionBaseName) has no result tensors, so adding \
+          it as a target node.
+          """)
       targetNodeSpecs.append(funcNode)
     }
     if _RuntimeConfig.executionMode.isTPU {
@@ -536,25 +551,40 @@ extension TFState {
         debugLog("Running enqueue with \(inputTensors.count) input tensors.")
       }
     }
+    var runOptions: UnsafePointer<TF_Buffer>? = nil
+    // When there's a run metadata output path specified, we enable `FULL_TRACE`
+    // in run options and dump that to the specified path after execution.
+    if _RuntimeConfig.runMetadataOutputPath != nil {
+      runOptions = UnsafePointer(TF_CreateRunOptions(/*enable_full_trace*/ 1))
+      runMetadataOutput = TF_NewBuffer()
+    }
     debugLog("""
-               Calling TF_SessionRun on function \(entryFunctionBaseName), With \
-               \(targetNodeSpecs.count) target nodes.
-               """)
+      Calling TF_SessionRun on function \(entryFunctionBaseName), With \
+      \(targetNodeSpecs.count) target nodes.
+      """)
     TF_SessionRun(
-      cSession, nil,
+      cSession, runOptions,
       // input related parameters
       inputNodeSpecs, inputTensors, Int32(inputTensors.count),
       // output related parameters
       outputNodeSpecs, &outputTensors, Int32(returnValues.count),
       // target related parameters
       targetNodeSpecs, Int32(targetNodeSpecs.count),
-      /*run_metadata*/nil, status
+      /*run_metadata*/ runMetadataOutput, status
     )
     if (TF_GetCode(status) != TF_OK) {
       _ = fputs(TF_Message(status), stderr)
       exit(-1)
     }
     debugLog("Done running TF computation.")
+    
+    // If run metadata path was set, dump the run metadata proto to a file.
+    if let path = _RuntimeConfig.runMetadataOutputPath {
+      TF_DeleteBuffer(runOptions)
+      writeContents(of: runMetadataOutput!, toFile: path)
+      TF_DeleteBuffer(runMetadataOutput)
+      debugLog("Writing run metadata to \"\(path)\"")
+    }
 
     // Delete input tensors.
     for inputTensor in inputTensors {
