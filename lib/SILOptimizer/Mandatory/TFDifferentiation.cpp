@@ -1658,7 +1658,7 @@ static void convertToIndirectSeed(intmax_t value, CanType type,
                                             SILAccessEnforcement::Static,
                                             /*noNestedConflict*/ true,
                                             /*fromBuiltin*/ false);
-    builder.createStore(loc, one, seedBuf,
+    builder.createStore(loc, one, access,
                         getBufferSOQ(type, builder.getFunction()));
     builder.createEndAccess(loc, access, /*aborted*/ false);
     return;
@@ -1697,7 +1697,13 @@ static void convertToIndirectSeed(intmax_t value, CanType type,
   convertIntToIndirectExpressible(value, scalarTyDecl, scalarBuf,
                                   loc, builder, context);
   auto scalarLOQ = getBufferLOQ(scalarTy, builder.getFunction());
-  auto scalarVal = builder.createLoad(loc, scalarBuf, scalarLOQ);
+  auto loadAccess = builder.createBeginAccess(loc, scalarBuf,
+                                              SILAccessKind::Read,
+                                              SILAccessEnforcement::Static,
+                                              /*noNestedConflict*/ true,
+                                              /*fromBuiltin*/ false);
+  auto scalarVal = builder.createLoad(loc, loadAccess, scalarLOQ);
+  builder.createEndAccess(loc, loadAccess, /*aborted*/ false);
   // dealloc_stack %0 : $*<scalar type>
   builder.createDeallocStack(loc, scalarBuf);
   // %1 = metatype $<scalar type>.Type
@@ -1720,7 +1726,7 @@ static void convertToIndirectSeed(intmax_t value, CanType type,
                                               /*noNestedConflict*/ true,
                                               /*fromBuiltin*/ false);
   // store %0 : $<scalar type> to $*<scalar type>
-  builder.createStore(loc, scalarVal, scalarValBuf,
+  builder.createStore(loc, scalarVal, bufAccess,
                       getBufferSOQ(scalarTy, builder.getFunction()));
   builder.createEndAccess(loc, bufAccess, /*aborted*/ false);
   auto *vecNumProto = context.getVectorNumericProtocol();
@@ -3206,8 +3212,14 @@ public:
                                                                 structBuf,
                                                                 varDecl);
         if (varDecl == sei->getField()) {
-          getBuilder().createStore(sei->getLoc(), adj, eltBufAddr,
+          auto *bufAccess = builder.createBeginAccess(
+              sei->getLoc(), eltBufAddr, SILAccessKind::Init,
+              SILAccessEnforcement::Static, /*noNestedConflict*/ true,
+              /*fromBuiltin*/ false);
+          getBuilder().createStore(bufAccess->getLoc(), adj, bufAccess,
               getBufferSOQ(sei->getType().getASTType(), getAdjoint()));
+          builder.createEndAccess(bufAccess->getLoc(), bufAccess,
+                                  /*aborted*/ false);
         } else {
           auto eltType = varDecl->getType()->getCanonicalType();
           auto zero =
@@ -3215,9 +3227,15 @@ public:
           materializeAdjointIndirect(zero, eltBufAddr);
         }
       }
+      auto access = getBuilder().createBeginAccess(sei->getLoc(), structBuf,
+                                                   SILAccessKind::Read,
+                                                   SILAccessEnforcement::Static,
+                                                   /*noNestedConflict*/ true,
+                                                   /*fromBuiltin*/ false);
       addAdjointValue(sei->getOperand(),
-                      getBuilder().createLoad(sei->getLoc(), structBuf,
+                      getBuilder().createLoad(sei->getLoc(), access,
           getBufferLOQ(structDecl->getDeclaredInterfaceType(), getAdjoint())));
+      getBuilder().createEndAccess(sei->getLoc(), access, /*aborted*/ false);
       break;
     }
   }
@@ -3370,8 +3388,15 @@ SILValue AdjointEmitter::materializeAdjoint(AdjointValue value,
   auto valueBuf = getBuilder().createAllocStack(loc, value.getType());
   SWIFT_DEFER { getBuilder().createDeallocStack(loc, valueBuf); };
   materializeAdjointIndirect(value, valueBuf);
+  auto access = getBuilder().createBeginAccess(loc, valueBuf,
+                                               SILAccessKind::Read,
+                                               SILAccessEnforcement::Static,
+                                               /*noNestedConflict*/ true,
+                                               /*fromBuiltin*/ false);
   auto loq = getBufferLOQ(value.getType().getASTType(), getAdjoint());
-  return getBuilder().createLoad(loc, valueBuf, loq);
+  auto val = getBuilder().createLoad(loc, valueBuf, loq);
+  getBuilder().createEndAccess(loc, access, /*aborted*/ false);
+  return val;
 }
 
 void AdjointEmitter::materializeAdjointIndirect(AdjointValue val,
@@ -3510,8 +3535,15 @@ SILValue AdjointEmitter::accumulateMaterializedAdjoints(SILValue lhs,
   auto resultBuf = getBuilder().createAllocStack(lhs.getLoc(), adjointTy);
   accumulateMaterializedAdjointsIndirect(lhs, rhs, resultBuf);
   getBuilder().createDeallocStack(resultBuf->getLoc(), resultBuf);
-  return getBuilder().createLoad(resultBuf->getLoc(), resultBuf,
+  auto access = getBuilder().createBeginAccess(resultBuf->getLoc(), resultBuf,
+                                               SILAccessKind::Read,
+                                               SILAccessEnforcement::Static,
+                                               /*noNestedConflict*/ true,
+                                               /*fromBuiltin*/ false);
+  auto val = getBuilder().createLoad(resultBuf->getLoc(), access,
     getBufferLOQ(lhs->getType().getASTType(), getAdjoint()));
+  getBuilder().createEndAccess(val->getLoc(), access, /*aborted*/ false);
+  return val;
 }
 
 void AdjointEmitter::accumulateMaterializedAdjointsIndirect(
