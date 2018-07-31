@@ -1,6 +1,6 @@
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize
-// RUN: %target-swift-frontend -Xllvm -tf-strict-deabstraction -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-target-tpu -O -emit-sil %s >/dev/null
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-target-tpu -O -emit-sil %s >/dev/null
 //
 // TPU device placement tests -- compiler-only tests for OSS.
 
