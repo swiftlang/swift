@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -verify -Xllvm -tf-strict-deabstraction -Xllvm -tf-module-level-graph=false %s | %FileCheck %s 
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -verify -Xllvm -tf-strict-deabstraction -Xllvm -tf-module-level-graph=false %s | %FileCheck %s
 
 import TensorFlow
 
@@ -55,9 +55,8 @@ public func testScalar(f: Float) { // expected-warning {{'f' implicitly copied t
 // CHECK: sil private @{{.*}}testScalar{{.*}} : $@callee_owned (TensorHandle<Builtin.FPIEEE32>) -> TensorHandle<Float> {
 // CHECK: bb0(%0 : $TensorHandle<Builtin.FPIEEE32>):
 // CHECK-NEXT:   %1 = unchecked_ref_cast %0 : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
-// CHECK:        [[CONST:%.*]] = graph_op "Const"() {dtype$dtype: $Builtin.FPIEEE32, value$tensor: f32 0x3F800000 /* 1 */, __device: "ALL_DEVICES"} : $TensorHandle<Builtin.FPIEEE32>
-// CHECK-NEXT:   [[CAST:%.*]] = unchecked_ref_cast [[CONST]] : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
-// CHECK:        [[ADD1:%.*]] = graph_op "Add,i,i"(%1 : $TensorHandle<Float>, [[CAST]] : $TensorHandle<Float>) {{.*}} : $TensorHandle<Float>
+// CHECK:        [[CONST:%.*]] = graph_op "Const"() {dtype: $Float, value$tensor: f32 0x3F800000 /* 1 */, __device: "ALL_DEVICES"} : $TensorHandle<Float>
+// CHECK:        [[ADD1:%.*]] = graph_op "Add,i,i"(%1 : $TensorHandle<Float>, [[CONST]] : $TensorHandle<Float>) {{.*}} : $TensorHandle<Float>
 // CHECK:        [[ADD2:%.*]] = graph_op "Add,i,i"([[ADD1]] : $TensorHandle<Float>, [[ADD1:%.*]] : $TensorHandle<Float>) {{.*}} : $TensorHandle<Float>
 // CHECK-NEXT:   return [[ADD2]] : $TensorHandle<Float>
 // CHECK-NEXT: }
@@ -95,9 +94,8 @@ public func testExitBranch1(i: Int) {
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testExitBranch1{{.*}}
 // CHECK: sil private @{{.*}}testExitBranch1{{.*}} : $@callee_owned () -> TensorHandle<Float> {
 // CHECK: bb0:
-// CHECK-NEXT:   [[CONST:%.*]] = graph_op "Const"() {dtype$dtype: $Builtin.FPIEEE32, value$tensor: f32 0x3F800000 /* 1 */, __device: "ALL_DEVICES"} : $TensorHandle<Builtin.FPIEEE32>
-// CHECK-NEXT:   [[TH:%.*]] = unchecked_ref_cast [[CONST]] : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
-// CHECK:        [[RET:%.*]] = graph_op "Add,i,i"([[TH]] : $TensorHandle<Float>, [[TH]] : $TensorHandle<Float>) {{.*}} : $TensorHandle<Float>
+// CHECK-NEXT:   [[CONST:%.*]] = graph_op "Const"() {dtype: $Float, value$tensor: f32 0x3F800000 /* 1 */, __device: "ALL_DEVICES"} : $TensorHandle<Float>
+// CHECK:        [[RET:%.*]] = graph_op "Add,i,i"([[CONST]] : $TensorHandle<Float>, [[CONST]] : $TensorHandle<Float>) {{.*}} : $TensorHandle<Float>
 // CHECK-NEXT:   return [[RET]] : $TensorHandle<Float>
 // CHECK-NEXT: }
 
@@ -310,10 +308,8 @@ public func scalar_manipulation(a : Float) -> Tensor<Float> {
 // CHECK: sil private @{{.*}}scalar_manipulation{{.*}} : $@callee_owned (TensorHandle<Builtin.FPIEEE32>) -> TensorHandle<Float> {
 // CHECK: bb0(%0 : $TensorHandle<Builtin.FPIEEE32>):
 // CHECK-NEXT:  %1 = unchecked_ref_cast %0 : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
-// CHECK-NEXT:  [[CONST:%.*]] = graph_op "Const"() {dtype$dtype: $Builtin.FPIEEE32, value$tensor: f32 0x3F800000 /* 1 */, __device: "ALL_DEVICES"} : $TensorHandle<Builtin.FPIEEE32>
-// CHECK-NEXT:  [[CAST:%.*]] = unchecked_ref_cast [[CONST]] : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
-
-// CHECK:       graph_op "Add,i,i"(%1 : $TensorHandle<Float>, [[CAST]] : $TensorHandle<Float>) {{.*}} : $TensorHandle<Float>
+// CHECK-NEXT:  [[CONST:%.*]] = graph_op "Const"() {dtype: $Float, value$tensor: f32 0x3F800000 /* 1 */, __device: "ALL_DEVICES"} : $TensorHandle<Float>
+// CHECK:       graph_op "Add,i,i"(%1 : $TensorHandle<Float>, [[CONST]] : $TensorHandle<Float>) {{.*}} : $TensorHandle<Float>
 // CHECK:       graph_op "tfc.SendToHost
 // CHECK-NEXT:  graph_op "Const"()
 // CHECK:       graph_op "tfc.RecvFromHost

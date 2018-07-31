@@ -538,6 +538,13 @@ SingleExitLoopTransformer::patchEdges(SILBasicBlock *newHeader,
     SILBasicBlock *src = const_cast<SILBasicBlock *>(edge.first);
     SILBasicBlock *tgt = const_cast<SILBasicBlock *>(edge.second);
     SILBasicBlock *newTgt = (src == preheader) ? newHeader : latchBlock;
+    SILBasicBlock *splitBlock = splitIfCriticalEdge(src, tgt, /*DT*/ nullptr, LI);
+    if (splitBlock != nullptr) {
+      // If the edge was critical then splitBlock would have been inserted
+      // between src and tgt as follows: src -> splitBlock -> tgt.  Therefore,
+      // update src as the new edge to patch would be splitBlock -> tgt.
+      src = splitBlock;
+    }
     bool stayInLoop = loop->contains(tgt);
     replaceBranchTarget(src->getTerminator(), tgt, newTgt,
                         /*preserveArgs=*/stayInLoop);

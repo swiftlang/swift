@@ -260,16 +260,20 @@ static FuncDecl *findAssociativeOperatorDeclInProtocol(
 
 /// Assuming the buffer is for indirect passing, returns the store ownership
 /// qualifier for creating a `store` instruction into the buffer.
-static StoreOwnershipQualifier getBufferSOQ(Type type, SILModule &module) {
-  return module.Types.getTypeLowering(type).isTrivial()
-    ? StoreOwnershipQualifier::Trivial : StoreOwnershipQualifier::Init;
+static StoreOwnershipQualifier getBufferSOQ(Type type, SILFunction &fn) {
+  if (fn.hasQualifiedOwnership())
+    return fn.getModule().Types.getTypeLowering(type).isTrivial()
+        ? StoreOwnershipQualifier::Trivial : StoreOwnershipQualifier::Init;
+  return StoreOwnershipQualifier::Unqualified;
 }
 
 /// Assuming the buffer is for indirect passing, returns the load ownership
 /// qualified for creating a `load` instruction from the buffer.
-static LoadOwnershipQualifier getBufferLOQ(Type type, SILModule &module) {
-  return module.Types.getTypeLowering(type).isTrivial()
-    ? LoadOwnershipQualifier::Trivial : LoadOwnershipQualifier::Take;
+static LoadOwnershipQualifier getBufferLOQ(Type type, SILFunction &fn) {
+  if (fn.hasQualifiedOwnership())
+    return fn.getModule().Types.getTypeLowering(type).isTrivial()
+        ? LoadOwnershipQualifier::Trivial : LoadOwnershipQualifier::Take;
+  return LoadOwnershipQualifier::Unqualified;
 }
 
 //===----------------------------------------------------------------------===//
@@ -317,7 +321,7 @@ private:
     std::pair<ApplyInst *,
               DifferentiationTask *> indirectDifferentiation;
     Value(ApplyInst *applyInst, DifferentiationTask *parentTask)
-      : indirectDifferentiation({applyInst, parentTask}) {}
+        : indirectDifferentiation({applyInst, parentTask}) {}
 
     /// The differential operator associated with the `DifferentialOperator`
     /// case.
@@ -326,8 +330,9 @@ private:
 
     /// The `@differentiable` attribute associated with the
     /// `DifferentiableAttribute` case.
-    DifferentiableAttr *differentiableAttribute;
-    Value(DifferentiableAttr *attr) : differentiableAttribute(attr) {}
+    std::pair<DifferentiableAttr *, FuncDecl *> differentiableAttribute;
+    Value(DifferentiableAttr *attr, FuncDecl *fd)
+        : differentiableAttribute({attr, fd}) {}
   } value;
 
   /*implicit*/
@@ -342,8 +347,8 @@ public:
     : kind(Kind::IndirectDifferentiation), value(applyInst, task) {}
   DifferentiationInvoker(ReverseAutoDiffExpr *expr)
     : kind(Kind::DifferentialOperator), value(expr) {}
-  DifferentiationInvoker(DifferentiableAttr *attr)
-    : kind(Kind::DifferentiableAttribute), value(attr) {}
+  DifferentiationInvoker(DifferentiableAttr *attr, FuncDecl *fd)
+    : kind(Kind::DifferentiableAttribute), value(attr, fd) {}
 
   Kind getKind() const { return kind; }
 
@@ -363,7 +368,8 @@ public:
     return value.differentialOperator;
   }
 
-  DifferentiableAttr *getDifferentiableAttribute() const {
+  std::pair<DifferentiableAttr *, FuncDecl *>
+  getDifferentiableAttribute() const {
     assert(kind == Kind::DifferentiableAttribute);
     return value.differentiableAttribute;
   }
@@ -745,11 +751,13 @@ void DifferentiationInvoker::print(llvm::raw_ostream &os) const {
     getDifferentialOperator()->print(os);
     os << ")";
     break;
-  case Kind::DifferentiableAttribute:
-    os << "differentiable_attribute=(";
-    getDifferentiableAttribute()->print(os);
-    os << ")";
+  case Kind::DifferentiableAttribute: {
+    auto diffAttr = getDifferentiableAttribute();
+    os << "differentiable_attribute=(attr=(";
+    diffAttr.first->print(os);
+    os << ") func_decl=" << diffAttr.second->getFullName();
     break;
+  }
   }
   os << ')';
 }
@@ -792,8 +800,7 @@ enum class PrimalValueKind {
   TapeCheckpoint
 };
 
-using GradientLookupKey = std::pair<SILFunction *,
-                                    SILReverseAutoDiffConfig>;
+using GradientLookupKey = std::pair<SILFunction *, SILReverseAutoDiffConfig>;
 
 //===----------------------------------------------------------------------===//
 // ADContext - Per-module contextual information for the Differentiation pass.
@@ -840,9 +847,6 @@ private:
   /// The FloatingPoint protocol in the stanard library.
   ProtocolDecl *floatingPointProtocol =
     astCtx.getProtocol(KnownProtocolKind::FloatingPoint);
-
-  /// Flag indicating whether an error occurred.
-  bool errorOccurred = false;
 
   /// `VectorNumeric.+` declaration.
   FuncDecl *cachedVectorPlusFn = nullptr;
@@ -1050,42 +1054,30 @@ public:
   /// parent function, emits a "not differentiable" error based on the task. If
   /// the task is indirect, emits notes all the way up to the outermost task,
   /// and emits an error at the outer task. Otherwise, emits an error directly.
-  void emitNondifferentiabilityError(
-    SILInstruction *inst, const DifferentiationTask *task,
-    Diag<> noteAtInnermostNode = diag::autodiff_expression_is_not_differentiable
-  );
+  void emitNondifferentiabilityError(SILInstruction *inst,
+                                     const DifferentiationTask *task,
+                                     Optional<Diag<>> diag = None);
 
   /// Given a value and a differentiation task associated with the parent
   /// function, emits a "not differentiable" error based on the task. If the
   /// task is indirect, emits notes all the way up to the outermost task, and
   /// emits an error at the outer task. Otherwise, emits an error directly.
-  void emitNondifferentiabilityError(
-    SILValue value, const DifferentiationTask *task,
-    Diag<> noteAtInnermostNode = diag::autodiff_expression_is_not_differentiable
-  );
-
-  void setErrorOccurred() { errorOccurred = true; }
-  bool hasErrorOccurred() const { return errorOccurred; }
+  void emitNondifferentiabilityError(SILValue value,
+                                     const DifferentiationTask *task,
+                                     Optional<Diag<>> diag = None) {
+    emitNondifferentiabilityError(value->getDefiningInstruction(), task, diag);
+  }
 };
 } // end anonymous namespace
 
 ADContext::ADContext(SILModule &module, SILPassManager &passManager)
-  : module(module), passManager(passManager) {}
-
-void ADContext::emitNondifferentiabilityError(SILValue value,
-                                              const DifferentiationTask *task,
-                                              Diag<> noteAtInnermostNode) {
-  emitNondifferentiabilityError(value->getDefiningInstruction(), task,
-                                noteAtInnermostNode);
-}
+    : module(module), passManager(passManager) {}
 
 void ADContext::emitNondifferentiabilityError(SILInstruction *inst,
                                               const DifferentiationTask *task,
-                                              Diag<> noteAtInnermostNode) {
-  SWIFT_DEFER { setErrorOccurred(); };
+                                              Optional<Diag<>> diag) {
   // Location of the instruction.
-  auto srcLoc = inst->getLoc().getSourceLoc();
-  if (srcLoc.isInvalid()) srcLoc = SourceLoc();
+  auto opLoc = inst->getLoc().getSourceLoc();
   auto invoker = task->getInvoker();
   LLVM_DEBUG(getADDebugStream()
              << "Diagnosing non-differentiability for value \n\t" << *inst
@@ -1095,52 +1087,43 @@ void ADContext::emitNondifferentiabilityError(SILInstruction *inst,
   // For a gradient instruction that is not associated with any source
   // location, we emit a diagnostic without source location.
   case DifferentiationInvoker::Kind::GradientInst:
-    diagnose(srcLoc, diag::autodiff_function_not_differentiable);
-    return;
+    diagnose(opLoc,
+        diag.getValueOr(diag::autodiff_expression_is_not_differentiable));
+    break;
 
   // For indirect differentiation, emit a "not differentiable" note on the
   // expression first. Then emit an error at the source invoker of
   // differentiation, and a "when differentiating this"  note at each indirect
   // invoker.
   case DifferentiationInvoker::Kind::IndirectDifferentiation: {
-    // Emit a default note at the innermost differentiation invoker.
-    diagnose(srcLoc, noteAtInnermostNode);
-    // Iteratively retrieve the outermost task, starting with the parent of the
-    // current node, until the task is no longer indirect.
-    auto *outerTask = invoker.getIndirectDifferentiation().second;
-    while (outerTask->getInvoker().getKind() ==
-             DifferentiationInvoker::Kind::IndirectDifferentiation) {
-      std::tie(inst, outerTask) =
-        outerTask->getInvoker().getIndirectDifferentiation();
-      auto applyLoc = inst->getLoc().getSourceLoc();
-      if (applyLoc.isValid())
-        diagnose(applyLoc, diag::autodiff_when_differentiating_function_call);
-    }
-    // Now we've reached a direct task, recursive once to emit an error.
-    emitNondifferentiabilityError(inst, outerTask);
-    return;
+    std::tie(inst, task) = task->getInvoker().getIndirectDifferentiation();
+    emitNondifferentiabilityError(inst, task, None);
+    diagnose(opLoc,
+        diag.getValueOr(diag::autodiff_when_differentiating_function_call));
+    break;
   }
 
-  // For a differential operator, emit a "not differentiable" note on the
-  // expression first. Then emit an error at the differential operator.
+  // For a differential operator, emit a "not differentiable" error on the
+  // attribute first and a note on the non-differentiable operation.
   case DifferentiationInvoker::Kind::DifferentialOperator: {
     auto *expr = invoker.getDifferentialOperator();
-    diagnose(srcLoc, noteAtInnermostNode);
-    diagnose(expr->getLoc(),
-      diag::autodiff_differential_operator_applied_to_nondifferentiable)
+    diagnose(expr->getLoc(), diag::autodiff_function_not_differentiable)
         .highlight(expr->getOriginalExpr()->getSourceRange());
-    return;
+    diagnose(opLoc,
+        diag.getValueOr(diag::autodiff_expression_is_not_differentiable));
+    break;
   }
 
-  // For a `@differentiable` attribute, emit a "not differentiable" note on the
-  // expression first. Then emit an error at the `@differentiable` attribute.
+  // For a `@differentiable` attribute, emit a "not differentiable" error on the
+  // attribute first and a note on the non-differentiable operation.
   case DifferentiationInvoker::Kind::DifferentiableAttribute: {
-    auto *attr = invoker.getDifferentiableAttribute();
-    diagnose(srcLoc, noteAtInnermostNode);
-    diagnose(attr->getLocation(),
-      diag::autodiff_differentiable_attr_applied_to_nondifferentiable)
-        .highlight(attr->getRangeWithAt());
-    return;
+    auto diffAttr = invoker.getDifferentiableAttribute();
+    diagnose(diffAttr.first->getLocation(),
+             diag::autodiff_function_not_differentiable)
+        .highlight(diffAttr.second->getNameLoc());
+    diagnose(opLoc,
+        diag.getValueOr(diag::autodiff_expression_is_not_differentiable));
+    break;
   }
   }
 }
@@ -1192,7 +1175,8 @@ public:
                                        SILLoopInfo &loopInfo)
     : function(function), domInfo(domInfo), loopInfo(loopInfo) {}
 
-  /// Run control flow canonicalization on the function.
+  /// Run control flow canonicalization on the function. Returns true if the
+  /// program changed.
   bool run();
 };
 }
@@ -1675,7 +1659,7 @@ static void convertToIndirectSeed(intmax_t value, CanType type,
                                             /*noNestedConflict*/ true,
                                             /*fromBuiltin*/ false);
     builder.createStore(loc, one, seedBuf,
-                        getBufferSOQ(type, context.getModule()));
+                        getBufferSOQ(type, builder.getFunction()));
     builder.createEndAccess(loc, access, /*aborted*/ false);
     return;
   }
@@ -1712,7 +1696,7 @@ static void convertToIndirectSeed(intmax_t value, CanType type,
     builder.createAllocStack(loc, SILType::getPrimitiveObjectType(scalarTy));
   convertIntToIndirectExpressible(value, scalarTyDecl, scalarBuf,
                                   loc, builder, context);
-  auto scalarLOQ = getBufferLOQ(scalarTy, module);
+  auto scalarLOQ = getBufferLOQ(scalarTy, builder.getFunction());
   auto scalarVal = builder.createLoad(loc, scalarBuf, scalarLOQ);
   // dealloc_stack %0 : $*<scalar type>
   builder.createDeallocStack(loc, scalarBuf);
@@ -1737,7 +1721,7 @@ static void convertToIndirectSeed(intmax_t value, CanType type,
                                               /*fromBuiltin*/ false);
   // store %0 : $<scalar type> to $*<scalar type>
   builder.createStore(loc, scalarVal, scalarValBuf,
-                      getBufferSOQ(scalarTy, module));
+                      getBufferSOQ(scalarTy, builder.getFunction()));
   builder.createEndAccess(loc, bufAccess, /*aborted*/ false);
   auto *vecNumProto = context.getVectorNumericProtocol();
   auto *reqr =
@@ -1771,15 +1755,21 @@ class PrimalGen {
 private:
   /// The global AD context.
   ADContext &context;
+
   /// A worklist of primal synthesis items, each of which specifies a the
   /// original function, the target primal function, AD indices, and the primal
   /// value struct.
   SmallVector<FunctionSynthesisItem, 16> worklist;
 
+  /// Flag indicating there was an error during primal generation.
+  bool errorOccurred = false;
+
 public:
   explicit PrimalGen(ADContext &context) : context(context) {}
 
-  void run();
+  /// Performs primal synthesis for all differentiation tasks. Returns true if
+  /// any error occurs.
+  bool run();
 
 protected:
   /// Lazily create a task to synthesize the primal function.
@@ -1790,8 +1780,8 @@ private:
   std::pair<SILFunction *, StructDecl *>
   createEmptyPrimal(DifferentiationTask *task);
 
-  /// Processes an original function and generate its adjoint.
-  void performSynthesis(FunctionSynthesisItem task);
+  /// Processes a synthesis item. Returns true if any error occurs.
+  bool performSynthesis(FunctionSynthesisItem task);
 };
 } // end anonymous namespace
 
@@ -1801,33 +1791,37 @@ ADContext::createPrimalValueStructForFunction(SILFunction *function) {
          "The function must be in the same module");
   auto &file = getPrimalValueDeclContainer();
   // Create a `<fn_name>__Type` struct.
-  std::string dependentStructName;
-  dependentStructName += function->getName();
-  dependentStructName += "__Type";
-  auto structId = astCtx.getIdentifier(dependentStructName);
+  std::string pvStructName;
+  pvStructName += function->getName();
+  pvStructName += "__Type";
+  auto structId = astCtx.getIdentifier(pvStructName);
   SourceLoc loc = function->getLocation().getSourceLoc();
-  auto ctxStruct =
+  auto pvStruct =
     new (astCtx) StructDecl(/*StructLoc*/ loc, /*Name*/ structId,
                             /*NameLoc*/ loc, /*Inherited*/ {},
                             /*GenericParams*/ nullptr, // to be set later
                             /*DC*/ &file);
-  ctxStruct->computeType();
-  ctxStruct->setAccess(AccessLevel::Internal);
+  pvStruct->computeType();
+  if (auto *dc = function->getDeclContext()) {
+    if (auto *afd = dyn_cast<AbstractFunctionDecl>(dc))
+      pvStruct->setAccess(afd->getEffectiveAccess());
+  } else {
+    pvStruct->setAccess(AccessLevel::Internal);
+  }
   // If the original function has generic parameters, clone them.
   auto *genEnv = function->getGenericEnvironment();
   if (genEnv && genEnv->getGenericSignature()) {
     auto *genParams = function->getDeclContext()->getGenericParamsOfContext();
-    ctxStruct->setGenericParams(genParams->clone(ctxStruct));
+    pvStruct->setGenericParams(genParams->clone(pvStruct));
   }
-  file.addVisibleDecl(ctxStruct);
+  file.addVisibleDecl(pvStruct);
   LLVM_DEBUG({
     auto &s = getADDebugStream();
     s << "Primal value struct created for function "
       << function->getName() << '\n';
-    ctxStruct->print(s);
-    s << '\n';
+    pvStruct->print(s); s << '\n';
   });
-  return ctxStruct;
+  return pvStruct;
 }
 
 /// For a nested function call whose result tuple is active on the
@@ -1897,18 +1891,12 @@ static bool diagnoseUnsupportedControlFlow(ADContext &context,
   if (task->getOriginal()->getBlocks().size() <= 1)
     return false;
   // Find any control flow node and diagnose.
-  for (auto &bb : task->getOriginal()->getBlocks()) {
+  for (auto &bb : *task->getOriginal()) {
     auto *term = bb.getTerminator();
-    switch (term->getKind()) {
-      case SILInstructionKind::CondBranchInst:
-      case SILInstructionKind::SwitchEnumInst:
-      case SILInstructionKind::SwitchValueInst:
-      case SILInstructionKind::SwitchEnumAddrInst:
-        context.emitNondifferentiabilityError(
+    if (term->isBranch()) {
+      context.emitNondifferentiabilityError(
           term, task, diag::autodiff_control_flow_not_supported);
-        return true;
-      default:
-        break;
+      return true;
     }
   }
   return false;
@@ -1948,6 +1936,8 @@ private:
 
   /// The postdominator tree of the original function.
   const PostDominanceInfo &postDomInfo;
+
+  bool errorOccurred = false;
 
   // To be used for control flow support.
   // const SILLoopInfo &loopInfo;
@@ -2033,17 +2023,19 @@ public:
       /*loopInfo(loopInfo),*/
       primalGen(primalGen) {}
 
-  /// Entry of primal generation for a function.
-  void run() {
+  /// Entry of primal generation for a function. Returns true if any error
+  /// occurred.
+  bool run() {
     LLVM_DEBUG(getADDebugStream()
                << "Cloning original @" << getOriginal()->getName()
                << " to primal @" << synthesis.target->getName() << '\n');
     // Kick off the cloner.
     visitSILFunction(getOriginal());
+    return errorOccurred;
   }
 
   void postProcess(SILInstruction *orig, SILInstruction *cloned) {
-    if (getContext().hasErrorOccurred())
+    if (errorOccurred)
       return;
     SILClonerWithScopes::postProcess(orig, cloned);
     switch (classifyPrimalValue(orig)) {
@@ -2072,7 +2064,7 @@ public:
   }
 
   void visitSILBasicBlock(SILBasicBlock *bb) {
-    if (getContext().hasErrorOccurred())
+    if (errorOccurred)
       return;
     SILClonerWithScopes::visitSILBasicBlock(bb);
   }
@@ -2091,7 +2083,7 @@ public:
     // Clone.
     SILClonerWithScopes::visitSILFunction(original);
     // If errors occurred, back out.
-    if (getContext().hasErrorOccurred())
+    if (errorOccurred)
       return;
     auto *origExit = &*original->findReturnBB();
     auto *exit = BBMap.lookup(origExit);
@@ -2099,9 +2091,7 @@ public:
     // Get the original's return value's corresponsing value in the primal.
     auto *origRetInst = cast<ReturnInst>(origExit->getTerminator());
     auto origRetVal = origRetInst->getOperand();
-    assert(origRetVal->getParentBlock() == origExit);
     auto origResInPrimal = getOpValue(origRetVal);
-    assert(origResInPrimal->getParentBlock() == exit);
     // Create a primal value struct containing all static primal values and
     // tapes.
     auto loc = getPrimal()->getLocation();
@@ -2151,7 +2141,7 @@ public:
   /// General visitor for all instruction. If there is any error emitted by
   /// previous visits, bail out.
   void visit(SILInstruction *inst) {
-    if (getContext().hasErrorOccurred())
+    if (errorOccurred)
       return;
     SILClonerWithScopes::visit(inst);
   }
@@ -2192,6 +2182,7 @@ public:
     // To support this, we need to emit a primal call for each active result.
     if (activeResultIndices.size() > 1) {
       context.emitNondifferentiabilityError(ai, synthesis.task);
+      errorOccurred = true;
       return;
     }
     // Form expected indices by assuming there's only one result.
@@ -2205,6 +2196,7 @@ public:
     // FIXME: Handle `partial_apply`.
     if (!calleeOriginFnRef) {
       context.emitNondifferentiabilityError(ai, synthesis.task);
+      errorOccurred = true;
       return;
     }
     // Find or register a differentiation task for this function.
@@ -2301,18 +2293,16 @@ public:
   void visitGradientInst(GradientInst *gi) {
     getContext().emitNondifferentiabilityError(
       gi, getDifferentiationTask(), diag::autodiff_nested_not_supported);
+    errorOccurred = true;
   }
 
   /// Primal has qualified ownership. We assign store ownership qualifier while
   /// cloning the `store` instruction.
   void visitStoreInst(StoreInst *si) {
-    if (si->getOwnershipQualifier() != StoreOwnershipQualifier::Unqualified) {
-      SILClonerWithScopes::visitStoreInst(si);
-      return;
-    }
+
     auto destTy = si->getDest()->getType().getASTType();
     auto loc = remapLocation(si->getLoc());
-    auto soq = getBufferSOQ(getOpASTType(destTy), getContext().getModule());
+    auto soq = getBufferSOQ(getOpASTType(destTy), *getPrimal());
     getBuilder().createStore(loc, getOpValue(si->getSrc()),
                              getOpValue(si->getDest()), soq);
   }
@@ -2320,24 +2310,21 @@ public:
   /// Primal has qualified ownership. We assign load ownership qualified while
   /// cloning the `load` instruction.
   void visitLoadInst(LoadInst *li) {
-    if (li->getOwnershipQualifier() != LoadOwnershipQualifier::Unqualified) {
-      SILClonerWithScopes::visitLoadInst(li);
-      return;
-    }
+
     auto srcTy = li->getOperand()->getType().getASTType();
     auto loc = remapLocation(li->getLoc());
-    auto loq = getBufferLOQ(getOpASTType(srcTy), getContext().getModule());
+    auto loq = getBufferLOQ(getOpASTType(srcTy), *getPrimal());
     ValueMap.insert(
       {li, getBuilder().createLoad(loc, getOpValue(li->getOperand()), loq)});
   }
 };
 } // end anonymous namespace
 
-void PrimalGen::performSynthesis(FunctionSynthesisItem item) {
+bool PrimalGen::performSynthesis(FunctionSynthesisItem item) {
   // FIXME: If the original function has multiple basic blocks, bail out since
   // AD does not support control flow yet.
   // Compute necessary analyses on the original function.
-  diagnoseUnsupportedControlFlow(context, item.task);
+  errorOccurred |= diagnoseUnsupportedControlFlow(context, item.task);
   // Synthesize the function.
   auto &passManager = context.getPassManager();
   auto *activityAnalysis =
@@ -2357,7 +2344,7 @@ void PrimalGen::performSynthesis(FunctionSynthesisItem item) {
   // Synthesize primal.
   PrimalGenCloner cloner(item, activityInfo, domInfo, pdomInfo,
                          loopInfo, *this, context);
-  cloner.run();
+  return cloner.run();
 }
 
 /// Creates a primal function.
@@ -2397,8 +2384,8 @@ PrimalGen::createEmptyPrimal(DifferentiationTask *task) {
                                             original->isBare(),
                                             original->isTransparent(),
                                             original->isSerialized());
-  LLVM_DEBUG(getADDebugStream() << "Primal function created \n"
-                                << *primal << '\n');
+  primal->setUnqualifiedOwnership();
+  LLVM_DEBUG(getADDebugStream() << "Primal function created \n" << *primal << '\n');
   task->setPrimal(primal);
   return { primal, primalValueStructDecl };
 }
@@ -2420,7 +2407,7 @@ PrimalGen::lookupPrimalOrScheduleSynthesis(DifferentiationTask *task) {
   return newPrimal;
 }
 
-void PrimalGen::run() {
+bool PrimalGen::run() {
   // Push everything to the list of primal synthesis items.
   for (auto &task : context.getDifferentiationTasks())
     lookupPrimalOrScheduleSynthesis(task.get());
@@ -2428,10 +2415,11 @@ void PrimalGen::run() {
   while (!worklist.empty()) {
     auto synthesis = worklist.back();
     worklist.pop_back();
-    performSynthesis(synthesis);
+    errorOccurred |= performSynthesis(synthesis);
     synthesis.task->getPrimalInfo()->computePrimalValueStructType();
     LLVM_DEBUG(synthesis.target->verify());
   }
+  return errorOccurred;
 }
 
 //===----------------------------------------------------------------------===//
@@ -2451,16 +2439,21 @@ private:
   /// Work list of synthesis items.
   SmallVector<FunctionSynthesisItem, 16> worklist;
 
+  /// Flag indicating whether an error has occurred.
+  bool errorOccurred = false;
+
 public:
   explicit AdjointGen(ADContext &context) : context(context) {}
 
-  void run();
+  /// Performs adjoint generation for all differentiation tasks. Returns true if
+  /// any error occurs.
+  bool run();
 
 private:
   /// Creates an empty adjoint function.
   SILFunction *createEmptyAdjoint(DifferentiationTask *task);
-  /// Synthesize an adjoint.
-  void performSynthesis(FunctionSynthesisItem item);
+  /// Do the synthesis item. Returns true if any error occurs.
+  bool performSynthesis(FunctionSynthesisItem item);
   /// Look up the adjoint function corresponding to this task. If it does not
   /// exist, create an empty adjoint and schedule a synthesis item to be
   /// processed later in AdjointGen.
@@ -2510,6 +2503,7 @@ AdjointGen::createEmptyAdjoint(DifferentiationTask *task) {
                                         original->isBare(),
                                         original->isTransparent(),
                                         original->isSerialized());
+  adjoint->setUnqualifiedOwnership();
   adjoint->setDebugScope(
     new (module) SILDebugScope(original->getLocation(), adjoint));
   task->setAdjoint(adjoint);
@@ -2531,7 +2525,7 @@ AdjointGen::lookupAdjointOrScheduleSynthesis(DifferentiationTask *task) {
   return newAdjoint;
 }
 
-void AdjointGen::run() {
+bool AdjointGen::run() {
   // Push everything to the worklist.
   for (auto &task : context.getDifferentiationTasks())
     lookupAdjointOrScheduleSynthesis(task.get());
@@ -2540,9 +2534,10 @@ void AdjointGen::run() {
   while (!worklist.empty()) {
     auto synthesis = worklist.back();
     worklist.pop_back();
-    performSynthesis(synthesis);
+    errorOccurred |= performSynthesis(synthesis);
     LLVM_DEBUG(synthesis.target->verify());
   }
+  return errorOccurred;
 }
 
 //===----------------------------------------------------------------------===//
@@ -2762,6 +2757,8 @@ private:
 
   llvm::BumpPtrAllocator allocator;
 
+  bool errorOccurred = false;
+
   ADContext &getContext() const {
     return adjointGen.context;
   }
@@ -2853,7 +2850,9 @@ protected:
   }
 
 public:
-  void run() {
+  /// Performs adjoint synthesis on the empty adjoint function. Returns true if
+  /// any error occurs.
+  bool run() {
     auto &original = getOriginal();
     auto &adjoint = getAdjoint();
     auto adjLoc = getAdjoint().getLocation();
@@ -2911,8 +2910,8 @@ public:
     }
     
     // If errors occurred, back out.
-    if (getContext().hasErrorOccurred())
-      return;
+    if (errorOccurred)
+      return true;
     
     // Place the builder at the adjoint block corresponding to the original
     // entry. This block is going to be our exit block and we emit a `return`
@@ -2933,10 +2932,12 @@ public:
     else
       retVal = getBuilder().createTuple(adjLoc, retElts);
     getBuilder().createReturn(adjLoc, retVal);
+
+    return errorOccurred;
   }
   
   void visit(SILInstruction *inst) {
-    if (getContext().hasErrorOccurred())
+    if (errorOccurred)
       return;
     SILInstructionVisitor::visit(inst);
   }
@@ -2946,7 +2947,7 @@ public:
   }
 
   void visitSILBasicBlock(SILBasicBlock *bb) {
-    if (getContext().hasErrorOccurred())
+    if (errorOccurred)
       return;
     auto indices = getDifferentiationTask()->getIndices();
     // Get the corresponding adjoint basic block.
@@ -3108,7 +3109,7 @@ public:
                                                    /*noNestedConflict*/ true,
                                                    /*fromBuiltin*/ false);
       args.push_back(getBuilder().createLoad(
-        loc, access, getBufferLOQ(seed.getSwiftType(), getModule())));
+          loc, access, getBufferLOQ(seed.getSwiftType(), getAdjoint())));
       getBuilder().createEndAccess(loc, access, /*aborted*/ false);
     }
     // Call the adjoint function.
@@ -3206,17 +3207,17 @@ public:
                                                                 varDecl);
         if (varDecl == sei->getField()) {
           getBuilder().createStore(sei->getLoc(), adj, eltBufAddr,
-            getBufferSOQ(sei->getType().getASTType(), getModule()));
+              getBufferSOQ(sei->getType().getASTType(), getAdjoint()));
         } else {
           auto eltType = varDecl->getType()->getCanonicalType();
           auto zero =
-            AdjointValue::getZero(SILType::getPrimitiveObjectType(eltType));
+              AdjointValue::getZero(SILType::getPrimitiveObjectType(eltType));
           materializeAdjointIndirect(zero, eltBufAddr);
         }
       }
       addAdjointValue(sei->getOperand(),
                       getBuilder().createLoad(sei->getLoc(), structBuf,
-        getBufferLOQ(structDecl->getDeclaredInterfaceType(), getModule())));
+          getBufferLOQ(structDecl->getDeclaredInterfaceType(), getAdjoint())));
       break;
     }
   }
@@ -3334,6 +3335,7 @@ public:
     }
     default:
       getContext().emitNondifferentiabilityError(bi, getDifferentiationTask());
+      errorOccurred = true;
       return;
     }
   }
@@ -3368,15 +3370,14 @@ SILValue AdjointEmitter::materializeAdjoint(AdjointValue value,
   auto valueBuf = getBuilder().createAllocStack(loc, value.getType());
   SWIFT_DEFER { getBuilder().createDeallocStack(loc, valueBuf); };
   materializeAdjointIndirect(value, valueBuf);
-  auto loq = value.getType().isTrivial(getModule())
-    ? LoadOwnershipQualifier::Trivial : LoadOwnershipQualifier::Take;
+  auto loq = getBufferLOQ(value.getType().getASTType(), getAdjoint());
   return getBuilder().createLoad(loc, valueBuf, loq);
 }
 
 void AdjointEmitter::materializeAdjointIndirect(AdjointValue val,
                                                 SILValue destBuffer) {
   auto loc = destBuffer.getLoc();
-  auto soq = getBufferSOQ(val.getType().getASTType(), getModule());
+  auto soq = getBufferSOQ(val.getType().getASTType(), getAdjoint());
   switch (val.getKind()) {
   /// Given a `%buf : *T, emit instructions that produce a zero or an aggregate
   /// of zeros of the expected type. When `T` conforms to
@@ -3405,7 +3406,7 @@ void AdjointEmitter::materializeAdjointIndirect(AdjointValue val,
       auto *zero = getBuilder().createFloatLiteral(
         loc, val.getType(), APFloat(builtinFP->getAPFloatSemantics(), 0));
       getBuilder().createStore(loc, zero, access,
-                               getBufferSOQ(builtinFP, getModule()));
+                               getBufferSOQ(builtinFP, getAdjoint()));
       getBuilder().createEndAccess(loc, access, /*aborted*/ false);
     }
     else {
@@ -3510,7 +3511,7 @@ SILValue AdjointEmitter::accumulateMaterializedAdjoints(SILValue lhs,
   accumulateMaterializedAdjointsIndirect(lhs, rhs, resultBuf);
   getBuilder().createDeallocStack(resultBuf->getLoc(), resultBuf);
   return getBuilder().createLoad(resultBuf->getLoc(), resultBuf,
-    getBufferLOQ(lhs->getType().getASTType(), getModule()));
+    getBufferLOQ(lhs->getType().getASTType(), getAdjoint()));
 }
 
 void AdjointEmitter::accumulateMaterializedAdjointsIndirect(
@@ -3527,7 +3528,7 @@ void AdjointEmitter::accumulateMaterializedAdjointsIndirect(
     auto *sum = getBuilder().createBuiltinBinaryFunction(
       loc, "fadd", lhs->getType(), lhs->getType(), { lhs, rhs });
     getBuilder().createStore(loc, sum, bufAccess,
-                             getBufferSOQ(adjointTy, getModule()));
+                             getBufferSOQ(adjointTy, getAdjoint()));
     getBuilder().createEndAccess(loc, bufAccess, /*aborted*/ false);
     return;
   }
@@ -3575,10 +3576,10 @@ void AdjointEmitter::accumulateMaterializedAdjointsIndirect(
                            /*isNonThrowing*/ false);
 }
 
-void AdjointGen::performSynthesis(FunctionSynthesisItem item) {
+bool AdjointGen::performSynthesis(FunctionSynthesisItem item) {
   auto &passManager = context.getPassManager();
   auto *activityAnalysis =
-    passManager.getAnalysis<DifferentiableActivityAnalysis>();
+      passManager.getAnalysis<DifferentiableActivityAnalysis>();
   auto *domAnalysis = passManager.getAnalysis<DominanceAnalysis>();
   auto *pdomAnalysis = passManager.getAnalysis<PostDominanceAnalysis>();
   auto *loopAnalysis = passManager.getAnalysis<SILLoopAnalysis>();
@@ -3589,8 +3590,7 @@ void AdjointGen::performSynthesis(FunctionSynthesisItem item) {
                          *pdomAnalysis->get(item.original),
                          *loopAnalysis->get(item.original),
                          *this);
-  emitter.run();
-  debugDump(*item.target);
+  return emitter.run();
 }
 
 //===----------------------------------------------------------------------===//
@@ -3626,6 +3626,7 @@ static SILFunction *lookupOrSynthesizeGradient(
                                          original->isBare(),
                                          original->isTransparent(),
                                          original->isSerialized());
+    gradFn->setUnqualifiedOwnership();
     gradFn->setDebugScope(
       new (module) SILDebugScope(original->getLocation(), gradFn));
     return gradFn;
@@ -3691,8 +3692,7 @@ static SILFunction *lookupOrSynthesizeGradient(
       if (seedSILTy.isAddressOnly(module)) {
         stackAllocsToCleanUp.push_back(seedBuf);
       } else {
-        auto loq = seedSILTy.isTrivial(module)
-          ? LoadOwnershipQualifier::Trivial : LoadOwnershipQualifier::Take;
+        auto loq = getBufferLOQ(seedSILTy.getASTType(), *gradFn);
         auto seedBufAccess = builder.createBeginAccess(
             loc, seedBuf, SILAccessKind::Read, SILAccessEnforcement::Static,
             /*noNestedConflict*/ false, /*fromBuiltin=*/ false);
@@ -3859,12 +3859,17 @@ class Differentiation : public SILModuleTransform {
 public:
   Differentiation() : SILModuleTransform() {}
   void run() override;
+
 private:
-  void processGradientInst(GradientInst *gi, ADContext &context);
+  /// Processes the given gradient instruction. This includes transforming it
+  /// into a normal `function_ref` to the synthesized gradient function, and
+  /// pushing a differentiation task onto the global list. Returns true if any
+  /// error occurred.
+  bool processGradientInst(GradientInst *gi, ADContext &context);
 };
 } // end anonymous namespace
 
-void Differentiation::processGradientInst(GradientInst *gi,
+bool Differentiation::processGradientInst(GradientInst *gi,
                                           ADContext &context) {
   SILFunction *parent = gi->getFunction();
   auto operand = gi->getOperand(0);
@@ -3873,9 +3878,6 @@ void Differentiation::processGradientInst(GradientInst *gi,
   if (auto *originalFRI = findReferenceToVisibleFunction(operand)) {
     auto *original = originalFRI->getReferencedFunction();
     gradFn = lookupOrSynthesizeGradient(context, gi, original);
-
-    // If `gradFn` is still null, errors must have occurred.
-    if (!gradFn) return;
 
     // Replace the `gradient` instruction with the reference to the specified
     // function.
@@ -3894,17 +3896,25 @@ void Differentiation::processGradientInst(GradientInst *gi,
   }
   // Differentiating opaque functions is not supported yet.
   else {
-    if (auto loc = gi->getLoc()) {
-      auto *expr = loc.castToASTNode<ReverseAutoDiffExpr>();
-      context.diagnose(expr->getOriginalExpr()->getLoc(),
+    // Find the original differential operator expression. Show an error at the
+    // operator, highlight the argument, and show a note at the definition site
+    // of the argument.
+    if (auto *expr = findDifferentialOperator(gi))
+      context.diagnose(expr->getLoc(),
+                       diag::autodiff_opaque_function_unsupported)
+          .highlight(expr->getOriginalExpr()->getSourceRange());
+    else
+      context.diagnose(gi->getLoc().getSourceLoc(),
                        diag::autodiff_opaque_function_unsupported);
-    }
-    context.setErrorOccurred();
-    return;
+    // Emit a note at the definition site.
+    context.diagnose(gi->getOriginal().getLoc().getSourceLoc(),
+                     diag::autodiff_value_defined_here);
+    return true;
   }
   // We invalidate analyses on the parent function because the `gradient`
   // instruction is transformed.
   PM->invalidateAnalysis(parent, SILAnalysis::InvalidationKind::FunctionBody);
+  return false;
 }
 
 /// AD pass entry.
@@ -3925,9 +3935,10 @@ void Differentiation::run() {
 
   // AD relies on stdlib (the Swift module). If it's not imported, it's an
   // internal error.
-  if (!module.getSwiftModule()->getASTContext().getStdlibModule()) {
-    llvm::errs() <<
-      "Internal error: AD depends on the Swift module but it's not imported.\n";
+  auto &astCtx = module.getSwiftModule()->getASTContext();
+  if (!astCtx.getStdlibModule()) {
+    astCtx.Diags.diagnose(SourceLoc(),
+                          diag::autodiff_internal_swift_not_imported);
     return;
   }
 
@@ -3944,23 +3955,30 @@ void Differentiation::run() {
   // infrastructure support for this yet and currently it'll error out, but
   // we'll look into adding a new function convention so that the primal and the
   // adjoint can be passed along with the function.
+  //
+  // If any error occurs during `gradient` instruction processing, it won't be
+  // turned into a differentiation task. But we don't back out just yet - primal
+  // synthesis and adjoint synthesis for newly created differentiation tasks
+  // should still run because they will diagnose more errors.
+  bool errorProcessingGradInsts = false;
   for (auto *gi : gradInsts)
-    processGradientInst(gi, context);
+    errorProcessingGradInsts |= processGradientInst(gi, context);
 
-  // Run primal generation.
+  // Run primal generation for newly created differentiation tasks. If any error
+  // occurs, back out.
   PrimalGen primalGen(context);
-  primalGen.run();
-
-  // If there were any error, back out.
-  if (context.hasErrorOccurred())
+  if (primalGen.run())
     return;
 
-  // TODO: Run adjoint generation.
+  // Run adjoint generation for differentiation tasks. If any error occurs, back
+  // out.
   AdjointGen adjointGen(context);
-  adjointGen.run();
+  if (adjointGen.run())
+    return;
 
-  // If there were any error, back out.
-  if (context.hasErrorOccurred())
+  // If there was any error that occurred during `gradient` instruction
+  // processing, back out.
+  if (errorProcessingGradInsts)
     return;
 
   // Fill the body of each empty canonical gradient function corresponding to

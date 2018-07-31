@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -O -emit-sil -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-strict-deabstraction=false -O -emit-sil -verify %s | %FileCheck %s
 // RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-strict-deabstraction -O -emit-sil -verify %s | %FileCheck %s --check-prefix=STRICTDA
 import TensorFlow
 

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-strict-deabstraction=false -O -emit-sil %s | %FileCheck %s
 // RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-strict-deabstraction -O -emit-sil -verify %s | %FileCheck %s -check-prefix=STRICTDA
 
 import TensorFlow
@@ -236,7 +236,6 @@ struct Classifier {
 
 public func mnist() {
   // Training data
-  // expected-warning @+1 {{'Tensor<Float>' implicitly copied to the accelerator, use .toAccelerator}}
   let images = Tensor<Float>(randomNormal: [10, 784])
   let labels = Tensor<Float>(randomNormal: [10, 10])
   var classifier = Classifier()
@@ -258,3 +257,8 @@ public func testMultiOutputs() {
   _hostOp(y)
 }
 
+// TODO: Eliminate the sends/recvs when -Onone is enabled.
+public func SR8395() {
+  let x: Tensor<Float> = [[1, 2], [3, 4]]
+  print(matmul(x, x) + x)
+}

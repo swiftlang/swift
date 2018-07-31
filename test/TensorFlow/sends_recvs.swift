@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-strict-deabstraction -Xllvm -tf-ensure-single-loop-exit=false -Xllvm -tf-module-level-graph=false -O -emit-sil %s -verify | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-strict-deabstraction -Xllvm -tf-module-level-graph=false -O -emit-sil %s -verify | %FileCheck %s
 
 // In this file, send means accelerator->host, and recv means the opposite.
 
@@ -165,7 +165,6 @@ public func testSendsInALoopTPU() {
 // CHECK-LABEL: --- TFDevicePartition Per-Device Function Extraction Result: {{.*}}testSendsInALoopTPU{{.*}}TPU{{.*}}
 // CHECK: bb1
 // CHECK:   graph_op "tfc.D2DTensorSend
-// CHECK: bb2
 // CHECK:   graph_op "tfc.D2DTensorSend
 
 public func testSendsInALoopWithNoResultTensor() {
@@ -228,7 +227,7 @@ public func test1RecvScalarCPU() {
 // CHECK-LABEL: --- TFPartition Host Result: {{.*}}test1RecvScalarCPU{{.*}}
 // CHECK:      function_ref @_swift_tfc_StartTensorComputation
 // CHECK:      // function_ref static TensorHandle.receiveFromAccelerator
-// CHECK-NEXT: function_ref 
+// CHECK-NEXT: function_ref
 // CHECK-NEXT: [[X_HANDLE:%.*]] = apply
 // CHECK:      // function_ref static TensorHandle.scalar(_:)
 // CHECK-NEXT: [[MAKE_SCALAR_TENSOR_FN:%.*]] = function_ref
@@ -309,7 +308,7 @@ public func test1RecvTensorCPU() {
 // CHECK-LABEL: --- TFPartition Host Result: {{.*}}test1RecvTensor{{.*}}
 // CHECK:      function_ref @_swift_tfc_StartTensorComputation
 // CHECK:      // function_ref static TensorHandle.receiveFromAccelerator
-// CHECK-NEXT: function_ref 
+// CHECK-NEXT: function_ref
 // CHECK-NEXT: [[A_HANDLE:%.*]] = apply
 // CHECK-NEXT: [[A_TENSOR:%.*]] = struct $Tensor<Float> ([[A_HANDLE]]
 // CHECK:      // function_ref {{.*}} atariSim(_:)
@@ -346,9 +345,6 @@ public func test1RecvTensorTPU_ToHostNoShape_Error() {
   _hostOp(b)
 }
 
-// TODO: fix the wrong diagnostic location, due to an invalid SILLocation value
-// in a graph op
-// expected-error @+1 {{TPU infeed enqueue supports enqueuing a single tensor -- did you specify shape?}}
 public func test1RecvTensorTPU_ToAcceleratorNoShape_Error() {
   TensorFlow.enableTPU()
   let a_tpu_h: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: 1.0, __device: "TPU_SYSTEM")
@@ -358,7 +354,7 @@ public func test1RecvTensorTPU_ToAcceleratorNoShape_Error() {
   // For the result of atariSim(): host -> CPU, and then CPU->TPU.
   var b = atariSim(a_host).toAccelerator()
   // This is the correct location
-  // xpected-error @+1 {{TPU infeed dequeue supports dequeuing a single tensor -- did you specify shape?}}
+  // expected-error @+1 {{TPU infeed enqueue supports enqueuing a single tensor -- did you specify shape?}}
   b += a_tpu
   _hostOp(b)
 }
@@ -384,7 +380,6 @@ public func testRecvsInALoop() {
   var a = Tensor<Float>(1.0)
   while count < maxCount {
     // One recv.
-    // expected-error @+1 {{tfop invalid: FIXME: cannot lower a Host->TF tensor transfer in a loop header}}
     let b = atariSim(a.toHost()).toAccelerator()
     a += b
     count += 1

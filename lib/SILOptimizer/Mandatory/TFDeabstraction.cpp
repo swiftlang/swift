@@ -44,7 +44,7 @@ TFDumpDeabstractionDetails("tf-dump-deabstraction-details",
            llvm::cl::desc("Dump extra details about TensorFlow deabstraction"));
 
 static llvm::cl::opt<bool>
-TFStrictDeabstraction("tf-strict-deabstraction", llvm::cl::init(false),
+TFStrictDeabstraction("tf-strict-deabstraction", llvm::cl::init(true),
        llvm::cl::desc("Verify #tfop's are valid without the perf optimizer"));
 
 template<typename...T, typename...U>
@@ -1905,8 +1905,30 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
                           "' is not allowed");
           return;
         }
+
+        // Check to see if it was constant foldable.  If so, we can turn this
+        // into a Const node to avoid a send.
+        auto it = constants.find(operand);
+        if (it != constants.end() && it->second.isConstant()) {
+          // Dig the element type out of the TensorHandle result type.
+          auto eltType =
+            getTensorHandleElementType(inst->getType().getASTType());
+          // We use int32 as the element type of the zero-d shape array.
+          auto int32Ty =
+            context.getInt32Decl()->getDeclaredType()->getCanonicalType();
+          auto constant =
+            createConstTensor(eltType, it->second,
+                              SymbolicValue::getArray({}, int32Ty, allocator),
+                              inst->getType(),  getUserSourceLocation(inst),
+                              DeviceType::ALL, B);
+          inst->replaceAllUsesWith(constant->getResult(0));
+          inst->eraseFromParent();
+          return;
+        }
+
         opName +=
           GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Scalar);
+
         inputs.push_back(operand);
         continue;
       }
@@ -2014,6 +2036,36 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
         return diagnoseInvalidAttr("may not use this device name");
     }
 
+    // Emits a diagnostic and returns true if the value is invalid for a shape
+    // attr.
+    auto verifyNormalAttr = [&](SymbolicValue constValue) -> bool {
+      switch (constValue.getKind()) {
+      case SymbolicValue::Unknown:
+      case SymbolicValue::UninitMemory:
+        assert(0 && "earlier code should have ruled out non-constant values");
+
+      case SymbolicValue::Address:
+        assert(0 && "it's impossible to pass an address as an attr");
+
+      case SymbolicValue::Enum:
+      case SymbolicValue::EnumWithPayload:
+      case SymbolicValue::Aggregate:
+        diagnoseInvalidAttr("cannot be an enum, struct, or tuple");
+        return true;
+
+      case SymbolicValue::Integer:
+      case SymbolicValue::Float:
+      case SymbolicValue::Metatype:
+      case SymbolicValue::String:
+      case SymbolicValue::Function:
+      case SymbolicValue::Array:
+        break;
+      }
+      return false;
+    };
+
+    // Emits a diagnostic and returns true if the value is invalid for a shape
+    // attr.
     auto verifyShapeAttr = [&](SymbolicValue constValue) -> bool {
       // strip away the possible aggregate wrapper.
       constValue = constValue.lookThroughSingleElementAggregates();
@@ -2037,12 +2089,16 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
       }
       return false;
     };
+
     // Verify that the type of this attribute is ok for the OperandClass we
     // have.
     switch (operandClass.second) {
     case SILTensorOpInfo::OperandClass::Input:
     case SILTensorOpInfo::OperandClass::InputElt:
+      assert(0 && "Input classes cannot exist for attributes");
     case SILTensorOpInfo::OperandClass::Normal:  // No modifier.
+      if (verifyNormalAttr(constValue))
+        return; // error already emitted.
       break;
     case SILTensorOpInfo::OperandClass::DType:
       // This integer value is a dtype.
@@ -2146,11 +2202,10 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
     resultTypes.push_back(inst->getType());
   }
 
-  auto op = B.createGraphOperation(inst->getLoc(),
+  auto op = B.createGraphOperation(getUserSourceLocation(inst),
                                    context.getIdentifier(opName), inputs,
                                    attributes, resultTypes);
-  op->setDebugLocation(inst->getDebugLocation());
-  
+
   if (auto tuple = inst->getType().getAs<TupleType>()) {
     SmallVector<SILValue, 4> elts;
     for (unsigned i = 0, e = tuple->getNumElements(); i != e; ++i)

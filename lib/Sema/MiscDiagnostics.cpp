@@ -681,7 +681,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       // either as the callee or as an argument (in which case, the typechecker
       // validates that the noescape bit didn't get stripped off), or as
       // a special case, e.g. in the binding of a withoutActuallyEscaping block
-      // or the argument of a type(of: ...).
+      // or the argument of a type(of: ...) or a differential operator such as
+      // #gradient(...).
       if (parent) {
         if (auto apply = dyn_cast<ApplyExpr>(parent)) {
           if (isa<ParamDecl>(DRE->getDecl()) && useKind == OperandKind::Callee)
@@ -695,7 +696,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
           // SWIFT_ENABLE_TENSORFLOW
         } else if (auto *ole = dyn_cast<ObjectLiteralExpr>(parent)) {
           if (ole->isTFOp()) return;
-        } else if (isa<DynamicTypeExpr>(parent)) {
+        } else if (isa<DynamicTypeExpr>(parent) ||
+                   isa<ReverseAutoDiffExpr>(parent)) {
           return;
         }
 

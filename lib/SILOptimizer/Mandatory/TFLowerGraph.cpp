@@ -249,6 +249,8 @@ struct TFGraphFunctionLowering
   /// name from the declaration. This will be used in `getUniqueName` to produce
   /// uniqued graph node names.
   llvm::SmallDenseMap<ValueDecl *, unsigned> uniqueNames;
+  /// To be used to generate unique undef names.
+  llvm::SmallDenseMap<SILType, unsigned> uniqueUndefNames;
 
   /// The set of graph functions that the generated graph use as
   /// function-typed attributes, but their definitions are not yet available,
@@ -695,12 +697,6 @@ std::string TFGraphFunctionLowering::getUniqueName(SILDebugLocation loc,
         break;
 
       auto lineCol = SM.getLineAndColumn(ds->Loc.getSourceLoc());
-      auto fnName = F->getName();
-
-      // Drop ".device_partition" suffix off function names.
-      if (fnName.endswith(".device_partition"))
-        fnName = fnName.drop_back(strlen(".device_partition"));
-
       // Separate functions using '/' so that TensorBoard can treat it as a
       // hierarchical separator.
       name += '/';
@@ -718,6 +714,11 @@ std::string TFGraphFunctionLowering::getUniqueName(SILDebugLocation loc,
         else
           uniqueNames.insert({afd, 1});
       } else {
+        auto fnName = F->getName();
+        // Drop ".device_partition" suffix off function names.
+        if (fnName.endswith(".device_partition")) {
+          fnName = fnName.drop_back(strlen(".device_partition"));
+        }
         funcName = fnName.str();
       }
 
@@ -737,6 +738,10 @@ std::string TFGraphFunctionLowering::getUniqueName(SILDebugLocation loc,
       name += "." + llvm::utostr(lineCol.second);
     }
   }
+
+  // Append device type to ensure the name is unique across all devices.
+  name += ':';
+  name += thisDeviceTypeStr;
 
   // Escape op name.
   escapeOpName(name);
@@ -919,6 +924,15 @@ TF_Output TFGraphFunctionLowering::createUndefNode(SILType type) {
       break;
     }
   }
+  nodeName += thisDeviceTypeStr;
+  escapeOpName(nodeName);
+  auto uniqueUndefLookup = uniqueUndefNames.find(type);
+  if (uniqueUndefLookup != uniqueUndefNames.end()) {
+    nodeName += "_" + llvm::itostr(uniqueUndefLookup->getSecond()++);
+  } else {
+    uniqueUndefNames.insert({type, 1});
+  }
+
   auto *result = TF_NewOperation(graphFn.getGraph(), "Const", nodeName.c_str());
   TF_SetAttrType(result, "dtype", dtype);
 

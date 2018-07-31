@@ -91,18 +91,6 @@ static CanType getSingleElementDeclFieldType(NominalTypeDecl *decl) {
   return fieldType;
 }
 
-/// Given a generic function with a single generic parameter `<T>(...) -> ...`
-/// an a type for substitution, return a substitution map that's suitable for
-/// calling this func.
-static SubstitutionMap
-getSingleSubstitutionMapForFunction(SILFunction *f, Type ty,
-                                    SILModule &userModule) {
-  auto *loadedFunc = lookupOrLinkFunction(f->getName(), userModule);
-  assert(loadedFunc->getGenericEnvironment());
-  auto *genericSig = loadedFunc->getGenericEnvironment()->getGenericSignature();
-  return getSingleSubstitutionMapForElementTypeAndSignature(ty, genericSig);
-}
-
 /// Classification of instructions that are interesting to the partitioning
 /// pass for various reasons.
 enum class PartitioningClass {
@@ -2794,7 +2782,7 @@ static SILValue createHostReceive(SILBuilder &B, SILLocation loc,
   auto scalarType = getTensorHandleElementType(valueTy.getASTType());
   assert(scalarType && "valueTy is not TensorHandle<T>");
   auto subMap =
-      getSingleSubstitutionMapForFunction(receiveFn, scalarType, userModule);
+      getSingleSubstitutionMapForElementType(scalarType, B.getASTContext());
 
   // Generate an instruction like:
   // %3 = metatype $@thick TensorHandle<Float>.Type
@@ -2898,7 +2886,6 @@ getStdlibNumericTypeDeclFromBuiltinType(Type ty, ASTContext &ctx) {
 static SILValue createHostSend(SILBuilder &B, SILLocation loc, SILValue value,
                                SILValue tensorComputation, int idNumber,
                                ModuleDecl &tensorFlowModule,
-                               SILModule &userModule,
                                SILFunction *createScalarTensorFn,
                                SILFunction *sendFn) {
   assert(sendFn);
@@ -2966,8 +2953,8 @@ static SILValue createHostSend(SILBuilder &B, SILLocation loc, SILValue value,
 
     auto createScalarTensorFnRef =
         B.createFunctionRef(loc, createScalarTensorFn);
-    SubstitutionMap subMap = getSingleSubstitutionMapForFunction(
-        createScalarTensorFn, scalarValueTy, userModule);
+    SubstitutionMap subMap = getSingleSubstitutionMapForElementType(
+        scalarValueTy, B.getASTContext());
     value = B.createApply(loc, createScalarTensorFnRef, subMap,
                           /*args*/ {access, metaTypeInst},
                           /*isNonThrowing*/ false);
@@ -2981,7 +2968,7 @@ static SILValue createHostSend(SILBuilder &B, SILLocation loc, SILValue value,
   // Verify that tensorComputation is passed in as a guaranteed parameter below.
   verifyTensorComputationArgAsGuaranteedParam(sendFnRef);
   SubstitutionMap subMap =
-      getSingleSubstitutionMapForFunction(sendFn, scalarValueTy, userModule);
+      getSingleSubstitutionMapForElementType(scalarValueTy, B.getASTContext());
   // This is a member method of the class of `value`, so we add it as the last
   // parameter.
   return B.createApply(loc, sendFnRef, subMap,
@@ -3078,8 +3065,7 @@ void PartitionCloner::handleSendRecvForTerminator(TermInst *inst) {
         createSomeIntegerValue(caseId /*caseEntry.index()*/, BH, loc, int32Decl);
 
     createHostSend(BH, loc, caseIdInst, tensorComputation, nextSendID,
-                   tensorFlowModule, FP.hostFn.getModule(),
-                   createScalarTensorFn, sendFn);
+                   tensorFlowModule, createScalarTensorFn, sendFn);
     ++caseId;
   }
 
@@ -3226,8 +3212,7 @@ void PartitionCloner::insertSend(SILInstruction &inst) {
            "from Swift to TensorFlow.");
     // Create the send in the host code.
     createHostSend(BH, loc, result, tensorComputation, nextSendID,
-                   tensorFlowModule, FP.hostFn.getModule(),
-                   createScalarTensorFn, sendFn);
+                   tensorFlowModule, createScalarTensorFn, sendFn);
     nextSendID++;
   }
 }
@@ -3598,7 +3583,6 @@ bool PartitionCloner::finalizeOriginal() {
 /// function definition into `userModule` first, so that we can get the generic
 /// substitution map as needed to issue the call.
 static SILValue convertScalarToHostTensorHandle(SILValue value,
-                                                SILModule &userModule,
                                                 SILBuilder &B,
                                                 SILLocation loc) {
   // We need to create a dtype value.  It is an imported C enum value, so it is
@@ -3611,8 +3595,9 @@ static SILValue convertScalarToHostTensorHandle(SILValue value,
   // @_silgen_name("_swift_tfc_CreateCTensorHandle")
   // func _TFCCreateCTensorHandle<T>(_ value : T,
   //                                 _ dtype: TF_DataType) -> CTensorHandle
-  auto createFn = B.getModule().findFunction("_swift_tfc_CreateCTensorHandle",
-                                             SILLinkage::PublicExternal);
+  auto &userModule = B.getModule();
+  auto *createFn = userModule.findFunction("_swift_tfc_CreateCTensorHandle",
+                                           SILLinkage::PublicExternal);
   auto *fnRef = B.createFunctionRef(loc, createFn);
 
   auto dtypeType = fnRef->getFunctionType()->getParameters()[1].getType();
@@ -3640,8 +3625,8 @@ static SILValue convertScalarToHostTensorHandle(SILValue value,
                                     /*fromBuiltin=*/false);
   auto result =
       B.createApply(loc, fnRef,
-                    getSingleSubstitutionMapForFunction(
-                        createFn, value->getType().getASTType(), userModule),
+                    getSingleSubstitutionMapForElementType(
+                        value->getType().getASTType(), B.getASTContext()),
                     {access, dtype}, /*isNonThrowing*/ false);
   // Finish our read access and free the stack memory.
   B.createEndAccess(loc, access, /*aborted*/false);
@@ -3922,8 +3907,7 @@ void TFFunctionPartition::insertTensorComputationStartEndTerminate(
                                                  tensorHandleMember);
       tensorValue = B.createLoad(loc, fieldAddress, loadOwnership);
     } else {
-      tensorValue = convertScalarToHostTensorHandle(tensorValue,
-                                                    hostFn.getModule(), B, loc);
+      tensorValue = convertScalarToHostTensorHandle(tensorValue, B, loc);
     }
     SILValue eltAddr = stackAlloc;
     if (numArgs >= 2)
