@@ -316,7 +316,6 @@ public final class _ExecutionContext {
       TF_DeleteGraph(graph)
     }
     TFE_DeleteContext(cContext)
-    checkOk(status)
     TF_DeleteBuffer(tensorFlowConfig)
     TF_DeleteStatus(status)
     pthread_mutex_destroy(&mutex)
