@@ -452,8 +452,8 @@ let _: Color = .frob(1, &d) // expected-error {{missing argument label 'b:' in c
 let _: Color = .frob(1, b: &d) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 var someColor : Color = .red // expected-error {{enum type 'Color' has no case 'red'; did you mean 'Red'}}
 someColor = .red  // expected-error {{enum type 'Color' has no case 'red'; did you mean 'Red'}}
-someColor = .svar() // expected-error {{static var 'svar' is not a function}}
-someColor = .svar(1) // expected-error {{static var 'svar' is not a function}}
+someColor = .svar() // expected-error {{static property 'svar' is not a function}}
+someColor = .svar(1) // expected-error {{static property 'svar' is not a function}}
 
 func testTypeSugar(_ a : Int) {
   typealias Stride = Int

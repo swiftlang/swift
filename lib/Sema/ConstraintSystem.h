@@ -365,11 +365,8 @@ public:
     auto rep = getRepresentative(record);
     Implementation &repImpl = rep->getImpl();
 
-    // Check whether it has a fixed type.
-    if (auto type = repImpl.ParentOrFixed.dyn_cast<TypeBase *>())
-      return type;
-
-    return Type();
+    // Return the bound type if there is one, otherwise, null.
+    return repImpl.ParentOrFixed.dyn_cast<TypeBase *>();
   }
 
   /// \brief Assign a fixed type to this equivalence class.
@@ -975,6 +972,7 @@ private:
   /// the types on the expression nodes.
   llvm::DenseMap<const Expr *, TypeBase *> ExprTypes;
   llvm::DenseMap<const TypeLoc *, TypeBase *> TypeLocTypes;
+  llvm::DenseMap<const ParamDecl *, TypeBase *> ParamTypes;
 
   /// Maps closure parameters to type variables.
   llvm::DenseMap<const ParamDecl *, TypeVariableType *>
@@ -1453,9 +1451,6 @@ public:
     /// The scope number of this scope. Set when the scope is registered.
     unsigned scopeNumber = 0;
 
-    /// Time in fractional seconds at which we entered this scope.
-    double startTime;
-
     /// Constraint graph scope associated with this solver scope.
     ConstraintGraphScope CGScope;
 
@@ -1467,13 +1462,6 @@ public:
   public:
     explicit SolverScope(ConstraintSystem &cs);
     ~SolverScope();
-
-    Optional<double> getElapsedTimeInFractionalSeconds() {
-      if (!cs.Timer)
-        return None;
-
-      return cs.Timer->getElapsedProcessTimeInFractionalSeconds() - startTime;
-    }
   };
 
   ConstraintSystem(TypeChecker &tc, DeclContext *dc,
@@ -1625,6 +1613,12 @@ public:
     TypeLocTypes[&L] = T.getPointer();
   }
 
+  void setType(ParamDecl *P, Type T) {
+    assert(P && "Expected non-null parameter!");
+    assert(T && "Expected non-null type!");
+    ParamTypes[P] = T.getPointer();
+  }
+
   /// Check to see if we have a type for an expression.
   bool hasType(const Expr *E) const {
     assert(E != nullptr && "Expected non-null expression!");
@@ -1633,6 +1627,11 @@ public:
 
   bool hasType(const TypeLoc &L) const {
     return TypeLocTypes.find(&L) != TypeLocTypes.end();
+  }
+
+  bool hasType(const ParamDecl *P) const {
+    assert(P != nullptr && "Expected non-null parameter!");
+    return ParamTypes.find(P) != ParamTypes.end();
   }
 
   /// Get the type for an expression.
@@ -1648,6 +1647,19 @@ public:
   Type getType(const TypeLoc &L) const {
     assert(hasType(L) && "Expected type to have been set!");
     return TypeLocTypes.find(&L)->second;
+  }
+
+  Type getType(const ParamDecl *P) const {
+    assert(hasType(P) && "Expected type to have been set!");
+    return ParamTypes.find(P)->second;
+  }
+
+  Type getType(const VarDecl *D, bool wantInterfaceType = true) const {
+    if (auto *P = dyn_cast<ParamDecl>(D))
+      return getType(P);
+
+    assert(D->hasValidSignature());
+    return wantInterfaceType ? D->getInterfaceType() : D->getType();
   }
 
   /// Cache the type of the expression argument and return that same
@@ -2221,6 +2233,22 @@ public:
                           ConstraintLocatorBuilder locator,
                           DeclContext *useDC,
                           const DeclRefExpr *base = nullptr);
+
+  /// Return the type-of-reference of the given value.
+  ///
+  /// \param baseType if non-null, return the type of a member reference to
+  ///   this value when the base has the given type
+  ///
+  /// \param UseDC The context of the access.  Some variables have different
+  ///   types depending on where they are used.
+  ///
+  /// \param base The optional base expression of this value reference
+  ///
+  /// \param wantInterfaceType Whether we want the interface type, if available.
+  Type getUnopenedTypeOfReference(VarDecl *value, Type baseType,
+                                  DeclContext *UseDC,
+                                  const DeclRefExpr *base = nullptr,
+                                  bool wantInterfaceType = false);
 
   /// \brief Retrieve the type of a reference to the given value declaration,
   /// as a member with a base of the given type.
@@ -2947,13 +2975,24 @@ private:
   /// \brief Collect the current inactive disjunction constraints.
   void collectDisjunctions(SmallVectorImpl<Constraint *> &disjunctions);
 
-  /// \brief Attempt to solve for the choices in the given disjunction.
+  /// \brief Attempt find a solution involving the options in a
+  ///        disjunction.
   ///
-  /// \returns true if we found at least one solution.
-  bool
-  solveForDisjunctionChoices(Constraint *disjunction,
-                             SmallVectorImpl<Solution> &solutions,
-                             FreeTypeVariableBinding allowFreeTypeVariables);
+  /// \returns true if we failed to find any solutions, false otherwise.
+  bool solveForDisjunction(Constraint *disjunction,
+                           SmallVectorImpl<Solution> &solutions,
+                           FreeTypeVariableBinding allowFreeTypeVariables);
+
+  /// \brief Attempt to solve for some subset of the constraints in a
+  ///        disjunction, skipping constraints that we decide do not
+  ///        need to be solved for because they would not result in
+  ///        the best solution to the constraint system.
+  ///
+  /// \returns true if we failed to find any solutions, false otherwise.
+  bool solveForDisjunctionChoices(
+      ArrayRef<Constraint *> constraints, ConstraintLocator *disjunctionLocator,
+      SmallVectorImpl<Solution> &solutions,
+      FreeTypeVariableBinding allowFreeTypeVariables, bool explicitConversion);
 
   /// \brief Solve the system of constraints after it has already been
   /// simplified.
@@ -3131,15 +3170,20 @@ public:
   
   /// \brief Determine if we've already explored too many paths in an
   /// attempt to solve this expression.
+  bool isExpressionAlreadyTooComplex = false;
   bool getExpressionTooComplex(SmallVectorImpl<Solution> const &solutions) {
+    if (isExpressionAlreadyTooComplex)
+      return true;
+
     auto used = TC.Context.getSolverMemory();
     for (auto const& s : solutions) {
       used += s.getTotalMemory();
     }
     MaxMemory = std::max(used, MaxMemory);
     auto threshold = TC.Context.LangOpts.SolverMemoryThreshold;
-    if (MaxMemory > threshold)
-      return true;
+    if (MaxMemory > threshold) {
+      return isExpressionAlreadyTooComplex= true;
+    }
 
     auto timeoutThresholdInMillis = TC.getExpressionTimeoutThresholdInSeconds();
     if (Timer && Timer->isExpired(timeoutThresholdInMillis)) {
@@ -3147,12 +3191,17 @@ public:
       // threshold since we're arbitrarily ending evaluation and
       // emitting an error.
       Timer->disableWarning();
-      return true;
+
+      return isExpressionAlreadyTooComplex = true;
     }
 
     // Bail out once we've looked at a really large number of
     // choices.
-    return CountScopes > TC.Context.LangOpts.SolverBindingThreshold;
+    if (CountScopes > TC.Context.LangOpts.SolverBindingThreshold) {
+      return isExpressionAlreadyTooComplex = true;
+    }
+
+    return false;
   }
   
   LLVM_ATTRIBUTE_DEPRECATED(
@@ -3321,13 +3370,13 @@ void simplifyLocator(Expr *&anchor,
 
 class DisjunctionChoice {
   ConstraintSystem *CS;
-  Constraint *Disjunction;
   Constraint *Choice;
+  bool ExplicitConversion;
 
 public:
-  DisjunctionChoice(ConstraintSystem *const cs, Constraint *disjunction,
-                    Constraint *choice)
-      : CS(cs), Disjunction(disjunction), Choice(choice) {}
+  DisjunctionChoice(ConstraintSystem *const cs, Constraint *choice,
+                    bool explicitConversion)
+      : CS(cs), Choice(choice), ExplicitConversion(explicitConversion) {}
 
   Constraint *operator->() const { return Choice; }
 
@@ -3456,52 +3505,6 @@ ForcedCheckedCastExpr *findForcedDowncast(ASTContext &ctx, Expr *expr);
 // Note: this may update the provided expr pointer.
 void eraseOpenedExistentials(constraints::ConstraintSystem &CS, Expr *&expr);
 
-
-/// ExprCleaner - This class is used by shrink to ensure that in
-/// no situation will an expr node be left with a dangling type variable stuck
-/// to it.  Often type checking will create new AST nodes and replace old ones
-/// (e.g. by turning an UnresolvedDotExpr into a MemberRefExpr).  These nodes
-/// might be left with pointers into the temporary constraint system through
-/// their type variables, and we don't want pointers into the original AST to
-/// dereference these now-dangling types.
-class ExprCleaner {
-  llvm::SmallVector<VarDecl*, 4> Vars;
-public:
-
-  ExprCleaner(Expr *E) {
-    struct ExprCleanerImpl : public ASTWalker {
-      ExprCleaner *TS;
-      ExprCleanerImpl(ExprCleaner *TS) : TS(TS) {}
-
-      bool walkToDeclPre(Decl *D) override {
-        if (auto VD = dyn_cast<VarDecl>(D))
-          TS->Vars.push_back(VD);
-
-        return true;
-      }
-
-      // Don't walk into statements.  This handles the BraceStmt in
-      // non-single-expr closures, so we don't walk into their body.
-      std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-        return { false, S };
-      }
-    };
-
-    E->walk(ExprCleanerImpl(this));
-  }
-
-  ~ExprCleaner() {
-    // Check each of the expression nodes to verify that there are no type
-    // variables hanging out.  If so, just nuke the type.
-    for (auto VD : Vars) {
-      if (VD->hasType() && VD->getType()->hasTypeVariable()) {
-        VD->setType(Type());
-        VD->setInterfaceType(Type());
-      }
-    }
-  }
-};
-
 // Count the number of overload sets present
 // in the expression and all of the children.
 class OverloadSetCounter : public ASTWalker {
@@ -3578,7 +3581,7 @@ bool diagnoseUnwrap(TypeChecker &TC, DeclContext *DC, Expr *expr, Type type);
 ///
 /// \returns true if a diagnostic was produced.
 bool diagnoseBaseUnwrapForMemberAccess(Expr *baseExpr, Type baseType,
-                                       DeclName memberName,
+                                       DeclName memberName, bool resultOptional,
                                        SourceRange memberRange);
 
 // Return true if, when replacing "<expr>" with "<expr> ?? T", parentheses need

@@ -80,13 +80,24 @@ namespace json {
 
 /// Serialization traits for SyntaxKind.
 template <>
-struct ScalarEnumerationTraits<syntax::SyntaxKind> {
-  static void enumeration(Output &out, syntax::SyntaxKind &value) {
-    out.enumCase(value, "Token", syntax::SyntaxKind::Token);
-    out.enumCase(value, "Unknown", syntax::SyntaxKind::Unknown);
+struct ScalarReferenceTraits<syntax::SyntaxKind> {
+  static StringRef stringRef(const syntax::SyntaxKind &value) {
+    switch (value) {
+      case syntax::SyntaxKind::Token:
+        return "\"Token\"";
+      case syntax::SyntaxKind::Unknown:
+        return "\"Unknown\"";
 % for node in SYNTAX_NODES:
-    out.enumCase(value, "${node.syntax_kind}", syntax::SyntaxKind::${node.syntax_kind});
+      case syntax::SyntaxKind::${node.syntax_kind}:
+        return "\"${node.syntax_kind}\"";
 % end
+    }
+  }
+
+  static bool mustQuote(StringRef) {
+    // The string is already quoted. This is more efficient since it does not
+    // check for characters that need to be escaped
+    return false;
   }
 };
 

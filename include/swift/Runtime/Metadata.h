@@ -239,10 +239,6 @@ const ValueWitnessTable VALUE_WITNESS_SYM(Bi512_); // Builtin.Int512
 // pointer types.
 SWIFT_RUNTIME_EXPORT
 const ExtraInhabitantsValueWitnessTable VALUE_WITNESS_SYM(Bo); // Builtin.NativeObject
-SWIFT_RUNTIME_EXPORT
-const ExtraInhabitantsValueWitnessTable UNOWNED_VALUE_WITNESS_SYM(Bo); // unowned Builtin.NativeObject
-SWIFT_RUNTIME_EXPORT
-const ValueWitnessTable WEAK_VALUE_WITNESS_SYM(Bo); // weak Builtin.NativeObject?
 
 SWIFT_RUNTIME_EXPORT
 const ExtraInhabitantsValueWitnessTable VALUE_WITNESS_SYM(Bb); // Builtin.BridgeObject
@@ -254,10 +250,6 @@ const ExtraInhabitantsValueWitnessTable VALUE_WITNESS_SYM(Bp); // Builtin.RawPoi
 // The ObjC-pointer table can be used for arbitrary ObjC pointer types.
 SWIFT_RUNTIME_EXPORT
 const ExtraInhabitantsValueWitnessTable VALUE_WITNESS_SYM(BO); // Builtin.UnknownObject
-SWIFT_RUNTIME_EXPORT
-const ExtraInhabitantsValueWitnessTable UNOWNED_VALUE_WITNESS_SYM(BO); // unowned Builtin.UnknownObject
-SWIFT_RUNTIME_EXPORT
-const ValueWitnessTable WEAK_VALUE_WITNESS_SYM(BO); // weak Builtin.UnknownObject?
 #endif
 
 // The () -> () table can be used for arbitrary function types.
@@ -477,9 +469,10 @@ swift_getObjCClassFromObject(HeapObject *object);
 #endif
 
 /// \brief Fetch a unique type metadata object for a foreign type.
-SWIFT_RUNTIME_EXPORT
-const ForeignTypeMetadata *
-swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique);
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+MetadataResponse
+swift_getForeignTypeMetadata(MetadataRequest request,
+                             ForeignTypeMetadata *nonUnique);
 
 /// \brief Fetch a unique witness table for a foreign witness table.
 SWIFT_RUNTIME_EXPORT
@@ -531,6 +524,46 @@ swift_getTupleTypeMetadata3(MetadataRequest request,
                             const Metadata *elt0, const Metadata *elt1,
                             const Metadata *elt2, const char *labels,
                             const ValueWitnessTable *proposedWitnesses);
+
+/// Perform layout as if for a tuple whose elements have the given layouts.
+///
+/// \param tupleLayout - A structure into which to write the tuple layout.
+///   Must be non-null.
+/// \param elementOffsets - An array into which to write the offsets of
+///   the elements.  May be null.  Must have space for all elements,
+///   including element 0 (which will always have offset 0).
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+void swift_getTupleTypeLayout(TypeLayout *tupleLayout,
+                              uint32_t *elementOffsets,
+                              TupleTypeFlags flags,
+                              const TypeLayout * const *elements);
+
+/// Perform layout as if for a two-element tuple whose elements have
+/// the given layouts.
+///
+/// \param tupleLayout - A structure into which to write the tuple layout.
+///   Must be non-null.
+/// \returns The offset of the second element.
+///   The first element always has offset 0.
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+size_t swift_getTupleTypeLayout2(TypeLayout *tupleLayout,
+                                 const TypeLayout *elt0,
+                                 const TypeLayout *elt1);
+
+struct OffsetPair { size_t First; size_t Second; };
+
+/// Perform layout as if for a three-element tuple whose elements have
+/// the given layouts.
+///
+/// \param tupleLayout - A structure into which to write the tuple layout.
+///   Must be non-null.
+/// \returns The offsets of the second and third elements.
+///   The first element always has offset 0.
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+OffsetPair swift_getTupleTypeLayout3(TypeLayout *tupleLayout,
+                                     const TypeLayout *elt0Layout,
+                                     const TypeLayout *elt1Layout,
+                                     const TypeLayout *elt2Layout);
 
 /// Initialize the value witness table and struct field offset vector for a
 /// struct, using the "Universal" layout strategy.
@@ -715,11 +748,11 @@ void swift_registerFieldDescriptors(const reflection::FieldDescriptor **records,
 /// Return the superclass, if any.  The result is nullptr for root
 /// classes and class protocol types.
 SWIFT_CC(swift)
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 const Metadata *_swift_class_getSuperclass(const Metadata *theClass);
 
 SWIFT_CC(swift)
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 void swift_getFieldAt(
   const Metadata *base, unsigned index, 
   void (*callback)(const char *name, const Metadata *type, void *ctx), void *callbackCtx);

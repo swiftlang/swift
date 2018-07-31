@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -794,13 +794,12 @@ private:
         if (AvAttr->PlatformAgnostic == PlatformAgnosticAvailabilityKind::Unavailable) {
           // Availability for *
           if (!AvAttr->Rename.empty() && isa<ValueDecl>(D)) {
-            // NB: Don't bother getting obj-c names, we can't get one for the
             // rename
             maybePrintLeadingSpace();
             os << "SWIFT_UNAVAILABLE_MSG(\"'"
                << cast<ValueDecl>(D)->getBaseName()
                << "' has been renamed to '";
-            printEncodedString(AvAttr->Rename, false);
+            printRenameForDecl(AvAttr, cast<ValueDecl>(D), false);
             os << '\'';
             if (!AvAttr->Message.empty()) {
               os << ": ";
@@ -825,7 +824,7 @@ private:
             printEncodedString(AvAttr->Message);
             if (!AvAttr->Rename.empty()) {
               os << ", ";
-              printEncodedString(AvAttr->Rename);
+              printRenameForDecl(AvAttr, cast<ValueDecl>(D), true);
             }
             os << ")";
           } else {
@@ -899,10 +898,9 @@ private:
         }
       }
       if (!AvAttr->Rename.empty() && isa<ValueDecl>(D)) {
-        // NB: Don't bother getting obj-c names, we can't get one for the rename
         os << ",message=\"'" << cast<ValueDecl>(D)->getBaseName()
            << "' has been renamed to '";
-        printEncodedString(AvAttr->Rename, false);
+        printRenameForDecl(AvAttr, cast<ValueDecl>(D), false);
         os << '\'';
         if (!AvAttr->Message.empty()) {
           os << ": ";
@@ -916,6 +914,61 @@ private:
       os << ")";
     }
     return hasPrintedAnything;
+  }
+    
+  void printRenameForDecl(const AvailableAttr *AvAttr, const ValueDecl *D,
+                          bool includeQuotes) {
+    assert(!AvAttr->Rename.empty());
+    
+    auto renamedParsedDeclName = parseDeclName(AvAttr->Rename);
+    auto renamedDeclName = renamedParsedDeclName.formDeclName(D->getASTContext());
+    
+    auto declContext = D->getDeclContext();
+    const ValueDecl *renamedDecl = nullptr;
+    
+    if (isa<ClassDecl>(D) || isa<ProtocolDecl>(D)) {
+      UnqualifiedLookup lookup(renamedDeclName.getBaseIdentifier(),
+                               declContext->getModuleScopeContext(),
+                               nullptr,
+                               SourceLoc(),
+                               UnqualifiedLookup::Flags::TypeLookup);
+      renamedDecl = lookup.getSingleTypeResult();
+    } else {
+      SmallVector<ValueDecl *, 4> lookupResults;
+      declContext->lookupQualified(declContext->getSelfTypeInContext(),
+                                   renamedDeclName, NL_QualifiedDefault, NULL,
+                                   lookupResults);
+      for (auto candidate : lookupResults) {
+        if (!shouldInclude(candidate))
+          continue;
+        
+        if (candidate->getKind() != D->getKind() ||
+            (candidate->isInstanceMember() !=
+             cast<ValueDecl>(D)->isInstanceMember()))
+          continue;
+        
+        if (isa<FuncDecl>(candidate) &&
+            (cast<FuncDecl>(candidate)->getParameters()->size() !=
+             cast<FuncDecl>(D)->getParameters()->size()))
+          continue;
+        
+        if (renamedDecl) {
+          // If we found a duplicated candidate then we would silently fail.
+          renamedDecl = nullptr;
+          break;
+        }
+        renamedDecl = candidate;
+      }
+    }
+    
+    if (renamedDecl) {
+      SmallString<128> scratch;
+      auto renamedObjCRuntimeName = renamedDecl->getObjCRuntimeName()
+        ->getString(scratch);
+      printEncodedString(renamedObjCRuntimeName, includeQuotes);
+    } else {
+      printEncodedString(AvAttr->Rename, includeQuotes);
+    }
   }
 
   void printSwift3ObjCDeprecatedInference(ValueDecl *VD) {
@@ -1837,20 +1890,15 @@ private:
   /// "(A) -> ((B) -> C)" becomes "C (^ (^)(A))(B)".
   void finishFunctionType(const FunctionType *FT) {
     os << ")(";
-    Type paramsTy = FT->getInput();
-    if (auto tupleTy = paramsTy->getAs<TupleType>()) {
-      if (FT->getParams().empty()) {
-        os << "void";
-      } else {
-        interleave(tupleTy->getElements(),
-                   [this](TupleTypeElt elt) {
-                     print(elt.getType(), OTK_None, elt.getName(),
-                           IsFunctionParam);
-                   },
-                   [this] { os << ", "; });
-      }
+    if (!FT->getParams().empty()) {
+      interleave(FT->getParams(),
+                 [this](const AnyFunctionType::Param &param) {
+                   print(param.getType(), OTK_None, param.getLabel(),
+                         IsFunctionParam);
+                 },
+                 [this] { os << ", "; });
     } else {
-      print(paramsTy, OTK_None, Identifier(), IsFunctionParam);
+      os << "void";
     }
     os << ")";
   }
@@ -1993,7 +2041,8 @@ class ReferencedTypeFinder : public TypeVisitor<ReferencedTypeFinder> {
   }
 
   void visitAnyFunctionType(AnyFunctionType *fnTy) {
-    visit(fnTy->getInput());
+    for (auto &param : fnTy->getParams())
+      visit(param.getType());
     visit(fnTy->getResult());
   }
 

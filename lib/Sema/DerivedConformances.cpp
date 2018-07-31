@@ -61,7 +61,7 @@ bool DerivedConformance::derivesProtocolConformance(TypeChecker &TC,
     // We can always complete a partial Hashable implementation, and we can
     // synthesize a full Hashable implementation for structs and enums with
     // Hashable components.
-    return canDeriveHashable(TC, Nominal);
+    return canDeriveHashable(Nominal);
   }
 
   if (auto *enumDecl = dyn_cast<EnumDecl>(Nominal)) {

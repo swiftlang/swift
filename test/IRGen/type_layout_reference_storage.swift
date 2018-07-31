@@ -11,23 +11,35 @@ struct ReferenceStorageTypeLayout<T, Native : C, Unknown : AnyObject> {
   var z: T
 
   // -- Known-Swift-refcounted type
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @"$SBoXoWV", i32 8)
-  unowned(safe)   var cs:  C
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @"$SBomWV", i32 8)
+  // CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_8_8_[[REF_XI:[0-9a-f][0-9a-f][0-9a-f]+]]_pod, i32 0, i32 0)
+  // CHECK-32: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_4_4_[[REF_XI:[0-9a-f][0-9a-f][0-9a-f]+]]_pod, i32 0, i32 0)
   unowned(unsafe) var cu:  C
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @"$SBoSgXwWV", i32 8)
+  // CHECK-native-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_8_8_[[REF_XI]]_bt, i32 0, i32 0)
+  // CHECK-objc-64:   store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_8_8_1_bt, i32 0, i32 0)
+  // CHECK-native-32: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_4_4_[[REF_XI]]_bt, i32 0, i32 0)
+  // CHECK-objc-32:   store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_4_4_1_bt, i32 0, i32 0)
+  unowned(safe)   var cs:  C
+  // CHECK-64: store i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @type_layout_8_8_0, i32 0, i32 0)
+  // CHECK-32: store i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @type_layout_4_4_0, i32 0, i32 0)
   weak            var cwo: C?
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @"$SBoSgXwWV", i32 8)
+  // CHECK-64: store i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @type_layout_8_8_0, i32 0, i32 0)
+  // CHECK-32: store i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @type_layout_4_4_0, i32 0, i32 0)
   weak            var cwi: C!
 
   // -- Known-Swift-refcounted archetype
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @"$SBoXoWV", i32 8)
-  unowned(safe)   var nc:  Native
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @"$SBomWV", i32 8)
+  // CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_8_8_[[REF_XI]]_pod, i32 0, i32 0)
+  // CHECK-32: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_4_4_[[REF_XI]]_pod, i32 0, i32 0)
   unowned(unsafe) var nu:  Native
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @"$SBoSgXwWV", i32 8)
+  // CHECK-native-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_8_8_[[REF_XI]]_bt, i32 0, i32 0)
+  // CHECK-objc-64:   store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_8_8_1_bt, i32 0, i32 0)
+  // CHECK-native-32: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_4_4_[[REF_XI]]_bt, i32 0, i32 0)
+  // CHECK-objc-32:   store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_4_4_1_bt, i32 0, i32 0)
+  unowned(safe)   var nc:  Native
+  // CHECK-64: store i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @type_layout_8_8_0, i32 0, i32 0)
+  // CHECK-32: store i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @type_layout_4_4_0, i32 0, i32 0)
   weak            var nwo: Native?
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @"$SBoSgXwWV", i32 8)
+  // CHECK-64: store i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @type_layout_8_8_0, i32 0, i32 0)
+  // CHECK-32: store i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @type_layout_4_4_0, i32 0, i32 0)
   weak            var nwi: Native!
 
   // -- Open-code layout for protocol types with witness tables. Note:
@@ -35,8 +47,8 @@ struct ReferenceStorageTypeLayout<T, Native : C, Unknown : AnyObject> {
   //       when ObjC interop is disabled.
   //    2) 0x7fffffff is the max extra inhabitant count, but not all types in
   //       all scenarios.
-  // CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_16_8_[[REF_XI:[0-9a-f][0-9a-f][0-9a-f]+]]_pod, i32 0, i32 0)
-  // CHECK-32: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_8_4_[[REF_XI:[0-9a-f][0-9a-f][0-9a-f]+]]_pod, i32 0, i32 0)
+  // CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_16_8_[[REF_XI]]_pod, i32 0, i32 0)
+  // CHECK-32: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_8_4_[[REF_XI]]_pod, i32 0, i32 0)
   unowned(unsafe) var pu:  P
   // CHECK-native-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_16_8_[[REF_XI]]_bt, i32 0, i32 0)
   // CHECK-objc-64:   store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_16_8_7fffffff, i32 0, i32 0)
@@ -81,23 +93,35 @@ struct ReferenceStorageTypeLayout<T, Native : C, Unknown : AnyObject> {
   weak            var pqcwi: (P & Q & C)!
 
   // -- Unknown-refcounted existential without witness tables.
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @"$S[[UNKNOWN:B[Oo]]]XoWV", i32 8)
-  unowned(safe)   var aos:  AnyObject
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @"$SBomWV", i32 8)
+  // CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_8_8_[[REF_XI]]_pod, i32 0, i32 0)
+  // CHECK-32: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_4_4_[[REF_XI]]_pod, i32 0, i32 0)
   unowned(unsafe) var aou:  AnyObject
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @"$S[[UNKNOWN]]SgXwWV", i32 8)
+  // CHECK-native-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_8_8_[[REF_XI]]_bt, i32 0, i32 0)
+  // CHECK-objc-64:   store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_8_8_1, i32 0, i32 0)
+  // CHECK-native-32: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_4_4_[[REF_XI]]_bt, i32 0, i32 0)
+  // CHECK-objc-32:   store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_4_4_1, i32 0, i32 0)
+  unowned(safe)   var aos:  AnyObject
+  // CHECK-64: store i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @type_layout_8_8_0, i32 0, i32 0)
+  // CHECK-32: store i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @type_layout_4_4_0, i32 0, i32 0)
   weak            var aowo: AnyObject?
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @"$S[[UNKNOWN]]SgXwWV", i32 8)
+  // CHECK-64: store i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @type_layout_8_8_0, i32 0, i32 0)
+  // CHECK-32: store i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @type_layout_4_4_0, i32 0, i32 0)
   weak            var aowi: AnyObject!
 
   // -- Unknown-refcounted archetype
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @"$S[[UNKNOWN:B[Oo]]]XoWV", i32 8)
-  unowned(safe)   var us:  Unknown
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @"$SBomWV", i32 8)
+  // CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_8_8_[[REF_XI]]_pod, i32 0, i32 0)
+  // CHECK-32: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_4_4_[[REF_XI]]_pod, i32 0, i32 0)
   unowned(unsafe) var uu:  Unknown
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @"$S[[UNKNOWN]]SgXwWV", i32 8)
+  // CHECK-native-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_8_8_[[REF_XI]]_bt, i32 0, i32 0)
+  // CHECK-objc-64:   store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_8_8_1, i32 0, i32 0)
+  // CHECK-native-32: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_4_4_[[REF_XI]]_bt, i32 0, i32 0)
+  // CHECK-objc-32:   store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_4_4_1, i32 0, i32 0)
+  unowned(safe)   var us:  Unknown
+  // CHECK-64: store i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @type_layout_8_8_0, i32 0, i32 0)
+  // CHECK-32: store i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @type_layout_4_4_0, i32 0, i32 0)
   weak            var uwo: Unknown?
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @"$S[[UNKNOWN]]SgXwWV", i32 8)
+  // CHECK-64: store i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @type_layout_8_8_0, i32 0, i32 0)
+  // CHECK-32: store i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @type_layout_4_4_0, i32 0, i32 0)
   weak            var uwi: Unknown!
 }
 
@@ -105,10 +129,12 @@ struct ReferenceStorageTypeLayout<T, Native : C, Unknown : AnyObject> {
 public class Base {
    var a: UInt32 = 0
 }
-// CHECK-LABEL: %swift.type* @{{.*}}7DerivedCMi"(%swift.type_descriptor*, i8**, i8**)
-// CHECK-NOT: store {{.*}}getelementptr{{.*}}SBomWV
-// CHECK: call swiftcc %swift.metadata_response @"$S29type_layout_reference_storage1P_pXmTMa"([[INT]] 0)
-// CHECK: store {{.*}}getelementptr{{.*}}SBoWV
+// CHECK-LABEL: %swift.metadata_response @{{.*}}7DerivedCMr"(
+// CHECK: call swiftcc %swift.metadata_response @"$S29type_layout_reference_storage4BaseCMa"
+// CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_16_8_{{.*}}_pod, i32 0, i32 0),
+// CHECK-32: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_8_4_{{.*}}_pod, i32 0, i32 0),
+// CHECK: store i8** getelementptr inbounds (i8*, i8** @"$SBoWV", i32 8),
+// CHECK: call void @swift_initClassMetadata
 // CHECK: ret
 public class Derived<T> : Base {
   var type : P.Type

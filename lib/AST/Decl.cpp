@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -164,14 +164,14 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
      auto var = cast<VarDecl>(this);
      switch (var->getCorrectStaticSpelling()) {
      case StaticSpellingKind::None:
-       return var->isLet()? DescriptiveDeclKind::Let
-                          : DescriptiveDeclKind::Var;
+       if (var->getDeclContext()->isTypeContext())
+         return DescriptiveDeclKind::Property;
+       return var->isLet() ? DescriptiveDeclKind::Let
+                           : DescriptiveDeclKind::Var;
      case StaticSpellingKind::KeywordStatic:
-       return var->isLet()? DescriptiveDeclKind::StaticLet
-                          : DescriptiveDeclKind::StaticVar;
+       return DescriptiveDeclKind::StaticProperty;
      case StaticSpellingKind::KeywordClass:
-       return var->isLet()? DescriptiveDeclKind::ClassLet
-                          : DescriptiveDeclKind::ClassVar;
+       return DescriptiveDeclKind::ClassProperty;
      }
    }
 
@@ -249,10 +249,9 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(Var, "var");
   ENTRY(Param, "parameter");
   ENTRY(Let, "let");
-  ENTRY(StaticVar, "static var");
-  ENTRY(StaticLet, "static let");
-  ENTRY(ClassVar, "class var");
-  ENTRY(ClassLet, "class let");
+  ENTRY(Property, "property");
+  ENTRY(StaticProperty, "static property");
+  ENTRY(ClassProperty, "class property");
   ENTRY(PrecedenceGroup, "precedence group");
   ENTRY(InfixOperator, "infix operator");
   ENTRY(PrefixOperator, "prefix operator");
@@ -2139,8 +2138,10 @@ Type ValueDecl::getInterfaceType() const {
 }
 
 void ValueDecl::setInterfaceType(Type type) {
-  if (!type.isNull() && isa<ParamDecl>(this)) {
-    assert(!type->is<InOutType>() && "caller did not pass a base type");
+  if (!type.isNull()) {
+    assert(!type->hasTypeVariable() && "Type variable in interface type");
+    if (isa<ParamDecl>(this))
+      assert(!type->is<InOutType>() && "caller did not pass a base type");
   }
   // lldb creates global typealiases with archetypes in them.
   // FIXME: Add an isDebugAlias() flag, like isDebugVar().
@@ -2153,9 +2154,8 @@ void ValueDecl::setInterfaceType(Type type) {
         isa<AbstractClosureExpr>(getDeclContext()))) {
     assert(!type->hasArchetype() &&
            "Archetype in interface type");
-    assert(!type->hasTypeVariable() &&
-           "Archetype in interface type");
   }
+
   TypeAndAccess.setPointer(type);
 }
 
@@ -3815,9 +3815,12 @@ ProtocolDecl::findProtocolSelfReferences(const ValueDecl *value,
     // Methods of non-final classes can only contain a covariant 'Self'
     // as a function result type.
     if (!allowCovariantParameters) {
-      auto inputType = type->castTo<AnyFunctionType>()->getInput();
-      auto inputKind = ::findProtocolSelfReferences(this, inputType,
-                                                    skipAssocTypes);
+      auto inputKind = SelfReferenceKind::None();
+      for (auto &elt : type->castTo<AnyFunctionType>()->getParams()) {
+        inputKind |= ::findProtocolSelfReferences(this, elt.getType(),
+                                                  skipAssocTypes);
+      }
+
       if (inputKind.parameter)
         return SelfReferenceKind::Other();
     }

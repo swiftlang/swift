@@ -104,8 +104,8 @@ class D : E {}
 
 // CHECK:      [[D_NAME:@.*]] = private constant [2 x i8] c"D\00"
 // CHECK-LABEL: @"$S14class_metadata1DCMn" =
-//   Flags. 268501072 == 0x1001_0050 == Reflectable | IndirectSuperclass | Unique | Class
-// CHECK-SAME: i32 268501072,
+//   Flags. 67174480 == 0x0401_0050 == Reflectable | IndirectSuperclass | Unique | Class
+// CHECK-SAME: i32 67174480,
 //   Parent.
 // CHECK-SAME: i32 {{.*}} @"$S14class_metadataMXM"
 //   Name.

@@ -193,6 +193,15 @@ public:
   /// Which sanitizer coverage is turned on.
   llvm::SanitizerCoverageOptions SanitizeCoverage;
 
+  /// The different modes for dumping IRGen type info.
+  enum class TypeInfoDumpFilter {
+    All,
+    Resilient,
+    Fragile
+  };
+
+  TypeInfoDumpFilter TypeInfoFilter;
+
   IRGenOptions()
       : DWARFVersion(2), OutputKind(IRGenOutputKind::LLVMAssembly),
         Verify(true), OptMode(OptimizationMode::NotSet),
@@ -208,7 +217,8 @@ public:
         EnableReflectionNames(true), EnableClassResilience(false),
         EnableResilienceBypass(false), UseIncrementalLLVMCodeGen(true),
         UseSwiftCall(false), GenerateProfile(false), CmdArgs(),
-        SanitizeCoverage(llvm::SanitizerCoverageOptions()) {}
+        SanitizeCoverage(llvm::SanitizerCoverageOptions()),
+        TypeInfoFilter(TypeInfoDumpFilter::All) {}
 
   // Get a hash of all options which influence the llvm compilation but are not
   // reflected in the llvm module itself.
