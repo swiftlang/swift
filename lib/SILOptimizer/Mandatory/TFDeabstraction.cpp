@@ -1909,18 +1909,17 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
         // Check to see if it was constant foldable.  If so, we can turn this
         // into a Const node to avoid a send.
         auto it = constants.find(operand);
-        if (it != constants.end()) {
+        if (it != constants.end() && it->second.isConstant()) {
           // Dig the element type out of the TensorHandle result type.
           auto eltType =
             getTensorHandleElementType(inst->getType().getASTType());
+          // We use int32 as the element type of the zero-d shape array.
           auto int32Ty =
             context.getInt32Decl()->getDeclaredType()->getCanonicalType();
-
           auto constant =
             createConstTensor(eltType, it->second,
-                              SymbolicValue::getArray({}, int32Ty,
-                                                      allocator),
-                              inst->getType(),  inst->getLoc(),
+                              SymbolicValue::getArray({}, int32Ty, allocator),
+                              inst->getType(),  getUserSourceLocation(inst),
                               DeviceType::ALL, B);
           inst->replaceAllUsesWith(constant->getResult(0));
           inst->eraseFromParent();
