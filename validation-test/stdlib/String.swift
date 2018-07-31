@@ -533,18 +533,20 @@ StringTests.test("appendToEmptyString") {
 }
 
 StringTests.test("Swift3Slice/Empty") {
-  let size = 5
+  let size = 16
   let s = String(repeating: "x", count: size)
+  expectNotNil(s.bufferID)
   for i in 0 ... size {
     let slice = s[s.index(_nth: i)..<s.index(_nth: i)]
-    // Most Swift 3 substrings are extracted into their own buffer,
-    // but empty substrings get turned into the empty string singleton
-    expectNil(slice.bufferID)
+    // Empty substrings still have indices relative to their base and can refer
+    // to the whole string. If the whole string has storage, so should its
+    // substring.
+    expectNotNil(slice.bufferID)
   }
 }
 
 StringTests.test("Swift3Slice/Full") {
-  let size = 5
+  let size = 16
   let s = String(repeating: "x", count: size)
   let slice = s[s.startIndex..<s.endIndex]
   // Most Swift 3 substrings are extracted into their own buffer,
