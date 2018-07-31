@@ -95,11 +95,13 @@ public enum _RuntimeConfig {
   /// TPU execution, set the enum value accordingly.
   static public var executionMode: _ExecutionMode = .auto
 
-  /// When true, let TensorFlow GPU memory allocation start small and grow as needed.
-  /// Otherwise, The entire GPU memory region is pre-allocated.
+  /// When true, let TensorFlow GPU memory allocation start small and grow as
+  /// needed. Otherwise, The entire GPU memory region is pre-allocated.
   // TODO: assess whether we should default to true.
   static public var gpuMemoryAllowGrowth = false
   
+  /// When non-nil, run metadata (with full trace) of each session execution
+  /// will be dumped to the give path.
   static public var runMetadataOutputPath: String? = nil
 
   /// Specifies whether the TensorFlow computation runs in a local (in-process)
