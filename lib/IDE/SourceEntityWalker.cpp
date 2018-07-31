@@ -252,6 +252,8 @@ static Optional<AccessKind> getAccessKind(Expr *E) {
 }
 
 std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
+  assert(E);
+
   if (isDone())
     return { false, nullptr };
 
