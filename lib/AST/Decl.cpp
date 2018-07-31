@@ -5514,7 +5514,7 @@ Type FuncDecl::getResultInterfaceType() const {
     return nullptr;
 
   Type resultTy = getInterfaceType();
-  if (resultTy->hasError())
+  if (resultTy->is<ErrorType>())
     return resultTy;
 
   if (hasImplicitSelfDecl())
