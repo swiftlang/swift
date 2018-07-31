@@ -1862,6 +1862,11 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
   if (!protocol)
     return nullptr;
 
+  // If protocol is deprecated or available don't try to optimize.
+  if (TypeChecker::getDeprecated(protocol) ||
+      protocol->getAttrs().isUnavailable(TC.Context))
+    return nullptr;
+
   Type type;
   if (typeExpr->getTypeLoc().wasValidated()) {
     type = typeExpr->getTypeLoc().getType();
