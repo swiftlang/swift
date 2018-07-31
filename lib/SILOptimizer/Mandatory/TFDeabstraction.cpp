@@ -354,14 +354,13 @@ static BuiltinInst *simplifyOperands(BuiltinInst *inst, TFDeabstraction &TFDA) {
       if (!decl || !isa<StructDecl>(decl)) return nullptr;
 
       // Check to see if there is a single stored field.
-      auto fieldIt = decl->getStoredProperties().begin();
-      if (fieldIt == decl->getStoredProperties().end()) return nullptr;
+      auto field = tf::getFieldIfContainsSingleField(decl);
+      if (!field) return nullptr;
 
       // If this is the top level of the struct, retain the field decl.
-      if (result == nullptr) result = *fieldIt;
+      if (result == nullptr) result = field;
 
-      type = (*fieldIt++)->getType();
-      if (fieldIt != decl->getStoredProperties().end()) return nullptr;
+      type = field->getType();
 
       // If we unwrapped a level and got to a builtin type, then this is a
       // wrapper.
@@ -1190,10 +1189,33 @@ void TFDeabstraction::prepareStackAllocForPromotion(AllocStackInst *alloc) {
   // we have tensor values mixed in with other random values that shouldn't
   // (or can't) be loaded.  For now, we can just fail to deabstract these
   // cases.
-  for (auto UI = alloc->use_begin(); UI != alloc->use_end();) {
-    auto inst = (*UI)->getUser();
 
-    if (auto sea = dyn_cast<StructElementAddrInst>(inst))
+  // Our first scan will look for begin_access instructions and remove them,
+  // allowing the second pass to be simpler.
+  for (auto UI = alloc->use_begin(); UI != alloc->use_end();) {
+    auto *begin = dyn_cast<BeginAccessInst>((*UI++)->getUser());
+    if (!begin)
+      continue;
+
+    // If we have a begin_access instruction, replace uses of begin_access with
+    // uses of the original value and remove the end_access.
+    for (auto UI = begin->use_begin(); UI != begin->use_end();) {
+      auto *use = *UI++;
+      auto inst = use->getUser();
+      if (isa<EndAccessInst>(inst))
+        inst->eraseFromParent();
+      else
+        use->set(alloc);
+    }
+    begin->eraseFromParent();
+  }
+
+  // Our second pass looks for aggregate operations and struct_element_addrs
+  // that poke inside the allocation.
+  for (auto UI = alloc->use_begin(); UI != alloc->use_end();) {
+    auto *inst = (*UI)->getUser();
+
+    if (auto *sea = dyn_cast<StructElementAddrInst>(inst)) {
       if (auto *use = sea->getSingleUse()) {
         // If we have a load(struct_element_addr(alloc)) turn it into
         // struct_extract(load(alloc)).
@@ -1210,7 +1232,31 @@ void TFDeabstraction::prepareStackAllocForPromotion(AllocStackInst *alloc) {
           sea->eraseFromParent();
           continue;
         }
+
+        // If we have a store(x ->struct_element_addr(alloc)), turn it into a
+        // load of the whole value, a bunch of extracts, then a struct_inst
+        // to rebuild the whole value, then a store of the whole thing.
+        //
+        // TODO: For now, we only handle a single element struct, which is
+        // considerably simpler.
+        //
+        if (auto *store = dyn_cast<StoreInst>(use->getUser())) {
+          if (use->getOperandNumber() == 1 &&  // store TO the alloca.
+              tf::getFieldIfContainsSingleField(sea->getStructDecl())) {
+            SILBuilder B(store);
+            auto *newStruct = B.createStruct(store->getLoc(),
+                                             alloc->getType().getObjectType(),
+                                             store->getOperand(0));
+            B.createStore(store->getLoc(), newStruct, sea->getOperand(),
+                          store->getOwnershipQualifier());
+            store->eraseFromParent();
+            ++UI;
+            sea->eraseFromParent();
+            continue;
+          }
+        }
       }
+    }
 
     // Explode aggregate by-address instructions like copy-addr.
     if (explodeAggregateInst(inst, /*all types*/nullptr)) {
@@ -1219,28 +1265,8 @@ void TFDeabstraction::prepareStackAllocForPromotion(AllocStackInst *alloc) {
       continue;
     }
 
-    // If we have an instruction other than begin_access, remember it.
-    auto *begin = dyn_cast<BeginAccessInst>(inst);
-    if (!begin) {
-      ++UI;
-      continue;
-    }
-
-    // If we have a begin_access instruction, look through it.  Add all of the
-    // users to the users list, and replace uses of begin_access with uses of
-    // the original value.  Finally, ignore and remove the end_access.
-    for (auto UI = begin->use_begin(); UI != begin->use_end();) {
-      auto *use = *UI++;
-      auto inst = use->getUser();
-      if (isa<EndAccessInst>(inst)) {
-        inst->eraseFromParent();
-      } else {
-        use->set(alloc);
-      }
-    }
-
+    // Otherwise we have something else, leave it alone.
     ++UI;
-    begin->eraseFromParent();
   }
 }
 

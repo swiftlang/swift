@@ -37,6 +37,10 @@ namespace tf {
   /// return null.  This is used for integration unit tests and debugging.
   llvm::raw_ostream *getTFDumpIntermediateStream();
 
+  /// If the specified decl has a single stored field, return it.  Otherwise
+  /// return null.
+  VarDecl *getFieldIfContainsSingleField(NominalTypeDecl *decl);
+
   /// If the specified type is the well-known TensorHandle<T> type, then return
   /// "T".  If not, return a null type.
   bool isTensorHandle(SILType ty);
