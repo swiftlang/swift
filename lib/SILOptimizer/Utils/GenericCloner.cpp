@@ -15,6 +15,7 @@
 #include "swift/AST/Type.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILValue.h"
@@ -38,7 +39,8 @@ SILFunction *GenericCloner::initCloned(SILFunction *Orig,
   assert(!Orig->isGlobalInit() && "Global initializer cannot be cloned");
 
   // Create a new empty function.
-  SILFunction *NewF = Orig->getModule().createFunction(
+  SILFunctionBuilder builder(Orig->getModule());
+  SILFunction *NewF = builder.createFunction(
       getSpecializedLinkage(Orig, Orig->getLinkage()), NewName,
       ReInfo.getSpecializedType(), ReInfo.getSpecializedGenericEnvironment(),
       Orig->getLocation(), Orig->isBare(), Orig->isTransparent(), Serialized,

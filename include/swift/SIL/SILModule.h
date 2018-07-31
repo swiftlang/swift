@@ -65,6 +65,7 @@ class ModuleDecl;
 class SILUndef;
 class SourceFile;
 class SerializedSILLoader;
+class SILFunctionBuilder;
 
 namespace Lowering {
 class SILGenModule;
@@ -103,6 +104,8 @@ enum class SILStage {
 /// \brief A SIL module. The SIL module owns all of the SILFunctions generated
 /// when a Swift compilation context is lowered to SIL.
 class SILModule {
+  friend class SILFunctionBuilder;
+
 public:
   using FunctionListType = llvm::ilist<SILFunction>;
   using GlobalListType = llvm::ilist<SILGlobalVariable>;
@@ -530,51 +533,6 @@ public:
   /// Link all definitions in all segments that are logically part of
   /// the same AST module.
   void linkAllFromCurrentModule();
-
-  /// \brief Return the declaration of a utility function that can,
-  /// but needn't, be shared between modules.
-  SILFunction *getOrCreateSharedFunction(SILLocation loc, StringRef name,
-                                         CanSILFunctionType type,
-                                         IsBare_t isBareSILFunction,
-                                         IsTransparent_t isTransparent,
-                                         IsSerialized_t isSerialized,
-                                         ProfileCounter entryCount,
-                                         IsThunk_t isThunk);
-
-  /// \brief Return the declaration of a function, or create it if it doesn't
-  /// exist.
-  SILFunction *getOrCreateFunction(
-      SILLocation loc, StringRef name, SILLinkage linkage,
-      CanSILFunctionType type, IsBare_t isBareSILFunction,
-      IsTransparent_t isTransparent, IsSerialized_t isSerialized,
-      ProfileCounter entryCount = ProfileCounter(),
-      IsThunk_t isThunk = IsNotThunk,
-      SubclassScope subclassScope = SubclassScope::NotApplicable);
-
-  /// \brief Return the declaration of a function, or create it if it doesn't
-  /// exist.
-  SILFunction *
-  getOrCreateFunction(SILLocation loc, SILDeclRef constant,
-                      ForDefinition_t forDefinition,
-                      ProfileCounter entryCount = ProfileCounter());
-
-  /// \brief Create a function declaration.
-  ///
-  /// This signature is a direct copy of the signature of SILFunction::create()
-  /// in order to simplify refactoring all SILFunction creation use-sites to use
-  /// SILModule. Eventually the uses should probably be refactored.
-  SILFunction *
-  createFunction(SILLinkage linkage, StringRef name,
-                 CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
-                 Optional<SILLocation> loc, IsBare_t isBareSILFunction,
-                 IsTransparent_t isTrans, IsSerialized_t isSerialized,
-                 ProfileCounter entryCount = ProfileCounter(),
-                 IsThunk_t isThunk = IsNotThunk,
-                 SubclassScope subclassScope = SubclassScope::NotApplicable,
-                 Inline_t inlineStrategy = InlineDefault,
-                 EffectsKind EK = EffectsKind::Unspecified,
-                 SILFunction *InsertBefore = nullptr,
-                 const SILDebugScope *DebugScope = nullptr);
 
   /// Look up the SILWitnessTable representing the lowering of a protocol
   /// conformance, and collect the substitutions to apply to the referenced
