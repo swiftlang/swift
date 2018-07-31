@@ -1,4 +1,4 @@
-// RUN: %target-run-stdlib-swift-swift3 | %FileCheck %s
+// RUN: %target-run-stdlib-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
@@ -15,7 +15,7 @@ func hexAddrVal<T>(_ x: T) -> String {
 }
 
 func repr(_ x: NSString) -> String {
-  return "\(NSStringFromClass(object_getClass(x)))\(hexAddrVal(x)) = \"\(x)\""
+  return "\(NSStringFromClass(object_getClass(x)!))\(hexAddrVal(x)) = \"\(x)\""
 }
 
 func repr(_ x: _StringGuts) -> String {
@@ -100,7 +100,7 @@ func nonASCII() {
   // CHECK-NEXT: String(Native(owner: @[[sliceAddress:[x0-9a-f]+]], count: 6
   let i2 = newNSUTF16.index(newNSUTF16.startIndex, offsetBy: 2)
   let i8 = newNSUTF16.index(newNSUTF16.startIndex, offsetBy: 6)
-  let slice = newNSUTF16[i2..<i8]
+  let slice = String(newNSUTF16[i2..<i8])
   print("  \(repr(slice))")
 
   // The storage of the slice implements NSString directly
@@ -148,7 +148,7 @@ func ascii() {
   let i6 = newNSASCII.index(newNSASCII.startIndex, offsetBy: 6)
   
   // Slicing the String
-  print("  \(repr(newNSASCII[i3..<i6]))")
+  print("  \(repr(String(newNSASCII[i3..<i6])))")
 
   // Representing a slice as an NSString
   let nsSliceASCII = newNSASCII[i3..<i6] as NSString
