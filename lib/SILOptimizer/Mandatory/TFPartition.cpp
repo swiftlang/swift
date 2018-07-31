@@ -82,13 +82,9 @@ static bool isUserIgnoredByPartitioning(SILInstruction *inst) {
 /// type of the single member, asserting and aborting if we get something
 /// unexpected.
 static CanType getSingleElementDeclFieldType(NominalTypeDecl *decl) {
-  auto fieldIt = decl->getStoredProperties().begin();
-  assert(fieldIt != decl->getStoredProperties().end() &&
-         "Struct should have one member");
-  auto fieldType = (*fieldIt++)->getType()->getCanonicalType();
-  assert(fieldIt == decl->getStoredProperties().end() &&
-         "Struct should have one member");
-  return fieldType;
+  auto *field = tf::getFieldIfContainsSingleField(decl);
+  assert(field && "Struct should have one member");
+  return field->getType()->getCanonicalType();
 }
 
 /// Classification of instructions that are interesting to the partitioning

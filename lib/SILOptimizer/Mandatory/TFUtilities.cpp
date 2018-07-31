@@ -84,6 +84,19 @@ llvm::raw_ostream *tf::getTFDumpIntermediateStream() {
   return &fileStream;
 }
 
+/// If the specified decl has a single stored field, return it.  Otherwise
+/// return null.
+VarDecl *tf::getFieldIfContainsSingleField(NominalTypeDecl *decl) {
+  // Check to see if there is a single stored field.
+  auto fieldIt = decl->getStoredProperties().begin();
+  if (fieldIt == decl->getStoredProperties().end())
+    return nullptr;
+  auto result = *fieldIt++;
+  if (fieldIt != decl->getStoredProperties().end())
+    return nullptr;
+  return result;
+}
+
 bool tf::isTensorHandle(SILType ty) {
   return (bool)isTensorHandle(ty.getASTType());
 }

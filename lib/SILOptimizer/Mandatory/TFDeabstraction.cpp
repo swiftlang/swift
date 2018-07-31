@@ -335,20 +335,6 @@ static SILValue lookThroughSingleElementStructInsts(SILValue value) {
   return value;
 }
 
-/// If the specified struct has a single stored field, return it.  Otherwise
-/// return null.
-static VarDecl *getFieldIfSingleFieldStruct(StructDecl *decl) {
-  // Check to see if there is a single stored field.
-  auto fieldIt = decl->getStoredProperties().begin();
-  if (fieldIt == decl->getStoredProperties().end())
-    return nullptr;
-  auto result = *fieldIt++;
-  if (fieldIt != decl->getStoredProperties().end())
-    return nullptr;
-  return result;
-}
-
-
 /// Scan the operand list of the builtin.  If any operand is passed indirectly
 /// (i.e., an address of a stack location is passed instead of the value itself)
 /// then rewrite the builtin to use a loaded version of that value.
@@ -368,7 +354,7 @@ static BuiltinInst *simplifyOperands(BuiltinInst *inst, TFDeabstraction &TFDA) {
       if (!decl || !isa<StructDecl>(decl)) return nullptr;
 
       // Check to see if there is a single stored field.
-      auto field = getFieldIfSingleFieldStruct(cast<StructDecl>(decl));
+      auto field = tf::getFieldIfContainsSingleField(decl);
       if (!field) return nullptr;
 
       // If this is the top level of the struct, retain the field decl.
@@ -1227,9 +1213,9 @@ void TFDeabstraction::prepareStackAllocForPromotion(AllocStackInst *alloc) {
   // Our second pass looks for aggregate operations and struct_element_addrs
   // that poke inside the allocation.
   for (auto UI = alloc->use_begin(); UI != alloc->use_end();) {
-    auto inst = (*UI)->getUser();
+    auto *inst = (*UI)->getUser();
 
-    if (auto sea = dyn_cast<StructElementAddrInst>(inst)) {
+    if (auto *sea = dyn_cast<StructElementAddrInst>(inst)) {
       if (auto *use = sea->getSingleUse()) {
         // If we have a load(struct_element_addr(alloc)) turn it into
         // struct_extract(load(alloc)).
@@ -1256,7 +1242,7 @@ void TFDeabstraction::prepareStackAllocForPromotion(AllocStackInst *alloc) {
         //
         if (auto *store = dyn_cast<StoreInst>(use->getUser())) {
           if (use->getOperandNumber() == 1 &&  // store TO the alloca.
-              getFieldIfSingleFieldStruct(sea->getStructDecl())) {
+              tf::getFieldIfContainsSingleField(sea->getStructDecl())) {
             SILBuilder B(store);
             auto *newStruct = B.createStruct(store->getLoc(),
                                              alloc->getType().getObjectType(),
