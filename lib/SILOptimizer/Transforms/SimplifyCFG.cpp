@@ -1583,11 +1583,12 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
     EnumElementDecl *FirstElt = *Iter;
 
     // We can't do this optimization on non-exhaustive enums.
-    bool isNonExhaustive = E->isResilient(Fn.getModule().getSwiftModule(),
-                                          ResilienceExpansion::Maximal);
-    isNonExhaustive |= E->isObjC();
+    // FIXME: Get the resilience expansion from the function.
+    bool IsExhaustive =
+        E->isEffectivelyExhaustive(Fn.getModule().getSwiftModule(),
+                                   ResilienceExpansion::Maximal);
 
-    if (!isNonExhaustive
+    if (IsExhaustive
         && SEI->getNumCases() >= 1
         && SEI->getCase(0).first != FirstElt) {
       ++Iter;

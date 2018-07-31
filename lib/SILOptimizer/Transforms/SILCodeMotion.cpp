@@ -317,10 +317,11 @@ void BBEnumTagDataflowState::handlePredCondSelectEnum(CondBranchInst *CondBr) {
   // know the true branch must be the other tag.
   if (EnumDecl *E = Operand->getType().getEnumOrBoundGenericEnum()) {
     // We can't do this optimization on non-exhaustive enums.
-    bool isNonExhaustive = E->isResilient(CondBr->getModule().getSwiftModule(),
-                                          ResilienceExpansion::Maximal);
-    isNonExhaustive |= E->isObjC();
-    if (isNonExhaustive)
+    // FIXME: Get resilience expansion from the function.
+    bool IsExhaustive =
+        E->isEffectivelyExhaustive(CondBr->getModule().getSwiftModule(),
+                                   ResilienceExpansion::Maximal);
+    if (!IsExhaustive)
       return;
     // Look for a single other element on this enum.
     EnumElementDecl *OtherElt = nullptr;

@@ -1425,9 +1425,8 @@ namespace {
     assert(decl && "switch_enum operand is not an enum");
 
     // FIXME: Get expansion from SILFunction
-    if (decl->isResilient(inst->getModule().getSwiftModule(),
-                          ResilienceExpansion::Maximal) ||
-        decl->isObjC()) {
+    if (!decl->isEffectivelyExhaustive(inst->getModule().getSwiftModule(),
+                                       ResilienceExpansion::Maximal)) {
       return nullptr;
     }
 
