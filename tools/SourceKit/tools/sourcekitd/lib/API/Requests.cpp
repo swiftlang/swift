@@ -2047,14 +2047,14 @@ public:
 
   bool syntaxMapEnabled() override { return Opts.EnableSyntaxMap; }
 
-  bool handleSyntaxMap(unsigned Offset, unsigned Length, UIdent Kind) override;
+  void handleSyntaxMap(unsigned Offset, unsigned Length, UIdent Kind) override;
 
-  bool handleSemanticAnnotation(unsigned Offset, unsigned Length, UIdent Kind,
+  void handleSemanticAnnotation(unsigned Offset, unsigned Length, UIdent Kind,
                                 bool isSystem) override;
 
   bool documentStructureEnabled() override { return Opts.EnableStructure; }
 
-  bool beginDocumentSubStructure(unsigned Offset, unsigned Length, UIdent Kind,
+  void beginDocumentSubStructure(unsigned Offset, unsigned Length, UIdent Kind,
                                  UIdent AccessLevel,
                                  UIdent SetterAccessLevel,
                                  unsigned NameOffset,
@@ -2070,30 +2070,29 @@ public:
                                  ArrayRef<StringRef> InheritedTypes,
                                  ArrayRef<std::tuple<UIdent, unsigned, unsigned>> Attrs) override;
 
-  bool endDocumentSubStructure() override;
+  void endDocumentSubStructure() override;
 
-  bool handleDocumentSubStructureElement(UIdent Kind,
-                                         unsigned Offset,
+  void handleDocumentSubStructureElement(UIdent Kind, unsigned Offset,
                                          unsigned Length) override;
 
-  bool recordAffectedRange(unsigned Offset, unsigned Length) override;
+  void recordAffectedRange(unsigned Offset, unsigned Length) override;
 
-  bool recordAffectedLineRange(unsigned Line, unsigned Length) override;
+  void recordAffectedLineRange(unsigned Line, unsigned Length) override;
 
-  bool recordFormattedText(StringRef Text) override;
+  void recordFormattedText(StringRef Text) override;
 
-  bool setDiagnosticStage(UIdent DiagStage) override;
-  bool handleDiagnostic(const DiagnosticEntryInfo &Info,
+  void setDiagnosticStage(UIdent DiagStage) override;
+  void handleDiagnostic(const DiagnosticEntryInfo &Info,
                         UIdent DiagStage) override;
 
-  bool handleSourceText(StringRef Text) override;
+  void handleSourceText(StringRef Text) override;
 
-  bool handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree,
+  void handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree,
                         std::unordered_set<unsigned> ReusedNodeIds) override;
 
   bool syntaxReuseInfoEnabled() override { return Opts.EnableSyntaxReuseInfo; }
-  bool handleSyntaxReuseRegions(
-      std::vector<SourceFileRange> ReuseRegions) override;
+  void
+  handleSyntaxReuseRegions(std::vector<SourceFileRange> ReuseRegions) override;
 
   SyntaxTreeTransferMode syntaxTreeTransferMode() override {
     return Opts.SyntaxTransferMode;
@@ -2268,24 +2267,22 @@ void SKEditorConsumer::handleRequestError(const char *Description) {
   }
 }
 
-bool SKEditorConsumer::handleSyntaxMap(unsigned Offset, unsigned Length,
+void SKEditorConsumer::handleSyntaxMap(unsigned Offset, unsigned Length,
                                        UIdent Kind) {
   if (!Opts.EnableSyntaxMap)
-    return true;
+    return;
 
   SyntaxMap.add(Kind, Offset, Length, /*IsSystem=*/false);
-  return true;
 }
 
-bool SKEditorConsumer::handleSemanticAnnotation(unsigned Offset,
-                                                unsigned Length,
-                                                UIdent Kind, bool isSystem) {
+void SKEditorConsumer::handleSemanticAnnotation(unsigned Offset,
+                                                unsigned Length, UIdent Kind,
+                                                bool isSystem) {
   assert(Kind.isValid());
   SemanticAnnotations.add(Kind, Offset, Length, isSystem);
-  return true;
 }
 
-bool
+void
 SKEditorConsumer::beginDocumentSubStructure(unsigned Offset,
                                             unsigned Length, UIdent Kind,
                                             UIdent AccessLevel,
@@ -2308,41 +2305,32 @@ SKEditorConsumer::beginDocumentSubStructure(unsigned Offset,
         NameLength, BodyOffset, BodyLength, DocOffset, DocLength, DisplayName,
         TypeName, RuntimeName, SelectorName, InheritedTypes, Attrs);
   }
-  return true;
 }
 
-bool SKEditorConsumer::endDocumentSubStructure() {
+void SKEditorConsumer::endDocumentSubStructure() {
   if (Opts.EnableStructure)
     DocStructure.endSubStructure();
-  return true;
 }
 
-bool SKEditorConsumer::handleDocumentSubStructureElement(UIdent Kind,
+void SKEditorConsumer::handleDocumentSubStructureElement(UIdent Kind,
                                                          unsigned Offset,
                                                          unsigned Length) {
   if (Opts.EnableStructure)
     DocStructure.addElement(Kind, Offset, Length);
-  return true;
 }
 
-bool SKEditorConsumer::recordAffectedRange(unsigned Offset, unsigned Length) {
+void SKEditorConsumer::recordAffectedRange(unsigned Offset, unsigned Length) {
   Dict.set(KeyOffset, Offset);
   Dict.set(KeyLength, Length);
-
-  return true;
 }
 
-bool SKEditorConsumer::recordAffectedLineRange(unsigned Line, unsigned Length) {
+void SKEditorConsumer::recordAffectedLineRange(unsigned Line, unsigned Length) {
   Dict.set(KeyLine, Line);
   Dict.set(KeyLength, Length);
-
-  return true;
 }
 
-bool SKEditorConsumer::recordFormattedText(StringRef Text) {
+void SKEditorConsumer::recordFormattedText(StringRef Text) {
   Dict.set(KeySourceText, Text);
-
-  return true;
 }
 
 static void fillDictionaryForDiagnosticInfoBase(
@@ -2409,15 +2397,14 @@ static void fillDictionaryForDiagnosticInfoBase(
   }
 }
 
-bool SKEditorConsumer::setDiagnosticStage(UIdent DiagStage) {
+void SKEditorConsumer::setDiagnosticStage(UIdent DiagStage) {
   Dict.set(KeyDiagnosticStage, DiagStage);
-  return true;
 }
 
-bool SKEditorConsumer::handleDiagnostic(const DiagnosticEntryInfo &Info,
+void SKEditorConsumer::handleDiagnostic(const DiagnosticEntryInfo &Info,
                                         UIdent DiagStage) {
   if (!Opts.EnableDiagnostics)
-    return true;
+    return;
 
   ResponseBuilder::Array &Arr = Diags;
   if (Arr.isNull())
@@ -2426,19 +2413,17 @@ bool SKEditorConsumer::handleDiagnostic(const DiagnosticEntryInfo &Info,
   auto Elem = Arr.appendDictionary();
   Elem.set(KeyDiagnosticStage, DiagStage);
   fillDictionaryForDiagnosticInfo(Elem, Info);
-  return true;
 }
 
-bool SKEditorConsumer::handleSourceText(StringRef Text) {
+void SKEditorConsumer::handleSourceText(StringRef Text) {
   Dict.set(KeySourceText, Text);
-  return true;
 }
 
-bool SKEditorConsumer::handleSyntaxTree(
+void SKEditorConsumer::handleSyntaxTree(
     const swift::syntax::SourceFileSyntax &SyntaxTree,
     std::unordered_set<unsigned> ReusedNodeIds) {
   if (Opts.SyntaxTransferMode == SyntaxTreeTransferMode::Off)
-    return true;
+    return;
 
   std::string SyntaxTreeString;
   {
@@ -2450,10 +2435,9 @@ bool SKEditorConsumer::handleSyntaxTree(
     SyntaxTreeOutput << *SyntaxTree.getRaw();
   }
   Dict.set(KeySerializedSyntaxTree, SyntaxTreeString);
-  return true;
 }
 
-bool SKEditorConsumer::handleSyntaxReuseRegions(
+void SKEditorConsumer::handleSyntaxReuseRegions(
     std::vector<SourceFileRange> ReuseRegions) {
   if (Opts.EnableSyntaxReuseInfo) {
     auto Array = Dict.setArray(KeySyntaxReuseRegions);
@@ -2464,7 +2448,6 @@ bool SKEditorConsumer::handleSyntaxReuseRegions(
       SubDict.set(KeyLength, Region.End - Region.Start);
     }
   }
-  return true;
 }
 
 static sourcekitd_response_t

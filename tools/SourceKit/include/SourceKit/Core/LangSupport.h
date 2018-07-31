@@ -222,15 +222,15 @@ public:
   virtual void handleRequestError(const char *Description) = 0;
 
   virtual bool syntaxMapEnabled() = 0;
-  virtual bool handleSyntaxMap(unsigned Offset, unsigned Length,
+  virtual void handleSyntaxMap(unsigned Offset, unsigned Length,
                                UIdent Kind) = 0;
 
   virtual bool documentStructureEnabled() = 0;
 
-  virtual bool handleSemanticAnnotation(unsigned Offset, unsigned Length,
+  virtual void handleSemanticAnnotation(unsigned Offset, unsigned Length,
                                         UIdent Kind, bool isSystem) = 0;
 
-  virtual bool beginDocumentSubStructure(unsigned Offset, unsigned Length,
+  virtual void beginDocumentSubStructure(unsigned Offset, unsigned Length,
                                          UIdent Kind, UIdent AccessLevel,
                                          UIdent SetterAccessLevel,
                                          unsigned NameOffset,
@@ -246,25 +246,24 @@ public:
                                          ArrayRef<StringRef> InheritedTypes,
                                          ArrayRef<std::tuple<UIdent, unsigned, unsigned>> Attrs) = 0;
 
-  virtual bool endDocumentSubStructure() = 0;
+  virtual void endDocumentSubStructure() = 0;
 
-  virtual bool handleDocumentSubStructureElement(UIdent Kind,
-                                                 unsigned Offset,
+  virtual void handleDocumentSubStructureElement(UIdent Kind, unsigned Offset,
                                                  unsigned Length) = 0;
 
-  virtual bool recordAffectedRange(unsigned Offset, unsigned Length) = 0;
+  virtual void recordAffectedRange(unsigned Offset, unsigned Length) = 0;
 
-  virtual bool recordAffectedLineRange(unsigned Line, unsigned Length) = 0;
+  virtual void recordAffectedLineRange(unsigned Line, unsigned Length) = 0;
 
-  virtual bool recordFormattedText(StringRef Text) = 0;
+  virtual void recordFormattedText(StringRef Text) = 0;
 
-  virtual bool setDiagnosticStage(UIdent DiagStage) = 0;
-  virtual bool handleDiagnostic(const DiagnosticEntryInfo &Info,
+  virtual void setDiagnosticStage(UIdent DiagStage) = 0;
+  virtual void handleDiagnostic(const DiagnosticEntryInfo &Info,
                                 UIdent DiagStage) = 0;
 
-  virtual bool handleSourceText(StringRef Text) = 0;
+  virtual void handleSourceText(StringRef Text) = 0;
 
-  virtual bool
+  virtual void
   handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree,
                    std::unordered_set<unsigned> ReusedNodeIds) = 0;
   virtual bool syntaxTreeEnabled() {
@@ -273,8 +272,8 @@ public:
   virtual SyntaxTreeTransferMode syntaxTreeTransferMode() = 0;
 
   virtual bool syntaxReuseInfoEnabled() = 0;
-  virtual bool handleSyntaxReuseRegions(
-      std::vector<SourceFileRange> ReuseRegions) = 0;
+  virtual void
+  handleSyntaxReuseRegions(std::vector<SourceFileRange> ReuseRegions) = 0;
 
   virtual void finished() {}
 };

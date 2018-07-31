@@ -1857,8 +1857,7 @@ void SwiftEditorDocument::readSemanticInfo(ImmutableTextSnapshotRef Snapshot,
     UIdent Kind = SemaTok.getUIdentForKind();
     bool IsSystem = SemaTok.getIsSystem();
     if (Kind.isValid())
-      if (!Consumer.handleSemanticAnnotation(Offset, Length, Kind, IsSystem))
-        break;
+      Consumer.handleSemanticAnnotation(Offset, Length, Kind, IsSystem);
   }
 
   static UIdent SemaDiagStage("source.diagnostic.stage.swift.sema");
