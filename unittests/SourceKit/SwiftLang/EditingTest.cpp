@@ -284,7 +284,8 @@ void EditTest::doubleOpenWithDelay(useconds_t delay, bool closeDoc) {
   EXPECT_STREQ("use of unresolved identifier 'unknown_name'", Consumer.Diags[0].Description.c_str());
 }
 
-TEST_F(EditTest, DiagsAfterCloseAndReopen) {
+// This test is failing occassionally in CI: rdar://42483323
+TEST_F(EditTest, DISABLED_DiagsAfterCloseAndReopen) {
   // Attempt to open the same file twice in a row. This tests (subject to
   // timing) cases where:
   // * the 2nd open happens before the first AST starts building
