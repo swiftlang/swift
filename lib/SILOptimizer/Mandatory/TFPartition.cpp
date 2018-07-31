@@ -612,7 +612,12 @@ template<typename T> struct DenseMapInfo;
 template<> struct DenseMapInfo<SourceRange> {
   static SourceRange getEmptyKey() { return SourceRange(); }
 
-  static SourceRange getTombstoneKey() { return SourceRange(); }
+  static SourceRange getTombstoneKey() {
+    // Make this different from empty key. See for context:
+    // http://lists.llvm.org/pipermail/llvm-dev/2015-July/088744.html
+    return SourceRange(SourceLoc(
+        SMLoc::getFromPointer(DenseMapInfo<const char *>::getTombstoneKey())));
+  }
 
   static unsigned getHashValue(const SourceRange &Val) {
     return hash_combine(
