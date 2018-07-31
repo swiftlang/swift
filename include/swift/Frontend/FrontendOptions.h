@@ -310,7 +310,7 @@ private:
   static bool canActionEmitInterface(ActionType);
 
 public:
-  static bool doesActionRunSILPasses(ActionType);
+  static bool doesActionGenerateSIL(ActionType);
   static bool doesActionProduceOutput(ActionType);
   static bool doesActionProduceTextualOutput(ActionType);
   static bool needsProperModuleName(ActionType);

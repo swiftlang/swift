@@ -465,7 +465,7 @@ bool FrontendOptions::doesActionProduceTextualOutput(ActionType action) {
   }
 }
 
-bool FrontendOptions::doesActionRunSILPasses(ActionType action) {
+bool FrontendOptions::doesActionGenerateSIL(ActionType action) {
   switch (action) {
   case ActionType::NoneAction:
   case ActionType::Parse:
@@ -478,22 +478,22 @@ bool FrontendOptions::doesActionRunSILPasses(ActionType action) {
   case ActionType::PrintAST:
   case ActionType::DumpScopeMaps:
   case ActionType::DumpTypeRefinementContexts:
-  case ActionType::DumpTypeInfo:
   case ActionType::EmitImportedModules:
   case ActionType::EmitPCH:
-  case ActionType::EmitSILGen:
     return false;
+  case ActionType::EmitSILGen:
+  case ActionType::EmitSIBGen:
   case ActionType::EmitSIL:
+  case ActionType::EmitSIB:
   case ActionType::EmitModuleOnly:
   case ActionType::MergeModules:
-  case ActionType::EmitSIBGen:
-  case ActionType::EmitSIB:
   case ActionType::Immediate:
   case ActionType::REPL:
   case ActionType::EmitAssembly:
   case ActionType::EmitIR:
   case ActionType::EmitBC:
   case ActionType::EmitObject:
+  case ActionType::DumpTypeInfo:
     return true;
   }
 }
