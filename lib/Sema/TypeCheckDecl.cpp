@@ -6126,7 +6126,7 @@ public:
           baseVar->getDeclContext()->getAsClassOrClassExtensionContext()) {
         if (classDecl->getBaseName().userFacingName() == "NSObject" &&
             baseVar->getBaseName().userFacingName() == "hashValue") {
-          override->diagnose(diag::override_nsobject_hashvalue);
+          TC.diagnose(override, diag::override_nsobject_hashvalue);
         }
       }
     }
