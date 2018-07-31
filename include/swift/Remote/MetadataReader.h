@@ -1306,6 +1306,18 @@ private:
     return None;
   }
 
+  static bool isCImportedContext(Demangle::NodePointer node) {
+    do {
+      if (node->getKind() == Demangle::Node::Kind::Module) {
+        return isCImportedModuleName(node->getText());
+      }
+
+      // Continue to the parent.
+      node = node->getChild(0);
+    } while (node);
+    return false;
+  }
+
   Demangle::NodePointer
   buildContextDescriptorMangling(ContextDescriptorRef descriptor,
                                  Demangle::NodeFactory &nodeFactory) {
@@ -1420,10 +1432,15 @@ private:
       auto typeFlags =
         TypeContextDescriptorFlags(descriptor->Flags.getKindSpecificFlags());
 
-      if (typeFlags.isCTag())
-        nodeKind = Demangle::Node::Kind::Structure;
-      else if (typeFlags.isCTypedef())
+      if (typeFlags.isCTypedef())
         nodeKind = Demangle::Node::Kind::TypeAlias;
+
+      // As a special case, always use the struct mangling for C-imported
+      // value types.
+      else if (nodeKind == Demangle::Node::Kind::Enum &&
+               !typeFlags.isSynthesizedRelatedEntity() &&
+               isCImportedContext(parentDemangling))
+        nodeKind = Demangle::Node::Kind::Structure;
     }
 
     auto nameNode = nodeFactory.createNode(Node::Kind::Identifier,
