@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -O -emit-sil -verify %s | %FileCheck %s --check-prefix=STRICTDA
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -O -emit-sil -verify %s | %FileCheck %s
 import TensorFlow
 
 public func testDatasetWithFakeData() {
@@ -13,11 +13,11 @@ public func testDatasetWithFakeData() {
   print(y.array.scalars[0])
 }
 
-// STRICTDA-LABEL: --- TFPartition Accelerator Result: {{.*}}testDatasetWithFakeData{{.*}}
-// STRICTDA: bb0:
-// STRICTDA:        [[GETNEXT:%[0-9]+]] = graph_op "tfc.makeIteratorGetNextWithDatasets{{.*}} : $TensorHandle<Float>
-// STRICTDA:        [[RESULT:%[0-9]+]] = graph_op "Add,i,i"([[GETNEXT]] : $TensorHandle<Float>, {{.*}} : $TensorHandle<Float>
-// STRICTDA-NEXT:   return [[RESULT]] : $TensorHandle<Float>
+// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testDatasetWithFakeData{{.*}}
+// CHECK: bb0:
+// CHECK:        [[GETNEXT:%[0-9]+]] = graph_op "tfc.makeIteratorGetNextWithDatasets{{.*}} : $TensorHandle<Float>
+// CHECK:        [[RESULT:%[0-9]+]] = graph_op "Add,i,i"([[GETNEXT]] : $TensorHandle<Float>, {{.*}} : $TensorHandle<Float>
+// CHECK-NEXT:   return [[RESULT]] : $TensorHandle<Float>
 
 public func testDatasetWithMNIST() {
   TensorFlow.enableTPU(infeed: true)
@@ -36,11 +36,11 @@ public func testDatasetWithMNIST() {
   print(labelsMod.array.scalars[0])
 }
 
-// STRICTDA-LABEL: --- TFPartition Accelerator Result: {{.*}}testDatasetWithMNIST{{.*}}
-// STRICTDA: bb0:
-// STRICTDA:  (%0, %1) = graph_op "tfc.makeIteratorGetNextWithDatasets{{.*}} : $TensorHandle<Float>, $TensorHandle<Int32>
-// STRICTDA: graph_op "Add,i,i"(
-// STRICTDA: graph_op "Add,i,i"(
+// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testDatasetWithMNIST{{.*}}
+// CHECK: bb0:
+// CHECK:  (%0, %1) = graph_op "tfc.makeIteratorGetNextWithDatasets{{.*}} : $TensorHandle<Float>, $TensorHandle<Int32>
+// CHECK: graph_op "Add,i,i"(
+// CHECK: graph_op "Add,i,i"(
 // The operands can appear in arbitrary order here.
-// STRICTDA:  [[RESULT:%.*]] = tuple ({{.*}} : $TensorHandle<{{.*}}>, {{.*}} : $TensorHandle<{{.*}}>)
-// STRICTDA-NEXT:  return [[RESULT]] : $(TensorHandle<{{.*}}>, TensorHandle<{{.*}}>)
+// CHECK:  [[RESULT:%.*]] = tuple ({{.*}} : $TensorHandle<{{.*}}>, {{.*}} : $TensorHandle<{{.*}}>)
+// CHECK-NEXT:  return [[RESULT]] : $(TensorHandle<{{.*}}>, TensorHandle<{{.*}}>)
