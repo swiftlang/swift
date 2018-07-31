@@ -261,7 +261,7 @@ protected:
         return true;
       if (!Derived->hasSuperclass())
         break;
-      Derived = Derived->getSuperclass()->getClassOrBoundGenericClass();
+      Derived = Derived->getSuperclassDecl();
     }
     return false;
   }

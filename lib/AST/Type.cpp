@@ -4071,9 +4071,8 @@ static bool doesOpaqueClassUseNativeReferenceCounting(const ASTContext &ctx) {
 static bool usesNativeReferenceCounting(ClassDecl *theClass,
                                         ResilienceExpansion resilience) {
   // TODO: Resilience? there might be some legal avenue of changing this.
-  while (Type supertype = theClass->getSuperclass()) {
-    theClass = supertype->getClassOrBoundGenericClass();
-    assert(theClass);
+  while (auto superclass = theClass->getSuperclassDecl()) {
+    theClass = superclass;
   }
   return !theClass->hasClangNode();
 }

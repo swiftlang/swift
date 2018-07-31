@@ -854,8 +854,8 @@ static bool getInstanceSizeByMethod(IRGenFunction &IGF,
   FuncDecl *fn; {
     auto name = IGF.IGM.Context.getIdentifier("__getInstanceSizeAndAlignMask");
     SmallVector<ValueDecl*, 4> results;
-    selfClass->lookupQualified(selfType, name, NL_KnownNonCascadingDependency,
-                               nullptr, results);
+    selfClass->lookupQualified(selfClass, name,
+                               NL_KnownNonCascadingDependency, results);
     if (results.size() != 1)
       return false;
     fn = dyn_cast<FuncDecl>(results[0]);
@@ -1287,7 +1287,7 @@ namespace {
       // superclass is SwiftObject, i.e. the root class.
       llvm::Constant *superPtr;
       if (getClass()->hasSuperclass()) {
-        auto base = getClass()->getSuperclass()->getClassOrBoundGenericClass();
+        auto base = getClass()->getSuperclassDecl();
         superPtr = getMetaclassRefOrNull(base);
       } else {
         superPtr = getMetaclassRefOrNull(
@@ -2277,8 +2277,8 @@ IRGenModule::getObjCRuntimeBaseForSwiftRootClass(ClassDecl *theClass) {
 }
 
 ClassDecl *irgen::getRootClassForMetaclass(IRGenModule &IGM, ClassDecl *C) {
-  while (auto superclass = C->getSuperclass())
-    C = superclass->getClassOrBoundGenericClass();
+  while (auto superclass = C->getSuperclassDecl())
+    C = superclass;
 
   // If the formal root class is imported from Objective-C, then
   // we should use that.  For a class that's really implemented in

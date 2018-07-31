@@ -142,9 +142,9 @@ static CanType getKnownType(Optional<CanType> &cacheSlot, ASTContext &C,
       // lookupValue would only give us types actually declared in the overlays
       // themselves.
       SmallVector<ValueDecl *, 2> decls;
-      mod->lookupQualified(ModuleType::get(mod), C.getIdentifier(typeName),
+      mod->lookupQualified(mod, C.getIdentifier(typeName),
                            NL_QualifiedDefault | NL_KnownNonCascadingDependency,
-                           /*typeResolver=*/nullptr, decls);
+                           decls);
       if (decls.size() != 1)
         return CanType();
 
