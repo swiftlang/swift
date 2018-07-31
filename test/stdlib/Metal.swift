@@ -117,21 +117,21 @@ if #available(OSX 10.14, iOS 12.0, tvOS 12.0, *){
       icbDesc.inheritBuffers = false
       icbDesc.maxVertexBufferBindCount = 1
       icbDesc.maxFragmentBufferBindCount = 1
-      let icb = device.makeIndirectCommandBuffer (descriptor: icbDesc, maxCommandCount: 4, options: MTLResourceOptions.storageModeShared )!
+      let icb = device.makeIndirectCommandBuffer(descriptor: icbDesc, maxCommandCount: 4, options: MTLResourceOptions.storageModeShared )!
 
       /* Call APIs */
 
       let encoder = cmdBuf.makeRenderCommandEncoder(descriptor: rpDesc)!
-      let cmd = icb.indirectRenderCommandAt (0)!
-      cmd.setVertexBuffer (buf, offset: 0, at: 0)
-      cmd.setFragmentBuffer (buf, offset: 0, at: 0)
-      cmd.drawPrimitives (MTLPrimitiveType.triangle, vertexStart: 0, vertexCount: 0, instanceCount: 0, baseInstance: 0)
-      let cmd2 = icb.indirectRenderCommandAt (1)!
+      let cmd = icb.indirectRenderCommandAt(0)
+      cmd.setVertexBuffer(buf, offset: 0, at: 0)
+      cmd.setFragmentBuffer(buf, offset: 0, at: 0)
+      cmd.drawPrimitives(MTLPrimitiveType.triangle, vertexStart: 0, vertexCount: 0, instanceCount: 0, baseInstance: 0)
+      let cmd2 = icb.indirectRenderCommandAt(1)
       cmd2.drawIndexedPrimitives(MTLPrimitiveType.triangle, indexCount: 0, indexType: MTLIndexType.uint16, indexBuffer: buf, indexBufferOffset: 0, instanceCount: 0, baseVertex: 0, baseInstance: 0)
-      let cmd3 = icb.indirectRenderCommandAt (2)!
+      let cmd3 = icb.indirectRenderCommandAt(2)
       cmd3.reset()
       icb.reset(0..<5)
-      encoder.executeCommandsInBuffer (icb, range:0..<5)
+      encoder.executeCommandsInBuffer(icb, range:0..<5)
       encoder.endEncoding()
     }
 

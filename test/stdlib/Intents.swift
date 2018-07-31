@@ -115,4 +115,36 @@ if #available(iOS 12.0, watchOS 5.0, *) {
 }
 #endif
 
+#if os(iOS)
+    
+    IntentsTestSuite.test("Car Commands Intents Initializer/\(swiftVersion)") {
+        if #available(iOS 12.0, *) {
+            _ = INSetProfileInCarIntent(profileNumber: nil, profileName: nil, isDefaultProfile: nil, carName: nil)
+            _ = INSetClimateSettingsInCarIntent(enableFan: nil, enableAirConditioner: nil, enableClimateControl: nil, enableAutoMode: nil, airCirculationMode: .unknown, fanSpeedIndex: nil, fanSpeedPercentage: nil, relativeFanSpeedSetting: .unknown, temperature: nil, relativeTemperatureSetting: .unknown, climateZone: .unknown, carName: nil)
+            _ = INSetDefrosterSettingsInCarIntent(enable: nil, defroster: .unknown, carName: nil)
+            _ = INSetSeatSettingsInCarIntent(enableHeating: nil, enableCooling: nil, enableMassage: nil, seat: .unknown, level: nil, relativeLevel: .unknown, carName: nil)
+        }
+        
+        if #available(iOS 11.0, *) {
+            _ = INSetProfileInCarIntent(profileNumber: nil, profileName: nil, isDefaultProfile: nil)
+            _ = INSetClimateSettingsInCarIntent(enableFan: nil, enableAirConditioner: nil, enableClimateControl: nil, enableAutoMode: nil, airCirculationMode: .unknown, fanSpeedIndex: nil, fanSpeedPercentage: nil, relativeFanSpeedSetting: .unknown, temperature: nil, relativeTemperatureSetting: .unknown, climateZone: .unknown)
+            _ = INSetDefrosterSettingsInCarIntent(enable: nil, defroster: .unknown)
+            _ = INSetSeatSettingsInCarIntent(enableHeating: nil, enableCooling: nil, enableMassage: nil, seat: .unknown, level: nil, relativeLevel: .unknown)
+        }
+    }
+
+#endif
+
+#if os(iOS) || os(watchOS)
+if #available(iOS 12.0, watchOS 5.0, *) {
+
+    IntentsTestSuite.test("INIntent Images/\(swiftVersion)") {
+        let intent = INSendPaymentIntent(payee: nil, currencyAmount: nil, note: nil)
+        intent.setImage(nil, forParameterNamed: \INSendPaymentIntent.payee)
+        intent.setImage(nil, forParameterNamed: \.payee)
+    }
+    
+}
+#endif
+
 runAllTests()
