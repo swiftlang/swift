@@ -2256,29 +2256,20 @@ public:
       verifyCheckedBase(E);
     }
 
-    static bool hasEnclosingFunctionContext(DeclContext *dc) {
-      switch (dc->getContextKind()) {
-      case DeclContextKind::AbstractClosureExpr:
-      case DeclContextKind::AbstractFunctionDecl:
-      case DeclContextKind::SerializedLocal:
-        return true;
-
-      case DeclContextKind::TopLevelCodeDecl:
-      case DeclContextKind::Module:
-      case DeclContextKind::FileUnit:
-        return false;
-
-      case DeclContextKind::Initializer:
-      case DeclContextKind::GenericTypeDecl:
-      case DeclContextKind::ExtensionDecl:
-      case DeclContextKind::SubscriptDecl:
-        return hasEnclosingFunctionContext(dc->getParent());
+    void verifyChecked(ValueDecl *VD) {
+      if (VD->getInterfaceType()->hasError()) {
+        Out << "checked decl cannot have error type\n";
+        VD->dump(Out);
+        abort();
       }
 
-      llvm_unreachable("Unhandled DeclContextKind in switch.");
-    }
+      // Make sure that there are no archetypes in the interface type.
+      if (!isa<VarDecl>(VD) && VD->getInterfaceType()->hasArchetype()) {
+        Out << "Interface type contains archetypes\n";
+        VD->dump(Out);
+        abort();
+      }
 
-    void verifyChecked(ValueDecl *VD) {
       if (VD->hasAccess()) {
         if (VD->getFormalAccess() == AccessLevel::Open) {
           if (!isa<ClassDecl>(VD) && !VD->isPotentiallyOverridable()) {
@@ -2293,24 +2284,11 @@ public:
           }
         }
       } else {
-        if (!VD->getDeclContext()->isLocalContext() &&
-            !isa<GenericTypeParamDecl>(VD) && !isa<ParamDecl>(VD)) {
+        if (!isa<GenericTypeParamDecl>(VD) && !isa<VarDecl>(VD)) {
           dumpRef(VD);
-          Out << " does not have access";
+          Out << " does not have access\n";
           abort();
         }
-      }
-
-      // Make sure that there are no archetypes in the interface type.
-      if (VD->getDeclContext()->isTypeContext() &&
-          !hasEnclosingFunctionContext(VD->getDeclContext()) &&
-          VD->getInterfaceType()->hasArchetype() &&
-          VD->getInterfaceType().findIf([](Type type) {
-            return type->is<ArchetypeType>();
-          })) {
-        Out << "Interface type contains archetypes\n";
-        VD->dump(Out);
-        abort();
       }
 
       verifyCheckedBase(VD);
@@ -2435,8 +2413,7 @@ public:
         abort();
       }
 
-      Type typeForAccessors =
-          var->getInterfaceType()->getReferenceStorageReferent();
+      Type typeForAccessors = var->getValueInterfaceType();
       if (!var->getDeclContext()->contextHasLazyGenericEnvironment()) {
         typeForAccessors =
             var->getDeclContext()->mapTypeIntoContext(typeForAccessors);

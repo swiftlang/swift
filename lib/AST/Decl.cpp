@@ -2196,22 +2196,24 @@ Type ValueDecl::getInterfaceType() const {
 }
 
 void ValueDecl::setInterfaceType(Type type) {
-  if (!type.isNull()) {
+  if (type) {
     assert(!type->hasTypeVariable() && "Type variable in interface type");
-    if (isa<ParamDecl>(this))
-      assert(!type->is<InOutType>() && "caller did not pass a base type");
-  }
-  // lldb creates global typealiases with archetypes in them.
-  // FIXME: Add an isDebugAlias() flag, like isDebugVar().
-  //
-  // Also, ParamDecls in closure contexts can have type variables
-  // archetype in them during constraint generation.
-  if (!type.isNull() &&
-      !isa<TypeAliasDecl>(this) &&
-      !(isa<ParamDecl>(this) &&
-        isa<AbstractClosureExpr>(getDeclContext()))) {
-    assert(!type->hasArchetype() &&
-           "Archetype in interface type");
+    assert(!type->is<InOutType>() && "Interface type must be materializable");
+
+    // lldb creates global typealiases with archetypes in them.
+    // FIXME: Add an isDebugAlias() flag, like isDebugVar().
+    //
+    // Also, ParamDecls in closure contexts can have type variables
+    // archetype in them during constraint generation.
+    if (!isa<TypeAliasDecl>(this) &&
+        !(isa<ParamDecl>(this) &&
+          isa<AbstractClosureExpr>(getDeclContext()))) {
+      assert(!type->hasArchetype() &&
+             "Archetype in interface type");
+    }
+
+    if (type->hasError())
+      setInvalid();
   }
 
   TypeAndAccess.setPointer(type);
@@ -4416,15 +4418,12 @@ Type VarDecl::getType() const {
 void VarDecl::setType(Type t) {
   assert(t.isNull() || !t->is<InOutType>());
   typeInContext = t;
-  if (t && t->hasError())
-    setInvalid();
 }
 
 void VarDecl::markInvalid() {
   auto &Ctx = getASTContext();
   setType(ErrorType::get(Ctx));
   setInterfaceType(ErrorType::get(Ctx));
-  setInvalid();
 }
 
 /// \brief Returns whether the var is settable in the specified context: this
@@ -4966,14 +4965,14 @@ void SubscriptDecl::setIndices(ParameterList *p) {
 
 Type SubscriptDecl::getIndicesInterfaceType() const {
   auto indicesTy = getInterfaceType();
-  if (indicesTy->hasError())
+  if (indicesTy->is<ErrorType>())
     return indicesTy;
   return indicesTy->castTo<AnyFunctionType>()->getInput();
 }
 
 Type SubscriptDecl::getElementInterfaceType() const {
   auto elementTy = getInterfaceType();
-  if (elementTy->hasError())
+  if (elementTy->is<ErrorType>())
     return elementTy;
   return elementTy->castTo<AnyFunctionType>()->getResult();
 }
@@ -5740,12 +5739,6 @@ bool EnumElementDecl::computeType() {
   EnumDecl *ED = getParentEnum();
   Type resultTy = ED->getDeclaredInterfaceType();
 
-  if (resultTy->hasError()) {
-    setInterfaceType(resultTy);
-    setInvalid();
-    return false;
-  }
-
   Type selfTy = MetatypeType::get(resultTy);
 
   // The type of the enum element is either (T) -> T or (T) -> ArgType -> T.
@@ -5771,12 +5764,12 @@ Type EnumElementDecl::getArgumentInterfaceType() const {
     return nullptr;
 
   auto interfaceType = getInterfaceType();
-  if (interfaceType->hasError()) {
+  if (interfaceType->is<ErrorType>()) {
     return interfaceType;
   }
 
   auto funcTy = interfaceType->castTo<AnyFunctionType>();
-  funcTy = funcTy->getResult()->castTo<AnyFunctionType>();
+  funcTy = funcTy->getResult()->castTo<FunctionType>();
   return funcTy->getInput();
 }
 

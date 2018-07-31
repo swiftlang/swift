@@ -1181,9 +1181,6 @@ static void configureImplicitSelf(TypeChecker &tc,
   selfDecl->setSpecifier(specifier);
 
   selfDecl->setInterfaceType(selfParam.getPlainType());
-
-  if (selfParam.getPlainType()->is<ErrorType>())
-    selfDecl->setInvalid();
 }
 
 static void recordParamContextTypes(AbstractFunctionDecl *func) {
@@ -3462,7 +3459,6 @@ static void validateTypealiasType(TypeChecker &tc, TypeAliasDecl *typeAlias) {
   if (underlyingType.isNull()) {
     typeAlias->getUnderlyingTypeLoc().setInvalidType(tc.Context);
     typeAlias->setInterfaceType(ErrorType::get(tc.Context));
-    typeAlias->setInvalid();
     return;
   }
 
@@ -4215,11 +4211,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         FD->getDeclContext()->getGenericEnvironmentOfContext());
 
       FD->computeType();
-
-      if (FD->getInterfaceType()->hasError()) {
-        FD->setInterfaceType(ErrorType::get(Context));
-        FD->setInvalid();
-      }
     }
 
     if (!isa<AccessorDecl>(FD) || cast<AccessorDecl>(FD)->isGetter()) {
@@ -4360,21 +4351,12 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   case DeclKind::Destructor: {
     auto *DD = cast<DestructorDecl>(D);
 
-    auto enclosingClass = dyn_cast<ClassDecl>(DD->getDeclContext());
-    if (DD->isInvalid() ||
-        enclosingClass == nullptr) {
-      DD->setInterfaceType(ErrorType::get(Context));
-      DD->setInvalid();
-      return;
-    }
-
     DeclValidationRAII IBV(DD);
 
-    assert(DD->getDeclContext()->isTypeContext()
-           && "Decl parsing must prevent destructors outside of types!");
-
     checkDeclAttributesEarly(DD);
-    DD->copyFormalAccessFrom(enclosingClass, /*sourceIsParentContext*/true);
+
+    if (auto enclosingClass = dyn_cast<ClassDecl>(DD->getDeclContext()))
+      DD->copyFormalAccessFrom(enclosingClass, /*sourceIsParentContext*/true);
 
     configureImplicitSelf(*this, DD);
 
@@ -4431,16 +4413,9 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     if (auto *PL = EED->getParameterList()) {
       CompleteGenericTypeResolver resolver(*this, ED->getGenericSignature());
 
-      bool isInvalid
-        = typeCheckParameterList(PL, EED->getParentEnum(),
-                                 TypeResolutionFlags::EnumCase, resolver);
-
-      if (isInvalid || EED->isInvalid()) {
-        EED->setInterfaceType(ErrorType::get(Context));
-        EED->setInvalid();
-      } else {
-        checkDefaultArguments(PL, EED);
-      }
+      typeCheckParameterList(PL, EED->getParentEnum(),
+                             TypeResolutionFlags::EnumCase, resolver);
+      checkDefaultArguments(PL, EED);
     }
 
     // If we have a raw value, make sure there's a raw type as well.
@@ -4461,8 +4436,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     // Now that we have an argument type we can set the element's declared
     // type.
-    if (!EED->isInvalid())
-      EED->computeType();
+    EED->computeType();
 
     EED->setSignatureIsValidated();
 
@@ -4473,7 +4447,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       if (!argTy->isMaterializable()) {
         diagnose(EED->getLoc(), diag::enum_element_not_materializable, argTy);
         EED->setInterfaceType(ErrorType::get(Context));
-        EED->setInvalid();
       }
     }
 
