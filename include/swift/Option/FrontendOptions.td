@@ -496,4 +496,8 @@ def disable_verify_exclusivity : Flag<["-"], "disable-verify-exclusivity">,
 def enable_key_path_resilience : Flag<["-"], "enable-key-path-resilience">,
   HelpText<"Enable key path resilience.">;
 
+def type_info_dump_filter_EQ : Joined<["-"], "type-info-dump-filter=">,
+  Flags<[FrontendOption]>,
+  HelpText<"One of 'all', 'resilient' or 'fragile'">;
+
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]
