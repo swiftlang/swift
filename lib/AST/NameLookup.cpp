@@ -24,6 +24,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
@@ -1673,23 +1674,15 @@ bool DeclContext::lookupQualified(Type type,
   SmallVector<NominalTypeDecl *, 4> nominalTypesToLookInto;
   extractDirectlyReferencedNominalTypes(type, nominalTypesToLookInto);
 
-  SmallVector<TypeDecl *, 4> declsToLookInto(nominalTypesToLookInto.begin(),
-                                             nominalTypesToLookInto.end());
-  return lookupQualified(declsToLookInto, member, options, decls);
+  return lookupQualified(nominalTypesToLookInto, member, options, decls);
 }
 
-bool DeclContext::lookupQualified(ArrayRef<TypeDecl *> typeDecls,
+bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
                                   DeclName member,
                                   NLOptions options,
                                   SmallVectorImpl<ValueDecl *> &decls) const {
   using namespace namelookup;
   assert(decls.empty() && "additive lookup not supported");
-
-  // If we have a module, look in it.
-  if (typeDecls.size() == 1 && isa<ModuleDecl>(typeDecls[0])) {
-    return lookupQualified(cast<ModuleDecl>(typeDecls[0]), member, options,
-                           decls);
-  }
 
   // Configure lookup and dig out the tracker.
   ReferencedNameTracker *tracker = nullptr;
@@ -1715,33 +1708,8 @@ bool DeclContext::lookupQualified(ArrayRef<TypeDecl *> typeDecls,
 
   // Look through the type declarations we were given, resolving
   ASTContext &ctx = getASTContext();
-  for (auto typeDecl : typeDecls) {
-    // Add nominal types directly.
-    if (auto nominal = dyn_cast<NominalTypeDecl>(typeDecl)) {
-      addNominalType(nominal);
-      continue;
-    }
-
-    // For typealiases, extract nominal type declarations from the underlying
-    // type of the typealias.
-    if (auto typealias = dyn_cast<TypeAliasDecl>(typeDecl)) {
-      SmallVector<NominalTypeDecl *, 4> nominalTypeDecls;
-      if (!typealias->getUnderlyingTypeLoc().getType()) {
-        auto lazyResolver = ctx.getLazyResolver();
-        assert(lazyResolver && "Cannot resolve underlying type of typealias");
-        lazyResolver->resolveDeclSignature(typealias);
-      }
-
-      extractDirectlyReferencedNominalTypes(
-          typealias->getUnderlyingTypeLoc().getType(),
-          nominalTypeDecls);
-      for (auto nominal : nominalTypeDecls)
-        addNominalType(nominal);
-      continue;
-    }
-
-    llvm_unreachable("Cannot look into multiple modules "
-                     "or any type parameter");
+  for (auto nominal : typeDecls) {
+    addNominalType(nominal);
   }
 
   // Whether we only want to return complete object initializers.
@@ -1953,4 +1921,308 @@ void DeclContext::lookupAllObjCMethods(
                      return !visited.insert(func).second;
                    }),
     results.end());
+}
+
+/// Given a set of type declarations, find all of the nominal type declarations
+/// that they reference, looking through typealiases as appropriate.
+static TinyPtrVector<NominalTypeDecl *>
+resolveTypeDeclsToNominal(Evaluator &evaluator,
+                          ASTContext &ctx,
+                          ArrayRef<TypeDecl *> typeDecls,
+                          SmallVectorImpl<ModuleDecl *> &modulesFound) {
+  TinyPtrVector<NominalTypeDecl *> nominalDecls;
+
+  for (auto typeDecl : typeDecls) {
+    // Nominal type declarations get copied directly.
+    if (auto nominalDecl = dyn_cast<NominalTypeDecl>(typeDecl)) {
+      nominalDecls.push_back(nominalDecl);
+      continue;
+    }
+
+    // Recursively resolve typealiases.
+    if (auto typealias = dyn_cast<TypeAliasDecl>(typeDecl)) {
+      auto underlyingTypeReferences
+        = evaluator(UnderlyingTypeDeclsReferencedRequest{typealias});
+      auto underlyingNominalReferences
+        = resolveTypeDeclsToNominal(evaluator, ctx, underlyingTypeReferences,
+                                    modulesFound);
+      nominalDecls.insert(nominalDecls.end(),
+                          underlyingNominalReferences.begin(),
+                          underlyingNominalReferences.end());
+      continue;
+    }
+
+    // Keep track of modules we see.
+    if (auto module = dyn_cast<ModuleDecl>(typeDecl)) {
+      modulesFound.push_back(module);
+      continue;
+    }
+
+    // Make sure we didn't miss some interesting kind of type declaration.
+    assert(isa<AbstractTypeParamDecl>(typeDecl));
+  }
+
+  return nominalDecls;
+}
+
+/// Perform unqualified name lookup for types at the given location.
+static DirectlyReferencedTypeDecls
+directReferencesForUnqualifiedTypeLookup(ASTContext &ctx, DeclName name,
+                                         SourceLoc loc, DeclContext *dc) {
+  DirectlyReferencedTypeDecls results;
+  UnqualifiedLookup::Options options = UnqualifiedLookup::Flags::TypeLookup;
+  UnqualifiedLookup lookup(name, dc, ctx.getLazyResolver(), loc, options);
+  for (const auto &result : lookup.Results) {
+    if (auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl()))
+      results.push_back(typeDecl);
+  }
+
+  return results;
+}
+
+/// Perform qualified name lookup for types.
+static DirectlyReferencedTypeDecls
+directReferencesForQualifiedTypeLookup(Evaluator &evaluator,
+                                       ASTContext &ctx,
+                                       ArrayRef<TypeDecl *> baseTypes,
+                                       DeclName name,
+                                       DeclContext *dc) {
+  // Look through the base types to find something on which we can perform
+  // qualified name lookup.
+  SmallVector<ModuleDecl *, 2> moduleBaseTypes;
+  auto nominalBaseTypes =
+      resolveTypeDeclsToNominal(evaluator, ctx, baseTypes, moduleBaseTypes);
+
+  DirectlyReferencedTypeDecls result;
+  auto addResults = [&result](ArrayRef<ValueDecl *> found){
+    for (auto decl : found){
+      assert(isa<TypeDecl>(decl) &&
+             "Lookup should only have found type declarations");
+      result.push_back(cast<TypeDecl>(decl));
+    }
+  };
+
+  {
+    // Look through nominal types.
+    SmallVector<ValueDecl *, 4> nominalMembers;
+    auto options = NL_RemoveNonVisible | NL_OnlyTypes;
+    dc->lookupQualified(nominalBaseTypes, name, options, nominalMembers);
+    addResults(nominalMembers);
+  }
+
+  {
+    // Look through modules.
+    auto options = NL_RemoveNonVisible | NL_OnlyTypes;
+    for (auto module : moduleBaseTypes) {
+      SmallVector<ValueDecl *, 4> moduleMembers;
+      dc->lookupQualified(module, name, options, moduleMembers);
+      addResults(moduleMembers);
+    }
+  }
+
+  return result;
+}
+
+/// Determine the types directly referenced by the given identifier type.
+static DirectlyReferencedTypeDecls
+directReferencesForIdentTypeRepr(Evaluator &evaluator,
+                                 ASTContext &ctx, IdentTypeRepr *ident,
+                                 DeclContext *dc) {
+  DirectlyReferencedTypeDecls current;
+
+  bool firstComponent = true;
+  for (const auto &component : ident->getComponentRange()) {
+    // If we already set a declaration, use it.
+    if (auto typeDecl = component->getBoundDecl()) {
+      current = {1, typeDecl};
+      continue;
+    }
+
+    // For the first component, perform unqualified name lookup.
+    if (current.empty()) {
+      current =
+        directReferencesForUnqualifiedTypeLookup(ctx,
+                                                 component->getIdentifier(),
+                                                 component->getIdLoc(),
+                                                 dc);
+
+      // If we didn't find anything, fail now.
+      if (current.empty())
+        return current;
+
+      firstComponent = false;
+      continue;
+    }
+
+    // For subsequent components, perform qualified name lookup.
+    current =
+        directReferencesForQualifiedTypeLookup(evaluator, ctx, current,
+                                               component->getIdentifier(), dc);
+    if (current.empty())
+      return current;
+  }
+
+  return current;
+}
+
+/// Retrieve the set of type declarations that are directly referenced from
+/// the given parsed type representation.
+static DirectlyReferencedTypeDecls
+directReferencesForTypeRepr(Evaluator &evaluator,
+                            ASTContext &ctx, TypeRepr *typeRepr,
+                            DeclContext *dc) {
+  switch (typeRepr->getKind()) {
+  case TypeReprKind::Array:
+    return {1, ctx.getArrayDecl()};
+
+  case TypeReprKind::Attributed: {
+    auto attributed = cast<AttributedTypeRepr>(typeRepr);
+    return directReferencesForTypeRepr(evaluator, ctx,
+                                       attributed->getTypeRepr(), dc);
+  }
+
+  case TypeReprKind::Composition: {
+    DirectlyReferencedTypeDecls result;
+    auto composition = cast<CompositionTypeRepr>(typeRepr);
+    for (auto component : composition->getTypes()) {
+      auto componentResult =
+          directReferencesForTypeRepr(evaluator, ctx, component, dc);
+      result.insert(result.end(),
+                    componentResult.begin(),
+                    componentResult.end());
+    }
+    return result;
+  }
+
+  case TypeReprKind::CompoundIdent:
+  case TypeReprKind::GenericIdent:
+  case TypeReprKind::SimpleIdent:
+    return directReferencesForIdentTypeRepr(evaluator, ctx,
+                                            cast<IdentTypeRepr>(typeRepr), dc);
+
+  case TypeReprKind::Dictionary:
+    return { 1, ctx.getDictionaryDecl()};
+
+  case TypeReprKind::Error:
+  case TypeReprKind::Function:
+  case TypeReprKind::InOut:
+  case TypeReprKind::Metatype:
+  case TypeReprKind::Owned:
+  case TypeReprKind::Protocol:
+  case TypeReprKind::Shared:
+  case TypeReprKind::SILBox:
+  case TypeReprKind::Tuple:
+    return { };
+
+  case TypeReprKind::Fixed:
+    llvm_unreachable("Cannot get fixed TypeReprs in name lookup");
+
+  case TypeReprKind::Optional:
+  case TypeReprKind::ImplicitlyUnwrappedOptional:
+    return { 1, ctx.getOptionalDecl() };
+  }
+}
+
+/// Retrieve the set of type declarations that are directly referenced from
+/// the given type.
+static DirectlyReferencedTypeDecls
+directReferencesForType(Type type) {
+  // If it's a typealias, return that.
+  if (auto aliasType = dyn_cast<NameAliasType>(type.getPointer()))
+    return { 1, aliasType->getDecl() };
+
+  // If there is a generic declaration, return it.
+  if (auto genericDecl = type->getAnyGeneric())
+    return { 1, genericDecl };
+
+  if (type->isExistentialType()) {
+    DirectlyReferencedTypeDecls result;
+    const auto &layout = type->getExistentialLayout();
+
+    // Superclass.
+    if (auto superclassType = layout.explicitSuperclass) {
+      if (auto superclassDecl = superclassType->getAnyGeneric()) {
+        result.push_back(superclassDecl);
+      }
+    }
+
+    // Protocols.
+    for (auto protocolTy : layout.getProtocols())
+      result.push_back(protocolTy->getDecl());
+    return result;
+  }
+
+  return { };
+}
+
+DirectlyReferencedTypeDecls InheritedDeclsReferencedRequest::evaluate(
+    Evaluator &evaluator,
+    llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
+    unsigned index) const {
+
+  // Prefer syntactic information when we have it.
+  TypeLoc &typeLoc = getTypeLoc(decl, index);
+  if (auto typeRepr = typeLoc.getTypeRepr()) {
+    // Figure out the context in which name lookup will occur.
+    DeclContext *dc;
+    if (auto typeDecl = decl.dyn_cast<TypeDecl *>())
+      dc = typeDecl->getInnermostDeclContext();
+    else
+      dc = decl.get<ExtensionDecl *>();
+
+    return directReferencesForTypeRepr(evaluator, dc->getASTContext(), typeRepr,
+                                       dc);
+  }
+
+  // Fall back to semantic types.
+  // FIXME: In the long run, we shouldn't need this. Non-syntactic results
+  // should be cached.
+  if (auto type = typeLoc.getType()) {
+    return directReferencesForType(type);
+  }
+
+  return { };
+}
+
+DirectlyReferencedTypeDecls UnderlyingTypeDeclsReferencedRequest::evaluate(
+    Evaluator &evaluator,
+    TypeAliasDecl *typealias) const {
+  // Prefer syntactic information when we have it.
+  if (auto typeRepr = typealias->getUnderlyingTypeLoc().getTypeRepr()) {
+    return directReferencesForTypeRepr(evaluator, typealias->getASTContext(),
+                                       typeRepr, typealias);
+  }
+
+  // Fall back to semantic types.
+  // FIXME: In the long run, we shouldn't need this. Non-syntactic results
+  // should be cached.
+  if (auto type = typealias->getUnderlyingTypeLoc().getType()) {
+    return directReferencesForType(type);
+  }
+
+  return { };
+}
+
+/// Evaluate a superclass declaration request.
+ClassDecl *SuperclassDeclRequest::evaluate(Evaluator &evaluator,
+                                           NominalTypeDecl *subject) const {
+  for (unsigned i : indices(subject->getInherited())) {
+    // Find the inherited declarations referenced at this position.
+    auto inheritedTypes =
+      evaluator(InheritedDeclsReferencedRequest{subject, i});
+
+    // Resolve those type declarations to nominal type declarations.
+    SmallVector<ModuleDecl *, 2> modulesFound;
+    auto inheritedNominalTypes
+      = resolveTypeDeclsToNominal(evaluator, subject->getASTContext(),
+                                  inheritedTypes, modulesFound);
+
+    // Look for a class declaration.
+    for (auto inheritedNominal : inheritedNominalTypes) {
+      if (auto classDecl = dyn_cast<ClassDecl>(inheritedNominal))
+        return classDecl;
+    }
+  }
+
+  return nullptr;
 }

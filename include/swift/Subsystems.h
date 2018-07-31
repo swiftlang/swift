@@ -356,6 +356,11 @@ namespace swift {
   /// The ASTContext will automatically call these upon construction.
   void registerAccessRequestFunctions(Evaluator &evaluator);
 
+  /// Register AST-level request functions with the evaluator.
+  ///
+  /// The ASTContext will automatically call these upon construction.
+  void registerNameLookupRequestFunctions(Evaluator &evaluator);
+
   /// Register Sema-level request functions with the evaluator.
   ///
   /// Clients that form an ASTContext and will perform any semantic queries

@@ -410,9 +410,10 @@ getProtocolRequirementDocComment(swift::markup::MarkupContext &MC,
                                                 const ValueDecl *VD)
     -> const ValueDecl * {
       SmallVector<ValueDecl *, 2> Members;
-      P->lookupQualified(P->getDeclaredType(), VD->getFullName(),
+      P->lookupQualified(const_cast<ProtocolDecl *>(P),
+                         VD->getFullName(),
                          NLOptions::NL_ProtocolMembers,
-                         /*typeResolver=*/nullptr, Members);
+                         Members);
     SmallVector<const ValueDecl *, 1> ProtocolRequirements;
     for (auto Member : Members)
       if (isa<ProtocolDecl>(Member->getDeclContext()) &&

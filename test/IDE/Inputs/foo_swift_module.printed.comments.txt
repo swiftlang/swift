@@ -60,7 +60,7 @@ precedencegroup High {
 
 infix operator %%% : High
 
-postfix operator =->
-
 postfix operator =>
+
+postfix operator =->
 

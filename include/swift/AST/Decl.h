@@ -3497,7 +3497,7 @@ public:
   }
 
   /// Determine whether this class has a superclass.
-  bool hasSuperclass() const { return (bool)getSuperclass(); }
+  bool hasSuperclass() const { return (bool)getSuperclassDecl(); }
 
   /// Retrieve the superclass of this class, or null if there is no superclass.
   Type getSuperclass() const;
@@ -3811,7 +3811,7 @@ public:
   llvm::TinyPtrVector<ProtocolDecl *> getInheritedProtocols() const;
 
   /// Determine whether this protocol has a superclass.
-  bool hasSuperclass() const { return (bool)getSuperclass(); }
+  bool hasSuperclass() const { return (bool)getSuperclassDecl(); }
 
   /// Retrieve the superclass of this protocol, or null if there is no superclass.
   Type getSuperclass() const;

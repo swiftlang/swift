@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift-swift3
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
@@ -408,7 +408,7 @@ if #available(OSX 10.11, iOS 9.0, *) {
 
     // confirm the that class function works
     do {
-      let decoded = try NSKeyedUnarchiver.unarchiveTopLevelObjectWithData(data) as? NSPredicate
+      let decoded = try NSKeyedUnarchiver.unarchiveTopLevelObjectWithData(data as Data) as? NSPredicate
       expectEqual(obj, decoded)
     }
     catch {

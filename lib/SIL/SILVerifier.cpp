@@ -2255,7 +2255,7 @@ public:
     require(class2,
             "Second operand of dealloc_partial_ref must be a class metatype");
     while (class1 != class2) {
-      class1 = class1->getSuperclass()->getClassOrBoundGenericClass();
+      class1 = class1->getSuperclassDecl();
       require(class1, "First operand not superclass of second instance type");
     }
   }
@@ -4854,10 +4854,7 @@ void SILVTable::verify(const SILModule &M) const {
     do {
       if (c == theClass)
         break;
-      if (auto ty = c->getSuperclass())
-        c = ty->getClassOrBoundGenericClass();
-      else
-        c = nullptr;
+      c = c->getSuperclassDecl();
     } while (c);
     assert(c && "vtable entry must refer to a member of the vtable's class");
 
