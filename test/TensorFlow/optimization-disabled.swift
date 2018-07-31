@@ -1,13 +1,11 @@
 // RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Onone -emit-sil -Xllvm -tf-strict-deabstraction -Xllvm -tf-module-level-graph=false -verify %s | %FileCheck %s
 import TensorFlow
 
-// expected-warning @+1 8 {{value implicitly copied to the host}}
 public func testArrayValues() -> Tensor<Float> {
-// expected-warning @+1 6 {{value implicitly copied to the host}}
+  // expected-warning @+1 14 {{value implicitly copied to the host}}
   let x: Tensor<Float> = [[1, 2], [3, 4]]
-  // expected-note @-1 8 {{value used here}}
   return (matmul(x, x) + x).toHost()
-// expected-warning {{value implicitly copied to the host}}
+// expected-warning @-1 {{value implicitly copied to the host}}
 }
 
 /*

@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph  -Xllvm -tf-strict-deabstraction -Xllvm -tf-module-level-graph=false -O -emit-sil -verify %s | %FileCheck %s
-
 import TensorFlow
 
 public func implicitDevicePlacement() {
@@ -16,7 +15,7 @@ public func implicitDeviceConfig() {
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}implicitDeviceConfig{{.*}}
-// CHECK: graph_op "Const"() {dtype$dtype: $Builtin.FPIEEE32, value$tensor: f32 0x3F800000 /* 1 */, __device: "ALL_DEVICES"
+// CHECK: graph_op "Const"() {dtype: $Float, value$tensor: f32 0x3F800000 /* 1 */, __device: "ALL_DEVICES"
 
 public func explicitDeviceConfigGPU() {
   TensorFlow.enableGPU()
@@ -25,7 +24,7 @@ public func explicitDeviceConfigGPU() {
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}explicitDeviceConfigGPU{{.*}}
-// CHECK: graph_op "Const"() {dtype$dtype: $Builtin.FPIEEE32, value$tensor: f32 0x3F800000 /* 1 */, __device: "ALL_DEVICES"
+// CHECK: graph_op "Const"() {dtype: $Float, value$tensor: f32 0x3F800000 /* 1 */, __device: "ALL_DEVICES"
 
 // Check that in the TF graph, both the function node itself, and ops in the
 // function, are placed on GPU.
