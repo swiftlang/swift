@@ -1,4 +1,3 @@
-// REQUIRES: rdar42570029
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource) -emit-module -enable-objc-interop -emit-objc-header -o %t %S/Inputs/resolve-cross-language/Base.swift -disable-objc-attr-requires-foundation-module
