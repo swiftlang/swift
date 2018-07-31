@@ -3683,8 +3683,6 @@ public:
 
     // Find the set of enum elements for the type so we can verify
     // exhaustiveness.
-    // FIXME: We also need to consider if the enum is resilient, in which case
-    // we're never guaranteed to be exhaustive.
     llvm::DenseSet<EnumElementDecl*> unswitchedElts;
     eDecl->getAllElements(unswitchedElts);
 
@@ -3707,7 +3705,12 @@ public:
     }
 
     // If the select is non-exhaustive, we require a default.
-    require(unswitchedElts.empty() || I->hasDefault(),
+    // FIXME: Get the resilience expansion from the function.
+    bool isNonExhaustive = eDecl->isResilient(I->getModule().getSwiftModule(),
+                                              ResilienceExpansion::Maximal);
+    isNonExhaustive |= eDecl->isObjC();
+    require((!isNonExhaustive && unswitchedElts.empty()) ||
+            I->hasDefault(),
             "nonexhaustive select_enum must have a default destination");
     if (I->hasDefault()) {
       requireSameType(I->getDefaultResult()->getType(),
@@ -3875,7 +3878,12 @@ public:
     }
 
     // If the switch is non-exhaustive, we require a default.
-    require(unswitchedElts.empty() || SOI->hasDefault(),
+    // FIXME: Get the resilience expansion from the function.
+    bool isNonExhaustive = uDecl->isResilient(SOI->getModule().getSwiftModule(),
+                                              ResilienceExpansion::Maximal);
+    isNonExhaustive |= uDecl->isObjC();
+    require((!isNonExhaustive && unswitchedElts.empty()) ||
+            SOI->hasDefault(),
             "nonexhaustive switch_enum must have a default destination");
     if (SOI->hasDefault()) {
       // When SIL ownership is enabled, we require all default branches to take

@@ -1426,8 +1426,10 @@ namespace {
 
     // FIXME: Get expansion from SILFunction
     if (decl->isResilient(inst->getModule().getSwiftModule(),
-                          ResilienceExpansion::Maximal))
+                          ResilienceExpansion::Maximal) ||
+        decl->isObjC()) {
       return nullptr;
+    }
 
     llvm::SmallPtrSet<EnumElementDecl *, 4> unswitchedElts;
     for (auto elt : decl->getAllElements())
