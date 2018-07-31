@@ -18,9 +18,7 @@ public func debugValuesInLoop(_ x: Tensor<Float>) {
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}basicDebugValues{{.*}}
 // CHECK: @{{.*}}basicDebugValues{{.*}}.tf
 // CHECK: [[ONE:%.*]] = graph_op "Const"
-// CHECK-NEXT: graph_op "tfc.SendToHost,i"
 // CHECK: [[ADD_RESULT:%.*]] = graph_op "Add,i,i"
-// CHECK-NEXT: graph_op "tfc.SendToHost,i"([[ADD_RESULT]] : $TensorHandle<Float>)
 // CHECK: graph_op "Square,i"([[ADD_RESULT]] : $TensorHandle<Float>) {T: $Float, __device: "/device:CPU:0"} : $TensorHandle<Float>
 
 

@@ -2119,6 +2119,7 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
       // The scalar case is very simple, the shape of a scalar is 0d, and the
       // data type comes from an attr that should already be processed.
       SmallVector<int64_t, 4> shape;
+      attrValue = attrValue.lookThroughSingleElementAggregates();
       if (attrValue.getKind() == SymbolicValue::Integer ||
           attrValue.getKind() == SymbolicValue::Float) {
         if (addScalar(attrValue, elements))
