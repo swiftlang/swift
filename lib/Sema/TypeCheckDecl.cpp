@@ -2620,6 +2620,12 @@ public:
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
     TC.validateDecl(SD);
+
+    if (!SD->isInvalid()) {
+      TC.checkReferencedGenericParams(SD);
+      TC.checkProtocolSelfRequirements(SD);
+    }
+
     TC.checkDeclAttributes(SD);
 
     AccessControlChecker::checkAccessControl(TC, SD);
@@ -3121,6 +3127,15 @@ public:
   void visitFuncDecl(FuncDecl *FD) {
     TC.validateDecl(FD);
 
+    // We get bogus errors here with generic subscript materializeForSet.
+    if (!FD->isInvalid()) {
+      if (!isa<AccessorDecl>(FD) ||
+          !cast<AccessorDecl>(FD)->isMaterializeForSet()) {
+        TC.checkReferencedGenericParams(FD);
+        TC.checkProtocolSelfRequirements(FD);
+      }
+    }
+
     AccessControlChecker::checkAccessControl(TC, FD);
     UsableFromInlineChecker::checkUsableFromInline(TC, FD);
 
@@ -3264,6 +3279,11 @@ public:
 
   void visitConstructorDecl(ConstructorDecl *CD) {
     TC.validateDecl(CD);
+
+    if (!CD->isInvalid()) {
+      TC.checkReferencedGenericParams(CD);
+      TC.checkProtocolSelfRequirements(CD);
+    }
 
     // Check whether this initializer overrides an initializer in its
     // superclass.
