@@ -10,7 +10,9 @@ import UIKit
 import StdlibUnittest
 import StdlibUnittestFoundationExtras
 
-#if swift(>=4)
+#if swift(>=4.2)
+  let UIKitTests = TestSuite("UIKit_Swift4_2")
+#elseif swift(>=4)
   let UIKitTests = TestSuite("UIKit_Swift4")
 #else
   let UIKitTests = TestSuite("UIKit_Swift3")
@@ -165,6 +167,24 @@ UIKitTests.test("UILayoutPriority") {
 #endif
 
 #if !os(watchOS)
+UIKitTests.test("UIWindow.Level") {
+  #if swift(>=4.2) // Swift 4.2
+    let normalWindowLevel: UIWindow.Level = .normal
+    
+    expectTrue(normalWindowLevel == .normal)
+    expectTrue(normalWindowLevel < .alert)
+    expectTrue(normalWindowLevel + 1 == 1 + normalWindowLevel)
+  #else // Swift 3 and 4
+    let normalWindowLevel: UIWindowLevel = UIWindowLevelNormal
+    
+    expectTrue(normalWindowLevel == UIWindowLevelNormal)
+    expectTrue(normalWindowLevel < UIWindowLevelAlert)
+    expectTrue(normalWindowLevel + 1 == 1 + UIWindowLevelNormal)
+  #endif
+}
+#endif
+
+#if !os(watchOS)
 class TestChildView : UIView, CustomPlaygroundQuickLookable {
   convenience init() {
     self.init(frame: CGRect(x: 0, y: 0, width: 10, height: 10))
@@ -288,5 +308,34 @@ UIKitTests.test("UIPrintError compatibility") {
 }
 #endif
 
+#if !os(watchOS)
+UIKitTests.test("UIApplicationMain") {
+  #if swift(>=4.2)
+  _ = { UIApplicationMain(CommandLine.argc, CommandLine.unsafeArgv, nil, nil) }
+  #endif
+  _ = { UIApplicationMain(CommandLine.argc, UnsafeMutableRawPointer(CommandLine.unsafeArgv).bindMemory(to: UnsafeMutablePointer<Int8>.self, capacity: Int(CommandLine.argc)), nil, nil) }
+}
+#endif
+
+UIKitTests.test("UIAccessibilityTraits") {
+  #if swift(>=4.2)
+  let traits: UIAccessibilityTraits = [.link, .button]
+  expectTrue(traits.contains(.link))
+  expectFalse(traits.contains(.header))
+  #else
+  let _: UIAccessibilityTraits = UIAccessibilityTraitLink | UIAccessibilityTraitButton
+  #endif
+}
+
+#if !os(watchOS)
+UIKitTests.test("UITextDirection") {
+  #if swift(>=4.2)
+  let _: UITextDirection = .storage(.forward)
+  let _: UITextDirection = .layout(.right)
+  #else
+  let _: UITextDirection = UITextStorageDirection.backward.rawValue
+  #endif
+}
+#endif
 
 runAllTests()
