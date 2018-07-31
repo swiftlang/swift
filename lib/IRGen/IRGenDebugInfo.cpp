@@ -1589,6 +1589,9 @@ void IRGenDebugInfoImpl::setCurrentLoc(IRBuilder &Builder,
   if (!Scope)
     return;
 
+  // NOTE: In CodeView, zero is not an artificial line location. We try to
+  //       avoid those line locations near user code to reduce the number
+  //       of breaks in the linetables.
   SILLocation::DebugLoc L;
   SILFunction *Fn = DS->getInlinedFunction();
   if (Fn && (Fn->isThunk() || Fn->isTransparent())) {
@@ -1597,10 +1600,11 @@ void IRGenDebugInfoImpl::setCurrentLoc(IRBuilder &Builder,
     // Reuse the last source location if we are still in the same
     // scope to get a more contiguous line table.
     L = LastDebugLoc;
-  } else if (DS == LastScope && Loc.is<ArtificialUnreachableLocation>() &&
+  } else if (DS == LastScope &&
+             (Loc.is<ArtificialUnreachableLocation>() || Loc.isLineZero(SM)) &&
              Opts.DebugInfoFormat == IRGenDebugInfoFormat::CodeView) {
-    // Remove unreachable locations with line zero because line zero does not
-    // represent an artificial location in CodeView.
+    // If the scope has not changed and the line number is either zero or
+    // artificial, we want to keep the most recent debug location.
     L = LastDebugLoc;
   } else {
     // Decode the location.

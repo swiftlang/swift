@@ -11,9 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "globalopt"
+#include "swift/AST/ASTMangler.h"
 #include "swift/Demangling/Demangle.h"
+#include "swift/Demangling/Demangler.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/ColdBlockInfo.h"
@@ -21,13 +25,10 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Local.h"
-#include "swift/Demangling/Demangler.h"
-#include "swift/Demangling/ManglingMacros.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SCCIterator.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
-#include "swift/AST/ASTMangler.h"
 
 using namespace swift;
 
@@ -270,10 +271,9 @@ static SILFunction *getGlobalGetterFunction(SILModule &M,
                          ParameterConvention::Direct_Unowned,
                          /*params*/ {}, /*yields*/ {}, Results, None,
                          M.getASTContext());
-
-  return M.getOrCreateFunction(
-      loc, getterName, Linkage, LoweredType,
-      IsBare, IsNotTransparent, Serialized);
+  SILFunctionBuilder builder(M);
+  return builder.getOrCreateFunction(loc, getterName, Linkage, LoweredType,
+                                     IsBare, IsNotTransparent, Serialized);
 }
 
 /// Generate getter from the initialization code whose result is stored by a

@@ -34,6 +34,7 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/CallerAnalysis.h"
@@ -45,8 +46,8 @@
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/Support/Debug.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Debug.h"
 
 using namespace swift;
 
@@ -494,7 +495,8 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   // The specialized function is an internal detail, so we need to disconnect it
   // from a parent class, if one exists, thus the override of the
   // classSubclassScope.
-  TransformDescriptor.OptimizedFunction = M.createFunction(
+  SILFunctionBuilder builder(M);
+  TransformDescriptor.OptimizedFunction = builder.createFunction(
       linkage, Name, NewFTy, NewFGenericEnv, F->getLocation(), F->isBare(),
       F->isTransparent(), F->isSerialized(), F->getEntryCount(), F->isThunk(),
       /*classSubclassScope=*/SubclassScope::NotApplicable,

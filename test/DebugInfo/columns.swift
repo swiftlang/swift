@@ -24,7 +24,6 @@ public func foo(_ a: Int64, _ b: Int64) -> Int64 {      // line 5
 
 // CV-CHECK-DAG: !DILexicalBlock({{.*}}, line: 5)
 // CV-CHECK-DAG: ![[DIV]] = !DILocation(line: 8, scope:
-// CV-CHECK-DAG: ![[ADD]] = !DILocation(line: 8, scope:
 // CV-CHECK-DAG: ![[SLT]] = !DILocation(line: 10, scope:
 // CV-CHECK-DAG: !DILexicalBlock({{.*}}, line: 10)
 // CV-CHECK-DAG: ![[SUB]] = !DILocation(line: 12, scope:

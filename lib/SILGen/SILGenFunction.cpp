@@ -20,6 +20,7 @@
 #include "Scope.h"
 #include "swift/AST/Initializer.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SIL/SILProfiler.h"
 #include "swift/SIL/SILUndef.h"
 
@@ -462,8 +463,9 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     ValueDecl *UIApplicationMainDecl = results.front();
 
     auto mainRef = SILDeclRef(UIApplicationMainDecl).asForeign();
-    auto UIApplicationMainFn = SGM.M.getOrCreateFunction(mainClass, mainRef,
-                                                         NotForDefinition);
+    SILFunctionBuilder builder(SGM.M);
+    auto UIApplicationMainFn =
+        builder.getOrCreateFunction(mainClass, mainRef, NotForDefinition);
     auto fnTy = UIApplicationMainFn->getLoweredFunctionType();
     SILFunctionConventions fnConv(fnTy, SGM.M);
 
@@ -489,11 +491,9 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                                 ResultConvention::Autoreleased),
                   /*error result*/ None,
                   ctx);
-    auto NSStringFromClassFn
-      = SGM.M.getOrCreateFunction(mainClass, "NSStringFromClass",
-                                  SILLinkage::PublicExternal,
-                                  NSStringFromClassType,
-                                  IsBare, IsTransparent, IsNotSerialized);
+    auto NSStringFromClassFn = builder.getOrCreateFunction(
+        mainClass, "NSStringFromClass", SILLinkage::PublicExternal,
+        NSStringFromClassType, IsBare, IsTransparent, IsNotSerialized);
     auto NSStringFromClass = B.createFunctionRef(mainClass, NSStringFromClassFn);
     SILValue metaTy = B.createMetatype(mainClass,
                              SILType::getPrimitiveObjectType(mainClassMetaty));
@@ -582,11 +582,10 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                   /*error result*/ None,
                   getASTContext());
 
-    auto NSApplicationMainFn
-      = SGM.M.getOrCreateFunction(mainClass, "NSApplicationMain",
-                                  SILLinkage::PublicExternal,
-                                  NSApplicationMainType,
-                                  IsBare, IsTransparent, IsNotSerialized);
+    SILFunctionBuilder builder(SGM.M);
+    auto NSApplicationMainFn = builder.getOrCreateFunction(
+        mainClass, "NSApplicationMain", SILLinkage::PublicExternal,
+        NSApplicationMainType, IsBare, IsTransparent, IsNotSerialized);
 
     auto NSApplicationMain = B.createFunctionRef(mainClass, NSApplicationMainFn);
     SILValue args[] = { argc, argv };
