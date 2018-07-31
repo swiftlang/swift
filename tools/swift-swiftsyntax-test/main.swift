@@ -17,10 +17,15 @@ func printHelp() {
             incrementally transferred post-edit syntax tree (--incr-tree) and
             write the source representation of the post-edit syntax tree to an
             out file (--out).
+      --classify-syntax
+            Parse the given source file (--source-file) and output it with
+            tokens classified for syntax colouring.
       --help
             Print this help message
 
     Arguments:
+      --source-file FILENAME
+            The path to a Swift source file to parse
       --pre-edit-tree FILENAME
             The path to a JSON serialized pre-edit syntax tree
       --incr-tree FILENAME
@@ -47,15 +52,30 @@ func performRoundTrip(args: CommandLineArguments) throws {
   try sourceRepresenation.write(to: outURL, atomically: false, encoding: .utf8)
 }
 
+func performClassifySyntax(args: CommandLineArguments) throws {
+  let treeURL = URL(fileURLWithPath: try args.getRequired("--source-file"))
+
+  let tree = try SyntaxTreeParser.parse(treeURL)
+  let classifications = SyntaxClassifier.classifyTokensInTree(tree)
+  let printer = ClassifiedSyntaxTreePrinter(classifications: classifications)
+  let result = printer.print(tree: tree)
+
+  if let outURL = args["--out"].map(URL.init(fileURLWithPath:)) {
+    try result.write(to: outURL, atomically: false, encoding: .utf8)
+  } else {
+    print(result)
+  }
+}
+
 do {
   let args = try CommandLineArguments.parse(CommandLine.arguments.dropFirst())
 
   if args.has("--deserialize-incremental") {
     try performRoundTrip(args: args)
-    exit(0)
+  } else if args.has("--classify-syntax") {
+    try performClassifySyntax(args: args)
   } else if args.has("--help") {
     printHelp()
-    exit(0)
   } else {
     printerr("""
       No action specified.
@@ -63,6 +83,7 @@ do {
       """)
     exit(1)
   }
+  exit(0)
 } catch {
   printerr(error.localizedDescription)
   printerr("Run swift-swiftsyntax-test --help for more help.")
