@@ -453,16 +453,10 @@ private class TFState {
 
   /// The TF_Session to execute the function.
   fileprivate let cSession: CTFSession
-  
   /// The graph that contains the function to execute. Not owned.
   let graph: CTFGraph
-  
   /// The input tensors.
   var inputTensors: [CTensor?] = []
-  
-  /// The buffer that stores the run metadata during execution. This is non-nil
-  /// only when `_RuntimeConfig.runMetadataOutputPath` is non-nil.
-  private var runMetadataOutput: UnsafeMutablePointer<TF_Buffer>? = nil
 
   init(_ programByteAddress: UnsafeRawPointer, programByteCount: Int) {
     let context = _ExecutionContext.global
@@ -472,7 +466,6 @@ private class TFState {
 
   deinit {
     TF_DeleteStatus(status)
-    TF_DeleteBuffer(runMetadataOutput)
   }
 }
 
@@ -554,6 +547,7 @@ extension TFState {
       }
     }
     var runOptions: UnsafePointer<TF_Buffer>? = nil
+    var runMetadataOutput: UnsafeMutablePointer<TF_Buffer>? = nil
     // When there's a run metadata output path specified, we enable `FULL_TRACE`
     // in run options and dump that to the specified path after execution.
     if _RuntimeConfig.runMetadataOutputPath != nil {
