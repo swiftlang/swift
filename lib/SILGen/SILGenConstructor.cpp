@@ -10,19 +10,20 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SILGenFunction.h"
 #include "ArgumentSource.h"
 #include "Initialization.h"
 #include "LValue.h"
 #include "RValue.h"
+#include "SILGenFunction.h"
 #include "Scope.h"
-#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/Basic/Defer.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
-#include "swift/Basic/Defer.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -450,7 +451,7 @@ bool Lowering::usesObjCAllocator(ClassDecl *theClass) {
     if (!theClass->hasSuperclass())
       return theClass->hasClangNode();
 
-    theClass = theClass->getSuperclass()->getClassOrBoundGenericClass();
+    theClass = theClass->getSuperclassDecl();
   }
 }
 
@@ -904,13 +905,10 @@ static SILValue getBehaviorInitStorageFn(SILGenFunction &SGF,
                                           SGF.getASTContext());
     
     // TODO: Generate the body of the thunk.
-    thunkFn = SGF.SGM.M.getOrCreateFunction(SILLocation(behaviorVar),
-                                            behaviorInitName,
-                                            SILLinkage::PrivateExternal,
-                                            initConstantTy,
-                                            IsBare, IsTransparent, IsSerialized);
-    
-    
+    SILFunctionBuilder builder(SGF.SGM.M);
+    thunkFn = builder.getOrCreateFunction(
+        SILLocation(behaviorVar), behaviorInitName, SILLinkage::PrivateExternal,
+        initConstantTy, IsBare, IsTransparent, IsSerialized);
   }
   return SGF.B.createFunctionRef(behaviorVar, thunkFn);
 }

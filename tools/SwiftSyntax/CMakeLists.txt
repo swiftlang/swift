@@ -16,6 +16,7 @@ add_swift_library(swiftSwiftSyntax SHARED
   SyntaxData.swift
   SyntaxChildren.swift
   SyntaxCollections.swift.gyb
+  SyntaxClassifier.swift.gyb
   SyntaxBuilders.swift.gyb
   SyntaxFactory.swift.gyb
   SyntaxKind.swift.gyb

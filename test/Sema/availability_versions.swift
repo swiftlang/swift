@@ -356,7 +356,7 @@ class ClassWithUnavailableProperties {
   }
   
   var propWithSetterOnlyAvailableOn10_51 : Int {
-      // expected-note@-1 {{add @available attribute to enclosing var}}
+      // expected-note@-1 {{add @available attribute to enclosing property}}
     get {
       _ = globalFuncAvailableOn10_51() // expected-error {{'globalFuncAvailableOn10_51()' is only available on OS X 10.51 or newer}}
           // expected-note@-1 {{add 'if #available' version check}}
@@ -369,7 +369,7 @@ class ClassWithUnavailableProperties {
   }
   
   var propWithGetterOnlyAvailableOn10_51 : Int {
-      // expected-note@-1 {{add @available attribute to enclosing var}}
+      // expected-note@-1 {{add @available attribute to enclosing property}}
     @available(OSX, introduced: 10.51)
     get {
       _ = globalFuncAvailableOn10_51()
@@ -419,7 +419,7 @@ class ClassWithReferencesInInitializers {
   lazy var lazyPropWithInitializer10_51: Int = globalFuncAvailableOn10_51()
 
   lazy var lazyPropWithInitializer10_52: Int = globalFuncAvailableOn10_52() // expected-error {{'globalFuncAvailableOn10_52()' is only available on OS X 10.52 or newer}}
-      // expected-note@-1 {{add @available attribute to enclosing var}}
+      // expected-note@-1 {{add @available attribute to enclosing property}}
 }
 
 func accessUnavailableProperties(_ o: ClassWithUnavailableProperties) {
@@ -998,6 +998,11 @@ class WidelyAvailableBase {
 @available(OSX, introduced: 10.53)
 class EsotericSmallBatchHipsterThing : WidelyAvailableBase {}
 
+@available(OSX, introduced: 10.53)
+class NestedClassTest {
+  class InnerClass : WidelyAvailableBase {}
+}
+
 // Useless #available(...) checks
 
 func functionWithDefaultAvailabilityAndUselessCheck(_ p: Bool) {
@@ -1264,7 +1269,7 @@ class ClassForFixit {
   }
 
   var fixitForReferenceInPropertyAccessor: Int {
-        // expected-note@-1 {{add @available attribute to enclosing var}} {{3-3=@available(OSX 10.51, *)\n  }}
+        // expected-note@-1 {{add @available attribute to enclosing property}} {{3-3=@available(OSX 10.51, *)\n  }}
     get {
       functionAvailableOn10_51()
         // expected-error@-1 {{'functionAvailableOn10_51()' is only available on OS X 10.51 or newer}}
@@ -1279,19 +1284,19 @@ class ClassForFixit {
 
   lazy var fixitForReferenceInLazyPropertyType: ClassAvailableOn10_51? = nil
       // expected-error@-1 {{'ClassAvailableOn10_51' is only available on OS X 10.51 or newer}}
-      // expected-note@-2 {{add @available attribute to enclosing var}} {{3-3=@available(OSX 10.51, *)\n  }}
+      // expected-note@-2 {{add @available attribute to enclosing property}} {{3-3=@available(OSX 10.51, *)\n  }}
 
   private lazy var fixitForReferenceInPrivateLazyPropertyType: ClassAvailableOn10_51? = nil
       // expected-error@-1 {{'ClassAvailableOn10_51' is only available on OS X 10.51 or newer}}
-      // expected-note@-2 {{add @available attribute to enclosing var}} {{3-3=@available(OSX 10.51, *)\n  }}
+      // expected-note@-2 {{add @available attribute to enclosing property}} {{3-3=@available(OSX 10.51, *)\n  }}
 
   lazy private var fixitForReferenceInLazyPrivatePropertyType: ClassAvailableOn10_51? = nil
       // expected-error@-1 {{'ClassAvailableOn10_51' is only available on OS X 10.51 or newer}}
-      // expected-note@-2 {{add @available attribute to enclosing var}} {{3-3=@available(OSX 10.51, *)\n  }}
+      // expected-note@-2 {{add @available attribute to enclosing property}} {{3-3=@available(OSX 10.51, *)\n  }}
 
   static var fixitForReferenceInStaticPropertyType: ClassAvailableOn10_51? = nil
       // expected-error@-1 {{'ClassAvailableOn10_51' is only available on OS X 10.51 or newer}}
-      // expected-note@-2 {{add @available attribute to enclosing static var}} {{3-3=@available(OSX 10.51, *)\n  }}
+      // expected-note@-2 {{add @available attribute to enclosing static property}} {{3-3=@available(OSX 10.51, *)\n  }}
 
   var fixitForReferenceInPropertyTypeMultiple: ClassAvailableOn10_51? = nil, other: Int = 7
       // expected-error@-1 {{'ClassAvailableOn10_51' is only available on OS X 10.51 or newer}}

@@ -698,9 +698,9 @@ public enum NWEndpoint: Hashable, CustomDebugStringConvertible {
 			return String("\(host)\(separator)\(port)")
 		case .service(name: let name, type: let type, domain: let domain, interface: let interface):
 			if let interface = interface {
-				return String("\(name).\(type).\(domain)%\(interface)")
+				return String("\(name).\(type)\(domain)%\(interface)")
 			}
-			return String("\(name).\(type).\(domain)")
+			return String("\(name).\(type)\(domain)")
 		case .unix(let path):
 			return path
 		}

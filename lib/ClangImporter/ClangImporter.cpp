@@ -951,6 +951,7 @@ ClangImporter::create(ASTContext &ctx,
   }
   auto &instance = *importer->Impl.Instance;
   instance.setInvocation(importer->Impl.Invocation);
+
   if (tracker)
     instance.addDependencyCollector(tracker->getClangCollector());
 
@@ -961,6 +962,20 @@ ClangImporter::create(ASTContext &ctx,
         importer->Impl, instance.getDiagnosticOpts(),
         importerOpts.DumpClangDiagnostics);
     instance.createDiagnostics(actualDiagClient.release());
+  }
+
+  // Set up the file manager.
+  {
+    if (!ctx.SearchPathOpts.VFSOverlayFiles.empty()) {
+      // If the clang instance has overlays it means the user has provided
+      // -ivfsoverlay options and swift -vfsoverlay options.  We're going to
+      // clobber their file system with our own, so warn about it.
+      if (!instance.getHeaderSearchOpts().VFSOverlayFiles.empty()) {
+        ctx.Diags.diagnose(SourceLoc(), diag::clang_vfs_overlay_is_ignored);
+      }
+      instance.setVirtualFileSystem(ctx.SourceMgr.getFileSystem());
+    }
+    instance.createFileManager();
   }
 
   // Don't stop emitting messages if we ever can't load a module.
@@ -3544,7 +3559,11 @@ EffectiveClangContext ClangImporter::Implementation::getEffectiveClangContext(
   }
 
   // If it's an @objc entity, go look for it.
-  if (nominal->isObjC()) {
+  // Note that we're stepping lightly here to avoid computing isObjC()
+  // too early.
+  if (isa<ClassDecl>(nominal) &&
+      (nominal->getAttrs().hasAttribute<ObjCAttr>() ||
+       (!nominal->getParentSourceFile() && nominal->isObjC()))) {
     // Map the name. If we can't represent the Swift name in Clang.
     // FIXME: We should be using the Objective-C name here!
     auto clangName = exportName(nominal->getName());

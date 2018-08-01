@@ -43,12 +43,13 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-capture-promotion"
-#include "swift/SILOptimizer/PassManager/Passes.h"
-#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
-#include "swift/SIL/SILCloner.h"
-#include "swift/SIL/TypeSubstCloner.h"
-#include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/SIL/SILCloner.h"
+#include "swift/SIL/SILFunctionBuilder.h"
+#include "swift/SIL/TypeSubstCloner.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/Statistic.h"
@@ -427,7 +428,8 @@ ClosureCloner::initCloned(SILFunction *Orig, IsSerialized_t Serialized,
          && "SILFunction missing DebugScope");
   assert(!Orig->isGlobalInit() && "Global initializer cannot be cloned");
 
-  auto *Fn = M.createFunction(
+  SILFunctionBuilder builder(M);
+  auto *Fn = builder.createFunction(
       Orig->getLinkage(), ClonedName, ClonedTy, Orig->getGenericEnvironment(),
       Orig->getLocation(), Orig->isBare(), IsNotTransparent, Serialized,
       Orig->getEntryCount(), Orig->isThunk(), Orig->getClassSubclassScope(),

@@ -2019,6 +2019,7 @@ public:
     auto *GenericSig = VD->getInnermostDeclContext()
         ->getGenericSignatureOfContext();
 
+    assert(VD->hasValidSignature());
     Type T = VD->getInterfaceType();
 
     if (*ExprType) {
@@ -2105,6 +2106,10 @@ public:
     addLeadingDot(Builder);
     Builder.addTextChunk(Name);
     setClangDeclKeywords(VD, Pairs, Builder);
+
+    if (!VD->hasValidSignature())
+      return;
+
     // Add a type annotation.
     Type VarType = getTypeOfMember(VD);
     if (VD->getName() != Ctx.Id_self && VD->isInOut()) {
@@ -4446,9 +4451,9 @@ public:
     const auto *CD = dyn_cast_or_null<ClassDecl>(CurrTy->getAnyNominal());
     if (!CD)
       return;
-    if (!CD->getSuperclass())
+    if (!CD->hasSuperclass())
       return;
-    CD = CD->getSuperclass()->getClassOrBoundGenericClass();
+    CD = CD->getSuperclassDecl();
     for (const auto *Member : CD->getMembers()) {
       const auto *Constructor = dyn_cast<ConstructorDecl>(Member);
       if (!Constructor)

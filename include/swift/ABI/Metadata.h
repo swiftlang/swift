@@ -28,6 +28,7 @@
 #include <utility>
 #include <string.h>
 #include "llvm/ADT/ArrayRef.h"
+#include "swift/Strings.h"
 #include "swift/Runtime/Config.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/ABI/System.h"
@@ -2344,6 +2345,9 @@ using ProtocolConformanceRecord = TargetProtocolConformanceRecord<InProcess>;
 template<typename Runtime>
 struct TargetGenericContext;
 
+template<typename Runtime>
+struct TargetModuleContextDescriptor;
+
 /// Base class for all context descriptors.
 template<typename Runtime>
 struct TargetContextDescriptor {
@@ -2361,6 +2365,12 @@ struct TargetContextDescriptor {
   /// context is not generic.
   const TargetGenericContext<Runtime> *getGenericContext() const;
 
+  /// Get the module context for this context.
+  const TargetModuleContextDescriptor<Runtime> *getModuleContext() const;
+
+  /// Is this context part of a C-imported module?
+  bool isCImportedContext() const;
+
   unsigned getNumGenericParams() const {
     auto *genericContext = getGenericContext();
     return genericContext
@@ -2376,11 +2386,23 @@ private:
 
 using ContextDescriptor = TargetContextDescriptor<InProcess>;
 
+inline bool isCImportedModuleName(StringRef name) {
+  // This does not include MANGLING_MODULE_CLANG_IMPORTER because that's
+  // used only for synthesized declarations and not actual imported
+  // declarations.
+  return name == MANGLING_MODULE_OBJC;
+}
+
 /// Descriptor for a module context.
 template<typename Runtime>
 struct TargetModuleContextDescriptor final : TargetContextDescriptor<Runtime> {
   /// The module name.
   RelativeDirectPointer<const char, /*nullable*/ false> Name;
+
+  /// Is this module a special C-imported module?
+  bool isCImportedContext() const {
+    return isCImportedModuleName(Name.get());
+  }
 
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
     return cd->getKind() == ContextDescriptorKind::Module;
@@ -2388,6 +2410,21 @@ struct TargetModuleContextDescriptor final : TargetContextDescriptor<Runtime> {
 };
 
 using ModuleContextDescriptor = TargetModuleContextDescriptor<InProcess>;
+
+template<typename Runtime>
+inline bool TargetContextDescriptor<Runtime>::isCImportedContext() const {
+  return getModuleContext()->isCImportedContext();
+}
+
+template<typename Runtime>
+inline const TargetModuleContextDescriptor<Runtime> *
+TargetContextDescriptor<Runtime>::getModuleContext() const {
+  // All context chains should eventually find a module.
+  for (auto cur = this; true; cur = cur->Parent.get()) {
+    if (auto module = dyn_cast<TargetModuleContextDescriptor<Runtime>>(cur))
+      return module;
+  }
+}
 
 template<typename Runtime>
 struct TargetGenericContextDescriptorHeader {

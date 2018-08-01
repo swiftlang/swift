@@ -45,7 +45,7 @@ positions in several different contexts:
 Consider the example:
 
 ```
-func example<T>(Int, i, t: T) -> (Int, T) {
+func example<T>(i: Int, t: T) -> (Int, T) {
   let foo = { return ($0, t) }
   return foo(i)
 }
@@ -84,7 +84,7 @@ first is the callee), and in lowered SIL, it is actually the third
 SILFunctionArgument (after the indirect result and first parameter):
 
 ```
-%closure = partial_apply @foo(#0: %t)
+%closure = partial_apply @foo(#0: t)
 ```
 
 Application of the closure with opaque values has one applied
@@ -97,7 +97,7 @@ argument:
 Lowered application of the closure has two applied arguments:
 
 ```
-%directResult = apply %closure(#0: %indirectResult: $*T, #1: i)
+%directResult = apply %closure(#0: %indirectResult: *T, #1: i)
 ```
 
 The mapping between `SILFunctionType` and `SILFunctionArgument`, which depends

@@ -112,7 +112,10 @@ def driver_batch_seed : Separate<["-"], "driver-batch-seed">,
   HelpText<"Use the given seed value to randomize batch-mode partitions">;
 def driver_batch_count : Separate<["-"], "driver-batch-count">,
   InternalDebugOpt,
-  HelpText<"Use the given number of batch-mode partitions, rather than default parallelism level">;
+  HelpText<"Use the given number of batch-mode partitions, rather than partitioning dynamically">;
+def driver_batch_size_limit : Separate<["-"], "driver-batch-size-limit">,
+  InternalDebugOpt,
+  HelpText<"Use the given number as the upper limit on dynamic batch-mode partition size">;
 def driver_force_one_batch_repartition : Flag<["-"], "driver-force-one-batch-repartition">,
   InternalDebugOpt,
   HelpText<"Force one batch repartitioning for testing">;
@@ -665,6 +668,10 @@ def dump_type_refinement_contexts :
   HelpText<"Type-check input file(s) and dump type refinement contexts(s)">,
   ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def dump_type_info : Flag<["-"], "dump-type-info">,
+  HelpText<"Output YAML dump of fixed-size types from all imported modules">,
+  ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def print_ast : Flag<["-"], "print-ast">,
   HelpText<"Parse and type-check input file(s) and pretty print AST(s)">,
   ModeOpt,
@@ -790,5 +797,13 @@ def working_directory : Separate<["-"], "working-directory">,
   MetaVarName<"<path>">;
 def working_directory_EQ : Joined<["-"], "working-directory=">,
   Alias<working_directory>;
+
+// VFS
+
+def vfsoverlay : JoinedOrSeparate<["-"], "vfsoverlay">,
+  Flags<[FrontendOption, ArgumentIsPath]>,
+  HelpText<"Add directory to VFS overlay file">;
+def vfsoverlay_EQ : Joined<["-"], "vfsoverlay=">,
+  Alias<vfsoverlay>;
 
 include "FrontendOptions.td"

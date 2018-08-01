@@ -1,3 +1,4 @@
+from Classification import classification_by_name
 from kinds import lowercase_first_word
 
 
@@ -6,10 +7,12 @@ class Token(object):
     Represents the specification for a Token in the TokenSyntax file.
     """
 
-    def __init__(self, name, kind, text=None, is_keyword=False):
+    def __init__(self, name, kind, text=None, classification='None', 
+                 is_keyword=False):
         self.name = name
         self.kind = kind
         self.text = text or ""
+        self.classification = classification_by_name(classification)
         self.is_keyword = is_keyword
 
     def swift_kind(self):
@@ -25,7 +28,8 @@ class Keyword(Token):
     """
 
     def __init__(self, name, text):
-        Token.__init__(self, name, 'kw_' + text, text=text, is_keyword=True)
+        Token.__init__(self, name, 'kw_' + text, text=text, 
+                       classification='Keyword', is_keyword=True)
 
 
 SYNTAX_TOKENS = [
@@ -90,39 +94,46 @@ SYNTAX_TOKENS = [
     Keyword('Wildcard', '_'),
     Keyword('Yield', 'yield'),
     Token('PoundAvailable', 'pound_available', text='#available',
-          is_keyword=True),
+          is_keyword=True, classification='Keyword'),
     Token('PoundEndif', 'pound_endif', text='#endif',
-          is_keyword=True),
+          is_keyword=True, classification='PoundDirectiveKeyword'),
     Token('PoundElse', 'pound_else', text='#else',
-          is_keyword=True),
+          is_keyword=True, classification='PoundDirectiveKeyword'),
     Token('PoundElseif', 'pound_elseif', text='#elseif',
-          is_keyword=True),
+          is_keyword=True, classification='PoundDirectiveKeyword'),
     Token('PoundIf', 'pound_if', text='#if',
-          is_keyword=True),
+          is_keyword=True, classification='PoundDirectiveKeyword'),
     Token('PoundSourceLocation', 'pound_sourceLocation',
-          text='#sourceLocation', is_keyword=True),
+          text='#sourceLocation', is_keyword=True,
+          classification='PoundDirectiveKeyword'),
+    Token('PoundWarning', 'pound_warning', text='#warning', is_keyword=True, 
+          classification='PoundDirectiveKeyword'),
+    Token('PoundError', 'pound_error', text='#error', is_keyword=True,
+          classification='PoundDirectiveKeyword'),
     Token('PoundFile', 'pound_file', text='#file',
-          is_keyword=True),
+          is_keyword=True, classification='Keyword'),
     Token('PoundLine', 'pound_line', text='#line',
-          is_keyword=True),
+          is_keyword=True, classification='Keyword'),
     Token('PoundColumn', 'pound_column', text='#column',
-          is_keyword=True),
+          is_keyword=True, classification='Keyword'),
     Token('PoundDsohandle', 'pound_dsohandle', text='#dsohandle',
-          is_keyword=True),
+          is_keyword=True, classification='Keyword'),
     Token('PoundFunction', 'pound_function', text='#function',
-          is_keyword=True),
+          is_keyword=True, classification='Keyword'),
     Token('PoundSelector', 'pound_selector', text='#selector',
-          is_keyword=True),
+          is_keyword=True, classification='Keyword'),
     Token('PoundKeyPath', 'pound_keyPath', text='#keyPath',
-          is_keyword=True),
+          is_keyword=True, classification='Keyword'),
     Token('PoundColorLiteral', 'pound_colorLiteral', text='#colorLiteral',
-          is_keyword=True),
+          is_keyword=True, classification='ObjectLiteral'),
     Token('PoundFileLiteral', 'pound_fileLiteral', text='#fileLiteral',
-          is_keyword=True),
+          is_keyword=True, classification='ObjectLiteral'),
     Token('PoundImageLiteral', 'pound_imageLiteral', text='#imageLiteral',
-          is_keyword=True),
+          is_keyword=True, classification='ObjectLiteral'),
     Token('Arrow', 'arrow', text='->'),
-    Token('AtSign', 'at_sign', text='@'),
+    Token('Backtick', 'backtick', text='`'),
+    Token('AtSign', 'at_sign', text='@', classification='Attribute'),
+    Token('Pound', 'pound', text='#'),
     Token('Colon', 'colon', text=':'),
     Token('Semicolon', 'semi', text=';'),
     Token('Comma', 'comma', text=','),
@@ -143,21 +154,26 @@ SYNTAX_TOKENS = [
     Token('ExclamationMark', 'exclaim_postfix', text='!'),
     Token('Backslash', 'backslash', text='\\\\'),
     Token('StringInterpolationAnchor', 'string_interpolation_anchor',
-          text=')'),
-    Token('StringQuote', 'string_quote', text='\\\"'),
+          text=')', classification='StringInterpolationAnchor'),
+    Token('StringQuote', 'string_quote', text='\\\"', 
+          classification='StringLiteral'),
     Token('MultilineStringQuote', 'multiline_string_quote',
-          text='\\\"\\\"\\\"'),
-    Token('StringSegment', 'string_segment'),
-    Token('Identifier', 'identifier'),
-    Token('DollarIdentifier', 'dollarident'),
+          text='\\\"\\\"\\\"', classification='StringLiteral'),
+    Token('StringSegment', 'string_segment', classification='StringLiteral'),
+    Token('Identifier', 'identifier', classification=None),
+    Token('DollarIdentifier', 'dollarident', 
+          classification='DollarIdentifier'),
     Token('UnspacedBinaryOperator', 'oper_binary_unspaced'),
     Token('SpacedBinaryOperator', 'oper_binary_spaced'),
     Token('PrefixOperator', 'oper_prefix'),
     Token('PostfixOperator', 'oper_postfix'),
-    Token('IntegerLiteral', 'integer_literal'),
-    Token('FloatingLiteral', 'floating_literal'),
-    Token('StringLiteral', 'string_literal'),
-    Token('ContextualKeyword', 'contextual_keyword'),
+    Token('IntegerLiteral', 'integer_literal', 
+          classification='IntegerLiteral'),
+    Token('FloatingLiteral', 'floating_literal', 
+          classification='FloatingLiteral'),
+    Token('StringLiteral', 'string_literal',
+          classification='StringLiteral'),
+    Token('ContextualKeyword', 'contextual_keyword', classification='Keyword'),
     Token('Unknown', 'unknown'),
 ]
 

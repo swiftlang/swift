@@ -2255,7 +2255,7 @@ public:
     require(class2,
             "Second operand of dealloc_partial_ref must be a class metatype");
     while (class1 != class2) {
-      class1 = class1->getSuperclass()->getClassOrBoundGenericClass();
+      class1 = class1->getSuperclassDecl();
       require(class1, "First operand not superclass of second instance type");
     }
   }
@@ -2709,7 +2709,7 @@ public:
     auto isConsumingOrMutatingApplyUse = [](Operand *use) -> bool {
       ApplySite apply(use->getUser());
       assert(apply && "Not an apply instruction kind");
-      auto conv = apply.getArgumentConvention(use->getOperandNumber() - 1);
+      auto conv = apply.getArgumentConvention(*use);
       switch (conv) {
       case SILArgumentConvention::Indirect_In_Guaranteed:
         return false;
@@ -4783,8 +4783,7 @@ void SILProperty::verify(const SILModule &M) const {
   auto sig = dc->getGenericSignatureOfContext();
   auto baseTy = dc->getInnermostTypeContext()->getSelfInterfaceType()
                   ->getCanonicalType(sig);
-  auto leafTy = decl->getStorageInterfaceType()->getReferenceStorageReferent()
-                    ->getCanonicalType(sig);
+  auto leafTy = decl->getValueInterfaceType()->getCanonicalType(sig);
   SubstitutionMap subs;
   if (sig) {
     auto env = dc->getGenericEnvironmentOfContext();
@@ -4855,10 +4854,7 @@ void SILVTable::verify(const SILModule &M) const {
     do {
       if (c == theClass)
         break;
-      if (auto ty = c->getSuperclass())
-        c = ty->getClassOrBoundGenericClass();
-      else
-        c = nullptr;
+      c = c->getSuperclassDecl();
     } while (c);
     assert(c && "vtable entry must refer to a member of the vtable's class");
 

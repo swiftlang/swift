@@ -11,14 +11,15 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "allocbox-to-stack"
-#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SIL/Dominance.h"
-#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
+#include "swift/SIL/SILFunctionBuilder.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -284,7 +285,7 @@ static bool partialApplyEscapes(SILValue V, bool examineApply) {
   SILModuleConventions ModConv(*V->getModule());
   llvm::SmallVector<Operand *, 32> Worklist(V->use_begin(), V->use_end());
   while (!Worklist.empty()) {
-    auto *Op = Worklist.pop_back_val();
+    Operand *Op = Worklist.pop_back_val();
 
     // These instructions do not cause the address to escape.
     if (!useCaptured(Op))
@@ -300,15 +301,14 @@ static bool partialApplyEscapes(SILValue V, bool examineApply) {
       continue;
     }
 
-    if (auto *Apply = dyn_cast<ApplyInst>(User)) {
+    if (auto Apply = FullApplySite::isa(User)) {
       // Applying a function does not cause the function to escape.
-      if (Op->getOperandNumber() == 0)
+      if (!Apply.isArgumentOperand(*Op))
         continue;
 
       // apply instructions do not capture the pointer when it is passed
       // indirectly
-      if (Apply->getArgumentConvention(Op->getOperandNumber() - 1)
-              .isIndirectConvention())
+      if (Apply.getArgumentConvention(*Op).isIndirectConvention())
         continue;
 
       // Optionally drill down into an apply to see if the operand is
@@ -665,7 +665,8 @@ SILFunction *PromotedParamCloner::initCloned(SILFunction *Orig,
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getDebugScope())
          && "SILFunction missing DebugScope");
   assert(!Orig->isGlobalInit() && "Global initializer cannot be cloned");
-  auto *Fn = M.createFunction(
+  SILFunctionBuilder builder(M);
+  auto *Fn = builder.createFunction(
       SILLinkage::Shared, ClonedName, ClonedTy, Orig->getGenericEnvironment(),
       Orig->getLocation(), Orig->isBare(), IsNotTransparent, Serialized,
       Orig->getEntryCount(), Orig->isThunk(), Orig->getClassSubclassScope(),

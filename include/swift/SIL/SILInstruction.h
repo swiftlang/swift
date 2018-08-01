@@ -62,6 +62,7 @@ class SILInstructionResultArray;
 class SILOpenedArchetypesState;
 class SILType;
 class SILArgument;
+class SILPHIArgument;
 class SILUndef;
 class Stmt;
 class StringLiteralExpr;
@@ -1934,11 +1935,6 @@ public:
     ArrayRef<Operand> opsWithoutSelf = ArrayRef<Operand>(&ops[0],
                                                          ops.size()-1);
     return OperandValueArrayRef(opsWithoutSelf);
-  }
-
-  /// Return the SILArgumentConvention for the given applied argument index.
-  SILArgumentConvention getArgumentConvention(unsigned index) const {
-    return getSubstCalleeConv().getSILArgumentConvention(index);
   }
 
   Optional<SILResultInfo> getSingleResult() const {
@@ -6835,6 +6831,11 @@ public:
 
   unsigned getNumArgs() const { return getAllOperands().size(); }
   SILValue getArg(unsigned i) const { return getAllOperands()[i].get(); }
+
+  /// Return the SILPHIArgument for the given operand.
+  ///
+  /// See SILArgument.cpp.
+  const SILPHIArgument *getArgForOperand(const Operand *oper) const;
 };
 
 /// A conditional branch.
@@ -6975,6 +6976,15 @@ public:
   /// \p Index argument to DestBB.
   SILValue getArgForDestBB(const SILBasicBlock *DestBB,
                            unsigned ArgIndex) const;
+
+  /// Return the SILPHIArgument from either the true or false destination for
+  /// the given operand.
+  ///
+  /// Returns nullptr for an operand with no block argument
+  /// (i.e the branch condition).
+  ///
+  /// See SILArgument.cpp.
+  const SILPHIArgument *getArgForOperand(const Operand *oper) const;
 
   void swapSuccessors();
 };
@@ -7665,7 +7675,7 @@ public:
   }
 
   /// Return the applied argument index for the given operand.
-  unsigned getArgumentIndex(const Operand &oper) const {
+  unsigned getAppliedArgIndex(const Operand &oper) const {
     assert(oper.getUser() == Inst);
     assert(isArgumentOperand(oper));
 
@@ -7704,19 +7714,14 @@ public:
   /// Note: Passing an applied argument index into SILFunctionConvention, as
   /// opposed to a function argument index, is incorrect.
   unsigned getCalleeArgIndex(const Operand &oper) const {
-    return getCalleeArgIndexOfFirstAppliedArg() + getArgumentIndex(oper);
+    return getCalleeArgIndexOfFirstAppliedArg() + getAppliedArgIndex(oper);
   }
 
   /// Return the SILArgumentConvention for the given applied argument operand.
   SILArgumentConvention getArgumentConvention(Operand &oper) const {
     unsigned calleeArgIdx =
-      getCalleeArgIndexOfFirstAppliedArg() + getArgumentIndex(oper);
+        getCalleeArgIndexOfFirstAppliedArg() + getAppliedArgIndex(oper);
     return getSubstCalleeConv().getSILArgumentConvention(calleeArgIdx);
-  }
-
-  // FIXME: This is incorrect. It will be removed in the next commit.
-  SILArgumentConvention getArgumentConvention(unsigned index) const {
-    return getSubstCalleeConv().getSILArgumentConvention(index);
   }
 
   /// Return true if 'self' is an applied argument.

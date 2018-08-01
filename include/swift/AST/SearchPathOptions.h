@@ -32,6 +32,9 @@ public:
   /// \c ASTContext::addSearchPath.
   std::vector<std::string> ImportSearchPaths;
 
+  /// Path(s) to virtual filesystem overlay YAML files.
+  std::vector<std::string> VFSOverlayFiles;
+
   struct FrameworkSearchPath {
     std::string Path;
     bool IsSystem = false;
@@ -78,6 +81,9 @@ public:
     auto Code = hash_value(SDKPath);
     for (auto Import : ImportSearchPaths) {
       Code = hash_combine(Code, Import);
+    }
+    for (auto VFSFile : VFSOverlayFiles) {
+      Code = hash_combine(Code, VFSFile);
     }
     for (const auto &FrameworkPath : FrameworkSearchPaths) {
       Code = hash_combine(Code, FrameworkPath.Path);

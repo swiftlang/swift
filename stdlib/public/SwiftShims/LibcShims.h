@@ -143,8 +143,8 @@ SWIFT_RUNTIME_STDLIB_INTERNAL
 void _stdlib_setErrno(int value);
 
 // Non-standard extensions
-SWIFT_READNONE SWIFT_RUNTIME_STDLIB_API
-__swift_size_t swift_stdlib_malloc_size(const void *ptr);
+SWIFT_READNONE SWIFT_RUNTIME_STDLIB_INTERNAL
+__swift_size_t _stdlib_malloc_size(const void *ptr);
 
 // Random number for stdlib
 SWIFT_RUNTIME_STDLIB_INTERNAL

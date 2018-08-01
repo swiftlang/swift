@@ -1734,11 +1734,13 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
       Thunk = addChild(Thunk, popNode(Node::Kind::Type));
       return addChild(Thunk, Ty2);
     }
-    case'g':
+    case 'g':
       return demangleGenericSpecialization(Node::Kind::GenericSpecialization);
-    case'G':
+    case 'G':
       return demangleGenericSpecialization(Node::Kind::
                                           GenericSpecializationNotReAbstracted);
+    case 'i':
+      return demangleGenericSpecialization(Node::Kind::InlinedGenericFunction);
     case'p': {
       NodePointer Spec = demangleSpecAttributes(Node::Kind::
                                                 GenericPartialSpecialization);
@@ -1869,7 +1871,8 @@ NodePointer Demangler::demangleGenericSpecialization(Node::Kind SpecKind) {
   if (!TyList)
     return nullptr;
   for (NodePointer Ty : *TyList) {
-    Spec->addChild(createWithChild(Node::Kind::GenericSpecializationParam, Ty), *this);
+    Spec->addChild(createWithChild(Node::Kind::GenericSpecializationParam, Ty),
+                   *this);
   }
   return Spec;
 }

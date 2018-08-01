@@ -117,10 +117,9 @@ enum class DescriptiveDeclKind : uint8_t {
   Var,
   Param,
   Let,
-  StaticVar,
-  StaticLet,
-  ClassVar,
-  ClassLet,
+  Property,
+  StaticProperty,
+  ClassProperty,
   InfixOperator,
   PrefixOperator,
   PostfixOperator,
@@ -3498,7 +3497,7 @@ public:
   }
 
   /// Determine whether this class has a superclass.
-  bool hasSuperclass() const { return (bool)getSuperclass(); }
+  bool hasSuperclass() const { return (bool)getSuperclassDecl(); }
 
   /// Retrieve the superclass of this class, or null if there is no superclass.
   Type getSuperclass() const;
@@ -3812,7 +3811,7 @@ public:
   llvm::TinyPtrVector<ProtocolDecl *> getInheritedProtocols() const;
 
   /// Determine whether this protocol has a superclass.
-  bool hasSuperclass() const { return (bool)getSuperclass(); }
+  bool hasSuperclass() const { return (bool)getSuperclassDecl(); }
 
   /// Retrieve the superclass of this protocol, or null if there is no superclass.
   Type getSuperclass() const;
@@ -4392,13 +4391,6 @@ public:
   /// \brief Do we need to use resilient access patterns when accessing this
   /// property from the given module?
   bool isResilient(ModuleDecl *M, ResilienceExpansion expansion) const;
-
-  /// Returns the interface type of elements of storage represented by this
-  /// declaration.
-  ///
-  /// For variables, this is the type of the variable itself.
-  /// For subscripts, this is the type of the subscript element.
-  Type getStorageInterfaceType() const;
 
   /// Does the storage use a behavior?
   bool hasBehavior() const {

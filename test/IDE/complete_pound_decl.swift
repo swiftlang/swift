@@ -6,8 +6,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POUND_ELSE_MEMATTR | %FileCheck %s -check-prefix=ATTR
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POUND_IF_GBLATTR | %FileCheck %s -check-prefix=ATTR
-// FIXME: SR-2364 the following line triggers an assertion
-// RUN_DISABLED: not --crash %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POUND_IF_GBLNAME
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POUND_IF_GBLNAME | %FileCheck %s -check-prefix=GLOBAL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POUND_ELIF_GBLNAME | %FileCheck %s -check-prefix=GLOBAL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POUND_ELIF_GBLATTR | %FileCheck %s -check-prefix=ATTR
 

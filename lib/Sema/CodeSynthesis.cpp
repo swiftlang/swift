@@ -655,10 +655,9 @@ static ProtocolDecl *getNSCopyingProtocol(TypeChecker &TC,
     return nullptr;
 
   SmallVector<ValueDecl *, 2> results;
-  DC->lookupQualified(ModuleType::get(foundation),
+  DC->lookupQualified(foundation,
                       ctx.getSwiftId(KnownFoundationEntity::NSCopying),
                       NL_QualifiedDefault | NL_KnownNonCascadingDependency,
-                      /*typeResolver=*/nullptr,
                       results);
 
   if (results.size() != 1)
@@ -2169,8 +2168,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
 
       auto varType = var->getType()
         ->getReferenceStorageReferent();
-      auto varInterfaceType = var->getInterfaceType()
-        ->getReferenceStorageReferent();
+      auto varInterfaceType = var->getValueInterfaceType();
 
       // If var is a lazy property, its value is provided for the underlying
       // storage.  We thus take an optional of the properties type.  We only
@@ -2400,8 +2398,20 @@ configureInheritedDesignatedInitAttributes(TypeChecker &tc,
   // If the superclass has its own availability, make sure the synthesized
   // constructor is only as available as its superclass's constructor.
   if (superclassCtor->getAttrs().hasAttribute<AvailableAttr>()) {
+    SmallVector<Decl *, 2> asAvailableAs;
+
+    // We don't have to look at enclosing contexts of the superclass constructor,
+    // because designated initializers must always be defined in the superclass
+    // body, and we already enforce that a superclass is at least as available as
+    // a subclass.
+    asAvailableAs.push_back(superclassCtor);
+    Decl *parentDecl = classDecl;
+    while (parentDecl != nullptr) {
+      asAvailableAs.push_back(parentDecl);
+      parentDecl = parentDecl->getDeclContext()->getAsDeclOrDeclExtensionContext();
+    }
     AvailabilityInference::applyInferredAvailableAttrs(
-        ctor, {classDecl, superclassCtor}, ctx);
+        ctor, asAvailableAs, ctx);
   }
 
   // Wire up the overrides.

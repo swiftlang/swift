@@ -1,7 +1,5 @@
 // RUN: %sourcekitd-test -req=open -print-raw-response %S/Inputs/syntaxmap-edit-multiline-string.swift == -req=edit -print-raw-response %S/Inputs/syntaxmap-edit-multiline-string.swift -pos=8:1 -replace='"""' -length=3 == -req=edit -print-raw-response %S/Inputs/syntaxmap-edit-multiline-string.swift -pos=6:2 -replace=')' -length=1 == -req=edit -print-raw-response %S/Inputs/syntaxmap-edit-multiline-string.swift -pos=2:10 -replace=' ' -length=1 | %sed_clean > %t.response
-// RUN: %FileCheck -input-file=%t.response %s --check-prefixes CHECK,CHECK-OLD
-// RUN: %sourcekitd-test -req=open -print-raw-response %S/Inputs/syntaxmap-edit-multiline-string.swift -force-libsyntax-based-processing == -req=edit -print-raw-response %S/Inputs/syntaxmap-edit-multiline-string.swift -pos=8:1 -replace='"""' -length=3 -force-libsyntax-based-processing == -req=edit -print-raw-response %S/Inputs/syntaxmap-edit-multiline-string.swift -pos=6:2 -replace=')' -length=1 -force-libsyntax-based-processing == -req=edit -print-raw-response %S/Inputs/syntaxmap-edit-multiline-string.swift -pos=2:10 -replace=' ' -length=1 -force-libsyntax-based-processing | %sed_clean > %t.libsyntax.response
-// RUN: %FileCheck -input-file=%t.libsyntax.response %s --check-prefixes CHECK,CHECK-NEW
+// RUN: %FileCheck -input-file=%t.response %s
 
 // Original file contents
 
@@ -52,14 +50,8 @@
 // CHECK-NEXT:   {
 // CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.string,
 // CHECK-NEXT:     key.offset: 24,
-// CHECK-OLD-NEXT:     key.length: 5
-// CHECK-NEW-NEXT:     key.length: 3
+// CHECK-NEXT:     key.length: 5
 // CHECK-NEXT:   },
-// CHECK-NEW-NEXT:   {
-// CHECK-NEW-NEXT:     key.kind: source.lang.swift.syntaxtype.string,
-// CHECK-NEW-NEXT:     key.offset: 27,
-// CHECK-NEW-NEXT:     key.length: 2
-// CHECK-NEW-NEXT:   },
 // CHECK-NEXT:   {
 // CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.string_interpolation_anchor,
 // CHECK-NEXT:     key.offset: 30,
@@ -78,14 +70,8 @@
 // CHECK-NEXT:   {
 // CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.string,
 // CHECK-NEXT:     key.offset: 35,
-// CHECK-OLD-NEXT:     key.length: 6
-// CHECK-NEW-NEXT:     key.length: 3
+// CHECK-NEXT:     key.length: 6
 // CHECK-NEXT:   },
-// CHECK-NEW-NEXT:   {
-// CHECK-NEW-NEXT:     key.kind: source.lang.swift.syntaxtype.string,
-// CHECK-NEW-NEXT:     key.offset: 38,
-// CHECK-NEW-NEXT:     key.length: 3
-// CHECK-NEW-NEXT:   },
 // CHECK-NEXT:   {
 // CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.keyword,
 // CHECK-NEXT:     key.offset: 43,
@@ -116,15 +102,13 @@
 // After adding a character after the interpolation
 // CHECK: {{^}}{
 // CHECK-NEXT: key.offset: 35,
-// CHECK-OLD-NEXT: key.length: 6,
-// CHECK-NEW-NEXT: key.length: 3,
+// CHECK-NEXT: key.length: 6,
 // CHECK-NEXT: key.diagnostic_stage: source.diagnostic.stage.swift.parse,
 // CHECK-NEXT: key.syntaxmap: [
 // CHECK-NEXT:   {
 // CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.string,
 // CHECK-NEXT:     key.offset: 35,
-// CHECK-OLD-NEXT:     key.length: 6
-// CHECK-NEW-NEXT:     key.length: 3
+// CHECK-NEXT:     key.length: 6
 // CHECK-NEXT:   }
 // CHECK-NEXT: ],
 

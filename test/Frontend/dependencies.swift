@@ -59,6 +59,8 @@
 
 // CHECK-IMPORT-TRACK-SYSTEM-LABEL: - :
 // CHECK-IMPORT-TRACK-SYSTEM: dependencies.swift
+// CHECK-IMPORT-TRACK-SYSTEM-DAG: Swift.swiftmodule
+// CHECK-IMPORT-TRACK-SYSTEM-DAG: SwiftOnoneSupport.swiftmodule
 // CHECK-IMPORT-TRACK-SYSTEM-DAG: CoreFoundation.swift
 // CHECK-IMPORT-TRACK-SYSTEM-DAG: CoreGraphics.swift
 // CHECK-IMPORT-TRACK-SYSTEM-DAG: Foundation.swift

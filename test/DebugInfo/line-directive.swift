@@ -22,3 +22,16 @@ func f() {
 // CHECK: .file	[[DEF:.*]] "def.swift"
 // CHECK: .loc	[[DEF]] 142
 // CHECK: .asciz "{{.*}}test/DebugInfo"
+
+// RUN: %empty-directory(%t)
+// RUN: sed -e "s:LINE_DIRECTIVE_DIR:%S:g" %S/Inputs/vfsoverlay.yaml > %t/overlay.yaml
+// RUN: %target-swift-frontend -vfsoverlay %t/overlay.yaml -primary-file %S/vfs-relocated-line-directive.swift -S -g -o - | %FileCheck -check-prefix=VFS %s
+// VFS: .file  [[MAIN:.*]] "{{.*}}vfs-relocated-line-directive.swift"
+// VFS: .loc  [[MAIN]] 1
+// VFS: .file  [[ABC:.*]] "abc.swift"
+// VFS: .loc  [[ABC]] 42
+// VFS: .loc  [[MAIN]] 8
+// VFS: .loc  [[ABC]] 142
+// VFS: .file  [[DEF:.*]] "def.swift"
+// VFS: .loc  [[DEF]] 142
+// VFS: .asciz "{{.*}}test/DebugInfo"

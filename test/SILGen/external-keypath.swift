@@ -67,3 +67,10 @@ func externalKeyPaths<T: Hashable, U>(_ x: T, _ y: U, _ z: Int) {
   // CHECK-SAME: external #External.subscript
   _ = \External<Int>.[privateSet: 0]
 }
+
+// CHECK-LABEL: sil hidden @{{.*}}testProtocolRequirement
+func testProtocolRequirement<T: ExternalProto>(_: T.Type) {
+  // CHECK: keypath $WritableKeyPath<T, Int>,
+  // CHECK-NOT: external #ExternalProto.protoReqt
+  _ = \T.protoReqt
+}

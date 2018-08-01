@@ -11,9 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "silgen"
+#include "ManagedValue.h"
+#include "RValue.h"
 #include "SILGenFunction.h"
 #include "Scope.h"
-#include "swift/Strings.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
@@ -25,17 +26,17 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/Timer.h"
 #include "swift/ClangImporter/ClangModule.h"
-#include "swift/Serialization/SerializedModuleLoader.h"
-#include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDebugScope.h"
+#include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SIL/SILProfiler.h"
+#include "swift/Serialization/SerializedModuleLoader.h"
+#include "swift/Serialization/SerializedSILLoader.h"
+#include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "llvm/ProfileData/InstrProfReader.h"
 #include "llvm/Support/Debug.h"
-#include "ManagedValue.h"
-#include "RValue.h"
 using namespace swift;
 using namespace Lowering;
 
@@ -429,10 +430,11 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
                                    None,
                                    C);
 
-  return M.createFunction(SILLinkage::Public, SWIFT_ENTRY_POINT_FUNCTION,
-                          topLevelType, nullptr, Loc, IsBare, IsNotTransparent,
-                          IsNotSerialized, ProfileCounter(), IsNotThunk,
-                          SubclassScope::NotApplicable);
+  SILFunctionBuilder builder(M);
+  return builder.createFunction(
+      SILLinkage::Public, SWIFT_ENTRY_POINT_FUNCTION, topLevelType, nullptr,
+      Loc, IsBare, IsNotTransparent, IsNotSerialized, ProfileCounter(),
+      IsNotThunk, SubclassScope::NotApplicable);
 }
 
 SILFunction *SILGenModule::getEmittedFunction(SILDeclRef constant,
@@ -521,9 +523,10 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
     return emitted;
 
   // Note: Do not provide any SILLocation. You can set it afterwards.
-  auto *F = M.getOrCreateFunction(constant.hasDecl() ? constant.getDecl()
-                                                     : (Decl *)nullptr,
-                                  constant, forDefinition);
+  SILFunctionBuilder builder(M);
+  auto *F = builder.getOrCreateFunction(constant.hasDecl() ? constant.getDecl()
+                                                           : (Decl *)nullptr,
+                                        constant, forDefinition);
 
   // Set up the function for profiling instrumentation.
   ASTNode profiledNode;
@@ -1030,11 +1033,10 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
                                     TupleType::getEmpty(C), type->getExtInfo());
   auto initSILType = getLoweredType(initType).castTo<SILFunctionType>();
 
-  auto *f =
-      M.createFunction(SILLinkage::Private,
-                       funcName, initSILType, nullptr,
-                       SILLocation(binding), IsNotBare, IsNotTransparent,
-                       IsNotSerialized);
+  SILFunctionBuilder builder(M);
+  auto *f = builder.createFunction(SILLinkage::Private, funcName, initSILType,
+                                   nullptr, SILLocation(binding), IsNotBare,
+                                   IsNotTransparent, IsNotSerialized);
   f->setDebugScope(new (M) SILDebugScope(RegularLocation(binding), f));
   auto dc = binding->getDeclContext();
   SILGenFunction(*this, *f, dc).emitLazyGlobalInitializer(binding, pbdEntry);
@@ -1202,14 +1204,13 @@ TypeConverter::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl) {
                                           M.getSwiftModule());
   switch (strategy.getKind()) {
   case AccessStrategy::Storage: {
-    // If the stored value would need to be reabstracted in fully opaque
-    // context, then we have to treat the component as computed.
-    auto componentObjTy = decl->getStorageInterfaceType()
-                              ->getWithoutSpecifierType();
     // Keypaths rely on accessors to handle the special behavior of weak or
     // unowned properties.
-    if (componentObjTy->is<ReferenceStorageType>())
+    if (decl->getInterfaceType()->is<ReferenceStorageType>())
       return false;
+    // If the stored value would need to be reabstracted in fully opaque
+    // context, then we have to treat the component as computed.
+    auto componentObjTy = decl->getValueInterfaceType();
     if (auto genericEnv =
               decl->getInnermostDeclContext()->getGenericEnvironmentOfContext())
       componentObjTy = genericEnv->mapTypeIntoContext(componentObjTy);
@@ -1286,20 +1287,17 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
   
   Type baseTy;
   if (decl->getDeclContext()->isTypeContext()) {
+    // TODO: Static properties should eventually be referenceable as
+    // keypaths from T.Type -> Element, viz `baseTy = MetatypeType::get(baseTy)`
+    assert(!decl->isStatic());
+    
     baseTy = decl->getDeclContext()->getSelfInterfaceType()
                  ->getCanonicalType(decl->getInnermostDeclContext()
                                         ->getGenericSignatureOfContext());
-    if (decl->isStatic()) {
-      // TODO: Static properties should eventually be referenceable as
-      // keypaths from T.Type -> Element
-      //baseTy = MetatypeType::get(baseTy);
-      return;
-    }
   } else {
     // TODO: Global variables should eventually be referenceable as
-    // key paths from ()
-    //baseTy = TupleType::getEmpty(getASTContext());
-    return;
+    // key paths from (), viz. baseTy = TupleType::getEmpty(getASTContext());
+    llvm_unreachable("should not export a property descriptor yet");
   }
 
   auto genericEnv = decl->getInnermostDeclContext()
@@ -1316,33 +1314,6 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
   if (genericEnv)
     subs = genericEnv->getForwardingSubstitutionMap();
   
-  if (auto sub = dyn_cast<SubscriptDecl>(decl)) {
-    for (auto *index : *sub->getIndices()) {
-      // Keypaths can't capture inout indices.
-      if (index->isInOut())
-        return;
-
-      // TODO: Handle reabstraction and tuple explosion in thunk generation.
-      // This wasn't previously a concern because anything that was Hashable
-      // had only one abstraction level and no explosion.
-      auto indexTy = index->getInterfaceType();
-      
-      if (isa<TupleType>(indexTy->getCanonicalType(sub->getGenericSignature())))
-        return;
-      
-      if (genericEnv)
-        indexTy = genericEnv->mapTypeIntoContext(indexTy);
-      
-      auto indexLoweredTy = Types.getLoweredType(indexTy);
-      auto indexOpaqueLoweredTy =
-        Types.getLoweredType(AbstractionPattern::getOpaque(), indexTy);
-      
-      if (indexOpaqueLoweredTy.getAddressType()
-             != indexLoweredTy.getAddressType())
-        return;
-    }
-  }
-
   auto component = emitKeyPathComponentForDecl(SILLocation(decl),
                                                genericEnv,
                                                baseOperand, needsGenericContext,

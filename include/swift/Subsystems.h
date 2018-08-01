@@ -320,6 +320,11 @@ namespace swift {
                    StringRef OutputFilename,
                    UnifiedStatsReporter *Stats=nullptr);
 
+  /// Dump YAML describing all fixed-size types imported from the given module.
+  bool performDumpTypeInfo(IRGenOptions &Opts,
+                           SILModule &SILMod,
+                           llvm::LLVMContext &LLVMContext);
+
   /// Creates a TargetMachine from the IRGen opts and AST Context.
   std::unique_ptr<llvm::TargetMachine>
   createTargetMachine(IRGenOptions &Opts, ASTContext &Ctx);
@@ -350,6 +355,11 @@ namespace swift {
   ///
   /// The ASTContext will automatically call these upon construction.
   void registerAccessRequestFunctions(Evaluator &evaluator);
+
+  /// Register AST-level request functions with the evaluator.
+  ///
+  /// The ASTContext will automatically call these upon construction.
+  void registerNameLookupRequestFunctions(Evaluator &evaluator);
 
   /// Register Sema-level request functions with the evaluator.
   ///

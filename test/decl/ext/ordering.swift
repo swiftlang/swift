@@ -122,7 +122,7 @@ extension OtherOuter5 {
   class Super {}
 }
 
-///
+/// SR-5993
 
 enum Outer5A {}
 
@@ -130,8 +130,6 @@ enum OtherOuter5A {}
 
 extension Outer5A {
   class Inner : OtherOuter5A.Super {}
-  // expected-error@-1 {{'Super' is not a member type of 'OtherOuter5A'}}
-  // FIXME
 }
 
 extension Outer5A.Inner {}

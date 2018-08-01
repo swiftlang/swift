@@ -800,20 +800,22 @@ static bool doesStorageProduceLValue(TypeChecker &TC,
       !storage->isSetterMutating();
 }
 
-Type TypeChecker::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
-                                             DeclContext *UseDC,
-                                             const DeclRefExpr *base,
-                                             bool wantInterfaceType) {
-  validateDecl(value);
-  if (!value->hasValidSignature() || value->isInvalid())
-    return ErrorType::get(Context);
+Type ConstraintSystem::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
+                                                  DeclContext *UseDC,
+                                                  const DeclRefExpr *base,
+                                                  bool wantInterfaceType) {
+  return TC.getUnopenedTypeOfReference(
+      value, baseType, UseDC,
+      [&](VarDecl *var) -> Type { return getType(var, wantInterfaceType); },
+      base, wantInterfaceType);
+}
 
-  Type requestedType = (wantInterfaceType
-                        ? value->getInterfaceType()
-                        : value->getType());
-
-  requestedType = requestedType->getWithoutSpecifierType()
-    ->getReferenceStorageReferent();
+Type TypeChecker::getUnopenedTypeOfReference(
+    VarDecl *value, Type baseType, DeclContext *UseDC,
+    llvm::function_ref<Type(VarDecl *)> getType, const DeclRefExpr *base,
+    bool wantInterfaceType) {
+  Type requestedType =
+      getType(value)->getWithoutSpecifierType()->getReferenceStorageReferent();
 
   // If we're dealing with contextual types, and we referenced this type from
   // a different context, map the type.
@@ -1013,8 +1015,8 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
   // Determine the type of the value, opening up that type if necessary.
   bool wantInterfaceType = !varDecl->getDeclContext()->isLocalContext();
-  Type valueType = TC.getUnopenedTypeOfReference(varDecl, Type(), useDC, base,
-                                                 wantInterfaceType);
+  Type valueType =
+      getUnopenedTypeOfReference(varDecl, Type(), useDC, base, wantInterfaceType);
 
   assert(!valueType->hasUnboundGenericType() &&
          !valueType->hasTypeParameter());
@@ -1334,9 +1336,8 @@ ConstraintSystem::getTypeOfMemberReference(
       refType = FunctionType::get(indicesTy, elementTy,
                                   AnyFunctionType::ExtInfo());
     } else {
-      refType = TC.getUnopenedTypeOfReference(cast<VarDecl>(value),
-                                              baseTy, useDC, base,
-                                              /*wantInterfaceType=*/true);
+      refType = getUnopenedTypeOfReference(cast<VarDecl>(value), baseTy, useDC,
+                                           base, /*wantInterfaceType=*/true);
     }
 
     auto selfTy = outerDC->getSelfInterfaceType();
