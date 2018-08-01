@@ -798,4 +798,12 @@ def working_directory : Separate<["-"], "working-directory">,
 def working_directory_EQ : Joined<["-"], "working-directory=">,
   Alias<working_directory>;
 
+// VFS
+
+def vfsoverlay : JoinedOrSeparate<["-"], "vfsoverlay">,
+  Flags<[FrontendOption, ArgumentIsPath]>,
+  HelpText<"Add directory to VFS overlay file">;
+def vfsoverlay_EQ : Joined<["-"], "vfsoverlay=">,
+  Alias<vfsoverlay>;
+
 include "FrontendOptions.td"

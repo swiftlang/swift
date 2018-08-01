@@ -136,6 +136,10 @@ void CompilerInstance::recordPrimarySourceFile(SourceFile *SF) {
 bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   Invocation = Invok;
 
+  // If initializing the overlay file system fails there's no sense in
+  // continuing because the compiler will read the wrong files.
+  if (setUpVirtualFileSystemOverlays())
+    return true;
   setUpLLVMArguments();
   setUpDiagnosticOptions();
 
@@ -164,6 +168,51 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
     Invocation.getLangOptions().EnableAccessControl = false;
 
   return setUpInputs();
+}
+
+static bool loadAndValidateVFSOverlay(
+    const std::string &File,
+    const llvm::IntrusiveRefCntPtr<clang::vfs::FileSystem> &BaseFS,
+    const llvm::IntrusiveRefCntPtr<clang::vfs::OverlayFileSystem> &OverlayFS,
+    DiagnosticEngine &Diag) {
+  // FIXME: It should be possible to allow chained lookup of later VFS overlays
+  // through the mapping defined by earlier overlays.
+  // See rdar://problem/39440687
+  auto Buffer = BaseFS->getBufferForFile(File);
+  if (!Buffer) {
+    Diag.diagnose(SourceLoc(), diag::cannot_open_file, File,
+                         Buffer.getError().message());
+    return true;
+  }
+
+  auto VFS = clang::vfs::getVFSFromYAML(std::move(Buffer.get()),
+                                        nullptr, File);
+  if (!VFS) {
+    Diag.diagnose(SourceLoc(), diag::invalid_vfs_overlay_file, File);
+    return true;
+  }
+  OverlayFS->pushOverlay(VFS);
+  return false;
+}
+
+bool CompilerInstance::setUpVirtualFileSystemOverlays() {
+  auto BaseFS = clang::vfs::getRealFileSystem();
+  auto OverlayFS = llvm::IntrusiveRefCntPtr<clang::vfs::OverlayFileSystem>(
+                    new clang::vfs::OverlayFileSystem(BaseFS));
+  bool hadAnyFailure = false;
+  for (const auto &File : Invocation.getSearchPathOptions().VFSOverlayFiles) {
+    hadAnyFailure |=
+        loadAndValidateVFSOverlay(File, BaseFS, OverlayFS, Diagnostics);
+  }
+
+  // If we successfully loaded all the overlays, let the source manager and
+  // diagnostic engine take advantage of the overlay file system.
+  if (!hadAnyFailure &&
+      (OverlayFS->overlays_begin() != OverlayFS->overlays_end())) {
+    SourceMgr.setFileSystem(OverlayFS);
+  }
+
+  return hadAnyFailure;
 }
 
 void CompilerInstance::setUpLLVMArguments() {
@@ -326,7 +375,8 @@ CompilerInstance::getInputBufferAndModuleDocBufferIfPresent(
   // FIXME: Working with filenames is fragile, maybe use the real path
   // or have some kind of FileManager.
   using FileOrError = llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>;
-  FileOrError inputFileOrErr = llvm::MemoryBuffer::getFileOrSTDIN(input.file());
+  FileOrError inputFileOrErr = swift::vfs::getFileOrSTDIN(getFileSystem(),
+                                                          input.file());
   if (!inputFileOrErr) {
     Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file, input.file(),
                          inputFileOrErr.getError().message());
@@ -351,7 +401,7 @@ CompilerInstance::openModuleDoc(const InputFile &input) {
       file_types::getExtension(file_types::TY_SwiftModuleDocFile));
   using FileOrError = llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>;
   FileOrError moduleDocFileOrErr =
-      llvm::MemoryBuffer::getFileOrSTDIN(moduleDocFilePath);
+      swift::vfs::getFileOrSTDIN(getFileSystem(), moduleDocFilePath);
   if (moduleDocFileOrErr)
     return std::move(*moduleDocFileOrErr);
 
