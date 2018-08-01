@@ -406,4 +406,6 @@ class Ownership {
 let closure = { [weak x=bindtox, unowned y=bindtoy, unowned(unsafe) z=bindtoz] in }
 
 protocol FakeClassRestrictedProtocol : `class` {}
-// CHECK: <kw>protocol</kw> FakeClassRestrictedProtocol : <type>`class`</type> {}
+// CHECK-OLD: <kw>protocol</kw> FakeClassRestrictedProtocol : <type>`class`</type> {}
+// FIXME: rdar://42801404: OLD and NEW should be the same '<type>`class`</type>'.
+// CHECK-NEW: <kw>protocol</kw> FakeClassRestrictedProtocol : `<type>class</type>` {}
