@@ -136,8 +136,8 @@ internal func _bridgeASCIICocoaString(
   return length == numCharWritten ? count : nil
 }
 
-public // @testable
-func _bridgeToCocoa(_ small: _SmallUTF8String) -> _CocoaString {
+@usableFromInline
+internal func _bridgeToCocoa(_ small: _SmallUTF8String) -> _CocoaString {
   return small.withUTF8CodeUnits { bufPtr in
       return _swift_stdlib_CFStringCreateWithBytes(
           nil, bufPtr.baseAddress._unsafelyUnwrappedUnchecked,

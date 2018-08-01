@@ -32,20 +32,27 @@ extension Collection {
 
 extension String {
   var nativeCapacity: Int {
-    precondition(_guts._isNative)
-    return _guts.capacity
+    switch self._classify()._form {
+      case ._native: break
+      default: preconditionFailure()
+    }
+    return self._classify()._capacity
   }
   var capacity: Int {
-    return _guts.capacity
+    return self._classify()._capacity
   }
   var unusedCapacity: Int {
-    return Swift.max(0, _guts.capacity - _guts.count)
+    return Swift.max(0, self._classify()._capacity - self._classify()._count)
   }
   var bufferID: ObjectIdentifier? {
     return _rawIdentifier()
   }
   func _rawIdentifier() -> ObjectIdentifier? {
-    return _guts._objectIdentifier
+    return self._classify()._objectIdentifier
+  }
+
+  var byteWidth: Int {
+    return _classify()._isASCII ? 1 : 2
   }
 }
 
@@ -851,7 +858,7 @@ func asciiString<
 where S.Iterator.Element == Character {
   var s = String()
   s.append(contentsOf: content)
-  expectTrue(s._guts.isSingleByte)
+  expectTrue(s._classify()._isASCII)
   return s
 }
 
@@ -908,7 +915,12 @@ StringTests.test("stringGutsReserve")
 
     // Managed native, unmanaged native, or small
     func isSwiftNative(_ s: String) -> Bool {
-      return s._guts._isNative || s._guts._isSmall || s._guts._isUnmanaged
+      switch s._classify()._form {
+        case ._native: return true
+        case ._small: return true
+        case ._immortal: return true
+        default: return false
+      }
     }
 
     switch k {
@@ -979,7 +991,7 @@ StringTests.test("stringGutsReserve")
 func makeStringGuts(_ base: String) -> _StringGuts {
   var x = _StringGuts()
   // make sure some - but not all - replacements will have to grow the buffer
-  x.reserveCapacity(base._guts.count * 3 / 2)
+  x.reserveCapacity(base._classify()._count * 3 / 2)
   let capacity = x.capacity
   x.append(base._guts)
   // Widening the guts should not make it lose its capacity,
@@ -1034,10 +1046,10 @@ StringTests.test("reserveCapacity") {
   s = ""
   print("empty capacity \(s.capacity)")
   s.reserveCapacity(oldCap + 18)
-  print("reserving \(oldCap + 18) -> \(s.capacity), width = \(s._guts.byteWidth)")
+  print("reserving \(oldCap + 18) -> \(s.capacity), width = \(s.byteWidth)")
   let id1 = s.bufferID
   s.insert(contentsOf: repeatElement(x, count: oldCap + 18), at: s.endIndex)
-  print("extending by \(oldCap + 18) -> \(s.capacity), width = \(s._guts.byteWidth)")
+  print("extending by \(oldCap + 18) -> \(s.capacity), width = \(s.byteWidth)")
   expectEqual(id1, s.bufferID)
   s.insert(contentsOf: repeatElement(x, count: s.capacity + 100), at: s.endIndex)
   expectNotEqual(id1, s.bufferID)
@@ -1138,8 +1150,7 @@ StringTests.test("Construction") {
 StringTests.test("Conversions") {
   // Whether we are natively ASCII or small ASCII
   func isKnownASCII(_ s: String) -> Bool {
-    return s._guts.isASCII ||
-      (s._guts._isSmall && s._guts._smallUTF8String.isASCII)
+    return s.byteWidth == 1
   }
   do {
     let c: Character = "a"

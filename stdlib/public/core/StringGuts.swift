@@ -100,8 +100,7 @@ extension _StringGuts {
 
   @inlinable
   @inline(__always)
-  public // @testable
-  mutating func _isUniqueNative() -> Bool {
+  internal mutating func _isUniqueNative() -> Bool {
     guard _isNative else { return false }
     // Note that the isUnique test must be in a separate statement;
     // `isNative && _isUnique` always evaluates to false in debug builds,
@@ -121,8 +120,7 @@ extension _StringGuts {
 
 extension _StringGuts {
   @inlinable
-  public // @testable
-  var isASCII: Bool {
+  internal var isASCII: Bool {
     @inline(__always) get { return _object.isContiguousASCII }
   }
 
@@ -135,40 +133,34 @@ extension _StringGuts {
   }
 
   @inlinable
-  public // @testable
-  var _isNative: Bool {
+  internal var _isNative: Bool {
     return _object.isNative
   }
 
 #if _runtime(_ObjC)
   @inlinable
-  public // @testable
-  var _isCocoa: Bool {
+  internal var _isCocoa: Bool {
     return _object.isCocoa
   }
 #endif
 
   @inlinable
-  public // @testable
-  var _isUnmanaged: Bool {
+  internal var _isUnmanaged: Bool {
     return _object.isUnmanaged
   }
 
   @inlinable
-  public // @testable
-  var _isSmall: Bool {
+  internal var _isSmall: Bool {
     return _object.isSmall
   }
 
   @inlinable
-  public // @testable
-  var _owner: AnyObject? {
+  internal var _owner: AnyObject? {
     return _object.owner
   }
 
   @inlinable
-  public // @testable
-  var isSingleByte: Bool {
+  internal var isSingleByte: Bool {
     // FIXME: Currently used to sometimes mean contiguous ASCII
     return _object.isSingleByte
   }
@@ -180,8 +172,7 @@ extension _StringGuts {
   }
 
   @inlinable
-  public // @testable
-  var byteWidth: Int {
+  internal var byteWidth: Int {
     return _object.byteWidth
   }
 
@@ -215,8 +206,7 @@ extension _StringGuts {
 extension _StringGuts {
   @inlinable
   @inline(__always)
-  public // @testable
-  init() {
+  internal init() {
     self.init(object: _StringObject(), otherBits: 0)
     _invariantCheck()
   }
@@ -474,8 +464,8 @@ extension _StringGuts {
   /// Return the object identifier for the reference counted heap object
   /// referred to by this string (if any). This is useful for testing allocation
   /// behavior.
-  public // @testable
-  var _objectIdentifier: ObjectIdentifier? {
+  @usableFromInline
+  internal var _objectIdentifier: ObjectIdentifier? {
     if _object.isNative {
       return ObjectIdentifier(_object.nativeRawStorage)
     }
@@ -793,8 +783,7 @@ extension _StringGuts {
   }
 
   @inlinable
-  public // @testable
-  var count: Int {
+  internal var count: Int {
     if _slowPath(!_hasStoredCount) {
       return _nonStoredCount
     }
@@ -823,8 +812,7 @@ extension _StringGuts {
   }
 
   @inlinable
-  public // @testable
-  var capacity: Int {
+  internal var capacity: Int {
     if _fastPath(_object.isNative) {
       return _object.nativeRawStorage.capacity
     }
@@ -839,8 +827,7 @@ extension _StringGuts {
 
   /// Get the UTF-16 code unit stored at the specified position in this string.
   @inlinable // FIXME(sil-serialize-all)
-  public // @testable
-  subscript(position: Int) -> UTF16.CodeUnit {
+  internal subscript(position: Int) -> UTF16.CodeUnit {
     if _slowPath(_isOpaque) {
       return _opaquePosition(position)
     }
