@@ -6119,6 +6119,18 @@ public:
       diagnoseOverrideForAvailability(TC, override, base);
     }
 
+    // Overrides of NSObject.hashValue are deprecated; one should override
+    // NSObject.hash instead.
+    if (auto baseVar = dyn_cast<VarDecl>(base)) {
+      if (auto classDecl =
+          baseVar->getDeclContext()->getAsClassOrClassExtensionContext()) {
+        if (classDecl->getBaseName().userFacingName() == "NSObject" &&
+            baseVar->getBaseName().userFacingName() == "hashValue") {
+          TC.diagnose(override, diag::override_nsobject_hashvalue);
+        }
+      }
+    }
+
     /// Check attributes associated with the base; some may need to merged with
     /// or checked against attributes in the overriding declaration.
     AttributeOverrideChecker attrChecker(TC, base, override);
