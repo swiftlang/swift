@@ -157,7 +157,7 @@ void FileSpecificDiagnosticConsumer::handleDiagnostic(
     StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
     const DiagnosticInfo &Info) {
 
-  HasAnErrorBeenConsumed |= Kind == DiagnosticKind::Error;
+  HasAnErrorBeenHandled |= Kind == DiagnosticKind::Error;
 
   Optional<ConsumerSpecificInformation *> consumerSpecificInfo =
       consumerSpecificInformationForDiagnostic(SM, Loc, Kind);
@@ -195,7 +195,7 @@ void FileSpecificDiagnosticConsumer::handleSwiftFileDiagnostic(
 
   consumerSpecificInfo->consumer->handleDiagnostic(SM, Loc, Kind, FormatString,
                                                    FormatArgs, Info);
-  consumerSpecificInfo->hasAnErrorBeenEmitted |= Kind == DiagnosticKind::Error;
+  consumerSpecificInfo->hasAnErrorBeenHandled |= Kind == DiagnosticKind::Error;
 }
 
 void FileSpecificDiagnosticConsumer::handleHeaderFileDiagnostic(
@@ -210,7 +210,7 @@ void FileSpecificDiagnosticConsumer::handleHeaderFileDiagnostic(
   }
   if (Kind == DiagnosticKind::Error)
     for (auto &csi : ConsumersOrderedByRange)
-      csi.hasAnErrorBeenEmitted = true;
+      csi.hasAnErrorBeenHandled = true;
 }
 
 bool FileSpecificDiagnosticConsumer::finishProcessing() {
@@ -227,10 +227,10 @@ bool FileSpecificDiagnosticConsumer::finishProcessing() {
 
 void FileSpecificDiagnosticConsumer::
     tellSubconsumersToInformDriverOfIncompleteBatchModeCompilation() const {
-  if (!HasAnErrorBeenConsumed)
+  if (!HasAnErrorBeenHandled)
     return;
   for (auto &info : ConsumersOrderedByRange) {
-    if (!info.hasAnErrorBeenEmitted && info.consumer)
+    if (!info.hasAnErrorBeenHandled && info.consumer)
       info.consumer->informDriverOfIncompleteBatchModeCompilation();
   }
 }

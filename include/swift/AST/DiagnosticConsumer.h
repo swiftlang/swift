@@ -157,7 +157,7 @@ public:
     /// The DiagnosticConsumer may be empty if those diagnostics are not to be
     /// emitted.
     DiagnosticConsumer * /*const*/ consumer;
-    bool hasAnErrorBeenEmitted = false;
+    bool hasAnErrorBeenHandled = false;
 
     ConsumerSpecificInformation(const CharSourceRange range,
                                 DiagnosticConsumer *const consumer)
@@ -186,7 +186,7 @@ private:
   Optional<ConsumerSpecificInformation *>
       ConsumerSpecificInfoForSubsequentNotes = None;
 
-  bool HasAnErrorBeenConsumed = false;
+  bool HasAnErrorBeenHandled = false;
 
 public:
   /// Takes ownership of the DiagnosticConsumers specified in \p consumers.
