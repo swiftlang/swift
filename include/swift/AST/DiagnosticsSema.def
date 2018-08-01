@@ -2667,6 +2667,9 @@ ERROR(tf_graph_attr_function_tensorflow_value_only,none,
       "values", ())
 ERROR(tf_graph_attr_no_generic_functions,none,
       "@TensorFlowGraph cannot be applied to generic functions", ())
+ERROR(tf_graph_attr_no_functions_with_captures,none,
+      "@TensorFlowGraph cannot be applied to functions that capture variables",
+      ())
 
 // @TFParameter attribute
 ERROR(tfparameter_attr_tensorflow_not_imported,none,

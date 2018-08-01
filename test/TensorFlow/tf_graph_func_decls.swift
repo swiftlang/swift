@@ -26,3 +26,12 @@ public func usingHostCode(_ x: Tensor<Float>) -> Tensor<Float> {
   let z = hostCode(y).toAccelerator()
   return z + z
 }
+
+public func outer() {
+  let x = Tensor<Float>([1, 2, 3])
+
+  @TensorFlowGraph // expected-error {{@TensorFlowGraph cannot be applied to functions that capture variables}}
+  func inner() -> Tensor<Float> {
+    return x
+  }
+}
