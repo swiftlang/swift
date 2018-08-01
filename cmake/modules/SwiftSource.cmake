@@ -232,8 +232,8 @@ function(_compile_swift_files
     list(APPEND swift_flags "-Xfrontend" "-sil-verify-all")
   endif()
 
-  # The standard library and overlays are always built with resilience.
-  if(SWIFTFILE_IS_STDLIB)
+  # The standard library are always built with resilience, but not the overlays yet.
+  if(SWIFTFILE_IS_STDLIB_CORE)
     list(APPEND swift_flags "-Xfrontend" "-enable-resilience")
   endif()
 

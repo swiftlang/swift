@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir | %FileCheck %s
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -O -emit-ir | %FileCheck %s
 
-// REQUIRES: objc_interop
+// REQUIRES: objc_interop, overlay_resilience
 
 import Foundation
 
