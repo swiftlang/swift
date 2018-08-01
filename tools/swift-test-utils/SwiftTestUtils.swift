@@ -1,29 +1,29 @@
 import Foundation
 
-struct CommandLineArguments {
-  struct MissingArgumentError: LocalizedError {
+public struct CommandLineArguments {
+  public struct MissingArgumentError: LocalizedError {
     let argName: String
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
       return "Missing required argument: \(argName)"
     }
   }
-  struct UnkeyedArgumentError: LocalizedError {
+  public struct UnkeyedArgumentError: LocalizedError {
     let argName: String
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
       return "Unexpectedly found command line argument \(argName) without a key"
     }
   }
 
   private let args: [String: String]
 
-  static func parse<T: Sequence>(_ args: T) throws -> CommandLineArguments
+  public static func parse<T: Sequence>(_ args: T) throws -> CommandLineArguments
     where T.Element == String {
       var parsedArgs: [String: String] = [:]
       var currentKey: String? = nil
       for arg in args {
-        if arg.hasPrefix("--") {
+        if arg.hasPrefix("-") {
           // Parse a new key
           if let currentKey = currentKey {
             // The last key didn't have a value. Just add it with an empty string as
@@ -48,11 +48,11 @@ struct CommandLineArguments {
       return CommandLineArguments(args: parsedArgs)
   }
 
-  subscript(key: String) -> String? {
+  public subscript(key: String) -> String? {
     return args[key]
   }
 
-  func getRequired(_ key: String) throws -> String {
+  public func getRequired(_ key: String) throws -> String {
     if let value = args[key] {
       return value
     } else {
@@ -60,7 +60,7 @@ struct CommandLineArguments {
     }
   }
 
-  func has(_ key: String) -> Bool {
+  public func has(_ key: String) -> Bool {
     return args[key] != nil
   }
 }
