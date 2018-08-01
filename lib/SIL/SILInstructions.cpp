@@ -1424,9 +1424,9 @@ namespace {
     EnumDecl *decl = enumType.getEnumOrBoundGenericEnum();
     assert(decl && "switch_enum operand is not an enum");
 
-    // FIXME: Get expansion from SILFunction
-    if (!decl->isEffectivelyExhaustive(inst->getModule().getSwiftModule(),
-                                       ResilienceExpansion::Maximal)) {
+    const SILFunction *F = inst->getFunction();
+    if (!decl->isEffectivelyExhaustive(F->getModule().getSwiftModule(),
+                                       F->getResilienceExpansion())) {
       return nullptr;
     }
 

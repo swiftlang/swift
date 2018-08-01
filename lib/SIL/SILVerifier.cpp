@@ -3705,10 +3705,9 @@ public:
     }
 
     // If the select is non-exhaustive, we require a default.
-    // FIXME: Get the resilience expansion from the function.
     bool isExhaustive =
         eDecl->isEffectivelyExhaustive(F.getModule().getSwiftModule(),
-                                       ResilienceExpansion::Maximal);
+                                       F.getResilienceExpansion());
     require((isExhaustive && unswitchedElts.empty()) || I->hasDefault(),
             "nonexhaustive select_enum must have a default destination");
     if (I->hasDefault()) {
@@ -3877,10 +3876,9 @@ public:
     }
 
     // If the switch is non-exhaustive, we require a default.
-    // FIXME: Get the resilience expansion from the function.
     bool isExhaustive =
         uDecl->isEffectivelyExhaustive(F.getModule().getSwiftModule(),
-                                       ResilienceExpansion::Maximal);
+                                       F.getResilienceExpansion());
     require((isExhaustive && unswitchedElts.empty()) || SOI->hasDefault(),
             "nonexhaustive switch_enum must have a default destination");
     if (SOI->hasDefault()) {
