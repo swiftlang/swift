@@ -223,7 +223,7 @@ def operatorComment(operator, fixedWidth):
   /// Returns the remainder of dividing the first value by the second.
   ///
   /// The result of the remainder operator (`%`) has the same sign as `lhs` and
-  /// is less than `rhs.magnitude`.
+  /// is less than `abs(rhs)`.
   ///
   ///     let x = 22 % 5
   ///     // x == 2
@@ -242,15 +242,22 @@ def operatorComment(operator, fixedWidth):
         '&+': """\
   /// Returns the sum of the two given values, wrapping any overflow.
   ///
-  /// The masking addition operator (`&+`) silently wraps any overflow that
-  /// occurs during the operation. In the following example, the sum of `100`
-  /// and `121` is greater than the maximum representable `Int8` value, so the
-  /// result is the wrapped overflow value:
+  /// The overflow addition operator (`&+`) discards any bits that overflow the
+  /// fixed width of the integer type. In the following example, the sum of
+  /// `100` and `121` is greater than the maximum representable `Int8` value,
+  /// so the result is the partial value after discarding the overflowing
+  /// bits.
   ///
   ///     let x: Int8 = 10 &+ 21
   ///     // x == 31
   ///     let y: Int8 = 100 &+ 121
   ///     // y == -35 (after overflow)
+  ///
+  /// For more about arithmetic with overflow operators, see [Overflow
+  /// Operators][overflow] in [The Swift Programming Language][tspl].
+  ///
+  /// [overflow]: https://docs.swift.org/swift-book/LanguageGuide/AdvancedOperators.html#ID37
+  /// [tspl]: https://docs.swift.org/swift-book/
   ///
   /// - Parameters:
   ///   - lhs: The first value to add.
@@ -259,15 +266,22 @@ def operatorComment(operator, fixedWidth):
         '&-': """\
   /// Returns the difference of the two given values, wrapping any overflow.
   ///
-  /// The masking subtraction operator (`&-`) silently wraps any overflow
-  /// that occurs during the operation. In the following example, the
+  /// The overflow subtraction operator (`&-`) discards any bits that overflow
+  /// the fixed width of the integer type. In the following example, the
   /// difference of `10` and `21` is less than zero, the minimum representable
-  /// `UInt` value, so the result is the wrapped overflow value:
+  /// `UInt` value, so the result is the partial value after discarding the
+  /// overflowing bits.
   ///
   ///     let x: UInt8 = 21 &- 10
   ///     // x == 11
   ///     let y: UInt8 = 10 &- 21
   ///     // y == 245 (after overflow)
+  ///
+  /// For more about arithmetic with overflow operators, see [Overflow
+  /// Operators][overflow] in [The Swift Programming Language][tspl].
+  ///
+  /// [overflow]: https://docs.swift.org/swift-book/LanguageGuide/AdvancedOperators.html#ID37
+  /// [tspl]: https://docs.swift.org/swift-book/
   ///
   /// - Parameters:
   ///   - lhs: A numeric value.
@@ -276,15 +290,22 @@ def operatorComment(operator, fixedWidth):
         '&*': """\
   /// Returns the product of the two given values, wrapping any overflow.
   ///
-  /// The masking multiplication operator (`&*`) silently wraps any overflow
-  /// that occurs during the operation. In the following example, the product
-  /// of `10` and `50` is greater than the maximum representable `Int8` value,
-  /// so the result is the wrapped overflow value:
+  /// The overflow multiplication operator (`&*`) discards any bits that
+  /// overflow the fixed width of the integer type. In the following example,
+  /// the product of `10` and `50` is greater than the maximum representable
+  /// `Int8` value, so the result is the partial value after discarding the
+  /// overflowing bits.
   ///
   ///     let x: Int8 = 10 &* 5
   ///     // x == 50
   ///     let y: Int8 = 10 &* 50
   ///     // y == -12 (after overflow)
+  ///
+  /// For more about arithmetic with overflow operators, see [Overflow
+  /// Operators][overflow] in [The Swift Programming Language][tspl].
+  ///
+  /// [overflow]: https://docs.swift.org/swift-book/LanguageGuide/AdvancedOperators.html#ID37
+  /// [tspl]: https://docs.swift.org/swift-book/
   ///
   /// - Parameters:
   ///   - lhs: The first value to multiply.
@@ -1171,6 +1192,10 @@ ${operatorComment(x.operator, False)}
 /// declaring conformance to the protocol and ensuring that the values of your
 /// type support negation. To customize your type's implementation, provide
 /// your own mutating `negate()` method.
+///
+/// When the additive inverse of a value is unrepresentable in a conforming
+/// type, the operation should return a sentinel value, such as NaN, or
+/// result in a runtime error.
 public protocol SignedNumeric : Numeric {
   /// Returns the additive inverse of the specified value.
   ///
@@ -1690,7 +1715,7 @@ ${assignmentOperatorComment(x.nonMaskingOperator, False)}
   ///
   /// - Parameter rhs: The value to divide this value by.
   /// - Returns: A tuple containing the quotient and remainder of this value
-  ///   divided by `rhs`.
+  ///   divided by `rhs`. The remainder has the same sign as `rhs`.
   func quotientAndRemainder(dividingBy rhs: Self)
     -> (quotient: Self, remainder: Self)
 
