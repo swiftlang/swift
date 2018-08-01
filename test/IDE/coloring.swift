@@ -390,3 +390,17 @@ func keywordInCaseAndLocalArgLabel(_ for: Int, for in: Int, class _: Int) {
     print(x, y)
   }
 }
+
+// CHECK: <kw>class</kw> Ownership {
+class Ownership {
+  // CHECK: <attr-builtin>weak</attr-builtin> <kw>var</kw> w
+  weak var w
+  // CHECK: <attr-builtin>unowned</attr-builtin> <kw>var</kw> u
+  unowned var u
+  // CHECK-OLD: <attr-builtin>unowned(unsafe)</attr-builtin> <kw>var</kw> uu
+  // CHECK-NEW: <attr-builtin>unowned</attr-builtin>(unsafe) <kw>var</kw> uu
+  unowned(unsafe) var uu
+}
+// CHECK-OLD: <kw>let</kw> closure = { [<attr-builtin>weak</attr-builtin> x=bindtox, <attr-builtin>unowned</attr-builtin> y=bindtoy, <attr-builtin>unowned(unsafe)</attr-builtin> z=bindtoz] <kw>in</kw> }
+// FIXME: CHECK-NEW: <kw>let</kw> closure = { [weak x=bindtox, unowned y=bindtoy, unowned(unsafe) z=bindtoz] <kw>in</kw> }
+let closure = { [weak x=bindtox, unowned y=bindtoy, unowned(unsafe) z=bindtoz] in }
