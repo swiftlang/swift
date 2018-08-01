@@ -41,7 +41,6 @@ public:
                                            FormatArgs);
     llvm::errs() << "\n";
   }
-  bool hadError() { return getHasAnErrorBeenHandled(); }
 };
 
 
@@ -84,7 +83,7 @@ bool InstrumenterBase::doTypeCheckImpl(ASTContext &Ctx, DeclContext *DC,
   if (parsedExpr) {
     ErrorFinder errorFinder;
     parsedExpr->walk(errorFinder);
-    if (!errorFinder.hadError() && !errorGatherer.hadError()) {
+    if (!errorFinder.hadError() && !errorGatherer.getHasAnErrorBeenHandled()) {
       return true;
     }
   }

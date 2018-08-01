@@ -42,8 +42,6 @@ public:
   void forceColors() {
     ForceColors = true;
   }
-
-  bool didErrorOccur() { return getHasAnErrorBeenHandled(); }
 };
   
 }

@@ -1131,7 +1131,7 @@ public:
   Implementation(CategorizedEditsReceiver Receiver):
     Receiver(std::move(Receiver)), OS(ErrBuffer), DiagConsumer(OS) {}
   ~Implementation() {
-    if (DiagConsumer.didErrorOccur()) {
+    if (DiagConsumer.getHasAnErrorBeenHandled()) {
       Receiver({}, OS.str());
       return;
     }
@@ -1210,7 +1210,7 @@ public:
       : Receiver(Receiver), OS(ErrBuffer), DiagConsumer(OS) {}
 
   ~Implementation() {
-    if (DiagConsumer.didErrorOccur()) {
+    if (DiagConsumer.getHasAnErrorBeenHandled()) {
       Receiver({}, OS.str());
       return;
     }
