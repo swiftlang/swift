@@ -422,7 +422,8 @@ ConstraintLocator *ConstraintSystem::getConstraintLocator(
 
 Type ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
                                               ConstraintLocatorBuilder locator,
-                                              OpenedTypeMap &replacements) {
+                                              OpenedTypeMap &replacements,
+                                              bool openRequirements) {
   auto unboundDecl = unbound->getDecl();
 
   // If the unbound decl hasn't been validated yet, we have a circular
@@ -441,11 +442,9 @@ Type ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
 
   // Open up the generic type.
   openGeneric(unboundDecl->getInnermostDeclContext(),
-              unboundDecl->getDeclContext(),
-              unboundDecl->getGenericSignature(),
-              /*skipProtocolSelfConstraint=*/false,
-              locator,
-              replacements);
+              unboundDecl->getDeclContext(), unboundDecl->getGenericSignature(),
+              /*skipProtocolSelfConstraint=*/false, locator, replacements,
+              openRequirements);
 
   if (parentTy) {
     auto subs = parentTy->getContextSubstitutions(
@@ -543,8 +542,9 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
   }
 }
 
-Type ConstraintSystem::openUnboundGenericType(
-    Type type, ConstraintLocatorBuilder locator) {
+Type ConstraintSystem::openUnboundGenericType(Type type,
+                                              ConstraintLocatorBuilder locator,
+                                              bool openRequirements) {
   assert(!type->hasTypeParameter());
 
   checkNestedTypeConstraints(*this, type, locator);
@@ -555,7 +555,8 @@ Type ConstraintSystem::openUnboundGenericType(
   type = type.transform([&](Type type) -> Type {
       if (auto unbound = type->getAs<UnboundGenericType>()) {
         OpenedTypeMap replacements;
-        return openUnboundGenericType(unbound, locator, replacements);
+        return openUnboundGenericType(unbound, locator, replacements,
+                                      openRequirements);
       }
 
       return type;
@@ -1125,13 +1126,12 @@ static void bindArchetypesFromContext(
   }
 }
 
-void ConstraintSystem::openGeneric(
-       DeclContext *innerDC,
-       DeclContext *outerDC,
-       GenericSignature *sig,
-       bool skipProtocolSelfConstraint,
-       ConstraintLocatorBuilder locator,
-       OpenedTypeMap &replacements) {
+void ConstraintSystem::openGeneric(DeclContext *innerDC, DeclContext *outerDC,
+                                   GenericSignature *sig,
+                                   bool skipProtocolSelfConstraint,
+                                   ConstraintLocatorBuilder locator,
+                                   OpenedTypeMap &replacements,
+                                   bool openRequirements) {
   if (sig == nullptr)
     return;
 
@@ -1160,6 +1160,9 @@ void ConstraintSystem::openGeneric(
                      locator.withPathElement(ConstraintLocator::OpenedGeneric));
 
   bindArchetypesFromContext(*this, outerDC, locatorPtr, replacements);
+
+  if (!openRequirements)
+    return;
 
   // Add the requirements as constraints.
   openGenericRequirements(
