@@ -330,10 +330,16 @@ public protocol Sequence {
   /// encapsulates its iteration state.
   associatedtype Iterator : IteratorProtocol where Iterator.Element == Element
 
-  /// A type that represents a subsequence of some of the sequence's elements.
+  /// A type that represents a subsequence of some of this sequence's elements.
   associatedtype SubSequence : Sequence = AnySequence<Element>
     where Element == SubSequence.Element,
           SubSequence.SubSequence == SubSequence
+  
+  /// A type that represents a sequence composed of an arbatrary
+  /// assortment of this sequence's elements.
+  associatedtype Filtered : Sequence = Array<Element>
+    where Element == Filtered.Element
+  /* /* FIXME: Do we want this?: */, Filtered.Filtered == Filtered */
 
   /// Returns an iterator over the elements of this sequence.
   __consuming func makeIterator() -> Iterator
@@ -385,12 +391,12 @@ public protocol Sequence {
   /// - Parameter isIncluded: A closure that takes an element of the
   ///   sequence as its argument and returns a Boolean value indicating
   ///   whether the element should be included in the returned array.
-  /// - Returns: An array of the elements that `isIncluded` allowed.
+  /// - Returns: An sequence of the elements that `isIncluded` allowed.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
   __consuming func filter(
     _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> [Element]
+  ) rethrows -> Filtered
 
   /// Calls the given closure on each element in the sequence in the same order
   /// as a `for`-`in` loop.
@@ -849,48 +855,6 @@ extension Sequence {
     return Array(result)
   }
 
-  /// Returns an array containing, in order, the elements of the sequence
-  /// that satisfy the given predicate.
-  ///
-  /// In this example, `filter(_:)` is used to include only names shorter than
-  /// five characters.
-  ///
-  ///     let cast = ["Vivien", "Marlon", "Kim", "Karl"]
-  ///     let shortNames = cast.filter { $0.count < 5 }
-  ///     print(shortNames)
-  ///     // Prints "["Kim", "Karl"]"
-  ///
-  /// - Parameter isIncluded: A closure that takes an element of the
-  ///   sequence as its argument and returns a Boolean value indicating
-  ///   whether the element should be included in the returned array.
-  /// - Returns: An array of the elements that `isIncluded` allowed.
-  ///
-  /// - Complexity: O(*n*), where *n* is the length of the sequence.
-  @inlinable
-  public func filter(
-    _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> [Element] {
-    return try _filter(isIncluded)
-  }
-
-  @_transparent
-  public func _filter(
-    _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> [Element] {
-
-    var result = ContiguousArray<Element>()
-
-    var iterator = self.makeIterator()
-
-    while let element = iterator.next() {
-      if try isIncluded(element) {
-        result.append(element)
-      }
-    }
-
-    return Array(result)
-  }
-
   /// A value less than or equal to the number of elements in the sequence,
   /// calculated nondestructively.
   ///
@@ -1048,6 +1012,99 @@ extension Sequence where Element : Equatable {
       maxSplits: maxSplits,
       omittingEmptySubsequences: omittingEmptySubsequences,
       whereSeparator: { $0 == separator })
+  }
+}
+
+extension Sequence where Filtered: RangeReplaceableCollection {
+  
+  /// Returns an array containing, in order, the elements of the sequence
+  /// that satisfy the given predicate.
+  ///
+  /// In this example, `filter(_:)` is used to include only names shorter than
+  /// five characters.
+  ///
+  ///     let cast = ["Vivien", "Marlon", "Kim", "Karl"]
+  ///     let shortNames = cast.filter { $0.count < 5 }
+  ///     print(shortNames)
+  ///     // Prints "["Kim", "Karl"]"
+  ///
+  /// - Parameter isIncluded: A closure that takes an element of the
+  ///   sequence as its argument and returns a Boolean value indicating
+  ///   whether the element should be included in the returned array.
+  /// - Returns: An collection of the elements that `isIncluded` allowed.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the sequence.
+  @inlinable
+  public func filter(
+    _ isIncluded: (Element) throws -> Bool
+    ) rethrows -> Filtered {
+    return try _filter(isIncluded)
+  }
+  
+  @_transparent
+  public func _filter(
+    _ isIncluded: (Element) throws -> Bool
+    ) rethrows -> Filtered {
+    
+    // FIXME: should we directly do this 2-pass like this?
+    // or filter directly into `Filtered`?
+    var result = ContiguousArray<Element>()
+    
+    var iterator = self.makeIterator()
+    
+    while let element = iterator.next() {
+      if try isIncluded(element) {
+        result.append(element)
+      }
+    }
+    
+    return Filtered(result)
+  }
+}
+
+// FIXME: is a special case for `Filtered == Array` required?
+extension Sequence where Filtered == Array<Element> {
+  
+  /// Returns an array containing, in order, the elements of the sequence
+  /// that satisfy the given predicate.
+  ///
+  /// In this example, `filter(_:)` is used to include only names shorter than
+  /// five characters.
+  ///
+  ///     let cast = ["Vivien", "Marlon", "Kim", "Karl"]
+  ///     let shortNames = cast.filter { $0.count < 5 }
+  ///     print(shortNames)
+  ///     // Prints "["Kim", "Karl"]"
+  ///
+  /// - Parameter isIncluded: A closure that takes an element of the
+  ///   sequence as its argument and returns a Boolean value indicating
+  ///   whether the element should be included in the returned array.
+  /// - Returns: An array of the elements that `isIncluded` allowed.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the sequence.
+  @inlinable
+  public func filter(
+    _ isIncluded: (Element) throws -> Bool
+    ) rethrows -> [Element] {
+    return try _filter(isIncluded)
+  }
+  
+  @_transparent
+  public func _filter(
+    _ isIncluded: (Element) throws -> Bool
+    ) rethrows -> [Element] {
+    
+    var result = ContiguousArray<Element>()
+    
+    var iterator = self.makeIterator()
+    
+    while let element = iterator.next() {
+      if try isIncluded(element) {
+        result.append(element)
+      }
+    }
+    
+    return Array(result)
   }
 }
 
