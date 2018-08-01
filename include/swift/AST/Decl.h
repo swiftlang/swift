@@ -3266,45 +3266,6 @@ public:
     return std::distance(eltRange.begin(), eltRange.end());
   }
 
-  /// If this is an enum with two cases, return the other case. Otherwise,
-  /// return nullptr.
-  EnumElementDecl *getOppositeBinaryDecl(EnumElementDecl *decl) const {
-    ElementRange range = getAllElements();
-    auto iter = range.begin();
-    if (iter == range.end())
-      return nullptr;
-    bool seenDecl = false;
-    EnumElementDecl *result = nullptr;
-    if (*iter == decl) {
-      seenDecl = true;
-    } else {
-      result = *iter;
-    }
-
-    ++iter;
-    if (iter == range.end())
-      return nullptr;
-    if (seenDecl) {
-      assert(!result);
-      result = *iter;
-    } else {
-      if (decl != *iter)
-        return nullptr;
-      seenDecl = true;
-    }
-    ++iter;
-
-    // If we reach this point, we saw the decl we were looking for and one other
-    // case. If we have any additional cases, then we do not have a binary enum.
-    if (iter != range.end())
-      return nullptr;
-
-    // This is always true since we have already returned earlier nullptr if we
-    // did not see the decl at all.
-    assert(seenDecl);
-    return result;
-  }
-
   /// If this enum has a unique element, return it. A unique element can
   /// either hold a value or not, and the existence of one unique element does
   /// not imply the existence or non-existence of the opposite unique element.
