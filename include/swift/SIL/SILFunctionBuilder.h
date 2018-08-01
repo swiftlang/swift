@@ -17,6 +17,8 @@
 
 namespace swift {
 
+class SILParserFunctionBuilder;
+
 /// A class for creating SILFunctions in a specific SILModule.
 ///
 /// The intention is that this class is not used directly, but rather that each
@@ -35,6 +37,8 @@ namespace swift {
 ///    code-reuse in between these different SILFunction creation sites.
 class SILFunctionBuilder {
   SILModule &mod;
+
+  friend class SILParserFunctionBuilder;
 
 public:
   SILFunctionBuilder(SILModule &mod) : mod(mod) {}
