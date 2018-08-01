@@ -17,7 +17,7 @@ import SwiftShims
 /// When you call methods that use random data, such as creating new random
 /// values or shuffling a collection, you can pass a `RandomNumberGenerator`
 /// type to be used as the source for randomness. When you don't pass a
-/// generator, the default `Random` type is used.
+/// generator, the default `SystemRandomNumberGenerator` type is used.
 ///
 /// When providing new APIs that use randomness, provide a version that accepts
 /// a generator conforming to the `RandomNumberGenerator` protocol as well as a
@@ -32,7 +32,7 @@ import SwiftShims
 ///         }
 ///
 ///         static func random() -> Weekday {
-///             var g = SystemRandomGenerator()
+///             var g = SystemRandomNumberGenerator()
 ///             return Weekday.random(using: &g)
 ///         }
 ///     }
@@ -52,6 +52,11 @@ import SwiftShims
 /// the thread safety and quality of the generator.
 public protocol RandomNumberGenerator {
   /// Returns a value from a uniform, independent distribution of binary data.
+  ///
+  /// Use this method when you need random binary data to generate another
+  /// value. If you need an integer value within a specific range, use the
+  /// static `random(in:using:)` method on that integer type instead of this
+  /// method.
   ///
   /// - Returns: An unsigned 64-bit random value.
   mutating func next() -> UInt64
@@ -81,6 +86,11 @@ extension RandomNumberGenerator {
 extension RandomNumberGenerator {
   /// Returns a value from a uniform, independent distribution of binary data.
   ///
+  /// Use this method when you need random binary data to generate another
+  /// value. If you need an integer value within a specific range, use the
+  /// static `random(in:using:)` method on that integer type instead of this
+  /// method.
+  ///
   /// - Returns: A random value of `T`. Bits are randomly distributed so that
   ///   every value of `T` is equally likely to be returned.
   @inlinable
@@ -89,6 +99,11 @@ extension RandomNumberGenerator {
   }
 
   /// Returns a random value that is less than the given upper bound.
+  ///
+  /// Use this method when you need random binary data to generate another
+  /// value. If you need an integer value within a specific range, use the
+  /// static `random(in:using:)` method on that integer type instead of this
+  /// method.
   ///
   /// - Parameter upperBound: The upper bound for the randomly generated value.
   ///   Must be non-zero.
@@ -138,6 +153,7 @@ extension RandomNumberGenerator {
 ///   from `/dev/urandom`.
 @_fixed_layout
 public struct SystemRandomNumberGenerator : RandomNumberGenerator {
+  /// Creates a new instance of the system's default random number generator.
   @inlinable
   public init() { }
 
