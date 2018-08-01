@@ -1760,7 +1760,7 @@ namespace {
 /// This is a little helper for working with literal arrays that may want to get
 /// deleted if all references to them are removed.
 struct ArrayElementDecoder {
-  SmallVector<SILValue, 4> elements;
+  SmallVector<Operand*, 4> elementsAtInit;
   SmallPtrSet<SILInstruction *, 8> arrayInsts;
 
   /// Given a SILValue that may be an array, attempt to decode it into the
@@ -1798,7 +1798,8 @@ struct ArrayElementDecoder {
     cast<IntegerLiteralInst>(numElementsVal)->getValue().getLimitedValue();
 
     return !tf::ConstExprEvaluator::
-    decodeAllocUninitializedArray(apply, numElements, elements, &arrayInsts);
+    decodeAllocUninitializedArray(apply, numElements, elementsAtInit,
+                                  &arrayInsts);
   }
 
   /// Try to remove the instructions that make up the array initialization.
@@ -1995,7 +1996,13 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
       // generally be uniqued on entry to this routine.  If so, make sure to
       // reuse them as we project out the .handle members to avoid code bloat.
       llvm::DenseMap<SILValue, SILValue> loweredElts;
-      for (auto elt : arrayDecoder.elements) {
+      for (auto *use : arrayDecoder.elementsAtInit) {
+        auto *store = dyn_cast<StoreInst>(use->getUser());
+        if (!store) {
+          diagnoseInvalid("element initialization error");
+          return;
+        }
+        auto elt = store->getSrc();
         auto &eltVal = loweredElts[elt];
         if (!eltVal) {
           eltVal = getTensorProtocolHandleMember(elt, inst->getLoc(), B);

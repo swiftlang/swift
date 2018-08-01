@@ -814,19 +814,28 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
       elementConstants.assign(numElements, SymbolicValue::getUninitMemory());
     } else {
       // We handle the flow-insensitive case specially in order to find the
-      // stores to initialize the array elements.  Collect them here and pretend
-      // that the array was initialized atomically.
-      SmallVector<SILValue, 8> elements;
+      // stores/apply_insts to initialize the array elements.  Collect them
+      // here and pretend that the array was initialized atomically.
+      SmallVector<Operand*, 8> elementsAtInit;
       if (ConstExprEvaluator::decodeAllocUninitializedArray(
-              apply, numElements, elements,
+              apply, numElements, elementsAtInit,
               /*arrayInsts*/ nullptr))
         return evaluator.getUnknown((SILInstruction *)apply,
                                     UnknownReason::Default);
 
       // Okay, we were able to decode the array.  See if we can fold all of the
       // elements we found.
-      for (auto elt : elements) {
-        auto eltCst = getConstantValue(elt);
+      for (auto *use : elementsAtInit) {
+        SymbolicValue eltCst = evaluator.getUnknown((SILInstruction *)apply,
+                                                    UnknownReason::Default);
+        if (auto *store = dyn_cast<StoreInst>(use->getUser())) {
+          eltCst = getConstantValue(store->getSrc());
+        } else {
+          auto addr = computeSingleStoreAddressValue(use->get());
+          if (addr.getKind() == SymbolicValue::Address)
+            eltCst = addr.getAddressValueMemoryObject()->getValue();
+        }
+
         if (!eltCst.isConstant())
           return eltCst;
         elementConstants.push_back(eltCst);
@@ -1057,20 +1066,18 @@ static bool updateIndexedElement(SymbolicValue &aggregate,
 /// key.
 SymbolicValue
 ConstExprFunctionState::computeSingleStoreAddressValue(SILValue addr) {
-  // The only value we can otherwise handle is an alloc_stack instruction.
-  auto alloc = dyn_cast<AllocStackInst>(addr);
-  if (!alloc)
-    return evaluator.getUnknown(addr, UnknownReason::Default);
+  assert(!calculatedValues.count(addr));
+  assert(addr->getType().isAddress() && "expect an address value");
 
   // Keep track of the value found for the first constant store.
   auto memoryAddress =
-      createMemoryObject(alloc, SymbolicValue::getUninitMemory());
+      createMemoryObject(addr, SymbolicValue::getUninitMemory());
   auto *memoryObject = memoryAddress.getAddressValueMemoryObject();
 
   // Okay, check out all of the users of this value looking for semantic stores
   // into the address.  If we find more than one, then this was a var or
   // something else we can't handle.
-  for (auto *use : alloc->getUses()) {
+  for (auto *use : addr->getUses()) {
     auto user = use->getUser();
 
     // Ignore markers, loads, and other things that aren't stores to this stack
@@ -1150,6 +1157,16 @@ ConstExprFunctionState::computeSingleStoreAddressValue(SILValue addr) {
       assert(memoryObject->getValue().isConstant() &&
              "Should have found a constant result value");
       continue;
+    }
+
+    // If it is an index_addr, make sure it is a different address from base.
+    if (auto *iai = dyn_cast<IndexAddrInst>(user)) {
+      assert(use->get() == iai->getBase());
+      if (auto *ili = dyn_cast<IntegerLiteralInst>(iai->getIndex())) {
+        if (ili->getValue().getLimitedValue() != 0)
+          continue;
+      }
+      return evaluator.getUnknown(addr, UnknownReason::Default);
     }
 
     LLVM_DEBUG(llvm::dbgs()
@@ -1527,65 +1544,21 @@ static bool analyzeArrayInitUses(SILValue v,
   return false;
 }
 
-/// Generate a top level stack variable as an element value holder. Make the
-/// valueFeeder write to the stack variable instead of elemAddr, then generate
-/// a load-store pair to copy the element from stack to elemAddr. Return the
-/// store on success and nullptr on failure.
-static StoreInst *makeTopLevelVariableForArrayElement(
-    SingleValueInstruction *elemAddr,
-    ApplyInst *valueFeeder) {
-  // Get the operand index of elemAddr used in valueFeeder
-  unsigned opIndex = [&]() {
-    for (unsigned i = 1, e = valueFeeder->getNumOperands(); i != e; ++i) {
-      if (valueFeeder->getOperand(i) == elemAddr)
-        return i;
-    }
-    assert(false && "elemAddr must be used as an argument of apply_inst.");
-  }();
-
-  // We only handle the case if this is an out-parameter (i.e., like a store).
-  auto conventions = valueFeeder->getSubstCalleeConv();
-  unsigned numIndirectResults = conventions.getNumIndirectSILResults();
-  unsigned argIndex = opIndex - 1;
-  if (argIndex >= numIndirectResults)
-    return nullptr;
-
-  // Okay, we perform the code transformation as follows:
-  // Allocate a stack variable as a top level element holder.
-  SILBuilder B(valueFeeder);
-  auto loc = elemAddr->getLoc();
-  SILType ty = elemAddr->getType().getObjectType();
-  auto *alloc = B.createAllocStack(loc, ty);
-
-  // Replace the use of addr by alloc
-  valueFeeder->getAllOperands()[opIndex].set(alloc);
-
-  // Add a load-store pair to copy the element from stack to elemAddr.
-  B.setInsertionPoint(std::next(SILBasicBlock::iterator(valueFeeder)));
-  auto *load = B.createLoad(loc, alloc,
-                            LoadOwnershipQualifier::Unqualified);
-  auto *store = B.createStore(loc, load, elemAddr,
-                              StoreOwnershipQualifier::Unqualified);
-
-  // Deallocate the stack variable, which is no longer to be used.
-  B.createDeallocStack(loc, alloc);
-
-  return store;
-}
-
 /// Try to decode the specified apply of the _allocateUninitializedArray
-/// function in the standard library.  This attempts to figure out what the
-/// resulting elements will be.  This fills in the elements result and returns
-/// false on success.
+/// function in the standard library.  This attempts to figure out how the
+/// resulting elements will be initialized.  This fills in the result with
+/// a lists of operands used to pass element addresses for initialization,
+/// and returns true on success.
 ///
 /// If arrayInsts is non-null and if decoding succeeds, this function adds
 /// all of the instructions relevant to the definition of this array into
 /// the set.  If decoding fails, then the contents of this set is undefined.
 ///
 bool ConstExprEvaluator::decodeAllocUninitializedArray(
-    ApplyInst *apply, uint64_t numElements, SmallVectorImpl<SILValue> &elements,
+    ApplyInst *apply, uint64_t numElements,
+    SmallVectorImpl<Operand*> &elementsAtInit,
     SmallPtrSet<SILInstruction *, 8> *arrayInsts) {
-  elements.resize(numElements);
+  elementsAtInit.resize(numElements);
 
   // The apply is part of the call.
   if (arrayInsts)
@@ -1596,7 +1569,7 @@ bool ConstExprEvaluator::decodeAllocUninitializedArray(
   bool hadUnknownUsers = false;
 
   // The call has a tuple return type, see if we can walk all uses of them to
-  // analyze them and find the stores to the elements.
+  // analyze them and find the stores/apply_insts to the elements.
   for (auto *use : apply->getUses()) {
     auto *user = use->getUser();
 
@@ -1633,11 +1606,11 @@ bool ConstExprEvaluator::decodeAllocUninitializedArray(
       arrayInsts->insert(pointer2addr);
 
     // Okay, process the use list of the pointer_to_address, each user is
-    // something that should result in a store of an element.
+    // something that should result in a store of an element or an apply_inst
+    // of in-place element initialization.
     for (auto *use : pointer2addr->getUses()) {
       auto *user = use->getUser();
 
-      SingleValueInstruction *elemAddr = pointer2addr;
       uint64_t index = 0;
       if (auto *iai = dyn_cast<IndexAddrInst>(user)) {
         if (arrayInsts)
@@ -1647,33 +1620,35 @@ bool ConstExprEvaluator::decodeAllocUninitializedArray(
         if (!ili)
           return true;
 
-        elemAddr = iai;
         index = ili->getValue().getLimitedValue();
-        user = iai->getSingleUserOfType<SILInstruction>();
+        use = iai->getSingleUse();
+        user = use ? use->getUser() : nullptr;
       }
+
+      // We handle the cases that the element is either set by a store or
+      // filled via an apply_inst.
+      if (auto *store = dyn_cast_or_null<StoreInst>(user)) {
+        if (store->getDest() != use->get())
+          return true;
+      } else if (auto *applyInst = dyn_cast_or_null<ApplyInst>(user)) {
+        // Check to see if this is an out-parameter (i.e., like a store).
+        auto conventions = applyInst->getSubstCalleeConv();
+        unsigned numIndirectResults = conventions.getNumIndirectSILResults();
+        unsigned argIndex = use->getOperandNumber() - 1;
+        if (argIndex >= numIndirectResults)
+          return true;
+      } else
+        return true;
 
       // Check to see if we have a valid index that hasn't been recorded yet.
-      if (index >= elements.size() || elements[index] != SILValue())
+      if (index >= elementsAtInit.size() || elementsAtInit[index])
         return true;
 
-      // If the element's address is not accessed by a store (with a top level
-      // value) but instead passed to a function call to get indirect result,
-      // we try to generate a top level stack variable to hold the result and
-      // then store it into this address.
-      if (auto *valueFeeder = dyn_cast<ApplyInst>(user)) {
-        user = makeTopLevelVariableForArrayElement(elemAddr, valueFeeder);
-      }
-
-      // Check to see if we have a valid store.
-      auto *store = dyn_cast_or_null<StoreInst>(user);
-      if (!store)
-        return true;
+      // If we got a store/apply_inst to a valid index, it must be our element.
+      elementsAtInit[index] = use;
 
       if (arrayInsts)
-        arrayInsts->insert(store);
-
-      // If we got a store to a valid index, it must be our element.
-      elements[index] = store->getOperand(0);
+        arrayInsts->insert(user);
 
       // Track how many elements we see so we can know if we got them all.
       --numElements;
