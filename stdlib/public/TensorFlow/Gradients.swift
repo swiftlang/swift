@@ -171,6 +171,20 @@ func _adjointExp<T : BinaryFloatingPoint>(
 }
 
 @inlinable
+func _adjointCeil<T : BinaryFloatingPoint>(
+  _ x: Tensor<T>, originalValue: Tensor<T>, seed: Tensor<T>
+) -> Tensor<T> {
+  return Tensor(0).broadcast(like: x)
+}
+
+@inlinable
+func _adjointFloor<T : BinaryFloatingPoint>(
+  _ x: Tensor<T>, originalValue: Tensor<T>, seed: Tensor<T>
+) -> Tensor<T> {
+  return Tensor(0).broadcast(like: x)
+}
+
+@inlinable
 func _adjointSqrt<T : BinaryFloatingPoint>(
   _ x: Tensor<T>, originalValue: Tensor<T>, seed: Tensor<T>
 ) -> Tensor<T> {

@@ -245,6 +245,14 @@ TensorTests.testAllBackends("ArgMax") {
   expectEqual(5, scalarsArgmax)
 }
 
+TensorTests.testAllBackends("CeilFloor") {
+  let x = Tensor<Float>([-1.3, -0.4, 0.5, 1.6])
+  let xFloor = floor(x)
+  let xCeil = ceil(x)
+  expectEqual(ShapedArray(shape: [4], scalars: [-2, -1, 0, 1]), xFloor.array)
+  expectEqual(ShapedArray(shape: [4], scalars: [-1, 0, 1, 2]), xCeil.array)
+}
+
 TensorTests.testAllBackends("SimpleMath") {
   let x = Tensor<Float>([1.2, 1.2])
   let y = tanh(x)
