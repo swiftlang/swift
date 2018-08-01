@@ -1525,17 +1525,17 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
     // @objc protocols in extensions of Swift generic classes, because there's
     // no stable Objective-C class object to install the protocol conformance
     // category onto.
-    if (isa<ExtensionDecl>(DC)) {
-      if (auto genericT = T->getGenericAncestor()) {
-        if (!cast<ClassDecl>(genericT->getAnyNominal())
-               ->usesObjCGenericsModel()) {
-          auto isSubclass = !genericT->isEqual(T);
-          auto genericTIsGeneric = (bool)genericT->getAnyGeneric()
-                                                 ->getGenericParams();
-          TC.diagnose(ComplainLoc, diag::objc_protocol_in_generic_extension, T,
-                      ProtoType, isSubclass, genericTIsGeneric);
-          conformance->setInvalid();
-          return conformance;
+    if (auto ext = dyn_cast<ExtensionDecl>(DC)) {
+      if (auto classDecl = ext->getAsClassOrClassExtensionContext()) {
+        if (auto genericClassDecl = classDecl->getGenericAncestor()) {
+          if (!genericClassDecl->usesObjCGenericsModel()) {
+            auto isSubclass = genericClassDecl != classDecl;
+            auto genericTIsGeneric = (bool)genericClassDecl->getGenericParams();
+            TC.diagnose(ComplainLoc, diag::objc_protocol_in_generic_extension,
+                        T, ProtoType, isSubclass, genericTIsGeneric);
+            conformance->setInvalid();
+            return conformance;
+          }
         }
       }
     }

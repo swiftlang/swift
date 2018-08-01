@@ -3376,6 +3376,18 @@ ClassDecl::findImplementingMethod(const AbstractFunctionDecl *Method) const {
   return nullptr;
 }
 
+ClassDecl *ClassDecl::getGenericAncestor() const {
+  ClassDecl *current = const_cast<ClassDecl *>(this);
+
+  while (current) {
+    if (current->isGenericContext())
+      return current;
+
+    current = current->getSuperclassDecl();
+  }
+
+  return nullptr;
+}
 
 EnumCaseDecl *EnumCaseDecl::create(SourceLoc CaseLoc,
                                    ArrayRef<EnumElementDecl *> Elements,
