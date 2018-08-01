@@ -98,10 +98,10 @@ def main():
         sys.exit(1)
 
     try:
-        run_command([swift_swiftsyntax_test, '--deserialize-incremental'] + 
-                    ['--pre-edit-tree', pre_edit_tree_file] +
-                    ['--incr-tree', incremental_tree_file] + 
-                    ['--out', after_roundtrip_source_file])
+        run_command([swift_swiftsyntax_test, '-deserialize-incremental'] +
+                    ['-pre-edit-tree', pre_edit_tree_file] +
+                    ['-incr-tree', incremental_tree_file] +
+                    ['-out', after_roundtrip_source_file])
     except subprocess.CalledProcessError as e:
         print('Test case "%s" of %s FAILed' % (test_case, test_file), 
               file=sys.stderr)
