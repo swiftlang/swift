@@ -393,6 +393,8 @@ public struct Dictionary<Key: Hashable, Value> {
   /// key-value pair.
   public typealias Element = (key: Key, value: Value)
 
+  public typealias Filtered = [Key: Value]
+  
   @usableFromInline
   internal var _variantBuffer: _VariantBuffer
 
@@ -587,7 +589,6 @@ extension Dictionary: Sequence {
   }
 }
 
-// This is not quite Sequence.filter, because that returns [Element], not Self
 extension Dictionary {
   /// Returns a new dictionary containing the key-value pairs of the dictionary
   /// that satisfy the given predicate.

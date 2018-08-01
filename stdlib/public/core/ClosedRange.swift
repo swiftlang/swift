@@ -124,6 +124,7 @@ extension ClosedRange: Sequence
 where Bound: Strideable, Bound.Stride: SignedInteger {
   public typealias Element = Bound
   public typealias Iterator = IndexingIterator<ClosedRange<Bound>>
+  public typealias Filtered = [Bound]
 }
 
 extension ClosedRange where Bound : Strideable, Bound.Stride : SignedInteger {

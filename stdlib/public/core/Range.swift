@@ -184,6 +184,7 @@ extension Range: Sequence
 where Bound: Strideable, Bound.Stride : SignedInteger {
   public typealias Element = Bound
   public typealias Iterator = IndexingIterator<Range<Bound>>
+  public typealias Filtered = [Bound]
 }
 
 extension Range: Collection, BidirectionalCollection, RandomAccessCollection

@@ -3500,6 +3500,8 @@ ${assignmentOperatorComment(x.operator, True)}
   public struct Words : BidirectionalCollection {
     public typealias Indices = Range<Int>
     public typealias SubSequence = Slice<${Self}.Words>
+    // FIXME: do we want a special type for this?
+    public typealias Filtered = [UInt]
 
     @usableFromInline // FIXME(sil-serialize-all)
     internal var _value: ${Self}

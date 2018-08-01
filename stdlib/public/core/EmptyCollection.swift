@@ -40,6 +40,8 @@ extension EmptyCollection {
 }
 
 extension EmptyCollection.Iterator: IteratorProtocol, Sequence {
+  public typealias Filtered = EmptyCollection.Iterator
+  
   /// Returns `nil`, indicating that there are no more elements.
   @inlinable // FIXME(sil-serialize-all)
   public mutating func next() -> Element? {
@@ -63,6 +65,7 @@ extension EmptyCollection: RandomAccessCollection, MutableCollection {
   public typealias Index = Int
   public typealias Indices = Range<Int>
   public typealias SubSequence = EmptyCollection<Element>
+  public typealias Filtered = EmptyCollection<Element>
 
   /// Always zero, just like `endIndex`.
   @inlinable // FIXME(sil-serialize-all)

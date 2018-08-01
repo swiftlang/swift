@@ -38,6 +38,7 @@ extension DefaultIndices: Collection {
   public typealias Element = Elements.Index
   public typealias Indices = DefaultIndices<Elements>
   public typealias SubSequence = DefaultIndices<Elements>
+  public typealias Filtered = [Elements.Index]
   public typealias Iterator = IndexingIterator<DefaultIndices<Elements>>
 
   @inlinable

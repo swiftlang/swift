@@ -20,6 +20,8 @@ extension String: BidirectionalCollection {
   public typealias IndexDistance = Int
 
   public typealias SubSequence = Substring
+  
+  public typealias Filtered = String
 
   /// The position of the first character in a nonempty string.
   ///

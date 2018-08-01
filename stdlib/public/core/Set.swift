@@ -245,6 +245,8 @@ extension Set: Sequence {
     return _variantBuffer.makeIterator()
   }
 
+  typealias Filtered = Set<Element>
+  
   /// Returns a Boolean value that indicates whether the given element exists
   /// in the set.
   ///
@@ -275,8 +277,6 @@ extension Set: Sequence {
   }
 }
 
-// This is not quite Sequence.filter, because that returns [Element], not Self
-// (RangeReplaceableCollection.filter returns Self, but Set isn't an RRC)
 extension Set {
   /// Returns a new set containing the elements of the set that satisfy the
   /// given predicate.

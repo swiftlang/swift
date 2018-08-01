@@ -61,6 +61,11 @@ extension ContiguousArray: RandomAccessCollection, MutableCollection {
   /// The type that allows iteration over an array's elements.
   public typealias Iterator = IndexingIterator<ContiguousArray>
 
+  // FIXME: do we want this?
+  // public typealias Filtered = ContiguousArray<Element>
+  // or this:
+  public typealias Filtered = [Element]
+  
   /// The position of the first element in a nonempty array.
   ///
   /// For an instance of `ContiguousArray`, `startIndex` is always zero. If the array

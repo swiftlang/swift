@@ -75,6 +75,9 @@ extension CollectionOfOne: RandomAccessCollection, MutableCollection {
   public typealias Index = Int
   public typealias Indices = Range<Int>
   public typealias SubSequence = Slice<CollectionOfOne<Element>>
+  // FIXME: do we want a special type for this?
+  // a `CollectionOfZeroOrOne`?
+  public typealias Filtered = [Element]
 
   /// The position of the first element.
   ///

@@ -96,6 +96,7 @@ extension String {
 public struct Substring : StringProtocol {
   public typealias Index = String.Index
   public typealias SubSequence = Substring
+  public typealias Filtered = String
 
   @usableFromInline // FIXME(sil-serialize-all)
   internal var _slice: Slice<String>
