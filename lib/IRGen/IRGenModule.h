@@ -98,7 +98,7 @@ namespace swift {
   class SourceLoc;
   class SourceFile;
   class Type;
-  enum class TypeMetadataRecordKind : unsigned;
+  enum class TypeReferenceKind : unsigned;
 
 namespace Lowering {
   class TypeConverter;
@@ -424,13 +424,13 @@ public:
 
 /// A reference to a declared type entity.
 class TypeEntityReference {
-  TypeMetadataRecordKind Kind;
+  TypeReferenceKind Kind;
   llvm::Constant *Value;
 public:
-  TypeEntityReference(TypeMetadataRecordKind kind, llvm::Constant *value)
+  TypeEntityReference(TypeReferenceKind kind, llvm::Constant *value)
     : Kind(kind), Value(value) {}
 
-  TypeMetadataRecordKind getKind() const { return Kind; }
+  TypeReferenceKind getKind() const { return Kind; }
   llvm::Constant *getValue() const { return Value; }
 };
 
@@ -530,6 +530,8 @@ public:
     llvm::StructType *TypeMetadataResponseTy;   /// { %swift.type*, iSize }
     llvm::StructType *TypeMetadataDependencyTy; /// { %swift.type*, iSize }
   };
+  llvm::StructType *OffsetPairTy;      /// { iSize, iSize }
+  llvm::StructType *FullTypeLayoutTy;  /// %swift.full_type_layout = { ... }
   llvm::PointerType *TupleTypeMetadataPtrTy; /// %swift.tuple_type*
   llvm::StructType *FullHeapMetadataStructTy; /// %swift.full_heapmetadata = type { ... }
   llvm::PointerType *FullHeapMetadataPtrTy;/// %swift.full_heapmetadata*
@@ -1156,6 +1158,9 @@ public:
                                              ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfTypeMetadataInstantiationCache(NominalTypeDecl *D,
                                              ForDefinition_t forDefinition);
+  llvm::Constant *getAddrOfTypeMetadataInPlaceInitializationCache(
+                                             NominalTypeDecl *D,
+                                             ForDefinition_t forDefinition);
   llvm::Function *getAddrOfTypeMetadataAccessFunction(CanType type,
                                                ForDefinition_t forDefinition);
   llvm::Function *getAddrOfGenericTypeMetadataAccessFunction(
@@ -1165,9 +1170,6 @@ public:
   llvm::Constant *getAddrOfTypeMetadataLazyCacheVariable(CanType type,
                                                ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfForeignTypeMetadataCandidate(CanType concreteType);
-
-  /// Determine whether the given type requires foreign type metadata.
-  bool requiresForeignTypeMetadata(CanType type);
 
   llvm::Constant *getAddrOfClassMetadataBounds(ClassDecl *D,
                                                ForDefinition_t forDefinition);

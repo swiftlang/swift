@@ -603,16 +603,23 @@ public:
           return llvm::None;
 
         return cls->getClassBoundsAsSwiftSuperclass();
+      },
+      [](StoredPointer objcClassName) -> llvm::Optional<ClassMetadataBounds> {
+        // We have no ability to look up an ObjC class by name.
+        // FIXME: add a query for this; clients may have a way to do it.
+        return llvm::None;
       });
   }
 
-  template <class Result, class DescriptorFn, class MetadataFn>
+  template <class Result, class DescriptorFn, class MetadataFn,
+            class ClassNameFn>
   llvm::Optional<Result>
-  forTypeReference(TypeMetadataRecordKind refKind, StoredPointer ref,
+  forTypeReference(TypeReferenceKind refKind, StoredPointer ref,
                    const DescriptorFn &descriptorFn,
-                   const MetadataFn &metadataFn) {
+                   const MetadataFn &metadataFn,
+                   const ClassNameFn &classNameFn) {
     switch (refKind) {
-    case TypeMetadataRecordKind::IndirectNominalTypeDescriptor: {
+    case TypeReferenceKind::IndirectNominalTypeDescriptor: {
       StoredPointer descriptorAddress = 0;
       if (!Reader->readInteger(RemoteAddress(ref), &descriptorAddress))
         return llvm::None;
@@ -621,7 +628,7 @@ public:
       LLVM_FALLTHROUGH;
     }
 
-    case TypeMetadataRecordKind::DirectNominalTypeDescriptor: {
+    case TypeReferenceKind::DirectNominalTypeDescriptor: {
       auto descriptor = readContextDescriptor(ref);
       if (!descriptor)
         return llvm::None;
@@ -629,7 +636,10 @@ public:
       return descriptorFn(descriptor);
     }
 
-    case TypeMetadataRecordKind::IndirectObjCClass: {
+    case TypeReferenceKind::DirectObjCClassName:
+      return classNameFn(ref);
+
+    case TypeReferenceKind::IndirectObjCClass: {
       StoredPointer classRef = 0;
       if (!Reader->readInteger(RemoteAddress(ref), &classRef))
         return llvm::None;
@@ -640,10 +650,9 @@ public:
 
       return metadataFn(metadata);
     }
-
-    default:
-      return llvm::None;
     }
+
+    return llvm::None;
   }
 
   /// Read a single generic type argument from a bound generic type
@@ -1038,9 +1047,25 @@ private:
                            sizeof(flags)))
       return nullptr;
     
+    TypeContextDescriptorFlags typeFlags(flags.getKindSpecificFlags());
     unsigned baseSize = 0;
     unsigned genericHeaderSize = sizeof(GenericContextDescriptorHeader);
+    unsigned metadataInitSize = 0;
     bool hasVTable = false;
+
+    auto readMetadataInitSize = [&]() -> unsigned {
+      switch (typeFlags.getMetadataInitialization()) {
+      case TypeContextDescriptorFlags::NoMetadataInitialization:
+        return 0;
+      case TypeContextDescriptorFlags::InPlaceMetadataInitialization:
+        // FIXME: classes
+        return sizeof(TargetInPlaceValueMetadataInitialization<Runtime>);
+      case TypeContextDescriptorFlags::ForeignMetadataInitialization:
+        return sizeof(TargetForeignMetadataInitialization<Runtime>);
+      }
+      return 0;
+    };
+
     switch (auto kind = flags.getKind()) {
     case ContextDescriptorKind::Module:
       baseSize = sizeof(TargetModuleContextDescriptor<Runtime>);
@@ -1055,22 +1080,24 @@ private:
     case ContextDescriptorKind::Class:
       baseSize = sizeof(TargetClassDescriptor<Runtime>);
       genericHeaderSize = sizeof(TypeGenericContextDescriptorHeader);
-      hasVTable = TypeContextDescriptorFlags(flags.getKindSpecificFlags())
-                    .class_hasVTable();
+      hasVTable = typeFlags.class_hasVTable();
+      metadataInitSize = readMetadataInitSize();
       break;
     case ContextDescriptorKind::Enum:
       baseSize = sizeof(TargetEnumDescriptor<Runtime>);
       genericHeaderSize = sizeof(TypeGenericContextDescriptorHeader);
+      metadataInitSize = readMetadataInitSize();
       break;
     case ContextDescriptorKind::Struct:
       baseSize = sizeof(TargetStructDescriptor<Runtime>);
       genericHeaderSize = sizeof(TypeGenericContextDescriptorHeader);
+      metadataInitSize = readMetadataInitSize();
       break;
     default:
       // We don't know about this kind of context.
       return nullptr;
     }
-    
+
     // Determine the full size of the descriptor. This is reimplementing a fair
     // bit of TrailingObjects but for out-of-process; maybe there's a way to
     // factor the layout stuff out...
@@ -1097,7 +1124,8 @@ private:
       TargetVTableDescriptorHeader<Runtime> header;
       auto headerAddr = address
         + baseSize
-        + genericsSize;
+        + genericsSize
+        + metadataInitSize;
       
       if (!Reader->readBytes(RemoteAddress(headerAddr),
                              (uint8_t*)&header, sizeof(header)))
@@ -1107,7 +1135,7 @@ private:
         + header.VTableSize * sizeof(TargetMethodDescriptor<Runtime>);
     }
     
-    unsigned size = baseSize + genericsSize + vtableSize;
+    unsigned size = baseSize + genericsSize + metadataInitSize + vtableSize;
     auto buffer = (uint8_t *)malloc(size);
     if (!Reader->readBytes(RemoteAddress(address), buffer, size)) {
       free(buffer);

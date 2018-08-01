@@ -163,6 +163,10 @@ class LinkEntity {
     /// The pointer is a NominalTypeDecl*.
     TypeMetadataInstantiationFunction,
 
+    /// The in-place initialization cache for a generic nominal type.
+    /// The pointer is a NominalTypeDecl*.
+    TypeMetadataInPlaceInitializationCache,
+
     /// The completion function for a generic or resilient nominal type.
     /// The pointer is a NominalTypeDecl*.
     TypeMetadataCompletionFunction,
@@ -507,9 +511,16 @@ public:
     return entity;
   }
 
-  static LinkEntity forTypeMetadataInstantiationFunction(NominalTypeDecl *decl){
+  static LinkEntity forTypeMetadataInstantiationFunction(NominalTypeDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::TypeMetadataInstantiationFunction, decl);
+    return entity;
+  }
+
+  static LinkEntity forTypeMetadataInPlaceInitializationCache(
+                                                      NominalTypeDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::TypeMetadataInPlaceInitializationCache, decl);
     return entity;
   }
 

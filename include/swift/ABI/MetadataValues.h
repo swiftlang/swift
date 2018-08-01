@@ -350,7 +350,7 @@ enum : unsigned {
 };
 
 /// Kinds of type metadata/protocol conformance records.
-enum class TypeMetadataRecordKind : unsigned {
+enum class TypeReferenceKind : unsigned {
   /// The conformance is for a nominal type referenced directly;
   /// getNominalTypeDescriptor() points to the nominal type descriptor.
   DirectNominalTypeDescriptor = 0x00,
@@ -359,9 +359,10 @@ enum class TypeMetadataRecordKind : unsigned {
   /// getNominalTypeDescriptor() points to the nominal type descriptor.
   IndirectNominalTypeDescriptor = 0x01,
 
-  /// Reserved for future use.
-  Reserved = 0x02,
-  
+  /// The conformance is for an Objective-C class that should be looked up
+  /// by class name.
+  DirectObjCClassName = 0x02,
+
   /// The conformance is for an Objective-C class that has no nominal type
   /// descriptor.
   /// getIndirectObjCClass() points to a variable that contains the pointer to
@@ -370,6 +371,8 @@ enum class TypeMetadataRecordKind : unsigned {
   /// On platforms without Objective-C interoperability, this case is
   /// unused.
   IndirectObjCClass = 0x03,
+
+  // We only reserve three bits for this in the various places we store it.
 
   First_Kind = DirectNominalTypeDescriptor,
   Last_Kind = IndirectObjCClass,
@@ -593,7 +596,7 @@ public:
     return ConformanceFlags((Value & ~ConformanceKindMask) | int_type(kind));
   }
 
-  ConformanceFlags withTypeReferenceKind(TypeMetadataRecordKind kind) const {
+  ConformanceFlags withTypeReferenceKind(TypeReferenceKind kind) const {
     return ConformanceFlags((Value & ~TypeMetadataKindMask)
                             | (int_type(kind) << TypeMetadataKindShift));
   }
@@ -621,8 +624,8 @@ public:
   }
 
   /// Retrieve the type reference kind kind.
-  TypeMetadataRecordKind getTypeReferenceKind() const {
-    return TypeMetadataRecordKind(
+  TypeReferenceKind getTypeReferenceKind() const {
+    return TypeReferenceKind(
                       (Value & TypeMetadataKindMask) >> TypeMetadataKindShift);
   }
 
@@ -1174,27 +1177,51 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
     // Generic flags build upwards from 0.
     // Type-specific flags build downwards from 15.
 
-    /// Set if the type represents an imported C tag type.
-    ///
-    /// Meaningful for all type-descriptor kinds.
-    IsCTag = 0,
-
-    /// Set if the type represents an imported C typedef type.
-    ///
-    /// Meaningful for all type-descriptor kinds.
-    IsCTypedef = 1,
-
     /// Set if the type supports reflection.  C and Objective-C enums
     /// currently don't.
     ///
     /// Meaningful for all type-descriptor kinds.
-    IsReflectable = 2,
+    IsReflectable = 0,
+
+    /// Whether there's something unusual about how the metadata is
+    /// initialized.
+    ///
+    /// Meaningful for all type-descriptor kinds.
+    MetadataInitialization = 1,
+    MetadataInitialization_width = 2,
+
+    /// The namespace of the imported declaration that gave rise to this type.
+    /// Some languages (most importantly, C/C++/Objective-C) have different
+    /// symbol namespaces in which types can be declared; for example,
+    /// `struct A` and `typedef ... A` can be declared in the same scope and
+    /// resolve to unrelated types.  When these declarations are imported,
+    /// there are several possible ways to distinguish them in Swift, e.g.
+    /// by implicitly renaming them; however, the external name used for
+    /// mangling and metadata must be stable and so is based on the original
+    /// declared name.  Therefore, in these languages, we privilege one
+    /// symbol namespace as the default (although which may depend on the
+    /// type kind), and declarations from the other(s) must be marked in
+    /// order to differentiate them.
+    ///
+    /// Meaningful for all type-descriptor kinds.
+    ImportNamespace = 3,
+    ImportNamespace_width = 3,
     
-    /// Set if the type is a Clang-importer-synthesized related entity. After
-    /// the null terminator for the type name is another null-terminated string
-    /// containing the tag that discriminates the entity from other synthesized
-    /// declarations associated with the same declaration.
-    IsSynthesizedRelatedEntity = 3,
+    /// Set if the type is an importer-synthesized related entity.
+    /// A related entity is an entity synthesized in response to an imported
+    /// type which is not the type itself; for example, when the importer
+    /// sees an ObjC error domain, it creates an error-wrapper type (a
+    /// related entity) and a Code enum (not a related entity because it's
+    /// exactly the original type).
+    ///
+    /// The name and import namespace (together with the parent context)
+    /// identify the original declaration.
+    ///
+    /// If this flag is set, then after the null terminator for the type name
+    /// is another null-terminated string containing the tag that discriminates
+    /// the entity from other synthesized declarations associated with the
+    /// same declaration.
+    IsSynthesizedRelatedEntity = 6,
 
     /// Set if the context descriptor is includes metadata for dynamically
     /// constructing a class's vtables at metadata instantiation time.
@@ -1207,25 +1234,93 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
     /// Only meaningful for class descriptors.
     Class_HasResilientSuperclass = 14,
 
-    /// The kind of reference that this class makes to its superclass
-    /// descriptor.  A TypeMetadataRecordKind.
-    ///
-    /// Only meaningful for class descriptors.
-    Class_SuperclassReferenceKind = 12,
-    Class_SuperclassReferenceKind_width = 2,
-
     /// Whether the immediate class members in this metadata are allocated
     /// at negative offsets.  For now, we don't use this.
-    Class_AreImmediateMembersNegative = 11,
+    Class_AreImmediateMembersNegative = 13,
+
+    /// The kind of reference that this class makes to its superclass
+    /// descriptor.  A TypeReferenceKind.
+    ///
+    /// Only meaningful for class descriptors.
+    Class_SuperclassReferenceKind = 10,
+    Class_SuperclassReferenceKind_width = 3,
   };
 
 public:
   explicit TypeContextDescriptorFlags(uint16_t bits) : FlagSet(bits) {}
   constexpr TypeContextDescriptorFlags() {}
 
-  FLAGSET_DEFINE_FLAG_ACCESSORS(IsCTag, isCTag, setIsCTag)
-  FLAGSET_DEFINE_FLAG_ACCESSORS(IsCTypedef, isCTypedef, setIsCTypedef)
   FLAGSET_DEFINE_FLAG_ACCESSORS(IsReflectable, isReflectable, setIsReflectable)
+
+  enum MetadataInitializationKind {
+    /// There are either no special rules for initializing the metadata
+    /// or the metadata is generic.  (Genericity is set in the
+    /// non-kind-specific descriptor flags.)
+    NoMetadataInitialization = 0,
+
+    /// The type requires non-trivial singleton initialization using the
+    /// "in-place" code pattern.
+    InPlaceMetadataInitialization = 1,
+
+    /// The type requires non-trivial singleton initialization using the
+    /// "foreign" code pattern.
+    ForeignMetadataInitialization = 2,
+
+    // We only have two bits here, so if you add a third special kind,
+    // include more flag bits in its out-of-line storage.
+  };
+
+  FLAGSET_DEFINE_FIELD_ACCESSORS(MetadataInitialization,
+                                 MetadataInitialization_width,
+                                 MetadataInitializationKind,
+                                 getMetadataInitialization,
+                                 setMetadataInitialization)
+
+  bool hasInPlaceMetadataInitialization() const {
+    return getMetadataInitialization() == InPlaceMetadataInitialization;
+  }
+
+  bool hasForeignMetadataInitialization() const {
+    return getMetadataInitialization() == ForeignMetadataInitialization;
+  }
+
+  enum ImportNamespaceKind {
+    /// The type comes the default namespace for its language.
+    DefaultNamespace = 0,
+
+    // The behavior for C imported types is complicated in ways that don't
+    // entirely make sense according to the design laid out in the comment
+    // on the ImportNamespace field.  The rules are basically:
+    //   - Classes are assumed to come from Objective-C by default.
+    //     ObjC classes are in the ordinary namespace in C.
+    //   - Protocols are assumed to come from Objective-C by default.
+    //     ObjC protocols are in their own namespace in C.
+    //   - Structs and enums seem to always get either CTag or CTypedef.
+    //     It would probably make more sense to assume they come from the
+    //     tag namespace in C and then just use CTypedef as an override.
+
+    /// The type comes from an imported C tag type.
+    CTag = 1,
+
+    /// The type comes from an imported C typedef type.
+    CTypedef = 2,
+
+    // We only have three bits here, so be judicious about adding new
+    // namespaces.
+  };
+
+  FLAGSET_DEFINE_FIELD_ACCESSORS(ImportNamespace,
+                                 ImportNamespace_width,
+                                 ImportNamespaceKind,
+                                 getImportNamespace,
+                                 setImportNamespace)
+
+  bool isCTag() const {
+    return getImportNamespace() == CTag;
+  }
+  bool isCTypedef() const {
+    return getImportNamespace() == CTypedef;
+  }
 
   FLAGSET_DEFINE_FLAG_ACCESSORS(IsSynthesizedRelatedEntity,
                                 isSynthesizedRelatedEntity,
@@ -1243,7 +1338,7 @@ public:
 
   FLAGSET_DEFINE_FIELD_ACCESSORS(Class_SuperclassReferenceKind,
                                  Class_SuperclassReferenceKind_width,
-                                 TypeMetadataRecordKind,
+                                 TypeReferenceKind,
                                  class_getSuperclassReferenceKind,
                                  class_setSuperclassReferenceKind)
 };

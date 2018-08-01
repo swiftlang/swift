@@ -1488,8 +1488,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
       return getSILLinkage(FormalLinkage::PublicUnique, forDefinition);
 
     // Imported types.
-    if (getTypeMetadataAccessStrategy(type) ==
-          MetadataAccessStrategy::NonUniqueAccessor)
+    if (isAccessorLazilyGenerated(getTypeMetadataAccessStrategy(type)))
       return SILLinkage::Shared;
 
     // Everything else is only referenced inside its module.
@@ -1498,6 +1497,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
 
   case Kind::TypeMetadataInstantiationCache:
   case Kind::TypeMetadataInstantiationFunction:
+  case Kind::TypeMetadataInPlaceInitializationCache:
   case Kind::TypeMetadataCompletionFunction:
   case Kind::TypeMetadataPattern:
     return SILLinkage::Private;
@@ -1506,8 +1506,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     auto type = getType();
 
     // Imported types, non-primitive structural types.
-    if (getTypeMetadataAccessStrategy(type) ==
-          MetadataAccessStrategy::NonUniqueAccessor)
+    if (isAccessorLazilyGenerated(getTypeMetadataAccessStrategy(type)))
       return SILLinkage::Shared;
 
     // Everything else is only referenced inside its module.
@@ -1547,6 +1546,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
       return getSILLinkage(FormalLinkage::HiddenUnique, forDefinition);
     case MetadataAccessStrategy::PrivateAccessor:
       return getSILLinkage(FormalLinkage::Private, forDefinition);
+    case MetadataAccessStrategy::ForeignAccessor:
     case MetadataAccessStrategy::NonUniqueAccessor:
       return SILLinkage::Shared;
     }
@@ -1719,6 +1719,7 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   case Kind::AnonymousDescriptor:
   case Kind::TypeMetadataInstantiationCache:
   case Kind::TypeMetadataInstantiationFunction:
+  case Kind::TypeMetadataInPlaceInitializationCache:
   case Kind::TypeMetadataCompletionFunction:
   case Kind::TypeMetadataPattern:
     return false;
@@ -2504,8 +2505,6 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity, Alignment alignment,
     // forward declaration.
     if (definitionType) {
       assert(existing->isDeclaration() && "already defined");
-      assert(entry->getType()->getPointerElementType() == defaultType
-          || entry->getType()->getPointerElementType() == definition.getType());
       updateLinkageForDefinition(*this, existing, entity);
 
       // If the existing entry is a variable of the right type,
@@ -2552,7 +2551,7 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity, Alignment alignment,
   // new variable.
   if (entry) {
     auto existing = cast<llvm::GlobalValue>(entry);
-    auto castVar = getElementBitCast(var, defaultType);
+    auto castVar = llvm::ConstantExpr::getBitCast(var, entry->getType());
     existing->replaceAllUsesWith(castVar);
     existing->eraseFromParent();
   }
@@ -2684,40 +2683,77 @@ IRGenModule::getFunctionGOTEquivalent(LinkEntity entity,
   return {gotEquivalent, ConstantReference::Indirect};
 }
 
-TypeEntityReference
-IRGenModule::getTypeEntityReference(NominalTypeDecl *decl) {
-  TypeMetadataRecordKind kind;
-  Optional<LinkEntity> entity;
-  llvm::Type *defaultTy;
+static TypeEntityReference
+getTypeContextDescriptorEntityReference(IRGenModule &IGM,
+                                        NominalTypeDecl *decl) {
+  // A reference to a concrete type.
+  // TODO: consider using a symbolic reference (i.e. a symbol string
+  // to be looked up dynamically) for types defined outside the module.
+  auto kind = TypeReferenceKind::DirectNominalTypeDescriptor;
+  auto entity = LinkEntity::forNominalTypeDescriptor(decl);
+  auto defaultTy = IGM.TypeContextDescriptorTy;
 
-  auto clas = dyn_cast<ClassDecl>(decl);
-  if (clas && !clas->isForeign() && !hasKnownSwiftMetadata(*this, clas)) {
-    // A reference to an Objective-C class object.
-    assert(clas->isObjC() && "Must have an Objective-C class here");
+  auto ref = IGM.getAddrOfLLVMVariableOrGOTEquivalent(
+      entity, IGM.getPointerAlignment(), defaultTy);
 
-    kind = TypeMetadataRecordKind::IndirectObjCClass;
-    defaultTy = TypeMetadataPtrTy;
-    entity = LinkEntity::forObjCClassRef(clas);
-  } else {
-    // A reference to a concrete type.
-    // TODO: consider using a symbolic reference (i.e. a symbol string
-    // to be looked up dynamically) for types defined outside the module.
-    kind = TypeMetadataRecordKind::DirectNominalTypeDescriptor;
-    entity = LinkEntity::forNominalTypeDescriptor(decl);
-    defaultTy = TypeContextDescriptorTy;
-  }
-
-  auto ref = getAddrOfLLVMVariableOrGOTEquivalent(
-      *entity, getPointerAlignment(), defaultTy);
-
-  // Adjust the flags now that we know whether the reference to this
-  // entity will be indirect.
   if (ref.isIndirect()) {
-    assert(kind == TypeMetadataRecordKind::DirectNominalTypeDescriptor);
-    kind = TypeMetadataRecordKind::IndirectNominalTypeDescriptor;
+    kind = TypeReferenceKind::IndirectNominalTypeDescriptor;
   }
 
   return TypeEntityReference(kind, ref.getValue());
+}
+
+static TypeEntityReference
+getObjCClassRefEntityReference(IRGenModule &IGM, ClassDecl *cls) {
+  // A reference to an Objective-C class object.
+  assert(cls->isObjC() && "Must have an Objective-C class here");
+
+  auto kind = TypeReferenceKind::IndirectObjCClass;
+  auto entity = LinkEntity::forObjCClassRef(cls);
+  auto defaultTy = IGM.TypeMetadataPtrTy;
+
+  auto ref = IGM.getAddrOfLLVMVariableOrGOTEquivalent(
+      entity, IGM.getPointerAlignment(), defaultTy);
+  assert(!ref.isIndirect());
+
+  return TypeEntityReference(kind, ref.getValue());
+}
+
+static TypeEntityReference
+getRuntimeOnlyClassEntityReference(IRGenModule &IGM, ClassDecl *cls) {
+  assert(cls->getForeignClassKind() == ClassDecl::ForeignKind::RuntimeOnly);
+
+  auto namedClangDecl = Mangle::ASTMangler::getClangDeclForMangling(cls);
+  assert(namedClangDecl);
+
+  auto kind = TypeReferenceKind::DirectObjCClassName;
+  auto ref = IGM.getAddrOfGlobalString(namedClangDecl->getName());
+
+  return TypeEntityReference(kind, ref);
+}
+
+TypeEntityReference
+IRGenModule::getTypeEntityReference(NominalTypeDecl *decl) {
+  auto clas = dyn_cast<ClassDecl>(decl);
+  if (!clas) {
+    return getTypeContextDescriptorEntityReference(*this, decl);
+  }
+
+  switch (clas->getForeignClassKind()) {
+  case ClassDecl::ForeignKind::RuntimeOnly:
+    return getRuntimeOnlyClassEntityReference(*this, clas);
+
+  case ClassDecl::ForeignKind::CFType:
+    return getTypeContextDescriptorEntityReference(*this, clas);
+
+  case ClassDecl::ForeignKind::Normal:
+    if (hasKnownSwiftMetadata(*this, clas)) {
+      return getTypeContextDescriptorEntityReference(*this, clas);
+    } else {
+      return getObjCClassRefEntityReference(*this, clas);
+    }
+  }
+  llvm_unreachable("bad foreign type kind");
 }
 
 /// Form an LLVM constant for the relative distance between a reference
@@ -3275,8 +3311,45 @@ IRGenModule::getAddrOfTypeMetadataLazyCacheVariable(CanType type,
                                               ForDefinition_t forDefinition) {
   assert(!type->hasArchetype() && !type->hasTypeParameter());
   LinkEntity entity = LinkEntity::forTypeMetadataLazyCacheVariable(type);
-  return getAddrOfLLVMVariable(entity, getPointerAlignment(), forDefinition,
-                               TypeMetadataPtrTy, DebugTypeInfo());
+  auto variable =
+    getAddrOfLLVMVariable(entity, getPointerAlignment(), forDefinition,
+                          TypeMetadataPtrTy, DebugTypeInfo());
+
+  // Zero-initialize if we're asking for a definition.
+  if (forDefinition) {
+    cast<llvm::GlobalVariable>(variable)->setInitializer(
+      llvm::ConstantPointerNull::get(TypeMetadataPtrTy));
+  }
+
+  return variable;
+}
+
+llvm::Constant *
+IRGenModule::getAddrOfTypeMetadataInPlaceInitializationCache(
+                                           NominalTypeDecl *D,
+                                           ForDefinition_t forDefinition) {
+  // Build the cache type.
+  llvm::Type *cacheTy;
+  if (isa<StructDecl>(D) || isa<EnumDecl>(D)) {
+    // This is struct InPlaceValueMetadataCache.
+    cacheTy = llvm::StructType::get(getLLVMContext(),
+                                    {TypeMetadataPtrTy, Int8PtrTy});
+  } else {
+    llvm_unreachable("in-place initialization for classes not yet supported");
+  }
+
+  LinkEntity entity = LinkEntity::forTypeMetadataInPlaceInitializationCache(D);
+  auto variable =
+    getAddrOfLLVMVariable(entity, getPointerAlignment(), forDefinition,
+                          cacheTy, DebugTypeInfo());
+
+  // Zero-initialize if we're asking for a definition.
+  if (forDefinition) {
+    cast<llvm::GlobalVariable>(variable)->setInitializer(
+      llvm::Constant::getNullValue(cacheTy));
+  }
+
+  return variable;
 }
 
 /// Define the metadata for a type.
@@ -4286,9 +4359,17 @@ IRGenModule::getAddrOfWitnessTableLazyCacheVariable(
   assert(!conformingType->hasArchetype());
   LinkEntity entity =
     LinkEntity::forProtocolWitnessTableLazyCacheVariable(conf, conformingType);
-  return getAddrOfLLVMVariable(entity, getPointerAlignment(),
-                               forDefinition, WitnessTablePtrTy,
-                               DebugTypeInfo());
+  auto variable = getAddrOfLLVMVariable(entity, getPointerAlignment(),
+                                        forDefinition, WitnessTablePtrTy,
+                                        DebugTypeInfo());
+
+  // Zero-initialize if we're asking for a definition.
+  if (forDefinition) {
+    cast<llvm::GlobalVariable>(variable)->setInitializer(
+      llvm::ConstantPointerNull::get(WitnessTablePtrTy));
+  }
+
+  return variable;
 }
 
 /// Look up the address of a witness table.
