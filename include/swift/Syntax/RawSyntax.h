@@ -251,6 +251,8 @@ class RawSyntax final
       /// Number of children this "layout" node has.
       unsigned NumChildren : 32;
       /// Number of bytes this node takes up spelled out in the source code
+      /// A value of UINT32_MAX indicates that the text length has not been
+      /// computed yet.
       unsigned TextLength : 32;
     } Layout;
 
@@ -292,6 +294,18 @@ class RawSyntax final
   RawSyntax(tok TokKind, OwnedString Text, ArrayRef<TriviaPiece> LeadingTrivia,
             ArrayRef<TriviaPiece> TrailingTrivia, SourcePresence Presence,
             bool ManualMemory, llvm::Optional<SyntaxNodeId> NodeId);
+
+  /// Compute the node's text length by summing up the length of its childern
+  size_t computeTextLength() {
+    size_t TextLength = 0;
+    for (size_t I = 0, NumChildren = getNumChildren(); I < NumChildren; ++I) {
+      auto &ChildNode = getChild(I);
+      if (ChildNode && !ChildNode->isMissing()) {
+        TextLength += ChildNode->getTextLength();
+      }
+    }
+    return TextLength;
+  }
 
 public:
   ~RawSyntax();
@@ -476,6 +490,9 @@ public:
       accumulateAbsolutePosition(Pos);
       return Pos.getOffset();
     } else {
+      if (Bits.Layout.TextLength == UINT32_MAX) {
+        Bits.Layout.TextLength = computeTextLength();
+      }
       return Bits.Layout.TextLength;
     }
   }
