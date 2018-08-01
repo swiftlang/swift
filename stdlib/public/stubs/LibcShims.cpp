@@ -32,7 +32,6 @@
 #include <cmath>
 #include <errno.h>
 #include <fcntl.h>
-#include <random>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -298,26 +297,6 @@ size_t swift::_stdlib_malloc_size(const void *ptr) {
 #else
 #error No malloc_size analog known for this platform/libc.
 #endif
-
-static Lazy<std::mt19937> theGlobalMT19937;
-
-static std::mt19937 &getGlobalMT19937() {
-  return theGlobalMT19937.get();
-}
-
-SWIFT_RUNTIME_STDLIB_API
-__swift_uint32_t swift::_stdlib_cxx11_mt19937() {
-  return getGlobalMT19937()();
-}
-
-SWIFT_RUNTIME_STDLIB_API
-__swift_uint32_t
-swift::_stdlib_cxx11_mt19937_uniform(__swift_uint32_t upper_bound) {
-  if (upper_bound > 0)
-    upper_bound--;
-  std::uniform_int_distribution<__swift_uint32_t> RandomUniform(0, upper_bound);
-  return RandomUniform(getGlobalMT19937());
-}
 
 // _stdlib_random
 //
