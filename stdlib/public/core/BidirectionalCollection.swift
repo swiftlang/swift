@@ -45,6 +45,9 @@ where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection {
 
   // FIXME(ABI): Associated type inference requires this.
   associatedtype SubSequence
+  
+  // FIXME(ABI): Associated type inference (probably) requires this.
+  associatedtype Filtered
 
   // FIXME(ABI): Associated type inference requires this.
   associatedtype Indices

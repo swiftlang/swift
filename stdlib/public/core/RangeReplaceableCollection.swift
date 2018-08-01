@@ -65,6 +65,15 @@ public protocol RangeReplaceableCollection : Collection
   where SubSequence : RangeReplaceableCollection {
   // FIXME(ABI): Associated type inference requires this.
   associatedtype SubSequence
+  
+  /// A type that represents a collection composed of an arbatrary
+  /// assortment of the collection's elements.
+  ///
+  /// This associated type appears as a requirement in the `Sequence`
+  /// protocol, but it is restated here with stricter constraints. A
+  /// filtered `RangeReplaceableCollection` should also conform
+  /// to `RangeReplaceableCollection`.
+  associatedtype Filtered: RangeReplaceableCollection = Self
 
   //===--- Fundamental Requirements ---------------------------------------===//
 
@@ -1074,8 +1083,8 @@ extension RangeReplaceableCollection {
   @available(swift, introduced: 4.0)
   public func filter(
     _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> Self {
-    return try Self(self.lazy.filter(isIncluded))
+  ) rethrows -> Filtered {
+    return try Filtered(self.lazy.filter(isIncluded))
   }
 }
 

@@ -22,6 +22,7 @@ protocol _SequenceWrapper : Sequence {
   associatedtype Base : Sequence where Base.Element == Element
   associatedtype Iterator = Base.Iterator
   associatedtype SubSequence = Base.SubSequence
+  associatedtype Filtered = Base.Filtered
   
   var _base: Base { get }
 }
@@ -66,7 +67,7 @@ extension _SequenceWrapper {
   @inlinable // FIXME(sil-serialize-all)
   public func filter(
     _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> [Element] {
+  ) rethrows -> Filtered {
     return try _base.filter(isIncluded)
   }
 

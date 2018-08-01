@@ -68,6 +68,9 @@ where SubSequence: MutableCollection
 
   // FIXME(ABI): Associated type inference requires this.
   associatedtype SubSequence
+  
+  // FIXME(ABI): Associated type inference (probably) requires this.
+  associatedtype Filtered
 
   /// Accesses the element at the specified position.
   ///

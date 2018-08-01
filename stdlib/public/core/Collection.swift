@@ -392,6 +392,14 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// collection, the subsequence should also conform to `Collection`.
   associatedtype SubSequence = Slice<Self> where SubSequence.Index == Index
 
+  /// A type that represents a collection composed of an arbatrary
+  /// assortment of the collection's elements.
+  ///
+  /// This associated type appears as a requirement in the `Sequence`
+  /// protocol, but it is restated here with stricter constraints. A
+  /// filtered collection should also conform to `Collection`.
+  associatedtype Filtered : Collection = Array<Element>
+  
   /// Accesses the element at the specified position.
   ///
   /// The following example accesses an element of an array through its
