@@ -1248,9 +1248,20 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         self.init(backing: backing, range: 0..<backing._length)
     }
     
+    @available(swift, introduced: 4.2)
     @inlinable
     public init<S: Sequence>(bytes elements: S) where S.Iterator.Element == UInt8 {
         self.init(elements)
+    }
+
+    @available(swift, obsoleted: 4.2)
+    public init(bytes: Array<UInt8>) {
+       self.init(bytes)
+    }
+    
+    @available(swift, obsoleted: 4.2)
+    public init(bytes: ArraySlice<UInt8>) {
+       self.init(bytes)
     }
 
     @usableFromInline
