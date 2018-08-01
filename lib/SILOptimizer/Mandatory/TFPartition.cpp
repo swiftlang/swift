@@ -659,7 +659,6 @@ public:
   DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>> &graphFunctions;
   GraphFunctionDeviceInfo deviceInfo; // Device placement info.
   DominanceInfo &DI;
-  SILLoopInfo &LI;
   BlocksReachingTensorCode tensorCodeBlocks;
 
   /// These are all the tensor ops found in the initial scan over the function.
@@ -773,7 +772,6 @@ public:
             GraphFunctionDeviceInfo::getForFunction(hostFn,
                                                     /*removeConfigInst*/ true)),
         DI(*PM->getAnalysis<DominanceAnalysis>()->get(&Fn)),
-        LI(*PM->getAnalysis<SILLoopAnalysis>()->get(&Fn)),
         tensorCodeBlocks(Fn) {}
 
   ~TFFunctionPartition() {
@@ -2014,7 +2012,8 @@ bool TFFunctionPartition::markFunction(bool &hasTensorOps) {
   };
 
   // Split all critical edges for block marking.
-  splitAllCondBrCriticalEdgesWithNonTrivialArgs(hostFn, &DI, &LI);
+  // FIXME: Remove this when deabstraction is fully implemented.
+  splitAllCondBrCriticalEdgesWithNonTrivialArgs(hostFn, &DI, /*LI*/ nullptr);
 
   // We walk the function in depth first order so that we only visit reachable
   // blocks and to slightly improve compile time performance of the 'marking'
