@@ -2089,7 +2089,7 @@ public:
   void handleSourceText(StringRef Text) override;
 
   void handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree,
-                        std::unordered_set<unsigned> ReusedNodeIds) override;
+                        std::unordered_set<unsigned> &ReusedNodeIds) override;
 
   bool syntaxReuseInfoEnabled() override { return Opts.EnableSyntaxReuseInfo; }
   void
@@ -2422,7 +2422,7 @@ void SKEditorConsumer::handleSourceText(StringRef Text) {
 
 void serializeSyntaxTreeAsJson(
     const swift::syntax::SourceFileSyntax &SyntaxTree,
-    std::unordered_set<unsigned> ReusedNodeIds,
+    std::unordered_set<unsigned> &ReusedNodeIds,
     ResponseBuilder::Dictionary &Dict) {
   auto StartClock = clock();
   // 4096 is a heuristic buffer size that appears to usually be able to fit an
@@ -2453,7 +2453,7 @@ void serializeSyntaxTreeAsJson(
 
 void SKEditorConsumer::handleSyntaxTree(
     const swift::syntax::SourceFileSyntax &SyntaxTree,
-    std::unordered_set<unsigned> ReusedNodeIds) {
+    std::unordered_set<unsigned> &ReusedNodeIds) {
   if (Opts.SyntaxTransferMode == SyntaxTreeTransferMode::Off)
     return;
 

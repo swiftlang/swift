@@ -2104,8 +2104,9 @@ void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
 
   if (Consumer.syntaxTreeEnabled()) {
     assert(EditorDoc->getSyntaxTree().hasValue());
-    Consumer.handleSyntaxTree(EditorDoc->getSyntaxTree().getValue(),
-                              /*ReusedNodeIds=*/{});
+    std::unordered_set<unsigned> ReusedNodeIds;
+    Consumer.handleSyntaxTree(EditorDoc->getSyntaxTree().getValue(), 
+                              ReusedNodeIds);
   }
 }
 
