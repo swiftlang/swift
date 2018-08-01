@@ -1802,15 +1802,9 @@ CaseBlocks::CaseBlocks(
   // Check to see if the enum may have values beyond the cases we can see
   // at compile-time. This includes future cases (for resilient enums) and
   // random values crammed into C enums.
-  //
-  // Note: This relies on the fact that there are no "non-resilient" enums that
-  // are still non-exhaustive, except for @objc enums.
-  bool canAssumeExhaustive = !enumDecl->isObjC();
-  if (canAssumeExhaustive) {
-    canAssumeExhaustive =
-        !enumDecl->isResilient(SGF.SGM.SwiftModule,
-                               SGF.F.getResilienceExpansion());
-  }
+  bool canAssumeExhaustive =
+      enumDecl->isEffectivelyExhaustive(SGF.getModule().getSwiftModule(),
+                                        SGF.F.getResilienceExpansion());
   if (canAssumeExhaustive) {
     // Check that Sema didn't let any cases slip through. (This can happen
     // with @_downgrade_exhaustivity_check.)

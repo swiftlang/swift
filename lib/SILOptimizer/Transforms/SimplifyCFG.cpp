@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-simplify-cfg"
+#include "swift/AST/Module.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/InstructionUtils.h"
@@ -1581,7 +1582,13 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
     auto Iter = AllElts.begin();
     EnumElementDecl *FirstElt = *Iter;
 
-    if (SEI->getNumCases() >= 1
+    // We can't do this optimization on non-exhaustive enums.
+    bool IsExhaustive =
+        E->isEffectivelyExhaustive(Fn.getModule().getSwiftModule(),
+                                   Fn.getResilienceExpansion());
+
+    if (IsExhaustive
+        && SEI->getNumCases() >= 1
         && SEI->getCase(0).first != FirstElt) {
       ++Iter;
 
