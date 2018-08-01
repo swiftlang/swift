@@ -223,7 +223,7 @@ def operatorComment(operator, fixedWidth):
   /// Returns the remainder of dividing the first value by the second.
   ///
   /// The result of the remainder operator (`%`) has the same sign as `lhs` and
-  /// is less than `abs(rhs)`.
+  /// is less than `rhs.magnitude`.
   ///
   ///     let x = 22 % 5
   ///     // x == 2
