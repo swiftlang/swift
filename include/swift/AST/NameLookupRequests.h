@@ -81,7 +81,6 @@ public:
   bool isCached() const { return true; }
 
   // Cycle handling
-  DirectlyReferencedTypeDecls breakCycle() const { return { }; }
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
 };
@@ -127,7 +126,6 @@ public:
   bool isCached() const { return true; }
 
   // Cycle handling
-  DirectlyReferencedTypeDecls breakCycle() const { return { }; }
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
 };
@@ -145,14 +143,14 @@ private:
   friend class SimpleRequest;
 
   // Evaluation.
-  ClassDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *subject) const;
+  llvm::Expected<ClassDecl *>
+  evaluate(Evaluator &evaluator, NominalTypeDecl *subject) const;
 
 public:
   // Caching
   bool isCached() const { return true; }
 
   // Cycle handling
-  ClassDecl *breakCycle() const { return nullptr; }
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
 };
@@ -170,7 +168,8 @@ private:
   friend class SimpleRequest;
 
   // Evaluation.
-  NominalTypeDecl *evaluate(Evaluator &evaluator, ExtensionDecl *ext) const;
+  llvm::Expected<NominalTypeDecl *>
+  evaluate(Evaluator &evaluator, ExtensionDecl *ext) const;
 
 public:
   // Separate caching.
@@ -179,7 +178,6 @@ public:
   void cacheResult(NominalTypeDecl *value) const;
 
   // Cycle handling
-  NominalTypeDecl *breakCycle() const { return nullptr; }
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
 };

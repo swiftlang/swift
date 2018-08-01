@@ -1624,7 +1624,7 @@ computeOverriddenAssociatedTypes(AssociatedTypeDecl *assocType) {
   return overriddenAssocTypes;
 }
 
-llvm::TinyPtrVector<ValueDecl *>
+llvm::Expected<llvm::TinyPtrVector<ValueDecl *>>
 OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // For an associated type, compute the (minimized) set of overridden
   // declarations.
@@ -1632,13 +1632,16 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     return computeOverriddenAssociatedTypes(assocType);
   }
 
+  // Value to return in error cases
+  auto noResults = llvm::TinyPtrVector<ValueDecl *>();
+
   // Only members of classes can override other declarations.
   if (!decl->getDeclContext()->getAsClassOrClassExtensionContext())
-    return { };
+    return noResults;
 
   // Types that aren't associated types cannot be overridden.
   if (isa<TypeDecl>(decl))
-    return { };
+    return noResults;
 
   // Accessors determine their overrides based on their abstract storage
   // declarations.
@@ -1647,13 +1650,13 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
 
     // Find the overidden storage declaration. If there isn't one, we're done.
     auto baseASD = overridingASD->getOverriddenDecl();
-    if (!baseASD) return { };
+    if (!baseASD) return noResults;
 
     auto kind = accessor->getAccessorKind();
 
     // Find the base accessor; if there isn't one, we're done.
     auto baseAccessor = baseASD->getAccessor(kind);
-    if (!baseAccessor) return { };
+    if (!baseAccessor) return noResults;
 
     switch (kind) {
       case AccessorKind::Get:
@@ -1664,7 +1667,7 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
         // forced static dispatch materializeForSet is not itself an
         // override.
         if (baseAccessor->hasForcedStaticDispatch())
-          return { };
+          return noResults;
 
         LLVM_FALLTHROUGH;
 
@@ -1672,7 +1675,7 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
         // For setter accessors, we need the base's setter to be
         // accessible from the overriding context, or it's not an override.
         if (!baseASD->isSetterAccessibleFrom(overridingASD->getDeclContext()))
-          return { };
+          return noResults;
         break;
 
       case AccessorKind::Address:
@@ -1681,7 +1684,7 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
       case AccessorKind::WillSet:
       case AccessorKind::Read:
       case AccessorKind::Modify:
-        return { };
+        return noResults;
     }
 
     // We are overriding the base accessor.
@@ -1691,7 +1694,7 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     if (matcher.checkOverride(baseAccessor,
                               OverrideCheckingAttempt::PerfectMatch)) {
       invalidateOverrideAttribute(decl);
-      return { };
+      return noResults;
     }
 
     return llvm::TinyPtrVector<ValueDecl *>{baseAccessor};
@@ -1701,17 +1704,17 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // modifier can override declarations.
   if (!isa<ConstructorDecl>(decl) &&
       !decl->getAttrs().hasAttribute<OverrideAttr>())
-    return { };
+    return noResults;
 
   // Try to match potential overridden declarations.
   OverrideMatcher matcher(decl);
   if (!matcher) {
-    return { };
+    return noResults;
   }
 
   auto matches = matcher.match(OverrideCheckingAttempt::PerfectMatch);
   if (matches.empty()) {
-    return { };
+    return noResults;
   }
 
   // If we have more than one potential match, diagnose the ambiguity and
@@ -1720,14 +1723,14 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     diagnoseGeneralOverrideFailure(decl, matches,
                                    OverrideCheckingAttempt::PerfectMatch);
     invalidateOverrideAttribute(decl);
-    return { };
+    return noResults;
   }
 
   // Check the correctness of the override.
   if (matcher.checkOverride(matches.front().Decl,
                             OverrideCheckingAttempt::PerfectMatch)) {
     invalidateOverrideAttribute(decl);
-    return { };
+    return noResults;
   }
 
   return llvm::TinyPtrVector<ValueDecl *>{matches.front().Decl};

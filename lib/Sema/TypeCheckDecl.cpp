@@ -1203,7 +1203,8 @@ static bool makeDynamic(ValueDecl *decl) {
   return true;
 }
 
-bool IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
+llvm::Expected<bool>
+IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // If we can't infer dynamic here, don't.
   if (!DeclAttribute::canAttributeAppearOnDecl(DAK_Dynamic, decl))
     return false;
@@ -1218,11 +1219,18 @@ bool IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
     switch (accessor->getAccessorKind()) {
     case AccessorKind::Get:
-    case AccessorKind::Set:
-      if (evaluator(IsDynamicRequest{accessor->getStorage()}))
+    case AccessorKind::Set: {
+      auto isDynamicResult = evaluator(
+        IsDynamicRequest{accessor->getStorage()});
+
+      if (!isDynamicResult)
+        return isDynamicResult;
+
+      if (*isDynamicResult)
         return makeDynamic(decl);
 
       return false;
+    }
 
 #define OBJC_ACCESSOR(ID, KEYWORD)
 #define ACCESSOR(ID) \
@@ -1263,7 +1271,9 @@ bool IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // Don't do this if the declaration is not exposed to Objective-C; that's
   // currently the (only) manner in which one can make an override of a
   // dynamic declaration non-dynamic.
-  for (auto overridden : evaluator(OverriddenDeclsRequest{decl})) {
+  auto overriddenDecls = evaluateOrDefault(evaluator,
+    OverriddenDeclsRequest{decl}, {});
+  for (auto overridden : overriddenDecls) {
     if (overridden->isDynamic())
       return makeDynamic(decl);
 

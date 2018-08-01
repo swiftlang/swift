@@ -168,11 +168,6 @@ void OverriddenDeclsRequest::noteCycleStep(DiagnosticEngine &diags) const {
 // isObjC computation.
 //----------------------------------------------------------------------------//
 
-bool IsObjCRequest::breakCycle() const {
-  auto decl = std::get<0>(getStorage());
-  return decl->getAttrs().hasAttribute<ObjCAttr>();
-}
-
 void IsObjCRequest::diagnoseCycle(DiagnosticEngine &diags) const {
   // FIXME: Improve this diagnostic.
   auto decl = std::get<0>(getStorage());
@@ -201,11 +196,6 @@ void IsObjCRequest::cacheResult(bool value) const {
 //----------------------------------------------------------------------------//
 // isDynamic computation.
 //----------------------------------------------------------------------------//
-
-bool IsDynamicRequest::breakCycle() const {
-  auto decl = std::get<0>(getStorage());
-  return decl->getAttrs().hasAttribute<DynamicAttr>();
-}
 
 void IsDynamicRequest::diagnoseCycle(DiagnosticEngine &diags) const {
   // FIXME: Improve this diagnostic.
