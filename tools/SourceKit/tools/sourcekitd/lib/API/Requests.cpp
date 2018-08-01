@@ -26,9 +26,11 @@
 #include "SourceKit/Support/UIdent.h"
 #include "SourceKit/SwiftLang/Factory.h"
 
-#include "swift/Demangling/ManglingMacros.h"
-#include "swift/Demangling/Demangler.h"
 #include "swift/Basic/Mangler.h"
+#include "swift/Demangling/Demangler.h"
+#include "swift/Demangling/ManglingMacros.h"
+#include "swift/Syntax/Serialization/SyntaxSerialization.h"
+#include "swift/Syntax/SyntaxNodes.h"
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallString.h"
@@ -2085,7 +2087,9 @@ public:
                         UIdent DiagStage) override;
 
   bool handleSourceText(StringRef Text) override;
-  bool handleSerializedSyntaxTree(StringRef Text) override;
+
+  bool handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree,
+                        std::unordered_set<unsigned> ReusedNodeIds) override;
 
   bool syntaxReuseInfoEnabled() override { return Opts.EnableSyntaxReuseInfo; }
   bool handleSyntaxReuseRegions(
@@ -2430,9 +2434,22 @@ bool SKEditorConsumer::handleSourceText(StringRef Text) {
   return true;
 }
 
-bool SKEditorConsumer::handleSerializedSyntaxTree(StringRef Text) {
-  if (syntaxTreeEnabled())
-    Dict.set(KeySerializedSyntaxTree, Text);
+bool SKEditorConsumer::handleSyntaxTree(
+    const swift::syntax::SourceFileSyntax &SyntaxTree,
+    std::unordered_set<unsigned> ReusedNodeIds) {
+  if (Opts.SyntaxTransferMode == SyntaxTreeTransferMode::Off)
+    return true;
+
+  std::string SyntaxTreeString;
+  {
+    llvm::raw_string_ostream SyntaxTreeStream(SyntaxTreeString);
+    swift::json::Output::UserInfoMap JsonUserInfo;
+    JsonUserInfo[swift::json::OmitNodesUserInfoKey] = &ReusedNodeIds;
+    swift::json::Output SyntaxTreeOutput(SyntaxTreeStream, JsonUserInfo,
+                                         /*PrettyPrint=*/false);
+    SyntaxTreeOutput << *SyntaxTree.getRaw();
+  }
+  Dict.set(KeySerializedSyntaxTree, SyntaxTreeString);
   return true;
 }
 

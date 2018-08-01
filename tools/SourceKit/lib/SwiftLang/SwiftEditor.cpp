@@ -1791,12 +1791,8 @@ void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer) {
   Impl.ParserDiagnostics = Impl.SyntaxInfo->getDiagnostics();
 
   if (Consumer.syntaxTreeEnabled()) {
-    std::string SyntaxContent;
-    llvm::raw_string_ostream OS(SyntaxContent);
-    json::Output JsonOut(OS, /*UserInfo=*/{}, /*PrettyPrint=*/false);
-    auto Root = Impl.SyntaxInfo->getSourceFile().getSyntaxRoot().getRaw();
-    JsonOut << *Root;
-    Consumer.handleSerializedSyntaxTree(OS.str());
+    Consumer.handleSyntaxTree(Impl.SyntaxInfo->getSourceFile().getSyntaxRoot(),
+                              /*ReusedNodeIds=*/{});
   }
 
   SwiftSyntaxMap NewMap = SwiftSyntaxMap(Impl.SyntaxMap.Tokens.size() + 16);
@@ -2303,14 +2299,8 @@ void SwiftLangSupport::editorReplaceText(StringRef Name,
         ReusedNodeIds = std::unordered_set<unsigned>(ReusedVector.begin(),
                                                      ReusedVector.end());
       }
-      std::string SyntaxTreeString;
-      llvm::raw_string_ostream SyntaxTreeStream(SyntaxTreeString);
-
-      swift::json::Output::UserInfoMap JsonUserInfo;
-      JsonUserInfo[swift::json::OmitNodesUserInfoKey] = &ReusedNodeIds;
-      swift::json::Output SyntaxTreeOutput(SyntaxTreeStream, JsonUserInfo);
-      SyntaxTreeOutput << *EditorDoc->getSyntaxTree()->getRaw();
-      Consumer.handleSerializedSyntaxTree(SyntaxTreeStream.str());
+      Consumer.handleSyntaxTree(EditorDoc->getSyntaxTree().getValue(),
+                                ReusedNodeIds);
     }
 
     if (ValidateSyntaxTree) {
