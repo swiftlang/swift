@@ -31,8 +31,8 @@ func unsupportedOn32bit() -> Never { _conditionallyUnreachable() }
 
 #else
 @_fixed_layout
-public // @testable
-struct _SmallUTF8String {
+@usableFromInline
+internal struct _SmallUTF8String {
   @usableFromInline
   typealias _RawBitPattern = (low: UInt, high: UInt)
 
@@ -61,12 +61,11 @@ struct _SmallUTF8String {
 //
 extension _SmallUTF8String {
   @inlinable
-  public // @testable
-  static var capacity: Int { return 15 }
+  static internal var capacity: Int { return 15 }
 
 #if _runtime(_ObjC)
-  public // @testable
-  init?(_cocoaString cocoa: _CocoaString) {
+  @usableFromInline
+  internal init?(_cocoaString cocoa: _CocoaString) {
 #if arch(i386) || arch(arm)
     return nil // Never form small strings on 32-bit
 #else
@@ -89,8 +88,7 @@ extension _SmallUTF8String {
 #endif // _runtime(_ObjC)
 
   @inlinable
-  public // @testable
-  init?<C: RandomAccessCollection>(_ codeUnits: C) where C.Element == UInt16 {
+  internal init?<C: RandomAccessCollection>(_ codeUnits: C) where C.Element == UInt16 {
 #if arch(i386) || arch(arm)
     return nil // Never form small strings on 32-bit
 #else
