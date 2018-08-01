@@ -1791,8 +1791,9 @@ void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer) {
   Impl.ParserDiagnostics = Impl.SyntaxInfo->getDiagnostics();
 
   if (Consumer.syntaxTreeEnabled()) {
+    std::unordered_set<unsigned> ReusedNodeIds;
     Consumer.handleSyntaxTree(Impl.SyntaxInfo->getSourceFile().getSyntaxRoot(),
-                              /*ReusedNodeIds=*/{});
+                              ReusedNodeIds);
   }
 
   SwiftSyntaxMap NewMap = SwiftSyntaxMap(Impl.SyntaxMap.Tokens.size() + 16);
