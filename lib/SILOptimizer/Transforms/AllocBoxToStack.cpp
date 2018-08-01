@@ -301,7 +301,9 @@ static bool partialApplyEscapes(SILValue V, bool examineApply) {
       continue;
     }
 
-    if (auto Apply = FullApplySite::isa(User)) {
+    if (auto AI = dyn_cast<ApplyInst>(User)) {
+      ApplySite Apply(AI);
+
       // Applying a function does not cause the function to escape.
       if (!Apply.isArgumentOperand(*Op))
         continue;
