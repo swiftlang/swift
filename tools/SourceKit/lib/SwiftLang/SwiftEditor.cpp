@@ -1713,6 +1713,10 @@ ImmutableTextSnapshotRef SwiftEditorDocument::replaceText(
 
   llvm::sys::ScopedLock L(Impl.AccessMtx);
 
+  // Validate offset and length.
+  if ((Offset + Length) > Impl.EditableBuffer->getSize())
+    return nullptr;
+
   Impl.Edited = true;
   llvm::StringRef Str = Buf->getBuffer();
 
@@ -2239,7 +2243,10 @@ void SwiftLangSupport::editorReplaceText(StringRef Name,
     }
     Snapshot = EditorDoc->replaceText(Offset, Length, Buf,
                                       Consumer.needsSemanticInfo());
-    assert(Snapshot);
+    if (!Snapshot) {
+      Consumer.handleRequestError("Failed to replace text");
+      return;
+    }
 
     llvm::Optional<SyntaxParsingCache> SyntaxCache = llvm::None;
     if (EditorDoc->getSyntaxTree().hasValue()) {
