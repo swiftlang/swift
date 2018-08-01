@@ -356,11 +356,20 @@ void swift::_stdlib_random(void *buf, __swift_size_t nbytes) {
   result;                                                                      \
 })
 
+#if defined(__ANDROID__)
+#include <android/api-level.h>
+#if __ANDROID_API__ >= 28 // Introduced in Android API 28 - P
+#define GETRANDOM_AVAILABLE
+#endif
+#elif defined(GRND_RANDOM)
+#define GETRANDOM_AVAILABLE
+#endif
+
 SWIFT_RUNTIME_STDLIB_INTERNAL
 void swift::_stdlib_random(void *buf, __swift_size_t nbytes) {
   while (nbytes > 0) {
     __swift_ssize_t actual_nbytes = -1;
-#if defined(GRND_RANDOM)
+#if defined(GETRANDOM_AVAILABLE)
     static const bool getrandom_available =
       !(getrandom(nullptr, 0, 0) == -1 && errno == ENOSYS);
     if (getrandom_available) {
