@@ -2652,9 +2652,18 @@ void AttributeChecker::visitTensorFlowGraphAttr(TensorFlowGraphAttr *attr) {
   // Only functions taking and returning TensorFlow values are permitted.
   if (!tf::isTensorFlowValueOrAggregate(
         FD->getParameters()->getType(FD->getASTContext())) ||
-      !tf::isTensorFlowValueOrAggregate(FD->getResultInterfaceType()))
+      !tf::isTensorFlowValueOrAggregate(FD->getResultInterfaceType())) {
     diagnoseAndRemoveAttr(attr,
                           diag::tf_graph_attr_function_tensorflow_value_only);
+    return;
+  }
+  // Only functions with no captures are permitted.
+  TC.computeCaptures(FD);
+  if (!FD->getCaptureInfo().isTrivial()) {
+    diagnoseAndRemoveAttr(attr,
+                          diag::tf_graph_attr_no_functions_with_captures);
+    return;
+  }
   // Assign @convention(tensorflow).
   AnyFunctionType *fnTy = FD->getInterfaceType()->castTo<AnyFunctionType>();
   auto *newFnTy = fnTy->withExtInfo(
