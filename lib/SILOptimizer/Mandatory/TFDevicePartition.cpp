@@ -309,7 +309,6 @@ class DevicePartitionCloner
 }  // end anonymous namespace
 
 void DevicePartitionCloner::visitGraphOperationInst(GraphOperationInst *inst) {
-  // TODO: try and remove this special case.
   if (inst->getName().str() == "tf_tensor_to_i1") {
     SILClonerWithScopes::visitGraphOperationInst(inst);
     return;
@@ -692,10 +691,6 @@ public:
   }
 
   void visitGraphOperationInst(GraphOperationInst *inst) {
-    // For this magic builtin, it will be handled in graph lowering directly.
-    if (inst->getName().str() == "tf_tensor_to_i1")
-      return;
-
     auto deviceType = GraphOperationInfo(inst).getDeviceType();
     markInstForDevice(deviceType, inst);
 

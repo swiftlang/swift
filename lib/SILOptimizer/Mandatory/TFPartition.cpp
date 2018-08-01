@@ -2423,9 +2423,13 @@ void PartitionCloner::visitCondBranchInst(CondBranchInst *inst) {
     assert(eltTy->isBuiltinIntegerType(1) && "expected Tensor<i1>");
 
     auto name = ctx.getIdentifier("tf_tensor_to_i1");
+    SmallVector<GraphOperationAttribute, 1> attributes;
+    FP.deviceInfo.handleDevicePlacement(
+      "tf_tensor_to_i1", /*opDevice*/ getDeviceString(DeviceType::ALL),
+      B.getModule().getASTContext(), attributes);
     cond = getSingleValueResult(B.createGraphOperation(
         getOpLocation(inst->getLoc()), name,
-        /*operands*/ {cond}, /*attributes*/ {},
+        /*operands*/ {cond}, attributes,
         {SILType::getPrimitiveObjectType(eltTy->getCanonicalType())}));
   }
 
