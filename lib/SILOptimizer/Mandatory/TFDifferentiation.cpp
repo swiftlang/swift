@@ -831,12 +831,8 @@ private:
     std::pair<SILFunction *, SILReverseAutoDiffIndices>,
     unsigned> enqueuedTaskIndices;
 
-  /// SIL loader.
-  ///
-  /// FIXME: Fix SILModule's deserialization so that we can drop the local
-  /// cache and use `SILModule::lookUpWitnessTable` directly.
-  const std::unique_ptr<SerializedSILLoader> silLoader =
-    SerializedSILLoader::create(astCtx, &module, nullptr);
+  /// The SIL loader owned by the module.
+  SerializedSILLoader *silLoader = module.getSILLoader();
 
   /// The VectorNumeric protocol in the standard library.
   ProtocolDecl *vectorNumericProtocol =
@@ -877,7 +873,7 @@ public:
     if (auto existingTable = module.lookUpWitnessTable(confRef))
       return existingTable;
     auto *decl =
-      conf->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+        conf->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
     auto linkage = getSILLinkage(getDeclLinkage(decl), NotForDefinition);
     auto *newTable = module.createWitnessTableDeclaration(conf, linkage);
     newTable = silLoader->lookupWitnessTable(newTable);
