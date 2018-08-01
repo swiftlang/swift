@@ -2203,11 +2203,10 @@ public:
                    ConstraintLocatorBuilder locator,
                    OpenedTypeMap &replacements);
 
-  /// Given generic signature open its generic requirements,
-  /// using substitution function, and record them in the
-  /// constraint system for further processing.
+  /// Open given generic requirements using substitution function,
+  /// and record them in the constraint system for further processing.
   void openGenericRequirements(DeclContext *outerDC,
-                               GenericSignature *signature,
+                               ArrayRef<Requirement> requirements,
                                bool skipProtocolSelfConstraint,
                                ConstraintLocatorBuilder locator,
                                llvm::function_ref<Type(Type)> subst);
