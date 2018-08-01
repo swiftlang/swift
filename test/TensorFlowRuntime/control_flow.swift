@@ -42,11 +42,11 @@ public func weighPet(_ pet: Pet,
     weight = _scalarTensorWithShape(weight)
   case .fish: break // no tensor code here
   }
+  // This is needed to work-around the current TF limitation where the `If` op
+  // must produce some output tensors.
+  // FIXME: lift this restriction.
+  weight += 0.0
   expectNearlyEqualWithScalarTensor(expectedVal, weight)
-  // TODO: remove the extra code below once TPU execution supports 0 output
-  // tensors (b/111123797)
-  let extra = Tensor<Float>(1.0)
-  _hostOp(extra)
 }
 ControlFlowTests.testAllBackends("weighPet") {
   weighPet(.bird, 2.0)
@@ -67,11 +67,11 @@ public func weighPetWithDefault(_ pet: Pet,
     weight += 3.0
     weight = _scalarTensorWithShape(weight)
   }
+  // This is needed to work-around the current TF limitation where the `If` op
+  // must produce some output tensors.
+  // FIXME: lift this restriction.
+  weight += 0.0
   expectNearlyEqualWithScalarTensor(expectedVal, weight)
-  // TODO: remove the extra code below once TPU execution supports 0 output
-  // tensors (b/111123797)
-  let extra = Tensor<Float>(1.0)
-  _hostOp(extra)
 }
 ControlFlowTests.testAllBackends("weighPetWithDefault") {
   weighPetWithDefault(.cat, 6.0)

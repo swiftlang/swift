@@ -15,10 +15,9 @@ public func weighPet(pet: Pet) {
   case .dog: weight += 10.0
   case .fish: break // no tensor code here
   }
-  // This is used to avoid noisy send/recv warnings, where in each case above,
-  // the computed tensor value is sent to host due to the branch inst that's not
-  // marked for accelerator.
-  // FIXME: Revisit sends/recvs warnings design and remove this statement.
+  // This is needed to work-around the current TF limitation where the `If` op
+  // must produce some output tensors.
+  // FIXME: lift this restriction.
   weight += 0.0
   _hostOp(weight)
 }
