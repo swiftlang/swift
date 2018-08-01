@@ -27,6 +27,7 @@ class SILBasicBlock;
 class SILLoop;
 class DominanceInfo;
 class SILLoopInfo;
+class LoopRegion;
 
 /// Canonicalize the loop for rotation and downstream passes.
 ///
@@ -36,6 +37,13 @@ bool canonicalizeLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI);
 /// Canonicalize all loops in the function F for which \p LI contains loop
 /// information. We update loop info and dominance info while we do this.
 bool canonicalizeAllLoops(DominanceInfo *DT, SILLoopInfo *LI);
+
+/// Returns true if it is defined to perform a bottom up from \p Succ to \p
+/// Pred.
+///
+/// This is interesting because in such cases, we must pessimistically assume
+/// that we are merging in the empty set from Succ into Pred or vis-a-versa.
+bool isDefinedMerge(const LoopRegion *Succ, const LoopRegion *Pred);
 
 /// A visitor that visits loops in a function in a bottom up order. It only
 /// performs the visit.
