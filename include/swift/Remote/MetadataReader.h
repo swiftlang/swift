@@ -24,6 +24,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/ABI/TypeIdentity.h"
 #include "swift/Runtime/ExistentialContainer.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Unreachable.h"
@@ -1347,7 +1348,8 @@ private:
     std::string nodeName;
     std::string relatedTag;
     Demangle::Node::Kind nodeKind;
-    
+    Optional<TypeImportInfo<std::string>> importInfo;
+
     auto getTypeName = [&]() -> bool {
       auto typeBuffer =
         reinterpret_cast<const TargetTypeContextDescriptor<Runtime> *>
@@ -1355,11 +1357,33 @@ private:
       auto nameAddress = resolveRelativeField(descriptor, typeBuffer->Name);
       if (!Reader->readString(RemoteAddress(nameAddress), nodeName))
         return false;
-      
-      if (typeBuffer->isSynthesizedRelatedEntity()) {
+
+      // Read the TypeImportInfo if present.
+      if (typeBuffer->getTypeContextDescriptorFlags().hasImportInfo()) {
+        importInfo.emplace();
         nameAddress += nodeName.size() + 1;
-        if (!Reader->readString(RemoteAddress(nameAddress), relatedTag))
-          return false;
+
+        while (true) {
+          // Read the next string.
+          std::string temp;
+          if (!Reader->readString(RemoteAddress(nameAddress), temp))
+            return false;
+
+          // If we read an empty string, we're done.
+          if (temp.empty())
+            break;
+
+          // Advance past the string.
+          nameAddress += temp.size() + 1;
+
+          // Collect the import information.  Ignore anything we don't
+          // understand.
+          importInfo->collect</*asserting*/false>(std::move(temp));
+        }
+
+        // Ignore the original if we have an ABI name override.
+        if (!importInfo->ABIName.empty())
+          nodeName = std::move(importInfo->ABIName);
       }
       
       return true;
@@ -1435,27 +1459,29 @@ private:
       return nullptr;
     }
 
-    // Override the node kind if this was a Clang-imported type.
-    if (isTypeContext) {
-      auto typeFlags =
-        TypeContextDescriptorFlags(descriptor->Flags.getKindSpecificFlags());
-
-      if (typeFlags.isCTypedef())
+    // Override various aspects of the mangling for imported types.
+    if (importInfo && isCImportedContext(parentDemangling)) {
+      if (importInfo->SymbolNamespace == TypeImportSymbolNamespace::CTypedef)
         nodeKind = Demangle::Node::Kind::TypeAlias;
 
-      // As a special case, always use the struct mangling for C-imported
-      // value types.
-      else if (nodeKind == Demangle::Node::Kind::Enum &&
-               !typeFlags.isSynthesizedRelatedEntity() &&
-               isCImportedContext(parentDemangling))
+      // As a special case, use the struct mangling for C-imported value
+      // types that don't have a special namespace and aren't a related
+      // entity.
+      //
+      // This should be kept in sync with the AST mangler and with
+      // _isCImportedTagType in the runtime.
+      else if (importInfo->SymbolNamespace.empty() &&
+               importInfo->RelatedEntityName.empty() &&
+               nodeKind == Demangle::Node::Kind::Enum)
         nodeKind = Demangle::Node::Kind::Structure;
     }
 
     auto nameNode = nodeFactory.createNode(Node::Kind::Identifier,
                                            std::move(nodeName));
-    if (!relatedTag.empty()) {
+    if (importInfo && !importInfo->RelatedEntityName.empty()) {
       auto relatedNode =
-        nodeFactory.createNode(Node::Kind::RelatedEntityDeclName, relatedTag);
+        nodeFactory.createNode(Node::Kind::RelatedEntityDeclName,
+                               std::move(importInfo->RelatedEntityName));
       relatedNode->addChild(nameNode, nodeFactory);
       nameNode = relatedNode;
     }

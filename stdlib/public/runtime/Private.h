@@ -28,6 +28,7 @@
 #endif
 
 namespace swift {
+class ParsedTypeIdentity;
 
 class TypeReferenceOwnership {
   enum : uint8_t {
@@ -315,7 +316,8 @@ public:
   };
 
   /// Is the given type imported from a C tag type?
-  bool isCImportedTagType(const TypeContextDescriptor *type);
+  bool _isCImportedTagType(const TypeContextDescriptor *type,
+                           const ParsedTypeIdentity &identity);
 
   /// Check whether a type conforms to a protocol.
   ///

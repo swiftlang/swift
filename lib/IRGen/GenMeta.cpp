@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/ABI/MetadataValues.h"
+#include "swift/ABI/TypeIdentity.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/CanTypeVisitor.h"
@@ -720,6 +721,9 @@ namespace {
     RequireMetadata_t HasMetadata;
     TypeContextDescriptorFlags::MetadataInitializationKind
       MetadataInitialization;
+
+    StringRef UserFacingName;
+    Optional<TypeImportInfo<std::string>> ImportInfo;
     
     using super::IGM;
     using super::B;
@@ -736,6 +740,8 @@ namespace {
     }
     
     void layout() {
+      asImpl().computeIdentity();
+
       super::layout();
       asImpl().addName();
       asImpl().addAccessFunction();
@@ -744,27 +750,68 @@ namespace {
       asImpl().addGenericSignature();
       asImpl().maybeAddMetadataInitialization();
     }
-    
-    void addName() {
-      SmallString<32> nameBuf;
-      StringRef name;
 
-      // Use the original name with tag for synthesized decls. The tag comes
-      // after the null terminator for the name.
+    /// Fill out all the aspects of the type identity.
+    void computeIdentity() {
+      // Remember the user-facing name.
+      UserFacingName = Type->getName().str();
+
+      // For related entities, set the original type name as the ABI name
+      // and remember the related entity tag.
+      StringRef abiName;
       if (auto *synthesizedTypeAttr =
             Type->getAttrs()
                  .template getAttribute<ClangImporterSynthesizedTypeAttr>()) {
-        nameBuf.append(synthesizedTypeAttr->originalTypeName);
-        nameBuf.push_back('\0');
-        nameBuf.append(synthesizedTypeAttr->getManglingName());
-        
-        name = nameBuf;
-      // Try to use the Clang name if there is one.
-      } else if (auto namedClangDecl =
+        abiName = synthesizedTypeAttr->originalTypeName;
+
+        getMutableImportInfo().RelatedEntityName =
+          synthesizedTypeAttr->getManglingName();
+
+      // Otherwise, if this was imported from a Clang declaration, use that
+      // declaration's name as the ABI name.
+      } else if (auto clangDecl =
                             Mangle::ASTMangler::getClangDeclForMangling(Type)) {
-        name = namedClangDecl->getName();
-      } else {
-        name = Type->getName().str();
+        abiName = clangDecl->getName();
+
+        // Typedefs and compatibility aliases that have been promoted to
+        // their own nominal types need to be marked specially.
+        if (isa<clang::TypedefNameDecl>(clangDecl) ||
+            isa<clang::ObjCCompatibleAliasDecl>(clangDecl)) {
+          getMutableImportInfo().SymbolNamespace =
+            TypeImportSymbolNamespace::CTypedef;
+        }
+      }
+
+      // If the ABI name differs from the user-facing name, add it as
+      // an override.
+      if (!abiName.empty() && abiName != UserFacingName) {
+        getMutableImportInfo().ABIName = abiName;
+      }
+    }
+
+    /// Get the mutable import info.  Note that calling this method itself
+    /// changes the code to cause it to be used, so don't set it unless
+    /// you're about to write something into it.
+    TypeImportInfo<std::string> &getMutableImportInfo() {
+      if (!ImportInfo)
+        ImportInfo.emplace();
+      return *ImportInfo;
+    }
+
+    void addName() {
+      SmallString<32> name;
+      name += UserFacingName;
+
+      // Collect the import info if present.
+      if (ImportInfo) {
+        name += '\0';
+        ImportInfo->appendTo(name);
+
+        // getAddrOfGlobalString will add its own null terminator, so pop
+        // off the second one.
+        assert(name.back() == '\0');
+        name.pop_back();
+        assert(name.back() == '\0');
       }
       
       auto nameStr = IGM.getAddrOfGlobalString(name,
@@ -855,21 +902,9 @@ namespace {
       setMetadataInitializationKind(flags);
     }
     
-    /// Flags to indicate Clang-imported declarations so we mangle them
-    /// consistently at runtime.
     void setClangImportedFlags(TypeContextDescriptorFlags &flags) {
-      if (Type->getAttrs()
-               .template getAttribute<ClangImporterSynthesizedTypeAttr>()) {
-        flags.setIsSynthesizedRelatedEntity(true);
-      }
-      
-      if (auto clangDecl = Mangle::ASTMangler::getClangDeclForMangling(Type)) {
-        if (isa<clang::TagDecl>(clangDecl)) {
-          flags.setImportNamespace(TypeContextDescriptorFlags::CTag);
-        } else if (isa<clang::TypedefNameDecl>(clangDecl)
-                   || isa<clang::ObjCCompatibleAliasDecl>(clangDecl)) {
-          flags.setImportNamespace(TypeContextDescriptorFlags::CTypedef);
-        }
+      if (ImportInfo) {
+        flags.setHasImportInfo(true);
       }
     }
 
