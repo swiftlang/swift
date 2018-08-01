@@ -224,11 +224,6 @@ class DevicePartitionCloner
     SILClonerWithScopes::visitUncheckedRefCastInst(inst);
   }
 
-  void visitTupleExtractInst(TupleExtractInst *inst) {
-    if (!targetOps.count(inst)) return;
-    SILClonerWithScopes::visitTupleExtractInst(inst);
-  }
-
   void visitStructExtractInst(StructExtractInst *inst) {
     if (!targetOps.count(inst)) return;
     SILClonerWithScopes::visitStructExtractInst(inst);
@@ -756,9 +751,6 @@ public:
     markInstForAllDevices(inst);
   }
   void visitStringLiteralInst(StringLiteralInst *inst) {
-    markInstForAllDevices(inst);
-  }
-  void visitTupleExtractInst(TupleExtractInst *inst) {
     markInstForAllDevices(inst);
   }
   void visitStructExtractInst(StructExtractInst *inst) {

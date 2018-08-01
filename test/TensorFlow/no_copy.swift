@@ -212,3 +212,12 @@ public func SR8395() {
   let x: Tensor<Float> = [[1, 2], [3, 4]]
   print(matmul(x, x) + x)
 }
+
+// Tuples should be deabstracted away.
+public func noTupleExtractOverTensorValues() {
+  let (a, _) = (Tensor<Float>(1.0), Tensor<Float>(2.0))
+  let c = a + 5
+  let d = (Tensor<Float>(3.0), Tensor<Float>(4.0))
+  let e = c + d.1
+  _hostOp(e)
+}
