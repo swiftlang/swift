@@ -1191,6 +1191,7 @@ handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
                  StringRef FormatString,
                  ArrayRef<DiagnosticArgument> FormatArgs,
                  const DiagnosticInfo &Info) {
+  setHasAnErrorBeenHandled(Kind);
   Impl.DiagConsumer.handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs,
                                      Info);
 }
@@ -1253,6 +1254,7 @@ handleDiagnostic(SourceManager &SM,
                  StringRef FormatString,
                  ArrayRef<DiagnosticArgument> FormatArgs,
                  const DiagnosticInfo &Info) {
+  setHasAnErrorBeenHandled(Kind);
   Impl.DiagConsumer.handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs,
                                      Info);
 }

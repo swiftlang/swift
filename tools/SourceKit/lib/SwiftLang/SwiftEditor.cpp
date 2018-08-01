@@ -78,9 +78,7 @@ void EditorDiagConsumer::handleDiagnostic(
     StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
     const DiagnosticInfo &Info) {
 
-  if (Kind == DiagnosticKind::Error) {
-    HadAnyError = true;
-  }
+  setHasAnErrorBeenHandled(Kind);
 
   // Filter out benign diagnostics for editing.
   if (Info.ID == diag::lex_editor_placeholder.ID ||

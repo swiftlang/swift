@@ -157,7 +157,7 @@ void FileSpecificDiagnosticConsumer::handleDiagnostic(
     StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
     const DiagnosticInfo &Info) {
 
-  HasAnErrorBeenHandled |= Kind == DiagnosticKind::Error;
+  setHasAnErrorBeenHandled(Kind);
 
   Optional<ConsumerSpecificInformation *> consumerSpecificInfo =
       consumerSpecificInformationForDiagnostic(SM, Loc, Kind);
@@ -195,7 +195,6 @@ void FileSpecificDiagnosticConsumer::handleSwiftFileDiagnostic(
 
   consumerSpecificInfo->consumer->handleDiagnostic(SM, Loc, Kind, FormatString,
                                                    FormatArgs, Info);
-  consumerSpecificInfo->hasAnErrorBeenHandled |= Kind == DiagnosticKind::Error;
 }
 
 void FileSpecificDiagnosticConsumer::handleHeaderFileDiagnostic(
@@ -208,9 +207,6 @@ void FileSpecificDiagnosticConsumer::handleHeaderFileDiagnostic(
                                            FormatArgs, Info);
     }
   }
-  if (Kind == DiagnosticKind::Error)
-    for (auto &csi : ConsumersOrderedByRange)
-      csi.hasAnErrorBeenHandled = true;
 }
 
 bool FileSpecificDiagnosticConsumer::finishProcessing() {
@@ -227,10 +223,10 @@ bool FileSpecificDiagnosticConsumer::finishProcessing() {
 
 void FileSpecificDiagnosticConsumer::
     tellSubconsumersToInformDriverOfIncompleteBatchModeCompilation() const {
-  if (!HasAnErrorBeenHandled)
+  if (!getHasAnErrorBeenHandled())
     return;
   for (auto &info : ConsumersOrderedByRange) {
-    if (!info.hasAnErrorBeenHandled && info.consumer)
+    if (info.consumer && !info.consumer->getHasAnErrorBeenHandled())
       info.consumer->informDriverOfIncompleteBatchModeCompilation();
   }
 }
@@ -239,6 +235,7 @@ void NullDiagnosticConsumer::handleDiagnostic(
     SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
     StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
     const DiagnosticInfo &Info) {
+  setHasAnErrorBeenHandled(Kind);
   LLVM_DEBUG({
     llvm::dbgs() << "NullDiagnosticConsumer received diagnostic: ";
     DiagnosticEngine::formatDiagnosticText(llvm::dbgs(), FormatString,

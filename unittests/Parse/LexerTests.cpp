@@ -712,6 +712,7 @@ public:
                                 DiagnosticKind Kind, StringRef FormatString,
                                 ArrayRef<DiagnosticArgument> FormatArgs,
                                 const swift::DiagnosticInfo &Info) override {
+    setHasAnErrorBeenHandled(Kind);
     std::string DiagMsg;
     llvm::raw_string_ostream DiagOS(DiagMsg);
     DiagnosticEngine::formatDiagnosticText(DiagOS, FormatString, FormatArgs);

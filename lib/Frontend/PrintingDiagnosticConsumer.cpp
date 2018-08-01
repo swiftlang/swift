@@ -67,6 +67,7 @@ void PrintingDiagnosticConsumer::handleDiagnostic(
     SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
     StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
     const DiagnosticInfo &Info) {
+  setHasAnErrorBeenHandled(Kind);
   // Determine what kind of diagnostic we're emitting.
   llvm::SourceMgr::DiagKind SMKind;
   switch (Kind) {
@@ -86,10 +87,6 @@ void PrintingDiagnosticConsumer::handleDiagnostic(
       break;
   }
 
-  if (Kind == DiagnosticKind::Error) {
-    DidErrorOccur = true;
-  }
-  
   // Translate ranges.
   SmallVector<llvm::SMRange, 2> Ranges;
   for (auto R : Info.Ranges)

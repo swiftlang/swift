@@ -29,7 +29,6 @@ namespace swift {
 class PrintingDiagnosticConsumer : public DiagnosticConsumer {
   llvm::raw_ostream &Stream;
   bool ForceColors = false;
-  bool DidErrorOccur = false;
 public:
   PrintingDiagnosticConsumer(llvm::raw_ostream &stream = llvm::errs()) :
     Stream(stream) { }
@@ -45,7 +44,7 @@ public:
   }
 
   bool didErrorOccur() {
-    return DidErrorOccur;
+    return getHasAnErrorBeenHandled();
   }
 };
   

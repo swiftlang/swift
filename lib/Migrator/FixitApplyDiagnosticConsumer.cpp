@@ -37,6 +37,7 @@ handleDiagnostic(SourceManager &SM, SourceLoc Loc,
                  StringRef FormatString,
                  ArrayRef<DiagnosticArgument> FormatArgs,
                  const DiagnosticInfo &Info) {
+  setHasAnErrorBeenHandled(Kind);
   if (Loc.isInvalid()) {
     return;
   }

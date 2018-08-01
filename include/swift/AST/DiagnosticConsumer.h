@@ -64,6 +64,7 @@ struct DiagnosticInfo {
   
 /// \brief Abstract interface for classes that present diagnostics to the user.
 class DiagnosticConsumer {
+
 protected:
   static llvm::SMLoc getRawLoc(SourceLoc Loc);
 
@@ -110,6 +111,19 @@ public:
   /// so here's a placeholder.
 
   virtual void informDriverOfIncompleteBatchModeCompilation() {}
+  
+private:
+  /// Some subclasses need to track if handleDiagnostic has ever seen an error
+  bool hasAnErrorBeenHandled = false;
+  
+protected:
+  
+  /// Set hasAnErrorBeenHandled if this is an error
+  void setHasAnErrorBeenHandled(const DiagnosticKind Kind) {
+    hasAnErrorBeenHandled |= Kind == DiagnosticKind::Error;
+  }
+public:
+  bool getHasAnErrorBeenHandled() const { return hasAnErrorBeenHandled; }
 };
   
 /// \brief DiagnosticConsumer that discards all diagnostics.
@@ -157,7 +171,6 @@ public:
     /// The DiagnosticConsumer may be empty if those diagnostics are not to be
     /// emitted.
     DiagnosticConsumer * /*const*/ consumer;
-    bool hasAnErrorBeenHandled = false;
 
     ConsumerSpecificInformation(const CharSourceRange range,
                                 DiagnosticConsumer *const consumer)
@@ -185,8 +198,6 @@ private:
   /// If null, diagnostics are suppressed.
   Optional<ConsumerSpecificInformation *>
       ConsumerSpecificInfoForSubsequentNotes = None;
-
-  bool HasAnErrorBeenHandled = false;
 
 public:
   /// Takes ownership of the DiagnosticConsumers specified in \p consumers.
