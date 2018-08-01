@@ -2868,6 +2868,8 @@ for host in "${ALL_HOSTS[@]}"; do
                 # test dependencies. Ultimately we want to delete as much lldb-specific logic
                 # from this file as possible and just have a single call to lldb-dotest.
                 if [[ "$using_xcodebuild" == "FALSE" ]] ; then
+                    with_pushd ${lldb_build_dir} \
+                     call ${NINJA_BIN} unittests/LLDBUnitTests
                     with_pushd ${results_dir} \
                      call "${llvm_build_dir}/bin/llvm-lit" "${lldb_build_dir}/lit" -sv --param dotest-args="--build-dir ${lldb_build_dir}/lldb-test-build.noindex ${LLDB_TEST_SUBDIR_CLAUSE} ${LLDB_TEST_CATEGORIES} -E \"${DOTEST_EXTRA}\""
 
