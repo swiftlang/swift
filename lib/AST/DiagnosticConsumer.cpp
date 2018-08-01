@@ -159,34 +159,55 @@ void FileSpecificDiagnosticConsumer::handleDiagnostic(
 
   HasAnErrorBeenConsumed |= Kind == DiagnosticKind::Error;
 
+  Optional<ConsumerSpecificInformation *> consumerSpecificInfo =
+      consumerSpecificInformationForDiagnostic(SM, Loc, Kind);
+  if (auto *swiftConsumerSpecificInfo =
+          consumerSpecificInfo.getValueOr(nullptr)) {
+    handleSwiftFileDiagnostic(swiftConsumerSpecificInfo, SM, Loc, Kind,
+                              FormatString, FormatArgs, Info);
+  } else
+    handleHeaderFileDiagnostic(SM, Loc, Kind, FormatString, FormatArgs, Info);
+}
+
+Optional<FileSpecificDiagnosticConsumer::ConsumerSpecificInformation *>
+FileSpecificDiagnosticConsumer::consumerSpecificInformationForDiagnostic(
+        SourceManager &SM, const SourceLoc Loc, const DiagnosticKind Kind) {
   Optional<ConsumerSpecificInformation *> consumerSpecificInfo;
   switch (Kind) {
   case DiagnosticKind::Error:
   case DiagnosticKind::Warning:
   case DiagnosticKind::Remark:
-    consumerSpecificInfo = consumerSpecificInformationForLocation(SM, Loc);
-    ConsumerSpecificInfoForSubsequentNotes = consumerSpecificInfo;
-    break;
+    ConsumerSpecificInfoForSubsequentNotes =
+        consumerSpecificInformationForLocation(SM, Loc);
+    return ConsumerSpecificInfoForSubsequentNotes;
   case DiagnosticKind::Note:
-    consumerSpecificInfo = ConsumerSpecificInfoForSubsequentNotes;
-    break;
+    return ConsumerSpecificInfoForSubsequentNotes;
   }
-  if (!consumerSpecificInfo.hasValue()) {
-    for (auto &subConsumer : SubConsumers) {
-      if (subConsumer.second) {
-        subConsumer.second->handleDiagnostic(SM, Loc, Kind, FormatString,
-                                             FormatArgs, Info);
-      }
-    }
-    return;
-  }
-  if (!consumerSpecificInfo.getValue()->consumer)
+}
+
+void FileSpecificDiagnosticConsumer::handleSwiftFileDiagnostic(
+    ConsumerSpecificInformation *consumerSpecificInfo, SourceManager &SM,
+    const SourceLoc Loc, const DiagnosticKind Kind,
+    const StringRef FormatString, const ArrayRef<DiagnosticArgument> FormatArgs,
+    const DiagnosticInfo &Info) {
+  if (!consumerSpecificInfo->consumer)
     return; // Suppress non-primary diagnostic in batch mode.
 
-  consumerSpecificInfo.getValue()->consumer->handleDiagnostic(
-      SM, Loc, Kind, FormatString, FormatArgs, Info);
-  consumerSpecificInfo.getValue()->hasAnErrorBeenEmitted |=
-      Kind == DiagnosticKind::Error;
+  consumerSpecificInfo->consumer->handleDiagnostic(SM, Loc, Kind, FormatString,
+                                                   FormatArgs, Info);
+  consumerSpecificInfo->hasAnErrorBeenEmitted |= Kind == DiagnosticKind::Error;
+}
+
+void FileSpecificDiagnosticConsumer::handleHeaderFileDiagnostic(
+    SourceManager &SM, const SourceLoc Loc, const DiagnosticKind Kind,
+    const StringRef FormatString, const ArrayRef<DiagnosticArgument> FormatArgs,
+    const DiagnosticInfo &Info) {
+  for (auto &subConsumer : SubConsumers) {
+    if (subConsumer.second) {
+      subConsumer.second->handleDiagnostic(SM, Loc, Kind, FormatString,
+                                           FormatArgs, Info);
+    }
+  }
 }
 
 bool FileSpecificDiagnosticConsumer::finishProcessing() {

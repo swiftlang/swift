@@ -219,6 +219,20 @@ private:
   Optional<ConsumerSpecificInformation *>
   consumerSpecificInformationForLocation(SourceManager &SM,
                                          SourceLoc loc) const;
+
+  Optional<ConsumerSpecificInformation *>
+  consumerSpecificInformationForDiagnostic(
+      SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind);
+
+  void handleSwiftFileDiagnostic(
+      ConsumerSpecificInformation *consumerSpecificInfo, SourceManager &SM,
+      SourceLoc Loc, DiagnosticKind Kind, StringRef FormatString,
+      ArrayRef<DiagnosticArgument> FormatArgs, const DiagnosticInfo &Info);
+
+  void handleHeaderFileDiagnostic(SourceManager &SM, SourceLoc Loc,
+                                  DiagnosticKind Kind, StringRef FormatString,
+                                  ArrayRef<DiagnosticArgument> FormatArgs,
+                                  const DiagnosticInfo &Info);
 };
   
 } // end namespace swift
