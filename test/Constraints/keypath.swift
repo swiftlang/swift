@@ -19,3 +19,18 @@ func test() {
 
   let _ = C()[keyPath: \.i] // no warning for a read
 }
+
+// SR-7339
+class Some<T, V> {
+  init(keyPath: KeyPath<T, ((V) -> Void)?>) {
+  }
+}
+
+class Demo {
+  var here: (() -> Void)?
+}
+
+// FIXME: This error is better than it was, but the diagnosis should break it down more specifically to 'here's type.
+let some = Some(keyPath: \Demo.here)
+// expected-error@-1 {{cannot convert value of type 'ReferenceWritableKeyPath<Demo, (() -> Void)?>' to expected argument type 'KeyPath<_, ((_) -> Void)?>'}}
+
