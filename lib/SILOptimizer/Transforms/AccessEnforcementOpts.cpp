@@ -65,6 +65,14 @@
 /// any point in the pipeline. Until then, we could settle for a partially
 /// working AccessEnforcementSelection, or expand it somewhat to handle
 /// alloc_stack.
+///
+/// **Access marker merger**
+///
+/// When a pair of non-overlapping accesses, where the first access dominates
+/// the second and there are no conflicts on the same storage in the paths
+/// between them, and they are part of the same sub-region
+/// be it the same block or the sampe loop, merge those accesses to create
+/// a new, larger, scope with a single begin_access for the accesses.
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "access-enforcement-opts"
@@ -73,10 +81,12 @@
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/Analysis/AccessedStorageAnalysis.h"
+#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/LoopRegionAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/SCCIterator.h"
 
 using namespace swift;
 
@@ -871,6 +881,172 @@ removeLocalNonNestedAccess(const AccessConflictAndMergeAnalysis::Result &result,
   return changed;
 }
 
+// TODO: support multi-end access cases
+static EndAccessInst *getSingleEndAccess(BeginAccessInst *inst) {
+  EndAccessInst *end = nullptr;
+  for (auto *currEnd : inst->getEndAccesses()) {
+    if (end == nullptr)
+      end = currEnd;
+    else
+      return nullptr;
+  }
+  return end;
+}
+
+struct SCCInfo {
+  unsigned id;
+  bool hasLoop;
+};
+
+static void mergeEndAccesses(BeginAccessInst *parentIns,
+                             BeginAccessInst *childIns) {
+  auto *endP = getSingleEndAccess(parentIns);
+  if (!endP)
+    llvm_unreachable("not supported");
+  auto *endC = getSingleEndAccess(childIns);
+  if (!endC)
+    llvm_unreachable("not supported");
+
+  endC->setOperand(parentIns);
+  endP->eraseFromParent();
+}
+
+static bool canMergeEnd(BeginAccessInst *parentIns, BeginAccessInst *childIns) {
+  auto *endP = getSingleEndAccess(parentIns);
+  if (!endP)
+    return false;
+
+  auto *endC = getSingleEndAccess(childIns);
+  if (!endC)
+    return false;
+
+  return true;
+}
+
+// TODO: support other merge patterns
+static bool
+canMergeBegin(PostDominanceInfo *postDomTree,
+              const llvm::DenseMap<SILBasicBlock *, SCCInfo> &blockToSCCMap,
+              BeginAccessInst *parentIns, BeginAccessInst *childIns) {
+  if (!postDomTree->properlyDominates(childIns, parentIns)) {
+    return false;
+  }
+  auto parentSCCIt = blockToSCCMap.find(parentIns->getParent());
+  assert(parentSCCIt != blockToSCCMap.end() && "Expected block in SCC Map");
+  auto childSCCIt = blockToSCCMap.find(childIns->getParent());
+  assert(childSCCIt != blockToSCCMap.end() && "Expected block in SCC Map");
+  auto parentSCC = parentSCCIt->getSecond();
+  auto childSCC = childSCCIt->getSecond();
+  if (parentSCC.id == childSCC.id) {
+    return true;
+  }
+  if (parentSCC.hasLoop) {
+    return false;
+  }
+  if (childSCC.hasLoop) {
+    return false;
+  }
+  return true;
+}
+
+static bool
+canMerge(PostDominanceInfo *postDomTree,
+         const llvm::DenseMap<SILBasicBlock *, SCCInfo> &blockToSCCMap,
+         BeginAccessInst *parentIns, BeginAccessInst *childIns) {
+  if (!canMergeBegin(postDomTree, blockToSCCMap, parentIns, childIns))
+    return false;
+
+  return canMergeEnd(parentIns, childIns);
+}
+
+/// Perform access merging.
+static bool mergeAccesses(
+    SILFunction *F, PostDominanceInfo *postDomTree,
+    const AccessConflictAndMergeAnalysis::MergeablePairs &mergePairs) {
+  bool changed = false;
+
+  // Compute a map from each block to its SCC -
+  // For now we can't merge cross SCC boundary
+  llvm::DenseMap<SILBasicBlock *, SCCInfo> blockToSCCMap;
+  SCCInfo info;
+  info.id = 0;
+  for (auto sccIt = scc_begin(F); !sccIt.isAtEnd(); ++sccIt) {
+    ++info.id;
+    info.hasLoop = sccIt.hasLoop();
+    for (auto *bb : *sccIt) {
+      blockToSCCMap.insert(std::make_pair(bb, info));
+    }
+  }
+  // make a temporary reverse copy to work on:
+  // It is in reverse order just to make it easier to debug / follow
+  AccessConflictAndMergeAnalysis::MergeablePairs workPairs;
+  workPairs.append(mergePairs.rbegin(), mergePairs.rend());
+
+  // Assume the result contains two access pairs to be merged:
+  // (begin_access %1, begin_access %2)
+  // = merge end_access %1 with begin_access %2
+  // (begin_access %2, begin_access %3)
+  // = merge end_access %2 with begin_access %3
+  // After merging the first pair, begin_access %2 is removed,
+  // so the second pair in the result list points to a to-be-deleted
+  // begin_access instruction. We store (begin_access %2 -> begin_access %1)
+  // to re-map a merged begin_access to it's replaced instruction.
+  llvm::DenseMap<BeginAccessInst *, BeginAccessInst *> oldToNewMap;
+
+  while (!workPairs.empty()) {
+    auto curr = workPairs.pop_back_val();
+    auto *parentIns = curr.first;
+    auto *childIns = curr.second;
+    if (oldToNewMap.count(parentIns) != 0) {
+      parentIns = oldToNewMap[parentIns];
+    }
+    assert(oldToNewMap.count(childIns) == 0 &&
+           "Can't have same child instruction twice in map");
+
+    // The optimization might not currently support every mergeable pair
+    // If the current pattern is not supported - skip
+    if (!canMerge(postDomTree, blockToSCCMap, parentIns, childIns))
+      continue;
+
+    LLVM_DEBUG(llvm::dbgs()
+               << "Merging: " << *childIns << " into " << *parentIns << "\n");
+
+    // Change the type of access of parent:
+    // should be the worse between it and child
+    auto childAccess = childIns->getAccessKind();
+    if (parentIns->getAccessKind() < childAccess) {
+      parentIns->setAccessKind(childAccess);
+    }
+
+    // Change the no nested conflict of parent:
+    // should be the worst case scenario: we might merge to non-conflicting
+    // scopes to a conflicting one. f the new result does not conflict,
+    // a later on pass will remove the flag
+    parentIns->setNoNestedConflict(false);
+
+    // remove end accesses and create new ones that cover bigger scope:
+    mergeEndAccesses(parentIns, childIns);
+
+    // In case the child instruction is at the map,
+    // updated the oldToNewMap to reflect that we are getting rid of it:
+    oldToNewMap.insert(std::make_pair(childIns, parentIns));
+
+    // Modify the users of child instruction to use the parent:
+    childIns->replaceAllUsesWith(parentIns);
+
+    changed = true;
+  }
+
+  // Delete all old instructions from parent scopes:
+  while (!oldToNewMap.empty()) {
+    auto curr = oldToNewMap.begin();
+    auto *oldIns = curr->getFirst();
+    oldToNewMap.erase(oldIns);
+    oldIns->eraseFromParent();
+  }
+  return changed;
+}
+
 namespace {
 struct AccessEnforcementOpts : public SILFunctionTransform {
   void run() override {
@@ -904,6 +1080,14 @@ struct AccessEnforcementOpts : public SILFunctionTransform {
     // this function will overlap.
     const FunctionAccessedStorage &functionAccess = ASA->getEffects(F);
     if (removeLocalNonNestedAccess(result, functionAccess))
+      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+
+    // Perform the access merging
+    // The inital version of the optimization requires a postDomTree
+    PostDominanceAnalysis *postDomAnalysis =
+        getAnalysis<PostDominanceAnalysis>();
+    PostDominanceInfo *postDomTree = postDomAnalysis->get(F);
+    if (mergeAccesses(F, postDomTree, result.mergePairs))
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 };

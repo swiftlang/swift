@@ -18,6 +18,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Analysis/AccessedStorageAnalysis.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
@@ -361,6 +362,7 @@ class LoopTreeOptimization {
   AliasAnalysis *AA;
   SideEffectAnalysis *SEA;
   DominanceInfo *DomTree;
+  AccessedStorageAnalysis *ASA;
   bool Changed;
 
   /// True if LICM is done on high-level SIL, i.e. semantic calls are not
@@ -380,8 +382,9 @@ class LoopTreeOptimization {
 public:
   LoopTreeOptimization(SILLoop *TopLevelLoop, SILLoopInfo *LI,
                        AliasAnalysis *AA, SideEffectAnalysis *SEA,
-                       DominanceInfo *DT, bool RunsOnHighLevelSil)
-      : LoopInfo(LI), AA(AA), SEA(SEA), DomTree(DT), Changed(false),
+                       DominanceInfo *DT, AccessedStorageAnalysis *ASA,
+                       bool RunsOnHighLevelSil)
+      : LoopInfo(LI), AA(AA), SEA(SEA), DomTree(DT), ASA(ASA), Changed(false),
         RunsOnHighLevelSIL(RunsOnHighLevelSil) {
     // Collect loops for a recursive bottom-up traversal in the loop tree.
     BotUpWorkList.push_back(TopLevelLoop);
@@ -528,9 +531,10 @@ static bool handledEndAccesses(BeginAccessInst *BI, SILLoop *Loop) {
   return true;
 }
 
-static bool
-analyzeBeginAccess(BeginAccessInst *BI,
-                   SmallVector<BeginAccessInst *, 8> &BeginAccesses) {
+static bool analyzeBeginAccess(BeginAccessInst *BI,
+                               SmallVector<BeginAccessInst *, 8> &BeginAccesses,
+                               SmallVector<FullApplySite, 8> &fullApplies,
+                               AccessedStorageAnalysis *ASA) {
   if (BI->getEnforcement() != SILAccessEnforcement::Dynamic) {
     return false;
   }
@@ -550,8 +554,18 @@ analyzeBeginAccess(BeginAccessInst *BI,
         findAccessedStorageNonNested(OtherBI));
   };
 
-  return (
-      std::all_of(BeginAccesses.begin(), BeginAccesses.end(), safeBeginPred));
+  if (!std::all_of(BeginAccesses.begin(), BeginAccesses.end(), safeBeginPred))
+    return false;
+
+  for (auto fullApply : fullApplies) {
+    FunctionAccessedStorage callSiteAccesses;
+    ASA->getCallSiteEffects(callSiteAccesses, fullApply);
+    SILAccessKind accessKind = BI->getAccessKind();
+    if (callSiteAccesses.mayConflictWith(accessKind, storage))
+      return false;
+  }
+
+  return true;
 }
 
 // Analyzes current loop for hosting/sinking potential:
@@ -575,6 +589,8 @@ void LoopTreeOptimization::analyzeCurrentLoop(
   SmallVector<FixLifetimeInst *, 8> FixLifetimes;
   // Contains begin_access, we might be able to hoist them.
   SmallVector<BeginAccessInst *, 8> BeginAccesses;
+  // Contains all applies - used for begin_access
+  SmallVector<FullApplySite, 8> fullApplies;
 
   for (auto *BB : Loop->getBlocks()) {
     for (auto &Inst : *BB) {
@@ -618,6 +634,9 @@ void LoopTreeOptimization::analyzeCurrentLoop(
         LLVM_FALLTHROUGH;
       }
       default: {
+        if (auto fullApply = FullApplySite::isa(&Inst)) {
+          fullApplies.push_back(fullApply);
+        }
         checkSideEffects(Inst, MayWrites);
         if (canHoistUpDefault(&Inst, Loop, DomTree, RunsOnHighLevelSIL)) {
           HoistUp.insert(&Inst);
@@ -660,7 +679,7 @@ void LoopTreeOptimization::analyzeCurrentLoop(
       LLVM_DEBUG(llvm::dbgs() << "Some end accesses can't be handled\n");
       continue;
     }
-    if (analyzeBeginAccess(BI, BeginAccesses)) {
+    if (analyzeBeginAccess(BI, BeginAccesses, fullApplies, ASA)) {
       SpecialHoist.insert(BI);
     }
   }
@@ -711,6 +730,7 @@ public:
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
     AliasAnalysis *AA = PM->getAnalysis<AliasAnalysis>();
     SideEffectAnalysis *SEA = PM->getAnalysis<SideEffectAnalysis>();
+    AccessedStorageAnalysis *ASA = getAnalysis<AccessedStorageAnalysis>();
     DominanceInfo *DomTree = nullptr;
 
     LLVM_DEBUG(llvm::dbgs() << "Processing loops in " << F->getName() << "\n");
@@ -718,7 +738,7 @@ public:
 
     for (auto *TopLevelLoop : *LoopInfo) {
       if (!DomTree) DomTree = DA->get(F);
-      LoopTreeOptimization Opt(TopLevelLoop, LoopInfo, AA, SEA, DomTree,
+      LoopTreeOptimization Opt(TopLevelLoop, LoopInfo, AA, SEA, DomTree, ASA,
                                RunsOnHighLevelSil);
       Changed |= Opt.optimize();
     }
