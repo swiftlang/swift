@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-codemotion"
 #include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/AST/Module.h"
 #include "swift/Basic/BlotMapVector.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
@@ -315,6 +316,13 @@ void BBEnumTagDataflowState::handlePredCondSelectEnum(CondBranchInst *CondBr) {
   // If the enum only has 2 values and its tag isn't the true branch, then we
   // know the true branch must be the other tag.
   if (EnumDecl *E = Operand->getType().getEnumOrBoundGenericEnum()) {
+    // We can't do this optimization on non-exhaustive enums.
+    const SILFunction *Fn = CondBr->getFunction();
+    bool IsExhaustive =
+        E->isEffectivelyExhaustive(Fn->getModule().getSwiftModule(),
+                                   Fn->getResilienceExpansion());
+    if (!IsExhaustive)
+      return;
     // Look for a single other element on this enum.
     EnumElementDecl *OtherElt = nullptr;
     for (EnumElementDecl *Elt : E->getAllElements()) {
