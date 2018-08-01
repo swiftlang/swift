@@ -841,12 +841,10 @@ extension String : _ExpressibleByBuiltinStringLiteral {
       return
     }
 
-    // SWIFT_ENABLE_TENSORFLOW
-    // TODO(SR-8117): Renable the code below. 
-    // if let small = _SmallUTF8String(bufPtr) {
-    //   self = String(_StringGuts(small))
-    //   return
-    // }
+    if let small = _SmallUTF8String(bufPtr) {
+      self = String(_StringGuts(small))
+      return
+    }
 
     if _fastPath(Bool(isASCII)) {
       self = String(_StringGuts(_large: _UnmanagedString(bufPtr)))
