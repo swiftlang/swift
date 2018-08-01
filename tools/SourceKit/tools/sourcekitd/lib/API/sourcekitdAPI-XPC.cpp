@@ -273,6 +273,14 @@ void ResponseBuilder::Dictionary::setCustomBuffer(
   xpc_release(xdata);
 }
 
+void ResponseBuilder::Dictionary::setCustomRawData(SourceKit::UIdent Key,
+                                                   CustomBufferKind Kind,
+                                                   void *Data, size_t Size) {
+  xpc_object_t xdata = xpc_data_create(Data, Size);
+  xpc_dictionary_set_value(Impl, Key.c_str(), xdata);
+  xpc_release(xdata);
+}
+
 ResponseBuilder::Dictionary ResponseBuilder::Array::appendDictionary() {
   xpc_object_t dict = xpc_dictionary_create(nullptr, nullptr, 0);
   xpc_array_append_value(Impl, dict);

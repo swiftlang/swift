@@ -1782,7 +1782,7 @@ void SwiftEditorDocument::parse(ImmutableTextSnapshotRef Snapshot,
   CompInv.setMainFileSyntaxParsingCache(SyntaxCache);
   // When reuse parts of the syntax tree from a SyntaxParsingCache, not
   // all tokens are visited and thus token collection is invalid
-  CompInv.getLangOptions().CollectParsedToken = (SyntaxCache == nullptr);
+  CompInv.getLangOptions().CollectParsedToken = !BuildSyntaxTree;
   // Access to Impl.SyntaxInfo is guarded by Impl.AccessMtx
   Impl.SyntaxInfo.reset(
     new SwiftDocumentSyntaxInfo(CompInv, Snapshot, Args, Impl.FilePath));

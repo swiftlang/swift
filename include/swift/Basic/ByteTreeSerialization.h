@@ -232,13 +232,16 @@ private:
 
 public:
   /// Write a binary serialization of \p Object to \p StreamWriter, prefixing
-  /// the stream by the specified ProtocolVersion.
+  /// the stream by the specified ProtocolVersion. If \p InitialOffset is
+  /// specified the first \p InitialOffset bytes will be left empty in the
+  /// Stream so that the caller can populate them.
   template <typename T>
   typename std::enable_if<has_ObjectTraits<T>::value, void>::type
   static write(ExponentialGrowthAppendingBinaryByteStream &Stream,
                uint32_t ProtocolVersion, const T &Object,
-               UserInfoMap &UserInfo) {
+               UserInfoMap &UserInfo, size_t InitialOffset = 0) {
     llvm::BinaryStreamWriter StreamWriter(Stream);
+    StreamWriter.setOffset(InitialOffset);
     ByteTreeWriter Writer(Stream, StreamWriter, UserInfo);
 
     auto Error = Writer.writeRaw(ProtocolVersion);

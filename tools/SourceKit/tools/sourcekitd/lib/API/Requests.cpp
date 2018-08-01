@@ -2446,17 +2446,17 @@ void serializeSyntaxTreeAsByteTree(
   swift::ExponentialGrowthAppendingBinaryByteStream Stream(
       llvm::support::endianness::little);
   Stream.reserve(32 * 1024);
+  auto Error = Stream.writeRaw(0, (uint64_t)CustomBufferKind::RawData);
+  (void)Error;
+  assert(!Error);
   std::map<void *, void *> UserInfo;
   UserInfo[swift::byteTree::UserInfoKeyReusedNodeIds] = &ReusedNodeIds;
   swift::byteTree::ByteTreeWriter::write(Stream, /*ProtocolVersion=*/1,
-                                         *SyntaxTree.getRaw(), UserInfo);
+                                         *SyntaxTree.getRaw(), UserInfo,
+                                         /*InitialOffset=*/sizeof(uint64_t));
 
-  std::unique_ptr<llvm::WritableMemoryBuffer> Buf =
-      llvm::WritableMemoryBuffer::getNewUninitMemBuffer(Stream.data().size());
-  memcpy(Buf->getBufferStart(), Stream.data().data(), Stream.data().size());
-
-  Dict.setCustomBuffer(KeySerializedSyntaxTree, CustomBufferKind::RawData,
-                       std::move(Buf));
+  Dict.setCustomRawData(KeySerializedSyntaxTree, CustomBufferKind::RawData,
+                        Stream.data().data(), Stream.data().size());
 
   auto EndClock = clock();
   LOG_SECTION("incrParse Performance", InfoLowPrio) {

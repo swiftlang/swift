@@ -87,6 +87,11 @@ public:
     Dictionary setDictionary(SourceKit::UIdent Key);
     void setCustomBuffer(SourceKit::UIdent Key, CustomBufferKind Kind,
                          std::unique_ptr<llvm::MemoryBuffer> MemBuf);
+    /// Set raw data for the specified \p Key. It is assumed that the data that
+    /// is being set has already been prefixed with the correct
+    /// \c CustomBufferKind.
+    void setCustomRawData(SourceKit::UIdent Key, CustomBufferKind Kind,
+                          void *Data, size_t Size);
 
   private:
     void *Impl = nullptr;
