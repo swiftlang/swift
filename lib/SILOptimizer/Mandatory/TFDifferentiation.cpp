@@ -3198,24 +3198,22 @@ public:
       SmallVector<SILValue, 8> eltVals;
       auto adj = materializeAdjoint(av, sei->getLoc());
       auto *structBuf =
-        getBuilder().createAllocStack(sei->getLoc(), structDeclSILTy);
+          getBuilder().createAllocStack(sei->getLoc(), structDeclSILTy);
+      auto *bufAccess = builder.createBeginAccess(
+          sei->getLoc(), structBuf, SILAccessKind::Init,
+          SILAccessEnforcement::Static, /*noNestedConflict*/ true,
+          /*fromBuiltin*/ false);
       SWIFT_DEFER {
         getBuilder().createDeallocStack(sei->getLoc(), structBuf);
       };
       // Emit and store each element to corresponding fields.
       for (auto *varDecl : structDecl->getStoredProperties()) {
         auto *eltBufAddr = getBuilder().createStructElementAddr(sei->getLoc(),
-                                                                structBuf,
+                                                                bufAccess,
                                                                 varDecl);
         if (varDecl == sei->getField()) {
-          auto *bufAccess = builder.createBeginAccess(
-              sei->getLoc(), eltBufAddr, SILAccessKind::Init,
-              SILAccessEnforcement::Static, /*noNestedConflict*/ true,
-              /*fromBuiltin*/ false);
-          getBuilder().createStore(bufAccess->getLoc(), adj, bufAccess,
+          getBuilder().createStore(bufAccess->getLoc(), adj, eltBufAddr,
               getBufferSOQ(sei->getType().getASTType(), getAdjoint()));
-          builder.createEndAccess(bufAccess->getLoc(), bufAccess,
-                                  /*aborted*/ false);
         } else {
           auto eltType = varDecl->getType()->getCanonicalType();
           auto zero =
@@ -3223,6 +3221,8 @@ public:
           materializeAdjointIndirect(zero, eltBufAddr);
         }
       }
+      builder.createEndAccess(bufAccess->getLoc(), bufAccess,
+                              /*aborted*/ false);
       auto access = getBuilder().createBeginAccess(sei->getLoc(), structBuf,
                                                    SILAccessKind::Read,
                                                    SILAccessEnforcement::Static,
