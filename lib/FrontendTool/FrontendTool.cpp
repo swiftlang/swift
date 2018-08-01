@@ -998,7 +998,7 @@ static bool performCompile(CompilerInstance &Instance,
   if (writeTBDIfNeeded(Invocation, Instance))
     return true;
 
-  assert(Action >= FrontendOptions::ActionType::EmitSILGen &&
+  assert(FrontendOptions::doesActionGenerateSIL(Action) &&
          "All actions not requiring SILGen must have been handled!");
 
   std::deque<PostSILGenInputs> PSGIs = generateSILModules(Invocation, Instance);

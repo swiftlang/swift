@@ -463,14 +463,21 @@ shouldImplicityImportSwiftOnoneSupportModule(CompilerInvocation &Invocation) {
   if (Invocation.getSILOptions().shouldOptimize())
     return false;
 
-  // If we are not going through the SIL Optimizer with the
-  // given frontend action, do not load SwiftOnoneSupport.
+  // If we are not executing an action that has a dependency on
+  // SwiftOnoneSupport, don't load it.
+  //
+  // FIXME: Knowledge of SwiftOnoneSupport loading in the Frontend is a layering
+  // violation. However, SIL currently does not have a way to express this
+  // dependency itself for the benefit of autolinking.  In the mean time, we
+  // will be conservative and say that actions like -emit-silgen and
+  // -emit-sibgen - that don't really involve the optimizer - have a
+  // strict dependency on SwiftOnoneSupport.
   //
   // This optimization is disabled by -track-system-dependencies to preserve
   // the explicit dependency.
   const auto &options = Invocation.getFrontendOptions();
   return options.TrackSystemDeps
-      || FrontendOptions::doesActionRunSILPasses(options.RequestedAction);
+      || FrontendOptions::doesActionGenerateSIL(options.RequestedAction);
 }
 
 void CompilerInstance::performParseAndResolveImportsOnly() {
