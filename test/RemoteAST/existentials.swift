@@ -1,3 +1,5 @@
+// UNSUPPORTED: linux
+// <rdar://problem/42793848>
 // RUN: %target-swift-remoteast-test %s | %FileCheck %s
 
 // REQUIRES: swift-remoteast-test
