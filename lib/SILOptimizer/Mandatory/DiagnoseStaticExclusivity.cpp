@@ -876,10 +876,13 @@ static void checkForViolationsAtInstruction(SILInstruction &I,
   // SILVerifier to better pinpoint the offending pass.
   if (auto *PAI = dyn_cast<PartialApplyInst>(&I)) {
     ApplySite apply(PAI);
-    if (llvm::any_of(apply.getArgumentOperands(), [apply](Operand &oper) {
-          return apply.getArgumentConvention(oper)
-                 == SILArgumentConvention::Indirect_InoutAliasable;
-        })) {
+    if (llvm::any_of(range(apply.getNumArguments()),
+                     [apply](unsigned argIdx) {
+                       unsigned calleeIdx =
+                         apply.getCalleeArgIndexOfFirstAppliedArg() + argIdx;
+                       return apply.getArgumentConvention(calleeIdx)
+                         == SILArgumentConvention::Indirect_InoutAliasable;
+                     })) {
       checkNoEscapePartialApply(PAI);
     }
   }
@@ -1112,7 +1115,8 @@ static void checkAccessedAddress(Operand *memOper, StorageMap &Accesses) {
     return;
 
   if (auto apply = ApplySite::isa(memInst)) {
-    SILArgumentConvention conv = apply.getArgumentConvention(*memOper);
+    SILArgumentConvention conv =
+        apply.getArgumentConvention(apply.getCalleeArgIndex(*memOper));
     // Captured addresses currently use the @inout_aliasable convention. They
     // are considered an access at any call site that uses the closure. However,
     // those accesses are never explictly protected by access markers. Instead,

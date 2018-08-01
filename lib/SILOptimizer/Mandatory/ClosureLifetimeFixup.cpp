@@ -339,7 +339,8 @@ static SILInstruction *getOnlyDestroy(CopyBlockWithoutEscapingInst *CB) {
 
     // If this an apply use, only handle unowned parameters.
     if (auto Apply = FullApplySite::isa(Inst)) {
-      SILArgumentConvention Conv = Apply.getArgumentConvention(*Use);
+      SILArgumentConvention Conv =
+          Apply.getArgumentConvention(Apply.getCalleeArgIndex(*Use));
       if (Conv != SILArgumentConvention::Direct_Unowned)
         return nullptr;
       continue;

@@ -152,10 +152,12 @@ static SILArgumentConvention getAddressArgConvention(ApplyInst *Apply,
                                                      Operand *&Oper) {
   Oper = nullptr;
   auto Args = Apply->getArgumentOperands();
+  llvm::Optional<unsigned> FoundArgIdx;
   for (auto ArgIdx : indices(Args)) {
     if (Args[ArgIdx].get() != Address)
       continue;
 
+    FoundArgIdx = ArgIdx;
     assert(!Oper && "Address can only be passed once as an indirection.");
     Oper = &Args[ArgIdx];
 #ifdef NDEBUG
@@ -163,7 +165,7 @@ static SILArgumentConvention getAddressArgConvention(ApplyInst *Apply,
 #endif
   }
   assert(Oper && "Address value not passed as an argument to this call.");
-  return ApplySite(Apply).getArgumentConvention(*Oper);
+  return Apply->getArgumentConvention(FoundArgIdx.getValue());
 }
 
 /// If the given instruction is a store, return the stored value.
@@ -1631,10 +1633,10 @@ bool TempRValueOptPass::collectLoads(
     return false;
 
   case SILInstructionKind::ApplyInst: {
-    ApplySite apply(user);
-    auto Convention = apply.getArgumentConvention(*userOp);
+    auto *AI = cast<ApplyInst>(user);
+    auto Convention = AI->getArgumentConvention(userOp->getOperandNumber() - 1);
     if (Convention.isGuaranteedConvention()) {
-      loadInsts.insert(user);
+      loadInsts.insert(AI);
       return true;
     }
     LLVM_DEBUG(llvm::dbgs() << "  Temp consuming use may write/destroy "

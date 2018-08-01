@@ -1937,6 +1937,11 @@ public:
     return OperandValueArrayRef(opsWithoutSelf);
   }
 
+  /// Return the SILArgumentConvention for the given applied argument index.
+  SILArgumentConvention getArgumentConvention(unsigned index) const {
+    return getSubstCalleeConv().getSILArgumentConvention(index);
+  }
+
   Optional<SILResultInfo> getSingleResult() const {
     auto SubstCallee = getSubstCalleeType();
     if (SubstCallee->getNumAllResults() != 1)
@@ -7675,7 +7680,7 @@ public:
   }
 
   /// Return the applied argument index for the given operand.
-  unsigned getAppliedArgIndex(const Operand &oper) const {
+  unsigned getArgumentIndex(const Operand &oper) const {
     assert(oper.getUser() == Inst);
     assert(isArgumentOperand(oper));
 
@@ -7714,14 +7719,19 @@ public:
   /// Note: Passing an applied argument index into SILFunctionConvention, as
   /// opposed to a function argument index, is incorrect.
   unsigned getCalleeArgIndex(const Operand &oper) const {
-    return getCalleeArgIndexOfFirstAppliedArg() + getAppliedArgIndex(oper);
+    return getCalleeArgIndexOfFirstAppliedArg() + getArgumentIndex(oper);
   }
 
   /// Return the SILArgumentConvention for the given applied argument operand.
   SILArgumentConvention getArgumentConvention(Operand &oper) const {
     unsigned calleeArgIdx =
-        getCalleeArgIndexOfFirstAppliedArg() + getAppliedArgIndex(oper);
+      getCalleeArgIndexOfFirstAppliedArg() + getArgumentIndex(oper);
     return getSubstCalleeConv().getSILArgumentConvention(calleeArgIdx);
+  }
+
+  // FIXME: This is incorrect. It will be removed in the next commit.
+  SILArgumentConvention getArgumentConvention(unsigned index) const {
+    return getSubstCalleeConv().getSILArgumentConvention(index);
   }
 
   /// Return true if 'self' is an applied argument.

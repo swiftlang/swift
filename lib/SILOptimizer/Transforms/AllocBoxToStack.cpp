@@ -285,7 +285,7 @@ static bool partialApplyEscapes(SILValue V, bool examineApply) {
   SILModuleConventions ModConv(*V->getModule());
   llvm::SmallVector<Operand *, 32> Worklist(V->use_begin(), V->use_end());
   while (!Worklist.empty()) {
-    Operand *Op = Worklist.pop_back_val();
+    auto *Op = Worklist.pop_back_val();
 
     // These instructions do not cause the address to escape.
     if (!useCaptured(Op))
@@ -301,14 +301,15 @@ static bool partialApplyEscapes(SILValue V, bool examineApply) {
       continue;
     }
 
-    if (auto Apply = FullApplySite::isa(User)) {
+    if (auto *Apply = dyn_cast<ApplyInst>(User)) {
       // Applying a function does not cause the function to escape.
-      if (!Apply.isArgumentOperand(*Op))
+      if (Op->getOperandNumber() == 0)
         continue;
 
       // apply instructions do not capture the pointer when it is passed
       // indirectly
-      if (Apply.getArgumentConvention(*Op).isIndirectConvention())
+      if (Apply->getArgumentConvention(Op->getOperandNumber() - 1)
+              .isIndirectConvention())
         continue;
 
       // Optionally drill down into an apply to see if the operand is
