@@ -43,9 +43,7 @@ public:
     ForceColors = true;
   }
 
-  bool didErrorOccur() {
-    return getHasAnErrorBeenHandled();
-  }
+  bool didErrorOccur() { return getHasAnErrorBeenHandled(); }
 };
   
 }

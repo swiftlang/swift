@@ -111,17 +111,17 @@ public:
   /// so here's a placeholder.
 
   virtual void informDriverOfIncompleteBatchModeCompilation() {}
-  
+
 private:
   /// Some subclasses need to track if handleDiagnostic has ever seen an error
   bool hasAnErrorBeenHandled = false;
-  
+
 protected:
-  
   /// Set hasAnErrorBeenHandled if this is an error
   void setHasAnErrorBeenHandled(const DiagnosticKind Kind) {
     hasAnErrorBeenHandled |= Kind == DiagnosticKind::Error;
   }
+
 public:
   bool getHasAnErrorBeenHandled() const { return hasAnErrorBeenHandled; }
 };
