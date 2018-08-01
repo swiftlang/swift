@@ -167,3 +167,28 @@ void GenericCloner::populateCloned() {
     visit(BI->first->getTerminator());
   }
 }
+
+
+const SILDebugScope *GenericCloner::remapScope(const SILDebugScope *DS) {
+  if (!DS)
+    return nullptr;
+  auto it = RemappedScopeCache.find(DS);
+  if (it != RemappedScopeCache.end())
+    return it->second;
+
+  auto &M = getBuilder().getModule();
+  auto *ParentFunction = DS->Parent.dyn_cast<SILFunction *>();
+  if (ParentFunction == &Original)
+    ParentFunction = getCloned();
+  else if (ParentFunction)
+    ParentFunction = remapParentFunction(
+        M, ParentFunction, SubsMap,
+        Original.getLoweredFunctionType()->getGenericSignature());
+
+  auto *ParentScope = DS->Parent.dyn_cast<const SILDebugScope *>();
+  auto *RemappedScope =
+      new (M) SILDebugScope(DS->Loc, ParentFunction, remapScope(ParentScope),
+                            remapScope(DS->InlinedCallSite));
+  RemappedScopeCache.insert({DS, RemappedScope});
+  return RemappedScope;
+}

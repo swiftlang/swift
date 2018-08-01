@@ -48,7 +48,8 @@ protected:
 protected:
   SpecializationMangler(SpecializationPass P, IsSerialized_t Serialized,
                         SILFunction *F)
-      : Pass(P), Serialized(Serialized), Function(F), ArgOpBuffer(ArgOpStorage) {}
+      : Pass(P), Serialized(Serialized), Function(F),
+        ArgOpBuffer(ArgOpStorage) {}
 
   SILFunction *getFunction() const { return Function; }
 
@@ -67,17 +68,17 @@ class GenericSpecializationMangler : public SpecializationMangler {
 
   SubstitutionMap SubMap;
   bool isReAbstracted;
+  bool isInlined;
 
 public:
+  GenericSpecializationMangler(SILFunction *F, SubstitutionMap SubMap,
+                               IsSerialized_t Serialized, bool isReAbstracted,
+                               bool isInlined = false)
+      : SpecializationMangler(SpecializationPass::GenericSpecializer,
+                              Serialized, F),
+        SubMap(SubMap), isReAbstracted(isReAbstracted), isInlined(isInlined) {}
 
-  GenericSpecializationMangler(SILFunction *F,
-                               SubstitutionMap SubMap,
-                               IsSerialized_t Serialized,
-                               bool isReAbstracted)
-    : SpecializationMangler(SpecializationPass::GenericSpecializer, Serialized, F),
-      SubMap(SubMap), isReAbstracted(isReAbstracted) {}
-
-  std::string mangle();
+  std::string mangle(GenericSignature *Sig = nullptr);
 };
 
 class PartialSpecializationMangler : public SpecializationMangler {
@@ -88,10 +89,10 @@ class PartialSpecializationMangler : public SpecializationMangler {
 public:
   PartialSpecializationMangler(SILFunction *F,
                                CanSILFunctionType SpecializedFnTy,
-                               IsSerialized_t Serialized,
-                               bool isReAbstracted)
-    : SpecializationMangler(SpecializationPass::GenericSpecializer, Serialized, F),
-      SpecializedFnTy(SpecializedFnTy), isReAbstracted(isReAbstracted) {}
+                               IsSerialized_t Serialized, bool isReAbstracted)
+      : SpecializationMangler(SpecializationPass::GenericSpecializer,
+                              Serialized, F),
+        SpecializedFnTy(SpecializedFnTy), isReAbstracted(isReAbstracted) {}
 
   std::string mangle();
 };
