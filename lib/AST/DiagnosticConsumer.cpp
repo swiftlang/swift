@@ -208,6 +208,9 @@ void FileSpecificDiagnosticConsumer::handleHeaderFileDiagnostic(
                                            FormatArgs, Info);
     }
   }
+  if (Kind == DiagnosticKind::Error)
+    for (auto &csi : ConsumersOrderedByRange)
+      csi.hasAnErrorBeenEmitted = true;
 }
 
 bool FileSpecificDiagnosticConsumer::finishProcessing() {
