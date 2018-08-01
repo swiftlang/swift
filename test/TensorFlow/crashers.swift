@@ -350,3 +350,14 @@ func SR8316_main() {
   let float: Float = 0.1 // expected-warning {{immutable value 'float' was never used}}
   _ = SR8316_helper()
 }
+
+func readDataset() -> (images: Tensor<Float>, labels: Tensor<Int32>)? {
+    print("Reading the data.")
+    return (Tensor<Float>(1.0), Tensor<Int32>(1))
+}
+
+public func constFoldingBug() {
+  guard let _ = readDataset() else {
+    return
+  }
+}
