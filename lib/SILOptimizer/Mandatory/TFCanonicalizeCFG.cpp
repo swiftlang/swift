@@ -342,6 +342,11 @@ private:
     return SILUndef::get(type, currentFn->getModule());
   }
 
+  /// Create a tf_tensor_to_i1 instruction with the given value as argument.
+  GraphOperationInst *createTFInt1ToBuiltinInt1(SILBuilder &builder,
+                                                SILLocation location,
+                                                SILValue value);
+
   // Configuration for graph construction.
   GraphFunctionDeviceInfo *deviceInfo;
   DominanceInfo *DI;
@@ -391,6 +396,22 @@ void SingleExitLoopTransformer::initialize() {
       llvm::for_each(inst.getResults(), saveEscaping);
     }
   }
+}
+
+GraphOperationInst* SingleExitLoopTransformer::createTFInt1ToBuiltinInt1(
+    SILBuilder &builder, SILLocation location, SILValue value) {
+  ASTContext &context = builder.getASTContext();
+  SmallVector<GraphOperationAttribute, 1> attributes;
+  deviceInfo->handleDevicePlacement(
+      "tf_tensor_to_i1",
+      /*opDevice*/ getDeviceString(DeviceType::ALL),
+      builder.getModule().getASTContext(), attributes);
+  GraphOperationInst *condValue = builder.createGraphOperation(
+    location, context.getIdentifier("tf_tensor_to_i1"),
+      /*operands*/ {value}, attributes,
+      {SILType::getBuiltinIntegerType(1, context)});
+  assert(condValue->getNumResults() == 1);
+  return condValue;
 }
 
 /// Appends the given arguments to the given edge. Deletes the old TermInst
@@ -636,7 +657,7 @@ SILBasicBlock *SingleExitLoopTransformer::createNewExitBlockWithDemux(
         GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
     SmallVector<GraphOperationAttribute, 2> attributes;
     deviceInfo->handleDevicePlacement(
-        "Equal", /*opDevice*/ getDeviceString(DeviceType::ALL),
+        equalOpName, /*opDevice*/ getDeviceString(DeviceType::ALL),
         builder.getModule().getASTContext(), attributes);
     GraphOperationInst *condTensorInst = builder.createGraphOperation(
         headerLocation, context.getIdentifier(equalOpName),
@@ -648,12 +669,9 @@ SILBasicBlock *SingleExitLoopTransformer::createNewExitBlockWithDemux(
         {convertElementTypeToTensorValueType(
             SILType::getBuiltinIntegerType(1, context))});
     assert(condTensorInst->getNumResults() == 1);
-    SILValue condTensor = condTensorInst->getResults()[0];
-    GraphOperationInst *condValue = builder.createGraphOperation(
-        headerLocation, context.getIdentifier("tf_tensor_to_i1"),
-        /*operands*/ {condTensor}, /*attributes */ {},
-        {SILType::getBuiltinIntegerType(1, context)});
-    assert(condValue->getNumResults() == 1);
+
+    GraphOperationInst *condValue = createTFInt1ToBuiltinInt1(
+        builder, headerLocation, condTensorInst->getResults()[0]);
     builder.createCondBranch(headerLocation, condValue->getResults()[0],
                              trueBlock, demuxBlock);
     demuxBlock = newBlock;
@@ -708,11 +726,8 @@ bool SingleExitLoopTransformer::transform() {
     builder.setInsertionPoint(newHeader);
     SILLocation headerLocation =
         getUserSourceLocation(header->getTerminator()->getDebugLocation());
-    GraphOperationInst *loopExitCond = builder.createGraphOperation(
-        headerLocation, context.getIdentifier("tf_tensor_to_i1"),
-        /*operands*/ {newHeader->getArguments().back()}, /*attributes*/ {},
-          {SILType::getBuiltinIntegerType(1, context)});
-    assert(loopExitCond->getNumResults() == 1);
+    GraphOperationInst *loopExitCond = createTFInt1ToBuiltinInt1(
+        builder, headerLocation, newHeader->getArguments().back());
     builder.createCondBranch(headerLocation, loopExitCond->getResults()[0],
                              header, newExitBlock);
   }
