@@ -422,5 +422,5 @@ extension Tensor where Scalar : BinaryFloatingPoint {
 func _adjointRelu<T : BinaryFloatingPoint>(
   _ x: Tensor<T>, originalValue: Tensor<T>, seed: Tensor<T>
 ) -> Tensor<T> {
-  return Tensor(x > 0) * seed
+  return Tensor(x.elementsGreater(0)) * seed
 }
