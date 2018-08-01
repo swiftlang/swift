@@ -585,9 +585,10 @@ static bool compileLLVMIR(CompilerInvocation &Invocation,
   assert(Invocation.getFrontendOptions().InputsAndOutputs.hasSingleInput() &&
          "We expect a single input for bitcode input!");
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-      llvm::MemoryBuffer::getFileOrSTDIN(
-          Invocation.getFrontendOptions()
-              .InputsAndOutputs.getFilenameOfFirstInput());
+      swift::vfs::getFileOrSTDIN(Instance.getFileSystem(),
+                                 Invocation.getFrontendOptions()
+                                   .InputsAndOutputs.getFilenameOfFirstInput());
+
   if (!FileBufOrErr) {
     Instance.getASTContext().Diags.diagnose(
         SourceLoc(), diag::error_open_input_file,

@@ -257,6 +257,9 @@ ERROR(error_invalid_debug_prefix_map, none,
       "invalid argument '%0' to -debug-prefix-map; it must be of the form "
       "'original=remapped'", (StringRef))
 
+ERROR(invalid_vfs_overlay_file,none,
+      "invalid virtual overlay file '%0'", (StringRef))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

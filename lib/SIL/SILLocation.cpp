@@ -136,7 +136,7 @@ SILLocation::DebugLoc SILLocation::decode(SourceLoc Loc,
                                           const SourceManager &SM) {
   DebugLoc DL;
   if (Loc.isValid()) {
-    DL.Filename = SM.getBufferIdentifierForLoc(Loc);
+    DL.Filename = SM.getDisplayNameForLoc(Loc);
     std::tie(DL.Line, DL.Column) = SM.getLineAndColumn(Loc);
   }
   return DL;
