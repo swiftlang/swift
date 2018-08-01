@@ -397,7 +397,10 @@ class Ownership {
   weak var w
   // CHECK: <attr-builtin>unowned</attr-builtin> <kw>var</kw> u
   unowned var u
+  // CHECK-OLD: <attr-builtin>unowned(unsafe)</attr-builtin> <kw>var</kw> uu
+  // CHECK-NEW: <attr-builtin>unowned</attr-builtin>(unsafe) <kw>var</kw> uu
+  unowned(unsafe) var uu
 }
-// CHECK-OLD: <kw>let</kw> closure = { [<attr-builtin>weak</attr-builtin> x=bindtox, <attr-builtin>unowned</attr-builtin> y=bindtoy] <kw>in</kw> }
-// FIXME: CHECK-NEW: <kw>let</kw> closure = { [weak x=bindtox, unowned y=bindtoy] <kw>in</kw> }
-let closure = { [weak x=bindtox, unowned y=bindtoy] in }
+// CHECK-OLD: <kw>let</kw> closure = { [<attr-builtin>weak</attr-builtin> x=bindtox, <attr-builtin>unowned</attr-builtin> y=bindtoy, <attr-builtin>unowned(unsafe)</attr-builtin> z=bindtoz] <kw>in</kw> }
+// FIXME: CHECK-NEW: <kw>let</kw> closure = { [weak x=bindtox, unowned y=bindtoy, unowned(unsafe) z=bindtoz] <kw>in</kw> }
+let closure = { [weak x=bindtox, unowned y=bindtoy, unowned(unsafe) z=bindtoz] in }

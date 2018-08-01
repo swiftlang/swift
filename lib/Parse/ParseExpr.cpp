@@ -2448,13 +2448,13 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
       SWIFT_DEFER { HasNext = consumeIf(tok::comma); };
       // Check for the strength specifier: "weak", "unowned", or
       // "unowned(safe/unsafe)".
-      SourceLoc ownershipLoc;
+      SourceLoc ownershipLocStart, ownershipLocEnd;
       auto ownershipKind = ReferenceOwnership::Strong;
       if (Tok.isContextualKeyword("weak")){
-        ownershipLoc = consumeToken(tok::identifier);
+        ownershipLocStart = ownershipLocEnd = consumeToken(tok::identifier);
         ownershipKind = ReferenceOwnership::Weak;
       } else if (Tok.isContextualKeyword("unowned")) {
-        ownershipLoc = consumeToken(tok::identifier);
+        ownershipLocStart = ownershipLocEnd = consumeToken(tok::identifier);
         ownershipKind = ReferenceOwnership::Unowned;
 
         // Skip over "safe" and "unsafe" if present.
@@ -2466,8 +2466,8 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
             ownershipKind = ReferenceOwnership::Unmanaged;
           else
             diagnose(Tok, diag::attr_unowned_invalid_specifier);
-          consumeIf(tok::identifier);
-          if (!consumeIf(tok::r_paren))
+          consumeIf(tok::identifier, ownershipLocEnd);
+          if (!consumeIf(tok::r_paren, ownershipLocEnd))
             diagnose(Tok, diag::attr_unowned_expected_rparen);
         }
       } else if (Tok.isAny(tok::identifier, tok::kw_self) &&
@@ -2532,8 +2532,8 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
 
       // Attributes.
       if (ownershipKind != ReferenceOwnership::Strong)
-        VD->getAttrs().add(
-          new (Context) ReferenceOwnershipAttr(ownershipLoc, ownershipKind));
+        VD->getAttrs().add(new (Context) ReferenceOwnershipAttr(
+          SourceRange(ownershipLocStart, ownershipLocEnd), ownershipKind));
 
       auto pattern = new (Context) NamedPattern(VD, /*implicit*/true);
 
