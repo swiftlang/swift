@@ -265,7 +265,7 @@ public:
 
   virtual void
   handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree,
-                   std::unordered_set<unsigned> ReusedNodeIds) = 0;
+                   std::unordered_set<unsigned> &ReusedNodeIds) = 0;
   virtual bool syntaxTreeEnabled() {
     return syntaxTreeTransferMode() != SyntaxTreeTransferMode::Off;
   }

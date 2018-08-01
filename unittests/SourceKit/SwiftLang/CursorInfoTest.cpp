@@ -79,7 +79,7 @@ class NullEditorConsumer : public EditorConsumer {
 
   void handleSourceText(StringRef Text) override {}
   void handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree,
-                        std::unordered_set<unsigned> ReusedNodeIds) override {}
+                        std::unordered_set<unsigned> &ReusedNodeIds) override {}
 
   SyntaxTreeTransferMode syntaxTreeTransferMode() override {
     return SyntaxTreeTransferMode::Off;
