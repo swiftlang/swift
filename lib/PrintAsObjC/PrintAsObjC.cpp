@@ -421,7 +421,8 @@ private:
       os << ", " << customName
          << ", \"" << ED->getName() << "\"";
     }
-    os << ", " << (ED->isExhaustive(/*useDC*/nullptr) ? "closed" : "open")
+    os << ", "
+       << (ED->isFormallyExhaustive(/*useDC*/nullptr) ? "closed" : "open")
        << ") {\n";
 
     for (auto Elt : ED->getAllElements()) {

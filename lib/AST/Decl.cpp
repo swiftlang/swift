@@ -3439,7 +3439,7 @@ bool EnumDecl::hasOnlyCasesWithoutAssociatedValues() const {
   return true;
 }
 
-bool EnumDecl::isExhaustive(const DeclContext *useDC) const {
+bool EnumDecl::isFormallyExhaustive(const DeclContext *useDC) const {
   // Enums explicitly marked frozen are exhaustive.
   if (getAttrs().hasAttribute<FrozenAttr>())
     return true;
@@ -3484,6 +3484,22 @@ bool EnumDecl::isExhaustive(const DeclContext *useDC) const {
 
   // Otherwise, the enum is non-exhaustive.
   return false;
+}
+
+bool EnumDecl::isEffectivelyExhaustive(ModuleDecl *M,
+                                       ResilienceExpansion expansion) const {
+  // Generated Swift code commits to handling garbage values of @objc enums,
+  // whether imported or not, to deal with C's loose rules around enums.
+  // This covers both frozen and non-frozen @objc enums.
+  if (isObjC())
+    return false;
+
+  // Otherwise, the only non-exhaustive cases are those that don't have a fixed
+  // layout.
+  assert(isFormallyExhaustive(M) == !isResilient(M,ResilienceExpansion::Maximal)
+         && "ignoring the effects of @inlinable, @testable, and @objc, "
+            "these should match up");
+  return !isResilient(M, expansion);
 }
 
 ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
