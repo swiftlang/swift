@@ -30,7 +30,7 @@ public func usingHostCode(_ x: Tensor<Float>) -> Tensor<Float> {
 public func outer() {
   let x = Tensor<Float>([1, 2, 3])
 
-  @TensorFlowGraph // expected-error {{@TensorFlowGraph cannot be applied to functions that capture variables}}
+  @TensorFlowGraph // expected-error {{@TensorFlowGraph cannot be applied to functions that capture values}}
   func inner() -> Tensor<Float> {
     return x
   }
