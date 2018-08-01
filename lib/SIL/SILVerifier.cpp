@@ -2706,7 +2706,7 @@ public:
     auto isConsumingOrMutatingApplyUse = [](Operand *use) -> bool {
       ApplySite apply(use->getUser());
       assert(apply && "Not an apply instruction kind");
-      auto conv = apply.getArgumentConvention(use->getOperandNumber() - 1);
+      auto conv = apply.getArgumentConvention(*use);
       switch (conv) {
       case SILArgumentConvention::Indirect_In_Guaranteed:
         return false;
