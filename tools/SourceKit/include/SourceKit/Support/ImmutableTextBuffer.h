@@ -184,7 +184,7 @@ private:
   ImmutableTextSnapshotRef addAtomicUpdate(ImmutableTextUpdateRef NewUpd);
   ImmutableTextBufferRef getBufferForSnapshot(
       const ImmutableTextSnapshot &Snap);
-  size_t getSizeForSnapshot(const ImmutableTextSnapshot &Snap);
+  size_t getSizeForSnapshot(const ImmutableTextSnapshot &Snap) const;
   void refresh();
   friend class ImmutableTextSnapshot;
 };

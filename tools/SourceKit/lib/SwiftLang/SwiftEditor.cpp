@@ -1709,13 +1709,15 @@ ImmutableTextSnapshotRef SwiftEditorDocument::initializeText(
 
 ImmutableTextSnapshotRef SwiftEditorDocument::replaceText(
     unsigned Offset, unsigned Length, llvm::MemoryBuffer *Buf,
-    bool ProvideSemanticInfo) {
+    bool ProvideSemanticInfo, std::string &error) {
 
   llvm::sys::ScopedLock L(Impl.AccessMtx);
 
   // Validate offset and length.
-  if ((Offset + Length) > Impl.EditableBuffer->getSize())
+  if ((Offset + Length) > Impl.EditableBuffer->getSize()) {
+    error = "'offset' + 'length' is out of range";
     return nullptr;
+  }
 
   Impl.Edited = true;
   llvm::StringRef Str = Buf->getBuffer();
@@ -2241,10 +2243,12 @@ void SwiftLangSupport::editorReplaceText(StringRef Name,
       StringRef PreEditTextRef(BufferStart + Offset, Length);
       PreEditText = PreEditTextRef.str();
     }
+    std::string error;
     Snapshot = EditorDoc->replaceText(Offset, Length, Buf,
-                                      Consumer.needsSemanticInfo());
+                                      Consumer.needsSemanticInfo(), error);
     if (!Snapshot) {
-      Consumer.handleRequestError("Failed to replace text");
+      assert(error.size());
+      Consumer.handleRequestError(error.c_str());
       return;
     }
 
