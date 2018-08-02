@@ -142,6 +142,15 @@ public struct Trivia: Codable {
     return Trivia(pieces: copy)
   }
 
+  public var sourceLength: SourceLength {
+    return pieces.map({ $0.sourceLength }).reduce(.zero, +)
+  }
+
+  /// Get the byteSize of this trivia
+  public var byteSize: Int {
+    return sourceLength.utf8Length
+  }
+
 % for trivia in TRIVIAS:
 %   if trivia.is_collection():
 %   joined = ''.join(trivia.swift_characters)
@@ -175,15 +184,6 @@ extension Trivia: Collection {
   public subscript(_ index: Int) -> TriviaPiece {
     return pieces[index]
   }
-
-  /// Get the byteSize of this trivia
-  public var byteSize: Int {
-    let pos = AbsolutePosition()
-    for piece in pieces {
-      piece.accumulateAbsolutePosition(pos)
-    }
-    return pos.utf8Offset
-  }
 }
 
 
@@ -200,18 +200,20 @@ public func +(lhs: Trivia, rhs: Trivia) -> Trivia {
 }
 
 extension TriviaPiece {
-  func accumulateAbsolutePosition(_ pos: AbsolutePosition) {
+  public var sourceLength: SourceLength {
     switch self {
 % for trivia in TRIVIAS:
 %   if trivia.is_new_line:
     case let .${trivia.lower_name}s(count):
-      pos.add(lines: count, size: ${trivia.characters_len()})
+      return SourceLength(newlines: count, columnsAtLastLine: 0, 
+                          utf8Length: count * ${trivia.characters_len()})
 %   elif trivia.is_collection():
     case let .${trivia.lower_name}s(count):
-      pos.add(columns: count)
+      return SourceLength(newlines: 0, columnsAtLastLine: count, 
+                          utf8Length: count)
 %   else:
     case let .${trivia.lower_name}(text):
-      pos.add(text: text)
+      return SourceLength(of: text)
 %   end
 % end
     }
