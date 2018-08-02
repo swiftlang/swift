@@ -82,7 +82,9 @@ struct StringGutsCollection: RangeReplaceableCollection, RandomAccessCollection 
   var endIndex: Index { return _guts.count }
   var indices: Indices { return startIndex..<endIndex }
 
-  subscript(position: Index) -> Element { return _guts[position] }
+  subscript(position: Index) -> Element {
+    return _guts.codeUnit(atCheckedOffset: position)
+  }
 
   mutating func replaceSubrange<C>(
     _ subrange: Range<Index>,
@@ -503,9 +505,7 @@ StringTests.test("substringDoesNotCopy/Swift4") {
       }
       let s0 = String(repeating: "x", count: size)
       let originalIdentity = s0.bufferID
-      let s1 = Substring(
-        _base: s0,
-        s0.index(_nth: sliceStart)..<s0.index(_nth: sliceEnd))
+      let s1 = s0[s0.index(_nth: sliceStart)..<s0.index(_nth: sliceEnd)]
       expectEqual(s1.bufferID, originalIdentity)
     }
   }
@@ -829,7 +829,7 @@ StringTests.test("COW/replaceSubrange/end") {
     // FIXME: We have to use Swift 4's Substring to get the desired storage
     // semantics; in Swift 3 mode, self-sliced strings get allocated a new
     // buffer immediately.
-    var slice = Substring(_base: str, str.startIndex..<str.index(_nth: 7))
+    var slice = str[str.startIndex..<str.index(_nth: 7)]
     expectEqual(heapStrIdentity1, str.bufferID)
     expectEqual(heapStrIdentity1, slice.bufferID)
 
