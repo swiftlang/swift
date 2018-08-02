@@ -1668,7 +1668,8 @@ ConstantFolder::processWorkList() {
 
       // The new constant could be further folded now, add it to the worklist.
       if (auto *Inst = C->getDefiningInstruction())
-        WorkList.insert(Inst);
+        if (isa<SingleValueInstruction>(Inst))
+          WorkList.insert(Inst);
     }
 
     // Eagerly DCE. We do this after visiting all users to ensure we don't
