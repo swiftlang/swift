@@ -234,6 +234,18 @@ TensorTests.testAllBackends("Concatenation") {
               concatenated1.array)
 }
 
+TensorTests.test("EwiseComparison") {
+  let x = Tensor<Float>([0, 1, 2])
+  let y = Tensor<Float>([2, 1, 3])
+  expectEqual(x.elementsLess(y).scalars, [true, false, true])
+}
+
+TensorTests.test("LexicographicalComparison") {
+  let x = Tensor<Float>([0, 1, 2, 3, 4])
+  let y = Tensor<Float>([2, 3, 4, 5, 6])
+  expectTrue(x < y)
+}
+
 TensorTests.testAllBackends("ArgMax") {
   // 2 x 3
   let x = Tensor<Float>([[0, 1, 2], [3, 4, 5]])
