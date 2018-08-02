@@ -79,14 +79,12 @@ canUseTemporaryForWrite(const StringRef outputPath) {
 /// temporary file that was just created.
 /// \param outputPath The path to the final output file, which is used to decide
 /// where to put the temporary.
-/// \param openFlags Controls how the output stream will be opened.
 ///
 /// \returns The path to the temporary file that was opened, or \c None if the
 /// file couldn't be created.
 static Optional<std::string>
 tryToOpenTemporaryFile(Optional<llvm::raw_fd_ostream> &openedStream,
-                       const StringRef outputPath,
-                       const llvm::sys::fs::OpenFlags openFlags) {
+                       const StringRef outputPath) {
   namespace fs = llvm::sys::fs;
 
   // Create a temporary file path.
@@ -102,8 +100,7 @@ tryToOpenTemporaryFile(Optional<llvm::raw_fd_ostream> &openedStream,
 
   int fd;
   const unsigned perms = fs::all_read | fs::all_write;
-  std::error_code EC = fs::createUniqueFile(tempPath, fd, tempPath, perms,
-                                            openFlags);
+  std::error_code EC = fs::createUniqueFile(tempPath, fd, tempPath, perms);
 
   if (EC) {
     // Ignore the specific error; the caller has to fall back to not using a
@@ -118,7 +115,7 @@ tryToOpenTemporaryFile(Optional<llvm::raw_fd_ostream> &openedStream,
 }
 
 std::error_code swift::atomicallyWritingToFile(
-    const StringRef outputPath, const bool binaryMode,
+    const StringRef outputPath,
     const llvm::function_ref<void(llvm::raw_pwrite_stream &)> action) {
   namespace fs = llvm::sys::fs;
 
@@ -133,11 +130,9 @@ std::error_code swift::atomicallyWritingToFile(
 
   Optional<std::string> temporaryPath;
   {
-    const fs::OpenFlags openFlags = (binaryMode ? fs::F_None : fs::F_Text);
-
     Optional<llvm::raw_fd_ostream> OS;
     if (canUseTemporary.get()) {
-      temporaryPath = tryToOpenTemporaryFile(OS, outputPath, openFlags);
+      temporaryPath = tryToOpenTemporaryFile(OS, outputPath);
 
       if (!temporaryPath) {
         assert(!OS.hasValue());
@@ -149,7 +144,7 @@ std::error_code swift::atomicallyWritingToFile(
 
     if (!OS.hasValue()) {
       std::error_code error;
-      OS.emplace(outputPath, error, openFlags);
+      OS.emplace(outputPath, error, fs::F_None);
       if (error)
         return error;
     }

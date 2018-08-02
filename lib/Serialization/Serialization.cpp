@@ -5092,7 +5092,6 @@ static inline bool
 withOutputFile(ASTContext &ctx, StringRef outputPath,
                llvm::function_ref<void(raw_ostream &)> action){
   std::error_code EC = swift::atomicallyWritingToFile(outputPath,
-                                                      /*binary*/true,
                                                       action);
   if (!EC)
     return false;
