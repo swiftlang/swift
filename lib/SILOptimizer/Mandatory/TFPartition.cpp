@@ -2421,16 +2421,8 @@ void PartitionCloner::visitCondBranchInst(CondBranchInst *inst) {
       eltTy = SILType::getBuiltinIntegerType(/*bitWidth*/ 1, ctx).getASTType();
 
     assert(eltTy->isBuiltinIntegerType(1) && "expected Tensor<i1>");
-
-    auto name = ctx.getIdentifier("tf_tensor_to_i1");
-    SmallVector<GraphOperationAttribute, 1> attributes;
-    FP.deviceInfo.handleDevicePlacement(
-      "tf_tensor_to_i1", /*opDevice*/ getDeviceString(DeviceType::ALL),
-      B.getModule().getASTContext(), attributes);
-    cond = getSingleValueResult(B.createGraphOperation(
-        getOpLocation(inst->getLoc()), name,
-        /*operands*/ {cond}, attributes,
-        {SILType::getPrimitiveObjectType(eltTy->getCanonicalType())}));
+    cond = getSingleValueResult(createTFInt1ToBuiltinInt1(
+        cond, B, getOpLocation(inst->getLoc()), FP.deviceInfo));
   }
 
   doPostProcess(inst,
@@ -3158,14 +3150,8 @@ void PartitionCloner::handleSendRecvForTerminator(TermInst *inst) {
           loc, ctx.getIdentifier(equalOpName),
           /*operands*/ {receivedCaseId, constTensorWithCaseId}, attributes,
           {tensorHandleI1Ty});
-      attributes.clear();
-      FP.deviceInfo.handleDevicePlacement(
-          "tf_tensor_to_i1", /*opDevice*/ getDeviceString(DeviceType::ALL),
-          BA.getModule().getASTContext(), attributes);
-      auto *condBrInst = BA.createGraphOperation(
-          loc, ctx.getIdentifier("tf_tensor_to_i1"),
-          /*operands*/ {getSingleValueResult(equalComparisonInst)}, attributes,
-          {boolFieldSILType});
+      auto *condBrInst = createTFInt1ToBuiltinInt1(
+          getSingleValueResult(equalComparisonInst), BA, loc, FP.deviceInfo);
       condBrOperand = getSingleValueResult(condBrInst);
     }
 

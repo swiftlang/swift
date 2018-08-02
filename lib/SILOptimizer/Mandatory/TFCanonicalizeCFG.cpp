@@ -342,11 +342,6 @@ private:
     return SILUndef::get(type, currentFn->getModule());
   }
 
-  /// Create a tf_tensor_to_i1 instruction with the given value as argument.
-  GraphOperationInst *createTFInt1ToBuiltinInt1(SILBuilder &builder,
-                                                SILLocation location,
-                                                SILValue value);
-
   // Configuration for graph construction.
   GraphFunctionDeviceInfo *deviceInfo;
   DominanceInfo *DI;
@@ -396,22 +391,6 @@ void SingleExitLoopTransformer::initialize() {
       llvm::for_each(inst.getResults(), saveEscaping);
     }
   }
-}
-
-GraphOperationInst* SingleExitLoopTransformer::createTFInt1ToBuiltinInt1(
-    SILBuilder &builder, SILLocation location, SILValue value) {
-  ASTContext &context = builder.getASTContext();
-  SmallVector<GraphOperationAttribute, 1> attributes;
-  deviceInfo->handleDevicePlacement(
-      "tf_tensor_to_i1",
-      /*opDevice*/ getDeviceString(DeviceType::ALL),
-      builder.getModule().getASTContext(), attributes);
-  GraphOperationInst *condValue = builder.createGraphOperation(
-    location, context.getIdentifier("tf_tensor_to_i1"),
-      /*operands*/ {value}, attributes,
-      {SILType::getBuiltinIntegerType(1, context)});
-  assert(condValue->getNumResults() == 1);
-  return condValue;
 }
 
 /// Appends the given arguments to the given edge. Deletes the old TermInst
@@ -671,7 +650,7 @@ SILBasicBlock *SingleExitLoopTransformer::createNewExitBlockWithDemux(
     assert(condTensorInst->getNumResults() == 1);
 
     GraphOperationInst *condValue = createTFInt1ToBuiltinInt1(
-        builder, headerLocation, condTensorInst->getResults()[0]);
+        condTensorInst->getResults()[0], builder, headerLocation, *deviceInfo);
     builder.createCondBranch(headerLocation, condValue->getResults()[0],
                              trueBlock, demuxBlock);
     demuxBlock = newBlock;
@@ -702,7 +681,6 @@ bool SingleExitLoopTransformer::transform() {
     }
   }
   SILBuilder builder(header);
-  ASTContext &context = builder.getASTContext();
 
   // Create a new header and get the exitIndex argument.
   std::pair<SILBasicBlock *, SILValue> headerResult = createNewHeader();
@@ -727,7 +705,7 @@ bool SingleExitLoopTransformer::transform() {
     SILLocation headerLocation =
         getUserSourceLocation(header->getTerminator()->getDebugLocation());
     GraphOperationInst *loopExitCond = createTFInt1ToBuiltinInt1(
-        builder, headerLocation, newHeader->getArguments().back());
+        newHeader->getArguments().back(), builder, headerLocation, *deviceInfo);
     builder.createCondBranch(headerLocation, loopExitCond->getResults()[0],
                              header, newExitBlock);
   }

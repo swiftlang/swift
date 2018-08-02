@@ -310,10 +310,17 @@ namespace tf {
                     SymbolicValue shape, SILType resultType, SILLocation loc,
                     DeviceType targetDevice, SILBuilder &B);
 
+  /// Create a tf_tensor_to_i1 instruction with the given value as argument.
+  GraphOperationInst *
+  createTFInt1ToBuiltinInt1(SILValue value, SILBuilder &builder,
+                            SILLocation location,
+                            GraphFunctionDeviceInfo &deviceInfo);
+
   /// This struct provides a an efficient implementation of a predicate that
   /// determines whether a type is or contains a TensorHandle that will be
-  /// exposed after deabstraction.  This is a class instead of a simple function
-  /// because we memoize state to avoid rechecking types over and over again.
+  /// exposed after deabstraction.  This is a class instead of a simple
+  /// function because we memoize state to avoid rechecking types over and
+  /// over again.
   class TensorFunctionClassifier {
     TypeContainsTensorFlowValue tctfc;
   public:
