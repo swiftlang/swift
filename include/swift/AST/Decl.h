@@ -1711,6 +1711,10 @@ public:
   /// Retrieve the nominal type declaration that is being extended.
   NominalTypeDecl *getExtendedNominal() const;
 
+  /// Determine whether this extension has already been bound to a nominal
+  /// type declaration.
+  bool alreadyBoundToNominal() const { return NextExtension.getInt(); }
+
   /// Retrieve the extended type location.
   TypeLoc &getExtendedTypeLoc() { return ExtendedType; }
 
@@ -3707,7 +3711,7 @@ public:
   ///
   /// This is true of imported Objective-C classes.
   bool usesObjCGenericsModel() const {
-    return isObjC() && hasClangNode() && isGenericContext();
+    return hasClangNode() && isGenericContext() && isObjC();
   }
   
   /// True if the class is known to be implemented in Swift.

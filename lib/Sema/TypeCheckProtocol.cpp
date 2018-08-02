@@ -1542,7 +1542,8 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
   }
 
   // Not every protocol/type is compatible with conditional conformances.
-  if (!conformance->getConditionalRequirements().empty()) {
+  auto conditionalReqs = conformance->getConditionalRequirementsIfAvailable();
+  if (conditionalReqs && !conditionalReqs->empty()) {
     auto nestedType = canT;
     // Obj-C generics cannot be looked up at runtime, so we don't support
     // conditional conformances involving them. Check the full stack of nested
@@ -1601,7 +1602,10 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
     while (implyingConf->getSourceKind() == ConformanceEntryKind::Implied) {
       implyingConf = implyingConf->getImplyingConformance();
     }
-    if (!implyingConf->getConditionalRequirements().empty()) {
+
+    auto implyingCondReqs =
+      implyingConf->getConditionalRequirementsIfAvailable();
+    if (implyingCondReqs && !implyingCondReqs->empty()) {
       // We shouldn't suggest including witnesses for the conformance, because
       // those suggestions will go in the current DeclContext, but really they
       // should go into the new extension we (might) suggest here.
@@ -4032,6 +4036,7 @@ void swift::useObjectiveCBridgeableConformancesOfArgs(
 }
 
 void TypeChecker::useBridgedNSErrorConformances(DeclContext *dc, Type type) {
+  auto errorProto = Context.getProtocol(KnownProtocolKind::Error);
   auto bridgedStoredNSError = Context.getProtocol(
                                     KnownProtocolKind::BridgedStoredNSError);
   auto errorCodeProto = Context.getProtocol(
@@ -4039,8 +4044,15 @@ void TypeChecker::useBridgedNSErrorConformances(DeclContext *dc, Type type) {
   auto rawProto = Context.getProtocol(
                         KnownProtocolKind::RawRepresentable);
 
-  if (!bridgedStoredNSError || !errorCodeProto || !rawProto)
+  if (!errorProto || !bridgedStoredNSError || !errorCodeProto || !rawProto)
     return;
+
+  // The NSError: Error conformance.
+  if (auto nsError = Context.getNSErrorDecl()) {
+    validateDecl(nsError);
+    (void)conformsToProtocol(nsError->TypeDecl::getDeclaredInterfaceType(),
+                             errorProto, dc, ConformanceCheckFlags::Used);
+  }
 
   // _BridgedStoredNSError.
   auto conformance = conformsToProtocol(type, bridgedStoredNSError, dc,

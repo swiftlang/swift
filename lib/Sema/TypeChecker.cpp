@@ -282,9 +282,67 @@ static GenericParamList *cloneGenericParams(ASTContext &ctx,
   return toParams;
 }
 
+/// FIXME: Similar to TypeChecker::prepareGenericParamList(), which needs
+/// to be separated from the type checker.
+static void prepareGenericParamList(GenericParamList *genericParams) {
+  unsigned depth = genericParams->getDepth();
+  for (auto gp : *genericParams) {
+    if (gp->getDepth() == depth)
+      return;
+
+    gp->setDepth(depth);
+  }
+
+  if (auto outerGenericParams = genericParams->getOuterParameters())
+    prepareGenericParamList(outerGenericParams);
+}
+
+/// Bind the given extension to the given nominal type.
+static void bindExtensionToNominal(ExtensionDecl *ext,
+                                   NominalTypeDecl *nominal) {
+  if (ext->alreadyBoundToNominal())
+    return;
+
+  if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
+    // For a protocol extension, build the generic parameter list.
+    auto genericParams = proto->createGenericParams(ext);
+    prepareGenericParamList(genericParams);
+    ext->setGenericParams(genericParams);
+  } else if (auto genericParams = nominal->getGenericParamsOfContext()) {
+    // Clone the generic parameter list of a generic type.
+    prepareGenericParamList(genericParams);
+    ext->setGenericParams(
+        cloneGenericParams(ext->getASTContext(), ext, genericParams));
+  }
+
+  // If we have a trailing where clause, deal with it now.
+  // For now, trailing where clauses are only permitted on protocol extensions.
+  if (auto trailingWhereClause = ext->getTrailingWhereClause()) {
+    if (!(nominal->getGenericParamsOfContext() || isa<ProtocolDecl>(nominal))) {
+      // Only generic and protocol types are permitted to have
+      // trailing where clauses.
+      ext->diagnose(diag::extension_nongeneric_trailing_where,
+                    nominal->getFullName())
+        .highlight(trailingWhereClause->getSourceRange());
+      ext->setTrailingWhereClause(nullptr);
+    } else {
+      // Merge the trailing where clause into the generic parameter list.
+      // FIXME: Long-term, we'd like clients to deal with the trailing where
+      // clause explicitly, but for now it's far more direct to represent
+      // the trailing where clause as part of the requirements.
+      ext->getGenericParams()->addTrailingWhereClause(
+        ext->getASTContext(),
+        trailingWhereClause->getWhereLoc(),
+        trailingWhereClause->getRequirements());
+    }
+  }
+
+  nominal->addExtension(ext);
+}
+
 static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   if (ED->getExtendedType())
-    return; 
+    return;
 
   // If we didn't parse a type, fill in an error type and bail out.
   if (!ED->getExtendedTypeLoc().getTypeRepr()) {
@@ -302,6 +360,7 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   options |= TypeResolutionFlags::ExtensionBinding;
   if (TC.validateType(ED->getExtendedTypeLoc(), dc, options)) {
     ED->setInvalid();
+    ED->getExtendedTypeLoc().setInvalidType(TC.Context);
     return;
   }
 
@@ -352,52 +411,15 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   }
   assert(extendedNominal && "Should have the nominal type being extended");
 
-  // If the extended type is generic or is a protocol. Clone or create
-  // the generic parameters.
-  if (extendedNominal->getGenericParamsOfContext() ||
-      isa<ProtocolDecl>(extendedNominal)) {
-    if (auto proto = dyn_cast<ProtocolDecl>(extendedNominal)) {
-      // For a protocol extension, build the generic parameter list.
-      ED->setGenericParams(proto->createGenericParams(ED));
-    } else {
-      // Clone the existing generic parameter list.
-      ED->setGenericParams(
-        cloneGenericParams(TC.Context, ED,
-                           extendedNominal->getGenericParamsOfContext()));
-    }
-  }
-
-  // If we have a trailing where clause, deal with it now.
-  // For now, trailing where clauses are only permitted on protocol extensions.
-  if (auto trailingWhereClause = ED->getTrailingWhereClause()) {
-    if (!(extendedNominal->getGenericParamsOfContext() ||
-          isa<ProtocolDecl>(extendedNominal))) {
-      // Only generic and protocol types are permitted to have
-      // trailing where clauses.
-      TC.diagnose(ED, diag::extension_nongeneric_trailing_where, extendedType)
-        .highlight(trailingWhereClause->getSourceRange());
-      ED->setTrailingWhereClause(nullptr);
-    } else {
-      // Merge the trailing where clause into the generic parameter list.
-      // FIXME: Long-term, we'd like clients to deal with the trailing where
-      // clause explicitly, but for now it's far more direct to represent
-      // the trailing where clause as part of the requirements.
-      ED->getGenericParams()->addTrailingWhereClause(
-        TC.Context,
-        trailingWhereClause->getWhereLoc(),
-        trailingWhereClause->getRequirements());
-    }
-  }
-
-  extendedNominal->addExtension(ED);
+  bindExtensionToNominal(ED, extendedNominal);
 }
 
 static void bindExtensions(SourceFile &SF, TypeChecker &TC) {
   // Utility function to try and resolve the extended type without diagnosing.
   // If we succeed, we go ahead and bind the extension. Otherwise, return false.
   auto tryBindExtension = [&](ExtensionDecl *ext) -> bool {
-    if (ext->getExtendedNominal()) {
-      bindExtensionDecl(ext, TC);
+    if (auto nominal = ext->getExtendedNominal()) {
+      bindExtensionToNominal(ext, nominal);
       return true;
     }
 
@@ -452,10 +474,6 @@ void TypeChecker::bindExtension(ExtensionDecl *ext) {
 void TypeChecker::resolveExtensionForConformanceConstruction(
     ExtensionDecl *ext,
     SmallVectorImpl<ConformanceConstructionInfo> &protocols) {
-  // To be able to know the conformances that an extension declares, we just
-  // need to know which type it is connected to:
-  ::bindExtensionDecl(ext, *this);
-
   // and the protocols which it inherits from:
   DependentGenericTypeResolver resolver;
   TypeResolutionOptions options = TypeResolutionFlags::GenericSignature;

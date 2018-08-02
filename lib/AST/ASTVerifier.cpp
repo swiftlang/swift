@@ -2619,8 +2619,14 @@ public:
       verifyProtocolList(nominal, nominal->getLocalProtocols());
 
       // Make sure that the protocol conformances are complete.
-      for (auto conformance : nominal->getLocalConformances()) {
-        verifyConformance(nominal, conformance);
+      // Only do so within the source file of the nominal type,
+      // because anywhere else this can trigger new type-check requests.
+      if (auto sf = M.dyn_cast<SourceFile *>()) {
+        if (nominal->getParentSourceFile() == sf) {
+          for (auto conformance : nominal->getLocalConformances()) {
+            verifyConformance(nominal, conformance);
+          }
+        }
       }
 
       verifyCheckedBase(nominal);

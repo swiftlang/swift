@@ -611,9 +611,16 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
         // Dig out the type we're looking into.
         // FIXME: We shouldn't need to compute a type to perform this lookup.
-        Type lookupType = dc->getSelfTypeInContext();
+        Type lookupType;
+        if (isa<ProtocolDecl>(nominal)) {
+          if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
+            TypeResolver->bindExtension(ext);
 
-        if (lookupType->hasError()) continue;
+            lookupType = dc->getSelfTypeInContext();
+
+            if (lookupType->hasError()) continue;
+          }
+        }
 
         NLOptions options = baseNLOptions;
         // Perform lookup into the type.
@@ -623,7 +630,10 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           options |= NL_KnownNonCascadingDependency;
 
         SmallVector<ValueDecl *, 4> lookup;
-        dc->lookupQualified(lookupType, Name, options, TypeResolver, lookup);
+        if (lookupType)
+          dc->lookupQualified(lookupType, Name, options, TypeResolver, lookup);
+        else
+          dc->lookupQualified(nominal, Name, options, lookup);
 
         auto startIndex = Results.size();
         for (auto result : lookup) {
@@ -767,10 +777,12 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           if (Loc.isValid()) {
             if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
               namelookup::FindLocalVal localVal(SM, Loc, Consumer);
-              localVal.visit(CE->getBody());
+              if (auto body = CE->getBody())
+                localVal.visit(body);
               if (shouldReturnBasedOnResults())
                 return;
-              localVal.checkParameterList(CE->getParameters());
+              if (auto params = CE->getParameters())
+                localVal.checkParameterList(params);
               if (shouldReturnBasedOnResults())
                 return;
             }
@@ -778,6 +790,16 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           if (!isCascadingUse.hasValue())
             isCascadingUse = ACE->isCascadingContextForLookup(false);
         } else if (auto *ED = dyn_cast<ExtensionDecl>(DC)) {
+          auto ExtendedNominal = ED->getExtendedNominal();
+          if (!ExtendedNominal) {
+            DC = ED->getParent();
+            continue;
+          }
+
+          if (TypeResolver) {
+            TypeResolver->bindExtension(ED);
+          }
+
           ExtendedType = ED->getSelfTypeInContext();
 
           BaseDC = ED;
@@ -1617,6 +1639,12 @@ static void extractDirectlyReferencedNominalTypes(
               Type type, SmallVectorImpl<NominalTypeDecl *> &decls) {
   if (auto nominal = type->getAnyNominal()) {
     decls.push_back(nominal);
+    return;
+  }
+
+  if (auto unbound = type->getAs<UnboundGenericType>()) {
+    if (auto nominal = dyn_cast<NominalTypeDecl>(unbound->getDecl()))
+      decls.push_back(nominal);
     return;
   }
 

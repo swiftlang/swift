@@ -4954,6 +4954,8 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
   if (ext->hasValidationStarted())
     return;
 
+  bindExtension(ext);
+
   DeclValidationRAII IBV(ext);
 
   // If the extension is already known to be invalid, we're done.

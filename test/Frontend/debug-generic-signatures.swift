@@ -76,7 +76,7 @@ struct Generic<T> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=Generic<T>
 // CHECK-NEXT: (normal_conformance type=Generic<T> protocol=P1
 // CHECK-NEXT:   (assoc_type req=A type=T)
-// CHECK-NEXT:   (value req=f() witness=main.(file).Generic.f()@{{.*}})
+// CHECK-NEXT:   (value req=f() witness=main.(file).Generic extension.f()@{{.*}})
 // CHECK-NEXT:   conforms_to: T P1)
 extension Generic: P1 where T: P1 {
     typealias A = T
