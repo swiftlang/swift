@@ -34,7 +34,7 @@
         "P2"
       ],
       "declAttributes": [
-        "fixedLayout"
+        "FixedLayout"
       ],
       "children": [
         {
@@ -231,6 +231,9 @@
           "usr": "s:4cake2C1C3InsACSgXwvp",
           "location": "",
           "moduleName": "cake",
+          "declAttributes": [
+            "ReferenceOwnership"
+          ],
           "ownership": 1,
           "children": [
             {
@@ -246,6 +249,9 @@
               "usr": "s:4cake2C1C3InsACSgXwvg",
               "location": "",
               "moduleName": "cake",
+              "declAttributes": [
+                "Transparent"
+              ],
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -271,6 +277,9 @@
               "usr": "s:4cake2C1C3InsACSgXwvs",
               "location": "",
               "moduleName": "cake",
+              "declAttributes": [
+                "Transparent"
+              ],
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -303,6 +312,9 @@
           "usr": "s:4cake2C1C4Ins2ACXovp",
           "location": "",
           "moduleName": "cake",
+          "declAttributes": [
+            "ReferenceOwnership"
+          ],
           "ownership": 2,
           "children": [
             {
@@ -318,6 +330,9 @@
               "usr": "s:4cake2C1C4Ins2ACXovg",
               "location": "",
               "moduleName": "cake",
+              "declAttributes": [
+                "Transparent"
+              ],
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -335,6 +350,9 @@
               "usr": "s:4cake2C1C4Ins2ACXovs",
               "location": "",
               "moduleName": "cake",
+              "declAttributes": [
+                "Transparent"
+              ],
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -561,6 +579,9 @@
           "usr": "s:4cake6NumberO8rawValueACSgSi_tcfc",
           "location": "",
           "moduleName": "cake",
+          "declAttributes": [
+            "Inlinable"
+          ],
           "children": [
             {
               "kind": "TypeNominal",
@@ -607,6 +628,9 @@
               "usr": "s:4cake6NumberO8rawValueSivg",
               "location": "",
               "moduleName": "cake",
+              "declAttributes": [
+                "Inlinable"
+              ],
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -687,7 +711,7 @@
         "CVarArg"
       ],
       "declAttributes": [
-        "fixedLayout"
+        "FixedLayout"
       ],
       "children": [
         {
