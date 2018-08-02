@@ -90,7 +90,7 @@ void ConstraintSystem::incrementScopeCounter() {
 bool ConstraintSystem::hasFreeTypeVariables() {
   // Look for any free type variables.
   for (auto tv : TypeVariables) {
-    if (!tv->getImpl().hasRepresentativeOrFixed()) {
+    if (!tv->getImpl().hasRepresentativeOrBound()) {
       return true;
     }
   }
@@ -146,12 +146,12 @@ bool ConstraintSystem::typeVarOccursInType(TypeVariableType *typeVar,
   return result;
 }
 
-void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
+void ConstraintSystem::assignBoundType(TypeVariableType *typeVar, Type type,
                                        bool updateState) {
   assert(!type->hasError() &&
          "Should not be assigning a type involving ErrorType!");
 
-  typeVar->getImpl().assignFixedType(type, getSavedBindings());
+  typeVar->getImpl().assignBoundType(type, getSavedBindings());
 
   if (!updateState)
     return;
@@ -199,7 +199,7 @@ void ConstraintSystem::setMustBeMaterializableRecursive(Type type)
   assert(type->isMaterializable() &&
          "argument to setMustBeMaterializableRecursive may not be inherently "
          "non-materializable");
-  type = getFixedTypeRecursive(type, /*wantRValue=*/false);
+  type = resolveTypeVariable(type, /*wantRValue=*/false);
   type = type->lookThroughAllOptionalTypes();
 
   if (auto typeVar = type->getAs<TypeVariableType>()) {
@@ -689,7 +689,7 @@ bool ConstraintSystem::isCollectionType(Type type) {
 
 bool ConstraintSystem::isAnyHashableType(Type type) {
   if (auto tv = type->getAs<TypeVariableType>()) {
-    auto fixedType = getFixedType(tv);
+    auto fixedType = getBoundType(tv);
     return fixedType && isAnyHashableType(fixedType);
   }
 
@@ -705,10 +705,8 @@ static Type withParens(ConstraintSystem &cs, Type type, ParenType *parenType) {
   return ParenType::get(cs.getASTContext(), type->getInOutObjectType(), flags);
 }
 
-Type ConstraintSystem::getFixedTypeRecursive(Type type,
-                                             TypeMatchOptions &flags,
-                                             bool wantRValue,
-                                             bool retainParens) {
+Type ConstraintSystem::resolveTypeVariable(Type type, TypeMatchOptions &flags,
+                                           bool wantRValue, bool retainParens) {
 
   // FIXME: This function doesn't strictly honor retainParens
   //        everywhere.
@@ -718,8 +716,8 @@ Type ConstraintSystem::getFixedTypeRecursive(Type type,
       type = type->getRValueType();
 
     if (auto *parenTy = dyn_cast<ParenType>(type.getPointer())) {
-      auto fixed = getFixedTypeRecursive(parenTy->getUnderlyingType(), flags,
-                                         wantRValue, retainParens);
+      auto fixed = resolveTypeVariable(parenTy->getUnderlyingType(), flags,
+                                       wantRValue, retainParens);
       return withParens(*this, fixed, parenTy);
     }
   }
@@ -747,7 +745,7 @@ Type ConstraintSystem::getFixedTypeRecursive(Type type,
     if (!typeVar)
       return type;
 
-    if (auto fixed = getFixedType(typeVar)) {
+    if (auto fixed = getBoundType(typeVar)) {
       type = fixed;
       continue;
     }
@@ -1252,7 +1250,7 @@ ConstraintSystem::getTypeOfMemberReference(
     const DeclRefExpr *base,
     OpenedTypeMap *replacementsPtr) {
   // Figure out the instance type used for the base.
-  Type baseObjTy = getFixedTypeRecursive(baseTy, /*wantRValue=*/true);
+  Type baseObjTy = resolveTypeVariable(baseTy, /*wantRValue=*/true);
   bool isInstance = true;
   if (auto baseMeta = baseObjTy->getAs<AnyMetatypeType>()) {
     baseObjTy = baseMeta->getInstanceType();
@@ -2013,14 +2011,12 @@ Type ConstraintSystem::simplifyType(Type type) {
     return type;
 
   // Map type variables down to the fixed types of their representatives.
-  return simplifyTypeImpl(
-      *this, type,
-      [&](TypeVariableType *tvt) -> Type {
-        if (auto fixed = getFixedType(tvt))
-          return simplifyType(fixed);
+  return simplifyTypeImpl(*this, type, [&](TypeVariableType *tvt) -> Type {
+    if (auto fixed = getBoundType(tvt))
+      return simplifyType(fixed);
 
-        return getRepresentative(tvt);
-      });
+    return getRepresentative(tvt);
+  });
 }
 
 Type Solution::simplifyType(Type type) const {

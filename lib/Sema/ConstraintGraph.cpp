@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -75,7 +75,7 @@ ConstraintGraph::lookupNode(TypeVariableType *typeVar) {
   auto typeVarRep = CS.getRepresentative(typeVar);
   if (typeVar != typeVarRep)
     mergeNodes(typeVar, typeVarRep);
-  else if (auto fixed = CS.getFixedType(typeVarRep)) {
+  else if (auto fixed = CS.getBoundType(typeVarRep)) {
     // Bind the type variable.
     bindTypeVariable(typeVar, fixed);
   }
@@ -601,7 +601,7 @@ unsigned ConstraintGraph::computeConnectedComponents(
   SmallVector<bool, 4> componentHasUnboundTypeVar(numComponents, false);
   for (unsigned i = 0; i != numTypeVariables; ++i) {
     // If this type variable has a fixed type, skip it.
-    if (CS.getFixedType(TypeVariables[i]))
+    if (CS.getBoundType(TypeVariables[i]))
       continue;
 
     // If this type variable isn't in the subset of type variables we care

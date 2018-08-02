@@ -69,9 +69,9 @@ namespace constraints {
 class SavedTypeVariableBinding {
   /// \brief The type variable and type variable options.
   llvm::PointerIntPair<TypeVariableType *, 3> TypeVarAndOptions;
-  
-  /// \brief The parent or fixed type.
-  llvm::PointerUnion<TypeVariableType *, TypeBase *> ParentOrFixed;
+
+  /// \brief The parent or bound type.
+  llvm::PointerUnion<TypeVariableType *, TypeBase *> ParentOrBound;
 
 public:
   explicit SavedTypeVariableBinding(TypeVariableType *typeVar);
@@ -174,16 +174,16 @@ enum TypeVariableOptions {
 ///
 /// The implementation object for a type variable contains information about
 /// the type variable, where it was generated, what protocols it must conform
-/// to, what specific types it might be and, eventually, the fixed type to
+/// to, what specific types it might be and, eventually, the bound type to
 /// which it is assigned.
 class TypeVariableType::Implementation {
   /// \brief The locator that describes where this type variable was generated.
   constraints::ConstraintLocator *locator;
 
-  /// \brief Either the parent of this type variable within an equivalence
-  /// class of type variables, or the fixed type to which this type variable
-  /// type is bound.
-  llvm::PointerUnion<TypeVariableType *, TypeBase *> ParentOrFixed;
+  /// \brief Either the parent of this type variable within an
+  /// equivalence class of type variables, or the type to which this
+  /// type variable type is bound.
+  llvm::PointerUnion<TypeVariableType *, TypeBase *> ParentOrBound;
 
   /// The corresponding node in the constraint graph.
   constraints::ConstraintGraphNode *GraphNode = nullptr;
@@ -203,7 +203,7 @@ public:
 
   explicit Implementation(constraints::ConstraintLocator *locator,
                           unsigned options)
-    : locator(locator), ParentOrFixed(getTypeVariable()) {
+      : locator(locator), ParentOrBound(getTypeVariable()) {
     getTypeVariable()->Bits.TypeVariableType.Options = options;
   }
 
@@ -258,14 +258,14 @@ public:
   
   /// \brief Check whether this type variable either has a representative that
   /// is not itself or has a fixed type binding.
-  bool hasRepresentativeOrFixed() const {
-    // If we have a fixed type, we're done.
-    if (!ParentOrFixed.is<TypeVariableType *>())
+  bool hasRepresentativeOrBound() const {
+    // If we have a bound type, we're done.
+    if (!ParentOrBound.is<TypeVariableType *>())
       return true;
 
     // Check whether the representative is different from our own type
     // variable.
-    return ParentOrFixed.get<TypeVariableType *>() != getTypeVariable();
+    return ParentOrBound.get<TypeVariableType *>() != getTypeVariable();
   }
 
   /// \brief Record the current type-variable binding.
@@ -293,9 +293,9 @@ public:
     // Find the representative type variable.
     auto result = getTypeVariable();
     Implementation *impl = this;
-    while (impl->ParentOrFixed.is<TypeVariableType *>()) {
+    while (impl->ParentOrBound.is<TypeVariableType *>()) {
       // Extract the representative.
-      auto nextTV = impl->ParentOrFixed.get<TypeVariableType *>();
+      auto nextTV = impl->ParentOrBound.get<TypeVariableType *>();
       if (nextTV == result)
         break;
 
@@ -308,16 +308,16 @@ public:
 
     // Perform path compression.
     impl = this;
-    while (impl->ParentOrFixed.is<TypeVariableType *>()) {
+    while (impl->ParentOrBound.is<TypeVariableType *>()) {
       // Extract the representative.
-      auto nextTV = impl->ParentOrFixed.get<TypeVariableType *>();
+      auto nextTV = impl->ParentOrBound.get<TypeVariableType *>();
       if (nextTV == result)
         break;
 
       // Record the state change.
       impl->recordBinding(*record);
 
-      impl->ParentOrFixed = result;
+      impl->ParentOrBound = result;
       impl = &nextTV->getImpl();
     }
 
@@ -342,7 +342,7 @@ public:
     auto otherRep = other->getImpl().getRepresentative(record);
     if (record)
       otherRep->getImpl().recordBinding(*record);
-    otherRep->getImpl().ParentOrFixed = getTypeVariable();
+    otherRep->getImpl().ParentOrBound = getTypeVariable();
     if (!mustBeMaterializable() && otherRep->getImpl().mustBeMaterializable()) {
       if (record)
         recordBinding(*record);
@@ -351,33 +351,33 @@ public:
     }
   }
 
-  /// \brief Retrieve the fixed type that corresponds to this type variable,
+  /// \brief Retrieve the bound type that corresponds to this type variable,
   /// if there is one.
   ///
-  /// \returns the fixed type associated with this type variable, or a null
-  /// type if there is no fixed type.
+  /// \returns the bound type associated with this type variable, or a null
+  /// type if there is no bound type.
   ///
   /// \param record The record of changes made by retrieving the representative,
   /// which can happen due to path compression. If null, path compression is
   /// not performed.
-  Type getFixedType(constraints::SavedTypeVariableBindings *record) {
+  Type getBoundType(constraints::SavedTypeVariableBindings *record) {
     // Find the representative type variable.
     auto rep = getRepresentative(record);
     Implementation &repImpl = rep->getImpl();
 
     // Return the bound type if there is one, otherwise, null.
-    return repImpl.ParentOrFixed.dyn_cast<TypeBase *>();
+    return repImpl.ParentOrBound.dyn_cast<TypeBase *>();
   }
 
-  /// \brief Assign a fixed type to this equivalence class.
-  void assignFixedType(Type type,
+  /// \brief Assign a bound type to this equivalence class.
+  void assignBoundType(Type type,
                        constraints::SavedTypeVariableBindings *record) {
-    assert((!getFixedType(0) || getFixedType(0)->isEqual(type)) &&
-           "Already has a fixed type!");
+    assert((!getBoundType(0) || getBoundType(0)->isEqual(type)) &&
+           "Already has a bound type!");
     auto rep = getRepresentative(record);
     if (record)
       rep->getImpl().recordBinding(*record);
-    rep->getImpl().ParentOrFixed = type.getPointer();
+    rep->getImpl().ParentOrBound = type.getPointer();
   }
 
   void setMustBeMaterializable(constraints::SavedTypeVariableBindings *record) {
@@ -612,7 +612,7 @@ public:
       Conformances;
 
   /// \brief Simplify the given type by substituting all occurrences of
-  /// type variables for their fixed types.
+  /// type variables for their bound types.
   Type simplifyType(Type type) const;
 
   /// \brief Coerce the given expression to the given type.
@@ -686,7 +686,7 @@ public:
   Score &getFixedScore() { return FixedScore; }
 
   /// \brief Retrieve the fixed type for the given type variable.
-  Type getFixedType(TypeVariableType *typeVar) const;
+  Type getBoundType(TypeVariableType *typeVar) const;
 
   /// Try to resolve the given locator to a declaration within this
   /// solution.
@@ -1999,15 +1999,16 @@ public:
   /// Options that govern how type matching should proceed.
   using TypeMatchOptions = OptionSet<TypeMatchFlags>;
 
-  /// \brief Retrieve the fixed type corresponding to the given type variable,
-  /// or a null type if there is no fixed type.
-  Type getFixedType(TypeVariableType *typeVar) {
-    return typeVar->getImpl().getFixedType(getSavedBindings());
+  /// \brief Retrieve the bound type corresponding to the given type variable,
+  /// or a null type if there is no bound type.
+  Type getBoundType(TypeVariableType *typeVar) {
+    return typeVar->getImpl().getBoundType(getSavedBindings());
   }
 
-  /// Retrieve the fixed type corresponding to a given type variable,
-  /// recursively, until we hit something that isn't a type variable
-  /// or a type variable that doesn't have a fixed type.
+  /// Iteratively reduce DependentMemberTypes and TypeVariableTypes to
+  /// their bound types until we converge on either a completely
+  /// concrete type or one which cannot be further simplified given
+  /// the current state of the constraint system.
   ///
   /// \param type The type to simplify.
   ///
@@ -2015,15 +2016,16 @@ public:
   /// lvalues at each step.
   ///
   /// param retainParens Whether to retain parentheses.
-  Type getFixedTypeRecursive(Type type, bool wantRValue,
-                             bool retainParens = false) {
+  Type resolveTypeVariable(Type type, bool wantRValue,
+                           bool retainParens = false) {
     TypeMatchOptions flags = None;
-    return getFixedTypeRecursive(type, flags, wantRValue, retainParens);
+    return resolveTypeVariable(type, flags, wantRValue, retainParens);
   }
 
-  /// Retrieve the fixed type corresponding to a given type variable,
-  /// recursively, until we hit something that isn't a type variable
-  /// or a type variable that doesn't have a fixed type.
+  /// Iteratively reduce DependentMemberTypes and TypeVariableTypes to
+  /// their bound types until we converge on either a completely
+  /// concrete type or one which cannot be further simplified given
+  /// the current state of the constraint system.
   ///
   /// \param type The type to simplify.
   ///
@@ -2035,9 +2037,8 @@ public:
   /// lvalues at each step.
   ///
   /// param retainParens Whether to retain parentheses.
-  Type getFixedTypeRecursive(Type type, TypeMatchOptions &flags,
-                             bool wantRValue,
-                             bool retainParens = false);
+  Type resolveTypeVariable(Type type, TypeMatchOptions &flags, bool wantRValue,
+                           bool retainParens = false);
 
   /// Determine whether the given type variable occurs within the given type.
   ///
@@ -2048,16 +2049,16 @@ public:
   static bool typeVarOccursInType(TypeVariableType *typeVar, Type type,
                                   bool *involvesOtherTypeVariables = nullptr);
 
-  /// \brief Assign a fixed type to the given type variable.
+  /// \brief Assign a bound type to the given type variable.
   ///
   /// \param typeVar The type variable to bind.
   ///
-  /// \param type The fixed type to which the type variable will be bound.
+  /// \param type The bound type to which the type variable will be bound.
   ///
   /// \param updateState Whether to update the state based on this binding.
-  /// False when we're only assigning a type as part of reconstructing 
+  /// False when we're only assigning a type as part of reconstructing
   /// a complete solution from partial solutions.
-  void assignFixedType(TypeVariableType *typeVar, Type type,
+  void assignBoundType(TypeVariableType *typeVar, Type type,
                        bool updateState = true);
 
   /// \brief Set the TVO_MustBeMaterializable bit on all type variables
@@ -2556,14 +2557,14 @@ public:
                        OverloadChoice choice, DeclContext *useDC);
 
   /// \brief Simplify a type, by replacing type variables with either their
-  /// fixed types (if available) or their representatives.
+  /// bound types (if available) or their representatives.
   ///
   /// The resulting types can be compared canonically, so long as additional
   /// type equivalence requirements aren't introduced between comparisons.
   Type simplifyType(Type type);
 
   /// \brief Simplify a type, by replacing type variables with either their
-  /// fixed types (if available) or their representatives.
+  /// bound types (if available) or their representatives.
   ///
   /// \param flags If the simplified type has changed, this will be updated
   /// to include \c TMF_GenerateConstraints.
@@ -2740,10 +2741,10 @@ public:
   ///
   /// The result of simplification is a constraint system consisting of
   /// only simple constraints relating type variables to each other or
-  /// directly to fixed types. There are no constraints that involve
+  /// directly to bound types. There are no constraints that involve
   /// type constructors on both sides. The simplified constraint system may,
   /// of course, include type variables for which we have constraints but
-  /// no fixed type. Such type variables are left to the solver to bind.
+  /// no bound type. Such type variables are left to the solver to bind.
   ///
   /// \returns true if an error occurred, false otherwise.
   bool simplify(bool ContinueAfterFailures = false);

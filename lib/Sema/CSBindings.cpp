@@ -29,7 +29,7 @@ ConstraintSystem::determineBestBindings() {
 
   // First, let's collect all of the possible bindings.
   for (auto *typeVar : getTypeVariables()) {
-    if (typeVar->getImpl().hasRepresentativeOrFixed())
+    if (typeVar->getImpl().hasRepresentativeOrBound())
       continue;
 
     if (auto bindings = getPotentialBindings(typeVar))
@@ -359,7 +359,7 @@ ConstraintSystem::PotentialBindings
 ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
   assert(typeVar->getImpl().getRepresentative(nullptr) == typeVar &&
          "not a representative");
-  assert(!typeVar->getImpl().getFixedType(nullptr) && "has a fixed type");
+  assert(!typeVar->getImpl().getBoundType(nullptr) && "has a fixed type");
 
   // Gather the constraints associated with this type variable.
   llvm::SetVector<Constraint *> constraints;
@@ -449,7 +449,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
 
     case ConstraintKind::Defaultable:
       // Do these in a separate pass.
-      if (getFixedTypeRecursive(constraint->getFirstType(), true)
+      if (resolveTypeVariable(constraint->getFirstType(), true)
               ->getAs<TypeVariableType>() == typeVar) {
         defaultableConstraints.push_back(constraint);
         hasNonDependentMemberRelationalConstraints = true;

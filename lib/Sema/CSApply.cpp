@@ -38,7 +38,7 @@ using namespace swift;
 using namespace constraints;
 
 /// \brief Retrieve the fixed type for the given type variable.
-Type Solution::getFixedType(TypeVariableType *typeVar) const {
+Type Solution::getBoundType(TypeVariableType *typeVar) const {
   auto knownBinding = typeBindings.find(typeVar);
   assert(knownBinding != typeBindings.end());
   return knownBinding->second;
@@ -77,7 +77,7 @@ SubstitutionMap Solution::computeSubstitutions(
 
   TypeSubstitutionMap subs;
   for (const auto &opened : openedTypes->second)
-    subs[opened.first] = getFixedType(opened.second);
+    subs[opened.first] = getBoundType(opened.second);
 
   auto &tc = getConstraintSystem().getTypeChecker();
 
