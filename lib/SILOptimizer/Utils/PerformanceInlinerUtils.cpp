@@ -661,6 +661,11 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
   if (!Callee) {
     return nullptr;
   }
+
+  // We don't currently support inlining co-routines with several yields.
+  if (!SILInliner::canInlineBeginApply(AI))
+    return nullptr;
+
   auto ModuleName = Callee->getModule().getSwiftModule()->getName().str();
   bool IsInStdlib = (ModuleName == STDLIB_NAME || ModuleName == SWIFT_ONONE_SUPPORT);
 
