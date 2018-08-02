@@ -818,7 +818,7 @@ public extension Tensor where Scalar == Bool {
   @inlinable @inline(__always)
   func all() -> Bool {
     let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
-    return Raw.all(self, reductionIndices: axes).scalarized()
+    return _TFGetScalarOrDie(Raw.all(self, reductionIndices: axes))
   }
 
   /// Returns `true` if any scalars are equal to `true`. Otherwise, returns
@@ -828,7 +828,7 @@ public extension Tensor where Scalar == Bool {
   @inlinable @inline(__always)
   func any() -> Bool {
     let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
-    return Raw.any(self, reductionIndices: axes).scalarized()
+    return _TFGetScalarOrDie(Raw.any(self, reductionIndices: axes))
   }
 
   /// Performs a logical AND operation along the specified axes. The reduced
@@ -874,7 +874,7 @@ public extension Tensor where Scalar : Numeric & Comparable {
   @inlinable @inline(__always)
   func min() -> Scalar {
     let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
-    return Raw.min(self, reductionIndices: axes).scalarized()
+    return _TFGetScalarOrDie(Raw.min(self, reductionIndices: axes))
   }
 
   // NOTE: This overload is necessary, otherwise `max()` would refer
@@ -882,7 +882,7 @@ public extension Tensor where Scalar : Numeric & Comparable {
   @inlinable @inline(__always)
   func max() -> Scalar {
     let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
-    return Raw.max(self, reductionIndices: axes).scalarized()
+    return _TFGetScalarOrDie(Raw.max(self, reductionIndices: axes))
   }
 
   /// Returns the maximum values along the specified axes. The reduced
