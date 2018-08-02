@@ -172,4 +172,13 @@ extension String {
     return String(_largeStorage: storage)
   }
 
+  // For testing purposes only, allow ourselves to have invalid contents
+  @usableFromInline // @testable
+  static internal
+  func _fromInvalidUTF16(_ cus: UnsafeBufferPointer<UInt16>) -> String {
+    let storage = _SwiftStringStorage<UTF16.CodeUnit>.create(
+      capacity: cus.count, count: cus.count)
+    _ = storage._initialize(fromCodeUnits: cus, encoding: UTF16.self)
+    return String(_StringGuts(_large: storage))
+  }
 }

@@ -1255,19 +1255,6 @@ extension _StringGuts {
   }
 }
 
-extension _StringGuts {
-  // For testing purposes only. Might be both inefficient and too low-level.
-  // There should be an eventual API on String to accomplish something similar.
-  @usableFromInline // @_testable
-  static internal
-  func _createStringFromUTF16(_ cus: UnsafeBufferPointer<UInt16>) -> String {
-    let storage = _SwiftStringStorage<UTF16.CodeUnit>.create(
-      capacity: cus.count, count: cus.count)
-    _ = storage._initialize(fromCodeUnits: cus, encoding: UTF16.self)
-    return String(_StringGuts(_large: storage))
-  }
-}
-
 extension _SwiftStringStorage {
   /// Initialize a piece of freshly allocated storage instance from a sequence
   /// of code units, which is assumed to contain exactly as many code units as
