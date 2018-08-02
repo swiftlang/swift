@@ -119,7 +119,7 @@ public func test75494462() {
     x += 1
     i += 1
   } while i < 5
-  print(x.array)
+  _hostOp(x)
 }
 
 public func paddingTuplesHoistable() {
@@ -210,7 +210,7 @@ public func testMultiOutputs() {
 // TODO: Eliminate the sends/recvs when -Onone is enabled.
 public func SR8395() {
   let x: Tensor<Float> = [[1, 2], [3, 4]]
-  print(matmul(x, x) + x)
+  _hostOp(matmul(x, x) + x)
 }
 
 // Tuples should be deabstracted away.
@@ -227,6 +227,6 @@ public func SR8399() {
   let x = Tensor<Float>(ones: [2, 2])
   let y = x.reshaped(toShape: Tensor<Int32>([4, Int32(1)]))
   let z = x.reshaped(toShape: Tensor<Int32>([Int32(4), 1]))
-  print(y)
-  print(z)
+  _hostOp(y)
+  _hostOp(z)
 }

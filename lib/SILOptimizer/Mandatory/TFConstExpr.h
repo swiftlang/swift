@@ -87,7 +87,7 @@ public:
   /// function in the standard library.  This attempts to figure out how the
   /// resulting elements will be initialized.  This fills in the result with
   /// a lists of operands used to pass element addresses for initialization,
-  /// and returns true on success.
+  /// and returns false on success.
   ///
   /// If arrayInsts is non-null and if decoding succeeds, this function adds
   /// all of the instructions relevant to the definition of this array into

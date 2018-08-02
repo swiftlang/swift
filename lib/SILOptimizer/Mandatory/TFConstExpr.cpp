@@ -814,8 +814,8 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
       elementConstants.assign(numElements, SymbolicValue::getUninitMemory());
     } else {
       // We handle the flow-insensitive case specially in order to find the
-      // stores/apply_insts to initialize the array elements.  Collect them
-      // here and pretend that the array was initialized atomically.
+      // stores/apply's to initialize the array elements.  Collect them here
+      // and pretend that the array was initialized atomically.
       SmallVector<Operand*, 8> elementsAtInit;
       if (ConstExprEvaluator::decodeAllocUninitializedArray(
               apply, numElements, elementsAtInit,
@@ -1548,7 +1548,7 @@ static bool analyzeArrayInitUses(SILValue v,
 /// function in the standard library.  This attempts to figure out how the
 /// resulting elements will be initialized.  This fills in the result with
 /// a lists of operands used to pass element addresses for initialization,
-/// and returns true on success.
+/// and returns false on success.
 ///
 /// If arrayInsts is non-null and if decoding succeeds, this function adds
 /// all of the instructions relevant to the definition of this array into
@@ -1569,7 +1569,7 @@ bool ConstExprEvaluator::decodeAllocUninitializedArray(
   bool hadUnknownUsers = false;
 
   // The call has a tuple return type, see if we can walk all uses of them to
-  // analyze them and find the stores/apply_insts to the elements.
+  // analyze them and find the stores/apply's to the elements.
   for (auto *use : apply->getUses()) {
     auto *user = use->getUser();
 
@@ -1606,7 +1606,7 @@ bool ConstExprEvaluator::decodeAllocUninitializedArray(
       arrayInsts->insert(pointer2addr);
 
     // Okay, process the use list of the pointer_to_address, each user is
-    // something that should result in a store of an element or an apply_inst
+    // something that should result in a store of an element or an apply
     // of in-place element initialization.
     for (auto *use : pointer2addr->getUses()) {
       auto *user = use->getUser();
@@ -1626,11 +1626,24 @@ bool ConstExprEvaluator::decodeAllocUninitializedArray(
       }
 
       // We handle the cases that the element is either set by a store or
-      // filled via an apply_inst.
+      // filled via an apply.
       if (auto *store = dyn_cast_or_null<StoreInst>(user)) {
         if (store->getDest() != use->get())
           return true;
       } else if (auto *applyInst = dyn_cast_or_null<ApplyInst>(user)) {
+        // In this case, the element's address is passed to an apply where
+        // the initialization happens in-place. For example, the SIL snippet
+        // may look like below:
+        //
+        //   %input_value_addr = something $*Int
+        //   %elt_ty = metatype $@thick Int32.Type
+        //   %elt_addr = something $*Int32
+        //   %func = function_ref SignedInteger<>.init<A>(_:)
+        //   %user = apply %func<Int32, Int>(%elt_addr, %input_value_addr, %elt_ty) : $@convention(method) <U, V> (@in V, @thick U.Type) -> @out U
+        //
+        // Here, %elt_addr is used as a @out parameter by the apply, and gets
+        // filled with the value in %input_value_addr.
+
         // Check to see if this is an out-parameter (i.e., like a store).
         auto conventions = applyInst->getSubstCalleeConv();
         unsigned numIndirectResults = conventions.getNumIndirectSILResults();
@@ -1644,7 +1657,7 @@ bool ConstExprEvaluator::decodeAllocUninitializedArray(
       if (index >= elementsAtInit.size() || elementsAtInit[index])
         return true;
 
-      // If we got a store/apply_inst to a valid index, it must be our element.
+      // If we got a store/apply to a valid index, it must be our element.
       elementsAtInit[index] = use;
 
       if (arrayInsts)
