@@ -59,6 +59,7 @@ enum class CustomBufferKind {
   InheritedTypesArray,
   DocStructureElementArray,
   AttributesArray,
+  RawData
 };
 
 class ResponseBuilder {
@@ -219,6 +220,8 @@ struct VariantFunctions {
   const char *(*string_get_ptr)(sourcekitd_variant_t obj);
   int64_t (*int64_get_value)(sourcekitd_variant_t obj);
   sourcekitd_uid_t (*uid_get_value)(sourcekitd_variant_t obj);
+  size_t (*data_get_size)(sourcekitd_variant_t obj);
+  const void *(*data_get_ptr)(sourcekitd_variant_t obj);
 };
 
 }

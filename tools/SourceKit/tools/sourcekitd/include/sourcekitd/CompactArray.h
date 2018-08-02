@@ -190,7 +190,9 @@ VariantFunctions CompactVariantFuncs<T>::Funcs = {
   nullptr/*Annot_string_get_length*/,
   nullptr/*Annot_string_get_ptr*/,
   nullptr/*Annot_int64_get_value*/,
-  nullptr/*Annot_uid_get_value*/
+  nullptr/*Annot_uid_get_value*/,
+  nullptr/*Annot_data_get_size*/,
+  nullptr/*Annot_data_get_ptr*/,
 };
 
 template <typename T>
@@ -235,7 +237,9 @@ VariantFunctions CompactArrayFuncs<T>::Funcs = {
   nullptr/*AnnotArray_string_get_length*/,
   nullptr/*AnnotArray_string_get_ptr*/,
   nullptr/*AnnotArray_int64_get_value*/,
-  nullptr/*AnnotArray_uid_get_value*/
+  nullptr/*AnnotArray_uid_get_value*/,
+  nullptr/*Annot_data_get_size*/,
+  nullptr/*Annot_data_get_ptr*/,
 };
 
 }
