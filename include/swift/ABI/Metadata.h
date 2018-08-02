@@ -47,7 +47,6 @@
 #include "llvm/Support/Casting.h"
 
 namespace swift {
-
 template <unsigned PointerSize>
 struct RuntimeTarget;
 
@@ -3355,21 +3354,6 @@ public:
   }
 
   llvm::ArrayRef<GenericParamDescriptor> getGenericParams() const;
-
-  bool isSynthesizedRelatedEntity() const {
-    return getTypeContextDescriptorFlags().isSynthesizedRelatedEntity();
-  }
-
-  /// Return the tag used to discriminate declarations synthesized by the
-  /// Clang importer and give them stable identities.
-  StringRef getSynthesizedDeclRelatedEntityTag() const {
-    if (!isSynthesizedRelatedEntity())
-      return {};
-    // The tag name comes after the null terminator for the name.
-    const char *nameBegin = Name.get();
-    auto *nameEnd = nameBegin + strlen(nameBegin) + 1;
-    return nameEnd;
-  }
 
   /// Return the offset of the start of generic arguments in the nominal
   /// type's metadata. The returned value is measured in sizeof(void*).

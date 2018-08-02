@@ -19,6 +19,7 @@
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/TypeDecoder.h"
 #include "swift/Reflection/Records.h"
+#include "swift/ABI/TypeIdentity.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/HeapObject.h"
@@ -153,22 +154,108 @@ static const TypeContextDescriptor *
 _findNominalTypeDescriptor(Demangle::NodePointer node,
                            Demangle::Demangler &Dem);
 
-bool swift::isCImportedTagType(const TypeContextDescriptor *type) {
+/// Recognize imported tag types, which have a special mangling rule.
+///
+/// This should be kept in sync with the AST mangler and with
+/// buildContextDescriptorMangling in MetadataReader.
+bool swift::_isCImportedTagType(const TypeContextDescriptor *type,
+                                const ParsedTypeIdentity &identity) {
   // Tag types are always imported as structs or enums.
   if (type->getKind() != ContextDescriptorKind::Enum &&
       type->getKind() != ContextDescriptorKind::Struct)
     return false;
 
   // Not a typedef imported as a nominal type.
-  if (type->getTypeContextDescriptorFlags().isCTypedef())
+  if (identity.isCTypedef())
     return false;
 
   // Not a related entity.
-  if (type->isSynthesizedRelatedEntity())
+  if (identity.isAnyRelatedEntity())
     return false;
 
   // Imported from C.
   return type->Parent->isCImportedContext();
+}
+
+ParsedTypeIdentity
+ParsedTypeIdentity::parse(const TypeContextDescriptor *type) {
+  ParsedTypeIdentity result;
+
+  // The first component is the user-facing name and (unless overridden)
+  // the ABI name.
+  StringRef component = type->Name.get();
+  result.UserFacingName = component;
+
+  // If we don't have import info, we're done.
+  if (!type->getTypeContextDescriptorFlags().hasImportInfo()) {
+    result.FullIdentity = result.UserFacingName;
+    return result;
+  }
+
+  // Otherwise, start parsing the import information.
+  result.ImportInfo.emplace();
+
+  // The identity starts with the user-facing name.
+  const char *startOfIdentity = component.begin();
+  const char *endOfIdentity = component.end();
+
+#ifndef NDEBUG
+  enum {
+    AfterName,
+    AfterABIName,
+    AfterSymbolNamespace,
+    AfterRelatedEntityName,
+    AfterIdentity,
+  } stage = AfterName;
+#endif
+
+  while (true) {
+    // Parse the next component.  If it's empty, we're done.
+    component = StringRef(component.end() + 1);
+    if (component.empty()) break;
+
+    // Update the identity bounds and assert that the identity
+    // components are in the right order.
+    auto kind = TypeImportComponent(component[0]);
+    if (kind == TypeImportComponent::ABIName) {
+#ifndef NDEBUG
+      assert(stage < AfterABIName);
+      stage = AfterABIName;
+      assert(result.UserFacingName != component.drop_front(1) &&
+             "user-facing name was same as the ABI name");
+#endif
+      startOfIdentity = component.begin() + 1;
+      endOfIdentity = component.end();
+    } else if (kind == TypeImportComponent::SymbolNamespace) {
+#ifndef NDEBUG
+      assert(stage < AfterSymbolNamespace);
+      stage = AfterSymbolNamespace;
+#endif
+      endOfIdentity = component.end();
+    } else if (kind == TypeImportComponent::RelatedEntityName) {
+#ifndef NDEBUG
+      assert(stage < AfterRelatedEntityName);
+      stage = AfterRelatedEntityName;
+#endif
+      endOfIdentity = component.end();
+    } else {
+#ifndef NDEBUG
+      // Anything else is assumed to not be part of the identity.
+      stage = AfterIdentity;
+#endif
+    }
+
+    // Collect the component, whatever it is.
+    result.ImportInfo->collect</*asserting*/true>(component);
+  }
+
+  assert(stage != AfterName && "no components?");
+
+  // Record the full identity.
+  result.FullIdentity =
+    StringRef(startOfIdentity, endOfIdentity - startOfIdentity);
+
+  return result;
 }
 
 bool
@@ -266,6 +353,13 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
 
     default:
       if (auto type = llvm::dyn_cast<TypeContextDescriptor>(context)) {
+        Optional<ParsedTypeIdentity> _identity;
+        auto getIdentity = [&]() -> const ParsedTypeIdentity & {
+          if (_identity) return *_identity;
+          _identity = ParsedTypeIdentity::parse(type);
+          return *_identity;
+        };
+
         switch (node->getKind()) {
         // If the mangled name doesn't indicate a type kind, accept anything.
         // Otherwise, try to match them up.
@@ -276,7 +370,7 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
           // imported C tag types.  This is necessary because we artificially
           // make imported C tag types Kind::Structure.
           if (type->getKind() != ContextDescriptorKind::Struct &&
-              !isCImportedTagType(type))
+              !_isCImportedTagType(type, getIdentity()))
             return false;
           break;
         case Demangle::Node::Kind::Class:
@@ -288,7 +382,7 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
             return false;
           break;
         case Demangle::Node::Kind::TypeAlias:
-          if (!type->getTypeContextDescriptorFlags().isCTypedef())
+          if (!getIdentity().isCTypedef())
             return false;
           break;
 
@@ -300,12 +394,12 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
         
         // Declarations synthesized by the Clang importer get a small tag
         // string in addition to their name.
-        if (nameNode->getKind() == Demangle::Node::Kind::RelatedEntityDeclName){
-          if (nameNode->getText() != type->getSynthesizedDeclRelatedEntityTag())
+        if (nameNode->getKind() == Demangle::Node::Kind::RelatedEntityDeclName){          
+          if (!getIdentity().isRelatedEntity(nameNode->getText()))
             return false;
           
           nameNode = nameNode->getChild(0);
-        } else if (type->isSynthesizedRelatedEntity()) {
+        } else if (getIdentity().isAnyRelatedEntity()) {
           return false;
         }
         
@@ -313,7 +407,7 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
         // names. The runtime metadata for private declarations would be
         // anonymized.
         if (nameNode->getKind() == Demangle::Node::Kind::Identifier) {
-          if (nameNode->getText() != type->Name.get())
+          if (nameNode->getText() != getIdentity().getABIName())
             return false;
           
           node = node->getChild(0);
