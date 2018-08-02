@@ -1268,7 +1268,7 @@ ConstraintSystem::getTypeOfMemberReference(
   // protocols.
   if (auto *alias = dyn_cast<TypeAliasDecl>(value)) {
     if (baseObjTy->isExistentialType()) {
-      auto memberTy = alias->getDeclaredInterfaceType();
+      auto memberTy = alias->getInterfaceType();
       // If we end up with a protocol typealias here, it's underlying
       // type must be fully concrete.
       assert(!memberTy->hasTypeParameter());
