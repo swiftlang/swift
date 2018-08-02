@@ -1,4 +1,4 @@
-// RUN: %target-run-strict-da-swift
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize
 //
