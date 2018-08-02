@@ -133,6 +133,22 @@ static SILType getSelfType(ClassDecl *base) {
   return SILType::getPrimitiveObjectType(loweredTy);
 }
 
+/// If the superclass came from another module, we may have dropped
+/// stored properties due to the Swift language version availability of
+/// their types. In these cases we can't precisely lay out the ivars in
+/// the class object at compile time so we need to do runtime layout.
+static bool classHasIncompleteLayout(IRGenModule &IGM,
+                                     ClassDecl *theClass) {
+  if (theClass->getParentModule() == IGM.getSwiftModule())
+    return false;
+
+  for (auto field : theClass->getStoredPropertiesAndMissingMemberPlaceholders())
+    if (isa<MissingMemberDecl>(field))
+      return true;
+
+  return false;
+}
+
 namespace {
   class ClassLayoutBuilder : public StructLayoutBuilder {
     SmallVector<ElementLayout, 8> Elements;
@@ -2232,26 +2248,6 @@ ClassDecl *irgen::getRootClassForMetaclass(IRGenModule &IGM, ClassDecl *C) {
 
   return IGM.getObjCRuntimeBaseClass(IGM.Context.Id_SwiftObject,
                                      IGM.Context.Id_SwiftObject);
-}
-
-/// If the superclass came from another module, we may have dropped
-/// stored properties due to the Swift language version availability of
-/// their types. In these cases we can't precisely lay out the ivars in
-/// the class object at compile time so we need to do runtime layout.
-bool irgen::classHasIncompleteLayout(IRGenModule &IGM,
-                                     ClassDecl *theClass) {
-  do {
-    if (theClass->getParentModule() != IGM.getSwiftModule()) {
-      for (auto field :
-          theClass->getStoredPropertiesAndMissingMemberPlaceholders()){
-        if (isa<MissingMemberDecl>(field)) {
-          return true;
-        }
-      }
-      return false;
-    }
-  } while ((theClass = theClass->getSuperclassDecl()));
-  return false;
 }
 
 bool irgen::doesClassMetadataRequireDynamicInitialization(IRGenModule &IGM,
