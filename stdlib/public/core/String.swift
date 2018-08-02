@@ -540,8 +540,8 @@ extension String {
 /// [equivalence]: http://www.unicode.org/glossary/#canonical_equivalent
 @_fixed_layout
 public struct String {
-  @usableFromInline
-  internal var _guts: _StringGuts
+  public // SPI(Foundation)
+  var _guts: _StringGuts
 
   /// Creates an empty string.
   ///

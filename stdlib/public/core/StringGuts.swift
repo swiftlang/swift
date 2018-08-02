@@ -137,12 +137,10 @@ extension _StringGuts {
     return _object.isNative
   }
 
-#if _runtime(_ObjC)
   @inlinable
   internal var _isCocoa: Bool {
     return _object.isCocoa
   }
-#endif
 
   @inlinable
   internal var _isUnmanaged: Bool {
