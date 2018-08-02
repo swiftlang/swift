@@ -1196,53 +1196,18 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
     MetadataInitialization = 1,
     MetadataInitialization_width = 2,
 
-    /// The namespace of the imported declaration that gave rise to this type.
-    /// Some languages (most importantly, C/C++/Objective-C) have different
-    /// symbol namespaces in which types can be declared; for example,
-    /// `struct A` and `typedef ... A` can be declared in the same scope and
-    /// resolve to unrelated types.  When these declarations are imported,
-    /// there are several possible ways to distinguish them in Swift, e.g.
-    /// by implicitly renaming them; however, the external name used for
-    /// mangling and metadata must be stable and so is based on the original
-    /// declared name.  Therefore, in these languages, we privilege one
-    /// symbol namespace as the default (although which may depend on the
-    /// type kind), and declarations from the other(s) must be marked in
-    /// order to differentiate them.
+    /// Set if the type has extended import information.
+    ///
+    /// If true, a sequence of strings follow the null terminator in the
+    /// descriptor, terminated by an empty string (i.e. by two null
+    /// terminators in a row).  See TypeImportInfo for the details of
+    /// these strings and the order in which they appear.
     ///
     /// Meaningful for all type-descriptor kinds.
-    ImportNamespace = 3,
-    ImportNamespace_width = 3,
-    
-    /// Set if the type is an importer-synthesized related entity.
-    /// A related entity is an entity synthesized in response to an imported
-    /// type which is not the type itself; for example, when the importer
-    /// sees an ObjC error domain, it creates an error-wrapper type (a
-    /// related entity) and a Code enum (not a related entity because it's
-    /// exactly the original type).
-    ///
-    /// The name and import namespace (together with the parent context)
-    /// identify the original declaration.
-    ///
-    /// If this flag is set, then after the null terminator for the type name
-    /// is another null-terminated string containing the tag that discriminates
-    /// the entity from other synthesized declarations associated with the
-    /// same declaration.
-    IsSynthesizedRelatedEntity = 6,
+    HasImportInfo = 3,
 
-    /// Set if the context descriptor is includes metadata for dynamically
-    /// constructing a class's vtables at metadata instantiation time.
-    ///
-    /// Only meaningful for class descriptors.
-    Class_HasVTable = 15,
 
-    /// Set if the context descriptor is for a class with resilient ancestry.
-    ///
-    /// Only meaningful for class descriptors.
-    Class_HasResilientSuperclass = 14,
-
-    /// Whether the immediate class members in this metadata are allocated
-    /// at negative offsets.  For now, we don't use this.
-    Class_AreImmediateMembersNegative = 13,
+    // Type-specific flags:
 
     /// The kind of reference that this class makes to its superclass
     /// descriptor.  A TypeReferenceKind.
@@ -1250,6 +1215,21 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
     /// Only meaningful for class descriptors.
     Class_SuperclassReferenceKind = 10,
     Class_SuperclassReferenceKind_width = 3,
+
+    /// Whether the immediate class members in this metadata are allocated
+    /// at negative offsets.  For now, we don't use this.
+    Class_AreImmediateMembersNegative = 13,
+
+    /// Set if the context descriptor is for a class with resilient ancestry.
+    ///
+    /// Only meaningful for class descriptors.
+    Class_HasResilientSuperclass = 14,
+
+    /// Set if the context descriptor is includes metadata for dynamically
+    /// constructing a class's vtables at metadata instantiation time.
+    ///
+    /// Only meaningful for class descriptors.
+    Class_HasVTable = 15,
   };
 
 public:
@@ -1290,44 +1270,7 @@ public:
     return getMetadataInitialization() == ForeignMetadataInitialization;
   }
 
-  enum ImportNamespaceKind {
-    /// The type comes the default namespace for its language.
-    DefaultNamespace = 0,
-
-    // The behavior for C imported types is complicated in ways that don't
-    // entirely make sense according to the design laid out in the comment
-    // on the ImportNamespace field.  The rules are basically:
-    //   - Classes are assumed to come from Objective-C by default.
-    //     ObjC classes are in the ordinary namespace in C.
-    //   - Protocols are assumed to come from Objective-C by default.
-    //     ObjC protocols are in their own namespace in C.
-    //   - Structs and enums seem to always get either CTag or CTypedef.
-    //     It would probably make more sense to assume they come from the
-    //     tag namespace in C and then just use CTypedef as an override.
-
-    /// The type comes from an imported C tag type.
-    CTag = 1,
-
-    /// The type comes from an imported C typedef type.
-    CTypedef = 2,
-
-    // We only have three bits here, so be judicious about adding new
-    // namespaces.
-  };
-
-  FLAGSET_DEFINE_FIELD_ACCESSORS(ImportNamespace,
-                                 ImportNamespace_width,
-                                 ImportNamespaceKind,
-                                 getImportNamespace,
-                                 setImportNamespace)
-
-  bool isCTypedef() const {
-    return getImportNamespace() == CTypedef;
-  }
-
-  FLAGSET_DEFINE_FLAG_ACCESSORS(IsSynthesizedRelatedEntity,
-                                isSynthesizedRelatedEntity,
-                                setIsSynthesizedRelatedEntity)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(HasImportInfo, hasImportInfo, setHasImportInfo)
 
   FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasVTable,
                                 class_hasVTable,

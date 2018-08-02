@@ -20,6 +20,7 @@
 #include "swift/Basic/Lazy.h"
 #include "swift/Basic/Range.h"
 #include "swift/Demangling/Demangler.h"
+#include "swift/ABI/TypeIdentity.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/ExistentialContainer.h"
 #include "swift/Runtime/HeapObject.h"
@@ -1646,18 +1647,7 @@ namespace {
     StringRef Name;
   public:
     explicit TypeContextIdentity(const TypeContextDescriptor *type) {
-      // Use the name of the type context.
-      Name = type->Name.get();
-
-      // If this is a synthesized entity, include the related entity tag.
-      if (type->isSynthesizedRelatedEntity()) {
-        auto tag = type->getSynthesizedDeclRelatedEntityTag();
-        assert(Name.end() + 1 == tag.begin());
-
-        // The length computation needs to include the \0 at the
-        // end of the name.
-        Name = StringRef(Name.begin(), Name.size() + tag.size() + 1);
-      }
+      Name = ParsedTypeIdentity::parse(type).FullIdentity;
     }
 
     bool operator==(const TypeContextIdentity &other) const {

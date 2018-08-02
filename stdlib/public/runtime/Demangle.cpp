@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/Range.h"
+#include "swift/ABI/TypeIdentity.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Portability.h"
 #include "swift/Strings.h"
@@ -138,7 +139,8 @@ swift::_buildDemanglingForContext(const ContextDescriptor *context,
     default:
       // Form a type context demangling for type contexts.
       if (auto type = llvm::dyn_cast<TypeContextDescriptor>(component)) {
-        auto name = type->Name.get();
+        auto identity = ParsedTypeIdentity::parse(type);
+
         Node::Kind nodeKind;
         Node::Kind genericNodeKind;
         switch (kind) {
@@ -164,20 +166,20 @@ swift::_buildDemanglingForContext(const ContextDescriptor *context,
         
         // Override the node kind if this is a Clang-imported type so we give it
         // a stable mangling.
-        auto typeFlags = type->getTypeContextDescriptorFlags();
-        if (typeFlags.isCTypedef()) {
+        if (identity.isCTypedef()) {
           nodeKind = Node::Kind::TypeAlias;
         } else if (nodeKind != Node::Kind::Structure &&
-                   isCImportedTagType(type)) {
+                   _isCImportedTagType(type, identity)) {
           nodeKind = Node::Kind::Structure;
         }
         
         auto typeNode = Dem.createNode(nodeKind);
         typeNode->addChild(node, Dem);
-        auto nameNode = Dem.createNode(Node::Kind::Identifier, name);
-        if (type->isSynthesizedRelatedEntity()) {
+        auto nameNode = Dem.createNode(Node::Kind::Identifier,
+                                       identity.getABIName());
+        if (identity.isAnyRelatedEntity()) {
           auto relatedName = Dem.createNode(Node::Kind::RelatedEntityDeclName,
-                                    type->getSynthesizedDeclRelatedEntityTag());
+                                            identity.getRelatedEntityName());
           relatedName->addChild(nameNode, Dem);
           nameNode = relatedName;
         }
