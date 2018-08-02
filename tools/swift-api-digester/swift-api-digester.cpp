@@ -40,6 +40,7 @@
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -313,12 +314,7 @@ enum class KnownProtocolKind: uint8_t {
 #include "swift/IDE/DigesterEnums.def"
 };
 
-enum class SDKDeclAttrKind: uint8_t {
-#define DECL_ATTR(Name) DAK_##Name,
-#include "swift/IDE/DigesterEnums.def"
-};
-
-  // Redefine << so that we can output the name of decl kind.
+// Redefine << so that we can output the name of decl kind.
 static raw_ostream &operator<<(raw_ostream &Out, const DeclKind Value) {
   switch (Value) {
 #define DECL(X, PARENT) case DeclKind::X: return Out << #X;
@@ -363,9 +359,10 @@ struct SDKNodeInitInfo {
   bool IsThrowing = false;
   bool IsMutating = false;
   bool IsStatic = false;
+  bool IsDeprecated = false;
   Optional<uint8_t> SelfIndex;
   ReferenceOwnership ReferenceOwnership = ReferenceOwnership::Strong;
-  std::vector<SDKDeclAttrKind> DeclAttrs;
+  std::vector<DeclAttrKind> DeclAttrs;
   std::vector<TypeAttrKind> TypeAttrs;
   std::vector<StringRef> ConformingProtocols;
   StringRef SuperclassUsr;
@@ -438,10 +435,11 @@ class SDKNodeDecl : public SDKNode {
   StringRef Usr;
   StringRef Location;
   StringRef ModuleName;
-  std::vector<SDKDeclAttrKind> DeclAttributes;
+  std::vector<DeclAttrKind> DeclAttributes;
   bool IsStatic;
+  bool IsDeprecated;
   uint8_t ReferenceOwnership;
-  bool hasDeclAttribute(SDKDeclAttrKind DAKind) const;
+  bool hasDeclAttribute(DeclAttrKind DAKind) const;
   // Non-null ExtInfo implies this decl is defined in an type extension.
   ParentExtensionInfo *ExtInfo;
 
@@ -450,6 +448,7 @@ protected:
       : SDKNode(Info, Kind), DKind(Info.DKind), Usr(Info.USR),
         Location(Info.Location), ModuleName(Info.ModuleName),
         DeclAttributes(Info.DeclAttrs), IsStatic(Info.IsStatic),
+        IsDeprecated(Info.IsDeprecated),
         ReferenceOwnership(uint8_t(Info.ReferenceOwnership)),
         ExtInfo(Info.ExtInfo) {}
 
@@ -458,8 +457,7 @@ public:
   StringRef getLocation() const { return Location; }
   StringRef getModuleName() const {return ModuleName;}
   StringRef getHeaderName() const;
-  void addDeclAttribute(SDKDeclAttrKind DAKind);
-  ArrayRef<SDKDeclAttrKind> getDeclAttributes() const;
+  ArrayRef<DeclAttrKind> getDeclAttributes() const;
   swift::ReferenceOwnership getReferenceOwnership() const {
     return swift::ReferenceOwnership(ReferenceOwnership);
   }
@@ -469,7 +467,7 @@ public:
   void printFullyQualifiedName(llvm::raw_ostream &OS) const;
   StringRef getFullyQualifiedName() const;
   bool isSDKPrivate() const;
-  bool isDeprecated() const;
+  bool isDeprecated() const { return IsDeprecated; };
   bool hasFixedLayout() const;
   bool isStatic() const { return IsStatic; };
   bool isFromExtension() const { return ExtInfo; }
@@ -761,12 +759,8 @@ SDKNode *SDKNodeRoot::getInstance(SDKContext &Ctx) {
   return Info.createSDKNode(SDKNodeKind::Root);
 }
 
-bool SDKNodeDecl::isDeprecated() const {
-  return hasDeclAttribute(SDKDeclAttrKind::DAK_deprecated);
-}
-
 bool SDKNodeDecl::hasFixedLayout() const {
-  return hasDeclAttribute(SDKDeclAttrKind::DAK_fixedLayout);
+  return hasDeclAttribute(DeclAttrKind::DAK_FixedLayout);
 }
 
 bool SDKNodeDecl::isSDKPrivate() const {
@@ -813,16 +807,12 @@ bool SDKNodeDecl::classof(const SDKNode *N) {
   llvm_unreachable("Unhandled SDKNodeKind in switch.");
 }
 
-void SDKNodeDecl::addDeclAttribute(SDKDeclAttrKind DAKind) {
-  DeclAttributes.push_back(DAKind);
-}
-
-bool SDKNodeDecl::hasDeclAttribute(SDKDeclAttrKind DAKind) const {
+bool SDKNodeDecl::hasDeclAttribute(DeclAttrKind DAKind) const {
   return std::find(DeclAttributes.begin(), DeclAttributes.end(), DAKind) !=
     DeclAttributes.end();
 }
 
-ArrayRef<SDKDeclAttrKind> SDKNodeDecl::getDeclAttributes() const {
+ArrayRef<DeclAttrKind> SDKNodeDecl::getDeclAttributes() const {
   return llvm::makeArrayRef(DeclAttributes.data(), DeclAttributes.size());
 }
 
@@ -1077,6 +1067,9 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
     case KeyKind::KK_static:
       Info.IsStatic = true;
       break;
+    case KeyKind::KK_deprecated:
+      Info.IsDeprecated = true;
+      break;
     case KeyKind::KK_ownership:
       Info.ReferenceOwnership =
           swift::ReferenceOwnership(getAsInt(Pair.getValue()));
@@ -1086,24 +1079,29 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
 
     case KeyKind::KK_typeAttributes: {
       auto *Seq = cast<llvm::yaml::SequenceNode>(Pair.getValue());
-      for (auto It = Seq->begin(); It != Seq->end(); ++ It) {
-        Info.TypeAttrs.push_back(
-          llvm::StringSwitch<TypeAttrKind>(GetScalarString(&*It))
+      std::transform(Seq->begin(), Seq->end(),
+                     std::back_inserter(Info.TypeAttrs),
+        [](llvm::yaml::Node &N) {
+          auto Result = llvm::StringSwitch<TypeAttrKind>(GetScalarString(&N))
 #define TYPE_ATTR(X) .Case(#X, TypeAttrKind::TAK_##X)
 #include "swift/AST/Attr.def"
-          .Case("Count", TypeAttrKind::TAK_Count));
-      }
+          .Default(TypeAttrKind::TAK_Count);
+          assert(Result != TypeAttrKind::TAK_Count);
+          return Result;
+        });
       break;
     }
     case KeyKind::KK_declAttributes: {
       auto *Seq = cast<llvm::yaml::SequenceNode>(Pair.getValue());
-      for (auto It = Seq->begin(); It != Seq->end(); ++ It) {
-        Info.DeclAttrs.push_back(
-          llvm::StringSwitch<SDKDeclAttrKind>(GetScalarString(&*It))
-#define DECL_ATTR(X) .Case(#X, SDKDeclAttrKind::DAK_##X)
-#include "swift/IDE/DigesterEnums.def"
-          );
-      }
+      std::transform(Seq->begin(), Seq->end(), std::back_inserter(Info.DeclAttrs),
+        [](llvm::yaml::Node &N) {
+          auto Result = llvm::StringSwitch<DeclAttrKind>(GetScalarString(&N))
+#define DECL_ATTR(_, NAME, ...) .Case(#NAME, DeclAttrKind::DAK_##NAME)
+#include "swift/AST/Attr.def"
+          .Default(DeclAttrKind::DAK_Count);
+          assert(Result != DeclAttrKind::DAK_Count);
+          return Result;
+        });
       break;
     }
     case KeyKind::KK_declKind:
@@ -1372,7 +1370,9 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
       USR(calculateUsr(Ctx, VD)), Location(calculateLocation(Ctx, VD)),
       ModuleName(VD->getModuleContext()->getName().str()),
       IsThrowing(isFuncThrowing(VD)), IsMutating(isFuncMutating(VD)),
-      IsStatic(VD->isStatic()), SelfIndex(getSelfIndex(VD)),
+      IsStatic(VD->isStatic()),
+      IsDeprecated(VD->getAttrs().getDeprecated(VD->getASTContext())),
+      SelfIndex(getSelfIndex(VD)),
       ReferenceOwnership(getReferenceOwnership(VD)), ExtInfo(nullptr) {
 
   // Calculate usr for its super class.
@@ -1380,13 +1380,11 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
     if (auto *Super = CD->getSuperclassDecl())
       SuperclassUsr = calculateUsr(Ctx, Super);
   }
-  if (VD->getAttrs().getDeprecated(VD->getASTContext()))
-    DeclAttrs.push_back(SDKDeclAttrKind::DAK_deprecated);
 
-  // If this is fixed_layout struct.
-  if (VD->getAttrs().hasAttribute<FixedLayoutAttr>()) {
-    DeclAttrs.push_back(SDKDeclAttrKind::DAK_fixedLayout);
-  }
+  // Capture all attributes.
+  auto AllAttrs = VD->getAttrs();
+  std::transform(AllAttrs.begin(), AllAttrs.end(), std::back_inserter(DeclAttrs),
+                 [](DeclAttribute *attr) { return attr->getKind(); });
 
   // If the decl is declared in an extension, calculate the extension info.
   if (auto *Ext = dyn_cast_or_null<ExtensionDecl>(VD->getDeclContext())) {
@@ -1759,15 +1757,14 @@ namespace swift {
       static void enumeration(Output &out, TypeAttrKind &value) {
 #define TYPE_ATTR(X) out.enumCase(value, #X, TypeAttrKind::TAK_##X);
 #include "swift/AST/Attr.def"
-        out.enumCase(value, "Count", TypeAttrKind::TAK_Count);
       }
     };
 
     template<>
-    struct ScalarEnumerationTraits<SDKDeclAttrKind> {
-      static void enumeration(Output &out, SDKDeclAttrKind &value) {
-#define DECL_ATTR(X) out.enumCase(value, #X, SDKDeclAttrKind::DAK_##X);
-#include "swift/IDE/DigesterEnums.def"
+    struct ScalarEnumerationTraits<DeclAttrKind> {
+      static void enumeration(Output &out, DeclAttrKind &value) {
+#define DECL_ATTR(_, Name, ...) out.enumCase(value, #Name, DeclAttrKind::DAK_##Name);
+#include "swift/AST/Attr.def"
       }
     };
 
@@ -1804,7 +1801,8 @@ namespace swift {
 
           if (auto isStatic = D->isStatic())
             out.mapRequired(getKeyContent(Ctx, KeyKind::KK_static).data(), isStatic);
-
+          if (bool isDeprecated = D->isDeprecated())
+            out.mapRequired(getKeyContent(Ctx, KeyKind::KK_deprecated).data(), isDeprecated);
           if (auto F = dyn_cast<SDKNodeDeclAbstractFunc>(value)) {
             if (bool isThrowing = F->isThrowing())
               out.mapRequired(getKeyContent(Ctx, KeyKind::KK_throwing).data(),
@@ -1903,13 +1901,13 @@ namespace swift {
     };
 
     template<>
-    struct ArrayTraits<ArrayRef<SDKDeclAttrKind>> {
-      static size_t size(Output &out, ArrayRef<SDKDeclAttrKind> &seq) {
+    struct ArrayTraits<ArrayRef<DeclAttrKind>> {
+      static size_t size(Output &out, ArrayRef<DeclAttrKind> &seq) {
         return seq.size();
       }
-      static SDKDeclAttrKind& element(Output &, ArrayRef<SDKDeclAttrKind> &seq,
+      static DeclAttrKind& element(Output &, ArrayRef<DeclAttrKind> &seq,
                                    size_t index) {
-        return const_cast<SDKDeclAttrKind&>(seq[index]);
+        return const_cast<DeclAttrKind&>(seq[index]);
       }
     };
     template<>
