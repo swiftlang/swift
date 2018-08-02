@@ -218,8 +218,33 @@ public:
 namespace llvm {
 template <typename T> struct DenseMapInfo;
 
+template <> struct DenseMapInfo<swift::SourceLoc> {
+  static swift::SourceLoc getEmptyKey() {
+    return SMLoc::getFromPointer(DenseMapInfo<const char *>::getEmptyKey());
+  }
+
+  static swift::SourceLoc getTombstoneKey() {
+    // Make this different from empty key. See for context:
+    // http://lists.llvm.org/pipermail/llvm-dev/2015-July/088744.html
+    return swift::SourceLoc(
+        SMLoc::getFromPointer(DenseMapInfo<const char *>::getTombstoneKey()));
+  }
+
+  static unsigned getHashValue(const swift::SourceLoc &Val) {
+    return DenseMapInfo<const void *>::getHashValue(getOpaquePointerValue());
+  }
+
+  static bool isEqual(const swift::SourceLoc &LHS,
+                      const swift::SourceLoc &RHS) {
+    return LHS == RHS;
+  }
+};
+
 template <> struct DenseMapInfo<swift::SourceRange> {
-  static swift::SourceRange getEmptyKey() { return swift::SourceRange(); }
+  static swift::SourceRange getEmptyKey() {
+    return swift::SourceRange(swift::SourceLoc(
+        SMLoc::getFromPointer(DenseMapInfo<const char *>::getEmptyKey())));
+  }
 
   static swift::SourceRange getTombstoneKey() {
     // Make this different from empty key. See for context:
