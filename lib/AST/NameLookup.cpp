@@ -172,10 +172,24 @@ static void recordShadowedDeclsAfterSignatureMatch(
   for (unsigned firstIdx : indices(decls)) {
     auto firstDecl = decls[firstIdx];
     auto firstModule = firstDecl->getModuleContext();
+    auto firstSig = firstDecl->getOverloadSignature();
     for (unsigned secondIdx : range(firstIdx + 1, decls.size())) {
       // Determine whether one module takes precedence over another.
       auto secondDecl = decls[secondIdx];
       auto secondModule = secondDecl->getModuleContext();
+
+      // Swift 4 compatibility hack: Don't shadow properties defined in
+      // extensions of generic types with properties defined elsewhere.
+      // This is due to the fact that in Swift 4, we only gave custom overload
+      // types to properties in extensions of generic types, otherwise we
+      // used the null type.
+      if (!ctx.isSwiftVersionAtLeast(5)) {
+        auto secondSig = secondDecl->getOverloadSignature();
+        if (firstSig.IsVariable && secondSig.IsVariable)
+          if (firstSig.InExtensionOfGenericType !=
+              secondSig.InExtensionOfGenericType)
+            continue;
+      }
 
       // If one declaration is in a protocol or extension thereof and the
       // other is not, prefer the one that is not.
