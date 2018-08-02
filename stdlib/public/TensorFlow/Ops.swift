@@ -627,6 +627,20 @@ public func exp<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
   return Raw.exp(x)
 }
 
+/// Computes the ceiling of the specified tensor element-wise.
+@inlinable @inline(__always)
+@differentiable(reverse, adjoint: _adjointCeil(_:originalValue:seed:))
+public func ceil<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
+  return Raw.ceil(x)
+}
+
+/// Computes the floor of the specified tensor element-wise.
+@inlinable @inline(__always)
+@differentiable(reverse, adjoint: _adjointFloor(_:originalValue:seed:))
+public func floor<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
+  return Raw.floor(x)
+}
+
 /// Computes the power of the first tensor to the second tensor.
 @inlinable @inline(__always)
 @differentiable(reverse, adjoint: _adjointPow(_:_:originalValue:seed:))
