@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -o %t/UsingObjCStuff.swiftmodule -module-name UsingObjCStuff -I %t -I %S/Inputs/mixed_mode -swift-version 4 %S/Inputs/mixed_mode/UsingObjCStuff.swift
-// RUN: %target-swift-frontend -emit-ir -I %t -I %S/Inputs/mixed_mode -module-name main -swift-version 3 %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-V3 -DWORD=i%target-ptrsize
+// RUN: %target-swift-frontend -emit-module -o %t/UsingObjCStuff.swiftmodule -module-name UsingObjCStuff -I %t -I %S/Inputs/mixed_mode -swift-version 5 %S/Inputs/mixed_mode/UsingObjCStuff.swift
 // RUN: %target-swift-frontend -emit-ir -I %t -I %S/Inputs/mixed_mode -module-name main -swift-version 4 %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-V4 -DWORD=i%target-ptrsize
+// RUN: %target-swift-frontend -emit-ir -I %t -I %S/Inputs/mixed_mode -module-name main -swift-version 5 %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-V5 -DWORD=i%target-ptrsize
 
 // REQUIRES: objc_interop
 
@@ -23,22 +23,22 @@ public class SubSubButtHolder: SubButtHolder {
 // CHECK-LABEL: define {{(protected )?}}{{(dllexport )?}}swiftcc void @"$S4main17accessFinalFields2ofyp_ypt14UsingObjCStuff10ButtHolderC_tF"
 public func accessFinalFields(of holder: ButtHolder) -> (Any, Any) {
 
-  // ButtHolder.y cannot be imported in Swift 3 mode, so make sure we use field
+  // ButtHolder.y cannot be imported in Swift 4 mode, so make sure we use field
   // offset globals here.
 
-  // CHECK-V3: [[OFFSET:%.*]] = load [[WORD]], [[WORD]]* @"$S14UsingObjCStuff10ButtHolderC1xSivpWvd"
-  // CHECK-V3: [[INSTANCE_RAW:%.*]] = bitcast {{.*}} to i8*
-  // CHECK-V3: getelementptr inbounds i8, i8* [[INSTANCE_RAW]], [[WORD]] [[OFFSET]]
+  // CHECK-V4: [[OFFSET:%.*]] = load [[WORD]], [[WORD]]* @"$S14UsingObjCStuff10ButtHolderC1xSivpWvd"
+  // CHECK-V4: [[INSTANCE_RAW:%.*]] = bitcast {{.*}} to i8*
+  // CHECK-V4: getelementptr inbounds i8, i8* [[INSTANCE_RAW]], [[WORD]] [[OFFSET]]
 
-  // CHECK-V3: [[OFFSET:%.*]] = load [[WORD]], [[WORD]]* @"$S14UsingObjCStuff10ButtHolderC1zSSvpWvd"
-  // CHECK-V3: [[INSTANCE_RAW:%.*]] = bitcast {{.*}} to i8*
-  // CHECK-V3: getelementptr inbounds i8, i8* [[INSTANCE_RAW]], [[WORD]] [[OFFSET]]
+  // CHECK-V4: [[OFFSET:%.*]] = load [[WORD]], [[WORD]]* @"$S14UsingObjCStuff10ButtHolderC1zSSvpWvd"
+  // CHECK-V4: [[INSTANCE_RAW:%.*]] = bitcast {{.*}} to i8*
+  // CHECK-V4: getelementptr inbounds i8, i8* [[INSTANCE_RAW]], [[WORD]] [[OFFSET]]
 
-  // ButtHolder.y is correctly imported in Swift 4 mode, so we can use fixed offsets.
+  // ButtHolder.y is correctly imported in Swift 5 mode, so we can use fixed offsets.
 
-  // CHECK-V4: [[OFFSET:%.*]] = getelementptr inbounds %T14UsingObjCStuff10ButtHolderC, %T14UsingObjCStuff10ButtHolderC* %2, i32 0, i32 1
+  // CHECK-V5: [[OFFSET:%.*]] = getelementptr inbounds %T14UsingObjCStuff10ButtHolderC, %T14UsingObjCStuff10ButtHolderC* %2, i32 0, i32 1
 
-  // CHECK-V4: [[OFFSET:%.*]] = getelementptr inbounds %T14UsingObjCStuff10ButtHolderC, %T14UsingObjCStuff10ButtHolderC* %2, i32 0, i32 3
+  // CHECK-V5: [[OFFSET:%.*]] = getelementptr inbounds %T14UsingObjCStuff10ButtHolderC, %T14UsingObjCStuff10ButtHolderC* %2, i32 0, i32 3
 
   return (holder.x, holder.z)
 }
@@ -48,31 +48,31 @@ public func accessFinalFields(ofSub holder: SubButtHolder) -> (Any, Any, Any) {
   // We should use the runtime-adjusted ivar offsets since we may not have
   // a full picture of the layout in mixed Swift language version modes.
 
-  // ButtHolder.y cannot be imported in Swift 3 mode, so make sure we use field
+  // ButtHolder.y cannot be imported in Swift 4 mode, so make sure we use field
   // offset globals here.
 
-  // CHECK-V3: [[OFFSET:%.*]] = load [[WORD]], [[WORD]]* @"$S14UsingObjCStuff10ButtHolderC1xSivpWvd"
-  // CHECK-V3: [[INSTANCE_RAW:%.*]] = bitcast {{.*}} to i8*
-  // CHECK-V3: getelementptr inbounds i8, i8* [[INSTANCE_RAW]], [[WORD]] [[OFFSET]]
+  // CHECK-V4: [[OFFSET:%.*]] = load [[WORD]], [[WORD]]* @"$S14UsingObjCStuff10ButtHolderC1xSivpWvd"
+  // CHECK-V4: [[INSTANCE_RAW:%.*]] = bitcast {{.*}} to i8*
+  // CHECK-V4: getelementptr inbounds i8, i8* [[INSTANCE_RAW]], [[WORD]] [[OFFSET]]
 
-  // CHECK-V3: [[OFFSET:%.*]] = load [[WORD]], [[WORD]]* @"$S14UsingObjCStuff10ButtHolderC1zSSvpWvd"
-  // CHECK-V3: [[INSTANCE_RAW:%.*]] = bitcast {{.*}} to i8*
-  // CHECK-V3: getelementptr inbounds i8, i8* [[INSTANCE_RAW]], [[WORD]] [[OFFSET]]
+  // CHECK-V4: [[OFFSET:%.*]] = load [[WORD]], [[WORD]]* @"$S14UsingObjCStuff10ButtHolderC1zSSvpWvd"
+  // CHECK-V4: [[INSTANCE_RAW:%.*]] = bitcast {{.*}} to i8*
+  // CHECK-V4: getelementptr inbounds i8, i8* [[INSTANCE_RAW]], [[WORD]] [[OFFSET]]
 
-  // CHECK-V3: [[OFFSET:%.*]] = load [[WORD]], [[WORD]]* @"$S4main13SubButtHolderC1wSfvpWvd"
+  // CHECK-V4: [[OFFSET:%.*]] = load [[WORD]], [[WORD]]* @"$S4main13SubButtHolderC1wSfvpWvd"
 
-  // CHECK-V3: [[INSTANCE_RAW:%.*]] = bitcast {{.*}} to i8*
-  // CHECK-V3: getelementptr inbounds i8, i8* [[INSTANCE_RAW]], [[WORD]] [[OFFSET]]
+  // CHECK-V4: [[INSTANCE_RAW:%.*]] = bitcast {{.*}} to i8*
+  // CHECK-V4: getelementptr inbounds i8, i8* [[INSTANCE_RAW]], [[WORD]] [[OFFSET]]
   
-  // ButtHolder.y is correctly imported in Swift 4 mode, so we can use fixed offsets.
+  // ButtHolder.y is correctly imported in Swift 5 mode, so we can use fixed offsets.
 
-  // CHECK-V4: [[SELF:%.*]] = bitcast %T4main13SubButtHolderC* %3 to %T14UsingObjCStuff10ButtHolderC*
-  // CHECK-V4: [[OFFSET:%.*]] = getelementptr inbounds %T14UsingObjCStuff10ButtHolderC, %T14UsingObjCStuff10ButtHolderC* [[SELF]], i32 0, i32 1
+  // CHECK-V5: [[SELF:%.*]] = bitcast %T4main13SubButtHolderC* %3 to %T14UsingObjCStuff10ButtHolderC*
+  // CHECK-V5: [[OFFSET:%.*]] = getelementptr inbounds %T14UsingObjCStuff10ButtHolderC, %T14UsingObjCStuff10ButtHolderC* [[SELF]], i32 0, i32 1
 
-  // CHECK-V4: [[SELF:%.*]] = bitcast %T4main13SubButtHolderC* %3 to %T14UsingObjCStuff10ButtHolderC*
-  // CHECK-V4: [[OFFSET:%.*]] = getelementptr inbounds %T14UsingObjCStuff10ButtHolderC, %T14UsingObjCStuff10ButtHolderC* [[SELF]], i32 0, i32 3
+  // CHECK-V5: [[SELF:%.*]] = bitcast %T4main13SubButtHolderC* %3 to %T14UsingObjCStuff10ButtHolderC*
+  // CHECK-V5: [[OFFSET:%.*]] = getelementptr inbounds %T14UsingObjCStuff10ButtHolderC, %T14UsingObjCStuff10ButtHolderC* [[SELF]], i32 0, i32 3
 
-  // CHECK-V4: [[OFFSET:%.*]] = getelementptr inbounds %T4main13SubButtHolderC, %T4main13SubButtHolderC* %3, i32 0, i32 4
+  // CHECK-V5: [[OFFSET:%.*]] = getelementptr inbounds %T4main13SubButtHolderC, %T4main13SubButtHolderC* %3, i32 0, i32 4
 
   return (holder.x, holder.z, holder.w)
 }
@@ -91,9 +91,9 @@ public func invokeMethod(on holder: SubButtHolder) {
   holder.subVirtual()
 }
 
-// CHECK-V3-LABEL: define private void @initialize_metadata_SubButtHolder
-// CHECK-V3:   call void @swift_initClassMetadata(
+// CHECK-V4-LABEL: define private void @initialize_metadata_SubButtHolder
+// CHECK-V4:   call void @swift_initClassMetadata(
 
-// CHECK-V3-LABEL: define private void @initialize_metadata_SubSubButtHolder
-// CHECK-V3:   call void @swift_initClassMetadata(
+// CHECK-V4-LABEL: define private void @initialize_metadata_SubSubButtHolder
+// CHECK-V4:   call void @swift_initClassMetadata(
 
