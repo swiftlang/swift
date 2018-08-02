@@ -3158,10 +3158,14 @@ void PartitionCloner::handleSendRecvForTerminator(TermInst *inst) {
           loc, ctx.getIdentifier(equalOpName),
           /*operands*/ {receivedCaseId, constTensorWithCaseId}, attributes,
           {tensorHandleI1Ty});
+      attributes.clear();
+      FP.deviceInfo.handleDevicePlacement(
+          "tf_tensor_to_i1", /*opDevice*/ getDeviceString(DeviceType::ALL),
+          BA.getModule().getASTContext(), attributes);
       auto *condBrInst = BA.createGraphOperation(
           loc, ctx.getIdentifier("tf_tensor_to_i1"),
-          /*operands*/ {getSingleValueResult(equalComparisonInst)},
-          /*attributes*/ {}, {boolFieldSILType});
+          /*operands*/ {getSingleValueResult(equalComparisonInst)}, attributes,
+          {boolFieldSILType});
       condBrOperand = getSingleValueResult(condBrInst);
     }
 
