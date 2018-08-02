@@ -13,9 +13,9 @@ var TopLevelTests = TestSuite("TopLevel")
 
 let g = Tensor<Float>(1.0)
 
-// This function is not inlined into main(). Confirm that it 
+// This function is not inlined into main(). Confirm that it can read the global
+// var properly and does not crash.
 func SR8405() {
-  // _hostOp(g)
   expectNearlyEqualWithScalarTensor(1.0, g)
 }
 
