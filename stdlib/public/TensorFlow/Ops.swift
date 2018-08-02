@@ -360,6 +360,36 @@ extension Tensor : Comparable where Scalar : Numeric & Comparable {
   }
 }
 
+public extension Tensor where Scalar : Numeric & Comparable {
+  /// Returns a Boolean value indicating whether the value of the first argument
+  /// is lexicographically less than that of the second argument.
+  @inlinable @inline(__always)
+  public static func < (lhs: Tensor, rhs: Scalar) -> Bool {
+    return lhs.elementsLess(rhs).all()
+  }
+
+  /// Returns a Boolean value indicating whether the value of the first argument
+  /// is lexicographically less than or equal to that of the second argument.
+  @inlinable @inline(__always)
+  public static func <= (lhs: Tensor, rhs: Scalar) -> Bool {
+    return lhs.elementsLessOrEqual(rhs).all()
+  }
+
+  /// Returns a Boolean value indicating whether the value of the first argument
+  /// is lexicographically greater than that of the second argument.
+  @inlinable @inline(__always)
+  public static func > (lhs: Tensor, rhs: Scalar) -> Bool {
+    return lhs.elementsGreater(rhs).all()
+  }
+
+  /// Returns a Boolean value indicating whether the value of the first argument
+  /// is lexicographically greater than or equal to that of the second argument.
+  @inlinable @inline(__always)
+  public static func >= (lhs: Tensor, rhs: Scalar) -> Bool {
+    return lhs.elementsGreaterOrEqual(rhs).all()
+  }
+}
+
 public extension Tensor where Scalar : Equatable {
   /// Computes `self == other` element-wise.
   /// - Note: `elementsEqual` supports broadcasting.
@@ -397,14 +427,6 @@ public extension Tensor where Scalar : BinaryFloatingPoint & Equatable {
   func elementsApproximatelyEqual(_ other: Tensor,
                                   tolerance: Double = 0.00001) -> Tensor<Bool> {
     return Raw.approximateEqual(self, other, tolerance: tolerance)
-  }
-
-  /// Returns a Boolean value indicating whether the value of the first argument
-  /// is lexicographically approximately equal to that of the second argument.
-  /// Errors no larger than `0.00001` are tolerated.
-  @inlinable @inline(__always)
-  static func ≈ (lhs: Tensor, rhs: Tensor) -> Bool {
-    return lhs.elementsApproximatelyEqual(rhs).all()
   }
 }
 
