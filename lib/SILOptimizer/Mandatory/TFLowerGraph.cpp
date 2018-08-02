@@ -312,9 +312,14 @@ public:
   /// Note: `name` starts with _, where the name of a graph node cannot start
   /// with _.
   ///
-  /// This sets `funcHasSideEffects` to true if the body of the graph had any
-  /// side effecting operations.  This allows calls to the graph to set up
-  /// control dependence edges properly.
+  /// `funcHasSideEffects` is set to true if the body of the graph function has
+  /// any side effecting operations.  This allows the caller to this graph
+  /// function to wire up control dependence edges properly. In particular, the
+  /// graph node that runs this function in the call-site is treated as a
+  /// side-effecting node, and will be threaded via control edges with other
+  /// side-effecting nodes in the caller. This is unless we are building a top
+  /// level graph function, in which case we ignore `funcHasSideEffects`, as the
+  /// top level function gets called in a `TF_SessionRun()` call.
   ///
   /// This emits an error and returns true on error.
   bool buildGraphFunction(const GraphFunctionBody &graphBody, StringRef name,
@@ -3611,6 +3616,8 @@ bool TFGraphLowering::lowerTFGraphOrFunction(
 
     bool funcHasSideEffects = false;
     SmallVector<TF_DataType, 4> inputTypes, outputTypes;
+    // Ignore `funcHasSideEffects` when the call returns, since this top level
+    // graph function gets called directly in a TF_SessionRun() call.
     if (graphFuncGen.buildGraphFunction(graphFnBody, graphFnName,
                                         funcHasSideEffects, &inputTypes,
                                         &outputTypes))
