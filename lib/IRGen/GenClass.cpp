@@ -229,15 +229,13 @@ namespace {
       fieldLayout.AllFieldAccesses = IGM.Context.AllocateCopy(AllFieldAccesses);
       fieldLayout.MetadataRequiresDynamicInitialization =
         ClassMetadataRequiresDynamicInitialization;
+      fieldLayout.HasFixedSize = ClassHasFixedSize;
       return fieldLayout;
     }
 
   private:
     void addFieldsForClass(ClassDecl *theClass, SILType classType) {
       if (theClass->isGenericContext())
-        ClassMetadataRequiresDynamicInitialization = true;
-
-      if (IGM.isResilient(theClass, ResilienceExpansion::Maximal))
         ClassMetadataRequiresDynamicInitialization = true;
 
       if (theClass->hasSuperclass()) {
@@ -251,6 +249,7 @@ namespace {
         // the class object at compile time so we need to do runtime layout.
         if (classHasIncompleteLayout(IGM, superclass)) {
           ClassMetadataRequiresDynamicInitialization = true;
+          ClassHasFixedSize = false;
         }
 
         if (superclass->hasClangNode()) {
@@ -282,9 +281,6 @@ namespace {
             }
         } else if (IGM.isResilient(superclass, ResilienceExpansion::Maximal)) {
           ClassMetadataRequiresDynamicInitialization = true;
-
-          // If the superclass is resilient to us, we cannot statically
-          // know the layout of either its instances or its class objects.
           ClassHasFixedSize = false;
 
           // Furthermore, if the superclass is a generic context, we have to
@@ -306,6 +302,11 @@ namespace {
       // If this class was imported from another module, assume that we may
       // not know its exact layout.
       if (classHasIncompleteLayout(IGM, theClass)) {
+        ClassMetadataRequiresDynamicInitialization = true;
+        ClassHasFixedSize = false;
+      }
+
+      if (IGM.isResilient(theClass, ResilienceExpansion::Maximal)) {
         ClassMetadataRequiresDynamicInitialization = true;
         ClassHasFixedSize = false;
       }
@@ -657,7 +658,7 @@ Address irgen::emitTailProjection(IRGenFunction &IGF, llvm::Value *Base,
   } else {
     llvm::Value *metadata = emitHeapMetadataRefForHeapObject(IGF, Base,
                                                              ClassType);
-    Offset = emitClassFragileInstanceSizeAndAlignMask(IGF,
+    Offset = emitClassResilientInstanceSizeAndAlignMask(IGF,
                                         ClassType.getClassOrBoundGenericClass(),
                                         metadata).first;
   }
@@ -789,17 +790,25 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
     emitClassHeapMetadataRef(IGF, classType, MetadataValueType::TypeMetadata,
                              MetadataState::Complete);
 
-  // FIXME: Long-term, we clearly need a specialized runtime entry point.
-  llvm::Value *size, *alignMask;
-  std::tie(size, alignMask)
-    = emitClassFragileInstanceSizeAndAlignMask(IGF,
-                                   selfType.getClassOrBoundGenericClass(),
-                                   metadata);
+  const StructLayout &structLayout = classTI.getLayout(IGF.IGM, selfType);
+  const ClassLayout &classLayout = classTI.getClassLayout(IGF.IGM, selfType);
 
-  const StructLayout &layout = classTI.getLayout(IGF.IGM, selfType);
-  llvm::Type *destType = layout.getType()->getPointerTo();
+  llvm::Value *size, *alignMask;
+  if (classLayout.HasFixedSize) {
+    assert(structLayout.isFixedLayout());
+
+    size = structLayout.emitSize(IGF.IGM);
+    alignMask = structLayout.emitAlignMask(IGF.IGM);
+  } else {
+    std::tie(size, alignMask)
+      = emitClassResilientInstanceSizeAndAlignMask(IGF,
+                                     selfType.getClassOrBoundGenericClass(),
+                                     metadata);
+  }
+
+  llvm::Type *destType = structLayout.getType()->getPointerTo();
   llvm::Value *val = nullptr;
-  if (llvm::Value *Promoted = stackPromote(IGF, layout, StackAllocSize,
+  if (llvm::Value *Promoted = stackPromote(IGF, structLayout, StackAllocSize,
                                            TailArrays)) {
     val = IGF.Builder.CreateBitCast(Promoted, IGF.IGM.RefCountedPtrTy);
     val = IGF.emitInitStackObjectCall(metadata, val, "reference.new");
@@ -863,7 +872,7 @@ static void getInstanceSizeAndAlignMask(IRGenFunction &IGF,
   llvm::Value *metadata =
     emitHeapMetadataRefForHeapObject(IGF, selfValue, selfType);
   std::tie(size, alignMask)
-    = emitClassFragileInstanceSizeAndAlignMask(IGF, selfClass, metadata);
+    = emitClassResilientInstanceSizeAndAlignMask(IGF, selfClass, metadata);
 }
 
 void irgen::emitClassDeallocation(IRGenFunction &IGF, SILType selfType,
