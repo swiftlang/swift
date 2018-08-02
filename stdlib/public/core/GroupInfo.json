@@ -32,6 +32,7 @@
     "StringRangeReplaceableCollection.swift",
     "StringStorage.swift",
     "StringSwitch.swift",
+    "StringTesting.swift",
     "StringUTF16View.swift",
     "StringUTF8View.swift",
     "StringUnicodeScalarView.swift",

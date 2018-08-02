@@ -540,7 +540,8 @@ extension String {
 /// [equivalence]: http://www.unicode.org/glossary/#canonical_equivalent
 @_fixed_layout
 public struct String {
-  public var _guts: _StringGuts
+  public // SPI(Foundation)
+  var _guts: _StringGuts
 
   /// Creates an empty string.
   ///
@@ -555,8 +556,7 @@ public struct String {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  public // @testable
-  init(_ _guts: _StringGuts) {
+  internal init(_ _guts: _StringGuts) {
     self._guts = _guts
   }
 }

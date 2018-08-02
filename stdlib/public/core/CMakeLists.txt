@@ -134,13 +134,14 @@ set(SWIFTLIB_ESSENTIAL
   StringObject.swift
   StringProtocol.swift
   StringIndex.swift
+  StringIndexConversions.swift
   StringInterpolation.swift
   StringLegacy.swift
+  StringNormalization.swift
   StringRangeReplaceableCollection.swift
   StringStorage.swift
   StringSwitch.swift
-  StringIndexConversions.swift
-  StringNormalization.swift
+  StringTesting.swift
   StringUnicodeScalarView.swift
   StringUTF16View.swift
   StringUTF8View.swift
