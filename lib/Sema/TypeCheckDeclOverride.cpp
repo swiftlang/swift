@@ -1524,8 +1524,10 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
   if (auto baseVar = dyn_cast<VarDecl>(base)) {
     if (auto classDecl =
           baseVar->getDeclContext()->getAsClassOrClassExtensionContext()) {
-      if (classDecl->getBaseName().userFacingName() == "NSObject" &&
-          baseVar->getBaseName().userFacingName() == "hashValue") {
+      if (baseVar->getName() == ctx.Id_hashValue &&
+          classDecl->getName().is("NSObject") &&
+          (classDecl->getModuleContext()->getName() == ctx.Id_Foundation ||
+           classDecl->getModuleContext()->getName() == ctx.Id_ObjectiveC)) {
         override->diagnose(diag::override_nsobject_hashvalue);
       }
     }
