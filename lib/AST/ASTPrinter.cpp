@@ -64,6 +64,21 @@ void PrintOptions::clearSynthesizedExtension() {
   TransformContext.reset();
 }
 
+PrintOptions PrintOptions::printTextualInterfaceFile() {
+  PrintOptions result;
+  result.PrintLongAttrsOnSeparateLines = true;
+  result.TypeDefinitions = true;
+  result.PrintIfConfig = false;
+  result.FullyQualifiedTypes = true;
+  result.SkipImports = true;
+  result.AccessFilter = AccessLevel::Public;
+
+  // FIXME: We'll need the actual default parameter expression.
+  result.PrintDefaultParameterPlaceholder = false;
+
+  return result;
+}
+
 TypeTransformContext::TypeTransformContext(Type T)
     : BaseType(T.getPointer()) {
   assert(T->mayHaveMembers());

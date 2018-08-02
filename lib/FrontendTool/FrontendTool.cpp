@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -24,6 +24,7 @@
 #include "ImportedModules.h"
 #include "ReferenceDependencies.h"
 #include "TBD.h"
+#include "TextualInterfaceGeneration.h"
 
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTScope.h"
@@ -62,11 +63,7 @@
 #include "swift/Syntax/SyntaxNodes.h"
 #include "swift/TBDGen/TBDGen.h"
 
-// FIXME: We're just using CompilerInstance::createOutputFile.
-// This API should be sunk down to LLVM.
-#include "clang/Frontend/CompilerInstance.h"
 #include "clang/AST/ASTContext.h"
-#include "clang/APINotes/Types.h"
 
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/LLVMContext.h"
@@ -314,47 +311,64 @@ static bool writeSIL(SILModule &SM, const PrimarySpecificPaths &PSPs,
                   PSPs.OutputFilename, opts.EmitSortedSIL);
 }
 
+/// A wrapper around swift::atomicallyWritingToFile that handles diagnosing any
+/// filesystem errors and ignores empty output paths.
+///
+/// \returns true if there were any errors, either from the filesystem
+/// operations or from \p action returning true.
+static bool atomicallyWritingToTextFile(
+    StringRef outputPath, DiagnosticEngine &diags,
+    llvm::function_ref<bool(llvm::raw_pwrite_stream &)> action) {
+  assert(!outputPath.empty());
+
+  bool actionFailed = false;
+  std::error_code EC =
+      swift::atomicallyWritingToFile(outputPath, /*binary*/false,
+                                     [&](llvm::raw_pwrite_stream &out) {
+    actionFailed = action(out);
+  });
+  if (EC) {
+    diags.diagnose(SourceLoc(), diag::error_opening_output,
+                   outputPath, EC.message());
+    return true;
+  }
+  return actionFailed;
+}
+
+/// Prints the Objective-C "generated header" interface for \p M to \p
+/// outputPath.
+///
+/// ...unless \p outputPath is empty, in which case it does nothing.
+///
+/// \returns true if there were any errors
+///
+/// \see swift::printAsObjC
 static bool printAsObjCIfNeeded(StringRef outputPath, ModuleDecl *M,
                                 StringRef bridgingHeader, bool moduleIsPublic) {
-  using namespace llvm::sys;
-
   if (outputPath.empty())
     return false;
+  return atomicallyWritingToTextFile(outputPath, M->getDiags(),
+                                     [&](raw_ostream &out) -> bool {
+    auto requiredAccess = moduleIsPublic ? AccessLevel::Public
+                                         : AccessLevel::Internal;
+    return printAsObjC(out, M, bridgingHeader, requiredAccess);
+  });
+}
 
-  clang::CompilerInstance Clang;
-
-  std::string tmpFilePath;
-  std::error_code EC;
-  std::unique_ptr<llvm::raw_pwrite_stream> out =
-    Clang.createOutputFile(outputPath, EC,
-                           /*Binary=*/false,
-                           /*RemoveFileOnSignal=*/true,
-                           /*BaseInput=*/"",
-                           path::extension(outputPath),
-                           /*UseTemporary=*/true,
-                           /*CreateMissingDirectories=*/false,
-                           /*ResultPathName=*/nullptr,
-                           &tmpFilePath);
-
-  if (!out) {
-    M->getASTContext().Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                                      tmpFilePath, EC.message());
-    return true;
-  }
-
-  auto requiredAccess = moduleIsPublic ? AccessLevel::Public
-                                       : AccessLevel::Internal;
-  bool hadError = printAsObjC(*out, M, bridgingHeader, requiredAccess);
-  out->flush();
-
-  EC = swift::moveFileIfDifferent(tmpFilePath, outputPath);
-  if (EC) {
-    M->getASTContext().Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                                      outputPath, EC.message());
-    return true;
-  }
-
-  return hadError;
+/// Prints the stable textual interface for \p M to \p outputPath.
+///
+/// ...unless \p outputPath is empty, in which case it does nothing.
+///
+/// \returns true if there were any errors
+///
+/// \see swift::emitModuleInterface
+static bool printModuleInterfaceIfNeeded(StringRef outputPath, ModuleDecl *M) {
+  if (outputPath.empty())
+    return false;
+  return atomicallyWritingToTextFile(outputPath, M->getDiags(),
+                                     [M](raw_ostream &out) -> bool {
+    return swift::emitModuleInterface(out, M);
+  });
 }
 
 /// Returns the OutputKind for the given Action.
@@ -1321,6 +1335,10 @@ static bool performCompileStepsPostSILGen(
   (void)printAsObjCIfNeeded(PSPs.SupplementaryOutputs.ObjCHeaderOutputPath,
                             Instance.getMainModule(),
                             opts.ImplicitObjCHeaderPath, moduleIsPublic);
+
+  (void)printModuleInterfaceIfNeeded(
+      PSPs.SupplementaryOutputs.ModuleInterfaceOutputPath,
+      Instance.getMainModule());
 
   if (Action == FrontendOptions::ActionType::EmitSIB)
     return serializeSIB(SM.get(), PSPs, Instance.getASTContext(), MSF);

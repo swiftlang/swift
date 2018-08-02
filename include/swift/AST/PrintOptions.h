@@ -424,6 +424,14 @@ struct PrintOptions {
     return result;
   }
 
+  /// Retrieve the set of options suitable for stable textual interfaces.
+  ///
+  /// This is a format that will be parsed again later, so the output must be
+  /// consistent and well-formed.
+  ///
+  /// \see swift::emitModuleInterface
+  static PrintOptions printTextualInterfaceFile();
+
   static PrintOptions printModuleInterface();
   static PrintOptions printTypeInterface(Type T);
 
