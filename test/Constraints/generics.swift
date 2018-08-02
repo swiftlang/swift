@@ -592,3 +592,19 @@ func sr8075() {
 
   let _: UIFont = .init(ofSize: switchOnCategory([0: 15.5, 1: 20.5]))
 }
+
+// rdar://problem/40537858 - Ambiguous diagnostic when type is missing conformance
+func rdar40537858() {
+  struct S {
+    struct Id {}
+    var id: Id
+  }
+
+  struct List<T: Collection, E: Hashable> {
+    typealias Data = T.Element
+    init(_: T, id: KeyPath<Data, E>) {}
+  }
+
+  var arr: [S] = []
+  _ = List(arr, id: \.id) // expected-error {{'List<[S], S.Id>' requires that 'S.Id' conform to 'Hashable'}}
+}

@@ -7926,7 +7926,7 @@ bool ConstraintSystem::applySolutionFixes(Expr *E, const Solution &solution) {
 
     bool diagnosed = false;
     for (auto &fix : fixes->second)
-      diagnosed |= applySolutionFix(expr, solution, fix);
+      diagnosed |= applySolutionFix(E, solution, fix);
     return diagnosed;
   };
 
@@ -7970,7 +7970,8 @@ bool ConstraintSystem::applySolutionFix(
   if (!resolved || !resolved->getAnchor() ||
       (!resolved->getPath().empty() &&
        fix.first.getKind() != FixKind::ExplicitlyEscaping &&
-       fix.first.getKind() != FixKind::ExplicitlyEscapingToAny))
+       fix.first.getKind() != FixKind::ExplicitlyEscapingToAny &&
+       fix.first.getKind() != FixKind::AddConformace))
     return false;
   
   Expr *affected = resolved->getAnchor();
@@ -8147,6 +8148,88 @@ bool ConstraintSystem::applySolutionFix(
     return diagnoseArgumentLabelError(getASTContext(), call->getArg(),
                                       fix.first.getArgumentLabels(*this),
                                       isa<SubscriptExpr>(call->getFn()));
+  }
+
+  case FixKind::AddConformace: {
+    auto getMissingConformance = [&](ConstraintLocator *locator) {
+      auto *anchor = locator->getAnchor();
+      auto &requirement = locator->getPath().back();
+      auto result = MissingConformances.find({anchor, requirement.getValue()});
+      assert(result != MissingConformances.end());
+      return result->getSecond();
+    };
+
+    auto conformance = getMissingConformance(locator);
+
+    auto owner = solution.simplifyType(getType(locator->getAnchor()));
+    auto type = conformance.first;
+    auto protocolType =
+        conformance.second->getInterfaceType()->getRValueInstanceType();
+
+    Optional<unsigned> atParameterPos;
+    if (auto *fnType = owner->getAs<AnyFunctionType>()) {
+      auto parameters = fnType->getParams();
+      for (auto index : indices(parameters)) {
+        if (parameters[index].getType()->isEqual(type)) {
+          atParameterPos = index;
+          break;
+        }
+      }
+    }
+
+    //  Find `ApplyExpr` based on a function expression attached to it.
+    auto findApplyExpr = [](Expr *parent, Expr *fnExpr) -> ApplyExpr * {
+      ApplyExpr *applyExpr = nullptr;
+      parent->forEachChildExpr([&applyExpr, &fnExpr](Expr *subExpr) -> Expr * {
+        auto *AE = dyn_cast<ApplyExpr>(subExpr);
+        if (!AE || AE->getFn() != fnExpr)
+          return subExpr;
+
+        applyExpr = AE;
+        return nullptr;
+      });
+      return applyExpr;
+    };
+
+    auto getArgumentAt = [](ApplyExpr *AE, unsigned index) -> Expr * {
+      assert(AE);
+
+      auto *arg = AE->getArg();
+      if (auto *TE = dyn_cast<TupleExpr>(arg))
+        return TE->getElement(index);
+
+      assert(index == 0);
+      if (auto *PE = dyn_cast<ParenExpr>(arg))
+        return PE->getSubExpr();
+
+      return arg;
+    };
+
+    auto *anchor = locator->getAnchor();
+    auto *applyExpr = findApplyExpr(expr, anchor);
+    // If this is a static, initializer or operator call,
+    // let's not try to diagnose it here, but refer to expression
+    // diagnostics.
+    if (applyExpr && (isa<BinaryExpr>(applyExpr) || isa<TypeExpr>(anchor)))
+      return false;
+
+    if (atParameterPos) {
+      // Requirement comes from one of the parameter types,
+      // let's try to point diagnostic to the argument expression.
+      // Although sometimes fix is recorded by type-checking
+      // sub-expression during normal diagnostics, in that case
+      // call expression is unavailable.
+      auto *argExpr =
+          applyExpr ? getArgumentAt(applyExpr, *atParameterPos) : anchor;
+
+      TC.diagnose(argExpr->getLoc(),
+                  diag::cannot_convert_argument_value_protocol, type,
+                  protocolType);
+    } else {
+      TC.diagnose(anchor->getLoc(), diag::type_does_not_conform_owner, owner,
+                  type, protocolType);
+    }
+    return true;
   }
   }
 

@@ -2766,6 +2766,28 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     }
     return result;
   }
+
+  // If this is a generic requirement let's try to record that
+  // conformance is missing and consider this a success, which
+  // makes it much easier to diagnose problems like that.
+  {
+    SmallVector<LocatorPathElt, 4> path;
+    auto *anchor = locator.getLocatorParts(path);
+
+    if (!path.empty() && path.back().getKind() ==
+        ConstraintLocator::PathElementKind::TypeParameterRequirement) {
+      auto typeRequirement = path.back();
+      std::pair<Expr *, unsigned> reqLoc = {anchor, typeRequirement.getValue()};
+      MissingConformances[reqLoc] = {type.getPointer(), protocol};
+      // Let's strip all of the uncessary information from locator,
+      // diagnostics only care about anchor - to lookup type,
+      // and what was the requirement# which is not satisfied.
+      ConstraintLocatorBuilder requirement(getConstraintLocator(anchor));
+      if (!recordFix({FixKind::AddConformace},
+                     requirement.withPathElement(typeRequirement)))
+        return SolutionKind::Solved;
+    }
+  }
   
   // There's nothing more we can do; fail.
   return SolutionKind::Error;
@@ -4991,6 +5013,7 @@ ConstraintSystem::simplifyFixConstraint(Fix fix, Type type1, Type type2,
   case FixKind::ExplicitlyEscapingToAny:
   case FixKind::CoerceToCheckedCast:
   case FixKind::RelabelArguments:
+  case FixKind::AddConformace:
     llvm_unreachable("handled elsewhere");
   }
 
