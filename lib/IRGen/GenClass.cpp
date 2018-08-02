@@ -2289,36 +2289,6 @@ bool irgen::hasKnownSwiftMetadata(IRGenModule &IGM, ClassDecl *theClass) {
   return theClass->hasKnownSwiftImplementation();
 }
 
-/// Given a reference to class metadata of the given type,
-/// load the fragile instance size and alignment of the class.
-std::pair<llvm::Value *, llvm::Value *>
-irgen::emitClassFragileInstanceSizeAndAlignMask(IRGenFunction &IGF,
-                                                ClassDecl *theClass,
-                                                llvm::Value *metadata) {
-  // FIXME: The below checks should capture this property already, but
-  // resilient class metadata layout is not fully implemented yet.
-  auto superClass = theClass;
-  do {
-    if (superClass->getParentModule() != IGF.IGM.getSwiftModule()) {
-      return emitClassResilientInstanceSizeAndAlignMask(IGF, theClass,
-                                                        metadata);
-    }
-  } while ((superClass = superClass->getSuperclassDecl()));
-
-  // If the class has fragile fixed layout, return the constant size and
-  // alignment.
-  if (llvm::Constant *size
-        = tryEmitClassConstantFragileInstanceSize(IGF.IGM, theClass)) {
-    llvm::Constant *alignMask
-      = tryEmitClassConstantFragileInstanceAlignMask(IGF.IGM, theClass);
-    assert(alignMask && "static size without static align");
-    return {size, alignMask};
-  }
- 
-  // Otherwise, load it from the metadata.
-  return emitClassResilientInstanceSizeAndAlignMask(IGF, theClass, metadata);
-}
-
 std::pair<llvm::Value *, llvm::Value *>
 irgen::emitClassResilientInstanceSizeAndAlignMask(IRGenFunction &IGF,
                                                   ClassDecl *theClass,
