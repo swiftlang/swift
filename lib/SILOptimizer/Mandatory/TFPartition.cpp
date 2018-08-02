@@ -34,6 +34,7 @@
 #include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/BitVector.h"
+#include "llvm/Support/CommandLine.h"
 #ifdef SWIFT_ENABLE_TENSORFLOW
 #include "tensorflow/c/c_api.h"
 #endif
