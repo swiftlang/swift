@@ -43,10 +43,6 @@ TFDumpDeabstractionDetails("tf-dump-deabstraction-details",
                            llvm::cl::init(false),
            llvm::cl::desc("Dump extra details about TensorFlow deabstraction"));
 
-static llvm::cl::opt<bool>
-TFStrictDeabstraction("tf-strict-deabstraction", llvm::cl::init(true),
-       llvm::cl::desc("Verify #tfop's are valid without the perf optimizer"));
-
 template<typename...T, typename...U>
 static InFlightDiagnostic
 diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag, U &&...args) {
@@ -222,20 +218,6 @@ void TFDeabstraction::inlineCalls() {
     // entrypoint used by SILGen to represent array allocations.
     if (callee.getName().contains("_allocateUninitializedArray"))
       return false;
-
-    // FIXME: This is a specific hack to inline literal conversion operations
-    // that prevent SSA promotion and bloat code.  This should be eliminated
-    // when we have a proper constexpr model and can just constant fold through
-    // the memory indirections.
-    if (callee.getName().contains("ExpressibleByBuiltinIntegerLiteral") ||
-        callee.getName().contains("ExpressibleByIntegerLiteral") ||
-        callee.getName().contains("SSfs13FloatingPoint") ||
-        callee.getName().contains("S10TensorFlow0A0VAAs13FloatingPointRzrlE12"
-                                  "randomNormal4mean6stddev5s") ||
-        callee.getName().contains("S10TensorFlow0A5ShapeV12arrayLiteral"
-                                  "ACs5Int32Vd_tcfC"))
-      if (!TFStrictDeabstraction)
-        return true;
 
     // If we're forcibly flattening code into the top level function, and if the
     // callee is in the same source file as that top-level function (and thus
@@ -625,84 +607,6 @@ void TFDeabstraction::simplifyTensorOperands() {
     tensorOps.clear();
 }
 
-// Return true if this is a standard LLVM arithmetic operation.  We often see
-// silly allocas in the way of them.
-// FIXME: This is only necessary because we don't have a constexpr model.
-// When that is in place and working well, this should be removed.
-static bool isSimpleBuiltinArithmeticOp(BuiltinInst *builtin) {
-  if (TFStrictDeabstraction)
-    return false;
-
-  switch (builtin->getBuiltinInfo().ID) {
-  default: return false;
-  case BuiltinValueKind::Trunc:
-  case BuiltinValueKind::ZExt:
-  case BuiltinValueKind::SExt:
-  case BuiltinValueKind::FPToUI:
-  case BuiltinValueKind::FPToSI:
-  case BuiltinValueKind::UIToFP:
-  case BuiltinValueKind::SIToFP:
-  case BuiltinValueKind::FPTrunc:
-  case BuiltinValueKind::FPExt:
-  case BuiltinValueKind::TruncOrBitCast:
-  case BuiltinValueKind::ZExtOrBitCast:
-  case BuiltinValueKind::SExtOrBitCast:
-  case BuiltinValueKind::Add:
-  case BuiltinValueKind::FAdd:
-  case BuiltinValueKind::And:
-  case BuiltinValueKind::AShr:
-  case BuiltinValueKind::LShr:
-  case BuiltinValueKind::Or:
-  case BuiltinValueKind::FDiv:
-  case BuiltinValueKind::Mul:
-  case BuiltinValueKind::FMul:
-  case BuiltinValueKind::SDiv:
-  case BuiltinValueKind::ExactSDiv:
-  case BuiltinValueKind::Shl:
-  case BuiltinValueKind::SRem:
-  case BuiltinValueKind::Sub:
-  case BuiltinValueKind::FSub:
-  case BuiltinValueKind::UDiv:
-  case BuiltinValueKind::ExactUDiv:
-  case BuiltinValueKind::URem:
-  case BuiltinValueKind::FRem:
-  case BuiltinValueKind::Xor:
-  case BuiltinValueKind::SAddOver:
-  case BuiltinValueKind::UAddOver:
-  case BuiltinValueKind::SSubOver:
-  case BuiltinValueKind::USubOver:
-  case BuiltinValueKind::SMulOver:
-  case BuiltinValueKind::UMulOver:
-  case BuiltinValueKind::FNeg:
-  case BuiltinValueKind::AssumeNonNegative:
-  case BuiltinValueKind::ICMP_EQ:
-  case BuiltinValueKind::ICMP_NE:
-  case BuiltinValueKind::ICMP_SLE:
-  case BuiltinValueKind::ICMP_SLT:
-  case BuiltinValueKind::ICMP_SGE:
-  case BuiltinValueKind::ICMP_SGT:
-  case BuiltinValueKind::ICMP_ULE:
-  case BuiltinValueKind::ICMP_ULT:
-  case BuiltinValueKind::ICMP_UGE:
-  case BuiltinValueKind::ICMP_UGT:
-  case BuiltinValueKind::FCMP_OEQ:
-  case BuiltinValueKind::FCMP_OGT:
-  case BuiltinValueKind::FCMP_OGE:
-  case BuiltinValueKind::FCMP_OLT:
-  case BuiltinValueKind::FCMP_OLE:
-  case BuiltinValueKind::FCMP_ONE:
-  case BuiltinValueKind::FCMP_ORD:
-  case BuiltinValueKind::FCMP_UEQ:
-  case BuiltinValueKind::FCMP_UGT:
-  case BuiltinValueKind::FCMP_UGE:
-  case BuiltinValueKind::FCMP_ULT:
-  case BuiltinValueKind::FCMP_ULE:
-  case BuiltinValueKind::FCMP_UNE:
-  case BuiltinValueKind::FCMP_UNO:
-    return true;
-  }
-}
-
 namespace {
   /// This helper is used to find promotable memory in the operand chains of
   /// tensor operations.  This operates on the pre-deabstraction code, so it has
@@ -821,16 +725,6 @@ void PromotableMemoryFinder::findPromotableMemoryFromValue(SILValue value) {
       findPromotableMemoryFromValue(operand.get());
     return;
   }
-
-
-  // Look through standard LLVM arithmetic operations.  We often see silly
-  // allocas in the way of them.
-  // FIXME: This is only necessary because we don't have a constexpr model.
-  // When that is in place and working well, this should be removed.
-  if (!TFStrictDeabstraction)
-    if (auto builtin = dyn_cast<BuiltinInst>(inst))
-      if (isSimpleBuiltinArithmeticOp(builtin))
-        findPromotableMemoryFromValue(builtin->getOperand(0));
 
   // If this is a load, then we can deabstract it if it is a SRoA'able pointer
   // to a stack allocation.
@@ -1706,17 +1600,15 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
   for (auto *&inst : tensorOps) {
     // If this is a normal tensor operation, validate it and transform it into a
     // graphOp instruction.
-    if (TFStrictDeabstraction) {
-      if (auto opInfo = SILTensorOpInfo::decode(inst)) {
-        // Do not translate this special inst into a graph op, since it will get
-        // removed at the beginning of the partition pass.
-        // TODO: remove this inst in the getForFunction() call above, once
-        // the partition pass is folded into deabstraction.
-        if (opInfo->opName == "tfc.configureTPU" ||
-            opInfo->opName == "tfc.configureGPU")
-          continue;
-        formGraphOp(*opInfo, constants, deviceInfo);
-      }
+    if (auto opInfo = SILTensorOpInfo::decode(inst)) {
+      // Do not translate this special inst into a graph op, since it will get
+      // removed at the beginning of the partition pass.
+      // TODO: remove this inst in the getForFunction() call above, once
+      // the partition pass is folded into deabstraction.
+      if (opInfo->opName == "tfc.configureTPU" ||
+          opInfo->opName == "tfc.configureGPU")
+        continue;
+      formGraphOp(*opInfo, constants, deviceInfo);
     }
 
     // Take a look at the various well known function calls that we can promote
@@ -2309,14 +2201,6 @@ void TFDeabstraction::doIt() {
   cleanupDeadInstructions();
 
   logCurrentState("Result", /*detailed*/false);
-
-  // We're currently relying on the performance optimizer to do some stuff, but
-  // for large testcacses it is doing bad stuff.
-  // FIXME: Should be eliminated when partitioning happens as part of
-  // deabstraction, because then the optimizer won't be seeing all of our tensor
-  // stuff.
-  if (!TFStrictDeabstraction)
-    fn.getModule().getOptions().EnableARCOptimizations = false;
 }
 
 
