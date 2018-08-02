@@ -1131,7 +1131,7 @@ public:
   Implementation(CategorizedEditsReceiver Receiver):
     Receiver(std::move(Receiver)), OS(ErrBuffer), DiagConsumer(OS) {}
   ~Implementation() {
-    if (DiagConsumer.didErrorOccur()) {
+    if (DiagConsumer.getHasAnErrorBeenHandled()) {
       Receiver({}, OS.str());
       return;
     }
@@ -1191,6 +1191,7 @@ handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
                  StringRef FormatString,
                  ArrayRef<DiagnosticArgument> FormatArgs,
                  const DiagnosticInfo &Info) {
+  setHasAnErrorBeenHandled(Kind);
   Impl.DiagConsumer.handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs,
                                      Info);
 }
@@ -1209,7 +1210,7 @@ public:
       : Receiver(Receiver), OS(ErrBuffer), DiagConsumer(OS) {}
 
   ~Implementation() {
-    if (DiagConsumer.didErrorOccur()) {
+    if (DiagConsumer.getHasAnErrorBeenHandled()) {
       Receiver({}, OS.str());
       return;
     }
@@ -1253,6 +1254,7 @@ handleDiagnostic(SourceManager &SM,
                  StringRef FormatString,
                  ArrayRef<DiagnosticArgument> FormatArgs,
                  const DiagnosticInfo &Info) {
+  setHasAnErrorBeenHandled(Kind);
   Impl.DiagConsumer.handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs,
                                      Info);
 }

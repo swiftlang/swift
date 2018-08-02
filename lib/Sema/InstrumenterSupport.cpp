@@ -24,7 +24,6 @@ namespace {
 
 class ErrorGatherer : public DiagnosticConsumer {
 private:
-  bool error = false;
   DiagnosticEngine &diags;
 
 public:
@@ -37,14 +36,11 @@ public:
                         StringRef FormatString,
                         ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info) override {
-    if (Kind == swift::DiagnosticKind::Error) {
-      error = true;
-    }
+    setHasAnErrorBeenHandled(Kind);
     DiagnosticEngine::formatDiagnosticText(llvm::errs(), FormatString,
                                            FormatArgs);
     llvm::errs() << "\n";
   }
-  bool hadError() { return error; }
 };
 
 
@@ -87,7 +83,7 @@ bool InstrumenterBase::doTypeCheckImpl(ASTContext &Ctx, DeclContext *DC,
   if (parsedExpr) {
     ErrorFinder errorFinder;
     parsedExpr->walk(errorFinder);
-    if (!errorFinder.hadError() && !errorGatherer.hadError()) {
+    if (!errorFinder.hadError() && !errorGatherer.getHasAnErrorBeenHandled()) {
       return true;
     }
   }

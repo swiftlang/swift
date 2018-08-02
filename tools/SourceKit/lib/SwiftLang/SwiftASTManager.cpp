@@ -51,6 +51,7 @@ public:
                         StringRef FormatString,
                         ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info) override {
+    setHasAnErrorBeenHandled(Kind);
     // FIXME: Print location info if available.
     switch (Kind) {
       case DiagnosticKind::Error: OS << "error: "; break;

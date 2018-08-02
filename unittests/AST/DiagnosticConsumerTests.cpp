@@ -38,6 +38,7 @@ namespace {
                           StringRef formatString,
                           ArrayRef<DiagnosticArgument> formatArgs,
                           const DiagnosticInfo &info) override {
+      setHasAnErrorBeenHandled(Kind);
       ASSERT_FALSE(expected.empty());
       EXPECT_EQ(std::make_pair(loc, formatString), expected.front());
       expected.erase(expected.begin());

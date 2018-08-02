@@ -41,8 +41,6 @@ class EditorDiagConsumer : public swift::DiagnosticConsumer {
     return BufferDiagnostics[LastDiagBufferID][LastDiagIndex];
   }
 
-  bool HadAnyError = false;
-
 public:
   void setInputBufferIDs(ArrayRef<unsigned> BufferIDs) {
     InputBufIDs.append(BufferIDs.begin(), BufferIDs.end());
@@ -64,7 +62,7 @@ public:
 
   void getAllDiagnostics(SmallVectorImpl<DiagnosticEntryInfo> &Result);
 
-  bool hadAnyError() const { return HadAnyError; }
+  bool hadAnyError() const { return getHasAnErrorBeenHandled(); }
 
   void handleDiagnostic(swift::SourceManager &SM, swift::SourceLoc Loc,
                         swift::DiagnosticKind Kind,
