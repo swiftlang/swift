@@ -302,13 +302,12 @@ namespace {
           NumInherited = Elements.size();
         }
       }
-      
+
       // If this class was imported from another module, assume that we may
       // not know its exact layout.
-      if (theClass->getModuleContext() != IGM.getSwiftModule()) {
+      if (classHasIncompleteLayout(IGM, theClass)) {
+        ClassMetadataRequiresDynamicInitialization = true;
         ClassHasFixedSize = false;
-        if (classHasIncompleteLayout(IGM, theClass))
-          ClassMetadataRequiresDynamicInitialization = true;
       }
 
       // Access strategies should be set by the abstract class layout,
