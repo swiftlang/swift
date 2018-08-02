@@ -2896,6 +2896,8 @@ GLStatus TFGraphFunctionLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
   if (buildGraphFunction(condFn, condFnName, condHasSideEffects,
                          /*inputTypes*/ nullptr, /*outputTypes*/ nullptr))
     return GLStatus::Error;
+  // This is needed for correctness, since we lower the header code again right
+  // after creating the While op towards the end of this function.
   assert(!condHasSideEffects && "The loop should have been canonicalized by "
                                 "now, where the cond has no side effects!");
 
