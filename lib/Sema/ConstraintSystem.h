@@ -437,10 +437,10 @@ struct SelectedOverload {
 enum ScoreKind {
   // These values are used as indices into a Score value.
 
-  /// A reference to an @unavailable declaration.
-  SK_Unavailable,
   /// A fix needs to be applied to the source.
   SK_Fix,
+  /// A reference to an @unavailable declaration.
+  SK_Unavailable,
   /// An implicit force of an implicitly unwrapped optional value.
   SK_ForceUnchecked,
   /// A user-defined conversion.
