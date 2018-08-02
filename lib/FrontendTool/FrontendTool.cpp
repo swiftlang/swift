@@ -322,7 +322,7 @@ static bool atomicallyWritingToTextFile(
 
   bool actionFailed = false;
   std::error_code EC =
-      swift::atomicallyWritingToFile(outputPath, /*binary*/false,
+      swift::atomicallyWritingToFile(outputPath,
                                      [&](llvm::raw_pwrite_stream &out) {
     actionFailed = action(out);
   });

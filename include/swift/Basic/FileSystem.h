@@ -45,7 +45,7 @@ namespace swift {
   /// As a special case, an output path of "-" is treated as referring to
   /// stdout.
   std::error_code atomicallyWritingToFile(
-      llvm::StringRef outputPath, bool binaryMode,
+      llvm::StringRef outputPath,
       llvm::function_ref<void(llvm::raw_pwrite_stream &)> action);
 
   /// Moves a file from \p source to \p destination, unless there is already
