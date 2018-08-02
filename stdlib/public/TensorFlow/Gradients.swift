@@ -281,7 +281,8 @@ extension Tensor where Scalar : BinaryFloatingPoint {
     let dim = Tensor(Tensor<Int32>(shapeTensor[axis]))
     let tmp = (dNorm * inv) + (dVariance * 2 * dMean / dim)
     let dSelf = tmp + (dMean / dim)
-    return (dSelf, dOffset.scalarized(), dScale.scalarized())
+    return (dSelf, _TFGetScalarOrDie(dOffset.handle),  
+            _TFGetScalarOrDie(dScale.handle))
   }
 }
 
