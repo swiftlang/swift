@@ -404,3 +404,8 @@ class Ownership {
 // CHECK-OLD: <kw>let</kw> closure = { [<attr-builtin>weak</attr-builtin> x=bindtox, <attr-builtin>unowned</attr-builtin> y=bindtoy, <attr-builtin>unowned(unsafe)</attr-builtin> z=bindtoz] <kw>in</kw> }
 // FIXME: CHECK-NEW: <kw>let</kw> closure = { [weak x=bindtox, unowned y=bindtoy, unowned(unsafe) z=bindtoz] <kw>in</kw> }
 let closure = { [weak x=bindtox, unowned y=bindtoy, unowned(unsafe) z=bindtoz] in }
+
+protocol FakeClassRestrictedProtocol : `class` {}
+// CHECK-OLD: <kw>protocol</kw> FakeClassRestrictedProtocol : <type>`class`</type> {}
+// FIXME: rdar://42801404: OLD and NEW should be the same '<type>`class`</type>'.
+// CHECK-NEW: <kw>protocol</kw> FakeClassRestrictedProtocol : `<type>class</type>` {}
