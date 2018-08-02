@@ -41,8 +41,9 @@ import SwiftShims
 /// ================================================
 ///
 /// A custom `RandomNumberGenerator` type can have different characteristics
-/// than the default `Random` type. For example, a seedable generator can be
-/// used to generate the same sequence of random values for testing purposes.
+/// than the default `SystemRandomNumberGenerator` type. For example, a
+/// seedable generator can be used to generate a repeatable sequence of random
+/// values for testing purposes.
 ///
 /// To make a custom type conform to the `RandomNumberGenerator` protocol,
 /// implement the required `next()` method. Each call to `next()` must produce
