@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -38,9 +38,7 @@
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Strings.h"
 
-// FIXME: We're just using CompilerInstance::createOutputFile.
-// This API should be sunk down to LLVM.
-#include "clang/Frontend/CompilerInstance.h"
+#include "clang/Basic/Module.h"
 
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
@@ -5085,44 +5083,15 @@ void Serializer::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
 static inline bool
 withOutputFile(ASTContext &ctx, StringRef outputPath,
                llvm::function_ref<void(raw_ostream &)> action){
-  namespace path = llvm::sys::path;
-  clang::CompilerInstance Clang;
+  std::error_code EC = swift::atomicallyWritingToFile(outputPath,
+                                                      /*binary*/true,
+                                                      action);
+  if (!EC)
+    return false;
 
-  std::string tmpFilePath;
-  {
-    std::error_code EC;
-    std::unique_ptr<llvm::raw_pwrite_stream> out =
-      Clang.createOutputFile(outputPath, EC,
-                             /*Binary=*/true,
-                             /*RemoveFileOnSignal=*/true,
-                             /*BaseInput=*/"",
-                             path::extension(outputPath),
-                             /*UseTemporary=*/true,
-                             /*CreateMissingDirectories=*/false,
-                             /*ResultPathName=*/nullptr,
-                             &tmpFilePath);
-
-    if (!out) {
-      StringRef problematicPath =
-          tmpFilePath.empty() ? outputPath : StringRef(tmpFilePath);
-      ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                         problematicPath, EC.message());
-      return true;
-    }
-
-    action(*out);
-  }
-
-  if (!tmpFilePath.empty()) {
-    std::error_code EC = swift::moveFileIfDifferent(tmpFilePath, outputPath);
-    if (EC) {
-      ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                         outputPath, EC.message());
-      return true;
-    }
-  }
-
-  return false;
+  ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                     outputPath, EC.message());
+  return true;
 }
 
 void swift::serialize(ModuleOrSourceFile DC,
