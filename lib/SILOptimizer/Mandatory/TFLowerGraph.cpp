@@ -77,6 +77,7 @@ static void markNodeAsTPUReplicated(TF_OperationDescription *desc) {
                    strlen(TPU_CLUSTER_ATTR_VALUE));
 }
 
+// TODO: reformat the code below.
 namespace {
   /// Each op is represented by a single SILValue, but we then also have
   /// tuple_extract values that project multiple-result values out.  A
@@ -143,7 +144,7 @@ namespace {
     SmallVector<std::pair<SILArgument*, TF_Output>, 4> outputs;
 
     /// If this graph has any side-effecting operations, this is the most
-    /// recently emitted operation that had side effects, and that operation
+    /// recently emitted operation that had side effects, and this operation
     /// should get executed before the function returns.  Otherwise, it is null.
     TF_Operation *controlDependenceValue = nullptr;
 
@@ -194,7 +195,7 @@ namespace {
          controlDependenceValue = result;
 
        return result;
-     }
+    }
 
     // If there is a control dependence value, run it before producing an output
     // tensor in GraphFunctionBody.
