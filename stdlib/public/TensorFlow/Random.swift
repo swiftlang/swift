@@ -22,54 +22,88 @@ import Darwin
 import Glibc
 #endif
 
-//===----------------------------------------------------------------------===//
-// Engines
-//===----------------------------------------------------------------------===//
-
-public protocol RandomEngine: class {
+/// A type that provides seedable deterministic pseudo-random data.
+///
+/// A SeedableRandomNumberGenerator can be used anywhere where a
+/// RandomNumberGenerator would be used. It is useful when the pseudo-random
+/// data needs to be reproducible across runs.
+///
+/// Conforming to the SeedableRandomNumberGenerator Protocol
+/// ========================================================
+///
+/// To make a custom type conform to the `SeedableRandomNumberGenerator`
+/// protocol, implement the `init(seed: [UInt8])` initializer, as well as the
+/// requirements for `RandomNumberGenerator`. The values returned by `next()`
+/// must form a deterministic sequence that depends only on the seed provided
+/// upon initialization.
+public protocol SeedableRandomNumberGenerator: RandomNumberGenerator {
   init(seed: [UInt8])
-  init<T>(seed: T) where T : BinaryInteger
-  func generate(count: Int) -> [UInt8]
+  init<T: BinaryInteger>(seed: T)
 }
 
-@_fixed_layout
-public class ARC4RandomEngine: RandomEngine {
-  public static let global = ARC4RandomEngine(seed: UInt32(time(nil)))
-  var state: [UInt8] = Array(0 ... 255)
-  var iPos: UInt8 = 0
-  var jPos: UInt8 = 0
-
-  public required init(seed: [UInt8]) {
-    var j: UInt8 = 0
-    for i in 0 ..< 256 {
-      j &+= state[Int(i)] &+ seed[Int(i) % seed.count]
-      state.swapAt(Int(i), Int(j))
-    }
-  }
-
-  public convenience required init<T>(seed: T) where T : BinaryInteger {
+extension SeedableRandomNumberGenerator {
+  public init<T: BinaryInteger>(seed: T) {
     var newSeed: [UInt8] = []
     for i in 0 ..< seed.bitWidth / UInt8.bitWidth {
       newSeed.append(UInt8(truncatingIfNeeded: seed >> (UInt8.bitWidth * i)))
     }
     self.init(seed: newSeed)
   }
+}
 
-  public required init(_ other: ARC4RandomEngine) {
-    state = other.state
-    iPos = other.iPos
-    jPos = other.jPos
+/// An implementation of `SeedableRandomNumberGenerator` using ARC4.
+///
+/// ARC4 is a stream cipher that generates a pseudo-random stream of bytes. This
+/// PRNG uses the seed as its key.
+///
+/// ARC4 is described in Schneier, B., "Applied Cryptography: Protocols,
+/// Algorithms, and Source Code in C", 2nd Edition, 1996.
+@_fixed_layout
+public struct ARC4RandomNumberGenerator: SeedableRandomNumberGenerator {
+  public static let global = ARC4RandomNumberGenerator(seed: UInt32(time(nil)))
+  var state: [UInt8] = Array(0 ... 255)
+  var iPos: UInt8 = 0
+  var jPos: UInt8 = 0
+
+  /// Initialize ARC4RandomNumberGenerator using an array of UInt8. The array
+  /// must have length between 1 and 256 inclusive.
+  public init(seed: [UInt8]) {
+    _precondition(seed.count > 0, "Length of seed must be positive")
+    _precondition(seed.count <= 256, "Length of seed must be at most 256")
+    var j: UInt8 = 0
+    for i: UInt8 in 0 ... 255 {
+      j &+= S(i) &+ seed[Int(i) % seed.count]
+      swapAt(i, j)
+    }
   }
 
-  public func generate(count: Int) -> [UInt8] {
-    var result: [UInt8] = []
-    for _ in 0 ..< count {
-      iPos &+= 1
-      jPos &+= state[Int(iPos)]
-      state.swapAt(Int(iPos), Int(jPos))
-      result.append(state[Int(state[Int(iPos)] &+ state[Int(jPos)])])
+  // Produce the next random UInt64 from the stream, and advance the internal
+  // state.
+  public mutating func next() -> UInt64 {
+    var result: UInt64 = 0
+    for _ in 0 ..< UInt64.bitWidth / UInt8.bitWidth {
+      result <<= UInt8.bitWidth
+      result += UInt64(nextByte())
     }
     return result
+  }
+
+  // Helper to access the state.
+  func S(_ index: UInt8) -> UInt8 {
+    return state[Int(index)]
+  }
+
+  // Helper to swap elements of the state.
+  mutating func swapAt(_ i: UInt8, _ j: UInt8) {
+    state.swapAt(Int(i), Int(j))
+  }
+
+  // Generates the next byte in the keystream.
+  mutating func nextByte() -> UInt8 {
+    iPos &+= 1
+    jPos &+= S(iPos)
+    swapAt(iPos, jPos)
+    return S(S(iPos) &+ S(jPos))
   }
 }
 
@@ -78,23 +112,16 @@ public class ARC4RandomEngine: RandomEngine {
 //===----------------------------------------------------------------------===//
 
 public class UniformIntegerDistribution<T: BinaryInteger> {
-
   public init() { }
 
-  public func generate(using engine: RandomEngine) -> T {
-    var result: T = 0
-    let bytes = engine.generate(count: result.bitWidth / 8)
-    for b in bytes {
-      result <<= 8
-      result += T(b)
-    }
-    return result
+  public func next(using rng: inout RandomNumberGenerator) -> T {
+    let r: UInt64 = rng.next()
+    return T.init(truncatingIfNeeded: r)
   }
 }
 
 @_fixed_layout
 public class UniformFloatingPointDistribution<T: BinaryFloatingPoint> {
-
   public let a: T
   public let b: T
   private let uniformIntDist = UniformIntegerDistribution<UInt64>()
@@ -104,8 +131,8 @@ public class UniformFloatingPointDistribution<T: BinaryFloatingPoint> {
     self.b = b
   }
 
-  public func generate(using engine: RandomEngine) -> T {
-    let result = uniformIntDist.generate(using: engine)
+  public func next(using rng: inout RandomNumberGenerator) -> T {
+    let result = uniformIntDist.next(using: &rng)
     let uniform01: T = T(result) / (T(UInt64.max) + 1)
     return a + (b - a) * uniform01
   }
@@ -113,29 +140,23 @@ public class UniformFloatingPointDistribution<T: BinaryFloatingPoint> {
 
 @_fixed_layout
 public class NormalFloatingPointDistribution<T: BinaryFloatingPoint> {
-
   public let mean: T
   public let standardDeviation: T
   private let uniformDist = UniformFloatingPointDistribution<T>()
-  private var cache: T? = nil
 
   public init(mean: T = 0, standardDeviation: T = 1) {
     self.mean = mean
     self.standardDeviation = standardDeviation
   }
 
-  public func generate(using engine: RandomEngine) -> T {
-    if let result = cache {
-      cache = nil
-      return result
-    }
-    let u1 = uniformDist.generate(using: engine)
-    let u2 = uniformDist.generate(using: engine)
+  public func next(using rng: inout RandomNumberGenerator) -> T {
+    // FIXME: Box-Muller can generate two values for only a little more than the
+    // cost of one.
+    let u1 = uniformDist.next(using: &rng)
+    let u2 = uniformDist.next(using: &rng)
     let r = (-2 * T(log(Double(u1)))).squareRoot()
     let theta: Double = 2 * Double.pi * Double(u2)
-    let normal0 = r * T(cos(theta))
-    let normal1 = r * T(sin(theta))
-    cache = mean + standardDeviation * normal1
-    return mean + standardDeviation * normal0
+    let normal01 = r * T(cos(theta))
+    return mean + standardDeviation * normal01
   }
 }

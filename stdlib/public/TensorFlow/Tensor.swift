@@ -588,14 +588,15 @@ public extension Tensor where Scalar == Int32 {
   ///   - engine: The random engine which generates random bytes.
   ///
   @inlinable @inline(__always)
-  init(randomStandardUniform shape: TensorShape, engine: RandomEngine? = nil) {
+  init(randomStandardUniform shape: TensorShape,
+       rng: RandomNumberGenerator? = nil) {
     self = Tensor(
       handle: _TFHoistable {
-        let engine = engine ?? ARC4RandomEngine.global
+        var rng = rng ?? ARC4RandomNumberGenerator.global
         let dist = UniformIntegerDistribution<Scalar>()
         var scalars: [Scalar] = []
         for _ in 0 ..< shape.contiguousSize {
-          scalars.append(dist.generate(using: engine))
+          scalars.append(dist.next(using: &rng))
         }
         return _TFTensorFromScalars(scalars, shape: shape.dimensions)
       }
@@ -612,14 +613,14 @@ public extension Tensor where Scalar : BinaryFloatingPoint {
   ///   - engine: The random engine which generates random bytes.
   ///
   @inlinable @inline(__always)
-  init(randomUniform shape: TensorShape, engine: RandomEngine? = nil) {
+  init(randomUniform shape: TensorShape, rng: RandomNumberGenerator? = nil) {
     self = Tensor(
       handle: _TFHoistable {
-        let engine = engine ?? ARC4RandomEngine.global
+        var rng = rng ?? ARC4RandomNumberGenerator.global
         let dist = UniformFloatingPointDistribution<Scalar>()
         var scalars: [Scalar] = []
         for _ in 0 ..< shape.contiguousSize {
-          scalars.append(dist.generate(using: engine))
+          scalars.append(dist.next(using: &rng))
         }
         return _TFTensorFromScalars(scalars, shape: shape.dimensions)
       }
@@ -637,14 +638,15 @@ public extension Tensor where Scalar : BinaryFloatingPoint {
   ///
   @inlinable @inline(__always)
   init(randomNormal shape: TensorShape, mean: Scalar = 0, stddev: Scalar = 1,
-       engine: RandomEngine? = nil) {
+       rng: RandomNumberGenerator? = nil) {
     self = Tensor(
       handle: _TFHoistable {
-        let engine = engine ?? ARC4RandomEngine.global
-        let dist = NormalFloatingPointDistribution<Scalar>(mean: mean, standardDeviation: stddev)
+        var rng = rng ?? ARC4RandomNumberGenerator.global
+        let dist = NormalFloatingPointDistribution<Scalar>(
+          mean: mean, standardDeviation: stddev)
         var scalars: [Scalar] = []
         for _ in 0 ..< shape.contiguousSize {
-          scalars.append(dist.generate(using: engine))
+          scalars.append(dist.next(using: &rng))
         }
         return _TFTensorFromScalars(scalars, shape: shape.dimensions)
       }
