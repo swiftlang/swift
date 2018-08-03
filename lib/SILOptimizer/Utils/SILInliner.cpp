@@ -17,14 +17,32 @@
 #include "llvm/Support/Debug.h"
 using namespace swift;
 
+bool SILInliner::canInlineBeginApply(FullApplySite AI) {
+  // Don't inline a coroutine with multiple yields. We are not yet able to do
+  // so. The current implementation cannot handle values that are live across
+  // only some yields.
+  unsigned NumYields = 0;
+  if (auto BA = dyn_cast<BeginApplyInst>(AI)) {
+    for (auto &B : BA->getReferencedFunction()->getBlocks()) {
+      if (isa<YieldInst>(B.getTerminator()))
+        NumYields++;
+      if (NumYields > 1)
+        return false;
+    }
+  }
+  return true;
+}
+
 bool SILInliner::canInlineFunction(FullApplySite AI) {
+  if (!canInlineBeginApply(AI))
+    return false;
   return AI.getFunction() != &Original;
 }
 
 /// Utility class for rewiring control-flow of inlined begin_apply functions.
 class BeginApplySite {
   SmallVector<SILBasicBlock *, 4> ExitingBlocks;
-  SmallVector<AllocStackInst*, 8> YieldedIndirectValues;
+  SmallVector<SILValue, 8> YieldedIndirectValues;
   SILLocation Loc;
   SILBuilder &Builder;
   BeginApplyInst *BeginApply;
@@ -77,17 +95,10 @@ public:
   void processApply(SILBasicBlock *ReturnToBB) {
     // Handle direct and indirect results.
     for (auto YieldedValue : BeginApply->getYieldedValues()) {
-      // Insert an alloc_stack for indirect results.
+      // Store the addresses of indirect results so that we can replace them by
+      // the yielded address value later.
       if (YieldedValue->getType().isAddress()) {
-        Builder.setInsertionPoint(F->getEntryBlock()->begin());
-        auto Addr = Builder.createAllocStack(
-            Loc, YieldedValue->getType().getObjectType());
-        YieldedValue->replaceAllUsesWith(Addr);
-        YieldedIndirectValues.push_back(Addr);
-        for (auto *Exit : ExitingBlocks) {
-          Builder.setInsertionPoint(Exit->getTerminator());
-          Builder.createDeallocStack(Loc, Addr);
-        }
+        YieldedIndirectValues.push_back(YieldedValue);
         continue;
       }
       // Insert a phi for direct results.
@@ -148,8 +159,7 @@ public:
         auto YieldedVal = remapValue(CalleeYieldedVal);
         if (YieldedVal->getType().isAddress()) {
           auto YieldedDestAddr = YieldedIndirectValues[IndirectIdx++];
-          Builder.createCopyAddr(Loc, YieldedVal, YieldedDestAddr, IsTake,
-                                 IsInitialization);
+          YieldedDestAddr->replaceAllUsesWith(YieldedVal);
         } else
           BrResults.push_back(YieldedVal);
       }
