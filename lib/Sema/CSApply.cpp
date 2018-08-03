@@ -8162,7 +8162,7 @@ bool ConstraintSystem::applySolutionFix(
     auto conformance = getMissingConformance(locator);
 
     auto *anchor = locator->getAnchor();
-    auto owner = solution.simplifyType(getType(anchor));
+    auto owner = solution.simplifyType(getType(anchor))->getRValueInstanceType();
 
     auto type = conformance.first;
     auto protocolType = conformance.second->getDeclaredType();
