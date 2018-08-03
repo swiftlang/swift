@@ -111,7 +111,7 @@ public struct ARC4RandomNumberGenerator: SeedableRandomNumberGenerator {
 // Distributions
 //===----------------------------------------------------------------------===//
 
-public class UniformIntegerDistribution<T: BinaryInteger> {
+public final class UniformIntegerDistribution<T: BinaryInteger> {
   public init() { }
 
   public func next(using rng: inout RandomNumberGenerator) -> T {
@@ -121,7 +121,7 @@ public class UniformIntegerDistribution<T: BinaryInteger> {
 }
 
 @_fixed_layout
-public class UniformFloatingPointDistribution<T: BinaryFloatingPoint> {
+public final class UniformFloatingPointDistribution<T: BinaryFloatingPoint> {
   public let a: T
   public let b: T
   private let uniformIntDist = UniformIntegerDistribution<UInt64>()
@@ -139,7 +139,7 @@ public class UniformFloatingPointDistribution<T: BinaryFloatingPoint> {
 }
 
 @_fixed_layout
-public class NormalFloatingPointDistribution<T: BinaryFloatingPoint> {
+public final class NormalFloatingPointDistribution<T: BinaryFloatingPoint> {
   public let mean: T
   public let standardDeviation: T
   private let uniformDist = UniformFloatingPointDistribution<T>()
