@@ -137,42 +137,46 @@ public:
 class FileSpecificDiagnosticConsumer : public DiagnosticConsumer {
 public:
   class Subconsumer;
-  
-  /// Given a vector of subconsumers, return the most specific DiagnosticConsumer for that vector.
-  /// That will be a FileSpecificDiagnosticConsumer if the vector has > 1 subconsumer,
-  /// the subconsumer itself if the vector has just one, or a null pointer if there are no subconsumers.
-  /// Takes ownership of the DiagnosticConsumers specified in \p subconsumers.
-  static std::unique_ptr<DiagnosticConsumer> consolidateSubconsumers(SmallVectorImpl<Subconsumer> &subconsumers);
-    
+
+  /// Given a vector of subconsumers, return the most specific
+  /// DiagnosticConsumer for that vector. That will be a
+  /// FileSpecificDiagnosticConsumer if the vector has > 1 subconsumer, the
+  /// subconsumer itself if the vector has just one, or a null pointer if there
+  /// are no subconsumers. Takes ownership of the DiagnosticConsumers specified
+  /// in \p subconsumers.
+  static std::unique_ptr<DiagnosticConsumer>
+  consolidateSubconsumers(SmallVectorImpl<Subconsumer> &subconsumers);
+
   /// A diagnostic consumer, along with the name of the buffer that it should
   /// be associated with.
   class Subconsumer {
-    friend std::unique_ptr<DiagnosticConsumer> FileSpecificDiagnosticConsumer::consolidateSubconsumers(SmallVectorImpl<Subconsumer> &subconsumers);
-    
+    friend std::unique_ptr<DiagnosticConsumer>
+    FileSpecificDiagnosticConsumer::consolidateSubconsumers(
+        SmallVectorImpl<Subconsumer> &subconsumers);
+
     /// The name of the input file that a consumer and diagnostics should
     /// be associated with. An empty string means that a consumer is not
     /// associated with any particular buffer, and should only receive
     /// diagnostics that are not in any of the other consumers' files.
     std::string inputFileName;
-    
+
     /// The consumer (if any) for diagnostics associated with the inputFileName.
     /// A null pointer for the DiagnosticConsumer means that diagnostics for
     /// this file should not be emitted.
     std::unique_ptr<DiagnosticConsumer> consumer;
-    
+
     // Has this subconsumer ever handled a diagnostic that is an error?
     bool hasAnErrorBeenConsumed = false;
 
-    
   public:
     std::string getInputFileName() const { return inputFileName; }
-    
+
     DiagnosticConsumer *getConsumer() const { return consumer.get(); }
 
     Subconsumer(std::string inputFileName,
                 std::unique_ptr<DiagnosticConsumer> consumer)
         : inputFileName(inputFileName), consumer(std::move(consumer)) {}
-    
+
     void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
                           DiagnosticKind Kind,
                           StringRef FormatString,
@@ -181,7 +185,8 @@ public:
       if (!getConsumer())
         return; // Suppress non-primary diagnostic in batch mode.
       hasAnErrorBeenConsumed |= Kind == DiagnosticKind::Error;
-      getConsumer()->handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs, Info);
+      getConsumer()->handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs,
+                                      Info);
     }
     
     void informDriverOfIncompleteBatchModeCompilation() {
@@ -205,38 +210,36 @@ public:
 
     /// Index into Subconsumers vector for this subconsumer.
     /*const*/ unsigned subconsumerIndex;
-    
+
   public:
     ConsumerSpecificInformation(const CharSourceRange range,
                                 unsigned subconsumerIndex)
-    : range(range), subconsumerIndex(subconsumerIndex) {}
+        : range(range), subconsumerIndex(subconsumerIndex) {}
 
     Subconsumer &subconsumer(FileSpecificDiagnosticConsumer &c) const {
       return c.Subconsumers[subconsumerIndex];
     }
-    
+
     /// Compare according to range:
-    bool operator < (const ConsumerSpecificInformation &right)  const {
+    bool operator<(const ConsumerSpecificInformation &right) const {
       auto compare = std::less<const char *>();
-      return compare(getRawLoc(      range.getEnd()).getPointer(),
+      return compare(getRawLoc(range.getEnd()).getPointer(),
                      getRawLoc(right.range.getEnd()).getPointer());
     }
-    
+
     /// Overlaps by range:
     bool overlaps(const ConsumerSpecificInformation &other) const {
       return range.overlaps(other.range);
     }
-    
+
     /// Does my range end after \p loc?
     bool endsAfter(const SourceLoc loc) const {
       auto compare = std::less<const char *>();
       return compare(getRawLoc(range.getEnd()).getPointer(),
                      getRawLoc(loc).getPointer());
     }
-    
-    bool contains(const SourceLoc loc) const {
-      return range.contains(loc);
-    }
+
+    bool contains(const SourceLoc loc) const { return range.contains(loc); }
   };
 
 private:
@@ -262,19 +265,15 @@ private:
       ConsumerSpecificInfoForSubsequentNotes = None;
 
   bool HasAnErrorBeenConsumed = false;
-  
-  
+
   /// Takes ownership of the DiagnosticConsumers specified in \p consumers.
   ///
   /// There must not be two consumers for the same file (i.e., having the same
   /// buffer name).
   explicit FileSpecificDiagnosticConsumer(
-                                          SmallVectorImpl<Subconsumer> &consumers);
+      SmallVectorImpl<Subconsumer> &consumers);
 
 public:
-  
- 
- 
   void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
                         DiagnosticKind Kind,
                         StringRef FormatString,

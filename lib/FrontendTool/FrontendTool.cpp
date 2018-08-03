@@ -1618,7 +1618,7 @@ createDispatchingDiagnosticConsumerIfNeeded(
           return false;
         });
   }
-  
+
   return FileSpecificDiagnosticConsumer::consolidateSubconsumers(subconsumers);
 }
 

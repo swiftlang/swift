@@ -53,15 +53,18 @@ static bool hasDuplicateFileNames(
   return false;
 }
 
-std::unique_ptr<DiagnosticConsumer> FileSpecificDiagnosticConsumer::
-consolidateSubconsumers(SmallVectorImpl<Subconsumer> &subconsumers) {
+std::unique_ptr<DiagnosticConsumer>
+FileSpecificDiagnosticConsumer::consolidateSubconsumers(
+    SmallVectorImpl<Subconsumer> &subconsumers) {
   if (subconsumers.empty())
     return nullptr;
   if (subconsumers.size() == 1)
     return std::move(subconsumers.front()).consumer;
-  // Cannot use return llvm::make_unique<FileSpecificDiagnosticConsumer>(subconsumers);
-  // because the constructor is private.
-  return std::unique_ptr<DiagnosticConsumer>(new FileSpecificDiagnosticConsumer(subconsumers));
+  // Cannot use return
+  // llvm::make_unique<FileSpecificDiagnosticConsumer>(subconsumers); because
+  // the constructor is private.
+  return std::unique_ptr<DiagnosticConsumer>(
+      new FileSpecificDiagnosticConsumer(subconsumers));
 }
 
 FileSpecificDiagnosticConsumer::FileSpecificDiagnosticConsumer(
@@ -134,7 +137,8 @@ FileSpecificDiagnosticConsumer::consumerSpecificInformationForLocation(
     if (!SM.getIDForBufferIdentifier(Subconsumers.begin()->getInputFileName())
              .hasValue()) {
       assert(llvm::none_of(Subconsumers, [&](const Subconsumer &subconsumer) {
-        return SM.getIDForBufferIdentifier(subconsumer.getInputFileName()).hasValue();
+        return SM.getIDForBufferIdentifier(subconsumer.getInputFileName())
+            .hasValue();
       }));
       return None;
     }
@@ -197,8 +201,8 @@ bool FileSpecificDiagnosticConsumer::finishProcessing() {
 
   bool hadError = false;
   for (auto &subconsumer : Subconsumers)
-    hadError |=
-        subconsumer.getConsumer() && subconsumer.getConsumer()->finishProcessing();
+    hadError |= subconsumer.getConsumer() &&
+                subconsumer.getConsumer()->finishProcessing();
   return hadError;
 }
 
