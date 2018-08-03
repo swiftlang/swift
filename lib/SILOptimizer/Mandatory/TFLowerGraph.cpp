@@ -20,28 +20,28 @@
 #include "llvm/Support/CommandLine.h"
 #ifdef SWIFT_ENABLE_TENSORFLOW
 #include "TFCanonicalizeCFG.h"
-#include "tensorflow/c/c_api.h"
-#include "tensorflow/c/c_api_experimental.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/Defer.h"
-#include "swift/SILOptimizer/PassManager/Passes.h"
-#include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "tensorflow/c/c_api.h"
+#include "tensorflow/c/c_api_experimental.h"
 #include "llvm/ADT/ScopedHashTable.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringSet.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/raw_ostream.h"
 #endif
 using namespace swift;
 using namespace tf;
 
 static llvm::cl::opt<bool>
-TFDumpGraph("tf-dump-graph", llvm::cl::init(false),
-            llvm::cl::desc("Dump generated tensorflow graphs to /tmp"));
+    TFDumpGraph("tf-dump-graph", llvm::cl::init(false),
+                llvm::cl::desc("Dump generated tensorflow graphs to /tmp"));
 
 #ifdef SWIFT_ENABLE_TENSORFLOW
 template <typename... T, typename... U>
@@ -77,142 +77,141 @@ static void markNodeAsTPUReplicated(TF_OperationDescription *desc) {
                    strlen(TPU_CLUSTER_ATTR_VALUE));
 }
 
-// TODO: reformat the code below.
 namespace {
-  /// Each op is represented by a single SILValue, but we then also have
-  /// tuple_extract values that project multiple-result values out.  A
-  /// SILOpResult holds this, allowing us to refer to each result of a
-  /// multi-output op.
-  ///
-  /// FIXME: Eliminate this when GraphOperationInst has taken over the world.
-  ///
-  typedef std::pair<SILValue, unsigned> SILOpResult;
+/// Each op is represented by a single SILValue, but we then also have
+/// tuple_extract values that project multiple-result values out.  A
+/// SILOpResult holds this, allowing us to refer to each result of a
+/// multi-output op.
+///
+/// FIXME: Eliminate this when GraphOperationInst has taken over the world.
+///
+typedef std::pair<SILValue, unsigned> SILOpResult;
 
-  /// As we lower SIL instructions to tensorflow graph nodes, we traverse the
-  /// SESE region tree.  Nodes that produce while loops and conditions turn into
-  /// scopes.
-  typedef llvm::ScopedHashTable<SILOpResult, std::pair<TF_Output, unsigned>>
+/// As we lower SIL instructions to tensorflow graph nodes, we traverse the
+/// SESE region tree.  Nodes that produce while loops and conditions turn into
+/// scopes.
+typedef llvm::ScopedHashTable<SILOpResult, std::pair<TF_Output, unsigned>>
     ValueMappingScopedHashTable;
 
-  /// This represents a single input parameter to a graph function.  In addition
-  /// to representing the Parameter node in the graph function itself, it also
-  /// knows the actual value to be passed in to fulfill that parameter from the
-  /// enclosing scope.
-  struct GraphFunctionInput {
-    /// This is the Parameter node inside of the graph function.
-    TF_Output parameter;
+/// This represents a single input parameter to a graph function.  In addition
+/// to representing the Parameter node in the graph function itself, it also
+/// knows the actual value to be passed in to fulfill that parameter from the
+/// enclosing scope.
+struct GraphFunctionInput {
+  /// This is the Parameter node inside of the graph function.
+  TF_Output parameter;
 
-    /// This is the value passed into the function from the enclosing scope.  If
-    /// this is the top level graph function, then the passed values are null.
-    TF_Output passedValue;
+  /// This is the value passed into the function from the enclosing scope.  If
+  /// this is the top level graph function, then the passed values are null.
+  TF_Output passedValue;
 
-    /// This is the SILValue that the parameter corresponds to.
-    SILOpResult value;
-  };
+  /// This is the SILValue that the parameter corresponds to.
+  SILOpResult value;
+};
 
-  /// This represents a TensorFlow TF_Function that is being constructed,
-  /// including its inputs, outputs, live-in values used by the loop and the
-  /// ops created that make it up.
-  struct GraphFunctionBody {
-    const DeviceType thisDeviceType;
-    const GraphFunctionDeviceInfo &deviceInfo;
+/// This represents a TensorFlow TF_Function that is being constructed,
+/// including its inputs, outputs, live-in values used by the loop and the
+/// ops created that make it up.
+struct GraphFunctionBody {
+  const DeviceType thisDeviceType;
+  const GraphFunctionDeviceInfo &deviceInfo;
 
-    /// This is the temporary Graph we use to build up the body of this
-    /// function.  When we're done building the graph, we transform it into a
-    /// graph function, then copy it out into a resultGraph, deleting both the
-    /// temporary graph and the temporary graph function.
-    ///
-    std::unique_ptr<TF_Graph, decltype(&TF_DeleteGraph)> graph;
+  /// This is the temporary Graph we use to build up the body of this
+  /// function.  When we're done building the graph, we transform it into a
+  /// graph function, then copy it out into a resultGraph, deleting both the
+  /// temporary graph and the temporary graph function.
+  ///
+  std::unique_ptr<TF_Graph, decltype(&TF_DeleteGraph)> graph;
 
-    /// These are inputs to the graph function.
-    SmallVector<GraphFunctionInput, 4> inputs;
+  /// These are inputs to the graph function.
+  SmallVector<GraphFunctionInput, 4> inputs;
 
-    /// These are outputs from the function, and the SILArgument* (if non-null)
-    /// specifies which SILArgument the output corresponds to.  This gets filled
-    /// in in a few different ways:
-    ///  1) If this is the top level of the function, then this is filled in by
-    ///     a return instruction and the SILArgument*'s are null.
-    ///  2) In a conditional region, this is filled in by a BranchInst to a
-    ///     merge point and the SILArgument's indicate which BB arguments are
-    ///     provided by the branch.
-    ///  3) The condition function for a While region has one output (with a
-    ///     null SILArgument) corresponding to the boolean result of the
-    ///     function.
-    ///  4) The body function for a While region has an output for each
-    ///     SILArgument in the loop header block, and also has outputs for the
-    ///     live-in values used within the loop (with no SILArgument specified).
-    SmallVector<std::pair<SILArgument*, TF_Output>, 4> outputs;
+  /// These are outputs from the function, and the SILArgument* (if non-null)
+  /// specifies which SILArgument the output corresponds to.  This gets filled
+  /// in in a few different ways:
+  ///  1) If this is the top level of the function, then this is filled in by
+  ///     a return instruction and the SILArgument*'s are null.
+  ///  2) In a conditional region, this is filled in by a BranchInst to a
+  ///     merge point and the SILArgument's indicate which BB arguments are
+  ///     provided by the branch.
+  ///  3) The condition function for a While region has one output (with a
+  ///     null SILArgument) corresponding to the boolean result of the
+  ///     function.
+  ///  4) The body function for a While region has an output for each
+  ///     SILArgument in the loop header block, and also has outputs for the
+  ///     live-in values used within the loop (with no SILArgument specified).
+  SmallVector<std::pair<SILArgument *, TF_Output>, 4> outputs;
 
-    /// If this graph has any side-effecting operations, this is the most
-    /// recently emitted operation that had side effects, and this operation
-    /// should get executed before the function returns.  Otherwise, it is null.
-    TF_Operation *controlDependenceValue = nullptr;
+  /// If this graph has any side-effecting operations, this is the most
+  /// recently emitted operation that had side effects, and this operation
+  /// should get executed before the function returns.  Otherwise, it is null.
+  TF_Operation *controlDependenceValue = nullptr;
 
-    /// If true, this graph function contains some side-effecting ops.
-    bool funcHasSideEffects = false;
+  /// If true, this graph function contains some side-effecting ops.
+  bool funcHasSideEffects = false;
 
-    /// This is a list of all of the operations that make up this function.
-    std::vector<const TF_Operation*> operations;
+  /// This is a list of all of the operations that make up this function.
+  std::vector<const TF_Operation *> operations;
 
-    // When true, lower effectful ops (e.g. TF->Swift send ops), if any, in the
-    // corresponding TF function. Currently in a While op context, these ops
-    // should not be run in the cond function.
-    // TODO(b/78472806): Add a more thorough and proper fix for effectful ops in
-    // the cond function.
-    bool shouldLowerEffectfulOps = true;
+  // When true, lower effectful ops (e.g. TF->Swift send ops), if any, in the
+  // corresponding TF function. Currently in a While op context, these ops
+  // should not be run in the cond function.
+  // TODO(b/78472806): Add a more thorough and proper fix for effectful ops in
+  // the cond function.
+  bool shouldLowerEffectfulOps = true;
 
-   public:
-     GraphFunctionBody(DeviceType thisDeviceType,
-                       const GraphFunctionDeviceInfo &deviceInfo)
-         : thisDeviceType(thisDeviceType), deviceInfo(deviceInfo),
-           graph(TF_NewGraph(), &TF_DeleteGraph) {}
+public:
+  GraphFunctionBody(DeviceType thisDeviceType,
+                    const GraphFunctionDeviceInfo &deviceInfo)
+      : thisDeviceType(thisDeviceType), deviceInfo(deviceInfo),
+        graph(TF_NewGraph(), &TF_DeleteGraph) {}
 
-     TF_Graph *getGraph() const { return graph.get(); }
+  TF_Graph *getGraph() const { return graph.get(); }
 
-     /// "Finish" a tensorflow op under construction, and remember that it is
-     /// part of this graph function.
-     TF_Operation *finishOp(TF_OperationDescription *desc,
-                            bool opHasSideEffects, bool isEligibleForTPU,
-                            TF_Status *status) {
-       funcHasSideEffects |= opHasSideEffects;
-       // If this node has side effects and we've already emitted another node
-       // that does, make sure to connect them with control dependencies to
-       // preserve ordering.
-       if (opHasSideEffects && controlDependenceValue)
-         TF_AddControlInput(desc, controlDependenceValue);
-
-       // If this node should be put onto TPU, mark it with an attribute.
-       if (thisDeviceType == DeviceType::TPU && isEligibleForTPU) {
-         markNodeAsTPUReplicated(desc);
-       }
-
-       auto result = TF_FinishOperation(desc, status);
-       operations.push_back(result);
-
-       // If this op has side effects, remember it in case we need to chain it
-       // to another one later.
-       if (opHasSideEffects)
-         controlDependenceValue = result;
-
-       return result;
-    }
-
-    // If there is a control dependence value, run it before producing an output
-    // tensor in GraphFunctionBody.
-    TF_Output maybeRunEffectfulOp(TF_Output result, TF_Status *status) {
-      if (!controlDependenceValue) return result;
-
-      std::string nodeName = "RunControlDependency";
-      auto *desc = TF_NewOperation(getGraph(), "Identity", nodeName.c_str());
+  /// "Finish" a tensorflow op under construction, and remember that it is
+  /// part of this graph function.
+  TF_Operation *finishOp(TF_OperationDescription *desc, bool opHasSideEffects,
+                         bool isEligibleForTPU, TF_Status *status) {
+    funcHasSideEffects |= opHasSideEffects;
+    // If this node has side effects and we've already emitted another node
+    // that does, make sure to connect them with control dependencies to
+    // preserve ordering.
+    if (opHasSideEffects && controlDependenceValue)
       TF_AddControlInput(desc, controlDependenceValue);
-      TF_AddInput(desc, result);
-      TF_Operation *newResult = finishOp(desc, /*opHasSideEffects*/ false,
-                                         /*isEligibleForTPU*/ false, status);
-      controlDependenceValue = nullptr;
-      return {newResult, 0};
+
+    // If this node should be put onto TPU, mark it with an attribute.
+    if (thisDeviceType == DeviceType::TPU && isEligibleForTPU) {
+      markNodeAsTPUReplicated(desc);
     }
-  };
-}
+
+    auto result = TF_FinishOperation(desc, status);
+    operations.push_back(result);
+
+    // If this op has side effects, remember it in case we need to chain it
+    // to another one later.
+    if (opHasSideEffects)
+      controlDependenceValue = result;
+
+    return result;
+  }
+
+  // If there is a control dependence value, run it before producing an output
+  // tensor in GraphFunctionBody.
+  TF_Output maybeRunEffectfulOp(TF_Output result, TF_Status *status) {
+    if (!controlDependenceValue)
+      return result;
+
+    std::string nodeName = "RunControlDependency";
+    auto *desc = TF_NewOperation(getGraph(), "Identity", nodeName.c_str());
+    TF_AddControlInput(desc, controlDependenceValue);
+    TF_AddInput(desc, result);
+    TF_Operation *newResult = finishOp(desc, /*opHasSideEffects*/ false,
+                                       /*isEligibleForTPU*/ false, status);
+    controlDependenceValue = nullptr;
+    return {newResult, 0};
+  }
+};
+} // namespace
 
 namespace {
 /// Status in the process of graph lowering. This is used for
@@ -290,7 +289,8 @@ public:
   /// valid return false.  If invalid, emit a diagnostic and return true.
   bool checkStatus(SILLocation loc,
                    Diag<StringRef> id = diag::tf_lowering_error) {
-    if (TF_GetCode(status) == TF_OK) return false;
+    if (TF_GetCode(status) == TF_OK)
+      return false;
     internalError(loc, TF_Message(status), id);
     return true;
   }
@@ -397,20 +397,16 @@ private: // Helpers to create TensorFlow graph nodes.
     /// FIXME: Assess whether to use SmallVector.
     std::vector<int64_t> dims;
     std::vector<int> numDims;
-    std::vector<int64_t*> dimPtrs;
+    std::vector<int64_t *> dimPtrs;
     std::vector<TF_DataType> infeedInputDtypes;
 
-   public:
+  public:
     DatasetCreationContext(SILInstruction *datasetInst, DataSource dataSource,
                            StringRef filePath, int batchSize,
                            ArrayRef<int64_t> dims, ArrayRef<int> numDims,
                            ArrayRef<TF_DataType> dTypes)
-        : datasetInst(datasetInst),
-          dataSource(dataSource),
-          filePath(filePath),
-          batchSize(batchSize),
-          dims(dims),
-          numDims(numDims),
+        : datasetInst(datasetInst), dataSource(dataSource), filePath(filePath),
+          batchSize(batchSize), dims(dims), numDims(numDims),
           infeedInputDtypes(dTypes) {
       assert(numDims.size() == dTypes.size());
       auto dimPtr = this->dims.data();
@@ -421,9 +417,7 @@ private: // Helpers to create TensorFlow graph nodes.
     }
 
     /// Returns the number of tensors produced by the dataset / iterator stack.
-    int getNumTensors() const {
-      return infeedInputDtypes.size();
-    }
+    int getNumTensors() const { return infeedInputDtypes.size(); }
 
     /// `desc` can be the partially constructed infeed enqueue or dequeue node.
     void setInfeedTypeAndShapeList(TF_OperationDescription *desc) {
@@ -459,7 +453,7 @@ private: // Helpers to create TensorFlow graph nodes.
   /// This emits an error and returns true on error.
   bool addTopLevelTPUConfigLogic(TF_Operation **metadataNode);
 
- public:  // Lowering functionality.
+public: // Lowering functionality.
   std::string getUniqueName(SILDebugLocation loc, const char *baseName);
 
   TF_DataType getTensorFlowDataType(SILType type, SILLocation loc);
@@ -472,7 +466,6 @@ private: // Helpers to create TensorFlow graph nodes.
   TF_Output createParameter(SILOpResult value, TF_Output passedValue,
                             GraphFunctionBody &fn);
 
-
   /// Add an available value for the specified SILOpResult (a SILValue+result#)
   /// to the value mapping.  This defaults to setting its scope to the current
   /// function depth, but can be customized, so long as the value isn't added
@@ -483,14 +476,14 @@ private: // Helpers to create TensorFlow graph nodes.
     // function.
     ValueMappingScopedHashTable::ScopeTy *scope = valueMapping.getCurScope();
     if (depth == ~0U) {
-      depth = functionStack.size()-1;
+      depth = functionStack.size() - 1;
     } else {
       // This isn't particularly efficient, but this happens infrequently and
       // the scope stack should be shallow.
       SmallVector<ValueMappingScopedHashTable::ScopeTy *, 4> scopes;
       for (auto tmp = scope; tmp != nullptr; tmp = tmp->getParentScope())
         scopes.push_back(tmp);
-      scope = scopes[scopes.size()-1-depth];
+      scope = scopes[scopes.size() - 1 - depth];
     }
 
 #ifndef NDEBUG
@@ -524,7 +517,7 @@ private: // Helpers to create TensorFlow graph nodes.
   /// occurred lowering the operand in question.
   /// On error, return a "NULL" value, and emit an error diagnostic.
   TF_Output getOperandValue(SILOpResult v) {
-    if (isa<SILUndef>(v.first) ) {
+    if (isa<SILUndef>(v.first)) {
       return createUndefNode(v.first->getType());
     }
     std::pair<TF_Output, unsigned> valueInfo = valueMapping.lookup(v);
@@ -544,11 +537,12 @@ private: // Helpers to create TensorFlow graph nodes.
     // When the node for 'x' is requested inside the two while loops, this will
     // add x as parameters to the two while loops so it is available inside.
     //
-    for (unsigned depth = valueInfo.second+1; depth != functionStack.size();
+    for (unsigned depth = valueInfo.second + 1; depth != functionStack.size();
          ++depth) {
       // Create placeholder, add it as input to each function.
       value = createParameter(v, value, functionStack[depth]);
-      if (value.oper == nullptr) return {};
+      if (value.oper == nullptr)
+        return {};
 
       // Remember that it is the available version of this value at that depth.
       addValueMapping(v, value, depth);
@@ -564,9 +558,7 @@ private: // Helpers to create TensorFlow graph nodes.
   GLStatus visitFloatLiteralInst(FloatLiteralInst *inst) {
     return GLStatus::Success;
   }
-  GLStatus visitMetatypeInst(MetatypeInst *inst) {
-    return GLStatus::Success;
-  }
+  GLStatus visitMetatypeInst(MetatypeInst *inst) { return GLStatus::Success; }
   GLStatus visitStringLiteralInst(StringLiteralInst *inst) {
     return GLStatus::Success;
   }
@@ -586,8 +578,7 @@ private: // Helpers to create TensorFlow graph nodes.
   // visitSILInstruction is the bottom level of the instruction visitor, where
   // unhandled instructions bottom out in.
   GLStatus visitSILInstruction(SILInstruction *inst) {
-    internalError(inst->getLoc(),
-                  "GraphGen cannot lower this instruction yet");
+    internalError(inst->getLoc(), "GraphGen cannot lower this instruction yet");
     llvm::errs() << "Unhandled SIL instruction in TFGraphFunctionLowering:\n";
     inst->dump();
     return GLStatus::Error;
@@ -596,8 +587,8 @@ private: // Helpers to create TensorFlow graph nodes.
   GraphFunctionBody lowerToFunction(const std::function<void()> &body);
 
   GLStatus lowerArgumentsToParams(ArrayRef<SILArgument *> args,
-                              ArrayRef<TF_Output> passedValues,
-                              SILLocation loc);
+                                  ArrayRef<TF_Output> passedValues,
+                                  SILLocation loc);
 
   GLStatus lowerBasicBlock(SILBasicBlock *bb, bool skipTerminator = false);
   GLStatus lowerRegion(SESERegionTree *region);
@@ -605,16 +596,15 @@ private: // Helpers to create TensorFlow graph nodes.
   GLStatus lowerWhileLoopRegion(WhileLoopSESERegion *r);
   GLStatus lowerConditionalRegion(ConditionalSESERegion *r);
 
- private:  // Helpers for lowering.
+private: // Helpers for lowering.
   /// Create a stack of TF dataset and iterator nodes up to IteratorGetNext.
   ///
   /// FIXME: Dissolve this builtin into a set of finer-grained, composable
   /// features.
   template <typename Inst>
-  GLStatus createDatasetCreationContext(
-    Inst *inst, std::vector<SILOpResult>& results);
-  template <typename Inst>
-  GLStatus visitTFDataset(Inst *inst);
+  GLStatus createDatasetCreationContext(Inst *inst,
+                                        std::vector<SILOpResult> &results);
+  template <typename Inst> GLStatus visitTFDataset(Inst *inst);
 
   // TODO: remove this after we complete proper dataset/iterator support.
   bool createDatasetIteratorNodesWithInfeedEnqueue();
@@ -649,7 +639,7 @@ private: // Helpers to create TensorFlow graph nodes.
                                const std::string &opName, SILLocation loc,
                                StringRef silFuncName);
 };
-}
+} // namespace
 
 // Escape the specified string to be a valid TensorFlow OpDef name.
 // Op names must match the regex "[A-Za-z0-9.][A-Za-z0-9_./]*".
@@ -786,9 +776,8 @@ TF_DataType TFGraphFunctionLowering::getTensorFlowDataType(SILType type,
     break;
   }
 
-
   internalError(loc, "Unknown Swift type to lower to TensorFlow: " +
-                type.getAsString());
+                         type.getAsString());
   return TF_DataType(-1);
 }
 
@@ -810,10 +799,10 @@ convertValuesToTensorLegacy(ArrayRef<SingleValueInstruction *> elts,
 
   // Make an uninitialized tensor that is big enough for our value.
   auto *tensor = TF_AllocateTensor(dtype, shape.data(), shape.size(),
-                                   dtypeSize*totalElements);
+                                   dtypeSize * totalElements);
 
   // Set up its contents, element-wise.
-  auto *ptr = (char*)TF_TensorData(tensor);
+  auto *ptr = (char *)TF_TensorData(tensor);
   APInt value;
   for (auto elt : elts) {
     if (auto *ILI = dyn_cast<IntegerLiteralInst>(elt)) {
@@ -1012,8 +1001,9 @@ bool TFGraphFunctionLowering::createDatasetIteratorNodesWithInfeedEnqueue() {
     TF_SetDevice(desc, DEFAULT_CPU_DEVICE);
     TF_SetAttrInt(desc, "device_ordinal", 0);
     datasetCreationContext->setInfeedTypeAndShapeList(desc);
-    /*TF_Operation* enqueue =*/ TF_FinishOperation(desc, status);
-    if (checkStatus(SILFn.getLocation())) return true;
+    /*TF_Operation* enqueue =*/TF_FinishOperation(desc, status);
+    if (checkStatus(SILFn.getLocation()))
+      return true;
   }
 
   return false;
@@ -1058,7 +1048,7 @@ static void decodeShapeArrayLegacy(const SILTensorOpInfo &tfopInfo,
                        .getLimitedValue();
   for (unsigned shape = 0; shape != numShapes; ++shape) {
     auto prevNumDims = dims.size();
-    ++operandIdx;  // We consumed an operand.
+    ++operandIdx; // We consumed an operand.
     auto nextOperand = inst->getOperand(operandIdx);
     assert(tfopInfo.operandClasses[operandIdx].second ==
                SILTensorOpInfo::OperandClass::Shape &&
@@ -1136,7 +1126,8 @@ GLStatus TFGraphFunctionLowering::visitGraphOpSendToHostInst(
   auto &graphFn = getCurrentGraphFunction();
   // TODO(b/78472806): Add a more thorough and proper fix for effectful ops in
   // the while cond function.
-  if (!graphFn.shouldLowerEffectfulOps) return GLStatus::Success;
+  if (!graphFn.shouldLowerEffectfulOps)
+    return GLStatus::Success;
 
   // Type check and process the parameters.
   // SendToHost has type <T> (input$T, tensorId$int, device$str) -> ()
@@ -1150,7 +1141,8 @@ GLStatus TFGraphFunctionLowering::visitGraphOpSendToHostInst(
   {
     auto operand = inst->getOperand(0);
     inputOp = getOperandValue(operand);
-    if (!inputOp.oper) return GLStatus::Error;
+    if (!inputOp.oper)
+      return GLStatus::Error;
     inputType = getTensorFlowDataType(operand->getType(), inst->getLoc());
   }
 
@@ -1408,7 +1400,7 @@ GLStatus TFGraphFunctionLowering::addTPUDequeueOp(SILInstruction *inst,
       graphFn.getGraph(),
       isInfeed ? "InfeedDequeueTuple" : "OutfeedDequeueTuple", opName.c_str());
   if (isInfeed) {
-      markNodeAsTPUReplicated(desc);
+    markNodeAsTPUReplicated(desc);
   } else {
     TF_SetDevice(desc, thisDeviceTypeStr.c_str());
     TF_SetAttrInt(desc, "device_ordinal", 0);
@@ -1454,7 +1446,7 @@ GLStatus TFGraphFunctionLowering::visitGraphOpD2DTensorRecvInst(
 
   SmallVector<int64_t, 8> dims;
   SmallVector<int, 3> numDims;
-  SmallVector<int64_t*, 8> dimPtrs;
+  SmallVector<int64_t *, 8> dimPtrs;
   if (inst->getNumAttributes() == 4) {
     // 3 is the attr idx for the optional shape array attr.
     decodeShapeArrayAtAttr(graphOpInfo, SHAPE_ARRAY_ATTR, /*attrIdx*/ 3, dims,
@@ -1462,10 +1454,10 @@ GLStatus TFGraphFunctionLowering::visitGraphOpD2DTensorRecvInst(
   }
   if (thisDeviceType == DeviceType::TPU) {
     return addTPUDequeueOp(inst, /* isInfeed */ true, transferId, dims, numDims,
-                    dimPtrs);
+                           dimPtrs);
   } else if (srcDevice == DeviceType::TPU) {
-    return addTPUDequeueOp(inst, /* isInfeed */ false, transferId, dims, numDims,
-                    dimPtrs);
+    return addTPUDequeueOp(inst, /* isInfeed */ false, transferId, dims,
+                           numDims, dimPtrs);
   } else {
     return addTFRecvOp(inst, transferId, srcDeviceStr);
   }
@@ -1481,7 +1473,8 @@ GLStatus TFGraphFunctionLowering::addTFSendOp(SILInstruction *inst,
 
   auto inputToSendVal = inst->getOperand(0);
   auto inputToSendOp = getOperandValue(inputToSendVal);
-  if (!inputToSendOp.oper) return GLStatus::Error;
+  if (!inputToSendOp.oper)
+    return GLStatus::Error;
   TF_AddInput(desc, inputToSendOp);
   auto tfType =
       getTensorFlowDataType(inputToSendVal->getType(), inst->getLoc());
@@ -1542,7 +1535,8 @@ GLStatus TFGraphFunctionLowering::addTPUEnqueueOp(SILInstruction *inst,
 
   auto inputToSendVal = inst->getOperand(0);
   auto inputToSendOp = getOperandValue(inputToSendVal);
-  if (!inputToSendOp.oper) return GLStatus::Error;
+  if (!inputToSendOp.oper)
+    return GLStatus::Error;
   TF_AddInputList(desc, &inputToSendOp, 1);
 
   TF_DataType tfType =
@@ -1579,17 +1573,17 @@ GLStatus TFGraphFunctionLowering::visitGraphOpD2DTensorSendInst(
 
   SmallVector<int64_t, 8> dims;
   SmallVector<int, 3> numDims;
-  SmallVector<int64_t*, 8> dimPtrs;
+  SmallVector<int64_t *, 8> dimPtrs;
   if (inst->getNumAttributes() == 4)
     // 3 is the attr idx for the optional shape array attr.
     decodeShapeArrayAtAttr(graphOpInfo, SHAPE_ARRAY_ATTR, /*attrIdx*/ 3, dims,
                            numDims, dimPtrs);
   if (thisDeviceType == DeviceType::TPU) {
-    return addTPUEnqueueOp(inst, /* isInfeed */ false, transferId, dims, numDims,
-                    dimPtrs);
+    return addTPUEnqueueOp(inst, /* isInfeed */ false, transferId, dims,
+                           numDims, dimPtrs);
   } else if (destDevice == DeviceType::TPU) {
     return addTPUEnqueueOp(inst, /* isInfeed */ true, transferId, dims, numDims,
-                    dimPtrs);
+                           dimPtrs);
   } else {
     return addTFSendOp(inst, transferId, destDeviceStr);
   }
@@ -1600,12 +1594,11 @@ GLStatus TFGraphFunctionLowering::createDatasetCreationContext(
     GraphOperationInst *inst, std::vector<SILOpResult> &outputResults) {
   GraphOperationInfo graphOpInfo(inst);
   // Type check and process the first attribute: dataSource.
-  auto dataSource =
-    llvm::StringSwitch<DatasetCreationContext::DataSource>(
-      graphOpInfo.getStringAttr(0, "dataSource"))
-    .Case("fake", DatasetCreationContext::FAKE)
-    .Case("mnist", DatasetCreationContext::MNIST)
-    .Default(DatasetCreationContext::IMAGENET);
+  auto dataSource = llvm::StringSwitch<DatasetCreationContext::DataSource>(
+                        graphOpInfo.getStringAttr(0, "dataSource"))
+                        .Case("fake", DatasetCreationContext::FAKE)
+                        .Case("mnist", DatasetCreationContext::MNIST)
+                        .Default(DatasetCreationContext::IMAGENET);
 
   // Type check and process the second attribute: filePath.
   // When dataSource is FAKE, this attribute needs to be present, but is not
@@ -1620,7 +1613,7 @@ GLStatus TFGraphFunctionLowering::createDatasetCreationContext(
   auto attr = inst->getAttribute(3);
   SmallVector<int64_t, 8> dims;
   SmallVector<int, 3> numDims;
-  SmallVector<int64_t*, 8> dimPtrs;
+  SmallVector<int64_t *, 8> dimPtrs;
   decodeShapeArray(attr.value, dims, numDims, dimPtrs);
 
   // Even when this built-in returns multiple tensors, they are always presented
@@ -1652,7 +1645,6 @@ GLStatus TFGraphFunctionLowering::createDatasetCreationContext(
   // infeed dequeue node to feed the user(s) of `inst`.
   datasetCreationContext.reset(new DatasetCreationContext(
       inst, dataSource, filePath, batchSize, dims, numDims, outputTypes));
-
 
   return GLStatus::Success;
 }
@@ -1703,7 +1695,7 @@ GLStatus TFGraphFunctionLowering::createDatasetCreationContext(
   // Type check and process the fourth attribute: outputShapes
   SmallVector<int64_t, 8> dims;
   SmallVector<int, 3> numDims;
-  SmallVector<int64_t*, 8> dimPtrs;
+  SmallVector<int64_t *, 8> dimPtrs;
   unsigned i = 3;
   unsigned e = inst->getNumOperands();
   decodeShapeArrayLegacy(tfopInfo, i, e, dims, numDims, dimPtrs);
@@ -1869,7 +1861,8 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
       assert(valueKind != TFValueKind::Nope &&
              "all op inputs should be TensorFlow values");
       auto opValue = getOperandValue(operand);
-      if (!opValue.oper) return GLStatus::Error;
+      if (!opValue.oper)
+        return GLStatus::Error;
       TF_AddInput(op, opValue);
       break;
     }
@@ -1890,7 +1883,8 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
         assert(valueKind != TFValueKind::Nope &&
                "all op inputs should be TensorFlow values");
         auto opValue = getOperandValue(operand);
-        if (!opValue.oper) return GLStatus::Error;
+        if (!opValue.oper)
+          return GLStatus::Error;
         elements.push_back(opValue);
       }
       TF_AddInputList(op, elements.data(), elements.size());
@@ -1908,7 +1902,7 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
   // value 0.
   unsigned dtypeAttr = 0;
   for (unsigned nextAttributeNumber = 0, e = inst->getNumAttributes();
-       nextAttributeNumber != e; ) {
+       nextAttributeNumber != e;) {
     // Look at which attribute comes next.
     auto attr = inst->getAttribute(nextAttributeNumber++);
     auto attrInfo = GraphOperationInfo::decodeAttributeName(attr.name);
@@ -1923,7 +1917,7 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
     case SILTensorOpInfo::OperandClass::InputElt:
       assert(0 && "Input classes cannot exist for attributes");
 
-    case SILTensorOpInfo::OperandClass::Normal:  // No modifier.
+    case SILTensorOpInfo::OperandClass::Normal: // No modifier.
       // We add attributes based on what the type of the value is.
       switch (attrValue.getKind()) {
       case SymbolicValue::Unknown:
@@ -1931,7 +1925,7 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
       case SymbolicValue::Enum:
       case SymbolicValue::EnumWithPayload:
       case SymbolicValue::Address:
-      case SymbolicValue::Aggregate:  // Tuples and structs
+      case SymbolicValue::Aggregate: // Tuples and structs
         assert(0 && "These attribute kinds cannot happen here");
       case SymbolicValue::Integer: {
         auto value = attrValue.getIntegerValue();
@@ -2019,7 +2013,7 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
         }
 
         if (elementTypeString == "String") {
-          SmallVector<const void*, 4> pointers;
+          SmallVector<const void *, 4> pointers;
           SmallVector<size_t, 4> sizes;
           pointers.reserve(elements.size());
           sizes.reserve(elements.size());
@@ -2172,7 +2166,7 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
                     "FIXME: Handle shapearray attributes");
       return GLStatus::Error;
 
-    case SILTensorOpInfo::OperandClass::Array:      // Handled as 'normal'
+    case SILTensorOpInfo::OperandClass::Array: // Handled as 'normal'
     case SILTensorOpInfo::OperandClass::ArrayElement:
       llvm_unreachable("This is a legacy class that shouldn't happen");
     }
@@ -2206,11 +2200,12 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
   // expect, and wire them into the valueMapping result table.
   unsigned numOpResults = TF_OperationNumOutputs(result);
   if (numOpResults != inst->getNumResults()) {
-    diagnose(SILFn, inst->getLoc(),
-             diag::tfop_incorrect_definition,
+    diagnose(SILFn, inst->getLoc(), diag::tfop_incorrect_definition,
              "TensorFlow op '" + opName.str() + "' produces " +
-             llvm::utostr(numOpResults) + " result, but Swift function "
-             "produces " + llvm::utostr(inst->getNumResults()));
+                 llvm::utostr(numOpResults) +
+                 " result, but Swift function "
+                 "produces " +
+                 llvm::utostr(inst->getNumResults()));
     return GLStatus::Error;
   }
 
@@ -2261,19 +2256,19 @@ GLStatus TFGraphFunctionLowering::visitTFOpInst(BuiltinInst *inst) {
     // Helper function to collect subsequent elements that contribute to an
     // array value.
     auto collectArrayElements =
-                    [&](SILValue attrValue, Type &eltType,
-                        SmallVectorImpl<SingleValueInstruction*> &elements) {
-      // We have the metatype for the array element, which we need to know the
-      // element type in case the array was empty.
-      auto metatype = cast<MetatypeInst>(attrValue)->getType();
-      eltType = metatype.getAs<AnyMetatypeType>()->getInstanceType();
+        [&](SILValue attrValue, Type &eltType,
+            SmallVectorImpl<SingleValueInstruction *> &elements) {
+          // We have the metatype for the array element, which we need to know
+          // the element type in case the array was empty.
+          auto metatype = cast<MetatypeInst>(attrValue)->getType();
+          eltType = metatype.getAs<AnyMetatypeType>()->getInstanceType();
 
-      while (i+1 < e &&
-             tfopInfo.operandClasses[i+1].second ==
-                     SILTensorOpInfo::OperandClass::ArrayElement) {
-        elements.push_back(cast<SingleValueInstruction>(inst->getOperand(++i)));
-      }
-    };
+          while (i + 1 < e && tfopInfo.operandClasses[i + 1].second ==
+                                  SILTensorOpInfo::OperandClass::ArrayElement) {
+            elements.push_back(
+                cast<SingleValueInstruction>(inst->getOperand(++i)));
+          }
+        };
 
     // Convert the not-necessarily-nul-terminated StringRef to an std::string
     // so we can guarantee null termination for the "const char*" taking APIs.
@@ -2290,8 +2285,8 @@ GLStatus TFGraphFunctionLowering::visitTFOpInst(BuiltinInst *inst) {
         // any exist.
         SmallVector<TF_Output, 4> elements;
 
-        while (i+1 < e && tfopInfo.operandClasses[i+1].second ==
-                                   SILTensorOpInfo::OperandClass::InputElt) {
+        while (i + 1 < e && tfopInfo.operandClasses[i + 1].second ==
+                                SILTensorOpInfo::OperandClass::InputElt) {
           auto eltValue = inst->getOperand(++i);
           auto valueKind = classifyTensorFlowValue(eltValue->getType());
 
@@ -2300,7 +2295,8 @@ GLStatus TFGraphFunctionLowering::visitTFOpInst(BuiltinInst *inst) {
           assert(valueKind != TFValueKind::Nope &&
                  "all op inputs should be TensorFlow values");
           auto opValue = getOperandValue(eltValue);
-          if (!opValue.oper) return GLStatus::Error;
+          if (!opValue.oper)
+            return GLStatus::Error;
           elements.push_back(opValue);
         }
         TF_AddInputList(op, elements.data(), elements.size());
@@ -2314,13 +2310,14 @@ GLStatus TFGraphFunctionLowering::visitTFOpInst(BuiltinInst *inst) {
       assert(valueKind != TFValueKind::Nope &&
              "all op inputs should be TensorFlow values");
       auto opValue = getOperandValue(operand);
-      if (!opValue.oper) return GLStatus::Error;
+      if (!opValue.oper)
+        return GLStatus::Error;
       TF_AddInput(op, opValue);
       break;
     }
     case SILTensorOpInfo::OperandClass::InputElt:
       assert(0 && "Handled by the Input that precedes it.");
-    case SILTensorOpInfo::OperandClass::Normal:  // No modifier.
+    case SILTensorOpInfo::OperandClass::Normal: // No modifier.
       // We add attributes based on what the type of the value is.
       if (auto *ili = dyn_cast<IntegerLiteralInst>(operand)) {
         uint64_t value = ili->getValue().getLimitedValue();
@@ -2376,7 +2373,7 @@ GLStatus TFGraphFunctionLowering::visitTFOpInst(BuiltinInst *inst) {
       // Tensor can support two cases: an array case, where 'attrValue' is a
       // metatype, and a scalar case.
       TF_DataType dtype;
-      SmallVector<SingleValueInstruction*, 4> elements;
+      SmallVector<SingleValueInstruction *, 4> elements;
       SmallVector<int64_t, 4> shape;
       if (!isa<MetatypeInst>(operand)) {
         // The scalar case is very simple, the shape of a scalar is 0d.
@@ -2388,12 +2385,13 @@ GLStatus TFGraphFunctionLowering::visitTFOpInst(BuiltinInst *inst) {
         Type eltType;
         collectArrayElements(operand, eltType, elements);
 
-        auto shapeAttr = tfopInfo.operandClasses[++i]; (void)shapeAttr;
+        auto shapeAttr = tfopInfo.operandClasses[++i];
+        (void)shapeAttr;
         assert(shapeAttr.second == SILTensorOpInfo::OperandClass::Shape);
         auto shapeAttrValue = tfopInfo.getAttrOperand(i);
         decodeShapeElements(shapeAttrValue, tfopInfo, i, e, shape);
         auto eltSILType =
-          SILType::getPrimitiveObjectType(eltType->getCanonicalType());
+            SILType::getPrimitiveObjectType(eltType->getCanonicalType());
         dtype = getTensorFlowDataType(eltSILType, inst->getLoc());
       }
 
@@ -2401,7 +2399,8 @@ GLStatus TFGraphFunctionLowering::visitTFOpInst(BuiltinInst *inst) {
       auto tensor = convertValuesToTensorLegacy(elements, shape, dtype);
       TF_SetAttrTensor(op, name.c_str(), tensor, status);
       TF_DeleteTensor(tensor);
-      if (checkStatus(inst->getLoc())) return GLStatus::Error;
+      if (checkStatus(inst->getLoc()))
+        return GLStatus::Error;
       break;
     }
     case SILTensorOpInfo::OperandClass::Shape: {
@@ -2413,7 +2412,7 @@ GLStatus TFGraphFunctionLowering::visitTFOpInst(BuiltinInst *inst) {
     case SILTensorOpInfo::OperandClass::ShapeArray: {
       SmallVector<int64_t, 8> dims;
       SmallVector<int, 3> numDims;
-      SmallVector<int64_t*, 8> dimPtrs;
+      SmallVector<int64_t *, 8> dimPtrs;
       decodeShapeArrayLegacy(tfopInfo, i, e, dims, numDims, dimPtrs);
       if (name != SHAPE_ARRAY_ATTR) {
         // SHAPE_ARRAY_ATTR is a pseudo-attribute used by the compiler's
@@ -2428,7 +2427,7 @@ GLStatus TFGraphFunctionLowering::visitTFOpInst(BuiltinInst *inst) {
     case SILTensorOpInfo::OperandClass::Array: {
       // Get all of the elements that contribute to this array value.
       Type eltType;
-      SmallVector<SingleValueInstruction*, 4> elements;
+      SmallVector<SingleValueInstruction *, 4> elements;
       collectArrayElements(operand, eltType, elements);
 
       if (eltType->is<MetatypeType>()) {
@@ -2446,7 +2445,7 @@ GLStatus TFGraphFunctionLowering::visitTFOpInst(BuiltinInst *inst) {
       }
 
       if (eltType->getString() == "String") {
-        SmallVector<const void*, 4> pointers;
+        SmallVector<const void *, 4> pointers;
         SmallVector<size_t, 4> sizes;
         for (auto elt : elements) {
           auto *sli = cast<StringLiteralInst>(elt);
@@ -2536,11 +2535,12 @@ GLStatus TFGraphFunctionLowering::visitTFOpInst(BuiltinInst *inst) {
   }
 
   if (numOpResults != numActualResults) {
-    diagnose(SILFn, inst->getLoc(),
-             diag::tfop_incorrect_definition,
+    diagnose(SILFn, inst->getLoc(), diag::tfop_incorrect_definition,
              "TensorFlow op '" + tfopInfo.opName.str() + "' produces " +
-             llvm::utostr(numOpResults) + " result, but Swift function "
-             "produces " + llvm::utostr(numActualResults));
+                 llvm::utostr(numOpResults) +
+                 " result, but Swift function "
+                 "produces " +
+                 llvm::utostr(numActualResults));
     return GLStatus::Error;
   }
 
@@ -2554,7 +2554,8 @@ GLStatus TFGraphFunctionLowering::visitTFOpInst(BuiltinInst *inst) {
 GLStatus TFGraphFunctionLowering::visitTupleInst(TupleInst *inst) {
   // Tuples never exist in the graph except when they are the argument to
   // the return instruction.
-  assert(inst->hasOneUse() && isa<ReturnInst>(inst->getSingleUse()->getUser())&&
+  assert(inst->hasOneUse() &&
+         isa<ReturnInst>(inst->getSingleUse()->getUser()) &&
          "Unexpected tuple_inst in GraphGen");
   return GLStatus::Success;
 }
@@ -2565,7 +2566,8 @@ TFGraphFunctionLowering::visitUncheckedRefCastInst(UncheckedRefCastInst *inst) {
   // when one is using a Swift type like Int32 and one is using Builtin.Int32.
   // None of this matters for graph lowering.
   auto opValue = getOperandValue(inst->getOperand());
-  if (!opValue.oper) return GLStatus::Error;
+  if (!opValue.oper)
+    return GLStatus::Error;
 
   addValueMapping({inst, 0}, opValue);
   return GLStatus::Success;
@@ -2581,17 +2583,21 @@ GLStatus TFGraphFunctionLowering::visitReturnInst(ReturnInst *inst) {
   if (auto *ti = dyn_cast<TupleInst>(inst->getOperand())) {
     for (auto &operand : ti->getAllOperands()) {
       auto result = getOperandValue(operand.get());
-      if (!result.oper) return GLStatus::Error;
+      if (!result.oper)
+        return GLStatus::Error;
       result = graphFn.maybeRunEffectfulOp(result, status);
-      if (checkStatus(SILFn.getLocation())) return GLStatus::Error;
-      graphFn.outputs.push_back({ /*SILArgument*/nullptr, result });
+      if (checkStatus(SILFn.getLocation()))
+        return GLStatus::Error;
+      graphFn.outputs.push_back({/*SILArgument*/ nullptr, result});
     }
   } else {
     auto result = getOperandValue(inst->getOperand());
-    if (!result.oper) return GLStatus::Error;
+    if (!result.oper)
+      return GLStatus::Error;
     result = graphFn.maybeRunEffectfulOp(result, status);
-    if (checkStatus(SILFn.getLocation())) return GLStatus::Error;
-    graphFn.outputs.push_back({ /*SILArgument*/nullptr, result });
+    if (checkStatus(SILFn.getLocation()))
+      return GLStatus::Error;
+    graphFn.outputs.push_back({/*SILArgument*/ nullptr, result});
   }
   return GLStatus::Success;
 }
@@ -2601,7 +2607,8 @@ GLStatus TFGraphFunctionLowering::visitBranchInst(BranchInst *inst) {
   assert(graphFn.outputs.empty() &&
          "Should only have one exit branch per graph function");
 
-  if (inst->getNumArgs() == 0) return GLStatus::Success;
+  if (inst->getNumArgs() == 0)
+    return GLStatus::Success;
 
   auto destBB = inst->getDestBB();
 
@@ -2610,10 +2617,12 @@ GLStatus TFGraphFunctionLowering::visitBranchInst(BranchInst *inst) {
   // with the BB argument being computed.
   for (unsigned i = 0, e = inst->getNumArgs(); i != e; ++i) {
     auto result = getOperandValue(inst->getArg(i));
-    if (!result.oper) return GLStatus::Error;
+    if (!result.oper)
+      return GLStatus::Error;
     result = graphFn.maybeRunEffectfulOp(result, status);
-    if (checkStatus(SILFn.getLocation())) return GLStatus::Error;
-    graphFn.outputs.push_back({ destBB->getArgument(i), result });
+    if (checkStatus(SILFn.getLocation()))
+      return GLStatus::Error;
+    graphFn.outputs.push_back({destBB->getArgument(i), result});
   }
   return GLStatus::Success;
 }
@@ -2634,7 +2643,8 @@ GLStatus TFGraphFunctionLowering::lowerBasicBlock(SILBasicBlock *bb,
     GLStatus S = visit(&*I);
 
     // If we produced an error lowering an instruction, give up hope and return.
-    if (S != GLStatus::Success) return S;
+    if (S != GLStatus::Success)
+      return S;
   }
 
   return GLStatus::Success;
@@ -2646,7 +2656,8 @@ GLStatus TFGraphFunctionLowering::lowerSequenceRegion(SequenceSESERegion *r) {
     // in the sequence. Hence, clear outputs for the current function if any.
     getCurrentGraphFunction().outputs.clear();
     GLStatus S = lowerRegion(child.get());
-    if (S != GLStatus::Success) return S;
+    if (S != GLStatus::Success)
+      return S;
   }
   return GLStatus::Success;
 }
@@ -2681,8 +2692,8 @@ static TF_Output createNotOp(TF_Output input, SILDebugLocation loc,
                              TFGraphFunctionLowering &lowering) {
   auto opLocString = lowering.getUniqueName(loc, "not");
   auto &graphFn = lowering.getCurrentGraphFunction();
-  auto *op = TF_NewOperation(graphFn.getGraph(), "LogicalNot",
-                             opLocString.c_str());
+  auto *op =
+      TF_NewOperation(graphFn.getGraph(), "LogicalNot", opLocString.c_str());
   TF_AddInput(op, input);
 
   // For this synthesized op, let TF figure out the best device placement.
@@ -2690,8 +2701,8 @@ static TF_Output createNotOp(TF_Output input, SILDebugLocation loc,
   auto *result = graphFn.finishOp(op, /*side effects*/ false,
                                   /*isEligibleForTPU*/ true, lowering.status);
   if (lowering.checkStatus(loc.getLocation()))
-    return { nullptr, 0 };
-  return { result, 0 };
+    return {nullptr, 0};
+  return {result, 0};
 }
 
 /// Given a boolean value, create a 'cast' operation to convert it to int32.
@@ -2699,8 +2710,7 @@ static TF_Output castBoolToInt32(TF_Output input, SILDebugLocation loc,
                                  TFGraphFunctionLowering &lowering) {
   auto opLocString = lowering.getUniqueName(loc, "cast");
   auto &graphFn = lowering.getCurrentGraphFunction();
-  auto *op = TF_NewOperation(graphFn.getGraph(), "Cast",
-                             opLocString.c_str());
+  auto *op = TF_NewOperation(graphFn.getGraph(), "Cast", opLocString.c_str());
   TF_AddInput(op, input);
   TF_SetAttrType(op, "SrcT", TF_BOOL);
   TF_SetAttrType(op, "DstT", TF_INT32);
@@ -2710,8 +2720,8 @@ static TF_Output castBoolToInt32(TF_Output input, SILDebugLocation loc,
   auto *result = graphFn.finishOp(op, /*side effects*/ false,
                                   /*isEligibleForTPU*/ true, lowering.status);
   if (lowering.checkStatus(loc.getLocation()))
-    return { nullptr, 0 };
-  return { result, 0 };
+    return {nullptr, 0};
+  return {result, 0};
 }
 
 /// Get the SILType for the specified SILOpResult.
@@ -2733,7 +2743,8 @@ GLStatus TFGraphFunctionLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
   // arguments, which we will handle specially later.  They provide the passed
   // values to the loop function that we will create.
   GLStatus S = lowerBasicBlock(r->getPreheader(), /*skipTerminator:*/ true);
-  if (S != GLStatus::Success) return S;
+  if (S != GLStatus::Success)
+    return S;
 
   auto phBranch = cast<BranchInst>(r->getPreheader()->getTerminator());
 
@@ -2742,7 +2753,8 @@ GLStatus TFGraphFunctionLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
   SmallVector<TF_Output, 4> preheaderInputs;
   for (auto argValue : phBranch->getArgs()) {
     auto result = getOperandValue(argValue);
-    if (!result.oper) return GLStatus::Error;
+    if (!result.oper)
+      return GLStatus::Error;
     preheaderInputs.push_back(result);
   }
 
@@ -2760,8 +2772,10 @@ GLStatus TFGraphFunctionLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
     // values that are live across loop iterations and are the outputs of the
     // body.
     auto brLoc = r->getPreheader()->getTerminator()->getLoc();
-    S = lowerArgumentsToParams(headerBB->getArguments(), preheaderInputs, brLoc);
-    if (S != GLStatus::Success) return;
+    S = lowerArgumentsToParams(headerBB->getArguments(), preheaderInputs,
+                               brLoc);
+    if (S != GLStatus::Success)
+      return;
 
     // The loop body consists of two logical regions: the code in the header
     // itself (which controls the exit condition) and the code in the body
@@ -2789,7 +2803,8 @@ GLStatus TFGraphFunctionLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
     // loop.  It ends with a conditional branch (which conditionally exits the
     // loop) that we don't want to lower.
     S = lowerBasicBlock(headerBB, /*skipTerminator:*/ true);
-    if (S != GLStatus::Success) return;
+    if (S != GLStatus::Success)
+      return;
 
     // Lower all the code in the body of the loop.  This region ends with a
     // branch back to the loop header that passes arguments, and these arguments
@@ -2797,7 +2812,8 @@ GLStatus TFGraphFunctionLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
     // lowering code.
     S = lowerRegion(r->getBody());
   });
-  if (S != GLStatus::Success) return S;
+  if (S != GLStatus::Success)
+    return S;
 
   // Okay, at this point, the loop body should have all of the SILArguments
   // installed as inputs and outputs (in guaranteed matching order) and will
@@ -2811,7 +2827,8 @@ GLStatus TFGraphFunctionLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
        i != e; ++i) {
     auto result =
         loopBodyFn.maybeRunEffectfulOp(loopBodyFn.inputs[i].parameter, status);
-    if (checkStatus(SILFn.getLocation())) return GLStatus::Error;
+    if (checkStatus(SILFn.getLocation()))
+      return GLStatus::Error;
     loopBodyFn.outputs.push_back({/*SILArgument*/ nullptr, result});
   }
 
@@ -2819,8 +2836,10 @@ GLStatus TFGraphFunctionLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
   auto condFn = lowerToFunction([&]() {
     // The condition function takes the same set of inputs as the loop body.
     auto brLoc = r->getPreheader()->getTerminator()->getLoc();
-    S = lowerArgumentsToParams(headerBB->getArguments(), preheaderInputs, brLoc);
-    if (S != GLStatus::Success) return;
+    S = lowerArgumentsToParams(headerBB->getArguments(), preheaderInputs,
+                               brLoc);
+    if (S != GLStatus::Success)
+      return;
 
     // Copy the live-in set over to the condition by requesting the values be
     // live.  This ensures that the condition and body functions agree on their
@@ -2839,7 +2858,8 @@ GLStatus TFGraphFunctionLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
     // condition.  It ends with a conditional branch which we handle manually.
     graphFn.shouldLowerEffectfulOps = false;
     S = lowerBasicBlock(r->getHeader(), /*skipTerminator:*/ true);
-    if (S != GLStatus::Success) return;
+    if (S != GLStatus::Success)
+      return;
 
     // Lower the condition, which always produces a boolean value.
     auto condValue = getCondition(headerBr, *this);
@@ -2873,9 +2893,10 @@ GLStatus TFGraphFunctionLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
     }
 
     // The result of the function is our condition value.
-    graphFn.outputs.push_back({ /*SILArgument*/nullptr, condValue });
+    graphFn.outputs.push_back({/*SILArgument*/ nullptr, condValue});
   });
-  if (S != GLStatus::Success) return S;
+  if (S != GLStatus::Success)
+    return S;
 
   // We are going to need the input values and types for the op creation: build
   // these lists now.
@@ -2917,8 +2938,7 @@ GLStatus TFGraphFunctionLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
   TF_AddInputList(op, inputs.data(), inputs.size());
   TF_SetAttrTypeList(op, "T", inputTypes.data(), inputTypes.size());
   TF_SetAttrFuncName(op, "cond", condFnName.c_str(), condFnName.size());
-  TF_SetAttrFuncName(op, "body",  loopBodyFnName.c_str(),
-                     loopBodyFnName.size());
+  TF_SetAttrFuncName(op, "body", loopBodyFnName.c_str(), loopBodyFnName.size());
 
   auto *result = graphFn.finishOp(op, bodyHasSideEffects,
                                   /*isEligibleForTPU*/ true, status);
@@ -2930,8 +2950,7 @@ GLStatus TFGraphFunctionLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
   // dominate the exit branch, so they may be used by code after the while.
   // Install them in our name lookup table.
   for (unsigned i = 0, e = headerBB->getArguments().size(); i != e; ++i) {
-    addValueMapping(SILOpResult(headerBB->getArgument(i), 0),
-                    { result, (int)i });
+    addValueMapping(SILOpResult(headerBB->getArgument(i), 0), {result, (int)i});
   }
 
   // In addition to the SIL arguments themselves, all of the code in the header
@@ -2948,7 +2967,8 @@ TFGraphFunctionLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
   // Start by lowering any code that exists in the block that leads up to the
   // conditional branch.  This ensures that the condition bool is available.
   GLStatus S = lowerBasicBlock(r->getBranchBB(), /*skipTerminator:*/ true);
-  if (S != GLStatus::Success) return S;
+  if (S != GLStatus::Success)
+    return S;
 
   // The branch block should end with a conditional branch on a tf_tensor_to_i1
   // invocation.
@@ -2956,7 +2976,8 @@ TFGraphFunctionLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
   auto loc = condBr->getDebugLocation();
 
   auto condValue = getCondition(condBr, *this);
-  if (!condValue.oper) return GLStatus::Error;
+  if (!condValue.oper)
+    return GLStatus::Error;
 
   // Lower the true and false bodies to graph functions.
   auto trueCodeFn = lowerToFunction([&]() {
@@ -2964,20 +2985,24 @@ TFGraphFunctionLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
     // create functions and call them as ops.
     if (auto trueRegion = r->getTrue()) {
       S = lowerRegion(trueRegion);
-      if (S != GLStatus::Success) return;
+      if (S != GLStatus::Success)
+        return;
     }
   });
-  if (S != GLStatus::Success) return S;
+  if (S != GLStatus::Success)
+    return S;
 
   auto falseCodeFn = lowerToFunction([&]() {
     // Lower all of the code inside the region (which can of course recursively
     // create functions and call them as ops.
     if (auto falseRegion = r->getFalse()) {
       S = lowerRegion(falseRegion);
-      if (S != GLStatus::Success) return;
+      if (S != GLStatus::Success)
+        return;
     }
   });
-  if (S != GLStatus::Success) return S;
+  if (S != GLStatus::Success)
+    return S;
 
   // We are generating the "If" TensorFlow node, which takes an input
   // condition as a bool, and functions to run for the true/false branch that
@@ -2994,7 +3019,8 @@ TFGraphFunctionLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
   // match the true list.
   llvm::SmallSet<SILOpResult, 4> trueInputs;
   for (auto &input : trueCodeFn.inputs) {
-    bool inserted = trueInputs.insert(input.value).second; (void)inserted;
+    bool inserted = trueInputs.insert(input.value).second;
+    (void)inserted;
     assert(inserted && "A passed value shouldn't be added multiple times");
   }
 
@@ -3008,15 +3034,16 @@ TFGraphFunctionLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
     // falseInputIndex.
     auto &entry = falseInputIndex[input.value];
     assert(entry == 0 && "A passed value shouldn't be added multiple times");
-    entry = i+1;  // Entry in the map is 1-biased.
+    entry = i + 1; // Entry in the map is 1-biased.
 
     // Check to see if the true function already has this passed value.
     if (!trueInputs.insert(input.value).second)
-      continue;  // Ignore common entries.
+      continue; // Ignore common entries.
 
     // If not, add the parameter to the true list.
     auto result = createParameter(input.value, input.passedValue, trueCodeFn);
-    if (result.oper == nullptr) return GLStatus::Error;
+    if (result.oper == nullptr)
+      return GLStatus::Error;
   }
 
   // Okay, we now know that the true function has all of the input parameters,
@@ -3040,12 +3067,14 @@ TFGraphFunctionLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
 
     // If the false function already had this parameter set up, use it.
     if (entry != 0) {
-      falseCodeFn.inputs.push_back(falseInputList[entry-1]);
+      falseCodeFn.inputs.push_back(falseInputList[entry - 1]);
     } else {
       // Otherwise, we need to create a new parameter and add it.  Fortunately
       // this automatically adds it to the false function's input list for us.
-      auto result = createParameter(input.value, input.passedValue, falseCodeFn);
-      if (result.oper == nullptr) return GLStatus::Error;
+      auto result =
+          createParameter(input.value, input.passedValue, falseCodeFn);
+      if (result.oper == nullptr)
+        return GLStatus::Error;
     }
   }
 
@@ -3066,7 +3095,7 @@ TFGraphFunctionLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
 
     // Scan until we find the matching argument list, then swap it into the
     // right place, to make it consistent with the trueCode function.
-    for (unsigned j = i+1; ; ++j) {
+    for (unsigned j = i + 1;; ++j) {
       assert(j != e && "true/false code don't common argument list");
       if (arg == falseCodeFn.outputs[j].first) {
         std::swap(falseCodeFn.outputs[i], falseCodeFn.outputs[j]);
@@ -3108,7 +3137,7 @@ TFGraphFunctionLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
   TF_SetAttrTypeList(op, "Tin", inputTypes.data(), inputTypes.size());
   TF_SetAttrTypeList(op, "Tout", outputTypes.data(), outputTypes.size());
   TF_SetAttrFuncName(op, "then_branch", trueFnName.c_str(), trueFnName.size());
-  TF_SetAttrFuncName(op, "else_branch",  falseFnName.c_str(),
+  TF_SetAttrFuncName(op, "else_branch", falseFnName.c_str(),
                      falseFnName.size());
 
   auto *result =
@@ -3122,9 +3151,9 @@ TFGraphFunctionLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
   // Also set the graph function outputs. Note they may have been set by the
   // lowering of a prior conditional region.
   for (int i = 0, e = trueCodeFn.outputs.size(); i != e; ++i) {
-      TF_Output outputNode = {result, i};
-      addValueMapping({trueCodeFn.outputs[i].first, 0}, outputNode);
-      graphFn.outputs.push_back({trueCodeFn.outputs[i].first, outputNode});
+    TF_Output outputNode = {result, i};
+    addValueMapping({trueCodeFn.outputs[i].first, 0}, outputNode);
+    graphFn.outputs.push_back({trueCodeFn.outputs[i].first, outputNode});
   }
   return GLStatus::Success;
 }
@@ -3162,7 +3191,7 @@ TF_Output TFGraphFunctionLowering::createParameter(SILOpResult value,
   auto type = getTensorFlowDataType(getOpResultType(value), loc);
   if (!type) {
     internalError(loc, "use of unknown dtype!");
-    return { nullptr, 0 };
+    return {nullptr, 0};
   }
   TF_SetAttrType(desc, "dtype", type);
 
@@ -3170,7 +3199,7 @@ TF_Output TFGraphFunctionLowering::createParameter(SILOpResult value,
   auto result = fn.finishOp(desc, /*side effects*/ false,
                             /*isEligibleForTPU*/ false, status);
   if (checkStatus(loc))
-    return { nullptr, 0 };
+    return {nullptr, 0};
 
 #ifndef NDEBUG
   // Verify we haven't seen this value yet.
@@ -3184,8 +3213,8 @@ TF_Output TFGraphFunctionLowering::createParameter(SILOpResult value,
          "expect a non-NULL result whenever the TensorFlow status is OK");
 
   // Success!  Remember this parameter, and the value that is passed in.
-  fn.inputs.push_back({{ result, 0 }, passedValue, value });
-  return { result, 0 };
+  fn.inputs.push_back({{result, 0}, passedValue, value});
+  return {result, 0};
 }
 
 /// Lower the specified list of SIL arguments to a bunch of parameters, filling
@@ -3202,7 +3231,8 @@ GLStatus TFGraphFunctionLowering::lowerArgumentsToParams(
       passedValue = passedValues[idx++];
 
     auto result = createParameter({arg, 0}, passedValue, graphFn);
-    if (result.oper == nullptr) return GLStatus::Error;
+    if (result.oper == nullptr)
+      return GLStatus::Error;
 
     addValueMapping({arg, 0}, result);
   }
@@ -3318,7 +3348,8 @@ bool TFGraphFunctionLowering::buildGraphNodesForTopLevelFunctionCall(
         TF_NewOperation(resultGraph, "Placeholder", inputNodeName.c_str());
     TF_SetAttrType(inputDesc, "dtype", inputTypes[i]);
     TF_Operation *placeholder = TF_FinishOperation(inputDesc, status);
-    if (checkStatus(SILFn.getLocation())) return true;
+    if (checkStatus(SILFn.getLocation()))
+      return true;
     TF_Output inputNode{placeholder, 0};
     if (thisDeviceType != DeviceType::TPU) {
       // Feed I directly into F.
@@ -3336,7 +3367,8 @@ bool TFGraphFunctionLowering::buildGraphNodesForTopLevelFunctionCall(
         // This node requires an input list.
         TF_AddInputList(desc, input.data(), input.size());
         replicatedInput = TF_FinishOperation(desc, status);
-        if (checkStatus(SILFn.getLocation())) return true;
+        if (checkStatus(SILFn.getLocation()))
+          return true;
       }
       {
         std::string nodeName = funcNodeBaseName +
@@ -3347,7 +3379,8 @@ bool TFGraphFunctionLowering::buildGraphNodesForTopLevelFunctionCall(
         TF_AddInput(desc, {replicatedInput, 0});
         markNodeAsTPUReplicated(desc);
         TF_Operation *idInput = TF_FinishOperation(desc, status);
-        if (checkStatus(SILFn.getLocation())) return true;
+        if (checkStatus(SILFn.getLocation()))
+          return true;
         TF_AddInput(funcDesc, {idInput, 0});
       }
     }
@@ -3355,7 +3388,8 @@ bool TFGraphFunctionLowering::buildGraphNodesForTopLevelFunctionCall(
 
   // Finish constructing the function node.
   TF_Operation *funcNode = TF_FinishOperation(funcDesc, status);
-  if (checkStatus(SILFn.getLocation())) return true;
+  if (checkStatus(SILFn.getLocation()))
+    return true;
 
   // Now handle outputs.
   for (unsigned i = 0, e = outputTypes.size(); i != e; ++i) {
@@ -3380,7 +3414,8 @@ bool TFGraphFunctionLowering::buildGraphNodesForTopLevelFunctionCall(
         TF_SetDevice(desc, deviceName.c_str());
         markNodeAsTPUReplicated(desc);
         outputIdNode = TF_FinishOperation(desc, status);
-        if (checkStatus(SILFn.getLocation())) return true;
+        if (checkStatus(SILFn.getLocation()))
+          return true;
       }
       {
         const std::string nodeName =
@@ -3390,12 +3425,14 @@ bool TFGraphFunctionLowering::buildGraphNodesForTopLevelFunctionCall(
         TF_AddInput(desc, {outputIdNode, 0});
         TF_SetAttrInt(desc, "num_replicas", 1);
         TF_Operation *replicatedOutputNode = TF_FinishOperation(desc, status);
-        if (checkStatus(SILFn.getLocation())) return true;
+        if (checkStatus(SILFn.getLocation()))
+          return true;
         TF_AddInput(outputDesc, {replicatedOutputNode, 0});
       }
     }
-    /*TF_Operation *outputNode =*/ TF_FinishOperation(outputDesc, status);
-    if (checkStatus(SILFn.getLocation())) return true;
+    /*TF_Operation *outputNode =*/TF_FinishOperation(outputDesc, status);
+    if (checkStatus(SILFn.getLocation()))
+      return true;
   }
 
   if (datasetCreationContext) {
@@ -3422,7 +3459,8 @@ bool TFGraphFunctionLowering::buildGraphFunction(
   }
   for (unsigned i = 0, e = graphBody.inputs.size(); i != e; ++i) {
     ins.push_back(graphBody.inputs[i].parameter);
-    if (inputTypes) inputTypes->push_back(TF_OperationOutputType(ins[i]));
+    if (inputTypes)
+      inputTypes->push_back(TF_OperationOutputType(ins[i]));
   }
   outs.reserve(graphBody.outputs.size());
   if (outputTypes) {
@@ -3431,7 +3469,8 @@ bool TFGraphFunctionLowering::buildGraphFunction(
   }
   for (unsigned i = 0, e = graphBody.outputs.size(); i != e; ++i) {
     outs.push_back(graphBody.outputs[i].second);
-    if (outputTypes) outputTypes->push_back(TF_OperationOutputType(outs[i]));
+    if (outputTypes)
+      outputTypes->push_back(TF_OperationOutputType(outs[i]));
   }
 
   LLVM_DEBUG(llvm::dbgs() << "Creating graph function " << funcName << "\n");
@@ -3455,7 +3494,7 @@ bool TFGraphFunctionLowering::buildGraphFunction(
   // multi-stage create-then-form-function-then-copy-function approach because
   // we don't want the nodes for the original function body to end up in the
   // result graph.
-  TF_GraphCopyFunction(resultGraph, resultFn, /*gradient*/nullptr, status);
+  TF_GraphCopyFunction(resultGraph, resultFn, /*gradient*/ nullptr, status);
   if (checkStatus(SILFn.getLocation()))
     return true;
 
@@ -3476,7 +3515,7 @@ bool TFGraphLowering::serializeGraphProtoBuf(ASTContext &ctx,
 
   // Serialize the graph into the buffer.
   TF_GraphToGraphDef(graph.get(), buffer, status);
-  if (TF_GetCode(status) != TF_OK)  {
+  if (TF_GetCode(status) != TF_OK) {
     diagnose(ctx, errorLoc, diag::tf_lowering_error, TF_Message(status));
     return true;
   }
@@ -3522,7 +3561,7 @@ bool TFGraphLowering::serializeGraphProtoBuf(ASTContext &ctx,
     }
   }
 
-  auto bufPtr = (const char*)buffer->data;
+  auto bufPtr = (const char *)buffer->data;
   bytes = std::vector<char>(bufPtr, bufPtr + buffer->length);
   return false;
 }
@@ -3532,7 +3571,8 @@ bool TFGraphLowering::serializeGraphProtoBuf(ASTContext &ctx,
 /// Gets a function name that can be used as a TF op name.
 StringRef getTFCompatibleFuncName(SILFunction *fn) {
   auto fnName = fn->getName();
-  if (fnName.startswith("$")) fnName = fnName.substr(1);
+  if (fnName.startswith("$"))
+    fnName = fnName.substr(1);
   return fnName;
 }
 
@@ -3568,9 +3608,7 @@ bool TFGraphLowering::lowerTFGraphOrFunction(
 
   TF_Status *status = TF_NewStatus();
 
-  SWIFT_DEFER {
-    TF_DeleteStatus(status);
-  };
+  SWIFT_DEFER { TF_DeleteStatus(status); };
 
   DevicePartitioner partitioner(*fn, deviceInfo, nextTensorTransferId);
   auto entryFnBaseName = graphFnNameForCaller;
@@ -3689,8 +3727,8 @@ struct TFLowerGraphTestPass : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
     auto fn = getFunction();
-    auto deviceInfo = GraphFunctionDeviceInfo::getForFunction(
-        *fn, /*removeConfigInst*/ true);
+    auto deviceInfo =
+        GraphFunctionDeviceInfo::getForFunction(*fn, /*removeConfigInst*/ true);
     llvm::DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>>
         graphFunctions;
     TFGraphLowering graphLowering(graphFunctions);
@@ -3712,6 +3750,4 @@ struct TFLowerGraphTestPass : public SILFunctionTransform {
 
 } // end anonymous namespace.
 
-SILTransform *swift::createTFLowerGraph() {
-  return new TFLowerGraphTestPass();
-}
+SILTransform *swift::createTFLowerGraph() { return new TFLowerGraphTestPass(); }
