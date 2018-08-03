@@ -32,29 +32,27 @@ using namespace swift;
 using namespace tf;
 typedef SILTensorOpInfo::OperandClass OperandClass;
 
-template<typename...T, typename...U>
-static InFlightDiagnostic
-diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag, U &&...args) {
+template <typename... T, typename... U>
+static InFlightDiagnostic diagnose(ASTContext &Context, SourceLoc loc,
+                                   Diag<T...> diag, U &&... args) {
   return Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
 }
 
-static llvm::cl::opt<bool>
-TFDumpIntermediates("tf-dump-intermediates", llvm::cl::init(false),
-              llvm::cl::desc("Dump intermediate results in TensorFlow passes"));
+static llvm::cl::opt<bool> TFDumpIntermediates(
+    "tf-dump-intermediates", llvm::cl::init(false),
+    llvm::cl::desc("Dump intermediate results in TensorFlow passes"));
 
-static llvm::cl::opt<bool>
-TFDumpIntermediatesToTmp("tf-dump-intermediates-tmp",
-                         llvm::cl::init(false),
-                         llvm::cl::desc("Dump intermediate results in "
-                                        "TensorFlow passes to files in /tmp"));
+static llvm::cl::opt<bool> TFDumpIntermediatesToTmp(
+    "tf-dump-intermediates-tmp", llvm::cl::init(false),
+    llvm::cl::desc("Dump intermediate results in "
+                   "TensorFlow passes to files in /tmp"));
 
 static raw_ostream &getTmpLoggingStream() {
   // If we are supposed to dump the intermediates into /tmp, set that up now.
   SmallString<64> resultPath;
   int resultFD = -1;
-  auto error =
-    llvm::sys::fs::createTemporaryFile("tf-dump-intermediates", "txt",
-                                       resultFD, resultPath);
+  auto error = llvm::sys::fs::createTemporaryFile("tf-dump-intermediates",
+                                                  "txt", resultFD, resultPath);
 
   // If we had an error, print something to stderr, but keep going.
   if (error) {
@@ -64,8 +62,8 @@ static raw_ostream &getTmpLoggingStream() {
   }
 
   // This file never gets closed since the raw_ostream is immortal.
-  return *new llvm::raw_fd_ostream(resultFD, /*shouldClose*/true,
-                                   /*unbuffered*/true);
+  return *new llvm::raw_fd_ostream(resultFD, /*shouldClose*/ true,
+                                   /*unbuffered*/ true);
 }
 
 /// If the -tf-dump-intermediates flag has been passed, return a pointer to
@@ -120,16 +118,17 @@ static Type conformsToTensorProtocol(Type ty, ModuleDecl *module) {
 
   auto &ctx = ty->getASTContext();
   auto tensorProto = ctx.getProtocol(KnownProtocolKind::TensorProtocol);
-  if (!tensorProto || !nominal) return Type();
+  if (!tensorProto || !nominal)
+    return Type();
 
-  SmallVector<ProtocolConformance*, 2> conformances;
-  nominal->lookupConformance(/*unused module*/nullptr, tensorProto,
+  SmallVector<ProtocolConformance *, 2> conformances;
+  nominal->lookupConformance(/*unused module*/ nullptr, tensorProto,
                              conformances);
   if (conformances.size() != 1)
     return Type();
 
   auto scalarMembers =
-    nominal->lookupDirect(DeclName(ctx.getIdentifier("Scalar")));
+      nominal->lookupDirect(DeclName(ctx.getIdentifier("Scalar")));
   if (scalarMembers.size() != 1)
     return Type();
   if (auto member = dyn_cast<TypeDecl>(scalarMembers[0]))
@@ -146,7 +145,6 @@ static Type getArrayElementType(Type ty) {
       return bgst->getGenericArgs()[0];
   return Type();
 }
-
 
 static bool is64(Type ty) {
   return ty->getASTContext().LangOpts.Target.isArch64Bit();
@@ -167,23 +165,23 @@ unsigned tf::convertSwiftTypeToTF(Type ty) {
       return 0;
 
     return llvm::StringSwitch<unsigned>(s->getDecl()->getNameStr())
-      .Case("Bool", TF_BOOL)
-      .Case("Int8", TF_INT8)
-      .Case("UInt8", TF_UINT8)
-      .Case("Int16", TF_INT16)
-      .Case("UInt16", TF_UINT16)
-      .Case("Int32", TF_INT32)
-      .Case("UInt32", TF_UINT32)
-      .Case("Int64", TF_INT64)
-      .Case("UInt64", TF_UINT64)
-      .Case("Int8", TF_INT8)
-      .Case("UInt8", TF_UINT8)
-      .Case("BFloat16", TF_BFLOAT16)
-      .Case("Float", TF_FLOAT)
-      .Case("Double", TF_DOUBLE)
-      .Case("Int", is64(s) ? TF_INT64 : TF_INT32)
-      .Case("UInt", is64(s) ? TF_UINT64 : TF_UINT32)
-      .Default(0);
+        .Case("Bool", TF_BOOL)
+        .Case("Int8", TF_INT8)
+        .Case("UInt8", TF_UINT8)
+        .Case("Int16", TF_INT16)
+        .Case("UInt16", TF_UINT16)
+        .Case("Int32", TF_INT32)
+        .Case("UInt32", TF_UINT32)
+        .Case("Int64", TF_INT64)
+        .Case("UInt64", TF_UINT64)
+        .Case("Int8", TF_INT8)
+        .Case("UInt8", TF_UINT8)
+        .Case("BFloat16", TF_BFLOAT16)
+        .Case("Float", TF_FLOAT)
+        .Case("Double", TF_DOUBLE)
+        .Case("Int", is64(s) ? TF_INT64 : TF_INT32)
+        .Case("UInt", is64(s) ? TF_UINT64 : TF_UINT32)
+        .Default(0);
   }
 
   // BuiltinIntegerType doesn't carry sign information, which TensorFlow needs,
@@ -194,19 +192,27 @@ unsigned tf::convertSwiftTypeToTF(Type ty) {
       return is64(ty) ? TF_INT64 : TF_INT32;
 
     switch (BII->getFixedWidth()) {
-    case 1: return TF_BOOL;
-    case 8: return TF_INT8;
-    case 16: return TF_INT16;
-    case 32: return TF_INT32;
-    case 64: return TF_INT64;
+    case 1:
+      return TF_BOOL;
+    case 8:
+      return TF_INT8;
+    case 16:
+      return TF_INT16;
+    case 32:
+      return TF_INT32;
+    case 64:
+      return TF_INT64;
     }
   }
 
   if (auto *BIF = ty->getAs<BuiltinFloatType>()) {
     switch (BIF->getFPKind()) {
-    case BuiltinFloatType::IEEE16: return TF_HALF;
-    case BuiltinFloatType::IEEE32: return TF_FLOAT;
-    case BuiltinFloatType::IEEE64: return TF_DOUBLE;
+    case BuiltinFloatType::IEEE16:
+      return TF_HALF;
+    case BuiltinFloatType::IEEE32:
+      return TF_FLOAT;
+    case BuiltinFloatType::IEEE64:
+      return TF_DOUBLE;
     case BuiltinFloatType::IEEE80:
     case BuiltinFloatType::IEEE128:
     case BuiltinFloatType::PPC128:
@@ -220,7 +226,7 @@ unsigned tf::convertSwiftTypeToTF(Type ty) {
 /// `ty` must be a valid TensorFlow element type "T", like Builtin.Int32. Turn
 /// it into a TensorHandle<T> type.
 SILType tf::convertElementTypeToTensorValueType(Type ty,
-                                                const ASTContext& ctx) {
+                                                const ASTContext &ctx) {
   assert(isValidTensorFlowElementType(ty));
   auto decl = ctx.getTensorHandleDecl();
   auto tensorType = BoundGenericClassType::get(decl, /*parent*/ Type(), ty);
@@ -241,9 +247,10 @@ SILType tf::convertElementTypeToTensorValueType(SILType ty) {
 
 /// Looks up members by `name` in the context of `typeDecl`, `proto` and
 /// `module`, and populates `results`.
-static void lookupProtocolRequiredMembers(
-    NominalTypeDecl *typeDecl, ProtocolDecl *proto, DeclName name,
-    ModuleDecl *module, SmallVectorImpl<ValueDecl *> &results) {
+static void
+lookupProtocolRequiredMembers(NominalTypeDecl *typeDecl, ProtocolDecl *proto,
+                              DeclName name, ModuleDecl *module,
+                              SmallVectorImpl<ValueDecl *> &results) {
   // Make sure the given type conforms to the given protocol.
   SmallVector<ProtocolConformance *, 2> conformances;
   auto type = typeDecl->getDeclaredInterfaceType();
@@ -251,8 +258,8 @@ static void lookupProtocolRequiredMembers(
   assert(!conformances.empty() && "Type doesn't conform to the protocol?");
   // Look up nominal type candidates and protocol requirement candidates.
   SmallVector<ValueDecl *, 2> lookupResults;
-  typeDecl->lookupQualified(
-    type, name, NLOptions::NL_ProtocolMembers, nullptr, lookupResults);
+  typeDecl->lookupQualified(type, name, NLOptions::NL_ProtocolMembers, nullptr,
+                            lookupResults);
   // Append matches to results.
   for (ValueDecl *decl : lookupResults)
     results.push_back(decl);
@@ -310,9 +317,11 @@ static SILValue getValueInsideStructInst(SILValue value) {
 /// TODO: Move to deabstraction when other clients are removed.
 bool isArrayAllocUninit(SILValue op, SILValue &numElements) {
   auto *apply = dyn_cast<ApplyInst>(op->getDefiningInstruction());
-  if (!apply) return false;
+  if (!apply)
+    return false;
   auto *callee = dyn_cast<FunctionRefInst>(apply->getOperand(0));
-  if (!callee) return false;
+  if (!callee)
+    return false;
 
   auto calleeName = callee->getReferencedFunction()->getName();
   // FIXME: Gross hack because this is specialized by perf optimizer.  Remove
@@ -327,7 +336,8 @@ bool isArrayAllocUninit(SILValue op, SILValue &numElements) {
 /// Return true if this is a reference to the _allocateUninitialized helper
 /// in array in the standard library allocating zero elements.
 static bool isZeroElementArrayAlloc(TupleExtractInst *tei) {
-  if (tei->getFieldNo() != 0) return false;
+  if (tei->getFieldNo() != 0)
+    return false;
   SILValue numElements;
 
   if (!isArrayAllocUninit(tei->getOperand(), numElements))
@@ -345,12 +355,13 @@ static bool isZeroElementArrayAlloc(TupleExtractInst *tei) {
 /// If arrayInsts is non-null and if decoding succeeds, this function adds all
 /// of the instructions relevant to the definition of this array into the set.
 /// If decoding fails, then the contents of this set are undefined.
-static bool decodeArrayElements(SILValue value,
-                                SmallVectorImpl<SILValue> &elements,
-                                Type &elementType,
-                        SmallPtrSet<SILInstruction*, 8> *arrayInsts = nullptr) {
+static bool
+decodeArrayElements(SILValue value, SmallVectorImpl<SILValue> &elements,
+                    Type &elementType,
+                    SmallPtrSet<SILInstruction *, 8> *arrayInsts = nullptr) {
   elementType = getArrayElementType(value->getType().getASTType());
-  if (!elementType) return false;
+  if (!elementType)
+    return false;
 
   // Handle zero element pattern.
   if (auto *tei = dyn_cast<TupleExtractInst>(value)) {
@@ -381,14 +392,17 @@ static bool decodeArrayElements(SILValue value,
   // here.
   AllocRefInst *allocRef = nullptr;
   while (!(allocRef = dyn_cast<AllocRefInst>(value))) {
-    auto *inst = dyn_cast<SILInstruction>((SILNode*)value);
-    if (!inst) return false;
+    auto *inst = dyn_cast<SILInstruction>((SILNode *)value);
+    if (!inst)
+      return false;
 
     // Remember this instruction if requested.
-    if (arrayInsts) arrayInsts->insert(inst);
+    if (arrayInsts)
+      arrayInsts->insert(inst);
 
     if (auto *si = dyn_cast<StructInst>(inst)) {
-      if (si->getNumOperands() != 1) return false;
+      if (si->getNumOperands() != 1)
+        return false;
       value = si->getOperand(0);
     } else if (auto *urci = dyn_cast<UncheckedRefCastInst>(inst)) {
       value = urci->getOperand();
@@ -398,8 +412,9 @@ static bool decodeArrayElements(SILValue value,
       // If we found a GlobalValueInst, then we're referring to an array that
       // got moved to being a static initializer.
       auto *init = dyn_cast_or_null<ObjectInst>(
-              globalValue->getReferencedGlobal()->getStaticInitializerValue());
-      if (!init) return false;
+          globalValue->getReferencedGlobal()->getStaticInitializerValue());
+      if (!init)
+        return false;
 
       // Do not add "init" to arrayInsts, since it is not in the host function.
 
@@ -419,12 +434,14 @@ static bool decodeArrayElements(SILValue value,
       //   %7 = raw_pointer_to_ref %6 : $RawPointer to $_EmptyArrayStorage
       //   %8 = unchecked_ref_cast %7 : $_EmptyArrayStorage to $BridgeObject
       auto a2p = dyn_cast<AddressToPointerInst>(rptr->getOperand());
-      if (!a2p) return false;
-      if (arrayInsts) arrayInsts->insert(a2p);
-
+      if (!a2p)
+        return false;
+      if (arrayInsts)
+        arrayInsts->insert(a2p);
 
       auto *ga = dyn_cast<GlobalAddrInst>(a2p->getOperand());
-      if (arrayInsts && ga) arrayInsts->insert(ga);
+      if (arrayInsts && ga)
+        arrayInsts->insert(ga);
 
       elements.clear();
       return ga &&
@@ -433,10 +450,12 @@ static bool decodeArrayElements(SILValue value,
       return false;
     }
   }
-  if (arrayInsts) arrayInsts->insert(allocRef);
+  if (arrayInsts)
+    arrayInsts->insert(allocRef);
 
   // The allocation must be of a constant number of elements.
-  if (allocRef->getNumOperands() != 1) return false;
+  if (allocRef->getNumOperands() != 1)
+    return false;
 
   auto numElementsInst = dyn_cast<IntegerLiteralInst>(allocRef->getOperand(0));
   if (!numElementsInst)
@@ -455,12 +474,16 @@ static bool decodeArrayElements(SILValue value,
   // %49 = index_addr %47 : $*Int, %14 : $Builtin.Word
   // store %13 to %49 : $*Int
   auto *uci = allocRef->getSingleUserOfType<UpcastInst>();
-  if (!uci) return false;
-  if (arrayInsts) arrayInsts->insert(uci);
+  if (!uci)
+    return false;
+  if (arrayInsts)
+    arrayInsts->insert(uci);
 
   auto *rti = uci->getSingleUserOfType<RefTailAddrInst>();
-  if (!rti) return false;
-  if (arrayInsts) arrayInsts->insert(rti);
+  if (!rti)
+    return false;
+  if (arrayInsts)
+    arrayInsts->insert(rti);
 
   elements.resize(numElements);
 
@@ -469,7 +492,8 @@ static bool decodeArrayElements(SILValue value,
 
     uint64_t index = 0;
     if (auto *iai = dyn_cast<IndexAddrInst>(user)) {
-      if (arrayInsts) arrayInsts->insert(iai);
+      if (arrayInsts)
+        arrayInsts->insert(iai);
 
       auto *ili = dyn_cast<IntegerLiteralInst>(iai->getOperand(1));
       if (!ili)
@@ -488,7 +512,8 @@ static bool decodeArrayElements(SILValue value,
     if (!store || index >= elements.size() || elements[index] != SILValue())
       return false;
 
-    if (arrayInsts) arrayInsts->insert(store);
+    if (arrayInsts)
+      arrayInsts->insert(store);
 
     // If we got a store to a valid index, it must be our element.
     elements[index] = store->getOperand(0);
@@ -504,7 +529,6 @@ static bool decodeArrayElements(SILValue value,
   return true;
 }
 
-
 /// This method is called when an owning reference to an array value is just
 /// removed.  It checks to see if the array value is now unused: if so, it
 /// removes the array and returns true.  Otherwise it returns false without
@@ -517,7 +541,7 @@ static bool decodeArrayElements(SILValue value,
 static bool tryToRemoveArrayValue(SILValue value) {
   SmallVector<SILValue, 4> elements;
   Type elementType;
-  SmallPtrSet<SILInstruction*, 8> arrayInsts;
+  SmallPtrSet<SILInstruction *, 8> arrayInsts;
   // Decode the array, collecting all of the instructions we see that are
   // relevant to its definition.
   if (!decodeArrayElements(value, elements, elementType, &arrayInsts))
@@ -530,8 +554,8 @@ static bool tryToRemoveArrayValue(SILValue value) {
 
   // Iterate over a copy of the set using indexes, to avoid invalidating
   // iterators.
-  SmallVector<SILInstruction*, 8> instsToCheck(arrayInsts.begin(),
-                                               arrayInsts.end());
+  SmallVector<SILInstruction *, 8> instsToCheck(arrayInsts.begin(),
+                                                arrayInsts.end());
   for (unsigned i = 0; i != instsToCheck.size(); ++i) {
     auto *inst = instsToCheck[i];
 
@@ -596,8 +620,9 @@ static bool tryToRemoveArrayValue(SILValue value) {
       continue;
 
     // Don't delete out of global initializers.
-    auto inst = dyn_cast<SILInstruction>((SILNode*)val);
-    if (!inst || !inst->getFunction()) continue;
+    auto inst = dyn_cast<SILInstruction>((SILNode *)val);
+    if (!inst || !inst->getFunction())
+      continue;
 
     // FIXME: This should use recursivelyDeleteTriviallyDeadInstructions.
     if (!isa<StructInst>(inst) && !isa<LiteralInst>(inst) &&
@@ -611,7 +636,8 @@ static bool tryToRemoveArrayValue(SILValue value) {
       for (auto *use : result->getUses())
         if (!isa<DebugValueInst>(use->getUser()))
           hasUnknownUses = true;
-    if (hasUnknownUses) continue;
+    if (hasUnknownUses)
+      continue;
 
     // Remove any debug_values.
     for (auto result : inst->getResults())
@@ -651,14 +677,15 @@ SingleValueInstruction *SILTensorOpInfo::getAttrOperand(SILValue v) {
   // string_literal instruction.
   auto &ctx = v->getType().getASTType()->getASTContext();
   if (v->getType().getASTType()->isEqual(
-                                     ctx.getStringDecl()->getDeclaredType())) {
+          ctx.getStringDecl()->getDeclaredType())) {
     auto str = v;
     // Strip off the specific set of instructions we expect to form the string
     // literal.
     while (1) {
       if (auto sli = dyn_cast<StringLiteralInst>(str))
         return sli->getEncoding() == StringLiteralInst::Encoding::UTF8
-                ? sli : nullptr;
+                   ? sli
+                   : nullptr;
 
       if (auto si = dyn_cast<StructInst>(str)) {
         assert(si->getNumOperands() >= 1 &&
@@ -695,7 +722,8 @@ SingleValueInstruction *SILTensorOpInfo::getAttrOperand(SILValue v) {
         case BuiltinValueKind::PtrToInt:
           str = bi->getOperand(0);
           continue;
-        default: break;
+        default:
+          break;
         }
       }
 
@@ -709,7 +737,8 @@ SingleValueInstruction *SILTensorOpInfo::getAttrOperand(SILValue v) {
       // So we want to follow the first func arg of the ApplyInst (%0 above).
       if (auto *ai = dyn_cast<ApplyInst>(str)) {
         // If the ApplyInst does not have such an operand, we bail with failure.
-        if (ai->getNumOperands() < 2) return nullptr;
+        if (ai->getNumOperands() < 2)
+          return nullptr;
         str = ai->getOperand(1);
         continue;
       }
@@ -746,22 +775,21 @@ SingleValueInstruction *SILTensorOpInfo::getAttrOperand(SILValue v) {
   if (auto *ili = dyn_cast<IntegerLiteralInst>(v))
     return ili->getValue().getBitWidth() <= 64 ? ili : nullptr;
   if (auto *sli = dyn_cast<StringLiteralInst>(v))
-    return sli->getEncoding() == StringLiteralInst::Encoding::UTF8
-           ? sli : nullptr;
+    return sli->getEncoding() == StringLiteralInst::Encoding::UTF8 ? sli
+                                                                   : nullptr;
   if (auto *mti = dyn_cast<MetatypeInst>(v)) {
     auto ty = mti->getType().castTo<AnyMetatypeType>()->getInstanceType();
-    if (convertSwiftTypeToTF(ty) != 0) return mti;
+    if (convertSwiftTypeToTF(ty) != 0)
+      return mti;
   }
 
   return nullptr;
 }
 
-
 /// Analyze the specified SIL instruction and return a SILTensorOpInfo result if
 /// the instruction is a valid tensor operation.  This is the way that
 /// SILTensorOpInfo's are created.
-Optional<SILTensorOpInfo>
-SILTensorOpInfo::decode(SILInstruction *inst) {
+Optional<SILTensorOpInfo> SILTensorOpInfo::decode(SILInstruction *inst) {
   // Tensor operations are builtin instructions and apply instructions.
   if (auto *builtin = dyn_cast<BuiltinInst>(inst)) {
     SILTensorOpInfo toiInfo(builtin);
@@ -777,13 +805,15 @@ std::string SILTensorOpInfo::getDeviceString() const {
   for (unsigned i = 0, e = inst->getNumOperands(); i != e; ++i) {
     auto operand = inst->getOperand(i);
     auto opInfo = operandClasses[i];
-    if (isInput(i)) continue;
+    if (isInput(i))
+      continue;
 
     // Handle attributes.
     auto attrOperand = getAttrOperand(operand);
 
     // If it's a device attribute, get the device value.
-    if (opInfo.first != DEVICE_ATTR) continue;
+    if (opInfo.first != DEVICE_ATTR)
+      continue;
     auto *sli = cast<StringLiteralInst>(attrOperand);
     assert(sli->getEncoding() == StringLiteralInst::Encoding::UTF8 &&
            "only byte encodings are supported");
@@ -799,11 +829,12 @@ typedef std::pair<StringRef, OperandClass> AttributeEntry;
 /// provided is invalid, this returns an error message to present.
 static std::string
 decodeTensorOpName(StringRef name, StringRef &opName,
-                   SmallVectorImpl<AttributeEntry> &operandClasses){
+                   SmallVectorImpl<AttributeEntry> &operandClasses) {
   // Decode the base name for the op.
   auto pos = name.find(",");
   opName = name.substr(0, pos);
-  if (pos == StringRef::npos) return "";
+  if (pos == StringRef::npos)
+    return "";
   name = name.substr(pos);
 
   // Parse out operand information.
@@ -812,7 +843,8 @@ decodeTensorOpName(StringRef name, StringRef &opName,
     name = name.drop_front(1);
 
     pos = name.find(",");
-    if (pos == StringRef::npos) pos = name.size();
+    if (pos == StringRef::npos)
+      pos = name.size();
 
     // Parse out the attribute name.  If it contains a $, then parse out the
     // OperandClass as well.
@@ -824,7 +856,7 @@ decodeTensorOpName(StringRef name, StringRef &opName,
 
     auto opClass = OperandClass::Normal;
     if (dollarLoc != StringRef::npos) {
-      auto suffix = attrName.drop_front(dollarLoc+1);
+      auto suffix = attrName.drop_front(dollarLoc + 1);
       if (auto res = SILTensorOpInfo::getOperandClass(suffix))
         opClass = res.getValue();
       else {
@@ -833,9 +865,7 @@ decodeTensorOpName(StringRef name, StringRef &opName,
     }
 
     // Slice the suffix off the attribute name and add the decoded version.
-    operandClasses.push_back({
-      attrName.substr(0, dollarLoc), opClass
-    });
+    operandClasses.push_back({attrName.substr(0, dollarLoc), opClass});
     name = name.substr(pos);
   }
 
@@ -871,7 +901,8 @@ bool SILTensorOpInfo::decodeBuiltin() {
   // Validate that this instruction is ok.
   if (inst->getNumOperands() != operandClasses.size()) {
     diagInvalid("op has " + llvm::utostr(operandClasses.size()) +
-                " operand classes, but " + llvm::utostr(inst->getNumOperands())+
+                " operand classes, but " +
+                llvm::utostr(inst->getNumOperands()) +
                 " inputs and attributes");
     return false;
   }
@@ -887,20 +918,21 @@ bool SILTensorOpInfo::decodeBuiltin() {
 /// FIXME: Remove this when Deabstraction subsumes op promotion.
 ///
 static bool expandArrayAttribute(SILValue arrayVal, StringRef attrName,
-                                 OperandClass attrKind,
-                                 std::string &name,
+                                 OperandClass attrKind, std::string &name,
                                  SmallVectorImpl<SILValue> &operands,
                                  SILInstruction *forInst) {
   // Otherwise, this is an array attribute, so expand it out.
   SmallVector<SILValue, 8> elements;
   Type elementType;
   bool isArray = decodeArrayElements(arrayVal, elements, elementType);
-  if (!isArray) return false;
+  if (!isArray)
+    return false;
 
   // Verify that we have all constants.
   for (auto &elt : elements) {
     elt = SILTensorOpInfo::getAttrOperand(elt);
-    if (!elt) return false;
+    if (!elt)
+      return false;
   }
 
   SILBuilder B(forInst);
@@ -915,21 +947,21 @@ static bool expandArrayAttribute(SILValue arrayVal, StringRef attrName,
         if (sd->getName().str() == "TensorShape")
           attrKind = OperandClass::ShapeArray;
   }
-  name += ","+attrName.str();
+  name += "," + attrName.str();
   name += SILTensorOpInfo::getOperandClassSuffix(attrKind);
 
   // If this is a ShapeArray, add the element count, otherwise add the element
   // type.
   if (attrKind != OperandClass::ShapeArray) {
     auto metatypeType =
-      MetatypeType::get(elementType, MetatypeRepresentation::Thin)
-        ->getCanonicalType();
-    operands.push_back(B.createMetatype(forInst->getLoc(),
-                                SILType::getPrimitiveObjectType(metatypeType)));
+        MetatypeType::get(elementType, MetatypeRepresentation::Thin)
+            ->getCanonicalType();
+    operands.push_back(B.createMetatype(
+        forInst->getLoc(), SILType::getPrimitiveObjectType(metatypeType)));
   } else {
     auto int64Ty = SILType::getBuiltinIntegerType(64, B.getASTContext());
-    operands.push_back(B.createIntegerLiteral(forInst->getLoc(), int64Ty,
-                                              elements.size()));
+    operands.push_back(
+        B.createIntegerLiteral(forInst->getLoc(), int64Ty, elements.size()));
   }
 
   // Add all of the operands as explicit values.  If the instructions came
@@ -938,8 +970,8 @@ static bool expandArrayAttribute(SILValue arrayVal, StringRef attrName,
   for (auto eltVal : elements) {
     // If this is a shape array, recursively decompose the elements into shapes.
     if (attrKind == OperandClass::ShapeArray) {
-      if (!expandArrayAttribute(eltVal, "", OperandClass::Shape,
-                                name, operands, forInst))
+      if (!expandArrayAttribute(eltVal, "", OperandClass::Shape, name, operands,
+                                forInst))
         return false;
       continue;
     }
@@ -968,18 +1000,26 @@ static bool expandArrayAttribute(SILValue arrayVal, StringRef attrName,
 }
 
 /// Return the string suffix for the specified attribute modifier.
-const char *SILTensorOpInfo::
-getOperandClassSuffix(OperandClass opClass) {
+const char *SILTensorOpInfo::getOperandClassSuffix(OperandClass opClass) {
   switch (opClass) {
-  case OperandClass::Input: return "$in";
-  case OperandClass::InputElt: return "$inelt";
-  case OperandClass::Normal: return "";
-  case OperandClass::DType: return "$dtype";
-  case OperandClass::Tensor: return "$tensor";
-  case OperandClass::Shape: return "$shape";
-  case OperandClass::Array: return "$array";
-  case OperandClass::ArrayElement: return "$elt";
-  case OperandClass::ShapeArray: return "$shapearray";
+  case OperandClass::Input:
+    return "$in";
+  case OperandClass::InputElt:
+    return "$inelt";
+  case OperandClass::Normal:
+    return "";
+  case OperandClass::DType:
+    return "$dtype";
+  case OperandClass::Tensor:
+    return "$tensor";
+  case OperandClass::Shape:
+    return "$shape";
+  case OperandClass::Array:
+    return "$array";
+  case OperandClass::ArrayElement:
+    return "$elt";
+  case OperandClass::ShapeArray:
+    return "$shapearray";
   }
 }
 
@@ -987,18 +1027,17 @@ getOperandClassSuffix(OperandClass opClass) {
 llvm::Optional<OperandClass>
 SILTensorOpInfo::getOperandClass(StringRef suffix) {
   return llvm::StringSwitch<llvm::Optional<OperandClass>>(suffix)
-                  .Case("in", OperandClass::Input)
-                  .Case("inelt", OperandClass::InputElt)
-                  .Case("", OperandClass::Normal)
-                  .Case("tensor", OperandClass::Tensor)
-                  .Case("shape", OperandClass::Shape)
-                  .Case("dtype", OperandClass::DType)
-                  .Case("array", OperandClass::Array)
-                  .Case("elt", OperandClass::ArrayElement)
-                  .Case("shapearray", OperandClass::ShapeArray)
-                  .Default(None);
+      .Case("in", OperandClass::Input)
+      .Case("inelt", OperandClass::InputElt)
+      .Case("", OperandClass::Normal)
+      .Case("tensor", OperandClass::Tensor)
+      .Case("shape", OperandClass::Shape)
+      .Case("dtype", OperandClass::DType)
+      .Case("array", OperandClass::Array)
+      .Case("elt", OperandClass::ArrayElement)
+      .Case("shapearray", OperandClass::ShapeArray)
+      .Default(None);
 }
-
 
 /// Verify that any attribute operands are passed acceptable constants,
 /// returning a non-empty error string to emit if that is not the case.
@@ -1032,8 +1071,8 @@ std::string SILTensorOpInfo::checkAndDiagnoseOperands() const {
       if (opName == "tfc.scalarToTensor") {
         auto scalarType = opTy.getASTType();
         if (convertSwiftTypeToTF(scalarType) == 0)
-          return "scalarToTensor requires scalar value; unrecognized type '"
-             + scalarType->getString() + "' is not allowed";
+          return "scalarToTensor requires scalar value; unrecognized type '" +
+                 scalarType->getString() + "' is not allowed";
         break;
       }
 
@@ -1065,9 +1104,9 @@ std::string SILTensorOpInfo::checkAndDiagnoseOperands() const {
         return "input list elements must be TensorHandle";
       break;
 
-    case OperandClass::Normal:  // No modifier.
+    case OperandClass::Normal: // No modifier.
       break;
-    case OperandClass::DType:   // This integer value is a dtype.
+    case OperandClass::DType: // This integer value is a dtype.
       if (!isa<IntegerLiteralInst>(operand))
         return "attribute '" + opClass.first.str() +
                "' requires a constant integer";
@@ -1079,28 +1118,26 @@ std::string SILTensorOpInfo::checkAndDiagnoseOperands() const {
       if (isa<MetatypeInst>(operand))
         break;
       return "attribute '" + opClass.first.str() +
-        "' requires a constant integer or floating point constant";
+             "' requires a constant integer or floating point constant";
 
     case OperandClass::ShapeArray:
       // Shape arrays contain an integer count of # elements, and are followed
       // by that many shapes.
       if (isa<IntegerLiteralInst>(operand))
-          break;
+        break;
       return "attribute '" + opClass.first.str() +
-        "' requires a constant integer count";
+             "' requires a constant integer count";
 
     case OperandClass::ArrayElement:
       // Integer and float elements work.
-      if (isa<IntegerLiteralInst>(operand) ||
-          isa<FloatLiteralInst>(operand))
+      if (isa<IntegerLiteralInst>(operand) || isa<FloatLiteralInst>(operand))
         break;
       return "attribute '" + opClass.first.str() +
-        "' requires a constant integer or floating point constant";
+             "' requires a constant integer or floating point constant";
 
     case OperandClass::Tensor:
       // If this an integer or float, it should be turned into a TF_Tensor.
-      if (isa<IntegerLiteralInst>(operand) ||
-          isa<FloatLiteralInst>(operand))
+      if (isa<IntegerLiteralInst>(operand) || isa<FloatLiteralInst>(operand))
         break;
 
       // Decoded tensor value as represented by a metatype, and are optionally
@@ -1126,9 +1163,9 @@ std::string SILTensorOpInfo::checkAndDiagnoseOperands() const {
         }
 
         // The next operand must be a shape.
-        if (i+1 >= operandClasses.size() ||
+        if (i + 1 >= operandClasses.size() ||
             opClass.first != operandClasses[i].first ||
-            operandClasses[i+1].second != OperandClass::Shape) {
+            operandClasses[i + 1].second != OperandClass::Shape) {
           // If we have a call to a well-known C function that will be promoted
           // to a tensor op, then we don't need a shape, it will be synthesized
           // later.
@@ -1153,7 +1190,7 @@ std::string SILTensorOpInfo::checkAndDiagnoseOperands() const {
         uint64_t scalarCount = 1;
         for (auto elt : shape) {
           auto *eltCst =
-            dyn_cast_or_null<IntegerLiteralInst>(getAttrOperand(elt));
+              dyn_cast_or_null<IntegerLiteralInst>(getAttrOperand(elt));
           if (!eltCst)
             return "attribute '" + opClass.first.str() +
                    "' has non-constant shape";
@@ -1162,7 +1199,8 @@ std::string SILTensorOpInfo::checkAndDiagnoseOperands() const {
         }
         if (scalarCount != scalars.size())
           return "tensor literal should have " + llvm::utostr(scalarCount) +
-             " scalars for this shape, but has " + llvm::utostr(scalars.size());
+                 " scalars for this shape, but has " +
+                 llvm::utostr(scalars.size());
 
         // If everything is ok, then we're good to go.
         break;
@@ -1198,7 +1236,8 @@ SILValue getTensorProtocolHandleMember(SILValue v, SILLocation loc,
   // wrapper.
   while (1) {
     auto si = dyn_cast<StructInst>(v);
-    if (!si) break;
+    if (!si)
+      break;
 
     if (si->getNumOperands() != 1)
       break;
@@ -1209,8 +1248,7 @@ SILValue getTensorProtocolHandleMember(SILValue v, SILLocation loc,
       return operand;
 
     // If we found a wrapper around another TensorProtocol, dig deeper.
-    if (!conformsToTensorProtocol(operand->getType().getASTType(),
-                                  module))
+    if (!conformsToTensorProtocol(operand->getType().getASTType(), module))
       break;
 
     v = operand;
@@ -1263,7 +1301,7 @@ SILTensorOpInfo::canonicalizeOperands(GraphFunctionDeviceInfo &deviceInfo) {
     auto operand = inst->getOperand(i);
     auto opInfo = operandClasses[i];
     std::string opName =
-      "," + opInfo.first.str() + getOperandClassSuffix(opInfo.second);
+        "," + opInfo.first.str() + getOperandClassSuffix(opInfo.second);
 
     // Handle inputs.
     if (isInput(i)) {
@@ -1290,7 +1328,6 @@ SILTensorOpInfo::canonicalizeOperands(GraphFunctionDeviceInfo &deviceInfo) {
       bool isArray = decodeArrayElements(operand, elements, elementType);
       assert(isArray && "Invalid case got through checking pass?");
 
-
       // If we have an array of TensorProtocol values, we have to extract the
       // tensor handle out of them.
       if (!isTensorHandle(elementType)) {
@@ -1308,10 +1345,10 @@ SILTensorOpInfo::canonicalizeOperands(GraphFunctionDeviceInfo &deviceInfo) {
 
       // Add the metatype marker so we know that there is an array of elements.
       auto metatypeType =
-        MetatypeType::get(elementType, MetatypeRepresentation::Thin)
-          ->getCanonicalType();
-      operands.push_back(B.createMetatype(inst->getLoc(),
-                              SILType::getPrimitiveObjectType(metatypeType)));
+          MetatypeType::get(elementType, MetatypeRepresentation::Thin)
+              ->getCanonicalType();
+      operands.push_back(B.createMetatype(
+          inst->getLoc(), SILType::getPrimitiveObjectType(metatypeType)));
       name += ",$in";
 
       // Add one element operand for each element of the array.
@@ -1356,8 +1393,8 @@ SILTensorOpInfo::canonicalizeOperands(GraphFunctionDeviceInfo &deviceInfo) {
   }
 
   // Determine whether canonicalization changed anything.
-  bool changed = name != builtinName ||
-                 operands.size() != inst->getNumOperands();
+  bool changed =
+      name != builtinName || operands.size() != inst->getNumOperands();
   for (unsigned i = 0, e = operands.size(); !changed && i != e; ++i)
     changed |= operands[i] != inst->getOperand(i);
 
@@ -1377,9 +1414,8 @@ SILTensorOpInfo::canonicalizeOperands(GraphFunctionDeviceInfo &deviceInfo) {
 
   // Otherwise, rebuild a new builtin instruction with the simplified operands.
   auto *newInst =
-    B.createBuiltin(inst->getLoc(),
-                    B.getASTContext().getIdentifier(name),
-                    inst->getType(), /*no substitions*/{}, operands);
+      B.createBuiltin(inst->getLoc(), B.getASTContext().getIdentifier(name),
+                      inst->getType(), /*no substitions*/ {}, operands);
   newInst->setDebugLocation(inst->getDebugLocation());
 
   // Replace the old with the new and delete the old instruction.
@@ -1392,7 +1428,6 @@ SILTensorOpInfo::canonicalizeOperands(GraphFunctionDeviceInfo &deviceInfo) {
     // release of them, since we've dropped a consuming use of it.
     removeOrDestroyArrayValue(array, newInst->getLoc(), B);
   }
-
 
   // Now that we have a new instruction, reparse it to make sure that our
   // internal state is all up to date, and that we built it correctly.
@@ -1426,23 +1461,31 @@ void GraphOperationInfo::assertWithDump(bool cond,
 
 /// Decode the name of a graph_op into its TensorFlow op name and a list of
 /// information about the operands.
-StringRef GraphOperationInfo::
-decodeName(SmallVectorImpl<InputMarker> &inputInfo) {
+StringRef
+GraphOperationInfo::decodeName(SmallVectorImpl<InputMarker> &inputInfo) {
   auto name = inst->getName().str();
   auto pos = name.find(',');
   auto opName = name.substr(0, pos);
 
   while (pos != StringRef::npos) {
-    name = name.drop_front(pos+1);
+    name = name.drop_front(pos + 1);
     pos = name.find(',');
     auto letter = name.substr(0, pos);
     assertWithDump(letter.size() == 1, "malformed graph_op instruction");
     InputMarker kind;
     switch (letter[0]) {
-    case 's': kind = InputMarker::IM_Scalar; break;
-    case 'i': kind = InputMarker::IM_Normal; break;
-    case 'L': kind = InputMarker::IM_InputList; break;
-    case 'e': kind = InputMarker::IM_InputListElt; break;
+    case 's':
+      kind = InputMarker::IM_Scalar;
+      break;
+    case 'i':
+      kind = InputMarker::IM_Normal;
+      break;
+    case 'L':
+      kind = InputMarker::IM_InputList;
+      break;
+    case 'e':
+      kind = InputMarker::IM_InputListElt;
+      break;
     default:
       assertWithDump(false, "malformed graph_op instruction");
     }
@@ -1462,12 +1505,12 @@ GraphOperationInfo::decodeAttributeName(Identifier name) {
 
   auto opClass = OperandClass::Normal;
   if (dollarLoc != StringRef::npos) {
-    auto suffix = nameStr.drop_front(dollarLoc+1);
+    auto suffix = nameStr.drop_front(dollarLoc + 1);
     opClass = SILTensorOpInfo::getOperandClass(suffix).getValue();
   }
 
   // Slice the suffix off the attribute name and add the decoded version.
-  return { nameStr.substr(0, dollarLoc), opClass };
+  return {nameStr.substr(0, dollarLoc), opClass};
 }
 
 int64_t GraphOperationInfo::getIntAttr(unsigned attrIdx,
@@ -1522,7 +1565,7 @@ SILDebugLocation tf::skipInternalLocations(SILDebugLocation loc) {
 }
 
 SILLocation tf::getUserSourceLocation(SILValue value) {
-  if (auto *inst = dyn_cast<SILInstruction>((SILNode*)value))
+  if (auto *inst = dyn_cast<SILInstruction>((SILNode *)value))
     return getUserSourceLocation(inst);
   return getUserSourceLocation(value.getDebugLocation());
 }
@@ -1540,7 +1583,7 @@ SILLocation tf::getUserSourceLocation(SILInstruction *inst) {
   if (auto *sei = dyn_cast<StructExtractInst>(inst)) {
     auto outerType = sei->getType().getASTType();
     if (outerType->is<BuiltinType>() || isTensorHandle(outerType)) {
-      if (sei->getOperand())  // Could be called after dropAllReferences().
+      if (sei->getOperand()) // Could be called after dropAllReferences().
         return getUserSourceLocation(sei->getOperand());
     }
   }
@@ -1568,36 +1611,32 @@ tf::createConstTensor(Type elementType, SymbolicValue scalars,
   SmallVector<GraphOperationAttribute, 8> attributes;
 
   // Add a dtype attribute for the array element.
-  attributes.push_back({
-    context.getIdentifier("dtype"),
-    SymbolicValue::getMetatype(elementType->getCanonicalType())
-  });
+  attributes.push_back(
+      {context.getIdentifier("dtype"),
+       SymbolicValue::getMetatype(elementType->getCanonicalType())});
 
   // Add an attribute for the value$tensor attribute.
-  auto tensorSuffix =
-  SILTensorOpInfo::getOperandClassSuffix(SILTensorOpInfo::OperandClass::Tensor);
-  attributes.push_back({
-    context.getIdentifier(std::string("value") + tensorSuffix), scalars
-  });
+  auto tensorSuffix = SILTensorOpInfo::getOperandClassSuffix(
+      SILTensorOpInfo::OperandClass::Tensor);
+  attributes.push_back(
+      {context.getIdentifier(std::string("value") + tensorSuffix), scalars});
 
   // Add the value$shape attribute if we have an array value.
   if (scalars.getKind() == SymbolicValue::Array) {
     auto shapeId = SILTensorOpInfo::OperandClass::Shape;
     auto shapeSuffix = SILTensorOpInfo::getOperandClassSuffix(shapeId);
-    attributes.push_back({
-      context.getIdentifier(std::string("value") + shapeSuffix), shape
-    });
+    attributes.push_back(
+        {context.getIdentifier(std::string("value") + shapeSuffix), shape});
   }
 
   // All graph_op's get a device.
-  attributes.push_back({
-    context.getIdentifier(DEVICE_ATTR),
-    SymbolicValue::getString(getDeviceString(targetDevice), allocator)
-  });
+  attributes.push_back(
+      {context.getIdentifier(DEVICE_ATTR),
+       SymbolicValue::getString(getDeviceString(targetDevice), allocator)});
 
   // Finally build a new graphop instruction with the simplified operands.
   return B.createGraphOperation(loc, context.getIdentifier("Const"),
-                                /*operands*/{}, attributes, resultType);
+                                /*operands*/ {}, attributes, resultType);
 }
 
 GraphOperationInst *
@@ -1611,7 +1650,7 @@ tf::createTensorToInt1Inst(SILValue value, SILBuilder &builder,
       /*opDevice*/ getDeviceString(DeviceType::ALL),
       builder.getModule().getASTContext(), attributes);
   GraphOperationInst *condValue = builder.createGraphOperation(
-    location, context.getIdentifier("tf_tensor_to_i1"),
+      location, context.getIdentifier("tf_tensor_to_i1"),
       /*operands*/ {value}, attributes,
       {SILType::getBuiltinIntegerType(1, context)});
   assert(condValue->getNumResults() == 1);
@@ -1705,8 +1744,8 @@ bool TensorFunctionClassifier::shouldBePartitioned(SILFunction *fn) {
 /// Return true if the specified function type has TensorHandle's in its
 /// argument or result list, even if they are abstracted by structs or
 /// tuples.
-bool TensorFunctionClassifier::
-containsTensorFlowValue(CanSILFunctionType fnType) {
+bool TensorFunctionClassifier::containsTensorFlowValue(
+    CanSILFunctionType fnType) {
   for (auto &result : fnType->getResults())
     if (containsTensorFlowValue(result.getType()))
       return true;
