@@ -3662,7 +3662,14 @@ namespace {
 bool IRGenModule::requiresForeignTypeMetadata(CanType type) {
   if (NominalTypeDecl *nominal = type->getAnyNominal()) {
     if (auto *clas = dyn_cast<ClassDecl>(nominal)) {
-      return clas->isForeign();
+      switch (clas->getForeignClassKind()) {
+      case ClassDecl::ForeignKind::Normal:
+      case ClassDecl::ForeignKind::RuntimeOnly:
+        return false;
+      case ClassDecl::ForeignKind::CFType:
+        return true;
+      }
+      llvm_unreachable("bad foreign class kind");
     }
 
     return isa<ClangModuleUnit>(nominal->getModuleScopeContext());

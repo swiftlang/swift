@@ -340,3 +340,19 @@ func testConditional(i: Int, s: String) {
   let _: PArray<Int> = [i, i, i]
   let _: PArray<String> = [s, s, s] // expected-error{{cannot convert value of type '[String]' to specified type 'PArray<String>'}}
 }
+
+
+// SR-8385
+enum SR8385: ExpressibleByStringLiteral {
+  case text(String)
+  init(stringLiteral value: String) {
+    self = .text(value)
+  }
+}
+
+func testSR8385() {
+  let _: [SR8385] = [SR8385("hello")]
+  let _: [SR8385] = [.text("hello")]
+  let _: [SR8385] = ["hello", SR8385.text("world")]
+  let _: [SR8385] = ["hello", .text("world")]
+}

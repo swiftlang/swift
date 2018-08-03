@@ -272,6 +272,7 @@ message("--   SWIFT_LIBRARY_PATH = ${SWIFT_LIBRARY_PATH}")
 message("--   CLANG_EXEC = ${CLANG_EXEC}")
 message("--   SWIFT_OPTIMIZATION_LEVELS = ${SWIFT_OPTIMIZATION_LEVELS}")
 message("--   ONLY_PLATFORMS = ${ONLY_PLATFORMS}")
+message("--   PAGE_ALIGNMENT_OPTION = ${PAGE_ALIGNMENT_OPTION}")
 
 message("--   found platforms: ${platforms}")
 message("--   found sdks:")
