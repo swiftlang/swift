@@ -611,4 +611,13 @@ func rdar40537858() {
 
   var arr: [S] = []
   _ = List(arr, id: \.id) // expected-error {{'List<[S], S.Id>' requires that 'S.Id' conform to 'Hashable'}}
+
+  enum E<T: P> {
+    case foo(T)
+    case bar([T])
+  }
+
+  var s = S(id: S.Id())
+  let _: E = .foo(s)   // expected-error {{'E<S>' requires that 'S' conform to 'P'}}
+  let _: E = .bar([s]) // expected-error {{'E<S>' requires that 'S' conform to 'P'}}
 }
