@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 5
 
 // Test availability attributes on UnsafePointer initializers.
 // Assume the original source contains no UnsafeRawPointer types.
@@ -114,4 +114,164 @@ func unsafeRawBufferPointerConversions(
   _ = UnsafeRawBufferPointer(start: omrp, count: 1)
   _ = UnsafeMutableRawBufferPointer(start: orp, count: 1) // expected-error {{cannot convert value of type 'UnsafeRawPointer?' to expected argument type 'UnsafeMutableRawPointer?'}}
   _ = UnsafeRawBufferPointer(start: orp, count: 1)
+}
+
+// Test that we get a custom diagnostic for an ephemeral conversion to non-ephemeral param for an Unsafe[Mutable][Raw][Buffer]Pointer init.
+func unsafePointerInitEphemeralConversions() {
+  class C {}
+  var foo = 0
+  var str = ""
+  var arr = [0]
+  var c: C?
+
+  _ = UnsafePointer(&foo) // expected-error {{initialization of 'UnsafePointer<Int>' results in a dangling pointer}}
+  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafePointer<Int>' produces a pointer valid only for the duration of the call}}
+
+  _ = UnsafePointer<Int8>("") // expected-error {{initialization of 'UnsafePointer<Int8>' results in a dangling pointer}}
+  // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call}}
+
+  _ = UnsafePointer<Int8>(str) // expected-error {{initialization of 'UnsafePointer<Int8>' results in a dangling pointer}}
+  // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call}}
+
+  _ = UnsafePointer([0]) // expected-error {{initialization of 'UnsafePointer<Int>' results in a dangling pointer}}
+  // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafePointer<Int>' produces a pointer valid only for the duration of the call}}
+
+  _ = UnsafePointer(arr) // expected-error {{initialization of 'UnsafePointer<Int>' results in a dangling pointer}}
+  // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafePointer<Int>' produces a pointer valid only for the duration of the call}}
+
+  _ = UnsafePointer(&arr) // expected-error {{initialization of 'UnsafePointer<Int>' results in a dangling pointer}}
+  // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafePointer<Int>' produces a pointer valid only for the duration of the call}}
+
+
+  _ = UnsafeMutablePointer(&foo) // expected-error {{initialization of 'UnsafeMutablePointer<Int>' results in a dangling pointer}}
+  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutablePointer<Int>' produces a pointer valid only for the duration of the call}}
+
+  _ = UnsafeMutablePointer(&arr) // expected-error {{initialization of 'UnsafeMutablePointer<Int>' results in a dangling pointer}}
+  // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafeMutablePointer<Int>' produces a pointer valid only for the duration of the call}}
+
+  _ = UnsafeMutablePointer(mutating: &foo) // expected-error {{initialization of 'UnsafeMutablePointer<Int>' results in a dangling pointer}}
+  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafePointer<Int>' produces a pointer valid only for the duration of the call}}
+
+  _ = UnsafeMutablePointer<Int8>(mutating: "") // expected-error {{initialization of 'UnsafeMutablePointer<Int8>' results in a dangling pointer}}
+  // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call}}
+
+  _ = UnsafeMutablePointer<Int8>(mutating: str) // expected-error {{initialization of 'UnsafeMutablePointer<Int8>' results in a dangling pointer}}
+  // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call}}
+
+  _ = UnsafeMutablePointer(mutating: [0]) // expected-error {{initialization of 'UnsafeMutablePointer<Int>' results in a dangling pointer}}
+  // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafePointer<Int>' produces a pointer valid only for the duration of the call}}
+
+  _ = UnsafeMutablePointer(mutating: arr) // expected-error {{initialization of 'UnsafeMutablePointer<Int>' results in a dangling pointer}}
+  // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafePointer<Int>' produces a pointer valid only for the duration of the call}}
+
+  _ = UnsafeMutablePointer(mutating: &arr) // expected-error {{initialization of 'UnsafeMutablePointer<Int>' results in a dangling pointer}}
+  // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafePointer<Int>' produces a pointer valid only for the duration of the call}}
+
+
+  _ = UnsafeRawPointer(&foo) // expected-error {{initialization of 'UnsafeRawPointer' results in a dangling pointer}}
+  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
+
+  _ = UnsafeRawPointer(str) // expected-error {{initialization of 'UnsafeRawPointer' results in a dangling pointer}}
+  // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+
+  _ = UnsafeRawPointer(arr) // expected-error {{initialization of 'UnsafeRawPointer' results in a dangling pointer}}
+  // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+
+  _ = UnsafeRawPointer(&arr) // expected-error {{initialization of 'UnsafeRawPointer' results in a dangling pointer}}
+  // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
+
+
+  _ = UnsafeMutableRawPointer(&foo) // expected-error {{initialization of 'UnsafeMutableRawPointer' results in a dangling pointer}}
+  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
+
+  _ = UnsafeMutableRawPointer(&arr) // expected-error {{initialization of 'UnsafeMutableRawPointer' results in a dangling pointer}}
+  // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
+
+  _ = UnsafeMutableRawPointer(mutating: &foo) // expected-error {{initialization of 'UnsafeMutableRawPointer' results in a dangling pointer}}
+  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+
+  _ = UnsafeMutableRawPointer(mutating: str) // expected-error {{initialization of 'UnsafeMutableRawPointer' results in a dangling pointer}}
+  // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+
+  _ = UnsafeMutableRawPointer(mutating: arr) // expected-error {{initialization of 'UnsafeMutableRawPointer' results in a dangling pointer}}
+  // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+
+  _ = UnsafeMutableRawPointer(mutating: &arr) // expected-error {{initialization of 'UnsafeMutableRawPointer' results in a dangling pointer}}
+  // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+
+
+  _ = AutoreleasingUnsafeMutablePointer(&c) // expected-error {{initialization of 'AutoreleasingUnsafeMutablePointer<C?>' results in a dangling pointer}}
+  // expected-note@-1 {{implicit argument conversion from 'C?' to 'AutoreleasingUnsafeMutablePointer<C?>' produces a pointer valid only for the duration of the call}}
+
+
+  _ = UnsafeBufferPointer(start: &foo, count: 0) // expected-error {{initialization of 'UnsafeBufferPointer<Int>' results in a dangling buffer pointer}}
+  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafePointer<Int>?' produces a pointer valid only for the duration of the call}}
+
+  _ = UnsafeBufferPointer<Int8>(start: str, count: 0) // expected-error {{initialization of 'UnsafeBufferPointer<Int8>' results in a dangling buffer pointer}}
+  // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafePointer<Int8>?' produces a pointer valid only for the duration of the call}}
+
+  _ = UnsafeBufferPointer(start: arr, count: 0) // expected-error {{initialization of 'UnsafeBufferPointer<Int>' results in a dangling buffer pointer}}
+  // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafePointer<Int>?' produces a pointer valid only for the duration of the call}}
+
+  _ = UnsafeBufferPointer(start: &arr, count: 0) // expected-error {{initialization of 'UnsafeBufferPointer<Int>' results in a dangling buffer pointer}}
+  // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafePointer<Int>?' produces a pointer valid only for the duration of the call}}
+
+
+  _ = UnsafeMutableBufferPointer(start: &foo, count: 0) // expected-error {{initialization of 'UnsafeMutableBufferPointer<Int>' results in a dangling buffer pointer}}
+  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutablePointer<Int>?' produces a pointer valid only for the duration of the call}}
+
+  _ = UnsafeMutableBufferPointer(start: &arr, count: 0) // expected-error {{initialization of 'UnsafeMutableBufferPointer<Int>' results in a dangling buffer pointer}}
+  // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafeMutablePointer<Int>?' produces a pointer valid only for the duration of the call}}
+
+
+  _ = UnsafeRawBufferPointer(start: &foo, count: 0) // expected-error {{initialization of 'UnsafeRawBufferPointer' results in a dangling buffer pointer}}
+  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeRawPointer?' produces a pointer valid only for the duration of the call}}
+
+  _ = UnsafeRawBufferPointer(start: str, count: 0) // expected-error {{initialization of 'UnsafeRawBufferPointer' results in a dangling buffer pointer}}
+  // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafeRawPointer?' produces a pointer valid only for the duration of the call}}
+
+  _ = UnsafeRawBufferPointer(start: arr, count: 0) // expected-error {{initialization of 'UnsafeRawBufferPointer' results in a dangling buffer pointer}}
+  // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafeRawPointer?' produces a pointer valid only for the duration of the call}}
+
+  _ = UnsafeRawBufferPointer(start: &arr, count: 0) // expected-error {{initialization of 'UnsafeRawBufferPointer' results in a dangling buffer pointer}}
+  // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafeRawPointer?' produces a pointer valid only for the duration of the call}}
+
+
+  _ = UnsafeMutableRawBufferPointer(start: &foo, count: 0) // expected-error {{initialization of 'UnsafeMutableRawBufferPointer' results in a dangling buffer pointer}}
+  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer?' produces a pointer valid only for the duration of the call}}
+
+  _ = UnsafeMutableRawBufferPointer(start: &arr, count: 0) // expected-error {{initialization of 'UnsafeMutableRawBufferPointer' results in a dangling buffer pointer}}
+  // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafeMutableRawPointer?' produces a pointer valid only for the duration of the call}}
+
+
+  // FIX-ME: Currently produces ambiguity error instead of custom non-ephemeral error.
+  _ = OpaquePointer(&foo) // expected-error {{cannot invoke initializer for type 'OpaquePointer' with an argument list of type '(inout Int)'}}
+  // expected-note@-1 {{overloads for 'OpaquePointer' exist with these partially matching parameter lists:}}
+
+  // FIX-ME: Currently produces ambiguity error instead of custom non-ephemeral error.
+  _ = OpaquePointer(&arr) // expected-error {{cannot invoke initializer for type 'OpaquePointer' with an argument list of type '(inout [Int])'}}
+  // expected-note@-1 {{overloads for 'OpaquePointer' exist with these partially matching parameter lists:}}
+
+  _ = OpaquePointer(arr) // expected-error {{initialization of 'OpaquePointer' results in a dangling pointer}}
+  // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+
+  _ = OpaquePointer(str) // expected-error {{initialization of 'OpaquePointer' results in a dangling pointer}}
+  // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+}
+
+var global = 0
+
+// Test that we allow non-ephemeral conversions, such as inout-to-pointer for globals.
+func unsafePointerInitNonEphemeralConversions() {
+  _ = UnsafePointer(&global)
+  _ = UnsafeMutablePointer(&global)
+  _ = UnsafeRawPointer(&global)
+  _ = UnsafeMutableRawPointer(&global)
+  _ = UnsafeBufferPointer(start: &global, count: 0)
+  _ = UnsafeMutableBufferPointer(start: &global, count: 0)
+  _ = UnsafeRawBufferPointer(start: &global, count: 0)
+  _ = UnsafeMutableRawBufferPointer(start: &global, count: 0)
+
+  // FIX-ME: This is currently ambiguous.
+  _ = OpaquePointer(&global) // expected-error {{ambiguous use of 'init(_:)'}}
 }

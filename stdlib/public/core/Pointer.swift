@@ -80,7 +80,7 @@ extension _Pointer {
   ///
   /// - Parameter other: The typed pointer to convert.
   @_transparent
-  public init(_ other: Self) {
+  public init(_ other: @_nonEphemeral Self) {
     self.init(other._rawValue)
   }
 
@@ -89,7 +89,7 @@ extension _Pointer {
   /// - Parameter other: The typed pointer to convert. If `other` is `nil`, the
   ///   result is `nil`.
   @_transparent
-  public init?(_ other: Self?) {
+  public init?(_ other: @_nonEphemeral Self?) {
     guard let unwrapped = other else { return nil }
     self.init(unwrapped._rawValue)
   }
@@ -104,7 +104,7 @@ extension _Pointer {
   ///
   /// - Parameter other: The typed pointer to convert.
   @_transparent
-  public init<T>(_ other: UnsafeMutablePointer<T>) {
+  public init<T>(_ other: @_nonEphemeral UnsafeMutablePointer<T>) {
     self.init(other._rawValue)
   }
 
@@ -117,7 +117,7 @@ extension _Pointer {
   /// - Parameter other: The typed pointer to convert. If `other` is `nil`, the
   ///   result is `nil`.
   @_transparent
-  public init?<T>(_ other: UnsafeMutablePointer<T>?) {
+  public init?<T>(_ other: @_nonEphemeral UnsafeMutablePointer<T>?) {
     guard let unwrapped = other else { return nil }
     self.init(unwrapped)
   }

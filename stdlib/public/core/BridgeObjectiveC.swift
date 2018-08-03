@@ -427,7 +427,9 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   /// - Warning: Accessing `pointee` as a type that is unrelated to
   ///   the underlying memory's bound type is undefined.
   @usableFromInline @_transparent
-  internal init<U>(_ from: UnsafePointer<U>) {
+  internal init<U>(
+    _ from: @_nonEphemeral UnsafePointer<U>
+  ) {
     self._rawValue = from._rawValue
   }
 
@@ -441,7 +443,9 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   /// - Warning: Accessing `pointee` as a type that is unrelated to
   ///   the underlying memory's bound type is undefined.
   @usableFromInline @_transparent
-  internal init?<U>(_ from: UnsafePointer<U>?) {
+  internal init?<U>(
+    _ from: @_nonEphemeral UnsafePointer<U>?
+  ) {
     guard let unwrapped = from else { return nil }
     self.init(unwrapped)
   }
@@ -453,7 +457,9 @@ extension UnsafeMutableRawPointer {
   ///
   /// - Parameter other: The pointer to convert.
   @_transparent
-  public init<T>(_ other: AutoreleasingUnsafeMutablePointer<T>) {
+  public init<T>(
+    _ other: @_nonEphemeral AutoreleasingUnsafeMutablePointer<T>
+  ) {
     _rawValue = other._rawValue
   }
 
@@ -463,7 +469,9 @@ extension UnsafeMutableRawPointer {
   /// - Parameter other: The pointer to convert. If `other` is `nil`, the
   ///   result is `nil`.
   @_transparent
-  public init?<T>(_ other: AutoreleasingUnsafeMutablePointer<T>?) {
+  public init?<T>(
+    _ other: @_nonEphemeral AutoreleasingUnsafeMutablePointer<T>?
+  ) {
     guard let unwrapped = other else { return nil }
     self.init(unwrapped)
   }
@@ -475,7 +483,9 @@ extension UnsafeRawPointer {
   ///
   /// - Parameter other: The pointer to convert.
   @_transparent
-  public init<T>(_ other: AutoreleasingUnsafeMutablePointer<T>) {
+  public init<T>(
+    _ other: @_nonEphemeral AutoreleasingUnsafeMutablePointer<T>
+  ) {
     _rawValue = other._rawValue
   }
 
@@ -485,7 +495,9 @@ extension UnsafeRawPointer {
   /// - Parameter other: The pointer to convert. If `other` is `nil`, the
   ///   result is `nil`.
   @_transparent
-  public init?<T>(_ other: AutoreleasingUnsafeMutablePointer<T>?) {
+  public init?<T>(
+    _ other: @_nonEphemeral AutoreleasingUnsafeMutablePointer<T>?
+  ) {
     guard let unwrapped = other else { return nil }
     self.init(unwrapped)
   }
