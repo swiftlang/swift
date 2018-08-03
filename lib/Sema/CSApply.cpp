@@ -1278,23 +1278,6 @@ namespace {
                       ConstraintLocatorBuilder locator);
 
   private:
-    /// \brief Retrieve the overload choice associated with the given
-    /// locator.
-    SelectedOverload getOverloadChoice(ConstraintLocator *locator) {
-      return *getOverloadChoiceIfAvailable(locator);
-    }
-
-    /// \brief Retrieve the overload choice associated with the given
-    /// locator.
-    Optional<SelectedOverload>
-    getOverloadChoiceIfAvailable(ConstraintLocator *locator) {
-      auto known = solution.overloadChoices.find(locator);
-      if (known != solution.overloadChoices.end())
-        return known->second;
-
-      return None;
-    }
-
     /// \brief Simplify the given type by substituting all occurrences of
     /// type variables for their fixed types.
     Type simplifyType(Type type) {
@@ -1395,7 +1378,7 @@ namespace {
 
       // Determine the declaration selected for this subscript operation.
       if (!selected)
-        selected = getOverloadChoiceIfAvailable(
+        selected = solution.getOverloadChoiceIfAvailable(
                           cs.getConstraintLocator(
                             locator.withPathElement(
                               ConstraintLocator::SubscriptMember)));
@@ -2505,7 +2488,7 @@ namespace {
       auto locator = cs.getConstraintLocator(expr);
 
       // Find the overload choice used for this declaration reference.
-      auto selected = getOverloadChoiceIfAvailable(locator);
+      auto selected = solution.getOverloadChoiceIfAvailable(locator);
       if (!selected.hasValue()) {
         auto *varDecl = cast<VarDecl>(expr->getDecl());
         assert(varDecl->getType()->is<UnresolvedType>() &&
@@ -2544,7 +2527,7 @@ namespace {
     Expr *visitOverloadedDeclRefExpr(OverloadedDeclRefExpr *expr) {
       // Determine the declaration selected for this overloaded reference.
       auto locator = cs.getConstraintLocator(expr);
-      auto selected = getOverloadChoice(locator);
+      auto selected = solution.getOverloadChoice(locator);
       auto choice = selected.choice;
 
       return buildDeclRef(choice, expr->getNameLoc(), selected.openedFullType,
@@ -2567,7 +2550,7 @@ namespace {
     Expr *visitMemberRefExpr(MemberRefExpr *expr) {
       auto memberLocator = cs.getConstraintLocator(expr,
                                                    ConstraintLocator::Member);
-      auto selected = getOverloadChoice(memberLocator);
+      auto selected = solution.getOverloadChoice(memberLocator);
       bool isDynamic
         = selected.choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
       return buildMemberRef(
@@ -2599,7 +2582,7 @@ namespace {
       // Find the selected member.
       auto memberLocator = cs.getConstraintLocator(
                              expr, ConstraintLocator::UnresolvedMember);
-      auto selected = getOverloadChoice(memberLocator);
+      auto selected = solution.getOverloadChoice(memberLocator);
       
       // If the member came by optional unwrapping, then unwrap the base type.
       if (selected.choice.getKind()
@@ -2740,7 +2723,7 @@ namespace {
       auto ctorLocator = cs.getConstraintLocator(
                            expr,
                            ConstraintLocator::ConstructorMember);
-      if (auto selected = getOverloadChoiceIfAvailable(ctorLocator)) {
+      if (auto selected = solution.getOverloadChoiceIfAvailable(ctorLocator)) {
         auto choice = selected->choice;
         return applyCtorRefExpr(
             expr, base, dotLoc, nameLoc, implicit, ctorLocator, choice,
@@ -2750,7 +2733,7 @@ namespace {
       // Determine the declaration selected for this overloaded reference.
       auto memberLocator = cs.getConstraintLocator(expr,
                                                    ConstraintLocator::Member);
-      auto selectedElt = getOverloadChoiceIfAvailable(memberLocator);
+      auto selectedElt = solution.getOverloadChoiceIfAvailable(memberLocator);
 
       if (!selectedElt) {
         // If constraint solving resolved this to an UnresolvedType, then we're
@@ -4360,7 +4343,7 @@ namespace {
         // If this is an unresolved link, make sure we resolved it.
         if (kind == KeyPathExpr::Component::Kind::UnresolvedProperty ||
             kind == KeyPathExpr::Component::Kind::UnresolvedSubscript) {
-          foundDecl = getOverloadChoiceIfAvailable(locator);
+          foundDecl = solution.getOverloadChoiceIfAvailable(locator);
           // Leave the component unresolved if the overload was not resolved.
           if (foundDecl) {
             // If this was a @dynamicMemberLookup property, then we actually
@@ -7589,7 +7572,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   auto ctorLocator = cs.getConstraintLocator(
                  locator.withPathElement(ConstraintLocator::ApplyFunction)
                         .withPathElement(ConstraintLocator::ConstructorMember));
-  auto selected = getOverloadChoiceIfAvailable(ctorLocator);
+  auto selected = solution.getOverloadChoiceIfAvailable(ctorLocator);
   if (!selected) {
     assert(ty->hasError() || ty->hasUnresolvedType());
     cs.setType(apply, ty);

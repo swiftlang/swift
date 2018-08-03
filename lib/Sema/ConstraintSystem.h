@@ -692,6 +692,22 @@ public:
   /// solution.
   ConcreteDeclRef resolveLocatorToDecl(ConstraintLocator *locator) const;
 
+  /// \brief Retrieve the overload choice associated with the given
+  /// locator.
+  SelectedOverload getOverloadChoice(ConstraintLocator *locator) const {
+    return *getOverloadChoiceIfAvailable(locator);
+  }
+
+  /// \brief Retrieve the overload choice associated with the given
+  /// locator.
+  Optional<SelectedOverload>
+  getOverloadChoiceIfAvailable(ConstraintLocator *locator) const {
+    auto known = overloadChoices.find(locator);
+    if (known != overloadChoices.end())
+      return known->second;
+    return None;
+  }
+
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() const LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");
