@@ -7971,7 +7971,7 @@ bool ConstraintSystem::applySolutionFix(
       (!resolved->getPath().empty() &&
        fix.first.getKind() != FixKind::ExplicitlyEscaping &&
        fix.first.getKind() != FixKind::ExplicitlyEscapingToAny &&
-       fix.first.getKind() != FixKind::AddConformace))
+       fix.first.getKind() != FixKind::AddConformance))
     return false;
   
   Expr *affected = resolved->getAnchor();
@@ -8150,7 +8150,7 @@ bool ConstraintSystem::applySolutionFix(
                                       isa<SubscriptExpr>(call->getFn()));
   }
 
-  case FixKind::AddConformace: {
+  case FixKind::AddConformance: {
     auto getMissingConformance = [&](ConstraintLocator *locator) {
       auto *anchor = locator->getAnchor();
       auto &requirement = locator->getPath().back();

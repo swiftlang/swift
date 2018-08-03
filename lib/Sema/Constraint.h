@@ -255,7 +255,7 @@ enum class FixKind : uint8_t {
   RelabelArguments,
 
   /// Add a new conformance to the type to satisfy a requirement.
-  AddConformace,
+  AddConformance,
 };
 
 /// Describes a fix that can be applied to a constraint before visiting it.

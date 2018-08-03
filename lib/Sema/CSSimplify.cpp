@@ -2783,7 +2783,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       // diagnostics only care about anchor - to lookup type,
       // and what was the requirement# which is not satisfied.
       ConstraintLocatorBuilder requirement(getConstraintLocator(anchor));
-      if (!recordFix({FixKind::AddConformace},
+      if (!recordFix({FixKind::AddConformance},
                      requirement.withPathElement(typeRequirement)))
         return SolutionKind::Solved;
     }
@@ -5013,7 +5013,7 @@ ConstraintSystem::simplifyFixConstraint(Fix fix, Type type1, Type type2,
   case FixKind::ExplicitlyEscapingToAny:
   case FixKind::CoerceToCheckedCast:
   case FixKind::RelabelArguments:
-  case FixKind::AddConformace:
+  case FixKind::AddConformance:
     llvm_unreachable("handled elsewhere");
   }
 
