@@ -2421,7 +2421,7 @@ void PartitionCloner::visitCondBranchInst(CondBranchInst *inst) {
       eltTy = SILType::getBuiltinIntegerType(/*bitWidth*/ 1, ctx).getASTType();
 
     assert(eltTy->isBuiltinIntegerType(1) && "expected Tensor<i1>");
-    cond = getSingleValueResult(createTFInt1ToBuiltinInt1(
+    cond = getSingleValueResult(createTensorToInt1Inst(
         cond, B, getOpLocation(inst->getLoc()), FP.deviceInfo));
   }
 
@@ -3150,7 +3150,7 @@ void PartitionCloner::handleSendRecvForTerminator(TermInst *inst) {
           loc, ctx.getIdentifier(equalOpName),
           /*operands*/ {receivedCaseId, constTensorWithCaseId}, attributes,
           {tensorHandleI1Ty});
-      auto *condBrInst = createTFInt1ToBuiltinInt1(
+      auto *condBrInst = createTensorToInt1Inst(
           getSingleValueResult(equalComparisonInst), BA, loc, FP.deviceInfo);
       condBrOperand = getSingleValueResult(condBrInst);
     }
