@@ -49,6 +49,7 @@ enum class AllocationArena;
 class ArchetypeType;
 class AssociatedTypeDecl;
 class ASTContext;
+enum BufferPointerTypeKind : unsigned;
 class ClassDecl;
 class DependentMemberType;
 class GenericTypeParamDecl;
@@ -713,6 +714,14 @@ public:
   /// current type.
   Type wrapInPointer(PointerTypeKind kind);
   
+  /// Determines the element type of a known Unsafe[Mutable][Raw]BufferPointer
+  /// variant, or returns null if the type is not a buffer pointer.
+  Type getAnyBufferPointerElementType(BufferPointerTypeKind &BPTK);
+  Type getAnyBufferPointerElementType() {
+    BufferPointerTypeKind Ignore;
+    return getAnyBufferPointerElementType(Ignore);
+  }
+
   /// Determine whether the given type is "specialized", meaning that
   /// it involves generic types for which generic arguments have been provided.
   /// For example, the types Vector<Int> and Vector<Int>.Element are both
