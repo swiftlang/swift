@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 import sourcekitd
+import Foundation
 
 public class SourceKitdService {
 
