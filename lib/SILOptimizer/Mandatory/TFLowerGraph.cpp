@@ -318,9 +318,9 @@ public:
   /// function to wire up control dependence edges properly. In particular, the
   /// graph node that runs this function in the call-site is treated as a
   /// side-effecting node, and will be threaded via control edges with other
-  /// side-effecting nodes in the caller. This is unless we are building a top
-  /// level graph function, in which case we ignore `funcHasSideEffects`, as the
-  /// top level function gets called in a `TF_SessionRun()` call.
+  /// side-effecting nodes in the caller. This is true unless we are building a
+  /// top level graph function, in which case we ignore `funcHasSideEffects`, as
+  /// the top level function gets called in a `TF_SessionRun()` call.
   ///
   /// This emits an error and returns true on error.
   bool buildGraphFunction(const GraphFunctionBody &graphBody, StringRef name,
