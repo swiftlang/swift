@@ -16,6 +16,7 @@ from __future__ import print_function
 import argparse
 import os.path
 import subprocess
+import sys
 
 def quote(arg):
     return repr(arg)
@@ -48,13 +49,25 @@ class CommandRunner(object):
         # FIXME: dump stderr at this point
         assert copy_proc.returncode == 0, "sftp fetch failed"
 
+    def run_remote(self, command):
+        remote_proc = self.open_remote(command)
+        (output, _) = remote_proc.communicate()
+        if remote_proc.returncode:
+            # FIXME: We probably still want to fetch the output files, to see
+            # what went wrong.
+            sys.exit(remote_proc.returncode)
+        return output
+
 class RemoteCommandRunner(CommandRunner):
     def __init__(self, remote_host):
         self.remote_host = remote_host
 
-    def run_remote(self, command):
-        return subprocess.check_output(['/usr/bin/ssh', '-n', self.remote_host, '--'] +
-            [quote(arg) for arg in command])
+    def open_remote(self, command):
+        return subprocess.Popen(['/usr/bin/ssh', '-n', self.remote_host, '--'] +
+            [quote(arg) for arg in command],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=None)
 
     def open_sftp(self):
         return subprocess.Popen(['/usr/bin/sftp', '-b', '-', self.remote_host],
@@ -63,8 +76,11 @@ class RemoteCommandRunner(CommandRunner):
             stderr=subprocess.PIPE)
 
 class LocalCommandRunner(CommandRunner):
-    def run_remote(self, command):
-        return subprocess.check_output(command)
+    def open_remote(self, command):
+        return subprocess.Popen(command,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=None)
 
     def open_sftp(self):
         return subprocess.Popen(['/usr/bin/sftp', '-b', '-', '-D', '/usr/libexec/sftp-server'],

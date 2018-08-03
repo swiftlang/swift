@@ -1,0 +1,2 @@
+RUN: not %debug-remote-run false >%t.txt 2>&1
+RUN: test -f %t.txt -a ! -s %t.txt
