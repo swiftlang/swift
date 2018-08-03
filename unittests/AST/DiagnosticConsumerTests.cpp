@@ -63,7 +63,7 @@ TEST(FileSpecificDiagnosticConsumer, SubConsumersFinishInOrder) {
   auto consumerUnaffiliated = llvm::make_unique<ExpectationDiagnosticConsumer>(
       consumerA.get(), None);
 
-  SmallVector<FileSpecificDiagnosticConsumer::ConsumerPair, 2> consumers;
+  SmallVector<FileSpecificDiagnosticConsumer::Subconsumer, 2> consumers;
   consumers.emplace_back("A", std::move(consumerA));
   consumers.emplace_back("", std::move(consumerUnaffiliated));
 
@@ -82,7 +82,7 @@ TEST(FileSpecificDiagnosticConsumer, InvalidLocDiagsGoToEveryConsumer) {
   auto consumerUnaffiliated = llvm::make_unique<ExpectationDiagnosticConsumer>(
       consumerA.get(), expected);
 
-  SmallVector<FileSpecificDiagnosticConsumer::ConsumerPair, 2> consumers;
+  SmallVector<FileSpecificDiagnosticConsumer::Subconsumer, 2> consumers;
   consumers.emplace_back("A", std::move(consumerA));
   consumers.emplace_back("", std::move(consumerUnaffiliated));
 
@@ -122,7 +122,7 @@ TEST(FileSpecificDiagnosticConsumer, ErrorsWithLocationsGoToExpectedConsumers) {
   auto consumerB = llvm::make_unique<ExpectationDiagnosticConsumer>(
       consumerA.get(), expectedB);
 
-  SmallVector<FileSpecificDiagnosticConsumer::ConsumerPair, 2> consumers;
+  SmallVector<FileSpecificDiagnosticConsumer::Subconsumer, 2> consumers;
   consumers.emplace_back("A", std::move(consumerA));
   consumers.emplace_back("B", std::move(consumerB));
 
@@ -176,7 +176,7 @@ TEST(FileSpecificDiagnosticConsumer,
   auto consumerUnaffiliated = llvm::make_unique<ExpectationDiagnosticConsumer>(
       consumerA.get(), expectedUnaffiliated);
 
-  SmallVector<FileSpecificDiagnosticConsumer::ConsumerPair, 2> consumers;
+  SmallVector<FileSpecificDiagnosticConsumer::Subconsumer, 2> consumers;
   consumers.emplace_back("A", std::move(consumerA));
   consumers.emplace_back("", std::move(consumerUnaffiliated));
 
@@ -221,7 +221,7 @@ TEST(FileSpecificDiagnosticConsumer, WarningsAndRemarksAreTreatedLikeErrors) {
   auto consumerUnaffiliated = llvm::make_unique<ExpectationDiagnosticConsumer>(
       consumerA.get(), expectedUnaffiliated);
 
-  SmallVector<FileSpecificDiagnosticConsumer::ConsumerPair, 2> consumers;
+  SmallVector<FileSpecificDiagnosticConsumer::Subconsumer, 2> consumers;
   consumers.emplace_back("A", std::move(consumerA));
   consumers.emplace_back("", std::move(consumerUnaffiliated));
 
@@ -273,7 +273,7 @@ TEST(FileSpecificDiagnosticConsumer, NotesAreAttachedToErrors) {
   auto consumerUnaffiliated = llvm::make_unique<ExpectationDiagnosticConsumer>(
       consumerA.get(), expectedUnaffiliated);
 
-  SmallVector<FileSpecificDiagnosticConsumer::ConsumerPair, 2> consumers;
+  SmallVector<FileSpecificDiagnosticConsumer::Subconsumer, 2> consumers;
   consumers.emplace_back("A", std::move(consumerA));
   consumers.emplace_back("", std::move(consumerUnaffiliated));
 
@@ -335,7 +335,7 @@ TEST(FileSpecificDiagnosticConsumer, NotesAreAttachedToWarningsAndRemarks) {
   auto consumerUnaffiliated = llvm::make_unique<ExpectationDiagnosticConsumer>(
       consumerA.get(), expectedUnaffiliated);
 
-  SmallVector<FileSpecificDiagnosticConsumer::ConsumerPair, 2> consumers;
+  SmallVector<FileSpecificDiagnosticConsumer::Subconsumer, 2> consumers;
   consumers.emplace_back("A", std::move(consumerA));
   consumers.emplace_back("", std::move(consumerUnaffiliated));
 
@@ -394,7 +394,7 @@ TEST(FileSpecificDiagnosticConsumer, NotesAreAttachedToErrorsEvenAcrossFiles) {
   auto consumerB = llvm::make_unique<ExpectationDiagnosticConsumer>(
       consumerA.get(), expectedB);
 
-  SmallVector<FileSpecificDiagnosticConsumer::ConsumerPair, 2> consumers;
+  SmallVector<FileSpecificDiagnosticConsumer::Subconsumer, 2> consumers;
   consumers.emplace_back("A", std::move(consumerA));
   consumers.emplace_back("B", std::move(consumerB));
 
@@ -457,7 +457,7 @@ TEST(FileSpecificDiagnosticConsumer,
   auto consumerUnaffiliated = llvm::make_unique<ExpectationDiagnosticConsumer>(
       consumerA.get(), expectedUnaffiliated);
 
-  SmallVector<FileSpecificDiagnosticConsumer::ConsumerPair, 2> consumers;
+  SmallVector<FileSpecificDiagnosticConsumer::Subconsumer, 2> consumers;
   consumers.emplace_back("A", std::move(consumerA));
   consumers.emplace_back("", std::move(consumerUnaffiliated));
 
@@ -512,7 +512,7 @@ TEST(FileSpecificDiagnosticConsumer,
   auto consumerUnaffiliated = llvm::make_unique<ExpectationDiagnosticConsumer>(
       consumerA.get(), expectedUnaffiliated);
 
-  SmallVector<FileSpecificDiagnosticConsumer::ConsumerPair, 2> consumers;
+  SmallVector<FileSpecificDiagnosticConsumer::Subconsumer, 2> consumers;
   consumers.emplace_back("A", std::move(consumerA));
   consumers.emplace_back("", std::move(consumerUnaffiliated));
 

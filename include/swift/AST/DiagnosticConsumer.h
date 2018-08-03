@@ -142,12 +142,12 @@ public:
   /// that are not in any of the other consumers' files.
   /// A null pointer for the DiagnosticConsumer means that diagnostics for this
   /// file should not be emitted.
-  using ConsumerPair =
+  using Subconsumer =
       std::pair<std::string, std::unique_ptr<DiagnosticConsumer>>;
 
 private:
   /// All consumers owned by this FileSpecificDiagnosticConsumer.
-  const SmallVector<ConsumerPair, 4> SubConsumers;
+  const SmallVector<Subconsumer, 4> SubConsumers;
 
 public:
   // The commented-out consts are there because the data does not change
@@ -194,7 +194,7 @@ public:
   /// There must not be two consumers for the same file (i.e., having the same
   /// buffer name).
   explicit FileSpecificDiagnosticConsumer(
-      SmallVectorImpl<ConsumerPair> &consumers);
+      SmallVectorImpl<Subconsumer> &consumers);
 
   void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
                         DiagnosticKind Kind,

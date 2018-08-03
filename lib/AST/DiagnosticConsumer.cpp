@@ -35,7 +35,7 @@ llvm::SMLoc DiagnosticConsumer::getRawLoc(SourceLoc loc) {
 
 LLVM_ATTRIBUTE_UNUSED
 static bool hasDuplicateFileNames(
-    ArrayRef<FileSpecificDiagnosticConsumer::ConsumerPair> consumers) {
+    ArrayRef<FileSpecificDiagnosticConsumer::Subconsumer> consumers) {
   llvm::StringSet<> seenFiles;
   for (const auto &consumerPair : consumers) {
     if (consumerPair.first.empty()) {
@@ -54,8 +54,8 @@ static bool hasDuplicateFileNames(
 }
 
 FileSpecificDiagnosticConsumer::FileSpecificDiagnosticConsumer(
-    SmallVectorImpl<ConsumerPair> &consumers)
-  : SubConsumers(std::move(consumers)) {
+    SmallVectorImpl<Subconsumer> &consumers)
+    : SubConsumers(std::move(consumers)) {
   assert(!SubConsumers.empty() &&
          "don't waste time handling diagnostics that will never get emitted");
   assert(!hasDuplicateFileNames(SubConsumers) &&
@@ -65,7 +65,7 @@ FileSpecificDiagnosticConsumer::FileSpecificDiagnosticConsumer(
 void FileSpecificDiagnosticConsumer::computeConsumersOrderedByRange(
     SourceManager &SM) {
   // Look up each file's source range and add it to the "map" (to be sorted).
-  for (const ConsumerPair &pair : SubConsumers) {
+  for (const Subconsumer &pair : SubConsumers) {
     if (pair.first.empty())
       continue;
 
@@ -121,9 +121,9 @@ FileSpecificDiagnosticConsumer::consumerSpecificInformationForLocation(
     // can't find buffers for the inputs).
     assert(!SubConsumers.empty());
     if (!SM.getIDForBufferIdentifier(SubConsumers.begin()->first).hasValue()) {
-      assert(llvm::none_of(SubConsumers, [&](const ConsumerPair &pair) {
-            return SM.getIDForBufferIdentifier(pair.first).hasValue();
-          }));
+      assert(llvm::none_of(SubConsumers, [&](const Subconsumer &pair) {
+        return SM.getIDForBufferIdentifier(pair.first).hasValue();
+      }));
       return None;
     }
     auto *mutableThis = const_cast<FileSpecificDiagnosticConsumer*>(this);
