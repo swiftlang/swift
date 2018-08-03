@@ -826,15 +826,11 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
       // Okay, we were able to decode the array.  See if we can fold all of the
       // elements we found.
       for (auto *use : elementsAtInit) {
-        SymbolicValue eltCst = evaluator.getUnknown((SILInstruction *)apply,
-                                                    UnknownReason::Default);
-        if (auto *store = dyn_cast<StoreInst>(use->getUser())) {
+        SymbolicValue eltCst;
+        if (auto *store = dyn_cast<StoreInst>(use->getUser()))
           eltCst = getConstantValue(store->getSrc());
-        } else {
-          auto addr = computeSingleStoreAddressValue(use->get());
-          if (addr.getKind() == SymbolicValue::Address)
-            eltCst = addr.getAddressValueMemoryObject()->getValue();
-        }
+        else
+          eltCst = computeLoadResult(use->get());
 
         if (!eltCst.isConstant())
           return eltCst;
@@ -1067,17 +1063,21 @@ static bool updateIndexedElement(SymbolicValue &aggregate,
 SymbolicValue
 ConstExprFunctionState::computeSingleStoreAddressValue(SILValue addr) {
   assert(!calculatedValues.count(addr));
-  assert(addr->getType().isAddress() && "expect an address value");
+
+  // The only value we can otherwise handle is an alloc_stack instruction.
+  auto alloc = dyn_cast<AllocStackInst>(addr);
+  if (!alloc)
+    return evaluator.getUnknown(addr, UnknownReason::Default);
 
   // Keep track of the value found for the first constant store.
   auto memoryAddress =
-      createMemoryObject(addr, SymbolicValue::getUninitMemory());
+      createMemoryObject(alloc, SymbolicValue::getUninitMemory());
   auto *memoryObject = memoryAddress.getAddressValueMemoryObject();
 
   // Okay, check out all of the users of this value looking for semantic stores
   // into the address.  If we find more than one, then this was a var or
   // something else we can't handle.
-  for (auto *use : addr->getUses()) {
+  for (auto *use : alloc->getUses()) {
     auto user = use->getUser();
 
     // Ignore markers, loads, and other things that aren't stores to this stack
@@ -1630,9 +1630,11 @@ bool ConstExprEvaluator::decodeAllocUninitializedArray(
       if (auto *store = dyn_cast_or_null<StoreInst>(user)) {
         if (store->getDest() != use->get())
           return true;
+        if (arrayInsts)
+          arrayInsts->insert(store);
       } else if (auto *applyInst = dyn_cast_or_null<ApplyInst>(user)) {
         // In this case, the element's address is passed to an apply where
-        // the initialization happens in-place. For example, the SIL snippet
+        // the initialization happens in-place.  For example, the SIL snippet
         // may look like below:
         //
         //   %input_value_addr = something $*Int
@@ -1650,6 +1652,8 @@ bool ConstExprEvaluator::decodeAllocUninitializedArray(
         unsigned argIndex = use->getOperandNumber() - 1;
         if (argIndex >= numIndirectResults)
           return true;
+        // An apply can have arbitrary side effects, so let's be conservative.
+        hadUnknownUsers = true;
       } else
         return true;
 
@@ -1659,9 +1663,6 @@ bool ConstExprEvaluator::decodeAllocUninitializedArray(
 
       // If we got a store/apply to a valid index, it must be our element.
       elementsAtInit[index] = use;
-
-      if (arrayInsts)
-        arrayInsts->insert(user);
 
       // Track how many elements we see so we can know if we got them all.
       --numElements;
