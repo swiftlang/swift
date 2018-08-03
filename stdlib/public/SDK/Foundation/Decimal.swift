@@ -370,8 +370,8 @@ extension Decimal {
         var compactValue = value
         var exponent: Int32 = 0
         while compactValue % 10 == 0 {
-            compactValue = compactValue / 10
-            exponent = exponent + 1
+            compactValue /= 10
+            exponent += 1
         }
         _isCompact = 1
         _exponent = exponent
@@ -385,11 +385,9 @@ extension Decimal {
     }
     
     public init(_ value: Int64) {
+        self.init(value.magnitude)
         if value < 0 {
-            self.init(value == Int64.min ? UInt64(Int64.max) + 1 : UInt64(abs(value)))
             _isNegative = 1
-        } else {
-            self.init(UInt64(value))
         }
     }
     
