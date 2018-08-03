@@ -1310,8 +1310,8 @@ private:
   void emitLazyPrivateDefinitions();
   void addRuntimeResolvableType(NominalTypeDecl *nominal);
 
-  /// Add all conformances of \p Nominal to LazyWitnessTables.
-  void addLazyConformances(NominalTypeDecl *Nominal);
+  /// Add all conformances of the given \c DeclContext LazyWitnessTables.
+  void addLazyConformances(DeclContext *dc);
 
 //--- Global context emission --------------------------------------------------
 public:
