@@ -1,6 +1,12 @@
-set(EXTRA_COMPILE_FLAGS "-F" "${SWIFT_LIBRARY_OUTPUT_INTDIR}")
-set(EXTRA_LINKER_FLAGS "-Xlinker" "-rpath" "-Xlinker" "${SWIFT_LIBRARY_OUTPUT_INTDIR}"
-    "-Xlinker" "-F" "-Xlinker" "${SWIFT_LIBRARY_OUTPUT_INTDIR}")
+if(SWIFT_SOURCEKIT_USE_INPROC_LIBRARY)
+  set(EXTRA_COMPILE_FLAGS "-I" "${SOURCEKITD_SOURCE_DIR}/include/sourcekitd")
+  set(SOURCEKITD_LINK_LIBS sourcekitdInProc)
+  set(INSTALLED_COMP sourcekit-inproc)
+else()
+  set(EXTRA_COMPILE_FLAGS "-F" "${SWIFT_LIBRARY_OUTPUT_INTDIR}")
+  set(SOURCEKITD_LINK_LIBS sourcekitd)
+  set(INSTALLED_COMP sourcekit-xpc-service)
+endif()
 
 add_swift_library(swiftSwiftLang SHARED
   SwiftLang.swift
@@ -11,10 +17,8 @@ add_swift_library(swiftSwiftLang SHARED
   UIDs.swift.gyb
 
   DEPENDS sourcekitd-test
-  PRIVATE_LINK_LIBRARIES sourcekitd
+  PRIVATE_LINK_LIBRARIES ${SOURCEKITD_LINK_LIBS}
   SWIFT_COMPILE_FLAGS ${EXTRA_COMPILE_FLAGS}
-  LINK_FLAGS ${EXTRA_LINKER_FLAGS}
-  SWIFT_MODULE_DEPENDS Foundation
-  INSTALL_IN_COMPONENT sourcekit-xpc-service
-  TARGET_SDKS OSX
+  INSTALL_IN_COMPONENT ${INSTALLED_COMP}
+  TARGET_SDKS ${SOURCEKIT_DEFAULT_TARGET_SDK}
   IS_STDLIB)

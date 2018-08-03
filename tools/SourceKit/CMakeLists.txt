@@ -91,6 +91,7 @@ include_directories(BEFORE
 )
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
+  set(SOURCEKIT_DEFAULT_TARGET_SDK "LINUX")
   if(SWIFT_BUILD_SOURCEKIT)
     include(ExternalProject)
     ExternalProject_Add(libdispatch
