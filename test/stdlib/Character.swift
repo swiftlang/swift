@@ -231,12 +231,7 @@ func checkRoundTripThroughCharacter(_ s: String) {
 }
 
 func isSmallRepresentation(_ s: String) -> Bool {
-  switch Character(s)._representation {
-    case .smallUTF16:
-      return true
-    default:
-      return false
-  }
+  return Character(s)._isSmall
 }
 
 func checkUnicodeScalars(_ s: String) {
