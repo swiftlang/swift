@@ -710,54 +710,39 @@ Type ConstraintSystem::getFixedTypeRecursive(Type type,
                                              bool wantRValue,
                                              bool retainParens) {
 
-  // FIXME: This function doesn't strictly honor retainParens
-  //        everywhere.
+  if (wantRValue)
+    type = type->getRValueType();
 
-  if (retainParens) {
-    if (wantRValue)
-      type = type->getRValueType();
-
-    if (auto *parenTy = dyn_cast<ParenType>(type.getPointer())) {
+  if (auto *parenTy = dyn_cast<ParenType>(type.getPointer())) {
+    if (retainParens) {
       auto fixed = getFixedTypeRecursive(parenTy->getUnderlyingType(), flags,
                                          wantRValue, retainParens);
       return withParens(*this, fixed, parenTy);
     }
   }
 
-  while (true) {
-    if (wantRValue)
-      type = type->getRValueType();
+  if (auto depMemType = type->getAs<DependentMemberType>()) {
+    if (!depMemType->getBase()->isTypeVariableOrMember()) return type;
 
-    if (auto depMemType = type->getAs<DependentMemberType>()) {
-      if (!depMemType->getBase()->isTypeVariableOrMember()) return type;
+    // FIXME: Perform a more limited simplification?
+    Type newType = simplifyType(type);
+    if (newType.getPointer() == type.getPointer()) return type;
 
-      // FIXME: Perform a more limited simplification?
-      Type newType = simplifyType(type);
-      if (newType.getPointer() == type.getPointer()) return type;
+    // Once we've simplified a dependent member type, we need to generate a
+    // new constraint.
+    flags |= TMF_GenerateConstraints;
 
-      type = newType;
+    return getFixedTypeRecursive(newType, flags, wantRValue, retainParens);
+  }
 
-      // Once we've simplified a dependent member type, we need to generate a
-      // new constraint.
-      flags |= TMF_GenerateConstraints;
-      continue;
-    }
-
-    auto typeVar = type->getAs<TypeVariableType>();
-    if (!typeVar)
-      return type;
-
-    if (auto fixed = getFixedType(typeVar)) {
-      type = fixed;
-      continue;
-    }
-
-    if (retainParens)
-      if (auto *parenType = dyn_cast<ParenType>(type.getPointer()))
-        return withParens(*this, getRepresentative(typeVar), parenType);
+  if (auto typeVar = type->getAs<TypeVariableType>()) {
+    if (auto fixed = getFixedType(typeVar))
+      return getFixedTypeRecursive(fixed, flags, wantRValue, retainParens);
 
     return getRepresentative(typeVar);
   }
+
+  return type;
 }
 
 /// Does a var or subscript produce an l-value?
