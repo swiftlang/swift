@@ -163,7 +163,7 @@ public func test_bool_param(cond: Bool, // expected-warning {{'cond' implicitly 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}test_bool_param{{.*}}
 // CHECK: sil private @{{.*}}test_bool_param{{.*}} : $@callee_owned (TensorHandle<Builtin.Int1>, TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float>
 // CHECK: bb0(%0 : $TensorHandle<Builtin.Int1>, %1 : $TensorHandle<Float>, %2 : $TensorHandle<Float>):
-// CHECK: %3 = graph_op "tf_tensor_to_i1"(%0 : $TensorHandle<Builtin.Int1>) : $Builtin.Int1
+// CHECK: %3 = graph_op "tf_tensor_to_i1"(%0 : $TensorHandle<Builtin.Int1>) {{.*}} : $Builtin.Int1
 // CHECK: cond_br %3, bb2, bb1
 
 
@@ -197,7 +197,7 @@ public func test_bool_param2(cond: Bool, // expected-warning {{'cond' implicitly
 // CHECK: sil private @{{.*}}test_bool_param2{{.*}}
 // CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>, %2 : $TensorHandle<Builtin.Int1>):
 // CHECK:         graph_op "Add,i,i"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) {{.*}} : $TensorHandle<Float>
-// CHECK-NEXT:    [[BOOL:%.*]] = graph_op "tf_tensor_to_i1"(%2 : $TensorHandle<Builtin.Int1>) : $Builtin.Int1
+// CHECK-NEXT:    [[BOOL:%.*]] = graph_op "tf_tensor_to_i1"(%2 : $TensorHandle<Builtin.Int1>) {{.*}} : $Builtin.Int1
 // CHECK-NEXT:    cond_br [[BOOL]]
 // ...
 // CHECK: }
@@ -270,7 +270,7 @@ public func test_while1(maxCount: Int,  // expected-warning {{'maxCount' implici
 // CHECK:       [[NEXTA:%.*]] = graph_op "Sub,i,i"([[A]] : $TensorHandle<Float>, %1 : $TensorHandle<Float>) {{.*}} : $TensorHandle<Float>
 // CHECK:       [[NEXTCOUNT:%.*]] = graph_op "Add,i,i"([[COUNT]] : $TensorHandle<Builtin.Int64>
 // CHECK:       [[CONDT:%.*]] = graph_op "Less,i,i"([[NEXTCOUNT]] : $TensorHandle<Builtin.Int64>
-// CHECK-NEXT:   [[COND:%.*]] = graph_op "tf_tensor_to_i1"([[CONDT]] : $TensorHandle<Builtin.Int1>) : $Builtin.Int1
+// CHECK-NEXT:   [[COND:%.*]] = graph_op "tf_tensor_to_i1"([[CONDT]] : $TensorHandle<Builtin.Int1>) {{.*}} : $Builtin.Int1
 // CHECK-NEXT:   cond_br [[COND]], bb5, bb4
 
 // CHECK: bb5:

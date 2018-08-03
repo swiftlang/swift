@@ -80,7 +80,7 @@ public func loopTest(breakCount:Int32) -> Int32 {
 
 //-- New Header simply checks flag
 // CHECK: bb9([[SUM_AT_HDR]] : $Builtin.Int32, [[COUNT_AT_HDR]] : $Builtin.Int32, [[SUM_ESCAPING_AT_HDR]] : $Builtin.Int32, [[HDR_EXIT_ARG:%.*]] : $TensorHandle<Builtin.Int32>, [[HDR_FLAG_ARG:%.*]] : $TensorHandle<Builtin.Int1>):
-// CHECK:  [[B:%.*]] = graph_op "tf_tensor_to_i1"([[HDR_FLAG_ARG]] : $TensorHandle<Builtin.Int1>) : $Builtin.Int1
+// CHECK:  [[B:%.*]] = graph_op "tf_tensor_to_i1"([[HDR_FLAG_ARG]] : $TensorHandle<Builtin.Int1>) {{.*}} : $Builtin.Int1
 // CHECK:  cond_br [[B]], bb1, bb11
 
 
@@ -88,7 +88,7 @@ public func loopTest(breakCount:Int32) -> Int32 {
 // CHECK: bb12:
 // CHECK:  [[ZERO_INDEX:%.*]] = graph_op  "Const"() {dtype$dtype: $Builtin.Int32, value$tensor: i32 0, __device: "ALL_DEVICES"} : $TensorHandle<Builtin.Int32>
 // CHECK:  [[A:%.*]] = graph_op "Equal,i,i"([[HDR_EXIT_ARG]] : $TensorHandle<Builtin.Int32>, [[ZERO_INDEX]] : $TensorHandle<Builtin.Int32>) {{.*}} : $TensorHandle<Builtin.Int1>
-// CHECK:  [[B:%.*]] = graph_op "tf_tensor_to_i1"([[A]] : $TensorHandle<Builtin.Int1>) : $Builtin.Int1
+// CHECK:  [[B:%.*]] = graph_op "tf_tensor_to_i1"([[A]] : $TensorHandle<Builtin.Int1>) {{.*}} : $Builtin.Int1
 // CHECK:  cond_br [[B]], bb3, bb7
 
 sil @$loopWithBreak : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {

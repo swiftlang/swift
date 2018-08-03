@@ -1600,6 +1600,23 @@ tf::createConstTensor(Type elementType, SymbolicValue scalars,
                                 /*operands*/{}, attributes, resultType);
 }
 
+GraphOperationInst *
+tf::createTFInt1ToBuiltinInt1(SILValue value, SILBuilder &builder,
+                              SILLocation location,
+                              GraphFunctionDeviceInfo &deviceInfo) {
+  ASTContext &context = builder.getASTContext();
+  SmallVector<GraphOperationAttribute, 1> attributes;
+  deviceInfo.handleDevicePlacement(
+      "tf_tensor_to_i1",
+      /*opDevice*/ getDeviceString(DeviceType::ALL),
+      builder.getModule().getASTContext(), attributes);
+  GraphOperationInst *condValue = builder.createGraphOperation(
+    location, context.getIdentifier("tf_tensor_to_i1"),
+      /*operands*/ {value}, attributes,
+      {SILType::getBuiltinIntegerType(1, context)});
+  assert(condValue->getNumResults() == 1);
+  return condValue;
+}
 
 //===----------------------------------------------------------------------===//
 // TensorFunctionClassifier Implementation

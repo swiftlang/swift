@@ -636,7 +636,7 @@ SILBasicBlock *SingleExitLoopTransformer::createNewExitBlockWithDemux(
         GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
     SmallVector<GraphOperationAttribute, 2> attributes;
     deviceInfo->handleDevicePlacement(
-        "Equal", /*opDevice*/ getDeviceString(DeviceType::ALL),
+        equalOpName, /*opDevice*/ getDeviceString(DeviceType::ALL),
         builder.getModule().getASTContext(), attributes);
     GraphOperationInst *condTensorInst = builder.createGraphOperation(
         headerLocation, context.getIdentifier(equalOpName),
@@ -648,12 +648,9 @@ SILBasicBlock *SingleExitLoopTransformer::createNewExitBlockWithDemux(
         {convertElementTypeToTensorValueType(
             SILType::getBuiltinIntegerType(1, context))});
     assert(condTensorInst->getNumResults() == 1);
-    SILValue condTensor = condTensorInst->getResults()[0];
-    GraphOperationInst *condValue = builder.createGraphOperation(
-        headerLocation, context.getIdentifier("tf_tensor_to_i1"),
-        /*operands*/ {condTensor}, /*attributes */ {},
-        {SILType::getBuiltinIntegerType(1, context)});
-    assert(condValue->getNumResults() == 1);
+
+    GraphOperationInst *condValue = createTFInt1ToBuiltinInt1(
+        condTensorInst->getResults()[0], builder, headerLocation, *deviceInfo);
     builder.createCondBranch(headerLocation, condValue->getResults()[0],
                              trueBlock, demuxBlock);
     demuxBlock = newBlock;
@@ -684,7 +681,6 @@ bool SingleExitLoopTransformer::transform() {
     }
   }
   SILBuilder builder(header);
-  ASTContext &context = builder.getASTContext();
 
   // Create a new header and get the exitIndex argument.
   std::pair<SILBasicBlock *, SILValue> headerResult = createNewHeader();
@@ -708,11 +704,8 @@ bool SingleExitLoopTransformer::transform() {
     builder.setInsertionPoint(newHeader);
     SILLocation headerLocation =
         getUserSourceLocation(header->getTerminator()->getDebugLocation());
-    GraphOperationInst *loopExitCond = builder.createGraphOperation(
-        headerLocation, context.getIdentifier("tf_tensor_to_i1"),
-        /*operands*/ {newHeader->getArguments().back()}, /*attributes*/ {},
-          {SILType::getBuiltinIntegerType(1, context)});
-    assert(loopExitCond->getNumResults() == 1);
+    GraphOperationInst *loopExitCond = createTFInt1ToBuiltinInt1(
+        newHeader->getArguments().back(), builder, headerLocation, *deviceInfo);
     builder.createCondBranch(headerLocation, loopExitCond->getResults()[0],
                              header, newExitBlock);
   }
