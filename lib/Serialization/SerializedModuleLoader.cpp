@@ -232,6 +232,42 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
                           moduleBuffer, moduleDocBuffer, scratch);
 }
 
+static std::pair<StringRef, clang::VersionTuple>
+getOSAndVersionForDiagnostics(const llvm::Triple &triple) {
+  StringRef osName;
+  unsigned major, minor, micro;
+  if (triple.isMacOSX()) {
+    // macOS triples represent their versions differently, so we have to use the
+    // special accessor.
+    triple.getMacOSXVersion(major, minor, micro);
+    osName = swift::prettyPlatformString(PlatformKind::OSX);
+  } else {
+    triple.getOSVersion(major, minor, micro);
+    if (triple.isWatchOS()) {
+      osName = swift::prettyPlatformString(PlatformKind::watchOS);
+    } else if (triple.isTvOS()) {
+      assert(triple.isiOS() &&
+             "LLVM treats tvOS as a kind of iOS, so tvOS is checked first");
+      osName = swift::prettyPlatformString(PlatformKind::tvOS);
+    } else if (triple.isiOS()) {
+      osName = swift::prettyPlatformString(PlatformKind::iOS);
+    } else {
+      assert(!triple.isOSDarwin() && "unknown Apple OS");
+      // Fallback to the LLVM triple name. This isn't great (it won't be
+      // capitalized or anything), but it's better than nothing.
+      osName = triple.getOSName();
+    }
+  }
+
+  assert(!osName.empty());
+  clang::VersionTuple version;
+  if (micro != 0)
+    version = clang::VersionTuple(major, minor, micro);
+  else
+    version = clang::VersionTuple(major, minor);
+  return {osName, version};
+}
+
 FileUnit *SerializedModuleLoader::loadAST(
     ModuleDecl &M, Optional<SourceLoc> diagLoc,
     std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
@@ -436,22 +472,17 @@ FileUnit *SerializedModuleLoader::loadAST(
     if (Ctx.LangOpts.DebuggerSupport)
       diagKind = diag::serialization_target_incompatible_repl;
     Ctx.Diags.diagnose(*diagLoc, diagKind,
-                       loadInfo.targetTriple, moduleBufferID);
+                       M.getName(), loadInfo.targetTriple, moduleBufferID);
     break;
   }
 
   case serialization::Status::TargetTooNew: {
     llvm::Triple moduleTarget(llvm::Triple::normalize(loadInfo.targetTriple));
 
-    StringRef osName;
-    unsigned major, minor, micro;
-    if (moduleTarget.isMacOSX()) {
-      osName = swift::prettyPlatformString(PlatformKind::OSX);
-      moduleTarget.getMacOSXVersion(major, minor, micro);
-    } else {
-      osName = moduleTarget.getOSName();
-      moduleTarget.getOSVersion(major, minor, micro);
-    }
+    std::pair<StringRef, clang::VersionTuple> moduleOSInfo =
+        getOSAndVersionForDiagnostics(moduleTarget);
+    std::pair<StringRef, clang::VersionTuple> compilationOSInfo =
+        getOSAndVersionForDiagnostics(Ctx.LangOpts.Target);
 
     // FIXME: This doesn't handle a non-debugger REPL, which should also treat
     // this as a non-fatal error.
@@ -459,7 +490,8 @@ FileUnit *SerializedModuleLoader::loadAST(
     if (Ctx.LangOpts.DebuggerSupport)
       diagKind = diag::serialization_target_too_new_repl;
     Ctx.Diags.diagnose(*diagLoc, diagKind,
-                       osName, major, minor, micro, moduleBufferID);
+                       compilationOSInfo.first, compilationOSInfo.second,
+                       M.getName(), moduleOSInfo.second, moduleBufferID);
     break;
   }
   }
