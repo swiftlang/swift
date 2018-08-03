@@ -3015,6 +3015,14 @@ static inline bool isRawPointerKind(PointerTypeKind PTK) {
   llvm_unreachable("Unhandled PointerTypeKind in switch.");
 }
 
+// Kinds of buffer pointer types.
+enum BufferPointerTypeKind : unsigned {
+  BPTK_UnsafeMutableRawBufferPointer,
+  BPTK_UnsafeRawBufferPointer,
+  BPTK_UnsafeMutableBufferPointer,
+  BPTK_UnsafeBufferPointer,
+};
+
 /// NominalTypeDecl - a declaration of a nominal type, like a struct.
 class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   SourceRange Braces;

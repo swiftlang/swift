@@ -618,6 +618,31 @@ Type TypeBase::getAnyPointerElementType(PointerTypeKind &PTK) {
   return Type();
 }
 
+Type TypeBase::getAnyBufferPointerElementType(BufferPointerTypeKind &BPTK) {
+  auto &C = getASTContext();
+  if (auto nominalTy = getAs<NominalType>()) {
+    if (nominalTy->getDecl() == C.getUnsafeMutableRawBufferPointerDecl()) {
+      BPTK = BPTK_UnsafeMutableRawBufferPointer;
+      return C.TheEmptyTupleType;
+    }
+    if (nominalTy->getDecl() == C.getUnsafeRawBufferPointerDecl()) {
+      BPTK = BPTK_UnsafeRawBufferPointer;
+      return C.TheEmptyTupleType;
+    }
+  }
+  if (auto boundTy = getAs<BoundGenericType>()) {
+    if (boundTy->getDecl() == C.getUnsafeMutableBufferPointerDecl()) {
+      BPTK = BPTK_UnsafeMutableBufferPointer;
+    } else if (boundTy->getDecl() == C.getUnsafeBufferPointerDecl()) {
+      BPTK = BPTK_UnsafeBufferPointer;
+    } else {
+      return Type();
+    }
+    return boundTy->getGenericArgs()[0];
+  }
+  return Type();
+}
+
 Type TypeBase::lookThroughAllOptionalTypes() {
   Type type(this);
   while (auto objType = type->getOptionalObjectType())
