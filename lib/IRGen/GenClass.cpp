@@ -133,6 +133,22 @@ static SILType getSelfType(ClassDecl *base) {
   return SILType::getPrimitiveObjectType(loweredTy);
 }
 
+/// If the superclass came from another module, we may have dropped
+/// stored properties due to the Swift language version availability of
+/// their types. In these cases we can't precisely lay out the ivars in
+/// the class object at compile time so we need to do runtime layout.
+static bool classHasIncompleteLayout(IRGenModule &IGM,
+                                     ClassDecl *theClass) {
+  if (theClass->getParentModule() == IGM.getSwiftModule())
+    return false;
+
+  for (auto field : theClass->getStoredPropertiesAndMissingMemberPlaceholders())
+    if (isa<MissingMemberDecl>(field))
+      return true;
+
+  return false;
+}
+
 namespace {
   class ClassLayoutBuilder : public StructLayoutBuilder {
     SmallVector<ElementLayout, 8> Elements;
@@ -229,15 +245,13 @@ namespace {
       fieldLayout.AllFieldAccesses = IGM.Context.AllocateCopy(AllFieldAccesses);
       fieldLayout.MetadataRequiresDynamicInitialization =
         ClassMetadataRequiresDynamicInitialization;
+      fieldLayout.HasFixedSize = ClassHasFixedSize;
       return fieldLayout;
     }
 
   private:
     void addFieldsForClass(ClassDecl *theClass, SILType classType) {
       if (theClass->isGenericContext())
-        ClassMetadataRequiresDynamicInitialization = true;
-
-      if (IGM.isResilient(theClass, ResilienceExpansion::Maximal))
         ClassMetadataRequiresDynamicInitialization = true;
 
       if (theClass->hasSuperclass()) {
@@ -251,6 +265,7 @@ namespace {
         // the class object at compile time so we need to do runtime layout.
         if (classHasIncompleteLayout(IGM, superclass)) {
           ClassMetadataRequiresDynamicInitialization = true;
+          ClassHasFixedSize = false;
         }
 
         if (superclass->hasClangNode()) {
@@ -282,9 +297,6 @@ namespace {
             }
         } else if (IGM.isResilient(superclass, ResilienceExpansion::Maximal)) {
           ClassMetadataRequiresDynamicInitialization = true;
-
-          // If the superclass is resilient to us, we cannot statically
-          // know the layout of either its instances or its class objects.
           ClassHasFixedSize = false;
 
           // Furthermore, if the superclass is a generic context, we have to
@@ -306,6 +318,11 @@ namespace {
       // If this class was imported from another module, assume that we may
       // not know its exact layout.
       if (classHasIncompleteLayout(IGM, theClass)) {
+        ClassMetadataRequiresDynamicInitialization = true;
+        ClassHasFixedSize = false;
+      }
+
+      if (IGM.isResilient(theClass, ResilienceExpansion::Maximal)) {
         ClassMetadataRequiresDynamicInitialization = true;
         ClassHasFixedSize = false;
       }
@@ -657,7 +674,7 @@ Address irgen::emitTailProjection(IRGenFunction &IGF, llvm::Value *Base,
   } else {
     llvm::Value *metadata = emitHeapMetadataRefForHeapObject(IGF, Base,
                                                              ClassType);
-    Offset = emitClassFragileInstanceSizeAndAlignMask(IGF,
+    Offset = emitClassResilientInstanceSizeAndAlignMask(IGF,
                                         ClassType.getClassOrBoundGenericClass(),
                                         metadata).first;
   }
@@ -789,17 +806,25 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
     emitClassHeapMetadataRef(IGF, classType, MetadataValueType::TypeMetadata,
                              MetadataState::Complete);
 
-  // FIXME: Long-term, we clearly need a specialized runtime entry point.
-  llvm::Value *size, *alignMask;
-  std::tie(size, alignMask)
-    = emitClassFragileInstanceSizeAndAlignMask(IGF,
-                                   selfType.getClassOrBoundGenericClass(),
-                                   metadata);
+  const StructLayout &structLayout = classTI.getLayout(IGF.IGM, selfType);
+  const ClassLayout &classLayout = classTI.getClassLayout(IGF.IGM, selfType);
 
-  const StructLayout &layout = classTI.getLayout(IGF.IGM, selfType);
-  llvm::Type *destType = layout.getType()->getPointerTo();
+  llvm::Value *size, *alignMask;
+  if (classLayout.HasFixedSize) {
+    assert(structLayout.isFixedLayout());
+
+    size = structLayout.emitSize(IGF.IGM);
+    alignMask = structLayout.emitAlignMask(IGF.IGM);
+  } else {
+    std::tie(size, alignMask)
+      = emitClassResilientInstanceSizeAndAlignMask(IGF,
+                                     selfType.getClassOrBoundGenericClass(),
+                                     metadata);
+  }
+
+  llvm::Type *destType = structLayout.getType()->getPointerTo();
   llvm::Value *val = nullptr;
-  if (llvm::Value *Promoted = stackPromote(IGF, layout, StackAllocSize,
+  if (llvm::Value *Promoted = stackPromote(IGF, structLayout, StackAllocSize,
                                            TailArrays)) {
     val = IGF.Builder.CreateBitCast(Promoted, IGF.IGM.RefCountedPtrTy);
     val = IGF.emitInitStackObjectCall(metadata, val, "reference.new");
@@ -863,7 +888,7 @@ static void getInstanceSizeAndAlignMask(IRGenFunction &IGF,
   llvm::Value *metadata =
     emitHeapMetadataRefForHeapObject(IGF, selfValue, selfType);
   std::tie(size, alignMask)
-    = emitClassFragileInstanceSizeAndAlignMask(IGF, selfClass, metadata);
+    = emitClassResilientInstanceSizeAndAlignMask(IGF, selfClass, metadata);
 }
 
 void irgen::emitClassDeallocation(IRGenFunction &IGF, SILType selfType,
@@ -2225,26 +2250,6 @@ ClassDecl *irgen::getRootClassForMetaclass(IRGenModule &IGM, ClassDecl *C) {
                                      IGM.Context.Id_SwiftObject);
 }
 
-/// If the superclass came from another module, we may have dropped
-/// stored properties due to the Swift language version availability of
-/// their types. In these cases we can't precisely lay out the ivars in
-/// the class object at compile time so we need to do runtime layout.
-bool irgen::classHasIncompleteLayout(IRGenModule &IGM,
-                                     ClassDecl *theClass) {
-  do {
-    if (theClass->getParentModule() != IGM.getSwiftModule()) {
-      for (auto field :
-          theClass->getStoredPropertiesAndMissingMemberPlaceholders()){
-        if (isa<MissingMemberDecl>(field)) {
-          return true;
-        }
-      }
-      return false;
-    }
-  } while ((theClass = theClass->getSuperclassDecl()));
-  return false;
-}
-
 bool irgen::doesClassMetadataRequireDynamicInitialization(IRGenModule &IGM,
                                                           ClassDecl *theClass) {
   // Classes imported from Objective-C never requires dynamic initialization.
@@ -2282,36 +2287,6 @@ bool irgen::hasKnownSwiftMetadata(IRGenModule &IGM, ClassDecl *theClass) {
   // Eventually we might have an attribute here or something based on
   // the deployment target.
   return theClass->hasKnownSwiftImplementation();
-}
-
-/// Given a reference to class metadata of the given type,
-/// load the fragile instance size and alignment of the class.
-std::pair<llvm::Value *, llvm::Value *>
-irgen::emitClassFragileInstanceSizeAndAlignMask(IRGenFunction &IGF,
-                                                ClassDecl *theClass,
-                                                llvm::Value *metadata) {
-  // FIXME: The below checks should capture this property already, but
-  // resilient class metadata layout is not fully implemented yet.
-  auto superClass = theClass;
-  do {
-    if (superClass->getParentModule() != IGF.IGM.getSwiftModule()) {
-      return emitClassResilientInstanceSizeAndAlignMask(IGF, theClass,
-                                                        metadata);
-    }
-  } while ((superClass = superClass->getSuperclassDecl()));
-
-  // If the class has fragile fixed layout, return the constant size and
-  // alignment.
-  if (llvm::Constant *size
-        = tryEmitClassConstantFragileInstanceSize(IGF.IGM, theClass)) {
-    llvm::Constant *alignMask
-      = tryEmitClassConstantFragileInstanceAlignMask(IGF.IGM, theClass);
-    assert(alignMask && "static size without static align");
-    return {size, alignMask};
-  }
- 
-  // Otherwise, load it from the metadata.
-  return emitClassResilientInstanceSizeAndAlignMask(IGF, theClass, metadata);
 }
 
 std::pair<llvm::Value *, llvm::Value *>
