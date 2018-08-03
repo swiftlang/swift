@@ -316,9 +316,13 @@ private:
   /// Create a new latch block and clone all the arguments from new header.
   SILBasicBlock *createNewLatch(SILBasicBlock *newHeader);
 
-  // Patch the edges that go to the header and exit blocks to the new header or
-  // latch block as appropriate. Also, return the map consisting of indices
-  // assigned to the exit blocks.
+  /// Replace the preheader->header edge with preheader->newHeader edge
+  /// and update the arguments of preheader to match that of newheader.
+  void patchPreheader(SILBasicBlock* newHeader);
+
+  /// Patch the edges that go to the header and exit blocks to the new header or
+  /// latch block as appropriate. Also, return the map consisting of indices
+  /// assigned to the exit blocks.
   llvm::DenseMap<SILBasicBlock *, intmax_t>
   patchEdges(SILBasicBlock *newHeader, SILBasicBlock *latchBlock);
 
@@ -368,10 +372,11 @@ void SingleExitLoopTransformer::initialize() {
   loop->getExitBlocks(exitBlocks);
   // All the exiting edges need to be rewired.
   loop->getExitEdges(edgesToFix);
-  // All the edges to the header need to be rewired.
-  for (SILBasicBlock *headerPred : header->getPredecessorBlocks()) {
-    edgesToFix.emplace_back(headerPred, header);
-  }
+  edgesToFix.emplace_back(latch, header);
+  // // All the edges to the header need to be rewired.
+  // for (SILBasicBlock *headerPred : header->getPredecessorBlocks()) {
+  //   edgesToFix.emplace_back(headerPred, header);
+  // }
 
   for (const SILBasicBlock *bb : loop->getBlocks()) {
     // Save the values that are escaping this loop in escapingValues set.
@@ -501,6 +506,29 @@ SingleExitLoopTransformer::createNewLatch(SILBasicBlock *newHeader) {
   loop->addBasicBlockToLoop(latchBlock, LI->getBase());
   return latchBlock;
 }
+
+void SingleExitLoopTransformer::patchPreheader(SILBasicBlock* newHeader) {
+  // Update edge
+  replaceBranchTarget(preheader->getTerminator(), header, newHeader,
+                      /*preserveArgs*/ true);
+  SILBuilder builder(preheader->getTerminator());
+  SILLocation location(
+    getUserSourceLocation(preheader->getTerminator()->getDebugLocation()));
+  // Add arguments corresponding to escaping arguments.
+  SmallVector<SILValue, 8> newArgs;
+  for (const SILValue &escapingValue : escapingValues) {
+    newArgs.push_back(getUndef(escapingValue->getType()));
+  }
+  // `exitIndex` to identify the block to which we exit from the loop.
+  newArgs.push_back(createTFIntegerConst(*deviceInfo, builder, location,
+                                         /*bitwidth*/ 32,
+                                         /*exitIndex*/ 0));
+  // `stayInLoop` flag
+  newArgs.push_back(createTFIntegerConst(*deviceInfo, builder, location,
+                                         /*bitwidth*/ 1, true));
+  appendArguments(preheader->getTerminator(), newHeader, newArgs);
+}
+
 
 llvm::DenseMap<SILBasicBlock *, intmax_t>
 SingleExitLoopTransformer::patchEdges(SILBasicBlock *newHeader,
@@ -689,6 +717,8 @@ bool SingleExitLoopTransformer::transform() {
 
   // Create a new latch block.
   SILBasicBlock *latchBlock = createNewLatch(newHeader);
+
+  patchPreheader(newHeader);
 
   // Patch the edges and return the map consisting of indices assigned
   // to the exit blocks.
