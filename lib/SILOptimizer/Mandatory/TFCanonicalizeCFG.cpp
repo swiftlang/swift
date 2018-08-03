@@ -373,10 +373,6 @@ void SingleExitLoopTransformer::initialize() {
   // All the exiting edges need to be rewired.
   loop->getExitEdges(edgesToFix);
   edgesToFix.emplace_back(latch, header);
-  // // All the edges to the header need to be rewired.
-  // for (SILBasicBlock *headerPred : header->getPredecessorBlocks()) {
-  //   edgesToFix.emplace_back(headerPred, header);
-  // }
 
   for (const SILBasicBlock *bb : loop->getBlocks()) {
     // Save the values that are escaping this loop in escapingValues set.
@@ -515,6 +511,8 @@ void SingleExitLoopTransformer::patchPreheader(SILBasicBlock* newHeader) {
   SILLocation location(
     getUserSourceLocation(preheader->getTerminator()->getDebugLocation()));
   // Add arguments corresponding to escaping arguments.
+  // State from within the loop is not available in the preheader.
+  // Simply pass in an undef. This will never be accessed at runtime.
   SmallVector<SILValue, 8> newArgs;
   for (const SILValue &escapingValue : escapingValues) {
     newArgs.push_back(getUndef(escapingValue->getType()));
@@ -565,7 +563,7 @@ SingleExitLoopTransformer::patchEdges(SILBasicBlock *newHeader,
   for (const auto &edge : edgesToFix) {
     SILBasicBlock *src = const_cast<SILBasicBlock *>(edge.first);
     SILBasicBlock *tgt = const_cast<SILBasicBlock *>(edge.second);
-    SILBasicBlock *newTgt = (src == preheader) ? newHeader : latchBlock;
+    SILBasicBlock *newTgt = latchBlock;
     SILBasicBlock *splitBlock = splitIfCriticalEdge(src, tgt, /*DT*/ nullptr, LI);
     if (splitBlock != nullptr) {
       // If the edge was critical then splitBlock would have been inserted
@@ -592,13 +590,8 @@ SingleExitLoopTransformer::patchEdges(SILBasicBlock *newHeader,
     for (const SILValue &escapingValue : escapingValues) {
       if (DI->properlyDominates(escapingValue, src->getTerminator())) {
         newArgs.push_back(escapingValue);
-      } else if (src != preheader) {
-        // newHeader arguments are available if src is not the preheader.
-        newArgs.push_back(newHeader->getArgument(argIndex));
       } else {
-        // State from within the loop is not available in the preheader.
-        // Simply pass in an undef. This will never be accessed at runtime.
-        newArgs.push_back(getUndef(escapingValue->getType()));
+        newArgs.push_back(newHeader->getArgument(argIndex));
       }
       ++argIndex;
     }
