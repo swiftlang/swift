@@ -585,7 +585,7 @@ public extension Tensor where Scalar == Int32 {
   ///
   /// - Parameters:
   ///   - shape: The dimensions of the tensor.
-  ///   - engine: The random engine which generates random bytes.
+  ///   - rng: Optional random number generator to use.
   ///
   @inlinable @inline(__always)
   init(randomStandardUniform shape: TensorShape,
@@ -610,7 +610,7 @@ public extension Tensor where Scalar : BinaryFloatingPoint {
   ///
   /// - Parameters:
   ///   - shape: The dimensions of the tensor.
-  ///   - engine: The random engine which generates random bytes.
+  ///   - rng: Optional random number generator to use.
   ///
   @inlinable @inline(__always)
   init(randomUniform shape: TensorShape, rng: RandomNumberGenerator? = nil) {
@@ -634,7 +634,7 @@ public extension Tensor where Scalar : BinaryFloatingPoint {
   ///   - shape: The dimensions of the tensor.
   ///   - mean: The mean of the distribution.
   ///   - stddev: The standard deviation of the distribution.
-  ///   - engine: The random engine which generates random bytes.
+  ///   - rng: Optional random number generator to use.
   ///
   @inlinable @inline(__always)
   init(randomNormal shape: TensorShape, mean: Scalar = 0, stddev: Scalar = 1,
