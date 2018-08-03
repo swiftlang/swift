@@ -380,7 +380,9 @@ extension Unsafe${Mutable}BufferPointer {
   ///   - count: The number of instances in the buffer. `count` must not be
   ///     negative.
   @inlinable // unsafe-performance
-  public init(start: Unsafe${Mutable}Pointer<Element>?, count: Int) {
+  public init(
+    start: @_nonEphemeral Unsafe${Mutable}Pointer<Element>?, count: Int
+  ) {
     _precondition(
       count >= 0, "Unsafe${Mutable}BufferPointer with negative count")
     _precondition(

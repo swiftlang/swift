@@ -31,7 +31,9 @@ public struct Unmanaged<Instance : AnyObject> {
   /// - Parameter value: An opaque C pointer.
   /// - Returns: An unmanaged class reference to `value`.
   @_transparent
-  public static func fromOpaque(_ value: UnsafeRawPointer) -> Unmanaged {
+  public static func fromOpaque(
+    _ value: @_nonEphemeral UnsafeRawPointer
+  ) -> Unmanaged {
     return Unmanaged(_private: unsafeBitCast(value, to: Instance.self))
   }
 

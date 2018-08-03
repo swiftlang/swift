@@ -526,7 +526,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   ///
   /// - Parameter other: The immutable pointer to convert.
   @_transparent
-  public init(mutating other: UnsafePointer<Pointee>) {
+  public init(mutating other: @_nonEphemeral UnsafePointer<Pointee>) {
     self._rawValue = other._rawValue
   }
 
@@ -536,7 +536,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   /// - Parameter other: The immutable pointer to convert. If `other` is `nil`,
   ///   the result is `nil`.
   @_transparent
-  public init?(mutating other: UnsafePointer<Pointee>?) {
+  public init?(mutating other: @_nonEphemeral UnsafePointer<Pointee>?) {
     guard let unwrapped = other else { return nil }
     self.init(mutating: unwrapped)
   }
@@ -741,7 +741,9 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   ///   - count: The number of instances to move from `source` to this
   ///     pointer's memory. `count` must not be negative.
   @inlinable
-  public func moveInitialize(from source: UnsafeMutablePointer, count: Int) {
+  public func moveInitialize(
+    from source: @_nonEphemeral UnsafeMutablePointer, count: Int
+  ) {
     _debugPrecondition(
       count >= 0, "UnsafeMutablePointer.moveInitialize with negative count")
     if self < source || self >= source + count {
@@ -812,7 +814,9 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   ///   - count: The number of instances to move from `source` to this
   ///     pointer's memory. `count` must not be negative.
   @inlinable
-  public func moveAssign(from source: UnsafeMutablePointer, count: Int) {
+  public func moveAssign(
+    from source: @_nonEphemeral UnsafeMutablePointer, count: Int
+  ) {
     _debugPrecondition(
       count >= 0, "UnsafeMutablePointer.moveAssign(from:) with negative count")
     _debugPrecondition(
