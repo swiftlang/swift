@@ -5451,6 +5451,48 @@ static bool hasCurriedSelf(ConstraintSystem &cs, ConcreteDeclRef callee,
   return false;
 }
 
+static void checkNonEphemeralArgumentConversion(
+    ConstraintSystem &cs, ConstraintLocatorBuilder argLocator,
+    const Expr *argExpr, Type argType, AnyFunctionType::Param param,
+    AnyFunctionType *fnType, const ValueDecl *callee) {
+  if (!param.isNonEphemeral())
+    return;
+
+  // Look through optional evaluation expressions – these can occur when we
+  // have an optional-to-optional conversion followed by a pointer conversion.
+  auto *subExpr = argExpr;
+  while (true) {
+    subExpr = subExpr->getValueProvidingExpr();
+    if (auto *oee = dyn_cast<OptionalEvaluationExpr>(subExpr)) {
+      subExpr = oee->getSubExpr();
+      continue;
+    }
+    if (auto *ioe = dyn_cast<InjectIntoOptionalExpr>(subExpr)) {
+      subExpr = ioe->getSubExpr();
+      continue;
+    }
+    if (auto *boe = dyn_cast<BindOptionalExpr>(subExpr)) {
+      subExpr = boe->getSubExpr();
+      continue;
+    }
+    break;
+  }
+
+  Optional<ConversionRestrictionKind> conversion;
+  if (isa<InOutToPointerExpr>(subExpr))
+    conversion = ConversionRestrictionKind::InoutToPointer;
+  else if (isa<ArrayToPointerExpr>(subExpr))
+    conversion = ConversionRestrictionKind::ArrayToPointer;
+  else if (isa<StringToPointerExpr>(subExpr))
+    conversion = ConversionRestrictionKind::StringToPointer;
+
+  if (conversion && !cs.isConversionNonEphemeral(*conversion, argLocator))
+    diagnoseIllegalEphemeralConversion(cs.getASTContext(), argExpr, argType,
+                                       param.getPlainType(), callee, fnType,
+                                       argLocator.getAnchor(),
+                                       /*downgradeToWarning*/ true);
+}
+
 Expr *ExprRewriter::coerceCallArguments(
     Expr *arg, AnyFunctionType *funcType,
     ApplyExpr *apply,
@@ -5647,6 +5689,7 @@ Expr *ExprRewriter::coerceCallArguments(
       return false;
     };
 
+    auto argLocator = getArgLocator(argIdx, paramIdx);
     Expr *convertedArg = nullptr;
     // Since it was allowed to pass function types to @autoclosure
     // parameters in Swift versions < 5, it has to be handled as
@@ -5666,12 +5709,18 @@ Expr *ExprRewriter::coerceCallArguments(
       convertedArg = cs.TC.buildAutoClosureExpr(dc, arg, closureType);
       cs.cacheExprTypes(convertedArg);
     } else {
-      convertedArg =
-          coerceToType(arg, paramType, getArgLocator(argIdx, paramIdx));
+      convertedArg = coerceToType(arg, paramType, argLocator);
     }
 
     if (!convertedArg)
       return nullptr;
+
+    // We might have allowed an ephemeral conversion to a non-ephemeral
+    // parameter. Emit a warning if this is the case (which will become an error
+    // in a future Swift version).
+    checkNonEphemeralArgumentConversion(cs, argLocator, convertedArg,
+                                        argType->getRValueType(), param,
+                                        funcType, callee.getDecl());
 
     // Add the converted argument.
     fromTupleExpr[argIdx] = convertedArg;

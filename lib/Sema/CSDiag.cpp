@@ -161,6 +161,15 @@ void constraints::simplifyLocator(Expr *&anchor,
         continue;
       }
 
+      if (auto *subscriptExpr = dyn_cast<SubscriptExpr>(anchor)) {
+        targetAnchor = nullptr;
+        targetPath.clear();
+
+        anchor = subscriptExpr->getIndex();
+        path = path.slice(1);
+        continue;
+      }
+
       if (auto objectLiteralExpr = dyn_cast<ObjectLiteralExpr>(anchor)) {
         targetAnchor = nullptr;
         targetPath.clear();
@@ -8402,4 +8411,84 @@ bool swift::diagnoseBaseUnwrapForMemberAccess(Expr *baseExpr, Type baseType,
         .fixItInsertAfter(baseExpr->getEndLoc(), "!");
   }
   return true;
+}
+
+void swift::diagnoseIllegalEphemeralConversion(
+    ASTContext &ctx, const Expr *argExpr, Type argType, Type paramType,
+    const ValueDecl *callee, AnyFunctionType *fnType, const Expr *anchor,
+    bool downgradeToWarning) {
+  auto &diags = ctx.Diags;
+
+  auto emitArgumentConversionNote = [&]() {
+    diags.diagnose(argExpr->getLoc(),
+                   diag::ephemeral_pointer_argument_conversion_note,
+                   argType->getWithoutSpecifierType(), paramType)
+        .highlight(argExpr->getSourceRange());
+  };
+
+  // Emit a specialised diagnostic for
+  // Unsafe[Mutable][Raw]Pointer.init([mutating]:) &
+  // Unsafe[Mutable][Raw]BufferPointer.init(start:count:).
+  auto diagnosePointerInit = [&]() -> bool {
+    auto *constructor = dyn_cast_or_null<ConstructorDecl>(callee);
+    if (!constructor)
+      return false;
+
+    auto instanceTy = fnType->getResult();
+
+    // Strip off a level of optionality if we have a failable initializer.
+    switch (constructor->getFailability()) {
+    case OTK_Optional:
+    case OTK_ImplicitlyUnwrappedOptional:
+      instanceTy = instanceTy->getOptionalObjectType();
+      break;
+    case OTK_None:
+      break;
+    }
+
+    auto isPointerType = [](Type ty, const ASTContext &ctx) -> bool {
+      if (auto nominalTy = ty->getAs<NominalType>())
+        if (nominalTy->getDecl() == ctx.getOpaquePointerDecl())
+          return true;
+      return (bool)ty->getAnyPointerElementType();
+    };
+
+    // This must stay in sync with diag::cannot_construct_dangling_pointer.
+    enum ConstructorKind {
+      CK_Pointer = 0,
+      CK_BufferPointer,
+    };
+
+    ConstructorKind constructorKind;
+    auto parameterCount = constructor->getParameters()->size();
+    if (isPointerType(instanceTy, ctx) && parameterCount == 1) {
+      constructorKind = CK_Pointer;
+    } else if (instanceTy->getAnyBufferPointerElementType() &&
+               parameterCount == 2) {
+      constructorKind = CK_BufferPointer;
+    } else {
+      return false;
+    }
+
+    auto diagID = downgradeToWarning
+                      ? diag::cannot_construct_dangling_pointer_warning
+                      : diag::cannot_construct_dangling_pointer;
+
+    diags.diagnose(anchor->getLoc(), diagID, instanceTy, constructorKind)
+        .highlight(anchor->getSourceRange());
+
+    emitArgumentConversionNote();
+    return true;
+  };
+
+  if (diagnosePointerInit())
+    return;
+
+  auto diagID = downgradeToWarning ? diag::cannot_convert_non_ephemeral_warning
+                                   : diag::cannot_convert_non_ephemeral;
+
+  diags.diagnose(argExpr->getLoc(), diagID, paramType)
+      .highlight(argExpr->getSourceRange());
+
+  emitArgumentConversionNote();
 }

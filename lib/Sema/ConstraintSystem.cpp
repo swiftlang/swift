@@ -2356,3 +2356,115 @@ Expr *constraints::simplifyLocatorToAnchor(ConstraintSystem &cs,
 
   return locator->getAnchor();
 }
+
+bool ConstraintSystem::isConversionNonEphemeral(
+    ConversionRestrictionKind conversion, ConstraintLocatorBuilder locator) {
+  switch (conversion) {
+  case ConversionRestrictionKind::ArrayToPointer:
+  case ConversionRestrictionKind::StringToPointer:
+    // Always ephemeral.
+    return false;
+  case ConversionRestrictionKind::InoutToPointer: {
+    // Ephemeral, except if the expression is a reference to a global or
+    // static stored variable, or a simple stored property on such a variable.
+    SourceRange range;
+    auto *argLoc = simplifyLocator(*this, getConstraintLocator(locator), range);
+    auto *expr = argLoc->getAnchor()->getSemanticsProvidingExpr();
+
+    auto *subExpr = cast<InOutExpr>(expr)->getSubExpr();
+
+    auto isDirectlyAccessedStoredVar = [&](ValueDecl *decl) -> bool {
+      auto *asd = dyn_cast_or_null<AbstractStorageDecl>(decl);
+      if (!asd)
+        return false;
+
+      // Check what access strategy is used for a read-write access. It must be
+      // direct-to-storage in order for the conversion to be non-ephemeral.
+      auto access = asd->getAccessStrategy(AccessSemantics::Ordinary,
+                                           AccessKind::ReadWrite, DC);
+      return access.getKind() == AccessStrategy::Storage;
+    };
+
+    auto isSimpleMember = [&](Expr *baseExpr, ValueDecl *member) -> bool {
+      if (!isDirectlyAccessedStoredVar(member))
+        return false;
+
+      // The member is simple if it is either static
+      if (member->isStatic())
+        return true;
+
+      // ... or it's an instance member on an lvalue struct base.
+      auto lvalueTy = simplifyType(getType(baseExpr))->getAs<LValueType>();
+      return lvalueTy && lvalueTy->getObjectType()->is<StructType>();
+    };
+
+    auto isValidBaseDecl = [&](ValueDecl *baseDecl) -> bool {
+      if (!isDirectlyAccessedStoredVar(baseDecl))
+        return false;
+
+      // The base decl must either be static or global in order for it to be
+      // non-ephemeral.
+      return baseDecl->isStatic() ||
+             baseDecl->getDeclContext()->isModuleScopeContext();
+    };
+
+    bool isMember = false;
+    while (true) {
+      subExpr = subExpr->getSemanticsProvidingExpr();
+
+      if (auto *fve = dyn_cast<ForceValueExpr>(subExpr)) {
+        subExpr = fve->getSubExpr();
+        continue;
+      }
+
+      if (auto *tee = dyn_cast<TupleElementExpr>(subExpr)) {
+        isMember = true;
+        subExpr = tee->getBase();
+        continue;
+      }
+
+      if (auto *mre = dyn_cast<MemberRefExpr>(subExpr)) {
+        if (!isSimpleMember(mre->getBase(), mre->getMember().getDecl()))
+          return false;
+        isMember = true;
+        subExpr = mre->getBase();
+        continue;
+      }
+      // TODO: Handle UnresolvedDotExpr.
+      break;
+    }
+
+    // First check if the base expr is a metatype – if so, we're dealing with
+    // a static member, which is non-ephemeral.
+    if (isMember && simplifyType(getType(subExpr))->is<AnyMetatypeType>())
+      return true;
+
+    // Otherwise, check to see if we have a base decl.
+    if (auto *dre = dyn_cast<DeclRefExpr>(subExpr))
+      return isValidBaseDecl(dre->getDecl());
+
+    // TODO: Handle potentially overloaded decl bases.
+    return false;
+  }
+  case ConversionRestrictionKind::TupleToTuple:
+  case ConversionRestrictionKind::DeepEquality:
+  case ConversionRestrictionKind::Superclass:
+  case ConversionRestrictionKind::LValueToRValue:
+  case ConversionRestrictionKind::Existential:
+  case ConversionRestrictionKind::MetatypeToExistentialMetatype:
+  case ConversionRestrictionKind::ExistentialMetatypeToMetatype:
+  case ConversionRestrictionKind::ValueToOptional:
+  case ConversionRestrictionKind::OptionalToOptional:
+  case ConversionRestrictionKind::ClassMetatypeToAnyObject:
+  case ConversionRestrictionKind::ExistentialMetatypeToAnyObject:
+  case ConversionRestrictionKind::ProtocolMetatypeToProtocolClass:
+  case ConversionRestrictionKind::PointerToPointer:
+  case ConversionRestrictionKind::ArrayUpcast:
+  case ConversionRestrictionKind::DictionaryUpcast:
+  case ConversionRestrictionKind::SetUpcast:
+  case ConversionRestrictionKind::HashableToAnyHashable:
+  case ConversionRestrictionKind::CFTollFreeBridgeToObjC:
+  case ConversionRestrictionKind::ObjCTollFreeBridgeToCF:
+    return true;
+  }
+}
