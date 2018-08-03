@@ -316,3 +316,37 @@ public func testCriticalEdges() {
     Tensor(1).scalars.forEach { _ in }
   }
 }
+
+
+// TODO: fix the noisy sends/recvs warning diagnostics.
+@inline(never)
+// expected-warning @+1 {{implicitly copied to the accelerator}}
+public func SR8443(n: Int32) {
+  var i: Int32 = 0
+// expected-warning @+1 {{implicitly copied to the accelerator}}
+  while i < n { // expected-note {{value used here}}
+
+    // expected-warning @+1 {{implicitly copied to the host}}
+    let images = Tensor<Float>(0.0)
+    _hostOp(images)
+    i += 1
+  }
+
+  let x = Tensor<Float>(1.0)
+  _hostOp(x)
+}
+
+// Check that we have wired up control dependency before returning the result
+// tensor `x`.
+
+// CHECK-LABEL: --- TFPartition GraphDef Proto:
+// CHECK:   function {
+// CHECK:    signature {
+// CHECK:      name: "{{.*}}SR8443{{.*}}.tf_CPU.device_partition"
+// CHECK:    node_def {
+// CHECK:      name: "RunControlDependency"
+// CHECK:      op: "Identity"
+// CHECK:      input:
+// CHECK:      input: "^
+// CHECK:    ret {
+// CHECK:      key: "runcontroldependency"

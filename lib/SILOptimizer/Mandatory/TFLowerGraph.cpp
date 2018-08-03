@@ -77,6 +77,7 @@ static void markNodeAsTPUReplicated(TF_OperationDescription *desc) {
                    strlen(TPU_CLUSTER_ATTR_VALUE));
 }
 
+// TODO: reformat the code below.
 namespace {
   /// Each op is represented by a single SILValue, but we then also have
   /// tuple_extract values that project multiple-result values out.  A
@@ -143,9 +144,12 @@ namespace {
     SmallVector<std::pair<SILArgument*, TF_Output>, 4> outputs;
 
     /// If this graph has any side-effecting operations, this is the most
-    /// recently emitted operation that had side effects.  Otherwise, it is
-    /// null.
+    /// recently emitted operation that had side effects, and this operation
+    /// should get executed before the function returns.  Otherwise, it is null.
     TF_Operation *controlDependenceValue = nullptr;
+
+    /// If true, this graph function contains some side-effecting ops.
+    bool funcHasSideEffects = false;
 
     /// This is a list of all of the operations that make up this function.
     std::vector<const TF_Operation*> operations;
@@ -167,12 +171,14 @@ namespace {
 
      /// "Finish" a tensorflow op under construction, and remember that it is
      /// part of this graph function.
-     TF_Operation *finishOp(TF_OperationDescription *desc, bool hasSideEffects,
-                            bool isEligibleForTPU, TF_Status *status) {
+     TF_Operation *finishOp(TF_OperationDescription *desc,
+                            bool opHasSideEffects, bool isEligibleForTPU,
+                            TF_Status *status) {
+       funcHasSideEffects |= opHasSideEffects;
        // If this node has side effects and we've already emitted another node
        // that does, make sure to connect them with control dependencies to
        // preserve ordering.
-       if (hasSideEffects && controlDependenceValue)
+       if (opHasSideEffects && controlDependenceValue)
          TF_AddControlInput(desc, controlDependenceValue);
 
        // If this node should be put onto TPU, mark it with an attribute.
@@ -185,7 +191,7 @@ namespace {
 
        // If this op has side effects, remember it in case we need to chain it
        // to another one later.
-       if (hasSideEffects)
+       if (opHasSideEffects)
          controlDependenceValue = result;
 
        return result;
@@ -200,7 +206,7 @@ namespace {
       auto *desc = TF_NewOperation(getGraph(), "Identity", nodeName.c_str());
       TF_AddControlInput(desc, controlDependenceValue);
       TF_AddInput(desc, result);
-      TF_Operation *newResult = finishOp(desc, /*hasSideEffects*/ false,
+      TF_Operation *newResult = finishOp(desc, /*opHasSideEffects*/ false,
                                          /*isEligibleForTPU*/ false, status);
       controlDependenceValue = nullptr;
       return {newResult, 0};
@@ -307,13 +313,18 @@ public:
   /// Note: `name` starts with _, where the name of a graph node cannot start
   /// with _.
   ///
-  /// This sets hasSideEffects to true if the body of the graph had any side
-  /// effecting operations.  This allows calls to the graph to set up control
-  /// dependence edges properly.
+  /// `funcHasSideEffects` is set to true if the body of the graph function has
+  /// any side effecting operations.  This allows the caller to this graph
+  /// function to wire up control dependence edges properly. In particular, the
+  /// graph node that runs this function in the call-site is treated as a
+  /// side-effecting node, and will be threaded via control edges with other
+  /// side-effecting nodes in the caller. This is true unless we are building a
+  /// top level graph function, in which case we ignore `funcHasSideEffects`, as
+  /// the top level function gets called in a `TF_SessionRun()` call.
   ///
   /// This emits an error and returns true on error.
   bool buildGraphFunction(const GraphFunctionBody &graphBody, StringRef name,
-                          bool &hasSideEffects,
+                          bool &funcHasSideEffects,
                           SmallVectorImpl<TF_DataType> *inputTypes,
                           SmallVectorImpl<TF_DataType> *outputTypes);
 
@@ -945,7 +956,7 @@ TF_Output TFGraphFunctionLowering::createUndefNode(SILType type) {
   memcpy((char *)TF_TensorData(tensor), value.getRawData(), dtypeSize);
   TF_SetAttrTensor(result, "value", tensor, status);
   TF_Operation *finalResult =
-      graphFn.finishOp(result, /*hasSideEffects*/ false,
+      graphFn.finishOp(result, /*opHasSideEffects*/ false,
                        /*isEligibleForTPU*/ true, status);
   if (::checkStatus(SILFn, SILFn.getLocation(), status))
     return {nullptr, 0};
@@ -1160,7 +1171,7 @@ GLStatus TFGraphFunctionLowering::visitGraphOpSendToHostInst(
     TF_SetAttrInt(desc, "capacity", NAMED_TENSOR_QUEUE_CAPACITY);
     TF_SetAttrTypeList(desc, "component_types", &inputType, 1);
     TF_SetAttrString(desc, "shared_name", opName.data(), opName.size());
-    queueOp = graphFn.finishOp(desc, /*hasSideEffects*/ false,
+    queueOp = graphFn.finishOp(desc, /*opHasSideEffects*/ false,
                                /*isEligibleForTPU*/ false, status);
     if (checkStatus(getUserSourceLocation(inst->getDebugLocation())))
       return GLStatus::Error;
@@ -1175,7 +1186,7 @@ GLStatus TFGraphFunctionLowering::visitGraphOpSendToHostInst(
     TF_SetDevice(desc, DEFAULT_CPU_DEVICE);
     TF_SetAttrTypeList(desc, "Tcomponents", &inputType, 1);
 
-    graphFn.finishOp(desc, /*hasSideEffects*/ true,
+    graphFn.finishOp(desc, /*opHasSideEffects*/ true,
                      /*isEligibleForTPU*/ false, status);
     if (checkStatus(getUserSourceLocation(inst->getDebugLocation())))
       return GLStatus::Error;
@@ -1261,7 +1272,7 @@ GLStatus TFGraphFunctionLowering::visitGraphOpRecvFromHostInst(
     TF_SetAttrInt(desc, "capacity", NAMED_TENSOR_QUEUE_CAPACITY);
     TF_SetAttrTypeList(desc, "component_types", &outputType, 1);
     TF_SetAttrString(desc, "shared_name", opName.data(), opName.size());
-    queueOp = graphFn.finishOp(desc, /*hasSideEffects*/ false,
+    queueOp = graphFn.finishOp(desc, /*opHasSideEffects*/ false,
                                /*isEligibleForTPU*/ false, status);
     if (checkStatus(getUserSourceLocation(inst->getDebugLocation())))
       return GLStatus::Error;
@@ -1275,7 +1286,7 @@ GLStatus TFGraphFunctionLowering::visitGraphOpRecvFromHostInst(
     TF_SetDevice(desc, DEFAULT_CPU_DEVICE);
     TF_SetAttrTypeList(desc, "component_types", &outputType, 1);
 
-    auto dequeueOp = graphFn.finishOp(desc, /*hasSideEffects*/ true,
+    auto dequeueOp = graphFn.finishOp(desc, /*opHasSideEffects*/ true,
                                       /*isEligibleForTPU*/ false, status);
     if (checkStatus(getUserSourceLocation(inst->getDebugLocation())))
       return GLStatus::Error;
@@ -1352,7 +1363,7 @@ GLStatus TFGraphFunctionLowering::addTFRecvOp(SILInstruction *inst,
   TF_SetAttrInt(desc, "send_device_incarnation", DEVICE_INCARNATION_ID);
   TF_SetAttrString(desc, "recv_device", thisDeviceTypeStr.data(),
                    thisDeviceTypeStr.size());
-  auto *recvOp = graphFn.finishOp(desc, /*hasSideEffects*/ true,
+  auto *recvOp = graphFn.finishOp(desc, /*opHasSideEffects*/ true,
                                   /*isEligibleForTPU*/ false, status);
   if (checkStatus(getUserSourceLocation(inst->getDebugLocation())))
     return GLStatus::Error;
@@ -1415,7 +1426,7 @@ GLStatus TFGraphFunctionLowering::addTPUDequeueOp(SILInstruction *inst,
                       numDims.size());
   // Infeed dequeue is placed on TPU; outfeed dequeue isn't.
   bool isEligibleForTPU = isInfeed;
-  auto *dequeue = graphFn.finishOp(desc, /*hasSideEffects*/ true,
+  auto *dequeue = graphFn.finishOp(desc, /*opHasSideEffects*/ true,
                                    isEligibleForTPU, status);
   if (checkStatus(getUserSourceLocation(inst->getDebugLocation())))
     return GLStatus::Error;
@@ -1482,7 +1493,7 @@ GLStatus TFGraphFunctionLowering::addTFSendOp(SILInstruction *inst,
                    thisDeviceTypeStr.size());
   TF_SetAttrInt(desc, "send_device_incarnation", DEVICE_INCARNATION_ID);
   TF_SetAttrString(desc, "recv_device", destDevice.data(), destDevice.size());
-  /* sendOp = */ graphFn.finishOp(desc, /*hasSideEffects*/ true,
+  /* sendOp = */ graphFn.finishOp(desc, /*opHasSideEffects*/ true,
                                   /*isEligibleForTPU*/ false, status);
   if (checkStatus(getUserSourceLocation(inst->getDebugLocation())))
     return GLStatus::Error;
@@ -1544,7 +1555,7 @@ GLStatus TFGraphFunctionLowering::addTPUEnqueueOp(SILInstruction *inst,
   }
   // Infeed enqueue is not placed on TPU; outfeed enqueue is.
   bool isEligibleForTPU = !isInfeed;
-  /*auto *enqueueOp = */ graphFn.finishOp(desc, /*hasSideEffects*/ true,
+  /*auto *enqueueOp = */ graphFn.finishOp(desc, /*opHasSideEffects*/ true,
                                           isEligibleForTPU, status);
   if (checkStatus(getUserSourceLocation(inst->getDebugLocation())))
     return GLStatus::Error;
@@ -1833,11 +1844,11 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
   auto *op = TF_NewOperation(graphFn.getGraph(), opName.str().c_str(),
                              opLocString.c_str());
 
-  // TODO: We compute the "hasSideEffects" bit solely based on whether or not
+  // TODO: We compute the "opHasSideEffects" bit solely based on whether or not
   // the op has Resource inputs.  This is a good starting point but is
   // insufficient.  It would be much nicer to have a TensorFlow C function that
   // returns the "SetIsStateful" bit from a TF_OperationDescription.
-  bool hasSideEffects = false;
+  bool opHasSideEffects = false;
   bool hasDevice = false;
 
   // Process all inputs.
@@ -1854,7 +1865,7 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
       auto valueKind = classifyTensorFlowValue(operand->getType());
 
       // Keep track of whether we have any resource inputs.
-      hasSideEffects |= valueKind == TFValueKind::ResourceHandle;
+      opHasSideEffects |= valueKind == TFValueKind::ResourceHandle;
       assert(valueKind != TFValueKind::Nope &&
              "all op inputs should be TensorFlow values");
       auto opValue = getOperandValue(operand);
@@ -1875,7 +1886,7 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
         auto valueKind = classifyTensorFlowValue(operand->getType());
 
         // Keep track of whether we have any resource inputs.
-        hasSideEffects |= valueKind == TFValueKind::ResourceHandle;
+        opHasSideEffects |= valueKind == TFValueKind::ResourceHandle;
         assert(valueKind != TFValueKind::Nope &&
                "all op inputs should be TensorFlow values");
         auto opValue = getOperandValue(operand);
@@ -2173,7 +2184,7 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
   }
 
   auto *result =
-      graphFn.finishOp(op, hasSideEffects, /*isEligibleForTPU*/ true, status);
+      graphFn.finishOp(op, opHasSideEffects, /*isEligibleForTPU*/ true, status);
 
   // If the node builder failed, then something is wrong.  Handle a few special
   // cases to improve the diagnostics.
@@ -2236,11 +2247,11 @@ GLStatus TFGraphFunctionLowering::visitTFOpInst(BuiltinInst *inst) {
   auto *op = TF_NewOperation(graphFn.getGraph(), tfopInfo.opName.str().c_str(),
                              opLocString.c_str());
 
-  // TODO: We compute the "hasSideEffects" bit solely based on whether or not
+  // TODO: We compute the "opHasSideEffects" bit solely based on whether or not
   // the op has Resource inputs.  This is a good starting point but is
   // insufficient.  It would be much nicer to have a TensorFlow C function that
   // returns the "SetIsStateful" bit from a TF_OperationDescription.
-  bool hasSideEffects = false;
+  bool opHasSideEffects = false;
   bool hasDevice = false;
 
   for (unsigned i = 0, e = inst->getNumOperands(); i != e; ++i) {
@@ -2285,7 +2296,7 @@ GLStatus TFGraphFunctionLowering::visitTFOpInst(BuiltinInst *inst) {
           auto valueKind = classifyTensorFlowValue(eltValue->getType());
 
           // Keep track of whether we have any resource inputs.
-          hasSideEffects |= valueKind == TFValueKind::ResourceHandle;
+          opHasSideEffects |= valueKind == TFValueKind::ResourceHandle;
           assert(valueKind != TFValueKind::Nope &&
                  "all op inputs should be TensorFlow values");
           auto opValue = getOperandValue(eltValue);
@@ -2299,7 +2310,7 @@ GLStatus TFGraphFunctionLowering::visitTFOpInst(BuiltinInst *inst) {
       auto valueKind = classifyTensorFlowValue(operand->getType());
 
       // Keep track of whether we have any resource inputs.
-      hasSideEffects |= valueKind == TFValueKind::ResourceHandle;
+      opHasSideEffects |= valueKind == TFValueKind::ResourceHandle;
       assert(valueKind != TFValueKind::Nope &&
              "all op inputs should be TensorFlow values");
       auto opValue = getOperandValue(operand);
@@ -2495,7 +2506,7 @@ GLStatus TFGraphFunctionLowering::visitTFOpInst(BuiltinInst *inst) {
   }
 
   auto *result =
-      graphFn.finishOp(op, hasSideEffects, /*isEligibleForTPU*/ true, status);
+      graphFn.finishOp(op, opHasSideEffects, /*isEligibleForTPU*/ true, status);
 
   // If the node builder failed, then something is wrong.  Handle a few special
   // cases to improve the diagnostics.
@@ -2873,19 +2884,23 @@ GLStatus TFGraphFunctionLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
     inputs.push_back(input.passedValue);
   }
 
-  bool hasSideEffects = false;
-
   // Create TF_Function's for our condition and body.
   auto loc = headerBr->getDebugLocation();
   auto loopBodyFnName = getUniqueName(loc, "whilebody");
   SmallVector<TF_DataType, 4> inputTypes, outputTypes;
-  if (buildGraphFunction(loopBodyFn, loopBodyFnName, hasSideEffects,
+  bool bodyHasSideEffects = false;
+  if (buildGraphFunction(loopBodyFn, loopBodyFnName, bodyHasSideEffects,
                          &inputTypes, &outputTypes))
     return GLStatus::Error;
   auto condFnName = getUniqueName(loc, "whilecond");
-  if (buildGraphFunction(condFn, condFnName, hasSideEffects,
+  bool condHasSideEffects = false;
+  if (buildGraphFunction(condFn, condFnName, condHasSideEffects,
                          /*inputTypes*/ nullptr, /*outputTypes*/ nullptr))
     return GLStatus::Error;
+  // This is needed for correctness, since we lower the header code again right
+  // after creating the While op towards the end of this function.
+  assert(!condHasSideEffects && "The loop should have been canonicalized by "
+                                "now, where the cond has no side effects!");
 
   auto &graphFn = getCurrentGraphFunction();
 
@@ -2905,8 +2920,8 @@ GLStatus TFGraphFunctionLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
   TF_SetAttrFuncName(op, "body",  loopBodyFnName.c_str(),
                      loopBodyFnName.size());
 
-  auto *result =
-      graphFn.finishOp(op, hasSideEffects, /*isEligibleForTPU*/ true, status);
+  auto *result = graphFn.finishOp(op, bodyHasSideEffects,
+                                  /*isEligibleForTPU*/ true, status);
   if (checkStatus(getUserSourceLocation(loc)))
     return GLStatus::Error;
 
@@ -3060,16 +3075,16 @@ TFGraphFunctionLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
     }
   }
 
-  bool hasSideEffects = false;
-
   // Create the graph functions for the true/false code.
   auto trueFnName = getUniqueName(loc, "true");
+  bool trueFnHasSideEffects = false;
   SmallVector<TF_DataType, 4> inputTypes, outputTypes;
-  if (buildGraphFunction(trueCodeFn, trueFnName, hasSideEffects, &inputTypes,
-                         &outputTypes))
+  if (buildGraphFunction(trueCodeFn, trueFnName, trueFnHasSideEffects,
+                         &inputTypes, &outputTypes))
     return GLStatus::Error;
+  bool falseFnHasSideEffects = false;
   auto falseFnName = getUniqueName(loc, "false");
-  if (buildGraphFunction(falseCodeFn, falseFnName, hasSideEffects,
+  if (buildGraphFunction(falseCodeFn, falseFnName, falseFnHasSideEffects,
                          /*inputTypes*/ nullptr, /*outputTypes*/ nullptr))
     return GLStatus::Error;
 
@@ -3097,7 +3112,8 @@ TFGraphFunctionLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
                      falseFnName.size());
 
   auto *result =
-      graphFn.finishOp(op, hasSideEffects, /*isEligibleForTPU*/ true, status);
+      graphFn.finishOp(op, trueFnHasSideEffects || falseFnHasSideEffects,
+                       /*isEligibleForTPU*/ true, status);
   if (checkStatus(getUserSourceLocation(loc)))
     return GLStatus::Error;
 
@@ -3393,10 +3409,10 @@ bool TFGraphFunctionLowering::buildGraphNodesForTopLevelFunctionCall(
 
 bool TFGraphFunctionLowering::buildGraphFunction(
     const GraphFunctionBody &graphBody, StringRef funcName,
-    bool &hasSideEffects, SmallVectorImpl<TF_DataType> *inputTypes,
+    bool &funcHasSideEffects, SmallVectorImpl<TF_DataType> *inputTypes,
     SmallVectorImpl<TF_DataType> *outputTypes) {
   // Inform our callers whether this function contains side effects or not.
-  hasSideEffects = graphBody.controlDependenceValue != nullptr;
+  funcHasSideEffects = graphBody.funcHasSideEffects;
 
   SmallVector<TF_Output, 4> ins, outs;
   ins.reserve(graphBody.inputs.size());
@@ -3601,10 +3617,12 @@ bool TFGraphLowering::lowerTFGraphOrFunction(
                           : std::string(getTFCompatibleFuncName(perDeviceFn));
     assert(!graphFunctions.count(graphFnName));
 
-    bool hasSideEffects = false;
+    bool funcHasSideEffects = false;
     SmallVector<TF_DataType, 4> inputTypes, outputTypes;
+    // Ignore `funcHasSideEffects` when the call returns, since this top level
+    // graph function gets called directly in a TF_SessionRun() call.
     if (graphFuncGen.buildGraphFunction(graphFnBody, graphFnName,
-                                        hasSideEffects, &inputTypes,
+                                        funcHasSideEffects, &inputTypes,
                                         &outputTypes))
       return true;
 
