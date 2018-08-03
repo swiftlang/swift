@@ -2970,7 +2970,9 @@ GLStatus TFGraphFunctionLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
   //   .Attr("cond: func")
   //   .Attr("body: func")
   auto opLocString = getUniqueName(loc, "op");
-  auto *op = TF_NewOperation(graphFn.getGraph(), "While", opLocString.c_str());
+  auto *op = TF_NewOperation(graphFn.getGraph(),
+                             bodyHasSideEffects ? "While" : "StatelessWhile",
+                             opLocString.c_str());
   TF_AddInputList(op, inputs.data(), inputs.size());
   TF_SetAttrTypeList(op, "T", inputTypes.data(), inputTypes.size());
   TF_SetAttrFuncName(op, "cond", condFnName.c_str(), condFnName.size());
@@ -3167,7 +3169,10 @@ TFGraphFunctionLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
   //   .Attr("Tin: list(type) >= 0")
   //   .Attr("Tout: list(type) >= 0")
   auto opLocString = getUniqueName(loc, "op");
-  auto *op = TF_NewOperation(graphFn.getGraph(), "If", opLocString.c_str());
+  bool usesideEffectingIf = trueFnHasSideEffects || falseFnHasSideEffects;
+  auto *op = TF_NewOperation(graphFn.getGraph(),
+                             usesideEffectingIf ? "If" : "StatelessIf",
+                             opLocString.c_str());
   TF_AddInput(op, condValue);
   TF_AddInputList(op, inputs.data(), inputs.size());
   TF_SetAttrTypeList(op, "Tin", inputTypes.data(), inputTypes.size());
@@ -3176,9 +3181,8 @@ TFGraphFunctionLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
   TF_SetAttrFuncName(op, "else_branch", falseFnName.c_str(),
                      falseFnName.size());
 
-  auto *result =
-      graphFn.finishOp(op, trueFnHasSideEffects || falseFnHasSideEffects,
-                       /*isEligibleForTPU*/ true, status);
+  auto *result = graphFn.finishOp(op, usesideEffectingIf,
+                                  /*isEligibleForTPU*/ true, status);
   if (checkStatus(getUserSourceLocation(loc)))
     return GLStatus::Error;
 
