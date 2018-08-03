@@ -938,9 +938,11 @@ llvm::Constant *IRGenModule::getAddrOfAssociatedTypeGenericParamRef(
   return var;
 }
 
-void IRGenModule::addLazyConformances(NominalTypeDecl *Nominal) {
-  for (const ProtocolConformance *Conf : Nominal->getAllConformances()) {
-    IRGen.addLazyWitnessTable(Conf);
+void IRGenModule::addLazyConformances(DeclContext *dc) {
+  for (const ProtocolConformance *conf :
+         dc->getLocalConformances(ConformanceLookupKind::All,
+                                  nullptr, /*sorted=*/true)) {
+    IRGen.addLazyWitnessTable(conf);
   }
 }
 
@@ -3830,6 +3832,8 @@ static bool shouldEmitCategory(IRGenModule &IGM, ExtensionDecl *ext) {
 
 void IRGenModule::emitExtension(ExtensionDecl *ext) {
   emitNestedTypeDecls(ext->getMembers());
+
+  addLazyConformances(ext);
 
   // Generate a category if the extension either introduces a
   // conformance to an ObjC protocol or introduces a method
