@@ -880,13 +880,13 @@ public extension Tensor {
 extension Tensor : Codable where Scalar : Codable {
   @inlinable
   public func encode(to encoder: Encoder) throws {
-    var container = encoder.unkeyedContainer()
+    var container = encoder.singleValueContainer()
     try container.encode(array)
   }
 
   @inlinable
   public init(from decoder: Decoder) throws {
-    var container = try decoder.unkeyedContainer()
+    var container = try decoder.singleValueContainer()
     let array = try container.decode(ShapedArray<Scalar>.self)
     self.init(array)
   }

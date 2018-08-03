@@ -34,8 +34,6 @@ private func _testRoundTrip<T>(
   }
 }
 
-// NOTE: This test currently crashes with:
-// Compiler bug -- Tensor op builtin __tfop_Shape,$in,T,out_type cannot be lowered to LLVM IR
 CodableTests.testAllBackends("Tensor") {
   let tensor = Tensor<Int32>(shape: [2, 3], scalars: Array(1...6))
   let expectedJSON = "{\"shape\":[2,3],\"scalars\":[1,2,3,4,5,6]}".data(using: .utf8)!
