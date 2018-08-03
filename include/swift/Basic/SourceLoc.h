@@ -220,7 +220,8 @@ template <typename T> struct DenseMapInfo;
 
 template <> struct DenseMapInfo<swift::SourceLoc> {
   static swift::SourceLoc getEmptyKey() {
-    return SMLoc::getFromPointer(DenseMapInfo<const char *>::getEmptyKey());
+    return swift::SourceLoc(
+        SMLoc::getFromPointer(DenseMapInfo<const char *>::getEmptyKey()));
   }
 
   static swift::SourceLoc getTombstoneKey() {
@@ -231,7 +232,8 @@ template <> struct DenseMapInfo<swift::SourceLoc> {
   }
 
   static unsigned getHashValue(const swift::SourceLoc &Val) {
-    return DenseMapInfo<const void *>::getHashValue(getOpaquePointerValue());
+    return DenseMapInfo<const void *>::getHashValue(
+        Val.getOpaquePointerValue());
   }
 
   static bool isEqual(const swift::SourceLoc &LHS,
