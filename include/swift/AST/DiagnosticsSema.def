@@ -640,12 +640,12 @@ ERROR(serialization_target_incompatible_repl,none,
 ERROR(serialization_target_too_new,Fatal,
       "compiling for %0 %1, but module %2 has a minimum "
       "deployment target of %0 %3: %4",
-      (StringRef, clang::VersionTuple, Identifier, clang::VersionTuple,
+      (StringRef, llvm::VersionTuple, Identifier, llvm::VersionTuple,
        StringRef))
 ERROR(serialization_target_too_new_repl,none,
       "compiling for %0 %1, but module %2 has a minimum "
       "deployment target of %0 %3: %4",
-      (StringRef, clang::VersionTuple, Identifier, clang::VersionTuple,
+      (StringRef, llvm::VersionTuple, Identifier, llvm::VersionTuple,
        StringRef))
 
 ERROR(serialization_fatal,Fatal,
