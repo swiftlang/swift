@@ -632,17 +632,21 @@ ERROR(serialization_name_mismatch,Fatal,
 ERROR(serialization_name_mismatch_repl,none,
       "cannot load module '%0' as %1", (StringRef, Identifier))
 ERROR(serialization_target_incompatible,Fatal,
-      "module file was created for incompatible target %0: %1",
-      (StringRef, StringRef))
+      "module %0 was created for incompatible target %1: %2",
+      (Identifier, StringRef, StringRef))
 ERROR(serialization_target_incompatible_repl,none,
-      "module file was created for incompatible target %0: %1",
-      (StringRef, StringRef))
+      "module %0 was created for incompatible target %1: %2",
+      (Identifier, StringRef, StringRef))
 ERROR(serialization_target_too_new,Fatal,
-      "module file's minimum deployment target is %0 v%1.%2%select{|.%3}3: %4",
-      (StringRef, unsigned, unsigned, unsigned, StringRef))
+      "compiling for %0 %1, but module %2 has a minimum "
+      "deployment target of %0 %3: %4",
+      (StringRef, clang::VersionTuple, Identifier, clang::VersionTuple,
+       StringRef))
 ERROR(serialization_target_too_new_repl,none,
-      "module file's minimum deployment target is %0 v%1.%2%select{|.%3}3: %4",
-      (StringRef, unsigned, unsigned, unsigned, StringRef))
+      "compiling for %0 %1, but module %2 has a minimum "
+      "deployment target of %0 %3: %4",
+      (StringRef, clang::VersionTuple, Identifier, clang::VersionTuple,
+       StringRef))
 
 ERROR(serialization_fatal,Fatal,
       "fatal error encountered while reading from module '%0'; "
