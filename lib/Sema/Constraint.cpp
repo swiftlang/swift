@@ -53,7 +53,9 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
   case ConstraintKind::BridgingConversion:
+  case ConstraintKind::ArgumentNonEphemeralConversion:
   case ConstraintKind::ArgumentConversion:
+  case ConstraintKind::OperatorArgumentNonEphemeralConversion:
   case ConstraintKind::OperatorArgumentConversion:
   case ConstraintKind::ConformsTo:
   case ConstraintKind::LiteralConformsTo:
@@ -112,7 +114,9 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
   case ConstraintKind::BridgingConversion:
+  case ConstraintKind::ArgumentNonEphemeralConversion:
   case ConstraintKind::ArgumentConversion:
+  case ConstraintKind::OperatorArgumentNonEphemeralConversion:
   case ConstraintKind::OperatorArgumentConversion:
   case ConstraintKind::ConformsTo:
   case ConstraintKind::LiteralConformsTo:
@@ -217,7 +221,9 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
   case ConstraintKind::BridgingConversion:
+  case ConstraintKind::ArgumentNonEphemeralConversion:
   case ConstraintKind::ArgumentConversion:
+  case ConstraintKind::OperatorArgumentNonEphemeralConversion:
   case ConstraintKind::OperatorArgumentConversion:
   case ConstraintKind::ConformsTo:
   case ConstraintKind::LiteralConformsTo:
@@ -289,7 +295,11 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   case ConstraintKind::Subtype: Out << " subtype "; break;
   case ConstraintKind::Conversion: Out << " conv "; break;
   case ConstraintKind::BridgingConversion: Out << " bridging conv "; break;
+  case ConstraintKind::ArgumentNonEphemeralConversion:
+      Out << " non-ephemeral arg conv "; break;
   case ConstraintKind::ArgumentConversion: Out << " arg conv "; break;
+  case ConstraintKind::OperatorArgumentNonEphemeralConversion:
+      Out << " operator non-ephemeral arg conv "; break;
   case ConstraintKind::OperatorArgumentConversion:
       Out << " operator arg conv "; break;
   case ConstraintKind::ConformsTo: Out << " conforms to "; break;
@@ -490,9 +500,11 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::Bind:
   case ConstraintKind::BindParam:
   case ConstraintKind::BindToPointerType:
+  case ConstraintKind::ArgumentNonEphemeralConversion:
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::Conversion:
   case ConstraintKind::BridgingConversion:
+  case ConstraintKind::OperatorArgumentNonEphemeralConversion:
   case ConstraintKind::OperatorArgumentConversion:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::Equal:

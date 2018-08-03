@@ -67,6 +67,39 @@ std::pair<Expr *, bool> FailureDiagnostic::computeAnchor() const {
   return {anchor, !resolved->getPath().empty()};
 }
 
+ConstraintLocator *FailureDiagnostic::getCalleeLocator(Expr *expr) const {
+  auto &cs = getConstraintSystem();
+
+  if (auto *applyExpr = dyn_cast<ApplyExpr>(expr)) {
+    auto *fnExpr = applyExpr->getFn();
+    // For an apply of a TypeExpr, we have a short-form constructor. Unlike
+    // other locators to callees, these are anchored on the apply expression
+    // rather than the function expr.
+    if (isa<TypeExpr>(fnExpr)) {
+      auto *fnLocator =
+          cs.getConstraintLocator(applyExpr, ConstraintLocator::ApplyFunction);
+      return cs.getConstraintLocator(fnLocator,
+                                     ConstraintLocator::ConstructorMember);
+    }
+    expr = fnExpr;
+  }
+
+  auto *locator = cs.getConstraintLocator(expr);
+  if (auto *ude = dyn_cast<UnresolvedDotExpr>(expr)) {
+    if (ude->getName().isSimpleName(DeclBaseName::createConstructor())) {
+      return cs.getConstraintLocator(locator,
+                                     ConstraintLocator::ConstructorMember);
+    } else {
+      return cs.getConstraintLocator(locator, ConstraintLocator::Member);
+    }
+  }
+
+  if (isa<SubscriptExpr>(expr))
+    return cs.getConstraintLocator(locator, ConstraintLocator::SubscriptMember);
+
+  return locator;
+}
+
 Type FailureDiagnostic::getType(Expr *expr) const {
   return resolveType(CS.getType(expr));
 }
@@ -93,34 +126,11 @@ const Requirement &RequirementFailure::getRequirement() const {
 }
 
 ValueDecl *RequirementFailure::getDeclRef() const {
-  auto &cs = getConstraintSystem();
-
   auto *anchor = getAnchor();
-  auto *locator = cs.getConstraintLocator(anchor);
-  if (auto *AE = dyn_cast<CallExpr>(anchor)) {
+  if (auto *AE = dyn_cast<CallExpr>(anchor))
     assert(isa<TypeExpr>(AE->getFn()));
-    ConstraintLocatorBuilder ctor(locator);
-    locator = cs.getConstraintLocator(
-        ctor.withPathElement(PathEltKind::ApplyFunction)
-            .withPathElement(PathEltKind::ConstructorMember));
-  } else if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
-    ConstraintLocatorBuilder member(locator);
 
-    if (UDE->getName().isSimpleName(DeclBaseName::createConstructor())) {
-      member = member.withPathElement(PathEltKind::ConstructorMember);
-    } else {
-      member = member.withPathElement(PathEltKind::Member);
-    }
-
-    locator = cs.getConstraintLocator(member);
-  } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor)) {
-    locator = cs.getConstraintLocator(locator, PathEltKind::UnresolvedMember);
-  } else if (isa<SubscriptExpr>(anchor)) {
-    ConstraintLocatorBuilder subscript(locator);
-    locator = cs.getConstraintLocator(
-        subscript.withPathElement(PathEltKind::SubscriptMember));
-  }
-
+  auto *locator = getCalleeLocator(anchor);
   auto overload = getOverloadChoiceIfAvailable(locator);
   if (overload)
     return overload->choice.getDecl();
@@ -1105,4 +1115,38 @@ Diag<StringRef> AssignmentFailure::findDeclDiagonstic(ASTContext &ctx,
   }
 
   return diag::assignment_lhs_is_immutable_variable;
+}
+
+bool NonEphemeralConversionFailure::diagnoseAsError() {
+  auto &cs = getConstraintSystem();
+  auto *locator = getLocator();
+  auto path = locator->getPath();
+  if (path.empty() ||
+      path.back().getKind() != ConstraintLocator::ApplyArgToParam)
+    return false;
+
+  SourceRange range;
+  auto *argExpr = getAnchor();
+  auto *applyExpr = dyn_cast<ApplyExpr>(locator->getAnchor());
+  if (!applyExpr)
+    return false;
+
+  auto overload = getOverloadChoiceIfAvailable(getCalleeLocator(applyExpr));
+  if (!overload)
+    return false;
+
+  auto *fnType = resolveType(overload->openedType)->getAs<AnyFunctionType>();
+  if (!fnType)
+    return false;
+
+  auto paramIdx = path.back().getValue2();
+  auto param = fnType->getParams()[paramIdx];
+
+  ValueDecl *callee =
+      overload->choice.isDecl() ? overload->choice.getDecl() : nullptr;
+
+  diagnoseIllegalNonEphemeralConversion(cs.TC, argExpr, getType(argExpr),
+                                        param.getPlainType(), callee, fnType,
+                                        /*downgradeToWarning*/ false);
+  return true;
 }

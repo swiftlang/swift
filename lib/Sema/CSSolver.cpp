@@ -1481,7 +1481,9 @@ void ConstraintSystem::ArgumentInfoCollector::walk(Type argType) {
       }
 
       case ConstraintKind::Subtype:
+      case ConstraintKind::OperatorArgumentNonEphemeralConversion:
       case ConstraintKind::OperatorArgumentConversion:
+      case ConstraintKind::ArgumentNonEphemeralConversion:
       case ConstraintKind::ArgumentConversion:
       case ConstraintKind::Conversion:
       case ConstraintKind::BridgingConversion:

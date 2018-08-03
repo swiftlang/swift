@@ -365,6 +365,24 @@ ERROR(cannot_convert_argument_value_generic,none,
       "cannot convert value of type %0 (%1) to expected argument type %2 (%3)",
       (Type, StringRef, Type, StringRef))
 
+ERROR(cannot_convert_non_ephemeral,none,
+      "cannot pass temporary pointer argument of type %0 to parameter "
+      "expecting a pointer that outlives the duration of the call", (Type))
+WARNING(cannot_convert_non_ephemeral_warning,none,
+        "passing temporary pointer argument of type %0 to parameter expecting "
+        "a pointer that outlives the duration of the call leads to undefined "
+        "behaviour; this will be an error in a future release", (Type))
+ERROR(cannot_construct_dangling_pointer,none,
+      "initialization of %0 results in a dangling %select{|buffer }1pointer",
+      (Type, unsigned))
+WARNING(cannot_construct_dangling_pointer_warning,none,
+        "initialization of %0 results in a dangling %select{|buffer }1pointer; "
+        "this will be an error in a future release",
+        (Type, unsigned))
+NOTE(ephemeral_pointer_argument_conversion_note,none,
+     "implicit argument conversion from %0 to %1 produces a pointer valid only "
+     "for the duration of the call", (Type, Type))
+
 ERROR(cannot_convert_argument_value_protocol,none,
       "argument type %0 does not conform to expected type %1", (Type, Type))
 ERROR(cannot_convert_partial_argument_value_protocol,none,

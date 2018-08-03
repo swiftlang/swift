@@ -190,3 +190,14 @@ SkipSuperclassRequirement::create(ConstraintSystem &cs, Type lhs, Type rhs,
   return new (cs.getAllocator())
       SkipSuperclassRequirement(cs, lhs, rhs, locator);
 }
+
+bool AllowEphemeral::diagnose(Expr *root, bool asNote) const {
+  NonEphemeralConversionFailure failure(root, getConstraintSystem(),
+                                        getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowEphemeral *AllowEphemeral::create(ConstraintSystem &cs,
+                                       ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AllowEphemeral(cs, locator);
+}

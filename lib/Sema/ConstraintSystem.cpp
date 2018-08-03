@@ -2360,3 +2360,126 @@ Expr *constraints::simplifyLocatorToAnchor(ConstraintSystem &cs,
 
   return locator->getAnchor();
 }
+
+bool ConstraintSystem::isConversionNonEphemeral(
+    ConversionRestrictionKind conversion, ConstraintLocatorBuilder locator) {
+  switch (conversion) {
+  case ConversionRestrictionKind::ArrayToPointer:
+  case ConversionRestrictionKind::StringToPointer:
+    // Always ephemeral.
+    return false;
+  case ConversionRestrictionKind::InoutToPointer: {
+    // Ephemeral, except if the expression is a reference to a global or
+    // static stored variable.
+    SourceRange range;
+    auto *argLoc = simplifyLocator(*this, getConstraintLocator(locator), range);
+    auto *expr = argLoc->getAnchor()->getSemanticsProvidingExpr();
+
+    auto *subExpr = cast<InOutExpr>(expr)->getSubExpr();
+
+    auto findOverloadChoice =
+        [&](ConstraintLocator *locator) -> Optional<OverloadChoice> {
+      auto overload = getResolvedOverloadSets();
+      while (overload) {
+        if (overload->Locator == locator)
+          return overload->Choice;
+        overload = overload->Previous;
+      }
+      return None;
+    };
+
+    auto isStoredVarDecl = [](ValueDecl *decl) -> bool {
+      auto *asd = dyn_cast_or_null<AbstractStorageDecl>(decl);
+      return asd && asd->getReadWriteImpl() == ReadWriteImplKind::Stored;
+    };
+
+    auto isSimpleMember = [&](Expr *baseExpr, ValueDecl *member) -> bool {
+      if (!isStoredVarDecl(member))
+        return false;
+
+      auto type = simplifyType(getType(baseExpr))->getAs<LValueType>();
+      if (!type)
+        return false;
+
+      auto baseType = type->getObjectType();
+      return baseType->is<StructType>() || baseType->is<TupleType>();
+    };
+
+    auto isValidBaseDecl = [&](ValueDecl *baseDecl) -> bool {
+      if (!isStoredVarDecl(baseDecl))
+        return false;
+
+      return baseDecl->isStatic() ||
+             baseDecl->getDeclContext()->isModuleScopeContext();
+    };
+
+    while (true) {
+      subExpr = subExpr->getSemanticsProvidingExpr();
+
+      // We can look through any number of force values.
+      if (auto *fve = dyn_cast<ForceValueExpr>(subExpr)) {
+        subExpr = fve->getSubExpr();
+        continue;
+      }
+
+      if (auto *tee = dyn_cast<TupleElementExpr>(subExpr)) {
+        subExpr = tee->getBase();
+        continue;
+      }
+
+      if (auto *mre = dyn_cast<MemberRefExpr>(subExpr)) {
+        if (!isSimpleMember(mre->getBase(), mre->getMember().getDecl()))
+          return false;
+        subExpr = mre->getBase();
+        continue;
+      }
+
+      if (auto *ude = dyn_cast<UnresolvedDotExpr>(subExpr)) {
+        auto choice = findOverloadChoice(
+            getConstraintLocator(subExpr, ConstraintLocator::Member));
+        if (!choice)
+          return false;
+
+        if (choice->getKind() != OverloadChoiceKind::TupleIndex)
+          if (!choice->isDecl() ||
+              !isSimpleMember(ude->getBase(), choice->getDecl()))
+            return false;
+
+        subExpr = ude->getBase();
+        continue;
+      }
+
+      break;
+    }
+
+    if (auto *dre = dyn_cast<DeclRefExpr>(subExpr))
+      return isValidBaseDecl(dre->getDecl());
+
+    auto choice = findOverloadChoice(getConstraintLocator(subExpr));
+    if (!choice || !choice->isDecl())
+      return false;
+
+    return isValidBaseDecl(choice->getDecl());
+  }
+  case ConversionRestrictionKind::TupleToTuple:
+  case ConversionRestrictionKind::DeepEquality:
+  case ConversionRestrictionKind::Superclass:
+  case ConversionRestrictionKind::LValueToRValue:
+  case ConversionRestrictionKind::Existential:
+  case ConversionRestrictionKind::MetatypeToExistentialMetatype:
+  case ConversionRestrictionKind::ExistentialMetatypeToMetatype:
+  case ConversionRestrictionKind::ValueToOptional:
+  case ConversionRestrictionKind::OptionalToOptional:
+  case ConversionRestrictionKind::ClassMetatypeToAnyObject:
+  case ConversionRestrictionKind::ExistentialMetatypeToAnyObject:
+  case ConversionRestrictionKind::ProtocolMetatypeToProtocolClass:
+  case ConversionRestrictionKind::PointerToPointer:
+  case ConversionRestrictionKind::ArrayUpcast:
+  case ConversionRestrictionKind::DictionaryUpcast:
+  case ConversionRestrictionKind::SetUpcast:
+  case ConversionRestrictionKind::HashableToAnyHashable:
+  case ConversionRestrictionKind::CFTollFreeBridgeToObjC:
+  case ConversionRestrictionKind::ObjCTollFreeBridgeToCF:
+    return true;
+  }
+}

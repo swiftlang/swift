@@ -5644,10 +5644,26 @@ Expr *ExprRewriter::coerceCallArguments(
     }
 
     // Convert the argument.
-    auto convertedArg = coerceToType(arg, paramType,
-                                     getArgLocator(argIdx, paramIdx));
+    auto argLocator = getArgLocator(argIdx, paramIdx);
+    auto convertedArg = coerceToType(arg, paramType, argLocator);
     if (!convertedArg)
       return nullptr;
+
+    // If the Swift version is < 5, we might have allowed an ephemeral
+    // conversion to a non-ephemeral parameter. Emit a warning if this is the
+    // case (which will become an error in Swift versions > 5).
+    if (!tc.Context.isSwiftVersionAtLeast(5) && param.isNonEphemeral()) {
+      auto argType = cs.getType(arg)->getRValueType();
+      auto result = solution.ConstraintRestrictions.find(
+          {argType->getCanonicalType(), paramType->getCanonicalType()});
+      if (result != solution.ConstraintRestrictions.end()) {
+        auto restriction = result->getSecond();
+        if (!cs.isConversionNonEphemeral(restriction, argLocator))
+          diagnoseIllegalNonEphemeralConversion(tc, arg, argType, paramType,
+                                                callee.getDecl(), funcType,
+                                                /*downgradeToWarning*/ true);
+      }
+    }
 
     // Add the converted argument.
     fromTupleExpr[argIdx] = convertedArg;

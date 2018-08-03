@@ -832,10 +832,20 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
   bool isOperator = (isa<PrefixUnaryExpr>(anchor) ||
                      isa<PostfixUnaryExpr>(anchor) || isa<BinaryExpr>(anchor));
 
-  ConstraintKind subKind = (isOperator
-                            ? ConstraintKind::OperatorArgumentConversion
-                            : ConstraintKind::ArgumentConversion);
-  
+  auto getSubConstraintKind =
+      [&](const AnyFunctionType::Param &param) -> ConstraintKind {
+    auto paramFlags = param.getParameterFlags();
+    if (isOperator) {
+      return paramFlags.isNonEphemeral()
+                 ? ConstraintKind::OperatorArgumentNonEphemeralConversion
+                 : ConstraintKind::OperatorArgumentConversion;
+    } else {
+      return paramFlags.isNonEphemeral()
+                 ? ConstraintKind::ArgumentNonEphemeralConversion
+                 : ConstraintKind::ArgumentConversion;
+    }
+  };
+
   for (unsigned paramIdx = 0, numParams = parameterBindings.size();
        paramIdx != numParams; ++paramIdx){
     // Skip unfulfilled parameters. There's nothing to do for them.
@@ -845,6 +855,8 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
     // Determine the parameter type.
     const auto &param = params[paramIdx];
     auto paramTy = param.getOldType();
+
+    auto subKind = getSubConstraintKind(param);
 
     // Compare each of the bound arguments for this parameter.
     for (auto argIdx : parameterBindings[paramIdx]) {
@@ -908,7 +920,9 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   assert(kind >= ConstraintKind::Conversion);
   ConstraintKind subKind;
   switch (kind) {
+  case ConstraintKind::OperatorArgumentNonEphemeralConversion:
   case ConstraintKind::OperatorArgumentConversion:
+  case ConstraintKind::ArgumentNonEphemeralConversion:
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::Conversion:
     subKind = ConstraintKind::Conversion;
@@ -1010,7 +1024,9 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
   case ConstraintKind::BridgingConversion:
+  case ConstraintKind::ArgumentNonEphemeralConversion:
   case ConstraintKind::ArgumentConversion:
+  case ConstraintKind::OperatorArgumentNonEphemeralConversion:
   case ConstraintKind::OperatorArgumentConversion:
   case ConstraintKind::ApplicableFunction:
   case ConstraintKind::BindOverload:
@@ -1084,7 +1100,9 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
+  case ConstraintKind::ArgumentNonEphemeralConversion:
   case ConstraintKind::ArgumentConversion:
+  case ConstraintKind::OperatorArgumentNonEphemeralConversion:
   case ConstraintKind::OperatorArgumentConversion:
     subKind = ConstraintKind::Subtype;
     break;
@@ -1766,6 +1784,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::Subtype:
     case ConstraintKind::Conversion:
     case ConstraintKind::ArgumentConversion:
+    case ConstraintKind::ArgumentNonEphemeralConversion:
+    case ConstraintKind::OperatorArgumentNonEphemeralConversion:
     case ConstraintKind::OperatorArgumentConversion:
       // We couldn't solve this constraint. If only one of the types is a type
       // variable, perhaps we can do something with it below.
@@ -1954,7 +1974,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case TypeKind::InOut:
       // If the RHS is an inout type, the LHS must be an @lvalue type.
       if (kind == ConstraintKind::BindParam ||
-          kind >= ConstraintKind::OperatorArgumentConversion)
+          kind >= ConstraintKind::OperatorArgumentNonEphemeralConversion)
         return getTypeMatchFailure(locator);
       
       return matchTypes(cast<InOutType>(desugar1)->getObjectType(),
@@ -1979,6 +1999,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     }
     }
   }
+
+  bool isConstraintNonEphemeral =
+      kind == ConstraintKind::ArgumentNonEphemeralConversion ||
+      kind == ConstraintKind::OperatorArgumentNonEphemeralConversion;
 
   if (concrete && kind >= ConstraintKind::Subtype) {
     // Subclass-to-superclass conversion.
@@ -2051,7 +2075,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       // 'T() == U()' for unrelated T and U that just happen to be Hashable.
       // We can remove this special case when we implement operator hiding.
       if (!type1->is<LValueType>() &&
-          kind != ConstraintKind::OperatorArgumentConversion) {
+          kind != ConstraintKind::OperatorArgumentConversion &&
+          kind != ConstraintKind::OperatorArgumentNonEphemeralConversion) {
         assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
         conversionsOrFixes.push_back(
                               ConversionRestrictionKind::HashableToAnyHashable);
@@ -2161,7 +2186,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         isAutoClosureArgument = true;
 
     // Pointer arguments can be converted from pointer-compatible types.
-    if (kind >= ConstraintKind::ArgumentConversion) {
+    if (kind >= ConstraintKind::ArgumentNonEphemeralConversion) {
       Type unwrappedType2 = type2;
       bool type2IsOptional = false;
       if (Type unwrapped = type2->getOptionalObjectType()) {
@@ -2171,34 +2196,49 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       PointerTypeKind pointerKind;
       if (Type pointeeTy =
               unwrappedType2->getAnyPointerElementType(pointerKind)) {
+
+        bool allowEphemeral = (!isConstraintNonEphemeral ||
+                               !getASTContext().isSwiftVersionAtLeast(5));
+
+        auto tryPointerConversion = [&](ConversionRestrictionKind conversion) {
+          if (allowEphemeral || isConversionNonEphemeral(conversion, locator))
+            conversionsOrFixes.push_back(conversion);
+        };
+
         switch (pointerKind) {
         case PTK_UnsafeRawPointer:
         case PTK_UnsafeMutableRawPointer:
         case PTK_UnsafePointer:
         case PTK_UnsafeMutablePointer:
           // UnsafeMutablePointer can be converted from an inout reference to a
-          // scalar or array.
+          // scalar or array if the parameter accepts ephemeral arguments.
           if (!isAutoClosureArgument) {
             if (auto inoutType1 = dyn_cast<InOutType>(desugar1)) {
               auto inoutBaseType = inoutType1->getInOutObjectType();
 
               Type simplifiedInoutBaseType = getFixedTypeRecursive(
-                  inoutBaseType, kind == ConstraintKind::Equal);
+                  inoutBaseType, /*wantRValue*/ kind == ConstraintKind::Equal);
+
+              auto baseIsArray = isArrayType(simplifiedInoutBaseType);
+
+              auto simplifiedDestType = getFixedTypeRecursive(
+                  pointeeTy, /*wantRValue*/ kind == ConstraintKind::Equal);
 
               // FIXME: If the base is still a type variable, we can't tell
               // what to do here. Might have to try \c ArrayToPointer and make
               // it more robust.
-              if (isArrayType(simplifiedInoutBaseType)) {
-                conversionsOrFixes.push_back(
-                    ConversionRestrictionKind::ArrayToPointer);
-              }
-              conversionsOrFixes.push_back(
-                  ConversionRestrictionKind::InoutToPointer);
+              if (baseIsArray)
+                tryPointerConversion(ConversionRestrictionKind::ArrayToPointer);
+
+              if (!baseIsArray || !simplifiedDestType->isEqual(
+                                      getASTContext().TheEmptyTupleType))
+                tryPointerConversion(ConversionRestrictionKind::InoutToPointer);
             }
           }
 
           // Operators cannot use these implicit conversions.
-          if (kind == ConstraintKind::ArgumentConversion) {
+          if (kind == ConstraintKind::ArgumentNonEphemeralConversion ||
+              kind == ConstraintKind::ArgumentConversion) {
             // We can potentially convert from an UnsafeMutablePointer
             // of a different type, if we're a void pointer.
             Type unwrappedType1 = type1;
@@ -2222,28 +2262,28 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                 // conversion.
                 if (type1PointerKind != pointerKind)
                   increaseScore(ScoreKind::SK_ValueToPointerConversion);
-                conversionsOrFixes.push_back(
-                  ConversionRestrictionKind::PointerToPointer);
+                tryPointerConversion(
+                    ConversionRestrictionKind::PointerToPointer);
               }
               // UnsafeMutableRawPointer -> UnsafeRawPointer
               else if (type1PointerKind == PTK_UnsafeMutableRawPointer &&
                        pointerKind == PTK_UnsafeRawPointer) {
                 if (type1PointerKind != pointerKind)
                   increaseScore(ScoreKind::SK_ValueToPointerConversion);
-                conversionsOrFixes.push_back(
-                  ConversionRestrictionKind::PointerToPointer);              
+                tryPointerConversion(
+                    ConversionRestrictionKind::PointerToPointer);
               }
             }
             // UnsafePointer and UnsafeRawPointer can also be converted from an
-            // array or string value, or a UnsafePointer or
+            // array or string value if the parameter accepts ephemeral
+            // arguments, or a UnsafePointer or
             // AutoreleasingUnsafeMutablePointer.
             if (pointerKind == PTK_UnsafePointer
                 || pointerKind == PTK_UnsafeRawPointer) {
               if (!isAutoClosureArgument) {
-                if (isArrayType(type1)) {
-                  conversionsOrFixes.push_back(
+                if (isArrayType(type1))
+                  tryPointerConversion(
                       ConversionRestrictionKind::ArrayToPointer);
-                }
 
                 // The pointer can be converted from a string, if the element
                 // type is compatible.
@@ -2252,16 +2292,16 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
                   if (baseTy->isTypeVariableOrMember() ||
                       isStringCompatiblePointerBaseType(TC, DC, baseTy))
-                    conversionsOrFixes.push_back(
+                    tryPointerConversion(
                         ConversionRestrictionKind::StringToPointer);
                 }
               }
-              
+
               if (type1IsPointer && optionalityMatches &&
                   (type1PointerKind == PTK_UnsafePointer ||
                    type1PointerKind == PTK_AutoreleasingUnsafeMutablePointer)) {
-                conversionsOrFixes.push_back(
-                                   ConversionRestrictionKind::PointerToPointer);
+                tryPointerConversion(
+                    ConversionRestrictionKind::PointerToPointer);
               }
             }
           }
@@ -2269,18 +2309,18 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
         case PTK_AutoreleasingUnsafeMutablePointer:
           // PTK_AutoreleasingUnsafeMutablePointer can be converted from an
-          // inout reference to a scalar.
-          if (!isAutoClosureArgument && type1->is<InOutType>()) {
-            conversionsOrFixes.push_back(
-                                     ConversionRestrictionKind::InoutToPointer);
-          }
+          // inout reference to a scalar if the parameter accepts ephemeral
+          // arguments.
+          if (!isAutoClosureArgument && type1->is<InOutType>())
+            tryPointerConversion(ConversionRestrictionKind::InoutToPointer);
           break;
         }
       }
     }
   }
 
-  if (concrete && kind >= ConstraintKind::OperatorArgumentConversion) {
+  if (concrete &&
+      kind >= ConstraintKind::OperatorArgumentNonEphemeralConversion) {
     // If the RHS is an inout type, the LHS must be an @lvalue type.
     if (auto *lvt = type1->getAs<LValueType>()) {
       if (auto *iot = type2->getAs<InOutType>()) {
@@ -2406,6 +2446,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     conversionsOrFixes.push_back(
           TreatRValueAsLValue::create(*this, getConstraintLocator(locator)));
   }
+
+  if (attemptFixes && isConstraintNonEphemeral)
+    conversionsOrFixes.push_back(
+        AllowEphemeral::create(*this, getConstraintLocator(locator)));
 
   if (attemptFixes)
     attemptToFixRequirementFailure(*this, type1, type2, conversionsOrFixes,
@@ -4746,7 +4790,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     
     auto baseType1 = type1->getInOutObjectType();
     auto baseType2 = getBaseTypeForPointer(*this, t2);
-    
+
     // Set up the disjunction for the array or scalar cases.
 
     increaseScore(ScoreKind::SK_ValueToPointerConversion);
@@ -5051,6 +5095,25 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
+  case FixKind::AllowEphemeral: {
+    // Assume that that we're doing a standard argument conversion, instead of
+    // a non-ephemeral one.
+    ConstraintKind newMatchKind;
+    if (matchKind == ConstraintKind::ArgumentNonEphemeralConversion)
+      newMatchKind = ConstraintKind::ArgumentConversion;
+    else if (matchKind ==
+             ConstraintKind::OperatorArgumentNonEphemeralConversion)
+      newMatchKind = ConstraintKind::OperatorArgumentConversion;
+    else
+      llvm_unreachable(
+          "FixKind::AllowEphemeral used without a non-ephemeral constraint");
+
+    auto result = matchTypes(type1, type2, newMatchKind, subflags, locator);
+    if (result == SolutionKind::Solved)
+      if (recordFix(fix))
+        return SolutionKind::Error;
+    return result;
+  }
   case FixKind::ExplicitlyEscaping:
   case FixKind::CoerceToCheckedCast:
   case FixKind::RelabelArguments:
@@ -5077,7 +5140,9 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::BindToPointerType:
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
+  case ConstraintKind::ArgumentNonEphemeralConversion:
   case ConstraintKind::ArgumentConversion:
+  case ConstraintKind::OperatorArgumentNonEphemeralConversion:
   case ConstraintKind::OperatorArgumentConversion:
     return matchTypes(first, second, kind, subflags, locator);
 
@@ -5328,7 +5393,9 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::BindToPointerType:
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
+  case ConstraintKind::ArgumentNonEphemeralConversion:
   case ConstraintKind::ArgumentConversion:
+  case ConstraintKind::OperatorArgumentNonEphemeralConversion:
   case ConstraintKind::OperatorArgumentConversion: {
     // Relational constraints.
     auto matchKind = constraint.getKind();

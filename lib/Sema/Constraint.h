@@ -70,9 +70,19 @@ enum class ConstraintKind : char {
   /// \brief The first type can be bridged to the second type.
   BridgingConversion,
   /// \brief The first type is the element of an argument tuple that is
+  /// convertible to the second (parameter) type without the creation of an
+  /// ephemeral argument that's only valid for the duration of the call (e.g
+  /// this forbids the inout-to-pointer argument conversion).
+  ArgumentNonEphemeralConversion,
+  /// \brief The first type is the element of an argument tuple that is
   /// convertible to the second type (which represents the corresponding
   /// parameter type).
   ArgumentConversion,
+  /// \brief The first type is convertible to the second type, including inout,
+  /// but excluding conversions that involve the creation of an ephemeral
+  /// argument that's only valid for the duration of the call (e.g this forbids
+  /// the inout-to-pointer argument conversion).
+  OperatorArgumentNonEphemeralConversion,
   /// \brief The first type is convertible to the second type, including inout.
   OperatorArgumentConversion,
   /// \brief The first type must conform to the second type (which is a
@@ -465,7 +475,9 @@ public:
     case ConstraintKind::Subtype:
     case ConstraintKind::Conversion:
     case ConstraintKind::BridgingConversion:
+    case ConstraintKind::ArgumentNonEphemeralConversion:
     case ConstraintKind::ArgumentConversion:
+    case ConstraintKind::OperatorArgumentNonEphemeralConversion:
     case ConstraintKind::OperatorArgumentConversion:
     case ConstraintKind::ConformsTo:
     case ConstraintKind::LiteralConformsTo:

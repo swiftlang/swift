@@ -138,6 +138,11 @@ protected:
   /// \returns true is locator hasn't been simplified down to expression.
   bool hasComplexLocator() const { return HasComplexLocator; }
 
+  /// Returns a locator describing the callee for a given expression. For an
+  /// apply, this is a locator to the function. For an unresolved dot, this is
+  /// a locator to the member.
+  ConstraintLocator *getCalleeLocator(Expr *expr) const;
+
 private:
   /// Compute anchor expression associated with current diagnostic.
   std::pair<Expr *, bool> computeAnchor() const;
@@ -556,6 +561,15 @@ private:
              isLoadedLValue(ifExpr->getElseExpr());
     return false;
   }
+};
+
+class NonEphemeralConversionFailure final : public FailureDiagnostic {
+public:
+  NonEphemeralConversionFailure(Expr *expr, ConstraintSystem &cs,
+                                ConstraintLocator *locator)
+      : FailureDiagnostic(expr, cs, locator) {}
+
+  bool diagnoseAsError() override;
 };
 
 } // end namespace constraints

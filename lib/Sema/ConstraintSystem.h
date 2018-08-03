@@ -2563,6 +2563,9 @@ public:
                                          ConstraintLocator *memberLocator,
                                          bool includeInaccessibleMembers);
 
+  bool isConversionNonEphemeral(ConversionRestrictionKind conversion,
+                                ConstraintLocatorBuilder locator);
+
 private:  
   /// \brief Attempt to simplify the given construction constraint.
   ///
@@ -3756,6 +3759,12 @@ public:
 bool diagnoseBaseUnwrapForMemberAccess(Expr *baseExpr, Type baseType,
                                        DeclName memberName, bool resultOptional,
                                        SourceRange memberRange);
+
+void diagnoseIllegalNonEphemeralConversion(TypeChecker &TC, const Expr *argExpr,
+                                           Type argType, Type paramType,
+                                           const ValueDecl *callee,
+                                           AnyFunctionType *fnType,
+                                           bool downgradeToWarning);
 
 // Return true if, when replacing "<expr>" with "<expr> ?? T", parentheses need
 // to be added around <expr> first in order to maintain the correct precedence.

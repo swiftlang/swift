@@ -80,6 +80,9 @@ enum class FixKind : uint8_t {
   /// and assume that types are related.
   SkipSuperclassRequirement,
 
+  /// Allow an ephemeral argument conversion for a parameter marked as being
+  /// non-ephemeral.
+  AllowEphemeral,
 };
 
 class ConstraintFix {
@@ -345,6 +348,19 @@ public:
 
   static SkipSuperclassRequirement *
   create(ConstraintSystem &cs, Type lhs, Type rhs, ConstraintLocator *locator);
+};
+
+class AllowEphemeral final : public ConstraintFix {
+  AllowEphemeral(ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowEphemeral, locator) {}
+
+public:
+  std::string getName() const override { return "allow ephemeral"; }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AllowEphemeral *create(ConstraintSystem &cs,
+                                ConstraintLocator *locator);
 };
 
 } // end namespace constraints

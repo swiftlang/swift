@@ -138,7 +138,9 @@ findInferableTypeVars(Type type,
 /// wrapper type.
 static bool shouldBindToValueType(Constraint *constraint) {
   switch (constraint->getKind()) {
+  case ConstraintKind::OperatorArgumentNonEphemeralConversion:
   case ConstraintKind::OperatorArgumentConversion:
+  case ConstraintKind::ArgumentNonEphemeralConversion:
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::Conversion:
   case ConstraintKind::BridgingConversion:
@@ -420,7 +422,9 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
     case ConstraintKind::BindToPointerType:
     case ConstraintKind::Subtype:
     case ConstraintKind::Conversion:
+    case ConstraintKind::ArgumentNonEphemeralConversion:
     case ConstraintKind::ArgumentConversion:
+    case ConstraintKind::OperatorArgumentNonEphemeralConversion:
     case ConstraintKind::OperatorArgumentConversion:
     case ConstraintKind::OptionalObject: {
       // If there is a `bind param` constraint associated with
