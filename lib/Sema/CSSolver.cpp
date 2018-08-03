@@ -1501,11 +1501,10 @@ bool ConstraintSystem::solve(Expr *const expr,
 bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
                                 FreeTypeVariableBinding allowFreeTypeVariables){
   // If we already failed, or simplification fails, we're done.
-  if (failedConstraint || simplify()) {
+  if (failedConstraint || simplify())
     return true;
-  } else {
-    assert(ActiveConstraints.empty() && "Active constraints remain?");
-  }
+
+  assert(ActiveConstraints.empty() && "Active constraints remain?");
 
   // If there are no constraints remaining, we're done. Save this solution.
   if (InactiveConstraints.empty()) {
