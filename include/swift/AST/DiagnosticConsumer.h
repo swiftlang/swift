@@ -136,29 +136,28 @@ public:
 /// current file.
 class FileSpecificDiagnosticConsumer : public DiagnosticConsumer {
 public:
-  
   /// A diagnostic consumer, along with the name of the buffer that it should
   /// be associated with.
   class Subconsumer {
   public:
     /// The name of the buffer that a consumer should
     /// be associated with. An empty string means that a consumer is not
-    /// associated with any particular buffer, and should only receive diagnostics
-    /// that are not in any of the other consumers' files.
+    /// associated with any particular buffer, and should only receive
+    /// diagnostics that are not in any of the other consumers' files.
     std::string bufferName;
-    
-    /// A null pointer for the DiagnosticConsumer means that diagnostics for this
-    /// file should not be emitted.
+
+    /// A null pointer for the DiagnosticConsumer means that diagnostics for
+    /// this file should not be emitted.
     std::unique_ptr<DiagnosticConsumer> consumer;
-    
+
   private:
-    
     // Has this subconsumer ever handled a diagnostic that is an error?
     bool handledError = false;
-    
+
   public:
-    Subconsumer(std::string bufferName, std::unique_ptr<DiagnosticConsumer> consumer)
-    : bufferName(bufferName), consumer(std::move(consumer)) {}
+    Subconsumer(std::string bufferName,
+                std::unique_ptr<DiagnosticConsumer> consumer)
+        : bufferName(bufferName), consumer(std::move(consumer)) {}
   };
 
 private:

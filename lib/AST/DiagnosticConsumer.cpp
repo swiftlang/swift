@@ -39,10 +39,10 @@ static bool hasDuplicateFileNames(
   llvm::StringSet<> seenFiles;
   for (const auto &subconsumer : subconsumers) {
     if (subconsumer.bufferName.empty()) {
-      // We can handle multiple subconsumers that aren't associated with any file,
-      // because they only collect diagnostics that aren't in any of the special
-      // files. This isn't an important use case to support, but also SmallSet
-      // doesn't handle empty strings anyway!
+      // We can handle multiple subconsumers that aren't associated with any
+      // file, because they only collect diagnostics that aren't in any of the
+      // special files. This isn't an important use case to support, but also
+      // SmallSet doesn't handle empty strings anyway!
       continue;
     }
 
@@ -69,7 +69,8 @@ void FileSpecificDiagnosticConsumer::computeConsumersOrderedByRange(
     if (subconsumer.bufferName.empty())
       continue;
 
-    Optional<unsigned> bufferID = SM.getIDForBufferIdentifier(subconsumer.bufferName);
+    Optional<unsigned> bufferID =
+        SM.getIDForBufferIdentifier(subconsumer.bufferName);
     assert(bufferID.hasValue() && "consumer registered for unknown file");
     CharSourceRange range = SM.getRangeForBuffer(bufferID.getValue());
     ConsumersOrderedByRange.emplace_back(
@@ -120,7 +121,8 @@ FileSpecificDiagnosticConsumer::consumerSpecificInformationForLocation(
     // than trying to build a nonsensical map (and actually crashing since we
     // can't find buffers for the inputs).
     assert(!Subconsumers.empty());
-    if (!SM.getIDForBufferIdentifier(Subconsumers.begin()->bufferName).hasValue()) {
+    if (!SM.getIDForBufferIdentifier(Subconsumers.begin()->bufferName)
+             .hasValue()) {
       assert(llvm::none_of(Subconsumers, [&](const Subconsumer &subconsumer) {
         return SM.getIDForBufferIdentifier(subconsumer.bufferName).hasValue();
       }));
@@ -175,7 +177,7 @@ void FileSpecificDiagnosticConsumer::handleDiagnostic(
     for (auto &subconsumer : Subconsumers) {
       if (subconsumer.consumer) {
         subconsumer.consumer->handleDiagnostic(SM, Loc, Kind, FormatString,
-                                             FormatArgs, Info);
+                                               FormatArgs, Info);
       }
     }
     return;
@@ -197,7 +199,8 @@ bool FileSpecificDiagnosticConsumer::finishProcessing() {
 
   bool hadError = false;
   for (auto &subconsumer : Subconsumers)
-    hadError |= subconsumer.consumer && subconsumer.consumer->finishProcessing();
+    hadError |=
+        subconsumer.consumer && subconsumer.consumer->finishProcessing();
   return hadError;
 }
 

@@ -1600,10 +1600,11 @@ createDispatchingDiagnosticConsumerIfNeeded(
 
   inputsAndOutputs.forEachInputProducingSupplementaryOutput(
       [&](const InputFile &input) -> bool {
-    if (auto subconsumer = maybeCreateSingleConsumer(input))
-      subconsumers.emplace_back(FileSpecificDiagnosticConsumer::Subconsumer(input.file(), std::move(subconsumer)));
-    return false;
-  });
+        if (auto subconsumer = maybeCreateSingleConsumer(input))
+          subconsumers.emplace_back(FileSpecificDiagnosticConsumer::Subconsumer(
+              input.file(), std::move(subconsumer)));
+        return false;
+      });
   // For batch mode, the compiler must swallow diagnostics pertaining to
   // non-primary files in order to avoid Xcode showing the same diagnostic
   // multiple times. So, create a diagnostic "eater" for those non-primary
