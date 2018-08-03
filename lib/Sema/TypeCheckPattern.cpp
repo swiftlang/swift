@@ -855,6 +855,10 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL,
       } else if (isa<OwnedTypeRepr>(nestedRepr)) {
         param->setSpecifier(VarDecl::Specifier::Owned);
       }
+
+      if (auto *attrTypeRepr = dyn_cast<AttributedTypeRepr>(typeRepr))
+        if (attrTypeRepr->getAttrs().has(TAK_nonEphemeral))
+          param->setNonEphemeral();
     }
   }
   

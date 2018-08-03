@@ -106,8 +106,8 @@ void ParameterList::getParams(
       type = ParamDecl::getVarargBaseTy(type);
 
     auto label = P->getArgumentName();
-    auto flags = ParameterTypeFlags::fromParameterType(type, P->isVariadic(),
-                                                       P->getValueOwnership());
+    auto flags = ParameterTypeFlags::fromParameterType(
+        type, P->isVariadic(), P->isNonEphemeral(), P->getValueOwnership());
     params.emplace_back(type, label, flags);
   }
 }

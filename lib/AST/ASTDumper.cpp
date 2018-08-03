@@ -978,6 +978,9 @@ namespace {
       if (P->isVariadic())
         OS << " variadic";
 
+      if (P->isNonEphemeral())
+        OS << " non-ephemeral";
+
       if (P->getDefaultArgumentKind() != DefaultArgumentKind::None)
         printField("default_arg",
                    getDefaultArgumentKindString(P->getDefaultArgumentKind()));
@@ -3150,6 +3153,7 @@ namespace {
       printFlag(paramFlags.isVariadic(), "vararg");
       printFlag(paramFlags.isAutoClosure(), "autoclosure");
       printFlag(paramFlags.isEscaping(), "escaping");
+      printFlag(paramFlags.isNonEphemeral(), "non_ephemeral");
       switch (paramFlags.getValueOwnership()) {
       case ValueOwnership::Default: break;
       case ValueOwnership::Owned: printFlag("owned"); break;

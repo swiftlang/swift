@@ -42,9 +42,12 @@
                    DECL_ATTR_ALIAS(SPELLING, CLASS)
 #endif
 
-#ifndef TYPE_ATTR
-#define TYPE_ATTR(X)
+#ifndef TYPE_ATTR_WITH_NAME
+#define TYPE_ATTR_WITH_NAME(Name, IdStr)
 #endif
+
+#define TYPE_ATTR(Name) TYPE_ATTR_WITH_NAME(Name, #Name)
+#define TYPE_ATTR_(Name) TYPE_ATTR_WITH_NAME(Name, "_" #Name)
 
 // Type attributes
 TYPE_ATTR(autoclosure)
@@ -52,6 +55,7 @@ TYPE_ATTR(convention)
 TYPE_ATTR(noreturn)
 TYPE_ATTR(noescape)
 TYPE_ATTR(escaping)
+TYPE_ATTR_(nonEphemeral)
 
 // SIL-specific attributes
 TYPE_ATTR(block_storage)
@@ -379,7 +383,7 @@ SIMPLE_DECL_ATTR(_nonoverride, NonOverride,
   UserInaccessible | NotSerialized,
   79)
 
-#undef TYPE_ATTR
+#undef TYPE_ATTR_WITH_NAME
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS
 #undef SIMPLE_DECL_ATTR

@@ -2135,6 +2135,35 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     }
   }
 
+  if (attrs.has(TAK_nonEphemeral)) {
+    auto getLoc = [&] { return attrs.getLoc(TAK_nonEphemeral); };
+    // The attribute is meaningless except on parameter types.
+    if (!isParam ||
+        options.getBaseContext() == TypeResolverContext::EnumElementDecl) {
+      auto loc = getLoc();
+      auto attrRange = getTypeAttrRangeWithAt(Context, loc);
+
+      diagnose(loc, diag::attr_only_on_parameters,
+               attrs.getAttrName(TAK_nonEphemeral))
+          .fixItRemove(attrRange);
+    }
+
+    auto pointerType = ty;
+    if (auto unwrapped = pointerType->getOptionalObjectType())
+      pointerType = unwrapped;
+
+    // Can only be applied to Unsafe[...]Pointer types,
+    // or the protocol Self type.
+    if (!pointerType->getAnyPointerElementType() &&
+        !pointerType->hasArchetype() &&
+        !(DC->getParent()->getSelfProtocolDecl() &&
+          pointerType->isEqual(DC->getParent()->getProtocolSelfType()))) {
+      diagnose(getLoc(), diag::non_ephemeral_non_pointer_type);
+    }
+
+    attrs.clearAttribute(TAK_nonEphemeral);
+  }
+
   if (hasFunctionAttr && !fnRepr) {
     // @autoclosure usually auto-implies @noescape, don't complain about both
     // of them.
@@ -2255,6 +2284,10 @@ bool TypeResolver::resolveASTFunctionTypeParams(
       ty = ty->mapTypeOutOfContext();
     }
 
+    bool isNonEphemeral = false;
+    if (auto *attributedRepr = dyn_cast<AttributedTypeRepr>(eltTypeRepr))
+      isNonEphemeral = attributedRepr->getAttrs().has(TAK_nonEphemeral);
+
     ValueOwnership ownership;
 
     auto *nestedRepr = eltTypeRepr;
@@ -2281,8 +2314,8 @@ bool TypeResolver::resolveASTFunctionTypeParams(
       ownership = ValueOwnership::Default;
       break;
     }
-    ParameterTypeFlags paramFlags =
-        ParameterTypeFlags::fromParameterType(ty, variadic, ownership);
+    ParameterTypeFlags paramFlags = ParameterTypeFlags::fromParameterType(
+        ty, variadic, isNonEphemeral, ownership);
     elements.emplace_back(ty, Identifier(), paramFlags);
   }
 

@@ -3013,11 +3013,13 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     unsigned rawSpecifier;
     TypeID interfaceTypeID;
     bool isVariadic;
+    bool isNonEphemeral;
     uint8_t rawDefaultArg;
 
     decls_block::ParamLayout::readRecord(scratch, argNameID, paramNameID,
                                          contextID, rawSpecifier,
                                          interfaceTypeID, isVariadic,
+                                         isNonEphemeral,
                                          rawDefaultArg);
 
     auto DC = getDeclContext(contextID);
@@ -3049,6 +3051,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
 
     param->setInterfaceType(paramTy);
     param->setVariadic(isVariadic);
+    param->setNonEphemeral(isNonEphemeral);
 
     // Decode the default argument kind.
     // FIXME: Default argument expression, if available.
@@ -4440,11 +4443,12 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 
       IdentifierID labelID;
       TypeID typeID;
-      bool isVariadic, isAutoClosure, isEscaping;
+      bool isVariadic, isAutoClosure, isEscaping, isNonEphemeral;
       unsigned rawOwnership;
       decls_block::FunctionParamLayout::readRecord(scratch, labelID, typeID,
                                                    isVariadic, isAutoClosure,
-                                                   isEscaping, rawOwnership);
+                                                   isEscaping, isNonEphemeral,
+                                                   rawOwnership);
 
       auto ownership =
           getActualValueOwnership((serialization::ValueOwnership)rawOwnership);
@@ -4460,7 +4464,8 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
       params.emplace_back(paramTy.get(),
                           getIdentifier(labelID),
                           ParameterTypeFlags(isVariadic, isAutoClosure,
-                                             isEscaping, *ownership));
+                                             isEscaping, isNonEphemeral,
+                                             *ownership));
     }
 
     if (recordID == decls_block::FUNCTION_TYPE) {

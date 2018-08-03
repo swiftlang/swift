@@ -3200,6 +3200,7 @@ void Serializer::writeDecl(const Decl *D) {
         getRawStableVarDeclSpecifier(param->getSpecifier()),
         addTypeRef(interfaceType),
         param->isVariadic(),
+        param->isNonEphemeral(),
         getRawStableDefaultArgumentKind(param->getDefaultArgumentKind()),
         defaultArgumentText);
 
@@ -3841,7 +3842,8 @@ void Serializer::writeType(Type ty) {
       FunctionParamLayout::emitRecord(
           Out, ScratchRecord, abbrCode, addDeclBaseNameRef(param.getLabel()),
           addTypeRef(param.getPlainType()), paramFlags.isVariadic(),
-          paramFlags.isAutoClosure(), paramFlags.isEscaping(), rawOwnership);
+          paramFlags.isAutoClosure(), paramFlags.isEscaping(),
+          paramFlags.isNonEphemeral(), rawOwnership);
     }
 
     break;
