@@ -150,33 +150,50 @@ public:
     /// this file should not be emitted.
     std::unique_ptr<DiagnosticConsumer> consumer;
 
-  private:
     // Has this subconsumer ever handled a diagnostic that is an error?
     bool handledError = false;
 
-  public:
     Subconsumer(std::string bufferName,
                 std::unique_ptr<DiagnosticConsumer> consumer)
         : bufferName(bufferName), consumer(std::move(consumer)) {}
+    
+    void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
+                          DiagnosticKind Kind,
+                          StringRef FormatString,
+                          ArrayRef<DiagnosticArgument> FormatArgs,
+                          const DiagnosticInfo &Info) {
+      if (!consumer)
+        return; // Suppress non-primary diagnostic in batch mode.
+      handledError |= Kind == DiagnosticKind::Error;
+      consumer.get()->handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs, Info);
+    }
+    
+    void informDriverOfIncompleteBatchModeCompilation() {
+      if (!handledError && consumer)
+        consumer.get()->informDriverOfIncompleteBatchModeCompilation();
+    }
   };
 
 private:
   /// All consumers owned by this FileSpecificDiagnosticConsumer.
-  const SmallVector<Subconsumer, 4> Subconsumers;
+  SmallVector<Subconsumer, 4> Subconsumers;
 
 public:
   // The commented-out consts are there because the data does not change
   // but the swap method gets called on this structure.
   struct ConsumerSpecificInformation {
     /*const*/ CharSourceRange range;
-    /// The DiagnosticConsumer may be empty if those diagnostics are not to be
-    /// emitted.
-    DiagnosticConsumer * /*const*/ consumer;
-    bool hasAnErrorBeenEmitted = false;
+    
+    /// Index into Subconsumers vector.
+    unsigned subconsumerIndex;
 
     ConsumerSpecificInformation(const CharSourceRange range,
-                                DiagnosticConsumer *const consumer)
-        : range(range), consumer(consumer) {}
+                                unsigned subconsumerIndex)
+        : range(range), subconsumerIndex(subconsumerIndex) {}
+    
+    Subconsumer &subconsumer(FileSpecificDiagnosticConsumer &c) const {
+      return c.Subconsumers[subconsumerIndex];
+    }
   };
 
 private:
@@ -224,7 +241,7 @@ private:
   /// Xcode will only see an error for a particular primary in that primary's
   /// serialized diagnostics file. So, tell the subconsumers to inform the
   /// driver of incomplete batch mode compilation.
-  void tellSubconsumersToInformDriverOfIncompleteBatchModeCompilation() const;
+  void tellSubconsumersToInformDriverOfIncompleteBatchModeCompilation();
 
   void computeConsumersOrderedByRange(SourceManager &SM);
 

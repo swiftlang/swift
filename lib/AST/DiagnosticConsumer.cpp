@@ -65,7 +65,8 @@ FileSpecificDiagnosticConsumer::FileSpecificDiagnosticConsumer(
 void FileSpecificDiagnosticConsumer::computeConsumersOrderedByRange(
     SourceManager &SM) {
   // Look up each file's source range and add it to the "map" (to be sorted).
-  for (const Subconsumer &subconsumer : Subconsumers) {
+  for (const unsigned subconsumerIndex: indices(Subconsumers)) {
+    const Subconsumer &subconsumer = Subconsumers[subconsumerIndex];
     if (subconsumer.bufferName.empty())
       continue;
 
@@ -74,7 +75,7 @@ void FileSpecificDiagnosticConsumer::computeConsumersOrderedByRange(
     assert(bufferID.hasValue() && "consumer registered for unknown file");
     CharSourceRange range = SM.getRangeForBuffer(bufferID.getValue());
     ConsumersOrderedByRange.emplace_back(
-        ConsumerSpecificInformation(range, subconsumer.consumer.get()));
+        ConsumerSpecificInformation(range, subconsumerIndex));
   }
 
   // Sort the "map" by buffer /end/ location, for use with std::lower_bound
@@ -173,22 +174,12 @@ void FileSpecificDiagnosticConsumer::handleDiagnostic(
     consumerSpecificInfo = ConsumerSpecificInfoForSubsequentNotes;
     break;
   }
-  if (!consumerSpecificInfo.hasValue()) {
-    for (auto &subconsumer : Subconsumers) {
-      if (subconsumer.consumer) {
-        subconsumer.consumer->handleDiagnostic(SM, Loc, Kind, FormatString,
-                                               FormatArgs, Info);
-      }
-    }
+  if (consumerSpecificInfo.hasValue()) {
+    consumerSpecificInfo.getValue()->subconsumer(*this).handleDiagnostic(SM,Loc, Kind, FormatString, FormatArgs, Info);
     return;
   }
-  if (!consumerSpecificInfo.getValue()->consumer)
-    return; // Suppress non-primary diagnostic in batch mode.
-
-  consumerSpecificInfo.getValue()->consumer->handleDiagnostic(
-      SM, Loc, Kind, FormatString, FormatArgs, Info);
-  consumerSpecificInfo.getValue()->hasAnErrorBeenEmitted |=
-      Kind == DiagnosticKind::Error;
+  for (auto &subconsumer : Subconsumers)
+    subconsumer.handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs, Info);
 }
 
 bool FileSpecificDiagnosticConsumer::finishProcessing() {
@@ -205,13 +196,11 @@ bool FileSpecificDiagnosticConsumer::finishProcessing() {
 }
 
 void FileSpecificDiagnosticConsumer::
-    tellSubconsumersToInformDriverOfIncompleteBatchModeCompilation() const {
+    tellSubconsumersToInformDriverOfIncompleteBatchModeCompilation() {
   if (!HasAnErrorBeenConsumed)
     return;
-  for (auto &info : ConsumersOrderedByRange) {
-    if (!info.hasAnErrorBeenEmitted && info.consumer)
-      info.consumer->informDriverOfIncompleteBatchModeCompilation();
-  }
+  for (auto &info : ConsumersOrderedByRange)
+    info.subconsumer(*this).informDriverOfIncompleteBatchModeCompilation();
 }
 
 void NullDiagnosticConsumer::handleDiagnostic(
