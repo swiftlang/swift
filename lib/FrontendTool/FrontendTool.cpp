@@ -1596,12 +1596,12 @@ createDispatchingDiagnosticConsumerIfNeeded(
   // So a value of "4" here means that there would be no heap allocation on a
   // clean build of a module with up to 32 files on an 8-core machine, if the
   // user doesn't customize anything.
-  SmallVector<FileSpecificDiagnosticConsumer::Subconsumer, 4> subConsumers;
+  SmallVector<FileSpecificDiagnosticConsumer::Subconsumer, 4> subconsumers;
 
   inputsAndOutputs.forEachInputProducingSupplementaryOutput(
       [&](const InputFile &input) -> bool {
-    if (auto subConsumer = maybeCreateSingleConsumer(input))
-      subConsumers.emplace_back(input.file(), std::move(subConsumer));
+    if (auto subconsumer = maybeCreateSingleConsumer(input))
+      subconsumers.emplace_back(FileSpecificDiagnosticConsumer::Subconsumer(input.file(), std::move(subconsumer)));
     return false;
   });
   // For batch mode, the compiler must swallow diagnostics pertaining to
@@ -1613,16 +1613,16 @@ createDispatchingDiagnosticConsumerIfNeeded(
   if (inputsAndOutputs.hasMultiplePrimaryInputs()) {
     inputsAndOutputs.forEachNonPrimaryInput(
         [&](const InputFile &input) -> bool {
-          subConsumers.emplace_back(input.file(), nullptr);
+          subconsumers.emplace_back(input.file(), nullptr);
           return false;
         });
   }
 
-  if (subConsumers.empty())
+  if (subconsumers.empty())
     return nullptr;
-  if (subConsumers.size() == 1)
-    return std::move(subConsumers.front()).second;
-  return llvm::make_unique<FileSpecificDiagnosticConsumer>(subConsumers);
+  if (subconsumers.size() == 1)
+    return std::move(subconsumers.front()).consumer;
+  return llvm::make_unique<FileSpecificDiagnosticConsumer>(subconsumers);
 }
 
 /// Creates a diagnostic consumer that handles serializing diagnostics, based on

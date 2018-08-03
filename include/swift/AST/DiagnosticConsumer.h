@@ -136,18 +136,34 @@ public:
 /// current file.
 class FileSpecificDiagnosticConsumer : public DiagnosticConsumer {
 public:
+  
   /// A diagnostic consumer, along with the name of the buffer that it should
-  /// be associated with. An empty string means that a consumer is not
-  /// associated with any particular buffer, and should only receive diagnostics
-  /// that are not in any of the other consumers' files.
-  /// A null pointer for the DiagnosticConsumer means that diagnostics for this
-  /// file should not be emitted.
-  using Subconsumer =
-      std::pair<std::string, std::unique_ptr<DiagnosticConsumer>>;
+  /// be associated with.
+  class Subconsumer {
+  public:
+    /// The name of the buffer that a consumer should
+    /// be associated with. An empty string means that a consumer is not
+    /// associated with any particular buffer, and should only receive diagnostics
+    /// that are not in any of the other consumers' files.
+    std::string bufferName;
+    
+    /// A null pointer for the DiagnosticConsumer means that diagnostics for this
+    /// file should not be emitted.
+    std::unique_ptr<DiagnosticConsumer> consumer;
+    
+  private:
+    
+    // Has this subconsumer ever handled a diagnostic that is an error?
+    bool handledError = false;
+    
+  public:
+    Subconsumer(std::string bufferName, std::unique_ptr<DiagnosticConsumer> consumer)
+    : bufferName(bufferName), consumer(std::move(consumer)) {}
+  };
 
 private:
   /// All consumers owned by this FileSpecificDiagnosticConsumer.
-  const SmallVector<Subconsumer, 4> SubConsumers;
+  const SmallVector<Subconsumer, 4> Subconsumers;
 
 public:
   // The commented-out consts are there because the data does not change

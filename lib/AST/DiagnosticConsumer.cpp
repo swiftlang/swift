@@ -35,18 +35,18 @@ llvm::SMLoc DiagnosticConsumer::getRawLoc(SourceLoc loc) {
 
 LLVM_ATTRIBUTE_UNUSED
 static bool hasDuplicateFileNames(
-    ArrayRef<FileSpecificDiagnosticConsumer::Subconsumer> consumers) {
+    ArrayRef<FileSpecificDiagnosticConsumer::Subconsumer> subconsumers) {
   llvm::StringSet<> seenFiles;
-  for (const auto &consumerPair : consumers) {
-    if (consumerPair.first.empty()) {
-      // We can handle multiple consumers that aren't associated with any file,
+  for (const auto &subconsumer : subconsumers) {
+    if (subconsumer.bufferName.empty()) {
+      // We can handle multiple subconsumers that aren't associated with any file,
       // because they only collect diagnostics that aren't in any of the special
       // files. This isn't an important use case to support, but also SmallSet
       // doesn't handle empty strings anyway!
       continue;
     }
 
-    bool isUnique = seenFiles.insert(consumerPair.first).second;
+    bool isUnique = seenFiles.insert(subconsumer.bufferName).second;
     if (!isUnique)
       return true;
   }
@@ -54,26 +54,26 @@ static bool hasDuplicateFileNames(
 }
 
 FileSpecificDiagnosticConsumer::FileSpecificDiagnosticConsumer(
-    SmallVectorImpl<Subconsumer> &consumers)
-    : SubConsumers(std::move(consumers)) {
-  assert(!SubConsumers.empty() &&
+    SmallVectorImpl<Subconsumer> &subconsumers)
+    : Subconsumers(std::move(subconsumers)) {
+  assert(!Subconsumers.empty() &&
          "don't waste time handling diagnostics that will never get emitted");
-  assert(!hasDuplicateFileNames(SubConsumers) &&
-         "having multiple consumers for the same file is not implemented");
+  assert(!hasDuplicateFileNames(Subconsumers) &&
+         "having multiple subconsumers for the same file is not implemented");
 }
 
 void FileSpecificDiagnosticConsumer::computeConsumersOrderedByRange(
     SourceManager &SM) {
   // Look up each file's source range and add it to the "map" (to be sorted).
-  for (const Subconsumer &pair : SubConsumers) {
-    if (pair.first.empty())
+  for (const Subconsumer &subconsumer : Subconsumers) {
+    if (subconsumer.bufferName.empty())
       continue;
 
-    Optional<unsigned> bufferID = SM.getIDForBufferIdentifier(pair.first);
+    Optional<unsigned> bufferID = SM.getIDForBufferIdentifier(subconsumer.bufferName);
     assert(bufferID.hasValue() && "consumer registered for unknown file");
     CharSourceRange range = SM.getRangeForBuffer(bufferID.getValue());
     ConsumersOrderedByRange.emplace_back(
-        ConsumerSpecificInformation(range, pair.second.get()));
+        ConsumerSpecificInformation(range, subconsumer.consumer.get()));
   }
 
   // Sort the "map" by buffer /end/ location, for use with std::lower_bound
@@ -119,10 +119,10 @@ FileSpecificDiagnosticConsumer::consumerSpecificInformationForLocation(
     // source buffers are loaded in yet. In that case we return None, rather
     // than trying to build a nonsensical map (and actually crashing since we
     // can't find buffers for the inputs).
-    assert(!SubConsumers.empty());
-    if (!SM.getIDForBufferIdentifier(SubConsumers.begin()->first).hasValue()) {
-      assert(llvm::none_of(SubConsumers, [&](const Subconsumer &pair) {
-        return SM.getIDForBufferIdentifier(pair.first).hasValue();
+    assert(!Subconsumers.empty());
+    if (!SM.getIDForBufferIdentifier(Subconsumers.begin()->bufferName).hasValue()) {
+      assert(llvm::none_of(Subconsumers, [&](const Subconsumer &subconsumer) {
+        return SM.getIDForBufferIdentifier(subconsumer.bufferName).hasValue();
       }));
       return None;
     }
@@ -172,9 +172,9 @@ void FileSpecificDiagnosticConsumer::handleDiagnostic(
     break;
   }
   if (!consumerSpecificInfo.hasValue()) {
-    for (auto &subConsumer : SubConsumers) {
-      if (subConsumer.second) {
-        subConsumer.second->handleDiagnostic(SM, Loc, Kind, FormatString,
+    for (auto &subconsumer : Subconsumers) {
+      if (subconsumer.consumer) {
+        subconsumer.consumer->handleDiagnostic(SM, Loc, Kind, FormatString,
                                              FormatArgs, Info);
       }
     }
@@ -196,8 +196,8 @@ bool FileSpecificDiagnosticConsumer::finishProcessing() {
   // behavior.
 
   bool hadError = false;
-  for (auto &subConsumer : SubConsumers)
-    hadError |= subConsumer.second && subConsumer.second->finishProcessing();
+  for (auto &subconsumer : Subconsumers)
+    hadError |= subconsumer.consumer && subconsumer.consumer->finishProcessing();
   return hadError;
 }
 
