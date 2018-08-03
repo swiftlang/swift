@@ -28,3 +28,5 @@ typealias c = @foobar(a) () -> Void
 let d = \.foo
 let e = \.[1]
 let f = \.?.bar
+
+let optionalArray: [Int]?

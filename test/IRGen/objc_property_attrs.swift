@@ -15,16 +15,16 @@ class Foo: NSManagedObject {
 
   // nonatomic, readonly, ivar b
   // CHECK: private unnamed_addr constant {{.*}} c"Tq,N,R,Va\00"
-  let a: Int = 0
+  @objc let a: Int = 0
   // nonatomic, ivar b
   // CHECK: private unnamed_addr constant {{.*}} c"Tq,N,Vb\00"
-  var b: Int = 0
+  @objc var b: Int = 0
   // nonatomic, readonly
   // CHECK: private unnamed_addr constant {{.*}} c"Tq,N,R\00"
-  var c: Int { return 0 }
+  @objc var c: Int { return 0 }
   // nonatomic, assign
   // CHECK: private unnamed_addr constant {{.*}} c"Tq,N\00"
-  var d: Int { get { return 0 } set {} }
+  @objc var d: Int { get { return 0 } set {} }
   // nonatomic, dynamic
   // CHECK: private unnamed_addr constant {{.*}} c"Tq,N,D\00"
   @NSManaged var e: Int
@@ -34,32 +34,32 @@ class Foo: NSManagedObject {
 
   // nonatomic, retain, ivar f
   // CHECK: private unnamed_addr constant {{.*}} c"T@\22NSData\22,N,&,Vf\00"
-  var f: NSData = NSData()
+  @objc var f: NSData = NSData()
   // nonatomic, weak, assign, ivar g
   // CHECK: private unnamed_addr constant {{.*}} c"T@\22NSData\22,N,W,Vg\00"
-  weak var g: NSData? = nil
+  @objc weak var g: NSData? = nil
   // nonatomic, copy, ivar h
   // CHECK: private unnamed_addr constant {{.*}} c"T@\22NSData\22,N,C,Vh\00"
-  @NSCopying var h: NSData! = nil
+  @objc @NSCopying var h: NSData! = nil
   // nonatomic, dynamic, assign
   // CHECK: private unnamed_addr constant {{.*}} c"T@\22NSData\22,N,D,&\00"
   @NSManaged var i: NSData
   // nonatomic, readonly
   // CHECK: private unnamed_addr constant {{.*}} c"T@\22NSData\22,N,R\00"
-  var j: NSData { return NSData() }
+  @objc var j: NSData { return NSData() }
 
   // -- Bridged value types
 
   // nonatomic, copy, ivar k
   // CHECK: private unnamed_addr constant {{.*}} c"T@\22NSString\22,N,C,Vk\00"
-  var k: String = ""
+  @objc var k: String = ""
   // nonatomic, readonly, ivar l
   // CHECK: private unnamed_addr constant {{.*}} c"T@\22NSString\22,N,R,Vl\00"
-  let l: String? = nil
+  @objc let l: String? = nil
 
   // -- Protocol types:
   // CHECK: private unnamed_addr constant {{.*}} c"T@\22<_TtP19objc_property_attrs1P_>\22,N,&,Vp\00"
-  var p: P?
+  @objc var p: P?
   // CHECK: private unnamed_addr constant {{.*}} c"T@\22<_TtP19objc_property_attrs1P_><_TtP19objc_property_attrs1Q_>\22,N,&,Vpq\00"
-  var pq: (P & Q)?
+  @objc var pq: (P & Q)?
 }

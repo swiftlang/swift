@@ -1655,7 +1655,7 @@ class HasIBOutlet {
   init() {}
 
   @IBOutlet weak var goodOutlet: Class_ObjC1!
-  // CHECK-LABEL: {{^}} @IBOutlet @_implicitly_unwrapped_optional @objc weak var goodOutlet: @sil_weak Class_ObjC1!
+  // CHECK-LABEL: {{^}} @objc @IBOutlet @_implicitly_unwrapped_optional weak var goodOutlet: @sil_weak Class_ObjC1!
 
   @IBOutlet var badOutlet: PlainStruct
   // expected-error@-1 {{@IBOutlet property cannot have non-object type 'PlainStruct'}} {{3-13=}}
@@ -1672,11 +1672,10 @@ class HasIBOutlet {
 // CHECK-LABEL: {{^}}class HasIBAction {
 class HasIBAction {
   @IBAction func goodAction(_ sender: AnyObject?) { }
-  // CHECK: {{^}}  @IBAction @objc func goodAction(_ sender: AnyObject?) {
+  // CHECK: {{^}}  @objc @IBAction func goodAction(_ sender: AnyObject?) {
 
   @IBAction func badAction(_ sender: PlainStruct?) { }
   // expected-error@-1{{argument to @IBAction method cannot have non-object type 'PlainStruct?'}}
-  // expected-error@-2{{method cannot be marked @IBAction because the type of the parameter cannot be represented in Objective-C}}
 }
 
 //===---
@@ -1686,7 +1685,7 @@ class HasIBAction {
 // CHECK-LABEL: {{^}}class HasIBInspectable {
 class HasIBInspectable {
   @IBInspectable var goodProperty: AnyObject?
-  // CHECK: {{^}}  @IBInspectable @objc var goodProperty: AnyObject?
+  // CHECK: {{^}}  @objc @IBInspectable var goodProperty: AnyObject?
 }
 
 //===---
@@ -1696,7 +1695,7 @@ class HasIBInspectable {
 // CHECK-LABEL: {{^}}class HasGKInspectable {
 class HasGKInspectable {
   @GKInspectable var goodProperty: AnyObject?
-  // CHECK: {{^}}  @GKInspectable @objc var goodProperty: AnyObject?
+  // CHECK: {{^}}  @objc @GKInspectable var goodProperty: AnyObject?
 }
 
 //===---
@@ -1710,12 +1709,13 @@ class HasNSManaged {
 
   @NSManaged
   var goodManaged: Class_ObjC1
-  // CHECK-LABEL: {{^}}  @NSManaged @objc dynamic var goodManaged: Class_ObjC1
+  // CHECK-LABEL: {{^}}  @objc @NSManaged dynamic var goodManaged: Class_ObjC1
 
   @NSManaged
   var badManaged: PlainStruct
   // expected-error@-1 {{property cannot be marked @NSManaged because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
+  // expected-error@-3{{'dynamic' var 'badManaged' must also be '@objc'}}
   // CHECK-LABEL: {{^}}  @NSManaged var badManaged: PlainStruct
 }
 
@@ -1799,7 +1799,7 @@ enum BadEnum1: Int { case X }
 
 @objc
 enum BadEnum2: Int {
-  @objc(X:)   // expected-error{{'@objc' enum element must have a simple name}}{{10-11=}}
+  @objc(X:)   // expected-error{{'@objc' enum case must have a simple name}}{{10-11=}}
   case X
 }
 

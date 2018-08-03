@@ -570,7 +570,7 @@ static void deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl) {
   // `let container` (containerExpr) is generated above.
 
   // encoder
-  auto encoderParam = encodeDecl->getParameterList(1)->get(0);
+  auto encoderParam = encodeDecl->getParameters()->get(0);
   auto *encoderExpr = new (C) DeclRefExpr(ConcreteDeclRef(encoderParam),
                                           DeclNameLoc(), /*Implicit=*/true);
 
@@ -583,11 +583,8 @@ static void deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl) {
   // binding.
   auto *containerPattern = new (C) NamedPattern(containerDecl,
                                                 /*implicit=*/true);
-  auto *bindingDecl = PatternBindingDecl::create(C, SourceLoc(),
-                                                 StaticSpellingKind::None,
-                                                 SourceLoc(),
-                                                 containerPattern, callExpr,
-                                                 funcDC);
+  auto *bindingDecl = PatternBindingDecl::createImplicit(
+      C, StaticSpellingKind::None, containerPattern, callExpr, funcDC);
   statements.push_back(bindingDecl);
   statements.push_back(containerDecl);
 
@@ -728,14 +725,13 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
                 SourceLoc(), C.Id_encoder, encoderType, conformanceDC);
   encoderParam->setInterfaceType(encoderType);
 
-  ParameterList *params[] = {ParameterList::createWithoutLoc(selfDecl),
-                             ParameterList::createWithoutLoc(encoderParam)};
+  ParameterList *params = ParameterList::createWithoutLoc(encoderParam);
 
   // Func name: encode(to: Encoder)
-  DeclName name(C, C.Id_encode, params[1]);
+  DeclName name(C, C.Id_encode, params);
   auto *encodeDecl = FuncDecl::create(
       C, SourceLoc(), StaticSpellingKind::None, SourceLoc(), name, SourceLoc(),
-      /*Throws=*/true, SourceLoc(), nullptr, params,
+      /*Throws=*/true, SourceLoc(), nullptr, selfDecl, params,
       TypeLoc::withoutLoc(returnType), conformanceDC);
   encodeDecl->setImplicit();
   encodeDecl->setSynthesized();
@@ -764,7 +760,7 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
   }
 
   encodeDecl->setInterfaceType(interfaceType);
-  encodeDecl->setValidationStarted();
+  encodeDecl->setValidationToChecked();
   encodeDecl->copyFormalAccessFrom(derived.Nominal,
                                    /*sourceIsParentContext*/ true);
 
@@ -834,7 +830,7 @@ static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl) {
     // `let container` (containerExpr) is generated above.
 
     // decoder
-    auto decoderParam = initDecl->getParameterList(1)->get(0);
+    auto decoderParam = initDecl->getParameters()->get(0);
     auto *decoderExpr = new (C) DeclRefExpr(ConcreteDeclRef(decoderParam),
                                             DeclNameLoc(), /*Implicit=*/true);
 
@@ -851,11 +847,8 @@ static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl) {
     // binding.
     auto *containerPattern = new (C) NamedPattern(containerDecl,
                                                   /*implicit=*/true);
-    auto *bindingDecl = PatternBindingDecl::create(C, SourceLoc(),
-                                                   StaticSpellingKind::None,
-                                                   SourceLoc(),
-                                                   containerPattern, tryExpr,
-                                                   funcDC);
+    auto *bindingDecl = PatternBindingDecl::createImplicit(
+        C, StaticSpellingKind::None, containerPattern, tryExpr, funcDC);
     statements.push_back(bindingDecl);
     statements.push_back(containerDecl);
 
@@ -876,7 +869,7 @@ static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl) {
       // otherwise, we can just decode(T.self, forKey: ...).
       // This is also true if the type is an ImplicitlyUnwrappedOptional.
       auto varType = conformanceDC->mapTypeIntoContext(
-          varDecl->getType()->mapTypeOutOfContext());
+          varDecl->getInterfaceType());
       auto methodName = C.Id_decode;
       if (auto referenceType = varType->getAs<ReferenceStorageType>()) {
         // This is a weak/unowned/unmanaged var. Get the inner type before
@@ -1103,7 +1096,7 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
   }
 
   initDecl->setInterfaceType(interfaceType);
-  initDecl->setValidationStarted();
+  initDecl->setValidationToChecked();
   initDecl->setInitializerInterfaceType(initializerType);
   initDecl->copyFormalAccessFrom(derived.Nominal,
                                  /*sourceIsParentContext*/ true);

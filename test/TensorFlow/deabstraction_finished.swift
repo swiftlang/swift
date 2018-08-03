@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -Xllvm -tf-strict-deabstraction -verify %s
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -Xllvm -tf-strict-deabstraction -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -Xllvm -tf-module-level-graph=false -verify %s | %FileCheck %s
 import TensorFlow
 
 // FIXME: This should not build with -O.
@@ -34,15 +33,10 @@ public func constexprCall(a: Tensor<Float>, idx: Tensor<Int32>) -> Tensor<Float>
 
 /*
  CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}constexprCall
- CHECK: [[A:%.*]] = graph_op "Const"() {dtype$dtype: $Builtin.Int64, value$tensor: i64 0
- CHECK: [[AC:%.*]] = graph_op "Cast,i"
+ CHECK: [[A:%.*]] = graph_op "Const"() {dtype: $Int32, value$tensor: i32 0
  CHECK: [[B:%.*]] = graph_op "Const"
- CHECK: [[BC:%.*]] = graph_op "Cast,i"
  CHECK: [[C:%.*]] = graph_op "Const"
- CHECK: [[CX:%.*]] = unchecked_ref_cast [[C]] : $TensorHandle<Builtin.Int32> to $TensorHandle<Int32>
- CHECK: [[BX:%.*]] = unchecked_ref_cast [[BC]] : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
- CHECK: [[AX:%.*]] = unchecked_ref_cast [[AC]] : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
- CHECK: [[RESULT:%.*]] = graph_op "OneHot,i,i,i,i"(%0 : $TensorHandle<Int32>, [[CX]] : $TensorHandle<Int32>, [[BX]] : $TensorHandle<Float>, [[AX]] : $TensorHandle<Float>) {T: $Float, TI: $Int32, axis: i64 1, __device: "/device:CPU:0"} : $TensorHandle<Float>
+ CHECK: [[RESULT:%.*]] = graph_op "OneHot,i,i,i,i"(%0 : $TensorHandle<Int32>, [[A]] : $TensorHandle<Int32>, [[B]] : $TensorHandle<Float>, [[C]] : $TensorHandle<Float>) {T: $Float, TI: $Int32, axis: i64 1, __device: "/device:CPU:0"} : $TensorHandle<Float>
   CHECK: return [[RESULT]]
 */
 
@@ -99,28 +93,41 @@ CHECK-LABEL: --- INPUT FUNCTION {{.*}}stringAttributes
  CHECK: graph_op "foo"() {attr1: "", attr2: "abc", __device: "/device:CPU:0"}
 */
 
-#if false
-
-
-// FIXME: Constexpr propagation of tensorshape should handle this.
 public func tensorShape() -> Tensor<Float> {
-  let shape : TensorShape = [2,1]
-  // xpected-error @+1 {{attribute 'value' requires a constant argument}}
-  return Tensor(handle: #tfop("Const", dtype: Float.self, value$tensor: [1.0, 2.0], value$shape: shape))
+  let shape : TensorShape = [1, 2]
+
+  return Tensor(handle: #tfop("Const", dtype: Float.self, value$tensor: [17.0 as Float, 18.0], value$shape: shape))
 }
 
 // b/75407624
-
 // This requires propagation of the array initializer of TensorShape through its
 // initializers.
 public func test75407624() {
-  // xpected-warning @+1 {{copied to the accelerator}}
   let a = Tensor<Float>([1])
-  // xpected-warning @+1 {{copied to the accelerator}}
   let b = Tensor<Float>(shape: [1], repeating: 1)
-  // xpected-warning @+1 {{copied to the accelerator}}
   let c = Tensor<Float>(shape: [1], repeating: 1)
-  // xpected-note @+1 {{value used here}}
-  _ = a+b+c
+  let d = Tensor<Float>(shape: [2,2], scalars: [1,2,3,4])
+  _ = a+b+c+d
 }
-#endif
+/* CHECK-LABEL: ---- INPUT FUNCTION {{.*}}test75407624
+ * CHECK: graph_op "Const"() {dtype: $Float, value$tensor: [$Float: (f32 0x3F800000 /* 1 */)], value$shape: [$Int32: i32 1]
+ * CHECK: [[B1X:%.*]] = graph_op "Const"() {dtype: $Int32, value$tensor: [$Int32: (i32 1)], value$shape: [$Int32: i32 1],
+ * CHECK: [[BX2:%.*]] = graph_op "Const"() {dtype: $Float, value$tensor: f32 0x3F800000 /* 1 */
+ * CHECK:  graph_op "Fill,i,i"([[B1X]] : $TensorHandle<Int32>, [[BX2]] : $TensorHandle<Float>)
+ * CHECK: [[C1X:%.*]] = graph_op "Const"() {dtype: $Int32, value$tensor: [$Int32: (i32 1)], value$shape: [$Int32: i32 1],
+ * CHECK: [[CX2:%.*]] = graph_op "Const"() {dtype: $Float, value$tensor: f32 0x3F800000 /* 1 */
+ * CHECK:  graph_op "Fill,i,i"([[C1X]] : $TensorHandle<Int32>, [[CX2]] : $TensorHandle<Float>)
+ * CHECK: graph_op "Const"() {dtype: $Float, value$tensor: [$Float: (f32 0x3F800000 /* 1 */), (f32 0x40000000 /* 2 */), (f32 0x40400000 /* 3 */), (f32 0x40800000 /* 4 */)], value$shape: [$Int32: (i32 2), (i32 2)],
+ * CHECK-LABEL: ---- END OF 
+*/
+
+
+public func testConvolution(x: Tensor<Float>, filter: Tensor<Float>) -> Tensor<Float> {
+  return x.toAccelerator().convolved2D(withFilter: filter.toAccelerator(),
+                                       strides: (1, 2, 3, 4), padding: .same)
+}
+
+/* CHECK-LABEL: ---- INPUT FUNCTION {{.*}}testConvolution
+ * CHECK: graph_op "Conv2D,i,i"({{.*}} : $TensorHandle<Float>, {{.*}} : $TensorHandle<Float>) {T: $Float, strides: [$Int32: (i32 1), (i32 2), (i32 3), (i32 4)], use_cudnn_on_gpu: i1 -1, padding: "SAME", data_format: "NHWC", dilations: [$Int32: (i32 1), (i32 1), (i32 1), (i32 1)],
+ * CHECK-LABEL: ---- END OF
+*/

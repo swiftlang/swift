@@ -17,6 +17,8 @@
 
 namespace swift {
 
+class ValueDecl;
+
 /// Linkage for a SIL object.  This concept combines the notions
 /// of symbol linkage and visibility.
 ///
@@ -175,6 +177,8 @@ inline bool isPossiblyUsedExternally(SILLinkage linkage, bool wholeModule) {
   }
   return linkage <= SILLinkage::Hidden;
 }
+
+SILLinkage getDeclSILLinkage(const ValueDecl *decl);
 
 inline bool hasPublicVisibility(SILLinkage linkage) {
   switch (linkage) {

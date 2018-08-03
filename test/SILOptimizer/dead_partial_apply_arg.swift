@@ -8,7 +8,7 @@ extension Int32 {
 
 // This function has an unused metatype argument.
 
-// CHECK-LABEL: sil [thunk] [always_inline] @$Ss5Int32V4testE8lessthan3lhs3rhsSbAB_ABtFZ : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool
+// CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @$Ss5Int32V4testE8lessthan3lhs3rhsSbAB_ABtFZ : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool
   public static func lessthan (lhs: Int32, rhs: Int32) -> Bool {
     return lhs < rhs
   }

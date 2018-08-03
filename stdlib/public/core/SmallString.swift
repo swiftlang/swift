@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+@usableFromInline // FIXME(sil-serialize-all)
 internal
 typealias _SmallUTF16StringBuffer = _FixedArray16<UInt16>
 

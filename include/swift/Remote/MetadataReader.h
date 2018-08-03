@@ -351,17 +351,16 @@ public:
       BuiltType SuperclassType = BuiltType();
       if (Exist->Flags.hasSuperclassConstraint()) {
         // The superclass is stored after the list of protocols.
-        SuperclassType = readTypeFromMetadata(
-                                              Exist->Protocols[Exist->Protocols.NumProtocols]);
+        SuperclassType = readTypeFromMetadata(Exist->getSuperclassConstraint());
         if (!SuperclassType) return BuiltType();
 
         HasExplicitAnyObject = true;
       }
 
       std::vector<BuiltProtocolDecl> Protocols;
-      for (size_t i = 0; i < Exist->Protocols.NumProtocols; ++i) {
-        auto ProtocolAddress = Exist->Protocols[i];
-        auto ProtocolDescriptor = readProtocolDescriptor(ProtocolAddress);
+      for (auto ProtocolAddress : Exist->getProtocols()) {
+        auto ProtocolDescriptor = readProtocolDescriptor(
+            ProtocolAddress.getProtocolDescriptorUnchecked());
         if (!ProtocolDescriptor)
           return BuiltType();
 
@@ -868,14 +867,15 @@ protected:
         StoredPointer flagsAddress = address +
           sizeof(StoredPointer);
 
-        StoredPointer flags;
+        ExistentialTypeFlags::int_type flagsData;
         if (!Reader->readInteger(RemoteAddress(flagsAddress),
-                                 &flags))
+                                 &flagsData))
           return nullptr;
 
-        StoredPointer numProtocolsAddress = address +
-          TargetExistentialTypeMetadata<Runtime>::OffsetToNumProtocols;
-        StoredPointer numProtocols;
+        ExistentialTypeFlags flags(flagsData);
+
+        StoredPointer numProtocolsAddress = flagsAddress + sizeof(flagsData);
+        uint32_t numProtocols;
         if (!Reader->readInteger(RemoteAddress(numProtocolsAddress),
                                  &numProtocols))
           return nullptr;
@@ -888,7 +888,7 @@ protected:
           + numProtocols *
           sizeof(ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor>);
 
-        if (ExistentialTypeFlags(flags).hasSuperclassConstraint())
+        if (flags.hasSuperclassConstraint())
           totalSize += sizeof(StoredPointer);
 
         return _readMetadata(address, totalSize);
@@ -1138,12 +1138,13 @@ private:
   Demangle::NodePointer
   buildNominalTypeMangling(ContextDescriptorRef descriptor,
                            Demangle::NodeFactory &nodeFactory) {
-    std::vector<std::pair<Demangle::Node::Kind, std::string>>
+    std::vector<std::pair<Demangle::Node::Kind, Demangle::NodePointer>>
       nameComponents;
     ContextDescriptorRef parent = descriptor;
     
     while (parent) {
       std::string nodeName;
+      std::string relatedTag;
       Demangle::Node::Kind nodeKind;
       
       auto getTypeName = [&]() -> bool {
@@ -1151,7 +1152,16 @@ private:
           reinterpret_cast<const TargetTypeContextDescriptor<Runtime> *>
             (parent.getLocalBuffer());
         auto nameAddress = resolveRelativeField(parent, typeBuffer->Name);
-        return Reader->readString(RemoteAddress(nameAddress), nodeName);
+        if (!Reader->readString(RemoteAddress(nameAddress), nodeName))
+          return false;
+        
+        if (typeBuffer->isSynthesizedRelatedEntity()) {
+          nameAddress += nodeName.size() + 1;
+          if (!Reader->readString(RemoteAddress(nameAddress), relatedTag))
+            return false;
+        }
+        
+        return true;
       };
       
       bool isTypeContext = false;
@@ -1210,8 +1220,17 @@ private:
         else if (typeFlags.isCTypedef())
           nodeKind = Demangle::Node::Kind::TypeAlias;
       }
+      
+      auto nameNode = nodeFactory.createNode(Node::Kind::Identifier,
+                                             nodeName);
+      if (!relatedTag.empty()) {
+        auto relatedNode =
+          nodeFactory.createNode(Node::Kind::RelatedEntityDeclName, relatedTag);
+        relatedNode->addChild(nameNode, nodeFactory);
+        nameNode = relatedNode;
+      }
 
-      nameComponents.emplace_back(nodeKind, nodeName);
+      nameComponents.emplace_back(nodeKind, nameNode);
       
       parent = readParentContextDescriptor(parent);
     }
@@ -1224,13 +1243,11 @@ private:
     auto moduleInfo = std::move(nameComponents.back());
     nameComponents.pop_back();
     auto demangling =
-      nodeFactory.createNode(Node::Kind::Module, moduleInfo.second);
+      nodeFactory.createNode(Node::Kind::Module, moduleInfo.second->getText());
     for (auto &component : reversed(nameComponents)) {
-      auto name = nodeFactory.createNode(Node::Kind::Identifier,
-                                         component.second);
       auto parent = nodeFactory.createNode(component.first);
       parent->addChild(demangling, nodeFactory);
-      parent->addChild(name, nodeFactory);
+      parent->addChild(component.second, nodeFactory);
       demangling = parent;
     }
     

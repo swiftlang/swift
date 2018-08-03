@@ -280,81 +280,113 @@ public extension Tensor where Scalar : Numeric {
 // Element-wise binary comparison
 //===----------------------------------------------------------------------===//
 
-public extension Tensor where Scalar : Numeric {
-  /// Computes `lhs < rhs` element-wise.
-  /// - Note: `<` supports broadcasting.
+public extension Tensor where Scalar : Numeric & Comparable {
+  /// Computes `self < other` element-wise.
   @inlinable @inline(__always)
-  static func < (lhs: Tensor, rhs: Tensor) -> Tensor<Bool> {
-    return Raw.less(lhs, rhs)
+  func elementsLess(_ other: Tensor) -> Tensor<Bool> {
+    return Raw.less(self, other)
   }
 
-  /// Computes `lhs < rhs`, broadcasting `rhs`.
+  /// Computes `self < other`, broadcasting `other`.
   @inlinable @inline(__always)
-  static func < (lhs: Tensor, rhs: Scalar) -> Tensor<Bool> {
-    return lhs < Tensor(rhs)
+  func elementsLess(_ other: Scalar) -> Tensor<Bool> {
+    return elementsLess(Tensor(other))
   }
 
-  /// Computes `lhs < rhs`, broadcasting `lhs`.
+  /// Computes `self <= other` element-wise.
   @inlinable @inline(__always)
-  static func < (lhs: Scalar, rhs: Tensor) -> Tensor<Bool> {
-    return Tensor(lhs) < rhs
+  func elementsLessOrEqual(_ other: Tensor) -> Tensor<Bool> {
+    return Raw.lessEqual(self, other)
   }
 
-  /// Computes `lhs <= rhs` element-wise.
-  /// - Note: `<=` supports broadcasting.
+  /// Computes `self <= other`, broadcasting `other`.
   @inlinable @inline(__always)
-  static func <= (lhs: Tensor, rhs: Tensor) -> Tensor<Bool> {
-    return Raw.lessEqual(lhs, rhs)
+  func elementsLessOrEqual(_ other: Scalar) -> Tensor<Bool> {
+    return elementsLessOrEqual(Tensor(other))
   }
 
-  /// Computes `lhs <= rhs`, broadcasting `rhs`.
+  /// Computes `self > other` element-wise.
   @inlinable @inline(__always)
-  static func <= (lhs: Tensor, rhs: Scalar) -> Tensor<Bool> {
-    return lhs <= Tensor(rhs)
+  func elementsGreater(_ other: Tensor) -> Tensor<Bool> {
+    return Raw.greater(self, other)
   }
 
-  /// Computes `lhs <= rhs`, broadcasting `rhs`.
+  /// Computes `self > other`, broadcasting `other`.
   @inlinable @inline(__always)
-  static func <= (lhs: Scalar, rhs: Tensor) -> Tensor<Bool> {
-    return Tensor(lhs) <= rhs
+  func elementsGreater(_ other: Scalar) -> Tensor<Bool> {
+    return elementsGreater(Tensor(other))
   }
 
-  /// Computes `lhs > rhs` element-wise.
-  /// - Note: `>` supports broadcasting.
+  /// Computes `self >= other` element-wise.
   @inlinable @inline(__always)
-  static func > (lhs: Tensor, rhs: Tensor) -> Tensor<Bool> {
-    return Raw.greater(lhs, rhs)
+  func elementsGreaterOrEqual(_ other: Tensor) -> Tensor<Bool> {
+    return Raw.greaterEqual(self, other)
   }
 
-  /// Computes `lhs <= rhs`, broadcasting `rhs`.
+  /// Computes `self >= other`, broadcasting `other`.
   @inlinable @inline(__always)
-  static func > (lhs: Tensor, rhs: Scalar) -> Tensor<Bool> {
-    return lhs > Tensor(rhs)
+  func elementsGreaterOrEqual(_ other: Scalar) -> Tensor<Bool> {
+    return elementsGreaterOrEqual(Tensor(other))
+  }
+}
+
+extension Tensor : Comparable where Scalar : Numeric & Comparable {
+  /// Returns a Boolean value indicating whether the value of the first argument
+  /// is lexicographically less than that of the second argument.
+  @inlinable @inline(__always)
+  public static func < (lhs: Tensor, rhs: Tensor) -> Bool {
+    return lhs.elementsLess(rhs).all()
   }
 
-  /// Computes `lhs <= rhs`, broadcasting `lhs`.
+  /// Returns a Boolean value indicating whether the value of the first argument
+  /// is lexicographically less than or equal to that of the second argument.
   @inlinable @inline(__always)
-  static func > (lhs: Scalar, rhs: Tensor) -> Tensor<Bool> {
-    return Tensor(lhs) > rhs
+  public static func <= (lhs: Tensor, rhs: Tensor) -> Bool {
+    return lhs.elementsLessOrEqual(rhs).all()
   }
 
-  /// Computes `lhs >= rhs` element-wise.
-  /// - Note: `>=` supports broadcasting.
+  /// Returns a Boolean value indicating whether the value of the first argument
+  /// is lexicographically greater than that of the second argument.
   @inlinable @inline(__always)
-  static func >= (lhs: Tensor, rhs: Tensor) -> Tensor<Bool> {
-    return Raw.greaterEqual(lhs, rhs)
+  public static func > (lhs: Tensor, rhs: Tensor) -> Bool {
+    return lhs.elementsGreater(rhs).all()
   }
 
-  /// Computes `lhs >= rhs`, broadcasting `rhs`.
+  /// Returns a Boolean value indicating whether the value of the first argument
+  /// is lexicographically greater than or equal to that of the second argument.
   @inlinable @inline(__always)
-  static func >= (lhs: Tensor, rhs: Scalar) -> Tensor<Bool> {
-    return lhs >= Tensor(rhs)
+  public static func >= (lhs: Tensor, rhs: Tensor) -> Bool {
+    return lhs.elementsGreaterOrEqual(rhs).all()
+  }
+}
+
+public extension Tensor where Scalar : Numeric & Comparable {
+  /// Returns a Boolean value indicating whether the value of the first argument
+  /// is lexicographically less than that of the second argument.
+  @inlinable @inline(__always)
+  public static func < (lhs: Tensor, rhs: Scalar) -> Bool {
+    return lhs.elementsLess(rhs).all()
   }
 
-  /// Computes `lhs >= rhs`, broadcasting `lhs`.
+  /// Returns a Boolean value indicating whether the value of the first argument
+  /// is lexicographically less than or equal to that of the second argument.
   @inlinable @inline(__always)
-  static func >= (lhs: Scalar, rhs: Tensor) -> Tensor<Bool> {
-    return Tensor(lhs) >= rhs
+  public static func <= (lhs: Tensor, rhs: Scalar) -> Bool {
+    return lhs.elementsLessOrEqual(rhs).all()
+  }
+
+  /// Returns a Boolean value indicating whether the value of the first argument
+  /// is lexicographically greater than that of the second argument.
+  @inlinable @inline(__always)
+  public static func > (lhs: Tensor, rhs: Scalar) -> Bool {
+    return lhs.elementsGreater(rhs).all()
+  }
+
+  /// Returns a Boolean value indicating whether the value of the first argument
+  /// is lexicographically greater than or equal to that of the second argument.
+  @inlinable @inline(__always)
+  public static func >= (lhs: Tensor, rhs: Scalar) -> Bool {
+    return lhs.elementsGreaterOrEqual(rhs).all()
   }
 }
 
@@ -386,49 +418,48 @@ public extension Tensor where Scalar : Equatable {
   }
 }
 
-public extension Tensor where Scalar == Bool {
-  /// Performs a logical NOT operation element-wise.
+infix operator ≈ : ComparisonPrecedence
+
+public extension Tensor where Scalar : BinaryFloatingPoint & Equatable {
+  /// Returns a `Tensor` of Boolean values indicating whether the elements of
+  /// `self` are approximately equal to those of `other`.
   @inlinable @inline(__always)
-  static prefix func ! (x: Tensor) -> Tensor {
-    return Raw.logicalNot(x)
+  func elementsApproximatelyEqual(_ other: Tensor,
+                                  tolerance: Double = 0.00001) -> Tensor<Bool> {
+    return Raw.approximateEqual(self, other, tolerance: tolerance)
+  }
+}
+
+public extension Tensor where Scalar == Bool {
+  /// Computes `!self` element-wise.
+  @inlinable @inline(__always)
+  func elementsLogicalNot() -> Tensor {
+    return Raw.logicalNot(self)
   }
 
-  /// Performs a logical AND operation element-wise.
+  /// Computes `self && other` element-wise.
   /// - Note: `&&` supports broadcasting.
   @inlinable @inline(__always)
-  static func && (lhs: Tensor, rhs: Tensor) -> Tensor {
-    return Raw.logicalAnd(lhs, rhs)
+  func elementsLogicalAnd(_ other: Tensor) -> Tensor {
+    return Raw.logicalAnd(self, other)
   }
 
-  /// Performs a logical AND operation element-wise, broadcasting `rhs`.
+  /// Computes `self && other` element-wise, broadcasting `other`.
   @inlinable @inline(__always)
-  static func && (lhs: Tensor, rhs: Scalar) -> Tensor {
-    return lhs && Tensor(rhs)
+  func elementsLogicalAnd(_ other: Scalar) -> Tensor {
+    return elementsLogicalAnd(Tensor(other))
   }
 
-  /// Performs a logical AND operation element-wise, broadcasting `lhs`.
+  /// Computes `self || other` element-wise.
   @inlinable @inline(__always)
-  static func && (lhs: Scalar, rhs: Tensor) -> Tensor {
-    return Tensor(lhs) && rhs
+  func elementsLogicalOr(_ other: Tensor) -> Tensor {
+    return Raw.logicalOr(self, other)
   }
 
-  /// Performs a logical OR operation element-wise.
-  /// - Note: `||` supports broadcasting.
+  /// Computes `self || other` element-wise, broadcasting `other`.
   @inlinable @inline(__always)
-  static func || (lhs: Tensor, rhs: Tensor) -> Tensor {
-    return Raw.logicalOr(lhs, rhs)
-  }
-
-  /// Performs a logical OR operation element-wise, broadcasting `rhs`.
-  @inlinable @inline(__always)
-  static func || (lhs: Tensor, rhs: Scalar) -> Tensor {
-    return lhs || Tensor(rhs)
-  }
-
-  /// Performs a logical OR operation element-wise, broadcasting `lhs`.
-  @inlinable @inline(__always)
-  static func || (lhs: Scalar, rhs: Tensor) -> Tensor {
-    return Tensor(lhs) || rhs
+  func elementsLogicalOr(_ other: Scalar) -> Tensor {
+    return elementsLogicalOr(Tensor(other))
   }
 }
 
@@ -627,6 +658,20 @@ public func exp<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
   return Raw.exp(x)
 }
 
+/// Computes the ceiling of the specified tensor element-wise.
+@inlinable @inline(__always)
+@differentiable(reverse, adjoint: _adjointCeil(_:originalValue:seed:))
+public func ceil<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
+  return Raw.ceil(x)
+}
+
+/// Computes the floor of the specified tensor element-wise.
+@inlinable @inline(__always)
+@differentiable(reverse, adjoint: _adjointFloor(_:originalValue:seed:))
+public func floor<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
+  return Raw.floor(x)
+}
+
 /// Computes the power of the first tensor to the second tensor.
 @inlinable @inline(__always)
 @differentiable(reverse, adjoint: _adjointPow(_:_:originalValue:seed:))
@@ -773,7 +818,7 @@ public extension Tensor where Scalar == Bool {
   @inlinable @inline(__always)
   func all() -> Bool {
     let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
-    return Raw.all(self, reductionIndices: axes).scalarized()
+    return _TFGetScalarOrDie(Raw.all(self, reductionIndices: axes).handle)
   }
 
   /// Returns `true` if any scalars are equal to `true`. Otherwise, returns
@@ -783,7 +828,7 @@ public extension Tensor where Scalar == Bool {
   @inlinable @inline(__always)
   func any() -> Bool {
     let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
-    return Raw.any(self, reductionIndices: axes).scalarized()
+    return _TFGetScalarOrDie(Raw.any(self, reductionIndices: axes).handle)
   }
 
   /// Performs a logical AND operation along the specified axes. The reduced
@@ -829,7 +874,7 @@ public extension Tensor where Scalar : Numeric & Comparable {
   @inlinable @inline(__always)
   func min() -> Scalar {
     let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
-    return Raw.min(self, reductionIndices: axes).scalarized()
+    return _TFGetScalarOrDie(Raw.min(self, reductionIndices: axes).handle)
   }
 
   // NOTE: This overload is necessary, otherwise `max()` would refer
@@ -837,7 +882,7 @@ public extension Tensor where Scalar : Numeric & Comparable {
   @inlinable @inline(__always)
   func max() -> Scalar {
     let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
-    return Raw.max(self, reductionIndices: axes).scalarized()
+    return _TFGetScalarOrDie(Raw.max(self, reductionIndices: axes).handle)
   }
 
   /// Returns the maximum values along the specified axes. The reduced
@@ -924,13 +969,22 @@ public extension Tensor where Scalar : Numeric {
     return _TFGetScalarOrDie(Raw.sum(self, reductionIndices: axes).handle)
   }
 
+  // NOTE: This overload is necessary, otherwise `sum()` would refer
+  // to the variadic method `sum(squeezingAxes:)` with zero indices.
+  @inlinable @inline(__always)
+  func product() -> Scalar {
+    let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
+    return _TFGetScalarOrDie(Raw.prod(self, reductionIndices: axes).handle)
+  }
+
   /// Returns the arithmetic mean along the specified axes. The reduced
   /// dimensions are removed.
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank...rank`.
   @inlinable @inline(__always)
   func mean(squeezingAxes axes: Int32...) -> Tensor {
-    return Raw.mean(self, reductionIndices: Tensor<Int32>(axes), keepDims: false)
+    return Raw.mean(self, reductionIndices: Tensor<Int32>(axes),
+                    keepDims: false)
   }
 
   /// Returns the sum along the specified axes. The reduced dimensions are
@@ -942,6 +996,16 @@ public extension Tensor where Scalar : Numeric {
     return Raw.sum(self, reductionIndices: Tensor<Int32>(axes), keepDims: false)
   }
 
+  /// Returns the product along the specified axes. The reduced dimensions are
+  /// removed.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank...rank`.
+  @inlinable @inline(__always)
+  func product(squeezingAxes axes: Int32...) -> Tensor {
+    return Raw.prod(self, reductionIndices: Tensor<Int32>(axes),
+                    keepDims: false)
+  }
+
   /// Returns the arithmetic mean along the specified axes. The reduced
   /// dimensions are retained with value 1.
   /// - Parameter axes: The dimensions to reduce.
@@ -951,13 +1015,22 @@ public extension Tensor where Scalar : Numeric {
     return Raw.mean(self, reductionIndices: Tensor<Int32>(axes), keepDims: true)
   }
 
-  /// Returns the arithmetic mean along the specified axes. The reduced
-  /// dimensions are retained with value 1.
+  /// Returns the sum along the specified axes. The reduced dimensions are
+  /// retained with value 1.
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
   func sum(alongAxes axes: Int32...) -> Tensor {
     return Raw.sum(self, reductionIndices: Tensor<Int32>(axes), keepDims: true)
+  }
+
+  /// Returns the product along the specified axes. The reduced dimensions are
+  /// retained with value 1.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
+  @inlinable @inline(__always)
+  func product(alongAxes axes: Int32...) -> Tensor {
+    return Raw.prod(self, reductionIndices: Tensor<Int32>(axes), keepDims: true)
   }
 }
 

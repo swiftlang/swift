@@ -244,10 +244,6 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &args) {
   validateDebugInfoArgs(diags, args);
   validateCompilationConditionArgs(diags, args);
   validateAutolinkingArgs(diags, args);
-
-  if (args.hasArg(options::OPT_emit_public_type_metadata_accessors))
-    diags.diagnose(SourceLoc(),
-                   diag::warn_emit_public_type_metadata_accessors_deprecated);
 }
 
 std::unique_ptr<ToolChain>
@@ -672,6 +668,86 @@ getDriverBatchCount(llvm::opt::InputArgList &ArgList,
   return None;
 }
 
+static bool computeIncremental(const llvm::opt::InputArgList *ArgList,
+                               const bool ShowIncrementalBuildDecisions) {
+  if (!ArgList->hasArg(options::OPT_incremental))
+    return false;
+
+  const char *ReasonToDisable =
+      ArgList->hasArg(options::OPT_whole_module_optimization)
+          ? "is not compatible with whole module optimization."
+          : ArgList->hasArg(options::OPT_embed_bitcode)
+                ? "is not currently compatible with embedding LLVM IR bitcode."
+                : nullptr;
+
+  if (!ReasonToDisable)
+    return true;
+
+  if (ShowIncrementalBuildDecisions) {
+    llvm::outs() << "Incremental compilation has been disabled, because it "
+                 << ReasonToDisable;
+  }
+  return false;
+}
+
+static std::string
+computeWorkingDirectory(const llvm::opt::InputArgList *ArgList) {
+  if (auto *A = ArgList->getLastArg(options::OPT_working_directory)) {
+    SmallString<128> workingDirectory;
+    workingDirectory = A->getValue();
+    llvm::sys::fs::make_absolute(workingDirectory);
+    std::string result = workingDirectory.str().str();
+    return result;
+  }
+  return std::string();
+}
+
+static std::unique_ptr<UnifiedStatsReporter>
+createStatsReporter(const llvm::opt::InputArgList *ArgList,
+                    const InputFileList &Inputs, const OutputInfo OI,
+                    StringRef DefaultTargetTriple) {
+  const Arg *A = ArgList->getLastArgNoClaim(options::OPT_stats_output_dir);
+  if (!A)
+    return nullptr;
+
+  StringRef OptType;
+  if (const Arg *OptA = ArgList->getLastArgNoClaim(options::OPT_O_Group)) {
+    OptType = OptA->getSpelling();
+  }
+  StringRef InputName;
+  if (Inputs.size() == 1) {
+    InputName = Inputs[0].second->getSpelling();
+  }
+  StringRef OutputType = file_types::getTypeTempSuffix(OI.CompilerOutputType);
+  return llvm::make_unique<UnifiedStatsReporter>("swift-driver",
+                                                 OI.ModuleName,
+                                                 InputName,
+                                                 DefaultTargetTriple,
+                                                 OutputType,
+                                                 OptType,
+                                                 A->getValue());
+}
+
+static bool
+computeContinueBuildingAfterErrors(const bool BatchMode,
+                                   const llvm::opt::InputArgList *ArgList) {
+  // Note: Batch mode handling of serialized diagnostics requires that all
+  // batches get to run, in order to make sure that all diagnostics emitted
+  // during the compilation end up in at least one serialized diagnostic file.
+  // Therefore, treat batch mode as implying -continue-building-after-errors.
+  // (This behavior could be limited to only when serialized diagnostics are
+  // being emitted, but this seems more consistent and less surprising for
+  // users.)
+  // FIXME: We don't really need (or want) a full ContinueBuildingAfterErrors.
+  // If we fail to precompile a bridging header, for example, there's no need
+  // to go on to compilation of source files, and if compilation of source files
+  // fails, we shouldn't try to link. Instead, we'd want to let all jobs finish
+  // but not schedule any new ones.
+  return BatchMode ||
+         ArgList->hasArg(options::OPT_continue_building_after_errors);
+
+}
+
 std::unique_ptr<Compilation>
 Driver::buildCompilation(const ToolChain &TC,
                          std::unique_ptr<llvm::opt::InputArgList> ArgList) {
@@ -682,47 +758,9 @@ Driver::buildCompilation(const ToolChain &TC,
   // Claim --driver-mode here, since it's already been handled.
   (void) ArgList->hasArg(options::OPT_driver_mode);
 
-  bool DriverPrintActions = ArgList->hasArg(options::OPT_driver_print_actions);
-  bool DriverPrintOutputFileMap =
-    ArgList->hasArg(options::OPT_driver_print_output_file_map);
-  bool DriverPrintDerivedOutputFileMap =
-    ArgList->hasArg(options::OPT_driver_print_derived_output_file_map);
   DriverPrintBindings = ArgList->hasArg(options::OPT_driver_print_bindings);
-  bool ShowIncrementalBuildDecisions =
-    ArgList->hasArg(options::OPT_driver_show_incremental);
-  bool ShowJobLifecycle =
-    ArgList->hasArg(options::OPT_driver_show_job_lifecycle);
-  unsigned DriverBatchSeed = getDriverBatchSeed(*ArgList, Diags);
-  Optional<unsigned> DriverBatchCount = getDriverBatchCount(*ArgList, Diags);
-  bool DriverForceOneBatchRepartition =
-      ArgList->hasArg(options::OPT_driver_force_one_batch_repartition);
 
-  bool Incremental = ArgList->hasArg(options::OPT_incremental);
-  if (ArgList->hasArg(options::OPT_whole_module_optimization)) {
-    if (Incremental && ShowIncrementalBuildDecisions) {
-      llvm::outs() << "Incremental compilation has been disabled, because it "
-                   << "is not compatible with whole module optimization.";
-    }
-    Incremental = false;
-  }
-  if (ArgList->hasArg(options::OPT_embed_bitcode)) {
-    if (Incremental && ShowIncrementalBuildDecisions) {
-      llvm::outs() << "Incremental compilation has been disabled, because it "
-                   << "is not currently compatible with embedding LLVM IR "
-                   << "bitcode.";
-    }
-    Incremental = false;
-  }
-
-  bool SaveTemps = ArgList->hasArg(options::OPT_save_temps);
-  bool ShowDriverTimeCompilation =
-    ArgList->hasArg(options::OPT_driver_time_compilation);
-
-  SmallString<128> workingDirectory;
-  if (auto *A = ArgList->getLastArg(options::OPT_working_directory)) {
-    workingDirectory = A->getValue();
-    llvm::sys::fs::make_absolute(workingDirectory);
-  }
+  const std::string workingDirectory = computeWorkingDirectory(ArgList.get());
 
   std::unique_ptr<DerivedArgList> TranslatedArgList(
       translateInputAndPathArgs(*ArgList, workingDirectory));
@@ -749,44 +787,8 @@ Driver::buildCompilation(const ToolChain &TC,
   OI.CompilerMode = computeCompilerMode(*TranslatedArgList, Inputs, BatchMode);
   buildOutputInfo(TC, *TranslatedArgList, BatchMode, Inputs, OI);
 
-  // Note: Batch mode handling of serialized diagnostics requires that all
-  // batches get to run, in order to make sure that all diagnostics emitted
-  // during the compilation end up in at least one serialized diagnostic file.
-  // Therefore, treat batch mode as implying -continue-building-after-errors.
-  // (This behavior could be limited to only when serialized diagnostics are
-  // being emitted, but this seems more consistent and less surprising for
-  // users.)
-  // FIXME: We don't really need (or want) a full ContinueBuildingAfterErrors.
-  // If we fail to precompile a bridging header, for example, there's no need
-  // to go on to compilation of source files, and if compilation of source files
-  // fails, we shouldn't try to link. Instead, we'd want to let all jobs finish
-  // but not schedule any new ones.
-  const bool ContinueBuildingAfterErrors =
-      BatchMode || ArgList->hasArg(options::OPT_continue_building_after_errors);
-
   if (Diags.hadAnyError())
     return nullptr;
-
-  std::unique_ptr<UnifiedStatsReporter> StatsReporter;
-  if (const Arg *A =
-      ArgList->getLastArgNoClaim(options::OPT_stats_output_dir)) {
-    StringRef OptType;
-    if (const Arg *OptA = ArgList->getLastArgNoClaim(options::OPT_O_Group)) {
-      OptType = OptA->getSpelling();
-    }
-    StringRef InputName;
-    if (Inputs.size() == 1) {
-      InputName = Inputs[0].second->getSpelling();
-    }
-    StringRef OutputType = file_types::getTypeTempSuffix(OI.CompilerOutputType);
-    StatsReporter = llvm::make_unique<UnifiedStatsReporter>("swift-driver",
-                                                            OI.ModuleName,
-                                                            InputName,
-                                                            DefaultTargetTriple,
-                                                            OutputType,
-                                                            OptType,
-                                                            A->getValue());
-  }
 
   assert(OI.CompilerOutputType != file_types::ID::TY_INVALID &&
          "buildOutputInfo() must set a valid output type!");
@@ -803,13 +805,18 @@ Driver::buildCompilation(const ToolChain &TC,
   if (Diags.hadAnyError())
     return nullptr;
 
-  if (DriverPrintOutputFileMap) {
+  if (ArgList->hasArg(options::OPT_driver_print_output_file_map)) {
     if (OFM)
       OFM->dump(llvm::errs(), true);
     else
       Diags.diagnose(SourceLoc(), diag::error_no_output_file_map_specified);
     return nullptr;
   }
+
+  const bool ShowIncrementalBuildDecisions =
+      ArgList->hasArg(options::OPT_driver_show_incremental);
+  const bool Incremental =
+      computeIncremental(ArgList.get(), ShowIncrementalBuildDecisions);
 
   std::string buildRecordPath;
   bool outputBuildRecordForModuleOnlyBuild = false;
@@ -848,25 +855,53 @@ Driver::buildCompilation(const ToolChain &TC,
       llvm_unreachable("Unknown OutputLevel argument!");
   }
 
-  std::unique_ptr<Compilation> C(
-      new Compilation(Diags, TC, OI, Level,
-                      std::move(ArgList),
-                      std::move(TranslatedArgList),
-                      std::move(Inputs),
-                      buildRecordPath,
-                      outputBuildRecordForModuleOnlyBuild,
-                      ArgsHash,
-                      StartTime,
-                      LastBuildTime,
-                      DriverFilelistThreshold,
-                      Incremental,
-                      BatchMode,
-                      DriverBatchSeed,
-                      DriverBatchCount,
-                      DriverForceOneBatchRepartition,
-                      SaveTemps,
-                      ShowDriverTimeCompilation,
-                      std::move(StatsReporter)));
+  
+  // About to move argument list, so capture some flags that will be needed
+  // later.
+  const bool DriverPrintActions =
+      ArgList->hasArg(options::OPT_driver_print_actions);
+  const bool DriverPrintDerivedOutputFileMap =
+      ArgList->hasArg(options::OPT_driver_print_derived_output_file_map);
+  const bool ContinueBuildingAfterErrors =
+      computeContinueBuildingAfterErrors(BatchMode, ArgList.get());
+  const bool ShowJobLifecycle =
+      ArgList->hasArg(options::OPT_driver_show_job_lifecycle);
+
+  // In order to confine the values below, while still moving the argument
+  // list, and preserving the interface to Compilation, enclose the call to the
+  // constructor in a block:
+  std::unique_ptr<Compilation> C;
+  {
+    const unsigned DriverBatchSeed = getDriverBatchSeed(*ArgList, Diags);
+    const Optional<unsigned> DriverBatchCount = getDriverBatchCount(*ArgList, Diags);
+    const bool DriverForceOneBatchRepartition =
+    ArgList->hasArg(options::OPT_driver_force_one_batch_repartition);
+    const bool SaveTemps = ArgList->hasArg(options::OPT_save_temps);
+    const bool ShowDriverTimeCompilation =
+        ArgList->hasArg(options::OPT_driver_time_compilation);
+    std::unique_ptr<UnifiedStatsReporter> StatsReporter =
+        createStatsReporter(ArgList.get(), Inputs, OI, DefaultTargetTriple);
+    
+    C = llvm::make_unique<Compilation>(
+        Diags, TC, OI, Level,
+        std::move(ArgList),
+        std::move(TranslatedArgList),
+        std::move(Inputs),
+        buildRecordPath,
+        outputBuildRecordForModuleOnlyBuild,
+        ArgsHash,
+        StartTime,
+        LastBuildTime,
+        DriverFilelistThreshold,
+        Incremental,
+        BatchMode,
+        DriverBatchSeed,
+        DriverBatchCount,
+        DriverForceOneBatchRepartition,
+        SaveTemps,
+        ShowDriverTimeCompilation,
+        std::move(StatsReporter));
+  }
 
   // Construct the graph of Actions.
   SmallVector<const Action *, 8> TopLevelActions;
@@ -1335,6 +1370,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.LinkAction = LinkKind::None;
       break;
     case options::OPT_parse:
+    case options::OPT_resolve_imports:
     case options::OPT_typecheck:
     case options::OPT_dump_parse:
     case options::OPT_dump_ast:
@@ -1369,14 +1405,43 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
 
   if (const Arg *A = Args.getLastArg(options::OPT_g_Group)) {
     if (A->getOption().matches(options::OPT_g))
-      OI.DebugInfoKind = IRGenDebugInfoKind::Normal;
+      OI.DebugInfoLevel = IRGenDebugInfoLevel::Normal;
     else if (A->getOption().matches(options::OPT_gline_tables_only))
-      OI.DebugInfoKind = IRGenDebugInfoKind::LineTables;
+      OI.DebugInfoLevel = IRGenDebugInfoLevel::LineTables;
     else if (A->getOption().matches(options::OPT_gdwarf_types))
-      OI.DebugInfoKind = IRGenDebugInfoKind::DwarfTypes;
+      OI.DebugInfoLevel = IRGenDebugInfoLevel::DwarfTypes;
     else
       assert(A->getOption().matches(options::OPT_gnone) &&
              "unknown -g<kind> option");
+  }
+
+  if (const Arg *A = Args.getLastArg(options::OPT_debug_info_format)) {
+    if (strcmp(A->getValue(), "dwarf") == 0)
+      OI.DebugInfoFormat = IRGenDebugInfoFormat::DWARF;
+    else if (strcmp(A->getValue(), "codeview") == 0)
+      OI.DebugInfoFormat = IRGenDebugInfoFormat::CodeView;
+    else
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+  } else if (OI.DebugInfoLevel > IRGenDebugInfoLevel::None) {
+    // If -g was specified but not -debug-info-format, DWARF is assumed.
+    OI.DebugInfoFormat = IRGenDebugInfoFormat::DWARF;
+  }
+  if (Args.hasArg(options::OPT_debug_info_format) &&
+      !Args.hasArg(options::OPT_g_Group)) {
+    const Arg *debugFormatArg = Args.getLastArg(options::OPT_debug_info_format);
+    Diags.diagnose(SourceLoc(), diag::error_option_missing_required_argument,
+                   debugFormatArg->getAsString(Args), "-g");
+  }
+  if (OI.DebugInfoFormat == IRGenDebugInfoFormat::CodeView &&
+      (OI.DebugInfoLevel == IRGenDebugInfoLevel::LineTables ||
+       OI.DebugInfoLevel == IRGenDebugInfoLevel::DwarfTypes)) {
+    const Arg *debugFormatArg = Args.getLastArg(options::OPT_debug_info_format);
+    Diags.diagnose(SourceLoc(), diag::error_argument_not_allowed_with,
+                   debugFormatArg->getAsString(Args),
+                   OI.DebugInfoLevel == IRGenDebugInfoLevel::LineTables
+                     ? "-gline-tables-only"
+                     : "-gdwarf_types");
   }
 
   if (Args.hasArg(options::OPT_emit_module, options::OPT_emit_module_path)) {
@@ -1384,7 +1449,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     // top-level output.
     OI.ShouldGenerateModule = true;
     OI.ShouldTreatModuleAsTopLevelOutput = true;
-  } else if ((OI.DebugInfoKind > IRGenDebugInfoKind::LineTables &&
+  } else if ((OI.DebugInfoLevel > IRGenDebugInfoLevel::LineTables &&
               OI.shouldLink()) ||
              Args.hasArg(options::OPT_emit_objc_header,
                          options::OPT_emit_objc_header_path)) {
@@ -1806,7 +1871,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
     }
 
     if (MergeModuleAction) {
-      if (OI.DebugInfoKind == IRGenDebugInfoKind::Normal) {
+      if (OI.DebugInfoLevel == IRGenDebugInfoLevel::Normal) {
         if (TC.getTriple().getObjectFormat() == llvm::Triple::ELF) {
           auto *ModuleWrapAction =
               C.createAction<ModuleWrapJobAction>(MergeModuleAction);
@@ -1823,7 +1888,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
     TopLevelActions.push_back(LinkAction);
 
     if (TC.getTriple().isOSDarwin() &&
-        OI.DebugInfoKind > IRGenDebugInfoKind::None) {
+        OI.DebugInfoLevel > IRGenDebugInfoLevel::None) {
       auto *dSYMAction = C.createAction<GenerateDSYMJobAction>(LinkAction);
       TopLevelActions.push_back(dSYMAction);
       if (Args.hasArg(options::OPT_verify_debug_info)) {
@@ -2120,11 +2185,11 @@ static bool hasExistingAdditionalOutput(CommandOutput &output,
   return false;
 }
 
-static void addAuxiliaryOutput(Compilation &C, CommandOutput &output,
-                               file_types::ID outputType, const OutputInfo &OI,
-                               const TypeToPathMap *outputMap,
-                               StringRef workingDirectory,
-                               StringRef outputPath = StringRef()) {
+static void addAuxiliaryOutput(
+    Compilation &C, CommandOutput &output, file_types::ID outputType,
+    const OutputInfo &OI, const TypeToPathMap *outputMap,
+    StringRef workingDirectory, StringRef outputPath = StringRef(),
+    llvm::opt::OptSpecifier requireArg = llvm::opt::OptSpecifier()) {
 
   if (hasExistingAdditionalOutput(output, outputType, outputPath))
     return;
@@ -2141,6 +2206,10 @@ static void addAuxiliaryOutput(Compilation &C, CommandOutput &output,
     output.setAdditionalOutputForType(outputType, outputMapPath);
   } else if (!outputPath.empty()) {
     output.setAdditionalOutputForType(outputType, outputPath);
+  } else if (requireArg.isValid() && !C.getArgs().getLastArg(requireArg)) {
+    // This auxiliary output only exists if requireArg is passed, but it
+    // wasn't this time.
+    return;
   } else {
     // Put the auxiliary output file next to "the" primary output file.
     //
@@ -2365,6 +2434,14 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
     if (C.getArgs().hasArg(options::OPT_serialize_diagnostics))
       chooseSerializedDiagnosticsPath(C, JA, OI, OutputMap, workingDirectory,
                                       Output.get());
+  }
+
+  if (isa<MergeModuleJobAction>(JA) ||
+      (isa<CompileJobAction>(JA) &&
+       OI.CompilerMode == OutputInfo::Mode::SingleCompile)) {
+    // An emit-tbd argument gets passed down to a job that sees the whole
+    // module, either the -merge-modules job or a -wmo compiler invocation.
+    chooseTBDPath(C, OI, OutputMap, workingDirectory, Buf, Output.get());
   }
 
   if (isa<CompileJobAction>(JA))
@@ -2686,7 +2763,6 @@ void Driver::chooseDependenciesOutputPaths(Compilation &C, const OutputInfo &OI,
                        workingDirectory);
   }
   chooseLoadedModuleTracePath(C, OI, workingDirectory, Buf, Output);
-  chooseTBDPath(C, OI, workingDirectory, Buf, Output);
 }
 
 void Driver::chooseLoadedModuleTracePath(Compilation &C, const OutputInfo &OI,
@@ -2723,22 +2799,18 @@ void Driver::chooseLoadedModuleTracePath(Compilation &C, const OutputInfo &OI,
 }
 
 void Driver::chooseTBDPath(Compilation &C, const OutputInfo &OI,
+                           const TypeToPathMap *OutputMap,
                            StringRef workingDirectory,
                            llvm::SmallString<128> &Buf,
                            CommandOutput *Output) const {
-  if (C.getArgs().hasArg(options::OPT_emit_tbd, options::OPT_emit_tbd_path)) {
-    if (OI.CompilerMode != OutputInfo::Mode::SingleCompile) {
-      llvm::outs() << "TBD emission has been disabled, because it requires a "
-                   << "single compiler invocation: consider enabling the "
-                   << "-whole-module-optimization flag.\n";
-    } else {
-      auto filename = *getOutputFilenameFromPathArgOrAsTopLevel(
-          OI, C.getArgs(), options::OPT_emit_tbd_path, file_types::TY_TBD,
-          /*TreatAsTopLevelOutput=*/true, workingDirectory, "tbd", Buf);
-
-      Output->setAdditionalOutputForType(file_types::TY_TBD, filename);
-    }
+  StringRef pathFromArgs;
+  if (const Arg *A = C.getArgs().getLastArg(options::OPT_emit_tbd_path)) {
+    pathFromArgs = A->getValue();
   }
+
+  addAuxiliaryOutput(C, *Output, file_types::TY_TBD, OI, OutputMap,
+                     workingDirectory, pathFromArgs,
+                     /*requireArg=*/options::OPT_emit_tbd);
 }
 
 void Driver::chooseOptimizationRecordPath(Compilation &C, const OutputInfo &OI,

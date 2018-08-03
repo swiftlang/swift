@@ -19,6 +19,7 @@
 #define SWIFT_AST_AUTODIFF_H
 
 #include "ASTContext.h"
+#include "llvm/ADT/SmallBitVector.h"
 
 namespace swift {
 
@@ -50,7 +51,7 @@ public:
     : Loc(loc), Kind(kind), V(value) {}
 
   static AutoDiffParameter getIndexParameter(SourceLoc loc, unsigned index) {
-    return { loc, Kind::Index, { index } };
+    return { loc, Kind::Index, index };
   }
 
   static AutoDiffParameter getSelfParameter(SourceLoc loc) {
@@ -70,38 +71,136 @@ public:
     return Loc;
   }
 
-  bool isEqual(AutoDiffParameter other) const {
+  bool isEqual(const AutoDiffParameter &other) const {
     if (getKind() == other.getKind() && getKind() == Kind::Index)
       return getIndex() == other.getIndex();
     return getKind() == other.getKind() && getKind() == Kind::Self;
   }
 };
 
+/// SIL-level automatic differentiation indices. Consists of a source index,
+/// i.e. index of the dependent result to differentiate from, and parameter
+/// indices, i.e. index of independent parameters to differentiate with
+/// respect to.
+struct SILReverseAutoDiffIndices {
+  /// The index of the dependent result to differentiate from.
+  unsigned source;
+  /// Indices of independent parameters to differentiate with respect to.
+  llvm::SmallBitVector parameters;
+  
+  /// Creates a set of AD indices from the given source index and a bit vector
+  /// representing parameter indices.
+  /*implicit*/ SILReverseAutoDiffIndices(unsigned source,
+                                         llvm::SmallBitVector parameters)
+    : source(source), parameters(parameters) {}
+  
+  /// Creates a set of AD indices from the given source index and an array of
+  /// parameter indices. Elements in `parameters` must be acending integers.
+  /*implicit*/ SILReverseAutoDiffIndices(unsigned source,
+                                         ArrayRef<unsigned> parameters);
+
+  bool operator==(const SILReverseAutoDiffIndices &other) const {
+    return source == other.source && !parameters.test(other.parameters);
+  }
+
+  void print(llvm::raw_ostream &s = llvm::outs()) const {
+    s << "(source=" << source << " parameters=(";
+    interleave(parameters.set_bits(),
+               [&s](unsigned p) { s << p; }, [&s]{ s << ' '; });
+    s << "))";
+  }
+};
+
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &s,
+                                     const SILReverseAutoDiffIndices &indices) {
+  indices.print(s);
+  return s;
+}
+
+/// Flags to define the semantics and the type signature of a gradient function.
+enum class SILGradientFlags : unsigned {
+  /// The gradient function is seedable, i.e. able to take a back-propagated
+  /// adjoint value as the last parameter.
+  Seedable = 1 << 0,
+  
+  /// The gradient function is preserving the result of the original function.
+  PreservingResult = 1 << 1,
+  
+  /// The adjoint computation is "delayed". We say that the adjoint computation
+  /// is delayed when when it's returned as a thunk.
+  Delayed = 1 << 2
+};
+using SILGradientOptions = OptionSet<SILGradientFlags>;
+static inline SILGradientOptions operator|(SILGradientFlags lhs,
+                                           SILGradientFlags rhs) {
+  return SILGradientOptions(unsigned(lhs) | unsigned(rhs));
+}
+
 /// SIL-level automatic differentiation configuration.
-struct SILReverseAutoDiffConfiguration {
-  unsigned sourceIndex;
-  ArrayRef<unsigned> parameterIndices;
-  bool seedable;
-  bool preservingResult;
+struct SILReverseAutoDiffConfig {
+  SILReverseAutoDiffIndices indices;
+  SILGradientOptions options;
+
+  /*implicit*/
+  SILReverseAutoDiffConfig(const SILReverseAutoDiffIndices &indices,
+                                  SILGradientOptions options)
+    : indices(indices), options(options) {}
+
+  /*implicit*/
+  SILReverseAutoDiffConfig(const SILReverseAutoDiffIndices &indices,
+                                  bool seedable, bool preservingResult)
+    : SILReverseAutoDiffConfig(indices, getCanonicalGradientOptions()) {}
+
+  unsigned getSourceIndex() const {
+    return indices.source;
+  }
+
+  llvm::SmallBitVector getParameterIndices() const {
+    return indices.parameters;
+  }
+
+  bool isSeedable() const {
+    return options.contains(SILGradientFlags::Seedable);
+  }
+
+  bool isPreservingResult() const {
+    return options.contains(SILGradientFlags::PreservingResult);
+  }
+
+  bool isDelayed() const {
+    return options.contains(SILGradientFlags::Delayed);
+  }
+
+  // FIXME: The master configuration should have all three gradient options
+  // enabled, that is, the canonical gradient should return a delayed gradient
+  // function. We need to handle this here as well as within the
+  // differentiation pass.
+  static SILGradientOptions getCanonicalGradientOptions() {
+    return SILGradientFlags::Seedable | SILGradientFlags::PreservingResult;
+  }
 
   /// Returns the "master" configuration, which all variants with the same
   /// parameter indices can derive from.
   static
-  SILReverseAutoDiffConfiguration getMaster(unsigned sourceIndex,
-                                            ArrayRef<unsigned> paramIndices) {
-    return { sourceIndex, paramIndices,
-             /*seedable*/ true, /*preservingResult*/ true };
+  SILReverseAutoDiffConfig getMaster(
+      const SILReverseAutoDiffIndices &indices) {
+    return {
+      indices,
+      getCanonicalGradientOptions()
+    };
   }
 
-  bool isEqual(const SILReverseAutoDiffConfiguration &other) const {
-    return sourceIndex == other.sourceIndex &&
-           parameterIndices.equals(other.parameterIndices) &&
-           seedable == other.seedable &&
-           preservingResult == other.preservingResult;
+  SILReverseAutoDiffConfig getWithCanonicalOptions() const {
+    return getMaster(indices);
   }
 
   bool isMaster() const {
-    return seedable && preservingResult;
+    return options.toRaw() == getCanonicalGradientOptions().toRaw();
+  }
+
+  bool operator==(const SILReverseAutoDiffConfig &other) const {
+    return indices == other.indices &&
+           options.toRaw() == other.options.toRaw();
   }
 };
 
@@ -109,47 +208,61 @@ struct SILReverseAutoDiffConfiguration {
 
 namespace llvm {
 
-using swift::SILReverseAutoDiffConfiguration;
+using swift::SILReverseAutoDiffIndices;
+using swift::SILReverseAutoDiffConfig;
+using swift::SILGradientFlags;
+using swift::OptionSet;
 
 template<typename T> struct DenseMapInfo;
 
-template<> struct DenseMapInfo<SILReverseAutoDiffConfiguration> {
-  static SILReverseAutoDiffConfiguration getEmptyKey() {
-    return { DenseMapInfo<unsigned>::getEmptyKey(),
-             DenseMapInfo<ArrayRef<unsigned>>::getEmptyKey(),
-             static_cast<bool>(DenseMapInfo<unsigned>::getEmptyKey()),
-             static_cast<bool>(DenseMapInfo<unsigned>::getEmptyKey()) };
+template<> struct DenseMapInfo<SILReverseAutoDiffIndices> {
+  static SILReverseAutoDiffIndices getEmptyKey() {
+    return { DenseMapInfo<unsigned>::getEmptyKey(), SmallBitVector() };
   }
 
-  static SILReverseAutoDiffConfiguration getTombstoneKey() {
+  static SILReverseAutoDiffIndices getTombstoneKey() {
     return { DenseMapInfo<unsigned>::getTombstoneKey(),
-             DenseMapInfo<ArrayRef<unsigned>>::getTombstoneKey(),
-             static_cast<bool>(DenseMapInfo<unsigned>::getTombstoneKey()),
-             static_cast<bool>(DenseMapInfo<unsigned>::getTombstoneKey()) };
+             SmallBitVector(sizeof(intptr_t), true) };
   }
 
-  static unsigned getHashValue(const SILReverseAutoDiffConfiguration &Val) {
-    unsigned paramHash = ~1U;
-    for (auto i : Val.parameterIndices)
-      paramHash = hash_combine(paramHash,
-                               DenseMapInfo<unsigned>::getHashValue(i));
+  static unsigned getHashValue(const SILReverseAutoDiffIndices &Val) {
+    auto params = Val.parameters.set_bits();
+    unsigned combinedHash =
+      hash_combine(~1U, DenseMapInfo<unsigned>::getHashValue(Val.source),
+                   hash_combine_range(params.begin(), params.end()));
+    return combinedHash;
+  }
+
+  static bool isEqual(const SILReverseAutoDiffIndices &LHS,
+                      const SILReverseAutoDiffIndices &RHS) {
+    return LHS == RHS;
+  }
+};
+
+template<> struct DenseMapInfo<SILReverseAutoDiffConfig> {
+  static SILReverseAutoDiffConfig getEmptyKey() {
+    return { DenseMapInfo<SILReverseAutoDiffIndices>::getEmptyKey(), None };
+  }
+
+  static SILReverseAutoDiffConfig getTombstoneKey() {
+    return {
+      DenseMapInfo<SILReverseAutoDiffIndices>::getTombstoneKey(),
+      SILGradientFlags::Delayed
+    };
+  }
+
+  static unsigned getHashValue(const SILReverseAutoDiffConfig &Val) {
     return hash_combine(
-      paramHash,
-      DenseMapInfo<unsigned>::getHashValue(Val.seedable),
-      DenseMapInfo<unsigned>::getHashValue(Val.preservingResult)
+      DenseMapInfo<SILReverseAutoDiffIndices>::getHashValue(Val.indices),
+      DenseMapInfo<unsigned>::getHashValue(Val.options.toRaw())
     );
   }
 
-  static bool isEqual(const SILReverseAutoDiffConfiguration &LHS,
-                      const SILReverseAutoDiffConfiguration &RHS) {
-    auto numParams = LHS.parameterIndices.size();
-    if (numParams != RHS.parameterIndices.size())
-      return false;
-    for (unsigned i = 0; i < numParams; i++)
-      if (LHS.parameterIndices[i] != RHS.parameterIndices[i])
-        return false;
-    return LHS.seedable == RHS.seedable &&
-           LHS.preservingResult == LHS.preservingResult;
+  static bool isEqual(const SILReverseAutoDiffConfig &LHS,
+                      const SILReverseAutoDiffConfig &RHS) {
+    return DenseMapInfo<SILReverseAutoDiffIndices>
+             ::isEqual(LHS.indices, RHS.indices) &&
+           LHS.options.toRaw() == RHS.options.toRaw();
   }
 };
 

@@ -132,8 +132,7 @@ public protocol LazySequenceProtocol : Sequence {
   /// possibly with a simpler type.
   ///
   /// - See also: `elements`
-  associatedtype Elements : Sequence = Self
-  where Elements.Iterator.Element == Iterator.Element
+  associatedtype Elements: Sequence = Self where Elements.Element == Element
 
   /// A sequence containing the same elements as this one, possibly with
   /// a simpler type.
@@ -154,19 +153,19 @@ public protocol LazySequenceProtocol : Sequence {
 /// property is provided.
 extension LazySequenceProtocol where Elements == Self {
   /// Identical to `self`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // protocol-only
   public var elements: Self { return self }
 }
 
 extension LazySequenceProtocol {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // protocol-only
   public var lazy: LazySequence<Elements> {
     return elements.lazy
   }
 }
 
 extension LazySequenceProtocol where Elements: LazySequenceProtocol {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // protocol-only
   public var lazy: Elements {
     return elements
   }
@@ -202,7 +201,7 @@ extension Sequence {
   /// A sequence containing the same elements as this sequence,
   /// but on which some operations, such as `map` and `filter`, are
   /// implemented lazily.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // protocol-only
   public var lazy: LazySequence<Self> {
     return LazySequence(_base: self)
   }

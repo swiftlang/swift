@@ -1,53 +1,6 @@
 // RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -O -emit-sil -verify %s | %FileCheck %s
 import TensorFlow
 
-public func testDatasetWithFakeData() {
-  TensorFlow.enableTPU(infeed: true)
-  let x: TensorHandle<Float> = #tfop(
-    "tfc.makeIteratorGetNextWithDatasets",
-    dataSource: "fake",
-    filePath: "dummy_path",
-    batchSize: 1,
-    outputShapes: [TensorShape()])
-  let y = Tensor<Float>(handle: x) + 1
-  print(y.array.scalars[0])
-}
-
-// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testDatasetWithFakeData{{.*}}
-// CHECK: bb0:
-// CHECK:        [[GETNEXT:%[0-9]+]] = builtin "__tfop_tfc.makeIteratorGetNextWithDatasets{{.*}} : $TensorHandle<Float>
-// CHECK:        [[RESULT:%[0-9]+]] = builtin "__tfop_Add,$in,$in,T,__device"([[GETNEXT]] : $TensorHandle<Float>, {{.*}} : $TensorHandle<Float>
-// CHECK-NEXT:   return [[RESULT]] : $TensorHandle<Float>
-
-public func testDatasetWithMNIST() {
-  TensorFlow.enableTPU(infeed: true)
-  let (images1, labels1): (TensorHandle<Float>, TensorHandle<Int32>) = #tfop(
-    "tfc.makeIteratorGetNextWithDatasets",
-    dataSource: "mnist",
-    filePath: "some_path",
-    batchSize: 64,
-    output_shapes: [TensorShape(64,224,224,3), TensorShape(64)])
-  let images : TensorHandle<Float> = #tfop("Identity", images1)
-  let labels : TensorHandle<Int32> = #tfop("Identity", labels1)
-  // Confirm we can add more nodes to the graph.
-  let imagesMod = Tensor<Float>(handle: images) + 1
-  let labelsMod = Tensor<Int32>(handle: labels) + 2
-  print(imagesMod.array.scalars[0])
-  print(labelsMod.array.scalars[0])
-}
-
-// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testDatasetWithMNIST{{.*}}
-// CHECK: bb0:
-// CHECK:  builtin "__tfop_tfc.makeIteratorGetNextWithDatasets{{.*}} : $(TensorHandle<Float>, TensorHandle<Int32>)
-// CHECK-NEXT:  tuple_extract {{.*}} : $(TensorHandle<Float>, TensorHandle<Int32>), 0
-// CHECK-NEXT:  tuple_extract {{.*}} : $(TensorHandle<Float>, TensorHandle<Int32>), 1
-// CHECK: builtin "__tfop_Add,$in,$in,T,__device"(
-// CHECK: builtin "__tfop_Add,$in,$in,T,__device"(
-// The operands can appear in arbitrary order here.
-// CHECK:  [[RESULT:%.*]] = tuple ({{.*}} : $TensorHandle<{{.*}}>, {{.*}} : $TensorHandle<{{.*}}>)
-// CHECK-NEXT:  return [[RESULT]] : $(TensorHandle<{{.*}}>, TensorHandle<{{.*}}>)
-
-
 // Creates a dataset, which produces one float scalar value in each get next
 // call.
 // TODO: declare with @convention tensorflow
@@ -66,19 +19,6 @@ public func createMockDataSet() -> VariantHandle {
                                       output_shapes: [TensorShape()])
   return dataset
 }
-
-// The lowered graph should only contain the graph function, and not any
-// top-level nodes.
-//
-// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}createMockDataSet{{.*}}
-// CHECK-NOT:   node {
-// CHECK:       function {
-// CHECK-NEXT:    signature {
-// CHECK-NEXT:      name: "{{.*}}createMockDataSet{{.*}}.tf_CPU.device_partition"
-// CHECK:           output_arg {
-// CHECK-NEXT:        name: "op_createmockdataset{{.*}}"
-// CHECK-NEXT:        type: DT_VARIANT
-// CHECK-NEXT:      }
 
 // TODO: support taking the following function typed parameter.
 // _ datasetCreator : @convention(tensorflow) () -> VariantHandle
@@ -112,10 +52,11 @@ public func model() {
   _hostOp(one)
 }
 
+// CHECK-LABEL: --- TFPartition GraphDef Proto
+
 // The lowered graph should only contain two graph functions, plus the
 // top-level nodes for calling the grah function lowered from model().
 
-// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}model{{.*}}
 // CHECK:      node {
 // CHECK-NEXT:   name: "{{.*}}model{{.*}}"
 // CHECK-NEXT:   op: "{{.*}}model{{.*}}.tf_CPU.device_partition"
@@ -125,3 +66,14 @@ public func model() {
 // CHECK:       function {
 // CHECK:       function {
 // CHECK-NOT:   function {
+
+// Ideally we want to check the following as well, but the two graph functions
+// above do not have a deterministic ordering in the GraphDef proto, which will
+// cause the test to be flakey.
+
+// HECK-NEXT:    signature {
+// HECK-NEXT:      name: "{{.*}}createMockDataSet{{.*}}.tf_only"
+// HECK:           output_arg {
+// HECK-NEXT:        name: "op_createmockdataset{{.*}}"
+// HECK-NEXT:        type: DT_VARIANT
+// HECK-NEXT:      }

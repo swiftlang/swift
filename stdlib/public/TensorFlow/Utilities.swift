@@ -127,6 +127,19 @@ func debugLog(_ message: @autoclosure () -> String,
 }
 
 //===----------------------------------------------------------------------===//
+// File writing
+//===----------------------------------------------------------------------===//
+
+/// Given the address of a `TF_Buffer` and a file path, write the buffer's
+/// contents to the file.
+func writeContents(of buffer: UnsafePointer<TF_Buffer>,
+                   toFile path: String) {
+  let fp = fopen(path, "w+")
+  fwrite(buffer.pointee.data, /*size*/ 1, /*count*/ buffer.pointee.length, fp)
+  fclose(fp)
+}
+
+//===----------------------------------------------------------------------===//
 // Pseudorandom number generation
 //===----------------------------------------------------------------------===//
 

@@ -3,7 +3,7 @@
 import Foundation
 
 class Butt: NSObject {
-  dynamic func butt(_ b: (Int) -> Int) {}
+  @objc dynamic func butt(_ b: (Int) -> Int) {}
 }
 
 class Tubb<GenericParamName>: Butt {

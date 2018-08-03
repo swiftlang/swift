@@ -287,7 +287,7 @@ public final class NWConnection : CustomDebugStringConvertible {
 	}
 
 	/// Content Context controls options for how data is sent, and access for metadata to send or receive.
-	/// All properties of Content Context are valid for sending. For received Content Context, only the protocolMetdata
+	/// All properties of Content Context are valid for sending. For received Content Context, only the protocolMetadata
 	/// values will be set.
 	public class ContentContext {
         internal let nw: nw_content_context_t
@@ -458,13 +458,13 @@ public final class NWConnection : CustomDebugStringConvertible {
 		}
 	}
 
-	/// Receive a complete content from the connection, waiting for the content to be marked complete
+	/// Receive complete message content from the connection, waiting for the content to be marked complete
 	/// (or encounter an error) before delivering the callback. This is useful for datagram or message-based
 	/// protocols like UDP. See receive(minimumIncompleteLength:, maximumLength:, completion:) for a description
 	/// of the completion handler.
-	public func receive(completion: @escaping (_ completeContent: Data?,
-											   _ contentContext: NWConnection.ContentContext?,
-											   _ isComplete: Bool, _ error: NWError?) -> Void) {
+	public func receiveMessage(completion: @escaping (_ completeContent: Data?,
+                                                      _ contentContext: NWConnection.ContentContext?,
+                                                      _ isComplete: Bool, _ error: NWError?) -> Void) {
 		nw_connection_receive_message(self.nw) { (content, context, complete, nwError) in
 			completion(NWCreateNSDataFromDispatchData(content) as Data?, ContentContext(context), complete, NWError(nwError))
 		}
@@ -483,7 +483,7 @@ public final class NWConnection : CustomDebugStringConvertible {
 	/// in which case the send will be enqueued until the connection is ready to send.
 	/// This is an asynchronous send and the completion block can be used to
 	/// determine when the send is complete. There is nothing preventing a client
-	/// from issuing an excessive number of outstanding sends. To minmize memory
+	/// from issuing an excessive number of outstanding sends. To minimize memory
 	/// footprint and excessive latency as a consequence of buffer bloat, it is
 	/// advisable to keep a low number of outstanding sends. The completion block
 	/// can be used to pace subsequent sends.
@@ -501,7 +501,8 @@ public final class NWConnection : CustomDebugStringConvertible {
 	///   be sent immediately (if the protocol requires sending bytes serially, like TCP).
 	///   For datagram protocols, like UDP, isComplete indicates that the content represents
 	///   a complete datagram.
-	///   When sending directly on streaming protocols like TCP, isComplete can be used to
+	///   When sending using streaming protocols like TCP, isComplete can be used to mark the end
+    ///   of a single message on the stream, of which there may be many. However, it can also
 	///   indicate that the connection should send a "write close" (a TCP FIN) if the sending
 	///   context is the final context on the connection. Specifically, to send a "write close",
 	///   pass .finalMessage or .defaultStream for the context (or create a custom context and

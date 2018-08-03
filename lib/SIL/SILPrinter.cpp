@@ -1151,20 +1151,24 @@ public:
 
   /// SWIFT_ENABLE_TENSORFLOW
   void visitGradientInst(GradientInst *GI) {
-    *this << "[source " << GI->getSourceIndex() << "] ";
-    if (!GI->getParameterIndices().empty()) {
+    auto &indices = GI->getIndices();
+    *this << "[source " << indices.source << "] ";
+    if (!indices.parameters.empty()) {
       *this << "[wrt ";
-      interleave(GI->getParameterIndices(), [&](unsigned idx) {
+      interleave(indices.parameters.set_bits(), [&](unsigned idx) {
         *this << idx;
       }, [&]{
         *this << ", ";
       });
       *this << "] ";
     }
-    if (GI->isSeedable())
+    auto options = GI->getOptions();
+    if (options.contains(SILGradientFlags::Seedable))
       *this << "[seedable] ";
-    if (GI->isPreservingResult())
+    if (options.contains(SILGradientFlags::PreservingResult))
       *this << "[preserving_result] ";
+    if (options.contains(SILGradientFlags::Delayed))
+      *this << "[delayed] ";
     *this << getIDAndType(GI->getOriginal());
   }
 
@@ -1221,36 +1225,39 @@ public:
       *this << " : $" << function->getLoweredFunctionType();
       return;
     }
-    case SymbolicValue::Aggregate:
-      *this << "[";
+    case SymbolicValue::Aggregate: {
+      *this << '(';
       interleave(v.getAggregateValue(), [&](SymbolicValue element) {
         visitSymbolicValue(element);
       }, [&] {
         *this << ", ";
       });
-      *this << "]";
+      *this << ')';
       return;
+    }
     case SymbolicValue::Enum:
       *this << SILDeclRef(v.getEnumValue(), SILDeclRef::Kind::EnumElement);
       return;
     case SymbolicValue::EnumWithPayload:
-      *this << "(";
+      *this << '(';
       *this << SILDeclRef(v.getEnumValue(), SILDeclRef::Kind::EnumElement);
       *this << ", ";
       visitSymbolicValue(v.getEnumPayloadValue());
-      *this << ")";
+      *this << ')';
       return;
-    case SymbolicValue::Array:
-      // Note, this prints arrays and aggregates as the same value.  We may want
-      // to produce distinguishing syntax at some point.
-      *this << "[";
-      interleave(v.getArrayValue(), [&](SymbolicValue element) {
+    case SymbolicValue::Array: {
+      CanType elementType;
+      auto elements = v.getArrayValue(elementType);
+
+      *this << "[$" << elementType << ": ";
+      interleave(elements, [&](SymbolicValue element) {
         visitSymbolicValue(element);
       }, [&] {
         *this << ", ";
       });
-      *this << "]";
+      *this << ']';
       return;
+    }
     case SymbolicValue::UninitMemory:
     case SymbolicValue::Unknown:
     case SymbolicValue::Address:
@@ -1479,29 +1486,21 @@ public:
     printDebugVar(DVAI->getVarInfo());
   }
 
-  void visitLoadUnownedInst(LoadUnownedInst *LI) {
-    if (LI->isTake())
-      *this << "[take] ";
-    *this << getIDAndType(LI->getOperand());
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  void visitLoad##Name##Inst(Load##Name##Inst *LI) { \
+    if (LI->isTake()) \
+      *this << "[take] "; \
+    *this << getIDAndType(LI->getOperand()); \
+  } \
+  void visitStore##Name##Inst(Store##Name##Inst *SI) { \
+    *this << Ctx.getID(SI->getSrc()) << " to "; \
+    if (SI->isInitializationOfDest()) \
+      *this << "[initialization] "; \
+    *this << getIDAndType(SI->getDest()); \
   }
-  void visitStoreUnownedInst(StoreUnownedInst *SI) {
-    *this << Ctx.getID(SI->getSrc()) << " to ";
-    if (SI->isInitializationOfDest())
-      *this << "[initialization] ";
-    *this << getIDAndType(SI->getDest());
-  }
-
-  void visitLoadWeakInst(LoadWeakInst *LI) {
-    if (LI->isTake())
-      *this << "[take] ";
-    *this << getIDAndType(LI->getOperand());
-  }
-  void visitStoreWeakInst(StoreWeakInst *SI) {
-    *this << Ctx.getID(SI->getSrc()) << " to ";
-    if (SI->isInitializationOfDest())
-      *this << "[initialization] ";
-    *this << getIDAndType(SI->getDest());
-  }
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
+#include "swift/AST/ReferenceStorage.def"
 
   void visitCopyAddrInst(CopyAddrInst *CI) {
     if (CI->isTakeOfSrc())
@@ -1626,18 +1625,15 @@ public:
   void visitRawPointerToRefInst(RawPointerToRefInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand());
   }
-  void visitRefToUnownedInst(RefToUnownedInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand());
+
+#define LOADABLE_REF_STORAGE(Name, ...) \
+  void visitRefTo##Name##Inst(RefTo##Name##Inst *CI) { \
+    printUncheckedConversionInst(CI, CI->getOperand()); \
+  } \
+  void visit##Name##ToRefInst(Name##ToRefInst *CI) { \
+    printUncheckedConversionInst(CI, CI->getOperand()); \
   }
-  void visitUnownedToRefInst(UnownedToRefInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand());
-  }
-  void visitRefToUnmanagedInst(RefToUnmanagedInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand());
-  }
-  void visitUnmanagedToRefInst(UnmanagedToRefInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand());
-  }
+#include "swift/AST/ReferenceStorage.def"
   void visitThinToThickFunctionInst(ThinToThickFunctionInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand());
   }
@@ -1674,9 +1670,11 @@ public:
     *this << getIDAndType(I->getOperand());
   }
 
-  void visitCopyUnownedValueInst(CopyUnownedValueInst *I) {
-    *this << getIDAndType(I->getOperand());
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  void visitCopy##Name##ValueInst(Copy##Name##ValueInst *I) { \
+    *this << getIDAndType(I->getOperand()); \
   }
+#include "swift/AST/ReferenceStorage.def"
 
   void visitDestroyValueInst(DestroyValueInst *I) {
     *this << getIDAndType(I->getOperand());
@@ -2276,6 +2274,16 @@ public:
         *this << " : "
               << component.getSubscriptIndexHash()->getLoweredType();
       }
+      
+      if (auto external = component.getExternalDecl()) {
+        *this << ", external #";
+        printValueDecl(external, PrintState.OS);
+        auto subs = component.getExternalSubstitutions();
+        if (!subs.empty()) {
+          printSubstitutions(subs);
+        }
+      }
+      
       break;
     }
     case KeyPathPatternComponent::Kind::OptionalWrap:
@@ -2296,30 +2304,6 @@ public:
       }
       *this << component.getComponentType();
       break;
-    }
-    case KeyPathPatternComponent::Kind::External: {
-      *this << "external #";
-      printValueDecl(component.getExternalDecl(), PrintState.OS);
-      if (!component.getExternalSubstitutions().empty()) {
-        printSubstitutions(component.getExternalSubstitutions());
-      }
-      
-      if (!component.getSubscriptIndices().empty()) {
-        printComponentIndices(component.getSubscriptIndices());
-      }
-      
-      *this << " : $" << component.getComponentType();
-      
-      if (!component.getSubscriptIndices().empty()) {
-        *this << ", indices_equals ";
-        component.getSubscriptIndexEquals()->printName(PrintState.OS);
-        *this << " : "
-              << component.getSubscriptIndexEquals()->getLoweredType();
-        *this << ", indices_hash ";
-        component.getSubscriptIndexHash()->printName(PrintState.OS);
-        *this << " : "
-              << component.getSubscriptIndexHash()->getLoweredType();
-      }
     }
     }
   }
@@ -2461,6 +2445,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   switch (isThunk()) {
   case IsNotThunk: break;
   case IsThunk: OS << "[thunk] "; break;
+  case IsSignatureOptimizedThunk:
+    OS << "[signature_optimized_thunk] ";
+    break;
   case IsReabstractionThunk: OS << "[reabstraction_thunk] "; break;
   }
 
@@ -2788,10 +2775,10 @@ void SILProperty::print(SILPrintContext &Ctx) const {
   if (auto sig = getDecl()->getInnermostDeclContext()
                           ->getGenericSignatureOfContext()) {
     sig->getCanonicalSignature()->print(OS, Options);
-    OS << ' ';
   }
-  OS << '(';
-  SILPrinter(Ctx).printKeyPathPatternComponent(getComponent());
+  OS << " (";
+  if (auto component = getComponent())
+    SILPrinter(Ctx).printKeyPathPatternComponent(*component);
   OS << ")\n";
 }
 
@@ -3193,8 +3180,9 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
 
 /// SWIFT_ENABLE_TENSORFLOW
 void SILReverseDifferentiableAttr::print(llvm::raw_ostream &OS) const {
-  OS << "source " << getSourceIndex() << " wrt ";
-  interleave(getParamIndices(),
+  auto &indices = getIndices();
+  OS << "source " << indices.source << " wrt ";
+  interleave(indices.parameters.set_bits(),
              [&](unsigned index) { OS << index; },
              [&] { OS << ", "; });
   if (!PrimalName.empty()) OS << " primal @" << PrimalName;

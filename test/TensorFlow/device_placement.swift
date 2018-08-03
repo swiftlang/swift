@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -O -emit-sil -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-module-level-graph=false -O -emit-sil -verify %s | %FileCheck %s
 
 import TensorFlow
 
@@ -8,8 +8,7 @@ public func implicitDevicePlacement() {
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}implicitDevicePlacement{{.*}}
-// CHECK: string_literal utf8 "/device:CPU:0"
-// CHECK: builtin "__tfop_Const,dtype,value$tensor,__device
+// CHECK: graph_op "Const"() {dtype: $Float, value$tensor: f64 0x3FF0000000000000 /* 1 */, __device: "/device:CPU:0"} : $TensorHandle<Float>
 
 public func implicitDeviceConfig() {
   let x = Tensor<Float>(1.0)
@@ -17,7 +16,7 @@ public func implicitDeviceConfig() {
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}implicitDeviceConfig{{.*}}
-// CHECK: graph_op "Const"() {dtype$dtype: $Builtin.FPIEEE32, value$tensor: f32 0x3F800000 /* 1 */, __device: "ALL_DEVICES"
+// CHECK: graph_op "Const"() {dtype: $Float, value$tensor: f32 0x3F800000 /* 1 */, __device: "ALL_DEVICES"
 
 public func explicitDeviceConfigGPU() {
   TensorFlow.enableGPU()
@@ -26,7 +25,7 @@ public func explicitDeviceConfigGPU() {
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}explicitDeviceConfigGPU{{.*}}
-// CHECK: graph_op "Const"() {dtype$dtype: $Builtin.FPIEEE32, value$tensor: f32 0x3F800000 /* 1 */, __device: "ALL_DEVICES"
+// CHECK: graph_op "Const"() {dtype: $Float, value$tensor: f32 0x3F800000 /* 1 */, __device: "ALL_DEVICES"
 
 // Check that in the TF graph, both the function node itself, and ops in the
 // function, are placed on GPU.
@@ -62,17 +61,16 @@ public func explicitDevicePlacementGPU() {
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}explicitDevicePlacementGPU{{.*}}
-// CHECK: string_literal utf8 "/device:GPU:0"
-// CHECK: builtin "__tfop_Const,dtype,value$tensor,__device
+// CHECK: graph_op "Const"() {dtype: $Float, value$tensor: f64 0x3FF0000000000000 /* 1 */, __device: "/device:GPU:0"} : $TensorHandle<Float>
 
 // CHECK-LABEL: --- TFDevicePartition Cross Device Tensor Transfer Annotation Result: {{.*}}explicitDevicePlacementGPU{{.*}}
-// CHECK: builtin "__tfop_tfc.TensorTransfer
+// CHECK: graph_op "tfc.TensorTransfer
 
 // CHECK-LABEL: --- TFDevicePartition Per-Device Function Extraction Result: {{.*}}explicitDevicePlacementGPU{{.*}}CPU{{.*}}
-// CHECK: builtin "__tfop_tfc.D2DTensorRecv
+// CHECK: graph_op "tfc.D2DTensorRecv
 
 // CHECK-LABEL: --- TFDevicePartition Per-Device Function Extraction Result: {{.*}}explicitDevicePlacementGPU{{.*}}GPU{{.*}}
-// CHECK: builtin "__tfop_tfc.D2DTensorSend
+// CHECK: graph_op "tfc.D2DTensorSend
 
 // Check that in the TF graph, there is one function node for each of GPU and
 // CPU. The GPU graph function has a send node, and the CPU one has a recv node.
@@ -120,31 +118,31 @@ public func explicitDevicePlacementAll() {
 //
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}explicitDevicePlacementAll{{.*}}
 //
-// CHECK:      builtin "__tfop_tfc.TensorTransfer
-// CHECK:      builtin "__tfop_tfc.TensorTransfer
-// CHECK:      builtin "__tfop_tfc.TensorTransfer
-// CHECK:      builtin "__tfop_tfc.TensorTransfer
-// CHECK-NOT:  builtin "__tfop_tfc.TensorTransfer
+// CHECK:      graph_op "tfc.TensorTransfer
+// CHECK:      graph_op "tfc.TensorTransfer
+// CHECK:      graph_op "tfc.TensorTransfer
+// CHECK:      graph_op "tfc.TensorTransfer
+// CHECK-NOT:  graph_op "tfc.TensorTransfer
 
 // CHECK-LABEL: --- TFDevicePartition Per-Device Function Extraction Result: {{.*}}explicitDevicePlacementAll{{.*}}CPU{{.*}}
 // get x from GPU
-// CHECK: builtin "__tfop_tfc.D2DTensorRecv
+// CHECK: graph_op "tfc.D2DTensorRecv
 // send x_cpu to TPU
-// CHECK: builtin "__tfop_tfc.D2DTensorSend
+// CHECK: graph_op "tfc.D2DTensorSend
 // send y_cpu to TPU
-// CHECK: builtin "__tfop_tfc.D2DTensorSend
+// CHECK: graph_op "tfc.D2DTensorSend
 // get add result from TPU
-// CHECK: builtin "__tfop_tfc.D2DTensorRecv
+// CHECK: graph_op "tfc.D2DTensorRecv
 
 // CHECK-LABEL: --- TFDevicePartition Per-Device Function Extraction Result: {{.*}}explicitDevicePlacementAll{{.*}}GPU{{.*}}
 // send x to CPU
-// CHECK: builtin "__tfop_tfc.D2DTensorSend
+// CHECK: graph_op "tfc.D2DTensorSend
 
 // CHECK-LABEL: --- TFDevicePartition Per-Device Function Extraction Result: {{.*}}explicitDevicePlacementAll{{.*}}TPU{{.*}}
 // Receive two operands from CPU, and send the add result back to CPU.
-// CHECK: builtin "__tfop_tfc.D2DTensorRecv
-// CHECK: builtin "__tfop_tfc.D2DTensorRecv
-// CHECK: builtin "__tfop_tfc.D2DTensorSend
+// CHECK: graph_op "tfc.D2DTensorRecv
+// CHECK: graph_op "tfc.D2DTensorRecv
+// CHECK: graph_op "tfc.D2DTensorSend
 
 // These send/recv ops are threaded via control dependency.
 // CHECK:          name: "{{.*}}explicitDevicePlacementAll{{.*}}.tf_CPU.device_partition"

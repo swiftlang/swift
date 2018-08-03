@@ -96,11 +96,11 @@ RC<SyntaxData> SyntaxData::getFirstToken() const {
   return getParent()->getChild(getIndexInParent());
 }
 
-AbsolutePosition SyntaxData::getAbsolutePositionWithLeadingTrivia() const {
+AbsolutePosition SyntaxData::getAbsolutePositionBeforeLeadingTrivia() const {
   if (PositionCache.hasValue())
     return *PositionCache;
   if (auto P = getPreviousNode()) {
-    auto Result = P->getAbsolutePositionWithLeadingTrivia();
+    auto Result = P->getAbsolutePositionBeforeLeadingTrivia();
     P->getRaw()->accumulateAbsolutePosition(Result);
     // FIXME: avoid using const_cast.
     const_cast<SyntaxData*>(this)->PositionCache = Result;
@@ -111,16 +111,16 @@ AbsolutePosition SyntaxData::getAbsolutePositionWithLeadingTrivia() const {
 }
 
 AbsolutePosition SyntaxData::getAbsolutePosition() const {
-  auto Result = getAbsolutePositionWithLeadingTrivia();
+  auto Result = getAbsolutePositionBeforeLeadingTrivia();
   getRaw()->accumulateLeadingTrivia(Result);
   return Result;
 }
 
-AbsolutePosition SyntaxData::getAbsoluteEndPosition() const {
+AbsolutePosition SyntaxData::getAbsoluteEndPositionAfterTrailingTrivia() const {
   if (auto N = getNextNode()) {
-    return N->getAbsolutePositionWithLeadingTrivia();
+    return N->getAbsolutePositionBeforeLeadingTrivia();
   } else {
-    auto Result = getAbsolutePositionWithLeadingTrivia();
+    auto Result = getAbsolutePositionBeforeLeadingTrivia();
     getRaw()->accumulateAbsolutePosition(Result);
     return Result;
   }

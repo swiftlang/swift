@@ -263,6 +263,9 @@ public:
   /// Optional table of counters to report, nullptr when not collecting.
   UnifiedStatsReporter *Stats = nullptr;
 
+  /// Set a new stats reporter.
+  void setStatsReporter(UnifiedStatsReporter *stats);
+
 private:
   /// \brief The current generation number, which reflects the number of
   /// times that external modules have been loaded.
@@ -430,6 +433,10 @@ public:
   /// Retrieve the decl for TensorFlow.TensorHandle iff the TensorFlow module
   /// has been imported.  Otherwise, this returns null.
   ClassDecl *getTensorHandleDecl() const;
+
+  /// Retrieve the decl for TensorFlow.TensorShape iff the TensorFlow module
+  /// has been imported.  Otherwise, this returns null.
+  StructDecl *getTensorShapeDecl() const;
 
   /// Retrieve the type for Swift._AutoDiffTape.
   CanType getAutoDiffTapeType() const;

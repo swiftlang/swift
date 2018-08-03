@@ -135,6 +135,9 @@ typealias MyBlockWithNoescapeParam = (() -> ()) -> Int
   
   // CHECK-NEXT: @property (nonatomic, getter=class, setter=setClass:) NSInteger (* _Nonnull class_)(NSInteger);
   @objc var `class`: @convention(c) (_ function: Int) -> Int = { $0 }
+  
+  // CHECK-NEXT: init
+  @objc init() {}
 }
-// CHECK-NEXT: init
+
 // CHECK-NEXT: @end

@@ -2,6 +2,9 @@
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize
 //
+// Compiler-only testing for TPU graph lowering (e.g. shape requirements by XLA).
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-target-tpu -O -emit-sil %s >/dev/null
+//
 // Tensor API tests.
 
 import TensorFlow
@@ -46,6 +49,10 @@ TensorTests.testAllBackends("NumericInitializers") {
 TensorTests.testAllBackends("RandomInitializer") {
   let _ = Tensor<Float>(randomUniform: [3, 4])
   let _ = Tensor<Float>(randomNormal: [3, 4])
+  // TODO: remove the extra code below once TPU execution supports 0 output
+  // tensors (b/111123797)
+  let extra = Tensor<Float>(1.0)
+  _hostOp(extra)
 }
 
 TensorTests.testAllBackends("ScalarToTensorConversion") {
@@ -195,10 +202,19 @@ TensorTests.test("WholeTensorSlicing") {
 }
 
 TensorTests.testAllBackends("Reduction") {
+  // TODO(b/111815968): triage and fix this TPU issue
+  #if !TPU
   // 2 x 5
   let x = Tensor<Float>([[1, 2, 3, 4, 5], [1, 2, 3, 4, 5]])
-  let sum = x.sum(squeezingAxes: 0)
-  expectEqual(ShapedArray(shape: [5], scalars: [2, 4, 6, 8, 10]), sum.array)
+  expectEqual(ShapedArray(shape: [5], scalars: [2, 4, 6, 8, 10]),
+              x.sum(squeezingAxes: 0).toHost(shape: []).array)
+  expectEqual(ShapedArray(shape: [1, 5], scalars: [2, 4, 6, 8, 10]),
+              x.sum(alongAxes: 0).toHost(shape: []).array)
+  expectEqual(ShapedArray(shape: [5], scalars: [1, 4, 9, 16, 25]),
+              x.product(squeezingAxes: 0).toHost(shape: []).array)
+  expectEqual(ShapedArray(shape: [1, 5], scalars: [1, 4, 9, 16, 25]),
+              x.product(alongAxes: 0).toHost(shape: []).array)
+  #endif // !TPU
 }
 
 TensorTests.testAllBackends("Concatenation") {
@@ -218,6 +234,18 @@ TensorTests.testAllBackends("Concatenation") {
               concatenated1.array)
 }
 
+TensorTests.test("EwiseComparison") {
+  let x = Tensor<Float>([0, 1, 2])
+  let y = Tensor<Float>([2, 1, 3])
+  expectEqual(x.elementsLess(y).scalars, [true, false, true])
+}
+
+TensorTests.test("LexicographicalComparison") {
+  let x = Tensor<Float>([0, 1, 2, 3, 4])
+  let y = Tensor<Float>([2, 3, 4, 5, 6])
+  expectTrue(x < y)
+}
+
 TensorTests.testAllBackends("ArgMax") {
   // 2 x 3
   let x = Tensor<Float>([[0, 1, 2], [3, 4, 5]])
@@ -227,6 +255,14 @@ TensorTests.testAllBackends("ArgMax") {
   expectEqual(ShapedArray(shape: [3], scalars: [1, 1, 1]), argmax0.array)
   expectEqual(ShapedArray(shape: [2], scalars: [2, 2]), argmax1.array)
   expectEqual(5, scalarsArgmax)
+}
+
+TensorTests.testAllBackends("CeilFloor") {
+  let x = Tensor<Float>([-1.3, -0.4, 0.5, 1.6])
+  let xFloor = floor(x)
+  let xCeil = ceil(x)
+  expectEqual(ShapedArray(shape: [4], scalars: [-2, -1, 0, 1]), xFloor.array)
+  expectEqual(ShapedArray(shape: [4], scalars: [-1, 0, 1, 2]), xCeil.array)
 }
 
 TensorTests.testAllBackends("SimpleMath") {
@@ -243,6 +279,11 @@ TensorTests.testAllBackends("ReductionToScalar") {
   // expectEqual(x.mean(), 3)
   // TODO: Test other reduction ops here. Currently code motion isn't
   // smart enough to avoid send/receive.
+
+  // TODO: remove the extra code below once TPU execution supports 0 output
+  // tensors (b/111123797)
+  let extra = Tensor<Float>(1.0)
+  _hostOp(extra)
 }
 
 TensorTests.testAllBackends("BatchNormalization") {

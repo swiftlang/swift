@@ -884,10 +884,7 @@ namespace {
               }
               importedTypeArg = subresult.AbstractType;
             } else if (typeParam->getSuperclass() &&
-                       (Impl.SwiftContext.isSwiftVersion3() ||
-                        typeParam->getConformingProtocols().empty())) {
-              // In Swift 3 mode, discard the protocol bounds if there is
-              // a superclass bound.
+                       typeParam->getConformingProtocols().empty()) {
               importedTypeArg = typeParam->getSuperclass();
             } else {
               SmallVector<Type, 4> memberTypes;
@@ -949,12 +946,13 @@ namespace {
         }
 
         // Determine whether this Objective-C class type is bridged to
-        // a Swift type.
+        // a Swift type. Hardcode "NSString" since it's referenced from
+        // the ObjectiveC module (a level below Foundation).
         Type bridgedType;
         if (auto objcClassDef = objcClass->getDefinition())
           bridgedType = mapSwiftBridgeAttr(objcClassDef);
-        else
-          bridgedType = mapSwiftBridgeAttr(objcClass);
+        else if (objcClass->getName() == "NSString")
+          bridgedType = Impl.SwiftContext.getStringDecl()->getDeclaredType();
 
         if (bridgedType) {
           // Gather the type arguments.
@@ -1038,10 +1036,7 @@ namespace {
         }
       }
 
-      // Swift 3 compatibility -- don't import subclass existentials
-      if (!type->qual_empty() &&
-          (importedType->isAnyObject() ||
-           !Impl.SwiftContext.isSwiftVersion3())) {
+      if (!type->qual_empty()) {
         SmallVector<Type, 4> members;
         if (!importedType->isAnyObject())
           members.push_back(importedType);
@@ -1554,23 +1549,7 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
     bool allowNSUIntegerAsInt) {
 
   // Hardcode handling of certain result types for builtins.
-  auto builtinID = clangDecl->getBuiltinID();
-  switch (builtinID) {
-  case clang::Builtin::NotBuiltin:
-    break;
-  case clang::Builtin::BIstrxfrm:
-  case clang::Builtin::BIstrcspn:
-  case clang::Builtin::BIstrspn:
-  case clang::Builtin::BIstrlen:
-  case clang::Builtin::BIstrlcpy:
-  case clang::Builtin::BIstrlcat:
-    // This is a list of all built-ins with a result type of 'size_t' that
-    // existed in Swift 3. We didn't have special handling for builtins at
-    // that time, and so these had a result type of UInt.
-    if (SwiftContext.isSwiftVersion3())
-      break;
-    LLVM_FALLTHROUGH;
-  default:
+  if (auto builtinID = clangDecl->getBuiltinID()) {
     switch (getClangASTContext().BuiltinInfo.getTypeString(builtinID)[0]) {
     case 'z': // size_t
     case 'Y': // ptrdiff_t

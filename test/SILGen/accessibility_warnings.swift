@@ -70,7 +70,7 @@ internal extension PublicStruct {
 }
 private extension PublicStruct {
   // CHECK-DAG: sil private @$S22accessibility_warnings12PublicStructV16extMemberPrivate33_5D2F2E026754A901C0FF90C404896D02LLyyF
-  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-9=private}}
+  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-9=fileprivate}}
   // CHECK-DAG: sil private @$S22accessibility_warnings12PublicStructV14extImplPrivate33_5D2F2E026754A901C0FF90C404896D02LLyyF
   private func extImplPrivate() {}
 }
@@ -83,7 +83,7 @@ internal extension InternalStruct {
 }
 private extension InternalStruct {
   // CHECK-DAG: sil private @$S22accessibility_warnings14InternalStructV16extMemberPrivate33_5D2F2E026754A901C0FF90C404896D02LLyyF
-  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-9=private}}
+  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-9=fileprivate}}
   // CHECK-DAG: sil private @$S22accessibility_warnings14InternalStructV14extImplPrivate33_5D2F2E026754A901C0FF90C404896D02LLyyF
   private func extImplPrivate() {}
 }
@@ -91,7 +91,7 @@ private extension InternalStruct {
 
 private extension PrivateStruct {
   // CHECK-DAG: sil private @$S22accessibility_warnings13PrivateStruct33_5D2F2E026754A901C0FF90C404896D02LLV09extMemberC0yyF
-  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-9=private}}
+  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-9=fileprivate}}
   // CHECK-DAG: sil private @$S22accessibility_warnings13PrivateStruct33_5D2F2E026754A901C0FF90C404896D02LLV07extImplC0yyF
   private func extImplPrivate() {}
 }

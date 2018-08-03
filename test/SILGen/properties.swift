@@ -209,8 +209,9 @@ func logical_struct_in_reftype_set(_ value: inout Val, z1: Int) {
   // CHECK: [[T0:%.*]] = tuple_extract [[MAT_RESULT]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>), 0
   // CHECK: [[OPT_CALLBACK:%.*]] = tuple_extract [[MAT_RESULT]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>), 1  
   // CHECK: [[T1:%[0-9]+]] = pointer_to_address [[T0]] : $Builtin.RawPointer to [strict] $*Val
-  // CHECK: [[VAL_REF_VAL_PROP_MAT:%.*]] = mark_dependence [[T1]] : $*Val on [[VAL_REF]]
+  // CHECK: [[T2:%.*]] = mark_dependence [[T1]] : $*Val on [[VAL_REF]]
   // CHECK: end_borrow [[VAL_REF_BORROWED]] from [[VAL_REF]]
+  // CHECK: [[VAL_REF_VAL_PROP_MAT:%.*]] = begin_access [modify] [unsafe] [[T2]] : $*Val
   // -- val.ref.val_prop.z_tuple
   // CHECK: [[V_R_VP_Z_TUPLE_MAT:%[0-9]+]] = alloc_stack $(Int, Int)
   // CHECK: [[LD:%[0-9]+]] = load_borrow [[VAL_REF_VAL_PROP_MAT]]
@@ -612,6 +613,47 @@ struct DidSetWillSetTests: ForceAccessors {
   // CHECK-NEXT: // function_ref {{.*}}.DidSetWillSetTests.a.didset : Swift.Int
   // CHECK-NEXT: [[DIDSETFN:%.*]] = function_ref @$S10properties010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vW : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
   // CHECK-NEXT: apply [[DIDSETFN]]([[OLDVAL]], [[WRITE]]) : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
+
+  // CHECK-LABEL: sil hidden @$S10properties010DidSetWillC5TestsV8testReadSiyF
+  // CHECK:         [[SELF:%.*]] = begin_access [read] [unknown] %0 : $*DidSetWillSetTests
+  // CHECK-NEXT:    [[PROP:%.*]] = struct_element_addr [[SELF]] : $*DidSetWillSetTests
+  // CHECK-NEXT:    [[LOAD:%.*]] = load [trivial] [[PROP]] : $*Int
+  // CHECK-NEXT:    end_access [[SELF]] : $*DidSetWillSetTests
+  // CHECK-NEXT:    return [[LOAD]] : $Int
+  mutating func testRead() -> Int {
+    return a
+  }
+
+  // CHECK-LABEL: sil hidden @$S10properties010DidSetWillC5TestsV9testWrite5inputySi_tF
+  // CHECK:         [[SELF:%.*]] = begin_access [modify] [unknown] %1 : $*DidSetWillSetTests
+  // CHECK-NEXT:    // function_ref properties.DidSetWillSetTests.a.setter
+  // CHECK-NEXT:    [[SETTER:%.*]] = function_ref @$S10properties010DidSetWillC5TestsV1aSivs
+  // CHECK-NEXT:    apply [[SETTER]](%0, [[SELF]])
+  // CHECK-NEXT:    end_access [[SELF]] : $*DidSetWillSetTests
+  // CHECK-NEXT:    [[RET:%.*]] = tuple ()
+  // CHECK-NEXT:    return [[RET]] : $()
+  mutating func testWrite(input: Int) {
+    a = input
+  }
+
+  // CHECK-LABEL: sil hidden @$S10properties010DidSetWillC5TestsV13testReadWrite5inputySi_tF
+  // CHECK:         [[SELF:%.*]] = begin_access [modify] [unknown] %1 : $*DidSetWillSetTests
+  // CHECK-NEXT:    [[TEMP:%.*]] = alloc_stack $Int
+  // CHECK-NEXT:    [[PROP:%.*]] = struct_element_addr [[SELF]] : $*DidSetWillSetTests
+  // CHECK-NEXT:    [[LOAD:%.*]] = load [trivial] [[PROP]] : $*Int
+  // CHECK-NEXT:    store [[LOAD]] to [trivial] [[TEMP]] : $*Int
+  // (modification goes here)
+  // CHECK:         [[RELOAD:%.*]] = load [trivial] [[TEMP]] : $*Int
+  // CHECK-NEXT:    // function_ref properties.DidSetWillSetTests.a.setter
+  // CHECK-NEXT:    [[SETTER:%.*]] = function_ref @$S10properties010DidSetWillC5TestsV1aSivs
+  // CHECK-NEXT:    apply [[SETTER]]([[RELOAD]], [[SELF]])
+  // CHECK-NEXT:    end_access [[SELF]] : $*DidSetWillSetTests
+  // CHECK-NEXT:    dealloc_stack [[TEMP]] : $*Int
+  // CHECK-NEXT:    [[RET:%.*]] = tuple ()
+  // CHECK-NEXT:    return [[RET]] : $()
+  mutating func testReadWrite(input: Int) {
+    a += input
+  }
 }
 
 
@@ -998,7 +1040,7 @@ func genericPropsInGenericContext<U>(_ x: GenericClass<U>) {
 // <rdar://problem/18275556> 'let' properties in a class should be implicitly final
 class ClassWithLetProperty {
   let p = 42
-  dynamic let q = 97
+  @objc dynamic let q = 97
 
   // We shouldn't have any dynamic dispatch within this method, just load p.
   func ReturnConstant() -> Int { return p }

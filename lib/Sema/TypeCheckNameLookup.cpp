@@ -47,11 +47,30 @@ void LookupResult::filter(
                 Results.end());
 }
 
+void LookupResult::shiftDownResults() {
+  // Remove inner results.
+  Results.erase(Results.begin(), Results.begin() + IndexOfFirstOuterResult);
+  IndexOfFirstOuterResult = 0;
+
+  if (Results.empty())
+    return;
+
+  // Compute IndexOfFirstOuterResult.
+  const DeclContext *dcInner = Results.front().getValueDecl()->getDeclContext();
+  for (auto &&result : Results) {
+    const DeclContext *dc = result.getValueDecl()->getDeclContext();
+    if (dc == dcInner ||
+        (dc->isModuleScopeContext() && dcInner->isModuleScopeContext()))
+      ++IndexOfFirstOuterResult;
+    else
+      break;
+  }
+}
+
 namespace {
   /// Builder that helps construct a lookup result from the raw lookup
   /// data.
   class LookupResultBuilder {
-    TypeChecker &TC;
     LookupResult &Result;
     DeclContext *DC;
     NameLookupOptions Options;
@@ -66,12 +85,12 @@ namespace {
     llvm::SmallDenseMap<std::pair<ValueDecl *, DeclContext *>, bool, 4> Known;
 
   public:
-    LookupResultBuilder(TypeChecker &tc, LookupResult &result, DeclContext *dc,
+    LookupResultBuilder(LookupResult &result, DeclContext *dc,
                         NameLookupOptions options,
                         bool isMemberLookup)
-      : TC(tc), Result(result), DC(dc), Options(options),
+      : Result(result), DC(dc), Options(options),
         IsMemberLookup(isMemberLookup) {
-      if (!TC.Context.LangOpts.EnableAccessControl)
+      if (!dc->getASTContext().LangOpts.EnableAccessControl)
         Options |= NameLookupFlags::IgnoreAccessControl;
     }
 
@@ -112,8 +131,8 @@ namespace {
       removeOverriddenDecls(FoundOuterDecls);
 
       // Remove any shadowed declarations from the found-declarations set.
-      removeShadowedDecls(FoundDecls, DC->getParentModule(), &TC);
-      removeShadowedDecls(FoundOuterDecls, DC->getParentModule(), &TC);
+      removeShadowedDecls(FoundDecls, DC->getParentModule());
+      removeShadowedDecls(FoundOuterDecls, DC->getParentModule());
 
       // Filter out those results that have been removed from the
       // found-declarations set.
@@ -200,8 +219,8 @@ namespace {
       // pull out the superclass instead, and use that below.
       if (foundInType->isExistentialType()) {
         auto layout = foundInType->getExistentialLayout();
-        if (layout.superclass) {
-          conformingType = layout.superclass;
+        if (auto superclass = layout.getSuperclass()) {
+          conformingType = superclass;
         } else {
           // Non-subclass existential: don't need to look for further
           // conformance or witness.
@@ -212,7 +231,10 @@ namespace {
 
       // Dig out the protocol conformance.
       auto *foundProto = cast<ProtocolDecl>(foundDC);
-      auto conformance = TC.conformsToProtocol(conformingType, foundProto, DC,
+      auto resolver = DC->getASTContext().getLazyResolver();
+      assert(resolver && "Need an active resolver");
+      auto &tc = *static_cast<TypeChecker *>(resolver);
+      auto conformance = tc.conformsToProtocol(conformingType, foundProto, DC,
                                                conformanceOptions);
       if (!conformance) {
         // If there's no conformance, we have an existential
@@ -234,10 +256,10 @@ namespace {
       ValueDecl *witness = nullptr;
       auto concrete = conformance->getConcrete();
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(found)) {
-        witness = concrete->getTypeWitnessAndDecl(assocType, &TC)
+        witness = concrete->getTypeWitnessAndDecl(assocType, nullptr)
           .second;
       } else if (found->isProtocolRequirement()) {
-        witness = concrete->getWitnessDecl(found, &TC);
+        witness = concrete->getWitnessDecl(found, nullptr);
 
         // It is possible that a requirement is visible to us, but
         // not the witness. In this case, just return the requirement;
@@ -280,12 +302,11 @@ convertToUnqualifiedLookupOptions(NameLookupOptions options) {
 LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
                                             SourceLoc loc,
                                             NameLookupOptions options) {
-  UnqualifiedLookup lookup(name, dc, this, loc,
+  UnqualifiedLookup lookup(name, dc, nullptr, loc,
                            convertToUnqualifiedLookupOptions(options));
 
   LookupResult result;
-  LookupResultBuilder builder(*this, result, dc, options,
-                              /*memberLookup*/false);
+  LookupResultBuilder builder(result, dc, options, /*memberLookup*/false);
   for (auto idx : indices(lookup.Results)) {
     const auto &found = lookup.Results[idx];
     // Determine which type we looked through to find this result.
@@ -316,7 +337,7 @@ TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
   {
     // Try lookup without ProtocolMembers first.
     UnqualifiedLookup lookup(
-        name, dc, this, loc,
+        name, dc, nullptr, loc,
         ulOptions - UnqualifiedLookup::Flags::AllowProtocolMembers);
 
     if (!lookup.Results.empty() ||
@@ -332,7 +353,7 @@ TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
     // is called too early, we start resolving extensions -- even those
     // which do provide not conformances.
     UnqualifiedLookup lookup(
-        name, dc, this, loc,
+        name, dc, nullptr, loc,
         ulOptions | UnqualifiedLookup::Flags::AllowProtocolMembers);
 
     return LookupResult(lookup.Results, lookup.IndexOfFirstOuterResult);
@@ -360,10 +381,10 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
   subOptions &= ~NL_RemoveOverridden;
   subOptions &= ~NL_RemoveNonVisible;
 
-  LookupResultBuilder builder(*this, result, dc, options,
+  LookupResultBuilder builder(result, dc, options,
                               /*memberLookup*/true);
   SmallVector<ValueDecl *, 4> lookupResults;
-  dc->lookupQualified(type, name, subOptions, this, lookupResults);
+  dc->lookupQualified(type, name, subOptions, nullptr, lookupResults);
 
   for (auto found : lookupResults)
     builder.add(found, nullptr, type, /*isOuter=*/false);

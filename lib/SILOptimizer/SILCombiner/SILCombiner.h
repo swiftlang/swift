@@ -26,6 +26,7 @@
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Utils/CastOptimizer.h"
+#include "swift/SILOptimizer/Utils/Existential.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
@@ -279,24 +280,16 @@ public:
                                        StringRef FInverseName, StringRef FName);
 
 private:
-  SILInstruction * createApplyWithConcreteType(FullApplySite AI,
-                                               SILValue NewSelf,
-                                               SILValue Self,
-                                               CanType ConcreteType,
-                                               SILValue ConcreteTypeDef,
-                                               ProtocolConformanceRef Conformance,
-                                               ArchetypeType *OpenedArchetype);
-
   FullApplySite rewriteApplyCallee(FullApplySite apply, SILValue callee);
 
-  SILInstruction *
-  propagateConcreteTypeOfInitExistential(FullApplySite AI,
-      ProtocolDecl *Protocol,
-      llvm::function_ref<void(CanType, ProtocolConformanceRef)> Propagate);
+  SILInstruction *createApplyWithConcreteType(FullApplySite Apply,
+                                              const ConcreteExistentialInfo &CEI,
+                                              SILBuilderContext &BuilderCtx);
 
-  SILInstruction *propagateConcreteTypeOfInitExistential(FullApplySite AI,
-                                                         WitnessMethodInst *WMI);
-  SILInstruction *propagateConcreteTypeOfInitExistential(FullApplySite AI);
+  SILInstruction *
+  propagateConcreteTypeOfInitExistential(FullApplySite Apply,
+                                         WitnessMethodInst *WMI);
+  SILInstruction *propagateConcreteTypeOfInitExistential(FullApplySite Apply);
 
   /// Perform one SILCombine iteration.
   bool doOneIteration(SILFunction &F, unsigned Iteration);

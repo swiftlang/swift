@@ -389,15 +389,16 @@ public struct LoggingCollection<Base_ : MyCollection> : LoggingCollectionType {
 }
 
 public func expectCustomizable<
-  T : Wrapper where
-  T : LoggingType,
-  T.Base : Wrapper, T.Base : LoggingType,
-  T.Log == T.Base.Log
+  T : Wrapper
 >(_: T, _ counters: TypeIndexed<Int>,
   stackTrace: SourceLocStack? = nil,
   file: String = #file, line: UInt = #line,
   collectMoreInfo: (()->String)? = nil
-) {
+)
+  where
+    T : LoggingType,
+    T.Base : Wrapper, T.Base : LoggingType,
+    T.Log == T.Base.Log {
   expectNotEqual(
     0, counters[T.self], collectMoreInfo?() ?? "",
     stackTrace: stackTrace ?? SourceLocStack(), file: file, line: line)
@@ -408,15 +409,16 @@ public func expectCustomizable<
 }
 
 public func expectNotCustomizable<
-  T : Wrapper where
-  T : LoggingType,
-  T.Base : Wrapper, T.Base : LoggingType,
-  T.Log == T.Base.Log
+  T : Wrapper
 >(_: T, _ counters: TypeIndexed<Int>,
   stackTrace: SourceLocStack? = nil,
   file: String = #file, line: UInt = #line,
   collectMoreInfo: (()->String)? = nil
-) {
+)
+  where
+    T : LoggingType,
+    T.Base : Wrapper, T.Base : LoggingType,
+    T.Log == T.Base.Log {
   expectNotEqual(
     0, counters[T.self], collectMoreInfo?() ?? "",
     stackTrace: stackTrace ?? SourceLocStack(), file: file, line: line)

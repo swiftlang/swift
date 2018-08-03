@@ -448,8 +448,8 @@ struct SR7249<T> {
 }
 
 extension SR7249 {
-  var x: Int { fatalError() } // expected-error{{invalid redeclaration of 'x'}}
-  var y: T { fatalError() } // expected-error{{invalid redeclaration of 'y'}}
+  var x: Int { fatalError() } // expected-warning{{redeclaration of 'x' is deprecated and will be an error in Swift 5}}
+  var y: T { fatalError() } // expected-warning{{redeclaration of 'y' is deprecated and will be an error in Swift 5}}
   var z: Int { fatalError() } // expected-error{{invalid redeclaration of 'z'}}
 }
 

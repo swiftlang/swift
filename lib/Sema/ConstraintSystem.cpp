@@ -885,7 +885,7 @@ void ConstraintSystem::recordOpenedTypes(
 static unsigned getNumRemovedArgumentLabels(TypeChecker &TC, ValueDecl *decl,
                                             bool isCurriedInstanceReference,
                                             FunctionRefKind functionRefKind) {
-  unsigned numParameterLists = 0;
+  unsigned numParameterLists;
 
   // Enum elements with associated values have to be treated
   // as regular function values.
@@ -897,19 +897,16 @@ static unsigned getNumRemovedArgumentLabels(TypeChecker &TC, ValueDecl *decl,
   // bar.map(E.foo)
   //
   // `E.foo` has to act as a regular function type passed as a value.
-  if (!TC.getLangOpts().isSwiftVersion3()) {
-    if (auto *EED = dyn_cast<EnumElementDecl>(decl)) {
-      numParameterLists = EED->hasAssociatedValues() ? 2 : 1;
-    }
-  }
+  if (auto *EED = dyn_cast<EnumElementDecl>(decl)) {
+    numParameterLists = EED->hasAssociatedValues() ? 2 : 1;
 
   // Only applicable to functions. Nothing else should have argument labels in
   // the type.
-  if (auto func = dyn_cast<AbstractFunctionDecl>(decl))
-    numParameterLists = func->getNumParameterLists();
-
-  if (numParameterLists == 0)
+  } else if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+    numParameterLists = func->hasImplicitSelfDecl() ? 2 : 1;
+  } else {
     return 0;
+  }
 
   switch (functionRefKind) {
   case FunctionRefKind::Unapplied:
@@ -969,9 +966,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
         auto params = openedFnType->getParams();
         assert(params.size() == 1);
         Type selfTy = params.front().getType()->getRValueInstanceType();
-        openedType = openedType->replaceCovariantResultType(
-                       selfTy,
-                       func->getNumParameterLists());
+        openedType = openedType->replaceCovariantResultType(selfTy, 2);
         openedFnType = openedType->castTo<FunctionType>();
       }
     } else {
@@ -1057,31 +1052,6 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   return { valueType, valueType };
 }
 
-static Type getInnermostConformingType(TypeChecker &TC, DeclContext *DC,
-                                       ProtocolDecl *protocol) {
-  do {
-    if (DC->isTypeContext()) {
-      if (protocol == DC->getAsProtocolOrProtocolExtensionContext())
-        return DC->mapTypeIntoContext(DC->getProtocolSelfType());
-
-      auto *NTD = DC->getAsNominalTypeOrNominalTypeExtensionContext();
-      auto type = NTD->getDeclaredType();
-
-      ConformanceCheckOptions options;
-      options |= ConformanceCheckFlags::InExpression;
-      options |= ConformanceCheckFlags::SuppressDependencyTracking;
-      options |= ConformanceCheckFlags::SkipConditionalRequirements;
-
-      auto result =
-          TC.conformsToProtocol(type, protocol, NTD->getDeclContext(), options);
-
-      if (result)
-        return DC->getDeclaredTypeInContext();
-    }
-  } while ((DC = DC->getParent()));
-
-  return nullptr;
-}
 /// Bind type variables for archetypes that are determined from
 /// context.
 ///
@@ -1097,10 +1067,10 @@ static Type getInnermostConformingType(TypeChecker &TC, DeclContext *DC,
 ///
 /// A final case we have to handle, even though it is invalid, is
 /// when a type is nested inside another protocol. We bind the
-/// protocol type variable for the protocol Self to its archetype
-/// in protocol context. This of course makes no sense, but we
-/// can't leave the type variable dangling, because then we crash
-/// later.
+/// protocol type variable for the protocol Self to an unresolved
+/// type, since it will conform to anything. This of course makes
+/// no sense, but we can't leave the type variable dangling,
+/// because then we crash later.
 ///
 /// If we ever do want to allow nominal types to be nested inside
 /// protocols, the key is to set their declared type to a
@@ -1121,43 +1091,43 @@ static void bindArchetypesFromContext(
 
   auto *genericEnv = cs.DC->getGenericEnvironmentOfContext();
 
+  auto bindContextArchetype = [&](Type paramTy, Type contextTy) {
+    auto found = replacements.find(cast<GenericTypeParamType>(
+                                     paramTy->getCanonicalType()));
+
+    // We might not have a type variable for this generic parameter
+    // because either we're opening up an UnboundGenericType,
+    // in which case we only want to infer the innermost generic
+    // parameters, or because this generic parameter was constrained
+    // away into a concrete type.
+    if (found != replacements.end()) {
+      auto typeVar = found->second;
+      cs.addConstraint(ConstraintKind::Bind, typeVar, contextTy,
+                       locatorPtr);
+    }
+  };
+
+  // Find the innermost non-type context.
   for (const auto *parentDC = outerDC;
        !parentDC->isModuleScopeContext();
        parentDC = parentDC->getParent()) {
-    if (parentDC->isTypeContext() &&
-        (parentDC == outerDC ||
-         !parentDC->getAsProtocolOrProtocolExtensionContext()))
+    if (parentDC->isTypeContext()) {
+      if (parentDC != outerDC && parentDC->getAsProtocolOrProtocolExtensionContext()) {
+        auto selfTy = parentDC->getSelfInterfaceType();
+        auto contextTy = cs.TC.Context.TheUnresolvedType;
+        bindContextArchetype(selfTy, contextTy);
+      }
       continue;
+    }
 
+    // If it's not generic, there's nothing to do.
     auto *genericSig = parentDC->getGenericSignatureOfContext();
     if (!genericSig)
       break;
 
     for (auto *paramTy : genericSig->getGenericParams()) {
-      auto found = replacements.find(cast<GenericTypeParamType>(
-                                       paramTy->getCanonicalType()));
-
-      // We might not have a type variable for this generic parameter
-      // because either we're opening up an UnboundGenericType,
-      // in which case we only want to infer the innermost generic
-      // parameters, or because this generic parameter was constrained
-      // away into a concrete type.
-      if (found != replacements.end()) {
-        Type contextTy;
-
-        if (genericEnv) {
-          contextTy = genericEnv->mapTypeIntoContext(paramTy);
-        } else {
-          auto *protocol = parentDC->getAsProtocolOrProtocolExtensionContext();
-          contextTy = getInnermostConformingType(cs.TC, cs.DC, protocol);
-        }
-
-        assert(contextTy);
-
-        auto typeVar = found->second;
-        cs.addConstraint(ConstraintKind::Bind, typeVar, contextTy,
-                         locatorPtr);
-      }
+      Type contextTy = genericEnv->mapTypeIntoContext(paramTy);
+      bindContextArchetype(paramTy, contextTy);
     }
 
     break;
@@ -1411,9 +1381,7 @@ ConstraintSystem::getTypeOfMemberReference(
     if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
       if ((isa<FuncDecl>(func) && cast<FuncDecl>(func)->hasDynamicSelf()) ||
           (isa<ConstructorDecl>(func) && !baseObjTy->getOptionalObjectType())) {
-        openedType = openedType->replaceCovariantResultType(
-          baseObjTy,
-            func->getNumParameterLists());
+        openedType = openedType->replaceCovariantResultType(baseObjTy, 2);
       }
     }
   } else {
@@ -1490,6 +1458,64 @@ ConstraintSystem::getTypeOfMemberReference(
   return { openedType, type };
 }
 
+// Performance hack: if there are two generic overloads, and one is
+// more specialized than the other, prefer the more-specialized one.
+static void tryOptimizeGenericDisjunction(ConstraintSystem &cs,
+                                          ArrayRef<OverloadChoice> choices,
+                                          OverloadChoice *&favoredChoice) {
+  if (favoredChoice || choices.size() != 2)
+    return;
+
+  const auto &choiceA = choices[0];
+  const auto &choiceB = choices[1];
+
+  if (!choiceA.isDecl() || !choiceB.isDecl())
+    return;
+
+  auto isViable = [](ValueDecl *decl) -> bool {
+    assert(decl);
+
+    auto *AFD = dyn_cast<AbstractFunctionDecl>(decl);
+    if (!AFD || !AFD->isGeneric())
+      return false;
+
+    auto funcType = AFD->getInterfaceType();
+    auto hasAnyOrOptional = funcType.findIf([](Type type) -> bool {
+      if (auto objType = type->getOptionalObjectType())
+        return true;
+
+      return type->isAny();
+    });
+
+    // If function declaration references `Any` or `Any?` type
+    // let's not attempt it, because it's unclear
+    // without solving which overload is going to be better.
+    return !hasAnyOrOptional;
+  };
+
+  auto *declA = choiceA.getDecl();
+  auto *declB = choiceB.getDecl();
+
+  if (!isViable(declA) || !isViable(declB))
+    return;
+
+  auto &TC = cs.TC;
+  auto *DC = cs.DC;
+
+  switch (TC.compareDeclarations(DC, declA, declB)) {
+  case Comparison::Better:
+    favoredChoice = const_cast<OverloadChoice *>(&choiceA);
+    break;
+
+  case Comparison::Worse:
+    favoredChoice = const_cast<OverloadChoice *>(&choiceB);
+    break;
+
+  case Comparison::Unordered:
+    break;
+  }
+}
+
 void ConstraintSystem::addOverloadSet(Type boundType,
                                       ArrayRef<OverloadChoice> choices,
                                       DeclContext *useDC,
@@ -1503,6 +1529,8 @@ void ConstraintSystem::addOverloadSet(Type boundType,
     addBindOverloadConstraint(boundType, choices.front(), locator, useDC);
     return;
   }
+
+  tryOptimizeGenericDisjunction(*this, choices, favoredChoice);
 
   SmallVector<Constraint *, 4> overloads;
   
@@ -1973,9 +2001,14 @@ Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
       Type lookupBaseType = newBase->getWithoutSpecifierType();
 
       if (lookupBaseType->mayHaveMembers()) {
-        auto subs = lookupBaseType->getContextSubstitutionMap(
-          cs.DC->getParentModule(),
-            assocType->getDeclContext());
+        auto *proto = assocType->getProtocol();
+        auto conformance = cs.DC->getParentModule()->lookupConformance(
+          lookupBaseType, proto);
+        if (!conformance)
+          return DependentMemberType::get(lookupBaseType, assocType);
+
+        auto subs = SubstitutionMap::getProtocolSubstitutions(
+          proto, lookupBaseType, *conformance);
         auto result = assocType->getDeclaredInterfaceType().subst(subs);
 
         if (result && !result->hasError())

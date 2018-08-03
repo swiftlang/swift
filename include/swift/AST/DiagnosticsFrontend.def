@@ -108,15 +108,17 @@ NOTE(note_valid_swift_versions, none,
      "valid arguments to '-swift-version' are %0", (StringRef))
 
 ERROR(error_mode_cannot_emit_dependencies,none,
-  "this mode does not support emitting dependency files", ())
+      "this mode does not support emitting dependency files", ())
+ERROR(error_mode_cannot_emit_reference_dependencies,none,
+      "this mode does not support emitting reference dependency files", ())
 ERROR(error_mode_cannot_emit_header,none,
-  "this mode does not support emitting Objective-C headers", ())
+      "this mode does not support emitting Objective-C headers", ())
 ERROR(error_mode_cannot_emit_loaded_module_trace,none,
-  "this mode does not support emitting the loaded module trace", ())
+      "this mode does not support emitting the loaded module trace", ())
 ERROR(error_mode_cannot_emit_module,none,
-  "this mode does not support emitting modules", ())
+      "this mode does not support emitting modules", ())
 ERROR(error_mode_cannot_emit_module_doc,none,
-  "this mode does not support emitting module documentation files", ())
+      "this mode does not support emitting module documentation files", ())
 
 WARNING(emit_reference_dependencies_without_primary_file,none,
   "ignoring -emit-reference-dependencies (requires -primary-file)", ())
@@ -213,12 +215,19 @@ ERROR(error_formatting_invalid_range,none,
 WARNING(stats_disabled,none,
   "compiler was not built with support for collecting statistics", ())
 
+WARNING(tbd_only_supported_in_whole_module,none,
+  "TBD generation is only supported when the whole module can be seen", ())
+
 ERROR(symbol_in_tbd_not_in_ir,none,
       "symbol '%0' (%1) is in TBD file, but not in generated IR",
       (StringRef, StringRef))
 ERROR(symbol_in_ir_not_in_tbd,none,
       "symbol '%0' (%1) is in generated IR file, but not in TBD file",
       (StringRef, StringRef))
+
+ERROR(tbd_validation_failure,none,
+      "please file a radar or open a bug on bugs.swift.org with this code, and "
+      "add -Xfrontend -validate-tbd-against-ir=none to squash the errors", ())
 
 ERROR(redundant_prefix_compilation_flag,none,
       "invalid argument '-D%0'; did you provide a redundant '-D' in your build settings?", 

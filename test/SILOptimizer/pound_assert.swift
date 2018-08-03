@@ -5,13 +5,14 @@ func trapsAndOverflows() {
   // expected-error @+1 {{arithmetic operation '124 + 92' (on type 'Int8') results in an overflow}}
   #assert((124 as Int8) + 92 < 42)
 
+  // expected-error @+2 {{integer literal '123231' overflows when stored into 'Int8'}}
   // expected-error @+1 {{#assert condition not constant}}
   #assert(Int8(123231) > 42)
-  // expected-note @-1 {{trap detected}}
-
-  // expected-error @+1 {{#assert condition not constant}}
-  #assert(Int8(124) + 8 > 42)
   // expected-note @-1 {{integer overflow detected}}
+
+  // expected-error @+2 {{arithmetic operation '124 + 8' (on type 'Int8') results in an overflow}}
+  // expected-error @+1 {{assertion failed}}
+  #assert(Int8(124) + 8 > 42)
 
   // expected-error @+1 {{#assert condition not constant}}
   #assert({ () -> Int in fatalError(String()) }() > 42)
@@ -64,6 +65,7 @@ func loops1(a: Int) -> Int {
 // @constexpr
 func loops2(a: Int) -> Int {
   var x = 42
+  // expected-note @+1 {{expression not evaluable as constant here}}
   for i in 0 ... a {
     x += i
   }
@@ -173,5 +175,22 @@ public func weighPet(pet: Pet) -> Int {
 
 #assert(weighPet(pet: .dog(9, 10)) == 19)
 
+func foo() -> Bool {
+  // expected-note @+1 {{could not fold operation}}
+  print("not constexpr")
+  return true
+}
+
+func baz() -> Bool {
+  return foo() // expected-note {{when called from here}}
+}
+
+func bar() -> Bool {
+  return baz() // expected-note {{when called from here}}
+}
+
+func testCallStack() {
+  #assert(bar()) // expected-error{{#assert condition not constant}}
+}
 
 //===----------------------------------------------------------------------===//

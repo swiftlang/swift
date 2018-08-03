@@ -86,6 +86,7 @@ bool doesASTRequireProfiling(SILModule &M, ASTNode N) {
 } // namespace swift
 
 /// Check that the input AST has at least been type-checked.
+LLVM_ATTRIBUTE_UNUSED
 static bool hasASTBeenTypeChecked(ASTNode N) {
   DeclContext *DC = N.getAsDeclContext();
   assert(DC && "Invalid AST node for profiling");
@@ -140,8 +141,8 @@ static void walkPatternForProfiling(PatternBindingDecl *PBD,
                                     ASTWalker &Walker) {
   if (PBD && !PBD->isStatic())
     for (auto E : PBD->getPatternList())
-      if (E.getInit())
-        E.getInit()->walk(Walker);
+      if (auto init = E.getNonLazyInit())
+        init->walk(Walker);
 }
 
 /// Special logic for handling closure visitation.
@@ -203,7 +204,7 @@ struct MapRegionCounters : public ASTWalker {
   void mapRegion(ASTNode N) {
     CounterMap[N] = NextCounter;
 
-    DEBUG({
+    LLVM_DEBUG({
       llvm::dbgs() << "Assigned counter #" << NextCounter << " to: ";
       auto *E = N.dyn_cast<Expr *>();
       if (E)
@@ -1092,7 +1093,7 @@ void SILProfiler::assignRegionCounters() {
       CurrentFuncName, getEquivalentPGOLinkage(CurrentFuncLinkage),
       CurrentFileName);
 
-  DEBUG(llvm::dbgs() << "Assigning counters to: " << CurrentFuncName << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "Assigning counters to: " << CurrentFuncName << "\n");
   Root.walk(Mapper);
 
   NumRegionCounters = Mapper.NextCounter;

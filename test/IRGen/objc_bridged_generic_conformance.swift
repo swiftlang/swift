@@ -9,5 +9,5 @@
 protocol P { func test() }
 
 extension Thingy: P {
-  func test() {}
+  @objc func test() {}
 }

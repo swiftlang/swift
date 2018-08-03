@@ -103,7 +103,7 @@ func destroy_pod(_ x: Builtin.RawPointer) {
   // CHECK-NOT: destroy_value
   // CHECK: destroy_value [[XBOX]] : ${{.*}}{
   // CHECK-NOT: destroy_value
-  return Builtin.destroy(Builtin.Int64, x)
+  return Builtin.destroy(Builtin.Int64.self, x)
   // CHECK: return
 }
 
@@ -111,7 +111,7 @@ func destroy_pod(_ x: Builtin.RawPointer) {
 func destroy_obj(_ x: Builtin.RawPointer) {
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*Builtin.NativeObject
   // CHECK: destroy_addr [[ADDR]]
-  return Builtin.destroy(Builtin.NativeObject, x)
+  return Builtin.destroy(Builtin.NativeObject.self, x)
 }
 
 // CHECK-LABEL: sil hidden @$S8builtins11destroy_gen{{[_0-9a-zA-Z]*}}F

@@ -501,6 +501,7 @@ public:
     llvm::IntegerType *MetadataKindTy;
     llvm::IntegerType *OnceTy;
     llvm::IntegerType *FarRelativeAddressTy;
+    llvm::IntegerType *ProtocolDescriptorRefTy;
   };
   llvm::IntegerType *ObjCBoolTy;       /// i8 or i1
   union {
@@ -517,8 +518,9 @@ public:
   llvm::StructType *RefCountedStructTy;/// %swift.refcounted = type { ... }
   Size RefCountedStructSize;     /// sizeof(%swift.refcounted)
   llvm::PointerType *RefCountedPtrTy;  /// %swift.refcounted*
-  llvm::PointerType *WeakReferencePtrTy;/// %swift.weak_reference*
-  llvm::PointerType *UnownedReferencePtrTy;/// %swift.unowned_reference*
+#define CHECKED_REF_STORAGE(Name, ...) \
+  llvm::PointerType *Name##ReferencePtrTy; /// %swift. #name _reference*
+#include "swift/AST/ReferenceStorage.def"
   llvm::Constant *RefCountedNull;      /// %swift.refcounted* null
   llvm::StructType *FunctionPairTy;    /// { i8*, %swift.refcounted* }
   llvm::StructType *NoEscapeFunctionPairTy;    /// { i8*, %swift.opaque* }
@@ -569,6 +571,8 @@ public:
   llvm::StructType *OpenedErrorTripleTy; /// { %swift.opaque*, %swift.type*, i8** }
   llvm::PointerType *OpenedErrorTriplePtrTy; /// { %swift.opaque*, %swift.type*, i8** }*
   llvm::PointerType *WitnessTablePtrPtrTy;   /// i8***
+
+  llvm::GlobalVariable *TheTrivialPropertyDescriptor = nullptr;
 
   /// Used to create unique names for class layout types with tail allocated
   /// elements.
@@ -621,7 +625,7 @@ public:
 
   llvm::Type *getReferenceType(ReferenceCounting style);
 
-  static bool isUnownedReferenceAddressOnly(ReferenceCounting style) {
+  static bool isLoadableReferenceAddressOnly(ReferenceCounting style) {
     switch (style) {
     case ReferenceCounting::Native:
       return false;
@@ -633,7 +637,7 @@ public:
 
     case ReferenceCounting::Bridge:
     case ReferenceCounting::Error:
-      llvm_unreachable("unowned references to this type are not supported");
+      llvm_unreachable("loadable references to this type are not supported");
     }
 
     llvm_unreachable("Not a valid ReferenceCounting.");
@@ -646,15 +650,16 @@ public:
   const SpareBitVector &getFunctionPointerSpareBits() const;
   const SpareBitVector &getWitnessTablePtrSpareBits() const;
 
-  SpareBitVector getWeakReferenceSpareBits() const;
-  Size getWeakReferenceSize() const { return PtrSize; }
-  Alignment getWeakReferenceAlignment() const { return getPointerAlignment(); }
-
-  SpareBitVector getUnownedReferenceSpareBits(ReferenceCounting style) const;
-  unsigned getUnownedExtraInhabitantCount(ReferenceCounting style);
-  APInt getUnownedExtraInhabitantValue(unsigned bits, unsigned index,
-                                       ReferenceCounting style);
-  APInt getUnownedExtraInhabitantMask(ReferenceCounting style);
+  /// Return runtime specific extra inhabitant and spare bits policies.
+  unsigned getReferenceStorageExtraInhabitantCount(ReferenceOwnership ownership,
+                                                 ReferenceCounting style) const;
+  SpareBitVector getReferenceStorageSpareBits(ReferenceOwnership ownership,
+                                              ReferenceCounting style) const;
+  APInt getReferenceStorageExtraInhabitantValue(unsigned bits, unsigned index,
+                                                ReferenceOwnership ownership,
+                                                ReferenceCounting style) const;
+  APInt getReferenceStorageExtraInhabitantMask(ReferenceOwnership ownership,
+                                               ReferenceCounting style) const;
 
   llvm::Type *getFixedBufferTy();
   llvm::Type *getValueWitnessTy(ValueWitness index);

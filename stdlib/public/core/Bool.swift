@@ -69,7 +69,6 @@ public struct Bool {
   ///
   /// Do not call this initializer directly. Instead, use the Boolean literal
   /// `false` to create a new `Bool` instance.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @compilerEvaluable
   public init() {
@@ -77,9 +76,8 @@ public struct Bool {
     self._value = Builtin.trunc_Int8_Int1(zero._value)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
   @compilerEvaluable
+  @usableFromInline @_transparent
   internal init(_ v: Builtin.Int1) { self._value = v }
   
   /// Creates an instance equal to the given Boolean value.
@@ -127,20 +125,20 @@ public struct Bool {
   ///         print("Maybe another try?")
   ///     }
   ///
-  /// `Bool.random()` uses the default random generator, `Random.default`. The
-  /// call in the example above is equivalent to
-  /// `Bool.random(using: &Random.default)`.
+  /// `Bool.random()` uses the default random generator,
+  /// `SystemRandomNumberGenerator`. To supply a non-default generator, call the
+  /// equivalent method that takes one as an argument.
   ///
   /// - Returns: Either `true` or `false`, randomly chosen with equal
   ///   probability.
   @inlinable
   public static func random() -> Bool {
-    return Bool.random(using: &Random.default)
+    var g = SystemRandomNumberGenerator()
+    return Bool.random(using: &g)
   }
 }
 
 extension Bool : _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLiteral {
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @compilerEvaluable
   public init(_builtinBooleanLiteral value: Builtin.Int1) {
@@ -165,7 +163,6 @@ extension Bool : _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLitera
   /// this Boolean literal initializer behind the scenes.
   ///
   /// - Parameter value: The value of the new instance.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @compilerEvaluable
   public init(booleanLiteral value: Bool) {
@@ -175,7 +172,6 @@ extension Bool : _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLitera
 
 extension Bool {
   // This is a magic entry point known to the compiler.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @compilerEvaluable
   public // COMPILER_INTRINSIC
@@ -193,13 +189,11 @@ extension Bool : CustomStringConvertible {
 }
 
 // This is a magic entry point known to the compiler.
-@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public // COMPILER_INTRINSIC
 func _getBool(_ v: Builtin.Int1) -> Bool { return Bool(v) }
 
 extension Bool: Equatable {
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @compilerEvaluable
   public static func == (lhs: Bool, rhs: Bool) -> Bool {
@@ -258,7 +252,6 @@ extension Bool {
   ///     // Prints "You look nice today!"
   ///
   /// - Parameter a: The Boolean value to negate.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @compilerEvaluable
   public static prefix func ! (a: Bool) -> Bool {
@@ -299,7 +292,6 @@ extension Bool {
   /// - Parameters:
   ///   - lhs: The left-hand side of the operation.
   ///   - rhs: The right-hand side of the operation.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @inline(__always)
   @compilerEvaluable
@@ -341,7 +333,6 @@ extension Bool {
   /// - Parameters:
   ///   - lhs: The left-hand side of the operation.
   ///   - rhs: The right-hand side of the operation.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @inline(__always)
   @compilerEvaluable
@@ -352,16 +343,16 @@ extension Bool {
 }
 
 extension Bool {
-  @inlinable
-  /// Toggles the value of the Boolean. 
+  /// Toggles the Boolean variable's value.
   ///
-  /// Calling this method sets the variable to `true` if it was `false`,
-  /// and sets it to `false` if it was `true`. For example:
+  /// Use this method to toggle a Boolean value from `true` to `false` or from
+  /// `false` to `true`.
   ///
   ///    var bools = [true, false]
   ///
   ///    bools[0].toggle()
-  ///    // bools now contains [false, false]
+  ///    // bools == [false, false]
+  @inlinable
   public mutating func toggle() {
     self = !self
   }

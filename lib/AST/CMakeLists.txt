@@ -4,6 +4,8 @@ if (SWIFT_FORCE_OPTIMIZED_TYPECHECKER)
 endif()
 
 add_swift_library(swiftAST STATIC
+  AccessScopeChecker.cpp
+  AccessRequests.cpp
   ASTContext.cpp
   ASTDumper.cpp
   ASTMangler.cpp
@@ -13,6 +15,8 @@ add_swift_library(swiftAST STATIC
   ASTVerifier.cpp
   ASTWalker.cpp
   Attr.cpp
+  # SWIFT_ENABLE_TENSORFLOW
+  AutoDiff.cpp
   Availability.cpp
   AvailabilitySpec.cpp
   Builtins.cpp
@@ -54,6 +58,7 @@ add_swift_library(swiftAST STATIC
   # SWIFT_ENABLE_TENSORFLOW
   TensorFlow.cpp
   Type.cpp
+  TypeCheckRequests.cpp
   TypeJoinMeet.cpp
   TypeRefinementContext.cpp
   TypeRepr.cpp

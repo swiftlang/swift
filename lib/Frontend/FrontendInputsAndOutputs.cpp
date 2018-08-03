@@ -293,6 +293,7 @@ void FrontendInputsAndOutputs::setMainAndSupplementaryOutputs(
     assert(outputFiles.size() == N && "Must have one main output per primary");
     assert(supplementaryOutputs.size() == N &&
            "Must have one set of supplementary outputs per primary");
+    (void)N;
 
     unsigned i = 0;
     for (auto &input : AllInputs) {

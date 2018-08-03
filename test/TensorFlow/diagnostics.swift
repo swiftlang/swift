@@ -14,27 +14,9 @@ func testInferredElementResult() -> TensorHandle<Int32> {
   _ = #tfop("bar") as TensorHandle<Int32>
 }
 
-// This shows passing a non-constant value into an attribute.
-// TODO: Improve the diagnostic to display the Swift parameter name instead of
-// the internal TensorFlow attribute name. (In this example, it's hard to tell
-// because both Swift/TensorFlow use the same name "padding".)
-public func nonConstantAttribute(x: Tensor<Float>, padding: Padding) {
-  // expected-error @+1 {{attribute 'padding' requires a constant argument}}
-  print(x.convolved2D(withFilter: Tensor<Float>(ones: [1, 3, 3, 1]),
-                      strides: (1, 1, 1, 1),
-                      padding: padding))
-}
-
-public func shapeError() {
-  // expected-error @+1 {{tensor literal should have 9 scalars for this shape, but has 8}}
-  let _ = Tensor<Float>(shape: [1, 3, 3, 1],
-                        scalars: [0, 1, 0, 1, 1, 1, 0, 1])
-}
-
-
 class ClassTest {
   var w = Tensor<Float>(zeros: [1, 2])  // expected-warning {{value implicitly copied to the host}}
-  let b = Tensor<Float>(zeros: [1, 2])
+  let b = Tensor<Float>(zeros: [1, 2])  // expected-warning {{value implicitly copied to the host}}
 
   var c : Tensor<Float> { return w } // expected-warning {{properties in classes always cause a copy to the accelerator}}
 
@@ -52,24 +34,35 @@ public func f() {
 
 }
 
-public enum X {
-  case A, B
-}
-
-public func invalidAttributeArg() -> TensorHandle<Int32> {
-  // expected-error@+1 {{attribute 'someAttr' requires a constant argument}}
-  return #tfop("bar", someAttr: X.A)
-}
-
-public func invalidAttrTensor(a: Tensor<Float>) {
-   // expected-error @+1 {{attribute 'someAttr' requires a constant argument}}
-   () = #tfop("foo", someAttr: a)
-}
-
 // b/76387659 - Verify that there is a way to configure the TPU.
 public func testDevice() {
   TensorFlow.enableTPU()
   let a = Tensor<Float>(1.0)
   _ = a+a
+
+  // TODO: remove the extra code below once TPU execution supports 0 output
+  // tensors (b/111123797)
+  let extra = Tensor<Float>(1.0)
+  _hostOp(extra)
 }
 
+// This loop is unrolled, so we have multiple SIL values for `x`, but there
+// should be a single copy-to-host compiler warning.
+public func SR8412_CopyToHost() {
+  for _ in 0...10 {
+    let x = Tensor(1)  // expected-warning {{value implicitly copied to the host}}
+    _hostOp(x)
+  }
+}
+
+@inline(never)
+public func hostFunc() -> Tensor<Float> {
+  return Tensor<Float>(1.0)
+}
+
+public func SR8412_CopyToAccel(a: Int32) {
+  let x = Tensor<Float>(1.0)
+  for _ in 0...10 {
+    let _ = hostFunc() + x  // expected-warning {{value implicitly copied to the accelerator}}
+  }
+}

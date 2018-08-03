@@ -117,6 +117,12 @@ IDENTIFIER(value)
 IDENTIFIER_WITH_NAME(value_, "_value")
 IDENTIFIER(with)
 
+// SWIFT_ENABLE_TENSORFLOW
+IDENTIFIER(allParameters)
+IDENTIFIER(Parameter)
+IDENTIFIER(Parameters)
+IDENTIFIER(TensorFlow)
+
 // Kinds of layout constraints
 IDENTIFIER_WITH_NAME(UnknownLayout, "_UnknownLayout")
 IDENTIFIER_WITH_NAME(TrivialLayout, "_Trivial")
@@ -137,6 +143,7 @@ IDENTIFIER(AssignmentPrecedence)
 IDENTIFIER(CastingPrecedence)
 IDENTIFIER(DefaultPrecedence)
 IDENTIFIER(FunctionArrowPrecedence)
+IDENTIFIER(NilCoalescingPrecedence)
 IDENTIFIER(TernaryPrecedence)
 
 // Builtins and literals

@@ -48,17 +48,17 @@ using llvm::StringRef;
 
 #ifndef NDEBUG
 #define syntax_assert_child_kind(Raw, Cursor, ExpectedKind)                    \
-  ({                                                                           \
+  do {                                                                         \
     if (auto &__Child = Raw->getChild(Cursor))                                 \
       assert(__Child->getKind() == ExpectedKind);                              \
-  })
+  } while (false)
 #else
-#define syntax_assert_child_kind(Raw, Cursor, ExpectedKind) ({});
+#define syntax_assert_child_kind(Raw, Cursor, ExpectedKind)
 #endif
 
 #ifndef NDEBUG
 #define syntax_assert_child_token(Raw, CursorName, ...)                        \
-  ({                                                                           \
+  do {                                                                         \
     bool __Found = false;                                                      \
     if (auto &__Token = Raw->getChild(Cursor::CursorName)) {                   \
       assert(__Token->isToken());                                              \
@@ -73,14 +73,14 @@ using llvm::StringRef;
                           ", expected one of {" #__VA_ARGS__ "}");             \
       }                                                                        \
     }                                                                          \
-  })
+  } while (false)
 #else
-#define syntax_assert_child_token(Raw, CursorName, ...) ({});
+#define syntax_assert_child_token(Raw, CursorName, ...)
 #endif
 
 #ifndef NDEBUG
 #define syntax_assert_child_token_text(Raw, CursorName, TokenKind, ...)        \
-  ({                                                                           \
+  do {                                                                         \
     bool __Found = false;                                                      \
     if (auto &__Child = Raw->getChild(Cursor::CursorName)) {                   \
       assert(__Child->isToken());                                              \
@@ -96,19 +96,19 @@ using llvm::StringRef;
                           ", expected one of {" #__VA_ARGS__ "}");             \
       }                                                                        \
     }                                                                          \
-  })
+  } while (false)
 #else
-#define syntax_assert_child_token_text(Raw, CursorName, TokenKind, ...) ({});
+#define syntax_assert_child_token_text(Raw, CursorName, TokenKind, ...)
 #endif
 
 #ifndef NDEBUG
 #define syntax_assert_token_is(Tok, Kind, Text)                                \
-  ({                                                                           \
+  do {                                                                         \
     assert(Tok.getTokenKind() == Kind);                                        \
     assert(Tok.getText() == Text);                                             \
-  })
+  } while (false)
 #else
-#define syntax_assert_token_is(Tok, Kind, Text) ({});
+#define syntax_assert_token_is(Tok, Kind, Text)
 #endif
 
 namespace swift {
@@ -212,6 +212,8 @@ struct SyntaxPrintOptions {
   bool PrintTrivialNodeKind = false;
 };
 
+typedef unsigned SyntaxNodeId;
+
 /// RawSyntax - the strictly immutable, shared backing nodes for all syntax.
 ///
 /// This is implementation detail - do not expose it in public API.
@@ -221,8 +223,15 @@ class RawSyntax final
                                     TriviaPiece> {
   friend TrailingObjects;
 
+  /// The ID that shall be used for the next node that is created and does not
+  /// have a manually specified id
+  static SyntaxNodeId NextFreeNodeId;
+
+  /// An ID of this node that is stable across incremental parses
+  SyntaxNodeId NodeId;
+
   union {
-    uint64_t Clear;
+    uint64_t OpaqueBits;
     struct {
       /// The kind of syntax this node represents.
       unsigned Kind : bitmax(NumSyntaxKindBits, 8);
@@ -231,7 +240,7 @@ class RawSyntax final
       /// Whether this piece of syntax was constructed with manually managed
       /// memory.
       unsigned ManualMemory : 1;
-    };
+    } Common;
     enum { NumRawSyntaxBits = bitmax(NumSyntaxKindBits, 8) + 1 + 1 };
 
     // For "layout" nodes.
@@ -243,7 +252,7 @@ class RawSyntax final
       unsigned NumChildren : 32;
       /// Number of bytes this node takes up spelled out in the source code
       unsigned TextLength : 32;
-    };
+    } Layout;
 
     // For "token" nodes.
     struct {
@@ -256,38 +265,44 @@ class RawSyntax final
       unsigned NumLeadingTrivia : 16;
       /// Number of trailing trivia pieces.
       unsigned NumTrailingTrivia : 16;
-    };
+    } Token;
   } Bits;
 
   size_t numTrailingObjects(OverloadToken<RC<RawSyntax>>) const {
-    return isToken() ? 0 : Bits.NumChildren;
+    return isToken() ? 0 : Bits.Layout.NumChildren;
   }
   size_t numTrailingObjects(OverloadToken<OwnedString>) const {
     return isToken() ? 1 : 0;
   }
   size_t numTrailingObjects(OverloadToken<TriviaPiece>) const {
-    return isToken() ? Bits.NumLeadingTrivia + Bits.NumTrailingTrivia : 0;
+    return isToken()
+             ? Bits.Token.NumLeadingTrivia + Bits.Token.NumTrailingTrivia
+             : 0;
   }
 
   /// Constructor for creating layout nodes
+  /// If \p NodeId is \c None, the next free NodeId is used, if it is passed,
+  /// the caller needs to assure that the node ID has not been used yet.
   RawSyntax(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
-            SourcePresence Presence, bool ManualMemory);
+            SourcePresence Presence, bool ManualMemory,
+            llvm::Optional<SyntaxNodeId> NodeId);
   /// Constructor for creating token nodes
-  RawSyntax(tok TokKind, OwnedString Text,
-            ArrayRef<TriviaPiece> LeadingTrivia,
-            ArrayRef<TriviaPiece> TrailingTrivia,
-            SourcePresence Presence, bool ManualMemory);
+  /// If \p NodeId is \c None, the next free NodeId is used, if it is passed,
+  /// the caller needs to assure that the NodeId has not been used yet.
+  RawSyntax(tok TokKind, OwnedString Text, ArrayRef<TriviaPiece> LeadingTrivia,
+            ArrayRef<TriviaPiece> TrailingTrivia, SourcePresence Presence,
+            bool ManualMemory, llvm::Optional<SyntaxNodeId> NodeId);
 
 public:
   ~RawSyntax();
 
   void Release() const {
-    if (Bits.ManualMemory)
+    if (Bits.Common.ManualMemory)
       return;
     return llvm::ThreadSafeRefCountedBase<RawSyntax>::Release();
   }
   void Retain() const {
-    if (Bits.ManualMemory)
+    if (Bits.Common.ManualMemory)
       return;
     return llvm::ThreadSafeRefCountedBase<RawSyntax>::Retain();
   }
@@ -298,14 +313,16 @@ public:
   /// Make a raw "layout" syntax node.
   static RC<RawSyntax> make(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
                             SourcePresence Presence,
-                            SyntaxArena *Arena = nullptr);
+                            SyntaxArena *Arena = nullptr,
+                            llvm::Optional<SyntaxNodeId> NodeId = llvm::None);
 
   /// Make a raw "token" syntax node.
   static RC<RawSyntax> make(tok TokKind, OwnedString Text,
                             ArrayRef<TriviaPiece> LeadingTrivia,
                             ArrayRef<TriviaPiece> TrailingTrivia,
                             SourcePresence Presence,
-                            SyntaxArena *Arena = nullptr);
+                            SyntaxArena *Arena = nullptr,
+                            llvm::Optional<SyntaxNodeId> NodeId = llvm::None);
 
   /// Make a missing raw "layout" syntax node.
   static RC<RawSyntax> missing(SyntaxKind Kind, SyntaxArena *Arena = nullptr) {
@@ -326,10 +343,15 @@ public:
   /// @}
 
   SourcePresence getPresence() const {
-    return static_cast<SourcePresence>(Bits.Presence);
+    return static_cast<SourcePresence>(Bits.Common.Presence);
   }
 
-  SyntaxKind getKind() const { return static_cast<SyntaxKind>(Bits.Kind); }
+  SyntaxKind getKind() const {
+    return static_cast<SyntaxKind>(Bits.Common.Kind);
+  }
+
+  /// Get an ID for this node that is stable across incremental parses
+  SyntaxNodeId getId() const { return NodeId; }
 
   /// Returns true if the node is "missing" in the source (i.e. it was
   /// expected (or optional) but not written.
@@ -365,7 +387,7 @@ public:
   /// Get the kind of the token.
   tok getTokenKind() const {
     assert(isToken());
-    return static_cast<tok>(Bits.TokenKind);
+    return static_cast<tok>(Bits.Token.TokenKind);
   }
 
   /// Return the text of the token.
@@ -377,13 +399,13 @@ public:
   /// Return the leading trivia list of the token.
   ArrayRef<TriviaPiece> getLeadingTrivia() const {
     assert(isToken());
-    return {getTrailingObjects<TriviaPiece>(), Bits.NumLeadingTrivia};
+    return {getTrailingObjects<TriviaPiece>(), Bits.Token.NumLeadingTrivia};
   }
   /// Return the trailing trivia list of the token.
   ArrayRef<TriviaPiece> getTrailingTrivia() const {
     assert(isToken());
-    return {getTrailingObjects<TriviaPiece>() + Bits.NumLeadingTrivia,
-            Bits.NumTrailingTrivia};
+    return {getTrailingObjects<TriviaPiece>() + Bits.Token.NumLeadingTrivia,
+            Bits.Token.NumTrailingTrivia};
   }
 
   /// Return \c true if this is the given kind of token.
@@ -427,13 +449,13 @@ public:
   ArrayRef<RC<RawSyntax>> getLayout() const {
     if (isToken())
       return {};
-    return {getTrailingObjects<RC<RawSyntax>>(), Bits.NumChildren};
+    return {getTrailingObjects<RC<RawSyntax>>(), Bits.Layout.NumChildren};
   }
 
   size_t getNumChildren() const {
     if (isToken())
       return 0;
-    return Bits.NumChildren;
+    return Bits.Layout.NumChildren;
   }
 
   /// Get a child based on a particular node's "Cursor", indicating
@@ -454,7 +476,7 @@ public:
       accumulateAbsolutePosition(Pos);
       return Pos.getOffset();
     } else {
-      return Bits.TextLength;
+      return Bits.Layout.TextLength;
     }
   }
 
@@ -502,5 +524,9 @@ public:
 
 } // end namespace syntax
 } // end namespace swift
+
+namespace llvm {
+raw_ostream &operator<<(raw_ostream &OS, swift::syntax::AbsolutePosition Pos);
+} // end namespace llvm
 
 #endif // SWIFT_SYNTAX_RAWSYNTAX_H

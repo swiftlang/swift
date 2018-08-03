@@ -1311,14 +1311,6 @@ extension _SwiftStringStorage {
   }
 }
 
-extension String {
-  // FIXME: Remove. Still used by swift-corelibs-foundation
-  @available(*, deprecated, renamed: "_guts")
-  public var _core: _StringGuts {
-    return _guts
-  }
-}
-
 extension _StringGuts {
   // FIXME: Remove. Still used by swift-corelibs-foundation
   @available(*, deprecated)

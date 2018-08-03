@@ -251,10 +251,10 @@ class AccessedStorageAnalysis
 public:
   AccessedStorageAnalysis()
       : GenericFunctionEffectAnalysis<FunctionAccessedStorage>(
-            AnalysisKind::AccessedStorage) {}
+            SILAnalysisKind::AccessedStorage) {}
 
   static bool classof(const SILAnalysis *S) {
-    return S->getKind() == AnalysisKind::AccessedStorage;
+    return S->getKind() == SILAnalysisKind::AccessedStorage;
   }
 };
 

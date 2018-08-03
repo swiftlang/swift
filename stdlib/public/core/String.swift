@@ -742,6 +742,18 @@ extension String {
   ) -> String {
     return String._fromUTF8(input, repair: repair)!
   }
+
+  @inlinable
+  @usableFromInline
+  static func _fromWellFormedUTF16CodeUnits<C : RandomAccessCollection>(
+    _ input: C, repair: Bool = false
+  ) -> String where C.Element == UTF16.CodeUnit {
+    if let smol = _SmallUTF8String(input) {
+      return String(_StringGuts(smol))
+    }
+    return String._fromCodeUnits(
+      input, encoding: UTF16.self, repairIllFormedSequences: repair)!
+  }
 }
 
 extension String : _ExpressibleByBuiltinUnicodeScalarLiteral {
@@ -829,12 +841,10 @@ extension String : _ExpressibleByBuiltinStringLiteral {
       return
     }
 
-    // SWIFT_ENABLE_TENSORFLOW
-    // TODO(SR-8117): Renable the code below. 
-    // if let small = _SmallUTF8String(bufPtr) {
-    //   self = String(_StringGuts(small))
-    //   return
-    // }
+    if let small = _SmallUTF8String(bufPtr) {
+      self = String(_StringGuts(small))
+      return
+    }
 
     if _fastPath(Bool(isASCII)) {
       self = String(_StringGuts(_large: _UnmanagedString(bufPtr)))
@@ -862,7 +872,6 @@ extension String : ExpressibleByStringLiteral {
 
 extension String : CustomDebugStringConvertible {
   /// A representation of the string that is suitable for debugging.
-  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     var result = "\""
     for us in self.unicodeScalars {

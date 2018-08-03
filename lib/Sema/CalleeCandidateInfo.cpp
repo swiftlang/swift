@@ -17,6 +17,7 @@
 #include "ConstraintSystem.h"
 #include "CSDiag.h"
 #include "CalleeCandidateInfo.h"
+#include "TypeCheckAvailability.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeWalker.h"
@@ -89,10 +90,18 @@ ArrayRef<Identifier> UncurriedCandidate::getArgumentLabels(
   scratch.clear();
   if (auto decl = getDecl()) {
     if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-      // Retrieve the argument labels of the corresponding parameter list.
-      if (level < func->getNumParameterLists()) {
-        auto paramList = func->getParameterList(level);
-        for (auto param : *paramList) {
+      if (func->hasImplicitSelfDecl()) {
+        if (level == 0) {
+          scratch.push_back(Identifier());
+          return scratch;
+        }
+
+        --level;
+      }
+
+      if (level == 0) {
+        // Retrieve the argument labels of the corresponding parameter list.
+        for (auto param : *func->getParameters()) {
           scratch.push_back(param->getArgumentName());
         }
         return scratch;
@@ -879,6 +888,25 @@ CalleeCandidateInfo::CalleeCandidateInfo(Type baseType,
     declName = candidates[0].getDecl()->getBaseName().userFacingName();
 }
 
+CalleeCandidateInfo &CalleeCandidateInfo::
+operator=(const CalleeCandidateInfo &CCI) {
+  if (this != &CCI) {
+    // If the reference member (i.e., CS) is identical, just copy remaining
+    // members; otherwise, reconstruct the object.
+    if (&CS == &CCI.CS) {
+      declName = CCI.declName;
+      hasTrailingClosure = CCI.hasTrailingClosure;
+      candidates = CCI.candidates;
+      closeness = CCI.closeness;
+      failedArgument = CCI.failedArgument;
+    } else {
+      this->~CalleeCandidateInfo();
+      new (this) CalleeCandidateInfo(CCI);
+    }
+  }
+  return *this;
+}
+
 /// Given a set of parameter lists from an overload group, and a list of
 /// arguments, emit a diagnostic indicating any partially matching overloads.
 void CalleeCandidateInfo::
@@ -992,10 +1020,10 @@ bool CalleeCandidateInfo::diagnoseGenericParameterErrors(Expr *badArgExpr) {
     // Check for optional near miss.
     if (auto argOptType = substitution->getOptionalObjectType()) {
       if (isSubstitutableFor(argOptType, paramArchetype, CS.DC)) {
-        CS.TC.diagnose(badArgExpr->getLoc(), diag::missing_unwrap_optional,
-                       argType);
-        foundFailure = true;
-        break;
+        if (diagnoseUnwrap(CS.TC, CS.DC, badArgExpr, substitution)) {
+          foundFailure = true;
+          break;
+        }
       }
     }
     
@@ -1057,8 +1085,8 @@ bool CalleeCandidateInfo::diagnoseSimpleErrors(const Expr *E) {
   if (closeness == CC_Unavailable) {
     auto decl = candidates[0].getDecl();
     assert(decl && "Only decl-based candidates may be marked unavailable");
-    return CS.TC.diagnoseExplicitUnavailability(decl, loc, CS.DC,
-                                                dyn_cast<CallExpr>(E));
+    return diagnoseExplicitUnavailability(decl, loc, CS.DC,
+                                          dyn_cast<CallExpr>(E));
   }
   
   // Handle symbols that are matches, but are not accessible from the current

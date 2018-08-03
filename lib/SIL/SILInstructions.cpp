@@ -581,52 +581,32 @@ TryApplyInst *TryApplyInst::create(
 
 /// SWIFT_ENABLE_TENSORFLOW
 GradientInst::GradientInst(SILModule &module, SILDebugLocation debugLoc,
-                           SILValue original, unsigned sourceIndex,
-                           ArrayRef<unsigned> paramIndices,
-                           bool seedable, bool preservingResult)
-  : InstructionBase(debugLoc, getGradientSILType(module, original, sourceIndex,
-                                                 paramIndices, seedable,
-                                                 preservingResult)),
-    SourceIndex(sourceIndex),
-    NumParamIndices(paramIndices.size()), Seedable(seedable),
-    PreservingResult(preservingResult), Operands(this, original) {
-  std::copy(paramIndices.begin(), paramIndices.end(),
-            getParameterIndicesData());
-}
+                           SILValue original,
+                           const SILReverseAutoDiffConfig &config)
+  : InstructionBase(debugLoc,
+                    getGradientSILType(module, original, config)),
+    Config(config), Operands(this, original) {}
 
-SILType GradientInst::getGradientSILType(SILModule &module, SILValue original,
-                                         unsigned sourceIndex,
-                                         ArrayRef<unsigned> paramIndices,
-                                         bool seedable,
-                                         bool preservingResult) {
+SILType GradientInst::getGradientSILType(
+    SILModule &module, SILValue original,
+    const SILReverseAutoDiffConfig &config) {
   // If parameter indices are empty, return an invalid type (empty tuple type).
   // An "empty parameter indices" will be produced during verification.
-  if (paramIndices.empty()) {
+  if (config.indices.parameters.none()) {
     auto invalidTy = TupleType::get({}, module.getASTContext());
     return SILType::getPrimitiveObjectType(CanType(invalidTy));
   }
-  SILReverseAutoDiffConfiguration config =
-    { sourceIndex, paramIndices, seedable, preservingResult };
-  auto origFnTy = original->getType().getAs<SILFunctionType>();
+  auto origFnTy = original->getType().castTo<SILFunctionType>();
   auto gradFnTy = origFnTy->getGradientType(config, module);
   return SILType::getPrimitiveObjectType(gradFnTy->getCanonicalType());
 }
 
 GradientInst *
 GradientInst::create(SILModule &M, SILDebugLocation debugLoc,
-                     SILValue original, unsigned sourceIndex,
-                     ArrayRef<unsigned> paramIndices,
-                     bool seedable, bool preservingResult) {
-  unsigned size = sizeof(GradientInst) + paramIndices.size() * sizeof(unsigned);
-  void *buffer = M.allocateInst(size, alignof(GradientInst));
-  return ::new (buffer) GradientInst(M, debugLoc, original, sourceIndex,
-                                     paramIndices, seedable, preservingResult);
-}
-
-ArrayRef<unsigned> GradientInst::getParameterIndices() const {
-  return {
-    const_cast<GradientInst *>(this)->getParameterIndicesData(), NumParamIndices
-  };
+                     SILValue original,
+                     const SILReverseAutoDiffConfig &config) {
+  void *buffer = M.allocateInst(sizeof(GradientInst), alignof(GradientInst));
+  return ::new (buffer) GradientInst(M, debugLoc, original, config);
 }
 
 FunctionRefInst::FunctionRefInst(SILDebugLocation Loc, SILFunction *F)
@@ -2093,7 +2073,6 @@ bool KeyPathPatternComponent::isComputedSettablePropertyMutating() const {
   case Kind::OptionalChain:
   case Kind::OptionalWrap:
   case Kind::OptionalForce:
-  case Kind::External:
     llvm_unreachable("not a settable computed property");
   case Kind::SettableProperty: {
     auto setter = getComputedPropertySetter();
@@ -2111,7 +2090,6 @@ forEachRefcountableReference(const KeyPathPatternComponent &component,
   case KeyPathPatternComponent::Kind::OptionalChain:
   case KeyPathPatternComponent::Kind::OptionalWrap:
   case KeyPathPatternComponent::Kind::OptionalForce:
-  case KeyPathPatternComponent::Kind::External:
     return;
   case KeyPathPatternComponent::Kind::SettableProperty:
     forFunction(component.getComputedPropertySetter());
@@ -2170,7 +2148,6 @@ KeyPathPattern::get(SILModule &M, CanGenericSignature signature,
     case KeyPathPatternComponent::Kind::OptionalForce:
       break;
     
-    case KeyPathPatternComponent::Kind::External:
     case KeyPathPatternComponent::Kind::GettableProperty:
     case KeyPathPatternComponent::Kind::SettableProperty:
       for (auto &index : component.getSubscriptIndices()) {
@@ -2248,14 +2225,7 @@ void KeyPathPattern::Profile(llvm::FoldingSetNodeID &ID,
     case KeyPathPatternComponent::Kind::StoredProperty:
       ID.AddPointer(component.getStoredPropertyDecl());
       break;
-      
-    case KeyPathPatternComponent::Kind::External: {
-      ID.AddPointer(component.getExternalDecl());
-      component.getExternalSubstitutions().profile(ID);
-      profileIndices(component.getSubscriptIndices());
-      break;
-    }
-      
+            
     case KeyPathPatternComponent::Kind::SettableProperty:
       ID.AddPointer(component.getComputedPropertySetter());
       LLVM_FALLTHROUGH;
@@ -2285,6 +2255,8 @@ void KeyPathPattern::Profile(llvm::FoldingSetNodeID &ID,
       }
       }
       profileIndices(component.getSubscriptIndices());
+      ID.AddPointer(component.getExternalDecl());
+      component.getExternalSubstitutions().profile(ID);
       break;
     }
   }
@@ -2509,7 +2481,12 @@ GraphOperationInst *GraphOperationInst::create(
                                            resultTypes, resultOwnerships);
 }
 
-Optional<SymbolicValue> GraphOperationInst::getAttribute(StringRef name) {
+GraphOperationAttribute GraphOperationInst::getAttribute(unsigned i) const {
+  return getAttributes()[i];
+}
+
+
+Optional<SymbolicValue> GraphOperationInst::getAttributeNamed(StringRef name) {
   for (auto attr : getAttributes())
     if (attr.name.is(name))
       return attr.value;

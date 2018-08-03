@@ -27,11 +27,11 @@ public func checkIterator<
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
-  sameValue: (Expected.Iterator.Element, Expected.Iterator.Element) -> Bool
-) where I.Element == Expected.Iterator.Element {
+  sameValue: (Expected.Element, Expected.Element) -> Bool
+) where I.Element == Expected.Element {
   // Copying a `IteratorProtocol` is allowed.
   var mutableGen = iterator
-  var actual: [Expected.Iterator.Element] = []
+  var actual: [Expected.Element] = []
   while let e = mutableGen.next() {
     actual.append(e)
   }
@@ -57,7 +57,7 @@ public func checkIterator<
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all
-) where I.Element == Expected.Iterator.Element, Expected.Iterator.Element : Equatable {
+) where I.Element == Expected.Element, Expected.Element : Equatable {
   checkIterator(
     expected, iterator, message(),
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), showFrame: false,
@@ -75,8 +75,8 @@ public func checkSequence<
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
-  sameValue: (Expected.Iterator.Element, Expected.Iterator.Element) -> Bool
-) where S.Iterator.Element == Expected.Iterator.Element {
+  sameValue: (Expected.Element, Expected.Element) -> Bool
+) where S.Element == Expected.Element {
   let expectedCount: Int = numericCast(expected.count)
   checkIterator(
     expected, sequence.makeIterator(), message(),
@@ -93,7 +93,7 @@ public func checkSequence<
   _ = sequence._preprocessingPass { () -> Void in
     var count = 0
     for _ in sequence { count += 1 }
-    let ptr = UnsafeMutablePointer<S.Iterator.Element>.allocate(capacity: count)
+    let ptr = UnsafeMutablePointer<S.Element>.allocate(capacity: count)
     let buf = UnsafeMutableBufferPointer(start: ptr, count: count)
     var (remainders,writtenUpTo) = sequence._copyContents(initializing: buf)
     expectTrue(remainders.next() == nil,
@@ -126,8 +126,8 @@ public func checkSequence<
   file: String = #file, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all
 ) where
-  S.Iterator.Element == Expected.Iterator.Element,
-  S.Iterator.Element : Equatable {
+  S.Element == Expected.Element,
+  S.Element : Equatable {
 
   checkSequence(
     expected, sequence, message(),
@@ -195,7 +195,7 @@ public func checkSequence<
   file: String = #file, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (Element, Element) -> Bool
-) where S.Iterator.Element == Element {
+) where S.Element == Element {
   let expectedCount: Int = numericCast(expected.count)
   checkIterator(
     expected, sequence.makeIterator(), message(),
@@ -212,7 +212,7 @@ public func checkSequence<
   _ = sequence._preprocessingPass { () -> Void in
     var count = 0
     for _ in sequence { count += 1 }
-    let ptr = UnsafeMutablePointer<S.Iterator.Element>.allocate(capacity: count)
+    let ptr = UnsafeMutablePointer<S.Element>.allocate(capacity: count)
     let buf = UnsafeMutableBufferPointer(start: ptr, count: count)
     var (remainders,writtenUpTo) = sequence._copyContents(initializing: buf)
     expectTrue(remainders.next() == nil,
@@ -245,8 +245,8 @@ public func checkSequence<
   file: String = #file, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all
 ) where
-  S.Iterator.Element == Element,
-  S.Iterator.Element : Equatable {
+  S.Element == Element,
+  S.Element : Equatable {
 
   checkSequence(
     expected, sequence, message(),

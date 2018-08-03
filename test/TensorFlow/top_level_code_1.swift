@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -verify %s
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-promote-global-variables -Xllvm -tf-dump-intermediates -O -emit-sil -verify %s
+// RUN: %target-swift-frontend -Xllvm -tf-promote-global-variables -Xllvm -tf-dump-intermediates -O -emit-sil -verify %s | %FileCheck %s
 import TensorFlow
 
 // This test is intended to verify that all of the operations end up in-graph:
@@ -36,14 +36,14 @@ x -= one
 let y = Tensor<Float>(2.0)
 let y2 = y*y*y*y
 
-// CHECK:   [[ONE:%.*]] = builtin "__tfop_tfc.scalarToTensor
-// CHECK:   [[ADD1:%.*]] = builtin "__tfop_Add,$in,$in,T"([[ONE]] : $TensorHandle<Float>, [[ONE]] : $TensorHandle<Float>, {{.*}} : $@thick Float.Type)
-// CHECK:   [[ADD2:%.*]] = builtin "__tfop_Add,$in,$in,T"([[ADD1]] : $TensorHandle<Float>, [[ONE]] : $TensorHandle<Float>, {{.*}} : $@thick Float.Type)
-// CHECK:   builtin "__tfop_Sub,$in,$in,T"([[ONE]] : $TensorHandle<Float>, [[ONE]] : $TensorHandle<Float>, {{.*}} : $@thick Float.Type) : $TensorHandle<Float>
-// CHECK:   [[TWO:%.*]] = builtin "__tfop_tfc.scalarToTensor
-// CHECK:   [[MUL1:%.*]] = builtin "__tfop_Mul,$in,$in,T"([[TWO]] : $TensorHandle<Float>, [[TWO]] : $TensorHandle<Float>, {{.*}} : $@thick Float.Type)
-// CHECK:   [[MUL2:%.*]] = builtin "__tfop_Mul,$in,$in,T"([[MUL1]] : $TensorHandle<Float>, [[TWO]] : $TensorHandle<Float>, {{.*}} : $@thick Float.Type)
-// CHECK:   [[MUL3:%.*]] = builtin "__tfop_Mul,$in,$in,T"([[MUL2]] : $TensorHandle<Float>, [[TWO]] : $TensorHandle<Float>, {{.*}} : $@thick Float.Type)
+// CHECK:   [[ONE:%.*]] = graph_op "Const"(){{.*}} /* 1 */
+// CHECK:   [[ADD1:%.*]] = graph_op "Add,i,i"([[ONE]] : $TensorHandle<Float>, [[ONE]] : $TensorHandle<Float>)
+// CHECK:   [[ADD2:%.*]] = graph_op "Add,i,i"([[ADD1]] : $TensorHandle<Float>, [[ONE]] : $TensorHandle<Float>)
+// CHECK:   graph_op "Sub,i,i"([[ONE]] : $TensorHandle<Float>, [[ONE]] : $TensorHandle<Float>)
+// CHECK:   [[TWO:%.*]] = graph_op "Const"(){{.*}} /* 2 */
+// CHECK:   [[MUL1:%.*]] = graph_op "Mul,i,i"([[TWO]] : $TensorHandle<Float>, [[TWO]] : $TensorHandle<Float>)
+// CHECK:   [[MUL2:%.*]] = graph_op "Mul,i,i"([[MUL1]] : $TensorHandle<Float>, [[TWO]] : $TensorHandle<Float>)
+// CHECK:   [[MUL3:%.*]] = graph_op "Mul,i,i"([[MUL2]] : $TensorHandle<Float>, [[TWO]] : $TensorHandle<Float>)
 
 // b/76155918
 let a: Tensor<Float> = [1, 2, 3]

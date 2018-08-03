@@ -90,6 +90,27 @@ static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl) {
   }
 #endif
 
+  if (enumDecl->isObjC()) {
+    // Special case: ObjC enums are represented by their raw value, so just use
+    // a bitcast.
+
+    // return unsafeBitCast(self, to: RawType.self)
+    DeclName name(C, C.getIdentifier("unsafeBitCast"), {Identifier(), C.Id_to});
+    auto functionRef = new (C) UnresolvedDeclRefExpr(name,
+                                                     DeclRefKind::Ordinary,
+                                                     DeclNameLoc());
+    auto selfRef = DerivedConformance::createSelfDeclRef(toRawDecl);
+    auto bareTypeExpr = TypeExpr::createImplicit(rawTy, C);
+    auto typeExpr = new (C) DotSelfExpr(bareTypeExpr, SourceLoc(), SourceLoc());
+    auto call = CallExpr::createImplicit(C, functionRef, {selfRef, typeExpr},
+                                         {Identifier(), C.Id_to});
+    auto returnStmt = new (C) ReturnStmt(SourceLoc(), call);
+    auto body = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt),
+                                  SourceLoc());
+    toRawDecl->setBody(body);
+    return;
+  }
+
   Type enumType = parentDC->getDeclaredTypeInContext();
 
   SmallVector<ASTNode, 4> cases;
@@ -217,10 +238,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
       // In case of a string enum we are calling the _findStringSwitchCase
       // function from the library and switching on the returned Int value.
       stringExprs.push_back(litExpr);
-      llvm::SmallString<16> IdxAsStringBuffer;
-      APInt(64, Idx).toStringUnsigned(IdxAsStringBuffer);
-      StringRef IndexAsString(C.AllocateCopy(IdxAsStringBuffer.str()));
-      litExpr = new (C) IntegerLiteralExpr(IndexAsString, SourceLoc());
+      litExpr = IntegerLiteralExpr::createFromUnsigned(C, Idx); 
     }
     auto litPat = new (C) ExprPattern(litExpr, /*isResolved*/ true,
                                       nullptr, nullptr);
@@ -259,7 +277,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
                                    /*HasBoundDecls=*/false, SourceLoc(),
                                    SourceLoc(), dfltBody));
 
-  auto rawDecl = initDecl->getParameterList(1)->get(0);
+  auto rawDecl = initDecl->getParameters()->get(0);
   auto rawRef = new (C) DeclRefExpr(rawDecl, DeclNameLoc(), /*implicit*/true);
   Expr *switchArg = rawRef;
   if (isStringEnum) {
@@ -355,7 +373,7 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
   initDecl->setInterfaceType(allocIfaceType);
   initDecl->setInitializerInterfaceType(initIfaceType);
   initDecl->copyFormalAccessFrom(enumDecl, /*sourceIsParentContext*/true);
-  initDecl->setValidationStarted();
+  initDecl->setValidationToChecked();
 
   // If the containing module is not resilient, make sure clients can construct
   // an instance without function call overhead.

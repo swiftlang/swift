@@ -136,7 +136,9 @@ public struct UnsafeMutableAudioBufferListPointer {
 extension UnsafeMutableAudioBufferListPointer
   : MutableCollection, RandomAccessCollection {
 
+  public typealias Element = AudioBuffer
   public typealias Index = Int
+  public typealias Indices = Range<Int>
 
   /// Always zero, which is the index of the first `AudioBuffer`.
   public var startIndex: Int {
@@ -149,7 +151,7 @@ extension UnsafeMutableAudioBufferListPointer
   }
 
   /// Access an indexed `AudioBuffer` (`mBuffers[i]`).
-  public subscript(index: Int) -> AudioBuffer {
+  public subscript(index: Index) -> Element {
     get {
       _precondition(index >= 0 && index < self.count,
         "subscript index out of range")
@@ -161,17 +163,5 @@ extension UnsafeMutableAudioBufferListPointer
       (_audioBuffersPointer + index).pointee = newValue
     }
   }
-
-  public subscript(bounds: Range<Int>)
-    -> Slice<UnsafeMutableAudioBufferListPointer> {
-    get {
-      return Slice(base: self, bounds: bounds)
-    }
-    set {
-      _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
-    }
-  }
-
-  public typealias Indices = Range<Int>
 }
 

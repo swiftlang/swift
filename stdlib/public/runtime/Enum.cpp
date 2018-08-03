@@ -146,9 +146,8 @@ unsigned swift::swift_getEnumCaseSinglePayload(const OpaqueValue *value,
   auto *payloadWitnesses = payload->getValueWitnesses();
   auto size = payloadWitnesses->getSize();
   auto numExtraInhabitants = payloadWitnesses->getNumExtraInhabitants();
-  auto getExtraInhabitantIndex =
-      (static_cast<const ExtraInhabitantsValueWitnessTable *>(payloadWitnesses)
-           ->getExtraInhabitantIndex);
+  auto EIVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(payloadWitnesses);
+  auto getExtraInhabitantIndex = EIVWT ? EIVWT->getExtraInhabitantIndex : nullptr;
 
   return getEnumTagSinglePayloadImpl(value, emptyCases, payload, size,
                                      numExtraInhabitants,
@@ -163,9 +162,8 @@ void swift::swift_storeEnumTagSinglePayload(OpaqueValue *value,
   auto *payloadWitnesses = payload->getValueWitnesses();
   auto size = payloadWitnesses->getSize();
   auto numExtraInhabitants = payloadWitnesses->getNumExtraInhabitants();
-  auto storeExtraInhabitant =
-      (static_cast<const ExtraInhabitantsValueWitnessTable *>(payloadWitnesses)
-           ->storeExtraInhabitant);
+  auto EIVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(payloadWitnesses);
+  auto storeExtraInhabitant = EIVWT ? EIVWT->storeExtraInhabitant : nullptr;
 
   storeEnumTagSinglePayloadImpl(value, whichCase, emptyCases, payload, size,
                                 numExtraInhabitants, storeExtraInhabitant);

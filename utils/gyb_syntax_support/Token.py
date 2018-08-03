@@ -125,6 +125,8 @@ SYNTAX_TOKENS = [
           is_keyword=True),
     Token('PoundGradient', 'pound_gradient', text='#gradient',
           is_keyword=True),
+    Token('PoundChainableGradient', 'pound_chainableGradient',
+          text='#chainableGradient', is_keyword=True),
     Token('PoundValueAndGradient', 'pound_valueAndGradient',
           text='#valueAndGradient', is_keyword=True),
     Token('PoundAdjoint', 'pound_adjoint', text='#adjoint',

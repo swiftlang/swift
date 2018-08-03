@@ -171,6 +171,20 @@ func _adjointExp<T : BinaryFloatingPoint>(
 }
 
 @inlinable
+func _adjointCeil<T : BinaryFloatingPoint>(
+  _ x: Tensor<T>, originalValue: Tensor<T>, seed: Tensor<T>
+) -> Tensor<T> {
+  return Tensor(0).broadcast(like: x)
+}
+
+@inlinable
+func _adjointFloor<T : BinaryFloatingPoint>(
+  _ x: Tensor<T>, originalValue: Tensor<T>, seed: Tensor<T>
+) -> Tensor<T> {
+  return Tensor(0).broadcast(like: x)
+}
+
+@inlinable
 func _adjointSqrt<T : BinaryFloatingPoint>(
   _ x: Tensor<T>, originalValue: Tensor<T>, seed: Tensor<T>
 ) -> Tensor<T> {
@@ -267,7 +281,8 @@ extension Tensor where Scalar : BinaryFloatingPoint {
     let dim = Tensor(Tensor<Int32>(shapeTensor[axis]))
     let tmp = (dNorm * inv) + (dVariance * 2 * dMean / dim)
     let dSelf = tmp + (dMean / dim)
-    return (dSelf, dOffset.scalarized(), dScale.scalarized())
+    return (dSelf, _TFGetScalarOrDie(dOffset.handle),  
+            _TFGetScalarOrDie(dScale.handle))
   }
 }
 
@@ -422,5 +437,5 @@ extension Tensor where Scalar : BinaryFloatingPoint {
 func _adjointRelu<T : BinaryFloatingPoint>(
   _ x: Tensor<T>, originalValue: Tensor<T>, seed: Tensor<T>
 ) -> Tensor<T> {
-  return Tensor(x > 0) * seed
+  return Tensor(x.elementsGreater(0)) * seed
 }

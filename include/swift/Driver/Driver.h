@@ -102,7 +102,10 @@ public:
 
   /// Whether or not the output should contain debug info.
   // FIXME: Eventually this should be replaced by dSYM generation.
-  IRGenDebugInfoKind DebugInfoKind = IRGenDebugInfoKind::None;
+  IRGenDebugInfoLevel DebugInfoLevel = IRGenDebugInfoLevel::None;
+
+  /// What kind of debug info to generate.
+  IRGenDebugInfoFormat DebugInfoFormat = IRGenDebugInfoFormat::None;
 
   /// Whether or not the driver should generate a module.
   bool ShouldGenerateModule = false;
@@ -371,8 +374,8 @@ private:
                                    CommandOutput *Output) const;
 
   void chooseTBDPath(Compilation &C, const OutputInfo &OI,
-                     StringRef workingDirectory, llvm::SmallString<128> &Buf,
-                     CommandOutput *Output) const;
+                     const TypeToPathMap *OutputMap, StringRef workingDirectory,
+                     llvm::SmallString<128> &Buf, CommandOutput *Output) const;
 
 public:
   /// Handle any arguments which should be treated before building actions or

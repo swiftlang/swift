@@ -129,12 +129,12 @@ extension NSString : A, ZZZ {}
 // CHECK-LABEL: @interface PrivateProtoAdopter{{$}}
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
-@objc class PrivateProtoAdopter : PrivateProto {}
+@objc @objcMembers class PrivateProtoAdopter : PrivateProto {}
 
 // CHECK-LABEL: @interface PrivateProtoAdopter2 <A>
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
-@objc class PrivateProtoAdopter2 : PrivateProto, A {}
+@objc @objcMembers class PrivateProtoAdopter2 : PrivateProto, A {}
 
 // CHECK-LABEL: @protocol Properties
 // CHECK-NEXT: @property (nonatomic, readonly) NSInteger a;
@@ -165,7 +165,7 @@ extension NSString : A, ZZZ {}
   @objc func references(someClassAndZZZ: ReferencesSomeClass2 & ZZZ)
 }
 
-@objc class ReferencesSomeClass2 {}
+@objc @objcMembers class ReferencesSomeClass2 {}
 
 
 // CHECK-LABEL: @protocol ReversedOrder2{{$}}

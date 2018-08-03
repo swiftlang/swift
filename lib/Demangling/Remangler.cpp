@@ -20,6 +20,7 @@
 #include "swift/Demangling/Punycode.h"
 #include "swift/Demangling/ManglingUtils.h"
 #include "swift/Demangling/ManglingMacros.h"
+#include "swift/AST/Ownership.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -249,6 +250,9 @@ class Remangler {
 
   void manglePureProtocol(Node *Proto) {
     Proto = skipType(Proto);
+    if (mangleStandardSubstitution(Proto))
+      return;
+    
     mangleChildNodes(Proto);
   }
 
@@ -354,7 +358,8 @@ void Remangler::mangleIdentifierImpl(Node *node, bool isOperator) {
 
 bool Remangler::mangleStandardSubstitution(Node *node) {
   if (node->getKind() != Node::Kind::Structure
-      && node->getKind() != Node::Kind::Enum)
+      && node->getKind() != Node::Kind::Enum
+      && node->getKind() != Node::Kind::Protocol)
     return false;
 
   Node *context = node->getFirstChild();
@@ -470,6 +475,7 @@ void Remangler::mangleGenericArgs(Node *node, char &Separator) {
     case Node::Kind::Structure:
     case Node::Kind::Enum:
     case Node::Kind::Class:
+    case Node::Kind::TypeAlias:
       mangleGenericArgs(node->getChild(0), Separator);
       Buffer << Separator;
       Separator = '_';
@@ -479,6 +485,7 @@ void Remangler::mangleGenericArgs(Node *node, char &Separator) {
     case Node::Kind::BoundGenericStructure:
     case Node::Kind::BoundGenericEnum:
     case Node::Kind::BoundGenericClass:
+    case Node::Kind::BoundGenericProtocol:
     case Node::Kind::BoundGenericTypeAlias: {
       NodePointer unboundType = node->getChild(0);
       assert(unboundType->getKind() == Node::Kind::Type);
@@ -588,6 +595,10 @@ void Remangler::mangleBoundGenericStructure(Node *node) {
 }
 
 void Remangler::mangleBoundGenericOtherNominalType(Node *node) {
+  mangleAnyNominalType(node);
+}
+
+void Remangler::mangleBoundGenericProtocol(Node *node) {
   mangleAnyNominalType(node);
 }
 
@@ -1598,12 +1609,6 @@ void Remangler::mangleProtocolWitnessTableAccessor(Node *node) {
   Buffer << "Wa";
 }
 
-void Remangler::mangleQualifiedArchetype(Node *node) {
-  mangleChildNode(node, 1);
-  Buffer << "Qq";
-  mangleNumber(node->getFirstChild());
-}
-
 void Remangler::mangleReabstractionThunk(Node *node) {
   if (node->getNumChildren() == 3) {
     mangleChildNode(node, 1); // type 1
@@ -1714,7 +1719,7 @@ void Remangler::mangleType(Node *node) {
 }
 
 void Remangler::mangleTypeAlias(Node *node) {
-  mangleAnyGenericType(node, "a");
+  mangleAnyNominalType(node);
 }
 
 void Remangler::mangleTypeList(Node *node) {
@@ -1775,16 +1780,6 @@ void Remangler::mangleUncurriedFunctionType(Node *node) {
   Buffer << 'c';
 }
 
-void Remangler::mangleUnmanaged(Node *node) {
-  mangleSingleChildNode(node);
-  Buffer << "Xu";
-}
-
-void Remangler::mangleUnowned(Node *node) {
-  mangleSingleChildNode(node);
-  Buffer << "Xo";
-}
-
 void Remangler::mangleUnsafeAddressor(Node *node) {
   mangleAbstractStorage(node->getFirstChild(), "lu");
 }
@@ -1822,10 +1817,12 @@ void Remangler::mangleVTableThunk(Node *node) {
   Buffer << "TV";
 }
 
-void Remangler::mangleWeak(Node *node) {
-  mangleSingleChildNode(node);
-  Buffer << "Xw";
-}
+#define REF_STORAGE(Name, ...) \
+  void Remangler::mangle##Name(Node *node) { \
+    mangleSingleChildNode(node); \
+    Buffer << manglingOf(ReferenceOwnership::Name); \
+  }
+#include "swift/AST/ReferenceStorage.def"
 
 void Remangler::mangleWillSet(Node *node) {
   mangleAbstractStorage(node->getFirstChild(), "w");
@@ -2054,12 +2051,15 @@ bool Demangle::isSpecialized(Node *node) {
     case Node::Kind::BoundGenericClass:
     case Node::Kind::BoundGenericOtherNominalType:
     case Node::Kind::BoundGenericTypeAlias:
+    case Node::Kind::BoundGenericProtocol:
       return true;
 
     case Node::Kind::Structure:
     case Node::Kind::Enum:
     case Node::Kind::Class:
+    case Node::Kind::TypeAlias:
     case Node::Kind::OtherNominalType:
+    case Node::Kind::Protocol:
       return isSpecialized(node->getChild(0));
 
     case Node::Kind::Extension:
@@ -2075,6 +2075,7 @@ NodePointer Demangle::getUnspecialized(Node *node, NodeFactory &Factory) {
     case Node::Kind::Structure:
     case Node::Kind::Enum:
     case Node::Kind::Class:
+    case Node::Kind::TypeAlias:
     case Node::Kind::OtherNominalType: {
       NodePointer result = Factory.createNode(node->getKind());
       NodePointer parentOrModule = node->getChild(0);
@@ -2089,8 +2090,10 @@ NodePointer Demangle::getUnspecialized(Node *node, NodeFactory &Factory) {
     case Node::Kind::BoundGenericStructure:
     case Node::Kind::BoundGenericEnum:
     case Node::Kind::BoundGenericClass:
+    case Node::Kind::BoundGenericProtocol:
     case Node::Kind::BoundGenericOtherNominalType:
-    case Node::Kind::BoundGenericTypeAlias: {
+    case Node::Kind::BoundGenericTypeAlias:
+    {
       NodePointer unboundType = node->getChild(0);
       assert(unboundType->getKind() == Node::Kind::Type);
       NodePointer nominalType = unboundType->getChild(0);

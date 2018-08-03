@@ -143,6 +143,11 @@ IncrementalReuseLog("incremental-reuse-log",
                                    "describes all the nodes reused during "
                                    "incremental parsing."));
 
+static llvm::cl::opt<bool>
+OmitNodeIds("omit-node-ids",
+            llvm::cl::desc("If specified, the serialized syntax tree will not "
+                           "include the IDs of the serialized nodes."));
+
 static llvm::cl::opt<std::string>
 OutputFilename("output-filename",
                llvm::cl::desc("Path to the output file"));
@@ -192,14 +197,13 @@ namespace {
 // A utility class to wrap a source range consisting of a byte start and end
 // offset
 struct ByteBasedSourceRange {
-  unsigned Start;
-  unsigned End;
+  uintptr_t Start;
+  uintptr_t End;
 
-  ByteBasedSourceRange(unsigned Start, unsigned End) : Start(Start), End(End) {
+  ByteBasedSourceRange(uintptr_t Start, uintptr_t End)
+      : Start(Start), End(End) {
     assert(Start <= End);
   }
-  ByteBasedSourceRange(std::pair<unsigned, unsigned> Pair)
-      : ByteBasedSourceRange(Pair.first, Pair.second) {}
   ByteBasedSourceRange() : ByteBasedSourceRange(0, 0) {}
 
   ByteBasedSourceRange intersect(const ByteBasedSourceRange &Other) {
@@ -228,10 +232,9 @@ struct ByteBasedSourceRangeSet {
 
   ByteBasedSourceRangeSet() {}
 
-  ByteBasedSourceRangeSet(
-      std::vector<std::pair<unsigned, unsigned>> PairVector) {
-    for (auto Pair : PairVector) {
-      addRange(Pair);
+  ByteBasedSourceRangeSet(std::vector<SyntaxReuseRegion> Ranges) {
+    for (auto Range : Ranges) {
+      addRange({Range.Start.getOffset(), Range.End.getOffset()});
     }
   }
 
@@ -411,7 +414,8 @@ bool useColoredOutput() {
 
 void printVisualNodeReuseInformation(SourceManager &SourceMgr,
                                      unsigned BufferID,
-                                     SyntaxParsingCache *Cache) {
+                                     SyntaxParsingCache *Cache,
+                                     const SourceFileSyntax &NewSyntaxTree) {
   unsigned CurrentOffset = 0;
   auto SourceText = SourceMgr.getEntireTextForBuffer(BufferID);
   if (useColoredOutput()) {
@@ -437,13 +441,14 @@ void printVisualNodeReuseInformation(SourceManager &SourceMgr,
     }
   };
 
-  for (auto ReuseRange : Cache->getReusedRanges()) {
+  for (auto ReuseRange : Cache->getReusedRegions(NewSyntaxTree)) {
+    auto StartOffset = ReuseRange.Start.getOffset();
+    auto EndOffset = ReuseRange.End.getOffset();
     // Print region that was not reused
-    PrintReparsedRegion(SourceText, CurrentOffset, ReuseRange.first);
+    PrintReparsedRegion(SourceText, CurrentOffset, StartOffset);
 
-    llvm::outs() << SourceText.substr(ReuseRange.first,
-                                      ReuseRange.second - ReuseRange.first);
-    CurrentOffset = ReuseRange.second;
+    llvm::outs() << SourceText.substr(StartOffset, EndOffset - StartOffset);
+    CurrentOffset = EndOffset;
   }
   PrintReparsedRegion(SourceText, CurrentOffset, SourceText.size());
   if (useColoredOutput())
@@ -452,21 +457,16 @@ void printVisualNodeReuseInformation(SourceManager &SourceMgr,
   llvm::outs() << '\n';
 }
 
-void saveReuseLog(SourceManager &SourceMgr, unsigned BufferID,
-                  SyntaxParsingCache *Cache) {
+void saveReuseLog(SyntaxParsingCache *Cache,
+                  const SourceFileSyntax &NewSyntaxTree) {
   std::error_code ErrorCode;
   llvm::raw_fd_ostream ReuseLog(options::IncrementalReuseLog, ErrorCode,
                                 llvm::sys::fs::OpenFlags::F_RW);
   assert(!ErrorCode && "Unable to open incremental usage log");
 
-  for (auto ReuseRange : Cache->getReusedRanges()) {
-    SourceLoc Start = SourceMgr.getLocForOffset(BufferID, ReuseRange.first);
-    SourceLoc End = SourceMgr.getLocForOffset(BufferID, ReuseRange.second);
-
-    ReuseLog << "Reused ";
-    Start.printLineAndColumn(ReuseLog, SourceMgr, BufferID);
-    ReuseLog << " to ";
-    End.printLineAndColumn(ReuseLog, SourceMgr, BufferID);
+  for (auto ReuseRange : Cache->getReusedRegions(NewSyntaxTree)) {
+    ReuseLog << "Reused " << ReuseRange.Start << " to " << ReuseRange.End
+             << '\n';
     ReuseLog << '\n';
   }
 }
@@ -477,7 +477,7 @@ bool verifyReusedRegions(ByteBasedSourceRangeSet ExpectedReparseRegions,
                          SourceFile *SF) {
   // We always expect the EOF token to be reparsed. Don't complain about it.
   auto Eof = SF->getSyntaxRoot().getChild(SourceFileSyntax::Cursor::EOFToken);
-  auto EofNodeStart = Eof->getAbsolutePositionWithLeadingTrivia().getOffset();
+  auto EofNodeStart = Eof->getAbsolutePositionBeforeLeadingTrivia().getOffset();
   if (ExpectedReparseRegions.Ranges.back().End >= EofNodeStart) {
     // If the last expected reparse region already covers part of the eof
     // leading trivia, extended it
@@ -495,7 +495,8 @@ bool verifyReusedRegions(ByteBasedSourceRangeSet ExpectedReparseRegions,
   auto FileLength = SourceMgr.getRangeForBuffer(BufferID).getByteLength();
 
   // Compute the repared regions by inverting the reused regions
-  auto ReusedRanges = ByteBasedSourceRangeSet(SyntaxCache->getReusedRanges());
+  auto ReusedRanges = ByteBasedSourceRangeSet(
+      SyntaxCache->getReusedRegions(SF->getSyntaxRoot()));
   auto ReparsedRegions = ReusedRanges.invert(FileLength);
 
   // Same for expected reuse regions
@@ -553,8 +554,6 @@ int parseFile(const char *MainExecutablePath, const StringRef InputFileName,
     }
     SyntaxCache = new SyntaxParsingCache(OldSyntaxTree.getValue());
 
-    SyntaxCache->setRecordReuseInformation();
-
     if (options::OldSourceFilename.empty()) {
       llvm::errs() << "The old syntax file must be provided to translate "
                       "line:column edits to byte offsets";
@@ -609,10 +608,10 @@ int parseFile(const char *MainExecutablePath, const StringRef InputFileName,
   if (SyntaxCache) {
     if (options::PrintVisualReuseInfo) {
       printVisualNodeReuseInformation(Instance.getSourceMgr(), BufferID,
-                                      SyntaxCache);
+                                      SyntaxCache, SF->getSyntaxRoot());
     }
     if (!options::IncrementalReuseLog.empty()) {
-      saveReuseLog(Instance.getSourceMgr(), BufferID, SyntaxCache);
+      saveReuseLog(SyntaxCache, SF->getSyntaxRoot());
     }
     ByteBasedSourceRangeSet ExpectedReparseRegions;
 
@@ -671,8 +670,7 @@ int doDumpRawTokenSyntax(const StringRef InputFile) {
   }
 
   for (auto TokAndPos : Tokens) {
-    TokAndPos.second.printLineAndColumn(llvm::outs());
-    llvm::outs() << "\n";
+    llvm::outs() << TokAndPos.second << "\n";
     TokAndPos.first->dump(llvm::outs());
     llvm::outs() << "\n";
   }
@@ -691,6 +689,17 @@ int doFullParseRoundTrip(const char *MainExecutablePath,
 int doSerializeRawTree(const char *MainExecutablePath,
                        const StringRef InputFile) {
   return parseFile(MainExecutablePath, InputFile, [](SourceFile *SF) -> int {
+    auto SerializeTree = [](llvm::raw_ostream &os, RC<RawSyntax> Root) {
+      swift::json::Output::UserInfoMap JsonUserInfo;
+      if (options::OmitNodeIds) {
+        JsonUserInfo[swift::json::DontSerializeNodeIdsUserInfoKey] =
+            (void *)true;
+      }
+      swift::json::Output out(os, JsonUserInfo);
+      out << *Root;
+      os << "\n";
+    };
+
     auto Root = SF->getSyntaxRoot().getRaw();
 
     if (!options::OutputFilename.empty()) {
@@ -699,13 +708,9 @@ int doSerializeRawTree(const char *MainExecutablePath,
                               llvm::sys::fs::F_None);
       assert(!errorCode && "Couldn't open output file");
 
-      swift::json::Output out(os);
-      out << *Root;
-      os << "\n";
+      SerializeTree(os, Root);
     } else {
-      swift::json::Output out(llvm::outs());
-      out << *Root;
-      llvm::outs() << "\n";
+      SerializeTree(llvm::outs(), Root);
     }
     return EXIT_SUCCESS;
   });

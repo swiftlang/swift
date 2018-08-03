@@ -63,3 +63,7 @@ public func run_PrefixWhile${Name}(_ N: Int) {
   }
 }
 % end
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

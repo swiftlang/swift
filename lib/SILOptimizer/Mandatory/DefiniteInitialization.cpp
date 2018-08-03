@@ -16,6 +16,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Stmt.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
@@ -1239,14 +1240,32 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
     noteUninitializedMembers(Use);
     return;
   }
- 
 
+  // Extract the reason why this escape-use instruction exists and present
+  // diagnostics. While an escape-use instruction generally corresponds to a
+  // capture by a closure, there are the following special cases to consider:
+  //
+  // (a) A MarkFunctionEscapeInst with an operand say %var. This is introduced
+  // by the SILGen phase when %var is the address of a global variable that
+  // escapes because it is used by a closure or a defer statement or a function
+  // definition appearing at the top-level. The specific reason why %var escapes
+  // is recorded in MarkFunctionEscapeInst by making its SIL Location refer to
+  // the AST of the construct that uses the global variable (namely, a closure
+  // or a defer statement or a function definition). So, if %var is
+  // uninitialized at MarkFunctionEscapeInst, extract and report the reason
+  // why the variable escapes in the error message.
+  //
+  // (b) An UncheckedTakeEnumDataAddrInst takes the address of the data of
+  // an optional and is introduced as an intermediate step in optional chaining.
   Diag<StringRef, bool> DiagMessage;
   if (isa<MarkFunctionEscapeInst>(Inst)) {
-    if (Inst->getLoc().isASTNode<AbstractClosureExpr>())
+    if (Inst->getLoc().isASTNode<AbstractClosureExpr>()) {
       DiagMessage = diag::variable_closure_use_uninit;
-    else
+    } else if (Inst->getLoc().isASTNode<DeferStmt>()) {
+      DiagMessage = diag::variable_defer_use_uninit;
+    } else {
       DiagMessage = diag::variable_function_use_uninit;
+    }
   } else if (isa<UncheckedTakeEnumDataAddrInst>(Inst)) {
     DiagMessage = diag::variable_used_before_initialized;
   } else {
@@ -1796,21 +1815,15 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &Use) {
     return;
   }
   
-  if (auto *SW = dyn_cast<StoreWeakInst>(Inst)) {
-    assert(!SW->isInitializationOfDest() &&
-           "should not modify store_weak that already knows it is initialized");
-
-    SW->setIsInitializationOfDest(InitKind);
-    return;
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
+  if (auto *SW = dyn_cast<Store##Name##Inst>(Inst)) { \
+    if (SW->isInitializationOfDest()) \
+           llvm_unreachable("should not modify store_" #name \
+                            " that already knows it is initialized"); \
+    SW->setIsInitializationOfDest(InitKind); \
+    return; \
   }
-
-  if (auto *SU = dyn_cast<StoreUnownedInst>(Inst)) {
-    assert(!SU->isInitializationOfDest() &&
-           "should not modify store_unowned that already knows it is an init");
-
-    SU->setIsInitializationOfDest(InitKind);
-    return;
-  }
+#include "swift/AST/ReferenceStorage.def"
   
   // If this is an assign, rewrite it based on whether it is an initialization
   // or not.
@@ -2507,7 +2520,7 @@ void LifetimeChecker::
 putIntoWorkList(SILBasicBlock *BB, WorkListType &WorkList) {
   LiveOutBlockState &State = getBlockInfo(BB);
   if (!State.isInWorkList && State.containsUndefinedValues()) {
-    DEBUG(llvm::dbgs() << "    add block " << BB->getDebugID()
+    LLVM_DEBUG(llvm::dbgs() << "    add block " << BB->getDebugID()
           << " to worklist\n");
     WorkList.push_back(BB);
     State.isInWorkList = true;
@@ -2516,7 +2529,7 @@ putIntoWorkList(SILBasicBlock *BB, WorkListType &WorkList) {
 
 void LifetimeChecker::
 computePredsLiveOut(SILBasicBlock *BB) {
-  DEBUG(llvm::dbgs() << "  Get liveness for block " << BB->getDebugID() << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "  Get liveness for block " << BB->getDebugID() << "\n");
   
   // Collect blocks for which we have to calculate the out-availability.
   // These are the paths from blocks with known out-availability to the BB.
@@ -2541,7 +2554,7 @@ computePredsLiveOut(SILBasicBlock *BB) {
   do {
     assert(iteration < upperIterationLimit &&
            "Infinite loop in dataflow analysis?");
-    DEBUG(llvm::dbgs() << "    Iteration " << iteration++ << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "    Iteration " << iteration++ << "\n");
     
     changed = false;
     // We collected the blocks in reverse order. Since it is a forward dataflow-
@@ -2554,7 +2567,7 @@ computePredsLiveOut(SILBasicBlock *BB) {
       for (auto Pred : WorkBB->getPredecessorBlocks()) {
         changed |= BBState.mergeFromPred(getBlockInfo(Pred));
       }
-      DEBUG(llvm::dbgs() << "      Block " << WorkBB->getDebugID() << " out: "
+      LLVM_DEBUG(llvm::dbgs() << "      Block " << WorkBB->getDebugID() << " out: "
             << BBState.OutAvailability << "\n");
 
       // Clear the worklist-flag for the next call to computePredsLiveOut().
@@ -2573,7 +2586,7 @@ getOutAvailability(SILBasicBlock *BB, AvailabilitySet &Result) {
     auto &BBInfo = getBlockInfo(Pred);
     Result.mergeIn(BBInfo.OutAvailability);
   }
-  DEBUG(llvm::dbgs() << "    Result: " << Result << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "    Result: " << Result << "\n");
 }
 
 void LifetimeChecker::
@@ -2627,7 +2640,7 @@ LifetimeChecker::getLivenessAtNonTupleInst(swift::SILInstruction *Inst,
 AvailabilitySet LifetimeChecker::getLivenessAtInst(SILInstruction *Inst,
                                                    unsigned FirstElt,
                                                    unsigned NumElts) {
-  DEBUG(llvm::dbgs() << "Get liveness " << FirstElt << ", #" << NumElts
+  LLVM_DEBUG(llvm::dbgs() << "Get liveness " << FirstElt << ", #" << NumElts
                      << " at " << *Inst);
 
   AvailabilitySet Result(TheMemory.NumElements);
@@ -2737,7 +2750,7 @@ int LifetimeChecker::getAnyUninitializedMemberAtInst(SILInstruction *Inst,
 /// result is 'Partial'.
 DIKind LifetimeChecker::
 getSelfInitializedAtInst(SILInstruction *Inst) {
-  DEBUG(llvm::dbgs() << "Get self initialized at " << *Inst);
+  LLVM_DEBUG(llvm::dbgs() << "Get self initialized at " << *Inst);
 
   SILBasicBlock *InstBB = Inst->getParent();
   auto &BlockInfo = getBlockInfo(InstBB);
@@ -2813,7 +2826,7 @@ bool LifetimeChecker::isInitializedAtUse(const DIMemoryUse &Use,
 //===----------------------------------------------------------------------===//
 
 static bool processMemoryObject(MarkUninitializedInst *I) {
-  DEBUG(llvm::dbgs() << "*** Definite Init looking at: " << *I << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "*** Definite Init looking at: " << *I << "\n");
   DIMemoryObjectInfo MemInfo(I);
 
   // Set up the datastructure used to collect the uses of the allocation.
@@ -2831,7 +2844,7 @@ static bool processMemoryObject(MarkUninitializedInst *I) {
 /// properly set and transform the code as required for flow-sensitive
 /// properties.
 static bool checkDefiniteInitialization(SILFunction &Fn) {
-  DEBUG(llvm::dbgs() << "*** Definite Init visiting function: "
+  LLVM_DEBUG(llvm::dbgs() << "*** Definite Init visiting function: "
                      <<  Fn.getName() << "\n");
   bool Changed = false;
 

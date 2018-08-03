@@ -15,7 +15,7 @@
 
 #include "swift/Runtime/Config.h"
 
-SWIFT_CC(swift) LLVM_LIBRARY_VISIBILITY extern "C"
+SWIFT_CC(swift) SWIFT_RUNTIME_LIBRARY_VISIBILITY extern "C"
 const char *
 getSystemVersionPlistProperty(const char *PropertyName) {
   // This function is implemented in Objective-C because Swift does not support

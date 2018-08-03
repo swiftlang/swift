@@ -241,7 +241,7 @@ static bool isCaptured(AllocStackInst *ASI, bool &inSingleBlock) {
         continue;
 
     // Other instructions are assumed to capture the AllocStack.
-    DEBUG(llvm::dbgs() << "*** AllocStack is captured by: " << *II);
+    LLVM_DEBUG(llvm::dbgs() << "*** AllocStack is captured by: " << *II);
     return true;
   }
 
@@ -271,7 +271,7 @@ bool MemoryToRegisters::isWriteOnlyAllocation(AllocStackInst *ASI) {
       continue;
 
     // Can't do anything else with it.
-    DEBUG(llvm::dbgs() << "*** AllocStack has non-write use: " << *II);
+    LLVM_DEBUG(llvm::dbgs() << "*** AllocStack has non-write use: " << *II);
     return false;
   }
 
@@ -370,7 +370,7 @@ static void replaceDestroy(DestroyAddrInst *DAI, SILValue NewValue) {
 
 StoreInst *
 StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
-  DEBUG(llvm::dbgs() << "*** Promoting ASI in block: " << *ASI);
+  LLVM_DEBUG(llvm::dbgs() << "*** Promoting ASI in block: " << *ASI);
 
   // We don't know the value of the alloca until we find the first store.
   SILValue RunningVal = SILValue();
@@ -387,14 +387,14 @@ StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
       if (RunningVal) {
         // If we are loading from the AllocStackInst and we already know the
         // content of the Alloca then use it.
-        DEBUG(llvm::dbgs() << "*** Promoting load: " << *Load);
+        LLVM_DEBUG(llvm::dbgs() << "*** Promoting load: " << *Load);
         
         replaceLoad(Load, RunningVal, ASI);
         NumInstRemoved++;
       } else if (Load->getOperand() == ASI) {
         // If we don't know the content of the AllocStack then the loaded
         // value *is* the new value;
-        DEBUG(llvm::dbgs() << "*** First load: " << *Load);
+        LLVM_DEBUG(llvm::dbgs() << "*** First load: " << *Load);
         RunningVal = Load;
       }
       continue;
@@ -412,7 +412,7 @@ StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
       // If we met a store before this one, delete it.
       if (LastStore) {
         NumInstRemoved++;
-        DEBUG(llvm::dbgs() << "*** Removing redundant store: " << *LastStore);
+        LLVM_DEBUG(llvm::dbgs() << "*** Removing redundant store: " << *LastStore);
         LastStore->eraseFromParent();
       }
       LastStore = SI;
@@ -445,15 +445,15 @@ StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
     }
   }
   if (LastStore) {
-    DEBUG(llvm::dbgs() << "*** Finished promotion. Last store: " << *LastStore);
+    LLVM_DEBUG(llvm::dbgs() << "*** Finished promotion. Last store: " << *LastStore);
   } else {
-    DEBUG(llvm::dbgs() << "*** Finished promotion with no stores.\n");
+    LLVM_DEBUG(llvm::dbgs() << "*** Finished promotion with no stores.\n");
   }
   return LastStore;
 }
 
 void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
-  DEBUG(llvm::dbgs() << "*** Promoting in-block: " << *ASI);
+  LLVM_DEBUG(llvm::dbgs() << "*** Promoting in-block: " << *ASI);
 
   SILBasicBlock *BB = ASI->getParent();
 
@@ -537,7 +537,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
 }
 
 void StackAllocationPromoter::addBlockArguments(BlockSet &PhiBlocks) {
-  DEBUG(llvm::dbgs() << "*** Adding new block arguments.\n");
+  LLVM_DEBUG(llvm::dbgs() << "*** Adding new block arguments.\n");
 
   for (auto *Block : PhiBlocks)
     Block->createPHIArgument(ASI->getElementType(), ValueOwnershipKind::Owned);
@@ -546,7 +546,7 @@ void StackAllocationPromoter::addBlockArguments(BlockSet &PhiBlocks) {
 SILValue
 StackAllocationPromoter::getLiveOutValue(BlockSet &PhiBlocks,
                                          SILBasicBlock *StartBB) {
-  DEBUG(llvm::dbgs() << "*** Searching for a value definition.\n");
+  LLVM_DEBUG(llvm::dbgs() << "*** Searching for a value definition.\n");
   // Walk the Dom tree in search of a defining value:
   for (DomTreeNode *Node = DT->getNode(StartBB); Node; Node = Node->getIDom()) {
     SILBasicBlock *BB = Node->getBlock();
@@ -555,7 +555,7 @@ StackAllocationPromoter::getLiveOutValue(BlockSet &PhiBlocks,
     BlockToInstMap::iterator it = LastStoreInBlock.find(BB);
     if (it != LastStoreInBlock.end())
       if (auto *St = dyn_cast_or_null<StoreInst>(it->second)) {
-        DEBUG(llvm::dbgs() << "*** Found Store def " << *St->getSrc());
+        LLVM_DEBUG(llvm::dbgs() << "*** Found Store def " << *St->getSrc());
         return St->getSrc();
       }
 
@@ -564,14 +564,14 @@ StackAllocationPromoter::getLiveOutValue(BlockSet &PhiBlocks,
       // Return the dummy instruction that represents the new value that we will
       // add to the basic block.
       SILValue Phi = BB->getArgument(BB->getNumArguments() - 1);
-      DEBUG(llvm::dbgs() << "*** Found a dummy Phi def " << *Phi);
+      LLVM_DEBUG(llvm::dbgs() << "*** Found a dummy Phi def " << *Phi);
       return Phi;
     }
 
     // Move to the next dominating block.
-    DEBUG(llvm::dbgs() << "*** Walking up the iDOM.\n");
+    LLVM_DEBUG(llvm::dbgs() << "*** Walking up the iDOM.\n");
   }
-  DEBUG(llvm::dbgs() << "*** Could not find a Def. Using Undef.\n");
+  LLVM_DEBUG(llvm::dbgs() << "*** Could not find a Def. Using Undef.\n");
   return SILUndef::get(ASI->getElementType(), ASI->getModule());
 }
 
@@ -583,7 +583,7 @@ StackAllocationPromoter::getLiveInValue(BlockSet &PhiBlocks,
   // in the first block, but stores first in all other stores in the idom
   // chain.
   if (PhiBlocks.count(BB)) {
-    DEBUG(llvm::dbgs() << "*** Found a local Phi definition.\n");
+    LLVM_DEBUG(llvm::dbgs() << "*** Found a local Phi definition.\n");
     return BB->getArgument(BB->getNumArguments() - 1);
   }
 
@@ -603,11 +603,11 @@ void StackAllocationPromoter::fixPhiPredBlock(BlockSet &PhiBlocks,
                                               SILBasicBlock *Dest,
                                               SILBasicBlock *Pred) {
   TermInst *TI = Pred->getTerminator();
-  DEBUG(llvm::dbgs() << "*** Fixing the terminator " << TI << ".\n");
+  LLVM_DEBUG(llvm::dbgs() << "*** Fixing the terminator " << TI << ".\n");
 
   SILValue Def = getLiveOutValue(PhiBlocks, Pred);
 
-  DEBUG(llvm::dbgs() << "*** Found the definition: " << *Def);
+  LLVM_DEBUG(llvm::dbgs() << "*** Found the definition: " << *Def);
 
   addArgumentToBranch(Def, Dest, TI);
   TI->eraseFromParent();
@@ -632,7 +632,7 @@ void StackAllocationPromoter::fixBranchesAndUses(BlockSet &PhiBlocks) {
       SILBasicBlock *BB = LI->getParent();
       Def = getLiveInValue(PhiBlocks, BB);
 
-      DEBUG(llvm::dbgs() << "*** Replacing " << *LI << " with Def " << *Def);
+      LLVM_DEBUG(llvm::dbgs() << "*** Replacing " << *LI << " with Def " << *Def);
 
       // Replace the load with the definition that we found.
       replaceLoad(LI, Def, ASI);
@@ -682,7 +682,7 @@ void StackAllocationPromoter::fixBranchesAndUses(BlockSet &PhiBlocks) {
 }
 
 void StackAllocationPromoter::pruneAllocStackUsage() {
-  DEBUG(llvm::dbgs() << "*** Pruning : " << *ASI);
+  LLVM_DEBUG(llvm::dbgs() << "*** Pruning : " << *ASI);
   BlockSet Blocks;
 
   // Insert all of the blocks that ASI is live in.
@@ -697,7 +697,7 @@ void StackAllocationPromoter::pruneAllocStackUsage() {
     LastStoreInBlock[Block] = SI;
   }
 
-  DEBUG(llvm::dbgs() << "*** Finished pruning : " << *ASI);
+  LLVM_DEBUG(llvm::dbgs() << "*** Finished pruning : " << *ASI);
 }
 
 /// Compute the dominator tree levels for DT.
@@ -719,7 +719,7 @@ static void computeDomTreeLevels(DominanceInfo *DT,
 }
 
 void StackAllocationPromoter::promoteAllocationToPhi() {
-  DEBUG(llvm::dbgs() << "*** Placing Phis for : " << *ASI);
+  LLVM_DEBUG(llvm::dbgs() << "*** Placing Phis for : " << *ASI);
 
   // A list of blocks that will require new Phi values.
   BlockSet PhiBlocks;
@@ -740,7 +740,7 @@ void StackAllocationPromoter::promoteAllocationToPhi() {
     }
   }
 
-  DEBUG(llvm::dbgs() << "*** Found: " << PQ.size() << " Defs\n");
+  LLVM_DEBUG(llvm::dbgs() << "*** Found: " << PQ.size() << " Defs\n");
 
   // A list of nodes for which we already calculated the dominator frontier.
   llvm::SmallPtrSet<DomTreeNode *, 32> Visited;
@@ -806,7 +806,7 @@ void StackAllocationPromoter::promoteAllocationToPhi() {
     }
   }
 
-  DEBUG(llvm::dbgs() << "*** Found: " << PhiBlocks.size() << " new PHIs\n");
+  LLVM_DEBUG(llvm::dbgs() << "*** Found: " << PhiBlocks.size() << " new PHIs\n");
   NumPhiPlaced += PhiBlocks.size();
 
   // At this point we calculated the locations of all of the new Phi values.
@@ -819,7 +819,7 @@ void StackAllocationPromoter::promoteAllocationToPhi() {
   // Hook up the Phi nodes, loads, and debug_value_addr with incoming values.
   fixBranchesAndUses(PhiBlocks);
 
-  DEBUG(llvm::dbgs() << "*** Finished placing Phis ***\n");
+  LLVM_DEBUG(llvm::dbgs() << "*** Finished placing Phis ***\n");
 }
 
 void StackAllocationPromoter::run() {
@@ -838,7 +838,7 @@ void StackAllocationPromoter::run() {
 /// should check to see if the ASI is dead after this and remove it if so.
 bool MemoryToRegisters::promoteSingleAllocation(AllocStackInst *alloc,
                                                 DomTreeLevelMap &DomTreeLevels){
-  DEBUG(llvm::dbgs() << "*** Memory to register looking at: " << *alloc);
+  LLVM_DEBUG(llvm::dbgs() << "*** Memory to register looking at: " << *alloc);
   NumAllocStackFound++;
 
   // Don't handle captured AllocStacks.
@@ -852,7 +852,7 @@ bool MemoryToRegisters::promoteSingleAllocation(AllocStackInst *alloc,
   if (isWriteOnlyAllocation(alloc)) {
     eraseUsesOfInstruction(alloc);
 
-    DEBUG(llvm::dbgs() << "*** Deleting store-only AllocStack: " << *alloc);
+    LLVM_DEBUG(llvm::dbgs() << "*** Deleting store-only AllocStack: " << *alloc);
     return true;
   }
 
@@ -861,7 +861,7 @@ bool MemoryToRegisters::promoteSingleAllocation(AllocStackInst *alloc,
   if (inSingleBlock) {
     removeSingleBlockAllocation(alloc);
 
-    DEBUG(llvm::dbgs() << "*** Deleting single block AllocStackInst: "
+    LLVM_DEBUG(llvm::dbgs() << "*** Deleting single block AllocStackInst: "
                        << *alloc);
     if (!alloc->use_empty()) {
       // Handle a corner case where the ASI still has uses:
@@ -874,7 +874,7 @@ bool MemoryToRegisters::promoteSingleAllocation(AllocStackInst *alloc,
     return true;
   }
 
-  DEBUG(llvm::dbgs() << "*** Need to insert BB arguments for " << *alloc);
+  LLVM_DEBUG(llvm::dbgs() << "*** Need to insert BB arguments for " << *alloc);
 
   // Promote this allocation.
   StackAllocationPromoter(alloc, DT, DomTreeLevels, B).run();
@@ -955,7 +955,7 @@ class SILMem2Reg : public SILFunctionTransform {
 
   void run() override {
     SILFunction *F = getFunction();
-    DEBUG(llvm::dbgs() << "** Mem2Reg on function: " << F->getName() <<" **\n");
+    LLVM_DEBUG(llvm::dbgs() << "** Mem2Reg on function: " << F->getName() <<" **\n");
 
     DominanceAnalysis* DA = PM->getAnalysis<DominanceAnalysis>();
 

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -117,7 +117,7 @@ ERROR(could_not_use_type_member_on_instance,none,
       "static member %1 cannot be used on instance of type %0",
       (Type, DeclName))
 ERROR(could_not_use_enum_element_on_instance,none,
-      "enum element %0 cannot be referenced as an instance member",
+      "enum case %0 cannot be used as an instance member",
       (DeclName))
 ERROR(could_not_use_type_member_on_protocol_metatype,none,
       "static member %1 cannot be used on protocol metatype %0",
@@ -227,6 +227,12 @@ ERROR(cannot_subscript_nil_literal,none,
 ERROR(cannot_pass_rvalue_inout_subelement,none,
       "cannot pass immutable value as inout argument: %0",
       (StringRef))
+ERROR(cannot_pass_rvalue_inout_converted,none,
+      "inout argument could be set to a value with a type other than %0; "
+      "use a value declared as type %1 instead", (Type, Type))
+NOTE(inout_change_var_type_if_possible,none,
+      "change variable type to %1 if it doesn't need to be declared as %0",
+      (Type, Type))
 ERROR(cannot_pass_rvalue_inout,none,
       "cannot pass immutable value of type %0 as inout argument",
       (Type))
@@ -288,12 +294,6 @@ ERROR(err_noescape_param_call,none,
       "parameter %0 to a call to a non-escaping function parameter can allow "
       "re-entrant modification of a variable",
       (DeclName, unsigned))
-WARNING(warn_noescape_param_call,none,
-      "passing a %select{|closure which captures a }1non-escaping function "
-      "parameter %0 to a call to a non-escaping function parameter can allow "
-      "re-entrant modification of a variable and will be illegal in Swift 4",
-      (DeclName, unsigned))
-
 ERROR(cannot_call_function_value,none,
       "cannot invoke value of function type with argument list '%0'",
       (StringRef))
@@ -495,6 +495,9 @@ ERROR(expr_keypath_subscript_index_not_hashable, none,
 ERROR(expr_smart_keypath_application_type_mismatch,none,
       "key path of type %0 cannot be applied to a base of type %1",
       (Type, Type))
+WARNING(expr_deprecated_writable_keypath,none,
+        "forming a writable keypath to property %0 that is read-only in this context "
+        "is deprecated and will be removed in a future release",(DeclName))
 
 // Selector expressions.
 ERROR(expr_selector_no_objc_runtime,none,
@@ -588,7 +591,8 @@ ERROR(serialization_module_too_new,Fatal,
       "module file was created by a newer version of the compiler: %0",
       (StringRef))
 ERROR(serialization_module_language_version_mismatch,Fatal,
-      "module compiled with Swift %0 cannot be imported in Swift %1: %2",
+      "module compiled with Swift %0 cannot be imported by the Swift %1 "
+      "compiler: %2",
       (StringRef, StringRef, StringRef))
 ERROR(serialization_module_too_old,Fatal,
       "module file was created by an older version of the compiler; "
@@ -635,7 +639,7 @@ ERROR(reserved_member_name,none,
 
 ERROR(invalid_redecl,none,"invalid redeclaration of %0", (DeclName))
 WARNING(invalid_redecl_swift5_warning,none,
-        "redeclaration of %0 is deprecated and will be illegal in Swift 5",
+        "redeclaration of %0 is deprecated and will be an error in Swift 5",
         (DeclName))
 
 NOTE(invalid_redecl_prev,none,
@@ -660,6 +664,9 @@ ERROR(ambiguous_module_type,none,
 ERROR(use_nonmatching_operator,none,
       "%0 is not a %select{binary|prefix unary|postfix unary}1 operator",
       (DeclName, unsigned))
+ERROR(unsupported_recursion_in_associated_type_reference,none,
+      "unsupported recursion for reference to associated type %0 of type %1",
+      (DeclName, Type))
 ERROR(broken_associated_type_witness,none,
       "reference to invalid associated type %0 of type %1", (DeclName, Type))
 
@@ -679,8 +686,8 @@ ERROR(unspaced_unary_operator,none,
 ERROR(use_unresolved_identifier,none,
       "use of unresolved %select{identifier|operator}1 %0", (DeclName, bool))
 ERROR(use_unresolved_identifier_corrected,none,
-      "use of unresolved %select{identifier|operator}1 %0; did you mean %2?",
-      (DeclName, bool, DeclName))
+      "use of unresolved %select{identifier|operator}1 %0; did you mean '%2'?",
+      (DeclName, bool, StringRef))
 NOTE(confusable_character,none,
       "%select{identifier|operator}0 '%1' contains possibly confused characters; "
       "did you mean to use '%2'?",
@@ -936,10 +943,21 @@ NOTE(note_init_parameter,none,
 ERROR(missing_nullary_call,none,
      "function produces expected type %0; did you mean to call it with '()'?",
      (Type))
-ERROR(missing_unwrap_optional,none,
-      "value of optional type %0 not unwrapped; did you mean to use '!' "
-      "or '?'?",
-     (Type))
+ERROR(optional_not_unwrapped,none,
+      "value of optional type %0 must be unwrapped to a value of type %1",
+     (Type, Type))
+NOTE(unwrap_with_default_value,none,
+     "coalesce using '?" "?' to provide a default when the optional value "
+     "contains 'nil'", ())
+NOTE(unwrap_with_force_value,none,
+     "force-unwrap using '!' to abort execution if the optional value contains "
+     "'nil'", ())
+ERROR(optional_base_not_unwrapped,none,
+      "value of optional type %0 must be unwrapped to refer to member %1 of "
+      "wrapped base type %2", (Type, DeclName, Type))
+NOTE(optional_base_chain,none,
+     "chain the optional using '?' to access member %0 only for non-'nil' "
+     "base values", (DeclName))
 ERROR(missing_unwrap_optional_try,none,
       "value of optional type %0 not unwrapped; did you mean to use 'try!' "
       "or chain with '?'?",
@@ -947,10 +965,6 @@ ERROR(missing_unwrap_optional_try,none,
 ERROR(missing_forced_downcast,none,
       "%0 is not convertible to %1; "
       "did you mean to use 'as!' to force downcast?", (Type, Type))
-WARNING(missing_forced_downcast_swift3_compat_warning,none,
-        "bridging %0 to %1 may fail at runtime and will become a checked "
-        "cast in Swift 4; did you mean to use 'as!' to force downcast?",
-        (Type, Type))
 ERROR(missing_explicit_conversion,none,
       "%0 is not implicitly convertible to %1; "
       "did you mean to use 'as' to explicitly convert?", (Type, Type))
@@ -1353,6 +1367,28 @@ WARNING(pattern_type_access_inferred_warn,none,
         "because its type %6 uses "
         "%select{a private|a fileprivate|an internal|%error|%error}5 type",
         (bool, bool, bool, AccessLevel, bool, AccessLevel, Type))
+ERROR(pattern_type_not_usable_from_inline,none,
+      "type referenced from a '@usableFromInline' "
+      "%select{%select{variable|constant}0|property}1 "
+      "must be '@usableFromInline' or public",
+      (bool, bool))
+WARNING(pattern_type_not_usable_from_inline_warn,none,
+        "type referenced from a '@usableFromInline' "
+        "%select{%select{variable|constant}0|property}1 "
+        "should be '@usableFromInline' or public",
+        (bool, bool))
+ERROR(pattern_type_not_usable_from_inline_inferred,none,
+      "type referenced from a '@usableFromInline' "
+      "%select{%select{variable|constant}0|property}1 "
+      "with inferred type %2 "
+      "must be '@usableFromInline' or public",
+      (bool, bool, Type))
+WARNING(pattern_type_not_usable_from_inline_inferred_warn,none,
+        "type referenced from a '@usableFromInline' "
+        "%select{%select{variable|constant}0|property}1 "
+        "with inferred type %2 "
+        "should be '@usableFromInline' or public",
+        (bool, bool, Type))
 ERROR(pattern_binds_no_variables,none,
       "%select{property|global variable}0 declaration does not bind any "
       "variables",
@@ -1407,6 +1443,16 @@ WARNING(type_alias_underlying_type_access_warn,none,
         "because its underlying type uses "
         "%select{a private|a fileprivate|an internal|%error|%error}2 type",
         (bool, AccessLevel, AccessLevel, bool))
+ERROR(type_alias_underlying_type_not_usable_from_inline,none,
+      "type referenced from the underlying type of a "
+      "'@usableFromInline' type alias "
+      "must be '@usableFromInline' or public",
+      ())
+WARNING(type_alias_underlying_type_not_usable_from_inline_warn,none,
+        "type referenced from the underlying type of a "
+        "'@usableFromInline' type alias "
+        "should be '@usableFromInline' or public",
+        ())
 
 // Subscripts
 ERROR(subscript_type_access,none,
@@ -1424,6 +1470,14 @@ WARNING(subscript_type_access_warn,none,
         "because its %select{index|element type}3 uses "
         "%select{a private|a fileprivate|an internal|%error|%error}2 type",
         (bool, AccessLevel, AccessLevel, bool))
+ERROR(subscript_type_usable_from_inline,none,
+      "%select{index type|element type}0 of a '@usableFromInline' subscript "
+      "must be '@usableFromInline' or public",
+      (bool))
+WARNING(subscript_type_usable_from_inline_warn,none,
+        "%select{index type|element type}0 of a '@usableFromInline' subscript "
+        "should be '@usableFromInline' or public",
+        (bool))
 
 // Functions
 ERROR(function_type_access,none,
@@ -1442,6 +1496,16 @@ WARNING(function_type_access_warn,none,
         "because its %select{parameter|result}5 uses "
         "%select{a private|a fileprivate|an internal|%error|%error}3 type",
         (bool, AccessLevel, bool, AccessLevel, unsigned, bool))
+ERROR(function_type_usable_from_inline,none,
+      "the %select{parameter|result}1 of a "
+      "'@usableFromInline' %select{function|method|initializer}0 "
+      "must be '@usableFromInline' or public",
+      (unsigned, bool))
+WARNING(function_type_usable_from_inline_warn,none,
+        "the %select{parameter|result}1 of a "
+        "'@usableFromInline' %select{function|method|initializer}0 "
+        "should be '@usableFromInline' or public",
+        (unsigned, bool))
 ERROR(noreturn_not_supported,none,
       "'@noreturn' has been removed; functions that never return should have a "
       "return type of 'Never' instead", ())
@@ -1646,6 +1710,12 @@ WARNING(protocol_access_warn,none,
         "%select{protocol should not refine|protocol's 'where' clause should not use}2}0 "
         "%select{a private|a fileprivate|an internal|%error|%error}3 protocol",
         (bool, AccessLevel, bool, AccessLevel, bool))
+ERROR(protocol_usable_from_inline,none,
+      "protocol %select{refined|used}0 by '@usableFromInline' protocol "
+      "must be '@usableForInline' or public", (bool))
+WARNING(protocol_usable_from_inline_warn,none,
+        "protocol %select{refined|used}0 by '@usableFromInline' protocol "
+        "should be '@usableForInline' or public", (bool))
 ERROR(protocol_property_must_be_computed_var,none,
       "immutable property requirement must be declared as 'var' with a "
       "'{ get }' specifier", ())
@@ -1688,6 +1758,16 @@ WARNING(associated_type_access_warn,none,
         "%select{a private|a fileprivate|an internal|%error|%error}1 type in its "
         "%select{default definition|requirement}2 ",
         (AccessLevel, AccessLevel, unsigned))
+ERROR(associated_type_not_usable_from_inline,none,
+      "type referenced from a "
+      "%select{default definition|requirement}0 of an associated type in a "
+      "'@usableFromInline' protocol must be '@usableFromInline' or public",
+      (unsigned))
+WARNING(associated_type_not_usable_from_inline_warn,none,
+        "type referenced from a "
+        "%select{default definition|requirement}0 of an associated type in a "
+        "'@usableFromInline' protocol should be '@usableFromInline' or public",
+        (unsigned))
 
 NOTE(bad_associated_type_deduction,none,
      "unable to infer associated type %0 for protocol %1",
@@ -1818,12 +1898,13 @@ ERROR(typealias_outside_of_protocol,none,
       "generic parameter base", (Identifier))
 
 ERROR(circular_protocol_def,none,
-      "circular protocol inheritance %0", (StringRef))
+      "protocol %0 refines itself", (Identifier))
 ERROR(objc_protocol_inherits_non_objc_protocol,none,
       "@objc protocol %0 cannot refine non-@objc protocol %1", (Type, Type))
-WARNING(protocol_composition_with_postfix,none,
-        "protocol-constrained type with postfix '%0' is ambiguous "
-        "and will be rejected in future version of Swift", (StringRef))
+
+ERROR(protocol_where_clause_self_requirement,none,
+      "constraint with subject type of 'Self' is not supported; "
+      "consider adding requirement to protocol inheritance clause instead", ())
 
 ERROR(invalid_protocol_composition_member,none,
       "non-protocol, non-class type %0 cannot be used within a "
@@ -1870,6 +1951,9 @@ NOTE(redundant_conformance_here,none,
      "conformance constraint %1: %2 %select{written here|implied here|"
      "inferred from type here}0",
      (unsigned, Type, ProtocolDecl *))
+
+ERROR(unsupported_recursive_requirements, none,
+      "requirement involves recursion that is not currently supported", ())
 
 ERROR(same_type_conflict,none,
       "%select{generic parameter |protocol |}0%1 cannot be equal to both "
@@ -1937,6 +2021,16 @@ WARNING(generic_param_access_warn,none,
         "because its generic %select{parameter|requirement}5 uses "
         "%select{a private|a fileprivate|an internal|%error|%error}3 type",
         (DescriptiveDeclKind, bool, AccessLevel, AccessLevel, bool, bool))
+ERROR(generic_param_usable_from_inline,none,
+      "type referenced from a "
+      "generic %select{parameter|requirement}1 of a '@usableFromInline' %0 "
+      "must be '@usableFromInline' or public",
+      (DescriptiveDeclKind, bool))
+WARNING(generic_param_usable_from_inline_warn,none,
+        "type referenced from a "
+        "generic %select{parameter|requirement}1 of a '@usableFromInline' %0 "
+        "should be '@usableFromInline' or public",
+        (DescriptiveDeclKind, bool))
 
 ERROR(override_multiple_decls_base,none,
       "declaration %0 cannot override more than one superclass declaration",
@@ -1955,15 +2049,6 @@ NOTE(overridden_here,none,
 NOTE(overridden_here_can_be_objc,none,
      "add '@objc' to make this declaration overridable", ())
 
-ERROR(override_objc_type_mismatch_method,none,
-      "overriding method with selector %0 has incompatible type %1",
-      (ObjCSelector, Type))
-ERROR(override_objc_type_mismatch_subscript,none,
-      "overriding %select{|indexed |keyed }0subscript with incompatible type "
-      "%1",
-      (unsigned, Type))
-NOTE(overridden_here_with_type,none,
-     "overridden declaration here has type %0", (Type))
 ERROR(missing_override,none,
       "overriding declaration requires an 'override' keyword", ())
 
@@ -2116,6 +2201,8 @@ ERROR(duplicate_inheritance,none,
   "duplicate inheritance from %0", (Type))
 WARNING(duplicate_anyobject_class_inheritance,none,
   "redundant inheritance from 'AnyObject' and Swift 3 'class' keyword", ())
+ERROR(objc_protocol_with_superclass,none,
+  "protocol %0 is '@objc' and cannot have a superclass constraint", (Identifier))
 ERROR(multiple_inheritance,none,
   "multiple inheritance from classes %0 and %1", (Type, Type))
 ERROR(non_class_inheritance,none,
@@ -2134,8 +2221,6 @@ ERROR(superclass_not_open,none,
 NOTE(superclass_here,none,"superclass is declared here", ())
 ERROR(superclass_of_open_not_open,none,
   "superclass %0 of open class must be open", (Type))
-ERROR(circular_class_inheritance,none,
-      "circular class inheritance %0", (StringRef))
 ERROR(inheritance_from_final_class,none,
       "inheritance from a final class %0", (Identifier))
 ERROR(inheritance_from_unspecialized_objc_generic_class,none,
@@ -2166,14 +2251,18 @@ WARNING(enum_case_access_warn,none,
         "enum case in %select{a private|a fileprivate|an internal|a public|%error}0 enum "
         "uses %select{a private|a fileprivate|an internal|%error|%error}1 type",
         (AccessLevel, AccessLevel))
+ERROR(enum_case_usable_from_inline,none,
+      "type of enum case in '@usableFromInline' enum "
+      "must be '@usableFromInline' or public", ())
+WARNING(enum_case_usable_from_inline_warn,none,
+        "type of enum case in '@usableFromInline' enum "
+        "should be '@usableFromInline' or public", ())
 ERROR(enum_stored_property,none,
       "enums must not contain stored properties", ())
 
 // Enum raw types
 ERROR(multiple_enum_raw_types,none,
   "multiple enum raw types %0 and %1", (Type, Type))
-ERROR(circular_enum_inheritance,none,
-      "circular enum raw types %0", (StringRef))
 ERROR(raw_type_not_first,none,
   "raw type %0 must appear first in the enum inheritance clause", (Type))
 ERROR(raw_type_not_literal_convertible,none,
@@ -2202,6 +2291,17 @@ WARNING(enum_raw_type_access_warn,none,
         "because its raw type uses "
         "%select{a private|a fileprivate|an internal|%error|%error}2 type",
         (bool, AccessLevel, AccessLevel, bool))
+
+ERROR(enum_raw_type_not_usable_from_inline,none,
+      "type referenced from the raw type of a "
+      "'@usableFromInline' enum "
+      "must be '@usableFromInline' or public",
+      ())
+WARNING(enum_raw_type_not_usable_from_inline_warn,none,
+        "type referenced from the raw type of a "
+        "'@usableFromInline' enum "
+        "should be '@usableFromInline' or public",
+        ())
 
 ERROR(empty_enum_raw_type,none,
       "an enum with no cases cannot declare a raw type", ())
@@ -2268,6 +2368,17 @@ ERROR(broken_encodable_requirement,none,
       "Encodable protocol is broken: unexpected requirement", ())
 ERROR(broken_decodable_requirement,none,
       "Decodable protocol is broken: unexpected requirement", ())
+// SWIFT_ENABLE_TENSORFLOW
+ERROR(broken_parameter_aggregate_requirement,none,
+      "ParameterAggregate protocol is broken: unexpected requirement", ())
+ERROR(broken_parameterized_requirement,none,
+      "Parameterized protocol is broken: unexpected requirement", ())
+ERROR(parameterized_no_parameters_struct,none,
+      "cannot automatically synthesize %0 because 'Parameters' struct does not "
+      "exist", (Type))
+ERROR(parameterized_invalid_parameters_struct,none,
+      "cannot automatically synthesize %0 because 'Parameters' struct is "
+      "invalid", (Type))
 
 NOTE(codable_extraneous_codingkey_case_here,none,
      "CodingKey case %0 does not match any stored properties", (Identifier))
@@ -2556,6 +2667,17 @@ ERROR(tf_graph_attr_function_tensorflow_value_only,none,
       "values", ())
 ERROR(tf_graph_attr_no_generic_functions,none,
       "@TensorFlowGraph cannot be applied to generic functions", ())
+ERROR(tf_graph_attr_no_functions_with_captures,none,
+      "@TensorFlowGraph cannot be applied to functions that capture values",
+      ())
+
+// @TFParameter attribute
+ERROR(tfparameter_attr_tensorflow_not_imported,none,
+      "@%0 is available only when 'TensorFlow' is imported", (StringRef))
+ERROR(tfparameter_attr_instance_stored_property_only,none,
+      "only instance stored properties can be declared @%0", (StringRef))
+ERROR(tfparameter_attr_not_in_parameterized,none,
+      "@%0 is allowed only in types that conform to 'Parameterized'", (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Expressions
@@ -2819,11 +2941,18 @@ NOTE(ambiguous_because_of_trailing_closure,none,
 // Partial application of foreign functions not supported
 ERROR(partial_application_of_function_invalid,none,
       "partial application of %select{"
-        "function with 'inout' parameters|"
         "'mutating' method|"
         "'super.init' initializer chain|"
         "'self.init' initializer delegation"
       "}0 is not allowed",
+      (unsigned))
+WARNING(partial_application_of_function_invalid_swift4,none,
+      "partial application of %select{"
+        "'mutating' method|"
+        "'super.init' initializer chain|"
+        "'self.init' initializer delegation"
+      "}0 is not allowed; calling the function has undefined behavior and will "
+      "be an error in future Swift versions",
       (unsigned))
 
 ERROR(self_assignment_var,none,
@@ -2869,18 +2998,11 @@ WARNING(store_in_willset,none,
         "attempting to store to property %0 within its own willSet, which is "
         "about to be overwritten by the new value", (Identifier))
 
-ERROR(tuple_splat_use,none,
-      "passing %0 arguments to a callee as a single tuple value has been removed in Swift 3",
-        (unsigned))
-
-
 ERROR(value_of_module_type,none,
       "expected module member name after module name", ())
 
 ERROR(value_of_metatype_type,none,
       "expected member name or constructor call after type name", ())
-WARNING(warn_value_of_metatype_missing_self,none,
-      "missing '.self' for reference to metatype of type %0", (Type))
 
 NOTE(add_parens_to_type,none,
      "add arguments after the type to construct a value of the type", ())
@@ -3379,6 +3501,17 @@ WARNING(class_super_access_warn,none,
       "|uses %select{a private|a fileprivate|an internal|%error|%error}2 "
       "type as a generic parameter}4",
       (bool, AccessLevel, AccessLevel, bool, bool))
+ERROR(class_super_not_usable_from_inline,none,
+      "%select{type referenced from |}0the superclass of "
+      "a '@usableFromInline' class "
+      "must be '@usableFromInline' or public",
+      (bool))
+WARNING(class_super_not_usable_from_inline_warn,none,
+        "%select{type referenced from |}0the superclass of "
+        "a '@usableFromInline' class "
+        "should be '@usableFromInline' or public",
+        (bool))
+
 ERROR(dot_protocol_on_non_existential,none,
       "cannot use 'Protocol' with non-protocol type %0", (Type))
 ERROR(tuple_single_element,none,
@@ -3405,10 +3538,12 @@ ERROR(invalid_ownership_protocol_type,none,
       (ReferenceOwnership, Type))
 ERROR(invalid_ownership_with_optional,none,
       "%0 variable cannot have optional type", (ReferenceOwnership))
-ERROR(invalid_weak_ownership_not_optional,none,
-      "'weak' variable should have optional type %0", (Type))
-ERROR(invalid_weak_let,none,
-      "'weak' must be a mutable variable, because it may change at runtime", ())
+ERROR(invalid_ownership_not_optional,none,
+      "%0 variable should have optional type %1",
+      (ReferenceOwnership, Type))
+ERROR(invalid_ownership_is_let,none,
+      "%0 must be a mutable variable, because it may change at runtime",
+      (ReferenceOwnership))
 ERROR(ownership_invalid_in_protocols,none,
       "%0 cannot be applied to a property declaration in a protocol",
       (ReferenceOwnership))
@@ -4069,18 +4204,6 @@ WARNING(variable_never_mutated, none,
 WARNING(variable_never_read, none,
         "%select{variable|parameter}1 %0 was written to, but never read",
         (Identifier, unsigned))
-
-//------------------------------------------------------------------------------
-// MARK: Circular reference diagnostics
-//------------------------------------------------------------------------------
-ERROR(circular_reference, none,
-      "circular reference", ())
-
-ERROR(redundant_type_alias_define, none,
-      "redundant type alias declaration", ())
-
-NOTE(circular_reference_through, none,
-     "through reference here", ())
 
 //------------------------------------------------------------------------------
 // MARK: Debug diagnostics

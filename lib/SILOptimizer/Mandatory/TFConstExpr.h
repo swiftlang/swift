@@ -24,15 +24,19 @@
 #ifndef SWIFT_SILOPTIMIZER_TF_CONSTEXPR_H
 #define SWIFT_SILOPTIMIZER_TF_CONSTEXPR_H
 
-#include "llvm/Support/Allocator.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/SourceLoc.h"
+#include "llvm/Support/Allocator.h"
 
 namespace swift {
-  class ApplyInst;
-  class SILInstruction;
-  class SILModule;
-  class SILValue;
-  class SymbolicValue;
+class ApplyInst;
+class Operand;
+class SILInstruction;
+class SILModule;
+class SILNode;
+class SILValue;
+class SymbolicValue;
+enum class UnknownReason;
 
 namespace tf {
 
@@ -43,13 +47,30 @@ class ConstExprEvaluator {
   /// result values for the cached constexpr calls we have already analyzed.
   llvm::BumpPtrAllocator allocator;
 
+  /// The current call stack, used for providing accurate diagnostics.
+  llvm::SmallVector<SourceLoc, 4> callStack;
+
   ConstExprEvaluator(const ConstExprEvaluator &) = delete;
   void operator=(const ConstExprEvaluator &) = delete;
+
 public:
   explicit ConstExprEvaluator(SILModule &m);
   ~ConstExprEvaluator();
 
   llvm::BumpPtrAllocator &getAllocator() { return allocator; }
+
+  void pushCallStack(SourceLoc loc) { callStack.push_back(loc); }
+
+  void popCallStack() {
+    assert(!callStack.empty());
+    callStack.pop_back();
+  }
+
+  const llvm::SmallVector<SourceLoc, 4> &getCallStack() { return callStack; }
+
+  // As SymbolicValue::getUnknown(), but handles passing the call stack and
+  // allocator.
+  SymbolicValue getUnknown(SILNode *node, UnknownReason reason);
 
   /// Analyze the specified values to determine if they are constant values.
   /// This is done in code that is not necessarily itself a constexpr
@@ -63,18 +84,18 @@ public:
                              SmallVectorImpl<SymbolicValue> &results);
 
   /// Try to decode the specified apply of the _allocateUninitializedArray
-  /// function in the standard library.  This attempts to figure out what the
-  /// resulting elements will be.  This fills in the elements result and returns
-  /// true on success.
+  /// function in the standard library.  This attempts to figure out how the
+  /// resulting elements will be initialized.  This fills in the result with
+  /// a lists of operands used to pass element addresses for initialization,
+  /// and returns false on success.
   ///
   /// If arrayInsts is non-null and if decoding succeeds, this function adds
   /// all of the instructions relevant to the definition of this array into
   /// the set.  If decoding fails, then the contents of this set is undefined.
   ///
   static bool
-  decodeAllocUninitializedArray(ApplyInst *apply,
-                                uint64_t numElements,
-                                SmallVectorImpl<SILValue> &elements,
+  decodeAllocUninitializedArray(ApplyInst *apply, uint64_t numElements,
+                                SmallVectorImpl<Operand*> &elementsAtInit,
                                 SmallPtrSet<SILInstruction*, 8> *arrayInsts);
 };
 

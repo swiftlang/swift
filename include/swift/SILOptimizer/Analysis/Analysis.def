@@ -40,8 +40,12 @@ ANALYSIS(LoopRegion)
 ANALYSIS(OptimizerStats)
 ANALYSIS(PostDominance)
 ANALYSIS(PostOrder)
+ANALYSIS(ProtocolConformance)
 ANALYSIS(RCIdentity)
 ANALYSIS(SideEffect)
 ANALYSIS(TypeExpansion)
+ANALYSIS(PassManagerVerifier)
+// SWIFT_ENABLE_TENSORFLOW
+ANALYSIS(DifferentiableActivity)
 
 #undef ANALYSIS

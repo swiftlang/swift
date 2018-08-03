@@ -100,13 +100,13 @@ CanType SILFunctionType::getSelfInstanceType() const {
 
 /// SWIFT_ENABLE_TENSORFLOW
 CanSILFunctionType
-SILFunctionType::getGradientType(SILReverseAutoDiffConfiguration config,
-                                 SILModule &M) {
+SILFunctionType::getGradientType(
+    const SILReverseAutoDiffConfig &config, SILModule &M) {
+  // FIXME: Handle `Delayed` gradient option.
   auto originalParams = getParameters();
-  auto originalResult = getResults()[config.sourceIndex];
+  auto originalResult = getResults()[config.getSourceIndex()];
   auto originalSourceResultTy = originalResult.getType();
-  SmallVector<unsigned, 4> allParamIndices;
-  ArrayRef<unsigned> paramIndices = config.parameterIndices;
+  llvm::SmallBitVector paramIndices = config.getParameterIndices();
   SmallVector<SILParameterInfo, 4> gradParams;
   SmallVector<SILResultInfo, 4> gradResults;
   // Collect original parameters to gradient parameters. They have the same
@@ -114,7 +114,7 @@ SILFunctionType::getGradientType(SILReverseAutoDiffConfiguration config,
   for (auto &originalParam : originalParams)
     gradParams.push_back(originalParam);
   // If seedable, add original result to the parameter list.
-  if (config.seedable) {
+  if (config.isSeedable()) {
     ParameterConvention seedConv;
     switch (originalResult.getConvention()) {
     case ResultConvention::Indirect:
@@ -130,20 +130,18 @@ SILFunctionType::getGradientType(SILReverseAutoDiffConfiguration config,
     }
     gradParams.push_back({ originalSourceResultTy, seedConv });
   }
-  // If no differentiation parameters are specified, differentiation is done
-  // with respect to all of original's parameters. For simplicity, we add all
+  // If no differentiation parameters are specified, differentiation is with
+  // respect to all of original's parameters. For simplicity, we add all
   // parameter indices to a temporary.
-  if (config.parameterIndices.empty()) {
-    auto allParamRange = range(0, getNumParameters());
-    allParamIndices.append(allParamRange.begin(), allParamRange.end());
-    paramIndices = allParamIndices;
+  if (paramIndices.none()) {
+    paramIndices.resize(getNumParameters());
+    paramIndices.set();
   }
   // If preserving result, the original result will be the first result.
-  if (config.preservingResult) {
+  if (config.isPreservingResult())
     gradResults.push_back(originalResult);
-  }
   // Collect differentiation parameters to gradient results.
-  for (auto index : paramIndices) {
+  for (auto index : paramIndices.set_bits()) {
     auto param = originalParams[index];
     ResultConvention conv;
     switch (param.getConvention()) {
@@ -162,7 +160,40 @@ SILFunctionType::getGradientType(SILReverseAutoDiffConfiguration config,
     }
     gradResults.push_back({ param.getType(), conv });
   }
-  // Create an expected function type.
+  // If the gradient is delayed, the result type is
+  //   (original_params...) -> (original_result?, (seed?) -> (derivatives...))
+  if (config.isDelayed()) {
+    // The delayed gradient function (inner) type.
+    ArrayRef<SILParameterInfo> delayedGradParams = config.isSeedable()
+      ? ArrayRef<SILParameterInfo>(&gradParams.back(), 1)
+      : ArrayRef<SILParameterInfo>();
+    ArrayRef<SILResultInfo> delayedGradResults = config.isPreservingResult()
+      ? ArrayRef<SILResultInfo>(gradResults).drop_front()
+      : ArrayRef<SILResultInfo>(gradResults);
+    auto delayedGradFuncTy = SILFunctionType::get(
+      getGenericSignature(),
+      getExtInfo().withRepresentation(Representation::Thin),
+      getCoroutineKind(), getCalleeConvention(),
+      delayedGradParams, {}, delayedGradResults, None,
+      getASTContext(), getWitnessMethodConformanceOrNone());
+    ArrayRef<SILParameterInfo> params = config.isSeedable()
+      ? ArrayRef<SILParameterInfo>(gradParams).drop_back()
+      : ArrayRef<SILParameterInfo>(gradParams);
+    SILResultInfo delayedGradFuncResult(
+      delayedGradFuncTy, ResultConvention::Unowned);
+    SmallVector<SILResultInfo, 2> results;
+    if (config.isPreservingResult())
+      results.append({gradResults.front(), delayedGradFuncResult});
+    else
+      results.append({delayedGradFuncResult});
+    // $convention(thin) (seed?) -> (derivatives...)
+    return SILFunctionType::get(getGenericSignature(), getExtInfo(),
+                                getCoroutineKind(), getCalleeConvention(),
+                                params, getYields(), results,
+                                getOptionalErrorResult(), getASTContext(),
+                                None);
+  }
+  // Create an expected function type for the non-delayed case.
   return SILFunctionType::get(getGenericSignature(), getExtInfo(),
                               getCoroutineKind(), getCalleeConvention(),
                               gradParams, getYields(), gradResults,
@@ -234,7 +265,7 @@ static CanType getKnownType(Optional<CanType> &cacheSlot, ASTContext &C,
   // It is possible that we won't find a bridging type (e.g. String) when we're
   // parsing the stdlib itself.
   if (t) {
-    DEBUG(llvm::dbgs() << "Bridging type " << moduleName << '.' << typeName
+    LLVM_DEBUG(llvm::dbgs() << "Bridging type " << moduleName << '.' << typeName
             << " mapped to ";
           if (t)
             t->print(llvm::dbgs());
@@ -1083,7 +1114,9 @@ static CanSILFunctionType getSILFunctionType(
   if (extInfo.hasContext())
     calleeConvention = conventions.getCallee();
 
-  bool pseudogeneric = (constant ? isPseudogeneric(*constant) : false);
+  bool pseudogeneric = genericSig && constant
+    ? isPseudogeneric(*constant)
+    : false;
 
   // NOTE: SILFunctionType::ExtInfo doesn't track everything that
   // AnyFunctionType::ExtInfo tracks. For example: 'throws' or 'auto-closure'
@@ -2180,7 +2213,7 @@ const SILConstantInfo &TypeConverter::getConstantInfo(SILDeclRef constant) {
     ::getUncachedSILFunctionTypeForConstant(M, constant,
                                             loweredInterfaceType);
 
-  DEBUG(llvm::dbgs() << "lowering type for constant ";
+  LLVM_DEBUG(llvm::dbgs() << "lowering type for constant ";
         constant.print(llvm::dbgs());
         llvm::dbgs() << "\n  formal type: ";
         formalInterfaceType.print(llvm::dbgs());
@@ -2203,6 +2236,7 @@ const SILConstantInfo &TypeConverter::getConstantInfo(SILDeclRef constant) {
 
   auto inserted = ConstantTypes.insert({constant, result});
   assert(inserted.second);
+  (void)inserted;
   return *result;
 }
 
@@ -2333,7 +2367,7 @@ TypeConverter::getConstantOverrideInfo(SILDeclRef derived, SILDeclRef base) {
     auto overrideInterfaceFnTy = overrideInterfaceTy->castTo<FunctionType>();
     overrideInterfaceTy =
         GenericFunctionType::get(derivedInterfaceFnTy->getGenericSignature(),
-                                 overrideInterfaceFnTy->getInput(),
+                                 overrideInterfaceFnTy->getParams(),
                                  overrideInterfaceFnTy->getResult(),
                                  overrideInterfaceFnTy->getExtInfo());
   }
@@ -2370,6 +2404,7 @@ TypeConverter::getConstantOverrideInfo(SILDeclRef derived, SILDeclRef base) {
   
   auto inserted = ConstantOverrideTypes.insert({{derived, base}, result});
   assert(inserted.second);
+  (void)inserted;
   return *result;
 }
 
@@ -2453,8 +2488,12 @@ public:
       witnessMethodConformance =
           conformance->subst(selfType, Subst, Conformances);
     }
+    
+    // The substituted type is no longer generic, so it'd never be
+    // pseudogeneric.
+    auto extInfo = origType->getExtInfo().withIsPseudogeneric(false);
 
-    return SILFunctionType::get(nullptr, origType->getExtInfo(),
+    return SILFunctionType::get(nullptr, extInfo,
                                 origType->getCoroutineKind(),
                                 origType->getCalleeConvention(), substParams,
                                 substYields, substResults, substErrorResult,

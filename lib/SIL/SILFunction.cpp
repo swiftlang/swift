@@ -58,33 +58,20 @@ void SILFunction::addSpecializeAttr(SILSpecializeAttr *Attr) {
 
 /// SWIFT_ENABLE_TENSORFLOW
 SILReverseDifferentiableAttr::
-SILReverseDifferentiableAttr(unsigned sourceIndex,
-                             ArrayRef<unsigned> paramIndices,
+SILReverseDifferentiableAttr(const SILReverseAutoDiffIndices &indices,
                              StringRef primalName,
                              StringRef adjointName)
-  : SourceIndex(sourceIndex), NumParamIndices(paramIndices.size()),
-    PrimalName(primalName), AdjointName(adjointName) {
-  std::copy(paramIndices.begin(), paramIndices.end(), getParamIndicesData());
-}
+  : indices(indices), PrimalName(primalName), AdjointName(adjointName) {}
 
 SILReverseDifferentiableAttr *
 SILReverseDifferentiableAttr::create(SILModule &M,
-                                     unsigned sourceIndex,
-                                     ArrayRef<unsigned> paramIndices,
+                                     const SILReverseAutoDiffIndices &indices,
                                      StringRef primalName,
                                      StringRef adjointName) {
-  size_t size = sizeof(SILReverseDifferentiableAttr)
-    + paramIndices.size() * sizeof(unsigned);
-  void *mem = M.allocate(size, alignof(SILReverseDifferentiableAttr));
-  return ::new (mem) SILReverseDifferentiableAttr(sourceIndex, paramIndices,
-                                                  primalName, adjointName);
-}
-
-ArrayRef<unsigned> SILReverseDifferentiableAttr::getParamIndices() const {
-  return {
-    const_cast<SILReverseDifferentiableAttr *>(this)->getParamIndicesData(),
-    NumParamIndices
-  };
+  void *mem = M.allocate(sizeof(SILReverseDifferentiableAttr),
+                         alignof(SILReverseDifferentiableAttr));
+  return ::new (mem)
+      SILReverseDifferentiableAttr(indices, primalName, adjointName);
 }
 
 SILFunction *SILFunction::create(
@@ -133,6 +120,8 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
       HasCReferences(false), IsWeakLinked(false),
       OptMode(OptimizationMode::NotSet), EffectsKindAttr(E),
       EntryCount(entryCount) {
+  validateSubclassScope(classSubclassScope, isThunk, nullptr);
+
   if (InsertBefore)
     Module.functions.insert(SILModule::iterator(InsertBefore), this);
   else
@@ -434,17 +423,26 @@ TargetFunction("view-cfg-only-for-function", llvm::cl::init(""),
                llvm::cl::desc("Only print out the cfg for this function"));
 #endif
 
-
-void SILFunction::viewCFG() const {
+static void viewCFGHelper(const SILFunction* f, bool skipBBContents) {
 /// When asserts are disabled, this should be a NoOp.
 #ifndef NDEBUG
     // If we have a target function, only print that function out.
-    if (!TargetFunction.empty() && !(getName().str() == TargetFunction))
+    if (!TargetFunction.empty() && !(f->getName().str() == TargetFunction))
       return;
 
-  ViewGraph(const_cast<SILFunction *>(this), "cfg" + getName().str());
+    ViewGraph(const_cast<SILFunction *>(f), "cfg" + f->getName().str(),
+              /*shortNames=*/skipBBContents);
 #endif
 }
+
+void SILFunction::viewCFG() const {
+  viewCFGHelper(this, /*skipBBContents=*/false);
+}
+
+void SILFunction::viewCFGOnly() const {
+  viewCFGHelper(this, /*skipBBContents=*/true);
+}
+
 
 bool SILFunction::hasSelfMetadataParam() const {
   auto paramTypes = getConventions().getParameterSILTypes();

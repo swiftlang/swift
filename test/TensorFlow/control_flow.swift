@@ -15,9 +15,10 @@ public func weighPet(pet: Pet) {
   case .dog: weight += 10.0
   case .fish: break // no tensor code here
   }
-  // This is needed to work-around the current TF limitation where the `If` op
-  // must produce some output tensors.
-  // FIXME: lift this restriction.
+  // This is used to avoid noisy send/recv warnings, where in each case above,
+  // the computed tensor value is sent to host due to the branch inst that's not
+  // marked for accelerator.
+  // FIXME: Revisit sends/recvs warnings design and remove this statement.
   weight += 0.0
   _hostOp(weight)
 }
@@ -74,7 +75,6 @@ public func weighPetOnlyDefault(pet: Pet) {
 // CHECK-NOT:  bb1
 // CHECK:        return
 // CHECK-NEXT: }  // end sil function
-
 
 // CHECK-LABEL: ---- ANALYSIS STATE FOR FUNCTION {{.*}}testCondBranch
 // CHECK:       bb0:
@@ -280,3 +280,73 @@ public func foo<T>(_ a: T) {
 //   }
 //   _hostOp(a)
 // }
+
+// An infinite loop that we reject in partitioning.
+// expected-error @+1 {{Functions containing infinite loops are not supported by TensorFlow yet}}
+public func infLoop1() {
+  let maxCount: Int32 = 100
+  var a = Tensor<Int32>(0)
+  let count: Int32 = 0
+  while count < maxCount {
+    a += a
+  }
+  a -= a
+  _hostOp(a)
+}
+
+// TODO: Enable this test when we fix
+// SESE FIXME: Imperfect loop exits not handled yet!
+// public func SR8256(_ cond: Int?) {
+//   let a = Tensor<Float>(1.0)
+//   var i: Int32 = 0
+//   let maxCount: Int32 = 10
+//   while i < maxCount {
+//     if cond != nil {
+//       _hostOp(a+a)
+//     }
+//     i += 1
+//   }
+// }
+
+
+// SR-8373: Critical edges should be split.
+public func testCriticalEdges() {
+  _ = Tensor(1).scalars[0..<5 * Int(2)]
+  for _ in 1...5 {
+    Tensor(1).scalars.forEach { _ in }
+  }
+}
+
+
+// TODO: fix the noisy sends/recvs warning diagnostics.
+@inline(never)
+// expected-warning @+1 {{implicitly copied to the accelerator}}
+public func SR8443(n: Int32) {
+  var i: Int32 = 0
+// expected-warning @+1 {{implicitly copied to the accelerator}}
+  while i < n { // expected-note {{value used here}}
+
+    // expected-warning @+1 {{implicitly copied to the host}}
+    let images = Tensor<Float>(0.0)
+    _hostOp(images)
+    i += 1
+  }
+
+  let x = Tensor<Float>(1.0)
+  _hostOp(x)
+}
+
+// Check that we have wired up control dependency before returning the result
+// tensor `x`.
+
+// CHECK-LABEL: --- TFPartition GraphDef Proto:
+// CHECK:   function {
+// CHECK:    signature {
+// CHECK:      name: "{{.*}}SR8443{{.*}}.tf_CPU.device_partition"
+// CHECK:    node_def {
+// CHECK:      name: "RunControlDependency"
+// CHECK:      op: "Identity"
+// CHECK:      input:
+// CHECK:      input: "^
+// CHECK:    ret {
+// CHECK:      key: "runcontroldependency"

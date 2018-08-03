@@ -232,6 +232,9 @@ def profile_stats_entities: Flag<["-"], "profile-stats-entities">,
 def emit_dependencies : Flag<["-"], "emit-dependencies">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Emit basic Make-compatible dependencies files">;
+def track_system_dependencies : Flag<["-"], "track-system-dependencies">,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Track system dependencies while emitting Make-style dependencies">;
 
 def emit_loaded_module_trace : Flag<["-"], "emit-loaded-module-trace">,
   Flags<[FrontendOption, NoInteractiveOption]>,
@@ -358,11 +361,6 @@ def warn_swift3_objc_inference : Flag<["-"], "warn-swift3-objc-inference">,
   Alias<warn_swift3_objc_inference_complete>,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, HelpHidden]>;
 
-def emit_public_type_metadata_accessors :
-  Flag<["-"], "emit-public-type-metadata-accessors">,
-  Flags<[FrontendOption]>,
-  HelpText<"Emit all type metadata accessors as public (deprecated: now does nothing)">;
-
 def Rpass_EQ : Joined<["-"], "Rpass=">,
   Flags<[FrontendOption]>,
   HelpText<"Report performed transformations by optimization passes whose "
@@ -470,6 +468,10 @@ def gline_tables_only : Flag<["-"], "gline-tables-only">,
 def gdwarf_types : Flag<["-"], "gdwarf-types">,
   Group<g_Group>, Flags<[FrontendOption]>,
   HelpText<"Emit full DWARF type info.">;
+
+def debug_info_format : Joined<["-"], "debug-info-format=">,
+  Flags<[FrontendOption]>,
+  HelpText<"Specify the debug info format type to either 'dwarf' or 'codeview'">;
 
 // Verify debug info
 def verify_debug_info : Flag<["-"], "verify-debug-info">,
@@ -637,6 +639,9 @@ def fixit_all : Flag<["-"], "fixit-all">,
 // No Output Modes
 def parse: Flag<["-"], "parse">,
   HelpText<"Parse input file(s)">, ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def resolve_imports : Flag<["-"], "resolve-imports">,
+  HelpText<"Parse and resolve imports in input file(s)">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def typecheck : Flag<["-"], "typecheck">,
   HelpText<"Parse and type-check input file(s)">, ModeOpt,

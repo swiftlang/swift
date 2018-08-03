@@ -4,32 +4,32 @@
 // lib/Sema/PlaygroundTransform.cpp generates calls into.
 
 @inline(never)
-func $builtin_log<T>(_ object : T, _ name : String, _ sl : Int, _ el : Int, _ sc : Int, _ ec: Int) -> AnyObject? {
+func __builtin_log<T>(_ object : T, _ name : String, _ sl : Int, _ el : Int, _ sc : Int, _ ec: Int) -> AnyObject? {
   return nil
 }
 
 @inline(never)
-func $builtin_log_with_id<T>(_ object : T, _ name : String, _ id : Int, _ sl : Int, _ el : Int, _ sc : Int, _ ec: Int) -> AnyObject? {
+func __builtin_log_with_id<T>(_ object : T, _ name : String, _ id : Int, _ sl : Int, _ el : Int, _ sc : Int, _ ec: Int) -> AnyObject? {
   return nil
 }
 
 @inline(never)
-func $builtin_log_scope_entry(_ sl : Int, _ el : Int, _ sc : Int, _ ec: Int) -> AnyObject? {
+func __builtin_log_scope_entry(_ sl : Int, _ el : Int, _ sc : Int, _ ec: Int) -> AnyObject? {
   return nil
 }
 
 @inline(never)
-func $builtin_log_scope_exit(_ sl : Int, _ el : Int, _ sc : Int, _ ec: Int) -> AnyObject? {
+func __builtin_log_scope_exit(_ sl : Int, _ el : Int, _ sc : Int, _ ec: Int) -> AnyObject? {
   return nil
 }
 
 @inline(never)
-func $builtin_postPrint(_ sl : Int, _ el : Int, _ sc : Int, _ ec: Int) -> AnyObject? {
+func __builtin_postPrint(_ sl : Int, _ el : Int, _ sc : Int, _ ec: Int) -> AnyObject? {
   return nil
 }
 
 @inline(never)
-func $builtin_send_data(_ object:AnyObject?) {
+func __builtin_send_data(_ object:AnyObject?) {
 }
 
 

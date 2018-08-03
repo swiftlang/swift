@@ -285,7 +285,7 @@ public:
   }
   bool hasConflictFreeAccess() const {
     NoNestedConflictIterator iterator(*this);
-    return iterator.next() == nullptr;
+    return iterator.next() != nullptr;
   }
 
   bool hasInScopeAccess() const {
@@ -440,12 +440,12 @@ void AccessConflictAnalysis::visitBeginAccess(BeginAccessInst *innerBeginAccess,
     if (!outerAccess.isDistinctFrom(innerAccess))
       continue;
 
-    DEBUG(innerAccess.dump(); llvm::dbgs() << "  may conflict with:\n";
+    LLVM_DEBUG(innerAccess.dump(); llvm::dbgs() << "  may conflict with:\n";
           outerAccess.dump());
 
     recordConflict(outerAccess, accessSet);
   }
-  DEBUG(llvm::dbgs() << "Recording access: " << *innerBeginAccess;
+  LLVM_DEBUG(llvm::dbgs() << "Recording access: " << *innerBeginAccess;
         llvm::dbgs() << "  at: "; innerAccess.dump());
 
   // Record the current access in the map. It can potentially be folded
@@ -463,7 +463,7 @@ void AccessConflictAnalysis::visitEndAccess(EndAccessInst *endAccess,
     return;
 
   unsigned index = result.getAccessIndex(beginAccess);
-  DEBUG(if (accessSet.seenConflict(index)) llvm::dbgs()
+  LLVM_DEBUG(if (accessSet.seenConflict(index)) llvm::dbgs()
         << "No conflict on one path from " << *beginAccess << " to "
         << *endAccess);
 
@@ -486,7 +486,7 @@ void AccessConflictAnalysis::visitFullApply(FullApplySite fullApply,
     if (!callSiteAccesses.mayConflictWith(accessKind, outerAccess))
       continue;
 
-    DEBUG(llvm::dbgs() << *fullApply.getInstruction() << "  call site access: ";
+    LLVM_DEBUG(llvm::dbgs() << *fullApply.getInstruction() << "  call site access: ";
           callSiteAccesses.dump(); llvm::dbgs() << "  may conflict with:\n";
           outerAccess.dump());
 
@@ -529,7 +529,7 @@ void AccessConflictAnalysis::visitBlock(SILBasicBlock *BB) {
       visitFullApply(fullApply, accessSet);
     }
   }
-  DEBUG(if (accessSet.hasConflictFreeAccess()) {
+  LLVM_DEBUG(if (accessSet.hasConflictFreeAccess()) {
     llvm::dbgs() << "Initializing no-conflict access out of bb"
                  << BB->getDebugID() << "\n";
     accessSet.dump();
@@ -569,7 +569,7 @@ foldNonNestedAccesses(AccessConflictAnalysis::AccessMap &accessMap) {
     // Optimize this begin_access by setting [no_nested_conflict].
     beginAccess->setNoNestedConflict(true);
     changed = true;
-    DEBUG(llvm::dbgs() << "Folding " << *beginAccess);
+    LLVM_DEBUG(llvm::dbgs() << "Folding " << *beginAccess);
   }
   return changed;
 }
@@ -609,7 +609,7 @@ removeLocalNonNestedAccess(const AccessConflictAnalysis::Result &result,
     // [no_nested_conflict]. Now check FunctionAccessedStorage to determine if
     // that is true for all access to the same storage.
     if (functionAccess.hasNoNestedConflict(info)) {
-      DEBUG(llvm::dbgs() << "Disabling dead access " << *beginAccess);
+      LLVM_DEBUG(llvm::dbgs() << "Disabling dead access " << *beginAccess);
       beginAccess->setEnforcement(SILAccessEnforcement::Static);
       changed = true;
     }
@@ -623,6 +623,9 @@ struct AccessEnforcementOpts : public SILFunctionTransform {
     SILFunction *F = getFunction();
     if (F->empty())
       return;
+
+    LLVM_DEBUG(llvm::dbgs() << "Running local AccessEnforcementOpts on "
+                       << F->getName() << "\n");
 
     PostOrderFunctionInfo *PO = getAnalysis<PostOrderAnalysis>()->get(F);
     AccessedStorageAnalysis *ASA = getAnalysis<AccessedStorageAnalysis>();

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -O -emit-sil %s -verify | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-module-level-graph=false -O -emit-sil %s -verify | %FileCheck %s
 
 // In this file, send means accelerator->host, and recv means the opposite.
 
@@ -37,15 +37,15 @@ public func test1SendWithParam(x: Float) {
   _hostOp(a.toHost())
 }
 
-// GPU function takes the input arg of x.
-// CHECK-LABEL: --- TFDevicePartition Per-Device Function Extraction Result: {{.*}}test1SendWithParam{{.*}}GPU{{.*}}
-// CHECK: bb0(%0 : $TensorHandle
-// CHECK: builtin "__tfop_tfc.D2DTensorSend
-
 // CPU function takes no input arg.
 // CHECK-LABEL: --- TFDevicePartition Per-Device Function Extraction Result: {{.*}}test1SendWithParam{{.*}}CPU{{.*}}
 // CHECK: bb0:
-// CHECK: builtin "__tfop_tfc.D2DTensorRecv
+// CHECK: graph_op "tfc.D2DTensorRecv
+
+// GPU function takes the input arg of x.
+// CHECK-LABEL: --- TFDevicePartition Per-Device Function Extraction Result: {{.*}}test1SendWithParam{{.*}}GPU{{.*}}
+// CHECK: bb0(%0 : $TensorHandle
+// CHECK: graph_op "tfc.D2DTensorSend
 
 // The _Send node should be hooked up as a control dependency on the return
  // node, so that Sends gets run before the function returns.
@@ -130,14 +130,14 @@ public func testSendsInALoopGPU() {
 // In the loop head (where cond and body are evaluated), send a to CPU, which
 // then sends it to host.
 // CHECK:      bb1
-// CHECK:      builtin "__tfop_tfc.TensorTransfer
+// CHECK:      graph_op "tfc.TensorTransfer
 // CHECK:      graph_op "tfc.SendToHost
 
 // In the loop body (a trivial back-edge), we should not need to do transfer,
 // but since we are replicating BB args to BB1 to all devices, there is
 // currently another transfer, which we can optimize away in the future.
 // CHECK:      bb2
-// CHECK:      builtin "__tfop_tfc.TensorTransfer
+// CHECK:      graph_op "tfc.TensorTransfer
 
 public func testSendsInALoopTPU() {
   TensorFlow.enableTPU()
@@ -164,9 +164,8 @@ public func testSendsInALoopTPU() {
 
 // CHECK-LABEL: --- TFDevicePartition Per-Device Function Extraction Result: {{.*}}testSendsInALoopTPU{{.*}}TPU{{.*}}
 // CHECK: bb1
-// CHECK:   builtin "__tfop_tfc.D2DTensorSend
-// CHECK: bb2
-// CHECK:   builtin "__tfop_tfc.D2DTensorSend
+// CHECK:   graph_op "tfc.D2DTensorSend
+// CHECK:   graph_op "tfc.D2DTensorSend
 
 public func testSendsInALoopWithNoResultTensor() {
   let maxCount = 10
@@ -219,7 +218,8 @@ public func test1RecvScalarCPU() {
 // the promoted tensor add on "x.scalar! + 2.0"
 // CHECK:      graph_op "Add,i,i"([[X2]] : $TensorHandle<Builtin.FPIEEE32>, {{.*}} : $TensorHandle<Builtin.FPIEEE32>
 // z + z
-// CHECK:      builtin "__tfop_Add,$in,$in,T,__device"
+// CHECK:      graph_op "Add,i,i"
+// CHECK:      graph_op "Add,i,i"({{.*}}) {T: $Float, __device
 
 // On host, we receive x, extract its scalar value, and then make a scalar
 // tensor to send back to device.
@@ -227,7 +227,7 @@ public func test1RecvScalarCPU() {
 // CHECK-LABEL: --- TFPartition Host Result: {{.*}}test1RecvScalarCPU{{.*}}
 // CHECK:      function_ref @_swift_tfc_StartTensorComputation
 // CHECK:      // function_ref static TensorHandle.receiveFromAccelerator
-// CHECK-NEXT: function_ref 
+// CHECK-NEXT: function_ref
 // CHECK-NEXT: [[X_HANDLE:%.*]] = apply
 // CHECK:      // function_ref static TensorHandle.scalar(_:)
 // CHECK-NEXT: [[MAKE_SCALAR_TENSOR_FN:%.*]] = function_ref
@@ -253,15 +253,13 @@ public func test1RecvScalarGPU() {
 // "+ 2.0" is promoted to run on all devices.
 // CHECK-LABEL: --- TFDevicePartition Cross Device Tensor Transfer Annotation Result: {{.*}}test1RecvScalarGPU{{.*}}
 // CHECK:      graph_op "tfc.RecvFromHost
-// CHECK:      string_literal utf8 "/device:CPU:0"
-// CHECK-NEXT: string_literal utf8 "ALL_DEVICES"
-// CHECK-NEXT: builtin "__tfop_tfc.TensorTransfer
-
-// CHECK-LABEL: --- TFDevicePartition Per-Device Function Extraction Result: {{.*}}test1RecvScalarGPU{{.*}}GPU{{.*}}
-// CHECK: builtin "__tfop_tfc.D2DTensorRecv
+// CHECK-NEXT: graph_op "tfc.TensorTransfer
 
 // CHECK-LABEL: --- TFDevicePartition Per-Device Function Extraction Result: {{.*}}test1RecvScalarGPU{{.*}}CPU{{.*}}
-// CHECK: builtin "__tfop_tfc.D2DTensorSend
+// CHECK: graph_op "tfc.D2DTensorSend
+
+// CHECK-LABEL: --- TFDevicePartition Per-Device Function Extraction Result: {{.*}}test1RecvScalarGPU{{.*}}GPU{{.*}}
+// CHECK: graph_op "tfc.D2DTensorRecv
 
 public func test1RecvScalarTPU() {
   TensorFlow.enableTPU()
@@ -278,12 +276,12 @@ public func test1RecvScalarTPU() {
 // compilation. The shape array attr gets propagated to TensorTransfer.
 //
 // CHECK-LABEL: --- TFDevicePartition Cross Device Tensor Transfer Annotation Result: {{.*}}test1RecvScalarTPU{{.*}}
-// CHECK:      [[X_SCALAR_CPU:%.*]] = builtin "__tfop_tfc.RecvFromHost,tensorId,__device,__shapes$shapearray,$shape
-// CHECK:      [[X_SCALAR_TPU:%.*]] = builtin "__tfop_tfc.TensorTransfer,$in,transferId,srcDevice,destDevice,__shapes$shapearray,$shape"{{.*}}([[X_SCALAR_CPU]] : $TensorHandle
+// CHECK:      [[X_SCALAR_CPU:%.*]] = graph_op "tfc.RecvFromHost"() {tensorId: i32 0, __device: "/device:CPU:0", __shapes: [$TensorShape: [$Int32: ]]} : $TensorHandle
+// CHECK:      [[X_SCALAR_TPU:%.*]] = graph_op "tfc.TensorTransfer,i"([[X_SCALAR_CPU]] : $TensorHandle{{.*}}) {transferId: i32 0, srcDevice: "/device:CPU:0", destDevice: "ALL_DEVICES", __shapes
 // This is the promoted scalar add that computes x.scalar! + 2
 // CHECK-NEXT: graph_op "Add,i,i"([[X_SCALAR_TPU]] : $TensorHandle
 // This is z + z
-// CHECK:      [[RESULT:%.*]] = builtin "__tfop_Add
+// CHECK:      [[RESULT:%.*]] = graph_op "Add
 // CHECK-NEXT: return [[RESULT]]
 
 @inline(never)
@@ -305,12 +303,12 @@ public func test1RecvTensorCPU() {
 //
 // CHECK:      graph_op "tfc.SendToHost{{.*}}([[A:%.*]] : $TensorHandle<Float>
 // CHECK:      [[B:%.*]] = graph_op "tfc.RecvFromHost
-// CHECK:      builtin "__tfop_Add,$in,$in,T,__device"([[B]] : $TensorHandle<Float>, [[A]] : $TensorHandle<Float>
+// CHECK:      graph_op "Add,i,i"([[B]] : $TensorHandle<Float>, [[A]] : $TensorHandle<Float>
 
 // CHECK-LABEL: --- TFPartition Host Result: {{.*}}test1RecvTensor{{.*}}
 // CHECK:      function_ref @_swift_tfc_StartTensorComputation
 // CHECK:      // function_ref static TensorHandle.receiveFromAccelerator
-// CHECK-NEXT: function_ref 
+// CHECK-NEXT: function_ref
 // CHECK-NEXT: [[A_HANDLE:%.*]] = apply
 // CHECK-NEXT: [[A_TENSOR:%.*]] = struct $Tensor<Float> ([[A_HANDLE]]
 // CHECK:      // function_ref {{.*}} atariSim(_:)
@@ -327,9 +325,9 @@ public func test1RecvTensorTPU() {
   let a_tpu_h: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: 1.0, __device: "TPU_SYSTEM")
   let a_tpu = Tensor<Float>(handle: a_tpu_h)
   // Tensor transfer for the param of atariSim(): TPU->CPU, and then CPU->host.
-  let a_host = a_tpu.toHost(shape: TensorShape())
+  let a_host = a_tpu.toHost(shape: [])
   // For the result of atariSim(): host -> CPU, and then CPU->TPU.
-  var b = atariSim(a_host).toAccelerator(shape: TensorShape())
+  var b = atariSim(a_host).toAccelerator(shape: [])
   b += a_tpu
   _hostOp(b)
 }
@@ -342,7 +340,7 @@ public func test1RecvTensorTPU_ToHostNoShape_Error() {
   // Tensor transfer for the param of atariSim(): TPU->CPU, and then CPU->host.
   let a_host = a_tpu.toHost()
   // For the result of atariSim(): host -> CPU, and then CPU->TPU.
-  var b = atariSim(a_host).toAccelerator(shape: TensorShape())
+  var b = atariSim(a_host).toAccelerator(shape: [])
   b += a_tpu
   _hostOp(b)
 }
@@ -352,10 +350,11 @@ public func test1RecvTensorTPU_ToAcceleratorNoShape_Error() {
   let a_tpu_h: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: 1.0, __device: "TPU_SYSTEM")
   let a_tpu = Tensor<Float>(handle: a_tpu_h)
   // Tensor transfer for the param of atariSim(): TPU->CPU, and then CPU->host.
-  let a_host = a_tpu.toHost(shape: TensorShape())
+  let a_host = a_tpu.toHost(shape: [])
   // For the result of atariSim(): host -> CPU, and then CPU->TPU.
   var b = atariSim(a_host).toAccelerator()
-  // expected-error @+1 {{TPU infeed dequeue supports dequeuing a single tensor -- did you specify shape?}}
+  // This is the correct location
+  // expected-error @+1 {{TPU infeed enqueue supports enqueuing a single tensor -- did you specify shape?}}
   b += a_tpu
   _hostOp(b)
 }
@@ -367,10 +366,10 @@ public func test1RecvTensorGPU_WithShapes() {
   let a_gpu = Tensor<Float>(handle: a_gpu_h)
   // One send.
   // Tensor transfer for the param of atariSim(): GPU->CPU, and then CPU->host.
-  let a_host = a_gpu.toHost(shape: TensorShape())
+  let a_host = a_gpu.toHost(shape: [])
   // One recv.
   // For the result of atariSim(): host -> CPU, and then CPU->GPU.
-  var b = atariSim(a_host).toAccelerator(shape: TensorShape())
+  var b = atariSim(a_host).toAccelerator(shape: [])
   b += a_gpu
   _hostOp(b)
 }
@@ -381,7 +380,6 @@ public func testRecvsInALoop() {
   var a = Tensor<Float>(1.0)
   while count < maxCount {
     // One recv.
-    // expected-error @+1 {{tfop invalid: FIXME: cannot lower a Host->TF tensor transfer in a loop header}}
     let b = atariSim(a.toHost()).toAccelerator()
     a += b
     count += 1

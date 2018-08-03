@@ -736,10 +736,12 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       continue;
     }
 
-    if (isa<LoadWeakInst>(User)) {
-      trackUse(DIMemoryUse(User, DIUseKind::Load, BaseEltNo, 1));
-      continue;
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+    if (isa<Load##Name##Inst>(User)) { \
+      trackUse(DIMemoryUse(User, DIUseKind::Load, BaseEltNo, 1)); \
+      continue; \
     }
+#include "swift/AST/ReferenceStorage.def"
 
     // Stores *to* the allocation are writes.
     if ((isa<StoreInst>(User) || isa<AssignInst>(User)) &&
@@ -765,35 +767,22 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       continue;
     }
 
-    if (auto SWI = dyn_cast<StoreWeakInst>(User))
-      if (Op->getOperandNumber() == 1) {
-        DIUseKind Kind;
-        if (InStructSubElement)
-          Kind = DIUseKind::PartialStore;
-        else if (SWI->isInitializationOfDest())
-          Kind = DIUseKind::Initialization;
-        else if (isDefiniteInitFinished)
-          Kind = DIUseKind::Assign;
-        else
-          Kind = DIUseKind::InitOrAssign;
-        trackUse(DIMemoryUse(User, Kind, BaseEltNo, 1));
-        continue;
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+    if (auto SWI = dyn_cast<Store##Name##Inst>(User)) \
+      if (Op->getOperandNumber() == 1) { \
+        DIUseKind Kind; \
+        if (InStructSubElement) \
+          Kind = DIUseKind::PartialStore; \
+        else if (SWI->isInitializationOfDest()) \
+          Kind = DIUseKind::Initialization; \
+        else if (isDefiniteInitFinished) \
+          Kind = DIUseKind::Assign; \
+        else \
+          Kind = DIUseKind::InitOrAssign; \
+        trackUse(DIMemoryUse(User, Kind, BaseEltNo, 1)); \
+        continue; \
       }
-
-    if (auto SUI = dyn_cast<StoreUnownedInst>(User))
-      if (Op->getOperandNumber() == 1) {
-        DIUseKind Kind;
-        if (InStructSubElement)
-          Kind = DIUseKind::PartialStore;
-        else if (SUI->isInitializationOfDest())
-          Kind = DIUseKind::Initialization;
-        else if (isDefiniteInitFinished)
-          Kind = DIUseKind::Assign;
-        else
-          Kind = DIUseKind::InitOrAssign;
-        trackUse(DIMemoryUse(User, Kind, BaseEltNo, 1));
-        continue;
-      }
+#include "swift/AST/ReferenceStorage.def"
 
     if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
       // If this is a copy of a tuple, we should scalarize it so that we don't
@@ -950,6 +939,31 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       continue;
     }
 
+    // unchecked_take_enum_data_addr takes the address of the payload of an
+    // optional, which could be used to update the payload. So, visit the
+    // users of this instruction and ensure that there are no overwrites to an
+    // immutable optional. Note that this special handling is for checking
+    // immutability and is not for checking initialization before use.
+    if (auto *enumDataAddr = dyn_cast<UncheckedTakeEnumDataAddrInst>(User)) {
+      // Keep track of the fact that we're inside of an enum. This informs our
+      // recursion that tuple stores should not be treated as a partial
+      // store. This is needed because if the enum has data it would be accessed
+      // through tuple_element_addr instruction. The entire enum is expected
+      // to be initialized before any such access.
+      llvm::SaveAndRestore<bool> X(InEnumSubElement, true);
+      collectUses(enumDataAddr, BaseEltNo);
+      continue;
+    }
+
+    // 'select_enum_addr' selects one of the two operands based on the case
+    // of an enum value.
+    // 'switch_enum_addr' jumps to one of the two branch labels (provided as
+    // operands) based on the case of the enum value.
+    if (isa<SelectEnumAddrInst>(User) || isa<SwitchEnumAddrInst>(User)) {
+      trackUse(DIMemoryUse(User, DIUseKind::Load, BaseEltNo, 1));
+      continue;
+    }
+
     // We model destroy_addr as a release of the entire value.
     if (isa<DestroyAddrInst>(User)) {
       trackDestroy(User);
@@ -983,7 +997,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
     for (auto *User : UsesToScalarize) {
       ElementTmps.clear();
 
-      DEBUG(llvm::errs() << "  *** Scalarizing: " << *User << "\n");
+      LLVM_DEBUG(llvm::errs() << "  *** Scalarizing: " << *User << "\n");
 
       // Scalarize LoadInst
       if (auto *LI = dyn_cast<LoadInst>(User)) {

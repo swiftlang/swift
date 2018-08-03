@@ -220,183 +220,6 @@ DeclRefExpr *Expr::getMemberOperatorRef() {
   return operatorRef;
 }
 
-/// Propagate l-value use information to children.
-void Expr::propagateLValueAccessKind(AccessKind accessKind,
-                                     llvm::function_ref<Type(Expr *)> getType,
-                                     bool allowOverwrite) {
-  /// A visitor class which walks an entire l-value expression.
-  class PropagateAccessKind
-       : public ExprVisitor<PropagateAccessKind, void, AccessKind> {
-    llvm::function_ref<Type(Expr *)> GetType;
-#ifndef NDEBUG
-    bool AllowOverwrite;
-#endif
-  public:
-    PropagateAccessKind(llvm::function_ref<Type(Expr *)> getType,
-                        bool allowOverwrite) : GetType(getType)
-#ifndef NDEBUG
-                                               , AllowOverwrite(allowOverwrite)
-#endif
-    {}
-
-    void visit(Expr *E, AccessKind kind) {
-      assert((AllowOverwrite || !E->hasLValueAccessKind()) &&
-             "l-value access kind has already been set");
-
-      assert(GetType(E)->isAssignableType() &&
-             "setting access kind on non-l-value");
-      E->setLValueAccessKind(kind);
-
-      // Propagate this to sub-expressions.
-      ASTVisitor::visit(E, kind);
-    }
-
-#define NON_LVALUE_EXPR(KIND)                                           \
-    void visit##KIND##Expr(KIND##Expr *, AccessKind accessKind) {       \
-      llvm_unreachable("not an l-value");                               \
-    }
-#define LEAF_LVALUE_EXPR(KIND)                                          \
-    void visit##KIND##Expr(KIND##Expr *E, AccessKind accessKind) {}
-#define COMPLETE_PHYSICAL_LVALUE_EXPR(KIND, ACCESSOR)                   \
-    void visit##KIND##Expr(KIND##Expr *E, AccessKind accessKind) {      \
-      visit(E->ACCESSOR, accessKind);                                   \
-    }
-#define PARTIAL_PHYSICAL_LVALUE_EXPR(KIND, ACCESSOR)                    \
-    void visit##KIND##Expr(KIND##Expr *E, AccessKind accessKind) {      \
-      visit(E->ACCESSOR, getPartialAccessKind(accessKind));             \
-    }
-
-    void visitMemberRefExpr(MemberRefExpr *E, AccessKind accessKind) {
-      if (!GetType(E->getBase())->hasLValueType()) return;
-      visit(E->getBase(), getBaseAccessKind(E->getMember(), accessKind));
-    }
-    void visitSubscriptExpr(SubscriptExpr *E, AccessKind accessKind) {
-      if (!GetType(E->getBase())->hasLValueType()) return;
-      visit(E->getBase(), getBaseAccessKind(E->getDecl(), accessKind));
-    }
-    void visitKeyPathApplicationExpr(KeyPathApplicationExpr *E,
-                                     AccessKind accessKind) {
-      if (!GetType(E->getBase())->hasLValueType()) return;
-      auto kpDecl = GetType(E->getKeyPath())->castTo<BoundGenericType>()
-        ->getDecl();
-      AccessKind baseAccess;
-      // A ReferenceWritableKeyPath only reads its base.
-      if (kpDecl ==
-          GetType(E)->getASTContext().getReferenceWritableKeyPathDecl())
-        baseAccess = AccessKind::Read;
-      else
-        // Assuming a writable keypath projects a part of the base.
-        baseAccess = getPartialAccessKind(accessKind);
-      
-      visit(E->getBase(), baseAccess);
-    }
-
-    static AccessKind getPartialAccessKind(AccessKind accessKind) {
-      return (accessKind == AccessKind::Read
-                ? accessKind : AccessKind::ReadWrite);
-    }
-
-    static AccessKind getBaseAccessKind(ConcreteDeclRef member,
-                                        AccessKind accessKind) {
-      // We assume writes are partial writes, so the result is always
-      // either Read or ReadWrite.
-      auto memberDecl = cast<AbstractStorageDecl>(member.getDecl());
-
-      // If we're reading and the getter is mutating, or we're writing
-      // and the setter is mutating, this is readwrite.
-      if ((accessKind != AccessKind::Write &&
-           memberDecl->isGetterMutating()) ||
-          (accessKind != AccessKind::Read &&
-           memberDecl->isSetterMutating())) {
-        return AccessKind::ReadWrite;
-      }
-
-      return AccessKind::Read;
-    }
-
-    void visitTupleExpr(TupleExpr *E, AccessKind accessKind) {
-      for (auto elt : E->getElements()) {
-        visit(elt, accessKind);
-      }
-    }
-
-    void visitOpenExistentialExpr(OpenExistentialExpr *E,
-                                  AccessKind accessKind) {
-      AccessKind oldOpaqueValueAK;
-      bool opaqueValueHadAK;
-      if (E->getOpaqueValue()) {
-        opaqueValueHadAK = E->getOpaqueValue()->hasLValueAccessKind();
-        oldOpaqueValueAK =
-            (opaqueValueHadAK ? E->getOpaqueValue()->getLValueAccessKind()
-                              : AccessKind::Read);
-      }
-
-      visit(E->getSubExpr(), accessKind);
-
-      if (E->getOpaqueValue()) {
-        // Propagate the new access kind from the OVE to the original
-        // existential if we just set or changed it on the OVE.
-        if (E->getOpaqueValue()->hasLValueAccessKind()) {
-          auto newOpaqueValueAK = E->getOpaqueValue()->getLValueAccessKind();
-          if (!opaqueValueHadAK || newOpaqueValueAK != oldOpaqueValueAK)
-            visit(E->getExistentialValue(), newOpaqueValueAK);
-        }
-      }
-    }
-
-    LEAF_LVALUE_EXPR(DeclRef)
-    LEAF_LVALUE_EXPR(DiscardAssignment)
-    LEAF_LVALUE_EXPR(DynamicLookup)
-    LEAF_LVALUE_EXPR(OpaqueValue)
-    LEAF_LVALUE_EXPR(EditorPlaceholder)
-    LEAF_LVALUE_EXPR(Error)
-
-    COMPLETE_PHYSICAL_LVALUE_EXPR(AnyTry, getSubExpr())
-    PARTIAL_PHYSICAL_LVALUE_EXPR(BindOptional, getSubExpr())
-    COMPLETE_PHYSICAL_LVALUE_EXPR(DotSyntaxBaseIgnored, getRHS());
-    PARTIAL_PHYSICAL_LVALUE_EXPR(ForceValue, getSubExpr())
-    COMPLETE_PHYSICAL_LVALUE_EXPR(Identity, getSubExpr())
-    PARTIAL_PHYSICAL_LVALUE_EXPR(TupleElement, getBase())
-
-    NON_LVALUE_EXPR(Literal)
-    NON_LVALUE_EXPR(SuperRef)
-    NON_LVALUE_EXPR(Type)
-    NON_LVALUE_EXPR(OtherConstructorDeclRef)
-    NON_LVALUE_EXPR(Collection)
-    NON_LVALUE_EXPR(CaptureList)
-    NON_LVALUE_EXPR(AbstractClosure)
-    NON_LVALUE_EXPR(InOut)
-    NON_LVALUE_EXPR(DynamicType)
-    NON_LVALUE_EXPR(RebindSelfInConstructor)
-    NON_LVALUE_EXPR(Apply)
-    NON_LVALUE_EXPR(MakeTemporarilyEscapable)
-    NON_LVALUE_EXPR(ImplicitConversion)
-    NON_LVALUE_EXPR(ExplicitCast)
-    NON_LVALUE_EXPR(OptionalEvaluation)
-    NON_LVALUE_EXPR(If)
-    NON_LVALUE_EXPR(Assign)
-    NON_LVALUE_EXPR(CodeCompletion)
-    NON_LVALUE_EXPR(ObjCSelector)
-    NON_LVALUE_EXPR(KeyPath)
-    NON_LVALUE_EXPR(EnumIsCase)
-    // SWIFT_ENABLE_TENSORFLOW
-    NON_LVALUE_EXPR(Gradient)
-    NON_LVALUE_EXPR(ValueAndGradient)
-    NON_LVALUE_EXPR(Adjoint)
-    NON_LVALUE_EXPR(PoundAssert)
-
-#define UNCHECKED_EXPR(KIND, BASE) \
-    NON_LVALUE_EXPR(KIND)
-#include "swift/AST/ExprNodes.def"
-
-#undef PHYSICAL_LVALUE_EXPR
-#undef LEAF_LVALUE_EXPR
-#undef NON_LVALUE_EXPR
-  };
-
-  PropagateAccessKind(getType, allowOverwrite).visit(this, accessKind);
-}
-
 ConcreteDeclRef Expr::getReferencedDecl() const {
   switch (getKind()) {
   // No declaration reference.
@@ -418,6 +241,7 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   NO_REFERENCE(ObjectLiteral);
   NO_REFERENCE(MagicIdentifierLiteral);
   NO_REFERENCE(DiscardAssignment);
+  NO_REFERENCE(LazyInitializer);
 
   SIMPLE_REFERENCE(DeclRef, getDeclRef);
   SIMPLE_REFERENCE(SuperRef, getSelf);
@@ -534,6 +358,7 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   NO_REFERENCE(KeyPathDot);
   // SWIFT_ENABLE_TENSORFLOW
   NO_REFERENCE(Gradient);
+  NO_REFERENCE(ChainableGradient);
   NO_REFERENCE(ValueAndGradient);
   NO_REFERENCE(Adjoint);
   NO_REFERENCE(PoundAssert);
@@ -694,6 +519,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   switch (getKind()) {
   case ExprKind::Error:
   case ExprKind::CodeCompletion:
+  case ExprKind::LazyInitializer:
     return false;
 
   case ExprKind::NilLiteral:
@@ -707,6 +533,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::KeyPath:
   // SWIFT_ENABLE_TENSORFLOW
   case ExprKind::Gradient:
+  case ExprKind::ChainableGradient:
   case ExprKind::ValueAndGradient:
   case ExprKind::Adjoint:
     return true;
@@ -1021,6 +848,13 @@ LiteralExpr *LiteralExpr::shallowClone(
   return Result;
 }
 
+IntegerLiteralExpr * IntegerLiteralExpr::createFromUnsigned(ASTContext &C, unsigned value) {
+  llvm::SmallString<8> Scratch;
+  llvm::APInt(sizeof(unsigned)*8, value).toString(Scratch, 10, /*signed*/ false);
+  auto Text = C.AllocateCopy(StringRef(Scratch));
+  return new (C) IntegerLiteralExpr(Text, SourceLoc(), /*implicit*/ true);
+}
+
 /// A wrapper around LLVM::getAsInteger that can be used on Swift interger
 /// literals. It avoids misinterpreting decimal numbers prefixed with 0 as
 /// octal numbers.
@@ -1310,12 +1144,25 @@ GradientExpr *GradientExpr::create(ASTContext &ctx, SourceLoc loc,
                                    SourceLoc rParenLoc) {
   unsigned numParams = parameters.size();
   unsigned size =
-    sizeof(GradientExpr) + numParams * sizeof(AutoDiffIndexParameter);
+      sizeof(GradientExpr) + numParams * sizeof(AutoDiffIndexParameter);
   void *memory = ctx.Allocate(size, alignof(GradientExpr));
   return new (memory) GradientExpr(loc, lParenLoc, originalExpr, parameters,
                                    rParenLoc);
 }
 
+
+ChainableGradientExpr *
+ChainableGradientExpr::create(ASTContext &ctx, SourceLoc loc,
+                              SourceLoc lParenLoc, Expr *originalExpr,
+                              ArrayRef<AutoDiffIndexParameter> parameters,
+                              SourceLoc rParenLoc) {
+  unsigned numParams = parameters.size();
+  unsigned size = sizeof(ChainableGradientExpr)
+      + numParams * sizeof(AutoDiffIndexParameter);
+  void *memory = ctx.Allocate(size, alignof(ChainableGradientExpr));
+  return new (memory) ChainableGradientExpr(loc, lParenLoc, originalExpr,
+                                            parameters, rParenLoc);
+}
 
 ValueAndGradientExpr *
 ValueAndGradientExpr::create(ASTContext &ctx, SourceLoc loc,
@@ -1324,7 +1171,7 @@ ValueAndGradientExpr::create(ASTContext &ctx, SourceLoc loc,
                              SourceLoc rParenLoc) {
   unsigned numParams = parameters.size();
   unsigned size =
-    sizeof(ValueAndGradientExpr) + numParams * sizeof(AutoDiffIndexParameter);
+      sizeof(ValueAndGradientExpr) + numParams * sizeof(AutoDiffIndexParameter);
   void *memory = ctx.Allocate(size, alignof(ValueAndGradientExpr));
   return new (memory) ValueAndGradientExpr(loc, lParenLoc, originalExpr,
                                            parameters, rParenLoc);
@@ -1594,6 +1441,7 @@ TupleExpr *TupleExpr::create(ASTContext &ctx,
   assert((Implicit || ElementNames.size() == ElementNameLocs.size() ||
           (!hasNonEmptyIdentifier(ElementNames) && ElementNameLocs.empty())) &&
          "trying to create non-implicit tuple-expr without name locations");
+  (void)hasNonEmptyIdentifier;
 
   size_t size =
       totalSizeToAlloc<Expr *, Identifier, SourceLoc>(SubExprs.size(),

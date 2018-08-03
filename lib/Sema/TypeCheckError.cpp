@@ -41,7 +41,7 @@ private:
   };
   unsigned TheKind : 2;
   unsigned IsRethrows : 1;
-  unsigned ParamCount : 28;
+  unsigned ParamCount : 2;
 
 public:
   explicit AbstractFunction(Kind kind, Expr *fn)
@@ -54,7 +54,7 @@ public:
   explicit AbstractFunction(AbstractFunctionDecl *fn)
     : TheKind(Kind::Function),
       IsRethrows(fn->getAttrs().hasAttribute<RethrowsAttr>()),
-      ParamCount(fn->getNumParameterLists()) {
+      ParamCount(fn->hasImplicitSelfDecl() ? 2 : 1) {
     TheFunction = fn;
   }
 
@@ -134,6 +134,9 @@ public:
         fn = conversion->getSubExpr()->getValueProvidingExpr();
       } else if (auto conversion = dyn_cast<BindOptionalExpr>(fn)) {
         fn = conversion->getSubExpr()->getValueProvidingExpr();
+      // Look through optional injections.
+      } else if (auto injection = dyn_cast<InjectIntoOptionalExpr>(fn)) {
+        fn = injection->getSubExpr()->getValueProvidingExpr();
       // Look through function conversions.
       } else if (auto conversion = dyn_cast<FunctionConversionExpr>(fn)) {
         fn = conversion->getSubExpr()->getValueProvidingExpr();
@@ -923,7 +926,7 @@ public:
     }
 
     return Context(getKindForFunctionBody(
-        D->getInterfaceType(), D->getNumParameterLists()));
+        D->getInterfaceType(), D->hasImplicitSelfDecl() ? 2 : 1));
   }
 
   static Context forInitializer(Initializer *init) {

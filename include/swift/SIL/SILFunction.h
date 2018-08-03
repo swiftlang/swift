@@ -40,7 +40,12 @@ class SILProfiler;
 enum IsBare_t { IsNotBare, IsBare };
 enum IsTransparent_t { IsNotTransparent, IsTransparent };
 enum Inline_t { InlineDefault, NoInline, AlwaysInline };
-enum IsThunk_t { IsNotThunk, IsThunk, IsReabstractionThunk };
+enum IsThunk_t {
+  IsNotThunk,
+  IsThunk,
+  IsReabstractionThunk,
+  IsSignatureOptimizedThunk
+};
 
 class SILSpecializeAttr final {
   friend SILFunction;
@@ -109,38 +114,29 @@ class SILReverseDifferentiableAttr final {
   friend SILFunction;
 
 private:
-  /// The index of the original result to differentiate from.
-  unsigned SourceIndex;
-  /// The number of parameters of the original function to differentiate with
-  /// respect to.
-  unsigned NumParamIndices;
+  /// The AD indices.
+  SILReverseAutoDiffIndices indices;
   /// The primal and adjoint function names.
   StringRef PrimalName, AdjointName;
-  /// Constructor, copying parameter indices to the trailing buffer.
-  SILReverseDifferentiableAttr(unsigned sourceIndex,
-                               ArrayRef<unsigned> paramIndices,
+  
+  SILReverseDifferentiableAttr(const SILReverseAutoDiffIndices &indices,
                                StringRef primalName,
                                StringRef adjointName);
 
 public:
   static SILReverseDifferentiableAttr *create(
-    SILModule &M, unsigned sourceIndex, ArrayRef<unsigned> paramIndices,
-    StringRef primalName = StringRef(),
-    StringRef adjointName = StringRef());
-
-  StringRef getPrimalName() const { return PrimalName; }
+      SILModule &M, const SILReverseAutoDiffIndices &indices,
+      StringRef primalName = StringRef(), StringRef adjointName = StringRef());
+  
+  bool hasPrimal() const { return !PrimalName.empty(); }
+  StringRef getPrimalName() const { assert(hasPrimal()); return PrimalName; }
   void setPrimalName(StringRef name) { PrimalName = name; }
-  StringRef getAdjointName() const { return AdjointName; }
+
+  bool hasAdjoint() const { return !AdjointName.empty(); }
+  StringRef getAdjointName() const { assert(hasAdjoint()); return AdjointName; }
   void setAdjointName(StringRef name) { AdjointName = name; }
 
-  unsigned getSourceIndex() const {
-    return SourceIndex;
-  }
-  
-  ArrayRef<unsigned> getParamIndices() const;
-  unsigned *getParamIndicesData() {
-    return reinterpret_cast<unsigned *>(this+1);
-  }
+  const SILReverseAutoDiffIndices &getIndices() const { return indices; }
 
   void print(llvm::raw_ostream &OS) const;
 };
@@ -281,6 +277,33 @@ private:
   /// that the function's home module performed SIL diagnostics prior to
   /// serialization.
   bool WasDeserializedCanonical = false;
+
+  static void
+  validateSubclassScope(SubclassScope scope, IsThunk_t isThunk,
+                        const GenericSpecializationInformation *genericInfo) {
+#ifndef NDEBUG
+    // The _original_ function for a method can turn into a thunk through
+    // signature optimization, meaning it needs to retain its subclassScope, but
+    // other thunks and specializations are implementation details and so
+    // shouldn't be connected to their parent class.
+    bool thunkCanHaveSubclassScope;
+    switch (isThunk) {
+    case IsNotThunk:
+    case IsSignatureOptimizedThunk:
+      thunkCanHaveSubclassScope = true;
+      break;
+    case IsThunk:
+    case IsReabstractionThunk:
+      thunkCanHaveSubclassScope = false;
+      break;
+    }
+    auto allowsInterestingScopes = thunkCanHaveSubclassScope && !genericInfo;
+    assert(
+        allowsInterestingScopes ||
+        scope == SubclassScope::NotApplicable &&
+            "SubclassScope on specialization or non-signature-optimized thunk");
+#endif
+  }
 
   SILFunction(SILModule &module, SILLinkage linkage, StringRef mangledName,
               CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
@@ -640,13 +663,20 @@ public:
 
   /// Get this function's thunk attribute.
   IsThunk_t isThunk() const { return IsThunk_t(Thunk); }
-  void setThunk(IsThunk_t isThunk) { Thunk = isThunk; }
+  void setThunk(IsThunk_t isThunk) {
+    validateSubclassScope(getClassSubclassScope(), isThunk, SpecializationInfo);
+    Thunk = isThunk;
+  }
 
   /// Get the class visibility (relevant for class methods).
   SubclassScope getClassSubclassScope() const {
     return SubclassScope(ClassSubclassScope);
   }
-    
+  void setClassSubclassScope(SubclassScope scope) {
+    validateSubclassScope(scope, isThunk(), SpecializationInfo);
+    ClassSubclassScope = static_cast<unsigned>(scope);
+  }
+
   /// Get this function's noinline attribute.
   Inline_t getInlineStrategy() const { return Inline_t(InlineStrategy); }
   void setInlineStrategy(Inline_t inStr) { InlineStrategy = inStr; }
@@ -722,6 +752,7 @@ public:
 
   void setSpecializationInfo(const GenericSpecializationInformation *Info) {
     assert(!isSpecialization());
+    validateSubclassScope(getClassSubclassScope(), isThunk(), Info);
     SpecializationInfo = Info;
   }
 
@@ -927,6 +958,9 @@ public:
   /// block inside.  This depends on there being a 'dot' and 'gv' program in
   /// your path.
   void viewCFG() const;
+  /// Like ViewCFG, but the graph does not show the contents of basic blocks.
+  void viewCFGOnly() const;
+
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,

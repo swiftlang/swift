@@ -454,8 +454,7 @@ protected:
   NodePointer addFuncSpecParamNumber(NodePointer Param,
                               FunctionSigSpecializationParamKind Kind);
 
-  NodePointer demangleSpecAttributes(Node::Kind SpecKind,
-                                     bool demangleUniqueID = false);
+  NodePointer demangleSpecAttributes(Node::Kind SpecKind);
 
   NodePointer demangleWitness();
   NodePointer demangleSpecialType();

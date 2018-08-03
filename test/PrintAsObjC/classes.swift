@@ -18,7 +18,7 @@
 // RUN: %FileCheck --check-prefix=NEGATIVE %s < %t/classes.h
 // RUN: %check-in-clang -I %S/Inputs/custom-modules/ %t/classes.h
 // RUN: not %check-in-clang -I %S/Inputs/custom-modules/ -fno-modules -Qunused-arguments %t/classes.h
-// RUN: %check-in-clang -I %S/Inputs/custom-modules/ -fno-modules -Qunused-arguments %t/classes.h -include Foundation.h -include CoreFoundation.h -include objc_generics.h -include SingleGenericClass.h -include CompatibilityAlias.h
+// RUN: %check-in-clang -I %S/Inputs/custom-modules/ -fno-modules -Qunused-arguments %t/classes.h -include CoreFoundation.h -include objc_generics.h -include SingleGenericClass.h -include CompatibilityAlias.h
 
 // CHECK-NOT: AppKit;
 // CHECK-NOT: Properties;
@@ -42,7 +42,7 @@ import SingleGenericClass
 // CHECK-LABEL: @interface A1{{$}}
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
-@objc class A1 {}
+@objc @objcMembers class A1 {}
 
 // CHECK-LABEL: @interface B1 : A1
 // CHECK-NEXT: init
@@ -54,7 +54,7 @@ import SingleGenericClass
 // CHECK-NEXT: - (NSSet * _Nonnull)setBridge:(NSSet * _Nonnull)x SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
-@objc class BridgedTypes {
+@objc @objcMembers class BridgedTypes {
   @objc func dictBridge(_ x: Dictionary<NSObject, AnyObject>) -> Dictionary<NSObject, AnyObject> {
     return x
   }
@@ -71,7 +71,8 @@ import SingleGenericClass
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc(CustomName)
-class ClassWithCustomName {
+@objcMembers
+ class ClassWithCustomName {
   @objc func forwardCustomName(_: ClassWithCustomName2) {}
 }
   
@@ -80,6 +81,7 @@ class ClassWithCustomName {
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc(CustomName2)
+@objcMembers
 class ClassWithCustomName2 {}
   
 // CHECK-LABEL: SWIFT_CLASS_NAMED("ClassWithCustomNameSub")
@@ -96,7 +98,7 @@ class ClassWithCustomNameSub : ClassWithCustomName {}
 // CHECK-NEXT: - (BOOL)isKindOfClass:(Class _Nonnull)aClass SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: @end
-@objc class ClassWithNSObjectProtocol : NSObjectProtocol {
+@objc @objcMembers class ClassWithNSObjectProtocol : NSObjectProtocol {
   @objc var description: String { return "me" }
   @objc(conformsToProtocol:)
   func conforms(to _: Protocol) -> Bool { return false }
@@ -290,6 +292,8 @@ class NotObjC {}
   @objc func initializeEvenMoreThings() {}
 
   @objc(newWithFoo:) class func make(foo: Int) -> Methods { return Methods() }
+
+  @objc init() {}
 }
 
 typealias AliasForNSRect = NSRect
@@ -310,7 +314,7 @@ typealias AliasForNSRect = NSRect
 // CHECK-NEXT: - (NSURL * _Nullable)returnsURL SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
-@objc class MethodsWithImports {
+@objc @objcMembers class MethodsWithImports {
   @objc func getOrigin(_ r: NSRect) -> NSPoint { return r.origin }
   @objc func getOriginX(_ r: AliasForNSRect) -> CGFloat { return r.origin.x }
   @objc func getOriginY(_ r: CGRect) -> CGFloat { return r.origin.y }
@@ -340,7 +344,7 @@ typealias AliasForNSRect = NSRect
 // CHECK-NEXT: - (void)testBridgingOptionality:(NSInteger const * _Nullable)a b:(NSInteger * _Null_unspecified)b c:(Methods * _Nullable * _Nullable)c;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
-@objc class MethodsWithPointers {
+@objc @objcMembers class MethodsWithPointers {
   @objc func test(_ a: UnsafeMutablePointer<Int>) -> UnsafeMutablePointer<AnyObject> {
     return UnsafeMutablePointer(bitPattern: -1)!
   }
@@ -368,7 +372,7 @@ class MyObject : NSObject {}
 // CHECK-NEXT: - (void)test:(Class <MyProtocolMetaOnly> _Nullable)x;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
-@objc class MyProtocolMetaCheck {
+@objc @objcMembers class MyProtocolMetaCheck {
   @objc func test(_ x: MyProtocolMetaOnly.Type?) {}
 }
 // CHECK-LABEL: @protocol MyProtocolMetaOnly
@@ -378,21 +382,21 @@ class MyObject : NSObject {}
 // CHECK-LABEL: @interface Nested
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
-@objc class Nested {
+@objc @objcMembers class Nested {
   // CHECK-LABEL: @interface Inner
   // CHECK-NEXT: init
   // CHECK-NEXT: @end
-  @objc class Inner {
+  @objc @objcMembers class Inner {
     // CHECK-LABEL: @interface DeeperIn
     // CHECK-NEXT: init
     // CHECK-NEXT: @end
-    @objc class DeeperIn {}
+    @objc @objcMembers class DeeperIn {}
   }
 
   // CHECK-LABEL: @interface AnotherInner : A1
   // CHECK-NEXT: init
   // CHECK-NEXT: @end
-  @objc class AnotherInner : A1 {}
+  @objc @objcMembers class AnotherInner : A1 {}
 
   // NEGATIVE-NOT: NonObjCInner
   class NonObjCInner {}
@@ -407,13 +411,13 @@ class MyObject : NSObject {}
 // CHECK-NEXT: @property (nonatomic, strong) Inner3 * _Nullable ref3;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
-@objc class NestedMembers {
+@objc @objcMembers class NestedMembers {
   // NEGATIVE-NOT: @class NestedMembers;
   // CHECK-LABEL: @interface Inner2
   // CHECK-NEXT: @property (nonatomic, strong) NestedMembers * _Nullable ref;
   // CHECK-NEXT: init
   // CHECK-NEXT: @end
-  @objc class Inner2 {
+  @objc @objcMembers class Inner2 {
     @objc var ref: NestedMembers?
   }
 
@@ -424,7 +428,7 @@ class MyObject : NSObject {}
   // CHECK-NEXT: @property (nonatomic, strong) NestedMembers * _Nullable ref;
   // CHECK-NEXT: init
   // CHECK-NEXT: @end
-  @objc class Inner3 {
+  @objc @objcMembers class Inner3 {
     @objc var ref: NestedMembers?
   }
 }
@@ -432,11 +436,11 @@ class MyObject : NSObject {}
 // CHECK-LABEL: @interface NestedSuperclass
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
-@objc class NestedSuperclass {
+@objc @objcMembers class NestedSuperclass {
   // CHECK-LABEL: @interface Subclass : NestedSuperclass
   // CHECK-NEXT: init
   // CHECK-NEXT: @end
-  @objc class Subclass : NestedSuperclass {}
+  @objc @objcMembers class Subclass : NestedSuperclass {}
 }
 
 // CHECK-LABEL: @interface NewBanned
@@ -444,7 +448,7 @@ class MyObject : NSObject {}
 // CHECK-NEXT: - (nonnull instancetype)init SWIFT_UNAVAILABLE;
 // CHECK-NEXT: + (nonnull instancetype)new SWIFT_DEPRECATED_MSG("-init is unavailable");
 // CHECK-NEXT: @end
-@objc class NewBanned : NSObject {
+@objc @objcMembers class NewBanned : NSObject {
   init(arbitraryArgument: Int) { super.init() }
 }
 
@@ -452,7 +456,7 @@ class MyObject : NSObject {}
 // CHECK-NEXT: - (nonnull instancetype)initWithDifferentArbitraryArgument:(NSInteger)differentArbitraryArgument OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: - (nonnull instancetype)initWithArbitraryArgument:(NSInteger)arbitraryArgument SWIFT_UNAVAILABLE;
 // CHECK-NEXT: @end
-@objc class NewBannedStill : NewBanned {
+@objc @objcMembers class NewBannedStill : NewBanned {
   init(differentArbitraryArgument: Int) { super.init(arbitraryArgument: 0) }
 }
 
@@ -461,7 +465,7 @@ class MyObject : NSObject {}
 // CHECK-NEXT: + (nonnull instancetype)new;
 // CHECK-NEXT: - (nonnull instancetype)initWithArbitraryArgument:(NSInteger)arbitraryArgument SWIFT_UNAVAILABLE;
 // CHECK-NEXT: @end
-@objc class NewUnbanned : NewBanned {
+@objc @objcMembers class NewUnbanned : NewBanned {
   init() { super.init(arbitraryArgument: 0) }
 }
 
@@ -470,7 +474,7 @@ class MyObject : NSObject {}
 // CHECK-NEXT: + (nonnull instancetype)new;
 // CHECK-NEXT: - (nonnull instancetype)initWithDifferentArbitraryArgument:(NSInteger)differentArbitraryArgument SWIFT_UNAVAILABLE;
 // CHECK-NEXT: @end
-@objc class NewUnbannedDouble : NewBannedStill {
+@objc @objcMembers class NewUnbannedDouble : NewBannedStill {
   init() { super.init(differentArbitraryArgument: 0) }
 }
 
@@ -664,6 +668,8 @@ public class NonObjCClass { }
   }
 
   @objc var customValueTypeProp: URL?
+
+  @objc init() {}
 }
 
 // CHECK-LABEL: @interface PropertiesOverridden
@@ -690,7 +696,7 @@ public class NonObjCClass { }
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class ReversedOrder1 : ReversedOrder2 {}
-@objc class ReversedOrder2 {}
+@objc @objcMembers class ReversedOrder2 {}
 
 
 // CHECK-LABEL: @interface Subscripts1
@@ -698,7 +704,7 @@ public class NonObjCClass { }
 // CHECK-NEXT: - (Subscripts1 * _Nonnull)objectForKeyedSubscript:(Subscripts1 * _Nonnull)o SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
-@objc class Subscripts1 {
+@objc @objcMembers class Subscripts1 {
   @objc subscript (i: Int) -> Subscripts1 {
     return self
   }
@@ -716,7 +722,7 @@ public class NonObjCClass { }
 // CHECK-NEXT: @property (nonatomic, copy) NSArray<NSString *> * _Nonnull cardPaths;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
-@objc class Subscripts2 {
+@objc @objcMembers class Subscripts2 {
   @objc subscript (i: Int16) -> Subscripts2 {
     get {
       return self
@@ -743,7 +749,7 @@ public class NonObjCClass { }
 // CHECK-NEXT: - (Subscripts3 * _Nonnull)objectAtIndexedSubscript:(unsigned long)_ SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
-@objc class Subscripts3 {
+@objc @objcMembers class Subscripts3 {
   @objc subscript (_: CUnsignedLong) -> Subscripts3 {
     return self
   }

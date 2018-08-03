@@ -30,7 +30,7 @@ static StringRef getRuntimeLibPath() {
 namespace {
 
 class NullEditorConsumer : public EditorConsumer {
-  bool needsSemanticInfo() override { return false; }
+  bool needsSemanticInfo() override { return needsSema; }
 
   void handleRequestError(const char *Description) override {
     llvm_unreachable("unexpected error");
@@ -90,6 +90,16 @@ class NullEditorConsumer : public EditorConsumer {
   bool handleSourceText(StringRef Text) override { return false; }
   bool handleSerializedSyntaxTree(StringRef Text) override { return false; }
   bool syntaxTreeEnabled() override { return false; }
+  bool forceLibSyntaxBasedProcessing() override { return false; }
+
+  bool syntaxReuseInfoEnabled() override { return false; }
+
+  bool handleSyntaxReuseRegions(
+      std::vector<SourceFileRange> ReuseRegions) override {
+    return false;
+  }
+public:
+  bool needsSema = false;
 };
 
 struct TestCursorInfo {
@@ -100,8 +110,9 @@ struct TestCursorInfo {
 };
 
 class CursorInfoTest : public ::testing::Test {
-  SourceKit::Context Ctx{ getRuntimeLibPath(), SourceKit::createSwiftLangSupport };
+  SourceKit::Context &Ctx;
   std::atomic<int> NumTasks;
+  NullEditorConsumer Consumer;
 
 public:
   LangSupport &getLang() { return Ctx.getSwiftLangSupport(); }
@@ -114,20 +125,29 @@ public:
     NumTasks = 0;
   }
 
+  CursorInfoTest()
+      : Ctx(*new SourceKit::Context(getRuntimeLibPath(),
+                                    SourceKit::createSwiftLangSupport,
+                                    /*dispatchOnMain=*/false)) {
+    // This is avoiding destroying \p SourceKit::Context because another
+    // thread may be active trying to use it to post notifications.
+    // FIXME: Use shared_ptr ownership to avoid such issues.
+  }
+
   void addNotificationReceiver(DocumentUpdateNotificationReceiver Receiver) {
     Ctx.getNotificationCenter().addDocumentUpdateNotificationReceiver(Receiver);
   }
 
-  void open(StringRef DocName, StringRef Text) {
-    NullEditorConsumer Consumer;
+  void open(const char *DocName, StringRef Text,
+            Optional<ArrayRef<const char *>> CArgs = llvm::None) {
+    auto Args = CArgs.hasValue() ? makeArgs(DocName, *CArgs)
+                                 : std::vector<const char *>{};
     auto Buf = MemoryBuffer::getMemBufferCopy(Text, DocName);
-    getLang().editorOpen(DocName, Buf.get(), /*EnableSyntaxMap=*/false, Consumer,
-                         /*Args=*/{});
+    getLang().editorOpen(DocName, Buf.get(), Consumer, Args);
   }
 
   void replaceText(StringRef DocName, unsigned Offset, unsigned Length,
                    StringRef Text) {
-    NullEditorConsumer Consumer;
     auto Buf = MemoryBuffer::getMemBufferCopy(Text, DocName);
     getLang().editorReplaceText(DocName, Buf.get(), Offset, Length, Consumer);
   }
@@ -158,6 +178,8 @@ public:
     assert(pos != StringRef::npos);
     return pos;
   }
+
+  void setNeedsSema(bool needsSema) { Consumer.needsSema = needsSema; }
 
 private:
   std::vector<const char *> makeArgs(const char *DocName,
@@ -336,14 +358,43 @@ TEST_F(CursorInfoTest, CursorInfoMustWaitDueToken) {
   replaceText(DocName, findOffset(TextToReplace, Contents), TextToReplace.size(),
               ExpensiveInit);
   // Change 'foo' to 'fog' by replacing the last character.
-  replaceText(DocName, FooRefOffs+2, 1, "g");
   replaceText(DocName, FooOffs+2, 1, "g");
+  replaceText(DocName, FooRefOffs+2, 1, "g");
 
   // Should wait for the new AST, because the cursor location points to a
   // different token.
   Info = getCursor(DocName, FooRefOffs, Args);
   EXPECT_STREQ("fog", Info.Name.c_str());
   EXPECT_STREQ("[Int : Int]", Info.Typename.c_str());
+  ASSERT_TRUE(Info.DeclarationLoc.hasValue());
+  EXPECT_EQ(FooOffs, Info.DeclarationLoc->first);
+  EXPECT_EQ(strlen("fog"), Info.DeclarationLoc->second);
+}
+
+TEST_F(CursorInfoTest, CursorInfoMustWaitDueTokenRace) {
+  const char *DocName = "/test.swift";
+  const char *Contents = "let value = foo\n"
+                         "let foo = 0\n";
+  const char *Args[] = {"-parse-as-library"};
+
+  auto FooRefOffs = findOffset("foo", Contents);
+  auto FooOffs = findOffset("foo =", Contents);
+
+  // Open with args, kicking off an ast build. The hope of this tests is for
+  // this AST to still be in the process of building when we start the cursor
+  // info, to ensure the ASTManager doesn't try to handle this cursor info with
+  // the wrong AST.
+  setNeedsSema(true);
+  open(DocName, Contents, llvm::makeArrayRef(Args));
+  // Change 'foo' to 'fog' by replacing the last character.
+  replaceText(DocName, FooOffs + 2, 1, "g");
+  replaceText(DocName, FooRefOffs + 2, 1, "g");
+
+  // Should wait for the new AST, because the cursor location points to a
+  // different token.
+  auto Info = getCursor(DocName, FooRefOffs, Args);
+  EXPECT_STREQ("fog", Info.Name.c_str());
+  EXPECT_STREQ("Int", Info.Typename.c_str());
   ASSERT_TRUE(Info.DeclarationLoc.hasValue());
   EXPECT_EQ(FooOffs, Info.DeclarationLoc->first);
   EXPECT_EQ(strlen("fog"), Info.DeclarationLoc->second);

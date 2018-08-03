@@ -404,9 +404,11 @@ void EscapeAnalysis::ConnectionGraph::computeUsePoints() {
 
     for (auto &I : BB) {
       switch (I.getKind()) {
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+        case SILInstructionKind::Name##ReleaseInst:
+#include "swift/AST/ReferenceStorage.def"
         case SILInstructionKind::StrongReleaseInst:
         case SILInstructionKind::ReleaseValueInst:
-        case SILInstructionKind::UnownedReleaseInst:
         case SILInstructionKind::ApplyInst:
         case SILInstructionKind::TryApplyInst: {
           /// Actually we only add instructions which may release a reference.
@@ -991,11 +993,9 @@ void EscapeAnalysis::ConnectionGraph::verifyStructure() const {
 //                          EscapeAnalysis
 //===----------------------------------------------------------------------===//
 
-EscapeAnalysis::EscapeAnalysis(SILModule *M) :
-  BottomUpIPAnalysis(AnalysisKind::Escape), M(M),
-  ArrayType(M->getASTContext().getArrayDecl()), BCA(nullptr) {
-}
-
+EscapeAnalysis::EscapeAnalysis(SILModule *M)
+    : BottomUpIPAnalysis(SILAnalysisKind::Escape), M(M),
+      ArrayType(M->getASTContext().getArrayDecl()), BCA(nullptr) {}
 
 void EscapeAnalysis::initialize(SILPassManager *PM) {
   BCA = PM->getAnalysis<BasicCalleeAnalysis>();
@@ -1080,7 +1080,7 @@ void EscapeAnalysis::buildConnectionGraph(FunctionInfo *FInfo,
   if (BottomUpOrder.prepareForVisiting(FInfo))
     return;
 
-  DEBUG(llvm::dbgs() << "  >> build graph for " <<
+  LLVM_DEBUG(llvm::dbgs() << "  >> build graph for " <<
         FInfo->Graph.F->getName() << '\n');
 
   FInfo->NeedUpdateSummaryGraph = true;
@@ -1138,7 +1138,7 @@ void EscapeAnalysis::buildConnectionGraph(FunctionInfo *FInfo,
       }
     }
   }
-  DEBUG(llvm::dbgs() << "  << finished graph for " <<
+  LLVM_DEBUG(llvm::dbgs() << "  << finished graph for " <<
         FInfo->Graph.F->getName() << '\n');
 }
 
@@ -1369,11 +1369,14 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       ConGraph->getNode(cast<SingleValueInstruction>(I), this);
       return;
 
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+    case SILInstructionKind::Name##RetainInst: \
+    case SILInstructionKind::StrongRetain##Name##Inst: \
+    case SILInstructionKind::Copy##Name##ValueInst:
+#include "swift/AST/ReferenceStorage.def"
     case SILInstructionKind::DeallocStackInst:
     case SILInstructionKind::StrongRetainInst:
-    case SILInstructionKind::StrongRetainUnownedInst:
     case SILInstructionKind::RetainValueInst:
-    case SILInstructionKind::UnownedRetainInst:
     case SILInstructionKind::BranchInst:
     case SILInstructionKind::CondBranchInst:
     case SILInstructionKind::SwitchEnumInst:
@@ -1390,10 +1393,13 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     case SILInstructionKind::ValueToBridgeObjectInst:
       // These instructions don't have any effect on escaping.
       return;
+
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+    case SILInstructionKind::Name##ReleaseInst:
+#include "swift/AST/ReferenceStorage.def"
     case SILInstructionKind::StrongReleaseInst:
     case SILInstructionKind::ReleaseValueInst:
-    case SILInstructionKind::StrongUnpinInst:
-    case SILInstructionKind::UnownedReleaseInst: {
+    case SILInstructionKind::StrongUnpinInst: {
       SILValue OpV = I->getOperand(0);
       if (CGNode *AddrNode = ConGraph->getNode(OpV, this)) {
         // A release instruction may deallocate the pointer operand. This may
@@ -1409,8 +1415,11 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       }
       return;
     }
+
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+    case SILInstructionKind::Load##Name##Inst:
+#include "swift/AST/ReferenceStorage.def"
     case SILInstructionKind::LoadInst:
-    case SILInstructionKind::LoadWeakInst:
     // We treat ref_element_addr like a load (see NodeType::Content).
     case SILInstructionKind::RefElementAddrInst:
     case SILInstructionKind::RefTailAddrInst:
@@ -1461,9 +1470,11 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       }
       return;
     }
-    break;
+
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+    case SILInstructionKind::Store##Name##Inst:
+#include "swift/AST/ReferenceStorage.def"
     case SILInstructionKind::StoreInst:
-    case SILInstructionKind::StoreWeakInst:
       if (CGNode *ValueNode = ConGraph->getNode(I->getOperand(StoreInst::Src),
                                                 this)) {
         CGNode *AddrNode = ConGraph->getNode(I->getOperand(StoreInst::Dest),
@@ -1540,8 +1551,6 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     case SILInstructionKind::UpcastInst:
     case SILInstructionKind::InitExistentialRefInst:
     case SILInstructionKind::OpenExistentialRefInst:
-    case SILInstructionKind::UnownedToRefInst:
-    case SILInstructionKind::RefToUnownedInst:
     case SILInstructionKind::RawPointerToRefInst:
     case SILInstructionKind::RefToRawPointerInst:
     case SILInstructionKind::RefToBridgeObjectInst:
@@ -1549,6 +1558,12 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     case SILInstructionKind::UncheckedAddrCastInst:
     case SILInstructionKind::UnconditionalCheckedCastInst:
     case SILInstructionKind::StrongPinInst:
+    // DO NOT use LOADABLE_REF_STORAGE because unchecked references don't have
+    // retain/release instructions that trigger the 'default' case.
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+    case SILInstructionKind::RefTo##Name##Inst: \
+    case SILInstructionKind::Name##ToRefInst:
+#include "swift/AST/ReferenceStorage.def"
       // A cast is almost like a projection.
       if (CGNode *OpNode = ConGraph->getNode(I->getOperand(0), this)) {
         ConGraph->setNode(cast<SingleValueInstruction>(I), OpNode);
@@ -1648,7 +1663,7 @@ void EscapeAnalysis::setAllEscaping(SILInstruction *I,
 void EscapeAnalysis::recompute(FunctionInfo *Initial) {
   allocNewUpdateID();
 
-  DEBUG(llvm::dbgs() << "recompute escape analysis with UpdateID " <<
+  LLVM_DEBUG(llvm::dbgs() << "recompute escape analysis with UpdateID " <<
         getCurrentUpdateID() << '\n');
 
   // Collect and analyze all functions to recompute, starting at Initial.
@@ -1664,13 +1679,13 @@ void EscapeAnalysis::recompute(FunctionInfo *Initial) {
   int Iteration = 0;
   bool NeedAnotherIteration;
   do {
-    DEBUG(llvm::dbgs() << "iteration " << Iteration << '\n');
+    LLVM_DEBUG(llvm::dbgs() << "iteration " << Iteration << '\n');
     NeedAnotherIteration = false;
 
     for (FunctionInfo *FInfo : BottomUpOrder) {
       bool SummaryGraphChanged = false;
       if (FInfo->NeedUpdateSummaryGraph) {
-        DEBUG(llvm::dbgs() << "  create summary graph for " <<
+        LLVM_DEBUG(llvm::dbgs() << "  create summary graph for " <<
               FInfo->Graph.F->getName() << '\n');
 
         FInfo->Graph.propagateEscapeStates();
@@ -1693,7 +1708,7 @@ void EscapeAnalysis::recompute(FunctionInfo *Initial) {
 
             // Only include callers which we are actually recomputing.
             if (BottomUpOrder.wasRecomputedWithCurrentUpdateID(E.Caller)) {
-              DEBUG(llvm::dbgs() << "  merge  " << FInfo->Graph.F->getName() <<
+              LLVM_DEBUG(llvm::dbgs() << "  merge  " << FInfo->Graph.F->getName() <<
                     " into " << E.Caller->Graph.F->getName() << '\n');
 
               if (mergeCalleeGraph(E.FAS, &E.Caller->Graph,
@@ -1711,7 +1726,7 @@ void EscapeAnalysis::recompute(FunctionInfo *Initial) {
         // Limit the total number of iterations. First to limit compile time,
         // second to make sure that the loop terminates. Theoretically this
         // should always be the case, but who knows?
-        DEBUG(llvm::dbgs() << "  finalize conservatively " <<
+        LLVM_DEBUG(llvm::dbgs() << "  finalize conservatively " <<
               FInfo->Graph.F->getName() << '\n');
         for (const auto &E : FInfo->getCallers()) {
           assert(E.isValid());
@@ -1987,12 +2002,12 @@ bool EscapeAnalysis::canParameterEscape(FullApplySite FAS, int ParamIdx,
 void EscapeAnalysis::invalidate() {
   Function2Info.clear();
   Allocator.DestroyAll();
-  DEBUG(llvm::dbgs() << "invalidate all\n");
+  LLVM_DEBUG(llvm::dbgs() << "invalidate all\n");
 }
 
 void EscapeAnalysis::invalidate(SILFunction *F, InvalidationKind K) {
   if (FunctionInfo *FInfo = Function2Info.lookup(F)) {
-    DEBUG(llvm::dbgs() << "  invalidate " << FInfo->Graph.F->getName() << '\n');
+    LLVM_DEBUG(llvm::dbgs() << "  invalidate " << FInfo->Graph.F->getName() << '\n');
     invalidateIncludingAllCallers(FInfo);
   }
 }

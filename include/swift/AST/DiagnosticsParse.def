@@ -257,13 +257,15 @@ ERROR(getset_nontrivial_pattern,none,
       "getter/setter can only be defined for a single variable", ())
 ERROR(expected_rbrace_in_getset,none,
       "expected '}' at end of variable get/set clause", ())
-ERROR(duplicate_property_accessor,none,
-      "duplicate definition of %0", (StringRef))
+ERROR(duplicate_accessor,none,
+      "%select{variable|subscript}0 already has %1", (unsigned, StringRef))
+ERROR(conflicting_accessor,none,
+      "%select{variable|subscript}0 cannot provide both %1 and %2",
+      (unsigned, StringRef, StringRef))
+ERROR(modify_mutatingness_different_from_setter,none,
+      "mutating-ness of 'modify' accessor cannot differ from setter", ())
 NOTE(previous_accessor,none,
-     "previous definition of %0 is here", (StringRef))
-ERROR(conflicting_property_addressor,none,
-      "%select{variable|subscript}0 already has a "
-      "%select{addressor|mutable addressor}1", (unsigned, unsigned))
+     "%select{|previous definition of }1%0 %select{defined |}1here", (StringRef, bool))
 ERROR(expected_accessor_name,none,
       "expected %select{%error|setter|%error|willSet|didSet}0 parameter name",
       (unsigned))
@@ -278,32 +280,22 @@ ERROR(expected_lbrace_accessor,PointsToFirstBadToken,
 ERROR(expected_accessor_kw,none,
       "expected 'get', 'set', 'willSet', or 'didSet' keyword to "
       "start an accessor definition",())
-ERROR(var_set_without_get,none,
-      "variable with a setter must also have a getter", ())
-ERROR(observingproperty_with_getset,none,
-      "%select{willSet|didSet}0 variable must not also have a "
-      "%select{get|set}1 specifier", (unsigned, unsigned))
-ERROR(observingproperty_without_mutableaddress,none,
-      "%select{willSet|didSet}0 variable with addressor must provide a "
-      "'mutableAddress' accessor", (unsigned))
-ERROR(observingproperty_in_subscript,none,
-      "%select{willSet|didSet}0 is not allowed in subscripts", (unsigned))
+ERROR(missing_getter,none,
+      "%select{variable|subscript}0 with %1 must also have a getter",
+      (unsigned, StringRef))
+ERROR(missing_reading_accessor,none,
+      "%select{variable|subscript}0 with %1 must also have "
+      "a getter or an addressor",
+      (unsigned, StringRef))
+ERROR(observing_accessor_conflicts_with_accessor,none,
+      "%select{'willSet'|'didSet'}0 cannot be provided together with %1",
+      (unsigned, StringRef))
+ERROR(observing_accessor_in_subscript,none,
+      "%select{'willSet'|'didSet'}0 is not allowed in subscripts", (unsigned))
 ERROR(getset_init,none,
       "variable with getter/setter cannot have an initial value", ())
 ERROR(getset_cannot_be_implied,none,
       "variable with implied type cannot have implied getter/setter", ())
-ERROR(mutableaddressor_without_address,none,
-      "%select{variable|subscript}0 must provide either a getter or "
-      "'address' if it provides 'mutableAddress'", (unsigned))
-ERROR(mutableaddressor_with_setter,none,
-      "%select{variable|subscript}0 cannot provide both 'mutableAddress' "
-      " and a setter", (unsigned))
-ERROR(addressor_with_getter,none,
-      "%select{variable|subscript}0 cannot provide both 'address' and "
-      "a getter", (unsigned))
-ERROR(addressor_with_setter,none,
-      "%select{variable|subscript}0 cannot provide both 'address' and "
-      "a setter; use an ordinary getter instead", (unsigned))
 ERROR(behavior_multiple_vars,none,
       "applying property behavior with parameter to multiple variables is "
       "not supported", ())
@@ -551,12 +543,9 @@ ERROR(sil_invalid_instr_operands,none,
       "invalid instruction operands", ())
 ERROR(sil_operand_not_address,none,
       "%0 operand of '%1' must have address type", (StringRef, StringRef))
-ERROR(sil_operand_not_unowned_address,none,
-      "%0 operand of '%1' must have address of [unowned] type",
-      (StringRef, StringRef))
-ERROR(sil_operand_not_weak_address,none,
-      "%0 operand of '%1' must have address of [weak] type",
-      (StringRef, StringRef))
+ERROR(sil_operand_not_ref_storage_address,none,
+      "%0 operand of '%1' must have address of %2 type",
+      (StringRef, StringRef, ReferenceOwnership))
 ERROR(sil_integer_literal_not_integer_type,none,
       "integer_literal instruction requires a 'Builtin.Int<n>' type", ())
 ERROR(sil_float_literal_not_float_type,none,
@@ -1504,6 +1493,12 @@ ERROR(sil_reverse_autodiff_expected_source_index,PointsToFirstBadToken,
 ERROR(sil_reverse_autodiff_expected_parameter_index,PointsToFirstBadToken,
       "expected the index of a parameter to differentiate with respect to", ())
 
+ERROR(sil_reverse_autodiff_expected_option,PointsToFirstBadToken,
+      "expected a gradient option: 'seedable', 'preserving_result' or 'delayed'", ())
+
+ERROR(sil_reverse_autodiff_duplicate_option,PointsToFirstBadToken,
+      "duplicate gradient option", ())
+
 ERROR(sil_gradient_invalid_seed_type,PointsToFirstBadToken,
       "expected seed '%0' to have type %1", (StringRef, Type))
 
@@ -1701,8 +1696,10 @@ ERROR(sil_const_expected_fp_datatype,PointsToFirstBadToken,
       "expected floating point datatype ('f32' or 'f64')", ())
 ERROR(sil_const_expected_fp_value,PointsToFirstBadToken,
       "expected floating point value in SIL constant value", ())
-ERROR(sil_const_aggregate_expected_rsquare,PointsToFirstBadToken,
-      "expected ']' at end of aggregate 'SymbolicValue'", ())
+ERROR(sil_const_array_expected_rsquare,PointsToFirstBadToken,
+      "expected ']' at end of array 'SymbolicValue'", ())
+ERROR(sil_const_aggregate_expected_rparen,PointsToFirstBadToken,
+      "expected ')' at end of aggregate 'SymbolicValue'", ())
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

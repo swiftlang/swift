@@ -10,7 +10,7 @@ import gizmo
 @objc class ObjCClass {}
 
 class A {
-  dynamic subscript (i: Int) -> ObjCClass {
+  @objc dynamic subscript (i: Int) -> ObjCClass {
     get {
       return ObjCClass()
     }

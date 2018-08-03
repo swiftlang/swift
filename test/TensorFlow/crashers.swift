@@ -64,7 +64,6 @@ public func lowerGraphCrash(x: Tensor<Int32>) {
 
   _ = x*x  // expected-note {{value used here}}
   for _ in 0..<1000 {
-    // expected-error @+1{{FIXME: cannot lower a Host->TF tensor transfer in a loop header}}
     _ = x+someGlobal // expected-warning {{value implicitly copied to the accelerator}}
   }
 }
@@ -167,12 +166,6 @@ public func testGenericThing() {
 }
 
 
-// b/75247714: #tfop crashes when attribute argument is a tuple
-public func test75247714() {
-  // expected-error @+1 {{attribute 'bar' requires a constant argument}}
-  let _ : () = #tfop("foo", bar: (1, 2))
-}
-
 // b/76058387: Deabstraction crasher
 public func testPropagateScalarOperands() {
   let bounds = 0..<10
@@ -193,18 +186,6 @@ public func tensorEndPointComputation() -> Int {
   } while i < 10
 
   return retval
-}
-
-
-// b/76115311
-func genericMethod76115311<Scalar : Numeric>(with value: Scalar = 0) -> Tensor<Scalar> {
-  // expected-error @+1 {{operand has unrecognized type}}
-  return #tfop("FooOp", value)
-}
-
-public func b76115311() {
-  let matrix: Tensor<Float> = genericMethod76115311()
-  _ = matrix+matrix
 }
 
 
@@ -263,7 +244,6 @@ public func testMultiResultOp_send_recv() {
   // Accelerator -> Host
   _hostOp(x)
   x += [[2.0]]
-  // expected-warning @+2{{implicitly copied to the host}}
   // expected-warning @+1{{implicitly copied to the host}}
   let results = TensorFlow.Raw.softmaxCrossEntropyWithLogits(features: x, labels: x)
   // Accelerator -> Host
@@ -332,7 +312,7 @@ public func SR8226(n: Float, m: Float, cond: Bool, cond2: Bool) {
 // expected-warning @+1{{implicitly copied to the accelerator}}
 public func SR8228_unusedTensorBBArg(n: Int32, x: Tensor<Float>) {
   var a = Tensor<Float>(1.0)
-  // expected-warning @+1{{variable 'b' was written to, but never read}}  
+  // expected-warning @+1{{variable 'b' was written to, but never read}}
   var b = x
   var i: Int32 = 0
   // expected-warning @+2{{implicitly copied to the accelerator}}
@@ -341,5 +321,43 @@ public func SR8228_unusedTensorBBArg(n: Int32, x: Tensor<Float>) {
     a += a
     b = a
     i += 1
+  }
+}
+
+// When handling cond_br with ThensorHandle<Elem> in PartitionCloner, only Builtin.i1
+// was considered for Elem type. As a result, Elem of Bool type crashed the compiler.
+public func SR8222_cond_br_TensorHandle_Bool() {
+  let t = Tensor<Float>(1.0)
+  var i = Tensor<Int32>(0)
+  repeat {
+    let y = t + t
+    // expected-warning @-1{{implicitly copied to the host}}
+    print(y)
+    i += 1
+  } while i != Tensor<Int32>(10)
+  // expected-warning @-1{{implicitly copied to the host}}
+}
+
+// Previously, dead instruction cleanup during deabstraction crashed while
+// compiling the following code. (Instructions were deleted from a basic block
+// while traversing the basic block, causing iterator invalidation).
+func SR8316_helper() -> Tensor<Int32> {
+  return Tensor(1)
+}
+func SR8316_main() {
+  // It is important that `float` is let-bound so that a debug_value
+  // instruction is produced, which is what triggered the original crash.
+  let float: Float = 0.1 // expected-warning {{immutable value 'float' was never used}}
+  _ = SR8316_helper()
+}
+
+func readDataset() -> (images: Tensor<Float>, labels: Tensor<Int32>)? {
+    print("Reading the data.")
+    return (Tensor<Float>(1.0), Tensor<Int32>(1))
+}
+
+public func constFoldingBug() {
+  guard let _ = readDataset() else {
+    return
   }
 }

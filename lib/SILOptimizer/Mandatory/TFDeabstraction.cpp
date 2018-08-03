@@ -43,9 +43,13 @@ TFDumpDeabstractionDetails("tf-dump-deabstraction-details",
                            llvm::cl::init(false),
            llvm::cl::desc("Dump extra details about TensorFlow deabstraction"));
 
-static llvm::cl::opt<bool>
-TFStrictDeabstraction("tf-strict-deabstraction", llvm::cl::init(false),
-       llvm::cl::desc("Verify #tfop's are valid without the perf optimizer"));
+// When this code path is enabled, it currently only works in some
+// scenarios. The comments around the relevant code below provide more context.
+static llvm::cl::opt<bool> TFPromoteGlobalVariables(
+    "tf-promote-global-variables", llvm::cl::init(false),
+    llvm::cl::desc(
+        "If enabled, promote global variables into SSA with a best "
+        "effort to minimize sends/recvs. This is a performance optimization."));
 
 template<typename...T, typename...U>
 static InFlightDiagnostic
@@ -68,6 +72,19 @@ static void deleteInstAndAbandonedUses(SILInstruction *inst) {
   // Finally, delete the instruction itself.
   inst->eraseFromParent();
 }
+
+/// Return true if this apply instruction is to a function that can be
+/// conditionally hoisted into the graph, but don't check the operands to
+/// see if they are actually constants we can handle.
+static bool isDecodableApply(ApplyInst *apply) {
+  auto fn = apply->getCalleeFunction();
+  if (!fn) return false;
+
+  auto name = fn->getName();
+  return name == "__tf_tensor_from_scalars" ||
+         name == "__tf_tensor_from_scalars_1d";
+}
+
 
 namespace {
   /// This class wraps the state and logic necessary to deabstract code into one
@@ -125,7 +142,8 @@ namespace {
     void checkAttributesAndFormGraphOps();
     void formGraphOp(SILTensorOpInfo &opInfo,
                      DenseMap<SILValue, SymbolicValue> &constants,
-                     GraphGlobalConfiguration &deviceConfig);
+                     GraphFunctionDeviceInfo &deviceInfo);
+    void cleanupDeadInstructions();
   };
 }  // end anonymous namespace
 
@@ -177,7 +195,7 @@ void TFDeabstraction::inlineCalls() {
   // produces for each entered statement?  Matching on __repl or whatever prefix
   // LLDB and the integrated REPL use is probably enough.
   //
-  if (fn.getName() == SWIFT_ENTRY_POINT_FUNCTION) {
+  if (TFPromoteGlobalVariables && fn.getName() == SWIFT_ENTRY_POINT_FUNCTION) {
     forciblyFlattened = [&]() -> bool {
       for (auto &bb : fn)
         for (auto &i : bb)
@@ -206,24 +224,8 @@ void TFDeabstraction::inlineCalls() {
 
     // Never inline _allocateUninitializedArray (even of Tensors).  It is the
     // entrypoint used by SILGen to represent array allocations.
-    if (TFStrictDeabstraction &&
-        callee.getName().contains("_allocateUninitializedArray"))
+    if (callee.getName().contains("_allocateUninitializedArray"))
       return false;
-
-    // FIXME: This is a specific hack to inline literal conversion operations
-    // that prevent SSA promotion and bloat code.  This should be eliminated
-    // when we have a proper constexpr model and can just constant fold through
-    // the memory indirections.
-    if (callee.getName().contains("ExpressibleByBuiltinIntegerLiteral") ||
-        callee.getName().contains("ExpressibleByIntegerLiteral") ||
-        callee.getName().contains("SSfs13FloatingPoint") ||
-        callee.getName().contains("S10TensorFlow0A0VAAs13FloatingPointRzrlE12"
-                                  "randomNormal4mean6stddev5s") ||
-        callee.getName().contains("S10TensorFlow0A5ShapeV12arrayLiteral"
-                                  "ACs5Int32Vd_tcfC") ||
-        callee.getName().contains("_allocateUninitializedArray"))
-      if (!TFStrictDeabstraction)
-        return true;
 
     // If we're forcibly flattening code into the top level function, and if the
     // callee is in the same source file as that top-level function (and thus
@@ -307,7 +309,7 @@ void TFDeabstraction::inlineCalls() {
     if (callee->getRepresentation() ==SILFunctionTypeRepresentation::ObjCMethod)
       continue;
 
-    passManager->notifyDeleteFunction(callee);
+    passManager->notifyWillDeleteFunction(callee);
 
     // Okay, erase the function from the module.
     module.eraseFunction(callee);
@@ -342,14 +344,13 @@ static BuiltinInst *simplifyOperands(BuiltinInst *inst, TFDeabstraction &TFDA) {
       if (!decl || !isa<StructDecl>(decl)) return nullptr;
 
       // Check to see if there is a single stored field.
-      auto fieldIt = decl->getStoredProperties().begin();
-      if (fieldIt == decl->getStoredProperties().end()) return nullptr;
+      auto field = tf::getFieldIfContainsSingleField(decl);
+      if (!field) return nullptr;
 
       // If this is the top level of the struct, retain the field decl.
-      if (result == nullptr) result = *fieldIt;
+      if (result == nullptr) result = field;
 
-      type = (*fieldIt++)->getType();
-      if (fieldIt != decl->getStoredProperties().end()) return nullptr;
+      type = field->getType();
 
       // If we unwrapped a level and got to a builtin type, then this is a
       // wrapper.
@@ -511,7 +512,6 @@ static bool explodeAggregateInst(SILInstruction *inst,
   return true;
 }
 
-
 /// Identify all of the tensor operations in the current function, and scan them
 /// to see if there are any indirect arguments, where the address of a stack
 /// allocation is passed to the builtin.  These occur when the tensor op was in
@@ -562,7 +562,7 @@ void TFDeabstraction::simplifyTensorOperands() {
       // deabstract.  This ensures that we deabstract its operands, which makes
       // it possible to tell if it is getting a variable or constant value.
       if (auto *apply = dyn_cast<ApplyInst>(inst)) {
-        if (SILTensorOpInfo::isDecodableApply(apply)) {
+        if (isDecodableApply(apply)) {
           logIfFirstChange();
           // Remember this for later passes.
           tensorOps.push_back(apply);
@@ -613,84 +613,6 @@ void TFDeabstraction::simplifyTensorOperands() {
   // working on the host-side tensor operation.
   if (!containsOpBuiltin)
     tensorOps.clear();
-}
-
-// Return true if this is a standard LLVM arithmetic operation.  We often see
-// silly allocas in the way of them.
-// FIXME: This is only necessary because we don't have a constexpr model.
-// When that is in place and working well, this should be removed.
-static bool isSimpleBuiltinArithmeticOp(BuiltinInst *builtin) {
-  if (TFStrictDeabstraction)
-    return false;
-
-  switch (builtin->getBuiltinInfo().ID) {
-  default: return false;
-  case BuiltinValueKind::Trunc:
-  case BuiltinValueKind::ZExt:
-  case BuiltinValueKind::SExt:
-  case BuiltinValueKind::FPToUI:
-  case BuiltinValueKind::FPToSI:
-  case BuiltinValueKind::UIToFP:
-  case BuiltinValueKind::SIToFP:
-  case BuiltinValueKind::FPTrunc:
-  case BuiltinValueKind::FPExt:
-  case BuiltinValueKind::TruncOrBitCast:
-  case BuiltinValueKind::ZExtOrBitCast:
-  case BuiltinValueKind::SExtOrBitCast:
-  case BuiltinValueKind::Add:
-  case BuiltinValueKind::FAdd:
-  case BuiltinValueKind::And:
-  case BuiltinValueKind::AShr:
-  case BuiltinValueKind::LShr:
-  case BuiltinValueKind::Or:
-  case BuiltinValueKind::FDiv:
-  case BuiltinValueKind::Mul:
-  case BuiltinValueKind::FMul:
-  case BuiltinValueKind::SDiv:
-  case BuiltinValueKind::ExactSDiv:
-  case BuiltinValueKind::Shl:
-  case BuiltinValueKind::SRem:
-  case BuiltinValueKind::Sub:
-  case BuiltinValueKind::FSub:
-  case BuiltinValueKind::UDiv:
-  case BuiltinValueKind::ExactUDiv:
-  case BuiltinValueKind::URem:
-  case BuiltinValueKind::FRem:
-  case BuiltinValueKind::Xor:
-  case BuiltinValueKind::SAddOver:
-  case BuiltinValueKind::UAddOver:
-  case BuiltinValueKind::SSubOver:
-  case BuiltinValueKind::USubOver:
-  case BuiltinValueKind::SMulOver:
-  case BuiltinValueKind::UMulOver:
-  case BuiltinValueKind::FNeg:
-  case BuiltinValueKind::AssumeNonNegative:
-  case BuiltinValueKind::ICMP_EQ:
-  case BuiltinValueKind::ICMP_NE:
-  case BuiltinValueKind::ICMP_SLE:
-  case BuiltinValueKind::ICMP_SLT:
-  case BuiltinValueKind::ICMP_SGE:
-  case BuiltinValueKind::ICMP_SGT:
-  case BuiltinValueKind::ICMP_ULE:
-  case BuiltinValueKind::ICMP_ULT:
-  case BuiltinValueKind::ICMP_UGE:
-  case BuiltinValueKind::ICMP_UGT:
-  case BuiltinValueKind::FCMP_OEQ:
-  case BuiltinValueKind::FCMP_OGT:
-  case BuiltinValueKind::FCMP_OGE:
-  case BuiltinValueKind::FCMP_OLT:
-  case BuiltinValueKind::FCMP_OLE:
-  case BuiltinValueKind::FCMP_ONE:
-  case BuiltinValueKind::FCMP_ORD:
-  case BuiltinValueKind::FCMP_UEQ:
-  case BuiltinValueKind::FCMP_UGT:
-  case BuiltinValueKind::FCMP_UGE:
-  case BuiltinValueKind::FCMP_ULT:
-  case BuiltinValueKind::FCMP_ULE:
-  case BuiltinValueKind::FCMP_UNE:
-  case BuiltinValueKind::FCMP_UNO:
-    return true;
-  }
 }
 
 namespace {
@@ -765,7 +687,7 @@ bool PromotableMemoryFinder::run(ArrayRef<SILInstruction*> tensorOps) {
   // If we're in the main function processing top level code, scan the function
   // to collect any global_addr instructions which provide address roots.  We
   // want to promote tensor-related globals and the values that feed into them.
-  if (fn.getName() == SWIFT_ENTRY_POINT_FUNCTION)
+  if (TFPromoteGlobalVariables && fn.getName() == SWIFT_ENTRY_POINT_FUNCTION)
     findMainFunctionGlobalAddressRootCandidates(addressRoots);
 
   if (addressRoots.empty())
@@ -811,16 +733,6 @@ void PromotableMemoryFinder::findPromotableMemoryFromValue(SILValue value) {
       findPromotableMemoryFromValue(operand.get());
     return;
   }
-
-
-  // Look through standard LLVM arithmetic operations.  We often see silly
-  // allocas in the way of them.
-  // FIXME: This is only necessary because we don't have a constexpr model.
-  // When that is in place and working well, this should be removed.
-  if (!TFStrictDeabstraction)
-    if (auto builtin = dyn_cast<BuiltinInst>(inst))
-      if (isSimpleBuiltinArithmeticOp(builtin))
-        findPromotableMemoryFromValue(builtin->getOperand(0));
 
   // If this is a load, then we can deabstract it if it is a SRoA'able pointer
   // to a stack allocation.
@@ -1179,10 +1091,33 @@ void TFDeabstraction::prepareStackAllocForPromotion(AllocStackInst *alloc) {
   // we have tensor values mixed in with other random values that shouldn't
   // (or can't) be loaded.  For now, we can just fail to deabstract these
   // cases.
-  for (auto UI = alloc->use_begin(); UI != alloc->use_end();) {
-    auto inst = (*UI)->getUser();
 
-    if (auto sea = dyn_cast<StructElementAddrInst>(inst))
+  // Our first scan will look for begin_access instructions and remove them,
+  // allowing the second pass to be simpler.
+  for (auto UI = alloc->use_begin(); UI != alloc->use_end();) {
+    auto *begin = dyn_cast<BeginAccessInst>((*UI++)->getUser());
+    if (!begin)
+      continue;
+
+    // If we have a begin_access instruction, replace uses of begin_access with
+    // uses of the original value and remove the end_access.
+    for (auto UI = begin->use_begin(); UI != begin->use_end();) {
+      auto *use = *UI++;
+      auto inst = use->getUser();
+      if (isa<EndAccessInst>(inst))
+        inst->eraseFromParent();
+      else
+        use->set(alloc);
+    }
+    begin->eraseFromParent();
+  }
+
+  // Our second pass looks for aggregate operations and struct_element_addrs
+  // that poke inside the allocation.
+  for (auto UI = alloc->use_begin(); UI != alloc->use_end();) {
+    auto *inst = (*UI)->getUser();
+
+    if (auto *sea = dyn_cast<StructElementAddrInst>(inst)) {
       if (auto *use = sea->getSingleUse()) {
         // If we have a load(struct_element_addr(alloc)) turn it into
         // struct_extract(load(alloc)).
@@ -1199,7 +1134,31 @@ void TFDeabstraction::prepareStackAllocForPromotion(AllocStackInst *alloc) {
           sea->eraseFromParent();
           continue;
         }
+
+        // If we have a store(x ->struct_element_addr(alloc)), turn it into a
+        // load of the whole value, a bunch of extracts, then a struct_inst
+        // to rebuild the whole value, then a store of the whole thing.
+        //
+        // TODO: For now, we only handle a single element struct, which is
+        // considerably simpler.
+        //
+        if (auto *store = dyn_cast<StoreInst>(use->getUser())) {
+          if (use->getOperandNumber() == 1 &&  // store TO the alloca.
+              tf::getFieldIfContainsSingleField(sea->getStructDecl())) {
+            SILBuilder B(store);
+            auto *newStruct = B.createStruct(store->getLoc(),
+                                             alloc->getType().getObjectType(),
+                                             store->getOperand(0));
+            B.createStore(store->getLoc(), newStruct, sea->getOperand(),
+                          store->getOwnershipQualifier());
+            store->eraseFromParent();
+            ++UI;
+            sea->eraseFromParent();
+            continue;
+          }
+        }
       }
+    }
 
     // Explode aggregate by-address instructions like copy-addr.
     if (explodeAggregateInst(inst, /*all types*/nullptr)) {
@@ -1208,28 +1167,8 @@ void TFDeabstraction::prepareStackAllocForPromotion(AllocStackInst *alloc) {
       continue;
     }
 
-    // If we have an instruction other than begin_access, remember it.
-    auto *begin = dyn_cast<BeginAccessInst>(inst);
-    if (!begin) {
-      ++UI;
-      continue;
-    }
-
-    // If we have a begin_access instruction, look through it.  Add all of the
-    // users to the users list, and replace uses of begin_access with uses of
-    // the original value.  Finally, ignore and remove the end_access.
-    for (auto UI = begin->use_begin(); UI != begin->use_end();) {
-      auto *use = *UI++;
-      auto inst = use->getUser();
-      if (isa<EndAccessInst>(inst)) {
-        inst->eraseFromParent();
-      } else {
-        use->set(alloc);
-      }
-    }
-
+    // Otherwise we have something else, leave it alone.
     ++UI;
-    begin->eraseFromParent();
   }
 }
 
@@ -1484,105 +1423,6 @@ void TFDeabstraction::propagateTensorValues() {
   }
 }
 
-/// Create and return a new constant literal instruction for the specified
-/// scalar constant value.
-///
-/// TODO: this should eventually go away when we stop using literal instructions
-/// and builtin instructions to represent #tfop.  We should switch to a more
-/// principled design when we have a custom SIL instruction for graph ops.
-static SingleValueInstruction *
-emitConstantInst(SymbolicValue symVal, SILType type, SILLocation loc,
-                 SILBuilder &B) {
-  assert(symVal.isConstant() && "Not a constant value");
-
-  switch (symVal.getKind()) {
-  case SymbolicValue::Unknown:
-  case SymbolicValue::UninitMemory:
-  case SymbolicValue::Address:
-    assert(0 && "Shouldn't happen");
-  case SymbolicValue::Aggregate:
-  case SymbolicValue::Array:
-  case SymbolicValue::Function:
-  case SymbolicValue::Enum:
-  case SymbolicValue::EnumWithPayload:
-    // TODO: Unsupported right now.
-    return nullptr;
-
-  case SymbolicValue::Metatype: {
-    auto mt = MetatypeType::get(symVal.getMetatypeValue())->getCanonicalType();
-    return B.createMetatype(loc, SILType::getPrimitiveObjectType(mt));
-  }
-
-  case SymbolicValue::Integer:
-    return B.createIntegerLiteral(loc, type, symVal.getIntegerValue());
-  case SymbolicValue::Float:
-    return B.createFloatLiteral(loc, type, symVal.getFloatValue());
-  case SymbolicValue::String:
-    return B.createStringLiteral(loc, symVal.getStringValue(),
-                                 StringLiteralInst::Encoding::UTF8);
-  }
-}
-
-/// Decode the specified array constant value (which should be an
-/// array of constant integer or fp values) and add it as an expanded operand
-/// to the specified op that is being built up.
-static void expandArrayConstant(ArrayRef<SymbolicValue> arrayElements,
-                                SILType arrayEltType,
-                                StringRef attrName,
-                                SILTensorOpInfo::OperandClass attrKind,
-                                std::string &name,
-                                SmallVectorImpl<SILValue> &operands,
-                                SILInstruction *forInst) {
-  SILBuilder B(forInst);
-
-  // Add the first operand, which is the metatype for the element.  If it was
-  // a 'Normal' operand, change it to an Array so we can distinguish it in the
-  // case of an empty array.
-  if (attrKind == SILTensorOpInfo::OperandClass::Normal)
-    attrKind = SILTensorOpInfo::OperandClass::Array;
-  name += ","+attrName.str();
-  name += SILTensorOpInfo::getOperandClassSuffix(attrKind);
-
-  auto metatypeType =
-    MetatypeType::get(arrayEltType.getASTType(),
-                      MetatypeRepresentation::Thin)
-      ->getCanonicalType();
-  operands.push_back(B.createMetatype(forInst->getLoc(),
-                              SILType::getPrimitiveObjectType(metatypeType)));
-
-  // Add all of the operands as explicit values.  If the instructions came
-  // from an out of line array initializer, make sure to clone them over to
-  // our function.
-  for (auto eltVal : arrayElements) {
-    auto elt = eltVal.getConstantInstIfPresent();
-
-    if (!elt || elt->getFunction() != forInst->getFunction()) {
-      // Make a copy of the value, it may be computed.
-      elt = emitConstantInst(eltVal, arrayEltType, forInst->getLoc(), B);
-      elt->setDebugLocation(B.getSILDebugLocation(forInst->getLoc()));
-    }
-
-    operands.push_back(elt);
-    name += ",";
-    auto eltKind = SILTensorOpInfo::OperandClass::ArrayElement;
-    name += SILTensorOpInfo::getOperandClassSuffix(eltKind);
-  }
-}
-
-/// If the specified type is a Swift.Array or some element type, then return the
-/// element type.  Otherwise, return a null Type.
-static SILType getArrayElementType(SILType ty) {
-  assert(0 && "FIXME: Implement when array constant prop is up and running");
-  abort();
-#if 0
-  if (auto bgst = ty->getAs<BoundGenericStructType>())
-    if (bgst->getDecl() == bgst->getASTContext().getArrayDecl())
-      return bgst->getGenericArgs()[0];
-  return Type();
-#endif
-}
-
-
 /// If all the operands to a call to __tf_tensor_from_scalars are constants, we
 /// can promote this to a 'Const' node with an attached TF_Tensor attribute.
 /// It takes a 1D array of scalars and a shape as a 1D array of integers.
@@ -1593,179 +1433,128 @@ static SILType getArrayElementType(SILType ty) {
 /// FIXME: This is a near duplication of the logic used by TFPartitioning in
 /// SILTensorOpInfo::decodeTensorFromScalars.  When constexpr propagation is
 /// done, we should remove the logic in SILTensorOpInfo.
-static BuiltinInst *
-tryToPromoteTensorFromScalars(ApplyInst *inst,
-                            const DenseMap<SILValue, SymbolicValue> &constants) {
+static GraphOperationInst *tryToPromoteTensorFromScalars(
+    ApplyInst *inst, const DenseMap<SILValue, SymbolicValue> &constants,
+    GraphFunctionDeviceInfo &deviceInfo) {
   assert(inst->getNumOperands() == 3 && isTensorHandle(inst->getType()) &&
          "Unexpected type signature for __tf_tensor_from_scalars");
 
+  auto scalarsValue = inst->getOperand(1);
+  auto shapeValue = inst->getOperand(2);
+
   // If we can't analyze the operands as arrays of constants, give up.
-  auto scalarIt = constants.find(inst->getOperand(1));
+  auto scalarIt = constants.find(scalarsValue);
   if (scalarIt == constants.end() || !scalarIt->second.isConstant())
     return nullptr;
-  auto shapeIt = constants.find(inst->getOperand(2));
+  auto scalars = scalarIt->second;
+  CanType scalarsElementType;
+  auto scalarsElements = scalars.getArrayValue(scalarsElementType);
+
+  auto shapeIt = constants.find(shapeValue);
   if (shapeIt == constants.end() || !shapeIt->second.isConstant())
     return nullptr;
+  auto shape = shapeIt->second;
 
-  // Okay, we were able to resolve the two arrays of constants.  Transform this
-  // into the correct Const operation.
-
-  // We transform this into a __tfop_Const instruction, where the values are
-  // part of the 'value' tensor attribute and the shape is specified as a shape
-  // attribute.
-  SmallVector<SILValue, 8> operands;
-  std::string name = "__tfop_Const";
-
-  // Try to expand the array and the shape into their scalars.
-  expandArrayConstant(scalarIt->second.getAggregateValue(),
-                      getArrayElementType(inst->getOperand(1)->getType()),
-                      "value",
-                      SILTensorOpInfo::OperandClass::Tensor,
-                      name, operands, inst);
-  unsigned numElements = operands.size()-1;
-  expandArrayConstant(shapeIt->second.getAggregateValue(),
-                      getArrayElementType(inst->getOperand(2)->getType()),
-                      "value",
-                      SILTensorOpInfo::OperandClass::Shape,
-                      name, operands, inst);
+  CanType shapeElementType;
+  auto shapeElements = shape.getArrayValue(shapeElementType);
 
   // Verify we have the right number of scalars.  If not, emit an error and
   // leave the broken code without promoting it to an op.
   uint64_t scalarCount = 1;
-  std::string errorInfo;
-  for (auto elt : ArrayRef<SILValue>(operands).drop_front(numElements+2)) {
-    auto *eltCst = cast<IntegerLiteralInst>(elt);
-    scalarCount *= eltCst->getValue().getLimitedValue();
+  for (auto elt : shapeElements) {
+    if (!elt.isConstant()) return nullptr;
+    elt = elt.lookThroughSingleElementAggregates();
+    scalarCount *= elt.getIntegerValue().getLimitedValue();
   }
-  if (scalarCount != numElements && errorInfo.empty()) {
-    errorInfo = "tensor literal should have " + llvm::utostr(scalarCount) +
-          " scalars for this shape, but has " + llvm::utostr(numElements);
-  }
+  uint64_t numElements = scalarsElements.size();
+  if (scalarCount != numElements) {
+    std::string errorInfo =
+      "tensor literal should have " + llvm::utostr(scalarCount) +
+      " scalars for this shape, but has " + llvm::utostr(numElements);
 
-  if (!errorInfo.empty()) {
     auto loc = getUserSourceLocation(inst);
-    diagnose(inst->getType().getASTType()->getASTContext(),
-             loc.getSourceLoc(), diag::tf_op_misuse, errorInfo)
+    auto &context = inst->getType().getASTContext();
+    diagnose(context, loc.getSourceLoc(), diag::tf_op_misuse, errorInfo)
       .highlight(loc.getSourceRange());
     return nullptr;
   }
 
-  // This takes a Tensor and a Shape operand, but needs a DType added.  The
-  // dtype is the type of the Tensor elements, which we conveniently already
-  // have available as the first operand.
-  operands.push_back(operands[0]);
-  name += ",dtype";
-
-  auto scalarV = inst->getOperand(1);
-  auto shapeV = inst->getOperand(2);
-
+  // Okay, we were able to resolve the two arrays of constants.  Transform this
+  // into the correct Const operation.
   SILBuilder B(inst);
-  // Finally build a new builtin instruction with the simplified operands.
-  auto newInst =
-    B.createBuiltin(inst->getLoc(),
-                    B.getASTContext().getIdentifier(name),
-                    inst->getType(), SubstitutionMap(),
-                    operands);
-  newInst->setDebugLocation(inst->getDebugLocation());
-  inst->replaceAllUsesPairwiseWith(newInst);
-  inst->eraseFromParent();
+  B.setCurrentDebugScope(inst->getDebugScope());
+  auto result =
+      createConstTensor(scalarsElementType, scalars, shape, inst->getType(),
+                        inst->getLoc(), deviceInfo.primaryDeviceType, B);
 
-  // We are dropping a reference to the element and shape array initializers, so
-  // we need to remove the arrays themselves or at least release them.
-  SILTensorOpInfo::removeOrDestroyArrayValue(scalarV, inst->getLoc(), B);
-  SILTensorOpInfo::removeOrDestroyArrayValue(shapeV, inst->getLoc(), B);
-  return newInst;
+  // Replace the old instruction with the new one.
+  inst->replaceAllUsesPairwiseWith(result);
+
+  // Clean up the IR.
+  auto callee = dyn_cast<FunctionRefInst>(inst->getOperand(0));
+  inst->eraseFromParent();
+  if (callee && callee->use_empty())
+    callee->eraseFromParent();
+  return result;
 }
 
 /// If all the operands to a call to __tf_tensor_from_scalars_1d are constants,
 /// we can promote this to a 'Const' node with an attached TF_Tensor attribute.
 /// This is a specialized form of __tf_tensor_from_scalars, because the later is
 /// defined in terms of a shape of "[scalars.count]" but the performance
-/// optimizer is not reliably constant propagating this.  When we have a
-/// reliable deabstraction pass we can re-evaluate this and hopefully eliminate
-/// it in favor of library code in the TensorFlow module.
+/// optimizer is not reliably constant propagating this.
+///
+/// When we have a the ability constexpr fold array.count, we should be able to
+/// eliminate this in favor of library code in the TensorFlow module.
 ///
 /// On success, this removes the applyexpr and returns a pointer to the new
-/// BuiltinInst that is created.  On failure, it returns a nullptr.
+/// instruction that it created.  On failure, it returns a nullptr.
 ///
-/// FIXME: This is a near duplication of the logic used by TFPartitioning in
-/// SILTensorOpInfo::decodeTensorFromScalars1D.  When constexpr propagation is
-/// done, we should remove the logic in SILTensorOpInfo.
-static BuiltinInst *
-tryToPromoteTensorFromScalars1D(ApplyInst *inst,
-                          const DenseMap<SILValue, SymbolicValue> &constants) {
+static GraphOperationInst *tryToPromoteTensorFromScalars1D(
+    ApplyInst *inst, const DenseMap<SILValue, SymbolicValue> &constants,
+    GraphFunctionDeviceInfo &deviceInfo) {
   assert(inst->getNumOperands() == 2 && isTensorHandle(inst->getType()) &&
          "Unexpected type signature for __tf_tensor_from_scalars_1d");
 
+  auto arrayValue = inst->getOperand(1);
+
   // If we can't analyze the scalars as an arrays of constants, give up.
-  auto scalarIt = constants.find(inst->getOperand(1));
+  auto scalarIt = constants.find(arrayValue);
   if (scalarIt == constants.end() || !scalarIt->second.isConstant())
     return nullptr;
 
-  // We transform this into a __tfop_Const instruction, where the values are
-  // part of the 'value' tensor attribute and the shape is hard coded.
-  SmallVector<SILValue, 8> operands;
-  std::string name = "__tfop_Const";
+  auto scalars = scalarIt->second;
+  assert(scalars.getKind() == SymbolicValue::Array &&
+         "Unexpected value for array constant");
+  CanType scalarElementType;
+  auto scalarElements = scalars.getArrayValue(scalarElementType);
 
-  // Try to expand the array into its scalars.
-  expandArrayConstant(scalarIt->second.getAggregateValue(),
-                      getArrayElementType(inst->getOperand(1)->getType()),
-                      "value",
-                      SILTensorOpInfo::OperandClass::Tensor,
-                      name, operands, inst);
+  auto &context = inst->getType().getASTContext();
+  auto &allocator = context.getAllocator();
+
+  // This takes a Tensor operand, but needs a shape added.  Since this is 1d,
+  // our shape is just a single entry array with the length of scalars, like
+  // [i32 42] if the scalars list is 42 entries in size.
+  auto shape = SymbolicValue::getArray({
+    SymbolicValue::getInteger(scalarElements.size(), /*bitwidth*/ 32)
+  }, context.getInt32Decl()->getDeclaredType()->getCanonicalType(), allocator);
 
   SILBuilder B(inst);
+  B.setCurrentDebugScope(inst->getDebugScope());
+  auto result =
+      createConstTensor(scalarElementType, scalars, shape, inst->getType(),
+                        inst->getLoc(), deviceInfo.primaryDeviceType, B);
 
-  // This takes a Tensor operand, but needs a Shape and a DType added.  At
-  // this point, the operands list will have a metatype for the tensor as
-  // the first operand then all the elements.
-  uint64_t scalarCount = operands.size()-1;
+  // Replace the old instruction with the new one.
+  inst->replaceAllUsesPairwiseWith(result);
 
-  // The shape needs a metatype to be well formed, but nothing actually
-  // cares what it is.  Just re-push the metatype for the tensor elements,
-  // even though it might be floating point or something else weird.
-  operands.push_back(operands[0]);
-  name += ",shape";
-  auto shapeKind = SILTensorOpInfo::OperandClass::Shape;
-  name += SILTensorOpInfo::getOperandClassSuffix(shapeKind);
-
-  // The shape of a 1d tensor is just the count of elements.
-  auto &ctx = inst->getFunction()->getASTContext();
-  auto scalarCountVal =
-    B.createIntegerLiteral(inst->getLoc(),
-                           SILType::getBuiltinIntegerType(64, ctx),
-                           scalarCount);
-  operands.push_back(scalarCountVal);
-  name += ",";
-  auto arrayEltKind = SILTensorOpInfo::OperandClass::ArrayElement;
-  name += SILTensorOpInfo::getOperandClassSuffix(arrayEltKind);
-
-  // The  dtype is the type of the Tensor elements, which we conveniently
-  // already have available as the first operand.
-  operands.push_back(operands[0]);
-  name += ",dtype";
-
-  auto arrayValue = inst->getOperand(1);
-
-  // Finally build a new builtin instruction with the simplified operands.
-  auto newInst =
-    B.createBuiltin(inst->getLoc(),
-                    B.getASTContext().getIdentifier(name),
-                    inst->getType(), SubstitutionMap(),
-                    operands);
-  newInst->setDebugLocation(inst->getDebugLocation());
-  inst->replaceAllUsesPairwiseWith(newInst);
+  // Clean up the IR.
+  auto callee = dyn_cast<FunctionRefInst>(inst->getOperand(0));
   inst->eraseFromParent();
-
-  // We dropped a reference to the element initializer, so we need to
-  // remove the array itself or at least release it.  This happens after
-  // creating the replacement builtin, so that element initializers aren't
-  // dropped.
-  B.setInsertionPoint(newInst);
-  SILTensorOpInfo::removeOrDestroyArrayValue(arrayValue, inst->getLoc(), B);
-  return newInst;
+  if (callee && callee->use_empty())
+    callee->eraseFromParent();
+  return result;
 }
-
 
 /// Canonicalize tensor ops, validating that attribute arguments are constant
 /// expressions, and transform the IR to use GraphOperationInst.
@@ -1773,8 +1562,8 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
   llvm::PrettyStackTraceFormat
   X("TFDeabstraction::checkAttributesAndFormGraphOps");
 
-  auto deviceConfiguration =
-    GraphGlobalConfiguration::getForFunction(fn, /*removeConfigInst*/false);
+  auto deviceInfo =
+      GraphFunctionDeviceInfo::getForFunction(fn, /*removeConfigInst*/ false);
 
   // Do a big sweep over all of the operands to tensor values, collecting ones
   // that we might be interested in being constants into a single list.
@@ -1817,70 +1606,180 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
   // This makes it immediately obvious to partitioning what is and isn't a
   // constant.
   for (auto *&inst : tensorOps) {
+    // If this is a normal tensor operation, validate it and transform it into a
+    // graphOp instruction.
+    if (auto opInfo = SILTensorOpInfo::decode(inst)) {
+      // Do not translate this special inst into a graph op, since it will get
+      // removed at the beginning of the partition pass.
+      // TODO: remove this inst in the getForFunction() call above, once
+      // the partition pass is folded into deabstraction.
+      if (opInfo->opName == "tfc.configureTPU" ||
+          opInfo->opName == "tfc.configureGPU")
+        continue;
+      formGraphOp(*opInfo, constants, deviceInfo);
+    }
+
     // Take a look at the various well known function calls that we can promote
     // to tensor operations.  We can promote them if we are able to constant
     // fold all of the operands to these calls.  If so, we rewrite them in terms
     // of a proper op, and partitioning will continue to treat them that way.
     if (auto apply = dyn_cast<ApplyInst>(inst)) {
-      // FIXME: Move this upgrading logic out of SILTensorOpInfo into
-      // Deabstraction once partitioning is moved up to the mandatory passes.
-      if (!SILTensorOpInfo::isDecodableApply(apply))
+      auto callee = apply->getCalleeFunction();
+
+      if (callee && callee->getName() == "__tf_tensor_from_scalars") {
+        if (auto result =
+                tryToPromoteTensorFromScalars(apply, constants, deviceInfo))
+          inst = result;
         continue;
-
-      auto name = apply->getCalleeFunction()->getName();
-      BuiltinInst *result;
-      if (name == "__tf_tensor_from_scalars")
-        result = tryToPromoteTensorFromScalars(apply, constants);
-      else if (name == "__tf_tensor_from_scalars_1d")
-        result = tryToPromoteTensorFromScalars1D(apply, constants);
-      else
-        llvm_unreachable("out of sync with isDecodableApply");
-
-      // If promotion failed, no change is necessary.
-      if (!result) continue;
-
-      // Otherwise, we got a new instruction, so remember it in our tensor op
-      // list.
-      inst = result;
-
-      // Fall into the normal op processing code.
-    }
-
-    // TODO: Handle normal tensor ops with their attributes, subsuming the
-    // following loop.
-  }
-
-  for (auto &BB : fn) {
-    for (auto I = BB.begin(), E = BB.end(); I != E; ) {
-      // Manually move iterator to avoid invalidation if we replace 'inst'.
-      auto *inst = &*I++;
-
-      // If this is a well known function that can be transformed into an op, do
-      // so first.
-      // FIXME: This should take into consideration the constants we just
-      // computed!
-      if (auto apply = dyn_cast<ApplyInst>(inst))
-        inst = SILTensorOpInfo::decodeApply(apply);
-
-      // Try to decode this instruction as an op.  If it isn't one, ignore it.
-      auto opInfo = SILTensorOpInfo::decode(inst);
-      if (!opInfo)
+      }
+      if (callee && callee->getName() == "__tf_tensor_from_scalars_1d") {
+        if (auto result =
+                tryToPromoteTensorFromScalars1D(apply, constants, deviceInfo))
+          inst = result;
         continue;
-
-      // TODO: Deabstraction isn't fully handling all constant expressions and
-      // other canonicalizations that we expect, so for now we depend on the
-      // performance optimizer.  When deabstraction is done, we will run the
-      // partitioner as part of deabstraction (including at -O0).  Until we are
-      // ready for that, we gate the validation of tensor operations on a flag.
-      // This allows us to write testcases without breaking current use of the
-      // compiler.
-      if (!TFStrictDeabstraction)
-        continue;
-
-      formGraphOp(*opInfo, constants, deviceConfiguration);
+      }
     }
   }
 }
+
+/// If the specified type is a Swift.Array or some element type, then return the
+/// element type.  Otherwise, return a null Type.
+static Type getArrayElementType(Type ty) {
+  if (auto bgst = ty->getAs<BoundGenericStructType>())
+    if (bgst->getDecl() == bgst->getASTContext().getArrayDecl())
+      return bgst->getGenericArgs()[0];
+  return Type();
+}
+
+/// Return true if this is a reference to the _allocateUninitialized helper
+/// in array in the standard library allocating zero elements.
+/// TODO: Move to deabstraction when other clients are removed.
+bool isArrayAllocUninit(SILValue op, SILValue &numElements);
+
+namespace {
+/// This is a little helper for working with literal arrays that may want to get
+/// deleted if all references to them are removed.
+struct ArrayElementDecoder {
+  SmallVector<Operand*, 4> elementsAtInit;
+  SmallPtrSet<SILInstruction *, 8> arrayInsts;
+
+  /// Given a SILValue that may be an array, attempt to decode it into the
+  /// literal values that make up its elements.  This returns the element type
+  /// of the array if it succeeds, otherwise a null type.
+  Type decode(SILValue value) {
+    auto elementType = getArrayElementType(value->getType().getASTType());
+    if (!elementType) return Type();
+
+    // The only pattern we support involves a call to
+    // _allocateUninitializedArray.  The array value will be a tuple extract
+    // from the 0th result of the call.
+    auto *teiValue = dyn_cast<TupleExtractInst>(value);
+    if (!teiValue || teiValue->getFieldNo() != 0 ||
+        !isa<ApplyInst>(teiValue->getOperand()))
+      return Type();
+
+    // Figure out the number of elements, which must be a constant integer.
+    auto *apply = cast<ApplyInst>(teiValue->getOperand());
+
+    if (decodeApply(apply))
+      return elementType;
+    return Type();
+  }
+
+  /// Given an applyinst for _allocateUninitialized, try to decode it.  This
+  /// returns true on success or false on failure.
+  bool decodeApply(ApplyInst *apply) {
+    // Verify we have a call to _allocateUninitializedArray.
+    SILValue numElementsVal;
+    if (!isArrayAllocUninit(apply, numElementsVal) ||
+        !isa<IntegerLiteralInst>(numElementsVal))
+      return false;
+    uint64_t numElements =
+    cast<IntegerLiteralInst>(numElementsVal)->getValue().getLimitedValue();
+
+    return !tf::ConstExprEvaluator::
+    decodeAllocUninitializedArray(apply, numElements, elementsAtInit,
+                                  &arrayInsts);
+  }
+
+  /// Try to remove the instructions that make up the array initialization.
+  void removeInstructionsIfPossible() {
+    if (arrayInsts.empty())
+      return;
+
+    // If we can remove it, drop all inter-dependent references.
+    for (auto inst : arrayInsts)
+      inst->dropAllReferences();
+    // Then erase the instructions themselves.
+    for (auto inst : arrayInsts)
+      inst->eraseFromParent();
+  }
+};
+} // end anonymous namespace
+
+
+
+/// A reference to the specified array was just dropped.  If it was a literal
+/// array and this was the last use, clean up the instructions that fed it.
+static void removeArrayValueIfPossible(ApplyInst *array) {
+  // If this array is a literal that we can decode, remove the instructions that
+  // it came from.
+  ArrayElementDecoder decoder;
+  if (decoder.decodeApply(array))
+    decoder.removeInstructionsIfPossible();
+}
+
+/// Deabstraction can leave around lots of dead instructions from the attributes
+/// that get promoted, including heavy weight types that inline into a lot of
+/// code, like arrays.  Do a quick pass to remove these, improving compile time
+/// of subsequent passes.
+void TFDeabstraction::cleanupDeadInstructions() {
+  llvm::PrettyStackTraceFormat
+  X("TFDeabstraction::cleanupDeadInstructions");
+
+  SmallVector<SILInstruction *, 16> deadInsts;
+  SmallVector<ApplyInst *, 8> arrayAllocUninitInsts;
+
+  auto markInstructionForRemoval = [&](SILInstruction *inst) {
+    // Mark trivially dead instructions.
+    if (isa<SingleValueInstruction>(inst) &&
+        isInstructionTriviallyDead(inst)) {
+      deadInsts.push_back(inst);
+      return;
+    }
+
+    // Mark instructions applying the _allocateUninitialized function.
+    if (auto *apply = dyn_cast<ApplyInst>(inst)) {
+      SILValue tmp;
+      if (isArrayAllocUninit(apply, tmp)) {
+        arrayAllocUninitInsts.push_back(apply);
+        return;
+      }
+    }
+
+    // TODO: Mark dead stack slots for tensors being passed as input lists.
+
+    // TODO: Mark TensorShape.init and other methods that we shouldn't bake in
+    // special knowledge of. Needs integration with ConstExpr.
+
+    // TODO: Handle String.init and other stuff. Refactor this when ConstExpr
+    // handling subsumes ConstantPropagation.
+  };
+
+  // Mark instructions for removal.
+  for (auto &bb : fn)
+    for (auto &inst : bb)
+      markInstructionForRemoval(&inst);
+
+  // Remove dead instructions. Debug instructions are not deleted.
+  for (auto *inst : deadInsts)
+    recursivelyDeleteTriviallyDeadInstructions(inst);
+
+  // Clean up instructions related to array literal initialization, if possible.
+  for (auto *inst : arrayAllocUninitInsts)
+    removeArrayValueIfPossible(inst);
+}
+
 
 // TODO: move this from TFUtilities when deabstraction is done.
 SILValue getTensorProtocolHandleMember(SILValue v, SILLocation loc,
@@ -1889,10 +1788,9 @@ SILValue getTensorProtocolHandleMember(SILValue v, SILLocation loc,
 /// Replace the specified tensor operation with a GraphOperation instruction,
 /// emitting errors if attribute arguments could not be constant folded, or if
 /// the operand/attribute types are incorrect.
-void TFDeabstraction::
-formGraphOp(SILTensorOpInfo &opInfo,
-            DenseMap<SILValue, SymbolicValue> &constants,
-            GraphGlobalConfiguration &deviceConfig) {
+void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
+                                  DenseMap<SILValue, SymbolicValue> &constants,
+                                  GraphFunctionDeviceInfo &deviceInfo) {
   auto *inst = opInfo.inst;
   auto &context = inst->getFunction()->getASTContext();
   auto &allocator = context.getAllocator();
@@ -1934,8 +1832,30 @@ formGraphOp(SILTensorOpInfo &opInfo,
                           "' is not allowed");
           return;
         }
+
+        // Check to see if it was constant foldable.  If so, we can turn this
+        // into a Const node to avoid a send.
+        auto it = constants.find(operand);
+        if (it != constants.end() && it->second.isConstant()) {
+          // Dig the element type out of the TensorHandle result type.
+          auto eltType =
+            getTensorHandleElementType(inst->getType().getASTType());
+          // We use int32 as the element type of the zero-d shape array.
+          auto int32Ty =
+            context.getInt32Decl()->getDeclaredType()->getCanonicalType();
+          auto constant =
+            createConstTensor(eltType, it->second,
+                              SymbolicValue::getArray({}, int32Ty, allocator),
+                              inst->getType(),  getUserSourceLocation(inst),
+                              DeviceType::ALL, B);
+          inst->replaceAllUsesWith(constant->getResult(0));
+          inst->eraseFromParent();
+          return;
+        }
+
         opName +=
           GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Scalar);
+
         inputs.push_back(operand);
         continue;
       }
@@ -1953,11 +1873,8 @@ formGraphOp(SILTensorOpInfo &opInfo,
                                         fn.getModule()));
 
       // Otherwise this must be an array, representing an input list.
-      SmallVector<SILValue, 4> elements;
-      SmallPtrSet<SILInstruction*, 8> arrayInsts;
-      auto elementType =
-        GraphOperationInfo::decodeArrayElements(operand, elements, &arrayInsts);
-
+      ArrayElementDecoder arrayDecoder;
+      auto elementType = arrayDecoder.decode(operand);
       if (!elementType) {
         diagnoseInvalid("operand has unrecognized type '" +
                         operandTy.getASTType()->getString() + "'");
@@ -1979,7 +1896,13 @@ formGraphOp(SILTensorOpInfo &opInfo,
       // generally be uniqued on entry to this routine.  If so, make sure to
       // reuse them as we project out the .handle members to avoid code bloat.
       llvm::DenseMap<SILValue, SILValue> loweredElts;
-      for (auto elt : elements) {
+      for (auto *use : arrayDecoder.elementsAtInit) {
+        auto *store = dyn_cast<StoreInst>(use->getUser());
+        if (!store) {
+          diagnoseInvalid("element initialization error");
+          return;
+        }
+        auto elt = store->getSrc();
         auto &eltVal = loweredElts[elt];
         if (!eltVal) {
           eltVal = getTensorProtocolHandleMember(elt, inst->getLoc(), B);
@@ -1994,18 +1917,6 @@ formGraphOp(SILTensorOpInfo &opInfo,
         opName += elementMarker;
         inputs.push_back(elt);
       }
-
-      // Okay, now that we updated this operand, try to remove the array
-      // entirely  If we can't, then we just leave it alone: we were using it as
-      // a +0 value, so we can just drop the use.
-      if (!arrayInsts.empty()) {
-        // If we can remove it, drop all inter-dependent references.
-        for (auto inst : arrayInsts)
-          inst->dropAllReferences();
-        // Then erase the instructions themselves.
-        for (auto inst : arrayInsts)
-          inst->eraseFromParent();
-      }
       continue;
     }
 
@@ -2018,9 +1929,7 @@ formGraphOp(SILTensorOpInfo &opInfo,
     // Ok, we have an attribute operand, we should have been able to fold it
     // through our constexpr evaluation logic.
     auto it = constants.find(operand);
-    assert(it != constants.end() && "out of sync with constant scanning loop");
-
-    if (!it->second.isConstant()) {
+    if (it == constants.end() || !it->second.isConstant()) {
       // TODO: improve the diagnostic to talk about the parameter label in
       // the user code, not the internal op attribute.  The bookkeeping for
       // this isn't obvious though.
@@ -2028,7 +1937,8 @@ formGraphOp(SILTensorOpInfo &opInfo,
 
       // If we have more specific information about what went wrong, emit
       // notes.
-      if (it->second.getKind() == SymbolicValue::Unknown)
+      if (it != constants.end() &&
+          it->second.getKind() == SymbolicValue::Unknown)
         it->second.emitUnknownDiagnosticNotes(opInfo.inst->getLoc());
       return;
     }
@@ -2038,7 +1948,12 @@ formGraphOp(SILTensorOpInfo &opInfo,
     auto attrName = operandClass.first.str() +
        SILTensorOpInfo::getOperandClassSuffix(operandClass.second);
 
-    auto constValue = it->second.cloneInto(allocator);
+    // Get the constant, ignoring struct wrappers.
+    auto constValue = it->second.lookThroughSingleElementAggregates();
+
+    // Clone it out of the ConstExpr pool into the global SILModule pool.
+    constValue = constValue.cloneInto(allocator);
+
     auto attrIdentifier = context.getIdentifier(attrName);
     attributes.push_back({ attrIdentifier, constValue });
 
@@ -2054,48 +1969,160 @@ formGraphOp(SILTensorOpInfo &opInfo,
         return diagnoseInvalidAttr("may not use this device name");
     }
 
+    // Emits a diagnostic and returns true if the value is invalid for a shape
+    // attr.
+    auto verifyNormalAttr = [&](SymbolicValue constValue) -> bool {
+      switch (constValue.getKind()) {
+      case SymbolicValue::Unknown:
+      case SymbolicValue::UninitMemory:
+        assert(0 && "earlier code should have ruled out non-constant values");
+
+      case SymbolicValue::Address:
+        assert(0 && "it's impossible to pass an address as an attr");
+
+      case SymbolicValue::Enum:
+      case SymbolicValue::EnumWithPayload:
+      case SymbolicValue::Aggregate:
+        diagnoseInvalidAttr("cannot be an enum, struct, or tuple");
+        return true;
+
+      case SymbolicValue::Integer:
+      case SymbolicValue::Float:
+      case SymbolicValue::Metatype:
+      case SymbolicValue::String:
+      case SymbolicValue::Function:
+      case SymbolicValue::Array:
+        break;
+      }
+      return false;
+    };
+
+    // Emits a diagnostic and returns true if the value is invalid for a shape
+    // attr.
+    auto verifyShapeAttr = [&](SymbolicValue constValue) -> bool {
+      // strip away the possible aggregate wrapper.
+      constValue = constValue.lookThroughSingleElementAggregates();
+      if (constValue.getKind() != SymbolicValue::Array) {
+        diagnoseInvalidAttr("requires an array");
+        return true;
+      }
+      CanType eltType;
+      auto elements = constValue.getArrayValue(eltType);
+      if (!StringRef(eltType->getString()).startswith("Int")) {
+        diagnoseInvalidAttr("requires an array of ints");
+        return true;
+      }
+      for (auto elt : elements) {
+        // strip away the possible aggregate wrapper.
+        elt = elt.lookThroughSingleElementAggregates();
+        if (elt.getKind() != SymbolicValue::Integer) {
+          diagnoseInvalidAttr("requires an array of ints");
+          return true;
+        }
+      }
+      return false;
+    };
+
     // Verify that the type of this attribute is ok for the OperandClass we
     // have.
     switch (operandClass.second) {
     case SILTensorOpInfo::OperandClass::Input:
     case SILTensorOpInfo::OperandClass::InputElt:
+      assert(0 && "Input classes cannot exist for attributes");
     case SILTensorOpInfo::OperandClass::Normal:  // No modifier.
+      if (verifyNormalAttr(constValue))
+        return; // error already emitted.
       break;
-    case SILTensorOpInfo::OperandClass::DType:   // This integer value is a dtype.
+    case SILTensorOpInfo::OperandClass::DType:
+      // This integer value is a dtype.
       if (constValue.getKind() != SymbolicValue::Integer)
         return diagnoseInvalidAttr("requires a constant integer");
       break;
-    case SILTensorOpInfo::OperandClass::Shape:
     case SILTensorOpInfo::OperandClass::Array:
-    case SILTensorOpInfo::OperandClass::ShapeArray:
+      if (constValue.getKind() != SymbolicValue::Array)
+        return diagnoseInvalidAttr("requires an array");
+      break;
+    case SILTensorOpInfo::OperandClass::Shape:
+      if (verifyShapeAttr(constValue))
+        return; // error already emitted.
+      break;
+    case SILTensorOpInfo::OperandClass::ShapeArray: {
+      if (constValue.getKind() != SymbolicValue::Array)
+        return diagnoseInvalidAttr("requires an array");
+      CanType eltType;
+      auto shapes = constValue.getArrayValue(eltType);
+      if (eltType->getString() != "TensorShape")
+        return diagnoseInvalidAttr("requires an array of TensorShape values");
+      for (auto shape : shapes) {
+        if (verifyShapeAttr(shape))
+          return; // error already emitted.
+      }
+      break;
+    }
     case SILTensorOpInfo::OperandClass::ArrayElement:
       // Match logic from checkAndDiagnoseOperands.
-      assert(0 && "FIXME: array constant exprs aren't handled yet");
+      inst->dump();
+      assert(0 && "FIXME: array elem exprs aren't handled yet");
     case SILTensorOpInfo::OperandClass::Tensor:
-      // FIXME: Support array constants.
-      if (constValue.getKind() != SymbolicValue::Integer &&
-          constValue.getKind() != SymbolicValue::Float)
+      // FIXME: There needs to be a dtype attribute before this.
+
+      if (constValue.getKind() == SymbolicValue::Integer ||
+          constValue.getKind() == SymbolicValue::Float)
+        break;
+
+      if (constValue.getKind() != SymbolicValue::Array)
         return diagnoseInvalidAttr("requires a constant that is an integer,"
                                    " floating point, or array thereof");
+
+      CanType eltType;
+      auto elements = constValue.getArrayValue(eltType);
+
+      /// Tensor array arguments must always be followed by a shape.
+      if (i+1 >= opInfo.operandClasses.size() ||
+          opInfo.operandClasses[i+1].second !=
+                      SILTensorOpInfo::OperandClass::Shape)
+        return diagnoseInvalidAttr("tensor attributes must be followed by "
+                                   "a shape attribute");
+
+      // TODO: Decode the shape and validate that it matches the # elements
+      // we have.
+
+      // Empty tensor value is ok.
+      if (elements.empty()) break;
+
+      auto firstElt = elements.front().lookThroughSingleElementAggregates();
+
+      // Verify that all the elements are the same type, and that they are
+      // either integer or FP.
+      if (firstElt.getKind() == SymbolicValue::Integer) {
+        for (auto elt : elements) {
+          elt = elt.lookThroughSingleElementAggregates();
+          if (elt.getKind() != SymbolicValue::Integer ||
+              elt.getIntegerValueBitWidth() !=
+              firstElt.getIntegerValueBitWidth())
+            return diagnoseInvalidAttr("array values must be the same type");
+        }
+      } else if (firstElt.getKind() == SymbolicValue::Float) {
+        for (auto elt : elements) {
+          elt = elt.lookThroughSingleElementAggregates();
+          if (elt.getKind() != SymbolicValue::Float ||
+              elt.getFloatValueSemantics() != firstElt.getFloatValueSemantics())
+            return diagnoseInvalidAttr("array values must be the same type");
+        }
+      } else {
+        return diagnoseInvalidAttr("requires a constant that is an integer,"
+                                   " floating point, or array thereof");
+      }
       break;
     }
   }
 
   // Finally, set a device attribute for this if there wasn't already one
   // specified.
-  if (opInfo.opName == "tfc.scalarToTensor") {
-    if (!opDevice.empty())
-      return diagnoseInvalid("device may not be specified for this op");
-  } else if (opDevice.empty()) {
-    auto deviceID = deviceConfig.chooseDevice(opInfo.opName);
-
-    // TODO: Use integer device ID's instead of strings?
-    auto constValue = SymbolicValue::getString(getDeviceString(deviceID),
-                                               allocator);
-    auto attrIdentifier = context.getIdentifier(DEVICE_ATTR);
-    attributes.push_back({ attrIdentifier, constValue });
+  if (opDevice.empty()) {
+    deviceInfo.handleDevicePlacement(opInfo.opName, opDevice, context,
+                                     attributes);
   }
-
   // Okay, if we got this far then we have all valid attributes and inputs.
   // Figure out the result list.
   SmallVector<SILType, 4> resultTypes;
@@ -2108,11 +2135,10 @@ formGraphOp(SILTensorOpInfo &opInfo,
     resultTypes.push_back(inst->getType());
   }
 
-  auto op = B.createGraphOperation(inst->getLoc(),
+  auto op = B.createGraphOperation(getUserSourceLocation(inst),
                                    context.getIdentifier(opName), inputs,
                                    attributes, resultTypes);
-  op->setDebugLocation(inst->getDebugLocation());
-  
+
   if (auto tuple = inst->getType().getAs<TupleType>()) {
     SmallVector<SILValue, 4> elts;
     for (unsigned i = 0, e = tuple->getNumElements(); i != e; ++i)
@@ -2129,24 +2155,6 @@ formGraphOp(SILTensorOpInfo &opInfo,
 
   // TODO: Analyze the operands to the instruction and remove them if they are
   // now dead.
-
-  /// TODO: Analyze and subsume this if necessary.
-#if 0
-
-  // Check to see if the usage of this op looks ok.  If not, reject it with
-  // an error and ignore it.
-  auto error = opInfo.checkAndDiagnoseOperands();
-  if (!error.empty()) {
-    diagnoseInvalid(error);
-    return;
-  }
-
-  // If the tensor operation uses array parameters or has scalar values that
-  // are passed through memory, promote them to being simple arguments to
-  // make all subsequent analyses and promotion of the tensor operations
-  // simpler.
-  opInfo.canonicalizeOperands(deviceConfig);
-#endif
 }
 
 /// Process the specified top level function as a deabstraction context: if it
@@ -2161,11 +2169,6 @@ formGraphOp(SILTensorOpInfo &opInfo,
 ///      top level code in scripts.
 ///   3) SSA Promotion of stack values to registers.
 ///   4) Scalarization of struct/tuple values.
-///
-/// TODO:
-///   *) Move tensor op canonicalization up from tf-partition.
-///   *) Enums.  What can we reliably do with them?  Should they be out of
-///      model?  We can definitely do ones without payload values.
 ///
 void TFDeabstraction::doIt() {
   // Start by inlining functions that take and return Tensor values.
@@ -2203,19 +2206,16 @@ void TFDeabstraction::doIt() {
 
   logCurrentState("After propagateTensorValues", /*detailed*/true);
 
-  // Canonicalize attribute arguments, checking that they have constants, and
-  // flattening array attributes.
+  // Canonicalize attribute arguments, check that they have constants,
+  // flatten array attributes, and form graph_op instructions.
   checkAttributesAndFormGraphOps();
 
-  logCurrentState("Result", /*detailed*/false);
+  logCurrentState("Before Cleanup", /*detailed*/true);
 
-  // We're currently relying on the performance optimizer to do some stuff, but
-  // for large testcacses it is doing bad stuff.
-  // FIXME: Should be eliminated when partitioning happens as part of
-  // deabstraction, because then the optimizer won't be seeing all of our tensor
-  // stuff.
-  if (!TFStrictDeabstraction)
-    fn.getModule().getOptions().EnableARCOptimizations = false;
+  // Remove code that is dead now that tensor operations are formed.
+  cleanupDeadInstructions();
+
+  logCurrentState("Result", /*detailed*/false);
 }
 
 
@@ -2234,7 +2234,7 @@ void TFDeabstractionPass::run() {
   // If the TensorFlow module hasn't been imported by the program, don't do
   // anything.  This avoids impacting compile time for non-TensorFlow using
   // Swift programs by doing extraneous analysis.
-  auto tfModule = ctx.getLoadedModule(ctx.getIdentifier("TensorFlow"));
+  auto tfModule = ctx.getLoadedModule(ctx.Id_TensorFlow);
   if (!tfModule)
     return;
 

@@ -31,8 +31,10 @@
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/BitVector.h"
+#include "llvm/Support/CommandLine.h"
 #ifdef SWIFT_ENABLE_TENSORFLOW
 #include "tensorflow/c/c_api.h"
 #endif
@@ -44,15 +46,35 @@ using namespace swift;
 using namespace tf;
 using llvm::DenseMap;
 
-template<typename...T, typename...U>
-static InFlightDiagnostic
-diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag, U &&...args) {
+/// This is a counter we use to give each send/receive operation a unique ID.
+static int nextSendID = 0;
+
+static llvm::cl::opt<bool> TFModuleLevelGraph(
+    "tf-module-level-graph", llvm::cl::init(true),
+    llvm::cl::desc(
+        "When true, generate 1 TF graph per module. Otherwise generate 1 TF "
+        "graph per partitionable function, for ease of writing tests and "
+        "verifying test outputs. Only set to false in unit tests,"
+        "and when the unit tests do not involve function-typed attributes."));
+
+template <typename... T, typename... U>
+static InFlightDiagnostic diagnose(ASTContext &Context, SourceLoc loc,
+                                   Diag<T...> diag, U &&... args) {
   return Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
 }
 
 /// Returns true if the partitioning pass should ignore this user.
 static bool isUserIgnoredByPartitioning(SILInstruction *inst) {
-  return isa<DebugValueInst>(inst) || isa<RefCountingInst>(inst);
+  auto optMode = inst->getFunction()->getEffectiveOptimizationMode();
+  // `debug_value` instructions are used for value inspection during debugging.
+  // For optimized builds, we ignored these instructions so that no send/receive
+  // will be emitted.
+  if (isa<DebugValueInst>(inst) &&
+      optMode != OptimizationMode::NoOptimization) {
+    return true;
+  }
+  // Reference counting instructions are always ignored.
+  return isa<RefCountingInst>(inst);
 }
 
 /// Given a decl for a struct that has a single field (typically because it is
@@ -60,25 +82,9 @@ static bool isUserIgnoredByPartitioning(SILInstruction *inst) {
 /// type of the single member, asserting and aborting if we get something
 /// unexpected.
 static CanType getSingleElementDeclFieldType(NominalTypeDecl *decl) {
-  auto fieldIt = decl->getStoredProperties().begin();
-  assert(fieldIt != decl->getStoredProperties().end() &&
-         "Struct should have one member");
-  auto fieldType = (*fieldIt++)->getType()->getCanonicalType();
-  assert(fieldIt == decl->getStoredProperties().end() &&
-         "Struct should have one member");
-  return fieldType;
-}
-
-/// Given a generic function with a single generic parameter `<T>(...) -> ...`
-/// an a type for substitution, return a substitution map that's suitable for
-/// calling this func.
-static SubstitutionMap
-getSingleSubstitutionMapForFunction(SILFunction *f, Type ty,
-                                    SILModule &userModule) {
-  auto *loadedFunc = lookupOrLinkFunction(f->getName(), userModule);
-  assert(loadedFunc->getGenericEnvironment());
-  auto *genericSig = loadedFunc->getGenericEnvironment()->getGenericSignature();
-  return getSingleSubstitutionMapForElementTypeAndSignature(ty, genericSig);
+  auto *field = tf::getFieldIfContainsSingleField(decl);
+  assert(field && "Struct should have one member");
+  return field->getType()->getCanonicalType();
 }
 
 /// Classification of instructions that are interesting to the partitioning
@@ -111,11 +117,13 @@ enum class PartitioningClass {
 };
 
 static PartitioningClass classifyInst(SILInstruction *inst) {
-  if (!inst) return PartitioningClass::Unknown;
+  if (!inst)
+    return PartitioningClass::Unknown;
 
   if (auto *BI = dyn_cast<BuiltinInst>(inst)) {
     switch (BI->getBuiltinInfo().ID) {
-    default: return PartitioningClass::Unknown;
+    default:
+      return PartitioningClass::Unknown;
     case BuiltinValueKind::UAddOver:
     case BuiltinValueKind::SAddOver:
     case BuiltinValueKind::USubOver:
@@ -143,7 +151,6 @@ static PartitioningClass classifyInst(SILInstruction *inst) {
   return PartitioningClass::Unknown;
 }
 
-
 /// Given an overflow-checking integer operation, return true if the overflow
 /// result will be unused in the tensor program.  This could be because the
 /// overflow result is already dead, because it is extracted but the extract
@@ -154,7 +161,8 @@ static bool canPromoteOverflowCheckingInstToTensorProgram(BuiltinInst *BI) {
   // has tuple extracts hanging off of it.
   for (auto *use : BI->getUses()) {
     auto *extract = dyn_cast<TupleExtractInst>(use->getUser());
-    if (!extract) return false;
+    if (!extract)
+      return false;
 
     // If this is a use of the normal result of the call, then we can ignore
     // it - this can be moved to the tensor program.
@@ -175,7 +183,6 @@ static bool canPromoteOverflowCheckingInstToTensorProgram(BuiltinInst *BI) {
   return true;
 }
 
-
 /// When classifying a builtin operation as a scalar to be promoted to a tensor,
 /// this returns the kind of operation it is.
 enum class PromotedScalarKind {
@@ -187,17 +194,16 @@ enum class PromotedScalarKind {
   OverflowingBinary,
 };
 
-
 /// If the specified scalar operation can be partitioned and run on the
 /// accelerator, return the name of the op to use to implement it.
-static std::pair<const char*, PromotedScalarKind>
+static std::pair<const char *, PromotedScalarKind>
 classifyPromotedScalarOp(SILInstruction *inst) {
   // We can turn integer and FP literals into constant nodes if their type is
   // compatible.
   if (isa<IntegerLiteralInst>(inst) || isa<FloatLiteralInst>(inst)) {
     auto resultTy = inst->getResults()[0]->getType();
     if (isValidTensorFlowElementType(resultTy.getASTType()))
-      return { "Const", PromotedScalarKind::Literal };
+      return {"Const", PromotedScalarKind::Literal};
   }
 
   auto instClass = classifyInst(inst);
@@ -206,10 +212,11 @@ classifyPromotedScalarOp(SILInstruction *inst) {
   // because it takes a +1 value as its argument.  That said, it is safe to
   // hoist and sink it.
   if (instClass == PartitioningClass::GetScalarOrDie)
-    return { "tfc.getScalarOrDie", PromotedScalarKind::TensorToScalar };
+    return {"tfc.getScalarOrDie", PromotedScalarKind::TensorToScalar};
 
   auto *builtin = dyn_cast<BuiltinInst>(inst);
-  if (!builtin) return { nullptr, PromotedScalarKind::Invalid };
+  if (!builtin)
+    return {nullptr, PromotedScalarKind::Invalid};
 
   // Verify that the instruction is processing dtypes that are supported by
   // TensorFlow nodes - we don't want to handle SIMD vectors or other exotic
@@ -217,7 +224,7 @@ classifyPromotedScalarOp(SILInstruction *inst) {
   if (builtin->getNumOperands() != 0) {
     auto opTy = builtin->getOperand(0)->getType();
     if (!isValidTensorFlowElementType(opTy.getASTType()))
-      return { nullptr, PromotedScalarKind::Invalid };
+      return {nullptr, PromotedScalarKind::Invalid};
   }
   // Verify the result is a valid tensorflow type, or a 2-element tuple that
   // starts with one (used by the overflowing ops).
@@ -225,46 +232,61 @@ classifyPromotedScalarOp(SILInstruction *inst) {
     auto *tt = builtin->getType().getASTType()->getAs<TupleType>();
     if (!tt || tt->getNumElements() != 2 ||
         !isValidTensorFlowElementType(tt->getElementType(0)))
-      return { nullptr, PromotedScalarKind::Invalid };
+      return {nullptr, PromotedScalarKind::Invalid};
   }
 
-
-  auto binary = [&](const char *name)
-       -> std::pair<const char*, PromotedScalarKind> {
-    return { name, PromotedScalarKind::Binary };
+  auto binary =
+      [&](const char *name) -> std::pair<const char *, PromotedScalarKind> {
+    return {name, PromotedScalarKind::Binary};
   };
 
-  auto overflowingBinary = [&](const char *name)
-       -> std::pair<const char*, PromotedScalarKind> {
+  auto overflowingBinary =
+      [&](const char *name) -> std::pair<const char *, PromotedScalarKind> {
     if (!canPromoteOverflowCheckingInstToTensorProgram(builtin))
-      return { nullptr, PromotedScalarKind::Invalid };
-    return { name, PromotedScalarKind::OverflowingBinary };
+      return {nullptr, PromotedScalarKind::Invalid};
+    return {name, PromotedScalarKind::OverflowingBinary};
   };
 
-  auto conversion = [&]() -> std::pair<const char*, PromotedScalarKind> {
-    return { "Cast", PromotedScalarKind::Conversion };
+  auto conversion = [&]() -> std::pair<const char *, PromotedScalarKind> {
+    return {"Cast", PromotedScalarKind::Conversion};
   };
 
   switch (builtin->getBuiltinInfo().ID) {
-  default: return { nullptr, PromotedScalarKind::Invalid };
+  default:
+    return {nullptr, PromotedScalarKind::Invalid};
   // TODO: Unsigned comparisons: ICMP_UGT, ICMP_ULE, ICMP_UGE
   // TODO: FP Comparisons.
-  case BuiltinValueKind::ICMP_EQ:  return binary("Equal");
-  case BuiltinValueKind::ICMP_NE:  return binary("NotEqual");
-  case BuiltinValueKind::ICMP_SLT: return binary("Less");
-  case BuiltinValueKind::ICMP_SGT: return binary("Greater");
-  case BuiltinValueKind::ICMP_SLE: return binary("LessEqual");
-  case BuiltinValueKind::ICMP_SGE: return binary("GreaterEqual");
-  case BuiltinValueKind::Add:      return binary("Add");
-  case BuiltinValueKind::Sub:      return binary("Sub");
-  case BuiltinValueKind::Mul:      return binary("Mul");
-  case BuiltinValueKind::FAdd:     return binary("Add");
-  case BuiltinValueKind::FSub:     return binary("Sub");
-  case BuiltinValueKind::FMul:     return binary("Mul");
+  case BuiltinValueKind::ICMP_EQ:
+    return binary("Equal");
+  case BuiltinValueKind::ICMP_NE:
+    return binary("NotEqual");
+  case BuiltinValueKind::ICMP_SLT:
+    return binary("Less");
+  case BuiltinValueKind::ICMP_SGT:
+    return binary("Greater");
+  case BuiltinValueKind::ICMP_SLE:
+    return binary("LessEqual");
+  case BuiltinValueKind::ICMP_SGE:
+    return binary("GreaterEqual");
+  case BuiltinValueKind::Add:
+    return binary("Add");
+  case BuiltinValueKind::Sub:
+    return binary("Sub");
+  case BuiltinValueKind::Mul:
+    return binary("Mul");
+  case BuiltinValueKind::FAdd:
+    return binary("Add");
+  case BuiltinValueKind::FSub:
+    return binary("Sub");
+  case BuiltinValueKind::FMul:
+    return binary("Mul");
   // TODO: UAddOver, USubOver, UMulOver:
-  case BuiltinValueKind::SAddOver: return overflowingBinary("Add");
-  case BuiltinValueKind::SSubOver: return overflowingBinary("Sub");
-  case BuiltinValueKind::SMulOver: return overflowingBinary("Mul");
+  case BuiltinValueKind::SAddOver:
+    return overflowingBinary("Add");
+  case BuiltinValueKind::SSubOver:
+    return overflowingBinary("Sub");
+  case BuiltinValueKind::SMulOver:
+    return overflowingBinary("Mul");
 
   // TODO: Unsigned conversions.
   case BuiltinValueKind::SIToFP:
@@ -273,7 +295,7 @@ classifyPromotedScalarOp(SILInstruction *inst) {
   case BuiltinValueKind::TruncOrBitCast:
   case BuiltinValueKind::SExt:
   case BuiltinValueKind::SExtOrBitCast:
-     return conversion();
+    return conversion();
   }
 }
 
@@ -286,7 +308,7 @@ classifyPromotedScalarOp(SILInstruction *inst) {
 /// referencing the function in a function-typed op attribute).
 static bool isAcceleratorOnly(const SILFunction &hostFn) {
   return hostFn.getRepresentation() ==
-    SILFunctionType::Representation::TensorFlow; // @convention(tensorflow)
+         SILFunctionType::Representation::TensorFlow; // @convention(tensorflow)
 }
 
 //===----------------------------------------------------------------------===//
@@ -308,12 +330,13 @@ struct SILBBSubsetNode {
   // We care about the addresses of these nodes, so disable these to avoid
   // accidental copies.
   SILBBSubsetNode() = delete;
-  SILBBSubsetNode(const SILBBSubsetNode&) = delete;
+  SILBBSubsetNode(const SILBBSubsetNode &) = delete;
+
 public:
   SILBasicBlock *BB;
   BlocksReachingTensorCode *Parent;
   SILBBSubsetNode(SILBasicBlock *BB, BlocksReachingTensorCode *Parent)
-    : BB(BB), Parent(Parent) {}
+      : BB(BB), Parent(Parent) {}
 
   SILBBSubsetNode(SILBBSubsetNode &&rhs) {
     BB = rhs.BB;
@@ -321,9 +344,8 @@ public:
   }
 
   // These are predecessors and successors of the CFG subset.
-  typedef std::vector<SILBBSubsetNode*> BBListTy;
+  typedef std::vector<SILBBSubsetNode *> BBListTy;
   BBListTy Predecessors, Successors;
-
 
   // Requirements of the domtree implementation.
   BlocksReachingTensorCode *getParent() const { return Parent; }
@@ -333,35 +355,30 @@ public:
 };
 } // end anonymous namespace
 
-
 namespace llvm {
-  template <> struct GraphTraits<SILBBSubsetNode*> {
-    using ChildIteratorType = SILBBSubsetNode::BBListTy::iterator;
-    using Node = SILBBSubsetNode;
-    using NodeRef = SILBBSubsetNode*;
+template <> struct GraphTraits<SILBBSubsetNode *> {
+  using ChildIteratorType = SILBBSubsetNode::BBListTy::iterator;
+  using Node = SILBBSubsetNode;
+  using NodeRef = SILBBSubsetNode *;
 
-    static ChildIteratorType child_begin(NodeRef N) {
-      return N->Successors.begin();
-    }
-    static ChildIteratorType child_end(NodeRef N) {
-      return N->Successors.end();
-    }
-  };
+  static ChildIteratorType child_begin(NodeRef N) {
+    return N->Successors.begin();
+  }
+  static ChildIteratorType child_end(NodeRef N) { return N->Successors.end(); }
+};
 
-  template <> struct GraphTraits<Inverse<SILBBSubsetNode*>> {
-    using ChildIteratorType = SILBBSubsetNode::BBListTy::iterator;
-    using Node = SILBBSubsetNode;
-    using NodeRef = SILBBSubsetNode*;
-    static ChildIteratorType child_begin(NodeRef N) {
-      return N->Predecessors.begin();
-    }
-    static ChildIteratorType child_end(NodeRef N) {
-      return N->Predecessors.end();
-    }
-  };
+template <> struct GraphTraits<Inverse<SILBBSubsetNode *>> {
+  using ChildIteratorType = SILBBSubsetNode::BBListTy::iterator;
+  using Node = SILBBSubsetNode;
+  using NodeRef = SILBBSubsetNode *;
+  static ChildIteratorType child_begin(NodeRef N) {
+    return N->Predecessors.begin();
+  }
+  static ChildIteratorType child_end(NodeRef N) {
+    return N->Predecessors.end();
+  }
+};
 } // end namespace llvm
-
-
 
 namespace {
 /// Represent a subset of a function in a way that we can fulfill the model of
@@ -387,8 +404,8 @@ namespace {
 /// generate accurate post dominator info.
 ///
 class BlocksReachingTensorCode {
-  friend struct llvm::GraphTraits<BlocksReachingTensorCode*>;
-  friend struct llvm::GraphTraits<llvm::Inverse<BlocksReachingTensorCode*>>;
+  friend struct llvm::GraphTraits<BlocksReachingTensorCode *>;
+  friend struct llvm::GraphTraits<llvm::Inverse<BlocksReachingTensorCode *>>;
 
   /// The function this slice is a subset of.
   SILFunction &fn;
@@ -398,13 +415,14 @@ class BlocksReachingTensorCode {
 
   /// This map contains all of the SILBBSubsetNode's that make up the subset
   /// graph.
-  DenseMap<SILBasicBlock*, SILBBSubsetNode*> nodeMap;
+  DenseMap<SILBasicBlock *, SILBBSubsetNode *> nodeMap;
 
   /// This is the post dominator tree built over our node subset.
   llvm::DominatorTreeBase<SILBBSubsetNode, true> PDI;
+
 public:
   BlocksReachingTensorCode(SILFunction &fn) : fn(fn) {}
-  void compute(ArrayRef<SILInstruction*> ops);
+  void compute(ArrayRef<SILInstruction *> ops);
 
   SILBBSubsetNode *getNode(SILBasicBlock *BB) const {
     auto i = nodeMap.find(BB);
@@ -412,14 +430,10 @@ public:
     return i->second;
   }
 
-  SILBBSubsetNode *getEntryBlock() const {
-    return getNode(fn.getEntryBlock());
-  }
+  SILBBSubsetNode *getEntryBlock() const { return getNode(fn.getEntryBlock()); }
 
   /// Return true if the specified block is in our subset of the function.
-  bool contains(SILBasicBlock *bb) const {
-    return nodeMap.count(bb);
-  }
+  bool contains(SILBasicBlock *bb) const { return nodeMap.count(bb); }
 
   bool postDominates(SILBasicBlock *dominator, SILBasicBlock *dominatee) {
     return PDI.dominates(getNode(dominator), getNode(dominatee));
@@ -458,7 +472,7 @@ public:
 template <typename WrappedIteratorT,
           typename T = decltype(&*std::declval<WrappedIteratorT>())>
 struct address_iterator
-  : llvm::iterator_adaptor_base<
+    : llvm::iterator_adaptor_base<
           address_iterator<WrappedIteratorT>, WrappedIteratorT,
           typename std::iterator_traits<WrappedIteratorT>::iterator_category,
           T> {
@@ -471,43 +485,42 @@ struct address_iterator
 };
 
 namespace llvm {
-  template<>
-  struct GraphTraits<BlocksReachingTensorCode*>
-                            : public GraphTraits<SILBBSubsetNode*> {
-    using GraphType = BlocksReachingTensorCode*;
-    using NodeRef = SILBBSubsetNode*;
+template <>
+struct GraphTraits<BlocksReachingTensorCode *>
+    : public GraphTraits<SILBBSubsetNode *> {
+  using GraphType = BlocksReachingTensorCode *;
+  using NodeRef = SILBBSubsetNode *;
 
-    static NodeRef getEntryNode(GraphType F) {
-      return F->getEntryBlock();
-    }
+  static NodeRef getEntryNode(GraphType F) { return F->getEntryBlock(); }
 
-    typedef address_iterator<std::vector<SILBBSubsetNode>::iterator>
-                               nodes_iterator;
-    static nodes_iterator nodes_begin(GraphType F) {
-      return nodes_iterator(F->nodes.begin());
-    }
-    static nodes_iterator nodes_end(GraphType F) {
-      return nodes_iterator(F->nodes.end());
-    }
+  typedef address_iterator<std::vector<SILBBSubsetNode>::iterator>
+      nodes_iterator;
+  static nodes_iterator nodes_begin(GraphType F) {
+    return nodes_iterator(F->nodes.begin());
+  }
+  static nodes_iterator nodes_end(GraphType F) {
+    return nodes_iterator(F->nodes.end());
+  }
 
-    static unsigned size(GraphType F) { return F->nodes.size(); }
-  };
+  static unsigned size(GraphType F) { return F->nodes.size(); }
+};
 
-  template<> struct GraphTraits<Inverse<BlocksReachingTensorCode*>>
-  : public GraphTraits<Inverse<swift::SILBasicBlock*>> {
-    using GraphType = Inverse<BlocksReachingTensorCode*>;
-    using NodeRef = SILBBSubsetNode*;
+template <>
+struct GraphTraits<Inverse<BlocksReachingTensorCode *>>
+    : public GraphTraits<Inverse<swift::SILBasicBlock *>> {
+  using GraphType = Inverse<BlocksReachingTensorCode *>;
+  using NodeRef = SILBBSubsetNode *;
 
-    typedef address_iterator<std::vector<SILBBSubsetNode>::iterator>
-                              nodes_iterator;
-    static nodes_iterator nodes_begin(GraphType F) {
-      return nodes_iterator(F.Graph->nodes.begin());
-    }
-    static nodes_iterator nodes_end(GraphType F) {
-      return nodes_iterator(F.Graph->nodes.end());
-    }
-    static unsigned size(GraphType F) { return F.Graph->nodes.size(); }
-  };
+  typedef address_iterator<std::vector<SILBBSubsetNode>::iterator>
+      nodes_iterator;
+  static nodes_iterator nodes_begin(GraphType F) {
+    return nodes_iterator(F.Graph->nodes.begin());
+  }
+  static nodes_iterator nodes_end(GraphType F) {
+    return nodes_iterator(F.Graph->nodes.end());
+  }
+  static unsigned size(GraphType F) { return F.Graph->nodes.size(); }
+};
 } // end namespace llvm
 
 // This template requires explicit instantiation.
@@ -515,9 +528,9 @@ template class llvm::DominatorTreeBase<SILBBSubsetNode, true>;
 
 /// Compute the set of blocks that can reach the specified operations, and
 /// uses of them.
-void BlocksReachingTensorCode::compute(ArrayRef<SILInstruction*> ops) {
+void BlocksReachingTensorCode::compute(ArrayRef<SILInstruction *> ops) {
   assert(!ops.empty() && "Cannot compute empty CFG subset");
-  SmallVector<SILBasicBlock*, 8> worklist;
+  SmallVector<SILBasicBlock *, 8> worklist;
 
   // We seed the worklist with the blocks that the operations occur in, along
   // with the blocks containing all uses of the results.  These uses may not
@@ -556,7 +569,8 @@ void BlocksReachingTensorCode::compute(ArrayRef<SILInstruction*> ops) {
     // If we already visited this block, we're done.  Otherwise insert it,
     // creating the SILBBSubsetNode for this BB.
     auto &entry = nodeMap[bb];
-    if (entry != nullptr) continue;
+    if (entry != nullptr)
+      continue;
 
     nodes.emplace_back(SILBBSubsetNode(bb, this));
     entry = &nodes.back();
@@ -587,24 +601,51 @@ void BlocksReachingTensorCode::compute(ArrayRef<SILInstruction*> ops) {
   PDI.recalculate(*this);
 }
 
-void BlocksReachingTensorCode::dump() {
-  PDI.print(llvm::errs());
-}
-
+void BlocksReachingTensorCode::dump() { PDI.print(llvm::errs()); }
 
 //===----------------------------------------------------------------------===//
 //                             FunctionPartitioner
 //===----------------------------------------------------------------------===//
 
+namespace llvm {
+template <typename T> struct DenseMapInfo;
+
+// An alternative is to SourceManager::getLineAndColumn() as the
+// DenseMap/DenseSet key type instead of SourceRange. That would require that
+// the call-site translate a SILLocation / SourceRange to line and column
+// numbers first.
+template <> struct DenseMapInfo<SourceRange> {
+  static SourceRange getEmptyKey() { return SourceRange(); }
+
+  static SourceRange getTombstoneKey() {
+    // Make this different from empty key. See for context:
+    // http://lists.llvm.org/pipermail/llvm-dev/2015-July/088744.html
+    return SourceRange(SourceLoc(
+        SMLoc::getFromPointer(DenseMapInfo<const char *>::getTombstoneKey())));
+  }
+
+  static unsigned getHashValue(const SourceRange &Val) {
+    return hash_combine(DenseMapInfo<const void *>::getHashValue(
+                            Val.Start.getOpaquePointerValue()),
+                        DenseMapInfo<const void *>::getHashValue(
+                            Val.End.getOpaquePointerValue()));
+  }
+
+  static bool isEqual(const SourceRange &LHS, const SourceRange &RHS) {
+    return LHS == RHS;
+  }
+};
+} // namespace llvm
+
 namespace {
 /// Marking values in the host program need to either be moved, copied, or have
 /// their results sent over to the accelerator.
 enum class Marking {
-  Copy,      // This instruction is run on both the host and accelerator.
-  Move,      // This instruction is run on the accelerator, not the host.
-  Send,      // The value produced by this instruction is copied to accelerator.
-  Argument,  // The value is passed as an argument to the tensor function.
-  Delete,    // This instruction is simply deleted (e.g. debug_value)
+  Copy,     // This instruction is run on both the host and accelerator.
+  Move,     // This instruction is run on the accelerator, not the host.
+  Send,     // The value produced by this instruction is copied to accelerator.
+  Argument, // The value is passed as an argument to the tensor function.
+  Delete,   // This instruction is simply deleted (e.g. debug_value)
 };
 
 // Each string should be no more than 6 characters, so that a string like
@@ -616,24 +657,28 @@ static const char *markingStr[]{
 class TFFunctionPartition {
 public:
   SILFunction &hostFn;
-  ModuleDecl &tensorFlowModule;  // TensorFlow standard library.
-  GraphGlobalConfiguration configuration; // Device placement info.
+  ModuleDecl &tensorFlowModule; // TensorFlow standard library.
+  TFGraphLowering *const graphLowering;
+  /// For partitionable functions, map the SIL host function names to the
+  /// lowered TF graph artifacts.
+  DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>> &graphFunctions;
+  GraphFunctionDeviceInfo deviceInfo; // Device placement info.
   DominanceInfo &DI;
   BlocksReachingTensorCode tensorCodeBlocks;
 
   /// These are all the tensor ops found in the initial scan over the function.
-  SmallPtrSet<SILInstruction*, 8> tensorOpsSet;
+  SmallPtrSet<SILInstruction *, 8> tensorOpsSet;
 
   /// This keeps track of the set of blocks that are marked as needing to be
   /// partitioned out to the accelerator.  If the block is in this set, then
   /// some instruction in the block has to run on the accelerator.
-  SmallPtrSet<SILBasicBlock*, 8> markedBlocks;
+  SmallPtrSet<SILBasicBlock *, 8> markedBlocks;
 
   /// This contains a set of all basic blocks that are immediate successors of
   /// TensorOp blocks, but which are outside of the tensor program (typically
   /// these are error edges).  These blocks need to kill the tensor program if
   /// reached.
-  SmallPtrSet<SILBasicBlock*, 8> tensorKillBlocks;
+  SmallPtrSet<SILBasicBlock *, 8> tensorKillBlocks;
 
   /// As the primary tensor operations are marked, the nearest common ancestor
   /// (NCA) in the dominator tree of the tensor operations is found.  This will
@@ -658,7 +703,7 @@ public:
   SmallVector<SILValue, 4> tensorFnArguments;
 
   /// The instructions that are to be run on the accelerator.
-  DenseMap<SILInstruction*, Marking> markedInstructions;
+  DenseMap<SILInstruction *, Marking> markedInstructions;
 
   /// BB Arguments that are marked as being moved, deleted, copied, or used as
   /// arguments.
@@ -670,35 +715,42 @@ public:
   /// We capture source location information for BB arguments during the marking
   /// phase, because once we start chopping up instructions we can't reliably
   /// get it.
-  DenseMap<SILArgument*, std::pair<Marking, SILLocation>> markedBBArguments;
+  DenseMap<SILArgument *, std::pair<Marking, SILLocation>> markedBBArguments;
 
   /// The set of values that must be sent to the accelerator.
   SmallPtrSet<SILValue, 8> valuesToSend;
 
   /// Set of all of the __tf_send calls that silence copy-in warnings.
-  SmallPtrSet<SILInstruction*, 8> explicitCopyMarkers;
+  SmallPtrSet<SILInstruction *, 8> explicitCopyMarkers;
 
- public:
-  TFFunctionPartition(SILFunction &Fn, SILPassManager *PM,
-                      ModuleDecl &tensorFlowModule)
-      : hostFn(Fn), tensorFlowModule(tensorFlowModule),
-        configuration(GraphGlobalConfiguration::getForFunction(Fn,
-                                                   /*removeConfigInst*/true)),
-        DI(*PM->getAnalysis<DominanceAnalysis>()->get(&Fn)),
-        tensorCodeBlocks(Fn) {}
-
-  bool markFunction();
+  /// Set of source locations where we have issued copy-to-host warnings.
+  llvm::DenseSet<SourceRange> copyToHostWarningLocs;
+  /// Set of source locations where we have issued copy-to-accelerator warnings.
+  llvm::DenseSet<SourceRange> copyToAccelWarningLocs;
 
   struct PartitionedTensorProgram {
-    SILFunction *acceleratorFn; // The function representing the tensor program.
+    // Initialize all members to NULL.
+    PartitionedTensorProgram() {}
+
+    PartitionedTensorProgram(
+        StringLiteralInst *programPlaceholder,
+        IntegerLiteralInst *programLengthPlaceholder,
+        StringLiteralInst *entryFunctionBaseNamePlaceholder,
+        IntegerLiteralInst *helperFunctionCountPlaceholder,
+        SILValue theTensorComputation)
+        : programPlaceholder(programPlaceholder),
+          programLengthPlaceholder(programLengthPlaceholder),
+          entryFunctionBaseNamePlaceholder(entryFunctionBaseNamePlaceholder),
+          helperFunctionCountPlaceholder(helperFunctionCountPlaceholder),
+          theTensorComputation(theTensorComputation) {}
 
     /// These are placeholder instructions inserted during partitioning to
     /// represent the tensor program itself.  These will be replaced when the
     /// tensor function is lowered to a TF graph.
-    StringLiteralInst *programPlaceholder;
-    IntegerLiteralInst *programLengthPlaceholder;
-    StringLiteralInst *entryFunctionBaseNamePlaceholder;
-    IntegerLiteralInst *helperFunctionCountPlaceholder;
+    StringLiteralInst *programPlaceholder = nullptr;
+    IntegerLiteralInst *programLengthPlaceholder = nullptr;
+    StringLiteralInst *entryFunctionBaseNamePlaceholder = nullptr;
+    IntegerLiteralInst *helperFunctionCountPlaceholder = nullptr;
 
     /// This is the "TensorFlow.TensorComputation" object returned by the
     /// '_swift_tfc_StartTensorComputation' runtime API entrypoint.  This is
@@ -706,23 +758,81 @@ public:
     /// transformation has been made.
     SILValue theTensorComputation;
   };
-  PartitionedTensorProgram partition();
+
+  PartitionedTensorProgram tensorProgram;
+  // The accelerator function corresponding to `tensorProgram`.
+  SILFunction *acceleratorFn = nullptr;
+
+public:
+  TFFunctionPartition(SILFunction &Fn, SILPassManager *PM,
+                      ModuleDecl &tensorFlowModule,
+                      TFGraphLowering *graphLowering,
+                      DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>>
+                          &graphFunctions)
+      : hostFn(Fn), tensorFlowModule(tensorFlowModule),
+        graphLowering(graphLowering), graphFunctions(graphFunctions),
+        // TODO: remote this call once partition pass is folded into
+        // deabstraction.
+        deviceInfo(
+            GraphFunctionDeviceInfo::getForFunction(hostFn,
+                                                    /*removeConfigInst*/ true)),
+        DI(*PM->getAnalysis<DominanceAnalysis>()->get(&Fn)),
+        tensorCodeBlocks(Fn) {}
+
+  ~TFFunctionPartition() {
+    // Remove the partitioned function so it doesn't go through the normal
+    // compiler flow.
+    if (acceleratorFn)
+      acceleratorFn->getModule().eraseFunction(acceleratorFn);
+  }
+
+  /// Run the marking/analysis phase on this function. Return true on error.
+  bool markFunction(bool &hasTensorOps);
+
+  TFGraphLowering *getGraphLoweringTest() { return graphLowering; }
+
+  /// Partition and lower this function to a graph, and add an entry to
+  /// `graphFunctions`.  Return true on error.
+  ///
+  /// Should only be called when markFunction() succeeds.
+  bool partitionAndLowerGraph(bool isTest);
+
+  /// For a non-accelerator-only function, complete the host function
+  /// rewrite, by "installing" the serialized protobuf bytes into that function.
+  void finalizeHostFunction(const std::vector<char> &bytes,
+                            StringRef entryFnBaseName);
 
   void diagnoseCopyToAccelerator(SILValue value, SILInstruction *user,
                                  bool isTensorProgramArgument);
   void diagnoseUsesFromHost(SILValue value, SILLocation loc);
-  void diagnoseCopyToHost(SILValue value, SILInstruction *user, SILLocation loc);
+  void diagnoseCopyToHost(SILValue value, SILInstruction *user,
+                          SILLocation loc);
 
 private:
   // Marking.
-  void markBlock(SILBasicBlock *BB);
-  void markInstruction(SILInstruction &inst, Marking mark);
-  void markArgument(SILArgument *arg, SILInstruction *user);
-  void markValue(SILValue value, SILInstruction *user);
+  /// Return true if we've encountered an error. In that case the diagnostic
+  /// must have been emitted.
+  bool markBlock(SILBasicBlock *BB);
+  bool markInstruction(SILInstruction &inst, Marking mark);
+  bool markArgument(SILArgument *arg, SILInstruction *user);
+  bool markValue(SILValue value, SILInstruction *user);
+
   void sinkValueIntoRegionForPromotion(SILInstruction *&inst);
 
   void promoteCopyToMove();
   void markTensorBBArgumentsForDeletion();
+
+  /// Partially construct `tensorProgram`, by generating an accelerator function
+  /// from partitioning the host function.
+  /// Return true on error.
+  bool partition(bool isTest);
+
+  /// Lower the accelerator function into a graph, add an entry to
+  /// `graphFunctions`. Also delete the accelerator function so that it does not
+  /// go through the normal compiler flow. Return true on error.
+  ///
+  /// Should only be called when partition() succeeds.
+  bool lowerGraph(bool isTest);
 
   /// Rewrite the host program, inserting a call to _TFCStartTensorComputation
   /// at the start point of the tensor function, passing in the tensor program
@@ -731,7 +841,7 @@ private:
   /// The `resultValues` list is the set of tensor handle values moved to the
   /// accelerator program that should be returned as program results instead of
   /// being sent back.
-  PartitionedTensorProgram
+  void
   insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues);
 
   // `oldResult` is a tensor in the original host program which has some use
@@ -746,7 +856,6 @@ private:
 };
 } // end anonymous namespace
 
-
 /// Determine the marking strategy (Mark::Copy / Mark::Send) according
 /// to the type of TermInst of a predecessor BasicBlock.
 /// For general terminators (like br/cond_br), we'd generate code to
@@ -757,29 +866,27 @@ private:
 static inline bool shouldMarkCopy(TermInst *predTerm) {
   auto termKind = predTerm->getTermKind();
   return termKind == TermKind::BranchInst ||
-      termKind == TermKind::CondBranchInst;
+         termKind == TermKind::CondBranchInst;
 }
 static inline bool shouldMarkSend(TermInst *predTerm) {
   // TODO : support SwitchValueInst and CheckedCastValueBranchInst
   // once they are properly tested.
   auto termKind = predTerm->getTermKind();
   return termKind == TermKind::SwitchEnumInst ||
-      termKind == TermKind::SwitchEnumAddrInst ||
-      termKind == TermKind::TryApplyInst ||
-      termKind == TermKind::DynamicMethodBranchInst ||
-      termKind == TermKind::CheckedCastBranchInst ||
-      termKind == TermKind::CheckedCastAddrBranchInst;
+         termKind == TermKind::SwitchEnumAddrInst ||
+         termKind == TermKind::TryApplyInst ||
+         termKind == TermKind::DynamicMethodBranchInst ||
+         termKind == TermKind::CheckedCastBranchInst ||
+         termKind == TermKind::CheckedCastAddrBranchInst;
 }
 //@}
-
 
 /// Check to see if the specified value being copied into a partition for the
 /// accelerator is our designated "send" operation.  If so, we're fine,
 /// otherwise emit a warning to tell the programmer that they are doing
 /// something that induces an implicit data transfer into their code.
-void TFFunctionPartition::
-diagnoseCopyToAccelerator(SILValue value, SILInstruction *user,
-                          bool isTensorProgramArgument) {
+void TFFunctionPartition::diagnoseCopyToAccelerator(
+    SILValue value, SILInstruction *user, bool isTensorProgramArgument) {
   // If it isn't the result of a "send" operation, then produce a warning about
   // an implicit copy to the accelerator.
   if (auto *apply = dyn_cast<ApplyInst>(value))
@@ -867,9 +974,12 @@ diagnoseCopyToAccelerator(SILValue value, SILInstruction *user,
 
   auto &ctx = hostFn.getModule().getASTContext();
 
-  // Emit the warning.
+  // Emit the warning on this value, if that has not been done before.
+  if (!copyToAccelWarningLocs.insert(loc.getSourceRange()).second)
+    return;
+
   diagnose(ctx, loc.getSourceLoc(), diagID, description)
-    .highlight(loc.getSourceRange());
+      .highlight(loc.getSourceRange());
   auto userLoc = getUserSourceLocation(user);
 
   if (loc.isNull()) {
@@ -888,12 +998,12 @@ diagnoseCopyToAccelerator(SILValue value, SILInstruction *user,
   auto &SM = ctx.SourceMgr;
   if (!userLoc.isNull() &&
       (SM.findBufferContainingLoc(loc.getSourceLoc()) !=
-         SM.findBufferContainingLoc(userLoc.getSourceLoc()) ||
+           SM.findBufferContainingLoc(userLoc.getSourceLoc()) ||
        SM.getLineNumber(loc.getSourceLoc()) !=
-         SM.getLineNumber(userLoc.getSourceLoc()))) {
+           SM.getLineNumber(userLoc.getSourceLoc()))) {
     diagnose(ctx, userLoc.getSourceLoc(),
              diag::tf_value_implicitly_copied_to_host_computed_used_here)
-    .highlight(userLoc.getSourceRange());
+        .highlight(userLoc.getSourceRange());
   }
 }
 
@@ -901,8 +1011,8 @@ diagnoseCopyToAccelerator(SILValue value, SILInstruction *user,
 /// accelerator is our designated "receive" operation.  If so, we're fine,
 /// otherwise emit a warning to tell the programmer that they are doing
 /// something that induces an implicit data transfer into their code.
-void TFFunctionPartition::diagnoseUsesFromHost(SILValue value, SILLocation loc){
-  bool diagnosed = false;
+void TFFunctionPartition::diagnoseUsesFromHost(SILValue value,
+                                               SILLocation loc) {
   for (auto *use : value->getUses()) {
     auto *user = use->getUser();
 
@@ -924,14 +1034,15 @@ void TFFunctionPartition::diagnoseUsesFromHost(SILValue value, SILLocation loc){
     if (hostFn.getName() == SWIFT_ENTRY_POINT_FUNCTION)
       continue;
 
-    // Only emit one warning per use.
-    if (!diagnosed)
+    // Only emit one warning per value, even if it has multiple host uses.
+    if (copyToHostWarningLocs.insert(loc.getSourceRange()).second)
       diagnoseCopyToHost(value, user, loc);
   }
 }
 
-void TFFunctionPartition::
-diagnoseCopyToHost(SILValue value, SILInstruction *user, SILLocation loc) {
+void TFFunctionPartition::diagnoseCopyToHost(SILValue value,
+                                             SILInstruction *user,
+                                             SILLocation loc) {
   // Since we're in early development and don't support copies, we always show
   // the using instruction that caused the copy.
   // TODO: Remove this as the stack matures.
@@ -946,7 +1057,7 @@ diagnoseCopyToHost(SILValue value, SILInstruction *user, SILLocation loc) {
 
   // Emit the warning.
   diagnose(ctx, loc.getSourceLoc(), diag::tf_value_implicitly_copied_to_host)
-    .highlight(loc.getSourceRange());
+      .highlight(loc.getSourceRange());
   auto userLoc = getUserSourceLocation(user);
 
   if (loc.isNull()) {
@@ -962,19 +1073,19 @@ diagnoseCopyToHost(SILValue value, SILInstruction *user, SILLocation loc) {
   }
 
   // If the use is at a different position, emit a note showing where it is.
-  if (!userLoc.isNull() &&
-      loc.getSourceLoc() != userLoc.getSourceLoc()) {
+  if (!userLoc.isNull() && loc.getSourceLoc() != userLoc.getSourceLoc()) {
     diagnose(ctx, userLoc.getSourceLoc(),
              diag::tf_value_implicitly_copied_to_host_computed_used_here)
-    .highlight(userLoc.getSourceRange());
+        .highlight(userLoc.getSourceRange());
   }
 }
-
 
 /// Some instruction in the specified block needs to be split out to the
 /// accelerator, so we mark it (and its control dependencies) as to-be-moved
 /// over.
-void TFFunctionPartition::markBlock(SILBasicBlock *BB) {
+/// Return true if we've encountered an error. In that case the diagnostic must
+/// have been emitted.
+bool TFFunctionPartition::markBlock(SILBasicBlock *BB) {
   // "tensorStartPoint" marks the start of the extracted function, so it must
   // dominate all blocks that are to be extracted.
   assert(DI.dominates(tensorStartPoint->getParent(), BB) &&
@@ -983,7 +1094,7 @@ void TFFunctionPartition::markBlock(SILBasicBlock *BB) {
   // Insert the block into our set - if the block is already there, we have
   // nothing more to do.
   if (!markedBlocks.insert(BB).second)
-    return;
+    return false;
 
   // Walk predecessors until we find marked blocks or other blocks we are
   // control-dependent on.
@@ -995,12 +1106,12 @@ void TFFunctionPartition::markBlock(SILBasicBlock *BB) {
   // since each block marking can walk the entire function's CFG, but it is good
   // enough for now.  It would probably make more sense to walk the pdom tree
   // instead of walking the CFG.
-  SmallVector<SILBasicBlock*, 8> worklist;
+  SmallVector<SILBasicBlock *, 8> worklist;
   worklist.push_back(BB);
 
   // The addedToList set keeps track of blocks that have been added to the
   // worklist, to ensure we don't process something more than once.
-  SmallPtrSet<SILBasicBlock*, 32> addedToList;
+  SmallPtrSet<SILBasicBlock *, 32> addedToList;
   addedToList.insert(BB);
 
   // Walk up the CFG looking for terminators we are control-dependent on.
@@ -1017,6 +1128,17 @@ void TFFunctionPartition::markBlock(SILBasicBlock *BB) {
     // Check the predecessors of this block.  If any of them have multiple
     // successors, then we may be control-dependent on that conditional.
     for (auto pred : thisBB->getPredecessorBlocks()) {
+      if (pred->getSingleSuccessorBlock() == pred) {
+        // Edge case: we've entered an infinite loop, so we'll just error
+        // out here.
+        // FIXME: Consider using a different error code than `tf_op_misuse`.
+        diagnose(hostFn.getASTContext(), hostFn.getLocation().getSourceLoc(),
+                 diag::tf_op_misuse,
+                 "Functions containing infinite loops are not supported by "
+                 "TensorFlow yet");
+        return true;
+      }
+
       // Count the number of successors of this block which are tensor related,
       // for sanity-check purposes.
       //
@@ -1024,11 +1146,21 @@ void TFFunctionPartition::markBlock(SILBasicBlock *BB) {
       // so we can insert a kill of the tensor program.
       unsigned numTensorSuccs = 0;
       for (auto succ : pred->getSuccessorBlocks()) {
+        if (succ->getSingleSuccessorBlock() == succ) {
+          // Edge case: we've entered an infinite loop, so we'll just error
+          // out here.
+          // FIXME: Consider using a different error code than `tf_op_misuse`.
+          diagnose(hostFn.getASTContext(), hostFn.getLocation().getSourceLoc(),
+                   diag::tf_op_misuse,
+                   "Functions containing infinite loops are not supported by "
+                   "TensorFlow yet");
+          return true;
+        }
         if (tensorCodeBlocks.contains(succ))
           ++numTensorSuccs;
         else {
           assert(succ->getSinglePredecessorBlock() &&
-                 "Need to split critical edges??");
+                 "Critical edges should've been split");
           tensorKillBlocks.insert(succ);
         }
       }
@@ -1078,7 +1210,8 @@ void TFFunctionPartition::markBlock(SILBasicBlock *BB) {
 
       auto predTerm = pred->getTerminator();
       if (shouldMarkCopy(predTerm)) {
-        markInstruction(*predTerm, Marking::Copy);
+        if (markInstruction(*predTerm, Marking::Copy))
+          return true;
         continue;
       }
 
@@ -1086,18 +1219,25 @@ void TFFunctionPartition::markBlock(SILBasicBlock *BB) {
         // We intend for `predTerm` to still run on host (and thus did not
         // mark its parent block), but send its result to accelerator.
         markedInstructions.insert({predTerm, Marking::Send});
+        // Even though we don't need to mark `pred` for accelerator if it has no
+        // block which it is control-dependent on, when there is a block that
+        // `pred` is control-dependent on, we need to mark that block. This is
+        // done by marking `pred` first. Otherwise we can miss marking an
+        // encompassing loop where `pred` and `thisBB` are part of the loop
+        // body.
+        if (markBlock(pred))
+          return true;
         continue;
       }
 
       diagnose(hostFn.getModule().getASTContext(),
-               predTerm->getLoc().getSourceLoc(),
-               diag::tf_internal_error,
-               "TermInst " + getSILInstructionName(predTerm->getKind()).str()
-               + " not supported for TFFunctionPartition");
+               predTerm->getLoc().getSourceLoc(), diag::tf_internal_error,
+               "TermInst " + getSILInstructionName(predTerm->getKind()).str() +
+                   " not supported for TFFunctionPartition");
     }
   }
+  return false;
 }
-
 
 /// When considering whether we should promote a scalar operation to a tensor
 /// op in the graph, we have several cases.
@@ -1115,7 +1255,8 @@ static ScalarPromoteClass shouldPromoteToTensorOp(SILInstruction *inst,
                                                   TFFunctionPartition &tffp) {
   if (auto *TE = dyn_cast<TupleExtractInst>(inst)) {
     auto *opInst = TE->getOperand()->getDefiningInstruction();
-    if (!opInst) return ScalarPromoteClass::NeverPromote;
+    if (!opInst)
+      return ScalarPromoteClass::NeverPromote;
 
     // We can handle (tuple_extract x, c) when the operand is a tensor op, since
     // it is just extracting a result from the tensor op.
@@ -1168,65 +1309,47 @@ static ScalarPromoteClass shouldPromoteToTensorOp(SILInstruction *inst,
   // a literal), then try hard to promote the conversion.
   if (scalarClass == PromotedScalarKind::Conversion)
     if (auto *op = inst->getOperand(0)->getDefiningInstruction())
-      if (shouldPromoteToTensorOp(op, tffp) ==ScalarPromoteClass::ShouldPromote)
+      if (shouldPromoteToTensorOp(op, tffp) ==
+          ScalarPromoteClass::ShouldPromote)
         return ScalarPromoteClass::ShouldPromote;
 
   // Otherwise, we can promote this if desired.
   return ScalarPromoteClass::CanPromote;
 }
 
-void TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
+/// In addition to marking this inst itself for accelerator (Copy or Move), also
+/// mark the block, and the operands of this inst. In addition, for
+/// Marking::Copy, handle a few special types of scalar promotion.
+bool TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
+  assert(mark == Marking::Copy || mark == Marking::Move);
+
   // Insert the specified instruction into the marked set.  If it is already
   // there then we have nothing more to do.
   if (!markedInstructions.insert({&inst, mark}).second)
-    return;
-
-  // If we're moving a computation to the accelerator and we see a tuple_extract
-  // from a moved value, then we move the tuple_extract as well, to make sure
-  // that any copy-to-host or results are scalar values, not the multiple
-  // results of tensor ops.
-  if (mark == Marking::Move) {
-    for (auto result : inst.getResults())
-      for (auto *use : result->getUses()) {
-        auto user = use->getUser();
-
-        // FIXME: We should probably consider these as tensorops to make sure
-        // they get moved to the accelerator and we don't end up with any
-        // multi-result tensor operations being copied over.
-        if (isa<TupleExtractInst>(user)) {
-          // It is possible the tuple extract already got marked as a copy.  If
-          // so, remove its entry so we can upgrade it to a move.
-          markedInstructions.erase(user);
-          markInstruction(*user, Marking::Move);
-        }
-      }
-  }
-
-  // If we are simply deleting this instruction, then we're done.
-  if (mark == Marking::Delete)
-    return;
+    return false;
 
   // Make sure the instruction's block is marked as being copied over to the
   // tensor program.
-  markBlock(inst.getParent());
+  if (markBlock(inst.getParent()))
+    return true;
 
   // If we have an uncond branch with basic block arguments, don't add operands
   // as used values.  Instead, we'll use more careful conditional liveness
   // based on whether the BB args in the successor are live.
   if (isa<BranchInst>(&inst))
-    return;
+    return false;
 
-  // If we are moving the instruction over, then we know it is a tensor op, and
-  // it get special attention.  Otherwise, we just recursively mark the
-  // operands in question.
+  // If we are copying the instruction over (for scalar promotion), we just
+  // recursively mark the operands in question.
   // TODO: This special case will go away when Tensor ops are not representing
   // attributes as operands.
-  if (mark != Marking::Move) {
+  if (mark == Marking::Copy) {
     auto operandRange = inst.getAllOperands();
 
     // Some instructions require special handling during marking.
     switch (classifyInst(&inst)) {
-    default: break;  // No special handling.
+    default:
+      break; // No special handling.
 
     case PartitioningClass::OverflowCheckingInst:
       // Overflow-checking integer ops have a "should check" bit as their last
@@ -1245,23 +1368,38 @@ void TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
     // computation over to the accelerator, by copying the value over, or by
     // passing as an argument to the tensor computation.
     for (auto &op : operandRange)
-      markValue(op.get(), &inst);
-    return;
+      if (markValue(op.get(), &inst))
+        return true;
+    return false;
   }
 
-  // If this is a tuple_extract of a tensor op, then we already marked its
-  // operand.
-  if (isa<TupleExtractInst>(inst))
-    return;
+  assert(mark == Marking::Move);
+  // If we are moving the instruction over, then we know it is a tensor op, and
+  // it gets special attention.
+
+  // Sanity check that we never need to need with multi-result tensors encoded
+  // in a tuple.
+#ifndef NDEBUG
+  for (auto result : inst.getResults())
+    for (auto *use : result->getUses()) {
+      auto user = use->getUser();
+      assert(!isa<TupleExtractInst>(user) &&
+             "No result value of a graph_op inst should be a tuple!");
+    }
+#endif // NDEBUG
+
+  assert(!isa<TupleExtractInst>(inst) &&
+         "tuple_extract over a tensor value should not be marked!");
 
   // Okay, we know that the instruction is a tensor op.  Decode its argument
   // list so we know how to handle the operands.
   if (auto *graphOp = dyn_cast<GraphOperationInst>(&inst)) {
     for (unsigned i = 0, e = graphOp->getNumOperands(); i != e; ++i) {
       // Tensor and scalar input operands are recursively marked.
-      markValue(graphOp->getOperand(i), graphOp);
+      if (markValue(graphOp->getOperand(i), graphOp))
+        return true;
     }
-    return;
+    return false;
   }
 
   SILTensorOpInfo tfopInfo = SILTensorOpInfo::decode(&inst).getValue();
@@ -1270,29 +1408,31 @@ void TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
     if (tfopInfo.isInput(i) &&
         // Don't mark array designators.
         !inst.getOperand(i)->getType().is<MetatypeType>())
-      markValue(inst.getOperand(i), &inst);
+      if (markValue(inst.getOperand(i), &inst))
+        return true;
   }
+  return false;
 }
 
-void TFFunctionPartition::markArgument(SILArgument *arg, SILInstruction *user) {
+bool TFFunctionPartition::markArgument(SILArgument *arg, SILInstruction *user) {
   // If we've already marked this argument, there is nothing more to do.
   if (markedBBArguments.count(arg))
-    return;
+    return false;
 
   // If this BB argument is outside the region dominated by the start point,
   // then we pass its value in as an argument to the tensor function.
   if (!DI.properlyDominates(tensorStartPoint->getParent(), arg->getParent())) {
-    markedBBArguments.insert({
-      arg, { Marking::Argument, getUserSourceLocation(arg) }
-    });
+    markedBBArguments.insert(
+        {arg, {Marking::Argument, getUserSourceLocation(arg)}});
     tensorFnArguments.push_back(SILValue(arg));
-    diagnoseCopyToAccelerator(arg, user, /*tensorProgramArgument*/true);
-    return;
+    diagnoseCopyToAccelerator(arg, user, /*tensorProgramArgument*/ true);
+    return false;
   }
 
   // Ok, since we're marking it, we need to make sure the argument's block is
   // marked as being copied.
-  markBlock(arg->getParent());
+  if (markBlock(arg->getParent()))
+    return true;
 
   // If this is a value of TensorFlow value type, then we move it to the
   // accelerator.  If it is also used on the host, it will be copied back.
@@ -1301,13 +1441,11 @@ void TFFunctionPartition::markArgument(SILArgument *arg, SILInstruction *user) {
     // dominated region anyway.
     assert(!isa<SILFunctionArgument>(arg) &&
            "Cannot move function parameters!");
-    markedBBArguments.insert({
-      arg, { Marking::Move, getUserSourceLocation(arg) }
-    });
+    markedBBArguments.insert(
+        {arg, {Marking::Move, getUserSourceLocation(arg)}});
   } else {
-    markedBBArguments.insert({
-      arg, { Marking::Copy, getUserSourceLocation(arg) }
-    });
+    markedBBArguments.insert(
+        {arg, {Marking::Copy, getUserSourceLocation(arg)}});
   }
 
   // Otherwise, we mark the branches that contribute values to it, then mark
@@ -1326,8 +1464,10 @@ void TFFunctionPartition::markArgument(SILArgument *arg, SILInstruction *user) {
     SmallVector<SILValue, 4> incomingValues;
     arg->getIncomingValues(incomingValues);
     for (auto v : incomingValues)
-      markValue(v, user);
+      if (markValue(v, user))
+        return true;
   }
+  return false;
 }
 
 /// Determine whether we are able to move the specified instruction across
@@ -1342,7 +1482,8 @@ void TFFunctionPartition::markArgument(SILArgument *arg, SILInstruction *user) {
 /// `o` to wrap `inst`, and sink `inst` along with the release.
 static bool canMoveInstruction(SILInstruction *inst,
                                SILValue *plusZeroTensorOperand) {
-  if (plusZeroTensorOperand) *plusZeroTensorOperand = SILValue();
+  if (plusZeroTensorOperand)
+    *plusZeroTensorOperand = SILValue();
 
   // Instructions that SIL knows are always side-effect-free can generally be
   // moved.
@@ -1461,9 +1602,8 @@ static bool sinkValueAfterEndPoint(SILInstruction *inst,
     if (plusZeroTensorOperand) {
       // Create strong_release right after `inst`.
       SILBuilder B(inst);
-      auto *releaseInst =
-          B.createStrongRelease(tensorEndPoint->getLoc(), plusZeroTensorOperand,
-                                Atomicity::Atomic);
+      auto *releaseInst = B.createStrongRelease(
+          tensorEndPoint->getLoc(), plusZeroTensorOperand, Atomicity::Atomic);
       releaseInst->moveAfter(inst);
     }
     return true;
@@ -1477,8 +1617,8 @@ static bool sinkValueAfterEndPoint(SILInstruction *inst,
 /// program, and is known to be promotable to a tensor op.   Try to sink it down
 /// to be part of the tensor program and return true if successful.
 ///
-void TFFunctionPartition::
-sinkValueIntoRegionForPromotion(SILInstruction *&inst) {
+void TFFunctionPartition::sinkValueIntoRegionForPromotion(
+    SILInstruction *&inst) {
   // Determine whether the instruction is only used by things after the
   // tensorStartPoint.  If so, we can move it into place.
   bool hasProblematicUsers = false;
@@ -1506,7 +1646,7 @@ sinkValueIntoRegionForPromotion(SILInstruction *&inst) {
   // Replace uses of the original instruction with the new one, if they are
   // within the tensor program.
   for (auto result : oldInst->getResults()) {
-    for (auto it = result->use_begin(), e = result->use_end(); it != e; ) {
+    for (auto it = result->use_begin(), e = result->use_end(); it != e;) {
       auto *operand = *it++;
       auto user = operand->getUser();
 
@@ -1520,11 +1660,11 @@ sinkValueIntoRegionForPromotion(SILInstruction *&inst) {
 /// Indicate that the specified value must be available on the accelerator.
 /// This can be done by moving the computation over, or by inserting a data
 /// transfer.
-void TFFunctionPartition::markValue(SILValue value, SILInstruction *user) {
+bool TFFunctionPartition::markValue(SILValue value, SILInstruction *user) {
   // We can safely ignore SILUndef, since SILCloner will just make another
   // one for us.
   if (isa<SILUndef>(value))
-    return;
+    return false;
 
   if (auto *arg = dyn_cast<SILArgument>(value))
     return markArgument(arg, user);
@@ -1532,17 +1672,16 @@ void TFFunctionPartition::markValue(SILValue value, SILInstruction *user) {
   auto *inst = value->getDefiningInstruction();
   assert(inst);
   if (markedInstructions.count(inst))
-    return;
+    return false;
 
   // If this is a reference to a tensor op that we haven't gotten to yet, just
   // ignore it.  The outer marking loop will find it and mark it.
   if (tensorOpsSet.count(inst))
-    return;
+    return false;
 
   // Determine whether the instruction is lexically before the tensor program
   // start point, and whether it is something we can promote into the graph.
-  bool isBeforeStartPoint =
-    !DI.properlyDominates(tensorStartPoint, inst);
+  bool isBeforeStartPoint = !DI.properlyDominates(tensorStartPoint, inst);
   ScalarPromoteClass promotionClass = shouldPromoteToTensorOp(inst, *this);
 
   // If this is a scalar operation that we really want to promote to a tensor
@@ -1582,8 +1721,8 @@ void TFFunctionPartition::markValue(SILValue value, SILInstruction *user) {
     // If the function is not accelerator-only, diagnose implicit copy to
     // the accelerator.
     if (!isAcceleratorOnly(hostFn))
-      diagnoseCopyToAccelerator(value, user, /*tensorProgramArgument*/true);
-    return;
+      diagnoseCopyToAccelerator(value, user, /*tensorProgramArgument*/ true);
+    return false;
   }
 
   // If this is a scalar operation that can be promoted to a tensor op on the
@@ -1594,22 +1733,22 @@ void TFFunctionPartition::markValue(SILValue value, SILInstruction *user) {
 
   // Otherwise, insert a send from the host to the accelerator.
   valuesToSend.insert(value);
-  diagnoseCopyToAccelerator(value, user, /*tensorProgramArgument*/false);
+  diagnoseCopyToAccelerator(value, user, /*tensorProgramArgument*/ false);
 
   // Instead of cloning over this instruction, we'll add a send after it and
   // insert a receive in the accelerator code.
   markedInstructions.insert({inst, Marking::Send});
-  markBlock(inst->getParent());
+  return markBlock(inst->getParent());
 }
 
 /// Given a set of tensor operations, find the nearest common ancestor of those
 /// operations in the [post-]dominator-tree of the CFG.  In addition to finding
 /// the NCA, this also returns the list of ops that are in that block (if any).
-static SILBasicBlock *
-findNCAOfTensorOps(const SmallPtrSetImpl<SILInstruction*> &tensorOps,
-                   SmallPtrSet<SILInstruction*, 8> &ncaBBOps,
-                   ArrayRef<SILBasicBlock*> extraBlocks,
-         std::function<SILBasicBlock*(SILBasicBlock*,SILBasicBlock*)> findNCA) {
+static SILBasicBlock *findNCAOfTensorOps(
+    const SmallPtrSetImpl<SILInstruction *> &tensorOps,
+    SmallPtrSet<SILInstruction *, 8> &ncaBBOps,
+    ArrayRef<SILBasicBlock *> extraBlocks,
+    std::function<SILBasicBlock *(SILBasicBlock *, SILBasicBlock *)> findNCA) {
   assert(!tensorOps.empty() && "expect at least one tensor op");
 
   // Pick an arbitrary starting point.
@@ -1653,7 +1792,7 @@ void TFFunctionPartition::promoteCopyToMove() {
 
   // TODO: This should be an optimistic algorithm in general, and should include
   // arguments as well.  This would allow moving over of cyclic references.
-  SmallVector<SILInstruction*, 16> worklist;
+  SmallVector<SILInstruction *, 16> worklist;
   for (auto &markInfo : markedInstructions) {
     auto *inst = markInfo.first;
     if (markInfo.second == Marking::Copy)
@@ -1720,7 +1859,7 @@ void TFFunctionPartition::markTensorBBArgumentsForDeletion() {
   // are deletable until we find evidence otherwise.  When/if we find such
   // evidence, we mark them as live, which propagates this liveness upwards,
   // marking other BB arguments potentially live.
-  SmallPtrSet<SILArgument*, 16> potentiallyDeadArguments;
+  SmallPtrSet<SILArgument *, 16> potentiallyDeadArguments;
   for (auto *block : llvm::depth_first(&hostFn)) {
     for (auto *arg : block->getArguments()) {
       // Ignore non-tensor arguments.
@@ -1752,8 +1891,8 @@ void TFFunctionPartition::markTensorBBArgumentsForDeletion() {
   if (potentiallyDeadArguments.empty())
     return;
 
-  SmallVector<SILArgument*, 16> worklist(potentiallyDeadArguments.begin(),
-                                         potentiallyDeadArguments.end());
+  SmallVector<SILArgument *, 16> worklist(potentiallyDeadArguments.begin(),
+                                          potentiallyDeadArguments.end());
   while (!worklist.empty()) {
     auto *arg = worklist.pop_back_val();
 
@@ -1812,9 +1951,8 @@ void TFFunctionPartition::markTensorBBArgumentsForDeletion() {
 
   // If we have any dead arguments, go ahead and mark them as such now.
   for (auto arg : potentiallyDeadArguments) {
-    markedBBArguments.insert({
-      arg, { Marking::Delete, getUserSourceLocation(arg) }
-    });
+    markedBBArguments.insert(
+        {arg, {Marking::Delete, getUserSourceLocation(arg)}});
 
     // Mark trivial users as being deleted.
     for (auto *operand : arg->getUses()) {
@@ -1827,14 +1965,19 @@ void TFFunctionPartition::markTensorBBArgumentsForDeletion() {
   }
 }
 
-static const char* markingEnumToStr(Marking m) {
+static const char *markingEnumToStr(Marking m) {
   return markingStr[static_cast<int>(m)];
 }
 
 /// Scan the function looking for blocks with tensor operations in them.  As
 /// we find them, mark them as "to-be-partitioned", which marks (transitive)
 /// data and control dependencies.
-bool TFFunctionPartition::markFunction() {
+/// Return true if we've encountered an error, in which case the diagnostic must
+/// have been emitted. Otherwise, return false, set `hasTensorOps` based on
+/// whether this function has any tensor ops, and add any SIL functions
+/// referenced in the tfops of this function as function-typed attributes to
+/// `worklist` and `addedToWorklist`
+bool TFFunctionPartition::markFunction(bool &hasTensorOps) {
   bool loggedInput = false;
 
   // Print out the input to the partitioning pass on the first op we encounter.
@@ -1845,8 +1988,7 @@ bool TFFunctionPartition::markFunction() {
     // can diagnose the errors).
     if (!loggedInput) {
       if (auto *outs = getTFDumpIntermediateStream()) {
-        *outs << "---- INPUT FUNCTION " << hostFn.getName()
-        << " ----------\n";
+        *outs << "---- INPUT FUNCTION " << hostFn.getName() << " ----------\n";
         hostFn.print(*outs);
         *outs << "---- END OF INPUT FUNCTION ----------\n";
         outs->flush();
@@ -1855,10 +1997,14 @@ bool TFFunctionPartition::markFunction() {
     }
   };
 
+  // Split all critical edges for block marking.
+  // FIXME: Remove this when deabstraction is fully implemented.
+  splitAllCondBrCriticalEdgesWithNonTrivialArgs(hostFn, &DI, /*LI*/ nullptr);
+
   // We walk the function in depth first order so that we only visit reachable
   // blocks and to slightly improve compile time performance of the 'marking'
   // operation.
-  SmallVector<SILInstruction*, 32> tensorOps;
+  SmallVector<SILInstruction *, 32> tensorOps;
   bool invalidOpFound = false;
   for (auto *BB : llvm::depth_first(&hostFn)) {
     for (auto bbi = BB->begin(), e = BB->end(); bbi != e; ++bbi) {
@@ -1871,19 +2017,9 @@ bool TFFunctionPartition::markFunction() {
         tensorOps.push_back(inst);
         tensorOpsSet.insert(inst);
 
-        // tfc.scalarToTensor doesn't get a device.
-        if (!graphOp->getName().is("tfc.scalarToTensor,s")) {
-          auto opDevice = GraphOperationInfo(graphOp).getDeviceType();
-          configuration.markDeviceUsed(opDevice);
-        }
+        auto opDevice = GraphOperationInfo(graphOp).getDeviceType();
+        deviceInfo.markDeviceUsed(opDevice);
         continue;
-      }
-
-      // If this is a well known function that can be transformed into an op, do
-      // so first.
-      if (auto apply = dyn_cast<ApplyInst>(inst)) {
-        inst = SILTensorOpInfo::decodeApply(apply);
-        bbi = SILBasicBlock::iterator(inst);
       }
 
       auto opInfo = SILTensorOpInfo::decode(inst);
@@ -1914,17 +2050,20 @@ bool TFFunctionPartition::markFunction() {
       // partitioning pass and data flow analysis code doesn't have to reason
       // about it.
       // TODO(clattner): Remove this when deabstraction subsumes it.
-      inst = opInfo->canonicalizeOperands(configuration);
+      inst = opInfo->canonicalizeOperands(deviceInfo);
       bbi = SILBasicBlock::iterator(inst);
 
       tensorOps.push_back(inst);
       tensorOpsSet.insert(inst);
     }
   }
+  hasTensorOps = !tensorOps.empty();
 
   // If there is nothing to do, or the ops in this function are malformed,
   // don't touch this function.
-  if (tensorOps.empty() || invalidOpFound)
+  if (invalidOpFound)
+    return true;
+  if (!hasTensorOps)
     return false;
 
   // Compute the blocksReachingTensorCode set.
@@ -1933,12 +2072,12 @@ bool TFFunctionPartition::markFunction() {
   // Next, compute the NCA of all of the core tensor operations as our "start
   // point".  This is where we will start the tensor computation, sending over
   // argument values defined outside the scope of the computation.
-  SmallPtrSet<SILInstruction*, 8> bbOps;
-  auto startBB = findNCAOfTensorOps(tensorOpsSet, bbOps, /*no extra blocks*/{},
-                                    [&] (SILBasicBlock *B1,
-                                         SILBasicBlock *B2) -> SILBasicBlock* {
-    return DI.findNearestCommonDominator(B1, B2);
-  });
+  SmallPtrSet<SILInstruction *, 8> bbOps;
+  auto startBB = findNCAOfTensorOps(
+      tensorOpsSet, bbOps, /*no extra blocks*/ {},
+      [&](SILBasicBlock *B1, SILBasicBlock *B2) -> SILBasicBlock * {
+        return DI.findNearestCommonDominator(B1, B2);
+      });
 
   // Compute the start point by doing a linear scan of the startBB to find the
   // first (of possibly many) tensor operations.
@@ -1956,7 +2095,8 @@ bool TFFunctionPartition::markFunction() {
   // operations as being moved over to the graph, and recursively mark their
   // operands as appropriate.
   for (auto inst : tensorOps)
-    markInstruction(*inst, Marking::Move);
+    if (markInstruction(*inst, Marking::Move))
+      return true;
 
   // Optimize the host code (and avoid copies back to the host in some cases) by
   // changing scalar operations marked as "Copy" into "Move" when all of their
@@ -1977,7 +2117,7 @@ bool TFFunctionPartition::markFunction() {
         diagnose(hostFn.getASTContext(),
                  markInfo.first->getLoc().getSourceLoc(),
                  diag::tf_convention_tf_host_code_not_allowed);
-        return false;
+        return true;
       }
 
   // Not that we know all of the instructions we'll be moving over, find the end
@@ -1987,8 +2127,8 @@ bool TFFunctionPartition::markFunction() {
   // As we walk through all markings, if there's any Copy/Send while the
   // function is @convention(tensorflow), we emit an error.
   bbOps.clear();
-  SmallPtrSet<SILInstruction*, 16> instrsToCheck;
-  SmallVector<SILBasicBlock*, 16> extraBlocksToCheck;
+  SmallPtrSet<SILInstruction *, 16> instrsToCheck;
+  SmallVector<SILBasicBlock *, 16> extraBlocksToCheck;
 
   for (auto markInfo : markedInstructions) {
     // Ignore instructions that will be deleted or are input arguments to the
@@ -2008,10 +2148,11 @@ bool TFFunctionPartition::markFunction() {
         extraBlocksToCheck.push_back(succ.getBB());
   }
 
-  auto endBB = findNCAOfTensorOps(instrsToCheck, bbOps, extraBlocksToCheck,
-    [&](SILBasicBlock *B1, SILBasicBlock *B2) -> SILBasicBlock* {
-      return tensorCodeBlocks.findNearestCommonPostDominator(B1, B2);
-    });
+  auto endBB = findNCAOfTensorOps(
+      instrsToCheck, bbOps, extraBlocksToCheck,
+      [&](SILBasicBlock *B1, SILBasicBlock *B2) -> SILBasicBlock * {
+        return tensorCodeBlocks.findNearestCommonPostDominator(B1, B2);
+      });
   assert(endBB && "Didn't find an end point for the tensor program");
 
   // Compute the end point by doing a backward scan.
@@ -2054,7 +2195,7 @@ bool TFFunctionPartition::markFunction() {
       for (auto *arg : BB.getArguments()) {
         if (markedBBArguments.count(arg)) {
           auto it = markedBBArguments.find(arg);
-          assert (it != markedBBArguments.end());
+          assert(it != markedBBArguments.end());
           *outs << "[" << markingEnumToStr(it->second.first) << "]";
         }
         *outs << "\t";
@@ -2075,11 +2216,8 @@ bool TFFunctionPartition::markFunction() {
 
   assert(DI.dominates(startBB, endBB));
 
-  return true;
+  return false;
 }
-
-
-
 
 //===----------------------------------------------------------------------===//
 //                              PartitionCloner
@@ -2093,21 +2231,17 @@ class PartitionCloner : public SILClonerWithScopes<PartitionCloner> {
   /// exit node of the function.
   SILBasicBlock *exitBB;
 
-  /// This is a counter we use to give each send/receive operation a unique ID.
-  int nextSendID = 0;
-
   /// This is the set of instructions that should be removed from the host code
   /// after the cloning operation is complete.
-  SmallVector<SILInstruction*, 8> instructionsToRemove;
+  SmallVector<SILInstruction *, 8> instructionsToRemove;
 
   SILValue tensorComputation;
   ModuleDecl &tensorFlowModule;
 
- public:
+public:
   PartitionCloner(TFFunctionPartition &FP, SILFunction &NewFn,
                   SILValue tensorComputation, ModuleDecl &tensorFlowModule)
-      : SILClonerWithScopes(NewFn),
-        FP(FP),
+      : SILClonerWithScopes(NewFn), FP(FP),
         tensorComputation(tensorComputation),
         tensorFlowModule(tensorFlowModule) {}
 
@@ -2164,18 +2298,12 @@ class PartitionCloner : public SILClonerWithScopes<PartitionCloner> {
     visitScalarInst(inst);
   }
 
-  void visitBuiltinInst(BuiltinInst *inst) {
-    visitScalarOrOpInst(inst);
-  }
-  void visitApplyInst(ApplyInst *inst) {
-    visitScalarOrOpInst(inst);
-  }
+  void visitBuiltinInst(BuiltinInst *inst) { visitScalarOrOpInst(inst); }
+  void visitApplyInst(ApplyInst *inst) { visitScalarOrOpInst(inst); }
   void visitIntegerLiteralInst(IntegerLiteralInst *inst) {
     visitScalarInst(inst);
   }
-  void visitFloatLiteralInst(FloatLiteralInst *inst) {
-    visitScalarInst(inst);
-  }
+  void visitFloatLiteralInst(FloatLiteralInst *inst) { visitScalarInst(inst); }
 
   void visitTupleExtractInst(TupleExtractInst *inst);
   void visitStructExtractInst(StructExtractInst *inst);
@@ -2188,7 +2316,8 @@ private:
   // copy it over to the tensor program.
   bool shouldCloneArgument(SILArgument *arg) const {
     auto it = FP.markedBBArguments.find(arg);
-    if (it == FP.markedBBArguments.end()) return false;
+    if (it == FP.markedBBArguments.end())
+      return false;
 
     switch (it->second.first) {
     case Marking::Copy:
@@ -2212,7 +2341,6 @@ private:
 };
 } // end anonymous namespace
 
-
 /// We create each block in an initial pass over the function, before cloning
 /// over the instructions.  This allows us to know that there is always a block
 /// in our block mapping as we start cloning over branch instructions.
@@ -2227,9 +2355,8 @@ void PartitionCloner::initBlock(SILBasicBlock *BB) {
 
     // Create the argument and copy it into the ValueMap so future references
     // use it.
-    ValueMap[arg] = newBB->createPHIArgument(remapType(arg->getType()),
-                                             ValueOwnershipKind::Trivial,
-                                             arg->getDecl());
+    ValueMap[arg] = newBB->createPHIArgument(
+        remapType(arg->getType()), ValueOwnershipKind::Trivial, arg->getDecl());
   }
 
   // If this is the entry block for our computation, add the parameter BB
@@ -2256,15 +2383,16 @@ void PartitionCloner::visitBranchInst(BranchInst *inst) {
   }
 
   getBuilder().setCurrentDebugScope(getOpScope(inst->getDebugScope()));
-  auto br = getBuilder().createBranch(getOpLocation(inst->getLoc()),
-                                      getOpBasicBlock(inst->getDestBB()),
-                                      operands);
+  auto br =
+      getBuilder().createBranch(getOpLocation(inst->getLoc()),
+                                getOpBasicBlock(inst->getDestBB()), operands);
   doPostProcess(inst, br);
 }
 
 /// For conditional branches, we do exactly what the normal cloner does, except
-/// that if we see a branch on a Tensor<Int1>, we unwrap it into an Int1.  We
-/// know (by construction) that this only happens when the Tensor is a 0D value.
+/// that if we see a branch on a Tensor<Int1>/Tensor<Bool>, we unwrap it into
+/// an Int1. We know (by construction) that this only happens when the Tensor
+/// is a 0D value.
 void PartitionCloner::visitCondBranchInst(CondBranchInst *inst) {
   auto TrueArgs = getOpValueArray<8>(inst->getTrueArgs());
   auto FalseArgs = getOpValueArray<8>(inst->getFalseArgs());
@@ -2275,21 +2403,22 @@ void PartitionCloner::visitCondBranchInst(CondBranchInst *inst) {
   auto condTy = cond->getType().getASTType();
 
   if (auto eltTy = getTensorHandleElementType(condTy)) {
-    assert(eltTy->isBuiltinIntegerType(1) && "expected Tensor<i1>");
+    // The TensorHandle's element type here could be Bool or Builtin.il.
+    // In either case, we eventually get Builtin.il to create GraphOp.
+    auto &ctx = B.getASTContext();
+    if (eltTy->isBool())
+      eltTy = SILType::getBuiltinIntegerType(/*bitWidth*/ 1, ctx).getASTType();
 
-    auto name = B.getASTContext().getIdentifier("tf_tensor_to_i1");
-    cond = B.createBuiltin(getOpLocation(inst->getLoc()), name,
-                   SILType::getPrimitiveObjectType(eltTy->getCanonicalType()),
-                           /*substitutionlist*/{}, cond);
+    assert(eltTy->isBuiltinIntegerType(1) && "expected Tensor<i1>");
+    cond = getSingleValueResult(createTensorToInt1Inst(
+        cond, B, getOpLocation(inst->getLoc()), FP.deviceInfo));
   }
 
-  doPostProcess(inst,
-                B.createCondBranch(getOpLocation(inst->getLoc()),
-                                   cond,
-                                   getOpBasicBlock(inst->getTrueBB()), TrueArgs,
-                                   getOpBasicBlock(inst->getFalseBB()),
-                                   FalseArgs, inst->getTrueBBCount(),
-                                   inst->getFalseBBCount()));
+  doPostProcess(inst, B.createCondBranch(
+                          getOpLocation(inst->getLoc()), cond,
+                          getOpBasicBlock(inst->getTrueBB()), TrueArgs,
+                          getOpBasicBlock(inst->getFalseBB()), FalseArgs,
+                          inst->getTrueBBCount(), inst->getFalseBBCount()));
 }
 
 void PartitionCloner::visitGraphOperationInst(GraphOperationInst *inst) {
@@ -2302,6 +2431,9 @@ void PartitionCloner::visitGraphOperationInst(GraphOperationInst *inst) {
     // need a TensorHandle<Int32>. If that is the case, we insert an
     // UncheckedRefCast to get it to the right type.  These are treated as noops
     // by GraphGen.
+    //
+    // For this special op, we ignore any device placement. Logically, this
+    // means this op is always placed on ALL devices.
     auto result = remapValue(inst->getOperand(0));
     auto S2TResult = inst->getResult(0);
     if (!S2TResult->getType().getASTType()->isEqual(
@@ -2334,8 +2466,8 @@ void PartitionCloner::visitOpInst(SingleValueInstruction *inst,
     // UncheckedRefCast to get it to the right type.  These are treated as noops
     // by GraphGen.
     auto result = remapValue(inst->getOperand(0));
-    if (!inst->getType().getASTType()
-          ->isEqual(result->getType().getASTType())) {
+    if (!inst->getType().getASTType()->isEqual(
+            result->getType().getASTType())) {
       result = B.createUncheckedRefCast(loc, result, inst->getType());
     }
 
@@ -2344,16 +2476,16 @@ void PartitionCloner::visitOpInst(SingleValueInstruction *inst,
   }
 
   SmallVector<SILValue, 4> args;
-  auto cloneSingleInst = [&](SingleValueInstruction *inst)
-  -> SingleValueInstruction* {
+  auto cloneSingleInst =
+      [&](SingleValueInstruction *inst) -> SingleValueInstruction * {
     auto ourInst = inst->clone();
     ourInst->setDebugLocation(B.getSILDebugLocation(loc));
     B.getInsertionBB()->push_back(ourInst);
     return ourInst;
   };
 
-  for (unsigned i = isa<ApplyInst>(inst), e = inst->getNumOperands();
-       i != e; ++i) {
+  for (unsigned i = isa<ApplyInst>(inst), e = inst->getNumOperands(); i != e;
+       ++i) {
     auto opValue = inst->getOperand(i);
     if (isTensorFlowValue(opValue->getType())) {
       // Tensor operands just become operands.
@@ -2365,7 +2497,7 @@ void PartitionCloner::visitOpInst(SingleValueInstruction *inst,
 
   auto name = B.getASTContext().getIdentifier(tfopInfo.builtinName);
   auto result = B.createBuiltin(loc, name, inst->getType(),
-                                /*substitutionlist*/{}, args);
+                                /*substitutionlist*/ {}, args);
   ValueMap[inst] = result;
 }
 
@@ -2387,29 +2519,28 @@ static void createConstTensorAttrsOnAccel(
   attributes.push_back({ctx.getIdentifier("value$tensor"), constVal});
 }
 
-static SILValue getSingleValueResult(GraphOperationInst *inst) {
-  assert(inst->getNumResults() == 1);
-  return inst->getResults()[0];
-}
-
-static void createConstTensorAttrsOnAccel(
-    unsigned constVal, SILType valTy, SILLocation loc, ASTContext &ctx,
-    SILBuilder &B, std::string &opName,
-    SmallVectorImpl<GraphOperationAttribute> &attributes) {
-  // Literals take attributes specifying the dtype and value.
+static void
+addScalarShapeArrayAttr(SmallVectorImpl<GraphOperationAttribute> &attributes,
+                        ASTContext &ctx) {
+  // For TPU graph, set a scalar shape array, with attr name "__shapes".
+  auto attrName = std::string(SHAPE_ARRAY_ATTR);
+  // A shape is an array of ints -- empty array means it's a scalar (0d) shape.
+  auto scalarShape = SymbolicValue::getArray(
+      {}, ctx.getInt32Decl()->getDeclaredType()->getCanonicalType(),
+      ctx.getAllocator());
   attributes.push_back(
-      {ctx.getIdentifier("dtype$dtype"),
-       SymbolicValue::getMetatype(valTy.getASTType()->getCanonicalType())});
-  attributes.push_back({ctx.getIdentifier("value$tensor"),
-                        SymbolicValue::getInteger(APInt(/*width*/ 32, constVal),
-                                                  ctx.getAllocator())});
+      {ctx.getIdentifier(attrName),
+       SymbolicValue::getArray(
+           {scalarShape},
+           ctx.getTensorShapeDecl()->getDeclaredType()->getCanonicalType(),
+           ctx.getAllocator())});
 }
 
 /// Given a primitive scalar instruction like a literal or an LLVM IR
 /// instruction (represented as a builtin), promote it to a tensor op in the
 /// graph function.
 void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
-  auto loc = remapLocation(inst->getLoc());
+  auto loc = remapLocation(getUserSourceLocation(inst->getDebugLocation()));
 
   // Determine which kind of scalar operation this is, since different forms get
   // different sorts of processing applied to them.
@@ -2450,12 +2581,14 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
 
   auto &B = getBuilder();
   auto &ctx = B.getASTContext();
-  SmallVector<GraphOperationAttribute, 2> attributes;
+  SmallVector<GraphOperationAttribute, 4> attributes;
 
   // Handle opKind-specific issues.
   switch (opKind) {
-  case PromotedScalarKind::Invalid: assert(0 && "Rejected ealier");
-  case PromotedScalarKind::TensorToScalar: assert(0 && "Handled above");
+  case PromotedScalarKind::Invalid:
+    assert(0 && "Rejected ealier");
+  case PromotedScalarKind::TensorToScalar:
+    assert(0 && "Handled above");
   case PromotedScalarKind::Binary:
   case PromotedScalarKind::OverflowingBinary:
     opName += GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
@@ -2467,7 +2600,7 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
     if (auto *ILI = dyn_cast<IntegerLiteralInst>(inst)) {
       auto intVal = ILI->getValue();
       constVal = SymbolicValue::getInteger(intVal, ctx.getAllocator());
-      bitWidth = intVal.getBitWidth();  // For sanity-check only.
+      bitWidth = intVal.getBitWidth(); // For sanity-check only.
     } else if (auto *FLI = dyn_cast<FloatLiteralInst>(inst)) {
       auto floatVal = FLI->getValue();
       constVal = SymbolicValue::getFloat(floatVal, ctx.getAllocator());
@@ -2500,9 +2633,12 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
   // To minimize sends/recvs, place promoted scalars on all devices. If they are
   // consumed only on some devices, the promoted scalars on those other devices
   // should get pruned away in the later graph lowering pass.
-  FP.configuration.handleDevicePlacement(
-      opInfo.first, /*opDevice*/ getDeviceString(DeviceType::ALL), B, loc,
-      attributes);
+  FP.deviceInfo.handleDevicePlacement(
+      opInfo.first, /*opDevice*/ getDeviceString(DeviceType::ALL),
+      B.getModule().getASTContext(), attributes);
+
+  if (FP.deviceInfo.primaryDeviceType == DeviceType::TPU)
+    addScalarShapeArrayAttr(attributes, ctx);
 
   auto *result =
       B.createGraphOperation(loc, ctx.getIdentifier(opName), operands,
@@ -2515,15 +2651,16 @@ void PartitionCloner::visitTupleExtractInst(TupleExtractInst *inst) {
   // This case corresponds to PromotedScalarKind::OverflowingBinary above. We
   // clone over tuple_extract(x, 0) into x's value.
   if (classifyInst(inst->getOperand()->getDefiningInstruction()) ==
-         PartitioningClass::OverflowCheckingInst) {
+      PartitioningClass::OverflowCheckingInst) {
     assert(inst->getFieldNo() == 0 && "Unexpected extract to remap");
     ValueMap[inst] = remapValue(inst->getOperand());
     return;
   }
 
-  // Otherwise we have a normal tuple_exract from a tuple of TensorFlow values,
-  // which is the result of a TensorFlow op.
-  SILCloner::visitTupleExtractInst(inst);
+  // Note that tuple_exract from a tuple of TensorFlow values should not be
+  // marked and cloned over.
+  inst->dump();
+  llvm_unreachable("Cannot partition this tuple_extract inst!");
 }
 
 /// We clone over struct_extract(x, 0) into x's value.  The only time we mark
@@ -2563,7 +2700,8 @@ static SILValue createSomeIntegerValue(intmax_t value, SILBuilder &B,
   auto literal = B.createIntegerLiteral(loc, intFieldSILType, value);
 
   // If the caller wanted the integer_literal instruction, return it too.
-  if (ILI) *ILI = literal;
+  if (ILI)
+    *ILI = literal;
 
   return wrapInStruct(literal, integerDecl, B, loc);
 }
@@ -2586,19 +2724,19 @@ static SILValue createIntValue(intmax_t value, SILBuilder &B, SILLocation loc,
 /// recvFromHost has type <T> (tensorId$int, device$string) -> (T)
 //
 // TODO: Remove this function after migration to GraphOpInst.
-static SILValue
-createAcceleratorReceive(SILBuilder &B, SILLocation loc, SILType valueTy,
-                         bool isScalar, unsigned idNumber,
-                         GraphGlobalConfiguration &configuration) {
+static SILValue createAcceleratorReceive(SILBuilder &B, SILLocation loc,
+                                         SILType valueTy, bool isScalar,
+                                         unsigned idNumber,
+                                         GraphFunctionDeviceInfo &deviceInfo) {
   auto &ctx = B.getASTContext();
   auto opType = "tfc.RecvFromHost";
-  std::string instName = std::string("__tfop_") + opType + ",tensorId";
-  SmallVector<SILValue, 2> operands;
-  auto tensorIdAttr = B.createIntegerLiteral(
-      loc, SILType::getBuiltinIntegerType(32, ctx), idNumber);
-  operands.push_back(tensorIdAttr);
-  configuration.handleDevicePlacement(opType, /*opDevice*/ "", B, loc, operands,
-                                      instName);
+  std::string instName = opType;
+
+  SmallVector<GraphOperationAttribute, 3> attributes;
+  attributes.push_back(
+      {ctx.getIdentifier("tensorId"), SymbolicValue::getInteger(idNumber, 32)});
+  deviceInfo.handleDevicePlacement(opType, /*opDevice*/ "",
+                                   B.getModule().getASTContext(), attributes);
 
   // For XLA compilation, and when receiving a promoted scalar from the host,
   // add a __shapes pseudo-attr to assist the XLA compiler. This special case is
@@ -2607,58 +2745,13 @@ createAcceleratorReceive(SILBuilder &B, SILLocation loc, SILType valueTy,
   // compiler is synthesizing a tensor.
   //
   // TODO: Do this also for XLA-based GPU (and CPU) execution. Consider
-  // extending `configuration` with a bool indicating if we are targeting XLA.
-  if (configuration.primaryDeviceType == DeviceType::TPU && isScalar) {
-    // Add a list of operands corresponding to a scalar-tensor shaped shape
-    // array attr, with opName extension "__shapes$shapearray,$shape". Note
-    // the single element in the shape array, the scalar shape, has no
-    // dimensions.
-
-    // First add the $shapearray operand.
-    instName += std::string(",") + SHAPE_ARRAY_ATTR;
-    instName += SILTensorOpInfo::getOperandClassSuffix(
-        SILTensorOpInfo::OperandClass::ShapeArray);
-    auto int64Ty = SILType::getBuiltinIntegerType(64, B.getASTContext());
-    operands.push_back(B.createIntegerLiteral(loc, int64Ty,
-                                              /*numShapes*/ 1));
-
-    // Now add a scalar shape (with no dimensions) to the shape array.
-    instName += ",";
-    instName += SILTensorOpInfo::getOperandClassSuffix(
-        SILTensorOpInfo::OperandClass::Shape);
-    auto scalarTy = getTensorHandleElementType(valueTy.getASTType());
-    auto metatypeType =
-        MetatypeType::get(scalarTy, MetatypeRepresentation::Thin)
-            ->getCanonicalType();
-    operands.push_back(
-        B.createMetatype(loc, SILType::getPrimitiveObjectType(metatypeType)));
-  }
-  auto subMap =
-    getSingleSubstitutionMapForElementType(valueTy.getASTType(), ctx);
+  // extending `deviceInfo` with a bool indicating if we are targeting XLA.
+  if (deviceInfo.primaryDeviceType == DeviceType::TPU && isScalar)
+    addScalarShapeArrayAttr(attributes, ctx);
   auto name = ctx.getIdentifier(instName);
-  return B.createBuiltin(loc, name, valueTy, subMap, operands);
-}
-
-static SILValue createAcceleratorReceiveViaGraphOp(
-    SILBuilder &B, SILLocation loc, SILType valueTy, bool isScalar,
-    unsigned idNumber, GraphGlobalConfiguration &configuration) {
-  // TODO: lift this restriction once GraphOpInst supports shape array attrs.
-  assert(configuration.primaryDeviceType != DeviceType::TPU || !isScalar);
-
-  auto &ctx = B.getASTContext();
-  auto opType = "tfc.RecvFromHost";
-  std::string instName = "tfc.RecvFromHost";
-  SmallVector<GraphOperationAttribute, 2> attributes;
-  auto &allocator = B.getModule().getASTContext().getAllocator();
-  attributes.push_back(
-      {ctx.getIdentifier("tensorId"),
-       SymbolicValue::getInteger(APInt(/*width*/ 32, idNumber), allocator)});
-  configuration.handleDevicePlacement(opType, /*opDevice*/ "", B, loc,
-                                      attributes);
-
-  auto *inst = B.createGraphOperation(loc, ctx.getIdentifier(instName),
-                                      /*operands*/ {}, attributes, {valueTy});
-  return getSingleValueResult(inst);
+  return getSingleValueResult(B.createGraphOperation(loc, name,
+                                                     /*operands*/ {},
+                                                     attributes, {valueTy}));
 }
 
 static void
@@ -2698,7 +2791,7 @@ static SILValue createHostReceive(SILBuilder &B, SILLocation loc,
   auto scalarType = getTensorHandleElementType(valueTy.getASTType());
   assert(scalarType && "valueTy is not TensorHandle<T>");
   auto subMap =
-      getSingleSubstitutionMapForFunction(receiveFn, scalarType, userModule);
+      getSingleSubstitutionMapForElementType(scalarType, B.getASTContext());
 
   // Generate an instruction like:
   // %3 = metatype $@thick TensorHandle<Float>.Type
@@ -2725,25 +2818,22 @@ static SILValue createHostReceive(SILBuilder &B, SILLocation loc,
 // SendToHost has type <T> (input$T, tensorId$int, device$string) -> ()
 void createAcceleratorSend(SILBuilder &B, SILLocation loc, SILValue value,
                            unsigned idNumber,
-                           GraphGlobalConfiguration &configuration) {
+                           GraphFunctionDeviceInfo &deviceInfo) {
   auto &ctx = B.getASTContext();
   auto voidTy = B.getModule().Types.getEmptyTupleType();
   auto opType = "tfc.SendToHost";
   std::string instName = opType;
   instName += GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
   SmallVector<GraphOperationAttribute, 2> attributes;
-  auto &allocator = B.getModule().getASTContext().getAllocator();
   attributes.push_back(
-      {ctx.getIdentifier("tensorId"),
-       SymbolicValue::getInteger(APInt(/*width*/ 32, idNumber), allocator)});
-  configuration.handleDevicePlacement(opType, /*opDevice*/ "", B, loc,
-                                      attributes);
+      {ctx.getIdentifier("tensorId"), SymbolicValue::getInteger(idNumber, 32)});
+  deviceInfo.handleDevicePlacement(opType, /*opDevice*/ "",
+                                   B.getModule().getASTContext(), attributes);
   B.createGraphOperation(loc, ctx.getIdentifier(instName),
                          /*operands*/ {value}, attributes, {voidTy});
 }
 
-template<typename T>
-static T* castWithDebugInfo(SILInstruction *inst) {
+template <typename T> static T *castWithDebugInfo(SILInstruction *inst) {
 #ifndef NDEBUG
   if (!isa<T>(inst)) {
     inst->dump();
@@ -2804,7 +2894,6 @@ getStdlibNumericTypeDeclFromBuiltinType(Type ty, ASTContext &ctx) {
 static SILValue createHostSend(SILBuilder &B, SILLocation loc, SILValue value,
                                SILValue tensorComputation, int idNumber,
                                ModuleDecl &tensorFlowModule,
-                               SILModule &userModule,
                                SILFunction *createScalarTensorFn,
                                SILFunction *sendFn) {
   assert(sendFn);
@@ -2872,8 +2961,8 @@ static SILValue createHostSend(SILBuilder &B, SILLocation loc, SILValue value,
 
     auto createScalarTensorFnRef =
         B.createFunctionRef(loc, createScalarTensorFn);
-    SubstitutionMap subMap = getSingleSubstitutionMapForFunction(
-        createScalarTensorFn, scalarValueTy, userModule);
+    SubstitutionMap subMap = getSingleSubstitutionMapForElementType(
+        scalarValueTy, B.getASTContext());
     value = B.createApply(loc, createScalarTensorFnRef, subMap,
                           /*args*/ {access, metaTypeInst},
                           /*isNonThrowing*/ false);
@@ -2887,7 +2976,7 @@ static SILValue createHostSend(SILBuilder &B, SILLocation loc, SILValue value,
   // Verify that tensorComputation is passed in as a guaranteed parameter below.
   verifyTensorComputationArgAsGuaranteedParam(sendFnRef);
   SubstitutionMap subMap =
-      getSingleSubstitutionMapForFunction(sendFn, scalarValueTy, userModule);
+      getSingleSubstitutionMapForElementType(scalarValueTy, B.getASTContext());
   // This is a member method of the class of `value`, so we add it as the last
   // parameter.
   return B.createApply(loc, sendFnRef, subMap,
@@ -2980,12 +3069,11 @@ void PartitionCloner::handleSendRecvForTerminator(TermInst *inst) {
     auto loc = caseBB->front().getLoc();
     // `caseId` must be of a type conforming to `AccelerableByTensorFlow`, so we
     // chose Int32 here.
-    auto caseIdInst =
-        createSomeIntegerValue(caseId /*caseEntry.index()*/, BH, loc, int32Decl);
+    auto caseIdInst = createSomeIntegerValue(caseId /*caseEntry.index()*/, BH,
+                                             loc, int32Decl);
 
     createHostSend(BH, loc, caseIdInst, tensorComputation, nextSendID,
-                   tensorFlowModule, FP.hostFn.getModule(),
-                   createScalarTensorFn, sendFn);
+                   tensorFlowModule, createScalarTensorFn, sendFn);
     ++caseId;
   }
 
@@ -3001,13 +3089,8 @@ void PartitionCloner::handleSendRecvForTerminator(TermInst *inst) {
   auto BA = getBuilder(); // Builder for accelerator.
   auto loc = remapLocation(getUserSourceLocation(inst->getDebugLocation()));
   auto receivedCaseId =
-      (FP.configuration.primaryDeviceType == DeviceType::TPU)
-          ? createAcceleratorReceive(BA, loc, remapType(int32SILType),
-                                     /*isScalar*/ true, nextSendID,
-                                     FP.configuration)
-          : createAcceleratorReceiveViaGraphOp(
-                BA, loc, remapType(int32SILType),
-                /*isScalar*/ true, nextSendID, FP.configuration);
+      createAcceleratorReceive(BA, loc, remapType(int32SILType),
+                               /*isScalar*/ true, nextSendID, FP.deviceInfo);
 
   // Let K be the total # cases (including the optional default case). Create a
   // chain of K-1 BB's with cond_br, to dispatch to the K cases.
@@ -3018,13 +3101,11 @@ void PartitionCloner::handleSendRecvForTerminator(TermInst *inst) {
     {
       std::string constOpName = "Const";
       SmallVector<GraphOperationAttribute, 2> attributes;
-      createConstTensorAttrsOnAccel(
-          SymbolicValue::getInteger(APInt(/*width*/ 32, caseId),
-                                    ctx.getAllocator()),
-          int32SILType, ctx, attributes);
-      FP.configuration.handleDevicePlacement(
-          "Const", /*opDevice*/ getDeviceString(DeviceType::ALL), BA, loc,
-          attributes);
+      createConstTensorAttrsOnAccel(SymbolicValue::getInteger(caseId, 32),
+                                    int32SILType, ctx, attributes);
+      FP.deviceInfo.handleDevicePlacement(
+          "Const", /*opDevice*/ getDeviceString(DeviceType::ALL),
+          BA.getModule().getASTContext(), attributes);
       auto tensorHandleInt32Ty =
           convertElementTypeToTensorValueType(int32SILType);
       auto *caseIdInst = BA.createGraphOperation(
@@ -3050,18 +3131,16 @@ void PartitionCloner::handleSendRecvForTerminator(TermInst *inst) {
           convertElementTypeToTensorValueType(boolFieldSILType);
 
       SmallVector<GraphOperationAttribute, 2> attributes;
-      FP.configuration.handleDevicePlacement(
-          "Equal", /*opDevice*/ getDeviceString(DeviceType::ALL), BA, loc,
-          attributes);
+      FP.deviceInfo.handleDevicePlacement(
+          "Equal", /*opDevice*/ getDeviceString(DeviceType::ALL),
+          BA.getModule().getASTContext(), attributes);
 
       auto *equalComparisonInst = BA.createGraphOperation(
           loc, ctx.getIdentifier(equalOpName),
           /*operands*/ {receivedCaseId, constTensorWithCaseId}, attributes,
           {tensorHandleI1Ty});
-      auto *condBrInst = BA.createGraphOperation(
-          loc, ctx.getIdentifier("tf_tensor_to_i1"),
-          /*operands*/ {getSingleValueResult(equalComparisonInst)},
-          /*attributes*/ {}, {boolFieldSILType});
+      auto *condBrInst = createTensorToInt1Inst(
+          getSingleValueResult(equalComparisonInst), BA, loc, FP.deviceInfo);
       condBrOperand = getSingleValueResult(condBrInst);
     }
 
@@ -3107,7 +3186,7 @@ void PartitionCloner::insertSend(SILInstruction &inst) {
   }
 
   SILBuilder BH(++SILBasicBlock::iterator(&inst)); // Builder for host.
-  auto BA = getBuilder();        // Builder for accelerator.
+  auto BA = getBuilder();                          // Builder for accelerator.
 
   auto loc = getUserSourceLocation(&inst);
 
@@ -3116,12 +3195,8 @@ void PartitionCloner::insertSend(SILInstruction &inst) {
     // Create the receive in the accelerator code.  Each send/receive pair gets
     // a unique ID to associate one with the other.
     this->ValueMap[result] =
-        (FP.configuration.primaryDeviceType == DeviceType::TPU && isScalar)
-            ? createAcceleratorReceive(BA, loc, remapType(result->getType()),
-                                       isScalar, nextSendID, FP.configuration)
-            : createAcceleratorReceiveViaGraphOp(
-                  BA, loc, remapType(result->getType()), isScalar, nextSendID,
-                  FP.configuration);
+        createAcceleratorReceive(BA, loc, remapType(result->getType()),
+                                 isScalar, nextSendID, FP.deviceInfo);
 
     // if `result` is a scalar, we need to convert it to TensorHandle<T>,
     // before sending that value to accelerator. We pass such a function
@@ -3143,26 +3218,26 @@ void PartitionCloner::insertSend(SILInstruction &inst) {
            "from Swift to TensorFlow.");
     // Create the send in the host code.
     createHostSend(BH, loc, result, tensorComputation, nextSendID,
-                   tensorFlowModule, FP.hostFn.getModule(),
-                   createScalarTensorFn, sendFn);
+                   tensorFlowModule, createScalarTensorFn, sendFn);
     nextSendID++;
   }
 }
 
 bool PartitionCloner::insertReceive(SILValue value, SILLocation loc) {
-  assert(value->getDefiningInstruction() || isa<SILArgument>(value) &&
-         "Don't know how to receive this value");
+  assert(value->getDefiningInstruction() ||
+         isa<SILArgument>(value) && "Don't know how to receive this value");
   SILFunction *receiveFn = lookupSendReceiveFunction("receiveFromAccelerator",
                                                      value->getType(), loc);
   // If `value` is not receivable on Swift host from TensorFlow (e.g. it is a
   // tensor resource handle), reject the program.
-  if (!receiveFn) return false;
+  if (!receiveFn)
+    return false;
 
   // Diagnose implicit data transfers if they are implicit.
   FP.diagnoseUsesFromHost(value, loc);
 
-  SILBuilder BH(FP.hostFn);      // Builder for the host.
-  auto BA = getBuilder();        // Builder for accelerator.
+  SILBuilder BH(FP.hostFn); // Builder for the host.
+  auto BA = getBuilder();   // Builder for accelerator.
 
   if (auto *inst = value->getDefiningInstruction()) {
     assert(!isa<TermInst>(inst) && "Cannot move a terminator");
@@ -3181,8 +3256,7 @@ bool PartitionCloner::insertReceive(SILValue value, SILLocation loc) {
 
   // Create the send in the accelerator code.  Each send/receive pair gets
   // a unique ID to associate one with the other.
-  createAcceleratorSend(BA, loc, remapValue(value), nextSendID,
-                        FP.configuration);
+  createAcceleratorSend(BA, loc, remapValue(value), nextSendID, FP.deviceInfo);
 
   // Create the receive in the host code.
   auto newVal = createHostReceive(BH, loc, value->getType(), tensorComputation,
@@ -3193,11 +3267,11 @@ bool PartitionCloner::insertReceive(SILValue value, SILLocation loc) {
   return true;
 }
 
-bool PartitionCloner::
-handleHostReferencesOfMovedValue(SILValue value, SILLocation loc) {
+bool PartitionCloner::handleHostReferencesOfMovedValue(SILValue value,
+                                                       SILLocation loc) {
   // If the argument has any non-debug-non-retain/release instructions using
   // it, then we need to insert a copy.
-  SmallVector<SILInstruction*, 4> instToRemove;
+  SmallVector<SILInstruction *, 4> instToRemove;
   bool needsCopy = false;
   for (auto use : value->getUses()) {
     auto user = use->getUser();
@@ -3224,7 +3298,7 @@ handleHostReferencesOfMovedValue(SILValue value, SILLocation loc) {
 /// transfers between the host and destination code as necessary.
 void PartitionCloner::cloneBlock(SILBasicBlock *BB) {
   if (!FP.markedBlocks.count(BB))
-    return;  // Ignore blocks that aren't in accelerator code.
+    return; // Ignore blocks that aren't in accelerator code.
   auto newBB = BBMap[BB];
 
   Builder.setInsertionPoint(newBB);
@@ -3232,7 +3306,8 @@ void PartitionCloner::cloneBlock(SILBasicBlock *BB) {
     // If the specified instruction is used by the accelerator program somehow,
     // we have to copy the instruction over, copy it, or send the result.
     auto it = FP.markedInstructions.find(&inst);
-    if (it == FP.markedInstructions.end()) continue;
+    if (it == FP.markedInstructions.end())
+      continue;
 
     switch (it->second) {
     case Marking::Move:
@@ -3270,12 +3345,11 @@ void PartitionCloner::cloneFunction(ArrayRef<SILValue> resultValues) {
   // Go through and create all the blocks before we start cloning the
   // instructions over.  This allows us to remap instructions when we clone
   // them over.
-  initBlock(FP.tensorStartPoint->getParent());  // First block first.
+  initBlock(FP.tensorStartPoint->getParent()); // First block first.
 
   for (auto &BB : FP.hostFn) {
     // If the BB is unmarked, we don't need it for the accelerator.
-    if (!FP.markedBlocks.count(&BB) ||
-        &BB == FP.tensorStartPoint->getParent())
+    if (!FP.markedBlocks.count(&BB) || &BB == FP.tensorStartPoint->getParent())
       continue;
 
     initBlock(&BB);
@@ -3325,7 +3399,6 @@ void PartitionCloner::cloneFunction(ArrayRef<SILValue> resultValues) {
   }
 }
 
-
 /// Now that all of the interesting instructions are cloned over, we need to
 /// clean up the input function by removing the instructions, and inserting
 /// sends of results from the accelerator code back to the host code.
@@ -3336,8 +3409,8 @@ bool PartitionCloner::finalizeOriginal() {
 
   // Build a set of the instructions we're going to remove so we can add new
   // values without fear of adding duplicates.
-  SmallPtrSet<SILInstruction*, 16>
-  instsToRemoveSet(instructionsToRemove.begin(), instructionsToRemove.end());
+  SmallPtrSet<SILInstruction *, 16> instsToRemoveSet(
+      instructionsToRemove.begin(), instructionsToRemove.end());
   assert(instsToRemoveSet.size() == instructionsToRemove.size() &&
          "duplicates shouldn't exist in the instsToRemove list");
 
@@ -3348,9 +3421,9 @@ bool PartitionCloner::finalizeOriginal() {
     auto inst = instructionsToRemove[idx];
 
 #ifndef NDEBUG
-    // When removing a builtin or ApplyInst tensor op instruction TO, for each tensor
-    // argument TA of it, since we know TA is taken at +0, we need not rebalance
-    // the retain/release count of TA.
+    // When removing a builtin or ApplyInst tensor op instruction TO, for each
+    // tensor argument TA of it, since we know TA is taken at +0, we need not
+    // rebalance the retain/release count of TA.
     if (isa<BuiltinInst>(inst)) {
       // The tfop inst takes tensor operands as +0, but we know of no API that
       // we can use to verify that here.
@@ -3368,7 +3441,7 @@ bool PartitionCloner::finalizeOriginal() {
         if (!isTensorFlowValue(op->getType()))
           continue;
 
-        auto argConvention = conventions.getSILArgumentConvention(i-1);
+        auto argConvention = conventions.getSILArgumentConvention(i - 1);
         if (argConvention != SILArgumentConvention::Direct_Guaranteed) {
           inst->print(llvm::errs());
           llvm_unreachable("Apply inst takes a tensor operand NOT at +0!");
@@ -3393,15 +3466,14 @@ bool PartitionCloner::finalizeOriginal() {
     }
   }
 
-
   // As we're removing branch arguments, we remove all the bb args for a given
   // block at a time.  This is important because otherwise we invalidate our our
   // bb arg -> branch argument mappings.
-  SmallPtrSet<SILBasicBlock*, 4> argsRemovedBlocks;
+  SmallPtrSet<SILBasicBlock *, 4> argsRemovedBlocks;
 
   // We remove arguments with a two-pass approach, first dropping the insts that
   // feed them, then removing the arg (potentially inserting a receive).
-  SmallVector<SILArgument*, 4> argsToRemove;
+  SmallVector<SILArgument *, 4> argsToRemove;
 
   // For BB arguments, we remove the uses from the branches first (which breaks
   // interdependent references) and delete the actual arguments later.
@@ -3504,7 +3576,7 @@ bool PartitionCloner::finalizeOriginal() {
     ecm->getResults()[0]->replaceAllUsesWith(callee);
     ecm->eraseFromParent();
 
-    if (callee->use_empty())  // Remove the function_ref too.
+    if (callee->use_empty()) // Remove the function_ref too.
       cast<SingleValueInstruction>(callee)->eraseFromParent();
   }
   return true;
@@ -3515,9 +3587,7 @@ bool PartitionCloner::finalizeOriginal() {
 /// To create the function call "_swift_tfc_CreateCTensorHandle", load that
 /// function definition into `userModule` first, so that we can get the generic
 /// substitution map as needed to issue the call.
-static SILValue convertScalarToHostTensorHandle(SILValue value,
-                                                SILModule &userModule,
-                                                SILBuilder &B,
+static SILValue convertScalarToHostTensorHandle(SILValue value, SILBuilder &B,
                                                 SILLocation loc) {
   // We need to create a dtype value.  It is an imported C enum value, so it is
   // modeled as a struct that wraps an integer value (itself a struct).
@@ -3529,8 +3599,9 @@ static SILValue convertScalarToHostTensorHandle(SILValue value,
   // @_silgen_name("_swift_tfc_CreateCTensorHandle")
   // func _TFCCreateCTensorHandle<T>(_ value : T,
   //                                 _ dtype: TF_DataType) -> CTensorHandle
-  auto createFn = B.getModule().findFunction("_swift_tfc_CreateCTensorHandle",
-                                             SILLinkage::PublicExternal);
+  auto &userModule = B.getModule();
+  auto *createFn = userModule.findFunction("_swift_tfc_CreateCTensorHandle",
+                                           SILLinkage::PublicExternal);
   auto *fnRef = B.createFunctionRef(loc, createFn);
 
   auto dtypeType = fnRef->getFunctionType()->getParameters()[1].getType();
@@ -3538,8 +3609,8 @@ static SILValue convertScalarToHostTensorHandle(SILValue value,
   auto dtypeFieldType = getSingleElementDeclFieldType(dtypeDecl);
 
   // The internal type is something like UInt32.  Create it now.
-  auto dtype = createSomeIntegerValue(dtypeVal, B, loc,
-                                      dtypeFieldType->getAnyNominal());
+  auto dtype =
+      createSomeIntegerValue(dtypeVal, B, loc, dtypeFieldType->getAnyNominal());
   // Then wrap it in the dtype enum.
   dtype = wrapInStruct(dtype, dtypeDecl, B, loc);
 
@@ -3547,9 +3618,9 @@ static SILValue convertScalarToHostTensorHandle(SILValue value,
   // by address on the stack.
   auto stackAlloc = B.createAllocStack(loc, value->getType());
 
-  auto storeOwnership =
-    B.getFunction().hasQualifiedOwnership() ? StoreOwnershipQualifier::Trivial :
-                                          StoreOwnershipQualifier::Unqualified;
+  auto storeOwnership = B.getFunction().hasQualifiedOwnership()
+                            ? StoreOwnershipQualifier::Trivial
+                            : StoreOwnershipQualifier::Unqualified;
   B.createStore(loc, value, stackAlloc, storeOwnership);
 
   auto access = B.createBeginAccess(loc, stackAlloc, SILAccessKind::Read,
@@ -3558,11 +3629,11 @@ static SILValue convertScalarToHostTensorHandle(SILValue value,
                                     /*fromBuiltin=*/false);
   auto result =
       B.createApply(loc, fnRef,
-                    getSingleSubstitutionMapForFunction(
-                        createFn, value->getType().getASTType(), userModule),
+                    getSingleSubstitutionMapForElementType(
+                        value->getType().getASTType(), B.getASTContext()),
                     {access, dtype}, /*isNonThrowing*/ false);
   // Finish our read access and free the stack memory.
-  B.createEndAccess(loc, access, /*aborted*/false);
+  B.createEndAccess(loc, access, /*aborted*/ false);
   B.createDeallocStack(loc, stackAlloc);
 
   return result;
@@ -3572,17 +3643,18 @@ static SILValue convertScalarToHostTensorHandle(SILValue value,
 // one, appends the blocks on that path to `path`, and returns true. Otherwise
 // returns false without modifying `path`.
 // `visitedBlocks` is updated with the blocks visited in all cases.
-static bool gatherBBsOnCFGPathHelper(
-    SILBasicBlock *srcBlock, SILBasicBlock *destBlock,
-    llvm::SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
-    llvm::SmallVectorImpl<SILBasicBlock *> &path) {
+static bool
+gatherBBsOnCFGPathHelper(SILBasicBlock *srcBlock, SILBasicBlock *destBlock,
+                         llvm::SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
+                         llvm::SmallVectorImpl<SILBasicBlock *> &path) {
   visitedBlocks.insert(srcBlock);
 
   // Optimistically assume `srcBlock` is on a path to `destBlock`. If such a
   // path is not found, this update to `path` will be reverted.
   path.push_back(srcBlock);
 
-  if (srcBlock == destBlock) return true;  // Done with DFS!
+  if (srcBlock == destBlock)
+    return true; // Done with DFS!
 
   for (SILBasicBlock *childBB : srcBlock->getSuccessors()) {
     // When the CFG has loops, `childBB` may have been visited, in which case we
@@ -3596,11 +3668,11 @@ static bool gatherBBsOnCFGPathHelper(
   return false;
 }
 
-// Finds an arbitrary CFG path from `srcBlock` to `destBlock` (requires that such
-// a path exists), and sets `pathset` to the blocks on that path.
-static void gatherBBsOnCFGPath(
-    SILBasicBlock *srcBlock, SILBasicBlock *destBlock,
-    llvm::SmallPtrSetImpl<SILBasicBlock *> &pathSet) {
+// Finds an arbitrary CFG path from `srcBlock` to `destBlock` (requires that
+// such a path exists), and sets `pathset` to the blocks on that path.
+static void
+gatherBBsOnCFGPath(SILBasicBlock *srcBlock, SILBasicBlock *destBlock,
+                   llvm::SmallPtrSetImpl<SILBasicBlock *> &pathSet) {
   llvm::SmallPtrSet<SILBasicBlock *, 8> visitedBlocks;
   llvm::SmallVector<SILBasicBlock *, 4> path;
   bool foundPath =
@@ -3643,10 +3715,12 @@ void TFFunctionPartition::balanceRetainReleaseCount(SILValue oldResult,
     auto user = operand->getUser();
 
     // Ignore uses outside the CFG path from `defBlock` to `endBlock`.
-    if (!relevantBlocks.count(user->getParent())) continue;
+    if (!relevantBlocks.count(user->getParent()))
+      continue;
 
     // Ignore uses outside the tensor program region.
-    if (DI.dominates(tensorEndPoint, user)) continue;
+    if (DI.dominates(tensorEndPoint, user))
+      continue;
 
     if (isa<DebugValueInst>(user))
       continue;
@@ -3678,18 +3752,17 @@ void TFFunctionPartition::balanceRetainReleaseCount(SILValue oldResult,
         "Unhandled instruction type, as a use of a result tensor above");
   }
 
-  DEBUG(llvm::dbgs() << "Creating " << retainReleaseBalance
-                     << " retains for result tensor :\n");
-  DEBUG(oldResult->print(llvm::dbgs()));
+  LLVM_DEBUG(llvm::dbgs() << "Creating " << retainReleaseBalance
+                          << " retains for result tensor :\n");
+  LLVM_DEBUG(oldResult->print(llvm::dbgs()));
   assert(retainReleaseBalance >= 0);
   for (int i = 0; i < retainReleaseBalance; ++i) {
     B.createStrongRetain(oldResult.getLoc(), newResult, Atomicity::Atomic);
   }
 }
 
-auto TFFunctionPartition::
-insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
-       -> PartitionedTensorProgram {
+void TFFunctionPartition::insertTensorComputationStartEndTerminate(
+    ArrayRef<SILValue> resultValues) {
   // Sanity check that all result values are tensor handles. Note SIL
   // accelerator functions under the "tensorflow" convention can also return
   // variant and resource tensors (in addition to tensor handles), but such
@@ -3748,28 +3821,26 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
   if (!startComputationFn || !finishComputationFn || !terminateComputationFn) {
     diagnose(ctx, hostFn.getLocation().getSourceLoc(), diag::tf_internal_error,
              "'_swift_tfc_' entrypoints not found in TensorFlow module");
-    return { nullptr, nullptr, nullptr, nullptr, nullptr, SILValue() };
+    return;
   }
 
   // Create various types and SIL types that we'll be using below.
   auto cTensorHandleTy = ctx.getOpaquePointerDecl()->getDeclaredType();
   auto cTensorHandleSILTy =
-    SILType::getPrimitiveObjectType(cTensorHandleTy->getCanonicalType());
-  auto unsafePointerType =
-    BoundGenericType::get(ctx.getUnsafePointerDecl(), /*parent*/Type(),
-                          cTensorHandleTy);
+      SILType::getPrimitiveObjectType(cTensorHandleTy->getCanonicalType());
+  auto unsafePointerType = BoundGenericType::get(
+      ctx.getUnsafePointerDecl(), /*parent*/ Type(), cTensorHandleTy);
   auto unsafePointerSILType =
-    SILType::getPrimitiveObjectType(unsafePointerType->getCanonicalType());
-  auto unsafeMutPointerType =
-    BoundGenericType::get(ctx.getUnsafeMutablePointerDecl(), /*parent*/Type(),
-                          cTensorHandleTy);
+      SILType::getPrimitiveObjectType(unsafePointerType->getCanonicalType());
+  auto unsafeMutPointerType = BoundGenericType::get(
+      ctx.getUnsafeMutablePointerDecl(), /*parent*/ Type(), cTensorHandleTy);
   auto unsafeMutPointerSILType =
-    SILType::getPrimitiveObjectType(unsafeMutPointerType->getCanonicalType());
+      SILType::getPrimitiveObjectType(unsafeMutPointerType->getCanonicalType());
   auto int8PointerType =
-    BoundGenericType::get(ctx.getUnsafePointerDecl(), /*parent*/Type(),
-                          ctx.getInt8Decl()->getDeclaredType());
+      BoundGenericType::get(ctx.getUnsafePointerDecl(), /*parent*/ Type(),
+                            ctx.getInt8Decl()->getDeclaredType());
   auto int8PointerSILType =
-    SILType::getPrimitiveObjectType(int8PointerType->getCanonicalType());
+      SILType::getPrimitiveObjectType(int8PointerType->getCanonicalType());
 
   // This assumes that the first member of TensorHandle is the CTensorHandle.
   auto tensorHandleDecl = ctx.getTensorHandleDecl();
@@ -3790,19 +3861,19 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
   // Create a string literal to hold the  serialized protobuf for the tensor
   // program.  We haven't actually created that yet, so we create a placeholder
   // and RAUW it later.
-  auto programPlaceholder =
-    B.createStringLiteral(loc, StringRef(), StringLiteralInst::Encoding::Bytes);
-  auto program = wrapInStruct(programPlaceholder, ctx.getUnsafeRawPointerDecl(),
-                              B, loc);
-  auto entryFunctionBaseNamePlaceholder =
-    B.createStringLiteral(loc, StringRef(), StringLiteralInst::Encoding::UTF8);
-  auto entryFunctionBaseName = B.createStruct(loc, int8PointerSILType,
-                                          { entryFunctionBaseNamePlaceholder });
+  auto programPlaceholder = B.createStringLiteral(
+      loc, StringRef(), StringLiteralInst::Encoding::Bytes);
+  auto program =
+      wrapInStruct(programPlaceholder, ctx.getUnsafeRawPointerDecl(), B, loc);
+  auto entryFunctionBaseNamePlaceholder = B.createStringLiteral(
+      loc, StringRef(), StringLiteralInst::Encoding::UTF8);
+  auto entryFunctionBaseName = B.createStruct(
+      loc, int8PointerSILType, {entryFunctionBaseNamePlaceholder});
 
   // Pass zero as a place holder for now; they will be filled in later.
   IntegerLiteralInst *programLengthPlaceholder = nullptr;
   auto programLength = createIntValue(0, B, loc, &programLengthPlaceholder);
-  // We cannot yet use `configuration.usedDeviceTypes` to set
+  // We cannot yet use `deviceInfo.usedDeviceTypes` to set
   // `helperFunctionCount`, because Swift<->TF tensor transfers are handled in
   // the later PartitionCloner logic, which could be adding a TF CPU device as
   // the impl (queueing) mechanism for such tensor transfers.
@@ -3825,7 +3896,7 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
   auto tupleType = TupleType::get(tupleEltTypes, ctx)->getCanonicalType();
   // %0 = alloc_stack $(CTensorHandle, CTensorHandle)
   auto stackAlloc =
-    B.createAllocStack(loc, SILType::getPrimitiveObjectType(tupleType));
+      B.createAllocStack(loc, SILType::getPrimitiveObjectType(tupleType));
 
   // Emit a store into the tuple for each parameter, giving it a copy of the
   // OpaquePointer that is within the TensorHandle<T> value we have.
@@ -3837,12 +3908,11 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
     // it.  If it is a scalar, then we need to box the scalar in a
     // CTensorHandle.
     if (isTensorHandle(tensorValue->getType().getASTType())) {
-      auto fieldAddress = B.createRefElementAddr(loc, tensorValue,
-                                                 tensorHandleMember);
+      auto fieldAddress =
+          B.createRefElementAddr(loc, tensorValue, tensorHandleMember);
       tensorValue = B.createLoad(loc, fieldAddress, loadOwnership);
     } else {
-      tensorValue = convertScalarToHostTensorHandle(tensorValue,
-                                                    hostFn.getModule(), B, loc);
+      tensorValue = convertScalarToHostTensorHandle(tensorValue, B, loc);
     }
     SILValue eltAddr = stackAlloc;
     if (numArgs >= 2)
@@ -3865,8 +3935,8 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
     firstPtr = B.createTupleElementAddr(loc, firstPtr, 0,
                                         cTensorHandleSILTy.getAddressType());
   // %3 = address_to_pointer %2 : $*CTensorHandle to $Builtin.RawPointer
-  firstPtr = B.createAddressToPointer(loc, firstPtr,
-                                      SILType::getRawPointerType(ctx));
+  firstPtr =
+      B.createAddressToPointer(loc, firstPtr, SILType::getRawPointerType(ctx));
 
   // %4 = struct $UnsafePointer<CTensorHandle>(%3 : $Builtin.RawPointer)
   firstPtr = B.createStruct(loc, unsafePointerSILType, firstPtr);
@@ -3879,13 +3949,13 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
   // The first two arguments are the program, the rest of the arguments are the
   // parameters passed in.
   SILValue startArgs[] = {
-    program,            // programByteAddress: UnsafeRawPointer
-    programLength,      // programByteCount: Int
-    entryFunctionBaseName,  // entryFunctionBaseName: UnsafePointer<Int8>
-    firstPtr,           // tensorArgumentAddress: UnsafePointer<CTensorHandle>
-    numTensorArguments, // tensorArgumentCount: Int
-    helperFunctionCount,// helperFunctionCount,: Int
-    numTensorResults    // resultCount: Int
+      program,               // programByteAddress: UnsafeRawPointer
+      programLength,         // programByteCount: Int
+      entryFunctionBaseName, // entryFunctionBaseName: UnsafePointer<Int8>
+      firstPtr,           // tensorArgumentAddress: UnsafePointer<CTensorHandle>
+      numTensorArguments, // tensorArgumentCount: Int
+      helperFunctionCount, // helperFunctionCount,: Int
+      numTensorResults     // resultCount: Int
   };
 
   // Now that we have our argument list, create a call.
@@ -3894,12 +3964,12 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
   // Create the runtime call in the host program that kicks off the tensor
   // program, setting the argument values we provide as the tensor params.
   auto tensorComputation =
-    B.createApply(loc, startProgramFnRef, /*no substitutions*/{}, startArgs,
-                  /*isNonThrowing*/false);
+      B.createApply(loc, startProgramFnRef, /*no substitutions*/ {}, startArgs,
+                    /*isNonThrowing*/ false);
 
   // Finish our read access and free the stack memory.
   // end_access %1 : $*(CTensorHandle, CTensorHandle)
-  B.createEndAccess(loc, access, /*aborted*/false);
+  B.createEndAccess(loc, access, /*aborted*/ false);
   // dealloc_stack %0 : $*(CTensorHandle, CTensorHandle)
   B.createDeallocStack(loc, stackAlloc);
 
@@ -3919,7 +3989,7 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
 
   // %0 = alloc_stack $(CTensorHandle, CTensorHandle)
   stackAlloc =
-    B.createAllocStack(loc, SILType::getPrimitiveObjectType(tupleType));
+      B.createAllocStack(loc, SILType::getPrimitiveObjectType(tupleType));
 
   // Ok, now we have our uninitialized array on the stack.  Start a write
   // access, and get the address of the first element as an
@@ -3936,8 +4006,8 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
     firstPtr = B.createTupleElementAddr(loc, firstPtr, 0,
                                         cTensorHandleSILTy.getAddressType());
   // %3 = address_to_pointer %2 : $*CTensorHandle to $Builtin.RawPointer
-  firstPtr = B.createAddressToPointer(loc, firstPtr,
-                                      SILType::getRawPointerType(ctx));
+  firstPtr =
+      B.createAddressToPointer(loc, firstPtr, SILType::getRawPointerType(ctx));
 
   // %4 = struct $UnsafeMutablePointer<CTensorHandle>(%3: $Builtin.RawPointer)
   firstPtr = B.createStruct(loc, unsafeMutPointerSILType, firstPtr);
@@ -3946,12 +4016,12 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
 
   // Create the builtin in the host program that kicks off the tensor program,
   // setting the argument values.
-  B.createApply(loc, finishComputationFnRef, /*no substitutions*/{},
+  B.createApply(loc, finishComputationFnRef, /*no substitutions*/ {},
                 /*args*/ {tensorComputation, firstPtr, numTensorResults},
-                /*isNonThrowing*/false);
+                /*isNonThrowing*/ false);
 
   // end_access %1 : $*(CTensorHandle, CTensorHandle)
-  B.createEndAccess(loc, access, /*aborted*/false);
+  B.createEndAccess(loc, access, /*aborted*/ false);
 
   // After the call, we have a buffer filled in with CTensorHandle values, load
   // them, taking ownership and RAUW'ing uses of the old value to the newly
@@ -3962,26 +4032,24 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
     SILValue eltAddress = stackAlloc;
     if (resultValues.size() > 1) {
       eltAddress =
-        B.createTupleElementAddr(result.getLoc(),
-                                 eltAddress, resultNumber,
-                                 cTensorHandleSILTy.getAddressType());
+          B.createTupleElementAddr(result.getLoc(), eltAddress, resultNumber,
+                                   cTensorHandleSILTy.getAddressType());
     }
 
     // The load takes ownership from the buffer, leaving the buffer
     // uninitialized again.
-    SILValue newValue = B.createLoad(result.getLoc(), eltAddress,
-                                     loadOwnership);
+    SILValue newValue =
+        B.createLoad(result.getLoc(), eltAddress, loadOwnership);
 
     // Create a new TensorHandle<T> type to take ownership.
     auto newTH = B.createAllocRef(result.getLoc(), result->getType(),
-                                  /*objc*/false, /*canAllocOnStack*/false,
-                                  /*elementTypes*/{},
-                                  /*elementCountOperands*/{});
+                                  /*objc*/ false, /*canAllocOnStack*/ false,
+                                  /*elementTypes*/ {},
+                                  /*elementCountOperands*/ {});
     auto fieldAddress =
-      B.createRefElementAddr(result.getLoc(), newTH, tensorHandleMember);
+        B.createRefElementAddr(result.getLoc(), newTH, tensorHandleMember);
 
-    B.createStore(result.getLoc(), newValue, fieldAddress,
-                  storeOwnership);
+    B.createStore(result.getLoc(), newValue, fieldAddress, storeOwnership);
 
     // After moving the program region between tensor start and end points to
     // the accelerator, we want to restore the retain/release balance of
@@ -3990,7 +4058,7 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
 
     // Manually walk the use list in a custom way to avoid invalidating the
     // iterator as we potentially change it.
-    for (auto UI = result->use_begin(), UE = result->use_end(); UI != UE; ) {
+    for (auto UI = result->use_begin(), UE = result->use_end(); UI != UE;) {
       auto *operand = *UI++;
       auto user = operand->getUser();
 
@@ -4022,22 +4090,57 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
     B.setInsertionPoint(&killBB->front());
 
     auto terminateComputationFnRef =
-      B.createFunctionRef(loc, terminateComputationFn);
+        B.createFunctionRef(loc, terminateComputationFn);
 
     // Create the builtin in the host program that kicks off the tensor program,
     // setting the argument values.
-    B.createApply(loc, terminateComputationFnRef, /*no substitutions*/{},
-                  /*args*/{ tensorComputation }, /*isNonThrowing*/false);
+    B.createApply(loc, terminateComputationFnRef, /*no substitutions*/ {},
+                  /*args*/ {tensorComputation}, /*isNonThrowing*/ false);
   }
 
-  return {
-    nullptr,  // New function hasn't been created yet.
-    programPlaceholder,
-    programLengthPlaceholder,
-    entryFunctionBaseNamePlaceholder,
-    helperFunctionCountPlaceholder,
-    tensorComputation
-  };
+  tensorProgram = {programPlaceholder, programLengthPlaceholder,
+                   entryFunctionBaseNamePlaceholder,
+                   helperFunctionCountPlaceholder, tensorComputation};
+}
+
+bool TFFunctionPartition::partitionAndLowerGraph(bool isTest) {
+  // If partition() returns true, short circuit the execution and error out.
+  return partition(isTest) || lowerGraph(isTest);
+}
+
+// Our partitioning can leave around lots of unconditional branches between
+// blocks that formerly had control edges.  Go through and merge those to make
+// later passes simpler.
+static void contractUncondBranches(SILFunction *fn) {
+  // Iterate carefully to avoid invalidating iterators: we mutate the block list
+  // while we walk it.
+  for (auto bbi = fn->begin(), e = fn->end(); bbi != e;) {
+    auto *bb = &*bbi;
+    ++bbi; // Increment the iterator in case we do no transformation.
+
+    if (auto succ = bb->getSingleSuccessorBlock()) {
+      if (succ != bb && succ->getSinglePredecessorBlock()) {
+        if (auto *BI = dyn_cast<BranchInst>(bb->getTerminator())) {
+          // If there are any BB arguments in the destination, replace them with
+          // the branch operands, since they must dominate the dest block.
+          for (unsigned i = 0, e = BI->getArgs().size(); i != e; ++i) {
+            assert(succ->getArgument(i) != BI->getArg(i) &&
+                   "Cloned code regions are always reachable");
+            succ->getArgument(i)->replaceAllUsesWith(BI->getArg(i));
+          }
+
+          // Zap BI and move all of the instructions from DestBB into this one.
+          BI->eraseFromParent();
+          bb->spliceAtEnd(succ);
+          succ->eraseFromParent();
+
+          // Revisit this node: we have new successor(s) and may need to
+          // contract them as well.  Also, bbi may be invalidated at this point.
+          bbi = SILFunction::iterator(bb);
+        }
+      }
+    }
+  }
 }
 
 /// Run the TensorFlow partitioning pass.  This pass is a very close relative to
@@ -4047,11 +4150,11 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
 /// operations and a subset of the CFG that is profitable and interesting to
 /// move to the accelerator.
 ///
-/// If the returned PartitionedTensorProgram::fn is null, an error has occurred,
-/// and diagnostics will be issued. Otherwise, it points to an accelerator
-/// function generated by this call, to be lowered to a TF graph.
+/// If it returns true, an error has occurred, and diagnostics has been
+/// issued. Otherwise, it sets `acceleratorFn` to an accelerator function
+/// generated by this call, to be lowered to a TF graph.
 ///
-auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
+bool TFFunctionPartition::partition(bool isTest) {
   assert(!markedBlocks.empty() &&
          "Shouldn't run on functions with no tensor ops");
 
@@ -4076,18 +4179,8 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
       // the whole value.
       bool hasAnyNonResultUse = false, hasAnyUse = false;
       for (auto result : inst.getResults()) {
-        // If this is a tuple type and the tuple elements are tensor values
-        // that are consumed beyond the tensor end point, the TupleExtract
-        // insts that produce these tensor values are already marked for Move,
-        // which will make them result tensors.
-        // e.g. For SIL snippet
-        //   %12 = builtin "__tfop_SoftmaxCrossEntropyWithLogits"(...) :
-        //     $(loss: TensorHandle<Float>, backprop: TensorHandle<Float>)
-        //   %13 = tuple_extract %12 : $(...), 0
-        //   %16 = tuple_extract %12 : $(...), 1
-        // %13 and %16 can be the result tensors.
-        if (isa<TupleType>(result->getType().getASTType()))
-          continue;
+        assert(!isa<TupleType>(result->getType().getASTType()) &&
+               "No result value of a graph_op inst should be a tuple!");
 
         for (auto *operand : result->getUses()) {
           auto user = operand->getUser();
@@ -4133,8 +4226,7 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
       // If all of the results can be handled with return values, then handle
       // them that way by appending them to our result list.
       if (hasAnyUse && !hasAnyNonResultUse)
-        resultValues.append(inst.getResults().begin(),
-                            inst.getResults().end());
+        resultValues.append(inst.getResults().begin(), inst.getResults().end());
     }
   }
 
@@ -4144,25 +4236,31 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
     *outs << "(Possibly updated) tensor end point: ";
     tensorEndPoint->print(*outs);
     *outs << "There are " << resultValues.size() << " result values:\n";
-    for (auto& resultValue : resultValues) {
+    for (auto &resultValue : resultValues) {
       resultValue->print(*outs);
     }
     *outs << "---- END OF PARTITION STATE FOR FUNCTION ----------\n\n";
     outs->flush();
   }
 
-  PartitionedTensorProgram resultProgram;
   if (!isAcceleratorOnly(hostFn)) {
+    // TODO(b/111123797): Lift this restriction.
+    if (resultValues.empty() &&
+        deviceInfo.primaryDeviceType == DeviceType::TPU) {
+      diagnose(hostFn.getASTContext(), hostFn.getLocation().getSourceLoc(),
+               diag::tfop_incorrect_definition,
+               "TPU execution cannot yet handle a graph that produces no "
+               "result tensors.");
+      return true;
+    }
+
     // Insert the start/finish and any terminate runtime calls.
-    // FIXME: Order resultValues based on the ordering of their defining
-    // instructions first, so that the generated tensor program has a
-    // deterministic output tensor ordering.
-    resultProgram = insertTensorComputationStartEndTerminate(resultValues);
+    insertTensorComputationStartEndTerminate(resultValues);
 
     // If the TensorFlow module is malformed, bail out without breaking the
     // code.
-    if (!resultProgram.theTensorComputation)
-      return resultProgram;
+    if (!tensorProgram.theTensorComputation)
+      return true;
   }
 
   // Calculate the parameter list for the new function.
@@ -4175,9 +4273,8 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
 
   SmallVector<SILResultInfo, 4> results;
   for (auto r : resultValues)
-    results.push_back(SILResultInfo(r->getType().getASTType(),
-                                    ResultConvention::Unowned));
-
+    results.push_back(
+        SILResultInfo(r->getType().getASTType(), ResultConvention::Unowned));
 
   // Create the partitioned function, which never has arguments or result
   // values, since they get sent and received back and forth.
@@ -4190,8 +4287,15 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
       hostFn.getLocation(), hostFn.getName().str() + ".tf", SILLinkage::Private,
       newFnType,
       /*What's this*/ IsBare, IsNotTransparent, IsNotSerialized);
+  SWIFT_DEFER {
+    // If we error out before assigning `resultFn` to the member field
+    // `acceleratorFn`, we should make sure this synthensized function is
+    // removed, to avoid it going through the normal compiler flow.
+    if (resultFn)
+      resultFn->getModule().eraseFunction(resultFn);
+  };
 
-  PartitionCloner PC(*this, *resultFn, resultProgram.theTensorComputation,
+  PartitionCloner PC(*this, *resultFn, tensorProgram.theTensorComputation,
                      tensorFlowModule);
 
   // Fill in the cloned function body.
@@ -4199,78 +4303,161 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
 
   // Clean up the source function, removing the tensor code.
   if (!isAcceleratorOnly(hostFn) && !PC.finalizeOriginal())
-    return resultProgram;
+    return true;
 
   // Success!
-  resultProgram.acceleratorFn = resultFn;
-  return resultProgram;
+  acceleratorFn = resultFn;
+  resultFn = nullptr;
+
+  // Our partitioning can leave around lots of unconditional branches between
+  // blocks that formerly had control edges.  Go through and merge those to
+  // make later passes simpler.
+  contractUncondBranches(acceleratorFn);
+
+  if (auto outs = getTFDumpIntermediateStream()) {
+    *outs << "--- TFPartition Accelerator Result: " << acceleratorFn->getName()
+          << "\n";
+    acceleratorFn->print(*outs);
+    *outs << "----\n";
+    outs->flush();
+  } else if (isTest) {
+    llvm::outs() << "--- TFPartition Accelerator Result: "
+                 << acceleratorFn->getName() << "\n";
+    acceleratorFn->print(llvm::outs());
+    llvm::outs() << "----\n";
+    llvm::outs().flush();
+  }
+
+#ifndef NDEBUG
+  // Verify that the generated function is ok.
+  acceleratorFn->verify();
+#endif
+
+  return false;
 }
 
+bool TFFunctionPartition::lowerGraph(bool isTest) {
+  assert(acceleratorFn);
+  if (isAcceleratorOnly(hostFn)) {
+    assert(deviceInfo.numUsedDeviceTypes == 1 &&
+           "An accelerator-only SIL function must be lowered to a single TF "
+           "device.");
+    if (graphLowering->lowerTFFunction(hostFn.getName(), acceleratorFn,
+                                       deviceInfo))
+      return true;
+
+    // Remove the host function so it doesn't go through the normal
+    // compiler flow.
+    hostFn.getModule().eraseFunction(&hostFn);
+  } else {
+    if (graphLowering->lowerTFGraph(hostFn.getName(), acceleratorFn,
+                                    deviceInfo))
+      return true;
+  }
+
+  return false;
+}
+
+void TFFunctionPartition::finalizeHostFunction(const std::vector<char> &bytes,
+                                               StringRef entryFnBaseName) {
+  assert(!entryFnBaseName.startswith("$"));
+
+  if (isAcceleratorOnly(hostFn))
+    return;
+
+  // Now that we know what the tensor program actually is, we can replace
+  // the placeholder instructions for the data + length with the actual bits
+  // we want to use.
+  // This effectively emits the encoded graph as a global symbol.
+  SILBuilder B(tensorProgram.programPlaceholder);
+  auto data = B.createStringLiteral(hostFn.getLocation(),
+                                    StringRef(bytes.data(), bytes.size()),
+                                    StringLiteralInst::Encoding::Bytes);
+  auto len = B.createIntegerLiteral(
+      hostFn.getLocation(), tensorProgram.programLengthPlaceholder->getType(),
+      bytes.size());
+
+  auto name =
+      B.createStringLiteral(hostFn.getLocation(), StringRef(entryFnBaseName),
+                            StringLiteralInst::Encoding::UTF8);
+  // Set the number of helper functions here based on the # devices involved
+  // in this TF program.
+  auto helperFunctionCount = B.createIntegerLiteral(
+      hostFn.getLocation(),
+      tensorProgram.helperFunctionCountPlaceholder->getType(),
+      deviceInfo.numUsedDeviceTypes - 1);
+  tensorProgram.programPlaceholder->replaceAllUsesWith(data);
+  tensorProgram.programPlaceholder->eraseFromParent();
+  tensorProgram.programLengthPlaceholder->replaceAllUsesWith(len);
+  tensorProgram.programLengthPlaceholder->eraseFromParent();
+  tensorProgram.entryFunctionBaseNamePlaceholder->replaceAllUsesWith(name);
+  tensorProgram.entryFunctionBaseNamePlaceholder->eraseFromParent();
+  tensorProgram.helperFunctionCountPlaceholder->replaceAllUsesWith(
+      helperFunctionCount);
+  tensorProgram.helperFunctionCountPlaceholder->eraseFromParent();
+
+  if (auto outs = getTFDumpIntermediateStream()) {
+    *outs << "--- TFPartition Host Result: " << hostFn.getName() << "\n";
+    hostFn.print(*outs);
+    *outs << "---\n";
+    outs->flush();
+  }
+}
 
 //===----------------------------------------------------------------------===//
 //                              Top Level Driver
 //===----------------------------------------------------------------------===//
 
-
-// Our partitioning can leave around lots of unconditional branches between
-// blocks that formerly had control edges.  Go through and merge those to make
-// later passes simpler.
-static void contractUncondBranches(SILFunction *fn) {
-  // Iterate carefully to avoid invalidating iterators: we mutate the block list
-  // while we walk it.
-  for (auto bbi = fn->begin(), e = fn->end(); bbi != e; ) {
-    auto *bb = &*bbi;
-    ++bbi;  // Increment the iterator in case we do no transformation.
-
-    if (auto succ = bb->getSingleSuccessorBlock()) {
-      if (succ != bb && succ->getSinglePredecessorBlock()) {
-        if (auto *BI = dyn_cast<BranchInst>(bb->getTerminator())) {
-          // If there are any BB arguments in the destination, replace them with
-          // the branch operands, since they must dominate the dest block.
-          for (unsigned i = 0, e = BI->getArgs().size(); i != e; ++i) {
-            assert(succ->getArgument(i) != BI->getArg(i) &&
-                   "Cloned code regions are always reachable");
-            succ->getArgument(i)->replaceAllUsesWith(BI->getArg(i));
-          }
-
-          // Zap BI and move all of the instructions from DestBB into this one.
-          BI->eraseFromParent();
-          bb->spliceAtEnd(succ);
-          succ->eraseFromParent();
-
-          // Revisit this node: we have new successor(s) and may need to
-          // contract them as well.  Also, bbi may be invalidated at this point.
-          bbi = SILFunction::iterator(bb);
-        }
-      }
-    }
-  }
-}
-
 namespace {
-class TFPartition : public SILFunctionTransform {
+class TFPartition : public SILModuleTransform {
+  ModuleDecl *tfModule = nullptr;
+
   bool isTest = false;
   TensorFunctionClassifier tfc;
-  // For accelerator-only functions, map the SIL host function names to the
-  // lowered TF graph artifacts.
-  DenseMap<StringRef, SerializedGraphFunction> graphFunctions;
+  /// For partitionable functions, map the SIL host function names to the
+  /// lowered TF graph artifacts.
+  ///
+  /// Impl note: The value type is a unique_ptr to avoid having to moving the
+  /// underlying `LoweredGraphFunction` object once it's constructed, because
+  /// the map key is backed by the string field
+  /// `LoweredGraphFunction::silHostFnName` in that object.
+  DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>> graphFunctions;
+
+  // Mutually exclusive, based on flag value TFModuleLevelGraph.
+  TFGraphLowering moduleGraphLowering; // Used when the flag is true.
+  SmallVector<TFGraphLowering, 16> testGraphLowerings; // Used when false.
+
+  using HostPartitionContext =
+      std::pair<SILFunction *, std::unique_ptr<TFFunctionPartition>>;
 
 public:
-  TFPartition(bool isTest) : isTest(isTest) {}
+  TFPartition(bool isTest)
+      : isTest(isTest), moduleGraphLowering(TFGraphLowering(graphFunctions)) {}
 
   /// The entry point to the transformation.
   void run() override;
+
+private:
+  /// Partition and lower `hostFn` if it's eligible. Add an entry to
+  /// `hostPartitionContexts`, if it references some other function F as a
+  /// function-typed attribute, but the graph function definition of F is not
+  /// yet available.
+  bool
+  processFunction(SILFunction *hostFn,
+                  SmallVectorImpl<HostPartitionContext> &hostPartitionContexts);
+
+  /// Partition and lower `hostFn` into a graph if it's eligible. In that case
+  /// set `partitioner` to the created partitioner instance to continue with
+  /// graph serialization later, or otherwise set `partitioner` to NULL.  Return
+  /// true on error.
+  bool partitionFunction(SILFunction *hostFn,
+                         std::unique_ptr<TFFunctionPartition> &partitioner);
 };
 } // end anonymous namespace
 
 void TFPartition::run() {
-  SILFunction *hostFn = getFunction();
-  if (isAcceleratorOnly(*hostFn)) {
-    DEBUG(llvm::dbgs() << "SIL function " << hostFn->getName()
-                       << " is accelerator-only.\n");
-  }
-  auto &ctx = hostFn->getASTContext();
-
+  SILModule *module = getModule();
+  auto &ctx = module->getASTContext();
   // TODO(clattner): This logic will eventually be subsumed by the
   // corresponding logic in the TFDeabstraction pass.  Until deabstraction
   // is done, we have some amount of top-level redundancy here because we have
@@ -4279,84 +4466,97 @@ void TFPartition::run() {
   // If the TensorFlow module hasn't been imported by the program, don't do
   // anything.  This avoids impacting compile time for non-TensorFlow using
   // Swift programs by doing extraneous analysis.
-  auto tfModule = ctx.getLoadedModule(ctx.getIdentifier("TensorFlow"));
+  tfModule = ctx.getLoadedModule(ctx.Id_TensorFlow);
   if (!tfModule)
     return;
 
-  // If this function is a building block of larger tensor programs (e.g.
-  // the ops defined in the TensorFlow module), then don't transform it in
-  // isolation.
-  DEBUG(llvm::dbgs() << "Processing SIL function " << hostFn->getName()
-                     << " in TFPartition::run().\n");
-  if (!tfc.shouldBePartitioned(hostFn))
-    return;
-
-  DEBUG(llvm::dbgs() << "  " << hostFn->getName()
-                     << " should be partitioned.\n");
-  TFFunctionPartition partitioner(*hostFn, PM, *tfModule);
-  if (!partitioner.markFunction())
-    return; // No tensor ops found in the function.
-  DEBUG(llvm::dbgs() << "  " << hostFn->getName()
-                     << " contains tensor op(s).\n");
-
-  // Check to see if we cannot transform the function but should.  In this
-  // case we emit a compiler error.  This is a limitation of the compiler that
-  // will need to be resolved in the future (possibly through a model change),
-  // it's not clear if we should allow partitioning to work on unspecialized
-  // generics.
-  if (hostFn->getLoweredFunctionType()->isPolymorphic()) {
-    auto &ctx = hostFn->getASTContext();
-    diagnose(ctx, hostFn->getLocation().getSourceLoc(),
-             diag::tf_internal_error,
-             "TensorFlow graph program extraction does not work on generic "
-             "functions yet");
-    return;
+  // We use a two-pass design below. The first pass partitions and lowers those
+  // partitionable functions into graphs. When we process a function that
+  // references in function-typed attributes other functions that are not yet
+  // lowered, keep track of them in `hostPartitionContexts`, to be processed in
+  // the second pass.
+  //
+  // Loop over all of the functions defined in the current module. Since we are
+  // synthesizing new functions into the module (those accelerator functions),
+  // we make a snapshot of the functions to be processed into `fns`, and then
+  // start the processing.
+  SmallVector<SILFunction *, 16> fns;
+  for (auto &fn : *module) {
+    if (!fn.isDefinition())
+      continue;
+    fns.push_back(&fn);
   }
 
-  // Because we're in active development, it is common to do something wrong
-  // in the TensorFlow module.  Detect and reject things here.
-  if (hostFn->getModule().getSwiftModule() == tfModule) {
-    auto &ctx = hostFn->getASTContext();
-    diagnose(ctx, hostFn->getLocation().getSourceLoc(),
-             diag::tf_internal_error,
-             "nothing in the TensorFlow module should require partitioning, "
-             "did you forget @inlinable on '" + hostFn->getName().str()
-             + "'?");
-    return;
-  }
+  // Track the set of functions that reference some function-typed attributes
+  // whose graph function definitions are not yet available.
+  SmallVector<HostPartitionContext, 16> hostPartitionContexts;
+  for (auto *fn : fns)
+    if (processFunction(fn, hostPartitionContexts))
+      continue; // error already emitted, but continue processing other
+                // functions.
 
-  // Actually do the partitioning transformation, splitting out a new SIL
-  // function for the tensor program body.
-  auto tensorProgram = partitioner.partition();
-
-  // If the TensorFlow module is malformed, exit without breaking the SIL:
-  // an error has already been emitted.
-  if (!tensorProgram.acceleratorFn)
+  if (hostPartitionContexts.empty() || !TFModuleLevelGraph)
     return;
 
-  // Our partitioning can leave around lots of unconditional branches between
-  // blocks that formerly had control edges.  Go through and merge those to
-  // make later passes simpler.
-  contractUncondBranches(tensorProgram.acceleratorFn);
+  // In the second pass, we know all partitionable functions have had their
+  // graph function bodies generated. When a function foo() references another
+  // function bar() as a function-typed attribute, but bar()'s graph function
+  // body is not avilable during the first pass, we will be copying the graph
+  // function body of bar() into the graph function body of foo() in this pass.
 
-  if (auto outs = getTFDumpIntermediateStream()) {
-    *outs << "--- TFPartition Accelerator Result: "
-          << tensorProgram.acceleratorFn->getName() << "\n";
-    tensorProgram.acceleratorFn->print(*outs);
-    *outs << "----\n";
-    outs->flush();
-  } else if (isTest) {
-    llvm::outs() << "--- TFPartition Accelerator Result: "
-                 << tensorProgram.acceleratorFn->getName() << "\n";
-    tensorProgram.acceleratorFn->print(llvm::outs());
-    llvm::outs() << "----\n";
-    llvm::outs().flush();
+  std::vector<char> bytes;
+  auto errorLoc = hostPartitionContexts.front().first->getLocation();
+  if (TFModuleLevelGraph &&
+      moduleGraphLowering.serializeGraphProtoBuf(ctx, errorLoc, bytes))
+    return; // error already emitted
+
+  for (auto &context : hostPartitionContexts) {
+    auto *hostFn = context.first;
+    auto *partitioner = context.second.get();
+    assert(graphFunctions.count(hostFn->getName()));
+    auto &thisGraphFunc = *graphFunctions[hostFn->getName()];
+
+    // TODO: Currently the byte buffer is local to the host function, so
+    // multiple partitionable functions that share the same graphDef could have
+    // replicated byte buffers. Can move to a global byte buffer if this helps
+    // with performance.
+    partitioner->finalizeHostFunction(bytes, thisGraphFunc.graphFnName);
   }
+}
 
-#ifndef NDEBUG
-  // Verify that the generated function is ok.
-  tensorProgram.acceleratorFn->verify();
-#endif
+bool TFPartition::processFunction(
+    SILFunction *hostFn,
+    SmallVectorImpl<HostPartitionContext> &hostPartitionContexts) {
+  std::unique_ptr<TFFunctionPartition> partitioner;
+  if (partitionFunction(hostFn, partitioner)) {
+    return true; // error already emitted.
+  } else if (partitioner) {
+    if (!TFModuleLevelGraph) {
+      // In this test mode, for code simplicity we eagerly serialize the graph
+      // def, without first copying over any graph functions that this graph
+      // function depends on (in its function-typed attributes), so this test
+      // mode is only robust when there are no function-typed attributes.
+      assert(graphFunctions.count(hostFn->getName()));
+      auto &thisGraphFunc = *graphFunctions[hostFn->getName()];
+
+      std::vector<char> bytes;
+      auto errorLoc = hostFn->getLocation();
+      if (partitioner->getGraphLoweringTest()->serializeGraphProtoBuf(
+              getModule()->getASTContext(), errorLoc, bytes))
+        return true; // error already emitted
+      partitioner->finalizeHostFunction(bytes, thisGraphFunc.graphFnName);
+
+      // Reset the tensor id counter for host-TF sends/recvs, so that each test
+      // starts with a nice 0 as the id.
+      nextSendID = 0;
+    } else {
+      // The lowered graph references some other graph functions whose
+      // bodies are not yet available -- track it for continued processing
+      // in the second pass.
+      hostPartitionContexts.push_back(
+          std::make_pair(hostFn, std::move(partitioner)));
+    }
+  }
 
   // If this is called from sil-opt, we currently just print out the results
   // and quit.  This allows writing regression tests for the tf-partition
@@ -4368,84 +4568,84 @@ void TFPartition::run() {
     hostFn->print(llvm::outs());
     llvm::outs() << "---\n";
     llvm::outs().flush();
-
-    // Finally, we're done.  Remove the partitioned function so it doesn't go
-    // through the normal compiler flow.
-    tensorProgram.acceleratorFn->getModule().eraseFunction(
-        tensorProgram.acceleratorFn);
-    return;
   }
+  return false;
+}
 
-  // Next translate it to a graph.
+bool TFPartition::partitionFunction(
+    SILFunction *hostFn, std::unique_ptr<TFFunctionPartition> &partitioner) {
   if (isAcceleratorOnly(*hostFn)) {
-    assert(partitioner.configuration.usedDeviceTypes.size() == 1 &&
-           "An accelerator-only SIL function must be lowered to a single TF "
-           "device.");
-    lowerTFFunction(hostFn->getName(), tensorProgram.acceleratorFn,
-                    partitioner.configuration, graphFunctions);
-
-    // Remove the partitioned function so it doesn't go through the normal
-    // compiler flow.
-    hostFn->getModule().eraseFunction(hostFn);
-  } else {
-    std::string entryFnBaseName;
-    auto bytes =
-        lowerTFGraph(tensorProgram.acceleratorFn, partitioner.configuration,
-                     /*graphFnNames*/ graphFunctions, entryFnBaseName);
-    assert(!StringRef(entryFnBaseName).startswith("$"));
-
-    // Now that we know what the tensor program actually is, we can replace
-    // the placeholder instructions for the data + length with the actual bits
-    // we want to use.
-    // This effectively emits the encoded graph as a global symbol.
-    SILBuilder B(tensorProgram.programPlaceholder);
-    auto data = B.createStringLiteral(hostFn->getLocation(),
-                                      StringRef(bytes.data(), bytes.size()),
-                                      StringLiteralInst::Encoding::Bytes);
-    auto len = B.createIntegerLiteral(
-        hostFn->getLocation(),
-        tensorProgram.programLengthPlaceholder->getType(), bytes.size());
-
-    auto name = B.createStringLiteral(hostFn->getLocation(),
-                                      StringRef(entryFnBaseName),
-                                      StringLiteralInst::Encoding::UTF8);
-    // Set the number of helper functions here based on the # devices involved
-    // in this TF program.
-    auto helperFunctionCount = B.createIntegerLiteral(
-        hostFn->getLocation(),
-        tensorProgram.helperFunctionCountPlaceholder->getType(),
-        partitioner.configuration.usedDeviceTypes.size() - 1);
-    tensorProgram.programPlaceholder->replaceAllUsesWith(data);
-    tensorProgram.programPlaceholder->eraseFromParent();
-    tensorProgram.programLengthPlaceholder->replaceAllUsesWith(len);
-    tensorProgram.programLengthPlaceholder->eraseFromParent();
-    tensorProgram.entryFunctionBaseNamePlaceholder->replaceAllUsesWith(name);
-    tensorProgram.entryFunctionBaseNamePlaceholder->eraseFromParent();
-    tensorProgram.helperFunctionCountPlaceholder->replaceAllUsesWith(
-        helperFunctionCount);
-    tensorProgram.helperFunctionCountPlaceholder->eraseFromParent();
-
-    if (auto outs = getTFDumpIntermediateStream()) {
-      *outs << "--- TFPartition Host Result: " << hostFn->getName() << "\n";
-      hostFn->print(*outs);
-      *outs << "---\n";
-      outs->flush();
-    }
+    LLVM_DEBUG(llvm::dbgs() << "SIL function " << hostFn->getName()
+                            << " is accelerator-only.\n");
   }
 
-  // Finally, we're done.  Remove the partitioned function so it doesn't go
-  // through the normal compiler flow.
-  tensorProgram.acceleratorFn->getModule().eraseFunction(
-      tensorProgram.acceleratorFn);
+  // If this function is a building block of larger tensor programs (e.g.
+  // the ops defined in the TensorFlow module), then don't transform it in
+  // isolation.
+  LLVM_DEBUG(llvm::dbgs() << "Processing SIL function " << hostFn->getName()
+                          << " in TFPartition::partitionFunction().\n");
+  if (!tfc.shouldBePartitioned(hostFn))
+    return false;
+
+  LLVM_DEBUG(llvm::dbgs() << "  " << hostFn->getName()
+                          << " should be partitioned.\n");
+  TFGraphLowering *graphLowering = &moduleGraphLowering;
+  if (!TFModuleLevelGraph) {
+    testGraphLowerings.emplace_back(TFGraphLowering(graphFunctions));
+    graphLowering = &testGraphLowerings.back();
+  }
+  partitioner = llvm::make_unique<TFFunctionPartition>(
+      *hostFn, PM, *tfModule, graphLowering, graphFunctions);
+
+  bool hasTensorOps = false;
+  if (partitioner->markFunction(hasTensorOps))
+    return true; // We've encountered an error.
+  if (!hasTensorOps) {
+    partitioner = nullptr;
+    return false;
+  }
+
+  LLVM_DEBUG(llvm::dbgs() << "  " << hostFn->getName()
+                          << " contains tensor op(s).\n");
+
+  // Check to see if we cannot transform the function but should.  In this
+  // case we emit a compiler error.  This is a limitation of the compiler that
+  // will need to be resolved in the future (possibly through a model change),
+  // it's not clear if we should allow partitioning to work on unspecialized
+  // generics.
+  if (hostFn->getLoweredFunctionType()->isPolymorphic()) {
+    auto &ctx = hostFn->getASTContext();
+    diagnose(ctx, hostFn->getLocation().getSourceLoc(), diag::tf_internal_error,
+             "TensorFlow graph program extraction does not work on generic "
+             "functions yet");
+    return true;
+  }
+
+  // Because we're in active development, it is common to do something wrong
+  // in the TensorFlow module.  Detect and reject things here.
+  if (hostFn->getModule().getSwiftModule() == tfModule) {
+    auto &ctx = hostFn->getASTContext();
+    diagnose(ctx, hostFn->getLocation().getSourceLoc(), diag::tf_internal_error,
+             "nothing in the TensorFlow module should require partitioning, "
+             "did you forget @inlinable on '" +
+                 hostFn->getName().str() + "'?");
+    return true;
+  }
+
+  // Actually do the partitioning transformation, splitting out a new SIL
+  // function for the tensor program body.
+  // If we've encountered an error, exit without breaking the SIL:
+  // an error has already been emitted.
+  return partitioner->partitionAndLowerGraph(isTest);
 }
 
 SILTransform *swift::createTFPartition() {
-  return new TFPartition(/*isTest*/false);
+  return new TFPartition(/*isTest*/ false);
 }
 
 /// Create a version of the tf-partition pass that is used by sil-opt for
 /// testcases.  TF-Partition is not a normal pass, so we need an unconventional
 /// approach here.
 SILTransform *swift::createTFPartitionTest() {
-  return new TFPartition(/*isTest*/true);
+  return new TFPartition(/*isTest*/ true);
 }

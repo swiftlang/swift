@@ -257,8 +257,7 @@ class TestData : TestDataSuper {
             // Mutate it
             bytes.pointee = 0x67
             expectEqual(bytes.pointee, 0x67, "First byte should be 0x67")
-            expectEqual(mutatingHello[0], 0x67, "First byte accessed via other method should still be 0x67")
-            
+
             // Verify that the first data is still correct
             expectEqual(hello[0], 0x68, "The first byte should still be 0x68")
         }
@@ -283,7 +282,6 @@ class TestData : TestDataSuper {
             // Mutate the second data
             bytes.pointee = 0
             expectEqual(bytes.pointee, 0, "First byte should be 0")
-            expectEqual(allOnesCopyToMutate[0], 0, "First byte accessed via other method should still be 0")
             
             // Verify that the first data is still 1
             expectEqual(allOnesData[0], 1, "The first byte should still be 1")

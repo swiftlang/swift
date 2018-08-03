@@ -37,8 +37,8 @@ public func run_StringRemoveDupes(_ N: Int) {
 // of using contains is very inefficient
 // alternatively, could require comparable, sort, and remove adjacent dupes
 func uniq<S: Sequence,
-          E: Hashable>(_ seq: S) -> [E] where E == S.Iterator.Element {
-  var seen: [S.Iterator.Element:Int] = [:]
+          E: Hashable>(_ seq: S) -> [E] where E == S.Element {
+  var seen: [S.Element:Int] = [:]
   return seq.filter { seen.updateValue(1, forKey: $0) == nil }
 }
 

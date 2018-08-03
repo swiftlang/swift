@@ -463,6 +463,17 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
   return sub;
 }
 
+static Expr *formUnaryArgument(ASTContext &context, Expr *argument) {
+  if (isa<ParenExpr>(argument))
+    return argument;
+
+  auto *arg = new (context)
+      ParenExpr(argument->getStartLoc(), argument, argument->getEndLoc(),
+                /*hasTrailingClosure*/ false);
+  arg->setImplicit();
+  return arg;
+}
+
 /// parseExprUnary
 ///
 ///   expr-unary(Mode):
@@ -538,8 +549,8 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
     }
   }
 
-  return makeParserResult(
-      new (Context) PrefixUnaryExpr(Operator, SubExpr.get()));
+  return makeParserResult(new (Context) PrefixUnaryExpr(
+      Operator, formUnaryArgument(Context, SubExpr.get())));
 }
 
 /// expr-keypath-swift:
@@ -1330,8 +1341,9 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
         break;
 
       Expr *oper = parseExprOperator();
-      Result =
-          makeParserResult(new (Context) PostfixUnaryExpr(oper, Result.get()));
+
+      Result = makeParserResult(new (Context) PostfixUnaryExpr(
+          oper, formUnaryArgument(Context, Result.get())));
       SyntaxContext->createNodeInPlace(SyntaxKind::PostfixUnaryExpr);
       continue;
     }
@@ -1752,6 +1764,10 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   case tok::pound_gradient:
     return parseExprGradientBody(ExprKind::Gradient);
     break;
+      
+  case tok::pound_chainableGradient:
+    return parseExprGradientBody(ExprKind::ChainableGradient);
+    break;
 
   case tok::pound_valueAndGradient:
     return parseExprGradientBody(ExprKind::ValueAndGradient);
@@ -2138,7 +2154,7 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
     // This is not a compound name.
     // FIXME: Could recover better if we "know" it's a compound name.
     loc = DeclNameLoc(baseNameLoc);
-    ArgsCtxt.setDiscard();
+    ArgsCtxt.setBackTracking();
     return baseName;
   }
   // We have a compound name. Cancel backtracking and build that name.
@@ -2499,6 +2515,7 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
       Expr *initializer;
       Identifier name;
       SourceLoc nameLoc = Tok.getLoc();
+      SourceLoc equalLoc;
       if (peekToken().isNot(tok::equal)) {
         // If this is the simple case, then the identifier is both the name and
         // the expression to capture.
@@ -2516,7 +2533,7 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
       } else {
         // Otherwise, the name is a new declaration.
         consumeIdentifier(&name);
-        consumeToken(tok::equal);
+        equalLoc = consumeToken(tok::equal);
 
         auto ExprResult = parseExpr(diag::expected_init_capture_specifier);
         if (ExprResult.isNull())
@@ -2541,10 +2558,10 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
 
       auto pattern = new (Context) NamedPattern(VD, /*implicit*/true);
 
-      auto *PBD = PatternBindingDecl::create(Context, /*staticloc*/SourceLoc(),
-                                             StaticSpellingKind::None,
-                                             nameLoc, pattern, initializer,
-                                             CurDeclContext);
+      auto *PBD = PatternBindingDecl::create(
+          Context, /*StaticLoc*/ SourceLoc(), StaticSpellingKind::None,
+          /*VarLoc*/ nameLoc, pattern, /*EqualLoc*/ equalLoc, initializer,
+          CurDeclContext);
 
       captureList.push_back(CaptureListEntry(VD, PBD));
     } while (HasNext);
@@ -3648,9 +3665,11 @@ ParserResult<Expr> Parser::parseExprTypeOf() {
 ///     '.' [0-9]+
 ///
 ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
-  SyntaxParsingContext GradientContext(SyntaxContext, SyntaxKind::GradientExpr);
+  SyntaxParsingContext RADEContext(SyntaxContext,
+                                   SyntaxKind::ReverseAutoDiffExpr);
 
-  assert(Tok.is(tok::pound_gradient) || Tok.is(tok::pound_valueAndGradient));
+  assert(Tok.isAny(tok::pound_gradient, tok::pound_valueAndGradient,
+                   tok::pound_chainableGradient));
   auto poundGradLoc = consumeToken();
   SourceLoc lParenLoc;
   SourceLoc rParenLoc;
@@ -3659,6 +3678,9 @@ ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
   switch (kind) {
   case ExprKind::Gradient:
     exprName = "#gradient";
+    break;
+  case ExprKind::ChainableGradient:
+    exprName = "#chainableGradient";
     break;
   case ExprKind::ValueAndGradient:
     exprName = "#valueAndGradient";
@@ -3706,7 +3728,7 @@ ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
     // Function that parses one parameter.
     auto parseParam = [&]() -> bool {
       SyntaxParsingContext DiffParamContext(
-          SyntaxContext, SyntaxKind::GradientExprDiffParam);
+          SyntaxContext, SyntaxKind::ReverseAutoDiffExprParam);
       SourceLoc paramLoc;
       switch (Tok.getKind()) {
       case tok::period_prefix: {
@@ -3736,7 +3758,8 @@ ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
     while (Tok.isNot(tok::r_paren))
       if (parseParam())
         return errorAndSkipToEnd();
-    SyntaxContext->collectNodesInPlace(SyntaxKind::GradientExprParamList);
+    SyntaxContext->collectNodesInPlace(
+        SyntaxKind::ReverseAutoDiffExprParamList);
   }
   // Parse the closing ')'.
   if (parseToken(tok::r_paren, rParenLoc, diag::expr_expected_rparen, exprName))
@@ -3750,6 +3773,11 @@ ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
     result = GradientExpr::create(Context, poundGradLoc, lParenLoc,
                                   originalFnParseResult.get(), params,
                                   rParenLoc);
+    break;
+  case ExprKind::ChainableGradient:
+    result = ChainableGradientExpr::create(Context, poundGradLoc, lParenLoc,
+                                           originalFnParseResult.get(), params,
+                                           rParenLoc);
     break;
   case ExprKind::ValueAndGradient:
     result = ValueAndGradientExpr::create(Context, poundGradLoc, lParenLoc,
