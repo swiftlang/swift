@@ -1,0 +1,3 @@
+RUN: %debug-remote-run echo hello | %FileCheck %s
+
+CHECK: {{^hello$}}

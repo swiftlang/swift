@@ -1,0 +1,17 @@
+RUN: %debug-remote-run --source-dir %S/Inputs/upload/ ls %S/Inputs/upload/1.txt %S/Inputs/upload/2.txt | %FileCheck -check-prefix CHECK-REMOTE %s
+RUN: ls %t-REMOTE/inputs/ | %FileCheck %s
+
+RUN: %empty-directory(%t-REMOTE)
+RUN: %debug-remote-run --source-dir %S/Inputs/ ls %S/Inputs/upload/1.txt %S/Inputs/upload/2.txt | %FileCheck -check-prefix CHECK-REMOTE-NESTED %s
+RUN: ls %t-REMOTE/inputs/upload/ | %FileCheck %s
+
+CHECK-REMOTE: {{-REMOTE/inputs/1.txt$}}
+CHECK-REMOTE-NEXT: {{-REMOTE/inputs/2.txt$}}
+
+CHECK-REMOTE-NESTED: {{-REMOTE/inputs/upload/1.txt$}}
+CHECK-REMOTE-NESTED-NEXT: {{-REMOTE/inputs/upload/2.txt$}}
+
+CHECK-NOT: BAD
+CHECK: {{^1.txt$}}
+CHECK-NEXT: {{^2.txt$}}
+CHECK-NOT: BAD

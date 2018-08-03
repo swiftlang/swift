@@ -1,0 +1,23 @@
+RUN: %empty-directory(%t)
+RUN: %empty-directory(%t-REMOTE)
+RUN: touch %t/input %t/BAD
+RUN: %debug-remote-run --test-dir %t cp %t/input %t/output
+RUN: ls %t/ | %FileCheck %s
+RUN: ls %t-REMOTE/inout/ | %FileCheck -check-prefix CHECK-REMOTE %s
+
+CHECK: BAD
+CHECK-NEXT: {{^input$}}
+CHECK-NEXT: {{^output$}}
+
+CHECK-REMOTE-NOT: BAD
+CHECK-REMOTE: {{^input$}}
+CHECK-REMOTE-NEXT: {{^output$}}
+CHECK-REMOTE-NOT: BAD
+
+RUN: %empty-directory(%t)
+RUN: %empty-directory(%t/nested)
+RUN: %empty-directory(%t-REMOTE)
+RUN: touch %t/nested/input %t/nested/BAD
+RUN: %debug-remote-run --test-dir %t cp %t/nested/input %t/nested/output
+RUN: ls %t/nested/ | %FileCheck %s
+RUN: ls %t-REMOTE/inout/nested/ | %FileCheck -check-prefix CHECK-REMOTE %s
