@@ -1618,12 +1618,8 @@ createDispatchingDiagnosticConsumerIfNeeded(
           return false;
         });
   }
-
-  if (subconsumers.empty())
-    return nullptr;
-  if (subconsumers.size() == 1)
-    return std::move(subconsumers.front()).consumer;
-  return llvm::make_unique<FileSpecificDiagnosticConsumer>(subconsumers);
+  
+  return FileSpecificDiagnosticConsumer::consolidateSubconsumers(subconsumers);
 }
 
 /// Creates a diagnostic consumer that handles serializing diagnostics, based on

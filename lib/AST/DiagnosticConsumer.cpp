@@ -38,7 +38,7 @@ static bool hasDuplicateFileNames(
     ArrayRef<FileSpecificDiagnosticConsumer::Subconsumer> subconsumers) {
   llvm::StringSet<> seenFiles;
   for (const auto &subconsumer : subconsumers) {
-    if (subconsumer.bufferName.empty()) {
+    if (subconsumer.getInputFileName().empty()) {
       // We can handle multiple subconsumers that aren't associated with any
       // file, because they only collect diagnostics that aren't in any of the
       // special files. This isn't an important use case to support, but also
@@ -46,11 +46,22 @@ static bool hasDuplicateFileNames(
       continue;
     }
 
-    bool isUnique = seenFiles.insert(subconsumer.bufferName).second;
+    bool isUnique = seenFiles.insert(subconsumer.getInputFileName()).second;
     if (!isUnique)
       return true;
   }
   return false;
+}
+
+std::unique_ptr<DiagnosticConsumer> FileSpecificDiagnosticConsumer::
+consolidateSubconsumers(SmallVectorImpl<Subconsumer> &subconsumers) {
+  if (subconsumers.empty())
+    return nullptr;
+  if (subconsumers.size() == 1)
+    return std::move(subconsumers.front()).consumer;
+  // Cannot use return llvm::make_unique<FileSpecificDiagnosticConsumer>(subconsumers);
+  // because the constructor is private.
+  return std::unique_ptr<DiagnosticConsumer>(new FileSpecificDiagnosticConsumer(subconsumers));
 }
 
 FileSpecificDiagnosticConsumer::FileSpecificDiagnosticConsumer(
@@ -67,11 +78,11 @@ void FileSpecificDiagnosticConsumer::computeConsumersOrderedByRange(
   // Look up each file's source range and add it to the "map" (to be sorted).
   for (const unsigned subconsumerIndex: indices(Subconsumers)) {
     const Subconsumer &subconsumer = Subconsumers[subconsumerIndex];
-    if (subconsumer.bufferName.empty())
+    if (subconsumer.getInputFileName().empty())
       continue;
 
     Optional<unsigned> bufferID =
-        SM.getIDForBufferIdentifier(subconsumer.bufferName);
+        SM.getIDForBufferIdentifier(subconsumer.getInputFileName());
     assert(bufferID.hasValue() && "consumer registered for unknown file");
     CharSourceRange range = SM.getRangeForBuffer(bufferID.getValue());
     ConsumersOrderedByRange.emplace_back(
@@ -85,9 +96,7 @@ void FileSpecificDiagnosticConsumer::computeConsumersOrderedByRange(
   std::sort(ConsumersOrderedByRange.begin(), ConsumersOrderedByRange.end(),
             [](const ConsumerSpecificInformation &left,
                const ConsumerSpecificInformation &right) -> bool {
-              auto compare = std::less<const char *>();
-              return compare(getRawLoc(left.range.getEnd()).getPointer(),
-                             getRawLoc(right.range.getEnd()).getPointer());
+              return left < right;
             });
 
   // Check that the ranges are non-overlapping. If the files really are all
@@ -98,7 +107,7 @@ void FileSpecificDiagnosticConsumer::computeConsumersOrderedByRange(
                                 ConsumersOrderedByRange.end(),
                                 [](const ConsumerSpecificInformation &left,
                                    const ConsumerSpecificInformation &right) {
-                                  return left.range.overlaps(right.range);
+                                  return left.overlaps(right);
                                 }) &&
          "overlapping ranges despite having distinct files");
 }
@@ -122,10 +131,10 @@ FileSpecificDiagnosticConsumer::consumerSpecificInformationForLocation(
     // than trying to build a nonsensical map (and actually crashing since we
     // can't find buffers for the inputs).
     assert(!Subconsumers.empty());
-    if (!SM.getIDForBufferIdentifier(Subconsumers.begin()->bufferName)
+    if (!SM.getIDForBufferIdentifier(Subconsumers.begin()->getInputFileName())
              .hasValue()) {
       assert(llvm::none_of(Subconsumers, [&](const Subconsumer &subconsumer) {
-        return SM.getIDForBufferIdentifier(subconsumer.bufferName).hasValue();
+        return SM.getIDForBufferIdentifier(subconsumer.getInputFileName()).hasValue();
       }));
       return None;
     }
@@ -141,13 +150,11 @@ FileSpecificDiagnosticConsumer::consumerSpecificInformationForLocation(
       std::lower_bound(
           ConsumersOrderedByRange.begin(), ConsumersOrderedByRange.end(), loc,
           [](const ConsumerSpecificInformation &entry, SourceLoc loc) -> bool {
-            auto compare = std::less<const char *>();
-            return compare(getRawLoc(entry.range.getEnd()).getPointer(),
-                           getRawLoc(loc).getPointer());
+            return entry.endsAfter(loc);
           });
 
   if (possiblyContainingRangeIter != ConsumersOrderedByRange.end() &&
-      possiblyContainingRangeIter->range.contains(loc)) {
+      possiblyContainingRangeIter->contains(loc)) {
     return const_cast<ConsumerSpecificInformation *>(
         possiblyContainingRangeIter);
   }
@@ -191,7 +198,7 @@ bool FileSpecificDiagnosticConsumer::finishProcessing() {
   bool hadError = false;
   for (auto &subconsumer : Subconsumers)
     hadError |=
-        subconsumer.consumer && subconsumer.consumer->finishProcessing();
+        subconsumer.getConsumer() && subconsumer.getConsumer()->finishProcessing();
   return hadError;
 }
 
