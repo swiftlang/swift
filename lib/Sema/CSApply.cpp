@@ -8161,21 +8161,11 @@ bool ConstraintSystem::applySolutionFix(
 
     auto conformance = getMissingConformance(locator);
 
-    auto owner = solution.simplifyType(getType(locator->getAnchor()));
-    auto type = conformance.first;
-    auto protocolType =
-        conformance.second->getInterfaceType()->getRValueInstanceType();
+    auto *anchor = locator->getAnchor();
+    auto owner = solution.simplifyType(getType(anchor));
 
-    Optional<unsigned> atParameterPos;
-    if (auto *fnType = owner->getAs<AnyFunctionType>()) {
-      auto parameters = fnType->getParams();
-      for (auto index : indices(parameters)) {
-        if (parameters[index].getType()->isEqual(type)) {
-          atParameterPos = index;
-          break;
-        }
-      }
-    }
+    auto type = conformance.first;
+    auto protocolType = conformance.second->getDeclaredType();
 
     //  Find `ApplyExpr` based on a function expression attached to it.
     auto findApplyExpr = [](Expr *parent, Expr *fnExpr) -> ApplyExpr * {
@@ -8205,23 +8195,40 @@ bool ConstraintSystem::applySolutionFix(
       return arg;
     };
 
-    auto *anchor = locator->getAnchor();
     auto *applyExpr = findApplyExpr(expr, anchor);
-    // If this is a static, initializer or operator call,
-    // let's not try to diagnose it here, but refer to expression
-    // diagnostics.
-    if (applyExpr && (isa<BinaryExpr>(applyExpr) || isa<TypeExpr>(anchor)))
-      return false;
 
-    if (atParameterPos) {
+    Optional<unsigned> atParameterPos;
+    // Sometimes fix is recorded by type-checking sub-expression
+    // during normal diagnostics, in such case call expression
+    // is unavailable.
+    if (applyExpr) {
+      // If this is a static, initializer or operator call,
+      // let's not try to diagnose it here, but refer to expression
+      // diagnostics.
+      if (isa<BinaryExpr>(applyExpr) || isa<TypeExpr>(anchor))
+        return false;
+
+      if (auto *fnType = owner->getAs<AnyFunctionType>()) {
+        auto parameters = fnType->getParams();
+        for (auto index : indices(parameters)) {
+          if (parameters[index].getType()->isEqual(type)) {
+            atParameterPos = index;
+            break;
+          }
+        }
+      }
+    }
+
+    if (type->isExistentialType()) {
+      auto diagnostic = diag::protocol_does_not_conform_objc;
+      if (type->isObjCExistentialType())
+        diagnostic = diag::protocol_does_not_conform_static;
+
+      TC.diagnose(anchor->getLoc(), diagnostic, type, protocolType);
+    } else if (atParameterPos) {
       // Requirement comes from one of the parameter types,
       // let's try to point diagnostic to the argument expression.
-      // Although sometimes fix is recorded by type-checking
-      // sub-expression during normal diagnostics, in that case
-      // call expression is unavailable.
-      auto *argExpr =
-          applyExpr ? getArgumentAt(applyExpr, *atParameterPos) : anchor;
-
+      auto *argExpr = getArgumentAt(applyExpr, *atParameterPos);
       TC.diagnose(argExpr->getLoc(),
                   diag::cannot_convert_argument_value_protocol, type,
                   protocolType);
