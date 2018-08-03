@@ -193,7 +193,7 @@ public func tensorEndPointComputation() -> Int {
 public func argumentCrash() {
   for i : Int8 in 1...10 {  // expected-warning {{implicitly copied to the accelerator}}
     let x = Tensor(i)  // expected-note {{value used here}}
-    print(x+x)
+    _hostOp(x+x)
   }
 }
 
@@ -276,7 +276,7 @@ public func SR8191() {
   var i = 0
   repeat {
     let y = t + t // expected-warning {{value implicitly copied to the host}}
-    print(y)
+    _hostOp(y)
     i += 1
   } while i < 10
 }
@@ -332,7 +332,7 @@ public func SR8222_cond_br_TensorHandle_Bool() {
   repeat {
     let y = t + t
     // expected-warning @-1{{implicitly copied to the host}}
-    print(y)
+    _hostOp(y)
     i += 1
   } while i != Tensor<Int32>(10)
   // expected-warning @-1{{implicitly copied to the host}}
@@ -352,7 +352,7 @@ func SR8316_main() {
 }
 
 func readDataset() -> (images: Tensor<Float>, labels: Tensor<Int32>)? {
-    print("Reading the data.")
+    _hostOp("Reading the data.")
     return (Tensor<Float>(1.0), Tensor<Int32>(1))
 }
 

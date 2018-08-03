@@ -94,7 +94,7 @@ func testSendsInALoopWithNoResultTensor() {
   while count < maxCount {
     a = _addScalarTensorsWithShape(a, a)
     // One send.
-    print(a.toHost())
+    _hostOp(a.toHost())
     count += 1
   }
 

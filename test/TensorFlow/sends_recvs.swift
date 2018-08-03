@@ -174,7 +174,7 @@ public func testSendsInALoopWithNoResultTensor() {
   while count < maxCount {
     a += a
     // One send.
-    print(a.toHost())
+    _hostOp(a.toHost())
     count += 1
   }
 }
@@ -191,7 +191,7 @@ public func testCannotSendResource() {
   let iterator: ResourceHandle =
     #tfop("Iterator", shared_name: "foo", container: "bar")
 
-  print(iterator)
+  _hostOp(iterator)
   let _ = Tensor<Float>(1.0)
 }
 

@@ -95,20 +95,21 @@ public func testEnumWithPayload(_ x: EnumWithPayload, _ expectedVal: Float) {
   case .a(let x):
     val += 1.0
     val = _scalarTensorWithShape(val)
-    print(x)
+    _hostOp(x)
   case .b(let x):
-    print(x)
+    _hostOp(x)
     let tx = Tensor<Float>(x).toAccelerator(shape: [])
     val += tx
     val = _scalarTensorWithShape(val)
   case .c(let x, let y):
     val *= x.toAccelerator(shape: []) + y.toAccelerator(shape: [])
     val = _scalarTensorWithShape(val)
-    print(x, y)
+    _hostOp(x)
+    _hostOp(y)
   case .d(let f):
     val += 10.0
     val = _scalarTensorWithShape(val)
-    print(f)
+    _hostOp(f)
   }
   val += 0.0
   expectNearlyEqualWithScalarTensor(expectedVal, val)

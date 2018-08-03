@@ -15,7 +15,7 @@ import TensorFlow
 // because both Swift/TensorFlow use the same name "padding".)
 public func nonConstantAttribute(x: Tensor<Float>, padding: Padding) {
   // expected-error @+1 {{attribute 'padding' requires a constant argument}}
-  print(x.convolved2D(withFilter: Tensor<Float>(ones: [1, 3, 3, 1]),
+  _hostOp(x.convolved2D(withFilter: Tensor<Float>(ones: [1, 3, 3, 1]),
                       strides: (1, 1, 1, 1),
                       padding: padding))
 }

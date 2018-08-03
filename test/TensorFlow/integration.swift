@@ -9,10 +9,10 @@ public func testTensor(a: Tensor<Float>, b: Tensor<Float>) {
 
   x -= x  // expected-warning {{value implicitly copied to the host, use .toHost() to make transfer explicit}}
 
-  print(x) // expected-note {{value used here}}
+  _hostOp(x) // expected-note {{value used here}}
   var y = b.toAccelerator()
   y += y
-  print(y)
+  _hostOp(y)
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testTensor{{.*}}
@@ -48,7 +48,7 @@ public func testScalar(f: Float) { // expected-warning {{'f' implicitly copied t
           +
           Tensor<Float>(1.0)
   x += x
-  print(x)
+  _hostOp(x)
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testScalar{{.*}}
@@ -86,7 +86,7 @@ public func testExitBranch1(i: Int) {
   }
 
   x += x
-  print(x)
+  _hostOp(x)
 }
 
 // The tensor program should have no branch.
@@ -126,7 +126,7 @@ public func testExitBranch2(i: Int) {
   }
 
   x += x    // expected-warning {{value implicitly copied to the host}}
-  print(x)  // expected-note {{value used here}}
+  _hostOp(x)  // expected-note {{value used here}}
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testExitBranch2{{.*}}
@@ -156,7 +156,7 @@ public func test_bool_param(cond: Bool, // expected-warning {{'cond' implicitly 
     a -= b
   }
   a += b
-  print(a.toHost())
+  _hostOp(a.toHost())
 }
 
 
@@ -190,7 +190,7 @@ public func test_bool_param2(cond: Bool, // expected-warning {{'cond' implicitly
     a -= b
   }
   a += b
-  print(a.toHost())
+  _hostOp(a.toHost())
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}test_bool_param2{{.*}}
@@ -255,7 +255,7 @@ public func test_while1(maxCount: Int,  // expected-warning {{'maxCount' implici
     count += 1
   }
   a += b
-  print(a.toHost())
+  _hostOp(a.toHost())
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}test_while1{{.*}}
@@ -471,7 +471,7 @@ public struct NonInlineMethodExample {
 // to retain these if there is a host use, because they may be retaining the value!
 @inline(never)
 func noInlineUser(_ x: Tensor<Float>) {
-  print(x)
+  _hostOp(x)
 }
 
 public func testNoInlineUser() {
