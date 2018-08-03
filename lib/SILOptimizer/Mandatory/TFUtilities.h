@@ -316,10 +316,9 @@ GraphOperationInst *createConstTensor(Type elementType, SymbolicValue scalars,
                                       SILBuilder &B);
 
 /// Create a tf_tensor_to_i1 instruction with the given value as argument.
-GraphOperationInst *
-createTFInt1ToBuiltinInt1(SILValue value, SILBuilder &builder,
-                          SILLocation location,
-                          GraphFunctionDeviceInfo &deviceInfo);
+GraphOperationInst *createTensorToInt1Inst(SILValue value, SILBuilder &builder,
+                                           SILLocation location,
+                                           GraphFunctionDeviceInfo &deviceInfo);
 
 /// This struct provides a an efficient implementation of a predicate that
 /// determines whether a type is or contains a TensorHandle that will be

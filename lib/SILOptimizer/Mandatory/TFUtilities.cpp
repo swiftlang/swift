@@ -1640,9 +1640,9 @@ tf::createConstTensor(Type elementType, SymbolicValue scalars,
 }
 
 GraphOperationInst *
-tf::createTFInt1ToBuiltinInt1(SILValue value, SILBuilder &builder,
-                              SILLocation location,
-                              GraphFunctionDeviceInfo &deviceInfo) {
+tf::createTensorToInt1Inst(SILValue value, SILBuilder &builder,
+                           SILLocation location,
+                           GraphFunctionDeviceInfo &deviceInfo) {
   ASTContext &context = builder.getASTContext();
   SmallVector<GraphOperationAttribute, 1> attributes;
   deviceInfo.handleDevicePlacement(
