@@ -30,6 +30,7 @@
 
 namespace swift {
 class ApplyInst;
+class Operand;
 class SILInstruction;
 class SILModule;
 class SILNode;
@@ -83,9 +84,10 @@ public:
                              SmallVectorImpl<SymbolicValue> &results);
 
   /// Try to decode the specified apply of the _allocateUninitializedArray
-  /// function in the standard library.  This attempts to figure out what the
-  /// resulting elements will be.  This fills in the elements result and returns
-  /// true on success.
+  /// function in the standard library.  This attempts to figure out how the
+  /// resulting elements will be initialized.  This fills in the result with
+  /// a lists of operands used to pass element addresses for initialization,
+  /// and returns false on success.
   ///
   /// If arrayInsts is non-null and if decoding succeeds, this function adds
   /// all of the instructions relevant to the definition of this array into
@@ -93,8 +95,8 @@ public:
   ///
   static bool
   decodeAllocUninitializedArray(ApplyInst *apply, uint64_t numElements,
-                                SmallVectorImpl<SILValue> &elements,
-                                SmallPtrSet<SILInstruction *, 8> *arrayInsts);
+                                SmallVectorImpl<Operand*> &elementsAtInit,
+                                SmallPtrSet<SILInstruction*, 8> *arrayInsts);
 };
 
 } // end namespace tf
