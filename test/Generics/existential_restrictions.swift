@@ -17,7 +17,7 @@ func fAOE(_ t: AnyObject) { }
 func fT<T>(_ t: T) { }
 
 func testPassExistential(_ p: P, op: OP, opp: OP & P, cp: CP, sp: SP, any: Any, ao: AnyObject) {
-  fP(p) // expected-error{{cannot invoke 'fP' with an argument list of type '(P)'}} // expected-note{{expected an argument list of type '(T)'}}
+  fP(p) // expected-error{{using 'P' as a concrete type conforming to protocol 'P' is not supported}}
   fAO(p) // expected-error{{cannot invoke 'fAO' with an argument list of type '(P)'}} // expected-note{{expected an argument list of type '(T)'}}
   fAOE(p) // expected-error{{argument type 'P' does not conform to expected type 'AnyObject'}}
   fT(p)
@@ -31,14 +31,14 @@ func testPassExistential(_ p: P, op: OP, opp: OP & P, cp: CP, sp: SP, any: Any, 
   fAOE(cp)
   fT(cp)
 
-  fP(opp) // expected-error{{cannot invoke 'fP' with an argument list of type '(OP & P)'}} // expected-note{{expected an argument list of type '(T)'}}
-  fOP(opp) // expected-error{{cannot invoke 'fOP' with an argument list of type '(OP & P)'}} // expected-note{{expected an argument list of type '(T)'}}
+  fP(opp) // expected-error{{using 'OP & P' as a concrete type conforming to protocol 'P' is not supported}}
+  fOP(opp) // expected-error{{using 'OP & P' as a concrete type conforming to protocol 'OP' is not supported}}
   fAO(opp) // expected-error{{cannot invoke 'fAO' with an argument list of type '(OP & P)'}} // expected-note{{expected an argument list of type '(T)'}}
   fAOE(opp)
   fT(opp)
 
   fOP(sp)
-  fSP(sp) // expected-error{{cannot invoke 'fSP' with an argument list of type '(SP)'}} // expected-note{{expected an argument list of type '(T)'}}
+  fSP(sp) // expected-error{{'SP' cannot be used as a type conforming to protocol 'SP' because 'SP' has static requirements}}
   fAO(sp)
   fAOE(sp)
   fT(sp)
