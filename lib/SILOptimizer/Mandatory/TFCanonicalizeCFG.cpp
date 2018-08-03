@@ -649,7 +649,7 @@ SILBasicBlock *SingleExitLoopTransformer::createNewExitBlockWithDemux(
             SILType::getBuiltinIntegerType(1, context))});
     assert(condTensorInst->getNumResults() == 1);
 
-    GraphOperationInst *condValue = createTFInt1ToBuiltinInt1(
+    GraphOperationInst *condValue = createTensorToInt1Inst(
         condTensorInst->getResults()[0], builder, headerLocation, *deviceInfo);
     builder.createCondBranch(headerLocation, condValue->getResults()[0],
                              trueBlock, demuxBlock);
@@ -704,7 +704,7 @@ bool SingleExitLoopTransformer::transform() {
     builder.setInsertionPoint(newHeader);
     SILLocation headerLocation =
         getUserSourceLocation(header->getTerminator()->getDebugLocation());
-    GraphOperationInst *loopExitCond = createTFInt1ToBuiltinInt1(
+    GraphOperationInst *loopExitCond = createTensorToInt1Inst(
         newHeader->getArguments().back(), builder, headerLocation, *deviceInfo);
     builder.createCondBranch(headerLocation, loopExitCond->getResults()[0],
                              header, newExitBlock);
