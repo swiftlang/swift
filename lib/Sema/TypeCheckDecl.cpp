@@ -2754,8 +2754,6 @@ public:
       checkEnumRawValues(TC, ED);
     }
 
-    ED->getAllConformances();
-
     TC.checkDeclCircularity(ED);
     TC.ConformanceContexts.push_back(ED);
   }
@@ -2778,8 +2776,6 @@ public:
 
     AccessControlChecker::checkAccessControl(TC, SD);
     UsableFromInlineChecker::checkUsableFromInline(TC, SD);
-
-    SD->getAllConformances();
 
     TC.checkDeclCircularity(SD);
     TC.ConformanceContexts.push_back(SD);
@@ -3001,8 +2997,6 @@ public:
       }
 
     }
-
-    CD->getAllConformances();
 
     TC.checkDeclAttributes(CD);
 
@@ -3246,13 +3240,6 @@ public:
       ACC.checkGenericParamAccess(ED->getGenericParams(), ED,
                                   desiredAccessScope, access);
     }
-
-    // Trigger the creation of all of the conformances associated with this
-    // nominal type.
-    // FIXME: This is a hack to make sure that the type checker precomputes
-    // enough information for later passes that might query conformances.
-    if (auto nominal = ED->getAsNominalTypeOrNominalTypeExtensionContext())
-      (void)nominal->getAllConformances();
   }
 
   void visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
