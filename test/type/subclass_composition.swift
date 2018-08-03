@@ -407,7 +407,7 @@ func conformsTo<T1 : P2, T2 : Base<Int> & P2>(
   // expected-note@-2 {{expected an argument list of type '(T)'}}
 
   conformsToP1(p1)
-  // expected-error@-1 {{using 'P1' as a concrete type conforming to protocol 'P1' is not supported}}
+  // expected-error@-1 {{protocol type 'P1' cannot conform to 'P1' because only concrete types can conform to protocols}}
 
   // FIXME: Following diagnostics are not great because when
   // `conformsTo*` methods are re-typechecked, they loose information

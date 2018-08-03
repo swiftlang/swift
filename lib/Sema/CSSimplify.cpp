@@ -2779,7 +2779,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       auto typeRequirement = path.back();
       std::pair<Expr *, unsigned> reqLoc = {anchor, typeRequirement.getValue()};
       MissingConformances[reqLoc] = {type.getPointer(), protocol};
-      // Let's strip all of the uncessary information from locator,
+      // Let's strip all of the unnecessary information from locator,
       // diagnostics only care about anchor - to lookup type,
       // and what was the requirement# which is not satisfied.
       ConstraintLocatorBuilder requirement(getConstraintLocator(anchor));

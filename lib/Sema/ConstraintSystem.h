@@ -1009,7 +1009,7 @@ private:
   /// Argument labels fixed by the constraint solver.
   SmallVector<std::vector<Identifier>, 4> FixedArgLabels;
 
-  /// Conformances which solver "fixed" to exist to help with
+  /// Conformances which solver "fixed" to help with
   /// diagnosing problems related to generic requirements.
   llvm::SmallDenseMap<std::pair<Expr *, unsigned>,
                       std::pair<TypeBase *, ProtocolDecl *>>
