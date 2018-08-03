@@ -49,12 +49,13 @@ class CommandRunner(object):
         # FIXME: dump stderr at this point
         assert copy_proc.returncode == 0, "sftp fetch failed"
 
-    def run_remote(self, command):
-        remote_proc = self.open_remote(command)
+    def run_remote(self, command, remote_env={}):
+        env_strings = ['{0}={1}'.format(k,v) for k,v in remote_env.viewitems()]
+        remote_proc = self.open_remote(['/usr/bin/env'] + env_strings + command)
         (output, _) = remote_proc.communicate()
         if remote_proc.returncode:
-            # FIXME: We probably still want to fetch the output files, to see
-            # what went wrong.
+            # FIXME: We may still want to fetch the output files to see what
+            # went wrong.
             sys.exit(remote_proc.returncode)
         return output
 
@@ -100,6 +101,9 @@ def find_transfers(args, source_dir, dest_dir):
         result[arg] = os.path.join(dest_dir, relative_path)
     return result
 
+def collect_remote_env(local_env=os.environ, prefix='REMOTE_RUN_CHILD_'):
+    return dict((key[len(prefix):], value) for key, value in local_env.items() if key.startswith(prefix))
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--source-dir')
 parser.add_argument('--test-dir')
@@ -132,8 +136,10 @@ if args.test_dir:
 if upload_files:
     runner.send(upload_files)
 
+remote_env = collect_remote_env()
+
 translated_command = [upload_files.get(arg, download_files.get(arg, arg)) for arg in args.command]
-print(runner.run_remote(translated_command))
+print(runner.run_remote(translated_command, remote_env))
 
 if download_files:
     runner.fetch(download_files)
