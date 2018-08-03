@@ -2562,6 +2562,9 @@ ERROR(escaping_non_function_parameter,none,
 NOTE(escaping_optional_type_argument, none,
      "closure is already escaping in optional type argument", ())
 
+ERROR(non_ephemeral_non_pointer_type,none,
+      "@_nonEphemeral attribute currently only applies to pointer types", ())
+
 // NSManaged attribute
 ERROR(attr_NSManaged_not_instance_member,none,
       "@NSManaged only allowed on an instance property or method", ())

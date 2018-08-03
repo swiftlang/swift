@@ -2336,6 +2336,8 @@ static void printParameterFlags(ASTPrinter &printer, PrintOptions options,
     printer << "@autoclosure ";
   if (!options.excludeAttrKind(TAK_escaping) && flags.isEscaping())
     printer << "@escaping ";
+  if (!options.excludeAttrKind(TAK_nonEphemeral) && flags.isNonEphemeral())
+    printer << "@_nonEphemeral ";
 
   switch (flags.getValueOwnership()) {
   case ValueOwnership::Default:

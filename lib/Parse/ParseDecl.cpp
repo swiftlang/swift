@@ -4042,6 +4042,7 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
                                      P->CurDeclContext);
         accessorParam->setVariadic(storageParam->isVariadic());
         accessorParam->setAutoClosure(storageParam->isAutoClosure());
+        accessorParam->setNonEphemeral(storageParam->isNonEphemeral());
 
         // The cloned parameter is implicit.
         accessorParam->setImplicit();

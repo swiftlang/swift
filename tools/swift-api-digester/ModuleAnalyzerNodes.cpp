@@ -590,7 +590,7 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
                        std::back_inserter(Info.TypeAttrs),
           [&](llvm::yaml::Node &N) {
             auto Result = llvm::StringSwitch<TypeAttrKind>(GetScalarString(&N))
-  #define TYPE_ATTR(X) .Case(#X, TypeAttrKind::TAK_##X)
+  #define TYPE_ATTR_WITH_NAME(Name, ...) .Case(#Name, TypeAttrKind::TAK_##Name)
   #include "swift/AST/Attr.def"
             .Default(TypeAttrKind::TAK_Count);
             if (Result == TAK_Count)
@@ -1671,7 +1671,7 @@ namespace json {
 template<>
 struct ScalarEnumerationTraits<TypeAttrKind> {
   static void enumeration(Output &out, TypeAttrKind &value) {
-#define TYPE_ATTR(X) out.enumCase(value, #X, TypeAttrKind::TAK_##X);
+#define TYPE_ATTR_WITH_NAME(Name, ...) out.enumCase(value, #Name, TypeAttrKind::TAK_##Name);
 #include "swift/AST/Attr.def"
   }
 };

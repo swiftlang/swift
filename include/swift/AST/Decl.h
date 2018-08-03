@@ -4855,11 +4855,15 @@ class ParamDecl : public VarDecl {
     StringRef StringRepresentation;
   };
 
-  /// The default value, if any, along with whether this is varargs.
-  llvm::PointerIntPair<StoredDefaultArgument *, 1> DefaultValueAndIsVariadic;
+  enum class Flags {
+    IsVariadic     = 1 << 0,
+    IsAutoClosure  = 1 << 1,
+    IsNonEphemeral = 1 << 2,
+  };
 
-  /// `@autoclosure` flag associated with this parameter.
-  bool IsAutoClosure = false;
+  /// The default value, if any, along with flags.
+  llvm::PointerIntPair<StoredDefaultArgument *, 3, OptionSet<Flags>>
+      DefaultValueAndFlags;
 
 public:
   ParamDecl(VarDecl::Specifier specifier,
@@ -4900,7 +4904,7 @@ public:
   }
   
   Expr *getDefaultValue() const {
-    if (auto stored = DefaultValueAndIsVariadic.getPointer())
+    if (auto stored = DefaultValueAndFlags.getPointer())
       return stored->DefaultArg;
     return nullptr;
   }
@@ -4908,7 +4912,7 @@ public:
   void setDefaultValue(Expr *E);
 
   Initializer *getDefaultArgumentInitContext() const {
-    if (auto stored = DefaultValueAndIsVariadic.getPointer())
+    if (auto stored = DefaultValueAndFlags.getPointer())
       return stored->InitContext;
     return nullptr;
   }
@@ -4942,12 +4946,33 @@ public:
   void setDefaultValueStringRepresentation(StringRef stringRepresentation);
 
   /// Whether or not this parameter is varargs.
-  bool isVariadic() const { return DefaultValueAndIsVariadic.getInt(); }
-  void setVariadic(bool value = true) {DefaultValueAndIsVariadic.setInt(value);}
+  bool isVariadic() const {
+    return DefaultValueAndFlags.getInt().contains(Flags::IsVariadic);
+  }
+  void setVariadic(bool value = true) {
+    auto flags = DefaultValueAndFlags.getInt();
+    DefaultValueAndFlags.setInt(value ? flags | Flags::IsVariadic
+                                      : flags - Flags::IsVariadic);
+  }
 
   /// Whether or not this parameter is marked with `@autoclosure`.
-  bool isAutoClosure() const { return IsAutoClosure; }
-  void setAutoClosure(bool value = true) { IsAutoClosure = value; }
+  bool isAutoClosure() const {
+    return DefaultValueAndFlags.getInt().contains(Flags::IsAutoClosure);
+  }
+  void setAutoClosure(bool value = true) {
+    auto flags = DefaultValueAndFlags.getInt();
+    DefaultValueAndFlags.setInt(value ? flags | Flags::IsAutoClosure
+                                      : flags - Flags::IsAutoClosure);
+  }
+
+  bool isNonEphemeral() const {
+    return DefaultValueAndFlags.getInt().contains(Flags::IsNonEphemeral);
+  }
+  void setNonEphemeral(bool value = true) {
+    auto flags = DefaultValueAndFlags.getInt();
+    DefaultValueAndFlags.setInt(value ? flags | Flags::IsNonEphemeral
+                                      : flags - Flags::IsNonEphemeral);
+  }
 
   /// Remove the type of this varargs element designator, without the array
   /// type wrapping it.  A parameter like "Int..." will have formal parameter

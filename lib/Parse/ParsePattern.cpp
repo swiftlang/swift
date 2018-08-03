@@ -484,12 +484,13 @@ mapParsedParameters(Parser &parser,
       }
       param->getTypeLoc() = TypeLoc(type);
 
-      // If there is `@autoclosure` attribute associated with the type
-      // let's mark that in the declaration as well, because it
+      // If there is an `@autoclosure` or `@_nonEphemeral` attribute associated
+      // with the type let's mark that in the declaration as well, because it
       // belongs to both type flags and declaration.
       if (auto *ATR = dyn_cast<AttributedTypeRepr>(type)) {
         auto &attrs = ATR->getAttrs();
         param->setAutoClosure(attrs.has(TypeAttrKind::TAK_autoclosure));
+        param->setNonEphemeral(attrs.has(TypeAttrKind::TAK_nonEphemeral));
       }
     } else if (paramContext != Parser::ParameterContextKind::Closure) {
       // Non-closure parameters require a type.

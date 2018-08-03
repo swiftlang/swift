@@ -273,3 +273,29 @@ class SILStored {
 @_invalid_attribute_ // expected-error {{unknown attribute '_invalid_attribute_'}}
 @inline(__always)
 public func sillyFunction() {}
+
+// @_nonEphemeral attribute
+struct S1<T> {
+  func foo(_ x: @_nonEphemeral String) {} // expected-error {{@_nonEphemeral attribute currently only applies to pointer types}}
+  func bar(_ x: @_nonEphemeral T) {} // expected-error {{@_nonEphemeral attribute currently only applies to pointer types}}
+
+  // FIXME(SR-9178): We shouldn't produce a duplicate diagnostic here.
+  func baz<U>(_ x: @_nonEphemeral U) {} // expected-error 2{{@_nonEphemeral attribute currently only applies to pointer types}}
+
+  func qux(_ x: @_nonEphemeral UnsafeMutableRawPointer) {}
+  func quux(_ x: @_nonEphemeral UnsafeMutablePointer<Int>?) {}
+}
+
+protocol P {}
+extension P {
+  // Allow @_nonEphemeral on the protocol Self type, as the protocol could be adopted by a pointer type.
+  func foo(_ x: @_nonEphemeral Self) {}
+  func bar(_ x: @_nonEphemeral Self?) {}
+}
+
+enum E1 {
+  case str(@_nonEphemeral String) // expected-error {{@_nonEphemeral attribute currently only applies to pointer types}}
+  case ptr(@_nonEphemeral UnsafeMutableRawPointer) // expected-error {{'_nonEphemeral' may only be used on parameters}}
+
+  func foo() -> @_nonEphemeral UnsafeMutableRawPointer? { return nil } // expected-error {{'_nonEphemeral' may only be used on parameters}}
+}

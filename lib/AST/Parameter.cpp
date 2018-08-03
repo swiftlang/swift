@@ -109,6 +109,7 @@ void ParameterList::getParams(
     auto flags = ParameterTypeFlags::fromParameterType(type,
                                                        P->isVariadic(),
                                                        P->isAutoClosure(),
+                                                       P->isNonEphemeral(),
                                                        P->getValueOwnership());
     params.emplace_back(type, label, flags);
   }

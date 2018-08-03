@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 466; // Last change: add isAutoClosure flag to param
+const uint16_t SWIFTMODULE_VERSION_MINOR = 467; // Last change: non ephemeral
 
 using DeclIDField = BCFixed<31>;
 
@@ -750,6 +750,7 @@ namespace decls_block {
     BCFixed<1>,         // vararg?
     BCFixed<1>,         // autoclosure?
     BCFixed<1>,         // escaping?
+    BCFixed<1>,         // non-ephemeral?
     ValueOwnershipField // inout, shared or owned?
   >;
 
@@ -1024,6 +1025,7 @@ namespace decls_block {
     TypeIDField,           // interface type
     BCFixed<1>,            // isVariadic?
     BCFixed<1>,            // isAutoClosure?
+    BCFixed<1>,            // isNonEphemeral?
     DefaultArgumentField,  // default argument kind
     BCBlob                 // default argument text
   >;

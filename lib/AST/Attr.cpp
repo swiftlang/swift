@@ -61,7 +61,7 @@ StringRef swift::getAccessLevelSpelling(AccessLevel value) {
 ///
 TypeAttrKind TypeAttributes::getAttrKindFromString(StringRef Str) {
   return llvm::StringSwitch<TypeAttrKind>(Str)
-#define TYPE_ATTR(X) .Case(#X, TAK_##X)
+#define TYPE_ATTR_WITH_NAME(Name, IdStr) .Case(IdStr, TAK_##Name)
 #include "swift/AST/Attr.def"
   .Default(TAK_Count);
 }
@@ -70,7 +70,7 @@ TypeAttrKind TypeAttributes::getAttrKindFromString(StringRef Str) {
 const char *TypeAttributes::getAttrName(TypeAttrKind kind) {
   switch (kind) {
   default: llvm_unreachable("Invalid attribute ID");
-#define TYPE_ATTR(X) case TAK_##X: return #X;
+#define TYPE_ATTR_WITH_NAME(Name, IdStr) case TAK_##Name: return IdStr;
 #include "swift/AST/Attr.def"
   }
 }
