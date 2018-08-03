@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -362,11 +362,35 @@ extension Decimal {
     }
     
     public init(_ value: UInt64) {
-        self.init(Double(value))
+        self = Decimal()
+        if value == 0 {
+            return
+        }
+
+        var compactValue = value
+        var exponent: Int32 = 0
+        while compactValue % 10 == 0 {
+            compactValue = compactValue / 10
+            exponent = exponent + 1
+        }
+        _isCompact = 1
+        _exponent = exponent
+
+        let wordCount = ((UInt64.bitWidth - compactValue.leadingZeroBitCount) + (UInt16.bitWidth - 1)) / UInt16.bitWidth
+        _length = UInt32(wordCount)
+        _mantissa.0 = UInt16(truncatingIfNeeded: compactValue >> 0)
+        _mantissa.1 = UInt16(truncatingIfNeeded: compactValue >> 16)
+        _mantissa.2 = UInt16(truncatingIfNeeded: compactValue >> 32)
+        _mantissa.3 = UInt16(truncatingIfNeeded: compactValue >> 48)
     }
     
     public init(_ value: Int64) {
-        self.init(Double(value))
+        if value < 0 {
+            self.init(value == Int64.min ? UInt64(Int64.max) + 1 : UInt64(abs(value)))
+            _isNegative = 1
+        } else {
+            self.init(UInt64(value))
+        }
     }
     
     public init(_ value: UInt) {
