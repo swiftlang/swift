@@ -373,6 +373,18 @@ void SingleExitLoopTransformer::initialize() {
   // All the exiting edges need to be rewired.
   loop->getExitEdges(edgesToFix);
   edgesToFix.emplace_back(latch, header);
+  // Split critical edges in edgesToFix before we do any transformations.
+  for (auto &edge : edgesToFix) {
+    SILBasicBlock *src = const_cast<SILBasicBlock *>(edge.first);
+    SILBasicBlock *tgt = const_cast<SILBasicBlock *>(edge.second);
+    SILBasicBlock *splitBlock = splitIfCriticalEdge(src, tgt, /*DT*/ nullptr, LI);
+    if (splitBlock != nullptr) {
+      // If the edge was critical then splitBlock would have been inserted
+      // between src and tgt as follows: src -> splitBlock -> tgt.  Therefore,
+      // update src as the new edge to patch would be splitBlock -> tgt.
+      edge.first = splitBlock;
+    }
+  }
 
   for (const SILBasicBlock *bb : loop->getBlocks()) {
     // Save the values that are escaping this loop in escapingValues set.
@@ -564,13 +576,6 @@ SingleExitLoopTransformer::patchEdges(SILBasicBlock *newHeader,
     SILBasicBlock *src = const_cast<SILBasicBlock *>(edge.first);
     SILBasicBlock *tgt = const_cast<SILBasicBlock *>(edge.second);
     SILBasicBlock *newTgt = latchBlock;
-    SILBasicBlock *splitBlock = splitIfCriticalEdge(src, tgt, /*DT*/ nullptr, LI);
-    if (splitBlock != nullptr) {
-      // If the edge was critical then splitBlock would have been inserted
-      // between src and tgt as follows: src -> splitBlock -> tgt.  Therefore,
-      // update src as the new edge to patch would be splitBlock -> tgt.
-      src = splitBlock;
-    }
     bool stayInLoop = loop->contains(tgt);
     replaceBranchTarget(src->getTerminator(), tgt, newTgt,
                         /*preserveArgs=*/stayInLoop);
