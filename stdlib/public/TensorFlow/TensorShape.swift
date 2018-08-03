@@ -147,7 +147,7 @@ extension TensorShape : Codable {
   }
 
   public init(from decoder: Decoder) throws {
-    var container = try decoder.singleValueContainer()
+    let container = try decoder.singleValueContainer()
     let dimensions = try container.decode([Int32].self)
     self.init(dimensions)
   }

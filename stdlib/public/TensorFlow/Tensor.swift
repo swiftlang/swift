@@ -886,7 +886,7 @@ extension Tensor : Codable where Scalar : Codable {
 
   @inlinable
   public init(from decoder: Decoder) throws {
-    var container = try decoder.singleValueContainer()
+    let container = try decoder.singleValueContainer()
     let array = try container.decode(ShapedArray<Scalar>.self)
     self.init(array)
   }
