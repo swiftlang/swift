@@ -469,6 +469,9 @@ static bool findNonMembers(TypeChecker &TC,
     }
 
     ValueDecl *D = Result.getValueDecl();
+    if (!isValid(D))
+      return false;
+
     if (!D->hasInterfaceType())
       TC.validateDecl(D);
 
@@ -477,9 +480,6 @@ static bool findNonMembers(TypeChecker &TC,
       AllDeclRefs = false;
       continue;
     }
-
-    if (!isValid(D))
-      return false;
 
     if (matchesDeclRefKind(D, refKind))
       ResultValues.push_back(D);
