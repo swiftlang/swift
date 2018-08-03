@@ -74,8 +74,7 @@ bool DerivedConformance::canDeriveParameterAggregate(TypeChecker &TC,
 }
 
 // Add @_fixed_layout attribute to type conforming to `ParameterAggregate`, if
-// necessary. @_fixed_layout is currently necessary for differentiation wrt
-// structs conforming to `ParameterAggregate` for resilience reasons.
+// necessary.
 void addFixedLayoutAttrIfNeeded(TypeChecker &TC, NominalTypeDecl *nominal) {
   // If nominal already has @_fixed_layout, return.
   if (nominal->getAttrs().hasAttribute<FixedLayoutAttr>()) return;
@@ -85,7 +84,7 @@ void addFixedLayoutAttrIfNeeded(TypeChecker &TC, NominalTypeDecl *nominal) {
     return;
   // If nominal is internal, it should have the @usableFromInline attribute.
   if (access == AccessLevel::Internal &&
-      nominal->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
+      !nominal->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
     nominal->getAttrs().add(
       new (TC.Context) UsableFromInlineAttr(/*Implicit*/ true));
   }
