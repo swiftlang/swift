@@ -43,6 +43,14 @@ TFDumpDeabstractionDetails("tf-dump-deabstraction-details",
                            llvm::cl::init(false),
            llvm::cl::desc("Dump extra details about TensorFlow deabstraction"));
 
+// When this code path is enabled, it currently only works in some
+// scenarios. The comments around the relevant code below provide more context.
+static llvm::cl::opt<bool> TFPromoteGlobalVariables(
+    "tf-promote-global-variables", llvm::cl::init(false),
+    llvm::cl::desc(
+        "If enabled, promote global variables into SSA with a best "
+        "effort to minimize sends/recvs. This is a performance optimization."));
+
 template<typename...T, typename...U>
 static InFlightDiagnostic
 diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag, U &&...args) {
@@ -187,7 +195,7 @@ void TFDeabstraction::inlineCalls() {
   // produces for each entered statement?  Matching on __repl or whatever prefix
   // LLDB and the integrated REPL use is probably enough.
   //
-  if (fn.getName() == SWIFT_ENTRY_POINT_FUNCTION) {
+  if (TFPromoteGlobalVariables && fn.getName() == SWIFT_ENTRY_POINT_FUNCTION) {
     forciblyFlattened = [&]() -> bool {
       for (auto &bb : fn)
         for (auto &i : bb)
@@ -679,7 +687,7 @@ bool PromotableMemoryFinder::run(ArrayRef<SILInstruction*> tensorOps) {
   // If we're in the main function processing top level code, scan the function
   // to collect any global_addr instructions which provide address roots.  We
   // want to promote tensor-related globals and the values that feed into them.
-  if (fn.getName() == SWIFT_ENTRY_POINT_FUNCTION)
+  if (TFPromoteGlobalVariables && fn.getName() == SWIFT_ENTRY_POINT_FUNCTION)
     findMainFunctionGlobalAddressRootCandidates(addressRoots);
 
   if (addressRoots.empty())
