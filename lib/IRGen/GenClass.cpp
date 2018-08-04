@@ -316,11 +316,15 @@ namespace {
       // not using the concrete type information we have.
       const ClassLayout *abstractLayout = nullptr;
 
+      auto *classTI = &IGM.getTypeInfo(classType).as<ClassTypeInfo>();
+
       SILType selfType = getSelfType(theClass);
-      if (classType != selfType) {
-        auto &selfTI = IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
-        abstractLayout = &selfTI.getClassLayout(IGM, selfType);
-      }
+      auto *selfTI = &IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
+
+      // Only calculate an abstract layout if its different than the one
+      // being computed now.
+      if (classTI != selfTI)
+        abstractLayout = &selfTI->getClassLayout(IGM, selfType);
 
       // Collect fields from this class and add them to the layout as a chunk.
       addDirectFieldsFromClass(theClass, classType, abstractLayout);
@@ -406,17 +410,9 @@ void ClassTypeInfo::generateLayout(IRGenModule &IGM, SILType classType) const {
   // Add the heap header.
   ClassLayoutBuilder builder(IGM, classType, Refcount);
 
-  // generateLayout can call itself recursively in order to compute a layout
-  // for the abstract type.  If classType shares an exemplar types with the
-  // abstract type, that will end up re-entrantly building the layout
-  // of the same ClassTypeInfo.  We don't have anything else to do in this
-  // case.
-  if (Layout) {
-    assert(this == &IGM.getTypeInfo(
-                     getSelfType(classType.getClassOrBoundGenericClass())));
-    return;
-  }
-  
+  // generateLayout should not call itself recursively.
+  assert(!Layout);
+
   // Set the body of the class type.
   auto classTy =
     cast<llvm::StructType>(getStorageType()->getPointerElementType());
