@@ -90,23 +90,17 @@ class LocalCommandRunner(CommandRunner):
             stderr=subprocess.PIPE)
 
 
-def find_transfers(args, source_dir, dest_dir):
-    if not source_dir.endswith(os.path.sep):
-        source_dir += os.path.sep
-    result = dict()
-    for arg in args:
-        if not arg.startswith(source_dir):
-            continue
-        relative_path = os.path.relpath(arg, source_dir)
-        result[arg] = os.path.join(dest_dir, relative_path)
-    return result
+def find_transfers(args, source_prefix, dest_prefix):
+    if source_prefix.endswith(os.path.sep):
+        source_prefix = source_prefix[:-len(os.path.sep)]
+    return dict((arg, dest_prefix + arg[len(source_prefix):]) for arg in args if arg.startswith(source_prefix))
 
 def collect_remote_env(local_env=os.environ, prefix='REMOTE_RUN_CHILD_'):
     return dict((key[len(prefix):], value) for key, value in local_env.items() if key.startswith(prefix))
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--source-dir')
-parser.add_argument('--test-dir')
+parser.add_argument('--input-prefix')
+parser.add_argument('--output-prefix')
 parser.add_argument('--remote-dir', required=True)
 parser.add_argument('--debug-as-local', action='store_true')
 parser.add_argument('host')
@@ -122,12 +116,12 @@ else:
 
 upload_files = dict()
 download_files = dict()
-if args.source_dir:
-    input_files = find_transfers(args.command, args.source_dir, os.path.join(args.remote_dir, 'inputs'))
+if args.input_prefix:
+    input_files = find_transfers(args.command, args.input_prefix, os.path.join(args.remote_dir, 'input'))
     assert not any(upload_files.has_key(f) for f in input_files)
     upload_files.update(input_files)
-if args.test_dir:
-    test_files = find_transfers(args.command, args.test_dir, os.path.join(args.remote_dir, 'inout'))
+if args.output_prefix:
+    test_files = find_transfers(args.command, args.output_prefix, os.path.join(args.remote_dir, 'output'))
     assert not any(upload_files.has_key(f) for f in test_files)
     upload_files.update(test_files)
     assert not any(download_files.has_key(f) for f in test_files)

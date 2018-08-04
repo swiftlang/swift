@@ -1,9 +1,9 @@
 RUN: %empty-directory(%t)
 RUN: %empty-directory(%t-REMOTE)
 RUN: touch %t/input %t/BAD
-RUN: %debug-remote-run --test-dir %t cp %t/input %t/output
+RUN: %debug-remote-run --output-prefix %t cp %t/input %t/output
 RUN: ls %t/ | %FileCheck %s
-RUN: ls %t-REMOTE/inout/ | %FileCheck -check-prefix CHECK-REMOTE %s
+RUN: ls %t-REMOTE/output/ | %FileCheck -check-prefix CHECK-REMOTE %s
 
 CHECK: BAD
 CHECK-NEXT: {{^input$}}
@@ -18,6 +18,18 @@ RUN: %empty-directory(%t)
 RUN: %empty-directory(%t/nested)
 RUN: %empty-directory(%t-REMOTE)
 RUN: touch %t/nested/input %t/nested/BAD
-RUN: %debug-remote-run --test-dir %t cp %t/nested/input %t/nested/output
+RUN: %debug-remote-run --output-prefix %t cp %t/nested/input %t/nested/output
 RUN: ls %t/nested/ | %FileCheck %s
-RUN: ls %t-REMOTE/inout/nested/ | %FileCheck -check-prefix CHECK-REMOTE %s
+RUN: ls %t-REMOTE/output/nested/ | %FileCheck -check-prefix CHECK-REMOTE %s
+
+RUN: %empty-directory(%t)
+RUN: touch %t/xyz-1before
+RUN: %debug-remote-run --output-prefix %t/xyz cp %t/xyz-1before %t/xyz-2after
+RUN: ls %t | %FileCheck -check-prefix CHECK-PREFIXED %s
+RUN: ls %t-REMOTE/ | %FileCheck -check-prefix CHECK-PREFIXED-REMOTE %s
+
+CHECK-PREFIXED: {{^xyz-1before$}}
+CHECK-PREFIXED: {{^xyz-2after$}}
+
+CHECK-PREFIXED-REMOTE: {{^output-1before$}}
+CHECK-PREFIXED-REMOTE: {{^output-2after$}}
