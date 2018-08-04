@@ -1118,15 +1118,20 @@ RValue SILGenFunction::emitRValueForStorageLoad(
   }
 
   // If the base is a reference type, just handle this as loading the lvalue.
+  ManagedValue result;
   if (baseFormalType->hasReferenceSemantics()) {
     LValue LV = emitPropertyLValue(loc, base, baseFormalType, field,
                                    LValueOptions(), AccessKind::Read,
                                    AccessSemantics::DirectToStorage);
-    return emitLoadOfLValue(loc, std::move(LV), C, isBaseGuaranteed);
-  }
-
-  ManagedValue result;
-  if (!base.getType().isAddress()) {
+    auto loaded = emitLoadOfLValue(loc, std::move(LV), C, isBaseGuaranteed);
+    // If we don't have to reabstract, the load is sufficient.
+    if (!hasAbstractionChange)
+      return loaded;
+    
+    // Otherwise, bring the component up to +1 so we can reabstract it.
+    result = std::move(loaded).getAsSingleValue(*this, loc)
+                              .copyUnmanaged(*this, loc);
+  } else if (!base.getType().isAddress()) {
     // For non-address-only structs, we emit a struct_extract sequence.
     result = B.createStructExtract(loc, base, field);
 
@@ -2361,7 +2366,7 @@ private:
     // If the field is not a let, bail. We need to use the lvalue logic.
     if (!Field->isLet())
       return None;
-
+    
     // If we are emitting a delegating init super and we have begun the
     // super.init call, since self has been exclusively borrowed, we need to be
     // conservative and use the lvalue machinery. This ensures that we properly
