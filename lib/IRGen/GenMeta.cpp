@@ -1838,8 +1838,6 @@ namespace {
   class FixedClassMemberBuilder {
     IRGenModule &IGM;
     ConstantStructBuilder &B;
-    const StructLayout &Layout;
-    const ClassLayout &FieldLayout;
     SILVTable *VTable;
 
   public:
@@ -1847,17 +1845,15 @@ namespace {
                             ConstantStructBuilder &builder,
                             const StructLayout &layout,
                             const ClassLayout &fieldLayout)
-      : IGM(IGM), B(builder), Layout(layout), FieldLayout(fieldLayout) {
+      : IGM(IGM), B(builder) {
       VTable = IGM.getSILModule().lookUpVTable(theClass);
     }
 
     void addFieldOffset(VarDecl *var) {
-      unsigned fieldIndex = FieldLayout.getFieldIndex(var);
-      auto &element = Layout.getElement(fieldIndex);
-      assert(element.getKind() == ElementLayout::Kind::Fixed ||
-             element.getKind() == ElementLayout::Kind::Empty);
-
-      B.addInt(IGM.SizeTy, element.getByteOffset().getValue());
+      SILType baseType = SILType::getPrimitiveObjectType(
+        var->getDeclContext()->getDeclaredTypeInContext()
+          ->getCanonicalType());
+      B.addInt(IGM.SizeTy, getClassFieldOffset(IGM, baseType, var).getValue());
     }
 
     void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {

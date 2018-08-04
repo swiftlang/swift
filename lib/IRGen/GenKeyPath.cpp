@@ -728,6 +728,27 @@ emitWitnessTableGeneratorForKeyPath(IRGenModule &IGM,
     });
 }
 
+static unsigned getClassFieldIndex(ClassDecl *classDecl, VarDecl *property) {
+  SmallVector<ClassDecl *, 3> superclasses;
+  for (auto *superDecl = classDecl; superDecl != nullptr;
+       superDecl = classDecl->getSuperclassDecl()) {
+    superclasses.push_back(superDecl);
+  }
+
+  std::reverse(superclasses.begin(), superclasses.end());
+
+  unsigned index = 0;
+  for (auto *superDecl : superclasses) {
+    for (auto *other : superDecl->getStoredProperties()) {
+      if (other == property)
+        return index;
+      index++;
+    }
+  }
+
+  llvm_unreachable("Did not find stored property in class");
+}
+
 static void
 emitKeyPathComponent(IRGenModule &IGM,
                      ConstantStructBuilder &fields,
@@ -984,7 +1005,7 @@ emitKeyPathComponent(IRGenModule &IGM,
         }
         assert(structIdx && "not a stored property of the struct?!");
         idValue = llvm::ConstantInt::get(IGM.SizeTy, structIdx.getValue());
-      } else if (baseTy->getClassOrBoundGenericClass()) {
+      } else if (auto *classDecl = baseTy->getClassOrBoundGenericClass()) {
         // TODO: This field index would require runtime resolution with Swift
         // native class resilience. We never directly access ObjC-imported
         // ivars so we can disregard ObjC ivar resilience for this computation
@@ -995,8 +1016,7 @@ emitKeyPathComponent(IRGenModule &IGM,
         case FieldAccess::NonConstantDirect:
           idResolved = true;
           idValue = llvm::ConstantInt::get(IGM.SizeTy,
-            getClassFieldIndex(IGM,
-                         SILType::getPrimitiveAddressType(baseTy), property));
+                                       getClassFieldIndex(classDecl, property));
           break;
         }
         
