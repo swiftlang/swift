@@ -73,6 +73,26 @@ bool DerivedConformance::canDeriveParameterAggregate(TypeChecker &TC,
   return bool(deriveParameterAggregate_Parameter(TC, nominal));
 }
 
+// Add @_fixed_layout attribute to type conforming to `ParameterAggregate`, if
+// necessary.
+void addFixedLayoutAttrIfNeeded(TypeChecker &TC, NominalTypeDecl *nominal) {
+  // If nominal already has @_fixed_layout, return.
+  if (nominal->getAttrs().hasAttribute<FixedLayoutAttr>()) return;
+  auto access = nominal->getEffectiveAccess();
+  // If nominal does not have at least internal access, return.
+  if (access < AccessLevel::Internal)
+    return;
+  // If nominal is internal, it should have the @usableFromInline attribute.
+  if (access == AccessLevel::Internal &&
+      !nominal->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
+    nominal->getAttrs().add(
+      new (TC.Context) UsableFromInlineAttr(/*Implicit*/ true));
+  }
+  // Add the @_fixed_layout attribute to the nominal.
+  nominal->getAttrs().add(
+    new (TC.Context) FixedLayoutAttr(/*Implicit*/ true));
+}
+
 static TypeAliasDecl *getParameterTypeAliasDecl(NominalTypeDecl *nominal) {
   auto &ctx = nominal->getASTContext();
   TypeAliasDecl *parameterDecl = nullptr;
@@ -241,8 +261,10 @@ static ValueDecl *deriveParameterAggregate_update(DerivedConformance &derived) {
 
 ValueDecl *
 DerivedConformance::deriveParameterAggregate(ValueDecl *requirement) {
-  if (requirement->getBaseName() == TC.Context.getIdentifier("update"))
+  if (requirement->getBaseName() == TC.Context.getIdentifier("update")) {
+    addFixedLayoutAttrIfNeeded(TC, Nominal);
     return deriveParameterAggregate_update(*this);
+  }
   TC.diagnose(requirement->getLoc(),
               diag::broken_parameter_aggregate_requirement);
   return nullptr;
@@ -250,8 +272,10 @@ DerivedConformance::deriveParameterAggregate(ValueDecl *requirement) {
 
 Type DerivedConformance::deriveParameterAggregate(
     AssociatedTypeDecl *requirement) {
-  if (requirement->getBaseName() == TC.Context.Id_Parameter)
+  if (requirement->getBaseName() == TC.Context.Id_Parameter) {
+    addFixedLayoutAttrIfNeeded(TC, Nominal);
     return deriveParameterAggregate_Parameter(TC, Nominal);
+  }
   TC.diagnose(requirement->getLoc(),
               diag::broken_parameter_aggregate_requirement);
   return nullptr;
