@@ -9156,3 +9156,125 @@ bool swift::diagnoseBaseUnwrapForMemberAccess(Expr *baseExpr, Type baseType,
   }
   return true;
 }
+
+FailureDiagnostic::~FailureDiagnostic() {}
+
+Type FailureDiagnostic::getType(Expr *expr) const {
+  auto &cs = getConstraintSystem();
+  return solution.simplifyType(cs.getType(expr));
+}
+
+Type RequirementFailure::getOwnerType() const {
+  return getType(getAnchor())->getRValueInstanceType();
+}
+
+const Requirement &RequirementFailure::getRequirement() {
+  auto *genericCtx = AffectedDecl->getAsGenericContext();
+  return genericCtx->getGenericRequirements()[getRequirementIndex()];
+}
+
+ValueDecl *RequirementFailure::getDeclRef() const {
+  auto &cs = getConstraintSystem();
+
+  auto *anchor = getAnchor();
+  auto *locator = cs.getConstraintLocator(anchor);
+  if (auto *AE = dyn_cast<CallExpr>(anchor)) {
+    assert(isa<TypeExpr>(AE->getFn()));
+    ConstraintLocatorBuilder ctor(locator);
+    locator = cs.getConstraintLocator(
+        ctor.withPathElement(PathEltKind::ApplyFunction)
+            .withPathElement(PathEltKind::ConstructorMember));
+  } else if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
+    ConstraintLocatorBuilder member(locator);
+    locator =
+        cs.getConstraintLocator(member.withPathElement(PathEltKind::Member));
+  }
+
+  auto overload = getOverloadChoiceIfAvailable(locator);
+  if (overload)
+    return overload->choice.getDecl();
+
+  auto ownerType = getOwnerType();
+  if (auto *NA = dyn_cast<NameAliasType>(ownerType.getPointer()))
+    return NA->getDecl();
+
+  return ownerType->getAnyGeneric();
+}
+
+bool MissingConformanceFailure::diagnose() {
+  auto *anchor = getAnchor();
+  auto ownerType = getOwnerType();
+  auto type = getNonConformingType();
+  auto protocolType = getProtocolType();
+
+  //  Find `ApplyExpr` based on a function expression attached to it.
+  auto findApplyExpr = [](Expr *parent, Expr *fnExpr) -> ApplyExpr * {
+    ApplyExpr *applyExpr = nullptr;
+    parent->forEachChildExpr([&applyExpr, &fnExpr](Expr *subExpr) -> Expr * {
+      auto *AE = dyn_cast<ApplyExpr>(subExpr);
+      if (!AE || AE->getFn() != fnExpr)
+        return subExpr;
+
+      applyExpr = AE;
+      return nullptr;
+    });
+    return applyExpr;
+  };
+
+  auto getArgumentAt = [](ApplyExpr *AE, unsigned index) -> Expr * {
+    assert(AE);
+
+    auto *arg = AE->getArg();
+    if (auto *TE = dyn_cast<TupleExpr>(arg))
+      return TE->getElement(index);
+
+    assert(index == 0);
+    if (auto *PE = dyn_cast<ParenExpr>(arg))
+      return PE->getSubExpr();
+
+    return arg;
+  };
+
+  auto *applyExpr = findApplyExpr(getParentExpr(), anchor);
+
+  Optional<unsigned> atParameterPos;
+  // Sometimes fix is recorded by type-checking sub-expression
+  // during normal diagnostics, in such case call expression
+  // is unavailable.
+  if (applyExpr) {
+    // If this is a static, initializer or operator call,
+    // let's not try to diagnose it here, but refer to expression
+    // diagnostics.
+    if (isa<BinaryExpr>(applyExpr) || isa<TypeExpr>(anchor))
+      return false;
+
+    if (auto *fnType = ownerType->getAs<AnyFunctionType>()) {
+      auto parameters = fnType->getParams();
+      for (auto index : indices(parameters)) {
+        if (parameters[index].getType()->isEqual(type)) {
+          atParameterPos = index;
+          break;
+        }
+      }
+    }
+  }
+
+  auto &TC = getConstraintSystem().TC;
+  if (type->isExistentialType()) {
+    auto diagnostic = diag::protocol_does_not_conform_objc;
+    if (type->isObjCExistentialType())
+      diagnostic = diag::protocol_does_not_conform_static;
+
+    TC.diagnose(anchor->getLoc(), diagnostic, type, protocolType);
+  } else if (atParameterPos) {
+    // Requirement comes from one of the parameter types,
+    // let's try to point diagnostic to the argument expression.
+    auto *argExpr = getArgumentAt(applyExpr, *atParameterPos);
+    TC.diagnose(argExpr->getLoc(), diag::cannot_convert_argument_value_protocol,
+                type, protocolType);
+  } else {
+    TC.diagnose(anchor->getLoc(), diag::type_does_not_conform_owner, ownerType,
+                type, protocolType);
+  }
+  return true;
+}

@@ -716,6 +716,108 @@ public:
   void dump(raw_ostream &OS) const LLVM_ATTRIBUTE_USED;
 };
 
+/// Base class for all of the possible diagnostics,
+/// provides most basic information such as location of
+/// the problem, parent expression and some utility methods.
+class FailureDiagnostic {
+  Expr *E;
+  const Solution &solution;
+  ConstraintLocator *Locator;
+
+public:
+  FailureDiagnostic(Expr *expr, const Solution &solution,
+                    ConstraintLocator *locator)
+      : E(expr), solution(solution), Locator(locator) {}
+
+  virtual ~FailureDiagnostic();
+
+  // Try to produce diagnostic based on the information contained
+  // in given expression and fix associated with it.
+  virtual bool diagnose() = 0;
+
+  ConstraintSystem &getConstraintSystem() const {
+    return solution.getConstraintSystem();
+  }
+
+  Expr *getParentExpr() const { return E; }
+
+  Expr *getAnchor() const { return Locator->getAnchor(); }
+
+  ConstraintLocator *getLocator() const { return Locator; }
+
+  Type getType(Expr *expr) const;
+
+protected:
+  Optional<SelectedOverload>
+  getOverloadChoiceIfAvailable(ConstraintLocator *locator) const {
+    return solution.getOverloadChoiceIfAvailable(locator);
+  }
+};
+
+/// Base class for all of the diagnostics related to generic requirement
+/// failures, provides common information like failed requirement,
+/// declaration where such requirement comes from, etc.
+class RequirementFailure : public FailureDiagnostic {
+  using PathEltKind = ConstraintLocator::PathElementKind;
+
+protected:
+  const ValueDecl *AffectedDecl;
+
+public:
+  RequirementFailure(Expr *expr, const Solution &solution,
+                     ConstraintLocator *locator)
+      : FailureDiagnostic(expr, solution, locator), AffectedDecl(getDeclRef()) {
+  }
+
+  unsigned getRequirementIndex() const {
+    auto path = getLocator()->getPath();
+    assert(!path.empty());
+
+    auto &requirementLoc = path.back();
+    assert(requirementLoc.getKind() == PathEltKind::TypeParameterRequirement);
+    return requirementLoc.getValue();
+  }
+
+  /// The generic base type where failing requirement comes from.
+  Type getOwnerType() const;
+
+  /// Generic requirement associated with the failure.
+  const Requirement &getRequirement();
+
+private:
+  /// Retrieve declaration associated with failing generic requirement.
+  ValueDecl *getDeclRef() const;
+};
+
+/// Diagnostics for failed conformance checks originating from
+/// generic requirements e.g.
+/// ```swift
+///   struct S {}
+///   func foo<T: Hashable>(_ t: T) {}
+///   foo(S())
+/// ```
+class MissingConformanceFailure final : public RequirementFailure {
+  Type NonConformingType;
+  ProtocolDecl *Protocol;
+
+public:
+  MissingConformanceFailure(Expr *expr, const Solution &solution,
+                            ConstraintLocator *locator,
+                            std::pair<TypeBase *, ProtocolDecl *> conformance)
+      : RequirementFailure(expr, solution, locator),
+        NonConformingType(conformance.first), Protocol(conformance.second) {}
+
+  bool diagnose() override;
+
+private:
+  /// The type which was expected, by one of the generic requirements,
+  /// to conform to associated protocol.
+  Type getNonConformingType() const { return NonConformingType; }
+
+  /// The protocol generic requirement expected associated type to conform to.
+  Type getProtocolType() const { return Protocol->getDeclaredType(); }
+};
+
 /// \brief Describes the differences between several solutions to the same
 /// constraint system.
 class SolutionDiff {
