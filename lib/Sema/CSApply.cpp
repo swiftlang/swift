@@ -6487,24 +6487,13 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                               toType->getCanonicalType() });
   if (knownRestriction != solution.ConstraintRestrictions.end()) {
     switch (knownRestriction->second) {
-    case ConversionRestrictionKind::TupleToTuple: {
-      auto fromTuple = fromType->castTo<TupleType>();
-      auto toTuple = toType->castTo<TupleType>();
-      SmallVector<int, 4> sources;
-      SmallVector<unsigned, 4> variadicArgs;
-      bool failed = computeTupleShuffle(fromTuple, toTuple,
-                                        sources, variadicArgs);
-      assert(!failed && "Couldn't convert tuple to tuple?");
-      (void)failed;
-      return coerceTupleToTuple(expr, fromTuple, toTuple, locator, sources,
-                                variadicArgs, typeFromPattern);
-    }
 
-    case ConversionRestrictionKind::ScalarToTuple: {
-      auto toTuple = toType->castTo<TupleType>();
-      return coerceScalarToTuple(expr, toTuple,
-                                 toTuple->getElementForScalarInit(), locator);
-    }
+    case ConversionRestrictionKind::TupleToTuple:
+    case ConversionRestrictionKind::ScalarToTuple:
+    case ConversionRestrictionKind::LValueToRValue:
+        // Restrictions that don't need to be recorded.
+        // Should match recordRestriction() in CSSimplify
+        break;
 
     case ConversionRestrictionKind::DeepEquality: {
       if (toType->hasUnresolvedType())
@@ -6548,21 +6537,12 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     case ConversionRestrictionKind::Superclass:
+    case ConversionRestrictionKind::ExistentialMetatypeToMetatype:
       return coerceSuperclass(expr, toType, locator);
-
-    case ConversionRestrictionKind::LValueToRValue: {
-      if (toType->is<TupleType>() || fromType->is<TupleType>())
-        break;
-
-      return coerceToType(addImplicitLoadExpr(cs, expr), toType, locator);
-    }
 
     case ConversionRestrictionKind::Existential:
     case ConversionRestrictionKind::MetatypeToExistentialMetatype:
       return coerceExistential(expr, toType, locator);
-
-    case ConversionRestrictionKind::ExistentialMetatypeToMetatype:
-      return coerceSuperclass(expr, toType, locator);
 
     case ConversionRestrictionKind::ClassMetatypeToAnyObject: {
       assert(tc.getLangOpts().EnableObjCInterop

@@ -4880,6 +4880,19 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   llvm_unreachable("bad conversion restriction");
 }
 
+// Restrictions where CSApply can figure out the correct action from the shape of
+// the types, rather than needing a record of the choice made.
+static bool recordRestriction(ConversionRestrictionKind restriction) {
+  switch(restriction) {
+    case ConversionRestrictionKind::TupleToTuple:
+    case ConversionRestrictionKind::ScalarToTuple:
+    case ConversionRestrictionKind::LValueToRValue:
+      return false;
+    default:
+      return true;
+  }
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyRestrictedConstraint(
                                        ConversionRestrictionKind restriction,
@@ -4890,8 +4903,8 @@ ConstraintSystem::simplifyRestrictedConstraint(
   switch (simplifyRestrictedConstraintImpl(restriction, type1, type2,
                                            matchKind, flags, locator)) {
   case SolutionKind::Solved:
-    ConstraintRestrictions.push_back(
-      std::make_tuple(type1, type2, restriction));
+    if (recordRestriction(restriction))
+      ConstraintRestrictions.push_back(std::make_tuple(type1, type2, restriction));
     return SolutionKind::Solved;
 
   case SolutionKind::Unsolved:
