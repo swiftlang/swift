@@ -9278,3 +9278,11 @@ bool MissingConformanceFailure::diagnose() {
   }
   return true;
 }
+
+bool LabelingFailure::diagnose() {
+  auto &cs = getConstraintSystem();
+  auto *call = cast<CallExpr>(getAnchor());
+  return diagnoseArgumentLabelError(cs.getASTContext(), call->getArg(),
+                                    CorrectLabels,
+                                    isa<SubscriptExpr>(call->getFn()));
+}

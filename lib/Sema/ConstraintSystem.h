@@ -818,6 +818,25 @@ private:
   Type getProtocolType() const { return Protocol->getDeclaredType(); }
 };
 
+/// Diagnose errors associated with missing, extraneous
+/// or incorrect labels supplied by arguments, e.g.
+/// ```swift
+///   func foo(q: String, _ a: Int) {}
+///   foo("ultimate quesiton", a: 42)
+/// ```
+/// Call to `foo` is going to be diagnosed as missing `q:`
+/// and having extraneous `a:` labels, with appropriate fix-its added.
+class LabelingFailure final : public FailureDiagnostic {
+  ArrayRef<Identifier> CorrectLabels;
+
+public:
+  LabelingFailure(const Solution &solution, ConstraintLocator *locator,
+                  ArrayRef<Identifier> labels)
+      : FailureDiagnostic(nullptr, solution, locator), CorrectLabels(labels) {}
+
+  bool diagnose() override;
+};
+
 /// \brief Describes the differences between several solutions to the same
 /// constraint system.
 class SolutionDiff {

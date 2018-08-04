@@ -8107,10 +8107,9 @@ bool ConstraintSystem::applySolutionFix(
   }
 
   case FixKind::RelabelArguments: {
-    auto *call = cast<CallExpr>(locator->getAnchor());
-    return diagnoseArgumentLabelError(getASTContext(), call->getArg(),
-                                      fix.first.getArgumentLabels(*this),
-                                      isa<SubscriptExpr>(call->getFn()));
+    LabelingFailure failure(solution, fix.second,
+                            fix.first.getArgumentLabels(*this));
+    return failure.diagnose();
   }
 
   case FixKind::AddConformance: {
