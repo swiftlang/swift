@@ -1586,7 +1586,7 @@ static std::unique_ptr<DiagnosticConsumer>
 createDispatchingDiagnosticConsumerIfNeeded(
     const FrontendInputsAndOutputs &inputsAndOutputs,
     llvm::function_ref<std::unique_ptr<DiagnosticConsumer>(const InputFile &)>
-      maybeCreateSingleConsumer) {
+      maybeCreateConsumerForDiagnosticsFrom) {
 
   // The "4" here is somewhat arbitrary. In practice we're going to have one
   // sub-consumer for each diagnostic file we're trying to output, which (again
@@ -1600,9 +1600,8 @@ createDispatchingDiagnosticConsumerIfNeeded(
 
   inputsAndOutputs.forEachInputProducingSupplementaryOutput(
       [&](const InputFile &input) -> bool {
-        if (auto subconsumer = maybeCreateSingleConsumer(input))
-          subconsumers.emplace_back(FileSpecificDiagnosticConsumer::Subconsumer(
-              input.file(), std::move(subconsumer)));
+        if (auto subconsumer = maybeCreateConsumerForDiagnosticsFrom(input))
+          subconsumers.emplace_back(input.file(), std::move(subconsumer));
         return false;
       });
   // For batch mode, the compiler must swallow diagnostics pertaining to

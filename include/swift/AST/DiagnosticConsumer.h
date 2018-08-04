@@ -183,7 +183,7 @@ public:
                           ArrayRef<DiagnosticArgument> FormatArgs,
                           const DiagnosticInfo &Info) {
       if (!getConsumer())
-        return; // Suppress non-primary diagnostic in batch mode.
+        return;
       hasAnErrorBeenConsumed |= Kind == DiagnosticKind::Error;
       getConsumer()->handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs,
                                       Info);
@@ -200,35 +200,33 @@ private:
   SmallVector<Subconsumer, 4> Subconsumers;
 
 public:
-  // The commented-out consts are there because the data does not change
-  // but the swap method gets called on this structure.
-  class ConsumerSpecificInformation {
+  class ConsumerAndRange {
   private:
     /// The range of SourceLoc's for which diagnostics should be directed to
     /// this subconsumer.
+    /// Should be const but then the sort won't compile.
     /*const*/ CharSourceRange range;
 
     /// Index into Subconsumers vector for this subconsumer.
+    /// Should be const but then the sort won't compile.
     /*const*/ unsigned subconsumerIndex;
-
+    
   public:
-    ConsumerSpecificInformation(const CharSourceRange range,
+    unsigned getSubconsumerIndex() const { return subconsumerIndex; }
+    
+    ConsumerAndRange(const CharSourceRange range,
                                 unsigned subconsumerIndex)
         : range(range), subconsumerIndex(subconsumerIndex) {}
 
-    Subconsumer &subconsumer(FileSpecificDiagnosticConsumer &c) const {
-      return c.Subconsumers[subconsumerIndex];
-    }
-
     /// Compare according to range:
-    bool operator<(const ConsumerSpecificInformation &right) const {
+    bool operator<(const ConsumerAndRange &right) const {
       auto compare = std::less<const char *>();
       return compare(getRawLoc(range.getEnd()).getPointer(),
                      getRawLoc(right.range.getEnd()).getPointer());
     }
 
     /// Overlaps by range:
-    bool overlaps(const ConsumerSpecificInformation &other) const {
+    bool overlaps(const ConsumerAndRange &other) const {
       return range.overlaps(other.range);
     }
 
@@ -238,11 +236,14 @@ public:
       return compare(getRawLoc(range.getEnd()).getPointer(),
                      getRawLoc(loc).getPointer());
     }
-
+ 
     bool contains(const SourceLoc loc) const { return range.contains(loc); }
   };
 
 private:
+  Subconsumer &operator[](const ConsumerAndRange& consumerAndRange) {
+    return Subconsumers[consumerAndRange.getSubconsumerIndex()];
+  }
   /// The consumers owned by this FileSpecificDiagnosticConsumer, sorted by
   /// the end locations of each file so that a lookup by position can be done
   /// using binary search.
@@ -251,8 +252,8 @@ private:
   /// This allows diagnostics to be emitted before files are actually opened,
   /// as long as they don't have source locations.
   ///
-  /// \see #consumerSpecificInformationForLocation
-  SmallVector<ConsumerSpecificInformation, 4> ConsumersOrderedByRange;
+  /// \see #consumerAndRangeForLocation
+  SmallVector<ConsumerAndRange, 4> ConsumersOrderedByRange;
 
   /// Indicates which consumer to send Note diagnostics too.
   ///
@@ -261,7 +262,7 @@ private:
   ///
   /// If None, Note diagnostics are sent to every consumer.
   /// If null, diagnostics are suppressed.
-  Optional<ConsumerSpecificInformation *>
+  Optional<ConsumerAndRange *>
       ConsumerSpecificInfoForSubsequentNotes = None;
 
   bool HasAnErrorBeenConsumed = false;
@@ -294,8 +295,8 @@ private:
   /// Returns nullptr if diagnostic is to be suppressed,
   /// None if diagnostic is to be distributed to every consumer,
   /// a particular consumer if diagnostic goes there.
-  Optional<ConsumerSpecificInformation *>
-  consumerSpecificInformationForLocation(SourceManager &SM,
+  Optional<ConsumerAndRange *>
+  consumerAndRangeForLocation(SourceManager &SM,
                                          SourceLoc loc) const;
 };
   

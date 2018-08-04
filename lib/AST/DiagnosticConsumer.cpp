@@ -89,18 +89,14 @@ void FileSpecificDiagnosticConsumer::computeConsumersOrderedByRange(
     assert(bufferID.hasValue() && "consumer registered for unknown file");
     CharSourceRange range = SM.getRangeForBuffer(bufferID.getValue());
     ConsumersOrderedByRange.emplace_back(
-        ConsumerSpecificInformation(range, subconsumerIndex));
+        ConsumerAndRange(range, subconsumerIndex));
   }
 
   // Sort the "map" by buffer /end/ location, for use with std::lower_bound
   // later. (Sorting by start location would produce the same sort, since the
   // ranges must not be overlapping, but since we need to check end locations
   // later it's consistent to sort by that here.)
-  std::sort(ConsumersOrderedByRange.begin(), ConsumersOrderedByRange.end(),
-            [](const ConsumerSpecificInformation &left,
-               const ConsumerSpecificInformation &right) -> bool {
-              return left < right;
-            });
+  std::sort(ConsumersOrderedByRange.begin(), ConsumersOrderedByRange.end());
 
   // Check that the ranges are non-overlapping. If the files really are all
   // distinct, this should be trivially true, but if it's ever not we might end
@@ -108,15 +104,15 @@ void FileSpecificDiagnosticConsumer::computeConsumersOrderedByRange(
   assert(ConsumersOrderedByRange.end() ==
              std::adjacent_find(ConsumersOrderedByRange.begin(),
                                 ConsumersOrderedByRange.end(),
-                                [](const ConsumerSpecificInformation &left,
-                                   const ConsumerSpecificInformation &right) {
+                                [](const ConsumerAndRange &left,
+                                   const ConsumerAndRange &right) {
                                   return left.overlaps(right);
                                 }) &&
          "overlapping ranges despite having distinct files");
 }
 
-Optional<FileSpecificDiagnosticConsumer::ConsumerSpecificInformation *>
-FileSpecificDiagnosticConsumer::consumerSpecificInformationForLocation(
+Optional<FileSpecificDiagnosticConsumer::ConsumerAndRange *>
+FileSpecificDiagnosticConsumer::consumerAndRangeForLocation(
     SourceManager &SM, SourceLoc loc) const {
   // Diagnostics with invalid locations always go to every consumer.
   if (loc.isInvalid())
@@ -150,16 +146,16 @@ FileSpecificDiagnosticConsumer::consumerSpecificInformationForLocation(
   // that /might/ contain 'loc'. Specifically, since the ranges are sorted
   // by end location, it's looking for the first range where the end location
   // is greater than or equal to 'loc'.
-  const ConsumerSpecificInformation *possiblyContainingRangeIter =
+  const ConsumerAndRange *possiblyContainingRangeIter =
       std::lower_bound(
           ConsumersOrderedByRange.begin(), ConsumersOrderedByRange.end(), loc,
-          [](const ConsumerSpecificInformation &entry, SourceLoc loc) -> bool {
+          [](const ConsumerAndRange &entry, SourceLoc loc) -> bool {
             return entry.endsAfter(loc);
           });
 
   if (possiblyContainingRangeIter != ConsumersOrderedByRange.end() &&
       possiblyContainingRangeIter->contains(loc)) {
-    return const_cast<ConsumerSpecificInformation *>(
+    return const_cast<ConsumerAndRange *>(
         possiblyContainingRangeIter);
   }
 
@@ -173,20 +169,20 @@ void FileSpecificDiagnosticConsumer::handleDiagnostic(
 
   HasAnErrorBeenConsumed |= Kind == DiagnosticKind::Error;
 
-  Optional<ConsumerSpecificInformation *> consumerSpecificInfo;
+  Optional<ConsumerAndRange *> consumerAndRange;
   switch (Kind) {
   case DiagnosticKind::Error:
   case DiagnosticKind::Warning:
   case DiagnosticKind::Remark:
-    consumerSpecificInfo = consumerSpecificInformationForLocation(SM, Loc);
-    ConsumerSpecificInfoForSubsequentNotes = consumerSpecificInfo;
+    consumerAndRange = consumerAndRangeForLocation(SM, Loc);
+    ConsumerSpecificInfoForSubsequentNotes = consumerAndRange;
     break;
   case DiagnosticKind::Note:
-    consumerSpecificInfo = ConsumerSpecificInfoForSubsequentNotes;
+    consumerAndRange = ConsumerSpecificInfoForSubsequentNotes;
     break;
   }
-  if (consumerSpecificInfo.hasValue()) {
-    consumerSpecificInfo.getValue()->subconsumer(*this).handleDiagnostic(SM,Loc, Kind, FormatString, FormatArgs, Info);
+  if (consumerAndRange.hasValue()) {
+    (*this)[*consumerAndRange.getValue()].handleDiagnostic(SM,Loc, Kind, FormatString, FormatArgs, Info);
     return;
   }
   for (auto &subconsumer : Subconsumers)
@@ -211,7 +207,7 @@ void FileSpecificDiagnosticConsumer::
   if (!HasAnErrorBeenConsumed)
     return;
   for (auto &info : ConsumersOrderedByRange)
-    info.subconsumer(*this).informDriverOfIncompleteBatchModeCompilation();
+    (*this)[info].informDriverOfIncompleteBatchModeCompilation();
 }
 
 void NullDiagnosticConsumer::handleDiagnostic(

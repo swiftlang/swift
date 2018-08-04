@@ -64,10 +64,8 @@ TEST(FileSpecificDiagnosticConsumer, SubconsumersFinishInOrder) {
       consumerA.get(), None);
 
   SmallVector<FileSpecificDiagnosticConsumer::Subconsumer, 2> consumers;
-  consumers.emplace_back(
-      FileSpecificDiagnosticConsumer::Subconsumer("A", std::move(consumerA)));
-  consumers.emplace_back(FileSpecificDiagnosticConsumer::Subconsumer(
-      "", std::move(consumerUnaffiliated)));
+  consumers.emplace_back("A", std::move(consumerA));
+  consumers.emplace_back("", std::move(consumerUnaffiliated));
 
   auto topConsumer =
       FileSpecificDiagnosticConsumer::consolidateSubconsumers(consumers);
@@ -86,10 +84,8 @@ TEST(FileSpecificDiagnosticConsumer, InvalidLocDiagsGoToEveryConsumer) {
       consumerA.get(), expected);
 
   SmallVector<FileSpecificDiagnosticConsumer::Subconsumer, 2> consumers;
-  consumers.emplace_back(
-      FileSpecificDiagnosticConsumer::Subconsumer("A", std::move(consumerA)));
-  consumers.emplace_back(FileSpecificDiagnosticConsumer::Subconsumer(
-      "", std::move(consumerUnaffiliated)));
+  consumers.emplace_back("A", std::move(consumerA));
+  consumers.emplace_back("", std::move(consumerUnaffiliated));
 
   auto topConsumer =
       FileSpecificDiagnosticConsumer::consolidateSubconsumers(consumers);
@@ -129,10 +125,8 @@ TEST(FileSpecificDiagnosticConsumer, ErrorsWithLocationsGoToExpectedConsumers) {
       consumerA.get(), expectedB);
 
   SmallVector<FileSpecificDiagnosticConsumer::Subconsumer, 2> consumers;
-  consumers.emplace_back(
-      FileSpecificDiagnosticConsumer::Subconsumer("A", std::move(consumerA)));
-  consumers.emplace_back(
-      FileSpecificDiagnosticConsumer::Subconsumer("B", std::move(consumerB)));
+  consumers.emplace_back("A", std::move(consumerA));
+  consumers.emplace_back("B", std::move(consumerB));
 
   auto topConsumer =
       FileSpecificDiagnosticConsumer::consolidateSubconsumers(consumers);
@@ -186,10 +180,8 @@ TEST(FileSpecificDiagnosticConsumer,
       consumerA.get(), expectedUnaffiliated);
 
   SmallVector<FileSpecificDiagnosticConsumer::Subconsumer, 2> consumers;
-  consumers.emplace_back(
-      FileSpecificDiagnosticConsumer::Subconsumer("A", std::move(consumerA)));
-  consumers.emplace_back(FileSpecificDiagnosticConsumer::Subconsumer(
-      "", std::move(consumerUnaffiliated)));
+  consumers.emplace_back("A", std::move(consumerA));
+  consumers.emplace_back("", std::move(consumerUnaffiliated));
 
   auto topConsumer =
       FileSpecificDiagnosticConsumer::consolidateSubconsumers(consumers);
@@ -234,10 +226,8 @@ TEST(FileSpecificDiagnosticConsumer, WarningsAndRemarksAreTreatedLikeErrors) {
       consumerA.get(), expectedUnaffiliated);
 
   SmallVector<FileSpecificDiagnosticConsumer::Subconsumer, 2> consumers;
-  consumers.emplace_back(
-      FileSpecificDiagnosticConsumer::Subconsumer("A", std::move(consumerA)));
-  consumers.emplace_back(FileSpecificDiagnosticConsumer::Subconsumer(
-      "", std::move(consumerUnaffiliated)));
+  consumers.emplace_back("A", std::move(consumerA));
+  consumers.emplace_back("", std::move(consumerUnaffiliated));
 
   auto topConsumer =
       FileSpecificDiagnosticConsumer::consolidateSubconsumers(consumers);
@@ -289,10 +279,8 @@ TEST(FileSpecificDiagnosticConsumer, NotesAreAttachedToErrors) {
       consumerA.get(), expectedUnaffiliated);
 
   SmallVector<FileSpecificDiagnosticConsumer::Subconsumer, 2> consumers;
-  consumers.emplace_back(
-      FileSpecificDiagnosticConsumer::Subconsumer("A", std::move(consumerA)));
-  consumers.emplace_back(FileSpecificDiagnosticConsumer::Subconsumer(
-      "", std::move(consumerUnaffiliated)));
+  consumers.emplace_back("A", std::move(consumerA));
+  consumers.emplace_back("", std::move(consumerUnaffiliated));
 
   auto topConsumer =
       FileSpecificDiagnosticConsumer::consolidateSubconsumers(consumers);
@@ -354,10 +342,8 @@ TEST(FileSpecificDiagnosticConsumer, NotesAreAttachedToWarningsAndRemarks) {
       consumerA.get(), expectedUnaffiliated);
 
   SmallVector<FileSpecificDiagnosticConsumer::Subconsumer, 2> consumers;
-  consumers.emplace_back(
-      FileSpecificDiagnosticConsumer::Subconsumer("A", std::move(consumerA)));
-  consumers.emplace_back(FileSpecificDiagnosticConsumer::Subconsumer(
-      "", std::move(consumerUnaffiliated)));
+  consumers.emplace_back("A", std::move(consumerA));
+  consumers.emplace_back("", std::move(consumerUnaffiliated));
 
   auto topConsumer =
       FileSpecificDiagnosticConsumer::consolidateSubconsumers(consumers);
@@ -416,10 +402,8 @@ TEST(FileSpecificDiagnosticConsumer, NotesAreAttachedToErrorsEvenAcrossFiles) {
       consumerA.get(), expectedB);
 
   SmallVector<FileSpecificDiagnosticConsumer::Subconsumer, 2> consumers;
-  consumers.emplace_back(
-      FileSpecificDiagnosticConsumer::Subconsumer("A", std::move(consumerA)));
-  consumers.emplace_back(
-      FileSpecificDiagnosticConsumer::Subconsumer("B", std::move(consumerB)));
+  consumers.emplace_back("A", std::move(consumerA));
+  consumers.emplace_back("B", std::move(consumerB));
 
   auto topConsumer =
       FileSpecificDiagnosticConsumer::consolidateSubconsumers(consumers);
@@ -482,10 +466,8 @@ TEST(FileSpecificDiagnosticConsumer,
       consumerA.get(), expectedUnaffiliated);
 
   SmallVector<FileSpecificDiagnosticConsumer::Subconsumer, 2> consumers;
-  consumers.emplace_back(
-      FileSpecificDiagnosticConsumer::Subconsumer("A", std::move(consumerA)));
-  consumers.emplace_back(FileSpecificDiagnosticConsumer::Subconsumer(
-      "", std::move(consumerUnaffiliated)));
+  consumers.emplace_back("A", std::move(consumerA));
+  consumers.emplace_back("", std::move(consumerUnaffiliated));
 
   auto topConsumer =
       FileSpecificDiagnosticConsumer::consolidateSubconsumers(consumers);
@@ -540,10 +522,8 @@ TEST(FileSpecificDiagnosticConsumer,
       consumerA.get(), expectedUnaffiliated);
 
   SmallVector<FileSpecificDiagnosticConsumer::Subconsumer, 2> consumers;
-  consumers.emplace_back(
-      FileSpecificDiagnosticConsumer::Subconsumer("A", std::move(consumerA)));
-  consumers.emplace_back(FileSpecificDiagnosticConsumer::Subconsumer(
-      "", std::move(consumerUnaffiliated)));
+  consumers.emplace_back("A", std::move(consumerA));
+  consumers.emplace_back("", std::move(consumerUnaffiliated));
 
   auto topConsumer =
       FileSpecificDiagnosticConsumer::consolidateSubconsumers(consumers);
