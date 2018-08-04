@@ -1512,8 +1512,8 @@ ERROR(use_of_equal_instead_of_equality,none,
 
 
 ERROR(protocol_does_not_conform_objc,none,
-      "using %0 as a concrete type conforming to protocol %1 is not supported",
-      (Type, Type))
+      "protocol type %0 cannot conform to %1 because only concrete "
+      "types can conform to protocols", (Type, Type))
 ERROR(protocol_does_not_conform_static,none,
       "%0 cannot be used as a type conforming to protocol %1 because %1 "
       "has static requirements",

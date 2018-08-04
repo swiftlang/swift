@@ -437,10 +437,10 @@ struct SelectedOverload {
 enum ScoreKind {
   // These values are used as indices into a Score value.
 
-  /// A reference to an @unavailable declaration.
-  SK_Unavailable,
   /// A fix needs to be applied to the source.
   SK_Fix,
+  /// A reference to an @unavailable declaration.
+  SK_Unavailable,
   /// An implicit force of an implicitly unwrapped optional value.
   SK_ForceUnchecked,
   /// A user-defined conversion.
@@ -1008,6 +1008,12 @@ private:
 
   /// Argument labels fixed by the constraint solver.
   SmallVector<std::vector<Identifier>, 4> FixedArgLabels;
+
+  /// Conformances which solver "fixed" to help with
+  /// diagnosing problems related to generic requirements.
+  llvm::SmallDenseMap<std::pair<Expr *, unsigned>,
+                      std::pair<TypeBase *, ProtocolDecl *>>
+      MissingConformances;
 
   /// \brief The set of remembered disjunction choices used to reach
   /// the current constraint system.
