@@ -146,17 +146,15 @@ FileSpecificDiagnosticConsumer::consumerAndRangeForLocation(
   // that /might/ contain 'loc'. Specifically, since the ranges are sorted
   // by end location, it's looking for the first range where the end location
   // is greater than or equal to 'loc'.
-  const ConsumerAndRange *possiblyContainingRangeIter =
-      std::lower_bound(
-          ConsumersOrderedByRange.begin(), ConsumersOrderedByRange.end(), loc,
-          [](const ConsumerAndRange &entry, SourceLoc loc) -> bool {
-            return entry.endsAfter(loc);
-          });
+  const ConsumerAndRange *possiblyContainingRangeIter = std::lower_bound(
+      ConsumersOrderedByRange.begin(), ConsumersOrderedByRange.end(), loc,
+      [](const ConsumerAndRange &entry, SourceLoc loc) -> bool {
+        return entry.endsAfter(loc);
+      });
 
   if (possiblyContainingRangeIter != ConsumersOrderedByRange.end() &&
       possiblyContainingRangeIter->contains(loc)) {
-    return const_cast<ConsumerAndRange *>(
-        possiblyContainingRangeIter);
+    return const_cast<ConsumerAndRange *>(possiblyContainingRangeIter);
   }
 
   return None;
@@ -182,7 +180,8 @@ void FileSpecificDiagnosticConsumer::handleDiagnostic(
     break;
   }
   if (consumerAndRange.hasValue()) {
-    (*this)[*consumerAndRange.getValue()].handleDiagnostic(SM,Loc, Kind, FormatString, FormatArgs, Info);
+    (*this)[*consumerAndRange.getValue()].handleDiagnostic(
+        SM, Loc, Kind, FormatString, FormatArgs, Info);
     return;
   }
   for (auto &subconsumer : Subconsumers)

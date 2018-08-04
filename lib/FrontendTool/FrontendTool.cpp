@@ -1586,7 +1586,7 @@ static std::unique_ptr<DiagnosticConsumer>
 createDispatchingDiagnosticConsumerIfNeeded(
     const FrontendInputsAndOutputs &inputsAndOutputs,
     llvm::function_ref<std::unique_ptr<DiagnosticConsumer>(const InputFile &)>
-      maybeCreateConsumerForDiagnosticsFrom) {
+        maybeCreateConsumerForDiagnosticsFrom) {
 
   // The "4" here is somewhat arbitrary. In practice we're going to have one
   // sub-consumer for each diagnostic file we're trying to output, which (again

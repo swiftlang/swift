@@ -210,12 +210,11 @@ public:
     /// Index into Subconsumers vector for this subconsumer.
     /// Should be const but then the sort won't compile.
     /*const*/ unsigned subconsumerIndex;
-    
+
   public:
     unsigned getSubconsumerIndex() const { return subconsumerIndex; }
-    
-    ConsumerAndRange(const CharSourceRange range,
-                                unsigned subconsumerIndex)
+
+    ConsumerAndRange(const CharSourceRange range, unsigned subconsumerIndex)
         : range(range), subconsumerIndex(subconsumerIndex) {}
 
     /// Compare according to range:
@@ -236,12 +235,12 @@ public:
       return compare(getRawLoc(range.getEnd()).getPointer(),
                      getRawLoc(loc).getPointer());
     }
- 
+
     bool contains(const SourceLoc loc) const { return range.contains(loc); }
   };
 
 private:
-  Subconsumer &operator[](const ConsumerAndRange& consumerAndRange) {
+  Subconsumer &operator[](const ConsumerAndRange &consumerAndRange) {
     return Subconsumers[consumerAndRange.getSubconsumerIndex()];
   }
   /// The consumers owned by this FileSpecificDiagnosticConsumer, sorted by
@@ -262,8 +261,7 @@ private:
   ///
   /// If None, Note diagnostics are sent to every consumer.
   /// If null, diagnostics are suppressed.
-  Optional<ConsumerAndRange *>
-      ConsumerSpecificInfoForSubsequentNotes = None;
+  Optional<ConsumerAndRange *> ConsumerSpecificInfoForSubsequentNotes = None;
 
   bool HasAnErrorBeenConsumed = false;
 
@@ -295,9 +293,8 @@ private:
   /// Returns nullptr if diagnostic is to be suppressed,
   /// None if diagnostic is to be distributed to every consumer,
   /// a particular consumer if diagnostic goes there.
-  Optional<ConsumerAndRange *>
-  consumerAndRangeForLocation(SourceManager &SM,
-                                         SourceLoc loc) const;
+  Optional<ConsumerAndRange *> consumerAndRangeForLocation(SourceManager &SM,
+                                                           SourceLoc loc) const;
 };
   
 } // end namespace swift
