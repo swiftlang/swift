@@ -357,3 +357,13 @@ extension Foo {
 // RDAR_41234606-DAG: Decl[AssociatedType]/Super:         .Element; name=Element
 // RDAR_41234606-DAG: Decl[AssociatedType]/Super:         .Iterator; name=Iterator
 // RDAR_41234606: End completions
+
+// rdar://problem/41071587
+// RUN: %target-swift-ide-test -code-completion -code-completion-token=RDAR_41071587 -source-filename=%s | %FileCheck %s -check-prefix=RDAR_41071587
+func test_41071587(x: Any) {
+  switch x {
+    case (let (_, _)) #^RDAR_41071587^#:
+      ()
+  }
+}
+// RDAR_41071587: Begin completions

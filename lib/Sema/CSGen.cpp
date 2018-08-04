@@ -177,6 +177,14 @@ namespace {
     
     /// \brief Ignore declarations.
     bool walkToDeclPre(Decl *decl) override { return false; }
+
+    /// \brief Ignore patterns.
+    std::pair<bool, Pattern*> walkToPatternPre(Pattern *pat) override {
+      return { false, pat };
+    }
+
+    /// \brief Ignore types.
+    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
   };
   
   /// Given a collection of "linked" expressions, analyzes them for
@@ -338,6 +346,14 @@ namespace {
     
     /// \brief Ignore declarations.
     bool walkToDeclPre(Decl *decl) override { return false; }
+
+    /// \brief Ignore patterns.
+    std::pair<bool, Pattern*> walkToPatternPre(Pattern *pat) override {
+      return { false, pat };
+    }
+
+    /// \brief Ignore types.
+    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
   };
   
   /// For a given expression, given information that is global to the
