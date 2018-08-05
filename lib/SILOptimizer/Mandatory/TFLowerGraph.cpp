@@ -837,20 +837,20 @@ static TF_Tensor *convertValuesToTensor(ArrayRef<SymbolicValue> elts,
   // the dtype and the shape.
   if (dtype != TF_STRING) {
     auto dtypeSize = TF_DataTypeSize(dtype);
-    
+
     // Compute the total memory size of the tensor value.
     unsigned totalElements = 1;
     for (auto dim : shape)
       totalElements *= dim;
-    
+
     // Make an uninitialized tensor that is big enough for our value.
     auto *tensor = TF_AllocateTensor(dtype, shape.data(), shape.size(),
                                      dtypeSize * totalElements);
-    
+
     // Set up its contents, element-wise.
     // FIXME: This will need a byte swap for big endian hosts.
     auto *ptr = (char *)TF_TensorData(tensor);
-    
+
     for (auto elt : elts) {
       switch (elt.getKind()) {
       case SymbolicValue::Integer: {
@@ -873,7 +873,6 @@ static TF_Tensor *convertValuesToTensor(ArrayRef<SymbolicValue> elts,
         memcpy(ptr, floatVal.bitcastToAPInt().getRawData(), dtypeSize);
         break;
       }
-        
       default:
         llvm_unreachable("Tensor element values can only be Integer or Float");
       }
@@ -882,7 +881,7 @@ static TF_Tensor *convertValuesToTensor(ArrayRef<SymbolicValue> elts,
 
     return tensor;
   }
-  
+
   // When dtype is string, strings are stored as varint encodings. The buffer
   // starts with uint64_t offsets for each string, followed by all strings'
   // encodings.

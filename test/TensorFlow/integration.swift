@@ -428,6 +428,12 @@ public func testStringHandle() {
   let _: StringTensorHandle = #tfop(
     "Substr", str, Tensor<Int32>(0), Tensor<Int32>(1)
   )
+  let _: StringTensorHandle = #tfop(
+    "Const", dtype:
+    String.self,
+    value$tensor: ["foo", "bar"],
+    value$shape: TensorShape(2)
+  )
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testStringHandle
@@ -435,6 +441,7 @@ public func testStringHandle() {
 // CHECK: [[POS:%.*]] = graph_op "Const"() {dtype: $Int32, value$tensor: i32 0, __device: "ALL_DEVICES"} : $TensorHandle<Int32>
 // CHECK: [[LEN:%.*]] = graph_op "Const"() {dtype: $Int32, value$tensor: i32 1, __device: "ALL_DEVICES"} : $TensorHandle<Int32>
 // CHECK: graph_op "Substr,i,i,i"([[STR]] : $StringTensorHandle, [[POS]] : $TensorHandle<Int32>, [[LEN]] : $TensorHandle<Int32>) {__device: "/device:CPU:0"} : $StringTensorHandle
+// CHECK: graph_op "Const"() {dtype: $String, value$tensor: [$String: "foo", "bar"], value$shape: [$Int32: (i32 2)], __device: "/device:CPU:0"} : $StringTensorHandle
 
 
 // b/76117368
