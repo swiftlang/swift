@@ -747,6 +747,9 @@ public:
 
   Type getType(Expr *expr) const;
 
+  template <typename... ArgTypes>
+  InFlightDiagnostic emitDiagnostic(ArgTypes &&... Args) const;
+
 protected:
   Optional<SelectedOverload>
   getOverloadChoiceIfAvailable(ConstraintLocator *locator) const {

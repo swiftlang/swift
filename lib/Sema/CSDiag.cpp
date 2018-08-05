@@ -9164,6 +9164,13 @@ Type FailureDiagnostic::getType(Expr *expr) const {
   return solution.simplifyType(cs.getType(expr));
 }
 
+template <typename... ArgTypes>
+InFlightDiagnostic
+FailureDiagnostic::emitDiagnostic(ArgTypes &&... Args) const {
+  auto &cs = getConstraintSystem();
+  return cs.TC.diagnose(std::forward<ArgTypes>(Args)...);
+}
+
 Type RequirementFailure::getOwnerType() const {
   return getType(getAnchor())->getRValueInstanceType();
 }
@@ -9259,22 +9266,22 @@ bool MissingConformanceFailure::diagnose() {
     }
   }
 
-  auto &TC = getConstraintSystem().TC;
   if (type->isExistentialType()) {
     auto diagnostic = diag::protocol_does_not_conform_objc;
     if (type->isObjCExistentialType())
       diagnostic = diag::protocol_does_not_conform_static;
 
-    TC.diagnose(anchor->getLoc(), diagnostic, type, protocolType);
+    emitDiagnostic(anchor->getLoc(), diagnostic, type, protocolType);
   } else if (atParameterPos) {
     // Requirement comes from one of the parameter types,
     // let's try to point diagnostic to the argument expression.
     auto *argExpr = getArgumentAt(applyExpr, *atParameterPos);
-    TC.diagnose(argExpr->getLoc(), diag::cannot_convert_argument_value_protocol,
-                type, protocolType);
+    emitDiagnostic(argExpr->getLoc(),
+                   diag::cannot_convert_argument_value_protocol, type,
+                   protocolType);
   } else {
-    TC.diagnose(anchor->getLoc(), diag::type_does_not_conform_owner, ownerType,
-                type, protocolType);
+    emitDiagnostic(anchor->getLoc(), diag::type_does_not_conform_owner,
+                   ownerType, type, protocolType);
   }
   return true;
 }
