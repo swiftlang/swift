@@ -2063,7 +2063,8 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
   
   // Recursively collect transitive captures from captured local functions.
   llvm::DenseSet<AnyFunctionRef> visitedFunctions;
-  llvm::SetVector<CapturedValue> captures;
+  llvm::DenseSet<ValueDecl*> capturedValues;
+  llvm::SmallVector<CapturedValue, 4> captures;
 
   // If there is a capture of 'self' with dynamic 'Self' type, it goes last so
   // that IRGen can pass dynamic 'Self' metadata.
@@ -2144,10 +2145,22 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
         }
         }
       }
-      
     capture_value:
       // Collect non-function captures.
-      captures.insert(capture);
+      ValueDecl *value = capture.getDecl();
+      if (capturedValues.count(value)) {
+        for (auto it = captures.begin(); it != captures.end(); ++it) {
+          if (it->getDecl() == value) {
+            // The value is already in the list, it needs to have the logical
+            // AND of each flag of all uses.
+            *it = CapturedValue(value, it->getFlags() & capture.getFlags());
+            break;
+          }
+        }
+      } else {
+        capturedValues.insert(value);
+        captures.push_back(capture);
+      }
     }
   };
   collectFunctionCaptures(fn);
@@ -2156,10 +2169,10 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
   // add it as the final capture. Otherwise, add a fake hidden capture for
   // the dynamic 'Self' metatype.
   if (selfCapture.hasValue()) {
-    captures.insert(*selfCapture);
+    captures.push_back(*selfCapture);
   } else if (capturesDynamicSelf) {
     selfCapture = CapturedValue::getDynamicSelfMetadata();
-    captures.insert(*selfCapture);
+    captures.push_back(*selfCapture);
   }
 
   // Cache the uniqued set of transitive captures.
