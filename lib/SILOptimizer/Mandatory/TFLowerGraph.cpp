@@ -769,6 +769,8 @@ TF_DataType TFGraphFunctionLowering::getTensorFlowDataType(SILType type,
     return TF_RESOURCE;
   case TFValueKind::VariantHandle:
     return TF_VARIANT;
+  case TFValueKind::StringTensorHandle:
+    return TF_STRING;
   case TFValueKind::Nope:
     // Otherwise this must be a scalar type we're promoting to a tensor.
     if (auto ty = (TF_DataType)convertSwiftTypeToTF(type.getASTType()))
@@ -819,31 +821,96 @@ convertValuesToTensorLegacy(ArrayRef<SingleValueInstruction *> elts,
   return tensor;
 }
 
-static TF_Tensor *convertValuesToTensor(ArrayRef<APInt> elts,
+/// A default deallocator function to pass in `TF_NewTensor`.
+static void tensorDataDeallocator(void *data, size_t len, void *arg) {
+  free(data);
+};
+
+/// Convert given elements to a tensor with the given shape and dtype.
+/// Tensor element values can only be Integer, Float or String, and must
+/// be consistent with the specified dtype.
+static TF_Tensor *convertValuesToTensor(ArrayRef<SymbolicValue> elts,
                                         ArrayRef<int64_t> shape,
                                         TF_DataType dtype) {
   assert(dtype != TF_DataType() && "Expected to get a type!");
-  auto dtypeSize = TF_DataTypeSize(dtype);
+  // If dtype is not string, we can directly compute the total alloc size from
+  // the dtype and the shape.
+  if (dtype != TF_STRING) {
+    auto dtypeSize = TF_DataTypeSize(dtype);
+    
+    // Compute the total memory size of the tensor value.
+    unsigned totalElements = 1;
+    for (auto dim : shape)
+      totalElements *= dim;
+    
+    // Make an uninitialized tensor that is big enough for our value.
+    auto *tensor = TF_AllocateTensor(dtype, shape.data(), shape.size(),
+                                     dtypeSize * totalElements);
+    
+    // Set up its contents, element-wise.
+    // FIXME: This will need a byte swap for big endian hosts.
+    auto *ptr = (char *)TF_TensorData(tensor);
+    
+    for (auto elt : elts) {
+      switch (elt.getKind()) {
+      case SymbolicValue::Integer: {
+        auto intVal = elt.getIntegerValue();
+        // Swift.Bool is represented as a 1-bit value, but TF_BOOL is 1 byte
+        // or more.
+        if (dtype == TF_BOOL)
+          intVal = intVal.zext(dtypeSize * 8);
+        assert(intVal.getBitWidth() == dtypeSize * 8);
+        memcpy(ptr, intVal.getRawData(), dtypeSize);
+        break;
+      }
+      case SymbolicValue::Float: {
+        auto floatVal = elt.getFloatValue();
+        bool losesInfo = false;
+        // Convert to float if necessary.
+        if (dtype == TF_FLOAT)
+          floatVal.convert(APFloat::IEEEsingle(),
+                           APFloat::rmNearestTiesToEven, &losesInfo);
+        memcpy(ptr, floatVal.bitcastToAPInt().getRawData(), dtypeSize);
+        break;
+      }
+        
+      default:
+        llvm_unreachable("Tensor element values can only be Integer or Float");
+      }
+      ptr += dtypeSize;
+    }
 
-  // Compute the total memory size of the tensor value.
-  unsigned totalElements = 1;
-  for (auto dim : shape)
-    totalElements *= dim;
-
-  // Make an uninitialized tensor that is big enough for our value.
-  auto *tensor = TF_AllocateTensor(dtype, shape.data(), shape.size(),
-                                   dtypeSize * totalElements);
-
-  // Set up its contents, element-wise.
-  // FIXME: This will need a byte swap for big endian hosts.
-  auto *ptr = (char *)TF_TensorData(tensor);
-
-  for (auto elt : elts) {
-    assert(elt.getBitWidth() == dtypeSize * 8);
-    memcpy(ptr, elt.getRawData(), dtypeSize);
-    ptr += dtypeSize;
+    return tensor;
   }
-
+  
+  // When dtype is string, strings are stored as varint encodings. The buffer
+  // starts with uint64_t offsets for each string, followed by all strings'
+  // encodings.
+  size_t offsetsSize = elts.size() * sizeof(uint64_t);
+  // Compute the total size.
+  size_t totalSize = offsetsSize;
+  for (auto elt : elts) {
+    auto string = elt.getStringValue();
+    totalSize += TF_StringEncodedSize(string.size());
+  }
+  // Allocate tensor.
+  void *baseAddr = malloc(totalSize);
+  auto *tensor = TF_NewTensor(dtype, shape.data(), shape.size(), baseAddr,
+                              totalSize, tensorDataDeallocator, nullptr);
+  auto *status = TF_NewStatus();
+  // Populate the buffer with strings and record each string's offset.
+  uint64_t *offsets = (uint64_t *)baseAddr;
+  char *dataStart = (char *)baseAddr + offsetsSize;
+  char *curData = dataStart;
+  for (unsigned i = 0, n = elts.size(); i < n; i++) {
+    auto string = elts[i].getStringValue();
+    auto encodingSize = TF_StringEncode(string.data(), string.size(), curData,
+                                        totalSize, status);
+    assert(TF_GetCode(status) == TF_OK);
+    offsets[i] = curData - dataStart;
+    curData += encodingSize;
+  }
+  TF_DeleteStatus(status);
   return tensor;
 }
 
@@ -2077,55 +2144,27 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
         llvm_unreachable("dtype attr must have been processed!");
       }
       auto dtype = (TF_DataType)dtypeAttr;
-      auto dtypeSize = TF_DataTypeSize(dtype);
 
       // Add a scalar to the elements list, checking that it is the right size
       // for our dtype, and adjusting for a couple of special cases we
       // intentionally support.
       auto addScalar = [&](SymbolicValue value,
-                           SmallVectorImpl<APInt> &elements) -> bool {
+                           SmallVectorImpl<SymbolicValue> &elements) -> bool {
         value = value.lookThroughSingleElementAggregates();
-
-        if (value.getKind() == SymbolicValue::Integer) {
-          auto intVal = value.getIntegerValue();
-
-          // Swift.Bool is represented as a 1-bit value, but TF_BOOL is 1 byte
-          // or more.
-          if (dtype == TF_BOOL)
-            intVal = intVal.zext(dtypeSize * 8);
-          elements.push_back(intVal);
-        } else {
-          assert(value.getKind() == SymbolicValue::Float);
-          auto floatValue = value.getFloatValue();
-          bool losesInfo = false;
-          // Convert to float if necessary.
-          if (dtype == TF_FLOAT)
-            floatValue.convert(APFloat::IEEEsingle(),
-                               APFloat::rmNearestTiesToEven, &losesInfo);
-          elements.push_back(floatValue.bitcastToAPInt());
-        }
-
-        // Sanity check that the user provided the right size types for this
-        // dtype.  This will produce an error if they attempt to use an array
-        // of int64's with TF_INT16 for example.
-        if (elements.back().getBitWidth() != dtypeSize * 8) {
-          internalError(inst->getLoc(),
-                        "invalid element type for tensor dtype");
-          return true;
-        }
-
+        elements.push_back(value);
         return false;
       };
 
       // Tensor can support two cases: an array case, and a scalar case.
-      SmallVector<APInt, 4> elements;
+      SmallVector<SymbolicValue, 4> elements;
 
       // The scalar case is very simple, the shape of a scalar is 0d, and the
       // data type comes from an attr that should already be processed.
       SmallVector<int64_t, 4> shape;
       attrValue = attrValue.lookThroughSingleElementAggregates();
       if (attrValue.getKind() == SymbolicValue::Integer ||
-          attrValue.getKind() == SymbolicValue::Float) {
+          attrValue.getKind() == SymbolicValue::Float ||
+          attrValue.getKind() == SymbolicValue::String) {
         if (addScalar(attrValue, elements))
           return GLStatus::Error;
       } else {

@@ -2067,7 +2067,8 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
       // FIXME: There needs to be a dtype attribute before this.
 
       if (constValue.getKind() == SymbolicValue::Integer ||
-          constValue.getKind() == SymbolicValue::Float)
+          constValue.getKind() == SymbolicValue::Float   ||
+          constValue.getKind() == SymbolicValue::String)
         break;
 
       if (constValue.getKind() != SymbolicValue::Array)
@@ -2109,7 +2110,14 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
               elt.getFloatValueSemantics() != firstElt.getFloatValueSemantics())
             return diagnoseInvalidAttr("array values must be the same type");
         }
-      } else {
+      } else if (firstElt.getKind() == SymbolicValue::String) {
+        for (auto elt : elements) {
+          elt = elt.lookThroughSingleElementAggregates();
+          if (elt.getKind() != SymbolicValue::String)
+            return diagnoseInvalidAttr("array values must be the same type");
+        }
+      }
+      else {
         return diagnoseInvalidAttr("requires a constant that is an integer,"
                                    " floating point, or array thereof");
       }

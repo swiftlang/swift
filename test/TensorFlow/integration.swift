@@ -417,8 +417,24 @@ public func testResourceAndVariants() {
 // CHECK:  [[VALUES:%.*]] = graph_op "Const"() {dtype: $Float, value$tensor: [$Float: (f32 0x3F800000 /* 1 */), (f32 0x40000000 /* 2 */),
 // CHECK:  [[DATASET:%.*]] = graph_op "TensorDataSet,i"([[VALUES]] : $TensorHandle<Float>
 // CHECK:  [[ITERATOR:%.*]] = graph_op "Iterator"()
-// CHECK:  graph_op "MakeIterator,i,i"([[DATASET]] : $VariantHandle, [[ITERATOR]] : $ResourceHandle) {{.*}} 
+// CHECK:  graph_op "MakeIterator,i,i"([[DATASET]] : $VariantHandle, [[ITERATOR]] : $ResourceHandle) {{.*}}
 // CHECK-LABEL: ----
+
+
+public func testStringHandle() {
+  let str: StringTensorHandle = #tfop(
+    "Const", dtype: String.self, value$tensor: "foo"
+  )
+  let _: StringTensorHandle = #tfop(
+    "Substr", str, Tensor<Int32>(0), Tensor<Int32>(1)
+  )
+}
+
+// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testStringHandle
+// CHECK: [[STR:%.*]] = graph_op "Const"() {dtype: $String, value$tensor: "foo", __device: "/device:CPU:0"} : $StringTensorHandle
+// CHECK: [[POS:%.*]] = graph_op "Const"() {dtype: $Int32, value$tensor: i32 0, __device: "ALL_DEVICES"} : $TensorHandle<Int32>
+// CHECK: [[LEN:%.*]] = graph_op "Const"() {dtype: $Int32, value$tensor: i32 1, __device: "ALL_DEVICES"} : $TensorHandle<Int32>
+// CHECK: graph_op "Substr,i,i,i"([[STR]] : $StringTensorHandle, [[POS]] : $TensorHandle<Int32>, [[LEN]] : $TensorHandle<Int32>) {__device: "/device:CPU:0"} : $StringTensorHandle
 
 
 // b/76117368

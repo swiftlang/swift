@@ -45,6 +45,8 @@ TFValueKind tf::classifyTensorFlowValue(Type ty) {
       return TFValueKind::ResourceHandle;
     if (name == "VariantHandle")
       return TFValueKind::VariantHandle;
+    if (name == "StringTensorHandle")
+      return TFValueKind::StringTensorHandle;
   }
 
   if (getTensorHandleElementType(ty))
