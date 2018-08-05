@@ -1181,6 +1181,21 @@ public extension Tensor {
       let slice: Tensor = Raw.slice(self, begin: startIndices, size: boundSizes)
       return slice.squeezingShape(at: 0)
     }
+    @inline(__always)
+    set {
+      let orig = self[index]
+      // FIXME: Currently there's no existing non-in-place slice updating
+      // operator in TensorFlow. But since most scalar types are numeric, we do
+      // a hack by using arithmetic operations. We need to find a proper
+      // solution soon.
+      let diff = Tensor(handle: #tfop("Sub", newValue, orig))
+      let scatteredDiff = Raw.scatterNd(
+        indices: Tensor<Int32>(shape: [1, 1], scalars: [index]),
+        updates: Tensor([diff]),
+        shape: shapeTensor
+      )
+      self = Tensor(handle: #tfop("Add", handle, scatteredDiff))
+    }
   }
 
   /// Access the subdimensional tensor at the specified list of indices.
