@@ -10,7 +10,7 @@ public func testDatasetWithFakeData() {
     batchSize: 1,
     outputShapes: [TensorShape()])
   let y = Tensor<Float>(handle: x) + 1
-  print(y.array.scalars[0])
+  _hostOp(y.array.scalars[0])
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testDatasetWithFakeData{{.*}}
@@ -32,8 +32,8 @@ public func testDatasetWithMNIST() {
   // Confirm we can add more nodes to the graph.
   let imagesMod = Tensor<Float>(handle: images) + 1
   let labelsMod = Tensor<Int32>(handle: labels) + 2
-  print(imagesMod.array.scalars[0])
-  print(labelsMod.array.scalars[0])
+  _hostOp(imagesMod.array.scalars[0])
+  _hostOp(labelsMod.array.scalars[0])
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testDatasetWithMNIST{{.*}}

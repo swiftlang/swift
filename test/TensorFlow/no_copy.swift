@@ -119,7 +119,7 @@ public func test75494462() {
     x += 1
     i += 1
   } while i < 5
-  _hostOp(x)
+  _hostOp(x.array)
 }
 
 public func paddingTuplesHoistable() {
@@ -191,7 +191,7 @@ public func mnist() {
   var classifier = Classifier()
   let loss = classifier.train(images: images, labels: labels,
                               learningRate: 0.3, epochCount: 100)
-  print(loss)
+  _hostOp(loss)
 }
 
 // A TF op that produces multiple outputs.

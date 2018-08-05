@@ -30,7 +30,7 @@ func expectNearlyEqual(_ outputTensor: CTensorHandle, _ expectedVal: Float) {
   TF_DeleteStatus(s)
   assert(TF_TensorByteSize(tensor) == MemoryLayout<Float>.stride)
   let actualValue = TF_TensorData(tensor).assumingMemoryBound(to: Float.self).pointee
-  print("The actual output float value is \(actualValue)")
+  _hostOp("The actual output float value is \(actualValue)")
   expectLT(abs(expectedVal - actualValue), 0.0001)
   TF_DeleteTensor(tensor)
 }

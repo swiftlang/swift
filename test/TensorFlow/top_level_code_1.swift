@@ -49,8 +49,8 @@ let y2 = y*y*y*y
 let a: Tensor<Float> = [1, 2, 3]
 let b: Tensor<Float> = [1, 2]
 
-print(x)
-print(y2)
+_hostOp(x)
+_hostOp(y2)
 
 
 // CHECK-LABEL: } // end sil function 'main'
