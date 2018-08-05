@@ -731,8 +731,12 @@ public:
 
   virtual ~FailureDiagnostic();
 
-  // Try to produce diagnostic based on the information contained
-  // in given expression and fix associated with it.
+  /// Try to diagnose a problem given affected expression,
+  /// failure location, types and declarations deduced by
+  /// constraint system, and other auxiliary information.
+  ///
+  /// \returns true If the problem has been successfully diagnosed
+  /// and diagnostic message emitted, false otherwise.
   virtual bool diagnose() = 0;
 
   ConstraintSystem &getConstraintSystem() const {
