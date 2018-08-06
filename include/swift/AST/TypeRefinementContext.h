@@ -233,7 +233,7 @@ public:
   SourceRange
   getAvailabilityConditionVersionSourceRange(
       PlatformKind Platform,
-      const clang::VersionTuple &Version) const;
+      const llvm::VersionTuple &Version) const;
 
   /// Returns the source range on which this context refines types.
   SourceRange getSourceRange() const { return SrcRange; }

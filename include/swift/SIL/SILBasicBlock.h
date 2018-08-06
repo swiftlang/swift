@@ -161,6 +161,36 @@ public:
   const_arg_iterator args_begin() const { return ArgumentList.begin(); }
   const_arg_iterator args_end() const { return ArgumentList.end(); }
 
+  /// Iterator over the PHI arguments of a basic block.
+  /// Defines an implicit cast operator on the iterator, so that this iterator
+  /// can be used in the SSAUpdaterImpl.
+  template <typename PHIArgT = SILPHIArgument,
+            typename IteratorT = arg_iterator>
+  class phi_iterator_impl {
+  private:
+    IteratorT It;
+
+  public:
+    explicit phi_iterator_impl(IteratorT A) : It(A) {}
+    phi_iterator_impl &operator++() { ++It; return *this; }
+
+    operator PHIArgT *() { return cast<PHIArgT>(*It); }
+    bool operator==(const phi_iterator_impl& x) const { return It == x.It; }
+    bool operator!=(const phi_iterator_impl& x) const { return !operator==(x); }
+  };
+  typedef phi_iterator_impl<> phi_iterator;
+  typedef phi_iterator_impl<const SILPHIArgument,
+                            SILBasicBlock::const_arg_iterator>
+      const_phi_iterator;
+
+  inline iterator_range<phi_iterator> phis() {
+    return make_range(phi_iterator(args_begin()), phi_iterator(args_end()));
+  }
+  inline iterator_range<const_phi_iterator> phis() const {
+    return make_range(const_phi_iterator(args_begin()),
+                      const_phi_iterator(args_end()));
+  }
+
   ArrayRef<SILArgument *> getArguments() const { return ArgumentList; }
   using PHIArgumentArrayRefTy =
       TransformArrayRef<SILPHIArgument *(*)(SILArgument *)>;
@@ -408,7 +438,7 @@ namespace llvm {
 
 template <>
 struct ilist_traits<::swift::SILBasicBlock>
-  : ilist_default_traits<::swift::SILBasicBlock> {
+  : ilist_node_traits<::swift::SILBasicBlock> {
   using SelfTy = ilist_traits<::swift::SILBasicBlock>;
   using SILBasicBlock = ::swift::SILBasicBlock;
   using SILFunction = ::swift::SILFunction;

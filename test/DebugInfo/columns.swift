@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s --check-prefixes CHECK,DWARF-CHECK
 // RUN: %target-swift-frontend %s -emit-ir -g -debug-info-format=codeview -o - \
-// RUN:   | %FileCheck %s --check-prefixes CHECK,CV-CHECK
+// RUN:   | %FileCheck %s --check-prefixes CHECK,CV-CHECK -allow-deprecated-dag-overlap
 
 public func foo(_ a: Int64, _ b: Int64) -> Int64 {      // line 5
   // CHECK: sdiv i64 {{.*}}, !dbg ![[DIV:[0-9]+]]

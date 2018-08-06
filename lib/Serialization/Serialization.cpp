@@ -47,6 +47,7 @@
 #include "llvm/Config/config.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/DJB.h"
 #include "llvm/Support/EndianStream.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -99,7 +100,8 @@ namespace {
       switch (key.getKind()) {
         case DeclBaseName::Kind::Normal:
           assert(!key.empty());
-          return llvm::HashString(key.getIdentifier().str());
+          // FIXME: DJB seed=0, audit whether the default seed could be used.
+          return llvm::djbHash(key.getIdentifier().str(), 0);
         case DeclBaseName::Kind::Subscript:
           return static_cast<uint8_t>(DeclNameKind::Subscript);
         case DeclBaseName::Kind::Constructor:
@@ -121,14 +123,14 @@ namespace {
       uint32_t dataLength = (sizeof(uint32_t) + 1) * data.size();
       assert(dataLength == static_cast<uint16_t>(dataLength));
 
-      endian::Writer<little> writer(out);
+      endian::Writer writer(out, little);
       writer.write<uint16_t>(keyLength);
       writer.write<uint16_t>(dataLength);
       return { keyLength, dataLength };
     }
 
     void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
-      endian::Writer<little> writer(out);
+      endian::Writer writer(out, little);
       switch (key.getKind()) {
       case DeclBaseName::Kind::Normal:
         writer.write<uint8_t>(static_cast<uint8_t>(DeclNameKind::Normal));
@@ -149,7 +151,7 @@ namespace {
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
       static_assert(declIDFitsIn32Bits(), "DeclID too large");
-      endian::Writer<little> writer(out);
+      endian::Writer writer(out, little);
       for (auto entry : data) {
         writer.write<uint8_t>(entry.first);
         writer.write<uint32_t>(entry.second);
@@ -174,7 +176,8 @@ namespace {
 
     hash_value_type ComputeHash(key_type_ref key) {
       assert(!key.empty());
-      return llvm::HashString(key.str());
+      // FIXME: DJB seed=0, audit whether the default seed could be used.
+      return llvm::djbHash(key.str(), 0);
     }
 
     int32_t getNameDataForBase(const NominalTypeDecl *nominal,
@@ -204,7 +207,7 @@ namespace {
           dataLength += nameData;
       }
       assert(dataLength == static_cast<uint16_t>(dataLength));
-      endian::Writer<little> writer(out);
+      endian::Writer writer(out, little);
       writer.write<uint16_t>(keyLength);
       writer.write<uint16_t>(dataLength);
       return { keyLength, dataLength };
@@ -217,7 +220,7 @@ namespace {
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
       static_assert(declIDFitsIn32Bits(), "DeclID too large");
-      endian::Writer<little> writer(out);
+      endian::Writer writer(out, little);
       for (auto entry : data) {
         StringRef dataToWrite;
         writer.write<uint32_t>(entry.second);
@@ -238,7 +241,8 @@ namespace {
 
     hash_value_type ComputeHash(key_type_ref key) {
       assert(!key.empty());
-      return llvm::HashString(key);
+      // FIXME: DJB seed=0, audit whether the default seed could be used.
+      return llvm::djbHash(key, 0);
     }
 
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
@@ -247,7 +251,7 @@ namespace {
       uint32_t keyLength = key.size();
       assert(keyLength == static_cast<uint16_t>(keyLength));
       uint32_t dataLength = sizeof(uint32_t);
-      endian::Writer<little> writer(out);
+      endian::Writer writer(out, little);
       writer.write<uint16_t>(keyLength);
       // No need to write the data length; it's constant.
       return { keyLength, dataLength };
@@ -260,7 +264,7 @@ namespace {
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
       static_assert(declIDFitsIn32Bits(), "DeclID too large");
-      endian::Writer<little> writer(out);
+      endian::Writer writer(out, little);
       writer.write<uint32_t>(data);
     }
   };
@@ -279,7 +283,8 @@ namespace {
 
     hash_value_type ComputeHash(key_type_ref key) {
       assert(!key.empty());
-      return llvm::HashString(key.str());
+      // FIXME: DJB seed=0, audit whether the default seed could be used.
+      return llvm::djbHash(key.str(), 0);
     }
 
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
@@ -289,7 +294,7 @@ namespace {
       assert(keyLength == static_cast<uint16_t>(keyLength));
       uint32_t dataLength = (sizeof(uint32_t) * 2) * data.size();
       assert(dataLength == static_cast<uint16_t>(dataLength));
-      endian::Writer<little> writer(out);
+      endian::Writer writer(out, little);
       writer.write<uint16_t>(keyLength);
       writer.write<uint16_t>(dataLength);
       return { keyLength, dataLength };
@@ -303,7 +308,7 @@ namespace {
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
       static_assert(declIDFitsIn32Bits(), "DeclID too large");
-      endian::Writer<little> writer(out);
+      endian::Writer writer(out, little);
       for (auto entry : data) {
         writer.write<uint32_t>(entry.first);
         writer.write<uint32_t>(entry.second);
@@ -324,7 +329,8 @@ namespace {
       switch (key.getKind()) {
       case DeclBaseName::Kind::Normal:
         assert(!key.empty());
-        return llvm::HashString(key.getIdentifier().str());
+        // FIXME: DJB seed=0, audit whether the default seed could be used.
+        return llvm::djbHash(key.getIdentifier().str(), 0);
       case DeclBaseName::Kind::Subscript:
         return static_cast<uint8_t>(DeclNameKind::Subscript);
       case DeclBaseName::Kind::Constructor:
@@ -343,14 +349,14 @@ namespace {
       }
       assert(keyLength == static_cast<uint16_t>(keyLength));
       uint32_t dataLength = sizeof(uint32_t);
-      endian::Writer<little> writer(out);
+      endian::Writer writer(out, little);
       writer.write<uint16_t>(keyLength);
       // No need to write dataLength, it's constant.
       return { keyLength, dataLength };
     }
 
     void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
-      endian::Writer<little> writer(out);
+      endian::Writer writer(out, little);
       switch (key.getKind()) {
       case DeclBaseName::Kind::Normal:
         writer.write<uint8_t>(static_cast<uint8_t>(DeclNameKind::Normal));
@@ -371,7 +377,7 @@ namespace {
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
       static_assert(bitOffsetFitsIn32Bits(), "BitOffset too large");
-      endian::Writer<little> writer(out);
+      endian::Writer writer(out, little);
       writer.write<uint32_t>(static_cast<uint32_t>(data));
     }
   };
@@ -396,7 +402,7 @@ namespace {
       // with the same DeclBaseName. Seems highly unlikely.
       assert((data.size() < (1 << 14)) && "Too many members");
       uint32_t dataLength = sizeof(uint32_t) * data.size(); // value DeclIDs
-      endian::Writer<little> writer(out);
+      endian::Writer writer(out, little);
       // No need to write the key length; it's constant.
       writer.write<uint16_t>(dataLength);
       return { sizeof(uint32_t), dataLength };
@@ -405,14 +411,14 @@ namespace {
     void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
       static_assert(declIDFitsIn32Bits(), "DeclID too large");
       assert(len == sizeof(uint32_t));
-      endian::Writer<little> writer(out);
+      endian::Writer writer(out, little);
       writer.write<uint32_t>(key);
     }
 
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
       static_assert(declIDFitsIn32Bits(), "DeclID too large");
-      endian::Writer<little> writer(out);
+      endian::Writer writer(out, little);
       for (auto entry : data) {
         writer.write<uint32_t>(entry);
       }
@@ -4195,7 +4201,7 @@ static void writeDeclTable(const index_block::DeclListLayout &DeclList,
 
     llvm::raw_svector_ostream blobStream(hashTableBlob);
     // Make sure that no bucket is at offset 0
-    endian::Writer<little>(blobStream).write<uint32_t>(0);
+    endian::write<uint32_t>(blobStream, 0, little);
     tableOffset = generator.Emit(blobStream);
   }
 
@@ -4221,7 +4227,7 @@ writeExtensionTable(const index_block::ExtensionTableLayout &ExtensionTable,
 
     llvm::raw_svector_ostream blobStream(hashTableBlob);
     // Make sure that no bucket is at offset 0
-    endian::Writer<little>(blobStream).write<uint32_t>(0);
+    endian::write<uint32_t>(blobStream, 0, little);
     tableOffset = generator.Emit(blobStream, info);
   }
 
@@ -4237,7 +4243,7 @@ static void writeLocalDeclTable(const index_block::DeclListLayout &DeclList,
   {
     llvm::raw_svector_ostream blobStream(hashTableBlob);
     // Make sure that no bucket is at offset 0
-    endian::Writer<little>(blobStream).write<uint32_t>(0);
+    endian::write<uint32_t>(blobStream, 0, little);
     tableOffset = generator.Emit(blobStream);
   }
 
@@ -4257,7 +4263,7 @@ writeNestedTypeDeclsTable(const index_block::NestedTypeDeclsLayout &declList,
 
     llvm::raw_svector_ostream blobStream(hashTableBlob);
     // Make sure that no bucket is at offset 0
-    endian::Writer<little>(blobStream).write<uint32_t>(0);
+    endian::write<uint32_t>(blobStream, 0, little);
     tableOffset = generator.Emit(blobStream);
   }
 
@@ -4282,7 +4288,7 @@ writeDeclMemberNamesTable(const index_block::DeclMemberNamesLayout &declNames,
 
     llvm::raw_svector_ostream blobStream(hashTableBlob);
     // Make sure that no bucket is at offset 0
-    endian::Writer<little>(blobStream).write<uint32_t>(0);
+    endian::write<uint32_t>(blobStream, 0, little);
     tableOffset = generator.Emit(blobStream);
   }
 
@@ -4302,7 +4308,7 @@ writeDeclMembersTable(const decl_member_tables_block::DeclMembersLayout &mems,
 
     llvm::raw_svector_ostream blobStream(hashTableBlob);
     // Make sure that no bucket is at offset 0
-    endian::Writer<little>(blobStream).write<uint32_t>(0);
+    endian::write<uint32_t>(blobStream, 0, little);
     tableOffset = generator.Emit(blobStream);
   }
 
@@ -4329,7 +4335,8 @@ public:
 
   hash_value_type ComputeHash(key_type_ref key) {
     assert(!key.empty());
-    return llvm::HashString(key);
+    // FIXME: DJB seed=0, audit whether the default seed could be used.
+    return llvm::djbHash(key, 0);
   }
 
   std::pair<unsigned, unsigned>
@@ -4351,7 +4358,7 @@ public:
 
     // Source order.
     dataLength += numLen;
-    endian::Writer<little> writer(out);
+    endian::Writer writer(out, little);
     writer.write<uint32_t>(keyLength);
     writer.write<uint32_t>(dataLength);
     return { keyLength, dataLength };
@@ -4363,7 +4370,7 @@ public:
 
   void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                 unsigned len) {
-    endian::Writer<little> writer(out);
+    endian::Writer writer(out, little);
     writer.write<uint32_t>(data.Brief.size());
     out << data.Brief;
     writer.write<uint32_t>(data.Raw.Comments.size());
@@ -4559,7 +4566,7 @@ static void writeGroupNames(const comment_block::GroupNamesLayout &GroupNames,
                             ArrayRef<StringRef> Names) {
   llvm::SmallString<32> Blob;
   llvm::raw_svector_ostream BlobStream(Blob);
-  endian::Writer<little> Writer(BlobStream);
+  endian::Writer Writer(BlobStream, little);
   Writer.write<uint32_t>(Names.size());
   for (auto N : Names) {
     Writer.write<uint32_t>(N.size());
@@ -4680,7 +4687,7 @@ static void writeDeclCommentTable(
   {
     llvm::raw_svector_ostream blobStream(hashTableBlob);
     // Make sure that no bucket is at offset 0
-    endian::Writer<little>(blobStream).write<uint32_t>(0);
+    endian::write<uint32_t>(blobStream, 0, little);
     tableOffset = Writer.generator.Emit(blobStream);
   }
 
@@ -4700,7 +4707,8 @@ namespace {
 
     hash_value_type ComputeHash(key_type_ref key) {
       llvm::SmallString<32> scratch;
-      return llvm::HashString(key.getString(scratch));
+      // FIXME: DJB seed=0, audit whether the default seed could be used.
+      return llvm::djbHash(key.getString(scratch), 0);
     }
 
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
@@ -4716,7 +4724,7 @@ namespace {
         dataLength += std::get<0>(entry).size();
       }
 
-      endian::Writer<little> writer(out);
+      endian::Writer writer(out, little);
       writer.write<uint16_t>(keyLength);
       writer.write<uint32_t>(dataLength);
       return { keyLength, dataLength };
@@ -4733,7 +4741,7 @@ namespace {
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
       static_assert(declIDFitsIn32Bits(), "DeclID too large");
-      endian::Writer<little> writer(out);
+      endian::Writer writer(out, little);
       for (const auto &entry : data) {
         writer.write<uint32_t>(std::get<0>(entry).size());
         writer.write<uint8_t>(std::get<1>(entry));
@@ -4766,7 +4774,7 @@ static void writeObjCMethodTable(const index_block::ObjCMethodTableLayout &out,
     }
 
     // Make sure that no bucket is at offset 0
-    endian::Writer<little>(blobStream).write<uint32_t>(0);
+    endian::write<uint32_t>(blobStream, 0, little);
     tableOffset = generator.Emit(blobStream);
   }
 

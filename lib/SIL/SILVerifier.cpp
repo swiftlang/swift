@@ -1217,9 +1217,6 @@ public:
     case llvm::Intrinsic::memmove:
     case llvm::Intrinsic::memset:
       require(!isa<SILArgument>(BI->getArguments()[3]),
-              "alignment argument of memory intrinsics must be an integer "
-              "literal");
-      require(!isa<SILArgument>(BI->getArguments()[4]),
               "isvolatile argument of memory intrinsics must be an integer "
               "literal");
       break;

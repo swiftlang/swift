@@ -1722,7 +1722,7 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
     if (isDefinition) {
       return std::make_tuple(llvm::GlobalValue::AvailableExternallyLinkage,
                              llvm::GlobalValue::DefaultVisibility,
-                             ExportedStorage);
+                             llvm::GlobalValue::DefaultStorageClass);
     }
 
     auto linkage = isWeakImported ? llvm::GlobalValue::ExternalWeakLinkage
@@ -1733,10 +1733,14 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
 
   case SILLinkage::HiddenExternal:
   case SILLinkage::PrivateExternal:
-    return std::make_tuple(isDefinition
-                               ? llvm::GlobalValue::AvailableExternallyLinkage
-                               : llvm::GlobalValue::ExternalLinkage,
-                           llvm::GlobalValue::HiddenVisibility,
+    if (isDefinition) {
+      return std::make_tuple(llvm::GlobalValue::AvailableExternallyLinkage,
+                             llvm::GlobalValue::HiddenVisibility,
+                             llvm::GlobalValue::DefaultStorageClass);
+    }
+
+    return std::make_tuple(llvm::GlobalValue::ExternalLinkage,
+                           llvm::GlobalValue::DefaultVisibility,
                            ImportedStorage);
 
   }

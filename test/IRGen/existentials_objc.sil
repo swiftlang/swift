@@ -45,7 +45,7 @@ bb0(%0 : $*Any, %1 : $*Any):
 // CHECK-DAG:   define linkonce_odr hidden %Any* @"$SypWOb"(%Any*, %Any*)
 // CHECK:       %2 = bitcast %Any* %1 to i8*
 // CHECK-NEXT:  %3 = bitcast %Any* %0 to i8*
-// CHECK-NEXT:  call void @llvm.memcpy.p0i8.p0i8.i64(i8* %2, i8* %3, i64 32, i32 8, i1 false)
+// CHECK-NEXT:  call void @llvm.memcpy.p0i8.p0i8.i64(i8* align 8 %2, i8* align 8 %3, i64 32, i1 false)
 // CHECK-NEXT:  ret %Any* %1
 
 // rdar://problem/19035529

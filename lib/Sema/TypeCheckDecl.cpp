@@ -49,6 +49,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/DJB.h"
 
 using namespace swift;
 
@@ -169,7 +170,8 @@ public:
       return DenseMapInfo<uint64_t>::getHashValue(k.intValue.v0) &
              DenseMapInfo<uint64_t>::getHashValue(k.intValue.v1);
     case RawValueKey::Kind::String:
-      return llvm::HashString(k.stringValue);
+      // FIXME: DJB seed=0, audit whether the default seed could be used.
+      return llvm::djbHash(k.stringValue, 0);
     case RawValueKey::Kind::Empty:
     case RawValueKey::Kind::Tombstone:
       return 0;
@@ -912,8 +914,8 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
 
       if (isAcceptableVersionBasedChange) {
         class AvailabilityRange {
-          Optional<clang::VersionTuple> introduced;
-          Optional<clang::VersionTuple> obsoleted;
+          Optional<llvm::VersionTuple> introduced;
+          Optional<llvm::VersionTuple> obsoleted;
 
         public:
           static AvailabilityRange from(const ValueDecl *VD) {

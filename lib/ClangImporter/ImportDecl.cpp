@@ -1732,7 +1732,7 @@ static void applyAvailableAttribute(Decl *decl, AvailabilityContext &info,
   if (info.isAlwaysAvailable())
     return;
 
-  clang::VersionTuple noVersion;
+  llvm::VersionTuple noVersion;
   auto AvAttr = new (C) AvailableAttr(SourceLoc(), SourceRange(),
                                       targetPlatform(C.LangOpts),
                                       /*Message=*/StringRef(),
@@ -2284,10 +2284,10 @@ namespace {
           // However, a Swift 4 name is obsoleted in Swift 4.2.
           // FIXME: it would be better to have a unified place
           // to represent Swift versions for API versioning.
-          clang::VersionTuple obsoletedVersion =
+          llvm::VersionTuple obsoletedVersion =
             (majorVersion == 4 && minorVersion < 2)
-                ? clang::VersionTuple(4, 2)
-                : clang::VersionTuple(majorVersion + 1);
+                ? llvm::VersionTuple(4, 2)
+                : llvm::VersionTuple(majorVersion + 1);
           attr = AvailableAttr::createPlatformAgnostic(
               ctx, /*Message*/StringRef(), ctx.AllocateCopy(renamed.str()),
               PlatformAgnosticAvailabilityKind::SwiftVersionSpecific,
@@ -2295,16 +2295,16 @@ namespace {
         } else {
           // Future names are introduced in their future version.
           assert(getVersion() > getActiveSwiftVersion());
-          clang::VersionTuple introducedVersion =
+          llvm::VersionTuple introducedVersion =
             (majorVersion == 4 && minorVersion == 2)
-                ? clang::VersionTuple(4, 2)
-                : clang::VersionTuple(majorVersion);
+                ? llvm::VersionTuple(4, 2)
+                : llvm::VersionTuple(majorVersion);
           attr = new (ctx) AvailableAttr(
               SourceLoc(), SourceRange(), PlatformKind::none,
               /*Message*/StringRef(), ctx.AllocateCopy(renamed.str()),
               /*Introduced*/introducedVersion, SourceRange(),
-              /*Deprecated*/clang::VersionTuple(), SourceRange(),
-              /*Obsoleted*/clang::VersionTuple(), SourceRange(),
+              /*Deprecated*/llvm::VersionTuple(), SourceRange(),
+              /*Obsoleted*/llvm::VersionTuple(), SourceRange(),
               PlatformAgnosticAvailabilityKind::SwiftVersionSpecific,
               /*Implicit*/false);
         }
@@ -4159,7 +4159,7 @@ namespace {
 
     /// Returns the latest "introduced" version on the current platform for
     /// \p D.
-    clang::VersionTuple findLatestIntroduction(const clang::Decl *D);
+    llvm::VersionTuple findLatestIntroduction(const clang::Decl *D);
 
     /// Returns true if importing \p objcMethod will produce a "better"
     /// initializer than \p existingCtor.
@@ -5964,13 +5964,13 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
 
 /// Returns the latest "introduced" version on the current platform for
 /// \p D.
-clang::VersionTuple
+llvm::VersionTuple
 SwiftDeclConverter::findLatestIntroduction(const clang::Decl *D) {
-  clang::VersionTuple result;
+  llvm::VersionTuple result;
 
   for (auto *attr : D->specific_attrs<clang::AvailabilityAttr>()) {
     if (attr->getPlatform()->getName() == "swift") {
-      clang::VersionTuple maxVersion{~0U, ~0U, ~0U};
+      llvm::VersionTuple maxVersion{~0U, ~0U, ~0U};
       return maxVersion;
     }
 
@@ -6025,7 +6025,7 @@ bool SwiftDeclConverter::existingConstructorIsWorse(
   // was introduced first.
   // FIXME: But if one of them is now deprecated, should we prefer the
   // other?
-  clang::VersionTuple introduced = findLatestIntroduction(objcMethod);
+  llvm::VersionTuple introduced = findLatestIntroduction(objcMethod);
   AvailabilityContext existingAvailability =
       AvailabilityInference::availableRange(existingCtor, Impl.SwiftContext);
   assert(!existingAvailability.isKnownUnreachable());
@@ -7406,7 +7406,7 @@ void ClangImporter::Implementation::importAttributes(
 
       StringRef message = avail->getMessage();
 
-      clang::VersionTuple deprecated = avail->getDeprecated();
+      llvm::VersionTuple deprecated = avail->getDeprecated();
 
       if (!deprecated.empty()) {
         if (platformAvailability.deprecatedAsUnavailableFilter &&
@@ -7419,13 +7419,8 @@ void ClangImporter::Implementation::importAttributes(
         }
       }
 
-      clang::VersionTuple obsoleted = avail->getObsoleted();
-      clang::VersionTuple introduced = avail->getIntroduced();
-
-      // Swift only allows "." separators.
-      obsoleted.UseDotAsSeparator();
-      introduced.UseDotAsSeparator();
-      deprecated.UseDotAsSeparator();
+      llvm::VersionTuple obsoleted = avail->getObsoleted();
+      llvm::VersionTuple introduced = avail->getIntroduced();
 
       const auto &replacement = avail->getReplacement();
 
