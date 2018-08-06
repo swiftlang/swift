@@ -1413,9 +1413,6 @@ public:
       GenericRequirementsCheckListener *listener = nullptr,
       SubstOptions options = None);
 
-  /// Resolve the inherited protocols of a given protocol.
-  void resolveInheritedProtocols(ProtocolDecl *protocol);
-
   /// Validate a protocol's where clause, along with the where clauses of
   /// its associated types.
   void validateWhereClauses(ProtocolDecl *protocol,
