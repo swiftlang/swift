@@ -14,6 +14,7 @@
 #include "ManagedValue.h"
 #include "RValue.h"
 #include "SILGenFunction.h"
+#include "SILGenFunctionBuilder.h"
 #include "Scope.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -29,7 +30,6 @@
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDebugScope.h"
-#include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SIL/SILProfiler.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/SerializedSILLoader.h"
@@ -430,7 +430,7 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
                                    None,
                                    C);
 
-  SILFunctionBuilder builder(M);
+  SILGenFunctionBuilder builder(*this);
   return builder.createFunction(
       SILLinkage::Public, SWIFT_ENTRY_POINT_FUNCTION, topLevelType, nullptr,
       Loc, IsBare, IsNotTransparent, IsNotSerialized, ProfileCounter(),
@@ -523,7 +523,7 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
     return emitted;
 
   // Note: Do not provide any SILLocation. You can set it afterwards.
-  SILFunctionBuilder builder(M);
+  SILGenFunctionBuilder builder(*this);
   auto *F = builder.getOrCreateFunction(constant.hasDecl() ? constant.getDecl()
                                                            : (Decl *)nullptr,
                                         constant, forDefinition);
@@ -1033,7 +1033,7 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
                                     TupleType::getEmpty(C), type->getExtInfo());
   auto initSILType = getLoweredType(initType).castTo<SILFunctionType>();
 
-  SILFunctionBuilder builder(M);
+  SILGenFunctionBuilder builder(*this);
   auto *f = builder.createFunction(SILLinkage::Private, funcName, initSILType,
                                    nullptr, SILLocation(binding), IsNotBare,
                                    IsNotTransparent, IsNotSerialized);

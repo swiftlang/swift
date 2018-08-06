@@ -17,10 +17,10 @@
 
 #include "SILGenFunction.h"
 #include "RValue.h"
+#include "SILGenFunctionBuilder.h"
 #include "Scope.h"
 #include "swift/AST/Initializer.h"
 #include "swift/SIL/SILArgument.h"
-#include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SIL/SILProfiler.h"
 #include "swift/SIL/SILUndef.h"
 
@@ -462,7 +462,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     ValueDecl *UIApplicationMainDecl = results.front();
 
     auto mainRef = SILDeclRef(UIApplicationMainDecl).asForeign();
-    SILFunctionBuilder builder(SGM.M);
+    SILGenFunctionBuilder builder(SGM);
     auto UIApplicationMainFn =
         builder.getOrCreateFunction(mainClass, mainRef, NotForDefinition);
     auto fnTy = UIApplicationMainFn->getLoweredFunctionType();
@@ -581,7 +581,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                   /*error result*/ None,
                   getASTContext());
 
-    SILFunctionBuilder builder(SGM.M);
+    SILGenFunctionBuilder builder(SGM);
     auto NSApplicationMainFn = builder.getOrCreateFunction(
         mainClass, "NSApplicationMain", SILLinkage::PublicExternal,
         NSApplicationMainType, IsBare, IsTransparent, IsNotSerialized);
