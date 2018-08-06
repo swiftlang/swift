@@ -550,7 +550,7 @@ static void deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl) {
 
 /// Derive an '==' operator implementation for an enum or a struct.
 static ValueDecl *
-deriveEquatable_eq(DerivedConformance &derived, Identifier generatedIdentifier,
+deriveEquatable_eq(DerivedConformance &derived,
                    void (*bodySynthesizer)(AbstractFunctionDecl *)) {
   // enum SomeEnum<T...> {
   //   case A, B(Int), C(String, Int)
@@ -590,14 +590,14 @@ deriveEquatable_eq(DerivedConformance &derived, Identifier generatedIdentifier,
   ASTContext &C = derived.TC.Context;
 
   auto parentDC = derived.getConformanceContext();
-  auto enumTy = parentDC->getDeclaredTypeInContext();
-  auto enumIfaceTy = parentDC->getDeclaredInterfaceType();
+  auto selfTy = parentDC->getDeclaredTypeInContext();
+  auto selfIfaceTy = parentDC->getDeclaredInterfaceType();
 
   auto getParamDecl = [&](StringRef s) -> ParamDecl * {
     auto *param = new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(),
                                     SourceLoc(), Identifier(), SourceLoc(),
-                                    C.getIdentifier(s), enumTy, parentDC);
-    param->setInterfaceType(enumIfaceTy);
+                                    C.getIdentifier(s), selfTy, parentDC);
+    param->setInterfaceType(selfIfaceTy);
     return param;
   };
 
@@ -610,6 +610,17 @@ deriveEquatable_eq(DerivedConformance &derived, Identifier generatedIdentifier,
   });
 
   auto boolTy = C.getBoolDecl()->getDeclaredType();
+
+  Identifier generatedIdentifier;
+  if (parentDC->getParentModule()->getResilienceStrategy() ==
+      ResilienceStrategy::Resilient) {
+    generatedIdentifier = C.Id_EqualsOperator;
+  } else if (selfTy->getEnumOrBoundGenericEnum()) {
+    generatedIdentifier = C.Id_derived_enum_equals;
+  } else {
+    assert(selfTy->getStructOrBoundGenericStruct());
+    generatedIdentifier = C.Id_derived_struct_equals;
+  }
 
   DeclName name(C, generatedIdentifier, params);
   auto eqDecl =
@@ -626,17 +637,19 @@ deriveEquatable_eq(DerivedConformance &derived, Identifier generatedIdentifier,
   eqDecl->getAttrs().add(new (C) InfixAttr(/*implicit*/false));
 
   // Add the @_implements(Equatable, ==(_:_:)) attribute
-  auto equatableProto = C.getProtocol(KnownProtocolKind::Equatable);
-  auto equatableTy = equatableProto->getDeclaredType();
-  auto equatableTypeLoc = TypeLoc::withoutLoc(equatableTy);
-  SmallVector<Identifier, 2> argumentLabels = { Identifier(), Identifier() };
-  auto equalsDeclName = DeclName(C, DeclBaseName(C.Id_EqualsOperator),
-                                 argumentLabels);
-  eqDecl->getAttrs().add(new (C) ImplementsAttr(SourceLoc(),
-                                                SourceRange(),
-                                                equatableTypeLoc,
-                                                equalsDeclName,
-                                                DeclNameLoc()));
+  if (generatedIdentifier != C.Id_EqualsOperator) {
+    auto equatableProto = C.getProtocol(KnownProtocolKind::Equatable);
+    auto equatableTy = equatableProto->getDeclaredType();
+    auto equatableTypeLoc = TypeLoc::withoutLoc(equatableTy);
+    SmallVector<Identifier, 2> argumentLabels = { Identifier(), Identifier() };
+    auto equalsDeclName = DeclName(C, DeclBaseName(C.Id_EqualsOperator),
+                                   argumentLabels);
+    eqDecl->getAttrs().add(new (C) ImplementsAttr(SourceLoc(),
+                                                  SourceRange(),
+                                                  equatableTypeLoc,
+                                                  equalsDeclName,
+                                                  DeclNameLoc()));
+  }
 
   if (!C.getEqualIntDecl()) {
     derived.TC.diagnose(derived.ConformanceDecl->getLoc(),
@@ -683,11 +696,9 @@ ValueDecl *DerivedConformance::deriveEquatable(ValueDecl *requirement) {
               : ed->hasOnlyCasesWithoutAssociatedValues()
                     ? &deriveBodyEquatable_enum_noAssociatedValues_eq
                     : &deriveBodyEquatable_enum_hasAssociatedValues_eq;
-      return deriveEquatable_eq(*this, TC.Context.Id_derived_enum_equals,
-                                bodySynthesizer);
+      return deriveEquatable_eq(*this, bodySynthesizer);
     } else if (isa<StructDecl>(Nominal))
-      return deriveEquatable_eq(*this, TC.Context.Id_derived_struct_equals,
-                                &deriveBodyEquatable_struct_eq);
+      return deriveEquatable_eq(*this, &deriveBodyEquatable_struct_eq);
     else
       llvm_unreachable("todo");
   }
