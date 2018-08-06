@@ -293,7 +293,7 @@ public:
   std::string getPCHHash() const;
 
   SourceFile::ImplicitModuleImportKind getImplicitModuleImportKind() {
-    if (getInputKind() == InputFileKind::IFK_SIL) {
+    if (getInputKind() == InputFileKind::SIL) {
       return SourceFile::ImplicitModuleImportKind::None;
     }
     if (getParseStdlib()) {
@@ -310,7 +310,7 @@ public:
                        bool alwaysSetModuleToMain, bool bePrimary,
                        serialization::ExtendedValidationInfo &extendedInfo);
   bool hasSerializedAST() {
-    return FrontendOpts.InputKind == InputFileKind::IFK_Swift_Library;
+    return FrontendOpts.InputKind == InputFileKind::SwiftLibrary;
   }
 
   const PrimarySpecificPaths &
@@ -507,10 +507,10 @@ private:
   void setUpDiagnosticOptions();
   bool setUpModuleLoaders();
   bool isInputSwift() {
-    return Invocation.getInputKind() == InputFileKind::IFK_Swift;
+    return Invocation.getInputKind() == InputFileKind::Swift;
   }
   bool isInSILMode() {
-    return Invocation.getInputKind() == InputFileKind::IFK_SIL;
+    return Invocation.getInputKind() == InputFileKind::SIL;
   }
 
   bool setUpInputs();

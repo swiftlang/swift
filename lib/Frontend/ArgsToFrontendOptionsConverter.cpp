@@ -378,15 +378,15 @@ bool ArgsToFrontendOptionsConverter::setUpForSILOrLLVM() {
   }
 
   if (treatAsSIL)
-    Opts.InputKind = InputFileKind::IFK_SIL;
+    Opts.InputKind = InputFileKind::SIL;
   else if (treatAsLLVM)
-    Opts.InputKind = InputFileKind::IFK_LLVM_IR;
+    Opts.InputKind = InputFileKind::LLVM;
   else if (Args.hasArg(OPT_parse_as_library))
-    Opts.InputKind = InputFileKind::IFK_Swift_Library;
+    Opts.InputKind = InputFileKind::SwiftLibrary;
   else if (Opts.RequestedAction == FrontendOptions::ActionType::REPL)
-    Opts.InputKind = InputFileKind::IFK_Swift_REPL;
+    Opts.InputKind = InputFileKind::SwiftREPL;
   else
-    Opts.InputKind = InputFileKind::IFK_Swift;
+    Opts.InputKind = InputFileKind::Swift;
 
   return false;
 }

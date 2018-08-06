@@ -761,7 +761,7 @@ static int doREPLCodeCompletion(const CompilerInvocation &InitInvok,
     BufferText = BufferText.drop_back(1);
 
   CompilerInvocation Invocation(InitInvok);
-  Invocation.setInputKind(InputFileKind::IFK_Swift_REPL);
+  Invocation.setInputKind(InputFileKind::SwiftREPL);
 
   CompilerInstance CI;
 
@@ -3037,7 +3037,7 @@ int main(int argc, char *argv[]) {
   for (auto &File : options::InputFilenames)
     InitInvok.getFrontendOptions().InputsAndOutputs.addInputFile(File);
   if (!options::InputFilenames.empty())
-    InitInvok.setInputKind(InputFileKind::IFK_Swift_Library);
+    InitInvok.setInputKind(InputFileKind::SwiftLibrary);
 
   InitInvok.setMainExecutablePath(
       llvm::sys::fs::getMainExecutable(argv[0],

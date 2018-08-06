@@ -65,16 +65,16 @@ void CompilerInvocation::setTargetTriple(StringRef Triple) {
 
 SourceFileKind CompilerInvocation::getSourceFileKind() const {
   switch (getInputKind()) {
-  case InputFileKind::IFK_Swift:
+  case InputFileKind::Swift:
     return SourceFileKind::Main;
-  case InputFileKind::IFK_Swift_Library:
+  case InputFileKind::SwiftLibrary:
     return SourceFileKind::Library;
-  case InputFileKind::IFK_Swift_REPL:
+  case InputFileKind::SwiftREPL:
     return SourceFileKind::REPL;
-  case InputFileKind::IFK_SIL:
+  case InputFileKind::SIL:
     return SourceFileKind::SIL;
-  case InputFileKind::IFK_None:
-  case InputFileKind::IFK_LLVM_IR:
+  case InputFileKind::None:
+  case InputFileKind::LLVM:
     llvm_unreachable("Trying to convert from unsupported InputFileKind");
   }
 
@@ -171,7 +171,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DisableTsanInoutInstrumentation |=
       Args.hasArg(OPT_disable_tsan_inout_instrumentation);
 
-  if (FrontendOpts.InputKind == InputFileKind::IFK_SIL)
+  if (FrontendOpts.InputKind == InputFileKind::SIL)
     Opts.DisableAvailabilityChecking = true;
   
   if (auto A = Args.getLastArg(OPT_enable_access_control,
@@ -1204,13 +1204,13 @@ CompilerInvocation::setUpInputForSILTool(
                                ? moduleNameArg
                                : llvm::sys::path::stem(inputFilename);
     setModuleName(stem);
-    setInputKind(InputFileKind::IFK_Swift_Library);
+    setInputKind(InputFileKind::SwiftLibrary);
   } else {
     const StringRef name = (alwaysSetModuleToMain || moduleNameArg.empty())
                                ? "main"
                                : moduleNameArg;
     setModuleName(name);
-    setInputKind(InputFileKind::IFK_SIL);
+    setInputKind(InputFileKind::SIL);
   }
   return fileBufOrErr;
 }

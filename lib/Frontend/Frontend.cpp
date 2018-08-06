@@ -498,7 +498,7 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
   FrontendStatsTracer tracer(Context->Stats, "perform-sema");
   Context->LoadedModules[MainModule->getName()] = getMainModule();
 
-  if (Invocation.getInputKind() == InputFileKind::IFK_SIL) {
+  if (Invocation.getInputKind() == InputFileKind::SIL) {
     assert(!InputSourceCodeBufferIDs.empty());
     assert(InputSourceCodeBufferIDs.size() == 1);
     assert(MainBufferID != NO_SUCH_BUFFER);
@@ -517,7 +517,7 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
 
   const ImplicitImports implicitImports(*this);
 
-  if (Invocation.getInputKind() == InputFileKind::IFK_Swift_REPL) {
+  if (Invocation.getInputKind() == InputFileKind::SwiftREPL) {
     createREPLFile(implicitImports);
     return;
   }
@@ -914,15 +914,15 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
   ModuleDecl *const MainModule = getMainModule();
   Context->LoadedModules[MainModule->getName()] = MainModule;
 
-  assert((Kind == InputFileKind::IFK_Swift ||
-          Kind == InputFileKind::IFK_Swift_Library) &&
+  assert((Kind == InputFileKind::Swift ||
+          Kind == InputFileKind::SwiftLibrary) &&
          "only supports parsing .swift files");
   (void)Kind;
 
   // Make sure the main file is the first file in the module but parse it last,
   // to match the parsing logic used when performing Sema.
   if (MainBufferID != NO_SUCH_BUFFER) {
-    assert(Kind == InputFileKind::IFK_Swift);
+    assert(Kind == InputFileKind::Swift);
     createSourceFileForMainModule(Invocation.getSourceFileKind(),
                                   SourceFile::ImplicitModuleImportKind::None,
                                   MainBufferID);
