@@ -847,7 +847,6 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
   options |= TypeResolutionFlags::AllowUnboundGenerics;
   if (isSILMode) {
     options |= TypeResolutionFlags::SILMode;
-    options |= TypeResolutionFlags::AllowIUO;
   }
   if (isSILType)
     options |= TypeResolutionFlags::SILType;

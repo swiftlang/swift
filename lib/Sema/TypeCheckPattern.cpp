@@ -749,11 +749,12 @@ static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
   // If the element is a variadic parameter, resolve the parameter type as if
   // it were in non-parameter position, since we want functions to be
   // @escaping in this case.
-  auto elementOptions = (options | (decl->isVariadic()
-                                    ? TypeResolutionFlags::VariadicFunctionInput
-                                    : TypeResolutionFlags::FunctionInput));
-  if (!decl->isVariadic())
-    elementOptions |= TypeResolutionFlags::AllowIUO;
+  options |= TypeResolutionFlags::Direct;
+  if (decl->isVariadic()) {
+    options |= TypeResolutionFlags::VariadicFunctionInput;
+  } else {
+    options |= TypeResolutionFlags::FunctionInput;
+  }
 
   bool hadError = false;
 
@@ -762,8 +763,7 @@ static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
   // We might have a null typeLoc if this is a closure parameter list,
   // where parameters are allowed to elide their types.
   if (!TL.isNull()) {
-    hadError |= TC.validateType(TL, DC,
-                                elementOptions, &resolver);
+    hadError |= TC.validateType(TL, DC, options, &resolver);
   }
 
   auto *TR = TL.getTypeRepr();
@@ -773,7 +773,7 @@ static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
   // If this is declared with '!' indicating that it is an Optional
   // that we should implicitly unwrap if doing so is required to type
   // check, then add an attribute to the decl.
-  if (elementOptions.contains(TypeResolutionFlags::AllowIUO) && TR &&
+  if (!decl->isVariadic() && TR &&
       TR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
     auto &C = DC->getASTContext();
     decl->getAttrs().add(
