@@ -1600,6 +1600,56 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
   llvm_unreachable("bad access semantics");
 }
 
+bool AbstractStorageDecl::requiresMaterializeForSet() const {
+  // Only for mutable storage.
+  if (!supportsMutation())
+    return false;
+
+  // We only need materializeForSet in type contexts.
+  // TODO: resilient global variables?
+  auto *dc = getDeclContext();
+  if (!dc->isTypeContext())
+    return false;
+
+  // Requirements of ObjC protocols don't need materializeForSet.
+  if (auto protoDecl = dyn_cast<ProtocolDecl>(dc))
+    if (protoDecl->isObjC())
+      return false;
+
+  // Members of structs imported by Clang don't need an eagerly-synthesized
+  // materializeForSet.
+  if (auto structDecl = dyn_cast<StructDecl>(dc))
+    if (structDecl->hasClangNode())
+      return false;
+
+  return true;
+}
+
+void AbstractStorageDecl::visitExpectedOpaqueAccessors(
+                        llvm::function_ref<void (AccessorKind)> visit) const {
+  // For now, always assume storage declarations should have getters
+  // instead of read accessors.
+  visit(AccessorKind::Get);
+
+  if (supportsMutation()) {
+    // All mutable storage should have a setter.
+    visit(AccessorKind::Set);
+
+    // Include materializeForSet if necessary.
+    if (requiresMaterializeForSet())
+      visit(AccessorKind::MaterializeForSet);
+  }
+}
+
+void AbstractStorageDecl::visitOpaqueAccessors(
+                        llvm::function_ref<void (AccessorDecl*)> visit) const {
+  visitExpectedOpaqueAccessors([&](AccessorKind kind) {
+    auto accessor = getAccessor(kind);
+    assert(accessor && "didn't have expected opaque accessor");
+    visit(accessor);
+  });
+}
+
 static bool hasPrivateOrFilePrivateFormalAccess(const ValueDecl *D) {
   return D->hasAccess() && D->getFormalAccess() <= AccessLevel::FilePrivate;
 }

@@ -140,13 +140,12 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
             addSymbolIfNecessary(valueReq, witnessDecl);
           } else if (auto *storage = dyn_cast<AbstractStorageDecl>(valueReq)) {
             auto witnessStorage = cast<AbstractStorageDecl>(witnessDecl);
-            if (auto *getter = storage->getGetter())
-              addSymbolIfNecessary(getter, witnessStorage->getGetter());
-            if (auto *setter = storage->getSetter())
-              addSymbolIfNecessary(setter, witnessStorage->getSetter());
-            if (auto *materializeForSet = storage->getMaterializeForSetFunc())
-              addSymbolIfNecessary(materializeForSet,
-                                   witnessStorage->getMaterializeForSetFunc());
+            storage->visitOpaqueAccessors([&](AccessorDecl *reqtAccessor) {
+              auto witnessAccessor =
+                witnessStorage->getAccessor(reqtAccessor->getAccessorKind());
+              assert(witnessAccessor && "no corresponding witness accessor?");
+              addSymbolIfNecessary(reqtAccessor, witnessAccessor);
+            });
           }
         });
   }
