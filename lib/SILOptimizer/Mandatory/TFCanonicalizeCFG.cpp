@@ -318,7 +318,7 @@ private:
 
   /// Replace the preheader->header edge with preheader->newHeader edge
   /// and update the arguments of preheader to match that of newheader.
-  void patchPreheader(SILBasicBlock* newHeader);
+  void patchPreheader(SILBasicBlock *newHeader);
 
   /// Patch the edges that go to the header and exit blocks to the new header or
   /// latch block as appropriate. Also, return the map consisting of indices
@@ -515,7 +515,7 @@ SingleExitLoopTransformer::createNewLatch(SILBasicBlock *newHeader) {
   return latchBlock;
 }
 
-void SingleExitLoopTransformer::patchPreheader(SILBasicBlock* newHeader) {
+void SingleExitLoopTransformer::patchPreheader(SILBasicBlock *newHeader) {
   // Update edge
   replaceBranchTarget(preheader->getTerminator(), header, newHeader,
                       /*preserveArgs*/ true);
@@ -538,7 +538,6 @@ void SingleExitLoopTransformer::patchPreheader(SILBasicBlock* newHeader) {
                                          /*bitwidth*/ 1, true));
   appendArguments(preheader->getTerminator(), newHeader, newArgs);
 }
-
 
 llvm::DenseMap<SILBasicBlock *, intmax_t>
 SingleExitLoopTransformer::patchEdges(SILBasicBlock *newHeader,
