@@ -1801,26 +1801,34 @@ bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
     if (!wantProtocolMembers && !currentIsProtocol)
       continue;
 
-    if (!sawClassDecl) {
-      if (auto *protoDecl = dyn_cast<ProtocolDecl>(current)) {
+    SmallVector<ProtocolDecl *, 4> protocols;
+
+    if (auto *protoDecl = dyn_cast<ProtocolDecl>(current)) {
+      // If we haven't seen a class declaration yet, look into the protocol.
+      if (!sawClassDecl) {
         if (auto superclassDecl = protoDecl->getSuperclassDecl()) {
           visited.insert(superclassDecl);
           stack.push_back(superclassDecl);
         }
       }
-    }
 
-    SmallVector<ProtocolDecl *, 4> protocols;
-    for (auto proto : current->getAllProtocols()) {
-      if (visited.insert(proto).second) {
-        stack.push_back(proto);
+      // Collect inherited protocols.
+      for (auto inheritedProto : protoDecl->getInheritedProtocols()) {
+        addNominalType(inheritedProto);
       }
-    }
+    } else {
+      // Collect the protocols to which the nominal type conforms.
+      for (auto proto : current->getAllProtocols()) {
+        if (visited.insert(proto).second) {
+          stack.push_back(proto);
+        }
+      }
 
-    // For a class, we don't need to visit the protocol members of the
-    // superclass: that's already handled.
-    if (isa<ClassDecl>(current))
-      wantProtocolMembers = false;
+      // For a class, we don't need to visit the protocol members of the
+      // superclass: that's already handled.
+      if (isa<ClassDecl>(current))
+        wantProtocolMembers = false;
+    }
   }
 
   return finishLookup(this, options, decls);

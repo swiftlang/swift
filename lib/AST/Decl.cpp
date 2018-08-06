@@ -3539,41 +3539,20 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
 llvm::TinyPtrVector<ProtocolDecl *>
 ProtocolDecl::getInheritedProtocols() const {
   llvm::TinyPtrVector<ProtocolDecl *> result;
-
-  // FIXME: Gather inherited protocols from the "inherited" list.
-  // We shouldn't need this, but it shows up in recursive invocations.
-  if (!isRequirementSignatureComputed()) {
-    SmallPtrSet<ProtocolDecl *, 4> known;
-    if (Bits.ProtocolDecl.ComputingInheritedProtocols) return result;
-
-    auto *self = const_cast<ProtocolDecl *>(this);
-    self->Bits.ProtocolDecl.ComputingInheritedProtocols = true;
-    for (unsigned index : indices(getInherited())) {
-      if (auto type = getInheritedType(index)) {
-        // Only protocols can appear in the inheritance clause
-        // of a protocol -- anything else should get diagnosed
-        // elsewhere.
-        if (type->isExistentialType()) {
-          auto layout = type->getExistentialLayout();
-          for (auto protoTy : layout.getProtocols()) {
-            auto *protoDecl = protoTy->getDecl();
-            if (known.insert(protoDecl).second)
-              result.push_back(protoDecl);
-          }
-        }
-      }
+  SmallPtrSet<const ProtocolDecl *, 4> known;
+  known.insert(this);
+  bool anyObject = false;
+  for (const auto &found :
+           getDirectlyInheritedNominalTypeDecls(
+             const_cast<ProtocolDecl *>(this), anyObject)) {
+    if (auto proto = dyn_cast<ProtocolDecl>(found.second)) {
+      if (known.insert(proto).second)
+        result.push_back(proto);
     }
-    self->Bits.ProtocolDecl.ComputingInheritedProtocols = false;
-    return result;
   }
 
-  // Gather inherited protocols from the requirement signature.
-  auto selfType = getProtocolSelfType();
-  for (const auto &req : getRequirementSignature()) {
-    if (req.getKind() == RequirementKind::Conformance &&
-        req.getFirstType()->isEqual(selfType))
-      result.push_back(req.getSecondType()->castTo<ProtocolType>()->getDecl());
-  }
+  // FIXME: ComputingInheritedProtocols is dynamically dead.
+
   return result;
 }
 
@@ -3644,10 +3623,13 @@ bool ProtocolDecl::walkInheritedProtocols(
 bool ProtocolDecl::inheritsFrom(const ProtocolDecl *super) const {
   if (this == super)
     return false;
-  
-  auto allProtocols = getLocalProtocols();
-  return std::find(allProtocols.begin(), allProtocols.end(), super)
-           != allProtocols.end();
+
+  return walkInheritedProtocols([super](ProtocolDecl *inherited) {
+    if (inherited == super)
+      return TypeWalker::Action::Stop;
+
+    return TypeWalker::Action::Continue;
+  });
 }
 
 bool ProtocolDecl::requiresClassSlow() {

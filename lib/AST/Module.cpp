@@ -592,10 +592,6 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol) {
   // existential's list of conformances and the existential conforms to
   // itself.
   if (type->isExistentialType()) {
-    // FIXME: Recursion break.
-    if (!protocol->hasValidSignature())
-      return None;
-
     // If the existential type cannot be represented or the protocol does not
     // conform to itself, there's no point in looking further.
     if (!protocol->existentialConformsToSelf())

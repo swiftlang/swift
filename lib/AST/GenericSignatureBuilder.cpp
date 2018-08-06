@@ -3016,6 +3016,11 @@ void ArchetypeType::resolveNestedType(
     builder.resolveEquivalenceClass(
                                   memberInterfaceType,
                                   ArchetypeResolutionKind::CompleteWellFormed);
+  if (!equivClass) {
+    nested.second = ErrorType::get(interfaceType);
+    return;
+  }
+
   auto result = equivClass->getTypeInContext(builder, genericEnv);
   assert(!nested.second ||
          nested.second->isEqual(result) ||
