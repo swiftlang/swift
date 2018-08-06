@@ -1966,7 +1966,8 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
                           ASTContext &ctx,
                           ArrayRef<TypeDecl *> typeDecls,
                           SmallVectorImpl<ModuleDecl *> &modulesFound,
-                          bool &anyObject) {
+                          bool &anyObject,
+                          llvm::SmallPtrSetImpl<TypeAliasDecl *> &typealiases) {
   TinyPtrVector<NominalTypeDecl *> nominalDecls;
 
   for (auto typeDecl : typeDecls) {
@@ -1978,11 +1979,16 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
 
     // Recursively resolve typealiases.
     if (auto typealias = dyn_cast<TypeAliasDecl>(typeDecl)) {
+      // FIXME: Ad hoc recursion breaking, so we don't look through the
+      // same typealias multiple times.
+      if (!typealiases.insert(typealias).second)
+        continue;
+
       auto underlyingTypeReferences
         = evaluator(UnderlyingTypeDeclsReferencedRequest{typealias});
       auto underlyingNominalReferences
         = resolveTypeDeclsToNominal(evaluator, ctx, underlyingTypeReferences,
-                                    modulesFound, anyObject);
+                                    modulesFound, anyObject, typealiases);
       nominalDecls.insert(nominalDecls.end(),
                           underlyingNominalReferences.begin(),
                           underlyingNominalReferences.end());
@@ -2022,6 +2028,17 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
   }
 
   return nominalDecls;
+}
+
+static TinyPtrVector<NominalTypeDecl *>
+resolveTypeDeclsToNominal(Evaluator &evaluator,
+                          ASTContext &ctx,
+                          ArrayRef<TypeDecl *> typeDecls,
+                          SmallVectorImpl<ModuleDecl *> &modulesFound,
+                          bool &anyObject) {
+  llvm::SmallPtrSet<TypeAliasDecl *, 4> typealiases;
+  return resolveTypeDeclsToNominal(evaluator, ctx, typeDecls, modulesFound,
+                                   anyObject, typealiases);
 }
 
 /// Perform unqualified name lookup for types at the given location.
