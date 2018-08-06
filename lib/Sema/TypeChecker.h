@@ -479,6 +479,7 @@ enum class TypeResolutionFlags : unsigned {
 
   /// Whether we are in the input type of a function, or under one level of
   /// tuple type.  This is not set for multi-level tuple arguments.
+  /// See also: TypeResolutionFlags::Direct
   FunctionInput = 1 << 5,
 
   /// Whether this is a variadic function input.
@@ -543,8 +544,8 @@ enum class TypeResolutionFlags : unsigned {
   /// Whether we are checking the parameter list of a subscript.
   SubscriptParameters = 1 << 23,
 
-  /// Is it okay to resolve an IUO sigil ("!") here?
-  AllowIUO = 1 << 24,
+  /// Whether we are at the direct base of a type expression.
+  Direct = 1 << 24,
 
   /// Whether this type is being used in a cast or coercion expression.
   InCastOrCoercionExpression = 1 << 25,
@@ -557,6 +558,13 @@ enum class TypeResolutionFlags : unsigned {
 
   /// Whether we should not produce diagnostics if the type is invalid.
   SilenceErrors = 1 << 28,
+
+  /// Whether we are in the result type of a function, including multi-level
+  /// tuple return values. See also: TypeResolutionFlags::Direct
+  FunctionResult = 1 << 29,
+
+  /// Whether this is a pattern binding entry.
+  PatternBindingEntry = 1 << 30,
 };
 
 /// Option set describing how type resolution should work.
@@ -565,12 +573,14 @@ using TypeResolutionOptions = OptionSet<TypeResolutionFlags>;
 /// Strip the contextual options from the given type resolution options.
 static inline TypeResolutionOptions
 withoutContext(TypeResolutionOptions options, bool preserveSIL = false) {
+  options -= TypeResolutionFlags::Direct;
   options -= TypeResolutionFlags::FunctionInput;
   options -= TypeResolutionFlags::VariadicFunctionInput;
+  options -= TypeResolutionFlags::FunctionResult;
   options -= TypeResolutionFlags::EnumCase;
   options -= TypeResolutionFlags::SubscriptParameters;
   options -= TypeResolutionFlags::ImmediateOptionalTypeArgument;
-  options -= TypeResolutionFlags::AllowIUO;
+  options -= TypeResolutionFlags::PatternBindingEntry;
   if (!preserveSIL) options -= TypeResolutionFlags::SILType;
   return options;
 }

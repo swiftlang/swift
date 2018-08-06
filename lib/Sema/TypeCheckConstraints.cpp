@@ -1248,7 +1248,6 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   options |= TypeResolutionFlags::AllowUnspecifiedTypes;
   options |= TypeResolutionFlags::AllowUnboundGenerics;
   options |= TypeResolutionFlags::InExpression;
-  options |= TypeResolutionFlags::AllowIUO;
   bool hadParameterError = false;
 
   GenericTypeToArchetypeResolver resolver(closure);
