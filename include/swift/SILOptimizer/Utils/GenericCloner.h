@@ -30,7 +30,11 @@
 
 namespace swift {
 
-class GenericCloner : public TypeSubstCloner<GenericCloner> {
+class GenericCloner
+  : public TypeSubstCloner<GenericCloner, SILOptFunctionBuilder> {
+  using SuperTy = TypeSubstCloner<GenericCloner, SILOptFunctionBuilder>;
+
+  SILOptFunctionBuilder &FuncBuilder;
   IsSerialized_t Serialized;
   const ReabstractionInfo &ReInfo;
   CloneCollector::CallbackType Callback;
@@ -47,8 +51,8 @@ public:
                 SubstitutionMap ParamSubs,
                 StringRef NewName,
                 CloneCollector::CallbackType Callback)
-    : TypeSubstCloner(*initCloned(FuncBuilder, F, Serialized, ReInfo, NewName), *F,
-                    ParamSubs), ReInfo(ReInfo), Callback(Callback) {
+    : SuperTy(*initCloned(FuncBuilder, F, Serialized, ReInfo, NewName), *F,
+	      ParamSubs), FuncBuilder(FuncBuilder), ReInfo(ReInfo), Callback(Callback) {
     assert(F->getDebugScope()->Parent != getCloned()->getDebugScope()->Parent);
   }
   /// Clone and remap the types in \p F according to the substitution
