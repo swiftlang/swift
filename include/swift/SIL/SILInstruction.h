@@ -2891,6 +2891,7 @@ class StringLiteralInst final
 
 public:
   enum class Encoding {
+    Bytes,
     UTF8,
     UTF16,
     /// UTF-8 encoding of an Objective-C selector.

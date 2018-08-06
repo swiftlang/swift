@@ -1184,6 +1184,7 @@ public:
   }
   static StringRef getStringEncodingName(StringLiteralInst::Encoding kind) {
     switch (kind) {
+    case StringLiteralInst::Encoding::Bytes: return "bytes ";
     case StringLiteralInst::Encoding::UTF8: return "utf8 ";
     case StringLiteralInst::Encoding::UTF16: return "utf16 ";
     case StringLiteralInst::Encoding::ObjCSelector: return "objc_selector ";
@@ -1192,8 +1193,17 @@ public:
   }
 
   void visitStringLiteralInst(StringLiteralInst *SLI) {
-    *this << getStringEncodingName(SLI->getEncoding())
-          << QuotedString(SLI->getValue());
+    *this << getStringEncodingName(SLI->getEncoding());
+
+    if (SLI->getEncoding() != StringLiteralInst::Encoding::Bytes) {
+      // FIXME: this isn't correct: this doesn't properly handle translating
+      // UTF16 into UTF8, and the SIL parser always parses as UTF8.
+      *this << QuotedString(SLI->getValue());
+      return;
+    }
+
+    // "Bytes" are always output in a hexadecimal form.
+    *this << '"' << llvm::toHex(SLI->getValue()) << '"';
   }
 
   static StringRef
