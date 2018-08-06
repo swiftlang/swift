@@ -159,7 +159,7 @@ UIdent UIdentVisitor::visitParamDecl(const ParamDecl *D) {
 
 UIdent UIdentVisitor::visitExtensionDecl(const ExtensionDecl *D) {
   assert(!IsRef && "reference to an extension ?");
-  if (NominalTypeDecl *NTD = D->getExtendedType()->getAnyNominal()) {
+  if (NominalTypeDecl *NTD = D->getExtendedNominal()) {
     if (isa<StructDecl>(NTD))
       return KindDeclExtensionStruct;
     if (isa<ClassDecl>(NTD))

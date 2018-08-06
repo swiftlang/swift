@@ -6487,24 +6487,13 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                               toType->getCanonicalType() });
   if (knownRestriction != solution.ConstraintRestrictions.end()) {
     switch (knownRestriction->second) {
-    case ConversionRestrictionKind::TupleToTuple: {
-      auto fromTuple = fromType->castTo<TupleType>();
-      auto toTuple = toType->castTo<TupleType>();
-      SmallVector<int, 4> sources;
-      SmallVector<unsigned, 4> variadicArgs;
-      bool failed = computeTupleShuffle(fromTuple, toTuple,
-                                        sources, variadicArgs);
-      assert(!failed && "Couldn't convert tuple to tuple?");
-      (void)failed;
-      return coerceTupleToTuple(expr, fromTuple, toTuple, locator, sources,
-                                variadicArgs, typeFromPattern);
-    }
 
-    case ConversionRestrictionKind::ScalarToTuple: {
-      auto toTuple = toType->castTo<TupleType>();
-      return coerceScalarToTuple(expr, toTuple,
-                                 toTuple->getElementForScalarInit(), locator);
-    }
+    case ConversionRestrictionKind::TupleToTuple:
+    case ConversionRestrictionKind::ScalarToTuple:
+    case ConversionRestrictionKind::LValueToRValue:
+        // Restrictions that don't need to be recorded.
+        // Should match recordRestriction() in CSSimplify
+        break;
 
     case ConversionRestrictionKind::DeepEquality: {
       if (toType->hasUnresolvedType())
@@ -6548,21 +6537,12 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     case ConversionRestrictionKind::Superclass:
+    case ConversionRestrictionKind::ExistentialMetatypeToMetatype:
       return coerceSuperclass(expr, toType, locator);
-
-    case ConversionRestrictionKind::LValueToRValue: {
-      if (toType->is<TupleType>() || fromType->is<TupleType>())
-        break;
-
-      return coerceToType(addImplicitLoadExpr(cs, expr), toType, locator);
-    }
 
     case ConversionRestrictionKind::Existential:
     case ConversionRestrictionKind::MetatypeToExistentialMetatype:
       return coerceExistential(expr, toType, locator);
-
-    case ConversionRestrictionKind::ExistentialMetatypeToMetatype:
-      return coerceSuperclass(expr, toType, locator);
 
     case ConversionRestrictionKind::ClassMetatypeToAnyObject: {
       assert(tc.getLangOpts().EnableObjCInterop
@@ -7926,7 +7906,7 @@ bool ConstraintSystem::applySolutionFixes(Expr *E, const Solution &solution) {
 
     bool diagnosed = false;
     for (auto &fix : fixes->second)
-      diagnosed |= applySolutionFix(expr, solution, fix);
+      diagnosed |= applySolutionFix(E, solution, fix);
     return diagnosed;
   };
 
@@ -7970,7 +7950,8 @@ bool ConstraintSystem::applySolutionFix(
   if (!resolved || !resolved->getAnchor() ||
       (!resolved->getPath().empty() &&
        fix.first.getKind() != FixKind::ExplicitlyEscaping &&
-       fix.first.getKind() != FixKind::ExplicitlyEscapingToAny))
+       fix.first.getKind() != FixKind::ExplicitlyEscapingToAny &&
+       fix.first.getKind() != FixKind::AddConformance))
     return false;
   
   Expr *affected = resolved->getAnchor();
@@ -8147,6 +8128,95 @@ bool ConstraintSystem::applySolutionFix(
     return diagnoseArgumentLabelError(getASTContext(), call->getArg(),
                                       fix.first.getArgumentLabels(*this),
                                       isa<SubscriptExpr>(call->getFn()));
+  }
+
+  case FixKind::AddConformance: {
+    auto getMissingConformance = [&](ConstraintLocator *locator) {
+      auto *anchor = locator->getAnchor();
+      auto &requirement = locator->getPath().back();
+      auto result = MissingConformances.find({anchor, requirement.getValue()});
+      assert(result != MissingConformances.end());
+      return result->getSecond();
+    };
+
+    auto conformance = getMissingConformance(locator);
+
+    auto *anchor = locator->getAnchor();
+    auto owner = solution.simplifyType(getType(anchor))->getRValueInstanceType();
+
+    auto type = conformance.first;
+    auto protocolType = conformance.second->getDeclaredType();
+
+    //  Find `ApplyExpr` based on a function expression attached to it.
+    auto findApplyExpr = [](Expr *parent, Expr *fnExpr) -> ApplyExpr * {
+      ApplyExpr *applyExpr = nullptr;
+      parent->forEachChildExpr([&applyExpr, &fnExpr](Expr *subExpr) -> Expr * {
+        auto *AE = dyn_cast<ApplyExpr>(subExpr);
+        if (!AE || AE->getFn() != fnExpr)
+          return subExpr;
+
+        applyExpr = AE;
+        return nullptr;
+      });
+      return applyExpr;
+    };
+
+    auto getArgumentAt = [](ApplyExpr *AE, unsigned index) -> Expr * {
+      assert(AE);
+
+      auto *arg = AE->getArg();
+      if (auto *TE = dyn_cast<TupleExpr>(arg))
+        return TE->getElement(index);
+
+      assert(index == 0);
+      if (auto *PE = dyn_cast<ParenExpr>(arg))
+        return PE->getSubExpr();
+
+      return arg;
+    };
+
+    auto *applyExpr = findApplyExpr(expr, anchor);
+
+    Optional<unsigned> atParameterPos;
+    // Sometimes fix is recorded by type-checking sub-expression
+    // during normal diagnostics, in such case call expression
+    // is unavailable.
+    if (applyExpr) {
+      // If this is a static, initializer or operator call,
+      // let's not try to diagnose it here, but refer to expression
+      // diagnostics.
+      if (isa<BinaryExpr>(applyExpr) || isa<TypeExpr>(anchor))
+        return false;
+
+      if (auto *fnType = owner->getAs<AnyFunctionType>()) {
+        auto parameters = fnType->getParams();
+        for (auto index : indices(parameters)) {
+          if (parameters[index].getType()->isEqual(type)) {
+            atParameterPos = index;
+            break;
+          }
+        }
+      }
+    }
+
+    if (type->isExistentialType()) {
+      auto diagnostic = diag::protocol_does_not_conform_objc;
+      if (type->isObjCExistentialType())
+        diagnostic = diag::protocol_does_not_conform_static;
+
+      TC.diagnose(anchor->getLoc(), diagnostic, type, protocolType);
+    } else if (atParameterPos) {
+      // Requirement comes from one of the parameter types,
+      // let's try to point diagnostic to the argument expression.
+      auto *argExpr = getArgumentAt(applyExpr, *atParameterPos);
+      TC.diagnose(argExpr->getLoc(),
+                  diag::cannot_convert_argument_value_protocol, type,
+                  protocolType);
+    } else {
+      TC.diagnose(anchor->getLoc(), diag::type_does_not_conform_owner, owner,
+                  type, protocolType);
+    }
+    return true;
   }
   }
 

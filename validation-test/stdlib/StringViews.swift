@@ -37,8 +37,8 @@ let replacementCharacter = Character(replacementScalar)
 // UTF16, grapheme clusters composed of multiple Unicode scalars, and
 // invalid UTF16 that should be replaced with replacement characters.
 let winterUTF16 = Array("🏂☃❅❆❄︎⛄️❄️".utf16) + [0xD83C, 0x0020, 0xDF67, 0xD83C]
-var winter = winterUTF16.withUnsafeBufferPointer { bufPtr in 
-  _StringGuts._createStringFromUTF16(bufPtr)
+var winter = winterUTF16.withUnsafeBufferPointer {
+  String._fromInvalidUTF16($0)
 }
 
 let winterInvalidUTF8: [UTF8.CodeUnit] = replacementUTF8 + ([0x20] as [UTF8.CodeUnit]) + replacementUTF8 + replacementUTF8
@@ -536,7 +536,7 @@ tests.test("index-mapping/utf8-to-character/\(id)") {
   expectEqualSequence(
     winterUtf8Characters,
     winter.utf8.indices.map {
-      (i:String.UTF8Index) -> Character? in mapIndex(i, winter).map {
+      (i:String.Index) -> Character? in mapIndex(i, winter).map {
         winter[$0]
       }
     }, sameValue: ==)
@@ -603,12 +603,12 @@ tests.test("UTF8 indexes") {
   //
   // CHECK-NEXT: true
   let abc = "abcdefghijklmnop"
-  
+
   do {
-    let start = String.UTF8Index(abc.startIndex, within: abc.utf8)
+    let start = String.Index(abc.startIndex, within: abc.utf8)
     expectEqual(
       abc.utf8.index(after: start!),
-      String.UTF8Index(abc.index(after: abc.startIndex), within: abc.utf8))
+      String.Index(abc.index(after: abc.startIndex), within: abc.utf8))
   }
 
   let diverseCharacters = summer + winter + winter + summer

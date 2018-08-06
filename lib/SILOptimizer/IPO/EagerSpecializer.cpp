@@ -31,6 +31,7 @@
 #include "swift/AST/Type.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "llvm/Support/Debug.h"
 
@@ -701,7 +702,8 @@ public:
 } // end anonymous namespace
 
 /// Specializes a generic function for a concrete type list.
-static SILFunction *eagerSpecialize(SILFunction *GenericFunc,
+static SILFunction *eagerSpecialize(SILOptFunctionBuilder &FuncBuilder,
+                                    SILFunction *GenericFunc,
                                     const SILSpecializeAttr &SA,
                                     const ReabstractionInfo &ReInfo) {
   LLVM_DEBUG(dbgs() << "Specializing " << GenericFunc->getName() << "\n");
@@ -720,8 +722,9 @@ static SILFunction *eagerSpecialize(SILFunction *GenericFunc,
     Serialized = IsSerializable;
 
   GenericFuncSpecializer
-        FuncSpecializer(GenericFunc, ReInfo.getClonerParamSubstitutionMap(),
-                        Serialized, ReInfo);
+      FuncSpecializer(FuncBuilder, GenericFunc,
+                      ReInfo.getClonerParamSubstitutionMap(),
+                      Serialized, ReInfo);
 
   SILFunction *NewFunc = FuncSpecializer.trySpecialization();
   if (!NewFunc)
@@ -733,6 +736,8 @@ static SILFunction *eagerSpecialize(SILFunction *GenericFunc,
 void EagerSpecializerTransform::run() {
   if (!EagerSpecializeFlag)
     return;
+
+  SILOptFunctionBuilder FuncBuilder(*getPassManager());
 
   // Process functions in any order.
   for (auto &F : *getModule()) {
@@ -758,7 +763,7 @@ void EagerSpecializerTransform::run() {
     for (auto *SA : F.getSpecializeAttrs()) {
       auto AttrRequirements = SA->getRequirements();
       ReInfoVec.emplace_back(&F, AttrRequirements);
-      auto *NewFunc = eagerSpecialize(&F, *SA, ReInfoVec.back());
+      auto *NewFunc = eagerSpecialize(FuncBuilder, &F, *SA, ReInfoVec.back());
       notifyAddFunction(NewFunc);
 
       SpecializedFuncs.push_back(NewFunc);

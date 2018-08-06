@@ -309,7 +309,7 @@ void TBDGenVisitor::visitDestructorDecl(DestructorDecl *DD) {
 }
 
 void TBDGenVisitor::visitExtensionDecl(ExtensionDecl *ED) {
-  if (!ED->getExtendedType()->isExistentialType()) {
+  if (!isa<ProtocolDecl>(ED->getExtendedNominal())) {
     addConformances(ED);
   }
 

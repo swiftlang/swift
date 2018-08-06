@@ -1490,7 +1490,8 @@ ERROR(extension_specialization,none,
 ERROR(extension_stored_property,none,
       "extensions must not contain stored properties", ())
 ERROR(extension_nongeneric_trailing_where,none,
-      "trailing 'where' clause for extension of non-generic type %0", (Type))
+      "trailing 'where' clause for extension of non-generic type %0",
+      (DeclName))
 ERROR(extension_protocol_inheritance,none,
       "extension of protocol %0 cannot have an inheritance clause", (Type))
 ERROR(objc_generic_extension_using_type_parameter,none,
@@ -1512,8 +1513,8 @@ ERROR(use_of_equal_instead_of_equality,none,
 
 
 ERROR(protocol_does_not_conform_objc,none,
-      "using %0 as a concrete type conforming to protocol %1 is not supported",
-      (Type, Type))
+      "protocol type %0 cannot conform to %1 because only concrete "
+      "types can conform to protocols", (Type, Type))
 ERROR(protocol_does_not_conform_static,none,
       "%0 cannot be used as a type conforming to protocol %1 because %1 "
       "has static requirements",

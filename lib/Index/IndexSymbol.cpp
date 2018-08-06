@@ -149,9 +149,7 @@ SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
     case DeclKind::Extension: {
       info.Kind = SymbolKind::Extension;
       auto *ED = cast<ExtensionDecl>(D);
-      if (!ED->getExtendedType())
-        break;
-      NominalTypeDecl *NTD = ED->getExtendedType()->getAnyNominal();
+      NominalTypeDecl *NTD = ED->getExtendedNominal();
       if (!NTD)
         break;
       if (isa<StructDecl>(NTD))

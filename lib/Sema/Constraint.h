@@ -253,6 +253,9 @@ enum class FixKind : uint8_t {
   /// Arguments have labeling failures - missing/extraneous or incorrect
   /// labels attached to the, fix it by suggesting proper labels.
   RelabelArguments,
+
+  /// Add a new conformance to the type to satisfy a requirement.
+  AddConformance,
 };
 
 /// Describes a fix that can be applied to a constraint before visiting it.

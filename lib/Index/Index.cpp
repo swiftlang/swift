@@ -221,7 +221,7 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
     if (SymInfo.Kind == SymbolKind::Unknown)
       return true;
     if (auto *ExtD = dyn_cast<ExtensionDecl>(D)) {
-      NominalTypeDecl *NTD = ExtD->getExtendedType()->getAnyNominal();
+      NominalTypeDecl *NTD = ExtD->getExtendedNominal();
       if (getNameAndUSR(NTD, ExtD, Name, USR))
         return true;
     } else {
@@ -667,7 +667,7 @@ bool IndexSwiftASTWalker::startEntityDecl(ValueDecl *D) {
         return false;
 
     } else if (auto ParentED = dyn_cast<ExtensionDecl>(Parent)) {
-      if (ParentED->getExtendedType()->getAnyNominal()) {
+      if (ParentED->getExtendedNominal()) {
         if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationChildOf, ParentED))
           return false;
       }
@@ -841,9 +841,7 @@ bool IndexSwiftASTWalker::reportExtension(ExtensionDecl *D) {
   //   extension A.B {}
   // we want the location of 'B' token.
   SourceLoc Loc = D->getExtendedTypeLoc().getSourceRange().End;
-  if (!D->getExtendedType())
-    return true;
-  NominalTypeDecl *NTD = D->getExtendedType()->getAnyNominal();
+  NominalTypeDecl *NTD = D->getExtendedNominal();
   if (!NTD)
     return true;
   if (!shouldIndex(NTD, /*IsRef=*/false))

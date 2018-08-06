@@ -2766,6 +2766,28 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     }
     return result;
   }
+
+  // If this is a generic requirement let's try to record that
+  // conformance is missing and consider this a success, which
+  // makes it much easier to diagnose problems like that.
+  {
+    SmallVector<LocatorPathElt, 4> path;
+    auto *anchor = locator.getLocatorParts(path);
+
+    if (!path.empty() && path.back().getKind() ==
+        ConstraintLocator::PathElementKind::TypeParameterRequirement) {
+      auto typeRequirement = path.back();
+      std::pair<Expr *, unsigned> reqLoc = {anchor, typeRequirement.getValue()};
+      MissingConformances[reqLoc] = {type.getPointer(), protocol};
+      // Let's strip all of the unnecessary information from locator,
+      // diagnostics only care about anchor - to lookup type,
+      // and what was the requirement# which is not satisfied.
+      ConstraintLocatorBuilder requirement(getConstraintLocator(anchor));
+      if (!recordFix({FixKind::AddConformance},
+                     requirement.withPathElement(typeRequirement)))
+        return SolutionKind::Solved;
+    }
+  }
   
   // There's nothing more we can do; fail.
   return SolutionKind::Error;
@@ -4880,6 +4902,19 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   llvm_unreachable("bad conversion restriction");
 }
 
+// Restrictions where CSApply can figure out the correct action from the shape of
+// the types, rather than needing a record of the choice made.
+static bool recordRestriction(ConversionRestrictionKind restriction) {
+  switch(restriction) {
+    case ConversionRestrictionKind::TupleToTuple:
+    case ConversionRestrictionKind::ScalarToTuple:
+    case ConversionRestrictionKind::LValueToRValue:
+      return false;
+    default:
+      return true;
+  }
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyRestrictedConstraint(
                                        ConversionRestrictionKind restriction,
@@ -4890,8 +4925,8 @@ ConstraintSystem::simplifyRestrictedConstraint(
   switch (simplifyRestrictedConstraintImpl(restriction, type1, type2,
                                            matchKind, flags, locator)) {
   case SolutionKind::Solved:
-    ConstraintRestrictions.push_back(
-      std::make_tuple(type1, type2, restriction));
+    if (recordRestriction(restriction))
+      ConstraintRestrictions.push_back(std::make_tuple(type1, type2, restriction));
     return SolutionKind::Solved;
 
   case SolutionKind::Unsolved:
@@ -4991,6 +5026,7 @@ ConstraintSystem::simplifyFixConstraint(Fix fix, Type type1, Type type2,
   case FixKind::ExplicitlyEscapingToAny:
   case FixKind::CoerceToCheckedCast:
   case FixKind::RelabelArguments:
+  case FixKind::AddConformance:
     llvm_unreachable("handled elsewhere");
   }
 

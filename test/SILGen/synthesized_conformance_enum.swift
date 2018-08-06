@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-silgen %s -swift-version 4 | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-silgen %s -swift-version 4 | %FileCheck -check-prefix CHECK -check-prefix CHECK-FRAGILE %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-silgen %s -swift-version 4 -enable-resilience | %FileCheck -check-prefix CHECK -check-prefix CHECK-RESILIENT %s
 
 enum Enum<T> {
     case a(T), b(T)
@@ -12,13 +13,15 @@ enum NoValues {
 }
 // CHECK-LABEL: enum NoValues {
 // CHECK:   case a, b
-// CHECK:   @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ a: NoValues, _ b: NoValues) -> Bool
+// CHECK-FRAGILE:   @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ a: NoValues, _ b: NoValues) -> Bool
+// CHECK-RESILIENT: static func == (a: NoValues, b: NoValues) -> Bool
 // CHECK:   var hashValue: Int { get }
 // CHECK:   func hash(into hasher: inout Hasher)
 // CHECK: }
 
 // CHECK-LABEL: extension Enum : Equatable where T : Equatable {
-// CHECK:   @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ a: Enum<T>, _ b: Enum<T>) -> Bool
+// CHECK-FRAGILE:   @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ a: Enum<T>, _ b: Enum<T>) -> Bool
+// CHECK-RESILIENT: static func == (a: Enum<T>, b: Enum<T>) -> Bool
 // CHECK: }
 // CHECK-LABEL: extension Enum : Hashable where T : Hashable {
 // CHECK:   var hashValue: Int { get }
@@ -32,8 +35,10 @@ enum NoValues {
 
 
 extension Enum: Equatable where T: Equatable {}
-// CHECK-LABEL: // static Enum<A>.__derived_enum_equals(_:_:)
-// CHECK-NEXT: sil hidden @$S28synthesized_conformance_enum4EnumOAASQRzlE010__derived_C7_equalsySbACyxG_AEtFZ : $@convention(method) <T where T : Equatable> (@in_guaranteed Enum<T>, @in_guaranteed Enum<T>, @thin Enum<T>.Type) -> Bool {
+// CHECK-FRAGILE-LABEL: // static Enum<A>.__derived_enum_equals(_:_:)
+// CHECK-FRAGILE-NEXT: sil hidden @$S28synthesized_conformance_enum4EnumOAASQRzlE010__derived_C7_equalsySbACyxG_AEtFZ : $@convention(method) <T where T : Equatable> (@in_guaranteed Enum<T>, @in_guaranteed Enum<T>, @thin Enum<T>.Type) -> Bool {
+// CHECK-RESILIENT-LABEL: // static Enum<A>.== infix(_:_:)
+// CHECK-RESILIENT-NEXT: sil hidden @$S28synthesized_conformance_enum4EnumOAASQRzlE2eeoiySbACyxG_AEtFZ : $@convention(method) <T where T : Equatable> (@in_guaranteed Enum<T>, @in_guaranteed Enum<T>, @thin Enum<T>.Type) -> Bool {
 
 extension Enum: Hashable where T: Hashable {}
 // CHECK-LABEL: // Enum<A>.hashValue.getter

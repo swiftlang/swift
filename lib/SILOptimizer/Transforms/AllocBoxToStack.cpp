@@ -15,7 +15,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
-#include "swift/SIL/SILFunctionBuilder.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Local.h"
@@ -504,7 +504,7 @@ public:
   friend class SILInstructionVisitor<PromotedParamCloner>;
   friend class SILCloner<PromotedParamCloner>;
 
-  PromotedParamCloner(SILFunction *Orig, IsSerialized_t Serialized,
+  PromotedParamCloner(SILOptFunctionBuilder &FuncBuilder, SILFunction *Orig, IsSerialized_t Serialized,
                       ArgIndexList &PromotedArgIndices,
                       llvm::StringRef ClonedName);
 
@@ -513,7 +513,8 @@ public:
   SILFunction *getCloned() { return &getBuilder().getFunction(); }
 
 private:
-  static SILFunction *initCloned(SILFunction *Orig, IsSerialized_t Serialized,
+  static SILFunction *initCloned(SILOptFunctionBuilder &FuncBuilder,
+                                 SILFunction *Orig, IsSerialized_t Serialized,
                                  ArgIndexList &PromotedArgIndices,
                                  llvm::StringRef ClonedName);
 
@@ -532,12 +533,14 @@ private:
 };
 } // end anonymous namespace
 
-PromotedParamCloner::PromotedParamCloner(SILFunction *Orig,
+PromotedParamCloner::PromotedParamCloner(SILOptFunctionBuilder &FuncBuilder,
+                                         SILFunction *Orig,
                                          IsSerialized_t Serialized,
                                          ArgIndexList &PromotedArgIndices,
                                          llvm::StringRef ClonedName)
     : SILClonerWithScopes<PromotedParamCloner>(
-          *initCloned(Orig, Serialized, PromotedArgIndices, ClonedName)),
+          *initCloned(FuncBuilder, Orig, Serialized, PromotedArgIndices,
+                      ClonedName)),
       Orig(Orig), PromotedArgIndices(PromotedArgIndices) {
   assert(Orig->getDebugScope()->getParentFunction() !=
          getCloned()->getDebugScope()->getParentFunction());
@@ -556,10 +559,10 @@ static std::string getClonedName(SILFunction *F, IsSerialized_t Serialized,
 /// \brief Create the function corresponding to the clone of the
 /// original closure with the signature modified to reflect promoted
 /// parameters (which are specified by PromotedArgIndices).
-SILFunction *PromotedParamCloner::initCloned(SILFunction *Orig,
-                                             IsSerialized_t Serialized,
-                                             ArgIndexList &PromotedArgIndices,
-                                             llvm::StringRef ClonedName) {
+SILFunction *PromotedParamCloner::
+initCloned(SILOptFunctionBuilder &FuncBuilder, SILFunction *Orig,
+           IsSerialized_t Serialized, ArgIndexList &PromotedArgIndices,
+           llvm::StringRef ClonedName) {
   SILModule &M = Orig->getModule();
 
   SmallVector<SILParameterInfo, 4> ClonedInterfaceArgTys;
@@ -601,8 +604,7 @@ SILFunction *PromotedParamCloner::initCloned(SILFunction *Orig,
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getDebugScope())
          && "SILFunction missing DebugScope");
   assert(!Orig->isGlobalInit() && "Global initializer cannot be cloned");
-  SILFunctionBuilder builder(M);
-  auto *Fn = builder.createFunction(
+  auto *Fn = FuncBuilder.createFunction(
       SILLinkage::Shared, ClonedName, ClonedTy, Orig->getGenericEnvironment(),
       Orig->getLocation(), Orig->isBare(), IsNotTransparent, Serialized,
       Orig->getEntryCount(), Orig->isThunk(), Orig->getClassSubclassScope(),
@@ -735,7 +737,8 @@ void PromotedParamCloner::visitProjectBoxInst(ProjectBoxInst *Inst) {
 /// indices. We expect these parameters to be replaced by stack address
 /// references.
 static PartialApplyInst *
-specializePartialApply(PartialApplyInst *PartialApply,
+specializePartialApply(SILOptFunctionBuilder &FuncBuilder,
+                       PartialApplyInst *PartialApply,
                        ArgIndexList &PromotedCalleeArgIndices,
                        AllocBoxToStackState &pass) {
   auto *FRI = cast<FunctionRefInst>(PartialApply->getCallee());
@@ -758,7 +761,8 @@ specializePartialApply(PartialApplyInst *PartialApply,
     ClonedFn = PrevFn;
   } else {
     // Clone the function the existing partial_apply references.
-    PromotedParamCloner Cloner(F, Serialized, PromotedCalleeArgIndices,
+    PromotedParamCloner Cloner(FuncBuilder, F, Serialized,
+                               PromotedCalleeArgIndices,
                                ClonedName);
     Cloner.populateCloned();
     ClonedFn = Cloner.getCloned();
@@ -839,6 +843,7 @@ static void rewritePartialApplies(AllocBoxToStackState &pass) {
   // Clone the referenced function of each partial_apply, removing the
   // operands that we will not need, and remove the existing
   // partial_apply.
+  SILOptFunctionBuilder FuncBuilder(*pass.T->getPassManager());
   for (auto &It : IndexMap) {
     auto *PartialApply = It.first;
     auto &Indices = It.second;
@@ -848,7 +853,7 @@ static void rewritePartialApplies(AllocBoxToStackState &pass) {
     Indices.erase(std::unique(Indices.begin(), Indices.end()), Indices.end());
 
     PartialApplyInst *Replacement =
-        specializePartialApply(PartialApply, Indices, pass);
+      specializePartialApply(FuncBuilder, PartialApply, Indices, pass);
     PartialApply->replaceAllUsesWith(Replacement);
 
     auto *FRI = cast<FunctionRefInst>(PartialApply->getCallee());

@@ -210,7 +210,7 @@ extension String {
           "out-of-range access on a UTF16View")
 
       let index = _internalIndex(at: i.encodedOffset)
-      let u = _guts[index]
+      let u = _guts.codeUnit(atCheckedOffset: index)
       if _fastPath(UTF16._isScalar(u)) {
         // Neither high-surrogate, nor low-surrogate -- well-formed sequence
         // of 1 code unit.
@@ -221,7 +221,8 @@ extension String {
         // Sequence is well-formed if `u` is followed by a low-surrogate.
         if _fastPath(
           index + 1 < _guts.count &&
-          UTF16.isTrailSurrogate(_guts[index + 1])) {
+          UTF16.isTrailSurrogate(_guts.codeUnit(atCheckedOffset: index + 1)))
+        {
           return u
         }
         return UTF16._replacementCodeUnit
@@ -229,7 +230,10 @@ extension String {
 
       // `u` is a low-surrogate.  Sequence is well-formed if
       // previous code unit is a high-surrogate.
-      if _fastPath(index != 0 && UTF16.isLeadSurrogate(_guts[index - 1])) {
+      if _fastPath(
+        index != 0 &&
+        UTF16.isLeadSurrogate(_guts.codeUnit(atCheckedOffset: index - 1)))
+      {
         return u
       }
       return UTF16._replacementCodeUnit

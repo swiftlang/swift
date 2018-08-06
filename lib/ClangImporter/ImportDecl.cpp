@@ -8342,7 +8342,7 @@ void ClangImporter::Implementation::loadAllMembersIntoExtension(
     Decl *D, uint64_t extra) {
   // We have extension.
   auto ext = cast<ExtensionDecl>(D);
-  auto nominal = ext->getExtendedType()->getAnyNominal();
+  auto nominal = ext->getExtendedNominal();
 
   // The submodule of the extension is encoded in the extra data.
   clang::Module *submodule =
@@ -8440,7 +8440,7 @@ figureOutTheDeclarationContextToImportInto(Decl *D, DeclContext *&DC,
 }
 
 static void loadMembersOfBaseImportedFromClang(ExtensionDecl *ext) {
-  const NominalTypeDecl *base = ext->getExtendedType()->getAnyNominal();
+  const NominalTypeDecl *base = ext->getExtendedNominal();
   auto *clangBase = base->getClangDecl();
   if (!clangBase)
     return;

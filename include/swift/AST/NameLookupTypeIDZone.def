@@ -17,3 +17,4 @@
 SWIFT_TYPEID(InheritedDeclsReferencedRequest)
 SWIFT_TYPEID(UnderlyingTypeDeclsReferencedRequest)
 SWIFT_TYPEID(SuperclassDeclRequest)
+SWIFT_TYPEID(ExtendedNominalRequest)

@@ -814,7 +814,8 @@ Type TypeChecker::getUnopenedTypeOfReference(
 
   // Qualify storage declarations with an lvalue when appropriate.
   // Otherwise, they yield rvalues (and the access must be a load).
-  if (doesStorageProduceLValue(*this, value, baseType, UseDC, base)) {
+  if (doesStorageProduceLValue(*this, value, baseType, UseDC, base) &&
+      !requestedType->hasError()) {
     return LValueType::get(requestedType);
   }
 

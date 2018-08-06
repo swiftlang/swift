@@ -542,6 +542,8 @@ StringRef Fix::getName(FixKind kind) {
     return "fix: add @escaping";
   case FixKind::RelabelArguments:
     return "fix: re-label argument(s)";
+  case FixKind::AddConformance:
+    return "fix: add missing protocol conformance";
   }
 
   llvm_unreachable("Unhandled FixKind in switch.");

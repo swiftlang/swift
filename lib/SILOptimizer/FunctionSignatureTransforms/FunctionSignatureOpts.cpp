@@ -34,7 +34,7 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
-#include "swift/SIL/SILFunctionBuilder.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/CallerAnalysis.h"
@@ -495,8 +495,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   // The specialized function is an internal detail, so we need to disconnect it
   // from a parent class, if one exists, thus the override of the
   // classSubclassScope.
-  SILFunctionBuilder builder(M);
-  TransformDescriptor.OptimizedFunction = builder.createFunction(
+  TransformDescriptor.OptimizedFunction = FunctionBuilder.createFunction(
       linkage, Name, NewFTy, NewFGenericEnv, F->getLocation(), F->isBare(),
       F->isTransparent(), F->isSerialized(), F->getEntryCount(), F->isThunk(),
       /*classSubclassScope=*/SubclassScope::NotApplicable,
@@ -795,8 +794,9 @@ public:
       ResultDescList.emplace_back(IR);
     }
 
+    SILOptFunctionBuilder FuncBuilder(*getPassManager());
     // Owned to guaranteed optimization.
-    FunctionSignatureTransform FST(F, RCIA, EA, Mangler, AIM,
+    FunctionSignatureTransform FST(FuncBuilder, F, RCIA, EA, Mangler, AIM,
                                    ArgumentDescList, ResultDescList);
 
     bool Changed = false;

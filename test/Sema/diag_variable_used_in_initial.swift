@@ -44,6 +44,7 @@ func localContext() {
     }
 
     extension E { // expected-error {{declaration is only valid at file scope}}
+      // expected-error@-1{{use of undeclared type 'E'}}
       class A7 {
         func foo1() {}
         func foo2() {

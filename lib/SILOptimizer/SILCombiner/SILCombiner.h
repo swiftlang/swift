@@ -137,11 +137,13 @@ class SILCombiner :
   CastOptimizer CastOpt;
 
 public:
-  SILCombiner(SILBuilder &B, AliasAnalysis *AA, DominanceAnalysis *DA,
+  SILCombiner(SILOptFunctionBuilder &FuncBuilder,
+              SILBuilder &B, AliasAnalysis *AA, DominanceAnalysis *DA,
               bool removeCondFails)
       : AA(AA), DA(DA), Worklist(), MadeChange(false),
         RemoveCondFails(removeCondFails), Iteration(0), Builder(B),
-        CastOpt(/* ReplaceInstUsesAction */
+        CastOpt(FuncBuilder,
+                /* ReplaceInstUsesAction */
                 [&](SingleValueInstruction *I, ValueBase *V) {
                   replaceInstUsesWith(*I, V);
                 },
