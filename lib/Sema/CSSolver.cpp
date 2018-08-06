@@ -129,8 +129,12 @@ Solution ConstraintSystem::finalize(
 
   // Update the best score we've seen so far.
   if (solverState && !retainAllSolutions()) {
-    assert(!solverState->BestScore || CurrentScore <= *solverState->BestScore);
-    solverState->BestScore = CurrentScore;
+    assert(TC.getLangOpts().DisableConstraintSolverPerformanceHacks ||
+           !solverState->BestScore || CurrentScore <= *solverState->BestScore);
+
+    if (!solverState->BestScore || CurrentScore <= *solverState->BestScore) {
+      solverState->BestScore = CurrentScore;
+    }
   }
 
   for (auto tv : TypeVariables) {
@@ -1763,6 +1767,9 @@ static bool shortCircuitDisjunctionAt(Constraint *constraint,
                                       Constraint *successfulConstraint,
                                       ASTContext &ctx) {
 
+  if (ctx.LangOpts.DisableConstraintSolverPerformanceHacks)
+    return false;
+
   // If the successfully applied constraint is favored, we'll consider that to
   // be the "best".
   if (successfulConstraint->isFavored() && !constraint->isFavored()) {
@@ -1831,6 +1838,9 @@ static bool shouldSkipDisjunctionChoice(ConstraintSystem &cs,
   // Skip unavailable overloads unless solver is in the "diagnostic" mode.
   if (!cs.shouldAttemptFixes() && choice.isUnavailable())
     return true;
+
+  if (cs.TC.getLangOpts().DisableConstraintSolverPerformanceHacks)
+    return false;
 
   // Don't attempt to solve for generic operators if we already have
   // a non-generic solution.

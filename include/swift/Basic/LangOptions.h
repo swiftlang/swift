@@ -122,6 +122,9 @@ namespace swift {
     /// completions.
     bool CodeCompleteCallPatternHeuristics = false;
 
+    /// Disable constraint system performance hacks.
+    bool DisableConstraintSolverPerformanceHacks = false;
+
     ///
     /// Flags for use by tests
     ///
