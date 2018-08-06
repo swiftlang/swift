@@ -1402,13 +1402,11 @@ void ASTMangler::appendContext(const DeclContext *ctx) {
 
   case DeclContextKind::ExtensionDecl: {
     auto ExtD = cast<ExtensionDecl>(ctx);
-    auto ExtTy = ExtD->getExtendedType();
+    auto decl = ExtD->getExtendedNominal();
     // Recover from erroneous extension.
-    if (ExtTy.isNull() || ExtTy->hasError())
+    if (!decl)
       return appendContext(ExtD->getDeclContext());
 
-    auto decl = ExtTy->getAnyNominal();
-    assert(decl && "extension of non-nominal type?");
     if (!ExtD->isEquivalentToExtendedContext()) {
     // Mangle the extension if:
     // - the extension is defined in a different module from the original

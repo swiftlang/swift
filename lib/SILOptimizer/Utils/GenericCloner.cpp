@@ -15,7 +15,7 @@
 #include "swift/AST/Type.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
-#include "swift/SIL/SILFunctionBuilder.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILValue.h"
@@ -26,7 +26,8 @@
 using namespace swift;
 
 /// Create a new empty function with the correct arguments and a unique name.
-SILFunction *GenericCloner::initCloned(SILFunction *Orig,
+SILFunction *GenericCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
+				       SILFunction *Orig,
                                        IsSerialized_t Serialized,
                                        const ReabstractionInfo &ReInfo,
                                        StringRef NewName) {
@@ -39,8 +40,7 @@ SILFunction *GenericCloner::initCloned(SILFunction *Orig,
   assert(!Orig->isGlobalInit() && "Global initializer cannot be cloned");
 
   // Create a new empty function.
-  SILFunctionBuilder builder(Orig->getModule());
-  SILFunction *NewF = builder.createFunction(
+  SILFunction *NewF = FunctionBuilder.createFunction(
       getSpecializedLinkage(Orig, Orig->getLinkage()), NewName,
       ReInfo.getSpecializedType(), ReInfo.getSpecializedGenericEnvironment(),
       Orig->getLocation(), Orig->isBare(), Orig->isTransparent(), Serialized,

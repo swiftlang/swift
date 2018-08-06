@@ -223,10 +223,35 @@ namespace {
         return Type();
 
       // FIXME: Types that can be mapped, but aren't yet.
+      case clang::BuiltinType::ShortAccum:
+      case clang::BuiltinType::Accum:
+      case clang::BuiltinType::LongAccum:
+      case clang::BuiltinType::UShortAccum:
+      case clang::BuiltinType::UAccum:
+      case clang::BuiltinType::ULongAccum:
+      case clang::BuiltinType::ShortFract:
+      case clang::BuiltinType::Fract:
+      case clang::BuiltinType::LongFract:
+      case clang::BuiltinType::UShortFract:
+      case clang::BuiltinType::UFract:
+      case clang::BuiltinType::ULongFract:
+      case clang::BuiltinType::SatShortAccum:
+      case clang::BuiltinType::SatAccum:
+      case clang::BuiltinType::SatLongAccum:
+      case clang::BuiltinType::SatUShortAccum:
+      case clang::BuiltinType::SatUAccum:
+      case clang::BuiltinType::SatULongAccum:
+      case clang::BuiltinType::SatShortFract:
+      case clang::BuiltinType::SatFract:
+      case clang::BuiltinType::SatLongFract:
+      case clang::BuiltinType::SatUShortFract:
+      case clang::BuiltinType::SatUFract:
+      case clang::BuiltinType::SatULongFract:
       case clang::BuiltinType::Half:
       case clang::BuiltinType::Float16:
       case clang::BuiltinType::Float128:
       case clang::BuiltinType::NullPtr:
+      case clang::BuiltinType::Char8:
         return Type();
 
       // Objective-C types that aren't mapped directly; rather, pointers to

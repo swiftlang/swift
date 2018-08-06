@@ -214,7 +214,7 @@ namespace llvm {
 
 template <>
 struct ilist_traits<::swift::SILGlobalVariable> :
-public ilist_default_traits<::swift::SILGlobalVariable> {
+public ilist_node_traits<::swift::SILGlobalVariable> {
   using SILGlobalVariable = ::swift::SILGlobalVariable;
 
 public:

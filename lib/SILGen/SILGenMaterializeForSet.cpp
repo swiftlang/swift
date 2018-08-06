@@ -161,6 +161,7 @@
 #include "LValue.h"
 #include "RValue.h"
 #include "SILGen.h"
+#include "SILGenFunctionBuilder.h"
 #include "Scope.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Decl.h"
@@ -170,7 +171,6 @@
 #include "swift/AST/Types.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
-#include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/Support/raw_ostream.h"
@@ -717,7 +717,7 @@ SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F,
   auto callbackLinkage =
       F.isSerialized() ? SILLinkage::Shared : SILLinkage::Private;
 
-  SILFunctionBuilder builder(SGM.M);
+  SILGenFunctionBuilder builder(SGM);
   auto callback = builder.createFunction(
       callbackLinkage, CallbackName, callbackType, genericEnv,
       SILLocation(Witness), IsBare, F.isTransparent(), F.isSerialized(),

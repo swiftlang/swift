@@ -27,7 +27,7 @@ struct A {
 }
 
 extension A: K {
-    static let j = S(\A.id + "id") // expected-error {{'+' cannot be applied}} expected-note {{}}
+    static let j = S(\A.id + "id") // expected-error {{'S' requires that 'String' conform to 'K'}}
 }
 
 // SR-5034

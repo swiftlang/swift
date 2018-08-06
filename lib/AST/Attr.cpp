@@ -89,7 +89,7 @@ bool DeclAttribute::canAttributeAppearOnDeclKind(DeclAttrKind DAK, DeclKind DK) 
 bool
 DeclAttributes::isUnavailableInSwiftVersion(
   const version::Version &effectiveVersion) const {
-  clang::VersionTuple vers = effectiveVersion;
+  llvm::VersionTuple vers = effectiveVersion;
   for (auto attr : *this) {
     if (auto available = dyn_cast<AvailableAttr>(attr)) {
       if (available->isInvalid())
@@ -158,11 +158,11 @@ DeclAttributes::getDeprecated(const ASTContext &ctx) const {
       if (AvAttr->isUnconditionallyDeprecated())
         return AvAttr;
 
-      Optional<clang::VersionTuple> DeprecatedVersion = AvAttr->Deprecated;
+      Optional<llvm::VersionTuple> DeprecatedVersion = AvAttr->Deprecated;
       if (!DeprecatedVersion.hasValue())
         continue;
 
-      clang::VersionTuple MinVersion =
+      llvm::VersionTuple MinVersion =
         AvAttr->isLanguageVersionSpecific() ?
         ctx.LangOpts.EffectiveLanguageVersion :
         ctx.LangOpts.getMinPlatformVersion();
@@ -751,9 +751,9 @@ AvailableAttr::createPlatformAgnostic(ASTContext &C,
                                    StringRef Message,
                                    StringRef Rename,
                                    PlatformAgnosticAvailabilityKind Kind,
-                                   clang::VersionTuple Obsoleted) {
+                                   llvm::VersionTuple Obsoleted) {
   assert(Kind != PlatformAgnosticAvailabilityKind::None);
-  clang::VersionTuple NoVersion;
+  llvm::VersionTuple NoVersion;
   if (Kind == PlatformAgnosticAvailabilityKind::SwiftVersionSpecific) {
     assert(!Obsoleted.empty());
   }
@@ -819,7 +819,7 @@ AvailableVersionComparison AvailableAttr::getVersionAvailability(
   if (isUnconditionallyUnavailable())
     return AvailableVersionComparison::Unavailable;
 
-  clang::VersionTuple queryVersion =
+  llvm::VersionTuple queryVersion =
     isLanguageVersionSpecific() ?
     ctx.LangOpts.EffectiveLanguageVersion :
     ctx.LangOpts.getMinPlatformVersion();

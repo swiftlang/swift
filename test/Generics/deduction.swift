@@ -214,7 +214,7 @@ func rangeOfIsBefore<R : IteratorProtocol>(_ range: R) where R.Element : IsBefor
 
 func callRangeOfIsBefore(_ ia: [Int], da: [Double]) {
   rangeOfIsBefore(ia.makeIterator())
-  rangeOfIsBefore(da.makeIterator()) // expected-error{{type 'Double' does not conform to protocol 'IsBefore'}}
+  rangeOfIsBefore(da.makeIterator()) // expected-error{{'(IndexingIterator<[Double]>) -> ()' requires that 'Double' conform to 'IsBefore'}}
 }
 
 func testEqualIterElementTypes<A: IteratorProtocol, B: IteratorProtocol>(_ a: A, _ b: B) where A.Element == B.Element {}

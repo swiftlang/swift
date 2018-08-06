@@ -981,6 +981,12 @@ ExtensionDecl::takeConformanceLoaderSlow() {
   return { contextInfo->loader, contextInfo->allConformancesData };
 }
 
+NominalTypeDecl *ExtensionDecl::getExtendedNominal() const {
+  ASTContext &ctx = getASTContext();
+  return ctx.evaluator(
+      ExtendedNominalRequest{const_cast<ExtensionDecl *>(this)});;
+}
+
 Type ExtensionDecl::getInheritedType(unsigned index) const {
   ASTContext &ctx = getASTContext();
   return ctx.evaluator(InheritedTypeRequest{const_cast<ExtensionDecl *>(this),
@@ -992,7 +998,7 @@ bool ExtensionDecl::isConstrainedExtension() const {
   if (!getGenericSignature())
     return false;
 
-  auto nominal = getExtendedType()->getAnyNominal();
+  auto nominal = getExtendedNominal();
   assert(nominal);
 
   // If the generic signature differs from that of the nominal type, it's a
@@ -1002,7 +1008,7 @@ bool ExtensionDecl::isConstrainedExtension() const {
 }
 
 bool ExtensionDecl::isEquivalentToExtendedContext() const {
-  auto decl = getExtendedType()->getAnyNominal();
+  auto decl = getExtendedNominal();
   return getParentModule() == decl->getParentModule()
     && !isConstrainedExtension()
     && !getDeclaredInterfaceType()->isExistentialType();
@@ -2373,11 +2379,9 @@ AccessLevel ValueDecl::getEffectiveAccess() const {
   } else if (auto enclosingExt = dyn_cast<ExtensionDecl>(getDeclContext())) {
     // Just check the base type. If it's a constrained extension, Sema should
     // have already enforced access more strictly.
-    if (auto extendedTy = enclosingExt->getExtendedType()) {
-      if (auto nominal = extendedTy->getAnyNominal()) {
-        effectiveAccess =
-            restrictToEnclosing(effectiveAccess, nominal->getEffectiveAccess());
-      }
+    if (auto nominal = enclosingExt->getExtendedNominal()) {
+      effectiveAccess =
+          restrictToEnclosing(effectiveAccess, nominal->getEffectiveAccess());
     }
 
   } else if (getDeclContext()->isLocalContext()) {
@@ -2430,13 +2434,11 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
     } else if (auto enclosingExt = dyn_cast<ExtensionDecl>(resultDC)) {
       // Just check the base type. If it's a constrained extension, Sema should
       // have already enforced access more strictly.
-      if (auto extendedTy = enclosingExt->getExtendedType()) {
-        if (auto nominal = extendedTy->getAnyNominal()) {
-          auto nominalAccess =
-              getAdjustedFormalAccess(nominal, useDC,
-                                      treatUsableFromInlineAsPublic);
-          access = std::min(access, nominalAccess);
-        }
+      if (auto nominal = enclosingExt->getExtendedNominal()) {
+        auto nominalAccess =
+            getAdjustedFormalAccess(nominal, useDC,
+                                    treatUsableFromInlineAsPublic);
+        access = std::min(access, nominalAccess);
       }
 
     } else {
@@ -2881,7 +2883,7 @@ ExtensionRange NominalTypeDecl::getExtensions() {
 }
 
 void NominalTypeDecl::addExtension(ExtensionDecl *extension) {
-  assert(!extension->NextExtension.getInt() && "Already added extension");
+  assert(!extension->alreadyBoundToNominal() && "Already added extension");
   extension->NextExtension.setInt(true);
   
   // First extension; set both first and last.
@@ -3374,6 +3376,18 @@ ClassDecl::findImplementingMethod(const AbstractFunctionDecl *Method) const {
   return nullptr;
 }
 
+ClassDecl *ClassDecl::getGenericAncestor() const {
+  ClassDecl *current = const_cast<ClassDecl *>(this);
+
+  while (current) {
+    if (current->isGenericContext())
+      return current;
+
+    current = current->getSuperclassDecl();
+  }
+
+  return nullptr;
+}
 
 EnumCaseDecl *EnumCaseDecl::create(SourceLoc CaseLoc,
                                    ArrayRef<EnumElementDecl *> Elements,

@@ -1896,8 +1896,7 @@ auto AssociatedTypeInference::solve(ConformanceChecker &checker)
   }
 
   // Result variable to use for returns so that we get NRVO.
-  Optional<InferredTypeWitnesses> result;
-  result = { };
+  Optional<InferredTypeWitnesses> result = InferredTypeWitnesses();
 
   // If we resolved everything, we're done.
   if (unresolvedAssocTypes.empty())

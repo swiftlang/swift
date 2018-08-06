@@ -27,7 +27,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_C_4 | %FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_C_4
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_C_5 | %FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_C_5
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_D_1 | %FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_D_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_D_1 | %FileCheck %s -allow-deprecated-dag-overlap -check-prefix=NESTED_NOMINAL_DECL_D_1
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_E_1 | %FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_E_1
 

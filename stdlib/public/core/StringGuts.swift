@@ -817,39 +817,6 @@ extension _StringGuts {
     return 0
   }
 
-  //
-  // TODO (TODO: JIRA): Remove all of this. StringGuts users need to deal with
-  // the fact that it has multiple representations, otherwise they'll never be
-  // efficient.
-  //
-
-  /// Get the UTF-16 code unit stored at the specified position in this string.
-  @inlinable // FIXME(sil-serialize-all)
-  internal subscript(position: Int) -> UTF16.CodeUnit {
-    if _slowPath(_isOpaque) {
-      return _opaquePosition(position)
-    }
-
-    defer { _fixLifetime(self) }
-    if isASCII {
-      return _unmanagedASCIIView[position]
-    }
-
-    return _unmanagedUTF16View[position]
-  }
-
-  @usableFromInline // @opaque
-  internal func _opaquePosition(_ position: Int) -> UTF16.CodeUnit {
-    // TODO: ascii fast path, and reconsider this whole API anyways
-    if self._isSmall {
-      return self._smallUTF8String.withUnmanagedASCII { $0[position] }
-    }
-
-    _sanityCheck(_isOpaque)
-    defer { _fixLifetime(self) }
-    return _asOpaque()[position]
-  }
-
   /// Get the UTF-16 code unit stored at the specified position in this string.
   @inlinable // FIXME(sil-serialize-all)
   func codeUnit(atCheckedOffset offset: Int) -> UTF16.CodeUnit {
@@ -1252,19 +1219,6 @@ extension _StringGuts {
       fromCodeUnits: input,
       encoding: Encoding.self)
     return (_StringGuts(_large: storage), hadError)
-  }
-}
-
-extension _StringGuts {
-  // For testing purposes only. Might be both inefficient and too low-level.
-  // There should be an eventual API on String to accomplish something similar.
-  @usableFromInline // @_testable
-  static internal
-  func _createStringFromUTF16(_ cus: UnsafeBufferPointer<UInt16>) -> String {
-    let storage = _SwiftStringStorage<UTF16.CodeUnit>.create(
-      capacity: cus.count, count: cus.count)
-    _ = storage._initialize(fromCodeUnits: cus, encoding: UTF16.self)
-    return String(_StringGuts(_large: storage))
   }
 }
 

@@ -1239,7 +1239,8 @@ void Decl::dump() const {
 
 void Decl::dump(const char *filename) const {
   std::error_code ec;
-  llvm::raw_fd_ostream stream(filename, ec, llvm::sys::fs::F_RW);
+  llvm::raw_fd_ostream stream(filename, ec, llvm::sys::fs::FA_Read |
+                              llvm::sys::fs::FA_Write);
   // In assert builds, we blow up. Otherwise, we just return.
   assert(!ec && "Failed to open file for dumping?!");
   if (ec)
@@ -1295,11 +1296,8 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
     break;
 
   case DeclContextKind::ExtensionDecl:
-    if (auto extendedTy = cast<ExtensionDecl>(dc)->getExtendedType()) {
-      if (auto nominal = extendedTy->getAnyNominal()) {
-        printName(os, nominal->getName());
-        break;
-      }
+    if (auto extendedNominal = cast<ExtensionDecl>(dc)->getExtendedNominal()) {
+      printName(os, extendedNominal->getName());
     }
     os << " extension";
     break;

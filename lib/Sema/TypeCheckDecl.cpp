@@ -49,6 +49,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/DJB.h"
 
 using namespace swift;
 
@@ -169,7 +170,8 @@ public:
       return DenseMapInfo<uint64_t>::getHashValue(k.intValue.v0) &
              DenseMapInfo<uint64_t>::getHashValue(k.intValue.v1);
     case RawValueKey::Kind::String:
-      return llvm::HashString(k.stringValue);
+      // FIXME: DJB seed=0, audit whether the default seed could be used.
+      return llvm::djbHash(k.stringValue, 0);
     case RawValueKey::Kind::Empty:
     case RawValueKey::Kind::Tombstone:
       return 0;
@@ -912,8 +914,8 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
 
       if (isAcceptableVersionBasedChange) {
         class AvailabilityRange {
-          Optional<clang::VersionTuple> introduced;
-          Optional<clang::VersionTuple> obsoleted;
+          Optional<llvm::VersionTuple> introduced;
+          Optional<llvm::VersionTuple> obsoleted;
 
         public:
           static AvailabilityRange from(const ValueDecl *VD) {
@@ -3194,18 +3196,16 @@ public:
     }
 
     TC.checkInheritanceClause(ED);
-    if (auto extendedTy = ED->getExtendedType()) {
-      if (auto nominal = extendedTy->getAnyNominal()) {
-        TC.validateDecl(nominal);
-        if (auto *classDecl = dyn_cast<ClassDecl>(nominal))
-          TC.requestNominalLayout(classDecl);
+    if (auto nominal = ED->getExtendedNominal()) {
+      TC.validateDecl(nominal);
+      if (auto *classDecl = dyn_cast<ClassDecl>(nominal))
+        TC.requestNominalLayout(classDecl);
 
-        // Check the raw values of an enum, since we might synthesize
-        // RawRepresentable while checking conformances on this extension.
-        if (auto enumDecl = dyn_cast<EnumDecl>(nominal)) {
-          if (enumDecl->hasRawType())
-            checkEnumRawValues(TC, enumDecl);
-        }
+      // Check the raw values of an enum, since we might synthesize
+      // RawRepresentable while checking conformances on this extension.
+      if (auto enumDecl = dyn_cast<EnumDecl>(nominal)) {
+        if (enumDecl->hasRawType())
+          checkEnumRawValues(TC, enumDecl);
       }
     }
 
@@ -4955,6 +4955,8 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
   // there's nothing more to do now.
   if (ext->hasValidationStarted())
     return;
+
+  bindExtension(ext);
 
   DeclValidationRAII IBV(ext);
 

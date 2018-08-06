@@ -310,7 +310,7 @@ getInputBufForRequest(Optional<StringRef> SourceFile,
       return nullptr;
     }
   } else {
-    InputBuf = llvm::MemoryBuffer::getNewMemBuffer(0, "<input>");
+    InputBuf = llvm::WritableMemoryBuffer::getNewMemBuffer(0, "<input>");
   }
 
   return InputBuf;

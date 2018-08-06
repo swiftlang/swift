@@ -115,7 +115,7 @@ static StringRef maybeGetOSObjectBaseName(const clang::NamedDecl *decl) {
   // Hack: check to see if the name came from a macro in <os/object.h>.
   clang::SourceManager &sourceMgr = decl->getASTContext().getSourceManager();
   clang::SourceLocation expansionLoc =
-      sourceMgr.getImmediateExpansionRange(loc).first;
+      sourceMgr.getImmediateExpansionRange(loc).getBegin();
   clang::SourceLocation spellingLoc = sourceMgr.getSpellingLoc(expansionLoc);
 
   if (!sourceMgr.getFilename(spellingLoc).endswith("/os/object.h"))
@@ -193,11 +193,7 @@ public:
     assert(members.begin() != members.end());
 
     const DeclContext *origDC = (*members.begin())->getDeclContext();
-    auto *baseClass = dyn_cast<ClassDecl>(origDC);
-    if (!baseClass) {
-      Type extendedTy = cast<ExtensionDecl>(origDC)->getExtendedType();
-      baseClass = extendedTy->getClassOrBoundGenericClass();
-    }
+    auto *baseClass = origDC->getAsClassOrClassExtensionContext();
 
     os << "@interface " << getNameForObjC(baseClass);
     maybePrintObjCGenericParameters(baseClass);
@@ -369,7 +365,7 @@ private:
     if (isEmptyExtensionDecl(ED))
       return;
 
-    auto baseClass = ED->getExtendedType()->getClassOrBoundGenericClass();
+    auto baseClass = ED->getAsClassOrClassExtensionContext();
 
     if (printAvailability(ED, PrintLeadingSpace::No))
       os << "\n";
@@ -2410,7 +2406,7 @@ public:
   bool writeExtension(const ExtensionDecl *ED) {
     bool allRequirementsSatisfied = true;
 
-    const ClassDecl *CD = ED->getExtendedType()->getClassOrBoundGenericClass();
+    const ClassDecl *CD = ED->getAsClassOrClassExtensionContext();
     allRequirementsSatisfied &= require(CD);
     for (auto proto : ED->getLocalProtocols())
       if (printer.shouldInclude(proto))
@@ -2772,7 +2768,7 @@ public:
         return !printer.shouldInclude(VD);
 
       if (auto ED = dyn_cast<ExtensionDecl>(D)) {
-        auto baseClass = ED->getExtendedType()->getClassOrBoundGenericClass();
+        auto baseClass = ED->getAsClassOrClassExtensionContext();
         return !baseClass || !printer.shouldInclude(baseClass) ||
                baseClass->isForeign();
       }
@@ -2796,7 +2792,7 @@ public:
           return VD->getBaseName().userFacingName();
 
         if (auto ED = dyn_cast<ExtensionDecl>(D)) {
-          auto baseClass = ED->getExtendedType()->getClassOrBoundGenericClass();
+          auto baseClass = ED->getAsClassOrClassExtensionContext();
           return baseClass->getName().str();
         }
         llvm_unreachable("unknown top-level ObjC decl");

@@ -45,7 +45,7 @@
 #define DEBUG_TYPE "sil-capture-promotion"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/SIL/SILCloner.h"
-#include "swift/SIL/SILFunctionBuilder.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -197,7 +197,8 @@ public:
   friend class SILInstructionVisitor<ClosureCloner>;
   friend class SILCloner<ClosureCloner>;
 
-  ClosureCloner(SILFunction *Orig, IsSerialized_t Serialized,
+  ClosureCloner(SILOptFunctionBuilder &FuncBuilder,
+                SILFunction *Orig, IsSerialized_t Serialized,
                 StringRef ClonedName,
                 IndicesSet &PromotableIndices);
 
@@ -206,7 +207,8 @@ public:
   SILFunction *getCloned() { return &getBuilder().getFunction(); }
 
 private:
-  static SILFunction *initCloned(SILFunction *Orig, IsSerialized_t Serialized,
+  static SILFunction *initCloned(SILOptFunctionBuilder &FuncBuilder,
+                                 SILFunction *Orig, IsSerialized_t Serialized,
                                  StringRef ClonedName,
                                  IndicesSet &PromotableIndices);
 
@@ -306,11 +308,12 @@ ReachabilityInfo::isReachable(SILBasicBlock *From, SILBasicBlock *To) {
   return FromSet.test(FI->second);
 }
 
-ClosureCloner::ClosureCloner(SILFunction *Orig, IsSerialized_t Serialized,
+ClosureCloner::ClosureCloner(SILOptFunctionBuilder &FuncBuilder,
+                             SILFunction *Orig, IsSerialized_t Serialized,
                              StringRef ClonedName,
                              IndicesSet &PromotableIndices)
   : SILClonerWithScopes<ClosureCloner>(
-                           *initCloned(Orig, Serialized, ClonedName, PromotableIndices)),
+      *initCloned(FuncBuilder, Orig, Serialized, ClonedName, PromotableIndices)),
     Orig(Orig), PromotableIndices(PromotableIndices) {
   assert(Orig->getDebugScope()->Parent != getCloned()->getDebugScope()->Parent);
 }
@@ -403,7 +406,8 @@ static std::string getSpecializedName(SILFunction *F,
 /// *NOTE* PromotableIndices only contains the container value of the box, not
 /// the address value.
 SILFunction*
-ClosureCloner::initCloned(SILFunction *Orig, IsSerialized_t Serialized,
+ClosureCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
+                          SILFunction *Orig, IsSerialized_t Serialized,
                           StringRef ClonedName,
                           IndicesSet &PromotableIndices) {
   SILModule &M = Orig->getModule();
@@ -428,8 +432,7 @@ ClosureCloner::initCloned(SILFunction *Orig, IsSerialized_t Serialized,
          && "SILFunction missing DebugScope");
   assert(!Orig->isGlobalInit() && "Global initializer cannot be cloned");
 
-  SILFunctionBuilder builder(M);
-  auto *Fn = builder.createFunction(
+  auto *Fn = FunctionBuilder.createFunction(
       Orig->getLinkage(), ClonedName, ClonedTy, Orig->getGenericEnvironment(),
       Orig->getLocation(), Orig->isBare(), IsNotTransparent, Serialized,
       Orig->getEntryCount(), Orig->isThunk(), Orig->getClassSubclassScope(),
@@ -1130,7 +1133,8 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
 }
 
 static SILFunction *
-constructClonedFunction(PartialApplyInst *PAI, FunctionRefInst *FRI,
+constructClonedFunction(SILOptFunctionBuilder &FuncBuilder,
+                        PartialApplyInst *PAI, FunctionRefInst *FRI,
                         IndicesSet &PromotableIndices) {
   SILFunction *F = PAI->getFunction();
 
@@ -1150,7 +1154,7 @@ constructClonedFunction(PartialApplyInst *PAI, FunctionRefInst *FRI,
   }
 
   // Otherwise, create a new clone.
-  ClosureCloner cloner(Orig, Serialized, ClonedName, PromotableIndices);
+  ClosureCloner cloner(FuncBuilder, Orig, Serialized, ClonedName, PromotableIndices);
   cloner.populateCloned();
   return cloner.getCloned();
 }
@@ -1203,14 +1207,15 @@ static SILValue getOrCreateProjectBoxHelper(SILValue PartialOperand) {
 /// necessary. Also, if the closure is cloned, the cloned function is added to
 /// the worklist.
 static SILFunction *
-processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
+processPartialApplyInst(SILOptFunctionBuilder &FuncBuilder,
+                        PartialApplyInst *PAI, IndicesSet &PromotableIndices,
                         SmallVectorImpl<SILFunction*> &Worklist) {
   SILModule &M = PAI->getModule();
 
   auto *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee());
 
   // Clone the closure with the given promoted captures.
-  SILFunction *ClonedFn = constructClonedFunction(PAI, FRI, PromotableIndices);
+  SILFunction *ClonedFn = constructClonedFunction(FuncBuilder, PAI, FRI, PromotableIndices);
   Worklist.push_back(ClonedFn);
 
   // Initialize a SILBuilder and create a function_ref referencing the cloned
@@ -1338,9 +1343,11 @@ void CapturePromotionPass::processFunction(SILFunction *F,
 
   // Do the actual promotions; all promotions on a single partial_apply are
   // handled together.
+  SILOptFunctionBuilder FuncBuilder(*getPassManager());
   for (auto &IndicesPair : IndicesMap) {
     PartialApplyInst *PAI = IndicesPair.first;
-    SILFunction *ClonedFn = processPartialApplyInst(PAI, IndicesPair.second,
+    SILFunction *ClonedFn = processPartialApplyInst(FuncBuilder,
+                                                    PAI, IndicesPair.second,
                                                     Worklist);
     notifyAddFunction(ClonedFn);
   }

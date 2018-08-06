@@ -84,7 +84,7 @@ namespace llvm {
 
 template <>
 struct ilist_traits<::swift::SILProperty>
-    : public ilist_default_traits<::swift::SILProperty> {
+    : public ilist_node_traits<::swift::SILProperty> {
   using SILProperty = ::swift::SILProperty;
 
 public:

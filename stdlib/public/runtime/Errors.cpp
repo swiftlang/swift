@@ -140,8 +140,11 @@ void swift::dumpStackTraceEntry(unsigned index, void *framePC,
   }
 
   // If lookupSymbol succeeded then fileName is non-null. Thus, we find the
-  // library name here.
-  StringRef libraryName = StringRef(syminfo.fileName).rsplit('/').second;
+  // library name here. Avoid using StringRef::rsplit because its definition
+  // is not provided in the header so that it requires linking with
+  // libSupport.a.
+  StringRef libraryName = StringRef(syminfo.fileName);
+  libraryName = libraryName.substr(libraryName.rfind('/')).substr(1);
 
   // Next we get the symbol name that we are going to use in our backtrace.
   std::string symbolName;

@@ -15,13 +15,13 @@
 #include "LValue.h"
 #include "RValue.h"
 #include "SILGenFunction.h"
+#include "SILGenFunctionBuilder.h"
 #include "Scope.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/SILArgument.h"
-#include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
 
@@ -905,7 +905,7 @@ static SILValue getBehaviorInitStorageFn(SILGenFunction &SGF,
                                           SGF.getASTContext());
     
     // TODO: Generate the body of the thunk.
-    SILFunctionBuilder builder(SGF.SGM.M);
+    SILGenFunctionBuilder builder(SGF);
     thunkFn = builder.getOrCreateFunction(
         SILLocation(behaviorVar), behaviorInitName, SILLinkage::PrivateExternal,
         initConstantTy, IsBare, IsTransparent, IsSerialized);

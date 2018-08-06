@@ -244,7 +244,6 @@ internal func _memcpy(
   let size = UInt64(size)._value
   Builtin.int_memcpy_RawPointer_RawPointer_Int64(
     dest, src, size,
-    /*alignment:*/ Int32()._value,
     /*volatile:*/ false._value)
 }
 
@@ -263,6 +262,5 @@ internal func _memmove(
   let size = UInt64(size)._value
   Builtin.int_memmove_RawPointer_RawPointer_Int64(
     dest, src, size,
-    /*alignment:*/ Int32()._value,
     /*volatile:*/ false._value)
 }

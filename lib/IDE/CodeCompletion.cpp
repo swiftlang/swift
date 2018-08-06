@@ -1971,6 +1971,9 @@ public:
   ///
   /// FIXME: Perhaps this should be an option in PrintOptions instead.
   Type eraseArchetypes(ModuleDecl *M, Type type, GenericSignature *genericSig) {
+    if (!genericSig)
+      return type;
+
     auto buildProtocolComposition = [&](ArrayRef<ProtocolDecl *> protos) -> Type {
       SmallVector<Type, 2> types;
       for (auto proto : protos)

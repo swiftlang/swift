@@ -923,7 +923,7 @@ namespace llvm {
 
 template <>
 struct ilist_traits<::swift::SILFunction> :
-public ilist_default_traits<::swift::SILFunction> {
+public ilist_node_traits<::swift::SILFunction> {
   using SILFunction = ::swift::SILFunction;
 
 public:

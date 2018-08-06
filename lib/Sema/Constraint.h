@@ -253,6 +253,9 @@ enum class FixKind : uint8_t {
   /// Arguments have labeling failures - missing/extraneous or incorrect
   /// labels attached to the, fix it by suggesting proper labels.
   RelabelArguments,
+
+  /// Add a new conformance to the type to satisfy a requirement.
+  AddConformance,
 };
 
 /// Describes a fix that can be applied to a constraint before visiting it.
@@ -734,7 +737,7 @@ namespace llvm {
 /// Specialization of \c ilist_traits for constraints.
 template<>
 struct ilist_traits<swift::constraints::Constraint>
-         : public ilist_default_traits<swift::constraints::Constraint> {
+         : public ilist_node_traits<swift::constraints::Constraint> {
   using Element = swift::constraints::Constraint;
 
   static Element *createNode(const Element &V) = delete;

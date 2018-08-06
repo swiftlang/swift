@@ -1,3 +1,5 @@
+// REQUIRES: rdar39260564
+
 // RUN: %sourcekitd-test -req=track-compiles == -req=sema %s -- %s | %FileCheck %s -check-prefix=NODIAGS
 // NODIAGS: key.notification: source.notification.compile-did-finish
 // NODIAGS-NEXT: key.diagnostics: [
