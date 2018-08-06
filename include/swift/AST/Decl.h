@@ -6506,6 +6506,8 @@ AbstractStorageDecl::overwriteSetterAccess(AccessLevel accessLevel) {
     setter->overwriteAccess(accessLevel);
   if (auto materializeForSet = getMaterializeForSetFunc())
     materializeForSet->overwriteAccess(accessLevel);
+  if (auto modify = getModifyCoroutine())
+    modify->overwriteAccess(accessLevel);
   if (auto mutableAddressor = getMutableAddressor())
     mutableAddressor->overwriteAccess(accessLevel);
 }

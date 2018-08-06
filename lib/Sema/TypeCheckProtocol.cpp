@@ -295,7 +295,10 @@ static bool checkMutating(FuncDecl *requirement, FuncDecl *witness,
       witnessMutating = isReadWriteMutating();
       break;
 
-    default:
+#define OPAQUE_ACCESSOR(ID, KEYWORD)
+#define ACCESSOR(ID) \
+    case AccessorKind::ID:
+#include "swift/AST/AccessorKinds.def"
       llvm_unreachable("unexpected accessor requirement");
     }
   }
@@ -380,6 +383,8 @@ static ValueDecl *getStandinForAccessor(AbstractStorageDecl *witnessStorage,
   case AccessorKind::Get:
     if (auto addressor = getExplicitAccessor(AccessorKind::Address))
       return addressor;
+    if (auto read = getExplicitAccessor(AccessorKind::Read))
+      return read;
     break;
 
   case AccessorKind::MaterializeForSet:
@@ -390,10 +395,15 @@ static ValueDecl *getStandinForAccessor(AbstractStorageDecl *witnessStorage,
   case AccessorKind::Set:
     if (auto addressor = getExplicitAccessor(AccessorKind::MutableAddress))
       return addressor;
+    if (auto modify = getExplicitAccessor(AccessorKind::Modify))
+      return modify;
     break;
 
-  default:
-    break;
+#define OPAQUE_ACCESSOR(ID, KEYWORD)
+#define ACCESSOR(ID) \
+  case AccessorKind::ID:
+#include "swift/AST/AccessorKinds.def"
+    llvm_unreachable("unexpected accessor requirement");
   }
 
   // Otherwise, just diagnose starting at the storage declaration itself.
