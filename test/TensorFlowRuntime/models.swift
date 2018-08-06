@@ -35,8 +35,8 @@ ModelTests.testAllBackends("StraightLineXORTraining") {
 
   // Parameters
   var rng = ARC4RandomNumberGenerator(seed: 42)
-  var w1 = Tensor<Float>(randomUniform: [2, 4], rng: rng)
-  var w2 = Tensor<Float>(randomUniform: [4, 1], rng: rng)
+  var w1 = Tensor<Float>(randomUniform: [2, 4], generator: &rng)
+  var w2 = Tensor<Float>(randomUniform: [4, 1], generator: &rng)
   var b1 = Tensor<Float>(zeros: [1, 4])
   var b2 = Tensor<Float>(zeros: [1, 1])
 
@@ -96,8 +96,8 @@ ModelTests.testAllBackends("XORClassifierTraining") {
     var w1, w2, b1, b2: Tensor<Float>
 
     init() {
-      w1 = Tensor(randomUniform: [2, 4], rng: rng)
-      w2 = Tensor(randomUniform: [4, 1], rng: rng)
+      w1 = Tensor(randomUniform: [2, 4], generator: &rng)
+      w2 = Tensor(randomUniform: [4, 1], generator: &rng)
       b1 = Tensor(zeros: [1, 4])
       b2 = Tensor(zeros: [1, 1])
     }

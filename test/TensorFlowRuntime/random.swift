@@ -83,8 +83,9 @@ RandomTests.test("ARC4CopyIsDistinctFromOriginal") {
 }
 
 RandomTests.test("UniformDistributionIsInRange") {
-  var rng: RandomNumberGenerator = ARC4RandomNumberGenerator(seed: UInt64(42))
-  let dist = UniformFloatingPointDistribution<Double>(a: 10, b: 42)
+  var rng = ARC4RandomNumberGenerator(seed: UInt64(42))
+  let dist = UniformFloatingPointDistribution<Double>(lowerBound: 10,
+                                                      upperBound: 42)
   for _ in 0 ..< 1000 {
     let r = dist.next(using: &rng)
     expectGE(r, 10)
@@ -93,8 +94,9 @@ RandomTests.test("UniformDistributionIsInRange") {
 }
 
 RandomTests.test("UniformDistributionMean") {
-  var rng: RandomNumberGenerator = ARC4RandomNumberGenerator(seed: UInt64(42))
-  let dist = UniformFloatingPointDistribution<Double>(a: 10, b: 50)
+  var rng = ARC4RandomNumberGenerator(seed: UInt64(42))
+  let dist = UniformFloatingPointDistribution<Double>(lowerBound: 10,
+                                                      upperBound: 50)
   let count = 100000
   var mean: Double = 0
   for _ in 0 ..< count {
@@ -105,8 +107,9 @@ RandomTests.test("UniformDistributionMean") {
 }
 
 RandomTests.test("UniformDistributionStdDev") {
-  var rng: RandomNumberGenerator = ARC4RandomNumberGenerator(seed: UInt64(42))
-  let dist = UniformFloatingPointDistribution<Double>(a: 10, b: 50)
+  var rng = ARC4RandomNumberGenerator(seed: UInt64(42))
+  let dist = UniformFloatingPointDistribution<Double>(lowerBound: 10,
+                                                      upperBound: 50)
   let count = 100000
   var mean: Double = 0
   var meanSquare: Double = 0
@@ -122,9 +125,8 @@ RandomTests.test("UniformDistributionStdDev") {
 }
 
 RandomTests.test("NormalDistributionMean") {
-  var rng: RandomNumberGenerator = ARC4RandomNumberGenerator(seed: UInt64(42))
-  let dist = NormalFloatingPointDistribution<Double>(mean: 10,
-                                                     standardDeviation: 50)
+  var rng = ARC4RandomNumberGenerator(seed: UInt64(42))
+  let dist = NormalDistribution<Double>(mean: 10, standardDeviation: 50)
   let count = 100000
   var mean: Double = 0
   for _ in 0 ..< count {
@@ -135,8 +137,8 @@ RandomTests.test("NormalDistributionMean") {
 }
 
 RandomTests.test("NormalDistributionStdDev") {
-  var rng: RandomNumberGenerator = ARC4RandomNumberGenerator(seed: UInt64(42))
-  let dist = NormalFloatingPointDistribution<Double>(mean: 10, standardDeviation: 50)
+  var rng = ARC4RandomNumberGenerator(seed: UInt64(42))
+  let dist = NormalDistribution<Double>(mean: 10, standardDeviation: 50)
   let count = 100000
   var mean: Double = 0
   var meanSquare: Double = 0
@@ -152,7 +154,7 @@ RandomTests.test("NormalDistributionStdDev") {
 }
 
 RandomTests.test("UniformIntDistributionMean") {
-  var rng: RandomNumberGenerator = ARC4RandomNumberGenerator(seed: UInt64(42))
+  var rng = ARC4RandomNumberGenerator(seed: UInt64(42))
   let dist = UniformIntegerDistribution<UInt16>()
   let count = 100000
   var mean: Double = 0
@@ -164,7 +166,7 @@ RandomTests.test("UniformIntDistributionMean") {
 }
 
 RandomTests.test("UniformIntDistributionStdDev") {
-  var rng: RandomNumberGenerator = ARC4RandomNumberGenerator(seed: UInt64(42))
+  var rng = ARC4RandomNumberGenerator(seed: UInt64(42))
   let dist = UniformIntegerDistribution<UInt16>()
   let count = 100000
   var mean: Double = 0

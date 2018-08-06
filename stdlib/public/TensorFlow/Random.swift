@@ -44,7 +44,7 @@ public protocol SeedableRandomNumberGenerator: RandomNumberGenerator {
 extension SeedableRandomNumberGenerator {
   public init<T: BinaryInteger>(seed: T) {
     var newSeed: [UInt8] = []
-    for i in 0 ..< seed.bitWidth / UInt8.bitWidth {
+    for i in 0..<seed.bitWidth / UInt8.bitWidth {
       newSeed.append(UInt8(truncatingIfNeeded: seed >> (UInt8.bitWidth * i)))
     }
     self.init(seed: newSeed)
@@ -58,10 +58,13 @@ extension SeedableRandomNumberGenerator {
 ///
 /// ARC4 is described in Schneier, B., "Applied Cryptography: Protocols,
 /// Algorithms, and Source Code in C", 2nd Edition, 1996.
+///
+/// This generator is thread-safe. The random data generated is of high-quality,
+/// but is not suitable for cryptographic applications.
 @_fixed_layout
 public struct ARC4RandomNumberGenerator: SeedableRandomNumberGenerator {
-  public static let global = ARC4RandomNumberGenerator(seed: UInt32(time(nil)))
-  var state: [UInt8] = Array(0 ... 255)
+  public static var global = ARC4RandomNumberGenerator(seed: UInt32(time(nil)))
+  var state: [UInt8] = Array(0...255)
   var iPos: UInt8 = 0
   var jPos: UInt8 = 0
 
@@ -71,7 +74,7 @@ public struct ARC4RandomNumberGenerator: SeedableRandomNumberGenerator {
     _precondition(seed.count > 0, "Length of seed must be positive")
     _precondition(seed.count <= 256, "Length of seed must be at most 256")
     var j: UInt8 = 0
-    for i: UInt8 in 0 ... 255 {
+    for i: UInt8 in 0...255 {
       j &+= S(i) &+ seed[Int(i) % seed.count]
       swapAt(i, j)
     }
@@ -81,7 +84,7 @@ public struct ARC4RandomNumberGenerator: SeedableRandomNumberGenerator {
   // state.
   public mutating func next() -> UInt64 {
     var result: UInt64 = 0
-    for _ in 0 ..< UInt64.bitWidth / UInt8.bitWidth {
+    for _ in 0..<UInt64.bitWidth / UInt8.bitWidth {
       result <<= UInt8.bitWidth
       result += UInt64(nextByte())
     }
@@ -89,17 +92,17 @@ public struct ARC4RandomNumberGenerator: SeedableRandomNumberGenerator {
   }
 
   // Helper to access the state.
-  func S(_ index: UInt8) -> UInt8 {
+  private func S(_ index: UInt8) -> UInt8 {
     return state[Int(index)]
   }
 
   // Helper to swap elements of the state.
-  mutating func swapAt(_ i: UInt8, _ j: UInt8) {
+  private mutating func swapAt(_ i: UInt8, _ j: UInt8) {
     state.swapAt(Int(i), Int(j))
   }
 
   // Generates the next byte in the keystream.
-  mutating func nextByte() -> UInt8 {
+  private mutating func nextByte() -> UInt8 {
     iPos &+= 1
     jPos &+= S(iPos)
     swapAt(iPos, jPos)
@@ -111,35 +114,40 @@ public struct ARC4RandomNumberGenerator: SeedableRandomNumberGenerator {
 // Distributions
 //===----------------------------------------------------------------------===//
 
-public final class UniformIntegerDistribution<T: BinaryInteger> {
-  public init() { }
+@_fixed_layout
+public final class UniformIntegerDistribution<T: FixedWidthInteger> {
+  public let lowerBound: T
+  public let upperBound: T
 
-  public func next(using rng: inout RandomNumberGenerator) -> T {
-    let r: UInt64 = rng.next()
-    return T.init(truncatingIfNeeded: r)
+  public init(lowerBound: T = T.self.min, upperBound: T = T.self.max) {
+    self.lowerBound = lowerBound
+    self.upperBound = upperBound
+  }
+
+  public func next<G: RandomNumberGenerator>(using rng: inout G) -> T {
+    return T.random(in: lowerBound...upperBound, using: &rng)
   }
 }
 
 @_fixed_layout
-public final class UniformFloatingPointDistribution<T: BinaryFloatingPoint> {
-  public let a: T
-  public let b: T
-  private let uniformIntDist = UniformIntegerDistribution<UInt64>()
+public final class UniformFloatingPointDistribution<T: BinaryFloatingPoint>
+  where T.RawSignificand : FixedWidthInteger {
+  public let lowerBound: T
+  public let upperBound: T
 
-  public init(a: T = 0, b: T = 1) {
-    self.a = a
-    self.b = b
+  public init(lowerBound: T = 0, upperBound: T = 1) {
+    self.lowerBound = lowerBound
+    self.upperBound = upperBound
   }
 
-  public func next(using rng: inout RandomNumberGenerator) -> T {
-    let result = uniformIntDist.next(using: &rng)
-    let uniform01: T = T(result) / (T(UInt64.max) + 1)
-    return a + (b - a) * uniform01
+  public func next<G: RandomNumberGenerator>(using rng: inout G) -> T {
+    return T.random(in: lowerBound..<upperBound, using: &rng)
   }
 }
 
 @_fixed_layout
-public final class NormalFloatingPointDistribution<T: BinaryFloatingPoint> {
+public final class NormalDistribution<T: BinaryFloatingPoint>
+  where T.RawSignificand : FixedWidthInteger {
   public let mean: T
   public let standardDeviation: T
   private let uniformDist = UniformFloatingPointDistribution<T>()
@@ -149,7 +157,7 @@ public final class NormalFloatingPointDistribution<T: BinaryFloatingPoint> {
     self.standardDeviation = standardDeviation
   }
 
-  public func next(using rng: inout RandomNumberGenerator) -> T {
+  public func next<G: RandomNumberGenerator>(using rng: inout G) -> T {
     // FIXME: Box-Muller can generate two values for only a little more than the
     // cost of one.
     let u1 = uniformDist.next(using: &rng)

@@ -585,46 +585,59 @@ public extension Tensor where Scalar == Int32 {
   ///
   /// - Parameters:
   ///   - shape: The dimensions of the tensor.
-  ///   - rng: Optional random number generator to use.
+  ///   - generator: Random number generator to use.
   ///
   @inlinable @inline(__always)
-  init(randomStandardUniform shape: TensorShape,
-       rng: RandomNumberGenerator? = nil) {
+  init<G: RandomNumberGenerator>(randomStandardUniform shape: TensorShape,
+                                 generator: inout G) {
     self = Tensor(
       handle: _TFHoistable {
-        var rng = rng ?? ARC4RandomNumberGenerator.global
         let dist = UniformIntegerDistribution<Scalar>()
         var scalars: [Scalar] = []
         for _ in 0 ..< shape.contiguousSize {
-          scalars.append(dist.next(using: &rng))
+          scalars.append(dist.next(using: &generator))
         }
         return _TFTensorFromScalars(scalars, shape: shape.dimensions)
       }
     ).toAccelerator()
   }
+
+  @inlinable @inline(__always)
+  init(randomStandardUniform shape: TensorShape) {
+    self.init(randomStandardUniform: shape,
+              generator: &ARC4RandomNumberGenerator.global)
+  }
+
 }
 
-public extension Tensor where Scalar : BinaryFloatingPoint {
+public extension Tensor where Scalar : BinaryFloatingPoint,
+                              Scalar.RawSignificand : FixedWidthInteger {
   /// Creates a tensor with the specified shape, randomly sampling scalar values
   /// from a uniform distribution between 0 and 1.
   ///
   /// - Parameters:
   ///   - shape: The dimensions of the tensor.
-  ///   - rng: Optional random number generator to use.
+  ///   - generator: Random number generator to use.
   ///
   @inlinable @inline(__always)
-  init(randomUniform shape: TensorShape, rng: RandomNumberGenerator? = nil) {
+  init<G: RandomNumberGenerator>(randomUniform shape: TensorShape,
+                                 generator: inout G) {
     self = Tensor(
       handle: _TFHoistable {
-        var rng = rng ?? ARC4RandomNumberGenerator.global
         let dist = UniformFloatingPointDistribution<Scalar>()
         var scalars: [Scalar] = []
         for _ in 0 ..< shape.contiguousSize {
-          scalars.append(dist.next(using: &rng))
+          scalars.append(dist.next(using: &generator))
         }
         return _TFTensorFromScalars(scalars, shape: shape.dimensions)
       }
     ).toAccelerator()
+  }
+
+  @inlinable @inline(__always)
+  init(randomUniform shape: TensorShape) {
+    self.init(randomUniform: shape,
+              generator: &ARC4RandomNumberGenerator.global)
   }
 
   /// Creates a tensor with the specified shape, randomly sampling scalar values
@@ -634,23 +647,32 @@ public extension Tensor where Scalar : BinaryFloatingPoint {
   ///   - shape: The dimensions of the tensor.
   ///   - mean: The mean of the distribution.
   ///   - stddev: The standard deviation of the distribution.
-  ///   - rng: Optional random number generator to use.
+  ///   - generator: Random number generator to use.
   ///
   @inlinable @inline(__always)
-  init(randomNormal shape: TensorShape, mean: Scalar = 0, stddev: Scalar = 1,
-       rng: RandomNumberGenerator? = nil) {
+  init<G: RandomNumberGenerator>(randomNormal shape: TensorShape,
+                                 mean: Scalar = 0,
+                                 stddev: Scalar = 1,
+                                 generator: inout G) {
     self = Tensor(
       handle: _TFHoistable {
-        var rng = rng ?? ARC4RandomNumberGenerator.global
-        let dist = NormalFloatingPointDistribution<Scalar>(
+        let dist = NormalDistribution<Scalar>(
           mean: mean, standardDeviation: stddev)
         var scalars: [Scalar] = []
         for _ in 0 ..< shape.contiguousSize {
-          scalars.append(dist.next(using: &rng))
+          scalars.append(dist.next(using: &generator))
         }
         return _TFTensorFromScalars(scalars, shape: shape.dimensions)
       }
     ).toAccelerator()
+  }
+
+  @inlinable @inline(__always)
+  init(randomNormal shape: TensorShape,
+       mean: Scalar = 0,
+       stddev: Scalar = 1) {
+    self.init(randomNormal: shape, mean: mean, stddev: stddev,
+              generator: &ARC4RandomNumberGenerator.global)
   }
 }
 
