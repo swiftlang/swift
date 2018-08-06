@@ -86,6 +86,9 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
 }
 
 bool ConstraintSystem::worseThanBestSolution() const {
+  if (TC.getLangOpts().DisableConstraintSolverPerformanceHacks)
+    return false;
+
   if (retainAllSolutions())
     return false;
 

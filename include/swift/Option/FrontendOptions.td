@@ -183,6 +183,9 @@ def debug_time_function_bodies : Flag<["-"], "debug-time-function-bodies">,
 def debug_time_expression_type_checking : Flag<["-"], "debug-time-expression-type-checking">,
   HelpText<"Dumps the time it takes to type-check each expression">;
 
+def disable_constraint_solver_performance_hacks : Flag<["-"], "disable-constraint-solver-performance-hacks">,
+  HelpText<"Disable all the hacks in the constraint solver">;
+
 def debug_assert_immediately : Flag<["-"], "debug-assert-immediately">,
   DebugCrashOpt, HelpText<"Force an assertion failure immediately">;
 def debug_assert_after_parse : Flag<["-"], "debug-assert-after-parse">,
