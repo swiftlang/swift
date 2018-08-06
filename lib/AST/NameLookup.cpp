@@ -1957,7 +1957,8 @@ static TinyPtrVector<NominalTypeDecl *>
 resolveTypeDeclsToNominal(Evaluator &evaluator,
                           ASTContext &ctx,
                           ArrayRef<TypeDecl *> typeDecls,
-                          SmallVectorImpl<ModuleDecl *> &modulesFound) {
+                          SmallVectorImpl<ModuleDecl *> &modulesFound,
+                          bool &anyObject) {
   TinyPtrVector<NominalTypeDecl *> nominalDecls;
 
   for (auto typeDecl : typeDecls) {
@@ -1973,10 +1974,32 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
         = evaluator(UnderlyingTypeDeclsReferencedRequest{typealias});
       auto underlyingNominalReferences
         = resolveTypeDeclsToNominal(evaluator, ctx, underlyingTypeReferences,
-                                    modulesFound);
+                                    modulesFound, anyObject);
       nominalDecls.insert(nominalDecls.end(),
                           underlyingNominalReferences.begin(),
                           underlyingNominalReferences.end());
+
+      // Recognize Swift.AnyObject directly.
+      if (typealias->getName().is("AnyObject")) {
+        // TypeRepr version: Builtin.AnyObject
+        if (auto typeRepr = typealias->getUnderlyingTypeLoc().getTypeRepr()) {
+          if (auto compound = dyn_cast<CompoundIdentTypeRepr>(typeRepr)) {
+            auto components = compound->getComponents();
+            if (components.size() == 2 &&
+                components[0]->getIdentifier().is("Builtin") &&
+                components[1]->getIdentifier().is("AnyObject")) {
+              anyObject = true;
+            }
+          }
+        }
+
+        // Type version: an empty class-bound existential.
+        if (auto type = typealias->getUnderlyingTypeLoc().getType()) {
+          if (type->isAnyObject())
+            anyObject = true;
+        }
+      }
+
       continue;
     }
 
@@ -2018,8 +2041,10 @@ directReferencesForQualifiedTypeLookup(Evaluator &evaluator,
   // Look through the base types to find something on which we can perform
   // qualified name lookup.
   SmallVector<ModuleDecl *, 2> moduleBaseTypes;
+  bool anyObject = false;
   auto nominalBaseTypes =
-      resolveTypeDeclsToNominal(evaluator, ctx, baseTypes, moduleBaseTypes);
+      resolveTypeDeclsToNominal(evaluator, ctx, baseTypes, moduleBaseTypes,
+                                anyObject);
 
   DirectlyReferencedTypeDecls result;
   auto addResults = [&result](ArrayRef<ValueDecl *> found){
@@ -2241,9 +2266,10 @@ ClassDecl *SuperclassDeclRequest::evaluate(Evaluator &evaluator,
 
     // Resolve those type declarations to nominal type declarations.
     SmallVector<ModuleDecl *, 2> modulesFound;
+    bool anyObject = false;
     auto inheritedNominalTypes
       = resolveTypeDeclsToNominal(evaluator, subject->getASTContext(),
-                                  inheritedTypes, modulesFound);
+                                  inheritedTypes, modulesFound, anyObject);
 
     // Look for a class declaration.
     for (auto inheritedNominal : inheritedNominalTypes) {
@@ -2273,15 +2299,18 @@ NominalTypeDecl *ExtendedNominalRequest::evaluate(Evaluator &evaluator,
 
   // Resolve those type declarations to nominal type declarations.
   SmallVector<ModuleDecl *, 2> modulesFound;
+  bool anyObject = false;
   auto nominalTypes
-    = resolveTypeDeclsToNominal(evaluator, ctx, referenced, modulesFound);
+    = resolveTypeDeclsToNominal(evaluator, ctx, referenced, modulesFound,
+                                anyObject);
   return nominalTypes.empty() ? nullptr : nominalTypes.front();
 }
 
 void swift::getDirectlyInheritedNominalTypeDecls(
     llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
     unsigned i,
-    llvm::SmallVectorImpl<std::pair<SourceLoc, NominalTypeDecl *>> &result) {
+    llvm::SmallVectorImpl<std::pair<SourceLoc, NominalTypeDecl *>> &result,
+    bool &anyObject) {
   auto typeDecl = decl.dyn_cast<TypeDecl *>();
   auto extDecl = decl.dyn_cast<ExtensionDecl *>();
 
@@ -2294,7 +2323,8 @@ void swift::getDirectlyInheritedNominalTypeDecls(
   // Resolve those type declarations to nominal type declarations.
   SmallVector<ModuleDecl *, 2> modulesFound;
   auto nominalTypes
-    = resolveTypeDeclsToNominal(ctx.evaluator, ctx, referenced, modulesFound);
+    = resolveTypeDeclsToNominal(ctx.evaluator, ctx, referenced, modulesFound,
+                                anyObject);
 
   // Dig out the source location
   // FIXME: This is a hack. We need cooperation from
@@ -2313,7 +2343,8 @@ void swift::getDirectlyInheritedNominalTypeDecls(
 
 SmallVector<std::pair<SourceLoc, NominalTypeDecl *>, 4>
 swift::getDirectlyInheritedNominalTypeDecls(
-                        llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl) {
+                        llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
+                        bool &anyObject) {
   auto typeDecl = decl.dyn_cast<TypeDecl *>();
   auto extDecl = decl.dyn_cast<ExtensionDecl *>();
 
@@ -2322,7 +2353,7 @@ swift::getDirectlyInheritedNominalTypeDecls(
                                    : extDecl->getInherited().size();
   SmallVector<std::pair<SourceLoc, NominalTypeDecl *>, 4> result;
   for (unsigned i : range(numInherited)) {
-    getDirectlyInheritedNominalTypeDecls(decl, i, result);
+    getDirectlyInheritedNominalTypeDecls(decl, i, result, anyObject);
   }
 
   return result;

@@ -31,6 +31,7 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
@@ -3652,31 +3653,32 @@ bool ProtocolDecl::inheritsFrom(const ProtocolDecl *super) const {
 bool ProtocolDecl::requiresClassSlow() {
   // Set this first to catch (invalid) circular inheritance.
   Bits.ProtocolDecl.RequiresClassValid = true;
+  Bits.ProtocolDecl.RequiresClass = false;
 
   // Quick check: @objc protocols require a class.
-  if (isObjC()) {
-    Bits.ProtocolDecl.RequiresClass = true;
-    return true;
-  }
+  if (isObjC())
+    return Bits.ProtocolDecl.RequiresClass = true;
 
-  // Otherwise, check if the inheritance clause contains a
-  // class-constrained existential.
-  //
-  // FIXME: Use the requirement signature if available.
-  Bits.ProtocolDecl.RequiresClass = false;
-  for (unsigned i : indices(getInherited())) {
-    Type type = getInheritedType(i);
-    assert(type && "Should have type checked inheritance clause by now");
-    if (type->isExistentialType()) {
-      auto layout = type->getExistentialLayout();
-      if (layout.requiresClass()) {
-        Bits.ProtocolDecl.RequiresClass = true;
-        return true;
-      }
-    }
-    if (type->getClassOrBoundGenericClass()) {
-      Bits.ProtocolDecl.RequiresClass = true;
-      return true;
+  // Determine the set of nominal types that this protocol inherits.
+  bool anyObject = false;
+  auto allInheritedNominals =
+    getDirectlyInheritedNominalTypeDecls(this, anyObject);
+
+  // Quick check: do we inherit AnyObject?
+  if (anyObject)
+    return Bits.ProtocolDecl.RequiresClass = true;
+
+  // Look through all of the inherited nominals for a superclass or a
+  // class-bound protocol.
+  for (const auto &found : allInheritedNominals) {
+    // Superclass bound.
+    if (isa<ClassDecl>(found.second))
+      return Bits.ProtocolDecl.RequiresClass = true;
+
+    // A protocol that might be class-constrained;
+    if (auto proto = dyn_cast<ProtocolDecl>(found.second)) {
+      if (proto->requiresClass())
+        return Bits.ProtocolDecl.RequiresClass = true;
     }
   }
 

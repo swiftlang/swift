@@ -490,7 +490,9 @@ void ConformanceLookupTable::addInheritedProtocols(
                           llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
                           ConformanceSource source) {
   // Find all of the protocols in the inheritance list.
-  for (const auto &found : getDirectlyInheritedNominalTypeDecls(decl)) {
+  bool anyObject = false;
+  for (const auto &found :
+          getDirectlyInheritedNominalTypeDecls(decl, anyObject)) {
     if (auto proto = dyn_cast<ProtocolDecl>(found.second))
       addProtocol(proto, found.first, source);
   }
