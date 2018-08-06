@@ -14,7 +14,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/SIL/SILCloner.h"
-#include "swift/SIL/SILFunctionBuilder.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/Analysis/ColdBlockInfo.h"
@@ -257,8 +257,8 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
   GenericEnvironment *GenericEnv = nullptr;
   if (NewFTy->getGenericSignature())
     GenericEnv = OrigF->getGenericEnvironment();
-  SILFunctionBuilder builder(OrigF->getModule());
-  SILFunction *NewF = builder.createFunction(
+  SILOptFunctionBuilder FuncBuilder(*getPassManager());
+  SILFunction *NewF = FuncBuilder.createFunction(
       SILLinkage::Shared, Name, NewFTy, GenericEnv, OrigF->getLocation(),
       OrigF->isBare(), OrigF->isTransparent(), Serialized,
       OrigF->getEntryCount(), OrigF->isThunk(), OrigF->getClassSubclassScope(),
@@ -336,6 +336,7 @@ static bool onlyContainsReturnOrThrowOfArg(SILBasicBlock *BB) {
 /// GenericSpecialized contains a tuple:
 /// (new specialized function, old function)
 static SILFunction *getSpecializedWithDeadParams(
+    SILOptFunctionBuilder &FuncBuilder,
     PartialApplyInst *PAI, SILFunction *Orig, int numDeadParams,
     std::pair<SILFunction *, SILFunction *> &GenericSpecialized) {
   SILBasicBlock &EntryBB = *Orig->begin();
@@ -418,10 +419,10 @@ static SILFunction *getSpecializedWithDeadParams(
     ReabstractionInfo ReInfo(ApplySite(), Specialized,
                              PAI->getSubstitutionMap(),
                              /* ConvertIndirectToDirect */ false);
-    GenericFuncSpecializer FuncSpecializer(
-                                         Specialized,
-                                         ReInfo.getClonerParamSubstitutionMap(),
-                                         Specialized->isSerialized(), ReInfo);
+    GenericFuncSpecializer FuncSpecializer(FuncBuilder,
+                                           Specialized,
+                                           ReInfo.getClonerParamSubstitutionMap(),
+                                           Specialized->isSerialized(), ReInfo);
 
     SILFunction *GenericSpecializedFunc = FuncSpecializer.trySpecialization();
     if (!GenericSpecializedFunc)
@@ -451,7 +452,8 @@ bool CapturePropagation::optimizePartialApply(PartialApplyInst *PAI) {
   // First possibility: Is it a partial_apply where all partially applied
   // arguments are dead?
   std::pair<SILFunction *, SILFunction *> GenericSpecialized;
-  if (auto *NewFunc = getSpecializedWithDeadParams(
+  SILOptFunctionBuilder FuncBuilder(*PM);
+  if (auto *NewFunc = getSpecializedWithDeadParams(FuncBuilder,
           PAI, SubstF, PAI->getNumArguments(), GenericSpecialized)) {
     rewritePartialApply(PAI, NewFunc);
     if (GenericSpecialized.first) {

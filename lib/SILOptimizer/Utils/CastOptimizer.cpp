@@ -26,7 +26,7 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILFunctionBuilder.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
@@ -90,8 +90,7 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
   SILDeclRef FuncDeclRef(BridgeFuncDecl, SILDeclRef::Kind::Func);
 
   // Lookup a function from the stdlib.
-  SILFunctionBuilder builder(M);
-  SILFunction *BridgedFunc = builder.getOrCreateFunction(
+  SILFunction *BridgedFunc = FunctionBuilder.getOrCreateFunction(
       Loc, FuncDeclRef, ForDefinition_t::NotForDefinition);
 
   if (!BridgedFunc)
@@ -388,8 +387,7 @@ SILInstruction *CastOptimizer::optimizeBridgedSwiftToObjCCast(
 
   auto *resultDecl = Results.front();
   auto MemberDeclRef = SILDeclRef(resultDecl);
-  SILFunctionBuilder builder(M);
-  auto *BridgedFunc = builder.getOrCreateFunction(
+  auto *BridgedFunc = FunctionBuilder.getOrCreateFunction(
       Loc, MemberDeclRef, ForDefinition_t::NotForDefinition);
 
   // Implementation of _bridgeToObjectiveC could not be found.

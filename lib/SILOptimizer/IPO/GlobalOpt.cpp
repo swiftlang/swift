@@ -17,7 +17,7 @@
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/DebugUtils.h"
-#include "swift/SIL/SILFunctionBuilder.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/ColdBlockInfo.h"
@@ -50,6 +50,7 @@ namespace {
 /// - When the addressor is local to the module, be sure it is inlined to allow
 ///   constant propagation in case of statically initialized "lets".
 class SILGlobalOpt {
+  SILOptFunctionBuilder &FunctionBuilder;
   SILModule *Module;
   DominanceAnalysis *DA;
   bool HasChanged = false;
@@ -95,8 +96,8 @@ class SILGlobalOpt {
   /// function.
   llvm::DenseMap<SILFunction *, unsigned> InitializerCount;
 public:
-  SILGlobalOpt(SILModule *M, DominanceAnalysis *DA)
-      : Module(M), DA(DA) {}
+  SILGlobalOpt(SILOptFunctionBuilder &FunctionBuilder, SILModule *M, DominanceAnalysis *DA)
+      : FunctionBuilder(FunctionBuilder), Module(M), DA(DA) {}
 
   bool run();
 
@@ -242,7 +243,8 @@ static std::string mangleGetter(VarDecl *varDecl) {
   return Mangler.mangleGlobalGetterEntity(varDecl);
 }
 
-static SILFunction *getGlobalGetterFunction(SILModule &M,
+static SILFunction *getGlobalGetterFunction(SILOptFunctionBuilder &FunctionBuilder,
+                                            SILModule &M,
                                             SILLocation loc,
                                             VarDecl *varDecl) {
   auto getterName = mangleGetter(varDecl);
@@ -271,14 +273,15 @@ static SILFunction *getGlobalGetterFunction(SILModule &M,
                          ParameterConvention::Direct_Unowned,
                          /*params*/ {}, /*yields*/ {}, Results, None,
                          M.getASTContext());
-  SILFunctionBuilder builder(M);
-  return builder.getOrCreateFunction(loc, getterName, Linkage, LoweredType,
-                                     IsBare, IsNotTransparent, Serialized);
+  return FunctionBuilder.getOrCreateFunction(loc, getterName, Linkage,
+                                             LoweredType, IsBare,
+                                             IsNotTransparent, Serialized);
 }
 
 /// Generate getter from the initialization code whose result is stored by a
 /// given store instruction.
-static SILFunction *genGetterFromInit(StoreInst *Store,
+static SILFunction *genGetterFromInit(SILOptFunctionBuilder &FunctionBuilder,
+                                      StoreInst *Store,
                                       SILGlobalVariable *SILG) {
   auto *varDecl = SILG->getDecl();
 
@@ -296,7 +299,8 @@ static SILFunction *genGetterFromInit(StoreInst *Store,
   // Produce a correct order of instructions.
   std::reverse(Insts.begin(), Insts.end());
 
-  auto *GetterF = getGlobalGetterFunction(Store->getModule(),
+  auto *GetterF = getGlobalGetterFunction(FunctionBuilder,
+                                          Store->getModule(),
                                           Store->getLoc(),
                                           varDecl);
 
@@ -535,10 +539,12 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
 }
 
 /// Create a getter function from the initializer function.
-static SILFunction *genGetterFromInit(SILFunction *InitF, VarDecl *varDecl) {
+static SILFunction *genGetterFromInit(SILOptFunctionBuilder &FunctionBuilder,
+                                      SILFunction *InitF, VarDecl *varDecl) {
   // Generate a getter from the global init function without side-effects.
 
-  auto *GetterF = getGlobalGetterFunction(InitF->getModule(),
+  auto *GetterF = getGlobalGetterFunction(FunctionBuilder,
+                                          InitF->getModule(),
                                           InitF->getLocation(),
                                           varDecl);
   if (!InitF->hasQualifiedOwnership())
@@ -655,7 +661,7 @@ replaceLoadsByKnownValue(BuiltinInst *CallToOnce, SILFunction *AddrF,
   }
 
   // Generate a getter from InitF which returns the value of the global.
-  auto *GetterF = genGetterFromInit(InitF, SILG->getDecl());
+  auto *GetterF = genGetterFromInit(FunctionBuilder, InitF, SILG->getDecl());
 
   // Replace all calls of an addressor by calls of a getter .
   for (int i = 0, e = Calls.size(); i < e; ++i) {
@@ -862,7 +868,7 @@ void SILGlobalOpt::optimizeGlobalAccess(SILGlobalVariable *SILG,
     return;
 
   // Generate a getter only if there are any loads from this variable.
-  SILFunction *GetterF = genGetterFromInit(SI, SILG);
+  SILFunction *GetterF = genGetterFromInit(FunctionBuilder, SI, SILG);
   if (!GetterF)
     return;
 
@@ -939,7 +945,8 @@ namespace {
 class SILGlobalOptPass : public SILModuleTransform {
   void run() override {
     auto *DA = PM->getAnalysis<DominanceAnalysis>();
-    if (SILGlobalOpt(getModule(), DA).run()) {
+    SILOptFunctionBuilder FunctionBuilder(*getPassManager());
+    if (SILGlobalOpt(FunctionBuilder, getModule(), DA).run()) {
       invalidateAll();
     }
   }

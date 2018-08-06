@@ -14,7 +14,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILFunctionBuilder.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/Support/Debug.h"
@@ -23,6 +23,7 @@ using namespace swift;
 namespace {
 
 class ObjectOutliner {
+  SILOptFunctionBuilder &FunctionBuilder;
   NominalTypeDecl *ArrayDecl = nullptr;
   int GlobIdx = 0;
 
@@ -46,7 +47,9 @@ class ObjectOutliner {
   void replaceFindStringCall(ApplyInst *FindStringCall);
 
 public:
-  ObjectOutliner(NominalTypeDecl *ArrayDecl) : ArrayDecl(ArrayDecl) { }
+  ObjectOutliner(SILOptFunctionBuilder &FunctionBuilder,
+                 NominalTypeDecl *ArrayDecl)
+      : FunctionBuilder(FunctionBuilder), ArrayDecl(ArrayDecl) { }
 
   bool run(SILFunction *F);
 };
@@ -432,8 +435,7 @@ void ObjectOutliner::replaceFindStringCall(ApplyInst *FindStringCall) {
     return;
 
   SILDeclRef declRef(FD, SILDeclRef::Kind::Func);
-  SILFunctionBuilder builder(*Module);
-  SILFunction *replacementFunc = builder.getOrCreateFunction(
+  SILFunction *replacementFunc = FunctionBuilder.getOrCreateFunction(
       FindStringCall->getLoc(), declRef, NotForDefinition);
 
   SILFunctionType *FTy = replacementFunc->getLoweredFunctionType();
@@ -489,7 +491,9 @@ class ObjectOutlinerPass : public SILFunctionTransform
 {
   void run() override {
     SILFunction *F = getFunction();
-    ObjectOutliner Outliner(F->getModule().getASTContext().getArrayDecl());
+    SILOptFunctionBuilder FuncBuilder(*getPassManager());
+    ObjectOutliner Outliner(FuncBuilder,
+                            F->getModule().getASTContext().getArrayDecl());
     if (Outliner.run(F)) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }

@@ -28,6 +28,7 @@
 namespace swift {
 
 class FunctionSignaturePartialSpecializer;
+class SILOptFunctionBuilder;
 
 namespace OptRemark {
 class Emitter;
@@ -41,6 +42,7 @@ class Emitter;
 ///
 /// This is the top-level entry point for specializing an existing call site.
 void trySpecializeApplyOfGeneric(
+    SILOptFunctionBuilder &FunctionBuilder,
     ApplySite Apply, DeadInstructionSet &DeadApplies,
     llvm::SmallVectorImpl<SILFunction *> &NewFunctions,
     OptRemark::Emitter &ORE);
@@ -257,6 +259,7 @@ public:
 /// Helper class for specializing a generic function given a list of
 /// substitutions.
 class GenericFuncSpecializer {
+  SILOptFunctionBuilder &FuncBuilder;
   SILModule &M;
   SILFunction *GenericFunc;
   SubstitutionMap ParamSubs;
@@ -267,7 +270,8 @@ class GenericFuncSpecializer {
   std::string ClonedName;
 
 public:
-  GenericFuncSpecializer(SILFunction *GenericFunc,
+  GenericFuncSpecializer(SILOptFunctionBuilder &FuncBuilder,
+                         SILFunction *GenericFunc,
                          SubstitutionMap ParamSubs,
                          IsSerialized_t Serialized,
                          const ReabstractionInfo &ReInfo);

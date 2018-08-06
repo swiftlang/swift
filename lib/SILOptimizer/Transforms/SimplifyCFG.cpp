@@ -26,6 +26,7 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Utils/CastOptimizer.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/ConstantFolding.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
@@ -59,6 +60,7 @@ static unsigned MaxIterationsOfDominatorBasedSimplify = 10;
 
 namespace {
   class SimplifyCFG {
+    SILOptFunctionBuilder FuncBuilder;
     SILFunction &Fn;
     SILPassManager *PM;
 
@@ -91,8 +93,8 @@ namespace {
   public:
     SimplifyCFG(SILFunction &Fn, SILPassManager *PM, bool Verify,
                 bool EnableJumpThread)
-        : Fn(Fn), PM(PM),
-          ConstFolder(PM->getOptions().AssertConfig,
+        : FuncBuilder(*PM), Fn(Fn), PM(PM),
+          ConstFolder(FuncBuilder, PM->getOptions().AssertConfig,
                       /* EnableDiagnostics */false,
                       [&](SILInstruction *I) { constFoldingCallback(I); }),
           ShouldVerify(Verify), EnableJumpThread(EnableJumpThread) {}
@@ -1917,7 +1919,8 @@ bool SimplifyCFG::simplifyCheckedCastBranchBlock(CheckedCastBranchInst *CCBI) {
   auto ThisBB = CCBI->getParent();
 
   bool MadeChange = false;
-  CastOptimizer CastOpt([&MadeChange](SILInstruction *I,
+  CastOptimizer CastOpt(FuncBuilder,
+      [&MadeChange](SILInstruction *I,
                     ValueBase *V) {  /* ReplaceInstUsesAction */
         MadeChange = true;
       },
@@ -1946,6 +1949,7 @@ bool SimplifyCFG::simplifyCheckedCastValueBranchBlock(
 
   bool MadeChange = false;
   CastOptimizer CastOpt(
+      FuncBuilder,
       [&MadeChange](SILInstruction *I,
                     ValueBase *V) { /* ReplaceInstUsesAction */
                                     MadeChange = true;
@@ -1975,7 +1979,8 @@ simplifyCheckedCastAddrBranchBlock(CheckedCastAddrBranchInst *CCABI) {
   auto ThisBB = CCABI->getParent();
 
   bool MadeChange = false;
-  CastOptimizer CastOpt([&MadeChange](SILInstruction *I, ValueBase *V) {
+  CastOptimizer CastOpt(FuncBuilder,
+      [&MadeChange](SILInstruction *I, ValueBase *V) {
         MadeChange = true;
       }, /* ReplaceInstUsesAction */
       [&MadeChange](SILInstruction *I) { /* EraseInstAction */
