@@ -207,9 +207,11 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
 void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
   // statically/globally stored variables have some special handling.
   if (VD->hasStorage() && isGlobalOrStaticVar(VD)) {
-    // The actual variable has a symbol.
-    Mangle::ASTMangler mangler;
-    addSymbol(mangler.mangleEntity(VD, false));
+    if (getDeclLinkage(VD) == FormalLinkage::PublicUnique) {
+      // The actual variable has a symbol.
+      Mangle::ASTMangler mangler;
+      addSymbol(mangler.mangleEntity(VD, false));
+    }
 
     if (VD->isLazilyInitializedGlobal())
       addSymbol(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
