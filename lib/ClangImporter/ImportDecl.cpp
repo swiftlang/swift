@@ -5168,21 +5168,15 @@ Decl *SwiftDeclConverter::importCompatibilityTypeAlias(
 namespace {
   template<typename D>
   bool inheritanceListContainsProtocol(D decl, const ProtocolDecl *proto) {
-    return llvm::any_of(range(decl->getInherited().size()),
-                        [decl, proto](unsigned index) -> bool {
-      Type type = decl->getInheritedType(index);
-      if (!type || !type->isExistentialType())
-        return false;
-
-      auto layout = type->getExistentialLayout();
-      for (auto protoTy : layout.getProtocols()) {
-        auto *protoDecl = protoTy->getDecl();
+    bool anyObject = false;
+    for (const auto &found :
+            getDirectlyInheritedNominalTypeDecls(decl, anyObject)) {
+      if (auto protoDecl = dyn_cast<ProtocolDecl>(found.second))
         if (protoDecl == proto || protoDecl->inheritsFrom(proto))
           return true;
-      }
+    }
 
-      return false;
-    });
+    return false;
   }
 }
 

@@ -560,16 +560,11 @@ getInheritedForCycleCheck(TypeChecker &tc,
                           ProtocolDecl **scratch) {
   TinyPtrVector<ProtocolDecl *> result;
 
-  for (unsigned index : indices(proto->getInherited())) {
-    if (auto type = proto->getInheritedType(index)) {
-      if (type->isExistentialType()) {
-        auto layout = type->getExistentialLayout();
-        for (auto protoTy : layout.getProtocols()) {
-          auto *protoDecl = protoTy->getDecl();
-          result.push_back(protoDecl);
-        }
-      }
-    }
+  bool anyObject = false;
+  for (const auto &found :
+         getDirectlyInheritedNominalTypeDecls(proto, anyObject)) {
+    if (auto protoDecl = dyn_cast<ProtocolDecl>(found.second))
+      result.push_back(protoDecl);
   }
 
   return result;
