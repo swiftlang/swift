@@ -7794,6 +7794,9 @@ namespace {
     }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      if (Rewriter.cs.prunedSubexpressions.count(expr))
+        return { false, expr };
+
       // For closures, update the parameter types and check the body.
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
         Rewriter.simplifyExprType(expr);

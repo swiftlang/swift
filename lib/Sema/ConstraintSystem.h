@@ -916,6 +916,8 @@ public:
   //         was created in.
   llvm::DenseMap<Constraint *, unsigned> DisjunctionNumber;
 
+  llvm::SmallPtrSet<Expr *, 4> prunedSubexpressions;
+
 private:
 
   /// \brief Allocator used for all of the related constraint systems.
