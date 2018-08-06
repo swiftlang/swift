@@ -1640,7 +1640,10 @@ class ExtensionDecl final : public GenericContext, public Decl,
 
   /// The type being extended.
   TypeLoc ExtendedType;
-  
+
+  /// The nominal type being extended.
+  NominalTypeDecl *ExtendedNominal = nullptr;
+
   MutableArrayRef<TypeLoc> Inherited;
 
   /// \brief The next extension in the linked list of extensions.
@@ -1677,6 +1680,7 @@ class ExtensionDecl final : public GenericContext, public Decl,
   /// Slow path for \c takeConformanceLoader().
   std::pair<LazyMemberLoader *, uint64_t> takeConformanceLoaderSlow();
 
+  friend class ExtendedNominalRequest;
 public:
   using Decl::getASTContext;
 
@@ -1698,7 +1702,18 @@ public:
   void setBraces(SourceRange braces) { Braces = braces; }
 
   /// Retrieve the type being extended.
+  ///
+  /// Only use this entry point when the complete type, as spelled in the source,
+  /// is required. For most clients, \c getExtendedNominal(), which provides
+  /// only the \c NominalTypeDecl, will suffice.
   Type getExtendedType() const { return ExtendedType.getType(); }
+
+  /// Retrieve the nominal type declaration that is being extended.
+  NominalTypeDecl *getExtendedNominal() const;
+
+  /// Determine whether this extension has already been bound to a nominal
+  /// type declaration.
+  bool alreadyBoundToNominal() const { return NextExtension.getInt(); }
 
   /// Retrieve the extended type location.
   TypeLoc &getExtendedTypeLoc() { return ExtendedType; }
@@ -3615,6 +3630,23 @@ public:
   /// might have implicitly @objc members, but will never itself be @objc.
   ObjCClassKind checkObjCAncestry() const;
 
+  /// \brief Whether this class or its superclasses has some form of generic
+  /// context.
+  ///
+  /// For example, given
+  ///
+  /// class A<X> {}
+  /// class B : A<Int> {}
+  /// struct C<T> {
+  ///   struct Inner {}
+  /// }
+  /// class D {}
+  /// class E: D {}
+  ///
+  /// Calling hasGenericAncestry() on `B` returns `A<Int>`, on `C<T>.Inner`
+  /// returns `C<T>.Inner`, but on `E` it returns null.
+  ClassDecl *getGenericAncestor() const;
+
   /// The type of metaclass to use for a class.
   enum class MetaclassKind : uint8_t {
     ObjC,
@@ -3679,7 +3711,7 @@ public:
   ///
   /// This is true of imported Objective-C classes.
   bool usesObjCGenericsModel() const {
-    return isObjC() && hasClangNode() && isGenericContext();
+    return hasClangNode() && isGenericContext() && isObjC();
   }
   
   /// True if the class is known to be implemented in Swift.

@@ -86,6 +86,38 @@ void SuperclassDeclRequest::noteCycleStep(DiagnosticEngine &diags) const {
   diags.diagnose(subjectDecl, diag::circular_reference_through);
 }
 
+//----------------------------------------------------------------------------//
+// Superclass declaration computation.
+//----------------------------------------------------------------------------//
+Optional<NominalTypeDecl *> ExtendedNominalRequest::getCachedResult() const {
+  // Note: if we fail to compute any nominal declaration, it's considered
+  // a cache miss. This allows us to recompute the extended nominal types
+  // during extension binding.
+  auto ext = std::get<0>(getStorage());
+  if (ext->ExtendedNominal)
+    return ext->ExtendedNominal;
+
+  return None;
+}
+
+void ExtendedNominalRequest::cacheResult(NominalTypeDecl *value) const {
+  auto ext = std::get<0>(getStorage());
+  if (value)
+    ext->ExtendedNominal = value;
+}
+
+void ExtendedNominalRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  // FIXME: Improve this diagnostic.
+  auto ext = std::get<0>(getStorage());
+  diags.diagnose(ext, diag::circular_reference);
+}
+
+void ExtendedNominalRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto ext = std::get<0>(getStorage());
+  // FIXME: Customize this further.
+  diags.diagnose(ext, diag::circular_reference_through);
+}
+
 // Define request evaluation functions for each of the name lookup requests.
 static AbstractRequestFunction *nameLookupRequestFunctions[] = {
 #define SWIFT_TYPEID(Name)                                    \

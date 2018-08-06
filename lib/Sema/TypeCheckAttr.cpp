@@ -374,11 +374,9 @@ void AttributeEarlyChecker::visitIBActionAttr(IBActionAttr *attr) {
 
 void AttributeEarlyChecker::visitIBDesignableAttr(IBDesignableAttr *attr) {
   if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
-    if (auto extendedType = ED->getExtendedType()) {
-      if (auto *nominalDecl = extendedType->getAnyNominal()) {
-        if (!isa<ClassDecl>(nominalDecl))
-          diagnoseAndRemoveAttr(attr, diag::invalid_ibdesignable_extension);
-      }
+    if (auto nominalDecl = ED->getExtendedNominal()) {
+      if (!isa<ClassDecl>(nominalDecl))
+        diagnoseAndRemoveAttr(attr, diag::invalid_ibdesignable_extension);
     }
   }
 }
@@ -1395,7 +1393,7 @@ static bool isObjCClassExtensionInOverlay(DeclContext *dc) {
     return false;
 
   // Find the extended class.
-  auto classDecl = ext->getExtendedType()->getClassOrBoundGenericClass();
+  auto classDecl = ext->getAsClassOrClassExtensionContext();
   if (!classDecl)
     return false;
 
@@ -1483,12 +1481,12 @@ void AttributeChecker::visitAccessControlAttr(AccessControlAttr *attr) {
       return;
     }
 
-    Type extendedTy = extension->getExtendedType();
-    AccessLevel typeAccess = extendedTy->getAnyNominal()->getFormalAccess();
+    NominalTypeDecl *nominal = extension->getExtendedNominal();
+    AccessLevel typeAccess = nominal->getFormalAccess();
     if (attr->getAccess() > typeAccess) {
       TC.diagnose(attr->getLocation(), diag::access_control_extension_more,
                   typeAccess,
-                  extendedTy->getAnyNominal()->getDescriptiveKind(),
+                  nominal->getDescriptiveKind(),
                   attr->getAccess())
         .fixItRemove(attr->getRange());
       attr->setInvalid();

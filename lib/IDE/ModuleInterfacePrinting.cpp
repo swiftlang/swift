@@ -533,7 +533,7 @@ void swift::ide::printSubmoduleInterface(
       // Swift extensions are printed with their associated type unless it's
       // a cross-module extension.
       if (!extensionHasClangNode(Ext)) {
-        auto ExtendedNominal = Ext->getExtendedType()->getAnyNominal();
+        auto ExtendedNominal = Ext->getExtendedNominal();
         if (Ext->getModuleContext() == ExtendedNominal->getModuleContext())
           return false;
       }

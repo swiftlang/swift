@@ -118,7 +118,8 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
     builder->resolveEquivalenceClass(
                                 baseTy,
                                 ArchetypeResolutionKind::CompleteWellFormed);
-  assert(baseEquivClass && "Unknown base type?");
+  if (!baseEquivClass)
+    return ErrorType::get(baseTy);
 
   // Look for a nested type with the given name.
   if (auto nestedType =

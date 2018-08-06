@@ -1525,24 +1525,25 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
     // @objc protocols in extensions of Swift generic classes, because there's
     // no stable Objective-C class object to install the protocol conformance
     // category onto.
-    if (isa<ExtensionDecl>(DC)) {
-      if (auto genericT = T->getGenericAncestor()) {
-        if (!cast<ClassDecl>(genericT->getAnyNominal())
-               ->usesObjCGenericsModel()) {
-          auto isSubclass = !genericT->isEqual(T);
-          auto genericTIsGeneric = (bool)genericT->getAnyGeneric()
-                                                 ->getGenericParams();
-          TC.diagnose(ComplainLoc, diag::objc_protocol_in_generic_extension, T,
-                      ProtoType, isSubclass, genericTIsGeneric);
-          conformance->setInvalid();
-          return conformance;
+    if (auto ext = dyn_cast<ExtensionDecl>(DC)) {
+      if (auto classDecl = ext->getAsClassOrClassExtensionContext()) {
+        if (auto genericClassDecl = classDecl->getGenericAncestor()) {
+          if (!genericClassDecl->usesObjCGenericsModel()) {
+            auto isSubclass = genericClassDecl != classDecl;
+            auto genericTIsGeneric = (bool)genericClassDecl->getGenericParams();
+            TC.diagnose(ComplainLoc, diag::objc_protocol_in_generic_extension,
+                        T, ProtoType, isSubclass, genericTIsGeneric);
+            conformance->setInvalid();
+            return conformance;
+          }
         }
       }
     }
   }
 
   // Not every protocol/type is compatible with conditional conformances.
-  if (!conformance->getConditionalRequirements().empty()) {
+  auto conditionalReqs = conformance->getConditionalRequirementsIfAvailable();
+  if (conditionalReqs && !conditionalReqs->empty()) {
     auto nestedType = canT;
     // Obj-C generics cannot be looked up at runtime, so we don't support
     // conditional conformances involving them. Check the full stack of nested
@@ -1601,7 +1602,10 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
     while (implyingConf->getSourceKind() == ConformanceEntryKind::Implied) {
       implyingConf = implyingConf->getImplyingConformance();
     }
-    if (!implyingConf->getConditionalRequirements().empty()) {
+
+    auto implyingCondReqs =
+      implyingConf->getConditionalRequirementsIfAvailable();
+    if (implyingCondReqs && !implyingCondReqs->empty()) {
       // We shouldn't suggest including witnesses for the conformance, because
       // those suggestions will go in the current DeclContext, but really they
       // should go into the new extension we (might) suggest here.
@@ -4032,6 +4036,7 @@ void swift::useObjectiveCBridgeableConformancesOfArgs(
 }
 
 void TypeChecker::useBridgedNSErrorConformances(DeclContext *dc, Type type) {
+  auto errorProto = Context.getProtocol(KnownProtocolKind::Error);
   auto bridgedStoredNSError = Context.getProtocol(
                                     KnownProtocolKind::BridgedStoredNSError);
   auto errorCodeProto = Context.getProtocol(
@@ -4039,8 +4044,15 @@ void TypeChecker::useBridgedNSErrorConformances(DeclContext *dc, Type type) {
   auto rawProto = Context.getProtocol(
                         KnownProtocolKind::RawRepresentable);
 
-  if (!bridgedStoredNSError || !errorCodeProto || !rawProto)
+  if (!errorProto || !bridgedStoredNSError || !errorCodeProto || !rawProto)
     return;
+
+  // The NSError: Error conformance.
+  if (auto nsError = Context.getNSErrorDecl()) {
+    validateDecl(nsError);
+    (void)conformsToProtocol(nsError->TypeDecl::getDeclaredInterfaceType(),
+                             errorProto, dc, ConformanceCheckFlags::Used);
+  }
 
   // _BridgedStoredNSError.
   auto conformance = conformsToProtocol(type, bridgedStoredNSError, dc,
@@ -4540,10 +4552,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
   Decl *currentDecl = nullptr;
   AccessLevel defaultAccess;
   if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-    Type extendedTy = ext->getExtendedType();
-    if (!extendedTy)
-      return;
-    const NominalTypeDecl *nominal = extendedTy->getAnyNominal();
+    const NominalTypeDecl *nominal = ext->getExtendedNominal();
     if (!nominal)
       return;
     defaultAccess = nominal->getFormalAccess();

@@ -444,8 +444,8 @@ void NormalProtocolConformance::differenceAndStoreConditionalRequirements()
     return;
   }
 
-  auto typeSig = DC->getAsNominalTypeOrNominalTypeExtensionContext()
-                     ->getGenericSignature();
+  auto nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto typeSig = nominal->getGenericSignature();
 
   // A non-generic type won't have conditional requirements.
   if (!typeSig) {
@@ -454,6 +454,13 @@ void NormalProtocolConformance::differenceAndStoreConditionalRequirements()
   }
 
   auto extensionSig = DC->getGenericSignatureOfContext();
+  if (!extensionSig) {
+    if (auto lazyResolver = ctxt.getLazyResolver()) {
+      lazyResolver->resolveExtension(cast<ExtensionDecl>(DC));
+      extensionSig = DC->getGenericSignatureOfContext();
+    }
+  }
+
   // The type is generic, but the extension doesn't have a signature yet, so
   // we can't do any differencing.
   if (!extensionSig) {

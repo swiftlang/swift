@@ -156,9 +156,8 @@ static bool shouldUseObjCUSR(const Decl *D) {
   }
 
   if (const auto *ED = dyn_cast<ExtensionDecl>(D)) {
-    if (auto ExtendedType = ED->getExtendedType()) {
-      auto baseClass = ExtendedType->getClassOrBoundGenericClass();
-      return baseClass && shouldUseObjCUSR(baseClass) && !baseClass->isForeign();
+    if (auto baseClass = ED->getAsClassOrClassExtensionContext()) {
+      return shouldUseObjCUSR(baseClass) && !baseClass->isForeign();
     }
   }
   return false;
@@ -272,7 +271,8 @@ bool ide::printAccessorUSR(const AbstractStorageDecl *D, AccessorKind AccKind,
 }
 
 bool ide::printExtensionUSR(const ExtensionDecl *ED, raw_ostream &OS) {
-  if (ED->getExtendedType().isNull())
+  auto nominal = ED->getExtendedNominal();
+  if (!nominal)
     return true;
 
   // We make up a unique usr for each extension by combining a prefix
@@ -283,12 +283,8 @@ bool ide::printExtensionUSR(const ExtensionDecl *ED, raw_ostream &OS) {
       return printDeclUSR(VD, OS);
     }
   }
-  if (ED->getExtendedType() && ED->getExtendedType()->getAnyNominal()) {
-    OS << getUSRSpacePrefix() << "e:";
-    printDeclUSR(ED->getExtendedType()->getAnyNominal(), OS);
-  } else {
-    return true;
-  }
+  OS << getUSRSpacePrefix() << "e:";
+  printDeclUSR(nominal, OS);
   for (auto Inherit : ED->getInherited()) {
     if (auto T = Inherit.getType()) {
       if (T->getAnyNominal())

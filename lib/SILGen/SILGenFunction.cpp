@@ -93,8 +93,8 @@ DeclName SILGenModule::getMagicFunctionName(DeclContext *dc) {
     return m->getName();
   }
   if (auto e = dyn_cast<ExtensionDecl>(dc)) {
-    assert(e->getExtendedType()->getAnyNominal() && "extension for nonnominal");
-    return e->getExtendedType()->getAnyNominal()->getName();
+    assert(e->getExtendedNominal() && "extension for nonnominal");
+    return e->getExtendedNominal()->getName();
   }
   llvm_unreachable("unexpected #function context");
 }

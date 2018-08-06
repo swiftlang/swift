@@ -382,13 +382,14 @@ static bool checkObjCInExtensionContext(const ValueDecl *value,
     // parameters.
     // FIXME: This is a current limitation, not inherent. We don't have
     // a concrete class to attach Objective-C category metadata to.
-    if (auto generic = ED->getDeclaredInterfaceType()
-                           ->getGenericAncestor()) {
-      if (!generic->getClassOrBoundGenericClass()->hasClangNode()) {
-        if (diagnose) {
-          value->diagnose(diag::objc_in_generic_extension);
+    if (auto classDecl = ED->getAsClassOrClassExtensionContext()) {
+      if (auto generic = classDecl->getGenericAncestor()) {
+        if (!generic->usesObjCGenericsModel()) {
+          if (diagnose) {
+            value->diagnose(diag::objc_in_generic_extension);
+          }
+          return true;
         }
-        return true;
       }
     }
   }
