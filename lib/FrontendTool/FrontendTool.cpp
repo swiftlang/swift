@@ -1600,8 +1600,8 @@ createDispatchingDiagnosticConsumerIfNeeded(
 
   inputsAndOutputs.forEachInputProducingSupplementaryOutput(
       [&](const InputFile &input) -> bool {
-        if (auto subconsumer = maybeCreateConsumerForDiagnosticsFrom(input))
-          subconsumers.emplace_back(input.file(), std::move(subconsumer));
+        if (auto consumer = maybeCreateConsumerForDiagnosticsFrom(input))
+          subconsumers.emplace_back(input.file(), std::move(consumer));
         return false;
       });
   // For batch mode, the compiler must swallow diagnostics pertaining to
