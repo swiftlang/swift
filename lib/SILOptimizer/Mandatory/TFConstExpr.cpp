@@ -215,10 +215,21 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
   // If this is a struct extract from a fragile type, then we can return the
   // element being extracted.
   if (auto *sei = dyn_cast<StructExtractInst>(value)) {
-    auto val = getConstantValue(sei->getOperand());
-    if (!val.isConstant())
-      return val;
-    return val.getAggregateValue()[sei->getFieldNo()];
+    auto structValue = sei->getOperand();
+    auto val = getConstantValue(structValue);
+    if (val.isConstant())
+      return val.getAggregateValue()[sei->getFieldNo()];
+    // Even though the entire struct is not a const value, the field we are
+    // extracting could be, so we try evaluating just that field.
+    // TODO: should we remove the code path of getConstantValue(structValue)
+    // above?
+    if (auto *si = dyn_cast<StructInst>(structValue)) {
+      assert(si->getElements().size() > sei->getFieldNo());
+      auto &field = si->getElementOperands()[sei->getFieldNo()];
+      return getConstantValue(field.get());
+    }
+    // Not a const.
+    return val;
   }
 
   // TODO: If this is a single element struct, we can avoid creating an
@@ -882,7 +893,7 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
   SubstitutionMap calleeSubMap;
 
   auto calleeFnType = callee->getLoweredFunctionType();
-  if (auto signature = calleeFnType->getGenericSignature()) {
+  if (calleeFnType->getGenericSignature()) {
     ApplySite AI(apply);
 
     // Get the substitution map of the call.  This maps from the callee's space
@@ -1291,7 +1302,7 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
   if (auto apply = dyn_cast<ApplyInst>(inst))
     return computeCallResult(apply);
 
-  if (auto *store = dyn_cast<StoreInst>(inst)) {
+  if (isa<StoreInst>(inst)) {
     auto stored = getConstantValue(inst->getOperand(0));
     if (!stored.isConstant())
       return stored;
