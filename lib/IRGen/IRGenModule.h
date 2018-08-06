@@ -22,6 +22,7 @@
 #include "SwiftTargetInfo.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ReferenceCounting.h"
 #include "swift/Basic/ClusteredBitVector.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptimizationMode.h"
@@ -133,7 +134,6 @@ namespace irgen {
   class TypeConverter;
   class TypeInfo;
   enum class ValueWitness : unsigned;
-  enum class ReferenceCounting : unsigned char;
 
 class IRGenModule;
 

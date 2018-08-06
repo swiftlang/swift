@@ -19,6 +19,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericSignatureBuilder.h"
+#include "swift/AST/ReferenceCounting.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Decl.h"
@@ -4046,21 +4047,31 @@ bool UnownedStorageType::isLoadable(ResilienceExpansion resilience) const {
   return ty->usesNativeReferenceCounting(resilience);
 }
 
-static bool doesOpaqueClassUseNativeReferenceCounting(const ASTContext &ctx) {
-  return !ctx.LangOpts.EnableObjCInterop;
-}
-
-static bool usesNativeReferenceCounting(ClassDecl *theClass,
-                                        ResilienceExpansion resilience) {
+static ReferenceCounting getClassReferenceCounting(
+                                             ClassDecl *theClass,
+                                             ResilienceExpansion resilience) {
   // TODO: Resilience? there might be some legal avenue of changing this.
   while (auto superclass = theClass->getSuperclassDecl()) {
     theClass = superclass;
   }
-  return !theClass->hasClangNode();
+
+  return theClass->hasClangNode()
+           ? ReferenceCounting::ObjC
+           : ReferenceCounting::Native;
 }
 
-bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
+ReferenceCounting TypeBase::getReferenceCounting(
+                                              ResilienceExpansion resilience) {
   CanType type = getCanonicalType();
+  ASTContext &ctx = type->getASTContext();
+
+  // Determine which reference-counting scheme to use for an unknown object.
+  bool objCInterop = ctx.LangOpts.EnableObjCInterop;
+  auto getUnknownObjectReferenceCounting = [objCInterop] {
+    return objCInterop ? ReferenceCounting::Unknown
+                       : ReferenceCounting::Native;
+  };
+
   switch (type->getKind()) {
 #define SUGARED_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
@@ -4069,27 +4080,30 @@ bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
 
   case TypeKind::BuiltinNativeObject:
   case TypeKind::SILBox:
-    return true;
+    return ReferenceCounting::Native;
+
+  case TypeKind::BuiltinBridgeObject:
+    return objCInterop ? ReferenceCounting::Bridge
+                       : ReferenceCounting::Native;
 
   case TypeKind::BuiltinUnknownObject:
-  case TypeKind::BuiltinBridgeObject:
-    return ::doesOpaqueClassUseNativeReferenceCounting(type->getASTContext());
+    return getUnknownObjectReferenceCounting();
 
   case TypeKind::Class:
-    return ::usesNativeReferenceCounting(cast<ClassType>(type)->getDecl(),
-                                         resilience);
+    return getClassReferenceCounting(cast<ClassType>(type)->getDecl(),
+                                     resilience);
   case TypeKind::BoundGenericClass:
-    return ::usesNativeReferenceCounting(
+    return getClassReferenceCounting(
                                   cast<BoundGenericClassType>(type)->getDecl(),
-                                         resilience);
+                                  resilience);
   case TypeKind::UnboundGeneric:
-    return ::usesNativeReferenceCounting(
+    return getClassReferenceCounting(
                     cast<ClassDecl>(cast<UnboundGenericType>(type)->getDecl()),
-                                         resilience);
+                    resilience);
 
   case TypeKind::DynamicSelf:
     return cast<DynamicSelfType>(type).getSelfType()
-             ->usesNativeReferenceCounting(resilience);
+        ->getReferenceCounting(resilience);
 
   case TypeKind::Archetype: {
     auto archetype = cast<ArchetypeType>(type);
@@ -4098,17 +4112,17 @@ bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
     assert(archetype->requiresClass() ||
            (layout && layout->isRefCounted()));
     if (auto supertype = archetype->getSuperclass())
-      return supertype->usesNativeReferenceCounting(resilience);
-    return ::doesOpaqueClassUseNativeReferenceCounting(type->getASTContext());
+      return supertype->getReferenceCounting(resilience);
+    return getUnknownObjectReferenceCounting();
   }
 
   case TypeKind::Protocol:
   case TypeKind::ProtocolComposition: {
-    auto layout = getExistentialLayout();
+    auto layout = type->getExistentialLayout();
     assert(layout.requiresClass() && "Opaque existentials don't use refcounting");
     if (auto superclass = layout.getSuperclass())
-      return superclass->usesNativeReferenceCounting(resilience);
-    return ::doesOpaqueClassUseNativeReferenceCounting(type->getASTContext());
+      return superclass->getReferenceCounting(resilience);
+    return getUnknownObjectReferenceCounting();
   }
 
   case TypeKind::Function:
@@ -4143,6 +4157,10 @@ bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
   }
 
   llvm_unreachable("Unhandled type kind!");
+}
+
+bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
+  return getReferenceCounting(resilience) == ReferenceCounting::Native;
 }
 
 //

@@ -48,7 +48,6 @@ namespace irgen {
   class StructLayout;
   class TypeInfo;
   
-  enum class ReferenceCounting : unsigned char;
   enum class ClassDeallocationKind : unsigned char;
   enum class FieldAccess : uint8_t;
   
