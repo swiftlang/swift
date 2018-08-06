@@ -2144,6 +2144,28 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
           goto capture_value;
         }
         }
+
+        if (!capturedVar->hasStorage())
+          continue;
+
+        // We can always capture the storage in these cases.
+        Type captureType = capturedVar->getType();
+        if (auto *metatypeType = captureType->getAs<MetatypeType>())
+          captureType = metatypeType->getInstanceType();
+
+        if (auto *selfType = captureType->getAs<DynamicSelfType>()) {
+          captureType = selfType->getSelfType();
+
+          // We're capturing a 'self' value with dynamic 'Self' type;
+          // handle it specially.
+          if (captureType->getClassOrBoundGenericClass()) {
+            if (selfCapture)
+              selfCapture = selfCapture->mergeFlags(capture);
+            else
+              selfCapture = capture;
+            continue;
+          }
+        }
       }
     capture_value:
       // Collect non-function captures.
@@ -2151,9 +2173,7 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
       if (capturedValues.count(value)) {
         for (auto it = captures.begin(); it != captures.end(); ++it) {
           if (it->getDecl() == value) {
-            // The value is already in the list, it needs to have the logical
-            // AND of each flag of all uses.
-            *it = CapturedValue(value, it->getFlags() & capture.getFlags());
+            *it = it->mergeFlags(capture);
             break;
           }
         }
