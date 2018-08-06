@@ -59,8 +59,9 @@ extension SeedableRandomNumberGenerator {
 /// ARC4 is described in Schneier, B., "Applied Cryptography: Protocols,
 /// Algorithms, and Source Code in C", 2nd Edition, 1996.
 ///
-/// This generator is thread-safe. The random data generated is of high-quality,
-/// but is not suitable for cryptographic applications.
+/// An individual generator is not thread-safe, but distinct generators do not
+/// share state. The random data generated is of high-quality, but is not
+/// suitable for cryptographic applications.
 @_fixed_layout
 public struct ARC4RandomNumberGenerator: SeedableRandomNumberGenerator {
   public static var global = ARC4RandomNumberGenerator(seed: UInt32(time(nil)))
