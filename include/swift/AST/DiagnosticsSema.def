@@ -3614,9 +3614,6 @@ WARNING(attribute_meaningless_when_nonobjc,none,
 ERROR(objc_invalid_on_var,none,
       "property cannot be %" OBJC_ATTR_SELECT "0 "
       "because its type cannot be represented in Objective-C", (unsigned))
-ERROR(objc_invalid_subscript_key_type,none,
-      "subscript cannot be %" OBJC_ATTR_SELECT "0 because its key "
-      "type %1 is neither an integer nor an object", (unsigned, Type))
 ERROR(objc_invalid_on_subscript,none,
       "subscript cannot be %" OBJC_ATTR_SELECT "0 because its type "
       "cannot be represented in Objective-C", (unsigned))

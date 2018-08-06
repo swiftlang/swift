@@ -4330,8 +4330,6 @@ AbstractStorageDecl::getObjCGetterSelector(Identifier preferredName) const {
   auto &ctx = getASTContext();
   if (auto *SD = dyn_cast<SubscriptDecl>(this)) {
     switch (SD->getObjCSubscriptKind()) {
-    case ObjCSubscriptKind::None:
-      llvm_unreachable("Not an Objective-C subscript");
     case ObjCSubscriptKind::Indexed:
       return ObjCSelector(ctx, 1, ctx.Id_objectAtIndexedSubscript);
     case ObjCSubscriptKind::Keyed:
@@ -4363,9 +4361,6 @@ AbstractStorageDecl::getObjCSetterSelector(Identifier preferredName) const {
   auto &ctx = getASTContext();
   if (auto *SD = dyn_cast<SubscriptDecl>(this)) {
     switch (SD->getObjCSubscriptKind()) {
-    case ObjCSubscriptKind::None:
-      llvm_unreachable("Not an Objective-C subscript");
-
     case ObjCSubscriptKind::Indexed:
       return ObjCSelector(ctx, 2,
                           { ctx.Id_setObject, ctx.Id_atIndexedSubscript });
