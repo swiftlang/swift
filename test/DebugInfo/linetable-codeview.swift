@@ -70,7 +70,7 @@ func foo() {
   // CHECK: %[[MYARRAY:.*]] = alloca
   // CHECK: call void @llvm.dbg.declare(metadata %TSa* %[[MYARRAY]],
   // CHECK-SAME: !dbg ![[ARRAY:[0-9]+]]
-  // CHECK: call swiftcc { {{.*}} } @"$Ss27_allocateUninitializedArrayySayxG_BptBwlF"
+  // CHECK: call swiftcc { {{.*}} } @"${{.*}}_allocateUninitializedArray{{.*}}"
   // CHECK-SAME: !dbg ![[ARRAY]]
   // CHECK: ret void
 
