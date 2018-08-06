@@ -12,7 +12,11 @@
 
 /// A marker protocol used to determine whether a value is a `String`-keyed `Dictionary`
 /// containing `Encodable` values (in which case it should be exempt from key conversion strategies).
+#if arch(i386) || arch(arm)
+internal protocol _JSONStringDictionaryEncodableMarker { }
+#else
 fileprivate protocol _JSONStringDictionaryEncodableMarker { }
+#endif
 
 extension Dictionary : _JSONStringDictionaryEncodableMarker where Key == String, Value: Encodable { }
 
@@ -21,9 +25,15 @@ extension Dictionary : _JSONStringDictionaryEncodableMarker where Key == String,
 ///
 /// The marker protocol also provides access to the type of the `Decodable` values,
 /// which is needed for the implementation of the key conversion strategy exemption.
+#if arch(i386) || arch(arm)
+internal protocol _JSONStringDictionaryDecodableMarker {
+    static var elementType: Decodable.Type { get }
+}
+#else
 fileprivate protocol _JSONStringDictionaryDecodableMarker {
     static var elementType: Decodable.Type { get }
 }
+#endif
 
 extension Dictionary : _JSONStringDictionaryDecodableMarker where Key == String, Value: Decodable {
     static var elementType: Decodable.Type { return Value.self }
