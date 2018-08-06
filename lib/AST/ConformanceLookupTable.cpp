@@ -20,6 +20,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -488,22 +489,10 @@ bool ConformanceLookupTable::addProtocol(ProtocolDecl *protocol, SourceLoc loc,
 void ConformanceLookupTable::addInheritedProtocols(
                           llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
                           ConformanceSource source) {
-  // Visit each of the types in the inheritance list to find
-  // protocols.
-  auto typeDecl = decl.dyn_cast<TypeDecl *>();
-  auto extDecl = decl.dyn_cast<ExtensionDecl *>();
-  unsigned numInherited = typeDecl ? typeDecl->getInherited().size()
-                                   : extDecl->getInherited().size();
-  for (auto index : range(numInherited)) {
-    Type inheritedType = typeDecl ? typeDecl->getInheritedType(index)
-                                  : extDecl->getInheritedType(index);
-    if (!inheritedType || !inheritedType->isExistentialType())
-      continue;
-    SourceLoc loc = typeDecl ? typeDecl->getInherited()[index].getLoc()
-                             : extDecl->getInherited()[index].getLoc();
-    auto layout = inheritedType->getExistentialLayout();
-    for (auto *proto : layout.getProtocols())
-      addProtocol(proto->getDecl(), loc, source);
+  // Find all of the protocols in the inheritance list.
+  for (const auto &found : getDirectlyInheritedNominalTypeDecls(decl)) {
+    if (auto proto = dyn_cast<ProtocolDecl>(found.second))
+      addProtocol(proto, found.first, source);
   }
 }
 

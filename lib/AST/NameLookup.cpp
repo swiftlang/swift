@@ -2277,3 +2277,53 @@ NominalTypeDecl *ExtendedNominalRequest::evaluate(Evaluator &evaluator,
     = resolveTypeDeclsToNominal(evaluator, ctx, referenced, modulesFound);
   return nominalTypes.empty() ? nullptr : nominalTypes.front();
 }
+
+void swift::getDirectlyInheritedNominalTypeDecls(
+    llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
+    unsigned i,
+    llvm::SmallVectorImpl<std::pair<SourceLoc, NominalTypeDecl *>> &result) {
+  auto typeDecl = decl.dyn_cast<TypeDecl *>();
+  auto extDecl = decl.dyn_cast<ExtensionDecl *>();
+
+  ASTContext &ctx = typeDecl ? typeDecl->getASTContext()
+                             : extDecl->getASTContext();
+
+  // Find inherited declarations.
+  auto referenced = ctx.evaluator(InheritedDeclsReferencedRequest{decl, i});
+
+  // Resolve those type declarations to nominal type declarations.
+  SmallVector<ModuleDecl *, 2> modulesFound;
+  auto nominalTypes
+    = resolveTypeDeclsToNominal(ctx.evaluator, ctx, referenced, modulesFound);
+
+  // Dig out the source location
+  // FIXME: This is a hack. We need cooperation from
+  // InheritedDeclsReferencedRequest to make this work.
+  SourceLoc loc;
+  if (TypeRepr *typeRepr = typeDecl ? typeDecl->getInherited()[i].getTypeRepr()
+                                    : extDecl->getInherited()[i].getTypeRepr()){
+    loc = typeRepr->getLoc();
+  }
+
+  // Form the result.
+  for (auto nominal : nominalTypes) {
+    result.push_back({loc, nominal});
+  }
+}
+
+SmallVector<std::pair<SourceLoc, NominalTypeDecl *>, 4>
+swift::getDirectlyInheritedNominalTypeDecls(
+                        llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl) {
+  auto typeDecl = decl.dyn_cast<TypeDecl *>();
+  auto extDecl = decl.dyn_cast<ExtensionDecl *>();
+
+  // Gather results from all of the inherited types.
+  unsigned numInherited = typeDecl ? typeDecl->getInherited().size()
+                                   : extDecl->getInherited().size();
+  SmallVector<std::pair<SourceLoc, NominalTypeDecl *>, 4> result;
+  for (unsigned i : range(numInherited)) {
+    getDirectlyInheritedNominalTypeDecls(decl, i, result);
+  }
+
+  return result;
+}
