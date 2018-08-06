@@ -517,6 +517,7 @@ extension String.UTF8View.Iterator : IteratorProtocol {
   }
 
   @inlinable // FIXME(sil-serialize-all)
+  @inline(__always)
   public mutating func next() -> Unicode.UTF8.CodeUnit? {
     if _slowPath(_nextOffset == _endOffset) {
       if _slowPath(_buffer.isEmpty) {
