@@ -2131,9 +2131,11 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
 
           // We're capturing a 'self' value with dynamic 'Self' type;
           // handle it specially.
-          if (!selfCapture &&
-              captureType->getClassOrBoundGenericClass()) {
-            selfCapture = capture;
+          if (captureType->getClassOrBoundGenericClass()) {
+            if (selfCapture)
+              selfCapture = selfCapture->mergeFlags(capture);
+            else
+              selfCapture = capture;
             continue;
           }
         }
@@ -2146,9 +2148,7 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
       if (capturedValues.count(value)) {
         for (auto it = captures.begin(); it != captures.end(); ++it) {
           if (it->getDecl() == value) {
-            // The value is already in the list, it needs to have the logical
-            // AND of each flag of all uses.
-            *it = CapturedValue(value, it->getFlags() & capture.getFlags());
+            *it = it->mergeFlags(capture);
             break;
           }
         }
