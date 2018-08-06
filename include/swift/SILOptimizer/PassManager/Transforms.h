@@ -66,6 +66,8 @@ namespace swift {
     /// Inject the pass manager running this pass.
     void injectPassManager(SILPassManager *PMM) { PM = PMM; }
 
+    SILPassManager *getPassManager() const { return PM; }
+
     irgen::IRGenModule *getIRGenModule() {
       auto *Mod = PM->getIRGenModule();
       assert(Mod && "Expecting a valid module");

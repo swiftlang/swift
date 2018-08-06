@@ -60,7 +60,7 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
-#include "swift/SIL/SILFunctionBuilder.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
@@ -118,9 +118,10 @@ public:
   friend class SILInstructionVisitor<ClosureSpecCloner>;
   friend class SILCloner<ClosureSpecCloner>;
 
-  ClosureSpecCloner(const CallSiteDescriptor &CallSiteDesc,
+  ClosureSpecCloner(SILOptFunctionBuilder &FunctionBuilder,
+                    const CallSiteDescriptor &CallSiteDesc,
                     StringRef ClonedName)
-      : SuperTy(*initCloned(CallSiteDesc, ClonedName)),
+      : SuperTy(*initCloned(FunctionBuilder, CallSiteDesc, ClonedName)),
         CallSiteDesc(CallSiteDesc) {}
 
   void populateCloned();
@@ -131,16 +132,18 @@ public:
                         SmallVectorImpl<PartialApplyInst *> &NeedsRelease);
 
   SILFunction *getCloned() { return &getBuilder().getFunction(); }
-  static SILFunction *cloneFunction(const CallSiteDescriptor &CallSiteDesc,
+  static SILFunction *cloneFunction(SILOptFunctionBuilder &FunctionBuilder,
+                                    const CallSiteDescriptor &CallSiteDesc,
                                     StringRef NewName) {
-    ClosureSpecCloner C(CallSiteDesc, NewName);
+    ClosureSpecCloner C(FunctionBuilder, CallSiteDesc, NewName);
     C.populateCloned();
     ++NumClosureSpecialized;
     return C.getCloned();
   };
 
 private:
-  static SILFunction *initCloned(const CallSiteDescriptor &CallSiteDesc,
+  static SILFunction *initCloned(SILOptFunctionBuilder &FunctionBuilder,
+                                 const CallSiteDescriptor &CallSiteDesc,
                                  StringRef ClonedName);
   const CallSiteDescriptor &CallSiteDesc;
 };
@@ -563,7 +566,8 @@ static bool isSupportedClosure(const SILInstruction *Closure) {
 ///                   signature.
 /// \arg ClonedName The name of the cloned function that we will create.
 SILFunction *
-ClosureSpecCloner::initCloned(const CallSiteDescriptor &CallSiteDesc,
+ClosureSpecCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
+                              const CallSiteDescriptor &CallSiteDesc,
                               StringRef ClonedName) {
   SILFunction *ClosureUser = CallSiteDesc.getApplyCallee();
 
@@ -631,8 +635,7 @@ ClosureSpecCloner::initCloned(const CallSiteDescriptor &CallSiteDesc,
 
   // We make this function bare so we don't have to worry about decls in the
   // SILArgument.
-  SILFunctionBuilder builder(M);
-  auto *Fn = builder.createFunction(
+  auto *Fn = FunctionBuilder.createFunction(
       // It's important to use a shared linkage for the specialized function
       // and not the original linkage.
       // Otherwise the new function could have an external linkage (in case the
@@ -1140,6 +1143,7 @@ bool SILClosureSpecializerTransform::specialize(SILFunction *Caller,
     invalidateAnalysis(SILAnalysis::InvalidationKind::Branches);
   }
 
+  SILOptFunctionBuilder FuncBuilder(*getPassManager());
   bool Changed = false;
   for (auto *CInfo : ClosureCandidates) {
     for (auto &CSDesc : CInfo->CallSites) {
@@ -1159,7 +1163,7 @@ bool SILClosureSpecializerTransform::specialize(SILFunction *Caller,
       // If not, create a specialized version of ApplyCallee calling the closure
       // directly.
       if (!NewF) {
-        NewF = ClosureSpecCloner::cloneFunction(CSDesc, NewFName);
+        NewF = ClosureSpecCloner::cloneFunction(FuncBuilder, CSDesc, NewFName);
         notifyAddFunction(NewF, CSDesc.getApplyCallee());
       }
 

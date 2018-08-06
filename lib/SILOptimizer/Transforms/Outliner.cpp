@@ -23,7 +23,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
-#include "swift/SIL/SILFunctionBuilder.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -103,8 +103,13 @@ std::string OutlinerMangler::mangle() {
 }
 
 namespace {
+
 class OutlinePattern {
+protected:
+  SILOptFunctionBuilder &FuncBuilder;
+
 public:
+  OutlinePattern(SILOptFunctionBuilder &FuncBuilder) : FuncBuilder(FuncBuilder) {}
 
   /// Match the instruction sequence.
   virtual bool matchInstSequence(SILBasicBlock::iterator I) = 0;
@@ -229,7 +234,7 @@ public:
   std::pair<SILFunction *, SILBasicBlock::iterator>
   outline(SILModule &M) override;
 
-  BridgedProperty() {
+  BridgedProperty(SILOptFunctionBuilder &FuncBuilder) : OutlinePattern(FuncBuilder) {
     clearState();
   }
 
@@ -309,8 +314,7 @@ BridgedProperty::outline(SILModule &M) {
 
   std::string name = getOutlinedFunctionName();
 
-  SILFunctionBuilder builder(M);
-  auto *Fun = builder.getOrCreateFunction(
+  auto *Fun = FuncBuilder.getOrCreateFunction(
       ObjCMethod->getLoc(), name, SILLinkage::Shared, FunctionType, IsNotBare,
       IsNotTransparent, IsSerializable);
   bool NeedsDefinition = Fun->empty();
@@ -891,6 +895,8 @@ public:
   std::pair<SILFunction *, SILBasicBlock::iterator>
   outline(SILModule &M) override;
 
+  ObjCMethodCall(SILOptFunctionBuilder &FuncBuilder)
+      : OutlinePattern(FuncBuilder) {}
   ~ObjCMethodCall();
 
 private:
@@ -918,8 +924,7 @@ ObjCMethodCall::outline(SILModule &M) {
   auto FunctionType = getOutlinedFunctionType(M);
   std::string name = getOutlinedFunctionName();
 
-  SILFunctionBuilder builder(M);
-  auto *Fun = builder.getOrCreateFunction(
+  auto *Fun = FuncBuilder.getOrCreateFunction(
       ObjCMethod->getLoc(), name, SILLinkage::Shared, FunctionType, IsNotBare,
       IsNotTransparent, IsSerializable);
   bool NeedsDefinition = Fun->empty();
@@ -1155,7 +1160,9 @@ public:
     return nullptr;
   }
 
-  OutlinePatterns() {}
+  OutlinePatterns(SILOptFunctionBuilder &FuncBuilder)
+      : BridgedPropertyPattern(FuncBuilder),
+        ObjCMethodCallPattern(FuncBuilder) {}
   ~OutlinePatterns() {}
 
   OutlinePatterns(const OutlinePatterns&) = delete;
@@ -1166,11 +1173,11 @@ public:
 
 /// Perform outlining on the function and return any newly created outlined
 /// functions.
-bool tryOutline(SILFunction *Fun,
+bool tryOutline(SILOptFunctionBuilder &FuncBuilder, SILFunction *Fun,
                 SmallVectorImpl<SILFunction *> &FunctionsAdded) {
   SmallPtrSet<SILBasicBlock *, 32> Visited;
   SmallVector<SILBasicBlock *, 128> Worklist;
-  OutlinePatterns patterns;
+  OutlinePatterns patterns(FuncBuilder);
 
   // Traverse the function.
   Worklist.push_back(&*Fun->begin());
@@ -1204,9 +1211,9 @@ bool tryOutline(SILFunction *Fun,
 }
 
 namespace {
+
 class Outliner : public SILFunctionTransform {
 public:
-
   Outliner() { }
 
   void run() override {
@@ -1222,8 +1229,9 @@ public:
       Fun->dump();
     }
 
+    SILOptFunctionBuilder FuncBuilder(*getPassManager());
     SmallVector<SILFunction *, 16> FunctionsAdded;
-    bool Changed = tryOutline(Fun, FunctionsAdded);
+    bool Changed = tryOutline(FuncBuilder, Fun, FunctionsAdded);
 
     if (!FunctionsAdded.empty()) {
       // Notify the pass manager of any new functions we outlined.
@@ -1232,11 +1240,12 @@ public:
       }
     }
 
-		if (Changed) {
+    if (Changed) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
-		}
+    }
   }
 };
+
 } //end anonymous namespace.
 
 SILTransform *swift::createOutliner() {
