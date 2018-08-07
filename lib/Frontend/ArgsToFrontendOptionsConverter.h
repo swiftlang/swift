@@ -50,7 +50,7 @@ private:
   void setUnsignedIntegerArgument(options::ID optionID, unsigned radix,
                                   unsigned &valueToSet);
 
-  bool setUpForSILOrLLVM();
+  bool setUpInputKindAndImmediateArgs();
 
   bool checkUnusedSupplementaryOutputPaths() const;
 

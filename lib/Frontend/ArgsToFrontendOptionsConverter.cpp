@@ -118,7 +118,7 @@ bool ArgsToFrontendOptionsConverter::convert(
     return true;
   }
 
-  if (setUpForSILOrLLVM())
+  if (setUpInputKindAndImmediateArgs())
     return true;
 
   if (computeModuleName())
@@ -355,11 +355,10 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
   llvm_unreachable("Unhandled mode option");
 }
 
-bool ArgsToFrontendOptionsConverter::setUpForSILOrLLVM() {
+bool ArgsToFrontendOptionsConverter::setUpInputKindAndImmediateArgs() {
   using namespace options;
   bool treatAsSIL =
       Args.hasArg(OPT_parse_sil) || Opts.InputsAndOutputs.shouldTreatAsSIL();
-  bool treatAsLLVM = Opts.InputsAndOutputs.shouldTreatAsLLVM();
 
   if (Opts.InputsAndOutputs.verifyInputs(
           Diags, treatAsSIL,
@@ -378,15 +377,17 @@ bool ArgsToFrontendOptionsConverter::setUpForSILOrLLVM() {
   }
 
   if (treatAsSIL)
-    Opts.InputKind = InputFileKind::IFK_SIL;
-  else if (treatAsLLVM)
-    Opts.InputKind = InputFileKind::IFK_LLVM_IR;
+    Opts.InputKind = InputFileKind::SIL;
+  else if (Opts.InputsAndOutputs.shouldTreatAsLLVM())
+    Opts.InputKind = InputFileKind::LLVM;
+  else if (Opts.InputsAndOutputs.shouldTreatAsModuleInterface())
+    Opts.InputKind = InputFileKind::SwiftModuleInterface;
   else if (Args.hasArg(OPT_parse_as_library))
-    Opts.InputKind = InputFileKind::IFK_Swift_Library;
+    Opts.InputKind = InputFileKind::SwiftLibrary;
   else if (Opts.RequestedAction == FrontendOptions::ActionType::REPL)
-    Opts.InputKind = InputFileKind::IFK_Swift_REPL;
+    Opts.InputKind = InputFileKind::SwiftREPL;
   else
-    Opts.InputKind = InputFileKind::IFK_Swift;
+    Opts.InputKind = InputFileKind::Swift;
 
   return false;
 }
