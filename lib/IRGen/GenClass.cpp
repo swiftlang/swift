@@ -457,8 +457,8 @@ ClassTypeInfo::createLayoutWithTailElems(IRGenModule &IGM,
 
   // Create the StructLayout, which is transfered to the caller (the caller is
   // responsible for deleting it).
-  return new StructLayout(builder, classType.getASTType(), ResultTy,
-                          builder.getElements());
+  return new StructLayout(builder, classType.getClassOrBoundGenericClass(),
+                          ResultTy, builder.getElements());
 }
 
 const ClassLayout &

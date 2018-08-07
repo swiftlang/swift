@@ -39,12 +39,12 @@ static bool requiresHeapHeader(LayoutKind kind) {
 }
 
 /// Perform structure layout on the given types.
-StructLayout::StructLayout(IRGenModule &IGM, CanType astTy,
+StructLayout::StructLayout(IRGenModule &IGM,
+                           NominalTypeDecl *decl,
                            LayoutKind layoutKind,
                            LayoutStrategy strategy,
                            ArrayRef<const TypeInfo *> types,
                            llvm::StructType *typeToFill) {
-  ASTTy = astTy;
   Elements.reserve(types.size());
 
   // Fill in the Elements array.
@@ -91,28 +91,24 @@ StructLayout::StructLayout(IRGenModule &IGM, CanType astTy,
     }
   }
 
+  assert(typeToFill == nullptr || Ty == typeToFill);
+
   // If the struct is not @_fixed_layout, it will have a dynamic
   // layout outside of its resilience domain.
-  if (astTy && astTy->getAnyNominal())
-    if (IGM.isResilient(astTy->getAnyNominal(), ResilienceExpansion::Minimal))
+  if (decl) {
+    if (IGM.isResilient(decl, ResilienceExpansion::Minimal))
       IsKnownAlwaysFixedSize = IsNotFixedSize;
 
-  assert(typeToFill == nullptr || Ty == typeToFill);
-  if (ASTTy)
-    applyLayoutAttributes(IGM, ASTTy, IsFixedLayout, MinimumAlign);
+    applyLayoutAttributes(IGM, decl, IsFixedLayout, MinimumAlign);
+  }
 }
 
 void irgen::applyLayoutAttributes(IRGenModule &IGM,
-                                  CanType ASTTy,
+                                  NominalTypeDecl *decl,
                                   bool IsFixedLayout,
                                   Alignment &MinimumAlign) {
-  assert(ASTTy && "shouldn't call applyLayoutAttributes without a type");
-  
   auto &Diags = IGM.Context.Diags;
-  auto decl = ASTTy->getAnyNominal();
-  if (!decl)
-    return;
-  
+
   if (auto alignment = decl->getAttrs().getAttribute<AlignmentAttr>()) {
     auto value = alignment->getValue();
     assert(value != 0 && ((value - 1) & value) == 0

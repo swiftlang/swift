@@ -322,7 +322,7 @@ private:
 /// Apply layout attributes such as @_alignment to the layout properties of a
 /// type, diagnosing any problems with them.
 void applyLayoutAttributes(IRGenModule &IGM,
-                           CanType ty,
+                           NominalTypeDecl *decl,
                            bool isFixedLayout,
                            /*inout*/ Alignment &alignment);
 
@@ -345,7 +345,6 @@ class StructLayout {
   IsBitwiseTakable_t IsKnownBitwiseTakable;
   IsFixedSize_t IsKnownAlwaysFixedSize = IsFixedSize;
   
-  CanType ASTTy;
   llvm::Type *Ty;
   SmallVector<ElementLayout, 8> Elements;
 
@@ -358,14 +357,14 @@ public:
   ///   layout must include the reference-counting header
   /// \param typeToFill - if present, must be an opaque type whose body
   ///   will be filled with this layout
-  StructLayout(IRGenModule &IGM, CanType astTy,
+  StructLayout(IRGenModule &IGM, NominalTypeDecl *decl,
                LayoutKind kind, LayoutStrategy strategy,
                ArrayRef<const TypeInfo *> fields,
                llvm::StructType *typeToFill = 0);
 
   /// Create a structure layout from a builder.
   StructLayout(const StructLayoutBuilder &builder,
-               CanType astTy,
+               NominalTypeDecl *decl,
                llvm::Type *type,
                ArrayRef<ElementLayout> elements)
     : MinimumAlign(builder.getAlignment()),
@@ -375,7 +374,6 @@ public:
       IsKnownPOD(builder.isPOD()),
       IsKnownBitwiseTakable(builder.isBitwiseTakable()),
       IsKnownAlwaysFixedSize(builder.isAlwaysFixedSize()),
-      ASTTy(astTy),
       Ty(type),
       Elements(elements.begin(), elements.end()) {}
 
