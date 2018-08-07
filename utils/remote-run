@@ -35,7 +35,6 @@ class CommandRunner(object):
         # Send the local files.
         copy_proc = self.open_sftp()
         _, _ = copy_proc.communicate('\n'.join("-put {0} {1}".format(quote(local_file), quote(remote_file)) for local_file, remote_file in local_to_remote_files.viewitems()))
-        # FIXME: dump stderr at this point
         assert copy_proc.returncode == 0, "sftp send failed"
 
     def fetch(self, local_to_remote_files):
@@ -46,7 +45,6 @@ class CommandRunner(object):
         # Fetch the remote files.
         copy_proc = self.open_sftp()
         _, _ = copy_proc.communicate('\n'.join("-get {0} {1}".format(quote(remote_file), quote(local_file)) for local_file, remote_file in download_files.viewitems()))
-        # FIXME: dump stderr at this point
         assert copy_proc.returncode == 0, "sftp fetch failed"
 
     def run_remote(self, command, remote_env={}):
@@ -74,7 +72,7 @@ class RemoteCommandRunner(CommandRunner):
         return subprocess.Popen(['/usr/bin/sftp', '-b', '-', self.remote_host],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE)
+            stderr=None)
 
 class LocalCommandRunner(CommandRunner):
     def open_remote(self, command):
@@ -87,7 +85,7 @@ class LocalCommandRunner(CommandRunner):
         return subprocess.Popen(['/usr/bin/sftp', '-b', '-', '-D', '/usr/libexec/sftp-server'],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE)
+            stderr=None)
 
 
 def find_transfers(args, source_prefix, dest_prefix):
