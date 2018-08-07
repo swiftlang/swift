@@ -380,3 +380,27 @@ extension Double : AccelerableByTensorFlow {
     return fn()
   }
 }
+
+extension String : AccelerableByTensorFlow {
+  public static var _tensorFlowDataType: _TensorDataType {
+    return _TensorDataType(TF_STRING)
+  }
+  @_silgen_name("__tf_get_scalar_or_die_String") @inline(never)
+  public static func _getScalarOrDie(_ handle: TensorHandle<String>) -> String {
+    return _TFGetScalarOrDieImpl(handle)
+  }
+  @_silgen_name("__tf_get_scalar_String") @inline(never)
+  public static func _getScalar(_ handle: TensorHandle<String>) -> String? {
+    return _TFGetScalarImpl(handle)
+  }
+  @inlinable @inline(__always)
+  public static func _makeScalarTensor(_ scalar: String)
+    -> TensorHandle<String> {
+    return #tfop("tfc.scalarToTensor", scalar)
+  }
+  @_silgen_name("__tf_hoistable_String") @_optimize(none) @inline(never)
+  public static func _hoistableClosure(_ fn: () -> TensorHandle<String>)
+    -> TensorHandle<String> {
+    return fn()
+  }
+}
