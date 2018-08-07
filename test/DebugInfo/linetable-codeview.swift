@@ -25,6 +25,9 @@ func mySwitch(_ a: Int64) {
     }                         // line 25
   }
 }
+func foo() {
+  var myArray: [Int64] = []   // line 29
+}
 
 // func arithmetic(_ a: Int64, _ b: Int64)
   // CHECK: define {{.*}} @"$S4main10arithmeticyys5Int64V_ADtF"(i64, i64)
@@ -62,6 +65,14 @@ func mySwitch(_ a: Int64) {
   // CHECK: ; <label>:[[RETLABEL]]:
   // CHECK-NEXT: ret void
 
+// func foo()
+  // CHECK: define {{.*}} @"$S4main3fooyyF"
+  // CHECK: %[[MYARRAY:.*]] = alloca
+  // CHECK: call void @llvm.dbg.declare(metadata %TSa* %[[MYARRAY]],
+  // CHECK-SAME: !dbg ![[ARRAY:[0-9]+]]
+  // CHECK: call swiftcc { {{.*}} } @"${{.*}}_allocateUninitializedArray{{.*}}"
+  // CHECK-SAME: !dbg ![[ARRAY]]
+  // CHECK: ret void
 
 // CHECK-DAG: ![[ADD]] = !DILocation(line: 4, scope:
 // CHECK-DAG: ![[DIV]] = !DILocation(line: 5, scope:
@@ -78,3 +89,4 @@ func mySwitch(_ a: Int64) {
 // CHECK-DAG: ![[FORBODY]] = !DILocation(line: 16, scope:
 // CHECK-DAG: ![[CASE]] = !DILocation(line: 22, scope:
 // CHECK-DAG: ![[DEFAULTCLEANUP]] = !DILocation(line: 25, scope:
+// CHECK-DAG: ![[ARRAY]] = !DILocation(line: 29, scope:
