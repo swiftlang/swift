@@ -39,12 +39,12 @@ static bool requiresHeapHeader(LayoutKind kind) {
 }
 
 /// Perform structure layout on the given types.
-StructLayout::StructLayout(IRGenModule &IGM, CanType astTy,
+StructLayout::StructLayout(IRGenModule &IGM,
+                           NominalTypeDecl *decl,
                            LayoutKind layoutKind,
                            LayoutStrategy strategy,
                            ArrayRef<const TypeInfo *> types,
                            llvm::StructType *typeToFill) {
-  ASTTy = astTy;
   Elements.reserve(types.size());
 
   // Fill in the Elements array.
@@ -91,28 +91,24 @@ StructLayout::StructLayout(IRGenModule &IGM, CanType astTy,
     }
   }
 
+  assert(typeToFill == nullptr || Ty == typeToFill);
+
   // If the struct is not @_fixed_layout, it will have a dynamic
   // layout outside of its resilience domain.
-  if (astTy && astTy->getAnyNominal())
-    if (IGM.isResilient(astTy->getAnyNominal(), ResilienceExpansion::Minimal))
+  if (decl) {
+    if (IGM.isResilient(decl, ResilienceExpansion::Minimal))
       IsKnownAlwaysFixedSize = IsNotFixedSize;
 
-  assert(typeToFill == nullptr || Ty == typeToFill);
-  if (ASTTy)
-    applyLayoutAttributes(IGM, ASTTy, IsFixedLayout, MinimumAlign);
+    applyLayoutAttributes(IGM, decl, IsFixedLayout, MinimumAlign);
+  }
 }
 
 void irgen::applyLayoutAttributes(IRGenModule &IGM,
-                                  CanType ASTTy,
+                                  NominalTypeDecl *decl,
                                   bool IsFixedLayout,
                                   Alignment &MinimumAlign) {
-  assert(ASTTy && "shouldn't call applyLayoutAttributes without a type");
-  
   auto &Diags = IGM.Context.Diags;
-  auto decl = ASTTy->getAnyNominal();
-  if (!decl)
-    return;
-  
+
   if (auto alignment = decl->getAttrs().getAttribute<AlignmentAttr>()) {
     auto value = alignment->getValue();
     assert(value != 0 && ((value - 1) & value) == 0
@@ -175,37 +171,6 @@ Address ElementLayout::project(IRGenFunction &IGF, Address baseAddr,
                                  baseAddr.getAddress()->getName() + suffix);
   }
   llvm_unreachable("bad element layout kind");
-}
-
-ClassLayout::ClassLayout(const StructLayoutBuilder &builder,
-                         bool isFixedSize,
-                         bool metadataRequiresDynamicInitialization,
-                         llvm::Type *classTy,
-                         ArrayRef<VarDecl *> allStoredProps,
-                         ArrayRef<FieldAccess> allFieldAccesses,
-                         ArrayRef<ElementLayout> allElements)
-  : MinimumAlign(builder.getAlignment()),
-    MinimumSize(builder.getSize()),
-    IsFixedLayout(builder.isFixedLayout()),
-    IsFixedSize(isFixedSize),
-    MetadataRequiresDynamicInitialization(metadataRequiresDynamicInitialization),
-    Ty(classTy),
-    AllStoredProperties(allStoredProps),
-    AllFieldAccesses(allFieldAccesses),
-    AllElements(allElements) { }
-
-Size ClassLayout::getInstanceStart() const {
-  if (AllElements.empty())
-    return getSize();
-
-  auto element = AllElements[0];
-  if (element.getKind() == ElementLayout::Kind::Fixed ||
-      element.getKind() == ElementLayout::Kind::Empty) {
-    // FIXME: assumes layout is always sequential!
-    return element.getByteOffset();
-  }
-
-  return Size(0);
 }
 
 void StructLayoutBuilder::addHeapHeader() {
