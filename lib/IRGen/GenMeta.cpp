@@ -40,6 +40,7 @@
 
 #include "Address.h"
 #include "Callee.h"
+#include "ClassLayout.h"
 #include "ClassMetadataVisitor.h"
 #include "ConstantBuilder.h"
 #include "EnumMetadataVisitor.h"

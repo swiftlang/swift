@@ -322,7 +322,7 @@ private:
 /// Apply layout attributes such as @_alignment to the layout properties of a
 /// type, diagnosing any problems with them.
 void applyLayoutAttributes(IRGenModule &IGM,
-                           CanType ty,
+                           NominalTypeDecl *decl,
                            bool isFixedLayout,
                            /*inout*/ Alignment &alignment);
 
@@ -345,7 +345,6 @@ class StructLayout {
   IsBitwiseTakable_t IsKnownBitwiseTakable;
   IsFixedSize_t IsKnownAlwaysFixedSize = IsFixedSize;
   
-  CanType ASTTy;
   llvm::Type *Ty;
   SmallVector<ElementLayout, 8> Elements;
 
@@ -358,14 +357,14 @@ public:
   ///   layout must include the reference-counting header
   /// \param typeToFill - if present, must be an opaque type whose body
   ///   will be filled with this layout
-  StructLayout(IRGenModule &IGM, CanType astTy,
+  StructLayout(IRGenModule &IGM, NominalTypeDecl *decl,
                LayoutKind kind, LayoutStrategy strategy,
                ArrayRef<const TypeInfo *> fields,
                llvm::StructType *typeToFill = 0);
 
   /// Create a structure layout from a builder.
   StructLayout(const StructLayoutBuilder &builder,
-               CanType astTy,
+               NominalTypeDecl *decl,
                llvm::Type *type,
                ArrayRef<ElementLayout> elements)
     : MinimumAlign(builder.getAlignment()),
@@ -375,7 +374,6 @@ public:
       IsKnownPOD(builder.isPOD()),
       IsKnownBitwiseTakable(builder.isBitwiseTakable()),
       IsKnownAlwaysFixedSize(builder.isAlwaysFixedSize()),
-      ASTTy(astTy),
       Ty(type),
       Elements(elements.begin(), elements.end()) {}
 
@@ -405,91 +403,6 @@ public:
   /// Bitcast the given pointer to this type.
   Address emitCastTo(IRGenFunction &IGF, llvm::Value *ptr,
                      const llvm::Twine &name = "") const;
-};
-
-/// Different policies for accessing a physical field.
-enum class FieldAccess : uint8_t {
-  /// Instance variable offsets are constant.
-  ConstantDirect,
-  
-  /// Instance variable offsets must be loaded from "direct offset"
-  /// global variables.
-  NonConstantDirect,
-  
-  /// Instance variable offsets are kept in fields in metadata, but
-  /// the offsets of those fields within the metadata are constant.
-  ConstantIndirect
-};
-
-class ClassLayout {
-  /// The statically-known minimum bound on the alignment.
-  Alignment MinimumAlign;
-
-  /// The statically-known minimum bound on the size.
-  Size MinimumSize;
-
-  /// Whether this layout is fixed in size. If so, the size and
-  /// alignment are exact.
-  bool IsFixedLayout;
-
-  /// Do instances of this class have a size and layout known at compile time?
-  ///
-  /// Note: This is a stronger condition than having a fixed layout. The latter
-  /// is true even when the class requires sliding ivars by the Objective-C
-  /// runtime.
-  bool IsFixedSize;
-
-  /// Does the class metadata require dynamic initialization?
-  bool MetadataRequiresDynamicInitialization;
-
-  /// The LLVM type for instances of this class.
-  llvm::Type *Ty;
-
-  /// Lazily-initialized array of all fragile stored properties directly defined
-  /// in the class itself.
-  ArrayRef<VarDecl *> AllStoredProperties;
-
-  /// Lazily-initialized array of all field access methods.
-  ArrayRef<FieldAccess> AllFieldAccesses;
-
-  /// Fixed offsets of fields, if known (does not take Objective-C sliding into
-  /// account).
-  ArrayRef<ElementLayout> AllElements;
-
-public:
-  ClassLayout(const StructLayoutBuilder &builder,
-              bool isFixedSize,
-              bool metadataRequiresDynamicInitialization,
-              llvm::Type *classTy,
-              ArrayRef<VarDecl *> allStoredProps,
-              ArrayRef<FieldAccess> allFieldAccesses,
-              ArrayRef<ElementLayout> allElements);
-
-  Size getInstanceStart() const;
-
-  llvm::Type *getType() const { return Ty; }
-  Size getSize() const { return MinimumSize; }
-  Alignment getAlignment() const { return MinimumAlign; }
-  Size getAlignMask() const { return getAlignment().asSize() - Size(1); }
-
-  bool isFixedLayout() const { return IsFixedLayout; }
-
-  bool isFixedSize() const { return IsFixedSize; }
-
-  bool doesMetadataRequireDynamicInitialization() const {
-    return MetadataRequiresDynamicInitialization;
-  }
-
-  std::pair<FieldAccess, ElementLayout>
-  getFieldAccessAndElement(VarDecl *field) const {
-    // FIXME: This is algorithmically terrible.
-    auto found = std::find(AllStoredProperties.begin(),
-                           AllStoredProperties.end(), field);
-    assert(found != AllStoredProperties.end() && "didn't find field in type?!");
-    unsigned index = found - AllStoredProperties.begin();
-
-    return std::make_pair(AllFieldAccesses[index], AllElements[index]);
-  }
 };
 
 } // end namespace irgen

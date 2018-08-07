@@ -5633,7 +5633,7 @@ SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
   if (ElementsWithPayload.empty()) {
     enumTy->setBody(ArrayRef<llvm::Type*>{}, /*isPacked*/ true);
     Alignment alignment(1);
-    applyLayoutAttributes(TC.IGM, Type.getASTType(), /*fixed*/true, alignment);
+    applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/true, alignment);
     return registerEnumTypeInfo(new LoadableEnumTypeInfo(*this, enumTy,
                                                          Size(0), {},
                                                          alignment,
@@ -5652,8 +5652,7 @@ SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
 
     if (TIK <= Opaque) {
       auto alignment = eltTI.getBestKnownAlignment();
-      applyLayoutAttributes(TC.IGM, Type.getASTType(), /*fixed*/false,
-                            alignment);
+      applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/false, alignment);
       auto enumAccessible =
         IsABIAccessible_t(TC.IGM.getSILModule().isTypeABIAccessible(Type));
       return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
@@ -5664,8 +5663,7 @@ SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
     } else {
       auto &fixedEltTI = cast<FixedTypeInfo>(eltTI);
       auto alignment = fixedEltTI.getFixedAlignment();
-      applyLayoutAttributes(TC.IGM, Type.getASTType(), /*fixed*/true,
-                            alignment);
+      applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/true, alignment);
 
       return getFixedEnumTypeInfo(enumTy,
                         fixedEltTI.getFixedSize(),
@@ -5701,7 +5699,7 @@ NoPayloadEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
   spareBits.extendWithSetBits(tagSize.getValueInBits());
 
   Alignment alignment(tagSize.getValue());
-  applyLayoutAttributes(TC.IGM, Type.getASTType(), /*fixed*/true, alignment);
+  applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/true, alignment);
 
   return registerEnumTypeInfo(new LoadableEnumTypeInfo(*this,
                                    enumTy, tagSize, std::move(spareBits),
@@ -5741,7 +5739,7 @@ CCompatibleEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
   enumTy->setBody(body, /*isPacked*/ false);
 
   auto alignment = rawFixedTI.getFixedAlignment();
-  applyLayoutAttributes(TC.IGM, Type.getASTType(), /*fixed*/true, alignment);
+  applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/true, alignment);
 
   assert(!TC.IGM.isResilient(theEnum, ResilienceExpansion::Minimal) &&
          "C-compatible enums cannot be resilient");
@@ -5812,7 +5810,7 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeFixedLayout(
   }
   
   auto alignment = payloadTI.getFixedAlignment();
-  applyLayoutAttributes(TC.IGM, Type.getASTType(), /*fixed*/true, alignment);
+  applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/true, alignment);
 
   getFixedEnumTypeInfo(
       enumTy, Size(sizeWithTag), std::move(spareBits), alignment,
@@ -5840,8 +5838,7 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeDynamicLayout(
   auto &payloadTI = getPayloadTypeInfo();
   auto alignment = payloadTI.getBestKnownAlignment();
   
-  applyLayoutAttributes(TC.IGM, Type.getASTType(), /*fixed*/false,
-                        alignment);
+  applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/false, alignment);
   
   auto enumAccessible =
     IsABIAccessible_t(TC.IGM.getSILModule().isTypeABIAccessible(Type));
@@ -6006,8 +6003,7 @@ MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
     assert(PayloadTagBits.count() == numTagBits);
   }
   
-  applyLayoutAttributes(TC.IGM, Type.getASTType(), /*fixed*/ true,
-                        worstAlignment);
+  applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/ true, worstAlignment);
 
   getFixedEnumTypeInfo(enumTy, Size(sizeWithTag), std::move(spareBits),
                        worstAlignment, isPOD, isBT);
@@ -6043,8 +6039,7 @@ TypeInfo *MultiPayloadEnumImplStrategy::completeDynamicLayout(
     bt &= payloadTI.isBitwiseTakable(ResilienceExpansion::Maximal);
   }
   
-  applyLayoutAttributes(TC.IGM, Type.getASTType(), /*fixed*/false,
-                        alignment);
+  applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/false, alignment);
 
   auto enumAccessible =
     IsABIAccessible_t(TC.IGM.getSILModule().isTypeABIAccessible(Type));
