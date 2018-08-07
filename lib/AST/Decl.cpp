@@ -3585,7 +3585,6 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
   Bits.ProtocolDecl.NumRequirementsInSignature = 0;
   Bits.ProtocolDecl.HasMissingRequirements = false;
   Bits.ProtocolDecl.KnownProtocol = 0;
-  Bits.ProtocolDecl.ComputingInheritedProtocols = false;
 }
 
 llvm::TinyPtrVector<ProtocolDecl *>
@@ -3602,8 +3601,6 @@ ProtocolDecl::getInheritedProtocols() const {
         result.push_back(proto);
     }
   }
-
-  // FIXME: ComputingInheritedProtocols is dynamically dead.
 
   return result;
 }
