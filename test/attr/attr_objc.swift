@@ -878,14 +878,14 @@ class infer_instanceVar1 {
   //===--- Tuples.
 
   var var_tuple1: ()
-// CHECK-LABEL: {{^}} var var_tuple1: ()
+// CHECK-LABEL: {{^}} @_hasInitialValue var var_tuple1: ()
 
   @objc var var_tuple1_: ()
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{empty tuple type cannot be represented in Objective-C}}
 
   var var_tuple2: Void
-// CHECK-LABEL: {{^}} var var_tuple2: Void
+// CHECK-LABEL: {{^}} @_hasInitialValue var var_tuple2: Void
 
   @objc var var_tuple2_: Void
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
@@ -1157,20 +1157,20 @@ class infer_instanceVar1 {
   var var_Optional13: UnsafeMutablePointer<Int>?
   var var_Optional14: UnsafeMutablePointer<Class_ObjC1>?
 
-// CHECK-LABEL: @objc var var_Optional1: Class_ObjC1?
-// CHECK-LABEL: @objc var var_Optional2: Protocol_ObjC1?
-// CHECK-LABEL: @objc var var_Optional3: Class_ObjC1.Type?
-// CHECK-LABEL: @objc var var_Optional4: Protocol_ObjC1.Type?
-// CHECK-LABEL: @objc var var_Optional5: AnyObject?
-// CHECK-LABEL: @objc var var_Optional6: AnyObject.Type?
-// CHECK-LABEL: @objc var var_Optional7: String?
-// CHECK-LABEL: @objc var var_Optional8: Protocol_ObjC1?
-// CHECK-LABEL: @objc var var_Optional9: Protocol_ObjC1.Type?
-// CHECK-LABEL: @objc var var_Optional10: (Protocol_ObjC1 & Protocol_ObjC2)?
-// CHECK-LABEL: @objc var var_Optional11: (Protocol_ObjC1 & Protocol_ObjC2).Type?
-// CHECK-LABEL: @objc var var_Optional12: OpaquePointer?
-// CHECK-LABEL: @objc var var_Optional13: UnsafeMutablePointer<Int>?
-// CHECK-LABEL: @objc var var_Optional14: UnsafeMutablePointer<Class_ObjC1>?
+// CHECK-LABEL: @objc @_hasInitialValue var var_Optional1: Class_ObjC1?
+// CHECK-LABEL: @objc @_hasInitialValue var var_Optional2: Protocol_ObjC1?
+// CHECK-LABEL: @objc @_hasInitialValue var var_Optional3: Class_ObjC1.Type?
+// CHECK-LABEL: @objc @_hasInitialValue var var_Optional4: Protocol_ObjC1.Type?
+// CHECK-LABEL: @objc @_hasInitialValue var var_Optional5: AnyObject?
+// CHECK-LABEL: @objc @_hasInitialValue var var_Optional6: AnyObject.Type?
+// CHECK-LABEL: @objc @_hasInitialValue var var_Optional7: String?
+// CHECK-LABEL: @objc @_hasInitialValue var var_Optional8: Protocol_ObjC1?
+// CHECK-LABEL: @objc @_hasInitialValue var var_Optional9: Protocol_ObjC1.Type?
+// CHECK-LABEL: @objc @_hasInitialValue var var_Optional10: (Protocol_ObjC1 & Protocol_ObjC2)?
+// CHECK-LABEL: @objc @_hasInitialValue var var_Optional11: (Protocol_ObjC1 & Protocol_ObjC2).Type?
+// CHECK-LABEL: @objc @_hasInitialValue var var_Optional12: OpaquePointer?
+// CHECK-LABEL: @objc @_hasInitialValue var var_Optional13: UnsafeMutablePointer<Int>?
+// CHECK-LABEL: @objc @_hasInitialValue var var_Optional14: UnsafeMutablePointer<Class_ObjC1>?
 
 
   var var_ImplicitlyUnwrappedOptional1: Class_ObjC1!
@@ -1183,15 +1183,15 @@ class infer_instanceVar1 {
   var var_ImplicitlyUnwrappedOptional8: Protocol_ObjC1!
   var var_ImplicitlyUnwrappedOptional9: (Protocol_ObjC1 & Protocol_ObjC2)!
 
-// CHECK-LABEL: @objc var var_ImplicitlyUnwrappedOptional1: Class_ObjC1!
-// CHECK-LABEL: @objc var var_ImplicitlyUnwrappedOptional2: Protocol_ObjC1!
-// CHECK-LABEL: @objc var var_ImplicitlyUnwrappedOptional3: Class_ObjC1.Type!
-// CHECK-LABEL: @objc var var_ImplicitlyUnwrappedOptional4: Protocol_ObjC1.Type!
-// CHECK-LABEL: @objc var var_ImplicitlyUnwrappedOptional5: AnyObject!
-// CHECK-LABEL: @objc var var_ImplicitlyUnwrappedOptional6: AnyObject.Type!
-// CHECK-LABEL: @objc var var_ImplicitlyUnwrappedOptional7: String!
-// CHECK-LABEL: @objc var var_ImplicitlyUnwrappedOptional8: Protocol_ObjC1!
-// CHECK-LABEL: @objc var var_ImplicitlyUnwrappedOptional9: (Protocol_ObjC1 & Protocol_ObjC2)!
+// CHECK-LABEL: @objc @_hasInitialValue var var_ImplicitlyUnwrappedOptional1: Class_ObjC1!
+// CHECK-LABEL: @objc @_hasInitialValue var var_ImplicitlyUnwrappedOptional2: Protocol_ObjC1!
+// CHECK-LABEL: @objc @_hasInitialValue var var_ImplicitlyUnwrappedOptional3: Class_ObjC1.Type!
+// CHECK-LABEL: @objc @_hasInitialValue var var_ImplicitlyUnwrappedOptional4: Protocol_ObjC1.Type!
+// CHECK-LABEL: @objc @_hasInitialValue var var_ImplicitlyUnwrappedOptional5: AnyObject!
+// CHECK-LABEL: @objc @_hasInitialValue var var_ImplicitlyUnwrappedOptional6: AnyObject.Type!
+// CHECK-LABEL: @objc @_hasInitialValue var var_ImplicitlyUnwrappedOptional7: String!
+// CHECK-LABEL: @objc @_hasInitialValue var var_ImplicitlyUnwrappedOptional8: Protocol_ObjC1!
+// CHECK-LABEL: @objc @_hasInitialValue var var_ImplicitlyUnwrappedOptional9: (Protocol_ObjC1 & Protocol_ObjC2)!
 
   var var_Optional_fail1: PlainClass?
   var var_Optional_fail2: PlainClass.Type?
@@ -1232,11 +1232,11 @@ class infer_instanceVar1 {
   weak var var_Weak7: Protocol_ObjC1?
   weak var var_Weak8: (Protocol_ObjC1 & Protocol_ObjC2)?
 
-// CHECK-LABEL: @objc weak var var_Weak1: @sil_weak Class_ObjC1
-// CHECK-LABEL: @objc weak var var_Weak2: @sil_weak Protocol_ObjC1
-// CHECK-LABEL: @objc weak var var_Weak5: @sil_weak AnyObject
-// CHECK-LABEL: @objc weak var var_Weak7: @sil_weak Protocol_ObjC1
-// CHECK-LABEL: @objc weak var var_Weak8: @sil_weak (Protocol_ObjC1 & Protocol_ObjC2)?
+// CHECK-LABEL: @objc @_hasInitialValue weak var var_Weak1: @sil_weak Class_ObjC1
+// CHECK-LABEL: @objc @_hasInitialValue weak var var_Weak2: @sil_weak Protocol_ObjC1
+// CHECK-LABEL: @objc @_hasInitialValue weak var var_Weak5: @sil_weak AnyObject
+// CHECK-LABEL: @objc @_hasInitialValue weak var var_Weak7: @sil_weak Protocol_ObjC1
+// CHECK-LABEL: @objc @_hasInitialValue weak var var_Weak8: @sil_weak (Protocol_ObjC1 & Protocol_ObjC2)?
 
   weak var var_Weak_fail1: PlainClass?
   weak var var_Weak_bad2: PlainStruct?
@@ -1525,7 +1525,7 @@ class infer_instanceVar3 : Class_ObjC1 {
 // CHECK-LABEL: @objc class infer_instanceVar3 : Class_ObjC1 {
 
   var v1: Int = 0
-// CHECK-LABEL: @objc var v1: Int
+// CHECK-LABEL: @objc @_hasInitialValue var v1: Int
 }
 
 
@@ -1556,7 +1556,7 @@ class infer_staticVar1 {
 // CHECK-LABEL: @objc class infer_staticVar1 {
 
   class var staticVar1: Int = 42 // expected-error {{class stored properties not supported}}
-  // CHECK: @objc class var staticVar1: Int
+  // CHECK: @objc @_hasInitialValue class var staticVar1: Int
 }
 
 // @!objc
@@ -1655,7 +1655,7 @@ class HasIBOutlet {
   init() {}
 
   @IBOutlet weak var goodOutlet: Class_ObjC1!
-  // CHECK-LABEL: {{^}} @objc @IBOutlet @_implicitly_unwrapped_optional weak var goodOutlet: @sil_weak Class_ObjC1!
+  // CHECK-LABEL: {{^}} @objc @IBOutlet @_implicitly_unwrapped_optional @_hasInitialValue weak var goodOutlet: @sil_weak Class_ObjC1!
 
   @IBOutlet var badOutlet: PlainStruct
   // expected-error@-1 {{@IBOutlet property cannot have non-object type 'PlainStruct'}} {{3-13=}}
@@ -1685,7 +1685,7 @@ class HasIBAction {
 // CHECK-LABEL: {{^}}class HasIBInspectable {
 class HasIBInspectable {
   @IBInspectable var goodProperty: AnyObject?
-  // CHECK: {{^}}  @objc @IBInspectable var goodProperty: AnyObject?
+  // CHECK: {{^}}  @objc @IBInspectable @_hasInitialValue var goodProperty: AnyObject?
 }
 
 //===---
@@ -1695,7 +1695,7 @@ class HasIBInspectable {
 // CHECK-LABEL: {{^}}class HasGKInspectable {
 class HasGKInspectable {
   @GKInspectable var goodProperty: AnyObject?
-  // CHECK: {{^}}  @objc @GKInspectable var goodProperty: AnyObject?
+  // CHECK: {{^}}  @objc @GKInspectable @_hasInitialValue var goodProperty: AnyObject?
 }
 
 //===---

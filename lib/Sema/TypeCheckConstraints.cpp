@@ -2494,6 +2494,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
                                           unsigned patternNumber,
                                           bool skipApplyingSolution) {
+  auto &ctx = PBD->getASTContext();
   const auto &pbe = PBD->getPatternList()[patternNumber];
   Pattern *pattern = PBD->getPattern(patternNumber);
   Expr *init = PBD->getInit(patternNumber);
@@ -2515,6 +2516,13 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
   bool hadError = typeCheckBinding(pattern, init, DC, skipApplyingSolution);
   PBD->setPattern(patternNumber, pattern, initContext);
   PBD->setInit(patternNumber, init);
+
+  // Add the attribute that preserves the "has an initializer" value across
+  // module generation, as required for TBDGen.
+  PBD->getPattern(patternNumber)->forEachVariable([&](VarDecl *VD) {
+    if (VD->hasStorage())
+      VD->getAttrs().add(new (ctx) HasInitialValueAttr(/*IsImplicit=*/true));
+  });
 
   if (!hadError) {
     // If we're performing an binding to a weak or unowned variable from a

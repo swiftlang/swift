@@ -90,8 +90,6 @@ public:
   /// \brief Adds the global symbols associated with the first file.
   void addFirstFileSymbols();
 
-  void visitPatternBindingDecl(PatternBindingDecl *PBD);
-
   void visitAbstractFunctionDecl(AbstractFunctionDecl *AFD);
 
   void visitAccessorDecl(AccessorDecl *AD);
