@@ -6276,9 +6276,6 @@ void ExprRewriter::peepholeDictionaryUpcast(DictionaryExpr *expr,
   // the expr type as well.
   expr->setType(toType);
 
-  ConstraintLocatorBuilder keyLocator =
-    locator.withPathElement(
-      ConstraintLocator::PathElement::getGenericArgument(0));
   ConstraintLocatorBuilder valueLocator =
     locator.withPathElement(
       ConstraintLocator::PathElement::getGenericArgument(1));
