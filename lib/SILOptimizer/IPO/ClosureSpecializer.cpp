@@ -1143,7 +1143,7 @@ bool SILClosureSpecializerTransform::specialize(SILFunction *Caller,
     invalidateAnalysis(SILAnalysis::InvalidationKind::Branches);
   }
 
-  SILOptFunctionBuilder FuncBuilder(*getPassManager());
+  SILOptFunctionBuilder FuncBuilder(*this);
   bool Changed = false;
   for (auto *CInfo : ClosureCandidates) {
     for (auto &CSDesc : CInfo->CallSites) {
@@ -1164,7 +1164,7 @@ bool SILClosureSpecializerTransform::specialize(SILFunction *Caller,
       // directly.
       if (!NewF) {
         NewF = ClosureSpecCloner::cloneFunction(FuncBuilder, CSDesc, NewFName);
-        notifyAddFunction(NewF, CSDesc.getApplyCallee());
+        addFunctionToPassManagerWorklist(NewF, CSDesc.getApplyCallee());
       }
 
       // Rewrite the call
