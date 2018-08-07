@@ -57,9 +57,9 @@
                         "stable-next", "upstream",
                         "next-upstream", "upstream-with-swift"],
             "repos": {
-                "llvm": "swift-5.0-branch",
-                "clang": "swift-5.0-branch",
-                "compiler-rt": "swift-5.0-branch",
+                "llvm": "upstream-with-swift",
+                "clang": "upstream-with-swift",
+                "compiler-rt": "upstream-with-swift",
                 "swift": "master-next",
                 "lldb": "upstream-with-swift",
                 "cmark": "master",
