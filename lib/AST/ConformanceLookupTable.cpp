@@ -139,6 +139,10 @@ void ConformanceLookupTable::destroy() {
   this->~ConformanceLookupTable();
 }
 
+namespace {
+  using ConformanceConstructionInfo = std::pair<SourceLoc, ProtocolDecl *>;
+}
+
 template<typename NominalFunc, typename ExtensionFunc>
 void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
                                             NominalTypeDecl *nominal,
@@ -181,7 +185,7 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
                        : nominal->FirstExtension) {
     lastProcessed.setPointer(next);
 
-    SmallVector<LazyResolver::ConformanceConstructionInfo, 2> protocols;
+    SmallVector<ConformanceConstructionInfo, 2> protocols;
 
     // If we have conformances we can load, do so.
     // FIXME: This could be lazier.
@@ -275,7 +279,7 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
                                 ConformanceSource::forExplicit(nominal));
         },
         [&](ExtensionDecl *ext,
-            ArrayRef<LazyResolver::ConformanceConstructionInfo> protos) {
+            ArrayRef<ConformanceConstructionInfo> protos) {
           // The extension decl may not be validated, so we can't use
           // its inherited protocols directly.
           auto source = ConformanceSource::forExplicit(ext);
@@ -322,7 +326,7 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
                                     resolver);
               },
               [&](ExtensionDecl *ext,
-                  ArrayRef<LazyResolver::ConformanceConstructionInfo> protos) {
+                  ArrayRef<ConformanceConstructionInfo> protos) {
                 (void)protos;
                 inheritConformances(classDecl, superclassDecl, ext, resolver);
               });
@@ -348,7 +352,7 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
           expandImpliedConformances(nominal, nominal, resolver);
         },
         [&](ExtensionDecl *ext,
-            ArrayRef<LazyResolver::ConformanceConstructionInfo> protos) {
+            ArrayRef<ConformanceConstructionInfo> protos) {
           (void)protos;
           expandImpliedConformances(nominal, ext, resolver);
         });
@@ -365,7 +369,7 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
     forEachInStage(stage, nominal, resolver,
                    [&](NominalTypeDecl *nominal) { anyChanged = true; },
                    [&](ExtensionDecl *ext,
-                       ArrayRef<LazyResolver::ConformanceConstructionInfo>) {
+                       ArrayRef<ConformanceConstructionInfo>) {
                      anyChanged = true;
                    });
 
