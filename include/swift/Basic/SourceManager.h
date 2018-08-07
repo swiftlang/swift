@@ -30,9 +30,6 @@ class SourceManager {
   unsigned CodeCompletionBufferID = 0U;
   unsigned CodeCompletionOffset;
 
-  /// \brief The buffer ID where a hashbang line #! is allowed.
-  unsigned HashbangBufferID = 0U;
-
   /// Associates buffer identifiers to buffer IDs.
   llvm::StringMap<unsigned> BufIdentIDMap;
 
@@ -87,15 +84,6 @@ public:
   }
 
   SourceLoc getCodeCompletionLoc() const;
-
-  void setHashbangBufferID(unsigned BufferID) {
-    assert(HashbangBufferID == 0U && "Hashbang buffer ID already set");
-    HashbangBufferID = BufferID;
-  }
-
-  unsigned getHashbangBufferID() const {
-    return HashbangBufferID;
-  }
 
   /// Returns true if \c LHS is before \c RHS in the source buffer.
   bool isBeforeInBuffer(SourceLoc LHS, SourceLoc RHS) const {
