@@ -123,8 +123,8 @@ def operatorComment(operator, fixedWidth):
   ///
   /// - Note: Overflow checking is not performed in `-Ounchecked` builds.
   ///
-  /// If you want to opt out of overflow checking and ignore any overflow, use
-  /// the overflow addition operator (`&+`).
+  /// If you want to opt out of overflow checking and wrap the result in case
+  /// of any overflow, use the overflow addition operator (`&+`).
   ///
   ///     x &+ 120                // -115
   ///
@@ -160,8 +160,8 @@ def operatorComment(operator, fixedWidth):
   ///
   /// - Note: Overflow checking is not performed in `-Ounchecked` builds.
   ///
-  /// If you want to opt out of overflow checking and ignore any overflow, use
-  /// the overflow subtraction operator (`&-`).
+  /// If you want to opt out of overflow checking and wrap the result in case
+  /// of any overflow, use the overflow subtraction operator (`&-`).
   ///
   ///     x &- 50                // 227
   ///
@@ -197,8 +197,8 @@ def operatorComment(operator, fixedWidth):
   ///
   /// - Note: Overflow checking is not performed in `-Ounchecked` builds.
   ///
-  /// If you want to opt out of overflow checking and ignore any overflow, use
-  /// the overflow multiplication operator (`&*`).
+  /// If you want to opt out of overflow checking and wrap the result in case
+  /// of any overflow, use the overflow multiplication operator (`&*`).
   ///
   ///     x &* 21                // -115
   ///
@@ -223,7 +223,7 @@ def operatorComment(operator, fixedWidth):
   /// Returns the remainder of dividing the first value by the second.
   ///
   /// The result of the remainder operator (`%`) has the same sign as `lhs` and
-  /// is less than `rhs.magnitude`.
+  /// has a magnitude less than `rhs.magnitude`.
   ///
   ///     let x = 22 % 5
   ///     // x == 2
@@ -240,7 +240,8 @@ def operatorComment(operator, fixedWidth):
   ///   - rhs: The value to divide `lhs` by. `rhs` must not be zero.
 """,
         '&+': """\
-  /// Returns the sum of the two given values, wrapping any overflow.
+  /// Returns the sum of the two given values, wrapping the result in case of
+  /// any overflow.
   ///
   /// The overflow addition operator (`&+`) discards any bits that overflow the
   /// fixed width of the integer type. In the following example, the sum of
@@ -254,7 +255,7 @@ def operatorComment(operator, fixedWidth):
   ///     // y == -35 (after overflow)
   ///
   /// For more about arithmetic with overflow operators, see [Overflow
-  /// Operators][overflow] in [The Swift Programming Language][tspl].
+  /// Operators][overflow] in *[The Swift Programming Language][tspl]*.
   ///
   /// [overflow]: https://docs.swift.org/swift-book/LanguageGuide/AdvancedOperators.html#ID37
   /// [tspl]: https://docs.swift.org/swift-book/
@@ -264,7 +265,8 @@ def operatorComment(operator, fixedWidth):
   ///   - rhs: The second value to add.
 """,
         '&-': """\
-  /// Returns the difference of the two given values, wrapping any overflow.
+  /// Returns the difference of the two given values, wrapping the result in
+  /// case of any overflow.
   ///
   /// The overflow subtraction operator (`&-`) discards any bits that overflow
   /// the fixed width of the integer type. In the following example, the
@@ -278,7 +280,7 @@ def operatorComment(operator, fixedWidth):
   ///     // y == 245 (after overflow)
   ///
   /// For more about arithmetic with overflow operators, see [Overflow
-  /// Operators][overflow] in [The Swift Programming Language][tspl].
+  /// Operators][overflow] in *[The Swift Programming Language][tspl]*.
   ///
   /// [overflow]: https://docs.swift.org/swift-book/LanguageGuide/AdvancedOperators.html#ID37
   /// [tspl]: https://docs.swift.org/swift-book/
@@ -288,7 +290,8 @@ def operatorComment(operator, fixedWidth):
   ///   - rhs: The value to subtract from `lhs`.
 """,
         '&*': """\
-  /// Returns the product of the two given values, wrapping any overflow.
+  /// Returns the product of the two given values, wrapping the result in case
+  /// of any overflow.
   ///
   /// The overflow multiplication operator (`&*`) discards any bits that
   /// overflow the fixed width of the integer type. In the following example,
@@ -302,7 +305,7 @@ def operatorComment(operator, fixedWidth):
   ///     // y == -12 (after overflow)
   ///
   /// For more about arithmetic with overflow operators, see [Overflow
-  /// Operators][overflow] in [The Swift Programming Language][tspl].
+  /// Operators][overflow] in *[The Swift Programming Language][tspl]*.
   ///
   /// [overflow]: https://docs.swift.org/swift-book/LanguageGuide/AdvancedOperators.html#ID37
   /// [tspl]: https://docs.swift.org/swift-book/
@@ -607,7 +610,8 @@ def assignmentOperatorComment(operator, fixedWidth):
   /// Divides the first value by the second and stores the remainder in the
   /// left-hand-side variable.
   ///
-  /// The result has the same sign as `lhs` and is less than `rhs.magnitude`.
+  /// The result has the same sign as `lhs` and has a magnitude less than
+  /// `rhs.magnitude`.
   ///
   ///     var x = 22
   ///     x %= 5
@@ -632,7 +636,8 @@ def assignmentOperatorComment(operator, fixedWidth):
   /// The masking addition assignment operator (`&+=`) silently wraps any
   /// overflow that occurs during the operation. In the following example, the
   /// sum of `100` and `121` is greater than the maximum representable `Int8`
-  /// value, so the result is the wrapped overflow value:
+  /// value, so the result is the partial value after discarding the
+  /// overflowing bits.
   ///
   ///     var x: Int8 = 10
   ///     x &+= 21
@@ -640,6 +645,12 @@ def assignmentOperatorComment(operator, fixedWidth):
   ///     var y: Int8 = 100
   ///     y &+= 121
   ///     // y == -35 (after overflow)
+  ///
+  /// For more about arithmetic with overflow operators, see [Overflow
+  /// Operators][overflow] in *[The Swift Programming Language][tspl]*.
+  ///
+  /// [overflow]: https://docs.swift.org/swift-book/LanguageGuide/AdvancedOperators.html#ID37
+  /// [tspl]: https://docs.swift.org/swift-book/
   ///
   /// - Parameters:
   ///   - lhs: The first value to add.
@@ -652,7 +663,8 @@ def assignmentOperatorComment(operator, fixedWidth):
   /// The masking subtraction assignment operator (`&-=`) silently wraps any
   /// overflow that occurs during the operation. In the following example, the
   /// difference of `10` and `21` is less than zero, the minimum representable
-  /// `UInt` value, so the result is the wrapped overflow value:
+  /// `UInt` value, so the result is the result is the partial value after
+  /// discarding the overflowing bits.
   ///
   ///     var x: Int8 = 21
   ///     x &-= 10
@@ -660,6 +672,12 @@ def assignmentOperatorComment(operator, fixedWidth):
   ///     var y: UInt8 = 10
   ///     y &-= 21
   ///     // y == 245 (after overflow)
+  ///
+  /// For more about arithmetic with overflow operators, see [Overflow
+  /// Operators][overflow] in *[The Swift Programming Language][tspl]*.
+  ///
+  /// [overflow]: https://docs.swift.org/swift-book/LanguageGuide/AdvancedOperators.html#ID37
+  /// [tspl]: https://docs.swift.org/swift-book/
   ///
   /// - Parameters:
   ///   - lhs: A numeric value.
@@ -672,7 +690,8 @@ def assignmentOperatorComment(operator, fixedWidth):
   /// The masking multiplication assignment operator (`&*=`) silently wraps
   /// any overflow that occurs during the operation. In the following example,
   /// the product of `10` and `50` is greater than the maximum representable
-  /// `Int8` value, so the result is the wrapped overflow value:
+  /// `Int8` value, so the result is the partial value after discarding the
+  /// overflowing bits.
   ///
   ///     var x: Int8 = 10
   ///     x &*= 5
@@ -680,6 +699,12 @@ def assignmentOperatorComment(operator, fixedWidth):
   ///     var y: Int8 = 10
   ///     y &*= 50
   ///     // y == -12 (after overflow)
+  ///
+  /// For more about arithmetic with overflow operators, see [Overflow
+  /// Operators][overflow] in *[The Swift Programming Language][tspl]*.
+  ///
+  /// [overflow]: https://docs.swift.org/swift-book/LanguageGuide/AdvancedOperators.html#ID37
+  /// [tspl]: https://docs.swift.org/swift-book/
   ///
   /// - Parameters:
   ///   - lhs: The first value to multiply.
@@ -1194,8 +1219,13 @@ ${operatorComment(x.operator, False)}
 /// your own mutating `negate()` method.
 ///
 /// When the additive inverse of a value is unrepresentable in a conforming
-/// type, the operation should return a sentinel value, such as NaN, or
-/// result in a runtime error.
+/// type, the operation should either trap or return an exceptional value. For
+/// example, using the negation operator (prefix `-`) with `Int.min` results in
+/// a runtime error.
+///
+///     let x = Int.min
+///     let y = -x
+///     // Overflow error
 public protocol SignedNumeric : Numeric {
   /// Returns the additive inverse of the specified value.
   ///
@@ -2631,7 +2661,7 @@ extension FixedWidthInteger {
   ///     // Prints "64"
   ///     // Prints "5"
   ///
-  /// This method is equivalent to calling the version that takes a generator, 
+  /// This method is equivalent to calling the version that takes a generator,
   /// passing in the system's default random generator.
   ///
   /// - Parameter range: The range in which to create a random value.
