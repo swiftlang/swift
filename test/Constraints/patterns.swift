@@ -374,10 +374,10 @@ func test8347() -> String {
       return ""
     }
 
-    func h() -> String {
+    func h() -> String { // expected-note {{found this candidate}}
       return ""
     }
-    func h() -> Double {
+    func h() -> Double { // expected-note {{found this candidate}}
       return 3.0
     }
     func h() -> Int? { //expected-note{{found this candidate}}
