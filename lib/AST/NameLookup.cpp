@@ -493,11 +493,9 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
                           SmallVectorImpl<ModuleDecl *> &modulesFound,
                           bool &anyObject);
 
-/// Look through the "where" clause of the given protocol extension to
-/// find additional bounds written "Self: Foo", where Foo is either a
-/// superclass or a protocol.
-static TinyPtrVector<NominalTypeDecl *>
-getBoundsFromWhereClause(ExtensionDecl *ext) {
+TinyPtrVector<NominalTypeDecl *>
+SelfBoundsFromWhereClauseRequest::evaluate(Evaluator &evaluator,
+                                           ExtensionDecl *ext) const {
   auto proto = ext->getAsProtocolExtensionContext();
   assert(proto && "Not a protocol extension?");
 
@@ -522,14 +520,14 @@ getBoundsFromWhereClause(ExtensionDecl *ext) {
     // Resolve the right-hand side.
     DirectlyReferencedTypeDecls rhsDecls;
     if (auto typeRepr = req.getConstraintRepr()) {
-      rhsDecls = directReferencesForTypeRepr(ctx.evaluator, ctx, typeRepr, ext);
+      rhsDecls = directReferencesForTypeRepr(evaluator, ctx, typeRepr, ext);
     } else if (Type type = req.getConstraint()) {
       rhsDecls = directReferencesForType(type);
     }
 
     SmallVector<ModuleDecl *, 2> modulesFound;
     bool anyObject = false;
-    auto rhsNominals = resolveTypeDeclsToNominal(ctx.evaluator, ctx, rhsDecls,
+    auto rhsNominals = resolveTypeDeclsToNominal(evaluator, ctx, rhsDecls,
                                                  modulesFound, anyObject);
     result.insert(result.end(), rhsNominals.begin(), rhsNominals.end());
   }
@@ -681,7 +679,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         // "Self" constraints that can affect name lookup.
         if (isa<ProtocolDecl>(nominal)) {
           if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-            for (auto bound : getBoundsFromWhereClause(ext))
+            for (auto bound :
+                    Ctx.evaluator(SelfBoundsFromWhereClauseRequest{ext}))
               lookupDecls.push_back(bound);
           }
         }
@@ -765,7 +764,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           // "Self" constraints that can affect name lookup.
           if (isa<ProtocolDecl>(nominal)) {
             if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-              for (auto bound : getBoundsFromWhereClause(ext))
+              for (auto bound :
+                       Ctx.evaluator(SelfBoundsFromWhereClauseRequest{ext}))
                 lookupDecls.push_back(bound);
             }
           }
