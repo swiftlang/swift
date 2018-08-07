@@ -318,7 +318,6 @@ public func testCriticalEdges() {
 }
 
 
-// TODO: fix the noisy sends/recvs warning diagnostics.
 @inline(never)
 public func SR8443(n: Int32) {
   var i: Int32 = 0

@@ -44,9 +44,7 @@ public func testTensor(a: Tensor<Float>, b: Tensor<Float>) {
 
 
 public func testScalar(f: Float) {
-  var x = Tensor<Float>(f)
-          +
-          Tensor<Float>(1.0)
+  var x = Tensor<Float>(f) + Tensor<Float>(1.0)
   x += x
   _hostOp(x)
 }
@@ -146,8 +144,7 @@ public func testExitBranch2(i: Int) {
 
 
 // This program results in a boolean parameter being passed in.
-public func test_bool_param(cond: Bool,
-                            x: Tensor<Float>, y: Tensor<Float>) {
+public func test_bool_param(cond: Bool, x: Tensor<Float>, y: Tensor<Float>) {
   var a = x.toAccelerator()
   let b = y.toAccelerator()
 
@@ -178,8 +175,7 @@ public func test_bool_param(cond: Bool,
 // CHECK-NEXT:  end_access
 // CHECK-NEXT:  dealloc_stack
 
-public func test_bool_param2(cond: Bool,
-                             x: Tensor<Float>, y: Tensor<Float>) {
+public func test_bool_param2(cond: Bool, x: Tensor<Float>, y: Tensor<Float>) {
   var a = x.toAccelerator()
   let b = y.toAccelerator()
 
@@ -238,8 +234,7 @@ public func test_multiple_ifs(status: Bool) {
 // CHECK-NEXT:     block bb4}
 // CHECK-NEXT:   block bb6]
 
-public func test_while1(maxCount: Int,
-                        arg1: Tensor<Float>, arg2: Tensor<Float>) {
+public func test_while1(maxCount: Int, arg1: Tensor<Float>, arg2: Tensor<Float>) {
   var a = arg1.toAccelerator()
   let b = arg2.toAccelerator()
 
@@ -291,7 +286,6 @@ public func test_while1(maxCount: Int,
 public func scalar_manipulation(a : Float) -> Tensor<Float> {
   let x = Tensor<Float>(a) + Tensor<Float>(1.0) // expected-warning {{value implicitly copied to the host}}
   let y = x.scalar! + 2.0 // expected-note {{value used here}}
-
   let z = Tensor<Float>(y)
   return z+z
 }

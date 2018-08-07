@@ -237,7 +237,6 @@ public func testMultiResultOp_rawop(x: Tensor<Float>, y: Tensor<Float>) {
   _hostOp(results.backprop)
 }
 
-// TODO: The sends/recvs diagnostics are not very good. Fix them.
 public func testMultiResultOp_send_recv() {
   var x = Tensor<Float>([[1.0]])  // expected-warning {{implicitly copied to the host}}
   // Accelerator -> Host
