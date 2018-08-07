@@ -19,6 +19,12 @@ StringTensorTests.test("StringComparison") {
   let result2 = t2.elementsEqual(t2)
   expectEqual(ShapedArray(shape: [2], scalars: [true, true]),
               result2.array)
+
+  let t3 = Tensor(["different", "bar"])
+  let result3 = t2.elementsEqual(t3)
+  expectEqual(ShapedArray(shape: [2], scalars: [false, true]),
+              result3.array)
+
 }
 
 runAllTests()
