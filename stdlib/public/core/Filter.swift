@@ -223,20 +223,6 @@ extension LazyFilterCollection : LazyCollectionProtocol {
     } while i != _base.endIndex && !_predicate(_base[i])
   }
 
-  @inline(__always)
-  @inlinable // FIXME(sil-serialize-all)
-  internal func _ensureBidirectional(step: Int) {
-    // FIXME: This seems to be the best way of checking whether _base is
-    // forward only without adding an extra protocol requirement.
-    // index(_:offsetBy:limitedBy:) is chosen becuase it is supposed to return
-    // nil when the resulting index lands outside the collection boundaries,
-    // and therefore likely does not trap in these cases.
-    if step < 0 {
-      _ = _base.index(
-        _base.endIndex, offsetBy: step, limitedBy: _base.startIndex)
-    }
-  }
-
   @inlinable // FIXME(sil-serialize-all)
   public func distance(from start: Index, to end: Index) -> Int {
     // The following line makes sure that distance(from:to:) is invoked on the
@@ -268,10 +254,6 @@ extension LazyFilterCollection : LazyCollectionProtocol {
   public func index(_ i: Index, offsetBy n: Int) -> Index {
     var i = i
     let step = n.signum()
-    // The following line makes sure that index(_:offsetBy:) is invoked on the
-    // _base at least once, to trigger a _precondition in forward only
-    // collections.
-    _ensureBidirectional(step: step)
     for _ in 0 ..< abs(numericCast(n)) {
       _advanceIndex(&i, step: step)
     }
@@ -289,10 +271,6 @@ extension LazyFilterCollection : LazyCollectionProtocol {
   ) -> Index? {
     var i = i
     let step = n.signum()
-    // The following line makes sure that index(_:offsetBy:limitedBy:) is
-    // invoked on the _base at least once, to trigger a _precondition in
-    // forward only collections.
-    _ensureBidirectional(step: step)
     for _ in 0 ..< abs(numericCast(n)) {
       if i == limit {
         return nil
