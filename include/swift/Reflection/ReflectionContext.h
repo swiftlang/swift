@@ -102,10 +102,6 @@ public:
     return sizeof(StoredPointer) * 2;
   }
 
-  void dumpAllSections(std::ostream &OS) {
-    getBuilder().dumpAllSections(OS);
-  }
-
 #if defined(__APPLE__) && defined(__MACH__)
   template <typename T> bool readMachOSections(RemoteAddress ImageStart) {
     auto Buf =

@@ -232,6 +232,7 @@
           "location": "",
           "moduleName": "cake",
           "declAttributes": [
+            "HasInitialValue",
             "ReferenceOwnership"
           ],
           "ownership": 1,
@@ -313,6 +314,7 @@
           "location": "",
           "moduleName": "cake",
           "declAttributes": [
+            "HasInitialValue",
             "ReferenceOwnership"
           ],
           "ownership": 2,
