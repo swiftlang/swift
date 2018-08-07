@@ -673,7 +673,6 @@ public:
         Snapshot->getBuffer()->getText(), FilePath);
 
     BufferID = SM.addNewSourceBuffer(std::move(BufCopy));
-    SM.setHashbangBufferID(BufferID);
     DiagConsumer.setInputBufferIDs(BufferID);
 
     Parser.reset(

@@ -59,7 +59,8 @@ void tokenize(const LangOptions &LangOpts, const SourceManager &SM,
     EndOffset = SM.getRangeForBuffer(BufferID).getByteLength();
 
   Lexer L(LangOpts, SM, BufferID, Diags, /*InSILMode=*/false,
-          RetainComments, TriviaRetention, Offset, EndOffset);
+          HashbangMode::Allowed, RetainComments, TriviaRetention, Offset,
+          EndOffset);
 
   auto TokComp = [&](const Token &A, const Token &B) {
     return SM.isBeforeInBuffer(A.getLoc(), B.getLoc());
@@ -340,6 +341,9 @@ Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
               SF.getASTContext().LangOpts, SF.getASTContext().SourceMgr,
               BufferID, &SF.getASTContext().Diags,
               /*InSILMode=*/SIL != nullptr,
+              SF.Kind == SourceFileKind::Main
+                  ? HashbangMode::Allowed
+                  : HashbangMode::Disallowed,
               SF.getASTContext().LangOpts.AttachCommentsToDecls
                   ? CommentRetentionMode::AttachToNextToken
                   : CommentRetentionMode::None,
@@ -375,6 +379,7 @@ class TokenRecorder: public ConsumeTokenReceiver {
   void relexComment(CharSourceRange CommentRange,
                     llvm::SmallVectorImpl<Token> &Scracth) {
     Lexer L(Ctx.LangOpts, Ctx.SourceMgr, BufferID, nullptr, /*InSILMode=*/false,
+            HashbangMode::Disallowed,
             CommentRetentionMode::ReturnAsTokens,
             TriviaRetentionMode::WithoutTrivia,
             SM.getLocOffsetInBuffer(CommentRange.getStart(), BufferID),
@@ -1020,13 +1025,14 @@ ParserUnit::ParserUnit(SourceManager &SM, unsigned BufferID,
 }
 
 ParserUnit::ParserUnit(SourceManager &SM, unsigned BufferID,
-             unsigned Offset, unsigned EndOffset)
+                       unsigned Offset, unsigned EndOffset)
   : Impl(*new Implementation(SM, BufferID, LangOptions(), "input")) {
 
   std::unique_ptr<Lexer> Lex;
   Lex.reset(new Lexer(Impl.LangOpts, SM,
                       BufferID, &Impl.Diags,
                       /*InSILMode=*/false,
+                      HashbangMode::Allowed,
                       CommentRetentionMode::None,
                       TriviaRetentionMode::WithoutTrivia,
                       Offset, EndOffset));
