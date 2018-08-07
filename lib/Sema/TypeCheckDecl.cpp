@@ -235,12 +235,6 @@ void TypeChecker::validateWhereClauses(ProtocolDecl *protocol,
   }
 }
 
-void TypeChecker::resolveInheritedProtocols(ProtocolDecl *protocol) {
-  for (unsigned i : indices(protocol->getInherited()))
-    (void)protocol->getInheritedType(i);
-  resolveTrailingWhereClause(protocol);
-}
-
 /// check the inheritance clause of a type declaration or extension thereof.
 ///
 /// This routine validates all of the types in the parsed inheritance clause,
@@ -568,16 +562,11 @@ getInheritedForCycleCheck(TypeChecker &tc,
                           ProtocolDecl **scratch) {
   TinyPtrVector<ProtocolDecl *> result;
 
-  for (unsigned index : indices(proto->getInherited())) {
-    if (auto type = proto->getInheritedType(index)) {
-      if (type->isExistentialType()) {
-        auto layout = type->getExistentialLayout();
-        for (auto protoTy : layout.getProtocols()) {
-          auto *protoDecl = protoTy->getDecl();
-          result.push_back(protoDecl);
-        }
-      }
-    }
+  bool anyObject = false;
+  for (const auto &found :
+         getDirectlyInheritedNominalTypeDecls(proto, anyObject)) {
+    if (auto protoDecl = dyn_cast<ProtocolDecl>(found.second))
+      result.push_back(protoDecl);
   }
 
   return result;
@@ -3969,8 +3958,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       }
     }
 
-    // Record inherited protocols.
-    resolveInheritedProtocols(proto);
     resolveTrailingWhereClause(proto);
 
     validateAttributes(*this, D);
@@ -4516,8 +4503,6 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
 
     (void) proto->getFormalAccess();
 
-    // Record inherited protocols.
-    resolveInheritedProtocols(proto);
     resolveTrailingWhereClause(proto);
 
     for (auto ATD : proto->getAssociatedTypeMembers()) {
@@ -4737,6 +4722,7 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
   // validation of protocols, but clients will assume that things
   // like the requirement signature have been set.
   if (auto PD = dyn_cast<ProtocolDecl>(nominal)) {
+    (void)PD->getInheritedProtocols();
     if (!PD->isRequirementSignatureComputed()) {
       TC.validateDecl(PD);
     }
