@@ -316,9 +316,13 @@ private:
   /// Create a new latch block and clone all the arguments from new header.
   SILBasicBlock *createNewLatch(SILBasicBlock *newHeader);
 
-  // Patch the edges that go to the header and exit blocks to the new header or
-  // latch block as appropriate. Also, return the map consisting of indices
-  // assigned to the exit blocks.
+  /// Replace the preheader->header edge with preheader->newHeader edge
+  /// and update the arguments of preheader to match that of newheader.
+  void patchPreheader(SILBasicBlock *newHeader);
+
+  /// Patch the edges that go to the header and exit blocks to the new header or
+  /// latch block as appropriate. Also, return the map consisting of indices
+  /// assigned to the exit blocks.
   llvm::DenseMap<SILBasicBlock *, intmax_t>
   patchEdges(SILBasicBlock *newHeader, SILBasicBlock *latchBlock);
 
@@ -368,9 +372,18 @@ void SingleExitLoopTransformer::initialize() {
   loop->getExitBlocks(exitBlocks);
   // All the exiting edges need to be rewired.
   loop->getExitEdges(edgesToFix);
-  // All the edges to the header need to be rewired.
-  for (SILBasicBlock *headerPred : header->getPredecessorBlocks()) {
-    edgesToFix.emplace_back(headerPred, header);
+  edgesToFix.emplace_back(latch, header);
+  // Split critical edges in edgesToFix before we do any transformations.
+  for (auto &edge : edgesToFix) {
+    SILBasicBlock *src = const_cast<SILBasicBlock *>(edge.first);
+    SILBasicBlock *tgt = const_cast<SILBasicBlock *>(edge.second);
+    SILBasicBlock *splitBlock = splitIfCriticalEdge(src, tgt, /*DT*/ nullptr, LI);
+    if (splitBlock != nullptr) {
+      // If the edge was critical then splitBlock would have been inserted
+      // between src and tgt as follows: src -> splitBlock -> tgt.  Therefore,
+      // update src as the new edge to patch would be splitBlock -> tgt.
+      edge.first = splitBlock;
+    }
   }
 
   for (const SILBasicBlock *bb : loop->getBlocks()) {
@@ -502,6 +515,30 @@ SingleExitLoopTransformer::createNewLatch(SILBasicBlock *newHeader) {
   return latchBlock;
 }
 
+void SingleExitLoopTransformer::patchPreheader(SILBasicBlock *newHeader) {
+  // Update edge
+  replaceBranchTarget(preheader->getTerminator(), header, newHeader,
+                      /*preserveArgs*/ true);
+  SILBuilder builder(preheader->getTerminator());
+  SILLocation location(
+    getUserSourceLocation(preheader->getTerminator()->getDebugLocation()));
+  // Add arguments corresponding to escaping arguments.
+  // State from within the loop is not available in the preheader.
+  // Simply pass in an undef. This will never be accessed at runtime.
+  SmallVector<SILValue, 8> newArgs;
+  for (const SILValue &escapingValue : escapingValues) {
+    newArgs.push_back(getUndef(escapingValue->getType()));
+  }
+  // `exitIndex` to identify the block to which we exit from the loop.
+  newArgs.push_back(createTFIntegerConst(*deviceInfo, builder, location,
+                                         /*bitwidth*/ 32,
+                                         /*exitIndex*/ 0));
+  // `stayInLoop` flag
+  newArgs.push_back(createTFIntegerConst(*deviceInfo, builder, location,
+                                         /*bitwidth*/ 1, true));
+  appendArguments(preheader->getTerminator(), newHeader, newArgs);
+}
+
 llvm::DenseMap<SILBasicBlock *, intmax_t>
 SingleExitLoopTransformer::patchEdges(SILBasicBlock *newHeader,
                                       SILBasicBlock *latchBlock) {
@@ -537,14 +574,7 @@ SingleExitLoopTransformer::patchEdges(SILBasicBlock *newHeader,
   for (const auto &edge : edgesToFix) {
     SILBasicBlock *src = const_cast<SILBasicBlock *>(edge.first);
     SILBasicBlock *tgt = const_cast<SILBasicBlock *>(edge.second);
-    SILBasicBlock *newTgt = (src == preheader) ? newHeader : latchBlock;
-    SILBasicBlock *splitBlock = splitIfCriticalEdge(src, tgt, /*DT*/ nullptr, LI);
-    if (splitBlock != nullptr) {
-      // If the edge was critical then splitBlock would have been inserted
-      // between src and tgt as follows: src -> splitBlock -> tgt.  Therefore,
-      // update src as the new edge to patch would be splitBlock -> tgt.
-      src = splitBlock;
-    }
+    SILBasicBlock *newTgt = latchBlock;
     bool stayInLoop = loop->contains(tgt);
     replaceBranchTarget(src->getTerminator(), tgt, newTgt,
                         /*preserveArgs=*/stayInLoop);
@@ -564,13 +594,8 @@ SingleExitLoopTransformer::patchEdges(SILBasicBlock *newHeader,
     for (const SILValue &escapingValue : escapingValues) {
       if (DI->properlyDominates(escapingValue, src->getTerminator())) {
         newArgs.push_back(escapingValue);
-      } else if (src != preheader) {
-        // newHeader arguments are available if src is not the preheader.
-        newArgs.push_back(newHeader->getArgument(argIndex));
       } else {
-        // State from within the loop is not available in the preheader.
-        // Simply pass in an undef. This will never be accessed at runtime.
-        newArgs.push_back(getUndef(escapingValue->getType()));
+        newArgs.push_back(newHeader->getArgument(argIndex));
       }
       ++argIndex;
     }
@@ -689,6 +714,8 @@ bool SingleExitLoopTransformer::transform() {
 
   // Create a new latch block.
   SILBasicBlock *latchBlock = createNewLatch(newHeader);
+
+  patchPreheader(newHeader);
 
   // Patch the edges and return the map consisting of indices assigned
   // to the exit blocks.
