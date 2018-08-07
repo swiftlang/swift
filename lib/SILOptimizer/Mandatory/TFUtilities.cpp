@@ -181,6 +181,7 @@ unsigned tf::convertSwiftTypeToTF(Type ty) {
         .Case("Double", TF_DOUBLE)
         .Case("Int", is64(s) ? TF_INT64 : TF_INT32)
         .Case("UInt", is64(s) ? TF_UINT64 : TF_UINT32)
+        .Case("String", TF_STRING)
         .Default(0);
   }
 
@@ -218,6 +219,10 @@ unsigned tf::convertSwiftTypeToTF(Type ty) {
     case BuiltinFloatType::PPC128:
       return 0;
     }
+  }
+
+  if (auto *BRPT = ty->getAs<BuiltinRawPointerType>()) {
+    return TF_STRING;
   }
 #endif
   return 0;
