@@ -158,11 +158,12 @@ namespace {
     // dependent layout.
     bool ClassIsFixedSize = true;
 
-    // Does the class have identical layout under all generic substitutions?
-    // If not, we can have to access stored properties through the field
-    // offset vector in the instantiated type metadata.
-    bool ClassHasConcreteLayout = true;
-    
+    // Does the class layout depend on generic parameters?
+    bool ClassHasGenericLayout = false;
+
+    // Does the class have Objective-C ancestry?
+    bool ClassHasObjCAncestry = false;
+
   public:
     ClassLayoutBuilder(IRGenModule &IGM, SILType classType,
                        ReferenceCounting refcounting,
@@ -264,42 +265,23 @@ namespace {
         }
 
         if (superclassDecl->hasClangNode()) {
-          // If the superclass was imported from Objective-C, its size is
-          // not known at compile time. However, since the field offset
-          // vector only stores offsets of stored properties defined in
-          // Swift, we don't have to worry about indirect indexing of
-          // the field offset vector.
+          // If the superclass was imported from Objective-C, the Objective-C
+          // runtime will slide our instance variable offsets at runtime based
+          // on the actual runtime size of the Objective-C superclass.
+          ClassHasObjCAncestry = true;
           ClassIsFixedSize = false;
-
-          // We can't use global offset variables if we are generic and layout
-          // dependent on a generic parameter because the objective-c layout might
-          // depend on the alignment of the generic stored property('t' in the
-          // example below).
-          //
-          // class Foo<T> : NSFoobar {
-          //   var x : AKlass = AKlass()
-          //   var y : AKlass = AKlass()
-          //   var t : T?
-          // }
-          if (classType.hasArchetype())
-            for (VarDecl *var : theClass->getStoredProperties()) {
-              SILType type = classType.getFieldType(var, IGM.getSILModule());
-              auto &eltType = IGM.getTypeInfo(type);
-              if (!eltType.isFixedSize()) {
-                if (type.hasArchetype())
-                  ClassHasConcreteLayout = false;
-              }
-            }
         } else if (IGM.isResilient(superclassDecl, ResilienceExpansion::Maximal)) {
+          // If the class is resilient, don't walk over its fields; we have to
+          // calculate the layout at runtime.
           ClassMetadataRequiresDynamicInitialization = true;
           ClassIsFixedSize = false;
 
-          // Furthermore, if the superclass is a generic context, we have to
-          // assume that its layout depends on its generic parameters.
-          // But this only propagates down to subclasses whose superclass type
-          // depends on the subclass's generic context.
+          // Furthermore, if the superclass is generic, we have to assume
+          // that its layout depends on its generic parameters. But this only
+          // propagates down to subclasses whose superclass type depends on the
+          // subclass's generic context.
           if (superclassType.hasArchetype())
-            ClassHasConcreteLayout = false;
+            ClassHasGenericLayout = true;
 
         } else {
           // Otherwise, we have total knowledge of the class and its
@@ -308,8 +290,6 @@ namespace {
         }
       }
 
-      // If this class was imported from another module, assume that we may
-      // not know its exact layout.
       if (classHasIncompleteLayout(IGM, theClass)) {
         ClassMetadataRequiresDynamicInitialization = true;
         ClassIsFixedSize = false;
@@ -327,22 +307,6 @@ namespace {
     void addDirectFieldsFromClass(ClassDecl *theClass,
                                   SILType classType,
                                   bool superclass) {
-      // Access strategies should be set by the abstract class layout,
-      // not using the concrete type information we have.
-      const ClassLayout *abstractLayout = nullptr;
-
-      if (!superclass) {
-        auto *classTI = &IGM.getTypeInfo(classType).as<ClassTypeInfo>();
-
-        SILType selfType = getSelfType(theClass);
-        auto *selfTI = &IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
-
-        // Only calculate an abstract layout if its different than the one
-        // being computed now.
-        if (classTI != selfTI)
-          abstractLayout = &selfTI->getClassLayout(IGM, selfType);
-      }
-
       for (VarDecl *var : theClass->getStoredProperties()) {
         SILType type = classType.getFieldType(var, IGM.getSILModule());
         auto &eltTypeForAccess = IGM.getTypeInfo(type);
@@ -365,7 +329,7 @@ namespace {
           ClassIsFixedSize = false;
 
           if (type.hasArchetype())
-            ClassHasConcreteLayout = false;
+            ClassHasGenericLayout = true;
         }
 
         auto element = ElementLayout::getIncomplete(eltTypeForLayout,
@@ -379,41 +343,80 @@ namespace {
 
         if (!superclass) {
           AllStoredProperties.push_back(var);
-          AllFieldAccesses.push_back(getFieldAccess(abstractLayout, var));
+          AllFieldAccesses.push_back(getFieldAccess());
+        }
+      }
+
+      if (!superclass) {
+        // If we're calculating the layout of a specialized generic class type,
+        // we cannot use field offset globals for dependently-typed fields,
+        // because they will not exist -- we only emit such globals for fields
+        // which are not dependent in all instantiations.
+        //
+        // So make sure to fall back to the fully unsubstituted 'abstract layout'
+        // for any fields whose offsets are not completely fixed.
+        auto *classTI = &IGM.getTypeInfo(classType).as<ClassTypeInfo>();
+
+        SILType selfType = getSelfType(theClass);
+        auto *selfTI = &IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
+
+        // Only calculate an abstract layout if its different than the one
+        // being computed now.
+        if (classTI != selfTI) {
+          auto *abstractLayout = &selfTI->getClassLayout(IGM, selfType);
+
+          for (unsigned index : indices(AllFieldAccesses)) {
+            auto &access = AllFieldAccesses[index];
+            auto *var = AllStoredProperties[index];
+            if (access == FieldAccess::NonConstantDirect)
+              access = abstractLayout->getFieldAccessAndElement(var).first;
+          }
+        }
+
+        // If the class has Objective-C ancestry and we're doing runtime layout
+        // that depends on generic parameters, the Swift runtime will first
+        // layout the fields relative to the static instance start offset, and
+        // then ask the Objective-C runtime to slide them.
+        //
+        // However, this means that if some fields have a generic type, their
+        // alignment will change the instance start offset between generic
+        // instantiations, and we cannot use field offset global variables at
+        // all, even for fields that come before any generically-typed fields.
+        //
+        // For example, the alignment of 'x' and 'y' below might depend on 'T':
+        //
+        // class Foo<T> : NSFoobar {
+        //   var x : AKlass = AKlass()
+        //   var y : AKlass = AKlass()
+        //   var t : T?
+        // }
+        if (ClassHasGenericLayout && ClassHasObjCAncestry) {
+          for (auto &access : AllFieldAccesses) {
+            if (access == FieldAccess::NonConstantDirect)
+              access = FieldAccess::ConstantIndirect;
+          }
         }
       }
     }
 
-    FieldAccess getFieldAccess(const ClassLayout *abstractLayout,
-                               VarDecl *var) {
-      // The class has fixed size, so the field offset is known statically.
-      if (ClassIsFixedSize) {
+    FieldAccess getFieldAccess() {
+      // If the layout so far has a fixed size, the field offset is known
+      // statically.
+      if (ClassIsFixedSize)
         return FieldAccess::ConstantDirect;
-      }
 
-      // If the field offset can't be known at compile time, we need to
-      // load a field offset, either from a global or the metadata's field
-      // offset vector.
+      // If layout so far depends on generic parameters, we have to load the
+      // offset from the field offset vector in class metadata.
+      if (ClassHasGenericLayout)
+        return FieldAccess::ConstantIndirect;
 
-      // The global will exist only if the abstract type has concrete layout,
-      // so if we're not laying out the abstract type, use its access rule.
-      if (abstractLayout) {
-        return abstractLayout->getFieldAccessAndElement(var).first;
-      }
-
-      // If layout doesn't depend on any generic parameters, but it's
+      // If layout so far doesn't depend on any generic parameters, but it's
       // nonetheless not statically known (because either a superclass
       // or a member type was resilient), then we can rely on the existence
       // of a global field offset variable which will be initialized by
       // either the Objective-C or Swift runtime, depending on the
       // class's heritage.
-      if (ClassHasConcreteLayout) {
-        return FieldAccess::NonConstantDirect;
-      }
-
-      // If layout depends on generic parameters, we have to load the
-      // offset from the class metadata.
-      return FieldAccess::ConstantIndirect;
+      return FieldAccess::NonConstantDirect;
     }
   };
 } // end anonymous namespace
