@@ -57,13 +57,16 @@ bool swift::inputFileKindCanHaveTBDValidated(InputFileKind kind) {
   // Only things that involve an AST can have a TBD file computed, at the
   // moment.
   switch (kind) {
-  case InputFileKind::IFK_Swift:
-  case InputFileKind::IFK_Swift_Library:
+  case InputFileKind::Swift:
+  case InputFileKind::SwiftLibrary:
     return true;
-  case InputFileKind::IFK_None:
-  case InputFileKind::IFK_Swift_REPL:
-  case InputFileKind::IFK_SIL:
-  case InputFileKind::IFK_LLVM_IR:
+  case InputFileKind::SwiftModuleInterface:
+    // FIXME: This would be a good test of the interface format.
+    return false;
+  case InputFileKind::None:
+  case InputFileKind::SwiftREPL:
+  case InputFileKind::SIL:
+  case InputFileKind::LLVM:
     return false;
   }
 }

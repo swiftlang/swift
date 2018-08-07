@@ -152,6 +152,7 @@ public:
   // treat the input as LLVM_IR.
   bool shouldTreatAsLLVM() const;
   bool shouldTreatAsSIL() const;
+  bool shouldTreatAsModuleInterface() const;
 
   bool areAllNonPrimariesSIB() const;
 
