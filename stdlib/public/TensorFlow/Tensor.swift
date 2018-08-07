@@ -602,10 +602,27 @@ public extension Tensor where Scalar == Int32 {
     ).toAccelerator()
   }
 
+  /// Creates a tensor with the specified shape, randomly sampling scalar values
+  /// from a discrete uniform distribution, using the default random number
+  /// generator.
+  ///
+  /// - Parameters:
+  ///   - shape: The dimensions of the tensor.
+  ///
+  // FIXME: Simply call above init() function when Hoistable closures capture
+  // mutating references correctly
   @inlinable @inline(__always)
   init(randomStandardUniform shape: TensorShape) {
-    self.init(randomStandardUniform: shape,
-              generator: &ARC4RandomNumberGenerator.global)
+    self = Tensor(
+      handle: _TFHoistable {
+        let dist = UniformIntegerDistribution<Scalar>()
+        var scalars: [Scalar] = []
+        for _ in 0 ..< shape.contiguousSize {
+          scalars.append(dist.next(using: &ARC4RandomNumberGenerator.global))
+        }
+        return _TFTensorFromScalars(scalars, shape: shape.dimensions)
+      }
+    ).toAccelerator()
   }
 
 }
@@ -634,10 +651,27 @@ public extension Tensor where Scalar : BinaryFloatingPoint,
     ).toAccelerator()
   }
 
+  /// Creates a tensor with the specified shape, randomly sampling scalar values
+  /// from a uniform distribution between 0 and 1, using the default random
+  /// number generator.
+  ///
+  /// - Parameters:
+  ///   - shape: The dimensions of the tensor.
+  ///
+  // FIXME: Simply call above init() function when Hoistable closures capture
+  // mutating references correctly
   @inlinable @inline(__always)
   init(randomUniform shape: TensorShape) {
-    self.init(randomUniform: shape,
-              generator: &ARC4RandomNumberGenerator.global)
+    self = Tensor(
+      handle: _TFHoistable {
+        let dist = UniformFloatingPointDistribution<Scalar>()
+        var scalars: [Scalar] = []
+        for _ in 0 ..< shape.contiguousSize {
+          scalars.append(dist.next(using: &ARC4RandomNumberGenerator.global))
+        }
+        return _TFTensorFromScalars(scalars, shape: shape.dimensions)
+      }
+    ).toAccelerator()
   }
 
   /// Creates a tensor with the specified shape, randomly sampling scalar values
@@ -667,12 +701,29 @@ public extension Tensor where Scalar : BinaryFloatingPoint,
     ).toAccelerator()
   }
 
+  /// Creates a tensor with the specified shape, randomly sampling scalar values
+  /// from a normal distribution, using the default random number generator.
+  ///
+  /// - Parameters:
+  ///   - shape: The dimensions of the tensor.
+  ///   - mean: The mean of the distribution.
+  ///   - stddev: The standard deviation of the distribution.
+  ///
+  // FIXME: Simply call above init() function when Hoistable closures capture
+  // mutating references correctly
   @inlinable @inline(__always)
-  init(randomNormal shape: TensorShape,
-       mean: Scalar = 0,
-       stddev: Scalar = 1) {
-    self.init(randomNormal: shape, mean: mean, stddev: stddev,
-              generator: &ARC4RandomNumberGenerator.global)
+  init(randomNormal shape: TensorShape, mean: Scalar = 0, stddev: Scalar = 1) {
+    self = Tensor(
+      handle: _TFHoistable {
+        let dist = NormalDistribution<Scalar>(
+          mean: mean, standardDeviation: stddev)
+        var scalars: [Scalar] = []
+        for _ in 0 ..< shape.contiguousSize {
+          scalars.append(dist.next(using: &ARC4RandomNumberGenerator.global))
+        }
+        return _TFTensorFromScalars(scalars, shape: shape.dimensions)
+      }
+    ).toAccelerator()
   }
 }
 
