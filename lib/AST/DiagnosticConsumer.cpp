@@ -111,9 +111,9 @@ void FileSpecificDiagnosticConsumer::computeConsumersOrderedByRange(
          "overlapping ranges despite having distinct files");
 }
 
-Optional<FileSpecificDiagnosticConsumer::ConsumerAndRange *>
-FileSpecificDiagnosticConsumer::consumerAndRangeForLocation(
-    SourceManager &SM, SourceLoc loc) const {
+Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
+FileSpecificDiagnosticConsumer::subconsumerForLocation(SourceManager &SM,
+                                                       SourceLoc loc) {
   // Diagnostics with invalid locations always go to every consumer.
   if (loc.isInvalid())
     return None;
@@ -154,7 +154,9 @@ FileSpecificDiagnosticConsumer::consumerAndRangeForLocation(
 
   if (possiblyContainingRangeIter != ConsumersOrderedByRange.end() &&
       possiblyContainingRangeIter->contains(loc)) {
-    return const_cast<ConsumerAndRange *>(possiblyContainingRangeIter);
+    auto *consumerAndRangeForLocation =
+        const_cast<ConsumerAndRange *>(possiblyContainingRangeIter);
+    return &(*this)[*consumerAndRangeForLocation];
   }
 
   return None;
@@ -167,21 +169,21 @@ void FileSpecificDiagnosticConsumer::handleDiagnostic(
 
   HasAnErrorBeenConsumed |= Kind == DiagnosticKind::Error;
 
-  Optional<ConsumerAndRange *> consumerAndRange;
+  Optional<FileSpecificDiagnosticConsumer::Subconsumer *> subconsumer;
   switch (Kind) {
   case DiagnosticKind::Error:
   case DiagnosticKind::Warning:
   case DiagnosticKind::Remark:
-    consumerAndRange = consumerAndRangeForLocation(SM, Loc);
-    ConsumerSpecificInfoForSubsequentNotes = consumerAndRange;
+    subconsumer = subconsumerForLocation(SM, Loc);
+    SubconsumerForSubsequentNotes = subconsumer;
     break;
   case DiagnosticKind::Note:
-    consumerAndRange = ConsumerSpecificInfoForSubsequentNotes;
+    subconsumer = SubconsumerForSubsequentNotes;
     break;
   }
-  if (consumerAndRange.hasValue()) {
-    (*this)[*consumerAndRange.getValue()].handleDiagnostic(
-        SM, Loc, Kind, FormatString, FormatArgs, Info);
+  if (subconsumer.hasValue()) {
+    subconsumer.getValue()->handleDiagnostic(SM, Loc, Kind, FormatString,
+                                             FormatArgs, Info);
     return;
   }
   for (auto &subconsumer : Subconsumers)

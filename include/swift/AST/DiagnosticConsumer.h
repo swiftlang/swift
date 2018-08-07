@@ -251,7 +251,7 @@ private:
   /// This allows diagnostics to be emitted before files are actually opened,
   /// as long as they don't have source locations.
   ///
-  /// \see #consumerAndRangeForLocation
+  /// \see #subconsumerForLocation
   SmallVector<ConsumerAndRange, 4> ConsumersOrderedByRange;
 
   /// Indicates which consumer to send Note diagnostics too.
@@ -261,7 +261,7 @@ private:
   ///
   /// If None, Note diagnostics are sent to every consumer.
   /// If null, diagnostics are suppressed.
-  Optional<ConsumerAndRange *> ConsumerSpecificInfoForSubsequentNotes = None;
+  Optional<Subconsumer *> SubconsumerForSubsequentNotes = None;
 
   bool HasAnErrorBeenConsumed = false;
 
@@ -293,8 +293,8 @@ private:
   /// Returns nullptr if diagnostic is to be suppressed,
   /// None if diagnostic is to be distributed to every consumer,
   /// a particular consumer if diagnostic goes there.
-  Optional<ConsumerAndRange *> consumerAndRangeForLocation(SourceManager &SM,
-                                                           SourceLoc loc) const;
+  Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
+  subconsumerForLocation(SourceManager &SM, SourceLoc loc);
 };
   
 } // end namespace swift
