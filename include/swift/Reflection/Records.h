@@ -21,9 +21,10 @@
 #include "swift/Demangling/Demangle.h"
 #include "llvm/ADT/ArrayRef.h"
 
+namespace swift {
+
 const uint16_t SWIFT_REFLECTION_METADATA_VERSION = 3; // superclass field
 
-namespace swift {
 namespace reflection {
 
 // Field records describe the type of a single stored property or case member

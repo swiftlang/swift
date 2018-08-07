@@ -20,9 +20,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SILGenFunction.h"
-#include "Scope.h"
 #include "ManagedValue.h"
+#include "SILGenFunction.h"
+#include "SILGenFunctionBuilder.h"
+#include "Scope.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -49,16 +50,17 @@ SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
   // Mangle the constant with a TD suffix.
   auto name = constant.mangle(SILDeclRef::ManglingKind::DynamicThunk);
 
-  auto F = M.getOrCreateFunction(constant.getDecl(), name, SILLinkage::Shared,
-                                 constantTy, IsBare, IsTransparent,
-                                 IsSerializable, ProfileCounter(), IsThunk);
+  SILGenFunctionBuilder builder(*this);
+  auto F = builder.getOrCreateFunction(
+      constant.getDecl(), name, SILLinkage::Shared, constantTy, IsBare,
+      IsTransparent, IsSerializable, ProfileCounter(), IsThunk);
 
   if (F->empty()) {
     // Emit the thunk if we haven't yet.
     // Currently a dynamic thunk looks just like a foreign-to-native thunk around
     // an ObjC method. This would change if we introduced a native
     // runtime-hookable mechanism.
-    SILGenFunction SGF(*this, *F);
+    SILGenFunction SGF(*this, *F, SwiftModule);
     SGF.emitForeignToNativeThunk(constant);
   }
 
@@ -146,47 +148,47 @@ void SILGenFunction::emitCurryThunk(SILDeclRef thunk) {
     (void) fd;
   }
 
+  SILLocation loc(vd);
   Scope S(*this, vd);
 
-  auto selfTy = vd->getInterfaceType()->castTo<AnyFunctionType>()
-    ->getInput();
-  selfTy = vd->getInnermostDeclContext()->mapTypeIntoContext(selfTy);
-  ManagedValue selfArg =
-    B.createInputFunctionArgument(getLoweredType(selfTy), SILLocation(vd));
+  auto thunkFnTy = SGM.Types.getConstantInfo(thunk).SILFnType;
+  SILFunctionConventions fromConv(thunkFnTy, SGM.M);
+
+  auto selfTy = fromConv.getSILType(thunkFnTy->getSelfParameter());
+  selfTy = F.mapTypeIntoContext(selfTy);
+  ManagedValue selfArg = B.createInputFunctionArgument(selfTy, loc);
 
   // Forward substitutions.
   auto subs = F.getForwardingSubstitutionMap();
 
-  ManagedValue toFn = getNextUncurryLevelRef(*this, vd, thunk, selfArg, subs);
+  ManagedValue toFn = getNextUncurryLevelRef(*this, loc, thunk, selfArg, subs);
 
   // FIXME: Using the type from the ConstantInfo instead of looking at
   // getConstantOverrideInfo() for methods looks suspect in the presence
   // of covariant overrides and multiple vtable entries.
-  SILFunctionConventions fromConv(
-      SGM.Types.getConstantInfo(thunk).SILFnType, SGM.M);
   SILType resultTy = fromConv.getSingleSILResultType();
   resultTy = F.mapTypeIntoContext(resultTy);
   auto substTy = toFn.getType().substGenericArgs(SGM.M, subs);
 
   // Partially apply the next uncurry level and return the result closure.
-  selfArg = selfArg.ensurePlusOne(*this, vd);
+  selfArg = selfArg.ensurePlusOne(*this, loc);
   auto calleeConvention = ParameterConvention::Direct_Guaranteed;
   auto closureTy = SILGenBuilder::getPartialApplyResultType(
       toFn.getType(), /*appliedParams=*/1, SGM.M, subs, calleeConvention);
   ManagedValue toClosure =
-      B.createPartialApply(vd, toFn, substTy, subs, {selfArg}, closureTy);
+      B.createPartialApply(loc, toFn, substTy, subs, {selfArg}, closureTy);
   if (resultTy != closureTy) {
     CanSILFunctionType resultFnTy = resultTy.castTo<SILFunctionType>();
     CanSILFunctionType closureFnTy = closureTy.castTo<SILFunctionType>();
     if (resultFnTy->isABICompatibleWith(closureFnTy).isCompatible()) {
-      toClosure = B.createConvertFunction(vd, toClosure, resultTy);
+      toClosure = B.createConvertFunction(loc, toClosure, resultTy);
     } else {
       toClosure =
-          emitCanonicalFunctionThunk(vd, toClosure, closureFnTy, resultFnTy);
+          emitCanonicalFunctionThunk(loc, toClosure, closureFnTy, resultFnTy);
     }
   }
   toClosure = S.popPreservingValue(toClosure);
-  B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(vd), toClosure);
+  B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(loc), toClosure);
 }
 
 void SILGenModule::emitCurryThunk(SILDeclRef constant) {
@@ -201,7 +203,7 @@ void SILGenModule::emitCurryThunk(SILDeclRef constant) {
   preEmitFunction(constant, fd, f, fd);
   PrettyStackTraceSILFunction X("silgen emitCurryThunk", f);
 
-  SILGenFunction(*this, *f).emitCurryThunk(constant);
+  SILGenFunction(*this, *f, SwiftModule).emitCurryThunk(constant);
   postEmitFunction(constant, f);
 }
 
@@ -211,10 +213,10 @@ void SILGenModule::emitForeignToNativeThunk(SILDeclRef thunk) {
   SILFunction *f = getFunction(thunk, ForDefinition);
   f->setThunk(IsThunk);
   if (thunk.asForeign().isClangGenerated())
-    f->setSerialized(IsSerialized);
+    f->setSerialized(IsSerializable);
   preEmitFunction(thunk, thunk.getDecl(), f, thunk.getDecl());
   PrettyStackTraceSILFunction X("silgen emitForeignToNativeThunk", f);
-  SILGenFunction(*this, *f).emitForeignToNativeThunk(thunk);
+  SILGenFunction(*this, *f, SwiftModule).emitForeignToNativeThunk(thunk);
   postEmitFunction(thunk, f);
 }
 
@@ -231,7 +233,7 @@ void SILGenModule::emitNativeToForeignThunk(SILDeclRef thunk) {
   PrettyStackTraceSILFunction X("silgen emitNativeToForeignThunk", f);
   f->setBare(IsBare);
   f->setThunk(IsThunk);
-  SILGenFunction(*this, *f).emitNativeToForeignThunk(thunk);
+  SILGenFunction(*this, *f, SwiftModule).emitNativeToForeignThunk(thunk);
   postEmitFunction(thunk, f);
 }
 
@@ -289,7 +291,8 @@ getOrCreateReabstractionThunk(CanSILFunctionType thunkType,
   
   auto loc = RegularLocation::getAutoGeneratedLocation();
 
-  return M.getOrCreateSharedFunction(loc, name, thunkDeclType, IsBare,
-                                     IsTransparent, IsSerializable,
-                                     ProfileCounter(), IsReabstractionThunk);
+  SILGenFunctionBuilder builder(*this);
+  return builder.getOrCreateSharedFunction(
+      loc, name, thunkDeclType, IsBare, IsTransparent, IsSerializable,
+      ProfileCounter(), IsReabstractionThunk);
 }

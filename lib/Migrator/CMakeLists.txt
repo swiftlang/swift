@@ -55,7 +55,6 @@ add_swift_library(swiftMigrator STATIC
   MigrationState.cpp
   RewriteBufferEditsReceiver.cpp
   TupleSplatMigratorPass.cpp
-  TypeOfMigratorPass.cpp
   LINK_LIBRARIES swiftSyntax swiftIDE)
 
 add_dependencies(swiftMigrator

@@ -459,7 +459,7 @@ public enum NWEndpoint: Hashable, CustomDebugStringConvertible {
 	/// A service endpoint represents a Bonjour service
 	case service(name: String, type: String, domain: String, interface: NWInterface?)
 
-	/// A unix endpoint represnts a path that supports connections using AF_UNIX domain sockets.
+	/// A unix endpoint represents a path that supports connections using AF_UNIX domain sockets.
 	case unix(path: String)
 
 	/// A Host is a name or address
@@ -698,9 +698,9 @@ public enum NWEndpoint: Hashable, CustomDebugStringConvertible {
 			return String("\(host)\(separator)\(port)")
 		case .service(name: let name, type: let type, domain: let domain, interface: let interface):
 			if let interface = interface {
-				return String("\(name).\(type).\(domain)%\(interface)")
+				return String("\(name).\(type)\(domain)%\(interface)")
 			}
-			return String("\(name).\(type).\(domain)")
+			return String("\(name).\(type)\(domain)")
 		case .unix(let path):
 			return path
 		}

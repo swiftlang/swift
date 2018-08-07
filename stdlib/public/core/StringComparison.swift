@@ -13,6 +13,7 @@
 import SwiftShims
 
 // TODO: pick values that give us the best branching pattern
+@usableFromInline // FIXME(sil-serialize-all)
 internal
 enum _GutsClassification: UInt {
   case smallUTF8 = 0
@@ -426,7 +427,9 @@ extension _UnmanagedOpaqueString {
   ) -> Int {
     let count = Swift.min(self.count, otherRange.count)
     for idx in 0..<count {
-      guard self[idx] == other[idx + otherRange.lowerBound] else {
+      guard self[idx] == other.codeUnit(
+        atCheckedOffset: idx + otherRange.lowerBound
+      ) else {
         return idx
       }
     }
@@ -724,7 +727,7 @@ extension _UnmanagedOpaqueString {
     }
 
     let selfCU = self[idx]
-    let otherCU = other[idx + otherRange.lowerBound]
+    let otherCU = other.codeUnit(atCheckedOffset: idx + otherRange.lowerBound)
 
     //
     // Fast path: if one is ASCII, we can often compare the code units directly.
@@ -834,10 +837,10 @@ private struct _UnicodeScalarExceptions {
       guard let scalar = UnicodeScalar(rawValue) else { continue }
 
       // Fast path: skip unassigned code points
-      guard scalar._isDefined else { continue }
+      guard scalar.properties.generalCategory != .unassigned else { continue }
 
       // Fast path: skip unless QC_FCD=no
-      if _fastPath(!scalar._hasFullCompExclusion) {
+      if _fastPath(!scalar.properties.isFullCompositionExclusion) {
         continue
       }
 
@@ -964,7 +967,7 @@ extension _StringGuts {
       return true
     }
 
-    let nextCU = self[nextIndex]
+    let nextCU = self.codeUnit(atCheckedOffset: nextIndex)
     return _hasNormalizationBoundary(before: nextCU)
   }
 }

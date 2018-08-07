@@ -177,13 +177,13 @@ static SwiftObject *_allocHelper(Class cls) {
     class_getInstanceSize(cls), mask));
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 NSString *swift_stdlib_getDescription(OpaqueValue *value,
                                       const Metadata *type);
 
 NSString *swift::getDescription(OpaqueValue *value, const Metadata *type) {
   auto result = swift_stdlib_getDescription(value, type);
-  SWIFT_CC_PLUSZERO_GUARD(type->vw_destroy(value));
+  type->vw_destroy(value);
   return [result autorelease];
 }
 
@@ -1114,16 +1114,16 @@ swift_dynamicCastForeignClassUnconditionalImpl(
 }
 
 bool swift::objectConformsToObjCProtocol(const void *theObject,
-                                         const ProtocolDescriptor *protocol) {
+                                         ProtocolDescriptorRef protocol) {
   return [id_const_cast(theObject)
-          conformsToProtocol: protocol_const_cast(protocol)];
+          conformsToProtocol: protocol.getObjCProtocol()];
 }
 
 
 bool swift::classConformsToObjCProtocol(const void *theClass,
-                                        const ProtocolDescriptor *protocol) {
+                                        ProtocolDescriptorRef protocol) {
   return [class_const_cast(theClass)
-          conformsToProtocol: protocol_const_cast(protocol)];
+          conformsToProtocol: protocol.getObjCProtocol()];
 }
 
 SWIFT_RUNTIME_EXPORT

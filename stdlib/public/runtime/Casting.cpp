@@ -44,6 +44,11 @@
 #include <cstring>
 #include <type_traits>
 
+#if defined(__GLIBCXX__) && __GLIBCXX__ < 20160726
+#include <stddef.h>
+namespace std { using ::max_align_t; }
+#endif
+
 using namespace swift;
 using namespace swift::hashable_support;
 using namespace metadataimpl;
@@ -64,7 +69,7 @@ static const char *class_getName(const ClassMetadata* type) {
 extern "C" const void *swift_dynamicCastObjCProtocolConditional(
                          const void *object,
                          size_t numProtocols,
-                         const ProtocolDescriptor * const *protocols);
+                         Protocol * const *protocols);
 #endif
 
 // Build a user-comprehensible name for a type.
@@ -298,7 +303,7 @@ swift_dynamicCastClassUnconditionalImpl(const void *object,
 
 #if SWIFT_OBJC_INTEROP
 static bool _unknownClassConformsToObjCProtocol(const OpaqueValue *value,
-                                          const ProtocolDescriptor *protocol) {
+                                                Protocol *protocol) {
   const void *object
     = *reinterpret_cast<const void * const *>(value);
   return swift_dynamicCastObjCProtocolConditional(object, 1, &protocol);
@@ -307,11 +312,11 @@ static bool _unknownClassConformsToObjCProtocol(const OpaqueValue *value,
 
 bool swift::_conformsToProtocol(const OpaqueValue *value,
                                 const Metadata *type,
-                                const ProtocolDescriptor *protocol,
+                                ProtocolDescriptorRef protocol,
                                 const WitnessTable **conformance) {
   // Look up the witness table for protocols that need them.
-  if (protocol->Flags.needsWitnessTable()) {
-    auto witness = swift_conformsToProtocol(type, protocol);
+  if (protocol.needsWitnessTable()) {
+    auto witness = swift_conformsToProtocol(type, protocol.getSwiftProtocol());
     if (!witness)
       return false;
     if (conformance)
@@ -325,7 +330,8 @@ bool swift::_conformsToProtocol(const OpaqueValue *value,
   case MetadataKind::Class:
 #if SWIFT_OBJC_INTEROP
     if (value) {
-      return _unknownClassConformsToObjCProtocol(value, protocol);
+      return _unknownClassConformsToObjCProtocol(value,
+                                                 protocol.getObjCProtocol());
     } else {
       return classConformsToObjCProtocol(type, protocol);
     }
@@ -335,7 +341,8 @@ bool swift::_conformsToProtocol(const OpaqueValue *value,
   case MetadataKind::ObjCClassWrapper: {
 #if SWIFT_OBJC_INTEROP
     if (value) {
-      return _unknownClassConformsToObjCProtocol(value, protocol);
+      return _unknownClassConformsToObjCProtocol(value,
+                                                 protocol.getObjCProtocol());
     } else {
       auto wrapper = cast<ObjCClassWrapperMetadata>(type);
       return classConformsToObjCProtocol(wrapper->Class, protocol);
@@ -347,7 +354,8 @@ bool swift::_conformsToProtocol(const OpaqueValue *value,
   case MetadataKind::ForeignClass:
 #if SWIFT_OBJC_INTEROP
     if (value)
-      return _unknownClassConformsToObjCProtocol(value, protocol);
+      return _unknownClassConformsToObjCProtocol(value,
+                                                 protocol.getObjCProtocol());
     return false;
 #else
    return false;
@@ -379,12 +387,10 @@ static bool _conformsToProtocols(const OpaqueValue *value,
       return false;
   }
 
-  auto &protocols = existentialType->Protocols;
-  for (unsigned i = 0, n = protocols.NumProtocols; i != n; ++i) {
-    const ProtocolDescriptor *protocol = protocols[i];
+  for (auto protocol : existentialType->getProtocols()) {
     if (!_conformsToProtocol(value, type, protocol, conformances))
       return false;
-    if (protocol->Flags.needsWitnessTable()) {
+    if (protocol.needsWitnessTable()) {
       assert(*conformances != nullptr);
       ++conformances;
     }
@@ -400,7 +406,7 @@ static bool shouldDeallocateSource(bool castSucceeded, DynamicCastFlags flags) {
 
 static bool
 isAnyObjectExistentialType(const ExistentialTypeMetadata *targetType) {
-  unsigned numProtos =  targetType->Protocols.NumProtocols;
+  unsigned numProtos =  targetType->NumProtocols;
   return (numProtos == 0 &&
           targetType->getSuperclassConstraint() == nullptr &&
           targetType->isClassBounded());
@@ -884,7 +890,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
       reinterpret_cast<SwiftError**>(dest);
     // Check for the Error protocol conformance, which should be the only
     // one we need.
-    assert(targetType->Protocols.NumProtocols == 1);
+    assert(targetType->NumProtocols == 1);
     const WitnessTable *errorWitness;
     if (!_conformsToProtocols(srcDynamicValue, srcDynamicType,
                               targetType,
@@ -925,10 +931,8 @@ _dynamicCastUnknownClassToExistential(const void *object,
                                     const ExistentialTypeMetadata *targetType) {
   // FIXME: check superclass constraint here.
 
-  for (unsigned i = 0, e = targetType->Protocols.NumProtocols; i < e; ++i) {
-    const ProtocolDescriptor *protocol = targetType->Protocols[i];
-
-    switch (protocol->Flags.getDispatchStrategy()) {
+  for (auto protocol : targetType->getProtocols()) {
+    switch (protocol.getDispatchStrategy()) {
     case ProtocolDispatchStrategy::Swift:
       // If the target existential requires witness tables, we can't do this cast.
       // The result type would not have a single-refcounted-pointer rep.
@@ -1969,10 +1973,10 @@ static bool tryDynamicCastBoxedSwiftValue(OpaqueValue *dest,
 extern "C" const StructDescriptor NOMINAL_TYPE_DESCR_SYM(Sa);
 
 /// Nominal type descriptor for Swift.Dictionary.
-extern "C" const StructDescriptor STRUCT_TYPE_DESCR_SYM(s10Dictionary);
+extern "C" const StructDescriptor NOMINAL_TYPE_DESCR_SYM(SD);
 
 /// Nominal type descriptor for Swift.Set.
-extern "C" const StructDescriptor STRUCT_TYPE_DESCR_SYM(s3Set);
+extern "C" const StructDescriptor NOMINAL_TYPE_DESCR_SYM(Sh);
 
 // internal func _arrayDownCastIndirect<SourceValue, TargetValue>(
 //   _ source: UnsafePointer<Array<SourceValue>>,
@@ -2086,7 +2090,7 @@ static bool _dynamicCastStructToStruct(OpaqueValue *destination,
     }
 
   // Dictionaries.
-  } else if (descriptor == &STRUCT_TYPE_DESCR_SYM(s10Dictionary)) {
+  } else if (descriptor == &NOMINAL_TYPE_DESCR_SYM(SD)) {
     if (flags & DynamicCastFlags::Unconditional) {
       _swift_dictionaryDownCastIndirect(source, destination,
                                         sourceArgs[0], sourceArgs[1],
@@ -2102,7 +2106,7 @@ static bool _dynamicCastStructToStruct(OpaqueValue *destination,
     }
 
   // Sets.
-  } else if (descriptor == &STRUCT_TYPE_DESCR_SYM(s3Set)) {
+  } else if (descriptor == &NOMINAL_TYPE_DESCR_SYM(Sh)) {
     if (flags & DynamicCastFlags::Unconditional) {
       _swift_setDownCastIndirect(source, destination,
                                  sourceArgs[0], targetArgs[0],
@@ -2696,7 +2700,7 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
                 (HeapObject *)srcObject, (OpaqueValue *)optDestBuffer,
                 targetType, targetType, targetBridgeWitness);
   }
-  SWIFT_CC_PLUSZERO_GUARD(swift_unknownRelease(srcObject));
+  swift_unknownRelease(srcObject);
 
   // If we succeeded, take from the optional buffer into the
   // destination buffer.
@@ -2775,10 +2779,10 @@ static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
     // ObjC protocols bridge to their Protocol object.
     } else if (auto existential
                = dyn_cast<ExistentialTypeMetadata>(srcMetatypeValue)) {
-      if (existential->isObjC() && existential->Protocols.NumProtocols == 1) {
+      if (existential->isObjC() && existential->NumProtocols == 1) {
         // Though they're statically-allocated globals, Protocol inherits
         // NSObject's default refcounting behavior so must be retained.
-        auto protocolObj = id_const_cast(existential->Protocols[0]);
+        auto protocolObj = existential->getProtocols()[0].getObjCProtocol();
         return objc_retain(protocolObj);
       }
     }
@@ -2919,7 +2923,7 @@ static bool tryBridgeNonVerbatimFromObjectiveCUniversal(
   // If the type is the Any type, we can bridge by "upcasting" the object
   // to Any.
   if (auto nativeExistential = dyn_cast<ExistentialTypeMetadata>(nativeType)) {
-    if (nativeExistential->Protocols.NumProtocols == 0 &&
+    if (nativeExistential->NumProtocols == 0 &&
         !nativeExistential->isClassBounded()) {
       _bridgeNonVerbatimFromObjectiveCToAny(sourceValue, destValue);
       return true;
@@ -2936,6 +2940,12 @@ static bool tryBridgeNonVerbatimFromObjectiveCUniversal(
       return true;
     }
   }
+  // Try to bridge NSError to Error.
+  if (tryDynamicCastNSErrorObjectToValue(sourceValue, destValue, nativeType,
+                                         DynamicCastFlags::Default)) {
+    return true;
+  }
+
   
   return false;
 }
@@ -3005,7 +3015,6 @@ _bridgeNonVerbatimFromObjectiveCConditional(
 
   // Local function that releases the source and returns false.
   auto fail = [&] () -> bool {
-    SWIFT_CC_PLUSONE_GUARD(swift_unknownRelease(sourceValue));
     return false;
   };
   
@@ -3050,7 +3059,7 @@ bool _isBridgedNonVerbatimToObjectiveC(const Metadata *value,
 }
 
 // func _isClassOrObjCExistential<T>(x: T.Type) -> Bool
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 bool _swift_isClassOrObjCExistentialType(const Metadata *value,
                                                     const Metadata *T) {
   return swift_isClassOrObjCExistentialTypeImpl(T);

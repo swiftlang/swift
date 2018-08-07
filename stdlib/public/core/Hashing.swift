@@ -14,55 +14,10 @@
 // This file implements helpers for hashing collections.
 //
 
-/// This protocol is only used for compile-time checks that
-/// every buffer type implements all required operations.
-internal protocol _HashBuffer {
-  associatedtype Key
-  associatedtype Value
-  associatedtype Index
-  associatedtype SequenceElement
-  associatedtype SequenceElementWithoutLabels
-  var startIndex: Index { get }
-  var endIndex: Index { get }
-
-  func index(after i: Index) -> Index
-
-  func formIndex(after i: inout Index)
-
-  func index(forKey key: Key) -> Index?
-
-  func assertingGet(_ i: Index) -> SequenceElement
-
-  func assertingGet(_ key: Key) -> Value
-
-  func maybeGet(_ key: Key) -> Value?
-
-  @discardableResult
-  mutating func updateValue(_ value: Value, forKey key: Key) -> Value?
-
-  @discardableResult
-  mutating func insert(
-    _ value: Value, forKey key: Key
-  ) -> (inserted: Bool, memberAfterInsert: Value)
-
-  @discardableResult
-  mutating func remove(at index: Index) -> SequenceElement
-
-  @discardableResult
-  mutating func removeValue(forKey key: Key) -> Value?
-
-  mutating func removeAll(keepingCapacity keepCapacity: Bool)
-
-  var count: Int { get }
-
-  static func fromArray(_ elements: [SequenceElementWithoutLabels]) -> Self
-}
-
 /// The inverse of the default hash table load factor.  Factored out so that it
 /// can be used in multiple places in the implementation and stay consistent.
 /// Should not be used outside `Dictionary` implementation.
-@inlinable // FIXME(sil-serialize-all)
-@_transparent
+@usableFromInline @_transparent
 internal var _hashContainerDefaultMaxLoadFactorInverse: Double {
   return 1.0 / 0.75
 }

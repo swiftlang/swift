@@ -255,7 +255,7 @@ extension _UnmanagedOpaqueString {
 
     // Nuclear option: copy out the rest of the string into a contiguous buffer.
     let longStart = UnsafeMutablePointer<UInt16>.allocate(capacity: count)
-    defer { longStart.deallocate(capacity: count) }
+    defer { longStart.deallocate() }
     self._copy(into: UnsafeMutableBufferPointer(start: longStart, count: count))
     return UTF16._measureFirstExtendedGraphemeCluster(
       in: UnsafeBufferPointer(start: longStart, count: count))
@@ -282,7 +282,7 @@ extension _UnmanagedOpaqueString {
 
     // Nuclear option: copy out the rest of the string into a contiguous buffer.
     let longStart = UnsafeMutablePointer<UInt16>.allocate(capacity: count)
-    defer { longStart.deallocate(capacity: count) }
+    defer { longStart.deallocate() }
     self._copy(into: UnsafeMutableBufferPointer(start: longStart, count: count))
     return UTF16._measureLastExtendedGraphemeCluster(
       in: UnsafeBufferPointer(start: longStart, count: count))

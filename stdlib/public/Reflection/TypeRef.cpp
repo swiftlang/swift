@@ -236,23 +236,13 @@ public:
     OS << ')';
   }
 
-  void visitUnownedStorageTypeRef(const UnownedStorageTypeRef *US) {
-    printHeader("unowned_storage");
-    printRec(US->getType());
-    OS << ')';
+#define REF_STORAGE(Name, name, ...) \
+  void visit##Name##StorageTypeRef(const Name##StorageTypeRef *US) { \
+    printHeader(#name "_storage"); \
+    printRec(US->getType()); \
+    OS << ')'; \
   }
-
-  void visitWeakStorageTypeRef(const WeakStorageTypeRef *WS) {
-    printHeader("weak_storage");
-    printRec(WS->getType());
-    OS << ')';
-  }
-
-  void visitUnmanagedStorageTypeRef(const UnmanagedStorageTypeRef *US) {
-    printHeader("unmanaged_storage");
-    printRec(US->getType());
-    OS << ')';
-  }
+#include "swift/AST/ReferenceStorage.def"
 
   void visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
     printHeader("sil_box");
@@ -349,17 +339,11 @@ struct TypeRefIsConcrete
     return true;
   }
 
-  bool visitUnownedStorageTypeRef(const UnownedStorageTypeRef *US) {
-    return visit(US->getType());
+#define REF_STORAGE(Name, name, ...) \
+  bool visit##Name##StorageTypeRef(const Name##StorageTypeRef *US) { \
+    return visit(US->getType()); \
   }
-
-  bool visitWeakStorageTypeRef(const WeakStorageTypeRef *WS) {
-    return visit(WS->getType());
-  }
-
-  bool visitUnmanagedStorageTypeRef(const UnmanagedStorageTypeRef *US) {
-    return visit(US->getType());
-  }
+#include "swift/AST/ReferenceStorage.def"
 
   bool visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
     return visit(SB->getBoxedType());
@@ -402,7 +386,7 @@ unsigned NominalTypeTrait::getDepth() const {
   return 0;
 }
 
-GenericArgumentMap TypeRef::getSubstMap() const {
+llvm::Optional<GenericArgumentMap> TypeRef::getSubstMap() const {
   GenericArgumentMap Substitutions;
   switch (getKind()) {
     case TypeRefKind::Nominal: {
@@ -415,11 +399,16 @@ GenericArgumentMap TypeRef::getSubstMap() const {
       auto BG = cast<BoundGenericTypeRef>(this);
       auto Depth = BG->getDepth();
       unsigned Index = 0;
-      for (auto Param : BG->getGenericParams())
+      for (auto Param : BG->getGenericParams()) {
+        if (!Param->isConcrete())
+          return None;
         Substitutions.insert({{Depth, Index++}, Param});
+      }
       if (auto Parent = BG->getParent()) {
         auto ParentSubs = Parent->getSubstMap();
-        Substitutions.insert(ParentSubs.begin(), ParentSubs.end());
+        if (!ParentSubs)
+          return None;
+        Substitutions.insert(ParentSubs->begin(), ParentSubs->end());
       }
       break;
     }
@@ -525,18 +514,11 @@ public:
     return OC;
   }
 
-  const TypeRef *visitUnownedStorageTypeRef(const UnownedStorageTypeRef *US) {
-    return US;
+#define REF_STORAGE(Name, name, ...) \
+  const TypeRef *visit##Name##StorageTypeRef(const Name##StorageTypeRef *US) { \
+    return US; \
   }
-
-  const TypeRef *visitWeakStorageTypeRef(const WeakStorageTypeRef *WS) {
-    return WS;
-  }
-
-  const TypeRef *
-  visitUnmanagedStorageTypeRef(const UnmanagedStorageTypeRef *US) {
-    return US;
-  }
+#include "swift/AST/ReferenceStorage.def"
 
   const TypeRef *visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
     return SILBoxTypeRef::create(Builder, visit(SB->getBoxedType()));
@@ -659,8 +641,7 @@ public:
       if (auto *Nominal = dyn_cast<NominalTypeRef>(SubstBase)) {
         TypeWitness = Builder.lookupTypeWitness(Nominal->getMangledName(),
                                                 Member, Protocol);
-      } else {
-        auto BG = cast<BoundGenericTypeRef>(SubstBase);
+      } else if (auto *BG = dyn_cast<BoundGenericTypeRef>(SubstBase)) {
         TypeWitness = Builder.lookupTypeWitness(BG->getMangledName(),
                                                 Member, Protocol);
       }
@@ -683,8 +664,15 @@ public:
                                                SubstBase,
                                                DM->getProtocol());
 
+    // Likewise if we can't get the substitution map.
+    auto SubstMap = SubstBase->getSubstMap();
+    if (!SubstMap)
+      return Builder.createDependentMemberType(DM->getMember(),
+                                               SubstBase,
+                                               DM->getProtocol());
+
     // Apply base type substitutions to get the fully-substituted nested type.
-    auto *Subst = TypeWitness->subst(Builder, SubstBase->getSubstMap());
+    auto *Subst = TypeWitness->subst(Builder, *SubstMap);
 
     // Same as above.
     return thickenMetatypes(Builder, Subst);
@@ -698,18 +686,11 @@ public:
     return OC;
   }
 
-  const TypeRef *visitUnownedStorageTypeRef(const UnownedStorageTypeRef *US) {
-    return UnownedStorageTypeRef::create(Builder, visit(US->getType()));
+#define REF_STORAGE(Name, name, ...) \
+  const TypeRef *visit##Name##StorageTypeRef(const Name##StorageTypeRef *US) { \
+    return Name##StorageTypeRef::create(Builder, visit(US->getType())); \
   }
-
-  const TypeRef *visitWeakStorageTypeRef(const WeakStorageTypeRef *WS) {
-    return WeakStorageTypeRef::create(Builder, visit(WS->getType()));
-  }
-
-  const TypeRef *
-  visitUnmanagedStorageTypeRef(const UnmanagedStorageTypeRef *US) {
-    return UnmanagedStorageTypeRef::create(Builder, visit(US->getType()));
-  }
+#include "swift/AST/ReferenceStorage.def"
 
   const TypeRef *visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
     return SILBoxTypeRef::create(Builder, visit(SB->getBoxedType()));

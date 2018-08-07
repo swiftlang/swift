@@ -95,6 +95,7 @@ public:
     Global,
     Class,
     Argument,
+    Yield,
     Nested,
     Unidentified,
     NumKindBits = countBitsUsed(static_cast<unsigned>(Unidentified))
@@ -209,6 +210,7 @@ public:
     switch (getKind()) {
     case Box:
     case Stack:
+    case Yield:
     case Nested:
     case Unidentified:
       return value == other.value;
@@ -221,6 +223,7 @@ public:
     }
   }
 
+  /// Return true if the storage is guaranteed local.
   bool isLocal() const {
     switch (getKind()) {
     case Box:
@@ -229,6 +232,7 @@ public:
     case Global:
     case Class:
     case Argument:
+    case Yield:
     case Nested:
     case Unidentified:
       return false;
@@ -243,6 +247,7 @@ public:
       return true;
     case Class:
     case Argument:
+    case Yield:
     case Nested:
     case Unidentified:
       return false;
@@ -294,6 +299,7 @@ template <> struct DenseMapInfo<swift::AccessedStorage> {
     case swift::AccessedStorage::Box:
     case swift::AccessedStorage::Stack:
     case swift::AccessedStorage::Nested:
+    case swift::AccessedStorage::Yield:
     case swift::AccessedStorage::Unidentified:
       return DenseMapInfo<swift::SILValue>::getHashValue(storage.getValue());
     case swift::AccessedStorage::Argument:
@@ -316,6 +322,7 @@ template <> struct DenseMapInfo<swift::AccessedStorage> {
     case swift::AccessedStorage::Box:
     case swift::AccessedStorage::Stack:
     case swift::AccessedStorage::Nested:
+    case swift::AccessedStorage::Yield:
     case swift::AccessedStorage::Unidentified:
       return LHS.getValue() == RHS.getValue();
     case swift::AccessedStorage::Argument:
@@ -356,7 +363,8 @@ AccessedStorage findAccessedStorage(SILValue sourceAddr);
 /// through any Nested access to find the original storage.
 ///
 /// This is identical to findAccessedStorage(), but never returns Nested
-/// storage.
+/// storage and may return invalid storage for nested access when the outer
+/// access has Unsafe enforcement.
 AccessedStorage findAccessedStorageNonNested(SILValue sourceAddr);
 
 /// Return true if the given address operand is used by a memory operation that
@@ -366,6 +374,8 @@ bool memInstMustInitialize(Operand *memOper);
 
 /// Return true if the given address producer may be the source of a formal
 /// access (a read or write of a potentially aliased, user visible variable).
+///
+/// `storage` must be a valid AccessedStorage object.
 ///
 /// If this returns false, then the address can be safely accessed without
 /// a begin_access marker. To determine whether to emit begin_access:

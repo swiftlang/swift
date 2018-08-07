@@ -28,6 +28,7 @@
 #endif
 
 namespace swift {
+class ParsedTypeIdentity;
 
 class TypeReferenceOwnership {
   enum : uint8_t {
@@ -43,15 +44,10 @@ class TypeReferenceOwnership {
 public:
   constexpr TypeReferenceOwnership() : Data(0) {}
 
-  bool isWeak() const { return Data & Weak; }
-  bool isUnowned() const { return Data & Unowned; }
-  bool isUnmanaged() const { return Data & Unmanaged; }
-
-  void setWeak() { Data |= Weak; }
-
-  void setUnowned() { Data |= Unowned; }
-
-  void setUnmanaged() { Data |= Unmanaged; }
+#define REF_STORAGE(Name, ...) \
+  void set##Name() { Data |= Name; } \
+  bool is##Name() const { return Data & Name; }
+#include "swift/AST/ReferenceStorage.def"
 };
 
 /// Type information consists of metadata and its ownership info,
@@ -82,10 +78,10 @@ public:
 
 #if SWIFT_OBJC_INTEROP
   bool objectConformsToObjCProtocol(const void *theObject,
-                                    const ProtocolDescriptor *theProtocol);
+                                    ProtocolDescriptorRef protocol);
   
   bool classConformsToObjCProtocol(const void *theClass,
-                                    const ProtocolDescriptor *theProtocol);
+                                   ProtocolDescriptorRef protocol);
 #endif
 
   /// Is the given value a valid alignment mask?
@@ -120,7 +116,8 @@ public:
 #if SWIFT_HAS_OPAQUE_ISAS
     // The ISA is opaque so masking it will not return a pointer.  We instead
     // need to call the objc runtime to get the class.
-    return reinterpret_cast<const ClassMetadata*>(object_getClass((id)object));
+    id idObject = reinterpret_cast<id>(const_cast<void *>(object));
+    return reinterpret_cast<const ClassMetadata*>(object_getClass(idObject));
 #else
     // Load the isa field.
     uintptr_t bits = *reinterpret_cast<const uintptr_t*>(object);
@@ -318,6 +315,10 @@ public:
     }
   };
 
+  /// Is the given type imported from a C tag type?
+  bool _isCImportedTagType(const TypeContextDescriptor *type,
+                           const ParsedTypeIdentity &identity);
+
   /// Check whether a type conforms to a protocol.
   ///
   /// \param value - can be null, in which case the question should
@@ -327,8 +328,23 @@ public:
   ///   table will be placed here
   bool _conformsToProtocol(const OpaqueValue *value,
                            const Metadata *type,
-                           const ProtocolDescriptor *protocol,
+                           ProtocolDescriptorRef protocol,
                            const WitnessTable **conformance);
+
+  void _swift_getFieldAt(
+      const Metadata *type, unsigned index,
+      std::function<void(llvm::StringRef name, FieldType type)> callback);
+
 } // end namespace swift
+
+// ADT uses report_bad_alloc_error to report an error when it can't allocate
+// elements for a data structure. The swift runtime uses ADT without linking
+// against libSupport, so here we provide a stub to make sure we don't fail
+// to link. Give it `weak` linkage so, in case the `strong` definition of
+// the function is available, that has precedence.
+namespace llvm {
+  __attribute__((weak))
+  void report_bad_alloc_error(const char *Reason, bool GenCrashDiag) {};
+} // end namespace llvm
 
 #endif /* SWIFT_RUNTIME_PRIVATE_H */

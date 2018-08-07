@@ -44,24 +44,6 @@ TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
 
   // Apply 'inout' or '__shared' or '__owned'
   if (specifierLoc.isValid()) {
-    if (auto *fnTR = dyn_cast<FunctionTypeRepr>(ty)) {
-      // If the input to the function isn't parenthesized, apply the inout
-      // to the first (only) parameter, as we would in Swift 2. (This
-      // syntax is deprecated in Swift 3.)
-      TypeRepr *argsTR = fnTR->getArgsTypeRepr();
-      if (!isa<TupleTypeRepr>(argsTR)) {
-        auto *newArgsTR =
-          new (Context) InOutTypeRepr(argsTR, specifierLoc);
-        auto *newTR =
-          new (Context) FunctionTypeRepr(fnTR->getGenericParams(),
-              newArgsTR,
-              fnTR->getThrowsLoc(),
-              fnTR->getArrowLoc(),
-              fnTR->getResultTypeRepr());
-        newTR->setGenericEnvironment(fnTR->getGenericEnvironment());
-        return newTR;
-      }
-    }
     switch (specifier) {
     case VarDecl::Specifier::Owned:
       ty = new (Context) OwnedTypeRepr(ty, specifierLoc);
@@ -461,7 +443,33 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       }
       SyntaxContext->addSyntax(Builder.build());
     }
-    tyR = new (Context) FunctionTypeRepr(generics, tyR, throwsLoc, arrowLoc,
+
+    TupleTypeRepr *argsTyR = nullptr;
+    if (auto *TTArgs = dyn_cast<TupleTypeRepr>(tyR)) {
+      argsTyR = TTArgs;
+    } else {
+      bool isVoid = false;
+      if (const auto Void = dyn_cast<SimpleIdentTypeRepr>(tyR)) {
+        if (Void->getIdentifier().str() == "Void") {
+          isVoid = true;
+        }
+      }
+
+      if (isVoid) {
+        diagnose(tyR->getStartLoc(), diag::function_type_no_parens)
+          .fixItReplace(tyR->getStartLoc(), "()");
+        argsTyR = TupleTypeRepr::createEmpty(Context, tyR->getSourceRange());
+      } else {
+        diagnose(tyR->getStartLoc(), diag::function_type_no_parens)
+          .highlight(tyR->getSourceRange())
+          .fixItInsert(tyR->getStartLoc(), "(")
+          .fixItInsertAfter(tyR->getEndLoc(), ")");
+        argsTyR = TupleTypeRepr::create(Context, {tyR},
+                                        tyR->getSourceRange());
+      }
+    }
+
+    tyR = new (Context) FunctionTypeRepr(generics, argsTyR, throwsLoc, arrowLoc,
                                          SecondHalf.get());
   } else if (generics) {
     // Only function types may be generic.
@@ -820,16 +828,13 @@ ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
       replacement += TrailingContent;
     }
 
-    auto isThree = Context.isSwiftVersion3();
-#define THREEIFY(MESSAGE) (isThree ? diag::swift3_##MESSAGE : diag::MESSAGE)
     // Replace 'protocol<T1, T2>' with 'T1 & T2'
     diagnose(ProtocolLoc,
-      IsEmpty              ? THREEIFY(deprecated_any_composition) :
-      Protocols.size() > 1 ? THREEIFY(deprecated_protocol_composition) :
-                             THREEIFY(deprecated_protocol_composition_single))
+      IsEmpty              ? diag::deprecated_any_composition :
+      Protocols.size() > 1 ? diag::deprecated_protocol_composition :
+                             diag::deprecated_protocol_composition_single)
       .highlight(composition->getSourceRange())
       .fixItReplace(composition->getSourceRange(), replacement);
-#undef THREEIFY
   }
 
   return makeParserResult(Status, composition);
@@ -1172,11 +1177,17 @@ Parser::parseTypeOptional(TypeRepr *base) {
   auto TyR = new (Context) OptionalTypeRepr(base, questionLoc);
   llvm::Optional<TypeSyntax> SyntaxNode;
   if (SyntaxContext->isEnabled()) {
-    OptionalTypeSyntaxBuilder Builder(Context.getSyntaxArena());
-    Builder
-      .useQuestionMark(SyntaxContext->popToken())
-      .useWrappedType(SyntaxContext->popIf<TypeSyntax>().getValue());
-    SyntaxNode.emplace(Builder.build());
+    auto QuestionMark = SyntaxContext->popToken();
+    if (auto WrappedType = SyntaxContext->popIf<TypeSyntax>()) {
+      OptionalTypeSyntaxBuilder Builder(Context.getSyntaxArena());
+      Builder
+        .useQuestionMark(QuestionMark)
+        .useWrappedType(WrappedType.getValue());
+      SyntaxNode.emplace(Builder.build());
+    } else {
+      // Undo the popping of the question mark
+      SyntaxContext->addSyntax(QuestionMark);
+    }
   }
   return makeSyntaxResult(SyntaxNode, TyR);
 }

@@ -52,7 +52,7 @@ public class NWProtocolIP : NWProtocol {
 
 		/// Specify a single version of the Internet NWProtocol to allow.
 		/// Setting this value will constrain which address endpoints can
-		/// be used, and will filter DNS results during connection establishement.
+		/// be used, and will filter DNS results during connection establishment.
 		public var version: Version {
 			set {
 				self._version = newValue
@@ -106,6 +106,20 @@ public class NWProtocolIP : NWProtocol {
 				return self._disableFragmentation
 			}
 		}
+
+        private var _shouldCalculateReceiveTime: Bool = false
+
+        /// Configure IP to calculate receive time for inbound
+        /// packets.
+        public var shouldCalculateReceiveTime: Bool {
+            set {
+                self._shouldCalculateReceiveTime = newValue
+                nw_ip_options_set_calculate_receive_time(self.nw, newValue)
+            }
+            get {
+                return self._shouldCalculateReceiveTime
+            }
+        }
 
 		override internal init(_ nw: nw_protocol_options_t) {
 			super.init(nw)
@@ -177,6 +191,14 @@ public class NWProtocolIP : NWProtocol {
             }
             get {
                 return NWParameters.ServiceClass(nw_ip_metadata_get_service_class(nw))
+            }
+        }
+
+        /// The time at which a packet was received, in nanoseconds.
+        /// Equivalent to timestamps returned by CLOCK_MONOTONIC_RAW.
+        public var receiveTime: UInt64 {
+            get {
+                return nw_ip_metadata_get_receive_time(nw)
             }
         }
 

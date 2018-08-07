@@ -54,6 +54,7 @@
 #include "FixedTypeInfo.h"
 #include "Fulfillment.h"
 #include "GenArchetype.h"
+#include "GenCast.h"
 #include "GenClass.h"
 #include "GenEnum.h"
 #include "GenHeap.h"
@@ -1091,8 +1092,8 @@ getWitnessTableLazyAccessFunction(IRGenModule &IGM,
   auto cacheVariable =
       cast<llvm::GlobalVariable>(IGM.getAddrOfWitnessTableLazyCacheVariable(
           rootConformance, conformingType, ForDefinition));
-  emitLazyCacheAccessFunction(IGM, accessor, cacheVariable,
-                              [&](IRGenFunction &IGF, Explosion &params) {
+  emitCacheAccessFunction(IGM, accessor, cacheVariable, CacheStrategy::Lazy,
+                          [&](IRGenFunction &IGF, Explosion &params) {
     llvm::Value *conformingMetadataCache = nullptr;
     return MetadataResponse::forComplete(
              emitWitnessTableAccessorCall(IGF, conformance,
@@ -2225,19 +2226,7 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   // Trigger the lazy emission of the foreign type metadata.
   CanType conformingType = conf->getType()->getCanonicalType();
   if (requiresForeignTypeMetadata(conformingType)) {
-    // Make sure we emit the metadata access function.
-    (void)getTypeMetadataAccessFunction(*this, conformingType,
-                                        ForDefinition);
-
-    // Make sure we emit the nominal type descriptor.
-    auto *nominal = conformingType->getAnyNominal();
-    auto entity = LinkEntity::forNominalTypeDescriptor(nominal);
-    if (auto entry = GlobalVars[entity]) {
-      if (!cast<llvm::GlobalValue>(entry)->isDeclaration())
-        return;
-    }
-
-    emitLazyTypeContextDescriptor(*this, nominal, RequireMetadata);
+    (void)getAddrOfForeignTypeMetadataCandidate(conformingType);
   }
 }
 
@@ -2614,6 +2603,7 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
           return /*finished?*/ false;
         });
     assert(found && "too many conditional conformances");
+    (void)found;
 
     sourceKey.Kind =
         LocalTypeDataKind::forAbstractProtocolWitnessTable(conformingProto);
@@ -2769,7 +2759,8 @@ void NecessaryBindings::addTypeMetadata(CanType type) {
     return;
   }
   if (auto fn = dyn_cast<FunctionType>(type)) {
-    addTypeMetadata(fn.getInput());
+    for (const auto &elt : fn.getParams())
+      addTypeMetadata(elt.getType());
     addTypeMetadata(fn.getResult());
     return;
   }
@@ -3372,15 +3363,23 @@ IRGenModule::getAssociatedTypeWitnessTableAccessFunctionSignature() {
 /// For ObjC protocols, descriptors are uniqued at runtime by the ObjC runtime.
 /// We need to load the unique reference from a global variable fixed up at
 /// startup.
+///
+/// The result is always a ProtocolDescriptorRefTy whose low bit will be
+/// set to indicate when this is an Objective-C protocol.
 llvm::Value *irgen::emitProtocolDescriptorRef(IRGenFunction &IGF,
                                               ProtocolDecl *protocol) {
-  if (!protocol->isObjC())
-    return IGF.IGM.getAddrOfProtocolDescriptor(protocol);
-  
-  auto refVar = IGF.IGM.getAddrOfObjCProtocolRef(protocol, NotForDefinition);
-  llvm::Value *val
-    = IGF.Builder.CreateLoad(refVar, IGF.IGM.getPointerAlignment());
-  val = IGF.Builder.CreateBitCast(val,
-                          IGF.IGM.ProtocolDescriptorStructTy->getPointerTo());
+  if (!protocol->isObjC()) {
+    return IGF.Builder.CreatePtrToInt(
+      IGF.IGM.getAddrOfProtocolDescriptor(protocol),
+      IGF.IGM.ProtocolDescriptorRefTy);
+  }
+
+  llvm::Value *val = emitReferenceToObjCProtocol(IGF, protocol);
+  val = IGF.Builder.CreatePtrToInt(val, IGF.IGM.ProtocolDescriptorRefTy);
+
+  // Set the low bit to indicate that this is an Objective-C protocol.
+  auto *isObjCBit = llvm::ConstantInt::get(IGF.IGM.ProtocolDescriptorRefTy, 1);
+  val = IGF.Builder.CreateOr(val, isObjCBit);
+
   return val;
 }

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -210,7 +210,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   
   Opts.EnableASTScopeLookup |= Args.hasArg(OPT_enable_astscope_lookup);
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
-  Opts.IterativeTypeChecker |= Args.hasArg(OPT_iterative_type_checker);
   Opts.NamedLazyMemberLoading &= !Args.hasArg(OPT_disable_named_lazy_member_loading);
   Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
 
@@ -254,6 +253,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.DebugForbidTypecheckPrefix = A->getValue();
   }
 
+  if (Args.getLastArg(OPT_debug_cycles)) {
+    Opts.EvaluatorCycleDiagnostics = CycleDiagnosticKind::DebugDiagnose;
+  }
+
   if (const Arg *A = Args.getLastArg(OPT_solver_memory_threshold)) {
     unsigned threshold;
     if (StringRef(A->getValue()).getAsInteger(10, threshold)) {
@@ -275,6 +278,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
     Opts.SolverShrinkUnsolvedThreshold = threshold;
   }
+
+  if (const Arg *A = Args.getLastArg(OPT_solver_disable_shrink))
+    Opts.SolverDisableShrink = true;
 
   if (const Arg *A = Args.getLastArg(OPT_value_recursion_threshold)) {
     unsigned threshold;
@@ -346,6 +352,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.UseDarwinPreStableABIBit = true;
 #endif
 
+  Opts.DisableConstraintSolverPerformanceHacks |=
+      Args.hasArg(OPT_disable_constraint_solver_performance_hacks);
+
   // Must be processed after any other language options that could affect
   // platform conditions.
   bool UnsupportedOS, UnsupportedArch;
@@ -385,6 +394,16 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
 
   for (const Arg *A : Args.filtered(OPT_Xcc)) {
     Opts.ExtraArgs.push_back(A->getValue());
+  }
+
+  for (auto A : Args.getAllArgValues(OPT_debug_prefix_map)) {
+    // Forward -debug-prefix-map arguments from Swift to Clang as
+    // -fdebug-prefix-map. This is required to ensure DIFiles created there,
+    // like "<swift-imported-modules>", have their paths remapped properly.
+    // (Note, however, that Clang's usage of std::map means that the remapping
+    // may not be applied in the same order, which can matter if one mapping is
+    // a prefix of another.)
+    Opts.ExtraArgs.push_back("-fdebug-prefix-map=" + A);
   }
 
   if (!workingDirectory.empty()) {
@@ -445,6 +464,10 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
 
   for (const Arg *A : Args.filtered(OPT_L)) {
     Opts.LibrarySearchPaths.push_back(resolveSearchPath(A->getValue()));
+  }
+
+  for (const Arg *A : Args.filtered(OPT_vfsoverlay)) {
+    Opts.VFSOverlayFiles.push_back(resolveSearchPath(A->getValue()));
   }
 
   if (const Arg *A = Args.getLastArg(OPT_sdk))
@@ -668,8 +691,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EnableMandatorySemanticARCOpts |=
       !Args.hasArg(OPT_disable_mandatory_semantic_arc_opts);
   Opts.EnableLargeLoadableTypes |= Args.hasArg(OPT_enable_large_loadable_types);
-  Opts.EnableGuaranteedNormalArguments &=
-      !Args.hasArg(OPT_disable_guaranteed_normal_arguments);
 
   if (const Arg *A = Args.getLastArg(OPT_save_optimization_record_path))
     Opts.OptRecordFile = A->getValue();
@@ -711,10 +732,10 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   return false;
 }
 
-void CompilerInvocation::buildDWARFDebugFlags(std::string &Output,
-                                              const ArrayRef<const char*> &Args,
-                                              StringRef SDKPath,
-                                              StringRef ResourceDir) {
+void CompilerInvocation::buildDebugFlags(std::string &Output,
+                                         const ArrayRef<const char*> &Args,
+                                         StringRef SDKPath,
+                                         StringRef ResourceDir) {
   // This isn't guaranteed to be the same temp directory as what the driver
   // uses, but it's highly likely.
   llvm::SmallString<128> TDir;
@@ -756,30 +777,66 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   using namespace options;
 
   if (!SILOpts.SILOutputFileNameForDebugging.empty()) {
-      Opts.DebugInfoKind = IRGenDebugInfoKind::LineTables;
+      Opts.DebugInfoLevel = IRGenDebugInfoLevel::LineTables;
   } else if (const Arg *A = Args.getLastArg(OPT_g_Group)) {
     if (A->getOption().matches(OPT_g))
-      Opts.DebugInfoKind = IRGenDebugInfoKind::Normal;
+      Opts.DebugInfoLevel = IRGenDebugInfoLevel::Normal;
     else if (A->getOption().matches(options::OPT_gline_tables_only))
-      Opts.DebugInfoKind = IRGenDebugInfoKind::LineTables;
+      Opts.DebugInfoLevel = IRGenDebugInfoLevel::LineTables;
     else if (A->getOption().matches(options::OPT_gdwarf_types))
-      Opts.DebugInfoKind = IRGenDebugInfoKind::DwarfTypes;
+      Opts.DebugInfoLevel = IRGenDebugInfoLevel::DwarfTypes;
     else
       assert(A->getOption().matches(options::OPT_gnone) &&
              "unknown -g<kind> option");
 
-    if (Opts.DebugInfoKind > IRGenDebugInfoKind::LineTables) {
-      ArgStringList RenderedArgs;
-      for (auto A : Args)
-        A->render(Args, RenderedArgs);
-      CompilerInvocation::buildDWARFDebugFlags(Opts.DWARFDebugFlags,
-                                               RenderedArgs, SDKPath,
-                                               ResourceDir);
+    if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::LineTables) {
+      if (Args.hasArg(options::OPT_debug_info_store_invocation)) {
+        ArgStringList RenderedArgs;
+        for (auto A : Args)
+          A->render(Args, RenderedArgs);
+        CompilerInvocation::buildDebugFlags(Opts.DebugFlags,
+                                            RenderedArgs, SDKPath,
+                                            ResourceDir);
+      }
       // TODO: Should we support -fdebug-compilation-dir?
       llvm::SmallString<256> cwd;
       llvm::sys::fs::current_path(cwd);
       Opts.DebugCompilationDir = cwd.str();
     }
+  }
+
+  if (const Arg *A = Args.getLastArg(options::OPT_debug_info_format)) {
+    if (A->containsValue("dwarf"))
+      Opts.DebugInfoFormat = IRGenDebugInfoFormat::DWARF;
+    else if (A->containsValue("codeview"))
+      Opts.DebugInfoFormat = IRGenDebugInfoFormat::CodeView;
+    else
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+  } else if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::None) {
+    // If -g was specified but not -debug-info-format, DWARF is assumed.
+    Opts.DebugInfoFormat = IRGenDebugInfoFormat::DWARF;
+  }
+  if (Args.hasArg(options::OPT_debug_info_format) &&
+      !Args.hasArg(options::OPT_g_Group)) {
+    const Arg *debugFormatArg = Args.getLastArg(options::OPT_debug_info_format);
+    Diags.diagnose(SourceLoc(), diag::error_option_missing_required_argument,
+                   debugFormatArg->getAsString(Args), "-g");
+  }
+  if (Opts.DebugInfoFormat == IRGenDebugInfoFormat::CodeView &&
+      (Opts.DebugInfoLevel == IRGenDebugInfoLevel::LineTables ||
+       Opts.DebugInfoLevel == IRGenDebugInfoLevel::DwarfTypes)) {
+    const Arg *debugFormatArg = Args.getLastArg(options::OPT_debug_info_format);
+    Diags.diagnose(SourceLoc(), diag::error_argument_not_allowed_with,
+                   debugFormatArg->getAsString(Args),
+                   Opts.DebugInfoLevel == IRGenDebugInfoLevel::LineTables
+                     ? "-gline-tables-only"
+                     : "-gdwarf_types");
+  }
+
+  for (auto A : Args.getAllArgValues(options::OPT_debug_prefix_map)) {
+    auto SplitMap = StringRef(A).split('=');
+    Opts.DebugPrefixMap.addMapping(SplitMap.first, SplitMap.second);
   }
 
   for (const Arg *A : Args.filtered(OPT_Xcc)) {
@@ -915,6 +972,20 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   for (const auto &Lib : Args.getAllArgValues(options::OPT_autolink_library))
     Opts.LinkLibraries.push_back(LinkLibrary(Lib, LibraryKind::Library));
+
+  if (const Arg *A = Args.getLastArg(OPT_type_info_dump_filter_EQ)) {
+    StringRef mode(A->getValue());
+    if (mode == "all")
+      Opts.TypeInfoFilter = IRGenOptions::TypeInfoDumpFilter::All;
+    else if (mode == "resilient")
+      Opts.TypeInfoFilter = IRGenOptions::TypeInfoDumpFilter::Resilient;
+    else if (mode == "fragile")
+      Opts.TypeInfoFilter = IRGenOptions::TypeInfoDumpFilter::Fragile;
+    else {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+    }
+  }
 
   return false;
 }

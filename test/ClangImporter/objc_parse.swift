@@ -130,7 +130,9 @@ func properties(_ b: B) {
   var obj : AnyObject = b
   var optStr = obj.nsstringProperty // optStr has type String??
   if optStr != nil {
-    var s : String = optStr! // expected-error{{value of optional type 'String?' not unwrapped; did you mean to use '!' or '?'?}}
+    var s : String = optStr! // expected-error{{value of optional type 'String?' must be unwrapped}}
+    // expected-note@-1{{coalesce}}
+    // expected-note@-2{{force-unwrap}}
     var t : String = optStr!!
   }
 
@@ -241,7 +243,7 @@ func overridingTest(_ srs: SuperRefsSub) {
 }
 
 func almostSubscriptableValueMismatch(_ as1: AlmostSubscriptable, a: A) {
-  as1[a] // expected-error{{type 'AlmostSubscriptable' has no subscript members}}
+  as1[a] // expected-error{{value of type 'AlmostSubscriptable' has no subscripts}}
 }
 
 func almostSubscriptableKeyMismatch(_ bc: BadCollection, key: NSString) {
@@ -288,7 +290,9 @@ extension Wobbler2 : NSMaybeInitWobble { // expected-error{{type 'Wobbler2' does
 
 func optionalMemberAccess(_ w: NSWobbling) {
   w.wobble()
-  w.wibble() // expected-error{{value of optional type '(() -> Void)?' not unwrapped; did you mean to use '!' or '?'?}} {{11-11=!}}
+  w.wibble() // expected-error{{value of optional type '(() -> Void)?' must be unwrapped}}
+  // expected-note@-1{{coalesce}}
+  // expected-note@-2{{force-unwrap}}
   let x = w[5]!!
   _ = x
 }
@@ -538,11 +542,11 @@ func testProtocolQualified(_ obj: CopyableNSObject, cell: CopyableSomeCell,
 
   _ = cell as NSObject
   _ = cell as NSObjectProtocol
-  _ = cell as NSCopying // expected-error {{'CopyableSomeCell' (aka 'SomeCell') is not convertible to 'NSCopying'; did you mean to use 'as!' to force downcast?}} {{12-14=as!}}
+  _ = cell as NSCopying
   _ = cell as SomeCell
   
   _ = plainObj as CopyableNSObject // expected-error {{'NSObject' is not convertible to 'CopyableNSObject' (aka 'NSCopying & NSObjectProtocol'); did you mean to use 'as!' to force downcast?}} {{16-18=as!}}
-  _ = plainCell as CopyableSomeCell // FIXME: This is not really typesafe.
+  _ = plainCell as CopyableSomeCell // expected-error {{'SomeCell' is not convertible to 'CopyableSomeCell' (aka 'SomeCell & NSCopying'); did you mean to use 'as!' to force downcast?}}
 }
 
 extension Printing {
@@ -633,6 +637,17 @@ class NewtypeUser {
   @objc func intNewtypeDictionary(a: [MyInt: NSObject]) {} // expected-error {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
   @objc func cfNewtype(a: CFNewType) {}
   @objc func cfNewtypeArray(a: [CFNewType]) {} // expected-error {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+
+  typealias MyTuple = (Int, AnyObject?)
+  typealias MyNamedTuple = (a: Int, b: AnyObject?)
+  
+  @objc func blockWithTypealias(_ input: @escaping (MyTuple) -> MyInt) {}
+  // expected-error@-1{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  // expected-note@-2{{function types cannot be represented in Objective-C}}
+
+  @objc func blockWithTypealiasWithNames(_ input: (MyNamedTuple) -> MyInt) {}
+  // expected-error@-1{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  // expected-note@-2{{function types cannot be represented in Objective-C}}
 }
 
 func testTypeAndValue() {

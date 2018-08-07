@@ -10,7 +10,7 @@ public func get_ci() -> dllexport.c {
 }
 
 public func get_c_type() -> dllexport.c.Type {
-  return dllexport.c
+  return dllexport.c.self
 }
 
 public class d : c {

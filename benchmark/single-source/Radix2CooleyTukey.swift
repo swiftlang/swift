@@ -108,12 +108,12 @@ func testDouble(iter: Int) {
   let size = doubleSize
   let level = Int(log2(Double(doubleN)))
 
-  let input_real = double_input_real._unsafelyUnwrappedUnchecked
-  let input_imag = double_input_imag._unsafelyUnwrappedUnchecked
-  let output_real = double_output_real._unsafelyUnwrappedUnchecked
-  let output_imag = double_output_imag._unsafelyUnwrappedUnchecked
-  let temp_real = double_temp_real._unsafelyUnwrappedUnchecked
-  let temp_imag = double_temp_imag._unsafelyUnwrappedUnchecked
+  let input_real = double_input_real.unsafelyUnwrapped
+  let input_imag = double_input_imag.unsafelyUnwrapped
+  let output_real = double_output_real.unsafelyUnwrapped
+  let output_imag = double_output_imag.unsafelyUnwrapped
+  let temp_real = double_temp_real.unsafelyUnwrapped
+  let temp_imag = double_temp_imag.unsafelyUnwrapped
 
   for _ in 0..<iter {
     memset(UnsafeMutableRawPointer(input_real), 0, size)
@@ -224,12 +224,12 @@ func testFloat(iter: Int) {
   let n = floatN
   let size = floatSize
 
-  let input_real = float_input_real._unsafelyUnwrappedUnchecked
-  let input_imag = float_input_imag._unsafelyUnwrappedUnchecked
-  let output_real = float_output_real._unsafelyUnwrappedUnchecked
-  let output_imag = float_output_imag._unsafelyUnwrappedUnchecked
-  let temp_real = float_temp_real._unsafelyUnwrappedUnchecked
-  let temp_imag = float_temp_imag._unsafelyUnwrappedUnchecked
+  let input_real = float_input_real.unsafelyUnwrapped
+  let input_imag = float_input_imag.unsafelyUnwrapped
+  let output_real = float_output_real.unsafelyUnwrapped
+  let output_imag = float_output_imag.unsafelyUnwrapped
+  let temp_real = float_temp_real.unsafelyUnwrapped
+  let temp_imag = float_temp_imag.unsafelyUnwrapped
 
   let level = Int(log2(Float(n)))
 

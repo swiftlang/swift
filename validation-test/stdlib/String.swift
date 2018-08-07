@@ -31,30 +31,28 @@ extension Collection {
 }
 
 extension String {
-  internal func index(_nth n: Int) -> Index {
-    return characters.index(_nth: n)
-  }
-  internal func index(_nthLast n: Int) -> Index {
-    return characters.index(_nthLast: n)
-  }
-}
-
-extension String {
   var nativeCapacity: Int {
-    precondition(_guts._isNative)
-    return _guts.capacity
+    switch self._classify()._form {
+      case ._native: break
+      default: preconditionFailure()
+    }
+    return self._classify()._capacity
   }
   var capacity: Int {
-    return _guts.capacity
+    return self._classify()._capacity
   }
   var unusedCapacity: Int {
-    return Swift.max(0, _guts.capacity - _guts.count)
+    return Swift.max(0, self._classify()._capacity - self._classify()._count)
   }
   var bufferID: ObjectIdentifier? {
     return _rawIdentifier()
   }
   func _rawIdentifier() -> ObjectIdentifier? {
-    return _guts._objectIdentifier
+    return self._classify()._objectIdentifier
+  }
+
+  var byteWidth: Int {
+    return _classify()._isASCII ? 1 : 2
   }
 }
 
@@ -84,7 +82,9 @@ struct StringGutsCollection: RangeReplaceableCollection, RandomAccessCollection 
   var endIndex: Index { return _guts.count }
   var indices: Indices { return startIndex..<endIndex }
 
-  subscript(position: Index) -> Element { return _guts[position] }
+  subscript(position: Index) -> Element {
+    return _guts.codeUnit(atCheckedOffset: position)
+  }
 
   mutating func replaceSubrange<C>(
     _ subrange: Range<Index>,
@@ -139,13 +139,12 @@ StringTests.test("AssociatedTypes-UnicodeScalarView") {
 }
 
 StringTests.test("AssociatedTypes-CharacterView") {
-  typealias View = String.CharacterView
   expectCollectionAssociatedTypes(
-    collectionType: View.self,
-    iteratorType: IndexingIterator<View>.self,
-    subSequenceType: View.self,
-    indexType: View.Index.self,
-    indicesType: DefaultIndices<View>.self)
+    collectionType: String.self,
+    iteratorType: IndexingIterator<String>.self,
+    subSequenceType: Substring.self,
+    indexType: String.Index.self,
+    indicesType: DefaultIndices<String>.self)
 }
 
 func checkUnicodeScalarViewIteration(
@@ -236,10 +235,6 @@ StringTests.test("ForeignIndexes/Valid") {
     let acceptor = "\u{1f601}\u{1f602}\u{1f603}"
     expectEqual("\u{1f601}", acceptor[donor.startIndex])
     expectEqual("\u{fffd}", acceptor[donor.index(after: donor.startIndex)])
-    expectEqualUnicodeScalars([ 0xfffd, 0x1f602, 0xfffd ],
-      acceptor[donor.index(_nth: 1)..<donor.index(_nth: 5)])
-    expectEqualUnicodeScalars([ 0x1f602, 0xfffd ],
-      acceptor[donor.index(_nth: 2)..<donor.index(_nth: 5)])
   }
 }
 
@@ -494,7 +489,7 @@ StringTests.test("substringDoesNotCopy/Swift3")
       }
       var s0 = String(repeating: "x", count: size)
       let originalIdentity = s0.bufferID
-      s0 = s0[s0.index(_nth: sliceStart)..<s0.index(_nth: sliceEnd)]
+      s0 = String(s0[s0.index(_nth: sliceStart)..<s0.index(_nth: sliceEnd)])
       expectEqual(originalIdentity, s0.bufferID)
     }
   }
@@ -510,9 +505,7 @@ StringTests.test("substringDoesNotCopy/Swift4") {
       }
       let s0 = String(repeating: "x", count: size)
       let originalIdentity = s0.bufferID
-      let s1 = Substring(
-        _base: s0,
-        s0.index(_nth: sliceStart)..<s0.index(_nth: sliceEnd))
+      let s1 = s0[s0.index(_nth: sliceStart)..<s0.index(_nth: sliceEnd)]
       expectEqual(s1.bufferID, originalIdentity)
     }
   }
@@ -547,18 +540,20 @@ StringTests.test("appendToEmptyString") {
 }
 
 StringTests.test("Swift3Slice/Empty") {
-  let size = 5
+  let size = 16
   let s = String(repeating: "x", count: size)
+  expectNotNil(s.bufferID)
   for i in 0 ... size {
     let slice = s[s.index(_nth: i)..<s.index(_nth: i)]
-    // Most Swift 3 substrings are extracted into their own buffer,
-    // but empty substrings get turned into the empty string singleton
-    expectNil(slice.bufferID)
+    // Empty substrings still have indices relative to their base and can refer
+    // to the whole string. If the whole string has storage, so should its
+    // substring.
+    expectNotNil(slice.bufferID)
   }
 }
 
 StringTests.test("Swift3Slice/Full") {
-  let size = 5
+  let size = 16
   let s = String(repeating: "x", count: size)
   let slice = s[s.startIndex..<s.endIndex]
   // Most Swift 3 substrings are extracted into their own buffer,
@@ -575,7 +570,7 @@ StringTests.test("appendToSubstring") {
           continue
         }
         var s0 = String(repeating: "x", count: initialSize)
-        s0 = s0[s0.index(_nth: sliceStart)..<s0.index(_nth: sliceEnd)]
+        s0 = String(s0[s0.index(_nth: sliceStart)..<s0.index(_nth: sliceEnd)])
         s0 += "x"
         expectEqual(
           String(
@@ -613,7 +608,7 @@ StringTests.test("appendToSubstringBug")
     
     // This sorta checks for the original bug
     expectEqual(
-      cap, s0[s0.index(_nth: 1)..<s0.endIndex].unusedCapacity)
+      cap, String(s0[s0.index(_nth: 1)..<s0.endIndex]).unusedCapacity)
     
     return (s0, cap)
   }
@@ -621,7 +616,7 @@ StringTests.test("appendToSubstringBug")
   do {
     var (s, _) = { ()->(String, Int) in
       let (s0, unused) = stringWithUnusedCapacity()
-      return (s0[s0.index(_nth: 5)..<s0.endIndex], unused)
+      return (String(s0[s0.index(_nth: 5)..<s0.endIndex]), unused)
     }()
     let originalID = s.bufferID
     // Appending to a String always results in storage that 
@@ -834,7 +829,7 @@ StringTests.test("COW/replaceSubrange/end") {
     // FIXME: We have to use Swift 4's Substring to get the desired storage
     // semantics; in Swift 3 mode, self-sliced strings get allocated a new
     // buffer immediately.
-    var slice = Substring(_base: str, str.startIndex..<str.index(_nth: 7))
+    var slice = str[str.startIndex..<str.index(_nth: 7)]
     expectEqual(heapStrIdentity1, str.bufferID)
     expectEqual(heapStrIdentity1, slice.bufferID)
 
@@ -863,7 +858,7 @@ func asciiString<
 where S.Iterator.Element == Character {
   var s = String()
   s.append(contentsOf: content)
-  expectTrue(s._guts.isSingleByte)
+  expectTrue(s._classify()._isASCII)
   return s
 }
 
@@ -912,6 +907,7 @@ StringTests.test("stringGutsReserve")
   .skip(.nativeRuntime("Foundation dependency"))
   .code {
 #if _runtime(_ObjC)
+  guard #available(iOS 11.0, *) else { return }
   for k in 0...7 {
     var base: String
     var startedNative: Bool
@@ -919,7 +915,12 @@ StringTests.test("stringGutsReserve")
 
     // Managed native, unmanaged native, or small
     func isSwiftNative(_ s: String) -> Bool {
-      return s._guts._isNative || s._guts._isSmall || s._guts._isUnmanaged
+      switch s._classify()._form {
+        case ._native: return true
+        case ._small: return true
+        case ._immortal: return true
+        default: return false
+      }
     }
 
     switch k {
@@ -990,7 +991,7 @@ StringTests.test("stringGutsReserve")
 func makeStringGuts(_ base: String) -> _StringGuts {
   var x = _StringGuts()
   // make sure some - but not all - replacements will have to grow the buffer
-  x.reserveCapacity(base._guts.count * 3 / 2)
+  x.reserveCapacity(base._classify()._count * 3 / 2)
   let capacity = x.capacity
   x.append(base._guts)
   // Widening the guts should not make it lose its capacity,
@@ -1013,27 +1014,6 @@ StringTests.test("StringGutsReplace") {
       checkRangeReplaceable(
         { StringGutsCollection(g1) },
         { Array(StringGutsCollection(g2))[0..<$0] }
-      )
-    }
-  }
-}
-
-StringTests.test("CharacterViewReplace") {
-  let narrow = "01234567890"
-  let wide = "ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩⅪ"
-  
-  for s1 in [narrow, wide] {
-    for s2 in [narrow, wide] {
-      let g1 = makeStringGuts(s1)
-      let g2 = makeStringGuts(s2 + s2)
-      checkRangeReplaceable(
-        { () -> String._CharacterView in
-          String._CharacterView(String(g1)) },
-        { String._CharacterView(String(g2._extractSlice(0..<$0))) }
-      )
-      checkRangeReplaceable(
-        { String._CharacterView(String(g1)) },
-        { Array(String._CharacterView(String(g2)))[0..<$0] }
       )
     }
   }
@@ -1066,10 +1046,10 @@ StringTests.test("reserveCapacity") {
   s = ""
   print("empty capacity \(s.capacity)")
   s.reserveCapacity(oldCap + 18)
-  print("reserving \(oldCap + 18) -> \(s.capacity), width = \(s._guts.byteWidth)")
+  print("reserving \(oldCap + 18) -> \(s.capacity), width = \(s.byteWidth)")
   let id1 = s.bufferID
   s.insert(contentsOf: repeatElement(x, count: oldCap + 18), at: s.endIndex)
-  print("extending by \(oldCap + 18) -> \(s.capacity), width = \(s._guts.byteWidth)")
+  print("extending by \(oldCap + 18) -> \(s.capacity), width = \(s.byteWidth)")
   expectEqual(id1, s.bufferID)
   s.insert(contentsOf: repeatElement(x, count: s.capacity + 100), at: s.endIndex)
   expectNotEqual(id1, s.bufferID)
@@ -1170,8 +1150,7 @@ StringTests.test("Construction") {
 StringTests.test("Conversions") {
   // Whether we are natively ASCII or small ASCII
   func isKnownASCII(_ s: String) -> Bool {
-    return s._guts.isASCII ||
-      (s._guts._isSmall && s._guts._smallUTF8String.isASCII)
+    return s.byteWidth == 1
   }
   do {
     let c: Character = "a"
@@ -1356,7 +1335,7 @@ StringTests.test("indexConversion")
   ) {
     result, flags, stop
   in
-    let r = result!.rangeAt(1)
+    let r = result!.range(at: 1)
     let start = String.UTF16Index(encodedOffset: r.location)
     let end = String.UTF16Index(encodedOffset: r.location + r.length)
     matches.append(String(s.utf16[start..<end])!)

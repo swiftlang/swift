@@ -18,6 +18,9 @@ extension Collection where Element: Equatable {
       var results = [SubSequence]()
       return results
   }
+  func foo(_ x: Iterator.Element) {
+    print(x)
+  }
 }
 
 class Foo<T> {
@@ -29,6 +32,16 @@ class Foo<T> {
 
 typealias Patatino<T> = Foo<T>
 
+public struct Outer<T> {
+  public struct Inner { }
+
+  public typealias Foo<U> = Outer<U>.Inner
+
+  public func blah() {
+    let foo: Foo<Int> = Outer<Int>.Inner()
+  }
+}
+
 func main() -> Int {
   struct patatino {}
   var p : Patatino<Int> = Patatino(23);
@@ -36,3 +49,18 @@ func main() -> Int {
 }
 
 let _ = main()
+
+public struct tinky : Equatable, Hashable {
+  internal let _value: Int
+
+  public var hashValue: Int {
+    return 0
+  }
+}
+
+public func == (lhs: tinky, rhs: tinky) -> Bool {
+  return true
+}
+
+public typealias patatino = UnsafePointer<tinky>
+var local_thread_one: patatino?

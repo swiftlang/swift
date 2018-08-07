@@ -63,7 +63,11 @@ struct _NormalizedCodeUnitIterator: IteratorProtocol {
     where Source.Element == UInt16, Source.SubSequence == Source
   {
     var remaining: Int {
-      return collection.distance(from: index, to: collection.endIndex)
+      @_specialize(where Source == _UnmanagedString<UInt16>)
+      @_specialize(where Source == _UnmanagedOpaqueString)
+      get {
+        return collection.distance(from: index, to: collection.endIndex)
+      }
     }
     var collection: Source
     var index: Source.Index
@@ -127,7 +131,7 @@ struct _NormalizedCodeUnitIterator: IteratorProtocol {
           return nil
         }
         
-        let cu = guts[index]
+        let cu = guts.codeUnit(atCheckedOffset: index)
         buffer[bufferIndex] = cu
         index += 1
         bufferIndex += 1

@@ -92,7 +92,7 @@ protocol ProtocolGetSet1 {
   subscript(i: Int) -> Int { get }
 }
 protocol ProtocolGetSet2 {
-  subscript(i: Int) -> Int { set } // expected-error {{subscript declarations must have a getter}}
+  subscript(i: Int) -> Int { set } // expected-error {{subscript with a setter must also have a getter}}
 }
 protocol ProtocolGetSet3 {
   subscript(i: Int) -> Int { get set }
@@ -102,21 +102,21 @@ protocol ProtocolGetSet4 {
 }
 
 protocol ProtocolWillSetDidSet1 {
-  subscript(i: Int) -> Int { willSet } // expected-error {{expected get or set in a protocol property}}
+  subscript(i: Int) -> Int { willSet } // expected-error {{expected get or set in a protocol property}} expected-error {{subscript declarations must have a getter}}
 }
 protocol ProtocolWillSetDidSet2 {
-  subscript(i: Int) -> Int { didSet } // expected-error {{expected get or set in a protocol property}}
+  subscript(i: Int) -> Int { didSet } // expected-error {{expected get or set in a protocol property}} expected-error {{subscript declarations must have a getter}}
 }
 protocol ProtocolWillSetDidSet3 {
-  subscript(i: Int) -> Int { willSet didSet } // expected-error {{expected get or set in a protocol property}}
+  subscript(i: Int) -> Int { willSet didSet } // expected-error 2 {{expected get or set in a protocol property}} expected-error {{subscript declarations must have a getter}}
 }
 protocol ProtocolWillSetDidSet4 {
-  subscript(i: Int) -> Int { didSet willSet } // expected-error {{expected get or set in a protocol property}}
+  subscript(i: Int) -> Int { didSet willSet } // expected-error 2 {{expected get or set in a protocol property}} expected-error {{subscript declarations must have a getter}}
 }
 
 class DidSetInSubscript {
   subscript(_: Int) -> Int {
-    didSet { // expected-error {{didSet is not allowed in subscripts}}
+    didSet { // expected-error {{'didSet' is not allowed in subscripts}}
       print("eek")
     }
     get {}
@@ -125,7 +125,7 @@ class DidSetInSubscript {
 
 class WillSetInSubscript {
   subscript(_: Int) -> Int {
-    willSet { // expected-error {{willSet is not allowed in subscripts}}
+    willSet { // expected-error {{'willSet' is not allowed in subscripts}}
       print("eek")
     }
     get {}
@@ -175,14 +175,14 @@ struct MissingGetterSubscript1 {
   } // expected-error {{subscript must have accessors specified}}
 }
 struct MissingGetterSubscript2 {
-  subscript (i : Int, j : Int) -> Int { // expected-error{{subscript declarations must have a getter}}
-    set {}
+  subscript (i : Int, j : Int) -> Int {
+    set {} // expected-error{{subscript with a setter must also have a getter}}
   }
 }
 
 func test_subscript(_ x2: inout X2, i: Int, j: Int, value: inout Int, no: NoSubscript,
                     ovl: inout OverloadedSubscript, ret: inout RetOverloadedSubscript) {
-  no[i] = value // expected-error{{type 'NoSubscript' has no subscript members}}
+  no[i] = value // expected-error{{value of type 'NoSubscript' has no subscripts}}
 
   value = x2[i]
   x2[i] = value
@@ -190,8 +190,8 @@ func test_subscript(_ x2: inout X2, i: Int, j: Int, value: inout Int, no: NoSubs
   value = ovl[i]
   ovl[i] = value
 
-  value = ovl[(i, j)]
-  ovl[(i, j)] = value
+  value = ovl[i, j]
+  ovl[i, j] = value
 
   value = ovl[(i, j, i)] // expected-error{{cannot convert value of type '(Int, Int, Int)' to expected argument type 'Int'}}
 

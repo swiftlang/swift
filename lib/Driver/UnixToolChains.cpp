@@ -317,15 +317,24 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
         Twine("-u", llvm::getInstrProfRuntimeHookVarName())));
   }
 
-  context.Args.AddAllArgs(Arguments, options::OPT_Xlinker);
+  // Run clang++ in verbose mode if "-v" is set
+  if (context.Args.hasArg(options::OPT_v)) {
+    Arguments.push_back("-v");
+  }
+
+  // These custom arguments should be right before the object file at the end.
   context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
+  context.Args.AddAllArgs(Arguments, options::OPT_Xlinker);
 
   // This should be the last option, for convenience in checking output.
   Arguments.push_back("-o");
   Arguments.push_back(
       context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
 
-  return {Clang, Arguments};
+  InvocationInfo II{Clang, Arguments};
+  II.allowsResponseFiles = true;
+
+  return II;
 }
 
 std::string toolchains::Android::getTargetForLinker() const {

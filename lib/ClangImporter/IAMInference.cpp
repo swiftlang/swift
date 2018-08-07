@@ -433,9 +433,9 @@ private:
       SmallVector<Identifier, 8> argLabels;
       for (auto str : argStrs)
         argLabels.push_back(getIdentifier(str));
-      DEBUG((beforeOmit = {context,
-                           getHumbleBaseName(baseName, isInitializer),
-                           argLabels}));
+      LLVM_DEBUG((beforeOmit = {context,
+                                getHumbleBaseName(baseName, isInitializer),
+                                argLabels}));
     }
 
     SmallVector<OmissionTypeName, 8> paramTypeNames;
@@ -459,8 +459,8 @@ private:
 
     if (didOmit) {
       ++OmitNumTimes;
-      DEBUG(llvm::dbgs() << "omission detected: " << beforeOmit << " ==> "
-                         << ret << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "omission detected: " << beforeOmit << " ==> "
+                              << ret << "\n");
     }
 
     return ret;
@@ -688,9 +688,10 @@ bool IAMInference::validToImportAsProperty(
 
 IAMResult IAMInference::inferVar(const clang::VarDecl *varDecl) {
   auto fail = [varDecl]() -> IAMResult {
-    DEBUG(llvm::dbgs() << "failed to infer variable: ");
-    DEBUG(varDecl->print(llvm::dbgs()));
-    DEBUG(llvm::dbgs() << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "failed to infer variable: ");
+    LLVM_DEBUG(varDecl->print(llvm::dbgs()));
+    (void)varDecl;
+    LLVM_DEBUG(llvm::dbgs() << "\n");
     ++FailInferVar;
     return {};
   };
@@ -731,9 +732,10 @@ IAMResult IAMInference::infer(const clang::NamedDecl *clangDecl) {
   }
 
   auto fail = [funcDecl]() -> IAMResult {
-    DEBUG(llvm::dbgs() << "failed to infer function: ");
-    DEBUG(funcDecl->print(llvm::dbgs()));
-    DEBUG(llvm::dbgs() << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "failed to infer function: ");
+    LLVM_DEBUG(funcDecl->print(llvm::dbgs()));
+    (void)funcDecl;
+    LLVM_DEBUG(llvm::dbgs() << "\n");
     ++FailInferFunction;
     return {};
   };

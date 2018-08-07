@@ -66,6 +66,8 @@ namespace swift {
     /// Inject the pass manager running this pass.
     void injectPassManager(SILPassManager *PMM) { PM = PMM; }
 
+    SILPassManager *getPassManager() const { return PM; }
+
     irgen::IRGenModule *getIRGenModule() {
       auto *Mod = PM->getIRGenModule();
       assert(Mod && "Expecting a valid module");
@@ -164,9 +166,9 @@ namespace swift {
       PM->invalidateFunctionTables();
     }
 
-    /// Inform the pass manager of a deleted function.
-    void notifyDeleteFunction(SILFunction *F) {
-      PM->notifyDeleteFunction(F);
+    /// Inform the pass manager that we are going to delete a function.
+    void notifyWillDeleteFunction(SILFunction *F) {
+      PM->notifyWillDeleteFunction(F);
     }
 
     /// Inform the pass manager of an added function.

@@ -92,8 +92,11 @@ bool FunctionSignatureTransform::OwnedToGuaranteedAnalyzeParameters() {
         auto ReleasesInThrow =
             ArgToThrowReleaseMap.getReleasesForArgument(A.Arg);
         if (!ArgToThrowReleaseMap.hasBlock() || !ReleasesInThrow.empty()) {
-          A.CalleeRelease = Releases;
-          A.CalleeReleaseInThrowBlock = ReleasesInThrow;
+          assert(A.CalleeRelease.empty());
+          assert(A.CalleeReleaseInThrowBlock.empty());
+          copy(Releases, std::back_inserter(A.CalleeRelease));
+          copy(ReleasesInThrow,
+               std::back_inserter(A.CalleeReleaseInThrowBlock));
           // We can convert this parameter to a @guaranteed.
           A.OwnedToGuaranteed = true;
           SignatureOptimize = true;

@@ -20,7 +20,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-func-extractor"
-#include "swift/Strings.h"
+#include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Demangling/Demangle.h"
@@ -178,9 +178,9 @@ void removeUnwantedFunctions(SILModule *M, ArrayRef<std::string> MangledNames,
     std::string DemangledName =
         swift::Demangle::demangleSymbolAsString(MangledName);
     DemangledName = DemangledName.substr(0, DemangledName.find_first_of(" <("));
-    DEBUG(llvm::dbgs() << "Visiting New Func:\n"
-                       << "    Mangled: " << MangledName
-                       << "\n    Demangled: " << DemangledName << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Visiting New Func:\n"
+                            << "    Mangled: " << MangledName
+                            << "\n    Demangled: " << DemangledName << "\n");
 
     bool FoundMangledName = stringInSortedArray(MangledName, MangledNames,
                                                 std::less<std::string>());
@@ -191,11 +191,11 @@ void removeUnwantedFunctions(SILModule *M, ArrayRef<std::string> MangledNames,
                  str2.substr(0, str2.find(' '));
         });
     if ((FoundMangledName || FoundDemangledName) ^ InvertMatch) {
-      DEBUG(llvm::dbgs() << "    Not removing!\n");
+      LLVM_DEBUG(llvm::dbgs() << "    Not removing!\n");
       continue;
     }
 
-    DEBUG(llvm::dbgs() << "    Removing!\n");
+    LLVM_DEBUG(llvm::dbgs() << "    Removing!\n");
 
     // If F has no body, there is nothing further to do.
     if (!F.size())
@@ -328,16 +328,16 @@ int main(int argc, char **argv) {
   ArrayRef<std::string> DemangledNames(&*std::next(Names.begin(), NumMangled),
                                        NumNames - NumMangled);
 
-  DEBUG(llvm::errs() << "MangledNames to keep:\n";
-        std::for_each(MangledNames.begin(), MangledNames.end(),
-                      [](const std::string &str) {
-                        llvm::errs() << "    " << str << '\n';
-                      }));
-  DEBUG(llvm::errs() << "DemangledNames to keep:\n";
-        std::for_each(DemangledNames.begin(), DemangledNames.end(),
-                      [](const std::string &str) {
-                        llvm::errs() << "    " << str << '\n';
-                      }));
+  LLVM_DEBUG(llvm::errs() << "MangledNames to keep:\n";
+             std::for_each(MangledNames.begin(), MangledNames.end(),
+                           [](const std::string &str) {
+                             llvm::errs() << "    " << str << '\n';
+                           }));
+  LLVM_DEBUG(llvm::errs() << "DemangledNames to keep:\n";
+             std::for_each(DemangledNames.begin(), DemangledNames.end(),
+                           [](const std::string &str) {
+                             llvm::errs() << "    " << str << '\n';
+                           }));
 
   removeUnwantedFunctions(CI.getSILModule(), MangledNames, DemangledNames);
 
@@ -347,10 +347,12 @@ int main(int argc, char **argv) {
       OutputFile = OutputFilename;
     } else if (ModuleName.size()) {
       OutputFile = ModuleName;
-      llvm::sys::path::replace_extension(OutputFile, SIB_EXTENSION);
+      llvm::sys::path::replace_extension(
+          OutputFile, file_types::getExtension(file_types::TY_SIB));
     } else {
       OutputFile = CI.getMainModule()->getName().str();
-      llvm::sys::path::replace_extension(OutputFile, SIB_EXTENSION);
+      llvm::sys::path::replace_extension(
+          OutputFile, file_types::getExtension(file_types::TY_SIB));
     }
 
     SerializationOptions serializationOpts;

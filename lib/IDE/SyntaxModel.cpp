@@ -801,9 +801,9 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     else
       SR = VD->getSourceRange();
     SN.Range = charSourceRangeFromSourceRange(SM, SR);
-    if (VD->hasAccessorFunctions())
-      SN.BodyRange = innerCharSourceRangeFromSourceRange(SM,
-                                                         VD->getBracesRange());
+    auto bracesRange = VD->getBracesRange();
+    if (bracesRange.isValid())
+      SN.BodyRange = innerCharSourceRangeFromSourceRange(SM, bracesRange);
     SourceLoc NRStart = VD->getNameLoc();
     SourceLoc NREnd = NRStart.getAdvancedLoc(VD->getName().getLength());
     SN.NameRange = CharSourceRange(SM, NRStart, NREnd);
@@ -960,11 +960,13 @@ bool ModelASTWalker::walkToTypeReprPre(TypeRepr *T) {
       return false;
 
   } else if (auto IdT = dyn_cast<ComponentIdentTypeRepr>(T)) {
-    if (!passNonTokenNode({ SyntaxNodeKind::TypeId,
-                            CharSourceRange(IdT->getIdLoc(),
-                                            IdT->getIdentifier().getLength())
-                          }))
+    if (!passTokenNodesUntil(IdT->getIdLoc(), ExcludeNodeAtLocation))
       return false;
+    if (TokenNodes.front().Range.getStart() != IdT->getIdLoc())
+      return false;
+    if (!passNode({SyntaxNodeKind::TypeId, TokenNodes.front().Range}))
+      return false;
+    TokenNodes = TokenNodes.slice(1);
   }
   return true;
 }

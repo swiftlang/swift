@@ -51,28 +51,36 @@ _swift_nw_connection_send(nw_connection_t connection, _Nullable dispatch_data_t 
 	nw_connection_send(connection, content, context, is_complete, completion);
 }
 
+API_AVAILABLE(macos(10.14), ios(12.0), watchos(5.0), tvos(12.0))
 _Nullable SWIFT_NW_RETURNS_RETAINED nw_endpoint_t
 nw_endpoint_create_unix(const char *path);
 
+API_AVAILABLE(macos(10.14), ios(12.0), watchos(5.0), tvos(12.0))
 _Nullable SWIFT_NW_RETURNS_RETAINED nw_interface_t
 nw_endpoint_copy_interface(nw_endpoint_t endpoint);
 
+API_AVAILABLE(macos(10.14), ios(12.0), watchos(5.0), tvos(12.0))
 void
 nw_endpoint_set_interface(nw_endpoint_t endpoint,
 						  _Nullable nw_interface_t interface);
 
+API_AVAILABLE(macos(10.14), ios(12.0), watchos(5.0), tvos(12.0))
 _Nullable SWIFT_NW_RETURNS_RETAINED nw_interface_t
 nw_interface_create_with_name(const char *interface_name);
 
+API_AVAILABLE(macos(10.14), ios(12.0), watchos(5.0), tvos(12.0))
 _Nullable SWIFT_NW_RETURNS_RETAINED nw_interface_t
 nw_interface_create_with_index(uint32_t interface_index);
 
+API_AVAILABLE(macos(10.14), ios(12.0), watchos(5.0), tvos(12.0))
 SWIFT_NW_RETURNS_RETAINED NSData * _Nullable
 NWCreateNSDataFromDispatchData(_Nullable dispatch_data_t data);
 
+API_AVAILABLE(macos(10.14), ios(12.0), watchos(5.0), tvos(12.0))
 _Nullable SWIFT_NW_RETURNS_RETAINED dispatch_data_t
 NWCreateDispatchDataFromNSData(NSData * _Nullable data);
 
+API_AVAILABLE(macos(10.14), ios(12.0), watchos(5.0), tvos(12.0))
 const char *
 nwlog_get_string_for_dns_service_error(int32_t err);
 

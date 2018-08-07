@@ -65,7 +65,10 @@ extension Character.UnicodeScalarView {
     internal let _stride: UInt8
 
     @inlinable // FIXME(sil-serialize-all)
-    internal init(_encodedOffset: Int, _scalar: Unicode.UTF16.EncodedScalar, _stride: UInt8) {
+    internal init(
+      _encodedOffset: Int,
+      _scalar: Unicode.UTF16.EncodedScalar, _stride: UInt8
+    ) {
       self._encodedOffset = _encodedOffset
       self._scalar = _scalar
       self._stride = _stride

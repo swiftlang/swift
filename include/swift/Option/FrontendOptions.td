@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -62,6 +62,10 @@ def serialize_diagnostics_path
 def emit_fixits_path
   : Separate<["-"], "emit-fixits-path">, MetaVarName<"<path>">,
     HelpText<"Output compiler fixits as source edits to <path>">;
+
+def emit_interface_path
+  : Separate<["-"], "emit-interface-path">, MetaVarName<"<path>">,
+    HelpText<"Output textual interface file to <path>">;
 
 def tbd_install_name
   : Separate<["-"], "tbd-install_name">, MetaVarName<"<path>">,
@@ -157,9 +161,6 @@ def debug_constraints : Flag<["-"], "debug-constraints">,
 def debug_constraints_attempt : Separate<["-"], "debug-constraints-attempt">,
   HelpText<"Debug the constraint solver at a given attempt">;
 
-def iterative_type_checker : Flag<["-"], "iterative-type-checker">,
-  HelpText<"Enable the iterative type checker">;
-
 def disable_named_lazy_member_loading : Flag<["-"], "disable-named-lazy-member-loading">,
   HelpText<"Disable per-name lazy member loading">;
 
@@ -170,12 +171,20 @@ def debug_forbid_typecheck_prefix : Separate<["-"], "debug-forbid-typecheck-pref
   HelpText<"Triggers llvm fatal_error if typechecker tries to typecheck a decl "
            "with the provided prefix name">;
 
+def debug_cycles : Flag<["-"], "debug-cycles">,
+  HelpText<"Print out debug dumps when cycles are detected in evaluation">;
+def output_request_graphviz : Separate<["-"], "output-request-graphviz">,
+  HelpText<"Emit GraphViz output visualizing the request graph">;
+
 def debug_time_compilation : Flag<["-"], "debug-time-compilation">,
   HelpText<"Prints the time taken by each compilation phase">;
 def debug_time_function_bodies : Flag<["-"], "debug-time-function-bodies">,
   HelpText<"Dumps the time it takes to type-check each function body">;
 def debug_time_expression_type_checking : Flag<["-"], "debug-time-expression-type-checking">,
   HelpText<"Dumps the time it takes to type-check each expression">;
+
+def disable_constraint_solver_performance_hacks : Flag<["-"], "disable-constraint-solver-performance-hacks">,
+  HelpText<"Disable all the hacks in the constraint solver">;
 
 def debug_assert_immediately : Flag<["-"], "debug-assert-immediately">,
   DebugCrashOpt, HelpText<"Force an assertion failure immediately">;
@@ -345,6 +354,10 @@ def warn_long_expression_type_checking_EQ : Joined<["-"], "warn-long-expression-
 
 def solver_expression_time_threshold_EQ : Joined<["-"], "solver-expression-time-threshold=">;
 
+def solver_disable_shrink :
+  Flag<["-"], "solver-disable-shrink">,
+  HelpText<"Disable the shrink phase of expression type checking">;
+
 def switch_checking_invocation_threshold_EQ : Joined<["-"],
     "switch-checking-invocation-threshold=">;
 
@@ -485,5 +498,9 @@ def disable_verify_exclusivity : Flag<["-"], "disable-verify-exclusivity">,
 
 def enable_key_path_resilience : Flag<["-"], "enable-key-path-resilience">,
   HelpText<"Enable key path resilience.">;
+
+def type_info_dump_filter_EQ : Joined<["-"], "type-info-dump-filter=">,
+  Flags<[FrontendOption]>,
+  HelpText<"One of 'all', 'resilient' or 'fragile'">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

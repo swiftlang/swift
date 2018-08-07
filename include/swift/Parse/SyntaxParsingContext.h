@@ -280,8 +280,9 @@ public:
   /// Move the collected parts to the tail of parent context.
   void setTransparent() { Mode = AccumulationMode::Transparent; }
 
-  /// Discard collected parts on this context.
-  void setDiscard() { Mode = AccumulationMode::Discard; }
+  /// This context is a back tracking context, so we should discard collected
+  /// parts on this context.
+  void setBackTracking() { Mode = AccumulationMode::Discard; }
 
   /// Explicitly finalizing syntax tree creation.
   /// This function will be called during the destroying of a root syntax

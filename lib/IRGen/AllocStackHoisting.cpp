@@ -348,16 +348,22 @@ void HoistAllocStack::collectHoistableInstructions() {
           FunctionExits.push_back(Term);
         continue;
       }
-
+      // Don't perform alloc_stack hoisting in functions with availability.
+      if (auto *Apply = dyn_cast<ApplyInst>(&Inst)) {
+        if (Apply->hasSemantics("availability.osversion")) {
+          AllocStackToHoist.clear();
+          return;
+        }
+      }
       auto *ASI = dyn_cast<AllocStackInst>(&Inst);
       if (!ASI) {
         continue;
       }
       if (isHoistable(ASI, IRGenMod)) {
-        DEBUG(llvm::dbgs() << "Hoisting     " << Inst);
+        LLVM_DEBUG(llvm::dbgs() << "Hoisting     " << Inst);
         AllocStackToHoist.push_back(ASI);
       } else {
-        DEBUG(llvm::dbgs() << "Not hoisting " << Inst);
+        LLVM_DEBUG(llvm::dbgs() << "Not hoisting " << Inst);
       }
     }
   }

@@ -15,6 +15,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILOptimizer/Utils/CFG.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 
 using namespace swift;
 
@@ -967,4 +968,48 @@ bool swift::splitAllCondBrCriticalEdgesWithNonTrivialArgs(SILFunction &Fn,
   }
 
   return true;
+}
+
+namespace {
+  class RemoveUnreachable {
+    SILFunction &Fn;
+    llvm::SmallSet<SILBasicBlock *, 8> Visited;
+  public:
+    RemoveUnreachable(SILFunction &Fn) : Fn(Fn) { }
+    void visit(SILBasicBlock *BB);
+    bool run();
+  };
+} // end anonymous namespace
+
+void RemoveUnreachable::visit(SILBasicBlock *BB) {
+  if (!Visited.insert(BB).second)
+    return;
+
+  for (auto &Succ : BB->getSuccessors())
+    visit(Succ);
+}
+
+bool RemoveUnreachable::run() {
+  bool Changed = false;
+
+  // Clear each time we run so that we can run multiple times.
+  Visited.clear();
+
+  // Visit all blocks reachable from the entry block of the function.
+  visit(&*Fn.begin());
+
+  // Remove the blocks we never reached.
+  for (auto It = Fn.begin(), End = Fn.end(); It != End; ) {
+    auto *BB = &*It++;
+    if (!Visited.count(BB)) {
+      removeDeadBlock(BB);
+      Changed = true;
+    }
+  }
+
+  return Changed;
+}
+
+bool swift::removeUnreachableBlocks(SILFunction &Fn) {
+  return RemoveUnreachable(Fn).run();
 }

@@ -28,7 +28,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FARG4 | %FileCheck %s -check-prefix=MEMBER4
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FARG5 | %FileCheck %s -check-prefix=MEMBER2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FARG6 | %FileCheck %s -check-prefix=FARG6
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FARG7 | %FileCheck %s -check-prefix=EXPECT_OINT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FARG7 | %FileCheck %s -allow-deprecated-dag-overlap -check-prefix=EXPECT_OINT
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FIRST_ARG_NAME_1 | %FileCheck %s -check-prefix=FIRST_ARG_NAME_PATTERN
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FIRST_ARG_NAME_2 | %FileCheck %s -check-prefix=FIRST_ARG_NAME_PATTERN

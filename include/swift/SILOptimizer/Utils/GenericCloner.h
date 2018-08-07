@@ -30,36 +30,44 @@
 
 namespace swift {
 
-class GenericCloner : public TypeSubstCloner<GenericCloner> {
+class GenericCloner
+  : public TypeSubstCloner<GenericCloner, SILOptFunctionBuilder> {
+  using SuperTy = TypeSubstCloner<GenericCloner, SILOptFunctionBuilder>;
+
+  SILOptFunctionBuilder &FuncBuilder;
   IsSerialized_t Serialized;
   const ReabstractionInfo &ReInfo;
   CloneCollector::CallbackType Callback;
+  llvm::SmallDenseMap<const SILDebugScope *, const SILDebugScope *, 8>
+      RemappedScopeCache;
 
 public:
   friend class SILCloner<GenericCloner>;
 
-  GenericCloner(SILFunction *F,
+  GenericCloner(SILOptFunctionBuilder &FuncBuilder,
+                SILFunction *F,
                 IsSerialized_t Serialized,
                 const ReabstractionInfo &ReInfo,
                 SubstitutionMap ParamSubs,
                 StringRef NewName,
                 CloneCollector::CallbackType Callback)
-  : TypeSubstCloner(*initCloned(F, Serialized, ReInfo, NewName), *F,
-                    ParamSubs), ReInfo(ReInfo), Callback(Callback) {
+    : SuperTy(*initCloned(FuncBuilder, F, Serialized, ReInfo, NewName), *F,
+	      ParamSubs), FuncBuilder(FuncBuilder), ReInfo(ReInfo), Callback(Callback) {
     assert(F->getDebugScope()->Parent != getCloned()->getDebugScope()->Parent);
   }
   /// Clone and remap the types in \p F according to the substitution
   /// list in \p Subs. Parameters are re-abstracted (changed from indirect to
   /// direct) according to \p ReInfo.
   static SILFunction *
-  cloneFunction(SILFunction *F,
+  cloneFunction(SILOptFunctionBuilder &FuncBuilder,
+                SILFunction *F,
                 IsSerialized_t Serialized,
                 const ReabstractionInfo &ReInfo,
                 SubstitutionMap ParamSubs,
                 StringRef NewName,
                 CloneCollector::CallbackType Callback =nullptr) {
     // Clone and specialize the function.
-    GenericCloner SC(F, Serialized, ReInfo, ParamSubs,
+    GenericCloner SC(FuncBuilder, F, Serialized, ReInfo, ParamSubs,
                      NewName, Callback);
     SC.populateCloned();
     SC.cleanUp(SC.getCloned());
@@ -82,7 +90,8 @@ protected:
   }
 
 private:
-  static SILFunction *initCloned(SILFunction *Orig,
+  static SILFunction *initCloned(SILOptFunctionBuilder &FuncBuilder,
+                                 SILFunction *Orig,
                                  IsSerialized_t Serialized,
                                  const ReabstractionInfo &ReInfo,
                                  StringRef NewName);
@@ -90,6 +99,9 @@ private:
   /// by initCloned.
   void populateCloned();
   SILFunction *getCloned() { return &getBuilder().getFunction(); }
+
+  const SILDebugScope *remapScope(const SILDebugScope *DS);
+
 };
 
 } // end namespace swift

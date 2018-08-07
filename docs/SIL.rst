@@ -28,6 +28,9 @@ In contrast to LLVM IR, SIL is a generally target-independent format
 representation that can be used for code distribution, but it can also express
 target-specific concepts as well as LLVM can.
 
+For more information on developing the implementation of SIL and SIL passes, see
+SILProgrammersManual.md.
+
 SIL in the Swift Compiler
 -------------------------
 
@@ -2237,7 +2240,7 @@ store
   // $T must be a loadable type
 
 Stores the value ``%0`` to memory at address ``%1``.  The type of %1 is ``*T``
-and the type of ``%0 is ``T``, which must be a loadable type. This will
+and the type of ``%0`` is ``T``, which must be a loadable type. This will
 overwrite the memory at ``%1``. If ``%1`` already references a value that
 requires ``release`` or other cleanup, that value must be loaded before being
 stored over and cleaned up. It is undefined behavior to store to an address
@@ -3064,8 +3067,7 @@ float_literal
   // $Builtin.FP<n> must be a builtin floating-point type
   // %1 has type $Builtin.FP<n>
 
-Creates a floating-point literal value. The result will be of type ``
-``Builtin.FP<n>``, which must be a builtin floating-point type. The literal
+Creates a floating-point literal value. The result will be of type ``Builtin.FP<n>``, which must be a builtin floating-point type. The literal
 value is specified as the bitwise representation of the floating point value,
 using Swift's hexadecimal integer literal syntax.
 
@@ -3872,12 +3874,12 @@ arrays or if the element-types do not match.
 Enums
 ~~~~~
 
-These instructions construct values of enum type. Loadable enum values are
-created with the `enum`_ instruction. Address-only enums require two-step
-initialization. First, if the case requires data, that data is stored into
-the enum at the address projected by `init_enum_data_addr`_. This step is
-skipped for cases without data. Finally, the tag for
-the enum is injected with an `inject_enum_addr`_ instruction::
+These instructions construct and manipulate values of enum type. Loadable enum
+values are created with the `enum`_ instruction. Address-only enums require
+two-step initialization. First, if the case requires data, that data is stored
+into the enum at the address projected by `init_enum_data_addr`_. This step is
+skipped for cases without data. Finally, the tag for the enum is injected with
+an `inject_enum_addr`_ instruction::
 
   enum AddressOnlyEnum {
     case HasData(AddressOnlyType)
@@ -3935,6 +3937,21 @@ projecting the enum value with `unchecked_take_enum_data_addr`_::
     %b = unchecked_take_enum_data_addr %foo : $*Foo<T>, #Foo.B!enumelt.1
     /* use %b */
   }
+
+Both `switch_enum`_ and `switch_enum_addr`_ must include a ``default`` case
+unless the enum can be exhaustively switched in the current function, i.e. when
+the compiler can be sure that it knows all possible present and future values
+of the enum in question. This is generally true for enums defined in Swift, but
+there are two exceptions: *non-frozen enums* declared in libraries compiled
+with the ``-enable-resilience`` flag, which may grow new cases in the future in
+an ABI-compatible way; and enums marked with the ``objc`` attribute, for which
+other bit patterns are permitted for compatibility with C. All enums imported
+from C are treated as "non-exhaustive" for the same reason, regardless of the
+presence or value of the ``enum_extensibility`` Clang attribute.
+
+(See `SE-0192`__ for more information about non-frozen enums.)
+
+__ https://github.com/apple/swift-evolution/blob/master/proposals/0192-non-exhaustive-enums.md
 
 enum
 ````
@@ -4073,6 +4090,9 @@ but turns the control flow dependency into a data flow dependency.
 For address-only enums, `select_enum_addr`_ offers the same functionality for
 an indirectly referenced enum value in memory.
 
+Like `switch_enum`_, ``select_enum`` must have a ``default`` case unless the
+enum can be exhaustively switched in the current function.
+
 select_enum_addr
 ````````````````
 ::
@@ -4094,6 +4114,9 @@ select_enum_addr
 Selects one of the "case" or "default" operands based on the case of the
 referenced enum value. This is the address-only counterpart to
 `select_enum`_.
+
+Like `switch_enum_addr`_, ``select_enum_addr`` must have a ``default`` case
+unless the enum can be exhaustively switched in the current function.
 
 Protocol and Protocol Composition Types
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -5002,7 +5025,7 @@ return
 Exits the current function and returns control to the calling function. If
 the current function was invoked with an ``apply`` instruction, the result
 of that function will be the operand of this ``return`` instruction. If
-the current function was invoked with a ``try_apply` instruction, control
+the current function was invoked with a ``try_apply`` instruction, control
 resumes at the normal destination, and the value of the basic block argument
 will be the operand of this ``return`` instruction.
 
@@ -5205,13 +5228,13 @@ switch_enum
 Conditionally branches to one of several destination basic blocks based on the
 discriminator in a loadable ``enum`` value. Unlike ``switch_int``,
 ``switch_enum`` requires coverage of the operand type: If the ``enum`` type
-is resilient, the ``default`` branch is required; if the ``enum`` type is
-fragile, the ``default`` branch is required unless a destination is assigned to
-every ``case`` of the ``enum``. The destination basic block for a ``case`` may
-take an argument of the corresponding ``enum`` ``case``'s data type (or of the
-address type, if the operand is an address). If the branch is taken, the
-destination's argument will be bound to the associated data inside the
-original enum value.  For example::
+cannot be switched exhaustively in the current function, the ``default`` branch
+is required; otherwise, the ``default`` branch is required unless a destination
+is assigned to every ``case`` of the ``enum``. The destination basic block for
+a ``case`` may take an argument of the corresponding ``enum`` ``case``'s data
+type (or of the address type, if the operand is an address). If the branch is
+taken, the destination's argument will be bound to the associated data inside
+the original enum value. For example::
 
   enum Foo {
     case Nothing
@@ -5278,11 +5301,12 @@ Conditionally branches to one of several destination basic blocks based on
 the discriminator in the enum value referenced by the address operand.
 
 Unlike ``switch_int``, ``switch_enum`` requires coverage of the operand type:
-If the ``enum`` type is resilient, the ``default`` branch is required; if the
-``enum`` type is fragile, the ``default`` branch is required unless a
-destination is assigned to every ``case`` of the ``enum``.
+If the ``enum`` type cannot be switched exhaustively in the current function,
+the ``default`` branch is required; otherwise, the ``default`` branch is
+required unless a destination is assigned to every ``case`` of the ``enum``.
 Unlike ``switch_enum``, the payload value is not passed to the destination
-basic blocks; it must be projected out separately with `unchecked_take_enum_data_addr`_.
+basic blocks; it must be projected out separately with
+`unchecked_take_enum_data_addr`_.
 
 dynamic_method_br
 `````````````````
@@ -5441,7 +5465,7 @@ constant replacement but leave the function application to be serialized to
 sil).
 
 The compiler flag that influences the value of the ``assert_configuration``
-function application is the optimization flag: at ``-Onone` the application will
+function application is the optimization flag: at ``-Onone`` the application will
 be replaced by ``Debug`` at higher optimization levels the instruction will be
 replaced by ``Release``. Optionally, the value to use for replacement can be
 specified with the ``-assert-config`` flag which overwrites the value selected by

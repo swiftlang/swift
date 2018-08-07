@@ -115,6 +115,7 @@ private:
   void visitFallthroughStmt(FallthroughStmt *) {}
   void visitFailStmt(FailStmt *) {}
   void visitReturnStmt(ReturnStmt *) {}
+  void visitYieldStmt(YieldStmt *) {}
   void visitThrowStmt(ThrowStmt *) {}
   void visitDeferStmt(DeferStmt *DS) {
     // Nothing in the defer is visible.

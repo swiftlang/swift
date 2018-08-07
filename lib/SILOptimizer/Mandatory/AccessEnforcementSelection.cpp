@@ -44,14 +44,14 @@ static void setStaticEnforcement(BeginAccessInst *access) {
   // TODO: delete if we're not using static enforcement?
   access->setEnforcement(SILAccessEnforcement::Static);
 
-  DEBUG(llvm::dbgs() << "Static Access: " << *access);
+  LLVM_DEBUG(llvm::dbgs() << "Static Access: " << *access);
 }
 
 static void setDynamicEnforcement(BeginAccessInst *access) {
   // TODO: delete if we're not using dynamic enforcement?
   access->setEnforcement(SILAccessEnforcement::Dynamic);
 
-  DEBUG(llvm::dbgs() << "Dynamic Access: " << *access);
+  LLVM_DEBUG(llvm::dbgs() << "Dynamic Access: " << *access);
 }
 
 namespace {
@@ -81,6 +81,7 @@ struct AddressCapture {
   bool isValid() const { return bool(site); }
 };
 
+LLVM_ATTRIBUTE_UNUSED
 raw_ostream &operator<<(raw_ostream &os, const AddressCapture &capture) {
   os << *capture.site.getInstruction() << " captures Arg #"
      << capture.calleeArgIdx;
@@ -102,7 +103,7 @@ public:
   DynamicCaptures() = default;
 
   void recordCapture(AddressCapture capture) {
-    DEBUG(llvm::dbgs() << "Dynamic Capture: " << capture);
+    LLVM_DEBUG(llvm::dbgs() << "Dynamic Capture: " << capture);
 
     auto callee = capture.site.getCalleeFunction();
     assert(callee && "cannot locate function ref for nonescaping closure");
@@ -200,7 +201,7 @@ private:
 } // end anonymous namespace
 
 void SelectEnforcement::run() {
-  DEBUG(llvm::dbgs() << "  Box: " << *Box);
+  LLVM_DEBUG(llvm::dbgs() << "  Box: " << *Box);
 
   // Set up the data-flow problem.
   analyzeUsesOfBox(Box);
@@ -277,7 +278,7 @@ void SelectEnforcement::analyzeProjection(ProjectBoxInst *projection) {
 }
 
 void SelectEnforcement::noteEscapingUse(SILInstruction *inst) {
-  DEBUG(llvm::dbgs() << "    Escape: " << *inst);
+  LLVM_DEBUG(llvm::dbgs() << "    Escape: " << *inst);
 
   // Add it to the escapes set.
   Escapes.insert(inst);
@@ -422,11 +423,11 @@ bool SelectEnforcement::hasPotentiallyEscapedAtAnyReachableBlock(
 
 void SelectEnforcement::updateAccesses() {
   for (auto *access : Accesses) {
-    DEBUG(llvm::dbgs() << "    Access: " << *access);
+    LLVM_DEBUG(llvm::dbgs() << "    Access: " << *access);
     updateAccess(access);
   }
   for (AddressCapture &capture : Captures) {
-    DEBUG(llvm::dbgs() << "    Capture: " << capture);
+    LLVM_DEBUG(llvm::dbgs() << "    Capture: " << capture);
     updateCapture(capture);
   }
 }
@@ -505,7 +506,8 @@ void SelectEnforcement::updateCapture(AddressCapture capture) {
       // case they occur.
       LLVM_FALLTHROUGH;
     default:
-      DEBUG(llvm::dbgs() << "    Unrecognized partial_apply user: " << *user);
+      LLVM_DEBUG(llvm::dbgs() << "    Unrecognized partial_apply user: "
+                              << *user);
 
       // Handle unknown uses conservatively by assuming a capture.
       captureIfEscaped(user);
@@ -578,8 +580,8 @@ void AccessEnforcementSelection::run() {
 }
 
 void AccessEnforcementSelection::processFunction(SILFunction *F) {
-  DEBUG(llvm::dbgs() << "Access Enforcement Selection in " << F->getName()
-                     << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "Access Enforcement Selection in " << F->getName()
+                          << "\n");
 
   // This ModuleTransform needs to analyze closures and their parent scopes in
   // the same pass, and the parent needs to be analyzed before the closure.
@@ -587,7 +589,8 @@ void AccessEnforcementSelection::processFunction(SILFunction *F) {
   auto *CSA = getAnalysis<ClosureScopeAnalysis>();
   if (isNonEscapingClosure(F->getLoweredFunctionType())) {
     for (auto *scopeF : CSA->getClosureScopes(F)) {
-      DEBUG(llvm::dbgs() << "  Parent scope: " << scopeF->getName() << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "  Parent scope: " << scopeF->getName()
+                              << "\n");
       assert(visited.count(scopeF));
       // Closures must be defined in the same module as their parent scope.
       assert(scopeF->wasDeserializedCanonical()

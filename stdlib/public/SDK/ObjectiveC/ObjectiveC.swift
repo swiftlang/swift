@@ -195,24 +195,55 @@ public var NO: ObjCBool {
 //===----------------------------------------------------------------------===//
 
 // NSObject implements Equatable's == as -[NSObject isEqual:]
-// NSObject implements Hashable's hashValue() as -[NSObject hash]
+// NSObject implements Hashable's hashValue as -[NSObject hash]
 // FIXME: what about NSObjectProtocol?
 
 extension NSObject : Equatable, Hashable {
+  /// Returns a Boolean value indicating whether two values are
+  /// equal. `NSObject` implements this by calling `lhs.isEqual(rhs)`.
+  ///
+  /// Subclasses of `NSObject` can customize Equatable conformance by overriding
+  /// `isEqual(_:)`. If two objects are equal, they must have the same hash
+  /// value, so if you override `isEqual(_:)`, make sure you also override the
+  /// `hash` property.
+  ///
+  /// - Parameters:
+  ///   - lhs: A value to compare.
+  ///   - rhs: Another value to compare.
   public static func == (lhs: NSObject, rhs: NSObject) -> Bool {
     return lhs.isEqual(rhs)
   }
 
   /// The hash value.
   ///
+  /// `NSObject` implements this by returning `self.hash`. Subclasses can
+  /// customize hashing by overriding the `hash` property.
+  ///
   /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
   ///
   /// - Note: the hash value is not guaranteed to be stable across
   ///   different invocations of the same program.  Do not persist the
   ///   hash value across program runs.
-  @objc
-  open var hashValue: Int {
+  @objc open // FIXME: Should be @nonobjc public. rdar://problem/42623458
+  var hashValue: Int {
     return hash
+  }
+
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// NSObject implements this by feeding `self.hash` to the hasher. Subclasses
+  /// can customize hashing by overriding the `hash` property.
+  public func hash(into hasher: inout Hasher) {
+    // FIXME: We should combine self.hash here, but hashValue is currently
+    // overridable.
+    hasher.combine(hashValue)
+  }
+
+  public func _rawHashValue(seed: (UInt64, UInt64)) -> Int {
+    // FIXME: We should use self.hash here, but hashValue is currently
+    // overridable.
+    return self.hashValue._rawHashValue(seed: seed)
   }
 }
 

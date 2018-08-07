@@ -360,7 +360,7 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx)
   setInterfaceType(ModuleType::get(this));
 
   // validateDecl() should return immediately given a ModuleDecl.
-  setValidationStarted();
+  setValidationToChecked();
 
   setAccess(AccessLevel::Public);
 }
@@ -592,10 +592,6 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol) {
   // existential's list of conformances and the existential conforms to
   // itself.
   if (type->isExistentialType()) {
-    // FIXME: Recursion break.
-    if (!protocol->hasValidSignature())
-      return None;
-
     // If the existential type cannot be represented or the protocol does not
     // conform to itself, there's no point in looking further.
     if (!protocol->existentialConformsToSelf())
@@ -611,15 +607,29 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol) {
 
     // If the existential is class-constrained, the class might conform
     // concretely.
-    if (layout.superclass) {
-      if (auto result = lookupConformance(layout.superclass, protocol))
+    if (auto superclass = layout.explicitSuperclass) {
+      if (auto result = lookupConformance(superclass, protocol))
         return result;
     }
 
     // Otherwise, the existential might conform abstractly.
     for (auto proto : layout.getProtocols()) {
       auto *protoDecl = proto->getDecl();
-      if (protoDecl == protocol || protoDecl->inheritsFrom(protocol))
+
+      // If we found the protocol we're looking for, return an abstract
+      // conformance to it.
+      if (protoDecl == protocol)
+        return ProtocolConformanceRef(protocol);
+
+      // If the protocol has a superclass constraint, we might conform
+      // concretely.
+      if (auto superclass = protoDecl->getSuperclass()) {
+        if (auto result = lookupConformance(superclass, protocol))
+          return result;
+      }
+
+      // Now check refined protocols.
+      if (protoDecl->inheritsFrom(protocol))
         return ProtocolConformanceRef(protocol);
     }
 
@@ -835,8 +845,7 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc, Identifier Name,
 {
   switch (File.getKind()) {
   case FileUnitKind::Builtin:
-  case FileUnitKind::Derived:
-    // The Builtin module declares no operators, nor do derived units.
+    // The Builtin module declares no operators.
     return nullptr;
   case FileUnitKind::Source:
     break;

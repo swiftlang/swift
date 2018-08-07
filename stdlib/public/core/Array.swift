@@ -299,9 +299,11 @@
 @_fixed_layout
 public struct Array<Element>: _DestructorSafeContainer {
   #if _runtime(_ObjC)
-    internal typealias _Buffer = _ArrayBuffer<Element>
+  @usableFromInline
+  internal typealias _Buffer = _ArrayBuffer<Element>
   #else
-    internal typealias _Buffer = _ContiguousArrayBuffer<Element>
+  @usableFromInline
+  internal typealias _Buffer = _ContiguousArrayBuffer<Element>
   #endif
 
   @usableFromInline
@@ -427,24 +429,25 @@ extension Array: RandomAccessCollection, MutableCollection {
   ///     print(numbers[i])
   ///     // Prints "50"
   ///
-  /// The value passed as `n` must not offset `i` beyond the bounds of the
-  /// collection.
+  /// The value passed as `distance` must not offset `i` beyond the bounds of
+  /// the collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the array.
-  ///   - n: The distance to offset `i`.
-  /// - Returns: An index offset by `n` from the index `i`. If `n` is positive,
-  ///   this is the same value as the result of `n` calls to `index(after:)`.
-  ///   If `n` is negative, this is the same value as the result of `-n` calls
-  ///   to `index(before:)`.
+  ///   - distance: The distance to offset `i`.
+  /// - Returns: An index offset by `distance` from the index `i`. If
+  ///   `distance` is positive, this is the same value as the result of
+  ///   `distance` calls to `index(after:)`. If `distance` is negative, this
+  ///   is the same value as the result of `abs(distance)` calls to
+  ///   `index(before:)`.
   @inlinable
-  public func index(_ i: Int, offsetBy n: Int) -> Int {
+  public func index(_ i: Int, offsetBy distance: Int) -> Int {
     // NOTE: this is a manual specialization of index movement for a Strideable
     // index that is required for Array performance.  The optimizer is not
     // capable of creating partial specializations yet.
     // NOTE: Range checks are not performed here, because it is done later by
     // the subscript function.
-    return i + n
+    return i + distance
   }
 
   /// Returns an index that is the specified distance from the given index,
@@ -473,22 +476,25 @@ extension Array: RandomAccessCollection, MutableCollection {
   ///     print(j)
   ///     // Prints "nil"
   ///
-  /// The value passed as `n` must not offset `i` beyond the bounds of the
-  /// collection, unless the index passed as `limit` prevents offsetting
+  /// The value passed as `distance` must not offset `i` beyond the bounds of
+  /// the collection, unless the index passed as `limit` prevents offsetting
   /// beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the array.
-  ///   - n: The distance to offset `i`.
-  ///   - limit: A valid index of the collection to use as a limit. If `n > 0`,
-  ///     `limit` has no effect if it is less than `i`. Likewise, if `n < 0`,
-  ///     `limit` has no effect if it is greater than `i`.
-  /// - Returns: An index offset by `n` from the index `i`, unless that index
-  ///   would be beyond `limit` in the direction of movement. In that case,
-  ///   the method returns `nil`.
+  ///   - distance: The distance to offset `i`.
+  ///   - limit: A valid index of the collection to use as a limit. If
+  ///     `distance > 0`, `limit` has no effect if it is less than `i`.
+  ///     Likewise, if `distance < 0`, `limit` has no effect if it is greater
+  ///     than `i`.
+  /// - Returns: An index offset by `distance` from the index `i`, unless that
+  ///   index would be beyond `limit` in the direction of movement. In that
+  ///   case, the method returns `nil`.
+  ///
+  /// - Complexity: O(1)
   @inlinable
   public func index(
-    _ i: Int, offsetBy n: Int, limitedBy limit: Int
+    _ i: Int, offsetBy distance: Int, limitedBy limit: Int
   ) -> Int? {
     // NOTE: this is a manual specialization of index movement for a Strideable
     // index that is required for Array performance.  The optimizer is not
@@ -496,10 +502,10 @@ extension Array: RandomAccessCollection, MutableCollection {
     // NOTE: Range checks are not performed here, because it is done later by
     // the subscript function.
     let l = limit - i
-    if n > 0 ? l >= 0 && l < n : l <= 0 && n < l {
+    if distance > 0 ? l >= 0 && l < distance : l <= 0 && distance < l {
       return nil
     }
-    return i + n
+    return i + distance
   }
 
   /// Returns the distance between two indices.
@@ -544,10 +550,9 @@ extension Array: RandomAccessCollection, MutableCollection {
   ///   greater than or equal to `startIndex` and less than `endIndex`.
   ///
   /// - Complexity: Reading an element from an array is O(1). Writing is O(1)
-  ///   unless the array's storage is shared with another array, in which case
-  ///   writing is O(*n*), where *n* is the length of the array.
-  ///   If the array uses a bridged `NSArray` instance as its storage, the
-  ///   efficiency is unspecified.
+  ///   unless the array's storage is shared with another array or uses a
+  ///   bridged `NSArray` instance as its storage, in which case writing is
+  ///   O(*n*), where *n* is the length of the array.
   @inlinable
   public subscript(index: Int) -> Element {
     get {
@@ -957,7 +962,10 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
   @inlinable
   public // @testable
   var _owner: AnyObject? {
-    return _buffer.owner
+    @inline(__always)
+    get {
+      return _buffer.owner      
+    }
   }
 
   /// If the elements are stored contiguously, a pointer to the first
@@ -1065,8 +1073,7 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
     let newCount = oldCount + 1
     var newBuffer = _buffer._forceCreateUniqueMutableBuffer(
       countForNewBuffer: oldCount, minNewCapacity: newCount)
-    _buffer._arrayOutOfPlaceUpdate(
-      &newBuffer, oldCount, 0, _IgnorePointer())
+    _buffer._arrayOutOfPlaceUpdate(&newBuffer, oldCount, 0)
   }
 
   @inlinable
@@ -1138,9 +1145,8 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
   ///
   /// - Parameter newElement: The element to append to the array.
   ///
-  /// - Complexity: Amortized O(1) over many additions. If the array uses a
-  ///   bridged `NSArray` instance as its storage, the efficiency is
-  ///   unspecified.
+  /// - Complexity: O(1) on average, over many calls to `append(_:)` on the
+  ///   same array.
   @inlinable
   @_semantics("array.append_element")
   public mutating func append(_ newElement: Element) {
@@ -1163,7 +1169,9 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
   ///
   /// - Parameter newElements: The elements to append to the array.
   ///
-  /// - Complexity: O(*n*), where *n* is the length of the resulting array.
+  /// - Complexity: O(*m*) on average, where *m* is the length of
+  ///   `newElements`, over many calls to `append(contentsOf:)` on the same
+  ///   array.
   @inlinable
   @_semantics("array.append_contentsOf")
   public mutating func append<S: Sequence>(contentsOf newElements: S)
@@ -1268,7 +1276,8 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
   ///   `index` must be a valid index of the array or equal to its `endIndex`
   ///   property.
   ///
-  /// - Complexity: O(*n*), where *n* is the length of the array.
+  /// - Complexity: O(*n*), where *n* is the length of the array. If
+  ///   `i == endIndex`, this method is equivalent to `append(_:)`.
   @inlinable
   public mutating func insert(_ newElement: Element, at i: Int) {
     _checkIndex(i)
@@ -1338,8 +1347,7 @@ extension Array: CustomStringConvertible, CustomDebugStringConvertible {
 }
 
 extension Array {
-  @inlinable
-  @_transparent
+  @usableFromInline @_transparent
   internal func _cPointerArgs() -> (AnyObject?, UnsafeRawPointer?) {
     let p = _baseAddressIfContiguous
     if _fastPath(p != nil || isEmpty) {
@@ -1351,6 +1359,55 @@ extension Array {
 }
 
 extension Array {
+  /// Creates an array with the specified capacity, then calls the given
+  /// closure with a buffer covering the array's uninitialized memory.
+  ///
+  /// Inside the closure, set the `initializedCount` parameter to the number of
+  /// elements that are initialized by the closure. The memory in the range
+  /// `buffer[0..<initializedCount]` must be initialized at the end of the
+  /// closure's execution, and the memory in the range
+  /// `buffer[initializedCount...]` must be uninitialized.
+  ///
+  /// - Note: While the resulting array may have a capacity larger than the
+  ///   requested amount, the buffer passed to the closure will cover exactly
+  ///   the requested number of elements.
+  ///
+  /// - Parameters:
+  ///   - _unsafeUninitializedCapacity: The number of elements to allocate
+  ///     space for in the new array.
+  ///   - initializer: A closure that initializes elements and sets the count
+  ///     of the new array.
+  ///     - Parameters:
+  ///       - buffer: A buffer covering uninitialized memory with room for the
+  ///         specified number of of elements.
+  ///       - initializedCount: The count of initialized elements in the array,
+  ///         which begins as zero. Set `initializedCount` to the number of
+  ///         elements you initialize.
+  @inlinable
+  public init(
+    _unsafeUninitializedCapacity: Int,
+    initializingWith initializer: (
+      _ buffer: inout UnsafeMutableBufferPointer<Element>,
+      _ initializedCount: inout Int) throws -> Void
+  ) rethrows {
+    var firstElementAddress: UnsafeMutablePointer<Element>
+    (self, firstElementAddress) =
+      Array._allocateUninitialized(_unsafeUninitializedCapacity)
+    
+    var initializedCount = 0
+    defer {
+      // Update self.count even if initializer throws an error.
+      _precondition(
+        initializedCount <= _unsafeUninitializedCapacity,
+        "Initialized count set to greater than specified capacity."
+      )
+      self._buffer.count = initializedCount
+    }
+    var buffer = UnsafeMutableBufferPointer<Element>(
+      start: firstElementAddress, count: _unsafeUninitializedCapacity)
+    try initializer(&buffer, &initializedCount)
+  }
+  
   /// Calls a closure with a pointer to the array's contiguous storage.
   ///
   /// Often, the optimizer can eliminate bounds checks within an array
@@ -1529,9 +1586,10 @@ extension Array {
   ///     a subrange must be valid indices of the array.
   ///   - newElements: The new elements to add to the array.
   ///
-  /// - Complexity: O(`subrange.count`) if you are replacing a suffix of the
-  ///   array with an empty collection; otherwise, O(*n*), where *n* is the
-  ///   length of the array.
+  /// - Complexity: O(*n* + *m*), where *n* is length of the array and
+  ///   *m* is the length of `newElements`. If the call to this method simply
+  ///   appends the contents of `newElements` to the array, this method is
+  ///   equivalent to `append(contentsOf:)`.
   @inlinable
   @_semantics("array.mutate_unknown")
   public mutating func replaceSubrange<C>(
@@ -1756,3 +1814,76 @@ extension Array {
   }
 }
 #endif
+
+extension Array: _HasCustomAnyHashableRepresentation
+  where Element: Hashable {
+  public func _toCustomAnyHashable() -> AnyHashable? {
+    return AnyHashable(_box: _ArrayAnyHashableBox(self))
+  }
+}
+
+internal protocol _ArrayAnyHashableProtocol: _AnyHashableBox {
+  var count: Int { get }
+  subscript(index: Int) -> AnyHashable { get }
+}
+
+internal struct _ArrayAnyHashableBox<Element: Hashable>
+  : _ArrayAnyHashableProtocol {
+  internal let _value: [Element]
+
+  internal init(_ value: [Element]) {
+    self._value = value
+  }
+
+  internal var _base: Any {
+    return _value
+  }
+
+  internal var count: Int {
+    return _value.count
+  }
+
+  internal subscript(index: Int) -> AnyHashable {
+    return _value[index] as AnyHashable
+  }
+
+  func _isEqual(to other: _AnyHashableBox) -> Bool? {
+    guard let other = other as? _ArrayAnyHashableProtocol else { return nil }
+    guard _value.count == other.count else { return false }
+    for i in 0 ..< _value.count {
+      if self[i] != other[i] { return false }
+    }
+    return true
+  }
+
+  var _hashValue: Int {
+    var hasher = Hasher()
+    _hash(into: &hasher)
+    return hasher.finalize()
+  }
+
+  func _hash(into hasher: inout Hasher) {
+    hasher.combine(_value.count) // discriminator
+    for i in 0 ..< _value.count {
+      hasher.combine(self[i])
+    }
+  }
+
+  func _rawHashValue(_seed: (UInt64, UInt64)) -> Int {
+    var hasher = Hasher(_seed: _seed)
+    self._hash(into: &hasher)
+    return hasher._finalize()
+  }
+
+  internal func _unbox<T : Hashable>() -> T? {
+    return _value as? T
+  }
+
+  internal func _downCastConditional<T>(
+    into result: UnsafeMutablePointer<T>
+  ) -> Bool {
+    guard let value = _value as? T else { return false }
+    result.initialize(to: value)
+    return true
+  }
+}

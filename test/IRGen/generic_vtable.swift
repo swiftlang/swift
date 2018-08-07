@@ -24,7 +24,7 @@ public class Concrete : Derived<Int> {
 
 // CHECK-LABEL: @"$S14generic_vtable4BaseCMn" = {{(dllexport )?}}{{(protected )?}}constant
 // -- flags: has vtable, reflectable, is class, is unique
-// CHECK-SAME: <i32 0x8004_0050>,
+// CHECK-SAME: <i32 0x8001_0050>,
 // -- vtable offset
 // CHECK-SAME: i32 10,
 // -- vtable size
@@ -49,7 +49,7 @@ public class Concrete : Derived<Int> {
 
 // CHECK-LABEL: @"$S14generic_vtable7DerivedCMn" = {{(dllexport )?}}{{(protected )?}}constant
 // -- flags: has vtable, reflectable, is class, is unique, is generic
-// CHECK-SAME: <i32 0x8004_00D0>,
+// CHECK-SAME: <i32 0x8001_00D0>,
 // -- vtable offset
 // CHECK-SAME: i32 14,
 // -- vtable size
@@ -73,7 +73,7 @@ public class Concrete : Derived<Int> {
 
 // CHECK-LABEL: @"$S14generic_vtable8ConcreteCMn" = {{(dllexport )?}}{{(protected )?}}constant
 // -- flags: has vtable, reflectable, is class, is unique
-// CHECK-SAME: <i32 0x8004_0050>,
+// CHECK-SAME: <i32 0x8001_0050>,
 // -- vtable offset
 // CHECK-SAME: i32 15,
 // -- vtable size

@@ -1259,6 +1259,16 @@ private:
       entityKind = Node::Kind::DidSet;
       name = demangleDeclName();
       if (!name) return nullptr;
+    } else if (Mangled.nextIf('r')) {
+      wrapEntity = true;
+      entityKind = Node::Kind::ReadAccessor;
+      name = demangleDeclName();
+      if (!name) return nullptr;
+    } else if (Mangled.nextIf('M')) {
+      wrapEntity = true;
+      entityKind = Node::Kind::ModifyAccessor;
+      name = demangleDeclName();
+      if (!name) return nullptr;
     } else if (Mangled.nextIf('U')) {
       entityKind = Node::Kind::ExplicitClosure;
       name = demangleIndexAsNode();
@@ -1704,20 +1714,6 @@ private:
     if (Mangled.nextIf('s')) {
       NodePointer stdlib = Factory.createNode(Node::Kind::Module, STDLIB_NAME);
       return makeAssociatedType(stdlib);
-    }
-    if (Mangled.nextIf('q')) {
-      NodePointer index = demangleIndexAsNode();
-      if (!index)
-        return nullptr;
-      NodePointer decl_ctx = Factory.createNode(Node::Kind::DeclContext);
-      NodePointer ctx = demangleContext();
-      if (!ctx)
-        return nullptr;
-      decl_ctx->addChild(ctx, Factory);
-      auto qual_atype = Factory.createNode(Node::Kind::QualifiedArchetype);
-      qual_atype->addChild(index, Factory);
-      qual_atype->addChild(decl_ctx, Factory);
-      return qual_atype;
     }
     return nullptr;
   }

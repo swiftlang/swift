@@ -14,67 +14,25 @@ typealias Bool = Builtin.Int1
 
 // CHECK: call swiftcc void @swift_errorInMain(
 
-infix operator * {
-  associativity left
-  precedence 200
-}
-infix operator / {
-  associativity left
-  precedence 200
-}
-infix operator % {
-  associativity left
-  precedence 200
-}
+infix operator *
+infix operator /
+infix operator %
 
-infix operator + {
-  associativity left
-  precedence 190
-}
-infix operator - {
-  associativity left
-  precedence 190
-}
+infix operator +
+infix operator -
 
-infix operator << {
-  associativity none
-  precedence 180
-}
-infix operator >> {
-  associativity none
-  precedence 180
-}
+infix operator <<
+infix operator >>
 
-infix operator ... {
-  associativity none
-  precedence 175
-}
+infix operator ...
 
-infix operator < {
-  associativity none
-  precedence 170
-}
-infix operator <= {
-  associativity none
-  precedence 170
-}
-infix operator > {
-  associativity none
-  precedence 170
-}
-infix operator >= {
-  associativity none
-  precedence 170
-}
+infix operator <
+infix operator <=
+infix operator >
+infix operator >=
 
-infix operator == {
-  associativity none
-  precedence 160
-}
-infix operator != {
-  associativity none
-  precedence 160
-}
+infix operator ==
+infix operator !=
 
 func * (lhs: Int, rhs: Int) -> Int {
   return Builtin.mul_Int32(lhs, rhs)
@@ -497,9 +455,9 @@ func copyPODArray(_ dest: Builtin.RawPointer, src: Builtin.RawPointer, count: Bu
 // CHECK-NOT:       loop:
 // CHECK:         call void @swift_arrayInitWithCopy
 // CHECK:         mul nuw i64 8, %2
-// CHECK:         call void @llvm.memmove.p0i8.p0i8.i64(i8* {{.*}}, i8* {{.*}}, i64 {{.*}}, i32 8, i1 false)
+// CHECK:         call void @llvm.memmove.p0i8.p0i8.i64(i8* {{.*}}, i8* {{.*}}, i64 {{.*}}, i1 false)
 // CHECK:         mul nuw i64 8, %2
-// CHECK:         call void @llvm.memmove.p0i8.p0i8.i64(i8* {{.*}}, i8* {{.*}}, i64 {{.*}}, i32 8, i1 false)
+// CHECK:         call void @llvm.memmove.p0i8.p0i8.i64(i8* {{.*}}, i8* {{.*}}, i64 {{.*}}, i1 false)
 // CHECK:         call void @swift_arrayAssignWithCopyNoAlias(
 // CHECK:         call void @swift_arrayAssignWithCopyFrontToBack(
 // CHECK:         call void @swift_arrayAssignWithCopyBackToFront(
@@ -785,7 +743,7 @@ func ispod_test() {
   // CHECK: store i1 true, i1*
   // CHECK: store i1 false, i1*
   var t = Builtin.ispod(Int.self)
-  var f = Builtin.ispod(Builtin.NativeObject)
+  var f = Builtin.ispod(Builtin.NativeObject.self)
 }
 
 // CHECK-LABEL: define {{.*}} @{{.*}}is_same_metatype

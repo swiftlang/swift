@@ -131,7 +131,8 @@ namespace {
     SILValue closure;
   public:
     CleanupClosureConstant(SILValue closure) : closure(closure) {}
-    void emit(SILGenFunction &SGF, CleanupLocation l) override {
+    void emit(SILGenFunction &SGF, CleanupLocation l,
+              ForUnwind_t forUnwind) override {
       SGF.B.emitDestroyValueOperation(l, closure);
     }
     void dump(SILGenFunction &) const override {
@@ -250,7 +251,8 @@ public:
   EndBorrowCleanup(SILValue original, SILValue borrowed)
       : original(original), borrowed(borrowed) {}
 
-  void emit(SILGenFunction &SGF, CleanupLocation l) override {
+  void emit(SILGenFunction &SGF, CleanupLocation l,
+            ForUnwind_t forUnwind) override {
     SGF.B.createEndBorrow(l, borrowed, original);
   }
 
@@ -271,7 +273,8 @@ class ReleaseValueCleanup : public Cleanup {
 public:
   ReleaseValueCleanup(SILValue v) : v(v) {}
 
-  void emit(SILGenFunction &SGF, CleanupLocation l) override {
+  void emit(SILGenFunction &SGF, CleanupLocation l,
+            ForUnwind_t forUnwind) override {
     if (v->getType().isAddress())
       SGF.B.createDestroyAddr(l, v);
     else
@@ -295,7 +298,8 @@ class DeallocStackCleanup : public Cleanup {
 public:
   DeallocStackCleanup(SILValue addr) : Addr(addr) {}
 
-  void emit(SILGenFunction &SGF, CleanupLocation l) override {
+  void emit(SILGenFunction &SGF, CleanupLocation l,
+            ForUnwind_t forUnwind) override {
     SGF.B.createDeallocStack(l, Addr);
   }
 
@@ -316,7 +320,8 @@ class DestroyLocalVariable : public Cleanup {
 public:
   DestroyLocalVariable(VarDecl *var) : Var(var) {}
 
-  void emit(SILGenFunction &SGF, CleanupLocation l) override {
+  void emit(SILGenFunction &SGF, CleanupLocation l,
+            ForUnwind_t forUnwind) override {
     SGF.destroyLocalVariable(l, Var);
   }
 
@@ -349,7 +354,8 @@ class DeallocateUninitializedLocalVariable : public Cleanup {
 public:
   DeallocateUninitializedLocalVariable(VarDecl *var) : Var(var) {}
 
-  void emit(SILGenFunction &SGF, CleanupLocation l) override {
+  void emit(SILGenFunction &SGF, CleanupLocation l,
+            ForUnwind_t forUnwind) override {
     SGF.deallocateUninitializedLocalVariable(l, Var);
   }
 
@@ -752,6 +758,52 @@ public:
 };
 } // end anonymous namespace
 
+/// If \p elt belongs to an enum that has exactly two cases and that can be
+/// exhaustively switched, return the other case. Otherwise, return nullptr.
+static EnumElementDecl *getOppositeBinaryDecl(const SILGenFunction &SGF,
+                                              const EnumElementDecl *elt) {
+  const EnumDecl *enumDecl = elt->getParentEnum();
+  if (!enumDecl->isEffectivelyExhaustive(SGF.SGM.SwiftModule,
+                                         SGF.F.getResilienceExpansion())) {
+    return nullptr;
+  }
+
+  EnumDecl::ElementRange range = enumDecl->getAllElements();
+  auto iter = range.begin();
+  if (iter == range.end())
+    return nullptr;
+  bool seenDecl = false;
+  EnumElementDecl *result = nullptr;
+  if (*iter == elt) {
+    seenDecl = true;
+  } else {
+    result = *iter;
+  }
+
+  ++iter;
+  if (iter == range.end())
+    return nullptr;
+  if (seenDecl) {
+    assert(!result);
+    result = *iter;
+  } else {
+    if (elt != *iter)
+      return nullptr;
+    seenDecl = true;
+  }
+  ++iter;
+
+  // If we reach this point, we saw the decl we were looking for and one other
+  // case. If we have any additional cases, then we do not have a binary enum.
+  if (iter != range.end())
+    return nullptr;
+
+  // This is always true since we have already returned earlier nullptr if we
+  // did not see the decl at all.
+  assert(seenDecl);
+  return result;
+}
+
 void EnumElementPatternInitialization::emitEnumMatch(
     ManagedValue value, EnumElementDecl *eltDecl, Initialization *subInit,
     JumpDest failureDest, SILLocation loc, SILGenFunction &SGF) {
@@ -787,8 +839,7 @@ void EnumElementPatternInitialization::emitEnumMatch(
   // If we have a binary enum, do not emit a true default case. This ensures
   // that we do not emit a destroy_value on a .None.
   bool inferredBinaryEnum = false;
-  auto *enumDecl = value.getType().getEnumOrBoundGenericEnum();
-  if (auto *otherDecl = enumDecl->getOppositeBinaryDecl(eltDecl)) {
+  if (auto *otherDecl = getOppositeBinaryDecl(SGF, eltDecl)) {
     inferredBinaryEnum = true;
     switchBuilder.addCase(otherDecl, defaultBlock, nullptr, handler);
   } else {
@@ -1141,7 +1192,7 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
 
   // If an initial value expression was specified by the decl, emit it into
   // the initialization. Otherwise, mark it uninitialized for DI to resolve.
-  if (auto *Init = entry.getInit()) {
+  if (auto *Init = entry.getNonLazyInit()) {
     FullExpr Scope(Cleanups, CleanupLocation(Init));
     emitExprInto(Init, initialization.get(), SILLocation(PBD));
   } else {
@@ -1172,7 +1223,7 @@ void SILGenFunction::visitVarDecl(VarDecl *D) {
 SILValue SILGenFunction::emitOSVersionRangeCheck(SILLocation loc,
                                                  const VersionRange &range) {
   // Emit constants for the checked version range.
-  clang::VersionTuple Vers = range.getLowerEndpoint();
+  llvm::VersionTuple Vers = range.getLowerEndpoint();
   unsigned major = Vers.getMajor();
   unsigned minor =
       (Vers.getMinor().hasValue() ? Vers.getMinor().getValue() : 0);
@@ -1304,7 +1355,8 @@ namespace {
         concreteFormalType(concreteFormalType),
         repr(repr) {}
     
-    void emit(SILGenFunction &SGF, CleanupLocation l) override {
+    void emit(SILGenFunction &SGF, CleanupLocation l,
+              ForUnwind_t forUnwind) override {
       switch (repr) {
       case ExistentialRepresentation::None:
       case ExistentialRepresentation::Class:
@@ -1481,7 +1533,8 @@ struct FormalAccessReleaseValueCleanup : Cleanup {
     state = newState;
   }
 
-  void emit(SILGenFunction &SGF, CleanupLocation l) override {
+  void emit(SILGenFunction &SGF, CleanupLocation l,
+            ForUnwind_t forUnwind) override {
     getEvaluation(SGF).finish(SGF);
   }
 

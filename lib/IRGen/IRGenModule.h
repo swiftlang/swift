@@ -22,6 +22,7 @@
 #include "SwiftTargetInfo.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ReferenceCounting.h"
 #include "swift/Basic/ClusteredBitVector.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptimizationMode.h"
@@ -98,7 +99,7 @@ namespace swift {
   class SourceLoc;
   class SourceFile;
   class Type;
-  enum class TypeMetadataRecordKind : unsigned;
+  enum class TypeReferenceKind : unsigned;
 
 namespace Lowering {
   class TypeConverter;
@@ -133,7 +134,6 @@ namespace irgen {
   class TypeConverter;
   class TypeInfo;
   enum class ValueWitness : unsigned;
-  enum class ReferenceCounting : unsigned char;
 
 class IRGenModule;
 
@@ -424,13 +424,13 @@ public:
 
 /// A reference to a declared type entity.
 class TypeEntityReference {
-  TypeMetadataRecordKind Kind;
+  TypeReferenceKind Kind;
   llvm::Constant *Value;
 public:
-  TypeEntityReference(TypeMetadataRecordKind kind, llvm::Constant *value)
+  TypeEntityReference(TypeReferenceKind kind, llvm::Constant *value)
     : Kind(kind), Value(value) {}
 
-  TypeMetadataRecordKind getKind() const { return Kind; }
+  TypeReferenceKind getKind() const { return Kind; }
   llvm::Constant *getValue() const { return Value; }
 };
 
@@ -501,6 +501,7 @@ public:
     llvm::IntegerType *MetadataKindTy;
     llvm::IntegerType *OnceTy;
     llvm::IntegerType *FarRelativeAddressTy;
+    llvm::IntegerType *ProtocolDescriptorRefTy;
   };
   llvm::IntegerType *ObjCBoolTy;       /// i8 or i1
   union {
@@ -517,8 +518,9 @@ public:
   llvm::StructType *RefCountedStructTy;/// %swift.refcounted = type { ... }
   Size RefCountedStructSize;     /// sizeof(%swift.refcounted)
   llvm::PointerType *RefCountedPtrTy;  /// %swift.refcounted*
-  llvm::PointerType *WeakReferencePtrTy;/// %swift.weak_reference*
-  llvm::PointerType *UnownedReferencePtrTy;/// %swift.unowned_reference*
+#define CHECKED_REF_STORAGE(Name, ...) \
+  llvm::PointerType *Name##ReferencePtrTy; /// %swift. #name _reference*
+#include "swift/AST/ReferenceStorage.def"
   llvm::Constant *RefCountedNull;      /// %swift.refcounted* null
   llvm::StructType *FunctionPairTy;    /// { i8*, %swift.refcounted* }
   llvm::StructType *NoEscapeFunctionPairTy;    /// { i8*, %swift.opaque* }
@@ -529,6 +531,8 @@ public:
     llvm::StructType *TypeMetadataResponseTy;   /// { %swift.type*, iSize }
     llvm::StructType *TypeMetadataDependencyTy; /// { %swift.type*, iSize }
   };
+  llvm::StructType *OffsetPairTy;      /// { iSize, iSize }
+  llvm::StructType *FullTypeLayoutTy;  /// %swift.full_type_layout = { ... }
   llvm::PointerType *TupleTypeMetadataPtrTy; /// %swift.tuple_type*
   llvm::StructType *FullHeapMetadataStructTy; /// %swift.full_heapmetadata = type { ... }
   llvm::PointerType *FullHeapMetadataPtrTy;/// %swift.full_heapmetadata*
@@ -569,6 +573,8 @@ public:
   llvm::StructType *OpenedErrorTripleTy; /// { %swift.opaque*, %swift.type*, i8** }
   llvm::PointerType *OpenedErrorTriplePtrTy; /// { %swift.opaque*, %swift.type*, i8** }*
   llvm::PointerType *WitnessTablePtrPtrTy;   /// i8***
+
+  llvm::GlobalVariable *TheTrivialPropertyDescriptor = nullptr;
 
   /// Used to create unique names for class layout types with tail allocated
   /// elements.
@@ -621,7 +627,7 @@ public:
 
   llvm::Type *getReferenceType(ReferenceCounting style);
 
-  static bool isUnownedReferenceAddressOnly(ReferenceCounting style) {
+  static bool isLoadableReferenceAddressOnly(ReferenceCounting style) {
     switch (style) {
     case ReferenceCounting::Native:
       return false;
@@ -633,7 +639,7 @@ public:
 
     case ReferenceCounting::Bridge:
     case ReferenceCounting::Error:
-      llvm_unreachable("unowned references to this type are not supported");
+      llvm_unreachable("loadable references to this type are not supported");
     }
 
     llvm_unreachable("Not a valid ReferenceCounting.");
@@ -646,15 +652,16 @@ public:
   const SpareBitVector &getFunctionPointerSpareBits() const;
   const SpareBitVector &getWitnessTablePtrSpareBits() const;
 
-  SpareBitVector getWeakReferenceSpareBits() const;
-  Size getWeakReferenceSize() const { return PtrSize; }
-  Alignment getWeakReferenceAlignment() const { return getPointerAlignment(); }
-
-  SpareBitVector getUnownedReferenceSpareBits(ReferenceCounting style) const;
-  unsigned getUnownedExtraInhabitantCount(ReferenceCounting style);
-  APInt getUnownedExtraInhabitantValue(unsigned bits, unsigned index,
-                                       ReferenceCounting style);
-  APInt getUnownedExtraInhabitantMask(ReferenceCounting style);
+  /// Return runtime specific extra inhabitant and spare bits policies.
+  unsigned getReferenceStorageExtraInhabitantCount(ReferenceOwnership ownership,
+                                                 ReferenceCounting style) const;
+  SpareBitVector getReferenceStorageSpareBits(ReferenceOwnership ownership,
+                                              ReferenceCounting style) const;
+  APInt getReferenceStorageExtraInhabitantValue(unsigned bits, unsigned index,
+                                                ReferenceOwnership ownership,
+                                                ReferenceCounting style) const;
+  APInt getReferenceStorageExtraInhabitantMask(ReferenceOwnership ownership,
+                                               ReferenceCounting style) const;
 
   llvm::Type *getFixedBufferTy();
   llvm::Type *getValueWitnessTy(ValueWitness index);
@@ -1055,8 +1062,8 @@ private:                            \
 //--- Generic ---------------------------------------------------------------
 public:
   llvm::Constant *getFixLifetimeFn();
-  
-  /// The constructor.
+
+  /// The constructor used when generating code.
   ///
   /// The \p SF is the source file for which the llvm module is generated when
   /// doing multi-threaded whole-module compilation. Otherwise it is null.
@@ -1064,6 +1071,14 @@ public:
               SourceFile *SF, llvm::LLVMContext &LLVMContext,
               StringRef ModuleName, StringRef OutputFilename,
               StringRef MainInputFilenameForDebugInfo);
+
+  /// The constructor used when we just need an IRGenModule for type lowering.
+  IRGenModule(IRGenerator &irgen, std::unique_ptr<llvm::TargetMachine> &&target,
+              llvm::LLVMContext &LLVMContext)
+    : IRGenModule(irgen, std::move(target), /*SF=*/nullptr, LLVMContext,
+                  "<fake module name>", "<fake output filename>",
+                  "<fake main input filename>") {}
+
   ~IRGenModule();
 
   llvm::LLVMContext &getLLVMContext() const { return LLVMContext; }
@@ -1152,6 +1167,9 @@ public:
                                              ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfTypeMetadataInstantiationCache(NominalTypeDecl *D,
                                              ForDefinition_t forDefinition);
+  llvm::Constant *getAddrOfTypeMetadataInPlaceInitializationCache(
+                                             NominalTypeDecl *D,
+                                             ForDefinition_t forDefinition);
   llvm::Function *getAddrOfTypeMetadataAccessFunction(CanType type,
                                                ForDefinition_t forDefinition);
   llvm::Function *getAddrOfGenericTypeMetadataAccessFunction(
@@ -1161,9 +1179,6 @@ public:
   llvm::Constant *getAddrOfTypeMetadataLazyCacheVariable(CanType type,
                                                ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfForeignTypeMetadataCandidate(CanType concreteType);
-
-  /// Determine whether the given type requires foreign type metadata.
-  bool requiresForeignTypeMetadata(CanType type);
 
   llvm::Constant *getAddrOfClassMetadataBounds(ClassDecl *D,
                                                ForDefinition_t forDefinition);
@@ -1181,8 +1196,6 @@ public:
   ConstantReference getAddrOfParentContextDescriptor(DeclContext *from);
   llvm::Constant *getAddrOfProtocolDescriptor(ProtocolDecl *D,
                                       ConstantInit definition = ConstantInit());
-  llvm::Constant *getAddrOfProtocolRequirementArray(ProtocolDecl *D,
-                                                    ConstantInit definition);
   llvm::Constant *getAddrOfProtocolConformanceDescriptor(
                                   const NormalProtocolConformance *conformance,
                                   ConstantInit definition = ConstantInit());
@@ -1297,8 +1310,8 @@ private:
   void emitLazyPrivateDefinitions();
   void addRuntimeResolvableType(NominalTypeDecl *nominal);
 
-  /// Add all conformances of \p Nominal to LazyWitnessTables.
-  void addLazyConformances(NominalTypeDecl *Nominal);
+  /// Add all conformances of the given \c DeclContext LazyWitnessTables.
+  void addLazyConformances(DeclContext *dc);
 
 //--- Global context emission --------------------------------------------------
 public:

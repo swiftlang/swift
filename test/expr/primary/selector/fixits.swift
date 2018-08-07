@@ -4,10 +4,12 @@
 // RUN: %empty-directory(%t.overlays)
 
 // FIXME: BEGIN -enable-source-import hackaround
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t.overlays %clang-importer-sdk-path/swift-modules/ObjectiveC.swift
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t.overlays %clang-importer-sdk-path/swift-modules/ObjectiveC.swift -disable-objc-attr-requires-foundation-module
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t.overlays %clang-importer-sdk-path/swift-modules/CoreGraphics.swift
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t.overlays %clang-importer-sdk-path/swift-modules/Foundation.swift
 // FIXME: END -enable-source-import hackaround
+
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t.overlays %S/Inputs/fixits_helper.swift -module-name Helper
 
 // Make sure we get the right diagnostics.
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t.overlays) -typecheck %s -verify
@@ -29,33 +31,7 @@
 // CHECK: warning: string literal is not a valid Objective-C selector
 
 import Foundation
-
-class Bar : Foo {
-  @objc(method2WithValue:) override func method2(_ value: Int) { }
-
-  @objc(overloadedWithInt:) func overloaded(_ x: Int) { }
-  @objc(overloadedWithString:) func overloaded(_ x: String) { }
-
-  @objc(staticOverloadedWithInt:) static func staticOverloaded(_ x: Int) { }
-  @objc(staticOverloadedWithString:) static func staticOverloaded(_ x: String) { }
-
-  @objc(staticOrNonStatic:) func staticOrNonStatic(_ x: Int) { }
-  @objc(staticOrNonStatic:) static func staticOrNonStatic(_ x: Int) { }
-
-  @objc(theInstanceOne:) func staticOrNonStatic2(_ x: Int) { }
-  @objc(theStaticOne:) static func staticOrNonStatic2(_ x: Int) { }
-}
-
-class Foo {
-  @objc(methodWithValue:label:) func method(_ value: Int, label: String) { }
-
-  @objc(method2WithValue:) func method2(_ value: Int) { }
-
-  @objc func method3() { }
-
-  @objc var property: String = ""
-}
-
+import Helper
 
 func testDeprecatedStringLiteralSelector() {
   let sel1: Selector = "methodWithValue:label:" // expected-warning{{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{24-48=#selector(Foo.method(_:label:))}}

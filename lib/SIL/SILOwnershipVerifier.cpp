@@ -129,6 +129,7 @@ static bool isGuaranteedForwardingInst(SILInstruction *I) {
   return isGuaranteedForwardingValueKind(SILNodeKind(I->getKind()));
 }
 
+LLVM_ATTRIBUTE_UNUSED
 static bool isOwnershipForwardingInst(SILInstruction *I) {
   return isOwnershipForwardingValueKind(SILNodeKind(I->getKind()));
 }
@@ -154,7 +155,9 @@ class OwnershipCompatibilityUseChecker
                                    OwnershipUseCheckerResult> {
 public:
 private:
+  LLVM_ATTRIBUTE_UNUSED
   SILModule &Mod;
+
   const Operand &Op;
   SILValue BaseValue;
   ErrorBehaviorKind ErrorBehavior;
@@ -306,10 +309,12 @@ NO_OPERAND_INST(RetainValueAddr)
 NO_OPERAND_INST(StringLiteral)
 NO_OPERAND_INST(ConstStringLiteral)
 NO_OPERAND_INST(StrongRetain)
-NO_OPERAND_INST(StrongRetainUnowned)
-NO_OPERAND_INST(UnownedRetain)
 NO_OPERAND_INST(Unreachable)
 NO_OPERAND_INST(Unwind)
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  NO_OPERAND_INST(StrongRetain##Name) \
+  NO_OPERAND_INST(Name##Retain)
+#include "swift/AST/ReferenceStorage.def"
 #undef NO_OPERAND_INST
 
 /// Instructions whose arguments are always compatible with one convention.
@@ -338,7 +343,6 @@ CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, ReleaseValue)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, ReleaseValueAddr)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, StrongRelease)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, StrongUnpin)
-CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, UnownedRelease)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, InitExistentialRef)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, EndLifetime)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, AbortApply)
@@ -367,8 +371,6 @@ CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, IsUnique)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, IsUniqueOrPinned)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, Load)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, LoadBorrow)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, LoadUnowned)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, LoadWeak)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, MarkFunctionEscape)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, MarkUninitializedBehavior)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, ObjCExistentialMetatypeToObject)
@@ -395,9 +397,18 @@ CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, UncheckedAddrCast)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, UncheckedRefCastAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, UncheckedTakeEnumDataAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, UnconditionalCheckedCastAddr)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, UnmanagedToRef)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, AllocValueBuffer)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, DeallocValueBuffer)
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, Load##Name)
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, Name##Release)
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...") \
+  ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
+#define UNCHECKED_REF_STORAGE(Name, ...) \
+  CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, Name##ToRef)
+#include "swift/AST/ReferenceStorage.def"
 #undef CONSTANT_OWNERSHIP_INST
 
 /// Instructions whose arguments are always compatible with one convention.
@@ -481,17 +492,20 @@ ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, CopyBlock)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, OpenExistentialBox)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, RefTailAddr)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, RefToRawPointer)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, RefToUnmanaged)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, RefToUnowned)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, SetDeallocating)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, StrongPin)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, UnownedToRef)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, CopyUnownedValue)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, ProjectExistentialBox)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, UnmanagedRetainValue)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, UnmanagedReleaseValue)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, UnmanagedAutoreleaseValue)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, ConvertEscapeToNoEscape)
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, RefTo##Name) \
+  ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, Name##ToRef) \
+  ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, Copy##Name##Value)
+#define UNCHECKED_REF_STORAGE(Name, ...) \
+  ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, RefTo##Name)
+#include "swift/AST/ReferenceStorage.def"
 #undef ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP
 
 OwnershipUseCheckerResult
@@ -814,24 +828,19 @@ OwnershipCompatibilityUseChecker::visitThrowInst(ThrowInst *I) {
           UseLifetimeConstraint::MustBeInvalidated};
 }
 
-OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitStoreUnownedInst(StoreUnownedInst *I) {
-  if (getValue() == I->getSrc())
-    return {compatibleWithOwnership(ValueOwnershipKind::Owned),
-            UseLifetimeConstraint::MustBeInvalidated};
-  return {compatibleWithOwnership(ValueOwnershipKind::Trivial),
-          UseLifetimeConstraint::MustBeLive};
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+OwnershipUseCheckerResult \
+OwnershipCompatibilityUseChecker::visitStore##Name##Inst(Store##Name##Inst *I){\
+  /* A store instruction implies that the value to be stored to be live, */ \
+  /* but it does not touch the strong reference count of the value. */ \
+  if (getValue() == I->getSrc()) \
+    return {true, UseLifetimeConstraint::MustBeLive}; \
+  return {compatibleWithOwnership(ValueOwnershipKind::Trivial), \
+          UseLifetimeConstraint::MustBeLive}; \
 }
-
-OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitStoreWeakInst(StoreWeakInst *I) {
-  // A store_weak instruction implies that the value to be stored to be live,
-  // but it does not touch the strong reference count of the value.
-  if (getValue() == I->getSrc())
-    return {true, UseLifetimeConstraint::MustBeLive};
-  return {compatibleWithOwnership(ValueOwnershipKind::Trivial),
-          UseLifetimeConstraint::MustBeLive};
-}
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
+#include "swift/AST/ReferenceStorage.def"
 
 OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitStoreBorrowInst(StoreBorrowInst *I) {
@@ -1389,7 +1398,7 @@ public:
     if (Result.hasValue())
       return Result.getValue();
 
-    DEBUG(llvm::dbgs() << "Verifying ownership of: " << *Value);
+    LLVM_DEBUG(llvm::dbgs() << "Verifying ownership of: " << *Value);
     Result = checkUses();
     if (!Result.getValue())
       return false;
@@ -1440,6 +1449,7 @@ private:
   bool checkValueWithoutLifetimeEndingUses();
 
   bool checkFunctionArgWithoutLifetimeEndingUses(SILFunctionArgument *Arg);
+  bool checkYieldWithoutLifetimeEndingUses(BeginApplyResult *Yield);
 
   bool isGuaranteedFunctionArgWithLifetimeEndingUses(
       SILFunctionArgument *Arg,
@@ -1510,14 +1520,14 @@ void SILValueOwnershipChecker::gatherUsers(
 
     if (OwnershipCompatibilityUseChecker(Mod, *Op, Value, ErrorBehavior)
             .check(User)) {
-      DEBUG(llvm::dbgs() << "        Lifetime Ending User: " << *User);
+      LLVM_DEBUG(llvm::dbgs() << "        Lifetime Ending User: " << *User);
       if (auto *CBI = dyn_cast<CondBranchInst>(User)) {
         addCondBranchToList(LifetimeEndingUsers, CBI, Op->getOperandNumber());
       } else {
         LifetimeEndingUsers.emplace_back(User);
       }
     } else {
-      DEBUG(llvm::dbgs() << "        Regular User: " << *User);
+      LLVM_DEBUG(llvm::dbgs() << "        Regular User: " << *User);
       if (auto *CBI = dyn_cast<CondBranchInst>(User)) {
         addCondBranchToList(NonLifetimeEndingUsers, CBI,
                             Op->getOperandNumber());
@@ -1627,10 +1637,38 @@ bool SILValueOwnershipChecker::checkFunctionArgWithoutLifetimeEndingUses(
   });
 }
 
+bool SILValueOwnershipChecker::checkYieldWithoutLifetimeEndingUses(
+    BeginApplyResult *Yield) {
+  switch (Yield->getOwnershipKind()) {
+  case ValueOwnershipKind::Guaranteed:
+  case ValueOwnershipKind::Unowned:
+  case ValueOwnershipKind::Trivial:
+    return true;
+  case ValueOwnershipKind::Any:
+    llvm_unreachable("Yields should never have ValueOwnershipKind::Any");
+  case ValueOwnershipKind::Owned:
+    break;
+  }
+
+  if (DEBlocks.isDeadEnd(Yield->getParent()->getParent()))
+    return true;
+
+  return !handleError([&] {
+    llvm::errs() << "Function: '" << Yield->getFunction()->getName() << "'\n"
+                 << "    Owned yield without life ending uses!\n"
+                 << "Value: " << *Yield << '\n';
+  });
+}
 bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses() {
-  DEBUG(llvm::dbgs() << "    No lifetime ending users?! Bailing early.\n");
+  LLVM_DEBUG(llvm::dbgs() << "    No lifetime ending users?! Bailing early.\n");
   if (auto *Arg = dyn_cast<SILFunctionArgument>(Value)) {
     if (checkFunctionArgWithoutLifetimeEndingUses(Arg)) {
+      return true;
+    }
+  }
+
+  if (auto *Yield = dyn_cast<BeginApplyResult>(Value)) {
+    if (checkYieldWithoutLifetimeEndingUses(Yield)) {
       return true;
     }
   }
@@ -1648,11 +1686,11 @@ bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses() {
 
   if (auto *ParentBlock = Value->getParentBlock()) {
     if (DEBlocks.isDeadEnd(ParentBlock)) {
-      DEBUG(llvm::dbgs() << "    Ignoring transitively unreachable value "
-                         << "without users!\n"
-                         << "    Function: '" << Value->getFunction()->getName()
-                         << "'\n"
-                         << "    Value: " << *Value << '\n');
+      LLVM_DEBUG(llvm::dbgs() << "    Ignoring transitively unreachable value "
+                              << "without users!\n"
+                              << "    Function: '"
+                              << Value->getFunction()->getName() << "'\n"
+                              << "    Value: " << *Value << '\n');
       return true;
     }
   }
@@ -1710,7 +1748,7 @@ bool SILValueOwnershipChecker::isSubobjectProjectionWithLifetimeEndingUses(
 }
 
 bool SILValueOwnershipChecker::checkUses() {
-  DEBUG(llvm::dbgs() << "    Gathering and classifying uses!\n");
+  LLVM_DEBUG(llvm::dbgs() << "    Gathering and classifying uses!\n");
 
   // First go through V and gather up its uses. While we do this we:
   //
@@ -1736,8 +1774,8 @@ bool SILValueOwnershipChecker::checkUses() {
     return false;
   }
 
-  DEBUG(llvm::dbgs() << "    Found lifetime ending users! Performing initial "
-                        "checks\n");
+  LLVM_DEBUG(llvm::dbgs() << "    Found lifetime ending users! Performing "
+                             "initial checks\n");
 
   // See if we have a guaranteed function address. Guaranteed function addresses
   // should never have any lifetime ending uses.

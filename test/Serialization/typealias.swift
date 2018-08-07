@@ -40,8 +40,8 @@ print("\(monadic(i))\n", terminator: "")
 
 // OUTPUT: -42
 
-func subtract(x: MyInt64, y: MyInt64) -> MyInt64 {
-  return x - y
+func subtract(_ t : (x: MyInt64, y: MyInt64)) -> MyInt64 {
+  return t.x - t.y
 }
 var dyadic : TwoIntFunction = subtract
 print("\(dyadic((named.b, i))) \(dyadic(both))\n", terminator: "")

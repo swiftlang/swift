@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -19,6 +19,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericSignatureBuilder.h"
+#include "swift/AST/ReferenceCounting.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Decl.h"
@@ -66,9 +67,9 @@ Type QuerySubstitutionMap::operator()(SubstitutableType *type) const {
   return subMap.lookupSubstitution(key);
 }
 
-void TypeLoc::setType(Type Ty, bool validated) {
+void TypeLoc::setType(Type Ty) {
   assert(!Ty || !Ty->hasTypeVariable());
-  TAndValidBit.setPointerAndInt(Ty, validated);
+  this->Ty = Ty;
 }
 
 bool TypeLoc::isError() const {
@@ -84,9 +85,7 @@ SourceRange TypeLoc::getSourceRange() const {
 
 TypeLoc TypeLoc::clone(ASTContext &ctx) const {
   if (TyR) {
-    TypeLoc result(TyR->clone(ctx));
-    result.TAndValidBit = this->TAndValidBit;
-    return result;
+    return TypeLoc(TyR->clone(ctx), Ty);
   }
   return *this;
 }
@@ -213,9 +212,9 @@ bool CanType::isReferenceTypeImpl(CanType type, bool functionsCount) {
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct:
   case TypeKind::SILToken:
-  case TypeKind::UnownedStorage:
-  case TypeKind::UnmanagedStorage:
-  case TypeKind::WeakStorage:
+#define REF_STORAGE(Name, ...) \
+  case TypeKind::Name##Storage:
+#include "swift/AST/ReferenceStorage.def"
     return false;
 
   case TypeKind::GenericTypeParam:
@@ -259,7 +258,7 @@ ExistentialLayout::ExistentialLayout(ProtocolCompositionType *type) {
   auto members = type->getMembers();
   if (!members.empty() &&
       isa<ClassDecl>(members[0]->getAnyNominal())) {
-    superclass = members[0];
+    explicitSuperclass = members[0];
     members = members.slice(1);
   }
 
@@ -286,7 +285,7 @@ ExistentialLayout CanType::getExistentialLayout() {
 }
 
 bool ExistentialLayout::requiresClass() const {
-  if (hasExplicitAnyObject || superclass)
+  if (hasExplicitAnyObject || explicitSuperclass)
     return true;
 
   for (auto proto : getProtocols()) {
@@ -297,8 +296,28 @@ bool ExistentialLayout::requiresClass() const {
   return false;
 }
 
+Type ExistentialLayout::getSuperclass() const {
+  if (explicitSuperclass)
+    return explicitSuperclass;
+
+  for (auto proto : getProtocols()) {
+    // If we have a generic signature, check there, because it
+    // will pick up superclass constraints from protocols that we
+    // refine as well.
+    auto *protoDecl = proto->getDecl();
+    if (auto genericSig = protoDecl->getGenericSignature()) {
+      if (auto superclass = genericSig->getSuperclassBound(
+            protoDecl->getSelfInterfaceType()))
+        return superclass;
+    } else if (auto superclass = protoDecl->getSuperclass())
+      return superclass;
+  }
+
+  return Type();
+}
+
 bool ExistentialLayout::isAnyObject() const {
-  return (hasExplicitAnyObject && !superclass && getProtocols().empty());
+  return (hasExplicitAnyObject && !explicitSuperclass && getProtocols().empty());
 }
 
 bool TypeBase::isObjCExistentialType() {
@@ -409,16 +428,18 @@ Type TypeBase::addCurriedSelfType(const DeclContext *dc) {
   GenericSignature *sig = dc->getGenericSignatureOfContext();
   if (auto *genericFn = type->getAs<GenericFunctionType>()) {
     sig = genericFn->getGenericSignature();
-    type = FunctionType::get(genericFn->getInput(),
+    type = FunctionType::get(genericFn->getParams(),
                              genericFn->getResult(),
                              genericFn->getExtInfo());
   }
 
   auto selfTy = dc->getDeclaredInterfaceType();
+  auto selfParam = AnyFunctionType::Param(selfTy,
+                                          Identifier(), ParameterTypeFlags());
   if (sig)
-    return GenericFunctionType::get(sig, selfTy, type,
+    return GenericFunctionType::get(sig, {selfParam}, type,
                                     AnyFunctionType::ExtInfo());
-  return FunctionType::get(selfTy, type);
+  return FunctionType::get({selfParam}, type, AnyFunctionType::ExtInfo());
 }
 
 void
@@ -561,7 +582,6 @@ CanType CanType::getOptionalObjectTypeImpl(CanType type) {
   if (auto boundTy = dyn_cast<BoundGenericEnumType>(type))
     if (boundTy->getDecl()->isOptionalDecl())
       return boundTy.getGenericArgs()[0];
-
   return CanType();
 }
 
@@ -624,7 +644,7 @@ bool TypeBase::isAnyObject() {
 bool ExistentialLayout::isErrorExistential() const {
   auto protocols = getProtocols();
   return (!hasExplicitAnyObject &&
-          !superclass &&
+          !explicitSuperclass &&
           protocols.size() == 1 &&
           protocols[0]->getDecl()->isSpecificProtocol(KnownProtocolKind::Error));
 }
@@ -785,7 +805,17 @@ swift::decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels) {
                                             parenTy->getParameterFlags()));
     return result;
   }
-    
+
+  // If `Void` has been explicitly specified, resulting decomposition
+  // should be empty, just like empty tuple would be.
+  case TypeKind::NameAlias: {
+    auto &ctx = type->getASTContext();
+    auto *typealias = cast<NameAliasType>(type.getPointer());
+    if (typealias->getDecl() == ctx.getVoidDecl())
+      return result;
+    break;
+  }
+
   default:
     // Default behavior below; inject the argument as the sole parameter.
     break;
@@ -812,8 +842,11 @@ swift::computeDefaultMap(ArrayRef<AnyFunctionType::Param> params,
   // Find the corresponding parameter list.
   const ParameterList *paramList = nullptr;
   if (auto *func = dyn_cast<AbstractFunctionDecl>(paramOwner)) {
-    if (level < func->getNumParameterLists())
-      paramList = func->getParameterList(level);
+    if (func->hasImplicitSelfDecl()) {
+      if (level == 1)
+        paramList = func->getParameters();
+    } else if (level == 0)
+      paramList = func->getParameters();
   } else if (auto *subscript = dyn_cast<SubscriptDecl>(paramOwner)) {
     if (level == 1)
       paramList = subscript->getIndices();
@@ -1062,9 +1095,8 @@ getCanonicalInputType(AnyFunctionType *funcType,
 
   auto flags = ParameterTypeFlags().withInOut(inputType->is<InOutType>());
   if (auto *parenTy = dyn_cast<ParenType>(origInputType.getPointer())) {
-    auto parenFlags = parenTy->getParameterFlags();
-    flags =
-        flags.withShared(parenFlags.isShared()).withOwned(parenFlags.isOwned());
+    flags = parenTy->getParameterFlags().withInOut(flags.isInOut());
+    assert(!flags.isVariadic() && "variadic ParenType");
   }
 
   inputType = ParenType::get(inputType->getASTContext(),
@@ -1126,6 +1158,18 @@ CanType TypeBase::computeCanonicalType() {
   case TypeKind::GenericTypeParam: {
     GenericTypeParamType *gp = cast<GenericTypeParamType>(this);
     auto gpDecl = gp->getDecl();
+
+    // If we haven't set a depth for this generic parameter, try to do so.
+    // FIXME: This is a dreadful hack.
+    if (gpDecl->getDepth() == GenericTypeParamDecl::InvalidDepth) {
+      auto resolver = gpDecl->getASTContext().getLazyResolver();
+      assert(resolver && "Need to resolve generic parameter depth");
+      if (auto decl =
+            gpDecl->getDeclContext()->getInnermostDeclarationDeclContext())
+        if (auto valueDecl = dyn_cast<ValueDecl>(decl))
+          resolver->resolveDeclSignature(valueDecl);
+    }
+
     assert(gpDecl->getDepth() != GenericTypeParamDecl::InvalidDepth &&
            "parameter hasn't been validated");
     Result = GenericTypeParamType::get(gpDecl->getDepth(), gpDecl->getIndex(),
@@ -1143,9 +1187,10 @@ CanType TypeBase::computeCanonicalType() {
     break;
   }
 
-  case TypeKind::UnownedStorage:
-  case TypeKind::UnmanagedStorage:
-  case TypeKind::WeakStorage: {
+#define REF_STORAGE(Name, ...) \
+  case TypeKind::Name##Storage:
+#include "swift/AST/ReferenceStorage.def"
+  {
     auto ref = cast<ReferenceStorageType>(this);
     Type referentType = ref->getReferentType()->getCanonicalType();
     Result = ReferenceStorageType::get(referentType, ref->getOwnership(),
@@ -1432,7 +1477,7 @@ bool TypeBase::satisfiesClassConstraint() {
   return mayHaveSuperclass() || isObjCExistentialType();
 }
 
-Type TypeBase::getSuperclass() {
+Type TypeBase::getSuperclass(bool useArchetypes) {
   auto *nominalDecl = getAnyNominal();
   auto *classDecl = dyn_cast_or_null<ClassDecl>(nominalDecl);
 
@@ -1444,8 +1489,8 @@ Type TypeBase::getSuperclass() {
     if (auto dynamicSelfTy = getAs<DynamicSelfType>())
       return dynamicSelfTy->getSelfType();
 
-    if (auto compositionTy = getAs<ProtocolCompositionType>())
-      return compositionTy->getExistentialLayout().superclass;
+    if (isExistentialType())
+      return getExistentialLayout().getSuperclass();
 
     // No other types have superclasses.
     return Type();
@@ -1467,7 +1512,9 @@ Type TypeBase::getSuperclass() {
   ModuleDecl *module = classDecl->getModuleContext();
   auto subMap = getContextSubstitutionMap(module,
                                           classDecl,
-                                          classDecl->getGenericEnvironment());
+                                          (useArchetypes
+                                           ? classDecl->getGenericEnvironment()
+                                           : nullptr));
   return superclassTy.subst(subMap);
 }
 
@@ -1591,9 +1638,11 @@ bool TypeBase::isBindableTo(Type b) {
         if (func->getExtInfo() != substFunc->getExtInfo())
           return false;
         
-        if (!visit(func->getInput()->getCanonicalType(),
-                   substFunc->getInput()->getCanonicalType()))
-          return false;
+        for (unsigned i : indices(func->getParams())) {
+          if (!visit(func->getParams()[i].getType(),
+                     substFunc.getParams()[i].getType()))
+            return false;
+        }
         
         return visit(func->getResult()->getCanonicalType(),
                      substFunc->getResult()->getCanonicalType());
@@ -1833,10 +1882,6 @@ getObjCObjectRepresentable(Type type, const DeclContext *dc) {
 
   // @objc classes.
   if (auto classDecl = type->getClassOrBoundGenericClass()) {
-    auto &ctx = classDecl->getASTContext();
-    if (auto resolver = ctx.getLazyResolver())
-      resolver->resolveIsObjC(classDecl);
-
     if (classDecl->isObjC())
       return ForeignRepresentableKind::Object;
   }
@@ -1847,8 +1892,8 @@ getObjCObjectRepresentable(Type type, const DeclContext *dc) {
   if (type->isExistentialType()) {
     auto layout = type->getExistentialLayout();
     if (layout.isObjC() &&
-        (!layout.superclass ||
-         getObjCObjectRepresentable(layout.superclass, dc) ==
+        (!layout.explicitSuperclass ||
+         getObjCObjectRepresentable(layout.explicitSuperclass, dc) ==
            ForeignRepresentableKind::Object))
       return ForeignRepresentableKind::Object;
   }
@@ -1951,30 +1996,32 @@ getForeignRepresentable(Type type, ForeignLanguage language,
       break;
     }
 
+    auto success = [](bool anyStaticBridged,
+                      bool anyBridged,
+                      bool isBlock) -> std::pair<ForeignRepresentableKind,
+                                                 ProtocolConformance *> {
+      // We have something representable; check how it is representable.
+      return { anyStaticBridged ? ForeignRepresentableKind::StaticBridged
+                   : anyBridged ? ForeignRepresentableKind::Bridged
+                   : isBlock    ? ForeignRepresentableKind::Object
+                   : ForeignRepresentableKind::Trivial,
+                   nullptr };
+    };
+
     // Look at the result type.
     Type resultType = functionType->getResult();
     if (!resultType->isVoid() && recurse(resultType))
       return failure();
 
-    // Look at the input types.
-    Type inputType = functionType->getInput();
-    if (auto inputTuple = inputType->getAs<TupleType>()) {
-      for (const auto &elt : inputTuple->getElements()) {
-        if (elt.isVararg())
-          return failure();
-        if (recurse(elt.getType()))
-          return failure();
-      }
-    } else if (recurse(inputType)) {
-      return failure();
+    // Look at the input params.
+    for (const auto &param : functionType->getParams()) {
+      if (param.isVariadic())
+        return failure();
+      if (recurse(param.getType()))
+        return failure();
     }
 
-    // We have something representable; check how it is representable.
-    return { anyStaticBridged ? ForeignRepresentableKind::StaticBridged
-                 : anyBridged ? ForeignRepresentableKind::Bridged
-                 : isBlock    ? ForeignRepresentableKind::Object
-                 : ForeignRepresentableKind::Trivial,
-             nullptr };
+    return success(anyStaticBridged, anyBridged, isBlock);
   }
 
   // Give special dispensation to builtin types for testing purposes.
@@ -2323,10 +2370,23 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
       return false;
 
     auto paramsAndResultMatch = [&]() {
-      // Inputs are contravariant, results are covariant.
-      return (matches(fn2.getInput(), fn1.getInput(), matchMode,
-                      ParameterPosition::Parameter, OptionalUnwrapping::None) &&
-              matches(fn1.getResult(), fn2.getResult(), matchMode,
+      auto fn2Params = fn2.getParams();
+      auto fn1Params = fn1.getParams();
+      if (fn2Params.size() != fn1Params.size()) {
+        return false;
+      }
+
+      // Inputs are contravariant.
+      for (auto i : indices(fn2.getParams())) {
+        if (!matches(fn2Params[i].getType(), fn1Params[i].getType(),
+                     matchMode, ParameterPosition::ParameterTupleElement,
+                     OptionalUnwrapping::None)) {
+          return false;
+        }
+      }
+
+      // Results are covariant.
+      return (matches(fn1.getResult(), fn2.getResult(), matchMode,
                       ParameterPosition::NotParameter,
                       OptionalUnwrapping::None));
     };
@@ -2771,9 +2831,9 @@ bool AnyFunctionType::isCanonicalFunctionInputType(Type input) {
 
 FunctionType *
 GenericFunctionType::substGenericArgs(SubstitutionMap subs) {
-  Type input = getInput().subst(subs);
-  Type result = getResult().subst(subs);
-  return FunctionType::get(input, result, getExtInfo());
+  auto substFn = Type(this).subst(subs)->castTo<AnyFunctionType>();
+  return FunctionType::get(substFn->getParams(),
+                           substFn->getResult(), getExtInfo());
 }
 
 static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
@@ -2894,7 +2954,8 @@ Optional<ProtocolConformanceRef>
 MakeAbstractConformanceForGenericType::operator()(CanType dependentType,
                                        Type conformingReplacementType,
                                        ProtocolDecl *conformedProtocol) const {
-  assert((conformingReplacementType->is<SubstitutableType>()
+  assert((conformingReplacementType->is<ErrorType>()
+          || conformingReplacementType->is<SubstitutableType>()
           || conformingReplacementType->is<DependentMemberType>())
          && "replacement requires looking up a concrete conformance");
   return ProtocolConformanceRef(conformedProtocol);
@@ -2931,7 +2992,7 @@ static Type substGenericFunctionType(GenericFunctionType *genericFnType,
                                      LookupConformanceFn lookupConformances,
                                      SubstOptions options) {
   // Substitute into the function type (without generic signature).
-  auto *bareFnType = FunctionType::get(genericFnType->getInput(),
+  auto *bareFnType = FunctionType::get(genericFnType->getParams(),
                                        genericFnType->getResult(),
                                        genericFnType->getExtInfo());
   Type result =
@@ -3013,7 +3074,7 @@ static Type substGenericFunctionType(GenericFunctionType *genericFnType,
   }
 
   // Produce the new generic function type.
-  return GenericFunctionType::get(genericSig, fnType->getInput(),
+  return GenericFunctionType::get(genericSig, fnType->getParams(),
                                   fnType->getResult(), fnType->getExtInfo());
 }
 
@@ -3155,19 +3216,18 @@ const DependentMemberType *TypeBase::findUnresolvedDependentMemberType() {
 }
 
 static Type getConcreteTypeForSuperclassTraversing(Type t) {
-  if (!t->getAnyNominal()) {
-    if (auto archetype = t->getAs<ArchetypeType>()) {
-      return archetype->getSuperclass();
-    } else if (auto dynamicSelfTy = t->getAs<DynamicSelfType>()) {
-      return dynamicSelfTy->getSelfType();
-    } else if (auto compositionTy = t->getAs<ProtocolCompositionType>()) {
-      return compositionTy->getExistentialLayout().superclass;
-    }
+  if (t->isExistentialType()) {
+    return t->getExistentialLayout().getSuperclass();
+  } if (auto archetype = t->getAs<ArchetypeType>()) {
+    return archetype->getSuperclass();
+  } else if (auto dynamicSelfTy = t->getAs<DynamicSelfType>()) {
+    return dynamicSelfTy->getSelfType();
   }
   return t;
 }
 
-Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass) {
+Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
+                                    bool useArchetypes) {
   Type t = getConcreteTypeForSuperclassTraversing(this);
 
   while (t) {
@@ -3180,27 +3240,9 @@ Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass) {
     if (nominalDecl == baseClass)
       return t;
 
-    t = t->getSuperclass();
+    t = t->getSuperclass(useArchetypes);
   }
   llvm_unreachable("no inheritance relationship between given classes");
-}
-
-Type TypeBase::getGenericAncestor() {
-  Type t = getConcreteTypeForSuperclassTraversing(this);
-
-  while (t && !t->hasError()) {
-    auto NTD = t->getAnyNominal();
-    assert(NTD && "expected nominal type in NTD");
-    if (!NTD)
-      return Type();
-
-    if (NTD->isGenericContext())
-      return t;
-
-    t = t->getSuperclass();
-  }
-
-  return Type();
 }
 
 TypeSubstitutionMap
@@ -3236,31 +3278,33 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
   assert(ownerNominal == baseTy->getAnyNominal());
 
   // Gather all of the substitutions for all levels of generic arguments.
-  GenericParamList *curGenericParams = dc->getGenericParamsOfContext();
-  if (!curGenericParams)
+  auto *genericSig = dc->getGenericSignatureOfContext();
+  if (!genericSig)
     return substitutions;
 
-  while (baseTy && curGenericParams) {
+  auto params = genericSig->getGenericParams();
+  unsigned n = params.size();
+
+  while (baseTy && n > 0) {
     // For a bound generic type, gather the generic parameter -> generic
     // argument substitutions.
     if (auto boundGeneric = baseTy->getAs<BoundGenericType>()) {
-      auto params = curGenericParams->getParams();
       auto args = boundGeneric->getGenericArgs();
-      for (unsigned i = 0, n = args.size(); i != n; ++i) {
-        substitutions[params[i]->getDeclaredInterfaceType()->getCanonicalType()
+      for (unsigned i = 0, e = args.size(); i < e; ++i) {
+        substitutions[params[n - e + i]->getCanonicalType()
                         ->castTo<GenericTypeParamType>()] = args[i];
       }
 
       // Continue looking into the parent.
       baseTy = boundGeneric->getParent();
-      curGenericParams = curGenericParams->getOuterParameters();
+      n -= args.size();
       continue;
     }
 
     // Continue looking into the parent.
     if (auto protocolTy = baseTy->getAs<ProtocolType>()) {
       baseTy = protocolTy->getParent();
-      curGenericParams = curGenericParams->getOuterParameters();
+      n--;
       continue;
     }
 
@@ -3273,19 +3317,16 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
     llvm_unreachable("Bad base type");
   }
 
-  if (genericEnv) {
-    auto *parentDC = dc;
-    while (parentDC->isTypeContext())
-      parentDC = parentDC->getParent();
-    if (auto *outerSig = parentDC->getGenericSignatureOfContext()) {
-      for (auto gp : outerSig->getGenericParams()) {
-        auto result = substitutions.insert(
-          {gp->getCanonicalType()->castTo<GenericTypeParamType>(),
-           genericEnv->mapTypeIntoContext(gp)});
-        assert(result.second);
-        (void) result;
-      }
-    }
+  while (n > 0) {
+    auto *gp = params[--n];
+    auto substTy = (genericEnv
+                    ? genericEnv->mapTypeIntoContext(gp)
+                    : gp);
+    auto result = substitutions.insert(
+      {gp->getCanonicalType()->castTo<GenericTypeParamType>(),
+       substTy});
+    assert(result.second);
+    (void) result;
   }
 
   return substitutions;
@@ -3371,7 +3412,7 @@ Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
       baseDecl, derivedDecl, /*derivedSubs=*/None);
 
   if (auto *genericMemberType = memberType->getAs<GenericFunctionType>()) {
-    memberType = FunctionType::get(genericMemberType->getInput(),
+    memberType = FunctionType::get(genericMemberType->getParams(),
                                    genericMemberType->getResult(),
                                    genericMemberType->getExtInfo());
   }
@@ -3382,8 +3423,7 @@ Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
     type = type->replaceSelfParameterType(this);
     if (auto func = dyn_cast<FuncDecl>(baseDecl)) {
       if (func->hasDynamicSelf()) {
-        type = type->replaceCovariantResultType(this,
-                                                func->getNumParameterLists());
+        type = type->replaceCovariantResultType(this, /*uncurryLevel=*/2);
       }
     } else if (isa<ConstructorDecl>(baseDecl)) {
       type = type->replaceCovariantResultType(this, /*uncurryLevel=*/2);
@@ -3568,9 +3608,10 @@ case TypeKind::Id:
                                 fnTy->getWitnessMethodConformanceOrNone());
   }
 
-  case TypeKind::UnownedStorage:
-  case TypeKind::UnmanagedStorage:
-  case TypeKind::WeakStorage: {
+#define REF_STORAGE(Name, ...) \
+  case TypeKind::Name##Storage:
+#include "swift/AST/ReferenceStorage.def"
+  {
     auto storageTy = cast<ReferenceStorageType>(base);
     Type refTy = storageTy->getReferentType();
     Type substRefTy = refTy.transformRec(fn);
@@ -3997,26 +4038,38 @@ bool Type::isPrivateStdlibType(bool treatNonBuiltinProtocolsAsPublic) const {
   return false;
 }
 
+// NOTE: If you add a new SOMETIMES_LOADABLE_CHECKED_REF_STORAGE type, then you
+// may or may not want to emulate what 'unowned' does.
 bool UnownedStorageType::isLoadable(ResilienceExpansion resilience) const {
-  return getReferentType()->usesNativeReferenceCounting(resilience);
+  auto ty = getReferentType();
+  if (auto underlyingTy = ty->getOptionalObjectType())
+    ty = underlyingTy;
+  return ty->usesNativeReferenceCounting(resilience);
 }
 
-static bool doesOpaqueClassUseNativeReferenceCounting(const ASTContext &ctx) {
-  return !ctx.LangOpts.EnableObjCInterop;
-}
-
-static bool usesNativeReferenceCounting(ClassDecl *theClass,
-                                        ResilienceExpansion resilience) {
+static ReferenceCounting getClassReferenceCounting(
+                                             ClassDecl *theClass,
+                                             ResilienceExpansion resilience) {
   // TODO: Resilience? there might be some legal avenue of changing this.
-  while (Type supertype = theClass->getSuperclass()) {
-    theClass = supertype->getClassOrBoundGenericClass();
-    assert(theClass);
+  while (auto superclass = theClass->getSuperclassDecl()) {
+    theClass = superclass;
   }
-  return !theClass->hasClangNode();
+
+  return theClass->hasClangNode()
+           ? ReferenceCounting::ObjC
+           : ReferenceCounting::Native;
 }
 
-bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
+ReferenceCounting TypeBase::getReferenceCounting(
+                                              ResilienceExpansion resilience) {
   CanType type = getCanonicalType();
+  ASTContext &ctx = type->getASTContext();
+
+  // In the absence of Objective-C interoperability, everything uses native
+  // reference counting.
+  if (!ctx.LangOpts.EnableObjCInterop)
+    return ReferenceCounting::Native;
+
   switch (type->getKind()) {
 #define SUGARED_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
@@ -4025,27 +4078,29 @@ bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
 
   case TypeKind::BuiltinNativeObject:
   case TypeKind::SILBox:
-    return true;
+    return ReferenceCounting::Native;
+
+  case TypeKind::BuiltinBridgeObject:
+    return ReferenceCounting::Bridge;
 
   case TypeKind::BuiltinUnknownObject:
-  case TypeKind::BuiltinBridgeObject:
-    return ::doesOpaqueClassUseNativeReferenceCounting(type->getASTContext());
+    return ReferenceCounting::Unknown;
 
   case TypeKind::Class:
-    return ::usesNativeReferenceCounting(cast<ClassType>(type)->getDecl(),
-                                         resilience);
+    return getClassReferenceCounting(cast<ClassType>(type)->getDecl(),
+                                     resilience);
   case TypeKind::BoundGenericClass:
-    return ::usesNativeReferenceCounting(
+    return getClassReferenceCounting(
                                   cast<BoundGenericClassType>(type)->getDecl(),
-                                         resilience);
+                                  resilience);
   case TypeKind::UnboundGeneric:
-    return ::usesNativeReferenceCounting(
+    return getClassReferenceCounting(
                     cast<ClassDecl>(cast<UnboundGenericType>(type)->getDecl()),
-                                         resilience);
+                    resilience);
 
   case TypeKind::DynamicSelf:
     return cast<DynamicSelfType>(type).getSelfType()
-             ->usesNativeReferenceCounting(resilience);
+        ->getReferenceCounting(resilience);
 
   case TypeKind::Archetype: {
     auto archetype = cast<ArchetypeType>(type);
@@ -4054,17 +4109,17 @@ bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
     assert(archetype->requiresClass() ||
            (layout && layout->isRefCounted()));
     if (auto supertype = archetype->getSuperclass())
-      return supertype->usesNativeReferenceCounting(resilience);
-    return ::doesOpaqueClassUseNativeReferenceCounting(type->getASTContext());
+      return supertype->getReferenceCounting(resilience);
+    return ReferenceCounting::Unknown;
   }
 
   case TypeKind::Protocol:
   case TypeKind::ProtocolComposition: {
-    auto layout = getExistentialLayout();
+    auto layout = type->getExistentialLayout();
     assert(layout.requiresClass() && "Opaque existentials don't use refcounting");
-    if (layout.superclass)
-      return layout.superclass->usesNativeReferenceCounting(resilience);
-    return ::doesOpaqueClassUseNativeReferenceCounting(type->getASTContext());
+    if (auto superclass = layout.getSuperclass())
+      return superclass->getReferenceCounting(resilience);
+    return ReferenceCounting::Unknown;
   }
 
   case TypeKind::Function:
@@ -4090,15 +4145,19 @@ bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct:
   case TypeKind::SILToken:
-  case TypeKind::UnownedStorage:
-  case TypeKind::UnmanagedStorage:
-  case TypeKind::WeakStorage:
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
+#define REF_STORAGE(Name, ...) \
+  case TypeKind::Name##Storage:
+#include "swift/AST/ReferenceStorage.def"
     llvm_unreachable("type is not a class reference");
   }
 
   llvm_unreachable("Unhandled type kind!");
+}
+
+bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
+  return getReferenceCounting(resilience) == ReferenceCounting::Native;
 }
 
 //

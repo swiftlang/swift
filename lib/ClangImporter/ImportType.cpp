@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -223,10 +223,35 @@ namespace {
         return Type();
 
       // FIXME: Types that can be mapped, but aren't yet.
+      case clang::BuiltinType::ShortAccum:
+      case clang::BuiltinType::Accum:
+      case clang::BuiltinType::LongAccum:
+      case clang::BuiltinType::UShortAccum:
+      case clang::BuiltinType::UAccum:
+      case clang::BuiltinType::ULongAccum:
+      case clang::BuiltinType::ShortFract:
+      case clang::BuiltinType::Fract:
+      case clang::BuiltinType::LongFract:
+      case clang::BuiltinType::UShortFract:
+      case clang::BuiltinType::UFract:
+      case clang::BuiltinType::ULongFract:
+      case clang::BuiltinType::SatShortAccum:
+      case clang::BuiltinType::SatAccum:
+      case clang::BuiltinType::SatLongAccum:
+      case clang::BuiltinType::SatUShortAccum:
+      case clang::BuiltinType::SatUAccum:
+      case clang::BuiltinType::SatULongAccum:
+      case clang::BuiltinType::SatShortFract:
+      case clang::BuiltinType::SatFract:
+      case clang::BuiltinType::SatLongFract:
+      case clang::BuiltinType::SatUShortFract:
+      case clang::BuiltinType::SatUFract:
+      case clang::BuiltinType::SatULongFract:
       case clang::BuiltinType::Half:
       case clang::BuiltinType::Float16:
       case clang::BuiltinType::Float128:
       case clang::BuiltinType::NullPtr:
+      case clang::BuiltinType::Char8:
         return Type();
 
       // Objective-C types that aren't mapped directly; rather, pointers to
@@ -365,7 +390,7 @@ namespace {
       if (pointeeQualType->isFunctionType()) {
         auto funcTy = pointeeType->castTo<FunctionType>();
         return {
-          FunctionType::get(funcTy->getInput(), funcTy->getResult(),
+          FunctionType::get(funcTy->getParams(), funcTy->getResult(),
             funcTy->getExtInfo().withRepresentation(
                           AnyFunctionType::Representation::CFunctionPointer)),
           ImportHint::CFunctionPointer
@@ -407,8 +432,9 @@ namespace {
       FunctionType *fTy = pointeeType->castTo<FunctionType>();
       
       auto rep = FunctionType::Representation::Block;
-      auto funcTy = FunctionType::get(fTy->getInput(), fTy->getResult(),
-                                   fTy->getExtInfo().withRepresentation(rep));
+      auto funcTy =
+          FunctionType::get(fTy->getParams(), fTy->getResult(),
+                            fTy->getExtInfo().withRepresentation(rep));
       return { funcTy, ImportHint::Block };
     }
 
@@ -884,10 +910,7 @@ namespace {
               }
               importedTypeArg = subresult.AbstractType;
             } else if (typeParam->getSuperclass() &&
-                       (Impl.SwiftContext.isSwiftVersion3() ||
-                        typeParam->getConformingProtocols().empty())) {
-              // In Swift 3 mode, discard the protocol bounds if there is
-              // a superclass bound.
+                       typeParam->getConformingProtocols().empty()) {
               importedTypeArg = typeParam->getSuperclass();
             } else {
               SmallVector<Type, 4> memberTypes;
@@ -949,12 +972,13 @@ namespace {
         }
 
         // Determine whether this Objective-C class type is bridged to
-        // a Swift type.
+        // a Swift type. Hardcode "NSString" since it's referenced from
+        // the ObjectiveC module (a level below Foundation).
         Type bridgedType;
         if (auto objcClassDef = objcClass->getDefinition())
           bridgedType = mapSwiftBridgeAttr(objcClassDef);
-        else
-          bridgedType = mapSwiftBridgeAttr(objcClass);
+        else if (objcClass->getName() == "NSString")
+          bridgedType = Impl.SwiftContext.getStringDecl()->getDeclaredType();
 
         if (bridgedType) {
           // Gather the type arguments.
@@ -974,8 +998,8 @@ namespace {
           // Convert the type arguments.
           for (auto typeArg : typeArgs) {
             Type importedTypeArg = Impl.importTypeIgnoreIUO(
-                typeArg, ImportTypeKind::BridgedValue, AllowNSUIntegerAsInt,
-                Bridging, OTK_None);
+                typeArg, ImportTypeKind::ObjCCollectionElement,
+                AllowNSUIntegerAsInt, Bridging, OTK_None);
             if (!importedTypeArg) {
               importedTypeArgs.clear();
               break;
@@ -1038,10 +1062,7 @@ namespace {
         }
       }
 
-      // Swift 3 compatibility -- don't import subclass existentials
-      if (!type->qual_empty() &&
-          (importedType->isAnyObject() ||
-           !Impl.SwiftContext.isSwiftVersion3())) {
+      if (!type->qual_empty()) {
         SmallVector<Type, 4> members;
         if (!importedType->isAnyObject())
           members.push_back(importedType);
@@ -1102,7 +1123,7 @@ static bool canBridgeTypes(ImportTypeKind importKind) {
   case ImportTypeKind::CFUnretainedOutParameter:
   case ImportTypeKind::Property:
   case ImportTypeKind::PropertyWithReferenceSemantics:
-  case ImportTypeKind::BridgedValue:
+  case ImportTypeKind::ObjCCollectionElement:
   case ImportTypeKind::Typedef:
     return true;
   }
@@ -1116,7 +1137,7 @@ static bool isCFAudited(ImportTypeKind importKind) {
   case ImportTypeKind::Abstract:
   case ImportTypeKind::Typedef:
   case ImportTypeKind::Value:
-  case ImportTypeKind::BridgedValue:
+  case ImportTypeKind::ObjCCollectionElement:
   case ImportTypeKind::Variable:
   case ImportTypeKind::Result:
   case ImportTypeKind::Pointee:
@@ -1283,14 +1304,29 @@ static ImportedType adjustTypeForConcreteImport(
   }
 
   // SwiftTypeConverter turns block pointers into @convention(block) types.
-  // In a bridgeable context, or in the direct structure of a typedef,
-  // we would prefer to instead use the default Swift convention.
+  // In some contexts, we bridge them to use the Swift function type
+  // representation. This includes typedefs of block types, which use the
+  // Swift function type representation.
   if (hint == ImportHint::Block) {
     if (canBridgeTypes(importKind)) {
+      // Determine the function type representation we need.
+      //
+      // For Objective-C collection arguments, we cannot bridge from a block
+      // to a Swift function type, so force the block representation. Normally
+      // the mapped type will have a block representation (making this a no-op),
+      // but in cases where the Clang type was written as a typedef of a
+      // block type, that typedef will have a Swift function type
+      // representation. This code will then break down the imported type
+      // alias and produce a function type with block representation.
+      auto requiredFunctionTypeRepr = FunctionTypeRepresentation::Swift;
+      if (importKind == ImportTypeKind::ObjCCollectionElement) {
+        requiredFunctionTypeRepr = FunctionTypeRepresentation::Block;
+      }
+
       auto fTy = importedType->castTo<FunctionType>();
       FunctionType::ExtInfo einfo = fTy->getExtInfo();
-      if (einfo.getRepresentation() != FunctionTypeRepresentation::Swift) {
-        einfo = einfo.withRepresentation(FunctionTypeRepresentation::Swift);
+      if (einfo.getRepresentation() != requiredFunctionTypeRepr) {
+        einfo = einfo.withRepresentation(requiredFunctionTypeRepr);
         importedType = fTy->withExtInfo(einfo);
       }
     }
@@ -1527,7 +1563,7 @@ static Type applyNoEscape(Type type) {
 
   // Apply @noescape to function types.
   if (auto funcType = type->getAs<FunctionType>()) {
-    return FunctionType::get(funcType->getInput(), funcType->getResult(),
+    return FunctionType::get(funcType->getParams(), funcType->getResult(),
                              funcType->getExtInfo().withNoEscape());
   }
 
@@ -1539,23 +1575,7 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
     bool allowNSUIntegerAsInt) {
 
   // Hardcode handling of certain result types for builtins.
-  auto builtinID = clangDecl->getBuiltinID();
-  switch (builtinID) {
-  case clang::Builtin::NotBuiltin:
-    break;
-  case clang::Builtin::BIstrxfrm:
-  case clang::Builtin::BIstrcspn:
-  case clang::Builtin::BIstrspn:
-  case clang::Builtin::BIstrlen:
-  case clang::Builtin::BIstrlcpy:
-  case clang::Builtin::BIstrlcat:
-    // This is a list of all built-ins with a result type of 'size_t' that
-    // existed in Swift 3. We didn't have special handling for builtins at
-    // that time, and so these had a result type of UInt.
-    if (SwiftContext.isSwiftVersion3())
-      break;
-    LLVM_FALLTHROUGH;
-  default:
+  if (auto builtinID = clangDecl->getBuiltinID()) {
     switch (getClangASTContext().BuiltinInfo.getTypeString(builtinID)[0]) {
     case 'z': // size_t
     case 'Y': // ptrdiff_t

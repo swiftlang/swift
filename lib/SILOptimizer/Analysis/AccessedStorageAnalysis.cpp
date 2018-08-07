@@ -174,7 +174,7 @@ bool FunctionAccessedStorage::mergeAccesses(
   for (auto &rawStorageInfo : otherStorageAccesses) {
     const StorageAccessInfo &otherStorageInfo =
       transformStorage(rawStorageInfo);
-    // transformStorage() returns invalid storage object for local storage
+    // If transformStorage() returns invalid storage object for local storage,
     // that should not be merged with the caller.
     if (!otherStorageInfo)
       continue;
@@ -272,7 +272,9 @@ transformCalleeStorage(const StorageAccessInfo &storage,
     SILValue argVal = getCallerArg(fullApply, storage.getParamIndex());
     if (argVal) {
       // Remap the argument source value and inherit the old storage info.
-      return StorageAccessInfo(findAccessedStorageNonNested(argVal), storage);
+      auto calleeStorage = findAccessedStorageNonNested(argVal);
+      if (calleeStorage)
+        return StorageAccessInfo(calleeStorage, storage);
     }
     // If the argument can't be transformed, demote it to an unidentified
     // access.
@@ -282,6 +284,10 @@ transformCalleeStorage(const StorageAccessInfo &storage,
   }
   case AccessedStorage::Nested:
     llvm_unreachable("Unexpected nested access");
+  case AccessedStorage::Yield:
+    // Continue to hold on to yields from the callee because we don't have
+    // any better placeholder in the callee.
+    return storage;
   case AccessedStorage::Unidentified:
     // For unidentified storage, continue to reference the value in the callee
     // because we don't have any better placeholder for a callee-defined object.

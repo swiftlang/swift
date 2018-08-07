@@ -83,7 +83,7 @@ func testFastRuncible<T: Runcible, U: FastRuncible>(_ t: T, u: U)
 // CHECK-NEXT: store %swift.type*
 //   2. Get the witness table for U.RuncerType.Runcee : Speedy
 //     2a. Get the protocol witness table for U.RuncerType : FastRuncer.
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds i8*, i8** %U.FastRuncible, i32 2
+// CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** %U.FastRuncible, i32 2
 // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]],
 // CHECK-NEXT: [[T2:%.*]] = bitcast i8* [[T1]] to i8** (%swift.type*, %swift.type*, i8**)*
 // CHECK-NEXT: %T.RuncerType.FastRuncer = call swiftcc i8** [[T2]](%swift.type* %T.RuncerType, %swift.type* %U, i8** %U.FastRuncible)
@@ -95,7 +95,7 @@ func testFastRuncible<T: Runcible, U: FastRuncible>(_ t: T, u: U)
 // CHECK-NEXT: %T.RuncerType.Runcee = extractvalue %swift.metadata_response [[T2]], 0
 // CHECK-NEXT: store %swift.type*
 //     2b. Get the witness table for U.RuncerType.Runcee : Speedy.
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds i8*, i8** %T.RuncerType.FastRuncer, i32 2
+// CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** %T.RuncerType.FastRuncer, i32 2
 // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]],
 // CHECK-NEXT: [[T2:%.*]] = bitcast i8* [[T1]] to i8** (%swift.type*, %swift.type*, i8**)*
 // CHECK-NEXT: %T.RuncerType.Runcee.Speedy = call swiftcc i8** [[T2]](%swift.type* %T.RuncerType.Runcee, %swift.type* %T.RuncerType, i8** %T.RuncerType.FastRuncer)

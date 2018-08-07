@@ -74,6 +74,10 @@
 
 #include <thread>
 
+#if HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+
 using namespace swift;
 using namespace irgen;
 using namespace llvm;
@@ -81,6 +85,14 @@ using namespace llvm;
 static cl::opt<bool> DisableObjCARCContract(
     "disable-objc-arc-contract", cl::Hidden,
     cl::desc("Disable running objc arc contract for testing purposes"));
+
+// This option is for performance benchmarking: to ensure a consistent
+// performance data, modules are aligned to the page size.
+// Warning: this blows up the text segment size. So use this option only for
+// performance benchmarking.
+static cl::opt<bool> AlignModuleToPageSize(
+    "align-module-to-page-size", cl::Hidden,
+    cl::desc("Align the text section of all LLVM modules to the page size"));
 
 namespace {
 // We need this to access IRGenOptions from extension functions
@@ -274,6 +286,23 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
 
   // Do it.
   ModulePasses.run(*Module);
+
+  if (AlignModuleToPageSize) {
+    // For performance benchmarking: Align the module to the page size by
+    // aligning the first function of the module.
+    unsigned pageSize =
+#if HAVE_UNISTD_H
+      sysconf(_SC_PAGESIZE));
+#else
+      4096; // Use a default value
+#endif
+    for (auto I = Module->begin(), E = Module->end(); I != E; ++I) {
+      if (!I->isDeclaration()) {
+        I->setAlignment(pageSize);
+        break;
+      }
+    }
+  }
 }
 
 namespace {
@@ -308,7 +337,7 @@ static void getHashOfModule(MD5::MD5Result &Result, IRGenOptions &Opts,
                             version::Version const& effectiveLanguageVersion) {
   // Calculate the hash of the whole llvm module.
   MD5Stream HashStream;
-  llvm::WriteBitcodeToFile(Module, HashStream);
+  llvm::WriteBitcodeToFile(*Module, HashStream);
 
   // Update the hash with the compiler version. We want to recompile if the
   // llvm pipeline of the compiler changed.
@@ -355,7 +384,7 @@ static bool needsRecompile(StringRef OutputFilename, ArrayRef<uint8_t> HashData,
       ArrayRef<uint8_t> PrevHashData(
           reinterpret_cast<const uint8_t *>(SectionData.data()),
           SectionData.size());
-      DEBUG(if (PrevHashData.size() == sizeof(MD5::MD5Result)) {
+      LLVM_DEBUG(if (PrevHashData.size() == sizeof(MD5::MD5Result)) {
         if (DiagMutex) DiagMutex->lock();
         SmallString<32> HashStr;
         MD5::stringifyResult(
@@ -411,7 +440,7 @@ bool swift::performLLVM(IRGenOptions &Opts, DiagnosticEngine *Diags,
     getHashOfModule(Result, Opts, Module, TargetMachine,
                     effectiveLanguageVersion);
 
-    DEBUG(
+    LLVM_DEBUG(
       if (DiagMutex) DiagMutex->lock();
       SmallString<32> ResultStr;
       MD5::stringifyResult(Result, ResultStr);
@@ -489,7 +518,7 @@ bool swift::performLLVM(IRGenOptions &Opts, DiagnosticEngine *Diags,
     EmitPasses.add(createTargetTransformInfoWrapperPass(
         TargetMachine->getTargetIRAnalysis()));
 
-    bool fail = TargetMachine->addPassesToEmitFile(EmitPasses, *RawOS,
+    bool fail = TargetMachine->addPassesToEmitFile(EmitPasses, *RawOS, nullptr,
                                                    FileType, !Opts.Verify);
     if (fail) {
       if (Diags) {
@@ -607,7 +636,7 @@ static void embedBitcode(llvm::Module *M, const IRGenOptions &Opts)
   std::string Data;
   llvm::raw_string_ostream OS(Data);
   if (Opts.EmbedMode == IRGenEmbedMode::EmbedBitcode)
-    llvm::WriteBitcodeToFile(M, OS);
+    llvm::WriteBitcodeToFile(*M, OS);
 
   ArrayRef<uint8_t> ModuleData(
       reinterpret_cast<const uint8_t *>(OS.str().data()), OS.str().size());
@@ -843,9 +872,10 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
 static void ThreadEntryPoint(IRGenerator *irgen,
                              llvm::sys::Mutex *DiagMutex, int ThreadIdx) {
   while (IRGenModule *IGM = irgen->fetchFromQueue()) {
-    DEBUG(DiagMutex->lock(); dbgs() << "thread " << ThreadIdx << ": fetched "
-                                    << IGM->OutputFilename << "\n";
-          DiagMutex->unlock(););
+    LLVM_DEBUG(DiagMutex->lock(); dbgs() << "thread " << ThreadIdx
+                                         << ": fetched "
+                                         << IGM->OutputFilename << "\n";
+               DiagMutex->unlock(););
     embedBitcode(IGM->getModule(), irgen->Opts);
     performLLVM(irgen->Opts, &IGM->Context.Diags, DiagMutex, IGM->ModuleHash,
                 IGM->getModule(), IGM->TargetMachine.get(),
@@ -854,7 +884,7 @@ static void ThreadEntryPoint(IRGenerator *irgen,
     if (IGM->Context.Diags.hadAnyError())
       return;
   }
-  DEBUG(
+  LLVM_DEBUG(
     DiagMutex->lock();
     dbgs() << "thread " << ThreadIdx << ": done\n";
     DiagMutex->unlock();

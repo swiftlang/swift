@@ -37,16 +37,8 @@ public:
   void layout() {
     super::layout();
     asImpl().addNominalTypeDescriptor();
-    asImpl().noteStartOfSuperClass();
-    asImpl().addSuperClass();
+    asImpl().addSuperclass();
     asImpl().addReservedWord();
-    asImpl().addReservedWord();
-    asImpl().addReservedWord();
-  }
-
-  bool requiresInitializationFunction() {
-    return Target->getSuperclassDecl() &&
-           Target->getSuperclassDecl()->isForeign();
   }
 
   CanType getTargetType() const {
@@ -70,7 +62,7 @@ public:
   void addMetadataFlags() { addPointer(); }
   void addValueWitnessTable() { addPointer(); }
   void addNominalTypeDescriptor() { addPointer(); }
-  void addSuperClass() { addPointer(); }
+  void addSuperclass() { addPointer(); }
   void addReservedWord() { addPointer(); }
 
 private:

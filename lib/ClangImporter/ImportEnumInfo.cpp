@@ -282,7 +282,7 @@ void EnumInfo::determineConstantNamePrefix(const clang::EnumDecl *decl) {
     if (elem->hasAttr<clang::SwiftNameAttr>())
       return false;
 
-    clang::VersionTuple maxVersion{~0U, ~0U, ~0U};
+    llvm::VersionTuple maxVersion{~0U, ~0U, ~0U};
     switch (elem->getAvailability(nullptr, maxVersion)) {
     case clang::AR_Available:
     case clang::AR_NotYetIntroduced:

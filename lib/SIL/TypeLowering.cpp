@@ -89,60 +89,35 @@ static bool hasSingletonMetatype(CanType instanceType) {
 CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture) {
   auto decl = capture.getDecl();
   if (auto *var = dyn_cast<VarDecl>(decl)) {
-    switch (var->getStorageKind()) {
-    case VarDecl::StoredWithTrivialAccessors:
-      llvm_unreachable("stored local variable with trivial accessors?");
+    assert(var->hasStorage() &&
+           "should not have attempted to directly capture this variable");
 
-    case VarDecl::InheritedWithObservers:
-      llvm_unreachable("inherited local variable?");
+    // If this is a non-address-only stored 'let' constant, we can capture it
+    // by value.  If it is address-only, then we can't load it, so capture it
+    // by its address (like a var) instead.
+    if (var->isImmutable() &&
+        (!SILModuleConventions(M).useLoweredAddresses() ||
+         !getTypeLowering(var->getType()).isAddressOnly()))
+      return CaptureKind::Constant;
 
-    case VarDecl::Computed:
-      llvm_unreachable("computed captured property should have been lowered "
-                       "away");
-
-    case VarDecl::StoredWithObservers:
-    case VarDecl::Addressed:
-    case VarDecl::AddressedWithTrivialAccessors:
-    case VarDecl::AddressedWithObservers:
-    case VarDecl::ComputedWithMutableAddress:
-      // Computed captures should have been lowered away.
-      assert(capture.isDirect()
-             && "computed captured property should have been lowered away");
-
-      // If captured directly, the variable is captured by box or pointer.
-      assert(var->hasStorage());
-      return capture.isNoEscape() ?
-        CaptureKind::StorageAddress : CaptureKind::Box;
-
-    case VarDecl::Stored:
-      // If this is a non-address-only stored 'let' constant, we can capture it
-      // by value.  If it is address-only, then we can't load it, so capture it
-      // by its address (like a var) instead.
-      if (var->isImmutable() &&
-          (!SILModuleConventions(M).useLoweredAddresses() ||
-           !getTypeLowering(var->getType()).isAddressOnly()))
-        return CaptureKind::Constant;
-
-      // In-out parameters are captured by address.
-      if (var->isInOut()) {
-        return CaptureKind::StorageAddress;
-      }
-
-      // Reference storage types can appear in a capture list, which means
-      // we might allocate boxes to store the captures. However, those boxes
-      // have the same lifetime as the closure itself, so we must capture
-      // the box itself and not the payload, even if the closure is noescape,
-      // otherwise they will be destroyed when the closure is formed.
-      if (var->getType()->is<ReferenceStorageType>()) {
-        return CaptureKind::Box;
-      }
-
-      // If we're capturing into a non-escaping closure, we can generally just
-      // capture the address of the value as no-escape.
-      return capture.isNoEscape() ?
-        CaptureKind::StorageAddress : CaptureKind::Box;
+    // In-out parameters are captured by address.
+    if (var->isInOut()) {
+      return CaptureKind::StorageAddress;
     }
-    llvm_unreachable("bad storage kind");
+
+    // Reference storage types can appear in a capture list, which means
+    // we might allocate boxes to store the captures. However, those boxes
+    // have the same lifetime as the closure itself, so we must capture
+    // the box itself and not the payload, even if the closure is noescape,
+    // otherwise they will be destroyed when the closure is formed.
+    if (var->getType()->is<ReferenceStorageType>()) {
+      return CaptureKind::Box;
+    }
+
+    // If we're capturing into a non-escaping closure, we can generally just
+    // capture the address of the value as no-escape.
+    return capture.isNoEscape() ?
+      CaptureKind::StorageAddress : CaptureKind::Box;
   }
   
   // "Captured" local types require no context.
@@ -297,17 +272,13 @@ namespace {
       return visitAbstractTypeParamType(type);
     }
 
-    RetTy visitUnmanagedStorageType(CanUnmanagedStorageType type) {
-      return asImpl().handleTrivial(type);
-    }
-
-    bool hasNativeReferenceCounting(CanType type) {
+    Type getConcreteReferenceStorageReferent(Type type) {
       if (type->isTypeParameter()) {
         auto signature = getGenericSignature();
         assert(signature && "dependent type without generic signature?!");
 
         if (auto concreteType = signature->getConcreteType(type))
-          return hasNativeReferenceCounting(concreteType->getCanonicalType());
+          return concreteType->getCanonicalType();
 
         assert(signature->requiresClass(type));
 
@@ -317,43 +288,51 @@ namespace {
         // at some point the type-checker should prove acyclic-ness.
         auto bound = signature->getSuperclassBound(type);
         if (bound) {
-          return hasNativeReferenceCounting(bound->getCanonicalType());
+          return getConcreteReferenceStorageReferent(bound->getCanonicalType());
         }
 
-        // Ask whether Builtin.UnknownObject uses native reference counting.
         auto &ctx = M.getASTContext();
-        return ctx.TheUnknownObjectType->
-                 usesNativeReferenceCounting(ResilienceExpansion::Maximal);
+        return ctx.TheUnknownObjectType;
       }
 
-      // FIXME: resilience
-      return type->usesNativeReferenceCounting(ResilienceExpansion::Maximal);
+      return type;
     }
 
-    RetTy visitUnownedStorageType(CanUnownedStorageType type) {
-      // FIXME: avoid this duplication of the behavior of isLoadable.
-      if (hasNativeReferenceCounting(type.getReferentType())) {
-        return asImpl().visitLoadableUnownedStorageType(type);
-      } else {
-        return asImpl().visitAddressOnlyUnownedStorageType(type);
-      }
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+    RetTy visit##Name##StorageType(Can##Name##StorageType type) { \
+      return asImpl().handleAddressOnly(type, {IsNotTrivial, \
+                                               IsFixedABI, \
+                                               IsAddressOnly}); \
     }
-
-    RetTy visitLoadableUnownedStorageType(CanUnownedStorageType type) {
-      return asImpl().handleReference(type);
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+    RetTy visit##Name##StorageType(Can##Name##StorageType type) { \
+      return asImpl().handleReference(type); \
     }
-
-    RetTy visitAddressOnlyUnownedStorageType(CanUnownedStorageType type) {
-      return asImpl().handleAddressOnly(type, {IsNotTrivial,
-                                               IsFixedABI,
-                                               IsAddressOnly});
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+    RetTy visitLoadable##Name##StorageType(Can##Name##StorageType type) { \
+      return asImpl().handleReference(type); \
+    } \
+    RetTy visitAddressOnly##Name##StorageType(Can##Name##StorageType type) { \
+      return asImpl().handleAddressOnly(type, {IsNotTrivial, \
+                                               IsFixedABI, \
+                                               IsAddressOnly}); \
+    } \
+    RetTy visit##Name##StorageType(Can##Name##StorageType type) { \
+      auto referentType = type->getReferentType(); \
+      auto concreteType = getConcreteReferenceStorageReferent(referentType); \
+      auto &ctx = M.getASTContext(); \
+      if (Name##StorageType::get(concreteType, ctx) \
+            ->isLoadable(ResilienceExpansion::Maximal)) {         \
+        return asImpl().visitLoadable##Name##StorageType(type); \
+      } else { \
+        return asImpl().visitAddressOnly##Name##StorageType(type); \
+      } \
     }
-
-    RetTy visitWeakStorageType(CanWeakStorageType type) {
-      return asImpl().handleAddressOnly(type, {IsNotTrivial,
-                                               IsFixedABI,
-                                               IsAddressOnly});
+#define UNCHECKED_REF_STORAGE(Name, ...) \
+    RetTy visit##Name##StorageType(Can##Name##StorageType type) { \
+      return asImpl().handleTrivial(type); \
     }
+#include "swift/AST/ReferenceStorage.def"
 
     RetTy visitArchetypeType(CanArchetypeType type) {
       if (type->requiresClass()) {
@@ -997,31 +976,30 @@ namespace {
     }
   };
 
-  /// A type lowering for loadable @unowned types.
-  class LoadableUnownedTypeLowering final : public LeafLoadableTypeLowering {
-  public:
-    LoadableUnownedTypeLowering(SILType type)
-      : LeafLoadableTypeLowering(type, RecursiveProperties::forReference(),
-                                 IsReferenceCounted) {}
-
-    SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
-                           SILValue value) const override {
-      if (B.getFunction().hasQualifiedOwnership())
-        return B.createCopyValue(loc, value);
-
-      B.createUnownedRetain(loc, value, B.getDefaultAtomicity());
-      return value;
-    }
-
-    void emitDestroyValue(SILBuilder &B, SILLocation loc,
-                          SILValue value) const override {
-      if (B.getFunction().hasQualifiedOwnership()) {
-        B.createDestroyValue(loc, value);
-        return;
-      }
-      B.createUnownedRelease(loc, value, B.getDefaultAtomicity());
-    }
+/// A type lowering for loadable @unowned types.
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  class Loadable##Name##TypeLowering final : public LeafLoadableTypeLowering { \
+  public: \
+    Loadable##Name##TypeLowering(SILType type) \
+      : LeafLoadableTypeLowering(type, RecursiveProperties::forReference(), \
+                                 IsReferenceCounted) {} \
+    SILValue emitCopyValue(SILBuilder &B, SILLocation loc, \
+                           SILValue value) const override { \
+      if (B.getFunction().hasQualifiedOwnership()) \
+        return B.createCopyValue(loc, value); \
+      B.create##Name##Retain(loc, value, B.getDefaultAtomicity()); \
+      return value; \
+    } \
+    void emitDestroyValue(SILBuilder &B, SILLocation loc, \
+                          SILValue value) const override { \
+      if (B.getFunction().hasQualifiedOwnership()) { \
+        B.createDestroyValue(loc, value); \
+        return; \
+      } \
+      B.create##Name##Release(loc, value, B.getDefaultAtomicity()); \
+    } \
   };
+#include "swift/AST/ReferenceStorage.def"
 
   /// A class for non-trivial, address-only types.
   class AddressOnlyTypeLowering : public TypeLowering {
@@ -1190,11 +1168,13 @@ namespace {
       return new (TC, Dependent) OpaqueValueTypeLowering(silType, properties);
     }
 
-    const TypeLowering *
-    visitLoadableUnownedStorageType(CanUnownedStorageType type) {
-      return new (TC, Dependent) LoadableUnownedTypeLowering(
-                                  SILType::getPrimitiveObjectType(type));
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+    const TypeLowering * \
+    visitLoadable##Name##StorageType(Can##Name##StorageType type) { \
+      return new (TC, Dependent) Loadable##Name##TypeLowering( \
+                                  SILType::getPrimitiveObjectType(type)); \
     }
+#include "swift/AST/ReferenceStorage.def"
 
     const TypeLowering *
     visitBuiltinUnsafeValueBufferType(CanBuiltinUnsafeValueBufferType type) {
@@ -1301,7 +1281,7 @@ TypeConverter::~TypeConverter() {
     CanType srcType = ti.first.OrigType;
     if (!srcType) continue;
     CanType mappedType = ti.second->getLoweredType().getASTType();
-    if (srcType == mappedType || isa<InOutType>(srcType))
+    if (srcType == mappedType)
       ti.second->~TypeLowering();
   }
 }
@@ -1440,25 +1420,10 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
   
   assert((!key.isDependent() || getCurGenericContext())
          && "dependent type outside of generic context?!");
-  
+  assert(!substType->is<InOutType>());
+
   if (auto existing = find(key))
     return *existing;
-
-  // inout types are a special case for lowering, because they get
-  // completely removed and represented as 'address' SILTypes.
-  if (isa<InOutType>(substType)) {
-    // Derive SILType for InOutType from the object type.
-    CanType substObjectType = substType.getWithoutSpecifierType();
-    AbstractionPattern origObjectType = origType.getWithoutSpecifierType();
-
-    SILType loweredType = getLoweredType(origObjectType, substObjectType)
-      .getAddressType();
-
-    auto *theInfo = new (*this, key.isDependent())
-      TrivialTypeLowering(loweredType);
-    insert(key, theInfo);
-    return *theInfo;
-  }
 
   // Lower the type.
   CanType loweredSubstType =
@@ -1708,9 +1673,10 @@ static CanAnyFunctionType getDestructorInterfaceType(TypeConverter &TC,
   CanType resultTy = (isDeallocating
                       ? TupleType::getEmpty(C)
                       : C.TheNativeObjectType);
+  CanType methodTy = CanFunctionType::get(TupleType::getEmpty(C), resultTy);
 
   auto sig = TC.getEffectiveGenericSignature(dd);
-  return CanAnyFunctionType::get(sig, classType, resultTy, extInfo);
+  return CanAnyFunctionType::get(sig, classType, methodTy, extInfo);
 }
 
 /// Retrieve the type of the ivar initializer or destroyer method for
@@ -2095,57 +2061,85 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
       // If the capture is of a computed property, grab the transitive captures
       // of its accessors.
       if (auto capturedVar = dyn_cast<VarDecl>(capture.getDecl())) {
-        switch (capturedVar->getStorageKind()) {
-        case VarDecl::StoredWithTrivialAccessors:
-          llvm_unreachable("stored local variable with trivial accessors?");
+        if (!capture.isDirect()) {
+          auto impl = capturedVar->getImplInfo();
 
-        case VarDecl::InheritedWithObservers:
-          llvm_unreachable("inherited local variable?");
-
-        case VarDecl::StoredWithObservers:
-        case VarDecl::Addressed:
-        case VarDecl::AddressedWithTrivialAccessors:
-        case VarDecl::AddressedWithObservers:
-        case VarDecl::ComputedWithMutableAddress:
-          // Directly capture storage if we're supposed to.
-          if (capture.isDirect())
-            goto capture_value;
-
-          // Otherwise, transitively capture the accessors.
-          LLVM_FALLTHROUGH;
-
-        case VarDecl::Computed: {
-          collectFunctionCaptures(capturedVar->getGetter());
-          if (auto setter = capturedVar->getSetter())
-            collectFunctionCaptures(setter);
-          continue;
-        }
-
-        case VarDecl::Stored: {
-          // We can always capture the storage in these cases.
-          Type captureType = capturedVar->getType();
-          if (auto *metatypeType = captureType->getAs<MetatypeType>())
-            captureType = metatypeType->getInstanceType();
-
-          if (auto *selfType = captureType->getAs<DynamicSelfType>()) {
-            captureType = selfType->getSelfType();
-
-            // We're capturing a 'self' value with dynamic 'Self' type;
-            // handle it specially.
-            if (!selfCapture &&
-                captureType->getClassOrBoundGenericClass()) {
-              selfCapture = capture;
-              continue;
-            }
+          switch (impl.getReadImpl()) {
+          case ReadImplKind::Stored:
+            // Will capture storage later.
+            break;
+          case ReadImplKind::Address:
+            collectFunctionCaptures(capturedVar->getAddressor());
+            break;
+          case ReadImplKind::Get:
+            collectFunctionCaptures(capturedVar->getGetter());
+            break;
+          case ReadImplKind::Read:
+            collectFunctionCaptures(capturedVar->getReadCoroutine());
+            break;
+          case ReadImplKind::Inherited:
+            llvm_unreachable("inherited local variable?");
           }
 
-          // Otherwise just fall through.
-          goto capture_value;
+          switch (impl.getWriteImpl()) {
+          case WriteImplKind::Immutable:
+          case WriteImplKind::Stored:
+            break;
+          case WriteImplKind::StoredWithObservers:
+          case WriteImplKind::Set:
+            collectFunctionCaptures(capturedVar->getSetter());
+            break;
+          case WriteImplKind::MutableAddress:
+            collectFunctionCaptures(capturedVar->getMutableAddressor());
+            break;
+          case WriteImplKind::Modify:
+            collectFunctionCaptures(capturedVar->getModifyCoroutine());
+            break;
+          case WriteImplKind::InheritedWithObservers:
+            llvm_unreachable("inherited local variable");
+          }
+
+          switch (impl.getReadWriteImpl()) {
+          case ReadWriteImplKind::Immutable:
+          case ReadWriteImplKind::Stored:
+            break;
+          case ReadWriteImplKind::MaterializeToTemporary:
+            // We've already processed the read and write operations.
+            break;
+          case ReadWriteImplKind::MutableAddress:
+            collectFunctionCaptures(capturedVar->getMutableAddressor());
+            break;
+          case ReadWriteImplKind::Modify:
+            collectFunctionCaptures(capturedVar->getModifyCoroutine());
+            break;
+          case ReadWriteImplKind::MaterializeForSet:
+            llvm_unreachable("local variable with materializeForSet?");
+          }
         }
+
+        if (!capturedVar->hasStorage())
+          continue;
+
+        // We can always capture the storage in these cases.
+        Type captureType = capturedVar->getType();
+        if (auto *metatypeType = captureType->getAs<MetatypeType>())
+          captureType = metatypeType->getInstanceType();
+
+        if (auto *selfType = captureType->getAs<DynamicSelfType>()) {
+          captureType = selfType->getSelfType();
+
+          // We're capturing a 'self' value with dynamic 'Self' type;
+          // handle it specially.
+          if (!selfCapture &&
+              captureType->getClassOrBoundGenericClass()) {
+            selfCapture = capture;
+            continue;
+          }
         }
+
+        // Fall through to capture the storage.
       }
       
-    capture_value:
       // Collect non-function captures.
       captures.insert(capture);
     }

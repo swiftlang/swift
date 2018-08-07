@@ -17,9 +17,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SILGenFunction.h"
-#include "Scope.h"
 #include "ManagedValue.h"
+#include "SILGenFunction.h"
+#include "SILGenFunctionBuilder.h"
+#include "Scope.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -130,15 +131,14 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
 
   // Emit the thunk.
   SILLocation loc(derivedDecl);
-  auto thunk =
-      M.createFunction(SILLinkage::Private,
-                       name, overrideInfo.SILFnType,
-                       cast<AbstractFunctionDecl>(derivedDecl)->getGenericEnvironment(),
-                       loc, IsBare,
-                       IsNotTransparent, IsNotSerialized);
+  SILGenFunctionBuilder builder(*this);
+  auto thunk = builder.createFunction(
+      SILLinkage::Private, name, overrideInfo.SILFnType,
+      cast<AbstractFunctionDecl>(derivedDecl)->getGenericEnvironment(), loc,
+      IsBare, IsNotTransparent, IsNotSerialized);
   thunk->setDebugScope(new (M) SILDebugScope(loc, thunk));
 
-  SILGenFunction(*this, *thunk)
+  SILGenFunction(*this, *thunk, theClass)
     .emitVTableThunk(derived, implFn, basePattern,
                      overrideInfo.LoweredType,
                      derivedInfo.LoweredType);
@@ -341,7 +341,7 @@ public:
 
     auto witnessStorage = cast<AbstractStorageDecl>(witness.getDecl());
     auto witnessAccessor =
-      witnessStorage->getAccessorFunction(reqAccessor->getAccessorKind());
+      witnessStorage->getAccessor(reqAccessor->getAccessorKind());
     if (!witnessAccessor)
       return asDerived().addMissingMethod(requirementRef);
 
@@ -610,8 +610,8 @@ SILFunction *SILGenModule::emitProtocolWitness(
   auto *genericEnv = witness.getSyntheticEnvironment();
 
   // The type of the witness thunk.
-  auto input = reqtOrigTy->getInput().subst(reqtSubMap)->getCanonicalType();
-  auto result = reqtOrigTy->getResult().subst(reqtSubMap)->getCanonicalType();
+  auto substReqtTy =
+        cast<AnyFunctionType>(reqtOrigTy.subst(reqtSubMap)->getCanonicalType());
 
   // If there's something to map to for the witness thunk, the conformance
   // should be phrased in the same terms. This particularly applies to classes
@@ -632,10 +632,12 @@ SILFunction *SILGenModule::emitProtocolWitness(
     auto *genericSig = genericEnv->getGenericSignature();
     reqtSubstTy = CanGenericFunctionType::get(
         genericSig->getCanonicalSignature(),
-        input, result, reqtOrigTy->getExtInfo());
+        substReqtTy->getParams(), substReqtTy.getResult(),
+        reqtOrigTy->getExtInfo());
   } else {
-    reqtSubstTy = CanFunctionType::get(
-        input, result, reqtOrigTy->getExtInfo());
+    reqtSubstTy = CanFunctionType::get(substReqtTy->getParams(),
+                                       substReqtTy.getResult(),
+                                       reqtOrigTy->getExtInfo());
   }
 
   // FIXME: this needs to pull out the conformances/witness-tables for any
@@ -663,7 +665,8 @@ SILFunction *SILGenModule::emitProtocolWitness(
   if (witnessRef.isAlwaysInline())
     InlineStrategy = AlwaysInline;
 
-  auto *f = M.createFunction(
+  SILGenFunctionBuilder builder(*this);
+  auto *f = builder.createFunction(
       linkage, nameBuffer, witnessSILFnType, genericEnv,
       SILLocation(witnessRef.getDecl()), IsNotBare, IsTransparent, isSerialized,
       ProfileCounter(), IsThunk, SubclassScope::NotApplicable, InlineStrategy);
@@ -674,7 +677,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
   PrettyStackTraceSILFunction trace("generating protocol witness thunk", f);
 
   // Create the witness.
-  SILGenFunction SGF(*this, *f);
+  SILGenFunction SGF(*this, *f, SwiftModule);
 
   // Substitutions mapping the generic parameters of the witness to
   // archetypes of the witness thunk generic environment.
@@ -862,7 +865,7 @@ public:
   void visitPatternBindingDecl(PatternBindingDecl *pd) {
     // Emit initializers.
     for (unsigned i = 0, e = pd->getNumPatternEntries(); i != e; ++i) {
-      if (pd->getInit(i)) {
+      if (pd->getNonLazyInit(i)) {
         if (pd->isStatic())
           SGM.emitGlobalInitialization(pd, i);
         else
@@ -913,7 +916,7 @@ public:
     for (Decl *member : e->getMembers())
       visit(member);
 
-    if (!e->getExtendedType()->isExistentialType()) {
+    if (!isa<ProtocolDecl>(e->getExtendedNominal())) {
       // Emit witness tables for protocol conformances introduced by the
       // extension.
       for (auto *conformance : e->getLocalConformances(
@@ -953,7 +956,7 @@ public:
   void visitPatternBindingDecl(PatternBindingDecl *pd) {
     // Emit initializers for static variables.
     for (unsigned i = 0, e = pd->getNumPatternEntries(); i != e; ++i) {
-      if (pd->getInit(i)) {
+      if (pd->getNonLazyInit(i)) {
         assert(pd->isStatic() && "stored property in extension?!");
         SGM.emitGlobalInitialization(pd, i);
       }

@@ -32,7 +32,7 @@ let closure: () -> Void = {
 // CHECK: location={{.*}}top-level-guard.swift:[[@LINE+5]]
 // CHECK: (closure_expr
 // CHECK: location={{.*}}top-level-guard.swift:[[@LINE+3]]
-// CHECK: captures=(x)
+// CHECK: captures=(x<direct>)
 // CHECK: (var_decl{{.*}}"closureCapture"
 let closureCapture: () -> Void = { [x] in
   _ = x

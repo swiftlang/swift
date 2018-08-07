@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 419; // Last change: Remove discriminator from LocalDeclTableInfo.
+const uint16_t VERSION_MINOR = 430; // Last change: ordered top-level decls
 
 using DeclIDField = BCFixed<31>;
 
@@ -112,13 +112,41 @@ using CharOffsetField = BitOffsetField;
 using FileSizeField = BCVBR<16>;
 using FileModTimeField = BCVBR<16>;
 
-enum class StorageKind : uint8_t {
-  Stored, StoredWithTrivialAccessors, StoredWithObservers,
-  InheritedWithObservers,
-  Computed, ComputedWithMutableAddress,
-  Addressed, AddressedWithTrivialAccessors, AddressedWithObservers,
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
+enum class ReadImplKind : uint8_t {
+  Stored = 0,
+  Get,
+  Inherited,
+  Address,
+  Read,
 };
-using StorageKindField = BCFixed<4>;
+using ReadImplKindField = BCFixed<3>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
+enum class WriteImplKind : uint8_t {
+  Immutable = 0,
+  Stored,
+  StoredWithObservers,
+  InheritedWithObservers,
+  Set,
+  MutableAddress,
+  Modify,
+};
+using WriteImplKindField = BCFixed<3>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
+enum class ReadWriteImplKind : uint8_t {
+  Immutable = 0,
+  Stored,
+  MaterializeForSet,
+  MutableAddress,
+  MaterializeToTemporary,
+  Modify,
+};
+using ReadWriteImplKindField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
@@ -183,20 +211,24 @@ enum OperatorKind : uint8_t {
   PrecedenceGroup,  // only for cross references
 };
 // This is currently required to have the same width as AccessorKindField.
-using OperatorKindField = BCFixed<3>;
+using OperatorKindField = BCFixed<4>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
 enum AccessorKind : uint8_t {
-  Getter = 0,
-  Setter,
+  Get = 0,
+  Set,
   WillSet,
   DidSet,
   MaterializeForSet,
-  Addressor,
-  MutableAddressor,
+  Address,
+  MutableAddress,
+  Read,
+  Modify,
 };
-using AccessorKindField = BCFixed<3>;
+using AccessorKindField = BCFixed<4>;
+
+using AccessorCountField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
@@ -859,8 +891,9 @@ namespace decls_block {
     IdentifierIDField,      // name
     DeclContextIDField,     // context decl
     BCFixed<1>,             // implicit flag
+    BCFixed<1>,             // isObjC
     GenericEnvironmentIDField, // generic environment
-    AccessLevelField, // access level
+    AccessLevelField,       // access level
     BCVBR<4>,               // number of conformances
     BCArray<TypeIDField>    // inherited types
     // Trailed by the generic parameters (if any), the members record, and
@@ -872,9 +905,10 @@ namespace decls_block {
     IdentifierIDField,      // name
     DeclContextIDField,     // context decl
     BCFixed<1>,             // implicit flag
+    BCFixed<1>,             // isObjC
     GenericEnvironmentIDField, // generic environment
     TypeIDField,            // raw type
-    AccessLevelField, // access level
+    AccessLevelField,       // access level
     BCVBR<4>,               // number of conformances
     BCVBR<4>,               // number of inherited types
     BCArray<TypeIDField>    // inherited types, followed by dependency types
@@ -884,15 +918,15 @@ namespace decls_block {
 
   using ClassLayout = BCRecordLayout<
     CLASS_DECL,
-    IdentifierIDField, // name
-    DeclContextIDField,// context decl
-    BCFixed<1>,        // implicit?
-    BCFixed<1>,        // explicitly objc?
-    BCFixed<1>,        // requires stored property initial values?
-    BCFixed<1>,        // inherits convenience initializers from its superclass?
+    IdentifierIDField,      // name
+    DeclContextIDField,     // context decl
+    BCFixed<1>,             // implicit?
+    BCFixed<1>,             // explicitly objc?
+    BCFixed<1>,             // requires stored property initial values?
+    BCFixed<1>,             // inherits convenience initializers from its superclass?
     GenericEnvironmentIDField, // generic environment
-    TypeIDField,       // superclass
-    AccessLevelField, // access level
+    TypeIDField,            // superclass
+    AccessLevelField,       // access level
     BCVBR<4>,               // number of conformances
     BCArray<TypeIDField>    // inherited types
     // Trailed by the generic parameters (if any), the members record, and
@@ -908,7 +942,8 @@ namespace decls_block {
     BCFixed<1>,             // objc?
     BCFixed<1>,             // existential-type-supported?
     GenericEnvironmentIDField, // generic environment
-    AccessLevelField, // access level
+    TypeIDField,            // superclass
+    AccessLevelField,       // access level
     BCArray<DeclIDField>    // inherited types
     // Trailed by the generic parameters (if any), the members record, and
     // the default witness table record
@@ -955,19 +990,15 @@ namespace decls_block {
     BCFixed<1>,   // HasNonPatternBindingInit?
     BCFixed<1>,   // is getter mutating?
     BCFixed<1>,   // is setter mutating?
-    StorageKindField,   // StorageKind
+    ReadImplKindField,   // read implementation
+    WriteImplKindField,   // write implementation
+    ReadWriteImplKindField,   // read-write implementation
+    AccessorCountField, // number of accessors
     TypeIDField,  // interface type
-    DeclIDField,  // getter
-    DeclIDField,  // setter
-    DeclIDField,  // materializeForSet
-    DeclIDField,  // addressor
-    DeclIDField,  // mutableAddressor
-    DeclIDField,  // willset
-    DeclIDField,  // didset
     DeclIDField,  // overridden decl
     AccessLevelField, // access level
     AccessLevelField, // setter access, if applicable
-    BCArray<TypeIDField> // dependencies
+    BCArray<TypeIDField> // accessors and dependencies
   >;
 
   using ParamLayout = BCRecordLayout<
@@ -985,7 +1016,7 @@ namespace decls_block {
     BCFixed<1>,   // implicit?
     BCFixed<1>,   // is 'static' or 'class'?
     StaticSpellingKindField, // spelling of 'static' or 'class'
-    BCFixed<1>,   // explicitly objc?
+    BCFixed<1>,   // isObjC?
     SelfAccessKindField,   // self access kind
     BCFixed<1>,   // has dynamic self?
     BCFixed<1>,   // has forced static dispatch?
@@ -1014,7 +1045,7 @@ namespace decls_block {
     BCFixed<1>,   // implicit?
     BCFixed<1>,   // is 'static' or 'class'?
     StaticSpellingKindField, // spelling of 'static' or 'class'
-    BCFixed<1>,   // explicitly objc?
+    BCFixed<1>,   // isObjC?
     SelfAccessKindField,   // self access kind
     BCFixed<1>,   // has dynamic self?
     BCFixed<1>,   // has forced static dispatch?
@@ -1098,21 +1129,18 @@ namespace decls_block {
     BCFixed<1>,  // objc?
     BCFixed<1>,   // is getter mutating?
     BCFixed<1>,   // is setter mutating?
-    StorageKindField,   // StorageKind
+    ReadImplKindField,   // read implementation
+    WriteImplKindField,   // write implementation
+    ReadWriteImplKindField,   // read-write implementation
+    AccessorCountField, // number of accessors
     GenericEnvironmentIDField, // generic environment
     TypeIDField, // interface type
-    DeclIDField, // getter
-    DeclIDField, // setter
-    DeclIDField, // materializeForSet
-    DeclIDField, // addressor
-    DeclIDField, // mutableAddressor
-    DeclIDField, // willSet
-    DeclIDField, // didSet
     DeclIDField, // overridden decl
     AccessLevelField, // access level
     AccessLevelField, // setter access, if applicable
     BCVBR<5>,    // number of parameter name components
     BCArray<IdentifierIDField> // name components,
+                               // followed by DeclID accessors,
                                // followed by TypeID dependencies
     // Trailed by:
     // - generic parameters, if any
@@ -1264,6 +1292,11 @@ namespace decls_block {
     DeclIDField // the protocol
   >;
 
+  /// A placeholder for an invalid conformance.
+  using InvalidProtocolConformanceLayout = BCRecordLayout<
+    INVALID_PROTOCOL_CONFORMANCE
+  >;
+
   using NormalProtocolConformanceLayout = BCRecordLayout<
     NORMAL_PROTOCOL_CONFORMANCE,
     DeclIDField, // the protocol
@@ -1317,7 +1350,8 @@ namespace decls_block {
     XREF_TYPE_PATH_PIECE,
     IdentifierIDField, // name
     IdentifierIDField, // private discriminator
-    BCFixed<1>         // restrict to protocol extension
+    BCFixed<1>,        // restrict to protocol extension
+    BCFixed<1>         // imported from Clang?
   >;
 
   using XRefValuePathPieceLayout = BCRecordLayout<
@@ -1325,6 +1359,7 @@ namespace decls_block {
     TypeIDField,       // type
     IdentifierIDField, // name
     BCFixed<1>,        // restrict to protocol extension
+    BCFixed<1>,        // imported from Clang?
     BCFixed<1>         // static?
   >;
 
@@ -1332,6 +1367,7 @@ namespace decls_block {
     XREF_INITIALIZER_PATH_PIECE,
     TypeIDField,             // type
     BCFixed<1>,              // restrict to protocol extension
+    BCFixed<1>,              // imported from Clang?
     CtorInitializerKindField // initializer kind
   >;
 
@@ -1599,6 +1635,8 @@ namespace index_block {
     NESTED_TYPE_DECLS,
     DECL_MEMBER_NAMES,
 
+    ORDERED_TOP_LEVEL_DECLS,
+
     GENERIC_SIGNATURE_OFFSETS,
     SUBSTITUTION_MAP_OFFSETS,
     LastRecordKind = SUBSTITUTION_MAP_OFFSETS,
@@ -1652,6 +1690,11 @@ namespace index_block {
   using EntryPointLayout = BCRecordLayout<
     ENTRY_POINT,
     DeclIDField  // the ID of the main class; 0 if there was a main source file
+  >;
+
+  using OrderedDeclsLayout = BCGenericRecordLayout<
+    RecordIDField,        // record ID
+    BCArray<DeclIDField>  // list of decls by ID
   >;
 }
 

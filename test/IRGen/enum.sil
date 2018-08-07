@@ -1285,7 +1285,7 @@ entry(%r : $*DynamicSinglePayload<T>):
 // CHECK:     i8 2, label {{.*}}
 // CHECK:     i8 3, label {{.*}}
 // CHECK:   ]
-sil @dynamic_single_payload_empty_payload_switch : $DynamicSinglePayload<()> -> () {
+sil @dynamic_single_payload_empty_payload_switch : $(DynamicSinglePayload<()>) -> () {
 entry(%x : $DynamicSinglePayload<()>):
   switch_enum %x : $DynamicSinglePayload<()>, case #DynamicSinglePayload.x!enumelt.1: x_case, case #DynamicSinglePayload.y!enumelt: y_case, case #DynamicSinglePayload.z!enumelt: z_case, default default_case
 
@@ -2452,7 +2452,7 @@ entry(%0 : $DynamicSingleton<NoPayloads>):
 enum Optionable<T> {
   case some(T), none
 }
-sil @optional_optional_class_protocol : $@convention(thin) Optionable<Optionable<PC>> -> Builtin.Int1 {
+sil @optional_optional_class_protocol : $@convention(thin) (Optionable<Optionable<PC>>) -> Builtin.Int1 {
 entry(%o : $Optionable<Optionable<PC>>):
   %t = integer_literal $Builtin.Int1, 1
   %f = integer_literal $Builtin.Int1, 0
@@ -2504,7 +2504,7 @@ entry(%x : $Int32):
   return %d : $Optional<(Optional<()>, Int32)>
 }
 
-sil @optional_float80 : $@convention(thin) Float80 -> () {
+sil @optional_float80 : $@convention(thin) (Float80) -> () {
 entry(%x : $Float80):
   %y = enum $Optional<Float80>, #Optional.some!enumelt.1, %x : $Float80
   return undef : $()

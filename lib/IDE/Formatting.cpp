@@ -601,12 +601,9 @@ class FormatWalker : public SourceEntityWalker {
 
       if (auto AFD = dyn_cast_or_null<AbstractFunctionDecl>(Node.dyn_cast<Decl*>())) {
         // Function parameters are siblings.
-        for (auto P : AFD->getParameterLists()) {
-          for (ParamDecl* param : *P) {
-            if (!param->isSelfParameter())
-              addPair(param->getEndLoc(), FindAlignLoc(param->getStartLoc()),
-                      tok::comma);
-          }
+        for (auto *param : *AFD->getParameters()) {
+          addPair(param->getEndLoc(), FindAlignLoc(param->getStartLoc()),
+                  tok::comma);
         }
       }
 
@@ -816,7 +813,9 @@ public:
                                            StringRef Text, TokenInfo ToInfo) {
 
     // If having sibling locs to align with, respect siblings.
-    if (FC.HasSibling()) {
+    auto isClosingSquare =
+      ToInfo && ToInfo.StartOfLineTarget->getKind() == tok::r_square;
+    if (!isClosingSquare && FC.HasSibling()) {
       StringRef Line = swift::ide::getTextForLine(LineIndex, Text, /*Trim*/true);
       StringBuilder Builder;
       FC.padToSiblingColumn(Builder, FmtOptions);

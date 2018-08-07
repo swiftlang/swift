@@ -1,6 +1,9 @@
 
 // RUN: %target-swift-emit-silgen -enable-sil-ownership -module-name Swift -parse-stdlib %s | %FileCheck %s
 
+@_semantics("typechecker.type(of:)")
+public func type<T, Metatype>(of value: T) -> Metatype {}
+
 enum Optional<Wrapped> {
   case none
   case some(Wrapped)

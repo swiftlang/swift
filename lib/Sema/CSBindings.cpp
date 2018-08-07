@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 #include "ConstraintGraph.h"
 #include "ConstraintSystem.h"
+#include "llvm/ADT/SetVector.h"
 #include <tuple>
 
 using namespace swift;
@@ -66,6 +67,14 @@ ConstraintSystem::determineBestBindings() {
         continue;
 
       for (auto &binding : relatedBindings->getSecond().Bindings) {
+        // We need the binding kind for the potential binding to
+        // either be Exact or Supertypes in order for it to make sense
+        // to add Supertype bindings based on the relationship between
+        // our type variables.
+        if (binding.Kind != AllowedBindingKind::Exact &&
+            binding.Kind != AllowedBindingKind::Supertypes)
+          continue;
+
         auto type = binding.BindingType;
 
         if (ConstraintSystem::typeVarOccursInType(typeVar, type))
@@ -353,8 +362,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
   assert(!typeVar->getImpl().getFixedType(nullptr) && "has a fixed type");
 
   // Gather the constraints associated with this type variable.
-  SmallVector<Constraint *, 8> constraints;
-  llvm::SmallPtrSet<Constraint *, 4> visitedConstraints;
+  llvm::SetVector<Constraint *> constraints;
   getConstraintGraph().gatherConstraints(
       typeVar, constraints, ConstraintGraph::GatheringKind::EquivalenceClass);
 
@@ -369,10 +377,6 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
   bool hasNonDependentMemberRelationalConstraints = false;
   bool hasDependentMemberRelationalConstraints = false;
   for (auto constraint : constraints) {
-    // Only visit each constraint once.
-    if (!visitedConstraints.insert(constraint).second)
-      continue;
-
     switch (constraint->getKind()) {
     case ConstraintKind::Bind:
     case ConstraintKind::Equal:

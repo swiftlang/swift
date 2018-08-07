@@ -65,6 +65,8 @@ set(SWIFT_BENCH_MODULES
     single-source/DictTest4
     single-source/DictTest4Legacy
     single-source/DictionaryBridge
+    single-source/DictionaryBridgeToObjC
+    single-source/DictionaryCompactMapValues
     single-source/DictionaryCopy
     single-source/DictionaryGroup
     single-source/DictionaryKeysContains
@@ -111,7 +113,6 @@ set(SWIFT_BENCH_MODULES
     single-source/ObserverUnappliedMethod
     single-source/OpaqueConsumingUsers
     single-source/OpenClose
-    single-source/PartialApplyDynamicType
     single-source/Phonebook
     single-source/PointerArithmetics
     single-source/PolymorphicCalls
@@ -271,6 +272,7 @@ message("--   SWIFT_LIBRARY_PATH = ${SWIFT_LIBRARY_PATH}")
 message("--   CLANG_EXEC = ${CLANG_EXEC}")
 message("--   SWIFT_OPTIMIZATION_LEVELS = ${SWIFT_OPTIMIZATION_LEVELS}")
 message("--   ONLY_PLATFORMS = ${ONLY_PLATFORMS}")
+message("--   PAGE_ALIGNMENT_OPTION = ${PAGE_ALIGNMENT_OPTION}")
 
 message("--   found platforms: ${platforms}")
 message("--   found sdks:")

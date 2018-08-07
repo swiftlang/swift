@@ -12,8 +12,6 @@
 // This file provides Swift language support by invoking SourceKit internally.
 //===----------------------------------------------------------------------===//
 
-import Foundation
-
 enum SourceKitdError: Error, CustomStringConvertible {
   case EditorOpenError(message: String)
   case EditorCloseError(message: String)
@@ -39,7 +37,10 @@ public class SwiftLang {
       Request.addParameter(.key_SourceText, value: content)
     }
     Request.addParameter(.key_Name, value: name)
-    Request.addParameter(.key_EnableSyntaxTree, value: 1)
+    Request.addParameter(.key_SyntaxTreeTransferMode,
+                         value: .kind_SyntaxTreeFull)
+    Request.addParameter(.key_EnableSyntaxMap, value: 0)
+    Request.addParameter(.key_EnableStructure, value: 0)
     Request.addParameter(.key_SyntacticOnly, value: 1)
 
     // FIXME: SourceKitd error handling.
@@ -62,16 +63,15 @@ public class SwiftLang {
   /// thread safe.
   /// - Parameter url: The URL you wish to parse.
   /// - Returns: The syntax tree in Json format string.
-  public static func parse(_ url: URL) throws -> String {
-    let Path = url.path
-    return try parse(content: Path, name: Path, isURL: true)
+  public static func parse(path: String) throws -> String {
+    return try parse(content: path, name: path, isURL: true)
   }
 
   /// Parses a given source buffer into a `Syntax` tree in Json serialization
   /// format by querying SourceKitd service. This function isn't thread safe.
   /// - Parameter source: The source buffer you wish to parse.
   /// - Returns: The syntax tree in Json format string.
-  public static func parse(_ source: String) throws -> String {
+  public static func parse(source: String) throws -> String {
     return try parse(content: source, name: "foo", isURL: false)
   }
 }

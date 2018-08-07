@@ -136,8 +136,8 @@ internal func _bridgeASCIICocoaString(
   return length == numCharWritten ? count : nil
 }
 
-public // @testable
-func _bridgeToCocoa(_ small: _SmallUTF8String) -> _CocoaString {
+@usableFromInline
+internal func _bridgeToCocoa(_ small: _SmallUTF8String) -> _CocoaString {
   return small.withUTF8CodeUnits { bufPtr in
       return _swift_stdlib_CFStringCreateWithBytes(
           nil, bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
@@ -315,7 +315,7 @@ public final class _NSContiguousString : _SwiftNativeNSString, _NSStringCore {
   @objc(characterAtIndex:)
   public func character(at index: Int) -> UInt16 {
     defer { _fixLifetime(self) }
-    return _guts[index]
+    return _guts.codeUnit(atCheckedOffset: index)
   }
 
   @inlinable

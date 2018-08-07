@@ -1365,10 +1365,11 @@ namespace {
                            SILType T) const {
       // If the layout is fixed, the size will be a constant.
       // Otherwise, do a memcpy of the dynamic size of the type.
-      IGF.Builder.CreateMemCpy(dest.getAddress(), src.getAddress(),
-                               TI->getSize(IGF, T),
-                               std::min(dest.getAlignment().getValue(),
-                                        src.getAlignment().getValue()));
+      IGF.Builder.CreateMemCpy(dest.getAddress(),
+                               dest.getAlignment().getValue(),
+                               src.getAddress(),
+                               src.getAlignment().getValue(),
+                               TI->getSize(IGF, T));
     }
 
     void emitPrimitiveStorePayloadAndExtraTag(IRGenFunction &IGF, Address dest,
@@ -2326,6 +2327,29 @@ namespace {
         llvm_unreachable("ABI-inaccessible type cannot be loadable");
 
       case Normal: {
+        if (loweredType.hasOpenedExistential()) {
+          EnumPayload payload;
+          llvm::Value *extraTag;
+          std::tie(payload, extraTag) =
+              getPayloadAndExtraTagFromExplosion(IGF, src);
+          llvm::BasicBlock *endBB =
+              testFixedEnumContainsPayload(IGF, payload, extraTag);
+
+          if (PayloadBitCount > 0) {
+            ConditionalDominanceScope condition(IGF);
+            Explosion payloadValue;
+            Explosion payloadCopy;
+            auto &loadableTI = getLoadablePayloadTypeInfo();
+            loadableTI.unpackFromEnumPayload(IGF, payload, payloadValue, 0);
+            loadableTI.copy(IGF, payloadValue, payloadCopy,
+                            IGF.getDefaultAtomicity());
+            (void)payloadCopy.claimAll();
+          }
+          IGF.Builder.CreateBr(endBB);
+          IGF.Builder.emitBlock(endBB);
+          return;
+        }
+
         if (!copyEnumFunction)
           copyEnumFunction = emitCopyEnumFunction(IGF.IGM, loweredType);
         Explosion tmp;
@@ -2363,6 +2387,27 @@ namespace {
         llvm_unreachable("ABI-inaccessible type cannot be loadable");
 
       case Normal: {
+        if (loweredType.hasOpenedExistential()) {
+          EnumPayload payload;
+          llvm::Value *extraTag;
+          std::tie(payload, extraTag) =
+              getPayloadAndExtraTagFromExplosion(IGF, src);
+          llvm::BasicBlock *endBB =
+              testFixedEnumContainsPayload(IGF, payload, extraTag);
+
+          // If we did, consume it.
+          if (PayloadBitCount > 0) {
+            ConditionalDominanceScope condition(IGF);
+            Explosion payloadValue;
+            auto &loadableTI = getLoadablePayloadTypeInfo();
+            loadableTI.unpackFromEnumPayload(IGF, payload, payloadValue, 0);
+            loadableTI.consume(IGF, payloadValue, IGF.getDefaultAtomicity());
+          }
+
+          IGF.Builder.CreateBr(endBB);
+          IGF.Builder.emitBlock(endBB);
+          return;
+        }
         if (!consumeEnumFunction)
           consumeEnumFunction = emitConsumeEnumFunction(IGF.IGM, loweredType);
         Explosion tmp;
@@ -4068,6 +4113,22 @@ namespace {
 
       case BitwiseTakable:
       case Normal: {
+        if (loweredType.hasOpenedExistential()) {
+          auto parts = destructureAndTagLoadableEnum(IGF, src);
+
+          forNontrivialPayloads(
+              IGF, parts.tag,
+              [&](unsigned tagIndex, EnumImplStrategy::Element elt) {
+                auto &lti = cast<LoadableTypeInfo>(*elt.ti);
+                Explosion value;
+                projectPayloadValue(IGF, parts.payload, tagIndex, lti, value);
+
+                Explosion tmp;
+                lti.copy(IGF, value, tmp, IGF.getDefaultAtomicity());
+                (void)tmp.claimAll(); // FIXME: repack if not bit-identical
+              });
+          return;
+        }
         if (!copyEnumFunction)
           copyEnumFunction = emitCopyEnumFunction(IGF.IGM, loweredType);
         Explosion tmp;
@@ -4113,6 +4174,20 @@ namespace {
 
       case BitwiseTakable:
       case Normal: {
+        if (loweredType.hasOpenedExistential()) {
+          auto parts = destructureAndTagLoadableEnum(IGF, src);
+
+          forNontrivialPayloads(
+              IGF, parts.tag,
+              [&](unsigned tagIndex, EnumImplStrategy::Element elt) {
+                auto &lti = cast<LoadableTypeInfo>(*elt.ti);
+                Explosion value;
+                projectPayloadValue(IGF, parts.payload, tagIndex, lti, value);
+
+                lti.consume(IGF, value, IGF.getDefaultAtomicity());
+              });
+          return;
+        }
         if (!consumeEnumFunction)
           consumeEnumFunction = emitConsumeEnumFunction(IGF.IGM, loweredType);
         Explosion tmp;
@@ -6036,25 +6111,26 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
   };
 
   if (auto fixedTI = dyn_cast<FixedTypeInfo>(ti)) {
-    DEBUG(llvm::dbgs() << "Layout for enum ";
-          type->print(llvm::dbgs());
-          llvm::dbgs() << ":\n";);
+    LLVM_DEBUG(llvm::dbgs() << "Layout for enum ";
+               type->print(llvm::dbgs());
+               llvm::dbgs() << ":\n";);
 
     SpareBitVector spareBits;
     fixedTI->applyFixedSpareBitsMask(spareBits);
 
     auto bitMask = strategy->getBitMaskForNoPayloadElements();
     assert(bitMask.size() == fixedTI->getFixedSize().getValueInBits());
-    DEBUG(llvm::dbgs() << "  no-payload mask:\t";
-          displayBitMask(bitMask));
-    DEBUG(llvm::dbgs() << "  spare bits mask:\t";
-          displayBitMask(spareBits));
+    LLVM_DEBUG(llvm::dbgs() << "  no-payload mask:\t";
+               displayBitMask(bitMask));
+    LLVM_DEBUG(llvm::dbgs() << "  spare bits mask:\t";
+               displayBitMask(spareBits));
 
     for (auto &elt : strategy->getElementsWithNoPayload()) {
       auto bitPattern = strategy->getBitPatternForNoPayloadElement(elt.decl);
       assert(bitPattern.size() == fixedTI->getFixedSize().getValueInBits());
-      DEBUG(llvm::dbgs() << "  no-payload case " << elt.decl->getName().str()
-                         << ":\t";
+      LLVM_DEBUG(llvm::dbgs() << "  no-payload case "
+                              << elt.decl->getName().str()
+                              << ":\t";
             displayBitMask(bitPattern));
 
       auto maskedBitPattern = bitPattern;
@@ -6065,8 +6141,8 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
     assert(tagBits.count() >= 32
             || static_cast<size_t>(static_cast<size_t>(1) << tagBits.count())
                >= strategy->getElementsWithPayload().size());
-    DEBUG(llvm::dbgs() << "  payload tag bits:\t";
-          displayBitMask(tagBits));
+    LLVM_DEBUG(llvm::dbgs() << "  payload tag bits:\t";
+               displayBitMask(tagBits));
 
     tagBits &= spareBits;
     assert(tagBits.none() && "tag bits overlap spare bits?!");

@@ -131,76 +131,6 @@ extension _StringGuts {
 }
 
 extension String {
-  @inlinable
-  internal static func _fromCodeUnits<
-    Input: Collection,
-    Encoding: Unicode.Encoding
-  >(
-    _ input: Input,
-    encoding: Encoding.Type,
-    repairIllFormedSequences: Bool,
-    minimumCapacity: Int = 0
-  ) -> String?
-  where Input.Element == Encoding.CodeUnit {
-
-    // TODO(SSO): small check
-
-    // Determine how many UTF-16 code units we'll need
-    let inputStream = input.makeIterator()
-    guard let (utf16Count, isASCII) = UTF16.transcodedLength(
-        of: inputStream,
-        decodedAs: encoding,
-        repairingIllFormedSequences: repairIllFormedSequences) else {
-      return nil
-    }
-
-    let capacity = Swift.max(utf16Count, minimumCapacity)
-    if isASCII {
-      if let small = _SmallUTF8String(
-        _fromCodeUnits: input,
-        utf16Length: utf16Count,
-        isASCII: true,
-        Encoding.self
-      ) {
-        return String(_StringGuts(small))
-      }
-
-      let storage = _SwiftStringStorage<UInt8>.create(
-        capacity: capacity,
-        count: utf16Count)
-      var p = storage.start
-      let sink: (UTF32.CodeUnit) -> Void = {
-        p.pointee = UTF8.CodeUnit($0)
-        p += 1
-      }
-      let hadError = transcode(
-        input.makeIterator(),
-        from: encoding, to: UTF32.self,
-        stoppingOnError: true,
-        into: sink)
-      _sanityCheck(!hadError,
-        "string cannot be ASCII if there were decoding errors")
-      return String(_largeStorage: storage)
-    } else {
-      // TODO(SSO): Small transcoded string
-
-      let storage = _SwiftStringStorage<UTF16.CodeUnit>.create(
-        capacity: capacity,
-        count: utf16Count)
-      var p = storage.start
-      let sink: (UTF16.CodeUnit) -> Void = {
-        p.pointee = $0
-        p += 1
-      }
-      _ = transcode(
-        input.makeIterator(),
-        from: encoding, to: UTF16.self,
-        stoppingOnError: !repairIllFormedSequences,
-        into: sink)
-      return String(_largeStorage: storage)
-    }
-  }
-
   /// Creates a string from the given Unicode code units in the specified
   /// encoding.
   ///
@@ -210,9 +140,24 @@ extension String {
   ///   - sourceEncoding: The encoding in which `codeUnits` should be
   ///     interpreted.
   @inlinable // FIXME(sil-serialize-all)
+  @inline(__always) // Eliminate dynamic type check when possible
   public init<C: Collection, Encoding: Unicode.Encoding>(
     decoding codeUnits: C, as sourceEncoding: Encoding.Type
   ) where C.Iterator.Element == Encoding.CodeUnit {
+    if let contigBytes = codeUnits as? _HasContiguousBytes,
+       sourceEncoding == UTF8.self
+    {
+      self = contigBytes.withUnsafeBytes { rawBufPtr in
+        let ptr = rawBufPtr.baseAddress._unsafelyUnwrappedUnchecked
+        return String._fromUTF8(
+          UnsafeBufferPointer(
+            start: ptr.assumingMemoryBound(to: UInt8.self),
+            count: rawBufPtr.count),
+          repair: true).unsafelyUnwrapped
+      }
+      return
+    }
+
     self = String._fromCodeUnits(
       codeUnits, encoding: sourceEncoding, repairIllFormedSequences: true)!
   }
@@ -595,7 +540,8 @@ extension String {
 /// [equivalence]: http://www.unicode.org/glossary/#canonical_equivalent
 @_fixed_layout
 public struct String {
-  public var _guts: _StringGuts
+  public // SPI(Foundation)
+  var _guts: _StringGuts
 
   /// Creates an empty string.
   ///
@@ -610,8 +556,7 @@ public struct String {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  public // @testable
-  init(_ _guts: _StringGuts) {
+  internal init(_ _guts: _StringGuts) {
     self._guts = _guts
   }
 }
@@ -629,40 +574,35 @@ internal func _isAllASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
   return true
 }
 
-extension String {
-  static func _fromUTF8CodeUnitSequence(
-    _ input: UnsafeBufferPointer<UInt8>, repair: Bool
-  ) -> String? {
-    if _isAllASCII(input) {
-      return _fromASCII(input)
-    }
+// TODO: re-organize a bit before merging...
 
-    if let smol = _SmallUTF8String(input) {
-      return String(_StringGuts(smol))
-    }
-
-    return String._fromCodeUnits(
-      input, encoding: UTF8.self, repairIllFormedSequences: repair)
+@usableFromInline
+internal protocol _HasContiguousBytes {
+  func withUnsafeBytes<R>(
+    _ body: (UnsafeRawBufferPointer) throws -> R
+  ) rethrows -> R
+}
+extension Array: _HasContiguousBytes {}
+extension UnsafeBufferPointer: _HasContiguousBytes {
+  @inlinable
+  @inline(__always)
+  func withUnsafeBytes<R>(
+    _ body: (UnsafeRawBufferPointer) throws -> R
+  ) rethrows -> R {
+    let ptr = UnsafeRawPointer(self.baseAddress._unsafelyUnwrappedUnchecked)
+    let len = self.count &* MemoryLayout<Element>.stride
+    return try body(UnsafeRawBufferPointer(start: ptr, count: len))
   }
-
-  @usableFromInline
-  static func _fromASCII(_ input: UnsafeBufferPointer<UInt8>) -> String {
-    if let smol = _SmallUTF8String(input) {
-      return String(_StringGuts(smol))
-    }
-    let storage = _SwiftStringStorage<UInt8>.create(
-      capacity: input.count, count: input.count)
-    _sanityCheck(storage.count == input.count)
-    storage.start.initialize(
-      from: input.baseAddress._unsafelyUnwrappedUnchecked, count: input.count)
-    return String(_StringGuts(_large: storage))
-  }
-
-  @usableFromInline
-  static func _fromWellFormedUTF8CodeUnitSequence(
-    _ input: UnsafeBufferPointer<UInt8>, repair: Bool = false
-  ) -> String {
-    return String._fromUTF8CodeUnitSequence(input, repair: repair)!
+}
+extension UnsafeMutableBufferPointer: _HasContiguousBytes {
+  @inlinable
+  @inline(__always)
+  func withUnsafeBytes<R>(
+    _ body: (UnsafeRawBufferPointer) throws -> R
+  ) rethrows -> R {
+    let ptr = UnsafeRawPointer(self.baseAddress._unsafelyUnwrappedUnchecked)
+    let len = self.count &* MemoryLayout<Element>.stride
+    return try body(UnsafeRawBufferPointer(start: ptr, count: len))
   }
 }
 
@@ -759,7 +699,7 @@ extension String : _ExpressibleByBuiltinStringLiteral {
       self = String(_StringGuts(_large: _UnmanagedString(bufPtr)))
       return
     }
-    self = String._fromWellFormedUTF8CodeUnitSequence(bufPtr)
+    self = String._fromWellFormedUTF8(bufPtr)
   }
 }
 
@@ -781,7 +721,6 @@ extension String : ExpressibleByStringLiteral {
 
 extension String : CustomDebugStringConvertible {
   /// A representation of the string that is suitable for debugging.
-  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     var result = "\""
     for us in self.unicodeScalars {
@@ -934,25 +873,6 @@ extension String {
   @inlinable // FIXME(sil-serialize-all)
   public static func += (lhs: inout String, rhs: String) {
     lhs.append(rhs)
-  }
-}
-
-extension String {
-  /// Constructs a `String` in `resultStorage` containing the given UTF-8.
-  ///
-  /// Low-level construction interface used by introspection
-  /// implementation in the runtime library.
-  @inlinable
-  @_silgen_name("swift_stringFromUTF8InRawMemory")
-  public // COMPILER_INTRINSIC
-  static func _fromUTF8InRawMemory(
-    _ resultStorage: UnsafeMutablePointer<String>,
-    start: UnsafeMutablePointer<UTF8.CodeUnit>,
-    utf8CodeUnitCount: Int
-  ) {
-    resultStorage.initialize(to:
-      String._fromWellFormedUTF8CodeUnitSequence(
-        UnsafeBufferPointer(start: start, count: utf8CodeUnitCount)))
   }
 }
 

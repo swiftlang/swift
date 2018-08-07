@@ -23,26 +23,26 @@ import Foundation
 public let CharacterPropertiesFetch = BenchmarkInfo(
   name: "CharacterPropertiesFetch",
   runFunction: run_CharacterPropertiesFetch,
-  tags: [.validation, .api, .String])
+  tags: [.validation, .api, .String],
+  setUpFunction: { blackHole(workload) })
 
 public let CharacterPropertiesStashed = BenchmarkInfo(
   name: "CharacterPropertiesStashed",
   runFunction: run_CharacterPropertiesStashed,
   tags: [.validation, .api, .String],
-  setUpFunction: { run_CharacterPropertiesStashed(1) },
-  tearDownFunction: nil)
+  setUpFunction: { setupStash() })
 
 public let CharacterPropertiesStashedMemo = BenchmarkInfo(
   name: "CharacterPropertiesStashedMemo",
   runFunction: run_CharacterPropertiesStashedMemo,
-  tags: [.validation, .api, .String])
+  tags: [.validation, .api, .String],
+  setUpFunction: { setupMemo() })
 
 public let CharacterPropertiesPrecomputed = BenchmarkInfo(
   name: "CharacterPropertiesPrecomputed",
   runFunction: run_CharacterPropertiesPrecomputed,
   tags: [.validation, .api, .String],
-  setUpFunction: { run_CharacterPropertiesPrecomputed(1) },
-  tearDownFunction: nil)
+  setUpFunction: { setupPrecomputed() })
 
 extension Character {
   var firstScalar: UnicodeScalar { return unicodeScalars.first! }
@@ -75,6 +75,13 @@ func is${Property}Stashed(_ c: Character) -> Bool {
 }
 % end
 
+func setupStash() {
+  blackHole(workload)
+% for Property, Set in Properties.items():
+    blackHole(${Set})
+% end
+}
+
 // Memoize the stashed set
 % for Property, Set in Properties.items():
 var ${Set}Memo = Set<UInt32>()
@@ -88,6 +95,13 @@ func is${Property}StashedMemo(_ c: Character) -> Bool {
   return false
 }
 % end
+
+func setupMemo() {
+  blackHole(workload)
+% for Property, Set in Properties.items():
+    blackHole(${Set}Memo)
+% end
+}
 
 // Precompute whole scalar set
 % for Property, Set in Properties.items():
@@ -105,6 +119,13 @@ func is${Property}Precomputed(_ c: Character) -> Bool {
   return ${Set}Precomputed.contains(c.firstScalar.value)
 }
 % end
+
+func setupPrecomputed() {
+  blackHole(workload)
+% for Property, Set in Properties.items():
+    blackHole(${Set}Precomputed)
+% end
+}
 
 // Compute on the fly
 //
@@ -175,3 +196,6 @@ public func run_CharacterPropertiesPrecomputed(_ N: Int) {
 
 // TODO: run_CharacterPropertiesComputed
 
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

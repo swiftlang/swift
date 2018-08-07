@@ -33,7 +33,7 @@ class RefArray<T> {
 
 @inline(never)
 func genIntArray() {
-  _ = RefArray<Int>(3, count:200_000)
+  blackHole(RefArray<Int>(3, count:200_000))
   // should be a nop
 }
 
@@ -45,7 +45,7 @@ enum PODEnum {
 
 @inline(never)
 func genEnumArray() {
-  _ = RefArray<PODEnum>(PODEnum.Some(3))
+  blackHole(RefArray<PODEnum>(PODEnum.Some(3)))
   // should be a nop
 }
 
@@ -55,13 +55,13 @@ struct S {
 }
 @inline(never)
 func genStructArray() {
-  _ = RefArray<S>(S(x:3, y:4))
+  blackHole(RefArray<S>(S(x:3, y:4)))
   // should be a nop
 }
 
 @inline(never)
 public func run_ArrayOfPOD(_ N: Int) {
-  for _ in 0...N {
+  for _ in 0..<N {
     genIntArray()
     genEnumArray()
     genStructArray()

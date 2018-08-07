@@ -198,7 +198,6 @@ internal final class _DataStorage {
                 var buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: range.count, alignment: MemoryLayout<UInt>.alignment)
                 defer { buffer.deallocate() }
 
-                let sliceRange = NSRange(location: range.lowerBound - _offset, length: range.count)
                 var enumerated = 0
                 d.enumerateBytes { (ptr, byteRange, stop) in
                     if byteRange.upperBound - _offset < range.lowerBound {
@@ -1249,9 +1248,20 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         self.init(backing: backing, range: 0..<backing._length)
     }
     
+    @available(swift, introduced: 4.2)
     @inlinable
     public init<S: Sequence>(bytes elements: S) where S.Iterator.Element == UInt8 {
         self.init(elements)
+    }
+
+    @available(swift, obsoleted: 4.2)
+    public init(bytes: Array<UInt8>) {
+       self.init(bytes)
+    }
+    
+    @available(swift, obsoleted: 4.2)
+    public init(bytes: ArraySlice<UInt8>) {
+       self.init(bytes)
     }
 
     @usableFromInline
@@ -1665,7 +1675,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     }
     
     public subscript<R: RangeExpression>(_ rangeExpression: R) -> Data
-        where R.Bound: FixedWidthInteger, R.Bound.Stride : SignedInteger {
+        where R.Bound: FixedWidthInteger {
         get {
             let lower = R.Bound(_sliceRange.lowerBound)
             let upper = R.Bound(_sliceRange.upperBound)

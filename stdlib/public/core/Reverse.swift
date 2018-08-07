@@ -22,7 +22,7 @@ extension MutableCollection where Self: BidirectionalCollection {
   ///
   /// - Complexity: O(*n*), where *n* is the number of elements in the
   ///   collection.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // protocol-only
   public mutating func reverse() {
     if isEmpty { return }
     var f = startIndex
@@ -307,9 +307,3 @@ extension LazyCollectionProtocol
     return ReversedCollection(_base: elements).lazy
   }
 }
-
-// @available(*, deprecated, renamed: "ReversedCollection")
-public typealias ReversedRandomAccessCollection<T: RandomAccessCollection> = ReversedCollection<T>
-
-// @available(*, deprecated, renamed: "ReversedCollection.Index")
-public typealias ReversedIndex<T: BidirectionalCollection> = ReversedCollection<T>

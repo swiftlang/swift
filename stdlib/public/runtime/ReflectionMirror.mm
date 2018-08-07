@@ -257,11 +257,21 @@ struct TupleImpl : ReflectionMirrorImpl {
 
 // Implementation for structs.
 struct StructImpl : ReflectionMirrorImpl {
+  bool isReflectable() {
+    const auto *Struct = static_cast<const StructMetadata *>(type);
+    const auto &Description = Struct->getDescription();
+    return Description->getTypeContextDescriptorFlags().isReflectable();
+  }
+
   char displayStyle() {
     return 's';
   }
   
   intptr_t count() {
+    if (!isReflectable()) {
+      return 0;
+    }
+
     auto *Struct = static_cast<const StructMetadata *>(type);
     return Struct->getDescription()->NumFields;
   }
@@ -278,7 +288,7 @@ struct StructImpl : ReflectionMirrorImpl {
 
     Any result;
     
-    swift_getFieldAt(type, i, [&](llvm::StringRef name, FieldType fieldInfo) {
+    _swift_getFieldAt(type, i, [&](llvm::StringRef name, FieldType fieldInfo) {
       assert(!fieldInfo.isIndirect() && "indirect struct fields not implemented");
       
       *outName = name.data();
@@ -319,7 +329,7 @@ struct EnumImpl : ReflectionMirrorImpl {
     bool indirect = false;
     
     const char *caseName = nullptr;
-    swift_getFieldAt(type, tag, [&](llvm::StringRef name, FieldType info) {
+    _swift_getFieldAt(type, tag, [&](llvm::StringRef name, FieldType info) {
       caseName = name.data();
       payloadType = info.getType();
       indirect = info.isIndirect();
@@ -399,11 +409,20 @@ struct EnumImpl : ReflectionMirrorImpl {
 
 // Implementation for classes.
 struct ClassImpl : ReflectionMirrorImpl {
+  bool isReflectable() {
+    const auto *Class = static_cast<const ClassMetadata *>(type);
+    const auto &Description = Class->getDescription();
+    return Description->getTypeContextDescriptorFlags().isReflectable();
+  }
+
   char displayStyle() {
     return 'c';
   }
   
   intptr_t count() {
+    if (!isReflectable())
+      return 0;
+
     auto *Clas = static_cast<const ClassMetadata*>(type);
     auto count = Clas->getDescription()->NumFields;
 
@@ -435,7 +454,7 @@ struct ClassImpl : ReflectionMirrorImpl {
 
     Any result;
     
-    swift_getFieldAt(type, i, [&](llvm::StringRef name, FieldType fieldInfo) {
+    _swift_getFieldAt(type, i, [&](llvm::StringRef name, FieldType fieldInfo) {
       assert(!fieldInfo.isIndirect() && "class indirect properties not implemented");
       
       auto *bytes = *reinterpret_cast<char * const *>(value);
@@ -539,7 +558,6 @@ auto call(OpaqueValue *passedValue, const Metadata *T, const Metadata *passedTyp
     impl->type = type;
     impl->value = value;
     auto result = f(impl);
-    SWIFT_CC_PLUSONE_GUARD(T->vw_destroy(passedValue));
     return result;
   };
   
@@ -642,7 +660,7 @@ auto call(OpaqueValue *passedValue, const Metadata *T, const Metadata *passedTyp
 
 
 // func _getNormalizedType<T>(_: T, type: Any.Type) -> Any.Type
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 const Metadata *swift_reflectionMirror_normalizedType(OpaqueValue *value,
                                                       const Metadata *type,
                                                       const Metadata *T) {
@@ -650,7 +668,7 @@ const Metadata *swift_reflectionMirror_normalizedType(OpaqueValue *value,
 }
 
 // func _getChildCount<T>(_: T, type: Any.Type) -> Int
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 intptr_t swift_reflectionMirror_count(OpaqueValue *value,
                                       const Metadata *type,
                                       const Metadata *T) {
@@ -670,7 +688,7 @@ intptr_t swift_reflectionMirror_count(OpaqueValue *value,
 //   outName: UnsafeMutablePointer<UnsafePointer<CChar>?>,
 //   outFreeFunc: UnsafeMutablePointer<NameFreeFunc?>
 // ) -> Any
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 AnyReturn swift_reflectionMirror_subscript(OpaqueValue *value, const Metadata *type,
                                            intptr_t index,
                                            const char **outName,
@@ -683,19 +701,19 @@ AnyReturn swift_reflectionMirror_subscript(OpaqueValue *value, const Metadata *t
 #pragma clang diagnostic pop
 
 // func _getDisplayStyle<T>(_: T) -> CChar
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 char swift_reflectionMirror_displayStyle(OpaqueValue *value, const Metadata *T) {
   return call(value, T, nullptr, [](ReflectionMirrorImpl *impl) { return impl->displayStyle(); });
 }
 
 // func _getEnumCaseName<T>(_ value: T) -> UnsafePointer<CChar>?
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 const char *swift_EnumCaseName(OpaqueValue *value, const Metadata *T) {
   return call(value, T, nullptr, [](ReflectionMirrorImpl *impl) { return impl->enumCaseName(); });
 }
 
 // func _opaqueSummary(_ metadata: Any.Type) -> UnsafePointer<CChar>?
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 const char *swift_OpaqueSummary(const Metadata *T) {
   switch (T->getKind()) {
     case MetadataKind::Class:
@@ -731,7 +749,7 @@ const char *swift_OpaqueSummary(const Metadata *T) {
 
 #if SWIFT_OBJC_INTEROP
 // func _getQuickLookObject<T>(_: T) -> AnyObject?
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 id swift_reflectionMirror_quickLookObject(OpaqueValue *value, const Metadata *T) {
   return call(value, T, nullptr, [](ReflectionMirrorImpl *impl) { return impl->quickLookObject(); });
 }

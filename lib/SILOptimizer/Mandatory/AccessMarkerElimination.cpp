@@ -18,13 +18,6 @@
 /// This is an always-on pass for temporary bootstrapping. It allows running
 /// test cases through the pipeline and exercising SIL verification before all
 /// passes support access markers.
-///
-/// This must only run before inlining _semantic calls. If we inline and drop
-/// the @_semantics("optimize.sil.preserve_exclusivity") attribute, the inlined
-/// markers will be eliminated, but the noninlined markers will not. This would
-/// result in inconsistent begin/end_unpaired_access resulting in unpredictable,
-/// potentially catastrophic runtime behavior.
-///
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "access-marker-elim"
@@ -37,13 +30,10 @@
 using namespace swift;
 
 // This temporary option allows markers during optimization passes. Enabling
-// this flag causes this pass to preserve only dynamic checks when dynamic
-// checking is enabled. Otherwise, this pass removes all checks.
-//
-// This is currently unsupported because tail duplication results in
-// address-type block arguments.
+// this flag causes this pass to preserve all access markers. Otherwise, it only
+// preserved "dynamic" markers.
 llvm::cl::opt<bool> EnableOptimizedAccessMarkers(
-    "sil-optimized-access-markers", llvm::cl::init(true),
+    "sil-optimized-access-markers", llvm::cl::init(false),
     llvm::cl::desc("Enable memory access markers during optimization passes."));
 
 namespace {
@@ -58,7 +48,7 @@ struct AccessMarkerElimination {
       : Mod(&F->getModule()), F(F) {}
 
   void notifyErased(SILInstruction *inst) {
-    DEBUG(llvm::dbgs() << "Erasing access marker: " << *inst);
+    LLVM_DEBUG(llvm::dbgs() << "Erasing access marker: " << *inst);
     removedAny = true;
   }
 
@@ -80,8 +70,8 @@ struct AccessMarkerElimination {
 
 bool AccessMarkerElimination::shouldPreserveAccess(
     SILAccessEnforcement enforcement) {
-  if (!EnableOptimizedAccessMarkers)
-    return false;
+  if (EnableOptimizedAccessMarkers || Mod->getOptions().VerifyExclusivity)
+    return true;
 
   switch (enforcement) {
   case SILAccessEnforcement::Static:
@@ -169,7 +159,8 @@ bool AccessMarkerElimination::stripMarkers() {
 // Implement a SILModule::SILFunctionBodyCallback that strips all access
 // markers from newly deserialized function bodies.
 static void prepareSILFunctionForOptimization(ModuleDecl *, SILFunction *F) {
-  DEBUG(llvm::dbgs() << "Stripping all markers in: " << F->getName() << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "Stripping all markers in: " << F->getName()
+                          << "\n");
 
   AccessMarkerElimination(F).stripMarkers();
 }

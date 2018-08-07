@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s
+// RUN: %target-typecheck-verify-swift
 var global = 42
 
 @dynamicMemberLookup
@@ -150,7 +150,9 @@ func test_iuo_result(x : IUOResultTest) {
   
   let _ : Int = x.bar  // Test implicitly forced optional
   let b = x.bar        // Should promote to 'Int?'
-  let _ : Int = b // expected-error {{value of optional type 'Int?' not unwrapped; did you mean to use '!' or '?'}}
+  let _ : Int = b // expected-error {{value of optional type 'Int?' must be unwrapped}}
+  // expected-note@-1{{coalesce}}
+  // expected-note@-2{{force-unwrap}}
 }
 
 

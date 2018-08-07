@@ -1612,8 +1612,7 @@ class FindAllSubDecls : public SourceEntityWalker {
       return false;
 
     if (auto ASD = dyn_cast<AbstractStorageDecl>(D)) {
-      llvm::SmallVector<Decl *, 6> accessors;
-      ASD->getAllAccessorFunctions(accessors);
+      auto accessors = ASD->getAllAccessors();
       Found.insert(accessors.begin(), accessors.end());
     }
     return true;
@@ -2394,7 +2393,8 @@ collectAvailableRefactoringsAtCursor(SourceFile *SF, unsigned Line,
 
 static EnumDecl* getEnumDeclFromSwitchStmt(SwitchStmt *SwitchS) {
   if (auto SubjectTy = SwitchS->getSubjectExpr()->getType()) {
-    return SubjectTy->getAnyNominal()->getAsEnumOrEnumExtensionContext();
+    // FIXME: Support more complex subject like '(Enum1, Enum2)'.
+    return dyn_cast_or_null<EnumDecl>(SubjectTy->getAnyNominal());
   }
   return nullptr;
 }
@@ -2568,6 +2568,110 @@ bool RefactoringActionLocalizeString::performChange() {
     return true;
   EditConsumer.accept(SM, Target->getStartLoc(), "NSLocalizedString(");
   EditConsumer.insertAfter(SM, Target->getEndLoc(), ", comment: \"\")");
+  return false;
+}
+
+static void generateMemberwiseInit(SourceEditConsumer &EditConsumer,
+                            SourceManager &SM,
+                            SmallVectorImpl<std::string>& memberNameVector,
+                            SmallVectorImpl<std::string>& memberTypeVector,
+                            SourceLoc targetLocation) {
+  
+  assert(!memberTypeVector.empty());
+  assert(memberTypeVector.size() == memberNameVector.size());
+  
+  EditConsumer.accept(SM, targetLocation, "\ninternal init(");
+  
+  for (size_t i = 0, n = memberTypeVector.size(); i < n ; i++) {
+    EditConsumer.accept(SM, targetLocation, memberNameVector[i] + ": " +
+                        memberTypeVector[i]);
+    
+    if (i != memberTypeVector.size() - 1) {
+      EditConsumer.accept(SM, targetLocation, ", ");
+    }
+  }
+  
+  EditConsumer.accept(SM, targetLocation, ") {\n");
+  
+  for (auto varName: memberNameVector) {
+    EditConsumer.accept(SM, targetLocation,
+                        "self." + varName + " = " + varName + "\n");
+  }
+  
+  EditConsumer.accept(SM, targetLocation, "}\n");
+}
+  
+static SourceLoc collectMembersForInit(ResolvedCursorInfo CursorInfo,
+                           SmallVectorImpl<std::string>& memberNameVector,
+                           SmallVectorImpl<std::string>& memberTypeVector) {
+  
+  if (!CursorInfo.ValueD)
+    return SourceLoc();
+  
+  ClassDecl *classDecl = dyn_cast<ClassDecl>(CursorInfo.ValueD);
+  if (!classDecl || classDecl->getStoredProperties().empty() ||
+      CursorInfo.IsRef) {
+    return SourceLoc();
+  }
+  
+  SourceLoc bracesStart = classDecl->getBraces().Start;
+  if (!bracesStart.isValid())
+    return SourceLoc();
+  
+  SourceLoc targetLocation = bracesStart.getAdvancedLoc(1);
+  if (!targetLocation.isValid())
+    return SourceLoc();
+  
+  for (auto varDecl : classDecl->getStoredProperties()) {
+    auto parentPatternBinding = varDecl->getParentPatternBinding();
+    if (!parentPatternBinding)
+      continue;
+    
+    auto varDeclIndex =
+      parentPatternBinding->getPatternEntryIndexForVarDecl(varDecl);
+    
+    if (auto init = varDecl->getParentPatternBinding()->getInit(varDeclIndex)) {
+      if (init->getStartLoc().isValid())
+        continue;
+    }
+    
+    StringRef memberName = varDecl->getName().str();
+    memberNameVector.push_back(memberName.str());
+    
+    std::string memberType = varDecl->getType().getString();
+    memberTypeVector.push_back(memberType);
+  }
+  
+  if (memberNameVector.empty() || memberTypeVector.empty()) {
+    return SourceLoc();
+  }
+  
+  return targetLocation;
+}
+
+bool RefactoringActionMemberwiseInitLocalRefactoring::
+isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
+  
+  SmallVector<std::string, 8> memberNameVector;
+  SmallVector<std::string, 8> memberTypeVector;
+  
+  return collectMembersForInit(Tok, memberNameVector,
+                               memberTypeVector).isValid();
+}
+    
+bool RefactoringActionMemberwiseInitLocalRefactoring::performChange() {
+  
+  SmallVector<std::string, 8> memberNameVector;
+  SmallVector<std::string, 8> memberTypeVector;
+  
+  SourceLoc targetLocation = collectMembersForInit(CursorInfo, memberNameVector,
+                                         memberTypeVector);
+  if (targetLocation.isInvalid())
+    return true;
+  
+  generateMemberwiseInit(EditConsumer, SM, memberNameVector,
+                         memberTypeVector, targetLocation);
+  
   return false;
 }
 
@@ -2776,7 +2880,7 @@ bool RefactoringActionTrailingClosure::performChange() {
     return true;
   Expr *Args = CE->getArg();
   if (auto *TSE = dyn_cast<TupleShuffleExpr>(Args))
-    Args = TSE;
+    Args = TSE->getSubExpr();
 
   Expr *ClosureArg = nullptr;
   Expr *PrevArg = nullptr;

@@ -101,10 +101,12 @@ static SourceKitRequest ActiveRequest = SourceKitRequest::None;
 static sourcekitd_uid_t SemaDiagnosticStage;
 
 static sourcekitd_uid_t NoteDocUpdate;
-
 static SourceKit::Semaphore semaSemaphore(0);
 static sourcekitd_response_t semaResponse;
 static const char *semaName;
+
+static sourcekitd_uid_t NoteTest;
+static SourceKit::Semaphore noteSyncSemaphore(0);
 
 namespace {
 struct AsyncResponseInfo {
@@ -139,7 +141,28 @@ struct NotificationBuffer {
 };
 static NotificationBuffer notificationBuffer;
 
-static void printBufferedNotifications() {
+static void syncNotificationsWithService() {
+  // Send TestNotification request, then wait for the notification. This ensures
+  // that all notifications previously posted on the service side have been
+  // passed to our notification handler.
+  sourcekitd_object_t req = sourcekitd_request_dictionary_create(nullptr, nullptr, 0);
+  sourcekitd_request_dictionary_set_uid(req, KeyRequest, RequestTestNotification);
+  auto resp = sourcekitd_send_request_sync(req);
+  if (sourcekitd_response_is_error(resp)) {
+    sourcekitd_response_description_dump(resp);
+    exit(1);
+  }
+  sourcekitd_response_dispose(resp);
+  sourcekitd_request_release(req);
+  if (noteSyncSemaphore.wait(60 * 1000)) {
+    llvm::report_fatal_error("Test notification not received");
+  }
+}
+
+static void printBufferedNotifications(bool syncWithService = true) {
+  if (syncWithService) {
+    syncNotificationsWithService();
+  }
   notificationBuffer.handleNotifications([](sourcekitd_response_t note) {
     sourcekitd_response_description_dump_filedesc(note, STDOUT_FILENO);
   });
@@ -171,6 +194,7 @@ static int skt_main(int argc, const char **argv) {
   SemaDiagnosticStage = sourcekitd_uid_get_from_cstr("source.diagnostic.stage.swift.sema");
 
   NoteDocUpdate = sourcekitd_uid_get_from_cstr("source.notification.editor.documentupdate");
+  NoteTest = sourcekitd_uid_get_from_cstr("source.notification.test");
 
 #define REQUEST(NAME, CONTENT) Request##NAME = sourcekitd_uid_get_from_cstr(CONTENT);
 #define KIND(NAME, CONTENT) Kind##NAME = sourcekitd_uid_get_from_cstr(CONTENT);
@@ -342,11 +366,12 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
 
   assert(Opts.repeatRequest >= 1);
   for (unsigned i = 0; i < Opts.repeatRequest; ++i) {
-    int ret = handleTestInvocation(Opts, InitOpts);
-    printBufferedNotifications();
-    if (ret) {
+    if (int ret = handleTestInvocation(Opts, InitOpts)) {
+      printBufferedNotifications(/*syncWithService=*/true);
       return ret;
     }
+    // We will sync with the service before exiting; don't do so here.
+    printBufferedNotifications(/*syncWithService=*/false);
   }
   return 0;
 }
@@ -367,6 +392,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     llvm::sys::fs::make_absolute(AbsSourceFile);
     SourceFile = AbsSourceFile.str();
   }
+  std::string SemaName = !Opts.Name.empty() ? Opts.Name : SourceFile;
 
   if (!Opts.TextInputFile.empty()) {
     auto Buf = getBufferForFilename(Opts.TextInputFile);
@@ -446,7 +472,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
                                           RequestCodeCompleteOpen);
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
-    sourcekitd_request_dictionary_set_string(Req, KeyName, SourceFile.c_str());
+    sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
     addCodeCompleteOptions(Req, Opts);
     break;
 
@@ -454,14 +480,14 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
                                           RequestCodeCompleteClose);
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
-    sourcekitd_request_dictionary_set_string(Req, KeyName, SourceFile.c_str());
+    sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
     break;
 
   case SourceKitRequest::CodeCompleteUpdate:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
                                           RequestCodeCompleteUpdate);
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
-    sourcekitd_request_dictionary_set_string(Req, KeyName, SourceFile.c_str());
+    sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
     addCodeCompleteOptions(Req, Opts);
     break;
 
@@ -617,34 +643,37 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
 
   case SourceKitRequest::SyntaxMap:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestEditorOpen);
-    sourcekitd_request_dictionary_set_string(Req, KeyName, SourceFile.c_str());
+    sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxMap, true);
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableStructure, false);
-    sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxTree, false);
+    sourcekitd_request_dictionary_set_uid(Req, KeySyntaxTreeTransferMode,
+                                          KindSyntaxTreeOff);
     sourcekitd_request_dictionary_set_int64(Req, KeySyntacticOnly, !Opts.UsedSema);
     break;
 
   case SourceKitRequest::Structure:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestEditorOpen);
-    sourcekitd_request_dictionary_set_string(Req, KeyName, SourceFile.c_str());
+    sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxMap, false);
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableStructure, true);
-    sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxTree, false);
+    sourcekitd_request_dictionary_set_uid(Req, KeySyntaxTreeTransferMode,
+                                          KindSyntaxTreeOff);
     sourcekitd_request_dictionary_set_int64(Req, KeySyntacticOnly, !Opts.UsedSema);
     break;
 
   case SourceKitRequest::Format:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestEditorOpen);
-    sourcekitd_request_dictionary_set_string(Req, KeyName, SourceFile.c_str());
+    sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxMap, false);
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableStructure, false);
-    sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxTree, false);
+    sourcekitd_request_dictionary_set_uid(Req, KeySyntaxTreeTransferMode,
+                                          KindSyntaxTreeOff);
     sourcekitd_request_dictionary_set_int64(Req, KeySyntacticOnly, !Opts.UsedSema);
     break;
 
   case SourceKitRequest::ExpandPlaceholder:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestEditorOpen);
-    sourcekitd_request_dictionary_set_string(Req, KeyName, SourceFile.c_str());
+    sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxMap, false);
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableStructure, false);
     sourcekitd_request_dictionary_set_int64(Req, KeySyntacticOnly, !Opts.UsedSema);
@@ -652,10 +681,11 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
 
   case SourceKitRequest::SyntaxTree:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestEditorOpen);
-    sourcekitd_request_dictionary_set_string(Req, KeyName, SourceFile.c_str());
+    sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxMap, false);
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableStructure, false);
-    sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxTree, true);
+    sourcekitd_request_dictionary_set_uid(Req, KeySyntaxTreeTransferMode,
+                                          KindSyntaxTreeFull);
     sourcekitd_request_dictionary_set_int64(Req, KeySyntacticOnly, true);
     break;
 
@@ -666,23 +696,23 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
   case SourceKitRequest::SemanticInfo:
     InitOpts.UsedSema = true;
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestEditorOpen);
-    sourcekitd_request_dictionary_set_string(Req, KeyName, SourceFile.c_str());
+    sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
     break;
 
   case SourceKitRequest::Open:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestEditorOpen);
-    sourcekitd_request_dictionary_set_string(Req, KeyName, SourceFile.c_str());
+    sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
     break;
 
   case SourceKitRequest::Close:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestEditorClose);
-    sourcekitd_request_dictionary_set_string(Req, KeyName, SourceFile.c_str());
+    sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
     break;
 
   case SourceKitRequest::Edit:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
                                           RequestEditorReplaceText);
-    sourcekitd_request_dictionary_set_string(Req, KeyName, SourceFile.c_str());
+    sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
     sourcekitd_request_dictionary_set_int64(Req, KeyLength, Opts.Length);
     sourcekitd_request_dictionary_set_string(Req, KeySourceText,
@@ -853,7 +883,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
   if (!Opts.isAsyncRequest) {
     sourcekitd_response_t Resp = sendRequestSync(Req, Opts);
     sourcekitd_request_release(Req);
-    return handleResponse(Resp, Opts, SourceFile, std::move(SourceBuf),
+    return handleResponse(Resp, Opts, SemaName, std::move(SourceBuf),
                           &InitOpts)
                ? 1
                : 0;
@@ -861,7 +891,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
 #if SOURCEKITD_HAS_BLOCKS
     AsyncResponseInfo info;
     info.options = Opts;
-    info.sourceFilename = std::move(SourceFile);
+    info.sourceFilename = std::move(SemaName);
     info.sourceBuffer = std::move(SourceBuf);
     unsigned respIndex = asyncResponses.size();
     asyncResponses.push_back(std::move(info));
@@ -1169,6 +1199,8 @@ static void notification_receiver(sourcekitd_response_t resp) {
     semaResponse = sourcekitd_send_request_sync(edReq);
     sourcekitd_request_release(edReq);
     semaSemaphore.signal();
+  } else if (note == NoteTest) {
+    noteSyncSemaphore.signal();
   } else {
     notificationBuffer.add(resp);
   }

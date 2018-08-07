@@ -60,6 +60,10 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (const Arg *A = Args.getLastArg(OPT_index_store_path)) {
     Opts.IndexStorePath = A->getValue();
   }
+  if (const Arg *A = Args.getLastArg(OPT_output_request_graphviz)) {
+    Opts.RequestEvaluatorGraphVizPath = A->getValue();
+  }
+
   Opts.IndexSystemModules |= Args.hasArg(OPT_index_system_modules);
 
   Opts.EmitVerboseSIL |= Args.hasArg(OPT_emit_verbose_sil);
@@ -67,6 +71,8 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.EnableTesting |= Args.hasArg(OPT_enable_testing);
   Opts.EnableResilience |= Args.hasArg(OPT_enable_resilience);
+
+  Opts.TrackSystemDeps |= Args.hasArg(OPT_track_system_dependencies);
 
   computePrintStatsOptions();
   computeDebugTimeOptions();
@@ -318,6 +324,8 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::EmitImportedModules;
   if (Opt.matches(OPT_parse))
     return FrontendOptions::ActionType::Parse;
+  if (Opt.matches(OPT_resolve_imports))
+    return FrontendOptions::ActionType::ResolveImports;
   if (Opt.matches(OPT_typecheck))
     return FrontendOptions::ActionType::Typecheck;
   if (Opt.matches(OPT_dump_parse))
@@ -334,6 +342,8 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::DumpTypeRefinementContexts;
   if (Opt.matches(OPT_dump_interface_hash))
     return FrontendOptions::ActionType::DumpInterfaceHash;
+  if (Opt.matches(OPT_dump_type_info))
+    return FrontendOptions::ActionType::DumpTypeInfo;
   if (Opt.matches(OPT_print_ast))
     return FrontendOptions::ActionType::PrintAST;
 
@@ -463,6 +473,12 @@ bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_dependencies);
     return true;
   }
+  if (!FrontendOptions::canActionEmitReferenceDependencies(Opts.RequestedAction)
+      && Opts.InputsAndOutputs.hasReferenceDependenciesPath()) {
+    Diags.diagnose(SourceLoc(),
+                   diag::error_mode_cannot_emit_reference_dependencies);
+    return true;
+  }
   if (!FrontendOptions::canActionEmitObjCHeader(Opts.RequestedAction) &&
       Opts.InputsAndOutputs.hasObjCHeaderOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_header);
@@ -482,6 +498,11 @@ bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
   if (!FrontendOptions::canActionEmitModuleDoc(Opts.RequestedAction) &&
       Opts.InputsAndOutputs.hasModuleDocOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module_doc);
+    return true;
+  }
+  if (!FrontendOptions::canActionEmitInterface(Opts.RequestedAction) &&
+      Opts.InputsAndOutputs.hasModuleInterfaceOutputPath()) {
+    Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_interface);
     return true;
   }
   return false;

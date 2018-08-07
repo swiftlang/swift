@@ -20,7 +20,7 @@ struct Foo {
 // CHECK-NEXT: entry
 // CHECK-NEXT: ret void
 sil @trivial : $@convention(thin) (Builtin.Int32) -> () {
-bb0(%0 : $Builtin.Int32):
+bb0(%0 : @trivial $Builtin.Int32):
   %1 = copy_value %0 : $Builtin.Int32
   destroy_value %1 : $Builtin.Int32
   %2 = tuple()
@@ -36,10 +36,22 @@ bb0(%0 : $Builtin.Int32):
 // CHECK: call %swift.refcounted* @swift_retain(%swift.refcounted* returned [[VAL2]])
 // CHECK: call void @swift_release(%swift.refcounted* [[VAL1]])
 // CHECK: call void @swift_release(%swift.refcounted* [[VAL2]])
-sil @non_trivial : $@convention(thin) (Foo) -> () {
-bb0(%0 : $Foo):
+sil @non_trivial : $@convention(thin) (@guaranteed Foo) -> () {
+bb0(%0 : @guaranteed $Foo):
   %1 = copy_value %0 : $Foo
   destroy_value %1 : $Foo
   %2 = tuple()
   return %2 : $()
+}
+
+// CHECK: define{{( protected)?}} swiftcc void @non_trivial_unowned(
+// CHECK: call %swift.refcounted* @swift_unownedRetainStrong(%swift.refcounted* returned %0)
+// CHECK: call void @swift_release(%swift.refcounted* %0)
+sil @non_trivial_unowned : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %1 = ref_to_unowned %0 : $Builtin.NativeObject to $@sil_unowned Builtin.NativeObject
+  %2 = copy_unowned_value %1 : $@sil_unowned Builtin.NativeObject
+  destroy_value %2 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
 }

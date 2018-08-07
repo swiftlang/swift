@@ -428,7 +428,7 @@ auto ReturnKW = SyntaxFactory::makeReturnKeyword({}, Trivia::spaces(1));
 auto Return = SyntaxFactory::makeReturnStmt(ReturnKW, Integer,
                                             /*Semicolon=*/ None);
 
-auto RightBrace = SyntaxFactory::makeLeftBraceToken({}, {});
+auto RightBrace = SyntaxFactory::makeRightBraceToken({}, {});
 
 auto Statements = SyntaxFactory::makeBlankStmtList()
   .addStmt(Return);
@@ -523,7 +523,7 @@ declarations. The `Token` class has the following fields.
 
 libSyntax uses Swift's `gyb` tool to generate the `Syntax` subclasses,
 `SyntaxFactory` methods, `SyntaxKind` enum entry, and `SyntaxBuilder` class.
-These files rely on a support library located at `utils/gyb_syntax_support.py`
+These files rely on a support library located at `utils/gyb_syntax_support/`
 which holds some common logic used inside the `gyb` files. These `gyb` files
 will be re-generated whenever any Python files are changed.
 
@@ -587,7 +587,7 @@ class Renamer: SyntaxRewriter {
 // Parse a .swift file
 let currentFile = URL(fileURLWithPath: "/tmp/test.swift")
 let currentFileContents = try String(contentsOf: currentFile)
-let parsed = try SourceFileSyntax.parse(currentFile)
+let parsed = try SourceFileSyntax.parse(currentFileContents)
 
 // Print the original file
 print("\n//======== Original =========\n")

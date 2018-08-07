@@ -109,7 +109,7 @@ namespace swift {
       StaticSpellingKind StaticSpellingKindVal;
       DescriptiveDeclKind DescriptiveDeclKindVal;
       const DeclAttribute *DeclAttributeVal;
-      clang::VersionTuple VersionVal;
+      llvm::VersionTuple VersionVal;
       LayoutConstraint LayoutConstraintVal;
     };
     
@@ -181,7 +181,7 @@ namespace swift {
         : Kind(DiagnosticArgumentKind::DeclAttribute),
           DeclAttributeVal(attr) {}
 
-    DiagnosticArgument(clang::VersionTuple version)
+    DiagnosticArgument(llvm::VersionTuple version)
       : Kind(DiagnosticArgumentKind::VersionTuple),
         VersionVal(version) { }
 
@@ -264,7 +264,7 @@ namespace swift {
       return DeclAttributeVal;
     }
 
-    clang::VersionTuple getAsVersionTuple() const {
+    llvm::VersionTuple getAsVersionTuple() const {
       assert(Kind == DiagnosticArgumentKind::VersionTuple);
       return VersionVal;
     }
@@ -759,7 +759,7 @@ namespace swift {
 
     /// \returns true if any diagnostic consumer gave an error while invoking
     //// \c finishProcessing.
-    bool finishProcessing(SourceManager &);
+    bool finishProcessing();
 
     /// \brief Format the given diagnostic text and place the result in the given
     /// buffer.

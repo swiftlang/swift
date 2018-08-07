@@ -24,6 +24,19 @@ func foo1(_ c : CC) -> CC{
   return c.getSelf()
 }
 
+protocol Foo {
+  var bar: String { get }
+}
+func foo(x: Foo) {
+  _ = x.bar
+}
+
+func testWithoutActuallyEscaping(closure: (Int) -> Void) {
+  withoutActuallyEscaping(closure) { escapable in
+    _ = escapable
+  }
+}
+
 // RUN: %target-swift-ide-test -range -pos=7:8 -end-pos=7:19 -source-filename %s | %FileCheck %s -check-prefix=CHECK-BOOL
 // CHECK-BOOL: <Type>Bool</Type>
 
@@ -36,6 +49,12 @@ func foo1(_ c : CC) -> CC{
 // RUN: %target-swift-ide-test -range -pos=23:31 -end-pos=23:41 -source-filename %s | %FileCheck %s -check-prefix=CHECK-PART-EXPR1
 // RUN: %target-swift-ide-test -range -pos=23:20 -end-pos=23:30 -source-filename %s | %FileCheck %s -check-prefix=CHECK-PART-EXPR1
 // RUN: %target-swift-ide-test -range -pos=23:9 -end-pos=23:19 -source-filename %s | %FileCheck %s -check-prefix=CHECK-PART-EXPR1
+
+// RUN: %target-swift-ide-test -range -pos=31:7 -end-pos=31:12 -source-filename %s | %FileCheck %s -check-prefix=CHECK-OEE-EXPR
+
+// RUN: %target-swift-ide-test -range -pos=35:1 -end-pos=38:1 -source-filename %s | %FileCheck %s -check-prefix=CHECK-MTEE-EXPR-1
+// RUN: %target-swift-ide-test -range -pos=35:27 -end-pos=35:34 -source-filename %s | %FileCheck %s -check-prefix=CHECK-MTEE-EXPR-2
+// RUN: %target-swift-ide-test -range -pos=35:36 -end-pos=37:4 -source-filename %s | %FileCheck %s -check-prefix=CHECK-MTEE-EXPR-3
 
 // CHECK-PART-EXPR: <Kind>PartOfExpression</Kind>
 // CHECK-PART-EXPR-NEXT: <Content>getSelf()</Content>
@@ -50,3 +69,41 @@ func foo1(_ c : CC) -> CC{
 // CHECK-PART-EXPR2: <Parent>Call</Parent>
 // CHECK-PART-EXPR2: <ASTNodes>2</ASTNodes>
 // CHECK-PART-EXPR2: <end>
+
+// CHECK-OEE-EXPR: <Kind>SingleExpression</Kind>
+// CHECK-OEE-EXPR-NEXT: <Content>x.bar</Content>
+// CHECK-OEE-EXPR-NEXT: <Type>String</Type><Exit>false</Exit>
+// CHECK-OEE-EXPR-NEXT: <Context>swift_ide_test.(file).foo(x:)</Context>
+// CHECK-OEE-EXPR-NEXT: <ASTNodes>1</ASTNodes>
+// CHECK-OEE-EXPR-NEXT: <end>
+
+// CHECK-MTEE-EXPR-1: <Kind>SingleExpression</Kind>
+// CHECK-MTEE-EXPR-1-NEXT: <Content>withoutActuallyEscaping(closure) { escapable in
+// CHECK-MTEE-EXPR-1-NEXT:     _ = escapable
+// CHECK-MTEE-EXPR-1-NEXT:   }</Content>
+// CHECK-MTEE-EXPR-1-NEXT: <Type>()</Type><Exit>false</Exit>
+// CHECK-MTEE-EXPR-1-NEXT: <Context>swift_ide_test.(file).testWithoutActuallyEscaping(closure:)</Context>
+// CHECK-MTEE-EXPR-1-NEXT: <Declared>escapable</Declared><OutscopeReference>false</OutscopeReference>
+// CHECK-MTEE-EXPR-1-NEXT: <Referenced>closure</Referenced><Type>(Int) -> Void</Type>
+// CHECK-MTEE-EXPR-1-NEXT: <Referenced>escapable</Referenced><Type>(Int) -> Void</Type>
+// CHECK-MTEE-EXPR-1-NEXT: <ASTNodes>1</ASTNodes>
+// CHECK-MTEE-EXPR-1-NEXT: <end>
+
+// CHECK-MTEE-EXPR-2: <Kind>SingleExpression</Kind>
+// CHECK-MTEE-EXPR-2-NEXT: <Content>closure</Content>
+// CHECK-MTEE-EXPR-2-NEXT: <Type>(Int) -> Void</Type><Exit>false</Exit>
+// CHECK-MTEE-EXPR-2-NEXT: <Context>swift_ide_test.(file).testWithoutActuallyEscaping(closure:)</Context>
+// CHECK-MTEE-EXPR-2-NEXT: <Referenced>closure</Referenced><Type>(Int) -> Void</Type>
+// CHECK-MTEE-EXPR-2-NEXT: <ASTNodes>1</ASTNodes>
+// CHECK-MTEE-EXPR-2-NEXT: <end>
+
+// CHECK-MTEE-EXPR-3: <Kind>SingleExpression</Kind>
+// CHECK-MTEE-EXPR-3-NEXT: <Content>{ escapable in
+// CHECK-MTEE-EXPR-3-NEXT:     _ = escapable
+// CHECK-MTEE-EXPR-3-NEXT:   }</Content>
+// CHECK-MTEE-EXPR-3-NEXT: <Type>((Int) -> Void) -> ()</Type><Exit>false</Exit>
+// CHECK-MTEE-EXPR-3-NEXT: <Context>swift_ide_test.(file).testWithoutActuallyEscaping(closure:)</Context>
+// CHECK-MTEE-EXPR-3-NEXT: <Declared>escapable</Declared><OutscopeReference>false</OutscopeReference>
+// CHECK-MTEE-EXPR-3-NEXT: <Referenced>escapable</Referenced><Type>(Int) -> Void</Type>
+// CHECK-MTEE-EXPR-3-NEXT: <ASTNodes>1</ASTNodes>
+// CHECK-MTEE-EXPR-3-NEXT: <end>

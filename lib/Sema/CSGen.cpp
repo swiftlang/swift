@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -23,6 +23,7 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/APInt.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 #include <utility>
@@ -176,6 +177,14 @@ namespace {
     
     /// \brief Ignore declarations.
     bool walkToDeclPre(Decl *decl) override { return false; }
+
+    /// \brief Ignore patterns.
+    std::pair<bool, Pattern*> walkToPatternPre(Pattern *pat) override {
+      return { false, pat };
+    }
+
+    /// \brief Ignore types.
+    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
   };
   
   /// Given a collection of "linked" expressions, analyzes them for
@@ -303,9 +312,12 @@ namespace {
 
       // Coercion exprs have a rigid type, so there's no use in gathering info
       // about them.
-      if (isa<CoerceExpr>(expr)) {
-        LTI.collectedTypes.insert(CS.getType(expr).getPointer());
-
+      if (auto *coercion = dyn_cast<CoerceExpr>(expr)) {
+        // Let's not collect information about types initialized by
+        // coercions just like we don't for regular initializer calls,
+        // because that might lead to overly eager type variable merging.
+        if (!coercion->isLiteralInit())
+          LTI.collectedTypes.insert(CS.getType(expr).getPointer());
         return { false, expr };
       }
 
@@ -317,6 +329,13 @@ namespace {
         return { false, expr };
       }
       
+      // Don't walk into unresolved member expressions - we avoid merging type
+      // variables inside UnresolvedMemberExpr and those outside, since they
+      // should be allowed to behave independently in CS.
+      if (isa<UnresolvedMemberExpr>(expr)) {
+        return {false, expr };
+      }
+
       return { true, expr };
     }
     
@@ -327,6 +346,14 @@ namespace {
     
     /// \brief Ignore declarations.
     bool walkToDeclPre(Decl *decl) override { return false; }
+
+    /// \brief Ignore patterns.
+    std::pair<bool, Pattern*> walkToPatternPre(Pattern *pat) override {
+      return { false, pat };
+    }
+
+    /// \brief Ignore types.
+    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
   };
   
   /// For a given expression, given information that is global to the
@@ -574,18 +601,19 @@ namespace {
     // being applied, and the only constraint attached to it should
     // be the disjunction constraint for the overload group.
     auto &CG = CS.getConstraintGraph();
-    SmallVector<Constraint *, 4> constraints;
-    CG.gatherConstraints(tyvarType, constraints,
-                         ConstraintGraph::GatheringKind::EquivalenceClass);
-    if (constraints.empty())
+    llvm::SetVector<Constraint *> disjunctions;
+    CG.gatherConstraints(tyvarType, disjunctions,
+                         ConstraintGraph::GatheringKind::EquivalenceClass,
+                         [](Constraint *constraint) -> bool {
+                           return constraint->getKind() ==
+                                  ConstraintKind::Disjunction;
+                         });
+    if (disjunctions.empty())
       return;
     
     // Look for the disjunction that binds the overload set.
-    for (auto constraint : constraints) {
-      if (constraint->getKind() != ConstraintKind::Disjunction)
-        continue;
-      
-      auto oldConstraints = constraint->getNestedConstraints();
+    for (auto *disjunction : disjunctions) {
+      auto oldConstraints = disjunction->getNestedConstraints();
       auto csLoc = CS.getConstraintLocator(expr->getFn());
       
       // Only replace the disjunctive overload constraint.
@@ -633,8 +661,8 @@ namespace {
 
       // Remove the original constraint from the inactive constraint
       // list and add the new one.
-      CS.removeInactiveConstraint(constraint);
-      
+      CS.removeInactiveConstraint(disjunction);
+
       // Create the disjunction of favored constraints.
       auto favoredConstraintsDisjunction =
           Constraint::createDisjunction(CS,
@@ -676,18 +704,16 @@ namespace {
   /// Return a pair, containing the total parameter count of a function, coupled
   /// with the number of non-default parameters.
   std::pair<size_t, size_t> getParamCount(ValueDecl *VD) {
-    auto fTy = VD->getInterfaceType()->getAs<AnyFunctionType>();
-    assert(fTy && "attempting to count parameters of a non-function type");
+    auto fTy = VD->getInterfaceType()->castTo<AnyFunctionType>();
     
     size_t nOperands = fTy->getParams().size();
     size_t nNoDefault = 0;
     
     if (auto AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
-      for (auto params : AFD->getParameterLists()) {
-        for (auto param : *params) {
-          if (!param->isDefaultArgument())
-            nNoDefault++;
-        }
+      assert(!AFD->hasImplicitSelfDecl());
+      for (auto param : *AFD->getParameters()) {
+        if (!param->isDefaultArgument())
+          nNoDefault++;
       }
     } else {
       nNoDefault = nOperands;
@@ -782,7 +808,7 @@ namespace {
         // Figure out the parameter type, accounting for the implicit 'self' if
         // necessary.
         if (auto *FD = dyn_cast<AbstractFunctionDecl>(value)) {
-          if (FD->getImplicitSelfDecl()) {
+          if (FD->hasImplicitSelfDecl()) {
             if (auto resFnTy = fnTy->getResult()->getAs<AnyFunctionType>()) {
               fnTy = resFnTy;
             }
@@ -1167,6 +1193,7 @@ namespace {
       if (!E->isActivated())
         return Type();
 
+      CS.Options |= ConstraintSystemFlags::SuppressDiagnostics;
       return CS.createTypeVariable(CS.getConstraintLocator(E),
                                    TVO_CanBindToLValue);
     }
@@ -1345,7 +1372,35 @@ namespace {
       }
 
       auto locator = CS.getConstraintLocator(E);
-      
+
+      // If this is a 'var' or 'let' declaration with already
+      // resolved type, let's favor it.
+      if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
+        Type type;
+        if (VD->hasInterfaceType()) {
+          type = VD->getInterfaceType();
+          if (type->hasTypeParameter())
+            type = VD->getDeclContext()->mapTypeIntoContext(type);
+          CS.setFavoredType(E, type.getPointer());
+        }
+
+        // This can only happen when failure diangostics is trying
+        // to type-check expressions inside of a single-statement
+        // closure which refer to anonymous parameters, in this case
+        // let's either use type as written or allocate a fresh type
+        // variable, just like we do for closure type.
+        if (auto *PD = dyn_cast<ParamDecl>(VD)) {
+          if (!CS.hasType(PD)) {
+            if (type && type->hasUnboundGenericType())
+              type = CS.openUnboundGenericType(type, locator);
+
+            CS.setType(
+                PD, type ? type
+                         : CS.createTypeVariable(locator, TVO_CanBindToLValue));
+          }
+        }
+      }
+
       // Create an overload choice referencing this declaration and immediately
       // resolve it. This records the overload for use later.
       auto tv = CS.createTypeVariable(locator,
@@ -1354,19 +1409,6 @@ namespace {
       OverloadChoice choice =
           OverloadChoice(Type(), E->getDecl(), E->getFunctionRefKind());
       CS.resolveOverload(locator, tv, choice, CurDC);
-
-      if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
-        if (VD->getInterfaceType() &&
-            !VD->getInterfaceType()->is<TypeVariableType>()) {
-          // FIXME: ParamDecls in closures shouldn't get an interface type
-          // until the constraint system has been solved.
-          auto type = VD->getInterfaceType();
-          if (type->hasTypeParameter())
-            type = VD->getDeclContext()->mapTypeIntoContext(type);
-          CS.setFavoredType(E, type.getPointer());
-        }
-      }
-
       return tv;
     }
 
@@ -1393,11 +1435,12 @@ namespace {
     Type visitTypeExpr(TypeExpr *E) {
       Type type;
       // If this is an implicit TypeExpr, don't validate its contents.
-      if (auto *rep = E->getTypeRepr()) {
-        type = resolveTypeReferenceInExpression(rep);
-      } else {
+      if (E->getTypeLoc().wasValidated()) {
         type = E->getTypeLoc().getType();
+      } else if (auto *rep = E->getTypeRepr()) {
+        type = resolveTypeReferenceInExpression(rep);
       }
+
       if (!type || type->hasError()) return Type();
       
       auto locator = CS.getConstraintLocator(E);
@@ -1983,19 +2026,17 @@ namespace {
           // FIXME: Need a better locator for a pattern as a base.
           Type openedType = CS.openUnboundGenericType(type, locator);
           assert(!param->isImmutable() || !openedType->is<InOutType>());
-          param->setType(openedType->getInOutObjectType());
-          param->setInterfaceType(openedType->getInOutObjectType());
+          CS.setType(param, openedType->getInOutObjectType());
           continue;
         }
 
         // Otherwise, create a fresh type variable.
-        Type ty = CS.createTypeVariable(locator, TVO_CanBindToInOut);
-
-        param->setType(ty);
-        param->setInterfaceType(ty);
+        CS.setType(param, CS.createTypeVariable(locator, TVO_CanBindToInOut));
       }
-      
-      return params->getType(CS.getASTContext());
+
+      return params->getType(CS.getASTContext(), [&](ParamDecl *param) {
+        return CS.getType(param);
+      });
     }
 
     
@@ -2045,28 +2086,25 @@ namespace {
           }
         }
 
-        auto ROK = ReferenceOwnership::Strong; // The default.
+        auto ROK = ReferenceOwnership::Strong;
         if (auto *OA = var->getAttrs().getAttribute<ReferenceOwnershipAttr>())
           ROK = OA->get();
 
-        switch (ROK) {
-        case ReferenceOwnership::Strong:
-        case ReferenceOwnership::Unowned:
-        case ReferenceOwnership::Unmanaged:
-          if (ty)
-            return ty;
-          return CS.createTypeVariable(CS.getConstraintLocator(locator));
-        case ReferenceOwnership::Weak:
-          // For weak variables, use Optional<T>.
+        switch (optionalityOf(ROK)) {
+        case ReferenceOwnershipOptionality::Required:
           if (ty && ty->getOptionalObjectType())
             return ty; // Already Optional<T>.
           // Create a fresh type variable to handle overloaded expressions.
           if (!ty || ty->is<TypeVariableType>())
             ty = CS.createTypeVariable(CS.getConstraintLocator(locator));
           return CS.getTypeChecker().getOptionalType(var->getLoc(), ty);
+        case ReferenceOwnershipOptionality::Allowed:
+        case ReferenceOwnershipOptionality::Disallowed:
+          break;
         }
-
-        llvm_unreachable("Unhandled ReferenceOwnership kind");
+        if (ty)
+          return ty;
+        return CS.createTypeVariable(CS.getConstraintLocator(locator));
       }
 
       case PatternKind::Typed: {
@@ -2568,9 +2606,7 @@ namespace {
       // Validate the resulting type.
       TypeResolutionOptions options = TypeResolutionFlags::AllowUnboundGenerics;
       options |= TypeResolutionFlags::InExpression;
-      // Prior to Swift 5, we allow 'as T!' and turn it into a disjunction.
-      if (!CS.getASTContext().isSwiftVersionAtLeast(5))
-        options |= TypeResolutionFlags::AllowIUODeprecated;
+      options |= TypeResolutionFlags::InCastOrCoercionExpression;
       if (tc.validateType(expr->getCastTypeLoc(), CS.DC, options))
         return nullptr;
 
@@ -2600,9 +2636,7 @@ namespace {
       // Validate the resulting type.
       TypeResolutionOptions options = TypeResolutionFlags::AllowUnboundGenerics;
       options |= TypeResolutionFlags::InExpression;
-      // Prior to Swift 5, we allow 'as T!' and turn it into a disjunction.
-      if (!CS.getASTContext().isSwiftVersionAtLeast(5))
-        options |= TypeResolutionFlags::AllowIUODeprecated;
+      options |= TypeResolutionFlags::InCastOrCoercionExpression;
       if (tc.validateType(expr->getCastTypeLoc(), CS.DC, options))
         return nullptr;
 
@@ -2637,9 +2671,7 @@ namespace {
       // Validate the resulting type.
       TypeResolutionOptions options = TypeResolutionFlags::AllowUnboundGenerics;
       options |= TypeResolutionFlags::InExpression;
-      // Prior to Swift 5, we allow 'as T!' and turn it into a disjunction.
-      if (!CS.getASTContext().isSwiftVersionAtLeast(5))
-        options |= TypeResolutionFlags::AllowIUODeprecated;
+      options |= TypeResolutionFlags::InCastOrCoercionExpression;
       if (tc.validateType(expr->getCastTypeLoc(), CS.DC, options))
         return nullptr;
 
@@ -2799,8 +2831,8 @@ namespace {
       auto locator = CS.getConstraintLocator(expr);
       auto projectedTy = CS.createTypeVariable(locator,
                                                TVO_CanBindToLValue);
-      CS.addKeyPathApplicationConstraint(expr->getKeyPath()->getType(),
-                                         expr->getBase()->getType(),
+      CS.addKeyPathApplicationConstraint(CS.getType(expr->getKeyPath()),
+                                         CS.getType(expr->getBase()),
                                          projectedTy,
                                          locator);
       return projectedTy;
@@ -2808,6 +2840,10 @@ namespace {
     
     Type visitEnumIsCaseExpr(EnumIsCaseExpr *expr) {
       return CS.getASTContext().getBoolDecl()->getDeclaredType();
+    }
+
+    Type visitLazyInitializerExpr(LazyInitializerExpr *expr) {
+      return expr->getType();
     }
 
     Type visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
@@ -3503,6 +3539,8 @@ Type ConstraintSystem::generateConstraints(Pattern *pattern,
 }
 
 void ConstraintSystem::optimizeConstraints(Expr *e) {
+  if (TC.getLangOpts().DisableConstraintSolverPerformanceHacks)
+    return;
   
   SmallVector<Expr *, 16> linkedExprs;
   
@@ -3560,6 +3598,8 @@ public:
   }
 
   Type visitCodeCompletionExpr(CodeCompletionExpr *Expr) override {
+    auto &cs = getConstraintSystem();
+    cs.Options |= ConstraintSystemFlags::SuppressDiagnostics;
     return createFreeTypeVariableType(Expr);
   }
 
@@ -3593,7 +3633,6 @@ bool swift::typeCheckUnresolvedExpr(DeclContext &DC,
   auto *TC = static_cast<TypeChecker*>(DC.getASTContext().getLazyResolver());
   ConstraintSystem CS(*TC, &DC, Options);
   Parent = Parent->walk(SanitizeExpr(CS));
-  CleanupIllFormedExpressionRAII cleanup(Parent);
   InferUnresolvedMemberConstraintGenerator MCG(E, CS);
   ConstraintWalker cw(MCG);
   Parent->walk(cw);

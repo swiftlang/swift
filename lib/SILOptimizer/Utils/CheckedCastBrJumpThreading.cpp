@@ -414,8 +414,8 @@ areEquivalentConditionsAlongSomePaths(CheckedCastBranchInst *DomCCBI,
       }
 
       // Condition is the same if BB is reached over a pass through Pred.
-      DEBUG(llvm::dbgs() << "Condition is the same if reached over ");
-      DEBUG(PredBB->print(llvm::dbgs()));
+      LLVM_DEBUG(llvm::dbgs() << "Condition is the same if reached over ");
+      LLVM_DEBUG(PredBB->print(llvm::dbgs()));
 
       // See if it is reached over Success or Failure path.
       SILBasicBlock *DomSuccessBB = DomCCBI->getSuccessBB();

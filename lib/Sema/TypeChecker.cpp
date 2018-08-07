@@ -17,6 +17,8 @@
 
 #include "swift/Subsystems.h"
 #include "TypeChecker.h"
+#include "TypeCheckObjC.h"
+#include "CodeSynthesis.h"
 #include "MiscDiagnostics.h"
 #include "GenericTypeResolver.h"
 #include "swift/AST/ASTWalker.h"
@@ -280,6 +282,64 @@ static GenericParamList *cloneGenericParams(ASTContext &ctx,
   return toParams;
 }
 
+/// FIXME: Similar to TypeChecker::prepareGenericParamList(), which needs
+/// to be separated from the type checker.
+static void prepareGenericParamList(GenericParamList *genericParams) {
+  unsigned depth = genericParams->getDepth();
+  for (auto gp : *genericParams) {
+    if (gp->getDepth() == depth)
+      return;
+
+    gp->setDepth(depth);
+  }
+
+  if (auto outerGenericParams = genericParams->getOuterParameters())
+    prepareGenericParamList(outerGenericParams);
+}
+
+/// Bind the given extension to the given nominal type.
+static void bindExtensionToNominal(ExtensionDecl *ext,
+                                   NominalTypeDecl *nominal) {
+  if (ext->alreadyBoundToNominal())
+    return;
+
+  if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
+    // For a protocol extension, build the generic parameter list.
+    auto genericParams = proto->createGenericParams(ext);
+    prepareGenericParamList(genericParams);
+    ext->setGenericParams(genericParams);
+  } else if (auto genericParams = nominal->getGenericParamsOfContext()) {
+    // Clone the generic parameter list of a generic type.
+    prepareGenericParamList(genericParams);
+    ext->setGenericParams(
+        cloneGenericParams(ext->getASTContext(), ext, genericParams));
+  }
+
+  // If we have a trailing where clause, deal with it now.
+  // For now, trailing where clauses are only permitted on protocol extensions.
+  if (auto trailingWhereClause = ext->getTrailingWhereClause()) {
+    if (!(nominal->getGenericParamsOfContext() || isa<ProtocolDecl>(nominal))) {
+      // Only generic and protocol types are permitted to have
+      // trailing where clauses.
+      ext->diagnose(diag::extension_nongeneric_trailing_where,
+                    nominal->getFullName())
+        .highlight(trailingWhereClause->getSourceRange());
+      ext->setTrailingWhereClause(nullptr);
+    } else {
+      // Merge the trailing where clause into the generic parameter list.
+      // FIXME: Long-term, we'd like clients to deal with the trailing where
+      // clause explicitly, but for now it's far more direct to represent
+      // the trailing where clause as part of the requirements.
+      ext->getGenericParams()->addTrailingWhereClause(
+        ext->getASTContext(),
+        trailingWhereClause->getWhereLoc(),
+        trailingWhereClause->getRequirements());
+    }
+  }
+
+  nominal->addExtension(ext);
+}
+
 static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   if (ED->getExtendedType())
     return;
@@ -300,6 +360,7 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   options |= TypeResolutionFlags::ExtensionBinding;
   if (TC.validateType(ED->getExtendedTypeLoc(), dc, options)) {
     ED->setInvalid();
+    ED->getExtendedTypeLoc().setInvalidType(TC.Context);
     return;
   }
 
@@ -350,56 +411,69 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   }
   assert(extendedNominal && "Should have the nominal type being extended");
 
-  // If the extended type is generic or is a protocol. Clone or create
-  // the generic parameters.
-  if (extendedNominal->getGenericParamsOfContext() ||
-      isa<ProtocolDecl>(extendedNominal)) {
-    if (auto proto = dyn_cast<ProtocolDecl>(extendedNominal)) {
-      // For a protocol extension, build the generic parameter list.
-      ED->setGenericParams(proto->createGenericParams(ED));
-    } else {
-      // Clone the existing generic parameter list.
-      ED->setGenericParams(
-        cloneGenericParams(TC.Context, ED,
-                           extendedNominal->getGenericParamsOfContext()));
-    }
-  }
+  bindExtensionToNominal(ED, extendedNominal);
+}
 
-  // If we have a trailing where clause, deal with it now.
-  // For now, trailing where clauses are only permitted on protocol extensions.
-  if (auto trailingWhereClause = ED->getTrailingWhereClause()) {
-    if (!(extendedNominal->getGenericParamsOfContext() ||
-          isa<ProtocolDecl>(extendedNominal))) {
-      // Only generic and protocol types are permitted to have
-      // trailing where clauses.
-      TC.diagnose(ED, diag::extension_nongeneric_trailing_where, extendedType)
-        .highlight(trailingWhereClause->getSourceRange());
-      ED->setTrailingWhereClause(nullptr);
-    } else {
-      // Merge the trailing where clause into the generic parameter list.
-      // FIXME: Long-term, we'd like clients to deal with the trailing where
-      // clause explicitly, but for now it's far more direct to represent
-      // the trailing where clause as part of the requirements.
-      ED->getGenericParams()->addTrailingWhereClause(
-        TC.Context,
-        trailingWhereClause->getWhereLoc(),
-        trailingWhereClause->getRequirements());
+static void bindExtensions(SourceFile &SF, TypeChecker &TC) {
+  // Utility function to try and resolve the extended type without diagnosing.
+  // If we succeed, we go ahead and bind the extension. Otherwise, return false.
+  auto tryBindExtension = [&](ExtensionDecl *ext) -> bool {
+    if (auto nominal = ext->getExtendedNominal()) {
+      bindExtensionToNominal(ext, nominal);
+      return true;
     }
-  }
 
-  extendedNominal->addExtension(ED);
+    return false;
+  };
+
+  // Phase 1 - try to bind each extension, adding those whose type cannot be
+  // resolved to a worklist.
+  SmallVector<ExtensionDecl *, 8> worklist;
+
+  // FIXME: The current source file needs to be handled specially, because of
+  // private extensions.
+  SF.forAllVisibleModules([&](ModuleDecl::ImportedModule import) {
+    // FIXME: Respect the access path?
+    for (auto file : import.second->getFiles()) {
+      auto SF = dyn_cast<SourceFile>(file);
+      if (!SF)
+        continue;
+
+      for (auto D : SF->Decls) {
+        if (auto ED = dyn_cast<ExtensionDecl>(D))
+          if (!tryBindExtension(ED))
+            worklist.push_back(ED);
+      }
+    }
+  });
+
+  // Phase 2 - repeatedly go through the worklist and attempt to bind each
+  // extension there, removing it from the worklist if we succeed.
+  bool changed;
+  do {
+    changed = false;
+
+    auto last = std::remove_if(worklist.begin(), worklist.end(),
+                               tryBindExtension);
+    if (last != worklist.end()) {
+      worklist.erase(last, worklist.end());
+      changed = true;
+    }
+  } while(changed);
+
+  // Phase 3 - anything that remains on the worklist cannot be resolved, which
+  // means its invalid. Diagnose.
+  for (auto *ext : worklist)
+    bindExtensionDecl(ext, TC);
 }
 
 void TypeChecker::bindExtension(ExtensionDecl *ext) {
   ::bindExtensionDecl(ext, *this);
 }
+
 void TypeChecker::resolveExtensionForConformanceConstruction(
     ExtensionDecl *ext,
     SmallVectorImpl<ConformanceConstructionInfo> &protocols) {
-  // To be able to know the conformances that an extension declares, we just
-  // need to know which type it is connected to:
-  ::bindExtensionDecl(ext, *this);
-
   // and the protocols which it inherits from:
   DependentGenericTypeResolver resolver;
   TypeResolutionOptions options = TypeResolutionFlags::GenericSignature;
@@ -467,8 +541,10 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
         TC.checkFunctionErrorHandling(AFD);
         continue;
       }
-      if (isa<NominalTypeDecl>(decl))
+      if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
+        (void)nominal->getAllConformances();
         continue;
+      }
       if (isa<VarDecl>(decl))
         continue;
       llvm_unreachable("Unhandled external definition kind");
@@ -484,13 +560,30 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
       TC.validateDecl(decl);
     }
 
+    // Synthesize any necessary function bodies.
+    // FIXME: If we're not planning to run SILGen, this is wasted effort.
+    while (!TC.FunctionsToSynthesize.empty()) {
+      auto function = TC.FunctionsToSynthesize.back().second;
+      TC.FunctionsToSynthesize.pop_back();
+      if (function.getDecl()->isInvalid() || TC.Context.hadError())
+        continue;
+
+      TC.synthesizeFunctionBody(function);
+    }
+
     // Validate any referenced declarations for SIL's purposes.
     // Note: if we ever start putting extension members in vtables, we'll need
     // to validate those members too.
     // FIXME: If we're not planning to run SILGen, this is wasted effort.
-    while (!TC.DeclsToFinalize.empty()) {
-      auto decl = TC.DeclsToFinalize.pop_back_val();
-      if (decl->isInvalid() || TC.Context.hadError())
+    while (TC.NextDeclToFinalize < TC.DeclsToFinalize.size()) {
+      auto decl = TC.DeclsToFinalize[TC.NextDeclToFinalize++];
+      if (decl->isInvalid())
+        continue;
+
+      // If we've already encountered an error, don't finalize declarations
+      // from other source files.
+      if (TC.Context.hadError() &&
+          decl->getDeclContext()->getParentSourceFile() != &SF)
         continue;
 
       TC.finalizeDecl(decl);
@@ -523,7 +616,8 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
   } while (currentFunctionIdx < TC.definedFunctions.size() ||
            currentExternalDef < TC.Context.ExternalDefinitions.size() ||
            currentSynthesizedDecl < SF.SynthesizedDecls.size() ||
-           !TC.DeclsToFinalize.empty() ||
+           !TC.FunctionsToSynthesize.empty() ||
+           TC.NextDeclToFinalize < TC.DeclsToFinalize.size() ||
            !TC.ConformanceContexts.empty() ||
            !TC.DelayedRequirementSignatures.empty() ||
            !TC.UsedConformances.empty() ||
@@ -639,23 +733,11 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     // Resolve extensions. This has to occur first during type checking,
     // because the extensions need to be wired into the AST for name lookup
     // to work.
-    // FIXME: We can have interesting ordering dependencies among the various
-    // extensions, so we'll need to be smarter here.
-    // FIXME: The current source file needs to be handled specially, because of
-    // private extensions.
-    SF.forAllVisibleModules([&](ModuleDecl::ImportedModule import) {
-      // FIXME: Respect the access path?
-      for (auto file : import.second->getFiles()) {
-        auto SF = dyn_cast<SourceFile>(file);
-        if (!SF)
-          continue;
+    bindExtensions(SF, TC);
 
-        for (auto D : SF->Decls) {
-          if (auto ED = dyn_cast<ExtensionDecl>(D))
-            bindExtensionDecl(ED, TC);
-        }
-      }
-    });
+    // Look for bridging functions. This only matters when
+    // -enable-source-import is provided.
+    checkBridgedFunctions(TC.Context);
 
     // Type check the top-level elements of the source file.
     bool hasTopLevelCode = false;
@@ -765,7 +847,6 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
   options |= TypeResolutionFlags::AllowUnboundGenerics;
   if (isSILMode) {
     options |= TypeResolutionFlags::SILMode;
-    options |= TypeResolutionFlags::AllowIUO;
   }
   if (isSILType)
     options |= TypeResolutionFlags::SILType;
@@ -789,7 +870,7 @@ swift::handleSILGenericParams(ASTContext &Ctx, GenericParamList *genericParams,
   return TypeChecker(Ctx).handleSILGenericParams(genericParams, DC);
 }
 
-bool swift::typeCheckCompletionDecl(Decl *D) {
+void swift::typeCheckCompletionDecl(Decl *D) {
   auto &Ctx = D->getASTContext();
 
   // Set up a diagnostics engine that swallows diagnostics.
@@ -799,8 +880,7 @@ bool swift::typeCheckCompletionDecl(Decl *D) {
   if (auto ext = dyn_cast<ExtensionDecl>(D))
     TC.validateExtension(ext);
   else
-    TC.typeCheckDecl(D);
-  return true;
+    TC.validateDecl(cast<ValueDecl>(D));
 }
 
 static Optional<Type> getTypeOfCompletionContextExpr(
@@ -883,13 +963,17 @@ bool swift::typeCheckExpression(DeclContext *DC, Expr *&parsedExpr) {
   auto &ctx = DC->getASTContext();
   if (ctx.getLazyResolver()) {
     TypeChecker *TC = static_cast<TypeChecker *>(ctx.getLazyResolver());
-    auto resultTy = TC->typeCheckExpression(parsedExpr, DC);
+    auto resultTy = TC->typeCheckExpression(parsedExpr, DC, TypeLoc(),
+                                      ContextualTypePurpose::CTP_Unused,
+                                      TypeCheckExprFlags::SuppressDiagnostics);
     return !resultTy;
   } else {
     // Set up a diagnostics engine that swallows diagnostics.
     DiagnosticEngine diags(ctx.SourceMgr);
     TypeChecker TC(ctx, diags);
-    auto resultTy = TC.typeCheckExpression(parsedExpr, DC);
+    auto resultTy = TC.typeCheckExpression(parsedExpr, DC, TypeLoc(),
+                                      ContextualTypePurpose::CTP_Unused,
+                                      TypeCheckExprFlags::SuppressDiagnostics);
     return !resultTy;
   }
 }
@@ -942,8 +1026,7 @@ void TypeChecker::diagnoseAmbiguousMemberType(Type baseTy,
       .highlight(baseRange);
   }
   for (const auto &member : lookup) {
-    diagnose(member.first, diag::found_candidate_type,
-             member.second);
+    diagnose(member.Member, diag::found_candidate_type, member.MemberType);
   }
 }
 

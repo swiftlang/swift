@@ -53,6 +53,8 @@ import DictTest3
 import DictTest4
 import DictTest4Legacy
 import DictionaryBridge
+import DictionaryBridgeToObjC
+import DictionaryCompactMapValues
 import DictionaryCopy
 import DictionaryGroup
 import DictionaryKeysContains
@@ -101,7 +103,6 @@ import ObserverPartiallyAppliedMethod
 import ObserverUnappliedMethod
 import OpaqueConsumingUsers
 import OpenClose
-import PartialApplyDynamicType
 import Phonebook
 import PointerArithmetics
 import PolymorphicCalls
@@ -215,6 +216,8 @@ registerBenchmark(Dictionary3)
 registerBenchmark(Dictionary4)
 registerBenchmark(Dictionary4Legacy)
 registerBenchmark(DictionaryBridge)
+registerBenchmark(DictionaryBridgeToObjC)
+registerBenchmark(DictionaryCompactMapValues)
 registerBenchmark(DictionaryCopy)
 registerBenchmark(DictionaryGroup)
 registerBenchmark(DictionaryKeysContains)
@@ -263,7 +266,6 @@ registerBenchmark(ObserverPartiallyAppliedMethod)
 registerBenchmark(ObserverUnappliedMethod)
 registerBenchmark(OpaqueConsumingUsers)
 registerBenchmark(OpenClose)
-registerBenchmark(PartialApplyDynamicType)
 registerBenchmark(Phonebook)
 registerBenchmark(PointerArithmetics)
 registerBenchmark(PolymorphicCalls)
@@ -305,6 +307,7 @@ registerBenchmark(StringBuilder)
 registerBenchmark(StringComparison)
 registerBenchmark(StringEdits)
 registerBenchmark(StringEnum)
+registerBenchmark(StringHashing)
 registerBenchmark(StringInterpolation)
 registerBenchmark(StringInterpolationSmall)
 registerBenchmark(StringInterpolationManySmallSegments)

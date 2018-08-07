@@ -901,6 +901,7 @@ static ManagedValue emitBuiltinValueToBridgeObject(SILGenFunction &SGF,
          "ValueToBridgeObject should have one sub");
   auto &fromTL = SGF.getTypeLowering(subs.getReplacementTypes()[0]);
   assert(fromTL.isTrivial() && "Expected a trivial type");
+  (void)fromTL;
 
   SILValue result = SGF.B.createValueToBridgeObject(loc, args[0].getValue());
   return SGF.emitManagedRetain(loc, result);

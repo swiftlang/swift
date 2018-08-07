@@ -13,6 +13,7 @@ extension String {
   /// A position of a character or code unit in a string.
   @_fixed_layout // FIXME(sil-serialize-all)
   public struct Index {
+    @usableFromInline
     internal typealias _UTF8Buffer = UTF8.EncodedScalar
 
     @usableFromInline // FIXME(sil-serialize-all)
@@ -136,74 +137,5 @@ extension String.Index {
   @inlinable // FIXME(sil-serialize-all)
   internal var transcodedOffset: Int {
     return Int(truncatingIfNeeded: _compoundOffset & 0x3)
-  }
-}
-
-// SPI for Foundation
-extension String.Index {
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, deprecated: 3.2)
-  @available(swift, obsoleted: 4.0)
-  public // SPI(Foundation)
-  init(_position: Int) {
-    self.init(encodedOffset: _position)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, deprecated: 3.2)
-  @available(swift, obsoleted: 4.0)
-  public // SPI(Foundation)
-  init(_codeUnitOffset: Int) {
-    self.init(encodedOffset: _codeUnitOffset)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, deprecated: 3.2)
-  @available(swift, obsoleted: 4.0)
-  public // SPI(Foundation)
-  init(_base: String.Index, in c: String.CharacterView) {
-    self = _base
-  }
-
-  /// The integer offset of this index in UTF-16 code units.
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, deprecated: 3.2)
-  @available(swift, obsoleted: 4.0)
-  public // SPI(Foundation)
-  var _utf16Index: Int {
-    return self.encodedOffset
-  }
-
-  /// The integer offset of this index in UTF-16 code units.
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, deprecated: 3.2)
-  @available(swift, obsoleted: 4.0)
-  public // SPI(Foundation)
-  var _offset: Int {
-    return self.encodedOffset
-  }
-}
-
-
-// backward compatibility for index interchange.
-extension Optional where Wrapped == String.Index {
-  @inlinable // FIXME(sil-serialize-all)
-  @available(
-    swift, obsoleted: 4.0,
-    message: "Any String view index conversion can fail in Swift 4; please unwrap the optional indices")
-  public static func ..<(
-    lhs: String.Index?, rhs: String.Index?
-  ) -> Range<String.Index> {
-    return lhs! ..< rhs!
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @available(
-    swift, obsoleted: 4.0,
-    message: "Any String view index conversion can fail in Swift 4; please unwrap the optional indices")
-  public static func ...(
-    lhs: String.Index?, rhs: String.Index?
-  ) -> ClosedRange<String.Index> {
-    return lhs! ... rhs!
   }
 }

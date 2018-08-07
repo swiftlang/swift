@@ -74,8 +74,6 @@ enum class PreserveOnSignal : bool {
 };
 
 class Compilation {
-  friend class PerformJobsState;
-
 public:
   /// The filelist threshold value to pass to ensure file lists are never used
   static const size_t NEVER_USE_FILELIST = SIZE_MAX;
@@ -174,6 +172,14 @@ private:
   /// Provides a randomization seed to batch-mode partitioning, for debugging.
   const unsigned BatchSeed;
 
+  /// Overrides parallelism level and \c BatchSizeLimit, sets exact
+  /// count of batches, if in batch-mode.
+  const Optional<unsigned> BatchCount;
+
+  /// Overrides maximum batch size, if in batch-mode and not overridden
+  /// by \c BatchCount.
+  const Optional<unsigned> BatchSizeLimit;
+
   /// In order to test repartitioning, set to true if
   /// -driver-force-one-batch-repartition is present.
   const bool ForceOneBatchRepartition = false;
@@ -228,6 +234,8 @@ public:
               bool EnableIncrementalBuild = false,
               bool EnableBatchMode = false,
               unsigned BatchSeed = 0,
+              Optional<unsigned> BatchCount = None,
+              Optional<unsigned> BatchSizeLimit = None,
               bool ForceOneBatchRepartition = false,
               bool SaveTemps = false,
               bool ShowDriverTimeCompilation = false,
@@ -240,6 +248,10 @@ public:
 
   OutputInfo const &getOutputInfo() const {
     return TheOutputInfo;
+  }
+
+  DiagnosticEngine &getDiags() const {
+    return Diags;
   }
 
   UnwrappedArrayView<const Action> getActions() const {
@@ -295,12 +307,22 @@ public:
     ContinueBuildingAfterErrors = Value;
   }
 
+  bool getShowIncrementalBuildDecisions() const {
+    return ShowIncrementalBuildDecisions;
+  }
   void setShowsIncrementalBuildDecisions(bool value = true) {
     ShowIncrementalBuildDecisions = value;
   }
 
+  bool getShowJobLifecycle() const {
+    return ShowJobLifecycle;
+  }
   void setShowJobLifecycle(bool value = true) {
     ShowJobLifecycle = value;
+  }
+
+  bool getShowDriverTimeCompilation() const {
+    return ShowDriverTimeCompilation;
   }
 
   size_t getFilelistThreshold() const {
@@ -309,6 +331,26 @@ public:
 
   UnifiedStatsReporter *getStatsReporter() const {
     return Stats.get();
+  }
+
+  OutputLevel getOutputLevel() const {
+    return Level;
+  }
+
+  unsigned getBatchSeed() const {
+    return BatchSeed;
+  }
+
+  llvm::sys::TimePoint<> getLastBuildTime() const {
+    return LastBuildTime;
+  }
+
+  Optional<unsigned> getBatchCount() const {
+    return BatchCount;
+  }
+
+  Optional<unsigned> getBatchSizeLimit() const {
+    return BatchSizeLimit;
   }
 
   /// Requests the path to a file containing all input source files. This can

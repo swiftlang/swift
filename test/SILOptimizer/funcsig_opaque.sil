@@ -14,7 +14,7 @@ sil @testAggregateArgHelper : $@convention(thin) (@owned R<S>) -> ()
 
 // Test owned-to-guaranteed transformation of opaque arguments.
 //
-// CHECK-LABEL: sil [thunk] [always_inline] @testAggregateArg : $@convention(thin) (@in R<S>) -> @out () {
+// CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @testAggregateArg : $@convention(thin) (@in R<S>) -> @out () {
 // CHECK: bb0(%0 : $R<S>):
 // CHECK:   [[F:%.*]] = function_ref @$S16testAggregateArgTf4g_n : $@convention(thin) (@in_guaranteed R<S>) -> @out ()
 // CHECK:   [[CALL:%.*]] = apply [[F]](%0) : $@convention(thin) (@in_guaranteed R<S>) -> @out ()

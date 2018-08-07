@@ -556,6 +556,7 @@ void TaskMonitor::verifyEvents(const short events) const {
   assert((events & POLLNVAL) == 0 && "Asked poll() to watch a closed fd");
   const short expectedEvents = POLLIN | POLLPRI | POLLHUP | POLLERR;
   assert((events & ~expectedEvents) == 0 && "Received unexpected event");
+  (void)expectedEvents;
 }
 
 void TaskMonitor::readDataIfAvailable(const short events, const int fd,

@@ -984,6 +984,7 @@ static int doSyntaxColoring(const CompilerInvocation &InitInvok,
       break;
   }
   assert(SF && "no source file?");
+
   ide::SyntaxModelContext ColorContext(*SF);
   PrintSyntaxColorWalker ColorWalker(CI.getSourceMgr(), BufID, llvm::outs(),
                                      TerminalOutput);
@@ -1854,6 +1855,8 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
     // Get the (sub)module to print.
     auto *M = getModuleByFullName(Context, ModuleToPrint);
     if (!M) {
+      llvm::errs() << "error: could not find module '" << ModuleToPrint
+                   << "'\n";
       ExitCode = 1;
       continue;
     }
@@ -1873,6 +1876,8 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
     if (ModuleName.size() > 1) {
       M = getModuleByFullName(Context, ModuleName[0]);
       if (!M) {
+        llvm::errs() << "error: could not find module '" << ModuleName[0]
+                     << "'\n";
         ExitCode = 1;
         continue;
       }
@@ -2169,26 +2174,32 @@ public:
     if (auto accessor = dyn_cast<AccessorDecl>(VD)) {
       auto *storage = accessor->getStorage();
       switch (accessor->getAccessorKind()) {
-      case AccessorKind::IsGetter:
+      case AccessorKind::Get:
         OS << "<getter for ";
         break;
-      case AccessorKind::IsSetter:
+      case AccessorKind::Set:
         OS << "<setter for ";
         break;
-      case AccessorKind::IsWillSet:
+      case AccessorKind::WillSet:
         OS << "<willSet for ";
         break;
-      case AccessorKind::IsDidSet:
+      case AccessorKind::DidSet:
         OS << "<didSet for ";
         break;
-      case AccessorKind::IsAddressor:
+      case AccessorKind::Address:
         OS << "<addressor for ";
         break;
-      case AccessorKind::IsMutableAddressor:
+      case AccessorKind::MutableAddress:
         OS << "<mutableAddressor for ";
         break;
-      case AccessorKind::IsMaterializeForSet:
+      case AccessorKind::MaterializeForSet:
         OS << "<materializeForSet for ";
+        break;
+      case AccessorKind::Read:
+        OS << "<read accessor for ";
+        break;
+      case AccessorKind::Modify:
+        OS << "<modify accessor for ";
         break;
       }
       printDeclName(storage);
@@ -2629,10 +2640,11 @@ private:
   void tryDemangleType(Type T, const DeclContext *DC, CharSourceRange range) {
     Mangle::ASTMangler Mangler;
     std::string mangledName(Mangler.mangleTypeForDebugger(
-        T, DC, DC->getGenericEnvironmentOfContext()));
+                              T->mapTypeOutOfContext(), DC,
+        DC->getGenericEnvironmentOfContext()));
     std::string Error;
-    Type ReconstructedType =
-        getTypeFromMangledSymbolname(Ctx, mangledName, Error);
+    Type ReconstructedType = DC->mapTypeIntoContext(
+        getTypeFromMangledSymbolname(Ctx, mangledName, Error));
     Stream << "type: ";
     if (ReconstructedType) {
       ReconstructedType->print(Stream);

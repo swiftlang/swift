@@ -21,7 +21,7 @@
 #define SWIFT_FUNC_STAT                                                 \
   do {                                                                  \
     static llvm::Statistic FStat =                                      \
-      {DEBUG_TYPE, __func__, __func__, {0}, false};                     \
+      {DEBUG_TYPE, __func__, __func__, {0}, {false}};                   \
     ++FStat;                                                            \
   } while (0)
 

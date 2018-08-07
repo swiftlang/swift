@@ -51,7 +51,6 @@ extension Unicode.Scalar :
   @inlinable // FIXME(sil-serialize-all)
   public var value: UInt32 { return _value }
 
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {
     self._value = UInt32(value)
@@ -68,7 +67,6 @@ extension Unicode.Scalar :
   ///
   /// In this example, the assignment to the `letterK` constant is handled by
   /// this initializer behind the scenes.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init(unicodeScalarLiteral value: Unicode.Scalar) {
     self = value
@@ -293,7 +291,6 @@ extension Unicode.Scalar : CustomStringConvertible, CustomDebugStringConvertible
 
   /// An escaped textual representation of the Unicode scalar, suitable for
   /// debugging.
-  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return "\"\(escaped(asASCII: true))\""
   }
@@ -467,6 +464,3 @@ extension Unicode.Scalar {
     Builtin.unreachable()
   }
 }
-
-// @available(swift, obsoleted: 4.0, renamed: "Unicode.Scalar")
-public typealias UnicodeScalar = Unicode.Scalar

@@ -84,6 +84,7 @@ public struct Character {
     return UInt64(Builtin.zext_Int63_Int64(value))
   }
 
+  @usableFromInline // FIXME(sil-serialize-all)
   typealias UTF16View = String.UTF16View
   @inlinable // FIXME(sil-serialize-all)
   internal var utf16: UTF16View {
@@ -366,13 +367,13 @@ extension Character : LosslessStringConvertible { }
 
 extension Character : CustomDebugStringConvertible {
   /// A textual representation of the character, suitable for debugging.
-  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return String(self).debugDescription
   }
 }
 
 extension Character {
+  @usableFromInline
   internal typealias _SmallUTF16 = _UIntBuffer<UInt64, Unicode.UTF16.CodeUnit>
 
   @inlinable // FIXME(sil-serialize-all)
@@ -392,6 +393,12 @@ extension Character {
   internal var _largeUTF16 : _UTF16StringStorage? {
     guard case .large(let storage) = _representation else { return nil }
     return storage
+  }
+
+  @usableFromInline // @testable
+  internal var _isSmall: Bool {
+    guard case .smallUTF16(_) = _representation else { return false }
+    return true
   }
 }
 

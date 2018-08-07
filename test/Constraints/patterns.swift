@@ -292,7 +292,7 @@ switch staticMembers {
   case .init(0): break
   case .init(_): break // expected-error{{'_' can only appear in a pattern}}
   case .init(let x): break // expected-error{{cannot appear in an expression}}
-  case .init(opt: 0): break // expected-error{{not unwrapped}}
+  case .init(opt: 0): break // expected-error{{pattern cannot match values of type 'StaticMembers'}}
 
   case .prop: break
   // TODO: repeated error message
@@ -309,7 +309,7 @@ switch staticMembers {
   case .method(withLabel: let x): break // expected-error{{cannot appear in an expression}}
 
   case .optMethod: break // expected-error{{cannot match}}
-  case .optMethod(0): break // expected-error{{not unwrapped}}
+  case .optMethod(0): break // expected-error{{pattern cannot match values of type 'StaticMembers'}}
 }
 
 _ = 0
@@ -351,3 +351,57 @@ func testOne() {
     if case One.E.SomeError = error {} // expected-error{{generic enum type 'One.E' is ambiguous without explicit generic parameters when matching value of type 'Error'}}
   }
 }
+
+// SR-8347
+// constrain initializer expressions of optional some pattern bindings to be optional
+func test8347() -> String {
+  struct C {
+    subscript (s: String) -> String? {
+      return ""
+    }
+    subscript (s: String) -> [String] {
+      return [""]
+    }
+
+    func f() -> String? {
+      return ""
+    }
+    func f() -> Int {
+      return 3
+    }
+
+    func g() -> String {
+      return ""
+    }
+
+    func h() -> String { // expected-note {{found this candidate}}
+      return ""
+    }
+    func h() -> Double { // expected-note {{found this candidate}}
+      return 3.0
+    }
+    func h() -> Int? { //expected-note{{found this candidate}}
+      return 2
+    }
+    func h() -> Float? { //expected-note{{found this candidate}}
+      return nil
+    }
+
+  }
+
+  let c = C()
+  if let s = c[""] {
+    return s
+  }
+  if let s = c.f() {
+    return s
+  }
+  if let s = c.g() { //expected-error{{initializer for conditional binding must have Optional type, not 'String'}}
+    return s
+  }
+  if let s = c.h() { //expected-error{{ambiguous use of 'h()'}}
+    return s
+  }
+}
+
+

@@ -18,6 +18,9 @@
 // CHECK: Hello World
 // CHECK: Hello Bob, today is Tuesday.
 
+// This test intentionally mirrors /Driver/emit-sil-single-file to ensure that
+// SwiftOnoneSupport is always a dependency of -Onone -emit-si*gen builds.
+
 @inlinable
 @usableFromInline
 func greet(_ name: String, _ day: String) -> String {

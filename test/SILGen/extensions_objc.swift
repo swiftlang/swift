@@ -8,8 +8,8 @@ import Foundation
 class Foo {}
 
 extension Foo {
-  dynamic func kay() {}
-  dynamic var cox: Int { return 0 }
+  @objc dynamic func kay() {}
+  @objc dynamic var cox: Int { return 0 }
 }
 
 // CHECK-LABEL: sil hidden @$S15extensions_objc19extensionReferencesyyAA3FooCF

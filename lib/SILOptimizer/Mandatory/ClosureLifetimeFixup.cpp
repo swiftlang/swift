@@ -339,8 +339,7 @@ static SILInstruction *getOnlyDestroy(CopyBlockWithoutEscapingInst *CB) {
 
     // If this an apply use, only handle unowned parameters.
     if (auto Apply = FullApplySite::isa(Inst)) {
-      SILArgumentConvention Conv =
-          Apply.getArgumentConvention(Apply.getCalleeArgIndex(*Use));
+      SILArgumentConvention Conv = Apply.getArgumentConvention(*Use);
       if (Conv != SILArgumentConvention::Direct_Unowned)
         return nullptr;
       continue;
@@ -549,7 +548,7 @@ class ClosureLifetimeFixup : public SILFunctionTransform {
     // copy_block_without_escaping instructions.
     if (fixupClosureLifetimes(*getFunction()))
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
-    DEBUG(getFunction()->verify());
+    LLVM_DEBUG(getFunction()->verify());
 
   }
 

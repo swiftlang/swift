@@ -23,7 +23,6 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ProfileData/InstrProfReader.h"
 #include <deque>
 
 namespace swift {
@@ -249,7 +248,7 @@ public:
 
   /// Emits the default argument generator with the given expression.
   void emitDefaultArgGenerator(SILDeclRef constant, Expr *arg,
-                               DefaultArgumentKind kind);
+                               DefaultArgumentKind kind, DeclContext *DC);
 
   /// Emits the stored property initializer for the given pattern.
   void emitStoredPropertyInitialization(PatternBindingDecl *pd, unsigned i);
@@ -335,9 +334,11 @@ public:
   
   SILDeclRef getGetterDeclRef(AbstractStorageDecl *decl);
   SILDeclRef getSetterDeclRef(AbstractStorageDecl *decl);
-  SILDeclRef getAddressorDeclRef(AbstractStorageDecl *decl,
-                                 AccessKind accessKind);
+  SILDeclRef getAddressorDeclRef(AbstractStorageDecl *decl);
+  SILDeclRef getMutableAddressorDeclRef(AbstractStorageDecl *decl);
   SILDeclRef getMaterializeForSetDeclRef(AbstractStorageDecl *decl);
+  SILDeclRef getReadCoroutineDeclRef(AbstractStorageDecl *decl);
+  SILDeclRef getModifyCoroutineDeclRef(AbstractStorageDecl *decl);
 
   KeyPathPatternComponent
   emitKeyPathComponentForDecl(SILLocation loc,

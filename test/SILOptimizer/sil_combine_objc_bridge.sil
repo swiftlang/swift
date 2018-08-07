@@ -29,13 +29,13 @@ struct AnArray<T> : _ObjectiveCBridgeable {
     _ x: AnNSArray,
     result: inout AnArray?
   ) {
-    _preconditionFailure("implement")
+    preconditionFailure("implement")
   }
   static func _conditionallyBridgeFromObjectiveC(
     _ x: AnNSArray,
     result: inout AnArray?
   ) -> Bool {
-    _preconditionFailure("implement")
+    preconditionFailure("implement")
   }
 }
 
@@ -201,6 +201,8 @@ enum AddressOnlyError : Error {
   case data(Data)
   case none
 }
+
+// Test that we emit a copy_addr for the address-only value initialization.
 
 // CHECK-LABEL: sil @unconditional_checked_cast_addr_address_only_type
 // CHECK: alloc_stack $Error

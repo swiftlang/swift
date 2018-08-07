@@ -43,6 +43,7 @@
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/Host.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "clang/Basic/FileManager.h"
 
 #include <memory>
 
@@ -121,11 +122,11 @@ public:
   serialization::Status loadFromSerializedAST(StringRef data);
 
   /// Serialize the command line arguments for emitting them
-  /// to DWARF and inject SDKPath if necessary.
-  static void buildDWARFDebugFlags(std::string &Output,
-                                   const ArrayRef<const char*> &Args,
-                                   StringRef SDKPath,
-                                   StringRef ResourceDir);
+  /// to DWARF or CodeView and inject SDKPath if necessary.
+  static void buildDebugFlags(std::string &Output,
+                              const ArrayRef<const char*> &Args,
+                              StringRef SDKPath,
+                              StringRef ResourceDir);
 
   void setTargetTriple(StringRef Triple);
 
@@ -409,6 +410,8 @@ public:
 
   DiagnosticEngine &getDiags() { return Diagnostics; }
 
+  clang::vfs::FileSystem &getFileSystem() { return *SourceMgr.getFileSystem(); }
+
   ASTContext &getASTContext() {
     return *Context;
   }
@@ -421,9 +424,9 @@ public:
     Diagnostics.addConsumer(*DC);
   }
 
-  void createDependencyTracker() {
+  void createDependencyTracker(bool TrackSystemDeps) {
     assert(!Context && "must be called before setup()");
-    DepTracker = llvm::make_unique<DependencyTracker>();
+    DepTracker = llvm::make_unique<DependencyTracker>(TrackSystemDeps);
   }
   DependencyTracker *getDependencyTracker() { return DepTracker.get(); }
 
@@ -495,6 +498,11 @@ public:
   bool setup(const CompilerInvocation &Invocation);
 
 private:
+  /// Set up the file system by loading and validating all VFS overlay YAML
+  /// files. If the process of validating VFS files failed, or the overlay
+  /// file system could not be initialized, this function returns true. Else it
+  /// returns false if setup succeeded.
+  bool setUpVirtualFileSystemOverlays();
   void setUpLLVMArguments();
   void setUpDiagnosticOptions();
   bool setUpModuleLoaders();
@@ -539,9 +547,13 @@ public:
 
   /// Parses the input file but does no type-checking or module imports.
   /// Note that this only supports parsing an invocation with a single file.
-  ///
-  ///
   void performParseOnly(bool EvaluateConditionals = false);
+
+  /// Parses and performs name binding on all input files.
+  ///
+  /// Like a parse-only invocation, a single file is required. Unlike a
+  /// parse-only invocation, module imports will be processed.
+  void performParseAndResolveImportsOnly();
 
 private:
   SourceFile *
@@ -581,7 +593,9 @@ private:
 
   void addMainFileToModule(const ImplicitImports &implicitImports);
 
-  void parseAndCheckTypes(const ImplicitImports &implicitImports);
+  void performSemaUpTo(SourceFile::ASTStage_t LimitStage);
+  void parseAndCheckTypesUpTo(const ImplicitImports &implicitImports,
+                              SourceFile::ASTStage_t LimitStage);
 
   void parseLibraryFile(unsigned BufferID,
                         const ImplicitImports &implicitImports,
@@ -600,9 +614,10 @@ private:
 
   void forEachFileToTypeCheck(llvm::function_ref<void(SourceFile &)> fn);
 
-  void parseAndTypeCheckMainFile(PersistentParserState &PersistentState,
-                                 DelayedParsingCallbacks *DelayedParseCB,
-                                 OptionSet<TypeCheckingFlags> TypeCheckOptions);
+  void parseAndTypeCheckMainFileUpTo(SourceFile::ASTStage_t LimitStage,
+                                     PersistentParserState &PersistentState,
+                                     DelayedParsingCallbacks *DelayedParseCB,
+                                     OptionSet<TypeCheckingFlags> TypeCheckOptions);
 
   void finishTypeChecking(OptionSet<TypeCheckingFlags> TypeCheckOptions);
 

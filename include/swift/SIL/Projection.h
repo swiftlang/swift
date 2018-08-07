@@ -78,7 +78,7 @@ bool getIntegerIndex(SILValue IndexVal, unsigned &IndexConst);
 /// TypeAlignments.h.
 ///
 /// Projection Kinds which can be represented via indices can use as many bits
-/// as they want to represent the kind. When the index value is uses at most 11
+/// as they want to represent the kind. When the index value uses at most 11
 /// bits, we represent it inline in the data structure. This is taking advantage
 /// of the fact that on most modern OSes (including Darwin), the zero page is
 /// not allocated. In the case where we have more than 11 bits of value
@@ -838,10 +838,7 @@ class ProjectionTree {
   SILModule &Mod;
 
   /// The allocator we use to allocate ProjectionTreeNodes in the tree.
-  ///
-  /// FIXME: This should be a reference to an outside allocator. We shouldn't
-  /// have each ProjectionTree have its own allocator.
-  llvm::SpecificBumpPtrAllocator<ProjectionTreeNode> Allocator;
+  llvm::SpecificBumpPtrAllocator<ProjectionTreeNode> &Allocator;
 
   // A common pattern is a 3 field struct.
   llvm::SmallVector<ProjectionTreeNode *, 4> ProjectionTreeNodes;
@@ -851,10 +848,13 @@ class ProjectionTree {
 
 public:
   /// Construct a projection tree from BaseTy.
-  ProjectionTree(SILModule &Mod, SILType BaseTy);
+  ProjectionTree(SILModule &Mod, SILType BaseTy,
+                 llvm::SpecificBumpPtrAllocator<ProjectionTreeNode> &Allocator);
   /// Construct an uninitialized projection tree, which can then be
   /// initialized by initializeWithExistingTree.
-  ProjectionTree(SILModule &Mod) : Mod(Mod) {}
+  ProjectionTree(SILModule &Mod,
+                 llvm::SpecificBumpPtrAllocator<ProjectionTreeNode> &Allocator)
+      : Mod(Mod), Allocator(Allocator) {}
   ~ProjectionTree();
   ProjectionTree(const ProjectionTree &) = delete;
   ProjectionTree(ProjectionTree &&) = default;

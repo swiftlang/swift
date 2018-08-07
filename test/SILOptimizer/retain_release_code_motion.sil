@@ -129,8 +129,8 @@ bb3:
 
 // Make sure that we do not move retains over unreachable terminator.
 // CHECK-LABEL: sil @no_return_stops_codemotion : $@convention(thin) (Builtin.NativeObject) -> () {
-// CHECK: strong_retain
-// CHECK-NEXT: unreachable
+// CHECK-NOT: strong_retain
+// CHECK: } // end sil function 'no_return_stops_codemotion'
 sil @no_return_stops_codemotion : $@convention(thin) (Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
   %1 = alloc_ref $C
@@ -666,3 +666,55 @@ bb1:
   %5 = tuple()
   return %5 : $()
 }
+
+sil [_semantics "arc.programtermination_point"] @fatalError : $@convention(thin) () -> Never
+
+// This should eliminate all retains except for the first one b/c of user.
+// CHECK-LABEL: sil @eliminate_retains_on_fatalError_path_single_bb : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: strong_retain
+// CHECK-NOT: strong_retain
+// CHECK: } // end sil function 'eliminate_retains_on_fatalError_path_single_bb'
+sil @eliminate_retains_on_fatalError_path_single_bb : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  %2 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %2(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  strong_retain %0 : $Builtin.NativeObject
+  %1 = function_ref @fatalError : $@convention(thin) () -> Never
+  strong_retain %0 : $Builtin.NativeObject
+  apply %1() : $@convention(thin) () -> Never
+  unreachable
+}
+
+// We should eliminate all retains except for the one that we sink into the
+// return block.
+//
+// CHECK-LABEL: sil @eliminate_retains_on_fatalError_path_diamond : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK-NOT: strong_retain
+// CHECK: bb4:
+// CHECK: strong_retain
+// CHECK-NOT: strong_retain
+// CHECK: } // end sil function 'eliminate_retains_on_fatalError_path_diamond'
+sil @eliminate_retains_on_fatalError_path_diamond : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  cond_br undef, bb3, bb4
+
+bb3:
+  strong_retain %0 : $Builtin.NativeObject
+  %1 = function_ref @fatalError : $@convention(thin) () -> Never
+  strong_retain %0 : $Builtin.NativeObject
+  apply %1() : $@convention(thin) () -> Never
+  unreachable
+
+bb4:
+  unreachable
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+

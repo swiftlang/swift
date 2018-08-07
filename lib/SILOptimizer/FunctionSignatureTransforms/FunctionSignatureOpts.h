@@ -27,6 +27,7 @@
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "llvm/ADT/DenseMap.h"
 
@@ -65,14 +66,14 @@ struct ArgumentDescriptor {
   /// Is this parameter an indirect result?
   bool IsIndirectResult;
 
-  /// If non-null, this is the release in the return block of the callee, which
-  /// is associated with this parameter if it is @owned. If the parameter is not
-  /// @owned or we could not find such a release in the callee, this is null.
-  ReleaseList CalleeRelease;
+  /// If non-empty, this is the set of releases in the return block of
+  /// the callee associated with this parameter if it is @owned. If it
+  /// is empty then we could not find any such releases.
+  TinyPtrVector<SILInstruction *> CalleeRelease;
 
-  /// The same as CalleeRelease, but the release in the throw block, if it is a
-  /// function which has a throw block.
-  ReleaseList CalleeReleaseInThrowBlock;
+  /// The same as CalleeRelease, but the releases are post-dominated
+  /// by the throw block, if it is a function which has a throw block.
+  TinyPtrVector<SILInstruction *> CalleeReleaseInThrowBlock;
 
   /// The projection tree of this arguments.
   ProjectionTree ProjTree;
@@ -86,12 +87,15 @@ struct ArgumentDescriptor {
   /// to the original argument. The reason why we do this is to make sure we
   /// have access to the original argument's state if we modify the argument
   /// when optimizing.
-  ArgumentDescriptor(SILFunctionArgument *A)
+  ArgumentDescriptor(
+      SILFunctionArgument *A,
+      llvm::SpecificBumpPtrAllocator<ProjectionTreeNode> &Allocator)
       : Arg(A), PInfo(A->getKnownParameterInfo()), Index(A->getIndex()),
         Decl(A->getDecl()), IsEntirelyDead(false), WasErased(false),
         Explode(false), OwnedToGuaranteed(false),
         IsIndirectResult(A->isIndirectResult()), CalleeRelease(),
-        CalleeReleaseInThrowBlock(), ProjTree(A->getModule(), A->getType()) {
+        CalleeReleaseInThrowBlock(),
+        ProjTree(A->getModule(), A->getType(), Allocator) {
     if (!A->isIndirectResult()) {
       PInfo = Arg->getKnownParameterInfo();
     }
@@ -213,6 +217,8 @@ struct FunctionSignatureTransformDescriptor {
 };
 
 class FunctionSignatureTransform {
+  SILOptFunctionBuilder &FunctionBuilder;
+
   /// A struct that contains all data that we use during our
   /// transformation. This is an initial step towards splitting this struct into
   /// multiple "transforms" that can be tested independently of each other.
@@ -281,12 +287,14 @@ private:
 public:
   /// Constructor.
   FunctionSignatureTransform(
+      SILOptFunctionBuilder &FunctionBuilder,
       SILFunction *F, RCIdentityAnalysis *RCIA, EpilogueARCAnalysis *EA,
       Mangle::FunctionSignatureSpecializationMangler &Mangler,
       llvm::SmallDenseMap<int, int> &AIM,
       llvm::SmallVector<ArgumentDescriptor, 4> &ADL,
       llvm::SmallVector<ResultDescriptor, 4> &RDL)
-      : TransformDescriptor{F, nullptr, AIM, false, ADL, RDL}, RCIA(RCIA),
+      : FunctionBuilder(FunctionBuilder),
+        TransformDescriptor{F, nullptr, AIM, false, ADL, RDL}, RCIA(RCIA),
         EA(EA) {}
 
   /// Return the optimized function.

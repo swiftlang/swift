@@ -62,8 +62,9 @@ SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
   auto params = FTI->getParameters();
   auto newParams = params.slice(0, params.size() - argCount);
 
-  auto extInfo = FTI->getExtInfo().withRepresentation(
-      SILFunctionType::Representation::Thick);
+  auto extInfo = FTI->getExtInfo()
+    .withRepresentation(SILFunctionType::Representation::Thick)
+    .withIsPseudogeneric(false);
 
   // If the original method has an @unowned_inner_pointer return, the partial
   // application thunk will lifetime-extend 'self' for us, converting the
@@ -259,12 +260,35 @@ SILBuilder::emitDestroyAddr(SILLocation Loc, SILValue Operand) {
 
 static bool couldReduceStrongRefcount(SILInstruction *Inst) {
   // Simple memory accesses cannot reduce refcounts.
-  if (isa<LoadInst>(Inst) || isa<StoreInst>(Inst) ||
-      isa<RetainValueInst>(Inst) || isa<UnownedRetainInst>(Inst) ||
-      isa<UnownedReleaseInst>(Inst) || isa<StrongRetainUnownedInst>(Inst) ||
-      isa<StoreWeakInst>(Inst) || isa<StrongRetainInst>(Inst) ||
-      isa<AllocStackInst>(Inst) || isa<DeallocStackInst>(Inst))
+  switch (Inst->getKind()) {
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case SILInstructionKind::Store##Name##Inst: \
     return false;
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  /* The next case must be first in this macro because */ \
+  /* SOMETIMES_LOADABLE_CHECKED_REF_STORAGE will fall into it. */ \
+  case SILInstructionKind::Name##ReleaseInst: \
+    if (isLessStrongThan(ReferenceOwnership::Name, ReferenceOwnership::Strong))\
+      return false; \
+    break; \
+  case SILInstructionKind::Name##RetainInst: \
+  case SILInstructionKind::StrongRetain##Name##Inst: \
+    return false;
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case SILInstructionKind::Store##Name##Inst: \
+  ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
+#include "swift/AST/ReferenceStorage.def"
+  case SILInstructionKind::LoadInst:
+  case SILInstructionKind::StoreInst:
+  case SILInstructionKind::RetainValueInst:
+  case SILInstructionKind::StrongRetainInst:
+  case SILInstructionKind::AllocStackInst:
+  case SILInstructionKind::DeallocStackInst:
+  case SILInstructionKind::CopyUnownedValueInst:
+    return false;
+  default:
+    break;
+  }
 
   // Assign and copyaddr of trivial types cannot drop refcounts, and 'inits'
   // never can either.  Nontrivial ones can though, because the overwritten

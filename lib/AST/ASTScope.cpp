@@ -171,22 +171,7 @@ static bool shouldSkipBraceStmtElement(ASTNode element) {
 
 /// Determine whether the given abstract storage declaration has accessors.
 static bool hasAccessors(AbstractStorageDecl *asd) {
-  switch (asd->getStorageKind()) {
-  case AbstractStorageDecl::Addressed:
-  case AbstractStorageDecl::AddressedWithObservers:
-  case AbstractStorageDecl::AddressedWithTrivialAccessors:
-  case AbstractStorageDecl::Computed:
-  case AbstractStorageDecl::ComputedWithMutableAddress:
-  case AbstractStorageDecl::InheritedWithObservers:
-  case AbstractStorageDecl::StoredWithObservers:
-    return asd->getBracesRange().isValid();
-
-  case AbstractStorageDecl::Stored:
-  case AbstractStorageDecl::StoredWithTrivialAccessors:
-    return false;
-  }
-
-  llvm_unreachable("Unhandled ContinuationKind in switch.");
+  return asd->getBracesRange().isValid();
 }
 
 void ASTScope::expand() const {
@@ -561,39 +546,12 @@ void ASTScope::expand() const {
 
   case ASTScopeKind::Accessors: {
     // Add children for all of the explicitly-written accessors.
-    SmallVector<ASTScope *, 4> accessors;
-    auto addAccessor = [&](FuncDecl *accessor) {
-      if (!accessor) return;
-      if (accessor->isImplicit()) return;
-      if (accessor->getStartLoc().isInvalid()) return;
-
+    for (auto accessor : abstractStorageDecl->getAllAccessors()) {
+      if (accessor->isImplicit() || accessor->getStartLoc().isInvalid())
+        continue;
       if (auto accessorChild = createIfNeeded(this, accessor))
-        accessors.push_back(accessorChild);
-    };
-
-    addAccessor(abstractStorageDecl->getGetter());
-    addAccessor(abstractStorageDecl->getSetter());
-    addAccessor(abstractStorageDecl->getMaterializeForSetFunc());
-    if (abstractStorageDecl->hasAddressors()) {
-      addAccessor(abstractStorageDecl->getAddressor());
-      addAccessor(abstractStorageDecl->getMutableAddressor());
+        addChild(accessorChild);
     }
-    if (abstractStorageDecl->hasObservers()) {
-      addAccessor(abstractStorageDecl->getDidSetFunc());
-      addAccessor(abstractStorageDecl->getWillSetFunc());
-    }
-
-    // Sort the accessors, because they can come in any order.
-    std::sort(accessors.begin(), accessors.end(),
-      [&](ASTScope *s1, ASTScope *s2) {
-        return ctx.SourceMgr.isBeforeInBuffer(s1->getSourceRange().Start,
-                                              s2->getSourceRange().Start);
-    });
-
-    // Add the accessors.
-    for (auto accessor : accessors)
-      addChild(accessor);
-
     break;
   }
 
@@ -659,27 +617,51 @@ ASTScope *ASTScope::createRoot(SourceFile *sourceFile) {
   return scope;
 }
 
+// FIXME: This is a vestige of multiple parameter lists.
+static ParamDecl *getParameter(AbstractFunctionDecl *func,
+                               unsigned listIndex,
+                               unsigned paramIndex) {
+  // Dig out the actual parameter.
+  if (auto *selfDecl = func->getImplicitSelfDecl()) {
+    if (listIndex == 0) {
+      assert(paramIndex == 0);
+      return selfDecl;
+    }
+
+    assert(listIndex == 1);
+    return func->getParameters()->get(paramIndex);
+  }
+
+  assert(listIndex == 0);
+  return func->getParameters()->get(paramIndex);
+}
+
 /// Find the parameter list and parameter index (into that list) corresponding
 /// to the next parameter.
 static Optional<std::pair<unsigned, unsigned>>
 findNextParameter(AbstractFunctionDecl *func, unsigned listIndex,
                   unsigned paramIndex) {
-  auto paramLists = func->getParameterLists();
   unsigned paramOffset = 1;
-  while (listIndex < paramLists.size()) {
-    auto currentList = paramLists[listIndex];
 
-    // If there is a parameter in this list, return it.
-    if (paramIndex + paramOffset < currentList->size()) {
-      return std::make_pair(listIndex, paramIndex + paramOffset);
+  if (func->hasImplicitSelfDecl()) {
+    if (listIndex > 1)
+      return None;
+
+    if (listIndex == 0) {
+      ++listIndex;
+      paramIndex = 0;
+      paramOffset = 0;
     }
 
-    // Move on to the next list.
-    ++listIndex;
-    paramIndex = 0;
-    paramOffset = 0;
+  } else {
+    if (listIndex > 0)
+      return None;
   }
 
+  if (paramIndex + paramOffset < func->getParameters()->size())
+    return std::make_pair(listIndex, paramIndex + paramOffset);
+
+  ++listIndex;
   return None;
 }
 
@@ -949,7 +931,7 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
     }
 
     // Figure out which parameter is next is the next one down.
-    Optional<std::pair<unsigned, unsigned>> nextParameter;
+    Optional<std::pair<unsigned, unsigned>> nextParameter = None;
     if (parent->getKind() == ASTScopeKind::AbstractFunctionParams &&
         parent->abstractFunctionParams.decl == decl) {
       nextParameter =
@@ -957,17 +939,15 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
                           parent->abstractFunctionParams.listIndex,
                           parent->abstractFunctionParams.paramIndex);
 
-    } else if (abstractFunction->getParameterList(0)->size() > 0) {
+    } else if (abstractFunction->hasImplicitSelfDecl() ||
+               abstractFunction->getParameters()->size() > 0) {
       nextParameter = std::make_pair(0, 0);
-    } else {
-      nextParameter = findNextParameter(abstractFunction, 0, 0);
     }
 
     if (nextParameter) {
-      // Dig out the actual parameter.
-      ParamDecl *currentParam =
-        abstractFunction->getParameterList(nextParameter->first)
-          ->get(nextParameter->second);
+      auto *currentParam = getParameter(abstractFunction,
+                                        nextParameter->first,
+                                        nextParameter->second);
 
       // Determine whether there is a default argument.
       ASTScope *defaultArgumentScope = nullptr;
@@ -1057,6 +1037,11 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Stmt *stmt) {
     return createIfNeeded(parent, returnStmt->getResult());
   }
 
+  case StmtKind::Yield: {
+    auto yieldStmt = cast<YieldStmt>(stmt);
+    return createIfNeeded(parent, yieldStmt->getYields());
+  }
+
   case StmtKind::Defer:
     return createIfNeeded(parent, cast<DeferStmt>(stmt)->getTempDecl());
 
@@ -1112,9 +1097,8 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Stmt *stmt) {
 }
 
 /// Find all of the (non-nested) closures referenced within this expression.
-static SmallVector<ClosureExpr *, 4> findClosures(Expr *expr) {
-  SmallVector<ClosureExpr *, 4> closures;
-  if (!expr) return closures;
+static void findClosures(Expr *expr, SmallVectorImpl<ClosureExpr *> &closures) {
+  assert(expr);
 
   /// AST walker that finds top-level closures in an expression.
   class ClosureFinder : public ASTWalker {
@@ -1152,14 +1136,20 @@ static SmallVector<ClosureExpr *, 4> findClosures(Expr *expr) {
   };
 
   expr->walk(ClosureFinder(closures));
-  return closures;
 }
 
 ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Expr *expr) {
   if (!expr) return nullptr;
+  return createIfNeeded(parent, llvm::makeArrayRef(expr));
+}
 
-  // Dig out closure expressions within the given expression.
-  auto closures = findClosures(expr);
+ASTScope *ASTScope::createIfNeeded(const ASTScope *parent,
+                                   ArrayRef<Expr *> exprs) {
+  SmallVector<ClosureExpr*, 4> closures;
+
+  // Dig out closure expressions within the given expressions.
+  for (auto expr: exprs)
+    findClosures(expr, closures);
   if (closures.empty())
     return nullptr;
 
@@ -1442,15 +1432,14 @@ SourceRange ASTScope::getSourceRangeImpl() const {
       if (isa<DestructorDecl>(abstractFunctionParams.decl)) {
         startLoc = abstractFunctionParams.decl->getNameLoc();
       } else {
-        startLoc = abstractFunctionParams.decl->getParameterList(1)
+        startLoc = abstractFunctionParams.decl->getParameters()
                      ->getLParenLoc();
       }
       return SourceRange(startLoc, endLoc);
     }
 
     // Otherwise, find the end of this parameter.
-    auto param = abstractFunctionParams.decl->getParameterList(
-                   abstractFunctionParams.listIndex)
+    auto param = abstractFunctionParams.decl->getParameters()
                      ->get(abstractFunctionParams.paramIndex);
     return SourceRange(param->getEndLoc(), endLoc);
   }
@@ -1771,11 +1760,6 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
     if (range.Start == range.End)
       break;
 
-    // Bind this extension, if we haven't done so already.
-    if (!extension->getExtendedType())
-      if (auto resolver = extension->getASTContext().getLazyResolver())
-        resolver->bindExtension(extension);
-
     // If there are generic parameters, add them.
     for (auto genericParams = extension->getGenericParams();
          genericParams;
@@ -1791,9 +1775,10 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
     break;
 
   case ASTScopeKind::AbstractFunctionParams:
-    result.push_back(abstractFunctionParams.decl->getParameterList(
-                         abstractFunctionParams.listIndex)
-                       ->get(abstractFunctionParams.paramIndex));
+    result.push_back(
+      getParameter(abstractFunctionParams.decl,
+                   abstractFunctionParams.listIndex,
+                   abstractFunctionParams.paramIndex));
     break;
 
   case ASTScopeKind::AfterPatternBinding:
@@ -1925,8 +1910,8 @@ void ASTScope::print(llvm::raw_ostream &out, unsigned level,
     out << " extension of '";
     if (auto typeRepr = extension->getExtendedTypeLoc().getTypeRepr())
       typeRepr->print(out);
-    else
-      extension->getExtendedType()->print(out);
+    else if (auto nominal = extension->getExtendedNominal())
+      out << nominal->getName();
     out << "'";
     printRange();
     break;

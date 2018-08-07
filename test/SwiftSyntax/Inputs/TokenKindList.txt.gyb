@@ -1,0 +1,6 @@
+%{
+  from gyb_syntax_support import *
+}%
+% for token in SYNTAX_TOKENS:
+${token.kind}
+% end

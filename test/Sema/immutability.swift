@@ -2,6 +2,9 @@
 
 func markUsed<T>(_ t: T) {}
 
+prefix operator ++
+public prefix func ++ <T>(rhs: inout T) -> T { fatalError() }
+
 let bad_property_1: Int {    // expected-error {{'let' declarations cannot be computed properties}} {{1-4=var}}
   get {
     return 42
@@ -246,9 +249,9 @@ protocol MutatingTestProto {
   mutating
   func mutatingfunc()
   
-  func nonmutatingfunc()  // expected-note 2 {{protocol requires}}
+  func nonmutatingfunc() // expected-note {{protocol requires}}
   __consuming
-  func consuming_nonmutating_func()  // expected-note 2 {{protocol requires}}
+  func consuming_nonmutating_func() // expected-note {{protocol requires}}
 }
 
 class TestClass : MutatingTestProto {
@@ -281,18 +284,18 @@ struct TestStruct3 : MutatingTestProto {   // expected-error {{type 'TestStruct3
   func consuming_nonmutating_func() {} // expected-note {{candidate is marked 'mutating' but protocol does not allow it}}
 }
 
-struct TestStruct4 : MutatingTestProto { // expected-error {{type 'TestStruct4' does not conform to protocol 'MutatingTestProto'}}
+struct TestStruct4 : MutatingTestProto {
   mutating
   func mutatingfunc() {}  // Ok, can be mutating.
   func nonmutatingfunc() {}
-  nonmutating func consuming_nonmutating_func() {}  // expected-note {{candidate is marked 'nonmutating' but protocol does not allow it}}
+  nonmutating func consuming_nonmutating_func() {}
 }
 
-struct TestStruct5 : MutatingTestProto { // expected-error {{type 'TestStruct5' does not conform to protocol 'MutatingTestProto'}}
+struct TestStruct5 : MutatingTestProto {
   mutating
   func mutatingfunc() {}  // Ok, can be mutating.
   __consuming
-  func nonmutatingfunc() {} // expected-note {{candidate is marked '__consuming' but protocol does not allow it}}
+  func nonmutatingfunc() {}
   __consuming func consuming_nonmutating_func() {}
 }
 

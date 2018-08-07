@@ -16,6 +16,11 @@ func getInput(_ file: String) -> URL {
   return result
 }
 
+func getSyntaxTree(_ url: URL) throws -> SourceFileSyntax {
+  let content = try SwiftLang.parse(path: url.path).data(using: .utf8)!
+  return try SyntaxTreeDeserializer().deserialize(content)
+}
+
 var VisitorTests = TestSuite("SyntaxVisitor")
 
 VisitorTests.test("Basic") {
@@ -27,8 +32,7 @@ VisitorTests.test("Basic") {
     }
   }
   expectDoesNotThrow({
-    let parsed = try SourceFileSyntax.decodeSourceFileSyntax(try
-      SwiftLang.parse(getInput("visitor.swift")))
+    let parsed = try getSyntaxTree(getInput("visitor.swift"))
     let counter = FuncCounter()
     let hashBefore = parsed.hashValue
     counter.visit(parsed)
@@ -45,8 +49,7 @@ VisitorTests.test("RewritingNodeWithEmptyChild") {
     }
   }
   expectDoesNotThrow({
-    let parsed = try SourceFileSyntax.decodeSourceFileSyntax(try
-      SwiftLang.parse(getInput("closure.swift")))
+    let parsed = try getSyntaxTree(getInput("closure.swift"))
     let rewriter = ClosureRewriter()
     let rewritten = rewriter.visit(parsed)
     expectEqual(parsed.description, rewritten.description)
@@ -67,8 +70,7 @@ VisitorTests.test("SyntaxRewriter.visitAny") {
     }
   }
   expectDoesNotThrow({
-    let parsed = try SourceFileSyntax.decodeSourceFileSyntax(try
-      SwiftLang.parse(getInput("near-empty.swift")))
+    let parsed = try getSyntaxTree(getInput("near-empty.swift"))
     let rewriter = VisitAnyRewriter(transform: { _ in
        return SyntaxFactory.makeIdentifier("")
     })
@@ -88,9 +90,7 @@ VisitorTests.test("SyntaxRewriter.visitCollection") {
   }
 
   expectDoesNotThrow({
-    let parsed = try SourceFileSyntax.decodeSourceFileSyntax(
-      try SwiftLang.parse(getInput("nested-blocks.swift"))
-    )
+    let parsed = try getSyntaxTree(getInput("nested-blocks.swift"))
     let visitor = VisitCollections()
     visitor.visit(parsed)
     expectEqual(4, visitor.numberOfCodeBlockItems)
