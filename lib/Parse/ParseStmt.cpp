@@ -1426,8 +1426,7 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
     llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
       T(InVarOrLetPattern, IVOLP_InMatchingPattern);
     ThePattern = parseMatchingPattern(/*isExprBasic*/ true);
-  } else if ((BindingKindStr == "let" || BindingKindStr == "var") &&
-              Tok.is(tok::kw_case)) {
+  } else if (Tok.is(tok::kw_case)) {
     ConditionCtxt.setCreateSyntax(SyntaxKind::Unknown);
     // If will probably be a common typo to write "if let case" instead of
     // "if case let" so detect this and produce a nice fixit.
@@ -1439,18 +1438,19 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
     consumeToken(tok::kw_case);
     
     bool wasLet = BindingKindStr == "let";
+    BindingKindStr = "case";
     
     // In our recursive parse, remember that we're in a var/let pattern.
     llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
       T(InVarOrLetPattern, wasLet ? IVOLP_InLet : IVOLP_InVar);
     
-    BindingKindStr = "case";
     ThePattern = parseMatchingPattern(/*isExprBasic*/ true);
+    Status |= Status;
     
     if (ThePattern.isNonNull()) {
       auto *P = new (Context) VarPattern(IntroducerLoc, wasLet,
                                           ThePattern.get(), /*impl*/false);
-      ThePattern = makeParserResult(P);
+      ThePattern = makeParserResult(Status, P);
     }
 
   } else {
@@ -1466,23 +1466,24 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
 
   ThePattern = parseOptionalPatternTypeAnnotation(ThePattern,
                                                   BindingKindStr != "case");
-  Status |= ThePattern;
+  if (ThePattern.hasCodeCompletion())
+    Status.setHasCodeCompletion();
     
-  if (ThePattern.isNull() || ThePattern.hasCodeCompletion())
-    return Status;
+  if (ThePattern.isNull()) {
+    // Recover by creating AnyPattern.
+    ThePattern = makeParserResult(new (Context) AnyPattern(PreviousLoc));
+  }
 
   // Conditional bindings must have an initializer.
   Expr *Init;
   if (Tok.is(tok::equal)) {
     SyntaxParsingContext InitCtxt(SyntaxContext, SyntaxKind::InitializerClause);
     consumeToken();
-    ParserResult<Expr> InitExpr
-      = parseExprBasic(diag::expected_expr_conditional_var);
-    Status |= InitExpr;
-    if (InitExpr.isNull())
-      return Status;
-    Init = InitExpr.get();
-    
+    ParserResult<Expr> InitExpr =
+        parseExprBasic(diag::expected_expr_conditional_var);
+    Init = InitExpr.getPtrOrNull();
+    if (InitExpr.hasCodeCompletion())
+      Status.setHasCodeCompletion();
   } else {
     // Although we require an initializer, recover by parsing as if it were
     // merely omitted.
@@ -1491,7 +1492,6 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
   }
   
   result.push_back({IntroducerLoc, ThePattern.get(), Init});
-  IntroducerLoc = SourceLoc();
   
   // Add variable bindings from the pattern to our current scope and mark
   // them as being having a non-pattern-binding initializer.
