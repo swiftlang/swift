@@ -134,7 +134,7 @@ extension SingleValueDatasetIterator : IteratorProtocol {
     guard _TFGetScalarOrDie(#tfop("OptionalHasValue", optional)) else {
       return nil
     }
-    return Tensor(handle: #tfop("OptionalGetValue",optional,
+    return Tensor(handle: #tfop("OptionalGetValue", optional,
                                 output_types: [Scalar.self],
                                 output_shapes: [elementShape]))
   }
