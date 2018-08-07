@@ -28,6 +28,28 @@ inline bool accessKindMayConflict(SILAccessKind a, SILAccessKind b) {
   return !(a == SILAccessKind::Read && b == SILAccessKind::Read);
 }
 
+inline bool updateAccessKind(SILAccessKind &LHS, SILAccessKind RHS) {
+  bool changed = false;
+  // Assume we don't track Init/Deinit.
+  if (LHS == SILAccessKind::Read && RHS == SILAccessKind::Modify) {
+    LHS = RHS;
+    changed = true;
+  }
+  return changed;
+}
+
+inline bool updateOptionalAccessKind(Optional<SILAccessKind> &LHS,
+                                     Optional<SILAccessKind> RHS) {
+  if (RHS == None)
+    return false;
+
+  if (LHS == None) {
+    LHS = RHS;
+    return true;
+  }
+  return updateAccessKind(LHS.getValue(), RHS.getValue());
+}
+
 /// Represents the identity of a stored class property as a combination
 /// of a base and a single projection. Eventually the goal is to make this
 /// more precise and consider, casts, etc.

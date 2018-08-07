@@ -65,6 +65,14 @@
 /// any point in the pipeline. Until then, we could settle for a partially
 /// working AccessEnforcementSelection, or expand it somewhat to handle
 /// alloc_stack.
+///
+/// **Access marker merger**
+///
+/// When a pair of non-overlapping accesses, where the first access dominates
+/// the second and there are no conflicts on the same storage in the paths
+/// between them, and they are part of the same sub-region
+/// be it the same block or the sampe loop, merge those accesses to create
+/// a new, larger, scope with a single begin_access for the accesses.
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "access-enforcement-opts"
@@ -73,8 +81,11 @@
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/Analysis/AccessedStorageAnalysis.h"
+#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/Analysis/LoopRegionAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Local.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SmallBitVector.h"
 
 using namespace swift;
@@ -127,16 +138,16 @@ using AccessInfo = AccessEnforcementOptsInfo;
 } // namespace swift
 
 namespace {
-// Sparse access sets are used temporarily for fast operations by local
-// reachability analysis. We don't care if they take more space.
-class SparseAccessSet;
-
 /// A dense set of begin_access instructions as a compact vector. Reachability
 /// results are stored here because very few accesses are typically in-progress
 /// at a particular program point, particularly at block boundaries.
 using DenseAccessSet = SmallVector<BeginAccessInst *, 4>;
 
-/// Analyze a function's formal access to determine nested conflicts.
+/// Maintains AccessConflictAnalysis' storage info for each sub-region
+class RegionStorage;
+
+/// Analyze a function's formal accesses.
+/// determines nested conflicts and mergeable accesses.
 ///
 /// Maps each begin access instruction to its AccessInfo, which:
 /// - identifies the accessed memory for conflict detection
@@ -150,21 +161,32 @@ using DenseAccessSet = SmallVector<BeginAccessInst *, 4>;
 /// or at the end_access instruction that is associated with the
 /// begin_access.
 ///
-/// Forward data flow computes `blockOutAccess` for each block. At a control
-/// flow merge, this analysis forms an intersection of reachable accesses on
-/// each path. Only visited predecessors are merged (unvisited paths
-/// optimistically assume reachability). Before a block is visited, it has no
-/// map entry in blockOutAccess. Blocks are processed in RPO order, and a single
+/// Forward data flow computes `regionToStorageMap` for each region's blocks.
+/// Loops are processed bottom-up.
+/// Control flow within a loop or function top level is processed in RPO order.
+/// At a block's control flow merge, this analysis forms an intersection of
+/// reachable accesses on each path inside the region.
+/// Only visited predecessors are merged (unvisited paths optimistically
+/// assume reachability). Before a block is visited, it has no map entry in
+/// regionToStorageMap. Blocks are processed in RPO order, and a single
 /// begin_access dominates all associated end_access instructions. Consequently,
-/// when a block is first visited, blockOutAccess contains the maximal
+/// when a block is first visited, its storage accesses contains the maximal
 /// reachability set. Further iteration would only reduce this set.
 ///
-/// The only result of this analysis is the seenNestedConflict flags in
-/// AccessInfo. Since reducing a reachability set cannot further detect
-/// conflicts, there is no need to iterate to a reachability fix point.
+/// The only results of this analysis are:
+//// 1) The seenNestedConflict flags in AccessInfo.
+///     Since reducing a reachability set cannot further detect
+///     conflicts, there is no need to iterate to a reachability fix point.
+///  2) A deterministic order map of out-of-scope instructions that we can
+///  merge.
+///     The way we construct this map guarantees the accesses within it are
+///     mergeable.
 class AccessConflictAnalysis {
 public:
   using AccessMap = llvm::SmallDenseMap<BeginAccessInst *, AccessInfo, 32>;
+  // A map of instruction pairs we can merge from dominating instruction to
+  // dominated
+  using MergeableMap = llvm::MapVector<BeginAccessInst *, BeginAccessInst *>;
   // This result of this analysis is a map from all BeginAccessInst in this
   // function to AccessInfo.
   struct Result {
@@ -172,6 +194,9 @@ public:
     /// Iterating over this map is nondeterministic. If it is necessary to order
     /// the accesses, then AccessInfo::getAccessIndex() can be used.
     AccessMap accessMap;
+
+    /// A map of instruction pairs we can merge the scope of
+    MergeableMap mergeMap;
 
     /// Convenience.
     ///
@@ -192,185 +217,354 @@ public:
       return const_cast<Result &>(*this).getAccessInfo(beginAccess);
     }
   };
+  using AccessedStorageLocs = llvm::SmallDenseSet<AccessedStorage, 8>;
 
 private:
-  SILFunction *F;
-  PostOrderFunctionInfo *PO;
+  LoopRegionFunctionInfo *LRFI;
   AccessedStorageAnalysis *ASA;
 
-  /// Tracks the in-scope accesses at the end of each block, for the purpose of
-  /// finding nested conflicts.  (Out-of-scope accesses are currently only
-  /// tracked locally for the purpose of merging access scopes.)
-  llvm::SmallDenseMap<SILBasicBlock *, DenseAccessSet, 32> blockOutAccess;
+  using RegionToRegionStorageMap =
+      llvm::SmallDenseMap<unsigned, RegionStorage *>;
+  RegionToRegionStorageMap regionToStorageMap;
+  AccessedStorageLocs storageAccesses;
 
   Result result;
-
 public:
-  AccessConflictAnalysis(SILFunction *F, PostOrderFunctionInfo *PO,
+  AccessConflictAnalysis(LoopRegionFunctionInfo *LRFI,
                          AccessedStorageAnalysis *ASA)
-      : F(F), PO(PO), ASA(ASA) {}
+      : LRFI(LRFI), ASA(ASA) {}
+  ~AccessConflictAnalysis();
 
   Result &&analyze() &&;
-
 protected:
   void identifyBeginAccesses();
+  void identifyStorageLocations();
+  void processBlockRegion(unsigned id);
+  void processLoopRegion(unsigned id);
 
-  void visitBeginAccess(BeginAccessInst *beginAccess,
-                        SparseAccessSet &accessMap);
+  void mergeBBPredAccesses(unsigned succID);
 
-  void visitEndAccess(EndAccessInst *endAccess, SparseAccessSet &accessMap);
+  void visitBeginAccess(BeginAccessInst *beginAccess);
+  void visitEndAccess(EndAccessInst *endAccess);
+  void detectApplyConflicts(const DenseAccessSet &conflictFreeSet,
+                            RegionStorage *applyStorage,
+                            const FunctionAccessedStorage &callSiteAccesses,
+                            const FullApplySite &fullApply);
 
-  void visitFullApply(FullApplySite fullApply, SparseAccessSet &accessMap);
+  void visitFullApply(FullApplySite fullApply);
 
-  void mergePredAccesses(SILBasicBlock *succBB,
-                         SparseAccessSet &mergedAccesses);
+  void calcBottomUpOrder(LoopRegion *region,
+                         llvm::SmallVectorImpl<unsigned> &worklist);
 
-  void visitBlock(SILBasicBlock *BB);
+  RegionStorage *getRegionStorageFromIns(SILInstruction *instr);
 };
 
-/// A sparse set of in-flight accesses.
-///
-/// Explodes a DenseAccessSet into a temporary sparse set for comparison
-/// and membership.
-///
-/// The AccessConflictAnalysis result provides the instruction to index
-/// mapping.
-class SparseAccessSet {
+/// The per-region result of AccessConflictAnalysis.
+class RegionStorage {
+  LoopRegion *R;
   AccessConflictAnalysis::Result &result;
 
+  // A set of accesses we care about in this scope.
+  AccessConflictAnalysis::AccessedStorageLocs storageAccesses;
+
+  DenseAccessSet inScopeConflictFreeAccesses;
   // Mark the in-scope accesses.
   // (Most functions have < 64 accesses.)
+  // The bitvector makes the intersection operation easier
   llvm::SmallBitVector inScopeBitmask;
-  // Mark a potential conflicts on each access since the last begin/end marker.
-  llvm::SmallBitVector conflictBitmask;
-  DenseAccessSet denseVec; // Hold all local accesses seen thus far.
+  DenseAccessSet outOfScopeConflictFreeAccesses;
+  // Mark the out-of-scope accesses.
+  // (Most functions have < 64 accesses.)
+  // The bitvector makes the intersection operation easier
+  llvm::SmallBitVector outOfScopeBitmask;
+
+  Optional<SILAccessKind> unidentifiedAccess;
 
 public:
-  /// Iterate over in-scope, conflict free access.
-  class NoNestedConflictIterator {
-    const SparseAccessSet &sparseSet;
-    DenseAccessSet::const_iterator denseIter;
+  RegionStorage(
+      LoopRegion *R, AccessConflictAnalysis::Result &result,
+      const AccessConflictAnalysis::AccessedStorageLocs &storageAccesses)
+      : R(R), result(result), storageAccesses(storageAccesses),
+        inScopeBitmask(result.accessMap.size()),
+        outOfScopeBitmask(result.accessMap.size()) {}
+  RegionStorage(LoopRegion *R, AccessConflictAnalysis::Result &result)
+      : R(R), result(result), inScopeBitmask(result.accessMap.size()),
+        outOfScopeBitmask(result.accessMap.size()) {}
 
-  public:
-    NoNestedConflictIterator(const SparseAccessSet &set)
-        : sparseSet(set), denseIter(set.denseVec.begin()) {}
+  const LoopRegion *getRegion() const { return R; }
 
-    BeginAccessInst *next() {
-      auto end = sparseSet.denseVec.end();
-      while (denseIter != end) {
-        BeginAccessInst *beginAccess = *denseIter;
-        ++denseIter;
-        unsigned sparseIndex = sparseSet.result.getAccessIndex(beginAccess);
-        if (sparseSet.inScopeBitmask[sparseIndex]
-            && !sparseSet.conflictBitmask[sparseIndex]) {
-          return beginAccess;
-        }
-      }
-      return nullptr;
-    }
-  };
+  // ---------------------------------------------------------------------------
+  // Accessing the results.
 
-  SparseAccessSet(AccessConflictAnalysis::Result &result)
-      : result(result), inScopeBitmask(result.accessMap.size()),
-        conflictBitmask(result.accessMap.size()) {}
+  bool hasUnidentifiedAccess() const { return unidentifiedAccess != None; }
 
-  // All accessed in the given denseVec are presumed to be in-scope and conflict
-  // free.
-  SparseAccessSet(const DenseAccessSet &denseVec,
-                  AccessConflictAnalysis::Result &result)
-      : result(result), inScopeBitmask(result.accessMap.size()),
-        conflictBitmask(result.accessMap.size()), denseVec(denseVec) {
-    for (BeginAccessInst *beginAccess : denseVec)
-      inScopeBitmask.set(result.getAccessIndex(beginAccess));
-  }
-  bool hasConflictFreeAccess() const {
-    NoNestedConflictIterator iterator(*this);
-    return iterator.next() != nullptr;
+  const DenseAccessSet &getInScopeAccesses() {
+    return inScopeConflictFreeAccesses;
   }
 
-  bool hasInScopeAccess() const {
-    return llvm::any_of(denseVec, [this](BeginAccessInst *beginAccess) {
-      unsigned sparseIndex = result.getAccessIndex(beginAccess);
-      return inScopeBitmask[sparseIndex];
-    });
+  const DenseAccessSet &getOutOfScopeConflictFreeAccesses() {
+    return outOfScopeConflictFreeAccesses;
   }
 
-  bool isInScope(unsigned index) const { return inScopeBitmask[index]; }
-
-  // Insert the given BeginAccessInst with its corresponding reachability index.
-  // Set the in-scope bit and reset the conflict bit.
-  bool enterScope(BeginAccessInst *beginAccess, unsigned index) {
-    assert(!inScopeBitmask[index]
-           && "nested access should not be dynamically enforced.");
-    inScopeBitmask.set(index);
-    conflictBitmask.reset(index);
-    denseVec.push_back(beginAccess);
-    return true;
+  const AccessConflictAnalysis::AccessedStorageLocs &getStorageLocs() {
+    return storageAccesses;
   }
 
-  /// End the scope of the given access by marking it in-scope and clearing the
-  /// conflict bit. (The conflict bit only marks conflicts since the last begin
-  /// *or* end access).
-  void exitScope(unsigned index) { inScopeBitmask.reset(index); }
+  /// Does any of the accesses represented by this AccessConflictAnalysis
+  /// object conflict with the given access kind and storage.
+  bool mayConflictWith(SILAccessKind otherAccessKind,
+                       const AccessedStorage &otherStorage) const;
 
-  bool seenConflict(unsigned index) const { return conflictBitmask[index]; }
+  // ---------------------------------------------------------------------------
+  // Constructing the results.
 
-  void setConflict(unsigned index) { conflictBitmask.set(index); }
-
-  // Only merge accesses that are present on the `other` map. i.e. erase
-  // all accesses in this map that are not present in `other`.
-  void merge(const SparseAccessSet &other) {
-    inScopeBitmask &= other.inScopeBitmask;
-    // Currently only conflict free accesses are preserved across blocks by this
-    // analysis. Otherwise, taking the union of conflict bits would be valid.
-    assert(other.conflictBitmask.none());
+  void mergeFrom(const RegionStorage &RHS);
+  bool updateUnidentifiedAccess(Optional<SILAccessKind> accessKind);
+  void recordStorageConflict(const AccessedStorage &storage);
+  void addStorage(const AccessedStorage &storage) {
+    storageAccesses.insert(storage);
+  }
+  void addInScopeAccess(BeginAccessInst *beginAccess);
+  void removeInScopeAccess(BeginAccessInst *beginAccess);
+  void addOutOfScopeAccess(BeginAccessInst *beginAccess);
+  void reset() {
+    outOfScopeBitmask.reset();
+    inScopeBitmask.reset();
+    storageAccesses.clear();
+    inScopeConflictFreeAccesses.clear();
+    outOfScopeConflictFreeAccesses.clear();
   }
 
-  void copyNoNestedConflictInto(DenseAccessSet &other) {
-    other.clear();
-    NoNestedConflictIterator iterator(*this);
-    while (BeginAccessInst *beginAccess = iterator.next())
-      other.push_back(beginAccess);
-  }
-
-  // Dump only the accesses with no conflict up to this point.
-  void dump() const {
-    for (BeginAccessInst *beginAccess : denseVec) {
-      unsigned sparseIndex = result.getAccessIndex(beginAccess);
-      if (conflictBitmask[sparseIndex])
-        continue;
-
-      llvm::dbgs() << *beginAccess << "  ";
-      if (!inScopeBitmask[sparseIndex])
-        llvm::dbgs() << " [noscope]";
-      result.getAccessInfo(beginAccess).dump();
-    }
-  }
+protected:
+  void mergeBBAccessSet(DenseAccessSet &LHS, const DenseAccessSet &RHS,
+                        const llvm::SmallBitVector &scopeBitmask);
+  void mergeBlockPred(const RegionStorage &RHS);
+  void mergeSuccIntoLoopRegion(const RegionStorage &RHS);
+  void mergeSuccBlockIntoLoopRegion(const RegionStorage &RHS);
+  void mergeSuccLoopIntoLoopRegion(const RegionStorage &RHS);
+  void removeConflictLocFromSet(DenseAccessSet &Set,
+                                const AccessedStorage &storage,
+                                llvm::SmallBitVector &scopeBitmask);
 };
 } // namespace
 
-// Top-level driver for AccessConflictAnalysis.
+// Top-level driver for AccessConflictAnalysis
 AccessConflictAnalysis::Result &&AccessConflictAnalysis::analyze() && {
-  // Populate beginAccessMap.
   identifyBeginAccesses();
+  identifyStorageLocations();
+  // calculate the order in which we should work
+  // on the function / loop sub-regions
+  llvm::SmallVector<unsigned, 16> bottomUpWorklist;
+  auto *topRegion = LRFI->getTopLevelRegion();
+  calcBottomUpOrder(topRegion, bottomUpWorklist);
 
-  // Perform data flow and set the conflict flags on AccessInfo.
-  for (auto *BB : PO->getReversePostOrder())
-    visitBlock(BB);
+  while (!bottomUpWorklist.empty()) {
+    auto id = bottomUpWorklist.pop_back_val();
+    processLoopRegion(id);
+  }
 
   return std::move(result);
+}
+
+void RegionStorage::removeConflictLocFromSet(
+    DenseAccessSet &Set, const AccessedStorage &storage,
+    llvm::SmallBitVector &scopeBitmask) {
+  auto pred = [&](BeginAccessInst *inst) {
+    auto &currStorage = result.getAccessInfo(inst);
+    return !currStorage.isDistinctFrom(storage);
+  };
+  auto it = std::find_if(Set.begin(), Set.end(), pred);
+  while (it != Set.end()) {
+    auto &ai = result.getAccessInfo(*it);
+    scopeBitmask.reset(ai.getAccessIndex());
+    Set.erase(it);
+    it = std::find_if(Set.begin(), Set.end(), pred);
+  }
+}
+
+bool RegionStorage::mayConflictWith(SILAccessKind otherAccessKind,
+                                    const AccessedStorage &otherStorage) const {
+  if (hasUnidentifiedAccess() &&
+      accessKindMayConflict(otherAccessKind, unidentifiedAccess.getValue())) {
+    return true;
+  }
+  for (auto &storageAccess : storageAccesses) {
+    if (!otherStorage.isDistinctFrom(storageAccess))
+      return true;
+  }
+  return false;
+}
+
+void RegionStorage::recordStorageConflict(const AccessedStorage &storage) {
+  removeConflictLocFromSet(outOfScopeConflictFreeAccesses, storage,
+                           outOfScopeBitmask);
+  DenseAccessSet tmpSet(inScopeConflictFreeAccesses);
+  removeConflictLocFromSet(inScopeConflictFreeAccesses, storage,
+                           inScopeBitmask);
+  for (auto it : tmpSet) {
+    if (std::find(inScopeConflictFreeAccesses.begin(),
+                  inScopeConflictFreeAccesses.end(),
+                  it) == inScopeConflictFreeAccesses.end()) {
+      auto &info = result.getAccessInfo(it);
+      info.setSeenNestedConflict();
+    }
+  }
+}
+
+void RegionStorage::addInScopeAccess(BeginAccessInst *beginAccess) {
+  assert(std::find(inScopeConflictFreeAccesses.begin(),
+                   inScopeConflictFreeAccesses.end(),
+                   beginAccess) == inScopeConflictFreeAccesses.end() &&
+         "the same begin_access cannot be seen twice.");
+  assert(storageAccesses.count(result.getAccessInfo(beginAccess)) > 0 &&
+         "begin_access need to have been added to region's storageAccesses");
+  inScopeConflictFreeAccesses.push_back(beginAccess);
+  auto &ai = result.getAccessInfo(beginAccess);
+  inScopeBitmask.set(ai.getAccessIndex());
+}
+
+void RegionStorage::removeInScopeAccess(BeginAccessInst *beginAccess) {
+  assert(storageAccesses.count(result.getAccessInfo(beginAccess)) > 0 &&
+         "begin_access need to have been added to region's storageAccesses");
+  auto it = std::find(inScopeConflictFreeAccesses.begin(),
+                      inScopeConflictFreeAccesses.end(), beginAccess);
+  assert(it != inScopeConflictFreeAccesses.end() &&
+         "the begin_access should have been in Set.");
+  inScopeConflictFreeAccesses.erase(it);
+  auto &ai = result.getAccessInfo(beginAccess);
+  inScopeBitmask.reset(ai.getAccessIndex());
+}
+
+void RegionStorage::addOutOfScopeAccess(BeginAccessInst *beginAccess) {
+  assert(std::find(outOfScopeConflictFreeAccesses.begin(),
+                   outOfScopeConflictFreeAccesses.end(),
+                   beginAccess) == outOfScopeConflictFreeAccesses.end() &&
+         "the same begin_access cannot be seen twice.");
+  assert(storageAccesses.count(result.getAccessInfo(beginAccess)) > 0 &&
+         "begin_access need to have been added to region's storageAccesses");
+
+  auto newStorageInfo = result.getAccessInfo(beginAccess);
+  auto pred = [&](BeginAccessInst *curr) {
+    auto currStorageInfo = result.getAccessInfo(curr);
+    return currStorageInfo.hasIdenticalBase(newStorageInfo);
+  };
+  auto it = std::find_if(outOfScopeConflictFreeAccesses.begin(),
+                         outOfScopeConflictFreeAccesses.end(), pred);
+  if (it == outOfScopeConflictFreeAccesses.end()) {
+    // We don't have a match in outOfScopeConflictFreeAccesses
+    // Just add it to dense set and return
+    outOfScopeConflictFreeAccesses.push_back(beginAccess);
+    outOfScopeBitmask.set(newStorageInfo.getAccessIndex());
+    return;
+  }
+
+  auto *otherBegin = *it;
+  LLVM_DEBUG(llvm::dbgs() << "Found mergable pair: " << *otherBegin << ", "
+                          << *beginAccess << "\n");
+  result.mergeMap.insert(std::make_pair(otherBegin, beginAccess));
+
+  // Update outOfScopeConflictFreeAccesses
+  // to this last seen instruction
+  while (it != outOfScopeConflictFreeAccesses.end()) {
+    outOfScopeConflictFreeAccesses.erase(it);
+    auto &ai = result.getAccessInfo(*it);
+    outOfScopeBitmask.reset(ai.getAccessIndex());
+    it = std::find_if(outOfScopeConflictFreeAccesses.begin(),
+                      outOfScopeConflictFreeAccesses.end(), pred);
+  }
+  outOfScopeConflictFreeAccesses.push_back(beginAccess);
+  outOfScopeBitmask.set(newStorageInfo.getAccessIndex());
+}
+
+void RegionStorage::mergeBBAccessSet(DenseAccessSet &LHS,
+                                     const DenseAccessSet &RHS,
+                                     const llvm::SmallBitVector &scopeBitmask) {
+  LHS.clear();
+  for (auto itRHS : RHS) {
+    auto &ai = result.getAccessInfo(itRHS);
+    if (scopeBitmask[ai.getAccessIndex()])
+      LHS.push_back(itRHS);
+  }
+}
+
+void RegionStorage::mergeBlockPred(const RegionStorage &RHS) {
+  // For a block, the initial locations we care about is the
+  // intersection of all region predecessors
+  inScopeBitmask &= RHS.inScopeBitmask;
+  outOfScopeBitmask &= RHS.outOfScopeBitmask;
+  AccessConflictAnalysis::AccessedStorageLocs locIntersect;
+  for (auto itRHS : RHS.storageAccesses) {
+
+    if (storageAccesses.count(itRHS) > 0) {
+      locIntersect.insert(itRHS);
+    }
+  }
+  storageAccesses.clear();
+  storageAccesses.insert(locIntersect.begin(), locIntersect.end());
+
+  mergeBBAccessSet(inScopeConflictFreeAccesses, RHS.inScopeConflictFreeAccesses,
+                   inScopeBitmask);
+  mergeBBAccessSet(outOfScopeConflictFreeAccesses,
+                   RHS.outOfScopeConflictFreeAccesses, outOfScopeBitmask);
+}
+
+void RegionStorage::mergeSuccBlockIntoLoopRegion(const RegionStorage &RHS) {
+  // Add storage locations accessed in block to loop:
+  for (auto itRHS : RHS.storageAccesses) {
+    storageAccesses.insert(itRHS);
+  }
+  // We don't maintain outOfScopeConflictFreeAccesses
+  // cross-loops, don't update.
+  assert(outOfScopeConflictFreeAccesses.empty() &&
+         "Expected an empty out of scope set");
+  // Same for in-scope
+  assert(inScopeConflictFreeAccesses.empty() &&
+         "Expected an empty in scope set");
+}
+
+void RegionStorage::mergeSuccLoopIntoLoopRegion(const RegionStorage &RHS) {
+  for (auto itRHS : RHS.storageAccesses) {
+    storageAccesses.insert(itRHS);
+  }
+}
+
+void RegionStorage::mergeSuccIntoLoopRegion(const RegionStorage &RHS) {
+  assert(!RHS.getRegion()->isFunction() &&
+         "Did not expect a function successor");
+  if (RHS.getRegion()->isBlock()) {
+    mergeSuccBlockIntoLoopRegion(RHS);
+  } else {
+    mergeSuccLoopIntoLoopRegion(RHS);
+  }
+}
+
+void RegionStorage::mergeFrom(const RegionStorage &RHS) {
+  updateUnidentifiedAccess(RHS.unidentifiedAccess);
+  if (getRegion()->isBlock()) {
+    assert(RHS.getRegion()->isBlock() && "Expected a block region");
+    mergeBlockPred(RHS);
+  } else {
+    mergeSuccIntoLoopRegion(RHS);
+  }
+}
+
+bool RegionStorage::updateUnidentifiedAccess(
+    Optional<SILAccessKind> accessKind) {
+  return updateOptionalAccessKind(unidentifiedAccess, accessKind);
 }
 
 // Find all begin access operations in this function. Map each access to
 // AccessInfo, which includes its identified memory location, identifying
 // index, and analysis result flags.
 //
+// Also, add the storage location to the function's RegionStorage
+//
 // TODO: begin_unpaired_access is not tracked. Even though begin_unpaired_access
 // isn't explicitly paired, it may be possible after devirtualization and
 // inlining to find all uses of the scratch buffer. However, this doesn't
 // currently happen in practice (rdar://40033735).
 void AccessConflictAnalysis::identifyBeginAccesses() {
-  for (auto &BB : *F) {
+  for (auto &BB : *LRFI->getFunction()) {
     for (auto &I : BB) {
       auto *beginAccess = dyn_cast<BeginAccessInst>(&I);
       if (!beginAccess)
@@ -401,12 +595,87 @@ void AccessConflictAnalysis::identifyBeginAccesses() {
   }
 }
 
-/// When a conflict is detected, flag the access so it can't be folded, and
-/// remove its index from the current access set so we stop checking for
-/// conflicts. Erasing from SparseAccessSet does not invalidate any iterators.
-static void recordConflict(AccessInfo &info, SparseAccessSet &accessSet) {
-  info.setSeenNestedConflict();
-  accessSet.setConflict(info.getAccessIndex());
+void AccessConflictAnalysis::identifyStorageLocations() {
+  for (auto it : result.accessMap) {
+    auto storage = it.second;
+    storageAccesses.insert(storage);
+  }
+}
+
+// Returns a worklist of loop IDs is bottom-up order.
+void AccessConflictAnalysis::calcBottomUpOrder(
+    LoopRegion *region, llvm::SmallVectorImpl<unsigned> &worklist) {
+  worklist.push_back(region->getID());
+  for (auto regionIndex : region->getReverseSubregions()) {
+    auto *region = LRFI->getRegion(regionIndex);
+    if (region->isBlock())
+      continue;
+    calcBottomUpOrder(region, worklist);
+  }
+}
+
+AccessConflictAnalysis::~AccessConflictAnalysis() {
+  // clear the RegionToRegionStorageMap
+  while (!regionToStorageMap.empty()) {
+    auto curr = regionToStorageMap.begin();
+    auto currData = curr->getSecond();
+    regionToStorageMap.erase(curr);
+    delete currData;
+  }
+}
+
+void AccessConflictAnalysis::mergeBBPredAccesses(unsigned id) {
+  auto currStorageIt = regionToStorageMap.find(id);
+  assert(currStorageIt != regionToStorageMap.end() &&
+         "Expected a region storage");
+  auto *storage = currStorageIt->getSecond();
+  auto *region = LRFI->getRegion(id);
+  assert(region->isBlock() && "Expected a block");
+  for (auto pred : region->getPreds()) {
+    auto *predRegion = LRFI->getRegion(pred);
+    auto storageIt = regionToStorageMap.find(pred);
+    if (storageIt == regionToStorageMap.end()) {
+      // Did not visit predecessor - bail
+      storage->reset();
+      return;
+    }
+    auto *subStorage = storageIt->getSecond();
+    auto parentID = region->getParentID();
+    if (predRegion->getParentID() != parentID || predRegion->isLoop()) {
+      // predecessor out of current sub-region
+      if (predRegion->isBlock()) {
+        // Unhandled control flow - bail
+        storage->reset();
+        return;
+      }
+      assert(predRegion->isLoop() && "Expected a loop");
+      SILAccessKind worstAccessKind = SILAccessKind::Modify;
+      // We don't merge in/out of scope cross loops
+      // we can ignore adding the outcome of the sub-loop
+      // in the intersection
+      // However, if we accessed any storage in said sub-loop
+      // then we have to record a conflict for current accesses
+      for (auto loc : subStorage->getStorageLocs()) {
+        if (storage->mayConflictWith(worstAccessKind, loc)) {
+          storage->recordStorageConflict(loc);
+        }
+      }
+      continue;
+    }
+    storage->mergeFrom(*subStorage);
+  }
+}
+
+RegionStorage *
+AccessConflictAnalysis::getRegionStorageFromIns(SILInstruction *instr) {
+  auto *parentBB = instr->getParent();
+  auto *parentRegion = LRFI->getRegion(parentBB);
+  auto parentRegionID = parentRegion->getID();
+  auto storageIt = regionToStorageMap.find(parentRegionID);
+  assert(storageIt != regionToStorageMap.end() &&
+         "Expected region storage info");
+  auto *parentStorage = storageIt->getSecond();
+  return parentStorage;
 }
 
 // Given an "inner" access, check for potential conflicts with any outer access.
@@ -414,133 +683,187 @@ static void recordConflict(AccessInfo &info, SparseAccessSet &accessSet) {
 // - read/read
 // - different bases, both valid, and at least one is local
 //
-// Remove any outer access that may conflict from the accessSet.
-// and flag the conflict in beginAccessMap.
+// Remove any outer access that may conflict and flag the conflict
+// in RegionStorage.
 //
-// Record the inner access in the accessSet.
+// Record the inner access in RegionStorage.
 //
-void AccessConflictAnalysis::visitBeginAccess(BeginAccessInst *innerBeginAccess,
-                                              SparseAccessSet &accessSet) {
-  if (innerBeginAccess->getEnforcement() != SILAccessEnforcement::Dynamic)
+void AccessConflictAnalysis::visitBeginAccess(BeginAccessInst *beginAccess) {
+  if (beginAccess->getEnforcement() != SILAccessEnforcement::Dynamic)
     return;
 
-  const AccessInfo &innerAccess = result.getAccessInfo(innerBeginAccess);
-  SILAccessKind innerAccessKind = innerBeginAccess->getAccessKind();
-
-  SparseAccessSet::NoNestedConflictIterator accessIter(accessSet);
-  while (BeginAccessInst *outerBeginAccess = accessIter.next()) {
+  // Get the Access info:
+  auto &beginAccessInfo = result.getAccessInfo(beginAccess);
+  SILAccessKind beginAccessKind = beginAccess->getAccessKind();
+  // get the storage summary for the instruction's block:
+  auto *beginStorage = getRegionStorageFromIns(beginAccess);
+  beginStorage->addStorage(beginAccessInfo);
+  if (beginAccessInfo.getKind() == AccessedStorage::Unidentified) {
+    beginStorage->updateUnidentifiedAccess(beginAccessKind);
+  }
+  // check the current in-scope accesses for conflicts:
+  for (auto *outerBeginAccess : beginStorage->getInScopeAccesses()) {
     // If both are reads, keep the mapped access.
-    if (!accessKindMayConflict(innerAccessKind,
+    if (!accessKindMayConflict(beginAccessKind,
                                outerBeginAccess->getAccessKind())) {
       continue;
     }
-    AccessInfo &outerAccess = result.getAccessInfo(outerBeginAccess);
+
+    auto &outerAccessInfo = result.getAccessInfo(outerBeginAccess);
 
     // If there is no potential conflict, leave the outer access mapped.
-    if (!outerAccess.isDistinctFrom(innerAccess))
+    if (!outerAccessInfo.isDistinctFrom(beginAccessInfo))
       continue;
 
-    LLVM_DEBUG(innerAccess.dump(); llvm::dbgs() << "  may conflict with:\n";
-               outerAccess.dump());
+    LLVM_DEBUG(beginAccessInfo.dump(); llvm::dbgs() << "  may conflict with:\n";
+               outerAccessInfo.dump());
 
-    recordConflict(outerAccess, accessSet);
+    beginStorage->recordStorageConflict(outerAccessInfo);
+    break;
   }
-  LLVM_DEBUG(llvm::dbgs() << "Recording access: " << *innerBeginAccess;
-             llvm::dbgs() << "  at: "; innerAccess.dump());
-
-  // Record the current access in the map. It can potentially be folded
+  // Record the current access to InScopeAccesses.
+  // It can potentially be folded
   // regardless of whether it may conflict with an outer access.
-  bool inserted =
-      accessSet.enterScope(innerBeginAccess, innerAccess.getAccessIndex());
-  (void)inserted;
-  assert(inserted && "the same begin_access cannot be seen twice.");
+  beginStorage->addInScopeAccess(beginAccess);
 }
 
-void AccessConflictAnalysis::visitEndAccess(EndAccessInst *endAccess,
-                                   SparseAccessSet &accessSet) {
+void AccessConflictAnalysis::detectApplyConflicts(
+    const DenseAccessSet &conflictFreeSet, RegionStorage *applyStorage,
+    const FunctionAccessedStorage &callSiteAccesses,
+    const FullApplySite &fullApply) {
+  for (auto *outerBeginAccess : conflictFreeSet) {
+    // If there is no potential conflict, leave the outer access mapped.
+    SILAccessKind accessKind = outerBeginAccess->getAccessKind();
+    AccessInfo &outerAccessInfo = result.getAccessInfo(outerBeginAccess);
+    if (!callSiteAccesses.mayConflictWith(accessKind, outerAccessInfo))
+      continue;
+
+    LLVM_DEBUG(
+        llvm::dbgs() << *fullApply.getInstruction() << "  call site access: ";
+        callSiteAccesses.dump(); llvm::dbgs() << "  may conflict with:\n";
+        outerAccessInfo.dump());
+
+    applyStorage->recordStorageConflict(outerAccessInfo);
+    break;
+  }
+}
+
+void AccessConflictAnalysis::visitFullApply(FullApplySite fullApply) {
+  FunctionAccessedStorage callSiteAccesses;
+  ASA->getCallSiteEffects(callSiteAccesses, fullApply);
+
+  // get the storage summary for the instruction's block:
+  auto *applyStorage = getRegionStorageFromIns(fullApply.getInstruction());
+
+  detectApplyConflicts(applyStorage->getInScopeAccesses(), applyStorage,
+                       callSiteAccesses, fullApply);
+  detectApplyConflicts(applyStorage->getOutOfScopeConflictFreeAccesses(),
+                       applyStorage, callSiteAccesses, fullApply);
+}
+
+void AccessConflictAnalysis::visitEndAccess(EndAccessInst *endAccess) {
   auto *beginAccess = endAccess->getBeginAccess();
   if (beginAccess->getEnforcement() != SILAccessEnforcement::Dynamic)
     return;
 
-  unsigned index = result.getAccessIndex(beginAccess);
-  LLVM_DEBUG(if (accessSet.seenConflict(index)) llvm::dbgs()
-             << "No conflict on one path from " << *beginAccess << " to "
-             << *endAccess);
-
-  // Erase this access from the sparse set. We only want to detect conflicts
-  // within the access scope.
-  accessSet.exitScope(index);
-}
-
-void AccessConflictAnalysis::visitFullApply(FullApplySite fullApply,
-                                   SparseAccessSet &accessSet) {
-  FunctionAccessedStorage callSiteAccesses;
-  ASA->getCallSiteEffects(callSiteAccesses, fullApply);
-
-  SparseAccessSet::NoNestedConflictIterator accessIter(accessSet);
-  while (BeginAccessInst *outerBeginAccess = accessIter.next()) {
-
-    // If there is no potential conflict, leave the outer access mapped.
-    SILAccessKind accessKind = outerBeginAccess->getAccessKind();
-    AccessInfo &outerAccess = result.getAccessInfo(outerBeginAccess);
-    if (!callSiteAccesses.mayConflictWith(accessKind, outerAccess))
-      continue;
-
-    LLVM_DEBUG(llvm::dbgs() << *fullApply.getInstruction()
-                            << "  call site access: ";
-               callSiteAccesses.dump();
-               llvm::dbgs() << "  may conflict with:\n";
-               outerAccess.dump());
-
-    recordConflict(outerAccess, accessSet);
+  auto *endStorage = getRegionStorageFromIns(endAccess);
+  auto &inScope = endStorage->getInScopeAccesses();
+  if (std::find(inScope.begin(), inScope.end(), beginAccess) != inScope.end()) {
+    LLVM_DEBUG(llvm::dbgs() << "No conflict on one path from " << *beginAccess
+                            << " to " << *endAccess);
+    endStorage->removeInScopeAccess(beginAccess);
   }
+  // We can merge out-of-scope regardless of having a conflict within a scope,
+  // when encountering an end access instruction,
+  // regardless of having it in the In scope set,
+  // add it to the out of scope set.
+  LLVM_DEBUG(llvm::dbgs() << "Got out of scope from " << *beginAccess << " to "
+                          << *endAccess << "\n");
+  endStorage->addOutOfScopeAccess(beginAccess);
 }
 
-// Merge all predecessor accesses into the local acces set. Only propagate
-// accesses that are still present in all predecessors. The absence of a begin
-// access from a visited predecessor indicates the presence of a conflict. A
-// block has been visited if it has a map entry in blockOutAccess.
-void AccessConflictAnalysis::mergePredAccesses(SILBasicBlock *succBB,
-                                      SparseAccessSet &mergedAccesses) {
-  for (SILBasicBlock *predBB : succBB->getPredecessorBlocks()) {
-    auto mapI = blockOutAccess.find(predBB);
-    if (mapI == blockOutAccess.end())
-      continue;
-
-    const DenseAccessSet &predSet = mapI->second;
-    mergedAccesses.merge(SparseAccessSet(predSet, result));
-  }
-}
-
-// Compute access reachability within the given block.
-void AccessConflictAnalysis::visitBlock(SILBasicBlock *BB) {
-  // Sparse set for tracking accesses with an individual block.
-  SparseAccessSet accessSet(result);
-  mergePredAccesses(BB, accessSet);
-
-  for (auto &I : *BB) {
+void AccessConflictAnalysis::processBlockRegion(unsigned id) {
+  assert(regionToStorageMap.find(id) == regionToStorageMap.end() &&
+         "Should not process a region twice");
+  auto *region = LRFI->getRegion(id);
+  assert(region->isBlock() && "Expected a block");
+  // A block's inital set is all of parent region's accesses
+  auto *storage = new RegionStorage(region, result, storageAccesses);
+  regionToStorageMap.insert(std::make_pair(id, storage));
+  mergeBBPredAccesses(id);
+  auto *bb = region->getBlock();
+  for (auto &I : *bb) {
     if (auto *BAI = dyn_cast<BeginAccessInst>(&I)) {
-      visitBeginAccess(BAI, accessSet);
+      visitBeginAccess(BAI);
       continue;
     }
     if (auto *EAI = dyn_cast<EndAccessInst>(&I)) {
-      visitEndAccess(EAI, accessSet);
+      visitEndAccess(EAI);
       continue;
     }
     if (auto fullApply = FullApplySite::isa(&I)) {
-      visitFullApply(fullApply, accessSet);
+      visitFullApply(fullApply);
     }
   }
-  LLVM_DEBUG(if (accessSet.hasConflictFreeAccess()) {
-    llvm::dbgs() << "Initializing no-conflict access out of bb"
-                 << BB->getDebugID() << "\n";
-    accessSet.dump();
-  });
-  if (BB->getTerminator()->isFunctionExiting())
-    assert(!accessSet.hasInScopeAccess() && "no postdominating end_access");
+}
 
-  // Initialize blockOutAccess for this block with the current access set.
-  accessSet.copyNoNestedConflictInto(blockOutAccess[BB]);
+void AccessConflictAnalysis::processLoopRegion(unsigned id) {
+  assert(regionToStorageMap.find(id) == regionToStorageMap.end() &&
+         "Should not process a region twice");
+  auto *region = LRFI->getRegion(id);
+  assert(!region->isBlock() && "Did not expect a block");
+  // A loop's inital storage access set is an empty set
+  auto *storage = new RegionStorage(region, result);
+  regionToStorageMap.insert(std::make_pair(id, storage));
+  for (auto subID : region->getSubregions()) {
+    auto *subRegion = LRFI->getRegion(subID);
+    if (subRegion->isBlock()) {
+      processBlockRegion(subID);
+    }
+    auto storageIt = regionToStorageMap.find(subID);
+    assert(storageIt != regionToStorageMap.end() &&
+           "Expected sub-region to have been processed");
+    auto *subStorage = storageIt->getSecond();
+    storage->mergeFrom(*subStorage);
+    if (subRegion->isLoop()) {
+      // We only merged storage locations
+      // however, inside the current loop,
+      // for each visited predecessor,
+      // treat the in/out scope accesses as conflicting
+      // with any successor loop access
+      for (auto pred : subRegion->getPreds()) {
+        auto *predRegion = LRFI->getRegion(pred);
+        if (predRegion->getParentID() != region->getParentID()) {
+          // predecessor outside of current loop
+          continue;
+        }
+        auto predStorageIt = regionToStorageMap.find(pred);
+        if (predStorageIt == regionToStorageMap.end()) {
+          // Did not visit predecessor
+          continue;
+        }
+        auto *predStorage = predStorageIt->getSecond();
+        SILAccessKind worstAccessKind = SILAccessKind::Modify;
+        for (auto loopLoc : subStorage->getStorageLocs()) {
+          if (predStorage->mayConflictWith(worstAccessKind, loopLoc)) {
+            predStorage->recordStorageConflict(loopLoc);
+          }
+        }
+      }
+    }
+  }
+  // Any block that exits the region, if it has in-scope accesses,
+  // record a conflict there, we are being conservative:
+  for (auto subID : region->getExitingSubregions()) {
+    auto storageIt = regionToStorageMap.find(subID);
+    assert(storageIt != regionToStorageMap.end() &&
+           "Expected sub-region to have been processed");
+    auto *subStorage = storageIt->getSecond();
+    for (auto *BI : subStorage->getInScopeAccesses()) {
+      auto &info = result.getAccessInfo(BI);
+      info.setSeenNestedConflict();
+    }
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -584,7 +907,7 @@ foldNonNestedAccesses(AccessConflictAnalysis::AccessMap &accessMap) {
 ///
 /// - Arguments cannot alias with local storage, so accessing an argument has no
 ///   effect on analysis of the current function. When a callee accesses an
-///   argument, AccessedStorageAnalysis will either map the accessed storage to
+///   argument, AccessConflictAnalysis will either map the accessed storage to
 ///   a value in the caller's function, or mark it as unidentified.
 ///
 /// - Stack or Box local storage could potentially be accessed via Unidentified
@@ -619,6 +942,132 @@ removeLocalNonNestedAccess(const AccessConflictAnalysis::Result &result,
   return changed;
 }
 
+// TODO: support multi-end access cases
+static EndAccessInst *getSingleEndAccess(BeginAccessInst *inst) {
+  EndAccessInst *end = nullptr;
+  for (auto *currEnd : inst->getEndAccesses()) {
+    if (end == nullptr)
+      end = currEnd;
+    else
+      return nullptr;
+  }
+  return end;
+}
+
+static void mergeEndAccesses(BeginAccessInst *parentIns,
+                             BeginAccessInst *childIns) {
+  auto *endP = getSingleEndAccess(parentIns);
+  if (!endP)
+    llvm_unreachable("not supported");
+  auto *endC = getSingleEndAccess(childIns);
+  if (!endC)
+    llvm_unreachable("not supported");
+
+  endC->setOperand(parentIns);
+  endP->eraseFromParent();
+}
+
+static bool canMergeEnd(BeginAccessInst *parentIns, BeginAccessInst *childIns) {
+  auto *endP = getSingleEndAccess(parentIns);
+  if (!endP)
+    return false;
+
+  auto *endC = getSingleEndAccess(childIns);
+  if (!endC)
+    return false;
+
+  return true;
+}
+
+// TODO: support other merge patterns
+static bool canMergeBegin(PostDominanceInfo *postDomTree,
+                          BeginAccessInst *parentIns,
+                          BeginAccessInst *childIns) {
+  if (!postDomTree->properlyDominates(childIns, parentIns)) {
+    return false;
+  }
+  return true;
+}
+
+static bool canMerge(PostDominanceInfo *postDomTree, BeginAccessInst *parentIns,
+                     BeginAccessInst *childIns) {
+  if (!canMergeBegin(postDomTree, parentIns, childIns))
+    return false;
+
+  return canMergeEnd(parentIns, childIns);
+}
+
+/// Perform access merging.
+static bool
+mergeAccesses(PostDominanceInfo *postDomTree,
+              const AccessConflictAnalysis::MergeableMap &mergeMap) {
+  bool changed = false;
+
+  // make a temporary reverse copy to work on:
+  AccessConflictAnalysis::MergeableMap workMap;
+  std::for_each(
+      mergeMap.rbegin(), mergeMap.rend(),
+      [&](const std::pair<BeginAccessInst *, BeginAccessInst *> &pair) {
+        workMap.insert(pair);
+      });
+
+  llvm::DenseMap<BeginAccessInst *, BeginAccessInst *> oldToNewMap;
+
+  while (!workMap.empty()) {
+    auto curr = workMap.back();
+    workMap.pop_back();
+    auto *parentIns = curr.first;
+    auto *childIns = curr.second;
+    if (oldToNewMap.count(parentIns) != 0) {
+      parentIns = oldToNewMap[parentIns];
+    }
+    assert(oldToNewMap.count(childIns) == 0 &&
+           "Can't have same child instruction twice in map");
+
+    // The optimization might not currently support every mergeable pair
+    // If the current pattern is not supported - skip
+    if (!canMerge(postDomTree, parentIns, childIns))
+      continue;
+
+    LLVM_DEBUG(llvm::dbgs()
+               << "Merging: " << *childIns << " into " << *parentIns << "\n");
+
+    // Change the type of access of parent:
+    // should be the worse between it and child
+    auto childAccess = childIns->getAccessKind();
+    if (parentIns->getAccessKind() < childAccess) {
+      parentIns->setAccessKind(childAccess);
+    }
+
+    // Change the no nested conflict of parent:
+    // should be the worst case scenario: we might merge to non-conflicting
+    // scopes to a conflicting one. f the new result does not conflict,
+    // a later on pass will remove the flag
+    parentIns->setNoNestedConflict(false);
+
+    // remove end accesses and create new ones that cover bigger scope:
+    mergeEndAccesses(parentIns, childIns);
+
+    // In case the child instruction is at the map,
+    // updated the oldToNewMap to reflect that we are getting rid of it:
+    oldToNewMap.insert(std::make_pair(childIns, parentIns));
+
+    // Modify the users of child instruction to use the parent:
+    childIns->replaceAllUsesWith(parentIns);
+
+    changed = true;
+  }
+
+  // Delete all old instructions from parent scopes:
+  while (!oldToNewMap.empty()) {
+    auto curr = oldToNewMap.begin();
+    auto *oldIns = curr->getFirst();
+    oldToNewMap.erase(oldIns);
+    oldIns->eraseFromParent();
+  }
+  return changed;
+}
+
 namespace {
 struct AccessEnforcementOpts : public SILFunctionTransform {
   void run() override {
@@ -629,9 +1078,9 @@ struct AccessEnforcementOpts : public SILFunctionTransform {
     LLVM_DEBUG(llvm::dbgs() << "Running local AccessEnforcementOpts on "
                             << F->getName() << "\n");
 
-    PostOrderFunctionInfo *PO = getAnalysis<PostOrderAnalysis>()->get(F);
     AccessedStorageAnalysis *ASA = getAnalysis<AccessedStorageAnalysis>();
-    auto result = AccessConflictAnalysis(F, PO, ASA).analyze();
+    LoopRegionFunctionInfo *LRFI = getAnalysis<LoopRegionAnalysis>()->get(F);
+    auto result = AccessConflictAnalysis(LRFI, ASA).analyze();
 
     // Perform access folding by setting the [no_nested_conflict] flag on
     // begin_access instructions.
@@ -651,6 +1100,14 @@ struct AccessEnforcementOpts : public SILFunctionTransform {
     // this function will overlap.
     const FunctionAccessedStorage &functionAccess = ASA->getEffects(F);
     if (removeLocalNonNestedAccess(result, functionAccess))
+      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+
+    // Perform the access merging
+    // The inital version of the optimization requires a postDomTree
+    PostDominanceAnalysis *postDomAnalysis =
+        getAnalysis<PostDominanceAnalysis>();
+    PostDominanceInfo *postDomTree = postDomAnalysis->get(F);
+    if (mergeAccesses(postDomTree, result.mergeMap))
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 };
