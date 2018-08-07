@@ -3879,22 +3879,6 @@ public:
         Lookup.unboxType(ReturnType);
   }
 
-  static bool getPositionInTupleExpr(DeclContext &DC, Expr *Target,
-                                     TupleExpr *Tuple, unsigned &Pos,
-                                     bool &HasName) {
-    auto &SM = DC.getASTContext().SourceMgr;
-    Pos = 0;
-    for (auto E : Tuple->getElements()) {
-      if (SM.isBeforeInBuffer(E->getEndLoc(), Target->getStartLoc())) {
-        Pos ++;
-        continue;
-      }
-      HasName = !Tuple->getElementName(Pos).empty();
-      return true;
-    }
-    return false;
-  }
-
   void addArgNameCompletionResults(ArrayRef<StringRef> Names) {
     for (auto Name : Names) {
       CodeCompletionResultBuilder Builder(Sink,
@@ -3908,83 +3892,9 @@ public:
 
   using FunctionParams = ArrayRef<AnyFunctionType::Param>;
 
-  static void collectArgumentExpectation(unsigned Position, bool HasName,
-                                         ArrayRef<FunctionParams> Candidates,
-                                         SourceLoc Loc,
-                                         std::vector<Type> &ExpectedTypes,
-                                         std::vector<StringRef> &ExpectedNames) {
-    SmallPtrSet<TypeBase *, 4> seenTypes;
-    SmallPtrSet<const char *, 4> seenNames;
-
-    for (auto Params : Candidates) {
-      if (Position >= Params.size()) {
-        continue;
-      }
-      const auto &Ele = Params[Position];
-      if (Ele.hasLabel() && !HasName) {
-        if (seenNames.insert(Ele.getLabel().get()).second)
-          ExpectedNames.push_back(Ele.getLabel().str());
-      } else {
-        if (seenTypes.insert(Ele.getType().getPointer()).second)
-          ExpectedTypes.push_back(Ele.getType());
-      }
-    }
-  }
-
-  bool lookupArgCompletionsAtPosition(unsigned Position, bool HasName,
-                                      ArrayRef<FunctionParams> Candidates,
-                                      SourceLoc Loc) {
-    std::vector<Type> ExpectedTypes;
-    std::vector<StringRef> ExpectedNames;
-    collectArgumentExpectation(Position, HasName, Candidates, Loc, ExpectedTypes,
-                               ExpectedNames);
-    addArgNameCompletionResults(ExpectedNames);
-    if (!ExpectedTypes.empty()) {
-      setExpectedTypes(ExpectedTypes);
-      getValueCompletionsInDeclContext(Loc, DefaultFilter);
-    }
-    return true;
-  }
-
-  static bool isPotentialSignatureMatch(ArrayRef<Type> TupleEles,
-                                        ArrayRef<Type> ExprTypes,
-                                        DeclContext *DC) {
-    // Not likely to be a match if users provide more arguments than expected.
-    if (ExprTypes.size() >= TupleEles.size())
-      return false;
-    for (unsigned I = 0; I < ExprTypes.size(); ++ I) {
-      auto Ty = ExprTypes[I];
-      if (Ty && !Ty->is<ErrorType>()) {
-        if (!isConvertibleTo(Ty, TupleEles[I], *DC)) {
-          return false;
-        }
-      }
-    }
-    return true;
-  }
-
-  static void removeUnlikelyOverloads(SmallVectorImpl<Type> &PossibleArgTypes,
-                                      ArrayRef<Type> TupleEleTypes,
-                                      DeclContext *DC) {
-    for (auto It = PossibleArgTypes.begin(); It != PossibleArgTypes.end(); ) {
-      llvm::SmallVector<Type, 3> ExpectedTypes;
-      if (isa<TupleType>((*It).getPointer())) {
-        auto Elements = (*It)->getAs<TupleType>()->getElements();
-        for (auto Ele : Elements)
-          ExpectedTypes.push_back(Ele.getType());
-      } else {
-        ExpectedTypes.push_back(*It);
-      }
-      if (isPotentialSignatureMatch(ExpectedTypes, TupleEleTypes, DC)) {
-        ++ It;
-      } else {
-        PossibleArgTypes.erase(It);
-      }
-    }
-  }
-
-  static bool collectionInputTypes(DeclContext &DC, CallExpr *callExpr,
-                                   SmallVectorImpl<FunctionParams> &candidates) {
+  static bool
+  collectPossibleParamLists(DeclContext &DC, CallExpr *callExpr,
+                            SmallVectorImpl<FunctionParams> &candidates) {
     auto *fnExpr = callExpr->getFn();
 
     if (auto type = fnExpr->getType()) {
@@ -4018,29 +3928,34 @@ public:
     return !candidates.empty();
   }
 
-  static bool collectPossibleArgTypes(DeclContext &DC, CallExpr *CallE,
-                                      Expr *CCExpr,
-                                      SmallVectorImpl<FunctionParams> &Candidates,
-                                      unsigned &Position, bool &HasName) {
-    if (!collectionInputTypes(DC, CallE, Candidates))
-      return false;
-
-    if (auto *tuple = dyn_cast<TupleExpr>(CallE->getArg())) {
-      for (unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
-        if (isa<CodeCompletionExpr>(tuple->getElement(i))) {
-          HasName = !tuple->getElementName(i).empty();
-          Position = i;
-          return true;
-        }
-      }
-
-      return getPositionInTupleExpr(DC, CCExpr, tuple, Position, HasName);
-    } else if (isa<ParenExpr>(CallE->getArg())) {
+  static bool getPositionInArgs(DeclContext &DC, Expr *Args, Expr *CCExpr,
+                                unsigned &Position, bool &HasName) {
+    if (isa<ParenExpr>(Args)) {
       HasName = false;
       Position = 0;
       return true;
     }
 
+    auto *tuple = dyn_cast<TupleExpr>(Args);
+    if (!tuple)
+      return false;
+
+    for (unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
+      if (isa<CodeCompletionExpr>(tuple->getElement(i))) {
+        HasName = !tuple->getElementName(i).empty();
+        Position = i;
+        return true;
+      }
+    }
+    auto &SM = DC.getASTContext().SourceMgr;
+    for (unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
+      if (SM.isBeforeInBuffer(tuple->getElement(i)->getEndLoc(),
+                              CCExpr->getStartLoc()))
+        continue;
+      HasName = !tuple->getElementName(i).empty();
+      Position = i;
+      return true;
+    }
     return false;
   }
 
@@ -4048,31 +3963,51 @@ public:
   collectArgumentExpectation(DeclContext &DC, CallExpr *CallE, Expr *CCExpr,
                              std::vector<Type> &ExpectedTypes,
                              std::vector<StringRef> &ExpectedNames) {
+    // Collect parameter lists for possible func decls.
     SmallVector<FunctionParams, 4> Candidates;
+    if (!collectPossibleParamLists(DC, CallE, Candidates))
+      return false;
+
+    // Determine the position of code completion token in call argument.
     unsigned Position;
     bool HasName;
-    if (collectPossibleArgTypes(DC, CallE, CCExpr, Candidates, Position,
-                                HasName)) {
-      collectArgumentExpectation(Position, HasName, Candidates,
-                                 CCExpr->getStartLoc(), ExpectedTypes,
-                                 ExpectedNames);
-      return !ExpectedTypes.empty() || !ExpectedNames.empty();
+    if (!getPositionInArgs(DC, CallE->getArg(), CCExpr, Position, HasName))
+      return false;
+
+    // Collect possible types at the position.
+    {
+      SmallPtrSet<TypeBase *, 4> seenTypes;
+      SmallPtrSet<Identifier, 4> seenNames;
+      for (auto Params : Candidates) {
+        if (Position >= Params.size())
+          continue;
+        const auto &Param = Params[Position];
+        if (Param.hasLabel() && !HasName) {
+          if (seenNames.insert(Param.getLabel()).second)
+            ExpectedNames.push_back(Param.getLabel().str());
+        } else {
+          if (seenTypes.insert(Param.getType().getPointer()).second)
+            ExpectedTypes.push_back(Param.getType());
+        }
+      }
     }
-    return false;
+    return !ExpectedTypes.empty() || !ExpectedNames.empty();
   }
 
   bool getCallArgCompletions(DeclContext &DC, CallExpr *CallE, Expr *CCExpr) {
-    SmallVector<FunctionParams, 4> PossibleTypes;
-    unsigned Position;
-    bool HasName;
-    bool hasPossibleArgTypes = collectPossibleArgTypes(DC, CallE, CCExpr,
-                                                       PossibleTypes, Position,
-                                                       HasName);
-    bool hasCompletions = lookupArgCompletionsAtPosition(Position, HasName,
-                                                         PossibleTypes,
-                                                         CCExpr->getStartLoc());
+    std::vector<Type> ExpectedTypes;
+    std::vector<StringRef> ExpectedNames;
+    if (!collectArgumentExpectation(DC, CallE, CCExpr, ExpectedTypes,
+                                    ExpectedNames))
+      return false;
 
-    return hasPossibleArgTypes && hasCompletions;
+    addArgNameCompletionResults(ExpectedNames);
+    if (!ExpectedTypes.empty()) {
+      setExpectedTypes(ExpectedTypes);
+      getValueCompletionsInDeclContext(CCExpr->getStartLoc(), DefaultFilter);
+    }
+
+    return true;
   }
 
   void getTypeContextEnumElementCompletions(SourceLoc Loc) {
