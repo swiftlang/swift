@@ -1509,13 +1509,20 @@ static bool isTopLevelContext(const DeclContext *DC) {
 static Type getReturnTypeFromContext(const DeclContext *DC) {
   if (auto FD = dyn_cast<AbstractFunctionDecl>(DC)) {
     if (FD->hasInterfaceType()) {
-      if (auto FT = FD->getInterfaceType()->getAs<FunctionType>()) {
+      auto Ty = FD->getInterfaceType();
+      if (FD->getDeclContext()->isTypeContext())
+        Ty = FD->getMethodInterfaceType();
+      if (auto FT = Ty->getAs<AnyFunctionType>())
         return FT->getResult();
-      }
     }
-  } else if (auto CE = dyn_cast<AbstractClosureExpr>(DC)) {
-    if (CE->getType()) {
-      return CE->getResultType();
+  } else if (auto ACE = dyn_cast<AbstractClosureExpr>(DC)) {
+    if (ACE->getType())
+      return ACE->getResultType();
+    if (auto CE = dyn_cast<ClosureExpr>(ACE)) {
+      if (CE->hasExplicitResultType())
+        return const_cast<ClosureExpr *>(CE)
+            ->getExplicitResultTypeLoc()
+            .getType();
     }
   }
   return Type();
@@ -5452,11 +5459,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   case CompletionKind::ReturnStmtExpr : {
     SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
-    if (auto FD = dyn_cast<AbstractFunctionDecl>(CurDeclContext)) {
-      if (auto FT = FD->getInterfaceType()->getAs<FunctionType>()) {
-        Lookup.setExpectedTypes(FT->getResult());
-      }
-    }
+    Lookup.setExpectedTypes(getReturnTypeFromContext(CurDeclContext));
     Lookup.getValueCompletionsInDeclContext(Loc);
     break;
   }
