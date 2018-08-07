@@ -823,7 +823,6 @@ Constraint *Constraint::createDisjunction(ConstraintSystem &cs,
   auto disjunction =  new (mem) Constraint(ConstraintKind::Disjunction,
                               cs.allocateCopy(constraints), locator, typeVars);
   disjunction->RememberChoice = (bool) rememberChoice;
-  cs.noteNewDisjunction(disjunction);
   return disjunction;
 }
 
