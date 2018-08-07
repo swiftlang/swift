@@ -1564,7 +1564,7 @@ static std::unique_ptr<DiagnosticConsumer>
 createDispatchingDiagnosticConsumerIfNeeded(
     const FrontendInputsAndOutputs &inputsAndOutputs,
     llvm::function_ref<std::unique_ptr<DiagnosticConsumer>(const InputFile &)>
-      maybeCreateSingleConsumer) {
+        maybeCreateConsumerForDiagnosticsFrom) {
 
   // The "4" here is somewhat arbitrary. In practice we're going to have one
   // sub-consumer for each diagnostic file we're trying to output, which (again
@@ -1574,14 +1574,14 @@ createDispatchingDiagnosticConsumerIfNeeded(
   // So a value of "4" here means that there would be no heap allocation on a
   // clean build of a module with up to 32 files on an 8-core machine, if the
   // user doesn't customize anything.
-  SmallVector<FileSpecificDiagnosticConsumer::ConsumerPair, 4> subConsumers;
+  SmallVector<FileSpecificDiagnosticConsumer::Subconsumer, 4> subconsumers;
 
   inputsAndOutputs.forEachInputProducingSupplementaryOutput(
       [&](const InputFile &input) -> bool {
-    if (auto subConsumer = maybeCreateSingleConsumer(input))
-      subConsumers.emplace_back(input.file(), std::move(subConsumer));
-    return false;
-  });
+        if (auto consumer = maybeCreateConsumerForDiagnosticsFrom(input))
+          subconsumers.emplace_back(input.file(), std::move(consumer));
+        return false;
+      });
   // For batch mode, the compiler must swallow diagnostics pertaining to
   // non-primary files in order to avoid Xcode showing the same diagnostic
   // multiple times. So, create a diagnostic "eater" for those non-primary
@@ -1591,16 +1591,12 @@ createDispatchingDiagnosticConsumerIfNeeded(
   if (inputsAndOutputs.hasMultiplePrimaryInputs()) {
     inputsAndOutputs.forEachNonPrimaryInput(
         [&](const InputFile &input) -> bool {
-          subConsumers.emplace_back(input.file(), nullptr);
+          subconsumers.emplace_back(input.file(), nullptr);
           return false;
         });
   }
 
-  if (subConsumers.empty())
-    return nullptr;
-  if (subConsumers.size() == 1)
-    return std::move(subConsumers.front()).second;
-  return llvm::make_unique<FileSpecificDiagnosticConsumer>(subConsumers);
+  return FileSpecificDiagnosticConsumer::consolidateSubconsumers(subconsumers);
 }
 
 /// Creates a diagnostic consumer that handles serializing diagnostics, based on
