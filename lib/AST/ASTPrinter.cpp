@@ -71,7 +71,24 @@ PrintOptions PrintOptions::printTextualInterfaceFile() {
   result.PrintIfConfig = false;
   result.FullyQualifiedTypes = true;
   result.SkipImports = true;
-  result.AccessFilter = AccessLevel::Public;
+
+  class UsableFromInlineOnly : public ShouldPrintChecker {
+    bool shouldPrint(const Decl *D, PrintOptions &options) override {
+      if (auto *VD = dyn_cast<ValueDecl>(D)) {
+        AccessScope accessScope =
+            VD->getFormalAccessScope(/*useDC*/nullptr,
+                                     /*treatUsableFromInlineAsPublic*/true);
+        if (!accessScope.isPublic())
+          return false;
+      }
+      return ShouldPrintChecker::shouldPrint(D, options);
+    }
+  };
+  result.CurrentPrintabilityChecker = std::make_shared<UsableFromInlineOnly>();
+
+  // FIXME: We don't really need 'public' on everything; we could just change
+  // the default to 'public' and mark the 'internal' things.
+  result.PrintAccess = true;
 
   // FIXME: We'll need the actual default parameter expression.
   result.PrintDefaultParameterPlaceholder = false;
