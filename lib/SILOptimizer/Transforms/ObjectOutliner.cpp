@@ -487,11 +487,10 @@ void ObjectOutliner::replaceFindStringCall(ApplyInst *FindStringCall) {
   FindStringCall->eraseFromParent();
 }
 
-class ObjectOutlinerPass : public SILFunctionTransform
-{
+class ObjectOutlinerPass : public SILFunctionTransform {
   void run() override {
     SILFunction *F = getFunction();
-    SILOptFunctionBuilder FuncBuilder(*getPassManager());
+    SILOptFunctionBuilder FuncBuilder(*this);
     ObjectOutliner Outliner(FuncBuilder,
                             F->getModule().getASTContext().getArrayDecl());
     if (Outliner.run(F)) {

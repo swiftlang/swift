@@ -945,7 +945,7 @@ namespace {
 class SILGlobalOptPass : public SILModuleTransform {
   void run() override {
     auto *DA = PM->getAnalysis<DominanceAnalysis>();
-    SILOptFunctionBuilder FunctionBuilder(*getPassManager());
+    SILOptFunctionBuilder FunctionBuilder(*this);
     if (SILGlobalOpt(FunctionBuilder, getModule(), DA).run()) {
       invalidateAll();
     }

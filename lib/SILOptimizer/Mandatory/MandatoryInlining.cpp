@@ -631,7 +631,7 @@ class MandatoryInlining : public SILModuleTransform {
     DenseFunctionSet FullyInlinedSet;
     ImmutableFunctionSet::Factory SetFactory;
 
-    SILOptFunctionBuilder FuncBuilder(*getPassManager());
+    SILOptFunctionBuilder FuncBuilder(*this);
     for (auto &F : *M) {
       // Don't inline into thunks, even transparent callees.
       if (F.isThunk())

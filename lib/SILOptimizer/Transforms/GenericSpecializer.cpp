@@ -49,7 +49,7 @@ class GenericSpecializer : public SILFunctionTransform {
 } // end anonymous namespace
 
 bool GenericSpecializer::specializeAppliesInFunction(SILFunction &F) {
-  SILOptFunctionBuilder FunctionBuilder(*getPassManager());
+  SILOptFunctionBuilder FunctionBuilder(*this);
   DeadInstructionSet DeadApplies;
   llvm::SmallSetVector<SILInstruction *, 8> Applies;
   OptRemark::Emitter ORE(DEBUG_TYPE, F.getModule());
@@ -124,7 +124,7 @@ bool GenericSpecializer::specializeAppliesInFunction(SILFunction &F) {
       // (as opposed to returning a previous specialization), we need to notify
       // the pass manager so that the new functions get optimized.
       for (SILFunction *NewF : reverse(NewFunctions)) {
-        notifyAddFunction(NewF, Callee);
+        addFunctionToPassManagerWorklist(NewF, Callee);
       }
     }
   }

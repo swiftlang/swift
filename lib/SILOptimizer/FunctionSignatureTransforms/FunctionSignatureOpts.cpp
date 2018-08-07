@@ -794,7 +794,7 @@ public:
       ResultDescList.emplace_back(IR);
     }
 
-    SILOptFunctionBuilder FuncBuilder(*getPassManager());
+    SILOptFunctionBuilder FuncBuilder(*this);
     // Owned to guaranteed optimization.
     FunctionSignatureTransform FST(FuncBuilder, F, RCIA, EA, Mangler, AIM,
                                    ArgumentDescList, ResultDescList);
@@ -818,7 +818,7 @@ public:
 
     // Make sure the PM knows about this function. This will also help us
     // with self-recursion.
-    notifyAddFunction(FST.getOptimizedFunction(), F);
+    addFunctionToPassManagerWorklist(FST.getOptimizedFunction(), F);
 
     if (!OptForPartialApply) {
       // We have to restart the pipeline for this thunk in order to run the

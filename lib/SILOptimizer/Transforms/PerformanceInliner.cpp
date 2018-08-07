@@ -900,7 +900,7 @@ public:
 
     auto OptMode = getFunction()->getEffectiveOptimizationMode();
 
-    SILOptFunctionBuilder FuncBuilder(*getPassManager());
+    SILOptFunctionBuilder FuncBuilder(*this);
     SILPerformanceInliner Inliner(FuncBuilder, WhatToInline, DA, LA, SEA,
 				  OptMode, ORE);
 

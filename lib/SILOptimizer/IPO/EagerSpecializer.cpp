@@ -737,7 +737,7 @@ void EagerSpecializerTransform::run() {
   if (!EagerSpecializeFlag)
     return;
 
-  SILOptFunctionBuilder FuncBuilder(*getPassManager());
+  SILOptFunctionBuilder FuncBuilder(*this);
 
   // Process functions in any order.
   for (auto &F : *getModule()) {
@@ -764,7 +764,6 @@ void EagerSpecializerTransform::run() {
       auto AttrRequirements = SA->getRequirements();
       ReInfoVec.emplace_back(&F, AttrRequirements);
       auto *NewFunc = eagerSpecialize(FuncBuilder, &F, *SA, ReInfoVec.back());
-      notifyAddFunction(NewFunc);
 
       SpecializedFuncs.push_back(NewFunc);
 
