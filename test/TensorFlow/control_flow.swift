@@ -87,9 +87,9 @@ public func weighPetOnlyDefault(pet: Pet) {
 // CHECK:           return
 // CHECK-NEXT:  ---- END OF ANALYSIS STATE FOR FUNCTION
 
-public func testCondBranch(_ a: Bool) { // expected-warning {{'a' implicitly copied to the accelerator}}
+public func testCondBranch(_ a: Bool) {
   var b = Tensor<Float>(2.0)
-  if a { // expected-note {{value used here}}
+  if a {
     b += 1.0
   }
   b -= 1.0
@@ -320,12 +320,9 @@ public func testCriticalEdges() {
 
 // TODO: fix the noisy sends/recvs warning diagnostics.
 @inline(never)
-// expected-warning @+1 {{implicitly copied to the accelerator}}
 public func SR8443(n: Int32) {
   var i: Int32 = 0
-// expected-warning @+1 {{implicitly copied to the accelerator}}
-  while i < n { // expected-note {{value used here}}
-
+  while i < n {
     // expected-warning @+1 {{implicitly copied to the host}}
     let images = Tensor<Float>(0.0)
     _hostOp(images)

@@ -43,8 +43,8 @@ public func testTensor(a: Tensor<Float>, b: Tensor<Float>) {
 // CHECK-NEXT: apply [[FINISHFN]]([[PROGRAM]],
 
 
-public func testScalar(f: Float) { // expected-warning {{'f' implicitly copied to the accelerator}}
-  var x = Tensor<Float>(f) // expected-note {{value used here}}
+public func testScalar(f: Float) {
+  var x = Tensor<Float>(f)
           +
           Tensor<Float>(1.0)
   x += x
@@ -120,7 +120,6 @@ public func testExitBranch1(i: Int) {
 public func testExitBranch2(i: Int) {
   var x = Tensor<Float>(1.0)
 
-  // expected-warning @+1 {{implicitly copied to the accelerator}}
   if i == 0 {
     return
   }
@@ -147,12 +146,12 @@ public func testExitBranch2(i: Int) {
 
 
 // This program results in a boolean parameter being passed in.
-public func test_bool_param(cond: Bool, // expected-warning {{'cond' implicitly copied to the accelerator}}
+public func test_bool_param(cond: Bool,
                             x: Tensor<Float>, y: Tensor<Float>) {
   var a = x.toAccelerator()
   let b = y.toAccelerator()
 
-  if cond {  // expected-note {{value used here}}
+  if cond {
     a -= b
   }
   a += b
@@ -179,14 +178,14 @@ public func test_bool_param(cond: Bool, // expected-warning {{'cond' implicitly 
 // CHECK-NEXT:  end_access
 // CHECK-NEXT:  dealloc_stack
 
-public func test_bool_param2(cond: Bool, // expected-warning {{'cond' implicitly copied to the accelerator}}
+public func test_bool_param2(cond: Bool,
                              x: Tensor<Float>, y: Tensor<Float>) {
   var a = x.toAccelerator()
   let b = y.toAccelerator()
 
   a += b
 
-  if cond { // expected-note {{value used here}}
+  if cond {
     a -= b
   }
   a += b
@@ -213,15 +212,13 @@ public func test_bool_param2(cond: Bool, // expected-warning {{'cond' implicitly
 // CHECK: cond_br [[BOOLVAL]],
 
 
-// expected-warning @+1 {{'status' implicitly copied to the accelerator}}
 public func test_multiple_ifs(status: Bool) {
   var a = Tensor<Int32>(0)
   let b = a
-  if status { // expected-note {{value used here}}
+  if status {
     a += b
   }
   a += b
-  // expected-warning @+1 {{value implicitly copied to the host, use .toHost() to make transfer explicit}}
   if a.scalarized() > 10 {
     a += b
   }
@@ -241,7 +238,7 @@ public func test_multiple_ifs(status: Bool) {
 // CHECK-NEXT:     block bb4}
 // CHECK-NEXT:   block bb6]
 
-public func test_while1(maxCount: Int,  // expected-warning {{'maxCount' implicitly copied to the accelerator}}
+public func test_while1(maxCount: Int,
                         arg1: Tensor<Float>, arg2: Tensor<Float>) {
   var a = arg1.toAccelerator()
   let b = arg2.toAccelerator()
@@ -249,8 +246,7 @@ public func test_while1(maxCount: Int,  // expected-warning {{'maxCount' implici
   a += b
 
   var count = 0
-  // expected-warning @+1 {{implicitly copied to the accelerator}}
-  while count < maxCount { // expected-note {{value used here}}
+  while count < maxCount {
     a -= b
     count += 1
   }
@@ -293,12 +289,8 @@ public func test_while1(maxCount: Int,  // expected-warning {{'maxCount' implici
 // disprove away the optional check, so we'll need to send a bit back to the
 // host.
 public func scalar_manipulation(a : Float) -> Tensor<Float> {
-  // expected-warning @-1 {{'a' implicitly copied to the accelerator, use .toAccelerator() to make transfer explicit}}
-
-  // expected-note @+1 {{value used here}}
   let x = Tensor<Float>(a) + Tensor<Float>(1.0) // expected-warning {{value implicitly copied to the host}}
   let y = x.scalar! + 2.0 // expected-note {{value used here}}
-  // expected-warning @-1 {{value implicitly copied to the accelerator}}
 
   let z = Tensor<Float>(y)
   return z+z
@@ -417,7 +409,7 @@ public func testResourceAndVariants() {
 // CHECK:  [[VALUES:%.*]] = graph_op "Const"() {dtype: $Float, value$tensor: [$Float: (f32 0x3F800000 /* 1 */), (f32 0x40000000 /* 2 */),
 // CHECK:  [[DATASET:%.*]] = graph_op "TensorDataSet,i"([[VALUES]] : $TensorHandle<Float>
 // CHECK:  [[ITERATOR:%.*]] = graph_op "Iterator"()
-// CHECK:  graph_op "MakeIterator,i,i"([[DATASET]] : $VariantHandle, [[ITERATOR]] : $ResourceHandle) {{.*}} 
+// CHECK:  graph_op "MakeIterator,i,i"([[DATASET]] : $VariantHandle, [[ITERATOR]] : $ResourceHandle) {{.*}}
 // CHECK-LABEL: ----
 
 
@@ -493,9 +485,9 @@ public func testNoInlineUser() {
 
 // b/77437755
 public func test77437755(_ hiddenSize: Float) {
-  let stddev = 1.0 / hiddenSize  // expected-warning {{method result implicitly copied to the accelerator}}
+  let stddev = 1.0 / hiddenSize
   let t1 = Tensor<Float>(shape: [5], scalars: [1.0, 2.0, 3.0, 4.0, 5.0])
-  _ = t1 * stddev  // expected-note {{value used here}}
+  _ = t1 * stddev
 }
 
 // CHECK-LABEL: ---- INPUT FUNCTION {{.*}}test77437755{{.*}} ----------
