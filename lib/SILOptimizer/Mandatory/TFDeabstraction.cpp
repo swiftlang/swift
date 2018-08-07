@@ -2119,7 +2119,7 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
       }
       else {
         return diagnoseInvalidAttr("requires a constant that is an integer,"
-                                   " floating point, or array thereof");
+                                   " floating point, string, or array thereof");
       }
       break;
     }

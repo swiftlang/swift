@@ -35,9 +35,3 @@ public final class VariantHandle {
     fatalError("VariantHandle is a marker type that can never be created")
   }
 }
-
-public final class StringTensorHandle {
-  private init() {
-    fatalError("StringTensorHandle is a marker type that can never be created")
-  }
-}

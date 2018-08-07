@@ -38,7 +38,6 @@ namespace tf {
     TensorHandle,   ///< This is TensorHandle<T>
     ResourceHandle, ///< This is ResourceHandle
     VariantHandle,  ///< This is VariantHandle
-    StringTensorHandle,   ///< This is StringTensorHandle
   };
 
   /// Determine whether the specified type is one of our well-known types, and

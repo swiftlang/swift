@@ -422,13 +422,13 @@ public func testResourceAndVariants() {
 
 
 public func testStringHandle() {
-  let str: StringTensorHandle = #tfop(
+  let str: TensorHandle<String> = #tfop(
     "Const", dtype: String.self, value$tensor: "foo"
   )
-  let _: StringTensorHandle = #tfop(
+  let _: TensorHandle<String> = #tfop(
     "Substr", str, Tensor<Int32>(0), Tensor<Int32>(1)
   )
-  let _: StringTensorHandle = #tfop(
+  let _: TensorHandle<String> = #tfop(
     "Const", dtype:
     String.self,
     value$tensor: ["foo", "bar"],
@@ -437,11 +437,11 @@ public func testStringHandle() {
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testStringHandle
-// CHECK: [[STR:%.*]] = graph_op "Const"() {dtype: $String, value$tensor: "foo", __device: "/device:CPU:0"} : $StringTensorHandle
+// CHECK: [[STR:%.*]] = graph_op "Const"() {dtype: $String, value$tensor: "foo", __device: "/device:CPU:0"} : $TensorHandle<String>
 // CHECK: [[POS:%.*]] = graph_op "Const"() {dtype: $Int32, value$tensor: i32 0, __device: "ALL_DEVICES"} : $TensorHandle<Int32>
 // CHECK: [[LEN:%.*]] = graph_op "Const"() {dtype: $Int32, value$tensor: i32 1, __device: "ALL_DEVICES"} : $TensorHandle<Int32>
-// CHECK: graph_op "Substr,i,i,i"([[STR]] : $StringTensorHandle, [[POS]] : $TensorHandle<Int32>, [[LEN]] : $TensorHandle<Int32>) {__device: "/device:CPU:0"} : $StringTensorHandle
-// CHECK: graph_op "Const"() {dtype: $String, value$tensor: [$String: "foo", "bar"], value$shape: [$Int32: (i32 2)], __device: "/device:CPU:0"} : $StringTensorHandle
+// CHECK: graph_op "Substr,i,i,i"([[STR]] : $TensorHandle<String>, [[POS]] : $TensorHandle<Int32>, [[LEN]] : $TensorHandle<Int32>) {__device: "/device:CPU:0"} : $TensorHandle<String>
+// CHECK: graph_op "Const"() {dtype: $String, value$tensor: [$String: "foo", "bar"], value$shape: [$Int32: (i32 2)], __device: "/device:CPU:0"} : $TensorHandle<String>
 
 
 // b/76117368

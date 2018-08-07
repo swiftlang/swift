@@ -769,8 +769,6 @@ TF_DataType TFGraphFunctionLowering::getTensorFlowDataType(SILType type,
     return TF_RESOURCE;
   case TFValueKind::VariantHandle:
     return TF_VARIANT;
-  case TFValueKind::StringTensorHandle:
-    return TF_STRING;
   case TFValueKind::Nope:
     // Otherwise this must be a scalar type we're promoting to a tensor.
     if (auto ty = (TF_DataType)convertSwiftTypeToTF(type.getASTType()))
