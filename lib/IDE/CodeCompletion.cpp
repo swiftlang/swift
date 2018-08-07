@@ -3900,7 +3900,7 @@ public:
   using FunctionParams = ArrayRef<AnyFunctionType::Param>;
 
   static bool
-  collectPossibleParamLists(DeclContext &DC, CallExpr *callExpr,
+  collectPossibleParamLists(DeclContext &DC, ApplyExpr *callExpr,
                             SmallVectorImpl<FunctionParams> &candidates) {
     auto *fnExpr = callExpr->getFn();
 
@@ -3967,7 +3967,7 @@ public:
   }
 
   static bool
-  collectArgumentExpectation(DeclContext &DC, CallExpr *CallE, Expr *CCExpr,
+  collectArgumentExpectation(DeclContext &DC, ApplyExpr *CallE, Expr *CCExpr,
                              std::vector<Type> &ExpectedTypes,
                              std::vector<StringRef> &ExpectedNames) {
     // Collect parameter lists for possible func decls.
@@ -3981,15 +3981,16 @@ public:
     if (!getPositionInArgs(DC, CallE->getArg(), CCExpr, Position, HasName))
       return false;
 
-    // Collect possible types at the position.
+    // Collect possible types (or labels) at the position.
     {
+      bool MayNeedName = !HasName && isa<CallExpr>(CallE);
       SmallPtrSet<TypeBase *, 4> seenTypes;
       SmallPtrSet<Identifier, 4> seenNames;
       for (auto Params : Candidates) {
         if (Position >= Params.size())
           continue;
         const auto &Param = Params[Position];
-        if (Param.hasLabel() && !HasName) {
+        if (Param.hasLabel() && MayNeedName) {
           if (seenNames.insert(Param.getLabel()).second)
             ExpectedNames.push_back(Param.getLabel().str());
         } else {
@@ -4992,6 +4993,8 @@ public:
       if (auto E = Node.dyn_cast<Expr *>()) {
         switch(E->getKind()) {
         case ExprKind::Call:
+        case ExprKind::Binary:
+        case ExprKind::PrefixUnary:
         case ExprKind::Assign:
           return true;
         default:
@@ -5023,11 +5026,13 @@ public:
   void analyzeExpr(Expr *Parent, llvm::function_ref<void(Type)> Callback,
                    SmallVectorImpl<StringRef> &PossibleNames) {
     switch (Parent->getKind()) {
-      case ExprKind::Call: {
+      case ExprKind::Call:
+      case ExprKind::Binary:
+      case ExprKind::PrefixUnary: {
         std::vector<Type> PotentialTypes;
         std::vector<StringRef> ExpectedNames;
         CompletionLookup::collectArgumentExpectation(
-            *DC, cast<CallExpr>(Parent), ParsedExpr, PotentialTypes,
+            *DC, cast<ApplyExpr>(Parent), ParsedExpr, PotentialTypes,
             ExpectedNames);
         for (Type Ty : PotentialTypes)
           Callback(Ty);

@@ -532,10 +532,9 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   }
 
   ParserResult<Expr> SubExpr = parseExprUnary(Message, isExprBasic);
-  if (SubExpr.hasCodeCompletion())
-    return makeParserCodeCompletionResult<Expr>();
+  ParserStatus Status = SubExpr;
   if (SubExpr.isNull())
-    return nullptr;
+    return Status;
 
   // We are sure we can create a prefix prefix operator expr now.
   UnaryContext.setCreateSyntax(SyntaxKind::PrefixOperatorExpr);
@@ -545,12 +544,13 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   if (auto *LE = dyn_cast<NumberLiteralExpr>(SubExpr.get())) {
     if (Operator->hasName() && Operator->getName().getBaseName() == "-") {
       LE->setNegative(Operator->getLoc());
-      return makeParserResult(LE);
+      return makeParserResult(Status, LE);
     }
   }
 
-  return makeParserResult(new (Context) PrefixUnaryExpr(
-      Operator, formUnaryArgument(Context, SubExpr.get())));
+  return makeParserResult(
+      Status, new (Context) PrefixUnaryExpr(
+                  Operator, formUnaryArgument(Context, SubExpr.get())));
 }
 
 /// expr-keypath-swift:
@@ -1667,9 +1667,6 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
                                           rParenLoc,
                                           trailingClosure,
                                           SyntaxKind::FunctionCallArgumentList);
-      if (status.isError())
-        return nullptr;
-
       SyntaxContext->createNodeInPlace(SyntaxKind::FunctionCallExpr);
       return makeParserResult(
                  status,
