@@ -149,9 +149,7 @@ SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
     case DeclKind::Extension: {
       info.Kind = SymbolKind::Extension;
       auto *ED = cast<ExtensionDecl>(D);
-      if (!ED->getExtendedType())
-        break;
-      NominalTypeDecl *NTD = ED->getExtendedType()->getAnyNominal();
+      NominalTypeDecl *NTD = ED->getExtendedNominal();
       if (!NTD)
         break;
       if (isa<StructDecl>(NTD))
@@ -234,6 +232,8 @@ SymbolSubKind index::getSubKindForAccessor(AccessorKind AK) {
   case AccessorKind::Address: return SymbolSubKind::SwiftAccessorAddressor;
   case AccessorKind::MutableAddress:
     return SymbolSubKind::SwiftAccessorMutableAddressor;
+  case AccessorKind::Read:      return SymbolSubKind::SwiftAccessorRead;
+  case AccessorKind::Modify:    return SymbolSubKind::SwiftAccessorModify;
   case AccessorKind::MaterializeForSet:
     llvm_unreachable("unexpected MaterializeForSet");
   }

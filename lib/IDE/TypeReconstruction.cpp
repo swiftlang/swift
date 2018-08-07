@@ -100,8 +100,7 @@ private:
     if (!entry)
       return false;
     size_t decls_size = decls.size();
-    entry->lookupQualified(ModuleType::get(entry), name, options, typeResolver,
-                           decls);
+    entry->lookupQualified(entry, name, options, decls);
     return decls.size() > decls_size;
   }
 

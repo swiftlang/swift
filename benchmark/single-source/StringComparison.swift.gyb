@@ -38,7 +38,7 @@ public let StringComparison = [
     name: "StringComparison_${Name}",
     runFunction: run_StringComparison_${Name},
     tags: [.validation, .api, .String],
-    setUpFunction: setup_StringComparison_${Name}),
+    setUpFunction: { blackHole(Workload_${Name}) }),
 % end # Names
 ]
 
@@ -47,25 +47,18 @@ public let StringHashing = [
   BenchmarkInfo(
     name: "StringHashing_${Name}",
     runFunction: run_StringHashing_${Name},
-    tags: [.validation, .api, .String]),    
+    tags: [.validation, .api, .String],
+    setUpFunction: { blackHole(Workload_${Name}) }),
 % end # Names
 ]
 
 % for Name in Names:
 
-var Workload_${Name}: Workload? = nil
-
-@inline(never)
-public func setup_StringComparison_${Name}() {
-  if Workload_${Name} != nil {
-    return
-  }
-  Workload_${Name} = Workload.${Name}
-}
+var Workload_${Name}: Workload! = Workload.${Name}
 
 @inline(never)
 public func run_StringComparison_${Name}(_ N: Int) {
-  let workload = Workload_${Name}._unsafelyUnwrappedUnchecked
+  let workload: Workload = Workload_${Name}
   let tripCount = workload.tripCount
   let payload = workload.payload
   for _ in 1...tripCount*N {
@@ -79,7 +72,7 @@ public func run_StringComparison_${Name}(_ N: Int) {
 
 @inline(never)
 public func run_StringHashing_${Name}(_ N: Int) {
-  let workload = Workload.${Name}
+  let workload: Workload = Workload.${Name}
   let tripCount = workload.tripCount
   let payload = workload.payload
   for _ in 1...tripCount*N {

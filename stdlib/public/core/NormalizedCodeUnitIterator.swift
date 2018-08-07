@@ -131,7 +131,7 @@ struct _NormalizedCodeUnitIterator: IteratorProtocol {
           return nil
         }
         
-        let cu = guts[index]
+        let cu = guts.codeUnit(atCheckedOffset: index)
         buffer[bufferIndex] = cu
         index += 1
         bufferIndex += 1

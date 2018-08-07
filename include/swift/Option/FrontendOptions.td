@@ -63,6 +63,10 @@ def emit_fixits_path
   : Separate<["-"], "emit-fixits-path">, MetaVarName<"<path>">,
     HelpText<"Output compiler fixits as source edits to <path>">;
 
+def emit_interface_path
+  : Separate<["-"], "emit-interface-path">, MetaVarName<"<path>">,
+    HelpText<"Output textual interface file to <path>">;
+
 def tbd_install_name
   : Separate<["-"], "tbd-install_name">, MetaVarName<"<path>">,
     HelpText<"The install_name to use in an emitted TBD file">;
@@ -491,5 +495,9 @@ def disable_verify_exclusivity : Flag<["-"], "disable-verify-exclusivity">,
 
 def enable_key_path_resilience : Flag<["-"], "enable-key-path-resilience">,
   HelpText<"Enable key path resilience.">;
+
+def type_info_dump_filter_EQ : Joined<["-"], "type-info-dump-filter=">,
+  Flags<[FrontendOption]>,
+  HelpText<"One of 'all', 'resilient' or 'fragile'">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

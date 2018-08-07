@@ -58,10 +58,13 @@ static bool isSubstitutableFor(Type type, ArchetypeType *archetype,
 
 UncurriedCandidate::UncurriedCandidate(ValueDecl *decl, unsigned level)
 : declOrExpr(decl), level(level), substituted(false) {
-  
-  if (auto *PD = dyn_cast<ParamDecl>(decl))
-    entityType = PD->getType();
-  else {
+
+  if (auto *PD = dyn_cast<ParamDecl>(decl)) {
+    if (PD->hasValidSignature())
+      entityType = PD->getType();
+    else
+      entityType = PD->getASTContext().TheUnresolvedType;
+  } else {
     entityType = decl->getInterfaceType();
     auto *DC = decl->getInnermostDeclContext();
     if (auto *GFT = entityType->getAs<GenericFunctionType>()) {
@@ -332,8 +335,17 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
     void missingArgument(unsigned paramIdx) override {
       result = CC_ArgumentCountMismatch;
     }
-    void missingLabel(unsigned paramIdx) override {
+    bool missingLabel(unsigned paramIdx) override {
       result = CC_ArgumentLabelMismatch;
+      return true;
+    }
+    bool extraneousLabel(unsigned paramIdx) override {
+      result = CC_ArgumentLabelMismatch;
+      return true;
+    }
+    bool incorrectLabel(unsigned paramIdx) override {
+      result = CC_ArgumentLabelMismatch;
+      return true;
     }
     void outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx) override {
       result = CC_ArgumentLabelMismatch;
@@ -668,7 +680,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
           if (baseType->isAnyObject())
             baseType = Type();
 
-          if (baseType) {
+          if (baseType && !baseType->hasUnresolvedType()) {
             C.entityType = baseType->getTypeOfMember(CS.DC->getParentModule(),
                                                      C.getDecl(), nullptr);
             C.substituted = true;
@@ -874,7 +886,7 @@ CalleeCandidateInfo::CalleeCandidateInfo(Type baseType,
       if (substType->isAnyObject())
         substType = Type();
 
-      if (substType && selfAlreadyApplied)
+      if (substType && selfAlreadyApplied && !substType->hasUnresolvedType())
         substType =
           substType->getTypeOfMember(CS.DC->getParentModule(), decl, nullptr);
       if (substType) {

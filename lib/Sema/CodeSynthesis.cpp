@@ -655,10 +655,9 @@ static ProtocolDecl *getNSCopyingProtocol(TypeChecker &TC,
     return nullptr;
 
   SmallVector<ValueDecl *, 2> results;
-  DC->lookupQualified(ModuleType::get(foundation),
+  DC->lookupQualified(foundation,
                       ctx.getSwiftId(KnownFoundationEntity::NSCopying),
                       NL_QualifiedDefault | NL_KnownNonCascadingDependency,
-                      /*typeResolver=*/nullptr,
                       results);
 
   if (results.size() != 1)
@@ -835,6 +834,16 @@ static void synthesizeAddressedGetterBody(TypeChecker &TC,
   synthesizeTrivialGetterBody(TC, getter, TargetImpl::Implementation);
 }
 
+/// Synthesize the body of a getter which just delegates to a read
+/// coroutine accessor.
+static void synthesizeReadCoroutineGetterBody(TypeChecker &TC,
+                                              AccessorDecl *getter) {
+  assert(getter->getStorage()->getReadCoroutine());
+
+  // This should call the read coroutine.
+  synthesizeTrivialGetterBody(TC, getter, TargetImpl::Implementation);
+}
+
 /// Synthesize the body of a setter which just stores to the given storage
 /// declaration (which doesn't have to be the storage for the setter).
 static void synthesizeTrivialSetterBodyWithStorage(TypeChecker &TC,
@@ -905,8 +914,20 @@ static void convertStoredVarInProtocolToComputed(VarDecl *VD, TypeChecker &TC) {
   VD->overwriteImplInfo(StorageImplInfo::getImmutableComputed());
 }
 
+/// Synthesize the body of a setter which just delegates to a mutable
+/// addressor.
 static void synthesizeMutableAddressSetterBody(TypeChecker &TC,
                                                AccessorDecl *setter) {
+  // This should call the mutable addressor.
+  synthesizeTrivialSetterBodyWithStorage(TC, setter, TargetImpl::Implementation,
+                                         setter->getStorage());
+}
+
+/// Synthesize the body of a setter which just delegates to a modify
+/// coroutine accessor.
+static void synthesizeModifyCoroutineSetterBody(TypeChecker &TC,
+                                                AccessorDecl *setter) {
+  // This should call the modify coroutine.
   synthesizeTrivialSetterBodyWithStorage(TC, setter, TargetImpl::Implementation,
                                          setter->getStorage());
 }
@@ -1756,6 +1777,7 @@ void swift::triggerAccessorSynthesis(TypeChecker &TC,
   case ReadImplKind::Stored:
   case ReadImplKind::Inherited:
   case ReadImplKind::Address:
+  case ReadImplKind::Read:
     if (auto getter = storage->getGetter())
       triggerSynthesis(TC, getter, SynthesizedFunction::Getter);
     break;
@@ -1771,6 +1793,7 @@ void swift::triggerAccessorSynthesis(TypeChecker &TC,
   case WriteImplKind::StoredWithObservers:
   case WriteImplKind::InheritedWithObservers:
   case WriteImplKind::MutableAddress:
+  case WriteImplKind::Modify:
     if (auto setter = storage->getSetter())
       triggerSynthesis(TC, setter, SynthesizedFunction::Setter);
     break;
@@ -2036,6 +2059,10 @@ static void synthesizeGetterBody(TypeChecker &TC, AccessorDecl *getter) {
   case ReadImplKind::Address:
     synthesizeAddressedGetterBody(TC, getter);
     return;
+
+  case ReadImplKind::Read:
+    synthesizeReadCoroutineGetterBody(TC, getter);
+    return;
   }
   llvm_unreachable("bad ReadImplKind");
 }
@@ -2059,6 +2086,10 @@ static void synthesizeSetterBody(TypeChecker &TC, AccessorDecl *setter) {
 
   case WriteImplKind::MutableAddress:
     return synthesizeMutableAddressSetterBody(TC, setter);
+
+  case WriteImplKind::Modify:
+    synthesizeModifyCoroutineSetterBody(TC, setter);
+    return;
   }
   llvm_unreachable("bad ReadImplKind");
 }
@@ -2137,8 +2168,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
 
       auto varType = var->getType()
         ->getReferenceStorageReferent();
-      auto varInterfaceType = var->getInterfaceType()
-        ->getReferenceStorageReferent();
+      auto varInterfaceType = var->getValueInterfaceType();
 
       // If var is a lazy property, its value is provided for the underlying
       // storage.  We thus take an optional of the properties type.  We only
@@ -2229,8 +2259,7 @@ static void createStubBody(TypeChecker &tc, ConstructorDecl *ctor) {
   ctor->setStubImplementation(true);
 }
 
-static std::tuple<GenericSignature *, GenericEnvironment *,
-                  GenericParamList *, SubstitutionMap>
+static std::tuple<GenericEnvironment *, GenericParamList *, SubstitutionMap>
 configureGenericDesignatedInitOverride(ASTContext &ctx,
                                        ClassDecl *classDecl,
                                        Type superclassTy,
@@ -2241,7 +2270,6 @@ configureGenericDesignatedInitOverride(ASTContext &ctx,
   auto subMap = superclassTy->getContextSubstitutionMap(
       moduleDecl, superclassDecl);
 
-  GenericSignature *genericSig;
   GenericEnvironment *genericEnv;
 
   // Inheriting initializers that have their own generic parameters
@@ -2321,20 +2349,21 @@ configureGenericDesignatedInitOverride(ASTContext &ctx,
     subMap = SubstitutionMap::get(superclassSig,
                                   substFn, lookupConformanceFn);
 
-    genericSig = std::move(builder).computeGenericSignature(SourceLoc());
+    auto *genericSig = std::move(builder).computeGenericSignature(SourceLoc());
     genericEnv = genericSig->createGenericEnvironment();
   } else {
     genericEnv = classDecl->getGenericEnvironment();
-    genericSig = classDecl->getGenericSignature();
   }
 
-  return std::make_tuple(genericSig, genericEnv, genericParams, subMap);
+  return std::make_tuple(genericEnv, genericParams, subMap);
 }
 
-static void configureDesignatedInitAttributes(TypeChecker &tc,
-                                              ClassDecl *classDecl,
-                                              ConstructorDecl *ctor,
-                                              ConstructorDecl *superclassCtor) {
+static void
+configureInheritedDesignatedInitAttributes(TypeChecker &tc,
+                                           ClassDecl *classDecl,
+                                           ConstructorDecl *ctor,
+                                           ConstructorDecl *superclassCtor) {
+  assert(ctor->getDeclContext() == classDecl);
   auto &ctx = tc.Context;
 
   AccessLevel access = classDecl->getFormalAccess();
@@ -2343,24 +2372,18 @@ static void configureDesignatedInitAttributes(TypeChecker &tc,
 
   ctor->setAccess(access);
 
-  // Inherit the @inlinable attribute.
-  if (superclassCtor->getFormalAccess(/*useDC=*/nullptr,
-                                      /*treatUsableFromInlineAsPublic=*/true)
-      >= AccessLevel::Public) {
+  AccessScope superclassInliningAccessScope =
+      superclassCtor->getFormalAccessScope(/*useDC*/nullptr,
+                                           /*usableFromInlineAsPublic=*/true);
+
+  if (superclassInliningAccessScope.isPublic()) {
     if (superclassCtor->getAttrs().hasAttribute<InlinableAttr>()) {
+      // Inherit the @inlinable attribute.
       auto *clonedAttr = new (ctx) InlinableAttr(/*implicit=*/true);
       ctor->getAttrs().add(clonedAttr);
-    }
-  }
 
-  // Inherit the @usableFromInline attribute. We need better abstractions
-  // for dealing with @usableFromInline.
-  if (superclassCtor->getFormalAccess(/*useDC=*/nullptr,
-                                      /*treatUsableFromInlineAsPublic=*/true)
-        >= AccessLevel::Public) {
-    if (access == AccessLevel::Internal &&
-        !superclassCtor->isDynamic() &&
-        !ctor->getAttrs().hasAttribute<InlinableAttr>()) {
+    } else if (access == AccessLevel::Internal && !superclassCtor->isDynamic()){
+      // Inherit the @usableFromInline attribute.
       auto *clonedAttr = new (ctx) UsableFromInlineAttr(/*implicit=*/true);
       ctor->getAttrs().add(clonedAttr);
     }
@@ -2375,8 +2398,20 @@ static void configureDesignatedInitAttributes(TypeChecker &tc,
   // If the superclass has its own availability, make sure the synthesized
   // constructor is only as available as its superclass's constructor.
   if (superclassCtor->getAttrs().hasAttribute<AvailableAttr>()) {
+    SmallVector<Decl *, 2> asAvailableAs;
+
+    // We don't have to look at enclosing contexts of the superclass constructor,
+    // because designated initializers must always be defined in the superclass
+    // body, and we already enforce that a superclass is at least as available as
+    // a subclass.
+    asAvailableAs.push_back(superclassCtor);
+    Decl *parentDecl = classDecl;
+    while (parentDecl != nullptr) {
+      asAvailableAs.push_back(parentDecl);
+      parentDecl = parentDecl->getDeclContext()->getAsDeclOrDeclExtensionContext();
+    }
     AvailabilityInference::applyInferredAvailableAttrs(
-        ctor, {classDecl, superclassCtor}, ctx);
+        ctor, asAvailableAs, ctx);
   }
 
   // Wire up the overrides.
@@ -2419,12 +2454,11 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
     return nullptr;
   }
 
-  GenericSignature *genericSig;
   GenericEnvironment *genericEnv;
   GenericParamList *genericParams;
   SubstitutionMap subMap;
 
-  std::tie(genericSig, genericEnv, genericParams, subMap) =
+  std::tie(genericEnv, genericParams, subMap) =
       configureGenericDesignatedInitOverride(ctx,
                                              classDecl,
                                              superclassTy,
@@ -2468,12 +2502,17 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
 
   // Set the interface type of the initializer.
   ctor->setGenericEnvironment(genericEnv);
+  ctor->computeType();
 
-  tc.configureInterfaceType(ctor, genericSig);
+  if (ctor->getFailability() == OTK_ImplicitlyUnwrappedOptional) {
+    ctor->getAttrs().add(
+      new (ctx) ImplicitlyUnwrappedOptionalAttr(/*implicit=*/true));
+  }
+
   ctor->setValidationToChecked();
 
-  configureDesignatedInitAttributes(tc, classDecl,
-                                    ctor, superclassCtor);
+  configureInheritedDesignatedInitAttributes(tc, classDecl, ctor,
+                                             superclassCtor);
 
   if (kind == DesignatedInitKind::Stub) {
     // Make this a stub implementation.

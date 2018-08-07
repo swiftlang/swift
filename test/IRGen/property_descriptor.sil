@@ -7,8 +7,8 @@ sil_stage canonical
 import Swift
 
 public struct ExternalGeneric<T: Comparable> {
-  public let ro: T
-  public var rw: T
+  @sil_stored public var ro: T { get }
+  @sil_stored public var rw: T { get set }
 
   public var computedRO: T { get }
   public var computedRW: T { get set }
@@ -21,8 +21,8 @@ public struct ExternalGeneric<T: Comparable> {
 }
 
 public struct External {
-  public let ro: Int
-  public var rw: Int
+  @sil_stored public var ro: Int { get }
+  @sil_stored public var rw: Int { get set }
 
   public var computedRO: Int { get }
   public var computedRW: Int { get set }
@@ -35,27 +35,27 @@ public struct External {
 }
 
 public struct ExternalReabstractions<T> {
-  public var ro: T
-  public var reabstracted: () -> ()
+  @sil_stored public var ro: T { get }
+  @sil_stored public var reabstracted: () -> () { get set }
 }
 
 // -- 0xff_fffe - struct property, offset resolved from field offset vector in metadata
 // CHECK-64: @"$S19property_descriptor15ExternalGenericV2roxvpMV" =
-// CHECK-64-SAME: <{ <i32 0x00ff_fffe>, i32 32 }>, align 8
+// CHECK-64-SAME: <{ <i32 0x01ff_fffe>, i32 32 }>, align 8
 // CHECK-32: @"$S19property_descriptor15ExternalGenericV2roxvpMV" =
-// CHECK-32-SAME: <{ <i32 0x00ff_fffe>, i32 16 }>, align 4
+// CHECK-32-SAME: <{ <i32 0x01ff_fffe>, i32 16 }>, align 4
 sil_property #ExternalGeneric.ro <T: Comparable> (
   stored_property #ExternalGeneric.ro : $T)
 // CHECK-64: @"$S19property_descriptor15ExternalGenericV2rwxvpMV" =
-// CHECK-64-SAME: <{ <i32 0x00ff_fffe>, i32 36 }>, align 8
+// CHECK-64-SAME: <{ <i32 0x01ff_fffe>, i32 36 }>, align 8
 // CHECK-32: @"$S19property_descriptor15ExternalGenericV2rwxvpMV" =
-// CHECK-32-SAME: <{ <i32 0x00ff_fffe>, i32 20 }>, align 4
+// CHECK-32-SAME: <{ <i32 0x01ff_fffe>, i32 20 }>, align 4
 sil_property #ExternalGeneric.rw <T: Comparable> (
   stored_property #ExternalGeneric.rw : $T)
 
 // CHECK: @"$S19property_descriptor15ExternalGenericV10computedROxvpMV" =
 // -- 0x0108_0000 - computed, readonly, has arguments
-// CHECK-SAME:  <{ <i32 0x0108_0000>,
+// CHECK-SAME:  <{ <i32 0x0208_0000>,
 // CHECK-SAME:     @id_computed, 
 // CHECK-SAME:     [[GET_COMPUTEDRO:@keypath_get[.0-9]*]],
 // CHECK-SAME:     [[GET_ARG_LAYOUT_COMPUTEDRO:@keypath_get_arg_layout[.0-9]*]],
@@ -68,7 +68,7 @@ sil_property #ExternalGeneric.computedRO <T: Comparable> (
 
 // CHECK: @"$S19property_descriptor15ExternalGenericV10computedRWxvpMV" =
 // -- 0x01c8_0000 - computed, settable, mutating, has arguments
-// CHECK-SAME:  <{ <i32 0x01c8_0000>, 
+// CHECK-SAME:  <{ <i32 0x02c8_0000>, 
 // CHECK-SAME:     @id_computed,
 // CHECK-SAME:     [[GET_COMPUTEDRW:@keypath_get[.0-9]*]],
 // CHECK-SAME:     [[SET_COMPUTEDRW:@keypath_set[.0-9]*]],
@@ -83,7 +83,7 @@ sil_property #ExternalGeneric.computedRW <T: Comparable> (
 
 // CHECK: @"$S19property_descriptor15ExternalGenericVyxqd__cSHRd__luipMV" =
 // -- 0x01c8_0000 - computed, settable, mutating, has arguments
-// CHECK-SAME:  <{ <i32 0x01c8_0000>, 
+// CHECK-SAME:  <{ <i32 0x02c8_0000>, 
 // CHECK-SAME:     @id_computed,
 // CHECK-SAME:     [[GET_SUBSCRIPT:@keypath_get[.0-9]*]],
 // CHECK-SAME:     [[SET_SUBSCRIPT:@keypath_set[.0-9]*]],
@@ -129,7 +129,7 @@ sil_property #ExternalReabstractions.reabstracted <T> (
 // definition
 
 // CHECK-LABEL: @"$S19property_descriptor15ExternalGenericV29computedWithTrivialDescriptorSivpMV" =
-// CHECK-SAME:    { i32 } { i32 -1 }, align 4
+// CHECK-SAME:    { i32 } zeroinitializer, align 4
 sil_property #ExternalGeneric.computedWithTrivialDescriptor <T: Comparable> ()
 
 // CHECK-LABEL: @"$S19property_descriptor8ExternalV29computedWithTrivialDescriptorSivpMV" =

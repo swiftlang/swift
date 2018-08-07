@@ -299,7 +299,7 @@ public:
       return false;
 
     LLVM_DEBUG(llvm::dbgs() << "Array append contentsOf calls replaced in "
-                       << Fn.getName() << " (" << Repls.size() << ")\n");
+                            << Fn.getName() << " (" << Repls.size() << ")\n");
 
     FuncDecl *AppendFnDecl = Ctx.getArrayAppendElementDecl();
     if (!AppendFnDecl)

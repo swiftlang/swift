@@ -100,8 +100,7 @@ extension _StringGuts {
 
   @inlinable
   @inline(__always)
-  public // @testable
-  mutating func _isUniqueNative() -> Bool {
+  internal mutating func _isUniqueNative() -> Bool {
     guard _isNative else { return false }
     // Note that the isUnique test must be in a separate statement;
     // `isNative && _isUnique` always evaluates to false in debug builds,
@@ -121,8 +120,7 @@ extension _StringGuts {
 
 extension _StringGuts {
   @inlinable
-  public // @testable
-  var isASCII: Bool {
+  internal var isASCII: Bool {
     @inline(__always) get { return _object.isContiguousASCII }
   }
 
@@ -135,40 +133,32 @@ extension _StringGuts {
   }
 
   @inlinable
-  public // @testable
-  var _isNative: Bool {
+  internal var _isNative: Bool {
     return _object.isNative
   }
 
-#if _runtime(_ObjC)
   @inlinable
-  public // @testable
-  var _isCocoa: Bool {
+  internal var _isCocoa: Bool {
     return _object.isCocoa
   }
-#endif
 
   @inlinable
-  public // @testable
-  var _isUnmanaged: Bool {
+  internal var _isUnmanaged: Bool {
     return _object.isUnmanaged
   }
 
   @inlinable
-  public // @testable
-  var _isSmall: Bool {
+  internal var _isSmall: Bool {
     return _object.isSmall
   }
 
   @inlinable
-  public // @testable
-  var _owner: AnyObject? {
+  internal var _owner: AnyObject? {
     return _object.owner
   }
 
   @inlinable
-  public // @testable
-  var isSingleByte: Bool {
+  internal var isSingleByte: Bool {
     // FIXME: Currently used to sometimes mean contiguous ASCII
     return _object.isSingleByte
   }
@@ -180,8 +170,7 @@ extension _StringGuts {
   }
 
   @inlinable
-  public // @testable
-  var byteWidth: Int {
+  internal var byteWidth: Int {
     return _object.byteWidth
   }
 
@@ -215,8 +204,7 @@ extension _StringGuts {
 extension _StringGuts {
   @inlinable
   @inline(__always)
-  public // @testable
-  init() {
+  internal init() {
     self.init(object: _StringObject(), otherBits: 0)
     _invariantCheck()
   }
@@ -474,8 +462,8 @@ extension _StringGuts {
   /// Return the object identifier for the reference counted heap object
   /// referred to by this string (if any). This is useful for testing allocation
   /// behavior.
-  public // @testable
-  var _objectIdentifier: ObjectIdentifier? {
+  @usableFromInline
+  internal var _objectIdentifier: ObjectIdentifier? {
     if _object.isNative {
       return ObjectIdentifier(_object.nativeRawStorage)
     }
@@ -793,8 +781,7 @@ extension _StringGuts {
   }
 
   @inlinable
-  public // @testable
-  var count: Int {
+  internal var count: Int {
     if _slowPath(!_hasStoredCount) {
       return _nonStoredCount
     }
@@ -823,46 +810,11 @@ extension _StringGuts {
   }
 
   @inlinable
-  public // @testable
-  var capacity: Int {
+  internal var capacity: Int {
     if _fastPath(_object.isNative) {
       return _object.nativeRawStorage.capacity
     }
     return 0
-  }
-
-  //
-  // TODO (TODO: JIRA): Remove all of this. StringGuts users need to deal with
-  // the fact that it has multiple representations, otherwise they'll never be
-  // efficient.
-  //
-
-  /// Get the UTF-16 code unit stored at the specified position in this string.
-  @inlinable // FIXME(sil-serialize-all)
-  public // @testable
-  subscript(position: Int) -> UTF16.CodeUnit {
-    if _slowPath(_isOpaque) {
-      return _opaquePosition(position)
-    }
-
-    defer { _fixLifetime(self) }
-    if isASCII {
-      return _unmanagedASCIIView[position]
-    }
-
-    return _unmanagedUTF16View[position]
-  }
-
-  @usableFromInline // @opaque
-  internal func _opaquePosition(_ position: Int) -> UTF16.CodeUnit {
-    // TODO: ascii fast path, and reconsider this whole API anyways
-    if self._isSmall {
-      return self._smallUTF8String.withUnmanagedASCII { $0[position] }
-    }
-
-    _sanityCheck(_isOpaque)
-    defer { _fixLifetime(self) }
-    return _asOpaque()[position]
   }
 
   /// Get the UTF-16 code unit stored at the specified position in this string.
@@ -1267,19 +1219,6 @@ extension _StringGuts {
       fromCodeUnits: input,
       encoding: Encoding.self)
     return (_StringGuts(_large: storage), hadError)
-  }
-}
-
-extension _StringGuts {
-  // For testing purposes only. Might be both inefficient and too low-level.
-  // There should be an eventual API on String to accomplish something similar.
-  @usableFromInline // @_testable
-  static internal
-  func _createStringFromUTF16(_ cus: UnsafeBufferPointer<UInt16>) -> String {
-    let storage = _SwiftStringStorage<UTF16.CodeUnit>.create(
-      capacity: cus.count, count: cus.count)
-    _ = storage._initialize(fromCodeUnits: cus, encoding: UTF16.self)
-    return String(_StringGuts(_large: storage))
   }
 }
 

@@ -226,6 +226,8 @@ StringRef swift::getReadImplKindName(ReadImplKind kind) {
     return "getter";
   case ReadImplKind::Address:
     return "addressor";
+  case ReadImplKind::Read:
+    return "read_coroutine";
   }
   llvm_unreachable("bad kind");
 }
@@ -244,6 +246,8 @@ StringRef swift::getWriteImplKindName(WriteImplKind kind) {
     return "setter";
   case WriteImplKind::MutableAddress:
     return "mutable_addressor";
+  case WriteImplKind::Modify:
+    return "modify_coroutine";
   }
   llvm_unreachable("bad kind");
 }
@@ -260,6 +264,8 @@ StringRef swift::getReadWriteImplKindName(ReadWriteImplKind kind) {
     return "mutable_addressor";
   case ReadWriteImplKind::MaterializeToTemporary:
     return "materialize_to_temporary";
+  case ReadWriteImplKind::Modify:
+    return "modify_coroutine";
   }
   llvm_unreachable("bad kind");
 }
@@ -1291,11 +1297,8 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
     break;
 
   case DeclContextKind::ExtensionDecl:
-    if (auto extendedTy = cast<ExtensionDecl>(dc)->getExtendedType()) {
-      if (auto nominal = extendedTy->getAnyNominal()) {
-        printName(os, nominal->getName());
-        break;
-      }
+    if (auto extendedNominal = cast<ExtensionDecl>(dc)->getExtendedNominal()) {
+      printName(os, extendedNominal->getName());
     }
     os << " extension";
     break;
@@ -1486,6 +1489,15 @@ public:
     if (S->hasResult()) {
       OS << '\n';
       printRec(S->getResult());
+    }
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
+  void visitYieldStmt(YieldStmt *S) {
+    printCommon(S, "yield_stmt");
+    for (auto yield : S->getYields()) {
+      OS << '\n';
+      printRec(yield);
     }
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }

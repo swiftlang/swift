@@ -52,6 +52,7 @@ bool Parser::isStartOfStmt() {
   case tok::kw_switch:
   case tok::kw_case:
   case tok::kw_default:
+  case tok::kw_yield:
   case tok::pound_if:
   case tok::pound_warning:
   case tok::pound_error:
@@ -72,7 +73,13 @@ bool Parser::isStartOfStmt() {
       
   case tok::identifier: {
     // "identifier ':' for/while/do/switch" is a label on a loop/switch.
-    if (!peekToken().is(tok::colon)) return false;
+    if (!peekToken().is(tok::colon)) {
+      // "yield" in the right context begins a yield statement.
+      if (isContextualYieldKeyword()) {
+        return true;
+      }
+      return false;
+    }
 
     // To disambiguate other cases of "identifier :", which might be part of a
     // question colon expression or something else, we look ahead to the second
@@ -396,7 +403,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       ParserStatus Status = parseExprOrStmt(Result);
       if (Status.hasCodeCompletion() && isCodeCompletionFirstPass()) {
         consumeTopLevelDecl(BeginParserPosition, TLCD);
-        auto Brace = BraceStmt::create(Context, StartLoc, {}, Tok.getLoc());
+        auto Brace = BraceStmt::create(Context, StartLoc, {}, PreviousLoc);
         TLCD->setBody(Brace);
         Entries.push_back(TLCD);
         return Status;
@@ -543,6 +550,12 @@ ParserResult<Stmt> Parser::parseStmt() {
 
   SourceLoc tryLoc;
   (void)consumeIf(tok::kw_try, tryLoc);
+
+  // Claim contextual statement keywords now that we've committed
+  // to parsing a statement.
+  if (isContextualYieldKeyword()) {
+    Tok.setKind(tok::kw_yield);
+  }
   
   switch (Tok.getKind()) {
   case tok::pound_line:
@@ -560,6 +573,9 @@ ParserResult<Stmt> Parser::parseStmt() {
   case tok::kw_return:
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
     return parseStmtReturn(tryLoc);
+  case tok::kw_yield:
+    if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
+    return parseStmtYield(tryLoc);
   case tok::kw_throw:
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
     return parseStmtThrow(tryLoc);
@@ -740,7 +756,7 @@ ParserResult<Stmt> Parser::parseStmtReturn(SourceLoc tryLoc) {
     }
 
     if (tryLoc.isValid()) {
-      diagnose(tryLoc, diag::try_on_return_throw, /*isThrow=*/false)
+      diagnose(tryLoc, diag::try_on_return_throw_yield, /*return=*/0)
         .fixItInsert(ExprLoc, "try ")
         .fixItRemoveChars(tryLoc, ReturnLoc);
 
@@ -758,6 +774,82 @@ ParserResult<Stmt> Parser::parseStmtReturn(SourceLoc tryLoc) {
     diagnose(tryLoc, diag::try_on_stmt, "return");
 
   return makeParserResult(new (Context) ReturnStmt(ReturnLoc, nullptr));
+}
+
+/// parseStmtYield
+///
+///   stmt-yield:
+///     'yield' expr
+///     'yield' '(' expr-list ')'
+///
+/// Note that a parenthesis always starts the second (list) grammar.
+ParserResult<Stmt> Parser::parseStmtYield(SourceLoc tryLoc) {
+  SyntaxContext->setCreateSyntax(SyntaxKind::YieldStmt);
+  SourceLoc yieldLoc = consumeToken(tok::kw_yield);
+
+  if (Tok.is(tok::code_complete)) {
+    auto cce = new (Context) CodeCompletionExpr(SourceRange(Tok.getLoc()));
+    auto result = makeParserResult(
+      YieldStmt::create(Context, yieldLoc, SourceLoc(), cce, SourceLoc()));
+    if (CodeCompletion) {
+      CodeCompletion->completeYieldStmt(cce, /*index=*/ None);
+    }
+    result.setHasCodeCompletion();
+    consumeToken();
+    return result;
+  }
+
+  ParserStatus status;
+  SourceLoc lpLoc, rpLoc;
+  SmallVector<Expr*, 4> yields;
+  if (Tok.is(tok::l_paren)) {
+    // If there was a 'try' on the yield, and there are multiple
+    // yielded values, suggest just removing the try instead of
+    // suggesting adding it to every yielded value.
+    if (tryLoc.isValid()) {
+      diagnose(tryLoc, diag::try_on_return_throw_yield, /*yield=*/2)
+        .fixItRemoveChars(tryLoc, yieldLoc);
+    }
+
+    SmallVector<Identifier, 4> yieldLabels;
+    SmallVector<SourceLoc, 4> yieldLabelLocs;
+    Expr *trailingClosure = nullptr;
+
+    status = parseExprList(tok::l_paren, tok::r_paren,
+                           /*postfix (allow trailing closure)*/ false,
+                           /*expr basic (irrelevant)*/ true,
+                           lpLoc,
+                           yields, yieldLabels, yieldLabelLocs,
+                           rpLoc,
+                           trailingClosure,
+                           SyntaxKind::YieldStmt);
+    assert(trailingClosure == nullptr);
+    assert(yieldLabels.empty());
+    assert(yieldLabelLocs.empty());
+  } else {
+    SourceLoc beginLoc = Tok.getLoc();
+
+    // There's a single yielded value, so suggest moving 'try' before it.
+    if (tryLoc.isValid()) {
+      diagnose(tryLoc, diag::try_on_return_throw_yield, /*yield=*/2)
+        .fixItInsert(beginLoc, "try ")
+        .fixItRemoveChars(tryLoc, yieldLoc);
+    }
+
+    auto expr = parseExpr(diag::expected_expr_yield);
+    if (expr.hasCodeCompletion())
+      return makeParserCodeCompletionResult<Stmt>();
+    if (expr.isParseError()) {
+      auto endLoc = (Tok.getLoc() == beginLoc ? beginLoc : PreviousLoc);
+      yields.push_back(
+        new (Context) ErrorExpr(SourceRange(beginLoc, endLoc)));
+    } else {
+      yields.push_back(expr.get());
+    }
+  }
+
+  return makeParserResult(
+           status, YieldStmt::create(Context, yieldLoc, lpLoc, yields, rpLoc));
 }
 
 /// parseStmtThrow
@@ -781,7 +873,7 @@ ParserResult<Stmt> Parser::parseStmtThrow(SourceLoc tryLoc) {
     Result = makeParserErrorResult(new (Context) ErrorExpr(throwLoc));
 
   if (tryLoc.isValid() && exprLoc.isValid()) {
-    diagnose(tryLoc, diag::try_on_return_throw, /*isThrow=*/true)
+    diagnose(tryLoc, diag::try_on_return_throw_yield, /*throw=*/1)
       .fixItInsert(exprLoc, "try ")
       .fixItRemoveChars(tryLoc, throwLoc);
 

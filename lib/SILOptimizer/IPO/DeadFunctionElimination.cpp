@@ -142,7 +142,8 @@ protected:
   /// Marks all contained functions and witness tables of a witness table as
   /// alive.
   void makeAlive(SILWitnessTable *WT) {
-    LLVM_DEBUG(llvm::dbgs() << "    scan witness table " << WT->getName() << '\n');
+    LLVM_DEBUG(llvm::dbgs() << "    scan witness table " << WT->getName()
+                            << '\n');
 
     AliveFunctionsAndTables.insert(WT);
     for (const SILWitnessTable::Entry &entry : WT->getEntries()) {
@@ -260,7 +261,7 @@ protected:
         return true;
       if (!Derived->hasSuperclass())
         break;
-      Derived = Derived->getSuperclass()->getClassOrBoundGenericClass();
+      Derived = Derived->getSuperclassDecl();
     }
     return false;
   }
@@ -414,12 +415,13 @@ protected:
 
     for (SILFunction &F : *Module) {
       if (isAnchorFunction(&F)) {
-        LLVM_DEBUG(llvm::dbgs() << "  anchor function: " << F.getName() << "\n");
+        LLVM_DEBUG(llvm::dbgs() << "  anchor function: " << F.getName() <<"\n");
         ensureAlive(&F);
       }
 
       if (!F.shouldOptimize()) {
-        LLVM_DEBUG(llvm::dbgs() << "  anchor a no optimization function: " << F.getName() << "\n");
+        LLVM_DEBUG(llvm::dbgs() << "  anchor a no optimization function: "
+                                << F.getName() << "\n");
         ensureAlive(&F);
       }
     }
@@ -615,8 +617,8 @@ class DeadFunctionElimination : FunctionLivenessComputation {
       vTable.removeEntries_if([this, &changedTable]
                               (SILVTable::Entry &entry) -> bool {
         if (!isAlive(entry.Implementation)) {
-          LLVM_DEBUG(llvm::dbgs() << "  erase dead vtable method " <<
-                entry.Implementation->getName() << "\n");
+          LLVM_DEBUG(llvm::dbgs() << "  erase dead vtable method "
+                                  << entry.Implementation->getName() << "\n");
           changedTable = true;
           return true;
         }
@@ -631,8 +633,8 @@ class DeadFunctionElimination : FunctionLivenessComputation {
       WT->clearMethods_if([this, &changedTable]
                           (const SILWitnessTable::MethodWitness &MW) -> bool {
         if (!isAlive(MW.Witness)) {
-          LLVM_DEBUG(llvm::dbgs() << "  erase dead witness method " <<
-                MW.Witness->getName() << "\n");
+          LLVM_DEBUG(llvm::dbgs() << "  erase dead witness method "
+                                  << MW.Witness->getName() << "\n");
           changedTable = true;
           return true;
         }
@@ -651,7 +653,7 @@ class DeadFunctionElimination : FunctionLivenessComputation {
           return false;
         if (!isAlive(MW)) {
           LLVM_DEBUG(llvm::dbgs() << "  erase dead default witness method "
-                             << MW->getName() << "\n");
+                                  << MW->getName() << "\n");
           changedTable = true;
           return true;
         }
@@ -689,8 +691,8 @@ public:
       SILWitnessTable *Wt = &*Iter;
       Iter++;
       if (!isAlive(Wt)) {
-        LLVM_DEBUG(llvm::dbgs() << "  erase dead witness table " << Wt->getName()
-                           << '\n');
+        LLVM_DEBUG(llvm::dbgs() << "  erase dead witness table "
+                                << Wt->getName() << '\n');
         Module->deleteWitnessTable(Wt);
       }
     }
@@ -700,7 +702,8 @@ public:
       SILFunction *F = DeadFunctions.back();
       DeadFunctions.pop_back();
 
-      LLVM_DEBUG(llvm::dbgs() << "  erase dead function " << F->getName() << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "  erase dead function " << F->getName()
+                              << "\n");
       NumDeadFunc++;
       DFEPass->notifyWillDeleteFunction(F);
       Module->eraseFunction(F);

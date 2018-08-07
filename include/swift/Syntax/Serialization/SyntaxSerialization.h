@@ -18,11 +18,12 @@
 #ifndef SWIFT_SYNTAX_SERIALIZATION_SYNTAXSERIALIZATION_H
 #define SWIFT_SYNTAX_SERIALIZATION_SYNTAXSERIALIZATION_H
 
-#include "swift/Syntax/RawSyntax.h"
 #include "swift/Basic/JSONSerialization.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Syntax/RawSyntax.h"
 #include "llvm/ADT/StringSwitch.h"
 #include <forward_list>
+#include <unordered_set>
 
 namespace swift {
 namespace json {
@@ -31,22 +32,45 @@ namespace json {
 /// will not be included in the serialized JSON.
 static void *DontSerializeNodeIdsUserInfoKey = &DontSerializeNodeIdsUserInfoKey;
 
+/// The user info key pointing to a std::unordered_set of IDs of nodes that
+/// shall be omitted when the tree gets serialized
+static void *OmitNodesUserInfoKey = &OmitNodesUserInfoKey;
+
 /// Serialization traits for SourcePresence.
 template <>
-struct ScalarEnumerationTraits<syntax::SourcePresence> {
-  static void enumeration(json::Output &out, syntax::SourcePresence &value) {
-    out.enumCase(value, "Present", syntax::SourcePresence::Present);
-    out.enumCase(value, "Missing", syntax::SourcePresence::Missing);
+struct ScalarReferenceTraits<syntax::SourcePresence> {
+  static StringRef stringRef(const syntax::SourcePresence &value) {
+    switch (value) {
+    case syntax::SourcePresence::Present:
+      return "\"Present\"";
+    case syntax::SourcePresence::Missing:
+      return "\"Missing\"";
+    }
+  }
+
+  static bool mustQuote(StringRef) {
+    // The string is already quoted. This is more efficient since it does not
+    // check for characters that need to be escaped
+    return false;
   }
 };
 
 /// Serialization traits for swift::tok.
 template <>
-struct ScalarEnumerationTraits<tok> {
-  static void enumeration(Output &out, tok &value) {
+struct ScalarReferenceTraits<tok> {
+  static StringRef stringRef(const tok &value) {
+    switch (value) {
 #define TOKEN(name) \
-    out.enumCase(value, #name, tok::name);
+    case tok::name: return "\"" #name "\"";
 #include "swift/Syntax/TokenKinds.def"
+    default: llvm_unreachable("Unknown token kind");
+    }
+  }
+
+  static bool mustQuote(StringRef) {
+    // The string is already quoted. This is more efficient since it does not
+    // check for characters that need to be escaped
+    return false;
   }
 };
 
@@ -125,6 +149,22 @@ struct ObjectTraits<TokenDescription> {
 template<>
 struct ObjectTraits<syntax::RawSyntax> {
   static void mapping(Output &out, syntax::RawSyntax &value) {
+    bool dontSerializeIds =
+        (bool)out.getUserInfo()[DontSerializeNodeIdsUserInfoKey];
+    if (!dontSerializeIds) {
+      auto nodeId = value.getId();
+      out.mapRequired("id", nodeId);
+    }
+
+    auto omitNodes =
+        (std::unordered_set<unsigned> *)out.getUserInfo()[OmitNodesUserInfoKey];
+
+    if (omitNodes && omitNodes->count(value.getId()) > 0) {
+      bool omitted = true;
+      out.mapRequired("omitted", omitted);
+      return;
+    }
+
     if (value.isToken()) {
       auto tokenKind = value.getTokenKind();
       auto text = value.getTokenText();
@@ -145,12 +185,6 @@ struct ObjectTraits<syntax::RawSyntax> {
     }
     auto presence = value.getPresence();
     out.mapRequired("presence", presence);
-
-    bool omitNodeId = (bool)out.getUserInfo()[DontSerializeNodeIdsUserInfoKey];
-    if (!omitNodeId) {
-      auto nodeId = value.getId();
-      out.mapRequired("id", nodeId);
-    }
   }
 };
 

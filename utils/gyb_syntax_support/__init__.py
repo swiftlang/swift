@@ -1,6 +1,7 @@
 import textwrap
 from AttributeNodes import ATTRIBUTE_NODES
 from AvailabilityNodes import AVAILABILITY_NODES
+import Classification
 from CommonNodes import COMMON_NODES  # noqa: I201
 from DeclNodes import DECL_NODES  # noqa: I201
 from ExprNodes import EXPR_NODES  # noqa: I201
@@ -17,6 +18,7 @@ SYNTAX_NODES = COMMON_NODES + EXPR_NODES + DECL_NODES + ATTRIBUTE_NODES + \
     AVAILABILITY_NODES
 SYNTAX_TOKENS = Token.SYNTAX_TOKENS
 SYNTAX_TOKEN_MAP = Token.SYNTAX_TOKEN_MAP
+SYNTAX_CLASSIFICATIONS = Classification.SYNTAX_CLASSIFICATIONS
 
 
 def make_missing_child(child):
@@ -77,11 +79,11 @@ def make_missing_swift_child(child):
         tok_kind = token.swift_kind() if token else "unknown"
         if not token or not token.text:
             tok_kind += '("")'
-        return 'RawSyntax.missingToken(.%s)' % tok_kind
+        return 'RawSyntax.missingToken(TokenKind.%s)' % tok_kind
     else:
         missing_kind = "unknown" if child.syntax_kind == "Syntax" \
                        else child.swift_syntax_kind
-        return 'RawSyntax.missing(.%s)' % missing_kind
+        return 'RawSyntax.missing(SyntaxKind.%s)' % missing_kind
 
 
 def create_node_map():

@@ -93,10 +93,10 @@ let testCharacters = [
 ]
 
 func randomGraphemeCluster(_ minSize: Int, _ maxSize: Int) -> String {
-  let n = pickRandom((minSize + 1)..<maxSize)
-  var result = String(pickRandom(baseScalars))
+  let n = Int.random(in: (minSize + 1) ..< maxSize)
+  var result = String(baseScalars.randomElement()!)
   for _ in 0..<n {
-    result += String(pickRandom(continuingScalars))
+    result += String(continuingScalars.randomElement()!)
   }
   return result
 }
@@ -231,12 +231,7 @@ func checkRoundTripThroughCharacter(_ s: String) {
 }
 
 func isSmallRepresentation(_ s: String) -> Bool {
-  switch Character(s)._representation {
-    case .smallUTF16:
-      return true
-    default:
-      return false
-  }
+  return Character(s)._isSmall
 }
 
 func checkUnicodeScalars(_ s: String) {
@@ -256,8 +251,9 @@ func checkUnicodeScalars(_ s: String) {
 }
 
 func checkRepresentation(_ s: String) {
+  let utf16 = Array(s.utf16)
   let expectSmall
-    = s.utf16.count < 4 || s.utf16.count == 4 && s._guts[3] < 0x8000
+    = utf16.count < 4 || utf16.count == 4 && utf16[3] < 0x8000
   let isSmall = isSmallRepresentation(s)
 
   let expectedSize = expectSmall ? "small" : "large"

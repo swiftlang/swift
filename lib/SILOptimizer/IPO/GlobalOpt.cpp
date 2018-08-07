@@ -11,9 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "globalopt"
+#include "swift/AST/ASTMangler.h"
 #include "swift/Demangling/Demangle.h"
+#include "swift/Demangling/Demangler.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/ColdBlockInfo.h"
@@ -21,13 +25,10 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Local.h"
-#include "swift/Demangling/Demangler.h"
-#include "swift/Demangling/ManglingMacros.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SCCIterator.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
-#include "swift/AST/ASTMangler.h"
 
 using namespace swift;
 
@@ -49,6 +50,7 @@ namespace {
 /// - When the addressor is local to the module, be sure it is inlined to allow
 ///   constant propagation in case of statically initialized "lets".
 class SILGlobalOpt {
+  SILOptFunctionBuilder &FunctionBuilder;
   SILModule *Module;
   DominanceAnalysis *DA;
   bool HasChanged = false;
@@ -94,8 +96,8 @@ class SILGlobalOpt {
   /// function.
   llvm::DenseMap<SILFunction *, unsigned> InitializerCount;
 public:
-  SILGlobalOpt(SILModule *M, DominanceAnalysis *DA)
-      : Module(M), DA(DA) {}
+  SILGlobalOpt(SILOptFunctionBuilder &FunctionBuilder, SILModule *M, DominanceAnalysis *DA)
+      : FunctionBuilder(FunctionBuilder), Module(M), DA(DA) {}
 
   bool run();
 
@@ -241,7 +243,8 @@ static std::string mangleGetter(VarDecl *varDecl) {
   return Mangler.mangleGlobalGetterEntity(varDecl);
 }
 
-static SILFunction *getGlobalGetterFunction(SILModule &M,
+static SILFunction *getGlobalGetterFunction(SILOptFunctionBuilder &FunctionBuilder,
+                                            SILModule &M,
                                             SILLocation loc,
                                             VarDecl *varDecl) {
   auto getterName = mangleGetter(varDecl);
@@ -270,15 +273,15 @@ static SILFunction *getGlobalGetterFunction(SILModule &M,
                          ParameterConvention::Direct_Unowned,
                          /*params*/ {}, /*yields*/ {}, Results, None,
                          M.getASTContext());
-
-  return M.getOrCreateFunction(
-      loc, getterName, Linkage, LoweredType,
-      IsBare, IsNotTransparent, Serialized);
+  return FunctionBuilder.getOrCreateFunction(loc, getterName, Linkage,
+                                             LoweredType, IsBare,
+                                             IsNotTransparent, Serialized);
 }
 
 /// Generate getter from the initialization code whose result is stored by a
 /// given store instruction.
-static SILFunction *genGetterFromInit(StoreInst *Store,
+static SILFunction *genGetterFromInit(SILOptFunctionBuilder &FunctionBuilder,
+                                      StoreInst *Store,
                                       SILGlobalVariable *SILG) {
   auto *varDecl = SILG->getDecl();
 
@@ -296,7 +299,8 @@ static SILFunction *genGetterFromInit(StoreInst *Store,
   // Produce a correct order of instructions.
   std::reverse(Insts.begin(), Insts.end());
 
-  auto *GetterF = getGlobalGetterFunction(Store->getModule(),
+  auto *GetterF = getGlobalGetterFunction(FunctionBuilder,
+                                          Store->getModule(),
                                           Store->getLoc(),
                                           varDecl);
 
@@ -482,8 +486,8 @@ ApplyInst *SILGlobalOpt::getHoistedApplyForInitializer(
 void SILGlobalOpt::placeInitializers(SILFunction *InitF,
                                      ArrayRef<ApplyInst *> Calls) {
   LLVM_DEBUG(llvm::dbgs() << "GlobalOpt: calls to "
-        << Demangle::demangleSymbolAsString(InitF->getName())
-        << " : " << Calls.size() << "\n");
+             << Demangle::demangleSymbolAsString(InitF->getName())
+             << " : " << Calls.size() << "\n");
   // Map each initializer-containing function to its final initializer call.
   llvm::DenseMap<SILFunction *, ApplyInst *> ParentFuncs;
   for (auto *AI : Calls) {
@@ -507,8 +511,9 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
     while (Node) {
       SILBasicBlock *DomParentBB = Node->getBlock();
       if (isAvailabilityCheck(DomParentBB)) {
-        LLVM_DEBUG(llvm::dbgs() << "  don't hoist above availability check at bb"
-                           << DomParentBB->getDebugID() << "\n");
+        LLVM_DEBUG(llvm::dbgs() << "  don't hoist above availability check "
+                                   "at bb"
+                                << DomParentBB->getDebugID() << "\n");
         break;
       }
       BB = DomParentBB;
@@ -520,8 +525,8 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
     if (BB == HoistAI->getParent()) {
       // BB is either unreachable or not in a loop.
       LLVM_DEBUG(llvm::dbgs() << "  skipping (not in a loop): " << *HoistAI
-                         << "  in " << HoistAI->getFunction()->getName()
-                         << "\n");
+                              << "  in " << HoistAI->getFunction()->getName()
+                              << "\n");
       continue;
     }
 
@@ -534,10 +539,12 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
 }
 
 /// Create a getter function from the initializer function.
-static SILFunction *genGetterFromInit(SILFunction *InitF, VarDecl *varDecl) {
+static SILFunction *genGetterFromInit(SILOptFunctionBuilder &FunctionBuilder,
+                                      SILFunction *InitF, VarDecl *varDecl) {
   // Generate a getter from the global init function without side-effects.
 
-  auto *GetterF = getGlobalGetterFunction(InitF->getModule(),
+  auto *GetterF = getGlobalGetterFunction(FunctionBuilder,
+                                          InitF->getModule(),
                                           InitF->getLocation(),
                                           varDecl);
   if (!InitF->hasQualifiedOwnership())
@@ -654,7 +661,7 @@ replaceLoadsByKnownValue(BuiltinInst *CallToOnce, SILFunction *AddrF,
   }
 
   // Generate a getter from InitF which returns the value of the global.
-  auto *GetterF = genGetterFromInit(InitF, SILG->getDecl());
+  auto *GetterF = genGetterFromInit(FunctionBuilder, InitF, SILG->getDecl());
 
   // Replace all calls of an addressor by calls of a getter .
   for (int i = 0, e = Calls.size(); i < e; ++i) {
@@ -723,8 +730,8 @@ void SILGlobalOpt::optimizeInitializer(SILFunction *AddrF,
   if (!SILG)
     return;
 
-  LLVM_DEBUG(llvm::dbgs() << "GlobalOpt: use static initializer for " <<
-        SILG->getName() << '\n');
+  LLVM_DEBUG(llvm::dbgs() << "GlobalOpt: use static initializer for "
+                          << SILG->getName() << '\n');
 
   // Remove "once" call from the addressor.
   if (!isAssignedOnlyOnceInInitializer(SILG) || !SILG->getDecl()) {
@@ -846,8 +853,8 @@ void SILGlobalOpt::collectGlobalAccess(GlobalAddrInst *GAI) {
 // that returns the value of this variable.
 void SILGlobalOpt::optimizeGlobalAccess(SILGlobalVariable *SILG,
                                         StoreInst *SI) {
-  LLVM_DEBUG(llvm::dbgs() << "GlobalOpt: use static initializer for " <<
-        SILG->getName() << '\n');
+  LLVM_DEBUG(llvm::dbgs() << "GlobalOpt: use static initializer for "
+                          << SILG->getName() << '\n');
 
   if (GlobalVarSkipProcessing.count(SILG))
     return;
@@ -861,7 +868,7 @@ void SILGlobalOpt::optimizeGlobalAccess(SILGlobalVariable *SILG,
     return;
 
   // Generate a getter only if there are any loads from this variable.
-  SILFunction *GetterF = genGetterFromInit(SI, SILG);
+  SILFunction *GetterF = genGetterFromInit(FunctionBuilder, SI, SILG);
   if (!GetterF)
     return;
 
@@ -938,7 +945,8 @@ namespace {
 class SILGlobalOptPass : public SILModuleTransform {
   void run() override {
     auto *DA = PM->getAnalysis<DominanceAnalysis>();
-    if (SILGlobalOpt(getModule(), DA).run()) {
+    SILOptFunctionBuilder FunctionBuilder(*getPassManager());
+    if (SILGlobalOpt(FunctionBuilder, getModule(), DA).run()) {
       invalidateAll();
     }
   }

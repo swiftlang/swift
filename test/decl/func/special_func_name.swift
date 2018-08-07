@@ -26,6 +26,14 @@ struct S22 : P2 {
   init(_: Int) {}
 }
 
+struct S3 {
+  static func `init`() {}
+
+  init(x: Int) { // expected-note {{'init(x:)' declared here}}
+    self.init() // expected-error {{missing argument for parameter 'x' in call}}
+  }
+}
+
 _ = S11(0) // expected-error {{argument passed to call that takes no arguments}}
 _ = S11.init(0) // expected-error {{argument passed to call that takes no arguments}}
 _ = S11.`init`(0)

@@ -11,12 +11,6 @@
 // RUN: %line-directive %t/main.swift -- %target-run %t/Dictionary
 // REQUIRES: executable_test
 
-#if os(OSX) || os(iOS) || os(tvOS) || os(watchOS)
-import Darwin
-#else
-import Glibc
-#endif
-
 import StdlibUnittest
 import StdlibCollectionUnittest
 
@@ -1485,48 +1479,26 @@ DictionaryTestSuite.test("deleteChainCollision2") {
   assert(d[k6_0]!.value == 1060)
 }
 
-func uniformRandom(_ max: Int) -> Int {
-#if os(Linux)
-  // SR-685: Can't use arc4random on Linux
-  return Int(random() % (max + 1))
-#else
-  return Int(arc4random_uniform(UInt32(max)))
-#endif
-}
-
-func pickRandom<T>(_ a: [T]) -> T {
-  return a[uniformRandom(a.count)]
-}
-
-func product<C1 : Collection, C2 : Collection>(
-  _ c1: C1, _ c2: C2
-) -> [(C1.Iterator.Element, C2.Iterator.Element)] {
-  var result: [(C1.Iterator.Element, C2.Iterator.Element)] = []
-  for e1 in c1 {
-    for e2 in c2 {
-      result.append((e1, e2))
-    }
-  }
-  return result
-}
-
-DictionaryTestSuite.test("deleteChainCollisionRandomized")
-  .forEach(in: product(1...8, 0...5)) {
-  (collisionChains, chainOverlap) in
+DictionaryTestSuite.test("deleteChainCollisionRandomized") {
+  let seed = UInt64.random(in: .min ... .max)
+  var generator = LinearCongruentialGenerator(seed: seed)
+  print("using LinearCongruentialGenerator(seed: \(seed))")
 
   func check(_ d: Dictionary<TestKeyTy, TestValueTy>) {
     let keys = Array(d.keys)
     for i in 0..<keys.count {
       for j in 0..<i {
-        assert(keys[i] != keys[j])
+        expectNotEqual(keys[i], keys[j])
       }
     }
 
     for k in keys {
-      assert(d[k] != nil)
+      expectNotNil(d[k])
     }
   }
 
+  let collisionChains = Int.random(in: 1...8, using: &generator)
+  let chainOverlap = Int.random(in: 0...5, using: &generator)
   let chainLength = 7
 
   var knownKeys: [TestKeyTy] = []
@@ -1536,7 +1508,7 @@ DictionaryTestSuite.test("deleteChainCollisionRandomized")
         return k
       }
     }
-    let hashValue = uniformRandom(chainLength - chainOverlap) * collisionChains
+    let hashValue = Int.random(in: 0 ..< (chainLength - chainOverlap), using: &generator) * collisionChains
     let k = TestKeyTy(value: value, hashValue: hashValue)
     knownKeys += [k]
     return k
@@ -1544,8 +1516,8 @@ DictionaryTestSuite.test("deleteChainCollisionRandomized")
 
   var d = Dictionary<TestKeyTy, TestValueTy>(minimumCapacity: 30)
   for _ in 1..<300 {
-    let key = getKey(uniformRandom(collisionChains * chainLength))
-    if uniformRandom(chainLength * 2) == 0 {
+    let key = getKey(Int.random(in: 0 ..< (collisionChains * chainLength), using: &generator))
+    if Int.random(in: 0 ..< (chainLength * 2), using: &generator) == 0 {
       d[key] = nil
     } else {
       d[key] = TestValueTy(key.value * 10)
@@ -3429,6 +3401,12 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.getObjects:andKeys:count:") {
   }
 }
 
+DictionaryTestSuite.test("BridgedToObjC.Verbatim.getObjects:andKeys:count:/InvalidCount") {
+  expectCrashLater()
+  let d = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
+  checkGetObjectsAndKeys(d, count: -1)
+}
+
 //===---
 // Dictionary -> NSDictionary bridging tests.
 //
@@ -3532,6 +3510,12 @@ DictionaryTestSuite.test("BridgedToObjC.Custom.getObjects:andKeys:count:") {
   for count in 0 ..< d.count + 2 {
     checkGetObjectsAndKeys(d, count: count)
   }
+}
+
+DictionaryTestSuite.test("BridgedToObjC.Custom.getObjects:andKeys:count:/InvalidCount") {
+  expectCrashLater()
+  let d = getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged()
+  checkGetObjectsAndKeys(d, count: -1)
 }
 
 func getBridgedNSDictionaryOfKey_ValueTypeCustomBridged() -> NSDictionary {
@@ -4749,6 +4733,22 @@ DictionaryTestSuite.test("Hashable") {
 }
 
 DictionaryTestSuite.setUp {
+#if _runtime(_ObjC)
+  // Exercise ARC's autoreleased return value optimization in Foundation.
+  //
+  // On some platforms, when a new process is started, the optimization is
+  // expected to fail the first time it is used in each linked
+  // dylib. StdlibUnittest takes care of warming up ARC for the stdlib
+  // (libswiftCore.dylib), but for this particular test we also need to do it
+  // for Foundation, or there will be spurious leaks reported for tests
+  // immediately following a crash test.
+  //
+  // <rdar://problem/42069800> stdlib tests: expectCrashLater() interferes with
+  // counting autoreleased live objects
+  let d = NSDictionary(objects: [1 as NSNumber], forKeys: [1 as NSNumber])
+  _ = d.object(forKey: 1 as NSNumber)
+#endif
+
   resetLeaksOfDictionaryKeysValues()
 #if _runtime(_ObjC)
   resetLeaksOfObjCDictionaryKeysValues()

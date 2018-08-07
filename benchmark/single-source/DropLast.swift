@@ -27,7 +27,7 @@ public let DropLast = [
   BenchmarkInfo(
     name: "DropLastCountableRange",
     runFunction: run_DropLastCountableRange,
-    tags: [.validation, .api]),
+    tags: [.validation, .api, .unstable]),
   BenchmarkInfo(
     name: "DropLastSequence",
     runFunction: run_DropLastSequence,
@@ -55,7 +55,7 @@ public let DropLast = [
   BenchmarkInfo(
     name: "DropLastCountableRangeLazy",
     runFunction: run_DropLastCountableRangeLazy,
-    tags: [.validation, .api]),
+    tags: [.validation, .api, .unstable]),
   BenchmarkInfo(
     name: "DropLastSequenceLazy",
     runFunction: run_DropLastSequenceLazy,

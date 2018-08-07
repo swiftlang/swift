@@ -62,7 +62,7 @@ func nthUnicodeScalar(_ n: UInt32) -> UnicodeScalar {
       return UnicodeScalar(r.upperBound - (count - n))!
     }
   }
-  _preconditionFailure("Index out of range")
+  preconditionFailure("Index out of range")
 }
 
 // `buffer` should have a length >= 4
@@ -73,7 +73,7 @@ func nsEncode<CodeUnit>(
   _ used: inout Int
 ) {
   var c = c
-  _precondition(buffer.count >= 4, "buffer is not large enough")
+  precondition(buffer.count >= 4, "buffer is not large enough")
 
   let s = NSString(
     bytes: &c,

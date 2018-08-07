@@ -4,7 +4,7 @@ import Builtin
 
 // fold_sadd_with_overflow_Overflow
 sil @fold_sadd_with_overflow_Overflow : $@convention(thin) (Builtin.RawPointer) -> Builtin.Int64 {
-bb0(%0 : $Builtin.RawPointer):
+bb0(%0 : @trivial $Builtin.RawPointer):
   %2 = integer_literal $Builtin.Int64, 9223372036854775807
   %3 = integer_literal $Builtin.Int64, 9223372036854775807
   %21 = integer_literal $Builtin.Int1, 1

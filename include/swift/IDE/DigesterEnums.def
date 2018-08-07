@@ -10,10 +10,6 @@
 #define NODE_ANNOTATION_CHANGE_KIND(NAME) NODE_ANNOTATION(NAME)
 #endif
 
-#ifndef DECL_ATTR
-#define DECL_ATTR(NAME)
-#endif
-
 #ifndef KEY
 #define KEY(NAME)
 #endif
@@ -96,9 +92,6 @@ NODE_ANNOTATION_CHANGE_KIND(Rename)
 // Keep type rewritten the last one.
 NODE_ANNOTATION_CHANGE_KIND(TypeRewritten)
 
-DECL_ATTR(deprecated)
-DECL_ATTR(fixedLayout)
-
 KEY(kind)
 KEY(name)
 KEY(selfIndex)
@@ -110,6 +103,7 @@ KEY(moduleName)
 KEY(throwing)
 KEY(mutating)
 KEY(static)
+KEY(deprecated)
 KEY(typeAttributes)
 KEY(declAttributes)
 KEY(declKind)
@@ -183,7 +177,6 @@ SPECIAL_CASE_ID(UIApplicationMain)
 #undef KNOWN_TYPE
 #undef KNOWN_PROTOCOL
 #undef KEY
-#undef DECL_ATTR
 #undef NODE_ANNOTATION_CHANGE_KIND
 #undef NODE_ANNOTATION
 #undef NODE_KIND

@@ -131,8 +131,10 @@ public:
     TypeParameterRequirement,
     /// \brief Locator for a binding from an IUO disjunction choice.
     ImplicitlyUnwrappedDisjunctionChoice,
-    /// \brief A result of an expressoin involving dynamic lookup.
+    /// \brief A result of an expression involving dynamic lookup.
     DynamicLookupResult,
+    /// \brief The desired contextual type passed in to the constraint system.
+    ContextualType,
   };
 
   /// \brief Determine the number of numeric values used for the given path
@@ -167,6 +169,7 @@ public:
     case OpenedGeneric:
     case ImplicitlyUnwrappedDisjunctionChoice:
     case DynamicLookupResult:
+    case ContextualType:
       return 0;
 
     case GenericArgument:
@@ -231,6 +234,7 @@ public:
     case TypeParameterRequirement:
     case ImplicitlyUnwrappedDisjunctionChoice:
     case DynamicLookupResult:
+    case ContextualType:
       return 0;
 
     case FunctionArgument:

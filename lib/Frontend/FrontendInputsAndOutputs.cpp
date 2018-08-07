@@ -13,6 +13,7 @@
 #include "swift/Frontend/FrontendInputsAndOutputs.h"
 
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/Basic/FileTypes.h"
 #include "swift/Basic/PrimarySpecificPaths.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Option/Options.h"
@@ -155,9 +156,14 @@ unsigned FrontendInputsAndOutputs::numberOfPrimaryInputsEndingWith(
 
 bool FrontendInputsAndOutputs::shouldTreatAsLLVM() const {
   if (hasSingleInput()) {
-    StringRef Input(getFilenameOfFirstInput());
-    return llvm::sys::path::extension(Input).endswith(LLVM_BC_EXTENSION) ||
-           llvm::sys::path::extension(Input).endswith(LLVM_IR_EXTENSION);
+    StringRef InputExt = llvm::sys::path::extension(getFilenameOfFirstInput());
+    switch (file_types::lookupTypeForExtension(InputExt)) {
+    case file_types::TY_LLVM_BC:
+    case file_types::TY_LLVM_IR:
+      return true;
+    default:
+      return false;
+    }
   }
   return false;
 }
@@ -166,12 +172,13 @@ bool FrontendInputsAndOutputs::shouldTreatAsSIL() const {
   if (hasSingleInput()) {
     // If we have exactly one input filename, and its extension is "sil",
     // treat the input as SIL.
-    const std::string &Input(getFilenameOfFirstInput());
-    return llvm::sys::path::extension(Input).endswith(SIL_EXTENSION);
+    StringRef extension = llvm::sys::path::extension(getFilenameOfFirstInput());
+    return file_types::lookupTypeForExtension(extension) == file_types::TY_SIL;
   }
   // If we have one primary input and it's a filename with extension "sil",
   // treat the input as SIL.
-  unsigned silPrimaryCount = numberOfPrimaryInputsEndingWith(SIL_EXTENSION);
+  const unsigned silPrimaryCount = numberOfPrimaryInputsEndingWith(
+      file_types::getExtension(file_types::TY_SIL));
   if (silPrimaryCount == 0)
     return false;
   if (silPrimaryCount == primaryInputCount()) {
@@ -186,7 +193,8 @@ bool FrontendInputsAndOutputs::areAllNonPrimariesSIB() const {
   for (const InputFile &input : AllInputs) {
     if (input.isPrimary())
       continue;
-    if (!llvm::sys::path::extension(input.file()).endswith(SIB_EXTENSION)) {
+    StringRef extension = llvm::sys::path::extension(input.file());
+    if (file_types::lookupTypeForExtension(extension) != file_types::TY_SIB) {
       return false;
     }
   }
@@ -416,6 +424,12 @@ bool FrontendInputsAndOutputs::hasModuleDocOutputPath() const {
   return hasSupplementaryOutputPath(
       [](const SupplementaryOutputPaths &outs) -> const std::string & {
         return outs.ModuleDocOutputPath;
+      });
+}
+bool FrontendInputsAndOutputs::hasModuleInterfaceOutputPath() const {
+  return hasSupplementaryOutputPath(
+      [](const SupplementaryOutputPaths &outs) -> const std::string & {
+        return outs.ModuleInterfaceOutputPath;
       });
 }
 bool FrontendInputsAndOutputs::hasTBDPath() const {

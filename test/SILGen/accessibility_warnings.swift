@@ -105,7 +105,7 @@ internal struct PrivateSettersForReadOnlyInternal : PublicReadOnlyOperations {
   // CHECK-DAG: sil hidden{{( \[.+\])*}} @$S22accessibility_warnings33PrivateSettersForReadOnlyInternalV4sizeSivg
   public private(set) var size = 0
   // CHECK-DAG: sil hidden @$S22accessibility_warnings33PrivateSettersForReadOnlyInternalVyS2icig
-  // CHECK-DAG: sil private @$S22accessibility_warnings33PrivateSettersForReadOnlyInternalVyS2icis
+  // CHECK-DAG: sil hidden @$S22accessibility_warnings33PrivateSettersForReadOnlyInternalVyS2icis
   internal private(set) subscript (_: Int) -> Int { // no-warning
     get { return 42 }
     set {}

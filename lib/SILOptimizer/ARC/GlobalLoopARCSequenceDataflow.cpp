@@ -96,7 +96,8 @@ bool LoopARCSequenceDataflowEvaluator::processLoopTopDown(const LoopRegion *R) {
     auto &SubregionData = getARCState(Subregion);
 
     // This will always succeed since we have an entry for each BB in our RPOT.
-    LLVM_DEBUG(llvm::dbgs() << "Processing Subregion#: " << SubregionIndex << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Processing Subregion#: " << SubregionIndex
+                            << "\n");
 
     // Ignore blocks that allow leaks.
     if (SubregionData.allowsLeaks()) {
@@ -159,7 +160,8 @@ void LoopARCSequenceDataflowEvaluator::mergeSuccessors(const LoopRegion *Region,
     auto *SuccRegion = LRFI->getRegionForNonLocalSuccessor(Region, SuccID);
     auto &SuccState = getARCState(SuccRegion);
 
-    LLVM_DEBUG(llvm::dbgs() << "    Merging Non Local Succs: " << SuccID << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "    Merging Non Local Succs: " << SuccID
+                            << "\n");
 
     // Check if this block is post dominated by ARC unreachable
     // blocks. Otherwise we clear all state.
@@ -210,7 +212,8 @@ bool LoopARCSequenceDataflowEvaluator::processLoopBottomUp(
 
     // This will always succeed since we have an entry for each BB in our post
     // order.
-    LLVM_DEBUG(llvm::dbgs() << "Processing Subregion#: " << SubregionIndex << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Processing Subregion#: " << SubregionIndex
+                            << "\n");
 
     LLVM_DEBUG(llvm::dbgs() << "Merging Successors!\n");
     mergeSuccessors(Subregion, SubregionData);
@@ -229,7 +232,8 @@ bool LoopARCSequenceDataflowEvaluator::processLoopBottomUp(
 
     // This will always succeed since we have an entry for each BB in our post
     // order.
-    LLVM_DEBUG(llvm::dbgs() << "Processing Subregion#: " << SubregionIndex << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Processing Subregion#: " << SubregionIndex
+                            << "\n");
 
     LLVM_DEBUG(llvm::dbgs() << "Merging Successors!\n");
     mergeSuccessors(Subregion, SubregionData);

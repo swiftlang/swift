@@ -21,16 +21,22 @@ func expectSmall(_ str: String,
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
  ) {
-  expectTrue(str._guts._isSmall,
-    stackTrace: stackTrace, showFrame: showFrame, file: file, line: line)
+  switch str._classify()._form {
+    case ._small: return
+    default: expectationFailure("expected: small", trace: "",
+      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+  }
 }
 func expectCocoa(_ str: String,
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
  ) {
-  expectTrue(str._guts._isCocoa,
-    stackTrace: stackTrace, showFrame: showFrame, file: file, line: line)
+  switch str._classify()._form {
+    case ._cocoa: return
+    default: expectationFailure("expected: cocoa", trace: "",
+      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+  }
 }
 
 StringBridgeTests.test("Tagged NSString") {

@@ -18,7 +18,12 @@ import Foundation
 @available(iOS 10.0, *)
 extension INSetProfileInCarIntent {
 
-    @available(iOS 11.0, *)
+    @available(iOS 12.0, *)
+    public convenience init(profileNumber: Int? = nil, profileName: String? = nil, isDefaultProfile: Bool? = nil, carName: INSpeakableString? = nil) {
+        self.init(__profileNumber: profileNumber.map { NSNumber(value: $0) }, profileName: profileName, defaultProfile: isDefaultProfile.map { NSNumber(value: $0) }, carName: carName)
+    }
+
+    @available(iOS, introduced: 11.0, obsoleted: 12.0)
     public convenience init(profileNumber: Int? = nil, profileName: String? = nil, isDefaultProfile: Bool? = nil) {
         self.init(__profileNumber: profileNumber.map { NSNumber(value: $0) }, profileName: profileName, defaultProfile: isDefaultProfile.map { NSNumber(value: $0) })
     }

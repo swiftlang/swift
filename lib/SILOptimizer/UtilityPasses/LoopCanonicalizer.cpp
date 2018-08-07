@@ -33,8 +33,8 @@ class LoopCanonicalizer : public SILFunctionTransform {
   void run() override {
     SILFunction *F = getFunction();
 
-    LLVM_DEBUG(llvm::dbgs() << "Attempt to canonicalize loops in " << F->getName()
-                       << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Attempt to canonicalize loops in "
+                            << F->getName() << "\n");
 
     auto *LA = PM->getAnalysis<SILLoopAnalysis>();
     auto *LI = LA->get(F);

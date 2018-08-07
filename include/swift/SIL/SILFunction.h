@@ -35,6 +35,7 @@ namespace swift {
 class ASTContext;
 class SILInstruction;
 class SILModule;
+class SILFunctionBuilder;
 class SILProfiler;
 
 enum IsBare_t { IsNotBare, IsBare };
@@ -152,7 +153,8 @@ public:
 private:
   friend class SILBasicBlock;
   friend class SILModule;
-    
+  friend class SILFunctionBuilder;
+
   /// Module - The SIL module that the function belongs to.
   SILModule &Module;
 

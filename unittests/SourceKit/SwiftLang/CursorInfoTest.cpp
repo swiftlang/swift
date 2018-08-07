@@ -36,16 +36,17 @@ class NullEditorConsumer : public EditorConsumer {
     llvm_unreachable("unexpected error");
   }
 
-  bool handleSyntaxMap(unsigned Offset, unsigned Length, UIdent Kind) override {
-    return false;
+  bool syntaxMapEnabled() override { return true; }
+
+  void handleSyntaxMap(unsigned Offset, unsigned Length, UIdent Kind) override {
   }
 
-  bool handleSemanticAnnotation(unsigned Offset, unsigned Length,
-                                UIdent Kind, bool isSystem) override {
-    return false;
-  }
+  void handleSemanticAnnotation(unsigned Offset, unsigned Length, UIdent Kind,
+                                bool isSystem) override {}
 
-  bool beginDocumentSubStructure(unsigned Offset, unsigned Length,
+  bool documentStructureEnabled() override { return false; }
+
+  void beginDocumentSubStructure(unsigned Offset, unsigned Length,
                                  UIdent Kind, UIdent AccessLevel,
                                  UIdent SetterAccessLevel,
                                  unsigned NameOffset,
@@ -60,44 +61,36 @@ class NullEditorConsumer : public EditorConsumer {
                                  StringRef SelectorName,
                                  ArrayRef<StringRef> InheritedTypes,
                                  ArrayRef<std::tuple<UIdent, unsigned, unsigned>> Attrs) override {
-    return false;
   }
 
-  bool endDocumentSubStructure() override { return false; }
+  void endDocumentSubStructure() override {}
 
-  bool handleDocumentSubStructureElement(UIdent Kind,
-                                         unsigned Offset,
-                                         unsigned Length) override {
-    return false;
+  void handleDocumentSubStructureElement(UIdent Kind, unsigned Offset,
+                                         unsigned Length) override {}
+
+  void recordAffectedRange(unsigned Offset, unsigned Length) override {}
+
+  void recordAffectedLineRange(unsigned Line, unsigned Length) override {}
+
+  void setDiagnosticStage(UIdent DiagStage) override {}
+  void handleDiagnostic(const DiagnosticEntryInfo &Info,
+                        UIdent DiagStage) override {}
+  void recordFormattedText(StringRef Text) override {}
+
+  void handleSourceText(StringRef Text) override {}
+  void handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree,
+                        std::unordered_set<unsigned> &ReusedNodeIds) override {}
+
+  SyntaxTreeTransferMode syntaxTreeTransferMode() override {
+    return SyntaxTreeTransferMode::Off;
   }
-
-  bool recordAffectedRange(unsigned Offset, unsigned Length) override {
-    return false;
-  }
-  
-  bool recordAffectedLineRange(unsigned Line, unsigned Length) override {
-    return false;
-  }
-
-  bool recordFormattedText(StringRef Text) override { return false; }
-
-  bool setDiagnosticStage(UIdent DiagStage) override { return false; }
-  bool handleDiagnostic(const DiagnosticEntryInfo &Info,
-                        UIdent DiagStage) override {
-    return false;
-  }
-
-  bool handleSourceText(StringRef Text) override { return false; }
-  bool handleSerializedSyntaxTree(StringRef Text) override { return false; }
-  bool syntaxTreeEnabled() override { return false; }
-  bool forceLibSyntaxBasedProcessing() override { return false; }
 
   bool syntaxReuseInfoEnabled() override { return false; }
 
-  bool handleSyntaxReuseRegions(
-      std::vector<SourceFileRange> ReuseRegions) override {
-    return false;
+  void
+  handleSyntaxReuseRegions(std::vector<SourceFileRange> ReuseRegions) override {
   }
+
 public:
   bool needsSema = false;
 };

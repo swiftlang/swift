@@ -23,13 +23,13 @@ import ObjectiveCTests
 
 public let ObjectiveCNoBridgingStubs = [
   BenchmarkInfo(name: "ObjectiveCBridgeStubToNSStringRef", runFunction: run_ObjectiveCBridgeStubToNSStringRef, tags: [.validation, .bridging]),
-  BenchmarkInfo(name: "ObjectiveCBridgeStubToNSDateRef", runFunction: run_ObjectiveCBridgeStubToNSDateRef, tags: [.validation, .bridging]),
+  BenchmarkInfo(name: "ObjectiveCBridgeStubToNSDateRef", runFunction: run_ObjectiveCBridgeStubToNSDateRef, tags: [.validation, .bridging, .unstable]),
   BenchmarkInfo(name: "ObjectiveCBridgeStubNSDateRefAccess", runFunction: run_ObjectiveCBridgeStubNSDateRefAccess, tags: [.validation, .bridging, .unstable]),
-  BenchmarkInfo(name: "ObjectiveCBridgeStubNSDateMutationRef", runFunction: run_ObjectiveCBridgeStubNSDateMutationRef, tags: [.validation, .bridging]),
+  BenchmarkInfo(name: "ObjectiveCBridgeStubNSDateMutationRef", runFunction: run_ObjectiveCBridgeStubNSDateMutationRef, tags: [.validation, .bridging, .unstable]),
   BenchmarkInfo(name: "ObjectiveCBridgeStubNSDataAppend", runFunction: run_ObjectiveCBridgeStubNSDataAppend, tags: [.validation, .bridging]),
-  BenchmarkInfo(name: "ObjectiveCBridgeStubFromNSStringRef", runFunction: run_ObjectiveCBridgeStubFromNSStringRef, tags: [.validation, .bridging]),
+  BenchmarkInfo(name: "ObjectiveCBridgeStubFromNSStringRef", runFunction: run_ObjectiveCBridgeStubFromNSStringRef, tags: [.validation, .bridging, .unstable]),
   BenchmarkInfo(name: "ObjectiveCBridgeStubFromNSDateRef", runFunction: run_ObjectiveCBridgeStubFromNSDateRef, tags: [.validation, .bridging, .unstable]),
-  BenchmarkInfo(name: "ObjectiveCBridgeStubURLAppendPathRef", runFunction: run_ObjectiveCBridgeStubURLAppendPathRef, tags: [.validation, .bridging]),
+  BenchmarkInfo(name: "ObjectiveCBridgeStubURLAppendPathRef2", runFunction: run_ObjectiveCBridgeStubURLAppendPathRef, tags: [.validation, .bridging]),
 ]
 
 #if _runtime(_ObjC)
@@ -104,7 +104,7 @@ public func run_ObjectiveCBridgeStubFromNSDateRef(N: Int) {
 public func testObjectiveCBridgeStubToNSDateRef() {
   let b = BridgeTester()
   let d = NSDate()
-  for _ in 0 ..< 100_000 {
+  for _ in 0 ..< 1_000 {
     b.use(d)
   }
 }
@@ -113,7 +113,7 @@ public func testObjectiveCBridgeStubToNSDateRef() {
 @inline(never)
 public func run_ObjectiveCBridgeStubToNSDateRef(N: Int) {
 #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< 100 * N {
     autoreleasepool {
       testObjectiveCBridgeStubToNSDateRef()
     }
@@ -148,7 +148,7 @@ public func run_ObjectiveCBridgeStubNSDateRefAccess(N: Int) {
 @inline(never)
 func testObjectiveCBridgeStubNSDateMutationRef() {
   var d = NSDate()
-  for _ in 0 ..< 100_000 {
+  for _ in 0 ..< 100 {
       d = d.addingTimeInterval(1)
   }
 }
@@ -157,7 +157,7 @@ func testObjectiveCBridgeStubNSDateMutationRef() {
 @inline(never)
 public func run_ObjectiveCBridgeStubNSDateMutationRef(N: Int) {
 #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< 100 * N {
     autoreleasepool {
       testObjectiveCBridgeStubNSDateMutationRef()
     }
@@ -169,7 +169,7 @@ public func run_ObjectiveCBridgeStubNSDateMutationRef(N: Int) {
 @inline(never)
 func testObjectiveCBridgeStubURLAppendPathRef() {
   let startUrl = URL(string: "/")!
-  for _ in 0 ..< 10_000 {
+  for _ in 0 ..< 100 {
     var url = startUrl
     for _ in 0 ..< 10 {
       url = url.appendingPathComponent("foo")

@@ -56,6 +56,7 @@ Globals
   global ::= nominal-type 'Mr'           // generic type completion function
   global ::= nominal-type 'Mi'           // generic type instantiation function
   global ::= nominal-type 'MI'           // generic type instantiation cache
+  global ::= nominal-type 'Ml'           // in-place type initialization cache
   global ::= nominal-type 'Mm'           // class metaclass
   global ::= nominal-type 'Mn'           // nominal type descriptor
   global ::= module 'MXM'                // module descriptor
@@ -64,7 +65,6 @@ Globals
   global ::= context identifier 'MXY'    // anonymous context descriptor
   global ::= type assoc_type_path 'MXA'  // generic parameter ref
   global ::= protocol 'Mp'               // protocol descriptor
-  global ::= protocol 'WR'               // protocol requirement table
 
   global ::= nominal-type 'Mo'           // class metadata immediate member base offset
 
@@ -223,10 +223,12 @@ Entities
   ACCESSOR ::= 'G'                           // global getter
   ACCESSOR ::= 'w'                           // willSet
   ACCESSOR ::= 'W'                           // didSet
+  ACCESSOR ::= 'r'                           // read
+  ACCESSOR ::= 'M'                           // modify (temporary)
   ACCESSOR ::= 'a' ADDRESSOR-KIND            // mutable addressor
   ACCESSOR ::= 'l' ADDRESSOR-KIND            // non-mutable addressor
   ACCESSOR ::= 'p'                           // pseudo accessor referring to the storage itself
-                                         
+
   ADDRESSOR-KIND ::= 'u'                     // unsafe addressor (no owner)
   ADDRESSOR-KIND ::= 'O'                     // owning addressor (non-native owner)
   ADDRESSOR-KIND ::= 'o'                     // owning addressor (native owner)
@@ -785,6 +787,7 @@ Function Specializations
 
   specialization ::= type '_' type* 'Tg' SPEC-INFO     // Generic re-abstracted specialization
   specialization ::= type '_' type* 'TG' SPEC-INFO     // Generic not re-abstracted specialization
+  specialization ::= type '_' type* 'Ti' SPEC-INFO     // Inlined function with generic substitutions.
 
 The types are the replacement types of the substitution list.
 

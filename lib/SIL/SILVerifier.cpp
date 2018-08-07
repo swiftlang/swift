@@ -241,16 +241,16 @@ void verifyKeyPathComponent(SILModule &M,
               && !component.getSubscriptIndexEquals()
               && !component.getSubscriptIndexHash(),
               "property descriptor should not have index information");
+      
+      require(component.getExternalDecl() == nullptr
+              && component.getExternalSubstitutions().empty(),
+              "property descriptor should not refer to another external decl");
     } else {
       require(hasIndices == !component.getSubscriptIndices().empty(),
               "component for subscript should have indices");
     }
-  
-    ParameterConvention normalArgConvention;
-    if (M.getOptions().EnableGuaranteedNormalArguments)
-      normalArgConvention = ParameterConvention::Indirect_In_Guaranteed;
-    else
-      normalArgConvention = ParameterConvention::Indirect_In;
+    
+    auto normalArgConvention = ParameterConvention::Indirect_In_Guaranteed;
   
     // Getter should be <Sig...> @convention(thin) (@in_guaranteed Base) -> @out Result
     {
@@ -2367,7 +2367,7 @@ public:
     require(class2,
             "Second operand of dealloc_partial_ref must be a class metatype");
     while (class1 != class2) {
-      class1 = class1->getSuperclass()->getClassOrBoundGenericClass();
+      class1 = class1->getSuperclassDecl();
       require(class1, "First operand not superclass of second instance type");
     }
   }
@@ -2821,7 +2821,7 @@ public:
     auto isConsumingOrMutatingApplyUse = [](Operand *use) -> bool {
       ApplySite apply(use->getUser());
       assert(apply && "Not an apply instruction kind");
-      auto conv = apply.getArgumentConvention(use->getOperandNumber() - 1);
+      auto conv = apply.getArgumentConvention(*use);
       switch (conv) {
       case SILArgumentConvention::Indirect_In_Guaranteed:
         return false;
@@ -3736,9 +3736,9 @@ public:
         F.mapTypeIntoContext(fnConv.getSILResultType());
     SILType instResultType = RI->getOperand()->getType();
     LLVM_DEBUG(llvm::dbgs() << "function return type: ";
-          functionResultType.dump();
-          llvm::dbgs() << "return inst type: ";
-          instResultType.dump(););
+               functionResultType.dump();
+               llvm::dbgs() << "return inst type: ";
+               instResultType.dump(););
     require(functionResultType == instResultType,
             "return value type does not match return type of function");
   }
@@ -3753,9 +3753,9 @@ public:
     SILType functionResultType = F.mapTypeIntoContext(fnConv.getSILErrorType());
     SILType instResultType = TI->getOperand()->getType();
     LLVM_DEBUG(llvm::dbgs() << "function error result type: ";
-          functionResultType.dump();
-          llvm::dbgs() << "throw operand type: ";
-          instResultType.dump(););
+               functionResultType.dump();
+               llvm::dbgs() << "throw operand type: ";
+               instResultType.dump(););
     require(functionResultType == instResultType,
             "throw operand type does not match error result type of function");
   }
@@ -3795,8 +3795,6 @@ public:
 
     // Find the set of enum elements for the type so we can verify
     // exhaustiveness.
-    // FIXME: We also need to consider if the enum is resilient, in which case
-    // we're never guaranteed to be exhaustive.
     llvm::DenseSet<EnumElementDecl*> unswitchedElts;
     eDecl->getAllElements(unswitchedElts);
 
@@ -3819,7 +3817,10 @@ public:
     }
 
     // If the select is non-exhaustive, we require a default.
-    require(unswitchedElts.empty() || I->hasDefault(),
+    bool isExhaustive =
+        eDecl->isEffectivelyExhaustive(F.getModule().getSwiftModule(),
+                                       F.getResilienceExpansion());
+    require((isExhaustive && unswitchedElts.empty()) || I->hasDefault(),
             "nonexhaustive select_enum must have a default destination");
     if (I->hasDefault()) {
       requireSameType(I->getDefaultResult()->getType(),
@@ -3987,7 +3988,10 @@ public:
     }
 
     // If the switch is non-exhaustive, we require a default.
-    require(unswitchedElts.empty() || SOI->hasDefault(),
+    bool isExhaustive =
+        uDecl->isEffectivelyExhaustive(F.getModule().getSwiftModule(),
+                                       F.getResilienceExpansion());
+    require((isExhaustive && unswitchedElts.empty()) || SOI->hasDefault(),
             "nonexhaustive switch_enum must have a default destination");
     if (SOI->hasDefault()) {
       // When SIL ownership is enabled, we require all default branches to take
@@ -4340,15 +4344,15 @@ public:
     require(entry->pred_empty(), "entry block cannot have predecessors");
 
     LLVM_DEBUG(llvm::dbgs() << "Argument types for entry point BB:\n";
-          for (auto *arg
-               : make_range(entry->args_begin(), entry->args_end()))
-              arg->getType()
-                  .dump();
-          llvm::dbgs() << "Input types for SIL function type ";
-          F.getLoweredFunctionType()->print(llvm::dbgs());
-          llvm::dbgs() << ":\n";
-          for (auto paramTy
-               : fnConv.getParameterSILTypes()) { paramTy.dump(); });
+               for (auto *arg
+                    : make_range(entry->args_begin(), entry->args_end()))
+                   arg->getType()
+                       .dump();
+               llvm::dbgs() << "Input types for SIL function type ";
+               F.getLoweredFunctionType()->print(llvm::dbgs());
+               llvm::dbgs() << ":\n";
+               for (auto paramTy
+                    : fnConv.getParameterSILTypes()) { paramTy.dump(); });
 
     require(entry->args_size() == (fnConv.getNumIndirectSILResults()
                                    + fnConv.getNumParameters()),
@@ -4923,8 +4927,7 @@ void SILProperty::verify(const SILModule &M) const {
   auto sig = dc->getGenericSignatureOfContext();
   auto baseTy = dc->getInnermostTypeContext()->getSelfInterfaceType()
                   ->getCanonicalType(sig);
-  auto leafTy = decl->getStorageInterfaceType()->getReferenceStorageReferent()
-                    ->getCanonicalType(sig);
+  auto leafTy = decl->getValueInterfaceType()->getCanonicalType(sig);
   SubstitutionMap subs;
   if (sig) {
     auto env = dc->getGenericEnvironmentOfContext();
@@ -4995,10 +4998,7 @@ void SILVTable::verify(const SILModule &M) const {
     do {
       if (c == theClass)
         break;
-      if (auto ty = c->getSuperclass())
-        c = ty->getClassOrBoundGenericClass();
-      else
-        c = nullptr;
+      c = c->getSuperclassDecl();
     } while (c);
     assert(c && "vtable entry must refer to a member of the vtable's class");
 
@@ -5176,7 +5176,7 @@ void SILModule::verify() const {
          "Cache size is not equal to true number of VTable entries");
 
   // Check all witness tables.
-  LLVM_DEBUG(llvm::dbgs() << "*** Checking witness tables for duplicates ***\n");
+  LLVM_DEBUG(llvm::dbgs() <<"*** Checking witness tables for duplicates ***\n");
   llvm::DenseSet<NormalProtocolConformance*> wtableConformances;
   for (const SILWitnessTable &wt : getWitnessTables()) {
     LLVM_DEBUG(llvm::dbgs() << "Witness Table:\n"; wt.dump());
@@ -5190,7 +5190,8 @@ void SILModule::verify() const {
   }
 
   // Check all default witness tables.
-  LLVM_DEBUG(llvm::dbgs() << "*** Checking default witness tables for duplicates ***\n");
+  LLVM_DEBUG(llvm::dbgs() << "*** Checking default witness tables for "
+             "duplicates ***\n");
   llvm::DenseSet<const ProtocolDecl *> defaultWitnessTables;
   for (const SILDefaultWitnessTable &wt : getDefaultWitnessTables()) {
     LLVM_DEBUG(llvm::dbgs() << "Default Witness Table:\n"; wt.dump());

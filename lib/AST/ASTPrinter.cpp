@@ -64,6 +64,21 @@ void PrintOptions::clearSynthesizedExtension() {
   TransformContext.reset();
 }
 
+PrintOptions PrintOptions::printTextualInterfaceFile() {
+  PrintOptions result;
+  result.PrintLongAttrsOnSeparateLines = true;
+  result.TypeDefinitions = true;
+  result.PrintIfConfig = false;
+  result.FullyQualifiedTypes = true;
+  result.SkipImports = true;
+  result.AccessFilter = AccessLevel::Public;
+
+  // FIXME: We'll need the actual default parameter expression.
+  result.PrintDefaultParameterPlaceholder = false;
+
+  return result;
+}
+
 TypeTransformContext::TypeTransformContext(Type T)
     : BaseType(T.getPointer()) {
   assert(T->mayHaveMembers());
@@ -1397,6 +1412,7 @@ static bool isAccessorAssumedNonMutating(AccessorDecl *accessor) {
   switch (accessor->getAccessorKind()) {
   case AccessorKind::Get:
   case AccessorKind::Address:
+  case AccessorKind::Read:
     return true;
 
   case AccessorKind::Set:
@@ -1404,6 +1420,7 @@ static bool isAccessorAssumedNonMutating(AccessorDecl *accessor) {
   case AccessorKind::DidSet:
   case AccessorKind::MaterializeForSet:
   case AccessorKind::MutableAddress:
+  case AccessorKind::Modify:
     return false;
   }
   llvm_unreachable("bad addressor kind");
@@ -1565,6 +1582,9 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
     case ReadImplKind::Address:
       PrintAccessor(ASD->getAddressor());
       break;
+    case ReadImplKind::Read:
+      PrintAccessor(ASD->getReadCoroutine());
+      break;
     }
     switch (impl.getWriteImpl()) {
     case WriteImplKind::Immutable:
@@ -1578,12 +1598,16 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
       break;
     case WriteImplKind::Set:
       PrintAccessor(ASD->getSetter());
-      // FIXME: ReadWriteImplKind::Modify
+      if (impl.getReadWriteImpl() == ReadWriteImplKind::Modify)
+        PrintAccessor(ASD->getModifyCoroutine());
       break;
     case WriteImplKind::MutableAddress:
       PrintAccessor(ASD->getMutableAddressor());
       PrintAccessor(ASD->getWillSetFunc());
       PrintAccessor(ASD->getDidSetFunc());
+      break;
+    case WriteImplKind::Modify:
+      PrintAccessor(ASD->getModifyCoroutine());
       break;
     }
   }
@@ -1793,8 +1817,7 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
     recordDeclLoc(decl, [&]{
       // We cannot extend sugared types.
       Type extendedType = decl->getExtendedType();
-      NominalTypeDecl *nominal = extendedType ? extendedType->getAnyNominal() : nullptr;
-      if (!nominal) {
+      if (!extendedType || !extendedType->getAnyNominal()) {
         // Fallback to TypeRepr.
         printTypeLoc(decl->getExtendedTypeLoc());
         return;
@@ -2384,6 +2407,8 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
   switch (auto kind = decl->getAccessorKind()) {
   case AccessorKind::Get:
   case AccessorKind::Address:
+  case AccessorKind::Read:
+  case AccessorKind::Modify:
   case AccessorKind::DidSet:
   case AccessorKind::MaterializeForSet:
   case AccessorKind::MutableAddress:
@@ -2816,6 +2841,26 @@ void PrintAST::visitReturnStmt(ReturnStmt *stmt) {
     Printer << " ";
     // FIXME: print expression.
   }
+}
+
+void PrintAST::visitYieldStmt(YieldStmt *stmt) {
+  Printer.printKeyword("yield");
+  Printer << " ";
+  bool parens = (stmt->getYields().size() != 1
+                 || stmt->getLParenLoc().isValid());
+  if (parens) Printer << "(";
+  bool first = true;
+  for (auto yield : stmt->getYields()) {
+    if (first) {
+      first = false;
+    } else {
+      Printer << ", ";
+    }
+
+    // FIXME: print expression.
+    (void) yield;
+  }
+  if (parens) Printer << ")";
 }
 
 void PrintAST::visitThrowStmt(ThrowStmt *stmt) {

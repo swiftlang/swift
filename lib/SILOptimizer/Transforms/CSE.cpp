@@ -797,7 +797,7 @@ bool CSE::processNode(DominanceInfoNode *Node) {
     // its simpler value.
     if (SILValue V = simplifyInstruction(Inst)) {
       LLVM_DEBUG(llvm::dbgs() << "SILCSE SIMPLIFY: " << *Inst << "  to: " << *V
-            << '\n');
+                              << '\n');
       replaceAllSimplifiedUsesAndErase(Inst, V,
                                        [&nextI](SILInstruction *deleteI) {
                                          if (nextI == deleteI->getIterator())
@@ -821,8 +821,8 @@ bool CSE::processNode(DominanceInfoNode *Node) {
     // Now that we know we have an instruction we understand see if the
     // instruction has an available value.  If so, use it.
     if (SILInstruction *AvailInst = AvailableValues->lookup(Inst)) {
-      LLVM_DEBUG(llvm::dbgs() << "SILCSE CSE: " << *Inst << "  to: " << *AvailInst
-                         << '\n');
+      LLVM_DEBUG(llvm::dbgs() << "SILCSE CSE: " << *Inst << "  to: "
+                              << *AvailInst << '\n');
       // Instructions producing a new opened archetype need a special handling,
       // because replacing these instructions may require a replacement
       // of the opened archetype type operands in some of the uses.
@@ -840,8 +840,8 @@ bool CSE::processNode(DominanceInfoNode *Node) {
 
     // Otherwise, just remember that this value is available.
     AvailableValues->insert(Inst, Inst);
-    LLVM_DEBUG(llvm::dbgs() << "SILCSE Adding to value table: " << *Inst << " -> "
-                       << *Inst << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "SILCSE Adding to value table: " << *Inst
+                            << " -> " << *Inst << "\n");
   }
 
   return Changed;
@@ -1163,8 +1163,8 @@ class SILCSE : public SILFunctionTransform {
   bool RunsOnHighLevelSil;
   
   void run() override {
-    LLVM_DEBUG(llvm::dbgs() << "***** CSE on function: " << getFunction()->getName()
-          << " *****\n");
+    LLVM_DEBUG(llvm::dbgs() << "***** CSE on function: "
+                            << getFunction()->getName() << " *****\n");
 
     DominanceAnalysis* DA = getAnalysis<DominanceAnalysis>();
 

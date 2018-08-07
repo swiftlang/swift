@@ -29,16 +29,16 @@ class B<U> : A<[U], U> {}
 
 _ = B<C>.S1()          // Ok
 _ = B<Int>.S2()        // Ok
-_ = B<Float>.S1()      // expected-error {{type 'Float' does not conform to protocol 'P'}}
+_ = B<Float>.S1()      // expected-error {{'B<Float>.S1' (aka 'Int') requires that 'Float' conform to 'P'}}
 _ = B<String>.S2()     // expected-error {{'B<String>.S2.Type' (aka 'Int.Type') requires the types '[String]' and '[Int]' be equivalent}}
 
 _ = S<C>.A()           // Ok
-_ = S<Int>.A()         // expected-error {{type 'Int' does not conform to protocol 'P'}}
+_ = S<Int>.A()         // expected-error {{'S<Int>.A' (aka 'Int') requires that 'Int' conform to 'P'}}
 _ = S<String>.B<Int>() // expected-error {{type 'String' does not conform to protocol 'P'}}
 _ = S<Int>.C()         // expected-error {{'S<Int>.C.Type' (aka 'Int.Type') requires the types 'Int' and 'Float' be equivalent}}
 
 func foo<T>(_ s: S<T>.Type) {
-  _ = s.A() // expected-error {{type 'T' does not conform to protocol 'P'}}
+  _ = s.A() // expected-error {{'S<T>.A' (aka 'Int') requires that 'T' conform to 'P'}}
 }
 
 func bar<T: P>(_ s: S<T>.Type) {

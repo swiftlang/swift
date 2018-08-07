@@ -31,6 +31,7 @@
 #include "swift/AST/StorageImpl.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/TypeWalker.h"
+#include "swift/AST/Types.h"
 #include "swift/AST/Witness.h"
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/Compiler.h"
@@ -116,10 +117,9 @@ enum class DescriptiveDeclKind : uint8_t {
   Var,
   Param,
   Let,
-  StaticVar,
-  StaticLet,
-  ClassVar,
-  ClassLet,
+  Property,
+  StaticProperty,
+  ClassProperty,
   InfixOperator,
   PrefixOperator,
   PostfixOperator,
@@ -150,6 +150,8 @@ enum class DescriptiveDeclKind : uint8_t {
   MaterializeForSet,
   Addressor,
   MutableAddressor,
+  ReadAccessor,
+  ModifyAccessor,
   WillSet,
   DidSet,
   EnumElement,
@@ -427,9 +429,9 @@ protected:
     SelfAccess : 2
   );
 
-  SWIFT_INLINE_BITFIELD(AccessorDecl, FuncDecl, 3+3,
+  SWIFT_INLINE_BITFIELD(AccessorDecl, FuncDecl, 4+3,
     /// The kind of accessor this is.
-    AccessorKind : 3,
+    AccessorKind : 4,
 
     /// The kind of addressor this is.
     AddressorKind : 3
@@ -477,17 +479,13 @@ protected:
     IsDebuggerAlias : 1
   );
 
-  SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1+1,
+  SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1,
     /// Whether we have already added implicitly-defined initializers
     /// to this declaration.
     AddedImplicitInitializers : 1,
 
     /// Whether there is are lazily-loaded conformances for this nominal type.
-    HasLazyConformances : 1,
-
-    /// Whether we have already validated all members of the type that
-    /// affect layout.
-    HasValidatedLayout : 1
+    HasLazyConformances : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+2+8+16,
@@ -1642,7 +1640,10 @@ class ExtensionDecl final : public GenericContext, public Decl,
 
   /// The type being extended.
   TypeLoc ExtendedType;
-  
+
+  /// The nominal type being extended.
+  NominalTypeDecl *ExtendedNominal = nullptr;
+
   MutableArrayRef<TypeLoc> Inherited;
 
   /// \brief The next extension in the linked list of extensions.
@@ -1679,6 +1680,7 @@ class ExtensionDecl final : public GenericContext, public Decl,
   /// Slow path for \c takeConformanceLoader().
   std::pair<LazyMemberLoader *, uint64_t> takeConformanceLoaderSlow();
 
+  friend class ExtendedNominalRequest;
 public:
   using Decl::getASTContext;
 
@@ -1700,7 +1702,18 @@ public:
   void setBraces(SourceRange braces) { Braces = braces; }
 
   /// Retrieve the type being extended.
+  ///
+  /// Only use this entry point when the complete type, as spelled in the source,
+  /// is required. For most clients, \c getExtendedNominal(), which provides
+  /// only the \c NominalTypeDecl, will suffice.
   Type getExtendedType() const { return ExtendedType.getType(); }
+
+  /// Retrieve the nominal type declaration that is being extended.
+  NominalTypeDecl *getExtendedNominal() const;
+
+  /// Determine whether this extension has already been bound to a nominal
+  /// type declaration.
+  bool alreadyBoundToNominal() const { return NextExtension.getInt(); }
 
   /// Retrieve the extended type location.
   TypeLoc &getExtendedTypeLoc() { return ExtendedType; }
@@ -2347,33 +2360,17 @@ public:
   /// Returns the access level specified explicitly by the user, or provided by
   /// default according to language rules.
   ///
-  /// This is the access used when calculating if access control is being used
-  /// consistently. If \p useDC is provided (the location where the value is
-  /// being used), features that affect formal access such as \c \@testable are
-  /// taken into account.
-  ///
-  /// If \p treatUsableFromInlineAsPublic is true, declarations marked with the
-  /// \c @usableFromInline attribute are treated as public. This is normally
-  /// false for name lookup and other source language concerns, but true when
-  /// computing the linkage of generated functions.
+  /// Most of the time this is not the interesting value to check; access is
+  /// limited by enclosing scopes per SE-0025. Use #getFormalAccessScope to
+  /// check if access control is being used consistently, and to take features
+  /// such as \c \@testable and \c \@usableFromInline into account.
   ///
   /// \sa getFormalAccessScope
-  AccessLevel getFormalAccess(const DeclContext *useDC = nullptr,
-                              bool treatUsableFromInlineAsPublic = false) const;
+  /// \sa hasOpenAccess
+  AccessLevel getFormalAccess() const;
 
-  /// If this declaration is a member of a protocol extension, return the
-  /// minimum of the given access level and the protocol's access level.
-  ///
-  /// Otherwise, return the given access level unmodified.
-  ///
-  /// This is used when checking name lookup visibility. Protocol extension
-  /// members can be found when performing name lookup on a concrete type;
-  /// if the concrete type is visible from the lookup context but the
-  /// protocol is not, we do not want the protocol extension members to be
-  /// visible.
-  AccessLevel adjustAccessLevelForProtocolExtension(AccessLevel access) const;
-
-  /// Determine whether this Decl has either Private or FilePrivate access.
+  /// Determine whether this Decl has either Private or FilePrivate access,
+  /// and its DeclContext does not.
   bool isOutermostPrivateOrFilePrivateScope() const;
 
   /// Returns the outermost DeclContext from which this declaration can be
@@ -2395,6 +2392,7 @@ public:
   ///
   /// \sa getFormalAccess
   /// \sa isAccessibleFrom
+  /// \sa hasOpenAccess
   AccessScope
   getFormalAccessScope(const DeclContext *useDC = nullptr,
                        bool treatUsableFromInlineAsPublic = false) const;
@@ -2447,6 +2445,14 @@ public:
   /// the default implementations are not visible to name lookup.
   bool isAccessibleFrom(const DeclContext *DC,
                         bool forConformance = false) const;
+
+  /// Returns whether this declaration should be treated as \c open from
+  /// \p useDC. This is very similar to #getFormalAccess, but takes
+  /// \c \@testable into account.
+  ///
+  /// This is mostly only useful when considering requirements on an override:
+  /// if the base declaration is \c open, the override might have to be too.
+  bool hasOpenAccess(const DeclContext *useDC) const;
 
   /// Retrieve the "interface" type of this value, which uses
   /// GenericTypeParamType if the declaration is generic. For a generic
@@ -2880,8 +2886,8 @@ public:
     TrailingWhere = trailingWhereClause;
   }
 
-  /// computeType - Compute the type (and declared type) of this associated
-  /// type; can only be called after the alias type has been resolved.
+  /// Set the interface type of this associated type declaration to a dependen
+  /// member type of 'Self'.
   void computeType();
 
   /// Retrieve the associated type "anchor", which is the associated type
@@ -3038,7 +3044,6 @@ protected:
     Bits.NominalTypeDecl.AddedImplicitInitializers = false;
     ExtensionGeneration = 0;
     Bits.NominalTypeDecl.HasLazyConformances = false;
-    Bits.NominalTypeDecl.HasValidatedLayout = false;
   }
 
   friend class ProtocolType;
@@ -3076,19 +3081,8 @@ public:
     Bits.NominalTypeDecl.AddedImplicitInitializers = true;
   }
 
-  /// Determine whether we have already validated any members
-  /// which affect layout.
-  bool hasValidatedLayout() const {
-    return Bits.NominalTypeDecl.HasValidatedLayout;
-  }
-
-  /// Note that we have attempted to validate any members
-  /// which affect layout.
-  void setHasValidatedLayout() {
-    Bits.NominalTypeDecl.HasValidatedLayout = true;
-  }
-
-  /// Compute the type of this nominal type.
+  /// Set the interface type of this nominal type to the metatype of the
+  /// declared interface type.
   void computeType();
 
   /// getDeclaredType - Retrieve the type declared by this entity, without
@@ -3297,45 +3291,6 @@ public:
     return std::distance(eltRange.begin(), eltRange.end());
   }
 
-  /// If this is an enum with two cases, return the other case. Otherwise,
-  /// return nullptr.
-  EnumElementDecl *getOppositeBinaryDecl(EnumElementDecl *decl) const {
-    ElementRange range = getAllElements();
-    auto iter = range.begin();
-    if (iter == range.end())
-      return nullptr;
-    bool seenDecl = false;
-    EnumElementDecl *result = nullptr;
-    if (*iter == decl) {
-      seenDecl = true;
-    } else {
-      result = *iter;
-    }
-
-    ++iter;
-    if (iter == range.end())
-      return nullptr;
-    if (seenDecl) {
-      assert(!result);
-      result = *iter;
-    } else {
-      if (decl != *iter)
-        return nullptr;
-      seenDecl = true;
-    }
-    ++iter;
-
-    // If we reach this point, we saw the decl we were looking for and one other
-    // case. If we have any additional cases, then we do not have a binary enum.
-    if (iter != range.end())
-      return nullptr;
-
-    // This is always true since we have already returned earlier nullptr if we
-    // did not see the decl at all.
-    assert(seenDecl);
-    return result;
-  }
-
   /// If this enum has a unique element, return it. A unique element can
   /// either hold a value or not, and the existence of one unique element does
   /// not imply the existence or non-existence of the opposite unique element.
@@ -3419,7 +3374,23 @@ public:
   /// Note that this property is \e not necessarily true for all children of
   /// \p useDC. In particular, an inlinable function does not get to switch
   /// exhaustively over a non-exhaustive enum declared in the same module.
-  bool isExhaustive(const DeclContext *useDC) const;
+  ///
+  /// This is the predicate used when deciding if a switch statement needs a
+  /// default case. It should not be used for optimization or code generation.
+  ///
+  /// \sa isEffectivelyExhaustive
+  bool isFormallyExhaustive(const DeclContext *useDC) const;
+
+  /// True if the enum can be exhaustively switched within a function defined
+  /// within \p M, with \p expansion specifying whether the function is
+  /// inlinable.
+  ///
+  /// This is the predicate used when making optimization and code generation
+  /// decisions. It should not be used at the AST or semantic level.
+  ///
+  /// \sa isFormallyExhaustive
+  bool isEffectivelyExhaustive(ModuleDecl *M,
+                               ResilienceExpansion expansion) const;
 };
 
 /// StructDecl - This is the declaration of a struct, for example:
@@ -3528,7 +3499,7 @@ public:
   }
 
   /// Determine whether this class has a superclass.
-  bool hasSuperclass() const { return (bool)getSuperclass(); }
+  bool hasSuperclass() const { return (bool)getSuperclassDecl(); }
 
   /// Retrieve the superclass of this class, or null if there is no superclass.
   Type getSuperclass() const;
@@ -3669,6 +3640,23 @@ public:
   /// might have implicitly @objc members, but will never itself be @objc.
   ObjCClassKind checkObjCAncestry() const;
 
+  /// \brief Whether this class or its superclasses has some form of generic
+  /// context.
+  ///
+  /// For example, given
+  ///
+  /// class A<X> {}
+  /// class B : A<Int> {}
+  /// struct C<T> {
+  ///   struct Inner {}
+  /// }
+  /// class D {}
+  /// class E: D {}
+  ///
+  /// Calling hasGenericAncestry() on `B` returns `A<Int>`, on `C<T>.Inner`
+  /// returns `C<T>.Inner`, but on `E` it returns null.
+  ClassDecl *getGenericAncestor() const;
+
   /// The type of metaclass to use for a class.
   enum class MetaclassKind : uint8_t {
     ObjC,
@@ -3733,7 +3721,7 @@ public:
   ///
   /// This is true of imported Objective-C classes.
   bool usesObjCGenericsModel() const {
-    return isObjC() && hasClangNode() && isGenericContext();
+    return hasClangNode() && isGenericContext() && isObjC();
   }
   
   /// True if the class is known to be implemented in Swift.
@@ -3842,7 +3830,7 @@ public:
   llvm::TinyPtrVector<ProtocolDecl *> getInheritedProtocols() const;
 
   /// Determine whether this protocol has a superclass.
-  bool hasSuperclass() const { return (bool)getSuperclass(); }
+  bool hasSuperclass() const { return (bool)getSuperclassDecl(); }
 
   /// Retrieve the superclass of this protocol, or null if there is no superclass.
   Type getSuperclass() const;
@@ -4342,8 +4330,7 @@ public:
     return getAccessor(AccessorKind::Address);
   }
 
-  /// \brief Return the decl for the 'mutableAddress' accessors if
-  /// it exists; this is only valid on a declaration with addressors.
+  /// \brief Return the decl for the mutable accessor if it exists.
   AccessorDecl *getMutableAddressor() const {
     return getAccessor(AccessorKind::MutableAddress);
   }
@@ -4354,7 +4341,17 @@ public:
       return getAddressor();
     return getMutableAddressor();
   }
-  
+
+  /// \brief Return the decl for the 'read' coroutine accessor if it exists.
+  AccessorDecl *getReadCoroutine() const {
+    return getAccessor(AccessorKind::Read);
+  }
+
+  /// \brief Return the decl for the 'modify' coroutine accessor if it exists.
+  AccessorDecl *getModifyCoroutine() const {
+    return getAccessor(AccessorKind::Modify);
+  }
+
   /// \brief Return the decl for the willSet specifier if it exists, this is
   /// only valid on a declaration with Observing storage.
   AccessorDecl *getWillSetFunc() const {
@@ -4414,13 +4411,6 @@ public:
   /// property from the given module?
   bool isResilient(ModuleDecl *M, ResilienceExpansion expansion) const;
 
-  /// Returns the interface type of elements of storage represented by this
-  /// declaration.
-  ///
-  /// For variables, this is the type of the variable itself.
-  /// For subscripts, this is the type of the subscript element.
-  Type getStorageInterfaceType() const;
-
   /// Does the storage use a behavior?
   bool hasBehavior() const {
     return BehaviorInfo.getPointer() != nullptr;
@@ -4442,6 +4432,10 @@ public:
   BehaviorRecord *getMutableBehavior() {
     return BehaviorInfo.getPointer();
   }
+  
+  /// True if the storage exports a property descriptor for key paths in
+  /// other modules.
+  bool exportsPropertyDescriptor() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -4894,6 +4888,10 @@ public:
   TypeLoc &getElementTypeLoc() { return ElementTy; }
   const TypeLoc &getElementTypeLoc() const { return ElementTy; }
 
+  /// Compute the interface type of this subscript from the parameter and
+  /// element types.
+  void computeType();
+
   /// \brief Returns whether the result of the subscript operation can be set.
   bool isSettable() const;
 
@@ -5185,6 +5183,10 @@ private:
   void computeNeedsNewVTableEntry();
 
 public:
+  /// Compute the interface type of this function declaration from the
+  /// parameter types.
+  void computeType(AnyFunctionType::ExtInfo Info = FunctionType::ExtInfo());
+
   /// Retrieve the source range of the function body.
   SourceRange getBodySourceRange() const;
 
@@ -5626,8 +5628,26 @@ public:
   bool isGetterOrSetter() const { return isGetter() || isSetter(); }
 
   bool isObservingAccessor() const {
-    return getAccessorKind() == AccessorKind::DidSet ||
-           getAccessorKind() == AccessorKind::WillSet;
+    switch (getAccessorKind()) {
+#define OBSERVING_ACCESSOR(ID, KEYWORD) \
+    case AccessorKind::ID: return true;
+#define ACCESSOR(ID) \
+    case AccessorKind::ID: return false;
+#include "swift/AST/AccessorKinds.def"
+    }
+    llvm_unreachable("bad accessor kind");
+  }
+
+  /// Is this accessor one of the kinds that's implicitly a coroutine?
+  bool isCoroutine() const {
+    switch (getAccessorKind()) {
+#define COROUTINE_ACCESSOR(ID, KEYWORD) \
+    case AccessorKind::ID: return true;
+#define ACCESSOR(ID) \
+    case AccessorKind::ID: return false;
+#include "swift/AST/AccessorKinds.def"
+    }
+    llvm_unreachable("bad accessor kind");
   }
 
   static bool classof(const Decl *D) {
@@ -5745,8 +5765,8 @@ public:
     return hasName() ? getBaseName().getIdentifier().str() : "_";
   }
 
-  /// \returns false if there was an error during the computation rendering the
-  /// EnumElementDecl invalid, true otherwise.
+  /// Set the interface type of this enum element to the constructor function
+  /// type; (Self) -> Result or (Self) -> (Args...) -> Result.
   bool computeType();
 
   Type getArgumentInterfaceType() const;

@@ -100,7 +100,7 @@ public struct ${vectype} {
   ///
   /// - Precondition: `array` must have exactly ${cardinal[count]} elements.
   public init(_ array: [${scalar}]) {
-  _precondition(array.count == ${count},
+  precondition(array.count == ${count},
                 "${vectype} requires a ${cardinal[count]}-element array")
     self.init(${', '.join(map(lambda i:
               'array[' + str(i) + ']',
@@ -111,16 +111,16 @@ public struct ${vectype} {
   public subscript(index: Int) -> ${scalar} {
     @_transparent
     get {
-      _precondition(index >= 0, "Vector index out of range")
-      _precondition(index < ${count}, "Vector index out of range")
+      precondition(index >= 0, "Vector index out of range")
+      precondition(index < ${count}, "Vector index out of range")
       let elt = Builtin.${extractelement}(_value,
         Int32(index)._value)
       return ${scalar}(elt)
     }
     @_transparent
     set(value) {
-      _precondition(index >= 0, "Vector index out of range")
-      _precondition(index < ${count}, "Vector index out of range")
+      precondition(index >= 0, "Vector index out of range")
+      precondition(index < ${count}, "Vector index out of range")
       _value = Builtin.${insertelement}(_value,
         value._value,
         Int32(index)._value)
@@ -652,7 +652,7 @@ extension ${mattype} {
 
   /// Initialize matrix to have specified `columns`.
   public init(_ columns: [${coltype}]) {
-    _precondition(columns.count == ${cols}, "Requires array of ${cols} vectors")
+    precondition(columns.count == ${cols}, "Requires array of ${cols} vectors")
     self.init()
 %   for i in range(cols):
     self.columns.${i} = columns[${i}]
@@ -661,7 +661,7 @@ extension ${mattype} {
 
   /// Initialize matrix to have specified `rows`.
   public init(rows: [${rowtype}]) {
-    _precondition(rows.count == ${rows}, "Requires array of ${rows} vectors")
+    precondition(rows.count == ${rows}, "Requires array of ${rows} vectors")
     self = ${transtype}(rows).transpose
   }
 
@@ -695,7 +695,7 @@ extension ${mattype} {
 %   for i in range(cols):
       case ${i}: return columns.${i}
 %   end
-      default: _preconditionFailure("Column index out of range")
+      default: preconditionFailure("Column index out of range")
       }
     }
     set (value) {
@@ -703,7 +703,7 @@ extension ${mattype} {
 %   for i in range(cols):
       case ${i}: columns.${i} = value
 %   end
-      default: _preconditionFailure("Column index out of range")
+      default: preconditionFailure("Column index out of range")
       }
     }
   }

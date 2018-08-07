@@ -115,6 +115,11 @@ public:
       const char *Ptr = sourcekitd_uid_get_string_ptr(UID);
       return static_cast<ImplClass*>(this)->visitUID(StringRef(Ptr, Len));
     }
+    case SOURCEKITD_VARIANT_TYPE_DATA: {
+      const void *Data = sourcekitd_variant_data_get_ptr(Obj);
+      size_t Size = sourcekitd_variant_data_get_size(Obj);
+      return static_cast<ImplClass*>(this)->visitData(Data, Size);
+    }
     }
   }
 };
@@ -564,6 +569,26 @@ sourcekitd_variant_string_get_ptr(sourcekitd_variant_t obj) {
   // Default implementation:
   // Assume this is a variant encapsulating the basic type.
   return (const char *)obj.data[1];
+}
+
+size_t
+sourcekitd_variant_data_get_size(sourcekitd_variant_t obj) {
+  if (auto fn = VAR_FN(obj, data_get_size))
+    return fn(obj);
+
+  // Default implementation:
+  // We store the byte's length in data[2] and its data in data[1]
+  return obj.data[2];
+}
+
+const void *
+sourcekitd_variant_data_get_ptr(sourcekitd_variant_t obj) {
+  if (auto fn = VAR_FN(obj, data_get_ptr))
+    return fn(obj);
+
+  // Default implementation:
+  // We store the byte's length in data[2] and its data in data[1]
+  return reinterpret_cast<void *>(obj.data[1]);
 }
 
 sourcekitd_uid_t

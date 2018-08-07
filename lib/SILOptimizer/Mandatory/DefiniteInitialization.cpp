@@ -1087,14 +1087,15 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
     // Otherwise, we produce a generic error.
     FuncDecl *FD = nullptr;
     bool isAssignment = false;
-    
-    if (auto *Apply = dyn_cast<ApplyInst>(Use.Inst)) {
+
+    auto Apply = FullApplySite::isa(Use.Inst);
+    if (Apply) {
       // If this is a method application, produce a nice, specific, error.
-      if (auto *WMI = dyn_cast<MethodInst>(Apply->getOperand(0)))
+      if (auto *WMI = dyn_cast<MethodInst>(Apply.getCallee()))
         FD = dyn_cast<FuncDecl>(WMI->getMember().getDecl());
       
       // If this is a direct/devirt method application, check the location info.
-      if (auto *Fn = Apply->getReferencedFunction()) {
+      if (auto *Fn = Apply.getReferencedFunction()) {
         if (Fn->hasLocation()) {
           auto SILLoc = Fn->getLocation();
           FD = SILLoc.getAsASTNode<FuncDecl>();
@@ -1104,9 +1105,9 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
       // If we failed to find the decl a clean and principled way, try hacks:
       // map back to the AST and look for some common patterns.
       if (!FD) {
-        if (Apply->getLoc().getAsASTNode<AssignExpr>())
+        if (Apply.getLoc().getAsASTNode<AssignExpr>())
           isAssignment = true;
-        else if (auto *CE = Apply->getLoc().getAsASTNode<ApplyExpr>()) {
+        else if (auto *CE = Apply.getLoc().getAsASTNode<ApplyExpr>()) {
           if (auto *DSCE = dyn_cast<SelfApplyExpr>(CE->getFn()))
             // Normal method calls are curried, so they are:
             // (call_expr (dot_syntax_call_expr (decl_ref_expr METHOD)))
@@ -2521,7 +2522,7 @@ putIntoWorkList(SILBasicBlock *BB, WorkListType &WorkList) {
   LiveOutBlockState &State = getBlockInfo(BB);
   if (!State.isInWorkList && State.containsUndefinedValues()) {
     LLVM_DEBUG(llvm::dbgs() << "    add block " << BB->getDebugID()
-          << " to worklist\n");
+                            << " to worklist\n");
     WorkList.push_back(BB);
     State.isInWorkList = true;
   }
@@ -2529,7 +2530,8 @@ putIntoWorkList(SILBasicBlock *BB, WorkListType &WorkList) {
 
 void LifetimeChecker::
 computePredsLiveOut(SILBasicBlock *BB) {
-  LLVM_DEBUG(llvm::dbgs() << "  Get liveness for block " << BB->getDebugID() << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "  Get liveness for block " << BB->getDebugID()
+                          << "\n");
   
   // Collect blocks for which we have to calculate the out-availability.
   // These are the paths from blocks with known out-availability to the BB.
@@ -2567,8 +2569,9 @@ computePredsLiveOut(SILBasicBlock *BB) {
       for (auto Pred : WorkBB->getPredecessorBlocks()) {
         changed |= BBState.mergeFromPred(getBlockInfo(Pred));
       }
-      LLVM_DEBUG(llvm::dbgs() << "      Block " << WorkBB->getDebugID() << " out: "
-            << BBState.OutAvailability << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "      Block " << WorkBB->getDebugID()
+                              << " out: "
+                              << BBState.OutAvailability << "\n");
 
       // Clear the worklist-flag for the next call to computePredsLiveOut().
       // This could be moved out of the outer loop, but doing it here avoids
@@ -2641,7 +2644,7 @@ AvailabilitySet LifetimeChecker::getLivenessAtInst(SILInstruction *Inst,
                                                    unsigned FirstElt,
                                                    unsigned NumElts) {
   LLVM_DEBUG(llvm::dbgs() << "Get liveness " << FirstElt << ", #" << NumElts
-                     << " at " << *Inst);
+                          << " at " << *Inst);
 
   AvailabilitySet Result(TheMemory.NumElements);
 
@@ -2845,7 +2848,7 @@ static bool processMemoryObject(MarkUninitializedInst *I) {
 /// properties.
 static bool checkDefiniteInitialization(SILFunction &Fn) {
   LLVM_DEBUG(llvm::dbgs() << "*** Definite Init visiting function: "
-                     <<  Fn.getName() << "\n");
+                          <<  Fn.getName() << "\n");
   bool Changed = false;
 
   for (auto &BB : Fn) {

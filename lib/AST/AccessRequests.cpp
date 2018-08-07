@@ -51,10 +51,12 @@ AccessLevel AccessLevelRequest::evaluate(Evaluator &evaluator,
     switch (accessor->getAccessorKind()) {
     case AccessorKind::Get:
     case AccessorKind::Address:
+    case AccessorKind::Read:
       return storage->getFormalAccess();
     case AccessorKind::Set:
     case AccessorKind::MutableAddress:
     case AccessorKind::MaterializeForSet:
+    case AccessorKind::Modify:
       return storage->getSetterFormalAccess();
     case AccessorKind::WillSet:
     case AccessorKind::DidSet:
@@ -204,12 +206,9 @@ DefaultAndMaxAccessLevelRequest::evaluate(Evaluator &evaluator,
 
   AccessLevel maxAccess = AccessLevel::Public;
 
-  if (!ED->getExtendedType().isNull() &&
-      !ED->getExtendedType()->hasError()) {
-    if (NominalTypeDecl *nominal = ED->getExtendedType()->getAnyNominal()) {
-      maxAccess = std::max(nominal->getFormalAccess(),
-                           AccessLevel::FilePrivate);
-    }
+  if (NominalTypeDecl *nominal = ED->getExtendedNominal()) {
+    maxAccess = std::max(nominal->getFormalAccess(),
+                         AccessLevel::FilePrivate);
   }
 
   if (const GenericParamList *genericParams = ED->getGenericParams()) {

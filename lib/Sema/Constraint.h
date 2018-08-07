@@ -249,6 +249,13 @@ enum class FixKind : uint8_t {
   ExplicitlyEscaping,
   /// Mark function type as explicitly '@escaping' to be convertable to 'Any'.
   ExplicitlyEscapingToAny,
+
+  /// Arguments have labeling failures - missing/extraneous or incorrect
+  /// labels attached to the, fix it by suggesting proper labels.
+  RelabelArguments,
+
+  /// Add a new conformance to the type to satisfy a requirement.
+  AddConformance,
 };
 
 /// Describes a fix that can be applied to a constraint before visiting it.
@@ -276,6 +283,11 @@ public:
   /// with the given name.
   static Fix getUnwrapOptionalBase(ConstraintSystem &cs, DeclName memberName);
 
+  /// Produce a new fix that re-labels existing arguments so they much
+  /// what parameters expect.
+  static Fix fixArgumentLabels(ConstraintSystem &cs,
+                               ArrayRef<Identifier> newLabels);
+
   /// Retrieve the kind of fix.
   FixKind getKind() const { return Kind; }
 
@@ -284,6 +296,12 @@ public:
 
   /// If this fix has a name argument, retrieve it.
   DeclName getDeclNameArgument(ConstraintSystem &cs) const;
+
+  /// If this fix is an argument re-labeling, retrieve new labels.
+  ArrayRef<Identifier> getArgumentLabels(ConstraintSystem &cs) const;
+
+  /// If this fix has optional result info, retrieve it.
+  bool isUnwrapOptionalBaseByOptionalChaining(ConstraintSystem &cs) const;
 
   /// Return a string representation of a fix.
   static llvm::StringRef getName(FixKind kind);

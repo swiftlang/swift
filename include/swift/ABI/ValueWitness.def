@@ -72,7 +72,7 @@
 ///     MUTABLE_BUFFER_TYPE - a pointer to a fixed-size value buffer
 ///     IMMUTABLE_BUFFER_TYPE - a pointer to an immutable fixed-size buffer
 ///     TYPE_TYPE - a pointer to type metadata
-///     SIZE_TYPE - size_t
+///     SIZE_TYPE - StoredSize
 ///     INT_TYPE - int
 ///     UINT_TYPE - unsigned int
 ///     VOID_TYPE - void
@@ -193,7 +193,7 @@ FUNCTION_VALUE_WITNESS(storeEnumTagSinglePayload,
 END_VALUE_WITNESS_RANGE(RequiredValueWitnessFunction,
                         StoreEnumTagSinglePayload)
 
-///   size_t size;
+///   SIZE_TYPE size;
 ///
 /// The required storage size of a single object of this type.
 DATA_VALUE_WITNESS(size,
@@ -206,7 +206,7 @@ BEGIN_VALUE_WITNESS_RANGE(TypeLayoutWitness,
 BEGIN_VALUE_WITNESS_RANGE(RequiredTypeLayoutWitness,
                           Size)
 
-///   size_t flags;
+///   SIZE_TYPE flags;
 ///
 /// The ValueWitnessAlignmentMask bits represent the required
 /// alignment of the first byte of an object of this type, expressed
@@ -235,7 +235,7 @@ DATA_VALUE_WITNESS(flags,
                    Flags,
                    SIZE_TYPE)
 
-///   size_t stride;
+///   SIZE_TYPE stride;
 ///
 /// The required size per element of an array of this type. It is at least
 /// one, even for zero-sized types, like the empty tuple.
@@ -256,7 +256,7 @@ END_VALUE_WITNESS_RANGE(RequiredValueWitness,
 // The following value witnesses are conditionally present based on
 // the Enum_HasExtraInhabitants bit of the flags.
 
-///   size_t extraInhabitantFlags;
+///   SIZE_TYPE extraInhabitantFlags;
 ///
 /// These bits are always present if the extra inhabitants witnesses are:
 ///

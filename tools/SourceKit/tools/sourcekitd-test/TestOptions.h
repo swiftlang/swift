@@ -107,7 +107,6 @@ struct TestOptions {
   bool timeRequest = false;
   unsigned repeatRequest = 1;
   llvm::Optional<bool> CancelOnSubsequentRequest;
-  bool ForceLibSyntaxBasedProcessing = false;
   bool parseArgs(llvm::ArrayRef<const char *> Args);
   void printHelp(bool ShowHidden) const;
 };

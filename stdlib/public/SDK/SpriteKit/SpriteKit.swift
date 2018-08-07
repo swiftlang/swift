@@ -25,7 +25,7 @@ public typealias SKColor = UIColor
 // since that method only exists in a private header in SpriteKit, the lookup
 // mechanism by default fails to accept it as a valid AnyObject call
 @objc class _SpriteKitMethodProvider : NSObject {
-  override init() { _sanityCheckFailure("don't touch me") }
+  override init() { preconditionFailure("don't touch me") }
   @objc func _copyImageData() -> NSData! { return nil }
 }
 
@@ -64,13 +64,13 @@ extension SKWarpGeometryGrid {
     case (0, 0):
         self.init(__columns: columns, rows: rows, sourcePositions: nil, destPositions: nil)
     case (let dests, 0):
-        _precondition(dests == requiredElementsCount, "Mismatch found between rows/columns and positions.")
+        precondition(dests == requiredElementsCount, "Mismatch found between rows/columns and positions.")
         self.init(__columns: columns, rows: rows, sourcePositions: nil, destPositions: destinationPositions)
     case (0, let sources):
-        _precondition(sources == requiredElementsCount, "Mismatch found between rows/columns and positions.")
+        precondition(sources == requiredElementsCount, "Mismatch found between rows/columns and positions.")
         self.init(__columns: columns, rows: rows, sourcePositions: sourcePositions, destPositions: nil)
     case (let dests, let sources):
-        _precondition(dests == requiredElementsCount && sources == requiredElementsCount, "Mismatch found between rows/columns and positions.")
+        precondition(dests == requiredElementsCount && sources == requiredElementsCount, "Mismatch found between rows/columns and positions.")
         self.init(__columns: columns, rows: rows, sourcePositions: sourcePositions, destPositions: destinationPositions)
     }
   }

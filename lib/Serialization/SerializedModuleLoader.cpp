@@ -12,10 +12,10 @@
 
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/ModuleFile.h"
-#include "swift/Strings.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/FileTypes.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Version.h"
@@ -40,7 +40,8 @@ SerializedModuleLoader::SerializedModuleLoader(ASTContext &ctx,
 SerializedModuleLoader::~SerializedModuleLoader() = default;
 
 static std::error_code
-openModuleFiles(StringRef DirName, StringRef ModuleFilename,
+openModuleFiles(clang::vfs::FileSystem &FS,
+                StringRef DirName, StringRef ModuleFilename,
                 StringRef ModuleDocFilename,
                 std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
                 std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
@@ -60,7 +61,7 @@ openModuleFiles(StringRef DirName, StringRef ModuleFilename,
   }
 
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> ModuleOrErr =
-  llvm::MemoryBuffer::getFile(StringRef(Scratch.data(), Scratch.size()));
+      FS.getBufferForFile(StringRef(Scratch.data(), Scratch.size()));
   if (!ModuleOrErr)
     return ModuleOrErr.getError();
 
@@ -69,7 +70,7 @@ openModuleFiles(StringRef DirName, StringRef ModuleFilename,
   Scratch.clear();
   llvm::sys::path::append(Scratch, DirName, ModuleDocFilename);
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> ModuleDocOrErr =
-      llvm::MemoryBuffer::getFile(StringRef(Scratch.data(), Scratch.size()));
+      FS.getBufferForFile(StringRef(Scratch.data(), Scratch.size()));
   if (!ModuleDocOrErr &&
       ModuleDocOrErr.getError() != std::errc::no_such_file_or_directory) {
     return ModuleDocOrErr.getError();
@@ -106,8 +107,8 @@ static void addDiagnosticInfoForArchitectureMismatch(ASTContext &ctx,
     auto entry = *directoryIterator;
     StringRef filePath(entry.path());
     StringRef extension = llvm::sys::path::extension(filePath);
-    if (extension.startswith(".") &&
-        extension.drop_front() == SERIALIZED_MODULE_EXTENSION) {
+    if (file_types::lookupTypeForExtension(extension) ==
+          file_types::TY_SwiftModuleFile) {
       foundArchs = foundArchs + (foundArchs.length() > 0 ? ", " : "") +
                    llvm::sys::path::stem(filePath).str();
     }
@@ -125,11 +126,12 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
   llvm::SmallString<64> moduleName(moduleID.first.str());
   llvm::SmallString<64> moduleFilename(moduleName);
   moduleFilename += '.';
-  moduleFilename += SERIALIZED_MODULE_EXTENSION;
+  moduleFilename += file_types::getExtension(file_types::TY_SwiftModuleFile);
 
   llvm::SmallString<64> moduleDocFilename(moduleID.first.str());
   moduleDocFilename += '.';
-  moduleDocFilename += SERIALIZED_MODULE_DOC_EXTENSION;
+  moduleDocFilename +=
+      file_types::getExtension(file_types::TY_SwiftModuleDocFile);
 
   // FIXME: Which name should we be using here? Do we care about CPU subtypes?
   // FIXME: At the very least, don't hardcode "arch".
@@ -139,24 +141,24 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
   llvm::SmallString<16> archDocFile{archName};
   if (!archFile.empty()) {
     archFile += '.';
-    archFile += SERIALIZED_MODULE_EXTENSION;
+    archFile += file_types::getExtension(file_types::TY_SwiftModuleFile);
 
     archDocFile += '.';
-    archDocFile += SERIALIZED_MODULE_DOC_EXTENSION;
+    archDocFile += file_types::getExtension(file_types::TY_SwiftModuleDocFile);
   }
 
   llvm::SmallString<128> scratch;
   llvm::SmallString<128> currPath;
   isFramework = false;
   for (auto path : ctx.SearchPathOpts.ImportSearchPaths) {
-    auto err = openModuleFiles(path,
+    auto err = openModuleFiles(*ctx.SourceMgr.getFileSystem(), path,
                                moduleFilename.str(), moduleDocFilename.str(),
                                moduleBuffer, moduleDocBuffer,
                                scratch);
     if (err == std::errc::is_a_directory) {
       currPath = path;
       llvm::sys::path::append(currPath, moduleFilename.str());
-      err = openModuleFiles(currPath,
+      err = openModuleFiles(*ctx.SourceMgr.getFileSystem(), currPath,
                             archFile.str(), archDocFile.str(),
                             moduleBuffer, moduleDocBuffer,
                             scratch);
@@ -185,7 +187,8 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
       }
 
       llvm::sys::path::append(currPath, "Modules", moduleFilename.str());
-      auto err = openModuleFiles(currPath, archFile.str(), archDocFile.str(),
+      auto err = openModuleFiles(*ctx.SourceMgr.getFileSystem(),
+                                 currPath, archFile.str(), archDocFile.str(),
                                  moduleBuffer, moduleDocBuffer, scratch);
 
       if (err == std::errc::no_such_file_or_directory) {
@@ -223,9 +226,46 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
 
   // Search the runtime import path.
   isFramework = false;
-  return !openModuleFiles(ctx.SearchPathOpts.RuntimeLibraryImportPath,
+  return !openModuleFiles(*ctx.SourceMgr.getFileSystem(),
+                          ctx.SearchPathOpts.RuntimeLibraryImportPath,
                           moduleFilename.str(), moduleDocFilename.str(),
                           moduleBuffer, moduleDocBuffer, scratch);
+}
+
+static std::pair<StringRef, clang::VersionTuple>
+getOSAndVersionForDiagnostics(const llvm::Triple &triple) {
+  StringRef osName;
+  unsigned major, minor, micro;
+  if (triple.isMacOSX()) {
+    // macOS triples represent their versions differently, so we have to use the
+    // special accessor.
+    triple.getMacOSXVersion(major, minor, micro);
+    osName = swift::prettyPlatformString(PlatformKind::OSX);
+  } else {
+    triple.getOSVersion(major, minor, micro);
+    if (triple.isWatchOS()) {
+      osName = swift::prettyPlatformString(PlatformKind::watchOS);
+    } else if (triple.isTvOS()) {
+      assert(triple.isiOS() &&
+             "LLVM treats tvOS as a kind of iOS, so tvOS is checked first");
+      osName = swift::prettyPlatformString(PlatformKind::tvOS);
+    } else if (triple.isiOS()) {
+      osName = swift::prettyPlatformString(PlatformKind::iOS);
+    } else {
+      assert(!triple.isOSDarwin() && "unknown Apple OS");
+      // Fallback to the LLVM triple name. This isn't great (it won't be
+      // capitalized or anything), but it's better than nothing.
+      osName = triple.getOSName();
+    }
+  }
+
+  assert(!osName.empty());
+  clang::VersionTuple version;
+  if (micro != 0)
+    version = clang::VersionTuple(major, minor, micro);
+  else
+    version = clang::VersionTuple(major, minor);
+  return {osName, version};
 }
 
 FileUnit *SerializedModuleLoader::loadAST(
@@ -432,22 +472,17 @@ FileUnit *SerializedModuleLoader::loadAST(
     if (Ctx.LangOpts.DebuggerSupport)
       diagKind = diag::serialization_target_incompatible_repl;
     Ctx.Diags.diagnose(*diagLoc, diagKind,
-                       loadInfo.targetTriple, moduleBufferID);
+                       M.getName(), loadInfo.targetTriple, moduleBufferID);
     break;
   }
 
   case serialization::Status::TargetTooNew: {
     llvm::Triple moduleTarget(llvm::Triple::normalize(loadInfo.targetTriple));
 
-    StringRef osName;
-    unsigned major, minor, micro;
-    if (moduleTarget.isMacOSX()) {
-      osName = swift::prettyPlatformString(PlatformKind::OSX);
-      moduleTarget.getMacOSXVersion(major, minor, micro);
-    } else {
-      osName = moduleTarget.getOSName();
-      moduleTarget.getOSVersion(major, minor, micro);
-    }
+    std::pair<StringRef, clang::VersionTuple> moduleOSInfo =
+        getOSAndVersionForDiagnostics(moduleTarget);
+    std::pair<StringRef, clang::VersionTuple> compilationOSInfo =
+        getOSAndVersionForDiagnostics(Ctx.LangOpts.Target);
 
     // FIXME: This doesn't handle a non-debugger REPL, which should also treat
     // this as a non-fatal error.
@@ -455,7 +490,8 @@ FileUnit *SerializedModuleLoader::loadAST(
     if (Ctx.LangOpts.DebuggerSupport)
       diagKind = diag::serialization_target_too_new_repl;
     Ctx.Diags.diagnose(*diagLoc, diagKind,
-                       osName, major, minor, micro, moduleBufferID);
+                       compilationOSInfo.first, compilationOSInfo.second,
+                       M.getName(), moduleOSInfo.second, moduleBufferID);
     break;
   }
   }

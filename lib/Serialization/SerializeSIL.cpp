@@ -44,7 +44,6 @@ using llvm::BCBlockRAII;
 
 static unsigned toStableStringEncoding(StringLiteralInst::Encoding encoding) {
   switch (encoding) {
-  // SWIFT_ENABLE_TENSORFLOW
   case StringLiteralInst::Encoding::Bytes: return SIL_BYTES;
   case StringLiteralInst::Encoding::UTF8: return SIL_UTF8;
   case StringLiteralInst::Encoding::UTF16: return SIL_UTF16;
@@ -212,7 +211,7 @@ namespace {
                     "layout has invalid record code");
       SILAbbrCodes[Layout::Code] = Layout::emitAbbrev(Out);
       LLVM_DEBUG(llvm::dbgs() << "SIL abbre code " << SILAbbrCodes[Layout::Code]
-                         << " for layout " << Layout::Code << "\n");
+                              << " for layout " << Layout::Code << "\n");
     }
 
     bool ShouldSerializeAll;
@@ -364,8 +363,8 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   unsigned abbrCode = SILAbbrCodes[SILFunctionLayout::Code];
   TypeID FnID = S.addTypeRef(F.getLoweredType().getASTType());
   LLVM_DEBUG(llvm::dbgs() << "SILFunction " << F.getName() << " @ BitNo "
-                     << Out.GetCurrentBitNo() << " abbrCode " << abbrCode
-                     << " FnID " << FnID << "\n");
+                          << Out.GetCurrentBitNo() << " abbrCode " << abbrCode
+                          << " FnID " << FnID << "\n");
   LLVM_DEBUG(llvm::dbgs() << "Serialized SIL:\n"; F.dump());
 
   SmallVector<IdentifierID, 1> SemanticsIDs;

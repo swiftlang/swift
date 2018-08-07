@@ -194,34 +194,8 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
   }
 
   case DeclContextKind::ExtensionDecl: {
-    Type Ty = cast<ExtensionDecl>(Context)->getExtendedType();
-    TypeBase *Base = Ty->getCanonicalType().getPointer();
-    const NominalTypeDecl *ExtNominal = nullptr;
-    switch (Base->getKind()) {
-      default:
-        llvm_unreachable("unhandled context kind in SILPrint!");
-      case TypeKind::Protocol:
-        ExtNominal = cast<ProtocolType>(Base)->getDecl();
-        break;
-      case TypeKind::Enum:
-        ExtNominal = cast<EnumType>(Base)->getDecl();
-        break;
-      case TypeKind::Struct:
-        ExtNominal = cast<StructType>(Base)->getDecl();
-        break;
-      case TypeKind::Class:
-        ExtNominal = cast<ClassType>(Base)->getDecl();
-        break;
-      case TypeKind::BoundGenericEnum:
-        ExtNominal = cast<BoundGenericEnumType>(Base)->getDecl();
-        break;
-      case TypeKind::BoundGenericStruct:
-        ExtNominal = cast<BoundGenericStructType>(Base)->getDecl();
-        break;
-      case TypeKind::BoundGenericClass:
-        ExtNominal = cast<BoundGenericClassType>(Base)->getDecl();
-        break;
-    }
+    const NominalTypeDecl *ExtNominal =
+      cast<ExtensionDecl>(Context)->getExtendedNominal();
     printFullContext(ExtNominal->getDeclContext(), Buffer);
     Buffer << ExtNominal->getName() << ".";
     return;
@@ -313,6 +287,14 @@ void SILDeclRef::print(raw_ostream &OS) const {
       case AccessorKind::MutableAddress:
         printValueDecl(accessor->getStorage(), OS);
         OS << "!mutableAddressor";
+        break;
+      case AccessorKind::Read:
+        printValueDecl(accessor->getStorage(), OS);
+        OS << "!read";
+        break;
+      case AccessorKind::Modify:
+        printValueDecl(accessor->getStorage(), OS);
+        OS << "!modify";
         break;
       }
     }
@@ -583,8 +565,7 @@ public:
 
     // If SIL ownership is enabled and the given function has not had ownership
     // stripped out, print out ownership of SILArguments.
-    if (BB->getModule().getOptions().EnableSILOwnership &&
-        BB->getParent()->hasQualifiedOwnership()) {
+    if (BB->getParent()->hasQualifiedOwnership()) {
       *this << getIDAndTypeAndOwnership(Args[0]);
       for (SILArgument *Arg : Args.drop_front()) {
         *this << ", " << getIDAndTypeAndOwnership(Arg);
@@ -1333,7 +1314,6 @@ public:
   }
   static StringRef getStringEncodingName(StringLiteralInst::Encoding kind) {
     switch (kind) {
-    // SWIFT_ENABLE_TENSORFLOW
     case StringLiteralInst::Encoding::Bytes: return "bytes ";
     case StringLiteralInst::Encoding::UTF8: return "utf8 ";
     case StringLiteralInst::Encoding::UTF16: return "utf16 ";
@@ -1345,7 +1325,6 @@ public:
   void visitStringLiteralInst(StringLiteralInst *SLI) {
     *this << getStringEncodingName(SLI->getEncoding());
 
-    // SWIFT_ENABLE_TENSORFLOW
     if (SLI->getEncoding() != StringLiteralInst::Encoding::Bytes) {
       // FIXME: this isn't correct: this doesn't properly handle translating
       // UTF16 into UTF8, and the SIL parser always parses as UTF8.

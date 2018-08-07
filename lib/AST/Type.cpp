@@ -3246,24 +3246,6 @@ Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
   llvm_unreachable("no inheritance relationship between given classes");
 }
 
-Type TypeBase::getGenericAncestor() {
-  Type t = getConcreteTypeForSuperclassTraversing(this);
-
-  while (t && !t->hasError()) {
-    auto NTD = t->getAnyNominal();
-    assert(NTD && "expected nominal type in NTD");
-    if (!NTD)
-      return Type();
-
-    if (NTD->isGenericContext())
-      return t;
-
-    t = t->getSuperclass();
-  }
-
-  return Type();
-}
-
 TypeSubstitutionMap
 TypeBase::getContextSubstitutions(const DeclContext *dc,
                                   GenericEnvironment *genericEnv) {
@@ -4073,9 +4055,8 @@ static bool doesOpaqueClassUseNativeReferenceCounting(const ASTContext &ctx) {
 static bool usesNativeReferenceCounting(ClassDecl *theClass,
                                         ResilienceExpansion resilience) {
   // TODO: Resilience? there might be some legal avenue of changing this.
-  while (Type supertype = theClass->getSuperclass()) {
-    theClass = supertype->getClassOrBoundGenericClass();
-    assert(theClass);
+  while (auto superclass = theClass->getSuperclassDecl()) {
+    theClass = superclass;
   }
   return !theClass->hasClangNode();
 }

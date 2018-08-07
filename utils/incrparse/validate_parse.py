@@ -1,24 +1,14 @@
 #!/usr/bin/env python
 
 from __future__ import print_function
+
 import argparse
 import os
 import subprocess
 import sys
 
-from test_util import TestFailedError, serializeIncrParseMarkupFile
-
-
-def escapeCmdArg(arg):
-    if '"' in arg or ' ' in arg:
-        return '"%s"' % arg.replace('"', '\\"')
-    else:
-        return arg
-
-
-def run_command(cmd):
-    print(' '.join([escapeCmdArg(arg) for arg in cmd]))
-    return subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+from test_util import TestFailedError, run_command, \
+    serializeIncrParseMarkupFile
 
 
 def main():
@@ -83,6 +73,7 @@ def main():
         serializeIncrParseMarkupFile(test_file=test_file, 
                                      test_case=test_case, 
                                      mode='incremental', 
+                                     serialization_mode='full',
                                      omit_node_ids=True,
                                      output_file=incremental_serialized_file, 
                                      temp_dir=temp_dir + '/temp', 
@@ -96,6 +87,7 @@ def main():
         serializeIncrParseMarkupFile(test_file=test_file, 
                                      test_case=test_case, 
                                      mode='post-edit', 
+                                     serialization_mode='full',
                                      omit_node_ids=True,
                                      output_file=post_edit_serialized_file, 
                                      temp_dir=temp_dir + '/temp', 

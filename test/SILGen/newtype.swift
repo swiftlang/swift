@@ -17,7 +17,7 @@ func createErrorDomain(str: String) -> ErrorDomain {
 }
 
 // CHECK-RAW-LABEL: sil shared [transparent] [serializable] @$SSo14SNTErrorDomaina8rawValueABSS_tcfC
-// CHECK-RAW: bb0([[STR:%[0-9]+]] : $String,
+// CHECK-RAW: bb0([[STR:%[0-9]+]] : @owned $String,
 // CHECK-RAW: [[SELF_BOX:%[0-9]+]] = alloc_box ${ var ErrorDomain }, var, name "self"
 // CHECK-RAW: [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [rootself] [[SELF_BOX]]
 // CHECK-RAW: [[PB_BOX:%[0-9]+]] = project_box [[MARKED_SELF_BOX]]
@@ -37,7 +37,7 @@ func getRawValue(ed: ErrorDomain) -> String {
 }
 
 // CHECK-RAW-LABEL: sil shared [serializable] @$SSo14SNTErrorDomaina8rawValueSSvg
-// CHECK-RAW: bb0([[SELF:%[0-9]+]] : $ErrorDomain):
+// CHECK-RAW: bb0([[SELF:%[0-9]+]] : @guaranteed $ErrorDomain):
 // CHECK-RAW: [[STORED_VALUE:%[0-9]+]] = struct_extract [[SELF]] : $ErrorDomain, #ErrorDomain._rawValue
 // CHECK-RAW: [[STORED_VALUE_COPY:%.*]] = copy_value [[STORED_VALUE]]
 // CHECK-RAW: [[BRIDGE_FN:%[0-9]+]] = function_ref @$SSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ

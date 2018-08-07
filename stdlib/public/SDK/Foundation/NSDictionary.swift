@@ -35,7 +35,7 @@ extension Dictionary {
   /// The provided `NSDictionary` will be copied to ensure that the copy can
   /// not be mutated by other code.
   public init(_cocoaDictionary: _NSDictionary) {
-    _sanityCheck(
+    assert(
       _isBridgedVerbatimToObjectiveC(Key.self) &&
       _isBridgedVerbatimToObjectiveC(Value.self),
       "Dictionary can be backed by NSDictionary storage only when both key and value are bridged verbatim to Objective-C")
@@ -228,8 +228,8 @@ extension NSDictionary {
     let alignment = MemoryLayout<AnyObject>.alignment
     let singleSize = stride * numElems
     let totalSize = singleSize * 2
-    _sanityCheck(stride == MemoryLayout<NSCopying>.stride)
-    _sanityCheck(alignment == MemoryLayout<NSCopying>.alignment)
+    assert(stride == MemoryLayout<NSCopying>.stride)
+    assert(alignment == MemoryLayout<NSCopying>.alignment)
 
     // Allocate a buffer containing both the keys and values.
     let buffer = UnsafeMutableRawPointer.allocate(

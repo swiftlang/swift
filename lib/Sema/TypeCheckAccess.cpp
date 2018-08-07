@@ -615,9 +615,7 @@ void AccessControlChecker::check(Decl *D) {
 
     checkGenericParamAccess(CD->getGenericParams(), CD);
 
-    if (CD->hasSuperclass()) {
-      const NominalTypeDecl *superclassDecl =
-          CD->getSuperclass()->getAnyNominal();
+    if (const NominalTypeDecl *superclassDecl = CD->getSuperclassDecl()) {
       // Be slightly defensive here in the presence of badly-ordered
       // inheritance clauses.
       auto superclassLocIter = std::find_if(CD->getInherited().begin(),
@@ -1134,8 +1132,7 @@ void UsableFromInlineChecker::check(Decl *D) {
     checkGenericParamAccess(CD->getGenericParams(), CD);
 
     if (CD->hasSuperclass()) {
-      const NominalTypeDecl *superclassDecl =
-          CD->getSuperclass()->getAnyNominal();
+      const NominalTypeDecl *superclassDecl = CD->getSuperclassDecl();
       // Be slightly defensive here in the presence of badly-ordered
       // inheritance clauses.
       auto superclassLocIter = std::find_if(CD->getInherited().begin(),

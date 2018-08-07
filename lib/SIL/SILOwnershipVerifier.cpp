@@ -1470,6 +1470,7 @@ private:
   bool checkValueWithoutLifetimeEndingUses();
 
   bool checkFunctionArgWithoutLifetimeEndingUses(SILFunctionArgument *Arg);
+  bool checkYieldWithoutLifetimeEndingUses(BeginApplyResult *Yield);
 
   bool isGuaranteedFunctionArgWithLifetimeEndingUses(
       SILFunctionArgument *Arg,
@@ -1657,10 +1658,38 @@ bool SILValueOwnershipChecker::checkFunctionArgWithoutLifetimeEndingUses(
   });
 }
 
+bool SILValueOwnershipChecker::checkYieldWithoutLifetimeEndingUses(
+    BeginApplyResult *Yield) {
+  switch (Yield->getOwnershipKind()) {
+  case ValueOwnershipKind::Guaranteed:
+  case ValueOwnershipKind::Unowned:
+  case ValueOwnershipKind::Trivial:
+    return true;
+  case ValueOwnershipKind::Any:
+    llvm_unreachable("Yields should never have ValueOwnershipKind::Any");
+  case ValueOwnershipKind::Owned:
+    break;
+  }
+
+  if (DEBlocks.isDeadEnd(Yield->getParent()->getParent()))
+    return true;
+
+  return !handleError([&] {
+    llvm::errs() << "Function: '" << Yield->getFunction()->getName() << "'\n"
+                 << "    Owned yield without life ending uses!\n"
+                 << "Value: " << *Yield << '\n';
+  });
+}
 bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses() {
   LLVM_DEBUG(llvm::dbgs() << "    No lifetime ending users?! Bailing early.\n");
   if (auto *Arg = dyn_cast<SILFunctionArgument>(Value)) {
     if (checkFunctionArgWithoutLifetimeEndingUses(Arg)) {
+      return true;
+    }
+  }
+
+  if (auto *Yield = dyn_cast<BeginApplyResult>(Value)) {
+    if (checkYieldWithoutLifetimeEndingUses(Yield)) {
       return true;
     }
   }
@@ -1679,10 +1708,10 @@ bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses() {
   if (auto *ParentBlock = Value->getParentBlock()) {
     if (DEBlocks.isDeadEnd(ParentBlock)) {
       LLVM_DEBUG(llvm::dbgs() << "    Ignoring transitively unreachable value "
-                         << "without users!\n"
-                         << "    Function: '" << Value->getFunction()->getName()
-                         << "'\n"
-                         << "    Value: " << *Value << '\n');
+                              << "without users!\n"
+                              << "    Function: '"
+                              << Value->getFunction()->getName() << "'\n"
+                              << "    Value: " << *Value << '\n');
       return true;
     }
   }
@@ -1766,8 +1795,8 @@ bool SILValueOwnershipChecker::checkUses() {
     return false;
   }
 
-  LLVM_DEBUG(llvm::dbgs() << "    Found lifetime ending users! Performing initial "
-                        "checks\n");
+  LLVM_DEBUG(llvm::dbgs() << "    Found lifetime ending users! Performing "
+                             "initial checks\n");
 
   // See if we have a guaranteed function address. Guaranteed function addresses
   // should never have any lifetime ending uses.

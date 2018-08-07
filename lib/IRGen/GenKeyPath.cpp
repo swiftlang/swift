@@ -46,10 +46,15 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/IRGen/Linking.h"
 
 using namespace swift;
 using namespace irgen;
+
+#define DEBUG_TYPE "IRGen key paths"
+STATISTIC(NumTrivialPropertyDescriptors, "# of trivial property descriptors");
+STATISTIC(NumNonTrivialPropertyDescriptors, "# of nontrivial property descriptors");
 
 enum KeyPathAccessor {
   Getter,
@@ -702,6 +707,27 @@ emitMetadataGeneratorForKeyPath(IRGenModule &IGM,
     });
 };
 
+static llvm::Function *
+emitWitnessTableGeneratorForKeyPath(IRGenModule &IGM,
+                                    CanType type,
+                                    ProtocolConformanceRef conformance,
+                                    GenericEnvironment *genericEnv,
+                                    ArrayRef<GenericRequirement> requirements) {
+  // TODO: Use the standard conformance accessor when there are no arguments
+  // and the conformance accessor is defined.
+  return emitGeneratorForKeyPath(IGM, "keypath_get_witness_table", type,
+    IGM.WitnessTablePtrTy,
+    genericEnv, requirements,
+    [&](IRGenFunction &IGF, CanType substType) {
+      if (type->hasTypeParameter())
+        conformance = conformance.subst(type,
+          QueryInterfaceTypeSubstitutions(genericEnv),
+          LookUpConformanceInSignature(*genericEnv->getGenericSignature()));
+      auto ret = emitWitnessTableRef(IGF, substType, conformance);
+      IGF.Builder.CreateRet(ret);
+    });
+}
+
 static void
 emitKeyPathComponent(IRGenModule &IGM,
                      ConstantStructBuilder &fields,
@@ -815,6 +841,46 @@ emitKeyPathComponent(IRGenModule &IGM,
   }
   case KeyPathPatternComponent::Kind::GettableProperty:
   case KeyPathPatternComponent::Kind::SettableProperty: {
+    // If the component references an external property, encode that in a
+    // header before the local attempt header, so that we can consult the
+    // external descriptor at instantiation time.
+    if (auto externalDecl = component.getExternalDecl()) {
+      SmallVector<llvm::Constant *, 4> externalSubArgs;
+      auto componentSig = externalDecl->getInnermostDeclContext()
+        ->getGenericSignatureOfContext();
+      auto subs = component.getExternalSubstitutions();
+      if (!subs.empty()) {
+        enumerateGenericSignatureRequirements(
+          componentSig->getCanonicalSignature(),
+          [&](GenericRequirement reqt) {
+            auto substType = reqt.TypeParameter.subst(subs)
+              ->getCanonicalType();
+            if (!reqt.Protocol) {
+              // Type requirement.
+              externalSubArgs.push_back(
+                emitMetadataGeneratorForKeyPath(IGM, substType,
+                                                genericEnv, requirements));
+            } else {
+              // Protocol requirement.
+              auto conformance = subs.lookupConformance(
+                           reqt.TypeParameter->getCanonicalType(), reqt.Protocol);
+              externalSubArgs.push_back(
+                emitWitnessTableGeneratorForKeyPath(IGM, substType,
+                                                    *conformance,
+                                                    genericEnv, requirements));
+            }
+          });
+      }
+      fields.addInt32(
+        KeyPathComponentHeader::forExternalComponent(externalSubArgs.size())
+          .getData());
+      fields.addAlignmentPadding(IGM.getPointerAlignment());
+      auto descriptor = IGM.getAddrOfPropertyDescriptor(externalDecl);
+      fields.add(descriptor);
+      for (auto *arg : externalSubArgs)
+        fields.add(arg);
+    }
+  
     // Encode the settability.
     bool settable = kind == KeyPathPatternComponent::Kind::SettableProperty;
     KeyPathComponentHeader::ComputedPropertyKind componentKind;
@@ -849,23 +915,43 @@ emitKeyPathComponent(IRGenModule &IGM,
         idValue = IGM.getAddrOfObjCSelectorRef(declRef);
         idResolved = false;
       } else {
-        idKind = KeyPathComponentHeader::VTableOffset;
+        if (auto overridden = declRef.getOverriddenVTableEntry())
+          declRef = overridden;
+
         auto dc = declRef.getDecl()->getDeclContext();
+
+        // If the method context is resilient, use the dispatch thunk as a
+        // stable identifier for the storage.
+        if (IGM.isResilient(cast<NominalTypeDecl>(dc),
+                            ResilienceExpansion::Minimal)) {
+          idKind = KeyPathComponentHeader::Pointer;
+          idValue = IGM.getAddrOfDispatchThunk(declRef, NotForDefinition);
+          idResolved = true;
+          break;
+        }
+      
+        idKind = KeyPathComponentHeader::VTableOffset;
         if (isa<ClassDecl>(dc) && !cast<ClassDecl>(dc)->isForeign()) {
-          auto overridden = declRef.getOverriddenVTableEntry();
           auto declaringClass =
-            cast<ClassDecl>(overridden.getDecl()->getDeclContext());
+            cast<ClassDecl>(declRef.getDecl()->getDeclContext());
           auto &metadataLayout = IGM.getClassMetadataLayout(declaringClass);
-          // FIXME: Resilience. We don't want vtable layout to be ABI, so this
-          // should be encoded as a reference to the method dispatch thunk
-          // instead.
-          auto offset = metadataLayout.getStaticMethodOffset(overridden);
+
+          // For a class method, we don't necessarily need the absolute offset,
+          // only an offset that's unique to this method. For a class with
+          // resilient ancestry, all of the superclass methods will be
+          // identified by their dispatch thunk (see above), so we can use
+          // relative offsets from the dynamic base offset to identify the local
+          // class's own methods.
+          auto methodInfo = metadataLayout.getMethodOffsetInfo(declRef);
+          Size offset;
+          if (methodInfo.isStatic())
+            offset = methodInfo.getStaticOffset();
+          else
+            offset = methodInfo.getRelativeOffset();
+
           idValue = llvm::ConstantInt::get(IGM.SizeTy, offset.getValue());
           idResolved = true;
         } else if (auto methodProto = dyn_cast<ProtocolDecl>(dc)) {
-          // FIXME: Resilience. We don't want witness table layout to be ABI,
-          // so this should be encoded as a reference to the method dispatch
-          // thunk instead.
           auto &protoInfo = IGM.getProtocolInfo(methodProto);
           auto index = protoInfo.getFunctionIndex(
                                cast<AbstractFunctionDecl>(declRef.getDecl()));
@@ -1126,6 +1212,7 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
 
 void IRGenModule::emitSILProperty(SILProperty *prop) {
   if (prop->isTrivial()) {
+    ++NumTrivialPropertyDescriptors;
     // All trivial property descriptors can share a single definition in the
     // translation unit.
     if (!TheTrivialPropertyDescriptor) {
@@ -1151,6 +1238,8 @@ void IRGenModule::emitSILProperty(SILProperty *prop) {
     }
     return;
   }
+
+  ++NumNonTrivialPropertyDescriptors;
 
   ConstantInitBuilder builder(*this);
   ConstantStructBuilder fields = builder.beginStruct();

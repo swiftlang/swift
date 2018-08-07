@@ -393,6 +393,16 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
     Opts.ExtraArgs.push_back(A->getValue());
   }
 
+  for (auto A : Args.getAllArgValues(OPT_debug_prefix_map)) {
+    // Forward -debug-prefix-map arguments from Swift to Clang as
+    // -fdebug-prefix-map. This is required to ensure DIFiles created there,
+    // like "<swift-imported-modules>", have their paths remapped properly.
+    // (Note, however, that Clang's usage of std::map means that the remapping
+    // may not be applied in the same order, which can matter if one mapping is
+    // a prefix of another.)
+    Opts.ExtraArgs.push_back("-fdebug-prefix-map=" + A);
+  }
+
   if (!workingDirectory.empty()) {
     // Provide a working directory to Clang as well if there are any -Xcc
     // options, in case some of them are search-related. But do it at the
@@ -451,6 +461,10 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
 
   for (const Arg *A : Args.filtered(OPT_L)) {
     Opts.LibrarySearchPaths.push_back(resolveSearchPath(A->getValue()));
+  }
+
+  for (const Arg *A : Args.filtered(OPT_vfsoverlay)) {
+    Opts.VFSOverlayFiles.push_back(resolveSearchPath(A->getValue()));
   }
 
   if (const Arg *A = Args.getLastArg(OPT_sdk))
@@ -677,8 +691,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EnableMandatorySemanticARCOpts |=
       !Args.hasArg(OPT_disable_mandatory_semantic_arc_opts);
   Opts.EnableLargeLoadableTypes |= Args.hasArg(OPT_enable_large_loadable_types);
-  Opts.EnableGuaranteedNormalArguments &=
-      !Args.hasArg(OPT_disable_guaranteed_normal_arguments);
 
   if (const Arg *A = Args.getLastArg(OPT_save_optimization_record_path))
     Opts.OptRecordFile = A->getValue();
@@ -822,6 +834,11 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                      : "-gdwarf_types");
   }
 
+  for (auto A : Args.getAllArgValues(options::OPT_debug_prefix_map)) {
+    auto SplitMap = StringRef(A).split('=');
+    Opts.DebugPrefixMap.addMapping(SplitMap.first, SplitMap.second);
+  }
+
   for (const Arg *A : Args.filtered(OPT_Xcc)) {
     StringRef Opt = A->getValue();
     if (Opt.startswith("-D") || Opt.startswith("-U"))
@@ -955,6 +972,20 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   for (const auto &Lib : Args.getAllArgValues(options::OPT_autolink_library))
     Opts.LinkLibraries.push_back(LinkLibrary(Lib, LibraryKind::Library));
+
+  if (const Arg *A = Args.getLastArg(OPT_type_info_dump_filter_EQ)) {
+    StringRef mode(A->getValue());
+    if (mode == "all")
+      Opts.TypeInfoFilter = IRGenOptions::TypeInfoDumpFilter::All;
+    else if (mode == "resilient")
+      Opts.TypeInfoFilter = IRGenOptions::TypeInfoDumpFilter::Resilient;
+    else if (mode == "fragile")
+      Opts.TypeInfoFilter = IRGenOptions::TypeInfoDumpFilter::Fragile;
+    else {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+    }
+  }
 
   return false;
 }

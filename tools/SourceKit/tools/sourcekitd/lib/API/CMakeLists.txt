@@ -8,6 +8,7 @@ set(sourcekitdAPI_sources
   CompactArray.cpp
   DocStructureArray.cpp
   DocSupportAnnotationArray.cpp
+  RawData.cpp
   Requests.cpp
   sourcekitdAPI-Common.cpp
   TokenAnnotationsArray.cpp

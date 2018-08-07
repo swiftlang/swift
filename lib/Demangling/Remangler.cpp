@@ -1122,8 +1122,20 @@ void Remangler::mangleGenericSpecialization(Node *node) {
   }
   assert(!FirstParam && "generic specialization with no substitutions");
 
-  Buffer << (node->getKind() ==
-               Node::Kind::GenericSpecializationNotReAbstracted ? "TG" : "Tg");
+  switch (node->getKind()) {
+  case Node::Kind::GenericSpecialization:
+    Buffer << "Tg";
+    break;
+  case Node::Kind::GenericSpecializationNotReAbstracted:
+    Buffer << "TG";
+    break;
+  case Node::Kind::InlinedGenericFunction:
+    Buffer << "Ti";
+    break;
+ default:
+   unreachable("unsupported node");
+  }
+
   for (NodePointer Child : *node) {
     if (Child->getKind() != Node::Kind::GenericSpecializationParam)
       mangle(Child);
@@ -1133,6 +1145,11 @@ void Remangler::mangleGenericSpecialization(Node *node) {
 void Remangler::mangleGenericSpecializationNotReAbstracted(Node *node) {
   mangleGenericSpecialization(node);
 }
+
+void Remangler::mangleInlinedGenericFunction(Node *node) {
+  mangleGenericSpecialization(node);
+}
+
 
 void Remangler::mangleGenericSpecializationParam(Node *node) {
   unreachable("handled inline");
@@ -1161,6 +1178,7 @@ void Remangler::mangleGlobal(Node *node) {
       case Node::Kind::FunctionSignatureSpecialization:
       case Node::Kind::GenericSpecialization:
       case Node::Kind::GenericSpecializationNotReAbstracted:
+      case Node::Kind::InlinedGenericFunction:
       case Node::Kind::GenericPartialSpecialization:
       case Node::Kind::GenericPartialSpecializationNotReAbstracted:
       case Node::Kind::OutlinedBridgedMethod:
@@ -1412,6 +1430,10 @@ void Remangler::mangleMetaclass(Node *node) {
   Buffer << "Mm";
 }
 
+void Remangler::mangleModifyAccessor(Node *node) {
+  mangleAbstractStorage(node->getFirstChild(), "M");
+}
+
 void Remangler::mangleModule(Node *node) {
   if (node->getText() == STDLIB_NAME) {
     Buffer << 's';
@@ -1545,11 +1567,6 @@ void Remangler::mangleProtocolDescriptor(Node *node) {
   Buffer << "Mp";
 }
 
-void Remangler::mangleProtocolRequirementArray(Node *node) {
-  manglePureProtocol(getSingleChild(node));
-  Buffer << "WR";
-}
-
 void Remangler::mangleProtocolConformanceDescriptor(Node *node) {
   mangleProtocolConformance(node->getChild(0));
   Buffer << "Mc";
@@ -1629,6 +1646,10 @@ void Remangler::mangleReabstractionThunkHelper(Node *node) {
     mangleChildNodes(node);
   }
   Buffer << "TR";
+}
+
+void Remangler::mangleReadAccessor(Node *node) {
+  mangleAbstractStorage(node->getFirstChild(), "r");
 }
 
 void Remangler::mangleKeyPathGetterThunkHelper(Node *node) {
@@ -1761,6 +1782,11 @@ void Remangler::mangleTypeMetadataInstantiationCache(Node *node) {
 void Remangler::mangleTypeMetadataInstantiationFunction(Node *node) {
   mangleSingleChildNode(node);
   Buffer << "Mi";
+}
+
+void Remangler::mangleTypeMetadataInPlaceInitializationCache(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Ml";
 }
 
 void Remangler::mangleTypeMetadataCompletionFunction(Node *node) {

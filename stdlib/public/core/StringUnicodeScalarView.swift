@@ -529,8 +529,12 @@ extension String.UnicodeScalarView {
     }
     if i.transcodedOffset != 0 { return false }
     let i2 = _toCoreIndex(i)
-    if _fastPath(!UTF16.isTrailSurrogate(_guts[i2])) { return true }
-    return i2 == 0 || !UTF16.isLeadSurrogate(_guts[i2 &- 1])
+    if _fastPath(
+      !UTF16.isTrailSurrogate(_guts.codeUnit(atCheckedOffset: i2))) {
+       return true
+    }
+    return i2 == 0 || !UTF16.isLeadSurrogate(
+      _guts.codeUnit(atCheckedOffset:i2 &- 1))
   }
 
   // NOTE: Don't make this function inlineable.  Grapheme cluster

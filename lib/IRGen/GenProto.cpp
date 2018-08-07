@@ -1092,8 +1092,8 @@ getWitnessTableLazyAccessFunction(IRGenModule &IGM,
   auto cacheVariable =
       cast<llvm::GlobalVariable>(IGM.getAddrOfWitnessTableLazyCacheVariable(
           rootConformance, conformingType, ForDefinition));
-  emitLazyCacheAccessFunction(IGM, accessor, cacheVariable,
-                              [&](IRGenFunction &IGF, Explosion &params) {
+  emitCacheAccessFunction(IGM, accessor, cacheVariable, CacheStrategy::Lazy,
+                          [&](IRGenFunction &IGF, Explosion &params) {
     llvm::Value *conformingMetadataCache = nullptr;
     return MetadataResponse::forComplete(
              emitWitnessTableAccessorCall(IGF, conformance,
@@ -2226,19 +2226,7 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   // Trigger the lazy emission of the foreign type metadata.
   CanType conformingType = conf->getType()->getCanonicalType();
   if (requiresForeignTypeMetadata(conformingType)) {
-    // Make sure we emit the metadata access function.
-    (void)getTypeMetadataAccessFunction(*this, conformingType,
-                                        ForDefinition);
-
-    // Make sure we emit the nominal type descriptor.
-    auto *nominal = conformingType->getAnyNominal();
-    auto entity = LinkEntity::forNominalTypeDescriptor(nominal);
-    if (auto entry = GlobalVars[entity]) {
-      if (!cast<llvm::GlobalValue>(entry)->isDeclaration())
-        return;
-    }
-
-    emitLazyTypeContextDescriptor(*this, nominal, RequireMetadata);
+    (void)getAddrOfForeignTypeMetadataCandidate(conformingType);
   }
 }
 

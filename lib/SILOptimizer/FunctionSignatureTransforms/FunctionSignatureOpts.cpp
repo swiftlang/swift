@@ -34,6 +34,7 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/CallerAnalysis.h"
@@ -45,8 +46,8 @@
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/Support/Debug.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Debug.h"
 
 using namespace swift;
 
@@ -357,17 +358,16 @@ FunctionSignatureTransformDescriptor::createOptimizedSILFunctionType() {
     if (!UsesGenerics) {
       // None of the generic type parameters are used.
       LLVM_DEBUG(llvm::dbgs() << "None of generic parameters are used by "
-                         << F->getName() << "\n";
-            llvm::dbgs() << "Interface params:\n";
-            for (auto Param : InterfaceParams) {
-              Param.getType().dump();
-            }
+                              << F->getName() << "\n";
+                 llvm::dbgs() << "Interface params:\n";
+                 for (auto Param : InterfaceParams) {
+                   Param.getType().dump();
+                 }
 
-            llvm::dbgs()
-            << "Interface results:\n";
-            for (auto Result : InterfaceResults) {
-              Result.getType().dump();
-            });
+                 llvm::dbgs() << "Interface results:\n";
+                 for (auto Result : InterfaceResults) {
+                   Result.getType().dump();
+                 });
     }
   }
 
@@ -483,7 +483,8 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   std::string Name = TransformDescriptor.createOptimizedSILFunctionName();
   SILLinkage linkage = getSpecializedLinkage(F, F->getLinkage());
 
-  LLVM_DEBUG(llvm::dbgs() << "  -> create specialized function " << Name << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "  -> create specialized function " << Name
+                          << "\n");
 
   auto NewFTy = TransformDescriptor.createOptimizedSILFunctionType();
   GenericEnvironment *NewFGenericEnv;
@@ -496,7 +497,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   // The specialized function is an internal detail, so we need to disconnect it
   // from a parent class, if one exists, thus the override of the
   // classSubclassScope.
-  TransformDescriptor.OptimizedFunction = M.createFunction(
+  TransformDescriptor.OptimizedFunction = FunctionBuilder.createFunction(
       linkage, Name, NewFTy, NewFGenericEnv, F->getLocation(), F->isBare(),
       F->isTransparent(), F->isSerialized(), F->getEntryCount(), F->isThunk(),
       /*classSubclassScope=*/SubclassScope::NotApplicable,
@@ -740,7 +741,8 @@ public:
       return;
 
     // This is the function to optimize.
-    LLVM_DEBUG(llvm::dbgs() << "*** FSO on function: " << F->getName() << " ***\n");
+    LLVM_DEBUG(llvm::dbgs() << "*** FSO on function: " << F->getName()
+                            << " ***\n");
 
     // Check the signature of F to make sure that it is a function that we
     // can specialize. These are conditions independent of the call graph.
@@ -794,8 +796,9 @@ public:
       ResultDescList.emplace_back(IR);
     }
 
+    SILOptFunctionBuilder FuncBuilder(*getPassManager());
     // Owned to guaranteed optimization.
-    FunctionSignatureTransform FST(F, RCIA, EA, Mangler, AIM,
+    FunctionSignatureTransform FST(FuncBuilder, F, RCIA, EA, Mangler, AIM,
                                    ArgumentDescList, ResultDescList);
 
     bool Changed = false;

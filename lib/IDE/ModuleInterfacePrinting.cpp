@@ -497,7 +497,7 @@ void swift::ide::printSubmoduleInterface(
   // If the group name is specified, we sort them according to their source order,
   // which is the order preserved by getTopLevelDecls.
   if (GroupNames.empty()) {
-    std::sort(SwiftDecls.begin(), SwiftDecls.end(),
+    std::stable_sort(SwiftDecls.begin(), SwiftDecls.end(),
       [&](Decl *LHS, Decl *RHS) -> bool {
         auto *LHSValue = dyn_cast<ValueDecl>(LHS);
         auto *RHSValue = dyn_cast<ValueDecl>(RHS);
@@ -533,7 +533,7 @@ void swift::ide::printSubmoduleInterface(
       // Swift extensions are printed with their associated type unless it's
       // a cross-module extension.
       if (!extensionHasClangNode(Ext)) {
-        auto ExtendedNominal = Ext->getExtendedType()->getAnyNominal();
+        auto ExtendedNominal = Ext->getExtendedNominal();
         if (Ext->getModuleContext() == ExtendedNominal->getModuleContext())
           return false;
       }

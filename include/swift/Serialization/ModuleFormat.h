@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 427; // SWIFT_ENABLE_TENSORFLOW: serialize @differentiable.
+const uint16_t VERSION_MINOR = 430; // Last change: ordered top-level decls
 
 using DeclIDField = BCFixed<31>;
 
@@ -118,7 +118,8 @@ enum class ReadImplKind : uint8_t {
   Stored = 0,
   Get,
   Inherited,
-  Address
+  Address,
+  Read,
 };
 using ReadImplKindField = BCFixed<3>;
 
@@ -131,6 +132,7 @@ enum class WriteImplKind : uint8_t {
   InheritedWithObservers,
   Set,
   MutableAddress,
+  Modify,
 };
 using WriteImplKindField = BCFixed<3>;
 
@@ -142,6 +144,7 @@ enum class ReadWriteImplKind : uint8_t {
   MaterializeForSet,
   MutableAddress,
   MaterializeToTemporary,
+  Modify,
 };
 using ReadWriteImplKindField = BCFixed<3>;
 
@@ -212,7 +215,7 @@ enum OperatorKind : uint8_t {
   PrecedenceGroup,  // only for cross references
 };
 // This is currently required to have the same width as AccessorKindField.
-using OperatorKindField = BCFixed<3>;
+using OperatorKindField = BCFixed<4>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
@@ -224,8 +227,10 @@ enum AccessorKind : uint8_t {
   MaterializeForSet,
   Address,
   MutableAddress,
+  Read,
+  Modify,
 };
-using AccessorKindField = BCFixed<3>;
+using AccessorKindField = BCFixed<4>;
 
 using AccessorCountField = BCFixed<3>;
 
@@ -1645,6 +1650,8 @@ namespace index_block {
     NESTED_TYPE_DECLS,
     DECL_MEMBER_NAMES,
 
+    ORDERED_TOP_LEVEL_DECLS,
+
     GENERIC_SIGNATURE_OFFSETS,
     SUBSTITUTION_MAP_OFFSETS,
     LastRecordKind = SUBSTITUTION_MAP_OFFSETS,
@@ -1698,6 +1705,11 @@ namespace index_block {
   using EntryPointLayout = BCRecordLayout<
     ENTRY_POINT,
     DeclIDField  // the ID of the main class; 0 if there was a main source file
+  >;
+
+  using OrderedDeclsLayout = BCGenericRecordLayout<
+    RecordIDField,        // record ID
+    BCArray<DeclIDField>  // list of decls by ID
   >;
 }
 

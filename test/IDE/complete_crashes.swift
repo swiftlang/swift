@@ -220,9 +220,11 @@ protocol Bar_38149042 {
 func foo_38149042(bar: Bar_38149042) {
   _ = bar.foo? #^RDAR_38149042^# .x
 }
-// RDAR_38149042: Begin completions, 2 items
+// RDAR_38149042: Begin completions
 // RDAR_38149042-DAG: Decl[InstanceVar]/CurrNominal:                  .x[#Int#]; name=x
 // RDAR_38149042-DAG: Keyword[self]/CurrNominal: .self[#Baz_38149042#]; name=self
+// RDAR_38149042-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: [' ']=== {#AnyObject?#}[#Bool#]; name==== AnyObject?
+// RDAR_38149042-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: [' ']!== {#AnyObject?#}[#Bool#]; name=!== AnyObject?
 // RDAR_38149042: End completions
 
 // rdar://problem/38272904
@@ -274,7 +276,8 @@ func foo(x: RDAR41159258_MyResult1) {
 
 
 // rdar://problem/41232519
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=RDAR41232519 | %FileCheck %s -check-prefix=RDAR_41232519
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=RDAR41232519_1 | %FileCheck %s -check-prefix=RDAR_41232519
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=RDAR41232519_2 | %FileCheck %s -check-prefix=RDAR_41232519
 public protocol IntProvider {
   func nextInt() -> Int
 }
@@ -282,10 +285,13 @@ public protocol IntProvider {
 public final class IntStore {
   public var myInt: Int = 0
   func readNextInt(from provider: IntProvider) {
-      myInt = provider.nextInt() #^RDAR41232519^#
+      myInt = provider.nextInt() #^RDAR41232519_1^#
+      _ = true ? 1 : provider.nextInt() #^RDAR41232519_2^#
   }
 }
 // RDAR_41232519: Begin completions
+// RDAR_41232519: Decl[InfixOperatorFunction]/OtherModule[Swift]: [' ']+ {#Int#}[#Int#]; name=+ Int
+// RDAR_41232519: End completions
 
 // rdar://problem/28188259
 // RUN: %target-swift-ide-test -code-completion -code-completion-token=RDAR_28188259 -source-filename=%s | %FileCheck %s -check-prefix=RDAR_28188259
@@ -302,7 +308,7 @@ func test_28188259(x: ((Int) -> Void) -> Void) {
 func test_40956846(
   arg_40956846_1: inout Int!,
   arg_40956846_2: Void!,
-  arg_40956846_3: (() -> Int)!,
+  arg_40956846_3: (() -> Int?)!,
   arg_40956846_4: inout ((Int) -> Int)!
 ) {
   let y = #^RDAR_40956846^#
@@ -310,6 +316,54 @@ func test_40956846(
 // RDAR_40956846: Begin completions
 // RDAR_40956846-DAG: Decl[LocalVar]/Local:               arg_40956846_1[#inout Int!#]; name=arg_40956846_1
 // RDAR_40956846-DAG: Decl[LocalVar]/Local:               arg_40956846_2[#Void!#]; name=arg_40956846_2
-// RDAR_40956846-DAG: Decl[LocalVar]/Local:               arg_40956846_3[#(() -> Int)!#]; name=arg_40956846_3
+// RDAR_40956846-DAG: Decl[LocalVar]/Local:               arg_40956846_3[#(() -> Int?)!#]; name=arg_40956846_3
 // RDAR_40956846-DAG: Decl[LocalVar]/Local:               arg_40956846_4[#inout ((Int) -> Int)!#]; name=arg_40956846_4
 // RDAR_40956846: End completions
+
+// rdar://problem/42443512
+// RUN: %target-swift-ide-test -code-completion -code-completion-token=RDAR_42443512 -source-filename=%s | %FileCheck %s -check-prefix=RDAR_42443512
+class test_42443512 {
+  func foo(x: Int!) { }
+  static func test() {
+    self.foo#^RDAR_42443512^#
+  }
+}
+// RDAR_42443512: Begin completions
+
+// rdar://problem/42452085
+// RUN: %target-swift-ide-test -code-completion -code-completion-token=RDAR_42452085_1 -source-filename=%s | %FileCheck %s -check-prefix=RDAR_42452085
+// RUN: %target-swift-ide-test -code-completion -code-completion-token=RDAR_42452085_2 -source-filename=%s | %FileCheck %s -check-prefix=RDAR_42452085
+// RUN: %target-swift-ide-test -code-completion -code-completion-token=RDAR_42452085_3 -source-filename=%s | %FileCheck %s -check-prefix=RDAR_42452085
+class cls_42452085 {
+  var value: Any
+  func canThrow() throws -> Int { return 1 }
+}
+func test_42452085(any: Any, obj: cls_42452085?) throws {
+  var object: Any? = nil
+  object = (any as? String) #^RDAR_42452085_1^#
+  obj?.value = any #^RDAR_42452085_2^#
+  _ = try obj?.canThrow() #^RDAR_42452085_3^#
+}
+// RDAR_42452085: Begin completions
+
+// rdar://problem/41234606
+// RUN: %target-swift-ide-test -code-completion -code-completion-token=RDAR_41234606 -source-filename=%s | %FileCheck %s -check-prefix=RDAR_41234606
+#if false
+extension Foo {
+  func foo<T: Collection #^RDAR_41234606^#>(x: T) {}
+}
+#endif
+// RDAR_41234606: Begin completion
+// RDAR_41234606-DAG: Decl[AssociatedType]/Super:         .Element; name=Element
+// RDAR_41234606-DAG: Decl[AssociatedType]/Super:         .Iterator; name=Iterator
+// RDAR_41234606: End completions
+
+// rdar://problem/41071587
+// RUN: %target-swift-ide-test -code-completion -code-completion-token=RDAR_41071587 -source-filename=%s | %FileCheck %s -check-prefix=RDAR_41071587
+func test_41071587(x: Any) {
+  switch x {
+    case (let (_, _)) #^RDAR_41071587^#:
+      ()
+  }
+}
+// RDAR_41071587: Begin completions

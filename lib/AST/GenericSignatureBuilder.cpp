@@ -7062,7 +7062,7 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
                               EquivalenceClass *equivClass) {
   assert(equivClass->superclass && "No superclass constraint?");
 
-  // Resolve any this-far-unresolved dependent types.
+  // Resolve any thus-far-unresolved dependent types.
   Type resolvedSuperclass =
     resolveDependentMemberTypes(*this, equivClass->superclass);
 
@@ -7075,13 +7075,13 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
 
         Type resolvedType =
           resolveDependentMemberTypes(*this, constraint.value);
-        return resolvedType->isEqual(equivClass->superclass);
+        return resolvedType->isEqual(resolvedSuperclass);
       },
       [&](const Constraint<Type> &constraint) {
         Type superclass = constraint.value;
 
         // If this class is a superclass of the "best"
-        if (superclass->isExactSuperclassOf(equivClass->superclass))
+        if (superclass->isExactSuperclassOf(resolvedSuperclass))
           return ConstraintRelation::Redundant;
 
         // Otherwise, it conflicts.
@@ -7091,7 +7091,7 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
       diag::redundant_superclass_constraint,
       diag::superclass_redundancy_here);
 
-  // Resolve any this-far-unresolved dependent types.
+  // Record the resolved superclass type.
   equivClass->superclass = resolvedSuperclass;
 
   // If we have a concrete type, check it.

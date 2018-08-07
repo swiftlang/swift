@@ -441,12 +441,12 @@ void AccessConflictAnalysis::visitBeginAccess(BeginAccessInst *innerBeginAccess,
       continue;
 
     LLVM_DEBUG(innerAccess.dump(); llvm::dbgs() << "  may conflict with:\n";
-          outerAccess.dump());
+               outerAccess.dump());
 
     recordConflict(outerAccess, accessSet);
   }
   LLVM_DEBUG(llvm::dbgs() << "Recording access: " << *innerBeginAccess;
-        llvm::dbgs() << "  at: "; innerAccess.dump());
+             llvm::dbgs() << "  at: "; innerAccess.dump());
 
   // Record the current access in the map. It can potentially be folded
   // regardless of whether it may conflict with an outer access.
@@ -464,8 +464,8 @@ void AccessConflictAnalysis::visitEndAccess(EndAccessInst *endAccess,
 
   unsigned index = result.getAccessIndex(beginAccess);
   LLVM_DEBUG(if (accessSet.seenConflict(index)) llvm::dbgs()
-        << "No conflict on one path from " << *beginAccess << " to "
-        << *endAccess);
+             << "No conflict on one path from " << *beginAccess << " to "
+             << *endAccess);
 
   // Erase this access from the sparse set. We only want to detect conflicts
   // within the access scope.
@@ -486,9 +486,11 @@ void AccessConflictAnalysis::visitFullApply(FullApplySite fullApply,
     if (!callSiteAccesses.mayConflictWith(accessKind, outerAccess))
       continue;
 
-    LLVM_DEBUG(llvm::dbgs() << *fullApply.getInstruction() << "  call site access: ";
-          callSiteAccesses.dump(); llvm::dbgs() << "  may conflict with:\n";
-          outerAccess.dump());
+    LLVM_DEBUG(llvm::dbgs() << *fullApply.getInstruction()
+                            << "  call site access: ";
+               callSiteAccesses.dump();
+               llvm::dbgs() << "  may conflict with:\n";
+               outerAccess.dump());
 
     recordConflict(outerAccess, accessSet);
   }
@@ -625,7 +627,7 @@ struct AccessEnforcementOpts : public SILFunctionTransform {
       return;
 
     LLVM_DEBUG(llvm::dbgs() << "Running local AccessEnforcementOpts on "
-                       << F->getName() << "\n");
+                            << F->getName() << "\n");
 
     PostOrderFunctionInfo *PO = getAnalysis<PostOrderAnalysis>()->get(F);
     AccessedStorageAnalysis *ASA = getAnalysis<AccessedStorageAnalysis>();

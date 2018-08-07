@@ -729,7 +729,7 @@ final public class ForkJoinPool {
 
   internal func _stealTask() -> ForkJoinTaskBase? {
     return _workDequesMutex.withLock {
-      let randomOffset = pickRandom(_workDeques.indices)
+      let randomOffset = _workDeques.indices.randomElement()!
       let count = _workDeques.count
       for i in _workDeques.indices {
         let index = (i + randomOffset) % count
@@ -767,7 +767,7 @@ final public class ForkJoinPool {
     _submissionQueuesMutex.withLock {
       precondition(!_submissionQueues.isEmpty)
       for task in tasks {
-        pickRandom(_submissionQueues).append(task)
+        _submissionQueues.randomElement()!.append(task)
       }
     }
   }
@@ -784,7 +784,7 @@ final public class ForkJoinPool {
       let done = _submissionQueuesMutex.withLock {
         () -> Bool in
         if !_submissionQueues.isEmpty {
-          pickRandom(_submissionQueues).append(task)
+          _submissionQueues.randomElement()!.append(task)
           return true
         }
         return false

@@ -16,7 +16,7 @@ import Swift
 
 // CHECK-LABEL: @"$S15generic_classes11RootGenericCMn" =
 // --       flags: class, generic, unique, reflectable, has vtable
-// CHECK-SAME:   <i32 0x8004_00D0>
+// CHECK-SAME:   <i32 0x8001_00D0>
 // --       name
 // CHECK-SAME:   [12 x i8]* [[ROOTGENERIC_NAME]]
 // --       negative size in words
@@ -80,7 +80,7 @@ import Swift
 // CHECK: [[ROOTNONGENERIC_NAME:@.*]] = private constant [15 x i8] c"RootNonGeneric\00"
 // CHECK: @"$S15generic_classes14RootNonGenericCMn" = hidden constant <{ {{.*}} %swift.method_descriptor }> <{
 // --       flags: class, unique, has vtable, reflectable
-// CHECK-SAME:   <i32 0x8004_0050>
+// CHECK-SAME:   <i32 0x8001_0050>
 // --       name
 // CHECK-SAME:   [15 x i8]* [[ROOTNONGENERIC_NAME]]
 // --       num fields
@@ -265,7 +265,7 @@ entry:
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc i8 @RootGeneric_concrete_fragile_dependent_member_access_x
 // CHECK:   getelementptr inbounds [[ROOTGENERIC]], [[ROOTGENERIC]]* %0, i32 0, i32 1
 sil @RootGeneric_concrete_fragile_dependent_member_access_x : $<F> (RootGeneric<F>) -> UInt8 {
-entry(%c : $RootGeneric<F>):
+entry(%c : @unowned $RootGeneric<F>):
   %p = ref_element_addr %c : $RootGeneric<F>, #RootGeneric.x
   %x = load_borrow %p : $*UInt8
   return %x : $UInt8
@@ -280,7 +280,7 @@ entry(%c : $RootGeneric<F>):
 // CHECK:   [[Y_ADDR:%.*]] = getelementptr inbounds i8, i8* [[CLASS_BYTE_ARRAY]], i64 [[Y_OFFSET]]
 // CHECK:   bitcast i8* [[Y_ADDR]] to %swift.opaque*
 sil @RootGeneric_concrete_fragile_dependent_member_access_y : $<F> (RootGeneric<F>) -> @out F {
-entry(%z : $*F, %c : $RootGeneric<F>):
+entry(%z : @trivial $*F, %c : @unowned $RootGeneric<F>):
   %p = ref_element_addr %c : $RootGeneric<F>, #RootGeneric.y
   copy_addr %p to [initialization] %z : $*F
   %t = tuple ()
@@ -291,7 +291,7 @@ entry(%z : $*F, %c : $RootGeneric<F>):
 // CHECK:   [[Y_ADDR:%.*]] = getelementptr inbounds {{.*}}, {{.*}}* %1, i32 0, i32 3
 // CHECK:   bitcast %TSi* [[Y_ADDR]] to i8*
 sil @RootGeneric_subst_concrete_fragile_dependent_member_access_y : $(RootGeneric<Int>) -> @out Int {
-entry(%z : $*Int, %c : $RootGeneric<Int>):
+entry(%z : @trivial $*Int, %c : @unowned $RootGeneric<Int>):
   %p = ref_element_addr %c : $RootGeneric<Int>, #RootGeneric.y
   copy_addr %p to [initialization] %z : $*Int
   %t = tuple ()
@@ -307,7 +307,7 @@ entry(%z : $*Int, %c : $RootGeneric<Int>):
 // CHECK:   [[Z_ADDR:%.*]] = getelementptr inbounds i8, i8* [[CLASS_BYTE_ARRAY]], i64 [[Z_OFFSET]]
 // CHECK:   bitcast i8* [[Z_ADDR]] to %Ts5UInt8V*
 sil @RootGeneric_concrete_fragile_dependent_member_access_z : $<F> (RootGeneric<F>) -> UInt8 {
-entry(%c : $RootGeneric<F>):
+entry(%c : @unowned $RootGeneric<F>):
   %p = ref_element_addr %c : $RootGeneric<F>, #RootGeneric.z
   %z = load_borrow %p : $*UInt8
   return %z : $UInt8
@@ -318,7 +318,7 @@ entry(%c : $RootGeneric<F>):
 // CHECK:   [[T0:%.*]] = getelementptr inbounds %Ts5UInt8V, %Ts5UInt8V* [[Z_ADDR]], i32 0, i32 0
 // CHECK:   load i8, i8* [[T0]], align
 sil @RootGeneric_subst_concrete_fragile_dependent_member_access_z : $(RootGeneric<Int>) -> UInt8 {
-entry(%c : $RootGeneric<Int>):
+entry(%c : @unowned $RootGeneric<Int>):
   %p = ref_element_addr %c : $RootGeneric<Int>, #RootGeneric.z
   %z = load_borrow %p : $*UInt8
   return %z : $UInt8

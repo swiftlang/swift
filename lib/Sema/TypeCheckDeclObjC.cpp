@@ -382,13 +382,14 @@ static bool checkObjCInExtensionContext(const ValueDecl *value,
     // parameters.
     // FIXME: This is a current limitation, not inherent. We don't have
     // a concrete class to attach Objective-C category metadata to.
-    if (auto generic = ED->getDeclaredInterfaceType()
-                           ->getGenericAncestor()) {
-      if (!generic->getClassOrBoundGenericClass()->hasClangNode()) {
-        if (diagnose) {
-          value->diagnose(diag::objc_in_generic_extension);
+    if (auto classDecl = ED->getAsClassOrClassExtensionContext()) {
+      if (auto generic = classDecl->getGenericAncestor()) {
+        if (!generic->usesObjCGenericsModel()) {
+          if (diagnose) {
+            value->diagnose(diag::objc_in_generic_extension);
+          }
+          return true;
         }
-        return true;
       }
     }
   }
@@ -484,6 +485,14 @@ bool swift::isRepresentableInObjC(
     case AccessorKind::MutableAddress:
       if (Diagnose) {
         accessor->diagnose(diag::objc_addressor);
+        describeObjCReason(accessor, Reason);
+      }
+      return false;
+
+    case AccessorKind::Read:
+    case AccessorKind::Modify:
+      if (Diagnose) {
+        accessor->diagnose(diag::objc_coroutine_accessor);
         describeObjCReason(accessor, Reason);
       }
       return false;
@@ -889,8 +898,7 @@ static Type getObjectiveCNominalType(Type &cache,
 
   SmallVector<ValueDecl *, 4> decls;
   NLOptions options = NL_QualifiedDefault | NL_OnlyTypes;
-  dc->lookupQualified(ModuleType::get(module), TypeName, options, nullptr,
-                      decls);
+  dc->lookupQualified(module, TypeName, options, decls);
   for (auto decl : decls) {
     if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
       cache = nominal->getDeclaredType();

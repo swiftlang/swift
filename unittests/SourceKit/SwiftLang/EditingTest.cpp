@@ -41,16 +41,17 @@ private:
     llvm_unreachable("unexpected error");
   }
 
-  bool handleSyntaxMap(unsigned Offset, unsigned Length, UIdent Kind) override {
-    return false;
+  bool syntaxMapEnabled() override { return true; }
+
+  void handleSyntaxMap(unsigned Offset, unsigned Length, UIdent Kind) override {
   }
 
-  bool handleSemanticAnnotation(unsigned Offset, unsigned Length,
-                                UIdent Kind, bool isSystem) override {
-    return false;
-  }
+  void handleSemanticAnnotation(unsigned Offset, unsigned Length, UIdent Kind,
+                                bool isSystem) override {}
 
-  bool beginDocumentSubStructure(unsigned Offset, unsigned Length,
+  bool documentStructureEnabled() override { return false; }
+
+  void beginDocumentSubStructure(unsigned Offset, unsigned Length,
                                  UIdent Kind, UIdent AccessLevel,
                                  UIdent SetterAccessLevel,
                                  unsigned NameOffset,
@@ -65,47 +66,37 @@ private:
                                  StringRef SelectorName,
                                  ArrayRef<StringRef> InheritedTypes,
                                  ArrayRef<std::tuple<UIdent, unsigned, unsigned>> Attrs) override {
-    return false;
   }
 
-  bool endDocumentSubStructure() override { return false; }
+  void endDocumentSubStructure() override {}
 
-  bool handleDocumentSubStructureElement(UIdent Kind,
-                                         unsigned Offset,
-                                         unsigned Length) override {
-    return false;
-  }
+  void handleDocumentSubStructureElement(UIdent Kind, unsigned Offset,
+                                         unsigned Length) override {}
 
-  bool recordAffectedRange(unsigned Offset, unsigned Length) override {
-    return false;
-  }
-  
-  bool recordAffectedLineRange(unsigned Line, unsigned Length) override {
-    return false;
-  }
+  void recordAffectedRange(unsigned Offset, unsigned Length) override {}
 
-  bool recordFormattedText(StringRef Text) override { return false; }
+  void recordAffectedLineRange(unsigned Line, unsigned Length) override {}
 
-  bool setDiagnosticStage(UIdent diagStage) override {
-    DiagStage = diagStage;
-    return true;
-  }
-  bool handleDiagnostic(const DiagnosticEntryInfo &Info,
+  void recordFormattedText(StringRef Text) override {}
+
+  void setDiagnosticStage(UIdent diagStage) override { DiagStage = diagStage; }
+  void handleDiagnostic(const DiagnosticEntryInfo &Info,
                         UIdent DiagStage) override {
     Diags.push_back(Info);
-    return true;
   }
 
-  bool handleSourceText(StringRef Text) override { return false; }
-  bool handleSerializedSyntaxTree(StringRef Text) override { return false; }
-  bool syntaxTreeEnabled() override { return false; }
-  bool forceLibSyntaxBasedProcessing() override { return false; }
+  void handleSourceText(StringRef Text) override {}
+  void handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree,
+                        std::unordered_set<unsigned> &ReusedNodeIds) override {}
+
+  SyntaxTreeTransferMode syntaxTreeTransferMode() override {
+    return SyntaxTreeTransferMode::Off;
+  }
 
   bool syntaxReuseInfoEnabled() override { return false; }
 
-  bool handleSyntaxReuseRegions(
-      std::vector<SourceFileRange> ReuseRegions) override {
-    return false;
+  void
+  handleSyntaxReuseRegions(std::vector<SourceFileRange> ReuseRegions) override {
   }
 };
 
@@ -278,7 +269,8 @@ void EditTest::doubleOpenWithDelay(useconds_t delay, bool closeDoc) {
   EXPECT_STREQ("use of unresolved identifier 'unknown_name'", Consumer.Diags[0].Description.c_str());
 }
 
-TEST_F(EditTest, DiagsAfterCloseAndReopen) {
+// This test is failing occassionally in CI: rdar://42483323
+TEST_F(EditTest, DISABLED_DiagsAfterCloseAndReopen) {
   // Attempt to open the same file twice in a row. This tests (subject to
   // timing) cases where:
   // * the 2nd open happens before the first AST starts building

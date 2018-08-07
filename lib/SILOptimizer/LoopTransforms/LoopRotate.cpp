@@ -303,7 +303,8 @@ bool swift::rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
   // Make sure we can duplicate the header.
   SmallVector<SILInstruction *, 8> MoveToPreheader;
   if (!canDuplicateOrMoveToPreheader(L, Preheader, Header, MoveToPreheader)) {
-    LLVM_DEBUG(llvm::dbgs() << *L << " instructions in header preventing rotating\n");
+    LLVM_DEBUG(llvm::dbgs() << *L
+                            << " instructions in header preventing rotating\n");
     return false;
   }
 
@@ -423,7 +424,7 @@ class LoopRotation : public SILFunctionTransform {
     }
     if (!ShouldRotate) {
       LLVM_DEBUG(llvm::dbgs() << "Skipping loop rotation in " << F->getName()
-            << "\n");
+                              << "\n");
       return;
     }
     LLVM_DEBUG(llvm::dbgs() << "Rotating loops in " << F->getName() << "\n");
