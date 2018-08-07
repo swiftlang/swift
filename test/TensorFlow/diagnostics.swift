@@ -96,3 +96,8 @@ public func scalarToHost() {
     i += 1
   }
 }
+
+// expected-warning @+1 {{'t' implicitly copied to the accelerator}}
+public func inoutArgumentToAccelerator(t: inout Tensor<Float>) {
+  t += 1  // expected-note {{value used here}}
+}
