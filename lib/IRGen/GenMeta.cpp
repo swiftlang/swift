@@ -1838,26 +1838,20 @@ namespace {
   class FixedClassMemberBuilder {
     IRGenModule &IGM;
     ConstantStructBuilder &B;
-    const StructLayout &Layout;
-    const ClassLayout &FieldLayout;
     SILVTable *VTable;
 
   public:
     FixedClassMemberBuilder(IRGenModule &IGM, ClassDecl *theClass,
-                            ConstantStructBuilder &builder,
-                            const StructLayout &layout,
-                            const ClassLayout &fieldLayout)
-      : IGM(IGM), B(builder), Layout(layout), FieldLayout(fieldLayout) {
+                            ConstantStructBuilder &builder)
+      : IGM(IGM), B(builder) {
       VTable = IGM.getSILModule().lookUpVTable(theClass);
     }
 
     void addFieldOffset(VarDecl *var) {
-      unsigned fieldIndex = FieldLayout.getFieldIndex(var);
-      auto &element = Layout.getElement(fieldIndex);
-      assert(element.getKind() == ElementLayout::Kind::Fixed ||
-             element.getKind() == ElementLayout::Kind::Empty);
-
-      B.addInt(IGM.SizeTy, element.getByteOffset().getValue());
+      SILType baseType = SILType::getPrimitiveObjectType(
+        var->getDeclContext()->getDeclaredTypeInContext()
+          ->getCanonicalType());
+      B.addInt(IGM.SizeTy, getClassFieldOffset(IGM, baseType, var).getValue());
     }
 
     void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
@@ -1908,9 +1902,7 @@ namespace {
 
   public:
     ResilientClassMemberBuilder(IRGenModule &IGM, ClassDecl *theClass,
-                                ConstantStructBuilder &builder,
-                                const StructLayout &layout,
-                                const ClassLayout &fieldLayout)
+                                ConstantStructBuilder &builder)
         : IGM(IGM) {
       VTable = IGM.getSILModule().lookUpVTable(theClass);
     }
@@ -1965,7 +1957,6 @@ namespace {
     using super::asImpl;
 
     ConstantStructBuilder &B;
-    const StructLayout &Layout;
     const ClassLayout &FieldLayout;
     ClassMetadataLayout &MetadataLayout;
 
@@ -1973,12 +1964,11 @@ namespace {
 
     ClassMetadataBuilderBase(IRGenModule &IGM, ClassDecl *theClass,
                              ConstantStructBuilder &builder,
-                             const StructLayout &layout,
                              const ClassLayout &fieldLayout)
       : super(IGM, theClass), B(builder),
-        Layout(layout), FieldLayout(fieldLayout),
+        FieldLayout(fieldLayout),
         MetadataLayout(IGM.getClassMetadataLayout(theClass)),
-        Members(IGM, theClass, builder, layout, fieldLayout) {}
+        Members(IGM, theClass, builder) {}
 
   public:
     void noteResilientSuperclass() {}
@@ -2337,9 +2327,8 @@ namespace {
     void emitInitializeFieldOffsets(IRGenFunction &IGF,
                                     llvm::Value *metadata) {
       for (auto prop : Target->getStoredProperties()) {
-        unsigned fieldIndex = FieldLayout.getFieldIndex(prop);
-        auto access = FieldLayout.AllFieldAccesses[fieldIndex];
-        if (access == FieldAccess::NonConstantDirect) {
+        auto fieldInfo = FieldLayout.getFieldAccessAndElement(prop);
+        if (fieldInfo.first == FieldAccess::NonConstantDirect) {
           Address offsetA = IGF.IGM.getAddrOfFieldOffset(prop, ForDefinition);
 
           // We can't use emitClassFieldOffset() here because that creates
@@ -2355,9 +2344,11 @@ namespace {
 
     void emitFieldOffsetGlobals() {
       for (auto prop : Target->getStoredProperties()) {
-        unsigned fieldIndex = FieldLayout.getFieldIndex(prop);
+        auto fieldInfo = FieldLayout.getFieldAccessAndElement(prop);
+        auto access = fieldInfo.first;
+        auto element = fieldInfo.second;
+
         llvm::Constant *fieldOffsetOrZero;
-        auto &element = Layout.getElement(fieldIndex);
 
         if (element.getKind() == ElementLayout::Kind::Fixed) {
           // Use a fixed offset if we have one.
@@ -2367,7 +2358,6 @@ namespace {
           fieldOffsetOrZero = IGM.getSize(Size(0));
         }
 
-        auto access = FieldLayout.AllFieldAccesses[fieldIndex];
         switch (access) {
         case FieldAccess::ConstantDirect:
         case FieldAccess::NonConstantDirect: {
@@ -2417,9 +2407,8 @@ namespace {
   public:
     ConcreteClassMetadataBuilderBase(IRGenModule &IGM, ClassDecl *theClass,
                                      ConstantStructBuilder &builder,
-                                     const StructLayout &layout,
                                      const ClassLayout &fieldLayout)
-      : super(IGM, theClass, builder, layout, fieldLayout) {
+      : super(IGM, theClass, builder, fieldLayout) {
     }
 
     void noteAddressPoint() {
@@ -2529,9 +2518,8 @@ namespace {
   public:
     FixedClassMetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
                               ConstantStructBuilder &builder,
-                              const StructLayout &layout,
                               const ClassLayout &fieldLayout)
-      : super(IGM, theClass, builder, layout, fieldLayout) {}
+      : super(IGM, theClass, builder, fieldLayout) {}
   };
 
   /// A builder for resilient, non-generic class metadata.
@@ -2544,9 +2532,8 @@ namespace {
   public:
     ResilientClassMetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
                                   ConstantStructBuilder &builder,
-                                  const StructLayout &layout,
                                   const ClassLayout &fieldLayout)
-      : super(IGM, theClass, builder, layout, fieldLayout) {}
+      : super(IGM, theClass, builder, fieldLayout) {}
   };
 
   /// A builder for GenericClassMetadataPattern objects.
@@ -2562,9 +2549,8 @@ namespace {
   public:
     GenericClassMetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
                                 ConstantStructBuilder &B,
-                                const StructLayout &layout,
                                 const ClassLayout &fieldLayout)
-      : super(IGM, theClass, B, layout, fieldLayout)
+      : super(IGM, theClass, B, fieldLayout)
     {
       // We need special initialization of metadata objects to trick the ObjC
       // runtime into initializing them.
@@ -2754,7 +2740,6 @@ static void emitObjCClassSymbol(IRGenModule &IGM,
 
 /// Emit the type metadata or metadata template for a class.
 void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
-                              const StructLayout &layout,
                               const ClassLayout &fieldLayout) {
   assert(!classDecl->isForeign());
 
@@ -2768,7 +2753,7 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
   bool canBeConstant;
   if (classDecl->isGenericContext()) {
     GenericClassMetadataBuilder builder(IGM, classDecl, init,
-                                        layout, fieldLayout);
+                                        fieldLayout);
     builder.layout();
     isPattern = true;
     canBeConstant = false;
@@ -2776,7 +2761,7 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
     builder.createMetadataAccessFunction();
   } else if (doesClassMetadataRequireDynamicInitialization(IGM, classDecl)) {
     ResilientClassMetadataBuilder builder(IGM, classDecl, init,
-                                          layout, fieldLayout);
+                                          fieldLayout);
     builder.layout();
     isPattern = false;
     canBeConstant = builder.canBeConstant();
@@ -2784,7 +2769,7 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
     builder.createMetadataAccessFunction();
   } else {
     FixedClassMetadataBuilder builder(IGM, classDecl, init,
-                                      layout, fieldLayout);
+                                      fieldLayout);
     builder.layout();
     isPattern = false;
     canBeConstant = builder.canBeConstant();
