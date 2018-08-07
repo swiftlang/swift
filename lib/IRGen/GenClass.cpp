@@ -40,6 +40,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "Callee.h"
+#include "ClassLayout.h"
 #include "ConstantBuilder.h"
 #include "Explosion.h"
 #include "GenFunc.h"
