@@ -355,9 +355,8 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
 
   // Validate the representation.
   // FIXME: Perform some kind of "shallow" validation here?
-  TypeResolutionOptions options;
+  TypeResolutionOptions options(TypeResolverContext::ExtensionBinding);
   options |= TypeResolutionFlags::AllowUnboundGenerics;
-  options |= TypeResolutionFlags::ExtensionBinding;
   if (TC.validateType(ED->getExtendedTypeLoc(), dc, options)) {
     ED->setInvalid();
     ED->getExtendedTypeLoc().setInvalidType(TC.Context);
@@ -476,8 +475,8 @@ void TypeChecker::resolveExtensionForConformanceConstruction(
     SmallVectorImpl<ConformanceConstructionInfo> &protocols) {
   // and the protocols which it inherits from:
   DependentGenericTypeResolver resolver;
-  TypeResolutionOptions options = TypeResolutionFlags::GenericSignature;
-  options |= TypeResolutionFlags::InheritanceClause;
+  TypeResolutionOptions options(TypeResolverContext::GenericSignature);
+  options.setContext(TypeResolverContext::InheritanceClause);
   options |= TypeResolutionFlags::AllowUnavailableProtocol;
   options |= TypeResolutionFlags::ResolveStructure;
   for (auto &inherited : ext->getInherited()) {
@@ -841,7 +840,7 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
                                    GenericEnvironment *GenericEnv,
                                    DeclContext *DC,
                                    bool ProduceDiagnostics) {
-  TypeResolutionOptions options;
+  TypeResolutionOptions options = None;
 
   // Fine to have unbound generic types.
   options |= TypeResolutionFlags::AllowUnboundGenerics;

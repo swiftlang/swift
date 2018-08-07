@@ -459,7 +459,7 @@ public:
     if (!ExprToIdentTypeRepr(components, TC.Context).visit(ude->getBase()))
       return nullptr;
 
-    TypeResolutionOptions options;
+    TypeResolutionOptions options = None;
     options |= TypeResolutionFlags::AllowUnboundGenerics;
     options |= TypeResolutionFlags::SilenceErrors;
 
@@ -578,7 +578,7 @@ public:
       auto *enumDecl = referencedElement->getParentEnum();
       loc = TypeLoc::withoutLoc(enumDecl->getDeclaredTypeInContext());
     } else {
-      TypeResolutionOptions options;
+      TypeResolutionOptions options = None;
       options |= TypeResolutionFlags::AllowUnboundGenerics;
       options |= TypeResolutionFlags::SilenceErrors;
 
@@ -746,15 +746,15 @@ static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
   if (auto ty = decl->getTypeLoc().getType())
     return ty->hasError();
 
+  options.setContext(None);
+
   // If the element is a variadic parameter, resolve the parameter type as if
   // it were in non-parameter position, since we want functions to be
   // @escaping in this case.
+  options.setContext(decl->isVariadic() ?
+                       TypeResolverContext::VariadicFunctionInput :
+                       TypeResolverContext::FunctionInput);
   options |= TypeResolutionFlags::Direct;
-  if (decl->isVariadic()) {
-    options |= TypeResolutionFlags::VariadicFunctionInput;
-  } else {
-    options |= TypeResolutionFlags::FunctionInput;
-  }
 
   bool hadError = false;
 
@@ -839,7 +839,7 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
     // as well to get the ParamDecl marked invalid and to get an ErrorType.
     if (!type) {
       // Closure argument lists are allowed to be missing types.
-      if (options & TypeResolutionFlags::InExpression)
+      if (options.isAnyExpr())
         continue;
       param->setInvalid();
     }
@@ -950,7 +950,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
     bool hadError = false;
     SmallVector<TupleTypeElt, 8> typeElts;
 
-    const auto elementOptions = withoutContext(options);
+    const auto elementOptions = options.withoutContext();
     bool missingType = false;
     for (unsigned i = 0, e = tuplePat->getNumElements(); i != e; ++i) {
       TuplePatternElt &elt = tuplePat->getElement(i);
@@ -1009,7 +1009,8 @@ recur:
     tyLoc = TypeLoc::withoutLoc(type);
   }
 
-  auto subOptions = options - TypeResolutionFlags::EnumPatternPayload;
+  auto subOptions = options;
+  subOptions.setContext(None);
   switch (P->getKind()) {
   // For parens and vars, just set the type annotation and propagate inwards.
   case PatternKind::Paren: {
@@ -1019,7 +1020,7 @@ recur:
     // If this is the payload of an enum, and the type is a single-element
     // labeled tuple, treat this as a tuple pattern. It's unlikely that the
     // user is interested in binding a variable of type (foo: Int).
-    if ((options & TypeResolutionFlags::EnumPatternPayload)
+    if ((options.getContext() == TypeResolverContext::EnumPatternPayload)
         && !isa<TuplePattern>(semantic)) {
       if (auto tupleType = type->getAs<TupleType>()) {
         if (tupleType->getNumElements() == 1 &&
@@ -1125,10 +1126,10 @@ recur:
         shouldRequireType = true;
     }
     
-    if (shouldRequireType && 
-        !(options & TypeResolutionFlags::FromNonInferredPattern) &&
-        !(options & TypeResolutionFlags::EnumerationVariable) &&
-        !(options & TypeResolutionFlags::EditorPlaceholder)) {
+    if (shouldRequireType &&
+        !options.is(TypeResolverContext::ForEachStmt) &&
+        !options.is(TypeResolverContext::EditorPlaceholderExpr) &&
+        !(options & TypeResolutionFlags::FromNonInferredPattern)) {
       diagnose(NP->getLoc(), diag::type_inferred_to_undesirable_type,
                NP->getDecl()->getName(), type, NP->getDecl()->isLet());
       diagnose(NP->getLoc(), diag::add_explicit_type_annotation_to_silence);
@@ -1253,8 +1254,8 @@ recur:
     auto IP = cast<IsPattern>(P);
 
     // Type-check the type parameter.
-    if (validateType(IP->getCastTypeLoc(), dc,
-                     TypeResolutionFlags::InExpression))
+    TypeResolutionOptions paramOptions(TypeResolverContext::InExpression); 
+    if (validateType(IP->getCastTypeLoc(), dc, paramOptions))
       return true;
 
     auto castType = IP->getCastTypeLoc().getType();
@@ -1464,10 +1465,10 @@ recur:
                                               elt, argType);
       else
         elementType = TupleType::getEmpty(Context);
-      if (coercePatternToType(sub, dc, elementType, subOptions
-                              | TypeResolutionFlags::FromNonInferredPattern
-                              | TypeResolutionFlags::EnumPatternPayload,
-                              resolver))
+      auto newSubOptions = subOptions;
+      newSubOptions.setContext(TypeResolverContext::EnumPatternPayload);
+      newSubOptions |= TypeResolutionFlags::FromNonInferredPattern;
+      if (coercePatternToType(sub, dc, elementType, newSubOptions, resolver))
         return true;
       EEP->setSubPattern(sub);
     } else if (auto argType = elt->getArgumentInterfaceType()) {
@@ -1495,10 +1496,10 @@ recur:
       Pattern *sub = TuplePattern::createSimple(Context, SourceLoc(),
                                                 elements, SourceLoc(),
                                                 /*implicit*/true);
-      if (coercePatternToType(sub, dc, elementType, subOptions
-                              | TypeResolutionFlags::FromNonInferredPattern
-                              | TypeResolutionFlags::EnumPatternPayload,
-                              resolver))
+      auto newSubOptions = subOptions;
+      newSubOptions.setContext(TypeResolverContext::EnumPatternPayload);
+      newSubOptions |= TypeResolutionFlags::FromNonInferredPattern;
+      if (coercePatternToType(sub, dc, elementType, newSubOptions, resolver))
         return true;
       EEP->setSubPattern(sub);
     }
@@ -1548,10 +1549,10 @@ recur:
     OP->setElementDecl(elementDecl);
 
     Pattern *sub = OP->getSubPattern();
-    if (coercePatternToType(sub, dc, elementType, subOptions
-                            | TypeResolutionFlags::FromNonInferredPattern
-                            | TypeResolutionFlags::EnumPatternPayload,
-                            resolver))
+    auto newSubOptions = subOptions;
+    newSubOptions.setContext(TypeResolverContext::EnumPatternPayload);
+    newSubOptions |= TypeResolutionFlags::FromNonInferredPattern;
+    if (coercePatternToType(sub, dc, elementType, newSubOptions, resolver))
       return true;
     OP->setSubPattern(sub);
     OP->setType(type);
@@ -1612,8 +1613,7 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
     
     // Check that the type, if explicitly spelled, is ok.
     if (param->getTypeLoc().getTypeRepr()) {
-      hadError |= validateParameterType(param, CE, TypeResolutionOptions(),
-                                        resolver, *this);
+      hadError |= validateParameterType(param, CE, None, resolver, *this);
       
       // Now that we've type checked the explicit argument type, see if it
       // agrees with the contextual type.

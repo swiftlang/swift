@@ -1846,8 +1846,7 @@ static void maybeAddAccessorsToBehaviorStorage(TypeChecker &TC, VarDecl *var) {
   };
 
   // Try to resolve the behavior to a protocol.
-  auto behaviorType = TC.resolveType(behavior->ProtocolName, dc,
-                                     TypeResolutionOptions());
+  auto behaviorType = TC.resolveType(behavior->ProtocolName, dc, None);
   if (!behaviorType) {
     return makeBehaviorAccessors();
   }

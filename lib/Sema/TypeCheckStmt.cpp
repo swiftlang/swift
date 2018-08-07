@@ -629,10 +629,9 @@ public:
   }
   
   Stmt *visitForEachStmt(ForEachStmt *S) {
-    TypeResolutionOptions options;
+    TypeResolutionOptions options(TypeResolverContext::InExpression);
     options |= TypeResolutionFlags::AllowUnspecifiedTypes;
     options |= TypeResolutionFlags::AllowUnboundGenerics;
-    options |= TypeResolutionFlags::InExpression;
     
     if (auto *P = TC.resolvePattern(S->getPattern(), DC,
                                     /*isStmtCondition*/false)) {
@@ -926,8 +925,9 @@ public:
                                                  /*isStmtCondition*/false)) {
           pattern = newPattern;
           // Coerce the pattern to the subject's type.
+          TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
           if (!subjectType || TC.coercePatternToType(pattern, DC, subjectType,
-                                     TypeResolutionFlags::InExpression)) {
+                                     patternOptions)) {
             limitExhaustivityChecks = true;
 
             // If that failed, mark any variables binding pieces of the pattern
@@ -1132,9 +1132,8 @@ bool TypeChecker::typeCheckCatchPattern(CatchStmt *S, DeclContext *DC) {
     pattern = newPattern;
 
     // Coerce the pattern to the exception type.
-    if (!exnType ||
-        coercePatternToType(pattern, DC, exnType,
-                            TypeResolutionFlags::InExpression)) {
+    TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
+    if (!exnType || coercePatternToType(pattern, DC, exnType, patternOptions)) {
       // If that failed, be sure to give the variables error types
       // before we type-check the guard.  (This will probably kill
       // most of the type-checking, but maybe not.)
