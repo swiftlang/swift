@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# ===--- Benchmark_Driver ------------------------------------------------===//
+# ===--- run_smoke_bench -------------------------------------------------===//
 #
 #  This source file is part of the Swift.org open source project
 #
