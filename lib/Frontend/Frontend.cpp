@@ -633,12 +633,6 @@ CompilerInstance::computeDelayedParsingCallback(bool isPrimary) {
 
 void CompilerInstance::addMainFileToModule(
     const ImplicitImports &implicitImports) {
-  const InputFileKind Kind = Invocation.getInputKind();
-  assert(Kind == InputFileKind::IFK_Swift || Kind == InputFileKind::IFK_SIL);
-
-  if (Kind == InputFileKind::IFK_Swift)
-    SourceMgr.setHashbangBufferID(MainBufferID);
-
   auto *MainFile = createSourceFileForMainModule(
       Invocation.getSourceFileKind(), implicitImports.kind, MainBufferID);
   addAdditionalInitialImportsTo(MainFile, implicitImports);
@@ -929,7 +923,6 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
   // to match the parsing logic used when performing Sema.
   if (MainBufferID != NO_SUCH_BUFFER) {
     assert(Kind == InputFileKind::IFK_Swift);
-    SourceMgr.setHashbangBufferID(MainBufferID);
     createSourceFileForMainModule(Invocation.getSourceFileKind(),
                                   SourceFile::ImplicitModuleImportKind::None,
                                   MainBufferID);
