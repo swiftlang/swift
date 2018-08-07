@@ -300,9 +300,9 @@ func dependentMemberTypes<T : BaseIntAndP2>(
 func conformsToAnyObject<T : AnyObject>(_: T) {}
 func conformsToP1<T : P1>(_: T) {}
 func conformsToP2<T : P2>(_: T) {}
-func conformsToBaseIntAndP2<T : Base<Int> & P2>(_: T) {}
+func conformsToBaseIntAndP2<T : Base<Int> & P2>(_: T) {} // expected-note 3 {{declared here}}
 
-func conformsToBaseIntAndP2WithWhereClause<T>(_: T) where T : Base<Int> & P2 {}
+func conformsToBaseIntAndP2WithWhereClause<T>(_: T) where T : Base<Int> & P2 {} // expected-note 2 {{declared here}}
 
 class FakeDerived : Base<String>, P2 {
   required init(classInit: ()) {
@@ -417,19 +417,19 @@ func conformsTo<T1 : P2, T2 : Base<Int> & P2>(
   // expected-error@-1 {{argument type 'Base<Int>' does not conform to expected type 'P2'}}
 
   conformsToBaseIntAndP2(badBase)
-  // expected-error@-1 {{'(Base<Int>) -> ()' requires that 'Base<Int>' conform to 'P2'}}
+  // expected-error@-1 {{global function 'conformsToBaseIntAndP2' requires that 'T' conform to 'P2' [with 'T' = 'Base<Int>']}}
 
   conformsToBaseIntAndP2(fakeDerived)
-  // expected-error@-1 {{'(Base<Int>) -> ()' requires that 'Base<Int>' conform to 'P2'}}
+  // expected-error@-1 {{global function 'conformsToBaseIntAndP2' requires that 'T' conform to 'P2' [with 'T' = 'Base<Int>']}}
 
   conformsToBaseIntAndP2WithWhereClause(fakeDerived)
-  // expected-error@-1 {{'(Base<Int>) -> ()' requires that 'Base<Int>' conform to 'P2'}}
+  // expected-error@-1 {{global function 'conformsToBaseIntAndP2WithWhereClause' requires that 'T' conform to 'P2' [with 'T' = 'Base<Int>']}}
 
   conformsToBaseIntAndP2(p2Archetype)
-  // expected-error@-1 {{'(Base<Int>) -> ()' requires that 'Base<Int>' conform to 'P2'}}
+  // expected-error@-1 {{global function 'conformsToBaseIntAndP2' requires that 'T' conform to 'P2' [with 'T' = 'Base<Int>']}}
 
   conformsToBaseIntAndP2WithWhereClause(p2Archetype)
-  // expected-error@-1 {{'(Base<Int>) -> ()' requires that 'Base<Int>' conform to 'P2'}}
+  // expected-error@-1 {{global function 'conformsToBaseIntAndP2WithWhereClause' requires that 'T' conform to 'P2' [with 'T' = 'Base<Int>']}}
 
   // Good
   conformsToAnyObject(anyObject)

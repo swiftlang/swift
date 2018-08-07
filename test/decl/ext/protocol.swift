@@ -180,7 +180,7 @@ extension S1 {
 // Protocol extensions with additional requirements
 // ----------------------------------------------------------------------------
 extension P4 where Self.AssocP4 : P1 {
-  func extP4a() {
+  func extP4a() { // expected-note 2 {{declared here}}
     acceptsP1(reqP4a())
   }
 }
@@ -215,9 +215,9 @@ extension P4 where Self.AssocP4 == Bool {
 }
 
 func testP4(_ s4a: S4a, s4b: S4b, s4c: S4c, s4d: S4d) {
-  s4a.extP4a() // expected-error{{'() -> ()' requires that 'S4aHelper' conform to 'P1'}}
+  s4a.extP4a() // expected-error{{instance method 'extP4a()' requires that 'Self.AssocP4' conform to 'P1' [with 'Self.AssocP4' = 'S4aHelper']}}
   s4b.extP4a() // ok
-  s4c.extP4a() // expected-error{{'() -> ()' requires that 'Int' conform to 'P1'}}
+  s4c.extP4a() // expected-error{{instance method 'extP4a()' requires that 'Self.AssocP4' conform to 'P1' [with 'Self.AssocP4' = 'Int']}}
   s4c.extP4Int() // okay
   var b1 = s4d.extP4a() // okay, "Bool" version
   b1 = true // checks type above

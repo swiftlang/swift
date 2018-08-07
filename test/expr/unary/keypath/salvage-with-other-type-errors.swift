@@ -6,7 +6,7 @@
 struct P<T: K> { }
 
 struct S {
-    init<B>(_ a: P<B>) {
+    init<B>(_ a: P<B>) { // expected-note {{declared here}}
         fatalError()
     }
 }
@@ -27,7 +27,7 @@ struct A {
 }
 
 extension A: K {
-    static let j = S(\A.id + "id") // expected-error {{'S' requires that 'String' conform to 'K'}}
+    static let j = S(\A.id + "id") // expected-error {{initializer 'init' requires that 'B' conform to 'K' [with 'B' = 'String']}}
 }
 
 // SR-5034

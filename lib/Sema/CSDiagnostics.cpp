@@ -147,8 +147,15 @@ bool MissingConformanceFailure::diagnose() {
                    diag::cannot_convert_argument_value_protocol, type,
                    protocolType);
   } else {
-    emitDiagnostic(anchor->getLoc(), diag::type_does_not_conform_owner,
-                   ownerType, type, protocolType);
+    const auto &req = getRequirement();
+    emitDiagnostic(anchor->getLoc(), diag::type_does_not_conform_decl_owner,
+                   AffectedDecl->getDescriptiveKind(),
+                   AffectedDecl->getFullName(), req.getFirstType(),
+                   protocolType, type);
+
+    if (!AffectedDecl->isImplicit())
+      emitDiagnostic(AffectedDecl, diag::decl_declared_here,
+                     AffectedDecl->getBaseName());
   }
   return true;
 }

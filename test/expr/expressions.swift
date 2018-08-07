@@ -736,8 +736,8 @@ func invalidDictionaryLiteral() {
 }
 
 
-[4].joined(separator: [1]) // expected-error {{'() -> FlattenCollection<[Int]>' requires that 'Int' conform to 'Collection'}}
-[4].joined(separator: [[[1]]]) // expected-error {{'() -> FlattenCollection<[Int]>' requires that 'Int' conform to 'Collection'}}
+[4].joined(separator: [1]) // expected-error {{instance method 'joined()' requires that 'Self.Element' conform to 'Collection' [with 'Self.Element' = 'Int']}}
+[4].joined(separator: [[[1]]]) // expected-error {{instance method 'joined()' requires that 'Self.Element' conform to 'Collection' [with 'Self.Element' = 'Int']}}
 
 //===----------------------------------------------------------------------===//
 // nil/metatype comparisons

@@ -1530,6 +1530,9 @@ ERROR(types_not_equal,none,
       (Type, Type, Type))
 ERROR(type_does_not_conform_owner,none,
       "%0 requires that %1 conform to %2", (Type, Type, Type))
+ERROR(type_does_not_conform_decl_owner,none,
+      "%0 %1 requires that %2 conform to %3 [with %2 = %4]",
+      (DescriptiveDeclKind, DeclName, Type, Type, Type))
 NOTE(requirement_implied_by_conditional_conformance,none,
      "requirement from conditional conformance of %0 to %1", (Type, Type))
 NOTE(candidate_types_equal_requirement,none,
