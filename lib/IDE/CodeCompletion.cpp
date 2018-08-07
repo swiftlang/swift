@@ -3879,22 +3879,6 @@ public:
         Lookup.unboxType(ReturnType);
   }
 
-  static bool getPositionInTupleExpr(DeclContext &DC, Expr *Target,
-                                     TupleExpr *Tuple, unsigned &Pos,
-                                     bool &HasName) {
-    auto &SM = DC.getASTContext().SourceMgr;
-    Pos = 0;
-    for (auto E : Tuple->getElements()) {
-      if (SM.isBeforeInBuffer(E->getEndLoc(), Target->getStartLoc())) {
-        Pos ++;
-        continue;
-      }
-      HasName = !Tuple->getElementName(Pos).empty();
-      return true;
-    }
-    return false;
-  }
-
   void addArgNameCompletionResults(ArrayRef<StringRef> Names) {
     for (auto Name : Names) {
       CodeCompletionResultBuilder Builder(Sink,
@@ -3946,19 +3930,30 @@ public:
 
   static bool getPositionInArgs(DeclContext &DC, Expr *Args, Expr *CCExpr,
                                 unsigned &Position, bool &HasName) {
-    if (auto *tuple = dyn_cast<TupleExpr>(Args)) {
-      for (unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
-        if (isa<CodeCompletionExpr>(tuple->getElement(i))) {
-          HasName = !tuple->getElementName(i).empty();
-          Position = i;
-          return true;
-        }
-      }
-
-      return getPositionInTupleExpr(DC, CCExpr, tuple, Position, HasName);
-    } else if (isa<ParenExpr>(Args)) {
+    if (isa<ParenExpr>(Args)) {
       HasName = false;
       Position = 0;
+      return true;
+    }
+
+    auto *tuple = dyn_cast<TupleExpr>(Args);
+    if (!tuple)
+      return false;
+
+    for (unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
+      if (isa<CodeCompletionExpr>(tuple->getElement(i))) {
+        HasName = !tuple->getElementName(i).empty();
+        Position = i;
+        return true;
+      }
+    }
+    auto &SM = DC.getASTContext().SourceMgr;
+    for (unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
+      if (SM.isBeforeInBuffer(tuple->getElement(i)->getEndLoc(),
+                              CCExpr->getStartLoc()))
+        continue;
+      HasName = !tuple->getElementName(i).empty();
+      Position = i;
       return true;
     }
     return false;
