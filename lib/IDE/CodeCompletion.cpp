@@ -3908,29 +3908,6 @@ public:
 
   using FunctionParams = ArrayRef<AnyFunctionType::Param>;
 
-  static void collectArgumentExpectation(unsigned Position, bool HasName,
-                                         ArrayRef<FunctionParams> Candidates,
-                                         SourceLoc Loc,
-                                         std::vector<Type> &ExpectedTypes,
-                                         std::vector<StringRef> &ExpectedNames) {
-    SmallPtrSet<TypeBase *, 4> seenTypes;
-    SmallPtrSet<const char *, 4> seenNames;
-
-    for (auto Params : Candidates) {
-      if (Position >= Params.size()) {
-        continue;
-      }
-      const auto &Ele = Params[Position];
-      if (Ele.hasLabel() && !HasName) {
-        if (seenNames.insert(Ele.getLabel().get()).second)
-          ExpectedNames.push_back(Ele.getLabel().str());
-      } else {
-        if (seenTypes.insert(Ele.getType().getPointer()).second)
-          ExpectedTypes.push_back(Ele.getType());
-      }
-    }
-  }
-
   static bool
   collectPossibleParamLists(DeclContext &DC, CallExpr *callExpr,
                             SmallVectorImpl<FunctionParams> &candidates) {
@@ -4003,9 +3980,22 @@ public:
       return false;
 
     // Collect possible types at the position.
-    collectArgumentExpectation(Position, HasName, Candidates,
-                               CCExpr->getStartLoc(), ExpectedTypes,
-                               ExpectedNames);
+    {
+      SmallPtrSet<TypeBase *, 4> seenTypes;
+      SmallPtrSet<Identifier, 4> seenNames;
+      for (auto Params : Candidates) {
+        if (Position >= Params.size())
+          continue;
+        const auto &Param = Params[Position];
+        if (Param.hasLabel() && !HasName) {
+          if (seenNames.insert(Param.getLabel()).second)
+            ExpectedNames.push_back(Param.getLabel().str());
+        } else {
+          if (seenTypes.insert(Param.getType().getPointer()).second)
+            ExpectedTypes.push_back(Param.getType());
+        }
+      }
+    }
     return !ExpectedTypes.empty() || !ExpectedNames.empty();
   }
 
