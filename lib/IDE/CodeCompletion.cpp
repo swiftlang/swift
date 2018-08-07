@@ -3982,14 +3982,9 @@ public:
     return !candidates.empty();
   }
 
-  static bool collectPossibleArgTypes(DeclContext &DC, CallExpr *CallE,
-                                      Expr *CCExpr,
-                                      SmallVectorImpl<FunctionParams> &Candidates,
-                                      unsigned &Position, bool &HasName) {
-    if (!collectPossibleParamLists(DC, CallE, Candidates))
-      return false;
-
-    if (auto *tuple = dyn_cast<TupleExpr>(CallE->getArg())) {
+  static bool getPositionInArgs(DeclContext &DC, Expr *Args, Expr *CCExpr,
+                                unsigned &Position, bool &HasName) {
+    if (auto *tuple = dyn_cast<TupleExpr>(Args)) {
       for (unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
         if (isa<CodeCompletionExpr>(tuple->getElement(i))) {
           HasName = !tuple->getElementName(i).empty();
@@ -3999,11 +3994,23 @@ public:
       }
 
       return getPositionInTupleExpr(DC, CCExpr, tuple, Position, HasName);
-    } else if (isa<ParenExpr>(CallE->getArg())) {
+    } else if (isa<ParenExpr>(Args)) {
       HasName = false;
       Position = 0;
       return true;
     }
+    return false;
+  }
+
+  static bool collectPossibleArgTypes(DeclContext &DC, CallExpr *CallE,
+                                      Expr *CCExpr,
+                                      SmallVectorImpl<FunctionParams> &Candidates,
+                                      unsigned &Position, bool &HasName) {
+    if (!collectPossibleParamLists(DC, CallE, Candidates))
+      return false;
+    if (!getPositionInArgs(DC, CallE->getArg(), CCExpr, Position, HasName))
+      return false;
+    return true;
 
     return false;
   }
