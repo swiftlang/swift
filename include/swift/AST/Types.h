@@ -54,6 +54,7 @@ namespace swift {
   class GenericParamList;
   class GenericSignature;
   class Identifier;
+  enum class ReferenceCounting : uint8_t;
   enum class ResilienceExpansion : unsigned;
   class SILModule;
   class SILType;
@@ -842,6 +843,10 @@ public:
   /// \brief Given that this type is a reference type, is it known to use
   /// Swift-native reference counting?
   bool usesNativeReferenceCounting(ResilienceExpansion resilience);
+
+  /// Given that this type is a reference type, which kind of reference
+  /// counting does it use?
+  ReferenceCounting getReferenceCounting(ResilienceExpansion resilience);
 
   /// Determines whether this type has a bridgeable object
   /// representation, i.e., whether it is always represented as a single

@@ -63,22 +63,7 @@ using namespace irgen;
 /// What reference counting mechanism does a class-like type have?
 ReferenceCounting irgen::getReferenceCountingForType(IRGenModule &IGM,
                                                      CanType type) {
-  // If ObjC interop is disabled, we have a Swift refcount.
-  if (!IGM.ObjCInterop)
-    return ReferenceCounting::Native;
-
-  if (type->usesNativeReferenceCounting(ResilienceExpansion::Maximal))
-    return ReferenceCounting::Native;
-
-  // Class-constrained archetypes and existentials that don't use
-  // native reference counting and yet have a superclass must be
-  // using ObjC reference counting.
-  auto superclass = type->getSuperclass();
-  if (superclass)
-    return ReferenceCounting::ObjC;
-
-  // Otherwise, it could be either one.
-  return ReferenceCounting::Unknown;
+  return type->getReferenceCounting(ResilienceExpansion::Maximal);
 }
 
 namespace {
