@@ -3996,7 +3996,7 @@ void swift::useObjectiveCBridgeableConformances(DeclContext *dc, Type type) {
               if (!hashableProto)
                 return Action::Stop;
 
-              auto result = tc.conformsToProtocol(
+              (void)tc.conformsToProtocol(
                   keyType, hashableProto, DC, options,
                   /*ComplainLoc=*/SourceLoc());
             }
