@@ -3946,8 +3946,9 @@ public:
     return true;
   }
 
-  static bool collectionInputTypes(DeclContext &DC, CallExpr *callExpr,
-                                   SmallVectorImpl<FunctionParams> &candidates) {
+  static bool
+  collectPossibleParamLists(DeclContext &DC, CallExpr *callExpr,
+                            SmallVectorImpl<FunctionParams> &candidates) {
     auto *fnExpr = callExpr->getFn();
 
     if (auto type = fnExpr->getType()) {
@@ -3985,7 +3986,7 @@ public:
                                       Expr *CCExpr,
                                       SmallVectorImpl<FunctionParams> &Candidates,
                                       unsigned &Position, bool &HasName) {
-    if (!collectionInputTypes(DC, CallE, Candidates))
+    if (!collectPossibleParamLists(DC, CallE, Candidates))
       return false;
 
     if (auto *tuple = dyn_cast<TupleExpr>(CallE->getArg())) {
