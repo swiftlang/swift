@@ -131,7 +131,12 @@ namespace {
     SmallVector<VarDecl*, 8> AllStoredProperties;
     SmallVector<FieldAccess, 8> AllFieldAccesses;
 
-    unsigned NumInherited = 0;
+    // If we're building a layout with tail-allocated elements, we do
+    // things slightly differently; all fields from the superclass are
+    // added before the class fields, and the tail elements themselves
+    // come after. We don't make a ClassLayout in this case, only a
+    // StructLayout.
+    Optional<ArrayRef<SILType>> TailTypes;
 
     // For now we always lay out resiliently-typed fields as if they
     // were fragile.
@@ -160,9 +165,9 @@ namespace {
     
   public:
     ClassLayoutBuilder(IRGenModule &IGM, SILType classType,
-                       ReferenceCounting refcounting)
-      : StructLayoutBuilder(IGM)
-    {
+                       ReferenceCounting refcounting,
+                       Optional<ArrayRef<SILType>> tailTypes = None)
+      : StructLayoutBuilder(IGM), TailTypes(tailTypes) {
       // Perform fragile layout if Objective-C interop is enabled.
       CompletelyFragileLayout =
         (IGM.Context.LangOpts.EnableObjCInterop &&
@@ -189,12 +194,39 @@ namespace {
       // Next, add the fields for the given class.
       auto theClass = classType.getClassOrBoundGenericClass();
       assert(theClass);
-      addFieldsForClass(theClass, classType);
-      
-      // Add these fields to the builder.
-      addFields(Elements, LayoutStrategy::Universal);
+      addFieldsForClass(theClass, classType, /*superclass=*/false);
+
+      if (TailTypes) {
+        // Add the tail elements.
+        for (SILType TailTy : *TailTypes) {
+          const TypeInfo &tailTI = IGM.getTypeInfo(TailTy);
+          addTailElement(ElementLayout::getIncomplete(tailTI, tailTI));
+        }
+      }
     }
 
+    /// Return the element layouts.
+    ArrayRef<ElementLayout> getElements() const {
+      return Elements;
+    }
+
+    ClassLayout getClassLayout(llvm::Type *classTy) const {
+      assert(!TailTypes);
+
+      auto allStoredProps = IGM.Context.AllocateCopy(AllStoredProperties);
+      auto allFieldAccesses = IGM.Context.AllocateCopy(AllFieldAccesses);
+      auto allElements = IGM.Context.AllocateCopy(Elements);
+
+      return ClassLayout(*this,
+                         ClassIsFixedSize,
+                         ClassMetadataRequiresDynamicInitialization,
+                         classTy,
+                         allStoredProps,
+                         allFieldAccesses,
+                         allElements);
+    }
+
+  private:
     /// Adds a layout of a tail-allocated element.
     void addTailElement(const ElementLayout &Elt) {
       Elements.push_back(Elt);
@@ -207,48 +239,31 @@ namespace {
       }
     }
 
-    /// Return the element layouts.
-    ArrayRef<ElementLayout> getElements() const {
-      return Elements;
-    }
-
-    ClassLayout getClassLayout(llvm::Type *classTy) const {
-      auto allStoredProps = IGM.Context.AllocateCopy(
-          ArrayRef<VarDecl *>(AllStoredProperties).slice(NumInherited));
-      auto allElements = IGM.Context.AllocateCopy(
-        ArrayRef<ElementLayout>(Elements).slice(NumInherited));
-      auto allFieldAccesses = IGM.Context.AllocateCopy(
-        ArrayRef<FieldAccess>(AllFieldAccesses).slice(NumInherited));
-
-      return ClassLayout(*this,
-                         ClassIsFixedSize,
-                         ClassMetadataRequiresDynamicInitialization,
-                         classTy,
-                         allStoredProps,
-                         allFieldAccesses,
-                         allElements);
-    }
-
-  private:
-    void addFieldsForClass(ClassDecl *theClass, SILType classType) {
+    /// If 'superclass' is true, we're adding fields for one of our
+    /// superclasses, which means they become part of the struct
+    /// layout calculation, but are not actually added to any of
+    /// the vectors like AllStoredProperties, etc. Also, we don't need
+    /// to compute FieldAccesses for them.
+    void addFieldsForClass(ClassDecl *theClass, SILType classType,
+                           bool superclass) {
       if (theClass->isGenericContext())
         ClassMetadataRequiresDynamicInitialization = true;
 
       if (theClass->hasSuperclass()) {
         SILType superclassType = classType.getSuperclass();
-        auto superclass = superclassType.getClassOrBoundGenericClass();
-        assert(superclass);
+        auto superclassDecl = superclassType.getClassOrBoundGenericClass();
+        assert(superclassType && superclassDecl);
 
         // If the superclass came from another module, we may have dropped
         // stored properties due to the Swift language version availability of
         // their types. In these cases we can't precisely lay out the ivars in
         // the class object at compile time so we need to do runtime layout.
-        if (classHasIncompleteLayout(IGM, superclass)) {
+        if (classHasIncompleteLayout(IGM, superclassDecl)) {
           ClassMetadataRequiresDynamicInitialization = true;
           ClassIsFixedSize = false;
         }
 
-        if (superclass->hasClangNode()) {
+        if (superclassDecl->hasClangNode()) {
           // If the superclass was imported from Objective-C, its size is
           // not known at compile time. However, since the field offset
           // vector only stores offsets of stored properties defined in
@@ -275,7 +290,7 @@ namespace {
                   ClassHasConcreteLayout = false;
               }
             }
-        } else if (IGM.isResilient(superclass, ResilienceExpansion::Maximal)) {
+        } else if (IGM.isResilient(superclassDecl, ResilienceExpansion::Maximal)) {
           ClassMetadataRequiresDynamicInitialization = true;
           ClassIsFixedSize = false;
 
@@ -289,9 +304,7 @@ namespace {
         } else {
           // Otherwise, we have total knowledge of the class and its
           // fields, so walk them to compute the layout.
-          addFieldsForClass(superclass, superclassType);
-          // Count the fields we got from the superclass.
-          NumInherited = Elements.size();
+          addFieldsForClass(superclassDecl, superclassType, /*superclass=*/true);
         }
       }
 
@@ -307,27 +320,29 @@ namespace {
         ClassIsFixedSize = false;
       }
 
-      // Access strategies should be set by the abstract class layout,
-      // not using the concrete type information we have.
-      const ClassLayout *abstractLayout = nullptr;
-
-      auto *classTI = &IGM.getTypeInfo(classType).as<ClassTypeInfo>();
-
-      SILType selfType = getSelfType(theClass);
-      auto *selfTI = &IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
-
-      // Only calculate an abstract layout if its different than the one
-      // being computed now.
-      if (classTI != selfTI)
-        abstractLayout = &selfTI->getClassLayout(IGM, selfType);
-
       // Collect fields from this class and add them to the layout as a chunk.
-      addDirectFieldsFromClass(theClass, classType, abstractLayout);
+      addDirectFieldsFromClass(theClass, classType, superclass);
     }
 
     void addDirectFieldsFromClass(ClassDecl *theClass,
                                   SILType classType,
-                                  const ClassLayout *abstractLayout) {
+                                  bool superclass) {
+      // Access strategies should be set by the abstract class layout,
+      // not using the concrete type information we have.
+      const ClassLayout *abstractLayout = nullptr;
+
+      if (!superclass) {
+        auto *classTI = &IGM.getTypeInfo(classType).as<ClassTypeInfo>();
+
+        SILType selfType = getSelfType(theClass);
+        auto *selfTI = &IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
+
+        // Only calculate an abstract layout if its different than the one
+        // being computed now.
+        if (classTI != selfTI)
+          abstractLayout = &selfTI->getClassLayout(IGM, selfType);
+      }
+
       for (VarDecl *var : theClass->getStoredProperties()) {
         SILType type = classType.getFieldType(var, IGM.getSILModule());
         auto &eltTypeForAccess = IGM.getTypeInfo(type);
@@ -353,10 +368,19 @@ namespace {
             ClassHasConcreteLayout = false;
         }
 
-        Elements.push_back(ElementLayout::getIncomplete(eltTypeForLayout,
-                                                        eltTypeForAccess));
-        AllStoredProperties.push_back(var);
-        AllFieldAccesses.push_back(getFieldAccess(abstractLayout, var));
+        auto element = ElementLayout::getIncomplete(eltTypeForLayout,
+                                                    eltTypeForAccess);
+        addField(element, LayoutStrategy::Universal);
+
+        // The 'Elements' list only contains superclass fields when we're
+        // building a layout for tail allocation.
+        if (!superclass || TailTypes)
+          Elements.push_back(element);
+
+        if (!superclass) {
+          AllStoredProperties.push_back(var);
+          AllFieldAccesses.push_back(getFieldAccess(abstractLayout, var));
+        }
       }
     }
 
@@ -417,13 +441,7 @@ ClassTypeInfo::createLayoutWithTailElems(IRGenModule &IGM,
                                          SILType classType,
                                          ArrayRef<SILType> tailTypes) const {
   // Add the elements for the class properties.
-  ClassLayoutBuilder builder(IGM, classType, Refcount);
-
-  // Add the tail elements.
-  for (SILType TailTy : tailTypes) {
-    const TypeInfo &tailTI = IGM.getTypeInfo(TailTy);
-    builder.addTailElement(ElementLayout::getIncomplete(tailTI, tailTI));
-  }
+  ClassLayoutBuilder builder(IGM, classType, Refcount, tailTypes);
 
   // Create a name for the new llvm type.
   llvm::StructType *classTy =
