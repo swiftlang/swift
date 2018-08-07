@@ -882,7 +882,12 @@ void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
   bool emittedFirstNote =
       emitNoteDiagnostic(badInst, getUnknownReason(), fallbackLoc, error);
 
+  auto sourceLoc = fallbackLoc.getSourceLoc();
   auto &module = badInst->getModule();
+  if (sourceLoc.isInvalid()) {
+    diagnose(module.getASTContext(), sourceLoc, diag::constexpr_not_evaluable);
+    return;
+  }
   auto &SM = module.getASTContext().SourceMgr;
   unsigned originalDiagnosticLineNumber =
       SM.getLineNumber(fallbackLoc.getSourceLoc());
