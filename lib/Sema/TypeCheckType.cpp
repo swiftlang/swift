@@ -3004,6 +3004,9 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
       return memberType;
     }
 
+    if (baseTy->is<ErrorType>())
+      return ErrorType::get(memberType);
+
     subs = baseTy->getContextSubstitutionMap(module, member->getDeclContext());
     resultType = memberType.subst(subs, SubstFlags::UseErrorType);
   } else {
