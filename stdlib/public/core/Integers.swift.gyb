@@ -2103,16 +2103,42 @@ ${operatorComment(x.nonMaskingOperator, False)}
     return (rounded, !sticky)
   }
 
+  /// Test if this value is exactly divisible by `testDivisor`.
+  ///
+  /// For example:
+  ///
+  /// ~~~~
+  /// 5.isDivisible(by: 2)  // false, because 5 is not twice any integer.
+  /// 21.isDivisible(by: 7) // true, because 21 = 3*7.
+  /// ~~~~
+  ///
+  /// Two edge cases warrant special attention:
+  /// - `x.isDivisible(by: 0)` is `false` for all `x`, even `x == 0`. This is
+  ///   because zero times anything is zero, so there is no *unique* `k`
+  ///   satisfying `0 = k*0`.
+  /// - For signed fixed-width integer types `T`, `T.min.isDivisible(by: -1)`
+  ///   is `true`, even though `T.min / -1` overflows, because the integer
+  ///   `k` exists and is unique; it simply isn't representable as a `T`.
+  ///
+  /// - Parameter testDivisor: the number by which to test for divisibility.
+  /// - Returns: true if a unique integer `k` exists such that `self == k * testDivisor`.
+  ///
+  /// - See also: isEven, isOdd.
   @_transparent
-  func isDivisible(by divisor: Self) -> Bool { return self % divisor == 0 }
+  func isDivisible(by testDivisor: Self) -> Bool {
+    return testDivisor != 0 && self % testDivisor == 0
+  }
 
+  /// True if this value is evenly divisible by two, false otherwise.
+  /// - See also: isDivisible(by:), isOdd
   @_transparent
   var isEven: Bool { return _lowWord % 2 == 0 }
 
+  /// True if this value is not evenly divisible by two, false otherwise.
+  /// - See also: isDivisible(by:), isEven
   @_transparent
   var isOdd: Bool { return !isEven }
 }
-
 
 //===----------------------------------------------------------------------===//
 //===--- CustomStringConvertible conformance ------------------------------===//
