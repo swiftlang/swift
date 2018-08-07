@@ -1214,6 +1214,14 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
     return bestIdx;
   }
 
+  // If there is not a single "better" than others
+  // solution, which probably means that solutions
+  // were incomparable, let's just keep the original
+  // list instead of removing everything, even if we
+  // are asked to "minimize" the result.
+  if (losers.size() == viable.size())
+    return None;
+
   // The comparison was ambiguous. Identify any solutions that are worse than
   // any other solution.
   for (unsigned i = 0, n = viable.size(); i != n; ++i) {
