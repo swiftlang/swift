@@ -175,8 +175,6 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
     return;
 
   // Handle the extensions that we have not yet visited.
-  llvm::SetVector<ExtensionDecl *> &delayedExtensionDecls
-    = DelayedExtensionDecls[static_cast<unsigned>(stage)];
   nominal->prepareExtensions();
   while (auto next = lastProcessed.getPointer()
                        ? lastProcessed.getPointer()->NextExtension.getPointer()
@@ -196,35 +194,15 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
         protocols.push_back({SourceLoc(), conf->getProtocol()});
       }
     } else if (next->getParentSourceFile()) {
-      if (!resolver) {
-        // We have a parsed extension that we can't resolve well enough to
-        // get any information from. Queue it for later.
-        // FIXME: Per the comment on DelayedExtensionDecls, this is insane.
-        delayedExtensionDecls.insert(next);
-        continue;
+      bool anyObject = false;
+      for (const auto &found :
+               getDirectlyInheritedNominalTypeDecls(next, anyObject)) {
+        if (auto proto = dyn_cast<ProtocolDecl>(found.second))
+          protocols.push_back({found.first, proto});
       }
-
-      // Resolve this extension.
-      delayedExtensionDecls.remove(next);
-      resolver->resolveExtensionForConformanceConstruction(next, protocols);
     }
 
     extensionFunc(next, protocols);
-  }
-
-  // If we delayed any extension declarations because we didn't have a resolver
-  // then, but we have a resolver now, process them.
-  if (resolver) {
-    while (!delayedExtensionDecls.empty()) {
-      // Remove the last extension declaration.
-      auto ext = delayedExtensionDecls.back();
-      delayedExtensionDecls.remove(ext);
-
-      SmallVector<LazyResolver::ConformanceConstructionInfo, 2> protocols;
-
-      resolver->resolveExtensionForConformanceConstruction(ext, protocols);
-      extensionFunc(ext, protocols);
-    }
   }
 }
 

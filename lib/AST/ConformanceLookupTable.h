@@ -78,13 +78,6 @@ class ConformanceLookupTable {
                      std::array<LastProcessedEntry, NumConformanceStages>>
   LastProcessed;
   
-  /// The list of parsed extension declarations that have been delayed because
-  /// no resolver was available at the time.
-  ///
-  /// FIXME: This is insane. The resolver should be there or we shouldn't
-  /// have parsed extensions.
-  llvm::SetVector<ExtensionDecl *> DelayedExtensionDecls[NumConformanceStages];
-
   struct ConformanceEntry;
 
   /// Describes the "source" of a conformance, indicating where the
