@@ -396,11 +396,11 @@ extension String : AccelerableByTensorFlow {
   @inlinable @inline(__always)
   public static func _makeScalarTensor(_ scalar: String)
     -> TensorHandle<String> {
-      return #tfop("tfc.scalarToTensor", scalar)
+    return #tfop("tfc.scalarToTensor", scalar)
   }
   @_silgen_name("__tf_hoistable_String") @_optimize(none) @inline(never)
   public static func _hoistableClosure(_ fn: () -> TensorHandle<String>)
     -> TensorHandle<String> {
-      return fn()
+    return fn()
   }
 }
