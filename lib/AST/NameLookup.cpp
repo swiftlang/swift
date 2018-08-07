@@ -1801,26 +1801,34 @@ bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
     if (!wantProtocolMembers && !currentIsProtocol)
       continue;
 
-    if (!sawClassDecl) {
-      if (auto *protoDecl = dyn_cast<ProtocolDecl>(current)) {
+    SmallVector<ProtocolDecl *, 4> protocols;
+
+    if (auto *protoDecl = dyn_cast<ProtocolDecl>(current)) {
+      // If we haven't seen a class declaration yet, look into the protocol.
+      if (!sawClassDecl) {
         if (auto superclassDecl = protoDecl->getSuperclassDecl()) {
           visited.insert(superclassDecl);
           stack.push_back(superclassDecl);
         }
       }
-    }
 
-    SmallVector<ProtocolDecl *, 4> protocols;
-    for (auto proto : current->getAllProtocols()) {
-      if (visited.insert(proto).second) {
-        stack.push_back(proto);
+      // Collect inherited protocols.
+      for (auto inheritedProto : protoDecl->getInheritedProtocols()) {
+        addNominalType(inheritedProto);
       }
-    }
+    } else {
+      // Collect the protocols to which the nominal type conforms.
+      for (auto proto : current->getAllProtocols()) {
+        if (visited.insert(proto).second) {
+          stack.push_back(proto);
+        }
+      }
 
-    // For a class, we don't need to visit the protocol members of the
-    // superclass: that's already handled.
-    if (isa<ClassDecl>(current))
-      wantProtocolMembers = false;
+      // For a class, we don't need to visit the protocol members of the
+      // superclass: that's already handled.
+      if (isa<ClassDecl>(current))
+        wantProtocolMembers = false;
+    }
   }
 
   return finishLookup(this, options, decls);
@@ -1957,7 +1965,9 @@ static TinyPtrVector<NominalTypeDecl *>
 resolveTypeDeclsToNominal(Evaluator &evaluator,
                           ASTContext &ctx,
                           ArrayRef<TypeDecl *> typeDecls,
-                          SmallVectorImpl<ModuleDecl *> &modulesFound) {
+                          SmallVectorImpl<ModuleDecl *> &modulesFound,
+                          bool &anyObject,
+                          llvm::SmallPtrSetImpl<TypeAliasDecl *> &typealiases) {
   TinyPtrVector<NominalTypeDecl *> nominalDecls;
 
   for (auto typeDecl : typeDecls) {
@@ -1969,14 +1979,41 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
 
     // Recursively resolve typealiases.
     if (auto typealias = dyn_cast<TypeAliasDecl>(typeDecl)) {
+      // FIXME: Ad hoc recursion breaking, so we don't look through the
+      // same typealias multiple times.
+      if (!typealiases.insert(typealias).second)
+        continue;
+
       auto underlyingTypeReferences
         = evaluator(UnderlyingTypeDeclsReferencedRequest{typealias});
       auto underlyingNominalReferences
         = resolveTypeDeclsToNominal(evaluator, ctx, underlyingTypeReferences,
-                                    modulesFound);
+                                    modulesFound, anyObject, typealiases);
       nominalDecls.insert(nominalDecls.end(),
                           underlyingNominalReferences.begin(),
                           underlyingNominalReferences.end());
+
+      // Recognize Swift.AnyObject directly.
+      if (typealias->getName().is("AnyObject")) {
+        // TypeRepr version: Builtin.AnyObject
+        if (auto typeRepr = typealias->getUnderlyingTypeLoc().getTypeRepr()) {
+          if (auto compound = dyn_cast<CompoundIdentTypeRepr>(typeRepr)) {
+            auto components = compound->getComponents();
+            if (components.size() == 2 &&
+                components[0]->getIdentifier().is("Builtin") &&
+                components[1]->getIdentifier().is("AnyObject")) {
+              anyObject = true;
+            }
+          }
+        }
+
+        // Type version: an empty class-bound existential.
+        if (auto type = typealias->getUnderlyingTypeLoc().getType()) {
+          if (type->isAnyObject())
+            anyObject = true;
+        }
+      }
+
       continue;
     }
 
@@ -1991,6 +2028,17 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
   }
 
   return nominalDecls;
+}
+
+static TinyPtrVector<NominalTypeDecl *>
+resolveTypeDeclsToNominal(Evaluator &evaluator,
+                          ASTContext &ctx,
+                          ArrayRef<TypeDecl *> typeDecls,
+                          SmallVectorImpl<ModuleDecl *> &modulesFound,
+                          bool &anyObject) {
+  llvm::SmallPtrSet<TypeAliasDecl *, 4> typealiases;
+  return resolveTypeDeclsToNominal(evaluator, ctx, typeDecls, modulesFound,
+                                   anyObject, typealiases);
 }
 
 /// Perform unqualified name lookup for types at the given location.
@@ -2018,8 +2066,10 @@ directReferencesForQualifiedTypeLookup(Evaluator &evaluator,
   // Look through the base types to find something on which we can perform
   // qualified name lookup.
   SmallVector<ModuleDecl *, 2> moduleBaseTypes;
+  bool anyObject = false;
   auto nominalBaseTypes =
-      resolveTypeDeclsToNominal(evaluator, ctx, baseTypes, moduleBaseTypes);
+      resolveTypeDeclsToNominal(evaluator, ctx, baseTypes, moduleBaseTypes,
+                                anyObject);
 
   DirectlyReferencedTypeDecls result;
   auto addResults = [&result](ArrayRef<ValueDecl *> found){
@@ -2241,9 +2291,10 @@ ClassDecl *SuperclassDeclRequest::evaluate(Evaluator &evaluator,
 
     // Resolve those type declarations to nominal type declarations.
     SmallVector<ModuleDecl *, 2> modulesFound;
+    bool anyObject = false;
     auto inheritedNominalTypes
       = resolveTypeDeclsToNominal(evaluator, subject->getASTContext(),
-                                  inheritedTypes, modulesFound);
+                                  inheritedTypes, modulesFound, anyObject);
 
     // Look for a class declaration.
     for (auto inheritedNominal : inheritedNominalTypes) {
@@ -2273,7 +2324,62 @@ NominalTypeDecl *ExtendedNominalRequest::evaluate(Evaluator &evaluator,
 
   // Resolve those type declarations to nominal type declarations.
   SmallVector<ModuleDecl *, 2> modulesFound;
+  bool anyObject = false;
   auto nominalTypes
-    = resolveTypeDeclsToNominal(evaluator, ctx, referenced, modulesFound);
+    = resolveTypeDeclsToNominal(evaluator, ctx, referenced, modulesFound,
+                                anyObject);
   return nominalTypes.empty() ? nullptr : nominalTypes.front();
+}
+
+void swift::getDirectlyInheritedNominalTypeDecls(
+    llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
+    unsigned i,
+    llvm::SmallVectorImpl<std::pair<SourceLoc, NominalTypeDecl *>> &result,
+    bool &anyObject) {
+  auto typeDecl = decl.dyn_cast<TypeDecl *>();
+  auto extDecl = decl.dyn_cast<ExtensionDecl *>();
+
+  ASTContext &ctx = typeDecl ? typeDecl->getASTContext()
+                             : extDecl->getASTContext();
+
+  // Find inherited declarations.
+  auto referenced = ctx.evaluator(InheritedDeclsReferencedRequest{decl, i});
+
+  // Resolve those type declarations to nominal type declarations.
+  SmallVector<ModuleDecl *, 2> modulesFound;
+  auto nominalTypes
+    = resolveTypeDeclsToNominal(ctx.evaluator, ctx, referenced, modulesFound,
+                                anyObject);
+
+  // Dig out the source location
+  // FIXME: This is a hack. We need cooperation from
+  // InheritedDeclsReferencedRequest to make this work.
+  SourceLoc loc;
+  if (TypeRepr *typeRepr = typeDecl ? typeDecl->getInherited()[i].getTypeRepr()
+                                    : extDecl->getInherited()[i].getTypeRepr()){
+    loc = typeRepr->getLoc();
+  }
+
+  // Form the result.
+  for (auto nominal : nominalTypes) {
+    result.push_back({loc, nominal});
+  }
+}
+
+SmallVector<std::pair<SourceLoc, NominalTypeDecl *>, 4>
+swift::getDirectlyInheritedNominalTypeDecls(
+                        llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
+                        bool &anyObject) {
+  auto typeDecl = decl.dyn_cast<TypeDecl *>();
+  auto extDecl = decl.dyn_cast<ExtensionDecl *>();
+
+  // Gather results from all of the inherited types.
+  unsigned numInherited = typeDecl ? typeDecl->getInherited().size()
+                                   : extDecl->getInherited().size();
+  SmallVector<std::pair<SourceLoc, NominalTypeDecl *>, 4> result;
+  for (unsigned i : range(numInherited)) {
+    getDirectlyInheritedNominalTypeDecls(decl, i, result, anyObject);
+  }
+
+  return result;
 }

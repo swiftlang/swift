@@ -9,7 +9,7 @@ import Foundation
 
 @objc protocol RootJSExport : JSExport { }
 
-// CHECK: @_PROTOCOL_PROTOCOLS__TtP8JSExport4Sub1_ = private constant{{.*}}_PROTOCOL__TtP8JSExport12RootJSExport_{{.*}}_PROTOCOL__TtP8JSExport8JSExport_
+// CHECK: @_PROTOCOL_PROTOCOLS__TtP8JSExport4Sub1_ = private constant{{.*}}_PROTOCOL__TtP8JSExport8JSExport_{{.*}}_PROTOCOL__TtP8JSExport12RootJSExport_
 @objc protocol Sub1 : JSExport, RootJSExport { }
 
 // CHECK: @_PROTOCOL_PROTOCOLS__TtP8JSExport4Sub2_{{.*}}_PROTOCOL__TtP8JSExport4Sub1_{{.*}}_PROTOCOL__TtP8JSExport8JSExport_

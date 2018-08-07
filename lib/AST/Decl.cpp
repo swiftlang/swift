@@ -31,6 +31,7 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
@@ -3538,41 +3539,20 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
 llvm::TinyPtrVector<ProtocolDecl *>
 ProtocolDecl::getInheritedProtocols() const {
   llvm::TinyPtrVector<ProtocolDecl *> result;
-
-  // FIXME: Gather inherited protocols from the "inherited" list.
-  // We shouldn't need this, but it shows up in recursive invocations.
-  if (!isRequirementSignatureComputed()) {
-    SmallPtrSet<ProtocolDecl *, 4> known;
-    if (Bits.ProtocolDecl.ComputingInheritedProtocols) return result;
-
-    auto *self = const_cast<ProtocolDecl *>(this);
-    self->Bits.ProtocolDecl.ComputingInheritedProtocols = true;
-    for (unsigned index : indices(getInherited())) {
-      if (auto type = getInheritedType(index)) {
-        // Only protocols can appear in the inheritance clause
-        // of a protocol -- anything else should get diagnosed
-        // elsewhere.
-        if (type->isExistentialType()) {
-          auto layout = type->getExistentialLayout();
-          for (auto protoTy : layout.getProtocols()) {
-            auto *protoDecl = protoTy->getDecl();
-            if (known.insert(protoDecl).second)
-              result.push_back(protoDecl);
-          }
-        }
-      }
+  SmallPtrSet<const ProtocolDecl *, 4> known;
+  known.insert(this);
+  bool anyObject = false;
+  for (const auto &found :
+           getDirectlyInheritedNominalTypeDecls(
+             const_cast<ProtocolDecl *>(this), anyObject)) {
+    if (auto proto = dyn_cast<ProtocolDecl>(found.second)) {
+      if (known.insert(proto).second)
+        result.push_back(proto);
     }
-    self->Bits.ProtocolDecl.ComputingInheritedProtocols = false;
-    return result;
   }
 
-  // Gather inherited protocols from the requirement signature.
-  auto selfType = getProtocolSelfType();
-  for (const auto &req : getRequirementSignature()) {
-    if (req.getKind() == RequirementKind::Conformance &&
-        req.getFirstType()->isEqual(selfType))
-      result.push_back(req.getSecondType()->castTo<ProtocolType>()->getDecl());
-  }
+  // FIXME: ComputingInheritedProtocols is dynamically dead.
+
   return result;
 }
 
@@ -3643,40 +3623,44 @@ bool ProtocolDecl::walkInheritedProtocols(
 bool ProtocolDecl::inheritsFrom(const ProtocolDecl *super) const {
   if (this == super)
     return false;
-  
-  auto allProtocols = getLocalProtocols();
-  return std::find(allProtocols.begin(), allProtocols.end(), super)
-           != allProtocols.end();
+
+  return walkInheritedProtocols([super](ProtocolDecl *inherited) {
+    if (inherited == super)
+      return TypeWalker::Action::Stop;
+
+    return TypeWalker::Action::Continue;
+  });
 }
 
 bool ProtocolDecl::requiresClassSlow() {
   // Set this first to catch (invalid) circular inheritance.
   Bits.ProtocolDecl.RequiresClassValid = true;
+  Bits.ProtocolDecl.RequiresClass = false;
 
   // Quick check: @objc protocols require a class.
-  if (isObjC()) {
-    Bits.ProtocolDecl.RequiresClass = true;
-    return true;
-  }
+  if (isObjC())
+    return Bits.ProtocolDecl.RequiresClass = true;
 
-  // Otherwise, check if the inheritance clause contains a
-  // class-constrained existential.
-  //
-  // FIXME: Use the requirement signature if available.
-  Bits.ProtocolDecl.RequiresClass = false;
-  for (unsigned i : indices(getInherited())) {
-    Type type = getInheritedType(i);
-    assert(type && "Should have type checked inheritance clause by now");
-    if (type->isExistentialType()) {
-      auto layout = type->getExistentialLayout();
-      if (layout.requiresClass()) {
-        Bits.ProtocolDecl.RequiresClass = true;
-        return true;
-      }
-    }
-    if (type->getClassOrBoundGenericClass()) {
-      Bits.ProtocolDecl.RequiresClass = true;
-      return true;
+  // Determine the set of nominal types that this protocol inherits.
+  bool anyObject = false;
+  auto allInheritedNominals =
+    getDirectlyInheritedNominalTypeDecls(this, anyObject);
+
+  // Quick check: do we inherit AnyObject?
+  if (anyObject)
+    return Bits.ProtocolDecl.RequiresClass = true;
+
+  // Look through all of the inherited nominals for a superclass or a
+  // class-bound protocol.
+  for (const auto &found : allInheritedNominals) {
+    // Superclass bound.
+    if (isa<ClassDecl>(found.second))
+      return Bits.ProtocolDecl.RequiresClass = true;
+
+    // A protocol that might be class-constrained;
+    if (auto proto = dyn_cast<ProtocolDecl>(found.second)) {
+      if (proto->requiresClass())
+        return Bits.ProtocolDecl.RequiresClass = true;
     }
   }
 
