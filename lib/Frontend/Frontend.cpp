@@ -286,6 +286,20 @@ Optional<unsigned> CompilerInstance::setUpCodeCompletionBuffer() {
   return codeCompletionBufferID;
 }
 
+static bool shouldTreatSingleInputAsMain(InputFileKind inputKind) {
+  switch (inputKind) {
+  case InputFileKind::Swift:
+  case InputFileKind::SwiftModuleInterface:
+  case InputFileKind::SIL:
+    return true;
+  case InputFileKind::SwiftLibrary:
+  case InputFileKind::SwiftREPL:
+  case InputFileKind::LLVM:
+  case InputFileKind::None:
+    return false;
+  }
+}
+
 bool CompilerInstance::setUpInputs() {
   // Adds to InputSourceCodeBufferIDs, so may need to happen before the
   // per-input setup.
@@ -303,9 +317,11 @@ bool CompilerInstance::setUpInputs() {
     recordPrimaryInputBuffer(*codeCompletionBufferID);
   }
 
-  if (isInputSwift() && MainBufferID == NO_SUCH_BUFFER &&
-      InputSourceCodeBufferIDs.size() == 1)
+  if (MainBufferID == NO_SUCH_BUFFER &&
+      InputSourceCodeBufferIDs.size() == 1 &&
+      shouldTreatSingleInputAsMain(Invocation.getInputKind())) {
     MainBufferID = InputSourceCodeBufferIDs.front();
+  }
 
   return false;
 }
@@ -318,9 +334,8 @@ bool CompilerInstance::setUpForInput(const InputFile &input) {
   if (!bufferID)
     return false;
 
-  if (isInSILMode() ||
-      (isInputSwift() &&
-       llvm::sys::path::filename(input.file()) == "main.swift")) {
+  if (isInputSwift() &&
+      llvm::sys::path::filename(input.file()) == "main.swift") {
     assert(MainBufferID == NO_SUCH_BUFFER && "re-setting MainBufferID");
     MainBufferID = *bufferID;
   }
@@ -915,14 +930,16 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
   Context->LoadedModules[MainModule->getName()] = MainModule;
 
   assert((Kind == InputFileKind::Swift ||
-          Kind == InputFileKind::SwiftLibrary) &&
+          Kind == InputFileKind::SwiftLibrary ||
+          Kind == InputFileKind::SwiftModuleInterface) &&
          "only supports parsing .swift files");
   (void)Kind;
 
   // Make sure the main file is the first file in the module but parse it last,
   // to match the parsing logic used when performing Sema.
   if (MainBufferID != NO_SUCH_BUFFER) {
-    assert(Kind == InputFileKind::Swift);
+    assert(Kind == InputFileKind::Swift ||
+           Kind == InputFileKind::SwiftModuleInterface);
     createSourceFileForMainModule(Invocation.getSourceFileKind(),
                                   SourceFile::ImplicitModuleImportKind::None,
                                   MainBufferID);
