@@ -246,13 +246,22 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
   // Metaclasses and ObjC class (duh) are a ObjC thing, and so are not needed in
   // build artifacts/for classes which can't touch ObjC.
   if (objCCompatible) {
-    if (isObjC)
+    bool addObjCClass = false;
+    if (isObjC) {
+      addObjCClass = true;
       addSymbol(LinkEntity::forObjCClass(CD));
+    }
 
-    if (CD->getMetaclassKind() == ClassDecl::MetaclassKind::ObjC)
+    if (CD->getMetaclassKind() == ClassDecl::MetaclassKind::ObjC) {
+      addObjCClass = true;
       addSymbol(LinkEntity::forObjCMetaclass(CD));
-    else
+    } else
       addSymbol(LinkEntity::forSwiftMetaclassStub(CD));
+
+    if (addObjCClass) {
+      SmallString<128> buffer;
+      addSymbol(CD->getObjCRuntimeName(buffer), SymbolKind::ObjectiveCClass);
+    }
   }
 
   // Some members of classes get extra handling, beyond members of struct/enums,
