@@ -4065,12 +4065,10 @@ ReferenceCounting TypeBase::getReferenceCounting(
   CanType type = getCanonicalType();
   ASTContext &ctx = type->getASTContext();
 
-  // Determine which reference-counting scheme to use for an unknown object.
-  bool objCInterop = ctx.LangOpts.EnableObjCInterop;
-  auto getUnknownObjectReferenceCounting = [objCInterop] {
-    return objCInterop ? ReferenceCounting::Unknown
-                       : ReferenceCounting::Native;
-  };
+  // In the absence of Objective-C interoperability, everything uses native
+  // reference counting.
+  if (!ctx.LangOpts.EnableObjCInterop)
+    return ReferenceCounting::Native;
 
   switch (type->getKind()) {
 #define SUGARED_TYPE(id, parent) case TypeKind::id:
@@ -4083,11 +4081,10 @@ ReferenceCounting TypeBase::getReferenceCounting(
     return ReferenceCounting::Native;
 
   case TypeKind::BuiltinBridgeObject:
-    return objCInterop ? ReferenceCounting::Bridge
-                       : ReferenceCounting::Native;
+    return ReferenceCounting::Bridge;
 
   case TypeKind::BuiltinUnknownObject:
-    return getUnknownObjectReferenceCounting();
+    return ReferenceCounting::Unknown;
 
   case TypeKind::Class:
     return getClassReferenceCounting(cast<ClassType>(type)->getDecl(),
@@ -4113,7 +4110,7 @@ ReferenceCounting TypeBase::getReferenceCounting(
            (layout && layout->isRefCounted()));
     if (auto supertype = archetype->getSuperclass())
       return supertype->getReferenceCounting(resilience);
-    return getUnknownObjectReferenceCounting();
+    return ReferenceCounting::Unknown;
   }
 
   case TypeKind::Protocol:
@@ -4122,7 +4119,7 @@ ReferenceCounting TypeBase::getReferenceCounting(
     assert(layout.requiresClass() && "Opaque existentials don't use refcounting");
     if (auto superclass = layout.getSuperclass())
       return superclass->getReferenceCounting(resilience);
-    return getUnknownObjectReferenceCounting();
+    return ReferenceCounting::Unknown;
   }
 
   case TypeKind::Function:
