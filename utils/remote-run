@@ -24,6 +24,7 @@ def quote(arg):
 class CommandRunner(object):
     def __init__(self):
         self.verbose = False
+        self.dry_run = False
 
     @staticmethod
     def _dirnames(files):
@@ -32,6 +33,8 @@ class CommandRunner(object):
     def popen(self, command, **kwargs):
         if self.verbose:
             print(' '.join(command), file=sys.stderr)
+        if self.dry_run:
+            return None
         return subprocess.Popen(command, **kwargs)
 
     def send(self, local_to_remote_files):
@@ -41,13 +44,8 @@ class CommandRunner(object):
         self.run_remote(['/bin/mkdir', '-p'] + dirs_to_make)
 
         # Send the local files.
-        copy_proc = self.open_sftp()
-        sftp_commands = '\n'.join("-put {0} {1}".format(quote(local_file), quote(remote_file)) for local_file, remote_file in local_to_remote_files.viewitems())
-        if self.verbose:
-            print(sftp_commands, file=sys.stderr)
-        _, _ = copy_proc.communicate(sftp_commands)
-        if copy_proc.returncode:
-            sys.exit(copy_proc.returncode)
+        sftp_commands = ("-put {0} {1}".format(quote(local_file), quote(remote_file)) for local_file, remote_file in local_to_remote_files.viewitems())
+        self.run_sftp(sftp_commands)
 
     def fetch(self, local_to_remote_files):
         # Prepare the local directory structure.
@@ -55,16 +53,12 @@ class CommandRunner(object):
         mkdir_command = ['/bin/mkdir', '-p'] + dirs_to_make
         if self.verbose:
             print(' '.join(mkdir_command), file=sys.stderr)
-        subprocess.check_call(mkdir_command)
+        if not self.dry_run:
+            subprocess.check_call(mkdir_command)
 
         # Fetch the remote files.
-        copy_proc = self.open_sftp()
-        sftp_commands = '\n'.join("-get {0} {1}".format(quote(remote_file), quote(local_file)) for local_file, remote_file in local_to_remote_files.viewitems())
-        if self.verbose:
-            print(sftp_commands, file=sys.stderr)
-        _, _ = copy_proc.communicate(sftp_commands)
-        if copy_proc.returncode:
-            sys.exit(copy_proc.returncode)
+        sftp_commands = ("-get {0} {1}".format(quote(remote_file), quote(local_file)) for local_file, remote_file in local_to_remote_files.viewitems())
+        self.run_sftp(sftp_commands)
 
     def run_remote(self, command, remote_env={}):
         env_strings = ['{0}={1}'.format(k,v) for k,v in remote_env.viewitems()]
@@ -74,17 +68,27 @@ class CommandRunner(object):
             stdin=subprocess.PIPE,
             stdout=None,
             stderr=None)
+        if self.dry_run:
+            return
         _, _ = remote_proc.communicate()
         if remote_proc.returncode:
             # FIXME: We may still want to fetch the output files to see what
             # went wrong.
             sys.exit(remote_proc.returncode)
     
-    def open_sftp(self):
-        return self.popen(self.sftp_invocation(),
+    def run_sftp(self, commands):
+        sftp_proc = self.popen(self.sftp_invocation(),
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=None)
+        concatenated_commands = '\n'.join(commands)
+        if self.verbose:
+            print(concatenated_commands, file=sys.stderr)
+        if self.dry_run:
+            return
+        _, _ = sftp_proc.communicate(concatenated_commands)
+        if sftp_proc.returncode:
+            sys.exit(sftp_proc.returncode)
 
 class RemoteCommandRunner(CommandRunner):
     def __init__(self, remote_host):
@@ -120,6 +124,7 @@ parser.add_argument('--remote-input-prefix', default='input')
 parser.add_argument('--remote-output-prefix', default='output')
 parser.add_argument('--debug-as-local', action='store_true')
 parser.add_argument('--verbose', '-v', action='store_true')
+parser.add_argument('--dry-run', '-n', action='store_true')
 parser.add_argument('host')
 parser.add_argument('command', nargs=argparse.REMAINDER)
 args = parser.parse_args()
@@ -129,8 +134,9 @@ if args.debug_as_local:
     args.command.insert(0, args.host)
     del args.host
 else:
-    runner = RemoteCommandRunner(args.host, args.identity)
-runner.verbose = args.verbose
+    runner = RemoteCommandRunner(args.host)
+runner.dry_run = args.dry_run
+runner.verbose = args.verbose or args.dry_run
 
 upload_files = dict()
 download_files = dict()
