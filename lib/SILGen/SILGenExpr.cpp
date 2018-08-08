@@ -2816,7 +2816,7 @@ RValue RValueEmitter::visitObjCSelectorExpr(ObjCSelectorExpr *e, SGFContext C) {
   for (auto member : selectorDecl->getMembers()) {
     if (auto var = dyn_cast<VarDecl>(member)) {
       if (!var->isStatic() && var->hasStorage()) {
-        selectorMemberTy = var->getInterfaceType()->getRValueType();
+        selectorMemberTy = var->getInterfaceType();
         break;
       }
     }

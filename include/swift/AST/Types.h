@@ -913,13 +913,6 @@ public:
   /// the result would be the (parenthesized) type ((int, int)).
   Type getUnlabeledType(ASTContext &Context);
 
-  /// Retrieve the type without any labels around it. For example, given
-  /// \code
-  /// (p : int)
-  /// \endcode
-  /// the result would be the (unparenthesized) type 'int'.
-  Type getWithoutImmediateLabel();
-
   /// Retrieve the type without any parentheses around it.
   Type getWithoutParens();
 
@@ -944,11 +937,6 @@ public:
   /// Otherwise, returns the type itself.
   Type getRValueType();
 
-  /// getRValueType - For an @lvalue type or tuple containing a single
-  /// non-variadic element, retrieves the underlying object type.
-  /// Otherwise, returns the type itself.
-  Type getRValueObjectType();
-
   /// getInOutObjectType - For an inout type, retrieves the underlying object
   /// type.  Otherwise, returns the type itself.
   Type getInOutObjectType();
@@ -958,8 +946,7 @@ public:
   /// Otherwise, returns the type itself.
   Type getWithoutSpecifierType();
 
-  /// Retrieves the rvalue instance type, looking through single-element
-  /// tuples, inout types, and metatypes.
+  /// getRValueInstanceType - Looks through inout types and metatypes.
   Type getRValueInstanceType();
 
   /// For a ReferenceStorageType like @unowned, this returns the referent.
@@ -1902,16 +1889,6 @@ public:
   /// Returns true if this tuple has inout elements.
   bool hasInOutElement() const {
     return static_cast<bool>(Bits.TupleType.HasInOutElement);
-  }
-  
-  /// Returns true if this tuple has parenthesis semantics.
-  bool hasParenSema(bool allowName = false) const {
-    auto Fields = getElements();
-    if (Fields.size() != 1 || Fields[0].isVararg())
-     return false;
-    if (allowName)
-      return true;
-    return !Fields[0].hasName();
   }
 
   // Implement isa/cast/dyncast/etc.
@@ -5167,17 +5144,6 @@ inline Type TypeBase::getInOutObjectType() {
   if (auto iot = getAs<InOutType>())
     return iot->getObjectType();
   return this;
-}
-
-inline Type TypeBase::getRValueObjectType() {
-  Type type = this;
-
-  // Look through lvalue type.
-  if (auto lv = type->getAs<LValueType>())
-    type = lv->getObjectType();
-
-  // Look through argument list tuples.
-  return type->getWithoutImmediateLabel();
 }
 
 /// getWithoutSpecifierType - For a non-materializable type

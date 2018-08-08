@@ -262,15 +262,12 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
   if (type->hasError())
     return None;
 
-  // Don't deduce autoclosure types or single-element, non-variadic
-  // tuples.
+  // Don't deduce autoclosure types.
   if (shouldBindToValueType(constraint)) {
     if (auto funcTy = type->getAs<FunctionType>()) {
       if (funcTy->isAutoClosure())
         type = funcTy->getResult();
     }
-
-    type = type->getWithoutImmediateLabel();
   }
 
   // If the source of the binding is 'OptionalObject' constraint

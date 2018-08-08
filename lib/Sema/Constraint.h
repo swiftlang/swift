@@ -168,8 +168,6 @@ enum class ConstraintClassification : char {
 enum class ConversionRestrictionKind {
   /// Tuple-to-tuple conversion.
   TupleToTuple,
-  /// Scalar-to-tuple conversion.
-  ScalarToTuple,
   /// Deep equality comparison.
   DeepEquality,
   /// Subclass-to-superclass conversion.
