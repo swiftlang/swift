@@ -2340,8 +2340,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
 
                     # Propagate TensorFlow GPU support flag to CMake.
-                    # Note: the 'SWIFT_ENABLE_TENSORFLOW_GPU' flag is not
-                    # currently used in CMake but may be useful in the future.
                     if [[ "${ENABLE_TENSORFLOW_GPU}" ]] ; then
                         cmake_options=(
                             "${cmake_options[@]}"
