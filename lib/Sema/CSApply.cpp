@@ -7842,7 +7842,7 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
                                ProtocolDecl *protocol,
                                ProtocolConformanceRef conformance,
                                DeclName name,
-                               MutableArrayRef<Expr *> arguments,
+                               ArrayRef<Expr *> arguments,
                                Diag<> brokenProtocolDiag) {
   // Construct an empty constraint system and solution.
   ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
