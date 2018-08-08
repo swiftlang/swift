@@ -183,6 +183,8 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
     if (extension == conformanceExtension)
       return true;
 
+    tc.bindExtension(extension);
+
     // Assume unconstrained concrete extensions we found witnesses in are
     // always viable.
     if (!extension->getExtendedType()->isAnyExistentialType()) {

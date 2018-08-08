@@ -309,6 +309,12 @@ static void bindExtensionToNominal(ExtensionDecl *ext,
     prepareGenericParamList(genericParams);
     ext->setGenericParams(genericParams);
   } else if (auto genericParams = nominal->getGenericParamsOfContext()) {
+    // Make sure the generic parameters are set up.
+    if (auto nominalGenericParams = nominal->getGenericParams()) {
+      nominalGenericParams->setOuterParameters(
+        nominal->getDeclContext()->getGenericParamsOfContext());
+    }
+
     // Clone the generic parameter list of a generic type.
     prepareGenericParamList(genericParams);
     ext->setGenericParams(

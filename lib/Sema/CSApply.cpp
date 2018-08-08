@@ -8085,6 +8085,7 @@ Solution::convertBooleanTypeToBuiltinI1(Expr *expr,
   }
 
   // The method is not generic, so there are no substitutions.
+  tc.validateDeclForNameLookup(builtinMethod);
   auto builtinMethodType = builtinMethod->getInterfaceType()
     ->castTo<FunctionType>();
 
