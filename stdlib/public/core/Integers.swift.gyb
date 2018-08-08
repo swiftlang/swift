@@ -3297,10 +3297,10 @@ public struct ${Self}
     guard source > ${str(lower)}.0 && source < ${str(upper)}.0 else {
       return nil
     }
-    self._value = Builtin.fpto${u}i_FPIEEE${FloatBits}_${BuiltinName}(source._value)
-    if ${FloatType}(self) != source {
+    guard source == source.rounded(.towardZero) else {
       return nil
     }
+    self._value = Builtin.fpto${u}i_FPIEEE${FloatBits}_${BuiltinName}(source._value)
   }
 
 %     if FloatType == 'Float80':
