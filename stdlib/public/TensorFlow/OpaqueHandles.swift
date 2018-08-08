@@ -14,8 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import CTensorFlow
-
 /// `ResourceHandle` is the type used by ops and the `#tfop()` syntax to
 /// represent TensorFlow "resource" values.  It exists only to represent edges
 /// in TensorFlow graphs, and has no host-side representation (and thus no
