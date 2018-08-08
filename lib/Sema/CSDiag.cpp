@@ -5276,8 +5276,7 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
     for (auto argNo : bindings[i]) {
       auto argType = args[argNo]
                          .getType()
-                         ->getWithoutSpecifierType()
-                         ->getRValueObjectType();
+                         ->getWithoutSpecifierType();
 
       if (argType->is<ArchetypeType>()) {
         diagnoseUnboundArchetype(archetype, fnExpr);
@@ -7396,8 +7395,7 @@ static bool diagnoseKeyPathComponents(ConstraintSystem &CS, KeyPathExpr *KPE,
       auto resolved =
           KeyPathExpr::Component::forProperty(varRef, Type(), componentNameLoc);
       resolvedComponents.push_back(resolved);
-      updateState(/*isProperty=*/true,
-                  var->getInterfaceType()->getRValueObjectType());
+      updateState(/*isProperty=*/true, var->getInterfaceType());
 
       continue;
     }

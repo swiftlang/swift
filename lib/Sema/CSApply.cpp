@@ -7986,8 +7986,7 @@ bool ConstraintSystem::applySolutionFix(
   switch (fix.first.getKind()) {
   case FixKind::ForceOptional: {
     Expr *unwrapped = affected->getValueProvidingExpr();
-    auto type = solution.simplifyType(getType(affected))
-                  ->getRValueObjectType();
+    auto type = solution.simplifyType(getType(affected))->getRValueType();
 
     if (auto tryExpr = dyn_cast<OptionalTryExpr>(unwrapped)) {
       TC.diagnose(tryExpr->getTryLoc(), diag::missing_unwrap_optional_try,
@@ -8002,8 +8001,7 @@ bool ConstraintSystem::applySolutionFix(
   }
           
   case FixKind::UnwrapOptionalBase: {
-    auto type = solution.simplifyType(getType(affected))
-                ->getRValueObjectType();
+    auto type = solution.simplifyType(getType(affected))->getRValueType();
     bool resultOptional = fix.first.isUnwrapOptionalBaseByOptionalChaining(*this);
 
     // If we've resolved the member overload to one that returns an optional
@@ -8029,8 +8027,7 @@ bool ConstraintSystem::applySolutionFix(
     if (auto *paren = dyn_cast<ParenExpr>(affected))
       affected = paren->getSubExpr();
 
-    auto fromType = solution.simplifyType(getType(affected))
-                      ->getRValueObjectType();
+    auto fromType = solution.simplifyType(getType(affected))->getRValueType();
     Type toType = solution.simplifyType(fix.first.getTypeArgument(*this));
     bool useAs = TC.isExplicitlyConvertibleTo(fromType, toType, DC);
     bool useAsBang = !useAs && TC.checkedCastMaySucceed(fromType, toType,
@@ -8076,8 +8073,7 @@ bool ConstraintSystem::applySolutionFix(
   }
 
   case FixKind::AddressOf: {
-    auto type = solution.simplifyType(getType(affected))
-                  ->getRValueObjectType();
+    auto type = solution.simplifyType(getType(affected))->getRValueType();
     TC.diagnose(affected->getLoc(), diag::missing_address_of, type)
       .fixItInsert(affected->getStartLoc(), "&");
     return true;

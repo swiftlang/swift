@@ -2435,7 +2435,7 @@ commit_to_conversions:
   // if there are no other possible solutions.
   if (shouldAttemptFixes() && !isTypeVarOrMember1 && !isTypeVarOrMember2 &&
       !flags.contains(TMF_ApplyingFix) && kind >= ConstraintKind::Conversion) {
-    Type objectType1 = type1->getRValueObjectType();
+    Type objectType1 = type1->getRValueType();
 
     // If we have an optional type, try to force-unwrap it.
     // FIXME: Should we also try '?'?
@@ -4986,7 +4986,7 @@ ConstraintSystem::simplifyFixConstraint(Fix fix, Type type1, Type type2,
   case FixKind::ForceOptional: {
     // Assume that we've unwrapped the first type.
     auto result =
-        matchTypes(type1->getRValueObjectType()->getOptionalObjectType(), type2,
+        matchTypes(type1->getRValueType()->getOptionalObjectType(), type2,
                    matchKind, subflags, locator);
     if (result == SolutionKind::Solved)
       if (recordFix(fix, locator))

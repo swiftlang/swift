@@ -323,8 +323,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
       auto resolved =
         KeyPathExpr::Component::forProperty(varRef, Type(), componentNameLoc);
       resolvedComponents.push_back(resolved);
-      updateState(/*isProperty=*/true,
-                  var->getInterfaceType()->getRValueObjectType());
+      updateState(/*isProperty=*/true, var->getInterfaceType());
 
       // Check that the property is @objc.
       if (!var->isObjC()) {
