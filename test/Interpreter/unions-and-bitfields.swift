@@ -1,4 +1,5 @@
 // RUN: %target-build-swift %s -import-objc-header %S/Inputs/unions-and-bitfields.h -disable-bridging-pch -o %t
+// RUN: %target-codesign %t
 // RUN: %target-run %t
 // REQUIRES: executable_test
 

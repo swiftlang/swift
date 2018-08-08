@@ -18,6 +18,7 @@
 // RUN: else \
 // RUN:   %target-build-swift %s -Xfrontend -disable-access-control -o %t/Mirror; \
 // RUN: fi
+// RUN: %target-codesign %t/Mirror
 // RUN: %target-run %t/Mirror
 // REQUIRES: executable_test
 

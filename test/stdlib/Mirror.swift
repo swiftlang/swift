@@ -19,6 +19,7 @@
 // RUN: else \
 // RUN:   %target-build-swift %t/main.swift %S/Inputs/Mirror/MirrorOther.swift -o %t/Mirror; \
 // RUN: fi
+// RUN: %target-codesign %t/Mirror
 // RUN: %target-run %t/Mirror
 // REQUIRES: executable_test
 

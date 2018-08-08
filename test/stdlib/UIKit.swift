@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -swift-version 3 %s -o %t/a.out3 && %target-run %t/a.out3
-// RUN: %target-build-swift -swift-version 4 %s -o %t/a.out4 && %target-run %t/a.out4
-// RUN: %target-build-swift -swift-version 4.2 %s -o %t/a.out4_2 && %target-run %t/a.out4_2
+// RUN: %target-build-swift -swift-version 3 %s -o %t/a.out3 && %target-codesign %t/a.out3 && %target-run %t/a.out3
+// RUN: %target-build-swift -swift-version 4 %s -o %t/a.out4 && %target-codesign %t/a.out4 && %target-run %t/a.out4
+// RUN: %target-build-swift -swift-version 4.2 %s -o %t/a.out4_2 && %target-codesign %t/a.out4_2 && %target-run %t/a.out4_2
 // REQUIRES: executable_test
 // UNSUPPORTED: OS=macosx
 // REQUIRES: objc_interop

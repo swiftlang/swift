@@ -9,6 +9,7 @@
 // RUN: %target-build-swift -c -parse-as-library -I %S/../../Inputs/ObjCBridging %S/../../Inputs/ObjCBridging/Appliances.swift -module-name Appliances -o %t/AppliancesSwift.o
 
 // RUN: %target-build-swift -I %t -I %S/../../Inputs/ObjCBridging %s %t/AppliancesSwift.o %t/AppliancesObjC.o -o %t/a.out
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: executable_test
