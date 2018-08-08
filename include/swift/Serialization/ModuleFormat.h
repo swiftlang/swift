@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 430; // Last change: ordered top-level decls
+const uint16_t VERSION_MINOR = 431; // Last change: eliminate PARAMETERLIST_ELT
 
 using DeclIDField = BCFixed<31>;
 
@@ -1003,11 +1003,13 @@ namespace decls_block {
 
   using ParamLayout = BCRecordLayout<
     PARAM_DECL,
-    IdentifierIDField, // argument name
-    IdentifierIDField, // parameter name
+    IdentifierIDField,   // argument name
+    IdentifierIDField,   // parameter name
     DeclContextIDField,  // context decl
-    VarDeclSpecifierField,   // specifier
-    TypeIDField  // interface type
+    VarDeclSpecifierField, // specifier
+    TypeIDField,         // interface type
+    BCFixed<1>,          // isVariadic?
+    DefaultArgumentField // default argument
   >;
 
   using FuncLayout = BCRecordLayout<
@@ -1172,15 +1174,8 @@ namespace decls_block {
 
   using ParameterListLayout = BCRecordLayout<
     PARAMETERLIST,
-    BCVBR<5>    // numparams
+    BCArray<DeclIDField> // params
   >;
-  
-  using ParameterListEltLayout = BCRecordLayout<
-    PARAMETERLIST_ELT,
-    DeclIDField,           // ParamDecl
-    BCFixed<1>,            // isVariadic?
-    DefaultArgumentField   // default argument
-    >;
 
   using ParenPatternLayout = BCRecordLayout<
     PAREN_PATTERN,
