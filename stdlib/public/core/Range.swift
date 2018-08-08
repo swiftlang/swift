@@ -373,11 +373,11 @@ extension Range: Equatable {
   /// Two ranges are equal when they have the same lower and upper bounds.
   /// That requirement holds even for empty ranges.
   ///
-  ///     let x: Range = 5..<15
+  ///     let x = 5..<15
   ///     print(x == 5..<15)
   ///     // Prints "true"
   ///
-  ///     let y: Range = 5..<5
+  ///     let y = 5..<5
   ///     print(y == 15..<15)
   ///     // Prints "false"
   ///
