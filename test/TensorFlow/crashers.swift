@@ -353,3 +353,17 @@ public func constFoldingBug() {
     return
   }
 }
+
+public func SR8419(iterationCount: Int) {
+  let images = Tensor<Float>(ones: [1000, 784])
+  let batchSize = Float(images.shape[0])
+
+  _hostOp("Begin training for \(iterationCount) iterations.")
+
+  for _ in 0...iterationCount {
+    let bound = Int32(batchSize)/25
+    for _ in 0..<bound {
+      let _ = Tensor(1)
+    }
+  }
+}
