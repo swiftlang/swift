@@ -4674,6 +4674,66 @@ static bool hasExplicitObjCName(ClassDecl *classDecl) {
   return objcAttr->hasName() && !objcAttr->isNameImplicit();
 }
 
+/// Check if the name of a class might be unstable, and if so, emit a
+/// diag::nscoding_unstable_mangled_name diagnostic.
+static void diagnoseUnstableName(TypeChecker &tc, ProtocolConformance *conformance,
+                                 ClassDecl *classDecl) {
+  // Note: these 'kind' values are synchronized with
+  // diag::nscoding_unstable_mangled_name.
+  enum class UnstableNameKind : unsigned {
+    Private = 0,
+    FilePrivate,
+    Nested,
+    Local,
+  };
+  Optional<UnstableNameKind> kind;
+  if (!classDecl->getDeclContext()->isModuleScopeContext()) {
+    if (classDecl->getDeclContext()->isTypeContext())
+      kind = UnstableNameKind::Nested;
+    else
+      kind = UnstableNameKind::Local;
+  } else {
+    switch (classDecl->getFormalAccess()) {
+    case AccessLevel::FilePrivate:
+      kind = UnstableNameKind::FilePrivate;
+      break;
+
+    case AccessLevel::Private:
+      kind = UnstableNameKind::Private;
+      break;
+
+    case AccessLevel::Internal:
+    case AccessLevel::Open:
+    case AccessLevel::Public:
+      break;
+    }
+  }
+
+  if (kind && tc.getLangOpts().EnableNSKeyedArchiverDiagnostics &&
+      isa<NormalProtocolConformance>(conformance) &&
+      !hasExplicitObjCName(classDecl)) {
+    tc.diagnose(cast<NormalProtocolConformance>(conformance)->getLoc(),
+             diag::nscoding_unstable_mangled_name,
+             static_cast<unsigned>(kind.getValue()),
+             classDecl->getDeclaredInterfaceType());
+    auto insertionLoc =
+      classDecl->getAttributeInsertionLoc(/*forModifier=*/false);
+    // Note: this is intentionally using the Swift 3 mangling,
+    // to provide compatibility with archives created in the Swift 3
+    // time frame.
+    Mangle::ASTMangler mangler;
+    std::string mangledName = mangler.mangleObjCRuntimeName(classDecl);
+    assert(Lexer::isIdentifier(mangledName) &&
+           "mangled name is not an identifier; can't use @objc");
+    tc.diagnose(classDecl, diag::unstable_mangled_name_add_objc)
+      .fixItInsert(insertionLoc,
+                   "@objc(" + mangledName + ")");
+    tc.diagnose(classDecl, diag::unstable_mangled_name_add_objc_new)
+      .fixItInsert(insertionLoc,
+                   "@objc(<#prefixed Objective-C class name#>)");
+  }
+}
+
 /// Determine whether a particular class has generic ancestry.
 static bool hasGenericAncestry(ClassDecl *classDecl) {
   SmallPtrSet<ClassDecl *, 4> visited;
@@ -4774,61 +4834,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
       if (Context.LangOpts.EnableObjCInterop &&
           isNSCoding(conformance->getProtocol()) &&
           !classDecl->isGenericContext()) {
-        // Note: these 'kind' values are synchronized with
-        // diag::nscoding_unstable_mangled_name.
-        enum class UnstableNameKind : unsigned {
-          Private = 0,
-          FilePrivate,
-          Nested,
-          Local,
-        };
-        Optional<UnstableNameKind> kind;
-        if (!classDecl->getDeclContext()->isModuleScopeContext()) {
-          if (classDecl->getDeclContext()->isTypeContext())
-            kind = UnstableNameKind::Nested;
-          else
-            kind = UnstableNameKind::Local;
-        } else {
-          switch (classDecl->getFormalAccess()) {
-          case AccessLevel::FilePrivate:
-            kind = UnstableNameKind::FilePrivate;
-            break;
-
-          case AccessLevel::Private:
-            kind = UnstableNameKind::Private;
-            break;
-
-          case AccessLevel::Internal:
-          case AccessLevel::Open:
-          case AccessLevel::Public:
-            break;
-          }
-        }
-
-        if (kind && getLangOpts().EnableNSKeyedArchiverDiagnostics &&
-            isa<NormalProtocolConformance>(conformance) &&
-            !hasExplicitObjCName(classDecl)) {
-          diagnose(cast<NormalProtocolConformance>(conformance)->getLoc(),
-                   diag::nscoding_unstable_mangled_name,
-                   static_cast<unsigned>(kind.getValue()),
-                   classDecl->getDeclaredInterfaceType());
-          auto insertionLoc =
-            classDecl->getAttributeInsertionLoc(/*forModifier=*/false);
-          // Note: this is intentionally using the Swift 3 mangling,
-          // to provide compatibility with archives created in the Swift 3
-          // time frame.
-          Mangle::ASTMangler mangler;
-          std::string mangledName = mangler.mangleObjCRuntimeName(classDecl);
-          assert(Lexer::isIdentifier(mangledName) &&
-                 "mangled name is not an identifier; can't use @objc");
-          diagnose(classDecl, diag::unstable_mangled_name_add_objc)
-            .fixItInsert(insertionLoc,
-                         "@objc(" + mangledName + ")");
-          diagnose(classDecl, diag::unstable_mangled_name_add_objc_new)
-            .fixItInsert(insertionLoc,
-                         "@objc(<#prefixed Objective-C class name#>)");
-        }
-
+        diagnoseUnstableName(*this, conformance, classDecl);
         // Infer @_staticInitializeObjCMetadata if needed.
         inferStaticInitializeObjCMetadata(*this, classDecl);
       }
