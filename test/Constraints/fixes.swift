@@ -71,16 +71,6 @@ func forgotOptionalBang(_ a: A, obj: AnyObject) {
   // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
 }
 
-// Crash with one-element tuple with labeled element
-class Dinner {}
-
-func microwave() -> Dinner {
-  let d: Dinner? = nil
-  return (n: d) // expected-error{{value of optional type 'Dinner?' must be unwrapped to a value of type 'Dinner'}}
-  // expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}}
-  // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
-}
-
 func forgotAnyObjectBang(_ obj: AnyObject) {
   var a = A()
   a = obj // expected-error{{'AnyObject' is not convertible to 'A'; did you mean to use 'as!' to force downcast?}}{{10-10= as! A}}

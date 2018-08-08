@@ -4909,21 +4909,17 @@ void SubscriptDecl::computeType() {
 }
 
 ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind() const {
-  auto indexTy = getIndicesInterfaceType();
-
-  // Look through a named 1-tuple.
-  indexTy = indexTy->getWithoutImmediateLabel();
-
   // If the index type is an integral type, we have an indexed
   // subscript.
-  if (isIntegralType(indexTy))
-    return ObjCSubscriptKind::Indexed;
+  if (auto funcTy = getInterfaceType()->getAs<AnyFunctionType>()) {
+    auto params = funcTy->getParams();
+    if (params.size() == 1)
+      if (isIntegralType(params[0].getPlainType()))
+        return ObjCSubscriptKind::Indexed;
+  }
 
   // If the index type is an object type in Objective-C, we have a
   // keyed subscript.
-  if (Type objectTy = indexTy->getOptionalObjectType())
-    indexTy = objectTy;
-
   return ObjCSubscriptKind::Keyed;
 }
 

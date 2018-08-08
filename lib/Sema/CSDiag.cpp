@@ -199,7 +199,6 @@ void constraints::simplifyLocator(Expr *&anchor,
     case ConstraintLocator::AutoclosureResult:
     case ConstraintLocator::LValueConversion:
     case ConstraintLocator::RValueAdjustment:
-    case ConstraintLocator::ScalarToTuple:
     case ConstraintLocator::UnresolvedMember:
       // Arguments in autoclosure positions, lvalue and rvalue adjustments, and
       // scalar-to-tuple conversions, and unresolved members are
@@ -1937,8 +1936,7 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
       anchor = locator->getAnchor();    
   }
 
-  Type fromType =
-      CS.simplifyType(constraint->getFirstType())->getWithoutImmediateLabel();
+  Type fromType = CS.simplifyType(constraint->getFirstType());
 
   if (fromType->hasTypeVariable() && resolvedAnchorToExpr) {
     TCCOptions options;
@@ -1960,8 +1958,7 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
     return false;
 
   fromType = fromType->getRValueType();
-  auto toType =
-      CS.simplifyType(constraint->getSecondType())->getWithoutImmediateLabel();
+  auto toType = CS.simplifyType(constraint->getSecondType());
 
   // Try to simplify irrelevant details of function types.  For example, if
   // someone passes a "() -> Float" function to a "() throws -> Int"
@@ -5265,7 +5262,7 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
   // requirements e.g. <A, B where A.Element == B.Element>.
   for (unsigned i = 0, e = bindings.size(); i != e; ++i) {
     auto param = params[i];
-    auto paramType = param.getType()->getInOutObjectType();
+    auto paramType = param.getPlainType();
 
     auto archetype = paramType->getAs<ArchetypeType>();
     if (!archetype)
@@ -5276,8 +5273,7 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
     for (auto argNo : bindings[i]) {
       auto argType = args[argNo]
                          .getType()
-                         ->getWithoutSpecifierType()
-                         ->getRValueObjectType();
+                         ->getWithoutSpecifierType();
 
       if (argType->is<ArchetypeType>()) {
         diagnoseUnboundArchetype(archetype, fnExpr);
@@ -7396,8 +7392,7 @@ static bool diagnoseKeyPathComponents(ConstraintSystem &CS, KeyPathExpr *KPE,
       auto resolved =
           KeyPathExpr::Component::forProperty(varRef, Type(), componentNameLoc);
       resolvedComponents.push_back(resolved);
-      updateState(/*isProperty=*/true,
-                  var->getInterfaceType()->getRValueObjectType());
+      updateState(/*isProperty=*/true, var->getInterfaceType());
 
       continue;
     }
