@@ -235,34 +235,14 @@ ParameterList *ModuleFile::readParameterList() {
   unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch);
   assert(recordID == PARAMETERLIST);
   (void) recordID;
-  unsigned numParams;
-  decls_block::ParameterListLayout::readRecord(scratch, numParams);
 
-  SmallVector<ParamDecl*, 8> params;
-  for (unsigned i = 0; i != numParams; ++i) {
-    scratch.clear();
-    auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
-    unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch);
-    assert(recordID == PARAMETERLIST_ELT);
-    (void) recordID;
-    
-    DeclID paramID;
-    bool isVariadic;
-    uint8_t rawDefaultArg;
-    decls_block::ParameterListEltLayout::readRecord(scratch, paramID,
-                                                    isVariadic, rawDefaultArg);
-    
+  ArrayRef<uint64_t> rawMemberIDs;
+  decls_block::ParameterListLayout::readRecord(scratch, rawMemberIDs);
 
-    auto decl = cast<ParamDecl>(getDecl(paramID));
-    decl->setVariadic(isVariadic);
+  SmallVector<ParamDecl *, 8> params;
+  for (DeclID paramID : rawMemberIDs)
+    params.push_back(cast<ParamDecl>(getDecl(paramID)));
 
-    // Decode the default argument kind.
-    // FIXME: Default argument expression, if available.
-    if (auto defaultArg = getActualDefaultArgKind(rawDefaultArg))
-      decl->setDefaultArgumentKind(*defaultArg);
-    params.push_back(decl);
-  }
-  
   return ParameterList::create(getContext(), params);
 }
 
@@ -3037,10 +3017,13 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     DeclContextID contextID;
     unsigned rawSpecifier;
     TypeID interfaceTypeID;
+    bool isVariadic;
+    uint8_t rawDefaultArg;
 
     decls_block::ParamLayout::readRecord(scratch, argNameID, paramNameID,
                                          contextID, rawSpecifier,
-                                         interfaceTypeID);
+                                         interfaceTypeID, isVariadic,
+                                         rawDefaultArg);
 
     auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -3070,6 +3053,12 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     }
 
     param->setInterfaceType(paramTy->getInOutObjectType());
+    param->setVariadic(isVariadic);
+
+    // Decode the default argument kind.
+    // FIXME: Default argument expression, if available.
+    if (auto defaultArg = getActualDefaultArgKind(rawDefaultArg))
+      param->setDefaultArgumentKind(*defaultArg);
     break;
   }
 
