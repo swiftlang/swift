@@ -958,8 +958,7 @@ public:
   /// Otherwise, returns the type itself.
   Type getWithoutSpecifierType();
 
-  /// Retrieves the rvalue instance type, looking through single-element
-  /// tuples, inout types, and metatypes.
+  /// getRValueInstanceType - Looks through inout types and metatypes.
   Type getRValueInstanceType();
 
   /// For a ReferenceStorageType like @unowned, this returns the referent.

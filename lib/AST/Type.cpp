@@ -929,22 +929,14 @@ Type TypeBase::replaceSelfParameterType(Type newSelf) {
                            fnTy->getExtInfo());
 }
 
-/// Retrieve the object type for a 'self' parameter, digging into one-element
-/// tuples, inout types, and metatypes.
+/// Retrieve the object type for a 'self' parameter, digging into
+/// inout types, and metatypes.
 Type TypeBase::getRValueInstanceType() {
-  Type type = this;
-  
-  // Look through argument list tuples.
-  if (auto tupleTy = type->getAs<TupleType>()) {
-    if (tupleTy->hasParenSema(/*allowName*/true))
-      type = tupleTy->getElementType(0);
-  }
-  
-  if (auto metaTy = type->getAs<AnyMetatypeType>())
+  if (auto metaTy = getAs<AnyMetatypeType>())
     return metaTy->getInstanceType();
 
   // For mutable value type methods, we need to dig through inout types.
-  return type->getInOutObjectType();
+  return getInOutObjectType();
 }
 
 /// \brief Collect the protocols in the existential type T into the given
