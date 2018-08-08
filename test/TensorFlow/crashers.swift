@@ -354,6 +354,7 @@ public func constFoldingBug() {
   }
 }
 
+// This function failed SIL verification due to a non-inlined SILDebugLocation.
 public func SR8419(iterationCount: Int) {
   let images = Tensor<Float>(ones: [1000, 784])
   let batchSize = Float(images.shape[0])
