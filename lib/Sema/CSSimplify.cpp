@@ -2367,13 +2367,17 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     }
   }
 
+  // Attempt fixes iff it's allowed, both types are concrete and
+  // we are not in the middle of attempting one already.
+  bool attemptFixes =
+      shouldAttemptFixes() && concrete && !flags.contains(TMF_ApplyingFix);
+
   // When we hit this point, we're committed to the set of potential
   // conversions recorded thus far.
   //
   // If we should attempt fixes, add those to the list. They'll only be visited
   // if there are no other possible solutions.
-  if (shouldAttemptFixes() && !isTypeVarOrMember1 && !isTypeVarOrMember2 &&
-      !flags.contains(TMF_ApplyingFix) && kind >= ConstraintKind::Conversion) {
+  if (attemptFixes && kind >= ConstraintKind::Conversion) {
     Type objectType1 = type1->getRValueType();
 
     // If we have an optional type, try to force-unwrap it.
