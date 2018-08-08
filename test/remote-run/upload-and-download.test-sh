@@ -33,3 +33,10 @@ CHECK-PREFIXED: {{^xyz-2after$}}
 
 CHECK-PREFIXED-REMOTE: {{^output-1before$}}
 CHECK-PREFIXED-REMOTE: {{^output-2after$}}
+
+RUN: %empty-directory(%t)
+RUN: %empty-directory(%t-REMOTE)
+RUN: touch %t/input %t/BAD
+RUN: %debug-remote-run --output-prefix %t --remote-output-prefix custom-output cp %t/input %t/output
+RUN: ls %t/ | %FileCheck %s
+RUN: ls %t-REMOTE/custom-output/ | %FileCheck -check-prefix CHECK-REMOTE %s

@@ -99,6 +99,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--input-prefix')
 parser.add_argument('--output-prefix')
 parser.add_argument('--remote-dir', required=True)
+parser.add_argument('--remote-input-prefix', default='input')
+parser.add_argument('--remote-output-prefix', default='output')
 parser.add_argument('--debug-as-local', action='store_true')
 parser.add_argument('host')
 parser.add_argument('command', nargs=argparse.REMAINDER)
@@ -110,15 +112,16 @@ if args.debug_as_local:
     del args.host
 else:
     runner = RemoteCommandRunner(args.host)
+runner.verbose = args.verbose
 
 upload_files = dict()
 download_files = dict()
 if args.input_prefix:
-    input_files = find_transfers(args.command, args.input_prefix, os.path.join(args.remote_dir, 'input'))
+    input_files = find_transfers(args.command, args.input_prefix, os.path.join(args.remote_dir, args.remote_input_prefix))
     assert not any(upload_files.has_key(f) for f in input_files)
     upload_files.update(input_files)
 if args.output_prefix:
-    test_files = find_transfers(args.command, args.output_prefix, os.path.join(args.remote_dir, 'output'))
+    test_files = find_transfers(args.command, args.output_prefix, os.path.join(args.remote_dir, args.remote_output_prefix))
     assert not any(upload_files.has_key(f) for f in test_files)
     upload_files.update(test_files)
     assert not any(download_files.has_key(f) for f in test_files)
