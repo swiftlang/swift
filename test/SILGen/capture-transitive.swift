@@ -18,3 +18,24 @@ func fibonacci(_ n: Int) -> Int {
   return recursive(n)
 }
 
+class C {
+    required init() {}
+    func f() {}
+    // Make sure that we capture dynamic self type if an explicit self isn't guaranteed
+    func returnsSelf() -> Self {
+        return { self.f(); return .init() }()
+        // CHECK-LABEL: sil private @{{.*}}returnsSelf{{.*}} : $@convention(thin) (@guaranteed C) -> @owned C
+    }
+
+    func returnsSelf1() -> Self {
+        return { [weak self] in self?.f(); return .init() }()
+        // CHECK-LABEL: sil private @{{.*}}returnsSelf{{.*}}  : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @thick @dynamic_self C.Type) -> @owned C
+    }
+
+    func returnsSelf2() -> Self {
+        return { [unowned self] in self.f(); return .init() }()
+        // CHECK-LABEL: sil private @{{.*}}returnsSelf{{.*}}  : $@convention(thin) (@guaranteed @sil_unowned C, @thick @dynamic_self C.Type) -> @owned C
+    }
+}
+
+
