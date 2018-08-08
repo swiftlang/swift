@@ -1832,6 +1832,51 @@ static void emitInitializeFieldOffsetVector(IRGenFunction &IGF,
 
 // Classes
 
+static void emitFieldOffsetGlobals(IRGenModule &IGM,
+                                   ClassDecl *classDecl,
+                                   const ClassLayout &classLayout) {
+  for (auto prop : classDecl->getStoredProperties()) {
+    auto fieldInfo = classLayout.getFieldAccessAndElement(prop);
+    auto access = fieldInfo.first;
+    auto element = fieldInfo.second;
+
+    llvm::Constant *fieldOffsetOrZero;
+
+    if (element.getKind() == ElementLayout::Kind::Fixed) {
+      // Use a fixed offset if we have one.
+      fieldOffsetOrZero = IGM.getSize(element.getByteOffset());
+    } else {
+      // Otherwise, leave a placeholder for the runtime to populate at runtime.
+      fieldOffsetOrZero = IGM.getSize(Size(0));
+    }
+
+    switch (access) {
+    case FieldAccess::ConstantDirect:
+    case FieldAccess::NonConstantDirect: {
+      // Emit a global variable storing the constant field offset.
+      // If the superclass was imported from Objective-C, the offset
+      // does not include the superclass size; we rely on the
+      // Objective-C runtime sliding it down.
+      //
+      // TODO: Don't emit the symbol if field has a fixed offset and size
+      // in all resilience domains
+      auto offsetAddr = IGM.getAddrOfFieldOffset(prop, ForDefinition);
+      auto offsetVar = cast<llvm::GlobalVariable>(offsetAddr.getAddress());
+      offsetVar->setInitializer(fieldOffsetOrZero);
+
+      // If we know the offset won't change, make it a constant.
+      offsetVar->setConstant(access == FieldAccess::ConstantDirect);
+
+      break;
+    }
+
+    case FieldAccess::ConstantIndirect:
+      // No global variable is needed.
+      break;
+    }
+  }
+}
+
 namespace {
   /// Utility class for building member metadata for classes where the
   /// entire hierarchy is in the current resilience domain, and all stored
@@ -2279,8 +2324,6 @@ namespace {
         metadata = emitFinishIdempotentInitialization(IGF, metadata);
       }
 
-      emitFieldOffsetGlobals();
-
       emitInitializeMethodOverrides(IGF, metadata);
 
       return metadata;
@@ -2335,49 +2378,6 @@ namespace {
         }
       }
     }
-
-    void emitFieldOffsetGlobals() {
-      for (auto prop : Target->getStoredProperties()) {
-        auto fieldInfo = FieldLayout.getFieldAccessAndElement(prop);
-        auto access = fieldInfo.first;
-        auto element = fieldInfo.second;
-
-        llvm::Constant *fieldOffsetOrZero;
-
-        if (element.getKind() == ElementLayout::Kind::Fixed) {
-          // Use a fixed offset if we have one.
-          fieldOffsetOrZero = IGM.getSize(element.getByteOffset());
-        } else {
-          // Otherwise, leave a placeholder for the runtime to populate at runtime.
-          fieldOffsetOrZero = IGM.getSize(Size(0));
-        }
-
-        switch (access) {
-        case FieldAccess::ConstantDirect:
-        case FieldAccess::NonConstantDirect: {
-          // Emit a global variable storing the constant field offset.
-          // If the superclass was imported from Objective-C, the offset
-          // does not include the superclass size; we rely on the
-          // Objective-C runtime sliding it down.
-          //
-          // TODO: Don't emit the symbol if field has a fixed offset and size
-          // in all resilience domains
-          auto offsetAddr = IGM.getAddrOfFieldOffset(prop, ForDefinition);
-          auto offsetVar = cast<llvm::GlobalVariable>(offsetAddr.getAddress());
-          offsetVar->setInitializer(fieldOffsetOrZero);
-
-          // If we know the offset won't change, make it a constant.
-          offsetVar->setConstant(access == FieldAccess::ConstantDirect);
-
-          break;
-        }
-
-        case FieldAccess::ConstantIndirect:
-          // No global variable is needed.
-          break;
-        }
-      }
-    }
   };
 
   /// Base class for layout of non-generic class metadata.
@@ -2393,7 +2393,6 @@ namespace {
     using super::addReferenceToHeapMetadata;
     using super::emitFinishInitializationOfClassMetadata;
     using super::emitFinishIdempotentInitialization;
-    using super::emitFieldOffsetGlobals;
 
     bool HasUnfilledSuperclass = false;
     Size AddressPoint;
@@ -2455,8 +2454,6 @@ namespace {
         // initialization idempotently and thus avoid the need for a lock.
         if (!HasUnfilledSuperclass &&
             !doesClassMetadataRequireDynamicInitialization(IGM, Target)) {
-          emitFieldOffsetGlobals();
-
           auto type = Target->getDeclaredType()->getCanonicalType();
           auto metadata = IGF.IGM.getAddrOfTypeMetadata(type);
           return MetadataResponse::forComplete(
@@ -2736,6 +2733,8 @@ static void emitObjCClassSymbol(IRGenModule &IGM,
 void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
                               const ClassLayout &fieldLayout) {
   assert(!classDecl->isForeign());
+
+  emitFieldOffsetGlobals(IGM, classDecl, fieldLayout);
 
   // Set up a dummy global to stand in for the metadata object while we produce
   // relative references.
