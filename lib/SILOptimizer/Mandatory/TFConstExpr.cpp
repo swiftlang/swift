@@ -840,10 +840,9 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
       // Okay, we were able to decode the array.  See if we can fold all of the
       // elements we found.
       for (auto *use : elementsAtInit) {
-        SymbolicValue eltCst;
         auto addrValue = use->get();
         assert(addrValue->getType().isAddress());
-        eltCst = computeLoadResult(addrValue);
+        SymbolicValue eltCst = computeLoadResult(addrValue);
         if (!eltCst.isConstant())
           return eltCst;
         elementConstants.push_back(eltCst);
