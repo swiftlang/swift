@@ -1890,16 +1890,6 @@ public:
   bool hasInOutElement() const {
     return static_cast<bool>(Bits.TupleType.HasInOutElement);
   }
-  
-  /// Returns true if this tuple has parenthesis semantics.
-  bool hasParenSema(bool allowName = false) const {
-    auto Fields = getElements();
-    if (Fields.size() != 1 || Fields[0].isVararg())
-     return false;
-    if (allowName)
-      return true;
-    return !Fields[0].hasName();
-  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {

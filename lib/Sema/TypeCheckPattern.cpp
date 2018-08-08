@@ -1027,7 +1027,8 @@ recur:
     if ((options & TypeResolutionFlags::EnumPatternPayload)
         && !isa<TuplePattern>(semantic)) {
       if (auto tupleType = type->getAs<TupleType>()) {
-        if (tupleType->hasParenSema(/*allowName*/true)) {
+        if (tupleType->getNumElements() == 1 &&
+            !tupleType->getElement(0).isVararg()) {
           auto elementTy = tupleType->getElementType(0);
           if (coercePatternToType(sub, dc, elementTy, subOptions, resolver))
             return true;
