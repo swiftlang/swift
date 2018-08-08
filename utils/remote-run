@@ -50,12 +50,11 @@ class CommandRunner(object):
     def run_remote(self, command, remote_env={}):
         env_strings = ['{0}={1}'.format(k,v) for k,v in remote_env.viewitems()]
         remote_proc = self.open_remote(['/usr/bin/env'] + env_strings + command)
-        (output, _) = remote_proc.communicate()
+        _, _ = remote_proc.communicate()
         if remote_proc.returncode:
             # FIXME: We may still want to fetch the output files to see what
             # went wrong.
             sys.exit(remote_proc.returncode)
-        return output
 
 class RemoteCommandRunner(CommandRunner):
     def __init__(self, remote_host):
@@ -65,7 +64,7 @@ class RemoteCommandRunner(CommandRunner):
         return subprocess.Popen(['/usr/bin/ssh', '-n', self.remote_host, '--'] +
             [quote(arg) for arg in command],
             stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
+            stdout=None,
             stderr=None)
 
     def open_sftp(self):
@@ -78,7 +77,7 @@ class LocalCommandRunner(CommandRunner):
     def open_remote(self, command):
         return subprocess.Popen(command,
             stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
+            stdout=None,
             stderr=None)
 
     def open_sftp(self):
@@ -131,7 +130,7 @@ if upload_files:
 remote_env = collect_remote_env()
 
 translated_command = [upload_files.get(arg, download_files.get(arg, arg)) for arg in args.command]
-print(runner.run_remote(translated_command, remote_env))
+runner.run_remote(translated_command, remote_env)
 
 if download_files:
     runner.fetch(download_files)
