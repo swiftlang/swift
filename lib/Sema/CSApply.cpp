@@ -453,20 +453,6 @@ namespace {
                              SmallVectorImpl<unsigned> &variadicArgs,
                              Optional<Pattern*> typeFromPattern = None);
 
-    /// \brief Coerce the given scalar value to the given tuple type.
-    ///
-    /// \param expr The expression to be coerced.
-    /// \param toTuple The tuple type to which the expression will be coerced.
-    /// \param toScalarIdx The index of the scalar field within the tuple type
-    /// \c toType.
-    /// \param locator Locator describing where this conversion occurs.
-    ///
-    /// \returns The coerced expression, whose type will be equivalent to
-    /// \c toTuple.
-    Expr *coerceScalarToTuple(Expr *expr, TupleType *toTuple,
-                              int toScalarIdx,
-                              ConstraintLocatorBuilder locator);
-
     /// \brief Coerce a subclass, class-constrained archetype, class-constrained
     /// existential or to a superclass type.
     ///
@@ -5282,101 +5268,6 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
                      toSugarType));
 }
 
-Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
-                                        int toScalarIdx,
-                                        ConstraintLocatorBuilder locator) {
-  auto &tc = solution.getConstraintSystem().getTypeChecker();
-
-  // If the destination type is variadic, compute the injection function to use.
-  Type arrayType = nullptr;
-  const auto &lastField = toTuple->getElements().back();
-
-  if (lastField.isVararg()) {
-    // Find the appropriate injection function.
-    arrayType = cast<ArraySliceType>(lastField.getType().getPointer());
-    if (tc.requireArrayLiteralIntrinsics(expr->getStartLoc()))
-      return nullptr;
-  }
-
-  // If we're initializing the varargs list, use its base type.
-  const auto &field = toTuple->getElement(toScalarIdx);
-  Type toScalarType;
-  if (field.isVararg())
-    toScalarType = field.getVarargBaseTy();
-  else
-    toScalarType = field.getType();
-
-  // Coerce the expression to the scalar type.
-  expr = coerceToType(expr, toScalarType,
-                      locator.withPathElement(
-                        ConstraintLocator::ScalarToTuple));
-  if (!expr)
-    return nullptr;
-
-  // Preserve the sugar of the scalar field.
-  // FIXME: This doesn't work if the type has default values because they fail
-  // to canonicalize.
-  SmallVector<TupleTypeElt, 4> sugarFields;
-  bool hasInit = false;
-  int i = 0;
-  for (auto &field : toTuple->getElements()) {
-    if (i == toScalarIdx) {
-      if (field.isVararg()) {
-        assert(cs.getType(expr)->isEqual(field.getVarargBaseTy()) &&
-               "scalar field is not equivalent to dest vararg field?!");
-
-        sugarFields.push_back(field);
-      }
-      else {
-        assert(cs.getType(expr)->isEqual(field.getType()) &&
-               "scalar field is not equivalent to dest tuple field?!");
-        sugarFields.push_back(field.getWithType(cs.getType(expr)));
-      }
-
-      // Record the
-    } else {
-      sugarFields.push_back(field);
-    }
-    ++i;
-  }
-
-  // Compute the elements of the resulting tuple.
-  SmallVector<int, 4> elements;
-  SmallVector<unsigned, 1> variadicArgs;
-  SmallVector<Expr*, 4> callerDefaultArgs;
-  ConcreteDeclRef callee =
-    findCalleeDeclRef(cs, solution, cs.getConstraintLocator(locator));
-
-  i = 0;
-  for (auto &field : toTuple->getElements()) {
-    if (field.isVararg()) {
-      elements.push_back(TupleShuffleExpr::Variadic);
-      if (i == toScalarIdx) {
-        variadicArgs.push_back(i);
-        ++i;
-        continue;
-      }
-    }
-
-    // This is the scalar field, so act like we're shuffling the 0th element.
-    assert(i == toScalarIdx);
-    elements.push_back(0);
-    ++i;
-  }
-
-  Type destSugarTy = hasInit? toTuple
-                            : TupleType::get(sugarFields, tc.Context);
-                            
-  return cs.cacheType(TupleShuffleExpr::create(tc.Context, expr,
-                                        elements,
-                                        TupleShuffleExpr::ScalarToTuple,
-                                        callee,
-                                        variadicArgs,
-                                        arrayType,
-                                        callerDefaultArgs,
-                                        destSugarTy));
-}
-
 static Type getMetatypeSuperclass(Type t, TypeChecker &tc) {
   if (auto *metaTy = t->getAs<MetatypeType>())
     return MetatypeType::get(getMetatypeSuperclass(
@@ -6470,7 +6361,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     switch (knownRestriction->second) {
 
     case ConversionRestrictionKind::TupleToTuple:
-    case ConversionRestrictionKind::ScalarToTuple:
     case ConversionRestrictionKind::LValueToRValue:
         // Restrictions that don't need to be recorded.
         // Should match recordRestriction() in CSSimplify
@@ -6741,12 +6631,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         return coerceTupleToTuple(expr, fromTuple, toTuple,
                                   locator, sources, variadicArgs);
       }
-    }
-
-    // Coerce scalar to tuple.
-    int toScalarIdx = toTuple->getElementForScalarInit();
-    if (toScalarIdx != -1) {
-      return coerceScalarToTuple(expr, toTuple, toScalarIdx, locator);
     }
   }
 

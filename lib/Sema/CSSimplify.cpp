@@ -1014,20 +1014,6 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   return getTypeMatchSuccess();
 }
 
-ConstraintSystem::TypeMatchResult
-ConstraintSystem::matchScalarToTupleTypes(Type type1, TupleType *tuple2,
-                                          ConstraintKind kind,
-                                          TypeMatchOptions flags,
-                                          ConstraintLocatorBuilder locator) {
-  int scalarFieldIdx = tuple2->getElementForScalarInit();
-  assert(scalarFieldIdx >= 0 && "Invalid tuple for scalar-to-tuple");
-  const auto &elt = tuple2->getElement(scalarFieldIdx);
-  auto scalarFieldTy = elt.isVararg()? elt.getVarargBaseTy() : elt.getType();
-  TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
-  return matchTypes(type1, scalarFieldTy, kind, subflags,
-                    locator.withPathElement(ConstraintLocator::ScalarToTuple));
-}
-
 // Returns 'false' (i.e. no error) if it is legal to match functions with the
 // corresponding function type representations and the given match kind.
 static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
@@ -2034,46 +2020,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   }
 
   if (concrete && kind >= ConstraintKind::Subtype) {
-    auto tuple1 = type1->getAs<TupleType>();
-    auto tuple2 = type2->getAs<TupleType>();
-
-    // Detect when the source and destination are both permit scalar
-    // conversions, but the source has a name and the destination does not have
-    // the same name.
-    bool tuplesWithMismatchedNames = false;
-    if (tuple1 && tuple2) {
-      int scalar1 = tuple1->getElementForScalarInit();
-      int scalar2 = tuple2->getElementForScalarInit();
-      if (scalar1 >= 0 && scalar2 >= 0) {
-        auto name1 = tuple1->getElement(scalar1).getName();
-        auto name2 = tuple2->getElement(scalar2).getName();
-        tuplesWithMismatchedNames = !name1.empty() && name1 != name2;
-      }
-    }
-
-    if (tuple2 && !tuplesWithMismatchedNames) {
-      // A scalar type is a trivial subtype of a one-element, non-variadic tuple
-      // containing a single element if the scalar type is a subtype of
-      // the type of that tuple's element.
-      //
-      // A scalar type can be converted to an argument tuple so long as
-      // there is at most one non-defaulted element.
-      // For non-argument tuples, we can do the same conversion but not
-      // to a tuple with varargs.
-      if (!type1->is<LValueType>() &&
-          (tuple2->hasParenSema(/*allowName*/true) ||
-           (kind >= ConstraintKind::Conversion &&
-            tuple2->getElementForScalarInit() >= 0 &&
-            (isArgumentTupleConversion ||
-             !tuple2->getVarArgsBaseType())))) {
-        conversionsOrFixes.push_back(
-          ConversionRestrictionKind::ScalarToTuple);
-
-        // FIXME: Prohibits some user-defined conversions for tuples.
-        goto commit_to_conversions;
-      }
-    }
-
     // Subclass-to-superclass conversion.
     if (type1->mayHaveSuperclass() &&
         type2->getClassOrBoundGenericClass() &&
@@ -2421,16 +2367,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     }
   }
 
-commit_to_conversions:
   // When we hit this point, we're committed to the set of potential
   // conversions recorded thus far.
   //
-  //
-  // FIXME: One should only jump to this label in the case where we want to
-  // cut off other potential conversions because we know none of them apply.
-  // Gradually, those gotos should go away as we can handle more kinds of
-  // conversions via disjunction constraints.
-
   // If we should attempt fixes, add those to the list. They'll only be visited
   // if there are no other possible solutions.
   if (shouldAttemptFixes() && !isTypeVarOrMember1 && !isTypeVarOrMember2 &&
@@ -4566,11 +4505,6 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
                            type2->castTo<TupleType>(),
                            matchKind, subflags, locator);
 
-  //   T <c U ===> T <c (U)
-  case ConversionRestrictionKind::ScalarToTuple:
-    return matchScalarToTupleTypes(type1, type2->castTo<TupleType>(),
-                                   matchKind, subflags, locator);
-
   case ConversionRestrictionKind::DeepEquality:
     return matchDeepEqualityTypes(type1, type2, locator);
 
@@ -4907,7 +4841,6 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
 static bool recordRestriction(ConversionRestrictionKind restriction) {
   switch(restriction) {
     case ConversionRestrictionKind::TupleToTuple:
-    case ConversionRestrictionKind::ScalarToTuple:
     case ConversionRestrictionKind::LValueToRValue:
       return false;
     default:

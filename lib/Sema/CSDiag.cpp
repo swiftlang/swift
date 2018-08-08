@@ -199,7 +199,6 @@ void constraints::simplifyLocator(Expr *&anchor,
     case ConstraintLocator::AutoclosureResult:
     case ConstraintLocator::LValueConversion:
     case ConstraintLocator::RValueAdjustment:
-    case ConstraintLocator::ScalarToTuple:
     case ConstraintLocator::UnresolvedMember:
       // Arguments in autoclosure positions, lvalue and rvalue adjustments, and
       // scalar-to-tuple conversions, and unresolved members are

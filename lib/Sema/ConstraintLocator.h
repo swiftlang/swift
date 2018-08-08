@@ -110,8 +110,6 @@ public:
     SequenceIteratorProtocol,
     /// \brief The element type of a generator.
     GeneratorElementType,
-    /// \brief The scalar type of a tuple type.
-    ScalarToTuple,
     /// \brief An argument passed in an autoclosure parameter
     /// position, which must match the autoclosure return type.
     AutoclosureResult,
@@ -162,7 +160,6 @@ public:
     case InstanceType:
     case SequenceIteratorProtocol:
     case GeneratorElementType:
-    case ScalarToTuple:
     case AutoclosureResult:
     case Requirement:
     case Witness:
@@ -217,7 +214,6 @@ public:
     case ParentType:
     case LValueConversion:
     case RValueAdjustment:
-    case ScalarToTuple:
     case SubscriptIndex:
     case SubscriptMember:
     case SubscriptResult:

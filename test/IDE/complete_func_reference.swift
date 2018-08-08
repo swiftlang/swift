@@ -70,7 +70,7 @@ do {
 }
 // VOID_VOID: Begin completions
 // VOID_VOID-DAG: Decl{{.*}}/TypeRelation[Identical]: voidToVoid;
-// VOID_VOID-DAG: Decl{{.*}}/TypeRelation[Convertible]: anyToVoid(a:);
+// VOID_VOID-DAG: Decl{{.*}}/NotRecommended/TypeRelation[Invalid]: anyToVoid({#a: Any#})[#Void#];
 // VOID_VOID-DAG: Decl{{.*}}/NotRecommended/TypeRelation[Invalid]: intToVoid({#a: Int#})[#Void#];
 // VOID_VOID-DAT: Decl{{.*}}/NotRecommended/TypeRelation[Invalid]: anyToVoid({#a: Any#})[#Void#];
 // VOID_VOID-DAG: Decl{{.*}}:      anyToAny({#a: Any#})[#Any#];
