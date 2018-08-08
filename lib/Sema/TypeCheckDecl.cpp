@@ -245,12 +245,10 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
   if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
     DC = nominal;
     options = TypeResolutionOptions(TypeResolverContext::GenericSignature);
-    options.setContext(TypeResolverContext::InheritanceClause);
     options |= TypeResolutionFlags::AllowUnavailableProtocol;
   } else if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
     DC = ext;
     options = TypeResolutionOptions(TypeResolverContext::GenericSignature);
-    options.setContext(TypeResolverContext::InheritanceClause);
     options |= TypeResolutionFlags::AllowUnavailableProtocol;
   } else if (isa<GenericTypeParamDecl>(decl)) {
     // For generic parameters, we want name lookup to look at just the

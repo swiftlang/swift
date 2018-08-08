@@ -1236,9 +1236,7 @@ static Type resolveNestedIdentTypeComponent(
   NameLookupOptions lookupOptions = defaultMemberLookupOptions;
   if (isKnownNonCascading)
     lookupOptions |= NameLookupFlags::KnownPrivate;
-  // FIXME: Lift the restriction for TypeResolutionFlags::InheritanceClause
-  if (options.is(TypeResolverContext::ExtensionBinding) ||
-      options.is(TypeResolverContext::InheritanceClause))
+  if (options.is(TypeResolverContext::ExtensionBinding))
     lookupOptions -= NameLookupFlags::ProtocolMembers;
   LookupTypeResult memberTypes;
   if (parentTy->mayHaveMembers())
@@ -2711,7 +2709,6 @@ Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   case TypeResolverContext::ForEachStmt:
   case TypeResolverContext::ExtensionBinding:
   case TypeResolverContext::ExplicitCastExpr:
-  case TypeResolverContext::InheritanceClause:
   case TypeResolverContext::SubscriptDecl:
   case TypeResolverContext::EnumElementDecl:
   case TypeResolverContext::EnumPatternPayload:

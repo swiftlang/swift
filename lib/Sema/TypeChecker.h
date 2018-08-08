@@ -552,10 +552,6 @@ enum class TypeResolverContext : uint8_t {
   /// Whether this type is being used in a cast or coercion expression.
   ExplicitCastExpr,
 
-  /// Whether we are in the inheritance clause of a nominal type declaration
-  /// or extension.
-  InheritanceClause,
-
   /// Whether this type is the value carried in an enum case.
   EnumElementDecl,
 
@@ -650,7 +646,6 @@ public:
     case Context::DynamicSelfResult:
     case Context::ProtocolWhereClause:
     case Context::ExtensionBinding:
-    case Context::InheritanceClause:
     case Context::SubscriptDecl:
     case Context::EnumElementDecl:
     case Context::EnumPatternPayload:

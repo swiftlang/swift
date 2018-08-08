@@ -476,7 +476,6 @@ void TypeChecker::resolveExtensionForConformanceConstruction(
   // and the protocols which it inherits from:
   DependentGenericTypeResolver resolver;
   TypeResolutionOptions options(TypeResolverContext::GenericSignature);
-  options.setContext(TypeResolverContext::InheritanceClause);
   options |= TypeResolutionFlags::AllowUnavailableProtocol;
   options |= TypeResolutionFlags::ResolveStructure;
   for (auto &inherited : ext->getInherited()) {

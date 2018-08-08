@@ -31,7 +31,6 @@ Type InheritedTypeRequest::evaluate(
     if (auto nominal = dyn_cast<NominalTypeDecl>(typeDecl)) {
       dc = nominal;
       options = TypeResolutionOptions(TypeResolverContext::GenericSignature);
-      options.setContext(TypeResolverContext::InheritanceClause);
       options |= TypeResolutionFlags::AllowUnavailableProtocol;
     } else {
       dc = typeDecl->getDeclContext();
@@ -58,7 +57,6 @@ Type InheritedTypeRequest::evaluate(
     auto ext = decl.get<ExtensionDecl *>();
     dc = ext;
     options = TypeResolutionOptions(TypeResolverContext::GenericSignature);
-    options.setContext(TypeResolverContext::InheritanceClause);
     options |= TypeResolutionFlags::AllowUnavailableProtocol;
   }
 
