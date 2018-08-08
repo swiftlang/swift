@@ -54,6 +54,15 @@ extension ${Type[0]} : _CustomPlaygroundQuickLookable {
 }
 % end
 
+#if !os(Windows) && (arch(i386) || arch(x86_64))
+extension Float80 : CustomReflectable {
+  /// A mirror that reflects the Float80 instance.
+  public var customMirror: Mirror {
+    return Mirror(self, unlabeledChildren: EmptyCollection<Void>())
+  }
+}
+#endif
+
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
 // End:
