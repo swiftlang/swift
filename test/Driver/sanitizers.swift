@@ -9,8 +9,8 @@
 // RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=address -target arm64-apple-tvos9.0 %s  | %FileCheck -check-prefix=ASAN -check-prefix=ASAN_tvOS %s
 // RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=address -target i386-apple-watchos2.0 %s   | %FileCheck -check-prefix=ASAN -check-prefix=ASAN_watchOS_SIM %s
 // RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=address -target armv7k-apple-watchos2.0 %s | %FileCheck -check-prefix=ASAN -check-prefix=ASAN_watchOS %s
-// RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=address -target x86_64-unknown-linux-gnu %s 2>&1 | %FileCheck -check-prefix=ASAN_LINUX %s
-// RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=address -target x86_64-unknown-windows-msvc %s 2>&1 | %FileCheck -check-prefix=ASAN_WINDOWS %s
+// RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=address -target x86_64-unknown-linux-gnu %s 2>&1 | %FileCheck -check-prefix=ASAN -check-prefix=ASAN_LINUX %s
+// RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=address -target x86_64-unknown-windows-msvc %s 2>&1 | %FileCheck -check-prefix=ASAN -check-prefix=ASAN_WINDOWS %s
 
 /*
  * Thread Sanitizer Tests  (tsan)
@@ -29,17 +29,16 @@
 /*
  * Undefined Behavior Sanitizer Tests  (ubsan)
  */
-
 // RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=undefined -target x86_64-apple-macosx10.9 %s | %FileCheck -check-prefix=UBSAN -check-prefix=UBSAN_OSX %s
-// RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=undefined -target x86-apple-macosx10.9 %s 2>&1 | %FileCheck -check-prefix=UBSAN_OSX_32 %s
-// RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=undefined -target x86_64-apple-ios7.1 %s 2>&1 | %FileCheck -check-prefix=UBSAN_IOSSIM %s
-// RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=undefined -target arm64-apple-ios7.1 %s 2>&1 | %FileCheck -check-prefix=UBSAN_IOS %s
-// RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=undefined -target x86_64-apple-tvos9.0 %s 2>&1 | %FileCheck -check-prefix=UBSAN_tvOS_SIM %s
-// RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=undefined -target arm64-apple-tvos9.0 %s 2>&1 | %FileCheck -check-prefix=UBSAN_tvOS %s
-// RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=undefined -target i386-apple-watchos2.0 %s 2>&1 | %FileCheck -check-prefix=UBSAN_watchOS_SIM %s
-// RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=undefined -target armv7k-apple-watchos2.0 %s 2>&1  | %FileCheck -check-prefix=UBSAN_watchOS %s
-// RUN: not %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=undefined -target x86_64-unknown-windows-msvc %s 2>&1 | %FileCheck -check-prefix=UBSAN_WINDOWS %s
-// RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=undefined -target x86_64-unknown-linux-gnu %s 2>&1 | %FileCheck -check-prefix=UBSAN_LINUX %s
+// RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=undefined -target x86_64-apple-ios7.1 %s | %FileCheck -check-prefix=UBSAN -check-prefix=UBSAN_IOSSIM %s
+// RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=undefined -target arm64-apple-ios7.1 %s  | %FileCheck -check-prefix=UBSAN -check-prefix=UBSAN_IOS %s
+// RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=undefined -target x86_64-apple-tvos9.0 %s | %FileCheck -check-prefix=UBSAN -check-prefix=UBSAN_tvOS_SIM %s
+// RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=undefined -target arm64-apple-tvos9.0 %s  | %FileCheck -check-prefix=UBSAN -check-prefix=UBSAN_tvOS %s
+// RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=undefined -target i386-apple-watchos2.0 %s   | %FileCheck -check-prefix=UBSAN -check-prefix=UBSAN_watchOS_SIM %s
+// RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=undefined -target armv7k-apple-watchos2.0 %s | %FileCheck -check-prefix=UBSAN -check-prefix=UBSAN_watchOS %s
+// RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=undefined -target x86_64-unknown-linux-gnu %s 2>&1 | %FileCheck -check-prefix=UBSAN -check-prefix=UBSAN_LINUX %s
+// RUN: %swiftc_driver -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=undefined -target x86_64-unknown-windows-msvc %s 2>&1 | %FileCheck -check-prefix=UBSAN -check-prefix=UBSAN_WINDOWS %s
+
 
 /*
  * Bad Argument Tests
@@ -99,7 +98,7 @@
 // UBSAN_watchOS_SIM: lib/swift/clang/lib/darwin/libclang_rt.ubsan_watchossim_dynamic.dylib
 // UBSAN_watchOS: lib/swift/clang/lib/darwin/libclang_rt.ubsan_watchos_dynamic.dylib
 // UBSAN_LINUX: lib/swift/clang/lib/linux/libclang_rt.ubsan-x86_64.a
-// UBSAN_WINDOWS: unsupported option '-sanitize=undefined' for target 'x86_64-unknown-windows-msvc'
+// UBSAN_WINDOWS: lib/swift/clang/lib/windows/clang_rt.ubsan_standalone-x86_64.lib
 
 // UBSAN: -rpath @executable_path
 
