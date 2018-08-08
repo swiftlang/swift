@@ -1,0 +1,74 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
+// RUN: %target-swift-frontend  -I %t -emit-ir -enable-resilience %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend  -I %t -emit-ir -enable-resilience -O %s
+
+// We only use fragile class layouts when Objective-C interop is enabled.
+
+// REQUIRES: objc_interop
+// REQUIRES: CPU=x86_64
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+import resilient_struct
+
+public class ClassWithResilientField {
+  var first: Int
+  var second: Size
+  var third: Int
+
+  init(x: Int, y: Size, z: Int)
+}
+
+sil_vtable ClassWithResilientField {}
+
+// Field offsets are statically known:
+// CHECK-DAG: @"$S31completely_fragile_class_layout23ClassWithResilientFieldC5firstSivpWvd" = hidden constant i64 16, align 8
+// CHECK-DAG: @"$S31completely_fragile_class_layout23ClassWithResilientFieldC6second16resilient_struct4SizeVvpWvd" = hidden constant i64 24, align 8
+// CHECK-DAG: @"$S31completely_fragile_class_layout23ClassWithResilientFieldC5thirdSivpWvd" = hidden constant i64 40, align 8
+
+// Class has static metadata:
+// CHECK-LABEL: $S31completely_fragile_class_layout23ClassWithResilientFieldCMf
+
+// rdar://problem/41308521 -- enum lowering needs to pretend payloads are
+// resilient and not use spare bits, even when bypassing resilience while
+// lowering class fields.
+
+// Because ResilientRef is resilient, the enum stores the tag out-of-line,
+// rather than packing it into the spare bits of the payload. Make sure that
+// this layout is maintained even when the enum is a class field, which
+// forces it to be lowered without resilience.
+enum EnumWithResilientPayload {
+  case none
+  case some(ClassWithResilientEnum)
+  case data(ResilientRef)
+}
+
+// Note that 'second' is at offset 25, which means 'first' is 9 bytes in size;
+// an 8 byte payload and an out-of-line tag, as expected.
+public class ClassWithResilientEnum {
+  var first: EnumWithResilientPayload
+  var second: Int8
+
+  init(x: EnumWithResilientPayload, y: Int8)
+}
+
+sil_vtable ClassWithResilientEnum {}
+
+// Field offsets are statically known:
+// CHECK-LABEL: @"$S31completely_fragile_class_layout22ClassWithResilientEnumC5firstAA0hfG7PayloadOvpWvd" = hidden constant i64 16, align 8
+// CHECK-LABEL: @"$S31completely_fragile_class_layout22ClassWithResilientEnumC6seconds4Int8VvpWvd" = hidden constant i64 25, align 8
+
+// Metadata accessor for ClassWithResilientField is trivial:
+// CHECK-LABEL: define swiftcc %swift.metadata_response @"$S31completely_fragile_class_layout23ClassWithResilientFieldCMa
+// CHECK: call %objc_class* @swift_getInitializedObjCClass(%objc_class* {{.*}} @"$S31completely_fragile_class_layout23ClassWithResilientFieldCMf"
+// CHECK: ret
+
+// Metadata accessor for ClassWithResilientEnum is trivial:
+// CHECK-LABEL: define swiftcc %swift.metadata_response @"$S31completely_fragile_class_layout22ClassWithResilientEnumCMa
+// CHECK: call %objc_class* @swift_getInitializedObjCClass(%objc_class* {{.*}} @"$S31completely_fragile_class_layout22ClassWithResilientEnumCMf"
+// CHECK: ret
