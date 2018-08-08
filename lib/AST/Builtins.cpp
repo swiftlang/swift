@@ -557,10 +557,10 @@ static BuiltinGenericSignatureBuilder::LambdaGenerator
 makeBoundGeneric(NominalTypeDecl *decl, const P &parentGenerator,
                  const Gs & ...genericParamGenerators) {
   return {
-    [=](BuiltinGenericSignatureBuilder &builder, bool forBody) -> Type {
-      Type parent = parentGenerator.build(builder, forBody);
+    [=](BuiltinGenericSignatureBuilder &builder) -> Type {
+      Type parent = parentGenerator.build(builder);
       Type genParams[] = {
-        genericParamGenerators.build(builder, forBody)...
+        genericParamGenerators.build(builder)...
       };
       return BoundGenericType::get(decl, parent, genParams);
     }

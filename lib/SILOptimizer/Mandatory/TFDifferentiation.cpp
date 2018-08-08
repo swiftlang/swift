@@ -35,6 +35,7 @@
 #include "swift/SIL/LoopInfo.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
+#include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -2379,13 +2380,14 @@ PrimalGen::createEmptyPrimal(DifferentiationTask *task) {
                                        results,
                                        originalTy->getOptionalErrorResult(),
                                        context.getASTContext());
-  auto *primal = module.getOrCreateFunction(original->getLocation(),
-                                            primalName,
-                                            original->getLinkage(),
-                                            primalTy,
-                                            original->isBare(),
-                                            original->isTransparent(),
-                                            original->isSerialized());
+  SILFunctionBuilder FB(module);
+  auto *primal = FB.getOrCreateFunction(original->getLocation(),
+                                        primalName,
+                                        original->getLinkage(),
+                                        primalTy,
+                                        original->isBare(),
+                                        original->isTransparent(),
+                                        original->isSerialized());
   primal->setUnqualifiedOwnership();
   LLVM_DEBUG(getADDebugStream() << "Primal function created \n" << *primal << '\n');
   task->setPrimal(primal);
@@ -2498,13 +2500,14 @@ AdjointGen::createEmptyAdjoint(DifferentiationTask *task) {
                                       origTy->getCalleeConvention(),
                                       adjParams, {}, adjResults, None,
                                       original->getASTContext());
-  auto *adjoint = module.createFunction(original->getLinkage(),
-                                        adjName, adjType,
-                                        original->getGenericEnvironment(),
-                                        original->getLocation(),
-                                        original->isBare(),
-                                        original->isTransparent(),
-                                        original->isSerialized());
+  SILFunctionBuilder FB(module);
+  auto *adjoint = FB.createFunction(original->getLinkage(),
+                                    adjName, adjType,
+                                    original->getGenericEnvironment(),
+                                    original->getLocation(),
+                                    original->isBare(),
+                                    original->isTransparent(),
+                                    original->isSerialized());
   adjoint->setUnqualifiedOwnership();
   adjoint->setDebugScope(
     new (module) SILDebugScope(original->getLocation(), adjoint));
@@ -3647,13 +3650,14 @@ static SILFunction *lookupOrSynthesizeGradient(
     std::string gradName =
       original->getName().str() + "__" + mangleADConfig(config);
     auto gradNameId = astCtx.getIdentifier(gradName);
-    auto *gradFn = module.createFunction(original->getLinkage(),
-                                         gradNameId.str(), gradType,
-                                         original->getGenericEnvironment(),
-                                         original->getLocation(),
-                                         original->isBare(),
-                                         original->isTransparent(),
-                                         original->isSerialized());
+    SILFunctionBuilder FB(module);
+    auto *gradFn = FB.createFunction(original->getLinkage(),
+                                     gradNameId.str(), gradType,
+                                     original->getGenericEnvironment(),
+                                     original->getLocation(),
+                                     original->isBare(),
+                                     original->isTransparent(),
+                                     original->isSerialized());
     gradFn->setUnqualifiedOwnership();
     gradFn->setDebugScope(
       new (module) SILDebugScope(original->getLocation(), gradFn));

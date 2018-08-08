@@ -35,40 +35,40 @@ bb0:
 // CHECK-NEXT: }
 
 sil @chained_op_test : $@convention(thin) (Tensor<Float>, Tensor<Float>) -> Tensor<Float> {
-bb0(%0 : $Tensor<Float>, %1 : $Tensor<Float>):
+bb0(%0 : @trivial $Tensor<Float>, %1 : @trivial $Tensor<Float>):
   %2 = graph_op "tf.Add"(%0 : $Tensor<Float>, %1 : $Tensor<Float>) {T: $Float} : $Tensor<Float>
   %3 = graph_op "tf.Mul"(%2 : $Tensor<Float>, %2 : $Tensor<Float>) {T: $Float} : $Tensor<Float>
   return %3 : $Tensor<Float>
 }
 
 // CHECK-LABEL: sil @chained_op_test : $@convention(thin) (Tensor<Float>, Tensor<Float>) -> Tensor<Float> {
-// CHECK: bb0(%0 : $Tensor<Float>, %1 : $Tensor<Float>):
+// CHECK: bb0(%0 : @trivial $Tensor<Float>, %1 : @trivial $Tensor<Float>):
 // CHECK-NEXT:   %2 = graph_op "tf.Add"(%0 : $Tensor<Float>, %1 : $Tensor<Float>) {T: $Float} : $Tensor<Float>
 // CHECK-NEXT:   %3 = graph_op "tf.Mul"(%2 : $Tensor<Float>, %2 : $Tensor<Float>) {T: $Float} : $Tensor<Float>
 // CHECK-NEXT:   return %3 : $Tensor<Float>
 // CHECK-NEXT: }
 
 sil @single_result_op_test : $@convention(thin) (Tensor<Float>, Tensor<Float>) -> Tensor<Float> {
-bb0(%0 : $Tensor<Float>, %1 : $Tensor<Float>):
+bb0(%0 : @trivial $Tensor<Float>, %1 : @trivial $Tensor<Float>):
   %2 = graph_op "tf.Add"(%0 : $Tensor<Float>, %1 : $Tensor<Float>) {T: $Float} : $Tensor<Float>
   return %2 : $Tensor<Float>
 }
 
 // CHECK-LABEL: sil @single_result_op_test : $@convention(thin) (Tensor<Float>, Tensor<Float>) -> Tensor<Float> {
-// CHECK: bb0(%0 : $Tensor<Float>, %1 : $Tensor<Float>):
+// CHECK: bb0(%0 : @trivial $Tensor<Float>, %1 : @trivial $Tensor<Float>):
 // CHECK-NEXT:   %2 = graph_op "tf.Add"(%0 : $Tensor<Float>, %1 : $Tensor<Float>) {T: $Float} : $Tensor<Float>
 // CHECK-NEXT:   return %2 : $Tensor<Float>
 // CHECK-NEXT: }
 
 sil @multiple_result_op_test : $@convention(thin) (Tensor<Float>, Tensor<Float>) -> (Tensor<Float>, Tensor<Float>) {
-bb0(%0 : $Tensor<Float>, %1 : $Tensor<Float>):
+bb0(%0 : @trivial $Tensor<Float>, %1 : @trivial $Tensor<Float>):
   (%2, %3) = graph_op "tf.Dummy"(%0 : $Tensor<Float>, %1 : $Tensor<Float>) {T: $Float} : $Tensor<Float>, $Tensor<Float>
   %4 = tuple (%2 : $Tensor<Float>, %3 : $Tensor<Float>)
   return %4 : $(Tensor<Float>, Tensor<Float>)
 }
 
 // CHECK-LABEL: sil @multiple_result_op_test : $@convention(thin) (Tensor<Float>, Tensor<Float>) -> (Tensor<Float>, Tensor<Float>) {
-// CHECK: bb0(%0 : $Tensor<Float>, %1 : $Tensor<Float>):
+// CHECK: bb0(%0 : @trivial $Tensor<Float>, %1 : @trivial $Tensor<Float>):
 // CHECK-NEXT:   (%2, %3) = graph_op "tf.Dummy"(%0 : $Tensor<Float>, %1 : $Tensor<Float>) {T: $Float} : $Tensor<Float>, $Tensor<Float>
 // CHECK-NEXT:   %4 = tuple (%2 : $Tensor<Float>, %3 : $Tensor<Float>)
 // CHECK-NEXT:   return %4 : $(Tensor<Float>, Tensor<Float>)

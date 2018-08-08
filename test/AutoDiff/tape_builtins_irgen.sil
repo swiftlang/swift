@@ -6,7 +6,7 @@ import Swift
 import Builtin
 
 sil @foo : $@convention(thin) (Float, Float) -> Float {
-bb0(%0 : $Float, %1 : $Float):
+bb0(%0 : @trivial $Float, %1 : @trivial $Float):
   %tape = builtin "autodiffCreateTape"<Float>() : $_AutoDiffTape<Float>
   %id = integer_literal $Builtin.Word, 0
   builtin "autodiffPushToTape"<Float>(%tape : $_AutoDiffTape<Float>, %0 : $Float, %id : $Builtin.Word) : $()
