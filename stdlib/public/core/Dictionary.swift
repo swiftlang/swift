@@ -879,6 +879,8 @@ extension Dictionary {
   ///   transformed value of the same or of a different type.
   /// - Returns: A dictionary containing the keys and transformed values of
   ///   this dictionary.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the dictionary.
   @inlinable // FIXME(sil-serialize-all)
   public func mapValues<T>(
     _ transform: (Value) throws -> T
