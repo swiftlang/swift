@@ -815,8 +815,14 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
   }
 
   // Figure out the type of the indices.
-  Type IndicesType = SD->getIndicesInterfaceType()->getWithoutImmediateLabel();
+  auto SubscriptType = SD->getInterfaceType()->getAs<AnyFunctionType>();
+  if (!SubscriptType)
+    return false;
 
+  if (SubscriptType->getParams().size() != 1)
+    return false;
+
+  Type IndicesType = SubscriptType->getParams()[0].getType();
   if (IndicesType->hasError())
     return false;
 
