@@ -1649,7 +1649,7 @@ bool ConstExprEvaluator::decodeAllocUninitializedArray(
 
       // We handle the cases that the element is either set by a store or
       // filled via an apply.
-      if (auto *store = dyn_cast_or_null<StoreInst>(user)) {
+      if (auto *store = dyn_cast<StoreInst>(user)) {
         if (store->getDest() != use->get())
           return true;
         if (arrayInsts)
