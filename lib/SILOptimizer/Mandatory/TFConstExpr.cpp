@@ -144,7 +144,7 @@ public:
   SymbolicValue computeConstantValue(SILValue value);
   SymbolicValue computeConstantValueBuiltin(BuiltinInst *inst);
 
-  SymbolicValue computeSingleStoreAddressValueForSomeAddrInsts(SILValue addr);
+  SymbolicValue computeSingleStoreAddressValue(SILValue addr);
   llvm::Optional<SymbolicValue> computeCallResult(ApplyInst *apply);
 
   llvm::Optional<SymbolicValue> computeOpaqueCallResult(ApplyInst *apply,
@@ -969,8 +969,7 @@ SymbolicValue ConstExprFunctionState::getConstantValue(SILValue value) {
   // single store value.  Since this is a very different computation, split it
   // out to its own path.
   if (!fn && value->getType().isAddress()) {
-    SymbolicValue result =
-        computeSingleStoreAddressValueForSomeAddrInsts(value);
+    SymbolicValue result = computeSingleStoreAddressValue(value);
     setValue(value, result);
     return result;
   }
@@ -1074,8 +1073,7 @@ static bool updateIndexedElement(SymbolicValue &aggregate,
 /// Invariant: Before the call, `calculatedValues` must not contain `addr` as a
 /// key.
 SymbolicValue
-ConstExprFunctionState::computeSingleStoreAddressValueForSomeAddrInsts(
-    SILValue addr) {
+ConstExprFunctionState::computeSingleStoreAddressValue(SILValue addr) {
   assert(!calculatedValues.count(addr));
 
   // TODO: consider supporting all instruction types that produce an
@@ -1108,6 +1106,8 @@ ConstExprFunctionState::computeSingleStoreAddressValueForSomeAddrInsts(
   return computeSingleStoreAddressValueHelper(addrInst);
 }
 
+/// This does the heavy-lifting of computeSingleStoreAddressValue() above, and
+/// may recursively call itself when const-evaluating TupleElementAddrInst.
 SymbolicValue
 ConstExprFunctionState::computeSingleStoreAddressValueHelper(SILValue addr) {
   // Keep track of the value found for the first constant store.
@@ -1223,15 +1223,13 @@ ConstExprFunctionState::computeSingleStoreAddressValueHelper(SILValue addr) {
         continue;
 
       // In this case we want to find a user of teai that writes to that tuple
-      // elt addr. We cannot call
-      // computeSingleStoreAddressValueForSomeAddrInsts(), since that'll involve
-      // evaluating the tuple operand (first operand) of teai first, denoted as
-      // X (an inst that creates the tuple), and that in turn will go through
-      // all uses of X, include teai, entering a cycle.
+      // elt addr. We cannot call computeSingleStoreAddressValue(), since
+      // that'll involve evaluating the tuple operand (first operand) of teai
+      // first, denoted as X (an inst that creates the tuple), and that in turn
+      // will go through all uses of X, include teai, entering a cycle.
 
       // Instead we call the lighter-weight method
-      // computeSingleStoreAddressValueHelper() to avoid forming the
-      // cycle.
+      // computeSingleStoreAddressValueHelper() to avoid forming the cycle.
       auto tupleEltAddrValue = computeSingleStoreAddressValueHelper(teai);
       if (tupleEltAddrValue.isConstant()) {
         // If the tuple elt is indeed a const, we write it into (the appropriate
@@ -1762,14 +1760,14 @@ bool ConstExprEvaluator::decodeAllocUninitializedArray(
         // In this case, the element's address is passed to a copy_addr, which
         // sets the value. For example, let %178 be the index_addr inst, the SIL
         // snippet that initializes the value given by index_addr might look
-        // like the following, where we set `elementsAtInit[index]` to the last
-        // copy_addr below, for caller to const-evaluate. Caller will
-        // const-evaluate %191, which const-evaluates %179, which involves
-        // const-evaluating %183, where the writer to that tuple elt address is
-        // "copy_addr %114". Eventually it const-evaluates %101 to fill in the
-        // vlaue for %183. The continues until the writer insts of all the other
-        // tuple elements of %179 are const-evaluated, yielding a const tuple
-        // for %179. This finally gives us the const value at address %178.
+        // like the following, where we set `elementsAtInit[index]` to
+        // %178. Caller will then const-evaluate %191 (the user of %178), which
+        // const-evaluates %179, which involves const-evaluating %183, where the
+        // writer to that tuple elt address is "copy_addr %114". Eventually it
+        // const-evaluates %101 to fill in the value for %183. The continues
+        // until the writer insts of all the other tuple elements of %179 are
+        // const-evaluated, yielding a const tuple for %179. This finally gives
+        // us the const value at address %178.
         //
         //   %101 = tuple_extract %96 : $(Int32, Int32, Int32, Int32), 3
         //   %108 = alloc_stack $Int32
