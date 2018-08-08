@@ -249,7 +249,7 @@ namespace {
         // Add the tail elements.
         for (SILType TailTy : *TailTypes) {
           const TypeInfo &tailTI = IGM.getTypeInfo(TailTy);
-          addTailElement(ElementLayout::getIncomplete(tailTI, tailTI));
+          addTailElement(ElementLayout::getIncomplete(tailTI));
         }
       }
     }
@@ -296,7 +296,7 @@ namespace {
       Elements.push_back(Elt);
       if (!addField(Elements.back(), LayoutStrategy::Universal)) {
         // For empty tail allocated elements we still add 1 padding byte.
-        assert(cast<FixedTypeInfo>(Elt.getTypeForLayout()).getFixedStride() == Size(1) &&
+        assert(cast<FixedTypeInfo>(Elt.getType()).getFixedStride() == Size(1) &&
                "empty elements should have stride 1");
         StructFields.push_back(llvm::ArrayType::get(IGM.Int8Ty, 1));
         CurSize += Size(1);
@@ -363,30 +363,22 @@ namespace {
                                   bool superclass) {
       for (VarDecl *var : theClass->getStoredProperties()) {
         SILType type = classType.getFieldType(var, IGM.getSILModule());
-        auto &eltTypeForAccess = IGM.getTypeInfo(type);
 
-        // For now, the Objective-C runtime cannot support dynamic layout of
-        // classes that contain resilient value types, so we just look through
-        // the resilience boundary and assume fragile layout for class ivars
-        // instead.
-        Optional<CompletelyFragileScope> generateStaticLayoutRAII;
-
-        if (CompletelyFragileLayout &&
-            !isa<FixedTypeInfo>(eltTypeForAccess)) {
-          generateStaticLayoutRAII.emplace(IGM);
+        // Lower the field type.
+        auto *eltType = &IGM.getTypeInfo(type);
+        if (CompletelyFragileLayout && !eltType->isFixedSize()) {
+          CompletelyFragileScope scope(IGM);
+          eltType = &IGM.getTypeInfo(type);
         }
 
-        auto &eltTypeForLayout = IGM.getTypeInfo(type);
-
-        if (!eltTypeForLayout.isFixedSize()) {
+        if (!eltType->isFixedSize()) {
           if (type.hasArchetype())
             ClassHasGenericLayout = true;
           else
             ClassHasResilientMembers = true;
         }
 
-        auto element = ElementLayout::getIncomplete(eltTypeForLayout,
-                                                    eltTypeForAccess);
+        auto element = ElementLayout::getIncomplete(*eltType);
         addField(element, LayoutStrategy::Universal);
 
         // The 'Elements' list only contains superclass fields when we're
