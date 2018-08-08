@@ -47,3 +47,19 @@ enum SomeType {
 
 let f: @convention(tensorflow) (Tensor<Float>) -> Tensor<Int32> = tensors(_:) // okay
 let g: (Tensor<Float>) -> Tensor<Int32> = tensors(_:) // expected-error {{TensorFlow functions cannot be converted to other function types}}
+
+func hof(_ f: @convention(tensorflow) (Tensor<Float>) -> Tensor<Int32>) -> Tensor<Float> {}
+_ = hof(tensors) // okay
+
+// Enable these tests when SR-8487 is fixed.
+//
+// let closure: @convention(tensorflow) (Tensor<Float>) -> Tensor<Int32> = {
+//   return Tensor<Int32>($0)
+// } // okay
+//
+// hof {
+//   return Tensor<Int32>($0)
+// } // okay
+
+func hofHost(_ f: (Tensor<Float>) -> Tensor<Int32>) -> Tensor<Float> {}
+_ = hofHost(tensors) // expected-error {{TensorFlow functions cannot be converted to other function types}}
