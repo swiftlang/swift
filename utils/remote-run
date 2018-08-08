@@ -91,15 +91,26 @@ class CommandRunner(object):
             sys.exit(sftp_proc.returncode)
 
 class RemoteCommandRunner(CommandRunner):
-    def __init__(self, remote_host):
-        self.remote_host = remote_host
+    def __init__(self, host):
+        if ':' in host:
+            (self.remote_host, self.port) = host.rsplit(':', 1)
+        else:
+            self.remote_host = host
+            self.port = None
+
+    def common_options(self, port_flag):
+        return [port_flag, self.port] if self.port else []
 
     def remote_invocation(self, command):
-        return (['/usr/bin/ssh', '-n', self.remote_host, '--'] +
+        return (['/usr/bin/ssh', '-n'] +
+            self.common_options(port_flag='-p') +
+            [self.remote_host, '--'] +
             [quote(arg) for arg in command])
 
     def sftp_invocation(self):
-        return ['/usr/bin/sftp', '-b', '-', self.remote_host]
+        return (['/usr/bin/sftp', '-b', '-'] +
+            self.common_options(port_flag='-P') +
+            [self.remote_host])
 
 class LocalCommandRunner(CommandRunner):
     def remote_invocation(self, command):
