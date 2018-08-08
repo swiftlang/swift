@@ -1723,7 +1723,7 @@ bool ConstExprEvaluator::decodeAllocUninitializedArray(
         use = iai->getSingleUse();
         if (!use)
           return true;
-        user = use ? use->getUser() : nullptr;
+        user = use->getUser();
       }
 
       // We handle the cases that the element is either set by a store or
