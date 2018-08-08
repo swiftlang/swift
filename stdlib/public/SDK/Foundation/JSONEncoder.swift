@@ -883,7 +883,9 @@ extension _JSONEncoder {
 
     // This method is called "box_" instead of "box" to disambiguate it from the overloads. Because the return type here is different from all of the "box" overloads (and is more general), any "box" calls in here would call back into "box" recursively instead of calling the appropriate overload, which is not what we want.
     fileprivate func box_(_ value: Encodable) throws -> NSObject? {
-        let type = type(of: value)
+        // Disambiguation between variable and function is required due to
+        // issue tracked at: https://bugs.swift.org/browse/SR-1846
+        let type = Swift.type(of: value)
         if type == Date.self || type == NSDate.self {
             // Respect Date encoding strategy
             return try self.box((value as! Date))
