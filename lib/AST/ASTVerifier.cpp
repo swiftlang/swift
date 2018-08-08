@@ -1406,6 +1406,145 @@ public:
       verifyCheckedBase(E);
     }
 
+    void verifyChecked(ErasureExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying ErasureExpr", E);
+
+      if (!E->getType()->isAnyExistentialType()) {
+        Out << "ErasureExpr result is not an existential: ";
+        E->getType()->print(Out);
+        Out << "\n";
+        abort();
+      }
+
+      auto erasedTy = E->getType();
+      auto concreteTy = E->getSubExpr()->getType();
+      
+      // Erasure can be from concrete to existential or from existential to more
+      // general existential. If we look through metatypes then we're forced
+      // into one or the other by context; otherwise, it doesn't matter.
+      enum {
+        AnyErasure,
+        ConcreteErasureOnly,
+        ExistentialErasureOnly,
+      } knownConcreteErasure = AnyErasure;
+      
+      // Existential metatypes should be erased from (existential or concrete)
+      // metatypes.
+      while (auto meta = erasedTy->getAs<ExistentialMetatypeType>()) {
+        erasedTy = meta->getInstanceType();
+        if (auto concreteMeta = concreteTy->getAs<MetatypeType>()) {
+          // If this is already forced to be an existential erasure, we
+          // shouldn't be here, since (P & Q).Protocol.Type doesn't exist as
+          // a type.
+          assert(knownConcreteErasure != ExistentialErasureOnly);
+          knownConcreteErasure = ConcreteErasureOnly;
+          concreteTy = concreteMeta->getInstanceType();
+        } else if (auto existentialMeta =
+                     concreteTy->getAs<ExistentialMetatypeType>()) {
+          // If this is already forced to be a concrete erasure (say we're going
+          // from (P & Q).Type.Protocol to P.Type.Type), then this is invalid,
+          // because it would require the existential metatype to be
+          // "self-conforming" to the protocol's static requirements (in other
+          // words, (P & Q).Type.self would have to be able to witness all of P's
+          // static requirements), which is currently never the case.
+          if (knownConcreteErasure == true) {
+            Out << "ErasureExpr concrete metatype is not a subtype of the "
+                   "existential metatype\n"
+                   "Destination type: ";
+            E->getType()->print(Out);
+            Out << "\nSource type: ";
+            E->getSubExpr()->getType()->print(Out);
+            Out << "\n";
+            abort();
+          }
+          knownConcreteErasure = ExistentialErasureOnly;
+          concreteTy = concreteMeta->getInstanceType();
+        } else {
+          // Anything else wouldn't be a valid erasure to an existential
+          // metatype.
+          Out << "ErasureExpr from non-metatype to existential metatype\n"
+                 "Destination type: ";
+          E->getType()->print(Out);
+          Out << "\nSource type: ";
+          E->getSubExpr()->getType()->print(Out);
+          Out << "\n";
+          abort();
+        }
+      }
+
+      auto erasedLayout = erasedTy->getCanonicalType()->getExistentialLayout();
+
+      // An existential-to-existential erasure ought to reduce the set of
+      // constraints.
+      if (knownConcreteErasure != ConcreteErasureOnly
+          && concreteTy->isExistentialType()) {
+        // TODO
+      } else {
+        // Check class constraints.
+        if (erasedLayout.requiresClass()) {
+          // A class constraint can be satisfied by a class, class-constrained
+          // archetype, or a class-constrained existential with no witness table
+          // requirements.
+          bool canBeClass;
+          if (concreteTy->mayHaveSuperclass()) {
+            canBeClass = true;
+          } else if (concreteTy->isExistentialType()) {
+            auto concreteLayout = concreteTy->getCanonicalType()
+                                            ->getExistentialLayout();
+            canBeClass = concreteLayout.getKind() == ExistentialLayout::Kind::Class
+              && !concreteLayout.containsNonObjCProtocol;
+          } else {
+            canBeClass = false;
+          }
+          
+          if (!canBeClass) {
+            Out << "ErasureExpr from non-class to existential that requires a "
+                   "class\n"
+                   "Destination type: ";
+            E->getType()->print(Out);
+            Out << "\nSource type: ";
+            E->getSubExpr()->getType()->print(Out);
+            Out << "\n";
+            abort();
+          }
+        }
+        
+        auto superclass = erasedLayout.getSuperclass();
+        if (superclass
+            && !superclass->isExactSuperclassOf(concreteTy)) {
+          Out << "ErasureExpr from class to existential with a superclass "
+                 "constraint that does not match the class\n"
+                 "Destination type: ";
+          E->getType()->print(Out);
+          Out << "\nSource type: ";
+          E->getSubExpr()->getType()->print(Out);
+          Out << "\n";
+          abort();
+        }
+        
+        // A concrete-to-existential erasure should have conformances on hand
+        // for all of the existential's requirements.
+        auto conformances = E->getConformances();
+        for (auto proto : erasedLayout.getProtocols()) {
+          if (std::find_if(conformances.begin(), conformances.end(),
+                           [&](ProtocolConformanceRef ref) -> bool {
+                             return ref.getRequirement() == proto->getDecl();
+                           })
+              == conformances.end()) {
+            Out << "ErasureExpr is missing conformance for required protocol\n";
+            E->getType()->print(Out);
+            Out << "\nSource type: ";
+            E->getSubExpr()->getType()->print(Out);
+            Out << "\n";
+            abort();
+          }
+          // TODO: Verify that the conformance applies to the type?
+        }
+        
+        // TODO: Check layout constraints?
+      }
+    }
+
     void verifyChecked(AnyHashableErasureExpr *E) {
       auto anyHashableDecl = Ctx.getAnyHashableDecl();
       if (!anyHashableDecl) {
