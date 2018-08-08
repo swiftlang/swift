@@ -147,8 +147,36 @@ bool MissingConformanceFailure::diagnose() {
                    diag::cannot_convert_argument_value_protocol, type,
                    protocolType);
   } else {
-    emitDiagnostic(anchor->getLoc(), diag::type_does_not_conform_owner,
-                   ownerType, type, protocolType);
+    const auto &req = getRequirement();
+    auto *genericCtx = AffectedDecl->getAsGenericContext();
+
+    std::function<const DeclContext *(Type)> getAffectedCtx =
+        [&](Type type) -> const DeclContext * {
+      if (auto *DMT = type->getAs<DependentMemberType>())
+        return getAffectedCtx(DMT->getBase());
+
+      if (auto *GPT = type->getAs<GenericTypeParamType>())
+        return GPT->getDecl()->getDeclContext();
+
+      return genericCtx;
+    };
+
+    const auto *affected = getAffectedCtx(req.getFirstType());
+    if (affected != genericCtx) {
+      auto *NTD = affected->getAsNominalTypeOrNominalTypeExtensionContext();
+      emitDiagnostic(anchor->getLoc(), diag::type_does_not_conform_in_decl_ref,
+                     AffectedDecl->getDescriptiveKind(),
+                     AffectedDecl->getFullName(), NTD->getDeclaredType(), type,
+                     protocolType);
+    } else {
+      emitDiagnostic(anchor->getLoc(), diag::type_does_not_conform_decl_owner,
+                     AffectedDecl->getDescriptiveKind(),
+                     AffectedDecl->getFullName(), type, protocolType);
+    }
+
+    emitDiagnostic(affected->getAsDeclOrDeclExtensionContext(),
+                   diag::where_type_does_not_conform_type, req.getFirstType(),
+                   type);
   }
   return true;
 }
