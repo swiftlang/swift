@@ -2063,8 +2063,7 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
   
   // Recursively collect transitive captures from captured local functions.
   llvm::DenseSet<AnyFunctionRef> visitedFunctions;
-  llvm::DenseSet<ValueDecl*> capturedValues;
-  llvm::SmallVector<CapturedValue, 4> captures;
+  llvm::MapVector<ValueDecl*,CapturedValue> captures;
 
   // If there is a capture of 'self' with dynamic 'Self' type, it goes last so
   // that IRGen can pass dynamic 'Self' metadata.
@@ -2170,29 +2169,29 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
     capture_value:
       // Collect non-function captures.
       ValueDecl *value = capture.getDecl();
-      if (capturedValues.count(value)) {
-        for (auto it = captures.begin(); it != captures.end(); ++it) {
-          if (it->getDecl() == value) {
-            *it = it->mergeFlags(capture);
-            break;
-          }
-        }
+      auto existing = captures.find(value);
+      if (existing != captures.end()) {
+        existing->second = existing->second.mergeFlags(capture);
       } else {
-        capturedValues.insert(value);
-        captures.push_back(capture);
+        captures.insert(std::pair<ValueDecl *, CapturedValue>(value, capture));
       }
     }
   };
   collectFunctionCaptures(fn);
 
+  SmallVector<CapturedValue, 4> resultingCaptures;
+  for (auto capturePair : captures) {
+    resultingCaptures.push_back(capturePair.second);
+  }
+
   // If we captured the dynamic 'Self' type and we have a 'self' value also,
   // add it as the final capture. Otherwise, add a fake hidden capture for
   // the dynamic 'Self' metatype.
   if (selfCapture.hasValue()) {
-    captures.push_back(*selfCapture);
+    resultingCaptures.push_back(*selfCapture);
   } else if (capturesDynamicSelf) {
     selfCapture = CapturedValue::getDynamicSelfMetadata();
-    captures.push_back(*selfCapture);
+    resultingCaptures.push_back(*selfCapture);
   }
 
   // Cache the uniqued set of transitive captures.
@@ -2201,7 +2200,7 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
   auto &cachedCaptures = inserted.first->second;
   cachedCaptures.setGenericParamCaptures(capturesGenericParams);
   cachedCaptures.setDynamicSelfType(capturesDynamicSelf);
-  cachedCaptures.setCaptures(Context.AllocateCopy(captures));
+  cachedCaptures.setCaptures(Context.AllocateCopy(resultingCaptures));
   
   return cachedCaptures;
 }
