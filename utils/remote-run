@@ -138,17 +138,40 @@ def collect_remote_env(local_env=os.environ, prefix='REMOTE_RUN_CHILD_'):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--identity', '-i')
-    parser.add_argument('--input-prefix')
-    parser.add_argument('--output-prefix')
-    parser.add_argument('--remote-dir', required=True)
-    parser.add_argument('--remote-input-prefix', default='input')
-    parser.add_argument('--remote-output-prefix', default='output')
-    parser.add_argument('--debug-as-local', action='store_true')
-    parser.add_argument('--verbose', '-v', action='store_true')
-    parser.add_argument('--dry-run', '-n', action='store_true')
-    parser.add_argument('host')
-    parser.add_argument('command', nargs=argparse.REMAINDER)
+
+    parser.add_argument('-v', '--verbose', action='store_true', dest='verbose',
+                        help='print commands as they are run')
+    parser.add_argument('-n', '--dry-run', action='store_true', dest='dry_run',
+                        help="print the commands that would have been run, but "
+                             "don't actually run them")
+
+    parser.add_argument('--remote-dir', required=True, metavar='PATH',
+                        help='(required) a writable temporary path on the '
+                             'remote machine')
+    parser.add_argument('--input-prefix',
+                        help='arguments matching this prefix will be uploaded')
+    parser.add_argument('--output-prefix',
+                        help='arguments matching this prefix will be both '
+                             'uploaded and downloaded')
+    parser.add_argument('--remote-input-prefix', default='input',
+                        help='input arguments use this prefix on the remote '
+                             'machine')
+    parser.add_argument('--remote-output-prefix', default='output',
+                        help='output arguments use this prefix on the remote '
+                             'machine')
+
+    parser.add_argument('-i', '--identity', dest='identity', metavar='FILE',
+                        help='an SSH identity file (private key) to use')
+    parser.add_argument('--debug-as-local', action='store_true',
+                        help='run commands locally instead of over SSH, for '
+                             'debugging purposes. The "host" argument is '
+                             'omitted.')
+
+    parser.add_argument('host',
+                        help='the host to connect to, in the form '
+                             '[user@]host[:port]')
+    parser.add_argument('command', nargs=argparse.REMAINDER,
+                        help='the command to run', metavar='command...')
     args = parser.parse_args()
 
     if args.debug_as_local:
