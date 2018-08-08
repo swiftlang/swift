@@ -214,8 +214,6 @@ bool Migrator::performSyntacticPasses() {
 
   runAPIDiffMigratorPass(Editor, StartInstance->getPrimarySourceFile(),
                          getMigratorOptions());
-  runTupleSplatMigratorPass(Editor, StartInstance->getPrimarySourceFile(),
-                            getMigratorOptions());
 
   Edits.commit(Editor.getEdits());
 
