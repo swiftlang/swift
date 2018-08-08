@@ -838,11 +838,9 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
       // elements we found.
       for (auto *use : elementsAtInit) {
         SymbolicValue eltCst;
-        if (auto *store = dyn_cast<StoreInst>(use->getUser()))
-          eltCst = getConstantValue(store->getSrc());
-        else
-          eltCst = computeLoadResult(use->get());
-
+        auto addrValue = use->get();
+        assert(addrValue->getType().isAddress());
+        eltCst = computeLoadResult(addrValue);
         if (!eltCst.isConstant())
           return eltCst;
         elementConstants.push_back(eltCst);
@@ -1075,20 +1073,25 @@ SymbolicValue
 ConstExprFunctionState::computeSingleStoreAddressValue(SILValue addr) {
   assert(!calculatedValues.count(addr));
 
-  // The only value we can otherwise handle is an alloc_stack instruction.
-  auto alloc = dyn_cast<AllocStackInst>(addr);
-  if (!alloc)
+  // TODO: consider supporting all instruction types that produce an
+  // address-typed SIL value.
+  SingleValueInstruction *addrInst = dyn_cast<AllocStackInst>(addr);
+  if (!addrInst)
+    addrInst = dyn_cast<PointerToAddressInst>(addr);
+  if (!addrInst)
+    addrInst = dyn_cast<IndexAddrInst>(addr);
+  if (!addrInst)
     return evaluator.getUnknown(addr, UnknownReason::Default);
 
   // Keep track of the value found for the first constant store.
   auto memoryAddress =
-      createMemoryObject(alloc, SymbolicValue::getUninitMemory());
+      createMemoryObject(addrInst, SymbolicValue::getUninitMemory());
   auto *memoryObject = memoryAddress.getAddressValueMemoryObject();
 
   // Okay, check out all of the users of this value looking for semantic stores
   // into the address.  If we find more than one, then this was a var or
   // something else we can't handle.
-  for (auto *use : alloc->getUses()) {
+  for (auto *use : addrInst->getUses()) {
     auto user = use->getUser();
 
     // Ignore markers, loads, and other things that aren't stores to this stack
@@ -1557,9 +1560,14 @@ static bool analyzeArrayInitUses(SILValue v,
 
 /// Try to decode the specified apply of the _allocateUninitializedArray
 /// function in the standard library.  This attempts to figure out how the
-/// resulting elements will be initialized.  This fills in the result with
-/// a lists of operands used to pass element addresses for initialization,
-/// and returns false on success.
+/// resulting elements will be initialized.  This fills in the result with a
+/// lists of insts used to pass element addresses for initialization, and
+/// returns false on success.
+///
+/// Specifically, elementsAtInit[i] is an operand, where the associated
+/// instruction returns the address for array element i, and the user of that
+/// operand is a writer for that array element. For example, the user can be a
+/// store inst into that array element.
 ///
 /// If arrayInsts is non-null and if decoding succeeds, this function adds
 /// all of the instructions relevant to the definition of this array into
@@ -1616,9 +1624,10 @@ bool ConstExprEvaluator::decodeAllocUninitializedArray(
     if (arrayInsts)
       arrayInsts->insert(pointer2addr);
 
-    // Okay, process the use list of the pointer_to_address, each user is
-    // something that should result in a store of an element or an apply
-    // of in-place element initialization.
+    // Okay, process the use list of the pointer_to_address, each user of
+    // interest is either an index_addr inst that specifies an array element
+    // (see `index` below), or a writer to a specific array element. When we
+    // find such a use/user pair, set `elementsAtInit[index]` to it.
     for (auto *use : pointer2addr->getUses()) {
       auto *user = use->getUser();
 
@@ -1633,17 +1642,19 @@ bool ConstExprEvaluator::decodeAllocUninitializedArray(
 
         index = ili->getValue().getLimitedValue();
         use = iai->getSingleUse();
+        if (!use)
+          return true;
         user = use ? use->getUser() : nullptr;
       }
 
       // We handle the cases that the element is either set by a store or
       // filled via an apply.
-      if (auto *store = dyn_cast_or_null<StoreInst>(user)) {
+      if (auto *store = dyn_cast<StoreInst>(user)) {
         if (store->getDest() != use->get())
           return true;
         if (arrayInsts)
           arrayInsts->insert(store);
-      } else if (auto *applyInst = dyn_cast_or_null<ApplyInst>(user)) {
+      } else if (auto *applyInst = dyn_cast<ApplyInst>(user)) {
         // In this case, the element's address is passed to an apply where
         // the initialization happens in-place.  For example, the SIL snippet
         // may look like below:

@@ -1911,10 +1911,9 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
             return;
           }
         }
-        elt = eltVal;
 
         opName += elementMarker;
-        inputs.push_back(elt);
+        inputs.push_back(eltVal);
       }
       continue;
     }
