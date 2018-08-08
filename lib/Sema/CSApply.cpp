@@ -6865,6 +6865,45 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
   }
 
+  // Coercions from metadata to objects.
+  if (auto fromMeta = fromType->getAs<AnyMetatypeType>()) {
+    if (toType->isAnyObject()) {
+      assert(cs.getASTContext().LangOpts.EnableObjCInterop
+             && "metatype-to-object conversion requires objc interop");
+      if (fromMeta->is<MetatypeType>()) {
+        assert(fromMeta->getInstanceType()->mayHaveSuperclass()
+               && "metatype-to-object input should be a class metatype");
+        return cs.cacheType(
+          new (tc.Context) ClassMetatypeToObjectExpr(expr, toType));
+      }
+      
+      if (fromMeta->is<ExistentialMetatypeType>()) {
+        assert(fromMeta->getInstanceType()->getCanonicalType()
+                       ->getExistentialLayout().requiresClass()
+               && "metatype-to-object input should be a class metatype");
+        return cs.cacheType(
+          new (tc.Context) ExistentialMetatypeToObjectExpr(expr, toType));
+      }
+      
+      llvm_unreachable("unhandled metatype kind");
+    }
+    
+    if (auto toClass = toType->getClassOrBoundGenericClass()) {
+      if (toClass->getName() == cs.getASTContext().Id_Protocol
+          && toClass->getModuleContext()->getName()
+              == cs.getASTContext().Id_ObjectiveC) {
+        assert(cs.getASTContext().LangOpts.EnableObjCInterop
+               && "metatype-to-object conversion requires objc interop");
+        assert(fromMeta->is<MetatypeType>()
+               && fromMeta->getInstanceType()->is<ProtocolType>()
+               && "protocol-metatype-to-Protocol only works for single "
+                  "protocols");
+        return cs.cacheType(
+          new (tc.Context) ProtocolMetatypeToObjectExpr(expr, toType));
+      }
+    }
+  }
+
   // Coercions from a type to an existential type.
   if (toType->isAnyExistentialType()) {
     return coerceExistential(expr, toType, locator);
