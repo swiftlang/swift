@@ -22,6 +22,18 @@ RUN: %debug-remote-run --output-prefix %t cp %t/nested/input %t/nested/output
 RUN: ls %t/nested/ | %FileCheck %s
 RUN: ls %t-REMOTE/output/nested/ | %FileCheck -check-prefix CHECK-REMOTE %s
 
+RUN: %debug-remote-run -v --output-prefix %t cp %t/nested/input %t/nested/output 2>&1 >/dev/null | %FileCheck -check-prefix VERBOSE %s
+
+VERBOSE: /usr/bin/env /bin/mkdir -p {{.+}}-REMOTE/output/nested
+VERBOSE-NEXT: /usr/bin/sftp
+VERBOSE-DAG: -put '{{.+}}/nested/output' '{{.+}}-REMOTE/output/nested/output'
+VERBOSE-DAG: -put '{{.+}}/nested/input' '{{.+}}-REMOTE/output/nested/input'
+VERBOSE: /usr/bin/env cp
+VERBOSE-NEXT: {{^}}/bin/mkdir -p {{.+}}/nested
+VERBOSE-NEXT: /usr/bin/sftp
+VERBOSE-DAG: -get '{{.+}}-REMOTE/output/nested/output' '{{.+}}/nested/output'
+VERBOSE-DAG: -get '{{.+}}-REMOTE/output/nested/input' '{{.+}}/nested/input'
+
 RUN: %empty-directory(%t)
 RUN: touch %t/xyz-1before
 RUN: %debug-remote-run --output-prefix %t/xyz cp %t/xyz-1before %t/xyz-2after
