@@ -967,32 +967,6 @@ void irgen::emitPartialClassDeallocation(IRGenFunction &IGF,
                                      size, alignMask);
 }
 
-llvm::Constant *irgen::tryEmitClassConstantFragileInstanceSize(
-                                                        IRGenModule &IGM,
-                                                        ClassDecl *Class) {
-  auto selfType = getSelfType(Class);
-  auto &classTI = IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
-
-  auto &layout = classTI.getClassLayout(IGM, selfType);
-  if (layout.isFixedLayout())
-    return IGM.getSize(layout.getSize());
-  
-  return nullptr;
-}
-
-llvm::Constant *irgen::tryEmitClassConstantFragileInstanceAlignMask(
-                                                             IRGenModule &IGM,
-                                                             ClassDecl *Class) {
-  auto selfType = getSelfType(Class);
-  auto &classTI = IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
-  
-  auto &layout = classTI.getClassLayout(IGM, selfType);
-  if (layout.isFixedLayout())
-    return IGM.getSize(layout.getAlignMask());
-  
-  return nullptr;
-}
-
 /// emitClassDecl - Emit all the declarations associated with this class type.
 void IRGenModule::emitClassDecl(ClassDecl *D) {
   PrettyStackTraceDecl prettyStackTrace("emitting class metadata for", D);

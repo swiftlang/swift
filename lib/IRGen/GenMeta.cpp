@@ -2149,12 +2149,8 @@ namespace {
     }
 
     void addInstanceSize() {
-      if (llvm::Constant *size
-            = tryEmitClassConstantFragileInstanceSize(IGM, Target)) {
-        // We only support a maximum 32-bit instance size.
-        if (IGM.SizeTy != IGM.Int32Ty)
-          size = llvm::ConstantExpr::getTrunc(size, IGM.Int32Ty);
-        B.add(size);
+      if (FieldLayout.isFixedLayout()) {
+        B.addInt32(FieldLayout.getSize().getValue());
       } else {
         // Leave a zero placeholder to be filled at runtime
         B.addInt32(0);
@@ -2162,11 +2158,8 @@ namespace {
     }
     
     void addInstanceAlignMask() {
-      if (llvm::Constant *align
-            = tryEmitClassConstantFragileInstanceAlignMask(IGM, Target)) {
-        if (IGM.SizeTy != IGM.Int16Ty)
-          align = llvm::ConstantExpr::getTrunc(align, IGM.Int16Ty);
-        B.add(align);
+      if (FieldLayout.isFixedLayout()) {
+        B.addInt16(FieldLayout.getAlignMask().getValue());
       } else {
         // Leave a zero placeholder to be filled at runtime
         B.addInt16(0);
