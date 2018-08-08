@@ -3291,12 +3291,13 @@ public struct ${Self}
   /// - Parameter source: A floating-point value to convert to an integer.
   @_transparent
   public init?(exactly source: ${FloatType}) {
+    // The value passed as `source` must not be infinite, NaN, or exceed the
+    // bounds of the integer type; the result of `fptosi` or `fptoui` is
+    // undefined if it overflows.
     guard source > ${str(lower)}.0 && source < ${str(upper)}.0 else {
-      // The source is out of bounds (including infinities).
       return nil
     }
     guard source == source.rounded(.towardZero) else {
-      // The source is a fraction or NaN.
       return nil
     }
     self._value = Builtin.fpto${u}i_FPIEEE${FloatBits}_${BuiltinName}(source._value)
