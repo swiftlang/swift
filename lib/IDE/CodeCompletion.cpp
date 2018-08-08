@@ -3947,19 +3947,12 @@ public:
     if (!tuple)
       return false;
 
-    for (unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
-      if (isa<CodeCompletionExpr>(tuple->getElement(i))) {
-        HasName = !tuple->getElementName(i).empty();
-        Position = i;
-        return true;
-      }
-    }
     auto &SM = DC.getASTContext().SourceMgr;
     for (unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
       if (SM.isBeforeInBuffer(tuple->getElement(i)->getEndLoc(),
                               CCExpr->getStartLoc()))
         continue;
-      HasName = !tuple->getElementName(i).empty();
+      HasName = tuple->getElementNameLoc(i).isValid();
       Position = i;
       return true;
     }
@@ -3983,7 +3976,8 @@ public:
 
     // Collect possible types (or labels) at the position.
     {
-      bool MayNeedName = !HasName && isa<CallExpr>(CallE);
+      bool MayNeedName =
+          !HasName && isa<CallExpr>(CallE) && !CallE->isImplicit();
       SmallPtrSet<TypeBase *, 4> seenTypes;
       SmallPtrSet<Identifier, 4> seenNames;
       for (auto Params : Candidates) {
