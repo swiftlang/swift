@@ -93,11 +93,11 @@ func f7() -> (c: Int, v: A) {
   return f6(g) // expected-error {{cannot convert return expression of type '(c: Int, i: A)' to return type '(c: Int, v: A)'}}
 }
 
-func f8<T:P2>(_ n: T, _ f: @escaping (T) -> T) {} // expected-note {{declared here}}
+func f8<T:P2>(_ n: T, _ f: @escaping (T) -> T) {} // expected-note {{where 'T' = '(_, _)'}}
 f8(3, f4) // expected-error {{argument type 'Int' does not conform to expected type 'P2'}}
 typealias Tup = (Int, Double)
 func f9(_ x: Tup) -> Tup { return x }
-f8((1,2.0), f9) // expected-error {{global function 'f8' requires that 'T' conform to 'P2' [with 'T' = '(_, _)']}}
+f8((1,2.0), f9) // expected-error {{global function 'f8' requires that '(_, _)' conform to 'P2'}}
 
 // <rdar://problem/19658691> QoI: Incorrect diagnostic for calling nonexistent members on literals
 1.doesntExist(0)  // expected-error {{value of type 'Int' has no member 'doesntExist'}}
@@ -1188,10 +1188,10 @@ func rdar17170728() {
 
 // https://bugs.swift.org/browse/SR-5934 - failure to emit diagnostic for bad
 // generic constraints
-func elephant<T, U>(_: T) where T : Collection, T.Element == U, T.Element : Hashable {} // expected-note {{declared here}}
+func elephant<T, U>(_: T) where T : Collection, T.Element == U, T.Element : Hashable {} // expected-note {{where 'U' = 'T'}}
 
 func platypus<T>(a: [T]) {
-    _ = elephant(a) // expected-error {{global function 'elephant' requires that 'U' conform to 'Hashable' [with 'U' = 'T']}}
+    _ = elephant(a) // expected-error {{global function 'elephant' requires that 'T' conform to 'Hashable'}}
 }
 
 // Another case of the above.
