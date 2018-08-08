@@ -94,10 +94,6 @@ namespace {
 
     const ClassLayout &getClassLayout(IRGenModule &IGM, SILType type) const;
 
-    Alignment getHeapAlignment(IRGenModule &IGM, SILType type) const {
-      return getClassLayout(IGM, type).getAlignment();
-    }
-
     StructLayout *createLayoutWithTailElems(IRGenModule &IGM,
                                             SILType classType,
                                             ArrayRef<SILType> tailTypes) const;
@@ -638,7 +634,7 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
 
   switch (fieldInfo.first) {
   case FieldAccess::ConstantDirect: {
-    Address baseAddr(base, baseClassTI.getHeapAlignment(IGF.IGM, baseType));
+    Address baseAddr(base, classLayout.getAlignment());
     auto element = fieldInfo.second;
     Address memberAddr = element.project(IGF, baseAddr, None);
     // We may need to bitcast the address if the field is of a generic type.
