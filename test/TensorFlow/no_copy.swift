@@ -236,3 +236,10 @@ public func SR8399_2() {
   let y = x.reshaped(toShape: Tensor<Int32>([4, Int32(1 * 1)]))
   _hostOp(y)
 }
+
+public func SR8413() {
+  let x = Tensor<Float>(ones: [17, 17, 17, 17])
+  let _ = x.maxPooled(
+    kernelSize: (64, 65, 66, 67), strides: (64, 65, 66, 67), padding: .same
+  )
+}

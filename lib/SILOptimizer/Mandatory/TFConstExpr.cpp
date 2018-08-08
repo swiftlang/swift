@@ -144,7 +144,7 @@ public:
   SymbolicValue computeConstantValue(SILValue value);
   SymbolicValue computeConstantValueBuiltin(BuiltinInst *inst);
 
-  SymbolicValue computeSingleStoreAddressValue(SILValue addr);
+  SymbolicValue computeSingleStoreAddressValueForSomeAddrInsts(SILValue addr);
   llvm::Optional<SymbolicValue> computeCallResult(ApplyInst *apply);
 
   llvm::Optional<SymbolicValue> computeOpaqueCallResult(ApplyInst *apply,
@@ -153,6 +153,9 @@ public:
   SymbolicValue computeLoadResult(SILValue addr);
   llvm::Optional<SymbolicValue> computeFSStore(SymbolicValue storedCst,
                                                SILValue dest);
+
+private:
+  SymbolicValue computeSingleStoreAddressValueHelper(SILValue addr);
 };
 } // end anonymous namespace
 
@@ -966,7 +969,8 @@ SymbolicValue ConstExprFunctionState::getConstantValue(SILValue value) {
   // single store value.  Since this is a very different computation, split it
   // out to its own path.
   if (!fn && value->getType().isAddress()) {
-    SymbolicValue result = computeSingleStoreAddressValue(value);
+    SymbolicValue result =
+        computeSingleStoreAddressValueForSomeAddrInsts(value);
     setValue(value, result);
     return result;
   }
@@ -1070,7 +1074,8 @@ static bool updateIndexedElement(SymbolicValue &aggregate,
 /// Invariant: Before the call, `calculatedValues` must not contain `addr` as a
 /// key.
 SymbolicValue
-ConstExprFunctionState::computeSingleStoreAddressValue(SILValue addr) {
+ConstExprFunctionState::computeSingleStoreAddressValueForSomeAddrInsts(
+    SILValue addr) {
   assert(!calculatedValues.count(addr));
 
   // TODO: consider supporting all instruction types that produce an
@@ -1078,20 +1083,42 @@ ConstExprFunctionState::computeSingleStoreAddressValue(SILValue addr) {
   SingleValueInstruction *addrInst = dyn_cast<AllocStackInst>(addr);
   if (!addrInst)
     addrInst = dyn_cast<PointerToAddressInst>(addr);
-  if (!addrInst)
+  if (!addrInst) {
+    // Example SIL snippet involving index_addr that we can handle:
+    // %78 = index_addr %73 : $*Int32, %77 : $Builtin.Word // user: %86
+    // function_ref SignedInteger<>.init<A>(_:)
+    // %85 = function_ref @... // user: %86
+    // Here the func call writes to %78.
+    // %86 = apply %85<Int32, Int>(%78, %83, %80) : $@convention(method)
     addrInst = dyn_cast<IndexAddrInst>(addr);
+  }
+  if (!addrInst) {
+    if (auto *teai = dyn_cast<TupleElementAddrInst>(addr)) {
+      // In this case, we simply const-evaluate this inst, which involves first
+      // const-evaluating the tuple operand of this inst (to an aggregate const
+      // value). e.g. %131 below.
+      // %132 = tuple_element_addr %131 : $*(Int32, Int32, Int32, Int32), 0
+      auto tupleEltAddr = computeConstantValue(addr);
+      return tupleEltAddr;
+    }
+  }
   if (!addrInst)
     return evaluator.getUnknown(addr, UnknownReason::Default);
 
+  return computeSingleStoreAddressValueHelper(addrInst);
+}
+
+SymbolicValue
+ConstExprFunctionState::computeSingleStoreAddressValueHelper(SILValue addr) {
   // Keep track of the value found for the first constant store.
   auto memoryAddress =
-      createMemoryObject(addrInst, SymbolicValue::getUninitMemory());
+      createMemoryObject(addr, SymbolicValue::getUninitMemory());
   auto *memoryObject = memoryAddress.getAddressValueMemoryObject();
 
   // Okay, check out all of the users of this value looking for semantic stores
   // into the address.  If we find more than one, then this was a var or
   // something else we can't handle.
-  for (auto *use : addrInst->getUses()) {
+  for (auto *use : addr->getUses()) {
     auto user = use->getUser();
 
     // Ignore markers, loads, and other things that aren't stores to this stack
@@ -1181,6 +1208,61 @@ ConstExprFunctionState::computeSingleStoreAddressValue(SILValue addr) {
           continue;
       }
       return evaluator.getUnknown(addr, UnknownReason::Default);
+    }
+
+    if (auto *teai = dyn_cast<TupleElementAddrInst>(user)) {
+      // Try finding a writer among its users. For example:
+      //   %132 = tuple_element_addr %131 : $*(Int32, Int32, Int32, Int32), 0
+      // If %132 is written to as a const value in one of its users, the call
+      // below will return a constant. An example writer can be:
+      //   copy_addr %111 to [initialization] %132
+      // Otherwise we continue to search for a writer.
+
+      auto *use = teai->getSingleUse();
+      if (!use)
+        continue;
+
+      // In this case we want to find a user of teai that writes to that tuple
+      // elt addr. We cannot call
+      // computeSingleStoreAddressValueForSomeAddrInsts(), since that'll involve
+      // evaluating the tuple operand (first operand) of teai first, denoted as
+      // X (an inst that creates the tuple), and that in turn will go through
+      // all uses of X, include teai, entering a cycle.
+
+      // Instead we call the lighter-weight method
+      // computeSingleStoreAddressValueHelper() to avoid forming the
+      // cycle.
+      auto tupleEltAddrValue = computeSingleStoreAddressValueHelper(teai);
+      if (tupleEltAddrValue.isConstant()) {
+        // If the tuple elt is indeed a const, we write it into (the appropriate
+        // aggregate element slot of the) `memoryObject`, which is the const
+        // value for the entire tuple.
+        SmallVector<unsigned, 4> accessPath;
+        auto *tupleEltMemoryObject =
+            tupleEltAddrValue.getAddressValue(accessPath);
+        assert(accessPath.empty());
+        auto tupleEltValue = tupleEltMemoryObject->getValue();
+        assert(tupleEltValue.isConstant());
+
+        auto objectVal = memoryObject->getValue();
+        auto objectType = memoryObject->getType();
+        auto index = teai->getFieldNo();
+        bool failed = updateIndexedElement(objectVal, /*accessPath*/ {index},
+                                           tupleEltValue, objectType,
+                                           evaluator.getAllocator());
+        if (failed)
+          return evaluator.getUnknown(addr, UnknownReason::Default);
+        memoryObject->setValue(objectVal);
+        // If all aggregate elements are const, we have successfully
+        // const-evaluated the entire tuple!
+        if (llvm::all_of(objectVal.getAggregateValue(),
+                         [](SymbolicValue v) { return v.isConstant(); }))
+          break;
+        // Otherwise we keep going, hoping to find more users of the tuple inst
+        // that write into other tuple elements.
+        continue;
+      } else
+        continue;
     }
 
     LLVM_DEBUG(llvm::dbgs()
@@ -1676,6 +1758,37 @@ bool ConstExprEvaluator::decodeAllocUninitializedArray(
           return true;
         // An apply can have arbitrary side effects, so let's be conservative.
         hadUnknownUsers = true;
+      } else if (auto *cai = dyn_cast<CopyAddrInst>(user)) {
+        // In this case, the element's address is passed to a copy_addr, which
+        // sets the value. For example, let %178 be the index_addr inst, the SIL
+        // snippet that initializes the value given by index_addr might look
+        // like the following, where we set `elementsAtInit[index]` to the last
+        // copy_addr below, for caller to const-evaluate. Caller will
+        // const-evaluate %191, which const-evaluates %179, which involves
+        // const-evaluating %183, where the writer to that tuple elt address is
+        // "copy_addr %114". Eventually it const-evaluates %101 to fill in the
+        // vlaue for %183. The continues until the writer insts of all the other
+        // tuple elements of %179 are const-evaluated, yielding a const tuple
+        // for %179. This finally gives us the const value at address %178.
+        //
+        //   %101 = tuple_extract %96 : $(Int32, Int32, Int32, Int32), 3
+        //   %108 = alloc_stack $Int32
+        //   store %101 to %108 : $*Int32
+        //   %114 = tuple_element_addr %110 : $*(Int32, Int32, Int32, Int32), 3
+        //   %121 = tuple_element_addr %110 : $*(Int32, Int32, Int32, Int32), 3
+        //   copy_addr [take] %108 to [initialization] %121 : $*Int32
+        //   copy_addr %114 to [initialization] %183 : $*Int32
+        //   %177 = integer_literal $Builtin.Word, 3
+        //   %178 = index_addr %130 : $*Int32, %177
+        //   %179 = alloc_stack $(Int32, Int32, Int32, Int32)
+        //   %183 = tuple_element_addr %179 : $*(Int32, Int32, Int32, Int32), 3
+        //   %191 = tuple_element_addr %179 : $*(Int32, Int32, Int32, Int32), 3
+        //   copy_addr [take] %191 to [initialization] %178 : $*Int32
+
+        if (cai->getOperand(1) != use->get())
+          return true;
+        if (arrayInsts)
+          arrayInsts->insert(cai);
       } else
         return true;
 
