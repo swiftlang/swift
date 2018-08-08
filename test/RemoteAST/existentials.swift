@@ -46,3 +46,8 @@ enum MyError : Error {
 // CHECK-NEXT: MyError
 let q : Error  = MyError.a
 printDynamicTypeAndAddressForExistential(q)
+
+// Case five: existential metatypes.
+// CHECK-NEXT: Any.Type
+let metatype : Any.Type = Any.self
+printDynamicTypeAndAddressForExistential(metatype)
