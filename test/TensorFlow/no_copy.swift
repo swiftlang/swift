@@ -23,7 +23,7 @@ public func testSelect(conds1: Tensor<Bool>, x1: Tensor<Float>, y1: Tensor<Float
 /*
  CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testSelect
  CHECK: sil private @{{.*}}testSelect{{.*}} : $@callee_owned (TensorHandle<Float>, TensorHandle<Bool>, TensorHandle<Float>) -> TensorHandle<Float> {
- CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Bool>, %2 : $TensorHandle<Float>):
+ CHECK: bb0(%0 : @unowned $TensorHandle<Float>, %1 : @unowned $TensorHandle<Bool>, %2 : @unowned $TensorHandle<Float>):
  CHECK:       [[A:%.*]] = graph_op "Add,i,i"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>
  CHECK:       [[B:%.*]] = graph_op "Select,i,i,i"(%1 : $TensorHandle<Bool>, [[A]] : $TensorHandle<Float>, %2 : $TensorHandle<Float>
  CHECK:      [[C:%.*]] = graph_op "Mul,i,i"([[B]] : $TensorHandle<Float>, %2 : $TensorHandle<Float>
@@ -51,8 +51,8 @@ public func testConvolution(x: Tensor<Float>, filter: Tensor<Float>) -> Tensor<F
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testConvolution
 // CHECK: sil private @{{.*}}testConvolution{{.*}} : $@callee_owned (TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float> {
-// CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>):
-// CHECK: [[A:%.*]] = graph_op "Conv2D,i,i"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) {T: $Float, strides: [$Int32: (i32 1), (i32 2), (i32 3), (i32 4)], use_cudnn_on_gpu: i1 -1, padding: "SAME", data_format: "NHWC", dilations: [$Int32: (i32 1), (i32 1), (i32 1), (i32 1)], __device: "/device:CPU:0"} : $TensorHandle<Float> 
+// CHECK: bb0(%0 : @unowned $TensorHandle<Float>, %1 : @unowned $TensorHandle<Float>):
+// CHECK: [[A:%.*]] = graph_op "Conv2D,i,i"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) {T: $Float, strides: [$Int32: (i32 1), (i32 2), (i32 3), (i32 4)], use_cudnn_on_gpu: i1 -1, padding: "SAME", data_format: "NHWC", dilations: [$Int32: (i32 1), (i32 1), (i32 1), (i32 1)], __device: "/device:CPU:0"} : $TensorHandle<Float>
 // CHECK-NEXT:  return [[A]] : $TensorHandle<Float>
 // CHECK-NEXT:}
 
@@ -64,7 +64,7 @@ public func testConstantArray() -> TensorHandle<Float> {
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testConstantArray
 // CHECK: sil private @{{.*}}testConstantArray{{.*}} : $@callee_owned () -> TensorHandle<Float> {
 // CHECK: bb0:
-// CHECK:  %0 = graph_op "Const"() {dtype: $Float, value$tensor: [$Double: (f64 0x3FF0000000000000 /* 1 */), (f64 0x4000000000000000 /* 2 */)], value$shape: [$Int: (i64 2)], __device: "/device:CPU:0"} : $TensorHandle<Float> 
+// CHECK:  %0 = graph_op "Const"() {dtype: $Float, value$tensor: [$Double: (f64 0x3FF0000000000000 /* 1 */), (f64 0x4000000000000000 /* 2 */)], value$shape: [$Int: (i64 2)], __device: "/device:CPU:0"} : $TensorHandle<Float>
 // CHECK-NEXT:  return %0 : $TensorHandle<Float>
 
 // Sigmoid shouldn't cause copies.  This should compile with no copy warnings/errors.

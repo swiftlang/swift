@@ -13,7 +13,7 @@ CHECK-LABEL: --- INPUT FUNCTION {{.*}}trivialAdd
 CHECK: graph_op "Add,i,i"({{.*}} : $TensorHandle<Float>, {{.*}} : $TensorHandle<Float>) {T: $Float, __device: "/device:CPU:0"} : $TensorHandle<Float>
 
 CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}trivialAdd
-CHECK:      bb0(%0 : $TensorHandle<Float>):
+CHECK:      bb0(%0 : @unowned $TensorHandle<Float>):
 CHECK-NEXT:   %1 = graph_op "Add,i,i"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>) {T: $Float, __device: "/device:CPU:0"} : $TensorHandle<Float>
 CHECK-NEXT:   return %1 : $TensorHandle<Float>
 
@@ -77,7 +77,7 @@ public func inputListMultipleUses(a: TensorHandle<Float>)
 
 /*
 CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}inputListMultipleUses
-CHECK: bb0(%0 : $TensorHandle<Float>):
+CHECK: bb0(%0 : @unowned $TensorHandle<Float>):
 CHECK:   %1 = graph_op "Pack,L,e,e,e"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>)
 CHECK:   return %1 : $TensorHandle<Float>
 CHECK-LABEL: ----
@@ -118,7 +118,7 @@ public func test75407624() {
  * CHECK: [[CX2:%.*]] = graph_op "Const"() {dtype: $Float, value$tensor: f32 0x3F800000 /* 1 */
  * CHECK:  graph_op "Fill,i,i"([[C1X]] : $TensorHandle<Int32>, [[CX2]] : $TensorHandle<Float>)
  * CHECK: graph_op "Const"() {dtype: $Float, value$tensor: [$Float: (f32 0x3F800000 /* 1 */), (f32 0x40000000 /* 2 */), (f32 0x40400000 /* 3 */), (f32 0x40800000 /* 4 */)], value$shape: [$Int32: (i32 2), (i32 2)],
- * CHECK-LABEL: ---- END OF 
+ * CHECK-LABEL: ---- END OF
 */
 
 

@@ -2278,20 +2278,20 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     return original->getParent() == func->getParent();
   };
 
+  auto isABIPublic = [&](FuncDecl *func) {
+    return func->getFormalAccess() >= AccessLevel::Public ||
+           func->getAttrs().hasAttribute<InlinableAttr>() ||
+           func->getAttrs().hasAttribute<UsableFromInlineAttr>();
+  };
+
   // If the original function is exported (i.e. it is public or
   // @usableFromInline), then the primal/adjoint must also be exported.
   // Returns true on error.
   using FuncSpecifier = DifferentiableAttr::FunctionSpecifier;
   auto checkAccessControl = [&](FuncDecl *func, FuncSpecifier funcSpec,
                                 bool isPrimal) {
-    auto originalAccess =
-      original->getFormalAccess(/*useDC*/ nullptr,
-		                /*treatUsableFromInlineAsPublic*/ true);
-    if (originalAccess < AccessLevel::Public) return false;
-    auto funcAccess =
-      func->getFormalAccess(/*useDC*/ nullptr,
-		            /*treatUsableFromInlineAsPublic*/ true);
-    if (funcAccess >= AccessLevel::Public) return false;
+    if (!isABIPublic(original)) return false;
+    if (isABIPublic(func)) return false;
     TC.diagnose(funcSpec.Loc.getBaseNameLoc(),
                 diag::differentiable_attr_invalid_access,
                 funcSpec.Name, original->getFullName(), isPrimal);
