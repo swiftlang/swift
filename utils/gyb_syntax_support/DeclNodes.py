@@ -662,7 +662,7 @@ DECL_NODES = [
                    ]),
              Child('InfixOperatorGroup', kind='InfixOperatorGroup',
                    description='''
-                   Optionally specifiy a precedence group
+                   Optionally specify a precedence group
                    ''',
                    is_optional=True),
          ]),
