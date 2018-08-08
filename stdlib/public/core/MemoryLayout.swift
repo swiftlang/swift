@@ -13,7 +13,7 @@
 /// The memory layout of a type, describing its size, stride, and alignment.
 ///
 /// You can use `MemoryLayout` as a source of information about a type when
-/// allocating or binding memory using unsafe pointers. The following example
+/// allocating or binding memory using raw pointers. The following example
 /// declares a `Point` type with `x` and `y` coordinates and a Boolean
 /// `isFilled` property.
 ///
@@ -32,7 +32,7 @@
 ///
 /// Always use a multiple of a type's `stride` instead of its `size` when
 /// allocating memory or accounting for the distance between instances in
-/// memory. This example allocates untyped, uninitialized memory with space
+/// memory. This example allocates uninitialized raw memory with space
 /// for four instances of `Point`.
 ///
 ///     let count = 4
@@ -157,25 +157,26 @@ extension MemoryLayout {
     return MemoryLayout.alignment
   }
 
-  /// Returns the offset of an inline stored property of `T` within the
-  /// in-memory representation of `T`.
+  /// Returns the offset of an inline stored property within a type's in-memory
+  /// representation.
   ///
-  /// If the given key refers to inline, directly addressable storage within
-  /// the in-memory representation of `T`, then the return value is a distance
-  /// in bytes that can be added to a pointer of type `T` to get a pointer to
-  /// the storage referenced by `key`.
+  /// You can use this method to find the distance in bytes that can be added
+  /// to a pointer of type `T` to get a pointer to the property referenced by
+  /// `key`. The offset is available only if the given key refers to inline,
+  /// directly addressable storage within the in-memory representation of `T`.
   ///
   /// If the return value of this method is non-`nil`, then accessing the value
   /// by key path or by an offset pointer are equivalent. For example, for a
-  /// variable `root` of type `T`, `value` of type `U`, and a key path `key`
-  /// of type `WritableKeyPath<T, U>`:
+  /// variable `root` of type `T`, a key path `key` of type
+  /// `WritableKeyPath<T, U>`, and a `value` of type `U`:
   ///
   ///     // Mutation through the key path
   ///     root[keyPath: key] = value
   ///
   ///     // Mutation through the offset pointer
   ///     withUnsafeMutableBytes(of: &root) { bytes in
-  ///         let rawPointerToValue = bytes.baseAddress! + MemoryLayout<T>.offset(of: key)!
+  ///         let offset = MemoryLayout<T>.offset(of: key)!
+  ///         let rawPointerToValue = bytes.baseAddress! + offset
   ///         let pointerToValue = rawPointerToValue.assumingMemoryBound(to: U.self)
   ///         pointerToValue.pointee = value
   ///     }
@@ -210,18 +211,18 @@ extension MemoryLayout {
   ///
   /// When using `offset(of:)` with a type imported from a library, don't
   /// assume that future versions of the library will have the same behavior.
-  /// If a property is converted from a stored property to a computed property,
-  /// the result of `offset(of:)` changes to `nil`. That kind of conversion is
-  /// non-breaking in other contexts, but would trigger a runtime error if the
-  /// result of `offset(of:)` is force-unwrapped.
+  /// If a property is converted from a stored property to a computed
+  /// property, the result of `offset(of:)` changes to `nil`. That kind of
+  /// conversion is nonbreaking in other contexts, but would trigger a runtime
+  /// error if the result of `offset(of:)` is force-unwrapped.
   ///
   /// - Parameter key: A key path referring to storage that can be accessed
   ///   through a value of type `T`.
-  /// - Returns: The offset in bytes from a pointer to a value of type `T`
-  ///   to a pointer to the storage referenced by `key`, or `nil` if no
-  ///   such offset is available for the storage referenced by `key`, such as
-  ///   because `key` is computed, has observers, requires reabstraction, or
-  ///   overlaps storage with other properties.
+  /// - Returns: The offset in bytes from a pointer to a value of type `T` to a
+  ///   pointer to the storage referenced by `key`, or `nil` if no such offset
+  ///   is available for the storage referenced by `key`. If the value is
+  ///   `nil`, it can be because `key` is computed, has observers, requires
+  ///   reabstraction, or overlaps storage with other properties.
   @_transparent
   public static func offset(of key: PartialKeyPath<T>) -> Int? {
     return key._storedInlineOffset

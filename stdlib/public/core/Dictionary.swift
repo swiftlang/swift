@@ -342,7 +342,7 @@ import SwiftShims
 ///
 /// Note that in this example, `imagePaths` is subscripted using a dictionary
 /// index. Unlike the key-based subscript, the index-based subscript returns
-/// the corresponding key-value pair as a non-optional tuple.
+/// the corresponding key-value pair as a nonoptional tuple.
 ///
 ///     print(imagePaths[glyphIndex!])
 ///     // Prints "("star", "/glyphs/star.png")"
@@ -882,6 +882,8 @@ extension Dictionary {
   ///   transformed value of the same or of a different type.
   /// - Returns: A dictionary containing the keys and transformed values of
   ///   this dictionary.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the dictionary.
   @inlinable // FIXME(sil-serialize-all)
   public func mapValues<T>(
     _ transform: (Value) throws -> T
@@ -890,13 +892,32 @@ extension Dictionary {
       _variantBuffer: _variantBuffer.mapValues(transform))
   }
 
-  /// Returns a new dictionary containing the keys of this dictionary with the
-  /// values transformed by the given closure.
+  /// Returns a new dictionary containing only the key-value pairs that have
+  /// non-`nil` values as the result from the transform by the given closure.
+  ///
+  /// Use this method to receive a dictionary of nonoptional values when your
+  /// transformation can produce an optional value.
+  ///
+  /// In this example, note the difference in the result of using `mapValues`
+  /// and `compactMapValues` with a transformation that returns an optional
+  /// `Int` value.
+  ///
+  ///     let data = ["a": "1", "b": "three", "c": "///4///"]
+  ///
+  ///     let m: [String: Int?] = data.mapValues { str in Int(str) }
+  ///     // ["a": 1, "b": nil, "c": nil]
+  ///
+  ///     let c: [String: Int] = data.compactMapValues { str in Int(str) }
+  ///     // ["a": 1]
+  ///
   /// - Parameter transform: A closure that transforms a value. `transform`
-  ///   accepts each value of the dictionary as its parameter and returns a
-  ///   transformed value of the same or of a different type.
-  /// - Returns: A dictionary containing the keys and transformed values of
-  ///   this dictionary.
+  ///   accepts each value of the dictionary as its parameter and returns an
+  ///   optional transformed value of the same or of a different type.
+  /// - Returns: A dictionary containing the keys and non-`nil` transformed
+  ///   values of this dictionary.
+  ///
+  /// - Complexity: O(*m* + *n*), where *n* is the length of the original
+  ///   dictionary and *m* is the length of the resulting dictionary.
   @inlinable // FIXME(sil-serialize-all)
   public func compactMapValues<T>(
     _ transform: (Value) throws -> T?
