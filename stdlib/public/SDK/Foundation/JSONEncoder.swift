@@ -12,7 +12,12 @@
 
 /// A marker protocol used to determine whether a value is a `String`-keyed `Dictionary`
 /// containing `Encodable` values (in which case it should be exempt from key conversion strategies).
-#if arch(i386) || arch(arm)
+///
+/// NOTE: The architecture and environment check is due to a bug in the current (2018-08-08) Swift 4.2
+/// runtime when running on i386 simulator. The issue is tracked in https://bugs.swift.org/browse/SR-8276
+/// Making the protocol `internal` instead of `fileprivate` works around this issue.
+/// Once SR-8276 is fixed, this check can be removed and the protocol always be made fileprivate.
+#if arch(i386) && targetEnvironment(simulator)
 internal protocol _JSONStringDictionaryEncodableMarker { }
 #else
 fileprivate protocol _JSONStringDictionaryEncodableMarker { }
@@ -25,7 +30,9 @@ extension Dictionary : _JSONStringDictionaryEncodableMarker where Key == String,
 ///
 /// The marker protocol also provides access to the type of the `Decodable` values,
 /// which is needed for the implementation of the key conversion strategy exemption.
-#if arch(i386) || arch(arm)
+///
+/// NOTE: Please see comment above regarding SR-8276
+#if arch(i386) && targetEnvironment(simulator)
 internal protocol _JSONStringDictionaryDecodableMarker {
     static var elementType: Decodable.Type { get }
 }
