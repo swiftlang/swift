@@ -7957,10 +7957,8 @@ bool ConstraintSystem::applySolutionFix(
   }
 
   case FixKind::AddressOf: {
-    auto type = solution.simplifyType(getType(affected))->getRValueType();
-    TC.diagnose(affected->getLoc(), diag::missing_address_of, type)
-      .fixItInsert(affected->getStartLoc(), "&");
-    return true;
+    MissingAddressOfFailure failure(expr, solution, locator);
+    return failure.diagnose();
   }
 
   case FixKind::CoerceToCheckedCast: {

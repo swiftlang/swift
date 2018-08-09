@@ -193,6 +193,17 @@ public:
   bool diagnose() override;
 };
 
+/// Diagnose failures related to passing value of some type
+/// to `inout` parameter, without explicitly specifying `&`.
+class MissingAddressOfFailure final : public FailureDiagnostic {
+public:
+  MissingAddressOfFailure(Expr *expr, const Solution &solution,
+                          ConstraintLocator *locator)
+      : FailureDiagnostic(expr, solution, locator) {}
+
+  bool diagnose() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 

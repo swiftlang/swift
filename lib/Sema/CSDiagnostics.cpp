@@ -275,3 +275,11 @@ bool MissingForcedDowncastFailure::diagnose() {
     return true;
   }
 }
+
+bool MissingAddressOfFailure::diagnose() {
+  auto *anchor = getAnchor();
+  auto type = getType(anchor)->getRValueType();
+  emitDiagnostic(anchor->getLoc(), diag::missing_address_of, type)
+      .fixItInsert(anchor->getStartLoc(), "&");
+  return true;
+}
