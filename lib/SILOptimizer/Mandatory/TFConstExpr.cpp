@@ -988,12 +988,15 @@ SymbolicValue ConstExprFunctionState::getConstantValue(SILValue value) {
 /// Given an aggregate value like {{1, 2}, 3} and an access path like [0,1], and
 /// a scalar like 4, return the aggregate value with the indexed element
 /// replaced with its specified scalar, producing {{1, 4}, 3} in this case.
+/// If `writeOnlyOnce` is true, and the target aggregate element to update
+/// already has a constant value, fail on the update.
 ///
 /// This returns true on failure and false on success.
 ///
 static bool updateIndexedElement(SymbolicValue &aggregate,
                                  ArrayRef<unsigned> indices,
                                  SymbolicValue scalar, Type type,
+                                 bool writeOnlyOnce,
                                  llvm::BumpPtrAllocator &allocator) {
   // We're done if we've run out of indices.
   if (indices.empty()) {
@@ -1050,10 +1053,16 @@ static bool updateIndexedElement(SymbolicValue &aggregate,
     }
   }
 
+  if (writeOnlyOnce &&
+      oldElts[elementNo].getKind() != SymbolicValue::UninitMemory) {
+    // Cannot overwrite an existing constant.
+    return true;
+  }
+
   // Update the indexed element of the aggregate.
   SmallVector<SymbolicValue, 4> newElts(oldElts.begin(), oldElts.end());
   if (updateIndexedElement(newElts[elementNo], indices.drop_front(), scalar,
-                           eltType, allocator))
+                           eltType, writeOnlyOnce, allocator))
     return true;
 
   if (aggregate.getKind() == SymbolicValue::Aggregate)
@@ -1244,9 +1253,9 @@ ConstExprFunctionState::computeSingleStoreAddressValueHelper(SILValue addr) {
         auto objectVal = memoryObject->getValue();
         auto objectType = memoryObject->getType();
         auto index = teai->getFieldNo();
-        bool failed = updateIndexedElement(objectVal, /*accessPath*/ {index},
-                                           tupleEltValue, objectType,
-                                           evaluator.getAllocator());
+        bool failed = updateIndexedElement(
+            objectVal, /*accessPath*/ {index}, tupleEltValue, objectType,
+            /*writeOnlyOnce*/ true, evaluator.getAllocator());
         if (failed)
           return evaluator.getUnknown(addr, UnknownReason::Default);
         memoryObject->setValue(objectVal);
@@ -1333,7 +1342,7 @@ ConstExprFunctionState::computeFSStore(SymbolicValue storedCst, SILValue dest) {
   auto objectType = memoryObject->getType();
 
   if (updateIndexedElement(objectVal, accessPath, storedCst, objectType,
-                           evaluator.getAllocator()))
+                           /*writeOnlyOnce*/ false, evaluator.getAllocator()))
     return evaluator.getUnknown(dest, UnknownReason::Default);
 
   memoryObject->setValue(objectVal);
