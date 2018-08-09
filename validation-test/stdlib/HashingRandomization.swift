@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -Xfrontend -disable-access-control -module-name main %s -o %t/hash
+// RUN: %target-codesign %t/hash
 // RUN: (export -n %env-SWIFT_DETERMINISTIC_HASHING; %target-run %t/hash && %target-run %t/hash) | %FileCheck --check-prefixes=RANDOM %s
 // RUN: (export %env-SWIFT_DETERMINISTIC_HASHING=1; %target-run %t/hash && %target-run %t/hash) | %FileCheck --check-prefixes=STABLE %s
 
