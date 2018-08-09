@@ -2644,6 +2644,19 @@ public:
     printCommon(E, "key_path_dot_expr");
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+  
+  void visitTapExpr(TapExpr *E) {
+    printCommon(E, "tap_expr");
+    PrintWithColorRAII(OS, DeclColor) << " var=";
+    printDeclRef(E->getVar());
+    OS << '\n';
+    
+    printRec(E->getSubExpr());
+    OS << '\n';
+    
+    printRec(E->getBody(), E->getVar()->getDeclContext()->getASTContext());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
 };
 
 } // end anonymous namespace

@@ -4568,6 +4568,18 @@ namespace {
     Expr *visitKeyPathDotExpr(KeyPathDotExpr *E) {
       llvm_unreachable("found KeyPathDotExpr in CSApply");
     }
+    
+    Expr *visitTapExpr(TapExpr *E) {
+      auto type = simplifyType(cs.getType(E));
+
+      E->getVar()->setType(type);
+      E->getVar()->setInterfaceType(type);
+
+      cs.setType(E, type);
+      E->setType(type);
+
+      return E;
+    }
 
     /// Interface for ExprWalker
     void walkToExprPre(Expr *expr) {
@@ -7572,12 +7584,17 @@ namespace {
   class ExprWalker : public ASTWalker {
     ExprRewriter &Rewriter;
     SmallVector<ClosureExpr *, 4> ClosuresToTypeCheck;
+    SmallVector<std::tuple<TapExpr *, DeclContext *>, 4> TapsToTypeCheck;
 
   public:
     ExprWalker(ExprRewriter &Rewriter) : Rewriter(Rewriter) { }
 
     const SmallVectorImpl<ClosureExpr *> &getClosuresToTypeCheck() const {
       return ClosuresToTypeCheck;
+    }
+
+    const SmallVectorImpl<std::tuple<TapExpr *, DeclContext *>> &getTapsToTypeCheck() const {
+      return TapsToTypeCheck;
     }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
@@ -7641,6 +7658,12 @@ namespace {
         tc.ClosuresWithUncomputedCaptures.push_back(closure);
 
         return { false, closure };
+      }
+
+      if (auto tap = dyn_cast_or_null<TapExpr>(expr)) {
+        // We remember the DeclContext because the code to handle 
+        // single-expression-body closures above changes it.
+        TapsToTypeCheck.push_back(std::make_tuple(tap, Rewriter.dc));
       }
 
       Rewriter.walkToExprPre(expr);
@@ -7753,12 +7776,19 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
     bool hadError = false;
     for (auto *closure : walker.getClosuresToTypeCheck())
       hadError |= tc.typeCheckClosureBody(closure);
-    
-    // If any of the closures failed to type check, bail.
+
+    // Tap expressions too; they should or should not be 
+    // type-checked under the same conditions as closure bodies.
+    for (auto tuple : walker.getTapsToTypeCheck()) {
+      auto tap = std::get<0>(tuple);
+      auto tapDC = std::get<1>(tuple);
+      hadError |= tc.typeCheckTapBody(tap, tapDC);
+    }
+
+    // If any of them failed to type check, bail.
     if (hadError)
       return nullptr;
   }
-  
   
   // If we're supposed to convert the expression to some particular type,
   // do so now.

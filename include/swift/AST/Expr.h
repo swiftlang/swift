@@ -916,6 +916,41 @@ public:
   }
 };
 
+/// \brief Runs a series of statements which use or modify \c SubExpr 
+/// before it is given to the rest of the expression.
+/// 
+/// \c Body should begin with a \c VarDecl; this defines the variable 
+/// \c TapExpr will initialize at the beginning and read a result 
+/// from at the end. \c TapExpr creates a separate scope, then 
+/// assigns the result of \c SubExpr to the variable and runs \c Body 
+/// in it, returning the value of the variable after the \c Body runs.
+/// 
+/// Note: This is a minimal, preliminary design. Expect it to change.
+class TapExpr : public Expr {
+  Expr *SubExpr;
+  BraceStmt *Body;
+  
+public:
+  TapExpr(Expr * SubExpr, BraceStmt *Body);
+  
+  Expr * getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr * se) { SubExpr = se; }
+  
+  /// \brief The variable which will be accessed and possibly modified by 
+  /// the \c Body. This is the first \c ASTNode in the \c Body.
+  VarDecl * getVar() const;
+  
+  BraceStmt * getBody() const { return Body; }
+  void setBody(BraceStmt * b) { Body = b; }
+  
+  SourceLoc getLoc() const { return SourceLoc(); }
+  SourceRange getSourceRange() const { return SourceRange(); }
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::Tap;
+  }
+};
+
 /// InterpolatedStringLiteral - An interpolated string literal.
 ///
 /// An interpolated string literal mixes expressions (which are evaluated and

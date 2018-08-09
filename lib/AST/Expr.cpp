@@ -362,6 +362,7 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   NO_REFERENCE(ObjCSelector);
   NO_REFERENCE(KeyPath);
   NO_REFERENCE(KeyPathDot);
+  NO_REFERENCE(Tap);
 
 #undef SIMPLE_REFERENCE
 #undef NO_REFERENCE
@@ -667,6 +668,9 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::EditorPlaceholder:
   case ExprKind::KeyPathDot:
     return false;
+
+  case ExprKind::Tap:
+    return true;
   }
 
   llvm_unreachable("Unhandled ExprKind in switch.");
@@ -2216,6 +2220,20 @@ void KeyPathExpr::Component::setSubscriptIndexHashableConformances(
   case Kind::Identity:
     llvm_unreachable("no hashable conformances for this kind");
   }
+}
+
+TapExpr::TapExpr(Expr * SubExpr, BraceStmt *Body)
+    : Expr(ExprKind::Tap, /*Implicit=*/true),
+      SubExpr(SubExpr), Body(Body) {
+  if (Body) {
+    assert(Body->getNumElements() > 0 &&
+           Body->getElement(0).isDecl(DeclKind::Var) &&
+           "First element of Body should be a variable to initialize with the value");
+  }
+}
+
+VarDecl * TapExpr::getVar() const {
+  return dyn_cast<VarDecl>(Body->getElement(0).dyn_cast<Decl *>());
 }
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing Exprs, is
