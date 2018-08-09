@@ -12,6 +12,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %gyb %s -o %t/NSValueBridging.swift
 // RUN: %target-build-swift -g -module-name a %t/NSValueBridging.swift -o %t.out
+// RUN: %target-codesign %t.out
 // RUN: %target-run %t.out
 // REQUIRES: executable_test
 //

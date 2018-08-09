@@ -16,6 +16,7 @@
 // RUN: %target-clang %S/Inputs/ArrayBridge/ArrayBridge.m -c -o %t/ArrayBridgeObjC.o -g
 // RUN:  %line-directive %t/ArrayBridge.swift -- %target-build-swift %t/ArrayBridge.swift -I %S/Inputs/ArrayBridge/ -Xlinker %t/ArrayBridgeObjC.o -o %t/ArrayBridge -swift-version 3 --
 
+// RUN: %target-codesign %t/ArrayBridge
 // RUN: %target-run %t/ArrayBridge
 // REQUIRES: executable_test
 // REQUIRES: objc_interop

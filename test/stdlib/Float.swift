@@ -3,10 +3,12 @@
 
 // RUN: echo "typealias TestFloat = Float" > %t/float_type.swift
 // RUN: %target-build-swift %t/main.swift %t/float_type.swift -o %t/float.out
+// RUN: %target-codesign %t/float.out
 // RUN: %target-run %t/float.out
 
 // RUN: echo "typealias TestFloat = Double" > %t/double_type.swift
 // RUN: %target-build-swift %t/main.swift %t/double_type.swift -o %t/double.out
+// RUN: %target-codesign %t/double.out
 // RUN: %target-run %t/double.out
 // REQUIRES: executable_test
 
