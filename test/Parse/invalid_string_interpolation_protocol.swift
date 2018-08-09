@@ -8,7 +8,7 @@ public struct BadStringInterpolation: StringInterpolationProtocol {
   public mutating func appendLiteral(_: String) {}
   
   public static func appendInterpolation(static: ()) {
-    // expected-warning@-1{{'appendInterpolation' method will never be used because it is static}} {{9-16=}}
+    // expected-warning@-1{{'appendInterpolation' method will never be used because it is static}} {{10-17=}}
   }
   
   private func appendInterpolation(private: ()) {
@@ -20,7 +20,7 @@ public struct BadStringInterpolation: StringInterpolationProtocol {
   }
   
   public func appendInterpolation(intResult: ()) -> Int {
-    // expected-warning@-1{{'appendInterpolation' method does not return 'Void' or have a discardable result}} {{9-9=@discardableResult }}
+    // expected-warning@-1{{'appendInterpolation' method does not return 'Void' or have a discardable result}} {{10-10=@discardableResult }}
   }
 }
 

@@ -23157,23 +23157,126 @@
       ]
     },
     {
-      "kind": "TypeAlias",
+      "kind": "TypeDecl",
       "name": "ExpressibleByStringInterpolation",
       "printedName": "ExpressibleByStringInterpolation",
-      "declKind": "TypeAlias",
-      "usr": "s:s32ExpressibleByStringInterpolationa",
+      "declKind": "Protocol",
+      "usr": "s:s32ExpressibleByStringInterpolationP",
       "location": "",
       "moduleName": "Swift",
-      "deprecated": true,
-      "declAttributes": [
-        "Available"
+      "conformingProtocols": [
+        "ExpressibleByStringLiteral",
+        "ExpressibleByExtendedGraphemeClusterLiteral",
+        "ExpressibleByUnicodeScalarLiteral"
       ],
       "children": [
         {
-          "kind": "TypeNominal",
-          "name": "_ExpressibleByStringInterpolation",
-          "printedName": "_ExpressibleByStringInterpolation",
-          "usr": "s:s33_ExpressibleByStringInterpolationP"
+          "kind": "Constructor",
+          "name": "init",
+          "printedName": "init(stringInterpolation:)",
+          "declKind": "Constructor",
+          "usr": "s:s32ExpressibleByStringInterpolationP06stringD0x0cD0Qz_tcfc",
+          "location": "",
+          "moduleName": "Swift",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Self"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "DependentMember",
+              "printedName": "Self.StringInterpolation"
+            }
+          ]
+        },
+        {
+          "kind": "Constructor",
+          "name": "init",
+          "printedName": "init(stringInterpolation:)",
+          "declKind": "Constructor",
+          "usr": "s:s32ExpressibleByStringInterpolationPss07DefaultcD0V0cD0RtzrlE06stringD0xAD_tcfc",
+          "location": "",
+          "moduleName": "Swift",
+          "parentExtensionReqs": [
+            "Self : ExpressibleByStringInterpolation",
+            "Self.StringInterpolation == DefaultStringInterpolation"
+          ],
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Self"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "DefaultStringInterpolation",
+              "printedName": "DefaultStringInterpolation",
+              "usr": "s:s26DefaultStringInterpolationV"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "TypeDecl",
+      "name": "StringInterpolationProtocol",
+      "printedName": "StringInterpolationProtocol",
+      "declKind": "Protocol",
+      "usr": "s:s27StringInterpolationProtocolP",
+      "location": "",
+      "moduleName": "Swift",
+      "children": [
+        {
+          "kind": "Constructor",
+          "name": "init",
+          "printedName": "init(literalCapacity:interpolationCount:)",
+          "declKind": "Constructor",
+          "usr": "s:s27StringInterpolationProtocolP15literalCapacity18interpolationCountxSi_Sitcfc",
+          "location": "",
+          "moduleName": "Swift",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Self"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "Int",
+              "printedName": "Int",
+              "usr": "s:Si"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "Int",
+              "printedName": "Int",
+              "usr": "s:Si"
+            }
+          ]
+        },
+        {
+          "kind": "Function",
+          "name": "appendLiteral",
+          "printedName": "appendLiteral(_:)",
+          "declKind": "Func",
+          "usr": "s:s27StringInterpolationProtocolP13appendLiteralyy0aE4TypeQzF",
+          "location": "",
+          "moduleName": "Swift",
+          "mutating": true,
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Void",
+              "printedName": "()"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "DependentMember",
+              "printedName": "Self.StringLiteralType"
+            }
+          ]
         }
       ]
     },
@@ -87379,6 +87482,7 @@
       "location": "",
       "moduleName": "Swift",
       "conformingProtocols": [
+        "_ExpressibleByBuiltinStringLiteral",
         "Decodable",
         "Encodable",
         "CustomReflectable",
@@ -87389,7 +87493,6 @@
         "_ExpressibleByBuiltinUnicodeScalarLiteral",
         "_ExpressibleByBuiltinExtendedGraphemeClusterLiteral",
         "_ExpressibleByBuiltinUTF16StringLiteral",
-        "_ExpressibleByBuiltinStringLiteral",
         "ExpressibleByStringLiteral",
         "ExpressibleByExtendedGraphemeClusterLiteral",
         "ExpressibleByUnicodeScalarLiteral",
@@ -87401,10 +87504,10 @@
         "Equatable",
         "Comparable",
         "_SwiftStringView",
-        "_ExpressibleByStringInterpolation",
         "StringProtocol",
         "RangeReplaceableCollection",
         "LosslessStringConvertible",
+        "ExpressibleByStringInterpolation",
         "MirrorPath"
       ],
       "declAttributes": [
@@ -89358,7 +89461,7 @@
           "name": "init",
           "printedName": "init(stringInterpolation:)",
           "declKind": "Constructor",
-          "usr": "s:SS19stringInterpolationS2Sd_tcfc",
+          "usr": "s:SS19stringInterpolationSSs013DefaultStringB0V_tcfc",
           "location": "",
           "moduleName": "Swift",
           "declAttributes": [
@@ -89374,121 +89477,9 @@
             },
             {
               "kind": "TypeNominal",
-              "name": "Array",
-              "printedName": "[String]",
-              "usr": "s:Sa",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "String",
-                  "printedName": "String",
-                  "usr": "s:SS"
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "kind": "Constructor",
-          "name": "init",
-          "printedName": "init(stringInterpolationSegment:)",
-          "declKind": "Constructor",
-          "usr": "s:SS26stringInterpolationSegmentSSx_tclufc",
-          "location": "",
-          "moduleName": "Swift",
-          "genericSig": "<T>",
-          "declAttributes": [
-            "Inlinable"
-          ],
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "String",
-              "printedName": "String",
-              "usr": "s:SS"
-            },
-            {
-              "kind": "TypeNominal",
-              "name": "GenericTypeParam",
-              "printedName": "T"
-            }
-          ]
-        },
-        {
-          "kind": "Constructor",
-          "name": "init",
-          "printedName": "init(stringInterpolationSegment:)",
-          "declKind": "Constructor",
-          "usr": "s:SS26stringInterpolationSegmentSSx_tcs20TextOutputStreamableRzlufc",
-          "location": "",
-          "moduleName": "Swift",
-          "genericSig": "<T where T : TextOutputStreamable>",
-          "declAttributes": [
-            "Inlinable"
-          ],
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "String",
-              "printedName": "String",
-              "usr": "s:SS"
-            },
-            {
-              "kind": "TypeNominal",
-              "name": "GenericTypeParam",
-              "printedName": "T"
-            }
-          ]
-        },
-        {
-          "kind": "Constructor",
-          "name": "init",
-          "printedName": "init(stringInterpolationSegment:)",
-          "declKind": "Constructor",
-          "usr": "s:SS26stringInterpolationSegmentSSx_tcs23CustomStringConvertibleRzlufc",
-          "location": "",
-          "moduleName": "Swift",
-          "genericSig": "<T where T : CustomStringConvertible>",
-          "declAttributes": [
-            "Inlinable"
-          ],
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "String",
-              "printedName": "String",
-              "usr": "s:SS"
-            },
-            {
-              "kind": "TypeNominal",
-              "name": "GenericTypeParam",
-              "printedName": "T"
-            }
-          ]
-        },
-        {
-          "kind": "Constructor",
-          "name": "init",
-          "printedName": "init(stringInterpolationSegment:)",
-          "declKind": "Constructor",
-          "usr": "s:SS26stringInterpolationSegmentSSx_tcs23CustomStringConvertibleRzs20TextOutputStreamableRzlufc",
-          "location": "",
-          "moduleName": "Swift",
-          "genericSig": "<T where T : CustomStringConvertible, T : TextOutputStreamable>",
-          "declAttributes": [
-            "Inlinable"
-          ],
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "String",
-              "printedName": "String",
-              "usr": "s:SS"
-            },
-            {
-              "kind": "TypeNominal",
-              "name": "GenericTypeParam",
-              "printedName": "T"
+              "name": "DefaultStringInterpolation",
+              "printedName": "DefaultStringInterpolation",
+              "usr": "s:s26DefaultStringInterpolationV"
             }
           ]
         },
@@ -89702,6 +89693,24 @@
               "kind": "TypeNominal",
               "name": "GenericTypeParam",
               "printedName": "S"
+            }
+          ]
+        },
+        {
+          "kind": "TypeAlias",
+          "name": "StringInterpolation",
+          "printedName": "StringInterpolation",
+          "declKind": "TypeAlias",
+          "usr": "s:SS19StringInterpolationa",
+          "location": "",
+          "moduleName": "Swift",
+          "parentExtensionReqs": [],
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "DefaultStringInterpolation",
+              "printedName": "DefaultStringInterpolation",
+              "usr": "s:s26DefaultStringInterpolationV"
             }
           ]
         },
@@ -93910,6 +93919,84 @@
         {
           "kind": "Constructor",
           "name": "init",
+          "printedName": "init(describing:)",
+          "declKind": "Constructor",
+          "usr": "s:SS10describingSSx_tcs23CustomStringConvertibleRzlufc",
+          "location": "",
+          "moduleName": "Swift",
+          "parentExtensionReqs": [],
+          "declAttributes": [
+            "Inlinable"
+          ],
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "String",
+              "printedName": "String",
+              "usr": "s:SS"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Subject"
+            }
+          ]
+        },
+        {
+          "kind": "Constructor",
+          "name": "init",
+          "printedName": "init(describing:)",
+          "declKind": "Constructor",
+          "usr": "s:SS10describingSSx_tcs20TextOutputStreamableRzlufc",
+          "location": "",
+          "moduleName": "Swift",
+          "parentExtensionReqs": [],
+          "declAttributes": [
+            "Inlinable"
+          ],
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "String",
+              "printedName": "String",
+              "usr": "s:SS"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Subject"
+            }
+          ]
+        },
+        {
+          "kind": "Constructor",
+          "name": "init",
+          "printedName": "init(describing:)",
+          "declKind": "Constructor",
+          "usr": "s:SS10describingSSx_tcs23CustomStringConvertibleRzs20TextOutputStreamableRzlufc",
+          "location": "",
+          "moduleName": "Swift",
+          "parentExtensionReqs": [],
+          "declAttributes": [
+            "Inlinable"
+          ],
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "String",
+              "printedName": "String",
+              "usr": "s:SS"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Subject"
+            }
+          ]
+        },
+        {
+          "kind": "Constructor",
+          "name": "init",
           "printedName": "init(reflecting:)",
           "declKind": "Constructor",
           "usr": "s:SS10reflectingSSx_tclufc",
@@ -93949,14 +94036,15 @@
         "TextOutputStream",
         "TextOutputStreamable",
         "LosslessStringConvertible",
-        "ExpressibleByStringLiteral",
+        "ExpressibleByStringInterpolation",
         "Hashable",
         "Comparable",
         "Collection",
         "CustomStringConvertible",
-        "ExpressibleByExtendedGraphemeClusterLiteral",
+        "ExpressibleByStringLiteral",
         "Equatable",
         "Sequence",
+        "ExpressibleByExtendedGraphemeClusterLiteral",
         "ExpressibleByUnicodeScalarLiteral"
       ],
       "children": [
@@ -94536,6 +94624,235 @@
     },
     {
       "kind": "TypeDecl",
+      "name": "DefaultStringInterpolation",
+      "printedName": "DefaultStringInterpolation",
+      "declKind": "Struct",
+      "usr": "s:s26DefaultStringInterpolationV",
+      "location": "",
+      "moduleName": "Swift",
+      "conformingProtocols": [
+        "StringInterpolationProtocol",
+        "CustomStringConvertible"
+      ],
+      "declAttributes": [
+        "FixedLayout"
+      ],
+      "children": [
+        {
+          "kind": "Constructor",
+          "name": "init",
+          "printedName": "init(literalCapacity:interpolationCount:)",
+          "declKind": "Constructor",
+          "usr": "s:s26DefaultStringInterpolationV15literalCapacity18interpolationCountABSi_Sitcfc",
+          "location": "",
+          "moduleName": "Swift",
+          "declAttributes": [
+            "Inlinable"
+          ],
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "DefaultStringInterpolation",
+              "printedName": "DefaultStringInterpolation",
+              "usr": "s:s26DefaultStringInterpolationV"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "Int",
+              "printedName": "Int",
+              "usr": "s:Si"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "Int",
+              "printedName": "Int",
+              "usr": "s:Si"
+            }
+          ]
+        },
+        {
+          "kind": "Function",
+          "name": "appendLiteral",
+          "printedName": "appendLiteral(_:)",
+          "declKind": "Func",
+          "usr": "s:s26DefaultStringInterpolationV13appendLiteralyySSF",
+          "location": "",
+          "moduleName": "Swift",
+          "mutating": true,
+          "declAttributes": [
+            "Inlinable"
+          ],
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Void",
+              "printedName": "()"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "String",
+              "printedName": "String",
+              "usr": "s:SS"
+            }
+          ]
+        },
+        {
+          "kind": "Function",
+          "name": "appendInterpolation",
+          "printedName": "appendInterpolation(_:)",
+          "declKind": "Func",
+          "usr": "s:s26DefaultStringInterpolationV06appendC0yyxs06CustomB11ConvertibleRzs20TextOutputStreamableRzlF",
+          "location": "",
+          "moduleName": "Swift",
+          "mutating": true,
+          "declAttributes": [
+            "Inlinable"
+          ],
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Void",
+              "printedName": "()"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "T"
+            }
+          ]
+        },
+        {
+          "kind": "Function",
+          "name": "appendInterpolation",
+          "printedName": "appendInterpolation(_:)",
+          "declKind": "Func",
+          "usr": "s:s26DefaultStringInterpolationV06appendC0yyxs20TextOutputStreamableRzlF",
+          "location": "",
+          "moduleName": "Swift",
+          "mutating": true,
+          "declAttributes": [
+            "Inlinable"
+          ],
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Void",
+              "printedName": "()"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "T"
+            }
+          ]
+        },
+        {
+          "kind": "Function",
+          "name": "appendInterpolation",
+          "printedName": "appendInterpolation(_:)",
+          "declKind": "Func",
+          "usr": "s:s26DefaultStringInterpolationV06appendC0yyxs06CustomB11ConvertibleRzlF",
+          "location": "",
+          "moduleName": "Swift",
+          "mutating": true,
+          "declAttributes": [
+            "Inlinable"
+          ],
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Void",
+              "printedName": "()"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "T"
+            }
+          ]
+        },
+        {
+          "kind": "Function",
+          "name": "appendInterpolation",
+          "printedName": "appendInterpolation(_:)",
+          "declKind": "Func",
+          "usr": "s:s26DefaultStringInterpolationV06appendC0yyxlF",
+          "location": "",
+          "moduleName": "Swift",
+          "mutating": true,
+          "declAttributes": [
+            "Inlinable"
+          ],
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Void",
+              "printedName": "()"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "T"
+            }
+          ]
+        },
+        {
+          "kind": "TypeAlias",
+          "name": "StringLiteralType",
+          "printedName": "StringLiteralType",
+          "declKind": "TypeAlias",
+          "usr": "s:s26DefaultStringInterpolationV0B11LiteralTypea",
+          "location": "",
+          "moduleName": "Swift",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "String",
+              "printedName": "String",
+              "usr": "s:SS"
+            }
+          ]
+        },
+        {
+          "kind": "Var",
+          "name": "description",
+          "printedName": "description",
+          "declKind": "Var",
+          "usr": "s:s26DefaultStringInterpolationV11descriptionSSvp",
+          "location": "",
+          "moduleName": "Swift",
+          "parentExtensionReqs": [],
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "String",
+              "printedName": "String",
+              "usr": "s:SS"
+            },
+            {
+              "kind": "Getter",
+              "name": "_",
+              "printedName": "_()",
+              "declKind": "Accessor",
+              "usr": "s:s26DefaultStringInterpolationV11descriptionSSvg",
+              "location": "",
+              "moduleName": "Swift",
+              "parentExtensionReqs": [],
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "String",
+                  "printedName": "String",
+                  "usr": "s:SS"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "TypeDecl",
       "name": "Substring",
       "printedName": "Substring",
       "declKind": "Struct",
@@ -94545,6 +94862,7 @@
       "conformingProtocols": [
         "StringProtocol",
         "BidirectionalCollection",
+        "ExpressibleByStringInterpolation",
         "Hashable",
         "Comparable",
         "Collection",
@@ -95425,6 +95743,23 @@
           ]
         },
         {
+          "kind": "TypeAlias",
+          "name": "StringInterpolation",
+          "printedName": "StringInterpolation",
+          "declKind": "TypeAlias",
+          "usr": "s:Ss19StringInterpolationa",
+          "location": "",
+          "moduleName": "Swift",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "DefaultStringInterpolation",
+              "printedName": "DefaultStringInterpolation",
+              "usr": "s:s26DefaultStringInterpolationV"
+            }
+          ]
+        },
+        {
           "kind": "Var",
           "name": "hashValue",
           "printedName": "hashValue",
@@ -95455,6 +95790,34 @@
                   "usr": "s:Si"
                 }
               ]
+            }
+          ]
+        },
+        {
+          "kind": "Constructor",
+          "name": "init",
+          "printedName": "init(stringInterpolation:)",
+          "declKind": "Constructor",
+          "usr": "s:Ss19stringInterpolationSss013DefaultStringB0V_tcfc",
+          "location": "",
+          "moduleName": "Swift",
+          "parentExtensionReqs": [],
+          "declAttributes": [
+            "Effects",
+            "Inlinable"
+          ],
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Substring",
+              "printedName": "Substring",
+              "usr": "s:Ss"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "DefaultStringInterpolation",
+              "printedName": "DefaultStringInterpolation",
+              "usr": "s:s26DefaultStringInterpolationV"
             }
           ]
         },
@@ -115228,17 +115591,10 @@
       ],
       "children": [
         {
-          "kind": "TypeNameAlias",
+          "kind": "TypeNominal",
           "name": "ExpressibleByStringInterpolation",
           "printedName": "ExpressibleByStringInterpolation",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "_ExpressibleByStringInterpolation",
-              "printedName": "_ExpressibleByStringInterpolation",
-              "usr": "s:s33_ExpressibleByStringInterpolationP"
-            }
-          ]
+          "usr": "s:s32ExpressibleByStringInterpolationP"
         }
       ]
     },
