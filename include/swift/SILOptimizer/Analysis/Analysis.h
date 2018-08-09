@@ -174,14 +174,16 @@ public:
 /// ```
 template <typename FunctionInfoTy>
 class FunctionAnalysisBase : public SILAnalysis {
-protected:
-  using StorageTy = llvm::DenseMap<SILFunction *, FunctionInfoTy *>;
+  using StorageTy = llvm::DenseMap<SILFunction *,
+                                   std::unique_ptr<FunctionInfoTy>>;
 
   /// Maps functions to their analysis provider.
   StorageTy storage;
 
+protected:
   /// Construct a new empty function info for a specific function \p F.
-  virtual FunctionInfoTy *newFunctionAnalysis(SILFunction *f) = 0;
+  virtual std::unique_ptr<FunctionInfoTy>
+  newFunctionAnalysis(SILFunction *f) = 0;
 
   /// Return True if the analysis should be invalidated given trait \K is
   /// preserved.
@@ -192,8 +194,6 @@ protected:
   virtual void verify(FunctionInfoTy *funcInfo) const {}
 
   void deleteAllAnalysisProviders() {
-    for (auto iter : storage)
-      delete iter.second;
     storage.clear();
   }
 
@@ -208,7 +208,7 @@ public:
     auto iter = storage.find(f);
     if (iter == storage.end())
       return nullptr;
-    return iter->second;
+    return iter->second.get();
   }
 
   /// Returns a function info structure for a specific function \p F.
@@ -219,7 +219,7 @@ public:
     auto &it = storage.FindAndConstruct(f);
     if (!it.second)
       it.second = newFunctionAnalysis(f);
-    return it.second;
+    return it.second.get();
   }
 
   /// Invalidate all information in this analysis.
@@ -229,11 +229,7 @@ public:
 
   /// Helper function to remove the function info for a specific function.
   void invalidateFunction(SILFunction *f) {
-    auto &it = storage.FindAndConstruct(f);
-    if (!it.second)
-      return;
-    delete it.second;
-    it.second = nullptr;
+    storage.erase(f);
   }
 
   /// Invalidate all of the information for a specific function.
@@ -269,10 +265,10 @@ public:
   /// This is not meant to be overridden by subclasses. Instead please override
   /// void FunctionAnalysisBase::verify(FunctionInfoTy *fInfo).
   virtual void verify() const override final {
-    for (auto iter : storage) {
-      if (!iter.second)
+    for (auto &entry : storage) {
+      if (!entry.second)
         continue;
-      verify(iter.second);
+      verify(entry.second.get());
     }
   }
 
@@ -287,7 +283,7 @@ public:
       return;
     if (!iter->second)
       return;
-    verify(iter->second);
+    verify(iter->second.get());
   }
 };
 
