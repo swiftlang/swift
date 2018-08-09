@@ -1918,6 +1918,12 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
       // the label (at best), and multiple arguments would form a tuple.
       if (!Context.isSwiftVersionAtLeast(5)) {
         if (args.size() > 1) {
+          diagnose(args[1]->getLoc(), diag::string_interpolation_list_changing)
+            .highlightChars(args[1]->getLoc(), rParen);
+          diagnose(args[1]->getLoc(), diag::string_interpolation_list_insert_parens)
+            .fixItInsertAfter(lParen, "(")
+            .fixItInsert(rParen, ")");
+          
           args = {
             TupleExpr::create(Context,
                               lParen, args, argLabels, argLabelLocs, rParen,
@@ -1928,6 +1934,11 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
           argLabelLocs = { SourceLoc() };
         }
         else if (args.size() == 1 && argLabels[0] != Identifier()) {
+          diagnose(argLabelLocs[0], diag::string_interpolation_label_changing)
+            .highlightChars(argLabelLocs[0], args[0]->getStartLoc());
+          diagnose(argLabelLocs[0], diag::string_interpolation_remove_label, argLabels[0])
+            .fixItRemoveChars(argLabelLocs[0], args[0]->getStartLoc());
+          
           argLabels[0] = Identifier();
         }
       }
