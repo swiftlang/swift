@@ -3168,6 +3168,12 @@ void Serializer::writeDecl(const Decl *D) {
     auto contextID = addDeclContextRef(param->getDeclContext());
     Type interfaceType = param->getInterfaceType();
 
+    // Only save the text for normal default arguments, not any of the special
+    // ones.
+    StringRef defaultArgumentText;
+    if (param->getDefaultArgumentKind() == swift::DefaultArgumentKind::Normal)
+      defaultArgumentText = param->getDefaultValueStringRepresentation();
+
     unsigned abbrCode = DeclTypeAbbrCodes[ParamLayout::Code];
     ParamLayout::emitRecord(Out, ScratchRecord, abbrCode,
         addDeclBaseNameRef(param->getArgumentName()),
@@ -3176,7 +3182,8 @@ void Serializer::writeDecl(const Decl *D) {
         getRawStableVarDeclSpecifier(param->getSpecifier()),
         addTypeRef(interfaceType),
         param->isVariadic(),
-        getRawStableDefaultArgumentKind(param->getDefaultArgumentKind()));
+        getRawStableDefaultArgumentKind(param->getDefaultArgumentKind()),
+        defaultArgumentText);
 
     if (interfaceType->hasError()) {
       param->getDeclContext()->dumpContext();

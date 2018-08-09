@@ -4704,6 +4704,7 @@ class ParamDecl : public VarDecl {
   struct StoredDefaultArgument {
     Expr *DefaultArg = nullptr;
     Initializer *InitContext = nullptr;
+    StringRef StringRepresentation;
   };
 
   /// The default value, if any, along with whether this is varargs.
@@ -4766,6 +4767,17 @@ public:
   }
 
   void setDefaultArgumentInitContext(Initializer *initContext);
+
+  /// Returns a saved string representation of the parameter's default value.
+  ///
+  /// This should only be called if the default value expression is absent or
+  /// doesn't have a valid source range; otherwise, clients should extract the
+  /// source text from that range.
+  ///
+  /// \sa getDefaultValue
+  StringRef getDefaultValueStringRepresentation() const;
+
+  void setDefaultValueStringRepresentation(StringRef stringRepresentation);
 
   /// Whether or not this parameter is varargs.
   bool isVariadic() const { return DefaultValueAndIsVariadic.getInt(); }
