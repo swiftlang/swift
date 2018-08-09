@@ -1464,26 +1464,36 @@ DictionaryExpr *DictionaryExpr::create(ASTContext &C, SourceLoc LBracketLoc,
                                   Ty);
 }
 
-static ValueDecl *getCalledValue(Expr *E) {
+template<typename T>
+static T getFromCalledDeclRefExpr(Expr *E, llvm::function_ref<T(const DeclRefExpr *)> DREFn,
+                       llvm::function_ref<T(const OtherConstructorDeclRefExpr *)> OCREFn) {
   if (auto *DRE = dyn_cast<DeclRefExpr>(E))
-    return DRE->getDecl();
+    return DREFn(DRE);
 
   if (auto *OCRE = dyn_cast<OtherConstructorDeclRefExpr>(E))
-    return OCRE->getDecl();
+    return OCREFn(OCRE);
 
   // Look through SelfApplyExpr.
   if (auto *SAE = dyn_cast<SelfApplyExpr>(E))
-    return SAE->getCalledValue();
+    return getFromCalledDeclRefExpr(SAE->getFn(), DREFn, OCREFn);
 
   Expr *E2 = E->getValueProvidingExpr();
   if (E != E2)
-    return getCalledValue(E2);
+    return getFromCalledDeclRefExpr(E2, DREFn, OCREFn);
 
   return nullptr;
 }
 
 ValueDecl *ApplyExpr::getCalledValue() const {
-  return ::getCalledValue(Fn);
+  return getFromCalledDeclRefExpr<ValueDecl*>(Fn,
+    [&](const DeclRefExpr *E) -> ValueDecl* { return E->getDecl(); },
+    [&](const OtherConstructorDeclRefExpr *E) -> ValueDecl* { return E->getDecl(); });
+}
+
+static ConcreteDeclRef getCalledDeclRef(ApplyExpr *apply) {
+  return getFromCalledDeclRefExpr<ConcreteDeclRef>(apply->getFn(),
+    [&](const DeclRefExpr *E) -> ConcreteDeclRef { return E->getDeclRef(); },
+    [&](const OtherConstructorDeclRefExpr *E) -> ConcreteDeclRef { return E->getDeclRef(); });
 }
 
 SubscriptExpr::SubscriptExpr(Expr *base, Expr *index,
