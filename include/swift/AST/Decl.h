@@ -2696,8 +2696,6 @@ public:
     return UnderlyingTy;
   }
 
-  /// Set the underlying type, for deserialization and synthesized
-  /// aliases.
   void setUnderlyingType(Type type);
 
   /// For generic typealiases, return the unbound generic type.
