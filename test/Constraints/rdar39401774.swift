@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 5
 
 class A<T> {
   var foo: Int? { return 42 }      // expected-note {{found this candidate}}
