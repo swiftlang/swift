@@ -385,14 +385,13 @@ internal func _float${bits}ToStringImpl(
 @inlinable // FIXME(sil-serialize-all)
 internal func _float${bits}ToString(
   _ value: Float${bits}, debug: Bool
-) -> String {
+) -> (buffer: _Buffer32, length: Int) {
   _sanityCheck(MemoryLayout<_Buffer32>.size == 32)
   var buffer = _Buffer32()
-  return buffer.withBytes { (bufferPtr) in
-    let actualLength = _float${bits}ToStringImpl(bufferPtr, 32, value, debug)
-    return String._fromASCII(
-      UnsafeBufferPointer(start: bufferPtr, count: Int(actualLength)))
+  let length = buffer.withBytes { (bufferPtr) in
+    Int(_float${bits}ToStringImpl(bufferPtr, 32, value, debug))
   }
+  return (buffer, length)
 }
 
 % if bits == 80:
