@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -verify | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s -verify -swift-version 5 | %FileCheck %s
 
 protocol P {
   var p: P { get set }
@@ -154,4 +154,117 @@ func testDerived(b: B) {
   // CHECK: function_ref @$S7ranking2f0yyxlF
   f0(f1(b))
   // CHECK: end sil function '$S7ranking11testDerived1byAA1BC_tF'
+}
+
+protocol X {
+  var foo: Int { get }
+  var bar: Int { get }
+  func baz() -> Int
+  subscript(foo: String) -> Int { get }
+}
+
+class Y {
+  var foo: Int = 0
+  func baz() -> Int { return foo }
+  subscript(foo: String) -> Int { return 0 }
+}
+extension Y {
+  var bar: Int { return foo }
+}
+
+protocol Z : Y {
+  var foo: Int { get }
+  var bar: Int { get }
+  func baz() -> Int
+  subscript(foo: String) -> Int { get }
+}
+
+class GenericClass<T> {
+  var foo: T
+  init(_ foo: T) { self.foo = foo }
+  func baz() -> T { return foo }
+}
+extension GenericClass {
+  var bar: T { return foo }
+  subscript(foo: String) -> Int { return 0 }
+}
+
+// Make sure we favour the class implementation over the protocol requirement.
+
+// CHECK-LABEL: sil hidden @$S7ranking32testGenericPropertyProtocolClassyyxAA1YCRbzAA1XRzlF
+func testGenericPropertyProtocolClass<T : X & Y>(_ t: T) {
+  _ = t.foo   // CHECK: class_method {{%.*}} : $Y, #Y.foo!getter.1
+  _ = t.bar   // CHECK: function_ref @$S7ranking1YC3barSivg
+  _ = t.baz() // CHECK: class_method {{%.*}} : $Y, #Y.baz
+  _ = t[""]   // CHECK: class_method {{%.*}} : $Y, #Y.subscript!getter.1
+}
+
+// CHECK-LABEL: sil hidden @$S7ranking36testExistentialPropertyProtocolClassyyAA1X_AA1YCXcF
+func testExistentialPropertyProtocolClass(_ t: X & Y) {
+  _ = t.foo   // CHECK: class_method {{%.*}} : $Y, #Y.foo!getter.1
+  _ = t.bar   // CHECK: function_ref @$S7ranking1YC3barSivg
+  _ = t.baz() // CHECK: class_method {{%.*}} : $Y, #Y.baz
+  _ = t[""]   // CHECK: class_method {{%.*}} : $Y, #Y.subscript!getter.1
+}
+
+// CHECK-LABEL: sil hidden @$S7ranking46testGenericPropertySubclassConstrainedProtocolyyxAA1ZRzlF
+func testGenericPropertySubclassConstrainedProtocol<T : Z>(_ t: T) {
+  _ = t.foo   // CHECK: class_method {{%.*}} : $Y, #Y.foo!getter.1
+  _ = t.bar   // CHECK: function_ref @$S7ranking1YC3barSivg
+  _ = t.baz() // CHECK: class_method {{%.*}} : $Y, #Y.baz
+  _ = t[""]   // CHECK: class_method {{%.*}} : $Y, #Y.subscript!getter.1
+}
+
+// CHECK-LABEL: sil hidden @$S7ranking50testExistentialPropertySubclassConstrainedProtocolyyAA1Z_pF
+func testExistentialPropertySubclassConstrainedProtocol(_ t: Z) {
+  _ = t.foo   // CHECK: class_method {{%.*}} : $Y, #Y.foo!getter.1
+  _ = t.bar   // CHECK: function_ref @$S7ranking1YC3barSivg
+  _ = t.baz() // CHECK: class_method {{%.*}} : $Y, #Y.baz
+  _ = t[""]   // CHECK: class_method {{%.*}} : $Y, #Y.subscript!getter.1
+}
+
+// CHECK-LABEL: sil hidden @$S7ranking43testExistentialPropertyProtocolGenericClassyyAA1X_AA0fG0CySiGXcF
+func testExistentialPropertyProtocolGenericClass(_ t: GenericClass<Int> & X) {
+  _ = t.foo   // CHECK: class_method {{%.*}} : $GenericClass<Int>, #GenericClass.foo!getter.1
+  _ = t.bar   // CHECK: function_ref @$S7ranking12GenericClassC3barxvg
+  _ = t.baz() // CHECK: class_method {{%.*}} : $GenericClass<Int>, #GenericClass.baz
+  _ = t[""]   // CHECK: function_ref @$S7ranking12GenericClassCySiSScig
+}
+
+// CHECK-LABEL: sil hidden @$S7ranking43testExistentialPropertyProtocolGenericClassyyAA1X_AA0fG0CySSGXcF
+func testExistentialPropertyProtocolGenericClass(_ t: GenericClass<String> & X) {
+  _ = t.foo   // CHECK: class_method {{%.*}} : $GenericClass<String>, #GenericClass.foo!getter.1
+  _ = t.bar   // CHECK: function_ref @$S7ranking12GenericClassC3barxvg
+  _ = t.baz() // CHECK: class_method {{%.*}} : $GenericClass<String>, #GenericClass.baz
+  _ = t[""]   // CHECK: function_ref @$S7ranking12GenericClassCySiSScig
+}
+
+extension X where Self : Y {
+  // CHECK-LABEL: sil hidden @$S7ranking1XPA2A1YCRbzrlE32testGenericPropertyProtocolClassyyxF
+  func testGenericPropertyProtocolClass(_ x: Self) {
+    _ = self.foo   // CHECK: class_method {{%.*}} : $Y, #Y.foo!getter.1
+    _ = self.bar   // CHECK: function_ref @$S7ranking1YC3barSivg
+    _ = self.baz() // CHECK: class_method {{%.*}} : $Y, #Y.baz
+    _ = self[""]   // CHECK: class_method {{%.*}} : $Y, #Y.subscript!getter.1
+  }
+}
+
+extension X where Self : GenericClass<Int> {
+  // CHECK-LABEL: sil hidden @$S7ranking1XPA2A12GenericClassCySiGRbzrlE04testb16PropertyProtocolbC0yyxF
+  func testGenericPropertyProtocolGenericClass(_ x: Self) {
+    _ = self.foo   // CHECK: class_method {{%.*}} : $GenericClass<Int>, #GenericClass.foo!getter.1
+    _ = self.bar   // CHECK: function_ref @$S7ranking12GenericClassC3barxvg
+    _ = self.baz() // CHECK: class_method {{%.*}} : $GenericClass<Int>, #GenericClass.baz
+    _ = self[""]   // CHECK: function_ref @$S7ranking12GenericClassCySiSScig
+  }
+}
+
+extension X where Self : GenericClass<String> {
+  // CHECK-LABEL: sil hidden @$S7ranking1XPA2A12GenericClassCySSGRbzrlE04testb16PropertyProtocolbC0yyxF
+  func testGenericPropertyProtocolGenericClass(_ x: Self) {
+    _ = self.foo   // CHECK: class_method {{%.*}} : $GenericClass<String>, #GenericClass.foo!getter.1
+    _ = self.bar   // CHECK: function_ref @$S7ranking12GenericClassC3barxvg
+    _ = self.baz() // CHECK: class_method {{%.*}} : $GenericClass<String>, #GenericClass.baz
+    _ = self[""]   // CHECK: function_ref @$S7ranking12GenericClassCySiSScig
+  }
 }
