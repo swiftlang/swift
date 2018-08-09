@@ -3364,6 +3364,8 @@ ERROR(throw_in_illegal_context,none,
 
 ERROR(throwing_operator_without_try,none,
       "operator can throw but expression is not marked with 'try'", ())
+ERROR(throwing_interpolation_without_try,none,
+      "interpolation can throw but is not marked with 'try'", ())
 ERROR(throwing_call_without_try,none,
       "call can throw but is not marked with 'try'", ())
 NOTE(note_forgot_try,none,
