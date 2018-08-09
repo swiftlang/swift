@@ -756,6 +756,9 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
   bool isStdlibOptionalMPlusOperator1 = false;
   bool isStdlibOptionalMPlusOperator2 = false;
 
+  bool isSwift4ConcreteOverProtocolVar1 = false;
+  bool isSwift4ConcreteOverProtocolVar2 = false;
+
   auto getWeight = [&](ConstraintLocator *locator) -> unsigned {
     if (auto *anchor = locator->getAnchor()) {
       auto weight = weights.find(anchor);
@@ -962,6 +965,32 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       }
     }
 
+    // Swift 4.1 compatibility hack: If everything else is considered equal,
+    // favour a property on a concrete type over a protocol property member.
+    //
+    // This hack is required due to changes in shadowing behaviour where a
+    // protocol property member will no longer shadow a property on a concrete
+    // type, which created unintentional ambiguities in 4.2. This hack ensures
+    // we at least keep these cases unambiguous in Swift 5 under Swift 4
+    // compatibility mode. Don't however apply this hack for decls found through
+    // dynamic lookup, as we want the user to have to disambiguate those.
+    //
+    // This is intentionally narrow in order to best preserve source
+    // compatibility under Swift 4 mode by ensuring we don't introduce any new
+    // ambiguities. This will become a more general "is more specialised" rule
+    // in Swift 5 mode.
+    if (!tc.Context.isSwiftVersionAtLeast(5) &&
+        choice1.getKind() != OverloadChoiceKind::DeclViaDynamic &&
+        choice2.getKind() != OverloadChoiceKind::DeclViaDynamic &&
+        isa<VarDecl>(decl1) && isa<VarDecl>(decl2)) {
+      auto *nominal1 = dc1->getSelfNominalTypeDecl();
+      auto *nominal2 = dc2->getSelfNominalTypeDecl();
+      if (nominal1 && nominal2 && nominal1 != nominal2) {
+        isSwift4ConcreteOverProtocolVar1 = isa<ProtocolDecl>(nominal2);
+        isSwift4ConcreteOverProtocolVar2 = isa<ProtocolDecl>(nominal1);
+      }
+    }
+
     // FIXME: Lousy hack for ?? to prefer the catamorphism (flattening)
     // over the mplus (non-flattening) overload if all else is equal.
     if (decl1->getBaseName() == "??") {
@@ -1116,6 +1145,14 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // This is correct: we want to /disprefer/ the mplus.
     score2 += isStdlibOptionalMPlusOperator1;
     score1 += isStdlibOptionalMPlusOperator2;
+  }
+
+  // All other things being equal, apply the Swift 4.1 compatibility hack for
+  // preferring var members in concrete types over a protocol requirement
+  // (see the comment above for the rationale of this hack).
+  if (!tc.Context.isSwiftVersionAtLeast(5) && score1 == score2) {
+    score1 += isSwift4ConcreteOverProtocolVar1;
+    score2 += isSwift4ConcreteOverProtocolVar2;
   }
 
   // FIXME: There are type variables and overloads not common to both solutions
