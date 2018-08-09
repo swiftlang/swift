@@ -943,7 +943,8 @@ void TFFunctionPartition::diagnoseCopyToAccelerator(
   auto loc = getUserSourceLocation(value);
   
   // Opaque handles can never be sent or passed as tensor program arguments.
-  // Deabstraction must have rejected this earlier.
+  // Type checking must have rejected host functions that are either a)
+  // public with private ABI or b) marked @inline(never).
   assert(!isOpaqueHandle(value->getType()) &&
          "Opaque handles should never have been on the host");
 
