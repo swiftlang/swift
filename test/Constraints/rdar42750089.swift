@@ -18,7 +18,7 @@ extension S : ExpressibleByStringLiteral {
     }
 }
 
-extension S : _ExpressibleByStringInterpolation {
+extension S : ExpressibleByStringInterpolation {
   init(stringInterpolation strings: S...) {
     self.key = "foo"
   }

@@ -2229,91 +2229,104 @@ namespace {
       auto type = simplifyType(openedType);
       cs.setType(expr, type);
 
-      // Find the string interpolation protocol we need.
-      auto &tc = cs.getTypeChecker();
-      auto interpolationProto
-        = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::ExpressibleByStringInterpolation);
-      assert(interpolationProto && "Missing string interpolation protocol?");
-
-      DeclName name(tc.Context, DeclBaseName::createConstructor(),
-                    { tc.Context.Id_stringInterpolation });
-      auto member
-        = findNamedWitnessImpl(
-            tc, dc, type,
-            interpolationProto, name,
-            diag::interpolation_broken_proto);
-
-      DeclName segmentName(tc.Context, DeclBaseName::createConstructor(),
-                           { tc.Context.Id_stringInterpolationSegment });
-      auto segmentMember
-        = findNamedWitnessImpl(
-            tc, dc, type, interpolationProto, segmentName,
-            diag::interpolation_broken_proto);
-      if (!member ||
-          !segmentMember ||
-          !isa<ConstructorDecl>(member.getDecl()) ||
-          !isa<ConstructorDecl>(segmentMember.getDecl()))
-        return nullptr;
-
-      // Build a reference to the init(stringInterpolation:) initializer.
-      // FIXME: This location info is bogus.
-      auto *typeRef = TypeExpr::createImplicitHack(expr->getStartLoc(), type,
-                                                   tc.Context);
-
-      Expr *memberRef =
-        new (tc.Context) MemberRefExpr(typeRef,
-                                       expr->getStartLoc(),
-                                       member.getDecl(),
-                                       DeclNameLoc(expr->getStartLoc()),
-                                       /*Implicit=*/true);
-      cs.cacheSubExprTypes(memberRef);
-      cs.setSubExprTypes(memberRef);
-      bool failed = tc.typeCheckExpressionShallow(memberRef, cs.DC);
-      cs.cacheExprTypes(memberRef);
-      assert(!failed && "Could not reference string interpolation witness");
-      (void)failed;
-
-      // Create a tuple containing all of the segments.
-      SmallVector<Expr *, 4> segments;
-      SmallVector<Identifier, 4> names;
-      ConstraintLocatorBuilder locatorBuilder(cs.getConstraintLocator(expr));
-      auto getType = [&](const Expr *E) -> Type {
-        return cs.getType(E);
-      };
-
-      for (auto segment : expr->getSegments()) {
-        ApplyExpr *apply =
-          CallExpr::createImplicit(
-            tc.Context, typeRef,
-            { segment },
-            { tc.Context.Id_stringInterpolationSegment }, getType);
-        cs.cacheSubExprTypes(apply);
-
-        Expr *convertedSegment = apply;
-        cs.setSubExprTypes(convertedSegment);
-        if (tc.typeCheckExpressionShallow(convertedSegment, cs.DC))
-          continue;
-        cs.cacheExprTypes(convertedSegment);
-
-        segments.push_back(convertedSegment);
-
-        if (names.empty()) {
-          names.push_back(tc.Context.Id_stringInterpolation);
-        } else {
-          names.push_back(Identifier());
-        }
+      if (expr->getSemanticExpr() != nullptr) {
+        return expr;
       }
 
-      // If all of the segments had errors, bail out.
-      if (segments.empty())
-        return nullptr;
+      auto &tc = cs.getTypeChecker();
+      auto loc = expr->getStartLoc();
 
-      // Call the init(stringInterpolation:) initializer with the arguments.
-      ApplyExpr *apply = CallExpr::createImplicit(tc.Context, memberRef,
-                                                  segments, names, getType);
-      cs.cacheExprTypes(apply);
-      expr->setSemanticExpr(finishApply(apply, openedType, locatorBuilder));
+      auto buildProtocolInitCall =
+        [&](KnownProtocolKind protocolKind, Type type, 
+            ArrayRef<Identifier> argLabels, ArrayRef<Expr *> args) -> Expr * {
+
+        auto proto = tc.getProtocol(loc, protocolKind);
+        assert(proto && "Missing string interpolation protocol?");
+
+        auto conformance =
+          tc.conformsToProtocol(type, proto, cs.DC,
+                              ConformanceCheckFlags::InExpression);
+        assert(conformance && "string interpolation type conforms to protocol");
+
+        DeclName constrName(tc.Context, DeclBaseName::createConstructor(), argLabels);
+        
+        Expr *base = TypeExpr::createImplicitHack(loc, type,
+                                                  tc.Context);
+        Expr *semanticExpr = tc.callWitness(base, dc, proto, *conformance,
+                                            constrName, args,
+                                            diag::interpolation_broken_proto);
+        if (semanticExpr)
+          cs.cacheExprTypes(semanticExpr);
+
+        return semanticExpr;
+      };
+
+      auto associatedTypeArray = 
+        tc.getProtocol(expr->getLoc(),
+             KnownProtocolKind::ExpressibleByStringInterpolation)
+          ->lookupDirect(tc.Context.Id_StringInterpolation);
+      if (associatedTypeArray.empty()) {
+        tc.diagnose(expr->getStartLoc(), diag::interpolation_broken_proto);
+        return nullptr;
+      }
+      auto associatedTypeDecl =
+        cast<AssociatedTypeDecl>(associatedTypeArray.front());
+      auto interpolationType =
+        simplifyType(DependentMemberType::get(openedType, associatedTypeDecl));
+
+      // interpolationInitCall = """
+      //   StringInterpolationProtocol.init(
+      //     literalCapacity: \(expr->getLiteralCapacity()), 
+      //     interpolationCount: \(expr->getInterpolationCount()))
+      //   """
+
+      // Make the integer literals for the parameters.
+      Expr *literalCapacity =
+        IntegerLiteralExpr::createFromUnsigned(tc.Context,
+                                               expr->getLiteralCapacity());
+      cs.setType(literalCapacity, tc.getIntType(cs.DC));
+      literalCapacity =
+        handleIntegerLiteralExpr((LiteralExpr*)literalCapacity);
+
+      Expr *interpolationCount =
+        IntegerLiteralExpr::createFromUnsigned(tc.Context,
+                                               expr->getInterpolationCount());
+      cs.setType(interpolationCount, tc.getIntType(cs.DC));
+      interpolationCount =
+        handleIntegerLiteralExpr((LiteralExpr*)interpolationCount);
+
+      // Make the call itself.
+      auto interpolationInitCall =
+        buildProtocolInitCall(
+          KnownProtocolKind::StringInterpolationProtocol, interpolationType,
+          { tc.Context.Id_literalCapacity, tc.Context.Id_interpolationCount },
+          { literalCapacity, interpolationCount });
+
+      // appendingExpr = """
+      //   _tap var \(expr->getBody()->getElement(0)) = 
+      //         \(interpolationInitCall) {
+      //     \(expr->getBody())
+      //   }
+      //   """
+
+      auto appendingExpr = expr->getAppendingExpr();
+      appendingExpr->setSubExpr(interpolationInitCall);
+
+      // initStringInterpolationExpr = """
+      //   ExpressibleByStringInterpolation.init(
+      //     stringInterpolation: \(appendingExpr))
+      //   """
+
+      auto initStringInterpolationExpr =
+        buildProtocolInitCall(
+          KnownProtocolKind::ExpressibleByStringInterpolation, type, 
+          { tc.Context.Id_stringInterpolation },
+          { appendingExpr });
+
+      // Set that as the semantic expr.
+      expr->setSemanticExpr(initStringInterpolationExpr);
+
+      // And we're done!
       return expr;
     }
     
