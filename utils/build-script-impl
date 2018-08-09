@@ -1762,6 +1762,7 @@ function set_lldb_xcodebuild_options() {
         OBJROOT="${lldb_build_dir}"
         -UseNewBuildSystem=NO
         ${LLDB_EXTRA_XCODEBUILD_ARGS}
+        MACOSX_DEPLOYMENT_TARGET=10.13
     )
     if [[ "${LLDB_NO_DEBUGSERVER}" ]] ; then
         lldb_xcodebuild_options=(
