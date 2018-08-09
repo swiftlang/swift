@@ -3169,9 +3169,9 @@ TFGraphFunctionLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
   //   .Attr("Tin: list(type) >= 0")
   //   .Attr("Tout: list(type) >= 0")
   auto opLocString = getUniqueName(loc, "op");
-  bool usesideEffectingIf = trueFnHasSideEffects || falseFnHasSideEffects;
+  bool useSideEffectingIf = trueFnHasSideEffects || falseFnHasSideEffects;
   auto *op = TF_NewOperation(graphFn.getGraph(),
-                             usesideEffectingIf ? "If" : "StatelessIf",
+                             useSideEffectingIf ? "If" : "StatelessIf",
                              opLocString.c_str());
   TF_AddInput(op, condValue);
   TF_AddInputList(op, inputs.data(), inputs.size());
@@ -3181,7 +3181,7 @@ TFGraphFunctionLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
   TF_SetAttrFuncName(op, "else_branch", falseFnName.c_str(),
                      falseFnName.size());
 
-  auto *result = graphFn.finishOp(op, usesideEffectingIf,
+  auto *result = graphFn.finishOp(op, useSideEffectingIf,
                                   /*isEligibleForTPU*/ true, status);
   if (checkStatus(getUserSourceLocation(loc)))
     return GLStatus::Error;
