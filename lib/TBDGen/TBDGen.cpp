@@ -421,8 +421,7 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
   file.setInstallName(opts.InstallName);
   // FIXME: proper version
   file.setCurrentVersion(tapi::internal::PackedVersion(1, 0, 0));
-  // FIXME: pull this out of moduleformat?
-  file.setSwiftABIVersion(5);
+  file.setSwiftABIVersion(TAPI_SWIFT_ABI_VERSION);
   file.setPlatform(tapi::internal::mapToSinglePlatform(target));
   auto arch = tapi::internal::getArchType(target.getArchName());
   file.setArch(arch);
