@@ -115,11 +115,11 @@ enum class PartitioningClass {
 
   /// This is an explicit send to the accelerator, which is sugared as
   /// '.toAccelerator()'.
-  ExplicitSend,
+  ExplicitToAccel,
 
   /// This is an explicit receive from the accelerator, which is sugared as
   /// '.toHost()'.
-  ExplicitReceive,
+  ExplicitToHost,
 };
 
 static PartitioningClass classifyInst(SILInstruction *inst) {
@@ -148,9 +148,9 @@ static PartitioningClass classifyInst(SILInstruction *inst) {
       if (fn->getName().startswith("__tf_hoistable_"))
         return PartitioningClass::Hoistable;
       if (fn->getName() == "__tf_send")
-        return PartitioningClass::ExplicitSend;
+        return PartitioningClass::ExplicitToAccel;
       if (fn->getName() == "__tf_receive")
-        return PartitioningClass::ExplicitReceive;
+        return PartitioningClass::ExplicitToHost;
     }
   }
 
@@ -896,7 +896,7 @@ void TFFunctionPartition::diagnoseCopyToAccelerator(
   // If it isn't the result of a "send" operation, then produce a warning about
   // an implicit copy to the accelerator.
   if (auto *apply = dyn_cast<ApplyInst>(value))
-    if (classifyInst(apply) == PartitioningClass::ExplicitSend) {
+    if (classifyInst(apply) == PartitioningClass::ExplicitToAccel) {
       explicitCopyMarkers.insert(apply);
       return;
     }
@@ -1020,7 +1020,7 @@ void TFFunctionPartition::diagnoseCopyToAccelerator(
 }
 
 /// Check to see if the specified value being copied into a partition for the
-/// accelerator is our designated "receive" operation.  If so, we're fine,
+/// accelerator is our designated "ToHost" operation.  If so, we're fine,
 /// otherwise emit a warning to tell the programmer that they are doing
 /// something that induces an implicit data transfer into their code.
 void TFFunctionPartition::diagnoseUsesFromHost(SILValue value,
@@ -1030,7 +1030,7 @@ void TFFunctionPartition::diagnoseUsesFromHost(SILValue value,
 
     // If it is used by a "receive" operation, remember the receive and don't
     // emit a warning.
-    if (classifyInst(user) == PartitioningClass::ExplicitReceive) {
+    if (classifyInst(user) == PartitioningClass::ExplicitToHost) {
       explicitCopyMarkers.insert(user);
       continue;
     }
@@ -1523,8 +1523,8 @@ static bool canMoveInstruction(SILInstruction *inst,
   SILValue tensorOperand;
   switch (classifyInst(inst)) {
   case PartitioningClass::GetScalarOrDie:
-  case PartitioningClass::ExplicitSend:
-  case PartitioningClass::ExplicitReceive:
+  case PartitioningClass::ExplicitToAccel:
+  case PartitioningClass::ExplicitToHost:
     // For the these functions, we know its first parameter is a TensorHandle,
     // with @guaranteed calling convention.
     tensorOperand = inst->getOperand(1);
@@ -2269,9 +2269,9 @@ public:
   bool finalizeOriginal();
 
   void handleSendRecvForTerminator(TermInst *inst);
-  void insertSend(SILInstruction &inst);
+  void insertHostToAccelTransfer(SILInstruction &inst);
   // On error, returns false.
-  bool insertReceive(SILValue value, SILLocation loc);
+  bool insertAccelToHostTransfer(SILValue value, SILLocation loc);
   // On error, returns false.
   bool handleHostReferencesOfMovedValue(SILValue value, SILLocation loc);
 
@@ -3194,7 +3194,7 @@ void PartitionCloner::handleSendRecvForTerminator(TermInst *inst) {
 
 /// Insert a send of values from the specified instruction result(s) to the
 /// accelerator, and insert receives in it.
-void PartitionCloner::insertSend(SILInstruction &inst) {
+void PartitionCloner::insertHostToAccelTransfer(SILInstruction &inst) {
   if (auto *TI = dyn_cast<TermInst>(&inst)) {
     if (shouldMarkSend(TI)) {
       handleSendRecvForTerminator(TI);
@@ -3242,7 +3242,7 @@ void PartitionCloner::insertSend(SILInstruction &inst) {
   }
 }
 
-bool PartitionCloner::insertReceive(SILValue value, SILLocation loc) {
+bool PartitionCloner::insertAccelToHostTransfer(SILValue value, SILLocation loc) {
   assert(value->getDefiningInstruction() ||
          isa<SILArgument>(value) && "Don't know how to receive this value");
   SILFunction *receiveFn = lookupSendReceiveFunction("receiveFromAccelerator",
@@ -3304,7 +3304,7 @@ bool PartitionCloner::handleHostReferencesOfMovedValue(SILValue value,
 
   if (needsCopy) {
     // If we need the value on the host, then keep the retain/release ops.
-    return insertReceive(value, loc);
+    return insertAccelToHostTransfer(value, loc);
   } else {
     // Otherwise, drop them.
     for (auto *inst : instToRemove)
@@ -3336,7 +3336,7 @@ void PartitionCloner::cloneBlock(SILBasicBlock *BB) {
       visit(&inst);
       break;
     case Marking::Send:
-      insertSend(inst);
+      insertHostToAccelTransfer(inst);
       break;
     case Marking::Argument:
       // Already handled.
@@ -3490,10 +3490,6 @@ bool PartitionCloner::finalizeOriginal() {
   // bb arg -> branch argument mappings.
   SmallPtrSet<SILBasicBlock *, 4> argsRemovedBlocks;
 
-  // We remove arguments with a two-pass approach, first dropping the insts that
-  // feed them, then removing the arg (potentially inserting a receive).
-  SmallVector<SILArgument *, 4> argsToRemove;
-
   // For BB arguments, we remove the uses from the branches first (which breaks
   // interdependent references) and delete the actual arguments later.
   for (auto argInfo : FP.markedBBArguments) {
@@ -3543,7 +3539,7 @@ bool PartitionCloner::finalizeOriginal() {
 
   // Ok, now all interdependent references have been dropped.  If there are any
   // uses of values that we moved over to the accelerator, then we must insert
-  // a receive from the accelerator of the computed value.  Regardless, we can
+  // a transfer from the accelerator of the computed value.  Regardless, we can
   // now delete the defining instruction/argument.
   for (auto argInfo : FP.markedBBArguments) {
     auto marking = argInfo.second.first;
