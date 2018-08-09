@@ -47,8 +47,6 @@ public func noCopyForOpaqueHandles() {
 // CHECK:   br bb1
 
 
-// CHECK-LABEL: ---- ANALYSIS STATE FOR FUNCTION ${{.*}}noCopyForOpaqueHandle
-// CHECK: [Move]    %28 = graph_op "TensorSliceDataset,L,e"(%4 : $TensorHandle<Float>)
 // CHECK-LABEL: ---- PARTITION STATE FOR FUNCTION ${{.*}}noCopyForOpaqueHandle
 // CHECK: result values:
 // CHECK-NOT: graph_op "TensorSliceDataset,L,e"(%4 : $TensorHandle<Float>)

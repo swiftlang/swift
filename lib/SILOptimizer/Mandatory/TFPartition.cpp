@@ -79,9 +79,7 @@ static bool isUserIgnoredByPartitioning(SILInstruction *inst) {
     if (optMode != OptimizationMode::NoOptimization)
       return true;
     // Ignore opaque handle because they cannot be sent/received.
-    if (isOpaqueHandle(DVI->getOperand()->getType()))
-      return true;
-    return false;
+    return isOpaqueHandle(DVI->getOperand()->getType());
   }
   // Reference counting instructions are always ignored.
   return isa<RefCountingInst>(inst);
@@ -319,15 +317,6 @@ classifyPromotedScalarOp(SILInstruction *inst) {
 static bool isAcceleratorOnly(const SILFunction &hostFn) {
   return hostFn.getRepresentation() ==
          SILFunctionType::Representation::TensorFlow; // @convention(tensorflow)
-}
-
-/// Return true if a user instruction is returning or forming a return value.
-static bool isReturning(SILInstruction *user) {
-  if (isa<ReturnInst>(user)) return true;
-  if (auto *TI = dyn_cast<TupleInst>(user))
-    return llvm::all_of(
-      TI->getUses(), [&](Operand *use) { return isReturning(user); });
-  return false;
 }
 
 //===----------------------------------------------------------------------===//
@@ -953,7 +942,7 @@ void TFFunctionPartition::diagnoseCopyToAccelerator(
   // Try to determine a good source location to report.
   auto loc = getUserSourceLocation(value);
   
-  // Opaque handles can never be sent or passed as tenosr program arguments.
+  // Opaque handles can never be sent or passed as tensor program arguments.
   // Deabstraction must have rejected this earlier.
   assert(!isOpaqueHandle(value->getType()) &&
          "Opaque handles should never have been on the host");
@@ -4195,6 +4184,15 @@ static void contractUncondBranches(SILFunction *fn) {
       }
     }
   }
+}
+
+/// Return true if a user instruction is returning or forming a return value.
+static bool isReturning(SILInstruction *user) {
+  if (isa<ReturnInst>(user)) return true;
+  if (auto *TI = dyn_cast<TupleInst>(user))
+    return llvm::all_of(TI->getUses(),
+                        [&](Operand *use) { return isReturning(user); });
+  return false;
 }
 
 /// Run the TensorFlow partitioning pass.  This pass is a very close relative to
