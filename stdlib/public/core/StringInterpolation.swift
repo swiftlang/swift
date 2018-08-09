@@ -197,6 +197,7 @@ extension String {
   ///     print(message)
   ///     // Prints "If one cookie costs 2 dollars, 3 cookies cost 6 dollars."
   @inlinable
+  @_effects(readonly)
   public init(stringInterpolation: DefaultStringInterpolation) {
     self = stringInterpolation.make()
   }
@@ -218,6 +219,7 @@ extension Substring {
   ///     print(message)
   ///     // Prints "If one cookie costs 2 dollars, 3 cookies cost 6 dollars."
   @inlinable
+  @_effects(readonly)
   public init(stringInterpolation: DefaultStringInterpolation) {
     self.init(stringInterpolation.make())
   }
