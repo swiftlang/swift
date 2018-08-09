@@ -3281,9 +3281,7 @@ ParserResult<PoundDiagnosticDecl> Parser::parseDeclPoundDiagnostic() {
     // Catch #warning(oops, forgot the quotes)
     SourceLoc wordsStartLoc = Tok.getLoc();
 
-    while (!Tok.isAtStartOfLine() && !Tok.isAny(tok::r_paren, tok::eof)) {
-      skipSingle();
-    }
+    skipUntilTokenOrEndOfLine(tok::r_paren);
 
     SourceLoc wordsEndLoc = getEndOfPreviousLoc();
 

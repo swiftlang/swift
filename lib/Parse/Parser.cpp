@@ -714,6 +714,13 @@ void Parser::skipUntilConditionalBlockClose() {
   }
 }
 
+bool Parser::skipUntilTokenOrEndOfLine(tok T1) {
+  while (Tok.isNot(tok::eof, T1) && !Tok.isAtStartOfLine())
+    skipSingle();
+
+  return Tok.is(T1) && !Tok.isAtStartOfLine();
+}
+
 bool Parser::loadCurrentSyntaxNodeFromCache() {
   // Don't do a cache lookup when not building a syntax tree since otherwise
   // the corresponding AST nodes do not get created

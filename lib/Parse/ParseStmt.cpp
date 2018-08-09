@@ -182,8 +182,9 @@ bool Parser::isTerminatorForBraceItemListKind(BraceItemListKind Kind,
       // for 'case's.
       do {
         consumeToken();
-        while (!Tok.isAtStartOfLine() && Tok.isNot(tok::eof))
-          skipSingle();
+
+        // just find the end of the line
+        skipUntilTokenOrEndOfLine(tok::NUM_TOKENS);
       } while (Tok.isAny(tok::pound_if, tok::pound_elseif, tok::pound_else));
       return isAtStartOfSwitchCase(*this, /*needsToBacktrack*/false);
     }
@@ -640,9 +641,7 @@ ParserResult<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
     diagnose(Tok, ID);
 
     // Attempt to recover by looking for a left brace on the same line
-    while (Tok.isNot(tok::eof, tok::l_brace) && !Tok.isAtStartOfLine())
-      skipSingle();
-    if (Tok.isNot(tok::l_brace))
+    if (!skipUntilTokenOrEndOfLine(tok::l_brace))
       return nullptr;
   }
   SyntaxParsingContext LocalContext(SyntaxContext, SyntaxKind::CodeBlock);
