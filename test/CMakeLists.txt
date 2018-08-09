@@ -196,7 +196,7 @@ foreach(SDK ${SWIFT_SDKS})
 
     if(SWIFT_BUILD_STDLIB AND SWIFT_INCLUDE_TESTS)
       list(APPEND test_dependencies
-          "swift-reflection-test${VARIANT_SUFFIX}")
+          "swift-reflection-test${VARIANT_SUFFIX}_signed")
     endif()
 
     if(NOT "${COVERAGE_DB}" STREQUAL "")
