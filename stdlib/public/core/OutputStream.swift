@@ -72,6 +72,8 @@ public protocol TextOutputStream {
 
   /// Appends the given string to the stream.
   mutating func write(_ string: String)
+
+  mutating func _writeASCII(_ buffer: UnsafeBufferPointer<UInt8>)
 }
 
 extension TextOutputStream {
@@ -79,6 +81,11 @@ extension TextOutputStream {
   public mutating func _lock() {}
   @inlinable // FIXME(sil-serialize-all)
   public mutating func _unlock() {}
+
+  @inlinable // FIXME(sil-serialize-all)
+  public mutating func _writeASCII(_ buffer: UnsafeBufferPointer<UInt8>) {
+    write(String._fromASCII(buffer))
+  }
 }
 
 /// A source of text-streaming operations.
@@ -566,6 +573,10 @@ extension String : TextOutputStream {
   @inlinable // FIXME(sil-serialize-all)
   public mutating func write(_ other: String) {
     self += other
+  }
+  
+  public mutating func _writeASCII(_ buffer: UnsafeBufferPointer<UInt8>) {
+    self._guts.append(_UnmanagedString(buffer))
   }
 }
 
