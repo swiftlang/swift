@@ -119,12 +119,22 @@ class RemoteCommandRunner(CommandRunner):
                 [self.remote_host])
 
 class LocalCommandRunner(CommandRunner):
+    def __init__(self):
+        self.cached_sftp_server_path = None
+
+    def sftp_server_path(self):
+        if not self.cached_sftp_server_path:
+            paths_to_try = ['/usr/libexec/sftp-server', '/usr/lib/sftp-server']
+            self.cached_sftp_server_path = next(
+                (path for path in paths_to_try if os.path.exists(path)),
+                paths_to_try[0])
+        return self.cached_sftp_server_path
+
     def remote_invocation(self, command):
         return command
 
     def sftp_invocation(self):
-        return ['/usr/bin/sftp', '-b', '-', '-q', '-D', 
-                '/usr/libexec/sftp-server']
+        return ['/usr/bin/sftp', '-b', '-', '-q', '-D', self.sftp_server_path()]
 
 def find_transfers(args, source_prefix, dest_prefix):
     if source_prefix.endswith(os.path.sep):
