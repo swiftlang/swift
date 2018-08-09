@@ -8000,27 +8000,14 @@ bool ConstraintSystem::applySolutionFix(
   }
 
   case FixKind::ExplicitlyEscaping: {
-    auto path = locator->getPath();
-    auto *anchor = locator->getAnchor();
-
-    if (path.empty())
-      return false;
-
-    auto &last = path.back();
-    if (last.getKind() == ConstraintLocator::Archetype) {
-      auto *archetype = last.getArchetype();
-      TC.diagnose(anchor->getLoc(), diag::converting_noescape_to_type,
-                  archetype);
-      return true;
-    }
-    break;
+    NoEscapeFuncToTypeConversionFailure failure(expr, solution, locator);
+    return failure.diagnose();
   }
 
   case FixKind::ExplicitlyEscapingToAny: {
-    auto *anchor = locator->getAnchor();
-    TC.diagnose(anchor->getLoc(), diag::converting_noescape_to_type,
-                getASTContext().TheAnyType);
-    return true;
+    NoEscapeFuncToTypeConversionFailure failure(expr, solution, locator,
+                                                getASTContext().TheAnyType);
+    return failure.diagnose();
   }
 
   case FixKind::RelabelArguments: {

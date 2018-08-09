@@ -188,3 +188,26 @@ bool LabelingFailure::diagnose() {
                                     CorrectLabels,
                                     isa<SubscriptExpr>(call->getFn()));
 }
+
+bool NoEscapeFuncToTypeConversionFailure::diagnose() {
+  auto *anchor = getAnchor();
+
+  if (ConvertTo) {
+    emitDiagnostic(anchor->getLoc(), diag::converting_noescape_to_type,
+                   ConvertTo);
+    return true;
+  }
+
+  auto path = getLocator()->getPath();
+  if (path.empty())
+    return false;
+
+  auto &last = path.back();
+  if (last.getKind() != ConstraintLocator::Archetype)
+    return false;
+
+  auto *archetype = last.getArchetype();
+  emitDiagnostic(anchor->getLoc(), diag::converting_noescape_to_type,
+                 archetype);
+  return true;
+}

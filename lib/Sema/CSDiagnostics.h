@@ -154,6 +154,20 @@ public:
   bool diagnose() override;
 };
 
+/// Diagnose errors related to converting function type which
+/// isn't explicitly '@escaping' to some other type.
+class NoEscapeFuncToTypeConversionFailure final : public FailureDiagnostic {
+  Type ConvertTo;
+
+public:
+  NoEscapeFuncToTypeConversionFailure(Expr *expr, const Solution &solution,
+                                      ConstraintLocator *locator,
+                                      Type toType = Type())
+      : FailureDiagnostic(expr, solution, locator), ConvertTo(toType) {}
+
+  bool diagnose() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 
