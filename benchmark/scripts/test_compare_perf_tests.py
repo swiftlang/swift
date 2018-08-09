@@ -133,7 +133,7 @@ class TestPerformanceTestSamples(unittest.TestCase):
             (0, 0, 0.0, 0, 0.0))
 
     def test_excludes_outliers(self):
-        ss = [Sample(*map(int, line.split())) for line in
+        ss = [Sample(*map(int, s.split())) for s in
               '0 1 1000, 1 1 1025, 2 1 1050, 3 1 1075, 4 1 1100, '
               '5 1 1000, 6 1 1025, 7 1 1050, 8 1 1075, 9 1 1100, '
               '10 1 1050, 11 1 949, 12 1 1151'.split(',')]
@@ -161,6 +161,20 @@ class TestPerformanceTestSamples(unittest.TestCase):
         self.samples.exclude_outliers()
 
         self.assertEquals(self.samples.count, 2)
+        self.assertEqualStats(
+            (self.samples.min, self.samples.max), (18, 18))
+
+    def test_excludes_outliers_top_only(self):
+        ss = [Sample(*map(int, s.split())) for s in
+              '0 1 1, 1 1 2, 2 1 2, 3 1 2, 4 1 3'.split(',')]
+        self.samples = PerformanceTestSamples('Top', ss)
+        self.assertEqualFiveNumberSummary(self.samples, (1, 2, 2, 2, 3))
+        self.assertEquals(self.samples.iqr, 0)
+
+        self.samples.exclude_outliers(top_only=True)
+
+        self.assertEquals(self.samples.count, 4)
+        self.assertEqualStats((self.samples.min, self.samples.max), (1, 2))
 
 
 class TestPerformanceTestResult(unittest.TestCase):

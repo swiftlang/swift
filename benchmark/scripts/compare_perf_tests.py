@@ -82,7 +82,7 @@ class PerformanceTestSamples(object):
         _, self.mean, self.S_runtime = (
             self.running_mean_variance(old_stats, sample.runtime))
 
-    def exclude_outliers(self):
+    def exclude_outliers(self, top_only=False):
         """Exclude outliers by applying Interquartile Range Rule.
 
         Moves the samples outside of the inner fences
@@ -94,7 +94,8 @@ class PerformanceTestSamples(object):
         benchmark runtimes in the microbenchmark range to filter out
         the environment noise caused by preemtive multitasking.
         """
-        lo = bisect_left(self._runtimes, int(self.q1 - 1.5 * self.iqr))
+        lo = (0 if top_only else
+              bisect_left(self._runtimes, int(self.q1 - 1.5 * self.iqr)))
         hi = bisect_right(self._runtimes, int(self.q3 + 1.5 * self.iqr))
 
         outliers = self.samples[:lo] + self.samples[hi:]
