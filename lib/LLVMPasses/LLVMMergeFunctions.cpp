@@ -402,6 +402,8 @@ private:
 
   bool deriveParams(ParamInfos &Params, FunctionInfos &FInfos);
 
+  bool numOperandsDiffer(FunctionInfos &FInfos);
+
   bool constsDiffer(const FunctionInfos &FInfos, unsigned OpIdx);
 
   bool tryMapToParameter(FunctionInfos &FInfos, unsigned OpIdx,
@@ -763,6 +765,20 @@ bool SwiftMergeFunctions::deriveParams(ParamInfos &Params,
   // Iterate over all instructions synchronously in all functions.
   do {
     if (isEligibleForConstantSharing(FirstFI.CurrentInst)) {
+
+      // Here we handle a rare corner case which needs to be explained:
+      // Usually the number of operands match, because otherwise the functions
+      // in FInfos would not be in the same equivalence class. There is only one
+      // exception to that: If the current instruction is a call to a function,
+      // which was merged in the previous iteration (in tryMergeEquivalenceClass)
+      // then the call could be replaced and has more arguments than the
+      // original call.
+      if (numOperandsDiffer(FInfos)) {
+        assert(isa<CallInst>(FirstFI.CurrentInst) &&
+               "only calls are expected to differ in number of operands");
+        return false;
+      }
+
       for (unsigned OpIdx = 0, NumOps = FirstFI.CurrentInst->getNumOperands();
            OpIdx != NumOps; ++OpIdx) {
 
@@ -782,6 +798,16 @@ bool SwiftMergeFunctions::deriveParams(ParamInfos &Params,
   } while (FirstFI.CurrentInst);
 
   return true;
+}
+
+/// Returns true if the number of operands of the current instruction differs.
+bool SwiftMergeFunctions::numOperandsDiffer(FunctionInfos &FInfos) {
+  unsigned numOps = FInfos[0].CurrentInst->getNumOperands();
+  for (const FunctionInfo &FI : ArrayRef<FunctionInfo>(FInfos).drop_front(1)) {
+    if (FI.CurrentInst->getNumOperands() != numOps)
+      return true;
+  }
+  return false;
 }
 
 /// Returns true if the \p OpIdx's constant operand in the current instruction
