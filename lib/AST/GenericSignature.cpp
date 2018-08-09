@@ -829,6 +829,10 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
                                   type,
                                   ArchetypeResolutionKind::CompleteWellFormed);
 
+  auto cached = equivClass->conformanceAccessPathCache.find(protocol);
+  if (cached != equivClass->conformanceAccessPathCache.end())
+    return cached->second;
+
   // Dig out the conformance of this type to the given protocol, because we
   // want its requirement source.
   auto conforms = equivClass->conformsTo.find(protocol);
@@ -840,11 +844,12 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
 
   // Local function to construct the conformance access path from the
   // requirement.
-  std::function<void(ArrayRef<Requirement>, const RequirementSource *,
-                     ProtocolDecl *, Type, ProtocolDecl *)> buildPath;
-  buildPath = [&](ArrayRef<Requirement> reqs, const RequirementSource *source,
-                  ProtocolDecl *conformingProto, Type rootType,
-                  ProtocolDecl *requirementSignatureProto) {
+  llvm::function_ref<void(ArrayRef<Requirement>, const RequirementSource *,
+                          ProtocolDecl *, Type, ProtocolDecl *)> buildPath;
+  auto buildPathLambda = [&](ArrayRef<Requirement> reqs,
+                             const RequirementSource *source,
+                             ProtocolDecl *conformingProto, Type rootType,
+                             ProtocolDecl *requirementSignatureProto) {
     // Each protocol requirement is a step along the path.
     if (source->isProtocolRequirement()) {
       // If we're expanding for a protocol that had no requirement signature
@@ -976,6 +981,7 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
     // Add the root of the path, which starts at this explicit requirement.
     path.path.push_back({rootType, conformingProto});
   };
+  buildPath = buildPathLambda;
 
   // Canonicalize the root type.
   auto source = getBestRequirementSource(conforms->second);
@@ -985,6 +991,7 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
   buildPath(getRequirements(), source, protocol, rootType, nullptr);
 
   // Return the path; we're done!
+  equivClass->conformanceAccessPathCache[protocol] = path;
   return path;
 }
 
