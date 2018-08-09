@@ -446,6 +446,18 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
         return inProtocolExtension2;
       }
 
+      // A concrete type member is always more specialised than a protocol
+      // member (bearing in mind that we have already handled the case where
+      // exactly one member is in a protocol extension). Only apply this rule in
+      // Swift 5 mode to better maintain source compatibility under Swift 4
+      // mode.
+      if (tc.Context.isSwiftVersionAtLeast(5)) {
+        auto *proto1 = dyn_cast<ProtocolDecl>(outerDC1);
+        auto *proto2 = dyn_cast<ProtocolDecl>(outerDC2);
+        if (proto1 != proto2)
+          return proto2;
+      }
+
       Type type1 = decl1->getInterfaceType();
       Type type2 = decl2->getInterfaceType();
 
