@@ -196,6 +196,17 @@ void ModuleFile::finishPendingActions() {
          "wrong module used for delayed actions");
 }
 
+static Optional<swift::AccessorKind>
+getActualAccessorKind(uint8_t raw) {
+  switch (serialization::AccessorKind(raw)) {
+#define ACCESSOR(ID) \
+  case serialization::AccessorKind::ID: return swift::AccessorKind::ID;
+#include "swift/AST/AccessorKinds.def"
+  }
+
+  return None;
+}
+
 /// Translate from the serialization DefaultArgumentKind enumerators, which are
 /// guaranteed to be stable, to the AST ones.
 static Optional<swift::DefaultArgumentKind>
@@ -1587,30 +1598,13 @@ giveUpFastPath:
       if (!values.front()->getBaseName().isOperator()) {
         pathTrace.addAccessor(rawKind);
         if (auto storage = dyn_cast<AbstractStorageDecl>(values.front())) {
-          switch (rawKind) {
-          case Get:
-            values.front() = storage->getGetter();
-            break;
-          case Set:
-            values.front() = storage->getSetter();
-            break;
-          case MaterializeForSet:
-            values.front() = storage->getMaterializeForSetFunc();
-            break;
-          case Address:
-            values.front() = storage->getAddressor();
-            break;
-          case MutableAddress:
-            values.front() = storage->getMutableAddressor();
-            break;
-          case WillSet:
-          case DidSet:
-            llvm_unreachable("invalid XREF accessor kind");
-          default:
+          auto actualKind = getActualAccessorKind(rawKind);
+          if (!actualKind) {
             // Unknown accessor kind.
             error();
             return nullptr;
           }
+          values.front() = storage->getAccessor(*actualKind);
         }
         break;
       }
@@ -2027,17 +2021,6 @@ getActualOptionalTypeKind(uint8_t raw) {
     return OTK_Optional;
   case serialization::OptionalTypeKind::ImplicitlyUnwrappedOptional:
     return OTK_ImplicitlyUnwrappedOptional;
-  }
-
-  return None;
-}
-
-static Optional<swift::AccessorKind>
-getActualAccessorKind(uint8_t raw) {
-  switch (serialization::AccessorKind(raw)) {
-#define ACCESSOR(ID) \
-  case serialization::AccessorKind::ID: return swift::AccessorKind::ID;
-#include "swift/AST/AccessorKinds.def"
   }
 
   return None;

@@ -100,8 +100,6 @@ void makeFinal(ASTContext &ctx, ValueDecl *D);
 bool checkOverrides(ValueDecl *decl);
 
 // These are implemented in CodeSynthesis.cpp.
-void maybeAddMaterializeForSet(AbstractStorageDecl *storage,
-                               TypeChecker &TC);
 void maybeAddAccessorsToStorage(TypeChecker &TC, AbstractStorageDecl *storage);
 
 void triggerAccessorSynthesis(TypeChecker &TC, AbstractStorageDecl *storage);
