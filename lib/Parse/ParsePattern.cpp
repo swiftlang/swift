@@ -63,11 +63,9 @@ void Parser::DefaultArgumentInfo::setFunctionContext(
   }
 }
 
-static ParserStatus parseDefaultArgument(Parser &P,
-                                   Parser::DefaultArgumentInfo *defaultArgs,
-                                   unsigned argIndex,
-                                   Expr *&init,
-                                 Parser::ParameterContextKind paramContext) {
+static ParserStatus parseDefaultArgument(
+    Parser &P, Parser::DefaultArgumentInfo *defaultArgs, unsigned argIndex,
+    Expr *&init, Parser::ParameterContextKind paramContext) {
   SyntaxParsingContext DefaultArgContext(P.SyntaxContext,
                                          SyntaxKind::InitializerClause);
   SourceLoc equalLoc = P.consumeToken(tok::equal);
@@ -576,8 +574,17 @@ mapParsedParameters(Parser &parser,
               paramContext == Parser::ParameterContextKind::Initializer ||
               paramContext == Parser::ParameterContextKind::EnumElement) &&
              "Default arguments are only permitted on the first param clause");
-      result->setDefaultArgumentKind(getDefaultArgKind(param.DefaultArg));
+      DefaultArgumentKind kind = getDefaultArgKind(param.DefaultArg);
+      result->setDefaultArgumentKind(kind);
       result->setDefaultValue(param.DefaultArg);
+      if (kind == DefaultArgumentKind::Normal) {
+        SourceRange defaultArgRange = param.DefaultArg->getSourceRange();
+        CharSourceRange charRange =
+            Lexer::getCharSourceRangeFromSourceRange(parser.SourceMgr,
+                                                     defaultArgRange);
+        StringRef defaultArgText = parser.SourceMgr.extractText(charRange);
+        result->setDefaultValueStringRepresentation(defaultArgText);
+      }
     }
 
     elements.push_back(result);

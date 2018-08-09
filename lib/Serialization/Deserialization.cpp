@@ -3057,8 +3057,11 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
 
     // Decode the default argument kind.
     // FIXME: Default argument expression, if available.
-    if (auto defaultArg = getActualDefaultArgKind(rawDefaultArg))
+    if (auto defaultArg = getActualDefaultArgKind(rawDefaultArg)) {
       param->setDefaultArgumentKind(*defaultArg);
+      if (!blobData.empty())
+        param->setDefaultValueStringRepresentation(blobData);
+    }
     break;
   }
 

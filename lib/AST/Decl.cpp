@@ -4830,6 +4830,43 @@ void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
   DefaultValueAndIsVariadic.getPointer()->InitContext = initContext;
 }
 
+StringRef ParamDecl::getDefaultValueStringRepresentation() const {
+  switch (getDefaultArgumentKind()) {
+  case DefaultArgumentKind::None:
+    llvm_unreachable("called on a ParamDecl with no default value");
+  case DefaultArgumentKind::Normal:
+    assert(DefaultValueAndIsVariadic.getPointer() &&
+           "default value not provided yet");
+    return DefaultValueAndIsVariadic.getPointer()->StringRepresentation;
+  case DefaultArgumentKind::Inherited:
+    // FIXME: This needs /some/ kind of textual representation, but this isn't
+    // a great one.
+    return "super";
+  case DefaultArgumentKind::File: return "#file";
+  case DefaultArgumentKind::Line: return "#line";
+  case DefaultArgumentKind::Column: return "#column";
+  case DefaultArgumentKind::Function: return "#function";
+  case DefaultArgumentKind::DSOHandle: return "#dsohandle";
+  case DefaultArgumentKind::NilLiteral: return "nil";
+  case DefaultArgumentKind::EmptyArray: return "[]";
+  case DefaultArgumentKind::EmptyDictionary: return "[:]";
+  }
+}
+
+void
+ParamDecl::setDefaultValueStringRepresentation(StringRef stringRepresentation) {
+  assert(getDefaultArgumentKind() == DefaultArgumentKind::Normal);
+  assert(!stringRepresentation.empty());
+
+  if (!DefaultValueAndIsVariadic.getPointer()) {
+    DefaultValueAndIsVariadic.setPointer(
+      getASTContext().Allocate<StoredDefaultArgument>());
+  }
+
+  DefaultValueAndIsVariadic.getPointer()->StringRepresentation =
+      stringRepresentation;
+}
+
 void DefaultArgumentInitializer::changeFunction(
     DeclContext *parent, ParameterList *paramList) {
   if (parent->isLocalContext()) {

@@ -130,10 +130,10 @@ struct d0100_FooStruct {
 // PASS_COMMON-NEXT: {{^}}  func instanceFunc3(a: Int, b: Double){{$}}
 
   func instanceFuncWithDefaultArg1(a: Int = 0) {}
-// PASS_COMMON-NEXT: {{^}}  func instanceFuncWithDefaultArg1(a: Int = default){{$}}
+// PASS_COMMON-NEXT: {{^}}  func instanceFuncWithDefaultArg1(a: Int = 0){{$}}
 
   func instanceFuncWithDefaultArg2(a: Int = 0, b: Double = 0) {}
-// PASS_COMMON-NEXT: {{^}}  func instanceFuncWithDefaultArg2(a: Int = default, b: Double = default){{$}}
+// PASS_COMMON-NEXT: {{^}}  func instanceFuncWithDefaultArg2(a: Int = 0, b: Double = 0){{$}}
 
   func varargInstanceFunc0(v: Int...) {}
 // PASS_COMMON-NEXT: {{^}}  func varargInstanceFunc0(v: Int...){{$}}

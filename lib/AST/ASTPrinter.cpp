@@ -2327,8 +2327,8 @@ void PrintAST::printOneParameter(const ParamDecl *param,
     Printer << "...";
 
   if (param->isDefaultArgument()) {
-    auto defaultArgStr
-      = getDefaultArgumentSpelling(param->getDefaultArgumentKind());
+    StringRef defaultArgStr = param->getDefaultValueStringRepresentation();
+
     if (defaultArgStr.empty()) {
       if (Options.PrintDefaultParameterPlaceholder)
         Printer << " = " << tok::kw_default;
@@ -2341,6 +2341,7 @@ void PrintAST::printOneParameter(const ParamDecl *param,
       case DefaultArgumentKind::Column:
       case DefaultArgumentKind::Function:
       case DefaultArgumentKind::DSOHandle:
+      case DefaultArgumentKind::NilLiteral:
         Printer.printKeyword(defaultArgStr);
         break;
       default:
