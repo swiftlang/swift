@@ -1839,10 +1839,10 @@ public:
   }
   void visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
     printCommon(E, "interpolated_string_literal_expr");
-    for (auto Segment : E->getSegments()) {
-      OS << '\n';
-      printRec(Segment);
-    }
+    PrintWithColorRAII(OS, LiteralValueColor) << " literal_capacity=" 
+      << E->getLiteralCapacity() << " interpolation_count="
+      << E->getInterpolationCount() << '\n';
+    printRec(E->getAppendingExpr());
     printSemanticExpr(E->getSemanticExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }

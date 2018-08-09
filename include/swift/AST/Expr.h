@@ -171,6 +171,12 @@ protected:
     IsSingleExtendedGraphemeCluster : 1
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(InterpolatedStringLiteralExpr, LiteralExpr, 32+20,
+    : NumPadBits,
+    InterpolationCount : 20,
+    LiteralCapacity : 32
+  );
+
   SWIFT_INLINE_BITFIELD(DeclRefExpr, Expr, 2+2,
     Semantics : 2, // an AccessSemantics
     FunctionRefKind : 2
@@ -962,16 +968,37 @@ public:
 class InterpolatedStringLiteralExpr : public LiteralExpr {
   /// Points at the beginning quote.
   SourceLoc Loc;
-  MutableArrayRef<Expr *> Segments;
+  TapExpr *AppendingExpr;
   Expr *SemanticExpr;
   
 public:
-  InterpolatedStringLiteralExpr(SourceLoc Loc, MutableArrayRef<Expr *> Segments)
-    : LiteralExpr(ExprKind::InterpolatedStringLiteral, /*Implicit=*/false),
-      Loc(Loc), Segments(Segments), SemanticExpr() { }
-  
-  MutableArrayRef<Expr *> getSegments() { return Segments; }
-  ArrayRef<Expr *> getSegments() const { return Segments; }
+  InterpolatedStringLiteralExpr(SourceLoc Loc, unsigned LiteralCapacity, 
+                                unsigned InterpolationCount,
+                                TapExpr *AppendingExpr)
+      : LiteralExpr(ExprKind::InterpolatedStringLiteral, /*Implicit=*/false),
+        Loc(Loc), AppendingExpr(AppendingExpr), SemanticExpr() {
+    Bits.InterpolatedStringLiteralExpr.InterpolationCount = InterpolationCount;
+    Bits.InterpolatedStringLiteralExpr.LiteralCapacity = LiteralCapacity;
+  }
+
+  /// \brief Retrieve the value of the literalCapacity parameter to the
+  /// initializer.
+  unsigned getLiteralCapacity() const {
+    return Bits.InterpolatedStringLiteralExpr.LiteralCapacity;
+  }
+
+  /// \brief Retrieve the value of the interpolationCount parameter to the
+  /// initializer.
+  unsigned getInterpolationCount() const {
+    return Bits.InterpolatedStringLiteralExpr.InterpolationCount;
+  }
+
+  /// \brief A block containing expressions which call
+  /// \c StringInterpolationProtocol methods to append segments to the
+  /// string interpolation. The first node in \c Body should be an uninitialized
+  /// \c VarDecl; the other statements should append to it.
+  TapExpr * getAppendingExpr() const { return AppendingExpr; }
+  void setAppendingExpr(TapExpr * AE) { AppendingExpr = AE; }
   
   /// \brief Retrieve the expression that actually evaluates the resulting
   /// string, typically with a series of '+' operations.
@@ -986,6 +1013,15 @@ public:
     // token, so the range should be (Start == End).
     return Loc;
   }
+
+  struct SegmentInfo {
+    Expr *arg;
+    ConcreteDeclRef appendMethod;
+    bool isInterpolation;
+  };
+
+  /// \brief Call the \c callback with information about each segment in turn.
+  void forEachSegment(llvm::function_ref<void(SegmentInfo)> callback);
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::InterpolatedStringLiteral;

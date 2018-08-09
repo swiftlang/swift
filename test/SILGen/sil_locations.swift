@@ -221,8 +221,28 @@ func captures_tuple<T, U>(x: (T, U)) -> () -> (T, U) {
 
 func interpolated_string(_ x: Int, y: String) -> String {
   return "The \(x) Million Dollar \(y)"
-  // CHECK-LABEL: sil hidden @$s13sil_locations19interpolated_string{{[_0-9a-zA-Z]*}}F
-  // CHECK: copy_value{{.*}}, loc "{{.*}}":[[@LINE-2]]:37
+  // CHECK-LABEL: sil hidden @$S13sil_locations19interpolated_string{{[_0-9a-zA-Z]*}}F
+  // CHECK: function_ref @$Ss26DefaultStringInterpolationV15literalCapacity18interpolationCountABSi_SitcfC
+  // CHECK-NEXT: apply{{.*}}, loc "{{.*}}":[[@LINE-3]]:10
+  
+  // CHECK: string_literal utf8 "The ", loc "{{.*}}":[[@LINE-5]]:10
+  // CHECK: function_ref @$Ss26DefaultStringInterpolationV13appendLiteralyySSF
+  // CHECK-NEXT: apply{{.*}}, loc "{{.*}}":[[@LINE-7]]:11
+  
+  // CHECK: store %0 to{{.*}}, loc "{{.*}}":[[@LINE-9]]:17
+  // CHECK: function_ref @$Ss26DefaultStringInterpolationV06appendC0yyxs06CustomB11ConvertibleRzlF
+  // CHECK-NEXT: apply{{.*}}, loc "{{.*}}":[[@LINE-11]]:16
+  
+  // CHECK: string_literal utf8 " Million Dollar ", loc "{{.*}}":[[@LINE-13]]:19
+  // CHECK: function_ref @$Ss26DefaultStringInterpolationV13appendLiteralyySSF
+  // CHECK-NEXT: apply{{.*}}, loc "{{.*}}":[[@LINE-15]]:19
+  
+  // CHECK: store_borrow %1 to {{.*}}, loc "{{.*}}":[[@LINE-17]]:37
+  // CHECK: function_ref @$Ss26DefaultStringInterpolationV06appendC0yyxs06CustomB11ConvertibleRzs20TextOutputStreamableRzlF
+  // CHECK-NEXT: apply{{.*}}, loc "{{.*}}":[[@LINE-19]]:36
+  
+  // CHECK: function_ref @$SSS19stringInterpolationSSs013DefaultStringB0V_tcfC
+  // CHECK-NEXT: apply{{.*}}, loc "{{.*}}":[[@LINE-22]]:10
 }
 
 

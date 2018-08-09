@@ -2749,10 +2749,10 @@ ERROR(optional_used_as_boolean,none,
      "test for '!= nil' instead", (Type))
 
 ERROR(interpolation_missing_proto,none,
-      "string interpolation requires the protocol '_ExpressibleByStringInterpolation' to be defined",
+      "string interpolation requires the protocol 'ExpressibleByStringInterpolation' to be defined",
       ())
 ERROR(interpolation_broken_proto,none,
-      "protocol '_ExpressibleByStringInterpolation' is broken",
+      "protocol 'ExpressibleByStringInterpolation' is broken",
       ())
 
 ERROR(object_literal_broken_proto,none,

@@ -291,12 +291,6 @@ namespace {
         return { false, expr };
       }      
 
-      // TODO: The systems that we need to solve for interpolated string expressions
-      // require bespoke logic that don't currently work with this approach.
-      if (isa<InterpolatedStringLiteralExpr>(expr)) {
-        return { false, expr };
-      }
-
       // For exprs of a structural type that are not modeling argument lists,
       // avoid merging the type variables. (We need to allow for cases like
       // (Int, Int32).)
@@ -1258,6 +1252,33 @@ namespace {
       CS.addConstraint(ConstraintKind::LiteralConformsTo, tv,
                        interpolationProto->getDeclaredType(),
                        locator);
+
+      if (auto semanticExpr = expr->getSemanticExpr()) {
+        // The semanticExpr must have the same type as this node.
+        auto semanticTV = CS.getType(semanticExpr);
+        auto semanticLocator = CS.getConstraintLocator(semanticExpr);
+        CS.addConstraint(ConstraintKind::Equal, tv, semanticTV,
+                         semanticLocator);
+      }
+      else if (auto appendingExpr = expr->getAppendingExpr()) {
+        auto associatedTypeArray = 
+          interpolationProto->lookupDirect(tc.Context.Id_StringInterpolation);
+        if (associatedTypeArray.empty()) {
+          tc.diagnose(expr->getStartLoc(), diag::interpolation_broken_proto);
+          return nullptr;
+        }
+        auto associatedTypeDecl =
+          cast<AssociatedTypeDecl>(associatedTypeArray.front());
+        auto interpolationTV = DependentMemberType::get(tv, associatedTypeDecl);
+
+        auto appendingExprType = CS.getType(appendingExpr);
+        auto appendingLocator = CS.getConstraintLocator(appendingExpr);
+
+        // Must be Conversion; if it's Equal, then in semi-rare cases, the 
+        // interpolation temporary variable cannot be @lvalue.
+        CS.addConstraint(ConstraintKind::Conversion, appendingExprType,
+                         interpolationTV, appendingLocator);
+      }
 
       return tv;
     }
