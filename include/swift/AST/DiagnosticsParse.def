@@ -951,8 +951,10 @@ ERROR(missing_condition_after_if,none,
       "missing condition in an 'if' statement", ())
 ERROR(expected_lbrace_after_if,PointsToFirstBadToken,
       "expected '{' after 'if' condition", ())
-ERROR(expected_lbrace_after_else,PointsToFirstBadToken,
-      "expected '{' after 'else'", ())
+ERROR(expected_lbrace_or_if_after_else,PointsToFirstBadToken,
+      "expected '{' or 'if' after 'else'", ())
+ERROR(expected_lbrace_or_if_after_else_fixit,PointsToFirstBadToken,
+      "expected '{' or 'if' after 'else'; did you mean to write 'if'?", ())
 ERROR(unexpected_else_after_if,none,
       "unexpected 'else' immediately following 'if' condition", ())
 NOTE(suggest_removing_else,none,

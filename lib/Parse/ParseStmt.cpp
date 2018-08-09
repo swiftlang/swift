@@ -1572,9 +1572,17 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
 ///   stmt-if-else:
 ///    'else' stmt-brace
 ///    'else' stmt-if
-ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo) {
+ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo,
+                                       bool IfWasImplicitlyInserted) {
   SyntaxContext->setCreateSyntax(SyntaxKind::IfStmt);
-  SourceLoc IfLoc = consumeToken(tok::kw_if);
+  SourceLoc IfLoc;
+  if (IfWasImplicitlyInserted) {
+    // The code was invalid due to a missing 'if' (e.g. 'else x < y {') and a
+    // fixit implicitly inserted it.
+    IfLoc = Tok.getLoc();
+  } else {
+    IfLoc = consumeToken(tok::kw_if);
+  }
 
   ParserStatus Status;
   StmtCondition Condition;
@@ -1634,16 +1642,30 @@ ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo) {
   ParserResult<Stmt> ElseBody;
   if (Tok.is(tok::kw_else)) {
     ElseLoc = consumeToken(tok::kw_else);
-    if (Tok.is(tok::kw_if)) {
+
+    bool implicitlyInsertIf = false;
+    if (Tok.isNot(tok::kw_if, tok::l_brace, tok::code_complete)) {
+      // The code looks like 'if ... { ... } else not_if_or_lbrace', so we've
+      // got a problem. If the last bit is 'else ... {' on one line, let's
+      // assume they've forgotten the 'if'.
+      BacktrackingScope backtrack(*this);
+      implicitlyInsertIf = skipUntilTokenOrEndOfLine(tok::l_brace);
+    }
+
+    if (Tok.is(tok::kw_if) || implicitlyInsertIf) {
+      if (implicitlyInsertIf) {
+        diagnose(ElseLoc, diag::expected_lbrace_or_if_after_else_fixit)
+            .fixItInsertAfter(ElseLoc, " if");
+      }
       SyntaxParsingContext ElseIfCtxt(SyntaxContext, SyntaxKind::IfStmt);
-      ElseBody = parseStmtIf(LabeledStmtInfo());
+      ElseBody = parseStmtIf(LabeledStmtInfo(), implicitlyInsertIf);
     } else if (Tok.is(tok::code_complete)) {
       if (CodeCompletion)
         CodeCompletion->completeAfterIfStmt(/*hasElse*/true);
       Status.setHasCodeCompletion();
       consumeToken(tok::code_complete);
     } else {
-      ElseBody = parseBraceItemList(diag::expected_lbrace_after_else);
+      ElseBody = parseBraceItemList(diag::expected_lbrace_or_if_after_else);
     }
     Status |= ElseBody;
   } else if (Tok.is(tok::code_complete)) {
