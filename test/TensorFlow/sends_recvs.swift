@@ -91,10 +91,9 @@ public func test2Sends() {
 
 // CHECK:      function_ref @_swift_tfc_FinishTensorComputation
 
- // expected-warning @+1{{implicitly copied to the accelerator}}
 public func testSendsInABranch(_ c: Bool) {
   var a = Tensor<Float>(1.0)
-  if c { // expected-note {{value used here}}
+  if c {
     a += a
     // One send.
     _hostOp(a.toHost())

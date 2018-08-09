@@ -100,11 +100,10 @@ public func testCondBranch(_ a: Bool) {
 // CHECK-LABEL: --- TFPartition GraphDef Proto:
 // CHECK:  op: "StatelessIf"
 
-public func testWhile(_ n: Int32) { // expected-warning {{'n' implicitly copied to the accelerator}}
+public func testWhile(_ n: Int32) {
   var i: Int32 = 0
   var a = Tensor<Float>(2.0)
-   // expected-warning @+1{{implicitly copied to the accelerator}}
-  while i < n { // expected-note {{value used here}}
+  while i < n {
     a += 1.0
     i += 1
   }
