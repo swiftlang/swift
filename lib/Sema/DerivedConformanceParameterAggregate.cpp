@@ -236,20 +236,9 @@ static ValueDecl *deriveParameterAggregate_update(DerivedConformance &derived) {
   updateDecl->setSelfAccessKind(SelfAccessKind::Mutating);
   updateDecl->setBodySynthesizer(deriveBodyParameterAggregate_update);
 
-  auto selfParam = computeSelfParam(updateDecl);
-  Type interfaceType =
-    FunctionType::get(params->getInterfaceType(C), TupleType::getEmpty(C),
-                      FunctionType::ExtInfo());
-  if (auto sig = nominal->getGenericSignatureOfContext()) {
-    updateDecl->setGenericEnvironment(
-        nominal->getGenericEnvironmentOfContext());
-    interfaceType = GenericFunctionType::get(sig, {selfParam}, interfaceType,
-                                             FunctionType::ExtInfo());
-  } else {
-    interfaceType =
-        FunctionType::get({selfParam}, interfaceType, FunctionType::ExtInfo());
-  }
-  updateDecl->setInterfaceType(interfaceType);
+  if (auto env = parentDC->getGenericEnvironmentOfContext())
+    updateDecl->setGenericEnvironment(env);
+  updateDecl->computeType();
   updateDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
   updateDecl->setValidationToChecked();
 
