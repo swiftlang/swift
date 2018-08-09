@@ -61,10 +61,19 @@ public:
 
   Type getType(Expr *expr) const;
 
+  /// Resolve type variables present in the raw type, if any.
+  Type resolveType(Type rawType) const {
+    return solution.simplifyType(rawType);
+  }
+
   template <typename... ArgTypes>
   InFlightDiagnostic emitDiagnostic(ArgTypes &&... Args) const;
 
 protected:
+  TypeChecker &getTypeChecker() const { return getConstraintSystem().TC; }
+
+  DeclContext *getDC() const { return getConstraintSystem().DC; }
+
   Optional<SelectedOverload>
   getOverloadChoiceIfAvailable(ConstraintLocator *locator) const {
     return solution.getOverloadChoiceIfAvailable(locator);
@@ -164,6 +173,15 @@ public:
                                       ConstraintLocator *locator,
                                       Type toType = Type())
       : FailureDiagnostic(expr, solution, locator), ConvertTo(toType) {}
+
+  bool diagnose() override;
+};
+
+class MissingForcedDowncastFailure final : public FailureDiagnostic {
+public:
+  MissingForcedDowncastFailure(Expr *expr, const Solution &solution,
+                               ConstraintLocator *locator)
+      : FailureDiagnostic(expr, solution, locator) {}
 
   bool diagnose() override;
 };

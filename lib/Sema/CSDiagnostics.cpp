@@ -211,3 +211,41 @@ bool NoEscapeFuncToTypeConversionFailure::diagnose() {
                  archetype);
   return true;
 }
+
+bool MissingForcedDowncastFailure::diagnose() {
+  auto &TC = getTypeChecker();
+
+  auto *coerceExpr = dyn_cast<CoerceExpr>(getAnchor());
+  if (!coerceExpr)
+    return false;
+
+  auto *subExpr = coerceExpr->getSubExpr();
+  auto fromType = getType(subExpr)->getRValueType();
+  auto toType = resolveType(coerceExpr->getCastTypeLoc().getType());
+
+  auto castKind =
+      TC.typeCheckCheckedCast(fromType, toType, CheckedCastContextKind::None,
+                              getDC(), coerceExpr->getLoc(), subExpr,
+                              coerceExpr->getCastTypeLoc().getSourceRange());
+
+  switch (castKind) {
+  // Invalid cast.
+  case CheckedCastKind::Unresolved:
+    // Fix didn't work, let diagnoseFailureForExpr handle this.
+    return false;
+  case CheckedCastKind::Coercion:
+  case CheckedCastKind::BridgingCoercion:
+    llvm_unreachable("Coercions handled in other disjunction branch");
+
+  // Valid casts.
+  case CheckedCastKind::ArrayDowncast:
+  case CheckedCastKind::DictionaryDowncast:
+  case CheckedCastKind::SetDowncast:
+  case CheckedCastKind::ValueCast:
+    emitDiagnostic(coerceExpr->getLoc(), diag::missing_forced_downcast,
+                   fromType, toType)
+        .highlight(coerceExpr->getSourceRange())
+        .fixItReplace(coerceExpr->getLoc(), "as!");
+    return true;
+  }
+}

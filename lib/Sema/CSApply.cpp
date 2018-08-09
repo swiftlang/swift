@@ -7964,39 +7964,8 @@ bool ConstraintSystem::applySolutionFix(
   }
 
   case FixKind::CoerceToCheckedCast: {
-    if (auto *coerceExpr = dyn_cast<CoerceExpr>(locator->getAnchor())) {
-      Expr *subExpr = coerceExpr->getSubExpr();
-      auto fromType =
-        solution.simplifyType(getType(subExpr))->getRValueType();
-      auto toType =
-        solution.simplifyType(coerceExpr->getCastTypeLoc().getType());
-      auto castKind = TC.typeCheckCheckedCast(
-                        fromType, toType, CheckedCastContextKind::None, DC,
-                        coerceExpr->getLoc(), subExpr,
-                        coerceExpr->getCastTypeLoc().getSourceRange());
-      
-      switch (castKind) {
-      // Invalid cast.
-      case CheckedCastKind::Unresolved:
-        // Fix didn't work, let diagnoseFailureForExpr handle this.
-        return false;
-      case CheckedCastKind::Coercion:
-      case CheckedCastKind::BridgingCoercion:
-        llvm_unreachable("Coercions handled in other disjunction branch");
-
-      // Valid casts.
-      case CheckedCastKind::ArrayDowncast:
-      case CheckedCastKind::DictionaryDowncast:
-      case CheckedCastKind::SetDowncast:
-      case CheckedCastKind::ValueCast:
-        TC.diagnose(coerceExpr->getLoc(), diag::missing_forced_downcast,
-                    fromType, toType)
-          .highlight(coerceExpr->getSourceRange())
-          .fixItReplace(coerceExpr->getLoc(), "as!");
-        return true;
-      }
-    }
-    return false;
+    MissingForcedDowncastFailure failure(expr, solution, locator);
+    return failure.diagnose();
   }
 
   case FixKind::ExplicitlyEscaping: {
