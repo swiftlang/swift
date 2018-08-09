@@ -26,6 +26,32 @@ using namespace constraints;
 
 FailureDiagnostic::~FailureDiagnostic() {}
 
+Expr *FailureDiagnostic::computeAnchor() const {
+  auto &cs = getConstraintSystem();
+
+  auto *locator = getLocator();
+  // Resolve the locator to a specific expression.
+  SourceRange range;
+  bool isSubscriptMember =
+      (!locator->getPath().empty() && locator->getPath().back().getKind() ==
+                                          ConstraintLocator::SubscriptMember);
+
+  ConstraintLocator *resolved = simplifyLocator(cs, locator, range);
+  if (!resolved || !resolved->getAnchor())
+    return locator->getAnchor();
+
+  Expr *anchor = resolved->getAnchor();
+
+  // FIXME: Work around an odd locator representation that doesn't separate the
+  // base of a subscript member from the member access.
+  if (isSubscriptMember) {
+    if (auto subscript = dyn_cast<SubscriptExpr>(anchor))
+      return subscript->getBase();
+  }
+
+  return anchor;
+}
+
 Type FailureDiagnostic::getType(Expr *expr) const {
   auto &cs = getConstraintSystem();
   return solution.simplifyType(cs.getType(expr));

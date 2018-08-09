@@ -34,10 +34,13 @@ class FailureDiagnostic {
   const Solution &solution;
   ConstraintLocator *Locator;
 
+  Expr *Anchor;
+
 public:
   FailureDiagnostic(Expr *expr, const Solution &solution,
                     ConstraintLocator *locator)
-      : E(expr), solution(solution), Locator(locator) {}
+      : E(expr), solution(solution), Locator(locator), Anchor(computeAnchor()) {
+  }
 
   virtual ~FailureDiagnostic();
 
@@ -55,7 +58,7 @@ public:
 
   Expr *getParentExpr() const { return E; }
 
-  Expr *getAnchor() const { return Locator->getAnchor(); }
+  Expr *getAnchor() const { return Anchor; }
 
   ConstraintLocator *getLocator() const { return Locator; }
 
@@ -78,6 +81,10 @@ protected:
   getOverloadChoiceIfAvailable(ConstraintLocator *locator) const {
     return solution.getOverloadChoiceIfAvailable(locator);
   }
+
+private:
+  /// Compute anchor expression associated with current diagnostic.
+  Expr *computeAnchor() const;
 };
 
 /// Base class for all of the diagnostics related to generic requirement
