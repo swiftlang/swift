@@ -48,7 +48,9 @@ set(SOURCES
   TensorHandle.swift
   TensorProtocol.swift
   TensorShape.swift
-  Utilities.swift)
+  Utilities.swift
+  # NumPy bridging for `ShapedArray` and `Tensor`.
+  NumpyConversion.swift)
 
 # Copy TensorFlow bindings file, if it exists.
 if (TENSORFLOW_SWIFT_BINDINGS)
