@@ -131,6 +131,12 @@ class XRefTracePath {
         case DidSet:
           os << "(didSet)";
           break;
+        case Read:
+          os << "(read)";
+          break;
+        case Modify:
+          os << "(modify)";
+          break;
         default:
           os << "(unknown accessor kind)";
           break;

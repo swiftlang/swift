@@ -133,15 +133,9 @@ public:
   }
 
   void visitAbstractStorageDecl(AbstractStorageDecl *sd) {
-    asDerived().addMethod(SILDeclRef(sd->getGetter(),
-                                     SILDeclRef::Kind::Func));
-    if (sd->isSettable(sd->getDeclContext())) {
-      asDerived().addMethod(SILDeclRef(sd->getSetter(),
-                                       SILDeclRef::Kind::Func));
-      if (sd->getMaterializeForSetFunc())
-        asDerived().addMethod(SILDeclRef(sd->getMaterializeForSetFunc(),
-                                         SILDeclRef::Kind::Func));
-    }
+    sd->visitOpaqueAccessors([&](AccessorDecl *accessor) {
+      asDerived().addMethod(SILDeclRef(accessor, SILDeclRef::Kind::Func));
+    });
   }
 
   void visitConstructorDecl(ConstructorDecl *cd) {
