@@ -40,9 +40,12 @@ llvm::raw_ostream *getTFDumpIntermediateStream();
 /// return null.
 VarDecl *getFieldIfContainsSingleField(NominalTypeDecl *decl);
 
-/// If the specified type is the well-known TensorHandle<T> type, then return
-/// "T".  If not, return a null type.
+/// Returns true if the specified type is the well-known TensorHandle<T> type.
 bool isTensorHandle(SILType ty);
+  
+/// Returns true if the specified type is the well-known opaque handle type such
+/// as VariantHandle and ResourceHandle.
+bool isOpaqueHandle(SILType ty);
 
 /// Determine whether the specified type is one of our well-known types, and
 /// if so, which one it is.

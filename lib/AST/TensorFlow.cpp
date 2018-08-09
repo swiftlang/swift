@@ -57,6 +57,13 @@ bool tf::isTensorHandle(Type ty) {
   return classifyTensorFlowValue(ty) == TFValueKind::TensorHandle;
 }
 
+/// Return true if the specified type is an opaque handle, such as
+/// VariantHandle and ResourceHandle.
+bool tf::isOpaqueHandle(Type ty) {
+  auto kind = classifyTensorFlowValue(ty);
+  return kind != TFValueKind::Nope && kind != TFValueKind::TensorHandle;
+}
+
 /// Return true if the specified type is TensorHandle<T>, ResourceHandle, or
 /// VariantHandle.
 bool tf::isTensorFlowValue(Type ty) {

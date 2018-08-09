@@ -96,7 +96,11 @@ VarDecl *tf::getFieldIfContainsSingleField(NominalTypeDecl *decl) {
 }
 
 bool tf::isTensorHandle(SILType ty) {
-  return (bool)isTensorHandle(ty.getASTType());
+  return isTensorHandle(ty.getASTType());
+}
+
+bool tf::isOpaqueHandle(SILType ty) {
+  return isOpaqueHandle(ty.getASTType());
 }
 
 /// Determine whether the specified type is one of our well-known types, and

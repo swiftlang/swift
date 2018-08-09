@@ -44,8 +44,12 @@ namespace tf {
   /// if so, which one it is.
   TFValueKind classifyTensorFlowValue(Type ty);
 
-  /// Return true if the specified type is a TensorHandle<T>.
+  /// Return true if the specified type is an opaque handle such as
+  /// VariantHandle and ResourceHandle.
   bool isTensorHandle(Type ty);
+  
+  /// Return true if the specified type is a TensorHandle<T>.
+  bool isOpaqueHandle(Type ty);
 
   /// Return true if the specified type is TensorHandle<T>, ResourceHandle, or
   /// VariantHandle.
