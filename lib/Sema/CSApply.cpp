@@ -7590,9 +7590,9 @@ static std::pair<Expr *, unsigned> getPrecedenceParentAndIndex(Expr *expr,
 /// Return true if, when replacing "<expr>" with "<expr> op <something>",
 /// parentheses must be added around "<expr>" to allow the new operator
 /// to bind correctly.
-static bool exprNeedsParensInsideFollowingOperator(TypeChecker &TC,
-                                                   DeclContext *DC, Expr *expr,
-                                            PrecedenceGroupDecl *followingPG) {
+bool swift::exprNeedsParensInsideFollowingOperator(
+    TypeChecker &TC, DeclContext *DC, Expr *expr,
+    PrecedenceGroupDecl *followingPG) {
   if (expr->isInfixOperator()) {
     auto exprPG = TC.lookupPrecedenceGroupForInfixOperator(DC, expr);
     if (!exprPG) return true;
@@ -7613,10 +7613,9 @@ static bool exprNeedsParensInsideFollowingOperator(TypeChecker &TC,
 /// within the given root expression, parentheses must be added around
 /// the new operator to prevent it from binding incorrectly in the
 /// surrounding context.
-static bool exprNeedsParensOutsideFollowingOperator(TypeChecker &TC,
-                                                    DeclContext *DC, Expr *expr,
-                                                    Expr *rootExpr,
-                                            PrecedenceGroupDecl *followingPG) {
+bool swift::exprNeedsParensOutsideFollowingOperator(
+    TypeChecker &TC, DeclContext *DC, Expr *expr, Expr *rootExpr,
+    PrecedenceGroupDecl *followingPG) {
   Expr *parent;
   unsigned index;
   std::tie(parent, index) = getPrecedenceParentAndIndex(expr, rootExpr);
@@ -7639,29 +7638,6 @@ static bool exprNeedsParensOutsideFollowingOperator(TypeChecker &TC,
   }
 
   return true;
-}
-
-// Return true if, when replacing "<expr>" with "<expr> as T", parentheses need
-// to be added around <expr> first in order to maintain the correct precedence.
-static bool exprNeedsParensBeforeAddingAs(TypeChecker &TC, DeclContext *DC,
-                                          Expr *expr) {
-  auto asPG =
-    TC.lookupPrecedenceGroup(DC, DC->getASTContext().Id_CastingPrecedence,
-                             SourceLoc());
-  if (!asPG) return true;
-  return exprNeedsParensInsideFollowingOperator(TC, DC, expr, asPG);
-}
-
-// Return true if, when replacing "<expr>" with "<expr> as T", parentheses need
-// to be added around the new expression in order to maintain the correct
-// precedence.
-static bool exprNeedsParensAfterAddingAs(TypeChecker &TC, DeclContext *DC,
-                                         Expr *expr, Expr *rootExpr) {
-  auto asPG =
-    TC.lookupPrecedenceGroup(DC, DC->getASTContext().Id_CastingPrecedence,
-                             SourceLoc());
-  if (!asPG) return true;
-  return exprNeedsParensOutsideFollowingOperator(TC, DC, expr, rootExpr, asPG);
 }
 
 bool swift::exprNeedsParensBeforeAddingNilCoalescing(TypeChecker &TC,
@@ -7908,52 +7884,9 @@ bool ConstraintSystem::applySolutionFix(
   }
 
   case FixKind::ForceDowncast: {
-    if (auto *paren = dyn_cast<ParenExpr>(affected))
-      affected = paren->getSubExpr();
-
-    auto fromType = solution.simplifyType(getType(affected))->getRValueType();
-    Type toType = solution.simplifyType(fix.first.getTypeArgument(*this));
-    bool useAs = TC.isExplicitlyConvertibleTo(fromType, toType, DC);
-    bool useAsBang = !useAs && TC.checkedCastMaySucceed(fromType, toType,
-                                                        DC);
-    if (!useAs && !useAsBang)
-      return false;
-    
-    // If we're performing pattern matching, "as" means something completely different...
-    if (auto binOpExpr = dyn_cast<BinaryExpr>(expr)) {
-      auto overloadedFn = dyn_cast<OverloadedDeclRefExpr>(binOpExpr->getFn());
-      if (overloadedFn && !overloadedFn->getDecls().empty()) {
-        ValueDecl *decl0 = overloadedFn->getDecls()[0];
-        if (decl0->getBaseName() == decl0->getASTContext().Id_MatchOperator)
-          return false;
-      }
-    }
-
-    bool needsParensInside = exprNeedsParensBeforeAddingAs(TC, DC, affected);
-    bool needsParensOutside = exprNeedsParensAfterAddingAs(TC, DC, affected,
-                                                           expr);
-    llvm::SmallString<2> insertBefore;
-    llvm::SmallString<32> insertAfter;
-    if (needsParensOutside) {
-      insertBefore += "(";
-    }
-    if (needsParensInside) {
-      insertBefore += "(";
-      insertAfter += ")";
-    }
-    insertAfter += useAs ? " as " : " as! ";
-    insertAfter += toType->getWithoutParens()->getString();
-    if (needsParensOutside)
-      insertAfter += ")";
-    
-    auto diagID = useAs ? diag::missing_explicit_conversion
-                        : diag::missing_forced_downcast;
-    auto diag = TC.diagnose(affected->getLoc(), diagID, fromType, toType);
-    if (!insertBefore.empty()) {
-      diag.fixItInsert(affected->getStartLoc(), insertBefore);
-    }
-    diag.fixItInsertAfter(affected->getEndLoc(), insertAfter);
-    return true;
+    MissingExplicitConversionFailure failure(expr, solution, locator,
+                                             fix.first.getTypeArgument(*this));
+    return failure.diagnose();
   }
 
   case FixKind::AddressOf: {

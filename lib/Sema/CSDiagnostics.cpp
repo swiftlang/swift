@@ -283,3 +283,57 @@ bool MissingAddressOfFailure::diagnose() {
       .fixItInsert(anchor->getStartLoc(), "&");
   return true;
 }
+
+bool MissingExplicitConversionFailure::diagnose() {
+  auto *DC = getDC();
+  auto &TC = getTypeChecker();
+
+  auto *anchor = getAnchor();
+  if (auto *paren = dyn_cast<ParenExpr>(anchor))
+    anchor = paren->getSubExpr();
+
+  auto fromType = getType(anchor)->getRValueType();
+  Type toType = resolveType(ConvertingTo);
+  bool useAs = TC.isExplicitlyConvertibleTo(fromType, toType, DC);
+  bool useAsBang = !useAs && TC.checkedCastMaySucceed(fromType, toType, DC);
+  if (!useAs && !useAsBang)
+    return false;
+
+  auto *expr = getParentExpr();
+  // If we're performing pattern matching,
+  // "as" means something completely different...
+  if (auto binOpExpr = dyn_cast<BinaryExpr>(expr)) {
+    auto overloadedFn = dyn_cast<OverloadedDeclRefExpr>(binOpExpr->getFn());
+    if (overloadedFn && !overloadedFn->getDecls().empty()) {
+      ValueDecl *decl0 = overloadedFn->getDecls()[0];
+      if (decl0->getBaseName() == decl0->getASTContext().Id_MatchOperator)
+        return false;
+    }
+  }
+
+  bool needsParensInside = exprNeedsParensBeforeAddingAs(anchor);
+  bool needsParensOutside = exprNeedsParensAfterAddingAs(anchor, expr);
+
+  llvm::SmallString<2> insertBefore;
+  llvm::SmallString<32> insertAfter;
+  if (needsParensOutside) {
+    insertBefore += "(";
+  }
+  if (needsParensInside) {
+    insertBefore += "(";
+    insertAfter += ")";
+  }
+  insertAfter += useAs ? " as " : " as! ";
+  insertAfter += toType->getWithoutParens()->getString();
+  if (needsParensOutside)
+    insertAfter += ")";
+
+  auto diagID =
+      useAs ? diag::missing_explicit_conversion : diag::missing_forced_downcast;
+  auto diag = emitDiagnostic(anchor->getLoc(), diagID, fromType, toType);
+  if (!insertBefore.empty()) {
+    diag.fixItInsert(anchor->getStartLoc(), insertBefore);
+  }
+  diag.fixItInsertAfter(anchor->getEndLoc(), insertAfter);
+  return true;
+}
