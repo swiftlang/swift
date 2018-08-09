@@ -1842,6 +1842,18 @@ bool TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {
   return HadError;
 }
 
+bool TypeChecker::typeCheckTapBody(TapExpr *expr, DeclContext *DC) {
+  // We intentionally use typeCheckStmt instead of typeCheckBody here
+  // because we want to contextualize TapExprs with the body 
+  // they're in.
+  BraceStmt *body = expr->getBody();
+  bool HadError = StmtChecker(*this, DC).typeCheckStmt(body);
+  if (body) {
+    expr->setBody(body);
+  }
+  return HadError;
+}
+
 void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
   // We intentionally use typeCheckStmt instead of typeCheckBody here
   // because we want to contextualize all the TopLevelCode
