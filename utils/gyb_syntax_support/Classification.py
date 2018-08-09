@@ -56,6 +56,18 @@ SYNTAX_CLASSIFICATIONS = [
     SyntaxClassification('EditorPlaceholder', description='''
     An editor placeholder of the form `<#content#>`
     '''),
+    SyntaxClassification('LineComment', description='''
+    A line comment starting with `//`.
+    '''),
+    SyntaxClassification('DocLineComment', description='''
+    A doc line comment starting with `///`.
+    '''),
+    SyntaxClassification('BlockComment', description='''
+    A block comment starting with `/**` and ending with `*/.
+    '''),
+    SyntaxClassification('DocBlockComment', description='''
+    A doc block comment starting with `/**` and ending with `*/.
+    '''),
 ]
 
 
