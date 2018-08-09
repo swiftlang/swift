@@ -4,6 +4,7 @@
 // RUN: %target-codesign %t/libresilient_struct.%target-dylib-extension
 
 // RUN: %target-build-swift %s -L %t -I %t -lresilient_struct -o %t/main -Xlinker -rpath -Xlinker %t
+// RUN: %target-codesign %t/main
 
 // RUN: %target-run %t/main %t/libresilient_struct.%target-dylib-extension
 
