@@ -300,8 +300,9 @@ public:
 
   virtual void initialize(SILPassManager *PM) override;
   
-  virtual EpilogueARCFunctionInfo *newFunctionAnalysis(SILFunction *F) override {
-    return new EpilogueARCFunctionInfo(F, PO, AA, RC);
+  virtual std::unique_ptr<EpilogueARCFunctionInfo>
+  newFunctionAnalysis(SILFunction *F) override {
+    return llvm::make_unique<EpilogueARCFunctionInfo>(F, PO, AA, RC);
   }
 
   virtual bool shouldInvalidate(SILAnalysis::InvalidationKind K) override {

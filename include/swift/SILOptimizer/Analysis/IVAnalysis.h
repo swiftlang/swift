@@ -90,8 +90,8 @@ public:
     return S->getKind() == SILAnalysisKind::InductionVariable;
   }
 
-  IVInfo *newFunctionAnalysis(SILFunction *F) override {
-    return new IVInfo(*F);
+  std::unique_ptr<IVInfo> newFunctionAnalysis(SILFunction *F) override {
+    return llvm::make_unique<IVInfo>(*F);
   }
 
   /// For now we always invalidate.
