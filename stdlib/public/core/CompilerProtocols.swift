@@ -703,49 +703,178 @@ public protocol ExpressibleByDictionaryLiteral {
 ///     let message = "One cookie: $\(price), \(number) cookies: $\(price * number)."
 ///     print(message)
 ///     // Prints "One cookie: $2, 3 cookies: $6."
-///
-/// Conforming to the ExpressibleByStringInterpolation Protocol
+/// 
+/// Extending default interpolation behavior
+/// ========================================
+/// 
+/// Clients which want to add new interpolation behavior to existing types
+/// should extend `DefaultStringInterpolation`, the type which implements
+/// interpolation for types like `String` and `Substring`, to add an overload of
+/// `appendInterpolation(_:)` with their new behavior. See the
+/// `DefaultStringInterpolation` and `StringInterpolationProtocol` documentation
+/// for more details.
+/// 
+/// Creating a type which supports default string interpolation
 /// ===========================================================
+/// 
+/// Clients which want to create new types supporting string literals and
+/// interpolation, but which do not need any custom behavior, should conform
+/// their type to `ExpressibleByStringInterpolation` and implement an
+/// `init(stringLiteral: String)` method. Swift will automatically use
+/// `DefaultStringInterpolation` and provide an `init(stringInterpolation:)`
+/// implementation which passes the interpolated literal's contents to
+/// `init(stringLiteral:)`, so you won't need to implement anything special.
 ///
-/// The `ExpressibleByStringInterpolation` protocol is deprecated. Do not add
-/// new conformances to the protocol.
-@available(*, deprecated, message: "it will be replaced or redesigned in Swift 5.0.  Instead of conforming to 'ExpressibleByStringInterpolation', consider adding an 'init(_:String)'")
-public typealias ExpressibleByStringInterpolation = _ExpressibleByStringInterpolation
-public protocol _ExpressibleByStringInterpolation {
-  /// Creates an instance by concatenating the given values.
-  ///
-  /// Do not call this initializer directly. It is used by the compiler when
-  /// you use string interpolation. For example:
-  ///
-  ///     let s = "\(5) x \(2) = \(5 * 2)"
-  ///     print(s)
-  ///     // Prints "5 x 2 = 10"
-  ///
-  /// After calling `init(stringInterpolationSegment:)` with each segment of
-  /// the string literal, this initializer is called with their string
-  /// representations.
-  ///
-  /// - Parameter strings: An array of instances of the conforming type.
-  init(stringInterpolation strings: Self...)
+/// Creating a type which supports custom string interpolation
+/// ==========================================================
+/// 
+/// If a conforming type wants to differentiate between literal and interpolated
+/// segments, restrict the types which can be interpolated into it, support
+/// different interpolators from the ones on `String`, or avoid constructing a
+/// `String` containing the data, it must specify a custom `StringInterpolation`
+/// associated type. This type must conform to `StringInterpolationProtocol` and
+/// must have a matching `StringLiteralType`.
+///
+/// See the `StringLiteralProtocol` documentation for more details about how to
+/// do this.
+public protocol ExpressibleByStringInterpolation
+  : ExpressibleByStringLiteral {
   
-  /// Creates an instance containing the appropriate representation for the
-  /// given value.
+  /// The type each segment of a string literal containing interpolations
+  /// should be appended to. Its `StringLiteralType` should match the
+  /// `StringLiteralType` of this type.
+  associatedtype StringInterpolation : StringInterpolationProtocol
+    = DefaultStringInterpolation
+    where StringInterpolation.StringLiteralType == StringLiteralType
+
+  /// Creates an instance from a string interpolation.
+  /// 
+  /// Most `StringInterpolation` types will store information about the
+  /// literals and interpolations appended to them in one or more properties.
+  /// `init(stringInterpolation:)` should use these properties to initialize
+  /// the instance.
+  /// 
+  /// - Parameter stringInterpolation: An instance of `StringInterpolation`
+  ///             which has had each segment of the string literal appended
+  ///             to it.
+  init(stringInterpolation: StringInterpolation)
+}
+
+extension ExpressibleByStringInterpolation
+  where StringInterpolation == DefaultStringInterpolation {
+  
+  /// Creates a new instance from an interpolated string literal.
+  /// 
+  /// Do not call this initializer directly. It is used by the compiler when
+  /// you create a string using string interpolation. Instead, use string
+  /// interpolation to create a new string by including values, literals,
+  /// variables, or expressions enclosed in parentheses, prefixed by a
+  /// backslash (`\(`...`)`).
   ///
-  /// Do not call this initializer directly. It is used by the compiler for
-  /// each string interpolation segment when you use string interpolation. For
-  /// example:
-  ///
-  ///     let s = "\(5) x \(2) = \(5 * 2)"
-  ///     print(s)
-  ///     // Prints "5 x 2 = 10"
-  ///
-  /// This initializer is called five times when processing the string literal
-  /// in the example above; once each for the following: the integer `5`, the
-  /// string `" x "`, the integer `2`, the string `" = "`, and the result of
-  /// the expression `5 * 2`.
-  ///
-  /// - Parameter expr: The expression to represent.
-  init<T>(stringInterpolationSegment expr: T)
+  ///     let price = 2
+  ///     let number = 3
+  ///     let message = "If one cookie costs \(price) dollars, " +
+  ///                   "\(number) cookies cost \(price * number) dollars."
+  ///     print(message)
+  ///     // Prints "If one cookie costs 2 dollars, 3 cookies cost 6 dollars."
+  public init(stringInterpolation: DefaultStringInterpolation) {
+    self.init(stringLiteral: stringInterpolation.make())
+  }
+}
+
+/// Represents the contents of a string literal with interpolations while it is
+/// being built up.
+/// 
+/// Each `ExpressibleByStringInterpolation` type has an associated
+/// `StringInterpolation` type which conforms to `StringInterpolationProtocol`.
+/// Swift converts an expression like `"The time is \(time)." as MyString` into
+/// a series of statements similar to:
+/// 
+///     var interpolation = MyString.StringInterpolation(literalCapacity: 13, 
+///                                                      interpolationCount: 1)
+/// 
+///     interpolation.appendLiteral("The time is ")
+///     interpolation.appendInterpolation(time)
+///     interpolation.appendLiteral(".")
+///
+///     MyString(stringInterpolation: interpolation)
+/// 
+/// The `StringInterpolation` type is responsible for collecting the segments
+/// passed to its `appendLiteral(_:)` and `appendInterpolation` methods and
+/// assembling them into a whole, converting as necessary. Once all of the
+/// segments have been appended, the interpolation will be passed to an
+/// `init(stringInterpolation:)` initializer on the type being created, which
+/// must extract the accumulated data from the `StringInterpolation`.
+/// 
+/// In simple cases, types conforming to `ExpressibleByStringInterpolation`
+/// can use `DefaultStringInterpolation` instead of writing their own. All they
+/// must do is conform to `ExpressibleByStringInterpolation` and implement
+/// `init(stringLiteral: String)`; interpolated string literals will then go
+/// through that initializer just as any other string literal would.
+/// 
+/// The `appendInterpolation` Method
+/// ================================
+/// 
+/// Each interpolated segment is translated into a call to a
+/// `StringInterpolationProtocol.appendInterpolation(...)` method, with the
+/// contents of the interpolation's parentheses treated as the call's argument
+/// list. That argument list can include multiple arguments and argument labels.
+/// For example:
+/// 
+/// | If you write... | Swift calls...                    |
+/// |---------------- | --------------------------------- |
+/// | `\(x)`          | `appendInterpolation(x)`          |
+/// | `\(x, y)`       | `appendInterpolation(x, y)`       |
+/// | `\(foo: x)`     | `appendInterpolation(foo: x)`     |
+/// | `\(x, foo: y)`  | `appendInterpolation(x, foo: y)`  |
+/// 
+/// `appendInterpolation` methods should return `Void` and should not be
+/// `static`. They otherwise support virtually all features of methods: they can
+/// have any number of parameters, can specify labels for any or all of them,
+/// can provide default values for parameters, can have variadic parameters, and
+/// can have parameters with generic types. Most importantly, they can be
+/// overloaded, so a `StringInterpolationProtocol`-conforming type can provide
+/// several different `appendInterpolation` methods with different behaviors.
+/// `appendInterpolation` methods can also throw; when a user uses one of these,
+/// they must mark the string literal with `try` or one of its variants.
+public protocol StringInterpolationProtocol {
+  /// The type that should be used for literal segments.
+  associatedtype StringLiteralType : _ExpressibleByBuiltinStringLiteral
+
+  /// Creates an empty instance ready to be filled with string literal content.
+  /// 
+  /// Do not call this initializer directly. Instead, initialize a variable or
+  /// constant using a string literal with interpolated expressions.
+  /// 
+  /// Swift passes this initializer a pair of arguments specifying the size of
+  /// the literal segments and the number of interpolated segments. Use this
+  /// information to estimate the amount of storage you will need and
+  /// pre-allocate it with a method like
+  /// `RangeReplaceableCollection.reserveCapacity(_:)`.
+  /// 
+  /// - Parameter literalCapacity: The approximate size of all literal segments
+  ///   combined. This is meant to be passed to `String.reserveCapacity(_:)`;
+  ///   it may be slightly larger or smaller than the sum of `String.count`
+  ///   called on each literal segment.
+  /// - Parameter interpolationCount: The number of interpolations which will be
+  ///   appended. Use this value to estimate how much additional capacity will
+  ///   be needed for the interpolated segments.
+  init(literalCapacity: Int, interpolationCount: Int)
+
+  /// Appends a literal segment to the interpolation.
+  /// 
+  /// Do not call this method directly. Instead, initialize a variable or
+  /// constant using a string literal with interpolated expressions.
+  /// 
+  /// Interpolated expressions do not pass through this method; instead, Swift
+  /// selects an overload of `appendInterpolation`. See the top-level
+  /// `StringInterpolationProtocol` documentation for more details.
+  /// 
+  /// - Parameter literal: A string literal containing the characters
+  ///             that appear next in the string literal.
+  mutating func appendLiteral(_ literal: StringLiteralType)
+
+  // Informal requirement: mutating func appendInterpolation(...)
 }
 
 /// A type that can be initialized using a color literal (e.g.

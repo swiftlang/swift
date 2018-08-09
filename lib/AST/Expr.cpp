@@ -788,7 +788,9 @@ static LiteralExpr *
 shallowCloneImpl(const InterpolatedStringLiteralExpr *E, ASTContext &Ctx,
                  llvm::function_ref<Type(const Expr *)> getType) {
   auto res = new (Ctx) InterpolatedStringLiteralExpr(E->getLoc(),
-                const_cast<InterpolatedStringLiteralExpr*>(E)->getSegments());
+                                                     E->getLiteralCapacity(),
+                                                     E->getInterpolationCount(),
+                                                     E->getAppendingExpr());
   res->setSemanticExpr(E->getSemanticExpr());
   return res;
 }
@@ -2179,6 +2181,42 @@ void KeyPathExpr::Component::setSubscriptIndexHashableConformances(
   case Kind::UnresolvedProperty:
   case Kind::Property:
     llvm_unreachable("no hashable conformances for this kind");
+  }
+}
+
+void InterpolatedStringLiteralExpr::forEachSegment(llvm::function_ref<void(SegmentInfo)> callback) {
+  auto appendingExpr = getAppendingExpr();
+  if (SemanticExpr) {
+    SemanticExpr->forEachChildExpr([&](Expr *subExpr) -> Expr * {
+      if (auto tap = dyn_cast_or_null<TapExpr>(subExpr)) {
+        appendingExpr = tap;
+        return nullptr;
+      }
+      return subExpr;
+    });
+  }
+  
+  for (auto stmt : appendingExpr->getBody()->getElements()) {
+    if (auto expr = stmt.dyn_cast<Expr*>()) {
+      if (auto apply = dyn_cast<ApplyExpr>(expr)) {
+        SegmentInfo segment;
+        
+        segment.arg = apply->getArg();
+        segment.appendMethod = getCalledDeclRef(apply);
+        
+        DeclName name;
+        if (segment.appendMethod) {
+          name = segment.appendMethod.getDecl()->getFullName();
+        } else if (auto unresolvedDot =
+                     dyn_cast<UnresolvedDotExpr>(apply->getFn())) {
+          name = unresolvedDot->getName();
+        }
+        
+        segment.isInterpolation = (name.getBaseName() == "appendInterpolation");
+        
+        callback(segment);
+      }
+    }
   }
 }
 
