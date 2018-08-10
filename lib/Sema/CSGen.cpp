@@ -3213,22 +3213,21 @@ namespace {
           continue;
         }
 
-        // Let's check if condition of the IfExpr looks properly
-        // type-checked, and roll it back to the original state,
-        // because otherwise, since condition is implicitly Int1,
-        // we'll have to handle multiple ways of type-checking
-        // IfExprs in both ConstraintGenerator and ExprRewriter,
-        // so it's less error prone to do it once here.
-        if (auto IE = dyn_cast<IfExpr>(expr)) {
-          [&] {
-            auto condition = IE->getCondExpr();
-            if (!condition) return;
-            auto call = dyn_cast<CallExpr>(condition);
-            if (!call || !call->isImplicit()) return;
-            auto DSCE = dyn_cast<DotSyntaxCallExpr>(call->getFn());
-            if (!DSCE->isImplicit()) return;
-            IE->setCondExpr(DSCE->getBase());
-          }();
+        // Strip off 'Bool' to 'Builtin.Int1' conversion. Otherwise, we'll have
+        // to handle multiple ways of type-checking.
+        if (expr->isImplicit()) {
+          if (auto call = dyn_cast<CallExpr>(expr)) {
+            if (auto DSCE = dyn_cast<DotSyntaxCallExpr>(call->getFn())) {
+              auto RefD = DSCE->getFn()->getReferencedDecl().getDecl();
+              if (RefD->getBaseName() == TC.Context.Id_getBuiltinLogicValue &&
+                  RefD->getDeclContext()
+                          ->getAsNominalTypeOrNominalTypeExtensionContext() ==
+                      TC.Context.getBoolDecl()) {
+                expr = DSCE->getBase();
+                continue;
+              }
+            }
+          }
         }
 
         // Now, we're ready to walk into sub expressions.
