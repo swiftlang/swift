@@ -265,9 +265,9 @@ static void emitResilientTagIndex(IRGenModule &IGM,
                                   const EnumImplStrategy *strategy,
                                   EnumElementDecl *Case) {
   auto resilientIdx = strategy->getTagIndex(Case);
-  auto global = IGM.getAddrOfEnumCase(Case, ForDefinition);
-  cast<llvm::GlobalVariable>(global.getAddress())
-      ->setInitializer(llvm::ConstantInt::get(IGM.Int32Ty, resilientIdx));
+  auto *global = cast<llvm::GlobalVariable>(
+    IGM.getAddrOfEnumCase(Case, ForDefinition).getAddress());
+  global->setInitializer(llvm::ConstantInt::get(IGM.Int32Ty, resilientIdx));
 }
 
 void
