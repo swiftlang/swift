@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -emit-sil -verify %s
+// RUN: %target-swift-frontend -Onone -emit-sil -verify %s
 
 // This file contains tests that produce errors in the semantic analysis pass
 // or earlier.  These have to be split from the other SIL tests because if there

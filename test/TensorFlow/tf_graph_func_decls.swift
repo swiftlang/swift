@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -emit-sil %s -verify -verify-ignore-unknown
+// RUN: %target-swift-frontend -Onone -emit-sil %s -verify -verify-ignore-unknown
 // FIXME: Remove -verify-ignore-unknown when we fix the source location.
 
 import TensorFlow

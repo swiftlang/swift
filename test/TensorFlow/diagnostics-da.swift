@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -verify %s
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Onone -emit-sil -verify %s
 
 import TensorFlow
 
