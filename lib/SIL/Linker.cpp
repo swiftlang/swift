@@ -9,8 +9,10 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-
-/// \file The SIL linker walks the call graph beginning at a starting function,
+///
+/// \file
+///
+/// The SIL linker walks the call graph beginning at a starting function,
 /// deserializing functions, vtables and witness tables.
 ///
 /// The behavior of the linker is controlled by a LinkMode value. The LinkMode
@@ -48,6 +50,8 @@
 /// even those with public linkage. This is not strictly necessary, since the
 /// devirtualizer deserializes vtables and witness tables as needed. However,
 /// doing so early creates more opportunities for optimization.
+///
+//===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-linker"
 #include "Linker.h"
