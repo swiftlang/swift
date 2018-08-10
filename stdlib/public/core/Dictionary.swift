@@ -342,7 +342,7 @@ import SwiftShims
 ///
 /// Note that in this example, `imagePaths` is subscripted using a dictionary
 /// index. Unlike the key-based subscript, the index-based subscript returns
-/// the corresponding key-value pair as a non-optional tuple.
+/// the corresponding key-value pair as a nonoptional tuple.
 ///
 ///     print(imagePaths[glyphIndex!])
 ///     // Prints "("star", "/glyphs/star.png")"
@@ -879,6 +879,8 @@ extension Dictionary {
   ///   transformed value of the same or of a different type.
   /// - Returns: A dictionary containing the keys and transformed values of
   ///   this dictionary.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the dictionary.
   @inlinable // FIXME(sil-serialize-all)
   public func mapValues<T>(
     _ transform: (Value) throws -> T
