@@ -1116,10 +1116,9 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
   // disambiguate.
   ParserResult<Expr> subExpr =
     parseExprImpl(diag::expected_pattern, isExprBasic);
-  if (subExpr.hasCodeCompletion())
-    return makeParserCodeCompletionStatus();
+  ParserStatus status = subExpr;
   if (subExpr.isNull())
-    return nullptr;
+    return status;
 
   if (SyntaxContext->isEnabled()) {
     if (auto UPES = PatternCtx.popIf<UnresolvedPatternExprSyntax>()) {
@@ -1132,9 +1131,9 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
   // obvious pattern, which will come back wrapped in an immediate
   // UnresolvedPatternExpr.  Transform this now to simplify later code.
   if (auto *UPE = dyn_cast<UnresolvedPatternExpr>(subExpr.get()))
-    return makeParserResult(UPE->getSubPattern());
+    return makeParserResult(status, UPE->getSubPattern());
   
-  return makeParserResult(new (Context) ExprPattern(subExpr.get()));
+  return makeParserResult(status, new (Context) ExprPattern(subExpr.get()));
 }
 
 ParserResult<Pattern> Parser::parseMatchingPatternAsLetOrVar(bool isLet,

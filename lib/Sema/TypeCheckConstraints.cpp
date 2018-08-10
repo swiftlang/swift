@@ -2231,9 +2231,6 @@ bool TypeChecker::typeCheckCompletionSequence(Expr *&expr, DeclContext *DC) {
   // Ensure the output expression is up to date.
   assert(exprAsBinOp == expr && isa<BinaryExpr>(expr) && "found wrong expr?");
 
-  // Add type variable for the code-completion expression.
-  CCE->setActivated();
-
   if (auto generated = CS.generateConstraints(expr)) {
     expr = generated;
   } else {
