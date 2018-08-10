@@ -1207,8 +1207,23 @@ static bool maybeConsumeNewlineEscape(const char *&CurPtr, ssize_t Offset) {
   }
 }
 
+/// extractDelimiterLength - Extracts/detects any custom delimiter on opening
+/// a string literal and advances CurPtr if a delimiter is found and returns
+/// a non-zero delimiter length. CurPtr[-1] is generally '#' when called.
+static unsigned extractDelimiterLength(const char *&CurPtr) {
+  const char *Lookahead = CurPtr;
+  while (*Lookahead == '#')
+    Lookahead++;
+  if (*Lookahead++ == '"') {
+    unsigned DelimiterLength = Lookahead - CurPtr;
+    CurPtr = Lookahead;
+    return DelimiterLength;
+  }
+  return 0;
+}
+
 /// delimiterMatches - Does custom delimiter (# characters surrounding quotes)
-/// match the number of # charatters after \ inside the string? This allows
+/// match the number of # characters after \ inside the string? This allows
 /// interpolation inside a "raw" string. Normal/cooked string processing is
 /// the degenerate case of there being no # characters surrounding the quotes.
 /// If delimiter matches, advances byte pointer passed in and returns true.
@@ -1349,8 +1364,9 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
                                                      const char *EndPtr,
                                                      DiagnosticEngine *Diags,
                                                      bool MultilineString) {
-  llvm::SmallVector<char, 4> OpenDelimiters;
-  llvm::SmallVector<bool, 4> AllowNewline;
+  SmallVector<char, 4> OpenDelimiters;
+  SmallVector<bool, 4> AllowNewline;
+  SmallVector<unsigned, 4> CustomDelimiter;
   AllowNewline.push_back(MultilineString);
 
   auto inStringLiteral = [&]() {
@@ -1366,6 +1382,7 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
     // On success scanning the expression body, the real lexer will be used to
     // relex the body when parsing the expressions.  We let it diagnose any
     // issues with malformed tokens or other problems.
+    unsigned DelimiterLength = 0;
     switch (*CurPtr++) {
     // String literals in general cannot be split across multiple lines;
     // interpolated ones are no exception - unless multiline literals.
@@ -1376,13 +1393,21 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
       // Will be diagnosed as an unterminated string literal.
       return CurPtr-1;
 
+    case '#':
+      if (inStringLiteral() ||
+          !(DelimiterLength = extractDelimiterLength(CurPtr)))
+        continue;
+      LLVM_FALLTHROUGH;
+
     case '"':
     case '\'': {
       if (!AllowNewline.back() && inStringLiteral()) {
-        if (OpenDelimiters.back() == CurPtr[-1]) {
+        if (OpenDelimiters.back() == CurPtr[-1] &&
+            delimiterMatches(CustomDelimiter.back(), CurPtr)) {
           // Closing single line string literal.
           OpenDelimiters.pop_back();
           AllowNewline.pop_back();
+          CustomDelimiter.pop_back();
         }
         // Otherwise, it's just a quote in string literal. e.g. "foo's".
         continue;
@@ -1397,22 +1422,26 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
         // Open string literal
         OpenDelimiters.push_back(CurPtr[-1]);
         AllowNewline.push_back(isMultilineQuote);
+        CustomDelimiter.push_back(DelimiterLength);
         continue;
       }
 
       // We are in multiline string literal.
       assert(AllowNewline.back() && "other cases must be handled above");
-      if (isMultilineQuote) {
+      if (isMultilineQuote &&
+          delimiterMatches(CustomDelimiter.back(), CurPtr)) {
         // Close multiline string literal.
         OpenDelimiters.pop_back();
         AllowNewline.pop_back();
+        CustomDelimiter.pop_back();
       }
 
       // Otherwise, it's just a normal character in multiline string.
       continue;
     }
     case '\\':
-      if (inStringLiteral()) {
+      if (inStringLiteral() &&
+          delimiterMatches(CustomDelimiter.back(), CurPtr)) {
         char escapedChar = *CurPtr++;
         switch (escapedChar) {
         case '(':
@@ -1761,7 +1790,7 @@ void Lexer::lexStringLiteral(unsigned DelimiterLength) {
       }
 
       // Is this the end of a delimited/multiline string literal?
-      if(StringRef(CurPtr - 1, Delimiter.length()) == Delimiter) {
+      if (StringRef(CurPtr - 1, Delimiter.length()) == Delimiter) {
         if (MultilineString) {
           CurPtr += 2;
           formToken(tok::string_literal, TokStart,
@@ -2281,16 +2310,9 @@ void Lexer::lexImpl() {
   case ':': return formToken(tok::colon, TokStart);
   case '\\': return formToken(tok::backslash, TokStart);
 
-  case '#': {
-      const char *Lookahead = CurPtr;
-      while (*Lookahead == '#')
-        Lookahead++;
-      if (*Lookahead++ == '"') {
-        unsigned DelimiterLength = Lookahead - CurPtr;
-        CurPtr = Lookahead;
-        return lexStringLiteral(DelimiterLength);
-      }
-    }
+  case '#':
+    if (unsigned DelimiterLength = extractDelimiterLength(CurPtr))
+      return lexStringLiteral(DelimiterLength);
     return lexHash();
 
       // Operator characters.
