@@ -861,7 +861,6 @@ public:
           srcFn.getLocation(), ctx.getIdentifier(identityOpName),
           /*operands*/ {opValue}, /*attributes*/ {deviceAttr},
           {opValue->getType()});
-      identityOpInst->dump(); // see if this crashes.
       markInstForDevice(deviceInfo.primaryDeviceType, identityOpInst);
 
       auto newValue = getSingleValueResult(identityOpInst);
