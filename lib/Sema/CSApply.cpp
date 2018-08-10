@@ -7254,7 +7254,8 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
                                        nonescaping,
                                        callSubExpr,
                                        apply->getArg()->getEndLoc(),
-                                       escapable);
+                                       escapable,
+                                       apply);
         cs.setType(replacement, resultType);
         return replacement;
       }
