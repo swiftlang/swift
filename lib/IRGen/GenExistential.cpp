@@ -167,44 +167,6 @@ namespace {
               NumStoredProtocols};
     }
 
-    /// Given an existential object, find the witness table
-    /// corresponding to the given protocol.
-    llvm::Value *findWitnessTable(IRGenFunction &IGF,
-                                  Explosion &container,
-                                  ProtocolDecl *protocol) const {
-      assert(NumStoredProtocols != 0 &&
-             "finding a witness table in a trivial existential");
-
-      return emitImpliedWitnessTableRef(IGF, getStoredProtocols(), protocol,
-        [&](unsigned originIndex) {
-          return asDerived().extractWitnessTable(IGF, container, originIndex);
-        });
-    }
-
-    /// Given the address of an existential object, find the witness
-    /// table corresponding to the given protocol.
-    llvm::Value *findWitnessTable(IRGenFunction &IGF, Address obj,
-                                  ProtocolDecl *protocol) const {
-      assert(NumStoredProtocols != 0 &&
-             "finding a witness table in a trivial existential");
-
-      return emitImpliedWitnessTableRef(IGF, getStoredProtocols(), protocol,
-        [&](unsigned originIndex) {
-          return asDerived().loadWitnessTable(IGF, obj, originIndex);
-        });
-    }
-
-    /// Given the witness table vector from an existential object, find the
-    /// witness table corresponding to the given protocol.
-    llvm::Value *findWitnessTable(IRGenFunction &IGF,
-                                  ArrayRef<llvm::Value *> witnesses,
-                                  ProtocolDecl *protocol) const {
-      return emitImpliedWitnessTableRef(IGF, getStoredProtocols(), protocol,
-        [&](unsigned originIndex) {
-          return witnesses[originIndex];
-        });
-    }
-
     /// Given the address of an existential object, find the witness
     /// table of a directly-stored witness table.
     llvm::Value *loadWitnessTable(IRGenFunction &IGF, Address obj,
