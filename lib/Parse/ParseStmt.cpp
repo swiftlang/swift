@@ -319,6 +319,10 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
     // Eat invalid tokens instead of allowing them to produce downstream errors.
     if (Tok.is(tok::unknown)) {
       SyntaxParsingContext ErrContext(SyntaxContext, SyntaxContextKind::Stmt);
+      if (Tok.getText().startswith("\"\"\"")) {
+        // This was due to unterminated multi-line string.
+        IsInputIncomplete = true;
+      }
       consumeToken();
       continue;
     }

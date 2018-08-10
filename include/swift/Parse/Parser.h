@@ -192,7 +192,10 @@ public:
   bool isInputIncomplete() const { return IsInputIncomplete; }
 
   void checkForInputIncomplete() {
-    IsInputIncomplete = IsInputIncomplete || Tok.is(tok::eof);
+    IsInputIncomplete = IsInputIncomplete ||
+      // Check whether parser reached EOF but the real EOF, not the end of a
+      // string interpolation segment.
+      (Tok.is(tok::eof) && Tok.getText() != ")");
   }
 
   /// \brief This is the current token being considered by the parser.
