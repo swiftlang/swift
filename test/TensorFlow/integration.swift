@@ -7,9 +7,9 @@ public func testTensor(a: Tensor<Float>, b: Tensor<Float>) {
   var x = a
   x += x  // expected-note {{value used here}}
 
-  x -= x  // expected-warning {{value implicitly copied to the host, use .toHost() to make transfer explicit}}
+  x -= x
 
-  _hostOp(x) // expected-note {{value used here}}
+  _hostOp(x)
   var y = b.toAccelerator()
   y += y
   _hostOp(y)
@@ -122,8 +122,8 @@ public func testExitBranch2(i: Int) {
     return
   }
 
-  x += x    // expected-warning {{value implicitly copied to the host}}
-  _hostOp(x)  // expected-note {{value used here}}
+  x += x
+  _hostOp(x)
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testExitBranch2{{.*}}
@@ -284,8 +284,8 @@ public func test_while1(maxCount: Int, arg1: Tensor<Float>, arg2: Tensor<Float>)
 // disprove away the optional check, so we'll need to send a bit back to the
 // host.
 public func scalar_manipulation(a : Float) -> Tensor<Float> {
-  let x = Tensor<Float>(a) + Tensor<Float>(1.0) // expected-warning {{value implicitly copied to the host}}
-  let y = x.scalar! + 2.0 // expected-note {{value used here}}
+  let x = Tensor<Float>(a) + Tensor<Float>(1.0)
+  let y = x.scalar! + 2.0
   let z = Tensor<Float>(y)
   return z+z
 }

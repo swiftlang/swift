@@ -14,8 +14,8 @@ func testInferredElementResult() -> TensorHandle<Int32> {
 }
 
 class ClassTest {
-  var w = Tensor<Float>(zeros: [1, 2])  // expected-warning {{value implicitly copied to the host}}
-  let b = Tensor<Float>(zeros: [1, 2])  // expected-warning {{value implicitly copied to the host}}
+  var w = Tensor<Float>(zeros: [1, 2])
+  let b = Tensor<Float>(zeros: [1, 2])
 
   var c : Tensor<Float> { return w } // expected-warning {{properties in classes always cause a copy to the accelerator}}
 
@@ -51,6 +51,7 @@ public func SR8412_CopyToHost() {
   for _ in 0...10 {
     let x = Tensor(1)  // expected-warning {{value implicitly copied to the host}}
     _hostOp(x)
+    let _ = x + 1.0
   }
 }
 

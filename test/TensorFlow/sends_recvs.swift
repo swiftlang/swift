@@ -197,9 +197,13 @@ public func testCannotSendResource() {
 // FIXME: Eliminate the sends/receives in this case, since host does not use the
 // value x.scalar! in any interesting way other than sending it back to device.
 // On the other hand, this likely will not happen in a real use case.
+//
+// Note: there is no copy-to-host warning for `x`, because the only user of x
+// lives in host. There is no copy-to-accl warning for `y`, because it is a
+// scalar.
 public func test1RecvScalarCPU() {
-  let x = Tensor<Float>(1.0) // expected-warning {{value implicitly copied to the host}}
-  let y = x.scalar! + 2.0 // expected-note {{value used here}}
+  let x = Tensor<Float>(1.0)
+  let y = x.scalar! + 2.0
 
   let z = Tensor<Float>(y)
   let result = z+z
@@ -238,8 +242,8 @@ public func test1RecvScalarCPU() {
 
 public func test1RecvScalarGPU() {
   TensorFlow.enableGPU()
-  let x = Tensor<Float>(1.0) // expected-warning {{value implicitly copied to the host}}
-  let y = x.scalar! + 2.0 // expected-note {{value used here}}
+  let x = Tensor<Float>(1.0)
+  let y = x.scalar! + 2.0
   let z = Tensor<Float>(y)
   let result = z+z
   let _ = result.scalar
@@ -259,8 +263,8 @@ public func test1RecvScalarGPU() {
 
 public func test1RecvScalarTPU() {
   TensorFlow.enableTPU()
-  let x = Tensor<Float>(1.0) // expected-warning {{value implicitly copied to the host}}
-  let y = x.scalar! + 2 // expected-note {{value used here}}
+  let x = Tensor<Float>(1.0)
+  let y = x.scalar! + 2
   let z = Tensor<Float>(y)
   let result = z + z
   _hostOp(result.toHost())

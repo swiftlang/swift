@@ -242,11 +242,9 @@ public func testMultiResultOp_send_recv() {
   // Accelerator -> Host
   _hostOp(x)
   x += [[2.0]]
-  // expected-warning @+1{{implicitly copied to the host}}
   let results = TensorFlow.Raw.softmaxCrossEntropyWithLogits(features: x, labels: x)
   // Accelerator -> Host
   _hostOp(results.loss)
-  // expected-note @+1{{value used here}}
   let adjustedLoss = results.loss.scalar! + 3.0
   // Host -> Accelerator
   let y = Tensor<Float>(adjustedLoss)
@@ -271,7 +269,7 @@ public func SR8191() {
   let t = Tensor<Float>(1.0)
   var i = 0
   repeat {
-    let y = t + t // expected-warning {{value implicitly copied to the host}}
+    let y = t + t
     _hostOp(y)
     i += 1
   } while i < 10
@@ -324,7 +322,6 @@ public func SR8222_cond_br_TensorHandle_Bool() {
   var i = Tensor<Int32>(0)
   repeat {
     let y = t + t
-    // expected-warning @-1{{implicitly copied to the host}}
     _hostOp(y)
     i += 1
   } while i != Tensor<Int32>(10)

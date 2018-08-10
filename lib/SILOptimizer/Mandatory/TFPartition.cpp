@@ -2254,6 +2254,10 @@ class PartitionCloner : public SILClonerWithScopes<PartitionCloner> {
   /// after the cloning operation is complete.
   SmallVector<SILInstruction *, 8> instructionsToRemove;
 
+  // Each element has some graph_op users. When such a value also has host
+  // users, we issue an accel-to-host copy warning.
+  SmallPtrSet<SILValue, 16> valuesWithGraphOpUser;
+
   SILValue tensorComputation;
   ModuleDecl &tensorFlowModule;
 
@@ -3252,8 +3256,13 @@ bool PartitionCloner::insertReceive(SILValue value, SILLocation loc) {
   if (!receiveFn)
     return false;
 
-  // Diagnose implicit data transfers if they are implicit.
-  FP.diagnoseUsesFromHost(value, loc);
+  // Diagnose implicit data transfers if they are implicit, and they have some
+  // graph_op users. If there are no graph_op users (as in the case of
+  // outfeeding loss values in a training loop for logging/debugging), we do not
+  // expect such transfers (often async) to slow down accelerator performance,
+  // and therefore issue no warning.
+  if (valuesWithGraphOpUser.count(value))
+    FP.diagnoseUsesFromHost(value, loc);
 
   SILBuilder BH(FP.hostFn); // Builder for the host.
   auto BA = getBuilder();   // Builder for accelerator.
@@ -3474,6 +3483,12 @@ bool PartitionCloner::finalizeOriginal() {
     for (auto &op : inst->getAllOperands()) {
       auto v = op.get();
       op.drop();
+
+      if (isTensorHandle(v->getType()) && isa<GraphOperationInst>(inst)) {
+        // `v` has a graph_op user (i.e., `inst`), so we track it. In case `v`
+        // also has some host users, we'll issue an accel-to-host copy warning.
+        valuesWithGraphOpUser.insert(v);
+      }
 
       // If we just dropped the last use of a trivial instruction (which are how
       // we represent attributes for instructions), clean it up now.

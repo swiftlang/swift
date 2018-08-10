@@ -18,14 +18,13 @@ public func testSendsInALoopGPU() {
   TensorFlow.enableGPU()
   let maxCount = 10
   // a cannot be an integer tensor due to a TensorFlow Eigen bug (b/77737504).
-  // expected-warning @+1 {{value implicitly copied to the host}}
   var a = Tensor<Float>(1)
   var count = 1
 
   while count < maxCount {
     // expected-warning @+2 {{implicitly copied to the accelerator}}
     // expected-warning @+1 {{implicitly copied to the accelerator}}
-    a += a    // expected-warning  {{implicitly copied to the host}}
+    a += a
     // One send.
     _hostOp(a.toHost())
     count += 1
