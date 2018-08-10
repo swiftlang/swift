@@ -136,7 +136,7 @@ createVarWithPattern(ASTContext &ctx, DeclContext *dc, Identifier name, Type ty,
       /*IsStatic*/false,
       specifier,
       /*IsCaptureList*/false,
-      SourceLoc(), name, dc->mapTypeIntoContext(ty), dc);
+      SourceLoc(), name, dc);
   if (isImplicit)
     var->setImplicit();
   var->setInterfaceType(ty);
@@ -426,7 +426,6 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
   auto param = new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(),
                                  SourceLoc(), C.Id_rawValue,
                                  SourceLoc(), C.Id_rawValue,
-                                 rawTy,
                                  enumDecl);
   param->setInterfaceType(rawTy);
   param->setValidationToChecked();
@@ -689,7 +688,6 @@ static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
   auto newValueDecl = new (C) ParamDecl(VarDecl::Specifier::Default,
                                         SourceLoc(), SourceLoc(),
                                         Identifier(), SourceLoc(), C.Id_value,
-                                        importedFieldDecl->getType(),
                                         importedDecl);
   newValueDecl->setInterfaceType(importedFieldDecl->getInterfaceType());
 
@@ -1237,7 +1235,7 @@ createValueConstructor(ClangImporter::Implementation &Impl,
     Identifier argName = generateParamName ? var->getName() : Identifier();
     auto param = new (context)
         ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), argName,
-                  SourceLoc(), var->getName(), var->getType(), structDecl);
+                  SourceLoc(), var->getName(), structDecl);
     param->setInterfaceType(var->getInterfaceType());
     param->setValidationToChecked();
     Impl.recordImplicitUnwrapForDecl(
@@ -1516,7 +1514,7 @@ static void makeStructRawValuedWithBridge(
   // Create a computed value variable.
   auto computedVar = new (ctx) VarDecl(
       /*IsStatic*/false, VarDecl::Specifier::Var, /*IsCaptureList*/false,
-      SourceLoc(), computedVarName, bridgedType, structDecl);
+      SourceLoc(), computedVarName, structDecl);
   computedVar->setInterfaceType(bridgedType);
   computedVar->setImplicit();
   computedVar->setAccess(AccessLevel::Public);
@@ -1623,12 +1621,10 @@ buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
 
   // 'self'
   auto selfDecl = ParamDecl::createSelf(SourceLoc(), dc);
-  auto elementTy = dc->mapTypeIntoContext(elementInterfaceTy);
 
   auto paramVarDecl =
       new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
-                        Identifier(), loc, valueIndex->get(0)->getName(),
-                        elementTy, dc);
+                        Identifier(), loc, valueIndex->get(0)->getName(), dc);
   paramVarDecl->setInterfaceType(elementInterfaceTy);
   paramVarDecl->setValidationToChecked();
 
@@ -1798,7 +1794,7 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
   // Make the property decl
   auto errorDomainPropertyDecl = new (C) VarDecl(
       /*IsStatic*/isStatic, VarDecl::Specifier::Var, /*IsCaptureList*/false,
-      SourceLoc(), C.Id_errorDomain, stringTy, swiftDecl);
+      SourceLoc(), C.Id_errorDomain, swiftDecl);
   errorDomainPropertyDecl->setInterfaceType(stringTy);
   errorDomainPropertyDecl->setValidationToChecked();
   errorDomainPropertyDecl->setAccess(AccessLevel::Public);
@@ -2660,7 +2656,7 @@ namespace {
           auto nsErrorProp = new (C) VarDecl(/*IsStatic*/false,
                                              VarDecl::Specifier::Let,
                                              /*IsCaptureList*/false,
-                                             loc, C.Id_nsError, nsErrorType,
+                                             loc, C.Id_nsError,
                                              errorWrapper);
           nsErrorProp->setImplicit();
           nsErrorProp->setAccess(AccessLevel::Public);
@@ -2741,7 +2737,7 @@ namespace {
         auto rawValue = new (C) VarDecl(/*IsStatic*/false,
                                         VarDecl::Specifier::Var,
                                         /*IsCaptureList*/false,
-                                        SourceLoc(), varName, underlyingType,
+                                        SourceLoc(), varName,
                                         enumDecl);
         rawValue->setImplicit();
         rawValue->setAccess(AccessLevel::Public);
@@ -3386,7 +3382,7 @@ namespace {
                        VarDecl::Specifier::Var,
                        /*IsCaptureList*/false,
                        Impl.importSourceLoc(decl->getLocStart()),
-                       name, dc->mapTypeIntoContext(type), dc);
+                       name, dc);
       result->setInterfaceType(type);
       result->setIsObjC(false);
       result->setIsDynamic(false);
@@ -3619,7 +3615,7 @@ namespace {
                               VarDecl::Specifier::Var,
                               /*IsCaptureList*/false,
                               Impl.importSourceLoc(decl->getLocation()),
-                              name, dc->mapTypeIntoContext(type), dc);
+                              name, dc);
       result->setIsObjC(false);
       result->setIsDynamic(false);
       result->setInterfaceType(type);
@@ -3706,7 +3702,7 @@ namespace {
                        specifier,
                        /*IsCaptureList*/false,
                        Impl.importSourceLoc(decl->getLocation()),
-                       name, dc->mapTypeIntoContext(type), dc);
+                       name, dc);
       result->setIsObjC(false);
       result->setIsDynamic(false);
       result->setInterfaceType(type);
@@ -4831,7 +4827,7 @@ namespace {
           getOverridableAccessLevel(dc),
           /*IsStatic*/decl->isClassProperty(), VarDecl::Specifier::Var,
           /*IsCaptureList*/false, Impl.importSourceLoc(decl->getLocation()),
-          name, dc->mapTypeIntoContext(type), dc);
+          name, dc);
       result->setInterfaceType(type);
       Impl.recordImplicitUnwrapForDecl(result,
                                        importedType.isImplicitlyUnwrapped());
@@ -5452,7 +5448,7 @@ SwiftDeclConverter::importOptionConstant(const clang::EnumConstantDecl *decl,
   if (isa<EnumDecl>(theStruct))
     convertKind = ConstantConvertKind::ConstructionWithUnwrap;
   Decl *CD = Impl.createConstant(
-      name, theStruct, theStruct->getDeclaredTypeInContext(),
+      name, theStruct, theStruct->getDeclaredInterfaceType(),
       clang::APValue(decl->getInitVal()), convertKind, /*isStatic*/ true, decl);
   Impl.importAttributes(decl, CD);
 
@@ -5491,7 +5487,7 @@ Decl *SwiftDeclConverter::importEnumCaseAlias(
   auto constantRef =
       new (Impl.SwiftContext) DeclRefExpr(original, DeclNameLoc(),
                                           /*implicit*/ true);
-  Type importedEnumTy = importedEnum->getDeclaredTypeInContext();
+  Type importedEnumTy = importedEnum->getDeclaredInterfaceType();
   auto typeRef = TypeExpr::createImplicit(importedEnumTy, Impl.SwiftContext);
   auto instantiate = new (Impl.SwiftContext)
       DotSyntaxCallExpr(constantRef, SourceLoc(), typeRef);
@@ -5563,8 +5559,7 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
     auto *paramDecl =
         new (Impl.SwiftContext) ParamDecl(
             VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), argNames.front(),
-            SourceLoc(), argNames.front(), Impl.SwiftContext.TheEmptyTupleType,
-            dc);
+            SourceLoc(), argNames.front(), dc);
     paramDecl->setInterfaceType(Impl.SwiftContext.TheEmptyTupleType);
     paramDecl->setValidationToChecked();
 
@@ -5847,7 +5842,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
   auto property = Impl.createDeclWithClangNode<VarDecl>(
       getter, AccessLevel::Public, /*IsStatic*/isStatic,
       VarDecl::Specifier::Var, /*IsCaptureList*/false, SourceLoc(),
-      propertyName, dc->mapTypeIntoContext(swiftPropertyType), dc);
+      propertyName, dc);
   property->setInterfaceType(swiftPropertyType);
   property->setIsObjC(false);
   property->setIsDynamic(false);
@@ -8190,11 +8185,11 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
     var = createDeclWithClangNode<VarDecl>(ClangN, AccessLevel::Public,
                                            /*IsStatic*/isStatic, VarDecl::Specifier::Var,
                                            /*IsCaptureList*/false, SourceLoc(),
-                                           name, dc->mapTypeIntoContext(type), dc);
+                                           name, dc);
   } else {
     var = new (SwiftContext)
         VarDecl(/*IsStatic*/isStatic, VarDecl::Specifier::Var, /*IsCaptureList*/false,
-                SourceLoc(), name, dc->mapTypeIntoContext(type), dc);
+                SourceLoc(), name, dc);
     var->setValidationToChecked();
   }
 
@@ -8304,7 +8299,7 @@ createUnavailableDecl(Identifier name, DeclContext *dc, Type type,
                                               /*IsStatic*/isStatic,
                                               VarDecl::Specifier::Var,
                                               /*IsCaptureList*/false,
-                                              SourceLoc(), name, type, dc);
+                                              SourceLoc(), name, dc);
   var->setIsObjC(false);
   var->setIsDynamic(false);
   var->setInterfaceType(type);

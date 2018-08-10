@@ -1475,8 +1475,7 @@ public:
   void completePropertyBehaviorParameter(VarDecl *VD,
                                FuncDecl *BehaviorParameter,
                                NormalProtocolConformance *BehaviorConformance,
-                               SubstitutionMap interfaceMap,
-                               SubstitutionMap contextMap);
+                               SubstitutionMap interfaceMap);
   
   /// Instantiate the accessor implementations for a behavior-backed
   /// property.

@@ -7,7 +7,7 @@ class HasFunc {
     return HasFunc()
   }
   func SomethingElse(_: SomethingElse) { // expected-error {{use of undeclared type 'SomethingElse'}}
-    return nil
+    return nil // expected-error {{unexpected non-void return value in void function}}
   }
   func SomethingElse() -> SomethingElse? { // expected-error {{use of undeclared type 'SomethingElse'}}
     return nil
