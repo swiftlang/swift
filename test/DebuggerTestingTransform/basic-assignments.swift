@@ -2,6 +2,7 @@
 
 // REQUIRES: executable_test
 // RUN: %target-build-swift -Xfrontend -debugger-testing-transform %s -o %t
+// RUN: %target-codesign %t
 // RUN: %target-run %t | %FileCheck %s -check-prefix=CHECK-E2E
 // RUN: rm -rf %t
 

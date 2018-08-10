@@ -4,6 +4,7 @@
 // RUN: %target-codesign %t/libresil.%target-dylib-extension
 
 // RUN: %target-build-swift %s -L %t -I %t -lresil -o %t/main -Xlinker -rpath -Xlinker %t
+// RUN: %target-codesign %t/main
 
 // RUN: %target-build-swift-dylib(%t/libresil.%target-dylib-extension) -Xfrontend -enable-resilience %S/Inputs/resilient_generic_struct_v2.swift -emit-module -emit-module-path %t/resil.swiftmodule -module-name resil
 // RUN: %target-codesign %t/libresil.%target-dylib-extension

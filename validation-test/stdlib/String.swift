@@ -7,6 +7,7 @@
 // RUN:   %target-build-swift %s -Xfrontend -disable-access-control -o %t/String; \
 // RUN: fi
 
+// RUN: %target-codesign %t/String
 // RUN: %target-run %t/String
 // REQUIRES: executable_test
 // XFAIL: interpret

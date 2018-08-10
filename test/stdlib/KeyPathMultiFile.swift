@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: cp %s %t/main.swift
 // RUN: %target-build-swift -o %t/a.out %t/main.swift %S/Inputs/KeyPathMultiFile_b.swift
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 
 import StdlibUnittest

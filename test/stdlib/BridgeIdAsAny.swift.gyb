@@ -2,6 +2,7 @@
 //
 // RUN: %gyb %s -o %t/BridgeIdAsAny.swift
 // RUN: %target-build-swift -g -module-name a %t/BridgeIdAsAny.swift -o %t.out
+// RUN: %target-codesign %t.out
 // RUN: %target-run %t.out
 // REQUIRES: executable_test
 //
