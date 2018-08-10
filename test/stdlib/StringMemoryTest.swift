@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -O %s -o %t/StringMemoryTest
+// RUN: %target-codesign %t/StringMemoryTest
 // RUN: %target-run %t/StringMemoryTest | %FileCheck %s
 
 // REQUIRES: optimized_stdlib

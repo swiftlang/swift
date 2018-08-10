@@ -1,6 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -o %t/test1 -module-name main -D PATTERN_1 
 // RUN: %target-build-swift %s -o %t/test2 -module-name main -D PATTERN_2
+// RUN: %target-codesign %t/test1
+// RUN: %target-codesign %t/test2
 // RUN: %target-run %t/test1 | %FileCheck -check-prefix=CHECK -check-prefix=CHECK1 %s
 // RUN: %target-run %t/test2 | %FileCheck -check-prefix=CHECK -check-prefix=CHECK2 %s
 

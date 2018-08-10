@@ -3,6 +3,7 @@
 // RUN: %target-codesign %t/libSimpleNSObjectSubclass.dylib
 
 // RUN: %target-build-swift %s -o %t/main -lSimpleNSObjectSubclass -L%t -import-objc-header %S/Inputs/class_getImageName-static-helper.h
+// RUN: %target-codesign %t/main
 // RUN: %target-run %t/main %t/libSimpleNSObjectSubclass.dylib
 
 // REQUIRES: executable_test

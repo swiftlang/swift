@@ -11,6 +11,7 @@
 //
 // RUN: %target-clang %S/Inputs/FoundationBridge/FoundationBridge.m -c -o %t/FoundationBridgeObjC.o -g
 // RUN: %target-build-swift %s -I %S/Inputs/FoundationBridge/ -Xlinker %t/FoundationBridgeObjC.o -o %t/TestData
+// RUN: %target-codesign %t/TestData
 
 // RUN: %target-run %t/TestData
 // REQUIRES: executable_test

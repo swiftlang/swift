@@ -9,6 +9,7 @@
 //
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -swift-version 4 %s -o %t/TestData_Swift4
+// RUN: %target-codesign %t/TestData_Swift4
 // RUN: %target-run %t/TestData_Swift4
 // REQUIRES: executable_test
 // REQUIRES: objc_interop

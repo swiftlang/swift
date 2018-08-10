@@ -7,7 +7,7 @@
 // RUN: else \
 // RUN:   %line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %t/main.swift -o %t/Array -Xfrontend -disable-access-control -swift-version 3; \
 // RUN: fi
-// RUN: %line-directive %t/main.swift -- %target-run %t/Array
+// RUN: %target-codesign %t/Array && %line-directive %t/main.swift -- %target-run %t/Array
 // REQUIRES: executable_test
 
 import StdlibUnittest
