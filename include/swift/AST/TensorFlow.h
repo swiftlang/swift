@@ -46,6 +46,10 @@ namespace tf {
 
   /// Return true if the specified type is a TensorHandle<T>.
   bool isTensorHandle(Type ty);
+  
+  /// Return true if the specified type is an opaque handle such as
+  /// VariantHandle and ResourceHandle.
+  bool isOpaqueHandle(Type ty);
 
   /// Return true if the specified type is TensorHandle<T>, ResourceHandle, or
   /// VariantHandle.

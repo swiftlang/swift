@@ -185,15 +185,6 @@ public func testSendsInALoopWithNoResultTensor() {
 // CHECK:        return {{.*}} : $()
 // CHECK-NEXT: } // end sil function {{.*}}testSendsInALoopWithNoResultTensor{{.*}}
 
-public func testCannotSendResource() {
-  // expected-error @+2 {{This value type cannot be sent/received}}
-  let iterator: ResourceHandle =
-    #tfop("Iterator", shared_name: "foo", container: "bar")
-
-  _hostOp(iterator)
-  let _ = Tensor<Float>(1.0)
-}
-
 // FIXME: Eliminate the sends/receives in this case, since host does not use the
 // value x.scalar! in any interesting way other than sending it back to device.
 // On the other hand, this likely will not happen in a real use case.

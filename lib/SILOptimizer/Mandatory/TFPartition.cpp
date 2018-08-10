@@ -73,11 +73,13 @@ static InFlightDiagnostic diagnose(ASTContext &Context, SourceLoc loc,
 static bool isUserIgnoredByPartitioning(SILInstruction *inst) {
   auto optMode = inst->getFunction()->getEffectiveOptimizationMode();
   // `debug_value` instructions are used for value inspection during debugging.
-  // For optimized builds, we ignored these instructions so that no send/receive
-  // will be emitted.
-  if (isa<DebugValueInst>(inst) &&
-      optMode != OptimizationMode::NoOptimization) {
-    return true;
+  if (auto *DVI = dyn_cast<DebugValueInst>(inst)) {
+    // Ignore all debug_value instructions for an optimized build so that no
+    // send/receive will be triggered.
+    if (optMode != OptimizationMode::NoOptimization)
+      return true;
+    // Ignore opaque handle because they cannot be sent/received.
+    return isOpaqueHandle(DVI->getOperand()->getType());
   }
   // Reference counting instructions are always ignored.
   return isa<RefCountingInst>(inst);
@@ -305,7 +307,7 @@ classifyPromotedScalarOp(SILInstruction *inst) {
   }
 }
 
-/// Returns true when this function must be entirely lowered to a TF graph
+/// Return true when this function must be entirely lowered to a TF graph
 /// function, with no host-side logic remaining (i.e., no sends/recvs, and no
 /// start/stop tensor computation on the host side). In other words, this
 /// function uses the tensorflow calling convention.
@@ -813,6 +815,7 @@ public:
   void diagnoseUsesFromHost(SILValue value, SILLocation loc);
   void diagnoseCopyToHost(SILValue value, SILInstruction *user,
                           SILLocation loc);
+  void diagnoseOpaqueHandleCopy(SILValue value, SILInstruction *user);
 
 private:
   // Marking.
@@ -938,6 +941,12 @@ void TFFunctionPartition::diagnoseCopyToAccelerator(
 
   // Try to determine a good source location to report.
   auto loc = getUserSourceLocation(value);
+  
+  // Opaque handles can never be sent or passed as tensor program arguments.
+  // Type checking must have rejected host functions that are either a)
+  // public with private ABI or b) marked @inline(never).
+  assert(!isOpaqueHandle(value->getType()) &&
+         "Opaque handles should never have been on the host");
 
   // Try to make a useful description of the value being copied to help
   // disambiguate.
@@ -1039,6 +1048,12 @@ void TFFunctionPartition::diagnoseUsesFromHost(SILValue value,
     // here.  It won't be very useful.
     if (isUserIgnoredByPartitioning(user))
       continue;
+    
+    // If the value is a non-copyable opaque handle, emit an error.
+    if (isOpaqueHandle(value->getType())) {
+      diagnoseOpaqueHandleCopy(value, user);
+      continue;
+    }
 
     // If we are running this in the context of an expression run in the REPL or
     // playgrounds, or script mode, then we should never emit a warning: we know
@@ -1097,6 +1112,19 @@ void TFFunctionPartition::diagnoseCopyToHost(SILValue value,
              diag::tf_value_implicitly_copied_to_host_computed_used_here)
         .highlight(userLoc.getSourceRange());
   }
+}
+
+/// Emit an error for invalid send/receive of opaque handles.
+void TFFunctionPartition::diagnoseOpaqueHandleCopy(SILValue value,
+                                                   SILInstruction *user) {
+  assert(isOpaqueHandle(value->getType()) &&
+         "Shouldn't emit an error for opaque handle copy when the value is not "
+         "an opaque handle");
+  auto &ctx = value->getFunction()->getASTContext();
+  diagnose(ctx, getUserSourceLocation(value).getSourceLoc(),
+           diag::tfop_value_no_send_receive);
+  diagnose(ctx, getUserSourceLocation(user).getSourceLoc(),
+           diag::tf_value_implicitly_copied_to_host_computed_used_here);
 }
 
 /// Some instruction in the specified block needs to be split out to the
@@ -3014,11 +3042,8 @@ SILFunction *PartitionCloner::lookupSendReceiveFunction(StringRef fnName,
   auto nominal = tensorValueTy.getASTType()->getAnyNominal();
   auto lookup =
       nominal->lookupConformance(&tensorFlowModule, proto, conformances);
-  if (!lookup) {
-    diagnose(ctx, loc.getSourceLoc(), diag::tfop_incorrect_definition,
-             "This value type cannot be sent/received");
-    return nullptr;
-  }
+  assert(lookup && "No conformance to TensorSendableReceivable found. "
+         "Is it a sendable/receivable TensorFlow value?");
   assert(conformances.size() == 1 && "Found multiple conformance candidates.");
   DeclName fnDeclName(ctx.getIdentifier(fnName));
   auto *fn = findSILFunctionForRequiredProtocolMember(
@@ -4162,6 +4187,15 @@ static void contractUncondBranches(SILFunction *fn) {
   }
 }
 
+/// Return true if a user instruction is returning or forming a return value.
+static bool isReturning(SILInstruction *user) {
+  if (isa<ReturnInst>(user)) return true;
+  if (auto *TI = dyn_cast<TupleInst>(user))
+    return llvm::all_of(TI->getUses(),
+                        [&](Operand *use) { return isReturning(user); });
+  return false;
+}
+
 /// Run the TensorFlow partitioning pass.  This pass is a very close relative to
 /// the standard "Aggressive Dead Code Elimination" (ADCE) optimization which is
 /// implemented using post-dominance frontiers and control dependence
@@ -4227,6 +4261,15 @@ bool TFFunctionPartition::partition(bool isTest) {
                 (argInfo->second.first == Marking::Move ||
                  argInfo->second.first == Marking::Delete))
               continue;
+          }
+          
+          // If it's an opaque handle such as VariantHandle or ResourceHandle,
+          // it cannot be a result except when it's being returned in an
+          // accelerator-only function.
+          if (isOpaqueHandle(result->getType()) &&
+              !(isAcceleratorOnly(hostFn) && isReturning(user))) {
+            diagnoseOpaqueHandleCopy(result, user);
+            return true;
           }
 
           // Remember if the instruction has any use.  If not, then it never
