@@ -4463,7 +4463,7 @@ protected:
   llvm::PointerUnion<PatternBindingDecl*, Stmt*> ParentPattern;
 
   VarDecl(DeclKind Kind, bool IsStatic, Specifier Sp, bool IsCaptureList,
-          SourceLoc NameLoc, Identifier Name, Type Ty, DeclContext *DC)
+          SourceLoc NameLoc, Identifier Name, DeclContext *DC)
     : AbstractStorageDecl(Kind, DC, Name, NameLoc, !isImmutableSpecifier(Sp))
   {
     Bits.VarDecl.IsStatic = IsStatic;
@@ -4472,7 +4472,6 @@ protected:
     Bits.VarDecl.IsDebuggerVar = false;
     Bits.VarDecl.IsREPLVar = false;
     Bits.VarDecl.HasNonPatternBindingInit = false;
-    setType(Ty);
   }
 
   /// This is the type specified, including location information.
@@ -4482,9 +4481,8 @@ protected:
 
 public:
   VarDecl(bool IsStatic, Specifier Sp, bool IsCaptureList, SourceLoc NameLoc,
-          Identifier Name, Type Ty, DeclContext *DC)
-    : VarDecl(DeclKind::Var, IsStatic, Sp, IsCaptureList, NameLoc, Name, Ty,
-              DC) {}
+          Identifier Name, DeclContext *DC)
+    : VarDecl(DeclKind::Var, IsStatic, Sp, IsCaptureList, NameLoc, Name, DC) {}
 
   SourceRange getSourceRange() const;
 
@@ -4712,7 +4710,7 @@ public:
   ParamDecl(VarDecl::Specifier specifier,
             SourceLoc specifierLoc, SourceLoc argumentNameLoc,
             Identifier argumentName, SourceLoc parameterNameLoc,
-            Identifier parameterName, Type ty, DeclContext *dc);
+            Identifier parameterName, DeclContext *dc);
 
   /// Clone constructor, allocates a new ParamDecl identical to the first.
   /// Intentionally not defined as a typical copy constructor to avoid

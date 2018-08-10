@@ -1248,13 +1248,12 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   options |= TypeResolutionFlags::AllowUnspecifiedTypes;
   options |= TypeResolutionFlags::AllowUnboundGenerics;
   options |= TypeResolutionFlags::InExpression;
+
   bool hadParameterError = false;
 
   GenericTypeToArchetypeResolver resolver(closure);
 
   if (TC.typeCheckParameterList(PL, DC, options, resolver)) {
-    closure->setType(ErrorType::get(TC.Context));
-
     // If we encounter an error validating the parameter list, don't bail.
     // Instead, go on to validate any potential result type, and bail
     // afterwards.  This allows for better diagnostics, and keeps the
@@ -1266,7 +1265,6 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   if (closure->hasExplicitResultType() &&
       TC.validateType(closure->getExplicitResultTypeLoc(), DC,
                       TypeResolutionFlags::InExpression, &resolver)) {
-    closure->setType(ErrorType::get(TC.Context));
     return false;
   }
 
@@ -2884,8 +2882,8 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                                          /*IsCaptureList*/false,
                                          EP->getLoc(),
                                          Context.getIdentifier("$match"),
-                                         rhsType,
                                          DC);
+  matchVar->setType(rhsType);
   matchVar->setInterfaceType(rhsType->mapTypeOutOfContext());
 
   matchVar->setImplicit();

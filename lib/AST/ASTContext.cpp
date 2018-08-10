@@ -3585,7 +3585,9 @@ Type AnyFunctionType::composeInput(ASTContext &ctx, ArrayRef<Param> params,
   for (const auto &param : params) {
     Type eltType = param.getPlainType();
     if (param.isVariadic()) {
-      if (canonicalVararg)
+      if (!ctx.getArrayDecl())
+        eltType = ErrorType::get(ctx);
+      else if (canonicalVararg)
         eltType = BoundGenericType::get(ctx.getArrayDecl(), Type(), {eltType});
       else
         eltType = ArraySliceType::get(eltType);
