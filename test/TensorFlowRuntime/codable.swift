@@ -10,6 +10,7 @@ import StdlibUnittest
 
 var CodableTests = TestSuite("TensorFlowCodable")
 
+// `testRoundTrip` adapted from test/stdlib/TestJSONEncoder.swift.
 private func _testRoundTrip<T>(
   of value: T, expectedJSON json: Data? = nil
 ) where T : Codable, T : Equatable {

@@ -141,11 +141,13 @@ extension TensorShape : Equatable {
 
 /// Codable conformance.
 extension TensorShape : Codable {
+  @inlinable
   public func encode(to encoder: Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(dimensions)
   }
 
+  @inlinable
   public init(from decoder: Decoder) throws {
     let container = try decoder.singleValueContainer()
     let dimensions = try container.decode([Int32].self)
