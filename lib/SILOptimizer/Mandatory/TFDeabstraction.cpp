@@ -1000,7 +1000,7 @@ promoteAddressRootsToStack(ArrayRef<std::pair<SILValue, bool>> addressRoots) {
 
     // Create a stack allocation in the entry block for the function.
     SILBuilder B(&fn.getEntryBlock()->front());
-    auto stackAlloc = B.createAllocStack(fn.getLocation(),
+    auto stackAlloc = B.createAllocStack(root.getLoc(),
                                          root->getType().getObjectType());
     stackAllocForRoot[root] = stackAlloc;
 
@@ -1024,20 +1024,20 @@ promoteAddressRootsToStack(ArrayRef<std::pair<SILValue, bool>> addressRoots) {
   // Insert a stack deallocation plus cleanup in all of the exit blocks.
   for (auto rootInfo : addressRoots) {
     auto root = rootInfo.first;
+    auto loc = root.getLoc();
     auto stackAlloc = stackAllocForRoot[root];
     assert(stackAlloc && "where'd our alloc_stack go?");
 
     // In some cases like global variables in top level code, the root will
     // start out uninitialized.  In other cases, it is already initialized - as
     // in indirect arguments to functions or REPL code that reuses a global.
-    // If it is initialize, emit code to do so.
+    // If it is initialized, emit code to do so.
     if (!rootInfo.second) {
       auto insertionPoint = rootInfo.first->getDefiningInstruction();
 
       // Insert the initialization after the root or stack alloc.
       if (!insertionPoint) insertionPoint = stackAlloc;
       SILBuilder B(++SILBasicBlock::iterator(insertionPoint));
-      auto loc = fn.getLocation();
 
       auto &TL = B.getTypeLowering(stackAlloc->getType());
       TL.emitCopyInto(B, loc, root, stackAlloc, IsTake_t::IsNotTake,
@@ -1047,7 +1047,6 @@ promoteAddressRootsToStack(ArrayRef<std::pair<SILValue, bool>> addressRoots) {
     // Process each exit block, inserting epilog code.
     for (auto *exit : exitBlocks) {
       SILBuilder B(exit->getTerminator());
-      auto loc = fn.getLocation();
 
       // Load from the stack allocation and store to the root, leaving it
       // initialized with our final state.
@@ -1912,10 +1911,9 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
             return;
           }
         }
-        elt = eltVal;
 
         opName += elementMarker;
-        inputs.push_back(elt);
+        inputs.push_back(eltVal);
       }
       continue;
     }
@@ -2067,7 +2065,8 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
       // FIXME: There needs to be a dtype attribute before this.
 
       if (constValue.getKind() == SymbolicValue::Integer ||
-          constValue.getKind() == SymbolicValue::Float)
+          constValue.getKind() == SymbolicValue::Float   ||
+          constValue.getKind() == SymbolicValue::String)
         break;
 
       if (constValue.getKind() != SymbolicValue::Array)
@@ -2109,9 +2108,16 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
               elt.getFloatValueSemantics() != firstElt.getFloatValueSemantics())
             return diagnoseInvalidAttr("array values must be the same type");
         }
-      } else {
+      } else if (firstElt.getKind() == SymbolicValue::String) {
+        for (auto elt : elements) {
+          elt = elt.lookThroughSingleElementAggregates();
+          if (elt.getKind() != SymbolicValue::String)
+            return diagnoseInvalidAttr("array values must be the same type");
+        }
+      }
+      else {
         return diagnoseInvalidAttr("requires a constant that is an integer,"
-                                   " floating point, or array thereof");
+                                   " floating point, string, or array thereof");
       }
       break;
     }

@@ -131,3 +131,32 @@ public func testConvolution(x: Tensor<Float>, filter: Tensor<Float>) -> Tensor<F
  * CHECK: graph_op "Conv2D,i,i"({{.*}} : $TensorHandle<Float>, {{.*}} : $TensorHandle<Float>) {T: $Float, strides: [$Int32: (i32 1), (i32 2), (i32 3), (i32 4)], use_cudnn_on_gpu: i1 -1, padding: "SAME", data_format: "NHWC", dilations: [$Int32: (i32 1), (i32 1), (i32 1), (i32 1)],
  * CHECK-LABEL: ---- END OF
 */
+
+
+// SR-8463: SimpleDataset itself is not a const, but the `elementShape` field
+// is, so it can be const-evaluated.
+struct SimpleDataset {
+  let handle: VariantHandle
+  let elementShape: TensorShape
+
+  init(handle: VariantHandle, elementShape: TensorShape) {
+    self.handle = handle
+    self.elementShape = elementShape
+  }
+}
+
+public func testShapeList() {
+  let t = Tensor<Int32>([0])
+  let handle: VariantHandle = #tfop(
+    "TensorSliceDataset", [t],
+    Toutput_types: [Int32.self],
+    output_shapes: [TensorShape()]
+  )
+  let dataset = SimpleDataset(handle: handle, elementShape: TensorShape())
+  _ = #tfop("AnonymousIterator",
+            output_types: [Int32.self],
+            output_shapes: [dataset.elementShape]) as ResourceHandle
+}
+
+// CHECK-LABEL: ---- INPUT FUNCTION {{.*}}testShapeList
+// CHECK: graph_op "AnonymousIterator"() {output_types: [$Int32.Type: $Int32], output_shapes: [$TensorShape: ([$Int32: ])]

@@ -22,7 +22,6 @@ public func testSendsInALoopGPU() {
   var a = Tensor<Float>(1)
   var count = 1
 
-  // expected-warning @+1 {{result implicitly copied to the accelerator}}
   while count < maxCount {
     // expected-warning @+2 {{implicitly copied to the accelerator}}
     // expected-warning @+1 {{implicitly copied to the accelerator}}

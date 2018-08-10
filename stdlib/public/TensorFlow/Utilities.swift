@@ -280,6 +280,11 @@ public struct RandomNumberSequence : Sequence {
 /// This is a generic host-only op that hides the details of its impl in the SIL
 /// code. This makes reading/writing SIL based compiler unit tests simple.
 @inline(never)
+public func _hostOp<T>(_ x: T) {
+  print(x)
+}
+
+@inline(never)
 public func _hostOp<Scalar>(_ x: Tensor<Scalar>) {
   print(x)
 }

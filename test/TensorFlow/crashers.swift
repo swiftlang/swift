@@ -7,11 +7,10 @@ import TensorFlow
 var someGlobal = Tensor<Int32>(1)
 
 public func iftest(z: Tensor<Int32>, y: Tensor<Int32>, c: Bool, d: Bool) -> Tensor<Int32> {
-  // expected-warning @-1 {{'c' implicitly copied to the accelerator}}
-  // expected-warning @-2 {{'z' implicitly copied to the accelerator}}
+  // expected-warning @-1 {{'z' implicitly copied to the accelerator}}
 
   var a = z
-  if c { // expected-note {{value used here}}
+  if c {
     if d { fatalError() }
     a = a + a // expected-note {{value used here}}
   } else {
@@ -191,9 +190,9 @@ public func tensorEndPointComputation() -> Int {
 
 // This was a crash marking arguments outside the tensor region.
 public func argumentCrash() {
-  for i : Int8 in 1...10 {  // expected-warning {{implicitly copied to the accelerator}}
-    let x = Tensor(i)  // expected-note {{value used here}}
-    print(x+x)
+  for i : Int8 in 1...10 {
+    let x = Tensor(i)
+    _hostOp(x+x)
   }
 }
 
@@ -238,7 +237,6 @@ public func testMultiResultOp_rawop(x: Tensor<Float>, y: Tensor<Float>) {
   _hostOp(results.backprop)
 }
 
-// TODO: The sends/recvs diagnostics are not very good. Fix them.
 public func testMultiResultOp_send_recv() {
   var x = Tensor<Float>([[1.0]])  // expected-warning {{implicitly copied to the host}}
   // Accelerator -> Host
@@ -248,8 +246,7 @@ public func testMultiResultOp_send_recv() {
   let results = TensorFlow.Raw.softmaxCrossEntropyWithLogits(features: x, labels: x)
   // Accelerator -> Host
   _hostOp(results.loss)
-  // expected-note @+2{{value used here}}
-  // expected-warning @+1{{implicitly copied to the accelerator}}
+  // expected-note @+1{{value used here}}
   let adjustedLoss = results.loss.scalar! + 3.0
   // Host -> Accelerator
   let y = Tensor<Float>(adjustedLoss)
@@ -267,7 +264,6 @@ public func testStructExtractBBArg(x: Tensor<Float>) -> Tensor<Int32> {
   _ = x.toAccelerator() + 1
   //  %21 = argument of bb2 : $Int32                    // user: %22
   // [Send]   %22 = struct_extract %21 : $Int32, #Int32._value // user: %23
-  // expected-warning @+1 {{value implicitly copied to the accelerator}}
   return Tensor<Int32>(globalThing)
 }
 
@@ -276,7 +272,7 @@ public func SR8191() {
   var i = 0
   repeat {
     let y = t + t // expected-warning {{value implicitly copied to the host}}
-    print(y)
+    _hostOp(y)
     i += 1
   } while i < 10
 }
@@ -309,14 +305,11 @@ public func SR8226(n: Float, m: Float, cond: Bool, cond2: Bool) {
 // users, and thus get deleted. This will in turn delete the associated
 // retain/release insts on that tensor.
 
-// expected-warning @+1{{implicitly copied to the accelerator}}
 public func SR8228_unusedTensorBBArg(n: Int32, x: Tensor<Float>) {
   var a = Tensor<Float>(1.0)
   // expected-warning @+1{{variable 'b' was written to, but never read}}
   var b = x
   var i: Int32 = 0
-  // expected-warning @+2{{implicitly copied to the accelerator}}
-  // expected-note @+1{{value used here}}
   while i < n {
     a += a
     b = a
@@ -332,10 +325,9 @@ public func SR8222_cond_br_TensorHandle_Bool() {
   repeat {
     let y = t + t
     // expected-warning @-1{{implicitly copied to the host}}
-    print(y)
+    _hostOp(y)
     i += 1
   } while i != Tensor<Int32>(10)
-  // expected-warning @-1{{implicitly copied to the host}}
 }
 
 // Previously, dead instruction cleanup during deabstraction crashed while
@@ -352,12 +344,27 @@ func SR8316_main() {
 }
 
 func readDataset() -> (images: Tensor<Float>, labels: Tensor<Int32>)? {
-    print("Reading the data.")
+    _hostOp("Reading the data.")
     return (Tensor<Float>(1.0), Tensor<Int32>(1))
 }
 
 public func constFoldingBug() {
   guard let _ = readDataset() else {
     return
+  }
+}
+
+// This function failed SIL verification due to a non-inlined SILDebugLocation.
+public func SR8419(iterationCount: Int) {
+  let images = Tensor<Float>(ones: [1000, 784])
+  let batchSize = Float(images.shape[0])
+
+  _hostOp("Begin training for \(iterationCount) iterations.")
+
+  for _ in 0...iterationCount {
+    let bound = Int32(batchSize)/25
+    for _ in 0..<bound {
+      let _ = Tensor(1)
+    }
   }
 }

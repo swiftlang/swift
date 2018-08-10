@@ -119,7 +119,7 @@ public func test75494462() {
     x += 1
     i += 1
   } while i < 5
-  _hostOp(x)
+  _hostOp(x.array)
 }
 
 public func paddingTuplesHoistable() {
@@ -191,7 +191,7 @@ public func mnist() {
   var classifier = Classifier()
   let loss = classifier.train(images: images, labels: labels,
                               learningRate: 0.3, epochCount: 100)
-  print(loss)
+  _hostOp(loss)
 }
 
 // A TF op that produces multiple outputs.
@@ -229,4 +229,10 @@ public func SR8399() {
   let z = x.reshaped(toShape: Tensor<Int32>([Int32(4), 1]))
   _hostOp(y)
   _hostOp(z)
+}
+
+public func SR8399_2() {
+  let x = Tensor<Float>(ones: [2, 2])
+  let y = x.reshaped(toShape: Tensor<Int32>([4, Int32(1 * 1)]))
+  _hostOp(y)
 }

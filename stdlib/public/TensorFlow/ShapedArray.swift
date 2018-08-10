@@ -617,7 +617,7 @@ extension ShapedArray : Codable where Scalar : Codable {
 ///
 /// For example:
 ///
-///     let matrix = ShapedArray(shape: [2, 2], scalars: [0, 1, 2, 3])
+///     var matrix = ShapedArray(shape: [2, 2], scalars: [0, 1, 2, 3])
 ///     // `matrix` represents [[0, 1], [2, 3]].
 ///
 ///     let element = matrix[0]

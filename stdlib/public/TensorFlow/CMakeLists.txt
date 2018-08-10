@@ -37,6 +37,7 @@ list(APPEND swift_stdlib_compile_flags "-Onone")
 set(SOURCES
   CompilerRuntime.swift
   CompositeMath.swift
+  Dataset.swift
   DataTypes.swift
   Gradients.swift
   OpaqueHandles.swift
