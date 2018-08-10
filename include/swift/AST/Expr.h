@@ -2556,6 +2556,7 @@ class MakeTemporarilyEscapableExpr : public Expr {
   OpaqueValueExpr *EscapingClosureValue;
   Expr *SubExpr;
   SourceLoc NameLoc, LParenLoc, RParenLoc;
+  Expr *OriginalExpr;
 
 public:
   MakeTemporarilyEscapableExpr(SourceLoc NameLoc,
@@ -2564,12 +2565,14 @@ public:
                                Expr *SubExpr,
                                SourceLoc RParenLoc,
                                OpaqueValueExpr *OpaqueValueForEscapingClosure,
+                               Expr *OriginalExpr,
                                bool implicit = false)
     : Expr(ExprKind::MakeTemporarilyEscapable, implicit, Type()),
       NonescapingClosureValue(NonescapingClosureValue),
       EscapingClosureValue(OpaqueValueForEscapingClosure),
       SubExpr(SubExpr),
-      NameLoc(NameLoc), LParenLoc(LParenLoc), RParenLoc(RParenLoc)
+      NameLoc(NameLoc), LParenLoc(LParenLoc), RParenLoc(RParenLoc),
+      OriginalExpr(OriginalExpr)
   {}
   
   SourceLoc getStartLoc() const {
@@ -2602,6 +2605,12 @@ public:
   }
   void setSubExpr(Expr *e) {
     SubExpr = e;
+  }
+
+  /// Retrieve the original 'withoutActuallyEscaping(closure) { ... }'
+  //  expression.
+  Expr *getOriginalExpr() const {
+    return OriginalExpr;
   }
 
   static bool classof(const Expr *E) {
