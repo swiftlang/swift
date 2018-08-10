@@ -354,3 +354,17 @@ bool MemberAccessOnOptionalBaseFailure::diagnose() {
   return diagnoseBaseUnwrapForMemberAccess(anchor, type, Member,
                                            resultIsOptional, SourceRange());
 }
+
+bool MissingOptionalUnwrapFailure::diagnose() {
+  auto *anchor = getAnchor();
+  auto *unwrapped = anchor->getValueProvidingExpr();
+  auto type = getType(anchor)->getRValueType();
+
+  auto *tryExpr = dyn_cast<OptionalTryExpr>(unwrapped);
+  if (!tryExpr)
+    return diagnoseUnwrap(getTypeChecker(), getDC(), unwrapped, type);
+
+  emitDiagnostic(tryExpr->getTryLoc(), diag::missing_unwrap_optional_try, type)
+      .fixItReplace({tryExpr->getTryLoc(), tryExpr->getQuestionLoc()}, "try!");
+  return true;
+}

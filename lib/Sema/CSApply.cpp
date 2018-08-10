@@ -7845,19 +7845,8 @@ bool ConstraintSystem::applySolutionFix(
     
   switch (fix.first.getKind()) {
   case FixKind::ForceOptional: {
-    Expr *unwrapped = affected->getValueProvidingExpr();
-    auto type = solution.simplifyType(getType(affected))->getRValueType();
-
-    if (auto tryExpr = dyn_cast<OptionalTryExpr>(unwrapped)) {
-      TC.diagnose(tryExpr->getTryLoc(), diag::missing_unwrap_optional_try,
-                  type)
-        .fixItReplace({tryExpr->getTryLoc(), tryExpr->getQuestionLoc()},
-                      "try!");
-
-    } else {
-      return diagnoseUnwrap(TC, DC, unwrapped, type);
-    }
-    return true;
+    MissingOptionalUnwrapFailure failure(expr, solution, locator);
+    return failure.diagnose();
   }
           
   case FixKind::UnwrapOptionalBase: {

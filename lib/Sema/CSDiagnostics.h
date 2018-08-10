@@ -271,6 +271,17 @@ public:
   bool diagnose() override;
 };
 
+/// Diagnose failures related to use of the unwrapped optional types,
+/// which require some type of force-unwrap e.g. "!" or "try!".
+class MissingOptionalUnwrapFailure final : public FailureDiagnostic {
+public:
+  MissingOptionalUnwrapFailure(Expr *expr, const Solution &solution,
+                               ConstraintLocator *locator)
+      : FailureDiagnostic(expr, solution, locator) {}
+
+  bool diagnose() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 
