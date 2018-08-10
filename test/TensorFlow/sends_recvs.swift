@@ -91,6 +91,22 @@ public func test2Sends() {
 
 // CHECK:      function_ref @_swift_tfc_FinishTensorComputation
 
+public func testSendsInABranch(_ c: Bool) {
+  var a = Tensor<Float>(1.0)
+  if c {
+    a += a
+    // One send.
+    _hostOp(a.toHost())
+  }
+  a += a
+  // This one should not be a send.
+  _hostOp(a.toHost())
+}
+
+// For testSendsInABranch(), we are generating a stateful while op.
+// CHECK-LABEL: --- TFPartition GraphDef Proto:
+// CHECK:  op: "If"
+
 public func testSendsInALoopCPU() {
   let maxCount = 10
   var count = 1
@@ -106,6 +122,9 @@ public func testSendsInALoopCPU() {
   _hostOp(a.toHost())
 }
 
+// For testSendsInALoopCPU(), we are generating a stateful while op.
+// CHECK-LABEL: --- TFPartition GraphDef Proto:
+// CHECK:  op: "While"
 
 public func testSendsInALoopGPU() {
   TensorFlow.enableGPU()
