@@ -3862,15 +3862,6 @@ extension ${Self} : _HasCustomAnyHashableRepresentation {
   }
 }
 
-
-// Create an ambiguity when indexing or slicing
-// Range[OfStrideable]<${Self}> outside a generic context.  See
-// Range.swift for details.
-extension ${Self} {
-  public typealias _DisabledRangeIndex = ${Self}
-}
-
-
 % for src_type in all_integer_types(word_bits):
 %   srcBits = src_type.bits
 %   srcSigned = src_type.is_signed
