@@ -72,13 +72,15 @@ public:
   typedef std::pair<Type, ProtocolDecl *> Entry;
 
 private:
-  llvm::SmallVector<Entry, 2> path;
+  ArrayRef<Entry> path;
+
+  ConformanceAccessPath(ArrayRef<Entry> path) : path(path) {}
 
   friend class GenericSignature;
 
 public:
-  typedef llvm::SmallVector<Entry, 2>::const_iterator iterator;
-  typedef llvm::SmallVector<Entry, 2>::const_iterator const_iterator;
+  typedef const Entry *const_iterator;
+  typedef const_iterator iterator;
 
   const_iterator begin() const { return path.begin(); }
   const_iterator end() const { return path.end(); }

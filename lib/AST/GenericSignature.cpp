@@ -840,7 +840,7 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
 
   // Follow the requirement source to form the conformance access path.
   typedef GenericSignatureBuilder::RequirementSource RequirementSource;
-  ConformanceAccessPath path;
+  SmallVector<ConformanceAccessPath::Entry, 2> path;
 
   // Local function to construct the conformance access path from the
   // requirement.
@@ -860,7 +860,7 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
         // If we have a requirement signature now, we're done.
         if (source->usesRequirementSignature) {
           Type subjectType = source->getStoredType()->getCanonicalType();
-          path.path.push_back({subjectType, conformingProto});
+          path.push_back({subjectType, conformingProto});
           return;
         }
 
@@ -885,7 +885,7 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
       auto inProtocol = source->getProtocolDecl();
       buildPath(reqs, source->parent, inProtocol, rootType,
                 requirementSignatureProto);
-      assert(path.path.back().second == inProtocol &&
+      assert(path.back().second == inProtocol &&
              "path produces incorrect conformance");
 
       // If this step was computed via the requirement signature, add it
@@ -906,7 +906,7 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
                "missing explicit conformance in requirement signature");
 
         // Record this step.
-        path.path.push_back({subjectType, conformingProto});
+        path.push_back({subjectType, conformingProto});
         return;
       }
 
@@ -954,7 +954,7 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
       auto conformance = source->getProtocolConformance();
       (void)conformance;
       assert(conformance.getRequirement() == conformingProto);
-      path.path.push_back({source->getAffectedType(), conformingProto});
+      path.push_back({source->getAffectedType(), conformingProto});
       return;
     }
 
@@ -971,7 +971,7 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
 
     // Skip trivial path elements. These occur when querying a requirement
     // signature.
-    if (!path.path.empty() && conformingProto == path.path.back().second &&
+    if (!path.empty() && conformingProto == path.back().second &&
         rootType->isEqual(conformingProto->getSelfInterfaceType()))
       return;
 
@@ -979,7 +979,7 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
            "missing explicit conformance in signature");
 
     // Add the root of the path, which starts at this explicit requirement.
-    path.path.push_back({rootType, conformingProto});
+    path.push_back({rootType, conformingProto});
   };
   buildPath = buildPathLambda;
 
@@ -991,8 +991,9 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
   buildPath(getRequirements(), source, protocol, rootType, nullptr);
 
   // Return the path; we're done!
-  equivClass->conformanceAccessPathCache[protocol] = path;
-  return path;
+  ConformanceAccessPath result(getASTContext().AllocateCopy(path));
+  equivClass->conformanceAccessPathCache.insert({protocol, result});
+  return result;
 }
 
 unsigned GenericParamKey::findIndexIn(
