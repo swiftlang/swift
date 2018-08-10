@@ -191,15 +191,6 @@ void Evaluator::printDependencies(
   }
 }
 
-void Evaluator::printDependencies(const AnyRequest &request,
-                                  llvm::raw_ostream &out) const {
-  std::string prefixStr;
-  llvm::DenseSet<AnyRequest> visitedAnywhere;
-  llvm::SmallVector<AnyRequest, 4> visitedAlongPath;
-  printDependencies(request, out, visitedAnywhere, visitedAlongPath, { },
-                    prefixStr, /*lastChild=*/true);
-}
-
 void Evaluator::dumpDependencies(const AnyRequest &request) const {
   printDependencies(request, llvm::dbgs());
 }

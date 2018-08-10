@@ -213,13 +213,13 @@ public:
   template<typename Request>
   typename Request::OutputType operator()(const Request &request) {
     // Check for a cycle.
-    if (checkDependency(request))
+    if (checkDependency(AnyRequest(request)))
       return request.breakCycle();
 
     // Make sure we remove this from the set of active requests once we're
     // done.
     SWIFT_DEFER {
-      assert(activeRequests.back() == request);
+      assert(activeRequests.back().castTo<Request>() == request);
       activeRequests.pop_back();
     };
 
@@ -283,7 +283,7 @@ private:
   typename Request::OutputType getResultUncached(const Request &request) {
     // Clear out the dependencies on this request; we're going to recompute
     // them now anyway.
-    dependencies[request].clear();
+    dependencies[AnyRequest(request)].clear();
 
     PrettyStackTraceRequest<Request> prettyStackTrace(request);
 
@@ -319,19 +319,17 @@ private:
       typename Request,
       typename std::enable_if<!Request::hasExternalCache>::type * = nullptr>
   typename Request::OutputType getResultCached(const Request &request) {
-    AnyRequest anyRequest{request};
-
     // If we already have an entry for this request in the cache, return it.
-    auto known = cache.find(anyRequest);
+    auto known = cache.find_as(request);
     if (known != cache.end()) {
-      return known->second.castTo<typename Request::OutputType>();
+      return known->second.template castTo<typename Request::OutputType>();
     }
 
     // Compute the result.
     auto result = getResultUncached(request);
 
     // Cache the result.
-    cache.insert({anyRequest, result});
+    cache.insert({AnyRequest(request), result});
     return result;
   }
 
@@ -349,8 +347,14 @@ public:
                          bool lastChild) const;
 
   /// Print the dependencies of the given request as a tree.
-  void printDependencies(const AnyRequest &request,
-                         llvm::raw_ostream &out) const;
+  template <typename Request>
+  void printDependencies(const Request &request, llvm::raw_ostream &out) const {
+    std::string prefixStr;
+    llvm::DenseSet<AnyRequest> visitedAnywhere;
+    llvm::SmallVector<AnyRequest, 4> visitedAlongPath;
+    printDependencies(AnyRequest(request), out, visitedAnywhere,
+                      visitedAlongPath, { }, prefixStr, /*lastChild=*/true);
+  }
 
   /// Dump the dependencies of the given request to the debugging stream
   /// as a tree.
