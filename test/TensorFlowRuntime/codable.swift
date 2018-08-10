@@ -43,10 +43,12 @@ CodableTests.testAllBackends("Tensor") {
 CodableTests.testAllBackends("ShapedArray") {
   let array = ShapedArray(shape: [2, 3], scalars: Array(1...6))
   let expectedJSON = "{\"shape\":[2,3],\"scalars\":[1,2,3,4,5,6]}".data(using: .utf8)!
-  _testRoundTrip(of: shape, expectedJSON: expectedJSON)
+  _testRoundTrip(of: array, expectedJSON: expectedJSON)
 }
 
 CodableTests.testAllBackends("TensorShape") {
   let shape: TensorShape = [2, 3, 4]
   _testRoundTrip(of: shape)
 }
+
+runAllTests()
