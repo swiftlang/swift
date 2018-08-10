@@ -641,7 +641,8 @@ namespace {
     }
 
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
-                                         Address src, SILType T)
+                                         Address src, SILType T,
+                                         bool isOutlined)
     const override {
       if (!getSingleton()) {
         // Any empty value is a valid value.
@@ -650,19 +651,22 @@ namespace {
 
       return getSingleton()->getExtraInhabitantIndex(IGF,
                                              getSingletonAddress(IGF, src),
-                                             getSingletonType(IGF.IGM, T));
+                                             getSingletonType(IGF.IGM, T),
+                                             isOutlined);
     }
 
     void storeExtraInhabitant(IRGenFunction &IGF,
                               llvm::Value *index,
-                              Address dest, SILType T) const override {
+                              Address dest, SILType T,
+                              bool isOutlined) const override {
       if (!getSingleton()) {
         // Nothing to store for empty singletons.
         return;
       }
       getSingleton()->storeExtraInhabitant(IGF, index,
                                            getSingletonAddress(IGF, dest),
-                                           getSingletonType(IGF.IGM, T));
+                                           getSingletonType(IGF.IGM, T),
+                                           isOutlined);
     }
 
     unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
@@ -1014,7 +1018,8 @@ namespace {
     }
 
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
-                                         Address src, SILType T)
+                                         Address src, SILType T,
+                                         bool isOutlined)
     const override {
       auto &C = IGF.IGM.getLLVMContext();
 
@@ -1044,7 +1049,8 @@ namespace {
 
     void storeExtraInhabitant(IRGenFunction &IGF,
                               llvm::Value *index,
-                              Address dest, SILType T) const override {
+                              Address dest, SILType T,
+                              bool isOutlined) const override {
       auto &C = IGF.IGM.getLLVMContext();
       auto payloadTy = llvm::IntegerType::get(C,
                       cast<FixedTypeInfo>(TI)->getFixedSize().getValueInBits());
@@ -1119,13 +1125,15 @@ namespace {
     }
 
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
-                                         Address src, SILType T) const override {
+                                         Address src, SILType T,
+                                         bool isOutlined) const override {
       llvm_unreachable("no extra inhabitants");
     }
 
     void storeExtraInhabitant(IRGenFunction &IGF,
                               llvm::Value *index,
-                              Address dest, SILType T) const override {
+                              Address dest, SILType T,
+                              bool isOutlined) const override {
       llvm_unreachable("no extra inhabitants");
     }
 
@@ -2915,11 +2923,13 @@ namespace {
 
     llvm::Value *
     getExtraInhabitantIndex(IRGenFunction &IGF,
-                            Address src, SILType T) const override {
+                            Address src, SILType T,
+                            bool isOutlined) const override {
       auto payload = projectPayloadData(IGF, src);
       llvm::Value *index
         = getPayloadTypeInfo().getExtraInhabitantIndex(IGF, payload,
-                                                   getPayloadType(IGF.IGM, T));
+                                                   getPayloadType(IGF.IGM, T),
+                                                   isOutlined);
 
       // Offset the payload extra inhabitant index by the number of inhabitants
       // we used. If less than zero, it's a valid value of the enum type.
@@ -2935,14 +2945,16 @@ namespace {
 
     void storeExtraInhabitant(IRGenFunction &IGF,
                               llvm::Value *index,
-                              Address dest, SILType T) const override {
+                              Address dest, SILType T,
+                              bool isOutlined) const override {
       // Offset the index to skip the extra inhabitants we used.
       index = IGF.Builder.CreateAdd(index,
           llvm::ConstantInt::get(IGF.IGM.Int32Ty, ElementsWithNoPayload.size()));
 
       auto payload = projectPayloadData(IGF, dest);
       getPayloadTypeInfo().storeExtraInhabitant(IGF, index, payload,
-                                                   getPayloadType(IGF.IGM, T));
+                                                getPayloadType(IGF.IGM, T),
+                                                isOutlined);
     }
     
     APInt
@@ -4811,14 +4823,16 @@ namespace {
 
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                          Address src,
-                                         SILType T) const override {
+                                         SILType T,
+                                         bool isOutlined) const override {
       llvm_unreachable("extra inhabitants for multi-payload enums not implemented");
     }
 
     void storeExtraInhabitant(IRGenFunction &IGF,
                               llvm::Value *index,
                               Address dest,
-                              SILType T) const override {
+                              SILType T,
+                              bool isOutlined) const override {
       llvm_unreachable("extra inhabitants for multi-payload enums not implemented");
     }
     
@@ -5204,14 +5218,16 @@ namespace {
 
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                          Address src,
-                                         SILType T) const override {
+                                         SILType T,
+                                         bool isOutlined) const override {
       return emitGetExtraInhabitantIndexCall(IGF, T, src);
     }
 
     void storeExtraInhabitant(IRGenFunction &IGF,
                               llvm::Value *index,
                               Address dest,
-                              SILType T) const override {
+                              SILType T,
+                              bool isOutlined) const override {
       emitStoreExtraInhabitantCall(IGF, T, index, dest);
     }
 
@@ -5436,14 +5452,16 @@ namespace {
     }
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                          Address src,
-                                         SILType T) const override {
-      return Strategy.getExtraInhabitantIndex(IGF, src, T);
+                                         SILType T,
+                                         bool isOutlined) const override {
+      return Strategy.getExtraInhabitantIndex(IGF, src, T, isOutlined);
     }
     void storeExtraInhabitant(IRGenFunction &IGF,
                               llvm::Value *index,
                               Address dest,
-                              SILType T) const override {
-      return Strategy.storeExtraInhabitant(IGF, index, dest, T);
+                              SILType T,
+                              bool isOutlined) const override {
+      return Strategy.storeExtraInhabitant(IGF, index, dest, T, isOutlined);
     }
     bool isSingleRetainablePointer(ResilienceExpansion expansion,
                                    ReferenceCounting *rc) const override {

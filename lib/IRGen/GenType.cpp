@@ -510,7 +510,7 @@ llvm::Value *FixedTypeInfo::getEnumTagSinglePayload(IRGenFunction &IGF,
   // If there are extra inhabitants, see whether the payload is valid.
   llvm::Value *result0;
   if (mayHaveExtraInhabitants(IGM)) {
-    result0 = getExtraInhabitantIndex(IGF, enumAddr, T);
+    result0 = getExtraInhabitantIndex(IGF, enumAddr, T, false);
     noExtraTagBitsBB = Builder.GetInsertBlock();
   } else {
     result0 = llvm::ConstantInt::getSigned(IGM.Int32Ty, -1);
@@ -665,7 +665,8 @@ void FixedTypeInfo::storeEnumTagSinglePayload(IRGenFunction &IGF,
   if (mayHaveExtraInhabitants(IGM)) {
     // Store an index in the range [0..ElementsWithNoPayload-1].
     auto *nonPayloadElementIndex = Builder.CreateSub(whichCase, one);
-    storeExtraInhabitant(IGF, nonPayloadElementIndex, enumAddr, T);
+    storeExtraInhabitant(IGF, nonPayloadElementIndex, enumAddr, T,
+                         /*outlined*/ false);
   }
   Builder.CreateBr(returnBB);
 
@@ -868,7 +869,8 @@ namespace {
 
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                          Address src,
-                                         SILType T) const override {
+                                         SILType T,
+                                         bool isOutlined) const override {
       // Copied from BridgeObjectTypeInfo.
       src = IGF.Builder.CreateBitCast(src, IGF.IGM.IntPtrTy->getPointerTo());
       auto val = IGF.Builder.CreateLoad(src);
@@ -880,7 +882,8 @@ namespace {
     }
 
     void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
-                              Address dest, SILType T) const override {
+                              Address dest, SILType T,
+                              bool isOutlined) const override {
       // Copied from BridgeObjectTypeInfo.
       // There's only one extra inhabitant, 0.
       dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.IntPtrTy->getPointerTo());

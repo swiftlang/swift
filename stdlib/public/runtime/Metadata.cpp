@@ -1939,7 +1939,7 @@ static ValueWitnessTable *getMutableVWTableForInit(StructMetadata *self,
 }
 
 /// Initialize the value witness table and struct field offset vector for a
-/// struct, using the "Universal" layout strategy.
+/// struct.
 void swift::swift_initStructMetadata(StructMetadata *structType,
                                      StructLayoutFlags layoutFlags,
                                      size_t numFields,
@@ -1952,17 +1952,29 @@ void swift::swift_initStructMetadata(StructMetadata *structType,
       assignUnlessEqual(fieldOffsets[i], offset);
     });
 
-  bool hasExtraInhabitants = fieldTypes[0]->flags.hasExtraInhabitants();
-
+  // We have extra inhabitants if any element does. Use the field with the most.
+  unsigned extraInhabitantField = ~0u;
+  unsigned extraInhabitantCount = 0;
+  for (unsigned i = 0; i < numFields; ++i) {
+    if (!fieldTypes[i]->flags.hasExtraInhabitants())
+      continue;
+    unsigned fieldExtraInhabitantCount =
+      fieldTypes[i]->getExtraInhabitantFlags().getNumExtraInhabitants();
+    if (fieldExtraInhabitantCount > extraInhabitantCount) {
+      extraInhabitantField = i;
+      extraInhabitantCount = fieldExtraInhabitantCount;
+    }
+  }
+    
   auto vwtable =
-    getMutableVWTableForInit(structType, layoutFlags, hasExtraInhabitants);
+    getMutableVWTableForInit(structType, layoutFlags,
+                             extraInhabitantCount > 0);
 
-  // We have extra inhabitants if the first element does.
-  // FIXME: generalize this.
-  if (hasExtraInhabitants) {
+  if (extraInhabitantCount > 0) {
     layout.flags = layout.flags.withExtraInhabitants(true);
     auto xiVWT = static_cast<ExtraInhabitantsValueWitnessTable*>(vwtable);
-    xiVWT->extraInhabitantFlags = fieldTypes[0]->getExtraInhabitantFlags();
+    xiVWT->extraInhabitantFlags =
+      fieldTypes[extraInhabitantField]->getExtraInhabitantFlags();
 
     // The compiler should already have initialized these.
     assert(xiVWT->storeExtraInhabitant);
