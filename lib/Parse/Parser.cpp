@@ -1016,6 +1016,13 @@ struct ParserUnit::Implementation {
             Opts.CollectParsedToken,
             Opts.BuildSyntaxTree)) {
   }
+
+  ~Implementation() {
+    // We need to delete the parser before the context so that it can finalize
+    // its SourceFileSyntax while it is still alive
+    TheParser.reset();
+    delete &Ctx;
+  }
 };
 
 ParserUnit::ParserUnit(SourceManager &SM, unsigned BufferID)
