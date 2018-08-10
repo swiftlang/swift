@@ -44,6 +44,8 @@ extension ShapedArray : ConvertibleFromNumpyArray
       UInt(numpyArray.__array_interface__["data"].tuple2.0) else {
       return nil
     }
+    // Note: `ptr` is not nil even if the `ndarray` is empty (i.e. has a shape
+    // of `(0,)`).
     guard let ptr = UnsafePointer<Scalar>(bitPattern: ptrVal) else {
       fatalError("numpy.ndarray data pointer was nil")
     }
@@ -86,6 +88,8 @@ extension Tensor : ConvertibleFromNumpyArray
       UInt(numpyArray.__array_interface__["data"].tuple2.0) else {
       return nil
     }
+    // Note: `ptr` is not nil even if the `ndarray` is empty (i.e. has a shape
+    // of `(0,)`).
     guard let ptr = UnsafePointer<Scalar>(bitPattern: ptrVal) else {
       fatalError("numpy.ndarray data pointer was nil")
     }

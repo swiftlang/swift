@@ -21,6 +21,11 @@ let numpyModule = try? Python.attemptImport("numpy")
 NumpyConversionTests.test("shaped-array-conversion") {
   guard let np = numpyModule else { return }
 
+  let numpyArrayEmpty = np.array([[]] as [[Float]], dtype: np.float32)
+  if let array = expectNotNil(ShapedArray<Float>(numpyArray: numpyArrayEmpty)) {
+    expectEqual(ShapedArray(shape: [1, 0], scalars: []), array)
+  }
+
   let numpyArrayBool = np.array([[true, false], [false, true]])
   expectNil(ShapedArray<Int8>(numpyArray: numpyArrayBool))
   expectNil(ShapedArray<Float>(numpyArray: numpyArrayBool))
@@ -48,6 +53,11 @@ NumpyConversionTests.test("shaped-array-conversion") {
 
 NumpyConversionTests.test("tensor-conversion") {
   guard let np = numpyModule else { return }
+
+  let numpyArrayEmpty = np.array([[]] as [[Float]], dtype: np.float32)
+  if let tensor = expectNotNil(Tensor<Float>(numpyArray: numpyArrayEmpty)) {
+    expectEqual(ShapedArray(shape: [1, 0], scalars: []), tensor.array)
+  }
 
   let numpyArrayBool = np.array([[true, false], [false, true]])
   expectNil(Tensor<Int8>(numpyArray: numpyArrayBool))

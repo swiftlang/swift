@@ -30,6 +30,11 @@ NumpyConversionTests.test("dtype-compatible") {
 NumpyConversionTests.test("array-conversion") {
   guard let np = numpyModule else { return }
 
+  let numpyArrayEmpty = np.array([] as [Float], dtype: np.float32)
+  if let array = expectNotNil(Array<Float>(numpyArray: numpyArrayEmpty)) {
+    expectEqual([], array)
+  }
+
   let numpyArrayBool = np.array([true, false, false, true])
   if let array = expectNotNil(Array<Bool>(numpyArray: numpyArrayBool)) {
     expectEqual([true, false, false, true], array)
