@@ -32,3 +32,10 @@ func foo5() {
     } else something()
     foo1()
 }
+
+func conditional() {
+    #if false
+    #elseif false
+    #elseif false
+    #endif
+}

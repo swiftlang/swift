@@ -572,6 +572,15 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
                                        SyntaxKind::IfConfigClause);
 
     bool isElse = Tok.is(tok::pound_else);
+    if (Tok.isAny(tok::pound_elif, tok::pound_elsif)) {
+      // #elif is the C preprocessor spelling (and elif is Python), and elsif is
+      // Ruby, so let's catch those ones and fix them to Swift's #elseif. Since
+      // `isElse` is false, they'll behave like #elseif automatically too.
+      diagnose(Tok.getLoc(), diag::unknown_directive_elseif_fixit,
+               Tok.getText())
+          .fixItReplace(Tok.getLoc(), "#elseif");
+    }
+
     SourceLoc ClauseLoc = consumeToken();
     Expr *Condition = nullptr;
     bool isActive = false;
@@ -627,7 +636,9 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
     Clauses.emplace_back(ClauseLoc, Condition,
                          Context.AllocateCopy(Elements), isActive);
 
-    if (Tok.isNot(tok::pound_elseif, tok::pound_else))
+    if (Tok.isNot(tok::pound_elseif, tok::pound_else,
+                  // error recovery
+                  tok::pound_elsif, tok::pound_elif))
       break;
 
     if (isElse)

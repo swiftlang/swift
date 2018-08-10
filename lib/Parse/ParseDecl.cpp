@@ -2465,7 +2465,9 @@ Parser::parseDecl(ParseDeclOptions Flags,
         SyntaxParsingContext DeclListCtx(SyntaxContext,
                                          SyntaxKind::MemberDeclList);
         while (Tok.isNot(tok::pound_else, tok::pound_endif, tok::pound_elseif,
-                         tok::eof)) {
+                         tok::eof,
+                         // error recovery
+                         tok::pound_elif, tok::pound_elsif)) {
           if (Tok.is(tok::r_brace)) {
             diagnose(Tok.getLoc(),
                       diag::unexpected_rbrace_in_conditional_compilation_block);

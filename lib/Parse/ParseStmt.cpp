@@ -290,6 +290,8 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
          Tok.isNot(tok::pound_endif) &&
          Tok.isNot(tok::pound_elseif) &&
          Tok.isNot(tok::pound_else) &&
+         // error recovery
+         Tok.isNot(tok::pound_elif, tok::pound_elsif) &&
          Tok.isNot(tok::eof) &&
          Tok.isNot(tok::kw_sil) &&
          Tok.isNot(tok::kw_sil_scope) &&
@@ -2189,7 +2191,10 @@ Parser::parseStmtCases(SmallVectorImpl<ASTNode> &cases, bool IsActive) {
   SyntaxParsingContext CasesContext(SyntaxContext, SyntaxKind::SwitchCaseList);
   ParserStatus Status;
   while (Tok.isNot(tok::r_brace, tok::eof,
-                   tok::pound_endif, tok::pound_elseif, tok::pound_else)) {
+                   tok::pound_endif, tok::pound_elseif,
+                   tok::pound_else,
+                   // error recovery
+                   tok::pound_elif, tok::pound_elsif)) {
     if (isAtStartOfSwitchCase(*this)) {
       ParserResult<CaseStmt> Case = parseStmtCase(IsActive);
       Status |= Case;

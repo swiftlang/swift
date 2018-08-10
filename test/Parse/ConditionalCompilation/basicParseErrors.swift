@@ -138,3 +138,19 @@ fn_k()
 func undefinedFunc() // ignored.
 #endif
 undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'}}
+
+#if false
+undefinedFunc()
+#elif true // expected-error {{use of unknown directive '#elif'; did you mean '#elseif'?}} {{1-6=#elseif}}
+undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'}}
+#else
+undefinedFunc()
+#endif
+
+#if false
+undefinedFunc()
+#elsif true // expected-error {{use of unknown directive '#elsif'; did you mean '#elseif'?}} {{1-7=#elseif}}
+undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'}}
+#else
+undefinedFunc()
+#endif

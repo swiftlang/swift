@@ -272,6 +272,9 @@ POUND_COND_DIRECTIVE_KEYWORD(if)
 POUND_COND_DIRECTIVE_KEYWORD(else)
 POUND_COND_DIRECTIVE_KEYWORD(elseif)
 POUND_COND_DIRECTIVE_KEYWORD(endif)
+// Error-if-they-occur keywords, purely for good fixits
+POUND_COND_DIRECTIVE_KEYWORD(elif) // C preprocessor, Python
+POUND_COND_DIRECTIVE_KEYWORD(elsif) // Ruby
 
 // Keywords prefixed with a '#' that are build configurations.
 POUND_CONFIG(available)

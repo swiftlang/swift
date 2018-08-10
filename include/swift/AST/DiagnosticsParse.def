@@ -67,6 +67,8 @@ ERROR(extra_tokens_conditional_compilation_directive,none,
       "extra tokens following conditional compilation directive", ())
 ERROR(unexpected_rbrace_in_conditional_compilation_block,none,
       "unexpected '}' in conditional compilation block", ())
+ERROR(unknown_directive_elseif_fixit,none,
+      "use of unknown directive '%0'; did you mean '#elseif'?", (StringRef))
 
 ERROR(pound_diagnostic_expected_string,none,
       "expected string literal in %select{#warning|#error}0 directive",(bool))
