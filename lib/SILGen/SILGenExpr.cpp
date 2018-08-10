@@ -1703,9 +1703,8 @@ static ManagedValue convertCFunctionSignature(SILGenFunction &SGF,
     assert(result.getType() == loweredResultTy);
 
     if (loweredResultTy != loweredDestTy) {
-      result = ManagedValue::forUnmanaged(
-          SGF.B.createConvertFunction(e, result.getUnmanagedValue(),
-                                      loweredDestTy));
+      assert(!result.hasCleanup());
+      result = SGF.B.createConvertFunction(e, result, loweredDestTy);
     }
 
     break;
@@ -1958,9 +1957,9 @@ RValue RValueEmitter::visitCovariantFunctionConversionExpr(
   CanAnyFunctionType destTy
     = cast<AnyFunctionType>(e->getType()->getCanonicalType());
   SILType resultType = SGF.getLoweredType(destTy);
-  SILValue result = SGF.B.createConvertFunction(e, 
-                                                original.forward(SGF),
-                                                resultType);
+  SILValue result =
+      SGF.B.createConvertFunction(e, original.forward(SGF), resultType,
+                                  /*Withoutactuallyescaping=*/false);
   return RValue(SGF, e, SGF.emitManagedRValueWithCleanup(result));
 }
 
@@ -5279,7 +5278,8 @@ RValue RValueEmitter::visitMakeTemporarilyEscapableExpr(
   if (silFnTy->getExtInfo().getRepresentation() !=
       SILFunctionTypeRepresentation::Thick) {
     auto escapingClosure =
-        SGF.B.createConvertFunction(E, functionValue, escapingFnTy);
+        SGF.B.createConvertFunction(E, functionValue, escapingFnTy,
+                                    /*WithoutActuallyEscaping=*/true);
     return visitSubExpr(escapingClosure, true /*isClosureConsumable*/);
   }
 

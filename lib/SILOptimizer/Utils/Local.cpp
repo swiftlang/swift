@@ -585,7 +585,8 @@ SILValue swift::castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
                  "Swift thick functions that differ in escapeness are not ABI "
                  "compatible");
       // Insert convert_function.
-      return B->createConvertFunction(Loc, Value, DestTy);
+      return B->createConvertFunction(Loc, Value, DestTy,
+                                      /*WithoutActuallyEscaping=*/false);
     }
   }
 

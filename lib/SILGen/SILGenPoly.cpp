@@ -3017,10 +3017,12 @@ SILGenFunction::createWithoutActuallyEscapingClosure(
       thunkType, noEscapingFnTy, escapingFnTy, F.isSerialized());
 
   if (thunk->empty()) {
+    thunk->setWithoutActuallyEscapingThunk();
     thunk->setGenericEnvironment(genericEnv);
     SILGenFunction thunkSGF(SGM, *thunk, FunctionDC);
     buildWithoutActuallyEscapingThunkBody(thunkSGF);
   }
+  assert(thunk->isWithoutActuallyEscapingThunk());
 
   CanSILFunctionType substFnTy = thunkType;
   // Use the subsitution map in the context of the current function.

@@ -315,7 +315,8 @@ protected:
     IsInvariant : 1
   );
 
-  UIWTDOB_BITFIELD_EMPTY(ConvertFunctionInst, ConversionInst);
+  UIWTDOB_BITFIELD(ConvertFunctionInst, ConversionInst, 1,
+                   WithoutActuallyEscaping : 1);
   UIWTDOB_BITFIELD_EMPTY(PointerToThinFunctionInst, ConversionInst);
   UIWTDOB_BITFIELD_EMPTY(UnconditionalCheckedCastInst, ConversionInst);
   UIWTDOB_BITFIELD_EMPTY(UpcastInst, ConversionInst);
