@@ -7818,31 +7818,6 @@ bool ConstraintSystem::applySolutionFix(
   if (!locator)
     return false;
 
-  // Resolve the locator to a specific expression.
-  SourceRange range;
-  bool isSubscriptMember =
-    (!locator->getPath().empty() &&
-     locator->getPath().back().getKind() == ConstraintLocator::SubscriptMember);
-  ConstraintLocator *resolved = simplifyLocator(*this, locator, range);
-
-  // If we didn't manage to resolve directly to an expression, we don't
-  // have a great diagnostic to give, so bail.
-  if (!resolved || !resolved->getAnchor() ||
-      (!resolved->getPath().empty() &&
-       fix.first.getKind() != FixKind::ExplicitlyEscaping &&
-       fix.first.getKind() != FixKind::ExplicitlyEscapingToAny &&
-       fix.first.getKind() != FixKind::AddConformance))
-    return false;
-  
-  Expr *affected = resolved->getAnchor();
-
-  // FIXME: Work around an odd locator representation that doesn't separate the
-  // base of a subscript member from the member access.
-  if (isSubscriptMember) {
-    if (auto subscript = dyn_cast<SubscriptExpr>(affected))
-      affected = subscript->getBase();
-  }
-    
   switch (fix.first.getKind()) {
   case FixKind::ForceOptional: {
     MissingOptionalUnwrapFailure failure(expr, solution, locator);

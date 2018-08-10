@@ -35,11 +35,15 @@ class FailureDiagnostic {
   ConstraintLocator *Locator;
 
   Expr *Anchor;
+  /// Indicates whether locator could be simplified
+  /// down to anchor expression.
+  bool HasComplexLocator;
 
 public:
   FailureDiagnostic(Expr *expr, const Solution &solution,
                     ConstraintLocator *locator)
-      : E(expr), solution(solution), Locator(locator), Anchor(computeAnchor()) {
+      : E(expr), solution(solution), Locator(locator) {
+    std::tie(Anchor, HasComplexLocator) = computeAnchor();
   }
 
   virtual ~FailureDiagnostic();
@@ -94,9 +98,12 @@ protected:
     return nullptr;
   }
 
+  /// \returns true is locator hasn't been simplified down to expression.
+  bool hasComplexLocator() const { return HasComplexLocator; }
+
 private:
   /// Compute anchor expression associated with current diagnostic.
-  Expr *computeAnchor() const;
+  std::pair<Expr *, bool> computeAnchor() const;
 };
 
 /// Base class for all of the diagnostics related to generic requirement

@@ -26,7 +26,7 @@ using namespace constraints;
 
 FailureDiagnostic::~FailureDiagnostic() {}
 
-Expr *FailureDiagnostic::computeAnchor() const {
+std::pair<Expr *, bool> FailureDiagnostic::computeAnchor() const {
   auto &cs = getConstraintSystem();
 
   auto *locator = getLocator();
@@ -38,18 +38,17 @@ Expr *FailureDiagnostic::computeAnchor() const {
 
   ConstraintLocator *resolved = simplifyLocator(cs, locator, range);
   if (!resolved || !resolved->getAnchor())
-    return locator->getAnchor();
+    return {locator->getAnchor(), true};
 
   Expr *anchor = resolved->getAnchor();
-
   // FIXME: Work around an odd locator representation that doesn't separate the
   // base of a subscript member from the member access.
   if (isSubscriptMember) {
     if (auto subscript = dyn_cast<SubscriptExpr>(anchor))
-      return subscript->getBase();
+      anchor = subscript->getBase();
   }
 
-  return anchor;
+  return {anchor, !resolved->getPath().empty()};
 }
 
 Type FailureDiagnostic::getType(Expr *expr) const {
@@ -239,6 +238,9 @@ bool NoEscapeFuncToTypeConversionFailure::diagnose() {
 }
 
 bool MissingForcedDowncastFailure::diagnose() {
+  if (hasComplexLocator())
+    return false;
+
   auto &TC = getTypeChecker();
 
   auto *coerceExpr = dyn_cast<CoerceExpr>(getAnchor());
@@ -277,6 +279,9 @@ bool MissingForcedDowncastFailure::diagnose() {
 }
 
 bool MissingAddressOfFailure::diagnose() {
+  if (hasComplexLocator())
+    return false;
+
   auto *anchor = getAnchor();
   auto type = getType(anchor)->getRValueType();
   emitDiagnostic(anchor->getLoc(), diag::missing_address_of, type)
@@ -285,6 +290,9 @@ bool MissingAddressOfFailure::diagnose() {
 }
 
 bool MissingExplicitConversionFailure::diagnose() {
+  if (hasComplexLocator())
+    return false;
+
   auto *DC = getDC();
   auto &TC = getTypeChecker();
 
@@ -339,6 +347,9 @@ bool MissingExplicitConversionFailure::diagnose() {
 }
 
 bool MemberAccessOnOptionalBaseFailure::diagnose() {
+  if (hasComplexLocator())
+    return false;
+
   auto *anchor = getAnchor();
   auto type = getType(anchor)->getRValueType();
   bool resultIsOptional = ResultTypeIsOptional;
@@ -356,6 +367,9 @@ bool MemberAccessOnOptionalBaseFailure::diagnose() {
 }
 
 bool MissingOptionalUnwrapFailure::diagnose() {
+  if (hasComplexLocator())
+    return false;
+
   auto *anchor = getAnchor();
   auto *unwrapped = anchor->getValueProvidingExpr();
   auto type = getType(anchor)->getRValueType();
