@@ -56,15 +56,9 @@ extension PrivateStruct {
   public var publicVarExtension: Int { get { return 0 } set {} }
 }
 
-public extension PublicStruct {
-  // CHECK-DAG: sil @$S22accessibility_warnings12PublicStructV09extMemberC0yyF
-  public func extMemberPublic() {}
-  // CHECK-DAG: sil private @$S22accessibility_warnings12PublicStructV07extImplC033_5D2F2E026754A901C0FF90C404896D02LLyyF
-  private func extImplPublic() {}
-}
 internal extension PublicStruct {
   // CHECK-DAG: sil hidden @$S22accessibility_warnings12PublicStructV17extMemberInternalyyF
-  public func extMemberInternal() {} // expected-warning {{declaring a public instance method in an internal extension}} {{3-9=internal}}
+  public func extMemberInternal() {} // expected-warning {{declaring a public instance method in an internal extension}} {{3-10=}}
   // CHECK-DAG: sil private @$S22accessibility_warnings12PublicStructV15extImplInternal33_5D2F2E026754A901C0FF90C404896D02LLyyF
   private func extImplInternal() {}
 }
@@ -77,7 +71,7 @@ private extension PublicStruct {
 
 internal extension InternalStruct {
   // CHECK-DAG: sil hidden @$S22accessibility_warnings14InternalStructV09extMemberC0yyF
-  public func extMemberInternal() {} // expected-warning {{declaring a public instance method in an internal extension}} {{3-9=internal}}
+  public func extMemberInternal() {} // expected-warning {{declaring a public instance method in an internal extension}} {{3-10=}}
   // CHECK-DAG: sil private @$S22accessibility_warnings14InternalStructV07extImplC033_5D2F2E026754A901C0FF90C404896D02LLyyF
   private func extImplInternal() {}
 }

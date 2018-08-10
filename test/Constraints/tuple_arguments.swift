@@ -1632,12 +1632,14 @@ do {
 
 // https://bugs.swift.org/browse/SR-6509
 public extension Optional {
+  // expected-warning@+1 {{'public' modifier is redundant for instance method declared in a public extension}}
   public func apply<Result>(_ transform: ((Wrapped) -> Result)?) -> Result? {
     return self.flatMap { value in
       transform.map { $0(value) }
     }
   }
 
+  // expected-warning@+1 {{'public' modifier is redundant for instance method declared in a public extension}}
   public func apply<Value, Result>(_ value: Value?) -> Result?
     where Wrapped == (Value) -> Result {
     return value.apply(self)

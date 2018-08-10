@@ -74,18 +74,18 @@ extension PrivateStruct {
 }
 
 public extension PublicStruct {
-  public func extMemberPublic() {}
+  public func extMemberPublic() {} // expected-warning {{'public' modifier is redundant for instance method declared in a public extension}} {{3-10=}}
   fileprivate func extFuncPublic() {}
   private func extImplPublic() {}
 }
 internal extension PublicStruct {
-  public func extMemberInternal() {} // expected-warning {{declaring a public instance method in an internal extension}} {{3-9=internal}}
+  public func extMemberInternal() {} // expected-warning {{declaring a public instance method in an internal extension}} {{3-10=}}
   fileprivate func extFuncInternal() {}
   private func extImplInternal() {}
 }
 fileprivate extension PublicStruct {
-  public func extMemberFilePrivate() {} // expected-warning {{declaring a public instance method in a fileprivate extension}} {{3-9=fileprivate}}
-  fileprivate func extFuncFilePrivate() {}
+  public func extMemberFilePrivate() {} // expected-warning {{declaring a public instance method in a fileprivate extension}} {{3-10=}}
+  fileprivate func extFuncFilePrivate() {} // expected-warning {{'fileprivate' modifier is redundant for instance method declared in a fileprivate extension}} {{3-15=}}
   private func extImplFilePrivate() {}
 }
 private extension PublicStruct {
@@ -94,18 +94,18 @@ private extension PublicStruct {
   private func extImplPrivate() {}
 }
 public extension InternalStruct { // expected-error {{extension of internal struct cannot be declared public}} {{1-8=}}
-  public func extMemberPublic() {}
+  public func extMemberPublic() {} // expected-warning {{'public' modifier is redundant for instance method declared in a public extension}} {{3-10=}}
   fileprivate func extFuncPublic() {}
   private func extImplPublic() {}
 }
 internal extension InternalStruct {
-  public func extMemberInternal() {} // expected-warning {{declaring a public instance method in an internal extension}} {{3-9=internal}}
+  public func extMemberInternal() {} // expected-warning {{declaring a public instance method in an internal extension}} {{3-10=}}
   fileprivate func extFuncInternal() {}
   private func extImplInternal() {}
 }
 fileprivate extension InternalStruct {
-  public func extMemberFilePrivate() {} // expected-warning {{declaring a public instance method in a fileprivate extension}} {{3-9=fileprivate}}
-  fileprivate func extFuncFilePrivate() {}
+  public func extMemberFilePrivate() {} // expected-warning {{declaring a public instance method in a fileprivate extension}} {{3-10=}}
+  fileprivate func extFuncFilePrivate() {} // expected-warning {{'fileprivate' modifier is redundant for instance method declared in a fileprivate extension}} {{3-15=}}
   private func extImplFilePrivate() {}
 }
 private extension InternalStruct {
@@ -114,18 +114,18 @@ private extension InternalStruct {
   private func extImplPrivate() {}
 }
 public extension FilePrivateStruct { // expected-error {{extension of fileprivate struct cannot be declared public}} {{1-8=}}
-  public func extMemberPublic() {}
+  public func extMemberPublic() {} // expected-warning {{'public' modifier is redundant for instance method declared in a public extension}} {{3-10=}}
   fileprivate func extFuncPublic() {}
   private func extImplPublic() {}
 }
 internal extension FilePrivateStruct { // expected-error {{extension of fileprivate struct cannot be declared internal}} {{1-10=}}
-  public func extMemberInternal() {} // expected-warning {{declaring a public instance method in an internal extension}} {{3-9=internal}}
+  public func extMemberInternal() {} // expected-warning {{declaring a public instance method in an internal extension}} {{3-10=}}
   fileprivate func extFuncInternal() {}
   private func extImplInternal() {}
 }
 fileprivate extension FilePrivateStruct {
-  public func extMemberFilePrivate() {} // expected-warning {{declaring a public instance method in a fileprivate extension}} {{3-9=fileprivate}}
-  fileprivate func extFuncFilePrivate() {}
+  public func extMemberFilePrivate() {} // expected-warning {{declaring a public instance method in a fileprivate extension}} {{3-10=}}
+  fileprivate func extFuncFilePrivate() {} // expected-warning {{'fileprivate' modifier is redundant for instance method declared in a fileprivate extension}} {{3-15=}}
   private func extImplFilePrivate() {}
 }
 private extension FilePrivateStruct {
@@ -134,18 +134,18 @@ private extension FilePrivateStruct {
   private func extImplPrivate() {}
 }
 public extension PrivateStruct { // expected-error {{extension of private struct cannot be declared public}} {{1-8=}}
-  public func extMemberPublic() {}
+  public func extMemberPublic() {} // expected-warning {{'public' modifier is redundant for instance method declared in a public extension}} {{3-10=}}
   fileprivate func extFuncPublic() {}
   private func extImplPublic() {}
 }
 internal extension PrivateStruct { // expected-error {{extension of private struct cannot be declared internal}} {{1-10=}}
-  public func extMemberInternal() {} // expected-warning {{declaring a public instance method in an internal extension}} {{3-9=internal}}
+  public func extMemberInternal() {} // expected-warning {{declaring a public instance method in an internal extension}} {{3-10=}}
   fileprivate func extFuncInternal() {}
   private func extImplInternal() {}
 }
 fileprivate extension PrivateStruct { // expected-error {{extension of private struct cannot be declared fileprivate}} {{1-13=}}
-  public func extMemberFilePrivate() {} // expected-warning {{declaring a public instance method in a fileprivate extension}} {{3-9=fileprivate}}
-  fileprivate func extFuncFilePrivate() {}
+  public func extMemberFilePrivate() {} // expected-warning {{declaring a public instance method in a fileprivate extension}} {{3-10=}}
+  fileprivate func extFuncFilePrivate() {} // expected-warning {{'fileprivate' modifier is redundant for instance method declared in a fileprivate extension}} {{3-15=}}
   private func extImplFilePrivate() {}
 }
 private extension PrivateStruct {
@@ -174,7 +174,7 @@ public class Base {
 
 
 public extension Base {
-  open func extMemberPublic() {} // expected-warning {{declaring open instance method in public extension}}
+  open func extMemberPublic() {} // expected-warning {{declaring open instance method in a public extension}}
 }
 internal extension Base {
   open func extMemberInternal() {} // expected-warning {{declaring open instance method in an internal extension}}

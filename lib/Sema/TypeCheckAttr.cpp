@@ -1459,6 +1459,13 @@ static bool hasThrowingFunctionParameter(CanType type) {
   return false;
 }
 
+static inline bool isRedundantAttrInExtension(AccessLevel access,
+                                              AccessControlAttr *extAttr) {
+  return access == extAttr->getAccess() &&
+         access != AccessLevel::Private &&
+         access != AccessLevel::Open;
+}
+
 void AttributeChecker::visitRethrowsAttr(RethrowsAttr *attr) {
   // 'rethrows' only applies to functions that take throwing functions
   // as parameters.
@@ -1522,7 +1529,18 @@ void AttributeChecker::visitAccessControlAttr(AccessControlAttr *attr) {
                                 attr->getAccess(),
                                 D->getDescriptiveKind(),
                                 extAttr->getAccess());
-        swift::fixItAccess(diag, cast<ValueDecl>(D), extAccess);
+        bool shouldNotReplace = isRedundantAttrInExtension(extAccess, extAttr);
+        swift::fixItAccess(diag, cast<ValueDecl>(D), extAccess, false,
+                           shouldNotReplace);
+        return;
+      }
+      if (isRedundantAttrInExtension(attr->getAccess(), extAttr)) {
+        TC.diagnose(attr->getLocation(),
+                    diag::access_control_ext_member_redundant,
+                    attr->getAccess(),
+                    D->getDescriptiveKind(),
+                    extAttr->getAccess())
+          .fixItRemove(attr->getRange());
         return;
       }
     }

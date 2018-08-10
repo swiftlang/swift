@@ -910,6 +910,7 @@ public protocol ReallyRaw : RawRepresentable {
 }
 
 public extension ReallyRaw where RawValue: SignedInteger {
+  // expected-warning@+1 {{'public' modifier is redundant for initializer declared in a public extension}}
   public init?(rawValue: RawValue) {
     self = unsafeBitCast(rawValue, to: Self.self)
   }
