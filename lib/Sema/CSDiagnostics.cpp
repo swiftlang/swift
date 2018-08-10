@@ -337,3 +337,20 @@ bool MissingExplicitConversionFailure::diagnose() {
   diag.fixItInsertAfter(anchor->getEndLoc(), insertAfter);
   return true;
 }
+
+bool MemberAccessOnOptionalBaseFailure::diagnose() {
+  auto *anchor = getAnchor();
+  auto type = getType(anchor)->getRValueType();
+  bool resultIsOptional = ResultTypeIsOptional;
+
+  // If we've resolved the member overload to one that returns an optional
+  // type, then the result of the expression is optional (and we want to offer
+  // only a '?' fixit) even though the constraint system didn't need to add any
+  // additional optionality.
+  auto overload = getResolvedOverload(getLocator());
+  if (overload && overload->ImpliedType->getOptionalObjectType())
+    resultIsOptional = true;
+
+  return diagnoseBaseUnwrapForMemberAccess(anchor, type, Member,
+                                           resultIsOptional, SourceRange());
+}

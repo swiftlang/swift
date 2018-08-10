@@ -82,6 +82,18 @@ protected:
     return solution.getOverloadChoiceIfAvailable(locator);
   }
 
+  /// Retrieve overload choice resolved for given locator
+  /// by the constraint solver.
+  ResolvedOverloadSetListItem *getResolvedOverload(ConstraintLocator *locator) {
+    auto resolvedOverload = getConstraintSystem().getResolvedOverloadSets();
+    while (resolvedOverload) {
+      if (resolvedOverload->Locator == locator)
+        return resolvedOverload;
+      resolvedOverload = resolvedOverload->Previous;
+    }
+    return nullptr;
+  }
+
 private:
   /// Compute anchor expression associated with current diagnostic.
   Expr *computeAnchor() const;
@@ -241,6 +253,22 @@ private:
     return exprNeedsParensOutsideFollowingOperator(TC, DC, expr, rootExpr,
                                                    asPG);
   }
+};
+
+/// Diagnose failures related to attempting member access on optional base
+/// type without optional chaining or force-unwrapping it first.
+class MemberAccessOnOptionalBaseFailure final : public FailureDiagnostic {
+  DeclName Member;
+  bool ResultTypeIsOptional;
+
+public:
+  MemberAccessOnOptionalBaseFailure(Expr *expr, const Solution &solution,
+                                    ConstraintLocator *locator,
+                                    DeclName memberName, bool resultOptional)
+      : FailureDiagnostic(expr, solution, locator), Member(memberName),
+        ResultTypeIsOptional(resultOptional) {}
+
+  bool diagnose() override;
 };
 
 } // end namespace constraints
