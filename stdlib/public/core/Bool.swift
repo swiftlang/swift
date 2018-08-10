@@ -100,6 +100,12 @@ public struct Bool {
   ///         print("Maybe another try?")
   ///     }
   ///
+  /// - Note: The algorithm used to create random values may change in a future
+  ///   version of Swift. If you're using a seeded generator and you need
+  ///   reproducible random values in versions of your program compiled using
+  ///   different versions of Swift, use the generator's output to create
+  ///   values instead of this method.
+  ///
   /// - Parameter generator: The random number generator to use when creating
   ///   the new random value.
   /// - Returns: Either `true` or `false`, randomly chosen with equal

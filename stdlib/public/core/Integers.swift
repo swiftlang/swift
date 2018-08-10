@@ -2512,6 +2512,12 @@ extension FixedWidthInteger {
   ///     // Prints "44"
   ///     // Prints "21"
   ///
+  /// - Note: The algorithm used to create random values may change in a future
+  ///   version of Swift. If you're using a seeded generator and you need
+  ///   reproducible random values in versions of your program compiled using
+  ///   different versions of Swift, use the generator's output to create
+  ///   values instead of this method.
+  ///
   /// - Parameters:
   ///   - range: The range in which to create a random value.
   ///     `range` must not be empty.

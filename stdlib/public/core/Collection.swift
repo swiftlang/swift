@@ -1037,6 +1037,10 @@ extension Collection {
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length of
   ///   the collection.
+  /// - Note: The algorithm used to select a random element may change in a
+  ///   future version of Swift. If you're using a seeded generator, you may
+  ///   not see reproducible results in versions of your program compiled
+  ///   using different versions of Swift.
   @inlinable
   public func randomElement<T: RandomNumberGenerator>(
     using generator: inout T

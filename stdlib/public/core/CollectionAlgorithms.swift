@@ -384,6 +384,10 @@ extension Sequence {
   /// - Returns: An array of this sequence's elements in a shuffled order.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
+  /// - Note: The algorithm used to shuffle a sequence may change in a
+  ///   future version of Swift. If you're using a seeded generator, you may
+  ///   not see reproducible results in versions of your program compiled
+  ///   using different versions of Swift.
   @inlinable
   public func shuffled<T: RandomNumberGenerator>(
     using generator: inout T
@@ -431,6 +435,10 @@ extension MutableCollection where Self : RandomAccessCollection {
   ///   the collection.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
+  /// - Note: The algorithm used to shuffle a collection may change in a
+  ///   future version of Swift. If you're using a seeded generator, you may
+  ///   not see reproducible results in versions of your program compiled
+  ///   using different versions of Swift.
   @inlinable
   public mutating func shuffle<T: RandomNumberGenerator>(
     using generator: inout T
