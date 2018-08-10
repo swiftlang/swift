@@ -4266,9 +4266,8 @@ bool TFFunctionPartition::partition(bool isTest) {
           // If it's an opaque handle such as VariantHandle or ResourceHandle,
           // it cannot be a result except when it's being returned in an
           // accelerator-only function.
-          if (isOpaqueHandle(result->getType())) {
-            if (isAcceleratorOnly(hostFn) && isReturning(user))
-              continue;
+          if (isOpaqueHandle(result->getType()) &&
+              !(isAcceleratorOnly(hostFn) && isReturning(user))) {
             diagnoseOpaqueHandleCopy(result, user);
             return true;
           }

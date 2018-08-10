@@ -118,3 +118,11 @@ public func opaqueHandlesCannotBeResults() {
     #tfop("Iterator", shared_name: "foo", container: "bar")
   _hostOp(iterator) // expected-note {{value used here}}
 }
+
+// Accelerator-only functions can return multiple opaque handles.
+@TensorFlowGraph
+public func graphFuncReturningOpaqueHandles() -> (ResourceHandle, ResourceHandle) {
+  let iterator: ResourceHandle =
+    #tfop("Iterator", shared_name: "foo", container: "bar")
+  return (iterator, iterator)
+}
