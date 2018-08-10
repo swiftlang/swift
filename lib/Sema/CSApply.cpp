@@ -7590,9 +7590,9 @@ static std::pair<Expr *, unsigned> getPrecedenceParentAndIndex(Expr *expr,
 /// Return true if, when replacing "<expr>" with "<expr> op <something>",
 /// parentheses must be added around "<expr>" to allow the new operator
 /// to bind correctly.
-static bool exprNeedsParensInsideFollowingOperator(TypeChecker &TC,
-                                                   DeclContext *DC, Expr *expr,
-                                            PrecedenceGroupDecl *followingPG) {
+bool swift::exprNeedsParensInsideFollowingOperator(
+    TypeChecker &TC, DeclContext *DC, Expr *expr,
+    PrecedenceGroupDecl *followingPG) {
   if (expr->isInfixOperator()) {
     auto exprPG = TC.lookupPrecedenceGroupForInfixOperator(DC, expr);
     if (!exprPG) return true;
@@ -7613,10 +7613,9 @@ static bool exprNeedsParensInsideFollowingOperator(TypeChecker &TC,
 /// within the given root expression, parentheses must be added around
 /// the new operator to prevent it from binding incorrectly in the
 /// surrounding context.
-static bool exprNeedsParensOutsideFollowingOperator(TypeChecker &TC,
-                                                    DeclContext *DC, Expr *expr,
-                                                    Expr *rootExpr,
-                                            PrecedenceGroupDecl *followingPG) {
+bool swift::exprNeedsParensOutsideFollowingOperator(
+    TypeChecker &TC, DeclContext *DC, Expr *expr, Expr *rootExpr,
+    PrecedenceGroupDecl *followingPG) {
   Expr *parent;
   unsigned index;
   std::tie(parent, index) = getPrecedenceParentAndIndex(expr, rootExpr);
@@ -7639,29 +7638,6 @@ static bool exprNeedsParensOutsideFollowingOperator(TypeChecker &TC,
   }
 
   return true;
-}
-
-// Return true if, when replacing "<expr>" with "<expr> as T", parentheses need
-// to be added around <expr> first in order to maintain the correct precedence.
-static bool exprNeedsParensBeforeAddingAs(TypeChecker &TC, DeclContext *DC,
-                                          Expr *expr) {
-  auto asPG =
-    TC.lookupPrecedenceGroup(DC, DC->getASTContext().Id_CastingPrecedence,
-                             SourceLoc());
-  if (!asPG) return true;
-  return exprNeedsParensInsideFollowingOperator(TC, DC, expr, asPG);
-}
-
-// Return true if, when replacing "<expr>" with "<expr> as T", parentheses need
-// to be added around the new expression in order to maintain the correct
-// precedence.
-static bool exprNeedsParensAfterAddingAs(TypeChecker &TC, DeclContext *DC,
-                                         Expr *expr, Expr *rootExpr) {
-  auto asPG =
-    TC.lookupPrecedenceGroup(DC, DC->getASTContext().Id_CastingPrecedence,
-                             SourceLoc());
-  if (!asPG) return true;
-  return exprNeedsParensOutsideFollowingOperator(TC, DC, expr, rootExpr, asPG);
 }
 
 bool swift::exprNeedsParensBeforeAddingNilCoalescing(TypeChecker &TC,
@@ -7842,185 +7818,46 @@ bool ConstraintSystem::applySolutionFix(
   if (!locator)
     return false;
 
-  // Resolve the locator to a specific expression.
-  SourceRange range;
-  bool isSubscriptMember =
-    (!locator->getPath().empty() &&
-     locator->getPath().back().getKind() == ConstraintLocator::SubscriptMember);
-  ConstraintLocator *resolved = simplifyLocator(*this, locator, range);
-
-  // If we didn't manage to resolve directly to an expression, we don't
-  // have a great diagnostic to give, so bail.
-  if (!resolved || !resolved->getAnchor() ||
-      (!resolved->getPath().empty() &&
-       fix.first.getKind() != FixKind::ExplicitlyEscaping &&
-       fix.first.getKind() != FixKind::ExplicitlyEscapingToAny &&
-       fix.first.getKind() != FixKind::AddConformance))
-    return false;
-  
-  Expr *affected = resolved->getAnchor();
-
-  // FIXME: Work around an odd locator representation that doesn't separate the
-  // base of a subscript member from the member access.
-  if (isSubscriptMember) {
-    if (auto subscript = dyn_cast<SubscriptExpr>(affected))
-      affected = subscript->getBase();
-  }
-    
   switch (fix.first.getKind()) {
   case FixKind::ForceOptional: {
-    Expr *unwrapped = affected->getValueProvidingExpr();
-    auto type = solution.simplifyType(getType(affected))->getRValueType();
-
-    if (auto tryExpr = dyn_cast<OptionalTryExpr>(unwrapped)) {
-      TC.diagnose(tryExpr->getTryLoc(), diag::missing_unwrap_optional_try,
-                  type)
-        .fixItReplace({tryExpr->getTryLoc(), tryExpr->getQuestionLoc()},
-                      "try!");
-
-    } else {
-      return diagnoseUnwrap(TC, DC, unwrapped, type);
-    }
-    return true;
+    MissingOptionalUnwrapFailure failure(expr, solution, locator);
+    return failure.diagnose();
   }
           
   case FixKind::UnwrapOptionalBase: {
-    auto type = solution.simplifyType(getType(affected))->getRValueType();
-    bool resultOptional = fix.first.isUnwrapOptionalBaseByOptionalChaining(*this);
-
-    // If we've resolved the member overload to one that returns an optional
-    // type, then the result of the expression is optional (and we want to offer
-    // only a '?' fixit) even though the constraint system didn't need to add any
-    // additional optionality.
-    auto resolvedOverload = getResolvedOverloadSets();
-    while (resolvedOverload) {
-      if (resolvedOverload->Locator == fix.second) {
-        if (resolvedOverload->ImpliedType->getOptionalObjectType())
-          resultOptional = true;
-        break;
-      }
-      resolvedOverload = resolvedOverload->Previous;
-    }
-
-    DeclName memberName = fix.first.getDeclNameArgument(*this);
-    return diagnoseBaseUnwrapForMemberAccess(affected, type, memberName,
-                                             resultOptional, SourceRange());
+    auto memberName = fix.first.getDeclNameArgument(*this);
+    bool resultIsOptional =
+        fix.first.isUnwrapOptionalBaseByOptionalChaining(*this);
+    MemberAccessOnOptionalBaseFailure failure(expr, solution, locator,
+                                              memberName, resultIsOptional);
+    return failure.diagnose();
   }
 
   case FixKind::ForceDowncast: {
-    if (auto *paren = dyn_cast<ParenExpr>(affected))
-      affected = paren->getSubExpr();
-
-    auto fromType = solution.simplifyType(getType(affected))->getRValueType();
-    Type toType = solution.simplifyType(fix.first.getTypeArgument(*this));
-    bool useAs = TC.isExplicitlyConvertibleTo(fromType, toType, DC);
-    bool useAsBang = !useAs && TC.checkedCastMaySucceed(fromType, toType,
-                                                        DC);
-    if (!useAs && !useAsBang)
-      return false;
-    
-    // If we're performing pattern matching, "as" means something completely different...
-    if (auto binOpExpr = dyn_cast<BinaryExpr>(expr)) {
-      auto overloadedFn = dyn_cast<OverloadedDeclRefExpr>(binOpExpr->getFn());
-      if (overloadedFn && !overloadedFn->getDecls().empty()) {
-        ValueDecl *decl0 = overloadedFn->getDecls()[0];
-        if (decl0->getBaseName() == decl0->getASTContext().Id_MatchOperator)
-          return false;
-      }
-    }
-
-    bool needsParensInside = exprNeedsParensBeforeAddingAs(TC, DC, affected);
-    bool needsParensOutside = exprNeedsParensAfterAddingAs(TC, DC, affected,
-                                                           expr);
-    llvm::SmallString<2> insertBefore;
-    llvm::SmallString<32> insertAfter;
-    if (needsParensOutside) {
-      insertBefore += "(";
-    }
-    if (needsParensInside) {
-      insertBefore += "(";
-      insertAfter += ")";
-    }
-    insertAfter += useAs ? " as " : " as! ";
-    insertAfter += toType->getWithoutParens()->getString();
-    if (needsParensOutside)
-      insertAfter += ")";
-    
-    auto diagID = useAs ? diag::missing_explicit_conversion
-                        : diag::missing_forced_downcast;
-    auto diag = TC.diagnose(affected->getLoc(), diagID, fromType, toType);
-    if (!insertBefore.empty()) {
-      diag.fixItInsert(affected->getStartLoc(), insertBefore);
-    }
-    diag.fixItInsertAfter(affected->getEndLoc(), insertAfter);
-    return true;
+    MissingExplicitConversionFailure failure(expr, solution, locator,
+                                             fix.first.getTypeArgument(*this));
+    return failure.diagnose();
   }
 
   case FixKind::AddressOf: {
-    auto type = solution.simplifyType(getType(affected))->getRValueType();
-    TC.diagnose(affected->getLoc(), diag::missing_address_of, type)
-      .fixItInsert(affected->getStartLoc(), "&");
-    return true;
+    MissingAddressOfFailure failure(expr, solution, locator);
+    return failure.diagnose();
   }
 
   case FixKind::CoerceToCheckedCast: {
-    if (auto *coerceExpr = dyn_cast<CoerceExpr>(locator->getAnchor())) {
-      Expr *subExpr = coerceExpr->getSubExpr();
-      auto fromType =
-        solution.simplifyType(getType(subExpr))->getRValueType();
-      auto toType =
-        solution.simplifyType(coerceExpr->getCastTypeLoc().getType());
-      auto castKind = TC.typeCheckCheckedCast(
-                        fromType, toType, CheckedCastContextKind::None, DC,
-                        coerceExpr->getLoc(), subExpr,
-                        coerceExpr->getCastTypeLoc().getSourceRange());
-      
-      switch (castKind) {
-      // Invalid cast.
-      case CheckedCastKind::Unresolved:
-        // Fix didn't work, let diagnoseFailureForExpr handle this.
-        return false;
-      case CheckedCastKind::Coercion:
-      case CheckedCastKind::BridgingCoercion:
-        llvm_unreachable("Coercions handled in other disjunction branch");
-
-      // Valid casts.
-      case CheckedCastKind::ArrayDowncast:
-      case CheckedCastKind::DictionaryDowncast:
-      case CheckedCastKind::SetDowncast:
-      case CheckedCastKind::ValueCast:
-        TC.diagnose(coerceExpr->getLoc(), diag::missing_forced_downcast,
-                    fromType, toType)
-          .highlight(coerceExpr->getSourceRange())
-          .fixItReplace(coerceExpr->getLoc(), "as!");
-        return true;
-      }
-    }
-    return false;
+    MissingForcedDowncastFailure failure(expr, solution, locator);
+    return failure.diagnose();
   }
 
   case FixKind::ExplicitlyEscaping: {
-    auto path = locator->getPath();
-    auto *anchor = locator->getAnchor();
-
-    if (path.empty())
-      return false;
-
-    auto &last = path.back();
-    if (last.getKind() == ConstraintLocator::Archetype) {
-      auto *archetype = last.getArchetype();
-      TC.diagnose(anchor->getLoc(), diag::converting_noescape_to_type,
-                  archetype);
-      return true;
-    }
-    break;
+    NoEscapeFuncToTypeConversionFailure failure(expr, solution, locator);
+    return failure.diagnose();
   }
 
   case FixKind::ExplicitlyEscapingToAny: {
-    auto *anchor = locator->getAnchor();
-    TC.diagnose(anchor->getLoc(), diag::converting_noescape_to_type,
-                getASTContext().TheAnyType);
-    return true;
+    NoEscapeFuncToTypeConversionFailure failure(expr, solution, locator,
+                                                getASTContext().TheAnyType);
+    return failure.diagnose();
   }
 
   case FixKind::RelabelArguments: {

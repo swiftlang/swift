@@ -3611,6 +3611,21 @@ bool exprNeedsParensAfterAddingNilCoalescing(TypeChecker &TC,
                                              Expr *expr,
                                              Expr *rootExpr);
 
+/// Return true if, when replacing "<expr>" with "<expr> op <something>",
+/// parentheses must be added around "<expr>" to allow the new operator
+/// to bind correctly.
+bool exprNeedsParensInsideFollowingOperator(TypeChecker &TC, DeclContext *DC,
+                                            Expr *expr,
+                                            PrecedenceGroupDecl *followingPG);
+
+/// Return true if, when replacing "<expr>" with "<expr> op <something>"
+/// within the given root expression, parentheses must be added around
+/// the new operator to prevent it from binding incorrectly in the
+/// surrounding context.
+bool exprNeedsParensOutsideFollowingOperator(
+    TypeChecker &TC, DeclContext *DC, Expr *expr, Expr *rootExpr,
+    PrecedenceGroupDecl *followingPG);
+
 } // end namespace swift
 
 #endif // LLVM_SWIFT_SEMA_CONSTRAINT_SYSTEM_H
