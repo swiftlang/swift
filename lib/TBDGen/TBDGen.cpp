@@ -152,6 +152,12 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
 }
 
 void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
+  // A @_silgen_name("...") function without a body only exists
+  // to forward-declare a symbol from another library.
+  if (!AFD->hasBody() && AFD->getAttrs().hasAttribute<SILGenNameAttr>()) {
+    return;
+  }
+
   addSymbol(SILDeclRef(AFD));
 
   if (AFD->getAttrs().hasAttribute<CDeclAttr>()) {
