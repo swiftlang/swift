@@ -422,6 +422,8 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
   tapi::internal::InterfaceFile file;
   file.setFileType(tapi::internal::FileType::TBD_V3);
   file.setInstallName(opts.InstallName);
+  file.setCompatibilityVersion(tapi::internal::PackedVersion(1, 0, 0));
+  file.setTwoLevelNamespace();
   // FIXME: proper version
   file.setCurrentVersion(tapi::internal::PackedVersion(1, 0, 0));
   file.setSwiftABIVersion(TAPI_SWIFT_ABI_VERSION);
