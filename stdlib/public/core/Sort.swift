@@ -516,14 +516,12 @@ internal func _siftDown<C: MutableCollection & RandomAccessCollection>(
   subRange range: Range<C.Index>,
   by areInIncreasingOrder: (C.Element, C.Element) throws -> Bool
 ) rethrows {
-
-  let countToIndex = elements.distance(from: range.lowerBound, to: index)
-  let countFromIndex = elements.distance(from: index, to: range.upperBound)
-  // Check if left child is within bounds. If not, return, because there are
+  var index = index
+  var countToIndex = elements.distance(from: range.lowerBound, to: index)
+  var countFromIndex = elements.distance(from: index, to: range.upperBound)
+  // Check if left child is within bounds. If not, stop iterating, because there are
   // no children of the given node in the heap.
-  if countToIndex + 1 >= countFromIndex {
-    return
-  }
+  while countToIndex + 1 < countFromIndex {
   let left = elements.index(index, offsetBy: countToIndex + 1)
   var largest = index
   if (try areInIncreasingOrder(elements[largest], elements[left])) {
@@ -540,11 +538,12 @@ internal func _siftDown<C: MutableCollection & RandomAccessCollection>(
   // down.
   if largest != index {
     elements.swapAt(index, largest)
-    try _siftDown(
-      &elements,
-      index: largest,
-      subRange: range
-      , by: areInIncreasingOrder)
+    index = largest
+  } else {
+    break
+  }
+    countToIndex = elements.distance(from: range.lowerBound, to: index)
+    countFromIndex = elements.distance(from: index, to: range.upperBound)
   }
 }
 
