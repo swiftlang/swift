@@ -2,6 +2,9 @@
 // RUN: %target-build-swift %s -Xfrontend -disable-access-control -o %t/Assert_Debug -Onone
 // RUN: %target-build-swift %s -Xfrontend -disable-access-control -o %t/Assert_Release -O
 // RUN: %target-build-swift %s -Xfrontend -disable-access-control -o %t/Assert_Unchecked -Ounchecked
+// RUN: %target-codesign %t/Assert_Debug
+// RUN: %target-codesign %t/Assert_Release
+// RUN: %target-codesign %t/Assert_Unchecked
 //
 // RUN: %target-run %t/Assert_Debug
 // RUN: %target-run %t/Assert_Release
