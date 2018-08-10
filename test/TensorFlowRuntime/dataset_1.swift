@@ -3,7 +3,14 @@
 // REQUIRES: swift_test_mode_optimize
 //
 // Compiler-only testing for TPU graph lowering (e.g. shape requirements by XLA).
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-target-tpu -O -emit-sil %s >/dev/null
+
+// TODO: re-enable TPU compilation, when we are able to handle returning tensor
+// `three` below produced on TF CPU to the TPU graph function, without running
+// into the "missing tensor shape" issue. One option is to convert return
+// tensors to TF->host sends, so that in this case we can send directly from TF
+// CPU to host, even if the primary device is TPU.
+
+// UN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-target-tpu -O -emit-sil %s >/dev/null
 //
 // Dataset tests.
 
@@ -22,6 +29,8 @@ var DatasetTests = TestSuite("Dataset")
 // call.
 @TensorFlowGraph
 public func createMockDataSet() -> VariantHandle {
+  // A dataset graph function must run on TF CPU.
+  TensorFlow.enableCPU()
   let values = Tensor<Float>([1.0, 2.0, 3.0])
   // REGISTER_OP("TensorSliceDataset")
   //   .Input("components: Toutput_types")
@@ -63,15 +72,15 @@ public func model() {
     output_shapes: [TensorShape()]
   )
 
-  let one = getNextScalarFloatTensor(iterator).toHost(shape: [])
+  let one = getNextScalarFloatTensor(iterator)
   _hostOp(one)
   expectNearlyEqualWithScalarTensor(1.0, one)
 
-  let two = getNextScalarFloatTensor(iterator).toHost(shape: [])
+  let two = getNextScalarFloatTensor(iterator)
   _hostOp(two)
   expectNearlyEqualWithScalarTensor(2.0, two)
 
-  let three = getNextScalarFloatTensor(iterator).toHost(shape: [])
+  let three = getNextScalarFloatTensor(iterator)
   _hostOp(three)
   expectNearlyEqualWithScalarTensor(3.0, three)
 
