@@ -398,14 +398,21 @@ endif()
 precondition(CMAKE_SYSTEM_NAME)
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   set(SWIFT_BUILD_SOURCEKIT_default TRUE)
+  set(SWIFT_BUILD_SYNTAX_default FALSE)
 elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
   if(EXISTS ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE})
     set(SWIFT_BUILD_SOURCEKIT_default TRUE)
   else()
     set(SWIFT_BUILD_SOURCEKIT_default FALSE)
   endif()
+  if(EXISTS ${SWIFT_PATH_TO_FOUNDATION_SOURCE})
+    set(SWIFT_BUILD_SYNTAX_default TRUE)
+  else()
+    set(SWIFT_BUILD_SYNTAX_default FALSE)
+  endif()
 else()
     set(SWIFT_BUILD_SOURCEKIT_default FALSE)
+    set(SWIFT_BUILD_SYNTAX_default FALSE)
 endif()
 option(SWIFT_BUILD_SOURCEKIT
     "Build SourceKit"
@@ -413,6 +420,9 @@ option(SWIFT_BUILD_SOURCEKIT
 option(SWIFT_ENABLE_SOURCEKIT_TESTS
     "Enable running SourceKit tests"
     ${SWIFT_BUILD_SOURCEKIT_default})
+option(SWIFT_BUILD_SYNTAX
+       "Build SwiftSyntax"
+       ${SWIFT_BUILD_SYNTAX_default})
 
 #
 # Assume a new enough ar to generate the index at construction time. This avoids

@@ -49,17 +49,18 @@ endif()
 if(SWIFT_HOST_VARIANT STREQUAL "macosx")
   # Only build Darwin-specific tools when deploying to OS X.
   add_swift_tool_subdirectory(swift-stdlib-tool)
+endif()
 
-  # SwiftSyntax depends on both the standard library (because it's a
-  # Swift module), and the SDK overlays (because it depends on Foundation).
-  # Ensure we only build SwiftSyntax when we're building both.
+# SwiftSyntax depends on both the standard library (because it's a
+# Swift module), and the SDK overlays (because it depends on Foundation).
+if(SWIFT_BUILD_SYNTAX)
+  add_subdirectory(SwiftSyntax)
+  add_swift_tool_subdirectory(swift-swiftsyntax-test)
+endif()
+
+if(SWIFT_HOST_VARIANT STREQUAL "macosx")
   if(BUILD_FOUNDATION)
-    add_subdirectory(SwiftSyntax)
-    # We should build swift-swiftsyntax-test only when OSX SDK is built, aka,
-    # when SwiftSyntax is built.
-    if("OSX" IN_LIST SWIFT_SDKS)
-      add_swift_tool_subdirectory(swift-swiftsyntax-test)
-    endif()
+    add_subdirectory(swift-test-utils)
   endif()
 endif()
 
