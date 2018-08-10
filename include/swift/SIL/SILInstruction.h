@@ -254,6 +254,36 @@ public:
   friend bool operator!=(iterator lhs, iterator rhs) { return !(lhs == rhs); }
 };
 
+inline SILInstructionResultArray::iterator
+SILInstructionResultArray::begin() const {
+  return iterator(*this, 0);
+}
+
+inline SILInstructionResultArray::iterator
+SILInstructionResultArray::end() const {
+  return iterator(*this, size());
+}
+
+inline SILInstructionResultArray::reverse_iterator
+SILInstructionResultArray::rbegin() const {
+  return llvm::make_reverse_iterator(end());
+}
+
+inline SILInstructionResultArray::reverse_iterator
+SILInstructionResultArray::rend() const {
+  return llvm::make_reverse_iterator(begin());
+}
+
+inline SILInstructionResultArray::range
+SILInstructionResultArray::getValues() const {
+  return {begin(), end()};
+}
+
+inline SILInstructionResultArray::reverse_range
+SILInstructionResultArray::getReversedValues() const {
+  return {rbegin(), rend()};
+}
+
 /// This is the root class for all instructions that can be used as the
 /// contents of a Swift SILBasicBlock.
 ///
