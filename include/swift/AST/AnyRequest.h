@@ -20,6 +20,7 @@
 #include "swift/Basic/TypeID.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include <string>
 
 namespace llvm {
@@ -50,7 +51,7 @@ class DiagnosticEngine;
 ///
 class AnyRequest {
   /// Abstract base class used to hold the specific request kind.
-  class HolderBase {
+  class HolderBase : public llvm::RefCountedBase<HolderBase> {
   public:
     /// The type ID of the request being stored.
     const uint64_t typeID;
@@ -128,7 +129,7 @@ class AnyRequest {
   } storageKind = StorageKind::Normal;
 
   /// The data stored in this value.
-  std::shared_ptr<HolderBase> stored;
+  llvm::IntrusiveRefCntPtr<HolderBase> stored;
 
   AnyRequest(StorageKind storageKind) : storageKind(storageKind) {
     assert(storageKind != StorageKind::Normal);
@@ -161,8 +162,9 @@ public:
   template<typename T>
   AnyRequest(T&& value) : storageKind(StorageKind::Normal) {
     using ValueType =
-      typename std::remove_cv<typename std::remove_reference<T>::type>::type;
-    stored.reset(new Holder<ValueType>(std::forward<T>(value)));
+        typename std::remove_cv<typename std::remove_reference<T>::type>::type;
+    stored = llvm::IntrusiveRefCntPtr<HolderBase>(
+        new Holder<ValueType>(std::forward<T>(value)));
   }
 
   /// Cast to a specific (known) type.
