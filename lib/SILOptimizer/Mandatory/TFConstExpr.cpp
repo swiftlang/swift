@@ -196,6 +196,12 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
 
   if (auto *fri = dyn_cast<FunctionRefInst>(value))
     return SymbolicValue::getFunction(fri->getReferencedFunction());
+  
+  if (auto *tttfi = dyn_cast<ThinToThickFunctionInst>(value))
+    return getConstantValue(tttfi->getOperand());
+
+  if (auto *cfi = dyn_cast<ConvertFunctionInst>(value))
+    return getConstantValue(cfi->getOperand());
 
   // If we have a reference to a metatype, constant fold any substitutable
   // types.
