@@ -987,7 +987,6 @@ SymbolicValue ConstExprFunctionState::getConstantValue(SILValue value) {
 
   setValue(value, result);
   return result;
-  // return calculatedValues[value] = result;
 }
 
 /// Given an aggregate value like {{1, 2}, 3} and an access path like [0,1], and
@@ -1091,13 +1090,13 @@ static bool updateIndexedElement(SymbolicValue &aggregate,
 /// do that by const-evaluating the writers of individual array elements.
 ///
 ///  There are a few forms of writers, such as:
-/// - %3 = alloc_stack ...
+/// - store %3 to %4 ...
 /// - %8 = pointer_to_address %7 : $Builtin.RawPointer to [strict] $*Int32
 /// - %14 = index_addr %9 : $*Int32, %13 : $Builtin.Word
 /// - %180 = tuple_element_addr %179 : $*(Int32, Int32, Int32, Int32), 3
 ///
 ///  Note unlike getConstAddrAndLoadResult(), this method does *not*
-///  const-evaluate the input `addr` by evaluating the operand first, such as %7
+///  const-evaluate the input `addr` by evaluating its operand first, such as %7
 ///  above. Instead, it finds a user of %8 who is the initializer, and uses that
 ///  to set the const value for %7. In other words, this method propagates const
 ///  info from result to operand (e.g. from %8 to %7), while
@@ -1127,6 +1126,9 @@ ConstExprFunctionState::getSingleWriterAddressValue(SILValue addr) {
   // Okay, check out all of the users of this value looking for semantic stores
   // into the address.  If we find more than one, then this was a var or
   // something else we can't handle.
+  // We must iterate over all uses, to make sure there is a single
+  // initializer. The only permitted early exit is when we known for sure
+  // const-evaluation has failed.
   for (auto *use : addr->getUses()) {
     auto user = use->getUser();
 
@@ -1239,36 +1241,36 @@ ConstExprFunctionState::getSingleWriterAddressValue(SILValue addr) {
         continue;
 
       auto tupleEltAddrValue = getSingleWriterAddressValue(teai);
-      if (tupleEltAddrValue.isConstant()) {
-        // If the tuple elt is indeed a const, we write it into (the appropriate
-        // aggregate element slot of the) `memoryObject`, which is the const
-        // value for the entire tuple.
-        SmallVector<unsigned, 4> accessPath;
-        auto *tupleEltMemoryObject =
-            tupleEltAddrValue.getAddressValue(accessPath);
-        assert(accessPath.empty());
-        auto tupleEltValue = tupleEltMemoryObject->getValue();
-        assert(tupleEltValue.isConstant());
+      if (!tupleEltAddrValue.isConstant())
+        continue;
+      // If the tuple elt is indeed a const, we write it into (the appropriate
+      // aggregate element slot of the) `memoryObject`, which is the const
+      // value for the entire tuple.
+      SmallVector<unsigned, 4> accessPath;
+      auto *tupleEltMemoryObject =
+          tupleEltAddrValue.getAddressValue(accessPath);
+      assert(accessPath.empty());
+      auto tupleEltValue = tupleEltMemoryObject->getValue();
+      assert(tupleEltValue.isConstant());
 
-        auto objectVal = memoryObject->getValue();
-        auto objectType = memoryObject->getType();
-        auto index = teai->getFieldNo();
-        bool failed = updateIndexedElement(
-            objectVal, /*accessPath*/ {index}, tupleEltValue, objectType,
-            /*writeOnlyOnce*/ true, evaluator.getAllocator());
-        if (failed)
-          return evaluator.getUnknown(addr, UnknownReason::Default);
-        memoryObject->setValue(objectVal);
-        // If all aggregate elements are const, we have successfully
-        // const-evaluated the entire tuple!
-        if (llvm::all_of(objectVal.getAggregateValue(),
-                         [](SymbolicValue v) { return v.isConstant(); }))
-          break;
-        // Otherwise we keep going, hoping to find more users of the tuple inst
-        // that write into other tuple elements.
-        continue;
-      } else
-        continue;
+      auto objectVal = memoryObject->getValue();
+      auto objectType = memoryObject->getType();
+      auto index = teai->getFieldNo();
+      bool failed = updateIndexedElement(
+          objectVal, /*accessPath*/ {index}, tupleEltValue, objectType,
+          /*writeOnlyOnce*/ true, evaluator.getAllocator());
+      if (failed)
+        return evaluator.getUnknown(addr, UnknownReason::Default);
+      memoryObject->setValue(objectVal);
+#ifndef NDEBUG
+      // If all aggregate elements are const, we have successfully
+      // const-evaluated the entire tuple!
+      if (llvm::all_of(objectVal.getAggregateValue(),
+                       [](SymbolicValue v) { return v.isConstant(); }))
+        LLVM_DEBUG(llvm::dbgs() << "Const-evaluated the entire tuple: ";
+                   objectVal.dump());
+#endif // NDEBUG
+      continue;
     }
 
     LLVM_DEBUG(llvm::dbgs()
@@ -1300,6 +1302,8 @@ SymbolicValue ConstExprFunctionState::getConstAddrAndLoadResult(SILValue addr) {
   return loadAddrValue(addr, addrVal);
 }
 
+/// Load and return the underlying (const) object whose address is given by
+/// `addrVal`. On error, return a message based on `addr`.
 SymbolicValue ConstExprFunctionState::loadAddrValue(SILValue addr,
                                                     SymbolicValue addrVal) {
   SmallVector<unsigned, 4> accessPath;
