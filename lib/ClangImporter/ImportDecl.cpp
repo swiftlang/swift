@@ -3499,9 +3499,7 @@ namespace {
       if (!importedType)
         return nullptr;
 
-      Type type = importedType.getType();
-
-      auto resultTy = type->castTo<FunctionType>()->getResult();
+      auto resultTy = importedType.getType();
       auto loc = Impl.importSourceLoc(decl->getLocation());
 
       if (name && name.isSimpleName()) {
@@ -3519,7 +3517,7 @@ namespace {
                                               resultTy, /*throws*/ false,
                                               dc, decl);
 
-      result->setInterfaceType(type);
+      result->computeType();
       result->setValidationToChecked();
       result->setIsObjC(false);
       result->setIsDynamic(false);
@@ -4041,9 +4039,7 @@ namespace {
 
       result->setAccess(getOverridableAccessLevel(dc));
 
-      auto resultTy = importedType.getType()
-          ->castTo<FunctionType>()->getResult();
-
+      auto resultTy = importedType.getType();
       auto isIUO = importedType.isImplicitlyUnwrapped();
 
       // If the method has a related result type that is representable
@@ -6100,8 +6096,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
     return nullptr;
 
   // Determine the failability of this initializer.
-  auto oldFnType = importedType.getType()->castTo<AnyFunctionType>();
-  bool resultIsOptional = (bool) oldFnType->getResult()->getOptionalObjectType();
+  bool resultIsOptional = (bool) importedType.getType()->getOptionalObjectType();
 
   // Update the failability appropriately based on the imported method type.
   assert(resultIsOptional || !importedType.isImplicitlyUnwrapped());
@@ -6119,7 +6114,9 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
 
   // Look for other imported constructors that occur in this context with
   // the same name.
-  auto allocParams = oldFnType->getParams();
+  SmallVector<AnyFunctionType::Param, 4> allocParams;
+  bodyParams->getParams(allocParams);
+
   bool ignoreNewExtensions = isa<ClassDecl>(dc);
   for (auto other : ownerNominal->lookupDirect(importedName.getDeclName(),
                                                ignoreNewExtensions)) {
@@ -6359,14 +6356,12 @@ void SwiftDeclConverter::recordObjCOverride(SubscriptDecl *subscript) {
 
     // Compute the type of indices for our own subscript operation, lazily.
     if (!unlabeledIndices) {
-      unlabeledIndices = subscript->getIndices()
-                             ->getInterfaceType(Impl.SwiftContext)
+      unlabeledIndices = subscript->getIndicesInterfaceType()
                              ->getUnlabeledType(Impl.SwiftContext);
     }
 
     // Compute the type of indices for the subscript we found.
-    auto parentUnlabeledIndices = parentSub->getIndices()
-                                      ->getInterfaceType(Impl.SwiftContext)
+    auto parentUnlabeledIndices = parentSub->getIndicesInterfaceType()
                                       ->getUnlabeledType(Impl.SwiftContext);
     if (!unlabeledIndices->isEqual(parentUnlabeledIndices))
       continue;
