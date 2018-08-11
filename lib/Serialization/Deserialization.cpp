@@ -2724,7 +2724,6 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     bool isImplicit, isObjC, hasStubImplementation, throws;
     GenericEnvironmentID genericEnvID;
     uint8_t storedInitKind, rawAccessLevel;
-    TypeID interfaceID;
     DeclID overriddenID;
     bool needsNewVTableEntry, firstTimeRequired;
     uint8_t rawDefaultArgumentResilienceExpansion;
@@ -2735,7 +2734,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
                                                rawFailability, isImplicit, 
                                                isObjC, hasStubImplementation,
                                                throws, storedInitKind,
-                                               genericEnvID, interfaceID,
+                                               genericEnvID,
                                                overriddenID,
                                                rawAccessLevel,
                                                needsNewVTableEntry,
@@ -2819,23 +2818,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     assert(bodyParams && "missing parameters for constructor");
     ctor->setParameters(selfDecl, bodyParams);
 
-    auto interfaceType = getType(interfaceID);
-    ctor->setInterfaceType(interfaceType);
-
-    // Set the initializer interface type of the constructor.
-    auto allocType = ctor->getInterfaceType();
-    auto selfParam = computeSelfParam(ctor, /*isInitializingCtor=*/true);
-    if (auto polyFn = allocType->getAs<GenericFunctionType>()) {
-      ctor->setInitializerInterfaceType(
-              GenericFunctionType::get(polyFn->getGenericSignature(),
-                                       {selfParam}, polyFn->getResult(),
-                                       polyFn->getExtInfo()));
-    } else {
-      auto fn = allocType->castTo<FunctionType>();
-      ctor->setInitializerInterfaceType(FunctionType::get({selfParam},
-                                                          fn->getResult(),
-                                                          fn->getExtInfo()));
-    }
+    ctor->computeType();
 
     if (auto errorConvention = maybeReadForeignErrorConvention())
       ctor->setForeignErrorConvention(*errorConvention);
@@ -3041,7 +3024,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     bool isObjC, hasDynamicSelf, hasForcedStaticDispatch, throws;
     unsigned numNameComponentsBiased;
     GenericEnvironmentID genericEnvID;
-    TypeID interfaceTypeID;
+    TypeID resultInterfaceTypeID;
     DeclID associatedDeclID;
     DeclID overriddenID;
     DeclID accessorStorageDeclID;
@@ -3055,7 +3038,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
                                           rawMutModifier, hasDynamicSelf,
                                           hasForcedStaticDispatch, throws,
                                           genericEnvID,
-                                          interfaceTypeID,
+                                          resultInterfaceTypeID,
                                           associatedDeclID, overriddenID,
                                           numNameComponentsBiased,
                                           rawAccessLevel,
@@ -3068,7 +3051,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
                                           rawMutModifier, hasDynamicSelf,
                                           hasForcedStaticDispatch, throws,
                                           genericEnvID,
-                                          interfaceTypeID,
+                                          resultInterfaceTypeID,
                                           overriddenID,
                                           accessorStorageDeclID,
                                           rawAccessorKind, rawAddressorKind,
@@ -3221,9 +3204,9 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       }
     }
 
-    // Set the interface type.
-    auto interfaceType = getType(interfaceTypeID);
-    fn->setInterfaceType(interfaceType);
+    fn->setStatic(isStatic);
+
+    fn->getBodyResultTypeLoc().setType(getType(resultInterfaceTypeID));
 
     ParamDecl *selfDecl = nullptr;
     if (DC->isTypeContext()) {
@@ -3237,6 +3220,9 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
 
     fn->setParameters(selfDecl, paramList);
 
+    // Set the interface type.
+    fn->computeType();
+
     if (auto errorConvention = maybeReadForeignErrorConvention())
       fn->setForeignErrorConvention(*errorConvention);
 
@@ -3245,7 +3231,6 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
     }
 
-    fn->setStatic(isStatic);
     if (isImplicit)
       fn->setImplicit();
     fn->setIsObjC(isObjC);
@@ -3644,7 +3629,6 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
 
   case decls_block::ENUM_ELEMENT_DECL: {
     DeclContextID contextID;
-    TypeID interfaceTypeID;
     bool isImplicit; bool hasPayload; bool isNegative;
     unsigned rawValueKindID;
     IdentifierID blobData;
@@ -3653,7 +3637,6 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     ArrayRef<uint64_t> argNameAndDependencyIDs;
 
     decls_block::EnumElementLayout::readRecord(scratch, contextID,
-                                               interfaceTypeID,
                                                isImplicit, hasPayload,
                                                rawValueKindID, isNegative,
                                                blobData,
@@ -3710,8 +3693,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     }
     }
 
-    auto interfaceType = getType(interfaceTypeID);
-    elem->setInterfaceType(interfaceType);
+    elem->computeType();
 
     if (isImplicit)
       elem->setImplicit();
@@ -3732,7 +3714,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     DeclContextID contextID;
     bool isImplicit, isObjC, isGetterMutating, isSetterMutating;
     GenericEnvironmentID genericEnvID;
-    TypeID interfaceTypeID;
+    TypeID elemInterfaceTypeID;
     AccessorRecord accessors;
     DeclID overriddenID;
     uint8_t rawAccessLevel, rawSetterAccessLevel;
@@ -3746,7 +3728,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
                                              readImpl, writeImpl, readWriteImpl,
                                              numAccessors,
                                              genericEnvID,
-                                             interfaceTypeID,
+                                             elemInterfaceTypeID,
                                              overriddenID, rawAccessLevel,
                                              rawSetterAccessLevel, numArgNames,
                                              argNameAndDependencyIDs);
@@ -3814,8 +3796,9 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       }
     }
 
-    auto interfaceType = getType(interfaceTypeID);
-    subscript->setInterfaceType(interfaceType);
+    auto elemInterfaceType = getType(elemInterfaceTypeID);
+    subscript->getElementTypeLoc().setType(elemInterfaceType);
+    subscript->computeType();
 
     if (isImplicit)
       subscript->setImplicit();
@@ -3911,12 +3894,10 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     DeclContextID contextID;
     bool isImplicit, isObjC;
     GenericEnvironmentID genericEnvID;
-    TypeID interfaceID;
 
     decls_block::DestructorLayout::readRecord(scratch, contextID,
                                               isImplicit, isObjC,
-                                              genericEnvID,
-                                              interfaceID);
+                                              genericEnvID);
 
     DeclContext *DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -3935,8 +3916,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     selfDecl->setImplicit();
     dtor->setParameters(selfDecl, ParameterList::createEmpty(ctx));
 
-    auto interfaceType = getType(interfaceID);
-    dtor->setInterfaceType(interfaceType);
+    dtor->computeType();
 
     if (isImplicit)
       dtor->setImplicit();

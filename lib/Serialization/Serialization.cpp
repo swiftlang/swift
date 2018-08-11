@@ -3207,8 +3207,8 @@ void Serializer::writeDecl(const Decl *D) {
     uint8_t rawDefaultArgumentResilienceExpansion =
       getRawStableResilienceExpansion(
           fn->getDefaultArgumentResilienceExpansion());
-    Type ty = fn->getInterfaceType();
 
+    Type ty = fn->getInterfaceType();
     for (auto dependency : collectDependenciesFromType(ty->getCanonicalType()))
       nameComponentsAndDependencies.push_back(addTypeRef(dependency));
 
@@ -3226,7 +3226,7 @@ void Serializer::writeDecl(const Decl *D) {
                            fn->hasThrows(),
                            addGenericEnvironmentRef(
                                                   fn->getGenericEnvironment()),
-                           addTypeRef(ty),
+                           addTypeRef(fn->getResultInterfaceType()),
                            addDeclRef(fn->getOperatorDecl()),
                            addDeclRef(fn->getOverriddenDecl()),
                            fn->getFullName().getArgumentNames().size() +
@@ -3263,8 +3263,8 @@ void Serializer::writeDecl(const Decl *D) {
     uint8_t rawDefaultArgumentResilienceExpansion =
       getRawStableResilienceExpansion(
           fn->getDefaultArgumentResilienceExpansion());
-    Type ty = fn->getInterfaceType();
 
+    Type ty = fn->getInterfaceType();
     SmallVector<IdentifierID, 4> dependencies;
     for (auto dependency : collectDependenciesFromType(ty->getCanonicalType()))
       dependencies.push_back(addTypeRef(dependency));
@@ -3283,7 +3283,7 @@ void Serializer::writeDecl(const Decl *D) {
                                fn->hasThrows(),
                                addGenericEnvironmentRef(
                                                   fn->getGenericEnvironment()),
-                               addTypeRef(ty),
+                               addTypeRef(fn->getResultInterfaceType()),
                                addDeclRef(fn->getOverriddenDecl()),
                                addDeclRef(fn->getStorage()),
                                rawAccessorKind,
@@ -3336,7 +3336,6 @@ void Serializer::writeDecl(const Decl *D) {
     unsigned abbrCode = DeclTypeAbbrCodes[EnumElementLayout::Code];
     EnumElementLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                   contextID,
-                                  addTypeRef(elem->getInterfaceType()),
                                   elem->isImplicit(),
                                   elem->hasAssociatedValues(),
                                   (unsigned)RawValueKind,
@@ -3389,7 +3388,7 @@ void Serializer::writeDecl(const Decl *D) {
                                 accessors.Decls.size(),
                                 addGenericEnvironmentRef(
                                             subscript->getGenericEnvironment()),
-                                addTypeRef(ty),
+                                addTypeRef(subscript->getElementInterfaceType()),
                                 addDeclRef(subscript->getOverriddenDecl()),
                                 rawAccessLevel,
                                 rawSetterAccessLevel,
@@ -3440,7 +3439,6 @@ void Serializer::writeDecl(const Decl *D) {
                                     ctor->getInitKind()),
                                   addGenericEnvironmentRef(
                                                  ctor->getGenericEnvironment()),
-                                  addTypeRef(ty),
                                   addDeclRef(ctor->getOverriddenDecl()),
                                   rawAccessLevel,
                                   ctor->needsNewVTableEntry(),
@@ -3469,8 +3467,7 @@ void Serializer::writeDecl(const Decl *D) {
                                  dtor->isImplicit(),
                                  dtor->isObjC(),
                                  addGenericEnvironmentRef(
-                                                dtor->getGenericEnvironment()),
-                                 addTypeRef(dtor->getInterfaceType()));
+                                                dtor->getGenericEnvironment()));
     break;
   }
 
