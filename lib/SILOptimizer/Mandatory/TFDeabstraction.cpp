@@ -1612,8 +1612,10 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
       // removed at the beginning of the partition pass.
       // TODO: remove this inst in the getForFunction() call above, once
       // the partition pass is folded into deabstraction.
+      // FIXME: consider defining constexpr strings for these literals.
       if (opInfo->opName == "tfc.configureTPU" ||
-          opInfo->opName == "tfc.configureGPU")
+          opInfo->opName == "tfc.configureGPU" ||
+          opInfo->opName == "tfc.configureCPU")
         continue;
       formGraphOp(*opInfo, constants, deviceInfo);
     }

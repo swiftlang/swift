@@ -66,7 +66,8 @@ GraphFunctionDeviceInfo::getForFunction(SILFunction &fn,
       if (!tfopInfo)
         continue;
       bool isConfigOp = tfopInfo->opName == "tfc.configureTPU" ||
-                        tfopInfo->opName == "tfc.configureGPU";
+                        tfopInfo->opName == "tfc.configureGPU" ||
+                        tfopInfo->opName == "tfc.configureCPU";
       if (!isConfigOp)
         continue;
 
@@ -92,10 +93,12 @@ GraphFunctionDeviceInfo::getForFunction(SILFunction &fn,
         auto infeedEnabled =
             cast<IntegerLiteralInst>(tfopInfo->getAttrOperand(0));
         isTPUInfeedEnabled = !infeedEnabled->getValue().isNullValue();
-      } else {
-        assert(tfopInfo->opName == "tfc.configureGPU" &&
-               "unknown device configuration op");
+      } else if (tfopInfo->opName == "tfc.configureGPU") {
         deviceType = DeviceType::GPU;
+      } else {
+        assert(tfopInfo->opName == "tfc.configureCPU" &&
+               "unknown device configuration op");
+        deviceType = DeviceType::CPU;
       }
     }
   }
@@ -309,11 +312,6 @@ class DevicePartitionCloner
 }  // end anonymous namespace
 
 void DevicePartitionCloner::visitGraphOperationInst(GraphOperationInst *inst) {
-  if (inst->getName().str() == "tf_tensor_to_i1") {
-    SILClonerWithScopes::visitGraphOperationInst(inst);
-    return;
-  }
-
   GraphOperationInfo decoder(inst);
   SmallVector<GraphOperationInfo::InputMarker, 4> inputInfos;
   auto opName = decoder.decodeName(inputInfos);
@@ -828,14 +826,57 @@ public:
                         unsigned operIdx) {
     auto opValue = inst->getOperand(operIdx);
 
-    // BB args are replicated on all devices, so no transfer is needed.
-    if (isa<SILArgument>(opValue)) return;
     // Undefs will be handled later.
     if (isa<SILUndef>(opValue)) return;
+    if (isa<SILArgument>(opValue)) {
+      // BB args that are not func input args are replicated on all devices, so
+      // no transfer is needed.
+      auto *funcArg = dyn_cast<SILFunctionArgument>(opValue);
+      if (!funcArg)
+        return;
+
+      // Otherwise, `inst` can look like like:
+      //   %3 = graph_op "tf_tensor_to_i1"(%0 : $TensorHandle<Builtin.Int1>)
+      //     {__device: "ALL_DEVICES"} : $Builtin.Int1
+      // Here we need to transfer %0 to the device that runs the graph_op. To
+      // keep the remaining code in this function simple (the code assumes
+      // `opValue` is produced by a graph_op inst), we synthesize an identity op
+      // that reads the func input arg at the primary device. If it turns out
+      // reading the func arg need no tensor transfer (i.e., if the graph_op %3
+      // above is placed on the primary device), we rely on the backend graph
+      // compiler (e.g. grappler) to optimize away this extraneous identity op.
+      std::string identityOpName = "Identity";
+      identityOpName +=
+          GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
+
+      // insert this new inst at the beginning of the function.
+      SILBuilder B(&srcFn.front().front());
+      auto &ctx = B.getModule().getASTContext();
+      GraphOperationAttribute deviceAttr = {
+          ctx.getIdentifier(DEVICE_ATTR),
+          SymbolicValue::getString(
+              getDeviceString(deviceInfo.primaryDeviceType),
+              ctx.getAllocator())};
+      auto *identityOpInst = B.createGraphOperation(
+          srcFn.getLocation(), ctx.getIdentifier(identityOpName),
+          /*operands*/ {opValue}, /*attributes*/ {deviceAttr},
+          {opValue->getType()});
+      markInstForDevice(deviceInfo.primaryDeviceType, identityOpInst);
+
+      auto newValue = getSingleValueResult(identityOpInst);
+      // Replace all users with the value produced by the new identity op inst,
+      // except for the identity inst itself.
+      for (auto *use : opValue->getUses()) {
+        auto *user = use->getUser();
+        if (user != identityOpInst)
+          use->set(newValue);
+      }
+      opValue = newValue;
+    }
 
     auto *operandInst = opValue->getDefiningInstruction();
     assert(operandInst && "value must be defined by an instruction");
-    
+
     DeviceType operandDeviceType = getSomeDevicePlacement(operandInst);
     // Already on this device -- we are done.
     if (operandDeviceType == DeviceType::ALL ||
@@ -848,7 +889,7 @@ public:
 
     assert(operandDeviceType != DeviceType::ALL);
     assert(operandDeviceType != deviceType);
-    // See if we have previously emitted a TransorTransfer from
+    // See if we have previously emitted a TensorTransfer from
     // `operandDeviceType` to `deviceType`.
     // FIXME: If we earlier sent the value to GPU device, and later lookup the
     // same value with dest device set to ALL, we will be generating another

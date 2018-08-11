@@ -73,11 +73,13 @@ static InFlightDiagnostic diagnose(ASTContext &Context, SourceLoc loc,
 static bool isUserIgnoredByPartitioning(SILInstruction *inst) {
   auto optMode = inst->getFunction()->getEffectiveOptimizationMode();
   // `debug_value` instructions are used for value inspection during debugging.
-  // For optimized builds, we ignored these instructions so that no send/receive
-  // will be emitted.
-  if (isa<DebugValueInst>(inst) &&
-      optMode != OptimizationMode::NoOptimization) {
-    return true;
+  if (auto *DVI = dyn_cast<DebugValueInst>(inst)) {
+    // Ignore all debug_value instructions for an optimized build so that no
+    // send/receive will be triggered.
+    if (optMode != OptimizationMode::NoOptimization)
+      return true;
+    // Ignore opaque handle because they cannot be sent/received.
+    return isOpaqueHandle(DVI->getOperand()->getType());
   }
   // Reference counting instructions are always ignored.
   return isa<RefCountingInst>(inst);
@@ -115,11 +117,11 @@ enum class PartitioningClass {
 
   /// This is an explicit send to the accelerator, which is sugared as
   /// '.toAccelerator()'.
-  ExplicitSend,
+  ExplicitToAccel,
 
   /// This is an explicit receive from the accelerator, which is sugared as
   /// '.toHost()'.
-  ExplicitReceive,
+  ExplicitToHost,
 };
 
 static PartitioningClass classifyInst(SILInstruction *inst) {
@@ -148,9 +150,9 @@ static PartitioningClass classifyInst(SILInstruction *inst) {
       if (fn->getName().startswith("__tf_hoistable_"))
         return PartitioningClass::Hoistable;
       if (fn->getName() == "__tf_send")
-        return PartitioningClass::ExplicitSend;
+        return PartitioningClass::ExplicitToAccel;
       if (fn->getName() == "__tf_receive")
-        return PartitioningClass::ExplicitReceive;
+        return PartitioningClass::ExplicitToHost;
     }
   }
 
@@ -305,7 +307,7 @@ classifyPromotedScalarOp(SILInstruction *inst) {
   }
 }
 
-/// Returns true when this function must be entirely lowered to a TF graph
+/// Return true when this function must be entirely lowered to a TF graph
 /// function, with no host-side logic remaining (i.e., no sends/recvs, and no
 /// start/stop tensor computation on the host side). In other words, this
 /// function uses the tensorflow calling convention.
@@ -813,6 +815,7 @@ public:
   void diagnoseUsesFromHost(SILValue value, SILLocation loc);
   void diagnoseCopyToHost(SILValue value, SILInstruction *user,
                           SILLocation loc);
+  void diagnoseOpaqueHandleCopy(SILValue value, SILInstruction *user);
 
 private:
   // Marking.
@@ -896,7 +899,7 @@ void TFFunctionPartition::diagnoseCopyToAccelerator(
   // If it isn't the result of a "send" operation, then produce a warning about
   // an implicit copy to the accelerator.
   if (auto *apply = dyn_cast<ApplyInst>(value))
-    if (classifyInst(apply) == PartitioningClass::ExplicitSend) {
+    if (classifyInst(apply) == PartitioningClass::ExplicitToAccel) {
       explicitCopyMarkers.insert(apply);
       return;
     }
@@ -938,6 +941,12 @@ void TFFunctionPartition::diagnoseCopyToAccelerator(
 
   // Try to determine a good source location to report.
   auto loc = getUserSourceLocation(value);
+  
+  // Opaque handles can never be sent or passed as tensor program arguments.
+  // Type checking must have rejected host functions that are either a)
+  // public with private ABI or b) marked @inline(never).
+  assert(!isOpaqueHandle(value->getType()) &&
+         "Opaque handles should never have been on the host");
 
   // Try to make a useful description of the value being copied to help
   // disambiguate.
@@ -1020,7 +1029,7 @@ void TFFunctionPartition::diagnoseCopyToAccelerator(
 }
 
 /// Check to see if the specified value being copied into a partition for the
-/// accelerator is our designated "receive" operation.  If so, we're fine,
+/// accelerator is our designated "ToHost" operation.  If so, we're fine,
 /// otherwise emit a warning to tell the programmer that they are doing
 /// something that induces an implicit data transfer into their code.
 void TFFunctionPartition::diagnoseUsesFromHost(SILValue value,
@@ -1030,7 +1039,7 @@ void TFFunctionPartition::diagnoseUsesFromHost(SILValue value,
 
     // If it is used by a "receive" operation, remember the receive and don't
     // emit a warning.
-    if (classifyInst(user) == PartitioningClass::ExplicitReceive) {
+    if (classifyInst(user) == PartitioningClass::ExplicitToHost) {
       explicitCopyMarkers.insert(user);
       continue;
     }
@@ -1039,6 +1048,12 @@ void TFFunctionPartition::diagnoseUsesFromHost(SILValue value,
     // here.  It won't be very useful.
     if (isUserIgnoredByPartitioning(user))
       continue;
+    
+    // If the value is a non-copyable opaque handle, emit an error.
+    if (isOpaqueHandle(value->getType())) {
+      diagnoseOpaqueHandleCopy(value, user);
+      continue;
+    }
 
     // If we are running this in the context of an expression run in the REPL or
     // playgrounds, or script mode, then we should never emit a warning: we know
@@ -1097,6 +1112,19 @@ void TFFunctionPartition::diagnoseCopyToHost(SILValue value,
              diag::tf_value_implicitly_copied_to_host_computed_used_here)
         .highlight(userLoc.getSourceRange());
   }
+}
+
+/// Emit an error for invalid send/receive of opaque handles.
+void TFFunctionPartition::diagnoseOpaqueHandleCopy(SILValue value,
+                                                   SILInstruction *user) {
+  assert(isOpaqueHandle(value->getType()) &&
+         "Shouldn't emit an error for opaque handle copy when the value is not "
+         "an opaque handle");
+  auto &ctx = value->getFunction()->getASTContext();
+  diagnose(ctx, getUserSourceLocation(value).getSourceLoc(),
+           diag::tfop_value_no_send_receive);
+  diagnose(ctx, getUserSourceLocation(user).getSourceLoc(),
+           diag::tf_value_implicitly_copied_to_host_computed_used_here);
 }
 
 /// Some instruction in the specified block needs to be split out to the
@@ -1523,8 +1551,8 @@ static bool canMoveInstruction(SILInstruction *inst,
   SILValue tensorOperand;
   switch (classifyInst(inst)) {
   case PartitioningClass::GetScalarOrDie:
-  case PartitioningClass::ExplicitSend:
-  case PartitioningClass::ExplicitReceive:
+  case PartitioningClass::ExplicitToAccel:
+  case PartitioningClass::ExplicitToHost:
     // For the these functions, we know its first parameter is a TensorHandle,
     // with @guaranteed calling convention.
     tensorOperand = inst->getOperand(1);
@@ -2269,9 +2297,9 @@ public:
   bool finalizeOriginal();
 
   void handleSendRecvForTerminator(TermInst *inst);
-  void insertSend(SILInstruction &inst);
+  void insertHostToAccelTransfer(SILInstruction &inst);
   // On error, returns false.
-  bool insertReceive(SILValue value, SILLocation loc);
+  bool insertAccelToHostTransfer(SILValue value, SILLocation loc);
   // On error, returns false.
   bool handleHostReferencesOfMovedValue(SILValue value, SILLocation loc);
 
@@ -3014,11 +3042,8 @@ SILFunction *PartitionCloner::lookupSendReceiveFunction(StringRef fnName,
   auto nominal = tensorValueTy.getASTType()->getAnyNominal();
   auto lookup =
       nominal->lookupConformance(&tensorFlowModule, proto, conformances);
-  if (!lookup) {
-    diagnose(ctx, loc.getSourceLoc(), diag::tfop_incorrect_definition,
-             "This value type cannot be sent/received");
-    return nullptr;
-  }
+  assert(lookup && "No conformance to TensorSendableReceivable found. "
+         "Is it a sendable/receivable TensorFlow value?");
   assert(conformances.size() == 1 && "Found multiple conformance candidates.");
   DeclName fnDeclName(ctx.getIdentifier(fnName));
   auto *fn = findSILFunctionForRequiredProtocolMember(
@@ -3194,7 +3219,7 @@ void PartitionCloner::handleSendRecvForTerminator(TermInst *inst) {
 
 /// Insert a send of values from the specified instruction result(s) to the
 /// accelerator, and insert receives in it.
-void PartitionCloner::insertSend(SILInstruction &inst) {
+void PartitionCloner::insertHostToAccelTransfer(SILInstruction &inst) {
   if (auto *TI = dyn_cast<TermInst>(&inst)) {
     if (shouldMarkSend(TI)) {
       handleSendRecvForTerminator(TI);
@@ -3242,7 +3267,7 @@ void PartitionCloner::insertSend(SILInstruction &inst) {
   }
 }
 
-bool PartitionCloner::insertReceive(SILValue value, SILLocation loc) {
+bool PartitionCloner::insertAccelToHostTransfer(SILValue value, SILLocation loc) {
   assert(value->getDefiningInstruction() ||
          isa<SILArgument>(value) && "Don't know how to receive this value");
   SILFunction *receiveFn = lookupSendReceiveFunction("receiveFromAccelerator",
@@ -3304,7 +3329,7 @@ bool PartitionCloner::handleHostReferencesOfMovedValue(SILValue value,
 
   if (needsCopy) {
     // If we need the value on the host, then keep the retain/release ops.
-    return insertReceive(value, loc);
+    return insertAccelToHostTransfer(value, loc);
   } else {
     // Otherwise, drop them.
     for (auto *inst : instToRemove)
@@ -3336,7 +3361,7 @@ void PartitionCloner::cloneBlock(SILBasicBlock *BB) {
       visit(&inst);
       break;
     case Marking::Send:
-      insertSend(inst);
+      insertHostToAccelTransfer(inst);
       break;
     case Marking::Argument:
       // Already handled.
@@ -3490,10 +3515,6 @@ bool PartitionCloner::finalizeOriginal() {
   // bb arg -> branch argument mappings.
   SmallPtrSet<SILBasicBlock *, 4> argsRemovedBlocks;
 
-  // We remove arguments with a two-pass approach, first dropping the insts that
-  // feed them, then removing the arg (potentially inserting a receive).
-  SmallVector<SILArgument *, 4> argsToRemove;
-
   // For BB arguments, we remove the uses from the branches first (which breaks
   // interdependent references) and delete the actual arguments later.
   for (auto argInfo : FP.markedBBArguments) {
@@ -3543,7 +3564,7 @@ bool PartitionCloner::finalizeOriginal() {
 
   // Ok, now all interdependent references have been dropped.  If there are any
   // uses of values that we moved over to the accelerator, then we must insert
-  // a receive from the accelerator of the computed value.  Regardless, we can
+  // a transfer from the accelerator of the computed value.  Regardless, we can
   // now delete the defining instruction/argument.
   for (auto argInfo : FP.markedBBArguments) {
     auto marking = argInfo.second.first;
@@ -4162,6 +4183,15 @@ static void contractUncondBranches(SILFunction *fn) {
   }
 }
 
+/// Return true if a user instruction is returning or forming a return value.
+static bool isReturning(SILInstruction *user) {
+  if (isa<ReturnInst>(user)) return true;
+  if (auto *TI = dyn_cast<TupleInst>(user))
+    return llvm::all_of(TI->getUses(),
+                        [&](Operand *use) { return isReturning(user); });
+  return false;
+}
+
 /// Run the TensorFlow partitioning pass.  This pass is a very close relative to
 /// the standard "Aggressive Dead Code Elimination" (ADCE) optimization which is
 /// implemented using post-dominance frontiers and control dependence
@@ -4227,6 +4257,15 @@ bool TFFunctionPartition::partition(bool isTest) {
                 (argInfo->second.first == Marking::Move ||
                  argInfo->second.first == Marking::Delete))
               continue;
+          }
+          
+          // If it's an opaque handle such as VariantHandle or ResourceHandle,
+          // it cannot be a result except when it's being returned in an
+          // accelerator-only function.
+          if (isOpaqueHandle(result->getType()) &&
+              !(isAcceleratorOnly(hostFn) && isReturning(user))) {
+            diagnoseOpaqueHandleCopy(result, user);
+            return true;
           }
 
           // Remember if the instruction has any use.  If not, then it never
