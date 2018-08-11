@@ -4822,8 +4822,6 @@ public:
   
 /// Describes the kind of subscripting used in Objective-C.
 enum class ObjCSubscriptKind {
-  /// Not an Objective-C subscripting kind.
-  None,
   /// Objective-C indexed subscripting, which is based on an integral
   /// index.
   Indexed,
