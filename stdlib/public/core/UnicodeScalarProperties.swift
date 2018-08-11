@@ -1086,7 +1086,8 @@ extension Unicode.Scalar.Properties {
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var generalCategory: Unicode.GeneralCategory {
     let rawValue = __swift_stdlib_UCharCategory(
-      UInt32(__swift_stdlib_u_getIntPropertyValue(
+      __swift_stdlib_UCharCategory.RawValue(
+      __swift_stdlib_u_getIntPropertyValue(
         _value, __swift_stdlib_UCHAR_GENERAL_CATEGORY)))
     return Unicode.GeneralCategory(rawValue: rawValue)
   }
@@ -1363,7 +1364,8 @@ extension Unicode.Scalar.Properties {
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var numericType: Unicode.NumericType? {
     let rawValue = __swift_stdlib_UNumericType(
-      UInt32(__swift_stdlib_u_getIntPropertyValue(
+      __swift_stdlib_UNumericType.RawValue(
+      __swift_stdlib_u_getIntPropertyValue(
         _value, __swift_stdlib_UCHAR_NUMERIC_TYPE)))
     return Unicode.NumericType(rawValue: rawValue)
   }
