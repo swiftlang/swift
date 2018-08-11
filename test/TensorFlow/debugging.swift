@@ -8,9 +8,9 @@ public func basicDebugValues(_ x: Tensor<Float>) {
 }
 
 // FIXME: `debug_value_addr` for `z` is not currently preserved due to SSA promotion in deabstraction.
-public func debugValuesInLoop(_ x: Tensor<Float>) {
+public func debugValuesInLoop(_ x: Tensor<Float>, _ n: Int) {
   var z = x.squared()
-  for i in 0..<10 {
+  for i in 0..<n {
     z += x
   }
 }
@@ -34,17 +34,14 @@ public func noCopyForOpaqueHandles() {
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}debugValuesInLoop
 // CHECK: bb0
 // CHECK:   [[SQUARED:%.*]] = graph_op "Square,i"
-// CHECK-NEXT:   graph_op "tfc.SendToHost,i"([[SQUARED]] : $TensorHandle<Float>)
-// CHECK:   br bb1
-// CHECK: bb1:
+// CHECK-NEXT:   br bb1([[SQUARED]] : $TensorHandle<Float>)
+// CHECK: bb1
 // CHECK:   graph_op "tfc.RecvFromHost"()
 // CHECK:   [[COND:%.*]] = graph_op "tf_tensor_to_i1"
 // CHECK:   cond_br [[COND]], bb2, bb3
 // CHECK: bb2:
-// CHECK:   graph_op "tfc.RecvFromHost"()
 // CHECK:   [[ADD_RESULT:%.*]] = graph_op "Add,i,i"
-// CHECK-NEXT:   graph_op "tfc.SendToHost,i"([[ADD_RESULT:%.*]] : $TensorHandle<Float>)
-// CHECK:   br bb1
+// CHECK-NEXT:   br bb1([[ADD_RESULT]]
 
 
 // CHECK-LABEL: ---- PARTITION STATE FOR FUNCTION ${{.*}}noCopyForOpaqueHandle
