@@ -233,15 +233,28 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
   // If this is a struct extract from a fragile type, then we can return the
   // element being extracted.
   if (auto *sei = dyn_cast<StructExtractInst>(value)) {
-    auto structValue = sei->getOperand();
-    auto val = getConstantValue(structValue);
-    if (val.isConstant())
-      return val.getAggregateValue()[sei->getFieldNo()];
+    auto aggValue = sei->getOperand();
+    auto val = getConstantValue(aggValue);
+    if (val.isConstant()) {
+      if (val.getKind() == SymbolicValue::Aggregate)
+        return val.getAggregateValue()[sei->getFieldNo()];
+      else {
+        // `val` can be an array. e.g. It can have SIL type $Array<Int32> and be
+        // produce by an inst such as:
+        //   %133 = struct_extract %132 : $TensorShape, #TensorShape.dimensions
+        assert(sei->getFieldNo() == 0);
+        return val;
+      }
+    }
     // Even though the entire struct is not a const value, the field we are
     // extracting could be, so we try evaluating just that field.
-    // TODO: should we remove the code path of getConstantValue(structValue)
-    // above?
-    if (auto *si = dyn_cast<StructInst>(structValue)) {
+    //
+    // Note: This is used in the TF deabstraction context. For example, a tensor
+    // shape attribute value is provided via [someStruct.tensorShape], where
+    // someStruct has non-const fields, and due to the wrapping of the
+    // singleton-array, we are not able to propagate the struct element SSA
+    // value to the use of that attribute in a graph_op inst.
+    if (auto *si = dyn_cast<StructInst>(aggValue)) {
       assert(si->getElements().size() > sei->getFieldNo());
       auto &field = si->getElementOperands()[sei->getFieldNo()];
       return getConstantValue(field.get());

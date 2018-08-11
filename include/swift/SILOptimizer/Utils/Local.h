@@ -654,6 +654,10 @@ protected:
 void promoteAllocsToSSA(ArrayRef<AllocStackInst*> allocs,
                         DominanceInfo *domInfo);
 
+// SWIFT_ENABLE_TENSORFLOW
+/// Run scalar-replacement-of-aggregate on the input set of instructions.
+bool runSROAOnInsts(llvm::ArrayRef<AllocStackInst *> Worklist);
+
 } // end namespace swift
 
 #endif

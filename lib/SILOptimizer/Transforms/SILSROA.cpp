@@ -62,7 +62,7 @@ public:
   }
 
   bool analyze();
-  void chopUpAlloca(std::vector<AllocStackInst *> &Worklist);
+  void chopUpAlloca(llvm::SmallVectorImpl<AllocStackInst *> &Worklist);
 
 private:
   SILValue createAgg(SILBuilder &B, SILLocation Loc, SILType Ty,
@@ -219,7 +219,8 @@ createAllocas(llvm::SmallVector<AllocStackInst *, 4> &NewAllocations) {
   }
 }
 
-void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist) {
+void SROAMemoryUseAnalyzer::chopUpAlloca(
+    llvm::SmallVectorImpl<AllocStackInst *> &Worklist) {
   // Create allocations for this instruction.
   llvm::SmallVector<AllocStackInst *, 4> NewAllocations;
   createAllocas(NewAllocations);
@@ -286,9 +287,27 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
   eraseFromParentWithDebugInsts(AI);
 }
 
-static bool runSROAOnFunction(SILFunction &Fn) {
-  std::vector<AllocStackInst *> Worklist;
+bool swift::runSROAOnInsts(llvm::ArrayRef<AllocStackInst *> Worklist) {
   bool Changed = false;
+  llvm::SmallVector<AllocStackInst *, 16> WorklistVec(Worklist.begin(),
+                                                      Worklist.end());
+  while (!WorklistVec.empty()) {
+    AllocStackInst *AI = WorklistVec.back();
+    WorklistVec.pop_back();
+
+    SROAMemoryUseAnalyzer Analyzer(AI);
+
+    if (!Analyzer.analyze())
+      continue;
+
+    Changed = true;
+    Analyzer.chopUpAlloca(WorklistVec);
+  }
+  return Changed;
+}
+
+static bool runSROAOnFunction(SILFunction &Fn) {
+  llvm::SmallVector<AllocStackInst *, 16> Worklist;
 
   // For each basic block BB in Fn...
   for (auto &BB : Fn)
@@ -299,19 +318,7 @@ static bool runSROAOnFunction(SILFunction &Fn) {
         if (shouldExpand(Fn.getModule(), AI->getElementType()))
           Worklist.push_back(AI);
 
-  while (!Worklist.empty()) {
-    AllocStackInst *AI = Worklist.back();
-    Worklist.pop_back();
-
-    SROAMemoryUseAnalyzer Analyzer(AI);
-
-    if (!Analyzer.analyze())
-      continue;
-
-    Changed = true;
-    Analyzer.chopUpAlloca(Worklist);
-  }
-  return Changed;
+  return runSROAOnInsts(Worklist);
 }
 
 namespace {

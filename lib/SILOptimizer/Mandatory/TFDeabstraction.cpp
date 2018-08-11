@@ -24,13 +24,14 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "tf-deabstraction"
-#include "TFUtilities.h"
 #include "TFConstExpr.h"
+#include "TFUtilities.h"
+#include "swift/AST/DiagnosticsSIL.h"
+#include "swift/SIL/SILConstants.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
-#include "swift/SIL/SILConstants.h"
-#include "swift/AST/DiagnosticsSIL.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/PrettyStackTrace.h"
 
@@ -136,7 +137,7 @@ namespace {
     void inlineCalls();
     void simplifyTensorOperands();
 
-    void promoteToSSA(MutableArrayRef<AllocStackInst*> allocs);
+    void promoteToSSA(ArrayRef<AllocStackInst *> allocs);
     void prepareStackAllocForPromotion(AllocStackInst *alloc);
     void propagateTensorValues();
     void checkAttributesAndFormGraphOps();
@@ -1069,53 +1070,69 @@ promoteAddressRootsToStack(ArrayRef<std::pair<SILValue, bool>> addressRoots) {
 
 /// Scan the function looking for TensorFlow value AllocStack instructions to
 /// promote.
-void TFDeabstraction::promoteToSSA(MutableArrayRef<AllocStackInst*> allocs) {
+void TFDeabstraction::promoteToSSA(ArrayRef<AllocStackInst *> allocs) {
   // If there is nothing to promote, don't bother calculating dominator info.
   if (allocs.empty())
     return;
 
   llvm::PrettyStackTraceFormat X("PromotableMemoryFinder::promoteToSSA");
 
-  // Do any necessary preprocessing of the stack allocations before promoting
-  // them.
-  for (auto alloc : allocs)
+  // Our first scan will look for begin/end access instructions and remove them,
+  // allowing later passes to be simpler.
+  // This is done repeatedly, since a begin_access itself can have another
+  // begin_access user.
+  for (auto *alloc : allocs) {
+    while (true) {
+      bool changed = false;
+      for (auto UI = alloc->use_begin(); UI != alloc->use_end();) {
+        auto *begin = dyn_cast<BeginAccessInst>((*UI++)->getUser());
+        if (!begin)
+          continue;
+
+        // If we have a begin_access instruction, replace uses of begin_access
+        // with uses of the original value and remove the end_access.
+        for (auto UI = begin->use_begin(); UI != begin->use_end();) {
+          auto *use = *UI++;
+          auto inst = use->getUser();
+          if (isa<EndAccessInst>(inst))
+            inst->eraseFromParent();
+          else
+            use->set(alloc);
+        }
+        begin->eraseFromParent();
+        changed = true;
+      }
+      if (!changed)
+        break;
+    }
+  }
+
+  // Now we explode the alloc / dealloc / load / store operations of aggregate
+  // values into per-field operations.
+  (void)runSROAOnInsts(allocs);
+
+  // Since the SROA pass above may have mutate alloc insts, we again scan over
+  // all of the operands of the tensor ops (including tf op attributes), finding
+  // stack allocations that we want to promote to SSA.
+  SmallVector<AllocStackInst *, 16> newStackAllocs;
+  if (PromotableMemoryFinder(newStackAllocs, tfc, fn).run(tensorOps)) {
+    logCurrentState("After running SROA",
+                    /*detailed*/ true);
+  }
+
+  for (auto alloc : newStackAllocs)
     prepareStackAllocForPromotion(alloc);
 
   // Otherwise the function does have tensor operations, so lets promote any
   // stack allocations out of the way so we can do simple dataflow analysis.
   auto domInfo = passManager->getAnalysis<DominanceAnalysis>()->get(&fn);
-  promoteAllocsToSSA(allocs, domInfo);
+  promoteAllocsToSSA(newStackAllocs, domInfo);
 }
 
 /// Preprocess the specified allocation instruction to make it more suitable for
 /// promotion to SSA.  In particularly, we eliminate CopyAddrInst and other
 /// uses that could prevent us from promoting this.
 void TFDeabstraction::prepareStackAllocForPromotion(AllocStackInst *alloc) {
-  // TODO: We will eventually need to do real SRoA to handle the case when
-  // we have tensor values mixed in with other random values that shouldn't
-  // (or can't) be loaded.  For now, we can just fail to deabstract these
-  // cases.
-
-  // Our first scan will look for begin_access instructions and remove them,
-  // allowing the second pass to be simpler.
-  for (auto UI = alloc->use_begin(); UI != alloc->use_end();) {
-    auto *begin = dyn_cast<BeginAccessInst>((*UI++)->getUser());
-    if (!begin)
-      continue;
-
-    // If we have a begin_access instruction, replace uses of begin_access with
-    // uses of the original value and remove the end_access.
-    for (auto UI = begin->use_begin(); UI != begin->use_end();) {
-      auto *use = *UI++;
-      auto inst = use->getUser();
-      if (isa<EndAccessInst>(inst))
-        inst->eraseFromParent();
-      else
-        use->set(alloc);
-    }
-    begin->eraseFromParent();
-  }
-
   // Our second pass looks for aggregate operations and struct_element_addrs
   // that poke inside the allocation.
   for (auto UI = alloc->use_begin(); UI != alloc->use_end();) {

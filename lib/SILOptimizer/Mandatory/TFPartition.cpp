@@ -4460,6 +4460,11 @@ void TFPartition::run() {
 bool TFPartition::processFunction(
     SILFunction *hostFn,
     SmallVectorImpl<HostPartitionContext> &hostPartitionContexts) {
+  // If something crashes, make sure the pretty stack trace says what we
+  // were doing.
+  llvm::PrettyStackTraceFormat X("TFPartition on function %s",
+                                 hostFn->getName().str().c_str());
+
   std::unique_ptr<TFFunctionPartition> partitioner;
   if (partitionFunction(hostFn, partitioner)) {
     return true; // error already emitted.
