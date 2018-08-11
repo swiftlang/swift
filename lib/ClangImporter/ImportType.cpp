@@ -1632,10 +1632,7 @@ ImportedType ClangImporter::Implementation::importFunctionType(
   if (clangDecl->isNoReturn())
     swiftResultTy = SwiftContext.getNeverType();
 
-  // Form the function type.
-  auto argTy = parameterList->getType(SwiftContext);
-  auto fnTy = FunctionType::get(argTy, swiftResultTy);
-  return {fnTy, importedType.isImplicitlyUnwrapped()};
+  return {swiftResultTy, importedType.isImplicitlyUnwrapped()};
 }
 
 ParameterList *ClangImporter::Implementation::importFunctionParameterList(
@@ -2196,20 +2193,13 @@ ImportedType ClangImporter::Implementation::importMethodType(
     swiftResultTy = SwiftContext.getNeverType();
   }
 
-  FunctionType::ExtInfo extInfo;
-
   if (errorInfo) {
     foreignErrorInfo = getForeignErrorInfo(*errorInfo, errorParamType,
                                            origSwiftResultTy);
-
-    // Mark that the function type throws.
-    extInfo = extInfo.withThrows(true);
   }
 
-  // Form the function type.
-  auto fnTy = FunctionType::get((*bodyParams)->getInterfaceType(SwiftContext),
-                                swiftResultTy->mapTypeOutOfContext(), extInfo);
-  return {fnTy, importedType.isImplicitlyUnwrapped()};
+  return {swiftResultTy->mapTypeOutOfContext(),
+          importedType.isImplicitlyUnwrapped()};
 }
 
 ImportedType ClangImporter::Implementation::importAccessorMethodType(
@@ -2269,9 +2259,7 @@ ImportedType ClangImporter::Implementation::importAccessorMethodType(
     isIUO = false;
   }
 
-  auto fnTy =
-      FunctionType::get((*params)->getInterfaceType(SwiftContext), resultTy);
-  return {fnTy, isIUO};
+  return {resultTy, isIUO};
 }
 
 
