@@ -4799,11 +4799,6 @@ ParamDecl *ParamDecl::createSelf(SourceLoc loc, DeclContext *DC,
   return selfDecl;
 }
 
-ParameterTypeFlags ParamDecl::getParameterFlags() const {
-  return ParameterTypeFlags::fromParameterType(getType(), isVariadic(),
-                                               getValueOwnership());
-}
-
 /// Return the full source range of this parameter.
 SourceRange ParamDecl::getSourceRange() const {
   SourceLoc APINameLoc = getArgumentNameLoc();

@@ -4729,10 +4729,6 @@ public:
   /// was specified separately from the parameter name.
   SourceLoc getArgumentNameLoc() const { return ArgumentNameLoc; }
   
-  /// Retrieve the parameter type flags corresponding to the declaration of
-  /// this parameter's argument type.
-  ParameterTypeFlags getParameterFlags() const;
-  
   SourceLoc getSpecifierLoc() const { return SpecifierLoc; }
     
   bool isTypeLocImplicit() const { return Bits.ParamDecl.IsTypeLocImplicit; }
