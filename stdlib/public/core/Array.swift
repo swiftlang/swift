@@ -1572,16 +1572,17 @@ extension Array {
   ///       you initialize or deinitialize any elements inside `body`, update
   ///       `initializedCount` with the new count for the array.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  public mutating func withUnsafeMutableBufferPointerToFullCapacity<R>(
+  @inlinable
+  public mutating func withUnsafeMutableBufferPointerToStorage<R>(
     capacity: Int,
     _ body: (
-      _ buffer: UnsafeMutableBufferPointer<Element>,
+      _ buffer: inout UnsafeMutableBufferPointer<Element>,
       _ initializedCount: inout Int
     ) throws -> R
   ) rethrows -> R {
     // Ensure unique storage and requested capacity
-    reserveCapacity(capacity)
     _precondition(capacity >= self.count)
+    reserveCapacity(capacity)
 
     var initializedCount = self.count
 
@@ -1594,7 +1595,7 @@ extension Array {
     // Create an UnsafeBufferPointer over the full capacity of `work`
     // that we can pass to `body`.
     let pointer = work._buffer.firstElementAddress
-    let bufferPointer = UnsafeMutableBufferPointer(
+    var inoutBufferPointer = UnsafeMutableBufferPointer(
       start: pointer, count: capacity)
 
     // Put the working array back before returning and update the count.
@@ -1604,7 +1605,7 @@ extension Array {
     }
 
     // Invoke the body.
-    return try body(bufferPointer, &initializedCount)
+    return try body(&inoutBufferPointer, &initializedCount)
   }
 }
 

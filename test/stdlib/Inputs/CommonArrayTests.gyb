@@ -434,9 +434,9 @@ ${Suite}.test("${ArrayType}/init(unsafeUninitializedCapacity:...:)/throwing") {
   expectEqual(0, InstanceCountedClass.instanceCounter)
 }
 
-${Suite}.test("${ArrayType}/withUnsafeMutableBufferPointerToFullCapacity") {
+${Suite}.test("${ArrayType}/withUnsafeMutableBufferPointerToStorage") {
   var a = Array<Int>()
-  let result: Int = a.withUnsafeMutableBufferPointerToFullCapacity(reservingCapacity: 10) {
+  let result: Int = a.withUnsafeMutableBufferPointerToStorage(capacity: 10) {
     buffer, initializedCount in
     expectEqual(10, buffer.count)
     expectEqual(0, initializedCount)
@@ -451,10 +451,10 @@ ${Suite}.test("${ArrayType}/withUnsafeMutableBufferPointerToFullCapacity") {
   expectEqual(5, a.count)
 }
 
-${Suite}.test("${ArrayType}/withUnsafeMutableBufferPointerToFullCapacity/throwing") {
+${Suite}.test("${ArrayType}/withUnsafeMutableBufferPointerToStorage/throwing") {
   do {
     var a = Array<InstanceCountedClass>()
-    a.withUnsafeMutableBufferPointerToFullCapacity(capacity: 10) { buffer, c in
+    a.withUnsafeMutableBufferPointerToStorage(capacity: 10) { buffer, c in
       let p = buffer.baseAddress!
       for i in 0..<5 {
         (p + i).initialize(to: InstanceCountedClass())
@@ -466,7 +466,7 @@ ${Suite}.test("${ArrayType}/withUnsafeMutableBufferPointerToFullCapacity/throwin
 
     a = []
     expectEqual(0, InstanceCountedClass.instanceCounter)
-    try a.withUnsafeMutableBufferPointerToFullCapacity(capacity: 10) { buffer, c in
+    try a.withUnsafeMutableBufferPointerToStorage(capacity: 10) { buffer, c in
       let p = buffer.baseAddress!
       for i in 0..<5 {
         (p + i).initialize(to: InstanceCountedClass())
