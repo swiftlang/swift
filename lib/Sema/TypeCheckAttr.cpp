@@ -1459,13 +1459,6 @@ static bool hasThrowingFunctionParameter(CanType type) {
   return false;
 }
 
-static inline bool isRedundantAttrInExtension(AccessLevel access,
-                                              AccessControlAttr *extAttr) {
-  return access == extAttr->getAccess() &&
-         access != AccessLevel::Private &&
-         access != AccessLevel::Open;
-}
-
 void AttributeChecker::visitRethrowsAttr(RethrowsAttr *attr) {
   // 'rethrows' only applies to functions that take throwing functions
   // as parameters.
@@ -1519,22 +1512,17 @@ void AttributeChecker::visitAccessControlAttr(AccessControlAttr *attr) {
 
     if (auto extAttr =
         extension->getAttrs().getAttribute<AccessControlAttr>()) {
-      // Extensions are top level declarations, for which the literally lowest
-      // access level `private` is equivalent to `fileprivate`.
-      AccessLevel extAccess = std::max(extAttr->getAccess(),
-                                       AccessLevel::FilePrivate);
-      if (attr->getAccess() > extAccess) {
+      AccessLevel defaultAccess = extension->getDefaultAccessLevel();
+      if (attr->getAccess() > defaultAccess) {
         auto diag = TC.diagnose(attr->getLocation(),
                                 diag::access_control_ext_member_more,
                                 attr->getAccess(),
                                 D->getDescriptiveKind(),
                                 extAttr->getAccess());
-        bool shouldNotReplace = isRedundantAttrInExtension(extAccess, extAttr);
-        swift::fixItAccess(diag, cast<ValueDecl>(D), extAccess, false,
-                           shouldNotReplace);
+        swift::fixItAccess(diag, cast<ValueDecl>(D), defaultAccess, false,
+                           true);
         return;
-      }
-      if (isRedundantAttrInExtension(attr->getAccess(), extAttr)) {
+      } else if (attr->getAccess() == defaultAccess) {
         TC.diagnose(attr->getLocation(),
                     diag::access_control_ext_member_redundant,
                     attr->getAccess(),
@@ -1575,6 +1563,15 @@ AttributeChecker::visitSetterAccessAttr(SetterAccessAttr *attr) {
     TC.diagnose(attr->getLocation(), diag::access_control_setter_more,
                 getterAccess, storageKind, attr->getAccess());
     attr->setInvalid();
+    return;
+
+  } else if (attr->getAccess() == getterAccess) {
+    TC.diagnose(attr->getLocation(),
+                diag::access_control_setter_redundant,
+                attr->getAccess(),
+                D->getDescriptiveKind(),
+                getterAccess)
+      .fixItRemove(attr->getRange());
     return;
   }
 }

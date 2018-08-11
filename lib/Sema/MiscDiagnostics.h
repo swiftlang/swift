@@ -55,7 +55,7 @@ void fixItAccess(InFlightDiagnostic &diag,
                  ValueDecl *VD,
                  AccessLevel desiredAccess,
                  bool isForSetter = false,
-                 bool shouldNotReplace = false);
+                 bool shouldUseDefaultAccess = false);
 
 /// Emit fix-its to correct the argument labels in \p expr, which is the
 /// argument tuple or single argument of a call.
