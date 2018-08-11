@@ -1630,11 +1630,8 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
     assert(!ty->hasLValueType() && "Bound param type to @lvalue?");
     if (forceMutable) {
       param->setSpecifier(VarDecl::Specifier::InOut);
-    } else if (auto *TTy = ty->getAs<TupleType>()) {
-      if (param->hasName() && TTy->hasInOutElement()) {
-        diagnose(param->getStartLoc(),
-                 diag::param_type_non_materializable_tuple, ty);
-      }
+    } else {
+      assert(ty->isMaterializable());
     }
 
     // If contextual type is invalid and we have a valid argument type

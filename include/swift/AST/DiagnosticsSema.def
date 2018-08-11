@@ -1064,16 +1064,6 @@ ERROR(c_function_pointer_from_function_with_context,none,
 // MARK: Type Check Declarations
 //------------------------------------------------------------------------------
 
-ERROR(var_type_not_materializable,none,
-      "variable has type %0 which includes nested inout parameters",
-      (Type))
-ERROR(param_type_non_materializable_tuple,none,
-      "named parameter has type %0 which includes nested inout parameters",
-      (Type))
-ERROR(enum_element_not_materializable,none,
-      "enum case has type %0 which includes nested inout parameters",
-      (Type))
-
 ERROR(missing_initializer_def,PointsToFirstBadToken,
       "initializer requires a body", ())
 
