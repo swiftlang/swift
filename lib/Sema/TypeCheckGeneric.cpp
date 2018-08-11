@@ -547,26 +547,6 @@ static void checkGenericFuncSignature(TypeChecker &tc,
                                    source);
       }
     }
-
-    // If this is a materializeForSet, infer requirements from the
-    // storage type instead, since it's not part of the accessor's
-    // type signature.
-    auto accessor = dyn_cast<AccessorDecl>(fn);
-    if (accessor && accessor->isMaterializeForSet()) {
-      if (builder) {
-        auto *storage = accessor->getStorage();
-        if (auto *subscriptDecl = dyn_cast<SubscriptDecl>(storage)) {
-          auto source =
-            GenericSignatureBuilder::FloatingRequirementSource::forInferred(
-                subscriptDecl->getElementTypeLoc().getTypeRepr());
-
-          TypeLoc type(nullptr, subscriptDecl->getElementInterfaceType());
-          assert(type.getType());
-          builder->inferRequirements(*func->getParentModule(),
-                                     type, source);
-        }
-      }
-    }
   }
 }
 
@@ -794,57 +774,80 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
   }
 }
 
-void TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
+static GenericSignature *
+computeGenericFuncSignature(TypeChecker &tc, AbstractFunctionDecl *func) {
   auto *dc = func->getDeclContext();
 
-  GenericSignature *sig;
-  if (auto gp = func->getGenericParams()) {
-    gp->setOuterParameters(dc->getGenericParamsOfContext());
-    prepareGenericParamList(gp, func);
-
-    // Create the generic signature builder.
-    GenericSignatureBuilder builder(Context);
-
-    // Type check the function declaration, treating all generic type
-    // parameters as dependent, unresolved.
-    DependentGenericTypeResolver dependentResolver;
-    checkGenericFuncSignature(*this, &builder, func, dependentResolver);
-
-    // The generic function signature is complete and well-formed. Determine
-    // the type of the generic function.
-    sig = std::move(builder).computeGenericSignature(func->getLoc());
-
-    // The generic signature builder now has all of the requirements, although
-    // there might still be errors that have not yet been diagnosed. Revert the
-    // generic function signature and type-check it again, completely.
-    revertGenericFuncSignature(func);
-    revertGenericParamList(gp);
-
-    // Debugging of the generic signature.
-    if (Context.LangOpts.DebugGenericSignatures) {
-      func->dumpRef(llvm::errs());
-      llvm::errs() << "\n";
-      llvm::errs() << "Generic signature: ";
-      sig->print(llvm::errs());
-      llvm::errs() << "\n";
-      llvm::errs() << "Canonical generic signature: ";
-      sig->getCanonicalSignature()->print(llvm::errs());
-      llvm::errs() << "\n";
-    }
-
-    GenericEnvironment *env;
-    if (auto accessor = dyn_cast<AccessorDecl>(func)) {
-      env = cast<SubscriptDecl>(accessor->getStorage())->getGenericEnvironment();
-      assert(env && "accessor has generics but subscript is not generic");
-    } else {
-      env = sig->createGenericEnvironment();
-    }
-    func->setGenericEnvironment(env);
-  } else {
-    // Inherit the signature of our environment.
-    sig = dc->getGenericSignatureOfContext();
+  // Check whether the function is separately generic.
+  auto gp = func->getGenericParams();
+  if (!gp) {
+    // If not, inherit the signature of our environment.
     func->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
+    return dc->getGenericSignatureOfContext();
   }
+
+  // Do some initial configuration of the generic parameter lists that's
+  // required in all cases.
+  gp->setOuterParameters(dc->getGenericParamsOfContext());
+  tc.prepareGenericParamList(gp, func);
+
+  // Accessors can always use the generic context of their storage
+  // declarations.  This is a compile-time optimization since it lets us
+  // avoid the requirements-gathering phase, but it also simplifies that
+  // work for accessors which don't mention the value type in their formal
+  // signatures (like the read and modify coroutines, since yield types
+  // aren't tracked in the AST type yet).
+  //
+  // Most accessors will implicitly have been handled above because they
+  // aren't separately generic; we only get here for the accessors of
+  // generic subscripts.
+  if (auto accessor = dyn_cast<AccessorDecl>(func)) {
+    auto subscript = cast<SubscriptDecl>(accessor->getStorage());
+    auto sig = subscript->getGenericSignature();
+    auto env = subscript->getGenericEnvironment();
+    assert(sig && env && "accessor has generics but subscript is not generic");
+    func->setGenericEnvironment(env);
+    return sig;
+  }
+
+  // Create the generic signature builder.
+  GenericSignatureBuilder builder(tc.Context);
+
+  // Type check the function declaration, treating all generic type
+  // parameters as dependent, unresolved.
+  DependentGenericTypeResolver dependentResolver;
+  checkGenericFuncSignature(tc, &builder, func, dependentResolver);
+
+  // The generic function signature is complete and well-formed. Determine
+  // the type of the generic function.
+  auto sig = std::move(builder).computeGenericSignature(func->getLoc());
+
+  // The generic signature builder now has all of the requirements, although
+  // there might still be errors that have not yet been diagnosed. Revert the
+  // generic function signature and type-check it again, completely.
+  revertGenericFuncSignature(func);
+  tc.revertGenericParamList(gp);
+
+  // Debugging of the generic signature.
+  if (tc.Context.LangOpts.DebugGenericSignatures) {
+    func->dumpRef(llvm::errs());
+    llvm::errs() << "\n";
+    llvm::errs() << "Generic signature: ";
+    sig->print(llvm::errs());
+    llvm::errs() << "\n";
+    llvm::errs() << "Canonical generic signature: ";
+    sig->getCanonicalSignature()->print(llvm::errs());
+    llvm::errs() << "\n";
+  }
+
+  GenericEnvironment *env = sig->createGenericEnvironment();
+  func->setGenericEnvironment(env);
+
+  return sig;
+}
+
+void TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
+  GenericSignature *sig = computeGenericFuncSignature(*this, func);
 
   CompleteGenericTypeResolver completeResolver(*this, sig);
   checkGenericFuncSignature(*this, nullptr, func, completeResolver);
