@@ -184,7 +184,7 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType,
 /// Build a builtin function declaration.
 static FuncDecl *
 getBuiltinGenericFunction(Identifier Id,
-                          ArrayRef<TupleTypeElt> ArgParamTypes,
+                          ArrayRef<AnyFunctionType::Param> ArgParamTypes,
                           Type ResType,
                           GenericParamList *GenericParams,
                           GenericEnvironment *Env) {
@@ -196,7 +196,7 @@ getBuiltinGenericFunction(Identifier Id,
 
   SmallVector<ParamDecl*, 4> params;
   for (unsigned i = 0, e = ArgParamTypes.size(); i < e; i++) {
-    auto paramIfaceType = ArgParamTypes[i].getRawType();
+    auto paramIfaceType = ArgParamTypes[i].getPlainType();
     auto specifier = (ArgParamTypes[i].getParameterFlags().isInOut())
                          ? VarDecl::Specifier::InOut
                          : VarDecl::Specifier::Default;
@@ -211,7 +211,7 @@ getBuiltinGenericFunction(Identifier Id,
   }
 
   auto *paramList = ParameterList::create(Context, params);
-  
+
   DeclName Name(Context, Id, paramList);
   auto func = FuncDecl::create(Context, /*StaticLoc=*/SourceLoc(),
                                StaticSpellingKind::None,
@@ -222,7 +222,7 @@ getBuiltinGenericFunction(Identifier Id,
                                /*SelfDecl=*/nullptr,
                                paramList,
                                TypeLoc::withoutLoc(ResType), DC);
-    
+
   func->setGenericEnvironment(Env);
   func->computeType();
   func->setValidationToChecked();
@@ -456,7 +456,7 @@ namespace {
     GenericParamList *TheGenericParamList;
     SmallVector<GenericTypeParamDecl*, 2> GenericTypeParams;
     GenericEnvironment *GenericEnv = nullptr;
-    SmallVector<TupleTypeElt, 4> InterfaceParams;
+    SmallVector<AnyFunctionType::Param, 4> InterfaceParams;
     Type InterfaceResult;
 
   public:
@@ -478,16 +478,15 @@ namespace {
     template <class G>
     void addParameter(const G &generator) {
       Type gTyIface = generator.build(*this);
-      InterfaceParams.push_back({gTyIface,
-                                 Identifier(), ParameterTypeFlags()});
+      auto flags = ParameterTypeFlags();
+      InterfaceParams.emplace_back(gTyIface, Identifier(), flags);
     }
 
     template <class G>
     void addInOutParameter(const G &generator) {
       Type gTyIface = generator.build(*this);
-      auto iFaceflags = ParameterTypeFlags().withInOut(true);
-      InterfaceParams.push_back(TupleTypeElt(gTyIface,
-                                             Identifier(), iFaceflags));
+      auto flags = ParameterTypeFlags().withInOut(true);
+      InterfaceParams.emplace_back(gTyIface, Identifier(), flags);
     }
     
     template <class G>
@@ -523,17 +522,6 @@ namespace {
         return TheFunction(builder);
       }
     };
-    template <class T, class U>
-    struct FunctionGenerator {
-      T Arg;
-      U Result;
-      FunctionType::ExtInfo ExtInfo;
-      Type build(BuiltinGenericSignatureBuilder &builder) const {
-        return FunctionType::get(Arg.build(builder),
-                                 Result.build(builder),
-                                 ExtInfo);
-      }
-    };
     template <class T>
     struct MetatypeGenerator {
       T Object;
@@ -566,13 +554,6 @@ makeTuple(const Gs & ...elementGenerators) {
       return TupleType::get(elts, builder.Context);
     }
   };
-}
-
-template <class T, class U>
-static BuiltinGenericSignatureBuilder::FunctionGenerator<T,U>
-makeFunction(const T &arg, const U &result,
-             FunctionType::ExtInfo extInfo = FunctionType::ExtInfo()) {
-  return { arg, result, extInfo };
 }
 
 template <class T>
