@@ -283,7 +283,7 @@ public:
     return MultilineString;
   }
 
-  unsigned DelimiterLength() const {
+  unsigned getDelimiterLength() const {
     return StringDelimiterLength;
   }
 };

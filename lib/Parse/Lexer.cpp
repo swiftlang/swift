@@ -296,7 +296,6 @@ void Lexer::formToken(tok Kind, const char *TokStart,
 
   NextToken.setToken(Kind, TokenText, CommentLength,
                      MultilineString, DelimiterLength);
-  CurPtr += DelimiterLength;
 }
 
 void Lexer::formEscapedIdentifierToken(const char *TokStart) {
@@ -1207,10 +1206,10 @@ static bool maybeConsumeNewlineEscape(const char *&CurPtr, ssize_t Offset) {
   }
 }
 
-/// extractDelimiterLength - Extracts/detects any custom delimiter on opening
-/// a string literal and advances CurPtr if a delimiter is found and returns
-/// a non-zero delimiter length. CurPtr[-1] is generally '#' when called.
-static unsigned extractDelimiterLength(const char *&CurPtr) {
+/// extractStringDelimiterLength - Extracts/detects any custom delimiter on
+/// opening a string literal and advances CurPtr if a delimiter is found and
+/// returns a non-zero delimiter length. CurPtr[-1] generally '#' when called.
+static unsigned extractStringDelimiterLength(const char *&CurPtr) {
   const char *Lookahead = CurPtr;
   while (*Lookahead == '#')
     Lookahead++;
@@ -1230,7 +1229,7 @@ static unsigned extractDelimiterLength(const char *&CurPtr) {
 static bool delimiterMatches(unsigned DelimiterLength, const char *&BytesPtr) {
   if (!DelimiterLength)
     return true;
-  for (unsigned i = 0; i < DelimiterLength ; i++)
+  for (unsigned i = 0; i < DelimiterLength; i++)
     if (BytesPtr[i] != '#')
       return false;
   BytesPtr += DelimiterLength;
@@ -1395,7 +1394,7 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
 
     case '#':
       if (inStringLiteral() ||
-          !(DelimiterLength = extractDelimiterLength(CurPtr)))
+          !(DelimiterLength = extractStringDelimiterLength(CurPtr)))
         continue;
       LLVM_FALLTHROUGH;
 
@@ -1501,6 +1500,9 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
 static StringRef getStringLiteralContent(const Token &Str) {
   StringRef Bytes = Str.getText();
 
+  if (unsigned DelimiterLength = Str.getDelimiterLength())
+    Bytes = Bytes.drop_front(DelimiterLength).drop_back(DelimiterLength);
+
   if (Str.IsMultilineString())
     Bytes = Bytes.drop_front(3).drop_back(3);
   else
@@ -1539,7 +1541,7 @@ getMultilineTrailingIndent(const Token &Str, DiagnosticEngine *Diags) {
       auto string = StringRef(start, end - start);
 
       // Disallow escaped newline in the last line.
-      if (Diags && Str.DelimiterLength() == 0) {
+      if (Diags && Str.getDelimiterLength() == 0) {
         auto *Ptr = start - 1;
         if (*Ptr == '\n') --Ptr;
         if (*Ptr == '\r') --Ptr;
@@ -1702,20 +1704,18 @@ void Lexer::lexStringLiteral(unsigned DelimiterLength) {
   // diagnostics about changing them to double quotes.
 
   bool wasErroneous = false, MultilineString = false;
-  std::string Delimiter;
-  Delimiter.push_back(*TokStart);
+  std::string ExtraTermination;
 
   // Is this the start of a multiline string literal?
   if (*TokStart == '"' && *CurPtr == '"' && *(CurPtr + 1) == '"') {
     MultilineString = true;
     CurPtr += 2;
-    Delimiter.push_back(*TokStart);
-    Delimiter.push_back(*TokStart);
     if (*CurPtr != '\n' && *CurPtr != '\r')
       diagnose(CurPtr, diag::lex_illegal_multiline_string_start)
         .fixItInsert(Lexer::getSourceLoc(CurPtr), "\n");
+    ExtraTermination.insert(ExtraTermination.size(), 2, *TokStart);
   }
-  Delimiter.insert(Delimiter.size(), DelimiterLength, '#');
+  ExtraTermination.insert(ExtraTermination.size(), DelimiterLength, '#');
 
   while (true) {
     const char *TmpPtr = CurPtr + 1;
@@ -1752,8 +1752,6 @@ void Lexer::lexStringLiteral(unsigned DelimiterLength) {
     // or an already-diagnosed error, just munch it.
     if (CharValue == ~0U) {
       ++CurPtr;
-      if (wasErroneous)
-        return formToken(tok::unknown, TokStart);
 
       if (*TokStart == '\'') {
         // Complain about single-quote string and suggest replacement with
@@ -1789,19 +1787,18 @@ void Lexer::lexStringLiteral(unsigned DelimiterLength) {
                              replacement);
       }
 
-      // Is this the end of a delimited/multiline string literal?
-      if (StringRef(CurPtr - 1, Delimiter.length()) == Delimiter) {
-        if (MultilineString) {
-          CurPtr += 2;
-          formToken(tok::string_literal, TokStart,
-                    MultilineString, DelimiterLength);
-          if (Diags)
-            validateMultilineIndents(NextToken, Diags);
-          return;
-        }
-        else
-          return formToken(tok::string_literal, TokStart,
-                           MultilineString, DelimiterLength);
+      // Is this the end of multiline/delimited string literal?
+      if (StringRef(CurPtr, ExtraTermination.length()) == ExtraTermination) {
+        TokStart -= DelimiterLength;
+        CurPtr += ExtraTermination.length();
+        if (wasErroneous)
+          return formToken(tok::unknown, TokStart);
+
+        formToken(tok::string_literal, TokStart,
+                  MultilineString, DelimiterLength);
+        if (MultilineString && Diags)
+          validateMultilineIndents(NextToken, Diags);
+        return;
       }
     }
   }
@@ -2166,7 +2163,7 @@ void Lexer::getStringLiteralSegments(
   // Are substitutions required either for indent stripping or line ending
   // normalization?
   bool MultilineString = Str.IsMultilineString(), IsFirstSegment = true;
-  unsigned IndentToStrip = 0, DelimiterLength = Str.DelimiterLength();
+  unsigned IndentToStrip = 0, DelimiterLength = Str.getDelimiterLength();
   if (MultilineString)
     IndentToStrip = 
       std::get<0>(getMultilineTrailingIndent(Str, /*Diags=*/nullptr)).size();
@@ -2216,6 +2213,7 @@ void Lexer::getStringLiteralSegments(
                                 IsFirstSegment, true, IndentToStrip,
                                 DelimiterLength));
 }
+
 
 //===----------------------------------------------------------------------===//
 // Main Lexer Loop
@@ -2311,7 +2309,7 @@ void Lexer::lexImpl() {
   case '\\': return formToken(tok::backslash, TokStart);
 
   case '#':
-    if (unsigned DelimiterLength = extractDelimiterLength(CurPtr))
+    if (unsigned DelimiterLength = extractStringDelimiterLength(CurPtr))
       return lexStringLiteral(DelimiterLength);
     return lexHash();
 

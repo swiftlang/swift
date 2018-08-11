@@ -221,7 +221,8 @@ static void getStringPartTokens(const Token &Tok, const LangOptions &LangOpts,
                                 int BufID, std::vector<Token> &Toks) {
   assert(Tok.is(tok::string_literal));
   bool IsMultiline = Tok.IsMultilineString();
-  unsigned QuoteLen = IsMultiline ? 3 : 1;
+  unsigned DelimiterLength = Tok.getDelimiterLength();
+  unsigned QuoteLen = (IsMultiline ? 3 : 1) + DelimiterLength;
   SmallVector<Lexer::StringSegment, 4> Segments;
   Lexer::getStringLiteralSegments(Tok, Segments, /*Diags=*/nullptr);
   for (unsigned i = 0, e = Segments.size(); i != e; ++i) {
@@ -243,7 +244,7 @@ static void getStringPartTokens(const Token &Tok, const LangOptions &LangOpts,
 
       StringRef Text = SM.extractText({ Loc, Len });
       Token NewTok;
-      NewTok.setToken(tok::string_literal, Text, IsMultiline);
+      NewTok.setToken(tok::string_literal, Text, IsMultiline, DelimiterLength);
       Toks.push_back(NewTok);
 
     } else {
@@ -384,7 +385,7 @@ class TokenRecorder: public ConsumeTokenReceiver {
       L.lex(Result);
       if (Result.is(tok::eof))
         break;
-      if(Result.is(tok::comment)) // interacts badly with custom delimiters
+      assert(Result.is(tok::comment));
       Scratch.push_back(Result);
     }
   }
