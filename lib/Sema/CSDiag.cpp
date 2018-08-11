@@ -147,7 +147,7 @@ void constraints::simplifyLocator(Expr *&anchor,
 
   while (!path.empty()) {
     switch (path[0].getKind()) {
-    case ConstraintLocator::ApplyArgument:
+    case ConstraintLocator::ApplyArgument: {
       // Extract application argument.
       if (auto applyExpr = dyn_cast<ApplyExpr>(anchor)) {
         // The target anchor is the function being called.
@@ -167,7 +167,20 @@ void constraints::simplifyLocator(Expr *&anchor,
         path = path.slice(1);
         continue;
       }
+
+      if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor)) {
+        // The target anchor is the method being called,
+        // no additional information could be retrieved
+        // about this call.
+        targetAnchor = nullptr;
+        targetPath.clear();
+
+        anchor = UME->getArgument();
+        path = path.slice(1);
+        continue;
+      }
       break;
+    }
 
     case ConstraintLocator::ApplyFunction:
       // Extract application function.
@@ -317,7 +330,7 @@ void constraints::simplifyLocator(Expr *&anchor,
       // This was just for identifying purposes, strip it off.
       path = path.slice(1);
       continue;
-        
+
     default:
       // FIXME: Lots of other cases to handle.
       break;

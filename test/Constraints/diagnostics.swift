@@ -447,7 +447,7 @@ let _: Color = .overload(1)  // expected-error {{ambiguous reference to member '
 let _: Color = .frob(1.0, &i) // expected-error {{missing argument label 'b:' in call}}
 let _: Color = .frob(1.0, b: &i) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 let _: Color = .frob(1, i)  // expected-error {{missing argument label 'b:' in call}}
-let _: Color = .frob(1, b: i)  // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}}
+let _: Color = .frob(1, b: i)  // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{28-28=&}}
 let _: Color = .frob(1, &d) // expected-error {{missing argument label 'b:' in call}}
 let _: Color = .frob(1, b: &d) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 var someColor : Color = .red // expected-error {{enum type 'Color' has no case 'red'; did you mean 'Red'}}
