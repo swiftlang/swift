@@ -1621,26 +1621,22 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
       // Coerce explicitly specified argument type to contextual type
       // only if both types are valid and do not match.
       if (!hadError && isValidType(ty) && !ty->isEqual(paramType)) {
-        assert(!param->isImmutable() || !ty->is<InOutType>());
-        param->setType(ty->getInOutObjectType());
-        param->setInterfaceType(ty->mapTypeOutOfContext()->getInOutObjectType());
+        param->setType(ty);
+        param->setInterfaceType(ty->mapTypeOutOfContext());
       }
     }
     
-    assert(!ty->hasLValueType() && "Bound param type to @lvalue?");
+    assert(ty->isMaterializable());
     if (forceMutable) {
       param->setSpecifier(VarDecl::Specifier::InOut);
-    } else {
-      assert(ty->isMaterializable());
     }
 
     // If contextual type is invalid and we have a valid argument type
     // trying to coerce argument to contextual type would mean erasing
     // valuable diagnostic information.
     if (isValidType(ty) || shouldOverwriteParam(param)) {
-      assert(!param->isImmutable() || !ty->is<InOutType>());
-      param->setType(ty->getInOutObjectType());
-      param->setInterfaceType(ty->mapTypeOutOfContext()->getInOutObjectType());
+      param->setType(ty);
+      param->setInterfaceType(ty->mapTypeOutOfContext());
     }
     
     checkTypeModifyingDeclAttributes(param);
@@ -1658,9 +1654,6 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
 
   auto getType = [](const AnyFunctionType::Param &param) -> Type {
     auto type = param.getPlainType();
-
-    if (param.isInOut())
-      return InOutType::get(type);
 
     if (param.isVariadic())
       return ArraySliceType::get(type);
