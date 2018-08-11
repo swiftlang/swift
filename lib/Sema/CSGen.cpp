@@ -2004,32 +2004,33 @@ namespace {
 
     /// Give each parameter in a ClosureExpr a fresh type variable if parameter
     /// types were not specified, and return the eventual function type.
-    Type getTypeForParameterList(ClosureExpr *closureExpr) {
-      auto *params = closureExpr->getParameters();
-      for (auto i : indices(params->getArray())) {
-        auto *param = params->get(i);
+    void getClosureParams(ClosureExpr *closureExpr,
+                          SmallVectorImpl<AnyFunctionType::Param> &params) {
+      auto *paramList = closureExpr->getParameters();
+      for (auto i : indices(paramList->getArray())) {
+        auto *param = paramList->get(i);
         auto *locator = CS.getConstraintLocator(
             closureExpr, LocatorPathElt::getTupleElement(i));
 
         // If a type was explicitly specified, use its opened type.
         if (auto type = param->getTypeLoc().getType()) {
           // FIXME: Need a better locator for a pattern as a base.
-          Type openedType = CS.openUnboundGenericType(type, locator);
-          assert(!param->isImmutable() || !openedType->is<InOutType>());
-          CS.setType(param, openedType->getInOutObjectType());
+          CS.setType(param, CS.openUnboundGenericType(type, locator));
           continue;
         }
 
-        // Otherwise, create a fresh type variable.
+        // Otherwise, create a fresh type variable. It might become an InOutType
+        // later; when applying the solution, we strip off the InOutType and
+        // change the ParamDecl's ownership specifier if this is the case.
         CS.setType(param, CS.createTypeVariable(locator, TVO_CanBindToInOut));
       }
 
-      return params->getType(CS.getASTContext(), [&](ParamDecl *param) {
-        return CS.getType(param);
-      });
+      paramList->getParams(params,
+                           [&](ParamDecl *param) {
+                             return CS.getType(param);
+                           });
     }
 
-    
     /// \brief Produces a type for the given pattern, filling in any missing
     /// type information with fresh type variables.
     ///
@@ -2353,25 +2354,25 @@ namespace {
       // parameter or return type is omitted, a fresh type variable is used to
       // stand in for that parameter or return type, allowing it to be inferred
       // from context.
-      Type funcTy;
+      Type resultTy;
       if (expr->hasExplicitResultType() &&
           expr->getExplicitResultTypeLoc().getType()) {
-        funcTy = expr->getExplicitResultTypeLoc().getType();
-        CS.setFavoredType(expr, funcTy.getPointer());
+        resultTy = expr->getExplicitResultTypeLoc().getType();
+        CS.setFavoredType(expr, resultTy.getPointer());
       } else if (!crt.isNull()) {
-        funcTy = crt;
+        resultTy = crt;
       } else{
         auto locator =
           CS.getConstraintLocator(expr, ConstraintLocator::ClosureResult);
 
         // If no return type was specified, create a fresh type
         // variable for it.
-        funcTy = CS.createTypeVariable(locator);
+        resultTy = CS.createTypeVariable(locator);
 
         // Allow it to default to () if there are no return statements.
         if (closureHasNoResult(expr)) {
           CS.addConstraint(ConstraintKind::Defaultable,
-                           funcTy,
+                           resultTy,
                            TupleType::getEmpty(CS.getASTContext()),
                            locator);
         }
@@ -2379,16 +2380,14 @@ namespace {
 
       // Give each parameter in a ClosureExpr a fresh type variable if parameter
       // types were not specified, and return the eventual function type.
-      auto paramTy = getTypeForParameterList(expr);
+      SmallVector<AnyFunctionType::Param, 4> paramTy;
+      getClosureParams(expr, paramTy);
+
       auto extInfo = FunctionType::ExtInfo();
-      
       if (closureCanThrow(expr))
         extInfo = extInfo.withThrows();
-      
-      // FIXME: If we want keyword arguments for closures, add them here.
-      funcTy = FunctionType::get(paramTy, funcTy, extInfo);
 
-      return funcTy;
+      return FunctionType::get(paramTy, resultTy, extInfo);
     }
 
     Type visitAutoClosureExpr(AutoClosureExpr *expr) {

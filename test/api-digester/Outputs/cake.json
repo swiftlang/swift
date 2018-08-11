@@ -485,14 +485,21 @@
                 },
                 {
                   "kind": "TypeNominal",
-                  "name": "Metatype",
-                  "printedName": "Number.Type",
+                  "name": "Paren",
+                  "printedName": "(Number.Type)",
                   "children": [
                     {
                       "kind": "TypeNominal",
-                      "name": "Number",
-                      "printedName": "Number",
-                      "usr": "s:4cake6NumberO"
+                      "name": "Metatype",
+                      "printedName": "Number.Type",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "Number",
+                          "printedName": "Number",
+                          "usr": "s:4cake6NumberO"
+                        }
+                      ]
                     }
                   ]
                 }
