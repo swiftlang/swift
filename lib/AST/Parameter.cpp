@@ -87,6 +87,31 @@ ParameterList *ParameterList::clone(const ASTContext &C,
   return create(C, params);
 }
 
+void ParameterList::getParams(
+                        SmallVectorImpl<AnyFunctionType::Param> &params) const {
+  getParams(params,
+            [](ParamDecl *decl) { return decl->getInterfaceType(); });
+}
+
+void ParameterList::getParams(
+                          SmallVectorImpl<AnyFunctionType::Param> &params,
+                          llvm::function_ref<Type(ParamDecl *)> getType) const {
+  if (size() == 0)
+    return;
+
+  for (auto P : *this) {
+    auto type = getType(P);
+
+    if (P->isVariadic())
+      type = ParamDecl::getVarargBaseTy(type);
+
+    auto label = P->getArgumentName();
+    auto flags = ParameterTypeFlags::fromParameterType(type, P->isVariadic(),
+                                                       P->getValueOwnership());
+    params.emplace_back(type, label, flags);
+  }
+}
+
 /// Return a TupleType or ParenType for this parameter list,
 /// based on types provided by a callback.
 Type ParameterList::getType(
