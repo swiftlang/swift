@@ -607,7 +607,7 @@ private:
       // a valid target for substitution, don't expand it.
       if (!tty ||
           (pattern.isTypeParameter() &&
-           !tty->hasElementWithOwnership())) {
+           !shouldExpandTupleType(tty))) {
         visit(paramFlags.getValueOwnership(), /*forSelf=*/false, pattern, ty,
               silRepresentation);
         return;

@@ -872,8 +872,9 @@ namespace {
         }
       }
 
-      // Special-case: tuples containing inouts, __shared or __owned.
-      if (inputTupleType && inputTupleType->hasElementWithOwnership()) {
+      // Special-case: tuples containing inouts, __shared or __owned,
+      // and one-element vararg tuples.
+      if (inputTupleType && shouldExpandTupleType(inputTupleType)) {
         // Non-materializable tuple types cannot be bound as generic
         // arguments, so none of the remaining transformations apply.
         // Instead, the outermost tuple layer is exploded, even when

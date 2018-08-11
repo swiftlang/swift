@@ -41,6 +41,29 @@ namespace swift {
 
 namespace Lowering {
 
+/// Should this tuple type always be expanded into its elements, even
+/// when emitted against an opaque abstraction pattern?
+///
+/// FIXME: Remove this once function signature lowering always explodes
+/// the top-level argument list.
+inline bool shouldExpandTupleType(TupleType *type) {
+  // Tuples with inout, __shared and __owned elements cannot be lowered
+  // to SIL types.
+  if (type->hasElementWithOwnership())
+    return true;
+
+  // A one-element tuple with a vararg element is essentially
+  // equivalent to the element itself, and we also can't lower it, since
+  // that would strip off the vararg-ness and produce a non-tuple type.
+  if (type->getNumElements() == 1 &&
+      type->getElement(0).isVararg()) {
+    return true;
+  }
+
+  // Everything else is OK.
+  return false;
+}
+
 /// The default convention for handling the callee object on thick
 /// callees.
 const ParameterConvention DefaultThickCalleeConvention =
