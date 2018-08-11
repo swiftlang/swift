@@ -75,16 +75,16 @@ class RawSyntaxCacheNode : public llvm::FoldingSetNode {
   friend llvm::FoldingSetTrait<RawSyntaxCacheNode>;
 
   /// Associated RawSyntax.
-  RawSyntax *Obj;
+  RC<RawSyntax> Obj;
   /// FoldingSet node identifier of the associated RawSyntax.
   llvm::FoldingSetNodeIDRef IDRef;
 
 public:
-  RawSyntaxCacheNode(RawSyntax *Obj, const llvm::FoldingSetNodeIDRef IDRef)
+  RawSyntaxCacheNode(RC<RawSyntax> Obj, const llvm::FoldingSetNodeIDRef IDRef)
       : Obj(Obj), IDRef(IDRef) {}
 
   /// Retrieve assciated RawSyntax.
-  RawSyntax *get() { return Obj; }
+  RC<RawSyntax> get() { return Obj; }
 
   // Only allow allocation of Node using the allocator in SyntaxArena.
   void *operator new(size_t Bytes, SyntaxArena &Arena,
@@ -156,7 +156,7 @@ RC<RawSyntax> RawSyntax::getToken(SyntaxArena &Arena, tok TokKind,
   auto Raw = RawSyntax::make(TokKind, Text, LeadingTrivia, TrailingTrivia,
                              SourcePresence::Present, &Arena);
   auto IDRef = ID.Intern(Arena.getAllocator());
-  auto CacheNode = new (Arena) RawSyntaxCacheNode(Raw.get(), IDRef);
+  auto CacheNode = new (Arena) RawSyntaxCacheNode(Raw, IDRef);
   CachedTokens.InsertNode(CacheNode, insertPos);
   return Raw;
 }
