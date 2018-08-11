@@ -2999,7 +2999,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       return nullptr;
     }
 
-    param->setInterfaceType(paramTy->getInOutObjectType());
+    param->setInterfaceType(paramTy);
     param->setVariadic(isVariadic);
 
     // Decode the default argument kind.
@@ -4263,25 +4263,13 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 
   case decls_block::PAREN_TYPE: {
     TypeID underlyingID;
-    bool isVariadic, isAutoClosure, isEscaping;
-    unsigned rawOwnership;
-    decls_block::ParenTypeLayout::readRecord(scratch, underlyingID, isVariadic,
-                                             isAutoClosure, isEscaping,
-                                             rawOwnership);
-    auto ownership =
-        getActualValueOwnership((serialization::ValueOwnership)rawOwnership);
-    if (!ownership) {
-      error();
-      return nullptr;
-    }
+    decls_block::ParenTypeLayout::readRecord(scratch, underlyingID);
 
     auto underlyingTy = getTypeChecked(underlyingID);
     if (!underlyingTy)
       return underlyingTy.takeError();
 
-    typeOrOffset = ParenType::get(
-        ctx, underlyingTy.get()->getInOutObjectType(),
-        ParameterTypeFlags(isVariadic, isAutoClosure, isEscaping, *ownership));
+    typeOrOffset = ParenType::get(ctx, underlyingTy.get());
     break;
   }
 
@@ -4301,44 +4289,42 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 
       IdentifierID nameID;
       TypeID typeID;
-      bool isVariadic, isAutoClosure, isEscaping;
-      unsigned rawOwnership;
-      decls_block::TupleTypeEltLayout::readRecord(scratch, nameID, typeID,
-                                                  isVariadic, isAutoClosure,
-                                                  isEscaping, rawOwnership);
-
-      auto ownership =
-          getActualValueOwnership((serialization::ValueOwnership)rawOwnership);
-      if (!ownership) {
-        error();
-        return nullptr;
-      }
+      decls_block::TupleTypeEltLayout::readRecord(scratch, nameID, typeID);
 
       auto elementTy = getTypeChecked(typeID);
       if (!elementTy)
         return elementTy.takeError();
 
-      elements.emplace_back(elementTy.get()->getInOutObjectType(),
-                            getIdentifier(nameID),
-                            ParameterTypeFlags(isVariadic, isAutoClosure,
-                                               isEscaping, *ownership));
+      elements.emplace_back(elementTy.get(), getIdentifier(nameID));
     }
 
     typeOrOffset = TupleType::get(elements, ctx);
     break;
   }
 
-  case decls_block::FUNCTION_TYPE: {
-    TypeID inputID;
+  case decls_block::FUNCTION_TYPE:
+  case decls_block::GENERIC_FUNCTION_TYPE: {
     TypeID resultID;
     uint8_t rawRepresentation;
-    bool autoClosure, noescape, throws;
+    bool autoClosure = false, noescape = false, throws;
+    GenericSignature *genericSig = nullptr;
 
-    decls_block::FunctionTypeLayout::readRecord(scratch, inputID, resultID,
-                                                rawRepresentation,
-                                                autoClosure,
-                                                noescape,
-                                                throws);
+    if (recordID == decls_block::FUNCTION_TYPE) {
+      decls_block::FunctionTypeLayout::readRecord(scratch, resultID,
+                                                  rawRepresentation,
+                                                  autoClosure,
+                                                  noescape,
+                                                  throws);
+    } else {
+      GenericSignatureID rawGenericSig;
+      decls_block::GenericFunctionTypeLayout::readRecord(scratch,
+                                                         resultID,
+                                                         rawRepresentation,
+                                                         throws,
+                                                         rawGenericSig);
+      genericSig = getGenericSignature(rawGenericSig);
+    }
+
     auto representation = getActualFunctionTypeRepresentation(rawRepresentation);
     if (!representation.hasValue()) {
       error();
@@ -4348,14 +4334,56 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     auto info = FunctionType::ExtInfo(*representation, autoClosure, noescape,
                                       throws);
 
-    auto inputTy = getTypeChecked(inputID);
-    if (!inputTy)
-      return inputTy.takeError();
     auto resultTy = getTypeChecked(resultID);
     if (!resultTy)
       return resultTy.takeError();
 
-    typeOrOffset = FunctionType::get(inputTy.get(), resultTy.get(), info);
+    SmallVector<AnyFunctionType::Param, 8> params;
+    while (true) {
+      auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+      if (entry.Kind != llvm::BitstreamEntry::Record)
+        break;
+
+      scratch.clear();
+      unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch,
+                                                    &blobData);
+      if (recordID != decls_block::FUNCTION_PARAM)
+        break;
+
+      IdentifierID labelID;
+      TypeID typeID;
+      bool isVariadic, isAutoClosure, isEscaping;
+      unsigned rawOwnership;
+      decls_block::FunctionParamLayout::readRecord(scratch, labelID, typeID,
+                                                   isVariadic, isAutoClosure,
+                                                   isEscaping, rawOwnership);
+
+      auto ownership =
+          getActualValueOwnership((serialization::ValueOwnership)rawOwnership);
+      if (!ownership) {
+        error();
+        return nullptr;
+      }
+
+      auto paramTy = getTypeChecked(typeID);
+      if (!paramTy)
+        return paramTy.takeError();
+
+      params.emplace_back(paramTy.get(),
+                          getIdentifier(labelID),
+                          ParameterTypeFlags(isVariadic, isAutoClosure,
+                                             isEscaping, *ownership));
+    }
+
+    if (recordID == decls_block::FUNCTION_TYPE) {
+      assert(genericSig == nullptr);
+      typeOrOffset = FunctionType::get(params, resultTy.get(), info);
+    } else {
+      assert(genericSig != nullptr);
+      typeOrOffset = GenericFunctionType::get(genericSig,
+                                              params, resultTy.get(), info);
+    }
+
     break;
   }
 
@@ -4434,18 +4462,6 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     TypeID selfID;
     decls_block::DynamicSelfTypeLayout::readRecord(scratch, selfID);
     typeOrOffset = DynamicSelfType::get(getType(selfID), ctx);
-    break;
-  }
-
-  case decls_block::INOUT_TYPE: {
-    TypeID objectTypeID;
-    decls_block::InOutTypeLayout::readRecord(scratch, objectTypeID);
-
-    auto objectTy = getTypeChecked(objectTypeID);
-    if (!objectTy)
-      return objectTy.takeError();
-
-    typeOrOffset = InOutType::get(objectTy.get());
     break;
   }
 
@@ -4596,40 +4612,6 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     break;
   }
 
-  case decls_block::GENERIC_FUNCTION_TYPE: {
-    TypeID inputID;
-    TypeID resultID;
-    uint8_t rawRep;
-    bool throws = false;
-    GenericSignatureID rawGenericSig;
-
-    decls_block::GenericFunctionTypeLayout::readRecord(scratch,
-                                                       inputID,
-                                                       resultID,
-                                                       rawRep,
-                                                       throws,
-                                                       rawGenericSig);
-    auto rep = getActualFunctionTypeRepresentation(rawRep);
-    if (!rep.hasValue()) {
-      error();
-      return nullptr;
-    }
-
-    auto sig = getGenericSignature(rawGenericSig);
-    auto info = GenericFunctionType::ExtInfo(*rep, throws);
-    
-    auto inputTy = getTypeChecked(inputID);
-    if (!inputTy)
-      return inputTy.takeError();
-    auto resultTy = getTypeChecked(resultID);
-    if (!resultTy)
-      return resultTy.takeError();
-
-    typeOrOffset = GenericFunctionType::get(sig, inputTy.get(), resultTy.get(),
-                                            info);
-    break;
-  }
-      
   case decls_block::SIL_BLOCK_STORAGE_TYPE: {
     TypeID captureID;
     

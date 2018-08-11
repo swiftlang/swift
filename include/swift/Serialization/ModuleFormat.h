@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 434; // Last change: don't serialize derivable interface types
+const uint16_t VERSION_MINOR = 435; // Last change: serialize new-style function parameters
 
 using DeclIDField = BCFixed<31>;
 
@@ -706,11 +706,7 @@ namespace decls_block {
 
   using ParenTypeLayout = BCRecordLayout<
     PAREN_TYPE,
-    TypeIDField,        // inner type
-    BCFixed<1>,         // vararg?
-    BCFixed<1>,         // autoclosure?
-    BCFixed<1>,         // escaping?
-    ValueOwnershipField // inout, shared or owned?
+    TypeIDField         // inner type
   >;
 
   using TupleTypeLayout = BCRecordLayout<
@@ -720,21 +716,28 @@ namespace decls_block {
   using TupleTypeEltLayout = BCRecordLayout<
     TUPLE_TYPE_ELT,
     IdentifierIDField,  // name
-    TypeIDField,        // type
-    BCFixed<1>,         // vararg?
-    BCFixed<1>,         // autoclosure?
-    BCFixed<1>,         // escaping?
-    ValueOwnershipField // inout, shared or owned?
+    TypeIDField         // type
   >;
 
   using FunctionTypeLayout = BCRecordLayout<
     FUNCTION_TYPE,
-    TypeIDField, // input
     TypeIDField, // output
     FunctionTypeRepresentationField, // representation
     BCFixed<1>,  // auto-closure?
     BCFixed<1>,  // noescape?
     BCFixed<1>   // throws?
+
+    // trailed by parameters
+  >;
+
+  using FunctionParamLayout = BCRecordLayout<
+    FUNCTION_PARAM,
+    IdentifierIDField,  // name
+    TypeIDField,        // type
+    BCFixed<1>,         // vararg?
+    BCFixed<1>,         // autoclosure?
+    BCFixed<1>,         // escaping?
+    ValueOwnershipField // inout, shared or owned?
   >;
 
   using MetatypeTypeLayout = BCRecordLayout<
@@ -747,11 +750,6 @@ namespace decls_block {
     EXISTENTIAL_METATYPE_TYPE,
     TypeIDField,                       // instance type
     MetatypeRepresentationField        // representation
-  >;
-
-  using InOutTypeLayout = BCRecordLayout<
-    INOUT_TYPE,
-    TypeIDField // object type
   >;
 
   using ArchetypeTypeLayout = BCRecordLayout<
@@ -785,11 +783,12 @@ namespace decls_block {
 
   using GenericFunctionTypeLayout = BCRecordLayout<
     GENERIC_FUNCTION_TYPE,
-    TypeIDField,         // input
     TypeIDField,         // output
     FunctionTypeRepresentationField, // representation
     BCFixed<1>,          // throws?
     GenericSignatureIDField // generic signture
+
+    // trailed by parameters
   >;
 
   using SILFunctionTypeLayout = BCRecordLayout<
