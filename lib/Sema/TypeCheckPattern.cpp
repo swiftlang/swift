@@ -868,11 +868,21 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
     
     checkTypeModifyingDeclAttributes(param);
     if (!hadError) {
-      if (isa<InOutTypeRepr>(typeRepr)) {
+      auto *nestedRepr = typeRepr;
+
+      // Look through parens here; other than parens, specifiers
+      // must appear at the top level of a parameter type.
+      while (auto *tupleRepr = dyn_cast<TupleTypeRepr>(nestedRepr)) {
+        if (!tupleRepr->isParenType())
+          break;
+        nestedRepr = tupleRepr->getElementType(0);
+      }
+
+      if (isa<InOutTypeRepr>(nestedRepr)) {
         param->setSpecifier(VarDecl::Specifier::InOut);
-      } else if (isa<SharedTypeRepr>(typeRepr)) {
+      } else if (isa<SharedTypeRepr>(nestedRepr)) {
         param->setSpecifier(VarDecl::Specifier::Shared);
-      } else if (isa<OwnedTypeRepr>(typeRepr)) {
+      } else if (isa<OwnedTypeRepr>(nestedRepr)) {
         param->setSpecifier(VarDecl::Specifier::Owned);
       }
     }

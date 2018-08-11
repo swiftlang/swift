@@ -2082,7 +2082,18 @@ bool TypeResolver::resolveASTFunctionTypeParams(
     }
 
     ValueOwnership ownership;
-    switch (eltTypeRepr->getKind()) {
+
+    auto *nestedRepr = eltTypeRepr;
+
+    // Look through parens here; other than parens, specifiers
+    // must appear at the top level of a parameter type.
+    while (auto *tupleRepr = dyn_cast<TupleTypeRepr>(nestedRepr)) {
+      if (!tupleRepr->isParenType())
+        break;
+      nestedRepr = tupleRepr->getElementType(0);
+    }
+
+    switch (nestedRepr->getKind()) {
     case TypeReprKind::Shared:
       ownership = ValueOwnership::Shared;
       break;
