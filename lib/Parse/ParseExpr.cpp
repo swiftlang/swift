@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1612,35 +1612,11 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     DeclNameLoc NameLoc;
 
     if (Tok.is(tok::code_complete)) {
-      auto Expr = UnresolvedMemberExpr::create(
-                    Context, DotLoc, DeclNameLoc(DotLoc.getAdvancedLoc(1)),
-                    Context.getIdentifier("_"), /*implicit=*/false);
-      auto Result = makeParserResult(Expr);
+      auto CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
+      auto Result = makeParserResult(CCE);
+      Result.setHasCodeCompletion();
       if (CodeCompletion) {
-
-        // FIXME: Code-completion should be able to find the contextual type
-        // from AST.
-        std::vector<StringRef> Identifiers;
-        bool HasReturn = false;
-        {
-          ParserPositionRAII PPR(*this);
-          // Move lexer to the start of the current line.
-          L->backtrackToState(L->getStateForBeginningOfTokenLoc(
-            L->getLocForStartOfLine(SourceMgr, Tok.getLoc())));
-
-          // Until we see the code completion token, collect identifiers.
-          for (L->lex(Tok); !Tok.isAny(tok::code_complete, tok::eof);
-              consumeTokenWithoutFeedingReceiver()) {
-            if (!HasReturn)
-              HasReturn = Tok.is(tok::kw_return);
-            if (Tok.is(tok::identifier)) {
-              Identifiers.push_back(Tok.getText());
-            }
-          }
-        }
-        CodeCompletion->completeUnresolvedMember(Expr, Identifiers, HasReturn);
-      } else {
-        Result.setHasCodeCompletion();
+        CodeCompletion->completeUnresolvedMember(CCE, DotLoc);
       }
       consumeToken();
       return Result;

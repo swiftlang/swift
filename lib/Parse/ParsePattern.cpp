@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1054,15 +1054,19 @@ parseOptionalPatternTypeAnnotation(ParserResult<Pattern> result,
                                           SyntaxKind::TypeAnnotation);
   consumeToken(tok::colon);
 
-  Pattern *P;
   if (result.isNull())
-    return nullptr;
-  else
-    P = result.get();
+    return result;
+
+  Pattern *P = result.get();
+  ParserStatus status;
+  if (result.hasCodeCompletion())
+    status.setHasCodeCompletion();
 
   ParserResult<TypeRepr> Ty = parseType();
-  if (Ty.hasCodeCompletion())
-    return makeParserCodeCompletionResult<Pattern>();
+  if (Ty.hasCodeCompletion()) {
+    result.setHasCodeCompletion();
+    return result;
+  }
 
   TypeRepr *repr = Ty.getPtrOrNull();
   if (!repr)
@@ -1073,7 +1077,7 @@ parseOptionalPatternTypeAnnotation(ParserResult<Pattern> result,
   if (isOptional)
     repr = new (Context) OptionalTypeRepr(repr, SourceLoc());
 
-  return makeParserResult(new (Context) TypedPattern(P, repr));
+  return makeParserResult(status, new (Context) TypedPattern(P, repr));
 }
 
 
