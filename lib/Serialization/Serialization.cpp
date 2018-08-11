@@ -4625,9 +4625,9 @@ static void writeDeclCommentTable(
         return true;
 
       RawComment Raw = VD->getRawComment();
-      // When building the stdlib we intend to
-      // serialize unusual comments.  This situation is represented by
-      // GroupContext.isEnable().  In that case, we perform fewer serialization checks.
+      // When building the stdlib we intend to serialize unusual comments.
+      // This situation is represented by GroupContext.isEnable().  In that
+      // case, we perform fewer serialization checks.
       if (!GroupContext.isEnable()) {
         // Skip the decl if it cannot have a comment.
         if (!VD->canHaveComment()) {
@@ -4638,11 +4638,11 @@ static void writeDeclCommentTable(
         if (Raw.Comments.empty())
           return true;
 
-        // Skip the decl if it's not visible to clients.
-        // The use of getEffectiveAccess is unusual here;
-        // we want to take the testability state into account
-        // and emit documentation if and only if they are visible to clients
-        // (which means public ordinarily, but public+internal when testing enabled).
+        // Skip the decl if it's not visible to clients. The use of
+        // getEffectiveAccess is unusual here; we want to take the testability
+        // state into account and emit documentation if and only if they are
+        // visible to clients (which means public ordinarily, but
+        // public+internal when testing enabled).
         if (VD->getEffectiveAccess() < swift::AccessLevel::Public)
           return true;
       }
@@ -4661,6 +4661,18 @@ static void writeDeclCommentTable(
                          SourceOrder++ });
       return true;
     }
+
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+      return { false, S };
+    }
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      return { false, E };
+    }
+
+    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
+    bool walkToTypeReprPre(TypeRepr *T) override { return false; }
+    bool walkToParameterListPre(ParameterList *PL) override { return false; }
   };
 
   DeclCommentTableWriter Writer(GroupContext);
