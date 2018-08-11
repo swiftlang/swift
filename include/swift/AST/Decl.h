@@ -3779,10 +3779,6 @@ private:
 class ProtocolDecl final : public NominalTypeDecl {
   SourceLoc ProtocolLoc;
 
-  /// The syntactic representation of the where clause in a protocol like
-  /// `protocol ... where ... { ... }`.
-  TrailingWhereClause *TrailingWhere;
-
   llvm::DenseMap<ValueDecl *, Witness> DefaultWitnesses;
 
   /// The generic signature representing exactly the new requirements introduced
@@ -3994,11 +3990,6 @@ public:
   /// Create the generic parameters of this protocol if the haven't been
   /// created yet.
   void createGenericParamsIfMissing();
-
-  /// Retrieve the trailing where clause on this protocol, if it exists.
-  TrailingWhereClause *getTrailingWhereClause() const {
-    return TrailingWhere;
-  }
 
   /// Retrieve the requirements that describe this protocol.
   ///
