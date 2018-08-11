@@ -4969,17 +4969,18 @@ Type SubscriptDecl::getElementInterfaceType() const {
 }
 
 void SubscriptDecl::computeType() {
-  auto &ctx = getASTContext();
-
   auto elementTy = getElementTypeLoc().getType();
-  auto indicesTy = getIndices()->getInterfaceType(ctx);
-  Type funcTy;
 
+  SmallVector<AnyFunctionType::Param, 2> argTy;
+  getIndices()->getParams(argTy);
+
+  Type funcTy;
   if (auto *sig = getGenericSignature())
-    funcTy = GenericFunctionType::get(sig, indicesTy, elementTy,
+    funcTy = GenericFunctionType::get(sig, argTy, elementTy,
                                       AnyFunctionType::ExtInfo());
   else
-    funcTy = FunctionType::get(indicesTy, elementTy);
+    funcTy = FunctionType::get(argTy, elementTy,
+                               AnyFunctionType::ExtInfo());
 
   // Record the interface type.
   setInterfaceType(funcTy);
@@ -5403,8 +5404,7 @@ void AbstractFunctionDecl::computeType(AnyFunctionType::ExtInfo info) {
 
   {
     SmallVector<AnyFunctionType::Param, 4> argTy;
-    AnyFunctionType::decomposeInput(
-      getParameters()->getInterfaceType(ctx), argTy);
+    getParameters()->getParams(argTy);
 
     // 'throws' only applies to the innermost function.
     info = info.withThrows(hasThrows());
@@ -5724,30 +5724,38 @@ SourceRange EnumElementDecl::getSourceRange() const {
   return {getStartLoc(), getNameLoc()};
 }
 
-bool EnumElementDecl::computeType() {
+void EnumElementDecl::computeType() {
   assert(!hasInterfaceType());
 
-  EnumDecl *ED = getParentEnum();
-  Type resultTy = ED->getDeclaredInterfaceType();
+  auto &ctx = getASTContext();
+  auto *ED = getParentEnum();
 
-  Type selfTy = MetatypeType::get(resultTy);
+  // The type of the enum element is either (Self.Type) -> Self
+  // or (Self.Type) -> (Args...) -> Self.
+  auto resultTy = ED->getDeclaredInterfaceType();
 
-  // The type of the enum element is either (T) -> T or (T) -> ArgType -> T.
+  SmallVector<AnyFunctionType::Param, 1> selfTy;
+  selfTy.emplace_back(MetatypeType::get(resultTy, ctx),
+                      Identifier(),
+                      ParameterTypeFlags());
+
   if (auto *PL = getParameterList()) {
-    auto paramTy = PL->getInterfaceType(getASTContext());
-    resultTy = FunctionType::get(paramTy, resultTy);
+    SmallVector<AnyFunctionType::Param, 4> argTy;
+    PL->getParams(argTy);
+
+    resultTy = FunctionType::get(argTy, resultTy,
+                                 AnyFunctionType::ExtInfo());
   }
 
-  if (auto *genericSig = ED->getGenericSignatureOfContext())
+  if (auto *genericSig = ED->getGenericSignature())
     resultTy = GenericFunctionType::get(genericSig, selfTy, resultTy,
                                         AnyFunctionType::ExtInfo());
   else
-    resultTy = FunctionType::get(selfTy, resultTy);
+    resultTy = FunctionType::get(selfTy, resultTy,
+                                 AnyFunctionType::ExtInfo());
 
   // Record the interface type.
   setInterfaceType(resultTy);
-
-  return true;
 }
 
 Type EnumElementDecl::getArgumentInterfaceType() const {

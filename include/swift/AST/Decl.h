@@ -5772,8 +5772,8 @@ public:
   }
 
   /// Set the interface type of this enum element to the constructor function
-  /// type; (Self) -> Result or (Self) -> (Args...) -> Result.
-  bool computeType();
+  /// type; (Self.Type) -> Self or (Self.Type) -> (Args...) -> Self.
+  void computeType();
 
   Type getArgumentInterfaceType() const;
 
