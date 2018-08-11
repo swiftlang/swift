@@ -144,18 +144,16 @@ public:
   SymbolicValue computeConstantValue(SILValue value);
   SymbolicValue computeConstantValueBuiltin(BuiltinInst *inst);
 
-  SymbolicValue computeSingleStoreAddressValue(SILValue addr);
   llvm::Optional<SymbolicValue> computeCallResult(ApplyInst *apply);
 
   llvm::Optional<SymbolicValue> computeOpaqueCallResult(ApplyInst *apply,
                                                         SILFunction *callee);
 
-  SymbolicValue computeLoadResult(SILValue addr);
+  SymbolicValue getSingleWriterAddressValue(SILValue addr);
+  SymbolicValue getConstAddrAndLoadResult(SILValue addr);
+  SymbolicValue loadAddrValue(SILValue addr, SymbolicValue addrVal);
   llvm::Optional<SymbolicValue> computeFSStore(SymbolicValue storedCst,
                                                SILValue dest);
-
-private:
-  SymbolicValue computeSingleStoreAddressValueHelper(SILValue addr);
 };
 } // end anonymous namespace
 
@@ -190,7 +188,19 @@ static void lookupOrLinkWitnessTable(ProtocolConformanceRef confRef,
       entry.getMethodWitness().Witness->setLinkage(linkage);
 }
 
+/// Const-evaluate `value`, which must not have been computed.
 SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
+  assert(!calculatedValues.count(value));
+
+  // If the client is asking for the value of a stack object that hasn't been
+  // computed, then we are in top level code, and the stack object must be a
+  // single store value.  Since this is a very different computation, split it
+  // out to its own path.
+  if (!fn && value->getType().isAddress() && isa<AllocStackInst>(value)) {
+    SymbolicValue result = getSingleWriterAddressValue(value);
+    return result;
+  }
+
   // If this a trivial constant instruction that we can handle, then fold it
   // immediately.
   if (isa<IntegerLiteralInst>(value) || isa<FloatLiteralInst>(value) ||
@@ -280,7 +290,7 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
   // former case this will be the latest value for this, in the later case, this
   // must be a single-def value for us to analyze it.
   if (auto li = dyn_cast<LoadInst>(value))
-    return computeLoadResult(li->getOperand());
+    return getConstAddrAndLoadResult(li->getOperand());
 
   // Try to resolve a witness method against our known conformances.
   if (auto *wmi = dyn_cast<WitnessMethodInst>(value)) {
@@ -327,7 +337,7 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
     if (!enumVal->hasOperand())
       return SymbolicValue::getEnum(enumVal->getElement());
 
-    auto payload = computeConstantValue(enumVal->getOperand());
+    auto payload = getConstantValue(enumVal->getOperand());
     if (!payload.isConstant())
       return payload;
     return SymbolicValue::getEnumWithPayload(enumVal->getElement(), payload,
@@ -336,7 +346,7 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
 
   // This one returns the address of its enum payload.
   if (auto *dai = dyn_cast<UncheckedTakeEnumDataAddrInst>(value)) {
-    auto enumVal = computeLoadResult(dai->getOperand());
+    auto enumVal = getConstAddrAndLoadResult(dai->getOperand());
     if (!enumVal.isConstant())
       return enumVal;
     return createMemoryObject(value, enumVal.getEnumPayloadValue());
@@ -840,9 +850,12 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
       // Okay, we were able to decode the array.  See if we can fold all of the
       // elements we found.
       for (auto *use : elementsAtInit) {
-        auto addrValue = use->get();
-        assert(addrValue->getType().isAddress());
-        SymbolicValue eltCst = computeLoadResult(addrValue);
+        auto addr = use->get();
+        assert(addr->getType().isAddress());
+        SymbolicValue addrVal = getSingleWriterAddressValue(addr);
+        if (!addrVal.isConstant())
+          return addrVal;
+        SymbolicValue eltCst = loadAddrValue(addr, addrVal);
         if (!eltCst.isConstant())
           return eltCst;
         elementConstants.push_back(eltCst);
@@ -963,16 +976,6 @@ SymbolicValue ConstExprFunctionState::getConstantValue(SILValue value) {
   if (it != calculatedValues.end())
     return it->second;
 
-  // If the client is asking for the value of a stack object that hasn't been
-  // computed, then we are in top level code, and the stack object must be a
-  // single store value.  Since this is a very different computation, split it
-  // out to its own path.
-  if (!fn && value->getType().isAddress()) {
-    SymbolicValue result = computeSingleStoreAddressValue(value);
-    setValue(value, result);
-    return result;
-  }
-
   // Compute the value of a normal instruction based on its operands.
   auto result = computeConstantValue(value);
 
@@ -982,7 +985,9 @@ SymbolicValue ConstExprFunctionState::getConstantValue(SILValue value) {
     LLVM_DEBUG(llvm::dbgs() << "  RESULT: "; result.dump());
   }
 
-  return calculatedValues[value] = result;
+  setValue(value, result);
+  return result;
+  // return calculatedValues[value] = result;
 }
 
 /// Given an aggregate value like {{1, 2}, 3} and an access path like [0,1], and
@@ -1073,51 +1078,47 @@ static bool updateIndexedElement(SymbolicValue &aggregate,
   return false;
 }
 
-/// When analyzing the top-level code involved in a constant expression, we can
-/// end up demanding values that are returned by address.  Handle this by
-/// finding the temporary stack value that they were stored into and analyzing
-/// the single store that should exist into that memory (there are a few forms).
+/// Find the initializer (single writer) of `addr` among it users,
+/// const-evaluate it and store the result into a memory object, and return the
+/// address of that memory object.
 ///
-/// Invariant: Before the call, `calculatedValues` must not contain `addr` as a
-/// key.
+/// Some use cases are:
+/// 1. When analyzing the top-level code involved in a constant expression, we
+/// can end up demanding values that are returned by address.  Handle this by
+/// finding the temporary stack value (an alloc_stack inst), and calling this
+/// method on it.
+/// 2. When const-evaluating an array via decodeAllocUninitializedArray(),
+/// do that by const-evaluating the writers of individual array elements.
+///
+///  There are a few forms of writers, such as:
+/// - %3 = alloc_stack ...
+/// - %8 = pointer_to_address %7 : $Builtin.RawPointer to [strict] $*Int32
+/// - %14 = index_addr %9 : $*Int32, %13 : $Builtin.Word
+/// - %180 = tuple_element_addr %179 : $*(Int32, Int32, Int32, Int32), 3
+///
+///  Note unlike getConstAddrAndLoadResult(), this method does *not*
+///  const-evaluate the input `addr` by evaluating the operand first, such as %7
+///  above. Instead, it finds a user of %8 who is the initializer, and uses that
+///  to set the const value for %7. In other words, this method propagates const
+///  info from result to operand (e.g. from %8 to %7), while
+///  getConstAddrAndLoadResult() propagates const info from operand to result.
+///
+///  As such, when const-evaluating an address-typed inst such as
+///  pointer_to_address, if the address is to be written to, caller should call
+///  this method (e.g. a[3] = 17). If the address is to be read (e.g. let v =
+///  a[3]), call getConstAddrAndLoadResult().
 SymbolicValue
-ConstExprFunctionState::computeSingleStoreAddressValue(SILValue addr) {
-  assert(!calculatedValues.count(addr));
+ConstExprFunctionState::getSingleWriterAddressValue(SILValue addr) {
+  // Check to see if we already have an answer.
+  auto it = calculatedValues.find(addr);
+  if (it != calculatedValues.end())
+    return it->second;
 
-  // TODO: consider supporting all instruction types that produce an
-  // address-typed SIL value.
-  SingleValueInstruction *addrInst = dyn_cast<AllocStackInst>(addr);
-  if (!addrInst)
-    addrInst = dyn_cast<PointerToAddressInst>(addr);
-  if (!addrInst) {
-    // Example SIL snippet involving index_addr that we can handle:
-    // %78 = index_addr %73 : $*Int32, %77 : $Builtin.Word // user: %86
-    // function_ref SignedInteger<>.init<A>(_:)
-    // %85 = function_ref @... // user: %86
-    // Here the func call writes to %78.
-    // %86 = apply %85<Int32, Int>(%78, %83, %80) : $@convention(method)
-    addrInst = dyn_cast<IndexAddrInst>(addr);
-  }
-  if (!addrInst) {
-    if (auto *teai = dyn_cast<TupleElementAddrInst>(addr)) {
-      // In this case, we simply const-evaluate this inst, which involves first
-      // const-evaluating the tuple operand of this inst (to an aggregate const
-      // value). e.g. %131 below.
-      // %132 = tuple_element_addr %131 : $*(Int32, Int32, Int32, Int32), 0
-      auto tupleEltAddr = computeConstantValue(addr);
-      return tupleEltAddr;
-    }
-  }
+  assert(addr->getType().isAddress());
+  auto *addrInst = dyn_cast<SingleValueInstruction>(addr);
   if (!addrInst)
     return evaluator.getUnknown(addr, UnknownReason::Default);
 
-  return computeSingleStoreAddressValueHelper(addrInst);
-}
-
-/// This does the heavy-lifting of computeSingleStoreAddressValue() above, and
-/// may recursively call itself when const-evaluating TupleElementAddrInst.
-SymbolicValue
-ConstExprFunctionState::computeSingleStoreAddressValueHelper(SILValue addr) {
   // Keep track of the value found for the first constant store.
   auto memoryAddress =
       createMemoryObject(addr, SymbolicValue::getUninitMemory());
@@ -1167,7 +1168,7 @@ ConstExprFunctionState::computeSingleStoreAddressValueHelper(SILValue addr) {
       if (memoryObject->getValue().getKind() != SymbolicValue::UninitMemory)
         return evaluator.getUnknown(addr, UnknownReason::Default);
 
-      auto result = computeLoadResult(cai->getOperand(0));
+      auto result = getConstAddrAndLoadResult(cai->getOperand(0));
       if (!result.isConstant())
         return evaluator.getUnknown(addr, UnknownReason::Default);
       memoryObject->setValue(result);
@@ -1197,6 +1198,7 @@ ConstExprFunctionState::computeSingleStoreAddressValueHelper(SILValue addr) {
 
       // If the call failed, we're done.
       if (callResult.hasValue()) {
+        assert(!callResult.getValue().isConstant());
         memoryObject->setValue(callResult.getValue());
         return memoryAddress;
       }
@@ -1219,26 +1221,24 @@ ConstExprFunctionState::computeSingleStoreAddressValueHelper(SILValue addr) {
     }
 
     if (auto *teai = dyn_cast<TupleElementAddrInst>(user)) {
-      // Try finding a writer among its users. For example:
-      //   %132 = tuple_element_addr %131 : $*(Int32, Int32, Int32, Int32), 0
-      // If %132 is written to as a const value in one of its users, the call
-      // below will return a constant. An example writer can be:
-      //   copy_addr %111 to [initialization] %132
-      // Otherwise we continue to search for a writer.
-
+      // Try finding a writer among the users of `teai`. For example:
+      //   copy_addr %114 to [initialization] %183 : $*Int32
+      //   %179 = alloc_stack $(Int32, Int32, Int32, Int32)
+      //   %183 = tuple_element_addr %179 : $*(Int32, Int32, Int32, Int32), 3
+      //   %191 = tuple_element_addr %179 : $*(Int32, Int32, Int32, Int32), 3
+      //   copy_addr [take] %191 to [initialization] %178 : $*Int32
+      //
+      // The workflow is: when const-evaluating %178, we const-evaluate %191,
+      // which in turn triggers const-evaluating %179, thereby enter this
+      // function, where `addrInst` being %179. Among its users, %191 is not an
+      // initializer, so we skip it (`getSingleWriterAddressValue(teai)` below
+      // will return non-const on it). %183 is a good initializer and can be
+      // const-evaluated (by const-evaluating %114).
       auto *use = teai->getSingleUse();
       if (!use)
         continue;
 
-      // In this case we want to find a user of teai that writes to that tuple
-      // elt addr. We cannot call computeSingleStoreAddressValue(), since
-      // that'll involve evaluating the tuple operand (first operand) of teai
-      // first, denoted as X (an inst that creates the tuple), and that in turn
-      // will go through all uses of X, include teai, entering a cycle.
-
-      // Instead we call the lighter-weight method
-      // computeSingleStoreAddressValueHelper() to avoid forming the cycle.
-      auto tupleEltAddrValue = computeSingleStoreAddressValueHelper(teai);
+      auto tupleEltAddrValue = getSingleWriterAddressValue(teai);
       if (tupleEltAddrValue.isConstant()) {
         // If the tuple elt is indeed a const, we write it into (the appropriate
         // aggregate element slot of the) `memoryObject`, which is the const
@@ -1280,21 +1280,30 @@ ConstExprFunctionState::computeSingleStoreAddressValueHelper(SILValue addr) {
   }
 
   // If we found a store of a constant, then return that value!
-  if (memoryObject->getValue().isConstant())
+  if (memoryObject->getValue().isConstant()) {
+    setValue(addr, memoryAddress);
     return memoryAddress;
+  }
 
   // Otherwise, return unknown.
   return evaluator.getUnknown(addr, UnknownReason::Default);
 }
 
 /// Given the operand to a load, resolve it to a constant if possible.
-SymbolicValue ConstExprFunctionState::computeLoadResult(SILValue addrVal) {
-  auto addr = getConstantValue(addrVal);
-  if (!addr.isConstant())
-    return addr;
+/// Also see the comments on getSingleWriterAddressValue() to contrast these 2
+/// APIs.
+SymbolicValue ConstExprFunctionState::getConstAddrAndLoadResult(SILValue addr) {
+  auto addrVal = getConstantValue(addr);
+  if (!addrVal.isConstant())
+    return addrVal;
 
+  return loadAddrValue(addr, addrVal);
+}
+
+SymbolicValue ConstExprFunctionState::loadAddrValue(SILValue addr,
+                                                    SymbolicValue addrVal) {
   SmallVector<unsigned, 4> accessPath;
-  auto *memoryObject = addr.getAddressValue(accessPath);
+  auto *memoryObject = addrVal.getAddressValue(accessPath);
 
   // If this is a derived address, then we are digging into an aggregate
   // value.
@@ -1316,7 +1325,7 @@ SymbolicValue ConstExprFunctionState::computeLoadResult(SILValue addrVal) {
     return objectVal;
 
   // Otherwise, return a generic failure.
-  return evaluator.getUnknown(addrVal, UnknownReason::Default);
+  return evaluator.getUnknown(addr, UnknownReason::Default);
 }
 
 /// Evaluate a flow sensitive store to the specified pointer address.
@@ -1403,7 +1412,7 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
 
   // Copy addr is a load + store combination.
   if (auto *copy = dyn_cast<CopyAddrInst>(inst)) {
-    auto value = computeLoadResult(copy->getOperand(0));
+    auto value = getConstAddrAndLoadResult(copy->getOperand(0));
     if (!value.isConstant())
       return value;
 
@@ -1548,7 +1557,7 @@ static llvm::Optional<SymbolicValue> evaluateAndCacheCall(
         value = state.getConstantValue(switchInst->getOperand());
       } else {
         switchInst = cast<SwitchEnumAddrInst>(inst);
-        value = state.computeLoadResult(switchInst->getOperand());
+        value = state.getConstAddrAndLoadResult(switchInst->getOperand());
       }
       if (!value.isConstant())
         return value;
@@ -1660,6 +1669,17 @@ static bool analyzeArrayInitUses(SILValue v,
 /// If arrayInsts is non-null and if decoding succeeds, this function adds
 /// all of the instructions relevant to the definition of this array into
 /// the set.  If decoding fails, then the contents of this set is undefined.
+///
+/// Some example array element initializers that we can handle:
+/// 1. %78 below
+///   %78 = index_addr %73 : $*Int32, %77 : $Builtin.Word // user: %86
+///   function_ref SignedInteger<>.init<A>(_:)
+///   %85 = function_ref @... // user: %86
+///   // Here the func call writes to %78.
+///   %86 = apply %85<Int32, Int>(%78, %83, %80) : $@convention(method)
+///
+/// 2. %132 below, and similar insts that initialize other tuple elts of %131.
+///   %132 = tuple_element_addr %131 : $*(Int32, Int32, Int32, Int32), 0
 ///
 bool ConstExprEvaluator::decodeAllocUninitializedArray(
     ApplyInst *apply, uint64_t numElements,
