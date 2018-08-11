@@ -669,22 +669,7 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
     case GENERIC_PARAM: {
       DeclID paramDeclID;
       GenericParamLayout::readRecord(scratch, paramDeclID);
-      auto genericParam = cast<GenericTypeParamDecl>(getDecl(paramDeclID, DC));
-      // FIXME: There are unfortunate inconsistencies in the treatment of
-      // generic param decls. Currently the first request for context wins
-      // because we don't want to change context on-the-fly.
-      // Here are typical scenarios:
-      // (1) AST reads decl, get's scope.
-      //     Later, readSILFunction tries to force module scope.
-      // (2) readSILFunction forces module scope.
-      //     Later, readVTable requests an enclosing scope.
-      // ...other combinations are possible, but as long as AST lookups
-      // precede SIL linkage, we should be ok.
-      assert((genericParam->getDeclContext()->isModuleScopeContext() ||
-              DC->isModuleScopeContext() ||
-              genericParam->getDeclContext() == DC ||
-              genericParam->getDeclContext()->isChildContextOf(DC)) &&
-             "Mismatched decl context for generic types.");
+      auto genericParam = cast<GenericTypeParamDecl>(getDecl(paramDeclID));
       params.push_back(genericParam);
       break;
     }
@@ -2194,8 +2179,8 @@ static uint64_t encodeLazyConformanceContextData(uint64_t numProtocols,
   return (numProtocols << 48) | bitPosition;
 }
 
-Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
-  Expected<Decl *> deserialized = getDeclChecked(DID, ForcedContext);
+Decl *ModuleFile::getDecl(DeclID DID) {
+  Expected<Decl *> deserialized = getDeclChecked(DID);
   if (!deserialized) {
     fatal(deserialized.takeError());
   }
@@ -2203,9 +2188,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 }
 
 Expected<Decl *>
-ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
+ModuleFile::getDeclChecked(DeclID DID) {
   // Tag every deserialized ValueDecl coming out of getDeclChecked with its ID.
-  Expected<Decl *> deserialized = getDeclCheckedImpl(DID, ForcedContext);
+  Expected<Decl *> deserialized = getDeclCheckedImpl(DID);
   if (deserialized && deserialized.get()) {
     if (auto *IDC = dyn_cast<IterableDeclContext>(deserialized.get())) {
       // Only set the DeclID on the returned Decl if it's one that was loaded
@@ -2220,7 +2205,7 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
 }
 
 Expected<Decl *>
-ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext) {
+ModuleFile::getDeclCheckedImpl(DeclID DID) {
   if (DID == 0)
     return nullptr;
 
@@ -2572,7 +2557,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
       }
     }
 
-    auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
+    auto DC = getDeclContext(contextID);
 
     auto genericParams = maybeReadGenericParams(DC);
     if (declOrOffset.isComplete())
@@ -2601,22 +2586,18 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
 
   case decls_block::GENERIC_TYPE_PARAM_DECL: {
     IdentifierID nameID;
-    DeclContextID contextID;
     bool isImplicit;
     unsigned depth;
     unsigned index;
 
     decls_block::GenericTypeParamDeclLayout::readRecord(scratch, nameID,
-                                                        contextID,
                                                         isImplicit,
                                                         depth,
                                                         index);
 
-    auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
-
-    if (declOrOffset.isComplete())
-      return declOrOffset;
-
+    // Always create GenericTypeParamDecls in the associated module;
+    // maybeReadGenericParams() will reparent them.
+    auto DC = getAssociatedModule();
     auto genericParam = createDecl<GenericTypeParamDecl>(DC,
                                                          getIdentifier(nameID),
                                                          SourceLoc(),
@@ -2643,7 +2624,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
                                                       isImplicit,
                                                       rawOverriddenIDs);
 
-    auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
+    auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
       return declOrOffset;
 
@@ -2939,7 +2920,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
       }
     }
 
-    auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
+    auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
       return declOrOffset;
 
@@ -3008,7 +2989,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
                                          interfaceTypeID, isVariadic,
                                          rawDefaultArg);
 
-    auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
+    auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
       return declOrOffset;
 

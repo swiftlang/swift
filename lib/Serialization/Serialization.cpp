@@ -2918,12 +2918,9 @@ void Serializer::writeDecl(const Decl *D) {
     auto genericParam = cast<GenericTypeParamDecl>(D);
     verifyAttrSerializable(genericParam);
 
-    auto contextID = addDeclContextRef(genericParam->getDeclContext());
-
     unsigned abbrCode = DeclTypeAbbrCodes[GenericTypeParamDeclLayout::Code];
     GenericTypeParamDeclLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                 addDeclBaseNameRef(genericParam->getName()),
-                                contextID,
                                 genericParam->isImplicit(),
                                 genericParam->getDepth(),
                                 genericParam->getIndex());

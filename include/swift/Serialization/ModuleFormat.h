@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 432; // Last change: default argument text
+const uint16_t VERSION_MINOR = 433; // Last change: GenericTypeParamDecl doesn't need a DC
 
 using DeclIDField = BCFixed<31>;
 
@@ -871,7 +871,6 @@ namespace decls_block {
   using GenericTypeParamDeclLayout = BCRecordLayout<
     GENERIC_TYPE_PARAM_DECL,
     IdentifierIDField,  // name
-    DeclContextIDField, // context decl
     BCFixed<1>,         // implicit flag
     BCVBR<4>,           // depth
     BCVBR<4>            // index

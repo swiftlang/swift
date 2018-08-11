@@ -19,7 +19,6 @@
 #define CLANG_ADAPTER_H
 
 #include "swift/Basic/StringExtras.h"
-#include "swift/Serialization/ModuleFormat.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "clang/Basic/Specifiers.h"
