@@ -2109,7 +2109,7 @@ bool TypeResolver::resolveASTFunctionTypeParams(
     }
     ParameterTypeFlags paramFlags =
         ParameterTypeFlags::fromParameterType(ty, variadic, ownership);
-    elements.emplace_back(ty->getInOutObjectType(), Identifier(), paramFlags);
+    elements.emplace_back(ty, Identifier(), paramFlags);
   }
 
   return false;
@@ -2622,16 +2622,12 @@ Type TypeResolver::resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
     options -= TypeResolutionFlags::TypeAliasUnderlyingType;
   }
 
-  Type ty = resolveType(repr->getBase(), options);
-  if (!ty || ty->hasError()) return ty;
-  if (repr->getKind() == TypeReprKind::InOut) return InOutType::get(ty);
-  return ty;
+  return resolveType(repr->getBase(), options);
 }
 
 
 Type TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
                                     TypeResolutionOptions options) {
-  // FIXME: diagnose non-materializability of element type!
   Type baseTy = resolveType(repr->getBase(), withoutContext(options));
   if (!baseTy || baseTy->hasError()) return baseTy;
 
@@ -2651,7 +2647,6 @@ Type TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
                                          TypeResolutionOptions options) {
   options = adjustOptionsForGenericArgs(options);
 
-  // FIXME: diagnose non-materializability of key/value type?
   Type keyTy = resolveType(repr->getKey(), withoutContext(options));
   if (!keyTy || keyTy->hasError()) return keyTy;
 
@@ -2772,8 +2767,7 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     Type ty = resolveType(tyR, elementOptions);
     if (!ty || ty->hasError()) return ty;
 
-    elements.emplace_back(ty->getInOutObjectType(),
-                          repr->getElementName(i), ParameterTypeFlags());
+    elements.emplace_back(ty, repr->getElementName(i), ParameterTypeFlags());
   }
 
   // Single-element labeled tuples are not permitted outside of declarations

@@ -789,19 +789,6 @@ static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
     TL.setType(Ty);
   }
 
-  // If the user did not explicitly write 'let', 'var', or 'inout', we'll let
-  // type inference figure out what went wrong in detail.
-  if (decl->getSpecifierLoc().isValid()) {
-    // If the param is not a 'let' and it is not an 'inout'.
-    // It must be a 'var'. Provide helpful diagnostics like a shadow copy
-    // in the function body to fix the 'var' attribute.
-    if (!decl->isImmutable() && !decl->isImplicit() &&
-        (Ty.isNull() || !Ty->is<InOutType>()) && !hadError) {
-      decl->setInvalid();
-      hadError = true;
-    }
-  }
-
   if (hadError)
     TL.setInvalidType(TC.Context);
 
@@ -861,9 +848,7 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
       param->markInvalid();
       hadError = true;
     } else {
-      if (type->is<InOutType>())
-        param->setSpecifier(VarDecl::Specifier::InOut);
-      param->setInterfaceType(type->getInOutObjectType());
+      param->setInterfaceType(type);
     }
     
     checkTypeModifyingDeclAttributes(param);
