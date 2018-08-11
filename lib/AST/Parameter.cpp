@@ -112,58 +112,6 @@ void ParameterList::getParams(
   }
 }
 
-/// Return a TupleType or ParenType for this parameter list,
-/// based on types provided by a callback.
-Type ParameterList::getType(
-    const ASTContext &C, llvm::function_ref<Type(ParamDecl *)> getType) const {
-  if (size() == 0)
-    return TupleType::getEmpty(C);
-
-  SmallVector<TupleTypeElt, 8> argumentInfo;
-
-  for (auto P : *this) {
-    auto type = getType(P);
-    argumentInfo.emplace_back(
-        type->getInOutObjectType(), P->getArgumentName(),
-        ParameterTypeFlags::fromParameterType(type, P->isVariadic(),
-                                              P->getValueOwnership()));
-  }
-
-  return TupleType::get(argumentInfo, C);
-}
-
-/// Return a TupleType or ParenType for this parameter list, written in terms
-/// of contextual archetypes.
-Type ParameterList::getType(const ASTContext &C) const {
-  return getType(C, [](ParamDecl *P) { return P->getType(); });
-}
-
-/// Return a TupleType or ParenType for this parameter list, written in terms
-/// of interface types.
-Type ParameterList::getInterfaceType(const ASTContext &C) const {
-  return getType(C, [](ParamDecl *P) {
-    auto type = P->getInterfaceType();
-    assert(!type->hasArchetype());
-    return type;
-  });
-}
-
-
-/// Return the full function type for a set of curried parameter lists that
-/// returns the specified result type.  This returns a null type if one of the
-/// ParamDecls does not have a type set for it yet.
-///
-Type ParameterList::getFullInterfaceType(Type resultType,
-                                         ArrayRef<ParameterList*> PLL,
-                                         const ASTContext &C) {
-  auto result = resultType;
-  for (auto PL : reversed(PLL)) {
-    auto paramType = PL->getInterfaceType(C);
-    result = FunctionType::get(paramType, result);
-  }
-  return result;
-}
-
 
 /// Return the full source range of this parameter list.
 SourceRange ParameterList::getSourceRange() const {
