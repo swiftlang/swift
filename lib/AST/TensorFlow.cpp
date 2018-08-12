@@ -95,7 +95,10 @@ bool tf::isTensorFlowValueOrAggregate(Type ty) {
 
 /// Return true if the specified type contains a TensorFlow value type that
 /// will be exposed after deabstraction.
-bool TypeContainsTensorFlowValue::containsTensorFlowValue(Type ty) {
+/// If `checkHigherOrderFunctions`, also check for a function-typed `ty`, if its
+/// parameter of result contains any TensorFlow value type.
+bool TypeContainsTensorFlowValue::containsTensorFlowValue(
+    Type ty, bool checkHigherOrderFunctions) {
   // If this type literally is a value type, then yep, we contain it.  This is
   // the base case.
   if (isTensorFlowValue(ty))
@@ -105,7 +108,7 @@ bool TypeContainsTensorFlowValue::containsTensorFlowValue(Type ty) {
   // then the tuple itself does.
   if (auto *tuple = ty->getAs<TupleType>()) {
     for (auto &elt : tuple->getElements())
-      if (containsTensorFlowValue(elt.getType()))
+      if (containsTensorFlowValue(elt.getType(), checkHigherOrderFunctions))
         return true;
     return false;
   }
@@ -119,7 +122,7 @@ bool TypeContainsTensorFlowValue::containsTensorFlowValue(Type ty) {
   if (auto *bgst = ty->getAs<BoundGenericStructType>()) {
     // Check the generic arguments.
     for (auto arg : bgst->getGenericArgs())
-      if (containsTensorFlowValue(arg))
+      if (containsTensorFlowValue(arg, checkHigherOrderFunctions))
         return true;
 
     return structContainsTensorFlowValue(bgst->getDecl());
@@ -129,6 +132,19 @@ bool TypeContainsTensorFlowValue::containsTensorFlowValue(Type ty) {
   if (auto *ugst = ty->getAs<UnboundGenericType>())
     if (auto *decl = dyn_cast<StructDecl>(ugst->getDecl()))
       return structContainsTensorFlowValue(decl);
+
+  if (checkHigherOrderFunctions) {
+    if (auto *fnType = ty->getAs<SILFunctionType>()) {
+      for (auto &result : fnType->getResults())
+        if (containsTensorFlowValue(result.getType(),
+                                    checkHigherOrderFunctions))
+          return true;
+
+      for (auto &param : fnType->getParameters())
+        if (containsTensorFlowValue(param.getType(), checkHigherOrderFunctions))
+          return true;
+    }
+  }
 
   // Otherwise we have a class or some other type that is opaque to
   // deabstraction.
@@ -145,7 +161,8 @@ structContainsTensorFlowValue(StructDecl *decl) {
 
   bool hasTensorFlowValue = false;
   for (auto p : decl->getStoredProperties())
-    if (containsTensorFlowValue(p->getType())) {
+    if (containsTensorFlowValue(p->getType(),
+                                /*checkHigherOrderFunctions*/ false)) {
       hasTensorFlowValue = true;
       break;
     }

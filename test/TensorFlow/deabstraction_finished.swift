@@ -181,3 +181,17 @@ public func noescapeFuncAsAttr(_ f: @convention(tensorflow) (Tensor<Float>) -> T
 
 // CHECK-LABEL: ---- INPUT FUNCTION {{.*}}noescapeFuncAsAttr
 // CHECK: graph_op "FilterDataset,i,L,e"(%{{.*}} : $VariantHandle, %{{.*}} : $TensorHandle<Int32>) {predicate: @{{.*}}isZero{{.*}} : $@convention(tensorflow) (@guaranteed Tensor<Float>) -> @owned Tensor<Bool>
+
+// Support higher-order functions that process tensors.
+// foo() is not a partitionable function.
+public func foo(tfOp: () -> Tensor<Float>) {
+  let _ = tfOp()
+}
+
+// Deabstraction should inline foo into bar().
+public func bar() {
+  foo(tfOp: { return Tensor<Float>(1.0) })
+}
+
+// CHECK-LABEL: --- INPUT FUNCTION {{.*}}bar
+// CHECK: graph_op "Const"

@@ -1754,11 +1754,13 @@ bool TensorFunctionClassifier::shouldBePartitioned(SILFunction *fn) {
 bool TensorFunctionClassifier::containsTensorFlowValue(
     CanSILFunctionType fnType) {
   for (auto &result : fnType->getResults())
-    if (containsTensorFlowValue(result.getType()))
+    if (containsTensorFlowValue(result.getType(),
+                                /*checkHigherOrderFunctions*/ true))
       return true;
 
   for (auto &param : fnType->getParameters())
-    if (containsTensorFlowValue(param.getType()))
+    if (containsTensorFlowValue(param.getType(),
+                                /*checkHigherOrderFunctions*/ true))
       return true;
 
   return false;

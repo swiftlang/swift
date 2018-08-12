@@ -73,7 +73,9 @@ namespace tf {
 
     /// Return true if the specified type contains a TensorFlow value type that
     /// will be exposed after deabstraction.
-    bool containsTensorFlowValue(Type ty);
+    /// If `checkHigherOrderFunctions`, also check for a function-typed `ty`, if
+    /// its parameter of result contains any TensorFlow value type.
+    bool containsTensorFlowValue(Type ty, bool checkHigherOrderFunctions);
 
   private:
     bool structContainsTensorFlowValue(StructDecl *decl);
