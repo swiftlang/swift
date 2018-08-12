@@ -1768,38 +1768,15 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
   auto &diags = ctx.Diags;
   auto tuple = dyn_cast<TupleExpr>(expr);
   if (!tuple) {
+    if (newNames[0].empty()) {
+      // We don't know what to do with this.
+      return false;
+    }
+
     llvm::SmallString<16> str;
     // If the diagnostic is local, flush it before returning.
     // This makes sure it's emitted before 'str' is destroyed.
     SWIFT_DEFER { diagOpt.reset(); };
-
-    if (newNames[0].empty()) {
-      // This is probably a conversion from a value of labeled tuple type to
-      // a scalar.
-      // FIXME: We want this issue to disappear completely when single-element
-      // labeled tuples go away.
-      if (auto tupleTy = expr->getType()->getRValueType()->getAs<TupleType>()) {
-        int scalarFieldIdx = tupleTy->getElementForScalarInit();
-        if (scalarFieldIdx >= 0) {
-          auto &field = tupleTy->getElement(scalarFieldIdx);
-          if (field.hasName()) {
-            str = ".";
-            str += field.getName().str();
-            if (!existingDiag) {
-              diagOpt.emplace(
-                          diags.diagnose(expr->getStartLoc(),
-                                         diag::extra_named_single_element_tuple,
-                                         field.getName().str()));
-            }
-            getDiag().fixItInsertAfter(expr->getEndLoc(), str);
-            return true;
-          }
-        }
-      }
-
-      // We don't know what to do with this.
-      return false;
-    }
 
     // This is a scalar-to-tuple conversion. Add the name. We "know"
     // that we're inside a ParenExpr, because ParenExprs are required
