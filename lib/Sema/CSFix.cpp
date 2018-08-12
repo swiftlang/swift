@@ -38,5 +38,10 @@ bool ForceDowncast::diagnose(Expr *expr, const Solution &solution) const {
 }
 
 void ForceDowncast::print(llvm::raw_ostream &Out) const {
-  Out << "fix: force downcast (as! " << DowncastTo->getString() << ")\n";
+  Out << "[fix: force downcast (as! " << DowncastTo->getString() << ")]";
+}
+
+bool ForceOptional::diagnose(Expr *root, const Solution &solution) const {
+  MissingOptionalUnwrapFailure failure(root, solution, getLocator());
+  return failure.diagnose();
 }

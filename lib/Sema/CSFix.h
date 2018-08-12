@@ -61,6 +61,17 @@ public:
   void print(llvm::raw_ostream &Out) const override;
 };
 
+/// Introduce a '!' to force an optional unwrap.
+class ForceOptional final : public ConstraintFix {
+public:
+  ForceOptional(ConstraintLocator *locator) : ConstraintFix(locator) {}
+
+  bool diagnose(Expr *root, const Solution &solution) const override;
+  void print(llvm::raw_ostream &Out) const override {
+    Out << "[fix: force optional]";
+  }
+};
+
 } // end namespace constraints
 } // end namespace swift
 
