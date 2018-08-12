@@ -109,6 +109,22 @@ public:
   }
 };
 
+/// Mark function type as explicitly '@escaping'.
+class MarkExplicitlyEscaping final : public ConstraintFix {
+  /// Sometimes function type has to be marked as '@escaping'
+  /// to be converted to some other generic type.
+  Type ConvertTo;
+
+public:
+  MarkExplicitlyEscaping(ConstraintLocator *locator, Type convertingTo = Type())
+      : ConstraintFix(locator), ConvertTo(convertingTo) {}
+
+  bool diagnose(Expr *root, const Solution &solution) const override;
+  void print(llvm::raw_ostream &Out) const override {
+    Out << "[fix: add @escaping]";
+  }
+};
+
 } // end namespace constraints
 } // end namespace swift
 

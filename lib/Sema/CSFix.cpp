@@ -62,3 +62,10 @@ bool CoerceToCheckedCast::diagnose(Expr *root, const Solution &solution) const {
   MissingForcedDowncastFailure failure(root, solution, getLocator());
   return failure.diagnose();
 }
+
+bool MarkExplicitlyEscaping::diagnose(Expr *root,
+                                      const Solution &solution) const {
+  NoEscapeFuncToTypeConversionFailure failure(root, solution, getLocator(),
+                                              ConvertTo);
+  return failure.diagnose();
+}
