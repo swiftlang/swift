@@ -18,6 +18,7 @@
 #ifndef SWIFT_SEMA_CONSTRAINT_H
 #define SWIFT_SEMA_CONSTRAINT_H
 
+#include "CSFix.h"
 #include "OverloadChoice.h"
 #include "swift/AST/FunctionRefKind.h"
 #include "swift/AST/Identifier.h"
@@ -223,37 +224,6 @@ llvm::StringRef getName(ConversionRestrictionKind kind);
 enum RememberChoice_t : bool {
   ForgetChoice = false,
   RememberChoice = true
-};
-
-/// Describes the kind of fix to apply to the given constraint before
-/// visiting it.
-enum class FixKind : uint8_t {
-  /// Introduce a '!' to force an optional unwrap.
-  ForceOptional,
-
-  /// Unwrap an optional base when we have a member access.
-  UnwrapOptionalBase,
-
-  /// Append 'as! T' to force a downcast to the specified type.
-  ForceDowncast,
-
-  /// Introduce a '&' to take the address of an lvalue.
-  AddressOf,
-
-  /// Replace a coercion ('as') with a forced checked cast ('as!').
-  CoerceToCheckedCast,
-
-  /// Mark function type as explicitly '@escaping'.
-  ExplicitlyEscaping,
-  /// Mark function type as explicitly '@escaping' to be convertable to 'Any'.
-  ExplicitlyEscapingToAny,
-
-  /// Arguments have labeling failures - missing/extraneous or incorrect
-  /// labels attached to the, fix it by suggesting proper labels.
-  RelabelArguments,
-
-  /// Add a new conformance to the type to satisfy a requirement.
-  AddConformance,
 };
 
 /// Describes a fix that can be applied to a constraint before visiting it.

@@ -34,13 +34,48 @@ namespace constraints {
 class ConstraintLocator;
 class Solution;
 
+/// Describes the kind of fix to apply to the given constraint before
+/// visiting it.
+enum class FixKind : uint8_t {
+  /// Introduce a '!' to force an optional unwrap.
+  ForceOptional,
+
+  /// Unwrap an optional base when we have a member access.
+  UnwrapOptionalBase,
+
+  /// Append 'as! T' to force a downcast to the specified type.
+  ForceDowncast,
+
+  /// Introduce a '&' to take the address of an lvalue.
+  AddressOf,
+
+  /// Replace a coercion ('as') with a forced checked cast ('as!').
+  CoerceToCheckedCast,
+
+  /// Mark function type as explicitly '@escaping'.
+  ExplicitlyEscaping,
+  /// Mark function type as explicitly '@escaping' to be convertable to 'Any'.
+  ExplicitlyEscapingToAny,
+
+  /// Arguments have labeling failures - missing/extraneous or incorrect
+  /// labels attached to the, fix it by suggesting proper labels.
+  RelabelArguments,
+
+  /// Add a new conformance to the type to satisfy a requirement.
+  AddConformance,
+};
+
 class ConstraintFix {
+  FixKind Kind;
   ConstraintLocator *Locator;
 
 public:
-  ConstraintFix(ConstraintLocator *locator) : Locator(locator) {}
+  ConstraintFix(FixKind kind, ConstraintLocator *locator)
+      : Kind(kind), Locator(locator) {}
 
   virtual ~ConstraintFix();
+
+  FixKind getKind() const { return Kind; }
 
   /// Diagnose a failure associated with this fix given
   /// root expression and information from well-formed solution.
@@ -59,7 +94,7 @@ class ForceDowncast final : public ConstraintFix {
 
 public:
   ForceDowncast(Type toType, ConstraintLocator *locator)
-      : ConstraintFix(locator), DowncastTo(toType) {}
+      : ConstraintFix(FixKind::ForceDowncast, locator), DowncastTo(toType) {}
 
   bool diagnose(Expr *root, const Solution &solution) const override;
   void print(llvm::raw_ostream &Out) const override;
@@ -68,7 +103,8 @@ public:
 /// Introduce a '!' to force an optional unwrap.
 class ForceOptional final : public ConstraintFix {
 public:
-  ForceOptional(ConstraintLocator *locator) : ConstraintFix(locator) {}
+  ForceOptional(ConstraintLocator *locator)
+      : ConstraintFix(FixKind::ForceOptional, locator) {}
 
   bool diagnose(Expr *root, const Solution &solution) const override;
   void print(llvm::raw_ostream &Out) const override {
@@ -82,7 +118,8 @@ class UnwrapOptionalBase final : public ConstraintFix {
 
 public:
   UnwrapOptionalBase(ConstraintLocator *locator, DeclName member)
-      : ConstraintFix(locator), MemberName(member) {}
+      : ConstraintFix(FixKind::UnwrapOptionalBase, locator),
+        MemberName(member) {}
 
   bool diagnose(Expr *root, const Solution &solution) const override;
   void print(llvm::raw_ostream &Out) const override {
@@ -93,7 +130,8 @@ public:
 /// Introduce a '&' to take the address of an lvalue.
 class AddAddressOf final : public ConstraintFix {
 public:
-  AddAddressOf(ConstraintLocator *locator) : ConstraintFix(locator) {}
+  AddAddressOf(ConstraintLocator *locator)
+      : ConstraintFix(FixKind::AddressOf, locator) {}
 
   bool diagnose(Expr *root, const Solution &solution) const override;
   void print(llvm::raw_ostream &Out) const override {
@@ -104,7 +142,8 @@ public:
 /// Replace a coercion ('as') with a forced checked cast ('as!').
 class CoerceToCheckedCast final : public ConstraintFix {
 public:
-  CoerceToCheckedCast(ConstraintLocator *locator) : ConstraintFix(locator) {}
+  CoerceToCheckedCast(ConstraintLocator *locator)
+      : ConstraintFix(FixKind::CoerceToCheckedCast, locator) {}
 
   bool diagnose(Expr *root, const Solution &solution) const override;
   void print(llvm::raw_ostream &Out) const override {
@@ -120,7 +159,8 @@ class MarkExplicitlyEscaping final : public ConstraintFix {
 
 public:
   MarkExplicitlyEscaping(ConstraintLocator *locator, Type convertingTo = Type())
-      : ConstraintFix(locator), ConvertTo(convertingTo) {}
+      : ConstraintFix(FixKind::ExplicitlyEscaping, locator),
+        ConvertTo(convertingTo) {}
 
   bool diagnose(Expr *root, const Solution &solution) const override;
   void print(llvm::raw_ostream &Out) const override {
@@ -136,7 +176,7 @@ class RelabelArguments final : public ConstraintFix {
 public:
   RelabelArguments(llvm::ArrayRef<Identifier> correctLabels,
                    ConstraintLocator *locator)
-      : ConstraintFix(locator),
+      : ConstraintFix(FixKind::RelabelArguments, locator),
         CorrectLabels(correctLabels.begin(), correctLabels.end()) {}
 
   bool diagnose(Expr *root, const Solution &solution) const override;
@@ -153,7 +193,8 @@ class MissingConformance final : public ConstraintFix {
 public:
   MissingConformance(Type type, ProtocolDecl *protocol,
                      ConstraintLocator *locator)
-      : ConstraintFix(locator), NonConformingType(type), Protocol(protocol) {}
+      : ConstraintFix(FixKind::AddConformance, locator),
+        NonConformingType(type), Protocol(protocol) {}
 
   bool diagnose(Expr *root, const Solution &solution) const override;
   void print(llvm::raw_ostream &Out) const override {
