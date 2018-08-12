@@ -604,9 +604,10 @@ private:
                                ParameterTypeFlags paramFlags, CanType ty) {
       CanTupleType tty = dyn_cast<TupleType>(ty);
       // If the abstraction pattern is opaque, and the tuple type is
-      // materializable -- if it doesn't contain an l-value type -- then it's
-      // a valid target for substitution and we should not expand it.
-      if (!tty || (pattern.isTypeParameter() && !tty->hasInOutElement())) {
+      // a valid target for substitution, don't expand it.
+      if (!tty ||
+          (pattern.isTypeParameter() &&
+           !shouldExpandTupleType(tty))) {
         visit(paramFlags.getValueOwnership(), /*forSelf=*/false, pattern, ty,
               silRepresentation);
         return;
