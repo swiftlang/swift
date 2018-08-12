@@ -200,7 +200,8 @@ void TFDeabstraction::inlineCalls() {
       for (auto &bb : fn)
         for (auto &i : bb)
           if (auto *inst = dyn_cast<GlobalAddrInst>(&i)) {
-            if (tfc.containsTensorFlowValue(inst->getType()))
+            if (tfc.containsTensorFlowValue(
+                    inst->getType(), /*checkHigherOrderFunctions*/ false))
               return true;
           }
       return false;
@@ -249,7 +250,7 @@ void TFDeabstraction::inlineCalls() {
 
     // If the call we found is to something that processes TensorFlow values,
     // then we want it inlined.
-    if (!tfc.containsTensorFlowValue(type))
+    if (!tfc.containsTensorFlowValue(type, /*checkHigherOrderFunctions*/ true))
       return false;
 
     return true;
@@ -458,7 +459,8 @@ static bool explodeAggregateInst(SILInstruction *inst,
   // Check to make sure that this operation is doing something on a value
   // containing a TensorFlow value.  If not, just leave it alone.
   auto type = inst->getOperand(0)->getType();
-  if (tfc && !tfc->containsTensorFlowValue(type))
+  if (tfc &&
+      !tfc->containsTensorFlowValue(type, /*checkHigherOrderFunctions*/ false))
     return false;
 
   // TODO: This is currently just handling loadable types.  We should be able to
@@ -679,8 +681,9 @@ bool PromotableMemoryFinder::run(ArrayRef<SILInstruction*> tensorOps) {
     auto convention = cast<SILFunctionArgument>(arg)->getArgumentConvention();
     // If this is an indirect argument working on tensors, it is a candidate.
     if (convention.isIndirectConvention() &&
-        tfc.containsTensorFlowValue(arg->getType()))
-      addressRoots.push_back({ arg, /*startsUninitialized*/false });
+        tfc.containsTensorFlowValue(arg->getType(),
+                                    /*checkHigherOrderFunctions*/ true))
+      addressRoots.push_back({arg, /*startsUninitialized*/ false});
   }
 
 
@@ -829,7 +832,8 @@ findMainFunctionGlobalAddressRootCandidates(
       // If we see an alloc global, remember where it is.
       if (auto agi = dyn_cast<AllocGlobalInst>(&inst)) {
         auto gv = agi->getReferencedGlobal();
-        if (tfc.containsTensorFlowValue(gv->getLoweredType())) {
+        if (tfc.containsTensorFlowValue(gv->getLoweredType(),
+                                        /*checkHigherOrderFunctions*/ false)) {
           assert(allocGlobals[agi->getReferencedGlobal()] == 0 &&
                  "more than one alloc_global instruction in the function?");
 
@@ -851,7 +855,8 @@ findMainFunctionGlobalAddressRootCandidates(
 
       // Process GlobalAddrInst's.
       auto ga = dyn_cast<GlobalAddrInst>(&inst);
-      if (!ga || !tfc.containsTensorFlowValue(ga->getType()))
+      if (!ga || !tfc.containsTensorFlowValue(
+                     ga->getType(), /*checkHigherOrderFunctions*/ false))
         continue;
 
       // Check to see if this is the first global_addr for this global

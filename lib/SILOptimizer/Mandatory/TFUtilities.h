@@ -342,20 +342,25 @@ public:
   bool shouldBePartitioned(SILFunction *fn);
 
   /// Return true if the specified function type has TensorFlow values in its
-  /// argument or result list, even if they are abstracted by structs or
-  /// tuples.
+  /// argument or result list (and do so recursively, if `fnType` has an
+  /// argument or result that is itself function-typed), even if they are
+  /// abstracted by structs or tuples.
   bool containsTensorFlowValue(CanSILFunctionType fnType);
 
   /// Return true if the specified type contains a TensorFlow value type that
   /// will be exposed after deabstraction.
-  bool containsTensorFlowValue(Type ty) {
-    return tctfc.containsTensorFlowValue(ty);
+  /// If `checkHigherOrderFunctions`, also check for a function-typed `ty`, if
+  /// its parameter or result contains any TensorFlow value type.
+  bool containsTensorFlowValue(Type ty, bool checkHigherOrderFunctions) {
+    return tctfc.containsTensorFlowValue(ty, checkHigherOrderFunctions);
   }
 
   /// Return true if the specified type contains a TensorFlow value type that
   /// will be exposed after deabstraction.
-  bool containsTensorFlowValue(SILType ty) {
-    return containsTensorFlowValue(ty.getASTType());
+  /// If `checkHigherOrderFunctions`, also check for a function-typed `ty`, if
+  /// its parameter or result contains any TensorFlow value type.
+  bool containsTensorFlowValue(SILType ty, bool checkHigherOrderFunctions) {
+    return containsTensorFlowValue(ty.getASTType(), checkHigherOrderFunctions);
   }
 };
 
