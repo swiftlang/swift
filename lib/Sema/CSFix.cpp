@@ -57,3 +57,8 @@ bool AddAddressOf::diagnose(Expr *root, const Solution &solution) const {
   MissingAddressOfFailure failure(root, solution, getLocator());
   return failure.diagnose();
 }
+
+bool CoerceToCheckedCast::diagnose(Expr *root, const Solution &solution) const {
+  MissingForcedDowncastFailure failure(root, solution, getLocator());
+  return failure.diagnose();
+}

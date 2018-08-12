@@ -98,6 +98,17 @@ public:
   }
 };
 
+/// Replace a coercion ('as') with a forced checked cast ('as!').
+class CoerceToCheckedCast final : public ConstraintFix {
+public:
+  CoerceToCheckedCast(ConstraintLocator *locator) : ConstraintFix(locator) {}
+
+  bool diagnose(Expr *root, const Solution &solution) const override;
+  void print(llvm::raw_ostream &Out) const override {
+    Out << "[fix: as to as!]";
+  }
+};
+
 } // end namespace constraints
 } // end namespace swift
 
