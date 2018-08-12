@@ -45,3 +45,10 @@ bool ForceOptional::diagnose(Expr *root, const Solution &solution) const {
   MissingOptionalUnwrapFailure failure(root, solution, getLocator());
   return failure.diagnose();
 }
+
+bool UnwrapOptionalBase::diagnose(Expr *root, const Solution &solution) const {
+  bool resultIsOptional = false; // FIXME: figure out a way to implement this.
+  MemberAccessOnOptionalBaseFailure failure(root, solution, getLocator(),
+                                            MemberName, resultIsOptional);
+  return failure.diagnose();
+}

@@ -18,6 +18,7 @@
 #define SWIFT_SEMA_CSFIX_H
 
 #include "swift/AST/Expr.h"
+#include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
 
 namespace llvm {
@@ -69,6 +70,20 @@ public:
   bool diagnose(Expr *root, const Solution &solution) const override;
   void print(llvm::raw_ostream &Out) const override {
     Out << "[fix: force optional]";
+  }
+};
+
+/// Unwrap an optional base when we have a member access.
+class UnwrapOptionalBase final : public ConstraintFix {
+  DeclName MemberName;
+
+public:
+  UnwrapOptionalBase(ConstraintLocator *locator, DeclName member)
+      : ConstraintFix(locator), MemberName(member) {}
+
+  bool diagnose(Expr *root, const Solution &solution) const override;
+  void print(llvm::raw_ostream &Out) const override {
+    Out << "[fix: unwrap optional base of member lookup]";
   }
 };
 
