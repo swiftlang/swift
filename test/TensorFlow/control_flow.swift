@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -O -emit-sil %s -verify -enable-objc-interop -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-module-level-graph=false -O -emit-sil %s -verify -enable-objc-interop -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 import TensorFlow
 
@@ -87,14 +87,33 @@ public func weighPetOnlyDefault(pet: Pet) {
 // CHECK:           return
 // CHECK-NEXT:  ---- END OF ANALYSIS STATE FOR FUNCTION
 
-public func testCondBranch(_ a: Bool) { // expected-warning {{'a' implicitly copied to the accelerator}}
+public func testCondBranch(_ a: Bool) {
   var b = Tensor<Float>(2.0)
-  if a { // expected-note {{value used here}}
+  if a {
     b += 1.0
   }
   b -= 1.0
   _hostOp(b)
 }
+
+// For testCondBranch(), we are generating a stateless if op.
+// CHECK-LABEL: --- TFPartition GraphDef Proto:
+// CHECK:  op: "StatelessIf"
+
+public func testWhile(_ n: Int32) {
+  var i: Int32 = 0
+  var a = Tensor<Float>(2.0)
+  while i < n {
+    a += 1.0
+    i += 1
+  }
+  a += 0.0
+  _hostOp(a)
+}
+
+// For testWhile(), we are generating a stateless while op.
+// CHECK-LABEL: --- TFPartition GraphDef Proto:
+// CHECK:  op: "StatelessWhile"
 
 // CHECK-LABEL: ---- ANALYSIS STATE FOR FUNCTION {{.*}}testSwitchEnum
 // CHECK:       bb0:
@@ -318,14 +337,10 @@ public func testCriticalEdges() {
 }
 
 
-// TODO: fix the noisy sends/recvs warning diagnostics.
 @inline(never)
-// expected-warning @+1 {{implicitly copied to the accelerator}}
 public func SR8443(n: Int32) {
   var i: Int32 = 0
-// expected-warning @+1 {{implicitly copied to the accelerator}}
-  while i < n { // expected-note {{value used here}}
-
+  while i < n {
     // expected-warning @+1 {{implicitly copied to the host}}
     let images = Tensor<Float>(0.0)
     _hostOp(images)

@@ -230,3 +230,9 @@ public func SR8399() {
   _hostOp(y)
   _hostOp(z)
 }
+
+public func SR8399_2() {
+  let x = Tensor<Float>(ones: [2, 2])
+  let y = x.reshaped(toShape: Tensor<Int32>([4, Int32(1 * 1)]))
+  _hostOp(y)
+}

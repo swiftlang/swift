@@ -279,6 +279,11 @@ private:
     if (opType == "tfc.RecvFromHost" || opType == "tfc.SendToHost")
       return DeviceType::CPU;
 
+    // Dataset / iterator related ops.
+    if (opType == "OneShotIterator" || opType == "IteratorGetNext" ||
+        opType == "TensorSliceDataset")
+      return DeviceType::CPU;
+
     // Place this inst on the device given by this deviceInfo.
     // FIXME: Use the op kernel device availability info to select a device for
     // `opType` -- if that op has no available kernel on `primaryDeviceType`, a

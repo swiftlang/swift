@@ -96,7 +96,11 @@ VarDecl *tf::getFieldIfContainsSingleField(NominalTypeDecl *decl) {
 }
 
 bool tf::isTensorHandle(SILType ty) {
-  return (bool)isTensorHandle(ty.getASTType());
+  return isTensorHandle(ty.getASTType());
+}
+
+bool tf::isOpaqueHandle(SILType ty) {
+  return isOpaqueHandle(ty.getASTType());
 }
 
 /// Determine whether the specified type is one of our well-known types, and
@@ -1554,17 +1558,15 @@ SILDebugLocation tf::skipInternalLocations(SILDebugLocation loc) {
   // implementation guts of the tensor library.  We want to report the
   // message inside the user's code, not in the guts we inlined through.
   for (; auto ics = ds->InlinedCallSite; ds = ics) {
-    // If we found a valid inlined-into location, then we are good.
-    if (ds->Loc.getSourceLoc().isValid())
-      return SILDebugLocation(ds->Loc, ds);
+    // Stop if ds is already inside a valid function location.
     if (SILFunction *F = ds->getInlinedFunction()) {
       if (F->getLocation().getSourceLoc().isValid())
         break;
     }
+    // If we found a valid inlined-into location, then we are good.
+    if (ics->Loc.getSourceLoc().isValid())
+      return SILDebugLocation(ics->Loc, ics);
   }
-
-  if (ds->Loc.getSourceLoc().isValid())
-    return SILDebugLocation(ds->Loc, ds);
 
   return loc;
 }

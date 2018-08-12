@@ -2,7 +2,6 @@
 
 import TensorFlow
 
-
 // Show inference of the tensor element type based on context.  This also
 // exposed a SILGen bug handling cleanup generation when emitting into let
 // declarations.
@@ -56,13 +55,66 @@ public func SR8412_CopyToHost() {
 }
 
 @inline(never)
-public func hostFunc() -> Tensor<Float> {
+public func hostScalarTensor() -> Tensor<Float> {
   return Tensor<Float>(1.0)
+}
+
+@inline(never)
+public func hostNonScalarTensor() -> Tensor<Float> {
+  return Tensor<Float>([1.0, 2.0])
 }
 
 public func SR8412_CopyToAccel(a: Int32) {
   let x = Tensor<Float>(1.0)
   for _ in 0...10 {
-    let _ = hostFunc() + x  // expected-warning {{value implicitly copied to the accelerator}}
+    let _ = hostScalarTensor() + x  // expected-warning {{value implicitly copied to the accelerator}}
   }
+}
+
+public func copyScalarTensorToAccel() -> Tensor<Float> {
+  return hostScalarTensor() + 1  // expected-warning {{value implicitly copied to the accelerator}}
+}
+
+public func copyNonScalarTensorToAccel() -> Tensor<Float> {
+  return hostNonScalarTensor() + 1  // expected-warning {{value implicitly copied to the accelerator}}
+}
+
+// Test that we do not diagnose a scalar transfer to the accelerator. There is a parallel test in
+// diagnostics_scalar_transfers.swift that tests that we do diagnose when
+// tf-warn-scalar-transfer=true.
+public func scalarToAccelerator(x: Float) -> Tensor<Float> {
+  return Tensor(x) + 1
+}
+
+// Test that we do not diagnose a scalar transfer to the host. There is a parallel test in
+// diagnostics_scalar_transfers.swift that tests that we do diagnose when
+// tf-warn-scalar-transfer=true.
+public func scalarToHost() {
+  var i = Tensor(0)
+  while i < 10 {
+    print("Running loop body")
+    i += 1
+  }
+}
+
+// expected-warning @+1 {{'t' implicitly copied to the accelerator}}
+public func inoutArgumentToAccelerator(t: inout Tensor<Float>) {
+  t += 1  // expected-note {{value used here}}
+}
+
+// Opaque handles should not be sent or received.
+public func opaqueHandlesCannotBeSentOrReceived() {
+  // expected-error @+2 {{value cannot be used by non-TensorFlow API}}
+  let iterator: ResourceHandle =
+    #tfop("Iterator", shared_name: "foo", container: "bar")
+  _hostOp(iterator) // expected-note {{value used here}}
+  let _ = Tensor<Float>(1.0)
+}
+
+// SR-8498: Opaque handles should not be tensor program results.
+public func opaqueHandlesCannotBeResults() {
+  // expected-error @+2 {{value cannot be used by non-TensorFlow API}}
+  let iterator: ResourceHandle =
+    #tfop("Iterator", shared_name: "foo", container: "bar")
+  _hostOp(iterator) // expected-note {{value used here}}
 }

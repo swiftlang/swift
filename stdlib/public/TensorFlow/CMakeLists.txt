@@ -37,6 +37,7 @@ list(APPEND swift_stdlib_compile_flags "-Onone")
 set(SOURCES
   CompilerRuntime.swift
   CompositeMath.swift
+  Dataset.swift
   DataTypes.swift
   Gradients.swift
   OpaqueHandles.swift
@@ -47,7 +48,9 @@ set(SOURCES
   TensorHandle.swift
   TensorProtocol.swift
   TensorShape.swift
-  Utilities.swift)
+  Utilities.swift
+  # NumPy bridging for `ShapedArray` and `Tensor`.
+  NumpyConversion.swift)
 
 # Copy TensorFlow bindings file, if it exists.
 if (TENSORFLOW_SWIFT_BINDINGS)

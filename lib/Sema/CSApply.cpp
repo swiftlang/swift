@@ -6308,10 +6308,13 @@ maybeDiagnoseUnsupportedFunctionConversion(ConstraintSystem &cs, Expr *expr,
   auto fromFnType = fromType->getAs<AnyFunctionType>();
 
   // SWIFT_ENABLE_TENSORFLOW
-  if (toType->getRepresentation()
-        == AnyFunctionType::Representation::TensorFlow ||
-      fromFnType->getRepresentation()
-        == AnyFunctionType::Representation::TensorFlow) {
+  // If function types have different representations and one of them is
+  // @convention(tensorflow), reject it.
+  auto toTypeRepr = toType->getRepresentation();
+  auto fromTypeRepr = fromFnType->getRepresentation();
+  if (toTypeRepr != fromTypeRepr &&
+      (toTypeRepr == AnyFunctionType::Representation::TensorFlow ||
+       fromTypeRepr == AnyFunctionType::Representation::TensorFlow)) {
     tc.diagnose(expr->getLoc(),
                 diag::invalid_tensorflow_fn_conversion);
     return;
