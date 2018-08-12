@@ -3482,9 +3482,24 @@ static Optional<unsigned> getElementForScalarInitOfArg(
   
   auto getElementForScalarInitSimple =
       [](const TupleType *tupleTy) -> Optional<unsigned> {
-    int index = tupleTy->getElementForScalarInit();
-    if (index < 0) return None;
-    return index;    
+    Optional<unsigned> result = None;
+    for (unsigned i = 0, e = tupleTy->getNumElements(); i != e; ++i) {
+      // If we already saw a non-vararg field, then we have more than
+      // one candidate field.
+      if (result.hasValue()) {
+        // Vararg fields are okay; they'll just end up being empty.
+        if (tupleTy->getElement(i).isVararg())
+          continue;
+
+        // Give up.
+        return None;
+      }
+
+      // Otherwise, remember this field number.
+      result = i;
+    }
+
+    return result;
   };
 
   // If there aren't any candidates, we're done.
@@ -8281,7 +8296,16 @@ bool FailureDiagnosis::visitTupleExpr(TupleExpr *TE) {
   }
   
   if (!variadicArgs.empty()) {
-    auto varargsTy = contextualTT->getVarArgsBaseType();
+    Type varargsTy;
+    for (auto &elt : contextualTT->getElements()) {
+      if (elt.isVararg()) {
+        varargsTy = elt.getVarargBaseTy();
+        break;
+      }
+    }
+
+    assert(varargsTy);
+
     for (unsigned i = 0, e = variadicArgs.size(); i != e; ++i) {
       unsigned inArgNo = variadicArgs[i];
 

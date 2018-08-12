@@ -674,8 +674,7 @@ private:
         return classifyShuffleRethrowsArgument(shuffle, paramTupleType);
       }
 
-      int scalarElt = paramTupleType->getElementForScalarInit();
-      if (scalarElt < 0) {
+      if (paramTupleType->getNumElements() != 1) {
         // Otherwise, we're passing an opaque tuple expression, and we
         // should treat it as contributing to 'rethrows' if the original
         // parameter type included a throwing function type.
@@ -684,7 +683,10 @@ private:
                                     PotentialReason::forRethrowsArgument(arg));
       }
 
-      paramType = paramTupleType->getElementType(scalarElt);
+      // FIXME: There's a case where we can end up with an ApplyExpr that
+      // has a single-element-tuple argument type, but the argument is just
+      // a ClosureExpr and not a TupleExpr/TupleShuffleExpr.
+      paramType = paramTupleType->getElementType(0);
     }
 
     // Otherwise, if the original parameter type was not a throwing

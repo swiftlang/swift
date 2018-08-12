@@ -974,9 +974,6 @@ ERROR(wrong_argument_labels,none,
       "incorrect argument label%select{|s}0 in %select{call|subscript}3 "
       "(have '%1', expected '%2')",
       (bool, StringRef, StringRef, bool))
-ERROR(extra_named_single_element_tuple,none,
-      "cannot treat single-element named tuple as a scalar; use '.%0' to "
-      "access its element", (StringRef))
 ERROR(argument_out_of_order_named_named,none,
       "argument %0 must precede argument %1", (Identifier, Identifier))
 ERROR(argument_out_of_order_named_unnamed,none,

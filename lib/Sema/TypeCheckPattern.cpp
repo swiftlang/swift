@@ -1646,7 +1646,9 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
   auto hasParenSugar = [](ArrayRef<AnyFunctionType::Param> params) -> bool {
     if (params.size() == 1) {
       const auto &param = params.front();
-      return !param.hasLabel() && !param.isVariadic();
+      return (!param.hasLabel() &&
+              !param.isVariadic() &&
+              !param.isInOut());
     }
 
     return false;
@@ -1661,36 +1663,28 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
     return type;
   };
 
-  // Check if parameter list only contains one single tuple.
-  // If it is, then parameter type would be sugared ParenType
-  // with a single underlying TupleType. In that case, check if
-  // the closure argument is also one to avoid the tuple splat
-  // from happening.
+  // If the closure is called with a single argument of tuple type
+  // but the closure body expects multiple parameters, explode the
+  // tuple.
+  //
+  // FIXME: This looks like the wrong place for this; the constraint
+  // solver should have inserted an explicit conversion already.
+  //
+  // The only reason we can get away with this, I think, is that
+  // at the SIL level, recursive tuple expansion lowers
+  // ((T, U)) -> () and (T, U) -> () to the same function type,
+  // and SILGen doesn't enforce AST invariaints very strictly.
   if (!hadError && hasParenSugar(params)) {
-    auto underlyingTy = params.front().getType();
-
-    if (underlyingTy->is<TupleType>() &&
-        !underlyingTy->castTo<TupleType>()->getVarArgsBaseType()) {
+    auto underlyingTy = params.front().getPlainType();
+    if (underlyingTy->is<TupleType>()) {
+      // If we're actually expecting a single parameter, handle it normally.
       if (P->size() == 1)
         return handleParameter(P->get(0), underlyingTy, /*mutable*/false);
-    }
 
-    // pass (strip paren sugar)
-    params.clear();
-    FunctionType::decomposeInput(underlyingTy, params);
-  }
-
-  // The context type must be a tuple.
-  if (hasParenSugar(params) && !hadError) {
-    const auto &param = params.front();
-    if (P->size() == 1) {
-      assert(P->size() == params.size());
-      return handleParameter(P->get(0), getType(param),
-                             /*mutable*/ param.isInOut());
+      // Otherwise, explode the tuple.
+      params.clear();
+      FunctionType::decomposeInput(underlyingTy, params);
     }
-    diagnose(P->getStartLoc(), diag::tuple_pattern_in_non_tuple_context,
-             param.getType());
-    hadError = true;
   }
   
   // The number of elements must match exactly.
