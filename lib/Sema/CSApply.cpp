@@ -6606,19 +6606,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                         /*isImplicit*/ true));
     }
 
-    // If we're actually turning this into an lvalue tuple element, don't
-    // load.
-    bool performLoad = true;
-    if (auto toTuple = toType->getAs<TupleType>()) {
-      int scalarIdx = toTuple->getElementForScalarInit();
-      if (scalarIdx >= 0 &&
-          toTuple->getElement(scalarIdx).isInOut())
-        performLoad = false;
-    }
-
-    if (performLoad) {
-      return coerceToType(addImplicitLoadExpr(cs, expr), toType, locator);
-    }
+    return coerceToType(addImplicitLoadExpr(cs, expr), toType, locator);
   }
 
   // Coercions to tuple type.
