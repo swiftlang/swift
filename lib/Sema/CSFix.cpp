@@ -52,3 +52,8 @@ bool UnwrapOptionalBase::diagnose(Expr *root, const Solution &solution) const {
                                             MemberName, resultIsOptional);
   return failure.diagnose();
 }
+
+bool AddAddressOf::diagnose(Expr *root, const Solution &solution) const {
+  MissingAddressOfFailure failure(root, solution, getLocator());
+  return failure.diagnose();
+}

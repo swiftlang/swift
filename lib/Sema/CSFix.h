@@ -87,6 +87,17 @@ public:
   }
 };
 
+/// Introduce a '&' to take the address of an lvalue.
+class AddAddressOf final : public ConstraintFix {
+public:
+  AddAddressOf(ConstraintLocator *locator) : ConstraintFix(locator) {}
+
+  bool diagnose(Expr *root, const Solution &solution) const override;
+  void print(llvm::raw_ostream &Out) const override {
+    Out << "[fix: add address-of]";
+  }
+};
+
 } // end namespace constraints
 } // end namespace swift
 
