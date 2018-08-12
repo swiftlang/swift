@@ -3207,8 +3207,8 @@ void Serializer::writeDecl(const Decl *D) {
     uint8_t rawDefaultArgumentResilienceExpansion =
       getRawStableResilienceExpansion(
           fn->getDefaultArgumentResilienceExpansion());
-    Type ty = fn->getInterfaceType();
 
+    Type ty = fn->getInterfaceType();
     for (auto dependency : collectDependenciesFromType(ty->getCanonicalType()))
       nameComponentsAndDependencies.push_back(addTypeRef(dependency));
 
@@ -3226,7 +3226,7 @@ void Serializer::writeDecl(const Decl *D) {
                            fn->hasThrows(),
                            addGenericEnvironmentRef(
                                                   fn->getGenericEnvironment()),
-                           addTypeRef(ty),
+                           addTypeRef(fn->getResultInterfaceType()),
                            addDeclRef(fn->getOperatorDecl()),
                            addDeclRef(fn->getOverriddenDecl()),
                            fn->getFullName().getArgumentNames().size() +
@@ -3263,8 +3263,8 @@ void Serializer::writeDecl(const Decl *D) {
     uint8_t rawDefaultArgumentResilienceExpansion =
       getRawStableResilienceExpansion(
           fn->getDefaultArgumentResilienceExpansion());
-    Type ty = fn->getInterfaceType();
 
+    Type ty = fn->getInterfaceType();
     SmallVector<IdentifierID, 4> dependencies;
     for (auto dependency : collectDependenciesFromType(ty->getCanonicalType()))
       dependencies.push_back(addTypeRef(dependency));
@@ -3283,7 +3283,7 @@ void Serializer::writeDecl(const Decl *D) {
                                fn->hasThrows(),
                                addGenericEnvironmentRef(
                                                   fn->getGenericEnvironment()),
-                               addTypeRef(ty),
+                               addTypeRef(fn->getResultInterfaceType()),
                                addDeclRef(fn->getOverriddenDecl()),
                                addDeclRef(fn->getStorage()),
                                rawAccessorKind,
@@ -3336,7 +3336,6 @@ void Serializer::writeDecl(const Decl *D) {
     unsigned abbrCode = DeclTypeAbbrCodes[EnumElementLayout::Code];
     EnumElementLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                   contextID,
-                                  addTypeRef(elem->getInterfaceType()),
                                   elem->isImplicit(),
                                   elem->hasAssociatedValues(),
                                   (unsigned)RawValueKind,
@@ -3389,7 +3388,7 @@ void Serializer::writeDecl(const Decl *D) {
                                 accessors.Decls.size(),
                                 addGenericEnvironmentRef(
                                             subscript->getGenericEnvironment()),
-                                addTypeRef(ty),
+                                addTypeRef(subscript->getElementInterfaceType()),
                                 addDeclRef(subscript->getOverriddenDecl()),
                                 rawAccessLevel,
                                 rawSetterAccessLevel,
@@ -3440,7 +3439,6 @@ void Serializer::writeDecl(const Decl *D) {
                                     ctor->getInitKind()),
                                   addGenericEnvironmentRef(
                                                  ctor->getGenericEnvironment()),
-                                  addTypeRef(ty),
                                   addDeclRef(ctor->getOverriddenDecl()),
                                   rawAccessLevel,
                                   ctor->needsNewVTableEntry(),
@@ -3469,8 +3467,7 @@ void Serializer::writeDecl(const Decl *D) {
                                  dtor->isImplicit(),
                                  dtor->isObjC(),
                                  addGenericEnvironmentRef(
-                                                dtor->getGenericEnvironment()),
-                                 addTypeRef(dtor->getInterfaceType()));
+                                                dtor->getGenericEnvironment()));
     break;
   }
 
@@ -3609,7 +3606,7 @@ void Serializer::writeType(Type ty) {
 
   TypeOffsets.push_back(Out.GetCurrentBitNo());
 
-  switch (ty.getPointer()->getKind()) {
+  switch (ty->getKind()) {
   case TypeKind::Error:
   case TypeKind::Unresolved:
     llvm_unreachable("should not serialize an invalid type");
@@ -3649,15 +3646,11 @@ void Serializer::writeType(Type ty) {
 
   case TypeKind::Paren: {
     auto parenTy = cast<ParenType>(ty.getPointer());
-    auto paramFlags = parenTy->getParameterFlags();
-    auto rawOwnership =
-        getRawStableValueOwnership(paramFlags.getValueOwnership());
+    assert(parenTy->getParameterFlags().isNone());
 
     unsigned abbrCode = DeclTypeAbbrCodes[ParenTypeLayout::Code];
     ParenTypeLayout::emitRecord(
-        Out, ScratchRecord, abbrCode, addTypeRef(parenTy->getUnderlyingType()),
-        paramFlags.isVariadic(), paramFlags.isAutoClosure(),
-        paramFlags.isEscaping(), rawOwnership);
+        Out, ScratchRecord, abbrCode, addTypeRef(parenTy->getUnderlyingType()));
     break;
   }
 
@@ -3669,13 +3662,11 @@ void Serializer::writeType(Type ty) {
 
     abbrCode = DeclTypeAbbrCodes[TupleTypeEltLayout::Code];
     for (auto &elt : tupleTy->getElements()) {
-      auto paramFlags = elt.getParameterFlags();
-      auto rawOwnership =
-          getRawStableValueOwnership(paramFlags.getValueOwnership());
+      assert(elt.getParameterFlags().isNone());
       TupleTypeEltLayout::emitRecord(
-          Out, ScratchRecord, abbrCode, addDeclBaseNameRef(elt.getName()),
-          addTypeRef(elt.getType()), paramFlags.isVariadic(),
-          paramFlags.isAutoClosure(), paramFlags.isEscaping(), rawOwnership);
+          Out, ScratchRecord, abbrCode,
+          addDeclBaseNameRef(elt.getName()),
+          addTypeRef(elt.getType()));
     }
 
     break;
@@ -3785,29 +3776,42 @@ void Serializer::writeType(Type ty) {
     break;
   }
 
-  case TypeKind::Function: {
-    auto fnTy = cast<FunctionType>(ty.getPointer());
-
-    unsigned abbrCode = DeclTypeAbbrCodes[FunctionTypeLayout::Code];
-    FunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-           addTypeRef(fnTy->getInput()),
-           addTypeRef(fnTy->getResult()),
-           getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
-           fnTy->isAutoClosure(),
-           fnTy->isNoEscape(),
-           fnTy->throws());
-    break;
-  }
-
+  case TypeKind::Function:
   case TypeKind::GenericFunction: {
-    auto fnTy = cast<GenericFunctionType>(ty.getPointer());
-    unsigned abbrCode = DeclTypeAbbrCodes[GenericFunctionTypeLayout::Code];
-    GenericFunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-            addTypeRef(fnTy->getInput()),
-            addTypeRef(fnTy->getResult()),
-            getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
-            fnTy->throws(),
-            addGenericSignatureRef(fnTy->getGenericSignature()));
+    auto *fnTy = cast<AnyFunctionType>(ty.getPointer());
+
+    if (isa<FunctionType>(fnTy)) {
+      unsigned abbrCode = DeclTypeAbbrCodes[FunctionTypeLayout::Code];
+      FunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+             addTypeRef(fnTy->getResult()),
+             getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
+             fnTy->isAutoClosure(),
+             fnTy->isNoEscape(),
+             fnTy->throws());
+    } else {
+      assert(!fnTy->isAutoClosure());
+      assert(!fnTy->isNoEscape());
+
+      auto *genericSig = cast<GenericFunctionType>(fnTy)->getGenericSignature();
+      unsigned abbrCode = DeclTypeAbbrCodes[GenericFunctionTypeLayout::Code];
+      GenericFunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+              addTypeRef(fnTy->getResult()),
+              getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
+              fnTy->throws(),
+              addGenericSignatureRef(genericSig));
+    }
+
+    unsigned abbrCode = DeclTypeAbbrCodes[FunctionParamLayout::Code];
+    for (auto &param : fnTy->getParams()) {
+      auto paramFlags = param.getParameterFlags();
+      auto rawOwnership =
+          getRawStableValueOwnership(paramFlags.getValueOwnership());
+      FunctionParamLayout::emitRecord(
+          Out, ScratchRecord, abbrCode, addDeclBaseNameRef(param.getLabel()),
+          addTypeRef(param.getPlainType()), paramFlags.isVariadic(),
+          paramFlags.isAutoClosure(), paramFlags.isEscaping(), rawOwnership);
+    }
+
     break;
   }
       
@@ -3930,15 +3934,6 @@ void Serializer::writeType(Type ty) {
     break;
   }
 
-  case TypeKind::InOut: {
-    auto iotTy = cast<InOutType>(ty.getPointer());
-
-    unsigned abbrCode = DeclTypeAbbrCodes[InOutTypeLayout::Code];
-    InOutTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                addTypeRef(iotTy->getObjectType()));
-    break;
-  }
-
 #define REF_STORAGE(Name, ...) \
   case TypeKind::Name##Storage:
 #include "swift/AST/ReferenceStorage.def"
@@ -3982,6 +3977,8 @@ void Serializer::writeType(Type ty) {
     break;
   }
 
+  case TypeKind::InOut:
+    llvm_unreachable("inout types are only used in function type parameters");
   case TypeKind::LValue:
     llvm_unreachable("lvalue types are only used in function bodies");
   case TypeKind::TypeVariable:
@@ -4001,9 +3998,9 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<TupleTypeLayout>();
   registerDeclTypeAbbr<TupleTypeEltLayout>();
   registerDeclTypeAbbr<FunctionTypeLayout>();
+  registerDeclTypeAbbr<FunctionParamLayout>();
   registerDeclTypeAbbr<MetatypeTypeLayout>();
   registerDeclTypeAbbr<ExistentialMetatypeTypeLayout>();
-  registerDeclTypeAbbr<InOutTypeLayout>();
   registerDeclTypeAbbr<ArchetypeTypeLayout>();
   registerDeclTypeAbbr<ProtocolCompositionTypeLayout>();
   registerDeclTypeAbbr<BoundGenericTypeLayout>();
