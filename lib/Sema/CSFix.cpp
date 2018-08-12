@@ -74,3 +74,9 @@ bool RelabelArguments::diagnose(Expr *root, const Solution &solution) const {
   LabelingFailure failure(solution, getLocator(), CorrectLabels);
   return failure.diagnose();
 }
+
+bool MissingConformance::diagnose(Expr *root, const Solution &solution) const {
+  MissingConformanceFailure failure(root, solution, getLocator(),
+                                    {NonConformingType.getPointer(), Protocol});
+  return failure.diagnose();
+}

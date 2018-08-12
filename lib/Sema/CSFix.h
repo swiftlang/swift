@@ -17,6 +17,7 @@
 #ifndef SWIFT_SEMA_CSFIX_H
 #define SWIFT_SEMA_CSFIX_H
 
+#include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
@@ -141,6 +142,22 @@ public:
   bool diagnose(Expr *root, const Solution &solution) const override;
   void print(llvm::raw_ostream &Out) const override {
     Out << "[fix: re-label argument(s)]";
+  }
+};
+
+/// Add a new conformance to the type to satisfy a requirement.
+class MissingConformance final : public ConstraintFix {
+  Type NonConformingType;
+  ProtocolDecl *Protocol;
+
+public:
+  MissingConformance(Type type, ProtocolDecl *protocol,
+                     ConstraintLocator *locator)
+      : ConstraintFix(locator), NonConformingType(type), Protocol(protocol) {}
+
+  bool diagnose(Expr *root, const Solution &solution) const override;
+  void print(llvm::raw_ostream &Out) const override {
+    Out << "[fix: add missing protocol conformance]";
   }
 };
 
