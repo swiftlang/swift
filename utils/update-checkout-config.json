@@ -293,7 +293,7 @@
                 "llvm": "swift-DEVELOPMENT-SNAPSHOT-2018-07-23-a",
                 "clang": "swift-DEVELOPMENT-SNAPSHOT-2018-07-23-a",
                 "swift": "tensorflow",
-                "lldb": "tensorflow",
+                "lldb": "7b71714e6b6ffb745d7f4c113a08eaf81755e943",
                 "cmark": "swift-DEVELOPMENT-SNAPSHOT-2018-07-23-a",
                 "llbuild": "swift-DEVELOPMENT-SNAPSHOT-2018-07-23-a",
                 "swiftpm": "swift-DEVELOPMENT-SNAPSHOT-2018-07-23-a",
