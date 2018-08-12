@@ -160,3 +160,24 @@ public func testShapeList() {
 
 // CHECK-LABEL: ---- INPUT FUNCTION {{.*}}testShapeList
 // CHECK: graph_op "AnonymousIterator"() {output_types: [$Int32.Type: $Int32], output_shapes: [$TensorShape: ([$Int32: ])]
+
+@TensorFlowGraph
+func isZero(_ x: Tensor<Float>) -> Tensor<Bool> {
+  return Tensor(x.scalarized() == 0)
+}
+
+public func noescapeFuncAsAttr(_ f: @convention(tensorflow) (Tensor<Float>) -> Tensor<Bool>) {
+  let t = Tensor<Int32>([0])
+  let dataset: VariantHandle = #tfop(
+    "TensorSliceDataset", [t],
+    Toutput_types: [Int32.self],
+    output_shapes: [TensorShape()]
+  )
+  let _: VariantHandle = #tfop(
+    "FilterDataset", dataset, [Tensor<Int32>(0)], predicate: isZero,
+    Targuments: [Int32.self], output_types: [Float.self], output_shapes: [TensorShape()]
+  )
+}
+
+// CHECK-LABEL: ---- INPUT FUNCTION {{.*}}noescapeFuncAsAttr
+// CHECK: graph_op "FilterDataset,i,L,e"(%{{.*}} : $VariantHandle, %{{.*}} : $TensorHandle<Int32>) {predicate: @{{.*}}isZero{{.*}} : $@convention(tensorflow) (@guaranteed Tensor<Float>) -> @owned Tensor<Bool>
