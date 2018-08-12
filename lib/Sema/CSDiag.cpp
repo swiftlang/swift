@@ -8296,7 +8296,16 @@ bool FailureDiagnosis::visitTupleExpr(TupleExpr *TE) {
   }
   
   if (!variadicArgs.empty()) {
-    auto varargsTy = contextualTT->getVarArgsBaseType();
+    Type varargsTy;
+    for (auto &elt : contextualTT->getElements()) {
+      if (elt.isVararg()) {
+        varargsTy = elt.getVarargBaseTy();
+        break;
+      }
+    }
+
+    assert(varargsTy);
+
     for (unsigned i = 0, e = variadicArgs.size(); i != e; ++i) {
       unsigned inArgNo = variadicArgs[i];
 

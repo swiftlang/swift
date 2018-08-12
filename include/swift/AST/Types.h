@@ -1876,11 +1876,6 @@ public:
   /// return the element index, otherwise return -1.
   int getNamedElementId(Identifier I) const;
   
-  /// If this tuple has a varargs element to it, return the base type of the
-  /// varargs element (i.e., if it is "Int...", this returns Int, not [Int]).
-  /// Otherwise, this returns Type().
-  Type getVarArgsBaseType() const;
-  
   /// Returns true if this tuple has inout elements.
   bool hasInOutElement() const {
     return static_cast<bool>(Bits.TupleType.HasInOutElement);

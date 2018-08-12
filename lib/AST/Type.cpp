@@ -2422,18 +2422,6 @@ int TupleType::getNamedElementId(Identifier I) const {
   return -1;
 }
 
-/// If this tuple has a varargs element to it, return the base type of the
-/// varargs element (i.e., if it is "Int...", this returns Int, not [Int]).
-/// Otherwise, this returns Type().
-Type TupleType::getVarArgsBaseType() const {
-  for (unsigned i = 0, e = Bits.TupleType.Count; i != e; ++i) {
-    if (getTrailingObjects<TupleTypeElt>()[i].isVararg())
-      return getTrailingObjects<TupleTypeElt>()[i].getVarargBaseTy();
-  }
-  
-  return Type();
-}
-
 
 ArchetypeType::ArchetypeType(
   const ASTContext &Ctx,
