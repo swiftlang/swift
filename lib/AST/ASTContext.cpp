@@ -2974,7 +2974,7 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
                           Fields[0].getParameterFlags());
 
   RecursiveTypeProperties properties;
-  bool hasInOut = false;
+  bool hasElementWithOwnership = false;
   for (const TupleTypeElt &Elt : Fields) {
     auto eltTy = Elt.getType();
     if (!eltTy) continue;
@@ -2984,11 +2984,13 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
     // non-paren tuples are malformed and will be diagnosed later.
     if (auto *TTy = Elt.getType()->getAs<TupleType>()) {
       if (TTy->getNumElements() == 1)
-        hasInOut |= TTy->hasInOutElement();
+        hasElementWithOwnership |= TTy->hasElementWithOwnership();
     } else if (auto *Pty = dyn_cast<ParenType>(Elt.getType().getPointer())) {
-      hasInOut |= Pty->getParameterFlags().isInOut();
+      hasElementWithOwnership |= (Pty->getParameterFlags().getValueOwnership() !=
+                                  ValueOwnership::Default);
     } else {
-      hasInOut |= Elt.getParameterFlags().isInOut();
+      hasElementWithOwnership |= (Elt.getParameterFlags().getValueOwnership() !=
+                                  ValueOwnership::Default);
     }
   }
 
@@ -3016,7 +3018,7 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
                          sizeof(TupleTypeElt) * Fields.size(),
                          alignof(TupleType), arena);
   auto New = new (mem) TupleType(Fields, IsCanonical ? &C : nullptr, properties,
-                                 hasInOut);
+                                 hasElementWithOwnership);
   C.getImpl().getArena(arena).TupleTypes.InsertNode(New, InsertPos);
   return New;
 }

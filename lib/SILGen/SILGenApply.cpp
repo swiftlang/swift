@@ -2540,7 +2540,7 @@ private:
 
   bool isUnmaterializableTupleType(CanType type) {
     if (auto tuple = dyn_cast<TupleType>(type))
-      if (tuple->hasInOutElement())
+      if (tuple->hasElementWithOwnership())
         return true;
     return false;
   }
