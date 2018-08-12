@@ -69,3 +69,8 @@ bool MarkExplicitlyEscaping::diagnose(Expr *root,
                                               ConvertTo);
   return failure.diagnose();
 }
+
+bool RelabelArguments::diagnose(Expr *root, const Solution &solution) const {
+  LabelingFailure failure(solution, getLocator(), CorrectLabels);
+  return failure.diagnose();
+}

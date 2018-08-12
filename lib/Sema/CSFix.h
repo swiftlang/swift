@@ -20,6 +20,8 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace llvm {
 class raw_ostream;
@@ -122,6 +124,23 @@ public:
   bool diagnose(Expr *root, const Solution &solution) const override;
   void print(llvm::raw_ostream &Out) const override {
     Out << "[fix: add @escaping]";
+  }
+};
+
+/// Arguments have labeling failures - missing/extraneous or incorrect
+/// labels attached to the, fix it by suggesting proper labels.
+class RelabelArguments final : public ConstraintFix {
+  llvm::SmallVector<Identifier, 4> CorrectLabels;
+
+public:
+  RelabelArguments(llvm::ArrayRef<Identifier> correctLabels,
+                   ConstraintLocator *locator)
+      : ConstraintFix(locator),
+        CorrectLabels(correctLabels.begin(), correctLabels.end()) {}
+
+  bool diagnose(Expr *root, const Solution &solution) const override;
+  void print(llvm::raw_ostream &Out) const override {
+    Out << "[fix: re-label argument(s)]";
   }
 };
 
