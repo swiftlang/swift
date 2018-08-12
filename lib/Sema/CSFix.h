@@ -31,6 +31,7 @@ class raw_ostream;
 namespace swift {
 namespace constraints {
 
+class ConstraintSystem;
 class ConstraintLocator;
 class Solution;
 
@@ -92,63 +93,77 @@ public:
 class ForceDowncast final : public ConstraintFix {
   Type DowncastTo;
 
-public:
   ForceDowncast(Type toType, ConstraintLocator *locator)
       : ConstraintFix(FixKind::ForceDowncast, locator), DowncastTo(toType) {}
 
+public:
   bool diagnose(Expr *root, const Solution &solution) const override;
   void print(llvm::raw_ostream &Out) const override;
+
+  static ForceDowncast *create(ConstraintSystem &cs, Type toType,
+                               ConstraintLocator *locator);
 };
 
 /// Introduce a '!' to force an optional unwrap.
 class ForceOptional final : public ConstraintFix {
-public:
   ForceOptional(ConstraintLocator *locator)
       : ConstraintFix(FixKind::ForceOptional, locator) {}
 
+public:
   bool diagnose(Expr *root, const Solution &solution) const override;
   void print(llvm::raw_ostream &Out) const override {
     Out << "[fix: force optional]";
   }
+
+  static ForceOptional *create(ConstraintSystem &cs,
+                               ConstraintLocator *locator);
 };
 
 /// Unwrap an optional base when we have a member access.
 class UnwrapOptionalBase final : public ConstraintFix {
   DeclName MemberName;
 
-public:
-  UnwrapOptionalBase(ConstraintLocator *locator, DeclName member)
+  UnwrapOptionalBase(DeclName member, ConstraintLocator *locator)
       : ConstraintFix(FixKind::UnwrapOptionalBase, locator),
         MemberName(member) {}
 
+public:
   bool diagnose(Expr *root, const Solution &solution) const override;
   void print(llvm::raw_ostream &Out) const override {
     Out << "[fix: unwrap optional base of member lookup]";
   }
+
+  static UnwrapOptionalBase *create(ConstraintSystem &cs, DeclName member,
+                                    ConstraintLocator *locator);
 };
 
 /// Introduce a '&' to take the address of an lvalue.
 class AddAddressOf final : public ConstraintFix {
-public:
   AddAddressOf(ConstraintLocator *locator)
       : ConstraintFix(FixKind::AddressOf, locator) {}
 
+private:
   bool diagnose(Expr *root, const Solution &solution) const override;
   void print(llvm::raw_ostream &Out) const override {
     Out << "[fix: add address-of]";
   }
+
+  static AddAddressOf *create(ConstraintSystem &cs, ConstraintLocator *locator);
 };
 
 /// Replace a coercion ('as') with a forced checked cast ('as!').
 class CoerceToCheckedCast final : public ConstraintFix {
-public:
   CoerceToCheckedCast(ConstraintLocator *locator)
       : ConstraintFix(FixKind::CoerceToCheckedCast, locator) {}
 
+public:
   bool diagnose(Expr *root, const Solution &solution) const override;
   void print(llvm::raw_ostream &Out) const override {
     Out << "[fix: as to as!]";
   }
+
+  static CoerceToCheckedCast *create(ConstraintSystem &cs,
+                                     ConstraintLocator *locator);
 };
 
 /// Mark function type as explicitly '@escaping'.
@@ -157,15 +172,19 @@ class MarkExplicitlyEscaping final : public ConstraintFix {
   /// to be converted to some other generic type.
   Type ConvertTo;
 
-public:
   MarkExplicitlyEscaping(ConstraintLocator *locator, Type convertingTo = Type())
       : ConstraintFix(FixKind::ExplicitlyEscaping, locator),
         ConvertTo(convertingTo) {}
 
+public:
   bool diagnose(Expr *root, const Solution &solution) const override;
   void print(llvm::raw_ostream &Out) const override {
     Out << "[fix: add @escaping]";
   }
+
+  static MarkExplicitlyEscaping *create(ConstraintSystem &cs,
+                                        ConstraintLocator *locator,
+                                        Type convertingTo = Type());
 };
 
 /// Arguments have labeling failures - missing/extraneous or incorrect
@@ -173,16 +192,20 @@ public:
 class RelabelArguments final : public ConstraintFix {
   llvm::SmallVector<Identifier, 4> CorrectLabels;
 
-public:
   RelabelArguments(llvm::ArrayRef<Identifier> correctLabels,
                    ConstraintLocator *locator)
       : ConstraintFix(FixKind::RelabelArguments, locator),
         CorrectLabels(correctLabels.begin(), correctLabels.end()) {}
 
+public:
   bool diagnose(Expr *root, const Solution &solution) const override;
   void print(llvm::raw_ostream &Out) const override {
     Out << "[fix: re-label argument(s)]";
   }
+
+  static RelabelArguments *create(ConstraintSystem &cs,
+                                  llvm::ArrayRef<Identifier> correctLabels,
+                                  ConstraintLocator *locator);
 };
 
 /// Add a new conformance to the type to satisfy a requirement.
@@ -190,16 +213,20 @@ class MissingConformance final : public ConstraintFix {
   Type NonConformingType;
   ProtocolDecl *Protocol;
 
-public:
   MissingConformance(Type type, ProtocolDecl *protocol,
                      ConstraintLocator *locator)
       : ConstraintFix(FixKind::AddConformance, locator),
         NonConformingType(type), Protocol(protocol) {}
 
+public:
   bool diagnose(Expr *root, const Solution &solution) const override;
   void print(llvm::raw_ostream &Out) const override {
     Out << "[fix: add missing protocol conformance]";
   }
+
+  static MissingConformance *create(ConstraintSystem &cs, Type type,
+                                    ProtocolDecl *protocol,
+                                    ConstraintLocator *locator);
 };
 
 } // end namespace constraints

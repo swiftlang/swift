@@ -41,9 +41,19 @@ void ForceDowncast::print(llvm::raw_ostream &Out) const {
   Out << "[fix: force downcast (as! " << DowncastTo->getString() << ")]";
 }
 
+ForceDowncast *ForceDowncast::create(ConstraintSystem &cs, Type toType,
+                                     ConstraintLocator *locator) {
+  return new (cs.getAllocator()) ForceDowncast(toType, locator);
+}
+
 bool ForceOptional::diagnose(Expr *root, const Solution &solution) const {
   MissingOptionalUnwrapFailure failure(root, solution, getLocator());
   return failure.diagnose();
+}
+
+ForceOptional *ForceOptional::create(ConstraintSystem &cs,
+                                     ConstraintLocator *locator) {
+  return new (cs.getAllocator()) ForceOptional(locator);
 }
 
 bool UnwrapOptionalBase::diagnose(Expr *root, const Solution &solution) const {
@@ -53,14 +63,30 @@ bool UnwrapOptionalBase::diagnose(Expr *root, const Solution &solution) const {
   return failure.diagnose();
 }
 
+UnwrapOptionalBase *UnwrapOptionalBase::create(ConstraintSystem &cs,
+                                               DeclName member,
+                                               ConstraintLocator *locator) {
+  return new (cs.getAllocator()) UnwrapOptionalBase(member, locator);
+}
+
 bool AddAddressOf::diagnose(Expr *root, const Solution &solution) const {
   MissingAddressOfFailure failure(root, solution, getLocator());
   return failure.diagnose();
 }
 
+AddAddressOf *AddAddressOf::create(ConstraintSystem &cs,
+                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AddAddressOf(locator);
+}
+
 bool CoerceToCheckedCast::diagnose(Expr *root, const Solution &solution) const {
   MissingForcedDowncastFailure failure(root, solution, getLocator());
   return failure.diagnose();
+}
+
+CoerceToCheckedCast *CoerceToCheckedCast::create(ConstraintSystem &cs,
+                                                 ConstraintLocator *locator) {
+  return new (cs.getAllocator()) CoerceToCheckedCast(locator);
 }
 
 bool MarkExplicitlyEscaping::diagnose(Expr *root,
@@ -70,13 +96,32 @@ bool MarkExplicitlyEscaping::diagnose(Expr *root,
   return failure.diagnose();
 }
 
+MarkExplicitlyEscaping *
+MarkExplicitlyEscaping::create(ConstraintSystem &cs, ConstraintLocator *locator,
+                               Type convertingTo) {
+  return new (cs.getAllocator()) MarkExplicitlyEscaping(locator, convertingTo);
+}
+
 bool RelabelArguments::diagnose(Expr *root, const Solution &solution) const {
   LabelingFailure failure(solution, getLocator(), CorrectLabels);
   return failure.diagnose();
+}
+
+RelabelArguments *
+RelabelArguments::create(ConstraintSystem &cs,
+                         llvm::ArrayRef<Identifier> correctLabels,
+                         ConstraintLocator *locator) {
+  return new (cs.getAllocator()) RelabelArguments(correctLabels, locator);
 }
 
 bool MissingConformance::diagnose(Expr *root, const Solution &solution) const {
   MissingConformanceFailure failure(root, solution, getLocator(),
                                     {NonConformingType.getPointer(), Protocol});
   return failure.diagnose();
+}
+
+MissingConformance *MissingConformance::create(ConstraintSystem &cs, Type type,
+                                               ProtocolDecl *protocol,
+                                               ConstraintLocator *locator) {
+  return new (cs.getAllocator()) MissingConformance(type, protocol, locator);
 }
