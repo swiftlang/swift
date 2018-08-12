@@ -94,7 +94,7 @@ extension RandomNumberGenerator {
     _memcpy(
       dest: dest.advanced(by: bytesWritten),
       src: &tmp,
-      size: UInt(buffer.count - blocks)
+      size: UInt(buffer.count - bytesWritten)
     )
   }
   
