@@ -144,7 +144,8 @@ bool MissingConformanceFailure::diagnose() {
     // If this is a static, initializer or operator call,
     // let's not try to diagnose it here, but refer to expression
     // diagnostics.
-    if (isa<BinaryExpr>(applyExpr) || isa<TypeExpr>(anchor))
+    if (isa<PrefixUnaryExpr>(applyExpr) || isa<PostfixUnaryExpr>(applyExpr) ||
+        isa<BinaryExpr>(applyExpr) || isa<TypeExpr>(anchor))
       return false;
 
     if (auto *fnType = ownerType->getAs<AnyFunctionType>()) {
