@@ -30,3 +30,13 @@ using namespace constraints;
 ConstraintFix::~ConstraintFix() {}
 
 void ConstraintFix::dump() const { print(llvm::errs()); }
+
+bool ForceDowncast::diagnose(Expr *expr, const Solution &solution) const {
+  MissingExplicitConversionFailure failure(expr, solution, getLocator(),
+                                           DowncastTo);
+  return failure.diagnose();
+}
+
+void ForceDowncast::print(llvm::raw_ostream &Out) const {
+  Out << "fix: force downcast (as! " << DowncastTo->getString() << ")\n";
+}

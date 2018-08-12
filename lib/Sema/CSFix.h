@@ -49,6 +49,18 @@ public:
   ConstraintLocator *getLocator() const { return Locator; }
 };
 
+/// Append 'as! T' to force a downcast to the specified type.
+class ForceDowncast final : public ConstraintFix {
+  Type DowncastTo;
+
+public:
+  ForceDowncast(Type toType, ConstraintLocator *locator)
+      : ConstraintFix(locator), DowncastTo(toType) {}
+
+  bool diagnose(Expr *root, const Solution &solution) const override;
+  void print(llvm::raw_ostream &Out) const override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 
