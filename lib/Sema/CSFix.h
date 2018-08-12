@@ -86,6 +86,10 @@ public:
   LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
                             "only for use within the debugger");
 
+  /// Retrieve anchor expression associated with this fix.
+  /// NOTE: such anchor comes directly from locator without
+  /// any simplication attempts.
+  Expr *getAnchor() const;
   ConstraintLocator *getLocator() const { return Locator; }
 };
 
@@ -142,7 +146,7 @@ class AddAddressOf final : public ConstraintFix {
   AddAddressOf(ConstraintLocator *locator)
       : ConstraintFix(FixKind::AddressOf, locator) {}
 
-private:
+public:
   bool diagnose(Expr *root, const Solution &solution) const override;
   void print(llvm::raw_ostream &Out) const override {
     Out << "[fix: add address-of]";

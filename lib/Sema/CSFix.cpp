@@ -29,6 +29,8 @@ using namespace constraints;
 
 ConstraintFix::~ConstraintFix() {}
 
+Expr *ConstraintFix::getAnchor() const { return getLocator()->getAnchor(); }
+
 void ConstraintFix::dump() const { print(llvm::errs()); }
 
 bool ForceDowncast::diagnose(Expr *expr, const Solution &solution) const {
