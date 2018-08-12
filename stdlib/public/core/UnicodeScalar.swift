@@ -33,7 +33,7 @@ extension Unicode {
   ///     print(airplane)
   ///     // Prints "✈︎"
   @_fixed_layout
-  public struct Scalar {    
+  public struct Scalar {
     @inlinable // FIXME(sil-serialize-all)
     internal init(_value: UInt32) {
       self._value = _value
@@ -337,7 +337,7 @@ extension Unicode.Scalar {
   ///
   /// In case of an invalid input value, nil is returned.
   ///
-  ///     let codepoint: UInt32 = extValue // This might be an invalid value. 
+  ///     let codepoint: UInt32 = extValue // This might be an invalid value.
   ///     if let emoji = Unicode.Scalar(codepoint) {
   ///       print(emoji)
   ///     } else {
@@ -396,7 +396,7 @@ extension Unicode.Scalar : Comparable {
 extension Unicode.Scalar {
   @_fixed_layout // FIXME(sil-serialize-all)
   public struct UTF16View {
-    @inlinable // FIXME(sil-serialize-all)    
+    @inlinable // FIXME(sil-serialize-all)
     internal init(value: Unicode.Scalar) {
       self.value = value
     }
@@ -464,3 +464,38 @@ extension Unicode.Scalar {
     Builtin.unreachable()
   }
 }
+
+// Access the underlying code units
+extension Unicode.Scalar {
+  // Access the scalar as encoded in UTF-16
+  internal func withUTF16CodeUnits<Result>(
+    _ body: (UnsafeBufferPointer<UInt16>) throws -> Result
+  ) rethrows -> Result {
+    var codeUnits: (UInt16, UInt16) = (self.utf16[0], 0)
+    let utf16Count = self.utf16.count
+    if utf16Count > 1 {
+      _sanityCheck(utf16Count == 2)
+      codeUnits.1 = self.utf16[1]
+    }
+    return try Swift.withUnsafePointer(to: &codeUnits) {
+      return try $0.withMemoryRebound(to: UInt16.self, capacity: 2) {
+        return try body(UnsafeBufferPointer(start: $0, count: utf16Count))
+      }
+    }
+  }
+
+  // Access the scalar as encoded in UTF-8
+  internal func withUTF8CodeUnits<Result>(
+    _ body: (UnsafeBufferPointer<UInt8>) throws -> Result
+  ) rethrows -> Result {
+    let encodedScalar = UTF8.encode(self)!
+    var (codeUnits, utf8Count) = encodedScalar._bytes
+    return try Swift.withUnsafePointer(to: &codeUnits) {
+      return try $0.withMemoryRebound(to: UInt8.self, capacity: 4) {
+        return try body(UnsafeBufferPointer(start: $0, count: utf8Count))
+      }
+    }
+  }
+}
+
+

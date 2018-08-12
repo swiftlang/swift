@@ -2082,7 +2082,18 @@ bool TypeResolver::resolveASTFunctionTypeParams(
     }
 
     ValueOwnership ownership;
-    switch (eltTypeRepr->getKind()) {
+
+    auto *nestedRepr = eltTypeRepr;
+
+    // Look through parens here; other than parens, specifiers
+    // must appear at the top level of a parameter type.
+    while (auto *tupleRepr = dyn_cast<TupleTypeRepr>(nestedRepr)) {
+      if (!tupleRepr->isParenType())
+        break;
+      nestedRepr = tupleRepr->getElementType(0);
+    }
+
+    switch (nestedRepr->getKind()) {
     case TypeReprKind::Shared:
       ownership = ValueOwnership::Shared;
       break;
@@ -2098,7 +2109,7 @@ bool TypeResolver::resolveASTFunctionTypeParams(
     }
     ParameterTypeFlags paramFlags =
         ParameterTypeFlags::fromParameterType(ty, variadic, ownership);
-    elements.emplace_back(ty->getInOutObjectType(), Identifier(), paramFlags);
+    elements.emplace_back(ty, Identifier(), paramFlags);
   }
 
   return false;
@@ -2611,16 +2622,12 @@ Type TypeResolver::resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
     options -= TypeResolutionFlags::TypeAliasUnderlyingType;
   }
 
-  Type ty = resolveType(repr->getBase(), options);
-  if (!ty || ty->hasError()) return ty;
-  if (repr->getKind() == TypeReprKind::InOut) return InOutType::get(ty);
-  return ty;
+  return resolveType(repr->getBase(), options);
 }
 
 
 Type TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
                                     TypeResolutionOptions options) {
-  // FIXME: diagnose non-materializability of element type!
   Type baseTy = resolveType(repr->getBase(), withoutContext(options));
   if (!baseTy || baseTy->hasError()) return baseTy;
 
@@ -2640,7 +2647,6 @@ Type TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
                                          TypeResolutionOptions options) {
   options = adjustOptionsForGenericArgs(options);
 
-  // FIXME: diagnose non-materializability of key/value type?
   Type keyTy = resolveType(repr->getKey(), withoutContext(options));
   if (!keyTy || keyTy->hasError()) return keyTy;
 
@@ -2761,8 +2767,7 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     Type ty = resolveType(tyR, elementOptions);
     if (!ty || ty->hasError()) return ty;
 
-    elements.emplace_back(ty->getInOutObjectType(),
-                          repr->getElementName(i), ParameterTypeFlags());
+    elements.emplace_back(ty, repr->getElementName(i), ParameterTypeFlags());
   }
 
   // Single-element labeled tuples are not permitted outside of declarations

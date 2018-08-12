@@ -4402,14 +4402,9 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     EED->setSignatureIsValidated();
 
-    // Require the carried type to be materializable.
     if (auto argTy = EED->getArgumentInterfaceType()) {
-      assert(!argTy->hasLValueType() && "enum element cannot carry @lvalue");
-
-      if (!argTy->isMaterializable()) {
-        diagnose(EED->getLoc(), diag::enum_element_not_materializable, argTy);
-        EED->setInterfaceType(ErrorType::get(Context));
-      }
+      assert(argTy->isMaterializable());
+      (void) argTy;
     }
 
     break;

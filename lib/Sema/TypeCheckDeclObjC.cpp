@@ -838,15 +838,6 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
   if (Result && checkObjCInExtensionContext(SD, Diagnose))
     return false;
 
-  // Make sure we know how to map the selector appropriately.
-  if (Result && SD->getObjCSubscriptKind() == ObjCSubscriptKind::None) {
-    SourceRange IndexRange = SD->getIndices()->getSourceRange();
-    SD->diagnose(diag::objc_invalid_subscript_key_type,
-                 getObjCDiagnosticAttrKind(Reason), IndicesType)
-      .highlight(IndexRange);
-    return false;
-  }
-
   if (!Diagnose || Result)
     return Result;
 

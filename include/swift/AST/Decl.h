@@ -4729,10 +4729,6 @@ public:
   /// was specified separately from the parameter name.
   SourceLoc getArgumentNameLoc() const { return ArgumentNameLoc; }
   
-  /// Retrieve the parameter type flags corresponding to the declaration of
-  /// this parameter's argument type.
-  ParameterTypeFlags getParameterFlags() const;
-  
   SourceLoc getSpecifierLoc() const { return SpecifierLoc; }
     
   bool isTypeLocImplicit() const { return Bits.ParamDecl.IsTypeLocImplicit; }
@@ -4822,8 +4818,6 @@ public:
   
 /// Describes the kind of subscripting used in Objective-C.
 enum class ObjCSubscriptKind {
-  /// Not an Objective-C subscripting kind.
-  None,
   /// Objective-C indexed subscripting, which is based on an integral
   /// index.
   Indexed,
@@ -5774,8 +5768,8 @@ public:
   }
 
   /// Set the interface type of this enum element to the constructor function
-  /// type; (Self) -> Result or (Self) -> (Args...) -> Result.
-  bool computeType();
+  /// type; (Self.Type) -> Self or (Self.Type) -> (Args...) -> Self.
+  void computeType();
 
   Type getArgumentInterfaceType() const;
 

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1293,9 +1293,6 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   CodeCompletionExpr *CodeCompleteTokenExpr = nullptr;
   AssignExpr *AssignmentExpr;
   CallExpr *FuncCallExpr;
-  UnresolvedMemberExpr *UnresolvedExpr;
-  bool UnresolvedExprInReturn;
-  std::vector<std::string> TokensBeforeUnresolvedExpr;
   CompletionKind Kind = CompletionKind::None;
   Expr *ParsedExpr = nullptr;
   SourceLoc DotLoc;
@@ -1459,9 +1456,8 @@ public:
 
   void completePoundAvailablePlatform() override;
   void completeImportDecl(std::vector<std::pair<Identifier, SourceLoc>> &Path) override;
-  void completeUnresolvedMember(UnresolvedMemberExpr *E,
-                                ArrayRef<StringRef> Identifiers,
-                                bool HasReturn) override;
+  void completeUnresolvedMember(CodeCompletionExpr *E,
+                                SourceLoc DotLoc) override;
   void completeAssignmentRHS(AssignExpr *E) override;
   void completeCallArg(CallExpr *E) override;
   void completeReturnStmt(CodeCompletionExpr *E) override;
@@ -3787,64 +3783,6 @@ public:
     }
   }
 
-  struct LookupByName : public swift::VisibleDeclConsumer {
-    CompletionLookup &Lookup;
-    std::vector<std::string> &SortedNames;
-    llvm::SmallPtrSet<Decl*, 3> HandledDecls;
-
-    bool isNameHit(StringRef Name) {
-      return std::binary_search(SortedNames.begin(), SortedNames.end(), Name);
-    }
-
-    void unboxType(Type T) {
-      if (T->hasParenSugar()) {
-        unboxType(T->getDesugaredType());
-      } else if (T->is<TupleType>()) {
-        for (auto Ele : T->getAs<TupleType>()->getElements()) {
-          unboxType(Ele.getType());
-        }
-      } else if (auto FT = T->getAs<FunctionType>()) {
-        for (const auto &Param : FT->getParams()) {
-          unboxType(Param.getType());
-        }
-        unboxType(FT->getResult());
-      } else if (auto NTD = T->getNominalOrBoundGenericNominal()){
-        if (HandledDecls.insert(NTD).second)
-          Lookup.getUnresolvedMemberCompletions(T);
-      }
-    }
-
-    LookupByName(CompletionLookup &Lookup, std::vector<std::string> &SortedNames) :
-                   Lookup(Lookup), SortedNames(SortedNames) {
-      std::sort(SortedNames.begin(), SortedNames.end());
-    }
-
-    void handleDeclRange(const DeclRange &Members,
-                         DeclVisibilityKind Reason) {
-      for (auto M : Members) {
-        if (auto VD = dyn_cast<ValueDecl>(M)) {
-          foundDecl(VD, Reason);
-        }
-      }
-    }
-
-    void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
-      if (auto NTD = dyn_cast<NominalTypeDecl>(VD)) {
-        if (isNameHit(NTD->getNameStr())) {
-          unboxType(NTD->getDeclaredType());
-        }
-        handleDeclRange(NTD->getMembers(), Reason);
-        for (auto Ex : NTD->getExtensions()) {
-          handleDeclRange(Ex->getMembers(), Reason);
-        }
-      } else if (!VD->getBaseName().isSpecial() &&
-                 isNameHit(VD->getBaseName().getIdentifier().str())) {
-        if (VD->hasInterfaceType())
-          unboxType(VD->getInterfaceType());
-      }
-    }
-  };
-
   void getUnresolvedMemberCompletions(ArrayRef<Type> Types) {
     NeedLeadingDot = !HaveDot;
     for (auto T : Types) {
@@ -3874,16 +3812,6 @@ public:
                                  /*includeInstanceMembers=*/false);
       }
     }
-  }
-
-  void getUnresolvedMemberCompletions(std::vector<std::string> &FuncNames,
-                                      bool HasReturn) {
-    NeedLeadingDot = !HaveDot;
-    LookupByName Lookup(*this, FuncNames);
-    lookupVisibleDecls(Lookup, CurrDeclContext, TypeResolver.get(), true);
-    if (HasReturn)
-      if (auto ReturnType = getReturnTypeFromContext(CurrDeclContext))
-        Lookup.unboxType(ReturnType);
   }
 
   void addArgNameCompletionResults(ArrayRef<StringRef> Names) {
@@ -4686,15 +4614,12 @@ void CodeCompletionCallbacksImpl::completeImportDecl(
   }
 }
 
-void CodeCompletionCallbacksImpl::completeUnresolvedMember(UnresolvedMemberExpr *E,
-    ArrayRef<StringRef> Identifiers, bool HasReturn) {
+void CodeCompletionCallbacksImpl::completeUnresolvedMember(CodeCompletionExpr *E,
+    SourceLoc DotLoc) {
   Kind = CompletionKind::UnresolvedMember;
   CurDeclContext = P.CurDeclContext;
-  UnresolvedExpr = E;
-  UnresolvedExprInReturn = HasReturn;
-  for (auto Id : Identifiers) {
-    TokensBeforeUnresolvedExpr.push_back(Id);
-  }
+  CodeCompleteTokenExpr = E;
+  this->DotLoc = DotLoc;
 }
 
 void CodeCompletionCallbacksImpl::completeAssignmentRHS(AssignExpr *E) {
@@ -5457,25 +5382,14 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       Lookup.addImportModuleNames();
     break;
   }
-  case CompletionKind::UnresolvedMember : {
-    Lookup.setHaveDot(SourceLoc());
-    SmallVector<Type, 1> PossibleTypes;
-    ExprParentFinder Walker(UnresolvedExpr, [&](ASTWalker::ParentTy Node) {
-      return Node.getAsExpr();
-    });
-    CurDeclContext->walkContext(Walker);
-    bool Success = false;
-    if (auto PE = Walker.ParentFarthest.getAsExpr()) {
-      prepareForRetypechecking(PE);
-      Success = typeCheckUnresolvedExpr(*CurDeclContext, UnresolvedExpr, PE,
-                                        PossibleTypes);
-      Lookup.getUnresolvedMemberCompletions(PossibleTypes);
-    }
-    if (!Success) {
-      Lookup.getUnresolvedMemberCompletions(
-        TokensBeforeUnresolvedExpr,
-        UnresolvedExprInReturn);
-    }
+  case CompletionKind::UnresolvedMember: {
+    Lookup.setHaveDot(DotLoc);
+    SmallVector<Type, 2> PossibleTypes;
+    ::CodeCompletionTypeContextAnalyzer TypeAnalyzer(CurDeclContext,
+                                                     CodeCompleteTokenExpr);
+    if (TypeAnalyzer.Analyze(PossibleTypes))
+      Lookup.setExpectedTypes(PossibleTypes);
+    Lookup.getUnresolvedMemberCompletions(PossibleTypes);
     break;
   }
   case CompletionKind::AssignmentRHS : {

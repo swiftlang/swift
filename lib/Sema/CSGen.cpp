@@ -31,13 +31,6 @@
 using namespace swift;
 using namespace swift::constraints;
 
-/// \brief Skip any implicit conversions applied to this expression.
-static Expr *skipImplicitConversions(Expr *expr) {
-  while (auto ice = dyn_cast<ImplicitConversionExpr>(expr))
-    expr = ice->getSubExpr();
-  return expr;
-}
-
 /// \brief Find the declaration directly referenced by this expression.
 static std::pair<ValueDecl *, FunctionRefKind>
 findReferencedDecl(Expr *expr, DeclNameLoc &loc) {
@@ -2011,32 +2004,33 @@ namespace {
 
     /// Give each parameter in a ClosureExpr a fresh type variable if parameter
     /// types were not specified, and return the eventual function type.
-    Type getTypeForParameterList(ClosureExpr *closureExpr) {
-      auto *params = closureExpr->getParameters();
-      for (auto i : indices(params->getArray())) {
-        auto *param = params->get(i);
+    void getClosureParams(ClosureExpr *closureExpr,
+                          SmallVectorImpl<AnyFunctionType::Param> &params) {
+      auto *paramList = closureExpr->getParameters();
+      for (auto i : indices(paramList->getArray())) {
+        auto *param = paramList->get(i);
         auto *locator = CS.getConstraintLocator(
             closureExpr, LocatorPathElt::getTupleElement(i));
 
         // If a type was explicitly specified, use its opened type.
         if (auto type = param->getTypeLoc().getType()) {
           // FIXME: Need a better locator for a pattern as a base.
-          Type openedType = CS.openUnboundGenericType(type, locator);
-          assert(!param->isImmutable() || !openedType->is<InOutType>());
-          CS.setType(param, openedType->getInOutObjectType());
+          CS.setType(param, CS.openUnboundGenericType(type, locator));
           continue;
         }
 
-        // Otherwise, create a fresh type variable.
+        // Otherwise, create a fresh type variable. It might become an InOutType
+        // later; when applying the solution, we strip off the InOutType and
+        // change the ParamDecl's ownership specifier if this is the case.
         CS.setType(param, CS.createTypeVariable(locator, TVO_CanBindToInOut));
       }
 
-      return params->getType(CS.getASTContext(), [&](ParamDecl *param) {
-        return CS.getType(param);
-      });
+      paramList->getParams(params,
+                           [&](ParamDecl *param) {
+                             return CS.getType(param);
+                           });
     }
 
-    
     /// \brief Produces a type for the given pattern, filling in any missing
     /// type information with fresh type variables.
     ///
@@ -2360,25 +2354,25 @@ namespace {
       // parameter or return type is omitted, a fresh type variable is used to
       // stand in for that parameter or return type, allowing it to be inferred
       // from context.
-      Type funcTy;
+      Type resultTy;
       if (expr->hasExplicitResultType() &&
           expr->getExplicitResultTypeLoc().getType()) {
-        funcTy = expr->getExplicitResultTypeLoc().getType();
-        CS.setFavoredType(expr, funcTy.getPointer());
+        resultTy = expr->getExplicitResultTypeLoc().getType();
+        CS.setFavoredType(expr, resultTy.getPointer());
       } else if (!crt.isNull()) {
-        funcTy = crt;
+        resultTy = crt;
       } else{
         auto locator =
           CS.getConstraintLocator(expr, ConstraintLocator::ClosureResult);
 
         // If no return type was specified, create a fresh type
         // variable for it.
-        funcTy = CS.createTypeVariable(locator);
+        resultTy = CS.createTypeVariable(locator);
 
         // Allow it to default to () if there are no return statements.
         if (closureHasNoResult(expr)) {
           CS.addConstraint(ConstraintKind::Defaultable,
-                           funcTy,
+                           resultTy,
                            TupleType::getEmpty(CS.getASTContext()),
                            locator);
         }
@@ -2386,16 +2380,14 @@ namespace {
 
       // Give each parameter in a ClosureExpr a fresh type variable if parameter
       // types were not specified, and return the eventual function type.
-      auto paramTy = getTypeForParameterList(expr);
+      SmallVector<AnyFunctionType::Param, 4> paramTy;
+      getClosureParams(expr, paramTy);
+
       auto extInfo = FunctionType::ExtInfo();
-      
       if (closureCanThrow(expr))
         extInfo = extInfo.withThrows();
-      
-      // FIXME: If we want keyword arguments for closures, add them here.
-      funcTy = FunctionType::get(paramTy, funcTy, extInfo);
 
-      return funcTy;
+      return FunctionType::get(paramTy, resultTy, extInfo);
     }
 
     Type visitAutoClosureExpr(AutoClosureExpr *expr) {
@@ -3569,112 +3561,6 @@ void ConstraintSystem::optimizeConstraints(Expr *e) {
   // Optimize the constraints.
   ConstraintOptimizer optimizer(*this);
   e->walk(optimizer);
-}
-
-class InferUnresolvedMemberConstraintGenerator : public ConstraintGenerator {
-  Expr *Target;
-  TypeVariableType *VT;
-
-  TypeVariableType *createFreeTypeVariableType(Expr *E) {
-    auto &CS = getConstraintSystem();
-    return CS.createTypeVariable(CS.getConstraintLocator(nullptr),
-                                 TVO_CanBindToLValue);
-  }
-
-public:
-  InferUnresolvedMemberConstraintGenerator(Expr *Target, ConstraintSystem &CS) :
-    ConstraintGenerator(CS), Target(Target), VT(nullptr) {};
-  ~InferUnresolvedMemberConstraintGenerator() override = default;
-
-  Type visitUnresolvedMemberExpr(UnresolvedMemberExpr *Expr) override {
-    if (Target != Expr) {
-      // If expr is not the target, do the default constraint generation.
-      return ConstraintGenerator::visitUnresolvedMemberExpr(Expr);
-    }
-    // Otherwise, create a type variable saying we know nothing about this expr.
-    assert(!VT && "cannot reassign type variable.");
-    return VT = createFreeTypeVariableType(Expr);
-  }
-
-  Type visitParenExpr(ParenExpr *Expr) override {
-    if (Target != Expr) {
-      // If expr is not the target, do the default constraint generation.
-      return ConstraintGenerator::visitParenExpr(Expr);
-    }
-    // Otherwise, create a type variable saying we know nothing about this expr.
-    assert(!VT && "cannot reassign type variable.");
-    return VT = createFreeTypeVariableType(Expr);
-  }
-
-  Type visitErrorExpr(ErrorExpr *Expr) override {
-    return createFreeTypeVariableType(Expr);
-  }
-
-  Type visitCodeCompletionExpr(CodeCompletionExpr *Expr) override {
-    auto &cs = getConstraintSystem();
-    cs.Options |= ConstraintSystemFlags::SuppressDiagnostics;
-    return createFreeTypeVariableType(Expr);
-  }
-
-  Type visitImplicitConversionExpr(ImplicitConversionExpr *Expr) override {
-    // We override this function to avoid assertion failures. Typically, we do have
-    // a type-checked AST when trying to infer the types of unresolved members.
-    return Expr->getType();
-  }
-
-  bool collectResolvedType(Solution &S, SmallVectorImpl<Type> &PossibleTypes) {
-    if (auto Bind = S.typeBindings[VT]) {
-      // We allow type variables in the overall solution, but must skip any
-      // type variables in the binding for VT; these types must outlive the
-      // constraint solver memory arena.
-      if (!Bind->hasTypeVariable()) {
-        PossibleTypes.push_back(Bind);
-        return true;
-      }
-    }
-    return false;
-  }
-};
-
-bool swift::typeCheckUnresolvedExpr(DeclContext &DC,
-                                    Expr *E, Expr *Parent,
-                                    SmallVectorImpl<Type> &PossibleTypes) {
-  PrettyStackTraceExpr stackTrace(DC.getASTContext(),
-                                  "type-checking unresolved member", Parent);
-
-  ConstraintSystemOptions Options = ConstraintSystemFlags::AllowFixes;
-  auto *TC = static_cast<TypeChecker*>(DC.getASTContext().getLazyResolver());
-  ConstraintSystem CS(*TC, &DC, Options);
-  Parent = Parent->walk(SanitizeExpr(CS));
-  InferUnresolvedMemberConstraintGenerator MCG(E, CS);
-  ConstraintWalker cw(MCG);
-  Parent->walk(cw);
-
-  if (TC->getLangOpts().DebugConstraintSolver) {
-    auto &log = DC.getASTContext().TypeCheckerDebug->getStream();
-    log << "---Initial constraints for the given expression---\n";
-    Parent->print(log);
-    log << "\n";
-    CS.print(log);
-  }
-
-  SmallVector<Solution, 3> solutions;
-  if (CS.solve(Parent, solutions, FreeTypeVariableBinding::UnresolvedType)) {
-    return false;
-  }
-
-  for (auto &S : solutions) {
-    bool resolved = MCG.collectResolvedType(S, PossibleTypes);
-
-    if (TC->getLangOpts().DebugConstraintSolver) {
-      auto &log = DC.getASTContext().TypeCheckerDebug->getStream();
-      log << "--- Solution ---\n";
-      S.dump(log);
-      if (resolved)
-        log << "--- Resolved target type ---\n" << PossibleTypes.back() << "\n";
-    }
-  }
-  return !PossibleTypes.empty();
 }
 
 bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,

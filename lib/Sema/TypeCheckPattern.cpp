@@ -789,19 +789,6 @@ static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
     TL.setType(Ty);
   }
 
-  // If the user did not explicitly write 'let', 'var', or 'inout', we'll let
-  // type inference figure out what went wrong in detail.
-  if (decl->getSpecifierLoc().isValid()) {
-    // If the param is not a 'let' and it is not an 'inout'.
-    // It must be a 'var'. Provide helpful diagnostics like a shadow copy
-    // in the function body to fix the 'var' attribute.
-    if (!decl->isImmutable() && !decl->isImplicit() &&
-        (Ty.isNull() || !Ty->is<InOutType>()) && !hadError) {
-      decl->setInvalid();
-      hadError = true;
-    }
-  }
-
   if (hadError)
     TL.setInvalidType(TC.Context);
 
@@ -861,18 +848,26 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
       param->markInvalid();
       hadError = true;
     } else {
-      if (type->is<InOutType>())
-        param->setSpecifier(VarDecl::Specifier::InOut);
-      param->setInterfaceType(type->getInOutObjectType());
+      param->setInterfaceType(type);
     }
     
     checkTypeModifyingDeclAttributes(param);
     if (!hadError) {
-      if (isa<InOutTypeRepr>(typeRepr)) {
+      auto *nestedRepr = typeRepr;
+
+      // Look through parens here; other than parens, specifiers
+      // must appear at the top level of a parameter type.
+      while (auto *tupleRepr = dyn_cast<TupleTypeRepr>(nestedRepr)) {
+        if (!tupleRepr->isParenType())
+          break;
+        nestedRepr = tupleRepr->getElementType(0);
+      }
+
+      if (isa<InOutTypeRepr>(nestedRepr)) {
         param->setSpecifier(VarDecl::Specifier::InOut);
-      } else if (isa<SharedTypeRepr>(typeRepr)) {
+      } else if (isa<SharedTypeRepr>(nestedRepr)) {
         param->setSpecifier(VarDecl::Specifier::Shared);
-      } else if (isa<OwnedTypeRepr>(typeRepr)) {
+      } else if (isa<OwnedTypeRepr>(nestedRepr)) {
         param->setSpecifier(VarDecl::Specifier::Owned);
       }
     }
@@ -1626,29 +1621,22 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
       // Coerce explicitly specified argument type to contextual type
       // only if both types are valid and do not match.
       if (!hadError && isValidType(ty) && !ty->isEqual(paramType)) {
-        assert(!param->isImmutable() || !ty->is<InOutType>());
-        param->setType(ty->getInOutObjectType());
-        param->setInterfaceType(ty->mapTypeOutOfContext()->getInOutObjectType());
+        param->setType(ty);
+        param->setInterfaceType(ty->mapTypeOutOfContext());
       }
     }
     
-    assert(!ty->hasLValueType() && "Bound param type to @lvalue?");
+    assert(ty->isMaterializable());
     if (forceMutable) {
       param->setSpecifier(VarDecl::Specifier::InOut);
-    } else if (auto *TTy = ty->getAs<TupleType>()) {
-      if (param->hasName() && TTy->hasInOutElement()) {
-        diagnose(param->getStartLoc(),
-                 diag::param_type_non_materializable_tuple, ty);
-      }
     }
 
     // If contextual type is invalid and we have a valid argument type
     // trying to coerce argument to contextual type would mean erasing
     // valuable diagnostic information.
     if (isValidType(ty) || shouldOverwriteParam(param)) {
-      assert(!param->isImmutable() || !ty->is<InOutType>());
-      param->setType(ty->getInOutObjectType());
-      param->setInterfaceType(ty->mapTypeOutOfContext()->getInOutObjectType());
+      param->setType(ty);
+      param->setInterfaceType(ty->mapTypeOutOfContext());
     }
     
     checkTypeModifyingDeclAttributes(param);
@@ -1666,9 +1654,6 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
 
   auto getType = [](const AnyFunctionType::Param &param) -> Type {
     auto type = param.getPlainType();
-
-    if (param.isInOut())
-      return InOutType::get(type);
 
     if (param.isVariadic())
       return ArraySliceType::get(type);

@@ -168,3 +168,14 @@ func testCurryFixits() {
 // Bogus diagnostic talking about a 'var' where there is none
 func invalidInOutParam(x: inout XYZ) {}
 // expected-error@-1{{use of undeclared type 'XYZ'}}
+
+// Parens around the 'inout'
+func parentheticalInout(_ x: ((inout Int))) {}
+
+var value = 0
+parentheticalInout(&value)
+
+func parentheticalInout2(_ fn: (((inout Int)), Int) -> ()) {
+  var value = 0
+  fn(&value, 0)
+}
