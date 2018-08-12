@@ -197,8 +197,7 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
   // single store value.  Since this is a very different computation, split it
   // out to its own path.
   if (!fn && value->getType().isAddress() && isa<AllocStackInst>(value)) {
-    SymbolicValue result = getSingleWriterAddressValue(value);
-    return result;
+    return getSingleWriterAddressValue(value);
   }
 
   // If this a trivial constant instruction that we can handle, then fold it
