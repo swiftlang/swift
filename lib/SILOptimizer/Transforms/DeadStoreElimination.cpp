@@ -1247,7 +1247,8 @@ public:
   /// The entry point to the transformation.
   void run() override {
     SILFunction *F = getFunction();
-    LLVM_DEBUG(llvm::dbgs() << "*** DSE on function: " << F->getName() << " ***\n");
+    LLVM_DEBUG(llvm::dbgs() << "*** DSE on function: " << F->getName()
+                            << " ***\n");
 
     auto *AA = PM->getAnalysis<AliasAnalysis>();
     auto *TE = PM->getAnalysis<TypeExpansionAnalysis>();

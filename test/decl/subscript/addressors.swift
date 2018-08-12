@@ -32,7 +32,7 @@ struct OnlyMutable {
   var base: UnsafeMutablePointer<Int>
 
   subscript(index: Int) -> Int {
-    unsafeMutableAddress { // expected-error {{subscript with a mutable addressor must also have a getter or an addressor}}
+    unsafeMutableAddress { // expected-error {{subscript with a mutable addressor must also have a getter, addressor, or 'read' accessor}}
       return base
     }
   }

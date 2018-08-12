@@ -13,6 +13,7 @@
 @_exported import AssetsLibrary // Clang module
 
 extension ALAssetsLibrary { 
+  @available(iOS, deprecated: 9.0)
   @nonobjc
   public func enumerateGroupsWithTypes(_ types: UInt32,
       usingBlock enumerationBlock: ALAssetsLibraryGroupsEnumerationResultsBlock!,

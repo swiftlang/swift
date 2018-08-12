@@ -41,6 +41,8 @@ extension Sequence where Element: Comparable {
   ///     // Prints "["Peter", "Kweku", "Kofi", "Akosua", "Abena"]"
   ///
   /// - Returns: A sorted array of the sequence's elements.
+  ///
+  /// - Complexity: O(*n* log *n*), where *n* is the length of the sequence.
   @inlinable
   public func sorted() -> [Element] {
     var result = ContiguousArray(self)
@@ -125,6 +127,8 @@ extension Sequence {
   ///   first argument should be ordered before its second argument;
   ///   otherwise, `false`.
   /// - Returns: A sorted array of the sequence's elements.
+  ///
+  /// - Complexity: O(*n* log *n*), where *n* is the length of the sequence.
   @inlinable
   public func sorted(
     by areInIncreasingOrder:
@@ -163,6 +167,8 @@ where Self: RandomAccessCollection, Element: Comparable {
   ///     students.sort(by: >)
   ///     print(students)
   ///     // Prints "["Peter", "Kweku", "Kofi", "Akosua", "Abena"]"
+  ///
+  /// - Complexity: O(*n* log *n*), where *n* is the length of the collection.
   @inlinable
   public mutating func sort() {
     let didSortUnsafeBuffer = _withUnsafeMutableBufferPointerIfSupported {
@@ -244,6 +250,8 @@ extension MutableCollection where Self: RandomAccessCollection {
   ///   otherwise, `false`. If `areInIncreasingOrder` throws an error during
   ///   the sort, the elements may be in a different order, but none will be
   ///   lost.
+  ///
+  /// - Complexity: O(*n* log *n*), where *n* is the length of the collection.
   @inlinable
   public mutating func sort(
     by areInIncreasingOrder: (Element, Element) throws -> Bool

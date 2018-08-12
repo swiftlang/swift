@@ -42,5 +42,14 @@ if #available(macOS 10.14, iOS 12.0, watchOS 5.0, tvOS 12.0, *) {
     os_signpost(.begin, log: interestingLog, name: "Basic Test", "%d", 42)
     os_signpost(.event, log: interestingLog, name: "Basic Test", "%d", 43)
     os_signpost(.end, log: interestingLog, name: "Basic Test", "%d", 44)
+
+    let log = OSLog(subsystem: "com.apple.swift", category: "SignpostIDs")
+    let v: UInt64 = 15
+    let spidOne = OSSignpostID(v)
+    let spidTwo = OSSignpostID(16 as UInt64)
+    os_signpost(.event, log: log, name: "With Signpost ID", signpostID: spidOne)
+    os_signpost(.event, log: log, name: "With Signpost ID", signpostID: spidTwo)
+    os_signpost(.event, log: log, name: "Negative Test", signpostID: .null)
+    os_signpost(.event, log: log, name: "Negative Test", signpostID: .invalid)
   }
 }

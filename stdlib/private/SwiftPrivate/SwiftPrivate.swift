@@ -41,18 +41,6 @@ public func scan<
   return result
 }
 
-public func randomShuffle<T>(_ a: [T]) -> [T] {
-  var result = a
-  for i in (1..<a.count).reversed() {
-    // FIXME: 32 bits are not enough in general case!
-    let j = Int(rand32(exclusiveUpperBound: UInt32(i + 1)))
-    if i != j {
-      result.swapAt(i, j)
-    }
-  }
-  return result
-}
-
 public func gather<C : Collection, IndicesSequence : Sequence>(
   _ collection: C, _ indices: IndicesSequence
 ) -> [C.Element]

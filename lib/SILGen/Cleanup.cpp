@@ -37,6 +37,7 @@ namespace {
   public:
     CleanupBuffer(const Cleanup &cleanup) {
       size_t size = cleanup.allocated_size();
+      data.reserve(size);
       data.set_size(size);
       memcpy(data.data(), reinterpret_cast<const void *>(&cleanup), size);
     }
@@ -53,6 +54,23 @@ void CleanupManager::popTopDeadCleanups(CleanupsDepth end) {
     stack.pop();
     stack.checkIterator(end);
   }
+}
+
+void CleanupManager::popAndEmitCleanup(CleanupHandle handle,
+                                       CleanupLocation loc,
+                                       ForUnwind_t forUnwind) {
+  auto iter = stack.find(handle);
+  Cleanup &stackCleanup = *iter;
+
+  // Copy the cleanup off the cleanup stack.
+  CleanupBuffer buffer(stackCleanup);
+  Cleanup &cleanup = buffer.getCopy();
+
+  // Deactivate it.
+  forwardCleanup(handle);
+
+  // Emit the cleanup.
+  cleanup.emit(SGF, loc, forUnwind);
 }
 
 void CleanupManager::emitCleanups(CleanupsDepth depth, CleanupLocation loc,

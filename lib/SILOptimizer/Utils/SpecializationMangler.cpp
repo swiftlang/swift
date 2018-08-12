@@ -74,11 +74,13 @@ std::string SpecializationMangler::finalize() {
 //                           Generic Specialization
 //===----------------------------------------------------------------------===//
 
-std::string GenericSpecializationMangler::mangle() {
+std::string GenericSpecializationMangler::mangle(GenericSignature *Sig) {
   beginMangling();
-  
-  SILFunctionType *FTy = Function->getLoweredFunctionType();
-  CanGenericSignature Sig = FTy->getGenericSignature();
+
+  if (!Sig) {
+    SILFunctionType *FTy = Function->getLoweredFunctionType();
+    Sig = FTy->getGenericSignature();
+  }
 
   bool First = true;
   for (auto ParamType : Sig->getSubstitutableParams()) {
@@ -86,8 +88,11 @@ std::string GenericSpecializationMangler::mangle() {
     appendListSeparator(First);
   }
   assert(!First && "no generic substitutions");
-  
-  appendSpecializationOperator(isReAbstracted ? "Tg" : "TG");
+
+  if (isInlined)
+    appendSpecializationOperator("Ti");
+  else
+    appendSpecializationOperator(isReAbstracted ? "Tg" : "TG");
   return finalize();
 }
 
@@ -231,7 +236,6 @@ FunctionSignatureSpecializationMangler::mangleConstantProp(LiteralInst *LI) {
 
     ArgOpBuffer << 's';
     switch (SLI->getEncoding()) {
-      // SWIFT_ENABLE_TENSORFLOW.
       case StringLiteralInst::Encoding::Bytes: ArgOpBuffer << 'B'; break;
       case StringLiteralInst::Encoding::UTF8: ArgOpBuffer << 'b'; break;
       case StringLiteralInst::Encoding::UTF16: ArgOpBuffer << 'w'; break;

@@ -331,7 +331,6 @@ static Type deriveParameterized_Parameters(DerivedConformance &derived) {
 
   auto *paramAggProto = C.getProtocol(KnownProtocolKind::ParameterAggregate);
   auto paramAggType = TypeLoc::withoutLoc(paramAggProto->getDeclaredType());
-  TypeLoc inherited[1] = {paramAggType};
   auto *parametersDecl =
       new (C) StructDecl(SourceLoc(), C.Id_Parameters, SourceLoc(),
                          /*Inherited*/ {}, /*GenericParams*/ {}, parentDC);
@@ -356,6 +355,8 @@ static Type deriveParameterized_Parameters(DerivedConformance &derived) {
         new (C) VarDecl(parameter->isStatic(), parameter->getSpecifier(),
                         parameter->isCaptureList(), /*NameLoc*/ SourceLoc(),
                         parameter->getName(), newParameterType, parametersDecl);
+    // NOTE: `newParameter` is not marked as implicit here, because that affects
+    // memberwise initializer synthesis.
     newParameter->setInterfaceType(newParameterType);
     parametersDecl->addMember(newParameter);
     newParameter->copyFormalAccessFrom(parameter,
@@ -368,8 +369,10 @@ static Type deriveParameterized_Parameters(DerivedConformance &derived) {
 
   // Add conformance to the ParameterAggregate protocol, if possible.
   // The ParameterAggregate protocol requirements will be derived.
-  if (DerivedConformance::canDeriveParameterAggregate(TC, parametersDecl))
+  if (DerivedConformance::canDeriveParameterAggregate(TC, parametersDecl)) {
+    TypeLoc inherited[1] = {paramAggType};
     parametersDecl->setInherited(C.AllocateCopy(inherited));
+  }
 
   // The implicit memberwise constructor must be explicitly created so that it
   // can called when synthesizing the `allParameters` getter. Normally, the
@@ -377,6 +380,15 @@ static Type deriveParameterized_Parameters(DerivedConformance &derived) {
   auto *initDecl = createImplicitConstructor(
       TC, parametersDecl, ImplicitConstructorKind::Memberwise);
   parametersDecl->addMember(initDecl);
+  C.addSynthesizedDecl(initDecl);
+
+  // After memberwise initializer is synthesized, mark members as implicit.
+  for (auto member : parametersDecl->getMembers()) {
+    auto varDecl = dyn_cast<VarDecl>(member);
+    if (!varDecl || varDecl->isStatic() || !varDecl->hasStorage())
+      continue;
+    varDecl->setImplicit();
+  }
 
   derived.addMembersToConformanceContext({parametersDecl});
   C.addSynthesizedDecl(parametersDecl);

@@ -39,7 +39,10 @@ public class SwiftLang {
       Request.addParameter(.key_SourceText, value: content)
     }
     Request.addParameter(.key_Name, value: name)
-    Request.addParameter(.key_EnableSyntaxTree, value: 1)
+    Request.addParameter(.key_SyntaxTreeTransferMode,
+                         value: .kind_SyntaxTreeFull)
+    Request.addParameter(.key_EnableSyntaxMap, value: 0)
+    Request.addParameter(.key_EnableStructure, value: 0)
     Request.addParameter(.key_SyntacticOnly, value: 1)
 
     // FIXME: SourceKitd error handling.

@@ -427,7 +427,9 @@ extension _UnmanagedOpaqueString {
   ) -> Int {
     let count = Swift.min(self.count, otherRange.count)
     for idx in 0..<count {
-      guard self[idx] == other[idx + otherRange.lowerBound] else {
+      guard self[idx] == other.codeUnit(
+        atCheckedOffset: idx + otherRange.lowerBound
+      ) else {
         return idx
       }
     }
@@ -725,7 +727,7 @@ extension _UnmanagedOpaqueString {
     }
 
     let selfCU = self[idx]
-    let otherCU = other[idx + otherRange.lowerBound]
+    let otherCU = other.codeUnit(atCheckedOffset: idx + otherRange.lowerBound)
 
     //
     // Fast path: if one is ASCII, we can often compare the code units directly.
@@ -965,7 +967,7 @@ extension _StringGuts {
       return true
     }
 
-    let nextCU = self[nextIndex]
+    let nextCU = self.codeUnit(atCheckedOffset: nextIndex)
     return _hasNormalizationBoundary(before: nextCU)
   }
 }

@@ -52,7 +52,7 @@ extension AudioBufferList {
   /// - Returns: the size in bytes of an `AudioBufferList` that can hold up to
   ///   `maximumBuffers` `AudioBuffer`s.
   public static func sizeInBytes(maximumBuffers: Int) -> Int {
-    _precondition(maximumBuffers >= 1,
+    precondition(maximumBuffers >= 1,
       "AudioBufferList should contain at least one AudioBuffer")
     return MemoryLayout<AudioBufferList>.size +
       (maximumBuffers - 1) * MemoryLayout<AudioBuffer>.stride
@@ -69,7 +69,7 @@ extension AudioBufferList {
     -> UnsafeMutableAudioBufferListPointer {
     let byteSize = sizeInBytes(maximumBuffers: maximumBuffers)
     let ablMemory = calloc(byteSize, 1)
-    _precondition(ablMemory != nil,
+    precondition(ablMemory != nil,
       "failed to allocate memory for an AudioBufferList")
 
     let listPtr = ablMemory!.bindMemory(to: AudioBufferList.self, capacity: 1)
@@ -153,12 +153,12 @@ extension UnsafeMutableAudioBufferListPointer
   /// Access an indexed `AudioBuffer` (`mBuffers[i]`).
   public subscript(index: Index) -> Element {
     get {
-      _precondition(index >= 0 && index < self.count,
+      precondition(index >= 0 && index < self.count,
         "subscript index out of range")
       return (_audioBuffersPointer + index).pointee
     }
     nonmutating set(newValue) {
-      _precondition(index >= 0 && index < self.count,
+      precondition(index >= 0 && index < self.count,
         "subscript index out of range")
       (_audioBuffersPointer + index).pointee = newValue
     }

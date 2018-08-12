@@ -152,12 +152,10 @@ static SILArgumentConvention getAddressArgConvention(ApplyInst *Apply,
                                                      Operand *&Oper) {
   Oper = nullptr;
   auto Args = Apply->getArgumentOperands();
-  llvm::Optional<unsigned> FoundArgIdx;
   for (auto ArgIdx : indices(Args)) {
     if (Args[ArgIdx].get() != Address)
       continue;
 
-    FoundArgIdx = ArgIdx;
     assert(!Oper && "Address can only be passed once as an indirection.");
     Oper = &Args[ArgIdx];
 #ifdef NDEBUG
@@ -165,7 +163,7 @@ static SILArgumentConvention getAddressArgConvention(ApplyInst *Apply,
 #endif
   }
   assert(Oper && "Address value not passed as an argument to this call.");
-  return Apply->getArgumentConvention(FoundArgIdx.getValue());
+  return ApplySite(Apply).getArgumentConvention(*Oper);
 }
 
 /// If the given instruction is a store, return the stored value.
@@ -290,7 +288,8 @@ static bool visitAddressUsers(SILValue address, SILInstruction *ignoredUser,
       //
       // TODO: assert that this list is consistent with
       // isTransitiveEscapeInst().
-      LLVM_DEBUG(llvm::dbgs() << "  Skipping copy: use exposes def" << *UserInst);
+      LLVM_DEBUG(llvm::dbgs() << "  Skipping copy: use exposes def"
+                              << *UserInst);
       return false;
     }
   }
@@ -776,7 +775,7 @@ CopyAddrInst *CopyForwarding::findCopyIntoDeadTemp(CopyAddrInst *destCopy) {
 bool CopyForwarding::
 forwardDeadTempCopy(CopyAddrInst *srcCopy, CopyAddrInst *destCopy) {
   LLVM_DEBUG(llvm::dbgs() << "  Temp Copy:" << *srcCopy
-        << "         to " << *destCopy);
+                          << "         to " << *destCopy);
 
   assert(srcCopy->getDest() == destCopy->getSrc());
   
@@ -876,8 +875,9 @@ bool CopyForwarding::markStoredValueUsers(SILValue storedValue) {
     }
     // Conservatively treat everything else as potentially transitively
     // retaining the stored value.
-    LLVM_DEBUG(llvm::dbgs() << "  Cannot reduce lifetime. May retain " << storedValue
-          << " at: " << *user << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "  Cannot reduce lifetime. May retain "
+                            << storedValue
+                            << " at: " << *user << "\n");
     return false;
   }
   return true;
@@ -980,7 +980,7 @@ bool CopyForwarding::forwardPropagateCopy() {
     DefDealloc = getSingleDealloc(ASI);
     if (!DefDealloc) {
       LLVM_DEBUG(llvm::dbgs() << "  Skipping copy" << *CurrentCopy
-            << "  stack address has multiple uses.\n");
+                              << "  stack address has multiple uses.\n");
       return false;
     }
   }
@@ -995,12 +995,12 @@ bool CopyForwarding::forwardPropagateCopy() {
     // before the Dest location is deinitialized. So we really need the copy.
     if (SrcUserInsts.count(UserInst)) {
       LLVM_DEBUG(llvm::dbgs() << "  Skipping copy" << *CurrentCopy
-            << "  source used by" << *UserInst);
+                              << "  source used by" << *UserInst);
       return false;
     }
     if (UserInst == DefDealloc) {
       LLVM_DEBUG(llvm::dbgs() << "  Skipping copy" << *CurrentCopy
-            << "    dealloc_stack before dest use.\n");
+                              << "    dealloc_stack before dest use.\n");
       return false;
     }
     // Early check to avoid scanning unrelated instructions.
@@ -1126,7 +1126,7 @@ bool CopyForwarding::backwardPropagateCopy() {
         continue;
       }
       LLVM_DEBUG(llvm::dbgs() << "  Skipping copy" << *CurrentCopy
-            << "    dest used by " << *UserInst);
+                              << "    dest used by " << *UserInst);
       return false;
     }
     // Early check to avoid scanning unrelated instructions.
@@ -1217,7 +1217,8 @@ bool CopyForwarding::hoistDestroy(SILInstruction *DestroyPoint,
         // ...                    // no access to CurrentDef
         // retain StoredValue
         // destroy_addr CurrentDef
-        LLVM_DEBUG(llvm::dbgs() << "  Cannot hoist above stored value use:" << *Inst);
+        LLVM_DEBUG(llvm::dbgs() << "  Cannot hoist above stored value use:"
+                                << *Inst);
         return false;
       }
       if (!IsWorthHoisting && isa<ApplyInst>(Inst))
@@ -1466,8 +1467,8 @@ class CopyForwardingPass : public SILFunctionTransform
     if (!EnableCopyForwarding && !EnableDestroyHoisting)
       return;
 
-    LLVM_DEBUG(llvm::dbgs() << "Copy Forwarding in Func " << getFunction()->getName()
-          << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Copy Forwarding in Func "
+                            << getFunction()->getName() << "\n");
 
     // Collect a set of identified objects (@in arg or alloc_stack) that are
     // copied in this function.
@@ -1486,7 +1487,7 @@ class CopyForwardingPass : public SILFunctionTransform
             CopiedDefs.insert(Def);
           else {
             LLVM_DEBUG(llvm::dbgs() << "  Skipping Def: " << Def
-                  << "    not an argument or local var!\n");
+                                    << "    not an argument or local var!\n");
           }
         }
       }
@@ -1561,8 +1562,8 @@ class TempRValueOptPass : public SILFunctionTransform {
 
 /// The main entry point of the pass.
 void TempRValueOptPass::run() {
-  LLVM_DEBUG(llvm::dbgs() << "Copy Peephole in Func " << getFunction()->getName()
-        << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "Copy Peephole in Func "
+                          << getFunction()->getName() << "\n");
 
   AA = PM->getAnalysis<AliasAnalysis>();
   bool Changed = false;
@@ -1625,18 +1626,20 @@ bool TempRValueOptPass::collectLoads(
   // (unchecked_take_enum_data_addr of Optional is nondestructive.)
   switch (user->getKind()) {
   default:
-    LLVM_DEBUG(llvm::dbgs() << "  Temp use may write/destroy its source" << *user);
+    LLVM_DEBUG(llvm::dbgs() << "  Temp use may write/destroy its source"
+                            << *user);
     return false;
 
   case SILInstructionKind::ApplyInst: {
-    auto *AI = cast<ApplyInst>(user);
-    auto Convention = AI->getArgumentConvention(userOp->getOperandNumber() - 1);
+    ApplySite apply(user);
+    auto Convention = apply.getArgumentConvention(*userOp);
     if (Convention.isGuaranteedConvention()) {
-      loadInsts.insert(AI);
+      loadInsts.insert(user);
       return true;
     }
-    LLVM_DEBUG(llvm::dbgs() << "  Temp consuming use may write/destroy is source"
-                       << *user);
+    LLVM_DEBUG(llvm::dbgs() << "  Temp consuming use may write/destroy "
+                               "its source"
+                            << *user);
     return false;
   }
   case SILInstructionKind::StructElementAddrInst:

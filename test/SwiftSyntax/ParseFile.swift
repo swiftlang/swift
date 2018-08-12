@@ -30,18 +30,18 @@ class Test: NSObject {
 ParseFile.test("ParseSingleFile") {
   let currentFile = URL(fileURLWithPath: #file)
   expectDoesNotThrow({
-    let currentFileContents = try String(contentsOf: currentFile)
-    let parsed = try SourceFileSyntax.decodeSourceFileSyntax(try
-      SwiftLang.parse(currentFile))
-    expectEqual("\(parsed)", currentFileContents)
+    let fileContents = try String(contentsOf: currentFile)
+    let syntaxTreeData = try SwiftLang.parse(fileContents).data(using: .utf8)!
+    let parsed = try SyntaxTreeDeserializer().deserialize(syntaxTreeData)
+    expectEqual("\(parsed)", fileContents)
   })
 }
 
 ParseFile.test("ParseBuffer") {
   expectDoesNotThrow({
     let content = "func foo() {}"
-    let parsed = try SourceFileSyntax.decodeSourceFileSyntax(try
-      SwiftLang.parse(content))
+    let syntaxTreeData = try SwiftLang.parse(content).data(using: .utf8)!
+    let parsed = try SyntaxTreeDeserializer().deserialize(syntaxTreeData)
     expectEqual("\(parsed)", content)
   })
 }

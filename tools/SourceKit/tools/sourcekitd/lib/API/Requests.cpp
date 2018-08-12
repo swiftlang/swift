@@ -26,15 +26,18 @@
 #include "SourceKit/Support/UIdent.h"
 #include "SourceKit/SwiftLang/Factory.h"
 
-#include "swift/Demangling/ManglingMacros.h"
-#include "swift/Demangling/Demangler.h"
 #include "swift/Basic/Mangler.h"
+#include "swift/Demangling/Demangler.h"
+#include "swift/Demangling/ManglingMacros.h"
+#include "swift/Syntax/Serialization/SyntaxSerialization.h"
+#include "swift/Syntax/SyntaxNodes.h"
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/NativeFormatting.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/raw_ostream.h"
@@ -73,12 +76,9 @@ struct SKEditorConsumerOptions {
   bool EnableSyntaxMap = false;
   bool EnableStructure = false;
   bool EnableDiagnostics = false;
-  bool EnableSyntaxTree = false;
+  SyntaxTreeTransferMode SyntaxTransferMode = SyntaxTreeTransferMode::Off;
   bool SyntacticOnly = false;
   bool EnableSyntaxReuseInfo = false;
-  // FIXME: This is just for bootstrapping incremental syntax tree parsing.
-  // Remove it once when we are able to incrementally transfer the syntax tree
-  bool ForceLibSyntaxBasedProcessing = false;
 };
 
 } // anonymous namespace
@@ -247,6 +247,21 @@ static void fillDictionaryForDiagnosticInfo(
     ResponseBuilder::Dictionary Elem, const DiagnosticEntryInfo &Info);
 
 static void enableCompileNotifications(bool value);
+
+static SyntaxTreeTransferMode syntaxTransferModeFromUID(sourcekitd_uid_t UID) {
+  if (UID == nullptr) {
+    // Default is no syntax tree
+    return SyntaxTreeTransferMode::Off;
+  } else if (UID == KindSyntaxTreeOff) {
+    return SyntaxTreeTransferMode::Off;
+  } else if (UID == KindSyntaxTreeIncremental) {
+    return SyntaxTreeTransferMode::Incremental;
+  } else if (UID == KindSyntaxTreeFull) {
+    return SyntaxTreeTransferMode::Full;
+  } else {
+    llvm_unreachable("Unexpected syntax tree transfer mode");
+  }
+}
 
 static void handleRequestImpl(sourcekitd_object_t Req,
                               ResponseReceiver Receiver);
@@ -435,13 +450,9 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     Req.getInt64(KeyEnableStructure, EnableStructure, /*isOptional=*/true);
     int64_t EnableDiagnostics = true;
     Req.getInt64(KeyEnableDiagnostics, EnableDiagnostics, /*isOptional=*/true);
-    int64_t EnableSyntaxTree = false;
-    Req.getInt64(KeyEnableSyntaxTree, EnableSyntaxTree, /*isOptional=*/true);
+    auto TransferModeUID = Req.getUID(KeySyntaxTreeTransferMode);
     int64_t SyntacticOnly = false;
     Req.getInt64(KeySyntacticOnly, SyntacticOnly, /*isOptional=*/true);
-    int64_t ForceLibSyntaxBasedProcessing = false;
-    Req.getInt64(KeyForceLibSyntaxBasedProcessing,
-                 ForceLibSyntaxBasedProcessing, /*isOptional=*/true);
     int64_t EnableSyntaxReuseInfo = false;
     Req.getInt64(KeyEnableSyntaxReuseRegions, EnableSyntaxReuseInfo,
                  /*isOptional=*/true);
@@ -450,10 +461,9 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     Opts.EnableSyntaxMap = EnableSyntaxMap;
     Opts.EnableStructure = EnableStructure;
     Opts.EnableDiagnostics = EnableDiagnostics;
-    Opts.EnableSyntaxTree = EnableSyntaxTree;
+    Opts.SyntaxTransferMode = syntaxTransferModeFromUID(TransferModeUID);
     Opts.SyntacticOnly = SyntacticOnly;
     Opts.EnableSyntaxReuseInfo = EnableSyntaxReuseInfo;
-    Opts.ForceLibSyntaxBasedProcessing = ForceLibSyntaxBasedProcessing;
     return Rec(editorOpen(*Name, InputBuf.get(), Opts, Args));
   }
   if (ReqUID == RequestEditorClose) {
@@ -484,14 +494,9 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     Req.getInt64(KeyEnableStructure, EnableStructure, /*isOptional=*/true);
     int64_t EnableDiagnostics = true;
     Req.getInt64(KeyEnableDiagnostics, EnableDiagnostics, /*isOptional=*/true);
-    int64_t EnableSyntaxTree = false;
-    Req.getInt64(KeyEnableSyntaxTree, EnableSyntaxTree, /*isOptional=*/true);
+    auto TransferModeUID = Req.getUID(KeySyntaxTreeTransferMode);
     int64_t SyntacticOnly = false;
     Req.getInt64(KeySyntacticOnly, SyntacticOnly, /*isOptional=*/true);
-    int64_t ForceLibSyntaxBasedProcessing = false;
-    Req.getInt64(KeyForceLibSyntaxBasedProcessing,
-                 ForceLibSyntaxBasedProcessing,
-                 /*isOptional=*/true);
     int64_t EnableSyntaxReuseInfo = false;
     Req.getInt64(KeyEnableSyntaxReuseRegions, EnableSyntaxReuseInfo,
                  /*isOptional=*/true);
@@ -500,10 +505,10 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     Opts.EnableSyntaxMap = EnableSyntaxMap;
     Opts.EnableStructure = EnableStructure;
     Opts.EnableDiagnostics = EnableDiagnostics;
-    Opts.EnableSyntaxTree = EnableSyntaxTree;
+    Opts.SyntaxTransferMode = syntaxTransferModeFromUID(TransferModeUID);
+    Opts.EnableSyntaxReuseInfo = EnableSyntaxReuseInfo;
     Opts.SyntacticOnly = SyntacticOnly;
     Opts.EnableSyntaxReuseInfo = EnableSyntaxReuseInfo;
-    Opts.ForceLibSyntaxBasedProcessing = ForceLibSyntaxBasedProcessing;
 
     return Rec(editorReplaceText(*Name, InputBuf.get(), Offset, Length, Opts));
   }
@@ -2041,12 +2046,16 @@ public:
 
   void handleRequestError(const char *Description) override;
 
-  bool handleSyntaxMap(unsigned Offset, unsigned Length, UIdent Kind) override;
+  bool syntaxMapEnabled() override { return Opts.EnableSyntaxMap; }
 
-  bool handleSemanticAnnotation(unsigned Offset, unsigned Length, UIdent Kind,
+  void handleSyntaxMap(unsigned Offset, unsigned Length, UIdent Kind) override;
+
+  void handleSemanticAnnotation(unsigned Offset, unsigned Length, UIdent Kind,
                                 bool isSystem) override;
 
-  bool beginDocumentSubStructure(unsigned Offset, unsigned Length, UIdent Kind,
+  bool documentStructureEnabled() override { return Opts.EnableStructure; }
+
+  void beginDocumentSubStructure(unsigned Offset, unsigned Length, UIdent Kind,
                                  UIdent AccessLevel,
                                  UIdent SetterAccessLevel,
                                  unsigned NameOffset,
@@ -2062,37 +2071,37 @@ public:
                                  ArrayRef<StringRef> InheritedTypes,
                                  ArrayRef<std::tuple<UIdent, unsigned, unsigned>> Attrs) override;
 
-  bool endDocumentSubStructure() override;
+  void endDocumentSubStructure() override;
 
-  bool handleDocumentSubStructureElement(UIdent Kind,
-                                         unsigned Offset,
+  void handleDocumentSubStructureElement(UIdent Kind, unsigned Offset,
                                          unsigned Length) override;
 
-  bool recordAffectedRange(unsigned Offset, unsigned Length) override;
+  void recordAffectedRange(unsigned Offset, unsigned Length) override;
 
-  bool recordAffectedLineRange(unsigned Line, unsigned Length) override;
+  void recordAffectedLineRange(unsigned Line, unsigned Length) override;
 
-  bool recordFormattedText(StringRef Text) override;
+  void recordFormattedText(StringRef Text) override;
 
-  bool setDiagnosticStage(UIdent DiagStage) override;
-  bool handleDiagnostic(const DiagnosticEntryInfo &Info,
+  void setDiagnosticStage(UIdent DiagStage) override;
+  void handleDiagnostic(const DiagnosticEntryInfo &Info,
                         UIdent DiagStage) override;
 
-  bool handleSourceText(StringRef Text) override;
-  bool handleSerializedSyntaxTree(StringRef Text) override;
-  bool syntaxTreeEnabled() override { return Opts.EnableSyntaxTree; }
+  void handleSourceText(StringRef Text) override;
+
+  void handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree,
+                        std::unordered_set<unsigned> &ReusedNodeIds) override;
 
   bool syntaxReuseInfoEnabled() override { return Opts.EnableSyntaxReuseInfo; }
-  bool handleSyntaxReuseRegions(
-      std::vector<SourceFileRange> ReuseRegions) override;
+  void
+  handleSyntaxReuseRegions(std::vector<SourceFileRange> ReuseRegions) override;
+
+  SyntaxTreeTransferMode syntaxTreeTransferMode() override {
+    return Opts.SyntaxTransferMode;
+  }
 
   void finished() override {
     if (RespReceiver)
       RespReceiver(createResponse());
-  }
-
-  virtual bool forceLibSyntaxBasedProcessing() override {
-    return Opts.ForceLibSyntaxBasedProcessing;
   }
 };
 
@@ -2259,24 +2268,22 @@ void SKEditorConsumer::handleRequestError(const char *Description) {
   }
 }
 
-bool SKEditorConsumer::handleSyntaxMap(unsigned Offset, unsigned Length,
+void SKEditorConsumer::handleSyntaxMap(unsigned Offset, unsigned Length,
                                        UIdent Kind) {
   if (!Opts.EnableSyntaxMap)
-    return true;
+    return;
 
   SyntaxMap.add(Kind, Offset, Length, /*IsSystem=*/false);
-  return true;
 }
 
-bool SKEditorConsumer::handleSemanticAnnotation(unsigned Offset,
-                                                unsigned Length,
-                                                UIdent Kind, bool isSystem) {
+void SKEditorConsumer::handleSemanticAnnotation(unsigned Offset,
+                                                unsigned Length, UIdent Kind,
+                                                bool isSystem) {
   assert(Kind.isValid());
   SemanticAnnotations.add(Kind, Offset, Length, isSystem);
-  return true;
 }
 
-bool
+void
 SKEditorConsumer::beginDocumentSubStructure(unsigned Offset,
                                             unsigned Length, UIdent Kind,
                                             UIdent AccessLevel,
@@ -2299,41 +2306,32 @@ SKEditorConsumer::beginDocumentSubStructure(unsigned Offset,
         NameLength, BodyOffset, BodyLength, DocOffset, DocLength, DisplayName,
         TypeName, RuntimeName, SelectorName, InheritedTypes, Attrs);
   }
-  return true;
 }
 
-bool SKEditorConsumer::endDocumentSubStructure() {
+void SKEditorConsumer::endDocumentSubStructure() {
   if (Opts.EnableStructure)
     DocStructure.endSubStructure();
-  return true;
 }
 
-bool SKEditorConsumer::handleDocumentSubStructureElement(UIdent Kind,
+void SKEditorConsumer::handleDocumentSubStructureElement(UIdent Kind,
                                                          unsigned Offset,
                                                          unsigned Length) {
   if (Opts.EnableStructure)
     DocStructure.addElement(Kind, Offset, Length);
-  return true;
 }
 
-bool SKEditorConsumer::recordAffectedRange(unsigned Offset, unsigned Length) {
+void SKEditorConsumer::recordAffectedRange(unsigned Offset, unsigned Length) {
   Dict.set(KeyOffset, Offset);
   Dict.set(KeyLength, Length);
-
-  return true;
 }
 
-bool SKEditorConsumer::recordAffectedLineRange(unsigned Line, unsigned Length) {
+void SKEditorConsumer::recordAffectedLineRange(unsigned Line, unsigned Length) {
   Dict.set(KeyLine, Line);
   Dict.set(KeyLength, Length);
-
-  return true;
 }
 
-bool SKEditorConsumer::recordFormattedText(StringRef Text) {
+void SKEditorConsumer::recordFormattedText(StringRef Text) {
   Dict.set(KeySourceText, Text);
-
-  return true;
 }
 
 static void fillDictionaryForDiagnosticInfoBase(
@@ -2400,15 +2398,14 @@ static void fillDictionaryForDiagnosticInfoBase(
   }
 }
 
-bool SKEditorConsumer::setDiagnosticStage(UIdent DiagStage) {
+void SKEditorConsumer::setDiagnosticStage(UIdent DiagStage) {
   Dict.set(KeyDiagnosticStage, DiagStage);
-  return true;
 }
 
-bool SKEditorConsumer::handleDiagnostic(const DiagnosticEntryInfo &Info,
+void SKEditorConsumer::handleDiagnostic(const DiagnosticEntryInfo &Info,
                                         UIdent DiagStage) {
   if (!Opts.EnableDiagnostics)
-    return true;
+    return;
 
   ResponseBuilder::Array &Arr = Diags;
   if (Arr.isNull())
@@ -2417,21 +2414,53 @@ bool SKEditorConsumer::handleDiagnostic(const DiagnosticEntryInfo &Info,
   auto Elem = Arr.appendDictionary();
   Elem.set(KeyDiagnosticStage, DiagStage);
   fillDictionaryForDiagnosticInfo(Elem, Info);
-  return true;
 }
 
-bool SKEditorConsumer::handleSourceText(StringRef Text) {
+void SKEditorConsumer::handleSourceText(StringRef Text) {
   Dict.set(KeySourceText, Text);
-  return true;
 }
 
-bool SKEditorConsumer::handleSerializedSyntaxTree(StringRef Text) {
-  if (syntaxTreeEnabled())
-    Dict.set(KeySerializedSyntaxTree, Text);
-  return true;
+void serializeSyntaxTreeAsJson(
+    const swift::syntax::SourceFileSyntax &SyntaxTree,
+    std::unordered_set<unsigned> &ReusedNodeIds,
+    ResponseBuilder::Dictionary &Dict) {
+  auto StartClock = clock();
+  // 4096 is a heuristic buffer size that appears to usually be able to fit an
+  // incremental syntax tree
+  size_t ReserveBufferSize = 4096;
+  std::string SyntaxTreeString;
+  SyntaxTreeString.reserve(ReserveBufferSize);
+  {
+    llvm::raw_string_ostream SyntaxTreeStream(SyntaxTreeString);
+    SyntaxTreeStream.SetBufferSize(ReserveBufferSize);
+    swift::json::Output::UserInfoMap JsonUserInfo;
+    JsonUserInfo[swift::json::OmitNodesUserInfoKey] = &ReusedNodeIds;
+    swift::json::Output SyntaxTreeOutput(SyntaxTreeStream, JsonUserInfo,
+                                         /*PrettyPrint=*/false);
+    SyntaxTreeOutput << *SyntaxTree.getRaw();
+  }
+  Dict.set(KeySerializedSyntaxTree, SyntaxTreeString);
+
+  auto EndClock = clock();
+  LOG_SECTION("incrParse Performance", InfoLowPrio) {
+    Log->getOS() << "Serialized " << SyntaxTreeString.size() << " bytes in ";
+    llvm::write_double(Log->getOS(),
+                       (double)(EndClock - StartClock) * 1000 / CLOCKS_PER_SEC,
+                       llvm::FloatStyle::Fixed, 2);
+    Log->getOS() << "ms";
+  }
 }
 
-bool SKEditorConsumer::handleSyntaxReuseRegions(
+void SKEditorConsumer::handleSyntaxTree(
+    const swift::syntax::SourceFileSyntax &SyntaxTree,
+    std::unordered_set<unsigned> &ReusedNodeIds) {
+  if (Opts.SyntaxTransferMode == SyntaxTreeTransferMode::Off)
+    return;
+
+  serializeSyntaxTreeAsJson(SyntaxTree, ReusedNodeIds, Dict);
+}
+
+void SKEditorConsumer::handleSyntaxReuseRegions(
     std::vector<SourceFileRange> ReuseRegions) {
   if (Opts.EnableSyntaxReuseInfo) {
     auto Array = Dict.setArray(KeySyntaxReuseRegions);
@@ -2442,7 +2471,6 @@ bool SKEditorConsumer::handleSyntaxReuseRegions(
       SubDict.set(KeyLength, Region.End - Region.Start);
     }
   }
-  return true;
 }
 
 static sourcekitd_response_t

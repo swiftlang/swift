@@ -22,26 +22,26 @@ import Foundation
 public let CharacterPropertiesFetch = BenchmarkInfo(
   name: "CharacterPropertiesFetch",
   runFunction: run_CharacterPropertiesFetch,
-  tags: [.validation, .api, .String])
+  tags: [.validation, .api, .String],
+  setUpFunction: { blackHole(workload) })
 
 public let CharacterPropertiesStashed = BenchmarkInfo(
   name: "CharacterPropertiesStashed",
   runFunction: run_CharacterPropertiesStashed,
   tags: [.validation, .api, .String],
-  setUpFunction: { run_CharacterPropertiesStashed(1) },
-  tearDownFunction: nil)
+  setUpFunction: { setupStash() })
 
 public let CharacterPropertiesStashedMemo = BenchmarkInfo(
   name: "CharacterPropertiesStashedMemo",
   runFunction: run_CharacterPropertiesStashedMemo,
-  tags: [.validation, .api, .String])
+  tags: [.validation, .api, .String],
+  setUpFunction: { setupMemo() })
 
 public let CharacterPropertiesPrecomputed = BenchmarkInfo(
   name: "CharacterPropertiesPrecomputed",
   runFunction: run_CharacterPropertiesPrecomputed,
   tags: [.validation, .api, .String],
-  setUpFunction: { run_CharacterPropertiesPrecomputed(1) },
-  tearDownFunction: nil)
+  setUpFunction: { setupPrecomputed() })
 
 extension Character {
   var firstScalar: UnicodeScalar { return unicodeScalars.first! }
@@ -120,6 +120,20 @@ func isNewlineStashed(_ c: Character) -> Bool {
 let capitalizedLetters = CharacterSet.capitalizedLetters
 func isCapitalizedStashed(_ c: Character) -> Bool {
   return capitalizedLetters.contains(c.firstScalar)
+}
+
+func setupStash() {
+  blackHole(workload)
+    blackHole(controlCharacters)
+    blackHole(alphanumerics)
+    blackHole(lowercaseLetters)
+    blackHole(punctuationCharacters)
+    blackHole(whitespaces)
+    blackHole(letters)
+    blackHole(uppercaseLetters)
+    blackHole(decimalDigits)
+    blackHole(newlines)
+    blackHole(capitalizedLetters)
 }
 
 // Memoize the stashed set
@@ -222,6 +236,20 @@ func isCapitalizedStashedMemo(_ c: Character) -> Bool {
     return true
   }
   return false
+}
+
+func setupMemo() {
+  blackHole(workload)
+    blackHole(controlCharactersMemo)
+    blackHole(alphanumericsMemo)
+    blackHole(lowercaseLettersMemo)
+    blackHole(punctuationCharactersMemo)
+    blackHole(whitespacesMemo)
+    blackHole(lettersMemo)
+    blackHole(uppercaseLettersMemo)
+    blackHole(decimalDigitsMemo)
+    blackHole(newlinesMemo)
+    blackHole(capitalizedLettersMemo)
 }
 
 // Precompute whole scalar set
@@ -354,6 +382,20 @@ var capitalizedLettersPrecomputed: Set<UInt32> = {
 }()
 func isCapitalizedPrecomputed(_ c: Character) -> Bool {
   return capitalizedLettersPrecomputed.contains(c.firstScalar.value)
+}
+
+func setupPrecomputed() {
+  blackHole(workload)
+    blackHole(controlCharactersPrecomputed)
+    blackHole(alphanumericsPrecomputed)
+    blackHole(lowercaseLettersPrecomputed)
+    blackHole(punctuationCharactersPrecomputed)
+    blackHole(whitespacesPrecomputed)
+    blackHole(lettersPrecomputed)
+    blackHole(uppercaseLettersPrecomputed)
+    blackHole(decimalDigitsPrecomputed)
+    blackHole(newlinesPrecomputed)
+    blackHole(capitalizedLettersPrecomputed)
 }
 
 // Compute on the fly

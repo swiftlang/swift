@@ -28,6 +28,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILConstants.h"
+#include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -614,36 +615,6 @@ void BlocksReachingTensorCode::dump() { PDI.print(llvm::errs()); }
 //===----------------------------------------------------------------------===//
 //                             FunctionPartitioner
 //===----------------------------------------------------------------------===//
-
-namespace llvm {
-template <typename T> struct DenseMapInfo;
-
-// An alternative is to SourceManager::getLineAndColumn() as the
-// DenseMap/DenseSet key type instead of SourceRange. That would require that
-// the call-site translate a SILLocation / SourceRange to line and column
-// numbers first.
-template <> struct DenseMapInfo<SourceRange> {
-  static SourceRange getEmptyKey() { return SourceRange(); }
-
-  static SourceRange getTombstoneKey() {
-    // Make this different from empty key. See for context:
-    // http://lists.llvm.org/pipermail/llvm-dev/2015-July/088744.html
-    return SourceRange(SourceLoc(
-        SMLoc::getFromPointer(DenseMapInfo<const char *>::getTombstoneKey())));
-  }
-
-  static unsigned getHashValue(const SourceRange &Val) {
-    return hash_combine(DenseMapInfo<const void *>::getHashValue(
-                            Val.Start.getOpaquePointerValue()),
-                        DenseMapInfo<const void *>::getHashValue(
-                            Val.End.getOpaquePointerValue()));
-  }
-
-  static bool isEqual(const SourceRange &LHS, const SourceRange &RHS) {
-    return LHS == RHS;
-  }
-};
-} // namespace llvm
 
 namespace {
 /// Marking values in the host program need to either be moved, copied, or have
@@ -4341,7 +4312,8 @@ bool TFFunctionPartition::partition(bool isTest) {
       SILCoroutineKind::None, ParameterConvention::Direct_Owned, params,
       /*interfaceYields*/ {}, results, /*interfaceErrorResult*/ None,
       hostFn.getModule().getASTContext());
-  auto resultFn = hostFn.getModule().getOrCreateFunction(
+  SILFunctionBuilder FB(hostFn.getModule());
+  auto resultFn = FB.getOrCreateFunction(
       hostFn.getLocation(), hostFn.getName().str() + ".tf", SILLinkage::Private,
       newFnType,
       /*What's this*/ IsBare, IsNotTransparent, IsNotSerialized);

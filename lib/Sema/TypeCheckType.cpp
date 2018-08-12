@@ -357,19 +357,21 @@ Type TypeChecker::applyGenericArguments(Type type,
 
   // We must either have an unbound generic type, or a generic type alias.
   if (!type->is<UnboundGenericType>()) {
-    auto diag = diagnose(loc, diag::not_a_generic_type, type);
+     if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
+      auto diag = diagnose(loc, diag::not_a_generic_type, type);
 
-    // Don't add fixit on module type; that isn't the right type regardless
-    // of whether it had generic arguments.
-    if (!type->is<ModuleType>()) {
-      // When turning a SourceRange into CharSourceRange the closing angle
-      // brackets on nested generics are lexed as one token.
-      SourceRange angles = generic->getAngleBrackets();
-      diag.fixItRemoveChars(angles.Start,
-                            angles.End.getAdvancedLocOrInvalid(1));
+      // Don't add fixit on module type; that isn't the right type regardless
+      // of whether it had generic arguments.
+      if (!type->is<ModuleType>()) {
+        // When turning a SourceRange into CharSourceRange the closing angle
+        // brackets on nested generics are lexed as one token.
+        SourceRange angles = generic->getAngleBrackets();
+        diag.fixItRemoveChars(angles.Start,
+                              angles.End.getAdvancedLocOrInvalid(1));
+      }
+
+      generic->setInvalid();
     }
-
-    generic->setInvalid();
     return type;
   }
 
@@ -383,12 +385,14 @@ Type TypeChecker::applyGenericArguments(Type type,
   auto genericArgs = generic->getGenericArgs();
   auto genericParams = genericDecl->getGenericParams();
   if (genericParams->size() != genericArgs.size()) {
-    diagnose(loc, diag::type_parameter_count_mismatch, decl->getName(),
-             genericParams->size(), genericArgs.size(),
-             genericArgs.size() < genericParams->size())
-        .highlight(generic->getAngleBrackets());
-    diagnose(decl, diag::kind_identifier_declared_here,
-             DescriptiveDeclKind::GenericType, decl->getName());
+    if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
+      diagnose(loc, diag::type_parameter_count_mismatch, decl->getName(),
+               genericParams->size(), genericArgs.size(),
+               genericArgs.size() < genericParams->size())
+          .highlight(generic->getAngleBrackets());
+      diagnose(decl, diag::kind_identifier_declared_here,
+               DescriptiveDeclKind::GenericType, decl->getName());
+    }
     return ErrorType::get(Context);
   }
 
@@ -412,9 +416,11 @@ Type TypeChecker::applyGenericArguments(Type type,
 
   // Cannot extend a bound generic type.
   if (options.contains(TypeResolutionFlags::ExtensionBinding)) {
-    diagnose(loc, diag::extension_specialization,
-             genericDecl->getName())
-      .highlight(generic->getSourceRange());
+    if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
+      diagnose(loc, diag::extension_specialization,
+               genericDecl->getName())
+        .highlight(generic->getSourceRange());
+    }
     return ErrorType::get(Context);
   }
 
@@ -901,14 +907,12 @@ static Type
 resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
                                   ComponentIdentTypeRepr *comp,
                                   TypeResolutionOptions options,
-                                  bool diagnoseErrors,
                                   GenericTypeResolver *resolver);
 
 static Type
 resolveGenericSignatureComponent(TypeChecker &TC, DeclContext *DC,
                                  ComponentIdentTypeRepr *comp,
                                  TypeResolutionOptions options,
-                                 bool diagnoseErrors,
                                  GenericTypeResolver *resolver) {
   if (!DC->isInnermostContextGeneric())
     return Type();
@@ -926,8 +930,7 @@ resolveGenericSignatureComponent(TypeChecker &TC, DeclContext *DC,
       return Type();
 
     comp->setValue(*matchingParam, nullptr);
-    return resolveTopLevelIdentTypeComponent(TC, DC, comp, options,
-                                             diagnoseErrors, resolver);
+    return resolveTopLevelIdentTypeComponent(TC, DC, comp, options, resolver);
   }
 
   // If we are inside an extension of a nested type, we have to visit
@@ -944,8 +947,7 @@ resolveGenericSignatureComponent(TypeChecker &TC, DeclContext *DC,
 
     if (matchingParam != outerParams->end()) {
       comp->setValue(*matchingParam, nullptr);
-      return resolveTopLevelIdentTypeComponent(TC, DC, comp, options,
-                                               diagnoseErrors, resolver);
+      return resolveTopLevelIdentTypeComponent(TC, DC, comp, options, resolver);
     }
   }
 
@@ -959,10 +961,9 @@ resolveGenericSignatureComponent(TypeChecker &TC, DeclContext *DC,
           comp->getIdLoc())) {
     auto nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
     SmallVector<ValueDecl *, 4> decls;
-    if (DC->lookupQualified(nominal->getDeclaredInterfaceType(),
+    if (DC->lookupQualified(nominal,
                             comp->getIdentifier(),
                             NL_OnlyTypes|NL_QualifiedDefault|NL_ProtocolMembers,
-                            &TC,
                             decls)) {
       for (const auto decl : decls) {
         // FIXME: Better ambiguity handling.
@@ -972,7 +973,7 @@ resolveGenericSignatureComponent(TypeChecker &TC, DeclContext *DC,
 
         comp->setValue(typeDecl, DC);
         return resolveTopLevelIdentTypeComponent(TC, DC, comp, options,
-                                                 diagnoseErrors, resolver);
+                                                 resolver);
       }
     }
   }
@@ -989,7 +990,6 @@ static Type
 resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
                                   ComponentIdentTypeRepr *comp,
                                   TypeResolutionOptions options,
-                                  bool diagnoseErrors,
                                   GenericTypeResolver *resolver) {
   // Short-circuiting.
   if (comp->isInvalid()) return ErrorType::get(TC.Context);
@@ -1027,7 +1027,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   // parameters (only), then move up to the enclosing context.
   if (options.contains(TypeResolutionFlags::GenericSignature)) {
     Type type = resolveGenericSignatureComponent(
-      TC, DC, comp, options, diagnoseErrors, resolver);
+      TC, DC, comp, options, resolver);
     if (type)
       return type;
 
@@ -1088,7 +1088,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   // Complain about any ambiguities we detected.
   // FIXME: We could recover by looking at later components.
   if (isAmbiguous) {
-    if (diagnoseErrors) {
+    if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
       TC.diagnose(comp->getIdLoc(), diag::ambiguous_type_base,
                   comp->getIdentifier())
         .highlight(comp->getIdLoc());
@@ -1105,7 +1105,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   if (current.isNull()) {
     // If we're not allowed to complain or we couldn't fix the
     // source, bail out.
-    if (!diagnoseErrors)
+    if (options.contains(TypeResolutionFlags::SilenceErrors))
       return ErrorType::get(TC.Context);
 
     return diagnoseUnknownType(TC, DC, nullptr, SourceRange(), comp, options,
@@ -1125,7 +1125,6 @@ static Type resolveNestedIdentTypeComponent(
               SourceRange parentRange,
               ComponentIdentTypeRepr *comp,
               TypeResolutionOptions options,
-              bool diagnoseErrors,
               GenericTypeResolver *resolver) {
   auto maybeApplyGenericArgs = [&](Type memberType) {
     // If there are generic arguments, apply them now.
@@ -1151,7 +1150,7 @@ static Type resolveNestedIdentTypeComponent(
                                         AssociatedTypeDecl *inferredAssocType) {
     // Diagnose invalid cases.
     if (TC.isUnsupportedMemberTypeAccess(parentTy, member)) {
-      if (diagnoseErrors) {
+      if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
         if (parentTy->is<UnboundGenericType>())
           diagnoseUnboundGenericType(TC, parentTy, parentRange.End);
         else if (parentTy->isExistentialType() &&
@@ -1172,7 +1171,7 @@ static Type resolveNestedIdentTypeComponent(
     // be an unbound generic.
     if (options & TypeResolutionFlags::TypeAliasUnderlyingType) {
       if (parentTy->is<UnboundGenericType>()) {
-        if (diagnoseErrors)
+        if (!options.contains(TypeResolutionFlags::SilenceErrors))
           diagnoseUnboundGenericType(TC, parentTy, parentRange.End);
 
         return ErrorType::get(TC.Context);
@@ -1180,8 +1179,8 @@ static Type resolveNestedIdentTypeComponent(
     }
 
     // Diagnose a bad conformance reference if we need to.
-    if (inferredAssocType && diagnoseErrors && memberType &&
-        memberType->hasError()) {
+    if (!options.contains(TypeResolutionFlags::SilenceErrors) &&
+        inferredAssocType && memberType && memberType->hasError()) {
       maybeDiagnoseBadConformanceRef(TC, DC, parentTy, comp->getLoc(),
                                      inferredAssocType);
     }
@@ -1252,7 +1251,7 @@ static Type resolveNestedIdentTypeComponent(
   // FIXME: Could try to apply generic arguments first, and see whether
   // that resolves things. But do we really want that to succeed?
   if (memberTypes.size() > 1) {
-    if (diagnoseErrors)
+    if (!options.contains(TypeResolutionFlags::SilenceErrors))
       TC.diagnoseAmbiguousMemberType(parentTy, parentRange,
                                      comp->getIdentifier(), comp->getIdLoc(),
                                      memberTypes);
@@ -1266,7 +1265,7 @@ static Type resolveNestedIdentTypeComponent(
   if (!memberTypes) {
     // If we're not allowed to complain or we couldn't fix the
     // source, bail out.
-    if (!diagnoseErrors)
+    if (options.contains(TypeResolutionFlags::SilenceErrors))
       return ErrorType::get(TC.Context);
 
     memberType = diagnoseUnknownType(TC, DC, parentTy, parentRange, comp,
@@ -1288,22 +1287,20 @@ static Type resolveIdentTypeComponent(
               TypeChecker &TC, DeclContext *DC,
               ArrayRef<ComponentIdentTypeRepr *> components,
               TypeResolutionOptions options,
-              bool diagnoseErrors,
               GenericTypeResolver *resolver) {
   auto comp = components.back();
 
   // The first component uses unqualified lookup.
   auto parentComps = components.slice(0, components.size()-1);
   if (parentComps.empty()) {
-    return resolveTopLevelIdentTypeComponent(TC, DC, comp, options,
-                                             diagnoseErrors, resolver);
+    return resolveTopLevelIdentTypeComponent(TC, DC, comp, options, resolver);
   }
 
   // All remaining components use qualified lookup.
 
   // Resolve the parent type.
   Type parentTy = resolveIdentTypeComponent(TC, DC, parentComps, options,
-                                            diagnoseErrors, resolver);
+                                            resolver);
   if (!parentTy || parentTy->hasError()) return parentTy;
   
   SourceRange parentRange(parentComps.front()->getIdLoc(),
@@ -1312,8 +1309,7 @@ static Type resolveIdentTypeComponent(
   // Resolve the nested type.
   return resolveNestedIdentTypeComponent(TC, DC, parentTy,
                                          parentRange, comp,
-                                         options, diagnoseErrors,
-                                         resolver);
+                                         options, resolver);
 }
 
 static bool diagnoseAvailability(IdentTypeRepr *IdType,
@@ -1373,7 +1369,6 @@ Type TypeChecker::resolveIdentifierType(
        DeclContext *DC,
        IdentTypeRepr *IdType,
        TypeResolutionOptions options,
-       bool diagnoseErrors,
        GenericTypeResolver *resolver) {
   assert(resolver && "Missing generic type resolver");
 
@@ -1381,11 +1376,11 @@ Type TypeChecker::resolveIdentifierType(
   auto Components = llvm::makeArrayRef(ComponentRange.begin(),
                                        ComponentRange.end());
   Type result = resolveIdentTypeComponent(*this, DC, Components, options, 
-                                          diagnoseErrors, resolver);
+                                          resolver);
   if (!result) return nullptr;
 
   if (auto moduleTy = result->getAs<ModuleType>()) {
-    if (diagnoseErrors) {
+    if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
       auto moduleName = moduleTy->getModule()->getName();
       diagnose(Components.back()->getIdLoc(),
                diag::use_undeclared_type, moduleName);
@@ -1410,7 +1405,8 @@ Type TypeChecker::resolveIdentifierType(
   // To support this, inside inheritance clauses we allow references to
   // protocols that are unavailable in the current type refinement context.
 
-  if (!(options & TypeResolutionFlags::AllowUnavailable) &&
+  if (!options.contains(TypeResolutionFlags::SilenceErrors) &&
+      !options.contains(TypeResolutionFlags::AllowUnavailable) &&
       diagnoseAvailability(IdType, DC, *this,
              options.contains(TypeResolutionFlags::AllowUnavailableProtocol))) {
     Components.back()->setInvalid();
@@ -1594,7 +1590,7 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
   case TypeReprKind::GenericIdent:
   case TypeReprKind::CompoundIdent:
     return TC.resolveIdentifierType(DC, cast<IdentTypeRepr>(repr), options,
-                                    /*diagnoseErrors*/ true, Resolver);
+                                    Resolver);
 
   case TypeReprKind::Function: {
     if (!(options & TypeResolutionFlags::SILType)) {

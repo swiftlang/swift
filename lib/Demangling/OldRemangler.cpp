@@ -534,8 +534,20 @@ void Remangler::mangleGenericSpecialization(Node *node) {
   // Start another mangled name.
   Out << "__T";
 }
+
 void Remangler::mangleGenericSpecializationNotReAbstracted(Node *node) {
   Out << "TSr";
+  mangleChildNodes(node); // GenericSpecializationParams
+
+  // Specializations are just prepended to already-mangled names.
+  resetSubstitutions();
+
+  // Start another mangled name.
+  Out << "__T";
+}
+
+void Remangler::mangleInlinedGenericFunction(Node *node) {
+  Out << "TSi";
   mangleChildNodes(node); // GenericSpecializationParams
 
   // Specializations are just prepended to already-mangled names.
@@ -716,6 +728,11 @@ void Remangler::mangleTypeMetadataInstantiationFunction(Node *node) {
   mangleSingleChildNode(node); // type
 }
 
+void Remangler::mangleTypeMetadataInPlaceInitializationCache(Node *node) {
+  Out << "Ml";
+  mangleSingleChildNode(node); // type
+}
+
 void Remangler::mangleTypeMetadataCompletionFunction(Node *node) {
   Out << "Mr";
   mangleSingleChildNode(node); // type
@@ -758,10 +775,6 @@ void Remangler::mangleFullTypeMetadata(Node *node) {
 void Remangler::mangleProtocolDescriptor(Node *node) {
   Out << "Mp";
   mangleProtocolWithoutPrefix(node->begin()[0]);
-}
-
-void Remangler::mangleProtocolRequirementArray(Node *node) {
-  unreachable("todo");
 }
 
 void Remangler::mangleProtocolWitnessTablePattern(Node *node) {
@@ -1034,6 +1047,14 @@ void Remangler::mangleNativePinningAddressor(Node *node, EntityContext &ctx) {
 
 void Remangler::mangleUnsafeAddressor(Node *node, EntityContext &ctx) {
   mangleAccessor(node->getFirstChild(), "lu", ctx);
+}
+
+void Remangler::mangleReadAccessor(Node *node, EntityContext &ctx) {
+  mangleAccessor(node->getFirstChild(), "r", ctx);
+}
+
+void Remangler::mangleModifyAccessor(Node *node, EntityContext &ctx) {
+  mangleAccessor(node->getFirstChild(), "M", ctx);
 }
 
 void Remangler::mangleExplicitClosure(Node *node, EntityContext &ctx) {

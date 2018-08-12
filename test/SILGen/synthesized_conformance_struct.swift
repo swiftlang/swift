@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-silgen %s -swift-version 4 | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-silgen %s -swift-version 4 | %FileCheck -check-prefix CHECK -check-prefix CHECK-FRAGILE %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-silgen %s -swift-version 4 -enable-resilience | %FileCheck -check-prefix CHECK -check-prefix CHECK-RESILIENT %s
 
 struct Struct<T> {
     var x: T
@@ -13,13 +14,15 @@ struct Struct<T> {
 // CHECK:     init?(stringValue: String)
 // CHECK:     var intValue: Int? { get }
 // CHECK:     init?(intValue: Int)
-// CHECK:     @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ a: Struct<T>.CodingKeys, _ b: Struct<T>.CodingKeys) -> Bool
+// CHECK-FRAGILE:   @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ a: Struct<T>.CodingKeys, _ b: Struct<T>.CodingKeys) -> Bool
+// CHECK-RESILIENT: static func == (a: Struct<T>.CodingKeys, b: Struct<T>.CodingKeys) -> Bool
 // CHECK:     var hashValue: Int { get }
 // CHECK:     func hash(into hasher: inout Hasher)
 // CHECK:   }
 // CHECK: }
 // CHECK-LABEL: extension Struct : Equatable where T : Equatable {
-// CHECK:   @_implements(Equatable, ==(_:_:)) static func __derived_struct_equals(_ a: Struct<T>, _ b: Struct<T>) -> Bool
+// CHECK-FRAGILE:   @_implements(Equatable, ==(_:_:)) static func __derived_struct_equals(_ a: Struct<T>, _ b: Struct<T>) -> Bool
+// CHECK-RESILIENT: static func == (a: Struct<T>, b: Struct<T>) -> Bool
 // CHECK: }
 // CHECK-LABEL: extension Struct : Hashable where T : Hashable {
 // CHECK:   var hashValue: Int { get }
@@ -31,8 +34,10 @@ struct Struct<T> {
 // CHECK: }
 
 extension Struct: Equatable where T: Equatable {}
-// CHECK-LABEL: // static Struct<A>.__derived_struct_equals(_:_:)
-// CHECK-NEXT: sil hidden @$S30synthesized_conformance_struct6StructVAASQRzlE010__derived_C7_equalsySbACyxG_AEtFZ : $@convention(method) <T where T : Equatable> (@in_guaranteed Struct<T>, @in_guaranteed Struct<T>, @thin Struct<T>.Type) -> Bool {
+// CHECK-FRAGILE-LABEL: // static Struct<A>.__derived_struct_equals(_:_:)
+// CHECK-FRAGILE-NEXT: sil hidden @$S30synthesized_conformance_struct6StructVAASQRzlE010__derived_C7_equalsySbACyxG_AEtFZ : $@convention(method) <T where T : Equatable> (@in_guaranteed Struct<T>, @in_guaranteed Struct<T>, @thin Struct<T>.Type) -> Bool {
+// CHECK-RESILIENT-LABEL: // static Struct<A>.== infix(_:_:)
+// CHECK-RESILIENT-NEXT: sil hidden @$S30synthesized_conformance_struct6StructVAASQRzlE2eeoiySbACyxG_AEtFZ : $@convention(method) <T where T : Equatable> (@in_guaranteed Struct<T>, @in_guaranteed Struct<T>, @thin Struct<T>.Type) -> Bool {
 
 extension Struct: Hashable where T: Hashable {}
 // CHECK-LABEL: // Struct<A>.hashValue.getter

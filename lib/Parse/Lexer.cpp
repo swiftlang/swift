@@ -279,10 +279,16 @@ void Lexer::formToken(tok Kind, const char *TokStart, bool MultilineString) {
   }
   unsigned CommentLength = 0;
   if (RetainComments == CommentRetentionMode::AttachToNextToken) {
+    // 'CommentLength' here is the length from the *first* comment to the
+    // token text (or its backtick if exist).
     auto Iter = llvm::find_if(LeadingTrivia, [](const TriviaPiece &Piece) {
       return Piece.isComment();
     });
     for (auto End = LeadingTrivia.end(); Iter != End; Iter++) {
+      if (Iter->getKind() == TriviaKind::Backtick)
+        // Since Token::getCommentRange() doesn't take backtick into account,
+        // we cannot include length of backtick.
+        break;
       CommentLength += Iter->getTextLength();
     }
   }
@@ -895,13 +901,9 @@ void Lexer::lexDollarIdent() {
   }
 
   if (CurPtr == tokStart + 1) {
-    // It is always an error to see a standalone '$' when not in Swift 3
-    // compatibility mode.
-    if (!LangOpts.isSwiftVersion3()) {
-      // Offer to replace '$' with '`$`'.
-      diagnose(tokStart, diag::standalone_dollar_identifier)
-        .fixItReplaceChars(getSourceLoc(tokStart), getSourceLoc(CurPtr), "`$`");
-    }
+    // It is an error to see a standalone '$'. Offer to replace '$' with '`$`'.
+    diagnose(tokStart, diag::standalone_dollar_identifier)
+      .fixItReplaceChars(getSourceLoc(tokStart), getSourceLoc(CurPtr), "`$`");
     return formToken(tok::identifier, tokStart);
   }
 

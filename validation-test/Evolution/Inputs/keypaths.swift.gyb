@@ -25,7 +25,7 @@ public enum AnEnum {
     }
   }
 
-% for (name, kind, before, after) in testCases:
+% for (name, kind, before, after, addsAPI) in testCases:
 
 %   if kind == "mutating" or kind == "nonmutating":
 
@@ -51,7 +51,7 @@ public struct AStruct {
 
   public var sink: Int = 0
 
-% for (name, kind, before, after) in testCases:
+% for (name, kind, before, after, addsAPI) in testCases:
 
 %   if kind == "mutating" or kind == "nonmutating" or kind == "stored":
 
@@ -75,7 +75,7 @@ public class AClass {
 
   public var sink: Int = 0
 
-% for (name, kind, before, after) in testCases:
+% for (name, kind, before, after, addsAPI) in testCases:
 
 %   if kind == "nonmutating" or kind == "stored":
 
@@ -86,6 +86,32 @@ public class AClass {
     #endif
 
     public static var keyPath_${name}: PartialKeyPath<AClass> { return \AClass.${name} }
+
+%   elif kind == "mutating":
+
+%   else:
+      %{ raise ValueError("improper test case kind") }%
+%   end
+
+% end
+
+}
+
+public final class AFinalClass {
+
+  public var sink: Int = 0
+
+% for (name, kind, before, after, addsAPI) in testCases:
+
+%   if kind == "nonmutating" or kind == "stored":
+
+    #if BEFORE
+      ${before.format(name=name, nonmutating="")}
+    #else
+      ${after.format(name=name, nonmutating="")}
+    #endif
+
+    public static var keyPath_${name}: PartialKeyPath<AFinalClass> { return \AFinalClass.${name} }
 
 %   elif kind == "mutating":
 

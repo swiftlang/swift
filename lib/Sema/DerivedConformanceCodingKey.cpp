@@ -141,37 +141,11 @@ static ValueDecl *deriveInitDecl(DerivedConformance &derived, Type paramType,
   // Synthesize the body.
   synthesizer(initDecl);
 
-  // Compute the type of the initializer.
-  TupleTypeElt element(paramType, paramName);
-  TupleTypeElt interfaceElement(paramType, paramName);
-  auto interfaceArgType = TupleType::get(interfaceElement, C);
-
   // Compute the interface type of the initializer.
-  Type retInterfaceType =
-      OptionalType::get(parentDC->getDeclaredInterfaceType());
-  Type interfaceType = FunctionType::get(interfaceArgType, retInterfaceType);
-  auto selfParam = computeSelfParam(initDecl);
-  auto initSelfParam = computeSelfParam(initDecl, /*init*/ true);
+  if (auto env = parentDC->getGenericEnvironmentOfContext())
+    initDecl->setGenericEnvironment(env);
+  initDecl->computeType();
 
-  Type allocIfaceType;
-  Type initIfaceType;
-  if (auto sig = parentDC->getGenericSignatureOfContext()) {
-    initDecl->setGenericEnvironment(parentDC->getGenericEnvironmentOfContext());
-
-    allocIfaceType = GenericFunctionType::get(sig, {selfParam},
-                                              interfaceType,
-                                              FunctionType::ExtInfo());
-    initIfaceType = GenericFunctionType::get(sig, {initSelfParam},
-                                             interfaceType,
-                                             FunctionType::ExtInfo());
-  } else {
-    allocIfaceType = FunctionType::get({selfParam},
-                                       interfaceType, FunctionType::ExtInfo());
-    initIfaceType = FunctionType::get({initSelfParam},
-                                      interfaceType, FunctionType::ExtInfo());
-  }
-  initDecl->setInterfaceType(allocIfaceType);
-  initDecl->setInitializerInterfaceType(initIfaceType);
   initDecl->setAccess(derived.Nominal->getFormalAccess());
   initDecl->setValidationToChecked();
 

@@ -18,26 +18,32 @@ using namespace llvm;
 
 TEST(EditableTextBuffer, Updates) {
   const char *Text = "hello world";
+  size_t Length = strlen(Text);
 
   EditableTextBufferManager BufMgr;
   EditableTextBufferRef EdBuf = BufMgr.getOrCreateBuffer("/a/test", Text);
   ImmutableTextBufferRef Buf = EdBuf->getBuffer();
 
   EXPECT_EQ(Buf->getText(), Text);
+  EXPECT_EQ(EdBuf->getSize(), Length);
 
   Buf = EdBuf->insert(6, "all ")->getBuffer();
   EXPECT_EQ(Buf->getText(), "hello all world");
+  EXPECT_EQ(EdBuf->getSize(), strlen("hello all world"));
 
   Buf = EdBuf->erase(9, 6)->getBuffer();
   EXPECT_EQ(Buf->getText(), "hello all");
+  EXPECT_EQ(EdBuf->getSize(), strlen("hello all"));
 
   Buf = EdBuf->replace(0, 5, "yo")->getBuffer();
   EXPECT_EQ(Buf->getText(), "yo all");
+  EXPECT_EQ(EdBuf->getSize(), strlen("yo all"));
 
   EdBuf = BufMgr.resetBuffer("/a/test", Text);
   EdBuf->insert(6, "all ");
   EdBuf->erase(9, 6);
   EdBuf->replace(0, 5, "yo");
+  EXPECT_EQ(EdBuf->getSize(), strlen("yo all"));
   Buf = EdBuf->getSnapshot()->getBuffer();
   EXPECT_EQ(Buf->getText(), "yo all");
 

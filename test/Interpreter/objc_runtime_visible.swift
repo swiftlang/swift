@@ -62,7 +62,6 @@ ObjCRuntimeVisibleTestSuite.test("protocols") {
 }
 
 ObjCRuntimeVisibleTestSuite.test("protocols/downcast")
-    .xfail(.always("unimplemented"))
     .code {
   let obj = HiddenClass.create()
   let opaque: AnyObject = obj

@@ -237,7 +237,7 @@ extension Unicode.Scalar.Properties {
   ///
   /// This property roughly defines the class of "Chinese characters" and does
   /// not include characters of other logographic scripts such as Cuneiform or
-  /// Egyptian Hieroglyphs
+  /// Egyptian Hieroglyphs.
   ///
   /// This property corresponds to the `Ideographic` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
@@ -292,8 +292,8 @@ extension Unicode.Scalar.Properties {
   ///   directs the rendering engine to render them as a connected glyph when it
   ///   would otherwise render them independently. The zero width joiner is also
   ///   used to construct complex emoji from sequences of base emoji characters.
-  ///   For example, "family" emoji are created by joining sequences of man,
-  ///   woman, and child emoji with the zero width joiner.
+  ///   For example, the various "family" emoji are encoded as sequences of man,
+  ///   woman, or child emoji that are interleaved with zero width joiners.
   ///
   /// This property corresponds to the `Join_Control` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
@@ -520,8 +520,8 @@ extension Unicode.Scalar.Properties {
     return _hasBinaryProperty(__swift_stdlib_UCHAR_CASE_IGNORABLE)
   }
 
-  /// A Boolean property indicating whether the scalar is one whose normalized
-  /// form is not stable under a `toLowercase` mapping.
+  /// A Boolean property indicating whether the scalar's normalized form differs
+  /// from the `lowercaseMapping` of each constituent scalar.
   ///
   /// This property corresponds to the `Changes_When_Lowercased` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
@@ -529,8 +529,8 @@ extension Unicode.Scalar.Properties {
     return _hasBinaryProperty(__swift_stdlib_UCHAR_CHANGES_WHEN_LOWERCASED)
   }
 
-  /// A Boolean property indicating whether the scalar is one whose normalized
-  /// form is not stable under a `toUppercase` mapping.
+  /// A Boolean property indicating whether the scalar's normalized form differs
+  /// from the `uppercaseMapping` of each constituent scalar.
   ///
   /// This property corresponds to the `Changes_When_Uppercased` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
@@ -538,8 +538,8 @@ extension Unicode.Scalar.Properties {
     return _hasBinaryProperty(__swift_stdlib_UCHAR_CHANGES_WHEN_UPPERCASED)
   }
 
-  /// A Boolean property indicating whether the scalar is one whose normalized
-  /// form is not stable under a `toTitlecase` mapping.
+  /// A Boolean property indicating whether the scalar's normalized form differs
+  /// from the `titlecaseMapping` of each constituent scalar.
   ///
   /// This property corresponds to the `Changes_When_Titlecased` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
@@ -547,8 +547,8 @@ extension Unicode.Scalar.Properties {
     return _hasBinaryProperty(__swift_stdlib_UCHAR_CHANGES_WHEN_TITLECASED)
   }
 
-  /// A Boolean property indicating whether the scalar is one whose normalized
-  /// form is not stable under case folding.
+  /// A Boolean property indicating whether the scalar's normalized form differs
+  /// from the case-fold mapping of each constituent scalar.
   ///
   /// This property corresponds to the `Changes_When_Casefolded` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
@@ -557,7 +557,7 @@ extension Unicode.Scalar.Properties {
   }
 
   /// A Boolean property indicating whether the scalar may change when it
-  /// undergoes a case mapping.
+  /// undergoes case mapping.
   ///
   /// For any scalar `s`, it holds by definition that
   ///
@@ -753,10 +753,8 @@ extension Unicode.Scalar.Properties {
   /// WITH DOT ABOVE) becomes two scalars (U+0069 LATIN SMALL LETTER I, U+0307
   /// COMBINING DOT ABOVE) when converted to lowercase.
   ///
-  /// This function corresponds to the `Lowercase_Mapping` property in the
+  /// This property corresponds to the `Lowercase_Mapping` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
-  ///
-  /// - Returns: The lowercase mapping of the scalar.
   public var lowercaseMapping: String {
     return _applyMapping(__swift_stdlib_u_strToLower)
   }
@@ -769,10 +767,8 @@ extension Unicode.Scalar.Properties {
   /// becomes "Fi" (U+0046 LATIN CAPITAL LETTER F, U+0069 LATIN SMALL LETTER I)
   /// when converted to titlecase.
   ///
-  /// This function corresponds to the `Titlecase_Mapping` property in the
+  /// This property corresponds to the `Titlecase_Mapping` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
-  ///
-  /// - Returns: The titlecase mapping of the scalar.
   public var titlecaseMapping: String {
     return _applyMapping { ptr, cap, src, len, locale, err in
       return __swift_stdlib_u_strToTitle(ptr, cap, src, len, nil, locale, err)
@@ -787,10 +783,8 @@ extension Unicode.Scalar.Properties {
   /// SHARP S) becomes "SS" (U+0053 LATIN CAPITAL LETTER S, U+0053 LATIN CAPITAL
   /// LETTER S) when converted to uppercase.
   ///
-  /// This function corresponds to the `Uppercase_Mapping` property in the
+  /// This property corresponds to the `Uppercase_Mapping` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
-  ///
-  /// - Returns: The uppercase mapping of the scalar.
   public var uppercaseMapping: String {
     return _applyMapping(__swift_stdlib_u_strToUpper)
   }
@@ -1355,14 +1349,14 @@ extension Unicode.Scalar.Properties {
   /// number.
   ///
   /// ```
-  /// print("X", ("X" as Unicode.Scalar).properties.numericType)
+  /// print("X", ("X" as Unicode.Scalar).properties.numericType ?? "nil")
   /// // Prints "X nil"
-  /// print("4", ("4" as Unicode.Scalar).properties.numericType)
-  /// // Prints "4 Optional(Swift.Unicode.NumericType.decimal)"
-  /// print("\u{2463}", ("\u{2463}" as Unicode.Scalar).properties.numericType)
-  /// // Prints "④ Optional(Swift.Unicode.NumericType.digit)"
-  /// print("\u{2155}", ("\u{2155}" as Unicode.Scalar).properties.numericType)
-  /// // Prints "⅕ Optional(Swift.Unicode.NumericType.numeric)"
+  /// print("4", ("4" as Unicode.Scalar).properties.numericType ?? "nil")
+  /// // Prints "4 decimal"
+  /// print("\u{2463}", ("\u{2463}" as Unicode.Scalar).properties.numericType ?? "nil")
+  /// // Prints "④ digit"
+  /// print("\u{2155}", ("\u{2155}" as Unicode.Scalar).properties.numericType ?? "nil")
+  /// // Prints "⅕ numeric"
   /// ```
   ///
   /// This property corresponds to the `Numeric_Type` property in the
@@ -1376,20 +1370,20 @@ extension Unicode.Scalar.Properties {
 
   /// The numeric value of the scalar.
   ///
-  /// The value of this property is `nil` for scalars that do not represent a
+  /// The value of this property is nil for scalars that do not represent a
   /// number.
   ///
   /// The numeric value of a scalar is represented as a `Double` because some
   /// scalars represent fractions:
   ///
   /// ```
-  /// print("X", ("X" as Unicode.Scalar).properties.numericValue)
-  /// // Prints "X nan"
-  /// print("4", ("4" as Unicode.Scalar).properties.numericValue)
+  /// print("X", ("X" as Unicode.Scalar).properties.numericValue ?? "nil")
+  /// // Prints "X nil"
+  /// print("4", ("4" as Unicode.Scalar).properties.numericValue ?? "nil")
   /// // Prints "4 4.0"
-  /// print("\u{2463}", ("\u{2463}" as Unicode.Scalar).properties.numericValue)
+  /// print("\u{2463}", ("\u{2463}" as Unicode.Scalar).properties.numericValue ?? "nil")
   /// // Prints "④ 4.0"
-  /// print("\u{2155}", ("\u{2155}" as Unicode.Scalar).properties.numericValue)
+  /// print("\u{2155}", ("\u{2155}" as Unicode.Scalar).properties.numericValue ?? "nil")
   /// // Prints "⅕ 0.2"
   /// ```
   ///

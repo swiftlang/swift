@@ -19,6 +19,7 @@
 #define SWIFT_AST_IRGENOPTIONS_H
 
 #include "swift/AST/LinkLibrary.h"
+#include "swift/Basic/PathRemapper.h"
 #include "swift/Basic/Sanitizers.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/OptimizationMode.h"
@@ -109,6 +110,9 @@ public:
   /// What type of debug info to generate.
   IRGenDebugInfoFormat DebugInfoFormat : 2;
 
+  /// Path prefixes that should be rewritten in debug info.
+  PathRemapper DebugPrefixMap;
+
   /// \brief Whether we're generating IR for the JIT.
   unsigned UseJIT : 1;
   
@@ -189,6 +193,15 @@ public:
   /// Which sanitizer coverage is turned on.
   llvm::SanitizerCoverageOptions SanitizeCoverage;
 
+  /// The different modes for dumping IRGen type info.
+  enum class TypeInfoDumpFilter {
+    All,
+    Resilient,
+    Fragile
+  };
+
+  TypeInfoDumpFilter TypeInfoFilter;
+
   IRGenOptions()
       : DWARFVersion(2), OutputKind(IRGenOutputKind::LLVMAssembly),
         Verify(true), OptMode(OptimizationMode::NotSet),
@@ -204,7 +217,8 @@ public:
         EnableReflectionNames(true), EnableClassResilience(false),
         EnableResilienceBypass(false), UseIncrementalLLVMCodeGen(true),
         UseSwiftCall(false), GenerateProfile(false), CmdArgs(),
-        SanitizeCoverage(llvm::SanitizerCoverageOptions()) {}
+        SanitizeCoverage(llvm::SanitizerCoverageOptions()),
+        TypeInfoFilter(TypeInfoDumpFilter::All) {}
 
   // Get a hash of all options which influence the llvm compilation but are not
   // reflected in the llvm module itself.

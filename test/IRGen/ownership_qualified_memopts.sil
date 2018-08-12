@@ -9,7 +9,7 @@ import Builtin
 // CHECK-NOT: retain
 // CHECK: ret void
 sil @take_load : $@convention(thin) (@in Builtin.NativeObject) -> () {
-bb0(%0 : $*Builtin.NativeObject):
+bb0(%0 : @trivial $*Builtin.NativeObject):
   load [take] %0 : $*Builtin.NativeObject
   %1 = tuple()
   return %1 : $()
@@ -20,7 +20,7 @@ bb0(%0 : $*Builtin.NativeObject):
 // CHECK: retain
 // CHECK: ret void
 sil @copy_load : $@convention(thin) (@in Builtin.NativeObject) -> () {
-bb0(%0 : $*Builtin.NativeObject):
+bb0(%0 : @trivial $*Builtin.NativeObject):
   load [copy] %0 : $*Builtin.NativeObject
   %1 = tuple()
   return %1 : $()
@@ -32,7 +32,7 @@ bb0(%0 : $*Builtin.NativeObject):
 // CHECK-NOT: retain
 // CHECK: ret void
 sil @trivial_load : $@convention(thin) (@in Builtin.Int32) -> () {
-bb0(%0 : $*Builtin.Int32):
+bb0(%0 : @trivial $*Builtin.Int32):
   load [trivial] %0 : $*Builtin.Int32
   %1 = tuple()
   return %1 : $()
@@ -46,7 +46,7 @@ bb0(%0 : $*Builtin.Int32):
 // CHECK-NOT: release
 // CHECK: ret void
 sil @init_store : $@convention(thin) (@in Builtin.NativeObject, Builtin.NativeObject) -> () {
-bb0(%0 : $*Builtin.NativeObject, %1 : $Builtin.NativeObject):
+bb0(%0 : @trivial $*Builtin.NativeObject, %1 : @trivial $Builtin.NativeObject):
   store %1 to [init] %0 : $*Builtin.NativeObject
   %2 = tuple()
   return %2 : $()
@@ -58,7 +58,7 @@ bb0(%0 : $*Builtin.NativeObject, %1 : $Builtin.NativeObject):
 // CHECK: release
 // CHECK: ret void
 sil @assign_store : $@convention(thin) (@in Builtin.NativeObject, Builtin.NativeObject) -> () {
-bb0(%0 : $*Builtin.NativeObject, %1 : $Builtin.NativeObject):
+bb0(%0 : @trivial $*Builtin.NativeObject, %1 : @unowned $Builtin.NativeObject):
   store %1 to [assign] %0 : $*Builtin.NativeObject
   %2 = tuple()
   return %2 : $()
@@ -70,7 +70,7 @@ struct Foo {
 }
 
 sil @assign_store_2 : $@convention(thin) (@in Foo, Foo) -> () {
-bb0(%0 : $*Foo, %1 : $Foo):
+bb0(%0 : @trivial $*Foo, %1 : @trivial $Foo):
   %2 = load [copy] %0 : $*Foo
   store %1 to [assign] %0 : $*Foo
   %3 = tuple()
@@ -85,7 +85,7 @@ bb0(%0 : $*Foo, %1 : $Foo):
 // CHECK-NOT: release
 // CHECK: ret void
 sil @trivial_store : $@convention(thin) (@in Builtin.Int32, Builtin.Int32) -> () {
-bb0(%0 : $*Builtin.Int32, %1 : $Builtin.Int32):
+bb0(%0 : @trivial $*Builtin.Int32, %1 : @trivial $Builtin.Int32):
   store %1 to [trivial] %0 : $*Builtin.Int32
   %2 = tuple()
   return %2 : $()

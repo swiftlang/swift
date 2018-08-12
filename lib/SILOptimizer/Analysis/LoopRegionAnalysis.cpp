@@ -114,7 +114,7 @@ LoopRegion::NonLocalSuccRange LoopRegion::getNonLocalSuccs() const {
 /// is already in the list.
 void LoopRegion::replaceSucc(SuccessorID OldSucc, SuccessorID NewSucc) {
   LLVM_DEBUG(llvm::dbgs() << "                Replacing " << OldSucc << " with "
-                     << NewSucc << "\n");
+                          << NewSucc << "\n");
   Succs.replace(OldSucc, NewSucc);
 }
 
@@ -290,8 +290,8 @@ void LoopRegionFunctionInfo::initializeBlockRegionSuccessors(
     BBRegion->addSucc(SuccRegion);
     SuccRegion->addPred(BBRegion);
     LLVM_DEBUG(llvm::dbgs() << "    Succ: ";
-          SuccBB->printAsOperand(llvm::dbgs());
-          llvm::dbgs() << " RPONum: " << SuccRPOIndex << "\n");
+               SuccBB->printAsOperand(llvm::dbgs());
+               llvm::dbgs() << " RPONum: " << SuccRPOIndex << "\n");
   }
 }
 
@@ -308,8 +308,8 @@ void LoopRegionFunctionInfo::markIrreducibleLoopPredecessorsOfNonLoopHeader(
 
     auto *PredRegion = createRegion(Pred, *PredRPONumber);
     LLVM_DEBUG(llvm::dbgs() << "    Backedge: ";
-          Pred->printAsOperand(llvm::dbgs());
-          llvm::dbgs() << " " << PredRegion->getID() << "\n");
+               Pred->printAsOperand(llvm::dbgs());
+               llvm::dbgs() << " " << PredRegion->getID() << "\n");
 
     // We mark the head/tail as unknown control flow regions since in CFGs like
     // the following:
@@ -363,8 +363,9 @@ void LoopRegionFunctionInfo::initializeBlockRegions(PostOrderFunctionInfo *PI,
     assert(*PI->getRPONumber(BB) == RPOIndex &&
            "Enumerated Reverse Post Order out of sync with RPO number");
 
-    LLVM_DEBUG(llvm::dbgs() << "Visiting BB: "; BB->printAsOperand(llvm::dbgs());
-          llvm::dbgs() << " RPO: " << RPOIndex << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Visiting BB: ";
+               BB->printAsOperand(llvm::dbgs());
+               llvm::dbgs() << " RPO: " << RPOIndex << "\n");
 
     // Wire up this BB as an "initial predecessor" of all of its successors
     // and make each of its successors a successor for the region.
@@ -468,8 +469,8 @@ rewriteLoopHeaderPredecessors(LoopTy *SubLoop, RegionTy *SubLoopRegion) {
   assert(SubLoopHeaderRegion->isBlock() && "A header must always be a block");
 
   LLVM_DEBUG(llvm::dbgs()
-        << "        Header: " << SubLoopHeaderRegion->getID() << "\n"
-        << "        Rewiring Header Predecessors to be Loop Preds.\n");
+             << "        Header: " << SubLoopHeaderRegion->getID() << "\n"
+             << "        Rewiring Header Predecessors to be Loop Preds.\n");
 
   if (SubLoopHeaderRegion->IsUnknownControlFlowEdgeHead)
     SubLoopRegion->IsUnknownControlFlowEdgeHead = true;
@@ -567,14 +568,14 @@ rewriteLoopExitingBlockSuccessors(LoopTy *Loop, RegionTy *LRegion) {
   for (unsigned ExitingSubregionID : ExitingSubregions) {
     auto *ExitingSubregion = getRegion(ExitingSubregionID);
     LLVM_DEBUG(llvm::dbgs() << "        Exiting Region: "
-                       << ExitingSubregion->getID() << "\n");
+                            << ExitingSubregion->getID() << "\n");
     bool HasBackedge = false;
 
     // For each successor region S of ER...
     for (auto SuccID : ExitingSubregion->getSuccs()) {
       LLVM_DEBUG(llvm::dbgs() << "            Succ: " << SuccID.ID
-                         << ". IsNonLocal: "
-                         << (SuccID.IsNonLocal ? "true" : "false") << "\n");
+                              << ". IsNonLocal: "
+                              << (SuccID.IsNonLocal ? "true" : "false") <<"\n");
 
       // If S is not contained in L, then:
       //
@@ -587,7 +588,8 @@ rewriteLoopExitingBlockSuccessors(LoopTy *Loop, RegionTy *LRegion) {
       // Then we continue.
       auto *SuccRegion = getRegion(SuccID.ID);
       if (!LRegion->containsSubregion(SuccRegion)) {
-        LLVM_DEBUG(llvm::dbgs() << "            Is not a subregion, replacing.\n");
+        LLVM_DEBUG(llvm::dbgs() << "            Is not a subregion, "
+                   "replacing.\n");
         SuccRegion->replacePred(ExitingSubregion->ID, LRegion->ID);
         if (ExitingSubregion->IsUnknownControlFlowEdgeTail)
           LRegion->IsUnknownControlFlowEdgeTail = true;
@@ -605,14 +607,14 @@ rewriteLoopExitingBlockSuccessors(LoopTy *Loop, RegionTy *LRegion) {
       // backedge and thus we do not want to clip the edge.
       if (SuccRegion->getRPONumber() > ExitingSubregion->getRPONumber()) {
         LLVM_DEBUG(llvm::dbgs() << "            Is a subregion, but not a "
-              "backedge, not removing.\n");
+                   "backedge, not removing.\n");
         continue;
       }
 
       // If the edge from ER to S is a back edge, we want to clip it and add
       // exiting subregion to
       LLVM_DEBUG(llvm::dbgs() << "            Is a subregion and a backedge, "
-            "removing.\n");
+                 "removing.\n");
       HasBackedge = true;
       auto Iter =
           std::remove(SuccRegion->Preds.begin(), SuccRegion->Preds.end(),
@@ -647,15 +649,15 @@ LoopRegionFunctionInfo::
 initializeLoopFunctionRegion(RegionTy *ParentRegion,
                              iterator_range<LoopInfoTy::iterator> SubLoops) {
 
-  LLVM_DEBUG(llvm::dbgs() << "Initializing Loop Region " << ParentRegion->getID()
-        << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "Initializing Loop Region "
+                          << ParentRegion->getID() << "\n");
   // For each subloop...
   for (auto *SubLoop : SubLoops) {
     // Grab the region associated with the subloop...
     auto *SubLoopRegion = getRegion(SubLoop);
 
-    LLVM_DEBUG(llvm::dbgs() << "    Visiting Subloop: " << SubLoopRegion->getID()
-          << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "    Visiting Subloop: "
+                            << SubLoopRegion->getID() << "\n");
 
     // First rewrite predecessors of the loop header to point at the loop.
     auto *SubLoopHeaderRegion = rewriteLoopHeaderPredecessors(SubLoop,

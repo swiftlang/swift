@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -31,6 +31,7 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -164,14 +165,14 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
      auto var = cast<VarDecl>(this);
      switch (var->getCorrectStaticSpelling()) {
      case StaticSpellingKind::None:
-       return var->isLet()? DescriptiveDeclKind::Let
-                          : DescriptiveDeclKind::Var;
+       if (var->getDeclContext()->isTypeContext())
+         return DescriptiveDeclKind::Property;
+       return var->isLet() ? DescriptiveDeclKind::Let
+                           : DescriptiveDeclKind::Var;
      case StaticSpellingKind::KeywordStatic:
-       return var->isLet()? DescriptiveDeclKind::StaticLet
-                          : DescriptiveDeclKind::StaticVar;
+       return DescriptiveDeclKind::StaticProperty;
      case StaticSpellingKind::KeywordClass:
-       return var->isLet()? DescriptiveDeclKind::ClassLet
-                          : DescriptiveDeclKind::ClassVar;
+       return DescriptiveDeclKind::ClassProperty;
      }
    }
 
@@ -199,6 +200,12 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
 
      case AccessorKind::MaterializeForSet:
        return DescriptiveDeclKind::MaterializeForSet;
+
+     case AccessorKind::Read:
+       return DescriptiveDeclKind::ReadAccessor;
+
+     case AccessorKind::Modify:
+       return DescriptiveDeclKind::ModifyAccessor;
      }
      llvm_unreachable("bad accessor kind");
    }
@@ -243,10 +250,9 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(Var, "var");
   ENTRY(Param, "parameter");
   ENTRY(Let, "let");
-  ENTRY(StaticVar, "static var");
-  ENTRY(StaticLet, "static let");
-  ENTRY(ClassVar, "class var");
-  ENTRY(ClassLet, "class let");
+  ENTRY(Property, "property");
+  ENTRY(StaticProperty, "static property");
+  ENTRY(ClassProperty, "class property");
   ENTRY(PrecedenceGroup, "precedence group");
   ENTRY(InfixOperator, "infix operator");
   ENTRY(PrefixOperator, "prefix operator");
@@ -279,6 +285,8 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(MaterializeForSet, "materializeForSet accessor");
   ENTRY(Addressor, "address accessor");
   ENTRY(MutableAddressor, "mutableAddress accessor");
+  ENTRY(ReadAccessor, "_read accessor");
+  ENTRY(ModifyAccessor, "_modify accessor");
   ENTRY(EnumElement, "enum case");
   ENTRY(Module, "module");
   ENTRY(MissingMember, "missing member placeholder");
@@ -973,6 +981,12 @@ ExtensionDecl::takeConformanceLoaderSlow() {
   return { contextInfo->loader, contextInfo->allConformancesData };
 }
 
+NominalTypeDecl *ExtensionDecl::getExtendedNominal() const {
+  ASTContext &ctx = getASTContext();
+  return ctx.evaluator(
+      ExtendedNominalRequest{const_cast<ExtensionDecl *>(this)});;
+}
+
 Type ExtensionDecl::getInheritedType(unsigned index) const {
   ASTContext &ctx = getASTContext();
   return ctx.evaluator(InheritedTypeRequest{const_cast<ExtensionDecl *>(this),
@@ -984,7 +998,7 @@ bool ExtensionDecl::isConstrainedExtension() const {
   if (!getGenericSignature())
     return false;
 
-  auto nominal = getExtendedType()->getAnyNominal();
+  auto nominal = getExtendedNominal();
   assert(nominal);
 
   // If the generic signature differs from that of the nominal type, it's a
@@ -994,7 +1008,7 @@ bool ExtensionDecl::isConstrainedExtension() const {
 }
 
 bool ExtensionDecl::isEquivalentToExtendedContext() const {
-  auto decl = getExtendedType()->getAnyNominal();
+  auto decl = getExtendedNominal();
   return getParentModule() == decl->getParentModule()
     && !isConstrainedExtension()
     && !getDeclaredInterfaceType()->isExistentialType();
@@ -1418,6 +1432,9 @@ getDirectReadAccessStrategy(const AbstractStorageDecl *storage) {
   case ReadImplKind::Address:
     return AccessStrategy::getAccessor(AccessorKind::Address,
                                        /*dispatch*/ false);
+  case ReadImplKind::Read:
+    return AccessStrategy::getAccessor(AccessorKind::Read,
+                                       /*dispatch*/ false);
   }
   llvm_unreachable("bad impl kind");
 }
@@ -1445,6 +1462,9 @@ getDirectWriteAccessStrategy(const AbstractStorageDecl *storage) {
   case WriteImplKind::MutableAddress:
     return AccessStrategy::getAccessor(AccessorKind::MutableAddress,
                                        /*dispatch*/ false);
+  case WriteImplKind::Modify:
+    return AccessStrategy::getAccessor(AccessorKind::Modify,
+                                       /*dispatch*/ false);
   }
   llvm_unreachable("bad impl kind");
 }
@@ -1463,6 +1483,9 @@ getDirectReadWriteAccessStrategy(const AbstractStorageDecl *storage) {
                                        /*dispatch*/ false);
   case ReadWriteImplKind::MutableAddress:
     return AccessStrategy::getAccessor(AccessorKind::MutableAddress,
+                                       /*dispatch*/ false);
+  case ReadWriteImplKind::Modify:
+    return AccessStrategy::getAccessor(AccessorKind::Modify,
                                        /*dispatch*/ false);
   case ReadWriteImplKind::MaterializeToTemporary:
     return AccessStrategy::getMaterializeToTemporary(
@@ -2122,8 +2145,10 @@ Type ValueDecl::getInterfaceType() const {
 }
 
 void ValueDecl::setInterfaceType(Type type) {
-  if (!type.isNull() && isa<ParamDecl>(this)) {
-    assert(!type->is<InOutType>() && "caller did not pass a base type");
+  if (!type.isNull()) {
+    assert(!type->hasTypeVariable() && "Type variable in interface type");
+    if (isa<ParamDecl>(this))
+      assert(!type->is<InOutType>() && "caller did not pass a base type");
   }
   // lldb creates global typealiases with archetypes in them.
   // FIXME: Add an isDebugAlias() flag, like isDebugVar().
@@ -2136,9 +2161,8 @@ void ValueDecl::setInterfaceType(Type type) {
         isa<AbstractClosureExpr>(getDeclContext()))) {
     assert(!type->hasArchetype() &&
            "Archetype in interface type");
-    assert(!type->hasTypeVariable() &&
-           "Archetype in interface type");
   }
+
   TypeAndAccess.setPointer(type);
 }
 
@@ -2280,10 +2304,44 @@ static AccessLevel getTestableAccess(const ValueDecl *decl) {
   return AccessLevel::Public;
 }
 
+/// Adjust \p access based on whether \p VD is \@usableFromInline or has been
+/// testably imported from \p useDC.
+///
+/// \p access isn't always just `VD->getFormalAccess()` because this adjustment
+/// may be for a write, in which case the setter's access might be used instead.
+static AccessLevel getAdjustedFormalAccess(const ValueDecl *VD,
+                                           AccessLevel access,
+                                           const DeclContext *useDC,
+                                           bool treatUsableFromInlineAsPublic) {
+  if (treatUsableFromInlineAsPublic &&
+      access == AccessLevel::Internal &&
+      VD->isUsableFromInline()) {
+    return AccessLevel::Public;
+  }
+
+  if (useDC && (access == AccessLevel::Internal ||
+                access == AccessLevel::Public)) {
+    if (auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext()))
+      if (useSF->hasTestableImport(VD->getModuleContext()))
+        return getTestableAccess(VD);
+  }
+
+  return access;
+}
+
+/// Convenience overload that uses `VD->getFormalAccess()` as the access to
+/// adjust.
+static AccessLevel
+getAdjustedFormalAccess(const ValueDecl *VD, const DeclContext *useDC,
+                        bool treatUsableFromInlineAsPublic) {
+  return getAdjustedFormalAccess(VD, VD->getFormalAccess(), useDC,
+                                 treatUsableFromInlineAsPublic);
+}
+
 AccessLevel ValueDecl::getEffectiveAccess() const {
   auto effectiveAccess =
-    getFormalAccess(/*useDC=*/nullptr,
-                    /*treatUsableFromInlineAsPublic=*/true);
+    getAdjustedFormalAccess(this, /*useDC=*/nullptr,
+                            /*treatUsableFromInlineAsPublic=*/true);
 
   // Handle @testable.
   switch (effectiveAccess) {
@@ -2321,11 +2379,9 @@ AccessLevel ValueDecl::getEffectiveAccess() const {
   } else if (auto enclosingExt = dyn_cast<ExtensionDecl>(getDeclContext())) {
     // Just check the base type. If it's a constrained extension, Sema should
     // have already enforced access more strictly.
-    if (auto extendedTy = enclosingExt->getExtendedType()) {
-      if (auto nominal = extendedTy->getAnyNominal()) {
-        effectiveAccess =
-            restrictToEnclosing(effectiveAccess, nominal->getEffectiveAccess());
-      }
+    if (auto nominal = enclosingExt->getExtendedNominal()) {
+      effectiveAccess =
+          restrictToEnclosing(effectiveAccess, nominal->getEffectiveAccess());
     }
 
   } else if (getDeclContext()->isLocalContext()) {
@@ -2335,72 +2391,195 @@ AccessLevel ValueDecl::getEffectiveAccess() const {
   return effectiveAccess;
 }
 
-AccessLevel ValueDecl::getFormalAccess(const DeclContext *useDC,
-                                       bool treatUsableFromInlineAsPublic) const {
+AccessLevel ValueDecl::getFormalAccess() const {
   ASTContext &ctx = getASTContext();
-  AccessLevel result = ctx.evaluator(AccessLevelRequest{const_cast<ValueDecl *>(this)});
-  if (treatUsableFromInlineAsPublic &&
-      result == AccessLevel::Internal &&
-      isUsableFromInline()) {
-    return AccessLevel::Public;
-  }
-  if (useDC && (result == AccessLevel::Internal ||
-                result == AccessLevel::Public)) {
-    if (auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext()))
-      if (useSF->hasTestableImport(getModuleContext()))
-        return getTestableAccess(this);
-  }
-  return result;
+  return ctx.evaluator(AccessLevelRequest{const_cast<ValueDecl *>(this)});
 }
 
-AccessScope
-ValueDecl::getFormalAccessScope(const DeclContext *useDC,
-                                bool treatUsableFromInlineAsPublic) const {
-  const DeclContext *result = getDeclContext();
-  AccessLevel access = getFormalAccess(useDC, treatUsableFromInlineAsPublic);
+bool ValueDecl::hasOpenAccess(const DeclContext *useDC) const {
+  assert(isa<ClassDecl>(this) || isa<ConstructorDecl>(this) ||
+         isPotentiallyOverridable());
 
-  while (!result->isModuleScopeContext()) {
-    if (result->isLocalContext() || access == AccessLevel::Private)
-      return AccessScope(result, true);
+  AccessLevel access =
+      getAdjustedFormalAccess(this, useDC,
+                              /*treatUsableFromInlineAsPublic*/false);
+  return access == AccessLevel::Open;
+}
 
-    if (auto enclosingNominal = dyn_cast<NominalTypeDecl>(result)) {
+/// Given the formal access level for using \p VD, compute the scope where
+/// \p VD may be accessed, taking \@usableFromInline, \@testable imports,
+/// and enclosing access levels into account.
+///
+/// \p access isn't always just `VD->getFormalAccess()` because this adjustment
+/// may be for a write, in which case the setter's access might be used instead.
+static AccessScope
+getAccessScopeForFormalAccess(const ValueDecl *VD,
+                              AccessLevel formalAccess,
+                              const DeclContext *useDC,
+                              bool treatUsableFromInlineAsPublic) {
+  AccessLevel access = getAdjustedFormalAccess(VD, formalAccess, useDC,
+                                               treatUsableFromInlineAsPublic);
+  const DeclContext *resultDC = VD->getDeclContext();
+
+  while (!resultDC->isModuleScopeContext()) {
+    if (resultDC->isLocalContext() || access == AccessLevel::Private)
+      return AccessScope(resultDC, /*private*/true);
+
+    if (auto enclosingNominal = dyn_cast<NominalTypeDecl>(resultDC)) {
       auto enclosingAccess =
-        enclosingNominal->getFormalAccess(useDC,
-                                          treatUsableFromInlineAsPublic);
+          getAdjustedFormalAccess(enclosingNominal, useDC,
+                                  treatUsableFromInlineAsPublic);
       access = std::min(access, enclosingAccess);
 
-    } else if (auto enclosingExt = dyn_cast<ExtensionDecl>(result)) {
+    } else if (auto enclosingExt = dyn_cast<ExtensionDecl>(resultDC)) {
       // Just check the base type. If it's a constrained extension, Sema should
       // have already enforced access more strictly.
-      if (auto extendedTy = enclosingExt->getExtendedType()) {
-        if (auto nominal = extendedTy->getAnyNominal()) {
-          auto nominalAccess =
-            nominal->getFormalAccess(useDC,
-                                     treatUsableFromInlineAsPublic);
-          access = std::min(access, nominalAccess);
-        }
+      if (auto nominal = enclosingExt->getExtendedNominal()) {
+        auto nominalAccess =
+            getAdjustedFormalAccess(nominal, useDC,
+                                    treatUsableFromInlineAsPublic);
+        access = std::min(access, nominalAccess);
       }
 
     } else {
       llvm_unreachable("unknown DeclContext kind");
     }
 
-    result = result->getParent();
+    resultDC = resultDC->getParent();
   }
 
   switch (access) {
   case AccessLevel::Private:
   case AccessLevel::FilePrivate:
-    assert(result->isModuleScopeContext());
-    return AccessScope(result, access == AccessLevel::Private);
+    assert(resultDC->isModuleScopeContext());
+    return AccessScope(resultDC, access == AccessLevel::Private);
   case AccessLevel::Internal:
-    return AccessScope(result->getParentModule());
+    return AccessScope(resultDC->getParentModule());
   case AccessLevel::Public:
   case AccessLevel::Open:
     return AccessScope::getPublic();
   }
 
   llvm_unreachable("unknown access level");
+}
+
+AccessScope
+ValueDecl::getFormalAccessScope(const DeclContext *useDC,
+                                bool treatUsableFromInlineAsPublic) const {
+  return getAccessScopeForFormalAccess(this, getFormalAccess(), useDC,
+                                       treatUsableFromInlineAsPublic);
+}
+
+/// Checks if \p VD may be used from \p useDC, taking \@testable imports into
+/// account.
+///
+/// Whenever the enclosing context of \p VD is usable from \p useDC, this
+/// should compute the same result as checkAccess, below, but more slowly.
+///
+/// See ValueDecl::isAccessibleFrom for a description of \p forConformance.
+static bool checkAccessUsingAccessScopes(const DeclContext *useDC,
+                                         const ValueDecl *VD,
+                                         AccessLevel access) {
+  AccessScope accessScope =
+      getAccessScopeForFormalAccess(VD, access, useDC,
+                                    /*treatUsableFromInlineAsPublic*/false);
+  return accessScope.getDeclContext() == useDC ||
+         AccessScope(useDC).isChildOf(accessScope);
+}
+
+/// Checks if \p VD may be used from \p useDC, taking \@testable imports into
+/// account.
+///
+/// When \p access is the same as `VD->getFormalAccess()` and the enclosing
+/// context of \p VD is usable from \p useDC, this ought to be the same as
+/// getting the AccessScope for `VD` and checking if \p useDC is within it.
+/// However, there's a source compatibility hack around protocol extensions
+/// that makes it not quite the same.
+///
+/// See ValueDecl::isAccessibleFrom for a description of \p forConformance.
+static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
+                        AccessLevel access, bool forConformance) {
+  auto *sourceDC = VD->getDeclContext();
+
+  if (!forConformance) {
+    if (auto *proto = sourceDC->getAsProtocolOrProtocolExtensionContext()) {
+      // FIXME: Swift 4.1 allowed accessing protocol extension methods that were
+      // marked 'public' if the protocol was '@_versioned' (now
+      // '@usableFromInline'). Which works at the ABI level, so let's keep
+      // supporting that here by explicitly checking for it.
+      if (access == AccessLevel::Public &&
+          proto->getFormalAccess() == AccessLevel::Internal &&
+          proto->isUsableFromInline()) {
+        return true;
+      }
+
+      // Skip the fast path below and just compare access scopes.
+      return checkAccessUsingAccessScopes(useDC, VD, access);
+    }
+  }
+
+  // Fast path: assume that the client context already has access to our parent
+  // DeclContext, and only check what might be different about this declaration.
+  if (!useDC)
+    return access >= AccessLevel::Public;
+
+  switch (access) {
+  case AccessLevel::Private:
+    return (useDC == sourceDC ||
+      AccessScope::allowsPrivateAccess(useDC, sourceDC));
+  case AccessLevel::FilePrivate:
+    return useDC->getModuleScopeContext() == sourceDC->getModuleScopeContext();
+  case AccessLevel::Internal: {
+    const ModuleDecl *sourceModule = sourceDC->getParentModule();
+    const DeclContext *useFile = useDC->getModuleScopeContext();
+    if (useFile->getParentModule() == sourceModule)
+      return true;
+    if (auto *useSF = dyn_cast<SourceFile>(useFile))
+      if (useSF->hasTestableImport(sourceModule))
+        return true;
+    return false;
+  }
+  case AccessLevel::Public:
+  case AccessLevel::Open:
+    return true;
+  }
+  llvm_unreachable("bad access level");
+}
+
+bool ValueDecl::isAccessibleFrom(const DeclContext *useDC,
+                                 bool forConformance) const {
+  auto access = getFormalAccess();
+  bool result = checkAccess(useDC, this, access, forConformance);
+
+  // For everything outside of protocols and operators, we should get the same
+  // result using either implementation of checkAccess, because useDC must
+  // already have access to this declaration's DeclContext.
+  // FIXME: Arguably, we're doing the wrong thing for operators here too,
+  // because we're finding internal operators within private types. Fortunately
+  // we have a requirement that a member operator take the enclosing type as an
+  // argument, so it won't ever match.
+  assert(getDeclContext()->getAsProtocolOrProtocolExtensionContext() ||
+         isOperator() ||
+         result == checkAccessUsingAccessScopes(useDC, this, access));
+
+  return result;
+}
+
+bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC,
+                                                 bool forConformance) const {
+  assert(isSettable(DC));
+
+  // If a stored property does not have a setter, it is still settable from the
+  // designated initializer constructor. In this case, don't check setter
+  // access; it is not set.
+  if (hasStorage() && !isSettable(nullptr))
+    return true;
+
+  if (isa<ParamDecl>(this))
+    return true;
+
+  auto access = getSetterFormalAccess();
+  return checkAccess(DC, this, access, forConformance);
 }
 
 void ValueDecl::copyFormalAccessFrom(const ValueDecl *source,
@@ -2704,7 +2883,7 @@ ExtensionRange NominalTypeDecl::getExtensions() {
 }
 
 void NominalTypeDecl::addExtension(ExtensionDecl *extension) {
-  assert(!extension->NextExtension.getInt() && "Already added extension");
+  assert(!extension->alreadyBoundToNominal() && "Already added extension");
   extension->NextExtension.setInt(true);
   
   // First extension; set both first and last.
@@ -3019,18 +3198,7 @@ void ClassDecl::addImplicitDestructor() {
     recordObjCMethod(DD);
 
   // Assign DD the interface type (Self) -> () -> ()
-  ArrayRef<AnyFunctionType::Param> noParams;
-  AnyFunctionType::ExtInfo info;
-  Type selfTy = selfDecl->getInterfaceType();
-  Type voidTy = TupleType::getEmpty(ctx);
-  Type funcTy = FunctionType::get(noParams, voidTy, info);
-  if (auto *sig = DD->getGenericSignature()) {
-    DD->setInterfaceType(
-      GenericFunctionType::get(sig, {selfTy}, funcTy, info));
-  } else {
-    DD->setInterfaceType(
-      FunctionType::get({selfTy}, funcTy, info));
-  }
+  DD->computeType();
 }
 
 
@@ -3053,8 +3221,7 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
 
   // If there's no superclass, there's nothing to inherit.
   ClassDecl *superclassDecl;
-  if (!getSuperclass() ||
-      !(superclassDecl = getSuperclass()->getClassOrBoundGenericClass())) {
+  if (!(superclassDecl = getSuperclassDecl())) {
     setAddedImplicitInitializers();
     return false;
   }
@@ -3093,14 +3260,15 @@ ObjCClassKind ClassDecl::checkObjCAncestry() const {
     if (CD->isGenericContext())
       genericAncestry = true;
 
-    // FIXME: Checking isObjC() introduces cyclic dependencies here, but this
-    // doesn't account for ill-formed @objc.
-    if (CD->getAttrs().hasAttribute<ObjCAttr>())
+    // Is this class @objc? For the current class, only look at the attribute
+    // to avoid cycles; for superclasses, compute @objc completely.
+    if ((CD == this && CD->getAttrs().hasAttribute<ObjCAttr>()) ||
+        (CD != this && CD->isObjC()))
       isObjC = true;
 
     if (!CD->hasSuperclass())
       break;
-    CD = CD->getSuperclass()->getClassOrBoundGenericClass();
+    CD = CD->getSuperclassDecl();
     // If we don't have a valid class here, we should have diagnosed
     // elsewhere.
     if (!CD)
@@ -3216,11 +3384,23 @@ ClassDecl::findImplementingMethod(const AbstractFunctionDecl *Method) const {
     // Check the superclass
     if (!C->hasSuperclass())
       break;
-    C = C->getSuperclass()->getClassOrBoundGenericClass();
+    C = C->getSuperclassDecl();
   }
   return nullptr;
 }
 
+ClassDecl *ClassDecl::getGenericAncestor() const {
+  ClassDecl *current = const_cast<ClassDecl *>(this);
+
+  while (current) {
+    if (current->isGenericContext())
+      return current;
+
+    current = current->getSuperclassDecl();
+  }
+
+  return nullptr;
+}
 
 EnumCaseDecl *EnumCaseDecl::create(SourceLoc CaseLoc,
                                    ArrayRef<EnumElementDecl *> Elements,
@@ -3286,7 +3466,7 @@ bool EnumDecl::hasOnlyCasesWithoutAssociatedValues() const {
   return true;
 }
 
-bool EnumDecl::isExhaustive(const DeclContext *useDC) const {
+bool EnumDecl::isFormallyExhaustive(const DeclContext *useDC) const {
   // Enums explicitly marked frozen are exhaustive.
   if (getAttrs().hasAttribute<FrozenAttr>())
     return true;
@@ -3331,6 +3511,22 @@ bool EnumDecl::isExhaustive(const DeclContext *useDC) const {
 
   // Otherwise, the enum is non-exhaustive.
   return false;
+}
+
+bool EnumDecl::isEffectivelyExhaustive(ModuleDecl *M,
+                                       ResilienceExpansion expansion) const {
+  // Generated Swift code commits to handling garbage values of @objc enums,
+  // whether imported or not, to deal with C's loose rules around enums.
+  // This covers both frozen and non-frozen @objc enums.
+  if (isObjC())
+    return false;
+
+  // Otherwise, the only non-exhaustive cases are those that don't have a fixed
+  // layout.
+  assert(isFormallyExhaustive(M) == !isResilient(M,ResilienceExpansion::Maximal)
+         && "ignoring the effects of @inlinable, @testable, and @objc, "
+            "these should match up");
+  return !isResilient(M, expansion);
 }
 
 ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
@@ -3412,9 +3608,8 @@ Type ProtocolDecl::getSuperclass() const {
 }
 
 ClassDecl *ProtocolDecl::getSuperclassDecl() const {
-  if (auto superclass = getSuperclass())
-    return superclass->getClassOrBoundGenericClass();
-  return nullptr;
+  ASTContext &ctx = getASTContext();
+  return ctx.evaluator(SuperclassDeclRequest{const_cast<ProtocolDecl *>(this)});
 }
 
 void ProtocolDecl::setSuperclass(Type superclass) {
@@ -3663,9 +3858,12 @@ ProtocolDecl::findProtocolSelfReferences(const ValueDecl *value,
     // Methods of non-final classes can only contain a covariant 'Self'
     // as a function result type.
     if (!allowCovariantParameters) {
-      auto inputType = type->castTo<AnyFunctionType>()->getInput();
-      auto inputKind = ::findProtocolSelfReferences(this, inputType,
-                                                    skipAssocTypes);
+      auto inputKind = SelfReferenceKind::None();
+      for (auto &elt : type->castTo<AnyFunctionType>()->getParams()) {
+        inputKind |= ::findProtocolSelfReferences(this, elt.getType(),
+                                                  skipAssocTypes);
+      }
+
       if (inputKind.parameter)
         return SelfReferenceKind::Other();
     }
@@ -3859,6 +4057,7 @@ void AbstractStorageDecl::configureAccessor(AccessorDecl *accessor) {
   switch (accessor->getAccessorKind()) {
   case AccessorKind::Get:
   case AccessorKind::Address:
+  case AccessorKind::Read:
     // Nothing to do.
     return;
 
@@ -3867,6 +4066,7 @@ void AbstractStorageDecl::configureAccessor(AccessorDecl *accessor) {
   case AccessorKind::WillSet:
   case AccessorKind::DidSet:
   case AccessorKind::MutableAddress:
+  case AccessorKind::Modify:
     // Propagate the setter access.
     if (auto setterAccess = Accessors.getInt()) {
       assert(!accessor->hasAccess() ||
@@ -4178,7 +4378,7 @@ SourceLoc AbstractStorageDecl::getOverrideLoc() const {
 
 Type AbstractStorageDecl::getValueInterfaceType() const {
   if (auto var = dyn_cast<VarDecl>(this))
-    return var->getInterfaceType();
+    return var->getInterfaceType()->getReferenceStorageReferent();
   return cast<SubscriptDecl>(this)->getElementInterfaceType();
 }
 
@@ -4720,6 +4920,23 @@ Type SubscriptDecl::getElementInterfaceType() const {
   return elementTy->castTo<AnyFunctionType>()->getResult();
 }
 
+void SubscriptDecl::computeType() {
+  auto &ctx = getASTContext();
+
+  auto elementTy = getElementTypeLoc().getType();
+  auto indicesTy = getIndices()->getInterfaceType(ctx);
+  Type funcTy;
+
+  if (auto *sig = getGenericSignature())
+    funcTy = GenericFunctionType::get(sig, indicesTy, elementTy,
+                                      AnyFunctionType::ExtInfo());
+  else
+    funcTy = FunctionType::get(indicesTy, elementTy);
+
+  // Record the interface type.
+  setInterfaceType(funcTy);
+}
+
 ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind() const {
   auto indexTy = getIndicesInterfaceType();
 
@@ -4776,6 +4993,8 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
     case AccessorKind::Address:
     case AccessorKind::MutableAddress:
     case AccessorKind::Get:
+    case AccessorKind::Read:
+    case AccessorKind::Modify:
       return subscript ? subscript->getFullName()
                        : DeclName(ctx, storage->getBaseName(),
                                   ArrayRef<Identifier>());
@@ -5044,6 +5263,8 @@ static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
       break;
     case AccessorKind::Address:
     case AccessorKind::MutableAddress:
+    case AccessorKind::Read:
+    case AccessorKind::Modify:
       return false;
     case AccessorKind::MaterializeForSet:
       // Special case -- materializeForSet on dynamic storage is not
@@ -5101,6 +5322,87 @@ void AbstractFunctionDecl::setParameters(ParamDecl *SelfDecl,
 
   Params = BodyParams;
   BodyParams->setDeclContextOfParamDecls(this);
+}
+
+void AbstractFunctionDecl::computeType(AnyFunctionType::ExtInfo info) {
+  auto &ctx = getASTContext();
+  auto *sig = getGenericSignature();
+  bool hasSelf = hasImplicitSelfDecl();
+
+  // Result
+  Type resultTy;
+  if (auto fn = dyn_cast<FuncDecl>(this)) {
+    resultTy = fn->getBodyResultTypeLoc().getType();
+    if (!resultTy)
+      resultTy = TupleType::getEmpty(ctx);
+
+  } else if (auto ctor = dyn_cast<ConstructorDecl>(this)) {
+    auto *dc = ctor->getDeclContext();
+
+    if (hasSelf) {
+      if (!dc->isTypeContext())
+        resultTy = ErrorType::get(ctx);
+      else
+        resultTy = dc->getSelfInterfaceType();
+    }
+
+    // Adjust result type for failability.
+    if (ctor->getFailability() != OTK_None)
+      resultTy = OptionalType::get(resultTy);
+  } else {
+    assert(isa<DestructorDecl>(this));
+    resultTy = TupleType::getEmpty(ctx);
+  }
+
+  // (Args...) -> Result
+  Type funcTy;
+
+  {
+    SmallVector<AnyFunctionType::Param, 4> argTy;
+    AnyFunctionType::decomposeInput(
+      getParameters()->getInterfaceType(ctx), argTy);
+
+    // 'throws' only applies to the innermost function.
+    info = info.withThrows(hasThrows());
+    // Defer bodies must not escape.
+    if (auto fd = dyn_cast<FuncDecl>(this))
+      info = info.withNoEscape(fd->isDeferBody());
+
+    if (sig && !hasSelf) {
+      funcTy = GenericFunctionType::get(sig, argTy, resultTy, info);
+    } else {
+      funcTy = FunctionType::get(argTy, resultTy, info);
+    }
+  }
+
+  Type initFuncTy;
+
+  // (Self) -> (Args...) -> Result
+  if (hasSelf) {
+    SmallVector<AnyFunctionType::Param, 1> argTy;
+    SmallVector<AnyFunctionType::Param, 1> initArgTy;
+
+    // Substitute in our own 'self' parameter.
+    argTy.push_back(computeSelfParam(this));
+    if (isa<ConstructorDecl>(this))
+      initArgTy.push_back(computeSelfParam(this, /*isInitializingCtor=*/true));
+
+    AnyFunctionType::ExtInfo info;
+    if (sig) {
+      if (isa<ConstructorDecl>(this))
+        initFuncTy = GenericFunctionType::get(sig, initArgTy, funcTy, info);
+      funcTy = GenericFunctionType::get(sig, argTy, funcTy, info);
+    } else {
+      if (isa<ConstructorDecl>(this))
+        initFuncTy = FunctionType::get(initArgTy, funcTy, info);
+      funcTy = FunctionType::get(argTy, funcTy, info);
+    }
+  }
+
+  // Record the interface type.
+  setInterfaceType(funcTy);
+  if (auto *ctor = dyn_cast<ConstructorDecl>(this))
+    ctor->setInitializerInterfaceType(initFuncTy);
 }
 
 FuncDecl *FuncDecl::createImpl(ASTContext &Context,
@@ -5256,7 +5558,7 @@ Type FuncDecl::getResultInterfaceType() const {
     return nullptr;
 
   Type resultTy = getInterfaceType();
-  if (resultTy->hasError())
+  if (resultTy->is<ErrorType>())
     return resultTy;
 
   if (hasImplicitSelfDecl())
@@ -5622,7 +5924,7 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
   // gets an implicit chained initializer.
   if (Kind == BodyInitKind::None) {
     if (auto classDecl = getDeclContext()->getAsClassOrClassExtensionContext()) {
-      if (classDecl->getSuperclass())
+      if (classDecl->hasSuperclass())
         Kind = BodyInitKind::ImplicitChained;
     }
   }
@@ -5747,9 +6049,8 @@ Type ClassDecl::getSuperclass() const {
 }
 
 ClassDecl *ClassDecl::getSuperclassDecl() const {
-  if (auto superclass = getSuperclass())
-    return superclass->getClassOrBoundGenericClass();
-  return nullptr;
+  ASTContext &ctx = getASTContext();
+  return ctx.evaluator(SuperclassDeclRequest{const_cast<ClassDecl *>(this)});
 }
 
 void ClassDecl::setSuperclass(Type superclass) {

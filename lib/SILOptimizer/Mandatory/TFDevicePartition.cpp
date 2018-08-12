@@ -22,6 +22,7 @@
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILConstants.h"
+#include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/DepthFirstIterator.h"
@@ -649,7 +650,8 @@ public:
     std::string resultFnName = srcFn.getName().str() + "_" +
                                getDeviceShortName(deviceType) +
                                ".device_partition";
-    auto resultFn = srcFn.getModule().getOrCreateFunction(
+    SILFunctionBuilder FB(srcFn.getModule());
+    auto resultFn = FB.getOrCreateFunction(
         srcFn.getLocation(), resultFnName, SILLinkage::Private, newFnType,
         /*What's this*/ IsBare, IsNotTransparent, IsNotSerialized);
 

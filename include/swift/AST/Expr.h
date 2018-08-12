@@ -4025,11 +4025,17 @@ class ApplyExpr : public Expr {
 
   /// The argument being passed to it, and whether it's a 'super' argument.
   llvm::PointerIntPair<Expr *, 1, bool> ArgAndIsSuper;
+  
+  /// Returns true if \c e could be used as the call's argument. For most \c ApplyExpr
+  /// subclasses, this means it is a \c ParenExpr, \c TupleExpr, or 
+  /// \c TupleShuffleExpr.
+  bool validateArg(Expr *e) const;
 
 protected:
   ApplyExpr(ExprKind Kind, Expr *Fn, Expr *Arg, bool Implicit, Type Ty = Type())
     : Expr(Kind, Implicit, Ty), Fn(Fn), ArgAndIsSuper(Arg, false) {
     assert(classof((Expr*)this) && "ApplyExpr::classof out of date");
+    assert(validateArg(Arg) && "Arg is not a permitted expr kind");
     Bits.ApplyExpr.ThrowsIsSet = false;
   }
 
@@ -4040,8 +4046,7 @@ public:
   
   Expr *getArg() const { return ArgAndIsSuper.getPointer(); }
   void setArg(Expr *e) {
-    assert((getKind() != ExprKind::Binary || isa<TupleExpr>(e)) &&
-           "BinaryExprs must have a TupleExpr as the argument");
+    assert(validateArg(e) && "Arg is not a permitted expr kind");
     ArgAndIsSuper = {e, ArgAndIsSuper.getInt()};
   }
   
@@ -5357,6 +5362,15 @@ class PoundAssertExpr : public Expr {
 inline bool Expr::isInfixOperator() const {
   return isa<BinaryExpr>(this) || isa<IfExpr>(this) ||
          isa<AssignExpr>(this) || isa<ExplicitCastExpr>(this);
+}
+  
+inline bool ApplyExpr::validateArg(Expr *e) const {
+  if (isa<SelfApplyExpr>(this))
+    return true;
+  else if (isa<BinaryExpr>(this))
+    return isa<TupleExpr>(e);
+  else
+    return isa<ParenExpr>(e) || isa<TupleExpr>(e) || isa<TupleShuffleExpr>(e);
 }
 
 inline Expr *const *CollectionExpr::getTrailingObjectsPointer() const {

@@ -3,7 +3,7 @@
 import CoreCooling
 
 // CHECK: sil hidden @$S2cf8useEmAllyySo16CCMagnetismModelCF :
-// CHECK: bb0([[ARG:%.*]] : $CCMagnetismModel):
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $CCMagnetismModel):
 func useEmAll(_ model: CCMagnetismModel) {
 // CHECK: function_ref @CCPowerSupplyGetDefault : $@convention(c) () -> @autoreleased Optional<CCPowerSupply>
   let power = CCPowerSupplyGetDefault()

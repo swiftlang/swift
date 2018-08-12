@@ -112,14 +112,14 @@ public:
   MemBehavior visit##Name(Name *I) {                                    \
     for (Operand &Op : I->getAllOperands()) {                           \
       if (!AA->isNoAlias(Op.get(), V)) {                                \
-        LLVM_DEBUG(llvm::dbgs() << "  " #Name                                \
-              " does alias inst. Returning Normal behavior.\n");        \
+        LLVM_DEBUG(llvm::dbgs() << "  " #Name                           \
+                   " does alias inst. Returning Normal behavior.\n");   \
         return I->getMemoryBehavior();                                  \
       }                                                                 \
     }                                                                   \
                                                                         \
-    LLVM_DEBUG(llvm::dbgs() << "  " #Name " does not alias inst. Returning " \
-          "None.\n");                                                   \
+    LLVM_DEBUG(llvm::dbgs() << "  " #Name " does not alias inst. "      \
+               "Returning None.\n");                                    \
     return MemBehavior::None;                                           \
   }
 
@@ -168,12 +168,12 @@ MemBehavior MemoryBehaviorVisitor::visitLoadInst(LoadInst *LI) {
   if (AA->isNoAlias(LI->getOperand(), V, computeTBAAType(LI->getOperand()),
                    getValueTBAAType())) {
     LLVM_DEBUG(llvm::dbgs() << "  Load Operand does not alias inst. Returning "
-                          "None.\n");
+                               "None.\n");
     return MemBehavior::None;
   }
 
   LLVM_DEBUG(llvm::dbgs() << "  Could not prove that load inst does not alias "
-                        "pointer. Returning may read.");
+                             "pointer. Returning may read.");
   return MemBehavior::MayRead;
 }
 
@@ -188,13 +188,13 @@ MemBehavior MemoryBehaviorVisitor::visitStoreInst(StoreInst *SI) {
   if (AA->isNoAlias(SI->getDest(), V, computeTBAAType(SI->getDest()),
                    getValueTBAAType())) {
     LLVM_DEBUG(llvm::dbgs() << "  Store Dst does not alias inst. Returning "
-                          "None.\n");
+                               "None.\n");
     return MemBehavior::None;
   }
 
   // Otherwise, a store just writes.
   LLVM_DEBUG(llvm::dbgs() << "  Could not prove store does not alias inst. "
-                        "Returning MayWrite.\n");
+                             "Returning MayWrite.\n");
   return MemBehavior::MayWrite;
 }
 
@@ -208,14 +208,14 @@ MemBehavior MemoryBehaviorVisitor::visitBuiltinInst(BuiltinInst *BI) {
   // If the builtin is read none, it does not read or write memory.
   if (!BI->mayReadOrWriteMemory()) {
     LLVM_DEBUG(llvm::dbgs() << "  Found apply of read none builtin. Returning"
-                          " None.\n");
+                               " None.\n");
     return MemBehavior::None;
   }
 
   // If the builtin is side effect free, then it can only read memory.
   if (!BI->mayHaveSideEffects()) {
     LLVM_DEBUG(llvm::dbgs() << "  Found apply of side effect free builtin. "
-                          "Returning MayRead.\n");
+                               "Returning MayRead.\n");
     return MemBehavior::MayRead;
   }
 
@@ -225,7 +225,7 @@ MemBehavior MemoryBehaviorVisitor::visitBuiltinInst(BuiltinInst *BI) {
 
   // Otherwise be conservative and return that we may have side effects.
   LLVM_DEBUG(llvm::dbgs() << "  Found apply of side effect builtin. "
-                        "Returning MayHaveSideEffects.\n");
+                             "Returning MayHaveSideEffects.\n");
   return MemBehavior::MayHaveSideEffects;
 }
 
@@ -236,7 +236,7 @@ MemBehavior MemoryBehaviorVisitor::visitTryApplyInst(TryApplyInst *AI) {
     Behavior = MemBehavior::None;
 
   // Otherwise be conservative and return that we may have side effects.
-  LLVM_DEBUG(llvm::dbgs() << "  Found tryapply, returning " << Behavior << '\n');
+  LLVM_DEBUG(llvm::dbgs() << "  Found tryapply, returning " << Behavior <<'\n');
   return Behavior;
 }
 
@@ -361,7 +361,7 @@ MemBehavior
 AliasAnalysis::computeMemoryBehaviorInner(SILInstruction *Inst, SILValue V,
                                           RetainObserveKind InspectionMode) {
   LLVM_DEBUG(llvm::dbgs() << "GET MEMORY BEHAVIOR FOR:\n    " << *Inst << "    "
-                     << *V);
+                          << *V);
   assert(SEA && "SideEffectsAnalysis must be initialized!");
   return MemoryBehaviorVisitor(this, SEA, EA, V, InspectionMode).visit(Inst);
 }

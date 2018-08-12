@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -407,8 +407,9 @@ namespace {
       FunctionType *fTy = pointeeType->castTo<FunctionType>();
       
       auto rep = FunctionType::Representation::Block;
-      auto funcTy = FunctionType::get(fTy->getInput(), fTy->getResult(),
-                                   fTy->getExtInfo().withRepresentation(rep));
+      auto funcTy =
+          FunctionType::get(fTy->getParams(), fTy->getResult(),
+                            fTy->getExtInfo().withRepresentation(rep));
       return { funcTy, ImportHint::Block };
     }
 
@@ -1537,7 +1538,7 @@ static Type applyNoEscape(Type type) {
 
   // Apply @noescape to function types.
   if (auto funcType = type->getAs<FunctionType>()) {
-    return FunctionType::get(funcType->getInput(), funcType->getResult(),
+    return FunctionType::get(funcType->getParams(), funcType->getResult(),
                              funcType->getExtInfo().withNoEscape());
   }
 

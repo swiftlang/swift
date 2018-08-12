@@ -158,7 +158,7 @@ public:
   const TypeRef *
   subst(TypeRefBuilder &Builder, const GenericArgumentMap &Subs) const;
 
-  GenericArgumentMap getSubstMap() const;
+  llvm::Optional<GenericArgumentMap> getSubstMap() const;
 
   virtual ~TypeRef() = default;
 

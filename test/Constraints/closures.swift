@@ -709,6 +709,6 @@ extension Node {
         return item.key == key
         // expected-error@-1 {{binary operator '==' cannot be applied to operands of type '_' and 'Self.K'}}
         // expected-note@-2 {{overloads for '==' exist with these partially matching parameter lists:}}
-      })
+      })!
   }
 }

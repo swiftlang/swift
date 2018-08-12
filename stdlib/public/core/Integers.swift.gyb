@@ -1606,8 +1606,8 @@ public protocol BinaryInteger :
 
   /// Returns the integer binary logarithm of this value.
   ///
-  /// If the value is negative, a runtime error will occur.
-  func _binaryLogarithm() -> Self
+  /// If the value is negative or zero, a runtime error will occur.
+  func _binaryLogarithm() -> Int
 
   /// The number of trailing zeros in this value's binary representation.
   ///
@@ -1719,7 +1719,7 @@ extension BinaryInteger {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  public func _binaryLogarithm() -> Self {
+  public func _binaryLogarithm() -> Int {
     _precondition(self > (0 as Self))
     var (quotient, remainder) =
       (bitWidth &- 1).quotientAndRemainder(dividingBy: UInt.bitWidth)
@@ -1737,9 +1737,8 @@ extension BinaryInteger {
     }
     // Note that the order of operations below is important to guarantee that
     // we won't overflow.
-    return Self(
-      UInt.bitWidth &* quotient &+
-        (UInt.bitWidth &- (word.leadingZeroBitCount &+ 1)))
+    return UInt.bitWidth &* quotient &+
+        (UInt.bitWidth &- (word.leadingZeroBitCount &+ 1))
   }
 
   /// Returns the quotient and remainder of this value divided by the given
@@ -2439,9 +2438,9 @@ extension FixedWidthInteger {
 
   @inlinable // FIXME(sil-serialize-all)
   @compilerEvaluable
-  public func _binaryLogarithm() -> Self {
+  public func _binaryLogarithm() -> Int {
     _precondition(self > (0 as Self))
-    return Self(Self.bitWidth &- (leadingZeroBitCount &+ 1))
+    return Self.bitWidth &- (leadingZeroBitCount &+ 1)
   }
 
   /// Creates an integer from its little-endian representation, changing the
@@ -3953,22 +3952,19 @@ ${assignmentOperatorComment(x.operator, True)}
     return !(lhs == rhs)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @inline(__always)
+  @_transparent
   @compilerEvaluable
   public static func <= (lhs: ${Self}, rhs: ${Self}) -> Bool {
     return !(rhs < lhs)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @inline(__always)
+  @_transparent
   @compilerEvaluable
   public static func >= (lhs: ${Self}, rhs: ${Self}) -> Bool {
     return !(lhs < rhs)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @inline(__always)
+  @_transparent
   @compilerEvaluable
   public static func > (lhs: ${Self}, rhs: ${Self}) -> Bool {
     return rhs < lhs

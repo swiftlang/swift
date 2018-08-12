@@ -55,13 +55,6 @@ void runTupleSplatMigratorPass(EditorAdapter &Editor,
                                SourceFile *SF,
                                const MigratorOptions &Opts);
 
-/// Run a pass to prepend 'Swift.' to `type(of:)` expressions if they will
-/// be shadowed in Swift 4, as these are now resolved by normal overload
-/// resolution.
-void runTypeOfMigratorPass(EditorAdapter &Editor,
-                           SourceFile *SF,
-                           const MigratorOptions &Opts);
-
 } // end namespace migrator
 } // end namespace swift
 

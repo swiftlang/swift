@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -57,6 +57,7 @@ bool FrontendOptions::needsProperModuleName(ActionType action) {
   case ActionType::EmitBC:
   case ActionType::EmitObject:
   case ActionType::EmitImportedModules:
+  case ActionType::DumpTypeInfo:
     return true;
   }
   llvm_unreachable("Unknown ActionType");
@@ -91,6 +92,7 @@ bool FrontendOptions::isActionImmediate(ActionType action) {
   case ActionType::EmitBC:
   case ActionType::EmitObject:
   case ActionType::EmitImportedModules:
+  case ActionType::DumpTypeInfo:
     return false;
   }
   llvm_unreachable("Unknown ActionType");
@@ -122,6 +124,7 @@ void FrontendOptions::forAllOutputPaths(
       input.getPrimarySpecificPaths().SupplementaryOutputs;
   const std::string *outputs[] = {&outs.ModuleOutputPath,
                                   &outs.ModuleDocOutputPath,
+                                  &outs.ModuleInterfaceOutputPath,
                                   &outs.ObjCHeaderOutputPath};
   for (const std::string *next : outputs) {
     if (!next->empty())
@@ -129,11 +132,13 @@ void FrontendOptions::forAllOutputPaths(
   }
 }
 
-StringRef
-FrontendOptions::suffixForPrincipalOutputFileForAction(ActionType action) {
+file_types::ID
+FrontendOptions::formatForPrincipalOutputFileForAction(ActionType action) {
+  using namespace file_types;
+
   switch (action) {
   case ActionType::NoneAction:
-    return StringRef();
+    return TY_Nothing;
 
   case ActionType::Parse:
   case ActionType::ResolveImports:
@@ -145,42 +150,47 @@ FrontendOptions::suffixForPrincipalOutputFileForAction(ActionType action) {
   case ActionType::PrintAST:
   case ActionType::DumpScopeMaps:
   case ActionType::DumpTypeRefinementContexts:
-    return StringRef();
+  case ActionType::DumpTypeInfo:
+    return TY_Nothing;
 
   case ActionType::EmitPCH:
-    return PCH_EXTENSION;
+    return TY_PCH;
 
   case ActionType::EmitSILGen:
+    return TY_RawSIL;
+
   case ActionType::EmitSIL:
-    return SIL_EXTENSION;
+    return TY_SIL;
 
   case ActionType::EmitSIBGen:
+    return TY_RawSIB;
+
   case ActionType::EmitSIB:
-    return SIB_EXTENSION;
+    return TY_SIB;
 
   case ActionType::MergeModules:
   case ActionType::EmitModuleOnly:
-    return SERIALIZED_MODULE_EXTENSION;
+    return TY_SwiftModuleFile;
 
   case ActionType::Immediate:
   case ActionType::REPL:
     // These modes have no frontend-generated output.
-    return StringRef();
+    return TY_Nothing;
 
   case ActionType::EmitAssembly:
-    return "s";
+    return TY_Assembly;
 
   case ActionType::EmitIR:
-    return "ll";
+    return TY_LLVM_IR;
 
   case ActionType::EmitBC:
-    return "bc";
+    return TY_LLVM_BC;
 
   case ActionType::EmitObject:
-    return "o";
+    return TY_Object;
 
   case ActionType::EmitImportedModules:
-    return "importedmodules";
+    return TY_ImportedModules;
   }
 }
 
@@ -195,6 +205,7 @@ bool FrontendOptions::canActionEmitDependencies(ActionType action) {
   case ActionType::PrintAST:
   case ActionType::DumpScopeMaps:
   case ActionType::DumpTypeRefinementContexts:
+  case ActionType::DumpTypeInfo:
   case ActionType::Immediate:
   case ActionType::REPL:
     return false;
@@ -228,6 +239,7 @@ bool FrontendOptions::canActionEmitReferenceDependencies(ActionType action) {
   case ActionType::PrintAST:
   case ActionType::DumpScopeMaps:
   case ActionType::DumpTypeRefinementContexts:
+  case ActionType::DumpTypeInfo:
   case ActionType::Immediate:
   case ActionType::REPL:
     return false;
@@ -261,6 +273,7 @@ bool FrontendOptions::canActionEmitObjCHeader(ActionType action) {
   case ActionType::EmitPCH:
   case ActionType::DumpScopeMaps:
   case ActionType::DumpTypeRefinementContexts:
+  case ActionType::DumpTypeInfo:
   case ActionType::Immediate:
   case ActionType::REPL:
     return false;
@@ -291,6 +304,7 @@ bool FrontendOptions::canActionEmitLoadedModuleTrace(ActionType action) {
   case ActionType::PrintAST:
   case ActionType::DumpScopeMaps:
   case ActionType::DumpTypeRefinementContexts:
+  case ActionType::DumpTypeInfo:
   case ActionType::Immediate:
   case ActionType::REPL:
     return false;
@@ -326,6 +340,7 @@ bool FrontendOptions::canActionEmitModule(ActionType action) {
   case ActionType::EmitPCH:
   case ActionType::DumpScopeMaps:
   case ActionType::DumpTypeRefinementContexts:
+  case ActionType::DumpTypeInfo:
   case ActionType::EmitSILGen:
   case ActionType::Immediate:
   case ActionType::REPL:
@@ -346,6 +361,39 @@ bool FrontendOptions::canActionEmitModule(ActionType action) {
 
 bool FrontendOptions::canActionEmitModuleDoc(ActionType action) {
   return canActionEmitModule(action);
+}
+
+bool FrontendOptions::canActionEmitInterface(ActionType action) {
+  switch (action) {
+  case ActionType::NoneAction:
+  case ActionType::Parse:
+  case ActionType::ResolveImports:
+  case ActionType::Typecheck:
+  case ActionType::DumpParse:
+  case ActionType::DumpInterfaceHash:
+  case ActionType::DumpAST:
+  case ActionType::EmitSyntax:
+  case ActionType::PrintAST:
+  case ActionType::EmitPCH:
+  case ActionType::DumpScopeMaps:
+  case ActionType::DumpTypeRefinementContexts:
+  case ActionType::DumpTypeInfo:
+  case ActionType::EmitSILGen:
+  case ActionType::EmitSIBGen:
+  case ActionType::Immediate:
+  case ActionType::REPL:
+  case ActionType::EmitImportedModules:
+    return false;
+  case ActionType::MergeModules:
+  case ActionType::EmitModuleOnly:
+  case ActionType::EmitSIL:
+  case ActionType::EmitSIB:
+  case ActionType::EmitIR:
+  case ActionType::EmitBC:
+  case ActionType::EmitAssembly:
+  case ActionType::EmitObject:
+    return true;
+  }
 }
 
 bool FrontendOptions::doesActionProduceOutput(ActionType action) {
@@ -372,6 +420,7 @@ bool FrontendOptions::doesActionProduceOutput(ActionType action) {
   case ActionType::EmitObject:
   case ActionType::EmitImportedModules:
   case ActionType::MergeModules:
+  case ActionType::DumpTypeInfo:
     return true;
 
   case ActionType::NoneAction:
@@ -411,9 +460,44 @@ bool FrontendOptions::doesActionProduceTextualOutput(ActionType action) {
   case ActionType::EmitSIL:
   case ActionType::EmitAssembly:
   case ActionType::EmitIR:
+  case ActionType::DumpTypeInfo:
     return true;
   }
 }
+
+bool FrontendOptions::doesActionGenerateSIL(ActionType action) {
+  switch (action) {
+  case ActionType::NoneAction:
+  case ActionType::Parse:
+  case ActionType::ResolveImports:
+  case ActionType::Typecheck:
+  case ActionType::DumpParse:
+  case ActionType::DumpInterfaceHash:
+  case ActionType::EmitSyntax:
+  case ActionType::DumpAST:
+  case ActionType::PrintAST:
+  case ActionType::DumpScopeMaps:
+  case ActionType::DumpTypeRefinementContexts:
+  case ActionType::EmitImportedModules:
+  case ActionType::EmitPCH:
+    return false;
+  case ActionType::EmitSILGen:
+  case ActionType::EmitSIBGen:
+  case ActionType::EmitSIL:
+  case ActionType::EmitSIB:
+  case ActionType::EmitModuleOnly:
+  case ActionType::MergeModules:
+  case ActionType::Immediate:
+  case ActionType::REPL:
+  case ActionType::EmitAssembly:
+  case ActionType::EmitIR:
+  case ActionType::EmitBC:
+  case ActionType::EmitObject:
+  case ActionType::DumpTypeInfo:
+    return true;
+  }
+}
+
 
 const PrimarySpecificPaths &
 FrontendOptions::getPrimarySpecificPathsForAtMostOnePrimary() const {

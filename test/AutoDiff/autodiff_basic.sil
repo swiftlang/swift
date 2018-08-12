@@ -6,17 +6,17 @@ import Swift
 sil_stage raw
 
 sil hidden @foo_adj : $@convention(thin) (Float, Float, Float) -> Float {
-bb0(%0 : $Float, %1 : $Float, %2 : $Float):
+bb0(%0 : @trivial $Float, %1 : @trivial $Float, %2 : @trivial $Float):
   return %2 : $Float
 }
 
 sil hidden [reverse_differentiable source 0 wrt 0 primal @foo adjoint @foo_adj] @foo : $@convention(thin) (Float) -> Float {
-bb0(%0 : $Float):
+bb0(%0 : @trivial $Float):
   return %0 : $Float
 }
 
 sil hidden @bar : $@convention(thin) (Float) -> (Float, Float) {
-bb0(%0 : $Float):
+bb0(%0 : @trivial $Float):
   %1 = function_ref @foo : $@convention(thin) (Float) -> Float
   %2 = gradient [source 0] [wrt 0] %1 : $@convention(thin) (Float) -> Float
   %3 = apply %2(%0) : $@convention(thin) (Float) -> Float

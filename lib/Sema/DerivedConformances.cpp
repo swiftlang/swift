@@ -61,7 +61,7 @@ bool DerivedConformance::derivesProtocolConformance(TypeChecker &TC,
     // We can always complete a partial Hashable implementation, and we can
     // synthesize a full Hashable implementation for structs and enums with
     // Hashable components.
-    return canDeriveHashable(TC, Nominal);
+    return canDeriveHashable(Nominal);
   }
 
   // SWIFT_ENABLE_TENSORFLOW
@@ -347,19 +347,10 @@ DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
     getterDecl->getAttrs().add(new (C) FinalAttr(/*IsImplicit=*/true));
 
   // Compute the interface type of the getter.
-  Type interfaceType = FunctionType::get(TupleType::getEmpty(C),
-                                         propertyInterfaceType);
-  auto selfParam = computeSelfParam(getterDecl);
-  if (auto sig = parentDC->getGenericSignatureOfContext()) {
-    getterDecl->setGenericEnvironment(
-        parentDC->getGenericEnvironmentOfContext());
-    interfaceType = GenericFunctionType::get(sig, {selfParam},
-                                             interfaceType,
-                                             FunctionType::ExtInfo());
-  } else
-    interfaceType = FunctionType::get({selfParam}, interfaceType,
-                                      FunctionType::ExtInfo());
-  getterDecl->setInterfaceType(interfaceType);
+  if (auto env = parentDC->getGenericEnvironmentOfContext())
+    getterDecl->setGenericEnvironment(env);
+  getterDecl->computeType();
+
   getterDecl->copyFormalAccessFrom(property);
   getterDecl->setValidationToChecked();
 

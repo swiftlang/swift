@@ -209,7 +209,7 @@ func sr2752(x: String?, y: String?) {
 var sr3248 : ((Int) -> ())!
 sr3248?(a: 2) // expected-error {{extraneous argument label 'a:' in call}}
 sr3248!(a: 2) // expected-error {{extraneous argument label 'a:' in call}}
-sr3248(a: 2)  // expected-error {{cannot call value of non-function type '((Int) -> ())?'}}
+sr3248(a: 2)  // expected-error {{extraneous argument label 'a:' in call}}
 
 struct SR_3248 {
     var callback: (([AnyObject]) -> Void)!

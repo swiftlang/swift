@@ -314,8 +314,19 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
       neverPublic = true;
     }
   }
+  
+  auto effectiveAccess = d->getEffectiveAccess();
+  
+  // Private setter implementations for an internal storage declaration should
+  // be internal as well, so that a dynamically-writable
+  // keypath can be formed from other files.
+  if (auto accessor = dyn_cast<AccessorDecl>(d)) {
+    if (accessor->isSetter()
+       && accessor->getStorage()->getEffectiveAccess() == AccessLevel::Internal)
+      effectiveAccess = AccessLevel::Internal;
+  }
 
-  switch (d->getEffectiveAccess()) {
+  switch (effectiveAccess) {
   case AccessLevel::Private:
   case AccessLevel::FilePrivate:
     return maybeAddExternal(SILLinkage::Private);

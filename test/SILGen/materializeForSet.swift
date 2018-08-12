@@ -6,7 +6,7 @@ class Base {
   var stored: Int = 0
 
 // CHECK-LABEL: sil hidden [transparent] @$S17materializeForSet4BaseC6storedSivm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed Base) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
-// CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $Base):
+// CHECK: bb0([[BUFFER:%.*]] : @trivial $Builtin.RawPointer, [[STORAGE:%.*]] : @trivial $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : @guaranteed $Base):
 // CHECK:   [[T0:%.*]] = ref_element_addr [[SELF]] : $Base, #Base.stored
 // CHECK:   [[T1:%.*]] = address_to_pointer [[T0]] : $*Int to $Builtin.RawPointer
 // CHECK:   [[T2:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.some
@@ -15,7 +15,7 @@ class Base {
 // CHECK: }
 
 // UNCHECKED-LABEL: sil hidden [transparent] @$S17materializeForSet4BaseC6storedSivm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed Base) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
-// UNCHECKED: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $Base):
+// UNCHECKED: bb0([[BUFFER:%.*]] : @trivial $Builtin.RawPointer, [[STORAGE:%.*]] : @trivial $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : @guaranteed $Base):
 // UNCHECKED:   [[T0:%.*]] = ref_element_addr [[SELF]] : $Base, #Base.stored
 // UNCHECKED:   [[T1:%.*]] = address_to_pointer [[T0]] : $*Int to $Builtin.RawPointer
 // UNCHECKED:   [[T2:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.none
@@ -24,7 +24,7 @@ class Base {
 // UNCHECKED: }
 
 // CHECK-LABEL: sil private [transparent] @$S17materializeForSet4BaseC8computedSivmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed Base, @thick Base.Type) -> () {
-// CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $*Base, [[SELFTYPE:%.*]] : $@thick Base.Type):
+// CHECK: bb0([[BUFFER:%.*]] : @trivial $Builtin.RawPointer, [[STORAGE:%.*]] : @trivial $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : @trivial $*Base, [[SELFTYPE:%.*]] : @trivial $@thick Base.Type):
 // CHECK:   [[T0:%.*]] = load_borrow [[SELF]]
 // CHECK:   [[T1:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to [strict] $*Int
 // CHECK:   [[T2:%.*]] = load [trivial] [[T1]] : $*Int
@@ -32,7 +32,7 @@ class Base {
 // CHECK:   apply [[SETTER]]([[T2]], [[T0]])
 
 // CHECK-LABEL: sil hidden [transparent] @$S17materializeForSet4BaseC8computedSivm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed Base) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
-// CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $Base):
+// CHECK: bb0([[BUFFER:%.*]] : @trivial $Builtin.RawPointer, [[STORAGE:%.*]] : @trivial $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : @guaranteed $Base):
 // CHECK:   [[ADDR:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to [strict] $*Int
 // CHECK:   [[T0:%.*]] = function_ref @$S17materializeForSet4BaseC8computedSivg
 // CHECK:   [[T1:%.*]] = apply [[T0]]([[SELF]])
@@ -78,7 +78,7 @@ protocol Abstractable {
 extension Derived : Abstractable {}
 
 // CHECK-LABEL: sil private [transparent] @$S17materializeForSet7DerivedCAA12AbstractableA2aDP14storedFunction6ResultQzycvmytfU_TW : $@convention(witness_method: Abstractable) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed Derived, @thick Derived.Type) -> ()
-// CHECK: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*Derived, %3 : $@thick Derived.Type):
+// CHECK: bb0(%0 : @trivial $Builtin.RawPointer, %1 : @trivial $*Builtin.UnsafeValueBuffer, %2 : @trivial $*Derived, %3 : @trivial $@thick Derived.Type):
 // CHECK-NEXT: [[T0:%.*]] = load_borrow %2 : $*Derived
 // CHECK-NEXT: [[SELF:%.*]] = upcast [[T0]] : $Derived to $Base
 // CHECK-NEXT: [[RESULT_ADDR:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*@callee_guaranteed () -> @out Int
@@ -93,7 +93,7 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: return
 
 // CHECK-LABEL: sil private [transparent] [thunk] @$S17materializeForSet7DerivedCAA12AbstractableA2aDP14storedFunction{{[_0-9a-zA-Z]*}}vmTW
-// CHECK: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*Derived):
+// CHECK: bb0(%0 : @trivial $Builtin.RawPointer, %1 : @trivial $*Builtin.UnsafeValueBuffer, %2 : @trivial $*Derived):
 // CHECK-NEXT: [[RESULT_ADDR:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*@callee_guaranteed () -> @out Int
 // CHECK-NEXT: [[T0:%.*]] = load_borrow %2 : $*Derived
 // CHECK-NEXT: [[SELF:%.*]] = upcast [[T0]] : $Derived to $Base
@@ -118,7 +118,7 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: return [[T4]]
 
 // CHECK-LABEL: sil private [transparent] @$S17materializeForSet7DerivedCAA12AbstractableA2aDP19finalStoredFunction6ResultQzycvmytfU_TW :
-// CHECK: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*Derived, %3 : $@thick Derived.Type):
+// CHECK: bb0(%0 : @trivial $Builtin.RawPointer, %1 : @trivial $*Builtin.UnsafeValueBuffer, %2 : @trivial $*Derived, %3 : @trivial $@thick Derived.Type):
 // CHECK-NEXT: [[T0:%.*]] = load_borrow %2 : $*Derived
 // CHECK-NEXT: [[SELF:%.*]] = upcast [[T0]] : $Derived to $Base
 // CHECK-NEXT: [[RESULT_ADDR:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*@callee_guaranteed () -> @out Int
@@ -135,7 +135,7 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: return
 
 // UNCHECKED-LABEL: sil private [transparent] @$S17materializeForSet7DerivedCAA12AbstractableA2aDP19finalStoredFunction6ResultQzycvmytfU_TW :
-// UNCHECKED: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*Derived, %3 : $@thick Derived.Type):
+// UNCHECKED: bb0(%0 : @trivial $Builtin.RawPointer, %1 : @trivial $*Builtin.UnsafeValueBuffer, %2 : @trivial $*Derived, %3 : @trivial $@thick Derived.Type):
 // UNCHECKED-NEXT: [[T0:%.*]] = load_borrow %2 : $*Derived
 // UNCHECKED-NEXT: [[SELF:%.*]] = upcast [[T0]] : $Derived to $Base
 // UNCHECKED-NEXT: [[RESULT_ADDR:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*@callee_guaranteed () -> @out Int
@@ -150,7 +150,7 @@ extension Derived : Abstractable {}
 // UNCHECKED-NEXT: return
 
 // CHECK-LABEL: sil private [transparent] [thunk] @$S17materializeForSet7DerivedCAA12AbstractableA2aDP19finalStoredFunction{{[_0-9a-zA-Z]*}}vmTW
-// CHECK: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*Derived):
+// CHECK: bb0(%0 : @trivial $Builtin.RawPointer, %1 : @trivial $*Builtin.UnsafeValueBuffer, %2 : @trivial $*Derived):
 // CHECK-NEXT: [[RESULT_ADDR:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*@callee_guaranteed () -> @out Int
 // CHECK-NEXT: [[T0:%.*]] = load_borrow %2 : $*Derived
 // CHECK-NEXT: [[SELF:%.*]] = upcast [[T0]] : $Derived to $Base
@@ -172,7 +172,7 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: return [[T4]]
 
 // UNCHECKED-LABEL: sil private [transparent] [thunk] @$S17materializeForSet7DerivedCAA12AbstractableA2aDP19finalStoredFunction{{[_0-9a-zA-Z]*}}vmTW
-// UNCHECKED: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*Derived):
+// UNCHECKED: bb0(%0 : @trivial $Builtin.RawPointer, %1 : @trivial $*Builtin.UnsafeValueBuffer, %2 : @trivial $*Derived):
 // UNCHECKED-NEXT: [[RESULT_ADDR:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*@callee_guaranteed () -> @out Int
 // UNCHECKED-NEXT: [[T0:%.*]] = load_borrow %2 : $*Derived
 // UNCHECKED-NEXT: [[SELF:%.*]] = upcast [[T0]] : $Derived to $Base
@@ -192,7 +192,7 @@ extension Derived : Abstractable {}
 // UNCHECKED-NEXT: return [[T4]]
 
 // CHECK-LABEL: sil private [transparent] @$S17materializeForSet7DerivedCAA12AbstractableA2aDP14staticFunction6ResultQzycvmZytfU_TW
-// CHECK: bb0([[ARG1:%.*]] : $Builtin.RawPointer, [[ARG2:%.*]] : $*Builtin.UnsafeValueBuffer, [[ARG3:%.*]] : $*@thick Derived.Type, [[ARG4:%.*]] : $@thick Derived.Type.Type):
+// CHECK: bb0([[ARG1:%.*]] : @trivial $Builtin.RawPointer, [[ARG2:%.*]] : @trivial $*Builtin.UnsafeValueBuffer, [[ARG3:%.*]] : @trivial $*@thick Derived.Type, [[ARG4:%.*]] : @trivial $@thick Derived.Type.Type):
 // CHECK-NEXT: [[SELF:%.*]] = load [trivial] [[ARG3]] : $*@thick Derived.Type
 // CHECK-NEXT: [[BASE_SELF:%.*]] = upcast [[SELF]] : $@thick Derived.Type to $@thick Base.Type
 // CHECK-NEXT: [[BUFFER:%.*]] = pointer_to_address [[ARG1]] : $Builtin.RawPointer to [strict] $*@callee_guaranteed () -> @out Int
@@ -205,7 +205,7 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: return [[RESULT]] : $()
 
 // CHECK-LABEL: sil private [transparent] [thunk] @$S17materializeForSet7DerivedCAA12AbstractableA2aDP14staticFunction6ResultQzycvmZTW
-// CHECK: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $@thick Derived.Type):
+// CHECK: bb0(%0 : @trivial $Builtin.RawPointer, %1 : @trivial $*Builtin.UnsafeValueBuffer, %2 : @trivial $@thick Derived.Type):
 // CHECK-NEXT: [[RESULT_ADDR:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*@callee_guaranteed () -> @out Int
 // CHECK-NEXT: [[SELF:%.*]] = upcast %2 : $@thick Derived.Type to $@thick Base.Type
 // CHECK-NEXT: [[OUT:%.*]] = alloc_stack $@callee_guaranteed () -> Int
@@ -258,7 +258,7 @@ class HasDidSet : Base {
   }
 
 // CHECK-LABEL: sil hidden [transparent] @$S17materializeForSet06HasDidC0C6storedSivm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed HasDidSet) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
-// CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $HasDidSet):
+// CHECK: bb0([[BUFFER:%.*]] : @trivial $Builtin.RawPointer, [[STORAGE:%.*]] : @trivial $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : @guaranteed $HasDidSet):
 // CHECK:   [[T2:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to [strict] $*Int
 // CHECK:   [[T0:%.*]] = function_ref @$S17materializeForSet06HasDidC0C6storedSivg
 // CHECK:   [[T1:%.*]] = apply [[T0]]([[SELF]])
@@ -277,7 +277,7 @@ class HasDidSet : Base {
   }
 
 // CHECK-LABEL: sil hidden [transparent] @$S17materializeForSet06HasDidC0C8computedSivm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed HasDidSet) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
-// CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $HasDidSet):
+// CHECK: bb0([[BUFFER:%.*]] : @trivial $Builtin.RawPointer, [[STORAGE:%.*]] : @trivial $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : @guaranteed $HasDidSet):
 // CHECK:   [[T2:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to [strict] $*Int
 // CHECK:   [[T0:%.*]] = function_ref @$S17materializeForSet06HasDidC0C8computedSivg
 // CHECK:   [[T1:%.*]] = apply [[T0]]([[SELF]])
@@ -297,7 +297,7 @@ class HasStoredDidSet {
   }
 
 // CHECK-LABEL: sil private [transparent] @$S17materializeForSet012HasStoredDidC0C6storedSivmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed HasStoredDidSet, @thick HasStoredDidSet.Type) -> () {
-// CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $*HasStoredDidSet, [[METATYPE:%.*]] : $@thick HasStoredDidSet.Type):
+// CHECK: bb0([[BUFFER:%.*]] : @trivial $Builtin.RawPointer, [[STORAGE:%.*]] : @trivial $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : @trivial $*HasStoredDidSet, [[METATYPE:%.*]] : @trivial $@thick HasStoredDidSet.Type):
 // CHECK:   [[SELF_VALUE:%.*]] = load_borrow [[SELF]] : $*HasStoredDidSet
 // CHECK:   [[BUFFER_ADDR:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to [strict] $*Int
 // CHECK:   [[VALUE:%.*]] = load [trivial] [[BUFFER_ADDR]] : $*Int
@@ -307,7 +307,7 @@ class HasStoredDidSet {
 // CHECK: }
 
 // CHECK-LABEL: sil hidden [transparent] @$S17materializeForSet012HasStoredDidC0C6storedSivm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed HasStoredDidSet) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
-// CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $HasStoredDidSet):
+// CHECK: bb0([[BUFFER:%.*]] : @trivial $Builtin.RawPointer, [[STORAGE:%.*]] : @trivial $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : @guaranteed $HasStoredDidSet):
 // CHECK:   [[T2:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to [strict] $*Int
 // CHECK:   [[T0:%.*]] = ref_element_addr [[SELF]] : $HasStoredDidSet, #HasStoredDidSet.stored
 // CHECK:   [[T1:%.*]] = begin_access [read] [dynamic] [[T0]] : $*Int
@@ -327,7 +327,7 @@ class HasWeak {
   weak var weakvar: HasWeak?
 }
 // CHECK-LABEL: sil hidden [transparent] @$S17materializeForSet7HasWeakC7weakvarACSgXwvm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed HasWeak) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
-// CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $HasWeak):
+// CHECK: bb0([[BUFFER:%.*]] : @trivial $Builtin.RawPointer, [[STORAGE:%.*]] : @trivial $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : @guaranteed $HasWeak):
 // CHECK:   [[T2:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to [strict] $*Optional<HasWeak>
 // CHECK:   [[T0:%.*]] = ref_element_addr [[SELF]] : $HasWeak, #HasWeak.weakvar
 // CHECK:   [[READ:%.*]] = begin_access [read] [dynamic] [[T0]] : $*@sil_weak Optional<HasWeak>
@@ -341,7 +341,7 @@ class HasWeak {
 // CHECK: }
 
 // UNCHECKED-LABEL: sil hidden [transparent] @$S17materializeForSet7HasWeakC7weakvarACSgXwvm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed HasWeak) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
-// UNCHECKED: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $HasWeak):
+// UNCHECKED: bb0([[BUFFER:%.*]] : @trivial $Builtin.RawPointer, [[STORAGE:%.*]] : @trivial $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : @guaranteed $HasWeak):
 // UNCHECKED:   [[T2:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to [strict] $*Optional<HasWeak>
 // UNCHECKED:   [[T0:%.*]] = ref_element_addr [[SELF]] : $HasWeak, #HasWeak.weakvar
 // UNCHECKED:   [[T1:%.*]] = load_weak [[T0]] : $*@sil_weak Optional<HasWeak>
@@ -395,7 +395,7 @@ struct Bill : Totalled {
 }
 
 // CHECK-LABEL: sil hidden [transparent] @$S17materializeForSet4BillV5totalSivm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Bill) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
-// CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $*Bill):
+// CHECK: bb0([[BUFFER:%.*]] : @trivial $Builtin.RawPointer, [[STORAGE:%.*]] : @trivial $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : @trivial $*Bill):
 // CHECK:   [[T0:%.*]] = struct_element_addr [[SELF]] : $*Bill, #Bill.total
 // CHECK:   [[T1:%.*]] = address_to_pointer [[T0]] : $*Int to $Builtin.RawPointer
 // CHECK:   [[T3:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.none!enumelt
@@ -404,7 +404,7 @@ struct Bill : Totalled {
 // CHECK: }
 
 // CHECK-LABEL:  sil private [transparent] [thunk] @$S17materializeForSet4BillVAA8TotalledA2aDP5totalSivmTW : $@convention(witness_method: Totalled) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Bill) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
-// CHECK:        bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $*Bill):
+// CHECK:        bb0([[BUFFER:%.*]] : @trivial $Builtin.RawPointer, [[STORAGE:%.*]] : @trivial $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : @trivial $*Bill):
 // CHECK:          [[T0:%.*]] = function_ref @$S17materializeForSet4BillV5totalSivm
 // CHECK-NEXT:     [[T1:%.*]] = apply [[T0]]([[BUFFER]], [[STORAGE]], [[SELF]])
 // CHECK-NEXT:     [[LEFT:%.*]] = tuple_extract [[T1]]

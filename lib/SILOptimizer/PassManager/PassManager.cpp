@@ -499,7 +499,7 @@ void SILPassManager::execute() {
   const SILOptions &Options = getOptions();
 
   LLVM_DEBUG(llvm::dbgs() << "*** Optimizing the module (" << StageName
-        << ") *** \n");
+                          << ") *** \n");
   if (SILPrintAll) {
     llvm::dbgs() << "*** SIL module before "  << StageName << " ***\n";
     printModule(Mod, Options.EmitVerboseSIL);

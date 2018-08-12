@@ -69,24 +69,11 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
   SourceManager &SM;
   llvm::DIBuilder DBuilder;
   IRGenModule &IGM;
-
-  /// Used for caching SILDebugScopes without inline information.
-  using LocalScopeHash = std::pair<const void *, const void *>;
-  struct LocalScope : public LocalScopeHash {
-    LocalScope(const SILDebugScope *DS)
-        : LocalScopeHash({DS->Loc.getOpaquePointerValue(),
-                          // If there is no parent SIL function use the scope
-                          // pointer as a unique id instead. This is safe
-                          // because such a function could also never have been
-                          // SIL-inlined.
-                          DS->Parent.getOpaqueValue()
-                              ? DS->Parent.getOpaqueValue()
-                              : DS}) {}
-  };
+  const PathRemapper &DebugPrefixMap;
 
   /// Various caches.
   /// @{
-  llvm::DenseMap<LocalScopeHash, llvm::TrackingMDNodeRef> ScopeCache;
+  llvm::DenseMap<const SILDebugScope *, llvm::TrackingMDNodeRef> ScopeCache;
   llvm::DenseMap<const SILDebugScope *, llvm::TrackingMDNodeRef> InlinedAtCache;
   llvm::DenseMap<const void *, SILLocation::DebugLoc> DebugLocCache;
   llvm::DenseMap<TypeBase *, llvm::TrackingMDNodeRef> DITypeCache;
@@ -351,7 +338,8 @@ private:
     StringRef File = llvm::sys::path::filename(Filename);
     llvm::SmallString<512> Path(Filename);
     llvm::sys::path::remove_filename(Path);
-    llvm::DIFile *F = DBuilder.createFile(File, Path);
+    llvm::DIFile *F = DBuilder.createFile(DebugPrefixMap.remapPath(File),
+                                          DebugPrefixMap.remapPath(Path));
 
     // Cache it.
     DIFileCache[Filename] = llvm::TrackingMDNodeRef(F);
@@ -385,6 +373,12 @@ private:
           break;
         case AccessorKind::MutableAddress:
           Kind = ".mutableAddressor";
+          break;
+        case AccessorKind::Read:
+          Kind = ".read";
+          break;
+        case AccessorKind::Modify:
+          Kind = ".modify";
           break;
         }
 
@@ -423,7 +417,7 @@ private:
     auto FnTy = SILTy.getAs<SILFunctionType>();
     if (!FnTy) {
       LLVM_DEBUG(llvm::dbgs() << "Unexpected function type: "; SILTy.dump();
-            llvm::dbgs() << "\n");
+                 llvm::dbgs() << "\n");
       return CanSILFunctionType();
     }
 
@@ -553,8 +547,9 @@ private:
       return cast<llvm::DIModule>(Val->second);
 
     StringRef Sysroot = IGM.Context.SearchPathOpts.SDKPath;
-    auto M =
-        DBuilder.createModule(Parent, Name, ConfigMacros, IncludePath, Sysroot);
+    auto M = DBuilder.createModule(
+        Parent, Name, ConfigMacros, DebugPrefixMap.remapPath(IncludePath),
+        Sysroot);
     DIModuleCache.insert({Key, llvm::TrackingMDNodeRef(M)});
     return M;
   }
@@ -990,8 +985,9 @@ private:
     TypeBase *BaseTy = DbgTy.getType();
 
     if (!BaseTy) {
-      LLVM_DEBUG(llvm::dbgs() << "Type without TypeBase: "; DbgTy.getType()->dump();
-            llvm::dbgs() << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "Type without TypeBase: ";
+                 DbgTy.getType()->dump();
+                 llvm::dbgs() << "\n");
       if (!InternalType) {
         StringRef Name = "<internal>";
         InternalType = DBuilder.createForwardDecl(
@@ -1348,7 +1344,7 @@ private:
     case TypeKind::BuiltinUnsafeValueBuffer:
 
       LLVM_DEBUG(llvm::errs() << "Unhandled type: "; DbgTy.getType()->dump();
-            llvm::errs() << "\n");
+                 llvm::errs() << "\n");
       MangledName = "<unknown>";
     }
     return DBuilder.createBasicType(MangledName, SizeInBits, Encoding);
@@ -1473,18 +1469,15 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
                                        llvm::Module &M,
                                        StringRef MainOutputFilenameForDebugInfo)
     : Opts(Opts), CI(CI), SM(IGM.Context.SourceMgr), DBuilder(M),
-      IGM(IGM), MetadataTypeDecl(nullptr), InternalType(nullptr),
-      LastDebugLoc({}), LastScope(nullptr) {
+      IGM(IGM), DebugPrefixMap(Opts.DebugPrefixMap), MetadataTypeDecl(nullptr),
+      InternalType(nullptr), LastDebugLoc({}), LastScope(nullptr) {
   assert(Opts.DebugInfoLevel > IRGenDebugInfoLevel::None &&
          "no debug info should be generated");
-  StringRef SourceFileName = MainOutputFilenameForDebugInfo;
-  llvm::SmallString<256> AbsMainFile;
-  if (SourceFileName.empty())
-    AbsMainFile = "<unknown>";
-  else {
-    AbsMainFile = SourceFileName;
-    llvm::sys::fs::make_absolute(AbsMainFile);
-  }
+  llvm::SmallString<256> SourcePath;
+  if (MainOutputFilenameForDebugInfo.empty())
+    SourcePath = "<unknown>";
+  else
+    SourcePath = MainOutputFilenameForDebugInfo;
 
   unsigned Lang = llvm::dwarf::DW_LANG_Swift;
   std::string Producer = version::getSwiftFullVersion(
@@ -1499,12 +1492,14 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
   // Note that File + Dir need not result in a valid path.
   // Clang is doing the same thing here.
   TheCU = DBuilder.createCompileUnit(
-      Lang, DBuilder.createFile(AbsMainFile, Opts.DebugCompilationDir),
+      Lang, DBuilder.createFile(
+          DebugPrefixMap.remapPath(SourcePath),
+          DebugPrefixMap.remapPath(Opts.DebugCompilationDir)),
       Producer, Opts.shouldOptimize(), Flags, MajorRuntimeVersion, SplitName,
       Opts.DebugInfoLevel > IRGenDebugInfoLevel::LineTables
           ? llvm::DICompileUnit::FullDebug
           : llvm::DICompileUnit::LineTablesOnly);
-  MainFile = getOrCreateFile(BumpAllocatedString(AbsMainFile));
+  MainFile = getOrCreateFile(BumpAllocatedString(SourcePath));
 
   // Because the swift compiler relies on Clang to setup the Module,
   // the clang CU is always created first.  Several dwarf-reading
@@ -1521,8 +1516,8 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
 
   // Create a module for the current compile unit.
   auto *MDecl = IGM.getSwiftModule();
-  llvm::sys::path::remove_filename(AbsMainFile);
-  MainModule = getOrCreateModule(MDecl, TheCU, Opts.ModuleName, AbsMainFile);
+  llvm::sys::path::remove_filename(SourcePath);
+  MainModule = getOrCreateModule(MDecl, TheCU, Opts.ModuleName, SourcePath);
   DBuilder.createImportedModule(MainFile, MainModule, MainFile, 0);
 
   // Macro definitions that were defined by the user with "-Xcc -D" on the
@@ -1682,7 +1677,7 @@ llvm::DIScope *IRGenDebugInfoImpl::getOrCreateScope(const SILDebugScope *DS) {
     return MainFile;
 
   // Try to find it in the cache first.
-  auto CachedScope = ScopeCache.find(LocalScope(DS));
+  auto CachedScope = ScopeCache.find(DS);
   if (CachedScope != ScopeCache.end())
     return cast<llvm::DIScope>(CachedScope->second);
 
@@ -1694,7 +1689,7 @@ llvm::DIScope *IRGenDebugInfoImpl::getOrCreateScope(const SILDebugScope *DS) {
     if (!FnScope)
       SILFn->setDebugScope(DS);
 
-    auto CachedScope = ScopeCache.find(LocalScope(FnScope));
+    auto CachedScope = ScopeCache.find(FnScope);
     if (CachedScope != ScopeCache.end())
       return cast<llvm::DIScope>(CachedScope->second);
 
@@ -1706,7 +1701,7 @@ llvm::DIScope *IRGenDebugInfoImpl::getOrCreateScope(const SILDebugScope *DS) {
     auto *SP = emitFunction(*SILFn, Fn);
 
     // Cache it.
-    ScopeCache[LocalScope(DS)] = llvm::TrackingMDNodeRef(SP);
+    ScopeCache[DS] = llvm::TrackingMDNodeRef(SP);
     return SP;
   }
 
@@ -1723,7 +1718,7 @@ llvm::DIScope *IRGenDebugInfoImpl::getOrCreateScope(const SILDebugScope *DS) {
   auto *DScope = DBuilder.createLexicalBlock(Parent, File, L.Line, L.Column);
 
   // Cache it.
-  ScopeCache[LocalScope(DS)] = llvm::TrackingMDNodeRef(DScope);
+  ScopeCache[DS] = llvm::TrackingMDNodeRef(DScope);
   return DScope;
 }
 
@@ -1755,7 +1750,7 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
                                  SILFunctionTypeRepresentation Rep,
                                  SILType SILTy, DeclContext *DeclCtx,
                                  GenericEnvironment *GE) {
-  auto Cached = ScopeCache.find(LocalScope(DS));
+  auto Cached = ScopeCache.find(DS);
   if (Cached != ScopeCache.end()) {
     auto SP = cast<llvm::DISubprogram>(Cached->second);
     // If we created the DISubprogram for a forward declaration,
@@ -1878,7 +1873,7 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
   if (!DS)
     return nullptr;
 
-  ScopeCache[LocalScope(DS)] = llvm::TrackingMDNodeRef(SP);
+  ScopeCache[DS] = llvm::TrackingMDNodeRef(SP);
   return SP;
 }
 
@@ -1909,9 +1904,8 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::LineTables)
     return;
 
-  // Currently, the DeclContext is needed to mangle archetypes. Bail out if
-  // it's missing.
-  if (DbgTy.Type->hasArchetype() && !DbgTy.DeclCtx)
+  // We cannot yet represent opened existentials.
+  if (DbgTy.Type->hasOpenedExistential())
     return;
 
   if (!DbgTy.size)

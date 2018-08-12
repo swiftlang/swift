@@ -2,10 +2,6 @@
 @_exported import CoreGraphics
 @_exported import Foundation
 
-public func == (lhs: NSObject, rhs: NSObject) -> Bool {
-  return lhs.isEqual(rhs)
-}
-
 public let NSUTF8StringEncoding: UInt = 8
 
 extension AnyHashable : _ObjectiveCBridgeable {

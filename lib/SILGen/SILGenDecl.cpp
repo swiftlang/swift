@@ -758,6 +758,52 @@ public:
 };
 } // end anonymous namespace
 
+/// If \p elt belongs to an enum that has exactly two cases and that can be
+/// exhaustively switched, return the other case. Otherwise, return nullptr.
+static EnumElementDecl *getOppositeBinaryDecl(const SILGenFunction &SGF,
+                                              const EnumElementDecl *elt) {
+  const EnumDecl *enumDecl = elt->getParentEnum();
+  if (!enumDecl->isEffectivelyExhaustive(SGF.SGM.SwiftModule,
+                                         SGF.F.getResilienceExpansion())) {
+    return nullptr;
+  }
+
+  EnumDecl::ElementRange range = enumDecl->getAllElements();
+  auto iter = range.begin();
+  if (iter == range.end())
+    return nullptr;
+  bool seenDecl = false;
+  EnumElementDecl *result = nullptr;
+  if (*iter == elt) {
+    seenDecl = true;
+  } else {
+    result = *iter;
+  }
+
+  ++iter;
+  if (iter == range.end())
+    return nullptr;
+  if (seenDecl) {
+    assert(!result);
+    result = *iter;
+  } else {
+    if (elt != *iter)
+      return nullptr;
+    seenDecl = true;
+  }
+  ++iter;
+
+  // If we reach this point, we saw the decl we were looking for and one other
+  // case. If we have any additional cases, then we do not have a binary enum.
+  if (iter != range.end())
+    return nullptr;
+
+  // This is always true since we have already returned earlier nullptr if we
+  // did not see the decl at all.
+  assert(seenDecl);
+  return result;
+}
+
 void EnumElementPatternInitialization::emitEnumMatch(
     ManagedValue value, EnumElementDecl *eltDecl, Initialization *subInit,
     JumpDest failureDest, SILLocation loc, SILGenFunction &SGF) {
@@ -793,8 +839,7 @@ void EnumElementPatternInitialization::emitEnumMatch(
   // If we have a binary enum, do not emit a true default case. This ensures
   // that we do not emit a destroy_value on a .None.
   bool inferredBinaryEnum = false;
-  auto *enumDecl = value.getType().getEnumOrBoundGenericEnum();
-  if (auto *otherDecl = enumDecl->getOppositeBinaryDecl(eltDecl)) {
+  if (auto *otherDecl = getOppositeBinaryDecl(SGF, eltDecl)) {
     inferredBinaryEnum = true;
     switchBuilder.addCase(otherDecl, defaultBlock, nullptr, handler);
   } else {

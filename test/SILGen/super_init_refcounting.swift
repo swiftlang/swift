@@ -8,7 +8,7 @@ class Foo {
 
 class Bar: Foo {
   // CHECK-LABEL: sil hidden @$S22super_init_refcounting3BarC{{[_0-9a-zA-Z]*}}fc
-  // CHECK: bb0([[INPUT_SELF:%.*]] : $Bar):
+  // CHECK: bb0([[INPUT_SELF:%.*]] : @owned $Bar):
   // CHECK:         [[SELF_BOX:%.*]] = alloc_box ${ var Bar }
   // CHECK:         [[MARKED_SELF_BOX:%.*]] =  mark_uninitialized [derivedself] [[SELF_BOX]]
   // CHECK:         [[PB_SELF_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]

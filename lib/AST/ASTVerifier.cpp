@@ -2234,10 +2234,24 @@ public:
           abort();
         }
       }
+      if (auto reader = ASD->getReadCoroutine()) {
+        if (reader->isMutating() != ASD->isGetterMutating()) {
+          Out << "AbstractStorageDecl::isGetterMutating is out of sync"
+                 " with whether read accessor is mutating";
+          abort();
+        }
+      }
       if (auto addressor = ASD->getMutableAddressor()) {
         if (addressor->isMutating() != ASD->isSetterMutating()) {
           Out << "AbstractStorageDecl::isSetterMutating is out of sync"
                  " with whether mutable addressor is mutating";
+          abort();
+        }
+      }
+      if (auto modifier = ASD->getModifyCoroutine()) {
+        if (modifier->isMutating() != ASD->isSetterMutating()) {
+          Out << "AbstractStorageDecl::isSetterMutating is out of sync"
+                 " with whether modify addressor is mutating";
           abort();
         }
       }
@@ -2457,7 +2471,7 @@ public:
       } else {
         auto ext = cast<ExtensionDecl>(decl);
         conformingDC = ext;
-        nominal = ext->getExtendedType()->getAnyNominal();
+        nominal = ext->getExtendedNominal();
       }
 
       auto proto = conformance->getProtocol();
@@ -2605,8 +2619,14 @@ public:
       verifyProtocolList(nominal, nominal->getLocalProtocols());
 
       // Make sure that the protocol conformances are complete.
-      for (auto conformance : nominal->getLocalConformances()) {
-        verifyConformance(nominal, conformance);
+      // Only do so within the source file of the nominal type,
+      // because anywhere else this can trigger new type-check requests.
+      if (auto sf = M.dyn_cast<SourceFile *>()) {
+        if (nominal->getParentSourceFile() == sf) {
+          for (auto conformance : nominal->getLocalConformances()) {
+            verifyConformance(nominal, conformance);
+          }
+        }
       }
 
       verifyCheckedBase(nominal);
@@ -2974,6 +2994,8 @@ public:
       case AccessorKind::WillSet:
       case AccessorKind::DidSet:
       case AccessorKind::MaterializeForSet:
+      case AccessorKind::Read:
+      case AccessorKind::Modify:
         if (FD->getAddressorKind() != AddressorKind::NotAddressor) {
           Out << "non-addressor accessor has an addressor kind\n";
           abort();
@@ -3475,7 +3497,7 @@ void swift::verify(SourceFile &SF) {
 bool swift::shouldVerify(const Decl *D, const ASTContext &Context) {
 #if !(defined(NDEBUG) || defined(SWIFT_DISABLE_AST_VERIFIER))
   if (const auto *ED = dyn_cast<ExtensionDecl>(D)) {
-    return shouldVerify(ED->getExtendedType()->getAnyNominal(), Context);
+    return shouldVerify(ED->getExtendedNominal(), Context);
   }
 
   const auto *VD = dyn_cast<ValueDecl>(D);

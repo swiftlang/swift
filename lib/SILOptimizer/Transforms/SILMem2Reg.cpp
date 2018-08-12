@@ -412,7 +412,8 @@ StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
       // If we met a store before this one, delete it.
       if (LastStore) {
         NumInstRemoved++;
-        LLVM_DEBUG(llvm::dbgs() << "*** Removing redundant store: " << *LastStore);
+        LLVM_DEBUG(llvm::dbgs() << "*** Removing redundant store: "
+                                << *LastStore);
         LastStore->eraseFromParent();
       }
       LastStore = SI;
@@ -445,7 +446,8 @@ StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
     }
   }
   if (LastStore) {
-    LLVM_DEBUG(llvm::dbgs() << "*** Finished promotion. Last store: " << *LastStore);
+    LLVM_DEBUG(llvm::dbgs() << "*** Finished promotion. Last store: "
+                            << *LastStore);
   } else {
     LLVM_DEBUG(llvm::dbgs() << "*** Finished promotion with no stores.\n");
   }
@@ -632,7 +634,8 @@ void StackAllocationPromoter::fixBranchesAndUses(BlockSet &PhiBlocks) {
       SILBasicBlock *BB = LI->getParent();
       Def = getLiveInValue(PhiBlocks, BB);
 
-      LLVM_DEBUG(llvm::dbgs() << "*** Replacing " << *LI << " with Def " << *Def);
+      LLVM_DEBUG(llvm::dbgs() << "*** Replacing " << *LI
+                              << " with Def " << *Def);
 
       // Replace the load with the definition that we found.
       replaceLoad(LI, Def, ASI);
@@ -806,7 +809,7 @@ void StackAllocationPromoter::promoteAllocationToPhi() {
     }
   }
 
-  LLVM_DEBUG(llvm::dbgs() << "*** Found: " << PhiBlocks.size() << " new PHIs\n");
+  LLVM_DEBUG(llvm::dbgs() << "*** Found: " << PhiBlocks.size() <<" new PHIs\n");
   NumPhiPlaced += PhiBlocks.size();
 
   // At this point we calculated the locations of all of the new Phi values.
@@ -852,7 +855,7 @@ bool MemoryToRegisters::promoteSingleAllocation(AllocStackInst *alloc,
   if (isWriteOnlyAllocation(alloc)) {
     eraseUsesOfInstruction(alloc);
 
-    LLVM_DEBUG(llvm::dbgs() << "*** Deleting store-only AllocStack: " << *alloc);
+    LLVM_DEBUG(llvm::dbgs() << "*** Deleting store-only AllocStack: "<< *alloc);
     return true;
   }
 
@@ -862,7 +865,7 @@ bool MemoryToRegisters::promoteSingleAllocation(AllocStackInst *alloc,
     removeSingleBlockAllocation(alloc);
 
     LLVM_DEBUG(llvm::dbgs() << "*** Deleting single block AllocStackInst: "
-                       << *alloc);
+                            << *alloc);
     if (!alloc->use_empty()) {
       // Handle a corner case where the ASI still has uses:
       // This can come up if the source contains a withUnsafePointer where
@@ -955,7 +958,8 @@ class SILMem2Reg : public SILFunctionTransform {
 
   void run() override {
     SILFunction *F = getFunction();
-    LLVM_DEBUG(llvm::dbgs() << "** Mem2Reg on function: " << F->getName() <<" **\n");
+    LLVM_DEBUG(llvm::dbgs() << "** Mem2Reg on function: " << F->getName()
+                            << " **\n");
 
     DominanceAnalysis* DA = PM->getAnalysis<DominanceAnalysis>();
 

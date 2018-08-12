@@ -27,7 +27,6 @@ class SomeMethods {
 func takesObjCClass<T : ObjCClass>(_: T) {}
 func takesObjCProtocol<T : ObjCProtocol>(_: T) {}
 func takesObjCClassAndProtocol<T : ObjCClass & ObjCProtocol>(_: T) {}
-// expected-note@-1 2 {{in call to function 'takesObjCClassAndProtocol'}}
 
 func testSelfConformance(c: ObjCClass, p: ObjCProtocol, cp: ObjCClass & ObjCProtocol) {
   takesObjCClass(c)
@@ -39,8 +38,8 @@ func testSelfConformance(c: ObjCClass, p: ObjCProtocol, cp: ObjCClass & ObjCProt
   takesObjCProtocol(cp)
 
   // FIXME: Bad diagnostics
-  takesObjCClassAndProtocol(c) // expected-error {{generic parameter 'T' could not be inferred}}
-  takesObjCClassAndProtocol(p) // expected-error {{generic parameter 'T' could not be inferred}}
+  takesObjCClassAndProtocol(c) // expected-error {{argument type 'ObjCClass' does not conform to expected type 'ObjCProtocol'}}
+  takesObjCClassAndProtocol(p) // expected-error {{'(ObjCClass) -> ()' requires that 'ObjCClass' conform to 'ObjCProtocol'}}
   takesObjCClassAndProtocol(cp)
 }
 
@@ -51,12 +50,8 @@ func testSelfConformance(c: ObjCClass, p: ObjCProtocol, cp: ObjCClass & ObjCProt
 func takesStaticObjCProtocol<T : StaticObjCProtocol>(_: T) {}
 
 func testSelfConformance(cp: ObjCClass & StaticObjCProtocol) {
-
-  // FIXME: Terrible diagnostic
   takesStaticObjCProtocol(cp)
-  // expected-error@-1 {{cannot invoke 'takesStaticObjCProtocol' with an argument list of type '(ObjCClass & StaticObjCProtocol)'}}
-  // expected-note@-2 {{expected an argument list of type '(T)'}}
-
+  // expected-error@-1 {{'ObjCClass & StaticObjCProtocol' cannot be used as a type conforming to protocol 'StaticObjCProtocol' because 'StaticObjCProtocol' has static requirements}}
 }
 
 func testMetatypeSelfConformance(m1: (ObjCClass & ObjCProtocol).Protocol,

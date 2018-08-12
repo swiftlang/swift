@@ -506,7 +506,8 @@ void SelectEnforcement::updateCapture(AddressCapture capture) {
       // case they occur.
       LLVM_FALLTHROUGH;
     default:
-      LLVM_DEBUG(llvm::dbgs() << "    Unrecognized partial_apply user: " << *user);
+      LLVM_DEBUG(llvm::dbgs() << "    Unrecognized partial_apply user: "
+                              << *user);
 
       // Handle unknown uses conservatively by assuming a capture.
       captureIfEscaped(user);
@@ -580,7 +581,7 @@ void AccessEnforcementSelection::run() {
 
 void AccessEnforcementSelection::processFunction(SILFunction *F) {
   LLVM_DEBUG(llvm::dbgs() << "Access Enforcement Selection in " << F->getName()
-                     << "\n");
+                          << "\n");
 
   // This ModuleTransform needs to analyze closures and their parent scopes in
   // the same pass, and the parent needs to be analyzed before the closure.
@@ -588,7 +589,8 @@ void AccessEnforcementSelection::processFunction(SILFunction *F) {
   auto *CSA = getAnalysis<ClosureScopeAnalysis>();
   if (isNonEscapingClosure(F->getLoweredFunctionType())) {
     for (auto *scopeF : CSA->getClosureScopes(F)) {
-      LLVM_DEBUG(llvm::dbgs() << "  Parent scope: " << scopeF->getName() << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "  Parent scope: " << scopeF->getName()
+                              << "\n");
       assert(visited.count(scopeF));
       // Closures must be defined in the same module as their parent scope.
       assert(scopeF->wasDeserializedCanonical()

@@ -35,7 +35,7 @@ class ConcreteSubclass : ConcreteClass { }
 // CHECK-LABEL: sil hidden @$Ss19class_bound_generic{{[_0-9a-zA-Z]*}}F
 func class_bound_generic<T : ClassBound>(x: T) -> T {
   var x = x
-  // CHECK: bb0([[X:%.*]] : $T):
+  // CHECK: bb0([[X:%.*]] : @guaranteed $T):
   // CHECK:   [[X_ADDR:%.*]] = alloc_box $<τ_0_0 where τ_0_0 : ClassBound> { var τ_0_0 } <T>
   // CHECK:   [[PB:%.*]] = project_box [[X_ADDR]]
   // CHECK:   [[X_COPY:%.*]] = copy_value [[X]]
@@ -50,7 +50,7 @@ func class_bound_generic<T : ClassBound>(x: T) -> T {
 // CHECK-LABEL: sil hidden @$Ss21class_bound_generic_2{{[_0-9a-zA-Z]*}}F
 func class_bound_generic_2<T : ClassBound & NotClassBound>(x: T) -> T {
   var x = x
-  // CHECK: bb0([[X:%.*]] : $T):
+  // CHECK: bb0([[X:%.*]] : @guaranteed $T):
   // CHECK:   [[X_ADDR:%.*]] = alloc_box $<τ_0_0 where τ_0_0 : ClassBound, τ_0_0 : NotClassBound> { var τ_0_0 } <T>
   // CHECK:   [[PB:%.*]] = project_box [[X_ADDR]]
   // CHECK:   [[X_COPY:%.*]] = copy_value [[X]]
@@ -64,7 +64,7 @@ func class_bound_generic_2<T : ClassBound & NotClassBound>(x: T) -> T {
 // CHECK-LABEL: sil hidden @$Ss20class_bound_protocol{{[_0-9a-zA-Z]*}}F
 func class_bound_protocol(x: ClassBound) -> ClassBound {
   var x = x
-  // CHECK: bb0([[X:%.*]] : $ClassBound):
+  // CHECK: bb0([[X:%.*]] : @guaranteed $ClassBound):
   // CHECK:   [[X_ADDR:%.*]] = alloc_box ${ var ClassBound }
   // CHECK:   [[PB:%.*]] = project_box [[X_ADDR]]
   // CHECK:   [[X_COPY:%.*]] = copy_value [[X]]
@@ -79,7 +79,7 @@ func class_bound_protocol(x: ClassBound) -> ClassBound {
 func class_bound_protocol_composition(x: ClassBound & NotClassBound)
 -> ClassBound & NotClassBound {
   var x = x
-  // CHECK: bb0([[X:%.*]] : $ClassBound & NotClassBound):
+  // CHECK: bb0([[X:%.*]] : @guaranteed $ClassBound & NotClassBound):
   // CHECK:   [[X_ADDR:%.*]] = alloc_box ${ var ClassBound & NotClassBound }
   // CHECK:   [[PB:%.*]] = project_box [[X_ADDR]]
   // CHECK:   [[X_COPY:%.*]] = copy_value [[X]]
@@ -101,7 +101,7 @@ func class_bound_erasure(x: ConcreteClass) -> ClassBound {
 func class_bound_existential_upcast(x: ClassBound & ClassBound2)
 -> ClassBound {
   return x
-  // CHECK: bb0([[ARG:%.*]] : $ClassBound & ClassBound2):
+  // CHECK: bb0([[ARG:%.*]] : @guaranteed $ClassBound & ClassBound2):
   // CHECK:   [[OPENED:%.*]] = open_existential_ref [[ARG]] : $ClassBound & ClassBound2 to [[OPENED_TYPE:\$@opened(.*) ClassBound & ClassBound2]]
   // CHECK:   [[OPENED_COPY:%.*]] = copy_value [[OPENED]]
   // CHECK:   [[PROTO:%.*]] = init_existential_ref [[OPENED_COPY]] : [[OPENED_TYPE]] : [[OPENED_TYPE]], $ClassBound
@@ -110,7 +110,7 @@ func class_bound_existential_upcast(x: ClassBound & ClassBound2)
 // CHECK: } // end sil function '$Ss30class_bound_existential_upcast1xs10ClassBound_psAC_s0E6Bound2p_tF'
 
 // CHECK-LABEL: sil hidden @$Ss41class_bound_to_unbound_existential_upcast1xs13NotClassBound_ps0hI0_sACp_tF :
-// CHECK: bb0([[ARG0:%.*]] : $*NotClassBound, [[ARG1:%.*]] : $ClassBound & NotClassBound):
+// CHECK: bb0([[ARG0:%.*]] : @trivial $*NotClassBound, [[ARG1:%.*]] : @guaranteed $ClassBound & NotClassBound):
 // CHECK:   [[X_OPENED:%.*]] = open_existential_ref [[ARG1]] : $ClassBound & NotClassBound to [[OPENED_TYPE:\$@opened(.*) ClassBound & NotClassBound]]
 // CHECK:   [[PAYLOAD_ADDR:%.*]] = init_existential_addr [[ARG0]] : $*NotClassBound, [[OPENED_TYPE]]
 // CHECK:   [[X_OPENED_COPY:%.*]] = copy_value [[X_OPENED]]
@@ -121,7 +121,7 @@ func class_bound_to_unbound_existential_upcast
 }
 
 // CHECK-LABEL: sil hidden @$Ss18class_bound_method1xys10ClassBound_p_tF :
-// CHECK: bb0([[ARG:%.*]] : $ClassBound):
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $ClassBound):
 func class_bound_method(x: ClassBound) {
   var x = x
   x.classBoundMethod()

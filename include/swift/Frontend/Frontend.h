@@ -43,6 +43,7 @@
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/Host.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "clang/Basic/FileManager.h"
 
 #include <memory>
 
@@ -409,6 +410,8 @@ public:
 
   DiagnosticEngine &getDiags() { return Diagnostics; }
 
+  clang::vfs::FileSystem &getFileSystem() { return *SourceMgr.getFileSystem(); }
+
   ASTContext &getASTContext() {
     return *Context;
   }
@@ -495,6 +498,11 @@ public:
   bool setup(const CompilerInvocation &Invocation);
 
 private:
+  /// Set up the file system by loading and validating all VFS overlay YAML
+  /// files. If the process of validating VFS files failed, or the overlay
+  /// file system could not be initialized, this function returns true. Else it
+  /// returns false if setup succeeded.
+  bool setUpVirtualFileSystemOverlays();
   void setUpLLVMArguments();
   void setUpDiagnosticOptions();
   bool setUpModuleLoaders();

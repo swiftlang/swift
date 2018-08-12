@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ASTVisitor.h"
+#include "ArgumentScope.h"
 #include "ArgumentSource.h"
 #include "Conversion.h"
 #include "Initialization.h"
@@ -671,6 +672,33 @@ SILValue UnenforcedFormalAccess::enter(SILGenFunction &SGF, SILLocation loc,
   return accessAddress;
 }
 
+static void copyBorrowedYieldsIntoTemporary(SILGenFunction &SGF,
+                                            SILLocation loc,
+                                            ArrayRef<ManagedValue> &yields,
+                                            AbstractionPattern origFormalType,
+                                            CanType substFormalType,
+                                            Initialization *init) {
+  if (!origFormalType.isTuple()) {
+    auto value = yields.front();
+    yields = yields.drop_front();
+    init->copyOrInitValueInto(SGF, loc, value, /*isInit*/ false);
+    init->finishInitialization(SGF);
+    return;
+  }
+
+  assert(init->canSplitIntoTupleElements());
+  SmallVector<InitializationPtr, 4> scratch;
+  auto eltInits =
+    init->splitIntoTupleElements(SGF, loc, substFormalType, scratch);
+  for (size_t i : indices(eltInits)) {
+    auto origEltType = origFormalType.getTupleElementType(i);
+    auto substEltType = cast<TupleType>(substFormalType).getElementType(i);
+    copyBorrowedYieldsIntoTemporary(SGF, loc, yields, origEltType,
+                                    substEltType, eltInits[i].get());
+  }
+  init->finishInitialization(SGF);
+}
+
 namespace {
   class RefElementComponent : public PhysicalPathComponent {
     VarDecl *Field;
@@ -1200,6 +1228,14 @@ namespace {
     AccessorDecl *getAccessorDecl() const {
       return cast<AccessorDecl>(Accessor.getFuncDecl());
     }
+
+    AccessKind getBaseAccessKind(SILGenFunction &SGF,
+                                 AccessKind kind) const override {
+      if (this->doesAccessorMutateSelf(SGF, Accessor))
+        return AccessKind::ReadWrite;
+      else
+        return AccessKind::Read;
+    }
   };
 
   class GetterSetterComponent
@@ -1228,14 +1264,6 @@ namespace {
                           SILLocation loc)
       : AccessorBasedComponent(copied, SGF, loc)
     {
-    }
-
-    AccessKind getBaseAccessKind(SILGenFunction &SGF,
-                                 AccessKind kind) const override {
-      if (doesAccessorMutateSelf(SGF, Accessor))
-        return AccessKind::ReadWrite;
-      else
-        return AccessKind::Read;
     }
 
     void emitAssignWithSetter(SILGenFunction &SGF, SILLocation loc,
@@ -1698,14 +1726,6 @@ namespace {
       assert(getAccessorDecl()->isAnyAddressor());
     }
 
-    AccessKind getBaseAccessKind(SILGenFunction &SGF,
-                                 AccessKind kind) const override {
-      if (doesAccessorMutateSelf(SGF, Accessor))
-        return AccessKind::ReadWrite;
-      else
-        return AccessKind::Read;
-    }
-
     ManagedValue offset(SILGenFunction &SGF, SILLocation loc, ManagedValue base,
                         AccessKind accessKind) && override {
       assert(SGF.InFormalEvaluationScope &&
@@ -1758,6 +1778,103 @@ namespace {
 
     void dump(raw_ostream &OS, unsigned indent) const override {
       printBase(OS, indent, "AddressorComponent");
+    }
+  };
+
+  class EndApplyPseudoComponent : public WritebackPseudoComponent {
+    CleanupHandle EndApplyHandle;
+  public:
+    EndApplyPseudoComponent(const LValueTypeData &typeData,
+                            CleanupHandle endApplyHandle)
+      : WritebackPseudoComponent(typeData), EndApplyHandle(endApplyHandle) {}
+
+  private:
+    void writeback(SILGenFunction &SGF, SILLocation loc,
+                   ManagedValue base,
+                   MaterializedLValue materialized,
+                   bool isFinal) override {
+      SGF.Cleanups.popAndEmitCleanup(EndApplyHandle, CleanupLocation::get(loc),
+                                     NotForUnwind);
+    }
+
+    void dump(raw_ostream &OS, unsigned indent) const override {
+      OS.indent(indent) << "EndApplyPseudoComponent";
+    }
+  };
+
+  /// A physical component which involves calling coroutine accessors.
+  class CoroutineAccessorComponent
+      : public AccessorBasedComponent<PhysicalPathComponent> {
+  public:
+    CoroutineAccessorComponent(AbstractStorageDecl *decl,
+                               SILDeclRef accessor,
+                               bool isSuper, bool isDirectAccessorUse,
+                               SubstitutionMap substitutions,
+                               CanType baseFormalType,
+                               LValueTypeData typeData,
+                               Expr *indexExprForDiagnostics = nullptr,
+                               RValue *optIndices = nullptr)
+      : AccessorBasedComponent(CoroutineAccessorKind,
+                               decl, accessor, isSuper, isDirectAccessorUse,
+                               substitutions, baseFormalType, typeData,
+                               indexExprForDiagnostics, optIndices) {
+    }
+
+    using AccessorBasedComponent::AccessorBasedComponent;
+
+    ManagedValue offset(SILGenFunction &SGF, SILLocation loc, ManagedValue base,
+                        AccessKind accessKind) && override {
+      assert(SGF.InFormalEvaluationScope &&
+             "offsetting l-value for modification without writeback scope");
+
+      ManagedValue result;
+
+      auto args =
+        std::move(*this).prepareAccessorArgs(SGF, loc, base, Accessor);
+      SmallVector<ManagedValue, 4> yields;
+      auto endApplyHandle =
+        SGF.emitCoroutineAccessor(
+          loc, Accessor, Substitutions, std::move(args.base), IsSuper,
+          IsDirectAccessorUse, std::move(args.Indices), yields);
+
+      // Push a writeback that ends the access.
+      std::unique_ptr<LogicalPathComponent>
+        component(new EndApplyPseudoComponent(getTypeData(), endApplyHandle));
+      pushWriteback(SGF, loc, std::move(component), ManagedValue(),
+                    MaterializedLValue());
+
+      auto decl = cast<AccessorDecl>(Accessor.getFuncDecl());
+
+      // 'modify' always returns an address of the right type.
+      if (decl->getAccessorKind() == AccessorKind::Modify) {
+        assert(yields.size() == 1);
+        return yields[0];
+      }
+
+      // 'read' returns a borrowed r-value, which might or might not be
+      // an address of the right type.
+
+      // Use the address if we have one.
+      if (!getOrigFormalType().isTuple()) {
+        assert(yields.size() == 1);
+        if (yields[0].isLValue()) {
+          return yields[0];
+        }
+      }
+
+      // Otherwise, we need to make a temporary.
+      auto temporary =
+        SGF.emitTemporary(loc, SGF.getTypeLowering(getTypeOfRValue()));
+      auto yieldsAsArray = llvm::makeArrayRef(yields);
+      copyBorrowedYieldsIntoTemporary(SGF, loc, yieldsAsArray,
+                                      getOrigFormalType(), getSubstFormalType(),
+                                      temporary.get());
+      assert(yieldsAsArray.empty() && "didn't claim all yields");
+      return temporary->getManagedAddress();
+    }
+
+    void dump(raw_ostream &OS, unsigned indent) const override {
+      printBase(OS, indent, "CoroutineAccessorComponent");
     }
   };
   
@@ -1865,6 +1982,38 @@ namespace {
       // Mark the projected address's dependence on the owner.
       projectedAddr = SGF.B.createMarkDependence(loc, projectedAddr,
                                                  projectedOwner.getValue());
+      
+      // Push a cleanup to destroy the owner object. We don't want to leave
+      // it to release whenever because the key path implementation hangs
+      // the writeback operations specific to the traversal onto the destruction
+      // of the owner.
+      struct DestroyOwnerPseudoComponent : WritebackPseudoComponent {
+        ManagedValue owner;
+        
+        DestroyOwnerPseudoComponent(const LValueTypeData &typeData,
+                                    ManagedValue owner)
+          : WritebackPseudoComponent(typeData), owner(owner)
+        {}
+        
+        void writeback(SILGenFunction &SGF, SILLocation loc,
+                       ManagedValue base,
+                       MaterializedLValue materialized,
+                       bool isFinal) override {
+          SGF.Cleanups.popAndEmitCleanup(owner.getCleanup(),
+                                         CleanupLocation::get(loc),
+                                         NotForUnwind);
+        }
+        
+        void dump(raw_ostream &OS, unsigned indent) const override {
+          OS << "DestroyOwnerPseudoComponent";
+        }
+      };
+      
+      std::unique_ptr<LogicalPathComponent> component(
+        new DestroyOwnerPseudoComponent(getTypeData(), projectedOwner));
+      
+      pushWriteback(SGF, loc, std::move(component), base, MaterializedLValue());
+
       return ManagedValue::forLValue(projectedAddr);
     }
 
@@ -2407,6 +2556,18 @@ namespace {
         return asImpl().emitUsingAddressor(accessor, isDirect, typeData);
       }
 
+      case AccessorKind::Read:
+      case AccessorKind::Modify: {
+        auto accessor =
+          accessorKind == AccessorKind::Read
+            ? SGF.SGM.getReadCoroutineDeclRef(Storage)
+            : SGF.SGM.getModifyCoroutineDeclRef(Storage);
+        auto typeData =
+          getPhysicalStorageTypeData(SGF.SGM, Storage, FormalRValueType);
+        return asImpl().emitUsingCoroutineAccessor(accessor, isDirect,
+                                                   typeData);
+      }
+
       case AccessorKind::WillSet:
       case AccessorKind::DidSet:
         llvm_unreachable("cannot use accessor directly to perform an access");
@@ -2474,6 +2635,13 @@ void LValue::addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
       LV.add<AddressorComponent>(Storage, addressor,
                                  /*isSuper=*/false, isDirect, getSubs(),
                                  CanType(), typeData, storageType);
+    }
+
+    void emitUsingCoroutineAccessor(SILDeclRef accessor, bool isDirect,
+                                    LValueTypeData typeData) {
+      LV.add<CoroutineAccessorComponent>(Storage, accessor,
+                                         /*isSuper*/ false, isDirect, getSubs(),
+                                         CanType(), typeData);
     }
 
     void emitUsingGetterSetter(SILDeclRef accessor, bool isDirect,
@@ -2854,6 +3022,13 @@ struct MemberStorageAccessEmitter : AccessEmitter<Impl, StorageType> {
     LV.add<AddressorComponent>(Storage, addressor, IsSuper, isDirect, Subs,
                                BaseFormalType, typeData, varStorageType,
                                IndexExprForDiagnostics, Indices);
+  }
+
+  void emitUsingCoroutineAccessor(SILDeclRef accessor, bool isDirect,
+                                  LValueTypeData typeData) {
+    LV.add<CoroutineAccessorComponent>(Storage, accessor, IsSuper, isDirect,
+                                       Subs, BaseFormalType, typeData,
+                                       IndexExprForDiagnostics, Indices);
   }
 
   void emitUsingGetterSetter(SILDeclRef accessor, bool isDirect,

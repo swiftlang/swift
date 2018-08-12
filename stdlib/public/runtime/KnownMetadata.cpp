@@ -67,14 +67,6 @@ const ValueWitnessTable swift::VALUE_WITNESS_SYM(Bi512_) =
 const ExtraInhabitantsValueWitnessTable swift::VALUE_WITNESS_SYM(Bo) =
   ValueWitnessTableForBox<SwiftRetainableBox>::table;
 
-/// The basic value-witness table for Swift unowned pointers.
-const ExtraInhabitantsValueWitnessTable swift::UNOWNED_VALUE_WITNESS_SYM(Bo) =
-  ValueWitnessTableForBox<SwiftUnownedRetainableBox>::table;
-
-/// The basic value-witness table for Swift weak pointers.
-const ValueWitnessTable swift::WEAK_VALUE_WITNESS_SYM(Bo) =
-  ValueWitnessTableForBox<SwiftWeakRetainableBox>::table;
-
 /// The value-witness table for pointer-aligned unmanaged pointer types.
 const ExtraInhabitantsValueWitnessTable swift::METATYPE_VALUE_WITNESS_SYM(Bo) =
   ValueWitnessTableForBox<PointerPointerBox>::table;
@@ -102,14 +94,6 @@ static const ValueWitnessTable VALUE_WITNESS_SYM(BB) =
 /// The basic value-witness table for ObjC object pointers.
 const ExtraInhabitantsValueWitnessTable swift::VALUE_WITNESS_SYM(BO) =
   ValueWitnessTableForBox<ObjCRetainableBox>::table;
-
-/// The basic value-witness table for ObjC unowned pointers.
-const ExtraInhabitantsValueWitnessTable swift::UNOWNED_VALUE_WITNESS_SYM(BO) =
-  ValueWitnessTableForBox<ObjCUnownedRetainableBox>::table;
-
-/// The basic value-witness table for ObjC weak pointers.
-const ValueWitnessTable swift::WEAK_VALUE_WITNESS_SYM(BO) =
-  ValueWitnessTableForBox<ObjCWeakRetainableBox>::table;
 
 #endif
 

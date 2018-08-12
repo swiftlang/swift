@@ -43,7 +43,7 @@ public func test1SendWithParam(x: Float) {
 
 // GPU function takes the input arg of x.
 // CHECK-LABEL: --- TFDevicePartition Per-Device Function Extraction Result: {{.*}}test1SendWithParam{{.*}}GPU{{.*}}
-// CHECK: bb0(%0 : $TensorHandle
+// CHECK: bb0(%0 : @unowned $TensorHandle
 // CHECK: graph_op "tfc.D2DTensorSend
 
 // The _Send node should be hooked up as a control dependency on the return

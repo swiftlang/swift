@@ -114,15 +114,13 @@ class AnnotatingPrinter : public StreamPrinter {
     const auto *ED = dyn_cast<ExtensionDecl>(D);
     if (!ED)
       return;
-    if (ED->getExtendedType()) {
-      if (auto NTD = ED->getExtendedType()->getAnyNominal()) {
-        if (auto *PD = dyn_cast<ProtocolDecl>(NTD)) {
-          auto Pair = AllDefaultMaps.insert({PD, DefaultImplementMap()});
-          DefaultMapToUse = &Pair.first->getSecond();
-          if (Pair.second) {
-            swift::collectDefaultImplementationForProtocolMembers(PD,
-                                                      Pair.first->getSecond());
-          }
+    if (auto NTD = ED->getExtendedNominal()) {
+      if (auto *PD = dyn_cast<ProtocolDecl>(NTD)) {
+        auto Pair = AllDefaultMaps.insert({PD, DefaultImplementMap()});
+        DefaultMapToUse = &Pair.first->getSecond();
+        if (Pair.second) {
+          swift::collectDefaultImplementationForProtocolMembers(PD,
+                                                    Pair.first->getSecond());
         }
       }
     }
@@ -374,8 +372,8 @@ static bool initDocEntityInfo(const Decl *D,
         assert(DocRef.find(Open) != StringRef::npos);
         auto FirstPart = DocRef.substr(0, DocRef.find(Open) + (Open).size());
         auto SecondPart = DocRef.substr(FirstPart.size());
-        auto ExtendedName = ((const ExtensionDecl*)D)->getExtendedType()->
-          getAnyNominal()->getName().str();
+        auto ExtendedName = ((const ExtensionDecl*)D)->getExtendedNominal()
+            ->getName().str();
         assert(SecondPart.startswith(ExtendedName));
         SecondPart = SecondPart.substr(ExtendedName.size());
         llvm::SmallString<128> UpdatedDocBuffer;

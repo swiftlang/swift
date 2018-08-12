@@ -22,7 +22,7 @@ enum TreeInt {
 }
 
 sil @indirect_enum : $@convention(thin) <T> (@owned TreeA<T>) -> () {
-entry(%e : $TreeA<T>):
+entry(%e : @owned $TreeA<T>):
   %a = unchecked_enum_data %e : $TreeA<T>, #TreeA.Leaf!enumelt.1
   %b = project_box %a : $<τ_0_0> { var τ_0_0 } <T>, 0
 
@@ -33,7 +33,7 @@ entry(%e : $TreeA<T>):
 }
 
 sil @indirect_enum_case_addr_only : $@convention(thin) <T> (@in TreeB<T>) -> () {
-entry(%e : $*TreeB<T>):
+entry(%e : @trivial $*TreeB<T>):
   %a = unchecked_take_enum_data_addr %e : $*TreeB<T>, #TreeB.Leaf!enumelt.1
   destroy_addr %a : $*T
 
@@ -44,7 +44,7 @@ entry(%e : $*TreeB<T>):
 }
 
 sil @indirect_enum_case_loadable : $@convention(thin) (@owned TreeInt) -> () {
-entry(%e : $TreeInt):
+entry(%e : @owned $TreeInt):
   %a = unchecked_enum_data %e : $TreeInt, #TreeInt.Leaf!enumelt.1
   store %a to [trivial] undef : $*Int
 

@@ -311,8 +311,8 @@ private:
     // that we don't understand.
     if (Array && !isIdentifiedUnderlyingArrayObject(Array)) {
       LLVM_DEBUG(llvm::dbgs()
-            << " not safe because of not identified underlying object "
-            << *Array << " in " << *Inst);
+                 << " not safe because of not identified underlying object "
+                 << *Array << " in " << *Inst);
       allArraysInMemoryAreUnsafe = true;
       // No need to store specific arrays in this case.
       UnsafeArrays.clear();
@@ -393,12 +393,12 @@ static bool removeRedundantChecksInBlock(SILBasicBlock &BB, ArraySet &Arrays,
     auto IndexedArray =
         getArrayIndexPair(Array, ArrayIndex, Kind);
     LLVM_DEBUG(llvm::dbgs() << " IndexedArray: " << *Array << " and "
-                       << *ArrayIndex);
+                            << *ArrayIndex);
 
     // Saw a check for the first time.
     if (!RedundantChecks.count(IndexedArray)) {
       LLVM_DEBUG(llvm::dbgs() << " first time: " << *Inst
-                         << "  with array argument: " << *Array);
+                              << "  with array argument: " << *Array);
       RedundantChecks.insert(IndexedArray);
       continue;
     }
@@ -458,7 +458,7 @@ static bool removeRedundantChecks(DominanceInfoNode *CurBB,
     // Saw a check for the first time.
     if (!DominatingSafeChecks.count(IndexedArray)) {
       LLVM_DEBUG(llvm::dbgs() << " first time: " << *Inst
-                         << "  with array arg: " << *Array);
+                              << "  with array arg: " << *Array);
       DominatingSafeChecks.insert(IndexedArray);
       SafeChecksToPop.push_back(IndexedArray);
       continue;
@@ -798,7 +798,8 @@ public:
 
       InductionInfo *Info;
       if (!(Info = analyzeIndVar(Arg, IV.Inc, IV.IncVal))) {
-        LLVM_DEBUG(llvm::dbgs() << " could not analyze the induction on: " << *Arg);
+        LLVM_DEBUG(llvm::dbgs() << " could not analyze the induction on: "
+                                << *Arg);
         continue;
       }
 
@@ -860,8 +861,8 @@ private:
       return nullptr;
 
     LLVM_DEBUG(llvm::dbgs() << " found an induction variable (ICMP_EQ): "
-                       << *HeaderVal << "  start: " << *Start
-                       << "  end: " << *End);
+                            << *HeaderVal << "  start: " << *Start
+                            << "  end: " << *End);
 
     // Check whether the addition is overflow checked by a cond_fail or whether
     // code in the preheader's predecessor ensures that we won't overflow.
@@ -1018,7 +1019,8 @@ static bool hoistChecksInLoop(DominanceInfo *DT, DominanceInfoNode *DTNode,
              "Must be able to hoist the instruction.");
       Changed = true;
       ArrayCall.hoist(Preheader->getTerminator(), DT);
-      LLVM_DEBUG(llvm::dbgs() << " could hoist invariant bounds check: " << *Inst);
+      LLVM_DEBUG(llvm::dbgs() << " could hoist invariant bounds check: "
+                              << *Inst);
       continue;
     }
 
@@ -1145,7 +1147,8 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
   if (!Loop->getSubLoops().empty())
     return false;
 
-  LLVM_DEBUG(llvm::dbgs() << "Attempting to remove redundant checks in " << *Loop);
+  LLVM_DEBUG(llvm::dbgs() << "Attempting to remove redundant checks in "
+                          << *Loop);
   LLVM_DEBUG(Header->getParent()->dump());
 
   // Collect safe arrays. Arrays are safe if there is no function call that
@@ -1174,8 +1177,7 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
   SILBasicBlock *ExitBlk = Loop->getExitBlock();
   SILBasicBlock *Latch = Loop->getLoopLatch();
   if (!ExitingBlk || !Latch || !ExitBlk) {
-    LLVM_DEBUG(llvm::dbgs()
-          << "No single exiting block or latch found\n");
+    LLVM_DEBUG(llvm::dbgs() << "No single exiting block or latch found\n");
     if (!Latch)
       return Changed;
 

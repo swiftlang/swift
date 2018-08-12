@@ -103,7 +103,6 @@ import ObserverPartiallyAppliedMethod
 import ObserverUnappliedMethod
 import OpaqueConsumingUsers
 import OpenClose
-import PartialApplyDynamicType
 import Phonebook
 import PointerArithmetics
 import PolymorphicCalls
@@ -267,7 +266,6 @@ registerBenchmark(ObserverPartiallyAppliedMethod)
 registerBenchmark(ObserverUnappliedMethod)
 registerBenchmark(OpaqueConsumingUsers)
 registerBenchmark(OpenClose)
-registerBenchmark(PartialApplyDynamicType)
 registerBenchmark(Phonebook)
 registerBenchmark(PointerArithmetics)
 registerBenchmark(PolymorphicCalls)

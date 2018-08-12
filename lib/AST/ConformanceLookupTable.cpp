@@ -865,6 +865,11 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
         ctx.getInheritedConformance(type, inheritedConformance->getConcrete());
   } else {
     // Create or find the normal conformance.
+    if (auto ext = dyn_cast<ExtensionDecl>(conformingDC)) {
+      if (auto resolver = ctx.getLazyResolver())
+        resolver->bindExtension(ext);
+    }
+
     Type conformingType = conformingDC->getDeclaredInterfaceType();
     SourceLoc conformanceLoc
       = conformingNominal == conformingDC

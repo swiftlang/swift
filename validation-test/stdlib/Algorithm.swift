@@ -134,8 +134,9 @@ struct A<T> : MutableCollection, RandomAccessCollection {
 }
 
 func randomArray() -> A<Int> {
-  let count = Int(rand32(exclusiveUpperBound: 50))
-  return A(randArray(count))
+  let count = Int.random(in: 0 ..< 50)
+  let array = (0 ..< count).map { _ in Int.random(in: .min ... .max) }
+  return A(array)
 }
 
 Algorithm.test("invalidOrderings") {

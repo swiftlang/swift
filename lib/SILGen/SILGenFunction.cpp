@@ -17,6 +17,7 @@
 
 #include "SILGenFunction.h"
 #include "RValue.h"
+#include "SILGenFunctionBuilder.h"
 #include "Scope.h"
 #include "swift/AST/Initializer.h"
 #include "swift/SIL/SILArgument.h"
@@ -92,8 +93,8 @@ DeclName SILGenModule::getMagicFunctionName(DeclContext *dc) {
     return m->getName();
   }
   if (auto e = dyn_cast<ExtensionDecl>(dc)) {
-    assert(e->getExtendedType()->getAnyNominal() && "extension for nonnominal");
-    return e->getExtendedType()->getAnyNominal()->getName();
+    assert(e->getExtendedNominal() && "extension for nonnominal");
+    return e->getExtendedNominal()->getName();
   }
   llvm_unreachable("unexpected #function context");
 }
@@ -441,34 +442,29 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     // we're getting away with it because the types are guaranteed to already
     // be imported.
     ASTContext &ctx = getASTContext();
-    ModuleDecl *UIKit = ctx.getLoadedModule(ctx.getIdentifier("UIKit"));
+    
+    std::pair<Identifier, SourceLoc> UIKitName =
+      {ctx.getIdentifier("UIKit"), SourceLoc()};
+    
+    ModuleDecl *UIKit = ctx
+      .getClangModuleLoader()
+      ->loadModule(SourceLoc(), UIKitName);
+    assert(UIKit && "couldn't find UIKit objc module?!");
     SmallVector<ValueDecl *, 1> results;
-    UIKit->lookupQualified(UIKit->getInterfaceType(),
+    UIKit->lookupQualified(UIKit,
                            ctx.getIdentifier("UIApplicationMain"),
                            NL_QualifiedDefault,
-                           /*resolver*/nullptr,
                            results);
-    assert(!results.empty() && "couldn't find UIApplicationMain in UIKit");
+    assert(results.size() == 1
+           && "couldn't find a unique UIApplicationMain in the UIKit ObjC "
+              "module?!");
 
-    // We want the original UIApplicationMain() declaration from Objective-C,
-    // not any overlay overloads.
-    ValueDecl *UIApplicationMainDecl = nullptr;
-    for (auto *result : results) {
-      if (result->hasClangNode()) {
-        assert(!UIApplicationMainDecl
-               && "more than one UIApplicationMain defined in ObjC?!");
-        UIApplicationMainDecl = result;
-#ifndef NDEBUG
-        break;
-#endif
-      }
-    }
-    
-    assert(UIApplicationMainDecl && "no UIApplicationMain defined in ObjC?!");
+    ValueDecl *UIApplicationMainDecl = results.front();
 
     auto mainRef = SILDeclRef(UIApplicationMainDecl).asForeign();
-    auto UIApplicationMainFn = SGM.M.getOrCreateFunction(mainClass, mainRef,
-                                                         NotForDefinition);
+    SILGenFunctionBuilder builder(SGM);
+    auto UIApplicationMainFn =
+        builder.getOrCreateFunction(mainClass, mainRef, NotForDefinition);
     auto fnTy = UIApplicationMainFn->getLoweredFunctionType();
     SILFunctionConventions fnConv(fnTy, SGM.M);
 
@@ -494,11 +490,9 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                                 ResultConvention::Autoreleased),
                   /*error result*/ None,
                   ctx);
-    auto NSStringFromClassFn
-      = SGM.M.getOrCreateFunction(mainClass, "NSStringFromClass",
-                                  SILLinkage::PublicExternal,
-                                  NSStringFromClassType,
-                                  IsBare, IsTransparent, IsNotSerialized);
+    auto NSStringFromClassFn = builder.getOrCreateFunction(
+        mainClass, "NSStringFromClass", SILLinkage::PublicExternal,
+        NSStringFromClassType, IsBare, IsTransparent, IsNotSerialized);
     auto NSStringFromClass = B.createFunctionRef(mainClass, NSStringFromClassFn);
     SILValue metaTy = B.createMetatype(mainClass,
                              SILType::getPrimitiveObjectType(mainClassMetaty));
@@ -587,11 +581,10 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                   /*error result*/ None,
                   getASTContext());
 
-    auto NSApplicationMainFn
-      = SGM.M.getOrCreateFunction(mainClass, "NSApplicationMain",
-                                  SILLinkage::PublicExternal,
-                                  NSApplicationMainType,
-                                  IsBare, IsTransparent, IsNotSerialized);
+    SILGenFunctionBuilder builder(SGM);
+    auto NSApplicationMainFn = builder.getOrCreateFunction(
+        mainClass, "NSApplicationMain", SILLinkage::PublicExternal,
+        NSApplicationMainType, IsBare, IsTransparent, IsNotSerialized);
 
     auto NSApplicationMain = B.createFunctionRef(mainClass, NSApplicationMainFn);
     SILValue args[] = { argc, argv };

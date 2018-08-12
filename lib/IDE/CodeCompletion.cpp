@@ -1465,6 +1465,8 @@ public:
   void completeAssignmentRHS(AssignExpr *E) override;
   void completeCallArg(CallExpr *E) override;
   void completeReturnStmt(CodeCompletionExpr *E) override;
+  void completeYieldStmt(CodeCompletionExpr *E,
+                         Optional<unsigned> yieldIndex) override;
   void completeAfterPound(CodeCompletionExpr *E, StmtKind ParentKind) override;
   void completeGenericParams(TypeLoc TL) override;
   void completeAfterIfStmt(bool hasElse) override;
@@ -1969,6 +1971,9 @@ public:
   ///
   /// FIXME: Perhaps this should be an option in PrintOptions instead.
   Type eraseArchetypes(ModuleDecl *M, Type type, GenericSignature *genericSig) {
+    if (!genericSig)
+      return type;
+
     auto buildProtocolComposition = [&](ArrayRef<ProtocolDecl *> protos) -> Type {
       SmallVector<Type, 2> types;
       for (auto proto : protos)
@@ -2017,6 +2022,7 @@ public:
     auto *GenericSig = VD->getInnermostDeclContext()
         ->getGenericSignatureOfContext();
 
+    assert(VD->hasValidSignature());
     Type T = VD->getInterfaceType();
 
     if (*ExprType) {
@@ -2103,6 +2109,10 @@ public:
     addLeadingDot(Builder);
     Builder.addTextChunk(Name);
     setClangDeclKeywords(VD, Pairs, Builder);
+
+    if (!VD->hasValidSignature())
+      return;
+
     // Add a type annotation.
     Type VarType = getTypeOfMember(VD);
     if (VD->getName() != Ctx.Id_self && VD->isInOut()) {
@@ -2479,16 +2489,17 @@ public:
         // What's left is the result type.
         if (ResultType->isVoid()) {
           OS << "Void";
-        } else if (!IsImplicitlyCurriedInstanceMethod
-                   && FD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
+        } else {
           // As we did with parameters in addParamPatternFromFunction,
           // for regular methods we'll print '!' after implicitly
           // unwrapped optional results.
-          auto ObjectType = ResultType->getOptionalObjectType();
-          OS << ObjectType->getStringAsComponent();
-          OS << "!";
-        } else {
-          ResultType.print(OS);
+          bool IsIUO =
+              !IsImplicitlyCurriedInstanceMethod &&
+              FD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+
+          PrintOptions PO;
+          PO.PrintOptionalAsImplicitlyUnwrapped = IsIUO;
+          ResultType.print(OS, PO);
         }
       }
       Builder.addTypeAnnotation(TypeStr);
@@ -3295,7 +3306,10 @@ public:
     // escape and there isn't a better way to allocate scratch Expr nodes.
     UnresolvedDeclRefExpr UDRE(op->getName(), DeclRefKind::PostfixOperator,
                                DeclNameLoc(expr->getSourceRange().End));
-    PostfixUnaryExpr opExpr(&UDRE, expr);
+    ParenExpr parenExpr(expr->getSourceRange().Start, expr,
+                        expr->getSourceRange().End,
+                        /*hasTrailingClosure=*/false);
+    PostfixUnaryExpr opExpr(&UDRE, &parenExpr);
     Expr *tempExpr = &opExpr;
     ConcreteDeclRef referencedDecl;
     if (auto T = getTypeOfCompletionContextExpr(
@@ -3384,10 +3398,13 @@ public:
       prepareForRetypechecking(SE);
 
       for (auto &element : sequence.drop_back(2)) {
-        // Unfold AssignExpr for re-typechecking sequence.
-        if (auto *AE = dyn_cast_or_null<AssignExpr>(element)) {
-          AE->setSrc(nullptr);
-          AE->setDest(nullptr);
+        // Unfold expressions for re-typechecking sequence.
+        if (auto *assignExpr = dyn_cast_or_null<AssignExpr>(element)) {
+          assignExpr->setSrc(nullptr);
+          assignExpr->setDest(nullptr);
+        } else if (auto *ifExpr = dyn_cast_or_null<IfExpr>(element)) {
+          ifExpr->setCondExpr(nullptr);
+          ifExpr->setElseExpr(nullptr);
         }
 
         // Reset any references to operators in types, so they are properly
@@ -3438,24 +3455,44 @@ public:
       flattenBinaryExpr(assignExpr->getSrc(), sequence);
       assignExpr->setDest(nullptr);
       assignExpr->setSrc(nullptr);
+    } else if (auto ifExpr = dyn_cast<IfExpr>(expr)) {
+      flattenBinaryExpr(ifExpr->getCondExpr(), sequence);
+      sequence.push_back(ifExpr);
+      flattenBinaryExpr(ifExpr->getElseExpr(), sequence);
+      ifExpr->setCondExpr(nullptr);
+      ifExpr->setElseExpr(nullptr);
+    } else if (auto tryExpr = dyn_cast<AnyTryExpr>(expr)) {
+      // Strip out try expression. It doesn't affect completion.
+      flattenBinaryExpr(tryExpr->getSubExpr(), sequence);
+    } else if (auto optEval = dyn_cast<OptionalEvaluationExpr>(expr)){
+      // Strip out optional evaluation expression. It doesn't affect completion.
+      flattenBinaryExpr(optEval->getSubExpr(), sequence);
     } else {
       sequence.push_back(expr);
     }
   }
 
   void typeCheckLeadingSequence(SmallVectorImpl<Expr *> &sequence) {
+
+    // Strip out try and optional evaluation expr because foldSequence() mutates
+    // hierarchy of these expressions. They don't affect completion anyway.
+    for (auto &element : sequence) {
+      if (auto *tryExpr = dyn_cast<AnyTryExpr>(element))
+        element = tryExpr->getSubExpr();
+      if (auto *optEval = dyn_cast<OptionalEvaluationExpr>(element))
+        element = optEval->getSubExpr();
+    }
+
     Expr *expr =
         SequenceExpr::create(CurrDeclContext->getASTContext(), sequence);
     prepareForRetypechecking(expr);
     // Take advantage of the fact the type-checker leaves the types on the AST.
     if (!typeCheckExpression(const_cast<DeclContext *>(CurrDeclContext),
                              expr)) {
-      if (isa<BinaryExpr>(expr) || isa<AssignExpr>(expr)) {
-        // Rebuild the sequence from the type-checked version.
-        sequence.clear();
-        flattenBinaryExpr(expr, sequence);
-        return;
-      }
+      // Rebuild the sequence from the type-checked version.
+      sequence.clear();
+      flattenBinaryExpr(expr, sequence);
+      return;
     }
 
     // Fall back to just using the immediate LHS.
@@ -4417,9 +4454,9 @@ public:
     const auto *CD = dyn_cast_or_null<ClassDecl>(CurrTy->getAnyNominal());
     if (!CD)
       return;
-    if (!CD->getSuperclass())
+    if (!CD->hasSuperclass())
       return;
-    CD = CD->getSuperclass()->getClassOrBoundGenericClass();
+    CD = CD->getSuperclassDecl();
     for (const auto *Member : CD->getMembers()) {
       const auto *Constructor = dyn_cast<ConstructorDecl>(Member);
       if (!Constructor)
@@ -4746,6 +4783,15 @@ void CodeCompletionCallbacksImpl::completeReturnStmt(CodeCompletionExpr *E) {
   Kind = CompletionKind::ReturnStmtExpr;
 }
 
+void CodeCompletionCallbacksImpl::completeYieldStmt(CodeCompletionExpr *E,
+                                                    Optional<unsigned> index) {
+  CurDeclContext = P.CurDeclContext;
+  CodeCompleteTokenExpr = E;
+  // TODO: use a different completion kind when completing without an index
+  // in a multiple-value context.
+  Kind = CompletionKind::YieldStmtExpr;
+}
+
 void CodeCompletionCallbacksImpl::completeAfterPound(CodeCompletionExpr *E,
                                                      StmtKind ParentKind) {
   CurDeclContext = P.CurDeclContext;
@@ -4890,6 +4936,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     LLVM_FALLTHROUGH;
   case CompletionKind::AssignmentRHS:
   case CompletionKind::ReturnStmtExpr:
+  case CompletionKind::YieldStmtExpr:
   case CompletionKind::PostfixExprBeginning:
   case CompletionKind::ForEachSequence:
     addSuperKeyword(Sink);
@@ -5473,6 +5520,18 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     if (auto FD = dyn_cast<AbstractFunctionDecl>(CurDeclContext)) {
       if (auto FT = FD->getInterfaceType()->getAs<FunctionType>()) {
         Lookup.setExpectedTypes(FT->getResult());
+      }
+    }
+    Lookup.getValueCompletionsInDeclContext(Loc);
+    break;
+  }
+
+  case CompletionKind::YieldStmtExpr: {
+    SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
+    if (auto FD = dyn_cast<AccessorDecl>(CurDeclContext)) {
+      if (FD->isCoroutine()) {
+        // TODO: handle multi-value yields.
+        Lookup.setExpectedTypes(FD->getStorage()->getValueInterfaceType());
       }
     }
     Lookup.getValueCompletionsInDeclContext(Loc);

@@ -570,8 +570,8 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
       // have exposed new inlining opportunities beyond those present in
       // the inlined function when processed independently.
       LLVM_DEBUG(llvm::errs() << "Inlining @" << CalleeFunction->getName()
-                         << " into @" << InnerAI.getFunction()->getName()
-                         << "\n");
+                              << " into @" << InnerAI.getFunction()->getName()
+                              << "\n");
 
       // If we intend to inline a thick function, then we need to balance the
       // reference counts for correctness.

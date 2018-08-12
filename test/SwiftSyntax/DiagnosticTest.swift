@@ -97,7 +97,7 @@ Diagnostics.test("SourceLocations") {
   }
 
   expectDoesNotThrow({
-    let file = try SourceFileSyntax.parse(url)
+    let file = try SyntaxTreeParser.parse(url)
     Visitor(url: url, engine: engine).visit(file)
   })
 

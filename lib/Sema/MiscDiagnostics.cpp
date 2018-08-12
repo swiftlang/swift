@@ -3423,10 +3423,7 @@ public:
 
       // If the best method was from a subclass of the place where
       // this method was declared, we have a new best.
-      while (auto superclassTy = bestClassDecl->getSuperclass()) {
-        auto superclassDecl = superclassTy->getClassOrBoundGenericClass();
-        if (!superclassDecl) break;
-
+      while (auto superclassDecl = bestClassDecl->getSuperclassDecl()) {
         if (classDecl == superclassDecl) {
           bestMethod = method;
           break;
@@ -3465,6 +3462,8 @@ public:
           case AccessorKind::MaterializeForSet:
           case AccessorKind::Address:
           case AccessorKind::MutableAddress:
+          case AccessorKind::Read:
+          case AccessorKind::Modify:
             llvm_unreachable("cannot be @objc");
           }
         } else {

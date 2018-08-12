@@ -86,7 +86,7 @@ static SILFunction *getDestructor(AllocRefInst *ARI) {
   // analyze it since it could be swapped out from under us at runtime.
   if (Fn->getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod) {
     LLVM_DEBUG(llvm::dbgs() << "        Found Objective-C destructor. Can't "
-          "analyze!\n");
+               "analyze!\n");
     return nullptr;
   }
 
@@ -118,7 +118,7 @@ static bool doesDestructorHaveSideEffects(AllocRefInst *ARI) {
       // If I has no side effects, we can ignore it.
       if (!I.mayHaveSideEffects()) {
         LLVM_DEBUG(llvm::dbgs() << "            SAFE! Instruction has no side "
-              "effects.\n");
+                   "effects.\n");
         continue;
       }
 
@@ -132,11 +132,11 @@ static bool doesDestructorHaveSideEffects(AllocRefInst *ARI) {
           assert(RefInst->getNumOperands() == 1 &&
                  "Make sure RefInst only has one argument.");
           LLVM_DEBUG(llvm::dbgs() << "            SAFE! Ref count operation on "
-                "Self.\n");
+                     "Self.\n");
           continue;
         } else {
-          LLVM_DEBUG(llvm::dbgs() << "            UNSAFE! Ref count operation not on"
-                " self.\n");
+          LLVM_DEBUG(llvm::dbgs() << "            UNSAFE! Ref count operation "
+                     "not on self.\n");
           return true;
         }
       }
@@ -144,7 +144,7 @@ static bool doesDestructorHaveSideEffects(AllocRefInst *ARI) {
       // dealloc_stack can be ignored.
       if (isa<DeallocStackInst>(I)) {
         LLVM_DEBUG(llvm::dbgs() << "            SAFE! dealloc_stack can be "
-              "ignored.\n");
+                   "ignored.\n");
         continue;
       }
 
@@ -152,11 +152,11 @@ static bool doesDestructorHaveSideEffects(AllocRefInst *ARI) {
       // cannot be eliminated.
       if (auto *DeallocRef = dyn_cast<DeallocRefInst>(&I)) {
         if (stripCasts(DeallocRef->getOperand()) == Self) {
-          LLVM_DEBUG(llvm::dbgs() << "            SAFE! dealloc_ref on self.\n");
+          LLVM_DEBUG(llvm::dbgs() <<"            SAFE! dealloc_ref on self.\n");
           continue;
         } else {
           LLVM_DEBUG(llvm::dbgs() << "            UNSAFE! dealloc_ref on value "
-                "besides self.\n");
+                     "besides self.\n");
           return true;
         }
       }
@@ -164,8 +164,8 @@ static bool doesDestructorHaveSideEffects(AllocRefInst *ARI) {
       // Storing into the object can be ignored.
       if (auto *SI = dyn_cast<StoreInst>(&I))
         if (stripAddressProjections(SI->getDest()) == Self) {
-          LLVM_DEBUG(llvm::dbgs() << "            SAFE! Instruction is a store into "
-                "self.\n");
+          LLVM_DEBUG(llvm::dbgs() << "            SAFE! Instruction is a store "
+                     "into self.\n");
           continue;
         }
 
@@ -268,8 +268,9 @@ hasUnremovableUsers(SILInstruction *AllocRef, UserList &Users,
         // users which would be an escape.
         if (auto *SI = dyn_cast<StoreInst>(User))
           if (Op->get() == SI->getSrc()) {
-            LLVM_DEBUG(llvm::dbgs() << "        Found store of pointer. Failure: " <<
-                  *SI);
+            LLVM_DEBUG(llvm::dbgs() << "        Found store of pointer. "
+                                       "Failure: "
+                                    << *SI);
             return true;
           }
 
@@ -405,7 +406,7 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
     if (auto *Store = dyn_cast<StoreInst>(User)) {
       // Bail if this address is stored to another object.
       if (Store->getDest() != DefInst) {
-        LLVM_DEBUG(llvm::dbgs() << "        Found an escaping store: " << *User);
+        LLVM_DEBUG(llvm::dbgs() <<"        Found an escaping store: " << *User);
         return false;
       }
       IndexTrieNode *StoreAddrNode = AddressNode;
@@ -470,7 +471,7 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
 // newly allocated object.
 bool DeadObjectAnalysis::analyze() {
   LLVM_DEBUG(llvm::dbgs() << "    Analyzing nontrivial dead object: "
-        << NewAddrValue);
+                          << NewAddrValue);
 
   // Populate AllValues, AddressProjectionTrie, and StoredLocations.
   AddressProjectionTrie = new IndexTrieNode();

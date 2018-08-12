@@ -188,7 +188,7 @@ func r22459135() {
 
 // <rdar://problem/19710848> QoI: Friendlier error message for "[] as Set"
 // <rdar://problem/22326930> QoI: "argument for generic parameter 'Element' could not be inferred" lacks context
-_ = [] as Set  // expected-error {{generic parameter 'Element' could not be inferred in cast to 'Set'}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{14-14=<<#Element: Hashable#>>}}
+_ = [] as Set  // expected-error {{protocol type 'Any' cannot conform to 'Hashable' because only concrete types can conform to protocols}}
 
 
 //<rdar://problem/22509125> QoI: Error when unable to infer generic archetype lacks greatness
@@ -285,10 +285,10 @@ struct ProtosBound3<Foo: SubProto> where Foo: NSCopyish {} // expected-note {{'F
 struct AnyClassAndProtoBound<Foo> where Foo: AnyObject, Foo: SubProto {} // expected-note {{'Foo' declared as parameter to type 'AnyClassAndProtoBound'}}
 struct AnyClassAndProtoBound2<Foo> where Foo: SubProto, Foo: AnyObject {} // expected-note {{'Foo' declared as parameter to type 'AnyClassAndProtoBound2'}}
 
-struct ClassAndProtoBound<Foo> where Foo: X, Foo: SubProto {} // expected-note {{'Foo' declared as parameter to type 'ClassAndProtoBound'}}
+struct ClassAndProtoBound<Foo> where Foo: X, Foo: SubProto {}
 
-struct ClassAndProtosBound<Foo> where Foo: X, Foo: SubProto, Foo: NSCopyish {} // expected-note {{'Foo' declared as parameter to type 'ClassAndProtosBound'}}
-struct ClassAndProtosBound2<Foo> where Foo: X, Foo: SubProto & NSCopyish {} // expected-note {{'Foo' declared as parameter to type 'ClassAndProtosBound2'}}
+struct ClassAndProtosBound<Foo> where Foo: X, Foo: SubProto, Foo: NSCopyish {}
+struct ClassAndProtosBound2<Foo> where Foo: X, Foo: SubProto & NSCopyish {}
 
 extension Pair {
   init(first: T) {}
@@ -331,10 +331,14 @@ func testFixIts() {
   _ = AnyClassAndProtoBound() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{28-28=<<#Foo: SubProto & AnyObject#>>}}
   _ = AnyClassAndProtoBound2() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{29-29=<<#Foo: SubProto & AnyObject#>>}}
 
-  _ = ClassAndProtoBound() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{25-25=<<#Foo: X & SubProto#>>}}
+  _ = ClassAndProtoBound() // expected-error {{'ClassAndProtoBound<X>' requires that 'X' conform to 'SubProto'}}
 
-  _ = ClassAndProtosBound() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{26-26=<<#Foo: X & NSCopyish & SubProto#>>}}
-  _ = ClassAndProtosBound2() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{27-27=<<#Foo: X & NSCopyish & SubProto#>>}}
+  _ = ClassAndProtosBound() 
+  // expected-error@-1 {{'ClassAndProtosBound<X>' requires that 'X' conform to 'SubProto'}}
+  // expected-error@-2 {{'ClassAndProtosBound<X>' requires that 'X' conform to 'NSCopyish'}}
+  _ = ClassAndProtosBound2()
+  // expected-error@-1 {{'ClassAndProtosBound2<X>' requires that 'X' conform to 'SubProto'}}
+  // expected-error@-2 {{'ClassAndProtosBound2<X>' requires that 'X' conform to 'NSCopyish'}}
 
   _ = Pair() // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{11-11=<Any, Any>}}
   _ = Pair(first: S()) // expected-error {{generic parameter 'U' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{11-11=<S, Any>}}
@@ -591,4 +595,29 @@ func sr8075() {
   }
 
   let _: UIFont = .init(ofSize: switchOnCategory([0: 15.5, 1: 20.5]))
+}
+
+// rdar://problem/40537858 - Ambiguous diagnostic when type is missing conformance
+func rdar40537858() {
+  struct S {
+    struct Id {}
+    var id: Id
+  }
+
+  struct List<T: Collection, E: Hashable> {
+    typealias Data = T.Element
+    init(_: T, id: KeyPath<Data, E>) {}
+  }
+
+  var arr: [S] = []
+  _ = List(arr, id: \.id) // expected-error {{'List<[S], S.Id>' requires that 'S.Id' conform to 'Hashable'}}
+
+  enum E<T: P> {
+    case foo(T)
+    case bar([T])
+  }
+
+  var s = S(id: S.Id())
+  let _: E = .foo(s)   // expected-error {{'E<S>' requires that 'S' conform to 'P'}}
+  let _: E = .bar([s]) // expected-error {{'E<S>' requires that 'S' conform to 'P'}}
 }

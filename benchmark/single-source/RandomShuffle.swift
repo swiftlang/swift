@@ -18,10 +18,14 @@ import TestsUtils
 //
 
 public let RandomShuffle = [
-  BenchmarkInfo(name: "RandomShuffleDef", runFunction: run_RandomShuffleDef,
-    tags: [.api], setUpFunction: setup_RandomShuffle),
-  BenchmarkInfo(name: "RandomShuffleLCG", runFunction: run_RandomShuffleLCG,
-    tags: [.api], setUpFunction: setup_RandomShuffle),
+  BenchmarkInfo(name: "RandomShuffleDef2", runFunction: run_RandomShuffleDef,
+    tags: [.api],
+    setUpFunction: { blackHole(numbersDef) },
+    tearDownFunction: { numbersDef = nil }),
+  BenchmarkInfo(name: "RandomShuffleLCG2", runFunction: run_RandomShuffleLCG,
+    tags: [.api],
+    setUpFunction: { blackHole(numbersLCG) },
+    tearDownFunction: { numbersLCG = nil }),
 ]
 
 /// A linear congruential PRNG.
@@ -39,15 +43,12 @@ struct LCRNG: RandomNumberGenerator {
   }
 }
 
-var numbers = Array(0...3_000_000)
-
-@inline(never)
-func setup_RandomShuffle() {
-  _ = numbers.count
-}
+var numbersDef: [Int]! = Array(0...10_000)
+var numbersLCG: [Int]! = Array(0...100_000)
 
 @inline(never)
 public func run_RandomShuffleDef(_ N: Int) {
+  var numbers: [Int] = numbersDef
   for _ in 0 ..< N {
     numbers.shuffle()
     blackHole(numbers.first!)
@@ -56,6 +57,7 @@ public func run_RandomShuffleDef(_ N: Int) {
 
 @inline(never)
 public func run_RandomShuffleLCG(_ N: Int) {
+  var numbers: [Int] = numbersLCG
   var generator = LCRNG(seed: 0)
   for _ in 0 ..< N {
     numbers.shuffle(using: &generator)

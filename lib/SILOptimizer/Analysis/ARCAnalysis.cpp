@@ -1213,7 +1213,7 @@ BuiltinInst *swift::getUnsafeGuaranteedEndUser(SILValue UnsafeGuaranteedToken) {
     if (!BI || !BI->getBuiltinKind() ||
         *BI->getBuiltinKind() != BuiltinValueKind::UnsafeGuaranteedEnd) {
       LLVM_DEBUG(llvm::dbgs() << "  wrong unsafeGuaranteed token user "
-            << *Operand->getUser());
+                 << *Operand->getUser());
       break;
     }
 

@@ -47,7 +47,7 @@ class GenericRef<T> : Constructible {
 // Reference to a POD class.
 @inline(never)
 func genPODRefArray() {
-  _ = ConstructibleArray<GenericRef<Int>>(3)
+  blackHole(ConstructibleArray<GenericRef<Int>>(3))
   // should be a nop
 }
 
@@ -57,7 +57,7 @@ class Dummy {}
 @inline(never)
 func genCommonRefArray() {
   let d = Dummy()
-  _ = ConstructibleArray<GenericRef<Dummy>>(d)
+  blackHole(ConstructibleArray<GenericRef<Dummy>>(d))
   // should be a nop
 }
 
@@ -74,7 +74,7 @@ class RefArray<T> {
 @inline(never)
 func genRefEnumArray() {
   let d = Dummy()
-  _ = RefArray<Dummy?>(d)
+  blackHole(RefArray<Dummy?>(d))
   // should be a nop
 }
 
@@ -88,13 +88,13 @@ struct GenericVal<T> : Constructible {
 @inline(never)
 func genRefStructArray() {
   let d = Dummy()
-  _ = ConstructibleArray<GenericVal<Dummy>>(d)
+  blackHole(ConstructibleArray<GenericVal<Dummy>>(d))
   // should be a nop
 }
 
 @inline(never)
 public func run_ArrayOfGenericRef(_ N: Int) {
-  for _ in 0...N {
+  for _ in 0..<N {
     genPODRefArray()
     genCommonRefArray()
     genRefEnumArray()

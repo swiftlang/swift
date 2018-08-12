@@ -148,12 +148,12 @@ bool SROAMemoryUseAnalyzer::analyze() {
     if (auto *SI = dyn_cast<StoreInst>(User)) {
       if (SI->getDest() == AI) {
         LLVM_DEBUG(llvm::dbgs() << "        Found a store into the "
-              "projection.\n");
+                                   "projection.\n");
         Stores.push_back(SI);
         continue;
       } else {
         LLVM_DEBUG(llvm::dbgs() << "        Found a store of the "
-              "projection pointer. Escapes!.\n");
+                                   "projection pointer. Escapes!.\n");
         ++NumEscapingAllocas;
         return false;
       }
@@ -188,7 +188,7 @@ bool SROAMemoryUseAnalyzer::analyze() {
     }
     
     // Otherwise we do not understand this instruction, so bail.
-    LLVM_DEBUG(llvm::dbgs() << "        Found unknown user, pointer escapes!\n");
+    LLVM_DEBUG(llvm::dbgs() <<"        Found unknown user, pointer escapes!\n");
     ++NumEscapingAllocas;
     return false;
   }
@@ -320,8 +320,8 @@ class SILSROA : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
     SILFunction *F = getFunction();
-    LLVM_DEBUG(llvm::dbgs() << "***** SROA on function: " << F->getName() <<
-          " *****\n");
+    LLVM_DEBUG(llvm::dbgs() << "***** SROA on function: " << F->getName()
+                            << " *****\n");
 
     if (runSROAOnFunction(*F))
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);

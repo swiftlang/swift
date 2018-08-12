@@ -52,6 +52,10 @@ class SILInliner : public TypeSubstCloner<SILInliner> {
 public:
   enum class InlineKind { MandatoryInline, PerformanceInline };
 
+  // Returns true if this an begin_apply instruction that we can inline or
+  // another application site.
+  static bool canInlineBeginApply(FullApplySite AI);
+
 private:
   InlineKind IKind;
 

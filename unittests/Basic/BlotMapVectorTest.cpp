@@ -227,8 +227,8 @@ private:
     std::string ValueAddr = "0x";
     ValueAddr += llvm::utohexstr(uintptr_t(Value.get()));
     LLVM_DEBUG(llvm::errs() << Name << " <Tester Addr:" << Addr
-          << " ValueAddr:" << ValueAddr << " Value:" << *Value.get()
-          << ">");
+               << " ValueAddr:" << ValueAddr << " Value:" << *Value.get()
+               << ">");
   }
 };
 

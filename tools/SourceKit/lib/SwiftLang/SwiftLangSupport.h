@@ -84,7 +84,8 @@ public:
                                           ArrayRef<const char *> Args);
   ImmutableTextSnapshotRef replaceText(unsigned Offset, unsigned Length,
                                        llvm::MemoryBuffer *Buf,
-                                       bool ProvideSemanticInfo);
+                                       bool ProvideSemanticInfo,
+                                       std::string &error);
 
   void updateSemaInfo();
 

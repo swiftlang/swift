@@ -342,6 +342,8 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::DumpTypeRefinementContexts;
   if (Opt.matches(OPT_dump_interface_hash))
     return FrontendOptions::ActionType::DumpInterfaceHash;
+  if (Opt.matches(OPT_dump_type_info))
+    return FrontendOptions::ActionType::DumpTypeInfo;
   if (Opt.matches(OPT_print_ast))
     return FrontendOptions::ActionType::PrintAST;
 
@@ -496,6 +498,11 @@ bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
   if (!FrontendOptions::canActionEmitModuleDoc(Opts.RequestedAction) &&
       Opts.InputsAndOutputs.hasModuleDocOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module_doc);
+    return true;
+  }
+  if (!FrontendOptions::canActionEmitInterface(Opts.RequestedAction) &&
+      Opts.InputsAndOutputs.hasModuleInterfaceOutputPath()) {
+    Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_interface);
     return true;
   }
   return false;

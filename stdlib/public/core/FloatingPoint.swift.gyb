@@ -2092,7 +2092,7 @@ extension BinaryFloatingPoint {
 
     let magnitude = source.magnitude
 
-    let exponent = Int(magnitude._binaryLogarithm())
+    let exponent = magnitude._binaryLogarithm()
     let exemplar = Self.greatestFiniteMagnitude
     guard _fastPath(exponent <= exemplar.exponent) else {
       return Source.isSigned && source < 0

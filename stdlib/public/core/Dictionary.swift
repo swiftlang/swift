@@ -4347,6 +4347,7 @@ extension Dictionary.Index {
 #if _runtime(_ObjC)
 @usableFromInline
 final internal class _CocoaDictionaryIterator: IteratorProtocol {
+  @usableFromInline
   internal typealias Element = (AnyObject, AnyObject)
 
   // Cocoa Dictionary iterator has to be a class, otherwise we cannot

@@ -170,3 +170,40 @@ struct S1116 {
 
 let a1116: [S1116] = []
 var s1116 = Set(1...10).subtracting(a1116.map({ $0.s })) // expected-error {{cannot convert value of type '[Int?]' to expected argument type 'Set<Int>'}}
+
+
+func moreComplexUnwrapFixes() {
+  struct S { let value: Int }
+  struct T {
+    let s: S
+    let optS: S?
+  }
+  func takeNon(_ x: Int) -> Void {}
+  func takeOpt(_ x: Int?) -> Void {}
+
+  let s = S(value: 0)
+  let t: T? = T(s: s, optS: nil)
+  let os: S? = s
+
+  takeOpt(os.value) // expected-error{{value of optional type 'S?' must be unwrapped to refer to member 'value' of wrapped base type 'S'}}
+  // expected-note@-1{{chain the optional using '?'}}{{13-13=?}}
+  takeNon(os.value) // expected-error{{value of optional type 'S?' must be unwrapped to refer to member 'value' of wrapped base type 'S'}}
+  // expected-note@-1{{chain the optional using '?'}}{{13-13=?}}
+  // expected-note@-2{{force-unwrap using '!'}}{{13-13=!}}
+
+  // FIXME: Ideally we'd recurse evaluating chaining fixits instead of only offering just the unwrap of t
+  takeOpt(t.s.value) // expected-error{{value of optional type 'T?' must be unwrapped to refer to member 's' of wrapped base type 'T'}}
+  // expected-note@-1{{chain the optional using '?'}}{{12-12=?}}
+  // expected-note@-2{{force-unwrap using '!'}}{{12-12=!}}
+
+  takeOpt(t.optS.value) // expected-error{{value of optional type 'T?' must be unwrapped to refer to member 'optS' of wrapped base type 'T'}}
+  // expected-note@-1{{chain the optional using '?'}}{{17-17=?}}
+  // expected-error@-2{{value of optional type 'S?' must be unwrapped to refer to member 'value' of wrapped base type 'S'}}
+  // expected-note@-3{{chain the optional using '?'}}{{12-12=?}}
+
+  takeNon(t.optS.value) // expected-error{{value of optional type 'T?' must be unwrapped to refer to member 'optS' of wrapped base type 'T'}}
+  // expected-note@-1{{chain the optional using '?'}}{{17-17=?}}
+  // expected-error@-2{{value of optional type 'S?' must be unwrapped to refer to member 'value' of wrapped base type 'S'}}
+  // expected-note@-3{{chain the optional using '?'}}{{12-12=?}}
+  // expected-note@-4{{force-unwrap using '!'}}{{17-17=!}}
+}

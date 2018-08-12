@@ -163,8 +163,8 @@ static const Decl* getGroupDecl(const Decl *D) {
   // Extensions always exist in the same group with the nominal.
   if (auto ED = dyn_cast_or_null<ExtensionDecl>(D->getDeclContext()->
                                                 getInnermostTypeContext())) {
-    if (auto ExtTy = ED->getExtendedType())
-      GroupD = ExtTy->getAnyNominal();
+    if (auto ExtNominal = ED->getExtendedNominal())
+      GroupD = ExtNominal;
   }
   return GroupD;
 }
