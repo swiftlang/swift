@@ -113,7 +113,7 @@ MarkExplicitlyEscaping::create(ConstraintSystem &cs, ConstraintLocator *locator,
 }
 
 bool RelabelArguments::diagnose(Expr *root, const Solution &solution) const {
-  LabelingFailure failure(solution, getLocator(), CorrectLabels);
+  LabelingFailure failure(solution, getLocator(), getLabels());
   return failure.diagnose();
 }
 
@@ -121,7 +121,9 @@ RelabelArguments *
 RelabelArguments::create(ConstraintSystem &cs,
                          llvm::ArrayRef<Identifier> correctLabels,
                          ConstraintLocator *locator) {
-  return new (cs.getAllocator()) RelabelArguments(correctLabels, locator);
+  unsigned size = totalSizeToAlloc<Identifier>(correctLabels.size());
+  void *mem = cs.getAllocator().Allocate(size, alignof(RelabelArguments));
+  return new (mem) RelabelArguments(correctLabels, locator);
 }
 
 bool MissingConformance::diagnose(Expr *root, const Solution &solution) const {

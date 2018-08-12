@@ -23,6 +23,7 @@
 #include "swift/AST/Type.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/TrailingObjects.h"
 
 namespace llvm {
 class raw_ostream;
@@ -198,15 +199,26 @@ public:
 
 /// Arguments have labeling failures - missing/extraneous or incorrect
 /// labels attached to the, fix it by suggesting proper labels.
-class RelabelArguments final : public ConstraintFix {
-  llvm::SmallVector<Identifier, 4> CorrectLabels;
+class RelabelArguments final
+    : public ConstraintFix,
+      private llvm::TrailingObjects<RelabelArguments, Identifier> {
+  friend TrailingObjects;
+
+  unsigned NumLabels;
 
   RelabelArguments(llvm::ArrayRef<Identifier> correctLabels,
                    ConstraintLocator *locator)
       : ConstraintFix(FixKind::RelabelArguments, locator),
-        CorrectLabels(correctLabels.begin(), correctLabels.end()) {}
+        NumLabels(correctLabels.size()) {
+    std::uninitialized_copy(correctLabels.begin(), correctLabels.end(),
+                            getLabelsBuffer().begin());
+  }
 
 public:
+  ArrayRef<Identifier> getLabels() const {
+    return {getTrailingObjects<Identifier>(), NumLabels};
+  }
+
   bool diagnose(Expr *root, const Solution &solution) const override;
   void print(llvm::raw_ostream &Out) const override {
     Out << "[fix: re-label argument(s)]";
@@ -215,6 +227,11 @@ public:
   static RelabelArguments *create(ConstraintSystem &cs,
                                   llvm::ArrayRef<Identifier> correctLabels,
                                   ConstraintLocator *locator);
+
+private:
+  MutableArrayRef<Identifier> getLabelsBuffer() {
+    return {getTrailingObjects<Identifier>(), NumLabels};
+  }
 };
 
 /// Add a new conformance to the type to satisfy a requirement.
