@@ -103,3 +103,13 @@ closureTakingOptional({ (_: Any) -> () in })
 // CHECK:   [[OPTADDR:%.*]] = init_existential_addr [[ANYADDR]] : $*Any, $Optional<Int>
 // CHECK:   store %0 to [trivial] [[OPTADDR]] : $*Optional<Int>
 // CHECK:   apply %1([[ANYADDR]]) : $@noescape @callee_guaranteed (@in_guaranteed Any) -> ()
+
+// Same behavior as above with other ownership qualifiers.
+func evenLessFun(_ s: __shared C, _ o: __owned C) {}
+
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$S10reabstract1CCACIeggx_A2CytIegnir_TR : $@convention(thin) (@in_guaranteed C, @in C, @guaranteed @callee_guaranteed (@guaranteed C, @owned C) -> ()) -> @out ()
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$S10reabstract1CCACytIegnir_A2CIeggx_TR : $@convention(thin) (@guaranteed C, @owned C, @guaranteed @callee_guaranteed (@in_guaranteed C, @in C) -> @out ()) -> ()
+func testSharedOwnedOpaque(_ s: C, o: C) {
+  let box = Box(t: evenLessFun)
+  box.t(s, o)
+}

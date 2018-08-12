@@ -1335,6 +1335,10 @@ void TypeConverter::insert(TypeKey k, const TypeLowering *tl) {
 static CanTupleType getLoweredTupleType(TypeConverter &tc,
                                         AbstractionPattern origType,
                                         CanTupleType substType) {
+  // We can't lower InOutType, and we can't lower an unlabeled one
+  // element vararg tuple either, because lowering strips off flags,
+  // which would end up producing a ParenType.
+  assert(!shouldExpandTupleType(substType));
   assert(origType.matchesTuple(substType));
 
   // Does the lowered tuple type differ from the substituted type in
@@ -1347,27 +1351,32 @@ static CanTupleType getLoweredTupleType(TypeConverter &tc,
     auto origEltType = origType.getTupleElementType(i);
     auto substEltType = substType.getElementType(i);
 
-    assert(!isa<LValueType>(substEltType) &&
-           "lvalue types cannot exist in function signatures");
-    assert(!isa<InOutType>(substEltType) &&
-           "inout cannot appear in tuple element type here");
-    
-    // If the original type was an archetype, use that archetype as
-    // the original type of the element --- the actual archetype
-    // doesn't matter, just the abstraction pattern.
+    auto &substElt = substType->getElement(i);
+
+    // Make sure we don't have something non-materializable.
+    auto Flags = substElt.getParameterFlags();
+    assert(Flags.getValueOwnership() == ValueOwnership::Default);
+
     SILType silType = tc.getLoweredType(origEltType, substEltType);
     CanType loweredSubstEltType = silType.getASTType();
 
-    changed = (changed || substEltType != loweredSubstEltType);
+    changed = (changed || substEltType != loweredSubstEltType ||
+               !Flags.isNone());
 
-    auto &substElt = substType->getElement(i);
-    loweredElts.push_back(substElt.getWithType(loweredSubstEltType));
+    // Note: we drop any parameter flags such as @escaping, @autoclosure and
+    // varargs.
+    //
+    // FIXME: Replace this with an assertion that the original tuple element
+    // did not have any flags.
+    loweredElts.emplace_back(loweredSubstEltType,
+                             substElt.getName(),
+                             ParameterTypeFlags());
   }
   
   if (!changed) return substType;
 
-  // Because we're transforming an existing tuple, the weird corner
-  // case where TupleType::get does not return a TupleType can't happen.
+  // The cast should succeed, because if we end up with a one-element
+  // tuple type here, it must have a label.
   return cast<TupleType>(CanType(TupleType::get(loweredElts, tc.Context)));
 }
 
