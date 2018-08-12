@@ -43,6 +43,7 @@ enum class FixKind : uint8_t {
 
   /// Unwrap an optional base when we have a member access.
   UnwrapOptionalBase,
+  UnwrapOptionalBaseWithOptionalResult,
 
   /// Append 'as! T' to force a downcast to the specified type.
   ForceDowncast,
@@ -55,8 +56,6 @@ enum class FixKind : uint8_t {
 
   /// Mark function type as explicitly '@escaping'.
   ExplicitlyEscaping,
-  /// Mark function type as explicitly '@escaping' to be convertable to 'Any'.
-  ExplicitlyEscapingToAny,
 
   /// Arguments have labeling failures - missing/extraneous or incorrect
   /// labels attached to the, fix it by suggesting proper labels.
@@ -127,9 +126,11 @@ public:
 class UnwrapOptionalBase final : public ConstraintFix {
   DeclName MemberName;
 
-  UnwrapOptionalBase(DeclName member, ConstraintLocator *locator)
-      : ConstraintFix(FixKind::UnwrapOptionalBase, locator),
-        MemberName(member) {}
+  UnwrapOptionalBase(FixKind kind, DeclName member, ConstraintLocator *locator)
+      : ConstraintFix(kind, locator), MemberName(member) {
+    assert(kind == FixKind::UnwrapOptionalBase ||
+           kind == FixKind::UnwrapOptionalBaseWithOptionalResult);
+  }
 
 public:
   bool diagnose(Expr *root, const Solution &solution) const override;
@@ -139,6 +140,10 @@ public:
 
   static UnwrapOptionalBase *create(ConstraintSystem &cs, DeclName member,
                                     ConstraintLocator *locator);
+
+  static UnwrapOptionalBase *
+  createWithOptionalResult(ConstraintSystem &cs, DeclName member,
+                           ConstraintLocator *locator);
 };
 
 /// Introduce a '&' to take the address of an lvalue.

@@ -59,7 +59,8 @@ ForceOptional *ForceOptional::create(ConstraintSystem &cs,
 }
 
 bool UnwrapOptionalBase::diagnose(Expr *root, const Solution &solution) const {
-  bool resultIsOptional = false; // FIXME: figure out a way to implement this.
+  bool resultIsOptional =
+      getKind() == FixKind::UnwrapOptionalBaseWithOptionalResult;
   MemberAccessOnOptionalBaseFailure failure(root, solution, getLocator(),
                                             MemberName, resultIsOptional);
   return failure.diagnose();
@@ -68,7 +69,14 @@ bool UnwrapOptionalBase::diagnose(Expr *root, const Solution &solution) const {
 UnwrapOptionalBase *UnwrapOptionalBase::create(ConstraintSystem &cs,
                                                DeclName member,
                                                ConstraintLocator *locator) {
-  return new (cs.getAllocator()) UnwrapOptionalBase(member, locator);
+  return new (cs.getAllocator())
+      UnwrapOptionalBase(FixKind::UnwrapOptionalBase, member, locator);
+}
+
+UnwrapOptionalBase *UnwrapOptionalBase::createWithOptionalResult(
+    ConstraintSystem &cs, DeclName member, ConstraintLocator *locator) {
+  return new (cs.getAllocator()) UnwrapOptionalBase(
+      FixKind::UnwrapOptionalBaseWithOptionalResult, member, locator);
 }
 
 bool AddAddressOf::diagnose(Expr *root, const Solution &solution) const {
@@ -118,7 +126,7 @@ RelabelArguments::create(ConstraintSystem &cs,
 
 bool MissingConformance::diagnose(Expr *root, const Solution &solution) const {
   MissingConformanceFailure failure(root, solution, getLocator(),
-                                    {NonConformingType.getPointer(), Protocol});
+                                    {NonConformingType, Protocol});
   return failure.diagnose();
 }
 
