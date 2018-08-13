@@ -9,7 +9,7 @@ Mangling
 --------
 ::
 
-  mangled-name ::= '_S' global
+  mangled-name ::= '$S' global
 
 All Swift-mangled names begin with this prefix.
 
