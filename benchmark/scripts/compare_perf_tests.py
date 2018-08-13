@@ -145,7 +145,14 @@ class LogParser(object):
 
     def __init__(self):
         """Create instance of `LogParser`."""
-        self.results, self.samples, self.num_iters = [], [], 1
+        self.results = []
+        self._reset()
+
+    def _reset(self):
+        """Reset parser to the default state for reading a new result."""
+        self.samples, self.num_iters = [], 1
+        self.max_rss, self.mem_pages = None, None
+        self.voluntary_cs, self.involuntary_cs = None, None
 
     # Parse lines like this
     # #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs)
@@ -158,16 +165,25 @@ class LogParser(object):
         if len(columns) < 8:
             columns = result.split()
         r = PerformanceTestResult(columns)
+        if self.max_rss:
+            r.max_rss = self.max_rss
+            r.mem_pages = self.mem_pages
+            r.voluntary_cs = self.voluntary_cs
+            r.involuntary_cs = self.involuntary_cs
         if self.samples:
             r.all_samples = self.samples
         self.results.append(r)
-        self.num_iters, self.samples = 1, []
+        self._reset()
+
+    def _store_memory_stats(self, max_rss, mem_pages):
+        self.max_rss = int(max_rss)
+        self.mem_pages = int(mem_pages)
 
     # Regular expression and action to take when it matches the parsed line
     state_actions = {
         results_re: _append_result,
 
-        # Verbose mode adds two new productions:
+        # Verbose mode adds new productions:
         # Adaptively determined N; test loop multiple adjusting runtime to ~1s
         re.compile(r'\s+Measuring with scale (\d+).'):
         (lambda self, num_iters: setattr(self, 'num_iters', num_iters)),
@@ -176,6 +192,16 @@ class LogParser(object):
         (lambda self, i, runtime:
          self.samples.append((int(i), int(self.num_iters), int(runtime)))
         ),
+
+        # Environmental statistics: memory usage and context switches
+        re.compile(r'\s+MAX_RSS \d+ - \d+ = (\d+) \((\d+) pages\)'):
+        _store_memory_stats,
+
+        re.compile(r'\s+VCS \d+ - \d+ = (\d+)'):
+        (lambda self, vcs: setattr(self, 'voluntary_cs', int(vcs))),
+
+        re.compile(r'\s+ICS \d+ - \d+ = (\d+)'):
+        (lambda self, ics: setattr(self, 'involuntary_cs', int(ics))),
     }
 
     def parse_results(self, lines):

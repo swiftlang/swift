@@ -248,6 +248,22 @@ Totals,2"""
         self.assertEquals(results[1].all_samples,
                           [(0, 1, 369900), (1, 1, 381039), (2, 1, 371043)])
 
+    def test_parse_environment_verbose(self):
+        """Parse stats about environment in verbose mode."""
+        verbose_log = """    MAX_RSS 8937472 - 8904704 = 32768 (8 pages)
+    ICS 1338 - 229 = 1109
+    VCS 2 - 1 = 1
+2,AngryPhonebook,3,11269,11884,11657,338,11820
+"""
+        parser = LogParser()
+        results = parser.parse_results(verbose_log.split('\n'))
+
+        r = results[0]
+        self.assertEquals(r.max_rss, 32768)
+        self.assertEquals(r.mem_pages, 8)
+        self.assertEquals(r.voluntary_cs, 1)
+        self.assertEquals(r.involuntary_cs, 1109)
+
     def test_results_from_merge(self):
         """Parsing concatenated log merges same PerformanceTestResults"""
         concatenated_logs = """4,ArrayAppend,20,23641,29000,24990,0,24990
