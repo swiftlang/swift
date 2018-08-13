@@ -391,7 +391,7 @@ public struct Dictionary<Key: Hashable, Value> {
   /// Creates an empty dictionary.
   @inlinable
   public init() {
-    self.init(_nativeDictionary: _NativeDictionary())
+    self.init(_native: _NativeDictionary())
   }
 
   /// Creates an empty dictionary with preallocated space for at least the
@@ -519,8 +519,8 @@ public struct Dictionary<Key: Hashable, Value> {
   }
 
   @inlinable
-  internal init(_nativeDictionary: _NativeDictionary<Key, Value>) {
-    _variant = .native(_nativeDictionary)
+  internal init(_native: _NativeDictionary<Key, Value>) {
+    _variant = .native(_native)
   }
 
   @inlinable
@@ -808,7 +808,7 @@ extension Dictionary: ExpressibleByDictionaryLiteral {
   @inlinable
   @_effects(readonly)
   public init(dictionaryLiteral elements: (Key, Value)...) {
-    self.init(_nativeDictionary: _NativeDictionary.fromArray(elements))
+    self.init(_native: _NativeDictionary.fromArray(elements))
   }
 }
 
@@ -2081,7 +2081,7 @@ final internal class _HashableTypedNativeDictionaryStorage<Key: Hashable, Value>
   }
 
   internal var full: Dictionary<Key, Value> {
-    return Dictionary(_nativeDictionary: native)
+    return Dictionary(_native: native)
   }
 
   @objc
@@ -2501,7 +2501,7 @@ extension _NativeDictionary where Key: Hashable {
         self._storage === _RawNativeDictionaryStorage.empty {
       nsSet = self._storage
     } else {
-      nsSet = _SwiftDeferredNSDictionary(nativeDictionary: self)
+      nsSet = _SwiftDeferredNSDictionary(self)
     }
 
     // Cast from "minimal NSDictionary" to "NSDictionary"
@@ -2750,7 +2750,7 @@ extension _NativeDictionary/*: _DictionaryBuffer */ where Key: Hashable {
 final internal class _SwiftDictionaryNSEnumerator<Key, Value>
   : _SwiftNativeNSEnumerator, _NSEnumerator {
 
-  internal var nativeDictionary: _NativeDictionary<Key, Value>
+  internal var base: _NativeDictionary<Key, Value>
   internal var nextIndex: _NativeDictionary<Key, Value>.Index
   internal var endIndex: _NativeDictionary<Key, Value>.Index
 
@@ -2758,10 +2758,10 @@ final internal class _SwiftDictionaryNSEnumerator<Key, Value>
     _sanityCheckFailure("don't call this designated initializer")
   }
 
-  internal init(_ nativeDictionary: _NativeDictionary<Key, Value>) {
-    self.nativeDictionary = nativeDictionary
-    nextIndex = nativeDictionary.startIndex
-    endIndex = nativeDictionary.endIndex
+  internal init(_ base: _NativeDictionary<Key, Value>) {
+    self.base = base
+    nextIndex = base.startIndex
+    endIndex = base.endIndex
   }
 
   //
@@ -2775,8 +2775,8 @@ final internal class _SwiftDictionaryNSEnumerator<Key, Value>
     if nextIndex == endIndex {
       return nil
     }
-    let key = nativeDictionary.bridgedKey(at: nextIndex)
-    nativeDictionary.formIndex(after: &nextIndex)
+    let key = base.bridgedKey(at: nextIndex)
+    base.formIndex(after: &nextIndex)
     return key
   }
 
@@ -2800,8 +2800,8 @@ final internal class _SwiftDictionaryNSEnumerator<Key, Value>
 
     // Return only a single element so that code can start iterating via fast
     // enumeration, terminate it, and continue via NSEnumerator.
-    let key = nativeDictionary.bridgedKey(at: nextIndex)
-    nativeDictionary.formIndex(after: &nextIndex)
+    let key = base.bridgedKey(at: nextIndex)
+    base.formIndex(after: &nextIndex)
 
     let unmanagedObjects = _UnmanagedAnyObjectArray(objects)
     unmanagedObjects[0] = key
@@ -2828,10 +2828,10 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
   internal var _heapStorageBridged_DoNotUse: AnyObject?
 
   /// The unbridged elements.
-  internal var nativeDictionary: _NativeDictionary<Key, Value>
+  internal var native: _NativeDictionary<Key, Value>
 
-  internal init(nativeDictionary: _NativeDictionary<Key, Value>) {
-    self.nativeDictionary = nativeDictionary
+  internal init(_ native: _NativeDictionary<Key, Value>) {
+    self.native = native
     super.init()
   }
 
@@ -2846,7 +2846,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
   // NSDictionary implementation.
   //
   // Do not call any of these methods from the standard library!  Use only
-  // `nativeDictionary`.
+  // `native`.
   //
 
   @objc
@@ -2878,7 +2878,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     guard count > 0 else { return }
     bridgeEverything()
     var i = 0 // Current position in the output buffers
-    let bucketCount = nativeDictionary.bucketCount
+    let bucketCount = native.bucketCount
 
     if let unmanagedKeys = _UnmanagedAnyObjectArray(keys) {
       if let unmanagedObjects = _UnmanagedAnyObjectArray(objects) {
@@ -2922,7 +2922,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     using block: @convention(block) (Unmanaged<AnyObject>, Unmanaged<AnyObject>,
      UnsafeMutablePointer<UInt8>) -> Void) {
     bridgeEverything()
-    let bucketCount = nativeDictionary.bucketCount
+    let bucketCount = native.bucketCount
     var stop: UInt8 = 0
     for position in 0..<bucketCount {
       if bridgedDictionary.isInitializedEntry(at: position) {
@@ -2978,14 +2978,14 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
 
     // Create buffer for bridged data.
     let bridged = _NativeDictionary<AnyObject, AnyObject>(
-      _exactBucketCount: nativeDictionary.bucketCount,
+      _exactBucketCount: native.bucketCount,
       unhashable: ())
 
     // Bridge everything.
-    for i in 0..<nativeDictionary.bucketCount {
-      if nativeDictionary.isInitializedEntry(at: i) {
-        let key = _bridgeAnythingToObjectiveC(nativeDictionary.key(at: i))
-        let val = _bridgeAnythingToObjectiveC(nativeDictionary.value(at: i))
+    for i in 0..<native.bucketCount {
+      if native.isInitializedEntry(at: i) {
+        let key = _bridgeAnythingToObjectiveC(native.key(at: i))
+        let val = _bridgeAnythingToObjectiveC(native.value(at: i))
         bridged.initializeKey(key, value: val, at: i)
       }
     }
@@ -2996,7 +2996,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
 
   @objc
   internal var count: Int {
-    return nativeDictionary.count
+    return native.count
   }
 
   @nonobjc
@@ -3005,8 +3005,8 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     guard let nativeKey = _conditionallyBridgeFromObjectiveC(aKey, Key.self)
     else { return nil }
 
-    let (i, found) = nativeDictionary._find(
-      nativeKey, startBucket: nativeDictionary._bucket(nativeKey))
+    let (i, found) = native._find(
+      nativeKey, startBucket: native._bucket(nativeKey))
     if found {
       bridgeEverything()
       return bridgedDictionary.value(at: i.bucket)
@@ -3031,7 +3031,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
       theState.state = 1 // Arbitrary non-zero value.
       theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
       theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
-      theState.extra.0 = CUnsignedLong(nativeDictionary.startIndex.bucket)
+      theState.extra.0 = CUnsignedLong(native.startIndex.bucket)
     }
 
     // Test 'objects' rather than 'count' because (a) this is very rare anyway,
@@ -3044,7 +3044,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     let unmanagedObjects = _UnmanagedAnyObjectArray(objects!)
     var currIndex = _NativeDictionary<Key, Value>.Index(
         bucket: Int(theState.extra.0))
-    let endIndex = nativeDictionary.endIndex
+    let endIndex = native.endIndex
     var stored = 0
 
     // Only need to bridge once, so we can hoist it out of the loop.
@@ -3060,7 +3060,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
       let bridgedKey = bridgedDictionary.key(at: currIndex.bucket)
       unmanagedObjects[i] = bridgedKey
       stored += 1
-      nativeDictionary.formIndex(after: &currIndex)
+      native.formIndex(after: &currIndex)
     }
     theState.extra.0 = CUnsignedLong(currIndex.bucket)
     state.pointee = theState
@@ -3090,12 +3090,12 @@ internal struct _CocoaDictionary: _DictionaryBuffer {
 
   @inlinable // FIXME(sil-serialize-all)
   internal var startIndex: Index {
-    return Index(cocoaDictionary: self, startIndex: ())
+    return Index(self, startIndex: ())
   }
 
   @inlinable // FIXME(sil-serialize-all)
   internal var endIndex: Index {
-    return Index(cocoaDictionary: self, endIndex: ())
+    return Index(self, endIndex: ())
   }
 
   @inlinable // FIXME(sil-serialize-all)
@@ -3140,7 +3140,7 @@ internal struct _CocoaDictionary: _DictionaryBuffer {
   @inlinable // FIXME(sil-serialize-all)
   internal func assertingGet(at i: Index) -> (key: Key, value: Value) {
     let key: Key = i.allKeys[i.currentKeyIndex]
-    let value: Value = i.cocoaDictionary.object.objectFor(key)!
+    let value: Value = i.base.object.objectFor(key)!
     return (key, value)
 
   }
@@ -3794,14 +3794,14 @@ extension Dictionary._Variant: _DictionaryBuffer {
     // unoptimized builds; see https://bugs.swift.org/browse/SR-6437
     let bucketCount = asNative.bucketCount
     let (_, capacityChanged) = ensureUniqueNative(withBucketCount: bucketCount)
-    var nativeDictionary = asNative
+    var native = asNative
     if capacityChanged {
-      idealBucket = nativeDictionary._bucket(key)
-      (index, found) = nativeDictionary._find(key, startBucket: idealBucket)
+      idealBucket = native._bucket(key)
+      (index, found) = native._find(key, startBucket: idealBucket)
       _sanityCheck(found, "key was lost during buffer migration")
     }
-    let oldValue = nativeDictionary.value(at: index.bucket)
-    nativeDictionary._delete(idealBucket: idealBucket, bucket: index.bucket)
+    let oldValue = native.value(at: index.bucket)
+    native._delete(idealBucket: idealBucket, bucket: index.bucket)
     return oldValue
   }
 
@@ -3815,11 +3815,11 @@ extension Dictionary._Variant: _DictionaryBuffer {
     // The provided index should be valid, so we will always mutate the buffer.
     // Request unique buffer.
     _ = ensureUniqueNative(withBucketCount: bucketCount)
-    var nativeDictionary = asNative
-    let result = nativeDictionary.assertingGet(at: index)
+    var native = asNative
+    let result = native.assertingGet(at: index)
     let key = result.0
-    let idealBucket = nativeDictionary._bucket(key)
-    nativeDictionary._delete(idealBucket: idealBucket, bucket: index.bucket)
+    let idealBucket = native._bucket(key)
+    native._delete(idealBucket: idealBucket, bucket: index.bucket)
     return result
   }
 
@@ -3882,8 +3882,8 @@ extension Dictionary._Variant: _DictionaryBuffer {
 
     // We have already checked for the empty dictionary case and unique
     // reference, so we will always mutate the dictionary.
-    var nativeDictionary = asNative
-    nativeDictionary._removeAll()
+    var native = asNative
+    native._removeAll()
   }
 
   @inlinable // FIXME(sil-serialize-all)
@@ -3992,7 +3992,7 @@ extension _CocoaDictionary {
     /// A reference to the NSDictionary, which owns members in `allObjects`,
     /// or `allKeys`, for NSSet and NSDictionary respectively.
     @usableFromInline // FIXME(sil-serialize-all)
-    internal let cocoaDictionary: _CocoaDictionary
+    internal let base: _CocoaDictionary
     // FIXME: swift-3-indexing-model: try to remove the cocoa reference, but
     // make sure that we have a safety check for accessing `allKeys`.  Maybe
     // move both into the dictionary/set itself.
@@ -4006,25 +4006,26 @@ extension _CocoaDictionary {
     internal var currentKeyIndex: Int
 
     @inlinable // FIXME(sil-serialize-all)
-    internal init(cocoaDictionary: _CocoaDictionary, startIndex: ()) {
-      self.cocoaDictionary = cocoaDictionary
-      self.allKeys = _stdlib_NSDictionary_allKeys(cocoaDictionary.object)
+    internal init(_ base: _CocoaDictionary, startIndex: ()) {
+      self.base = base
+      self.allKeys = _stdlib_NSDictionary_allKeys(base.object)
       self.currentKeyIndex = 0
     }
 
     @inlinable // FIXME(sil-serialize-all)
-    internal init(cocoaDictionary: _CocoaDictionary, endIndex: ()) {
-      self.cocoaDictionary = cocoaDictionary
-      self.allKeys = _stdlib_NSDictionary_allKeys(cocoaDictionary.object)
+    internal init(_ base: _CocoaDictionary, endIndex: ()) {
+      self.base = base
+      self.allKeys = _stdlib_NSDictionary_allKeys(base.object)
       self.currentKeyIndex = allKeys.value
     }
 
     @inlinable // FIXME(sil-serialize-all)
-    internal init(_ cocoaDictionary: _CocoaDictionary,
+    internal init(
+      _ base: _CocoaDictionary,
       _ allKeys: _HeapBuffer<Int, AnyObject>,
       _ currentKeyIndex: Int
     ) {
-      self.cocoaDictionary = cocoaDictionary
+      self.base = base
       self.allKeys = allKeys
       self.currentKeyIndex = currentKeyIndex
     }
@@ -4037,7 +4038,7 @@ extension _CocoaDictionary {
       // FIXME: swift-3-indexing-model: remove this method.
       _precondition(
         currentKeyIndex < allKeys.value, "Cannot increment endIndex")
-      return Index(cocoaDictionary, allKeys, currentKeyIndex + 1)
+      return Index(base, allKeys, currentKeyIndex + 1)
     }
   }
 }
@@ -4234,13 +4235,13 @@ extension _NativeDictionary {
     @usableFromInline
     internal var endIndex: Index
     @usableFromInline
-    internal let nativeDictionary: _NativeDictionary
+    internal let base: _NativeDictionary
 
     @inlinable
-    init(_ dictionary: _NativeDictionary) {
-      self.index = dictionary.startIndex
-      self.endIndex = dictionary.endIndex
-      self.nativeDictionary = dictionary
+    init(_ base: _NativeDictionary) {
+      self.index = base.startIndex
+      self.endIndex = base.endIndex
+      self.base = base
     }
   }
 
@@ -4257,8 +4258,8 @@ extension _NativeDictionary.Iterator: IteratorProtocol {
   @inlinable
   internal mutating func next() -> Element? {
     guard index != endIndex else { return nil }
-    let result = nativeDictionary.assertingGet(at: index)
-    nativeDictionary.formIndex(after: &index)
+    let result = base.assertingGet(at: index)
+    base.formIndex(after: &index)
     return result
   }
 }
@@ -4280,7 +4281,7 @@ extension _CocoaDictionary {
     // `_fastEnumerationState`.  There's code below relying on this.
     internal var _fastEnumerationStackBuf = _CocoaFastEnumerationStackBuf()
 
-    internal let cocoaDictionary: _CocoaDictionary
+    internal let base: _CocoaDictionary
 
     internal var _fastEnumerationStatePtr:
       UnsafeMutablePointer<_SwiftNSFastEnumerationState> {
@@ -4301,8 +4302,8 @@ extension _CocoaDictionary {
     internal var itemIndex: Int = 0
     internal var itemCount: Int = 0
 
-    internal init(_ cocoaDictionary: _CocoaDictionary) {
-      self.cocoaDictionary = cocoaDictionary
+    internal init(_ base: _CocoaDictionary) {
+      self.base = base
     }
   }
 
@@ -4322,14 +4323,14 @@ extension _CocoaDictionary.Iterator: IteratorProtocol {
     if itemIndex < 0 {
       return nil
     }
-    let cocoaDictionary = self.cocoaDictionary
+    let base = self.base
     if itemIndex == itemCount {
       let stackBufCount = _fastEnumerationStackBuf.count
       // We can't use `withUnsafeMutablePointer` here to get pointers to
       // properties, because doing so might introduce a writeback storage, but
       // fast enumeration relies on the pointer identity of the enumeration
       // state struct.
-      itemCount = cocoaDictionary.object.countByEnumerating(
+      itemCount = base.object.countByEnumerating(
         with: _fastEnumerationStatePtr,
         objects: UnsafeMutableRawPointer(_fastEnumerationStackBufPtr)
           .assumingMemoryBound(to: AnyObject.self),
@@ -4346,7 +4347,7 @@ extension _CocoaDictionary.Iterator: IteratorProtocol {
     let itemsPtr = _UnmanagedAnyObjectArray(itemsPtrUP)
     let key: AnyObject = itemsPtr[itemIndex]
     itemIndex += 1
-    let value: AnyObject = cocoaDictionary.object.objectFor(key)!
+    let value: AnyObject = base.object.objectFor(key)!
     return (key, value)
   }
 }
@@ -4510,7 +4511,7 @@ public struct _DictionaryBuilder<Key: Hashable, Value> {
     _actualCount = -1
     var result = _NativeDictionary<Key, Value>()
     swap(&result, &_target)
-    return Dictionary(_nativeDictionary: result)
+    return Dictionary(_native: result)
   }
 }
 
@@ -4581,13 +4582,12 @@ extension Dictionary {
     // Try all three NSDictionary impls that we currently provide.
 
     if let deferred = s as? _SwiftDeferredNSDictionary<Key, Value> {
-      return Dictionary(_nativeDictionary: deferred.nativeDictionary)
+      return Dictionary(_native: deferred.native)
     }
 
     typealias HTNDS = _HashableTypedNativeDictionaryStorage<Key, Value>
     if let nativeStorage = s as? HTNDS {
-      return Dictionary(
-        _nativeDictionary: _NativeDictionary(_storage: nativeStorage))
+      return Dictionary(_native: _NativeDictionary(_storage: nativeStorage))
     }
 
     if s === _RawNativeDictionaryStorage.empty {
