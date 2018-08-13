@@ -2079,7 +2079,7 @@ public:
       BaseTy = CurrDeclContext->getInnermostTypeContext()
                    ->getDeclaredTypeInContext();
     if (BaseTy) {
-      BaseTy = BaseTy->getRValueInstanceType();
+      BaseTy = BaseTy->getInOutObjectType()->getMetatypeInstanceType();
       if (auto NTD = BaseTy->getAnyNominal()) {
         auto *Module = NTD->getParentModule();
         auto Conformance = Module->lookupConformance(
@@ -3190,7 +3190,8 @@ public:
       DeclContext *DC = nullptr;
       if (VD)
         DC = VD->getInnermostDeclContext();
-      else if (auto NTD = ExprType->getRValueInstanceType()->getAnyNominal())
+      else if (auto NTD = ExprType->getInOutObjectType()
+                   ->getMetatypeInstanceType()->getAnyNominal())
         DC = NTD;
       if (DC)
         ExprType = DC->mapTypeIntoContext(ExprType);

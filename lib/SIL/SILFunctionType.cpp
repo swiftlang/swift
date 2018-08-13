@@ -2300,7 +2300,9 @@ TypeConverter::getConstantOverrideInfo(SILDeclRef derived, SILDeclRef base) {
   auto baseInterfaceTy = baseInfo.FormalType;
   auto derivedInterfaceTy = derivedInfo.FormalType;
 
-  auto selfInterfaceTy = derivedInterfaceTy.getInput()->getRValueInstanceType();
+  auto params = derivedInterfaceTy.getParams();
+  assert(params.size() == 1);
+  auto selfInterfaceTy = params[0].getPlainType()->getMetatypeInstanceType();
 
   auto overrideInterfaceTy =
       selfInterfaceTy->adjustSuperclassMemberDeclType(
@@ -2426,8 +2428,8 @@ public:
       // The Self type can be nested in a few layers of metatypes (etc.), e.g.
       // for a mutable static variable the materializeForSet currently has its
       // last argument as a Self.Type.Type metatype.
-      while (1) {
-        auto next = selfType->getRValueInstanceType()->getCanonicalType();
+      while (auto metatypeType = dyn_cast<MetatypeType>(selfType)) {
+        auto next = metatypeType->getInstanceType()->getCanonicalType();
         if (next == selfType)
           break;
         selfType = next;
