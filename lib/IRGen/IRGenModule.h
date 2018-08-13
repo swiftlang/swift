@@ -109,6 +109,7 @@ namespace irgen {
   class Address;
   class ClangTypeConverter;
   class ClassMetadataLayout;
+  class ConformanceInfo;
   class DebugTypeInfo;
   class EnumImplStrategy;
   class EnumMetadataLayout;
@@ -703,6 +704,12 @@ private:
 //--- Types -----------------------------------------------------------------
 public:
   const ProtocolInfo &getProtocolInfo(ProtocolDecl *D);
+
+  // Not strictly a type operation, but similar.
+  const ConformanceInfo &
+  getConformanceInfo(const ProtocolDecl *protocol,
+                     const ProtocolConformance *conformance);
+
   SILType getLoweredType(AbstractionPattern orig, Type subst);
   SILType getLoweredType(Type subst);
   const TypeInfo &getTypeInfoForUnlowered(AbstractionPattern orig,
@@ -773,6 +780,9 @@ private:
 
   llvm::DenseMap<Decl*, MetadataLayout*> MetadataLayouts;
   void destroyMetadataLayoutMap();
+
+  llvm::DenseMap<const ProtocolConformance *,
+                 std::unique_ptr<const ConformanceInfo>> Conformances;
 
   friend class GenericContextScope;
   friend class CompletelyFragileScope;
