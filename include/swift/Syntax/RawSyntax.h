@@ -404,11 +404,16 @@ public:
     return static_cast<tok>(Bits.Token.TokenKind);
   }
 
-  /// Return the text of the token.
-  StringRef getTokenText() const {
+  /// Return the text of the token as an \c OwnedString. Keeping a reference to
+  /// this string will keep it alive even if the syntax node gets freed.
+  OwnedString getOwnedTokenText() const {
     assert(isToken());
-    return getTrailingObjects<OwnedString>()->str();
+    return *getTrailingObjects<OwnedString>();
   }
+
+  /// Return the text of the token as a reference. The referenced buffer may
+  /// disappear when the syntax node gets freed.
+  StringRef getTokenText() const { return getOwnedTokenText().str(); }
 
   /// Return the leading trivia list of the token.
   ArrayRef<TriviaPiece> getLeadingTrivia() const {
@@ -434,7 +439,7 @@ public:
   /// trivia instead.
   RC<RawSyntax>
   withLeadingTrivia(ArrayRef<TriviaPiece> NewLeadingTrivia) const {
-    return make(getTokenKind(), getTokenText(), NewLeadingTrivia,
+    return make(getTokenKind(), getOwnedTokenText(), NewLeadingTrivia,
                 getTrailingTrivia(), getPresence());
   }
 
@@ -446,7 +451,7 @@ public:
   /// trivia instead.
   RC<RawSyntax>
   withTrailingTrivia(ArrayRef<TriviaPiece> NewTrailingTrivia) const {
-    return make(getTokenKind(), getTokenText(), getLeadingTrivia(),
+    return make(getTokenKind(), getOwnedTokenText(), getLeadingTrivia(),
                 NewTrailingTrivia, getPresence());
   }
 
