@@ -5,6 +5,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL5 | %FileCheck %s -check-prefix=LITERAL5
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL6 | %FileCheck %s -check-prefix=LITERAL6
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL7 | %FileCheck %s -check-prefix=LITERAL7
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL8 | %FileCheck %s -check-prefix=LITERAL8
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL9 | %FileCheck %s -check-prefix=LITERAL9
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL10 | %FileCheck %s -check-prefix=LITERAL10
 
 {
   1.#^LITERAL1^#
@@ -75,3 +78,21 @@ func testColor12() {
   y = #colorLiteral(red: 1.0, green: 0.1, blue: 0.5, alpha: 1.0) #^LITERAL7^#
 }
 // LITERAL7: Decl[InstanceVar]/CurrNominal:      .red[#Float#]; name=red
+
+func testArray(f1: Float) {
+  _ = [1, 2, f1] #^LITERAL8^#
+}
+// LITERAL8-DAG: Decl[InstanceVar]/CurrNominal:      .count[#Int#]; name=count
+// LITERAL8-DAG: Decl[InstanceVar]/Super:            .first[#Float?#]; name=first
+
+func testDict(f1: Float) {
+  _ = ["foo": f1, "bar": "baz"] #^LITERAL9^#
+}
+// LITERAL9-DAG: Decl[InstanceVar]/CurrNominal:      .keys[#Dictionary<String, Any>.Keys#]; name=keys
+// LITERAL9-DAG: Decl[InstanceVar]/CurrNominal:      .isEmpty[#Bool#]; name=isEmpty
+
+func testEditorPlaceHolder() {
+  _ = <#T##foo##String#> #^LITERAL10^#
+}
+// LITERAL10-DAG: Decl[InstanceVar]/CurrNominal:      .utf16[#String.UTF16View#]; name=utf16
+// LITERAL10-DAG: Decl[InstanceVar]/CurrNominal:      .utf8[#String.UTF8View#]; name=utf8
