@@ -10,6 +10,7 @@ add_swift_library(swiftSIL STATIC
   Linker.cpp
   LinearLifetimeChecker.cpp
   LoopInfo.cpp
+  Notifications.cpp
   OptimizationRemark.cpp
   PrettyStackTrace.cpp
   Projection.cpp
