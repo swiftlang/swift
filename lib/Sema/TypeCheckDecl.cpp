@@ -214,9 +214,7 @@ void TypeChecker::resolveTrailingWhereClause(ProtocolDecl *proto) {
 
 void TypeChecker::validateWhereClauses(ProtocolDecl *protocol,
                                        GenericTypeResolver *resolver) {
-  TypeResolutionOptions options;
-
-  options |= TypeResolutionFlags::ProtocolWhereClause;
+  TypeResolutionOptions options(TypeResolverContext::ProtocolWhereClause);
 
   if (auto whereClause = protocol->getTrailingWhereClause()) {
     revertGenericRequirements(whereClause->getRequirements());
@@ -242,17 +240,15 @@ void TypeChecker::validateWhereClauses(ProtocolDecl *protocol,
 /// to which this type declaration conforms.
 void TypeChecker::checkInheritanceClause(Decl *decl,
                                          GenericTypeResolver *resolver) {
-  TypeResolutionOptions options;
+  TypeResolutionOptions options = None;
   DeclContext *DC;
   if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
     DC = nominal;
-    options |= TypeResolutionFlags::GenericSignature;
-    options |= TypeResolutionFlags::InheritanceClause;
+    options = TypeResolutionOptions(TypeResolverContext::GenericSignature);
     options |= TypeResolutionFlags::AllowUnavailableProtocol;
   } else if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
     DC = ext;
-    options |= TypeResolutionFlags::GenericSignature;
-    options |= TypeResolutionFlags::InheritanceClause;
+    options = TypeResolutionOptions(TypeResolverContext::GenericSignature);
     options |= TypeResolutionFlags::AllowUnavailableProtocol;
   } else if (isa<GenericTypeParamDecl>(decl)) {
     // For generic parameters, we want name lookup to look at just the
@@ -260,13 +256,13 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     DC = decl->getDeclContext();
     if (auto nominal = dyn_cast<NominalTypeDecl>(DC)) {
       DC = nominal;
-      options |= TypeResolutionFlags::GenericSignature;
+      options = TypeResolutionOptions(TypeResolverContext::GenericSignature);
     } else if (auto ext = dyn_cast<ExtensionDecl>(DC)) {
       DC = ext;
-      options |= TypeResolutionFlags::GenericSignature;
+      options = TypeResolutionOptions(TypeResolverContext::GenericSignature);
     } else if (auto func = dyn_cast<AbstractFunctionDecl>(DC)) {
       DC = func;
-      options |= TypeResolutionFlags::GenericSignature;
+      options = TypeResolutionOptions(TypeResolverContext::GenericSignature);
     } else if (!DC->isModuleScopeContext()) {
       // Skip the generic parameter's context entirely.
       DC = DC->getParent();
@@ -1036,9 +1032,7 @@ static void validatePatternBindingEntry(TypeChecker &tc,
   // In particular, it's /not/ correct to check the PBD's DeclContext because
   // top-level variables in a script file are accessible from other files,
   // even though the PBD is inside a TopLevelCodeDecl.
-  TypeResolutionOptions options = TypeResolutionFlags::PatternBindingEntry;
-  options |= TypeResolutionFlags::InExpression;
-  options |= TypeResolutionFlags::Direct;
+  TypeResolutionOptions options(TypeResolverContext::PatternBindingDecl);
 
   if (binding->getInit(entryNumber)) {
     // If we have an initializer, we can also have unknown types.
@@ -3418,7 +3412,7 @@ void TypeChecker::typeCheckDecl(Decl *D) {
 
 /// Validate the underlying type of the given typealias.
 static void validateTypealiasType(TypeChecker &tc, TypeAliasDecl *typeAlias) {
-  TypeResolutionOptions options = TypeResolutionFlags::TypeAliasUnderlyingType;
+  TypeResolutionOptions options(TypeResolverContext::TypeAliasDecl);
   if (!typeAlias->getDeclContext()->isCascadingContextForLookup(
         /*functionsAreNonCascading*/true)) {
      options |= TypeResolutionFlags::KnownNonCascadingDependency;
@@ -4376,7 +4370,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       CompleteGenericTypeResolver resolver(*this, ED->getGenericSignature());
 
       typeCheckParameterList(PL, EED->getParentEnum(),
-                             TypeResolutionFlags::EnumCase, resolver);
+                             TypeResolverContext::EnumElementDecl, resolver);
       checkDefaultArguments(PL, EED);
     }
 
@@ -4482,8 +4476,7 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
           (void) typealias->getFormalAccess();
 
           ProtocolRequirementTypeResolver resolver;
-          TypeResolutionOptions options =
-            TypeResolutionFlags::TypeAliasUnderlyingType;
+          TypeResolutionOptions options(TypeResolverContext::TypeAliasDecl);
           if (validateType(typealias->getUnderlyingTypeLoc(),
                            typealias, options, &resolver)) {
             typealias->setInvalid();
