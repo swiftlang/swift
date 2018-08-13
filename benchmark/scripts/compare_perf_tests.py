@@ -20,7 +20,7 @@ It is structured into several classes that can be imported into other modules.
 from __future__ import print_function
 
 import argparse
-import csv
+import re
 import sys
 from math import sqrt
 
@@ -57,6 +57,8 @@ class PerformanceTestResult(object):
         self.median = int(csv_row[7])   # Median runtime (ms)
         self.max_rss = (                # Maximum Resident Set Size (B)
             int(csv_row[8]) if len(csv_row) > 8 else None)
+        # Sample lists for statistical analysis of measured results
+        self.all_samples = None
 
     def __repr__(self):
         """Short summary for debugging purposes."""
@@ -134,12 +136,63 @@ class ResultComparison(object):
 
 
 class LogParser(object):
+    """Converts log outputs into `PerformanceTestResult`s.
+
+    Supports various formats produced by the `Benchmark_Driver` and
+    `Benchmark_O`('Onone', 'Osize'). It can also merge together the
+    results from concatenated log files.
+    """
+
+    def __init__(self):
+        """Create instance of `LogParser`."""
+        self.results, self.samples, self.num_iters = [], [], 1
+
+    # Parse lines like this
+    # #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs)
+    results_re = re.compile(r'(\d+,[ \t]*\w+,' +
+                            ','.join([r'[ \t]*[\d.]+'] * 6) + ')')
+
+    def _append_result(self, result):
+        r = PerformanceTestResult(result.split(','))
+        if self.samples:
+            r.all_samples = self.samples
+        self.results.append(r)
+        self.num_iters, self.samples = 1, []
+
+    # Regular expression and action to take when it matches the parsed line
+    state_actions = {
+        results_re: _append_result,
+
+        # Verbose mode adds two new productions:
+        # Adaptively determined N; test loop multiple adjusting runtime to ~1s
+        re.compile(r'\s+Measuring with scale (\d+).'):
+        (lambda self, num_iters: setattr(self, 'num_iters', num_iters)),
+
+        re.compile(r'\s+Sample (\d+),(\d+)'):
+        (lambda self, i, runtime:
+         self.samples.append((int(i), int(self.num_iters), int(runtime)))
+        ),
+    }
+
+    def parse_results(self, lines):
+        """Parse results from the lines of the log output from Benchmark*.
+
+        Returns a list of `PerformanceTestResult`s.
+        """
+        for line in lines:
+            for regexp, action in LogParser.state_actions.items():
+                match = regexp.match(line)
+                if match:
+                    action(self, *match.groups())
+                    break  # stop after 1st match
+            else:  # If none matches, skip the line.
+                # print('skipping: ' + line.rstrip('\n'))
+                continue
+        return self.results
+
     @staticmethod
-    def load_from_csv(filename):  # handles output from Benchmark_O and
-        def skip_totals(row):     # Benchmark_Driver (added MAX_RSS column)
-            return len(row) > 7 and row[0].isdigit()
-        tests = map(PerformanceTestResult,
-                    filter(skip_totals, csv.reader(open(filename))))
+    def _results_from_lines(lines):
+        tests = LogParser().parse_results(lines)
 
         def add_or_merge(names, r):
             if r.name not in names:
@@ -147,7 +200,26 @@ class LogParser(object):
             else:
                 names[r.name].merge(r)
             return names
+
         return reduce(add_or_merge, tests, dict())
+
+    @staticmethod
+    def results_from_string(log_contents):
+        """Parse `PerformanceTestResult`s from the supplied string.
+
+        Returns dictionary of test names and `PerformanceTestResult`s.
+        """
+        return LogParser._results_from_lines(log_contents.splitlines())
+
+    @staticmethod
+    def results_from_file(log_file):
+        """Parse `PerformanceTestResult`s from the log file.
+
+        Returns dictionary of test names and `PerformanceTestResult`s.
+        """
+        with open(log_file) as f:
+            return LogParser._results_from_lines(f.readlines())
+
 
 class TestComparator(object):
     """Analyzes changes betweeen the old and new test results.
@@ -454,8 +526,8 @@ def parse_args(args):
 def main():
     """Compare benchmarks for changes in a formatted report."""
     args = parse_args(sys.argv[1:])
-    comparator = TestComparator(LogParser.load_from_csv(args.old_file),
-                                LogParser.load_from_csv(args.new_file),
+    comparator = TestComparator(LogParser.results_from_file(args.old_file),
+                                LogParser.results_from_file(args.new_file),
                                 args.delta_threshold)
     formatter = ReportFormatter(comparator, args.old_branch, args.new_branch,
                                 args.changes_only, args.single_table)
