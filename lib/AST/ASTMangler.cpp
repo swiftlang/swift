@@ -1711,7 +1711,7 @@ void ASTMangler::appendFunctionInputType(
 
   case 1: {
     const auto &param = params.front();
-    auto type = param.getType();
+    auto type = param.getPlainType();
 
     // If this is just a single parenthesized type,
     // to save space in the mangled name, let's encode
@@ -1730,7 +1730,7 @@ void ASTMangler::appendFunctionInputType(
   default:
     bool isFirstParam = true;
     for (auto &param : params) {
-      appendTypeListElement(Identifier(), param.getType(),
+      appendTypeListElement(Identifier(), param.getPlainType(),
                             param.getParameterFlags());
       appendListSeparator(isFirstParam);
     }
@@ -1749,8 +1749,11 @@ void ASTMangler::appendTypeList(Type listTy) {
       return appendOperator("y");
     bool firstField = true;
     for (auto &field : tuple->getElements()) {
-      appendTypeListElement(field.getName(), field.getType(),
-                            field.getParameterFlags());
+      // FIXME: We shouldn't put @escaping in non-parameter list tuples
+      auto flags = field.getParameterFlags().withEscaping(false);
+
+      assert(flags.isNone());
+      appendTypeListElement(field.getName(), field.getRawType(), flags);
       appendListSeparator(firstField);
     }
   } else {
@@ -1761,7 +1764,7 @@ void ASTMangler::appendTypeList(Type listTy) {
 
 void ASTMangler::appendTypeListElement(Identifier name, Type elementType,
                                        ParameterTypeFlags flags) {
-  appendType(elementType->getInOutObjectType());
+  appendType(elementType);
   switch (flags.getValueOwnership()) {
   case ValueOwnership::Default:
     /* nothing */

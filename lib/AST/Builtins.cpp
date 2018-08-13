@@ -478,7 +478,7 @@ namespace {
     template <class G>
     void addParameter(const G &generator) {
       Type gTyIface = generator.build(*this);
-      InterfaceParams.push_back({gTyIface->getInOutObjectType(),
+      InterfaceParams.push_back({gTyIface,
                                  Identifier(), ParameterTypeFlags()});
     }
 
@@ -486,7 +486,7 @@ namespace {
     void addInOutParameter(const G &generator) {
       Type gTyIface = generator.build(*this);
       auto iFaceflags = ParameterTypeFlags().withInOut(true);
-      InterfaceParams.push_back(TupleTypeElt(gTyIface->getInOutObjectType(),
+      InterfaceParams.push_back(TupleTypeElt(gTyIface,
                                              Identifier(), iFaceflags));
     }
     
