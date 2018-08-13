@@ -281,14 +281,17 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     resolver = &defaultResolver;
 
   MutableArrayRef<TypeLoc> inheritedClause;
+  Type declInterfaceTy;
 
   if (auto type = dyn_cast<TypeDecl>(decl)) {
+    declInterfaceTy = type->getDeclaredInterfaceType();
     inheritedClause = type->getInherited();
   } else {
     auto ext = cast<ExtensionDecl>(decl);
     if (!ext->getExtendedType())
       return;
 
+    declInterfaceTy = ext->getExtendedType();
     inheritedClause = ext->getInherited();
 
     // Protocol extensions cannot have inheritance clauses.
@@ -307,8 +310,11 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
   // Retrieve the location of the start of the inheritance clause.
   auto getStartLocOfInheritanceClause = [&] {
     if (auto genericTypeDecl = dyn_cast<GenericTypeDecl>(decl)) {
-      if (auto genericParams = genericTypeDecl->getGenericParams())
-        return genericParams->getSourceRange().End;
+      // Get the end location of the generic parameters, except for protocols
+      // which don't have explicit generic parameters.
+      if (!isa<ProtocolDecl>(decl))
+        if (auto genericParams = genericTypeDecl->getGenericParams())
+          return genericParams->getSourceRange().End;
 
       return genericTypeDecl->getNameLoc();
     }
@@ -317,7 +323,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       return typeDecl->getNameLoc();
 
     if (auto ext = dyn_cast<ExtensionDecl>(decl))
-      return ext->getSourceRange().End;
+      return ext->getExtendedTypeLoc().getLoc();
 
     return SourceLoc();
   };
@@ -353,6 +359,29 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     return SourceRange(afterPriorLoc, afterMyEndLoc);
   };
 
+  bool didFixItRemoveFirst = false;
+
+  /// Attempt to emit a removal fix-it for the ith entry in the inheritance
+  /// clause. Returns \c true if a removal fix-it was emitted, \c false
+  /// otherwise.
+  auto tryAddRemovalFixIt = [&](InFlightDiagnostic &diag, unsigned i) -> bool {
+    // HACK: Don't provide a removal fix-it for the second entry if we provided
+    // a removal fix-it for the first entry. This is in order to avoid emitting
+    // removal fix-its that would require their source range to be re-calculated
+    // after the application of another fix-it (which currently causes issues
+    // with the the bulk application of fix-its).
+    // FIX-ME(SR-8102): Improve the fix-it engine to handle such 'dependant'
+    // removal fix-its.
+    if (i == 0)
+      didFixItRemoveFirst = true;
+    else if (i == 1 && didFixItRemoveFirst)
+      return false;
+
+    auto removalRange = getRemovalRange(i);
+    diag.fixItRemoveChars(removalRange.Start, removalRange.End);
+    return true;
+  };
+
   // Check all of the types listed in the inheritance clause.
   Type superclassTy;
   SourceRange superclassRange;
@@ -372,37 +401,58 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     if (inheritedTy->hasError())
       continue;
 
-    // Check whether we inherited from the same type twice.
     CanType inheritedCanTy = inheritedTy->getCanonicalType();
+    auto isConstraint =
+        isa<AbstractTypeParamDecl>(decl) || isa<ProtocolDecl>(decl);
+
+    // Check whether we inherited from the same type twice.
     auto knownType = inheritedTypes.find(inheritedCanTy);
     if (knownType != inheritedTypes.end()) {
       // If the duplicated type is 'AnyObject', check whether the first was
       // written as 'class'. Downgrade the error to a warning in such cases
       // for backward compatibility with Swift <= 4.
       if (!Context.LangOpts.isSwiftVersionAtLeast(5) &&
-          inheritedTy->isAnyObject() &&
-          (isa<ProtocolDecl>(decl) || isa<AbstractTypeParamDecl>(decl)) &&
+          inheritedTy->isAnyObject() && isConstraint &&
           Lexer::getTokenAtLocation(Context.SourceMgr,
                                     knownType->second.second.Start)
             .is(tok::kw_class)) {
         SourceLoc classLoc = knownType->second.second.Start;
-        SourceRange removeRange = getRemovalRange(knownType->second.first);
 
-        diagnose(classLoc, diag::duplicate_anyobject_class_inheritance)
-          .fixItRemoveChars(removeRange.Start, removeRange.End);
+        auto diag =
+            diagnose(classLoc, diag::duplicate_anyobject_class_inheritance);
+        tryAddRemovalFixIt(diag, knownType->second.first);
         inherited.setInvalidType(Context);
         continue;
       }
 
-      auto removeRange = getRemovalRange(i);
-      diagnose(inherited.getSourceRange().Start,
-               diag::duplicate_inheritance, inheritedTy)
-        .fixItRemoveChars(removeRange.Start, removeRange.End)
-        .highlight(knownType->second.second);
+      auto diag = diagnose(inherited.getSourceRange().Start,
+                           diag::duplicate_inheritance, inheritedTy);
+      tryAddRemovalFixIt(diag, i);
+      diag.highlight(knownType->second.second);
+
       inherited.setInvalidType(Context);
       continue;
     }
     inheritedTypes[inheritedCanTy] = { i, inherited.getSourceRange() };
+
+    // Check for a stated conformance to Any, which is redundant.
+    // Ignore cases of ': Any' *constraints* that are parsed as inheritance
+    // clauses, such as with protocol and placeholder decls e.g <T : Any>, as
+    // these are handled by the generic signature builder along with redundant
+    // constraints that appear in 'where' clauses.
+    if (inheritedCanTy == Context.TheAnyType) {
+      if (!isConstraint) {
+        auto diagLoc = inherited.getSourceRange().Start;
+        auto diag = diagnose(diagLoc, diag::redundant_conformance_warning,
+                             declInterfaceTy, inheritedTy);
+        diag.highlight(inherited.getSourceRange());
+        tryAddRemovalFixIt(diag, i);
+        diag.flush();
+
+        diagnose(diagLoc, diag::all_types_implicitly_conform_to, inheritedTy);
+      }
+      continue;
+    }
 
     if (inheritedTy->isExistentialType()) {
       auto layout = inheritedTy->getExistentialLayout();
@@ -425,8 +475,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       //
       // Extensions, structs and enums can only inherit from protocol
       // compositions that do not contain AnyObject or class members.
-      if (isa<ProtocolDecl>(decl) ||
-          isa<AbstractTypeParamDecl>(decl) ||
+      if (isConstraint ||
           (!layout.hasExplicitAnyObject &&
            !layout.explicitSuperclass)) {
         continue;
@@ -446,11 +495,10 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       if (Context.LangOpts.isSwiftVersion3() && isa<ClassDecl>(decl) &&
           inheritedTy->isAnyObject()) {
         auto classDecl = cast<ClassDecl>(decl);
-        auto removeRange = getRemovalRange(i);
-        diagnose(inherited.getSourceRange().Start,
-                 diag::class_inherits_anyobject,
-                 classDecl->getDeclaredInterfaceType())
-          .fixItRemoveChars(removeRange.Start, removeRange.End);
+        auto diag = diagnose(inherited.getSourceRange().Start,
+                             diag::class_inherits_anyobject,
+                             classDecl->getDeclaredInterfaceType());
+        tryAddRemovalFixIt(diag, i);
         continue;
       }
     }
@@ -468,13 +516,11 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       
       // If this is not the first entry in the inheritance clause, complain.
       if (i > 0) {
-        auto removeRange = getRemovalRange(i);
-
-        diagnose(inherited.getSourceRange().Start,
-                 diag::raw_type_not_first, inheritedTy)
-          .fixItRemoveChars(removeRange.Start, removeRange.End)
-          .fixItInsert(inheritedClause[0].getSourceRange().Start,
-                       inheritedTy.getString() + ", ");
+        auto diag = diagnose(inherited.getSourceRange().Start,
+                             diag::raw_type_not_first, inheritedTy);
+        if (tryAddRemovalFixIt(diag, i))
+          diag.fixItInsert(inheritedClause[0].getSourceRange().Start,
+                           inheritedTy.getString() + ", ");
 
         // Fall through to record the raw type.
       }
@@ -528,12 +574,11 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
 
       // If this is not the first entry in the inheritance clause, complain.
       if (isa<ClassDecl>(decl) && i > 0) {
-        auto removeRange = getRemovalRange(i);
-        diagnose(inherited.getSourceRange().Start,
-                 diag::superclass_not_first, inheritedTy)
-          .fixItRemoveChars(removeRange.Start, removeRange.End)
-          .fixItInsert(inheritedClause[0].getSourceRange().Start,
-                       inheritedTy.getString() + ", ");
+        auto diag = diagnose(inherited.getSourceRange().Start,
+                             diag::superclass_not_first, inheritedTy);
+        if (tryAddRemovalFixIt(diag, i))
+          diag.fixItInsert(inheritedClause[0].getSourceRange().Start,
+                           inheritedTy.getString() + ", ");
 
         // Fall through to record the superclass.
       }

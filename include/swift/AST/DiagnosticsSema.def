@@ -1834,6 +1834,11 @@ WARNING(redundant_conformance_adhoc_conditional,none,
 NOTE(redundant_conformance_witness_ignored,none,
      "%0 %1 will not be used to satisfy the conformance to %2",
      (DescriptiveDeclKind, DeclName, DeclName))
+WARNING(redundant_conformance_warning,none,
+        "redundant conformance of %0 to %1", (Type, Type))
+NOTE(all_types_implicitly_conform_to,none,
+     "all types implicitly conform to %0", (Type))
+
 
 // "Near matches"
 WARNING(req_near_match,none,
@@ -1908,11 +1913,11 @@ ERROR(requires_generic_param_same_type_does_not_conform,none,
 ERROR(requires_same_concrete_type,none,
       "generic signature requires types %0 and %1 to be the same", (Type, Type))
 WARNING(redundant_conformance_constraint,none,
-        "redundant conformance constraint %0: %1", (Type, ProtocolDecl *))
+        "redundant conformance constraint %0: %1", (Type, Type))
 NOTE(redundant_conformance_here,none,
      "conformance constraint %1: %2 %select{written here|implied here|"
      "inferred from type here}0",
-     (unsigned, Type, ProtocolDecl *))
+     (unsigned, Type, Type))
 
 ERROR(unsupported_recursive_requirements, none,
       "requirement involves recursion that is not currently supported", ())

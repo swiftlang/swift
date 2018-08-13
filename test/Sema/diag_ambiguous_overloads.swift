@@ -58,7 +58,8 @@ Variadic.foo(1.0, 2.0, 3.0) // expected-error {{cannot convert value of type 'Do
 
 //=-------------- SR-7918 --------------=/
 class sr7918_Suit {
-  static func foo<T: Any>(_ :inout T) {}
+  static func foo<T: Any>(_ :inout T) {} // expected-warning {{redundant conformance constraint 'T': 'Any'}}
+  // expected-note@-1 {{all types implicitly conform to 'Any'}}
   static func foo() {}
 }
 

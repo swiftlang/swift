@@ -20,12 +20,16 @@ class C : B, A { } // expected-error{{multiple inheritance from classes 'B' and 
 class D : P, A { } // expected-error{{superclass 'A' must appear first in the inheritance clause}}{{12-15=}}{{11-11=A, }}
 
 // SR-8160
-class D1 : Any, A { } // expected-error{{superclass 'A' must appear first in the inheritance clause}}{{15-18=}}{{12-12=A, }}
+class D1 : Any, A { } // expected-error{{superclass 'A' must appear first in the inheritance clause}} // We don't emit a fix-it in this case in order to avoid overlapping removal fix-it ranges. However, we emit a removal fix-it for the redundant 'Any', which has the same effect.
+// expected-warning@-1 {{redundant conformance of 'D1' to 'Any'}} {{12-17=}}
+// expected-note@-2 {{all types implicitly conform to 'Any'}}
 
 class D2 : P & P1, A { } // expected-error{{superclass 'A' must appear first in the inheritance clause}}{{18-21=}}{{12-12=A, }}
 
 @usableFromInline
-class D3 : Any, A { } // expected-error{{superclass 'A' must appear first in the inheritance clause}}{{15-18=}}{{12-12=A, }}
+class D3 : Any, A { } // expected-error{{superclass 'A' must appear first in the inheritance clause}} // We don't emit a fix-it in this case in order to avoid overlapping removal fix-it ranges. However, we emit a removal fix-it for the redundant 'Any', which has the same effect.
+// expected-warning@-1 {{redundant conformance of 'D3' to 'Any'}} {{12-17=}}
+// expected-note@-2 {{all types implicitly conform to 'Any'}}
 
 @usableFromInline
 class D4 : P & P1, A { } // expected-error{{superclass 'A' must appear first in the inheritance clause}}{{18-21=}}{{12-12=A, }}

@@ -615,7 +615,8 @@ GenericParamList::clone(DeclContext *dc) const {
       reqt = RequirementRepr::getTypeConstraint(
           first.clone(ctx),
           reqt.getColonLoc(),
-          second.clone(ctx));
+          second.clone(ctx),
+          reqt.getRemovalRange());
       break;
     }
     case RequirementReprKind::SameType: {
@@ -624,7 +625,8 @@ GenericParamList::clone(DeclContext *dc) const {
       reqt = RequirementRepr::getSameType(
           first.clone(ctx),
           reqt.getEqualLoc(),
-          second.clone(ctx));
+          second.clone(ctx),
+          reqt.getRemovalRange());
       break;
     }
     case RequirementReprKind::LayoutConstraint: {
@@ -633,7 +635,8 @@ GenericParamList::clone(DeclContext *dc) const {
       reqt = RequirementRepr::getLayoutConstraint(
           first.clone(ctx),
           reqt.getColonLoc(),
-          layout);
+          layout,
+          reqt.getRemovalRange());
       break;
     }
     }

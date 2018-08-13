@@ -1819,11 +1819,13 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
       if (interfaceFirstType->hasTypeParameter()) {
         resolvedRequirements.push_back(RequirementRepr::getSameType(
             TypeLoc(req.getFirstTypeRepr(), genericType), req.getEqualLoc(),
-            TypeLoc(req.getSecondTypeRepr(), concreteType)));
+            TypeLoc(req.getSecondTypeRepr(), concreteType),
+            req.getRemovalRange()));
       } else {
         resolvedRequirements.push_back(RequirementRepr::getSameType(
             TypeLoc(req.getFirstTypeRepr(), concreteType), req.getEqualLoc(),
-            TypeLoc(req.getSecondTypeRepr(), genericType)));
+            TypeLoc(req.getSecondTypeRepr(), genericType),
+            req.getRemovalRange()));
       }
 
       // Convert the requirement into a form which uses canonical interface
@@ -1855,8 +1857,8 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
       // Re-create a requirement using the resolved interface types.
       auto resolvedReq = RequirementRepr::getLayoutConstraint(
           TypeLoc(req.getSubjectRepr(), interfaceSubjectType),
-          req.getColonLoc(),
-          req.getLayoutConstraintLoc());
+          req.getColonLoc(), req.getLayoutConstraintLoc(),
+          req.getRemovalRange());
 
       // Add a resolved requirement.
       resolvedRequirements.push_back(resolvedReq);
@@ -1897,7 +1899,8 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
       auto resolvedReq = RequirementRepr::getTypeConstraint(
           TypeLoc(req.getSubjectRepr(), interfaceSubjectType),
           req.getColonLoc(),
-          TypeLoc(req.getConstraintRepr(), interfaceLayoutConstraint));
+          TypeLoc(req.getConstraintRepr(), interfaceLayoutConstraint),
+          req.getRemovalRange());
 
       // Add a resolved requirement.
       resolvedRequirements.push_back(resolvedReq);

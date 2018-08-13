@@ -1011,6 +1011,12 @@ enum class RequirementReprKind : unsigned {
 /// \c GenericParamList assumes these are POD-like.
 class RequirementRepr {
   SourceLoc SeparatorLoc;
+
+  /// This range includes everything that needs to be removed to keep the
+  /// program syntactically valid (e.g. where and commas), unlike just from
+  /// the start of \c FirstType to the end of \c SecondType.
+  SourceRange RemovalRange;
+
   RequirementReprKind Kind : 2;
   bool Invalid : 1;
   TypeLoc FirstType;
@@ -1026,15 +1032,17 @@ class RequirementRepr {
   /// for the generated interface.
   StringRef AsWrittenString;
 
-  RequirementRepr(SourceLoc SeparatorLoc, RequirementReprKind Kind,
-                  TypeLoc FirstType, TypeLoc SecondType)
-    : SeparatorLoc(SeparatorLoc), Kind(Kind), Invalid(false),
-      FirstType(FirstType), SecondType(SecondType) { }
+  RequirementRepr(SourceLoc SeparatorLoc, SourceRange RemovalRange,
+                  RequirementReprKind Kind, TypeLoc FirstType,
+                  TypeLoc SecondType)
+      : SeparatorLoc(SeparatorLoc), RemovalRange(RemovalRange), Kind(Kind),
+        Invalid(false), FirstType(FirstType), SecondType(SecondType) {}
 
-  RequirementRepr(SourceLoc SeparatorLoc, RequirementReprKind Kind,
-                  TypeLoc FirstType, LayoutConstraintLoc SecondLayout)
-    : SeparatorLoc(SeparatorLoc), Kind(Kind), Invalid(false),
-      FirstType(FirstType), SecondLayout(SecondLayout) { }
+  RequirementRepr(SourceLoc SeparatorLoc, SourceRange RemovalRange,
+                  RequirementReprKind Kind, TypeLoc FirstType,
+                  LayoutConstraintLoc SecondLayout)
+      : SeparatorLoc(SeparatorLoc), RemovalRange(RemovalRange), Kind(Kind),
+        Invalid(false), FirstType(FirstType), SecondLayout(SecondLayout) {}
 
   void printImpl(ASTPrinter &OS, bool AsWritten) const;
 
@@ -1047,10 +1055,15 @@ public:
   /// this requirement was implied.
   /// \param Constraint The protocol or protocol composition to which the
   /// subject must conform, or superclass from which the subject must inherit.
-  static RequirementRepr getTypeConstraint(TypeLoc Subject,
-                                           SourceLoc ColonLoc,
-                                           TypeLoc Constraint) {
-    return { ColonLoc, RequirementReprKind::TypeConstraint, Subject, Constraint };
+  /// \param RemovalRange A source range suitable for removing the requirement
+  /// from the associated where clause, including everything that needs to be
+  /// removed to keep the program syntactically valid (e.g. the 'where' keyword
+  /// and commas).
+  static RequirementRepr getTypeConstraint(TypeLoc Subject, SourceLoc ColonLoc,
+                                           TypeLoc Constraint,
+                                           SourceRange RemovalRange) {
+    return {ColonLoc, RemovalRange, RequirementReprKind::TypeConstraint,
+            Subject, Constraint};
   }
 
   /// \brief Construct a new same-type requirement.
@@ -1059,25 +1072,34 @@ public:
   /// \param EqualLoc The location of the '==' in the same-type constraint, or
   /// an invalid location if this requirement was implied.
   /// \param SecondType The second type.
-  static RequirementRepr getSameType(TypeLoc FirstType,
-                                     SourceLoc EqualLoc,
-                                     TypeLoc SecondType) {
-    return { EqualLoc, RequirementReprKind::SameType, FirstType, SecondType };
+  /// \param RemovalRange A source range suitable for removing the requirement
+  /// from the associated where clause, including everything that needs to be
+  /// removed to keep the program syntactically valid (e.g. the 'where' keyword
+  /// and commas).
+  static RequirementRepr getSameType(TypeLoc FirstType, SourceLoc EqualLoc,
+                                     TypeLoc SecondType,
+                                     SourceRange RemovalRange) {
+    return {EqualLoc, RemovalRange, RequirementReprKind::SameType, FirstType,
+            SecondType};
   }
 
   /// \brief Construct a new layout-constraint requirement.
   ///
-  /// \param Subject The type that must conform to the given layout 
-  /// requirement.
+  /// \param Subject The type that must conform to the given layout requirement.
   /// \param ColonLoc The location of the ':', or an invalid location if
   /// this requirement was implied.
   /// \param Layout The layout requirement to which the
   /// subject must conform.
+  /// \param RemovalRange A source range suitable for removing the requirement
+  /// from the associated where clause, including everything that needs to be
+  /// removed to keep the program syntactically valid (e.g. the 'where' keyword
+  /// and commas).
   static RequirementRepr getLayoutConstraint(TypeLoc Subject,
                                              SourceLoc ColonLoc,
-                                             LayoutConstraintLoc Layout) {
-    return {ColonLoc, RequirementReprKind::LayoutConstraint, Subject,
-            Layout};
+                                             LayoutConstraintLoc Layout,
+                                             SourceRange RemovalRange) {
+    return {ColonLoc, RemovalRange, RequirementReprKind::LayoutConstraint,
+            Subject, Layout};
   }
 
   /// \brief Determine the kind of requirement
@@ -1158,6 +1180,20 @@ public:
     assert(getKind() == RequirementReprKind::TypeConstraint ||
            getKind() == RequirementReprKind::LayoutConstraint);
     return SeparatorLoc;
+  }
+
+  /// Retrieve the source range suitable for removing the requirement, if any.
+  /// Unlike \c getSourceRange(), this range includes everything that needs to
+  /// be removed to keep the program syntactically valid (e.g. the 'where'
+  /// keyword and commas).
+  SourceRange getRemovalRange() const { return RemovalRange; }
+
+  /// Set the source range suitable for removing the requirement, if any. Unlike
+  /// \c getSourceRange(), this range includes everything that needs to be
+  /// removed to keep the program syntactically valid (e.g. the 'where' keyword
+  /// and commas).
+  void setRemovalRange(SourceRange removalRange) {
+    RemovalRange = removalRange;
   }
 
   /// \brief Retrieve the first type of a same-type requirement.

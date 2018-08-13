@@ -14,11 +14,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Parse/Parser.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
-#include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Parse/Parser.h"
+#include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Syntax/SyntaxBuilders.h"
 #include "swift/Syntax/SyntaxNodes.h"
 using namespace swift;
@@ -273,20 +274,24 @@ ParserStatus Parser::parseGenericWhereClause(
   SyntaxParsingContext ReqListContext(SyntaxContext,
                                       SyntaxKind::GenericRequirementList);
   bool HasNextReq;
+  SourceLoc LastCommaLoc;
   do {
     SyntaxParsingContext ReqContext(SyntaxContext, SyntaxContextKind::Syntax);
     // Parse the leading type-identifier.
-    ParserResult<TypeRepr> FirstType = parseTypeIdentifier();
+    ParserResult<TypeRepr> FirstTypeResult = parseTypeIdentifier();
 
-    if (FirstType.hasCodeCompletion()) {
+    if (FirstTypeResult.hasCodeCompletion()) {
       Status.setHasCodeCompletion();
       FirstTypeInComplete = true;
     }
 
-    if (FirstType.isNull()) {
+    if (FirstTypeResult.isNull()) {
       Status.setIsParseError();
       break;
     }
+
+    auto FirstType = FirstTypeResult.get();
+    auto FirstTypeLoc = FirstType->getStartLoc();
 
     if (Tok.is(tok::colon)) {
       // A conformance-requirement.
@@ -311,8 +316,8 @@ ParserStatus Parser::parseGenericWhereClause(
         } else {
           // Add the layout requirement.
           Requirements.push_back(RequirementRepr::getLayoutConstraint(
-              FirstType.get(), ColonLoc,
-              LayoutConstraintLoc(Layout, LayoutLoc)));
+              FirstType, ColonLoc, LayoutConstraintLoc(Layout, LayoutLoc),
+              SourceRange(FirstTypeLoc, PreviousLoc)));
         }
       } else {
         // Parse the protocol or composition.
@@ -327,7 +332,8 @@ ParserStatus Parser::parseGenericWhereClause(
 
         // Add the requirement.
         Requirements.push_back(RequirementRepr::getTypeConstraint(
-            FirstType.get(), ColonLoc, Protocol.get()));
+            FirstType, ColonLoc, Protocol.get(),
+            SourceRange(FirstTypeLoc, PreviousLoc)));
       }
     } else if ((Tok.isAnyOperator() && Tok.getText() == "==") ||
                Tok.is(tok::equal)) {
@@ -349,15 +355,41 @@ ParserStatus Parser::parseGenericWhereClause(
       }
 
       // Add the requirement
-      Requirements.push_back(RequirementRepr::getSameType(FirstType.get(),
-                                                      EqualLoc,
-                                                      SecondType.get()));
+      Requirements.push_back(RequirementRepr::getSameType(
+          FirstType, EqualLoc, SecondType.get(),
+          SourceRange(FirstTypeLoc, PreviousLoc)));
     } else {
       diagnose(Tok, diag::expected_requirement_delim);
       Status.setIsParseError();
       break;
     }
-    HasNextReq = consumeIf(tok::comma);
+    SourceLoc NextCommaLoc;
+    HasNextReq = consumeIf(tok::comma, NextCommaLoc);
+    SWIFT_DEFER { LastCommaLoc = NextCommaLoc; };
+
+    auto &req = Requirements.back();
+    auto removalRange = req.getRemovalRange();
+
+    if (!HasNextReq && LastCommaLoc.isInvalid()) {
+      // Include the where clause in the removal range for the first and only
+      // requirement.
+      removalRange.Start = WhereLoc;
+    }
+    if (HasNextReq) {
+      // Include the next comma in the removal range of a middle requirement.
+      removalRange.End = NextCommaLoc;
+    }
+    if (!HasNextReq && LastCommaLoc.isValid()) {
+      // HACK: Don't provide removal ranges for last-but-not-only requirements.
+      // This is in order to avoid emitting removal fix-its that would require
+      // their source range to be re-calculated after the application of another
+      // fix-it.
+      // FIX-ME(SR-8102): Improve the fix-it engine to handle such 'dependant'
+      // removal fix-its.
+      removalRange = SourceRange();
+    }
+    req.setRemovalRange(removalRange);
+
     // If there's a comma, keep parsing the list.
   } while (HasNextReq);
 

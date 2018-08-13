@@ -5,7 +5,9 @@
 //===----------------------------------------------------------------------===//
 
 func f0<T>(x: Int, y: Int, t: T) { }
-func f1<T : Any>(x: Int, y: Int, t: T) { }
+func f1<T : Any>(x: Int, y: Int, t: T) { } // expected-warning {{redundant conformance constraint 'T': 'Any'}}
+// expected-note@-1 {{all types implicitly conform to 'Any'}}
+
 func f2<T : IteratorProtocol>(x: Int, y: Int, t: T) { }
 func f3<T : () -> ()>(x: Int, y: Int, t: T) { } // expected-error{{expected a class type or protocol-constrained type restricting 'T'}}
 func f4<T>(x: T, y: T) { }

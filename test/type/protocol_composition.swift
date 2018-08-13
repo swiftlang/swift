@@ -26,8 +26,13 @@ typealias Any1 = protocol<> // expected-error {{'protocol<>' syntax has been rem
 typealias Any2 = protocol< > // expected-error {{'protocol<>' syntax has been removed; use 'Any' instead}}
 
 // Okay to inherit a typealias for Any type.
-protocol P5 : Any { }
+protocol P5 : Any { } // expected-warning {{redundant conformance constraint 'Self': 'Any'}}
+// expected-note@-1 {{all types implicitly conform to 'Any'}}
+
 protocol P6 : protocol<> { } // expected-error {{'protocol<>' syntax has been removed; use 'Any' instead}}
+// expected-warning@-1 {{redundant conformance constraint 'Self': 'Any'}}
+// expected-note@-2 {{all types implicitly conform to 'Any'}}
+
 typealias P7 = Any & Any1
 
 extension Int : P5 { }

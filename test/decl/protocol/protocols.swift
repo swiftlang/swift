@@ -51,26 +51,79 @@ protocol FormattedPrintable : CustomStringConvertible {
   func print(format: TestFormat)
 }
 
+// expected-warning@+2 {{redundant conformance of 'X0' to 'Any'}} {{13-18=}}
+// expected-note@+1 {{all types implicitly conform to 'Any'}}
 struct X0 : Any, CustomStringConvertible {
   func print() {}
 }
 
+// expected-warning@+2 {{redundant conformance of 'X1' to 'Any'}} {{12-17=}}
+// expected-note@+1 {{all types implicitly conform to 'Any'}}
 class X1 : Any, CustomStringConvertible {
   func print() {}
 }
 
+// expected-warning@+2 {{redundant conformance of 'X2' to 'Any'}} {{8-14=}}
+// expected-note@+1 {{all types implicitly conform to 'Any'}}
 enum X2 : Any { }
 
 extension X2 : CustomStringConvertible {
   func print() {}
 }
 
+struct X5 {
+  func print() {}
+}
+extension X5 : Any {} // expected-warning {{redundant conformance of 'X5' to 'Any'}} {{13-19=}}
+// expected-note@-1 {{all types implicitly conform to 'Any'}}
+
+extension X5 : Any, CustomStringConvertible {} // expected-warning {{redundant conformance of 'X5' to 'Any'}} {{16-21=}}
+// expected-note@-1 {{all types implicitly conform to 'Any'}}
+
+struct X6 {
+  func print() {}
+}
+extension X6 : CustomStringConvertible, Any {} // expected-warning {{redundant conformance of 'X6' to 'Any'}} {{39-44=}}
+// expected-note@-1 {{all types implicitly conform to 'Any'}}
+
+struct X7<T> : Any {} // expected-warning {{redundant conformance of 'X7<T>' to 'Any'}} {{13-19=}}
+// expected-note@-1 {{all types implicitly conform to 'Any'}}
+
+struct X8<T> {
+  func print() {}
+}
+extension X8 : Any where T : CustomStringConvertible {} // expected-warning {{redundant conformance of 'X8<T>' to 'Any'}} {{13-19=}}
+// expected-note@-1 {{all types implicitly conform to 'Any'}}
+
+typealias AnyAlias = Any
+class X9 : AnyAlias {} // expected-warning {{redundant conformance of 'X9' to 'AnyAlias' (aka 'Any')}} {{9-20=}}
+// expected-note@-1 {{all types implicitly conform to 'AnyAlias' (aka 'Any')}}
+
+struct X10 : Any & Any {} // expected-warning {{redundant conformance of 'X10' to 'Any'}} {{11-23=}}
+// expected-note@-1 {{all types implicitly conform to 'Any'}}
+
+typealias AnyAnyAlias = Any & Any
+
+class X11 : AnyAnyAlias {} // expected-warning {{redundant conformance of 'X11' to 'AnyAnyAlias' (aka 'Any')}} {{10-24=}}
+// expected-note@-1 {{all types implicitly conform to 'AnyAnyAlias' (aka 'Any')}}
+
+struct X12 : Any, Any {}
+// expected-warning@-1 {{redundant conformance of 'X12' to 'Any'}} {{14-19=}}
+// expected-note@-2 {{all types implicitly conform to 'Any'}}
+// expected-error@-3 {{duplicate inheritance from 'Any'}} // FIX-ME(SR-8102): Add expected fix-it {{17-22=}}
+
 // Explicit conformance checks (unsuccessful)
 
+// expected-warning@+2 {{redundant conformance of 'NotPrintableS' to 'Any'}} {{24-29=}}
+// expected-note@+1 {{all types implicitly conform to 'Any'}}
 struct NotPrintableS : Any, CustomStringConvertible {} // expected-error{{type 'NotPrintableS' does not conform to protocol 'CustomStringConvertible'}}
 
+// expected-warning@+2 {{redundant conformance of 'NotPrintableC' to 'Any'}} {{46-51=}}
+// expected-note@+1 {{all types implicitly conform to 'Any'}}
 class NotPrintableC : CustomStringConvertible, Any {} // expected-error{{type 'NotPrintableC' does not conform to protocol 'CustomStringConvertible'}}
 
+// expected-warning@+2 {{redundant conformance of 'NotPrintableO' to 'Any'}} {{22-27=}}
+// expected-note@+1 {{all types implicitly conform to 'Any'}}
 enum NotPrintableO : Any, CustomStringConvertible {} // expected-error{{type 'NotPrintableO' does not conform to protocol 'CustomStringConvertible'}}
 
 struct NotFormattedPrintable : FormattedPrintable { // expected-error{{type 'NotFormattedPrintable' does not conform to protocol 'CustomStringConvertible'}}
