@@ -27,7 +27,7 @@ public let SortIntPyramid = [
 // maximum -||-: 1774
 // average -||-: 357
 
-// pyramid hight
+// pyramid height
 let pH = 5000
 let pyramidTemplate: [Int] = (1...pH) + (1...pH).reversed()
 
@@ -44,7 +44,7 @@ let pyramidTemplate: [Int] = (1...pH) + (1...pH).reversed()
 // maximum -||-: 120
 // average -||-: 36
 
-// adjacent pyramids hight.
+// adjacent pyramids height.
 let aPH = pH / 2
 let adjacentPyramidsTemplate: [Int] = (1...aPH) + (1...aPH).reversed()
                                     + (1...aPH) + (1...aPH).reversed()
