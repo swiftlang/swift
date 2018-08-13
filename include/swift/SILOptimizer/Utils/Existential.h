@@ -88,9 +88,11 @@ struct ConcreteExistentialInfo {
 
   ConcreteExistentialInfo(ConcreteExistentialInfo &) = delete;
 
+  /// We do not not need to check for InitExistential not being not null
+  /// since if that were the case, we would have everything else null too.
   bool isValid() const {
-    return OpenedArchetype && OpenedArchetypeDef && InitExistential
-           && ConcreteType && !ExistentialSubs.empty() && ConcreteValue;
+    return OpenedArchetype && OpenedArchetypeDef && ConcreteType &&
+           !ExistentialSubs.empty() && ConcreteValue;
   }
 
   // Do a conformance lookup on ConcreteType with the given requirement, P. If P
