@@ -373,20 +373,21 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       continue;
 
     // Check whether we inherited from the same type twice.
-    CanType inheritedCanTy = inheritedTy->getCanonicalType();
-    auto knownType = inheritedTypes.find(inheritedCanTy);
-    if (knownType != inheritedTypes.end()) {
+    auto knownPair = inheritedTypes.insert({ inheritedTy->getCanonicalType(),
+                                             {i, inherited.getSourceRange() }});
+    if (knownPair.second == /*insertion failed*/false) {
+      auto knownIndex = knownPair.first->second.first;
+      auto knownRange = knownPair.first->second.second;
       // If the duplicated type is 'AnyObject', check whether the first was
       // written as 'class'. Downgrade the error to a warning in such cases
       // for backward compatibility with Swift <= 4.
       if (!Context.LangOpts.isSwiftVersionAtLeast(5) &&
           inheritedTy->isAnyObject() &&
           (isa<ProtocolDecl>(decl) || isa<AbstractTypeParamDecl>(decl)) &&
-          Lexer::getTokenAtLocation(Context.SourceMgr,
-                                    knownType->second.second.Start)
+          Lexer::getTokenAtLocation(Context.SourceMgr, knownRange.Start)
             .is(tok::kw_class)) {
-        SourceLoc classLoc = knownType->second.second.Start;
-        SourceRange removeRange = getRemovalRange(knownType->second.first);
+        SourceLoc classLoc = knownRange.Start;
+        SourceRange removeRange = getRemovalRange(knownIndex);
 
         diagnose(classLoc, diag::duplicate_anyobject_class_inheritance)
           .fixItRemoveChars(removeRange.Start, removeRange.End);
@@ -398,11 +399,10 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       diagnose(inherited.getSourceRange().Start,
                diag::duplicate_inheritance, inheritedTy)
         .fixItRemoveChars(removeRange.Start, removeRange.End)
-        .highlight(knownType->second.second);
+        .highlight(knownRange);
       inherited.setInvalidType(Context);
       continue;
     }
-    inheritedTypes[inheritedCanTy] = { i, inherited.getSourceRange() };
 
     if (inheritedTy->isExistentialType()) {
       auto layout = inheritedTy->getExistentialLayout();
