@@ -293,6 +293,13 @@ private:
                                          WitnessMethodInst *WMI);
   SILInstruction *propagateConcreteTypeOfInitExistential(FullApplySite Apply);
 
+  // Common utility function to replace the WitnessMethodInst using a
+  // BuilderCtx.
+  void replaceWitnessMethodInst(FullApplySite Apply, WitnessMethodInst *WMI,
+                                SILBuilderContext &BuilderCtx,
+                                const CanType &ConcreteType,
+                                const ProtocolConformanceRef ConformanceRef);
+
   /// Perform one SILCombine iteration.
   bool doOneIteration(SILFunction &F, unsigned Iteration);
 
