@@ -244,7 +244,7 @@ void TypeChecker::checkGenericParamList(GenericSignatureBuilder *builder,
 
   // Determine where and how to perform name lookup for the generic
   // parameter lists and where clause.
-  TypeResolutionOptions options;
+  TypeResolutionOptions options = None;
   DeclContext *lookupDC = genericParams->begin()[0]->getDeclContext();
   if (!lookupDC->isModuleScopeContext()) {
     assert((isa<GenericTypeDecl>(lookupDC) ||
@@ -252,7 +252,7 @@ void TypeChecker::checkGenericParamList(GenericSignatureBuilder *builder,
             isa<AbstractFunctionDecl>(lookupDC) ||
             isa<SubscriptDecl>(lookupDC)) &&
            "not a proper generic parameter context?");
-    options = TypeResolutionFlags::GenericSignature;
+    options = TypeResolutionOptions(TypeResolverContext::GenericSignature);
   }    
 
   // First, add the generic parameters to the generic signature builder.
@@ -285,13 +285,10 @@ bool TypeChecker::validateRequirement(SourceLoc whereLoc, RequirementRepr &req,
   if (req.isInvalid())
     return true;
 
-  // Note that we are resolving within a requirement.
-  options |= TypeResolutionFlags::GenericRequirement;
-
   // Protocol where clauses cannot add conformance and superclass constraints
   // to 'Self', because we need to be able to resolve inherited protocols and
   // protocol superclasses before computing the protocol requirement signature.
-  if (options & TypeResolutionFlags::ProtocolWhereClause) {
+  if (options.is(TypeResolverContext::ProtocolWhereClause)) {
     if (req.getKind() == RequirementReprKind::TypeConstraint ||
         req.getKind() == RequirementReprKind::LayoutConstraint) {
       if (auto *subjectTyR = req.getSubjectLoc().getTypeRepr()) {
@@ -312,6 +309,10 @@ bool TypeChecker::validateRequirement(SourceLoc whereLoc, RequirementRepr &req,
       }
     }
   }
+
+  // Note that we are resolving within a requirement.
+  options.setContext(None);
+  options.setContext(TypeResolverContext::GenericRequirement);
 
   switch (req.getKind()) {
   case RequirementReprKind::TypeConstraint: {
@@ -516,7 +517,8 @@ static void checkGenericFuncSignature(TypeChecker &tc,
   // Check the parameter patterns.
   auto params = func->getParameters();
 
-  tc.typeCheckParameterList(params, func, TypeResolutionOptions(),
+  tc.typeCheckParameterList(params, func,
+                            TypeResolverContext::AbstractFunctionDecl,
                             resolver);
 
   // Infer requirements from the pattern.
@@ -529,10 +531,9 @@ static void checkGenericFuncSignature(TypeChecker &tc,
   if (auto fn = dyn_cast<FuncDecl>(func)) {
     if (!fn->getBodyResultTypeLoc().isNull()) {
       // Check the result type of the function.
-      TypeResolutionOptions options = TypeResolutionFlags::FunctionResult;
-      options |= TypeResolutionFlags::Direct;
-      if (fn->hasDynamicSelf())
-        options |= TypeResolutionFlags::DynamicSelfResult;
+      TypeResolutionOptions options(fn->hasDynamicSelf()
+          ? TypeResolverContext::DynamicSelfResult
+          : TypeResolverContext::FunctionResult);
 
       tc.validateType(fn->getBodyResultTypeLoc(), fn, options, &resolver);
 
@@ -882,10 +883,8 @@ static void checkGenericSubscriptSignature(TypeChecker &tc,
                     &resolver);
 
   // Check the element type.
-  TypeResolutionOptions elementOptions = TypeResolutionFlags::Direct;
-  elementOptions |= TypeResolutionFlags::FunctionResult;
   tc.validateType(subscript->getElementTypeLoc(), subscript,
-                  elementOptions, &resolver);
+                  TypeResolverContext::FunctionResult, &resolver);
 
   // Infer requirements from it.
   if (genericParams && builder) {
@@ -900,9 +899,9 @@ static void checkGenericSubscriptSignature(TypeChecker &tc,
 
   // Check the indices.
   auto params = subscript->getIndices();
-  TypeResolutionOptions options = TypeResolutionFlags::SubscriptParameters;
 
-  tc.typeCheckParameterList(params, subscript, options, resolver);
+  tc.typeCheckParameterList(params, subscript,
+                            TypeResolverContext::SubscriptDecl, resolver);
 
   // Infer requirements from the pattern.
   if (builder) {

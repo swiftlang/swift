@@ -25,13 +25,12 @@ Type InheritedTypeRequest::evaluate(
                         llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
                         unsigned index) const {
   // Figure out how to resolve types.
-  TypeResolutionOptions options;
+  TypeResolutionOptions options = None;
   DeclContext *dc;
   if (auto typeDecl = decl.dyn_cast<TypeDecl *>()) {
     if (auto nominal = dyn_cast<NominalTypeDecl>(typeDecl)) {
       dc = nominal;
-      options |= TypeResolutionFlags::GenericSignature;
-      options |= TypeResolutionFlags::InheritanceClause;
+      options = TypeResolutionOptions(TypeResolverContext::GenericSignature);
       options |= TypeResolutionFlags::AllowUnavailableProtocol;
     } else {
       dc = typeDecl->getDeclContext();
@@ -41,13 +40,13 @@ Type InheritedTypeRequest::evaluate(
         // signature of the enclosing entity.
         if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
           dc = nominal;
-          options |= TypeResolutionFlags::GenericSignature;
+          options = TypeResolutionOptions(TypeResolverContext::GenericSignature);
         } else if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
           dc = ext;
-          options |= TypeResolutionFlags::GenericSignature;
+          options = TypeResolutionOptions(TypeResolverContext::GenericSignature);
         } else if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
           dc = func;
-          options |= TypeResolutionFlags::GenericSignature;
+          options = TypeResolutionOptions(TypeResolverContext::GenericSignature);
         } else if (!dc->isModuleScopeContext()) {
           // Skip the generic parameter's context entirely.
           dc = dc->getParent();
@@ -57,8 +56,7 @@ Type InheritedTypeRequest::evaluate(
   } else {
     auto ext = decl.get<ExtensionDecl *>();
     dc = ext;
-    options |= TypeResolutionFlags::GenericSignature;
-    options |= TypeResolutionFlags::InheritanceClause;
+    options = TypeResolutionOptions(TypeResolverContext::GenericSignature);
     options |= TypeResolutionFlags::AllowUnavailableProtocol;
   }
 
