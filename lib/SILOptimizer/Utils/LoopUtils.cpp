@@ -119,8 +119,8 @@ static SILBasicBlock *insertBackedgeBlock(SILLoop *L, DominanceInfo *DT,
   // Create and insert the new backedge block...
   SILBasicBlock *BEBlock = F->createBasicBlock(BackedgeBlocks.back());
 
-  DEBUG(llvm::dbgs() << "  Inserting unique backedge block " << *BEBlock
-        << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "  Inserting unique backedge block " << *BEBlock
+                          << "\n");
 
   // Now that the block has been inserted into the function, create PHI nodes in
   // the backedge block which correspond to any PHI nodes in the header block.
@@ -197,12 +197,12 @@ static bool canonicalizeLoopExitBlocks(SILLoop *L, DominanceInfo *DT,
 // This is unfortunate but necessary since splitCriticalEdge may change IDs.
 #ifndef NDEBUG
       llvm::SmallString<5> OldExitingBlockName;
-      DEBUG({
+      LLVM_DEBUG({
         llvm::raw_svector_ostream buffer(OldExitingBlockName);
         ExitingBlock->printAsOperand(buffer);
       });
       llvm::SmallString<5> OldSuccBBName;
-      DEBUG({
+      LLVM_DEBUG({
         llvm::raw_svector_ostream buffer(OldSuccBBName);
         SuccBB->printAsOperand(buffer);
       });
@@ -210,11 +210,11 @@ static bool canonicalizeLoopExitBlocks(SILLoop *L, DominanceInfo *DT,
 
       // Split any critical edges in between exiting block and succ iter.
       if (splitCriticalEdge(ExitingBlock->getTerminator(), i, DT, LI)) {
-        DEBUG(llvm::dbgs() << "Split critical edge from " << OldExitingBlockName
-                           << " NewID: ";
-              ExitingBlock->printAsOperand(llvm::dbgs());
-              llvm::dbgs() << " -> OldID: " << OldSuccBBName << " NewID: ";
-              SuccBB->printAsOperand(llvm::dbgs()); llvm::dbgs() << "\n");
+        LLVM_DEBUG(llvm::dbgs() << "Split critical edge from "
+                                << OldExitingBlockName << " NewID: ";
+                   ExitingBlock->printAsOperand(llvm::dbgs());
+                   llvm::dbgs() << " -> OldID: " << OldSuccBBName << " NewID: ";
+                   SuccBB->printAsOperand(llvm::dbgs()); llvm::dbgs() << "\n");
         Changed = true;
       }
     }

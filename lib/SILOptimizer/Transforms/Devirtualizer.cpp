@@ -38,8 +38,8 @@ class Devirtualizer : public SILFunctionTransform {
   void run() override {
     SILFunction &F = *getFunction();
     ClassHierarchyAnalysis *CHA = PM->getAnalysis<ClassHierarchyAnalysis>();
-    DEBUG(llvm::dbgs() << "***** Devirtualizer on function:" << F.getName()
-                       << " *****\n");
+    LLVM_DEBUG(llvm::dbgs() << "***** Devirtualizer on function:" << F.getName()
+                            << " *****\n");
 
     if (devirtualizeAppliesInFunction(F, CHA))
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
@@ -103,7 +103,7 @@ bool Devirtualizer::devirtualizeAppliesInFunction(SILFunction &F,
     // be beneficial to rerun some earlier passes on the current
     // function now that we've made these direct references visible.
     if (CalleeFn->isDefinition() && CalleeFn->shouldOptimize())
-      notifyAddFunction(CalleeFn, nullptr);
+      addFunctionToPassManagerWorklist(CalleeFn, nullptr);
   }
 
   return Changed;

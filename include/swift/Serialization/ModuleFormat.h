@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 427; // Invalid conformances
+const uint16_t VERSION_MINOR = 435; // Last change: serialize new-style function parameters
 
 using DeclIDField = BCFixed<31>;
 
@@ -118,7 +118,8 @@ enum class ReadImplKind : uint8_t {
   Stored = 0,
   Get,
   Inherited,
-  Address
+  Address,
+  Read,
 };
 using ReadImplKindField = BCFixed<3>;
 
@@ -131,6 +132,7 @@ enum class WriteImplKind : uint8_t {
   InheritedWithObservers,
   Set,
   MutableAddress,
+  Modify,
 };
 using WriteImplKindField = BCFixed<3>;
 
@@ -142,6 +144,7 @@ enum class ReadWriteImplKind : uint8_t {
   MaterializeForSet,
   MutableAddress,
   MaterializeToTemporary,
+  Modify,
 };
 using ReadWriteImplKindField = BCFixed<3>;
 
@@ -208,7 +211,7 @@ enum OperatorKind : uint8_t {
   PrecedenceGroup,  // only for cross references
 };
 // This is currently required to have the same width as AccessorKindField.
-using OperatorKindField = BCFixed<3>;
+using OperatorKindField = BCFixed<4>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
@@ -220,8 +223,10 @@ enum AccessorKind : uint8_t {
   MaterializeForSet,
   Address,
   MutableAddress,
+  Read,
+  Modify,
 };
-using AccessorKindField = BCFixed<3>;
+using AccessorKindField = BCFixed<4>;
 
 using AccessorCountField = BCFixed<3>;
 
@@ -701,11 +706,7 @@ namespace decls_block {
 
   using ParenTypeLayout = BCRecordLayout<
     PAREN_TYPE,
-    TypeIDField,        // inner type
-    BCFixed<1>,         // vararg?
-    BCFixed<1>,         // autoclosure?
-    BCFixed<1>,         // escaping?
-    ValueOwnershipField // inout, shared or owned?
+    TypeIDField         // inner type
   >;
 
   using TupleTypeLayout = BCRecordLayout<
@@ -715,21 +716,28 @@ namespace decls_block {
   using TupleTypeEltLayout = BCRecordLayout<
     TUPLE_TYPE_ELT,
     IdentifierIDField,  // name
-    TypeIDField,        // type
-    BCFixed<1>,         // vararg?
-    BCFixed<1>,         // autoclosure?
-    BCFixed<1>,         // escaping?
-    ValueOwnershipField // inout, shared or owned?
+    TypeIDField         // type
   >;
 
   using FunctionTypeLayout = BCRecordLayout<
     FUNCTION_TYPE,
-    TypeIDField, // input
     TypeIDField, // output
     FunctionTypeRepresentationField, // representation
     BCFixed<1>,  // auto-closure?
     BCFixed<1>,  // noescape?
     BCFixed<1>   // throws?
+
+    // trailed by parameters
+  >;
+
+  using FunctionParamLayout = BCRecordLayout<
+    FUNCTION_PARAM,
+    IdentifierIDField,  // name
+    TypeIDField,        // type
+    BCFixed<1>,         // vararg?
+    BCFixed<1>,         // autoclosure?
+    BCFixed<1>,         // escaping?
+    ValueOwnershipField // inout, shared or owned?
   >;
 
   using MetatypeTypeLayout = BCRecordLayout<
@@ -742,11 +750,6 @@ namespace decls_block {
     EXISTENTIAL_METATYPE_TYPE,
     TypeIDField,                       // instance type
     MetatypeRepresentationField        // representation
-  >;
-
-  using InOutTypeLayout = BCRecordLayout<
-    INOUT_TYPE,
-    TypeIDField // object type
   >;
 
   using ArchetypeTypeLayout = BCRecordLayout<
@@ -780,11 +783,12 @@ namespace decls_block {
 
   using GenericFunctionTypeLayout = BCRecordLayout<
     GENERIC_FUNCTION_TYPE,
-    TypeIDField,         // input
     TypeIDField,         // output
     FunctionTypeRepresentationField, // representation
     BCFixed<1>,          // throws?
     GenericSignatureIDField // generic signture
+
+    // trailed by parameters
   >;
 
   using SILFunctionTypeLayout = BCRecordLayout<
@@ -866,7 +870,6 @@ namespace decls_block {
   using GenericTypeParamDeclLayout = BCRecordLayout<
     GENERIC_TYPE_PARAM_DECL,
     IdentifierIDField,  // name
-    DeclContextIDField, // context decl
     BCFixed<1>,         // implicit flag
     BCVBR<4>,           // depth
     BCVBR<4>            // index
@@ -961,7 +964,6 @@ namespace decls_block {
     BCFixed<1>,  // throws?
     CtorInitializerKindField,  // initializer kind
     GenericEnvironmentIDField, // generic environment
-    TypeIDField, // interface type
     DeclIDField, // overridden decl
     AccessLevelField, // access level
     BCFixed<1>,   // requires a new vtable slot
@@ -998,11 +1000,14 @@ namespace decls_block {
 
   using ParamLayout = BCRecordLayout<
     PARAM_DECL,
-    IdentifierIDField, // argument name
-    IdentifierIDField, // parameter name
-    DeclContextIDField,  // context decl
-    VarDeclSpecifierField,   // specifier
-    TypeIDField  // interface type
+    IdentifierIDField,     // argument name
+    IdentifierIDField,     // parameter name
+    DeclContextIDField,    // context decl
+    VarDeclSpecifierField, // specifier
+    TypeIDField,           // interface type
+    BCFixed<1>,            // isVariadic?
+    DefaultArgumentField,  // default argument kind
+    BCBlob                 // default argument text
   >;
 
   using FuncLayout = BCRecordLayout<
@@ -1017,7 +1022,7 @@ namespace decls_block {
     BCFixed<1>,   // has forced static dispatch?
     BCFixed<1>,   // throws?
     GenericEnvironmentIDField, // generic environment
-    TypeIDField,  // interface type
+    TypeIDField,  // result interface type
     DeclIDField,  // operator decl
     DeclIDField,  // overridden function
     BCVBR<5>,     // 0 for a simple name, otherwise the number of parameter name
@@ -1046,7 +1051,7 @@ namespace decls_block {
     BCFixed<1>,   // has forced static dispatch?
     BCFixed<1>,   // throws?
     GenericEnvironmentIDField, // generic environment
-    TypeIDField,  // interface type
+    TypeIDField,  // result interface type
     DeclIDField,  // overridden function
     DeclIDField,  // AccessorStorageDecl
     AccessorKindField, // accessor kind
@@ -1103,7 +1108,6 @@ namespace decls_block {
   using EnumElementLayout = BCRecordLayout<
     ENUM_ELEMENT_DECL,
     DeclContextIDField,// context decl
-    TypeIDField, // interface type
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // has payload?
     EnumElementRawValueKindField,  // raw value kind
@@ -1129,7 +1133,7 @@ namespace decls_block {
     ReadWriteImplKindField,   // read-write implementation
     AccessorCountField, // number of accessors
     GenericEnvironmentIDField, // generic environment
-    TypeIDField, // interface type
+    TypeIDField, // element interface type
     DeclIDField, // overridden decl
     AccessLevelField, // access level
     AccessLevelField, // setter access, if applicable
@@ -1160,22 +1164,13 @@ namespace decls_block {
     DeclContextIDField, // context decl
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // objc?
-    GenericEnvironmentIDField, // generic environment
-    TypeIDField  // interface type
-    // Trailed by a pattern for self.
+    GenericEnvironmentIDField // generic environment
   >;
 
   using ParameterListLayout = BCRecordLayout<
     PARAMETERLIST,
-    BCVBR<5>    // numparams
+    BCArray<DeclIDField> // params
   >;
-  
-  using ParameterListEltLayout = BCRecordLayout<
-    PARAMETERLIST_ELT,
-    DeclIDField,           // ParamDecl
-    BCFixed<1>,            // isVariadic?
-    DefaultArgumentField   // default argument
-    >;
 
   using ParenPatternLayout = BCRecordLayout<
     PAREN_PATTERN,
@@ -1257,8 +1252,8 @@ namespace decls_block {
   using GenericRequirementLayout = BCRecordLayout<
     GENERIC_REQUIREMENT,
     GenericRequirementKindField, // requirement kind
-    TypeIDField,                 // types involved (two for conformance,
-    TypeIDField                  // same-type; one for value witness marker)
+    TypeIDField,                 // subject type
+    TypeIDField                  // constraint type
   >;
 
   using LayoutRequirementLayout = BCRecordLayout<
@@ -1630,6 +1625,8 @@ namespace index_block {
     NESTED_TYPE_DECLS,
     DECL_MEMBER_NAMES,
 
+    ORDERED_TOP_LEVEL_DECLS,
+
     GENERIC_SIGNATURE_OFFSETS,
     SUBSTITUTION_MAP_OFFSETS,
     LastRecordKind = SUBSTITUTION_MAP_OFFSETS,
@@ -1683,6 +1680,11 @@ namespace index_block {
   using EntryPointLayout = BCRecordLayout<
     ENTRY_POINT,
     DeclIDField  // the ID of the main class; 0 if there was a main source file
+  >;
+
+  using OrderedDeclsLayout = BCGenericRecordLayout<
+    RecordIDField,        // record ID
+    BCArray<DeclIDField>  // list of decls by ID
   >;
 }
 

@@ -960,11 +960,13 @@ bool ModelASTWalker::walkToTypeReprPre(TypeRepr *T) {
       return false;
 
   } else if (auto IdT = dyn_cast<ComponentIdentTypeRepr>(T)) {
-    if (!passNonTokenNode({ SyntaxNodeKind::TypeId,
-                            CharSourceRange(IdT->getIdLoc(),
-                                            IdT->getIdentifier().getLength())
-                          }))
+    if (!passTokenNodesUntil(IdT->getIdLoc(), ExcludeNodeAtLocation))
       return false;
+    if (TokenNodes.front().Range.getStart() != IdT->getIdLoc())
+      return false;
+    if (!passNode({SyntaxNodeKind::TypeId, TokenNodes.front().Range}))
+      return false;
+    TokenNodes = TokenNodes.slice(1);
   }
   return true;
 }

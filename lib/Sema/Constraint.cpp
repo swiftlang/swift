@@ -433,8 +433,6 @@ StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
   switch (kind) {
   case ConversionRestrictionKind::TupleToTuple:
     return "[tuple-to-tuple]";
-  case ConversionRestrictionKind::ScalarToTuple:
-    return "[scalar-to-tuple]";
   case ConversionRestrictionKind::DeepEquality:
     return "[deep equality]";
   case ConversionRestrictionKind::Superclass:
@@ -493,6 +491,13 @@ Fix Fix::getUnwrapOptionalBase(ConstraintSystem &cs, DeclName memberName) {
   return Fix(FixKind::UnwrapOptionalBase, index);
 }
 
+Fix Fix::fixArgumentLabels(ConstraintSystem &cs,
+                           ArrayRef<Identifier> newLabels) {
+  unsigned index = cs.FixedArgLabels.size();
+  cs.FixedArgLabels.push_back(newLabels);
+  return Fix(FixKind::RelabelArguments, index);
+}
+
 Type Fix::getTypeArgument(ConstraintSystem &cs) const {
   assert(getKind() == FixKind::ForceDowncast);
   return cs.FixedTypes[Data];
@@ -502,6 +507,20 @@ Type Fix::getTypeArgument(ConstraintSystem &cs) const {
 DeclName Fix::getDeclNameArgument(ConstraintSystem &cs) const {
   assert(getKind() == FixKind::UnwrapOptionalBase);
   return cs.FixedDeclNames[Data];
+}
+
+ArrayRef<Identifier> Fix::getArgumentLabels(ConstraintSystem &cs) const {
+  assert(getKind() == FixKind::RelabelArguments);
+  return cs.FixedArgLabels[Data];
+}
+
+/// If this fix has optional result info, retrieve it.
+bool Fix::isUnwrapOptionalBaseByOptionalChaining(ConstraintSystem &cs) const {
+  assert(getKind() == FixKind::UnwrapOptionalBase);
+
+  // Assumes that these fixes are always created in pairs, with the first
+  // created non-optional and the second with an added optional.
+  return (Data % 2) == 1;
 }
 
 StringRef Fix::getName(FixKind kind) {
@@ -519,6 +538,10 @@ StringRef Fix::getName(FixKind kind) {
   case FixKind::ExplicitlyEscaping:
   case FixKind::ExplicitlyEscapingToAny:
     return "fix: add @escaping";
+  case FixKind::RelabelArguments:
+    return "fix: re-label argument(s)";
+  case FixKind::AddConformance:
+    return "fix: add missing protocol conformance";
   }
 
   llvm_unreachable("Unhandled FixKind in switch.");
@@ -798,7 +821,6 @@ Constraint *Constraint::createDisjunction(ConstraintSystem &cs,
   auto disjunction =  new (mem) Constraint(ConstraintKind::Disjunction,
                               cs.allocateCopy(constraints), locator, typeVars);
   disjunction->RememberChoice = (bool) rememberChoice;
-  cs.noteNewDisjunction(disjunction);
   return disjunction;
 }
 

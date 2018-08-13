@@ -709,6 +709,13 @@ extension Node {
         return item.key == key
         // expected-error@-1 {{binary operator '==' cannot be applied to operands of type '_' and 'Self.K'}}
         // expected-note@-2 {{overloads for '==' exist with these partially matching parameter lists:}}
-      })
+      })!
   }
 }
+
+// Make sure we don't allow this anymore
+func takesTwo(_: (Int, Int) -> ()) {}
+func takesTwoInOut(_: (Int, inout Int) -> ()) {}
+
+takesTwo { _ in } // expected-error {{contextual closure type '(Int, Int) -> ()' expects 2 arguments, but 1 was used in closure body}}
+takesTwoInOut { _ in } // expected-error {{contextual closure type '(Int, inout Int) -> ()' expects 2 arguments, but 1 was used in closure body}}

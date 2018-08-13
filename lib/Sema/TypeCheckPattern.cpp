@@ -458,13 +458,15 @@ public:
     SmallVector<ComponentIdentTypeRepr *, 2> components;
     if (!ExprToIdentTypeRepr(components, TC.Context).visit(ude->getBase()))
       return nullptr;
-    
+
+    TypeResolutionOptions options;
+    options |= TypeResolutionFlags::AllowUnboundGenerics;
+    options |= TypeResolutionFlags::SilenceErrors;
+
     auto *repr = IdentTypeRepr::create(TC.Context, components);
       
     // See if the repr resolves to a type.
-    Type ty = TC.resolveIdentifierType(DC, repr,
-                                      TypeResolutionFlags::AllowUnboundGenerics,
-                                       /*diagnoseErrors*/false, &resolver);
+    Type ty = TC.resolveIdentifierType(DC, repr, options, &resolver);
     
     auto *enumDecl = dyn_cast_or_null<EnumDecl>(ty->getAnyNominal());
     if (!enumDecl)
@@ -576,13 +578,17 @@ public:
       auto *enumDecl = referencedElement->getParentEnum();
       loc = TypeLoc::withoutLoc(enumDecl->getDeclaredTypeInContext());
     } else {
+      TypeResolutionOptions options;
+      options |= TypeResolutionFlags::AllowUnboundGenerics;
+      options |= TypeResolutionFlags::SilenceErrors;
+
       // Otherwise, see whether we had an enum type as the penultimate
       // component, and look up an element inside it.
       auto *prefixRepr = IdentTypeRepr::create(TC.Context, components);
+
       // See first if the entire repr resolves to a type.
-      Type enumTy = TC.resolveIdentifierType(DC, prefixRepr,
-                                      TypeResolutionFlags::AllowUnboundGenerics,
-                                      /*diagnoseErrors*/false, &resolver);
+      Type enumTy = TC.resolveIdentifierType(DC, prefixRepr, options,
+                                             &resolver);
       if (!dyn_cast_or_null<EnumDecl>(enumTy->getAnyNominal()))
         return nullptr;
 
@@ -743,11 +749,12 @@ static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
   // If the element is a variadic parameter, resolve the parameter type as if
   // it were in non-parameter position, since we want functions to be
   // @escaping in this case.
-  auto elementOptions = (options | (decl->isVariadic()
-                                    ? TypeResolutionFlags::VariadicFunctionInput
-                                    : TypeResolutionFlags::FunctionInput));
-  if (!decl->isVariadic())
-    elementOptions |= TypeResolutionFlags::AllowIUO;
+  options |= TypeResolutionFlags::Direct;
+  if (decl->isVariadic()) {
+    options |= TypeResolutionFlags::VariadicFunctionInput;
+  } else {
+    options |= TypeResolutionFlags::FunctionInput;
+  }
 
   bool hadError = false;
 
@@ -756,8 +763,7 @@ static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
   // We might have a null typeLoc if this is a closure parameter list,
   // where parameters are allowed to elide their types.
   if (!TL.isNull()) {
-    hadError |= TC.validateType(TL, DC,
-                                elementOptions, &resolver);
+    hadError |= TC.validateType(TL, DC, options, &resolver);
   }
 
   auto *TR = TL.getTypeRepr();
@@ -767,7 +773,7 @@ static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
   // If this is declared with '!' indicating that it is an Optional
   // that we should implicitly unwrap if doing so is required to type
   // check, then add an attribute to the decl.
-  if (elementOptions.contains(TypeResolutionFlags::AllowIUO) && TR &&
+  if (!decl->isVariadic() && TR &&
       TR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
     auto &C = DC->getASTContext();
     decl->getAttrs().add(
@@ -783,39 +789,25 @@ static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
     TL.setType(Ty);
   }
 
-  // If the user did not explicitly write 'let', 'var', or 'inout', we'll let
-  // type inference figure out what went wrong in detail.
-  if (decl->getSpecifierLoc().isValid()) {
-    // If the param is not a 'let' and it is not an 'inout'.
-    // It must be a 'var'. Provide helpful diagnostics like a shadow copy
-    // in the function body to fix the 'var' attribute.
-    if (!decl->isImmutable() && !decl->isImplicit() &&
-        (Ty.isNull() || !Ty->is<InOutType>()) && !hadError) {
-      decl->setInvalid();
-      hadError = true;
-    }
-  }
-
   if (hadError)
     TL.setInvalidType(TC.Context);
 
   return hadError;
 }
 
-/// Request nominal layout for any types that could be sources of typemetadata
+/// Request nominal layout for any types that could be sources of type metadata
 /// or conformances.
 void TypeChecker::requestRequiredNominalTypeLayoutForParameters(
     ParameterList *PL) {
   for (auto param : *PL) {
-    if (!param->hasType())
+    if (!param->hasInterfaceType())
       continue;
 
     // Generic types are sources for typemetadata and conformances. If a
     // parameter is of dependent type then the body of a function with said
     // parameter could potentially require the generic type's layout to
     // recover them.
-    if (auto *nominalDecl = dyn_cast_or_null<NominalTypeDecl>(
-            param->getType()->getAnyGeneric())) {
+    if (auto *nominalDecl = param->getInterfaceType()->getAnyNominal()) {
       requestNominalLayout(nominalDecl);
     }
   }
@@ -856,35 +848,31 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
       param->markInvalid();
       hadError = true;
     } else {
-      if (type->is<InOutType>())
-        param->setSpecifier(VarDecl::Specifier::InOut);
-      param->setInterfaceType(type->getInOutObjectType());
+      param->setInterfaceType(type);
     }
     
     checkTypeModifyingDeclAttributes(param);
     if (!hadError) {
-      if (isa<InOutTypeRepr>(typeRepr)) {
+      auto *nestedRepr = typeRepr;
+
+      // Look through parens here; other than parens, specifiers
+      // must appear at the top level of a parameter type.
+      while (auto *tupleRepr = dyn_cast<TupleTypeRepr>(nestedRepr)) {
+        if (!tupleRepr->isParenType())
+          break;
+        nestedRepr = tupleRepr->getElementType(0);
+      }
+
+      if (isa<InOutTypeRepr>(nestedRepr)) {
         param->setSpecifier(VarDecl::Specifier::InOut);
-      } else if (isa<SharedTypeRepr>(typeRepr)) {
+      } else if (isa<SharedTypeRepr>(nestedRepr)) {
         param->setSpecifier(VarDecl::Specifier::Shared);
-      } else if (isa<OwnedTypeRepr>(typeRepr)) {
+      } else if (isa<OwnedTypeRepr>(nestedRepr)) {
         param->setSpecifier(VarDecl::Specifier::Owned);
       }
     }
   }
   
-  return hadError;
-}
-
-bool TypeChecker::typeCheckParameterLists(AbstractFunctionDecl *fd,
-                                          GenericTypeResolver &resolver) {
-  bool hadError = false;
-  for (auto paramList : fd->getParameterLists()) {
-    hadError |= typeCheckParameterList(paramList, fd,
-                                       TypeResolutionOptions(),
-                                       resolver);
-  }
-
   return hadError;
 }
 
@@ -1034,7 +1022,8 @@ recur:
     if ((options & TypeResolutionFlags::EnumPatternPayload)
         && !isa<TuplePattern>(semantic)) {
       if (auto tupleType = type->getAs<TupleType>()) {
-        if (tupleType->hasParenSema(/*allowName*/true)) {
+        if (tupleType->getNumElements() == 1 &&
+            !tupleType->getElement(0).isVararg()) {
           auto elementTy = tupleType->getElementType(0);
           if (coercePatternToType(sub, dc, elementTy, subOptions, resolver))
             return true;
@@ -1632,29 +1621,22 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
       // Coerce explicitly specified argument type to contextual type
       // only if both types are valid and do not match.
       if (!hadError && isValidType(ty) && !ty->isEqual(paramType)) {
-        assert(!param->isImmutable() || !ty->is<InOutType>());
-        param->setType(ty->getInOutObjectType());
-        param->setInterfaceType(ty->mapTypeOutOfContext()->getInOutObjectType());
+        param->setType(ty);
+        param->setInterfaceType(ty->mapTypeOutOfContext());
       }
     }
     
-    assert(!ty->hasLValueType() && "Bound param type to @lvalue?");
+    assert(ty->isMaterializable());
     if (forceMutable) {
       param->setSpecifier(VarDecl::Specifier::InOut);
-    } else if (auto *TTy = ty->getAs<TupleType>()) {
-      if (param->hasName() && TTy->hasInOutElement()) {
-        diagnose(param->getStartLoc(),
-                 diag::param_type_non_materializable_tuple, ty);
-      }
     }
 
     // If contextual type is invalid and we have a valid argument type
     // trying to coerce argument to contextual type would mean erasing
     // valuable diagnostic information.
     if (isValidType(ty) || shouldOverwriteParam(param)) {
-      assert(!param->isImmutable() || !ty->is<InOutType>());
-      param->setType(ty->getInOutObjectType());
-      param->setInterfaceType(ty->mapTypeOutOfContext()->getInOutObjectType());
+      param->setType(ty);
+      param->setInterfaceType(ty->mapTypeOutOfContext());
     }
     
     checkTypeModifyingDeclAttributes(param);
@@ -1664,7 +1646,9 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
   auto hasParenSugar = [](ArrayRef<AnyFunctionType::Param> params) -> bool {
     if (params.size() == 1) {
       const auto &param = params.front();
-      return !param.hasLabel() && !param.isVariadic();
+      return (!param.hasLabel() &&
+              !param.isVariadic() &&
+              !param.isInOut());
     }
 
     return false;
@@ -1673,45 +1657,34 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
   auto getType = [](const AnyFunctionType::Param &param) -> Type {
     auto type = param.getPlainType();
 
-    if (param.isInOut())
-      return InOutType::get(type);
-
     if (param.isVariadic())
       return ArraySliceType::get(type);
 
     return type;
   };
 
-  // Check if parameter list only contains one single tuple.
-  // If it is, then parameter type would be sugared ParenType
-  // with a single underlying TupleType. In that case, check if
-  // the closure argument is also one to avoid the tuple splat
-  // from happening.
+  // If the closure is called with a single argument of tuple type
+  // but the closure body expects multiple parameters, explode the
+  // tuple.
+  //
+  // FIXME: This looks like the wrong place for this; the constraint
+  // solver should have inserted an explicit conversion already.
+  //
+  // The only reason we can get away with this, I think, is that
+  // at the SIL level, recursive tuple expansion lowers
+  // ((T, U)) -> () and (T, U) -> () to the same function type,
+  // and SILGen doesn't enforce AST invariaints very strictly.
   if (!hadError && hasParenSugar(params)) {
-    auto underlyingTy = params.front().getType();
-
-    if (underlyingTy->is<TupleType>() &&
-        !underlyingTy->castTo<TupleType>()->getVarArgsBaseType()) {
+    auto underlyingTy = params.front().getPlainType();
+    if (underlyingTy->is<TupleType>()) {
+      // If we're actually expecting a single parameter, handle it normally.
       if (P->size() == 1)
         return handleParameter(P->get(0), underlyingTy, /*mutable*/false);
-    }
 
-    // pass (strip paren sugar)
-    params.clear();
-    FunctionType::decomposeInput(underlyingTy, params);
-  }
-
-  // The context type must be a tuple.
-  if (hasParenSugar(params) && !hadError) {
-    const auto &param = params.front();
-    if (P->size() == 1) {
-      assert(P->size() == params.size());
-      return handleParameter(P->get(0), getType(param),
-                             /*mutable*/ param.isInOut());
+      // Otherwise, explode the tuple.
+      params.clear();
+      FunctionType::decomposeInput(underlyingTy, params);
     }
-    diagnose(P->getStartLoc(), diag::tuple_pattern_in_non_tuple_context,
-             param.getType());
-    hadError = true;
   }
   
   // The number of elements must match exactly.

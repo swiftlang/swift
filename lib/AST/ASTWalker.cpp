@@ -313,9 +313,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       visitGenericParamList(AFD->getGenericParams());
     }
 
-    for (auto PL : AFD->getParameterLists()) {
-      visit(PL);
-    }
+    if (auto *PD = AFD->getImplicitSelfDecl())
+      visit(PD);
+    visit(AFD->getParameters());
 
     if (auto *FD = dyn_cast<FuncDecl>(AFD))
       if (!isa<AccessorDecl>(FD))
@@ -1303,6 +1303,16 @@ Stmt *Traversal::visitReturnStmt(ReturnStmt *RS) {
   else
     return nullptr;
   return RS;
+}
+
+Stmt *Traversal::visitYieldStmt(YieldStmt *YS) {
+  for (auto &yield : YS->getMutableYields()) {
+    if (Expr *E = doIt(yield))
+      yield = E;
+    else
+      return nullptr;
+  }
+  return YS;
 }
 
 Stmt *Traversal::visitDeferStmt(DeferStmt *DS) {

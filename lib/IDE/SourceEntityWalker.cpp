@@ -33,6 +33,7 @@ class SemaAnnotator : public ASTWalker {
   SourceEntityWalker &SEWalker;
   SmallVector<ConstructorRefCallExpr *, 2> CtorRefs;
   SmallVector<ExtensionDecl *, 2> ExtDecls;
+  llvm::SmallDenseMap<OpaqueValueExpr *, Expr *, 4> OpaqueValueMap;
   bool Cancelled = false;
   Optional<AccessKind> OpAccess;
 
@@ -118,9 +119,8 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
     };
 
     if (auto AF = dyn_cast<AbstractFunctionDecl>(VD)) {
-      for (auto *PL : AF->getParameterLists())
-        if (ReportParamList(PL))
-          return false;
+      if (ReportParamList(AF->getParameters()))
+        return false;
     }
     if (auto SD = dyn_cast<SubscriptDecl>(VD)) {
       if (ReportParamList(SD->getIndices()))
@@ -218,8 +218,9 @@ std::pair<bool, Stmt *> SemaAnnotator::walkToStmtPre(Stmt *S) {
       // walk into the body.
       if (auto *FD = DeferS->getTempDecl()) {
         auto *RetS = FD->getBody()->walk(*this);
+        if (!RetS)
+          return { false, nullptr };
         assert(RetS == FD->getBody());
-        (void)RetS;
       }
       bool Continue = SEWalker.walkToStmtPost(DeferS);
       if (!Continue)
@@ -247,6 +248,8 @@ static SemaReferenceKind getReferenceKind(Expr *Parent, Expr *E) {
 }
 
 std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
+  assert(E);
+
   if (isDone())
     return { false, nullptr };
 
@@ -258,6 +261,10 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
 
   if (!isa<InOutExpr>(E) &&
       !isa<LoadExpr>(E) &&
+      !isa<OpenExistentialExpr>(E) &&
+      !isa<MakeTemporarilyEscapableExpr>(E) &&
+      !isa<CollectionUpcastConversionExpr>(E) &&
+      !isa<OpaqueValueExpr>(E) &&
       E->isImplicit())
     return { true, E };
 
@@ -409,17 +416,64 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       llvm::SaveAndRestore<Optional<AccessKind>>
         C(this->OpAccess, AccessKind::Write);
 
-      if (!AE->getDest()->walk(*this))
+      if (AE->getDest() && !AE->getDest()->walk(*this))
         return { false, nullptr };
     }
 
-    if (!AE->getSrc()->walk(*this))
+    if (AE->getSrc() && !AE->getSrc()->walk(*this))
       return { false, nullptr };
 
     // We already visited the children.
     if (!walkToExprPost(E))
       return { false, nullptr };
     return { false, E };
+  } else if (auto OEE = dyn_cast<OpenExistentialExpr>(E)) {
+    // Record opaque value.
+    OpaqueValueMap[OEE->getOpaqueValue()] = OEE->getExistentialValue();
+    SWIFT_DEFER {
+      OpaqueValueMap.erase(OEE->getOpaqueValue());
+    };
+
+    if (!OEE->getSubExpr()->walk(*this))
+      return { false, nullptr };
+    if (!walkToExprPost(E))
+      return { false, nullptr };
+    return { false, E };
+  } else if (auto MTEE = dyn_cast<MakeTemporarilyEscapableExpr>(E)) {
+    // Manually walk to original arguments in order. We don't handle
+    // OpaqueValueExpr here.
+
+    // Original non-escaping closure.
+    if (!MTEE->getNonescapingClosureValue()->walk(*this))
+      return { false, nullptr };
+
+    // Body, which is called by synthesized CallExpr.
+    auto *callExpr = cast<CallExpr>(MTEE->getSubExpr());
+    if (!callExpr->getFn()->walk(*this))
+      return { false, nullptr };
+
+    if (!walkToExprPost(E))
+      return { false, nullptr };
+    return { false, E };
+  } else if (auto CUCE = dyn_cast<CollectionUpcastConversionExpr>(E)) {
+    // Ignore conversion expressions. We don't handle OpaqueValueExpr here
+    // because it's only in conversion expressions. Instead, just walk into
+    // sub expression.
+    if (!CUCE->getSubExpr()->walk(*this))
+      return { false, nullptr };
+    if (!walkToExprPost(E))
+      return { false, nullptr };
+    return { false, E };
+  } else if (auto OVE = dyn_cast<OpaqueValueExpr>(E)) {
+    // Walk into mapped value.
+    auto value = OpaqueValueMap.find(OVE);
+    if (value != OpaqueValueMap.end()) {
+      if (!value->second->walk(*this))
+        return { false, nullptr };
+      if (!walkToExprPost(E))
+        return { false, nullptr };
+      return { false, E };
+    }
   }
 
   return { true, E };

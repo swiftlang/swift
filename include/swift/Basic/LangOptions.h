@@ -22,7 +22,6 @@
 #include "swift/Basic/CycleDiagnosticKind.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Version.h"
-#include "clang/Basic/VersionTuple.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallVector.h"
@@ -31,6 +30,7 @@
 #include "llvm/ADT/Triple.h"
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/VersionTuple.h"
 #include <string>
 #include <vector>
 
@@ -121,6 +121,9 @@ namespace swift {
     /// Whether to use heuristics to decide whether to show call-pattern
     /// completions.
     bool CodeCompleteCallPatternHeuristics = false;
+
+    /// Disable constraint system performance hacks.
+    bool DisableConstraintSolverPerformanceHacks = false;
 
     ///
     /// Flags for use by tests
@@ -226,7 +229,7 @@ namespace swift {
     bool EnableSILOpaqueValues = false;
     
     /// Enables key path resilience.
-    bool EnableKeyPathResilience = false;
+    bool EnableKeyPathResilience = true;
 
     /// If set to true, the diagnosis engine can assume the emitted diagnostics
     /// will be used in editor. This usually leads to more aggressive fixit.
@@ -282,7 +285,7 @@ namespace swift {
     ///
     /// This is only implemented on certain OSs. If no target has been
     /// configured, returns v0.0.0.
-    clang::VersionTuple getMinPlatformVersion() const {
+    llvm::VersionTuple getMinPlatformVersion() const {
       unsigned major, minor, revision;
       if (Target.isMacOSX()) {
         Target.getMacOSXVersion(major, minor, revision);
@@ -298,7 +301,7 @@ namespace swift {
       } else {
         llvm_unreachable("Unsupported target OS");
       }
-      return clang::VersionTuple(major, minor, revision);
+      return llvm::VersionTuple(major, minor, revision);
     }
 
     /// Sets an implicit platform condition.

@@ -22,7 +22,7 @@ public let Histogram = BenchmarkInfo(
 typealias rrggbb_t = UInt32
 
 func output_sorted_sparse_rgb_histogram<S: Sequence>(_ samples: S, _ N: Int)
-  where S.Iterator.Element == rrggbb_t {
+  where S.Element == rrggbb_t {
   var histogram = Dictionary<rrggbb_t, Int>()
   for  _ in 1...50*N {
     for sample in samples {   // This part is really awful, I agree

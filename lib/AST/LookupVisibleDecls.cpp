@@ -340,17 +340,14 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
       case DeclKind::Accessor:
       case DeclKind::Func: {
         auto FD = cast<FuncDecl>(D);
-        assert(FD->getImplicitSelfDecl() && "should not find free functions");
+        assert(FD->hasImplicitSelfDecl() && "should not find free functions");
         (void)FD;
 
         if (FD->isInvalid())
           break;
 
         // Get the type without the first uncurry level with 'self'.
-        CanType T = D->getInterfaceType()
-                        ->castTo<AnyFunctionType>()
-                        ->getResult()
-                        ->getCanonicalType();
+        CanType T = FD->getMethodInterfaceType()->getCanonicalType();
 
         auto Signature = std::make_pair(D->getBaseName(), T);
         if (!FunctionsReported.insert(Signature).second)
@@ -698,7 +695,11 @@ static void lookupVisibleMemberDeclsImpl(
     // If we have a class type, look into its superclass.
     auto *CurClass = dyn_cast<ClassDecl>(CurNominal);
 
-    if (CurClass && CurClass->hasSuperclass()) {
+    // FIXME: We check `getSuperclass()` here because we'll be using the
+    // superclass Type below, and in ill-formed code `hasSuperclass()` could
+    // be true while `getSuperclass()` returns null, because the latter
+    // looks for a declaration.
+    if (CurClass && CurClass->getSuperclass()) {
       // FIXME: This path is no substitute for an actual circularity check.
       // The real fix is to check that the superclass doesn't introduce a
       // circular reference before it's written into the AST.
@@ -990,14 +991,13 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
         namelookup::FindLocalVal(SM, Loc, Consumer).visit(AFD->getBody());
       }
 
-      for (auto *P : AFD->getParameterLists())
-        namelookup::FindLocalVal(SM, Loc, Consumer).checkParameterList(P);
+      if (auto *P = AFD->getImplicitSelfDecl()) {
+        namelookup::FindLocalVal(SM, Loc, Consumer).checkValueDecl(
+          const_cast<ParamDecl *>(P), DeclVisibilityKind::FunctionParameter);
+      }
 
-      // Constructors and destructors don't have 'self' in parameter patterns.
-      if (isa<ConstructorDecl>(AFD) || isa<DestructorDecl>(AFD))
-        if (auto *selfParam = AFD->getImplicitSelfDecl())
-          Consumer.foundDecl(const_cast<ParamDecl*>(selfParam),
-                             DeclVisibilityKind::FunctionParameter);
+      namelookup::FindLocalVal(SM, Loc, Consumer).checkParameterList(
+        AFD->getParameters());
 
       if (AFD->getDeclContext()->isTypeContext()) {
         ExtendedType = AFD->getDeclContext()->getSelfTypeInContext();

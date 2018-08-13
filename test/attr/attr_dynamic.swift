@@ -17,7 +17,7 @@ class Foo {
   @objc dynamic var x: Int
   
   @objc dynamic var nonObjcVar: NotObjCAble // expected-error{{property cannot be marked @objc because its type cannot be represented in Objective-C}} expected-note{{Swift structs cannot be represented in Objective-C}}
-  // expected-error@-1{{'dynamic' var 'nonObjcVar' must also be '@objc'}}
+  // expected-error@-1{{'dynamic' property 'nonObjcVar' must also be '@objc'}}
 
   @objc dynamic func foo(x: Int) {}
   @objc dynamic func bar(x: Int) {}
@@ -61,5 +61,5 @@ class InheritsDynamic: Foo {
 // SR-5317
 @objcMembers
 class ObjCMemberCheck {
-  dynamic var s = NotObjCAble(c: Foo()) // expected-error{{'dynamic' var 's' must also be '@objc'}}
+  dynamic var s = NotObjCAble(c: Foo()) // expected-error{{'dynamic' property 's' must also be '@objc'}}
 }

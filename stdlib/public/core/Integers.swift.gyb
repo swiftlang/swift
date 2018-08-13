@@ -123,8 +123,8 @@ def operatorComment(operator, fixedWidth):
   ///
   /// - Note: Overflow checking is not performed in `-Ounchecked` builds.
   ///
-  /// If you want to opt out of overflow checking and ignore any overflow, use
-  /// the overflow addition operator (`&+`).
+  /// If you want to opt out of overflow checking and wrap the result in case
+  /// of any overflow, use the overflow addition operator (`&+`).
   ///
   ///     x &+ 120                // -115
   ///
@@ -160,8 +160,8 @@ def operatorComment(operator, fixedWidth):
   ///
   /// - Note: Overflow checking is not performed in `-Ounchecked` builds.
   ///
-  /// If you want to opt out of overflow checking and ignore any overflow, use
-  /// the overflow subtraction operator (`&-`).
+  /// If you want to opt out of overflow checking and wrap the result in case
+  /// of any overflow, use the overflow subtraction operator (`&-`).
   ///
   ///     x &- 50                // 227
   ///
@@ -197,8 +197,8 @@ def operatorComment(operator, fixedWidth):
   ///
   /// - Note: Overflow checking is not performed in `-Ounchecked` builds.
   ///
-  /// If you want to opt out of overflow checking and ignore any overflow, use
-  /// the overflow multiplication operator (`&*`).
+  /// If you want to opt out of overflow checking and wrap the result in case
+  /// of any overflow, use the overflow multiplication operator (`&*`).
   ///
   ///     x &* 21                // -115
   ///
@@ -223,7 +223,7 @@ def operatorComment(operator, fixedWidth):
   /// Returns the remainder of dividing the first value by the second.
   ///
   /// The result of the remainder operator (`%`) has the same sign as `lhs` and
-  /// is less than `rhs.magnitude`.
+  /// has a magnitude less than `rhs.magnitude`.
   ///
   ///     let x = 22 % 5
   ///     // x == 2
@@ -240,51 +240,75 @@ def operatorComment(operator, fixedWidth):
   ///   - rhs: The value to divide `lhs` by. `rhs` must not be zero.
 """,
         '&+': """\
-  /// Returns the sum of the two given values, discarding any overflow.
+  /// Returns the sum of the two given values, wrapping the result in case of
+  /// any overflow.
   ///
-  /// The masking addition operator (`&+`) silently discards any overflow that
-  /// occurs during the operation. In the following example, the sum of `100`
-  /// and `121` is greater than the maximum representable `Int8` value, so the
-  /// result is the overflowed value:
+  /// The overflow addition operator (`&+`) discards any bits that overflow the
+  /// fixed width of the integer type. In the following example, the sum of
+  /// `100` and `121` is greater than the maximum representable `Int8` value,
+  /// so the result is the partial value after discarding the overflowing
+  /// bits.
   ///
   ///     let x: Int8 = 10 &+ 21
   ///     // x == 31
   ///     let y: Int8 = 100 &+ 121
   ///     // y == -35 (after overflow)
   ///
+  /// For more about arithmetic with overflow operators, see [Overflow
+  /// Operators][overflow] in *[The Swift Programming Language][tspl]*.
+  ///
+  /// [overflow]: https://docs.swift.org/swift-book/LanguageGuide/AdvancedOperators.html#ID37
+  /// [tspl]: https://docs.swift.org/swift-book/
+  ///
   /// - Parameters:
   ///   - lhs: The first value to add.
   ///   - rhs: The second value to add.
 """,
         '&-': """\
-  /// Returns the difference of the two given values, discarding any overflow.
+  /// Returns the difference of the two given values, wrapping the result in
+  /// case of any overflow.
   ///
-  /// The masking subtraction operator (`&-`) silently discards any overflow
-  /// that occurs during the operation. In the following example, the
+  /// The overflow subtraction operator (`&-`) discards any bits that overflow
+  /// the fixed width of the integer type. In the following example, the
   /// difference of `10` and `21` is less than zero, the minimum representable
-  /// `UInt` value, so the result is the overflowed value:
+  /// `UInt` value, so the result is the partial value after discarding the
+  /// overflowing bits.
   ///
   ///     let x: UInt8 = 21 &- 10
   ///     // x == 11
   ///     let y: UInt8 = 10 &- 21
   ///     // y == 245 (after overflow)
   ///
+  /// For more about arithmetic with overflow operators, see [Overflow
+  /// Operators][overflow] in *[The Swift Programming Language][tspl]*.
+  ///
+  /// [overflow]: https://docs.swift.org/swift-book/LanguageGuide/AdvancedOperators.html#ID37
+  /// [tspl]: https://docs.swift.org/swift-book/
+  ///
   /// - Parameters:
   ///   - lhs: A numeric value.
   ///   - rhs: The value to subtract from `lhs`.
 """,
         '&*': """\
-  /// Returns the product of the two given values, discarding any overflow.
+  /// Returns the product of the two given values, wrapping the result in case
+  /// of any overflow.
   ///
-  /// The masking multiplication operator (`&*`) silently discards any overflow
-  /// that occurs during the operation. In the following example, the product
-  /// of `10` and `50` is greater than the maximum representable `Int8` value,
-  /// so the result is the overflowed value:
+  /// The overflow multiplication operator (`&*`) discards any bits that
+  /// overflow the fixed width of the integer type. In the following example,
+  /// the product of `10` and `50` is greater than the maximum representable
+  /// `Int8` value, so the result is the partial value after discarding the
+  /// overflowing bits.
   ///
   ///     let x: Int8 = 10 &* 5
   ///     // x == 50
   ///     let y: Int8 = 10 &* 50
   ///     // y == -12 (after overflow)
+  ///
+  /// For more about arithmetic with overflow operators, see [Overflow
+  /// Operators][overflow] in *[The Swift Programming Language][tspl]*.
+  ///
+  /// [overflow]: https://docs.swift.org/swift-book/LanguageGuide/AdvancedOperators.html#ID37
+  /// [tspl]: https://docs.swift.org/swift-book/
   ///
   /// - Parameters:
   ///   - lhs: The first value to multiply.
@@ -586,7 +610,8 @@ def assignmentOperatorComment(operator, fixedWidth):
   /// Divides the first value by the second and stores the remainder in the
   /// left-hand-side variable.
   ///
-  /// The result has the same sign as `lhs` and is less than `rhs.magnitude`.
+  /// The result has the same sign as `lhs` and has a magnitude less than
+  /// `rhs.magnitude`.
   ///
   ///     var x = 22
   ///     x %= 5
@@ -605,13 +630,14 @@ def assignmentOperatorComment(operator, fixedWidth):
   ///   - rhs: The value to divide `lhs` by. `rhs` must not be zero.
 """,
         '&+': """\
-  /// Adds two values and stores the result in the left-hand-side variable, 
-  /// discarding any overflow.
+  /// Adds two values and stores the result in the left-hand-side variable,
+  /// wrapping any overflow.
   ///
-  /// The masking addition assignment operator (`&+=`) silently discards any 
-  /// overflow that occurs during the operation. In the following example, the 
-  /// sum of `100` and `121` is greater than the maximum representable `Int8` 
-  /// value, so the result is the overflowed value:
+  /// The masking addition assignment operator (`&+=`) silently wraps any
+  /// overflow that occurs during the operation. In the following example, the
+  /// sum of `100` and `121` is greater than the maximum representable `Int8`
+  /// value, so the result is the partial value after discarding the
+  /// overflowing bits.
   ///
   ///     var x: Int8 = 10
   ///     x &+= 21
@@ -620,18 +646,25 @@ def assignmentOperatorComment(operator, fixedWidth):
   ///     y &+= 121
   ///     // y == -35 (after overflow)
   ///
+  /// For more about arithmetic with overflow operators, see [Overflow
+  /// Operators][overflow] in *[The Swift Programming Language][tspl]*.
+  ///
+  /// [overflow]: https://docs.swift.org/swift-book/LanguageGuide/AdvancedOperators.html#ID37
+  /// [tspl]: https://docs.swift.org/swift-book/
+  ///
   /// - Parameters:
   ///   - lhs: The first value to add.
   ///   - rhs: The second value to add.
 """,
         '&-': """\
   /// Subtracts the second value from the first and stores the difference in the
-  /// left-hand-side variable, discarding any overflow.
+  /// left-hand-side variable, wrapping any overflow.
   ///
-  /// The masking subtraction assignment operator (`&-=`) silently discards any
+  /// The masking subtraction assignment operator (`&-=`) silently wraps any
   /// overflow that occurs during the operation. In the following example, the
   /// difference of `10` and `21` is less than zero, the minimum representable
-  /// `UInt` value, so the result is the overflowed value:
+  /// `UInt` value, so the result is the result is the partial value after
+  /// discarding the overflowing bits.
   ///
   ///     var x: Int8 = 21
   ///     x &-= 10
@@ -640,18 +673,25 @@ def assignmentOperatorComment(operator, fixedWidth):
   ///     y &-= 21
   ///     // y == 245 (after overflow)
   ///
+  /// For more about arithmetic with overflow operators, see [Overflow
+  /// Operators][overflow] in *[The Swift Programming Language][tspl]*.
+  ///
+  /// [overflow]: https://docs.swift.org/swift-book/LanguageGuide/AdvancedOperators.html#ID37
+  /// [tspl]: https://docs.swift.org/swift-book/
+  ///
   /// - Parameters:
   ///   - lhs: A numeric value.
   ///   - rhs: The value to subtract from `lhs`.
 """,
         '&*': """\
   /// Multiplies two values and stores the result in the left-hand-side
-  /// variable, discarding any overflow.
+  /// variable, wrapping any overflow.
   ///
-  /// The masking multiplication assignment operator (`&*=`) silently discards 
-  /// any overflow that occurs during the operation. In the following example, 
-  /// the product of `10` and `50` is greater than the maximum representable 
-  /// `Int8` value, so the result is the overflowed value:
+  /// The masking multiplication assignment operator (`&*=`) silently wraps
+  /// any overflow that occurs during the operation. In the following example,
+  /// the product of `10` and `50` is greater than the maximum representable
+  /// `Int8` value, so the result is the partial value after discarding the
+  /// overflowing bits.
   ///
   ///     var x: Int8 = 10
   ///     x &*= 5
@@ -659,6 +699,12 @@ def assignmentOperatorComment(operator, fixedWidth):
   ///     var y: Int8 = 10
   ///     y &*= 50
   ///     // y == -12 (after overflow)
+  ///
+  /// For more about arithmetic with overflow operators, see [Overflow
+  /// Operators][overflow] in *[The Swift Programming Language][tspl]*.
+  ///
+  /// [overflow]: https://docs.swift.org/swift-book/LanguageGuide/AdvancedOperators.html#ID37
+  /// [tspl]: https://docs.swift.org/swift-book/
   ///
   /// - Parameters:
   ///   - lhs: The first value to multiply.
@@ -1171,6 +1217,15 @@ ${operatorComment(x.operator, False)}
 /// declaring conformance to the protocol and ensuring that the values of your
 /// type support negation. To customize your type's implementation, provide
 /// your own mutating `negate()` method.
+///
+/// When the additive inverse of a value is unrepresentable in a conforming
+/// type, the operation should either trap or return an exceptional value. For
+/// example, using the negation operator (prefix `-`) with `Int.min` results in
+/// a runtime error.
+///
+///     let x = Int.min
+///     let y = -x
+///     // Overflow error
 public protocol SignedNumeric : Numeric {
   /// Returns the additive inverse of the specified value.
   ///
@@ -1199,6 +1254,14 @@ public protocol SignedNumeric : Numeric {
   ///     var x = 21
   ///     x.negate()
   ///     // x == -21
+  ///
+  /// The resulting value must be representable within the value's type. In
+  /// particular, negating a signed, fixed-width integer type's minimum
+  /// results in a value that cannot be represented.
+  ///
+  ///     var y = Int8.min
+  ///     y.negate()
+  ///     // Overflow error
   mutating func negate()
 }
 
@@ -1235,6 +1298,14 @@ extension SignedNumeric {
   ///     var x = 21
   ///     x.negate()
   ///     // x == -21
+  ///
+  /// The resulting value must be representable within the value's type. In
+  /// particular, negating a signed, fixed-width integer type's minimum
+  /// results in a value that cannot be represented.
+  ///
+  ///     var y = Int8.min
+  ///     y.negate()
+  ///     // Overflow error
   @_transparent
   public mutating func negate() {
     self = 0 - self
@@ -1599,8 +1670,8 @@ public protocol BinaryInteger :
 
   /// Returns the integer binary logarithm of this value.
   ///
-  /// If the value is negative, a runtime error will occur.
-  func _binaryLogarithm() -> Self
+  /// If the value is negative or zero, a runtime error will occur.
+  func _binaryLogarithm() -> Int
 
   /// The number of trailing zeros in this value's binary representation.
   ///
@@ -1674,7 +1745,7 @@ ${assignmentOperatorComment(x.nonMaskingOperator, False)}
   ///
   /// - Parameter rhs: The value to divide this value by.
   /// - Returns: A tuple containing the quotient and remainder of this value
-  ///   divided by `rhs`.
+  ///   divided by `rhs`. The remainder has the same sign as `rhs`.
   func quotientAndRemainder(dividingBy rhs: Self)
     -> (quotient: Self, remainder: Self)
 
@@ -1710,7 +1781,7 @@ extension BinaryInteger {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  public func _binaryLogarithm() -> Self {
+  public func _binaryLogarithm() -> Int {
     _precondition(self > (0 as Self))
     var (quotient, remainder) =
       (bitWidth &- 1).quotientAndRemainder(dividingBy: UInt.bitWidth)
@@ -1728,9 +1799,8 @@ extension BinaryInteger {
     }
     // Note that the order of operations below is important to guarantee that
     // we won't overflow.
-    return Self(
-      UInt.bitWidth &* quotient &+
-        (UInt.bitWidth &- (word.leadingZeroBitCount &+ 1)))
+    return UInt.bitWidth &* quotient &+
+        (UInt.bitWidth &- (word.leadingZeroBitCount &+ 1))
   }
 
   /// Returns the quotient and remainder of this value divided by the given
@@ -2412,9 +2482,9 @@ extension FixedWidthInteger {
   public var bitWidth: Int { return Self.bitWidth }
 
   @inlinable // FIXME(sil-serialize-all)
-  public func _binaryLogarithm() -> Self {
+  public func _binaryLogarithm() -> Int {
     _precondition(self > (0 as Self))
-    return Self(Self.bitWidth &- (leadingZeroBitCount &+ 1))
+    return Self.bitWidth &- (leadingZeroBitCount &+ 1)
   }
 
   /// Creates an integer from its little-endian representation, changing the
@@ -2591,7 +2661,7 @@ extension FixedWidthInteger {
   ///     // Prints "64"
   ///     // Prints "5"
   ///
-  /// This method is equivalent to calling the version that takes a generator, 
+  /// This method is equivalent to calling the version that takes a generator,
   /// passing in the system's default random generator.
   ///
   /// - Parameter range: The range in which to create a random value.
@@ -3292,12 +3362,13 @@ public struct ${Self}
   /// - Parameter source: A floating-point value to convert to an integer.
   @_transparent
   public init?(exactly source: ${FloatType}) {
+    // The value passed as `source` must not be infinite, NaN, or exceed the
+    // bounds of the integer type; the result of `fptosi` or `fptoui` is
+    // undefined if it overflows.
     guard source > ${str(lower)}.0 && source < ${str(upper)}.0 else {
-      // The source is out of bounds (including infinities).
       return nil
     }
     guard source == source.rounded(.towardZero) else {
-      // The source is a fraction or NaN.
       return nil
     }
     self._value = Builtin.fpto${u}i_FPIEEE${FloatBits}_${BuiltinName}(source._value)
@@ -3791,15 +3862,6 @@ extension ${Self} : _HasCustomAnyHashableRepresentation {
   }
 }
 
-
-// Create an ambiguity when indexing or slicing
-// Range[OfStrideable]<${Self}> outside a generic context.  See
-// Range.swift for details.
-extension ${Self} {
-  public typealias _DisabledRangeIndex = ${Self}
-}
-
-
 % for src_type in all_integer_types(word_bits):
 %   srcBits = src_type.bits
 %   srcSigned = src_type.is_signed
@@ -3882,20 +3944,17 @@ ${assignmentOperatorComment(x.operator, True)}
     return !(lhs == rhs)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @inline(__always)
+  @_transparent
   public static func <= (lhs: ${Self}, rhs: ${Self}) -> Bool {
     return !(rhs < lhs)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @inline(__always)
+  @_transparent
   public static func >= (lhs: ${Self}, rhs: ${Self}) -> Bool {
     return !(lhs < rhs)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @inline(__always)
+  @_transparent
   public static func > (lhs: ${Self}, rhs: ${Self}) -> Bool {
     return rhs < lhs
   }

@@ -84,7 +84,8 @@ public:
                                           ArrayRef<const char *> Args);
   ImmutableTextSnapshotRef replaceText(unsigned Offset, unsigned Length,
                                        llvm::MemoryBuffer *Buf,
-                                       bool ProvideSemanticInfo);
+                                       bool ProvideSemanticInfo,
+                                       std::string &error);
 
   void updateSemaInfo();
 
@@ -109,12 +110,6 @@ public:
                                       EditorConsumer &Consumer);
 
   const llvm::Optional<swift::SourceFileSyntax> &getSyntaxTree() const;
-
-  const swift::SourceManager &getSourceManager() const;
-  swift::SourceManager &getSourceManager();
-
-  /// Get the buffer ID of this file in its source manager
-  unsigned getBufferID() const;
 
   std::string getFilePath() const;
 

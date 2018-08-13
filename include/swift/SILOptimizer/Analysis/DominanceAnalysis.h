@@ -41,8 +41,8 @@ public:
     return S->getKind() == SILAnalysisKind::Dominance;
   }
 
-  DominanceInfo *newFunctionAnalysis(SILFunction *F) override {
-    return new DominanceInfo(F);
+  std::unique_ptr<DominanceInfo> newFunctionAnalysis(SILFunction *F) override {
+    return llvm::make_unique<DominanceInfo>(F);
   }
 
   virtual bool shouldInvalidate(SILAnalysis::InvalidationKind K) override {
@@ -70,8 +70,9 @@ public:
     return S->getKind() == SILAnalysisKind::PostDominance;
   }
 
-  PostDominanceInfo *newFunctionAnalysis(SILFunction *F) override {
-    return new PostDominanceInfo(F);
+  std::unique_ptr<PostDominanceInfo>
+  newFunctionAnalysis(SILFunction *F) override {
+    return llvm::make_unique<PostDominanceInfo>(F);
   }
 
   virtual bool shouldInvalidate(SILAnalysis::InvalidationKind K) override {

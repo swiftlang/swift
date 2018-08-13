@@ -114,15 +114,13 @@ class AnnotatingPrinter : public StreamPrinter {
     const auto *ED = dyn_cast<ExtensionDecl>(D);
     if (!ED)
       return;
-    if (ED->getExtendedType()) {
-      if (auto NTD = ED->getExtendedType()->getAnyNominal()) {
-        if (auto *PD = dyn_cast<ProtocolDecl>(NTD)) {
-          auto Pair = AllDefaultMaps.insert({PD, DefaultImplementMap()});
-          DefaultMapToUse = &Pair.first->getSecond();
-          if (Pair.second) {
-            swift::collectDefaultImplementationForProtocolMembers(PD,
-                                                      Pair.first->getSecond());
-          }
+    if (auto NTD = ED->getExtendedNominal()) {
+      if (auto *PD = dyn_cast<ProtocolDecl>(NTD)) {
+        auto Pair = AllDefaultMaps.insert({PD, DefaultImplementMap()});
+        DefaultMapToUse = &Pair.first->getSecond();
+        if (Pair.second) {
+          swift::collectDefaultImplementationForProtocolMembers(PD,
+                                                    Pair.first->getSecond());
         }
       }
     }
@@ -374,8 +372,8 @@ static bool initDocEntityInfo(const Decl *D,
         assert(DocRef.find(Open) != StringRef::npos);
         auto FirstPart = DocRef.substr(0, DocRef.find(Open) + (Open).size());
         auto SecondPart = DocRef.substr(FirstPart.size());
-        auto ExtendedName = ((const ExtensionDecl*)D)->getExtendedType()->
-          getAnyNominal()->getName().str();
+        auto ExtendedName = ((const ExtensionDecl*)D)->getExtendedNominal()
+            ->getName().str();
         assert(SecondPart.startswith(ExtendedName));
         SecondPart = SecondPart.substr(ExtendedName.size());
         llvm::SmallString<128> UpdatedDocBuffer;
@@ -778,7 +776,7 @@ static bool makeParserAST(CompilerInstance &CI, StringRef Text,
                           CompilerInvocation Invocation) {
   Invocation.getFrontendOptions().InputsAndOutputs.clearInputs();
   Invocation.setModuleName("main");
-  Invocation.setInputKind(InputFileKind::IFK_Swift);
+  Invocation.setInputKind(InputFileKind::Swift);
 
   std::unique_ptr<llvm::MemoryBuffer> Buf;
   Buf = llvm::MemoryBuffer::getMemBuffer(Text, "<module-interface>");
@@ -839,19 +837,13 @@ static void addParameters(const AbstractFunctionDecl *FD,
                           TextEntity &Ent,
                           SourceManager &SM,
                           unsigned BufferID) {
-  auto params = FD->getParameterLists();
-  // Ignore 'self'.
-  if (FD->getDeclContext()->isTypeContext())
-    params = params.slice(1);
-
   ArrayRef<Identifier> ArgNames;
   DeclName Name = FD->getFullName();
   if (Name) {
     ArgNames = Name.getArgumentNames();
   }
-  for (auto paramList : params) {
-    addParameters(ArgNames, paramList, Ent, SM, BufferID);
-  }
+  auto paramList = FD->getParameters();
+  addParameters(ArgNames, paramList, Ent, SM, BufferID);
 }
 
 static void addParameters(const SubscriptDecl *D,
@@ -1369,7 +1361,7 @@ SourceFile *SwiftLangSupport::getSyntacticSourceFile(
     Error = "Compiler invocation init failed";
     return nullptr;
   }
-  Invocation.setInputKind(InputFileKind::IFK_Swift);
+  Invocation.setInputKind(InputFileKind::Swift);
   Invocation.getFrontendOptions().InputsAndOutputs.addInput(
       InputFile(InputBuf->getBufferIdentifier(), false, InputBuf));
 

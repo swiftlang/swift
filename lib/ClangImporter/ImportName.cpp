@@ -552,7 +552,7 @@ namespace {
 /// For a SwiftVersionedRemovalAttr, the Attr member will be null.
 struct VersionedSwiftNameInfo {
   const clang::SwiftNameAttr *Attr;
-  clang::VersionTuple Version;
+  llvm::VersionTuple Version;
   bool IsReplacedByActive;
 };
 
@@ -573,7 +573,7 @@ enum class VersionedSwiftNameAction {
 
 static VersionedSwiftNameAction
 checkVersionedSwiftName(VersionedSwiftNameInfo info,
-                        clang::VersionTuple bestSoFar,
+                        llvm::VersionTuple bestSoFar,
                         ImportNameVersion requestedVersion) {
   if (!bestSoFar.empty() && bestSoFar <= info.Version)
     return VersionedSwiftNameAction::Ignore;
@@ -624,7 +624,7 @@ findSwiftNameAttr(const clang::Decl *decl, ImportNameVersion version) {
 
     const auto *activeAttr = decl->getAttr<clang::SwiftNameAttr>();
     const clang::SwiftNameAttr *result = activeAttr;
-    clang::VersionTuple bestSoFar;
+    llvm::VersionTuple bestSoFar;
     for (auto *attr : decl->attrs()) {
       VersionedSwiftNameInfo info;
 
@@ -682,9 +682,9 @@ findSwiftNameAttr(const clang::Decl *decl, ImportNameVersion version) {
   auto attr = decl->getAttr<clang::SwiftNameAttr>();
   if (!attr) return nullptr;
 
-  // API notes produce implicit attributes; ignore them because they weren't
-  // used for naming in Swift 2.
-  if (attr->isImplicit()) return nullptr;
+  // API notes produce attributes with no source location; ignore them because
+  // they weren't used for naming in Swift 2.
+  if (attr->getLocation().isInvalid()) return nullptr;
 
   // Hardcode certain kinds of explicitly-written Swift names that were
   // permitted and used in Swift 2. All others are ignored, so that we are

@@ -31,6 +31,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/DJB.h"
 #include "llvm/Support/EndianStream.h"
 #include "llvm/Support/OnDiskHashTable.h"
 
@@ -44,6 +45,7 @@ using llvm::BCBlockRAII;
 
 static unsigned toStableStringEncoding(StringLiteralInst::Encoding encoding) {
   switch (encoding) {
+  case StringLiteralInst::Encoding::Bytes: return SIL_BYTES;
   case StringLiteralInst::Encoding::UTF8: return SIL_UTF8;
   case StringLiteralInst::Encoding::UTF16: return SIL_UTF16;
   case StringLiteralInst::Encoding::ObjCSelector: return SIL_OBJC_SELECTOR;
@@ -111,7 +113,8 @@ namespace {
 
     hash_value_type ComputeHash(key_type_ref key) {
       assert(!key.empty());
-      return llvm::HashString(key.str());
+      // FIXME: DJB seed=0, audit whether the default seed could be used.
+      return llvm::djbHash(key.str(), 0);
     }
 
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
@@ -119,7 +122,7 @@ namespace {
                                                     data_type_ref data) {
       uint32_t keyLength = key.str().size();
       uint32_t dataLength = sizeof(uint32_t);
-      endian::Writer<little> writer(out);
+      endian::Writer writer(out, little);
       writer.write<uint16_t>(keyLength);
       // No need to write the data length; it's constant.
       return { keyLength, dataLength };
@@ -131,7 +134,7 @@ namespace {
 
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
-      endian::Writer<little>(out).write<uint32_t>(data);
+      endian::write<uint32_t>(out, data, little);
     }
   };
 
@@ -209,8 +212,8 @@ namespace {
       static_assert(Layout::Code <= std::tuple_size<AbbrArrayTy>::value,
                     "layout has invalid record code");
       SILAbbrCodes[Layout::Code] = Layout::emitAbbrev(Out);
-      DEBUG(llvm::dbgs() << "SIL abbre code " << SILAbbrCodes[Layout::Code]
-                         << " for layout " << Layout::Code << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "SIL abbre code " << SILAbbrCodes[Layout::Code]
+                              << " for layout " << Layout::Code << "\n");
     }
 
     bool ShouldSerializeAll;
@@ -361,10 +364,10 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   Funcs.push_back(Out.GetCurrentBitNo());
   unsigned abbrCode = SILAbbrCodes[SILFunctionLayout::Code];
   TypeID FnID = S.addTypeRef(F.getLoweredType().getASTType());
-  DEBUG(llvm::dbgs() << "SILFunction " << F.getName() << " @ BitNo "
-                     << Out.GetCurrentBitNo() << " abbrCode " << abbrCode
-                     << " FnID " << FnID << "\n");
-  DEBUG(llvm::dbgs() << "Serialized SIL:\n"; F.dump());
+  LLVM_DEBUG(llvm::dbgs() << "SILFunction " << F.getName() << " @ BitNo "
+                          << Out.GetCurrentBitNo() << " abbrCode " << abbrCode
+                          << " FnID " << FnID << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "Serialized SIL:\n"; F.dump());
 
   SmallVector<IdentifierID, 1> SemanticsIDs;
   for (auto SemanticAttr : F.getSemanticsAttrs()) {
@@ -490,7 +493,7 @@ static void handleSILDeclRef(Serializer &S, const SILDeclRef &Ref,
                              SmallVectorImpl<ValueID> &ListOfValues) {
   ListOfValues.push_back(S.addDeclRef(Ref.getDecl()));
   ListOfValues.push_back((unsigned)Ref.kind);
-  ListOfValues.push_back(Ref.getParameterListCount() - 1);
+  ListOfValues.push_back(Ref.isCurried);
   ListOfValues.push_back(Ref.isForeign);
 }
 
@@ -2119,7 +2122,7 @@ static void writeIndexTable(const sil_index_block::ListLayout &List,
 
     llvm::raw_svector_ostream blobStream(hashTableBlob);
     // Make sure that no bucket is at offset 0.
-    endian::Writer<little>(blobStream).write<uint32_t>(0);
+    endian::write<uint32_t>(blobStream, 0, little);
     tableOffset = generator.Emit(blobStream);
   }
   SmallVector<uint64_t, 8> scratch;

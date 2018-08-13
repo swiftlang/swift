@@ -1,5 +1,5 @@
-// Used by multiple_input.swift and emit-objc-header.swift tests. This file
-// should be inferred as the main source file from its name.
+// Used by emit-objc-header.swift and others.
+// This file should be inferred as the main source file from its name.
 
 var x = 4 + 5
 print(x)

@@ -18,7 +18,7 @@ extension Set {
   /// The provided `NSSet` will be copied to ensure that the copy can
   /// not be mutated by other code.
   public init(_cocoaSet: _NSSet) {
-    _sanityCheck(_isBridgedVerbatimToObjectiveC(Element.self),
+    assert(_isBridgedVerbatimToObjectiveC(Element.self),
       "Set can be backed by NSSet _variantStorage only when the member type can be bridged verbatim to Objective-C")
     // FIXME: We would like to call CFSetCreateCopy() to avoid doing an
     // objc_msgSend() for instances of CoreFoundation types.  We can't do that

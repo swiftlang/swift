@@ -557,18 +557,18 @@ extension TestSuite {
   >(
 
   _ testNamePrefix: String = "",
-  makeCollection: @escaping ([C.Iterator.Element]) -> C,
-  wrapValue: @escaping (OpaqueValue<Int>) -> C.Iterator.Element,
-  extractValue: @escaping (C.Iterator.Element) -> OpaqueValue<Int>,
+  makeCollection: @escaping ([C.Element]) -> C,
+  wrapValue: @escaping (OpaqueValue<Int>) -> C.Element,
+  extractValue: @escaping (C.Element) -> OpaqueValue<Int>,
 
   makeCollectionOfEquatable: @escaping (
-    [CollectionWithEquatableElement.Iterator.Element]
+    [CollectionWithEquatableElement.Element]
   ) -> CollectionWithEquatableElement,
 
   wrapValueIntoEquatable: @escaping (
-    MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
+    MinimalEquatableValue) -> CollectionWithEquatableElement.Element,
 
-  extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
+  extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Element) -> MinimalEquatableValue),
 
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   outOfBoundsIndexOffset: Int = 1,
@@ -579,7 +579,7 @@ extension TestSuite {
 
   C : Collection,
   CollectionWithEquatableElement : Collection,
-  CollectionWithEquatableElement.Iterator.Element : Equatable
+  CollectionWithEquatableElement.Element : Equatable
  {
 
     var testNamePrefix = testNamePrefix
@@ -1255,18 +1255,18 @@ extension TestSuite {
   >(
 
   _ testNamePrefix: String = "",
-  makeCollection: @escaping ([C.Iterator.Element]) -> C,
-  wrapValue: @escaping (OpaqueValue<Int>) -> C.Iterator.Element,
-  extractValue: @escaping (C.Iterator.Element) -> OpaqueValue<Int>,
+  makeCollection: @escaping ([C.Element]) -> C,
+  wrapValue: @escaping (OpaqueValue<Int>) -> C.Element,
+  extractValue: @escaping (C.Element) -> OpaqueValue<Int>,
 
   makeCollectionOfEquatable: @escaping (
-    [CollectionWithEquatableElement.Iterator.Element]
+    [CollectionWithEquatableElement.Element]
   ) -> CollectionWithEquatableElement,
 
   wrapValueIntoEquatable: @escaping (
-    MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
+    MinimalEquatableValue) -> CollectionWithEquatableElement.Element,
 
-  extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
+  extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Element) -> MinimalEquatableValue),
 
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   outOfBoundsIndexOffset: Int = 1,
@@ -1277,7 +1277,7 @@ extension TestSuite {
 
   C : BidirectionalCollection,
   CollectionWithEquatableElement : BidirectionalCollection,
-  CollectionWithEquatableElement.Iterator.Element : Equatable
+  CollectionWithEquatableElement.Element : Equatable
  {
 
     var testNamePrefix = testNamePrefix
@@ -1710,18 +1710,18 @@ extension TestSuite {
   >(
 
   _ testNamePrefix: String = "",
-  makeCollection: @escaping ([C.Iterator.Element]) -> C,
-  wrapValue: @escaping (OpaqueValue<Int>) -> C.Iterator.Element,
-  extractValue: @escaping (C.Iterator.Element) -> OpaqueValue<Int>,
+  makeCollection: @escaping ([C.Element]) -> C,
+  wrapValue: @escaping (OpaqueValue<Int>) -> C.Element,
+  extractValue: @escaping (C.Element) -> OpaqueValue<Int>,
 
   makeCollectionOfEquatable: @escaping (
-    [CollectionWithEquatableElement.Iterator.Element]
+    [CollectionWithEquatableElement.Element]
   ) -> CollectionWithEquatableElement,
 
   wrapValueIntoEquatable: @escaping (
-    MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
+    MinimalEquatableValue) -> CollectionWithEquatableElement.Element,
 
-  extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
+  extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Element) -> MinimalEquatableValue),
 
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   outOfBoundsIndexOffset: Int = 1,
@@ -1732,7 +1732,7 @@ extension TestSuite {
 
   C : RandomAccessCollection,
   CollectionWithEquatableElement : RandomAccessCollection,
-  CollectionWithEquatableElement.Iterator.Element : Equatable
+  CollectionWithEquatableElement.Element : Equatable
  {
 
     var testNamePrefix = testNamePrefix
@@ -1810,18 +1810,18 @@ extension TestSuite {
   >(
 
   _ testNamePrefix: String = "",
-  makeCollection: @escaping ([C.Iterator.Element]) -> C,
-  wrapValue: @escaping (OpaqueValue<Int>) -> C.Iterator.Element,
-  extractValue: @escaping (C.Iterator.Element) -> OpaqueValue<Int>,
+  makeCollection: @escaping ([C.Element]) -> C,
+  wrapValue: @escaping (OpaqueValue<Int>) -> C.Element,
+  extractValue: @escaping (C.Element) -> OpaqueValue<Int>,
 
   makeCollectionOfEquatable: @escaping (
-    [CollectionWithEquatableElement.Iterator.Element]
+    [CollectionWithEquatableElement.Element]
   ) -> CollectionWithEquatableElement,
 
   wrapValueIntoEquatable: @escaping (
-    MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
+    MinimalEquatableValue) -> CollectionWithEquatableElement.Element,
 
-  extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
+  extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Element) -> MinimalEquatableValue),
 
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   outOfBoundsIndexOffset: Int = 1,
@@ -1832,7 +1832,7 @@ extension TestSuite {
 
   C : Collection,
   CollectionWithEquatableElement : Collection,
-  CollectionWithEquatableElement.Iterator.Element : Equatable
+  CollectionWithEquatableElement.Element : Equatable
  {
 
     if !checksAdded.insert(
@@ -2059,18 +2059,18 @@ extension TestSuite {
   >(
 
   _ testNamePrefix: String = "",
-  makeCollection: @escaping ([C.Iterator.Element]) -> C,
-  wrapValue: @escaping (OpaqueValue<Int>) -> C.Iterator.Element,
-  extractValue: @escaping (C.Iterator.Element) -> OpaqueValue<Int>,
+  makeCollection: @escaping ([C.Element]) -> C,
+  wrapValue: @escaping (OpaqueValue<Int>) -> C.Element,
+  extractValue: @escaping (C.Element) -> OpaqueValue<Int>,
 
   makeCollectionOfEquatable: @escaping (
-    [CollectionWithEquatableElement.Iterator.Element]
+    [CollectionWithEquatableElement.Element]
   ) -> CollectionWithEquatableElement,
 
   wrapValueIntoEquatable: @escaping (
-    MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
+    MinimalEquatableValue) -> CollectionWithEquatableElement.Element,
 
-  extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
+  extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Element) -> MinimalEquatableValue),
 
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   outOfBoundsIndexOffset: Int = 1,
@@ -2081,7 +2081,7 @@ extension TestSuite {
 
   C : BidirectionalCollection,
   CollectionWithEquatableElement : BidirectionalCollection,
-  CollectionWithEquatableElement.Iterator.Element : Equatable
+  CollectionWithEquatableElement.Element : Equatable
  {
 
     if !checksAdded.insert(
@@ -2308,18 +2308,18 @@ extension TestSuite {
   >(
 
   _ testNamePrefix: String = "",
-  makeCollection: @escaping ([C.Iterator.Element]) -> C,
-  wrapValue: @escaping (OpaqueValue<Int>) -> C.Iterator.Element,
-  extractValue: @escaping (C.Iterator.Element) -> OpaqueValue<Int>,
+  makeCollection: @escaping ([C.Element]) -> C,
+  wrapValue: @escaping (OpaqueValue<Int>) -> C.Element,
+  extractValue: @escaping (C.Element) -> OpaqueValue<Int>,
 
   makeCollectionOfEquatable: @escaping (
-    [CollectionWithEquatableElement.Iterator.Element]
+    [CollectionWithEquatableElement.Element]
   ) -> CollectionWithEquatableElement,
 
   wrapValueIntoEquatable: @escaping (
-    MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
+    MinimalEquatableValue) -> CollectionWithEquatableElement.Element,
 
-  extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
+  extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Element) -> MinimalEquatableValue),
 
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   outOfBoundsIndexOffset: Int = 1,
@@ -2330,7 +2330,7 @@ extension TestSuite {
 
   C : RandomAccessCollection,
   CollectionWithEquatableElement : RandomAccessCollection,
-  CollectionWithEquatableElement.Iterator.Element : Equatable
+  CollectionWithEquatableElement.Element : Equatable
  {
 
     if !checksAdded.insert(

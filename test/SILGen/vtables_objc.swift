@@ -59,13 +59,13 @@ func callWotsit(_ w: Wotsit) {
 // CHECK: sil_vtable Hoozit {
 // CHECK-NEXT:   #Hoozit.anse!1: {{.*}} : @$S12vtables_objc6HoozitC4anse{{[_0-9a-zA-Z]*}}F
 // CHECK-NEXT:   #Hoozit.incorrige!1: {{.*}} : @$S12vtables_objc6HoozitC9incorrige{{[_0-9a-zA-Z]*}}F
-// CHECK-NEXT:   #Hoozit.deinit!deallocator: @$S12vtables_objc6HoozitCfD
+// CHECK-NEXT:   #Hoozit.deinit!deallocator.1: @$S12vtables_objc6HoozitCfD
 // CHECK-NEXT: }
 
 // CHECK: sil_vtable Wotsit {
 // CHECK-NEXT:   #Hoozit.anse!1: {{.*}} : @$S12vtables_objc6HoozitC4anse{{[_0-9a-zA-Z]*}}F
 // CHECK-NEXT:   #Hoozit.incorrige!1: {{.*}} : @$S12vtables_objc6WotsitC9incorrige{{[_0-9a-zA-Z]*}}F
-// CHECK-NEXT:   #Wotsit.deinit!deallocator: @$S12vtables_objc6WotsitCfD
+// CHECK-NEXT:   #Wotsit.deinit!deallocator.1: @$S12vtables_objc6WotsitCfD
 // CHECK-NEXT: }
 
 // <rdar://problem/15282548>

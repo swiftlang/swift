@@ -208,13 +208,14 @@ static bool wantsObjCRuntime(const llvm::Triple &triple) {
   // When updating the versions listed here, please record the most recent
   // feature being depended on and when it was introduced:
   //
-  // - The hook to override class_getImageName (macOS 10.14 and equivalent)
+  // - Make assigning 'nil' to an NSMutableDictionary subscript delete the
+  //   entry, like it does for Swift.Dictionary, rather than trap.
   if (triple.isiOS())
-    return triple.isOSVersionLT(12);
+    return triple.isOSVersionLT(9);
   if (triple.isMacOSX())
-    return triple.isMacOSXVersionLT(10, 14);
+    return triple.isMacOSXVersionLT(10, 11);
   if (triple.isWatchOS())
-    return triple.isOSVersionLT(5);
+    return false;
   llvm_unreachable("unknown Darwin OS");
 }
 
@@ -338,8 +339,6 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
     }
   }
 
-  context.Args.AddAllArgValues(Arguments, options::OPT_Xlinker);
-  context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
   for (const Arg *arg :
        context.Args.filtered(options::OPT_F, options::OPT_Fsystem)) {
     Arguments.push_back("-F");
@@ -475,6 +474,10 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   }
 
   Arguments.push_back("-no_objc_category_merging");
+
+  // These custom arguments should be right before the object file at the end.
+  context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
+  context.Args.AddAllArgValues(Arguments, options::OPT_Xlinker);
 
   // This should be the last option, for convenience in checking output.
   Arguments.push_back("-o");

@@ -316,13 +316,13 @@ bool State::checkPredsForDoubleConsume(SILBasicBlock *userBlock) {
 //===----------------------------------------------------------------------===//
 
 bool State::performDataflow(DeadEndBlocks &deBlocks) {
-  DEBUG(llvm::dbgs() << "    Beginning to check dataflow constraints\n");
+  LLVM_DEBUG(llvm::dbgs() << "    Beginning to check dataflow constraints\n");
   // Until the worklist is empty...
   while (!worklist.empty()) {
     // Grab the next block to visit.
     SILBasicBlock *block = worklist.pop_back_val();
-    DEBUG(llvm::dbgs() << "    Visiting Block: bb" << block->getDebugID()
-                       << '\n');
+    LLVM_DEBUG(llvm::dbgs() << "    Visiting Block: bb" << block->getDebugID()
+                            << '\n');
 
     // Since the block is on our worklist, we know already that it is not a
     // block with lifetime ending uses, due to the invariants of our loop.

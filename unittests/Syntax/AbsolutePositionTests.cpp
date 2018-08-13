@@ -16,7 +16,7 @@ TEST(PositionTests, AbsolutePosition1) {
   ASSERT_EQ(7u, Pos.getLine());
   ASSERT_EQ(1u, Pos.getColumn());
   ASSERT_EQ(8u, Pos.getOffset());
-  AbsolutePosition EndPos = Token.getAbsoluteEndPosition();
+  AbsolutePosition EndPos = Token.getAbsoluteEndPositionAfterTrailingTrivia();
   ASSERT_EQ(7u, EndPos.getLine());
   ASSERT_EQ(4u, EndPos.getColumn());
   ASSERT_EQ(11u, EndPos.getOffset());
@@ -30,7 +30,7 @@ TEST(PositionTests, AbsolutePosition2) {
   ASSERT_EQ(4u, Pos.getLine());
   ASSERT_EQ(4u, Pos.getColumn());
   ASSERT_EQ(10u, Pos.getOffset());
-  AbsolutePosition EndPos = Token.getAbsoluteEndPosition();
+  AbsolutePosition EndPos = Token.getAbsoluteEndPositionAfterTrailingTrivia();
   ASSERT_EQ(4u, EndPos.getLine());
   ASSERT_EQ(7u, EndPos.getColumn());
   ASSERT_EQ(13u, EndPos.getOffset());

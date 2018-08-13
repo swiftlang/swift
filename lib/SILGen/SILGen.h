@@ -334,9 +334,11 @@ public:
   
   SILDeclRef getGetterDeclRef(AbstractStorageDecl *decl);
   SILDeclRef getSetterDeclRef(AbstractStorageDecl *decl);
-  SILDeclRef getAddressorDeclRef(AbstractStorageDecl *decl,
-                                 AccessKind accessKind);
+  SILDeclRef getAddressorDeclRef(AbstractStorageDecl *decl);
+  SILDeclRef getMutableAddressorDeclRef(AbstractStorageDecl *decl);
   SILDeclRef getMaterializeForSetDeclRef(AbstractStorageDecl *decl);
+  SILDeclRef getReadCoroutineDeclRef(AbstractStorageDecl *decl);
+  SILDeclRef getModifyCoroutineDeclRef(AbstractStorageDecl *decl);
 
   KeyPathPatternComponent
   emitKeyPathComponentForDecl(SILLocation loc,

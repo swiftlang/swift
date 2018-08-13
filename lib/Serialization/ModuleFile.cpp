@@ -27,6 +27,7 @@
 #include "swift/Serialization/BCReadingExtras.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/DJB.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/OnDiskHashTable.h"
 
@@ -317,7 +318,8 @@ public:
 
   hash_value_type ComputeHash(internal_key_type key) {
     if (key.first == DeclBaseName::Kind::Normal) {
-      return llvm::HashString(key.second);
+      // FIXME: DJB seed=0, audit whether the default seed could be used.
+      return llvm::djbHash(key.second, 0);
     } else {
       return (hash_value_type)key.first;
     }
@@ -379,7 +381,8 @@ public:
   }
 
   hash_value_type ComputeHash(internal_key_type key) {
-    return llvm::HashString(key);
+    // FIXME: DJB seed=0, audit whether the default seed could be used.
+    return llvm::djbHash(key, 0);
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
@@ -438,7 +441,8 @@ public:
   }
 
   hash_value_type ComputeHash(internal_key_type key) {
-    return llvm::HashString(key);
+    // FIXME: DJB seed=0, audit whether the default seed could be used.
+    return llvm::djbHash(key, 0);
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
@@ -473,7 +477,8 @@ public:
   }
 
   hash_value_type ComputeHash(internal_key_type key) {
-    return llvm::HashString(key);
+    // FIXME: DJB seed=0, audit whether the default seed could be used.
+    return llvm::djbHash(key, 0);
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
@@ -528,7 +533,8 @@ public:
 
   hash_value_type ComputeHash(internal_key_type key) {
     if (key.first == DeclBaseName::Kind::Normal) {
-      return llvm::HashString(key.second);
+      // FIXME: DJB seed=0, audit whether the default seed could be used.
+      return llvm::djbHash(key.second, 0);
     } else {
       return (hash_value_type)key.first;
     }
@@ -700,7 +706,8 @@ public:
   }
 
   hash_value_type ComputeHash(internal_key_type key) {
-    return llvm::HashString(key);
+    // FIXME: DJB seed=0, audit whether the default seed could be used.
+    return llvm::djbHash(key, 0);
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
@@ -828,6 +835,9 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
         assert(blobData.empty());
         setEntryPointClassID(scratch.front());
         break;
+      case index_block::ORDERED_TOP_LEVEL_DECLS:
+        OrderedTopLevelDecls.assign(scratch.begin(), scratch.end());
+        break;
       case index_block::LOCAL_TYPE_DECLS:
         LocalTypeDecls = readLocalDeclTable(scratch, blobData);
         break;
@@ -891,7 +901,8 @@ public:
 
   hash_value_type ComputeHash(internal_key_type key) {
     assert(!key.empty());
-    return llvm::HashString(key);
+    // FIXME: DJB seed=0, audit whether the default seed could be used.
+    return llvm::djbHash(key, 0);
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
@@ -1664,8 +1675,8 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
 
           SmallVector<ValueDecl *, 8> Decls;
           TopLevelModule->lookupQualified(
-              ModuleType::get(TopLevelModule), ScopeID,
-              NL_QualifiedDefault | NL_KnownNoDependency, nullptr, Decls);
+              TopLevelModule, ScopeID,
+              NL_QualifiedDefault | NL_KnownNoDependency, Decls);
           Optional<ImportKind> FoundKind = ImportDecl::findBestImportKind(Decls);
           assert(FoundKind.hasValue() &&
                  "deserialized imports should not be ambiguous");
@@ -1980,48 +1991,15 @@ ModuleFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const
 
 void ModuleFile::getTopLevelDecls(SmallVectorImpl<Decl *> &results) {
   PrettyStackTraceModuleFile stackEntry(*this);
-  if (PrecedenceGroupDecls) {
-    for (auto entry : PrecedenceGroupDecls->data()) {
-      for (auto item : entry)
-        results.push_back(getDecl(item.second));
+  for (DeclID entry : OrderedTopLevelDecls) {
+    Expected<Decl *> declOrError = getDeclChecked(entry);
+    if (!declOrError) {
+      if (!getContext().LangOpts.EnableDeserializationRecovery)
+        fatal(declOrError.takeError());
+      llvm::consumeError(declOrError.takeError());
+      continue;
     }
-  }
-
-  if (OperatorDecls) {
-    for (auto entry : OperatorDecls->data()) {
-      for (auto item : entry)
-        results.push_back(getDecl(item.second));
-    }
-  }
-
-  if (TopLevelDecls) {
-    for (auto entry : TopLevelDecls->data()) {
-      for (auto item : entry) {
-        Expected<Decl *> declOrError = getDeclChecked(item.second);
-        if (!declOrError) {
-          if (!getContext().LangOpts.EnableDeserializationRecovery)
-            fatal(declOrError.takeError());
-          llvm::consumeError(declOrError.takeError());
-          continue;
-        }
-        results.push_back(declOrError.get());
-      }
-    }
-  }
-
-  if (ExtensionDecls) {
-    for (auto entry : ExtensionDecls->data()) {
-      for (auto item : entry) {
-        Expected<Decl *> declOrError = getDeclChecked(item.second);
-        if (!declOrError) {
-          if (!getContext().LangOpts.EnableDeserializationRecovery)
-            fatal(declOrError.takeError());
-          llvm::consumeError(declOrError.takeError());
-          continue;
-        }
-        results.push_back(declOrError.get());
-      }
-    }
+    results.push_back(declOrError.get());
   }
 }
 

@@ -34,14 +34,14 @@ template <typename FunctionEffects>
 void GenericFunctionEffectAnalysis<FunctionEffects>::invalidate() {
   functionInfoMap.clear();
   allocator.DestroyAll();
-  DEBUG(llvm::dbgs() << "invalidate all\n");
+  LLVM_DEBUG(llvm::dbgs() << "invalidate all\n");
 }
 
 template <typename FunctionEffects>
 void GenericFunctionEffectAnalysis<FunctionEffects>::invalidate(
     SILFunction *F, InvalidationKind K) {
   if (FunctionInfo *FInfo = functionInfoMap.lookup(F)) {
-    DEBUG(llvm::dbgs() << "  invalidate " << FInfo->F->getName() << '\n');
+    LLVM_DEBUG(llvm::dbgs() << "  invalidate " << FInfo->F->getName() << '\n');
     invalidateIncludingAllCallers(FInfo);
   }
 }
@@ -80,7 +80,7 @@ void GenericFunctionEffectAnalysis<FunctionEffects>::analyzeFunction(
   if (functionInfo->functionEffects.summarizeFunction(F))
     return;
 
-  DEBUG(llvm::dbgs() << "  >> analyze " << F->getName() << '\n');
+  LLVM_DEBUG(llvm::dbgs() << "  >> analyze " << F->getName() << '\n');
 
   // Check all instructions of the function
   for (auto &BB : *F) {
@@ -91,7 +91,7 @@ void GenericFunctionEffectAnalysis<FunctionEffects>::analyzeFunction(
         functionInfo->functionEffects.analyzeInstruction(&I);
     }
   }
-  DEBUG(llvm::dbgs() << "  << finished " << F->getName() << '\n');
+  LLVM_DEBUG(llvm::dbgs() << "  << finished " << F->getName() << '\n');
 }
 
 template <typename FunctionEffects>
@@ -136,8 +136,8 @@ void GenericFunctionEffectAnalysis<FunctionEffects>::recompute(
     FunctionInfo *initialInfo) {
   allocNewUpdateID();
 
-  DEBUG(llvm::dbgs() << "recompute function-effect analysis with UpdateID "
-                     << getCurrentUpdateID() << '\n');
+  LLVM_DEBUG(llvm::dbgs() << "recompute function-effect analysis with UpdateID "
+                          << getCurrentUpdateID() << '\n');
 
   // Collect and analyze all functions to recompute, starting at initialInfo.
   FunctionOrder bottomUpOrder(getCurrentUpdateID());
@@ -151,15 +151,15 @@ void GenericFunctionEffectAnalysis<FunctionEffects>::recompute(
   // it stabilizes.
   bool needAnotherIteration;
   do {
-    DEBUG(llvm::dbgs() << "new iteration\n");
+    LLVM_DEBUG(llvm::dbgs() << "new iteration\n");
     needAnotherIteration = false;
 
     for (FunctionInfo *functionInfo : bottomUpOrder) {
       if (!functionInfo->needUpdateCallers)
         continue;
 
-      DEBUG(llvm::dbgs() << "  update callers of " << functionInfo->F->getName()
-                         << '\n');
+      LLVM_DEBUG(llvm::dbgs() << "  update callers of "
+                              << functionInfo->F->getName() << '\n');
       functionInfo->needUpdateCallers = false;
 
       // Propagate the function effects to all callers.
@@ -170,8 +170,8 @@ void GenericFunctionEffectAnalysis<FunctionEffects>::recompute(
         if (!bottomUpOrder.wasRecomputedWithCurrentUpdateID(E.Caller))
           continue;
 
-        DEBUG(llvm::dbgs() << "    merge into caller " << E.Caller->F->getName()
-                           << '\n');
+        LLVM_DEBUG(llvm::dbgs() << "    merge into caller "
+                                << E.Caller->F->getName() << '\n');
 
         if (E.Caller->functionEffects.mergeFromApply(
                 functionInfo->functionEffects, FullApplySite(E.FAS))) {
@@ -358,13 +358,14 @@ bool FunctionSideEffects::summarizeFunction(SILFunction *F) {
 
   // Handle @_effects attributes
   if (setDefinedEffects(F)) {
-    DEBUG(llvm::dbgs() << "  -- has defined effects " << F->getName() << '\n');
+    LLVM_DEBUG(llvm::dbgs() << "  -- has defined effects " << F->getName()
+                            << '\n');
     return true;
   }
 
   if (!F->isDefinition()) {
     // We can't assume anything about external functions.
-    DEBUG(llvm::dbgs() << "  -- is external " << F->getName() << '\n');
+    LLVM_DEBUG(llvm::dbgs() << "  -- is external " << F->getName() << '\n');
     setWorstEffects();
     return true;
   }

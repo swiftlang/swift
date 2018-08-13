@@ -103,10 +103,10 @@ ERROR(expected_result_in_contextual_member,none,
       "member %0 in %2 produces result of type %1, but context expects %2",
       (DeclName, Type, Type))
 
-ERROR(unexpected_argument_in_contextual_member,none,
-      "member %0 takes no arguments", (DeclName))
-ERROR(unexpected_parens_in_contextual_member,none,
-      "member %0 is not a function", (DeclName))
+ERROR(unexpected_arguments_in_enum_case,none,
+      "enum case %0 has no associated values", (DeclName))
+ERROR(unexpected_arguments_in_contextual_member,none,
+      "%0 %1 is not a function", (DescriptiveDeclKind, DeclName))
 
 ERROR(could_not_use_value_member,none,
       "member %1 cannot be used on value of type %0", (Type, DeclName))
@@ -336,6 +336,9 @@ ERROR(cannot_throw_error_code,none,
       "thrown error code type %0 does not conform to 'Error'; construct an %1 "
       "instance", (Type, Type))
 
+ERROR(bad_yield_count,none,
+      "expected %0 yield value(s)", (unsigned))
+
 ERROR(cannot_throw_nil,none,
       "cannot infer concrete Error for thrown 'nil' value", ())
 
@@ -367,6 +370,23 @@ ERROR(cannot_convert_partial_argument_value_protocol,none,
 
 ERROR(cannot_convert_argument_value_nil,none,
       "'nil' is not compatible with expected argument type %0", (Type))
+
+ERROR(cannot_yield_rvalue_by_reference_same_type,none,
+      "cannot yield immutable value of type %0 as an inout yield", (Type))
+ERROR(cannot_yield_rvalue_by_reference,none,
+      "cannot yield immutable value of type %0 as an inout yield of type %1",
+      (Type,Type))
+ERROR(cannot_yield_wrong_type_by_reference,none,
+      "cannot yield reference to storage of type %0 as an inout yield of type %1",
+      (Type,Type))
+ERROR(cannot_convert_yield_value,none,
+      "cannot convert value of type %0 to expected yield type %1",
+      (Type,Type))
+ERROR(cannot_convert_yield_value_protocol,none,
+      "yielded type %0 does not conform to expected type %1",
+      (Type,Type))
+ERROR(cannot_convert_yield_value_nil,none,
+      "nil is not compatible with expected yield type %0", (Type))
 
 ERROR(cannot_convert_closure_result,none,
       "cannot convert value of type %0 to closure result type %1",
@@ -612,17 +632,21 @@ ERROR(serialization_name_mismatch,Fatal,
 ERROR(serialization_name_mismatch_repl,none,
       "cannot load module '%0' as %1", (StringRef, Identifier))
 ERROR(serialization_target_incompatible,Fatal,
-      "module file was created for incompatible target %0: %1",
-      (StringRef, StringRef))
+      "module %0 was created for incompatible target %1: %2",
+      (Identifier, StringRef, StringRef))
 ERROR(serialization_target_incompatible_repl,none,
-      "module file was created for incompatible target %0: %1",
-      (StringRef, StringRef))
+      "module %0 was created for incompatible target %1: %2",
+      (Identifier, StringRef, StringRef))
 ERROR(serialization_target_too_new,Fatal,
-      "module file's minimum deployment target is %0 v%1.%2%select{|.%3}3: %4",
-      (StringRef, unsigned, unsigned, unsigned, StringRef))
+      "compiling for %0 %1, but module %2 has a minimum "
+      "deployment target of %0 %3: %4",
+      (StringRef, llvm::VersionTuple, Identifier, llvm::VersionTuple,
+       StringRef))
 ERROR(serialization_target_too_new_repl,none,
-      "module file's minimum deployment target is %0 v%1.%2%select{|.%3}3: %4",
-      (StringRef, unsigned, unsigned, unsigned, StringRef))
+      "compiling for %0 %1, but module %2 has a minimum "
+      "deployment target of %0 %3: %4",
+      (StringRef, llvm::VersionTuple, Identifier, llvm::VersionTuple,
+       StringRef))
 
 ERROR(serialization_fatal,Fatal,
       "fatal error encountered while reading from module '%0'; "
@@ -924,6 +948,9 @@ ERROR(missing_explicit_conversion,none,
 ERROR(missing_address_of,none,
       "passing value of type %0 to an inout parameter requires explicit '&'",
       (Type))
+ERROR(missing_address_of_yield,none,
+      "yielding mutable value of type %0 requires explicit '&'",
+      (Type))
 ERROR(extraneous_address_of,none,
       "use of extraneous '&'",
       ())
@@ -947,9 +974,6 @@ ERROR(wrong_argument_labels,none,
       "incorrect argument label%select{|s}0 in %select{call|subscript}3 "
       "(have '%1', expected '%2')",
       (bool, StringRef, StringRef, bool))
-ERROR(extra_named_single_element_tuple,none,
-      "cannot treat single-element named tuple as a scalar; use '.%0' to "
-      "access its element", (StringRef))
 ERROR(argument_out_of_order_named_named,none,
       "argument %0 must precede argument %1", (Identifier, Identifier))
 ERROR(argument_out_of_order_named_unnamed,none,
@@ -1049,16 +1073,6 @@ ERROR(c_function_pointer_from_function_with_context,none,
 // MARK: Type Check Declarations
 //------------------------------------------------------------------------------
 
-ERROR(var_type_not_materializable,none,
-      "variable has type %0 which includes nested inout parameters",
-      (Type))
-ERROR(param_type_non_materializable_tuple,none,
-      "named parameter has type %0 which includes nested inout parameters",
-      (Type))
-ERROR(enum_element_not_materializable,none,
-      "enum case has type %0 which includes nested inout parameters",
-      (Type))
-
 ERROR(missing_initializer_def,PointsToFirstBadToken,
       "initializer requires a body", ())
 
@@ -1090,6 +1104,10 @@ ERROR(functions_mutating_and_not,none,
       (unsigned, unsigned))
 ERROR(static_functions_not_mutating,none,
       "static functions must not be declared mutating", ())
+
+ERROR(modify_mutatingness_differs_from_setter,none,
+      "'modify' accessor cannot be %select{nonmutating|mutating}0 "
+      "when the setter is %select{mutating|nonmutating}0", (bool))
 
 ERROR(transparent_in_protocols_not_supported,none,
       "'@_transparent' attribute is not supported on declarations within protocols", ())
@@ -1471,7 +1489,8 @@ ERROR(extension_specialization,none,
 ERROR(extension_stored_property,none,
       "extensions must not contain stored properties", ())
 ERROR(extension_nongeneric_trailing_where,none,
-      "trailing 'where' clause for extension of non-generic type %0", (Type))
+      "trailing 'where' clause for extension of non-generic type %0",
+      (DeclName))
 ERROR(extension_protocol_inheritance,none,
       "extension of protocol %0 cannot have an inheritance clause", (Type))
 ERROR(objc_generic_extension_using_type_parameter,none,
@@ -1493,8 +1512,8 @@ ERROR(use_of_equal_instead_of_equality,none,
 
 
 ERROR(protocol_does_not_conform_objc,none,
-      "using %0 as a concrete type conforming to protocol %1 is not supported",
-      (Type, Type))
+      "protocol type %0 cannot conform to %1 because only concrete "
+      "types can conform to protocols", (Type, Type))
 ERROR(protocol_does_not_conform_static,none,
       "%0 cannot be used as a type conforming to protocol %1 because %1 "
       "has static requirements",
@@ -1510,6 +1529,14 @@ ERROR(types_not_equal,none,
       (Type, Type, Type))
 ERROR(type_does_not_conform_owner,none,
       "%0 requires that %1 conform to %2", (Type, Type, Type))
+ERROR(type_does_not_conform_in_decl_ref,none,
+      "referencing %0 %1 on %2 requires that %3 conform to %4",
+      (DescriptiveDeclKind, DeclName, Type, Type, Type))
+ERROR(type_does_not_conform_decl_owner,none,
+      "%0 %1 requires that %2 conform to %3",
+      (DescriptiveDeclKind, DeclName, Type, Type))
+NOTE(where_type_does_not_conform_type,none,
+     "where %0 = %1", (Type, Type))
 NOTE(requirement_implied_by_conditional_conformance,none,
      "requirement from conditional conformance of %0 to %1", (Type, Type))
 NOTE(candidate_types_equal_requirement,none,
@@ -1569,7 +1596,7 @@ ERROR(protocol_has_missing_requirements,none,
 ERROR(protocol_has_missing_requirements_versioned,none,
       "type %0 cannot conform to protocol %1 (compiled with Swift %2) because "
       "it has requirements that could not be loaded in Swift %3",
-      (Type, Type, clang::VersionTuple, clang::VersionTuple))
+      (Type, Type, llvm::VersionTuple, llvm::VersionTuple))
 ERROR(requirement_restricts_self,none,
       "%0 requirement %1 cannot add constraint '%2%select{:|:| ==|:}3 %4' on "
       "'Self'",
@@ -2180,7 +2207,7 @@ ERROR(inheritance_from_class_with_missing_vtable_entries,none,
 ERROR(inheritance_from_class_with_missing_vtable_entries_versioned,none,
       "cannot inherit from class %0 (compiled with Swift %1) because it has "
       "overridable members that could not be loaded in Swift %2",
-      (Identifier, clang::VersionTuple, clang::VersionTuple))
+      (Identifier, llvm::VersionTuple, llvm::VersionTuple))
 ERROR(inheritance_from_cf_class,none,
       "cannot inherit from Core Foundation type %0", (Identifier))
 ERROR(inheritance_from_objc_runtime_visible_class,none,
@@ -3018,6 +3045,10 @@ ERROR(jump_out_of_defer,none,
       "'%0' cannot transfer control out of a defer statement",
       (StringRef))
 
+WARNING(defer_stmt_at_block_end,none,
+     "'defer' statement before end of scope always executes immediately; "
+     "replace with 'do' statement to silence this warning", ())
+
 ERROR(return_invalid_outside_func,none,
       "return invalid outside of a func", ())
 
@@ -3582,9 +3613,6 @@ WARNING(attribute_meaningless_when_nonobjc,none,
 ERROR(objc_invalid_on_var,none,
       "property cannot be %" OBJC_ATTR_SELECT "0 "
       "because its type cannot be represented in Objective-C", (unsigned))
-ERROR(objc_invalid_subscript_key_type,none,
-      "subscript cannot be %" OBJC_ATTR_SELECT "0 because its key "
-      "type %1 is neither an integer nor an object", (unsigned, Type))
 ERROR(objc_invalid_on_subscript,none,
       "subscript cannot be %" OBJC_ATTR_SELECT "0 because its type "
       "cannot be represented in Objective-C", (unsigned))
@@ -3644,6 +3672,8 @@ ERROR(objc_observing_accessor, none,
       "observing accessors are not allowed to be marked @objc", ())
 ERROR(objc_addressor, none,
       "addressors are not allowed to be marked @objc", ())
+ERROR(objc_coroutine_accessor, none,
+      "'read' and 'modify' accessors are not allowed to be marked @objc", ())
 ERROR(objc_invalid_on_func_variadic,none,
       "method cannot be %" OBJC_ATTR_SELECT "0 because it has a variadic "
       "parameter", (unsigned))
@@ -3840,21 +3870,21 @@ NOTE(availability_marked_unavailable, none,
 
 NOTE(availability_introduced_in_swift, none,
      "%select{getter for |setter for |}0%1 was introduced in Swift %2",
-     (unsigned, DeclName, clang::VersionTuple))
+     (unsigned, DeclName, llvm::VersionTuple))
 
 NOTE(availability_obsoleted, none,
      "%select{getter for |setter for |}0%1 was obsoleted in %2 %3",
-     (unsigned, DeclName, StringRef, clang::VersionTuple))
+     (unsigned, DeclName, StringRef, llvm::VersionTuple))
 
 WARNING(availability_deprecated, none,
         "%select{getter for |setter for |}0%1 %select{is|%select{is|was}4}2 "
         "deprecated%select{| %select{on|in}4 %3%select{| %5}4}2",
-        (unsigned, DeclName, bool, StringRef, bool, clang::VersionTuple))
+        (unsigned, DeclName, bool, StringRef, bool, llvm::VersionTuple))
 
 WARNING(availability_deprecated_msg, none,
         "%select{getter for |setter for |}0%1 %select{is|%select{is|was}4}2 "
         "deprecated%select{| %select{on|in}4 %3%select{| %5}4}2: %6",
-        (unsigned, DeclName, bool, StringRef, bool, clang::VersionTuple,
+        (unsigned, DeclName, bool, StringRef, bool, llvm::VersionTuple,
          StringRef))
 
 WARNING(availability_deprecated_rename, none,
@@ -3862,7 +3892,7 @@ WARNING(availability_deprecated_rename, none,
         "deprecated%select{| %select{on|in}4 %3%select{| %5}4}2: "
         "%select{renamed to|replaced by}6%" REPLACEMENT_DECL_KIND_SELECT "7 "
         "'%8'",
-        (unsigned, DeclName, bool, StringRef, bool, clang::VersionTuple, bool,
+        (unsigned, DeclName, bool, StringRef, bool, llvm::VersionTuple, bool,
          unsigned, StringRef))
 #undef REPLACEMENT_DECL_KIND_SELECT
 
@@ -3877,7 +3907,7 @@ NOTE(availability_decl_more_than_enclosing_enclosing_here, none,
 
 ERROR(availability_decl_only_version_newer, none,
       "%0 is only available on %1 %2 or newer",
-      (DeclName, StringRef, clang::VersionTuple))
+      (DeclName, StringRef, llvm::VersionTuple))
 
 NOTE(availability_guard_with_version_check, none,
      "add 'if #available' version check", ())
@@ -3888,12 +3918,12 @@ NOTE(availability_add_attribute, none,
 ERROR(availability_accessor_only_version_newer, none,
       "%select{getter|setter}0 for %1 is only available on %2 %3"
       " or newer",
-      (/*AccessorKind*/unsigned, DeclName, StringRef, clang::VersionTuple))
+      (/*AccessorKind*/unsigned, DeclName, StringRef, llvm::VersionTuple))
 
 ERROR(availability_inout_accessor_only_version_newer, none,
       "cannot pass as inout because %select{getter|setter}0 for %1 is only "
       "available on %2 %3 or newer",
-      (/*AccessorKind*/unsigned, DeclName, StringRef, clang::VersionTuple))
+      (/*AccessorKind*/unsigned, DeclName, StringRef, llvm::VersionTuple))
 
 ERROR(availability_query_required_for_platform, none,
       "condition required for target platform '%0'", (StringRef))
@@ -3915,7 +3945,7 @@ ERROR(availability_stored_property_no_potential,
 
 ERROR(availability_protocol_requires_version,
       none, "protocol %0 requires %1 to be available on %2 %3 and newer",
-      (DeclName, DeclName, StringRef, clang::VersionTuple))
+      (DeclName, DeclName, StringRef, llvm::VersionTuple))
 
 NOTE(availability_protocol_requirement_here, none,
      "protocol requirement here", ())
@@ -4120,6 +4150,10 @@ NOTE(redundant_particular_literal_case_here,none,
      "first occurrence of identical literal pattern is here", ())
 
 WARNING(non_exhaustive_switch_warn,none, "switch must be exhaustive", ())
+
+WARNING(override_nsobject_hashvalue,none,
+        "override of 'NSObject.hashValue' is deprecated; "
+        "override 'NSObject.hash' to get consistent hashing behavior", ())
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

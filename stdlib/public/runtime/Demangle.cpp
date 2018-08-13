@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/Range.h"
+#include "swift/ABI/TypeIdentity.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Portability.h"
 #include "swift/Strings.h"
@@ -122,10 +123,24 @@ swift::_buildDemanglingForContext(const ContextDescriptor *context,
       break;
     }
 
+    case ContextDescriptorKind::Protocol: {
+      auto protocol = llvm::cast<ProtocolDescriptor>(component);
+      auto name = protocol->Name.get();
+
+      auto protocolNode = Dem.createNode(Node::Kind::Protocol);
+      protocolNode->addChild(node, Dem);
+      auto nameNode = Dem.createNode(Node::Kind::Identifier, name);
+      protocolNode->addChild(nameNode, Dem);
+
+      node = protocolNode;
+      break;
+    }
+
     default:
       // Form a type context demangling for type contexts.
       if (auto type = llvm::dyn_cast<TypeContextDescriptor>(component)) {
-        auto name = type->Name.get();
+        auto identity = ParsedTypeIdentity::parse(type);
+
         Node::Kind nodeKind;
         Node::Kind genericNodeKind;
         switch (kind) {
@@ -151,19 +166,20 @@ swift::_buildDemanglingForContext(const ContextDescriptor *context,
         
         // Override the node kind if this is a Clang-imported type so we give it
         // a stable mangling.
-        auto typeFlags = type->getTypeContextDescriptorFlags();
-        if (typeFlags.isCTag()) {
-          nodeKind = Node::Kind::Structure;
-        } else if (typeFlags.isCTypedef()) {
+        if (identity.isCTypedef()) {
           nodeKind = Node::Kind::TypeAlias;
+        } else if (nodeKind != Node::Kind::Structure &&
+                   _isCImportedTagType(type, identity)) {
+          nodeKind = Node::Kind::Structure;
         }
         
         auto typeNode = Dem.createNode(nodeKind);
         typeNode->addChild(node, Dem);
-        auto nameNode = Dem.createNode(Node::Kind::Identifier, name);
-        if (type->isSynthesizedRelatedEntity()) {
+        auto nameNode = Dem.createNode(Node::Kind::Identifier,
+                                       identity.getABIName());
+        if (identity.isAnyRelatedEntity()) {
           auto relatedName = Dem.createNode(Node::Kind::RelatedEntityDeclName,
-                                    type->getSynthesizedDeclRelatedEntityTag());
+                                            identity.getRelatedEntityName());
           relatedName->addChild(nameNode, Dem);
           nameNode = relatedName;
         }
@@ -210,8 +226,8 @@ swift::_buildDemanglingForContext(const ContextDescriptor *context,
       // no richer runtime information available about it (such as an anonymous
       // context). Use an unstable mangling to represent the context by its
       // pointer identity.
-      char addressBuf[sizeof(void*) * 2 + 2 + 1];
-      snprintf(addressBuf, sizeof(addressBuf), "0x%" PRIxPTR, (uintptr_t)component);
+      char addressBuf[sizeof(void*) * 2 + 1 + 1];
+      snprintf(addressBuf, sizeof(addressBuf), "$%" PRIxPTR, (uintptr_t)component);
       
       auto anonNode = Dem.createNode(Node::Kind::AnonymousContext);
       CharVector addressStr;
@@ -381,11 +397,7 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
   }
   case MetadataKind::Existential: {
     auto exis = static_cast<const ExistentialTypeMetadata *>(type);
-    
-    std::vector<const ProtocolDescriptor *> protocols;
-    protocols.reserve(exis->Protocols.NumProtocols);
-    for (unsigned i = 0, e = exis->Protocols.NumProtocols; i < e; ++i)
-      protocols.push_back(exis->Protocols[i]);
+    auto protocols = exis->getProtocols();
 
     auto type_list = Dem.createNode(Node::Kind::TypeList);
     auto proto_list = Dem.createNode(Node::Kind::ProtocolList);
@@ -395,39 +407,52 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     // only ever make a swift_getExistentialTypeMetadata invocation using
     // its canonical ordering of protocols.
 
-    for (auto *protocol : protocols) {
-      // The protocol name is mangled as a type symbol, with the _Tt prefix.
-      StringRef ProtoName(protocol->Name);
-      NodePointer protocolNode = Dem.demangleSymbol(ProtoName);
+    for (auto protocol : protocols) {
+#if SWIFT_OBJC_INTEROP
+      if (protocol.isObjC()) {
+        // The protocol name is mangled as a type symbol, with the _Tt prefix.
+        StringRef ProtoName(protocol.getName());
+        NodePointer protocolNode = Dem.demangleSymbol(ProtoName);
 
-      // ObjC protocol names aren't mangled.
-      if (!protocolNode) {
-        auto module = Dem.createNode(Node::Kind::Module,
-                                          MANGLING_MODULE_OBJC);
-        auto node = Dem.createNode(Node::Kind::Protocol);
-        node->addChild(module, Dem);
-        node->addChild(Dem.createNode(Node::Kind::Identifier,
-                                        llvm::StringRef(protocol->Name)), Dem);
-        auto typeNode = Dem.createNode(Node::Kind::Type);
-        typeNode->addChild(node, Dem);
-        type_list->addChild(typeNode, Dem);
+        // ObjC protocol names aren't mangled.
+        if (!protocolNode) {
+          auto module = Dem.createNode(Node::Kind::Module,
+                                            MANGLING_MODULE_OBJC);
+          auto node = Dem.createNode(Node::Kind::Protocol);
+          node->addChild(module, Dem);
+          node->addChild(Dem.createNode(Node::Kind::Identifier, ProtoName),
+                         Dem);
+          auto typeNode = Dem.createNode(Node::Kind::Type);
+          typeNode->addChild(node, Dem);
+          type_list->addChild(typeNode, Dem);
+          continue;
+        }
+
+        // Dig out the protocol node.
+        // Global -> (Protocol|TypeMangling)
+        protocolNode = protocolNode->getChild(0);
+        if (protocolNode->getKind() == Node::Kind::TypeMangling) {
+          protocolNode = protocolNode->getChild(0); // TypeMangling -> Type
+          protocolNode = protocolNode->getChild(0); // Type -> ProtocolList
+          protocolNode = protocolNode->getChild(0); // ProtocolList -> TypeList
+          protocolNode = protocolNode->getChild(0); // TypeList -> Type
+
+          assert(protocolNode->getKind() == Node::Kind::Type);
+          assert(protocolNode->getChild(0)->getKind() == Node::Kind::Protocol);
+        } else {
+          assert(protocolNode->getKind() == Node::Kind::Protocol);
+        }
+
+        type_list->addChild(protocolNode, Dem);
         continue;
       }
+#endif
 
-      // Dig out the protocol node.
-      // Global -> (Protocol|TypeMangling)
-      protocolNode = protocolNode->getChild(0);
-      if (protocolNode->getKind() == Node::Kind::TypeMangling) {
-        protocolNode = protocolNode->getChild(0); // TypeMangling -> Type
-        protocolNode = protocolNode->getChild(0); // Type -> ProtocolList
-        protocolNode = protocolNode->getChild(0); // ProtocolList -> TypeList
-        protocolNode = protocolNode->getChild(0); // TypeList -> Type
-
-        assert(protocolNode->getKind() == Node::Kind::Type);
-        assert(protocolNode->getChild(0)->getKind() == Node::Kind::Protocol);
-      } else {
-        assert(protocolNode->getKind() == Node::Kind::Protocol);
-      }
+      auto protocolNode =
+          _buildDemanglingForContext(protocol.getSwiftProtocol(), { }, false,
+                                     Dem);
+      if (!protocolNode)
+        return nullptr;
 
       type_list->addChild(protocolNode, Dem);
     }
@@ -447,9 +472,8 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
       // protocols.
       bool requiresClassImplicit = false;
 
-      for (auto *protocol : protocols) {
-        if (protocol->Flags.getClassConstraint()
-            == ProtocolClassConstraint::Class)
+      for (auto protocol : protocols) {
+        if (protocol.getClassConstraint() == ProtocolClassConstraint::Class)
           requiresClassImplicit = true;
       }
 

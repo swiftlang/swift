@@ -12,52 +12,44 @@
 import Foundation
 import Swift
 
-func hexAddrVal<T>(_ x: T) -> String {
-  return "@0x" + String(UInt64(unsafeBitCast(x, to: Int.self)), radix: 16)
-}
+func hex(_ x: UInt64) -> String { return String(x, radix:16) }
 
-func hexAddr(_ x: AnyObject?) -> String {
-  if let owner = x {
-    if let y = owner as? _SwiftRawStringStorage {
-      return ".native\(hexAddrVal(y))"
-    }
-    if let y = owner as? NSString {
-      return ".cocoa\(hexAddrVal(y))"
-    }
-    else {
-      return "?Uknown?\(hexAddrVal(owner))"
-    }
-  }
-  return "nil"
+func hexAddrVal<T>(_ x: T) -> String {
+  return "@0x" + hex(UInt64(unsafeBitCast(x, to: UInt.self)))
 }
 
 func repr(_ x: NSString) -> String {
-  return "\(NSStringFromClass(object_getClass(x)))\(hexAddr(x)) = \"\(x)\""
+  return "\(NSStringFromClass(object_getClass(x)!))\(hexAddrVal(x)) = \"\(x)\""
 }
 
-func repr(_ x: _StringGuts) -> String {
-  if x._isNative {
-    return "Native("
-      + "owner: \(hexAddrVal(x._owner)), "
-      + "count: \(x.count), "
-      + "capacity: \(x.capacity))"
-  } else if x._isCocoa {
-    return "Cocoa("
-      + "owner: \(hexAddrVal(x._owner)), "
-      + "count: \(x.count))"
-  } else if x._isSmall {
-    return "Cocoa("
-      + "owner: <tagged>, "
-      + "count: \(x.count))"
-  } else if x._isUnmanaged {
-    return "Unmanaged("
-      + "count: \(x.count))"
+func repr(_ x: _StringRepresentation) -> String {
+  switch x._form {
+  case ._small:
+    return """
+      Small(count: \(x._count))
+      """
+  case ._cocoa(let object):
+    return """
+      Cocoa(\
+      owner: \(hexAddrVal(object)), \
+      count: \(x._count))
+      """
+  case ._native(let object):
+    return """
+      Native(\
+      owner: \(hexAddrVal(object)), \
+      count: \(x._count), \
+      capacity: \(x._capacity))
+      """
+  case ._immortal(_):
+    return """
+      Unmanaged(count: \(x._count))
+      """
   }
-  return "?????"
 }
 
 func repr(_ x: String) -> String {
-  return "String(\(repr(x._guts))) = \"\(x)\""
+  return "String(\(repr(x._classify()))) = \"\(x)\""
 }
 
 // ===------- Appending -------===

@@ -123,8 +123,9 @@ static VarDecl *indexedVarDecl(char prefixChar, int index, Type type,
 
   auto varDecl = new (C) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Let,
                                  /*IsCaptureList*/true, SourceLoc(),
-                                 C.getIdentifier(indexStrRef), type,
+                                 C.getIdentifier(indexStrRef),
                                  varContext);
+  varDecl->setType(type);
   varDecl->setHasNonPatternBindingInit(true);
   return varDecl;
 }
@@ -210,7 +211,7 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
 
   auto indexVar = new (C) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Var,
                                   /*IsCaptureList*/false, SourceLoc(),
-                                  C.getIdentifier(indexName), intType,
+                                  C.getIdentifier(indexName),
                                   funcDecl);
   indexVar->setInterfaceType(intType);
   indexVar->setImplicit();
@@ -260,20 +261,19 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
                              AccessSemantics::Ordinary, intType);
 }
 
-/// Generates a guard statement that checks whether the given lhs and rhs
-/// variables are equal; if they are not, then the isEqual variable is set to
-/// false and a break statement is executed.
+/// Returns a generated guard statement that checks whether the given lhs and
+/// rhs expressions are equal. If not equal, the else block for the guard
+/// returns false.
 /// \p C The AST context.
-/// \p lhsVar The first variable to test for equality.
-/// \p rhsVar The second variable to test for equality.
-/// \p isEqualVar The variable to set to false if the guard condition fails.
+/// \p lhsExpr The first expression to compare for equality.
+/// \p rhsExpr The second expression to compare for equality.
 static GuardStmt *returnIfNotEqualGuard(ASTContext &C,
                                         Expr *lhsExpr,
                                         Expr *rhsExpr) {
   SmallVector<StmtConditionElement, 1> conditions;
-  SmallVector<ASTNode, 2> statements;
+  SmallVector<ASTNode, 1> statements;
 
-  // First, generate the statements for the body of the guard.
+  // First, generate the statement for the body of the guard.
   // return false
   auto falseExpr = new (C) BooleanLiteralExpr(false, SourceLoc(),
                                               /*Implicit*/true);
@@ -305,7 +305,7 @@ deriveBodyEquatable_enum_uninhabited_eq(AbstractFunctionDecl *eqDecl) {
   auto parentDC = eqDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
-  auto args = eqDecl->getParameterLists().back();
+  auto args = eqDecl->getParameters();
   auto aParam = args->get(0);
   auto bParam = args->get(1);
 
@@ -336,7 +336,7 @@ deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl) {
   auto parentDC = eqDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
-  auto args = eqDecl->getParameterLists().back();
+  auto args = eqDecl->getParameters();
   auto aParam = args->get(0);
   auto bParam = args->get(1);
 
@@ -391,7 +391,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl) {
   auto parentDC = eqDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
-  auto args = eqDecl->getParameterLists().back();
+  auto args = eqDecl->getParameters();
   auto aParam = args->get(0);
   auto bParam = args->get(1);
 
@@ -505,7 +505,7 @@ static void deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl) {
   auto parentDC = eqDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
-  auto args = eqDecl->getParameterLists().back();
+  auto args = eqDecl->getParameters();
   auto aParam = args->get(0);
   auto bParam = args->get(1);
 
@@ -551,7 +551,7 @@ static void deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl) {
 
 /// Derive an '==' operator implementation for an enum or a struct.
 static ValueDecl *
-deriveEquatable_eq(DerivedConformance &derived, Identifier generatedIdentifier,
+deriveEquatable_eq(DerivedConformance &derived,
                    void (*bodySynthesizer)(AbstractFunctionDecl *)) {
   // enum SomeEnum<T...> {
   //   case A, B(Int), C(String, Int)
@@ -591,38 +591,45 @@ deriveEquatable_eq(DerivedConformance &derived, Identifier generatedIdentifier,
   ASTContext &C = derived.TC.Context;
 
   auto parentDC = derived.getConformanceContext();
-  auto enumTy = parentDC->getDeclaredTypeInContext();
-  auto enumIfaceTy = parentDC->getDeclaredInterfaceType();
+  auto selfIfaceTy = parentDC->getDeclaredInterfaceType();
 
   auto getParamDecl = [&](StringRef s) -> ParamDecl * {
     auto *param = new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(),
                                     SourceLoc(), Identifier(), SourceLoc(),
-                                    C.getIdentifier(s), enumTy, parentDC);
-    param->setInterfaceType(enumIfaceTy);
+                                    C.getIdentifier(s), parentDC);
+    param->setInterfaceType(selfIfaceTy);
     return param;
   };
 
   auto selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC,
                                         /*isStatic=*/true);
 
-  ParameterList *params[] = {
-    ParameterList::createWithoutLoc(selfDecl),
-    ParameterList::create(C, {
-        getParamDecl("a"),
-        getParamDecl("b")
-    })
-  };
+  ParameterList *params = ParameterList::create(C, {
+    getParamDecl("a"),
+    getParamDecl("b")
+  });
 
   auto boolTy = C.getBoolDecl()->getDeclaredType();
 
-  DeclName name(C, generatedIdentifier, params[1]);
+  Identifier generatedIdentifier;
+  if (parentDC->getParentModule()->getResilienceStrategy() ==
+      ResilienceStrategy::Resilient) {
+    generatedIdentifier = C.Id_EqualsOperator;
+  } else if (selfIfaceTy->getEnumOrBoundGenericEnum()) {
+    generatedIdentifier = C.Id_derived_enum_equals;
+  } else {
+    assert(selfIfaceTy->getStructOrBoundGenericStruct());
+    generatedIdentifier = C.Id_derived_struct_equals;
+  }
+
+  DeclName name(C, generatedIdentifier, params);
   auto eqDecl =
     FuncDecl::create(C, /*StaticLoc=*/SourceLoc(),
                      StaticSpellingKind::KeywordStatic,
                      /*FuncLoc=*/SourceLoc(), name, /*NameLoc=*/SourceLoc(),
                      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr,
-                     params,
+                     selfDecl, params,
                      TypeLoc::withoutLoc(boolTy),
                      parentDC);
   eqDecl->setImplicit();
@@ -630,17 +637,19 @@ deriveEquatable_eq(DerivedConformance &derived, Identifier generatedIdentifier,
   eqDecl->getAttrs().add(new (C) InfixAttr(/*implicit*/false));
 
   // Add the @_implements(Equatable, ==(_:_:)) attribute
-  auto equatableProto = C.getProtocol(KnownProtocolKind::Equatable);
-  auto equatableTy = equatableProto->getDeclaredType();
-  auto equatableTypeLoc = TypeLoc::withoutLoc(equatableTy);
-  SmallVector<Identifier, 2> argumentLabels = { Identifier(), Identifier() };
-  auto equalsDeclName = DeclName(C, DeclBaseName(C.Id_EqualsOperator),
-                                 argumentLabels);
-  eqDecl->getAttrs().add(new (C) ImplementsAttr(SourceLoc(),
-                                                SourceRange(),
-                                                equatableTypeLoc,
-                                                equalsDeclName,
-                                                DeclNameLoc()));
+  if (generatedIdentifier != C.Id_EqualsOperator) {
+    auto equatableProto = C.getProtocol(KnownProtocolKind::Equatable);
+    auto equatableTy = equatableProto->getDeclaredType();
+    auto equatableTypeLoc = TypeLoc::withoutLoc(equatableTy);
+    SmallVector<Identifier, 2> argumentLabels = { Identifier(), Identifier() };
+    auto equalsDeclName = DeclName(C, DeclBaseName(C.Id_EqualsOperator),
+                                   argumentLabels);
+    eqDecl->getAttrs().add(new (C) ImplementsAttr(SourceLoc(),
+                                                  SourceRange(),
+                                                  equatableTypeLoc,
+                                                  equalsDeclName,
+                                                  DeclNameLoc()));
+  }
 
   if (!C.getEqualIntDecl()) {
     derived.TC.diagnose(derived.ConformanceDecl->getLoc(),
@@ -650,30 +659,11 @@ deriveEquatable_eq(DerivedConformance &derived, Identifier generatedIdentifier,
 
   eqDecl->setBodySynthesizer(bodySynthesizer);
 
-  // Compute the type.
-  Type paramsTy = params[1]->getType(C);
-
   // Compute the interface type.
-  Type interfaceTy;
-  auto selfParam = computeSelfParam(eqDecl);
-  if (auto genericSig = parentDC->getGenericSignatureOfContext()) {
-    eqDecl->setGenericEnvironment(parentDC->getGenericEnvironmentOfContext());
+  if (auto genericEnv = parentDC->getGenericEnvironmentOfContext())
+    eqDecl->setGenericEnvironment(genericEnv);
+  eqDecl->computeType();
 
-    Type enumIfaceTy = parentDC->getDeclaredInterfaceType();
-    TupleTypeElt ifaceParamElts[] = {
-      enumIfaceTy, enumIfaceTy,
-    };
-    auto ifaceParamsTy = TupleType::get(ifaceParamElts, C);
-    interfaceTy = FunctionType::get(ifaceParamsTy, boolTy,
-                                    AnyFunctionType::ExtInfo());
-    interfaceTy = GenericFunctionType::get(genericSig, {selfParam}, interfaceTy,
-                                           AnyFunctionType::ExtInfo());
-  } else {
-    interfaceTy = FunctionType::get(paramsTy, boolTy);
-    interfaceTy = FunctionType::get({selfParam}, interfaceTy,
-                                    FunctionType::ExtInfo());
-  }
-  eqDecl->setInterfaceType(interfaceTy);
   eqDecl->copyFormalAccessFrom(derived.Nominal, /*sourceIsParentContext*/ true);
   eqDecl->setValidationToChecked();
 
@@ -687,7 +677,9 @@ deriveEquatable_eq(DerivedConformance &derived, Identifier generatedIdentifier,
 
 bool DerivedConformance::canDeriveEquatable(TypeChecker &tc, DeclContext *DC,
                                             NominalTypeDecl *type) {
-  auto equatableProto = tc.Context.getProtocol(KnownProtocolKind::Equatable);
+  ASTContext &ctx = DC->getASTContext();
+  auto equatableProto = ctx.getProtocol(KnownProtocolKind::Equatable);
+  if (!equatableProto) return false;
   return canDeriveConformance(tc, DC, type, equatableProto);
 }
 
@@ -704,11 +696,9 @@ ValueDecl *DerivedConformance::deriveEquatable(ValueDecl *requirement) {
               : ed->hasOnlyCasesWithoutAssociatedValues()
                     ? &deriveBodyEquatable_enum_noAssociatedValues_eq
                     : &deriveBodyEquatable_enum_hasAssociatedValues_eq;
-      return deriveEquatable_eq(*this, TC.Context.Id_derived_enum_equals,
-                                bodySynthesizer);
+      return deriveEquatable_eq(*this, bodySynthesizer);
     } else if (isa<StructDecl>(Nominal))
-      return deriveEquatable_eq(*this, TC.Context.Id_derived_struct_equals,
-                                &deriveBodyEquatable_struct_eq);
+      return deriveEquatable_eq(*this, &deriveBodyEquatable_struct_eq);
     else
       llvm_unreachable("todo");
   }
@@ -769,45 +759,29 @@ deriveHashable_hashInto(DerivedConformance &derived,
   auto *hasherParamDecl = new (C) ParamDecl(VarDecl::Specifier::InOut,
                                             SourceLoc(),
                                             SourceLoc(), C.Id_into, SourceLoc(),
-                                            C.Id_hasher, hasherType, parentDC);
+                                            C.Id_hasher, parentDC);
   hasherParamDecl->setInterfaceType(hasherType);
 
-  ParameterList *params[] = {ParameterList::createWithoutLoc(selfDecl),
-                             ParameterList::createWithoutLoc(hasherParamDecl)};
+  ParameterList *params = ParameterList::createWithoutLoc(hasherParamDecl);
 
   // Return type: ()
   auto returnType = TupleType::getEmpty(C);
 
   // Func name: hash(into: inout Hasher) -> ()
-  DeclName name(C, C.Id_hash, params[1]);
+  DeclName name(C, C.Id_hash, params);
   auto *hashDecl = FuncDecl::create(C,
                                     SourceLoc(), StaticSpellingKind::None,
                                     SourceLoc(), name, SourceLoc(),
                                     /*Throws=*/false, SourceLoc(),
-                                    nullptr, params,
+                                    nullptr, selfDecl, params,
                                     TypeLoc::withoutLoc(returnType),
                                     parentDC);
   hashDecl->setImplicit();
   hashDecl->setBodySynthesizer(bodySynthesizer);
 
-  // Evaluate type of Self in (Self) -> (into: inout Hasher) -> ()
-  auto selfParam = computeSelfParam(hashDecl);
-  auto inoutFlag = ParameterTypeFlags().withInOut(true);
-  auto hasherParam = AnyFunctionType::Param(hasherType, C.Id_into, inoutFlag);
-  auto innerType = FunctionType::get({hasherParam}, returnType,
-                                     FunctionType::ExtInfo());
-
-  Type interfaceType;
-  if (auto sig = parentDC->getGenericSignatureOfContext()) {
-    hashDecl->setGenericEnvironment(parentDC->getGenericEnvironmentOfContext());
-    interfaceType = GenericFunctionType::get(sig, {selfParam}, innerType,
-                                             FunctionType::ExtInfo());
-  } else {
-    // (Self) -> innerType == (inout Hasher) -> ()
-    interfaceType = FunctionType::get({selfParam}, innerType,
-                                      FunctionType::ExtInfo());
-  }
-  hashDecl->setInterfaceType(interfaceType);
+  if (auto env = parentDC->getGenericEnvironmentOfContext())
+    hashDecl->setGenericEnvironment(env);
+  hashDecl->computeType();
   hashDecl->copyFormalAccessFrom(derived.Nominal);
   hashDecl->setValidationToChecked();
 
@@ -833,7 +807,7 @@ deriveBodyHashable_compat_hashInto(AbstractFunctionDecl *hashIntoDecl) {
   auto hashValueExpr = new (C) UnresolvedDotExpr(selfRef, SourceLoc(),
                                                  C.Id_hashValue, DeclNameLoc(),
                                                  /*implicit*/ true);
-  auto hasherParam = hashIntoDecl->getParameterList(1)->get(0);
+  auto hasherParam = hashIntoDecl->getParameters()->get(0);
   auto hasherExpr = createHasherCombineCall(C, hasherParam, hashValueExpr);
 
   auto body = BraceStmt::create(C, SourceLoc(), {ASTNode(hasherExpr)},
@@ -862,7 +836,7 @@ deriveBodyHashable_enum_rawValue_hashInto(
                                                 /*Implicit=*/true);
 
   // generate: hasher.combine(discriminator)
-  auto hasherParam = hashIntoDecl->getParameterList(1)->get(0);
+  auto hasherParam = hashIntoDecl->getParameters()->get(0);
   ASTNode combineStmt = createHasherCombineCall(C, hasherParam, rawValueRef);
 
   auto body = BraceStmt::create(C, SourceLoc(), combineStmt, SourceLoc(),
@@ -903,7 +877,7 @@ deriveBodyHashable_enum_noAssociatedValues_hashInto(
                                               selfDecl, hashIntoDecl,
                                               "discriminator");
   // generate: hasher.combine(discriminator)
-  auto hasherParam = hashIntoDecl->getParameterList(1)->get(0);
+  auto hasherParam = hashIntoDecl->getParameters()->get(0);
   auto combineStmt = createHasherCombineCall(C, hasherParam, discriminatorExpr);
   stmts.push_back(combineStmt);
 
@@ -943,7 +917,7 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
   Type enumType = selfDecl->getType();
 
   // Extract the decl for the hasher parameter.
-  auto hasherParam = hashIntoDecl->getParameterList(1)->get(0);
+  auto hasherParam = hashIntoDecl->getParameters()->get(0);
 
   unsigned index = 0;
   SmallVector<ASTNode, 4> cases;
@@ -1022,7 +996,7 @@ deriveBodyHashable_struct_hashInto(AbstractFunctionDecl *hashIntoDecl) {
   auto selfDecl = hashIntoDecl->getImplicitSelfDecl();
 
   // Extract the decl for the hasher parameter.
-  auto hasherParam = hashIntoDecl->getParameterList(1)->get(0);
+  auto hasherParam = hashIntoDecl->getParameters()->get(0);
 
   auto storedProperties =
     structDecl->getStoredProperties(/*skipInaccessible=*/true);
@@ -1098,40 +1072,27 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   VarDecl *hashValueDecl =
     new (C) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Var,
                     /*IsCaptureList*/false, SourceLoc(),
-                    C.Id_hashValue, intType, parentDC);
+                    C.Id_hashValue, parentDC);
+  hashValueDecl->setType(intType);
 
-  auto selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC);
-
-  ParameterList *params[] = {
-    ParameterList::createWithoutLoc(selfDecl),
-    ParameterList::createEmpty(C)
-  };
+  auto *selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC);
+  ParameterList *params = ParameterList::createEmpty(C);
 
   AccessorDecl *getterDecl = AccessorDecl::create(C,
       /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
       AccessorKind::Get, AddressorKind::NotAddressor, hashValueDecl,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-      /*GenericParams=*/nullptr, params,
+      /*GenericParams=*/nullptr, selfDecl, params,
       TypeLoc::withoutLoc(intType), parentDC);
   getterDecl->setImplicit();
   getterDecl->setBodySynthesizer(&deriveBodyHashable_hashValue);
 
-  // Compute the type of hashValue().
-  Type methodType = FunctionType::get(TupleType::getEmpty(C), intType);
-
   // Compute the interface type of hashValue().
-  Type interfaceType;
-  auto selfParam = computeSelfParam(getterDecl);
-  if (auto sig = parentDC->getGenericSignatureOfContext()) {
-    getterDecl->setGenericEnvironment(parentDC->getGenericEnvironmentOfContext());
-    interfaceType = GenericFunctionType::get(sig, {selfParam}, methodType,
-                                             AnyFunctionType::ExtInfo());
-  } else
-    interfaceType = FunctionType::get({selfParam}, methodType,
-                                      AnyFunctionType::ExtInfo());
+  if (auto env = parentDC->getGenericEnvironmentOfContext())
+    getterDecl->setGenericEnvironment(env);
+  getterDecl->computeType();
 
-  getterDecl->setInterfaceType(interfaceType);
   getterDecl->setValidationToChecked();
   getterDecl->copyFormalAccessFrom(derived.Nominal,
                                    /*sourceIsParentContext*/ true);
@@ -1187,8 +1148,7 @@ getHashableConformance(Decl *parentDecl) {
   return nullptr;
 }
 
-bool DerivedConformance::canDeriveHashable(TypeChecker &tc,
-                                           NominalTypeDecl *type) {
+bool DerivedConformance::canDeriveHashable(NominalTypeDecl *type) {
   if (!isa<EnumDecl>(type) && !isa<StructDecl>(type) && !isa<ClassDecl>(type))
     return false;
   // FIXME: This is not actually correct. We cannot promise to always

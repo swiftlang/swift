@@ -302,6 +302,7 @@ MISC(comment)
 MISC(contextual_keyword)
 MISC(string_segment)
 MISC(string_interpolation_anchor)
+MISC(kw_yield)               // the contextual "yield" keyword
 
 #undef TOKEN
 #undef KEYWORD

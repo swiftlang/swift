@@ -498,8 +498,8 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
 void SILPassManager::execute() {
   const SILOptions &Options = getOptions();
 
-  DEBUG(llvm::dbgs() << "*** Optimizing the module (" << StageName
-        << ") *** \n");
+  LLVM_DEBUG(llvm::dbgs() << "*** Optimizing the module (" << StageName
+                          << ") *** \n");
   if (SILPrintAll) {
     llvm::dbgs() << "*** SIL module before "  << StageName << " ***\n";
     printModule(Mod, Options.EmitVerboseSIL);

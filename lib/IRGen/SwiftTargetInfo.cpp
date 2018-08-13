@@ -101,6 +101,9 @@ static void configureX86(IRGenModule &IGM, const llvm::Triple &triple,
 /// Configures target-specific information for 32-bit arm platforms.
 static void configureARM(IRGenModule &IGM, const llvm::Triple &triple,
                          SwiftTargetInfo &target) {
+  setToMask(target.PointerSpareBits, 32,
+            SWIFT_ABI_ARM_SWIFT_SPARE_BITS_MASK);
+
   // ARM requires marker assembly for objc_retainAutoreleasedReturnValue.
   target.ObjCRetainAutoreleasedReturnValueMarker =
     "mov\tr7, r7\t\t// marker for objc_retainAutoreleaseReturnValue";

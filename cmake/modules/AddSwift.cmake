@@ -2022,7 +2022,7 @@ function(_add_swift_executable_single name)
   cmake_parse_arguments(SWIFTEXE_SINGLE
     "EXCLUDE_FROM_ALL;DONT_STRIP_NON_MAIN_SYMBOLS;DISABLE_ASLR"
     "SDK;ARCHITECTURE"
-    "DEPENDS;LLVM_COMPONENT_DEPENDS;LINK_LIBRARIES;LINK_FAT_LIBRARIES"
+    "DEPENDS;LLVM_COMPONENT_DEPENDS;LINK_LIBRARIES;LINK_FAT_LIBRARIES;COMPILE_FLAGS"
     ${ARGN})
 
   set(SWIFTEXE_SINGLE_SOURCES ${SWIFTEXE_SINGLE_UNPARSED_ARGUMENTS})
@@ -2096,6 +2096,7 @@ function(_add_swift_executable_single name)
       MODULE_NAME ${name}
       SDK ${SWIFTEXE_SINGLE_SDK}
       ARCHITECTURE ${SWIFTEXE_SINGLE_ARCHITECTURE}
+      COMPILE_FLAGS ${SWIFTEXE_SINGLE_COMPILE_FLAGS}
       IS_MAIN)
   add_swift_source_group("${SWIFTEXE_SINGLE_EXTERNAL_SOURCES}")
 
@@ -2208,6 +2209,21 @@ function(add_swift_target_executable name)
           ${SWIFTEXE_TARGET_EXCLUDE_FROM_ALL_FLAG_CURRENT}
           ${SWIFTEXE_TARGET_DONT_STRIP_NON_MAIN_SYMBOLS_FLAG}
           ${SWIFTEXE_DISABLE_ASLR_FLAG})
+
+      is_darwin_based_sdk("${sdk}" IS_DARWIN)
+      if(IS_DARWIN)
+        add_custom_command_target(unused_var2
+         COMMAND "codesign" "-f" "-s" "-" "${SWIFT_RUNTIME_OUTPUT_INTDIR}/${VARIANT_NAME}"
+         CUSTOM_TARGET_NAME "${VARIANT_NAME}_signed"
+         OUTPUT "${SWIFT_RUNTIME_OUTPUT_INTDIR}/${VARIANT_NAME}_signed"
+         DEPENDS ${VARIANT_NAME})
+      else()
+        # No code signing on other platforms.
+        add_custom_command_target(unused_var2
+         CUSTOM_TARGET_NAME "${VARIANT_NAME}_signed"
+         OUTPUT "${SWIFT_RUNTIME_OUTPUT_INTDIR}/${VARIANT_NAME}_signed"
+         DEPENDS ${VARIANT_NAME})
+       endif()
     endforeach()
   endforeach()
 endfunction()
@@ -2260,7 +2276,7 @@ function(add_swift_executable name)
   cmake_parse_arguments(SWIFTEXE
     "EXCLUDE_FROM_ALL;DONT_STRIP_NON_MAIN_SYMBOLS;DISABLE_ASLR"
     ""
-    "DEPENDS;LLVM_COMPONENT_DEPENDS;LINK_LIBRARIES"
+    "DEPENDS;LLVM_COMPONENT_DEPENDS;LINK_LIBRARIES;COMPILE_FLAGS"
     ${ARGN})
 
   translate_flag(${SWIFTEXE_EXCLUDE_FROM_ALL}
@@ -2283,6 +2299,7 @@ function(add_swift_executable name)
       LINK_LIBRARIES ${SWIFTEXE_LINK_LIBRARIES}
       SDK ${SWIFT_HOST_VARIANT_SDK}
       ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
+      COMPILE_FLAGS ${SWIFTEXE_COMPILE_FLAGS}
       ${SWIFTEXE_EXCLUDE_FROM_ALL_FLAG}
       ${SWIFTEXE_DONT_STRIP_NON_MAIN_SYMBOLS_FLAG}
       ${SWIFTEXE_DISABLE_ASLR_FLAG})
@@ -2297,15 +2314,35 @@ macro(add_swift_lib_subdirectory name)
 endmacro()
 
 function(add_swift_host_tool executable)
+  set(ADDSWIFTHOSTTOOL_multiple_parameter_options
+        SWIFT_COMPONENT
+        COMPILE_FLAGS
+        DEPENDS
+        SWIFT_MODULE_DEPENDS)
+
   cmake_parse_arguments(
       ADDSWIFTHOSTTOOL # prefix
       "" # options
       "" # single-value args
-      "SWIFT_COMPONENT" # multi-value args
+      "${ADDSWIFTHOSTTOOL_multiple_parameter_options}" # multi-value args
       ${ARGN})
 
+  # Configure variables for this subdirectory.
+  set(VARIANT_SUFFIX "-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}")
+  set(MODULE_VARIANT_SUFFIX "-swiftmodule${VARIANT_SUFFIX}")
+
+  foreach(mod ${ADDSWIFTHOSTTOOL_SWIFT_MODULE_DEPENDS})
+    list(APPEND ADDSWIFTHOSTTOOL_DEPENDS "swift${mod}${MODULE_VARIANT_SUFFIX}")
+    list(APPEND ADDSWIFTHOSTTOOL_DEPENDS "swift${mod}${VARIANT_SUFFIX}")
+  endforeach()
+
   # Create the executable rule.
-  add_swift_executable(${executable} ${ADDSWIFTHOSTTOOL_UNPARSED_ARGUMENTS})
+  add_swift_executable(
+    ${executable} 
+    ${ADDSWIFTHOSTTOOL_UNPARSED_ARGUMENTS}
+    DEPENDS ${ADDSWIFTHOSTTOOL_DEPENDS}
+    COMPILE_FLAGS ${ADDSWIFTHOSTTOOL_COMPILE_FLAGS}
+  )
 
   # And then create the install rule if we are asked to.
   if (ADDSWIFTHOSTTOOL_SWIFT_COMPONENT)

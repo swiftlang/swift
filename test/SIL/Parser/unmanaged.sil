@@ -6,7 +6,7 @@ import Builtin
 class C {}
 
 sil @test : $@convention(thin) <U where U : AnyObject> (@inout Optional<U>) -> () {
-bb0(%0 : $*Optional<U>):
+bb0(%0 : @trivial $*Optional<U>):
   %1 = load [copy] %0 : $*Optional<U>
   %2 = ref_to_unmanaged %1 : $Optional<U> to $@sil_unmanaged Optional<U>
   %3 = unmanaged_to_ref %2 : $@sil_unmanaged Optional<U> to $Optional<U>
@@ -16,7 +16,7 @@ bb0(%0 : $*Optional<U>):
 }
 
 sil @retain_release : $@convention(thin) (@sil_unmanaged Optional<C>) -> () {
-bb0(%0 : $@sil_unmanaged Optional<C>):
+bb0(%0 : @unowned $@sil_unmanaged Optional<C>):
   %1 = unmanaged_to_ref %0 : $@sil_unmanaged Optional<C> to $Optional<C>
   unmanaged_retain_value %1 : $Optional<C>
   unmanaged_autorelease_value %1 : $Optional<C>

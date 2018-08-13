@@ -378,6 +378,10 @@ SIMPLE_DECL_ATTR(_forbidSerializingReference, ForbidSerializingReference,
   OnAnyDecl |
   LongAttribute | RejectByParser | UserInaccessible | NotSerialized,
   77)
+SIMPLE_DECL_ATTR(_hasInitialValue, HasInitialValue,
+  OnVar |
+  UserInaccessible,
+  78)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

@@ -89,7 +89,7 @@ bb0(%0 : $Bar):
 sil hidden @_TFC4test3BarD : $@convention(method) (@owned Bar) -> () {
 bb0(%0 : $Bar):
   debug_value %0 : $Bar, let, name "self" // id: %1
-  %2 = objc_super_method %0 : $Bar, #NSObject.deinit!deallocator.foreign : (NSObject) -> () -> (), $@convention(objc_method) (NSObject) -> ()  // user: %4
+  %2 = objc_super_method %0 : $Bar, #NSObject.deinit!deallocator.1.foreign : (NSObject) -> () -> (), $@convention(objc_method) (NSObject) -> ()  // user: %4
   %3 = upcast %0 : $Bar to $NSObject              // user: %4
   %4 = apply %2(%3) : $@convention(objc_method) (NSObject) -> ()
   %5 = tuple ()                                   // user: %6
@@ -269,5 +269,5 @@ bb0(%0 : $@objc_metatype XXX.Type):
 sil_vtable Bar {
   #Bar.init!initializer.1: @_TFC4test3BarcfMS0_FT_S0_	// test.Bar.init (test.Bar.Type)() -> test.Bar
   #Bar.walk!1: @_TFC4test3Bar4walkfS0_FT_T_	// test.Bar.walk (test.Bar)() -> ()
-  #Bar.deinit!deallocator: @_TFC4test3BarD	// test.Bar.__deallocating_deinit
+  #Bar.deinit!deallocator.1: @_TFC4test3BarD	// test.Bar.__deallocating_deinit
 }

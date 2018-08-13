@@ -79,6 +79,11 @@
 using namespace swift;
 using namespace irgen;
 
+// FIXME: Remove this option entirely and turn this on by default.
+llvm::cl::opt<bool> DebugInfoInlinedGenerics(
+    "debug-info-inlined-generics", llvm::cl::init(false),
+    llvm::cl::desc("Emit variable debug info for inlined generic functions"));
+
 namespace {
 
 class LoweredValue;
@@ -848,12 +853,15 @@ public:
     SILType Type = SILVal->getType();
     auto &LTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(Type));
     auto Alloca = LTI.allocateStack(*this, Type, "debug.copy");
+    ArtificialLocation AutoRestore(Scope, IGM.DebugInfo, Builder);
     LTI.initialize(*this, e, Alloca.getAddress(), false /* isOutlined */);
     copy.push_back(Alloca.getAddressPointer());
   }
 
   /// Determine whether a generic variable has been inlined.
   static bool isInlinedGeneric(VarDecl *VarDecl, const SILDebugScope *DS) {
+    if (DebugInfoInlinedGenerics)
+      return false;
     if (!DS->InlinedCallSite)
       return false;
     if (VarDecl->hasType())
@@ -1257,7 +1265,7 @@ IRGenSILFunction::~IRGenSILFunction() {
   // Emit the fail BB if we have one.
   if (!FailBBs.empty())
     emitFailBB();
-  DEBUG(CurFn->print(llvm::dbgs()));
+  LLVM_DEBUG(CurFn->print(llvm::dbgs()));
 }
 
 template<typename ValueVector>
@@ -1623,10 +1631,10 @@ void IRGenModule::emitSILFunction(SILFunction *f) {
 }
 
 void IRGenSILFunction::emitSILFunction() {
-  DEBUG(llvm::dbgs() << "emitting SIL function: ";
-        CurSILFn->printName(llvm::dbgs());
-        llvm::dbgs() << '\n';
-        CurSILFn->print(llvm::dbgs()));
+  LLVM_DEBUG(llvm::dbgs() << "emitting SIL function: ";
+             CurSILFn->printName(llvm::dbgs());
+             llvm::dbgs() << '\n';
+             CurSILFn->print(llvm::dbgs()));
   
   assert(!CurSILFn->empty() && "function has no basic blocks?!");
 
@@ -5483,6 +5491,12 @@ void IRGenSILFunction::visitCondFailInst(swift::CondFailInst *i) {
   llvm::BasicBlock *contBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
   Builder.CreateCondBr(cond, failBB, contBB);
   Builder.emitBlock(failBB);
+  if (IGM.DebugInfo)
+    // If we are emitting DWARF, this does nothing. Otherwise the ``llvm.trap``
+    // instruction emitted from ``Builtin.condfail`` should have an inlined
+    // debug location. This is because zero is not an artificial line location
+    // in CodeView.
+    IGM.DebugInfo->setInlinedTrapLocation(Builder, i->getDebugScope());
   emitTrap(/*EmitUnreachable=*/true);
   Builder.emitBlock(contBB);
   FailBBs.push_back(failBB);

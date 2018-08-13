@@ -71,15 +71,17 @@
 
 #define DEBUG_TYPE "sil-rr-code-motion"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
+#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/EscapeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
+#include "swift/SILOptimizer/Analysis/ProgramTerminationAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/Strings.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/Statistic.h"
@@ -296,6 +298,8 @@ class RetainCodeMotionContext : public CodeMotionContext {
   /// All the retain block state for all the basic blocks in the function. 
   llvm::SmallDenseMap<SILBasicBlock *, RetainBlockState *> BlockStates;
 
+  ProgramTerminationFunctionInfo PTFI;
+
   /// Return true if the instruction blocks the Ptr to be moved further.
   bool mayBlockCodeMotion(SILInstruction *II, SILValue Ptr) override {
     // NOTE: If more checks are to be added, place the most expensive in the
@@ -334,7 +338,7 @@ public:
   RetainCodeMotionContext(llvm::SpecificBumpPtrAllocator<BlockState> &BPA,
                           SILFunction *F, PostOrderFunctionInfo *PO,
                           AliasAnalysis *AA, RCIdentityFunctionInfo *RCFI)
-      : CodeMotionContext(BPA, F, PO, AA, RCFI) {}
+      : CodeMotionContext(BPA, F, PO, AA, RCFI), PTFI(F) {}
 
   /// virtual destructor.
   ~RetainCodeMotionContext() override {}
@@ -473,10 +477,18 @@ bool RetainCodeMotionContext::performCodeMotion() {
     auto Iter = InsertPoints.find(RC);
     if (Iter == InsertPoints.end())
       continue;
+
     for (auto IP : Iter->second) {
-      // we are about to insert a new retain instruction before the insertion
-      // point. Check if the previous instruction is reusable, reuse it, do
-      // not insert new instruction and delete old one.
+      // Check if the insertion point is in a block that we had previously
+      // identified as a program termination point. In such a case, we know that
+      // there are no releases or anything beyond a fatalError call. In such a
+      // case, do not insert the retain. It is ok if we leak.
+      if (PTFI.isProgramTerminatingBlock(IP->getParent()))
+        continue;
+
+      // We are about to insert a new retain instruction before the insertion
+      // point. Check if the previous instruction is reusable, reuse it, do not
+      // insert new instruction and delete old one.
       if (auto I = getPrevReusableInst(IP, Iter->first)) {
         RCInstructions.erase(I);
         continue;
@@ -1046,6 +1058,73 @@ void ReleaseCodeMotionContext::computeCodeMotionInsertPoints() {
 }
 
 //===----------------------------------------------------------------------===//
+//            Eliminate Retains Before Program Termination Points
+//===----------------------------------------------------------------------===//
+
+static void eliminateRetainsPrecedingProgramTerminationPoints(SILFunction *f) {
+  for (auto &block : *f) {
+    auto *term = block.getTerminator();
+    // If we don't have an unreachable or an unreachable that is the only
+    // element in the block, bail.
+    if (!isa<UnreachableInst>(term) || term == &*block.begin())
+      continue;
+
+    auto iter = std::prev(term->getIterator());
+
+    // If we have an apply next, see if it is a program termination point. In
+    // such a case, we can ignore it. All other functions though imply we must
+    // bail. If we don't have a function here, check for side
+    if (auto apply = FullApplySite::isa(&*iter)) {
+      SILFunction *callee = apply.getCalleeFunction();
+      if (!callee ||
+          !callee->hasSemanticsAttr(SEMANTICS_ARC_PROGRAMTERMINATION_POINT)) {
+        continue;
+      }
+    } else {
+      // If we didn't have an apply, move back onto the unreachable so that we
+      // can begin the loop in a proper state where we the current position of
+      // the iterator has already been tested.
+      ++iter;
+    }
+
+    while (iter != block.begin()) {
+      // Move iter back to the prev instruction and see if iter is a retain
+      // instruction. If it is not, then break out of the loop. We found a
+      // non-retain instruction so can not optimize further since we do not want
+      // to shorten the lifetime of any values that may be used before the
+      // program termination.
+      --iter;
+
+      // First check if iter has side-effects. If iter doesn't have
+      // side-effects, then ignore it.
+      //
+      // TODO: Use SideEffectsAnalysis here.
+      if (!iter->mayHaveSideEffects())
+        continue;
+
+      if (!isa<StrongRetainInst>(&*iter) && !isa<RetainValueInst>(&*iter)) {
+        break;
+      }
+
+      // Since we are going to delete this instruction, we grab the pointer to
+      // the instruction, move iter to the prev instruction and erase the
+      // instruction.
+      auto *i = &*iter;
+      auto tmp = prev_or_default(iter, block.begin(), block.end());
+      i->eraseFromParent();
+
+      // If tmp is the end of the block, then we wrapped... break out of the
+      // loop we did all of the work that we could.
+      if (tmp == block.end())
+        break;
+
+      // Otherwise, set iter to point at the next instruction.
+      iter = std::next(tmp);
+    }
+  }
+}
+
+//===----------------------------------------------------------------------===//
 //                           Top Level Entry Point
 //===----------------------------------------------------------------------===//
 
@@ -1081,7 +1160,8 @@ public:
     if (DisableIfWithCriticalEdge && hasCriticalEdges(*F, false))
       return;
 
-    DEBUG(llvm::dbgs() << "*** ARCCM on function: " << F->getName() << " ***\n");
+    LLVM_DEBUG(llvm::dbgs() << "*** ARCCM on function: " << F->getName()
+                            << " ***\n");
 
     PostOrderAnalysis *POA = PM->getAnalysis<PostOrderAnalysis>();
 
@@ -1115,6 +1195,13 @@ public:
       RetainCodeMotionContext RetCM(BPA, F, PO, AA, RCFI);
       // Run retain sinking.
       InstChanged |= RetCM.run();
+      // Eliminate any retains that are right before program termination
+      // points. We assume that any retains before semantic calls marked as
+      // program termination points can be eliminated since by assumption we are
+      // going to be leaking these objects and any releases that were afterwards
+      // were already eliminated. Assuming that the IR is correctly balanced
+      // from an ARC perspective.
+      eliminateRetainsPrecedingProgramTerminationPoints(F);
     }
 
     if (EdgeChanged) {

@@ -22,9 +22,10 @@
 namespace swift {
   
 struct OpaqueValue;
-struct ValueWitnessTable;
-  
 struct InProcess;
+
+template <typename Runtime> struct TargetValueWitnessTable;
+using ValueWitnessTable = TargetValueWitnessTable<InProcess>;
 
 template <typename Runtime> struct TargetMetadata;
 using Metadata = TargetMetadata<InProcess>;

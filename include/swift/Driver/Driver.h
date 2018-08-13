@@ -18,11 +18,11 @@
 #define SWIFT_DRIVER_DRIVER_H
 
 #include "swift/AST/IRGenOptions.h"
+#include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/Sanitizers.h"
 #include "swift/Driver/Util.h"
-#include "swift/Frontend/FileTypes.h"
 #include "swift/Frontend/OutputFileMap.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
@@ -374,8 +374,8 @@ private:
                                    CommandOutput *Output) const;
 
   void chooseTBDPath(Compilation &C, const OutputInfo &OI,
-                     StringRef workingDirectory, llvm::SmallString<128> &Buf,
-                     CommandOutput *Output) const;
+                     const TypeToPathMap *OutputMap, StringRef workingDirectory,
+                     llvm::SmallString<128> &Buf, CommandOutput *Output) const;
 
 public:
   /// Handle any arguments which should be treated before building actions or

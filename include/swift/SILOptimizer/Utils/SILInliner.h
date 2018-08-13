@@ -20,6 +20,7 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "swift/SIL/TypeSubstCloner.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include <functional>
 
 namespace swift {
@@ -35,12 +36,17 @@ enum class InlineCost : unsigned {
 /// disappear at the LLVM IR level are assigned a cost of 'Free'.
 InlineCost instructionInlineCost(SILInstruction &I);
 
-class SILInliner : public TypeSubstCloner<SILInliner> {
+class SILInliner : public TypeSubstCloner<SILInliner, SILOptFunctionBuilder> {
   friend class SILInstructionVisitor<SILInliner>;
   friend class SILCloner<SILInliner>;
+  using SuperTy = TypeSubstCloner<SILInliner, SILOptFunctionBuilder>;
 
 public:
   enum class InlineKind { MandatoryInline, PerformanceInline };
+
+  // Returns true if this an begin_apply instruction that we can inline or
+  // another application site.
+  static bool canInlineBeginApply(FullApplySite AI);
 
 private:
   InlineKind IKind;
@@ -58,15 +64,17 @@ private:
   llvm::SmallDenseMap<const SILDebugScope *, const SILDebugScope *, 8>
       InlinedScopeCache;
   CloneCollector::CallbackType Callback;
+  SILOptFunctionBuilder &FuncBuilder;
 
 public:
-  SILInliner(SILFunction &To, SILFunction &From, InlineKind IKind,
+  SILInliner(SILOptFunctionBuilder &FuncBuilder,
+	     SILFunction &To, SILFunction &From, InlineKind IKind,
              SubstitutionMap ApplySubs,
              SILOpenedArchetypesTracker &OpenedArchetypesTracker,
              CloneCollector::CallbackType Callback = nullptr)
-      : TypeSubstCloner<SILInliner>(To, From, ApplySubs,
-                                    OpenedArchetypesTracker, true),
-        IKind(IKind), CalleeFunction(&Original), Callback(Callback) {
+      : SuperTy(To, From, ApplySubs, OpenedArchetypesTracker, true),
+        IKind(IKind), CalleeFunction(&Original), Callback(Callback),
+	FuncBuilder(FuncBuilder) {
     // CalleeEntryBB is initialized later in case the callee is modified.
   }
 

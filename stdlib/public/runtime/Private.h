@@ -28,6 +28,7 @@
 #endif
 
 namespace swift {
+class ParsedTypeIdentity;
 
 class TypeReferenceOwnership {
   enum : uint8_t {
@@ -77,10 +78,10 @@ public:
 
 #if SWIFT_OBJC_INTEROP
   bool objectConformsToObjCProtocol(const void *theObject,
-                                    const ProtocolDescriptor *theProtocol);
+                                    ProtocolDescriptorRef protocol);
   
   bool classConformsToObjCProtocol(const void *theClass,
-                                    const ProtocolDescriptor *theProtocol);
+                                   ProtocolDescriptorRef protocol);
 #endif
 
   /// Is the given value a valid alignment mask?
@@ -314,6 +315,10 @@ public:
     }
   };
 
+  /// Is the given type imported from a C tag type?
+  bool _isCImportedTagType(const TypeContextDescriptor *type,
+                           const ParsedTypeIdentity &identity);
+
   /// Check whether a type conforms to a protocol.
   ///
   /// \param value - can be null, in which case the question should
@@ -323,7 +328,7 @@ public:
   ///   table will be placed here
   bool _conformsToProtocol(const OpaqueValue *value,
                            const Metadata *type,
-                           const ProtocolDescriptor *protocol,
+                           ProtocolDescriptorRef protocol,
                            const WitnessTable **conformance);
 
   void _swift_getFieldAt(
@@ -331,5 +336,15 @@ public:
       std::function<void(llvm::StringRef name, FieldType type)> callback);
 
 } // end namespace swift
+
+// ADT uses report_bad_alloc_error to report an error when it can't allocate
+// elements for a data structure. The swift runtime uses ADT without linking
+// against libSupport, so here we provide a stub to make sure we don't fail
+// to link. Give it `weak` linkage so, in case the `strong` definition of
+// the function is available, that has precedence.
+namespace llvm {
+  __attribute__((weak))
+  void report_bad_alloc_error(const char *Reason, bool GenCrashDiag) {};
+} // end namespace llvm
 
 #endif /* SWIFT_RUNTIME_PRIVATE_H */

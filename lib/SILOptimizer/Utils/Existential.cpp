@@ -152,9 +152,7 @@ SILValue swift::getAddressOfStackInit(AllocStackInst *ASI,
     }
     if (isa<ApplyInst>(User) || isa<TryApplyInst>(User)) {
       // Ignore function calls which do not write to the stack location.
-      auto Idx =
-          Use->getOperandNumber() - ApplyInst::getArgumentOperandNumber();
-      auto Conv = FullApplySite(User).getArgumentConvention(Idx);
+      auto Conv = FullApplySite(User).getArgumentConvention(*Use);
       if (Conv != SILArgumentConvention::Indirect_In &&
           Conv != SILArgumentConvention::Indirect_In_Guaranteed)
         return SILValue();

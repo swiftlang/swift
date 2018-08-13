@@ -398,7 +398,11 @@ ManagedValue Transform::transform(ManagedValue v,
   // optional or Any, force it.
   if (inputIsOptional && !outputIsOptional &&
       !outputSubstType->isExistentialType()) {
+    // isImplicitUnwrap is hardcoded true because the looseness in types of
+    // @objc witnesses/overrides that we're handling here only allows IUOs,
+    // not explicit Optionals.
     v = SGF.emitCheckedGetOptionalValueFrom(Loc, v,
+                                            /*isImplicitUnwrap*/ true, 
                                             SGF.getTypeLowering(v.getType()),
                                             SGFContext());
 
@@ -868,8 +872,9 @@ namespace {
         }
       }
 
-      // Special-case: tuples containing inouts.
-      if (inputTupleType && inputTupleType->hasInOutElement()) {
+      // Special-case: tuples containing inouts, __shared or __owned,
+      // and one-element vararg tuples.
+      if (inputTupleType && shouldExpandTupleType(inputTupleType)) {
         // Non-materializable tuple types cannot be bound as generic
         // arguments, so none of the remaining transformations apply.
         // Instead, the outermost tuple layer is exploded, even when
@@ -1052,8 +1057,8 @@ namespace {
                                     CanTupleType inputTupleType,
                                     AbstractionPattern outputOrigType,
                                     CanTupleType outputTupleType) {
-      assert(!inputTupleType->hasInOutElement() &&
-             !outputTupleType->hasInOutElement());
+      assert(!inputTupleType->hasElementWithOwnership() &&
+             !outputTupleType->hasElementWithOwnership());
       assert(inputTupleType->getNumElements() ==
              outputTupleType->getNumElements());
 
@@ -1145,8 +1150,8 @@ namespace {
       // when witness method thunks re-abstract a non-mutating
       // witness for a mutating requirement. The inout self is just
       // loaded to produce a value in this case.
-      assert(inputSubstType->hasInOutElement() ||
-             !outputSubstType->hasInOutElement());
+      assert(inputSubstType->hasElementWithOwnership() ||
+             !outputSubstType->hasElementWithOwnership());
       assert(inputSubstType->getNumElements() ==
              outputSubstType->getNumElements());
 
@@ -1167,8 +1172,8 @@ namespace {
                                   ManagedValue inputTupleAddr) {
       assert(inputOrigType.isTypeParameter());
       assert(outputOrigType.matchesTuple(outputSubstType));
-      assert(!inputSubstType->hasInOutElement() &&
-             !outputSubstType->hasInOutElement());
+      assert(!inputSubstType->hasElementWithOwnership() &&
+             !outputSubstType->hasElementWithOwnership());
       assert(inputSubstType->getNumElements() ==
              outputSubstType->getNumElements());
 
@@ -1214,8 +1219,8 @@ namespace {
                                  TemporaryInitialization &tupleInit) {
       assert(inputOrigType.matchesTuple(inputSubstType));
       assert(outputOrigType.matchesTuple(outputSubstType));
-      assert(!inputSubstType->hasInOutElement() &&
-             !outputSubstType->hasInOutElement());
+      assert(!inputSubstType->hasElementWithOwnership() &&
+             !outputSubstType->hasElementWithOwnership());
       assert(inputSubstType->getNumElements() ==
              outputSubstType->getNumElements());
 

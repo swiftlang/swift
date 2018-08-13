@@ -535,7 +535,7 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
     }
 
     if (Lowering::TypeConverter::protocolRequiresWitnessTable(protoDecl)) {
-      auto descriptor = emitProtocolDescriptorRef(IGF, protoDecl);
+      auto descriptor = IGF.IGM.getAddrOfProtocolDescriptor(protoDecl);
       witnessTableProtos.push_back(descriptor);
     }
 

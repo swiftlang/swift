@@ -220,6 +220,6 @@ bb0(%0 : $C):
 }
 
 sil_vtable C {
-  #C.deinit!deallocator: @_TFC28nonatomic_reference_counting1CD  // C.__deallocating_deinit
+  #C.deinit!deallocator.1: @_TFC28nonatomic_reference_counting1CD  // C.__deallocating_deinit
 }
 

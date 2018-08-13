@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 // RUN: %target-build-swift %s -g -Onone -o %t
+// RUN: %target-codesign %t
 // RUN: %target-run %t
 // REQUIRES: executable_test
 

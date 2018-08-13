@@ -19,6 +19,7 @@
 #include "ConstraintGraph.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/Basic/Statistic.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Format.h"
@@ -213,17 +214,16 @@ void ConstraintSystem::setMustBeMaterializableRecursive(Type type)
 void ConstraintSystem::addTypeVariableConstraintsToWorkList(
        TypeVariableType *typeVar) {
   // Gather the constraints affected by a change to this type variable.
-  SmallVector<Constraint *, 8> constraints;
-  CG.gatherConstraints(typeVar, constraints,
-                       ConstraintGraph::GatheringKind::AllMentions);
+  llvm::SetVector<Constraint *> inactiveConstraints;
+  CG.gatherConstraints(
+      typeVar, inactiveConstraints, ConstraintGraph::GatheringKind::AllMentions,
+      [](Constraint *constraint) { return !constraint->isActive(); });
 
   // Add any constraints that aren't already active to the worklist.
-  for (auto constraint : constraints) {
-    if (!constraint->isActive()) {
-      ActiveConstraints.splice(ActiveConstraints.end(),
-                               InactiveConstraints, constraint);
-      constraint->setActive(true);
-    }
+  for (auto constraint : inactiveConstraints) {
+    ActiveConstraints.splice(ActiveConstraints.end(), InactiveConstraints,
+                             constraint);
+    constraint->setActive(true);
   }
 }
 
@@ -700,6 +700,11 @@ bool ConstraintSystem::isAnyHashableType(Type type) {
   return false;
 }
 
+static Type withParens(ConstraintSystem &cs, Type type, ParenType *parenType) {
+  auto flags = parenType->getParameterFlags().withInOut(type->is<InOutType>());
+  return ParenType::get(cs.getASTContext(), type->getInOutObjectType(), flags);
+}
+
 Type ConstraintSystem::getFixedTypeRecursive(Type type,
                                              TypeMatchOptions &flags,
                                              bool wantRValue,
@@ -708,60 +713,33 @@ Type ConstraintSystem::getFixedTypeRecursive(Type type,
   if (wantRValue)
     type = type->getRValueType();
 
-  if (retainParens) {
-    if (auto parenTy = dyn_cast<ParenType>(type.getPointer())) {
-      type = getFixedTypeRecursive(parenTy->getUnderlyingType(), flags,
-                                   wantRValue, retainParens);
-      auto flags = parenTy->getParameterFlags().withInOut(type->is<InOutType>());
-      return ParenType::get(getASTContext(), type->getInOutObjectType(), flags);
+  if (auto *parenTy = dyn_cast<ParenType>(type.getPointer())) {
+    if (retainParens) {
+      auto fixed = getFixedTypeRecursive(parenTy->getUnderlyingType(), flags,
+                                         wantRValue, retainParens);
+      return withParens(*this, fixed, parenTy);
     }
   }
 
-  while (true) {
-    if (auto depMemType = type->getAs<DependentMemberType>()) {
-      if (!depMemType->getBase()->isTypeVariableOrMember()) return type;
+  if (auto depMemType = type->getAs<DependentMemberType>()) {
+    if (!depMemType->getBase()->isTypeVariableOrMember()) return type;
 
-      // FIXME: Perform a more limited simplification?
-      Type newType = simplifyType(type);
-      if (newType.getPointer() == type.getPointer()) return type;
+    // FIXME: Perform a more limited simplification?
+    Type newType = simplifyType(type);
+    if (newType.getPointer() == type.getPointer()) return type;
 
-      if (wantRValue)
-        newType = newType->getRValueType();
+    // Once we've simplified a dependent member type, we need to generate a
+    // new constraint.
+    flags |= TMF_GenerateConstraints;
 
-      type = newType;
+    return getFixedTypeRecursive(newType, flags, wantRValue, retainParens);
+  }
 
-      // Once we've simplified a dependent member type, we need to generate a
-      // new constraint.
-      flags |= TMF_GenerateConstraints;
-      continue;
-    }
+  if (auto typeVar = type->getAs<TypeVariableType>()) {
+    if (auto fixed = getFixedType(typeVar))
+      return getFixedTypeRecursive(fixed, flags, wantRValue, retainParens);
 
-    if (auto typeVar = type->getAs<TypeVariableType>()) {
-      bool hasRepresentative = false;
-      if (auto *repr = getRepresentative(typeVar)) {
-        if (typeVar != repr) {
-          hasRepresentative = true;
-          typeVar = repr;
-        }
-      }
-
-      if (auto fixed = getFixedType(typeVar)) {
-        if (wantRValue)
-          fixed = fixed->getRValueType();
-
-        type = fixed;
-        continue;
-      }
-
-      // If type variable has a representative but
-      // no fixed type, reflect that in the type itself.
-      if (hasRepresentative)
-        type = typeVar;
-
-      break;
-    }
-
-    break;
+    return getRepresentative(typeVar);
   }
 
   return type;
@@ -807,20 +785,22 @@ static bool doesStorageProduceLValue(TypeChecker &TC,
       !storage->isSetterMutating();
 }
 
-Type TypeChecker::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
-                                             DeclContext *UseDC,
-                                             const DeclRefExpr *base,
-                                             bool wantInterfaceType) {
-  validateDecl(value);
-  if (!value->hasValidSignature() || value->isInvalid())
-    return ErrorType::get(Context);
+Type ConstraintSystem::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
+                                                  DeclContext *UseDC,
+                                                  const DeclRefExpr *base,
+                                                  bool wantInterfaceType) {
+  return TC.getUnopenedTypeOfReference(
+      value, baseType, UseDC,
+      [&](VarDecl *var) -> Type { return getType(var, wantInterfaceType); },
+      base, wantInterfaceType);
+}
 
-  Type requestedType = (wantInterfaceType
-                        ? value->getInterfaceType()
-                        : value->getType());
-
-  requestedType = requestedType->getWithoutSpecifierType()
-    ->getReferenceStorageReferent();
+Type TypeChecker::getUnopenedTypeOfReference(
+    VarDecl *value, Type baseType, DeclContext *UseDC,
+    llvm::function_ref<Type(VarDecl *)> getType, const DeclRefExpr *base,
+    bool wantInterfaceType) {
+  Type requestedType =
+      getType(value)->getWithoutSpecifierType()->getReferenceStorageReferent();
 
   // If we're dealing with contextual types, and we referenced this type from
   // a different context, map the type.
@@ -834,7 +814,8 @@ Type TypeChecker::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
 
   // Qualify storage declarations with an lvalue when appropriate.
   // Otherwise, they yield rvalues (and the access must be a load).
-  if (doesStorageProduceLValue(*this, value, baseType, UseDC, base)) {
+  if (doesStorageProduceLValue(*this, value, baseType, UseDC, base) &&
+      !requestedType->hasError()) {
     return LValueType::get(requestedType);
   }
 
@@ -881,7 +862,7 @@ void ConstraintSystem::recordOpenedTypes(
 static unsigned getNumRemovedArgumentLabels(TypeChecker &TC, ValueDecl *decl,
                                             bool isCurriedInstanceReference,
                                             FunctionRefKind functionRefKind) {
-  unsigned numParameterLists = 0;
+  unsigned numParameterLists;
 
   // Enum elements with associated values have to be treated
   // as regular function values.
@@ -895,15 +876,14 @@ static unsigned getNumRemovedArgumentLabels(TypeChecker &TC, ValueDecl *decl,
   // `E.foo` has to act as a regular function type passed as a value.
   if (auto *EED = dyn_cast<EnumElementDecl>(decl)) {
     numParameterLists = EED->hasAssociatedValues() ? 2 : 1;
-  }
 
   // Only applicable to functions. Nothing else should have argument labels in
   // the type.
-  if (auto func = dyn_cast<AbstractFunctionDecl>(decl))
-    numParameterLists = func->getNumParameterLists();
-
-  if (numParameterLists == 0)
+  } else if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+    numParameterLists = func->hasImplicitSelfDecl() ? 2 : 1;
+  } else {
     return 0;
+  }
 
   switch (functionRefKind) {
   case FunctionRefKind::Unapplied:
@@ -963,9 +943,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
         auto params = openedFnType->getParams();
         assert(params.size() == 1);
         Type selfTy = params.front().getType()->getRValueInstanceType();
-        openedType = openedType->replaceCovariantResultType(
-                       selfTy,
-                       func->getNumParameterLists());
+        openedType = openedType->replaceCovariantResultType(selfTy, 2);
         openedFnType = openedType->castTo<FunctionType>();
       }
     } else {
@@ -1023,8 +1001,8 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
   // Determine the type of the value, opening up that type if necessary.
   bool wantInterfaceType = !varDecl->getDeclContext()->isLocalContext();
-  Type valueType = TC.getUnopenedTypeOfReference(varDecl, Type(), useDC, base,
-                                                 wantInterfaceType);
+  Type valueType =
+      getUnopenedTypeOfReference(varDecl, Type(), useDC, base, wantInterfaceType);
 
   assert(!valueType->hasUnboundGenericType() &&
          !valueType->hasTypeParameter());
@@ -1276,7 +1254,7 @@ ConstraintSystem::getTypeOfMemberReference(
   // protocols.
   if (auto *alias = dyn_cast<TypeAliasDecl>(value)) {
     if (baseObjTy->isExistentialType()) {
-      auto memberTy = alias->getDeclaredInterfaceType();
+      auto memberTy = alias->getInterfaceType();
       // If we end up with a protocol typealias here, it's underlying
       // type must be fully concrete.
       assert(!memberTy->hasTypeParameter());
@@ -1344,9 +1322,8 @@ ConstraintSystem::getTypeOfMemberReference(
       refType = FunctionType::get(indicesTy, elementTy,
                                   AnyFunctionType::ExtInfo());
     } else {
-      refType = TC.getUnopenedTypeOfReference(cast<VarDecl>(value),
-                                              baseTy, useDC, base,
-                                              /*wantInterfaceType=*/true);
+      refType = getUnopenedTypeOfReference(cast<VarDecl>(value), baseTy, useDC,
+                                           base, /*wantInterfaceType=*/true);
     }
 
     auto selfTy = outerDC->getSelfInterfaceType();
@@ -1380,9 +1357,7 @@ ConstraintSystem::getTypeOfMemberReference(
     if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
       if ((isa<FuncDecl>(func) && cast<FuncDecl>(func)->hasDynamicSelf()) ||
           (isa<ConstructorDecl>(func) && !baseObjTy->getOptionalObjectType())) {
-        openedType = openedType->replaceCovariantResultType(
-          baseObjTy,
-            func->getNumParameterLists());
+        openedType = openedType->replaceCovariantResultType(baseObjTy, 2);
       }
     }
   } else {
@@ -2027,12 +2002,10 @@ Type ConstraintSystem::simplifyType(Type type) {
   return simplifyTypeImpl(
       *this, type,
       [&](TypeVariableType *tvt) -> Type {
-        tvt = getRepresentative(tvt);
-        if (auto fixed = getFixedType(tvt)) {
+        if (auto fixed = getFixedType(tvt))
           return simplifyType(fixed);
-        }
 
-        return tvt;
+        return getRepresentative(tvt);
       });
 }
 

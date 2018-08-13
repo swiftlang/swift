@@ -17,7 +17,7 @@ add_swift_library(swiftStdlibCollectionUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYP
   LoggingWrappers.swift
   MinimalCollections.swift
   RangeSelection.swift
-  ../../public/core/WriteBackMutableSlice.swift
+  WriteBackMutableSlice.swift
 
   SWIFT_MODULE_DEPENDS StdlibUnittest
   SWIFT_MODULE_DEPENDS_LINUX Glibc

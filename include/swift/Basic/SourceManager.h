@@ -13,7 +13,9 @@
 #ifndef SWIFT_BASIC_SOURCEMANAGER_H
 #define SWIFT_BASIC_SOURCEMANAGER_H
 
+#include "swift/Basic/FileSystem.h"
 #include "swift/Basic/SourceLoc.h"
+#include "clang/Basic/FileManager.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/SourceMgr.h"
@@ -24,14 +26,18 @@ namespace swift {
 /// \brief This class manages and owns source buffers.
 class SourceManager {
   llvm::SourceMgr LLVMSourceMgr;
+  llvm::IntrusiveRefCntPtr<clang::vfs::FileSystem> FileSystem;
   unsigned CodeCompletionBufferID = 0U;
   unsigned CodeCompletionOffset;
 
-  /// \brief The buffer ID where a hashbang line #! is allowed.
-  unsigned HashbangBufferID = 0U;
-
   /// Associates buffer identifiers to buffer IDs.
   llvm::StringMap<unsigned> BufIdentIDMap;
+
+  /// A cache mapping buffer identifiers to vfs Status entries.
+  ///
+  /// This is as much a hack to prolong the lifetime of status objects as it is
+  /// to speed up stats.
+  mutable llvm::StringMap<clang::vfs::Status> StatusCache;
 
   // #line directive handling.
   struct VirtualFile {
@@ -43,11 +49,23 @@ class SourceManager {
   mutable std::pair<const char *, const VirtualFile*> CachedVFile = {nullptr, nullptr};
 
 public:
+  SourceManager(llvm::IntrusiveRefCntPtr<clang::vfs::FileSystem> FS =
+                    clang::vfs::getRealFileSystem())
+    : FileSystem(FS) {}
+
   llvm::SourceMgr &getLLVMSourceMgr() {
     return LLVMSourceMgr;
   }
   const llvm::SourceMgr &getLLVMSourceMgr() const {
     return LLVMSourceMgr;
+  }
+
+  void setFileSystem(llvm::IntrusiveRefCntPtr<clang::vfs::FileSystem> FS) {
+    FileSystem = FS;
+  }
+
+  llvm::IntrusiveRefCntPtr<clang::vfs::FileSystem> getFileSystem() {
+    return FileSystem;
   }
 
   void setCodeCompletionPoint(unsigned BufferID, unsigned Offset) {
@@ -66,15 +84,6 @@ public:
   }
 
   SourceLoc getCodeCompletionLoc() const;
-
-  void setHashbangBufferID(unsigned BufferID) {
-    assert(HashbangBufferID == 0U && "Hashbang buffer ID already set");
-    HashbangBufferID = BufferID;
-  }
-
-  unsigned getHashbangBufferID() const {
-    return HashbangBufferID;
-  }
 
   /// Returns true if \c LHS is before \c RHS in the source buffer.
   bool isBeforeInBuffer(SourceLoc LHS, SourceLoc RHS) const {
@@ -162,6 +171,13 @@ public:
   SourceLoc getLocForOffset(unsigned BufferID, unsigned Offset) const {
     return getLocForBufferStart(BufferID).getAdvancedLoc(Offset);
   }
+
+  /// Returns a buffer identifier suitable for display to the user containing
+  /// the given source location.
+  ///
+  /// This respects #line directives and the 'use-external-names' directive in
+  /// VFS overlay files.
+  StringRef getDisplayNameForLoc(SourceLoc Loc) const;
 
   /// Returns the identifier string for the buffer containing the given source
   /// location.

@@ -1961,7 +1961,7 @@ void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
       getAccessorKindAndNameForDiagnostics(DeprecatedDecl);
 
   StringRef Platform = Attr->prettyPlatformString();
-  clang::VersionTuple DeprecatedVersion;
+  llvm::VersionTuple DeprecatedVersion;
   if (Attr->Deprecated)
     DeprecatedVersion = Attr->Deprecated.getValue();
 

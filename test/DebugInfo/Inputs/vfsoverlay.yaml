@@ -1,0 +1,14 @@
+{
+  'version': 0,
+  'use-external-names': false,
+  'roots': [
+    {
+      'name': 'LINE_DIRECTIVE_DIR', 'type': 'directory',
+      'contents': [
+        { 'name': 'vfs-relocated-line-directive.swift', 'type': 'file',
+          'external-contents': 'LINE_DIRECTIVE_DIR/line-directive.swift'
+        },
+      ]
+    },
+  ]
+}

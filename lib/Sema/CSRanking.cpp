@@ -67,11 +67,7 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
     case SK_CollectionUpcastConversion:
       log << "collection upcast conversion";
       break;
-
-    case SK_BindOptionalToArchetype:
-      log << "bind optional to archetype";
-      break;
-
+        
     case SK_ValueToOptional:
       log << "value to optional";
       break;
@@ -90,6 +86,9 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
 }
 
 bool ConstraintSystem::worseThanBestSolution() const {
+  if (TC.getLangOpts().DisableConstraintSolverPerformanceHacks)
+    return false;
+
   if (retainAllSolutions())
     return false;
 
@@ -371,8 +370,7 @@ static Type getAdjustedParamType(const AnyFunctionType::Param &param) {
 // declared to be an IUO?
 static bool paramIsIUO(Decl *decl, int paramNum) {
   if (auto *fn = dyn_cast<AbstractFunctionDecl>(decl)) {
-    auto *paramList =
-        fn->getParameterList(fn->getDeclContext()->isTypeContext());
+    auto *paramList = fn->getParameters();
     auto *param = paramList->get(paramNum);
     return param->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
   }
@@ -638,28 +636,6 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
           Type paramType1 = getAdjustedParamType(param1);
           Type paramType2 = getAdjustedParamType(param2);
 
-          // If we have:
-          //   param1Type = $T0?
-          //   param2Type = $T1
-          // the subtype constraint check will always return true
-          // since we'll attempt to bind $T1 as $T0?.
-          //
-          // What we're comparing here is foo<T>(_: T?) vs. foo<T>(_: T) and
-          // we don't want to consider the optional-taking function to be the
-          // the more specialized one since throughout the type system we
-          // consider T to be a subtype of T?.
-          SmallVector<Type, 2> optionals1;
-          paramType1->lookThroughAllOptionalTypes(optionals1);
-          auto numOptionals1 = optionals1.size();
-
-          SmallVector<Type, 2> optionals2;
-          Type objType2 = paramType2->lookThroughAllOptionalTypes(optionals2);
-          auto numOptionals2 = optionals2.size();
-
-          if (numOptionals1 > numOptionals2 &&
-              (objType2->is<TypeVariableType>() || objType2->isAny()))
-            return false;
-
           // Check whether the first parameter is a subtype of the second.
           cs.addConstraint(ConstraintKind::Subtype,
                            paramType1, paramType2, locator);
@@ -708,7 +684,10 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
 
       if (!knownNonSubtype) {
         // Solve the system.
-        if (cs.solveSingle(FreeTypeVariableBinding::Allow))
+        auto solution = cs.solveSingle(FreeTypeVariableBinding::Allow);
+
+        // Ban value-to-optional conversions.
+        if (solution && solution->getFixedScore().Data[SK_ValueToOptional] == 0)
           return true;
       }
 
@@ -774,6 +753,9 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
   
   auto foundRefinement1 = false;
   auto foundRefinement2 = false;
+
+  bool isStdlibOptionalMPlusOperator1 = false;
+  bool isStdlibOptionalMPlusOperator2 = false;
 
   auto getWeight = [&](ConstraintLocator *locator) -> unsigned {
     if (auto *anchor = locator->getAnchor()) {
@@ -980,6 +962,40 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         foundRefinement2 = decl2InSubprotocol;
       }
     }
+
+    // FIXME: Lousy hack for ?? to prefer the catamorphism (flattening)
+    // over the mplus (non-flattening) overload if all else is equal.
+    if (decl1->getBaseName() == "??") {
+      assert(decl2->getBaseName() == "??");
+
+      auto check = [](const ValueDecl *VD) -> bool {
+        if (!VD->getModuleContext()->isStdlibModule())
+          return false;
+        auto fnTy = VD->getInterfaceType()->castTo<AnyFunctionType>();
+        if (!fnTy->getResult()->getOptionalObjectType())
+          return false;
+
+        // Check that the standard library hasn't added another overload of
+        // the ?? operator.
+        auto params = fnTy->getParams();
+        assert(params.size() == 2);
+
+        auto param1 = params[0].getType();
+        auto param2 = params[1].getType()->castTo<AnyFunctionType>();
+
+        assert(param1->getOptionalObjectType());
+        assert(param2->isAutoClosure());
+        assert(param2->getResult()->getOptionalObjectType());
+
+        (void) param1;
+        (void) param2;
+
+        return true;
+      };
+
+      isStdlibOptionalMPlusOperator1 = check(decl1);
+      isStdlibOptionalMPlusOperator2 = check(decl2);
+    }
   }
 
   // Compare the type variable bindings.
@@ -1095,6 +1111,14 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     }
   }
 
+  // FIXME: All other things being equal, prefer the catamorphism (flattening)
+  // overload of ?? over the mplus (non-flattening) overload.
+  if (score1 == score2) {
+    // This is correct: we want to /disprefer/ the mplus.
+    score2 += isStdlibOptionalMPlusOperator1;
+    score1 += isStdlibOptionalMPlusOperator2;
+  }
+
   // FIXME: There are type variables and overloads not common to both solutions
   // that haven't been considered. They make the systems different, but don't
   // affect ranking. We need to handle this.
@@ -1189,6 +1213,14 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
     NumDiscardedSolutions += viable.size() - 1;
     return bestIdx;
   }
+
+  // If there is not a single "better" than others
+  // solution, which probably means that solutions
+  // were incomparable, let's just keep the original
+  // list instead of removing everything, even if we
+  // are asked to "minimize" the result.
+  if (losers.size() == viable.size())
+    return None;
 
   // The comparison was ambiguous. Identify any solutions that are worse than
   // any other solution.

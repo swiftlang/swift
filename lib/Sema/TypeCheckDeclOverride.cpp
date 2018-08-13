@@ -81,15 +81,15 @@ Type swift::getMemberTypeForComparison(ASTContext &ctx, ValueDecl *member,
 
   auto memberType = member->getInterfaceType();
   if (derivedDecl) {
-    auto *dc = derivedDecl->getDeclContext();
-    auto owningType = dc->getDeclaredInterfaceType();
-    assert(owningType);
-
     if (!derivedDecl->hasInterfaceType()) {
       auto lazyResolver = ctx.getLazyResolver();
       assert(lazyResolver && "Need to resolve interface type");
       lazyResolver->resolveDeclSignature(derivedDecl);
     }
+
+    auto *dc = derivedDecl->getDeclContext();
+    auto owningType = dc->getDeclaredInterfaceType();
+    assert(owningType);
 
     memberType = owningType->adjustSuperclassMemberDeclType(member, derivedDecl,
                                                             memberType);
@@ -487,8 +487,8 @@ static bool parameterTypesMatch(const ValueDecl *derivedDecl,
     auto *base = dyn_cast<AbstractFunctionDecl>(baseDecl);
     if (!base)
       return false;
-    baseParams = base->getParameterList(1);
-    derivedParams = derived->getParameterList(1);
+    baseParams = base->getParameters();
+    derivedParams = derived->getParameters();
   } else {
     auto *base = dyn_cast<SubscriptDecl>(baseDecl);
     if (!base)
@@ -590,12 +590,7 @@ OverrideMatcher::OverrideMatcher(ValueDecl *decl)
     return;
 
   auto *dc = decl->getDeclContext();
-
-  auto owningTy = dc->getDeclaredInterfaceType();
-  if (!owningTy)
-    return;
-
-  auto classDecl = owningTy->getClassOrBoundGenericClass();
+  auto classDecl = dc->getAsClassOrClassExtensionContext();
   if (!classDecl)
     return;
 
@@ -794,17 +789,16 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
   // defining module.  This is not required for constructors, which are
   // never really "overridden" in the intended sense here, because of
   // course derived classes will change how the class is initialized.
-  AccessLevel matchAccess = baseDecl->getFormalAccess(dc);
+  bool baseHasOpenAccess = baseDecl->hasOpenAccess(dc);
   if (!isAccessor &&
-      matchAccess < AccessLevel::Open &&
+      !baseHasOpenAccess &&
       baseDecl->getModuleContext() != decl->getModuleContext() &&
       !isa<ConstructorDecl>(decl)) {
     diags.diagnose(decl, diag::override_of_non_open,
                    decl->getDescriptiveKind());
 
-  } else if (matchAccess == AccessLevel::Open &&
-             classDecl->getFormalAccess(dc) ==
-               AccessLevel::Open &&
+  } else if (baseHasOpenAccess &&
+             classDecl->hasOpenAccess(dc) &&
              decl->getFormalAccess() != AccessLevel::Open &&
              !decl->isFinal()) {
     {
@@ -847,7 +841,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
     if (shouldDiagnose || shouldDiagnoseSetter) {
       bool overriddenForcesAccess =
         (requiredAccessScope->hasEqualDeclContextWith(matchAccessScope) &&
-         matchAccess != AccessLevel::Open);
+         !baseHasOpenAccess);
       AccessLevel requiredAccess =
         requiredAccessScope->requiredAccessForDiagnostics();
       {
@@ -896,8 +890,8 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
         resultTL = methodAsFunc->getBodyResultTypeLoc();
 
       emittedMatchError |= diagnoseMismatchedOptionals(
-          method, method->getParameterList(1), resultTL, baseDecl,
-          cast<AbstractFunctionDecl>(baseDecl)->getParameterList(1),
+          method, method->getParameters(), resultTL, baseDecl,
+          cast<AbstractFunctionDecl>(baseDecl)->getParameters(),
           owningTy, mayHaveMismatchedOptionals);
     }
   } else if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
@@ -1176,6 +1170,7 @@ namespace  {
     UNINTERESTING_ATTR(ClangImporterSynthesizedType)
     UNINTERESTING_ATTR(WeakLinked)
     UNINTERESTING_ATTR(Frozen)
+    UNINTERESTING_ATTR(HasInitialValue)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {
@@ -1497,8 +1492,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     // FIXME: Customize message to the kind of thing.
     auto baseKind = base->getDescriptiveKind();
     switch (baseKind) {
-    case DescriptiveDeclKind::StaticLet:
-    case DescriptiveDeclKind::StaticVar:
+    case DescriptiveDeclKind::StaticProperty:
     case DescriptiveDeclKind::StaticMethod:
       override->diagnose(diag::override_static, baseKind);
       break;
@@ -1520,6 +1514,20 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
 
   if (!ctx.LangOpts.DisableAvailabilityChecking) {
     diagnoseOverrideForAvailability(override, base);
+  }
+
+  // Overrides of NSObject.hashValue are deprecated; one should override
+  // NSObject.hash instead.
+  if (auto baseVar = dyn_cast<VarDecl>(base)) {
+    if (auto classDecl =
+          baseVar->getDeclContext()->getAsClassOrClassExtensionContext()) {
+      if (baseVar->getName() == ctx.Id_hashValue &&
+          classDecl->getName().is("NSObject") &&
+          (classDecl->getModuleContext()->getName() == ctx.Id_Foundation ||
+           classDecl->getModuleContext()->getName() == ctx.Id_ObjectiveC)) {
+        override->diagnose(diag::override_nsobject_hashvalue);
+      }
+    }
   }
 
   /// Check attributes associated with the base; some may need to merged with
@@ -1676,6 +1684,8 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
       case AccessorKind::DidSet:
       case AccessorKind::MutableAddress:
       case AccessorKind::WillSet:
+      case AccessorKind::Read:
+      case AccessorKind::Modify:
         return { };
     }
 

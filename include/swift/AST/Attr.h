@@ -37,7 +37,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TrailingObjects.h"
-#include "clang/Basic/VersionTuple.h"
+#include "llvm/Support/VersionTuple.h"
 
 namespace swift {
 class ASTPrinter;
@@ -613,16 +613,16 @@ enum class PlatformAgnosticAvailabilityKind {
 class AvailableAttr : public DeclAttribute {
 public:
 #define INIT_VER_TUPLE(X)\
-  X(X.empty() ? Optional<clang::VersionTuple>() : X)
+  X(X.empty() ? Optional<llvm::VersionTuple>() : X)
 
   AvailableAttr(SourceLoc AtLoc, SourceRange Range,
                    PlatformKind Platform,
                    StringRef Message, StringRef Rename,
-                   const clang::VersionTuple &Introduced,
+                   const llvm::VersionTuple &Introduced,
                    SourceRange IntroducedRange,
-                   const clang::VersionTuple &Deprecated,
+                   const llvm::VersionTuple &Deprecated,
                    SourceRange DeprecatedRange,
-                   const clang::VersionTuple &Obsoleted,
+                   const llvm::VersionTuple &Obsoleted,
                    SourceRange ObsoletedRange,
                    PlatformAgnosticAvailabilityKind PlatformAgnostic,
                    bool Implicit)
@@ -649,19 +649,19 @@ public:
   const StringRef Rename;
 
   /// Indicates when the symbol was introduced.
-  const Optional<clang::VersionTuple> Introduced;
+  const Optional<llvm::VersionTuple> Introduced;
 
   /// Indicates where the Introduced version was specified.
   const SourceRange IntroducedRange;
 
   /// Indicates when the symbol was deprecated.
-  const Optional<clang::VersionTuple> Deprecated;
+  const Optional<llvm::VersionTuple> Deprecated;
 
   /// Indicates where the Deprecated version was specified.
   const SourceRange DeprecatedRange;
 
   /// Indicates when the symbol was obsoleted.
-  const Optional<clang::VersionTuple> Obsoleted;
+  const Optional<llvm::VersionTuple> Obsoleted;
 
   /// Indicates where the Obsoleted version was specified.
   const SourceRange ObsoletedRange;
@@ -722,8 +722,8 @@ public:
   createPlatformAgnostic(ASTContext &C, StringRef Message, StringRef Rename = "",
                       PlatformAgnosticAvailabilityKind Reason
                          = PlatformAgnosticAvailabilityKind::Unavailable,
-                         clang::VersionTuple Obsoleted
-                         = clang::VersionTuple());
+                         llvm::VersionTuple Obsoleted
+                         = llvm::VersionTuple());
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Available;

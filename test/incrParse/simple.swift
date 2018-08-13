@@ -1,18 +1,28 @@
 // RUN: %empty-directory(%t)
-// RUN: %incparse-test %s --test-case REPLACE
-// RUN: %incparse-test %s --test-case REPLACE_BY_LONGER
-// RUN: %incparse-test %s --test-case REPLACE_BY_SHORTER
-// RUN: %incparse-test %s --test-case INSERT
-// RUN: %incparse-test %s --test-case REMOVE
-// RUN: %incparse-test %s --test-case ATTACH_TO_PREV_NODE
-// RUN: %incparse-test %s --test-case CLASS_SURROUNDING
-// RUN: %incparse-test %s --test-case MULTI_EDIT
-// RUN: %incparse-test %s --test-case MULTI_EDIT_SAME_LINE
-// RUN: %incparse-test %s --test-case REPLACE_WITH_MULTI_BYTE_CHAR
-// RUN: %incparse-test %s --test-case REPLACE_MULTI_BYTE_CHAR_WITH_SHORTER
-// RUN: %incparse-test %s --test-case LAST_CHARACTER_OF_STRUCT
-// RUN: %incparse-test %s --test-case ADD_ARRAY_CLOSE_BRACKET
-// RUN: %incparse-test %s --test-case ADD_IF_OPEN_BRACE
+// RUN: %validate-incrparse %s --test-case REPLACE
+// RUN: %validate-incrparse %s --test-case REPLACE_BY_LONGER
+// RUN: %validate-incrparse %s --test-case REPLACE_BY_SHORTER
+// RUN: %validate-incrparse %s --test-case INSERT
+// RUN: %validate-incrparse %s --test-case REMOVE
+// RUN: %validate-incrparse %s --test-case ATTACH_TO_PREV_NODE
+// RUN: %validate-incrparse %s --test-case CLASS_SURROUNDING
+// RUN: %validate-incrparse %s --test-case MULTI_EDIT
+// RUN: %validate-incrparse %s --test-case MULTI_EDIT_SAME_LINE
+// RUN: %validate-incrparse %s --test-case REPLACE_WITH_MULTI_BYTE_CHAR
+// RUN: %validate-incrparse %s --test-case REPLACE_MULTI_BYTE_CHAR_WITH_SHORTER
+// RUN: %validate-incrparse %s --test-case LAST_CHARACTER_OF_STRUCT
+// RUN: %validate-incrparse %s --test-case ADD_ARRAY_CLOSE_BRACKET
+// RUN: %validate-incrparse %s --test-case ADD_IF_OPEN_BRACE
+// We need to require macOS since %incr-transfer-roundtrip uses swiftSyntax
+// which is not available on Linux
+// FIXME: Remove the requires flag when swiftSyntax builds on Linux
+// REQUIRES: OS=macosx
+// RUN: %incr-transfer-roundtrip %s --test-case REPLACE
+// RUN: %incr-transfer-roundtrip %s --test-case INSERT
+// RUN: %incr-transfer-roundtrip %s --test-case REMOVE
+// RUN: %incr-transfer-roundtrip %s --test-case CLASS_SURROUNDING
+// RUN: %incr-transfer-roundtrip %s --test-case MULTI_EDIT
+// RUN: %incr-transfer-roundtrip %s --test-case REPLACE_WITH_MULTI_BYTE_CHAR
 
 func start() {}
 

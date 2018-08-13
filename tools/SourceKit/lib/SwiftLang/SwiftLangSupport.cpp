@@ -159,7 +159,7 @@ UIdent UIdentVisitor::visitParamDecl(const ParamDecl *D) {
 
 UIdent UIdentVisitor::visitExtensionDecl(const ExtensionDecl *D) {
   assert(!IsRef && "reference to an extension ?");
-  if (NominalTypeDecl *NTD = D->getExtendedType()->getAnyNominal()) {
+  if (NominalTypeDecl *NTD = D->getExtendedNominal()) {
     if (isa<StructDecl>(NTD))
       return KindDeclExtensionStruct;
     if (isa<ClassDecl>(NTD))
@@ -228,6 +228,10 @@ UIdent SwiftLangSupport::getUIDForAccessor(const ValueDecl *D,
   case AccessorKind::MutableAddress:
     return IsRef ? KindRefAccessorMutableAddress
                  : KindDeclAccessorMutableAddress;
+  case AccessorKind::Read:
+    return IsRef ? KindRefAccessorRead : KindDeclAccessorRead;
+  case AccessorKind::Modify:
+    return IsRef ? KindRefAccessorModify : KindDeclAccessorModify;
   }
 
   llvm_unreachable("Unhandled AccessorKind in switch.");
@@ -679,6 +683,7 @@ Optional<UIdent> SwiftLangSupport::getUIDForDeclAttribute(const swift::DeclAttri
     case DAK_ShowInInterface:
     case DAK_RawDocComment:
     case DAK_DowngradeExhaustivityCheck:
+    case DAK_HasInitialValue:
       return None;
     default:
       break;

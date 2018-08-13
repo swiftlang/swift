@@ -29,7 +29,7 @@ namespace swift { extern "C" {
 ///     <prefix>: <message>: file <file>, line <line>\n
 ///
 /// The message may be omitted by passing messageLength=0.
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 void _swift_stdlib_reportFatalErrorInFile(
     const unsigned char *prefix, int prefixLength,
     const unsigned char *message, int messageLength,
@@ -40,7 +40,7 @@ void _swift_stdlib_reportFatalErrorInFile(
 /// Report a fatal error to system console, stderr, and crash logs.
 ///
 ///     <prefix>: <message>\n
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 void _swift_stdlib_reportFatalError(
     const unsigned char *prefix, int prefixLength,
     const unsigned char *message, int messageLength,
@@ -50,7 +50,7 @@ void _swift_stdlib_reportFatalError(
 ///
 ///     <file>: <line>: <column>: fatal error: use of unimplemented
 ///     initializer '<initName>' for class '<className>'
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 void _swift_stdlib_reportUnimplementedInitializerInFile(
     const unsigned char *className, int classNameLength,
     const unsigned char *initName, int initNameLength,
@@ -62,7 +62,7 @@ void _swift_stdlib_reportUnimplementedInitializerInFile(
 ///
 ///     fatal error: use of unimplemented initializer '<initName>'
 ///     for class 'className'
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 void _swift_stdlib_reportUnimplementedInitializer(
     const unsigned char *className, int classNameLength,
     const unsigned char *initName, int initNameLength,

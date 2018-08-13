@@ -853,7 +853,7 @@ bb0(%0 : $*T):
 sil_vtable ClassUsingThrowingP {
   #ClassUsingThrowingP.init!allocator.1: (ClassUsingThrowingP.Type) -> () -> ClassUsingThrowingP : @$S34eager_specialize_throwing_function19ClassUsingThrowingPCACycfC	// ClassUsingThrowingP.__allocating_init()
   #ClassUsingThrowingP.init!initializer.1: (ClassUsingThrowingP.Type) -> () -> ClassUsingThrowingP : @$S34eager_specialize_throwing_function19ClassUsingThrowingPCACycfc	// ClassUsingThrowingP.init()
-  #ClassUsingThrowingP.deinit!deallocator: @$S34eager_specialize_throwing_function19ClassUsingThrowingPCfD	// ClassUsingThrowingP.__deallocating_deinit
+  #ClassUsingThrowingP.deinit!deallocator.1: @$S34eager_specialize_throwing_function19ClassUsingThrowingPCfD	// ClassUsingThrowingP.__deallocating_deinit
 }
 
 sil_witness_table hidden Int64: ThrowingP module eager_specialize_throwing_function {

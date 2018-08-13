@@ -19,6 +19,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericSignatureBuilder.h"
+#include "swift/AST/ReferenceCounting.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Decl.h"
@@ -731,15 +732,6 @@ Type TypeBase::getWithoutParens() {
   return Ty;
 }
 
-Type TypeBase::getWithoutImmediateLabel() {
-  Type Ty = this;
-  if (auto tupleTy = dyn_cast<TupleType>(Ty.getPointer())) {
-    if (tupleTy->hasParenSema(/*allowName*/true))
-      Ty = tupleTy->getElementType(0);
-  }
-  return Ty;
-}
-
 Type TypeBase::replaceCovariantResultType(Type newResultType,
                                           unsigned uncurryLevel) {
   if (uncurryLevel == 0) {
@@ -841,8 +833,11 @@ swift::computeDefaultMap(ArrayRef<AnyFunctionType::Param> params,
   // Find the corresponding parameter list.
   const ParameterList *paramList = nullptr;
   if (auto *func = dyn_cast<AbstractFunctionDecl>(paramOwner)) {
-    if (level < func->getNumParameterLists())
-      paramList = func->getParameterList(level);
+    if (func->hasImplicitSelfDecl()) {
+      if (level == 1)
+        paramList = func->getParameters();
+    } else if (level == 0)
+      paramList = func->getParameters();
   } else if (auto *subscript = dyn_cast<SubscriptDecl>(paramOwner)) {
     if (level == 1)
       paramList = subscript->getIndices();
@@ -925,22 +920,14 @@ Type TypeBase::replaceSelfParameterType(Type newSelf) {
                            fnTy->getExtInfo());
 }
 
-/// Retrieve the object type for a 'self' parameter, digging into one-element
-/// tuples, inout types, and metatypes.
+/// Retrieve the object type for a 'self' parameter, digging into
+/// inout types, and metatypes.
 Type TypeBase::getRValueInstanceType() {
-  Type type = this;
-  
-  // Look through argument list tuples.
-  if (auto tupleTy = type->getAs<TupleType>()) {
-    if (tupleTy->hasParenSema(/*allowName*/true))
-      type = tupleTy->getElementType(0);
-  }
-  
-  if (auto metaTy = type->getAs<AnyMetatypeType>())
+  if (auto metaTy = getAs<AnyMetatypeType>())
     return metaTy->getInstanceType();
 
   // For mutable value type methods, we need to dig through inout types.
-  return type->getInOutObjectType();
+  return getInOutObjectType();
 }
 
 /// \brief Collect the protocols in the existential type T into the given
@@ -2435,45 +2422,6 @@ int TupleType::getNamedElementId(Identifier I) const {
   return -1;
 }
 
-/// getElementForScalarInit - If a tuple of this type can be initialized with a
-/// scalar, return the field number that the scalar is assigned to.  If not,
-/// return -1.
-int TupleType::getElementForScalarInit() const {
-  if (Bits.TupleType.Count == 0) return -1;
-  
-  int FieldWithoutDefault = -1;
-  for (unsigned i = 0, e = Bits.TupleType.Count; i != e; ++i) {
-    // If we already saw a non-vararg field missing a default value, then we
-    // cannot assign a scalar to this tuple.
-    if (FieldWithoutDefault != -1) {
-      // Vararg fields are okay; they'll just end up being empty.
-      if (getTrailingObjects<TupleTypeElt>()[i].isVararg())
-        continue;
-    
-      return -1;
-    }
-    
-    // Otherwise, remember this field number.
-    FieldWithoutDefault = i;    
-  }
-  
-  // If all the elements have default values, the scalar initializes the first
-  // value in the tuple.
-  return FieldWithoutDefault == -1 ? 0 : FieldWithoutDefault;
-}
-
-/// If this tuple has a varargs element to it, return the base type of the
-/// varargs element (i.e., if it is "Int...", this returns Int, not [Int]).
-/// Otherwise, this returns Type().
-Type TupleType::getVarArgsBaseType() const {
-  for (unsigned i = 0, e = Bits.TupleType.Count; i != e; ++i) {
-    if (getTrailingObjects<TupleTypeElt>()[i].isVararg())
-      return getTrailingObjects<TupleTypeElt>()[i].getVarargBaseTy();
-  }
-  
-  return Type();
-}
-
 
 ArchetypeType::ArchetypeType(
   const ASTContext &Ctx,
@@ -3241,24 +3189,6 @@ Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
   llvm_unreachable("no inheritance relationship between given classes");
 }
 
-Type TypeBase::getGenericAncestor() {
-  Type t = getConcreteTypeForSuperclassTraversing(this);
-
-  while (t && !t->hasError()) {
-    auto NTD = t->getAnyNominal();
-    assert(NTD && "expected nominal type in NTD");
-    if (!NTD)
-      return Type();
-
-    if (NTD->isGenericContext())
-      return t;
-
-    t = t->getSuperclass();
-  }
-
-  return Type();
-}
-
 TypeSubstitutionMap
 TypeBase::getContextSubstitutions(const DeclContext *dc,
                                   GenericEnvironment *genericEnv) {
@@ -3437,8 +3367,7 @@ Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
     type = type->replaceSelfParameterType(this);
     if (auto func = dyn_cast<FuncDecl>(baseDecl)) {
       if (func->hasDynamicSelf()) {
-        type = type->replaceCovariantResultType(this,
-                                                func->getNumParameterLists());
+        type = type->replaceCovariantResultType(this, /*uncurryLevel=*/2);
       }
     } else if (isa<ConstructorDecl>(baseDecl)) {
       type = type->replaceCovariantResultType(this, /*uncurryLevel=*/2);
@@ -4062,22 +3991,29 @@ bool UnownedStorageType::isLoadable(ResilienceExpansion resilience) const {
   return ty->usesNativeReferenceCounting(resilience);
 }
 
-static bool doesOpaqueClassUseNativeReferenceCounting(const ASTContext &ctx) {
-  return !ctx.LangOpts.EnableObjCInterop;
-}
-
-static bool usesNativeReferenceCounting(ClassDecl *theClass,
-                                        ResilienceExpansion resilience) {
+static ReferenceCounting getClassReferenceCounting(
+                                             ClassDecl *theClass,
+                                             ResilienceExpansion resilience) {
   // TODO: Resilience? there might be some legal avenue of changing this.
-  while (Type supertype = theClass->getSuperclass()) {
-    theClass = supertype->getClassOrBoundGenericClass();
-    assert(theClass);
+  while (auto superclass = theClass->getSuperclassDecl()) {
+    theClass = superclass;
   }
-  return !theClass->hasClangNode();
+
+  return theClass->hasClangNode()
+           ? ReferenceCounting::ObjC
+           : ReferenceCounting::Native;
 }
 
-bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
+ReferenceCounting TypeBase::getReferenceCounting(
+                                              ResilienceExpansion resilience) {
   CanType type = getCanonicalType();
+  ASTContext &ctx = type->getASTContext();
+
+  // In the absence of Objective-C interoperability, everything uses native
+  // reference counting.
+  if (!ctx.LangOpts.EnableObjCInterop)
+    return ReferenceCounting::Native;
+
   switch (type->getKind()) {
 #define SUGARED_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
@@ -4086,27 +4022,29 @@ bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
 
   case TypeKind::BuiltinNativeObject:
   case TypeKind::SILBox:
-    return true;
+    return ReferenceCounting::Native;
+
+  case TypeKind::BuiltinBridgeObject:
+    return ReferenceCounting::Bridge;
 
   case TypeKind::BuiltinUnknownObject:
-  case TypeKind::BuiltinBridgeObject:
-    return ::doesOpaqueClassUseNativeReferenceCounting(type->getASTContext());
+    return ReferenceCounting::Unknown;
 
   case TypeKind::Class:
-    return ::usesNativeReferenceCounting(cast<ClassType>(type)->getDecl(),
-                                         resilience);
+    return getClassReferenceCounting(cast<ClassType>(type)->getDecl(),
+                                     resilience);
   case TypeKind::BoundGenericClass:
-    return ::usesNativeReferenceCounting(
+    return getClassReferenceCounting(
                                   cast<BoundGenericClassType>(type)->getDecl(),
-                                         resilience);
+                                  resilience);
   case TypeKind::UnboundGeneric:
-    return ::usesNativeReferenceCounting(
+    return getClassReferenceCounting(
                     cast<ClassDecl>(cast<UnboundGenericType>(type)->getDecl()),
-                                         resilience);
+                    resilience);
 
   case TypeKind::DynamicSelf:
     return cast<DynamicSelfType>(type).getSelfType()
-             ->usesNativeReferenceCounting(resilience);
+        ->getReferenceCounting(resilience);
 
   case TypeKind::Archetype: {
     auto archetype = cast<ArchetypeType>(type);
@@ -4115,17 +4053,17 @@ bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
     assert(archetype->requiresClass() ||
            (layout && layout->isRefCounted()));
     if (auto supertype = archetype->getSuperclass())
-      return supertype->usesNativeReferenceCounting(resilience);
-    return ::doesOpaqueClassUseNativeReferenceCounting(type->getASTContext());
+      return supertype->getReferenceCounting(resilience);
+    return ReferenceCounting::Unknown;
   }
 
   case TypeKind::Protocol:
   case TypeKind::ProtocolComposition: {
-    auto layout = getExistentialLayout();
+    auto layout = type->getExistentialLayout();
     assert(layout.requiresClass() && "Opaque existentials don't use refcounting");
     if (auto superclass = layout.getSuperclass())
-      return superclass->usesNativeReferenceCounting(resilience);
-    return ::doesOpaqueClassUseNativeReferenceCounting(type->getASTContext());
+      return superclass->getReferenceCounting(resilience);
+    return ReferenceCounting::Unknown;
   }
 
   case TypeKind::Function:
@@ -4160,6 +4098,10 @@ bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
   }
 
   llvm_unreachable("Unhandled type kind!");
+}
+
+bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
+  return getReferenceCounting(resilience) == ReferenceCounting::Native;
 }
 
 //

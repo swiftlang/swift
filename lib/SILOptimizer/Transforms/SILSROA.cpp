@@ -141,19 +141,19 @@ bool SROAMemoryUseAnalyzer::analyze() {
   // Go through uses of the memory allocation of AI...
   for (auto *Operand : getNonDebugUses(SILValue(AI))) {
     SILInstruction *User = Operand->getUser();
-    DEBUG(llvm::dbgs() << "    Visiting use: " << *User);
+    LLVM_DEBUG(llvm::dbgs() << "    Visiting use: " << *User);
 
     // If we store the alloca pointer, we cannot analyze its uses so bail...
     // It is ok if we store into the alloca pointer though.
     if (auto *SI = dyn_cast<StoreInst>(User)) {
       if (SI->getDest() == AI) {
-        DEBUG(llvm::dbgs() << "        Found a store into the "
-              "projection.\n");
+        LLVM_DEBUG(llvm::dbgs() << "        Found a store into the "
+                                   "projection.\n");
         Stores.push_back(SI);
         continue;
       } else {
-        DEBUG(llvm::dbgs() << "        Found a store of the "
-              "projection pointer. Escapes!.\n");
+        LLVM_DEBUG(llvm::dbgs() << "        Found a store of the "
+                                   "projection pointer. Escapes!.\n");
         ++NumEscapingAllocas;
         return false;
       }
@@ -161,7 +161,7 @@ bool SROAMemoryUseAnalyzer::analyze() {
 
     // If the use is a load, keep track of it for splitting later...
     if (auto *LI = dyn_cast<LoadInst>(User)) {
-      DEBUG(llvm::dbgs() << "        Found a load of the projection.\n");
+      LLVM_DEBUG(llvm::dbgs() << "        Found a load of the projection.\n");
       Loads.push_back(LI);
       continue;
     }
@@ -169,7 +169,7 @@ bool SROAMemoryUseAnalyzer::analyze() {
     // If the use is a struct_element_addr, add it to the worklist so we check
     // if it or one of its descendants escape.
     if (auto *ASI = dyn_cast<StructElementAddrInst>(User)) {
-      DEBUG(llvm::dbgs() << "        Found a struct subprojection!\n");
+      LLVM_DEBUG(llvm::dbgs() << "        Found a struct subprojection!\n");
       ExtractInsts.push_back(ASI);
       continue;
     }
@@ -177,7 +177,7 @@ bool SROAMemoryUseAnalyzer::analyze() {
     // If the use is a tuple_element_addr, add it to the worklist so we check
     // if it or one of its descendants escape.
     if (auto *TSI = dyn_cast<TupleElementAddrInst>(User)) {
-      DEBUG(llvm::dbgs() << "        Found a tuple subprojection!\n");
+      LLVM_DEBUG(llvm::dbgs() << "        Found a tuple subprojection!\n");
       ExtractInsts.push_back(TSI);
       continue;
     }
@@ -188,7 +188,7 @@ bool SROAMemoryUseAnalyzer::analyze() {
     }
     
     // Otherwise we do not understand this instruction, so bail.
-    DEBUG(llvm::dbgs() << "        Found unknown user, pointer escapes!\n");
+    LLVM_DEBUG(llvm::dbgs() <<"        Found unknown user, pointer escapes!\n");
     ++NumEscapingAllocas;
     return false;
   }
@@ -270,7 +270,7 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
     // If the use is a DSI, add it to our memory analysis so that if we can chop
     // up allocas, we also chop up the relevant dealloc stack insts.
     if (auto *DSI = dyn_cast<DeallocStackInst>(User)) {
-      DEBUG(llvm::dbgs() << "        Found DeallocStackInst!\n");
+      LLVM_DEBUG(llvm::dbgs() << "        Found DeallocStackInst!\n");
       // Create the allocations in reverse order.
       for (auto *NewAI : swift::reversed(NewAllocations))
         B.createDeallocStack(DSI->getLoc(), SILValue(NewAI));
@@ -320,8 +320,8 @@ class SILSROA : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
     SILFunction *F = getFunction();
-    DEBUG(llvm::dbgs() << "***** SROA on function: " << F->getName() <<
-          " *****\n");
+    LLVM_DEBUG(llvm::dbgs() << "***** SROA on function: " << F->getName()
+                            << " *****\n");
 
     if (runSROAOnFunction(*F))
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);

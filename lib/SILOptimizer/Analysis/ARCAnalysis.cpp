@@ -1205,15 +1205,15 @@ BuiltinInst *swift::getUnsafeGuaranteedEndUser(SILValue UnsafeGuaranteedToken) {
 
   for (auto *Operand : getNonDebugUses(UnsafeGuaranteedToken)) {
     if (UnsafeGuaranteedEndI) {
-      DEBUG(llvm::dbgs() << "  multiple unsafeGuaranteedEnd users\n");
+      LLVM_DEBUG(llvm::dbgs() << "  multiple unsafeGuaranteedEnd users\n");
       UnsafeGuaranteedEndI = nullptr;
       break;
     }
     auto *BI = dyn_cast<BuiltinInst>(Operand->getUser());
     if (!BI || !BI->getBuiltinKind() ||
         *BI->getBuiltinKind() != BuiltinValueKind::UnsafeGuaranteedEnd) {
-      DEBUG(llvm::dbgs() << "  wrong unsafeGuaranteed token user "
-            << *Operand->getUser());
+      LLVM_DEBUG(llvm::dbgs() << "  wrong unsafeGuaranteed token user "
+                 << *Operand->getUser());
       break;
     }
 

@@ -15,7 +15,7 @@ var StringTestSuite = TestSuite("String")
 
 extension String {
   var capacity: Int {
-    return _guts.capacity
+    return _classify()._capacity
   }
 }
 

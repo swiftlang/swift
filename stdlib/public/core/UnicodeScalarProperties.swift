@@ -20,32 +20,33 @@ extension Unicode.Scalar {
   /// A value that provides access to properties of a Unicode scalar that are
   /// defined by the Unicode standard.
   public struct Properties {
-    internal init(_scalar: Unicode.Scalar) {
-      // We convert the value to the underlying UChar32 type here and store it
-      // in that form to make calling the ICU APIs cleaner below.
-      self._value = __swift_stdlib_UChar32(bitPattern: _scalar._value)
+    @usableFromInline
+    internal var _scalar: Unicode.Scalar
+
+    internal init(_ scalar: Unicode.Scalar) {
+      self._scalar = scalar
     }
 
-    @usableFromInline
-    internal var _value: __swift_stdlib_UChar32
+    // Provide the value as UChar32 to make calling the ICU APIs cleaner
+    internal var icuValue: __swift_stdlib_UChar32 {
+      return __swift_stdlib_UChar32(bitPattern: self._scalar._value)
+    }
   }
 
   /// A value that provides access to properties of the Unicode scalar that are
   /// defined by the Unicode standard.
   public var properties: Properties {
-    return Properties(_scalar: self)
+    return Properties(self)
   }
 }
 
 /// Boolean properties that are defined by the Unicode Standard (i.e., not
 /// ICU-specific).
 extension Unicode.Scalar.Properties {
-
-  @usableFromInline @_transparent
   internal func _hasBinaryProperty(
     _ property: __swift_stdlib_UProperty
   ) -> Bool {
-    return __swift_stdlib_u_hasBinaryProperty(_value, property) != 0
+    return __swift_stdlib_u_hasBinaryProperty(icuValue, property) != 0
   }
 
   /// A Boolean property indicating whether the scalar is alphabetic.
@@ -237,7 +238,7 @@ extension Unicode.Scalar.Properties {
   ///
   /// This property roughly defines the class of "Chinese characters" and does
   /// not include characters of other logographic scripts such as Cuneiform or
-  /// Egyptian Hieroglyphs
+  /// Egyptian Hieroglyphs.
   ///
   /// This property corresponds to the `Ideographic` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
@@ -292,8 +293,8 @@ extension Unicode.Scalar.Properties {
   ///   directs the rendering engine to render them as a connected glyph when it
   ///   would otherwise render them independently. The zero width joiner is also
   ///   used to construct complex emoji from sequences of base emoji characters.
-  ///   For example, "family" emoji are created by joining sequences of man,
-  ///   woman, and child emoji with the zero width joiner.
+  ///   For example, the various "family" emoji are encoded as sequences of man,
+  ///   woman, or child emoji that are interleaved with zero width joiners.
   ///
   /// This property corresponds to the `Join_Control` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
@@ -520,8 +521,8 @@ extension Unicode.Scalar.Properties {
     return _hasBinaryProperty(__swift_stdlib_UCHAR_CASE_IGNORABLE)
   }
 
-  /// A Boolean property indicating whether the scalar is one whose normalized
-  /// form is not stable under a `toLowercase` mapping.
+  /// A Boolean property indicating whether the scalar's normalized form differs
+  /// from the `lowercaseMapping` of each constituent scalar.
   ///
   /// This property corresponds to the `Changes_When_Lowercased` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
@@ -529,8 +530,8 @@ extension Unicode.Scalar.Properties {
     return _hasBinaryProperty(__swift_stdlib_UCHAR_CHANGES_WHEN_LOWERCASED)
   }
 
-  /// A Boolean property indicating whether the scalar is one whose normalized
-  /// form is not stable under a `toUppercase` mapping.
+  /// A Boolean property indicating whether the scalar's normalized form differs
+  /// from the `uppercaseMapping` of each constituent scalar.
   ///
   /// This property corresponds to the `Changes_When_Uppercased` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
@@ -538,8 +539,8 @@ extension Unicode.Scalar.Properties {
     return _hasBinaryProperty(__swift_stdlib_UCHAR_CHANGES_WHEN_UPPERCASED)
   }
 
-  /// A Boolean property indicating whether the scalar is one whose normalized
-  /// form is not stable under a `toTitlecase` mapping.
+  /// A Boolean property indicating whether the scalar's normalized form differs
+  /// from the `titlecaseMapping` of each constituent scalar.
   ///
   /// This property corresponds to the `Changes_When_Titlecased` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
@@ -547,8 +548,8 @@ extension Unicode.Scalar.Properties {
     return _hasBinaryProperty(__swift_stdlib_UCHAR_CHANGES_WHEN_TITLECASED)
   }
 
-  /// A Boolean property indicating whether the scalar is one whose normalized
-  /// form is not stable under case folding.
+  /// A Boolean property indicating whether the scalar's normalized form differs
+  /// from the case-fold mapping of each constituent scalar.
   ///
   /// This property corresponds to the `Changes_When_Casefolded` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
@@ -557,7 +558,7 @@ extension Unicode.Scalar.Properties {
   }
 
   /// A Boolean property indicating whether the scalar may change when it
-  /// undergoes a case mapping.
+  /// undergoes case mapping.
   ///
   /// For any scalar `s`, it holds by definition that
   ///
@@ -668,16 +669,6 @@ extension Unicode.Scalar.Properties {
 
 /// Case mapping properties.
 extension Unicode.Scalar.Properties {
-
-  /// The UTF-16 encoding of the scalar, represented as a tuple of 2 elements.
-  ///
-  /// If the scalar only encodes to one code unit, the second element is zero.
-  @usableFromInline @_transparent
-  internal var _utf16CodeUnits: (UTF16.CodeUnit, UTF16.CodeUnit) {
-    let utf16 = UnicodeScalar(UInt32(_value))!.utf16
-    return (utf16[0], utf16.count > 1 ? utf16[1] : 0)
-  }
-
   // The type of ICU case conversion functions.
   internal typealias _U_StrToX = (
     /* dest */ UnsafeMutablePointer<__swift_stdlib_UChar>,
@@ -695,51 +686,44 @@ extension Unicode.Scalar.Properties {
   /// all current case mappings. In the event more space is needed, it will be
   /// allocated on the heap.
   internal func _applyMapping(_ u_strTo: _U_StrToX) -> String {
-    let utf16Length = UnicodeScalar(UInt32(_value))!.utf16.count
-    var utf16 = _utf16CodeUnits
     var scratchBuffer = _Normalization._SegmentOutputBuffer(allZeros: ())
     let count = scratchBuffer.withUnsafeMutableBufferPointer { bufPtr -> Int in
-      return withUnsafePointer(to: &utf16) { tuplePtr in
-        return tuplePtr.withMemoryRebound(to: UInt16.self, capacity: 2) {
-          utf16Pointer in
-          var err = __swift_stdlib_U_ZERO_ERROR
-          let correctSize = u_strTo(
-            bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
-            Int32(bufPtr.count),
-            utf16Pointer,
-            Int32(utf16Length),
-            "",
-            &err)
-          guard err.isSuccess ||
-                err == __swift_stdlib_U_BUFFER_OVERFLOW_ERROR else {
-            fatalError("Unexpected error case-converting Unicode scalar.")
-          }
-          return Int(correctSize)
+      return _scalar.withUTF16CodeUnits { utf16 in
+        var err = __swift_stdlib_U_ZERO_ERROR
+        let correctSize = u_strTo(
+          bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
+          Int32(bufPtr.count),
+          utf16.baseAddress._unsafelyUnwrappedUnchecked,
+          Int32(utf16.count),
+          "",
+          &err)
+        guard err.isSuccess ||
+              err == __swift_stdlib_U_BUFFER_OVERFLOW_ERROR else {
+          fatalError("Unexpected error case-converting Unicode scalar.")
         }
+        return Int(correctSize)
       }
     }
+
     if _fastPath(count <= scratchBuffer.count) {
       scratchBuffer.count = count
       return String._fromWellFormedUTF16CodeUnits(scratchBuffer)
     }
     var array = Array<UInt16>(repeating: 0, count: count)
     array.withUnsafeMutableBufferPointer { bufPtr in
-      withUnsafePointer(to: &utf16) { tuplePtr in
-        tuplePtr.withMemoryRebound(to: UInt16.self, capacity: 2) {
-          utf16Pointer in
-          var err = __swift_stdlib_U_ZERO_ERROR
-          let correctSize = u_strTo(
-            bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
-            Int32(bufPtr.count),
-            utf16Pointer,
-            Int32(utf16Length),
-            "",
-            &err)
-          guard err.isSuccess else {
-            fatalError("Unexpected error case-converting Unicode scalar.")
-          }
-          _sanityCheck(count == correctSize, "inconsistent ICU behavior")
+      return _scalar.withUTF16CodeUnits { utf16 in
+        var err = __swift_stdlib_U_ZERO_ERROR
+        let correctSize = u_strTo(
+          bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
+          Int32(bufPtr.count),
+          utf16.baseAddress._unsafelyUnwrappedUnchecked,
+          Int32(utf16.count),
+          "",
+          &err)
+        guard err.isSuccess else {
+          fatalError("Unexpected error case-converting Unicode scalar.")
         }
+        _sanityCheck(count == correctSize, "inconsistent ICU behavior")
       }
     }
     return String._fromWellFormedUTF16CodeUnits(array[..<count])
@@ -753,10 +737,8 @@ extension Unicode.Scalar.Properties {
   /// WITH DOT ABOVE) becomes two scalars (U+0069 LATIN SMALL LETTER I, U+0307
   /// COMBINING DOT ABOVE) when converted to lowercase.
   ///
-  /// This function corresponds to the `Lowercase_Mapping` property in the
+  /// This property corresponds to the `Lowercase_Mapping` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
-  ///
-  /// - Returns: The lowercase mapping of the scalar.
   public var lowercaseMapping: String {
     return _applyMapping(__swift_stdlib_u_strToLower)
   }
@@ -769,10 +751,8 @@ extension Unicode.Scalar.Properties {
   /// becomes "Fi" (U+0046 LATIN CAPITAL LETTER F, U+0069 LATIN SMALL LETTER I)
   /// when converted to titlecase.
   ///
-  /// This function corresponds to the `Titlecase_Mapping` property in the
+  /// This property corresponds to the `Titlecase_Mapping` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
-  ///
-  /// - Returns: The titlecase mapping of the scalar.
   public var titlecaseMapping: String {
     return _applyMapping { ptr, cap, src, len, locale, err in
       return __swift_stdlib_u_strToTitle(ptr, cap, src, len, nil, locale, err)
@@ -787,10 +767,8 @@ extension Unicode.Scalar.Properties {
   /// SHARP S) becomes "SS" (U+0053 LATIN CAPITAL LETTER S, U+0053 LATIN CAPITAL
   /// LETTER S) when converted to uppercase.
   ///
-  /// This function corresponds to the `Uppercase_Mapping` property in the
+  /// This property corresponds to the `Uppercase_Mapping` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
-  ///
-  /// - Returns: The uppercase mapping of the scalar.
   public var uppercaseMapping: String {
     return _applyMapping(__swift_stdlib_u_strToUpper)
   }
@@ -817,7 +795,7 @@ extension Unicode.Scalar.Properties {
     withUnsafeMutablePointer(to: &versionInfo) { tuplePtr in
       tuplePtr.withMemoryRebound(to: UInt8.self, capacity: 4) {
         versionInfoPtr in
-        __swift_stdlib_u_charAge(_value, versionInfoPtr)
+        __swift_stdlib_u_charAge(icuValue, versionInfoPtr)
       }
     }
     guard versionInfo.0 != 0 else { return nil }
@@ -1092,8 +1070,9 @@ extension Unicode.Scalar.Properties {
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var generalCategory: Unicode.GeneralCategory {
     let rawValue = __swift_stdlib_UCharCategory(
-      UInt32(__swift_stdlib_u_getIntPropertyValue(
-        _value, __swift_stdlib_UCHAR_GENERAL_CATEGORY)))
+      __swift_stdlib_UCharCategory.RawValue(
+      __swift_stdlib_u_getIntPropertyValue(
+        icuValue, __swift_stdlib_UCHAR_GENERAL_CATEGORY)))
     return Unicode.GeneralCategory(rawValue: rawValue)
   }
 }
@@ -1104,7 +1083,7 @@ extension Unicode.Scalar.Properties {
     _ choice: __swift_stdlib_UCharNameChoice
   ) -> String? {
     var err = __swift_stdlib_U_ZERO_ERROR
-    let count = Int(__swift_stdlib_u_charName(_value, choice, nil, 0, &err))
+    let count = Int(__swift_stdlib_u_charName(icuValue, choice, nil, 0, &err))
     guard count > 0 else { return nil }
 
     // ICU writes a trailing null, so we have to save room for it as well.
@@ -1112,7 +1091,7 @@ extension Unicode.Scalar.Properties {
     return array.withUnsafeMutableBufferPointer { bufPtr in
       var err = __swift_stdlib_U_ZERO_ERROR
       let correctSize = __swift_stdlib_u_charName(
-        _value,
+        icuValue,
         choice,
         UnsafeMutableRawPointer(bufPtr.baseAddress._unsafelyUnwrappedUnchecked)
           .assumingMemoryBound(to: Int8.self),
@@ -1288,7 +1267,7 @@ extension Unicode.Scalar.Properties {
   /// the [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var canonicalCombiningClass: Unicode.CanonicalCombiningClass {
     let rawValue = UInt8(__swift_stdlib_u_getIntPropertyValue(
-      _value, __swift_stdlib_UCHAR_CANONICAL_COMBINING_CLASS))
+      icuValue, __swift_stdlib_UCHAR_CANONICAL_COMBINING_CLASS))
     return Unicode.CanonicalCombiningClass(rawValue: rawValue)
   }
 }
@@ -1355,41 +1334,42 @@ extension Unicode.Scalar.Properties {
   /// number.
   ///
   /// ```
-  /// print("X", ("X" as Unicode.Scalar).properties.numericType)
+  /// print("X", ("X" as Unicode.Scalar).properties.numericType ?? "nil")
   /// // Prints "X nil"
-  /// print("4", ("4" as Unicode.Scalar).properties.numericType)
-  /// // Prints "4 Optional(Swift.Unicode.NumericType.decimal)"
-  /// print("\u{2463}", ("\u{2463}" as Unicode.Scalar).properties.numericType)
-  /// // Prints "④ Optional(Swift.Unicode.NumericType.digit)"
-  /// print("\u{2155}", ("\u{2155}" as Unicode.Scalar).properties.numericType)
-  /// // Prints "⅕ Optional(Swift.Unicode.NumericType.numeric)"
+  /// print("4", ("4" as Unicode.Scalar).properties.numericType ?? "nil")
+  /// // Prints "4 decimal"
+  /// print("\u{2463}", ("\u{2463}" as Unicode.Scalar).properties.numericType ?? "nil")
+  /// // Prints "④ digit"
+  /// print("\u{2155}", ("\u{2155}" as Unicode.Scalar).properties.numericType ?? "nil")
+  /// // Prints "⅕ numeric"
   /// ```
   ///
   /// This property corresponds to the `Numeric_Type` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var numericType: Unicode.NumericType? {
     let rawValue = __swift_stdlib_UNumericType(
-      UInt32(__swift_stdlib_u_getIntPropertyValue(
-        _value, __swift_stdlib_UCHAR_NUMERIC_TYPE)))
+      __swift_stdlib_UNumericType.RawValue(
+      __swift_stdlib_u_getIntPropertyValue(
+        icuValue, __swift_stdlib_UCHAR_NUMERIC_TYPE)))
     return Unicode.NumericType(rawValue: rawValue)
   }
 
   /// The numeric value of the scalar.
   ///
-  /// The value of this property is `nil` for scalars that do not represent a
+  /// The value of this property is nil for scalars that do not represent a
   /// number.
   ///
   /// The numeric value of a scalar is represented as a `Double` because some
   /// scalars represent fractions:
   ///
   /// ```
-  /// print("X", ("X" as Unicode.Scalar).properties.numericValue)
-  /// // Prints "X nan"
-  /// print("4", ("4" as Unicode.Scalar).properties.numericValue)
+  /// print("X", ("X" as Unicode.Scalar).properties.numericValue ?? "nil")
+  /// // Prints "X nil"
+  /// print("4", ("4" as Unicode.Scalar).properties.numericValue ?? "nil")
   /// // Prints "4 4.0"
-  /// print("\u{2463}", ("\u{2463}" as Unicode.Scalar).properties.numericValue)
+  /// print("\u{2463}", ("\u{2463}" as Unicode.Scalar).properties.numericValue ?? "nil")
   /// // Prints "④ 4.0"
-  /// print("\u{2155}", ("\u{2155}" as Unicode.Scalar).properties.numericValue)
+  /// print("\u{2155}", ("\u{2155}" as Unicode.Scalar).properties.numericValue ?? "nil")
   /// // Prints "⅕ 0.2"
   /// ```
   ///
@@ -1397,7 +1377,7 @@ extension Unicode.Scalar.Properties {
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var numericValue: Double? {
     let icuNoNumericValue: Double = -123456789
-    let result = __swift_stdlib_u_getNumericValue(_value)
+    let result = __swift_stdlib_u_getNumericValue(icuValue)
     return result != icuNoNumericValue ? result : nil
   }
 }

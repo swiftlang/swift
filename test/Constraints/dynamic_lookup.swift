@@ -338,6 +338,5 @@ func testOverloadedWithUnavailable(ao: AnyObject) {
 
 func dynamicInitCrash(ao: AnyObject.Type) {
   let sdk = ao.init(blahblah: ())
-  // expected-error@-1 {{argument labels '(blahblah:)' do not match any available overloads}}
-  // expected-note@-2 {{overloads for 'AnyObject.Type.init' exist with these partially matching parameter lists}}
+  // expected-error@-1 {{incorrect argument label in call (have 'blahblah:', expected 'toMemory:')}}
 }

@@ -19,6 +19,7 @@
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/TypeDecoder.h"
 #include "swift/Reflection/Records.h"
+#include "swift/ABI/TypeIdentity.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/HeapObject.h"
@@ -153,6 +154,110 @@ static const TypeContextDescriptor *
 _findNominalTypeDescriptor(Demangle::NodePointer node,
                            Demangle::Demangler &Dem);
 
+/// Recognize imported tag types, which have a special mangling rule.
+///
+/// This should be kept in sync with the AST mangler and with
+/// buildContextDescriptorMangling in MetadataReader.
+bool swift::_isCImportedTagType(const TypeContextDescriptor *type,
+                                const ParsedTypeIdentity &identity) {
+  // Tag types are always imported as structs or enums.
+  if (type->getKind() != ContextDescriptorKind::Enum &&
+      type->getKind() != ContextDescriptorKind::Struct)
+    return false;
+
+  // Not a typedef imported as a nominal type.
+  if (identity.isCTypedef())
+    return false;
+
+  // Not a related entity.
+  if (identity.isAnyRelatedEntity())
+    return false;
+
+  // Imported from C.
+  return type->Parent->isCImportedContext();
+}
+
+ParsedTypeIdentity
+ParsedTypeIdentity::parse(const TypeContextDescriptor *type) {
+  ParsedTypeIdentity result;
+
+  // The first component is the user-facing name and (unless overridden)
+  // the ABI name.
+  StringRef component = type->Name.get();
+  result.UserFacingName = component;
+
+  // If we don't have import info, we're done.
+  if (!type->getTypeContextDescriptorFlags().hasImportInfo()) {
+    result.FullIdentity = result.UserFacingName;
+    return result;
+  }
+
+  // Otherwise, start parsing the import information.
+  result.ImportInfo.emplace();
+
+  // The identity starts with the user-facing name.
+  const char *startOfIdentity = component.begin();
+  const char *endOfIdentity = component.end();
+
+#ifndef NDEBUG
+  enum {
+    AfterName,
+    AfterABIName,
+    AfterSymbolNamespace,
+    AfterRelatedEntityName,
+    AfterIdentity,
+  } stage = AfterName;
+#endif
+
+  while (true) {
+    // Parse the next component.  If it's empty, we're done.
+    component = StringRef(component.end() + 1);
+    if (component.empty()) break;
+
+    // Update the identity bounds and assert that the identity
+    // components are in the right order.
+    auto kind = TypeImportComponent(component[0]);
+    if (kind == TypeImportComponent::ABIName) {
+#ifndef NDEBUG
+      assert(stage < AfterABIName);
+      stage = AfterABIName;
+      assert(result.UserFacingName != component.drop_front(1) &&
+             "user-facing name was same as the ABI name");
+#endif
+      startOfIdentity = component.begin() + 1;
+      endOfIdentity = component.end();
+    } else if (kind == TypeImportComponent::SymbolNamespace) {
+#ifndef NDEBUG
+      assert(stage < AfterSymbolNamespace);
+      stage = AfterSymbolNamespace;
+#endif
+      endOfIdentity = component.end();
+    } else if (kind == TypeImportComponent::RelatedEntityName) {
+#ifndef NDEBUG
+      assert(stage < AfterRelatedEntityName);
+      stage = AfterRelatedEntityName;
+#endif
+      endOfIdentity = component.end();
+    } else {
+#ifndef NDEBUG
+      // Anything else is assumed to not be part of the identity.
+      stage = AfterIdentity;
+#endif
+    }
+
+    // Collect the component, whatever it is.
+    result.ImportInfo->collect</*asserting*/true>(component);
+  }
+
+  assert(stage != AfterName && "no components?");
+
+  // Record the full identity.
+  result.FullIdentity =
+    StringRef(startOfIdentity, endOfIdentity - startOfIdentity);
+
+  return result;
+}
+
 bool
 swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
                                          Demangle::NodePointer node) {
@@ -233,17 +338,39 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
       node = node->getChild(0);
       break;
     }
-    
+
+    case ContextDescriptorKind::Protocol:
+      // Match a protocol context.
+      if (node->getKind() == Demangle::Node::Kind::Protocol) {
+        auto proto = llvm::cast<ProtocolDescriptor>(context);
+        auto nameNode = node->getChild(1);
+        if (nameNode->getText() == proto->Name.get()) {
+          node = node->getChild(0);
+          break;
+        }
+      }
+      return false;
+
     default:
       if (auto type = llvm::dyn_cast<TypeContextDescriptor>(context)) {
+        Optional<ParsedTypeIdentity> _identity;
+        auto getIdentity = [&]() -> const ParsedTypeIdentity & {
+          if (_identity) return *_identity;
+          _identity = ParsedTypeIdentity::parse(type);
+          return *_identity;
+        };
+
         switch (node->getKind()) {
         // If the mangled name doesn't indicate a type kind, accept anything.
         // Otherwise, try to match them up.
         case Demangle::Node::Kind::OtherNominalType:
           break;
         case Demangle::Node::Kind::Structure:
-          if (type->getKind() != ContextDescriptorKind::Struct
-              && !type->getTypeContextDescriptorFlags().isCTag())
+          // We allow non-structs to match Kind::Structure if they are
+          // imported C tag types.  This is necessary because we artificially
+          // make imported C tag types Kind::Structure.
+          if (type->getKind() != ContextDescriptorKind::Struct &&
+              !_isCImportedTagType(type, getIdentity()))
             return false;
           break;
         case Demangle::Node::Kind::Class:
@@ -255,7 +382,7 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
             return false;
           break;
         case Demangle::Node::Kind::TypeAlias:
-          if (!type->getTypeContextDescriptorFlags().isCTypedef())
+          if (!getIdentity().isCTypedef())
             return false;
           break;
 
@@ -267,12 +394,12 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
         
         // Declarations synthesized by the Clang importer get a small tag
         // string in addition to their name.
-        if (nameNode->getKind() == Demangle::Node::Kind::RelatedEntityDeclName){
-          if (nameNode->getText() != type->getSynthesizedDeclRelatedEntityTag())
+        if (nameNode->getKind() == Demangle::Node::Kind::RelatedEntityDeclName){          
+          if (!getIdentity().isRelatedEntity(nameNode->getText()))
             return false;
           
           nameNode = nameNode->getChild(0);
-        } else if (type->isSynthesizedRelatedEntity()) {
+        } else if (getIdentity().isAnyRelatedEntity()) {
           return false;
         }
         
@@ -280,7 +407,7 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
         // names. The runtime metadata for private declarations would be
         // anonymized.
         if (nameNode->getKind() == Demangle::Node::Kind::Identifier) {
-          if (nameNode->getText() != type->Name.get())
+          if (nameNode->getText() != getIdentity().getABIName())
             return false;
           
           node = node->getChild(0);
@@ -290,7 +417,7 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
         return false;
 
       }
-      
+
       // We don't know about this kind of context, or it doesn't have a stable
       // name we can match to.
       return false;
@@ -445,16 +572,11 @@ void swift::swift_registerProtocols(const ProtocolRecord *begin,
 
 static const ProtocolDescriptor *
 _searchProtocolRecords(ProtocolMetadataPrivateState &C,
-                       const llvm::StringRef protocolName){
+                       const Demangle::NodePointer &node) {
   for (auto &section : C.SectionsToScan.snapshot()) {
     for (const auto &record : section) {
       if (auto protocol = record.Protocol.getPointer()) {
-        // Drop the "S$" prefix from the protocol record. It's not used in
-        // the type itself.
-        StringRef foundProtocolName = protocol->Name;
-        assert(foundProtocolName.startswith("$S"));
-        foundProtocolName = foundProtocolName.drop_front(2);
-        if (foundProtocolName == protocolName)
+        if (_contextDescriptorMatchesMangling(protocol, node))
           return protocol;
       }
     }
@@ -464,9 +586,27 @@ _searchProtocolRecords(ProtocolMetadataPrivateState &C,
 }
 
 static const ProtocolDescriptor *
-_findProtocolDescriptor(llvm::StringRef mangledName) {
+_findProtocolDescriptor(const Demangle::NodePointer &node,
+                        Demangle::Demangler &Dem,
+                        std::string &mangledName) {
   const ProtocolDescriptor *foundProtocol = nullptr;
   auto &T = Protocols.get();
+
+  // If we have a symbolic reference to a context, resolve it immediately.
+  NodePointer symbolicNode = node;
+  if (symbolicNode->getKind() == Node::Kind::Type)
+    symbolicNode = symbolicNode->getChild(0);
+  if (symbolicNode->getKind() == Node::Kind::SymbolicReference)
+    return cast<ProtocolDescriptor>(
+      (const ContextDescriptor *)symbolicNode->getIndex());
+
+  mangledName =
+    Demangle::mangleNode(node,
+                         [&](const void *context) -> NodePointer {
+                           return _buildDemanglingForContext(
+                               (const ContextDescriptor *) context,
+                               {}, false, Dem);
+                         });
 
   // Look for an existing entry.
   // Find the bucket for the metadata entry.
@@ -474,7 +614,7 @@ _findProtocolDescriptor(llvm::StringRef mangledName) {
     return Value->getDescription();
 
   // Check type metadata records
-  foundProtocol = _searchProtocolRecords(T, mangledName);
+  foundProtocol = _searchProtocolRecords(T, node);
 
   if (foundProtocol) {
     T.ProtocolCache.getOrInsert(mangledName, foundProtocol);
@@ -644,9 +784,6 @@ namespace {
 /// the given name in the given protocol descriptor.
 Optional<unsigned> findAssociatedTypeByName(const ProtocolDescriptor *protocol,
                                             StringRef name) {
-  // Only Swift protocols have associated types.
-  if (!protocol->Flags.isSwift()) return None;
-
   // If we don't have associated type names, there's nothing to do.
   const char *associatedTypeNamesPtr = protocol->AssociatedTypeNames.get();
   if (!associatedTypeNamesPtr) return None;
@@ -656,14 +793,16 @@ Optional<unsigned> findAssociatedTypeByName(const ProtocolDescriptor *protocol,
   unsigned matchingAssocTypeIdx = 0;
   bool found = false;
   while (!associatedTypeNames.empty()) {
-    auto split = associatedTypeNames.split(' ');
-    if (split.first == name) {
+    // Avoid using StringRef::split because its definition is not
+    // provided in the header so that it requires linking with libSupport.a.
+    auto splitIdx = associatedTypeNames.find(' ');
+    if (associatedTypeNames.substr(0, splitIdx) == name) {
       found = true;
       break;
     }
 
     ++matchingAssocTypeIdx;
-    associatedTypeNames = split.second;
+    associatedTypeNames = associatedTypeNames.substr(splitIdx).substr(1);
   }
 
   if (!found) return None;
@@ -672,7 +811,7 @@ Optional<unsigned> findAssociatedTypeByName(const ProtocolDescriptor *protocol,
   // type requirement.
   unsigned currentAssocTypeIdx = 0;
   unsigned numRequirements = protocol->NumRequirements;
-  const ProtocolRequirement *requirements = protocol->Requirements.get();
+  auto requirements = protocol->getRequirements();
   for (unsigned reqIdx = 0; reqIdx != numRequirements; ++reqIdx) {
     if (requirements[reqIdx].Flags.getKind() !=
         ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction)
@@ -734,7 +873,7 @@ public:
     explicit operator bool() const { return !isNull(); }
   };
 
-  using BuiltProtocolDecl = const ProtocolDescriptor *;
+  using BuiltProtocolDecl = ProtocolDescriptorRef;
 
   Demangle::NodeFactory &getNodeFactory() { return demangler; }
 
@@ -756,19 +895,18 @@ public:
   BuiltProtocolDecl createProtocolDecl(
                                     const Demangle::NodePointer &node) const {
 #if SWIFT_OBJC_INTEROP
-    // If we have an Objective-C class name, call into the Objective-C
+    // If we have an Objective-C protocol name, call into the Objective-C
     // runtime to find them.
     if (auto objcProtocolName = getObjCClassOrProtocolName(node)) {
-      return (ProtocolDescriptor *)objc_getProtocol(
-                                              objcProtocolName->str().c_str());
+      return ProtocolDescriptorRef::forObjC(objc_getProtocol(
+                                              objcProtocolName->str().c_str()));
     }
 #endif
 
-    auto mangledName = Demangle::mangleNode(node);
-
-    // Look for a Swift protocol with this mangled name.
-    if (auto protocol = _findProtocolDescriptor(mangledName))
-      return protocol;
+    // Look for a protocol descriptor based on its mangled name.
+    std::string mangledName;
+    if (auto protocol = _findProtocolDescriptor(node, demangler, mangledName))
+      return ProtocolDescriptorRef::forSwift(protocol);;
 
 #if SWIFT_OBJC_INTEROP
     // Look for a Swift-defined @objc protocol with the Swift 3 mangling that
@@ -776,10 +914,10 @@ public:
     std::string objcMangledName =
       "_TtP" + mangledName.substr(0, mangledName.size()-1) + "_";
     if (auto protocol = objc_getProtocol(objcMangledName.c_str()))
-      return (ProtocolDescriptor *)protocol;
+      return ProtocolDescriptorRef::forObjC(protocol);
 #endif
 
-    return nullptr;
+    return ProtocolDescriptorRef();
   }
 
   BuiltType createNominalType(BuiltNominalTypeDecl metadataOrTypeDecl,
@@ -942,8 +1080,7 @@ public:
       classConstraint = ProtocolClassConstraint::Class;
     } else {
       for (auto protocol : protocols) {
-        if (protocol->Flags.getClassConstraint()
-              == ProtocolClassConstraint::Class) {
+        if (protocol.getClassConstraint() == ProtocolClassConstraint::Class) {
           classConstraint = ProtocolClassConstraint::Class;
           break;
         }
@@ -1001,8 +1138,13 @@ public:
 
   BuiltType createDependentMemberType(StringRef name, BuiltType base,
                                       BuiltProtocolDecl protocol) const {
+#if SWIFT_OBJC_INTEROP
+    if (protocol.isObjC())
+      return BuiltType();
+#endif
+
     if (lookupDependentMember)
-      return lookupDependentMember(base, name, protocol);
+      return lookupDependentMember(base, name, protocol.getSwiftProtocol());
 
     return BuiltType();
   }

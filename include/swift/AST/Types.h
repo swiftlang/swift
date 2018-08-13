@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -54,6 +54,7 @@ namespace swift {
   class GenericParamList;
   class GenericSignature;
   class Identifier;
+  enum class ReferenceCounting : uint8_t;
   enum class ResilienceExpansion : unsigned;
   class SILModule;
   class SILType;
@@ -360,8 +361,9 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD_FULL(TupleType, TypeBase, 1+32,
-    /// Whether an element of the tuple is inout.
-    HasInOutElement : 1,
+    /// Whether an element of the tuple is inout, __shared or __owned.
+    /// Values cannot have such tuple types in the language.
+    HasElementWithOwnership : 1,
 
     : NumPadBits,
 
@@ -806,23 +808,6 @@ public:
   Type getSuperclassForDecl(const ClassDecl *classDecl,
                             bool useArchetypes = true);
 
-  /// \brief Whether this type or its superclasses has some form of generic
-  /// context.
-  ///
-  /// For example, given
-  ///
-  /// class A<X> {}
-  /// class B : A<Int> {}
-  /// struct C<T> {
-  ///   struct Inner {}
-  /// }
-  /// class D {}
-  /// class E: D {}
-  ///
-  /// Calling hasGenericAncestry() on `B` returns `A<Int>`, on `C<T>.Inner`
-  /// returns `C<T>.Inner`, but on `E` it returns null.
-  Type getGenericAncestor();
-
   /// \brief True if this type is the superclass of another type, or a generic
   /// type that could be bound to the superclass.
   ///
@@ -859,6 +844,10 @@ public:
   /// \brief Given that this type is a reference type, is it known to use
   /// Swift-native reference counting?
   bool usesNativeReferenceCounting(ResilienceExpansion resilience);
+
+  /// Given that this type is a reference type, which kind of reference
+  /// counting does it use?
+  ReferenceCounting getReferenceCounting(ResilienceExpansion resilience);
 
   /// Determines whether this type has a bridgeable object
   /// representation, i.e., whether it is always represented as a single
@@ -925,13 +914,6 @@ public:
   /// the result would be the (parenthesized) type ((int, int)).
   Type getUnlabeledType(ASTContext &Context);
 
-  /// Retrieve the type without any labels around it. For example, given
-  /// \code
-  /// (p : int)
-  /// \endcode
-  /// the result would be the (unparenthesized) type 'int'.
-  Type getWithoutImmediateLabel();
-
   /// Retrieve the type without any parentheses around it.
   Type getWithoutParens();
 
@@ -956,11 +938,6 @@ public:
   /// Otherwise, returns the type itself.
   Type getRValueType();
 
-  /// getRValueType - For an @lvalue type or tuple containing a single
-  /// non-variadic element, retrieves the underlying object type.
-  /// Otherwise, returns the type itself.
-  Type getRValueObjectType();
-
   /// getInOutObjectType - For an inout type, retrieves the underlying object
   /// type.  Otherwise, returns the type itself.
   Type getInOutObjectType();
@@ -970,8 +947,7 @@ public:
   /// Otherwise, returns the type itself.
   Type getWithoutSpecifierType();
 
-  /// Retrieves the rvalue instance type, looking through single-element
-  /// tuples, inout types, and metatypes.
+  /// getRValueInstanceType - Looks through inout types and metatypes.
   Type getRValueInstanceType();
 
   /// For a ReferenceStorageType like @unowned, this returns the referent.
@@ -1901,29 +1877,9 @@ public:
   /// return the element index, otherwise return -1.
   int getNamedElementId(Identifier I) const;
   
-  /// getElementForScalarInit - If a tuple of this type can be initialized with
-  /// a scalar, return the element number that the scalar is assigned to.  If
-  /// not, return -1.
-  int getElementForScalarInit() const;
-  
-  /// If this tuple has a varargs element to it, return the base type of the
-  /// varargs element (i.e., if it is "Int...", this returns Int, not [Int]).
-  /// Otherwise, this returns Type().
-  Type getVarArgsBaseType() const;
-  
-  /// Returns true if this tuple has inout elements.
-  bool hasInOutElement() const {
-    return static_cast<bool>(Bits.TupleType.HasInOutElement);
-  }
-  
-  /// Returns true if this tuple has parenthesis semantics.
-  bool hasParenSema(bool allowName = false) const {
-    auto Fields = getElements();
-    if (Fields.size() != 1 || Fields[0].isVararg())
-     return false;
-    if (allowName)
-      return true;
-    return !Fields[0].hasName();
+  /// Returns true if this tuple has inout, __shared or __owned elements.
+  bool hasElementWithOwnership() const {
+    return static_cast<bool>(Bits.TupleType.HasElementWithOwnership);
   }
 
   // Implement isa/cast/dyncast/etc.
@@ -1940,9 +1896,9 @@ public:
 private:
   TupleType(ArrayRef<TupleTypeElt> elements, const ASTContext *CanCtx,
             RecursiveTypeProperties properties,
-            bool hasInOut)
+            bool hasElementWithOwnership)
      : TypeBase(TypeKind::Tuple, CanCtx, properties) {
-     Bits.TupleType.HasInOutElement = hasInOut;
+     Bits.TupleType.HasElementWithOwnership = hasElementWithOwnership;
      Bits.TupleType.Count = elements.size();
      std::uninitialized_copy(elements.begin(), elements.end(),
                              getTrailingObjects<TupleTypeElt>());
@@ -2860,6 +2816,9 @@ public:
   /// \brief Given two arrays of parameters determine if they are equal.
   static bool equalParams(ArrayRef<AnyFunctionType::Param> a,
                           ArrayRef<AnyFunctionType::Param> b);
+
+  /// \brief Given two arrays of parameters determine if they are equal.
+  static bool equalParams(CanParamArrayRef a, CanParamArrayRef b);
 
   Type getInput() const { return Input; }
   Type getResult() const { return Output; }
@@ -5022,13 +4981,13 @@ inline bool TypeBase::isTypeParameter() {
 inline bool TypeBase::isMaterializable() {
   if (hasLValueType())
     return false;
-  
+
   if (is<InOutType>())
     return false;
-  
+
   if (auto *TTy = getAs<TupleType>())
-    return !TTy->hasInOutElement();
-  
+    return !TTy->hasElementWithOwnership();
+
   return true;
 }
 
@@ -5176,17 +5135,6 @@ inline Type TypeBase::getInOutObjectType() {
   if (auto iot = getAs<InOutType>())
     return iot->getObjectType();
   return this;
-}
-
-inline Type TypeBase::getRValueObjectType() {
-  Type type = this;
-
-  // Look through lvalue type.
-  if (auto lv = type->getAs<LValueType>())
-    type = lv->getObjectType();
-
-  // Look through argument list tuples.
-  return type->getWithoutImmediateLabel();
 }
 
 /// getWithoutSpecifierType - For a non-materializable type

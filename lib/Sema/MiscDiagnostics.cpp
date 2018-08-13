@@ -183,8 +183,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       InvalidPartialApplications.insert(
         {fnDeclRef, {errorBehavior,
-                     PartialApplication::MutatingMethod,
-                     fn->getNumParameterLists()}});
+                     PartialApplication::MutatingMethod, 2}});
     }
 
     // Not interested in going outside a basic expression.
@@ -1769,38 +1768,15 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
   auto &diags = ctx.Diags;
   auto tuple = dyn_cast<TupleExpr>(expr);
   if (!tuple) {
+    if (newNames[0].empty()) {
+      // We don't know what to do with this.
+      return false;
+    }
+
     llvm::SmallString<16> str;
     // If the diagnostic is local, flush it before returning.
     // This makes sure it's emitted before 'str' is destroyed.
     SWIFT_DEFER { diagOpt.reset(); };
-
-    if (newNames[0].empty()) {
-      // This is probably a conversion from a value of labeled tuple type to
-      // a scalar.
-      // FIXME: We want this issue to disappear completely when single-element
-      // labeled tuples go away.
-      if (auto tupleTy = expr->getType()->getRValueType()->getAs<TupleType>()) {
-        int scalarFieldIdx = tupleTy->getElementForScalarInit();
-        if (scalarFieldIdx >= 0) {
-          auto &field = tupleTy->getElement(scalarFieldIdx);
-          if (field.hasName()) {
-            str = ".";
-            str += field.getName().str();
-            if (!existingDiag) {
-              diagOpt.emplace(
-                          diags.diagnose(expr->getStartLoc(),
-                                         diag::extra_named_single_element_tuple,
-                                         field.getName().str()));
-            }
-            getDiag().fixItInsertAfter(expr->getEndLoc(), str);
-            return true;
-          }
-        }
-      }
-
-      // We don't know what to do with this.
-      return false;
-    }
 
     // This is a scalar-to-tuple conversion. Add the name. We "know"
     // that we're inside a ParenExpr, because ParenExprs are required
@@ -2225,10 +2201,10 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
   if (auto *fn = dyn_cast<AbstractFunctionDecl>(decl)) {
     auto *baseFn = cast<AbstractFunctionDecl>(base);
     bool fixedAny = false;
-    if (fn->getParameterLists().back()->size() ==
-        baseFn->getParameterLists().back()->size()) {
-      for_each(*fn->getParameterLists().back(),
-               *baseFn->getParameterLists().back(),
+    if (fn->getParameters()->size() ==
+        baseFn->getParameters()->size()) {
+      for_each(*fn->getParameters(),
+               *baseFn->getParameters(),
                [&](ParamDecl *param, const ParamDecl *baseParam) {
         fixedAny |= fixItOverrideDeclarationTypes(diag, param, baseParam);
       });
@@ -2320,7 +2296,7 @@ public:
     if (auto FD = dyn_cast<AccessorDecl>(AFD)) {
       if (FD->getAccessorKind() == AccessorKind::Set) {
         if (auto getter = dyn_cast<VarDecl>(FD->getStorage())) {
-          auto arguments = FD->getParameterLists().back();
+          auto arguments = FD->getParameters();
           VarDecls[arguments->get(0)] = 0;
           AssociatedGetter = getter;
         }
@@ -3407,10 +3383,7 @@ public:
 
       // If the best method was from a subclass of the place where
       // this method was declared, we have a new best.
-      while (auto superclassTy = bestClassDecl->getSuperclass()) {
-        auto superclassDecl = superclassTy->getClassOrBoundGenericClass();
-        if (!superclassDecl) break;
-
+      while (auto superclassDecl = bestClassDecl->getSuperclassDecl()) {
         if (classDecl == superclassDecl) {
           bestMethod = method;
           break;
@@ -3449,6 +3422,8 @@ public:
           case AccessorKind::MaterializeForSet:
           case AccessorKind::Address:
           case AccessorKind::MutableAddress:
+          case AccessorKind::Read:
+          case AccessorKind::Modify:
             llvm_unreachable("cannot be @objc");
           }
         } else {
@@ -4155,7 +4130,7 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
   SmallVector<OmissionTypeName, 4> paramTypes;
 
   // Always look at the parameters in the last parameter list.
-  for (auto param : *afd->getParameterLists().back()) {
+  for (auto param : *afd->getParameters()) {
     paramTypes.push_back(getTypeNameForOmission(param->getInterfaceType())
                          .withDefaultArgument(param->isDefaultArgument()));
   }
@@ -4176,7 +4151,7 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
 
   // Figure out the first parameter name.
   StringRef firstParamName;
-  auto params = afd->getParameterList(afd->getImplicitSelfDecl() ? 1 : 0);
+  auto params = afd->getParameters();
   if (params->size() != 0 && !params->get(0)->getName().empty())
     firstParamName = params->get(0)->getName().str();
 

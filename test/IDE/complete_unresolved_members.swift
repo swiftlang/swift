@@ -99,27 +99,27 @@ struct OptionsAvail1 : OptionSet {
   @available(*, deprecated) static let BBB = OptionsAvail1(rawValue: 1 << 1)
 }
 
-func OptionSetTaker1(Op : SomeOptions1) {}
+func OptionSetTaker1(_ Op : SomeOptions1) {}
 
-func OptionSetTaker2(Op : SomeOptions2) {}
+func OptionSetTaker2(_ Op : SomeOptions2) {}
 
-func OptionSetTaker3(Op1: SomeOptions1, Op2: SomeOptions2) {}
+func OptionSetTaker3(_ Op1: SomeOptions1, _ Op2: SomeOptions2) {}
 
-func OptionSetTaker4(Op1: SomeOptions2, Op2: SomeOptions1) {}
+func OptionSetTaker4(_ Op1: SomeOptions2, _ Op2: SomeOptions1) {}
 
-func OptionSetTaker5(Op1: SomeOptions1, Op2: SomeOptions2, En1 : SomeEnum1, En2: SomeEnum2) {}
+func OptionSetTaker5(_ Op1: SomeOptions1, _ Op2: SomeOptions2, _ En1 : SomeEnum1, _ En2: SomeEnum2) {}
 
-func OptionSetTaker6(Op1: SomeOptions1, Op2: SomeOptions2) {}
+func OptionSetTaker6(_ Op1: SomeOptions1, _ Op2: SomeOptions2) {}
 
-func OptionSetTaker6(Op1: SomeOptions2, Op2: SomeOptions1) {}
+func OptionSetTaker6(_ Op1: SomeOptions2, _ Op2: SomeOptions1) {}
 
-func OptionSetTaker7(Op1: SomeOptions1, Op2: SomeOptions2) -> Int {return 0}
+func OptionSetTaker7(_ Op1: SomeOptions1, _ Op2: SomeOptions2) -> Int {return 0}
 
-func EnumTaker1(E : SomeEnum1) {}
+func EnumTaker1(_ E : SomeEnum1) {}
 
 class OptionTakerContainer1 {
-  func OptionSetTaker1(op : SomeOptions1) {}
-  func EnumTaker1(E : SomeEnum1) {}
+  func OptionSetTaker1(_ op : SomeOptions1) {}
+  func EnumTaker1(_ E : SomeEnum1) {}
 }
 
 class C1 {
@@ -146,9 +146,9 @@ class C2 {
 // UNRESOLVED_1:  Begin completions
 // UNRESOLVED_1-NOT:  SomeEnum1
 // UNRESOLVED_1-NOT:  SomeEnum2
-// UNRESOLVED_1-DAG:  Decl[StaticVar]/CurrNominal: Option1[#SomeOptions1#]; name=Option1
-// UNRESOLVED_1-DAG:  Decl[StaticVar]/CurrNominal: Option2[#SomeOptions1#]; name=Option2
-// UNRESOLVED_1-DAG:  Decl[StaticVar]/CurrNominal: Option3[#SomeOptions1#]; name=Option3
+// UNRESOLVED_1-DAG:  Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: Option1[#SomeOptions1#]; name=Option1
+// UNRESOLVED_1-DAG:  Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: Option2[#SomeOptions1#]; name=Option2
+// UNRESOLVED_1-DAG:  Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: Option3[#SomeOptions1#]; name=Option3
 // UNRESOLVED_1-NOT:  Not
 }
 
@@ -162,9 +162,9 @@ class C3 {
 // UNRESOLVED_2:  Begin completions
 // UNRESOLVED_2-NOT:  SomeEnum1
 // UNRESOLVED_2-NOT:  SomeEnum2
-// UNRESOLVED_2-DAG:  Decl[StaticVar]/CurrNominal: Option4[#SomeOptions2#]; name=Option4
-// UNRESOLVED_2-DAG:  Decl[StaticVar]/CurrNominal: Option5[#SomeOptions2#]; name=Option5
-// UNRESOLVED_2-DAG:  Decl[StaticVar]/CurrNominal: Option6[#SomeOptions2#]; name=Option6
+// UNRESOLVED_2-DAG:  Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: Option4[#SomeOptions2#]; name=Option4
+// UNRESOLVED_2-DAG:  Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: Option5[#SomeOptions2#]; name=Option5
+// UNRESOLVED_2-DAG:  Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: Option6[#SomeOptions2#]; name=Option6
 // UNRESOLVED_2-NOT:  Not
 }
 
@@ -199,7 +199,6 @@ OptionSetTaker5(.Option1, .Option4, .#^UNRESOLVED_13^#, .West)
 OptionSetTaker5(.#^UNRESOLVED_14^#, .Option4, .South, .West)
 OptionSetTaker5([.#^UNRESOLVED_15^#], .Option4, .South, .West)
 
-// FIXME: Overload needs to be handled.
 OptionSetTaker6(.#^UNRESOLVED_16^#, .Option4)
 OptionSetTaker6(.Option4, .#^UNRESOLVED_17^#,)
 
@@ -207,18 +206,18 @@ var a = {() in
   OptionSetTaker5([.#^UNRESOLVED_18^#], .Option4, .South, .West)
 }
 var Container = OptionTakerContainer1()
-Container.OptionSetTaker1(.#^UNRESOLVED_19^#
+Container.OptionSetTaker1(.#^UNRESOLVED_19^#)
 Container.EnumTaker1(.#^UNRESOLVED_20^#
 
 func parserSync() {}
 
 // UNRESOLVED_4: Begin completions
-// UNRESOLVED_4-DAG: Decl[StaticVar]/CurrNominal:        Option1[#SomeOptions1#]; name=Option1
-// UNRESOLVED_4-DAG: Decl[StaticVar]/CurrNominal:        Option2[#SomeOptions1#]; name=Option2
-// UNRESOLVED_4-DAG: Decl[StaticVar]/CurrNominal:        Option3[#SomeOptions1#]; name=Option3
-// UNRESOLVED_4-DAG: Decl[StaticVar]/CurrNominal:        Option4[#SomeOptions2#]; name=Option4
-// UNRESOLVED_4-DAG: Decl[StaticVar]/CurrNominal:        Option5[#SomeOptions2#]; name=Option5
-// UNRESOLVED_4-DAG: Decl[StaticVar]/CurrNominal:        Option6[#SomeOptions2#]; name=Option6
+// UNRESOLVED_4-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: Option1[#SomeOptions1#]; name=Option1
+// UNRESOLVED_4-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: Option2[#SomeOptions1#]; name=Option2
+// UNRESOLVED_4-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: Option3[#SomeOptions1#]; name=Option3
+// UNRESOLVED_4-NOT: Option4
+// UNRESOLVED_4-NOT: Option5
+// UNRESOLVED_4-NOT: Option6
 
 var OpIns1 : SomeOptions1 = .#^UNRESOLVED_21^#
 
@@ -230,7 +229,7 @@ class C6 {
   func f1() -> SomeOptions1 {
     return .#^UNRESOLVED_23^#
   }
-  func f2(P : SomeEnum3) {
+  func f2(p : SomeEnum3) {
   switch p {
   case .Payload(.#^UNRESOLVED_24^#)
   }
@@ -244,7 +243,7 @@ class C6 {
 }
 class C7 {}
 extension C7 {
-  func extendedf1(e :SomeEnum1) {}
+  func extendedf1(_ e :SomeEnum1) {}
 }
 
 var cInst1 = C7()
@@ -266,7 +265,7 @@ let TopLevelVar2 = OptionSetTaker1([.#^UNRESOLVED_29^#])
 
 let TopLevelVar3 = OptionSetTaker7([.Option1], Op2: [.#^UNRESOLVED_30^#])
 
-func testAvail1(x: EnumAvail1) {
+func testAvail1(_ x: EnumAvail1) {
   testAvail1(.#^ENUM_AVAIL_1^#)
 }
 // ENUM_AVAIL_1: Begin completions, 2 items
@@ -276,14 +275,14 @@ func testAvail1(x: EnumAvail1) {
 // ENUM_AVAIL_1-NOT: AAA
 // ENUM_AVAIL_1: End completions
 
-func testAvail2(x: OptionsAvail1) {
+func testAvail2(_ x: OptionsAvail1) {
   testAvail2(.#^OPTIONS_AVAIL_1^#)
 }
 // OPTIONS_AVAIL_1: Begin completions, 3 items
 // ENUM_AVAIL_1-NOT: AAA
-// OPTIONS_AVAIL_1-DAG: Decl[StaticVar]/CurrNominal:        aaa[#OptionsAvail1#];
-// OPTIONS_AVAIL_1-DAG: Decl[StaticVar]/CurrNominal/NotRecommended: BBB[#OptionsAvail1#];
-// OPTIONS_AVAIL_1-DAG: Decl[Constructor]/CurrNominal:      init({#rawValue: Int#})[#OptionsAvail1#]
+// OPTIONS_AVAIL_1-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: aaa[#OptionsAvail1#];
+// OPTIONS_AVAIL_1-DAG: Decl[StaticVar]/CurrNominal/NotRecommended/TypeRelation[Identical]: BBB[#OptionsAvail1#];
+// OPTIONS_AVAIL_1-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init({#rawValue: Int#})[#OptionsAvail1#]
 // ENUM_AVAIL_1-NOT: AAA
 // OPTIONS_AVAIL_1: End completions
 
@@ -355,10 +354,10 @@ func testNonOptSet() {
   x = .#^NON_OPT_SET_1^#
 }
 // NON_OPT_SET_1: Begin completions, 4 items
-// NON_OPT_SET_1-DAG: Decl[StaticVar]/CurrNominal:        a[#NonOptSet#]
-// NON_OPT_SET_1-DAG: Decl[Constructor]/CurrNominal:      init({#x: Int#}, {#y: Int#})[#NonOptSet#]
-// NON_OPT_SET_1-DAG: Decl[Constructor]/CurrNominal:      init()[#NonOptSet#]
-// NON_OPT_SET_1-DAG: Decl[StaticMethod]/CurrNominal:     b()[#NonOptSet#]
+// NON_OPT_SET_1-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]:    a[#NonOptSet#]
+// NON_OPT_SET_1-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]:  init({#x: Int#}, {#y: Int#})[#NonOptSet#]
+// NON_OPT_SET_1-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]:  init()[#NonOptSet#]
+// NON_OPT_SET_1-DAG: Decl[StaticMethod]/CurrNominal/TypeRelation[Identical]: b()[#NonOptSet#]
 // NON_OPT_SET_1: End completions
 
 func testNonOptSet() {

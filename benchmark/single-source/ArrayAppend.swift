@@ -202,7 +202,7 @@ public func run_ArrayAppendRepeatCol(_ N: Int) {
 @inline(never)
 public func appendFromGeneric<
   S: Sequence
->(array: inout [S.Iterator.Element], sequence: S) {
+>(array: inout [S.Element], sequence: S) {
   array.append(contentsOf: sequence)
 }
 
@@ -224,7 +224,7 @@ public func run_ArrayAppendFromGeneric(_ N: Int) {
 @inline(never)
 public func appendToGeneric<
   R: RangeReplaceableCollection
->(collection: inout R, array: [R.Iterator.Element]) {
+>(collection: inout R, array: [R.Element]) {
   collection.append(contentsOf: array)
 }
 
@@ -248,7 +248,7 @@ public func run_ArrayAppendToGeneric(_ N: Int) {
 public func appendToFromGeneric<
   R: RangeReplaceableCollection, S: Sequence
 >(collection: inout R, sequence: S) 
-where R.Iterator.Element == S.Iterator.Element {
+where R.Element == S.Element {
   collection.append(contentsOf: sequence)
 }
 

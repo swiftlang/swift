@@ -62,9 +62,7 @@ static bool isUnitTest(const ValueDecl *D) {
     return false;
 
   // 4. ...takes no parameters...
-  if (FD->getParameterLists().size() != 2)
-    return false;
-  if (FD->getParameterList(1)->size() != 0)
+  if (FD->getParameters()->size() != 0)
     return false;
 
   // 5. ...is of at least 'internal' access (unless we can use
@@ -151,9 +149,7 @@ SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
     case DeclKind::Extension: {
       info.Kind = SymbolKind::Extension;
       auto *ED = cast<ExtensionDecl>(D);
-      if (!ED->getExtendedType())
-        break;
-      NominalTypeDecl *NTD = ED->getExtendedType()->getAnyNominal();
+      NominalTypeDecl *NTD = ED->getExtendedNominal();
       if (!NTD)
         break;
       if (isa<StructDecl>(NTD))
@@ -236,6 +232,8 @@ SymbolSubKind index::getSubKindForAccessor(AccessorKind AK) {
   case AccessorKind::Address: return SymbolSubKind::SwiftAccessorAddressor;
   case AccessorKind::MutableAddress:
     return SymbolSubKind::SwiftAccessorMutableAddressor;
+  case AccessorKind::Read:      return SymbolSubKind::SwiftAccessorRead;
+  case AccessorKind::Modify:    return SymbolSubKind::SwiftAccessorModify;
   case AccessorKind::MaterializeForSet:
     llvm_unreachable("unexpected MaterializeForSet");
   }

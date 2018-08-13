@@ -11,11 +11,13 @@ add_swift_library(swiftSwiftSyntax SHARED
   PrintingDiagnosticConsumer.swift
   RawSyntax.swift
   SourcePresence.swift
+  SourceLength.swift
   SwiftcInvocation.swift
   Syntax.swift
   SyntaxData.swift
   SyntaxChildren.swift
   SyntaxCollections.swift.gyb
+  SyntaxClassifier.swift.gyb
   SyntaxBuilders.swift.gyb
   SyntaxFactory.swift.gyb
   SyntaxKind.swift.gyb

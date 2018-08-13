@@ -382,13 +382,14 @@ static bool checkObjCInExtensionContext(const ValueDecl *value,
     // parameters.
     // FIXME: This is a current limitation, not inherent. We don't have
     // a concrete class to attach Objective-C category metadata to.
-    if (auto generic = ED->getDeclaredInterfaceType()
-                           ->getGenericAncestor()) {
-      if (!generic->getClassOrBoundGenericClass()->hasClangNode()) {
-        if (diagnose) {
-          value->diagnose(diag::objc_in_generic_extension);
+    if (auto classDecl = ED->getAsClassOrClassExtensionContext()) {
+      if (auto generic = classDecl->getGenericAncestor()) {
+        if (!generic->usesObjCGenericsModel()) {
+          if (diagnose) {
+            value->diagnose(diag::objc_in_generic_extension);
+          }
+          return true;
         }
-        return true;
       }
     }
   }
@@ -487,6 +488,14 @@ bool swift::isRepresentableInObjC(
         describeObjCReason(accessor, Reason);
       }
       return false;
+
+    case AccessorKind::Read:
+    case AccessorKind::Modify:
+      if (Diagnose) {
+        accessor->diagnose(diag::objc_coroutine_accessor);
+        describeObjCReason(accessor, Reason);
+      }
+      return false;
     }
     llvm_unreachable("bad kind");
   }
@@ -507,7 +516,7 @@ bool swift::isRepresentableInObjC(
 
   if (!isSpecialInit &&
       !isParamListRepresentableInObjC(AFD,
-                                      AFD->getParameterLists().back(),
+                                      AFD->getParameters(),
                                       Reason)) {
     return false;
   }
@@ -661,7 +670,7 @@ bool swift::isRepresentableInObjC(
     // If the selector did not provide an index for the error, find
     // the last parameter that is not a trailing closure.
     if (!foundErrorParameterIndex) {
-      auto *paramList = AFD->getParameterLists().back();
+      auto *paramList = AFD->getParameters();
       errorParameterIndex = paramList->size();
 
       // Note: the errorParameterIndex is actually a SIL function
@@ -806,8 +815,14 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
   }
 
   // Figure out the type of the indices.
-  Type IndicesType = SD->getIndicesInterfaceType()->getWithoutImmediateLabel();
+  auto SubscriptType = SD->getInterfaceType()->getAs<AnyFunctionType>();
+  if (!SubscriptType)
+    return false;
 
+  if (SubscriptType->getParams().size() != 1)
+    return false;
+
+  Type IndicesType = SubscriptType->getParams()[0].getType();
   if (IndicesType->hasError())
     return false;
 
@@ -822,15 +837,6 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
 
   if (Result && checkObjCInExtensionContext(SD, Diagnose))
     return false;
-
-  // Make sure we know how to map the selector appropriately.
-  if (Result && SD->getObjCSubscriptKind() == ObjCSubscriptKind::None) {
-    SourceRange IndexRange = SD->getIndices()->getSourceRange();
-    SD->diagnose(diag::objc_invalid_subscript_key_type,
-                 getObjCDiagnosticAttrKind(Reason), IndicesType)
-      .highlight(IndexRange);
-    return false;
-  }
 
   if (!Diagnose || Result)
     return Result;
@@ -889,8 +895,7 @@ static Type getObjectiveCNominalType(Type &cache,
 
   SmallVector<ValueDecl *, 4> decls;
   NLOptions options = NL_QualifiedDefault | NL_OnlyTypes;
-  dc->lookupQualified(ModuleType::get(module), TypeName, options, nullptr,
-                      decls);
+  dc->lookupQualified(module, TypeName, options, decls);
   for (auto decl : decls) {
     if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
       cache = nominal->getDeclaredType();

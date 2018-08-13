@@ -381,8 +381,9 @@ static bool tryToUnrollLoop(SILLoop *Loop) {
     if (!isa<CondBranchInst>(Exit->getTerminator()))
       return false;
 
-  DEBUG(llvm::dbgs() << "Unrolling loop in " << Header->getParent()->getName()
-                     << " " << *Loop << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "Unrolling loop in "
+                          << Header->getParent()->getName()
+                          << " " << *Loop << "\n");
 
   SmallVector<SILBasicBlock *, 16> Headers;
   Headers.push_back(Header);

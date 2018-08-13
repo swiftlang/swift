@@ -1087,14 +1087,15 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
     // Otherwise, we produce a generic error.
     FuncDecl *FD = nullptr;
     bool isAssignment = false;
-    
-    if (auto *Apply = dyn_cast<ApplyInst>(Use.Inst)) {
+
+    auto Apply = FullApplySite::isa(Use.Inst);
+    if (Apply) {
       // If this is a method application, produce a nice, specific, error.
-      if (auto *WMI = dyn_cast<MethodInst>(Apply->getOperand(0)))
+      if (auto *WMI = dyn_cast<MethodInst>(Apply.getCallee()))
         FD = dyn_cast<FuncDecl>(WMI->getMember().getDecl());
       
       // If this is a direct/devirt method application, check the location info.
-      if (auto *Fn = Apply->getReferencedFunction()) {
+      if (auto *Fn = Apply.getReferencedFunction()) {
         if (Fn->hasLocation()) {
           auto SILLoc = Fn->getLocation();
           FD = SILLoc.getAsASTNode<FuncDecl>();
@@ -1104,9 +1105,9 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
       // If we failed to find the decl a clean and principled way, try hacks:
       // map back to the AST and look for some common patterns.
       if (!FD) {
-        if (Apply->getLoc().getAsASTNode<AssignExpr>())
+        if (Apply.getLoc().getAsASTNode<AssignExpr>())
           isAssignment = true;
-        else if (auto *CE = Apply->getLoc().getAsASTNode<ApplyExpr>()) {
+        else if (auto *CE = Apply.getLoc().getAsASTNode<ApplyExpr>()) {
           if (auto *DSCE = dyn_cast<SelfApplyExpr>(CE->getFn()))
             // Normal method calls are curried, so they are:
             // (call_expr (dot_syntax_call_expr (decl_ref_expr METHOD)))
@@ -2520,8 +2521,8 @@ void LifetimeChecker::
 putIntoWorkList(SILBasicBlock *BB, WorkListType &WorkList) {
   LiveOutBlockState &State = getBlockInfo(BB);
   if (!State.isInWorkList && State.containsUndefinedValues()) {
-    DEBUG(llvm::dbgs() << "    add block " << BB->getDebugID()
-          << " to worklist\n");
+    LLVM_DEBUG(llvm::dbgs() << "    add block " << BB->getDebugID()
+                            << " to worklist\n");
     WorkList.push_back(BB);
     State.isInWorkList = true;
   }
@@ -2529,7 +2530,8 @@ putIntoWorkList(SILBasicBlock *BB, WorkListType &WorkList) {
 
 void LifetimeChecker::
 computePredsLiveOut(SILBasicBlock *BB) {
-  DEBUG(llvm::dbgs() << "  Get liveness for block " << BB->getDebugID() << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "  Get liveness for block " << BB->getDebugID()
+                          << "\n");
   
   // Collect blocks for which we have to calculate the out-availability.
   // These are the paths from blocks with known out-availability to the BB.
@@ -2554,7 +2556,7 @@ computePredsLiveOut(SILBasicBlock *BB) {
   do {
     assert(iteration < upperIterationLimit &&
            "Infinite loop in dataflow analysis?");
-    DEBUG(llvm::dbgs() << "    Iteration " << iteration++ << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "    Iteration " << iteration++ << "\n");
     
     changed = false;
     // We collected the blocks in reverse order. Since it is a forward dataflow-
@@ -2567,8 +2569,9 @@ computePredsLiveOut(SILBasicBlock *BB) {
       for (auto Pred : WorkBB->getPredecessorBlocks()) {
         changed |= BBState.mergeFromPred(getBlockInfo(Pred));
       }
-      DEBUG(llvm::dbgs() << "      Block " << WorkBB->getDebugID() << " out: "
-            << BBState.OutAvailability << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "      Block " << WorkBB->getDebugID()
+                              << " out: "
+                              << BBState.OutAvailability << "\n");
 
       // Clear the worklist-flag for the next call to computePredsLiveOut().
       // This could be moved out of the outer loop, but doing it here avoids
@@ -2586,7 +2589,7 @@ getOutAvailability(SILBasicBlock *BB, AvailabilitySet &Result) {
     auto &BBInfo = getBlockInfo(Pred);
     Result.mergeIn(BBInfo.OutAvailability);
   }
-  DEBUG(llvm::dbgs() << "    Result: " << Result << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "    Result: " << Result << "\n");
 }
 
 void LifetimeChecker::
@@ -2640,8 +2643,8 @@ LifetimeChecker::getLivenessAtNonTupleInst(swift::SILInstruction *Inst,
 AvailabilitySet LifetimeChecker::getLivenessAtInst(SILInstruction *Inst,
                                                    unsigned FirstElt,
                                                    unsigned NumElts) {
-  DEBUG(llvm::dbgs() << "Get liveness " << FirstElt << ", #" << NumElts
-                     << " at " << *Inst);
+  LLVM_DEBUG(llvm::dbgs() << "Get liveness " << FirstElt << ", #" << NumElts
+                          << " at " << *Inst);
 
   AvailabilitySet Result(TheMemory.NumElements);
 
@@ -2750,7 +2753,7 @@ int LifetimeChecker::getAnyUninitializedMemberAtInst(SILInstruction *Inst,
 /// result is 'Partial'.
 DIKind LifetimeChecker::
 getSelfInitializedAtInst(SILInstruction *Inst) {
-  DEBUG(llvm::dbgs() << "Get self initialized at " << *Inst);
+  LLVM_DEBUG(llvm::dbgs() << "Get self initialized at " << *Inst);
 
   SILBasicBlock *InstBB = Inst->getParent();
   auto &BlockInfo = getBlockInfo(InstBB);
@@ -2826,7 +2829,7 @@ bool LifetimeChecker::isInitializedAtUse(const DIMemoryUse &Use,
 //===----------------------------------------------------------------------===//
 
 static bool processMemoryObject(MarkUninitializedInst *I) {
-  DEBUG(llvm::dbgs() << "*** Definite Init looking at: " << *I << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "*** Definite Init looking at: " << *I << "\n");
   DIMemoryObjectInfo MemInfo(I);
 
   // Set up the datastructure used to collect the uses of the allocation.
@@ -2844,8 +2847,8 @@ static bool processMemoryObject(MarkUninitializedInst *I) {
 /// properly set and transform the code as required for flow-sensitive
 /// properties.
 static bool checkDefiniteInitialization(SILFunction &Fn) {
-  DEBUG(llvm::dbgs() << "*** Definite Init visiting function: "
-                     <<  Fn.getName() << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "*** Definite Init visiting function: "
+                          <<  Fn.getName() << "\n");
   bool Changed = false;
 
   for (auto &BB : Fn) {

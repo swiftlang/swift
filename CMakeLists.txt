@@ -937,7 +937,11 @@ add_subdirectory(stdlib)
 if(SWIFT_INCLUDE_TOOLS)
   add_subdirectory(include)
   add_subdirectory(lib)
-  
+endif()
+
+include(SwiftExternal)
+
+if(SWIFT_INCLUDE_TOOLS)
   # Always include this after including stdlib/!
   # Refer to the large comment above the add_subdirectory(stdlib) call.
   # https://bugs.swift.org/browse/SR-5975

@@ -65,7 +65,7 @@ private:
 };
 
 void ReleaseDevirtualizer::run() {
-  DEBUG(llvm::dbgs() << "** ReleaseDevirtualizer **\n");
+  LLVM_DEBUG(llvm::dbgs() << "** ReleaseDevirtualizer **\n");
 
   SILFunction *F = getFunction();
   RCIA = PM->getAnalysis<RCIdentityAnalysis>()->get(F);
@@ -103,7 +103,7 @@ bool ReleaseDevirtualizer::
 devirtualizeReleaseOfObject(SILInstruction *ReleaseInst,
                             DeallocRefInst *DeallocInst) {
 
-  DEBUG(llvm::dbgs() << "  try to devirtualize " << *ReleaseInst);
+  LLVM_DEBUG(llvm::dbgs() << "  try to devirtualize " << *ReleaseInst);
 
   // We only do the optimization for stack promoted object, because for these
   // we know that they don't have associated objects, which are _not_ released
@@ -130,7 +130,7 @@ devirtualizeReleaseOfObject(SILInstruction *ReleaseInst,
 bool ReleaseDevirtualizer::createDeallocCall(SILType AllocType,
                                             SILInstruction *ReleaseInst,
                                             SILValue object) {
-  DEBUG(llvm::dbgs() << "  create dealloc call\n");
+  LLVM_DEBUG(llvm::dbgs() << "  create dealloc call\n");
 
   ClassDecl *Cl = AllocType.getClassOrBoundGenericClass();
   assert(Cl && "no class type allocated with alloc_ref");

@@ -242,7 +242,7 @@ HeapLayout::HeapLayout(IRGenModule &IGM, LayoutStrategy strategy,
                        ArrayRef<const TypeInfo *> fieldTypeInfos,
                        llvm::StructType *typeToFill,
                        NecessaryBindings &&bindings)
-  : StructLayout(IGM, CanType(), LayoutKind::HeapObject, strategy,
+  : StructLayout(IGM, /*decl=*/nullptr, LayoutKind::HeapObject, strategy,
                  fieldTypeInfos, typeToFill),
     ElementTypes(fieldTypes.begin(), fieldTypes.end()),
     Bindings(std::move(bindings))
@@ -277,7 +277,7 @@ static llvm::Value *calcInitOffset(swift::irgen::IRGenFunction &IGF,
   auto prevType = layout.getElementTypes()[i - 1];
   // Start calculating offsets from the last fixed-offset field.
   Size lastFixedOffset = layout.getElement(i - 1).getByteOffset();
-  if (auto *fixedType = dyn_cast<FixedTypeInfo>(&prevElt.getTypeForLayout())) {
+  if (auto *fixedType = dyn_cast<FixedTypeInfo>(&prevElt.getType())) {
     // If the last fixed-offset field is also fixed-size, we can
     // statically compute the end of the fixed-offset fields.
     auto fixedEnd = lastFixedOffset + fixedType->getFixedSize();
@@ -287,7 +287,7 @@ static llvm::Value *calcInitOffset(swift::irgen::IRGenFunction &IGF,
     // offset.
     offset = llvm::ConstantInt::get(IGF.IGM.SizeTy, lastFixedOffset.getValue());
     offset = IGF.Builder.CreateAdd(
-        offset, prevElt.getTypeForLayout().getSize(IGF, prevType));
+        offset, prevElt.getType().getSize(IGF, prevType));
   }
   return offset;
 }
@@ -307,7 +307,7 @@ HeapNonFixedOffsets::HeapNonFixedOffsets(IRGenFunction &IGF,
       case ElementLayout::Kind::InitialNonFixedSize:
         // Factor the non-fixed-size field's alignment into the total alignment.
         totalAlign = IGF.Builder.CreateOr(totalAlign,
-                                    elt.getTypeForLayout().getAlignmentMask(IGF, eltTy));
+                                    elt.getType().getAlignmentMask(IGF, eltTy));
         LLVM_FALLTHROUGH;
       case ElementLayout::Kind::Empty:
       case ElementLayout::Kind::Fixed:
@@ -323,7 +323,7 @@ HeapNonFixedOffsets::HeapNonFixedOffsets(IRGenFunction &IGF,
         }
         
         // Round up to alignment to get the offset.
-        auto alignMask = elt.getTypeForLayout().getAlignmentMask(IGF, eltTy);
+        auto alignMask = elt.getType().getAlignmentMask(IGF, eltTy);
         auto notAlignMask = IGF.Builder.CreateNot(alignMask);
         offset = IGF.Builder.CreateAdd(offset, alignMask);
         offset = IGF.Builder.CreateAnd(offset, notAlignMask);
@@ -332,7 +332,7 @@ HeapNonFixedOffsets::HeapNonFixedOffsets(IRGenFunction &IGF,
         
         // Advance by the field's size to start the next field.
         offset = IGF.Builder.CreateAdd(offset,
-                                       elt.getTypeForLayout().getSize(IGF, eltTy));
+                                       elt.getType().getSize(IGF, eltTy));
         totalAlign = IGF.Builder.CreateOr(totalAlign, alignMask);
 
         break;
@@ -422,7 +422,7 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
     if (field.isPOD())
       continue;
 
-    field.getTypeForAccess().destroy(
+    field.getType().destroy(
         IGF, field.project(IGF, structAddr, offsets), fieldTy,
         true /*Called from metadata constructors: must be outlined*/);
   }
@@ -1920,7 +1920,7 @@ llvm::Value *irgen::emitDynamicTypeOfHeapObject(IRGenFunction &IGF,
 
 static ClassDecl *getRootClass(ClassDecl *theClass) {
   while (theClass->hasSuperclass()) {
-    theClass = theClass->getSuperclass()->getClassOrBoundGenericClass();
+    theClass = theClass->getSuperclassDecl();
     assert(theClass && "base type of class not a class?");
   }
   return theClass;

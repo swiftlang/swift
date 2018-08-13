@@ -26,7 +26,7 @@ public let PrefixWhile = [
   BenchmarkInfo(
     name: "PrefixWhileCountableRange",
     runFunction: run_PrefixWhileCountableRange,
-    tags: [.validation, .api]),
+    tags: [.validation, .api, .unstable]),
   BenchmarkInfo(
     name: "PrefixWhileSequence",
     runFunction: run_PrefixWhileSequence,
@@ -38,7 +38,7 @@ public let PrefixWhile = [
   BenchmarkInfo(
     name: "PrefixWhileAnySeqCntRange",
     runFunction: run_PrefixWhileAnySeqCntRange,
-    tags: [.validation, .api]),
+    tags: [.validation, .api, .unstable]),
   BenchmarkInfo(
     name: "PrefixWhileAnySeqCRangeIter",
     runFunction: run_PrefixWhileAnySeqCRangeIter,
@@ -54,7 +54,7 @@ public let PrefixWhile = [
   BenchmarkInfo(
     name: "PrefixWhileCountableRangeLazy",
     runFunction: run_PrefixWhileCountableRangeLazy,
-    tags: [.validation, .api]),
+    tags: [.validation, .api, .unstable]),
   BenchmarkInfo(
     name: "PrefixWhileSequenceLazy",
     runFunction: run_PrefixWhileSequenceLazy,
@@ -66,7 +66,7 @@ public let PrefixWhile = [
   BenchmarkInfo(
     name: "PrefixWhileAnySeqCntRangeLazy",
     runFunction: run_PrefixWhileAnySeqCntRangeLazy,
-    tags: [.validation, .api]),
+    tags: [.validation, .api, .unstable]),
   BenchmarkInfo(
     name: "PrefixWhileAnySeqCRangeIterLazy",
     runFunction: run_PrefixWhileAnySeqCRangeIterLazy,

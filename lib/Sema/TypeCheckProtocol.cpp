@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -234,6 +234,8 @@ static bool checkMutating(FuncDecl *requirement, FuncDecl *witness,
         return false;
       case ReadImplKind::Address:
         return storage->getAddressor()->isMutating();
+      case ReadImplKind::Read:
+        return storage->getReadCoroutine()->isMutating();
       case ReadImplKind::Inherited:
       case ReadImplKind::Get:
         llvm_unreachable("should have a getter");
@@ -252,6 +254,8 @@ static bool checkMutating(FuncDecl *requirement, FuncDecl *witness,
         return isStoredSetterMutating();
       case WriteImplKind::MutableAddress:
         return storage->getMutableAddressor()->isMutating();
+      case WriteImplKind::Modify:
+        return storage->getModifyCoroutine()->isMutating();
       case WriteImplKind::Immutable:
         llvm_unreachable("asking for setter for immutable storage");
       case WriteImplKind::Set:
@@ -267,6 +271,8 @@ static bool checkMutating(FuncDecl *requirement, FuncDecl *witness,
         return isStoredSetterMutating();
       case ReadWriteImplKind::MutableAddress:
         return storage->getMutableAddressor()->isMutating();
+      case ReadWriteImplKind::Modify:
+        return storage->getModifyCoroutine()->isMutating();
       case ReadWriteImplKind::MaterializeToTemporary:
         return isReadMutating() || isWriteMutating();
       case ReadWriteImplKind::Immutable:
@@ -289,7 +295,10 @@ static bool checkMutating(FuncDecl *requirement, FuncDecl *witness,
       witnessMutating = isReadWriteMutating();
       break;
 
-    default:
+#define OPAQUE_ACCESSOR(ID, KEYWORD)
+#define ACCESSOR(ID) \
+    case AccessorKind::ID:
+#include "swift/AST/AccessorKinds.def"
       llvm_unreachable("unexpected accessor requirement");
     }
   }
@@ -346,7 +355,7 @@ static bool checkObjCWitnessSelector(TypeChecker &tc, ValueDecl *req,
 
 static ParameterList *getParameterList(ValueDecl *value) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(value))
-    return func->getParameterList(func->getDeclContext()->isTypeContext());
+    return func->getParameters();
 
   auto subscript = cast<SubscriptDecl>(value);
   return subscript->getIndices();
@@ -374,6 +383,8 @@ static ValueDecl *getStandinForAccessor(AbstractStorageDecl *witnessStorage,
   case AccessorKind::Get:
     if (auto addressor = getExplicitAccessor(AccessorKind::Address))
       return addressor;
+    if (auto read = getExplicitAccessor(AccessorKind::Read))
+      return read;
     break;
 
   case AccessorKind::MaterializeForSet:
@@ -384,10 +395,15 @@ static ValueDecl *getStandinForAccessor(AbstractStorageDecl *witnessStorage,
   case AccessorKind::Set:
     if (auto addressor = getExplicitAccessor(AccessorKind::MutableAddress))
       return addressor;
+    if (auto modify = getExplicitAccessor(AccessorKind::Modify))
+      return modify;
     break;
 
-  default:
-    break;
+#define OPAQUE_ACCESSOR(ID, KEYWORD)
+#define ACCESSOR(ID) \
+  case AccessorKind::ID:
+#include "swift/AST/AccessorKinds.def"
+    llvm_unreachable("unexpected accessor requirement");
   }
 
   // Otherwise, just diagnose starting at the storage declaration itself.
@@ -1519,24 +1535,25 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
     // @objc protocols in extensions of Swift generic classes, because there's
     // no stable Objective-C class object to install the protocol conformance
     // category onto.
-    if (isa<ExtensionDecl>(DC)) {
-      if (auto genericT = T->getGenericAncestor()) {
-        if (!cast<ClassDecl>(genericT->getAnyNominal())
-               ->usesObjCGenericsModel()) {
-          auto isSubclass = !genericT->isEqual(T);
-          auto genericTIsGeneric = (bool)genericT->getAnyGeneric()
-                                                 ->getGenericParams();
-          TC.diagnose(ComplainLoc, diag::objc_protocol_in_generic_extension, T,
-                      ProtoType, isSubclass, genericTIsGeneric);
-          conformance->setInvalid();
-          return conformance;
+    if (auto ext = dyn_cast<ExtensionDecl>(DC)) {
+      if (auto classDecl = ext->getAsClassOrClassExtensionContext()) {
+        if (auto genericClassDecl = classDecl->getGenericAncestor()) {
+          if (!genericClassDecl->usesObjCGenericsModel()) {
+            auto isSubclass = genericClassDecl != classDecl;
+            auto genericTIsGeneric = (bool)genericClassDecl->getGenericParams();
+            TC.diagnose(ComplainLoc, diag::objc_protocol_in_generic_extension,
+                        T, ProtoType, isSubclass, genericTIsGeneric);
+            conformance->setInvalid();
+            return conformance;
+          }
         }
       }
     }
   }
 
   // Not every protocol/type is compatible with conditional conformances.
-  if (!conformance->getConditionalRequirements().empty()) {
+  auto conditionalReqs = conformance->getConditionalRequirementsIfAvailable();
+  if (conditionalReqs && !conditionalReqs->empty()) {
     auto nestedType = canT;
     // Obj-C generics cannot be looked up at runtime, so we don't support
     // conditional conformances involving them. Check the full stack of nested
@@ -1595,7 +1612,10 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
     while (implyingConf->getSourceKind() == ConformanceEntryKind::Implied) {
       implyingConf = implyingConf->getImplyingConformance();
     }
-    if (!implyingConf->getConditionalRequirements().empty()) {
+
+    auto implyingCondReqs =
+      implyingConf->getConditionalRequirementsIfAvailable();
+    if (implyingCondReqs && !implyingCondReqs->empty()) {
       // We shouldn't suggest including witnesses for the conformance, because
       // those suggestions will go in the current DeclContext, but really they
       // should go into the new extension we (might) suggest here.
@@ -1760,10 +1780,7 @@ SourceLoc OptionalAdjustment::getOptionalityLoc(ValueDecl *witness) const {
   // For parameter adjustments, dig out the pattern.
   ParameterList *params = nullptr;
   if (auto func = dyn_cast<AbstractFunctionDecl>(witness)) {
-    auto bodyParamLists = func->getParameterLists();
-    if (func->getDeclContext()->isTypeContext())
-      bodyParamLists = bodyParamLists.slice(1);
-    params = bodyParamLists[0];
+    params = func->getParameters();
   } else if (auto subscript = dyn_cast<SubscriptDecl>(witness)) {
     params = subscript->getIndices();
   } else {
@@ -2155,8 +2172,7 @@ bool ConformanceChecker::checkObjCTypeErasedGenerics(
 
 void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                            Type type,
-                                           TypeDecl *typeDecl,
-                                           bool performRedeclarationCheck) {
+                                           TypeDecl *typeDecl) {
 
   // If we already recoded this type witness, there's nothing to do.
   if (Conformance->hasTypeWitness(assocType)) {
@@ -2207,26 +2223,6 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     }
   } else {
     // If there was no type declaration, synthesize one.
-
-    // If we're just setting an error, double-check that nobody has
-    // introduced a type declaration since we deduced one. This can
-    // happen when type-checking a different conformance deduces a
-    // different type witness with the same name. For non-error cases,
-    // the caller handles this.
-    if (performRedeclarationCheck && type->hasError()) {
-      switch (resolveTypeWitnessViaLookup(assocType)) {
-      case ResolveWitnessResult::Success:
-      case ResolveWitnessResult::ExplicitFailed:
-        // A type witness has shown up, and will have been
-        // recorded. There is nothing more to do.
-        return;
-
-      case ResolveWitnessResult::Missing:
-        // The type witness is still missing: create a new one.
-        break;
-      }
-    }
-
     auto aliasDecl = new (TC.Context) TypeAliasDecl(SourceLoc(),
                                                     SourceLoc(),
                                                     assocType->getName(),
@@ -2291,8 +2287,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     auto overriddenRootConformance =
       overriddenConformance->getConcrete()->getRootNormalConformance();
     ConformanceChecker(TC, overriddenRootConformance, GlobalMissingWitnesses)
-      .recordTypeWitness(overridden, type, typeDecl,
-                         /*performRedeclarationCheck=*/true);
+      .recordTypeWitness(overridden, type, typeDecl);
   }
 }
 
@@ -3194,12 +3189,12 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
     auto interfaceType = viable.front().MemberType;
     if (interfaceType->hasArchetype())
       interfaceType = interfaceType->mapTypeOutOfContext();
-    recordTypeWitness(assocType, interfaceType, viable.front().Member, true);
+    recordTypeWitness(assocType, interfaceType, viable.front().Member);
     return ResolveWitnessResult::Success;
   }
 
   // Record an error.
-  recordTypeWitness(assocType, ErrorType::get(TC.Context), nullptr, false);
+  recordTypeWitness(assocType, ErrorType::get(TC.Context), nullptr);
 
   // If we had multiple viable types, diagnose the ambiguity.
   if (!viable.empty()) {
@@ -3682,26 +3677,29 @@ static void diagnoseConformanceFailure(TypeChecker &TC, Type T,
   if (T->hasError())
     return;
 
+  ASTContext &ctx = DC->getASTContext();
+  auto &diags = ctx.Diags;
+
   // If we're checking conformance of an existential type to a protocol,
   // do a little bit of extra work to produce a better diagnostic.
   if (T->isExistentialType() &&
       TC.containsProtocol(T, Proto, DC, None)) {
 
     if (!T->isObjCExistentialType()) {
-      TC.diagnose(ComplainLoc, diag::protocol_does_not_conform_objc,
-                  T, Proto->getDeclaredType());
+      diags.diagnose(ComplainLoc, diag::protocol_does_not_conform_objc,
+                     T, Proto->getDeclaredType());
       return;
     }
 
-    TC.diagnose(ComplainLoc, diag::protocol_does_not_conform_static,
-                T, Proto->getDeclaredType());
+    diags.diagnose(ComplainLoc, diag::protocol_does_not_conform_static,
+                   T, Proto->getDeclaredType());
     return;
   }
 
   // Special case: diagnose conversion to ExpressibleByNilLiteral, since we
   // know this is something involving 'nil'.
   if (Proto->isSpecificProtocol(KnownProtocolKind::ExpressibleByNilLiteral)) {
-    TC.diagnose(ComplainLoc, diag::cannot_use_nil_with_this_type, T);
+    diags.diagnose(ComplainLoc, diag::cannot_use_nil_with_this_type, T);
     return;
   }
 
@@ -3716,20 +3714,19 @@ static void diagnoseConformanceFailure(TypeChecker &TC, Type T,
 
       auto rawType = enumDecl->getRawType();
 
-      TC.diagnose(enumDecl->getInherited()[0].getSourceRange().Start,
-                  diag::enum_raw_type_nonconforming_and_nonsynthable,
-                  T, rawType);
+      diags.diagnose(enumDecl->getInherited()[0].getSourceRange().Start,
+                     diag::enum_raw_type_nonconforming_and_nonsynthable,
+                     T, rawType);
 
       // If the reason is that the raw type does not conform to
       // Equatable, say so.
-      auto equatableProto = TC.getProtocol(enumDecl->getLoc(),
-                                           KnownProtocolKind::Equatable);
+      auto equatableProto = ctx.getProtocol(KnownProtocolKind::Equatable);
       if (!equatableProto)
         return;
 
       if (!TC.conformsToProtocol(rawType, equatableProto, enumDecl, None)) {
         SourceLoc loc = enumDecl->getInherited()[0].getSourceRange().Start;
-        TC.diagnose(loc, diag::enum_raw_type_not_equatable, rawType);
+        diags.diagnose(loc, diag::enum_raw_type_not_equatable, rawType);
         return;
       }
 
@@ -3737,8 +3734,8 @@ static void diagnoseConformanceFailure(TypeChecker &TC, Type T,
     }
   }
 
-  TC.diagnose(ComplainLoc, diag::type_does_not_conform,
-              T, Proto->getDeclaredType());
+  diags.diagnose(ComplainLoc, diag::type_does_not_conform,
+                 T, Proto->getDeclaredType());
 }
 
 void ConformanceChecker::diagnoseOrDefer(
@@ -4009,7 +4006,7 @@ void swift::useObjectiveCBridgeableConformances(DeclContext *dc, Type type) {
               if (!hashableProto)
                 return Action::Stop;
 
-              auto result = tc.conformsToProtocol(
+              (void)tc.conformsToProtocol(
                   keyType, hashableProto, DC, options,
                   /*ComplainLoc=*/SourceLoc());
             }
@@ -4049,6 +4046,7 @@ void swift::useObjectiveCBridgeableConformancesOfArgs(
 }
 
 void TypeChecker::useBridgedNSErrorConformances(DeclContext *dc, Type type) {
+  auto errorProto = Context.getProtocol(KnownProtocolKind::Error);
   auto bridgedStoredNSError = Context.getProtocol(
                                     KnownProtocolKind::BridgedStoredNSError);
   auto errorCodeProto = Context.getProtocol(
@@ -4056,8 +4054,15 @@ void TypeChecker::useBridgedNSErrorConformances(DeclContext *dc, Type type) {
   auto rawProto = Context.getProtocol(
                         KnownProtocolKind::RawRepresentable);
 
-  if (!bridgedStoredNSError || !errorCodeProto || !rawProto)
+  if (!errorProto || !bridgedStoredNSError || !errorCodeProto || !rawProto)
     return;
+
+  // The NSError: Error conformance.
+  if (auto nsError = Context.getNSErrorDecl()) {
+    validateDecl(nsError);
+    (void)conformsToProtocol(nsError->TypeDecl::getDeclaredInterfaceType(),
+                             errorProto, dc, ConformanceCheckFlags::Used);
+  }
 
   // _BridgedStoredNSError.
   auto conformance = conformsToProtocol(type, bridgedStoredNSError, dc,
@@ -4347,7 +4352,7 @@ static bool isGeneric(ValueDecl *decl) {
 static bool isUnlabeledInitializerOrSubscript(ValueDecl *value) {
   ParameterList *paramList = nullptr;
   if (auto constructor = dyn_cast<ConstructorDecl>(value))
-    paramList = constructor->getParameterList(1);
+    paramList = constructor->getParameters();
   else if (auto subscript = dyn_cast<SubscriptDecl>(value))
     paramList = subscript->getIndices();
   else
@@ -4557,10 +4562,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
   Decl *currentDecl = nullptr;
   AccessLevel defaultAccess;
   if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-    Type extendedTy = ext->getExtendedType();
-    if (!extendedTy)
-      return;
-    const NominalTypeDecl *nominal = extendedTy->getAnyNominal();
+    const NominalTypeDecl *nominal = ext->getExtendedNominal();
     if (!nominal)
       return;
     defaultAccess = nominal->getFormalAccess();
@@ -4903,6 +4905,8 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
     case AccessorKind::Address:
     case AccessorKind::MutableAddress:
     case AccessorKind::MaterializeForSet:
+    case AccessorKind::Read:
+    case AccessorKind::Modify:
       // These accessors are never exposed to Objective-C.
       return result;
     case AccessorKind::DidSet:

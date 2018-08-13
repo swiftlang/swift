@@ -38,7 +38,7 @@ class SwiftGizmo : A {
 
   // expected-error@+1{{property cannot be marked @NSManaged because its type cannot be represented in Objective-C}}
   @NSManaged var nonobjc_var: SwiftProto?
-  // expected-error@-1{{'dynamic' var 'nonobjc_var' must also be '@objc'}}
+  // expected-error@-1{{'dynamic' property 'nonobjc_var' must also be '@objc'}}
 
   // expected-error@+4 {{@NSManaged only allowed on an instance property or method}}
   // expected-error@+3 {{@NSManaged property cannot have an initial value}}

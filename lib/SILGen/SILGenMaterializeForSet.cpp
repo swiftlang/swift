@@ -155,24 +155,25 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SILGen.h"
+#include "ASTVisitor.h"
 #include "ArgumentSource.h"
+#include "Initialization.h"
 #include "LValue.h"
 #include "RValue.h"
+#include "SILGen.h"
+#include "SILGenFunctionBuilder.h"
 #include "Scope.h"
-#include "Initialization.h"
-#include "swift/AST/Decl.h"
-#include "swift/AST/Types.h"
-#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/Types.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/Support/raw_ostream.h"
-#include "ASTVisitor.h"
 using namespace swift;
 using namespace Lowering;
 
@@ -494,9 +495,8 @@ public:
 
     // Drill down to the member storage.
     lv.addMemberComponent(SGF, loc, WitnessStorage, WitnessSubs,
-                          LValueOptions(), IsSuper,
-                          accessKind, TheAccessSemantics, strategy,
-                          SubstStorageType, std::move(indices));
+                          LValueOptions(), IsSuper, strategy, SubstStorageType,
+                          std::move(indices), /*index expr for diags*/ nullptr);
 
     SILType expectedTy = SGM.Types.getLoweredType(
         lv.getOrigFormalType(),
@@ -717,7 +717,8 @@ SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F,
   auto callbackLinkage =
       F.isSerialized() ? SILLinkage::Shared : SILLinkage::Private;
 
-  auto callback = SGM.M.createFunction(
+  SILGenFunctionBuilder builder(SGM);
+  auto callback = builder.createFunction(
       callbackLinkage, CallbackName, callbackType, genericEnv,
       SILLocation(Witness), IsBare, F.isTransparent(), F.isSerialized(),
       F.getEntryCount(), IsNotThunk, SubclassScope::NotApplicable,
@@ -824,8 +825,7 @@ SILValue MaterializeForSetEmitter::emitUsingAddressor(SILGenFunction &SGF,
   bool isDirect = (TheAccessSemantics != AccessSemantics::Ordinary);
 
   // Call the mutable addressor.
-  auto addressor = SGF.SGM.getAddressorDeclRef(WitnessStorage,
-                                               AccessKind::ReadWrite);
+  auto addressor = SGF.SGM.getMutableAddressorDeclRef(WitnessStorage);
   std::pair<ManagedValue, ManagedValue> result;
   {
     FormalEvaluationScope Scope(SGF);

@@ -33,7 +33,7 @@ sil hidden [serialized] @box_type_parsing : $@convention(thin) (
   <X, Y, Z>{ var X, let Z }<Int, String, Optional<Double>>
 // CHECK: ) -> ()
 ) -> () {
-entry(%0 : $<E>{ var E }<F>, %1 : $<F: P>{ let F }<G>, %2 : $<G: P>{ var G }<Q>, %3 : ${ let Int }, %4 : ${ var Int, let String }, %5 : ${}, %6 : $<XX, YY, ZZ>{ var XX, let ZZ }<Int, String, Optional<Double>>):
+entry(%0 : @unowned $<E>{ var E }<F>, %1 : @unowned $<F: P>{ let F }<G>, %2 : @unowned $<G: P>{ var G }<Q>, %3 : @unowned ${ let Int }, %4 : @unowned ${ var Int, let String }, %5 : @unowned ${}, %6 : @unowned $<XX, YY, ZZ>{ var XX, let ZZ }<Int, String, Optional<Double>>):
   unreachable
 }
 
@@ -55,7 +55,7 @@ sil hidden [serialized] @box_type_parsing_in_generic_function : $@convention(thi
   <X, Y, Z>{ var X, let Z }<Int, String, Optional<Double>>
 // CHECK: ) -> ()
 ) -> () {
-entry(%0 : $<E>{ var E }<F>, %1 : $<F: P>{ let F }<G>, %2 : $<G: P>{ var G }<Q>, %3 : ${ let Int }, %4 : ${ var Int, let String }, %5 : ${}, %6 : $<XX, YY, ZZ>{ var XX, let ZZ }<Int, String, Optional<Double>>):
+entry(%0 : @unowned $<E>{ var E }<F>, %1 : @unowned $<F: P>{ let F }<G>, %2 : @unowned $<G: P>{ var G }<Q>, %3 : @unowned ${ let Int }, %4 : @unowned ${ var Int, let String }, %5 : @unowned ${}, %6 : @unowned $<XX, YY, ZZ>{ var XX, let ZZ }<Int, String, Optional<Double>>):
   unreachable
 }
 
@@ -67,7 +67,7 @@ sil hidden [serialized] @same_generic_param_name_in_multiple_box_signatures : $@
   <A> { var A } <String>
 // CHECK: ) -> ()
 ) -> () {
-entry(%0 : $<A> { var A } <Int>, %1 : $<A> { var A } <String>):
+entry(%0 : @unowned $<A> { var A } <Int>, %1 : @unowned $<A> { var A } <String>):
   unreachable
 }
 
@@ -77,20 +77,20 @@ sil hidden [serialized] @same_generic_param_name_in_outer_scope : $@convention(t
   <A> { var A } <A>
 // CHECK: ) -> ()
 ) -> () {
-entry(%0 : $<B> { var B } <A>):
+entry(%0 : @unowned $<B> { var B } <A>):
   unreachable
 }
 
 // CHECK-LABEL: sil hidden [serialized] @box_ownership : $@convention(thin) (@owned { var Int }, @guaranteed <τ_0_0> { let τ_0_0 } <Int>) -> ()
 sil hidden [serialized ]@box_ownership : $@convention(thin) (@owned { var Int }, @guaranteed <T> { let T } <Int>) -> () {
-entry(%0 : ${ var Int }, %1 : $<T> { let T } <Int>):
+entry(%0 : @owned ${ var Int }, %1 : @guaranteed $<T> { let T } <Int>):
   unreachable
 }
 
 // CHECK-LABEL: sil hidden [serialized] @address_of_box
 sil hidden [serialized] @address_of_box : $@convention(thin) (@in { var Int }, @in <T> { let T } <Int>) -> () {
-// CHECK: %0 : $*{ var Int }, %1 : $*<τ_0_0> { let τ_0_0 } <Int>
-entry(%0 : $*{ var Int }, %1 : $*<T> { let T } <Int>):
+// CHECK: %0 : @trivial $*{ var Int }, %1 : @trivial $*<τ_0_0> { let τ_0_0 } <Int>
+entry(%0 : @trivial $*{ var Int }, %1 : @trivial $*<T> { let T } <Int>):
   unreachable
 }
 

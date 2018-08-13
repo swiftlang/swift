@@ -319,7 +319,6 @@ adjustOptionsForGenericArgs(TypeResolutionOptions options) {
   options -= TypeResolutionFlags::FunctionInput;
   options -= TypeResolutionFlags::TypeAliasUnderlyingType;
   options -= TypeResolutionFlags::AllowUnavailableProtocol;
-  options -= TypeResolutionFlags::AllowIUO;
 
   return options;
 }
@@ -357,19 +356,21 @@ Type TypeChecker::applyGenericArguments(Type type,
 
   // We must either have an unbound generic type, or a generic type alias.
   if (!type->is<UnboundGenericType>()) {
-    auto diag = diagnose(loc, diag::not_a_generic_type, type);
+     if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
+      auto diag = diagnose(loc, diag::not_a_generic_type, type);
 
-    // Don't add fixit on module type; that isn't the right type regardless
-    // of whether it had generic arguments.
-    if (!type->is<ModuleType>()) {
-      // When turning a SourceRange into CharSourceRange the closing angle
-      // brackets on nested generics are lexed as one token.
-      SourceRange angles = generic->getAngleBrackets();
-      diag.fixItRemoveChars(angles.Start,
-                            angles.End.getAdvancedLocOrInvalid(1));
+      // Don't add fixit on module type; that isn't the right type regardless
+      // of whether it had generic arguments.
+      if (!type->is<ModuleType>()) {
+        // When turning a SourceRange into CharSourceRange the closing angle
+        // brackets on nested generics are lexed as one token.
+        SourceRange angles = generic->getAngleBrackets();
+        diag.fixItRemoveChars(angles.Start,
+                              angles.End.getAdvancedLocOrInvalid(1));
+      }
+
+      generic->setInvalid();
     }
-
-    generic->setInvalid();
     return type;
   }
 
@@ -383,12 +384,14 @@ Type TypeChecker::applyGenericArguments(Type type,
   auto genericArgs = generic->getGenericArgs();
   auto genericParams = genericDecl->getGenericParams();
   if (genericParams->size() != genericArgs.size()) {
-    diagnose(loc, diag::type_parameter_count_mismatch, decl->getName(),
-             genericParams->size(), genericArgs.size(),
-             genericArgs.size() < genericParams->size())
-        .highlight(generic->getAngleBrackets());
-    diagnose(decl, diag::kind_identifier_declared_here,
-             DescriptiveDeclKind::GenericType, decl->getName());
+    if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
+      diagnose(loc, diag::type_parameter_count_mismatch, decl->getName(),
+               genericParams->size(), genericArgs.size(),
+               genericArgs.size() < genericParams->size())
+          .highlight(generic->getAngleBrackets());
+      diagnose(decl, diag::kind_identifier_declared_here,
+               DescriptiveDeclKind::GenericType, decl->getName());
+    }
     return ErrorType::get(Context);
   }
 
@@ -412,9 +415,11 @@ Type TypeChecker::applyGenericArguments(Type type,
 
   // Cannot extend a bound generic type.
   if (options.contains(TypeResolutionFlags::ExtensionBinding)) {
-    diagnose(loc, diag::extension_specialization,
-             genericDecl->getName())
-      .highlight(generic->getSourceRange());
+    if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
+      diagnose(loc, diag::extension_specialization,
+               genericDecl->getName())
+        .highlight(generic->getSourceRange());
+    }
     return ErrorType::get(Context);
   }
 
@@ -901,14 +906,12 @@ static Type
 resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
                                   ComponentIdentTypeRepr *comp,
                                   TypeResolutionOptions options,
-                                  bool diagnoseErrors,
                                   GenericTypeResolver *resolver);
 
 static Type
 resolveGenericSignatureComponent(TypeChecker &TC, DeclContext *DC,
                                  ComponentIdentTypeRepr *comp,
                                  TypeResolutionOptions options,
-                                 bool diagnoseErrors,
                                  GenericTypeResolver *resolver) {
   if (!DC->isInnermostContextGeneric())
     return Type();
@@ -926,8 +929,7 @@ resolveGenericSignatureComponent(TypeChecker &TC, DeclContext *DC,
       return Type();
 
     comp->setValue(*matchingParam, nullptr);
-    return resolveTopLevelIdentTypeComponent(TC, DC, comp, options,
-                                             diagnoseErrors, resolver);
+    return resolveTopLevelIdentTypeComponent(TC, DC, comp, options, resolver);
   }
 
   // If we are inside an extension of a nested type, we have to visit
@@ -944,8 +946,7 @@ resolveGenericSignatureComponent(TypeChecker &TC, DeclContext *DC,
 
     if (matchingParam != outerParams->end()) {
       comp->setValue(*matchingParam, nullptr);
-      return resolveTopLevelIdentTypeComponent(TC, DC, comp, options,
-                                               diagnoseErrors, resolver);
+      return resolveTopLevelIdentTypeComponent(TC, DC, comp, options, resolver);
     }
   }
 
@@ -959,10 +960,9 @@ resolveGenericSignatureComponent(TypeChecker &TC, DeclContext *DC,
           comp->getIdLoc())) {
     auto nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
     SmallVector<ValueDecl *, 4> decls;
-    if (DC->lookupQualified(nominal->getDeclaredInterfaceType(),
+    if (DC->lookupQualified(nominal,
                             comp->getIdentifier(),
                             NL_OnlyTypes|NL_QualifiedDefault|NL_ProtocolMembers,
-                            &TC,
                             decls)) {
       for (const auto decl : decls) {
         // FIXME: Better ambiguity handling.
@@ -972,7 +972,7 @@ resolveGenericSignatureComponent(TypeChecker &TC, DeclContext *DC,
 
         comp->setValue(typeDecl, DC);
         return resolveTopLevelIdentTypeComponent(TC, DC, comp, options,
-                                                 diagnoseErrors, resolver);
+                                                 resolver);
       }
     }
   }
@@ -989,7 +989,6 @@ static Type
 resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
                                   ComponentIdentTypeRepr *comp,
                                   TypeResolutionOptions options,
-                                  bool diagnoseErrors,
                                   GenericTypeResolver *resolver) {
   // Short-circuiting.
   if (comp->isInvalid()) return ErrorType::get(TC.Context);
@@ -1027,7 +1026,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   // parameters (only), then move up to the enclosing context.
   if (options.contains(TypeResolutionFlags::GenericSignature)) {
     Type type = resolveGenericSignatureComponent(
-      TC, DC, comp, options, diagnoseErrors, resolver);
+      TC, DC, comp, options, resolver);
     if (type)
       return type;
 
@@ -1088,7 +1087,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   // Complain about any ambiguities we detected.
   // FIXME: We could recover by looking at later components.
   if (isAmbiguous) {
-    if (diagnoseErrors) {
+    if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
       TC.diagnose(comp->getIdLoc(), diag::ambiguous_type_base,
                   comp->getIdentifier())
         .highlight(comp->getIdLoc());
@@ -1105,7 +1104,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   if (current.isNull()) {
     // If we're not allowed to complain or we couldn't fix the
     // source, bail out.
-    if (!diagnoseErrors)
+    if (options.contains(TypeResolutionFlags::SilenceErrors))
       return ErrorType::get(TC.Context);
 
     return diagnoseUnknownType(TC, DC, nullptr, SourceRange(), comp, options,
@@ -1125,7 +1124,6 @@ static Type resolveNestedIdentTypeComponent(
               SourceRange parentRange,
               ComponentIdentTypeRepr *comp,
               TypeResolutionOptions options,
-              bool diagnoseErrors,
               GenericTypeResolver *resolver) {
   auto maybeApplyGenericArgs = [&](Type memberType) {
     // If there are generic arguments, apply them now.
@@ -1151,7 +1149,7 @@ static Type resolveNestedIdentTypeComponent(
                                         AssociatedTypeDecl *inferredAssocType) {
     // Diagnose invalid cases.
     if (TC.isUnsupportedMemberTypeAccess(parentTy, member)) {
-      if (diagnoseErrors) {
+      if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
         if (parentTy->is<UnboundGenericType>())
           diagnoseUnboundGenericType(TC, parentTy, parentRange.End);
         else if (parentTy->isExistentialType() &&
@@ -1172,7 +1170,7 @@ static Type resolveNestedIdentTypeComponent(
     // be an unbound generic.
     if (options & TypeResolutionFlags::TypeAliasUnderlyingType) {
       if (parentTy->is<UnboundGenericType>()) {
-        if (diagnoseErrors)
+        if (!options.contains(TypeResolutionFlags::SilenceErrors))
           diagnoseUnboundGenericType(TC, parentTy, parentRange.End);
 
         return ErrorType::get(TC.Context);
@@ -1180,8 +1178,8 @@ static Type resolveNestedIdentTypeComponent(
     }
 
     // Diagnose a bad conformance reference if we need to.
-    if (inferredAssocType && diagnoseErrors && memberType &&
-        memberType->hasError()) {
+    if (!options.contains(TypeResolutionFlags::SilenceErrors) &&
+        inferredAssocType && memberType && memberType->hasError()) {
       maybeDiagnoseBadConformanceRef(TC, DC, parentTy, comp->getLoc(),
                                      inferredAssocType);
     }
@@ -1252,7 +1250,7 @@ static Type resolveNestedIdentTypeComponent(
   // FIXME: Could try to apply generic arguments first, and see whether
   // that resolves things. But do we really want that to succeed?
   if (memberTypes.size() > 1) {
-    if (diagnoseErrors)
+    if (!options.contains(TypeResolutionFlags::SilenceErrors))
       TC.diagnoseAmbiguousMemberType(parentTy, parentRange,
                                      comp->getIdentifier(), comp->getIdLoc(),
                                      memberTypes);
@@ -1266,7 +1264,7 @@ static Type resolveNestedIdentTypeComponent(
   if (!memberTypes) {
     // If we're not allowed to complain or we couldn't fix the
     // source, bail out.
-    if (!diagnoseErrors)
+    if (options.contains(TypeResolutionFlags::SilenceErrors))
       return ErrorType::get(TC.Context);
 
     memberType = diagnoseUnknownType(TC, DC, parentTy, parentRange, comp,
@@ -1288,22 +1286,20 @@ static Type resolveIdentTypeComponent(
               TypeChecker &TC, DeclContext *DC,
               ArrayRef<ComponentIdentTypeRepr *> components,
               TypeResolutionOptions options,
-              bool diagnoseErrors,
               GenericTypeResolver *resolver) {
   auto comp = components.back();
 
   // The first component uses unqualified lookup.
   auto parentComps = components.slice(0, components.size()-1);
   if (parentComps.empty()) {
-    return resolveTopLevelIdentTypeComponent(TC, DC, comp, options,
-                                             diagnoseErrors, resolver);
+    return resolveTopLevelIdentTypeComponent(TC, DC, comp, options, resolver);
   }
 
   // All remaining components use qualified lookup.
 
   // Resolve the parent type.
   Type parentTy = resolveIdentTypeComponent(TC, DC, parentComps, options,
-                                            diagnoseErrors, resolver);
+                                            resolver);
   if (!parentTy || parentTy->hasError()) return parentTy;
   
   SourceRange parentRange(parentComps.front()->getIdLoc(),
@@ -1312,8 +1308,7 @@ static Type resolveIdentTypeComponent(
   // Resolve the nested type.
   return resolveNestedIdentTypeComponent(TC, DC, parentTy,
                                          parentRange, comp,
-                                         options, diagnoseErrors,
-                                         resolver);
+                                         options, resolver);
 }
 
 static bool diagnoseAvailability(IdentTypeRepr *IdType,
@@ -1373,7 +1368,6 @@ Type TypeChecker::resolveIdentifierType(
        DeclContext *DC,
        IdentTypeRepr *IdType,
        TypeResolutionOptions options,
-       bool diagnoseErrors,
        GenericTypeResolver *resolver) {
   assert(resolver && "Missing generic type resolver");
 
@@ -1381,11 +1375,11 @@ Type TypeChecker::resolveIdentifierType(
   auto Components = llvm::makeArrayRef(ComponentRange.begin(),
                                        ComponentRange.end());
   Type result = resolveIdentTypeComponent(*this, DC, Components, options, 
-                                          diagnoseErrors, resolver);
+                                          resolver);
   if (!result) return nullptr;
 
   if (auto moduleTy = result->getAs<ModuleType>()) {
-    if (diagnoseErrors) {
+    if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
       auto moduleName = moduleTy->getModule()->getName();
       diagnose(Components.back()->getIdLoc(),
                diag::use_undeclared_type, moduleName);
@@ -1410,7 +1404,8 @@ Type TypeChecker::resolveIdentifierType(
   // To support this, inside inheritance clauses we allow references to
   // protocols that are unavailable in the current type refinement context.
 
-  if (!(options & TypeResolutionFlags::AllowUnavailable) &&
+  if (!options.contains(TypeResolutionFlags::SilenceErrors) &&
+      !options.contains(TypeResolutionFlags::AllowUnavailable) &&
       diagnoseAvailability(IdType, DC, *this,
              options.contains(TypeResolutionFlags::AllowUnavailableProtocol))) {
     Components.back()->setInvalid();
@@ -1519,7 +1514,8 @@ namespace {
     Type resolveOptionalType(OptionalTypeRepr *repr,
                              TypeResolutionOptions options);
     Type resolveImplicitlyUnwrappedOptionalType(ImplicitlyUnwrappedOptionalTypeRepr *repr,
-                                      TypeResolutionOptions options);
+                                                TypeResolutionOptions options,
+                                                bool isDirect);
     Type resolveTupleType(TupleTypeRepr *repr,
                           TypeResolutionOptions options);
     Type resolveCompositionType(CompositionTypeRepr *repr,
@@ -1571,13 +1567,20 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
   // them.
   if (!isa<SpecifierTypeRepr>(repr) && !isa<TupleTypeRepr>(repr) &&
       !isa<AttributedTypeRepr>(repr) && !isa<FunctionTypeRepr>(repr) &&
-      !isa<IdentTypeRepr>(repr)) {
+      !isa<IdentTypeRepr>(repr) &&
+      !isa<ImplicitlyUnwrappedOptionalTypeRepr>(repr)) {
     options -= TypeResolutionFlags::FunctionInput;
     options -= TypeResolutionFlags::TypeAliasUnderlyingType;
   }
 
   if (Context.LangOpts.DisableAvailabilityChecking)
     options |= TypeResolutionFlags::AllowUnavailable;
+
+  bool isDirect = false;
+  if ((options & TypeResolutionFlags::Direct) && !isa<SpecifierTypeRepr>(repr)){
+    isDirect = true;
+    options -= TypeResolutionFlags::Direct;
+  }
 
   switch (repr->getKind()) {
   case TypeReprKind::Error:
@@ -1594,7 +1597,7 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
   case TypeReprKind::GenericIdent:
   case TypeReprKind::CompoundIdent:
     return TC.resolveIdentifierType(DC, cast<IdentTypeRepr>(repr), options,
-                                    /*diagnoseErrors*/ true, Resolver);
+                                    Resolver);
 
   case TypeReprKind::Function: {
     if (!(options & TypeResolutionFlags::SILType)) {
@@ -1620,10 +1623,10 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
   case TypeReprKind::Optional:
     return resolveOptionalType(cast<OptionalTypeRepr>(repr), options);
 
-  case TypeReprKind::ImplicitlyUnwrappedOptional:
-    return resolveImplicitlyUnwrappedOptionalType(
-             cast<ImplicitlyUnwrappedOptionalTypeRepr>(repr),
-             options);
+  case TypeReprKind::ImplicitlyUnwrappedOptional: {
+    auto iuoRepr = cast<ImplicitlyUnwrappedOptionalTypeRepr>(repr);
+    return resolveImplicitlyUnwrappedOptionalType(iuoRepr, options, isDirect);
+  }
 
   case TypeReprKind::Tuple:
     return resolveTupleType(cast<TupleTypeRepr>(repr), options);
@@ -2079,7 +2082,18 @@ bool TypeResolver::resolveASTFunctionTypeParams(
     }
 
     ValueOwnership ownership;
-    switch (eltTypeRepr->getKind()) {
+
+    auto *nestedRepr = eltTypeRepr;
+
+    // Look through parens here; other than parens, specifiers
+    // must appear at the top level of a parameter type.
+    while (auto *tupleRepr = dyn_cast<TupleTypeRepr>(nestedRepr)) {
+      if (!tupleRepr->isParenType())
+        break;
+      nestedRepr = tupleRepr->getElementType(0);
+    }
+
+    switch (nestedRepr->getKind()) {
     case TypeReprKind::Shared:
       ownership = ValueOwnership::Shared;
       break;
@@ -2095,7 +2109,7 @@ bool TypeResolver::resolveASTFunctionTypeParams(
     }
     ParameterTypeFlags paramFlags =
         ParameterTypeFlags::fromParameterType(ty, variadic, ownership);
-    elements.emplace_back(ty->getInOutObjectType(), Identifier(), paramFlags);
+    elements.emplace_back(ty, Identifier(), paramFlags);
   }
 
   return false;
@@ -2104,9 +2118,10 @@ bool TypeResolver::resolveASTFunctionTypeParams(
 Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
                                           TypeResolutionOptions options,
                                           FunctionType::ExtInfo extInfo) {
+  options -= TypeResolutionFlags::Direct;
   options -= TypeResolutionFlags::FunctionInput;
+  options -= TypeResolutionFlags::FunctionResult;
   options -= TypeResolutionFlags::TypeAliasUnderlyingType;
-  options -= TypeResolutionFlags::AllowIUO;
 
   SmallVector<AnyFunctionType::Param, 8> params;
   if (resolveASTFunctionTypeParams(repr->getArgsTypeRepr(), options,
@@ -2601,20 +2616,18 @@ Type TypeResolver::resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
     return ErrorType::get(Context);
   }
 
-  // Anything within the inout isn't a parameter anymore.
-  options -= TypeResolutionFlags::FunctionInput;
-  options -= TypeResolutionFlags::TypeAliasUnderlyingType;
+  if (!isa<ImplicitlyUnwrappedOptionalTypeRepr>(repr->getBase())) {
+    // Anything within the inout isn't a parameter anymore.
+    options -= TypeResolutionFlags::FunctionInput;
+    options -= TypeResolutionFlags::TypeAliasUnderlyingType;
+  }
 
-  Type ty = resolveType(repr->getBase(), options);
-  if (!ty || ty->hasError()) return ty;
-  if (repr->getKind() == TypeReprKind::InOut) return InOutType::get(ty);
-  return ty;
+  return resolveType(repr->getBase(), options);
 }
 
 
 Type TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
                                     TypeResolutionOptions options) {
-  // FIXME: diagnose non-materializability of element type!
   Type baseTy = resolveType(repr->getBase(), withoutContext(options));
   if (!baseTy || baseTy->hasError()) return baseTy;
 
@@ -2634,7 +2647,6 @@ Type TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
                                          TypeResolutionOptions options) {
   options = adjustOptionsForGenericArgs(options);
 
-  // FIXME: diagnose non-materializability of key/value type?
   Type keyTy = resolveType(repr->getKey(), withoutContext(options));
   if (!keyTy || keyTy->hasError()) return keyTy;
 
@@ -2686,22 +2698,28 @@ Type TypeResolver::resolveOptionalType(OptionalTypeRepr *repr,
 }
 
 Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
-       ImplicitlyUnwrappedOptionalTypeRepr *repr,
-       TypeResolutionOptions options) {
-  if (!options.contains(TypeResolutionFlags::AllowIUO)) {
-    if (options.contains(TypeResolutionFlags::AllowIUODeprecated)) {
+      ImplicitlyUnwrappedOptionalTypeRepr *repr,
+      TypeResolutionOptions options,
+      bool isDirect) {
+  TypeResolutionOptions allowIUO = TypeResolutionFlags::SILType;
+  allowIUO |= TypeResolutionFlags::FunctionInput;
+  allowIUO |= TypeResolutionFlags::FunctionResult;
+  allowIUO |= TypeResolutionFlags::PatternBindingEntry;
+
+  if (!isDirect || !(options & allowIUO)) {
+    // Prior to Swift 5, we allow 'as T!' and turn it into a disjunction.
+    if (TC.Context.isSwiftVersionAtLeast(5)) {
+      TC.diagnose(repr->getStartLoc(),
+                  diag::implicitly_unwrapped_optional_in_illegal_position)
+          .fixItReplace(repr->getExclamationLoc(), "?");
+    } else if (options.contains(TypeResolutionFlags::InCastOrCoercionExpression)) {
       TC.diagnose(
           repr->getStartLoc(),
           diag::implicitly_unwrapped_optional_deprecated_in_this_position);
-    } else if (!TC.Context.isSwiftVersionAtLeast(5)) {
-      TC.diagnose(
-            repr->getStartLoc(),
-            diag::
-                implicitly_unwrapped_optional_in_illegal_position_interpreted_as_optional)
-          .fixItReplace(repr->getExclamationLoc(), "?");
     } else {
-      TC.diagnose(repr->getStartLoc(),
-                  diag::implicitly_unwrapped_optional_in_illegal_position)
+      TC.diagnose(
+          repr->getStartLoc(),
+          diag::implicitly_unwrapped_optional_in_illegal_position_interpreted_as_optional)
           .fixItReplace(repr->getExclamationLoc(), "?");
     }
   }
@@ -2728,11 +2746,9 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
   SmallVector<TupleTypeElt, 8> elements;
   elements.reserve(repr->getNumElements());
   
-
   auto elementOptions = options;
   if (repr->isParenType()) {
-    // We also want to disallow IUO within even a paren.
-    elementOptions -= TypeResolutionFlags::AllowIUO;
+    elementOptions -= TypeResolutionFlags::Direct;
   } else {
     elementOptions = withoutContext(elementOptions, true);
   }
@@ -2751,8 +2767,7 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     Type ty = resolveType(tyR, elementOptions);
     if (!ty || ty->hasError()) return ty;
 
-    elements.emplace_back(ty->getInOutObjectType(),
-                          repr->getElementName(i), ParameterTypeFlags());
+    elements.emplace_back(ty, repr->getElementName(i), ParameterTypeFlags());
   }
 
   // Single-element labeled tuples are not permitted outside of declarations

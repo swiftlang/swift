@@ -13,7 +13,7 @@ class Sub : Base {
 }
 
 // CHECK-LABEL: sil hidden @$S21accessibility_vtables3SubCACycfc : $@convention(method) (@owned Sub) -> @owned Sub
-// CHECK:       bb0(%0 : $Sub):
+// CHECK:       bb0(%0 : @owned $Sub):
 // CHECK:         function_ref @$Ss25_unimplementedInitializer9className04initD04file4line6columns5NeverOs12StaticStringV_A2JS2utF
 
 // CHECK-LABEL: sil_vtable Sub {

@@ -25,6 +25,10 @@ struct AlignedFourInts { var x: FourInts }
 // CHECK:       define internal %swift.type* @"$S11type_layout14TypeLayoutTestVMi"
 // CHECK:       define internal swiftcc %swift.metadata_response @"$S11type_layout14TypeLayoutTestVMr"
 struct TypeLayoutTest<T> {
+  // CHECK:       [[TUPLE_LAYOUT_M:%.*]] = alloca %swift.full_type_layout,
+  // CHECK:       [[TUPLE_LAYOUT_N:%.*]] = alloca %swift.full_type_layout,
+  // CHECK:       [[TUPLE_LAYOUT_O:%.*]] = alloca %swift.full_type_layout,
+  // CHECK:       [[TUPLE_ELT_LAYOUTS_O:%.*]] = alloca i8**, [[INT]] 4,
   // -- dynamic layout, projected from metadata
   // CHECK:       [[T0:%.*]] = call{{( tail)?}} swiftcc %swift.metadata_response @swift_checkMetadataState([[INT]] 319, %swift.type* %T)
   // CHECK:       [[T_CHECKED:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
@@ -80,4 +84,35 @@ struct TypeLayoutTest<T> {
   // -- Single-field aggregate with alignment
   // CHECK:       store i8** getelementptr (i8*, i8** @"$SBi128_WV", i32 8)
   var l: AlignedFourInts
+  // -- Tuple with two elements
+  // CHECK:       [[T_LAYOUT_1:%.*]] = getelementptr inbounds i8*, i8** [[T_VALUE_WITNESSES]], i32 8
+  // CHECK:       [[T_LAYOUT_2:%.*]] = getelementptr inbounds i8*, i8** [[T_VALUE_WITNESSES]], i32 8
+  // CHECK:       call swiftcc [[INT]] @swift_getTupleTypeLayout2(%swift.full_type_layout* [[TUPLE_LAYOUT_M]], i8** [[T_LAYOUT_1]], i8** [[T_LAYOUT_2]])
+  // CHECK:       [[T0:%.*]] = bitcast %swift.full_type_layout* [[TUPLE_LAYOUT_M]] to i8**
+  // CHECK:       store i8** [[T0]]
+  var m: (T, T)
+  // -- Tuple with three elements
+  // CHECK:       [[T_LAYOUT_1:%.*]] = getelementptr inbounds i8*, i8** [[T_VALUE_WITNESSES]], i32 8
+  // CHECK:       [[T_LAYOUT_2:%.*]] = getelementptr inbounds i8*, i8** [[T_VALUE_WITNESSES]], i32 8
+  // CHECK:       [[T_LAYOUT_3:%.*]] = getelementptr inbounds i8*, i8** [[T_VALUE_WITNESSES]], i32 8
+  // CHECK:       call swiftcc { [[INT]], [[INT]] } @swift_getTupleTypeLayout3(%swift.full_type_layout* [[TUPLE_LAYOUT_N]], i8** [[T_LAYOUT_1]], i8** [[T_LAYOUT_2]], i8** [[T_LAYOUT_3]])
+  // CHECK:       [[T0:%.*]] = bitcast %swift.full_type_layout* [[TUPLE_LAYOUT_N]] to i8**
+  // CHECK:       store i8** [[T0]]
+  var n: (T, T, T)
+  // -- Tuple with four elements
+  // CHECK:       [[T_LAYOUT_1:%.*]] = getelementptr inbounds i8*, i8** [[T_VALUE_WITNESSES]], i32 8
+  // CHECK:       store i8** [[T_LAYOUT_1]], i8*** [[TUPLE_ELT_LAYOUTS_O]],
+  // CHECK:       [[T_LAYOUT_2:%.*]] = getelementptr inbounds i8*, i8** [[T_VALUE_WITNESSES]], i32 8
+  // CHECK:       [[T0:%.*]] = getelementptr inbounds i8**, i8*** [[TUPLE_ELT_LAYOUTS_O]], i32 1
+  // CHECK:       store i8** [[T_LAYOUT_2]], i8*** [[T0]],
+  // CHECK:       [[T_LAYOUT_3:%.*]] = getelementptr inbounds i8*, i8** [[T_VALUE_WITNESSES]], i32 8
+  // CHECK:       [[T0:%.*]] = getelementptr inbounds i8**, i8*** [[TUPLE_ELT_LAYOUTS_O]], i32 2
+  // CHECK:       store i8** [[T_LAYOUT_3]], i8*** [[T0]],
+  // CHECK:       [[T_LAYOUT_4:%.*]] = getelementptr inbounds i8*, i8** [[T_VALUE_WITNESSES]], i32 8
+  // CHECK:       [[T0:%.*]] = getelementptr inbounds i8**, i8*** [[TUPLE_ELT_LAYOUTS_O]], i32 3
+  // CHECK:       store i8** [[T_LAYOUT_4]], i8*** [[T0]],
+  // CHECK:       call swiftcc void @swift_getTupleTypeLayout(%swift.full_type_layout* [[TUPLE_LAYOUT_O]], i32* null, [[INT]] 4, i8*** [[TUPLE_ELT_LAYOUTS_O]])
+  // CHECK:       [[T0:%.*]] = bitcast %swift.full_type_layout* [[TUPLE_LAYOUT_O]] to i8**
+  // CHECK:       store i8** [[T0]]
+  var o: (T, T, T, T)
 }

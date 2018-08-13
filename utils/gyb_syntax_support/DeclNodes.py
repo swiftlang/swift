@@ -506,6 +506,7 @@ DECL_NODES = [
                       'mutableAddressWithOwner', 
                       'mutableAddressWithNativeOwner', 
                       'mutableAddressWithPinnedNativeOwner',
+                      '_read', '_modify'
                    ]),
              Child('Parameter', kind='AccessorParameter', is_optional=True),
              Child('Body', kind='CodeBlock', is_optional=True),
@@ -661,7 +662,7 @@ DECL_NODES = [
                    ]),
              Child('InfixOperatorGroup', kind='InfixOperatorGroup',
                    description='''
-                   Optionally specifiy a precedence group
+                   Optionally specify a precedence group
                    ''',
                    is_optional=True),
          ]),

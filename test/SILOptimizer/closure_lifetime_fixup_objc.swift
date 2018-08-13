@@ -89,7 +89,7 @@ func getDispatchQueue() -> DispatchQueue
 // CHECK:   [[F:%.*]] = function_ref @$S27closure_lifetime_fixup_objc1CCfdyyXEfU_
 // CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[F]](%0)
 // CHECK:   [[OPT:%.*]] = enum $Optional<@callee_guaranteed () -> ()>, #Optional.some!enumelt.1, [[PA]]
-// CHECK:   [[DEINIT:%.*]] = objc_super_method [[SELF]] : $C, #NSObject.deinit!deallocator.foreign
+// CHECK:   [[DEINIT:%.*]] = objc_super_method [[SELF]] : $C, #NSObject.deinit!deallocator.1.foreign
 // CHECK:   release_value [[OPT]] : $Optional<@callee_guaranteed () -> ()>
 // CHECK:   [[SUPER:%.*]] = upcast [[SELF]] : $C to $NSObject               // user: %34
 // CHECK-NEXT:   apply [[DEINIT]]([[SUPER]]) : $@convention(objc_method) (NSObject) -> ()

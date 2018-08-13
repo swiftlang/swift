@@ -318,7 +318,7 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
   StringRef Platform = Tok.getText();
 
   StringRef Message, Renamed;
-  clang::VersionTuple Introduced, Deprecated, Obsoleted;
+  llvm::VersionTuple Introduced, Deprecated, Obsoleted;
   SourceRange IntroducedRange, DeprecatedRange, ObsoletedRange;
   auto PlatformAgnostic = PlatformAgnosticAvailabilityKind::None;
 
@@ -1286,7 +1286,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
       for (auto *Spec : Specs) {
         PlatformKind Platform;
-        clang::VersionTuple Version;
+        llvm::VersionTuple Version;
         SourceRange VersionRange;
         PlatformAgnosticAvailabilityKind PlatformAgnostic;
 
@@ -1316,9 +1316,9 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                      /*Rename=*/StringRef(),
                                      /*Introduced=*/Version,
                                      /*IntroducedRange=*/VersionRange,
-                                     /*Deprecated=*/clang::VersionTuple(),
+                                     /*Deprecated=*/llvm::VersionTuple(),
                                      /*DeprecatedRange=*/SourceRange(),
-                                     /*Obsoleted=*/clang::VersionTuple(),
+                                     /*Obsoleted=*/llvm::VersionTuple(),
                                      /*ObsoletedRange=*/SourceRange(),
                                      PlatformAgnostic,
                                      /*Implicit=*/false));
@@ -1438,7 +1438,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
   return false;
 }
 
-bool Parser::parseVersionTuple(clang::VersionTuple &Version,
+bool Parser::parseVersionTuple(llvm::VersionTuple &Version,
                                SourceRange &Range,
                                const Diagnostic &D) {
   SyntaxParsingContext VersionContext(SyntaxContext, SyntaxKind::VersionTuple);
@@ -1459,7 +1459,7 @@ bool Parser::parseVersionTuple(clang::VersionTuple &Version,
       consumeToken();
       return true;
     }
-    Version = clang::VersionTuple(major);
+    Version = llvm::VersionTuple(major);
     Range = SourceRange(StartLoc, Tok.getLoc());
     consumeToken();
     return false;
@@ -1493,9 +1493,9 @@ bool Parser::parseVersionTuple(clang::VersionTuple &Version,
     Range = SourceRange(StartLoc, Tok.getLoc());
     consumeToken();
     
-    Version = clang::VersionTuple(major, minor, micro);
+    Version = llvm::VersionTuple(major, minor, micro);
   } else {
-    Version = clang::VersionTuple(major, minor);
+    Version = llvm::VersionTuple(major, minor);
   }
 
   return false;
@@ -1823,9 +1823,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
       if (Attributes.has(TAK_noescape)) {
         diagnose(Loc, diag::attr_noescape_conflicts_escaping_autoclosure);
       } else {
-        diagnose(Loc, Context.isSwiftVersion3()
-                          ? diag::swift3_attr_autoclosure_escaping_deprecated
-                          : diag::attr_autoclosure_escaping_deprecated)
+        diagnose(Loc, diag::attr_autoclosure_escaping_deprecated)
             .fixItReplace(autoclosureEscapingParenRange, " @escaping ");
       }
       Attributes.setAttr(TAK_escaping, Loc);
@@ -1850,9 +1848,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
     // In SIL, the polarity of @escaping is reversed.
     // @escaping is the default and @noescape is explicit.
     if (!isInSILMode()) {
-      diagnose(Loc, Context.isSwiftVersion3()
-               ? diag::swift3_attr_noescape_deprecated
-               : diag::attr_noescape_deprecated)
+      diagnose(Loc, diag::attr_noescape_deprecated)
         .fixItRemove({Attributes.AtLoc, Loc});
     }
     break;
@@ -3285,9 +3281,7 @@ ParserResult<PoundDiagnosticDecl> Parser::parseDeclPoundDiagnostic() {
     // Catch #warning(oops, forgot the quotes)
     SourceLoc wordsStartLoc = Tok.getLoc();
 
-    while (!Tok.isAtStartOfLine() && !Tok.isAny(tok::r_paren, tok::eof)) {
-      skipSingle();
-    }
+    skipUntilTokenOrEndOfLine(tok::r_paren);
 
     SourceLoc wordsEndLoc = getEndOfPreviousLoc();
 
@@ -3746,7 +3740,6 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
                                      storageParam->getArgumentName(),
                                      storageParam->getNameLoc(),
                                      storageParam->getName(),
-                                     Type(),
                                      P->CurDeclContext);
         accessorParam->setVariadic(storageParam->isVariadic());
 
@@ -3770,16 +3763,10 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
                                      EndLoc);
   }
 
-
-  // Create the parameter list(s) for the getter.
-  SmallVector<ParameterList*, 4> Params;
-  
-  // Add the implicit 'self' to Params, if needed.
+  // Create the implicit 'self' if needed.
+  ParamDecl *SelfDecl = nullptr;
   if (Flags & Parser::PD_HasContainerType)
-    Params.push_back(ParameterList::createUnboundSelf(DeclLoc, P->CurDeclContext));
-  
-  // Add the "(value)" and subscript indices parameter clause.
-  Params.push_back(ValueArg);
+    SelfDecl = ParamDecl::createUnboundSelf(DeclLoc, P->CurDeclContext);
 
   // The typechecker will always fill this in.
   TypeLoc ReturnType;
@@ -3794,7 +3781,7 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
                                  (GenericParams
                                   ? GenericParams->clone(P->CurDeclContext)
                                   : nullptr),
-                                 Params, ReturnType,
+                                 SelfDecl, ValueArg, ReturnType,
                                  P->CurDeclContext);
 
   // Non-static set/willSet/didSet/materializeForSet/mutableAddress
@@ -3803,12 +3790,14 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
   switch (Kind) {
   case AccessorKind::Address:
   case AccessorKind::Get:
+  case AccessorKind::Read:
     break;
 
   case AccessorKind::MutableAddress:
   case AccessorKind::Set:
   case AccessorKind::WillSet:
   case AccessorKind::DidSet:
+  case AccessorKind::Modify:
     if (D->isInstanceMember())
       D->setSelfAccessKind(SelfAccessKind::Mutating);
     break;
@@ -3835,7 +3824,7 @@ static ParamDecl *createSetterAccessorArgument(SourceLoc nameLoc,
 
   auto result = new (P.Context)
       ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
-                Identifier(), nameLoc, name, Type(), P.CurDeclContext);
+                Identifier(), nameLoc, name, P.CurDeclContext);
   if (isNameImplicit)
     result->setImplicit();
 
@@ -3962,61 +3951,51 @@ void Parser::consumeGetSetBody(AbstractFunctionDecl *AFD,
 
 /// Returns a descriptive name for the given accessor/addressor kind.
 static StringRef getAccessorNameForDiagnostic(AccessorKind accessorKind,
-                                              AddressorKind addressorKind) {
+                                              AddressorKind addressorKind,
+                                              bool article) {
   switch (accessorKind) {
-  case AccessorKind::Get: return "getter";
-  case AccessorKind::Set: return "setter";
-#define ACCESSOR(ID)
-#define OBJC_ACCESSOR(ID, KEYWORD) // treated specially above
-#define SINGLETON_ACCESSOR(ID, KEYWORD) \
-  case AccessorKind::ID: return #KEYWORD;
-#include "swift/AST/AccessorKinds.def"
+  case AccessorKind::Get:
+    return article ? "a getter" : "getter";
+  case AccessorKind::Set:
+    return article ? "a setter" : "setter";
   case AccessorKind::Address:
-    switch (addressorKind) {
-    case AddressorKind::NotAddressor: llvm_unreachable("invalid");
-#define ACCESSOR_KEYWORD(KEYWORD)
-#define IMMUTABLE_ADDRESSOR(ID, KEYWORD) \
-    case AddressorKind::ID: return #KEYWORD;
-#include "swift/AST/AccessorKinds.def"
-    }
-    llvm_unreachable("bad addressor kind");
+    return article ? "an addressor" : "addressor";
   case AccessorKind::MutableAddress:
-    switch (addressorKind) {
-    case AddressorKind::NotAddressor: llvm_unreachable("invalid");
-#define ACCESSOR_KEYWORD(KEYWORD)
-#define MUTABLE_ADDRESSOR(ID, KEYWORD) \
-    case AddressorKind::ID: return #KEYWORD;
-#include "swift/AST/AccessorKinds.def"
-    }
-    llvm_unreachable("bad addressor kind");
+    return article ? "a mutable addressor" : "mutable addressor";
+  case AccessorKind::Read:
+    return article ? "a 'read' accessor" : "'read' accessor";
+  case AccessorKind::Modify:
+    return article ? "a 'modify' accessor" : "'modify' accessor";
+  case AccessorKind::WillSet:
+    return "'willSet'";
+  case AccessorKind::DidSet:
+    return "'didSet'";
+  case AccessorKind::MaterializeForSet:
+    llvm_unreachable("unparseable");
   }
   llvm_unreachable("bad accessor kind");  
+}
+
+static StringRef getAccessorNameForDiagnostic(AccessorDecl *accessor,
+                                              bool article) {
+  return getAccessorNameForDiagnostic(accessor->getAccessorKind(),
+                                      accessor->getAddressorKind(),
+                                      article);
 }
 
 static void diagnoseRedundantAccessors(Parser &P, SourceLoc loc,
                                        AccessorKind accessorKind,
                                        AddressorKind addressorKind,
                                        bool isSubscript,
-                                       AccessorDecl *previousDecl) {
-  // Different addressor safety kinds still count as the same addressor.
-  if (previousDecl->getAddressorKind() != addressorKind) {
-    assert(accessorKind == AccessorKind::Address ||
-           accessorKind == AccessorKind::MutableAddress);
-    P.diagnose(loc, diag::conflicting_property_addressor,
-               unsigned(isSubscript),
-               unsigned(accessorKind == AccessorKind::MutableAddress));
+                                       AccessorDecl *previous) {
+  assert(accessorKind == previous->getAccessorKind());
 
-    // Be less specific about the previous definition.
-    P.diagnose(previousDecl->getLoc(), diag::previous_accessor,
-               accessorKind == AccessorKind::MutableAddress
-                 ? "mutable addressor" : "addressor");
-    return;
-  }
-
-  P.diagnose(loc, diag::duplicate_property_accessor,
-             getAccessorNameForDiagnostic(accessorKind, addressorKind));
-  P.diagnose(previousDecl->getLoc(), diag::previous_accessor,
-             getAccessorNameForDiagnostic(accessorKind, addressorKind));
+  P.diagnose(loc, diag::duplicate_accessor,
+             unsigned(isSubscript),
+             getAccessorNameForDiagnostic(previous, /*article*/ true));
+  P.diagnose(previous->getLoc(), diag::previous_accessor,
+             getAccessorNameForDiagnostic(previous, /*article*/ false),
+             /*already*/ true);
 }
 
 void Parser::parseAccessorAttributes(DeclAttributes &Attributes) {
@@ -4047,10 +4026,54 @@ static bool isAllowedInLimitedSyntax(AccessorKind kind) {
   case AccessorKind::MaterializeForSet:
   case AccessorKind::WillSet:
   case AccessorKind::DidSet:
+  case AccessorKind::Read:
+  case AccessorKind::Modify:
     return false;
   }
   llvm_unreachable("bad accessor kind");
 }
+
+struct Parser::ParsedAccessors {
+  SourceLoc LBLoc, RBLoc;
+  SmallVector<AccessorDecl*, 16> Accessors;
+
+#define ACCESSOR(ID) AccessorDecl *ID = nullptr;
+#include "swift/AST/AccessorKinds.def"
+
+  void record(Parser &P, AbstractStorageDecl *storage, bool invalid,
+              ParseDeclOptions flags, SourceLoc staticLoc,
+              const DeclAttributes &attrs,
+              TypeLoc elementTy, ParameterList *indices,
+              SmallVectorImpl<Decl *> &decls);
+
+  StorageImplInfo
+  classify(Parser &P, AbstractStorageDecl *storage, bool invalid,
+           ParseDeclOptions flags, SourceLoc staticLoc,
+           const DeclAttributes &attrs,
+           TypeLoc elementTy, ParameterList *indices);
+
+  /// Add an accessor.  If there's an existing accessor of this kind,
+  /// return it.  The new accessor is still remembered but will be
+  /// ignored.
+  AccessorDecl *add(AccessorDecl *accessor);
+
+  /// Find the first accessor that's not an observing accessor.
+  AccessorDecl *findFirstNonObserver() {
+    for (auto accessor : Accessors) {
+      if (!accessor->isObservingAccessor())
+        return accessor;
+    }
+    return nullptr;
+  }
+
+  /// Find the first accessor that can be used to perform mutation.
+  AccessorDecl *findFirstMutator() const {
+    if (Set) return Set;
+    if (Modify) return Modify;
+    if (MutableAddress) return MutableAddress;
+    return nullptr;
+  }
+};
 
 /// \brief Parse a get-set clause, optionally containing a getter, setter,
 /// willSet, and/or didSet clauses.  'Indices' is a paren or tuple pattern,
@@ -4213,7 +4236,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
       // _silgen_name'd accessors don't need bodies.
       if (!Attributes.hasAttribute<SILGenNameAttr>()) {
         diagnose(Tok, diag::expected_lbrace_accessor,
-                 getAccessorNameForDiagnostic(Kind, addressorKind));
+                 getAccessorNameForDiagnostic(accessor, /*article*/ false));
         return true;
       }
       BlockCtx.setTransparent();
@@ -4223,8 +4246,9 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
 
     // Parse the body.
     Scope S(this, ScopeKind::FunctionBody);
-    for (auto PL : accessor->getParameterLists())
-      addParametersToScope(PL);
+    if (auto *P = accessor->getImplicitSelfDecl())
+      addToScope(P);
+    addParametersToScope(accessor->getParameters());
 
     if (accessor->isGeneric())
       for (auto *GP : accessor->getGenericParams()->getParams())
@@ -4232,8 +4256,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
 
     // Establish the new context.
     ParseFunctionBody CC(*this, accessor);
-    for (auto PL : accessor->getParameterLists())
-      setLocalDiscriminatorToParamList(PL);
+    setLocalDiscriminatorToParamList(accessor->getParameters());
 
     // Parse the body.
     SmallVector<ASTNode, 16> Entries;
@@ -4321,8 +4344,7 @@ void Parser::parseAccessorBodyDelayed(AbstractFunctionDecl *AFD) {
   // Re-enter the lexical scope.
   Scope S(this, AccessorParserState->takeScope());
   ParseFunctionBody CC(*this, AFD);
-  for (auto PL : AFD->getParameterLists())
-    setLocalDiscriminatorToParamList(PL);
+  setLocalDiscriminatorToParamList(AFD->getParameters());
 
   SmallVector<ASTNode, 16> Entries;
   parseBraceItems(Entries);
@@ -4337,13 +4359,13 @@ static void fillInAccessorTypeErrors(Parser &P, FuncDecl *accessor,
   if (!accessor) return;
 
   // Fill in the parameter types.
-  for (auto paramList : accessor->getParameterLists()) {
-    for (auto param : *paramList) {
-      if (param->getTypeLoc().isNull()) {
-        param->getTypeLoc().setInvalidType(P.Context);
-      }
-    }
-  }
+  if (auto *param = accessor->getImplicitSelfDecl())
+    if (param->getTypeLoc().isNull())
+      param->getTypeLoc().setInvalidType(P.Context);
+
+  for (auto *param : *accessor->getParameters())
+    if (param->getTypeLoc().isNull())
+      param->getTypeLoc().setInvalidType(P.Context);
 
   // Fill in the result type.
   switch (kind) {
@@ -4361,6 +4383,8 @@ static void fillInAccessorTypeErrors(Parser &P, FuncDecl *accessor,
   case AccessorKind::Set:
   case AccessorKind::WillSet:
   case AccessorKind::DidSet:
+  case AccessorKind::Read:
+  case AccessorKind::Modify:
     return;
   }
   llvm_unreachable("bad kind");
@@ -4432,7 +4456,7 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern,
     storage = new (Context) VarDecl(StaticLoc.isValid(),
                                     VarDecl::Specifier::Var,
                                     /*is capture list*/ false,
-                                    VarLoc, Identifier(), Type(),
+                                    VarLoc, Identifier(),
                                     CurDeclContext);
     storage->setImplicit(true);
     storage->setInvalid(true);
@@ -4541,31 +4565,76 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
   storage->setAccessors(storageKind, LBLoc, Accessors, RBLoc);
 }
 
+static void flagInvalidAccessor(AccessorDecl *func) {
+  if (func) {
+    func->setInvalid();
+  }
+}
+
+static void ignoreInvalidAccessor(AccessorDecl *&func) {
+  if (func) {
+    flagInvalidAccessor(func);
+    func = nullptr;
+  }
+}
+
+static void diagnoseConflictingAccessors(Parser &P, AccessorDecl *first,
+                                         AccessorDecl *&second) {
+  if (!second) return;
+  P.diagnose(second->getLoc(), diag::conflicting_accessor,
+             isa<SubscriptDecl>(first->getStorage()),
+             getAccessorNameForDiagnostic(second, /*article*/ true),
+             getAccessorNameForDiagnostic(first, /*article*/ true));
+  P.diagnose(first->getLoc(), diag::previous_accessor,
+             getAccessorNameForDiagnostic(first, /*article*/ false),
+             /*already*/ false);
+  ignoreInvalidAccessor(second);
+}
+
+template <class... DiagArgs>
+static void diagnoseAndIgnoreObservers(Parser &P,
+                                       Parser::ParsedAccessors &accessors,
+                                       Diag<unsigned, DiagArgs...> diagnostic,
+                        typename std::enable_if<true, DiagArgs>::type... args) {
+  if (auto &accessor = accessors.WillSet) {
+    P.diagnose(accessor->getLoc(), diagnostic, /*willSet*/ 0, args...);
+    ignoreInvalidAccessor(accessor);
+  }
+  if (auto &accessor = accessors.DidSet) {
+    P.diagnose(accessor->getLoc(), diagnostic, /*didSet*/ 1, args...);
+    ignoreInvalidAccessor(accessor);
+  }
+}
+
 StorageImplInfo
 Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
                                   bool invalid, ParseDeclOptions flags,
                                   SourceLoc staticLoc,
                                   const DeclAttributes &attrs,
                                   TypeLoc elementTy, ParameterList *indices) {
-  auto flagInvalidAccessor = [&](AccessorDecl *&func) {
-    if (func) {
-      func->setInvalid();
-    }
-  };
-  auto ignoreInvalidAccessor = [&](AccessorDecl *&func) {
-    if (func) {
-      flagInvalidAccessor(func);
-      func = nullptr;
-    }
-  };
-
   GenericParamList *genericParams = nullptr;
   if (auto *subscript = dyn_cast<SubscriptDecl>(storage))
     genericParams = subscript->getGenericParams();
 
   // Create an implicit accessor declaration.
-  auto createImplicitAccessor =
-  [&](AccessorKind kind, AddressorKind addressorKind, ParameterList *argList) {
+  auto createImplicitAccessor = [&](AccessorKind kind,
+                                    AccessorDecl *funcForParams = nullptr) {
+    // We never use this to create addressors.
+    assert(kind != AccessorKind::Address &&
+           kind != AccessorKind::MutableAddress);
+    auto addressorKind = AddressorKind::NotAddressor;
+
+    // Create the paramter list for a setter.
+    ParameterList *argList = nullptr;
+    if (kind == AccessorKind::Set) {
+      assert(funcForParams);
+      auto argLoc = funcForParams->getStartLoc();
+
+      auto argument = createSetterAccessorArgument(
+          argLoc, Identifier(), AccessorKind::Set, P, elementTy);
+      argList = ParameterList::create(P.Context, argument);
+    }
+
     auto accessor = createAccessorFunc(SourceLoc(), argList,
                                        genericParams, indices, elementTy,
                                        staticLoc, flags, kind, addressorKind,
@@ -4574,176 +4643,135 @@ Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
     add(accessor);
   };
 
-  // 'address' is exclusive with 'get'/'read', and 'mutableAddress' is
-  // exclusive with 'set'/'modify'.
-  if (Address || MutableAddress) {
-    // Require either a 'get' or an 'address' accessor if there's
-    // a 'mutableAddress' accessor.  In principle, we could synthesize
-    // 'address' from 'mutableAddress', but for now we'll enforce this.
-    if (!Address && !Get) {
-      P.diagnose(MutableAddress->getLoc(),
-                 diag::mutableaddressor_without_address,
-                 isa<SubscriptDecl>(storage));
-
-      createImplicitAccessor(AccessorKind::Address, AddressorKind::Unsafe,
-                             nullptr);
-    }
-
-    // Don't allow both.
-    if (Address && Get) {
-      P.diagnose(Address->getLoc(), diag::addressor_with_getter,
-                 isa<SubscriptDecl>(storage));
-      ignoreInvalidAccessor(Get);
-    }
-
-    // Disallow mutableAddress+{set,modify}.
-    //
-    // Currently we don't allow the address+set combination either.
-    // In principle, this is an unnecessary restriction, and you can
-    // imagine caches that might want to vend this combination of
-    // accessors.  But we assume that in-place gets aren't all that
-    // important.  (For example, we don't make any effort to optimize
-    // them for polymorphic accesses.)
-    if (Set) {
-      if (MutableAddress) {
-        P.diagnose(MutableAddress->getLoc(), diag::mutableaddressor_with_setter,
-                   isa<SubscriptDecl>(storage));
-      } else {
-        P.diagnose(Set->getLoc(), diag::addressor_with_setter,
-                   isa<SubscriptDecl>(storage));
-      }
-      ignoreInvalidAccessor(Set);
-    }
-  }
-
-  // For now, we don't support the observing accessors on subscripts.
-  if (isa<SubscriptDecl>(storage) && (WillSet || DidSet)) {
-    P.diagnose(DidSet ? DidSet->getLoc() : WillSet->getLoc(),
-               diag::observingproperty_in_subscript, bool(DidSet));
-    ignoreInvalidAccessor(WillSet);
-    ignoreInvalidAccessor(DidSet);
-  }
-
-  // If this decl is invalid, mark any parsed accessors as invalid to avoid
-  // tripping up later invariants.
+  // If there was a problem parsing accessors, mark all parsed accessors
+  // as invalid to avoid tripping up later invariants.
+  // We also want to avoid diagnose missing accessors if something
+  // was invalid.
   if (invalid) {
     for (auto accessor : Accessors) {
       flagInvalidAccessor(accessor);
     }
   }
 
-  // Disallow observers with addressors.
-  if (Address || MutableAddress) {
-    if (WillSet) {
-      P.diagnose(WillSet->getLoc(), diag::observingproperty_with_address, 0);
-      ignoreInvalidAccessor(WillSet);
-    }
-    if (DidSet) {
-      P.diagnose(DidSet->getLoc(), diag::observingproperty_with_address, 1);
-      ignoreInvalidAccessor(DidSet);
-    }
-  }
-
-  // If this is a willSet/didSet observing property, record this and we're done.
+  // The observing accessors have very specific restrictions.
+  // Prefer to ignore them.
   if (WillSet || DidSet) {
-    if (Get) {
-      P.diagnose(Get->getLoc(), diag::observingproperty_with_getset,
-                 bool(DidSet), /*getter*/0);
-      ignoreInvalidAccessor(Get);
-    }
-    if (Set) {
-      P.diagnose(Set->getLoc(), diag::observingproperty_with_getset,
-                 bool(DidSet), /*setter*/1);
-      ignoreInvalidAccessor(Set);
-    }
-
-    // Observing properties will have getters and setters synthesized by sema.
-    // Create their prototypes now.
-    createImplicitAccessor(AccessorKind::Get,
-                           AddressorKind::NotAddressor, nullptr);
-
-    auto argFunc = (WillSet ? WillSet : DidSet);
-    auto argLoc = argFunc->getParameterLists().back()->getStartLoc();
-
-    auto argument = createSetterAccessorArgument(
-        argLoc, Identifier(), AccessorKind::Set, P, elementTy);
-    auto argList = ParameterList::create(P.Context, argument);
-    createImplicitAccessor(AccessorKind::Set,
-                           AddressorKind::NotAddressor, argList);
-
-    if (attrs.hasAttribute<OverrideAttr>()) {
-      return StorageImplInfo(ReadImplKind::Inherited,
-                             WriteImplKind::InheritedWithObservers,
-                             ReadWriteImplKind::MaterializeToTemporary);
-    } else {
-      return StorageImplInfo(ReadImplKind::Stored,
-                             WriteImplKind::StoredWithObservers,
-                             ReadWriteImplKind::MaterializeToTemporary);
-    }
-  }
-
-  // If we have addressors, at this point mark it as addressed.
-  if (Address) {
-    assert(!Get && !Set);
-    if (MutableAddress) {
-      return StorageImplInfo(ReadImplKind::Address,
-                             WriteImplKind::MutableAddress,
-                             ReadWriteImplKind::MutableAddress);
-    } else {
-      return StorageImplInfo(ReadImplKind::Address);
-    }
-  }
-
-  // If this is a get+mutableAddress property, synthesize an implicit
-  // setter and record what we've got.
-  if (MutableAddress) {
-    assert(Get && !Set);
-    auto argument =
-        createSetterAccessorArgument(MutableAddress->getLoc(), Identifier(),
-                                     AccessorKind::Set, P, elementTy);
-    auto argList = ParameterList::create(P.Context, argument);
-    createImplicitAccessor(AccessorKind::Set,
-                           AddressorKind::NotAddressor, argList);
-
-    return StorageImplInfo(ReadImplKind::Get,
-                           WriteImplKind::MutableAddress,
-                           ReadWriteImplKind::MutableAddress);
-  }
-
-  // Otherwise, this must be a get/set property.  The set is optional,
-  // but get is not.
-  if (!Get) {
-    // Subscripts always have to have *something*; they can't be
-    // purely stored.
+    // For now, we don't support the observing accessors on subscripts.
     if (isa<SubscriptDecl>(storage)) {
-      if (!invalid) P.diagnose(LBLoc, diag::subscript_without_get);
-      // Create a getter so we don't break downstream invariants by having a
-      // setter without a getter.
-      createImplicitAccessor(AccessorKind::Get,
-                             AddressorKind::NotAddressor, nullptr);
-    } else if (Set) {
-      if (!invalid) P.diagnose(Set->getLoc(), diag::var_set_without_get);
-      // Create a getter so we don't break downstream invariants by having a
-      // setter without a getter.
-      createImplicitAccessor(AccessorKind::Get,
-                             AddressorKind::NotAddressor, nullptr);
+      diagnoseAndIgnoreObservers(P, *this,
+                                 diag::observing_accessor_in_subscript);
+
+    // The observing accessors cannot be combined with other accessors.
+    } else if (auto nonObserver = findFirstNonObserver()) {
+      diagnoseAndIgnoreObservers(P, *this,
+                   diag::observing_accessor_conflicts_with_accessor,
+                   getAccessorNameForDiagnostic(nonObserver, /*article*/ true));
+
+    // Otherwise, we have either a stored or inherited observing property.
+    } else {
+      // Observing properties will have getters and setters synthesized
+      // by Sema.  Create their prototypes now.
+      auto argFunc = (WillSet ? WillSet : DidSet);
+      createImplicitAccessor(AccessorKind::Get);
+      createImplicitAccessor(AccessorKind::Set, argFunc);
+
+      if (attrs.hasAttribute<OverrideAttr>()) {
+        return StorageImplInfo(ReadImplKind::Inherited,
+                               WriteImplKind::InheritedWithObservers,
+                               ReadWriteImplKind::MaterializeToTemporary);
+      } else {
+        return StorageImplInfo(ReadImplKind::Stored,
+                               WriteImplKind::StoredWithObservers,
+                               ReadWriteImplKind::MaterializeToTemporary);
+      }
     }
   }
 
-  assert(!Set || Get);
+  // Okay, observers are out of the way.
+  assert(!WillSet && !DidSet);
 
-  if (Set || Get) {
-    if (attrs.hasAttribute<SILStoredAttr>())
-      // Turn this into a stored property with trivial accessors.
-      return StorageImplInfo::getSimpleStored(Set != nullptr);
-    else
-      // Turn this into a computed variable.
-      return StorageImplInfo::getComputed(Set != nullptr);
+  // 'get', 'read', and a non-mutable addressor are all exclusive.
+  ReadImplKind readImpl;
+  if (Get) {
+    diagnoseConflictingAccessors(P, Get, Read);
+    diagnoseConflictingAccessors(P, Get, Address);
+    readImpl = ReadImplKind::Get;
+  } else if (Read) {
+    diagnoseConflictingAccessors(P, Read, Address);
+    readImpl = ReadImplKind::Read;
+  } else if (Address) {
+    readImpl = ReadImplKind::Address;
+
+  // If there's a writing accessor of any sort, there must also be a
+  // reading accessor.
+  } else if (auto mutator = findFirstMutator()) {
+    if (!invalid) {
+      P.diagnose(mutator->getLoc(),
+                 // Don't mention the more advanced accessors if the user
+                 // only provided a setter without a getter.
+                 (MutableAddress || Modify)
+                   ? diag::missing_reading_accessor
+                   : diag::missing_getter,
+                 isa<SubscriptDecl>(storage),
+                 getAccessorNameForDiagnostic(mutator, /*article*/ true));
+    }
+    createImplicitAccessor(AccessorKind::Get);
+    readImpl = ReadImplKind::Get;
+
+  // Subscripts always have to have some sort of accessor; they can't be
+  // purely stored.
+  } else if (isa<SubscriptDecl>(storage)) {
+    if (!invalid) {
+      P.diagnose(LBLoc, diag::subscript_without_get);
+    }
+
+    createImplicitAccessor(AccessorKind::Get);
+    readImpl = ReadImplKind::Get;
+
+  // Otherwise, it's stored.
   } else {
-    // Otherwise this decl is invalid and the accessors have been rejected above.
-    // Make sure to at least record the braces range in the AST.
-    return StorageImplInfo::getSimpleStored(/*mutable*/ true);
+    readImpl = ReadImplKind::Stored;
   }
+
+  // A mutable addressor is exclusive with 'set' and 'modify', but
+  // 'set' and 'modify' can appear together.
+  // Prefer using 'set' and 'modify' over a mutable addressor.
+  WriteImplKind writeImpl;
+  ReadWriteImplKind readWriteImpl;
+  if (Set) {
+    diagnoseConflictingAccessors(P, Set, MutableAddress);
+    writeImpl = WriteImplKind::Set;
+    if (Modify) {
+      readWriteImpl = ReadWriteImplKind::Modify;
+    } else {
+      readWriteImpl = ReadWriteImplKind::MaterializeToTemporary;
+    }
+  } else if (Modify) {
+    diagnoseConflictingAccessors(P, Modify, MutableAddress);
+    writeImpl = WriteImplKind::Modify;
+    readWriteImpl = ReadWriteImplKind::Modify;
+  } else if (MutableAddress) {
+    writeImpl = WriteImplKind::MutableAddress;
+    readWriteImpl = ReadWriteImplKind::MutableAddress;
+
+  // Otherwise, it's stored if there was no specific reading accessor.
+  } else if (readImpl == ReadImplKind::Stored) {
+    writeImpl = WriteImplKind::Stored;
+    readWriteImpl = ReadWriteImplKind::Stored;
+
+  // Otherwise, it's immutable.
+  } else {
+    writeImpl = WriteImplKind::Immutable;
+    readWriteImpl = ReadWriteImplKind::Immutable;
+  }
+
+  // Allow the sil_stored attribute to override all the accessors we parsed
+  // when making the final classification.
+  if (attrs.hasAttribute<SILStoredAttr>()) {
+    return StorageImplInfo::getSimpleStored(Set != nullptr);
+  }
+
+  return StorageImplInfo(readImpl, writeImpl, readWriteImpl);
 }
 
 
@@ -5192,10 +5220,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     if (Flags & PD_InProtocol) {
       switch (StaticSpelling) {
       case StaticSpellingKind::None: {
-        auto Message = Context.isSwiftVersion3()
-                           ? diag::swift3_operator_static_in_protocol
-                           : diag::operator_static_in_protocol;
-        diagnose(NameLoc, Message, SimpleName.str())
+        diagnose(NameLoc, diag::operator_static_in_protocol, SimpleName.str())
             .fixItInsert(FuncLoc, "static ");
         StaticSpelling = StaticSpellingKind::KeywordStatic;
         break;
@@ -5233,21 +5258,21 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   if (SignatureHasCodeCompletion && !CodeCompletion)
     return makeParserCodeCompletionStatus();
 
-  SmallVector<ParameterList*, 8> BodyParams;
-  
-  // If we're within a container, add an implicit first pattern to match the
-  // container type as an element named 'self'.
+  // If we're within a container, create a parameter to match the
+  // container type named 'self'.
   //
   // This turns an instance function "(int)->int" on FooTy into
   // "(inout self: FooTy)->(int)->int", and a static function
   // "(int)->int" on FooTy into "(self: FooTy.Type)->(int)->int".
   // Note that we can't actually compute the type here until Sema.
+  ParamDecl *SelfDecl = nullptr;
   if (HasContainerType)
-    BodyParams.push_back(ParameterList::createUnboundSelf(NameLoc, CurDeclContext));
+    SelfDecl = ParamDecl::createUnboundSelf(NameLoc, CurDeclContext);
 
-  DefaultArgumentInfo DefaultArgs(HasContainerType);
+  DefaultArgumentInfo DefaultArgs;
   TypeRepr *FuncRetTy = nullptr;
   DeclName FullName;
+  ParameterList *BodyParams;
   SourceLoc throwsLoc;
   bool rethrows;
   ParserStatus SignatureStatus =
@@ -5266,7 +5291,8 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   auto *FD = FuncDecl::create(Context, StaticLoc, StaticSpelling,
                               FuncLoc, FullName, NameLoc,
                               /*Throws=*/throwsLoc.isValid(), throwsLoc,
-                              nullptr, BodyParams, FuncRetTy,
+                              /*GenericParams=*/nullptr,
+                              SelfDecl, BodyParams, FuncRetTy,
                               CurDeclContext);
 
   // Parse a 'where' clause if present, adding it to our GenericParamList.
@@ -5310,15 +5336,15 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     if (SignatureHasCodeCompletion)
       CodeCompletion->setParsedDecl(FD);
 
-    DefaultArgs.setFunctionContext(FD, FD->getParameterLists());
-    for (auto PL : FD->getParameterLists())
-      addParametersToScope(PL);
+    DefaultArgs.setFunctionContext(FD, FD->getParameters());
+    if (auto *P = FD->getImplicitSelfDecl())
+      addToScope(P);
+    addParametersToScope(FD->getParameters());
     setLocalDiscriminator(FD);
     
     // Establish the new context.
     ParseFunctionBody CC(*this, FD);
-    for (auto PL : FD->getParameterLists())
-      setLocalDiscriminatorToParamList(PL);
+    setLocalDiscriminatorToParamList(FD->getParameters());
 
     // Check to see if we have a "{" to start a brace statement.
     if (Tok.is(tok::l_brace)) {
@@ -5389,8 +5415,7 @@ bool Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
   // Re-enter the lexical scope.
   Scope S(this, FunctionParserState->takeScope());
   ParseFunctionBody CC(*this, AFD);
-  for (auto PL : AFD->getParameterLists())
-    setLocalDiscriminatorToParamList(PL);
+  setLocalDiscriminatorToParamList(AFD->getParameters());
 
   ParserResult<BraceStmt> Body =
       parseBraceItemList(diag::func_decl_without_brace);
@@ -6166,7 +6191,7 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     return makeParserCodeCompletionStatus();
 
   // Parse the parameters.
-  DefaultArgumentInfo DefaultArgs(/*inTypeContext*/true);
+  DefaultArgumentInfo DefaultArgs;
   llvm::SmallVector<Identifier, 4> namePieces;
   bool SignatureHasCodeCompletion = false;
   ParserResult<ParameterList> Params
@@ -6226,7 +6251,7 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   // No need to setLocalDiscriminator.
 
-  DefaultArgs.setFunctionContext(CD, CD->getParameterLists());
+  DefaultArgs.setFunctionContext(CD, CD->getParameters());
 
   // Pass the function signature to code completion.
   if (SignatureHasCodeCompletion)
@@ -6253,8 +6278,7 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     } else {
       // Parse the body.
       ParseFunctionBody CC(*this, CD);
-      for (auto PL : CD->getParameterLists())
-        setLocalDiscriminatorToParamList(PL);
+      setLocalDiscriminatorToParamList(CD->getParameters());
 
       if (!isDelayedParsingEnabled()) {
         if (Context.Stats)
@@ -6428,15 +6452,9 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
   SourceLoc lBraceLoc;
   if (consumeIf(tok::l_brace, lBraceLoc)) {
     if (isInfix && !Tok.is(tok::r_brace)) {
-      auto message = Context.isSwiftVersion3()
-                         ? diag::swift3_deprecated_operator_body_use_group
-                         : diag::deprecated_operator_body_use_group;
-      diagnose(lBraceLoc, message);
+      diagnose(lBraceLoc, diag::deprecated_operator_body_use_group);
     } else {
-      auto message = Context.isSwiftVersion3()
-                         ? diag::swift3_deprecated_operator_body
-                         : diag::deprecated_operator_body;
-      auto Diag = diagnose(lBraceLoc, message);
+      auto Diag = diagnose(lBraceLoc, diag::deprecated_operator_body);
       if (Tok.is(tok::r_brace)) {
         SourceLoc lastGoodLoc = precedenceGroupNameLoc;
         if (lastGoodLoc.isInvalid())

@@ -64,6 +64,38 @@ void PrintOptions::clearSynthesizedExtension() {
   TransformContext.reset();
 }
 
+PrintOptions PrintOptions::printTextualInterfaceFile() {
+  PrintOptions result;
+  result.PrintLongAttrsOnSeparateLines = true;
+  result.TypeDefinitions = true;
+  result.PrintIfConfig = false;
+  result.FullyQualifiedTypes = true;
+  result.SkipImports = true;
+
+  class UsableFromInlineOnly : public ShouldPrintChecker {
+    bool shouldPrint(const Decl *D, PrintOptions &options) override {
+      if (auto *VD = dyn_cast<ValueDecl>(D)) {
+        AccessScope accessScope =
+            VD->getFormalAccessScope(/*useDC*/nullptr,
+                                     /*treatUsableFromInlineAsPublic*/true);
+        if (!accessScope.isPublic())
+          return false;
+      }
+      return ShouldPrintChecker::shouldPrint(D, options);
+    }
+  };
+  result.CurrentPrintabilityChecker = std::make_shared<UsableFromInlineOnly>();
+
+  // FIXME: We don't really need 'public' on everything; we could just change
+  // the default to 'public' and mark the 'internal' things.
+  result.PrintAccess = true;
+
+  // FIXME: We'll need the actual default parameter expression.
+  result.PrintDefaultParameterPlaceholder = false;
+
+  return result;
+}
+
 TypeTransformContext::TypeTransformContext(Type T)
     : BaseType(T.getPointer()) {
   assert(T->mayHaveMembers());
@@ -622,12 +654,11 @@ private:
   bool printASTNodes(const ArrayRef<ASTNode> &Elements, bool NeedIndent = true);
 
   void printOneParameter(const ParamDecl *param, ParameterTypeFlags paramFlags,
-                         bool Curried, bool ArgNameIsAPIByDefault);
+                         bool ArgNameIsAPIByDefault);
 
   void printParameterList(ParameterList *PL,
                           ArrayRef<AnyFunctionType::Param> params,
-                          bool isCurried,
-                          llvm::function_ref<bool()> isAPINameByDefault);
+                          bool isAPINameByDefault);
 
   /// \brief Print the function parameters in curried or selector style,
   /// to match the original function declaration.
@@ -1398,6 +1429,7 @@ static bool isAccessorAssumedNonMutating(AccessorDecl *accessor) {
   switch (accessor->getAccessorKind()) {
   case AccessorKind::Get:
   case AccessorKind::Address:
+  case AccessorKind::Read:
     return true;
 
   case AccessorKind::Set:
@@ -1405,6 +1437,7 @@ static bool isAccessorAssumedNonMutating(AccessorDecl *accessor) {
   case AccessorKind::DidSet:
   case AccessorKind::MaterializeForSet:
   case AccessorKind::MutableAddress:
+  case AccessorKind::Modify:
     return false;
   }
   llvm_unreachable("bad addressor kind");
@@ -1566,6 +1599,9 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
     case ReadImplKind::Address:
       PrintAccessor(ASD->getAddressor());
       break;
+    case ReadImplKind::Read:
+      PrintAccessor(ASD->getReadCoroutine());
+      break;
     }
     switch (impl.getWriteImpl()) {
     case WriteImplKind::Immutable:
@@ -1579,12 +1615,16 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
       break;
     case WriteImplKind::Set:
       PrintAccessor(ASD->getSetter());
-      // FIXME: ReadWriteImplKind::Modify
+      if (impl.getReadWriteImpl() == ReadWriteImplKind::Modify)
+        PrintAccessor(ASD->getModifyCoroutine());
       break;
     case WriteImplKind::MutableAddress:
       PrintAccessor(ASD->getMutableAddressor());
       PrintAccessor(ASD->getWillSetFunc());
       PrintAccessor(ASD->getDidSetFunc());
+      break;
+    case WriteImplKind::Modify:
+      PrintAccessor(ASD->getModifyCoroutine());
       break;
     }
   }
@@ -1794,8 +1834,7 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
     recordDeclLoc(decl, [&]{
       // We cannot extend sugared types.
       Type extendedType = decl->getExtendedType();
-      NominalTypeDecl *nominal = extendedType ? extendedType->getAnyNominal() : nullptr;
-      if (!nominal) {
+      if (!extendedType || !extendedType->getAnyNominal()) {
         // Fallback to TypeRepr.
         printTypeLoc(decl->getExtendedTypeLoc());
         return;
@@ -2202,7 +2241,7 @@ void PrintAST::visitParamDecl(ParamDecl *decl) {
 }
 
 void PrintAST::printOneParameter(const ParamDecl *param,
-                                 ParameterTypeFlags paramFlags, bool Curried,
+                                 ParameterTypeFlags paramFlags,
                                  bool ArgNameIsAPIByDefault) {
   Printer.callPrintStructurePre(PrintStructureKind::FunctionParameter, param);
   SWIFT_DEFER {
@@ -2288,8 +2327,8 @@ void PrintAST::printOneParameter(const ParamDecl *param,
     Printer << "...";
 
   if (param->isDefaultArgument()) {
-    auto defaultArgStr
-      = getDefaultArgumentSpelling(param->getDefaultArgumentKind());
+    StringRef defaultArgStr = param->getDefaultValueStringRepresentation();
+
     if (defaultArgStr.empty()) {
       if (Options.PrintDefaultParameterPlaceholder)
         Printer << " = " << tok::kw_default;
@@ -2302,6 +2341,7 @@ void PrintAST::printOneParameter(const ParamDecl *param,
       case DefaultArgumentKind::Column:
       case DefaultArgumentKind::Function:
       case DefaultArgumentKind::DSOHandle:
+      case DefaultArgumentKind::NilLiteral:
         Printer.printKeyword(defaultArgStr);
         break;
       default:
@@ -2314,8 +2354,7 @@ void PrintAST::printOneParameter(const ParamDecl *param,
 
 void PrintAST::printParameterList(ParameterList *PL,
                                   ArrayRef<AnyFunctionType::Param> params,
-                                  bool isCurried,
-                                  llvm::function_ref<bool()> isAPINameByDefault) {
+                                  bool isAPINameByDefault) {
   Printer << "(";
   const unsigned paramSize = params.size();
   for (unsigned i = 0, e = PL->size(); i != e; ++i) {
@@ -2324,47 +2363,32 @@ void PrintAST::printParameterList(ParameterList *PL,
     auto paramFlags = (i < paramSize)
                     ? params[i].getParameterFlags()
                     : ParameterTypeFlags();
-    printOneParameter(PL->get(i), paramFlags, isCurried,
-                      isAPINameByDefault());
+    printOneParameter(PL->get(i), paramFlags,
+                      isAPINameByDefault);
   }
   Printer << ")";
 }
 
 void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
-  auto BodyParams = AFD->getParameterLists();
+  auto BodyParams = AFD->getParameters();
   auto curTy = AFD->hasInterfaceType() ? AFD->getInterfaceType() : nullptr;
 
   // Skip over the implicit 'self'.
-  if (AFD->getImplicitSelfDecl()) {
-    BodyParams = BodyParams.slice(1);
+  if (AFD->hasImplicitSelfDecl()) {
     if (curTy)
       if (auto funTy = curTy->getAs<AnyFunctionType>())
         curTy = funTy->getResult();
   }
 
-  SmallVector<ArrayRef<AnyFunctionType::Param>, 4> parameterListTypes;
-  for (unsigned i = 0; i < BodyParams.size(); ++i) {
-    if (curTy) {
-      if (auto funTy = curTy->getAs<AnyFunctionType>()) {
-        parameterListTypes.push_back(funTy->getParams());
-        if (i < BodyParams.size() - 1)
-          curTy = funTy->getResult();
-      }
+  ArrayRef<AnyFunctionType::Param> parameterListTypes;
+  if (curTy) {
+    if (auto funTy = curTy->getAs<AnyFunctionType>()) {
+      parameterListTypes = funTy->getParams();
     }
   }
 
-  for (unsigned CurrPattern = 0, NumPatterns = BodyParams.size();
-       CurrPattern != NumPatterns; ++CurrPattern) {
-    // Be extra careful in the event of printing mal-formed ASTs
-    auto paramListType = CurrPattern < parameterListTypes.size()
-                             ? parameterListTypes[CurrPattern]
-                             : ArrayRef<AnyFunctionType::Param>();
-    printParameterList(BodyParams[CurrPattern], paramListType,
-                       /*isCurried=*/CurrPattern > 0,
-                       [&]()->bool {
-      return CurrPattern > 0 || AFD->argumentNameIsAPIByDefault();
-    });
-  }
+  printParameterList(BodyParams, parameterListTypes,
+                     AFD->argumentNameIsAPIByDefault());
 
   if (AFD->hasThrows()) {
     if (AFD->getAttrs().hasAttribute<RethrowsAttr>())
@@ -2401,6 +2425,8 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
   switch (auto kind = decl->getAccessorKind()) {
   case AccessorKind::Get:
   case AccessorKind::Address:
+  case AccessorKind::Read:
+  case AccessorKind::Modify:
   case AccessorKind::DidSet:
   case AccessorKind::MaterializeForSet:
   case AccessorKind::MutableAddress:
@@ -2416,7 +2442,7 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
       [&]{
         Printer << getAccessorLabel(decl);
 
-        auto params = decl->getParameterLists().back();
+        auto params = decl->getParameters();
         if (params->size() != 0 && !params->get(0)->isImplicit()) {
           auto Name = params->get(0)->getName();
           if (!Name.empty()) {
@@ -2554,8 +2580,8 @@ void PrintAST::printEnumElement(EnumElementDecl *elt) {
                                       ->castTo<AnyFunctionType>()
                                       ->getParams();
     }
-    printParameterList(PL, params, /*isCurried=*/false,
-                       /*isAPINameByDefault*/[]()->bool{return true;});
+    printParameterList(PL, params,
+                       /*isAPINameByDefault*/true);
   }
 
   auto *raw = elt->getRawValueExpr();
@@ -2628,8 +2654,8 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
       // Walk to the params of the subscript's indices.
       params = decl->getInterfaceType()->castTo<AnyFunctionType>()->getParams();
     }
-    printParameterList(decl->getIndices(), params, /*isCurried=*/false,
-                       /*isAPINameByDefault*/[]()->bool{return false;});
+    printParameterList(decl->getIndices(), params,
+                       /*isAPINameByDefault*/false);
   });
   Printer << " -> ";
 
@@ -2833,6 +2859,26 @@ void PrintAST::visitReturnStmt(ReturnStmt *stmt) {
     Printer << " ";
     // FIXME: print expression.
   }
+}
+
+void PrintAST::visitYieldStmt(YieldStmt *stmt) {
+  Printer.printKeyword("yield");
+  Printer << " ";
+  bool parens = (stmt->getYields().size() != 1
+                 || stmt->getLParenLoc().isValid());
+  if (parens) Printer << "(";
+  bool first = true;
+  for (auto yield : stmt->getYields()) {
+    if (first) {
+      first = false;
+    } else {
+      Printer << ", ";
+    }
+
+    // FIXME: print expression.
+    (void) yield;
+  }
+  if (parens) Printer << ")";
 }
 
 void PrintAST::visitThrowStmt(ThrowStmt *stmt) {

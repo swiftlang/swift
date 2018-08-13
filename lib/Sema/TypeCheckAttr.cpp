@@ -71,6 +71,7 @@ public:
 
 #define IGNORED_ATTR(X) void visit##X##Attr(X##Attr *) {}
   IGNORED_ATTR(Available)
+  IGNORED_ATTR(HasInitialValue)
   IGNORED_ATTR(CDecl)
   IGNORED_ATTR(ClangImporterSynthesizedType)
   IGNORED_ATTR(Convenience)
@@ -130,7 +131,7 @@ public:
         range.End = range.End.getAdvancedLoc(1);
       diag.fixItRemove(range);
 
-      auto *last = FD->getParameterList(FD->getNumParameterLists() - 1);
+      auto *last = FD->getParameters();
 
       // If the declaration already has a result type, we're going
       // to change it to 'Never'.
@@ -375,11 +376,9 @@ void AttributeEarlyChecker::visitIBActionAttr(IBActionAttr *attr) {
 
 void AttributeEarlyChecker::visitIBDesignableAttr(IBDesignableAttr *attr) {
   if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
-    if (auto extendedType = ED->getExtendedType()) {
-      if (auto *nominalDecl = extendedType->getAnyNominal()) {
-        if (!isa<ClassDecl>(nominalDecl))
-          diagnoseAndRemoveAttr(attr, diag::invalid_ibdesignable_extension);
-      }
+    if (auto nominalDecl = ED->getExtendedNominal()) {
+      if (!isa<ClassDecl>(nominalDecl))
+        diagnoseAndRemoveAttr(attr, diag::invalid_ibdesignable_extension);
     }
   }
 }
@@ -777,6 +776,7 @@ public:
     void visit##CLASS##Attr(CLASS##Attr *) {}
 
     IGNORED_ATTR(Alignment)
+    IGNORED_ATTR(HasInitialValue)
     IGNORED_ATTR(ClangImporterSynthesizedType)
     IGNORED_ATTR(Consuming)
     IGNORED_ATTR(Convenience)
@@ -930,7 +930,7 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *funcDecl, DeclContext *DC,
   //    `ExpressibleByStringLiteral`.
   //    `D.Value` and the return type can be arbitrary.
 
-  auto paramList = funcDecl->getParameterList(1);
+  auto paramList = funcDecl->getParameters();
   if (paramList->size() != 1 || paramList->get(0)->isVariadic()) return false;
   auto argType = paramList->get(0)->getType();
 
@@ -1094,7 +1094,7 @@ void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {
     return;
   }
 
-  auto paramList = FD->getParameterList(1);
+  auto paramList = FD->getParameters();
   bool relaxedIBActionUsedOnOSX = false;
   bool Valid = true;
   switch (paramList->size()) {
@@ -1502,7 +1502,7 @@ static bool isObjCClassExtensionInOverlay(DeclContext *dc) {
     return false;
 
   // Find the extended class.
-  auto classDecl = ext->getExtendedType()->getClassOrBoundGenericClass();
+  auto classDecl = ext->getAsClassOrClassExtensionContext();
   if (!classDecl)
     return false;
 
@@ -1570,12 +1570,11 @@ void AttributeChecker::visitRethrowsAttr(RethrowsAttr *attr) {
   // 'rethrows' only applies to functions that take throwing functions
   // as parameters.
   auto fn = cast<AbstractFunctionDecl>(D);
-  for (auto paramList : fn->getParameterLists()) {
-    for (auto param : *paramList)
-      if (hasThrowingFunctionParameter(param->getType()
-              ->lookThroughAllOptionalTypes()
-              ->getCanonicalType()))
-        return;
+  for (auto param : *fn->getParameters()) {
+    if (hasThrowingFunctionParameter(param->getType()
+            ->lookThroughAllOptionalTypes()
+            ->getCanonicalType()))
+      return;
   }
 
   TC.diagnose(attr->getLocation(), diag::rethrows_without_throwing_parameter);
@@ -1591,12 +1590,12 @@ void AttributeChecker::visitAccessControlAttr(AccessControlAttr *attr) {
       return;
     }
 
-    Type extendedTy = extension->getExtendedType();
-    AccessLevel typeAccess = extendedTy->getAnyNominal()->getFormalAccess();
+    NominalTypeDecl *nominal = extension->getExtendedNominal();
+    AccessLevel typeAccess = nominal->getFormalAccess();
     if (attr->getAccess() > typeAccess) {
       TC.diagnose(attr->getLocation(), diag::access_control_extension_more,
                   typeAccess,
-                  extendedTy->getAnyNominal()->getDescriptiveKind(),
+                  nominal->getDescriptiveKind(),
                   attr->getAccess())
         .fixItRemove(attr->getRange());
       attr->setInvalid();
@@ -1618,15 +1617,21 @@ void AttributeChecker::visitAccessControlAttr(AccessControlAttr *attr) {
       return;
     }
 
-    auto extAttr = extension->getAttrs().getAttribute<AccessControlAttr>();
-    if (extAttr && attr->getAccess() > extAttr->getAccess()) {
-      auto diag = TC.diagnose(attr->getLocation(),
-                              diag::access_control_ext_member_more,
-                              attr->getAccess(),
-                              D->getDescriptiveKind(),
-                              extAttr->getAccess());
-      swift::fixItAccess(diag, cast<ValueDecl>(D), extAttr->getAccess());
-      return;
+    if (auto extAttr =
+        extension->getAttrs().getAttribute<AccessControlAttr>()) {
+      // Extensions are top level declarations, for which the literally lowest
+      // access level `private` is equivalent to `fileprivate`.
+      AccessLevel extAccess = std::max(extAttr->getAccess(),
+                                       AccessLevel::FilePrivate);
+      if (attr->getAccess() > extAccess) {
+        auto diag = TC.diagnose(attr->getLocation(),
+                                diag::access_control_ext_member_more,
+                                attr->getAccess(),
+                                D->getDescriptiveKind(),
+                                extAttr->getAccess());
+        swift::fixItAccess(diag, cast<ValueDecl>(D), extAccess);
+        return;
+      }
     }
   }
 
@@ -2036,11 +2041,10 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
 void AttributeChecker::visitFixedLayoutAttr(FixedLayoutAttr *attr) {
   auto *VD = cast<ValueDecl>(D);
 
-  auto access = VD->getFormalAccess(/*useDC=*/nullptr,
-                                    /*treatUsableFromInlineAsPublic=*/true);
-  if (access < AccessLevel::Public) {
+  if (VD->getFormalAccess() < AccessLevel::Public &&
+      !VD->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
     diagnoseAndRemoveAttr(attr, diag::fixed_layout_attr_on_internal_type,
-                          VD->getFullName(), access);
+                          VD->getFullName(), VD->getFormalAccess());
   }
 }
 
@@ -2195,9 +2199,8 @@ void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
     break;
   }
 
-  auto access = ED->getFormalAccess(/*useDC=*/nullptr,
-                                    /*treatUsableFromInlineAsPublic=*/true);
-  if (access < AccessLevel::Public) {
+  if (ED->getFormalAccess() < AccessLevel::Public &&
+      !ED->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
     diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonpublic, attr);
   }
 }

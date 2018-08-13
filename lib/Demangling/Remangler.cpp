@@ -629,17 +629,20 @@ void Remangler::mangleBuiltinTypeName(Node *node) {
   } else if (text.consume_front(BUILTIN_TYPE_NAME_FLOAT)) {
     Buffer << 'f' << text << '_';
   } else if (text.consume_front(BUILTIN_TYPE_NAME_VEC)) {
-    auto split = text.split('x');
-    if (split.second == "RawPointer") {
+    // Avoid using StringRef::split because its definition is not
+    // provided in the header so that it requires linking with libSupport.a.
+    size_t splitIdx = text.find('x');
+    auto element = text.substr(splitIdx).substr(1);
+    if (element == "RawPointer") {
       Buffer << 'p';
-    } else if (split.second.consume_front("Float")) {
-      Buffer << 'f' << split.second << '_';
-    } else if (split.second.consume_front("Int")) {
-      Buffer << 'i' << split.second << '_';
+    } else if (element.consume_front("Float")) {
+      Buffer << 'f' << element << '_';
+    } else if (element.consume_front("Int")) {
+      Buffer << 'i' << element << '_';
     } else {
       unreachable("unexpected builtin vector type");
     }
-    Buffer << "Bv" << split.first << '_';
+    Buffer << "Bv" << text.substr(0, splitIdx) << '_';
   } else {
     unreachable("unexpected builtin type");
   }
@@ -1122,8 +1125,20 @@ void Remangler::mangleGenericSpecialization(Node *node) {
   }
   assert(!FirstParam && "generic specialization with no substitutions");
 
-  Buffer << (node->getKind() ==
-               Node::Kind::GenericSpecializationNotReAbstracted ? "TG" : "Tg");
+  switch (node->getKind()) {
+  case Node::Kind::GenericSpecialization:
+    Buffer << "Tg";
+    break;
+  case Node::Kind::GenericSpecializationNotReAbstracted:
+    Buffer << "TG";
+    break;
+  case Node::Kind::InlinedGenericFunction:
+    Buffer << "Ti";
+    break;
+ default:
+   unreachable("unsupported node");
+  }
+
   for (NodePointer Child : *node) {
     if (Child->getKind() != Node::Kind::GenericSpecializationParam)
       mangle(Child);
@@ -1133,6 +1148,11 @@ void Remangler::mangleGenericSpecialization(Node *node) {
 void Remangler::mangleGenericSpecializationNotReAbstracted(Node *node) {
   mangleGenericSpecialization(node);
 }
+
+void Remangler::mangleInlinedGenericFunction(Node *node) {
+  mangleGenericSpecialization(node);
+}
+
 
 void Remangler::mangleGenericSpecializationParam(Node *node) {
   unreachable("handled inline");
@@ -1161,6 +1181,7 @@ void Remangler::mangleGlobal(Node *node) {
       case Node::Kind::FunctionSignatureSpecialization:
       case Node::Kind::GenericSpecialization:
       case Node::Kind::GenericSpecializationNotReAbstracted:
+      case Node::Kind::InlinedGenericFunction:
       case Node::Kind::GenericPartialSpecialization:
       case Node::Kind::GenericPartialSpecializationNotReAbstracted:
       case Node::Kind::OutlinedBridgedMethod:
@@ -1412,6 +1433,10 @@ void Remangler::mangleMetaclass(Node *node) {
   Buffer << "Mm";
 }
 
+void Remangler::mangleModifyAccessor(Node *node) {
+  mangleAbstractStorage(node->getFirstChild(), "M");
+}
+
 void Remangler::mangleModule(Node *node) {
   if (node->getText() == STDLIB_NAME) {
     Buffer << 's';
@@ -1545,11 +1570,6 @@ void Remangler::mangleProtocolDescriptor(Node *node) {
   Buffer << "Mp";
 }
 
-void Remangler::mangleProtocolRequirementArray(Node *node) {
-  manglePureProtocol(getSingleChild(node));
-  Buffer << "WR";
-}
-
 void Remangler::mangleProtocolConformanceDescriptor(Node *node) {
   mangleProtocolConformance(node->getChild(0));
   Buffer << "Mc";
@@ -1629,6 +1649,10 @@ void Remangler::mangleReabstractionThunkHelper(Node *node) {
     mangleChildNodes(node);
   }
   Buffer << "TR";
+}
+
+void Remangler::mangleReadAccessor(Node *node) {
+  mangleAbstractStorage(node->getFirstChild(), "r");
 }
 
 void Remangler::mangleKeyPathGetterThunkHelper(Node *node) {
@@ -1761,6 +1785,11 @@ void Remangler::mangleTypeMetadataInstantiationCache(Node *node) {
 void Remangler::mangleTypeMetadataInstantiationFunction(Node *node) {
   mangleSingleChildNode(node);
   Buffer << "Mi";
+}
+
+void Remangler::mangleTypeMetadataInPlaceInitializationCache(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Ml";
 }
 
 void Remangler::mangleTypeMetadataCompletionFunction(Node *node) {

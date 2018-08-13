@@ -1194,7 +1194,7 @@ bb3:
 // CHECK: bb0(
 // CHECK-NOT: retain_value
 // CHECK: bb1:
-// CHECK: retain_value
+// CHECK-NEXT: unreachable
 // CHECK: bb2:
 // CHECK: retain_value
 sil @delete_instead_of_sinkretainsintounreachable_bb : $@convention(thin) (Optional<Builtin.NativeObject>) -> () {

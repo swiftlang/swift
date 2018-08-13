@@ -592,10 +592,6 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol) {
   // existential's list of conformances and the existential conforms to
   // itself.
   if (type->isExistentialType()) {
-    // FIXME: Recursion break.
-    if (!protocol->hasValidSignature())
-      return None;
-
     // If the existential type cannot be represented or the protocol does not
     // conform to itself, there's no point in looking further.
     if (!protocol->existentialConformsToSelf())
@@ -1383,6 +1379,7 @@ bool SourceFile::shouldCollectToken() const {
   switch (Kind) {
   case SourceFileKind::Library:
   case SourceFileKind::Main:
+  case SourceFileKind::Interface:
     return (bool)AllCorrectedTokens;
   case SourceFileKind::REPL:
   case SourceFileKind::SIL:
@@ -1394,6 +1391,7 @@ bool SourceFile::shouldBuildSyntaxTree() const {
   switch (Kind) {
   case SourceFileKind::Library:
   case SourceFileKind::Main:
+  case SourceFileKind::Interface:
     return SyntaxInfo.Enable;
   case SourceFileKind::REPL:
   case SourceFileKind::SIL:

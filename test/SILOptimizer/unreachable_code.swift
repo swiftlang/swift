@@ -15,6 +15,49 @@ func ifTrue() -> Int {
   return 0 // expected-warning {{will never be executed}}
 }
 
+func testUnreachableIfBranch() -> Int {
+  let a = 2
+  let c: Int
+  if a < 2 {  // expected-note {{condition always evaluates to false}}
+    c = 3     // expected-warning {{will never be executed}}
+  } else {
+    c = 4
+  }
+  return c
+}
+
+func testUnreachableIfBranch2() -> Int {
+  let a = 2
+  let c: Int
+  if a > 2 { // expected-note {{condition always evaluates to false}}
+    c = 3    // expected-warning {{will never be executed}}
+  } else {
+    c = 4
+  }
+  return c
+}
+
+func testUnreachableElseBranch() -> Int {
+  let a = 2
+  let c: Int
+  if a == 2 { // expected-note {{condition always evaluates to true}}
+    c = 3
+  } else {
+    c = 4     // expected-warning {{will never be executed}}
+  }
+  return c
+}
+
+// FIXME: False Negative: <rdar://39516135>. No warnings are produced here
+// as the statements along the unreachable branches are marked implicit.
+// Unreachable code analysis suppresses warnings in such cases.
+func testQuestionMarkOperator() -> Int {
+  let a = 2
+  let c: Int
+  c = (a < 2) ? 3 : 4
+  return c
+}
+
 // Work-around <rdar://problem/17687851> by ensuring there is
 // something that appears to be user code in unreachable blocks.
 func userCode() {}
@@ -285,7 +328,7 @@ func deferTryNoReturn() throws {
 }
 
 func noReturnInDefer() {
-  defer {
+  defer { // expected-warning {{'defer' statement before end of scope always executes immediately}}{{3-8=do}}
     _ = Lisp()
     die() // expected-note {{a call to a never-returning function}}
     die() // expected-warning {{will never be executed}}

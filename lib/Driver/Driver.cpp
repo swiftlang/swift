@@ -198,6 +198,12 @@ static void validateDebugInfoArgs(DiagnosticEngine &diags,
                      diag::verify_debug_info_requires_debug_option);
     }
   }
+
+  // Check for any -debug-prefix-map options that aren't of the form
+  // 'original=remapped' (either side can be empty, however).
+  for (auto A : args.getAllArgValues(options::OPT_debug_prefix_map))
+    if (A.find('=') == StringRef::npos)
+      diags.diagnose(SourceLoc(), diag::error_invalid_debug_prefix_map, A);
 }
 
 static void validateCompilationConditionArgs(DiagnosticEngine &diags,
@@ -612,6 +618,12 @@ static void validateEmbedBitcode(DerivedArgList &Args, const OutputInfo &OI,
     Diags.diagnose(SourceLoc(), diag::warn_ignore_embed_bitcode);
     Args.eraseArg(options::OPT_embed_bitcode);
   }
+
+  if (Args.hasArg(options::OPT_embed_bitcode_marker) &&
+      OI.CompilerOutputType != file_types::TY_Object) {
+    Diags.diagnose(SourceLoc(), diag::warn_ignore_embed_bitcode_marker);
+    Args.eraseArg(options::OPT_embed_bitcode_marker);
+  }
 }
 
 /// Gets the filelist threshold to use. Diagnoses and returns true on error.
@@ -718,7 +730,7 @@ createStatsReporter(const llvm::opt::InputArgList *ArgList,
   if (Inputs.size() == 1) {
     InputName = Inputs[0].second->getSpelling();
   }
-  StringRef OutputType = file_types::getTypeTempSuffix(OI.CompilerOutputType);
+  StringRef OutputType = file_types::getExtension(OI.CompilerOutputType);
   return llvm::make_unique<UnifiedStatsReporter>("swift-driver",
                                                  OI.ModuleName,
                                                  InputName,
@@ -746,6 +758,22 @@ computeContinueBuildingAfterErrors(const bool BatchMode,
   return BatchMode ||
          ArgList->hasArg(options::OPT_continue_building_after_errors);
 
+}
+
+static Optional<unsigned>
+getDriverBatchSizeLimit(llvm::opt::InputArgList &ArgList,
+                        DiagnosticEngine &Diags)
+{
+  if (const Arg *A = ArgList.getLastArg(options::OPT_driver_batch_size_limit)) {
+    unsigned Limit = 0;
+    if (StringRef(A->getValue()).getAsInteger(10, Limit)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(ArgList), A->getValue());
+    } else {
+      return Limit;
+    }
+  }
+  return None;
 }
 
 std::unique_ptr<Compilation>
@@ -874,6 +902,8 @@ Driver::buildCompilation(const ToolChain &TC,
   {
     const unsigned DriverBatchSeed = getDriverBatchSeed(*ArgList, Diags);
     const Optional<unsigned> DriverBatchCount = getDriverBatchCount(*ArgList, Diags);
+    const Optional<unsigned> DriverBatchSizeLimit =
+      getDriverBatchSizeLimit(*ArgList, Diags);
     const bool DriverForceOneBatchRepartition =
     ArgList->hasArg(options::OPT_driver_force_one_batch_repartition);
     const bool SaveTemps = ArgList->hasArg(options::OPT_save_temps);
@@ -897,6 +927,7 @@ Driver::buildCompilation(const ToolChain &TC,
         BatchMode,
         DriverBatchSeed,
         DriverBatchCount,
+        DriverBatchSizeLimit,
         DriverForceOneBatchRepartition,
         SaveTemps,
         ShowDriverTimeCompilation,
@@ -1226,7 +1257,7 @@ static void diagnoseOutputModeArg(DiagnosticEngine &diags, const Arg *arg,
   }
 }
 
-static bool isSDKTooOld(StringRef sdkPath, clang::VersionTuple minVersion,
+static bool isSDKTooOld(StringRef sdkPath, llvm::VersionTuple minVersion,
                         StringRef firstPrefix, StringRef secondPrefix = {}) {
   // FIXME: This is a hack.
   // We should be looking at the SDKSettings.plist.
@@ -1249,7 +1280,7 @@ static bool isSDKTooOld(StringRef sdkPath, clang::VersionTuple minVersion,
   if (versionEnd == StringRef::npos)
     return false;
 
-  clang::VersionTuple version;
+  llvm::VersionTuple version;
   if (version.tryParse(sdkDirName.slice(versionStart, versionEnd)))
     return false;
   return version < minVersion;
@@ -1259,14 +1290,14 @@ static bool isSDKTooOld(StringRef sdkPath, clang::VersionTuple minVersion,
 /// the given target.
 static bool isSDKTooOld(StringRef sdkPath, const llvm::Triple &target) {
   if (target.isMacOSX()) {
-    return isSDKTooOld(sdkPath, clang::VersionTuple(10, 14), "OSX");
+    return isSDKTooOld(sdkPath, llvm::VersionTuple(10, 14), "OSX");
 
   } else if (target.isiOS()) {
     // Includes both iOS and TVOS.
-    return isSDKTooOld(sdkPath, clang::VersionTuple(12, 0), "Simulator", "OS");
+    return isSDKTooOld(sdkPath, llvm::VersionTuple(12, 0), "Simulator", "OS");
 
   } else if (target.isWatchOS()) {
-    return isSDKTooOld(sdkPath, clang::VersionTuple(5, 0), "Simulator", "OS");
+    return isSDKTooOld(sdkPath, llvm::VersionTuple(5, 0), "Simulator", "OS");
 
   } else {
     return false;
@@ -1379,6 +1410,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     case options::OPT_dump_type_refinement_contexts:
     case options::OPT_dump_scope_maps:
     case options::OPT_dump_interface_hash:
+    case options::OPT_dump_type_info:
     case options::OPT_verify_debug_info:
       OI.CompilerOutputType = file_types::TY_Nothing;
       break;
@@ -1731,6 +1763,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_TBD:
       case file_types::TY_ModuleTrace:
       case file_types::TY_OptRecord:
+      case file_types::TY_SwiftModuleInterfaceFile:
         // We could in theory handle assembly or LLVM input, but let's not.
         // FIXME: What about LTO?
         Diags.diagnose(SourceLoc(), diag::error_unexpected_input_file,
@@ -2012,7 +2045,7 @@ static void formFilenameFromBaseAndExt(StringRef base, StringRef newExt,
 static Optional<StringRef> getOutputFilenameFromPathArgOrAsTopLevel(
     const OutputInfo &OI, const llvm::opt::DerivedArgList &Args,
     llvm::opt::OptSpecifier PathArg, file_types::ID ExpectedOutputType,
-    bool TreatAsTopLevelOutput, StringRef workingDirectory, StringRef ext,
+    bool TreatAsTopLevelOutput, StringRef workingDirectory,
     llvm::SmallString<128> &Buffer) {
   if (const Arg *A = Args.getLastArg(PathArg))
     return StringRef(A->getValue());
@@ -2026,13 +2059,17 @@ static Optional<StringRef> getOutputFilenameFromPathArgOrAsTopLevel(
       Buffer = A->getValue();
       llvm::sys::path::remove_filename(Buffer);
       llvm::sys::path::append(Buffer, OI.ModuleName);
-      llvm::sys::path::replace_extension(Buffer, ext);
+      llvm::sys::path::replace_extension(
+          Buffer, file_types::getExtension(ExpectedOutputType));
       return Buffer.str();
     }
 
     // A top-level output wasn't specified, so just output to
     // <ModuleName>.<ext>.
-    formFilenameFromBaseAndExt(OI.ModuleName, ext, workingDirectory, Buffer);
+    formFilenameFromBaseAndExt(OI.ModuleName,
+                               file_types::getExtension(ExpectedOutputType),
+                               workingDirectory,
+                               Buffer);
     return Buffer.str();
   }
 
@@ -2047,7 +2084,7 @@ static StringRef assignOutputName(Compilation &C, const JobAction *JA,
   // We should output to a temporary file, since we're not at the top level
   // (or are generating a bridging PCH, which is currently always a temp).
   StringRef Stem = llvm::sys::path::stem(BaseName);
-  StringRef Suffix = file_types::getTypeTempSuffix(JA->getType());
+  StringRef Suffix = file_types::getExtension(JA->getType());
   std::error_code EC = llvm::sys::fs::createTemporaryFile(Stem, Suffix, Buffer);
   if (EC) {
     Diags.diagnose(SourceLoc(), diag::error_unable_to_make_temporary_file,
@@ -2111,8 +2148,7 @@ static StringRef getOutputFilename(Compilation &C,
   if (isa<MergeModuleJobAction>(JA)) {
     auto optFilename = getOutputFilenameFromPathArgOrAsTopLevel(
         OI, Args, options::OPT_emit_module_path, file_types::TY_SwiftModuleFile,
-        OI.ShouldTreatModuleAsTopLevelOutput, workingDirectory,
-        SERIALIZED_MODULE_EXTENSION, Buffer);
+        OI.ShouldTreatModuleAsTopLevelOutput, workingDirectory, Buffer);
     if (optFilename)
       return *optFilename;
   }
@@ -2121,7 +2157,7 @@ static StringRef getOutputFilename(Compilation &C,
   if (isa<GenerateDSYMJobAction>(JA)) {
     Buffer = PrimaryInput;
     Buffer.push_back('.');
-    Buffer.append(file_types::getTypeTempSuffix(JA->getType()));
+    Buffer.append(file_types::getExtension(JA->getType()));
     return Buffer.str();
   }
 
@@ -2164,7 +2200,7 @@ static StringRef getOutputFilename(Compilation &C,
     return Buffer.str();
   }
 
-  StringRef Suffix = file_types::getTypeTempSuffix(JA->getType());
+  StringRef Suffix = file_types::getExtension(JA->getType());
   assert(Suffix.data() &&
          "All types used for output should have a suffix.");
 
@@ -2185,11 +2221,11 @@ static bool hasExistingAdditionalOutput(CommandOutput &output,
   return false;
 }
 
-static void addAuxiliaryOutput(Compilation &C, CommandOutput &output,
-                               file_types::ID outputType, const OutputInfo &OI,
-                               const TypeToPathMap *outputMap,
-                               StringRef workingDirectory,
-                               StringRef outputPath = StringRef()) {
+static void addAuxiliaryOutput(
+    Compilation &C, CommandOutput &output, file_types::ID outputType,
+    const OutputInfo &OI, const TypeToPathMap *outputMap,
+    StringRef workingDirectory, StringRef outputPath = StringRef(),
+    llvm::opt::OptSpecifier requireArg = llvm::opt::OptSpecifier()) {
 
   if (hasExistingAdditionalOutput(output, outputType, outputPath))
     return;
@@ -2206,6 +2242,10 @@ static void addAuxiliaryOutput(Compilation &C, CommandOutput &output,
     output.setAdditionalOutputForType(outputType, outputMapPath);
   } else if (!outputPath.empty()) {
     output.setAdditionalOutputForType(outputType, outputPath);
+  } else if (requireArg.isValid() && !C.getArgs().getLastArg(requireArg)) {
+    // This auxiliary output only exists if requireArg is passed, but it
+    // wasn't this time.
+    return;
   } else {
     // Put the auxiliary output file next to "the" primary output file.
     //
@@ -2230,7 +2270,7 @@ static void addAuxiliaryOutput(Compilation &C, CommandOutput &output,
 
     bool isTempFile = C.isTemporaryFile(path);
     llvm::sys::path::replace_extension(
-        path, file_types::getTypeTempSuffix(outputType));
+        path, file_types::getExtension(outputType));
     output.setAdditionalOutputForType(outputType, path);
     if (isTempFile)
       C.addTemporaryFile(path);
@@ -2253,7 +2293,7 @@ static void addDiagFileOutputForPersistentPCHAction(
   StringRef headerPath = output.getBaseInput(JA->getInputIndex());
   StringRef stem = llvm::sys::path::stem(headerPath);
   StringRef suffix =
-      file_types::getTypeTempSuffix(file_types::TY_SerializedDiagnostics);
+      file_types::getExtension(file_types::TY_SerializedDiagnostics);
   SmallString<256> outPathBuf;
 
   if (const Arg *A = C.getArgs().getLastArg(options::OPT_emit_module_path)) {
@@ -2432,6 +2472,14 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
                                       Output.get());
   }
 
+  if (isa<MergeModuleJobAction>(JA) ||
+      (isa<CompileJobAction>(JA) &&
+       OI.CompilerMode == OutputInfo::Mode::SingleCompile)) {
+    // An emit-tbd argument gets passed down to a job that sees the whole
+    // module, either the -merge-modules job or a -wmo compiler invocation.
+    chooseTBDPath(C, OI, OutputMap, workingDirectory, Buf, Output.get());
+  }
+
   if (isa<CompileJobAction>(JA))
     chooseDependenciesOutputPaths(C, OI, OutputMap, workingDirectory, Buf,
                                   Output.get());
@@ -2608,17 +2656,16 @@ void Driver::chooseSwiftModuleOutputPath(Compilation &C, const OutputInfo &OI,
   }
 
   const Arg *A = C.getArgs().getLastArg(options::OPT_emit_module_path);
+  using file_types::TY_SwiftModuleFile;
 
   if (!OFMModuleOutputPath.empty()) {
     // Prefer a path from the OutputMap.
-    Output->setAdditionalOutputForType(file_types::TY_SwiftModuleFile,
-                                       OFMModuleOutputPath);
+    Output->setAdditionalOutputForType(TY_SwiftModuleFile, OFMModuleOutputPath);
   } else if (A && OI.CompilerMode == OutputInfo::Mode::SingleCompile) {
     // We're performing a single compilation (and thus no merge module step),
     // so prefer to use -emit-module-path, if present.
-    Output->setAdditionalOutputForType(file_types::TY_SwiftModuleFile,
-                                       A->getValue());
-  } else if (Output->getPrimaryOutputType() == file_types::TY_SwiftModuleFile) {
+    Output->setAdditionalOutputForType(TY_SwiftModuleFile, A->getValue());
+  } else if (Output->getPrimaryOutputType() == TY_SwiftModuleFile) {
     // If the primary type is already a module type, we're out of
     // options for overriding the primary name choice: stop now.
     assert(!Output->getPrimaryOutputFilename().empty());
@@ -2628,29 +2675,28 @@ void Driver::chooseSwiftModuleOutputPath(Compilation &C, const OutputInfo &OI,
     // We're performing a single compile and don't have -emit-module-path,
     // but have been told to treat the module as a top-level output.
     // Determine an appropriate path.
+    llvm::SmallString<128> Path;
     if (const Arg *A = C.getArgs().getLastArg(options::OPT_o)) {
       // Put the module next to the top-level output.
-      llvm::SmallString<128> Path(A->getValue());
+      Path = A->getValue();
       llvm::sys::path::remove_filename(Path);
-      llvm::sys::path::append(Path, OI.ModuleName);
-      llvm::sys::path::replace_extension(Path, SERIALIZED_MODULE_EXTENSION);
-      Output->setAdditionalOutputForType(file_types::TY_SwiftModuleFile, Path);
     } else {
       // A top-level output wasn't specified, so just output to
-      // <ModuleName>.swiftmodule.
-      llvm::SmallString<128> Path(OI.ModuleName);
-      llvm::sys::path::replace_extension(Path, SERIALIZED_MODULE_EXTENSION);
-      Output->setAdditionalOutputForType(file_types::TY_SwiftModuleFile, Path);
+      // <ModuleName>.swiftmodule in the current directory.
     }
+    llvm::sys::path::append(Path, OI.ModuleName);
+    llvm::sys::path::replace_extension(
+        Path, file_types::getExtension(TY_SwiftModuleFile));
+    Output->setAdditionalOutputForType(TY_SwiftModuleFile, Path);
   } else if (Output->getPrimaryOutputType() != file_types::TY_Nothing) {
     // We're only generating the module as an intermediate, so put it next
     // to the primary output of the compile command.
     llvm::SmallString<128> Path(Output->getPrimaryOutputFilenames()[0]);
     assert(!Path.empty());
     bool isTempFile = C.isTemporaryFile(Path);
-    llvm::sys::path::replace_extension(Path, SERIALIZED_MODULE_EXTENSION);
-    Output->setAdditionalOutputForType(file_types::ID::TY_SwiftModuleFile,
-                                       Path);
+    llvm::sys::path::replace_extension(
+        Path, file_types::getExtension(TY_SwiftModuleFile));
+    Output->setAdditionalOutputForType(TY_SwiftModuleFile, Path);
     if (isTempFile)
       C.addTemporaryFile(Path);
   }
@@ -2679,7 +2725,8 @@ void Driver::chooseSwiftModuleDocOutputPath(Compilation &C,
     llvm::SmallString<128> Path(
         Output->getAnyOutputForType(file_types::TY_SwiftModuleFile));
     bool isTempFile = C.isTemporaryFile(Path);
-    llvm::sys::path::replace_extension(Path, SERIALIZED_MODULE_DOC_EXTENSION);
+    llvm::sys::path::replace_extension(
+        Path, file_types::getExtension(file_types::TY_SwiftModuleDocFile));
     Output->setAdditionalOutputForType(file_types::TY_SwiftModuleDocFile, Path);
     if (isTempFile)
       C.addTemporaryFile(Path);
@@ -2705,7 +2752,8 @@ void Driver::chooseRemappingOutputPath(Compilation &C,
   } else {
     llvm::SmallString<128> Path(Output->getPrimaryOutputFilenames()[0]);
     bool isTempFile = C.isTemporaryFile(Path);
-    llvm::sys::path::replace_extension(Path, "remap");
+    llvm::sys::path::replace_extension(Path,
+        file_types::getExtension(file_types::ID::TY_Remapping));
     Output->setAdditionalOutputForType(file_types::ID::TY_Remapping, Path);
     if (isTempFile)
       C.addTemporaryFile(Path);
@@ -2751,7 +2799,6 @@ void Driver::chooseDependenciesOutputPaths(Compilation &C, const OutputInfo &OI,
                        workingDirectory);
   }
   chooseLoadedModuleTracePath(C, OI, workingDirectory, Buf, Output);
-  chooseTBDPath(C, OI, workingDirectory, Buf, Output);
 }
 
 void Driver::chooseLoadedModuleTracePath(Compilation &C, const OutputInfo &OI,
@@ -2780,7 +2827,7 @@ void Driver::chooseLoadedModuleTracePath(Compilation &C, const OutputInfo &OI,
       filename = *getOutputFilenameFromPathArgOrAsTopLevel(
           OI, C.getArgs(), options::OPT_emit_loaded_module_trace_path,
           file_types::TY_ModuleTrace,
-          /*TreatAsTopLevelOutput=*/true, workingDirectory, "trace.json", Buf);
+          /*TreatAsTopLevelOutput=*/true, workingDirectory, Buf);
     }
 
     Output->setAdditionalOutputForType(file_types::TY_ModuleTrace, filename);
@@ -2788,22 +2835,18 @@ void Driver::chooseLoadedModuleTracePath(Compilation &C, const OutputInfo &OI,
 }
 
 void Driver::chooseTBDPath(Compilation &C, const OutputInfo &OI,
+                           const TypeToPathMap *OutputMap,
                            StringRef workingDirectory,
                            llvm::SmallString<128> &Buf,
                            CommandOutput *Output) const {
-  if (C.getArgs().hasArg(options::OPT_emit_tbd, options::OPT_emit_tbd_path)) {
-    if (OI.CompilerMode != OutputInfo::Mode::SingleCompile) {
-      llvm::outs() << "TBD emission has been disabled, because it requires a "
-                   << "single compiler invocation: consider enabling the "
-                   << "-whole-module-optimization flag.\n";
-    } else {
-      auto filename = *getOutputFilenameFromPathArgOrAsTopLevel(
-          OI, C.getArgs(), options::OPT_emit_tbd_path, file_types::TY_TBD,
-          /*TreatAsTopLevelOutput=*/true, workingDirectory, "tbd", Buf);
-
-      Output->setAdditionalOutputForType(file_types::TY_TBD, filename);
-    }
+  StringRef pathFromArgs;
+  if (const Arg *A = C.getArgs().getLastArg(options::OPT_emit_tbd_path)) {
+    pathFromArgs = A->getValue();
   }
+
+  addAuxiliaryOutput(C, *Output, file_types::TY_TBD, OI, OutputMap,
+                     workingDirectory, pathFromArgs,
+                     /*requireArg=*/options::OPT_emit_tbd);
 }
 
 void Driver::chooseOptimizationRecordPath(Compilation &C, const OutputInfo &OI,
@@ -2814,7 +2857,7 @@ void Driver::chooseOptimizationRecordPath(Compilation &C, const OutputInfo &OI,
     auto filename = *getOutputFilenameFromPathArgOrAsTopLevel(
         OI, C.getArgs(), options::OPT_save_optimization_record_path,
         file_types::TY_OptRecord, /*TreatAsTopLevelOutput=*/true,
-        workingDirectory, "opt.yaml", Buf);
+        workingDirectory, Buf);
 
     Output->setAdditionalOutputForType(file_types::TY_OptRecord, filename);
   } else

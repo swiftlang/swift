@@ -54,7 +54,7 @@ let _ = SameType<Y>.T.self // expected-error {{'SameType<Y>.T.Type' (aka 'X.Type
 let _ = SameType<X>.T.self
 
 struct Conforms<T> {}
-extension Conforms where T: P {
+extension Conforms where T: P { // expected-note 5 {{where 'T' = 'Y'}}
     typealias TypeAlias1 = T
     typealias TypeAlias2 = Y
     typealias TypeAlias3<U> = (T, U)
@@ -75,18 +75,18 @@ let _ = Conforms<X>.Decl3.self
 let _ = Conforms<X>.Decl4<X>.self
 let _ = Conforms<X>.Decl5<X>.self
 
-let _ = Conforms<Y>.TypeAlias1.self // expected-error {{type 'Y' does not conform to protocol 'P'}}
-let _ = Conforms<Y>.TypeAlias2.self // expected-error {{type 'Y' does not conform to protocol 'P'}}
+let _ = Conforms<Y>.TypeAlias1.self // expected-error {{referencing type alias 'TypeAlias1' on 'Conforms' requires that 'Y' conform to 'P'}}
+let _ = Conforms<Y>.TypeAlias2.self // expected-error {{referencing type alias 'TypeAlias2' on 'Conforms' requires that 'Y' conform to 'P'}}
 let _ = Conforms<Y>.TypeAlias3<X>.self // expected-error {{type 'Y' does not conform to protocol 'P'}}
-let _ = Conforms<Y>.Decl1.self // expected-error {{type 'Y' does not conform to protocol 'P'}}
-let _ = Conforms<Y>.Decl2.self // expected-error {{type 'Y' does not conform to protocol 'P'}}
-let _ = Conforms<Y>.Decl3.self // expected-error {{type 'Y' does not conform to protocol 'P'}}
+let _ = Conforms<Y>.Decl1.self // expected-error {{referencing struct 'Decl1' on 'Conforms' requires that 'Y' conform to 'P'}}
+let _ = Conforms<Y>.Decl2.self // expected-error {{referencing enum 'Decl2' on 'Conforms' requires that 'Y' conform to 'P'}}
+let _ = Conforms<Y>.Decl3.self // expected-error {{referencing class 'Decl3' on 'Conforms' requires that 'Y' conform to 'P'}}
 let _ = Conforms<Y>.Decl4<X>.self // expected-error {{type 'Y' does not conform to protocol 'P'}}
 let _ = Conforms<Y>.Decl5<X>.self // expected-error {{type 'Y' does not conform to protocol 'P'}}
 
-extension Conforms: AssociatedType where T: P {}
+extension Conforms: AssociatedType where T: P {} // expected-note {{where 'T' = 'Y'}}
 
-let _ = Conforms<Y>.T.self // expected-error {{type 'Y' does not conform to protocol 'P'}}
+let _ = Conforms<Y>.T.self // expected-error {{referencing type alias 'T' on 'Conforms' requires that 'Y' conform to 'P'}}
 
 let _ = Conforms<X>.T.self
 
@@ -174,6 +174,9 @@ let _ = SameType<Y>.Decl4<Y>.Decl5<X>.self // expected-error {{'SameType<Y>.Decl
 
 // Finally, extra complicated:
 extension Conforms.Decl4 where U: AssociatedType, U.T: P {
+// expected-note@-1 5 {{where 'U' = 'Y'}}
+// expected-note@-2 5 {{'U.T' = 'Z2.T' (aka 'Y')}}
+// expected-note@-3 5 {{'U.T' = 'Y.T'}}
     typealias TypeAlias1 = T
     typealias TypeAlias2 = Y
     typealias TypeAlias3<V> = (T, U, V)
@@ -196,20 +199,35 @@ let _ = Conforms<X>.Decl4<Z1>.Decl5<X>.self
 
 // Two different forms of badness, corresponding to the two requirements:
 
-let _ = Conforms<X>.Decl4<Y>.TypeAlias1.self // expected-error {{type 'Y' does not conform to protocol 'AssociatedType'}}
-let _ = Conforms<X>.Decl4<Y>.TypeAlias2.self // expected-error {{type 'Y' does not conform to protocol 'AssociatedType'}}
+let _ = Conforms<X>.Decl4<Y>.TypeAlias1.self
+// expected-error@-1 {{referencing type alias 'TypeAlias1' on 'Conforms.Decl4' requires that 'Y.T' conform to 'P'}}
+// expected-error@-2 {{referencing type alias 'TypeAlias1' on 'Conforms.Decl4' requires that 'Y' conform to 'AssociatedType'}}
+
+let _ = Conforms<X>.Decl4<Y>.TypeAlias2.self
+// expected-error@-1 {{referencing type alias 'TypeAlias2' on 'Conforms.Decl4' requires that 'Y.T' conform to 'P'}}
+// expected-error@-2 {{referencing type alias 'TypeAlias2' on 'Conforms.Decl4' requires that 'Y' conform to 'AssociatedType'}}
+
 let _ = Conforms<X>.Decl4<Y>.TypeAlias3<X>.self // expected-error {{type 'Y' does not conform to protocol 'AssociatedType'}}
-let _ = Conforms<X>.Decl4<Y>.Decl1.self // expected-error {{type 'Y' does not conform to protocol 'AssociatedType'}}
-let _ = Conforms<X>.Decl4<Y>.Decl2.self // expected-error {{type 'Y' does not conform to protocol 'AssociatedType'}}
-let _ = Conforms<X>.Decl4<Y>.Decl3.self // expected-error {{type 'Y' does not conform to protocol 'AssociatedType'}}
+let _ = Conforms<X>.Decl4<Y>.Decl1.self
+// expected-error@-1 {{referencing struct 'Decl1' on 'Conforms.Decl4' requires that 'Y.T' conform to 'P'}}
+// expected-error@-2 {{referencing struct 'Decl1' on 'Conforms.Decl4' requires that 'Y' conform to 'AssociatedType'}}
+
+let _ = Conforms<X>.Decl4<Y>.Decl2.self
+// expected-error@-1 {{referencing enum 'Decl2' on 'Conforms.Decl4' requires that 'Y.T' conform to 'P'}}
+// expected-error@-2 {{referencing enum 'Decl2' on 'Conforms.Decl4' requires that 'Y' conform to 'AssociatedType'}}
+
+let _ = Conforms<X>.Decl4<Y>.Decl3.self
+// expected-error@-1 {{referencing class 'Decl3' on 'Conforms.Decl4' requires that 'Y.T' conform to 'P'}}
+// expected-error@-2 {{referencing class 'Decl3' on 'Conforms.Decl4' requires that 'Y' conform to 'AssociatedType'}}
+
 let _ = Conforms<X>.Decl4<Y>.Decl4<X>.self // expected-error {{type 'Y' does not conform to protocol 'AssociatedType'}}
 let _ = Conforms<X>.Decl4<Y>.Decl5<X>.self // expected-error {{type 'Y' does not conform to protocol 'AssociatedType'}}
 
-let _ = Conforms<X>.Decl4<Z2>.TypeAlias1.self // expected-error {{type 'Z2.T' (aka 'Y') does not conform to protocol 'P'}}
-let _ = Conforms<X>.Decl4<Z2>.TypeAlias2.self // expected-error {{type 'Z2.T' (aka 'Y') does not conform to protocol 'P'}}
+let _ = Conforms<X>.Decl4<Z2>.TypeAlias1.self // expected-error {{referencing type alias 'TypeAlias1' on 'Conforms.Decl4' requires that 'Z2.T' (aka 'Y') conform to 'P'}}
+let _ = Conforms<X>.Decl4<Z2>.TypeAlias2.self // expected-error {{referencing type alias 'TypeAlias2' on 'Conforms.Decl4' requires that 'Z2.T' (aka 'Y') conform to 'P'}}
 let _ = Conforms<X>.Decl4<Z2>.TypeAlias3<X>.self // expected-error {{type 'Z2.T' (aka 'Y') does not conform to protocol 'P'}}
-let _ = Conforms<X>.Decl4<Z2>.Decl1.self // expected-error {{type 'Z2.T' (aka 'Y') does not conform to protocol 'P'}}
-let _ = Conforms<X>.Decl4<Z2>.Decl2.self // expected-error {{type 'Z2.T' (aka 'Y') does not conform to protocol 'P'}}
-let _ = Conforms<X>.Decl4<Z2>.Decl3.self // expected-error {{type 'Z2.T' (aka 'Y') does not conform to protocol 'P'}}
+let _ = Conforms<X>.Decl4<Z2>.Decl1.self // expected-error {{referencing struct 'Decl1' on 'Conforms.Decl4' requires that 'Z2.T' (aka 'Y') conform to 'P'}}
+let _ = Conforms<X>.Decl4<Z2>.Decl2.self // expected-error {{referencing enum 'Decl2' on 'Conforms.Decl4' requires that 'Z2.T' (aka 'Y') conform to 'P'}}
+let _ = Conforms<X>.Decl4<Z2>.Decl3.self // expected-error {{referencing class 'Decl3' on 'Conforms.Decl4' requires that 'Z2.T' (aka 'Y') conform to 'P'}}
 let _ = Conforms<X>.Decl4<Z2>.Decl4<X>.self // expected-error {{type 'Z2.T' (aka 'Y') does not conform to protocol 'P'}}
 let _ = Conforms<X>.Decl4<Z2>.Decl5<X>.self // expected-error {{type 'Z2.T' (aka 'Y') does not conform to protocol 'P'}}

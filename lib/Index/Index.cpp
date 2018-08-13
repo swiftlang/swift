@@ -53,6 +53,8 @@ printArtificialName(const swift::AbstractStorageDecl *ASD, AccessorKind AK, llvm
   case AccessorKind::MaterializeForSet:
   case AccessorKind::Address:
   case AccessorKind::MutableAddress:
+  case AccessorKind::Read:
+  case AccessorKind::Modify:
     return true;
   }
 
@@ -219,7 +221,7 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
     if (SymInfo.Kind == SymbolKind::Unknown)
       return true;
     if (auto *ExtD = dyn_cast<ExtensionDecl>(D)) {
-      NominalTypeDecl *NTD = ExtD->getExtendedType()->getAnyNominal();
+      NominalTypeDecl *NTD = ExtD->getExtendedNominal();
       if (getNameAndUSR(NTD, ExtD, Name, USR))
         return true;
     } else {
@@ -665,7 +667,7 @@ bool IndexSwiftASTWalker::startEntityDecl(ValueDecl *D) {
         return false;
 
     } else if (auto ParentED = dyn_cast<ExtensionDecl>(Parent)) {
-      if (ParentED->getExtendedType()->getAnyNominal()) {
+      if (ParentED->getExtendedNominal()) {
         if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationChildOf, ParentED))
           return false;
       }
@@ -839,9 +841,7 @@ bool IndexSwiftASTWalker::reportExtension(ExtensionDecl *D) {
   //   extension A.B {}
   // we want the location of 'B' token.
   SourceLoc Loc = D->getExtendedTypeLoc().getSourceRange().End;
-  if (!D->getExtendedType())
-    return true;
-  NominalTypeDecl *NTD = D->getExtendedType()->getAnyNominal();
+  NominalTypeDecl *NTD = D->getExtendedNominal();
   if (!NTD)
     return true;
   if (!shouldIndex(NTD, /*IsRef=*/false))
@@ -1028,8 +1028,8 @@ bool IndexSwiftASTWalker::initFuncDeclIndexSymbol(FuncDecl *D,
 
   if (D->getAttrs().hasAttribute<IBActionAttr>()) {
     // Relate with type of the first parameter using RelationIBTypeOf.
-    if (D->getParameterLists().size() >= 2) {
-      auto paramList = D->getParameterList(1);
+    if (D->hasImplicitSelfDecl()) {
+      auto paramList = D->getParameters();
       if (!paramList->getArray().empty()) {
         auto param = paramList->get(0);
         if (auto nominal = param->getType()->getAnyNominal()) {

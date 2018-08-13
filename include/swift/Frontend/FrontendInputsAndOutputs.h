@@ -152,6 +152,7 @@ public:
   // treat the input as LLVM_IR.
   bool shouldTreatAsLLVM() const;
   bool shouldTreatAsSIL() const;
+  bool shouldTreatAsModuleInterface() const;
 
   bool areAllNonPrimariesSIB() const;
 
@@ -234,6 +235,7 @@ public:
   bool hasLoadedModuleTracePath() const;
   bool hasModuleOutputPath() const;
   bool hasModuleDocOutputPath() const;
+  bool hasModuleInterfaceOutputPath() const;
   bool hasTBDPath() const;
 
   bool hasDependencyTrackerPath() const;

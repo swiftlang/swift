@@ -28,6 +28,8 @@ namespace swift {
   class ProtocolCompositionType;
 
 struct ExistentialLayout {
+  enum Kind { Class, Error, Opaque };
+
   ExistentialLayout() {
     hasExplicitAnyObject = false;
     containsNonObjCProtocol = false;
@@ -45,6 +47,19 @@ struct ExistentialLayout {
 
   /// Whether any protocol members are non-@objc.
   bool containsNonObjCProtocol : 1;
+
+  /// Return the kind of this existential (class/error/opaque).
+  Kind getKind() {
+    if (requiresClass())
+      return Kind::Class;
+    if (isErrorExistential())
+      return Kind::Error;
+
+    // The logic here is that opaque is the complement of class + error,
+    // i.e. we don't have more concrete information guiding the layout
+    // and it doesn't fall into the special-case Error representation.
+    return Kind::Opaque;
+  }
 
   bool isAnyObject() const;
 

@@ -29,7 +29,8 @@ PassManagerVerifierAnalysis::PassManagerVerifierAnalysis(SILModule *mod)
   if (!EnableVerifier)
     return;
   for (auto &fn : *mod) {
-    DEBUG(llvm::dbgs() << "PMVerifierAnalysis. Add: " << fn.getName() << '\n');
+    LLVM_DEBUG(llvm::dbgs() << "PMVerifierAnalysis. Add: " << fn.getName()
+                            << '\n');
     liveFunctions.insert(&fn);
   }
 #endif
@@ -49,8 +50,8 @@ void PassManagerVerifierAnalysis::notifyAddedOrModifiedFunction(
 #ifndef NDEBUG
   if (!EnableVerifier)
     return;
-  DEBUG(llvm::dbgs() << "PMVerifierAnalysis. Add|Mod: " << f->getName()
-                     << '\n');
+  LLVM_DEBUG(llvm::dbgs() << "PMVerifierAnalysis. Add|Mod: " << f->getName()
+                          << '\n');
   liveFunctions.insert(f);
 #endif
 }
@@ -60,7 +61,8 @@ void PassManagerVerifierAnalysis::notifyWillDeleteFunction(SILFunction *f) {
 #ifndef NDEBUG
   if (!EnableVerifier)
     return;
-  DEBUG(llvm::dbgs() << "PMVerifierAnalysis. Delete: " << f->getName() << '\n');
+  LLVM_DEBUG(llvm::dbgs() << "PMVerifierAnalysis. Delete: " << f->getName()
+                          << '\n');
   assert(liveFunctions.count(f) &&
          "Tried to delete function that analysis was not aware of?!");
   liveFunctions.erase(f);

@@ -131,7 +131,10 @@ lookupSuperclass(const TypeRef *TR) {
   if (!Unsubstituted)
     return nullptr;
 
-  return Unsubstituted->subst(*this, TR->getSubstMap());
+  auto SubstMap = TR->getSubstMap();
+  if (!SubstMap)
+    return nullptr;
+  return Unsubstituted->subst(*this, *SubstMap);
 }
 
 std::pair<const FieldDescriptor *, const ReflectionInfo *>
@@ -180,6 +183,8 @@ bool TypeRefBuilder::getFieldTypeRefs(
     return false;
 
   auto Subs = TR->getSubstMap();
+  if (!Subs)
+    return false;
 
   for (auto &Field : *FD.first) {
     auto TypeRefOffset = FD.second->Field.SectionOffset
@@ -199,7 +204,7 @@ bool TypeRefBuilder::getFieldTypeRefs(
     if (!Unsubstituted)
       return false;
 
-    auto Substituted = Unsubstituted->subst(*this, Subs);
+    auto Substituted = Unsubstituted->subst(*this, *Subs);
 
     if (FD.first->isEnum() && Field.isIndirectCase()) {
       Fields.push_back(FieldTypeInfo::forIndirectCase(FieldName, Substituted));

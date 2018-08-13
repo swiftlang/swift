@@ -212,6 +212,8 @@ struct SyntaxPrintOptions {
   bool PrintTrivialNodeKind = false;
 };
 
+typedef unsigned SyntaxNodeId;
+
 /// RawSyntax - the strictly immutable, shared backing nodes for all syntax.
 ///
 /// This is implementation detail - do not expose it in public API.
@@ -223,10 +225,10 @@ class RawSyntax final
 
   /// The ID that shall be used for the next node that is created and does not
   /// have a manually specified id
-  static unsigned NextFreeNodeId;
+  static SyntaxNodeId NextFreeNodeId;
 
   /// An ID of this node that is stable across incremental parses
-  unsigned NodeId;
+  SyntaxNodeId NodeId;
 
   union {
     uint64_t OpaqueBits;
@@ -249,6 +251,8 @@ class RawSyntax final
       /// Number of children this "layout" node has.
       unsigned NumChildren : 32;
       /// Number of bytes this node takes up spelled out in the source code
+      /// A value of UINT32_MAX indicates that the text length has not been
+      /// computed yet.
       unsigned TextLength : 32;
     } Layout;
 
@@ -283,13 +287,25 @@ class RawSyntax final
   /// the caller needs to assure that the node ID has not been used yet.
   RawSyntax(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
             SourcePresence Presence, bool ManualMemory,
-            llvm::Optional<unsigned> NodeId);
+            llvm::Optional<SyntaxNodeId> NodeId);
   /// Constructor for creating token nodes
   /// If \p NodeId is \c None, the next free NodeId is used, if it is passed,
   /// the caller needs to assure that the NodeId has not been used yet.
   RawSyntax(tok TokKind, OwnedString Text, ArrayRef<TriviaPiece> LeadingTrivia,
             ArrayRef<TriviaPiece> TrailingTrivia, SourcePresence Presence,
-            bool ManualMemory, llvm::Optional<unsigned> NodeId);
+            bool ManualMemory, llvm::Optional<SyntaxNodeId> NodeId);
+
+  /// Compute the node's text length by summing up the length of its childern
+  size_t computeTextLength() {
+    size_t TextLength = 0;
+    for (size_t I = 0, NumChildren = getNumChildren(); I < NumChildren; ++I) {
+      auto &ChildNode = getChild(I);
+      if (ChildNode && !ChildNode->isMissing()) {
+        TextLength += ChildNode->getTextLength();
+      }
+    }
+    return TextLength;
+  }
 
 public:
   ~RawSyntax();
@@ -312,7 +328,7 @@ public:
   static RC<RawSyntax> make(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
                             SourcePresence Presence,
                             SyntaxArena *Arena = nullptr,
-                            llvm::Optional<unsigned> NodeId = llvm::None);
+                            llvm::Optional<SyntaxNodeId> NodeId = llvm::None);
 
   /// Make a raw "token" syntax node.
   static RC<RawSyntax> make(tok TokKind, OwnedString Text,
@@ -320,7 +336,7 @@ public:
                             ArrayRef<TriviaPiece> TrailingTrivia,
                             SourcePresence Presence,
                             SyntaxArena *Arena = nullptr,
-                            llvm::Optional<unsigned> NodeId = llvm::None);
+                            llvm::Optional<SyntaxNodeId> NodeId = llvm::None);
 
   /// Make a missing raw "layout" syntax node.
   static RC<RawSyntax> missing(SyntaxKind Kind, SyntaxArena *Arena = nullptr) {
@@ -349,7 +365,7 @@ public:
   }
 
   /// Get an ID for this node that is stable across incremental parses
-  unsigned getId() const { return NodeId; }
+  SyntaxNodeId getId() const { return NodeId; }
 
   /// Returns true if the node is "missing" in the source (i.e. it was
   /// expected (or optional) but not written.
@@ -474,6 +490,9 @@ public:
       accumulateAbsolutePosition(Pos);
       return Pos.getOffset();
     } else {
+      if (Bits.Layout.TextLength == UINT32_MAX) {
+        Bits.Layout.TextLength = computeTextLength();
+      }
       return Bits.Layout.TextLength;
     }
   }
@@ -522,5 +541,9 @@ public:
 
 } // end namespace syntax
 } // end namespace swift
+
+namespace llvm {
+raw_ostream &operator<<(raw_ostream &OS, swift::syntax::AbsolutePosition Pos);
+} // end namespace llvm
 
 #endif // SWIFT_SYNTAX_RAWSYNTAX_H

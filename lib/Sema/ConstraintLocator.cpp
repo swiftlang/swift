@@ -68,7 +68,6 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case InstanceType:
     case SequenceIteratorProtocol:
     case GeneratorElementType:
-    case ScalarToTuple:
     case AutoclosureResult:
     case GenericArgument:
     case NamedTupleElement:
@@ -80,6 +79,7 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case TypeParameterRequirement:
     case ImplicitlyUnwrappedDisjunctionChoice:
     case DynamicLookupResult:
+    case ContextualType:
       if (unsigned numValues = numNumericValuesInPathElement(elt.getKind())) {
         id.AddInteger(elt.getValue());
         if (numValues > 1)
@@ -201,10 +201,6 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       out << "rvalue adjustment";
       break;
 
-    case ScalarToTuple:
-      out << "scalar to tuple";
-      break;
-
     case SequenceIteratorProtocol:
       out << "sequence iterator type";
       break;
@@ -257,6 +253,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
 
     case DynamicLookupResult:
       out << "dynamic lookup result";
+      break;
+
+    case ContextualType:
+      out << "contextual type";
       break;
     }
   }

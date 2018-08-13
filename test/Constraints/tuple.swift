@@ -232,3 +232,16 @@ invoke(a: 1, b: "B") { (c: (a: Int, b: String)) in
 invoke(a: 1, b: "B") { c in
   return c.b
 }
+
+// Crash with one-element tuple with labeled element
+class Dinner {}
+
+func microwave() -> Dinner? {
+  let d: Dinner? = nil
+  return (n: d) // expected-error{{cannot convert return expression of type '(n: Dinner?)' to return type 'Dinner?'}}
+}
+
+func microwave() -> Dinner {
+  let d: Dinner? = nil
+  return (n: d) // expected-error{{cannot convert return expression of type '(n: Dinner?)' to return type 'Dinner'}}
+}

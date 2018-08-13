@@ -201,6 +201,8 @@ enum ContextualTypePurpose {
   CTP_Unused,           ///< No contextual type is specified.
   CTP_Initialization,   ///< Pattern binding initialization.
   CTP_ReturnStmt,       ///< Value specified to a 'return' statement.
+  CTP_YieldByValue,     ///< By-value yield operand.
+  CTP_YieldByReference, ///< By-reference yield operand.
   CTP_ThrowStmt,        ///< Value specified to a 'throw' statement.
   CTP_EnumCaseRawValue, ///< Raw value specified for "case X = 42" in enum.
   CTP_DefaultParameter, ///< Default value in parameter 'foo(a : Int = 42)'.
@@ -256,6 +258,13 @@ enum class TypeCheckExprFlags {
 
   /// If set, don't apply a solution.
   SkipApplyingSolution = 0x100,
+
+  /// This is an inout yield.
+  IsInOutYield = 0x200,
+
+  /// If set, a conversion constraint should be specfied so that the result of
+  /// the expression is an optional type.
+  ExpressionTypeMustBeOptional = 0x400,
 };
 
 using TypeCheckExprOptions = OptionSet<TypeCheckExprFlags>;
@@ -470,6 +479,7 @@ enum class TypeResolutionFlags : unsigned {
 
   /// Whether we are in the input type of a function, or under one level of
   /// tuple type.  This is not set for multi-level tuple arguments.
+  /// See also: TypeResolutionFlags::Direct
   FunctionInput = 1 << 5,
 
   /// Whether this is a variadic function input.
@@ -534,17 +544,27 @@ enum class TypeResolutionFlags : unsigned {
   /// Whether we are checking the parameter list of a subscript.
   SubscriptParameters = 1 << 23,
 
-  /// Is it okay to resolve an IUO sigil ("!") here?
-  AllowIUO = 1 << 24,
+  /// Whether we are at the direct base of a type expression.
+  Direct = 1 << 24,
 
-  /// Is it okay to resolve an IUO sigil ("!") here with a deprecation warning?
-  AllowIUODeprecated = 1 << 25,
+  /// Whether this type is being used in a cast or coercion expression.
+  InCastOrCoercionExpression = 1 << 25,
 
   /// Whether we are in a requirement of a generic declaration
   GenericRequirement = 1 << 26,
 
   /// Whether we are in a protocol's where clause
   ProtocolWhereClause = 1 << 27,
+
+  /// Whether we should not produce diagnostics if the type is invalid.
+  SilenceErrors = 1 << 28,
+
+  /// Whether we are in the result type of a function, including multi-level
+  /// tuple return values. See also: TypeResolutionFlags::Direct
+  FunctionResult = 1 << 29,
+
+  /// Whether this is a pattern binding entry.
+  PatternBindingEntry = 1 << 30,
 };
 
 /// Option set describing how type resolution should work.
@@ -553,12 +573,14 @@ using TypeResolutionOptions = OptionSet<TypeResolutionFlags>;
 /// Strip the contextual options from the given type resolution options.
 static inline TypeResolutionOptions
 withoutContext(TypeResolutionOptions options, bool preserveSIL = false) {
+  options -= TypeResolutionFlags::Direct;
   options -= TypeResolutionFlags::FunctionInput;
   options -= TypeResolutionFlags::VariadicFunctionInput;
+  options -= TypeResolutionFlags::FunctionResult;
   options -= TypeResolutionFlags::EnumCase;
   options -= TypeResolutionFlags::SubscriptParameters;
   options -= TypeResolutionFlags::ImmediateOptionalTypeArgument;
-  options -= TypeResolutionFlags::AllowIUO;
+  options -= TypeResolutionFlags::PatternBindingEntry;
   if (!preserveSIL) options -= TypeResolutionFlags::SILType;
   return options;
 }
@@ -643,6 +665,10 @@ public:
   /// of during type-checking, but which will need to be finalized before
   /// we can hand them off to SILGen etc.
   llvm::SetVector<ValueDecl *> DeclsToFinalize;
+
+  /// Track the index of the next declaration that needs to be finalized,
+  /// from the \c DeclsToFinalize set.
+  unsigned NextDeclToFinalize = 0;
 
   /// The list of functions that need to have their bodies synthesized.
   llvm::MapVector<FuncDecl*, SynthesizedFunction> FunctionsToSynthesize;
@@ -932,7 +958,6 @@ public:
   Type resolveIdentifierType(DeclContext *DC,
                              IdentTypeRepr *IdType,
                              TypeResolutionOptions options,
-                             bool diagnoseErrors,
                              GenericTypeResolver *resolver);
 
   /// Bind an UnresolvedDeclRefExpr by performing name lookup and
@@ -1228,7 +1253,7 @@ public:
   void checkReferenceOwnershipAttr(VarDecl *D, ReferenceOwnershipAttr *attr);
 
   /// Check the default arguments that occur within this value decl.
-  void checkDefaultArguments(ArrayRef<ParameterList *> params, ValueDecl *VD);
+  void checkDefaultArguments(ParameterList *params, ValueDecl *VD);
 
   virtual void resolveDeclSignature(ValueDecl *VD) override {
     validateDeclForNameLookup(VD);
@@ -1264,10 +1289,6 @@ public:
   /// Revert the dependent types within a set of requirements.
   void revertGenericRequirements(MutableArrayRef<RequirementRepr> requirements);
 
-  /// Configure the interface type of a function declaration.
-  void configureInterfaceType(AbstractFunctionDecl *func,
-                              GenericSignature *sig);
-
   /// Compute the generic signature, generic environment and interface type
   /// of a generic function.
   void validateGenericFuncSignature(AbstractFunctionDecl *func);
@@ -1283,9 +1304,13 @@ public:
   /// of a generic subscript.
   void validateGenericSubscriptSignature(SubscriptDecl *subscript);
 
-  /// Configure the interface type of a subscript declaration.
-  void configureInterfaceType(SubscriptDecl *subscript,
-                              GenericSignature *sig);
+  /// For a generic requirement in a protocol, make sure that the requirement
+  /// set didn't add any requirements to Self or its associated types.
+  void checkProtocolSelfRequirements(ValueDecl *decl);
+
+  /// All generic parameters of a generic function must be referenced in the
+  /// declaration's type, otherwise we have no way to infer them.
+  void checkReferencedGenericParams(GenericContext *dc);
 
   /// Construct a new generic environment for the given declaration context.
   ///
@@ -1398,9 +1423,6 @@ public:
       GenericRequirementsCheckListener *listener = nullptr,
       SubstOptions options = None);
 
-  /// Resolve the inherited protocols of a given protocol.
-  void resolveInheritedProtocols(ProtocolDecl *protocol);
-
   /// Validate a protocol's where clause, along with the where clauses of
   /// its associated types.
   void validateWhereClauses(ProtocolDecl *protocol,
@@ -1453,8 +1475,7 @@ public:
   void completePropertyBehaviorParameter(VarDecl *VD,
                                FuncDecl *BehaviorParameter,
                                NormalProtocolConformance *BehaviorConformance,
-                               SubstitutionMap interfaceMap,
-                               SubstitutionMap contextMap);
+                               SubstitutionMap interfaceMap);
   
   /// Instantiate the accessor implementations for a behavior-backed
   /// property.
@@ -1683,10 +1704,6 @@ public:
                               TypeResolutionOptions options,
                               GenericTypeResolver &resolver);
 
-  /// Type check all parameter lists of a function.
-  bool typeCheckParameterLists(AbstractFunctionDecl *fd,
-                               GenericTypeResolver &resolver);
-
   /// Coerce a pattern to the given type.
   ///
   /// \param P The pattern, which may be modified by this coercion.
@@ -1745,10 +1762,42 @@ public:
   /// \param base The optional base expression of this value reference
   ///
   /// \param wantInterfaceType Whether we want the interface type, if available.
+  ///
+  /// \param getType Optional callback to extract a type for given declaration.
+  Type getUnopenedTypeOfReference(VarDecl *value, Type baseType,
+                                  DeclContext *UseDC,
+                                  llvm::function_ref<Type(VarDecl *)> getType,
+                                  const DeclRefExpr *base = nullptr,
+                                  bool wantInterfaceType = false);
+
+  /// Return the type-of-reference of the given value.
+  ///
+  /// \param baseType if non-null, return the type of a member reference to
+  ///   this value when the base has the given type
+  ///
+  /// \param UseDC The context of the access.  Some variables have different
+  ///   types depending on where they are used.
+  ///
+  /// \param base The optional base expression of this value reference
+  ///
+  /// \param wantInterfaceType Whether we want the interface type, if available.
   Type getUnopenedTypeOfReference(VarDecl *value, Type baseType,
                                   DeclContext *UseDC,
                                   const DeclRefExpr *base = nullptr,
-                                  bool wantInterfaceType = false);
+                                  bool wantInterfaceType = false) {
+    return getUnopenedTypeOfReference(
+        value, baseType, UseDC,
+        [&](VarDecl *var) -> Type {
+          validateDecl(var);
+
+          if (!var->hasValidSignature() || var->isInvalid())
+            return ErrorType::get(Context);
+
+          return wantInterfaceType ? value->getInterfaceType()
+                                   : value->getType();
+        },
+        base, wantInterfaceType);
+  }
 
   /// \brief Retrieve the default type for the given protocol.
   ///
@@ -2303,25 +2352,6 @@ public:
   /// Check if the given decl has a @_semantics attribute that gives it
   /// special case type-checking behavior.
   DeclTypeCheckingSemantics getDeclTypeCheckingSemantics(ValueDecl *decl);
-};
-
-/// \brief RAII object that cleans up the given expression if not explicitly
-/// disabled.
-class CleanupIllFormedExpressionRAII {
-  Expr **expr;
-
-public:
-  CleanupIllFormedExpressionRAII(Expr *&expr)
-    : expr(&expr) { }
-
-  ~CleanupIllFormedExpressionRAII();
-
-  static void doIt(Expr *expr);
-
-  /// \brief Disable the cleanup of this expression; it doesn't need it.
-  void disable() {
-    expr = nullptr;
-  }
 };
 
 /// Temporary on-stack storage and unescaping for encoded diagnostic

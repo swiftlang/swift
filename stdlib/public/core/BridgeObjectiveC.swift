@@ -502,49 +502,30 @@ extension UnsafeRawPointer {
   }
 }
 
-@_fixed_layout
-@usableFromInline
 internal struct _CocoaFastEnumerationStackBuf {
   // Clang uses 16 pointers.  So do we.
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item0: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item1: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item2: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item3: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item4: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item5: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item6: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item7: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item8: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item9: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item10: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item11: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item12: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item13: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item14: UnsafeRawPointer?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _item15: UnsafeRawPointer?
 
-  @usableFromInline @_transparent
+  @_transparent
   internal var count: Int {
     return 16
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   internal init() {
     _item0 = nil
     _item1 = _item0

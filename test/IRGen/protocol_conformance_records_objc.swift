@@ -14,7 +14,7 @@ public protocol Runcible {
 
 // CHECK-LABEL: @"$SSo6NSRectV33protocol_conformance_records_objc8RuncibleACMc" = constant %swift.protocol_conformance_descriptor {
 // -- protocol descriptor
-// CHECK-SAME:           [[RUNCIBLE:%swift.protocol\* @"\$S33protocol_conformance_records_objc8RuncibleMp"]]
+// CHECK-SAME:           [[RUNCIBLE:@"\$S33protocol_conformance_records_objc8RuncibleMp"]]
 // -- nominal type descriptor
 // CHECK-SAME:           @"$SSo6NSRectVMn"
 // -- witness table

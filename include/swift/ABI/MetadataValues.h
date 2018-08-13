@@ -350,7 +350,7 @@ enum : unsigned {
 };
 
 /// Kinds of type metadata/protocol conformance records.
-enum class TypeMetadataRecordKind : unsigned {
+enum class TypeReferenceKind : unsigned {
   /// The conformance is for a nominal type referenced directly;
   /// getNominalTypeDescriptor() points to the nominal type descriptor.
   DirectNominalTypeDescriptor = 0x00,
@@ -359,9 +359,10 @@ enum class TypeMetadataRecordKind : unsigned {
   /// getNominalTypeDescriptor() points to the nominal type descriptor.
   IndirectNominalTypeDescriptor = 0x01,
 
-  /// Reserved for future use.
-  Reserved = 0x02,
-  
+  /// The conformance is for an Objective-C class that should be looked up
+  /// by class name.
+  DirectObjCClassName = 0x02,
+
   /// The conformance is for an Objective-C class that has no nominal type
   /// descriptor.
   /// getIndirectObjCClass() points to a variable that contains the pointer to
@@ -370,6 +371,8 @@ enum class TypeMetadataRecordKind : unsigned {
   /// On platforms without Objective-C interoperability, this case is
   /// unused.
   IndirectObjCClass = 0x03,
+
+  // We only reserve three bits for this in the various places we store it.
 
   First_Kind = DirectNominalTypeDescriptor,
   Last_Kind = IndirectObjCClass,
@@ -593,7 +596,7 @@ public:
     return ConformanceFlags((Value & ~ConformanceKindMask) | int_type(kind));
   }
 
-  ConformanceFlags withTypeReferenceKind(TypeMetadataRecordKind kind) const {
+  ConformanceFlags withTypeReferenceKind(TypeReferenceKind kind) const {
     return ConformanceFlags((Value & ~TypeMetadataKindMask)
                             | (int_type(kind) << TypeMetadataKindShift));
   }
@@ -621,8 +624,8 @@ public:
   }
 
   /// Retrieve the type reference kind kind.
-  TypeMetadataRecordKind getTypeReferenceKind() const {
-    return TypeMetadataRecordKind(
+  TypeReferenceKind getTypeReferenceKind() const {
+    return TypeReferenceKind(
                       (Value & TypeMetadataKindMask) >> TypeMetadataKindShift);
   }
 
@@ -656,7 +659,10 @@ public:
 
 /// Flags in an existential type metadata record.
 class ExistentialTypeFlags {
-  typedef size_t int_type;
+public:
+  typedef uint32_t int_type;
+
+private:
   enum : int_type {
     NumWitnessTablesMask  = 0x00FFFFFFU,
     ClassConstraintMask   = 0x80000000U,
@@ -1071,7 +1077,10 @@ enum class ContextDescriptorKind : uint8_t {
   /// This context descriptor represents an anonymous possibly-generic context
   /// such as a function body.
   Anonymous = 2,
-  
+
+  /// This context descriptor represents a protocol context.
+  Protocol = 3,
+
   /// First kind that represents a type of any sort.
   Type_First = 16,
   
@@ -1174,62 +1183,94 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
     // Generic flags build upwards from 0.
     // Type-specific flags build downwards from 15.
 
-    /// Set if the type represents an imported C tag type.
-    ///
-    /// Meaningful for all type-descriptor kinds.
-    IsCTag = 0,
-
-    /// Set if the type represents an imported C typedef type.
-    ///
-    /// Meaningful for all type-descriptor kinds.
-    IsCTypedef = 1,
-
     /// Set if the type supports reflection.  C and Objective-C enums
     /// currently don't.
     ///
     /// Meaningful for all type-descriptor kinds.
-    IsReflectable = 2,
-    
-    /// Set if the type is a Clang-importer-synthesized related entity. After
-    /// the null terminator for the type name is another null-terminated string
-    /// containing the tag that discriminates the entity from other synthesized
-    /// declarations associated with the same declaration.
-    IsSynthesizedRelatedEntity = 3,
+    IsReflectable = 0,
 
-    /// Set if the context descriptor is includes metadata for dynamically
-    /// constructing a class's vtables at metadata instantiation time.
+    /// Whether there's something unusual about how the metadata is
+    /// initialized.
+    ///
+    /// Meaningful for all type-descriptor kinds.
+    MetadataInitialization = 1,
+    MetadataInitialization_width = 2,
+
+    /// Set if the type has extended import information.
+    ///
+    /// If true, a sequence of strings follow the null terminator in the
+    /// descriptor, terminated by an empty string (i.e. by two null
+    /// terminators in a row).  See TypeImportInfo for the details of
+    /// these strings and the order in which they appear.
+    ///
+    /// Meaningful for all type-descriptor kinds.
+    HasImportInfo = 3,
+
+
+    // Type-specific flags:
+
+    /// The kind of reference that this class makes to its superclass
+    /// descriptor.  A TypeReferenceKind.
     ///
     /// Only meaningful for class descriptors.
-    Class_HasVTable = 15,
+    Class_SuperclassReferenceKind = 10,
+    Class_SuperclassReferenceKind_width = 3,
+
+    /// Whether the immediate class members in this metadata are allocated
+    /// at negative offsets.  For now, we don't use this.
+    Class_AreImmediateMembersNegative = 13,
 
     /// Set if the context descriptor is for a class with resilient ancestry.
     ///
     /// Only meaningful for class descriptors.
     Class_HasResilientSuperclass = 14,
 
-    /// The kind of reference that this class makes to its superclass
-    /// descriptor.  A TypeMetadataRecordKind.
+    /// Set if the context descriptor is includes metadata for dynamically
+    /// constructing a class's vtables at metadata instantiation time.
     ///
     /// Only meaningful for class descriptors.
-    Class_SuperclassReferenceKind = 12,
-    Class_SuperclassReferenceKind_width = 2,
-
-    /// Whether the immediate class members in this metadata are allocated
-    /// at negative offsets.  For now, we don't use this.
-    Class_AreImmediateMembersNegative = 11,
+    Class_HasVTable = 15,
   };
 
 public:
   explicit TypeContextDescriptorFlags(uint16_t bits) : FlagSet(bits) {}
   constexpr TypeContextDescriptorFlags() {}
 
-  FLAGSET_DEFINE_FLAG_ACCESSORS(IsCTag, isCTag, setIsCTag)
-  FLAGSET_DEFINE_FLAG_ACCESSORS(IsCTypedef, isCTypedef, setIsCTypedef)
   FLAGSET_DEFINE_FLAG_ACCESSORS(IsReflectable, isReflectable, setIsReflectable)
 
-  FLAGSET_DEFINE_FLAG_ACCESSORS(IsSynthesizedRelatedEntity,
-                                isSynthesizedRelatedEntity,
-                                setIsSynthesizedRelatedEntity)
+  enum MetadataInitializationKind {
+    /// There are either no special rules for initializing the metadata
+    /// or the metadata is generic.  (Genericity is set in the
+    /// non-kind-specific descriptor flags.)
+    NoMetadataInitialization = 0,
+
+    /// The type requires non-trivial singleton initialization using the
+    /// "in-place" code pattern.
+    InPlaceMetadataInitialization = 1,
+
+    /// The type requires non-trivial singleton initialization using the
+    /// "foreign" code pattern.
+    ForeignMetadataInitialization = 2,
+
+    // We only have two bits here, so if you add a third special kind,
+    // include more flag bits in its out-of-line storage.
+  };
+
+  FLAGSET_DEFINE_FIELD_ACCESSORS(MetadataInitialization,
+                                 MetadataInitialization_width,
+                                 MetadataInitializationKind,
+                                 getMetadataInitialization,
+                                 setMetadataInitialization)
+
+  bool hasInPlaceMetadataInitialization() const {
+    return getMetadataInitialization() == InPlaceMetadataInitialization;
+  }
+
+  bool hasForeignMetadataInitialization() const {
+    return getMetadataInitialization() == ForeignMetadataInitialization;
+  }
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(HasImportInfo, hasImportInfo, setHasImportInfo)
 
   FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasVTable,
                                 class_hasVTable,
@@ -1243,9 +1284,44 @@ public:
 
   FLAGSET_DEFINE_FIELD_ACCESSORS(Class_SuperclassReferenceKind,
                                  Class_SuperclassReferenceKind_width,
-                                 TypeMetadataRecordKind,
+                                 TypeReferenceKind,
                                  class_getSuperclassReferenceKind,
                                  class_setSuperclassReferenceKind)
+};
+
+/// Flags for protocol context descriptors. These values are used as the
+/// kindSpecificFlags of the ContextDescriptorFlags for the protocol.
+class ProtocolContextDescriptorFlags : public FlagSet<uint16_t> {
+  enum {
+    /// Whether this protocol is class-constrained.
+    HasClassConstraint = 0,
+    HasClassConstraint_width = 1,
+
+    /// Whether this protocol is resilient.
+    IsResilient = 1,
+
+    /// Special protocol value.
+    SpecialProtocolKind = 2,
+    SpecialProtocolKind_width = 6,
+  };
+
+public:
+  explicit ProtocolContextDescriptorFlags(uint16_t bits) : FlagSet(bits) {}
+  constexpr ProtocolContextDescriptorFlags() {}
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(IsResilient, isResilient, setIsResilient)
+
+  FLAGSET_DEFINE_FIELD_ACCESSORS(HasClassConstraint,
+                                 HasClassConstraint_width,
+                                 ProtocolClassConstraint,
+                                 getClassConstraint,
+                                 setClassConstraint)
+
+  FLAGSET_DEFINE_FIELD_ACCESSORS(SpecialProtocolKind,
+                                 SpecialProtocolKind_width,
+                                 SpecialProtocol,
+                                 getSpecialProtocol,
+                                 setSpecialProtocol)
 };
 
 enum class GenericParamKind : uint8_t {

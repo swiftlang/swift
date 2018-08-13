@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "ArgumentSource.h"
 #include "Condition.h"
 #include "Initialization.h"
 #include "LValue.h"
@@ -416,6 +417,20 @@ void StmtEmitter::visitThrowStmt(ThrowStmt *S) {
   SGF.emitThrow(S, exn, /* emit a call to willThrow */ true);
 }
 
+void StmtEmitter::visitYieldStmt(YieldStmt *S) {
+  SGF.CurrentSILLoc = S;
+
+  SmallVector<ArgumentSource, 4> sources;
+  SmallVector<AbstractionPattern, 4> origTypes;
+  for (auto yield : S->getYields()) {
+    sources.emplace_back(yield);
+    origTypes.emplace_back(yield->getType());
+  }
+
+  FullExpr fullExpr(SGF.Cleanups, CleanupLocation(S));
+
+  SGF.emitYield(S, sources, origTypes, SGF.CoroutineUnwindDest);
+}
 
 namespace {
   // This is a little cleanup that ensures that there are no jumps out of a

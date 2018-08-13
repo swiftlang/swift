@@ -37,7 +37,9 @@ func finalVarsAreDevirtualized(_ obj: FinalPropertyClass) {
 // CHECK-LABEL: sil hidden @$S10multi_file34finalVarsDontNeedMaterializeForSetyyAA27ObservingPropertyFinalClassCF
 func finalVarsDontNeedMaterializeForSet(_ obj: ObservingPropertyFinalClass) {
   obj.foo += 1
-  // CHECK: function_ref @$S10multi_file27ObservingPropertyFinalClassC3fooSivg
+  // CHECK: [[T0:%.*]] = ref_element_addr %0 : $ObservingPropertyFinalClass, #ObservingPropertyFinalClass.foo
+  // CHECK-NEXT: [[T1:%.*]] = begin_access [read] [dynamic] [[T0]] : $*Int
+  // CHECK-NEXT: load [trivial] [[T1]] : $*Int
   // CHECK: function_ref @$S10multi_file27ObservingPropertyFinalClassC3fooSivs
 }
 

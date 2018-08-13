@@ -687,19 +687,12 @@ public:
 /// can help us preserve the context of the code completion position.
 class CodeCompletionExpr : public Expr {
   SourceRange Range;
-  bool Activated;
 
 public:
-  CodeCompletionExpr(SourceRange Range, Type Ty = Type()) :
-      Expr(ExprKind::CodeCompletion, /*Implicit=*/true, Ty),
-      Range(Range) {
-    Activated = false;
-  }
+  CodeCompletionExpr(SourceRange Range, Type Ty = Type())
+      : Expr(ExprKind::CodeCompletion, /*Implicit=*/true, Ty), Range(Range) {}
 
   SourceRange getSourceRange() const { return Range; }
-
-  bool isActivated() const { return Activated; }
-  void setActivated() { Activated = true; }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::CodeCompletion;
@@ -2556,6 +2549,7 @@ class MakeTemporarilyEscapableExpr : public Expr {
   OpaqueValueExpr *EscapingClosureValue;
   Expr *SubExpr;
   SourceLoc NameLoc, LParenLoc, RParenLoc;
+  Expr *OriginalExpr;
 
 public:
   MakeTemporarilyEscapableExpr(SourceLoc NameLoc,
@@ -2564,12 +2558,14 @@ public:
                                Expr *SubExpr,
                                SourceLoc RParenLoc,
                                OpaqueValueExpr *OpaqueValueForEscapingClosure,
+                               Expr *OriginalExpr,
                                bool implicit = false)
     : Expr(ExprKind::MakeTemporarilyEscapable, implicit, Type()),
       NonescapingClosureValue(NonescapingClosureValue),
       EscapingClosureValue(OpaqueValueForEscapingClosure),
       SubExpr(SubExpr),
-      NameLoc(NameLoc), LParenLoc(LParenLoc), RParenLoc(RParenLoc)
+      NameLoc(NameLoc), LParenLoc(LParenLoc), RParenLoc(RParenLoc),
+      OriginalExpr(OriginalExpr)
   {}
   
   SourceLoc getStartLoc() const {
@@ -2602,6 +2598,12 @@ public:
   }
   void setSubExpr(Expr *e) {
     SubExpr = e;
+  }
+
+  /// Retrieve the original 'withoutActuallyEscaping(closure) { ... }'
+  //  expression.
+  Expr *getOriginalExpr() const {
+    return OriginalExpr;
   }
 
   static bool classof(const Expr *E) {
@@ -3447,14 +3449,6 @@ public:
   }
   enum : unsigned { InvalidDiscriminator = 0xFFFF };
 
-  ArrayRef<ParameterList *> getParameterLists() {
-    return parameterList ? parameterList : ArrayRef<ParameterList *>();
-  }
-  
-  ArrayRef<const ParameterList *> getParameterLists() const {
-    return parameterList ? parameterList : ArrayRef<const ParameterList *>();
-  }
-
   /// \brief Retrieve the result type of this closure.
   Type getResultType(llvm::function_ref<Type(const Expr *)> getType =
                          [](const Expr *E) -> Type {
@@ -3825,11 +3819,17 @@ class ApplyExpr : public Expr {
 
   /// The argument being passed to it, and whether it's a 'super' argument.
   llvm::PointerIntPair<Expr *, 1, bool> ArgAndIsSuper;
+  
+  /// Returns true if \c e could be used as the call's argument. For most \c ApplyExpr
+  /// subclasses, this means it is a \c ParenExpr, \c TupleExpr, or 
+  /// \c TupleShuffleExpr.
+  bool validateArg(Expr *e) const;
 
 protected:
   ApplyExpr(ExprKind Kind, Expr *Fn, Expr *Arg, bool Implicit, Type Ty = Type())
     : Expr(Kind, Implicit, Ty), Fn(Fn), ArgAndIsSuper(Arg, false) {
     assert(classof((Expr*)this) && "ApplyExpr::classof out of date");
+    assert(validateArg(Arg) && "Arg is not a permitted expr kind");
     Bits.ApplyExpr.ThrowsIsSet = false;
   }
 
@@ -3840,8 +3840,7 @@ public:
   
   Expr *getArg() const { return ArgAndIsSuper.getPointer(); }
   void setArg(Expr *e) {
-    assert((getKind() != ExprKind::Binary || isa<TupleExpr>(e)) &&
-           "BinaryExprs must have a TupleExpr as the argument");
+    assert(validateArg(e) && "Arg is not a permitted expr kind");
     ArgAndIsSuper = {e, ArgAndIsSuper.getInt()};
   }
   
@@ -5127,6 +5126,15 @@ public:
 inline bool Expr::isInfixOperator() const {
   return isa<BinaryExpr>(this) || isa<IfExpr>(this) ||
          isa<AssignExpr>(this) || isa<ExplicitCastExpr>(this);
+}
+  
+inline bool ApplyExpr::validateArg(Expr *e) const {
+  if (isa<SelfApplyExpr>(this))
+    return true;
+  else if (isa<BinaryExpr>(this))
+    return isa<TupleExpr>(e);
+  else
+    return isa<ParenExpr>(e) || isa<TupleExpr>(e) || isa<TupleShuffleExpr>(e);
 }
 
 inline Expr *const *CollectionExpr::getTrailingObjectsPointer() const {

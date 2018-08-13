@@ -83,6 +83,7 @@ VarDecl *getDisjointAccessLocation(const AccessedStorage &storage) {
   case AccessedStorage::Box:
   case AccessedStorage::Stack:
   case AccessedStorage::Argument:
+  case AccessedStorage::Yield:
   case AccessedStorage::Unidentified:
     return nullptr;
   case AccessedStorage::Nested:
@@ -215,9 +216,9 @@ void GlobalAccessRemoval::recordAccess(SILInstruction *beginAccess,
   if (!decl || module.isVisibleExternally(decl))
     return;
 
-  DEBUG(if (!hasNoNestedConflict) llvm::dbgs()
-        << "Nested conflict on " << decl->getName() << " at" << *beginAccess
-        << "\n");
+  LLVM_DEBUG(if (!hasNoNestedConflict) llvm::dbgs()
+             << "Nested conflict on " << decl->getName() << " at"
+             << *beginAccess << "\n");
 
   auto accessLocIter = disjointAccessMap.find(decl);
   if (accessLocIter != disjointAccessMap.end()) {
@@ -249,14 +250,14 @@ void GlobalAccessRemoval::removeNonreentrantAccess() {
       continue;
 
     VarDecl *decl = declAndInfo.first;
-    DEBUG(llvm::dbgs() << "Eliminating all formal access on " << decl->getName()
-                       << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Eliminating all formal access on "
+                            << decl->getName() << "\n");
     assert(!module.isVisibleExternally(decl));
     (void)decl;
 
     // Non-deterministic iteration, only used to set a flag.
     for (BeginAccessInst *beginAccess : info.beginAccessSet) {
-      DEBUG(llvm::dbgs() << "  Disabling access marker " << *beginAccess);
+      LLVM_DEBUG(llvm::dbgs() << "  Disabling access marker " << *beginAccess);
       beginAccess->setEnforcement(SILAccessEnforcement::Static);
     }
   }

@@ -277,7 +277,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
                                    /*HasBoundDecls=*/false, SourceLoc(),
                                    SourceLoc(), dfltBody));
 
-  auto rawDecl = initDecl->getParameterList(1)->get(0);
+  auto rawDecl = initDecl->getParameters()->get(0);
   auto rawRef = new (C) DeclRefExpr(rawDecl, DeclNameLoc(), /*implicit*/true);
   Expr *switchArg = rawRef;
   if (isStringEnum) {
@@ -323,7 +323,7 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
 
   auto *rawDecl = new (C)
       ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
-                C.Id_rawValue, SourceLoc(), C.Id_rawValue, rawType, parentDC);
+                C.Id_rawValue, SourceLoc(), C.Id_rawValue, parentDC);
   rawDecl->setInterfaceType(rawInterfaceType);
   rawDecl->setImplicit();
   auto paramList = ParameterList::createWithoutLoc(rawDecl);
@@ -341,37 +341,11 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
   initDecl->setImplicit();
   initDecl->setBodySynthesizer(&deriveBodyRawRepresentable_init);
 
-  // Compute the type of the initializer.
-  TupleTypeElt element(rawType, C.Id_rawValue);
-  TupleTypeElt interfaceElement(rawInterfaceType, C.Id_rawValue);
-  auto interfaceArgType = TupleType::get(interfaceElement, C);
-
   // Compute the interface type of the initializer.
-  Type retInterfaceType
-    = OptionalType::get(parentDC->getDeclaredInterfaceType());
-  Type interfaceType = FunctionType::get(interfaceArgType, retInterfaceType);
-  auto selfParam = computeSelfParam(initDecl);
-  auto initSelfParam = computeSelfParam(initDecl, /*init*/ true);
+  if (auto env = parentDC->getGenericEnvironmentOfContext())
+    initDecl->setGenericEnvironment(env);
+  initDecl->computeType();
 
-  Type allocIfaceType;
-  Type initIfaceType;
-  if (auto sig = parentDC->getGenericSignatureOfContext()) {
-    initDecl->setGenericEnvironment(parentDC->getGenericEnvironmentOfContext());
-
-    allocIfaceType = GenericFunctionType::get(sig, {selfParam},
-                                              interfaceType,
-                                              FunctionType::ExtInfo());
-    initIfaceType = GenericFunctionType::get(sig, {initSelfParam},
-                                             interfaceType,
-                                             FunctionType::ExtInfo());
-  } else {
-    allocIfaceType = FunctionType::get({selfParam},
-                                       interfaceType, FunctionType::ExtInfo());
-    initIfaceType = FunctionType::get({initSelfParam},
-                                      interfaceType, FunctionType::ExtInfo());
-  }
-  initDecl->setInterfaceType(allocIfaceType);
-  initDecl->setInitializerInterfaceType(initIfaceType);
   initDecl->copyFormalAccessFrom(enumDecl, /*sourceIsParentContext*/true);
   initDecl->setValidationToChecked();
 

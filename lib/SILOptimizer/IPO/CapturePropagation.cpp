@@ -12,17 +12,18 @@
 
 #define DEBUG_TYPE "capture-prop"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/SILOptimizer/PassManager/Passes.h"
-#include "swift/SILOptimizer/Utils/Generics.h"
-#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/SIL/SILCloner.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/Analysis/ColdBlockInfo.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
@@ -92,8 +93,9 @@ namespace {
 /// caller, so the cloned function will have a mix of locations from different
 /// functions.
 class CapturePropagationCloner
-  : public TypeSubstCloner<CapturePropagationCloner> {
-  using SuperTy = TypeSubstCloner<CapturePropagationCloner>;
+  : public TypeSubstCloner<CapturePropagationCloner, SILOptFunctionBuilder> {
+  using SuperTy =
+    TypeSubstCloner<CapturePropagationCloner, SILOptFunctionBuilder>;
   friend class SILInstructionVisitor<CapturePropagationCloner>;
   friend class SILCloner<CapturePropagationCloner>;
 
@@ -241,9 +243,9 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
   // just return it.
   if (auto *NewF = OrigF->getModule().lookUpFunction(Name)) {
     assert(NewF->isSerialized() == Serialized);
-    DEBUG(llvm::dbgs()
-              << "  Found an already specialized version of the callee: ";
-          NewF->printName(llvm::dbgs()); llvm::dbgs() << "\n");
+    LLVM_DEBUG(llvm::dbgs()
+                 << "  Found an already specialized version of the callee: ";
+               NewF->printName(llvm::dbgs()); llvm::dbgs() << "\n");
     return NewF;
   }
 
@@ -256,7 +258,8 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
   GenericEnvironment *GenericEnv = nullptr;
   if (NewFTy->getGenericSignature())
     GenericEnv = OrigF->getGenericEnvironment();
-  SILFunction *NewF = OrigF->getModule().createFunction(
+  SILOptFunctionBuilder FuncBuilder(*this);
+  SILFunction *NewF = FuncBuilder.createFunction(
       SILLinkage::Shared, Name, NewFTy, GenericEnv, OrigF->getLocation(),
       OrigF->isBare(), OrigF->isTransparent(), Serialized,
       OrigF->getEntryCount(), OrigF->isThunk(), OrigF->getClassSubclassScope(),
@@ -265,10 +268,11 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
   if (!OrigF->hasQualifiedOwnership()) {
     NewF->setUnqualifiedOwnership();
   }
-  DEBUG(llvm::dbgs() << "  Specialize callee as ";
-        NewF->printName(llvm::dbgs()); llvm::dbgs() << " " << NewFTy << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "  Specialize callee as ";
+             NewF->printName(llvm::dbgs());
+             llvm::dbgs() << " " << NewFTy << "\n");
 
-  DEBUG(if (PAI->hasSubstitutions()) {
+  LLVM_DEBUG(if (PAI->hasSubstitutions()) {
     llvm::dbgs() << "CapturePropagation of generic partial_apply:\n";
     PAI->dumpInContext();
   });
@@ -280,11 +284,12 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
 
 void CapturePropagation::rewritePartialApply(PartialApplyInst *OrigPAI,
                                              SILFunction *SpecialF) {
-  DEBUG(llvm::dbgs() << "\n  Rewriting a partial apply:\n";
-        OrigPAI->dumpInContext(); llvm::dbgs() << "   with special function: "
-                                               << SpecialF->getName() << "\n";
-        llvm::dbgs() << "\nThe function being rewritten is:\n";
-        OrigPAI->getFunction()->dump());
+  LLVM_DEBUG(llvm::dbgs() << "\n  Rewriting a partial apply:\n";
+             OrigPAI->dumpInContext();
+             llvm::dbgs() << "   with special function: "
+                          << SpecialF->getName() << "\n";
+             llvm::dbgs() << "\nThe function being rewritten is:\n";
+             OrigPAI->getFunction()->dump());
 
   SILBuilderWithScope Builder(OrigPAI);
   auto FuncRef = Builder.createFunctionRef(OrigPAI->getLoc(), SpecialF);
@@ -292,7 +297,7 @@ void CapturePropagation::rewritePartialApply(PartialApplyInst *OrigPAI,
                                                  OrigPAI->getType());
   OrigPAI->replaceAllUsesWith(T2TF);
   recursivelyDeleteTriviallyDeadInstructions(OrigPAI, true);
-  DEBUG(llvm::dbgs() << "  Rewrote caller:\n" << *T2TF);
+  LLVM_DEBUG(llvm::dbgs() << "  Rewrote caller:\n" << *T2TF);
 }
 
 /// For now, we conservative only specialize if doing so can eliminate dynamic
@@ -332,6 +337,7 @@ static bool onlyContainsReturnOrThrowOfArg(SILBasicBlock *BB) {
 /// GenericSpecialized contains a tuple:
 /// (new specialized function, old function)
 static SILFunction *getSpecializedWithDeadParams(
+    SILOptFunctionBuilder &FuncBuilder,
     PartialApplyInst *PAI, SILFunction *Orig, int numDeadParams,
     std::pair<SILFunction *, SILFunction *> &GenericSpecialized) {
   SILBasicBlock &EntryBB = *Orig->begin();
@@ -414,10 +420,10 @@ static SILFunction *getSpecializedWithDeadParams(
     ReabstractionInfo ReInfo(ApplySite(), Specialized,
                              PAI->getSubstitutionMap(),
                              /* ConvertIndirectToDirect */ false);
-    GenericFuncSpecializer FuncSpecializer(
-                                         Specialized,
-                                         ReInfo.getClonerParamSubstitutionMap(),
-                                         Specialized->isSerialized(), ReInfo);
+    GenericFuncSpecializer FuncSpecializer(FuncBuilder,
+                                           Specialized,
+                                           ReInfo.getClonerParamSubstitutionMap(),
+                                           Specialized->isSerialized(), ReInfo);
 
     SILFunction *GenericSpecializedFunc = FuncSpecializer.trySpecialization();
     if (!GenericSpecializedFunc)
@@ -436,10 +442,10 @@ bool CapturePropagation::optimizePartialApply(PartialApplyInst *PAI) {
     return false;
 
   if (PAI->hasSubstitutions() && PAI->getSubstitutionMap().hasArchetypes()) {
-    DEBUG(llvm::dbgs()
-              << "CapturePropagation: cannot handle partial specialization "
-                 "of partial_apply:\n";
-          PAI->dumpInContext());
+    LLVM_DEBUG(llvm::dbgs()
+                 << "CapturePropagation: cannot handle partial specialization "
+                    "of partial_apply:\n";
+               PAI->dumpInContext());
     return false;
   }
 
@@ -447,12 +453,14 @@ bool CapturePropagation::optimizePartialApply(PartialApplyInst *PAI) {
   // First possibility: Is it a partial_apply where all partially applied
   // arguments are dead?
   std::pair<SILFunction *, SILFunction *> GenericSpecialized;
-  if (auto *NewFunc = getSpecializedWithDeadParams(
+  SILOptFunctionBuilder FuncBuilder(*this);
+  if (auto *NewFunc = getSpecializedWithDeadParams(FuncBuilder,
           PAI, SubstF, PAI->getNumArguments(), GenericSpecialized)) {
     rewritePartialApply(PAI, NewFunc);
     if (GenericSpecialized.first) {
       // Notify the pass manager about the new function.
-      notifyAddFunction(GenericSpecialized.first, GenericSpecialized.second);
+      addFunctionToPassManagerWorklist(GenericSpecialized.first,
+                                       GenericSpecialized.second);
     }
     return true;
   }
@@ -465,14 +473,14 @@ bool CapturePropagation::optimizePartialApply(PartialApplyInst *PAI) {
   if (!isProfitable(SubstF))
     return false;
 
-  DEBUG(llvm::dbgs() << "Specializing closure for constant arguments:\n"
-                     << "  " << SubstF->getName() << "\n"
-                     << *PAI);
+  LLVM_DEBUG(llvm::dbgs() << "Specializing closure for constant arguments:\n"
+                          << "  " << SubstF->getName() << "\n"
+                          << *PAI);
   ++NumCapturesPropagated;
   SILFunction *NewF = specializeConstClosure(PAI, SubstF);
   rewritePartialApply(PAI, NewF);
 
-  notifyAddFunction(NewF, SubstF);
+  addFunctionToPassManagerWorklist(NewF, SubstF);
   return true;
 }
 

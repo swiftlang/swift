@@ -1304,7 +1304,7 @@ void LoadableStorageAllocation::insertIndirectReturnArgs() {
       VarDecl::Specifier::InOut, SourceLoc(), SourceLoc(),
       ctx.getIdentifier("$return_value"), SourceLoc(),
       ctx.getIdentifier("$return_value"),
-      resultStorageType.getASTType(), pass.F->getDeclContext());
+      pass.F->getDeclContext());
   pass.F->begin()->insertFunctionArgument(0, resultStorageType.getAddressType(),
                                           ValueOwnershipKind::Trivial, var);
 }
@@ -2288,7 +2288,7 @@ void LoadableByAddress::runOnFunction(SILFunction *F) {
     rewrittenReturn = rewriteFunctionReturn(pass);
   }
 
-  DEBUG(llvm::dbgs() << "\nREWRITING: " << F->getName(); F->dump());
+  LLVM_DEBUG(llvm::dbgs() << "\nREWRITING: " << F->getName(); F->dump());
 
   // Rewrite instructions relating to the loadable struct.
   rewriteFunction(pass, allocator);

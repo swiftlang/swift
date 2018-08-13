@@ -80,8 +80,8 @@ func callFrame4(_ data: Klass, _ user: ConsumingUser) {
 
 @inline(never)
 public func run_OpaqueConsumingUsers(_ N: Int) {
-  let d = data._unsafelyUnwrappedUnchecked
-  let u = user._unsafelyUnwrappedUnchecked
+  let d = data.unsafelyUnwrapped
+  let u = user.unsafelyUnwrapped
   for _ in 0..<N*200000 {
     callFrame4(d, u)
   }

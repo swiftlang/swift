@@ -328,8 +328,7 @@ Overloads.test("generic methods are worse than non-generic") {
   }
 
   Base().foo(C1());     expectEqual("foo(C1)", which)
-  Base().foo(Token1()); expectEqual("foo(T)", which)
-  Base().foo(Token1() as Any); expectEqual("foo(Any)", which)
+  Base().foo(Token1()); expectEqual("foo(Any)", which)
 
   Base().bar(C1());     expectEqual("bar(C1)", which)
   Base().bar(Token1()); expectEqual("bar(T)", which)

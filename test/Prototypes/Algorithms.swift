@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -g -Onone -DUSE_STDLIBUNITTEST %s -o %t/a.out
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 
@@ -73,8 +74,8 @@ extension MutableCollection {
   internal mutating func _swapNonemptySubrangePrefixes(
     _ lhs: Range<Index>, _ rhs: Range<Index>
   ) -> (Index, Index) {
-    _sanityCheck(!lhs.isEmpty)
-    _sanityCheck(!rhs.isEmpty)
+    assert(!lhs.isEmpty)
+    assert(!rhs.isEmpty)
 
     var p = lhs.lowerBound
     var q = rhs.lowerBound
@@ -352,7 +353,7 @@ public struct Concatenation<C1 : Collection, C2: Collection>: Collection
   public func index(after i: Index) -> Index {
     switch i._position {
     case let .first(i):
-      _sanityCheck(i != _base1.endIndex)
+      assert(i != _base1.endIndex)
       let next = _base1.index(after: i)
       return next == _base1.endIndex
         ? Index(second: _base2.startIndex)

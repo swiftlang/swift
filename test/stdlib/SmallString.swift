@@ -1,4 +1,6 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-build-swift -Xfrontend -disable-access-control -module-name a %s -o %t.out -O
+// RUN: %target-run %t.out
+
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 // REQUIRES: CPU=arm64 || CPU=x86_64

@@ -41,7 +41,7 @@ private:
   };
   unsigned TheKind : 2;
   unsigned IsRethrows : 1;
-  unsigned ParamCount : 28;
+  unsigned ParamCount : 2;
 
 public:
   explicit AbstractFunction(Kind kind, Expr *fn)
@@ -54,7 +54,7 @@ public:
   explicit AbstractFunction(AbstractFunctionDecl *fn)
     : TheKind(Kind::Function),
       IsRethrows(fn->getAttrs().hasAttribute<RethrowsAttr>()),
-      ParamCount(fn->getNumParameterLists()) {
+      ParamCount(fn->hasImplicitSelfDecl() ? 2 : 1) {
     TheFunction = fn;
   }
 
@@ -674,8 +674,7 @@ private:
         return classifyShuffleRethrowsArgument(shuffle, paramTupleType);
       }
 
-      int scalarElt = paramTupleType->getElementForScalarInit();
-      if (scalarElt < 0) {
+      if (paramTupleType->getNumElements() != 1) {
         // Otherwise, we're passing an opaque tuple expression, and we
         // should treat it as contributing to 'rethrows' if the original
         // parameter type included a throwing function type.
@@ -684,7 +683,10 @@ private:
                                     PotentialReason::forRethrowsArgument(arg));
       }
 
-      paramType = paramTupleType->getElementType(scalarElt);
+      // FIXME: There's a case where we can end up with an ApplyExpr that
+      // has a single-element-tuple argument type, but the argument is just
+      // a ClosureExpr and not a TupleExpr/TupleShuffleExpr.
+      paramType = paramTupleType->getElementType(0);
     }
 
     // Otherwise, if the original parameter type was not a throwing
@@ -926,7 +928,7 @@ public:
     }
 
     return Context(getKindForFunctionBody(
-        D->getInterfaceType(), D->getNumParameterLists()));
+        D->getInterfaceType(), D->hasImplicitSelfDecl() ? 2 : 1));
   }
 
   static Context forInitializer(Initializer *init) {

@@ -82,9 +82,9 @@ public:
     return 0;
   }
 
-  clang::VersionTuple asClangVersionTuple() const {
+  llvm::VersionTuple asClangVersionTuple() const {
     assert(*this != ImportNameVersion::raw());
-    return clang::VersionTuple(majorVersionNumber(), minorVersionNumber());    
+    return llvm::VersionTuple(majorVersionNumber(), minorVersionNumber());
   }
 
   bool operator==(ImportNameVersion other) const {

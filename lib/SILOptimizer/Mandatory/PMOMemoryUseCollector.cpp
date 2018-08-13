@@ -592,7 +592,7 @@ bool ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
     for (auto *User : UsesToScalarize) {
       ElementTmps.clear();
 
-      DEBUG(llvm::errs() << "  *** Scalarizing: " << *User << "\n");
+      LLVM_DEBUG(llvm::errs() << "  *** Scalarizing: " << *User << "\n");
 
       // Scalarize LoadInst
       if (auto *LI = dyn_cast<LoadInst>(User)) {

@@ -54,6 +54,7 @@ llvm::Constant *irgen::emitConstantFP(IRGenModule &IGM, FloatLiteralInst *FLI) {
 llvm::Constant *irgen::emitAddrOfConstantString(IRGenModule &IGM,
                                                 StringLiteralInst *SLI) {
   switch (SLI->getEncoding()) {
+  case StringLiteralInst::Encoding::Bytes:
   case StringLiteralInst::Encoding::UTF8:
     return IGM.getAddrOfGlobalString(SLI->getValue());
 

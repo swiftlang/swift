@@ -379,7 +379,7 @@ private:
 
   using DeclIDVector = SmallVector<serialization::DeclID, 4>;
 
-  DeclIDVector EagerDeserializationDecls;
+  DeclIDVector OrderedTopLevelDecls;
 
   class DeclCommentTableInfo;
   using SerializedDeclCommentTable =
@@ -506,8 +506,7 @@ private:
 
   /// Main logic of getDeclChecked.
   llvm::Expected<Decl *>
-  getDeclCheckedImpl(serialization::DeclID DID,
-                     Optional<DeclContext *> ForcedContext = None);
+  getDeclCheckedImpl(serialization::DeclID DID);
 
   /// Reads the index block, which contains global tables.
   ///
@@ -796,23 +795,15 @@ public:
   /// Returns the decl with the given ID, deserializing it if needed.
   ///
   /// \param DID The ID for the decl within this module.
-  /// \param ForcedContext Optional override for the decl context of certain
-  ///                      kinds of decls, used to avoid re-entrant
-  ///                      deserialization.
-  ///
+
   /// \sa getDeclChecked
-  Decl *getDecl(serialization::DeclID DID,
-                Optional<DeclContext *> ForcedContext = None);
+  Decl *getDecl(serialization::DeclID DID);
 
   /// Returns the decl with the given ID, deserializing it if needed.
   ///
   /// \param DID The ID for the decl within this module.
-  /// \param ForcedContext Optional override for the decl context of certain
-  ///                      kinds of decls, used to avoid re-entrant
-  ///                      deserialization.
   llvm::Expected<Decl *>
-  getDeclChecked(serialization::DeclID DID,
-                 Optional<DeclContext *> ForcedContext = None);
+  getDeclChecked(serialization::DeclID DID);
 
   /// Returns the decl context with the given ID, deserializing it if needed.
   DeclContext *getDeclContext(serialization::DeclContextID DID);

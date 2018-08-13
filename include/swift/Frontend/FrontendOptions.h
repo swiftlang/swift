@@ -13,6 +13,7 @@
 #ifndef SWIFT_FRONTEND_FRONTENDOPTIONS_H
 #define SWIFT_FRONTEND_FRONTENDOPTIONS_H
 
+#include "swift/Basic/FileTypes.h"
 #include "swift/Frontend/FrontendInputsAndOutputs.h"
 #include "swift/Frontend/InputFile.h"
 #include "llvm/ADT/Hashing.h"
@@ -35,7 +36,7 @@ public:
   FrontendInputsAndOutputs InputsAndOutputs;
 
   /// The kind of input on which the frontend should operate.
-  InputFileKind InputKind = InputFileKind::IFK_Swift;
+  InputFileKind InputKind = InputFileKind::Swift;
 
   void forAllOutputPaths(const InputFile &input,
                          llvm::function_ref<void(StringRef)> fn) const;
@@ -138,9 +139,9 @@ public:
     EmitIR,       ///< Emit LLVM IR
     EmitBC,       ///< Emit LLVM BC
     EmitObject,   ///< Emit object file
-  };
 
-  bool isCreatingSIL() { return RequestedAction >= ActionType::EmitSILGen; }
+    DumpTypeInfo, ///< Dump IRGen type info
+  };
 
   /// Indicates the action the user requested that the frontend perform.
   ActionType RequestedAction = ActionType::NoneAction;
@@ -243,6 +244,10 @@ public:
   /// variables by name when we print it out. This eases diffing of SIL files.
   bool EmitSortedSIL = false;
 
+  /// Indicates whether the dependency tracker should track system
+  /// dependencies as well.
+  bool TrackSystemDeps = false;
+
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {
     Default,        ///< Do the default validation for the current platform.
@@ -286,7 +291,7 @@ public:
   StringRef determineFallbackModuleName() const;
 
   bool isCompilingExactlyOneSwiftFile() const {
-    return InputKind == InputFileKind::IFK_Swift &&
+    return InputKind == InputFileKind::Swift &&
            InputsAndOutputs.hasSingleInput();
   }
 
@@ -302,12 +307,14 @@ private:
   static bool canActionEmitLoadedModuleTrace(ActionType);
   static bool canActionEmitModule(ActionType);
   static bool canActionEmitModuleDoc(ActionType);
+  static bool canActionEmitInterface(ActionType);
 
 public:
+  static bool doesActionGenerateSIL(ActionType);
   static bool doesActionProduceOutput(ActionType);
   static bool doesActionProduceTextualOutput(ActionType);
   static bool needsProperModuleName(ActionType);
-  static StringRef suffixForPrincipalOutputFileForAction(ActionType);
+  static file_types::ID formatForPrincipalOutputFileForAction(ActionType);
 };
 
 }

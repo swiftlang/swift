@@ -85,7 +85,7 @@ public:
   RC<RawSyntax> getRaw() const;
 
   /// Get an ID for this node that is stable across incremental parses
-  unsigned getId() const { return getRaw()->getId(); }
+  SyntaxNodeId getId() const { return getRaw()->getId(); }
 
   /// Get the number of child nodes in this piece of syntax, not including
   /// tokens.
@@ -200,16 +200,15 @@ public:
     return Data->getAbsolutePosition();
   }
 
-  /// Get the absolute end position (exclusively) of this raw syntax: its offset,
-  /// line, and column.
-  AbsolutePosition getAbsoluteEndPosition() const {
-    return Data->getAbsoluteEndPosition();
+  /// Get the absolute end position (exclusively) where the trailing trivia of
+  /// this node ends.
+  AbsolutePosition getAbsoluteEndPositionAfterTrailingTrivia() const {
+    return Data->getAbsoluteEndPositionAfterTrailingTrivia();
   }
 
-  /// Get the absolute position without skipping the leading trivia of this
-  /// node.
-  AbsolutePosition getAbsolutePositionWithLeadingTrivia() const {
-    return Data->getAbsolutePositionWithLeadingTrivia();
+  /// Get the absolute position at which the leading trivia of this node starts.
+  AbsolutePosition getAbsolutePositionBeforeLeadingTrivia() const {
+    return Data->getAbsolutePositionBeforeLeadingTrivia();
   }
 
   // TODO: hasSameStructureAs ?

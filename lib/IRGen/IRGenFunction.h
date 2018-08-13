@@ -60,7 +60,6 @@ namespace irgen {
   class Scope;
   class TypeInfo;
   enum class ValueWitness : unsigned;
-  enum class ReferenceCounting : unsigned char;
 
 /// IRGenFunction - Primary class for emitting LLVM instructions for a
 /// specific function.

@@ -84,14 +84,7 @@ RawSyntax::RawSyntax(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
   Bits.Common.Presence = unsigned(Presence);
   Bits.Common.ManualMemory = unsigned(ManualMemory);
   Bits.Layout.NumChildren = Layout.size();
-
-  // Compute the text length
-  Bits.Layout.TextLength = 0;
-  for (const auto ChildNode : Layout) {
-    if (ChildNode && !ChildNode->isMissing()) {
-      Bits.Layout.TextLength += ChildNode->getTextLength();
-    }
-  }
+  Bits.Layout.TextLength = UINT32_MAX;
 
   // Initialize layout data.
   std::uninitialized_copy(Layout.begin(), Layout.end(),
@@ -225,7 +218,7 @@ bool RawSyntax::accumulateLeadingTrivia(AbsolutePosition &Pos) const {
     }
   } else {
     for (auto &Child: getLayout()) {
-      if (!Child)
+      if (!Child || Child->isMissing())
         continue;
       if (Child->accumulateLeadingTrivia(Pos))
         return true;
@@ -342,4 +335,9 @@ void RawSyntax::Profile(llvm::FoldingSetNodeID &ID, tok TokKind,
     Piece.Profile(ID);
   for (auto &Piece : TrailingTrivia)
     Piece.Profile(ID);
+}
+
+llvm::raw_ostream &llvm::operator<<(raw_ostream &OS, AbsolutePosition Pos) {
+  Pos.printLineAndColumn(OS);
+  return OS;
 }

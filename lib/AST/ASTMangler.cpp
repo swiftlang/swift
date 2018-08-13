@@ -56,6 +56,10 @@ static StringRef getCodeForAccessorKind(AccessorKind kind,
     return "w";
   case AccessorKind::DidSet:
     return "W";
+  case AccessorKind::Read:
+    return "r";
+  case AccessorKind::Modify:
+    return "M";
   case AccessorKind::Address:
     // 'l' is for location. 'A' was taken.
     switch (addressorKind) {
@@ -566,20 +570,18 @@ static unsigned getUnnamedParamIndex(const ParamDecl *D) {
     llvm_unreachable("param not found");
   }
 
-  ArrayRef<ParameterList *> ParamLists;
+  ParameterList *ParamList;
 
   if (auto AFD = dyn_cast<AbstractFunctionDecl>(D->getDeclContext())) {
-    ParamLists = AFD->getParameterLists();
+    ParamList = AFD->getParameters();
   } else {
     auto ACE = cast<AbstractClosureExpr>(D->getDeclContext());
-    ParamLists = ACE->getParameterLists();
+    ParamList = ACE->getParameters();
   }
 
   unsigned UnnamedIndex = 0;
-  for (auto ParamList : ParamLists) {
-    if (getUnnamedParamIndex(ParamList, D, UnnamedIndex))
-      return UnnamedIndex;
-  }
+  if (getUnnamedParamIndex(ParamList, D, UnnamedIndex))
+    return UnnamedIndex;
 
   llvm_unreachable("param not found");
 }
@@ -1400,13 +1402,11 @@ void ASTMangler::appendContext(const DeclContext *ctx) {
 
   case DeclContextKind::ExtensionDecl: {
     auto ExtD = cast<ExtensionDecl>(ctx);
-    auto ExtTy = ExtD->getExtendedType();
+    auto decl = ExtD->getExtendedNominal();
     // Recover from erroneous extension.
-    if (ExtTy.isNull() || ExtTy->hasError())
+    if (!decl)
       return appendContext(ExtD->getDeclContext());
 
-    auto decl = ExtTy->getAnyNominal();
-    assert(decl && "extension of non-nominal type?");
     if (!ExtD->isEquivalentToExtendedContext()) {
     // Mangle the extension if:
     // - the extension is defined in a different module from the original

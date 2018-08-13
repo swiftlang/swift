@@ -204,7 +204,7 @@ struct MapRegionCounters : public ASTWalker {
   void mapRegion(ASTNode N) {
     CounterMap[N] = NextCounter;
 
-    DEBUG({
+    LLVM_DEBUG({
       llvm::dbgs() << "Assigned counter #" << NextCounter << " to: ";
       auto *E = N.dyn_cast<Expr *>();
       if (E)
@@ -1093,7 +1093,8 @@ void SILProfiler::assignRegionCounters() {
       CurrentFuncName, getEquivalentPGOLinkage(CurrentFuncLinkage),
       CurrentFileName);
 
-  DEBUG(llvm::dbgs() << "Assigning counters to: " << CurrentFuncName << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "Assigning counters to: " << CurrentFuncName
+                          << "\n");
   Root.walk(Mapper);
 
   NumRegionCounters = Mapper.NextCounter;

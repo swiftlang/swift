@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -514,6 +514,7 @@ ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
 
   // Register any request-evaluator functions available at the AST layer.
   registerAccessRequestFunctions(evaluator);
+  registerNameLookupRequestFunctions(evaluator);
 }
 
 ASTContext::~ASTContext() {
@@ -636,15 +637,15 @@ FuncDecl *ASTContext::getPlusFunctionOnString() const {
       auto ResultType = FD->getResultInterfaceType();
       if (ResultType->getNominalOrBoundGenericNominal() != getStringDecl())
         continue;
-      auto ParamLists = FD->getParameterLists();
-      if (ParamLists.size() != 2 || ParamLists[1]->size() != 2)
+      auto ParamList = FD->getParameters();
+      if (ParamList->size() != 2)
         continue;
       auto CheckIfStringParam = [this](ParamDecl* Param) {
         auto Type = Param->getInterfaceType()->getNominalOrBoundGenericNominal();
         return Type == getStringDecl();
       };
-      if (CheckIfStringParam(ParamLists[1]->get(0)) &&
-          CheckIfStringParam(ParamLists[1]->get(1))) {
+      if (CheckIfStringParam(ParamList->get(0)) &&
+          CheckIfStringParam(ParamList->get(1))) {
         getImpl().PlusFunctionOnString = FD;
         break;
       }
@@ -1027,10 +1028,10 @@ FuncDecl *ASTContext::getHashValueForDecl() const {
     auto *fd = dyn_cast<FuncDecl>(result);
     if (!fd)
       continue;
-    auto paramLists = fd->getParameterLists();
-    if (paramLists.size() != 1 || paramLists[0]->size() != 1)
+    auto paramList = fd->getParameters();
+    if (paramList->size() != 1)
       continue;
-    auto paramDecl = paramLists[0]->get(0);
+    auto paramDecl = paramList->get(0);
     if (paramDecl->getArgumentName() != Id_for)
       continue;
     auto genericParams = fd->getGenericParams();
@@ -1055,25 +1056,23 @@ FuncDecl *ASTContext::getArrayAppendElementDecl() const {
       if (A->Value != "array.append_element")
         continue;
 
-      auto ParamLists = FnDecl->getParameterLists();
-      if (ParamLists.size() != 2)
-        return nullptr;
-      if (ParamLists[0]->size() != 1)
-        return nullptr;
-      if (!ParamLists[0]->get(0)->isInOut())
+      auto SelfDecl = FnDecl->getImplicitSelfDecl();
+      if (!SelfDecl->isInOut())
         return nullptr;
 
-      auto SelfInOutTy = ParamLists[0]->get(0)->getInterfaceType();
+      auto SelfInOutTy = SelfDecl->getInterfaceType();
       BoundGenericStructType *SelfGenericStructTy =
-        SelfInOutTy->getInOutObjectType()->getAs<BoundGenericStructType>();
+        SelfInOutTy->getAs<BoundGenericStructType>();
       if (!SelfGenericStructTy)
         return nullptr;
       if (SelfGenericStructTy->getDecl() != getArrayDecl())
         return nullptr;
 
-      if (ParamLists[1]->size() != 1)
+      auto ParamList = FnDecl->getParameters();
+      if (ParamList->size() != 1)
         return nullptr;
-      GenericTypeParamType *ElementType = ParamLists[1]->get(0)->
+
+      GenericTypeParamType *ElementType = ParamList->get(0)->
                              getInterfaceType()->getAs<GenericTypeParamType>();
       if (!ElementType)
         return nullptr;
@@ -1104,26 +1103,23 @@ FuncDecl *ASTContext::getArrayReserveCapacityDecl() const {
       if (A->Value != "array.reserve_capacity_for_append")
         continue;
 
-      auto ParamLists = FnDecl->getParameterLists();
-      if (ParamLists.size() != 2)
-        return nullptr;
-      if (ParamLists[0]->size() != 1)
-        return nullptr;
-      if (!ParamLists[0]->get(0)->isInOut())
+      auto SelfDecl = FnDecl->getImplicitSelfDecl();
+      if (!SelfDecl->isInOut())
         return nullptr;
 
-      auto SelfInOutTy = ParamLists[0]->get(0)->getInterfaceType();
+      auto SelfInOutTy = SelfDecl->getInterfaceType();
       BoundGenericStructType *SelfGenericStructTy =
-        SelfInOutTy->getInOutObjectType()->getAs<BoundGenericStructType>();
+        SelfInOutTy->getAs<BoundGenericStructType>();
       if (!SelfGenericStructTy)
         return nullptr;
       if (SelfGenericStructTy->getDecl() != getArrayDecl())
         return nullptr;
 
-      if (ParamLists[1]->size() != 1)
+      auto ParamList = FnDecl->getParameters();
+      if (ParamList->size() != 1)
         return nullptr;
       StructType *IntType =
-        ParamLists[1]->get(0)->getInterfaceType()->getAs<StructType>();
+        ParamList->get(0)->getInterfaceType()->getAs<StructType>();
       if (!IntType)
         return nullptr;
 
@@ -2092,11 +2088,10 @@ std::pair<unsigned, DeclName> swift::getObjCMethodDiagInfo(
 
   if (auto accessor = dyn_cast<AccessorDecl>(member)) {
     switch (accessor->getAccessorKind()) {
-    case AccessorKind::Address:
-    case AccessorKind::DidSet:
-    case AccessorKind::MaterializeForSet:
-    case AccessorKind::MutableAddress:
-    case AccessorKind::WillSet:
+#define OBJC_ACCESSOR(ID, KEYWORD)
+#define ACCESSOR(ID) \
+    case AccessorKind::ID:
+#include "swift/AST/AccessorKinds.def"
       llvm_unreachable("Not an Objective-C entry point");
 
     case AccessorKind::Get:
@@ -2146,7 +2141,7 @@ bool swift::fixDeclarationName(InFlightDiagnostic &diag, ValueDecl *decl,
   // Fix the argument names that need fixing.
   assert(name.getArgumentNames().size()
           == targetName.getArgumentNames().size());
-  auto params = func->getParameterList(func->getDeclContext()->isTypeContext());
+  auto params = func->getParameters();
   for (unsigned i = 0, n = name.getArgumentNames().size(); i != n; ++i) {
     auto origArg = name.getArgumentNames()[i];
     auto targetArg = targetName.getArgumentNames()[i];
@@ -2302,16 +2297,14 @@ void ASTContext::recordObjCMethod(AbstractFunctionDecl *func) {
 }
 
 /// Lookup for an Objective-C method with the given selector in the
-/// given class type or any of its superclasses.
-static AbstractFunctionDecl *lookupObjCMethodInType(
-                               Type classType,
+/// given class or any of its superclasses.
+static AbstractFunctionDecl *lookupObjCMethodInClass(
+                               ClassDecl *classDecl,
                                ObjCSelector selector,
                                bool isInstanceMethod,
                                bool isInitializer,
                                SourceManager &srcMgr,
                                bool inheritingInits = true) {
-  // Dig out the declaration of the class.
-  auto classDecl = classType->getClassOrBoundGenericClass();
   if (!classDecl)
     return nullptr;
 
@@ -2352,9 +2345,9 @@ static AbstractFunctionDecl *lookupObjCMethodInType(
   if (isInitializer && !inheritingInits)
     return nullptr;
 
-  return lookupObjCMethodInType(classDecl->getSuperclass(), selector,
-                                isInstanceMethod, isInitializer, srcMgr,
-                                inheritingInits);
+  return lookupObjCMethodInClass(classDecl->getSuperclassDecl(), selector,
+                                 isInstanceMethod, isInitializer, srcMgr,
+                                 inheritingInits);
 }
 
 void AbstractFunctionDecl::setForeignErrorConvention(
@@ -2440,11 +2433,11 @@ bool ASTContext::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {
     // extensions for many other reasons.
     auto selector = method->getObjCSelector();
     AbstractFunctionDecl *overriddenMethod
-      = lookupObjCMethodInType(classDecl->getSuperclass(),
-                               selector,
-                               method->isObjCInstanceMethod(),
-                               isa<ConstructorDecl>(method),
-                               SourceMgr);
+      = lookupObjCMethodInClass(classDecl->getSuperclassDecl(),
+                                selector,
+                                method->isObjCInstanceMethod(),
+                                isa<ConstructorDecl>(method),
+                                SourceMgr);
     if (!overriddenMethod)
       continue;
 
@@ -2824,7 +2817,7 @@ NameAliasType::NameAliasType(TypeAliasDecl *typealias, Type parent,
   }
 
   // Record the substitutions.
-  if (auto genericSig = substitutions.getGenericSignature()) {
+  if (substitutions) {
     Bits.NameAliasType.HasSubstitutionMap = true;
     *getTrailingObjects<SubstitutionMap>() = substitutions;
   } else {
@@ -2981,7 +2974,7 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
                           Fields[0].getParameterFlags());
 
   RecursiveTypeProperties properties;
-  bool hasInOut = false;
+  bool hasElementWithOwnership = false;
   for (const TupleTypeElt &Elt : Fields) {
     auto eltTy = Elt.getType();
     if (!eltTy) continue;
@@ -2991,11 +2984,13 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
     // non-paren tuples are malformed and will be diagnosed later.
     if (auto *TTy = Elt.getType()->getAs<TupleType>()) {
       if (TTy->getNumElements() == 1)
-        hasInOut |= TTy->hasInOutElement();
+        hasElementWithOwnership |= TTy->hasElementWithOwnership();
     } else if (auto *Pty = dyn_cast<ParenType>(Elt.getType().getPointer())) {
-      hasInOut |= Pty->getParameterFlags().isInOut();
+      hasElementWithOwnership |= (Pty->getParameterFlags().getValueOwnership() !=
+                                  ValueOwnership::Default);
     } else {
-      hasInOut |= Elt.getParameterFlags().isInOut();
+      hasElementWithOwnership |= (Elt.getParameterFlags().getValueOwnership() !=
+                                  ValueOwnership::Default);
     }
   }
 
@@ -3023,7 +3018,7 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
                          sizeof(TupleTypeElt) * Fields.size(),
                          alignof(TupleType), arena);
   auto New = new (mem) TupleType(Fields, IsCanonical ? &C : nullptr, properties,
-                                 hasInOut);
+                                 hasElementWithOwnership);
   C.getImpl().getArena(arena).TupleTypes.InsertNode(New, InsertPos);
   return New;
 }
@@ -3534,6 +3529,8 @@ getGenericFunctionRecursiveProperties(Type Input, Type Result) {
   static_assert(RecursiveTypeProperties::BitWidth == 10,
                 "revisit this if you add new recursive type properties");
   RecursiveTypeProperties properties;
+  if (Input->getRecursiveProperties().hasError())
+    properties |= RecursiveTypeProperties::HasError;
   if (Result->getRecursiveProperties().hasDynamicSelf())
     properties |= RecursiveTypeProperties::HasDynamicSelf;
   if (Result->getRecursiveProperties().hasError())
@@ -3590,7 +3587,9 @@ Type AnyFunctionType::composeInput(ASTContext &ctx, ArrayRef<Param> params,
   for (const auto &param : params) {
     Type eltType = param.getPlainType();
     if (param.isVariadic()) {
-      if (canonicalVararg)
+      if (!ctx.getArrayDecl())
+        eltType = ErrorType::get(ctx);
+      else if (canonicalVararg)
         eltType = BoundGenericType::get(ctx.getArrayDecl(), Type(), {eltType});
       else
         eltType = ArraySliceType::get(eltType);
@@ -3603,6 +3602,18 @@ Type AnyFunctionType::composeInput(ASTContext &ctx, ArrayRef<Param> params,
 
 bool AnyFunctionType::equalParams(ArrayRef<AnyFunctionType::Param> a,
                                   ArrayRef<AnyFunctionType::Param> b) {
+  if (a.size() != b.size())
+    return false;
+
+  for (unsigned i = 0, n = a.size(); i != n; ++i) {
+    if (a[i] != b[i])
+      return false;
+  }
+
+  return true;
+}
+
+bool AnyFunctionType::equalParams(CanParamArrayRef a, CanParamArrayRef b) {
   if (a.size() != b.size())
     return false;
 

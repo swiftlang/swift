@@ -749,8 +749,8 @@ static bool removeUnreachableBlocks(SILFunction &F, SILModule &M,
 /// control flow edges.
 static void performNoReturnFunctionProcessing(SILFunction &Fn,
                                               SILFunctionTransform *T) {
-  DEBUG(llvm::errs() << "*** No return function processing: " << Fn.getName()
-                     << "\n");
+  LLVM_DEBUG(llvm::errs() << "*** No return function processing: "
+                          << Fn.getName() << "\n");
   bool Changed = false;
   for (auto &BB : Fn) {
     // Remove instructions from the basic block after a call to a noreturn
@@ -764,8 +764,8 @@ static void performNoReturnFunctionProcessing(SILFunction &Fn,
 }
 
 static void diagnoseUnreachable(SILFunction &Fn) {
-  DEBUG(llvm::errs() << "*** Diagnose Unreachable processing: " << Fn.getName()
-                     << "\n");
+  LLVM_DEBUG(llvm::errs() << "*** Diagnose Unreachable processing: "
+                          << Fn.getName() << "\n");
 
   UnreachableUserCodeReportingState State;
 

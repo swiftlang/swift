@@ -72,6 +72,8 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.EnableTesting |= Args.hasArg(OPT_enable_testing);
   Opts.EnableResilience |= Args.hasArg(OPT_enable_resilience);
 
+  Opts.TrackSystemDeps |= Args.hasArg(OPT_track_system_dependencies);
+
   computePrintStatsOptions();
   computeDebugTimeOptions();
   computeTBDOptions();
@@ -116,7 +118,7 @@ bool ArgsToFrontendOptionsConverter::convert(
     return true;
   }
 
-  if (setUpForSILOrLLVM())
+  if (setUpInputKindAndImmediateArgs())
     return true;
 
   if (computeModuleName())
@@ -340,6 +342,8 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::DumpTypeRefinementContexts;
   if (Opt.matches(OPT_dump_interface_hash))
     return FrontendOptions::ActionType::DumpInterfaceHash;
+  if (Opt.matches(OPT_dump_type_info))
+    return FrontendOptions::ActionType::DumpTypeInfo;
   if (Opt.matches(OPT_print_ast))
     return FrontendOptions::ActionType::PrintAST;
 
@@ -351,11 +355,10 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
   llvm_unreachable("Unhandled mode option");
 }
 
-bool ArgsToFrontendOptionsConverter::setUpForSILOrLLVM() {
+bool ArgsToFrontendOptionsConverter::setUpInputKindAndImmediateArgs() {
   using namespace options;
   bool treatAsSIL =
       Args.hasArg(OPT_parse_sil) || Opts.InputsAndOutputs.shouldTreatAsSIL();
-  bool treatAsLLVM = Opts.InputsAndOutputs.shouldTreatAsLLVM();
 
   if (Opts.InputsAndOutputs.verifyInputs(
           Diags, treatAsSIL,
@@ -374,15 +377,17 @@ bool ArgsToFrontendOptionsConverter::setUpForSILOrLLVM() {
   }
 
   if (treatAsSIL)
-    Opts.InputKind = InputFileKind::IFK_SIL;
-  else if (treatAsLLVM)
-    Opts.InputKind = InputFileKind::IFK_LLVM_IR;
+    Opts.InputKind = InputFileKind::SIL;
+  else if (Opts.InputsAndOutputs.shouldTreatAsLLVM())
+    Opts.InputKind = InputFileKind::LLVM;
+  else if (Opts.InputsAndOutputs.shouldTreatAsModuleInterface())
+    Opts.InputKind = InputFileKind::SwiftModuleInterface;
   else if (Args.hasArg(OPT_parse_as_library))
-    Opts.InputKind = InputFileKind::IFK_Swift_Library;
+    Opts.InputKind = InputFileKind::SwiftLibrary;
   else if (Opts.RequestedAction == FrontendOptions::ActionType::REPL)
-    Opts.InputKind = InputFileKind::IFK_Swift_REPL;
+    Opts.InputKind = InputFileKind::SwiftREPL;
   else
-    Opts.InputKind = InputFileKind::IFK_Swift;
+    Opts.InputKind = InputFileKind::Swift;
 
   return false;
 }
@@ -494,6 +499,11 @@ bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
   if (!FrontendOptions::canActionEmitModuleDoc(Opts.RequestedAction) &&
       Opts.InputsAndOutputs.hasModuleDocOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module_doc);
+    return true;
+  }
+  if (!FrontendOptions::canActionEmitInterface(Opts.RequestedAction) &&
+      Opts.InputsAndOutputs.hasModuleInterfaceOutputPath()) {
+    Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_interface);
     return true;
   }
   return false;

@@ -360,21 +360,21 @@ int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
     return -1;
   }
 
-  DEBUG(llvm::dbgs() << "Module to be executed:\n";
-        Module->dump());
+  LLVM_DEBUG(llvm::dbgs() << "Module to be executed:\n";
+             Module->dump());
 
   EE->finalizeObject();
   
   // Run the generated program.
   for (auto InitFn : InitFns) {
-    DEBUG(llvm::dbgs() << "Running initialization function "
-            << InitFn->getName() << '\n');
+    LLVM_DEBUG(llvm::dbgs() << "Running initialization function "
+                            << InitFn->getName() << '\n');
     EE->runFunctionAsMain(InitFn, CmdLine, nullptr);
   }
 
-  DEBUG(llvm::dbgs() << "Running static constructors\n");
+  LLVM_DEBUG(llvm::dbgs() << "Running static constructors\n");
   EE->runStaticConstructorsDestructors(false);
-  DEBUG(llvm::dbgs() << "Running main\n");
+  LLVM_DEBUG(llvm::dbgs() << "Running main\n");
   llvm::Function *EntryFn = Module->getFunction("main");
   return EE->runFunctionAsMain(EntryFn, CmdLine, nullptr);
 }

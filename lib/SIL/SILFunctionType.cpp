@@ -142,9 +142,9 @@ static CanType getKnownType(Optional<CanType> &cacheSlot, ASTContext &C,
       // lookupValue would only give us types actually declared in the overlays
       // themselves.
       SmallVector<ValueDecl *, 2> decls;
-      mod->lookupQualified(ModuleType::get(mod), C.getIdentifier(typeName),
+      mod->lookupQualified(mod, C.getIdentifier(typeName),
                            NL_QualifiedDefault | NL_KnownNonCascadingDependency,
-                           /*typeResolver=*/nullptr, decls);
+                           decls);
       if (decls.size() != 1)
         return CanType();
 
@@ -162,13 +162,13 @@ static CanType getKnownType(Optional<CanType> &cacheSlot, ASTContext &C,
   // It is possible that we won't find a bridging type (e.g. String) when we're
   // parsing the stdlib itself.
   if (t) {
-    DEBUG(llvm::dbgs() << "Bridging type " << moduleName << '.' << typeName
-            << " mapped to ";
-          if (t)
-            t->print(llvm::dbgs());
-          else
-            llvm::dbgs() << "<null>";
-          llvm::dbgs() << '\n');
+    LLVM_DEBUG(llvm::dbgs() << "Bridging type " << moduleName << '.' << typeName
+                            << " mapped to ";
+               if (t)
+                 t->print(llvm::dbgs());
+               else
+                 llvm::dbgs() << "<null>";
+               llvm::dbgs() << '\n');
   }
   return t;
 }
@@ -604,9 +604,10 @@ private:
                                ParameterTypeFlags paramFlags, CanType ty) {
       CanTupleType tty = dyn_cast<TupleType>(ty);
       // If the abstraction pattern is opaque, and the tuple type is
-      // materializable -- if it doesn't contain an l-value type -- then it's
-      // a valid target for substitution and we should not expand it.
-      if (!tty || (pattern.isTypeParameter() && !tty->hasInOutElement())) {
+      // a valid target for substitution, don't expand it.
+      if (!tty ||
+          (pattern.isTypeParameter() &&
+           !shouldExpandTupleType(tty))) {
         visit(paramFlags.getValueOwnership(), /*forSelf=*/false, pattern, ty,
               silRepresentation);
         return;
@@ -896,6 +897,62 @@ lowerCaptureContextParameters(SILModule &M, AnyFunctionRef function,
   }
 }
 
+static void destructureYieldsForReadAccessor(SILModule &M, CanType valueType,
+                                        SmallVectorImpl<SILYieldInfo> &yields) {
+  // Recursively destructure tuples.
+  if (auto tuple = dyn_cast<TupleType>(valueType)) {
+    for (auto eltType : tuple.getElementTypes())
+      destructureYieldsForReadAccessor(M, eltType, yields);
+    return;
+  }
+
+  auto &tl = M.Types.getTypeLowering(valueType);
+  auto convention = [&] {
+    if (tl.isAddressOnly())
+      return ParameterConvention::Indirect_In_Guaranteed;
+    if (tl.isTrivial())
+      return ParameterConvention::Direct_Unowned;
+    return ParameterConvention::Direct_Guaranteed;
+  }();
+  yields.push_back(SILYieldInfo(tl.getLoweredType().getASTType(),
+                                convention));
+}
+
+static void destructureYieldsForCoroutine(SILModule &M,
+                                          Optional<SILDeclRef> constant,
+                                          SmallVectorImpl<SILYieldInfo> &yields,
+                                          SILCoroutineKind &coroutineKind) {
+  assert(coroutineKind == SILCoroutineKind::None);
+  assert(yields.empty());
+
+  if (!constant || !constant->hasDecl())
+    return;
+
+  auto accessor = dyn_cast<AccessorDecl>(constant->getDecl());
+  if (!accessor || !accessor->isCoroutine())
+    return;
+
+  // Coroutine accessors are implicitly yield-once coroutines, despite
+  // their function type.
+  coroutineKind = SILCoroutineKind::YieldOnce;
+
+  auto storage = accessor->getStorage();
+  auto valueType = storage->getValueInterfaceType();
+
+  // 'modify' yields an inout of the target type.
+  if (accessor->getAccessorKind() == AccessorKind::Modify) {
+    auto loweredValueTy = M.Types.getLoweredType(valueType);
+    yields.push_back(SILYieldInfo(loweredValueTy.getASTType(),
+                                  ParameterConvention::Indirect_Inout));
+    return;
+  }
+
+  // 'read' yields a borrowed value of the target type, destructuring
+  // tuples as necessary.
+  assert(accessor->getAccessorKind() == AccessorKind::Read);
+  destructureYieldsForReadAccessor(M, valueType->getCanonicalType(), yields);
+}
+
 /// Create the appropriate SIL function type for the given formal type
 /// and conventions.
 ///
@@ -995,6 +1052,11 @@ static CanSILFunctionType getSILFunctionType(
                              substFnInterfaceType.getParams(),
                              extInfo);
   }
+
+  // Destructure the coroutine yields.
+  SILCoroutineKind coroutineKind = SILCoroutineKind::None;
+  SmallVector<SILYieldInfo, 8> yields;
+  destructureYieldsForCoroutine(M, constant, yields, coroutineKind);
   
   // Lower the capture context parameters, if any.
   //
@@ -1022,8 +1084,8 @@ static CanSILFunctionType getSILFunctionType(
     .withIsPseudogeneric(pseudogeneric)
     .withNoEscape(extInfo.isNoEscape());
   
-  return SILFunctionType::get(genericSig, silExtInfo, SILCoroutineKind::None,
-                              calleeConvention, inputs, /*yields*/ {},
+  return SILFunctionType::get(genericSig, silExtInfo, coroutineKind,
+                              calleeConvention, inputs, yields,
                               results, errorResult, M.getASTContext(),
                               witnessMethodConformance);
 }
@@ -1245,9 +1307,7 @@ getSILFunctionTypeForAbstractCFunction(SILModule &M,
 /// If EnableGuaranteedNormalArguments is set, return a default convention that
 /// uses guaranteed.
 static DefaultConventions getNormalArgumentConvention(SILModule &M) {
-  if (M.getOptions().EnableGuaranteedNormalArguments)
-    return DefaultConventions(NormalParameterConvention::Guaranteed);
-  return DefaultConventions(NormalParameterConvention::Owned);
+  return DefaultConventions(NormalParameterConvention::Guaranteed);
 }
 
 static CanSILFunctionType getNativeSILFunctionType(
@@ -1788,11 +1848,10 @@ static SelectorFamily getSelectorFamily(SILDeclRef c) {
       case AccessorKind::Get:
       case AccessorKind::Set:
         break;
-      case AccessorKind::WillSet:
-      case AccessorKind::DidSet:
-      case AccessorKind::Address:
-      case AccessorKind::MutableAddress:
-      case AccessorKind::MaterializeForSet:
+#define OBJC_ACCESSOR(ID, KEYWORD)
+#define ACCESSOR(ID) \
+      case AccessorKind::ID:
+#include "swift/AST/AccessorKinds.def"
         llvm_unreachable("Unexpected AccessorKind of foreign FuncDecl");
       }
     }
@@ -2101,15 +2160,15 @@ const SILConstantInfo &TypeConverter::getConstantInfo(SILDeclRef constant) {
     ::getUncachedSILFunctionTypeForConstant(M, constant,
                                             loweredInterfaceType);
 
-  DEBUG(llvm::dbgs() << "lowering type for constant ";
-        constant.print(llvm::dbgs());
-        llvm::dbgs() << "\n  formal type: ";
-        formalInterfaceType.print(llvm::dbgs());
-        llvm::dbgs() << "\n  lowered AST type: ";
-        loweredInterfaceType.print(llvm::dbgs());
-        llvm::dbgs() << "\n  SIL type: ";
-        silFnType.print(llvm::dbgs());
-        llvm::dbgs() << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "lowering type for constant ";
+             constant.print(llvm::dbgs());
+             llvm::dbgs() << "\n  formal type: ";
+             formalInterfaceType.print(llvm::dbgs());
+             llvm::dbgs() << "\n  lowered AST type: ";
+             loweredInterfaceType.print(llvm::dbgs());
+             llvm::dbgs() << "\n  SIL type: ";
+             silFnType.print(llvm::dbgs());
+             llvm::dbgs() << "\n");
 
   auto resultBuf = M.allocate(sizeof(SILConstantInfo),
                               alignof(SILConstantInfo));

@@ -851,7 +851,7 @@ public protocol UnkeyedEncodingContainer {
   /// - parameter sequence: The sequences whose contents to encode.
   /// - throws: An error if any of the contained values throws an error.
   mutating func encode<T : Sequence>(
-    contentsOf sequence: T) throws where T.Iterator.Element == ${type}
+    contentsOf sequence: T) throws where T.Element == ${type}
 % end
 
   /// Encodes the elements of the given sequence.
@@ -859,7 +859,7 @@ public protocol UnkeyedEncodingContainer {
   /// - parameter sequence: The sequences whose contents to encode.
   /// - throws: An error if any of the contained values throws an error.
   mutating func encode<T : Sequence>(
-    contentsOf sequence: T) throws where T.Iterator.Element : Encodable
+    contentsOf sequence: T) throws where T.Element : Encodable
 
   /// Encodes a nested container keyed by the given type and returns it.
   ///
@@ -1116,7 +1116,6 @@ public struct CodingUserInfoKey : RawRepresentable, Equatable, Hashable {
 /// An error that occurs during the encoding of a value.
 public enum EncodingError : Error {
   /// The context in which the error occurred.
-  @_fixed_layout // FIXME(sil-serialize-all)
   public struct Context {
     /// The path of coding keys taken to get to the point of the failing encode
     /// call.
@@ -1137,7 +1136,6 @@ public enum EncodingError : Error {
     ///   debugging purposes.
     /// - parameter underlyingError: The underlying error which caused this
     ///   error, if any.
-    @inlinable // FIXME(sil-serialize-all)
     public init(
       codingPath: [CodingKey],
       debugDescription: String,
@@ -1163,19 +1161,16 @@ public enum EncodingError : Error {
   // access CustomNSError (which is defined in Foundation) from here, we can
   // use the "hidden" entry points.
 
-  @inlinable // FIXME(sil-serialize-all)
   public var _domain: String {
     return "NSCocoaErrorDomain"
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   public var _code: Int {
     switch self {
-    case .invalidValue(_, _): return 4866
+    case .invalidValue: return 4866
     }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   public var _userInfo: AnyObject? {
     // The error dictionary must be returned as an AnyObject. We can do this
     // only on platforms with bridging, unfortunately.
@@ -1204,7 +1199,6 @@ public enum EncodingError : Error {
 /// An error that occurs during the decoding of a value.
 public enum DecodingError : Error {
   /// The context in which the error occurred.
-  @_fixed_layout // FIXME(sil-serialize-all)
   public struct Context {
     /// The path of coding keys taken to get to the point of the failing decode
     /// call.
@@ -1225,7 +1219,6 @@ public enum DecodingError : Error {
     ///   debugging purposes.
     /// - parameter underlyingError: The underlying error which caused this
     ///   error, if any.
-    @inlinable // FIXME(sil-serialize-all)
     public init(
       codingPath: [CodingKey],
       debugDescription: String,
@@ -1244,7 +1237,7 @@ public enum DecodingError : Error {
   /// for debugging.
   case typeMismatch(Any.Type, Context)
 
-  /// An indication that a non-optional value of the given type was expected,
+  /// An indication that a nonoptional value of the given type was expected,
   /// but a null value was found.
   ///
   /// As associated values, this case contains the attempted type and context
@@ -1270,22 +1263,17 @@ public enum DecodingError : Error {
   // access CustomNSError (which is defined in Foundation) from here, we can
   // use the "hidden" entry points.
 
-  @inlinable // FIXME(sil-serialize-all)
   public var _domain: String {
     return "NSCocoaErrorDomain"
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   public var _code: Int {
     switch self {
-    case .keyNotFound(_, _):   fallthrough
-    case .valueNotFound(_, _): return 4865
-    case .typeMismatch(_, _):  fallthrough
-    case .dataCorrupted(_):  return 4864
+    case .keyNotFound, .valueNotFound: return 4865
+    case .typeMismatch, .dataCorrupted:  return 4864
     }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   public var _userInfo: AnyObject? {
     // The error dictionary must be returned as an AnyObject. We can do this
     // only on platforms with bridging, unfortunately.
@@ -2138,7 +2126,7 @@ public extension UnkeyedEncodingContainer {
 % for type in codable_types:
   @inlinable // FIXME(sil-serialize-all)
   public mutating func encode<T : Sequence>(
-    contentsOf sequence: T) throws where T.Iterator.Element == ${type}
+    contentsOf sequence: T) throws where T.Element == ${type}
   {
     for element in sequence {
       try self.encode(element)
@@ -2148,7 +2136,7 @@ public extension UnkeyedEncodingContainer {
 
   @inlinable // FIXME(sil-serialize-all)
   public mutating func encode<T : Sequence>(
-    contentsOf sequence: T) throws where T.Iterator.Element : Encodable
+    contentsOf sequence: T) throws where T.Element : Encodable
   {
     for element in sequence {
       try self.encode(element)

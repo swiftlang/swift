@@ -1,4 +1,4 @@
 // RUN: %target-swift-frontend %s -typecheck -verify
 
 var d = [String:String]()
-_ = "\(d.map{ [$0 : $0] })" // expected-error {{type of expression is ambiguous without more context}}
+_ = "\(d.map{ [$0 : $0] })" // expected-error {{generic struct 'Dictionary' requires that '(key: String, value: String)' conform to 'Hashable'}}

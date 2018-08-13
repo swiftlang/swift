@@ -750,8 +750,7 @@ extension ${Self}: BinaryFloatingPoint {
     let provisional = Int(exponentBitPattern) - Int(${Self}._exponentBias)
     if isNormal { return provisional }
     let shift =
-      ${Self}.significandBitCount -
-        Int(significandBitPattern._binaryLogarithm())
+      ${Self}.significandBitCount - significandBitPattern._binaryLogarithm()
     return provisional + 1 - shift
   }
 
@@ -793,8 +792,7 @@ extension ${Self}: BinaryFloatingPoint {
     }
     if isSubnormal {
       let shift =
-        ${RawSignificand}(${Self}.significandBitCount) -
-          significandBitPattern._binaryLogarithm()
+        ${Self}.significandBitCount - significandBitPattern._binaryLogarithm()
       return ${Self}(sign: .plus,
         exponentBitPattern: ${Self}._exponentBias,
         significandBitPattern: significandBitPattern &<< shift)
@@ -1017,7 +1015,18 @@ extension ${Self}: BinaryFloatingPoint {
       _value = Builtin.int_ceil_FPIEEE${bits}(_value)
     case .down:
       _value = Builtin.int_floor_FPIEEE${bits}(_value)
+    @unknown default:
+      self._roundSlowPath(rule)
     }
+  }
+  
+  // Slow path for new cases that might have been inlined into an old
+  // ABI-stable version of round(_:) called from a newer version. If this is
+  // the case, this non-inlinable function will call into the _newer_ version
+  // which _will_ support this rounding rule.
+  @usableFromInline
+  internal mutating func _roundSlowPath(_ rule: FloatingPointRoundingRule) {
+    self.round(rule)
   }
 
   /// Replaces this value with its additive inverse.
@@ -1580,15 +1589,14 @@ extension ${Self} {
 %   ThatBuiltinName = self_ty.builtin_name
 %   sign = 's' if self_ty.is_signed else 'u'
 %   srcBits = self_ty.bits
-%   maxExponent = (1 << (ExponentBitCount - 1)) - 1
-%   maxBitLength = SignificandBitCount + 1 # implicit leading one
-%   if self_ty.is_signed:
-%     # The magnitude of the minimum value of a signed integer type is always
-%     # representable in floating point (assuming a large enough exponent)
-%     # because only one bit is set. All other possible magnitudes can be
-%     # represented using one bit less than the original source type.
-%     maxBitLength += 1
-%   end
+%
+%   max_required_exponent = srcBits - 1
+%   max_available_exponent = (1 << (ExponentBitCount - 1)) - 1
+%   max_required_precision = srcBits - 1 if self_ty.is_signed else srcBits
+%   max_available_precision = SignificandBitCount + 1
+%   is_always_represented_exactly = \
+%     (max_required_exponent <= max_available_exponent and \
+%       max_required_precision <= max_available_precision)
 
   /// Creates the closest representable value to the given integer.
   ///
@@ -1604,28 +1612,18 @@ extension ${Self} {
   /// can't be represented exactly, the result is `nil`.
   ///
   /// - Parameter value: The integer to represent as a floating-point value.
-%   if srcBits <= maxBitLength and srcBits - 1 <= maxExponent:
+%   if is_always_represented_exactly:
   @available(*, message: "Converting ${That} to ${Self} will always succeed.")
 %   end
   @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
   public init?(exactly value: ${That}) {
-%   if srcBits - 1 > maxExponent:
-    // Check that the exponent will be in range.
-    guard value.magnitude >> ${maxExponent} <= 1 else {
-      return nil
-    }
-%   end
-%   if srcBits > maxBitLength:
-    // The magnitude of the integer must be representable by the significand.
-    // Omit trailing zeros that can be encoded by the exponent.
-    let mask: ${That}.Magnitude = ~((1 << (${SignificandBitCount} + 1)) - 1)
-    let absolute = value.magnitude
-    guard (absolute >> absolute.trailingZeroBitCount) & mask == 0 else {
-      return nil
-    }
-%   end
     _value = Builtin.${sign}itofp_${ThatBuiltinName}_FPIEEE${bits}(value._value)
+%   if not is_always_represented_exactly:
+    guard let roundTrip = ${That}(exactly: self), roundTrip == value else {
+      return nil
+    }
+%   end
   }
 % end # all_integer_types
 }

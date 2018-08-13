@@ -20,3 +20,21 @@ func test() {
 
 // RUN: %refactor -source-filename %s -pos=17:3 -end-pos=18:15 | %FileCheck %s -check-prefix=CHECK2
 // CHECK2: Action begins
+
+// rdar://42098130
+enum E_42098130 { case foo, bar }
+func test_42098130<T>(e1: T, e2: E_42098130) {
+  switch e1 {
+  default:
+    break
+  }
+  switch (e2, e2) {
+  default:
+    break
+  }
+}
+// RUN: %refactor -source-filename %s -pos=27:3 | %FileCheck %s -check-prefix=CHECK3
+// RUN: %refactor -source-filename %s -pos=28:3 | %FileCheck %s -check-prefix=CHECK3
+// RUN: %refactor -source-filename %s -pos=31:3 | %FileCheck %s -check-prefix=CHECK3
+// RUN: %refactor -source-filename %s -pos=32:3 | %FileCheck %s -check-prefix=CHECK3
+// CHECK3: Action begins

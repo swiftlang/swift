@@ -192,7 +192,10 @@ public:
   bool isInputIncomplete() const { return IsInputIncomplete; }
 
   void checkForInputIncomplete() {
-    IsInputIncomplete = IsInputIncomplete || Tok.is(tok::eof);
+    IsInputIncomplete = IsInputIncomplete ||
+      // Check whether parser reached EOF but the real EOF, not the end of a
+      // string interpolation segment.
+      (Tok.is(tok::eof) && Tok.getText() != ")");
   }
 
   /// \brief This is the current token being considered by the parser.
@@ -459,8 +462,7 @@ public:
   }
 
   SourceLoc consumeIdentifier(Identifier *Result = nullptr) {
-    assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self,
-                     /* for Swift3 */tok::kw_throws, tok::kw_rethrows));
+    assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self));
     if (Result)
       *Result = Context.getIdentifier(Tok.getText());
     return consumeToken();
@@ -500,6 +502,12 @@ public:
     if (Tok.isAtStartOfLine()) return false;
     return consumeIf(K);
   }
+
+  bool isContextualYieldKeyword() {
+    return (Tok.isContextualKeyword("yield") &&
+            isa<AccessorDecl>(CurDeclContext) &&
+            cast<AccessorDecl>(CurDeclContext)->isCoroutine());
+  }
   
   /// \brief Read tokens until we get to one of the specified tokens, then
   /// return without consuming it.  Because we cannot guarantee that the token
@@ -530,6 +538,18 @@ public:
 
   /// \brief Skip until the next '#else', '#endif' or until eof.
   void skipUntilConditionalBlockClose();
+
+  /// \brief Skip until either finding \c T1 or reaching the end of the line.
+  ///
+  /// This uses \c skipSingle and so matches parens etc. After calling, one or
+  /// more of the following will be true: Tok.is(T1), Tok.isStartOfLine(),
+  /// Tok.is(tok::eof). The "or more" case is the first two: if the next line
+  /// starts with T1.
+  ///
+  /// \returns true if there is an instance of \c T1 on the current line (this
+  /// avoids the foot-gun of not considering T1 starting the next line for a
+  /// plain Tok.is(T1) check).
+  bool skipUntilTokenOrEndOfLine(tok T1);
 
   /// If the parser is generating only a syntax tree, try loading the current
   /// node from a previously generated syntax tree.
@@ -825,7 +845,7 @@ public:
 
   /// Parse a version tuple of the form x[.y[.z]]. Returns true if there was
   /// an error parsing.
-  bool parseVersionTuple(clang::VersionTuple &Version, SourceRange &Range,
+  bool parseVersionTuple(llvm::VersionTuple &Version, SourceRange &Range,
                          const Diagnostic &D);
 
   bool parseTypeAttributeList(VarDecl::Specifier &Specifier,
@@ -876,33 +896,9 @@ public:
 
   void consumeGetSetBody(AbstractFunctionDecl *AFD, SourceLoc LBLoc);
 
-  struct ParsedAccessors {
-    SourceLoc LBLoc, RBLoc;
-    SmallVector<AccessorDecl*, 16> Accessors;
-
-#define ACCESSOR(ID) AccessorDecl *ID = nullptr;
-#include "swift/AST/AccessorKinds.def"
-
-    void record(Parser &P, AbstractStorageDecl *storage, bool invalid,
-                ParseDeclOptions flags, SourceLoc staticLoc,
-                const DeclAttributes &attrs,
-                TypeLoc elementTy, ParameterList *indices,
-                SmallVectorImpl<Decl *> &decls);
-
-    StorageImplInfo
-    classify(Parser &P, AbstractStorageDecl *storage, bool invalid,
-             ParseDeclOptions flags, SourceLoc staticLoc,
-             const DeclAttributes &attrs,
-             TypeLoc elementTy, ParameterList *indices);
-
-    /// Add an accessor.  If there's an existing accessor of this kind,
-    /// return it.  The new accessor is still remembered but will be
-    /// ignored.
-    AccessorDecl *add(AccessorDecl *accessor);
-  };
-
   void parseAccessorAttributes(DeclAttributes &Attributes);
 
+  struct ParsedAccessors;
   bool parseGetSetImpl(ParseDeclOptions Flags,
                        GenericParamList *GenericParams,
                        ParameterList *Indices,
@@ -1033,10 +1029,10 @@ public:
 
     /// Set the parsed context for all the initializers to the given
     /// function.
-    void setFunctionContext(DeclContext *DC, ArrayRef<ParameterList *> paramList);
+    void setFunctionContext(DeclContext *DC, ParameterList *paramList);
     
-    DefaultArgumentInfo(bool inTypeContext) {
-      NextIndex = inTypeContext ? 1 : 0;
+    DefaultArgumentInfo() {
+      NextIndex = 0;
       HasDefaultArgument = false;
     }
   };
@@ -1126,12 +1122,12 @@ public:
                           DefaultArgumentInfo *defaultArgs = nullptr);
 
   ParserStatus parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
-                                    SmallVectorImpl<ParameterList*> &BodyParams,
+                                      ParameterList *&BodyParams,
                                       ParameterContextKind paramContext,
                                       DefaultArgumentInfo &defaultArgs);
   ParserStatus parseFunctionSignature(Identifier functionName,
                                       DeclName &fullName,
-                              SmallVectorImpl<ParameterList *> &bodyParams,
+                                      ParameterList *&bodyParams,
                                       DefaultArgumentInfo &defaultArgs,
                                       SourceLoc &throws,
                                       bool &rethrows,
@@ -1350,6 +1346,7 @@ public:
   ParserResult<Stmt> parseStmtBreak();
   ParserResult<Stmt> parseStmtContinue();
   ParserResult<Stmt> parseStmtReturn(SourceLoc tryLoc);
+  ParserResult<Stmt> parseStmtYield(SourceLoc tryLoc);
   ParserResult<Stmt> parseStmtThrow(SourceLoc tryLoc);
   ParserResult<Stmt> parseStmtDefer();
   ParserStatus
@@ -1359,7 +1356,8 @@ public:
   ParserStatus parseStmtCondition(StmtCondition &Result, Diag<> ID,
                                   StmtKind ParentKind);
   ParserResult<PoundAvailableInfo> parseStmtConditionPoundAvailable();
-  ParserResult<Stmt> parseStmtIf(LabeledStmtInfo LabelInfo);
+  ParserResult<Stmt> parseStmtIf(LabeledStmtInfo LabelInfo,
+                                 bool IfWasImplicitlyInserted = false);
   ParserResult<Stmt> parseStmtGuard();
   ParserResult<Stmt> parseStmtWhile(LabeledStmtInfo LabelInfo);
   ParserResult<Stmt> parseStmtRepeat(LabeledStmtInfo LabelInfo);

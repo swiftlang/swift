@@ -37,3 +37,7 @@ public enum Number: Int {
 }
 
 public func foo3(_ a: [Int: String]) {}
+
+public extension Int {
+  public func foo() {}
+}

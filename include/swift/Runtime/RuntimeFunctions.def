@@ -638,18 +638,26 @@ FUNCTION(GetFunctionMetadata3, swift_getFunctionTypeMetadata3,
         ATTRS(NoUnwind, ReadNone))
 
 // Metadata *swift_getForeignTypeMetadata(Metadata *nonUnique);
-FUNCTION(GetForeignTypeMetadata, swift_getForeignTypeMetadata, C_CC,
-         RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeMetadataPtrTy),
+FUNCTION(GetForeignTypeMetadata, swift_getForeignTypeMetadata, SwiftCC,
+         RETURNS(TypeMetadataResponseTy),
+         ARGS(SizeTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadNone)) // only writes to runtime-private fields
 
-// WitnessTable *swift_getForeignWitnessTable(const WitnessTable *candidate,
-//                                            const TypeContextDescriptor
-//                                            *forType);
+// WitnessTable *swift_getForeignWitnessTable(
+//                                  const WitnessTable *candidate,
+//                                  const TypeContextDescriptor *forType,
+//                                  const ProtocolDescriptor *forProtocol);
 FUNCTION(GetForeignWitnessTable, swift_getForeignWitnessTable, C_CC,
          RETURNS(WitnessTablePtrTy),
          ARGS(WitnessTablePtrTy, TypeContextDescriptorPtrTy,
               ProtocolDescriptorPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
+// MetadataResponse swift_getInPlaceMetadata(MetadataRequest request,
+//                                           TypeContextDescriptor *type);
+FUNCTION(GetInPlaceMetadata, swift_getInPlaceMetadata, SwiftCC,
+         RETURNS(TypeMetadataResponseTy),
+         ARGS(SizeTy, TypeContextDescriptorPtrTy),
          ATTRS(NoUnwind, ReadNone))
 
 // MetadataResponse swift_getGenericMetadata(MetadataRequest request,
@@ -758,18 +766,46 @@ FUNCTION(GetTupleMetadata3, swift_getTupleTypeMetadata3, SwiftCC,
               Int8PtrTy, WitnessTablePtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
+// void swift_getTupleTypeLayout(TypeLayout *result,
+//                               uint32_t offsets,
+//                               TupleTypeFlags flags,
+//                               const TypeLayout * const *elts);
+FUNCTION(GetTupleLayout, swift_getTupleTypeLayout, SwiftCC,
+         RETURNS(VoidTy),
+         ARGS(FullTypeLayoutTy->getPointerTo(0), Int32Ty->getPointerTo(0),
+              SizeTy, Int8PtrPtrTy->getPointerTo(0)),
+         ATTRS(NoUnwind))
+
+// size_t swift_getTupleTypeLayout2(TypeLayout *layout,
+//                                  const TypeLayout *elt0,
+//                                  const TypeLayout *elt1);
+FUNCTION(GetTupleLayout2, swift_getTupleTypeLayout2, SwiftCC,
+         RETURNS(SizeTy),
+         ARGS(FullTypeLayoutTy->getPointerTo(0), Int8PtrPtrTy, Int8PtrPtrTy),
+         ATTRS(NoUnwind))
+
+// OffsetPair swift_getTupleTypeLayout3(TypeLayout *layout,
+//                                      const TypeLayout *elt0,
+//                                      const TypeLayout *elt1,
+//                                      const TypeLayout *elt2);
+FUNCTION(GetTupleLayout3, swift_getTupleTypeLayout3, SwiftCC,
+         RETURNS(OffsetPairTy),
+         ARGS(FullTypeLayoutTy->getPointerTo(0),
+              Int8PtrPtrTy, Int8PtrPtrTy, Int8PtrPtrTy),
+         ATTRS(NoUnwind))
+
 // Metadata *swift_getExistentialTypeMetadata(
 //                              ProtocolClassConstraint classConstraint,
 //                              const Metadata *superclassConstraint,
 //                              size_t numProtocols,
-//                              const protocol_descriptor_t * const *protocols);
+//                              const ProtocolDescriptorRef *protocols);
 //
 // Note: ProtocolClassConstraint::Class is 0, ::Any is 1.
 FUNCTION(GetExistentialMetadata,
          swift_getExistentialTypeMetadata, C_CC,
          RETURNS(TypeMetadataPtrTy),
          ARGS(Int1Ty, TypeMetadataPtrTy, SizeTy,
-              ProtocolDescriptorPtrTy->getPointerTo()),
+              ProtocolDescriptorRefTy->getPointerTo()),
          ATTRS(NoUnwind, ReadOnly))
 
 // Metadata *swift_relocateClassMetadata(Metadata *self,

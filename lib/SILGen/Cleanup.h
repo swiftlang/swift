@@ -208,6 +208,10 @@ public:
                                        ::std::forward<A>(args)...);
   }
 
+  /// Emit the given active cleanup now and transition it to being inactive.
+  void popAndEmitCleanup(CleanupHandle handle, CleanupLocation loc,
+                         ForUnwind_t forUnwind);
+
   /// Transition the given active cleanup to the corresponding
   /// inactive state: Active becomes Dead and PersistentlyActive
   /// becomes Dormant.

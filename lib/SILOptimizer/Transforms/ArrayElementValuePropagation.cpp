@@ -298,8 +298,8 @@ public:
     if (Repls.empty())
       return false;
 
-    DEBUG(llvm::dbgs() << "Array append contentsOf calls replaced in "
-                       << Fn.getName() << " (" << Repls.size() << ")\n");
+    LLVM_DEBUG(llvm::dbgs() << "Array append contentsOf calls replaced in "
+                            << Fn.getName() << " (" << Repls.size() << ")\n");
 
     FuncDecl *AppendFnDecl = Ctx.getArrayAppendElementDecl();
     if (!AppendFnDecl)
@@ -363,7 +363,7 @@ public:
       }
     }
 
-    DEBUG(if (!GetElementReplacements.empty()) {
+    LLVM_DEBUG(if (!GetElementReplacements.empty()) {
       llvm::dbgs() << "Array elements replaced in " << Fn.getName() << " ("
                    << GetElementReplacements.size() << ")\n";
     });

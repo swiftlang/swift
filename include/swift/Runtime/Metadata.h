@@ -65,7 +65,7 @@ OpaqueValue *swift_copyPOD(OpaqueValue *dest,
 struct ExtraInhabitantsValueWitnessTable : ValueWitnessTable {
 #define WANT_ONLY_EXTRA_INHABITANT_VALUE_WITNESSES
 #define VALUE_WITNESS(LOWER_ID, UPPER_ID) \
-  value_witness_types::LOWER_ID LOWER_ID;
+  ValueWitnessTypes::LOWER_ID LOWER_ID;
 #include "swift/ABI/ValueWitness.def"
 
 #define SET_WITNESS(NAME) base.NAME,
@@ -76,9 +76,9 @@ struct ExtraInhabitantsValueWitnessTable : ValueWitnessTable {
       getExtraInhabitantIndex(nullptr) {}
   constexpr ExtraInhabitantsValueWitnessTable(
                             const ValueWitnessTable &base,
-                            value_witness_types::extraInhabitantFlags eif,
-                            value_witness_types::storeExtraInhabitant sei,
-                            value_witness_types::getExtraInhabitantIndex geii)
+                            ValueWitnessTypes::extraInhabitantFlags eif,
+                            ValueWitnessTypes::storeExtraInhabitant sei,
+                            ValueWitnessTypes::getExtraInhabitantIndex geii)
     : ValueWitnessTable(base),
       extraInhabitantFlags(eif),
       storeExtraInhabitant(sei),
@@ -95,7 +95,7 @@ struct ExtraInhabitantsValueWitnessTable : ValueWitnessTable {
 struct EnumValueWitnessTable : ExtraInhabitantsValueWitnessTable {
 #define WANT_ONLY_ENUM_VALUE_WITNESSES
 #define VALUE_WITNESS(LOWER_ID, UPPER_ID) \
-  value_witness_types::LOWER_ID LOWER_ID;
+  ValueWitnessTypes::LOWER_ID LOWER_ID;
 #include "swift/ABI/ValueWitness.def"
 
   constexpr EnumValueWitnessTable()
@@ -105,9 +105,9 @@ struct EnumValueWitnessTable : ExtraInhabitantsValueWitnessTable {
       destructiveInjectEnumTag(nullptr) {}
   constexpr EnumValueWitnessTable(
           const ExtraInhabitantsValueWitnessTable &base,
-          value_witness_types::getEnumTag getEnumTag,
-          value_witness_types::destructiveProjectEnumData destructiveProjectEnumData,
-          value_witness_types::destructiveInjectEnumTag destructiveInjectEnumTag)
+          ValueWitnessTypes::getEnumTag getEnumTag,
+          ValueWitnessTypes::destructiveProjectEnumData destructiveProjectEnumData,
+          ValueWitnessTypes::destructiveInjectEnumTag destructiveInjectEnumTag)
     : ExtraInhabitantsValueWitnessTable(base),
       getEnumTag(getEnumTag),
       destructiveProjectEnumData(destructiveProjectEnumData),
@@ -123,26 +123,26 @@ struct EnumValueWitnessTable : ExtraInhabitantsValueWitnessTable {
 /// the value witness functions and includes only the size, alignment,
 /// extra inhabitants, and miscellaneous flags about the type.
 struct TypeLayout {
-  value_witness_types::size size;
-  value_witness_types::flags flags;
-  value_witness_types::stride stride;
+  ValueWitnessTypes::size size;
+  ValueWitnessTypes::flags flags;
+  ValueWitnessTypes::stride stride;
 
 private:
   // Only available if the "hasExtraInhabitants" flag is set.
-  value_witness_types::extraInhabitantFlags extraInhabitantFlags;
+  ValueWitnessTypes::extraInhabitantFlags extraInhabitantFlags;
 
   void _static_assert_layout();
 public:
   TypeLayout() = default;
-  constexpr TypeLayout(value_witness_types::size size,
-                       value_witness_types::flags flags,
-                       value_witness_types::stride stride,
-                       value_witness_types::extraInhabitantFlags eiFlags =
-                         value_witness_types::extraInhabitantFlags())
+  constexpr TypeLayout(ValueWitnessTypes::size size,
+                       ValueWitnessTypes::flags flags,
+                       ValueWitnessTypes::stride stride,
+                       ValueWitnessTypes::extraInhabitantFlags eiFlags =
+                         ValueWitnessTypes::extraInhabitantFlags())
     : size(size), flags(flags), stride(stride),
       extraInhabitantFlags(eiFlags) {}
 
-  value_witness_types::extraInhabitantFlags getExtraInhabitantFlags() const {
+  ValueWitnessTypes::extraInhabitantFlags getExtraInhabitantFlags() const {
     assert(flags.hasExtraInhabitants());
     return extraInhabitantFlags;
   }
@@ -169,6 +169,7 @@ inline void TypeLayout::_static_assert_layout() {
   #undef CHECK_TYPE_LAYOUT_OFFSET
 }
 
+template <>
 inline void ValueWitnessTable::publishLayout(const TypeLayout &layout) {
   size = layout.size;
   stride = layout.stride;
@@ -184,23 +185,24 @@ inline void ValueWitnessTable::publishLayout(const TypeLayout &layout) {
   flags = layout.flags;
 }
 
-inline bool ValueWitnessTable::checkIsComplete() const {
+template <> inline bool ValueWitnessTable::checkIsComplete() const {
   return !flags.isIncomplete();
 }
 
+template <>
 inline const ExtraInhabitantsValueWitnessTable *
 ValueWitnessTable::_asXIVWT() const {
   assert(ExtraInhabitantsValueWitnessTable::classof(this));
   return static_cast<const ExtraInhabitantsValueWitnessTable *>(this);
 }
-  
-inline const EnumValueWitnessTable *
-ValueWitnessTable::_asEVWT() const {
+
+template <>
+inline const EnumValueWitnessTable *ValueWitnessTable::_asEVWT() const {
   assert(EnumValueWitnessTable::classof(this));
   return static_cast<const EnumValueWitnessTable *>(this);
 }
 
-inline unsigned ValueWitnessTable::getNumExtraInhabitants() const {
+template <> inline unsigned ValueWitnessTable::getNumExtraInhabitants() const {
   // If the table does not have extra inhabitant witnesses, then there are zero.
   if (!flags.hasExtraInhabitants())
     return 0;
@@ -237,10 +239,6 @@ const ValueWitnessTable VALUE_WITNESS_SYM(Bi512_); // Builtin.Int512
 // pointer types.
 SWIFT_RUNTIME_EXPORT
 const ExtraInhabitantsValueWitnessTable VALUE_WITNESS_SYM(Bo); // Builtin.NativeObject
-SWIFT_RUNTIME_EXPORT
-const ExtraInhabitantsValueWitnessTable UNOWNED_VALUE_WITNESS_SYM(Bo); // unowned Builtin.NativeObject
-SWIFT_RUNTIME_EXPORT
-const ValueWitnessTable WEAK_VALUE_WITNESS_SYM(Bo); // weak Builtin.NativeObject?
 
 SWIFT_RUNTIME_EXPORT
 const ExtraInhabitantsValueWitnessTable VALUE_WITNESS_SYM(Bb); // Builtin.BridgeObject
@@ -252,10 +250,6 @@ const ExtraInhabitantsValueWitnessTable VALUE_WITNESS_SYM(Bp); // Builtin.RawPoi
 // The ObjC-pointer table can be used for arbitrary ObjC pointer types.
 SWIFT_RUNTIME_EXPORT
 const ExtraInhabitantsValueWitnessTable VALUE_WITNESS_SYM(BO); // Builtin.UnknownObject
-SWIFT_RUNTIME_EXPORT
-const ExtraInhabitantsValueWitnessTable UNOWNED_VALUE_WITNESS_SYM(BO); // unowned Builtin.UnknownObject
-SWIFT_RUNTIME_EXPORT
-const ValueWitnessTable WEAK_VALUE_WITNESS_SYM(BO); // weak Builtin.UnknownObject?
 #endif
 
 // The () -> () table can be used for arbitrary function types.
@@ -334,6 +328,13 @@ bool equalContexts(const ContextDescriptor *a, const ContextDescriptor *b);
 ClassMetadataBounds getResilientMetadataBounds(
                                            const ClassDescriptor *descriptor);
 int32_t getResilientImmediateMembersOffset(const ClassDescriptor *descriptor);
+
+/// \brief Fetch a uniqued metadata object for a nominal type which requires
+/// in-place metadata initialization.
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+MetadataResponse
+swift_getInPlaceMetadata(MetadataRequest request,
+                         const TypeContextDescriptor *description);
 
 /// \brief Fetch a uniqued metadata object for a generic nominal type.
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
@@ -468,9 +469,10 @@ swift_getObjCClassFromObject(HeapObject *object);
 #endif
 
 /// \brief Fetch a unique type metadata object for a foreign type.
-SWIFT_RUNTIME_EXPORT
-const ForeignTypeMetadata *
-swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique);
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+MetadataResponse
+swift_getForeignTypeMetadata(MetadataRequest request,
+                             ForeignTypeMetadata *nonUnique);
 
 /// \brief Fetch a unique witness table for a foreign witness table.
 SWIFT_RUNTIME_EXPORT
@@ -523,6 +525,46 @@ swift_getTupleTypeMetadata3(MetadataRequest request,
                             const Metadata *elt2, const char *labels,
                             const ValueWitnessTable *proposedWitnesses);
 
+/// Perform layout as if for a tuple whose elements have the given layouts.
+///
+/// \param tupleLayout - A structure into which to write the tuple layout.
+///   Must be non-null.
+/// \param elementOffsets - An array into which to write the offsets of
+///   the elements.  May be null.  Must have space for all elements,
+///   including element 0 (which will always have offset 0).
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+void swift_getTupleTypeLayout(TypeLayout *tupleLayout,
+                              uint32_t *elementOffsets,
+                              TupleTypeFlags flags,
+                              const TypeLayout * const *elements);
+
+/// Perform layout as if for a two-element tuple whose elements have
+/// the given layouts.
+///
+/// \param tupleLayout - A structure into which to write the tuple layout.
+///   Must be non-null.
+/// \returns The offset of the second element.
+///   The first element always has offset 0.
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+size_t swift_getTupleTypeLayout2(TypeLayout *tupleLayout,
+                                 const TypeLayout *elt0,
+                                 const TypeLayout *elt1);
+
+struct OffsetPair { size_t First; size_t Second; };
+
+/// Perform layout as if for a three-element tuple whose elements have
+/// the given layouts.
+///
+/// \param tupleLayout - A structure into which to write the tuple layout.
+///   Must be non-null.
+/// \returns The offsets of the second and third elements.
+///   The first element always has offset 0.
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+OffsetPair swift_getTupleTypeLayout3(TypeLayout *tupleLayout,
+                                     const TypeLayout *elt0Layout,
+                                     const TypeLayout *elt1Layout,
+                                     const TypeLayout *elt2Layout);
+
 /// Initialize the value witness table and struct field offset vector for a
 /// struct, using the "Universal" layout strategy.
 SWIFT_RUNTIME_EXPORT
@@ -568,7 +610,7 @@ const ExistentialTypeMetadata *
 swift_getExistentialTypeMetadata(ProtocolClassConstraint classConstraint,
                                  const Metadata *superclassConstraint,
                                  size_t numProtocols,
-                                 const ProtocolDescriptor * const *protocols);
+                                 const ProtocolDescriptorRef *protocols);
 
 /// \brief Perform a copy-assignment from one existential container to another.
 /// Both containers must be of the same existential type representable with the
@@ -706,11 +748,11 @@ void swift_registerFieldDescriptors(const reflection::FieldDescriptor **records,
 /// Return the superclass, if any.  The result is nullptr for root
 /// classes and class protocol types.
 SWIFT_CC(swift)
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 const Metadata *_swift_class_getSuperclass(const Metadata *theClass);
 
 SWIFT_CC(swift)
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 void swift_getFieldAt(
   const Metadata *base, unsigned index, 
   void (*callback)(const char *name, const Metadata *type, void *ctx), void *callbackCtx);

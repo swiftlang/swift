@@ -1460,7 +1460,7 @@ void ConstantFolder::initializeWorklist(SILFunction &F) {
 
 SILAnalysis::InvalidationKind
 ConstantFolder::processWorkList() {
-  DEBUG(llvm::dbgs() << "*** ConstPropagation processing: \n");
+  LLVM_DEBUG(llvm::dbgs() << "*** ConstPropagation processing: \n");
 
   // This is the list of traits that this transformation might preserve.
   bool InvalidateBranches = false;
@@ -1471,9 +1471,8 @@ ConstantFolder::processWorkList() {
   // This is used to avoid duplicate error reporting in case we reach the same
   // instruction from different entry points in the WorkList.
   llvm::DenseSet<SILInstruction *> ErrorSet;
-
   llvm::SetVector<SILInstruction *> FoldedUsers;
-  CastOptimizer CastOpt(
+  CastOptimizer CastOpt(FuncBuilder,
       [&](SingleValueInstruction *I, ValueBase *V) { /* ReplaceInstUsesAction */
 
         InvalidateInstructions = true;
@@ -1499,7 +1498,7 @@ ConstantFolder::processWorkList() {
     SILInstruction *I = WorkList.pop_back_val();
     assert(I->getParent() && "SILInstruction must have parent.");
 
-    DEBUG(llvm::dbgs() << "Visiting: " << *I);
+    LLVM_DEBUG(llvm::dbgs() << "Visiting: " << *I);
 
     Callback(I);
 
@@ -1584,7 +1583,7 @@ ConstantFolder::processWorkList() {
     FoldedUsers.clear();
     for (auto Use : cast<SingleValueInstruction>(I)->getUses()) {
       SILInstruction *User = Use->getUser();
-      DEBUG(llvm::dbgs() << "    User: " << *User);
+      LLVM_DEBUG(llvm::dbgs() << "    User: " << *User);
 
       // It is possible that we had processed this user already. Do not try
       // to fold it again if we had previously produced an error while folding
@@ -1668,7 +1667,8 @@ ConstantFolder::processWorkList() {
 
       // The new constant could be further folded now, add it to the worklist.
       if (auto *Inst = C->getDefiningInstruction())
-        WorkList.insert(Inst);
+        if (isa<SingleValueInstruction>(Inst))
+          WorkList.insert(Inst);
     }
 
     // Eagerly DCE. We do this after visiting all users to ensure we don't

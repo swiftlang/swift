@@ -384,9 +384,7 @@ static Type findBaseTypeForReplacingArchetype(const ValueDecl *VD, const Type Ty
     return Type();
 
   // Find the nominal type decl related to VD.
-  NominalTypeDecl *NTD = VD->getDeclContext()->
-    getAsNominalTypeOrNominalTypeExtensionContext();
-  if (!NTD)
+  if (!VD->getDeclContext()->isTypeContext())
     return Type();
 
   return Ty->getRValueType()->getRValueInstanceType();
@@ -506,13 +504,7 @@ static StringRef getSourceToken(unsigned Offset,
                                                  MemBuf->getBufferIdentifier());
   auto BufId = SM.addNewSourceBuffer(std::move(MemBufRef));
   SourceLoc Loc = SM.getLocForOffset(BufId, Offset);
-
-  // Use fake language options; language options only affect validity
-  // and the exact token produced.
-  LangOptions FakeLangOpts;
-  Lexer L(FakeLangOpts, SM, BufId, nullptr, /*InSILMode=*/ false,
-          CommentRetentionMode::ReturnAsTokens);
-  return L.getTokenAt(Loc).getText();
+  return Lexer::getTokenAtLocation(SM, Loc).getText();
 }
 
 static llvm::Optional<unsigned>

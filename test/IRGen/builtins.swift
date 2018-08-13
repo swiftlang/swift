@@ -455,9 +455,9 @@ func copyPODArray(_ dest: Builtin.RawPointer, src: Builtin.RawPointer, count: Bu
 // CHECK-NOT:       loop:
 // CHECK:         call void @swift_arrayInitWithCopy
 // CHECK:         mul nuw i64 8, %2
-// CHECK:         call void @llvm.memmove.p0i8.p0i8.i64(i8* {{.*}}, i8* {{.*}}, i64 {{.*}}, i32 8, i1 false)
+// CHECK:         call void @llvm.memmove.p0i8.p0i8.i64(i8* {{.*}}, i8* {{.*}}, i64 {{.*}}, i1 false)
 // CHECK:         mul nuw i64 8, %2
-// CHECK:         call void @llvm.memmove.p0i8.p0i8.i64(i8* {{.*}}, i8* {{.*}}, i64 {{.*}}, i32 8, i1 false)
+// CHECK:         call void @llvm.memmove.p0i8.p0i8.i64(i8* {{.*}}, i8* {{.*}}, i64 {{.*}}, i1 false)
 // CHECK:         call void @swift_arrayAssignWithCopyNoAlias(
 // CHECK:         call void @swift_arrayAssignWithCopyFrontToBack(
 // CHECK:         call void @swift_arrayAssignWithCopyBackToFront(

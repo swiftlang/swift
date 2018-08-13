@@ -16,6 +16,7 @@
 #include "swift/Syntax/SyntaxNodes.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/raw_ostream.h"
+#include <unordered_set>
 
 namespace {
 
@@ -48,10 +49,8 @@ namespace swift {
 using namespace swift::syntax;
 
 struct SyntaxReuseRegion {
-  /// The byte offset at which the range begins
-  uintptr_t Start;
-  /// The byte offset at which the end ends
-  uintptr_t End;
+  AbsolutePosition Start;
+  AbsolutePosition End;
 };
 
 class SyntaxParsingCache {
@@ -62,13 +61,8 @@ class SyntaxParsingCache {
   /// the source file that is now parsed incrementally
   llvm::SmallVector<SourceEdit, 4> Edits;
 
-  /// Whether or not information about reused nodes shall be recored in
-  /// \c ReusedRanges
-  bool RecordReuseInformation = false;
-
-  /// If \c RecordReuseInformation buffer offsets of ranges that have been
-  /// successfully looked up in this cache are stored.
-  std::vector<SyntaxReuseRegion> ReusedRanges;
+  /// The IDs of all syntax nodes that got reused are collected in this vector.
+  std::unordered_set<SyntaxNodeId> ReusedNodeIds;
 
 public:
   SyntaxParsingCache(SourceFileSyntax OldSyntaxTree)
@@ -86,21 +80,20 @@ public:
   /// reused for a new syntax tree.
   llvm::Optional<Syntax> lookUp(size_t NewPosition, SyntaxKind Kind);
 
-  /// Turn recording of reused ranges on
-  void setRecordReuseInformation() { RecordReuseInformation = true; }
-
-  /// Return the ranges of the new source file that have been successfully
-  /// looked up in this cache as a (start, end) pair of byte offsets in the
-  /// post-edit file.
-  std::vector<SyntaxReuseRegion> getReusedRanges() const {
-    return ReusedRanges;
+  const std::unordered_set<SyntaxNodeId> &getReusedNodeIds() const {
+    return ReusedNodeIds;
   }
 
-private:
-  llvm::Optional<Syntax> lookUpFrom(const Syntax &Node, size_t Position,
-                                    SyntaxKind Kind);
+  /// Get the source regions of the new source file, represented by
+  /// \p SyntaxTree that have been reused as part of the incremental parse.
+  std::vector<SyntaxReuseRegion>
+  getReusedRegions(const SourceFileSyntax &SyntaxTree) const;
 
-  bool nodeCanBeReused(const Syntax &Node, size_t Position,
+private:
+  llvm::Optional<Syntax> lookUpFrom(const Syntax &Node, size_t NodeStart,
+                                    size_t Position, SyntaxKind Kind);
+
+  bool nodeCanBeReused(const Syntax &Node, size_t Position, size_t NodeStart,
                        SyntaxKind Kind) const;
 };
 

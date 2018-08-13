@@ -340,7 +340,7 @@ void ProvidesEmitter::emitTopLevelDecl(const Decl *const D,
 
 void ProvidesEmitter::emitExtensionDecl(const ExtensionDecl *const ED,
                                         CollectedDeclarations &cpd) const {
-  auto *NTD = ED->getExtendedType()->getAnyNominal();
+  auto *NTD = ED->getExtendedNominal();
   if (!NTD)
     return;
   if (NTD->hasAccess() && NTD->getFormalAccess() <= AccessLevel::FilePrivate) {
@@ -431,8 +431,7 @@ void ProvidesEmitter::emitMembers(const CollectedDeclarations &cpd) const {
 
   // This is also part of providesMember.
   for (auto *ED : cpd.extensionsWithJustMembers) {
-    auto mangledName =
-        mangleTypeAsContext(ED->getExtendedType()->getAnyNominal());
+    auto mangledName = mangleTypeAsContext(ED->getExtendedNominal());
 
     for (auto *member : ED->getMembers()) {
       auto *VD = dyn_cast<ValueDecl>(member);

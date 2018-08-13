@@ -1029,3 +1029,34 @@ bb3:
   unreachable
 
 }
+
+// Verify the case in which a box used by a partial apply which is then used by a try_apply.
+//
+// <rdar://problem/42815224> Swift CI: 2. Swift Source Compatibility Suite (master): Kitura project fails with compiler crash
+// CHECK-LABEL: sil @testPAUsedByTryApplyClosure : $@convention(thin) (@guaranteed { var Int }) -> () {
+// CHECK-LABEL: } // end sil function 'testPAUsedByTryApplyClosure'
+sil @testPAUsedByTryApplyClosure : $@convention(thin) (@guaranteed { var Int }) -> () {
+bb0(%0: ${ var Int }):
+  %v = tuple ()
+  return %v : $()
+}
+
+// CHECK-LABEL: sil private @testPAUsedByTryApply : $@convention(method) (@callee_guaranteed (@guaranteed @callee_guaranteed () -> ()) -> @error Error) -> () {
+// CHECK-LABEL: } // end sil function 'testPAUsedByTryApply'
+sil private @testPAUsedByTryApply : $@convention(method) (@callee_guaranteed (@guaranteed @callee_guaranteed () -> ()) -> @error Error) -> () {
+bb0(%0: $@callee_guaranteed (@guaranteed @callee_guaranteed () -> ()) -> @error Error):
+  %box = alloc_box ${ var Int }, var
+  %closure = function_ref @testPAUsedByTryApplyClosure : $@convention(thin) (@guaranteed { var Int }) -> ()
+  %pa = partial_apply [callee_guaranteed] %closure(%box) : $@convention(thin) (@guaranteed { var Int }) -> ()
+  try_apply %0(%pa) : $@callee_guaranteed (@guaranteed @callee_guaranteed () -> ()) -> @error Error, normal bb2, error bb3
+
+bb2(%result : $()):
+  br bb4
+
+bb3(%error : $Error):
+  br bb4
+
+bb4:
+  %v = tuple ()
+  return %v : $()
+}

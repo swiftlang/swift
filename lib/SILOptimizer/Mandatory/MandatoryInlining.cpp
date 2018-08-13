@@ -19,6 +19,7 @@
 #include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/ImmutableSet.h"
@@ -462,7 +463,8 @@ tryDevirtualizeApplyHelper(FullApplySite InnerAI, SILBasicBlock::iterator I,
 ///
 /// \returns true if successful, false if failed due to circular inlining.
 static bool
-runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
+runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
+			 SILFunction *F, FullApplySite AI,
                          DenseFunctionSet &FullyInlinedSet,
                          ImmutableFunctionSet::Factory &SetFactory,
                          ImmutableFunctionSet CurrentInliningSet,
@@ -516,7 +518,7 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
         continue;
 
       // Then recursively process it first before trying to inline it.
-      if (!runOnFunctionRecursively(CalleeFunction, InnerAI,
+      if (!runOnFunctionRecursively(FuncBuilder, CalleeFunction, InnerAI,
                                     FullyInlinedSet, SetFactory,
                                     CurrentInliningSet, CHA)) {
         // If we failed due to circular inlining, then emit some notes to
@@ -549,7 +551,7 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
         OpenedArchetypesTracker.registerUsedOpenedArchetypes(PAI);
       }
 
-      SILInliner Inliner(*F, *CalleeFunction,
+      SILInliner Inliner(FuncBuilder, *F, *CalleeFunction,
                          SILInliner::InlineKind::MandatoryInline, Subs,
                          OpenedArchetypesTracker);
       if (!Inliner.canInlineFunction(InnerAI)) {
@@ -565,9 +567,9 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
       // process the inlined body after inlining, because the inlining may
       // have exposed new inlining opportunities beyond those present in
       // the inlined function when processed independently.
-      DEBUG(llvm::errs() << "Inlining @" << CalleeFunction->getName()
-                         << " into @" << InnerAI.getFunction()->getName()
-                         << "\n");
+      LLVM_DEBUG(llvm::errs() << "Inlining @" << CalleeFunction->getName()
+                              << " into @" << InnerAI.getFunction()->getName()
+                              << "\n");
 
       // If we intend to inline a thick function, then we need to balance the
       // reference counts for correctness.
@@ -629,6 +631,7 @@ class MandatoryInlining : public SILModuleTransform {
     DenseFunctionSet FullyInlinedSet;
     ImmutableFunctionSet::Factory SetFactory;
 
+    SILOptFunctionBuilder FuncBuilder(*this);
     for (auto &F : *M) {
       // Don't inline into thunks, even transparent callees.
       if (F.isThunk())
@@ -638,7 +641,7 @@ class MandatoryInlining : public SILModuleTransform {
       if (F.wasDeserializedCanonical())
         continue;
 
-      runOnFunctionRecursively(&F,
+      runOnFunctionRecursively(FuncBuilder, &F,
                                FullApplySite(), FullyInlinedSet, SetFactory,
                                SetFactory.getEmptySet(), CHA);
     }

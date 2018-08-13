@@ -157,7 +157,6 @@ TEST(SourceLoc, StmtConditionElement) {
                                      /*IsCaptureList*/false,
                                      start.getAdvancedLoc(7)
                                     , C.Ctx.getIdentifier("x")
-                                    , Type()
                                     , nullptr);
   auto pattern = new (C.Ctx) NamedPattern(vardecl);
   auto init = new (C.Ctx) IntegerLiteralExpr( "1", start.getAdvancedLoc(25)

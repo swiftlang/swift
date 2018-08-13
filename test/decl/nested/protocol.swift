@@ -89,3 +89,23 @@ struct Outer {
     }
   }
 }
+
+struct OuterForUFI {
+  @usableFromInline
+  protocol Inner { // expected-error {{protocol 'Inner' cannot be nested inside another declaration}}
+    func req()
+  }
+}
+
+extension OuterForUFI.Inner {
+  public func extMethod() {} // The 'public' puts this in a special path.
+}
+
+func testLookup(_ x: OuterForUFI.Inner) {
+  x.req()
+  x.extMethod()
+}
+func testLookup<T: OuterForUFI.Inner>(_ x: T) {
+  x.req()
+  x.extMethod()
+}

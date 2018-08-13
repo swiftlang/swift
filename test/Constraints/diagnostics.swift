@@ -93,11 +93,11 @@ func f7() -> (c: Int, v: A) {
   return f6(g) // expected-error {{cannot convert return expression of type '(c: Int, i: A)' to return type '(c: Int, v: A)'}}
 }
 
-func f8<T:P2>(_ n: T, _ f: @escaping (T) -> T) {}
-f8(3, f4) // expected-error {{in argument type '(Int) -> Int', 'Int' does not conform to expected type 'P2'}}
+func f8<T:P2>(_ n: T, _ f: @escaping (T) -> T) {} // expected-note {{where 'T' = '(_, _)'}}
+f8(3, f4) // expected-error {{argument type 'Int' does not conform to expected type 'P2'}}
 typealias Tup = (Int, Double)
 func f9(_ x: Tup) -> Tup { return x }
-f8((1,2.0), f9) // expected-error {{in argument type '(Tup) -> Tup' (aka '((Int, Double)) -> (Int, Double)'), 'Tup' (aka '(Int, Double)') does not conform to expected type 'P2'}}
+f8((1,2.0), f9) // expected-error {{global function 'f8' requires that '(_, _)' conform to 'P2'}}
 
 // <rdar://problem/19658691> QoI: Incorrect diagnostic for calling nonexistent members on literals
 1.doesntExist(0)  // expected-error {{value of type 'Int' has no member 'doesntExist'}}
@@ -381,8 +381,7 @@ _ = CurriedClass.method3(c)(1, b: 2)(32) // expected-error {{cannot call value o
 _ = CurriedClass.method3(1, 2)           // expected-error {{instance member 'method3' cannot be used on type 'CurriedClass'; did you mean to use a value of this type instead?}}
 CurriedClass.method3(c)(1.0, b: 1)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 CurriedClass.method3(c)(1)               // expected-error {{missing argument for parameter 'b' in call}}
-
-CurriedClass.method3(c)(c: 1.0)          // expected-error {{missing argument for parameter 'b' in call}}
+CurriedClass.method3(c)(c: 1.0)          // expected-error {{missing argument for parameter #1 in call}}
 
 
 extension CurriedClass {
@@ -421,6 +420,7 @@ enum Color {
   static func overload(b : Int) -> Color {}
   
   static func frob(_ a : Int, b : inout Int) -> Color {}
+  static var svar: Color { return .Red }
 }
 let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) }) // expected-error {{'map' produces '[T]', not the expected contextual result type '(Int, Color)'}}
 
@@ -447,11 +447,13 @@ let _: Color = .overload(1)  // expected-error {{ambiguous reference to member '
 let _: Color = .frob(1.0, &i) // expected-error {{missing argument label 'b:' in call}}
 let _: Color = .frob(1.0, b: &i) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 let _: Color = .frob(1, i)  // expected-error {{missing argument label 'b:' in call}}
-let _: Color = .frob(1, b: i)  // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}}
+let _: Color = .frob(1, b: i)  // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{28-28=&}}
 let _: Color = .frob(1, &d) // expected-error {{missing argument label 'b:' in call}}
 let _: Color = .frob(1, b: &d) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 var someColor : Color = .red // expected-error {{enum type 'Color' has no case 'red'; did you mean 'Red'}}
 someColor = .red  // expected-error {{enum type 'Color' has no case 'red'; did you mean 'Red'}}
+someColor = .svar() // expected-error {{static property 'svar' is not a function}}
+someColor = .svar(1) // expected-error {{static property 'svar' is not a function}}
 
 func testTypeSugar(_ a : Int) {
   typealias Stride = Int
@@ -655,8 +657,7 @@ example21890157.property = "confusing"  // expected-error {{value of optional ty
 
 struct UnaryOp {}
 
-_ = -UnaryOp() // expected-error {{unary operator '-' cannot be applied to an operand of type 'UnaryOp'}}
-// expected-note @-1 {{overloads for '-' exist with these partially matching parameter lists: (Float), (Double)}}
+_ = -UnaryOp() // expected-error {{argument type 'UnaryOp' does not conform to expected type 'SignedNumeric'}}
 
 
 // <rdar://problem/23433271> Swift compiler segfault in failure diagnosis
@@ -762,7 +763,7 @@ func nilComparison(i: Int, o: AnyObject) {
 
 func secondArgumentNotLabeled(a: Int, _ b: Int) { }
 secondArgumentNotLabeled(10, 20)
-// expected-error@-1 {{missing argument label 'a' in call}}
+// expected-error@-1 {{missing argument label 'a:' in call}}
 
 // <rdar://problem/23709100> QoI: incorrect ambiguity error due to implicit conversion
 func testImplConversion(a : Float?) -> Bool {}
@@ -857,15 +858,15 @@ func r27212391(a: Int, x: Int, _ y: Int) {
   let _: Int = a + x + y
 }
 
-r27212391(3, 5)             // expected-error {{missing argument label 'x' in call}}
-r27212391(3, y: 5)          // expected-error {{missing argument label 'x' in call}}
+r27212391(3, 5)             // expected-error {{missing argument label 'x:' in call}}
+r27212391(3, y: 5)          // expected-error {{incorrect argument labels in call (have '_:y:', expected 'x:_:')}}
 r27212391(3, x: 5)          // expected-error {{argument 'x' must precede unnamed argument #1}} {{11-11=x: 5, }} {{12-18=}}
-r27212391(y: 3, x: 5)       // expected-error {{argument 'x' must precede argument 'y'}} {{11-11=x: 5, }} {{15-21=}}
+r27212391(y: 3, x: 5)       // expected-error {{incorrect argument labels in call (have 'y:x:', expected 'x:_:')}} {{11-12=x}} {{17-20=}}
 r27212391(y: 3, 5)          // expected-error {{incorrect argument label in call (have 'y:_:', expected 'x:_:')}}
 r27212391(x: 3, x: 5)       // expected-error {{extraneous argument label 'x:' in call}}
-r27212391(a: 1, 3, y: 5)    // expected-error {{missing argument label 'x' in call}}
-r27212391(1, x: 3, y: 5)    // expected-error {{missing argument label 'a' in call}}
-r27212391(a: 1, y: 3, x: 5) // expected-error {{argument 'x' must precede argument 'y'}} {{17-17=x: 5, }} {{21-27=}}
+r27212391(a: 1, 3, y: 5)    // expected-error {{incorrect argument labels in call (have 'a:_:y:', expected 'a:x:_:')}}
+r27212391(1, x: 3, y: 5)    // expected-error {{incorrect argument labels in call (have '_:x:y:', expected 'a:x:_:')}}
+r27212391(a: 1, y: 3, x: 5) // expected-error {{incorrect argument labels in call (have 'a:y:x:', expected 'a:x:_:')}} {{17-18=x}} {{23-26=}}
 r27212391(a: 1, 3, x: 5)    // expected-error {{argument 'x' must precede unnamed argument #2}} {{17-17=x: 5, }} {{18-24=}}
 
 // SR-1255
@@ -1151,7 +1152,7 @@ _ = rdar31849281(a: 101, b: 102, c: 103, foo: 104) // expected-error {{argument 
 _ = rdar31849281(a: 101, c: 103, b: 102, foo: 104) // expected-error {{argument 'foo' must precede argument 'a'}} {{18-18=foo: 104, }} {{40-50=}}
 _ = rdar31849281(foo: 104, a: 101, c: 103, b: 102) // expected-error {{argument 'b' must precede argument 'c'}} {{36-36=b: 102, }} {{42-50=}}
 
-_ = rdar31849281(b: 102, c: 103, a: 101, foo: 104) // expected-error {{argument 'foo' must precede argument 'b'}} {{18-18=foo: 104, }} {{40-50=}}
+_ = rdar31849281(b: 102, c: 103, a: 101, foo: 104) // expected-error {{incorrect argument labels in call (have 'b:c:a:foo:', expected 'foo:a:b:c:')}} {{18-19=foo}} {{26-27=a}} {{34-35=b}} {{42-45=c}}
 _ = rdar31849281(foo: 104, b: 102, c: 103, a: 101) // expected-error {{argument 'a' must precede argument 'b'}} {{28-28=a: 101, }} {{42-50=}}
 
 func var_31849281(_ a: Int, _ b: Int..., c: Int) {}
@@ -1159,14 +1160,14 @@ var_31849281(1, c: 10, 3, 4, 5, 6, 7, 8, 9) // expected-error {{unnamed argument
 
 func fun_31849281(a: (Bool) -> Bool, b: (Int) -> (String), c: [Int?]) {}
 fun_31849281(c: [nil, 42], a: { !$0 }, b: { (num: Int) -> String in return "\(num)" })
-// expected-error @-1 {{argument 'a' must precede argument 'c'}} {{14-14=a: { !$0 }, }} {{26-38=}}
+// expected-error @-1 {{incorrect argument labels in call (have 'c:a:b:', expected 'a:b:c:')}} {{14-15=a}} {{28-29=b}} {{40-41=c}}
 fun_31849281(a: { !$0 }, c: [nil, 42], b: { (num: Int) -> String in return String(describing: num) })
 // expected-error @-1 {{argument 'b' must precede argument 'c'}} {{26-26=b: { (num: Int) -> String in return String(describing: num) }, }} {{38-101=}}
 fun_31849281(a: { !$0 }, c: [nil, 42], b: { "\($0)" })
 // expected-error @-1 {{argument 'b' must precede argument 'c'}} {{26-26=b: { "\\($0)" }, }} {{38-54=}}
 
 func f_31849281(x: Int, y: Int, z: Int) {}
-f_31849281(42, y: 10, x: 20) // expected-error {{argument 'x' must precede unnamed argument #1}} {{12-12=x: 20, }} {{21-28=}}
+f_31849281(42, y: 10, x: 20) // expected-error {{incorrect argument labels in call (have '_:y:x:', expected 'x:y:z:')}} {{12-12=x: }} {{23-24=z}}
 
 func sr5081() {
   var a = ["1", "2", "3", "4", "5"]
@@ -1187,11 +1188,10 @@ func rdar17170728() {
 
 // https://bugs.swift.org/browse/SR-5934 - failure to emit diagnostic for bad
 // generic constraints
-func elephant<T, U>(_: T) where T : Collection, T.Element == U, T.Element : Hashable {}
-// expected-note@-1 {{in call to function 'elephant'}}
+func elephant<T, U>(_: T) where T : Collection, T.Element == U, T.Element : Hashable {} // expected-note {{where 'U' = 'T'}}
 
 func platypus<T>(a: [T]) {
-    _ = elephant(a) // expected-error {{generic parameter 'U' could not be inferred}}
+    _ = elephant(a) // expected-error {{global function 'elephant' requires that 'T' conform to 'Hashable'}}
 }
 
 // Another case of the above.

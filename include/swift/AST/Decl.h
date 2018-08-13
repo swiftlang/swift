@@ -31,6 +31,7 @@
 #include "swift/AST/StorageImpl.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/TypeWalker.h"
+#include "swift/AST/Types.h"
 #include "swift/AST/Witness.h"
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/Compiler.h"
@@ -116,10 +117,9 @@ enum class DescriptiveDeclKind : uint8_t {
   Var,
   Param,
   Let,
-  StaticVar,
-  StaticLet,
-  ClassVar,
-  ClassLet,
+  Property,
+  StaticProperty,
+  ClassProperty,
   InfixOperator,
   PrefixOperator,
   PostfixOperator,
@@ -150,6 +150,8 @@ enum class DescriptiveDeclKind : uint8_t {
   MaterializeForSet,
   Addressor,
   MutableAddressor,
+  ReadAccessor,
+  ModifyAccessor,
   WillSet,
   DidSet,
   EnumElement,
@@ -380,15 +382,15 @@ protected:
     DefaultArgumentResilienceExpansion : 1
   );
   
-  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+5+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+1+1+1+1+1+1+1,
     /// \see AbstractFunctionDecl::BodyKind
     BodyKind : 3,
 
     /// Import as member status.
     IAMStatus : 8,
 
-    /// Number of curried parameter lists.
-    NumParameterLists : 5,
+    /// Whether the function has an implicit 'self' parameter.
+    HasImplicitSelfDecl : 1,
 
     /// Whether we are overridden later.
     Overridden : 1,
@@ -427,9 +429,9 @@ protected:
     SelfAccess : 2
   );
 
-  SWIFT_INLINE_BITFIELD(AccessorDecl, FuncDecl, 3+3,
+  SWIFT_INLINE_BITFIELD(AccessorDecl, FuncDecl, 4+3,
     /// The kind of accessor this is.
-    AccessorKind : 3,
+    AccessorKind : 4,
 
     /// The kind of addressor this is.
     AddressorKind : 3
@@ -477,17 +479,13 @@ protected:
     IsDebuggerAlias : 1
   );
 
-  SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1+1,
+  SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1,
     /// Whether we have already added implicitly-defined initializers
     /// to this declaration.
     AddedImplicitInitializers : 1,
 
     /// Whether there is are lazily-loaded conformances for this nominal type.
-    HasLazyConformances : 1,
-
-    /// Whether we have already validated all members of the type that
-    /// affect layout.
-    HasValidatedLayout : 1
+    HasLazyConformances : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+2+8+16,
@@ -1642,7 +1640,10 @@ class ExtensionDecl final : public GenericContext, public Decl,
 
   /// The type being extended.
   TypeLoc ExtendedType;
-  
+
+  /// The nominal type being extended.
+  NominalTypeDecl *ExtendedNominal = nullptr;
+
   MutableArrayRef<TypeLoc> Inherited;
 
   /// \brief The next extension in the linked list of extensions.
@@ -1679,6 +1680,7 @@ class ExtensionDecl final : public GenericContext, public Decl,
   /// Slow path for \c takeConformanceLoader().
   std::pair<LazyMemberLoader *, uint64_t> takeConformanceLoaderSlow();
 
+  friend class ExtendedNominalRequest;
 public:
   using Decl::getASTContext;
 
@@ -1700,7 +1702,18 @@ public:
   void setBraces(SourceRange braces) { Braces = braces; }
 
   /// Retrieve the type being extended.
+  ///
+  /// Only use this entry point when the complete type, as spelled in the source,
+  /// is required. For most clients, \c getExtendedNominal(), which provides
+  /// only the \c NominalTypeDecl, will suffice.
   Type getExtendedType() const { return ExtendedType.getType(); }
+
+  /// Retrieve the nominal type declaration that is being extended.
+  NominalTypeDecl *getExtendedNominal() const;
+
+  /// Determine whether this extension has already been bound to a nominal
+  /// type declaration.
+  bool alreadyBoundToNominal() const { return NextExtension.getInt(); }
 
   /// Retrieve the extended type location.
   TypeLoc &getExtendedTypeLoc() { return ExtendedType; }
@@ -2347,33 +2360,17 @@ public:
   /// Returns the access level specified explicitly by the user, or provided by
   /// default according to language rules.
   ///
-  /// This is the access used when calculating if access control is being used
-  /// consistently. If \p useDC is provided (the location where the value is
-  /// being used), features that affect formal access such as \c \@testable are
-  /// taken into account.
-  ///
-  /// If \p treatUsableFromInlineAsPublic is true, declarations marked with the
-  /// \c @usableFromInline attribute are treated as public. This is normally
-  /// false for name lookup and other source language concerns, but true when
-  /// computing the linkage of generated functions.
+  /// Most of the time this is not the interesting value to check; access is
+  /// limited by enclosing scopes per SE-0025. Use #getFormalAccessScope to
+  /// check if access control is being used consistently, and to take features
+  /// such as \c \@testable and \c \@usableFromInline into account.
   ///
   /// \sa getFormalAccessScope
-  AccessLevel getFormalAccess(const DeclContext *useDC = nullptr,
-                              bool treatUsableFromInlineAsPublic = false) const;
+  /// \sa hasOpenAccess
+  AccessLevel getFormalAccess() const;
 
-  /// If this declaration is a member of a protocol extension, return the
-  /// minimum of the given access level and the protocol's access level.
-  ///
-  /// Otherwise, return the given access level unmodified.
-  ///
-  /// This is used when checking name lookup visibility. Protocol extension
-  /// members can be found when performing name lookup on a concrete type;
-  /// if the concrete type is visible from the lookup context but the
-  /// protocol is not, we do not want the protocol extension members to be
-  /// visible.
-  AccessLevel adjustAccessLevelForProtocolExtension(AccessLevel access) const;
-
-  /// Determine whether this Decl has either Private or FilePrivate access.
+  /// Determine whether this Decl has either Private or FilePrivate access,
+  /// and its DeclContext does not.
   bool isOutermostPrivateOrFilePrivateScope() const;
 
   /// Returns the outermost DeclContext from which this declaration can be
@@ -2395,6 +2392,7 @@ public:
   ///
   /// \sa getFormalAccess
   /// \sa isAccessibleFrom
+  /// \sa hasOpenAccess
   AccessScope
   getFormalAccessScope(const DeclContext *useDC = nullptr,
                        bool treatUsableFromInlineAsPublic = false) const;
@@ -2447,6 +2445,14 @@ public:
   /// the default implementations are not visible to name lookup.
   bool isAccessibleFrom(const DeclContext *DC,
                         bool forConformance = false) const;
+
+  /// Returns whether this declaration should be treated as \c open from
+  /// \p useDC. This is very similar to #getFormalAccess, but takes
+  /// \c \@testable into account.
+  ///
+  /// This is mostly only useful when considering requirements on an override:
+  /// if the base declaration is \c open, the override might have to be too.
+  bool hasOpenAccess(const DeclContext *useDC) const;
 
   /// Retrieve the "interface" type of this value, which uses
   /// GenericTypeParamType if the declaration is generic. For a generic
@@ -2690,8 +2696,6 @@ public:
     return UnderlyingTy;
   }
 
-  /// Set the underlying type, for deserialization and synthesized
-  /// aliases.
   void setUnderlyingType(Type type);
 
   /// For generic typealiases, return the unbound generic type.
@@ -2880,8 +2884,8 @@ public:
     TrailingWhere = trailingWhereClause;
   }
 
-  /// computeType - Compute the type (and declared type) of this associated
-  /// type; can only be called after the alias type has been resolved.
+  /// Set the interface type of this associated type declaration to a dependen
+  /// member type of 'Self'.
   void computeType();
 
   /// Retrieve the associated type "anchor", which is the associated type
@@ -3033,7 +3037,6 @@ protected:
     Bits.NominalTypeDecl.AddedImplicitInitializers = false;
     ExtensionGeneration = 0;
     Bits.NominalTypeDecl.HasLazyConformances = false;
-    Bits.NominalTypeDecl.HasValidatedLayout = false;
   }
 
   friend class ProtocolType;
@@ -3071,19 +3074,8 @@ public:
     Bits.NominalTypeDecl.AddedImplicitInitializers = true;
   }
 
-  /// Determine whether we have already validated any members
-  /// which affect layout.
-  bool hasValidatedLayout() const {
-    return Bits.NominalTypeDecl.HasValidatedLayout;
-  }
-
-  /// Note that we have attempted to validate any members
-  /// which affect layout.
-  void setHasValidatedLayout() {
-    Bits.NominalTypeDecl.HasValidatedLayout = true;
-  }
-
-  /// Compute the type of this nominal type.
+  /// Set the interface type of this nominal type to the metatype of the
+  /// declared interface type.
   void computeType();
 
   /// getDeclaredType - Retrieve the type declared by this entity, without
@@ -3287,45 +3279,6 @@ public:
     return std::distance(eltRange.begin(), eltRange.end());
   }
 
-  /// If this is an enum with two cases, return the other case. Otherwise,
-  /// return nullptr.
-  EnumElementDecl *getOppositeBinaryDecl(EnumElementDecl *decl) const {
-    ElementRange range = getAllElements();
-    auto iter = range.begin();
-    if (iter == range.end())
-      return nullptr;
-    bool seenDecl = false;
-    EnumElementDecl *result = nullptr;
-    if (*iter == decl) {
-      seenDecl = true;
-    } else {
-      result = *iter;
-    }
-
-    ++iter;
-    if (iter == range.end())
-      return nullptr;
-    if (seenDecl) {
-      assert(!result);
-      result = *iter;
-    } else {
-      if (decl != *iter)
-        return nullptr;
-      seenDecl = true;
-    }
-    ++iter;
-
-    // If we reach this point, we saw the decl we were looking for and one other
-    // case. If we have any additional cases, then we do not have a binary enum.
-    if (iter != range.end())
-      return nullptr;
-
-    // This is always true since we have already returned earlier nullptr if we
-    // did not see the decl at all.
-    assert(seenDecl);
-    return result;
-  }
-
   /// If this enum has a unique element, return it. A unique element can
   /// either hold a value or not, and the existence of one unique element does
   /// not imply the existence or non-existence of the opposite unique element.
@@ -3409,7 +3362,23 @@ public:
   /// Note that this property is \e not necessarily true for all children of
   /// \p useDC. In particular, an inlinable function does not get to switch
   /// exhaustively over a non-exhaustive enum declared in the same module.
-  bool isExhaustive(const DeclContext *useDC) const;
+  ///
+  /// This is the predicate used when deciding if a switch statement needs a
+  /// default case. It should not be used for optimization or code generation.
+  ///
+  /// \sa isEffectivelyExhaustive
+  bool isFormallyExhaustive(const DeclContext *useDC) const;
+
+  /// True if the enum can be exhaustively switched within a function defined
+  /// within \p M, with \p expansion specifying whether the function is
+  /// inlinable.
+  ///
+  /// This is the predicate used when making optimization and code generation
+  /// decisions. It should not be used at the AST or semantic level.
+  ///
+  /// \sa isFormallyExhaustive
+  bool isEffectivelyExhaustive(ModuleDecl *M,
+                               ResilienceExpansion expansion) const;
 };
 
 /// StructDecl - This is the declaration of a struct, for example:
@@ -3518,7 +3487,7 @@ public:
   }
 
   /// Determine whether this class has a superclass.
-  bool hasSuperclass() const { return (bool)getSuperclass(); }
+  bool hasSuperclass() const { return (bool)getSuperclassDecl(); }
 
   /// Retrieve the superclass of this class, or null if there is no superclass.
   Type getSuperclass() const;
@@ -3659,6 +3628,23 @@ public:
   /// might have implicitly @objc members, but will never itself be @objc.
   ObjCClassKind checkObjCAncestry() const;
 
+  /// \brief Whether this class or its superclasses has some form of generic
+  /// context.
+  ///
+  /// For example, given
+  ///
+  /// class A<X> {}
+  /// class B : A<Int> {}
+  /// struct C<T> {
+  ///   struct Inner {}
+  /// }
+  /// class D {}
+  /// class E: D {}
+  ///
+  /// Calling hasGenericAncestry() on `B` returns `A<Int>`, on `C<T>.Inner`
+  /// returns `C<T>.Inner`, but on `E` it returns null.
+  ClassDecl *getGenericAncestor() const;
+
   /// The type of metaclass to use for a class.
   enum class MetaclassKind : uint8_t {
     ObjC,
@@ -3723,7 +3709,7 @@ public:
   ///
   /// This is true of imported Objective-C classes.
   bool usesObjCGenericsModel() const {
-    return isObjC() && hasClangNode() && isGenericContext();
+    return hasClangNode() && isGenericContext() && isObjC();
   }
   
   /// True if the class is known to be implemented in Swift.
@@ -3832,7 +3818,7 @@ public:
   llvm::TinyPtrVector<ProtocolDecl *> getInheritedProtocols() const;
 
   /// Determine whether this protocol has a superclass.
-  bool hasSuperclass() const { return (bool)getSuperclass(); }
+  bool hasSuperclass() const { return (bool)getSuperclassDecl(); }
 
   /// Retrieve the superclass of this protocol, or null if there is no superclass.
   Type getSuperclass() const;
@@ -4275,6 +4261,13 @@ public:
     return {};
   }
 
+  /// Visit all the opaque accessors that this storage is expected to have.
+  void visitExpectedOpaqueAccessors(
+                            llvm::function_ref<void (AccessorKind)>) const;
+
+  /// Visit all the opaque accessors of this storage declaration.
+  void visitOpaqueAccessors(llvm::function_ref<void (AccessorDecl*)>) const;
+
   void setAccessors(StorageImplInfo storageImpl,
                     SourceLoc lbraceLoc, ArrayRef<AccessorDecl*> accessors,
                     SourceLoc rbraceLoc);
@@ -4295,6 +4288,9 @@ public:
 
   /// \brief Add a synthesized materializeForSet accessor.
   void setSynthesizedMaterializeForSet(AccessorDecl *materializeForSet);
+
+  /// Does this storage require a materializeForSet accessor?
+  bool requiresMaterializeForSet() const;
 
   SourceRange getBracesRange() const {
     if (auto info = Accessors.getPointer())
@@ -4332,8 +4328,7 @@ public:
     return getAccessor(AccessorKind::Address);
   }
 
-  /// \brief Return the decl for the 'mutableAddress' accessors if
-  /// it exists; this is only valid on a declaration with addressors.
+  /// \brief Return the decl for the mutable accessor if it exists.
   AccessorDecl *getMutableAddressor() const {
     return getAccessor(AccessorKind::MutableAddress);
   }
@@ -4344,7 +4339,17 @@ public:
       return getAddressor();
     return getMutableAddressor();
   }
-  
+
+  /// \brief Return the decl for the 'read' coroutine accessor if it exists.
+  AccessorDecl *getReadCoroutine() const {
+    return getAccessor(AccessorKind::Read);
+  }
+
+  /// \brief Return the decl for the 'modify' coroutine accessor if it exists.
+  AccessorDecl *getModifyCoroutine() const {
+    return getAccessor(AccessorKind::Modify);
+  }
+
   /// \brief Return the decl for the willSet specifier if it exists, this is
   /// only valid on a declaration with Observing storage.
   AccessorDecl *getWillSetFunc() const {
@@ -4404,13 +4409,6 @@ public:
   /// property from the given module?
   bool isResilient(ModuleDecl *M, ResilienceExpansion expansion) const;
 
-  /// Returns the interface type of elements of storage represented by this
-  /// declaration.
-  ///
-  /// For variables, this is the type of the variable itself.
-  /// For subscripts, this is the type of the subscript element.
-  Type getStorageInterfaceType() const;
-
   /// Does the storage use a behavior?
   bool hasBehavior() const {
     return BehaviorInfo.getPointer() != nullptr;
@@ -4432,6 +4430,10 @@ public:
   BehaviorRecord *getMutableBehavior() {
     return BehaviorInfo.getPointer();
   }
+  
+  /// True if the storage exports a property descriptor for key paths in
+  /// other modules.
+  bool exportsPropertyDescriptor() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -4461,7 +4463,7 @@ protected:
   llvm::PointerUnion<PatternBindingDecl*, Stmt*> ParentPattern;
 
   VarDecl(DeclKind Kind, bool IsStatic, Specifier Sp, bool IsCaptureList,
-          SourceLoc NameLoc, Identifier Name, Type Ty, DeclContext *DC)
+          SourceLoc NameLoc, Identifier Name, DeclContext *DC)
     : AbstractStorageDecl(Kind, DC, Name, NameLoc, !isImmutableSpecifier(Sp))
   {
     Bits.VarDecl.IsStatic = IsStatic;
@@ -4470,7 +4472,6 @@ protected:
     Bits.VarDecl.IsDebuggerVar = false;
     Bits.VarDecl.IsREPLVar = false;
     Bits.VarDecl.HasNonPatternBindingInit = false;
-    setType(Ty);
   }
 
   /// This is the type specified, including location information.
@@ -4480,9 +4481,8 @@ protected:
 
 public:
   VarDecl(bool IsStatic, Specifier Sp, bool IsCaptureList, SourceLoc NameLoc,
-          Identifier Name, Type Ty, DeclContext *DC)
-    : VarDecl(DeclKind::Var, IsStatic, Sp, IsCaptureList, NameLoc, Name, Ty,
-              DC) {}
+          Identifier Name, DeclContext *DC)
+    : VarDecl(DeclKind::Var, IsStatic, Sp, IsCaptureList, NameLoc, Name, DC) {}
 
   SourceRange getSourceRange() const;
 
@@ -4700,6 +4700,7 @@ class ParamDecl : public VarDecl {
   struct StoredDefaultArgument {
     Expr *DefaultArg = nullptr;
     Initializer *InitContext = nullptr;
+    StringRef StringRepresentation;
   };
 
   /// The default value, if any, along with whether this is varargs.
@@ -4709,7 +4710,7 @@ public:
   ParamDecl(VarDecl::Specifier specifier,
             SourceLoc specifierLoc, SourceLoc argumentNameLoc,
             Identifier argumentName, SourceLoc parameterNameLoc,
-            Identifier parameterName, Type ty, DeclContext *dc);
+            Identifier parameterName, DeclContext *dc);
 
   /// Clone constructor, allocates a new ParamDecl identical to the first.
   /// Intentionally not defined as a typical copy constructor to avoid
@@ -4727,10 +4728,6 @@ public:
   /// The resulting source location will be valid if the argument name
   /// was specified separately from the parameter name.
   SourceLoc getArgumentNameLoc() const { return ArgumentNameLoc; }
-  
-  /// Retrieve the parameter type flags corresponding to the declaration of
-  /// this parameter's argument type.
-  ParameterTypeFlags getParameterFlags() const;
   
   SourceLoc getSpecifierLoc() const { return SpecifierLoc; }
     
@@ -4762,6 +4759,17 @@ public:
   }
 
   void setDefaultArgumentInitContext(Initializer *initContext);
+
+  /// Returns a saved string representation of the parameter's default value.
+  ///
+  /// This should only be called if the default value expression is absent or
+  /// doesn't have a valid source range; otherwise, clients should extract the
+  /// source text from that range.
+  ///
+  /// \sa getDefaultValue
+  StringRef getDefaultValueStringRepresentation() const;
+
+  void setDefaultValueStringRepresentation(StringRef stringRepresentation);
 
   /// Whether or not this parameter is varargs.
   bool isVariadic() const { return DefaultValueAndIsVariadic.getInt(); }
@@ -4810,8 +4818,6 @@ public:
   
 /// Describes the kind of subscripting used in Objective-C.
 enum class ObjCSubscriptKind {
-  /// Not an Objective-C subscripting kind.
-  None,
   /// Objective-C indexed subscripting, which is based on an integral
   /// index.
   Indexed,
@@ -4883,6 +4889,10 @@ public:
   Type getElementInterfaceType() const;
   TypeLoc &getElementTypeLoc() { return ElementTy; }
   const TypeLoc &getElementTypeLoc() const { return ElementTy; }
+
+  /// Compute the interface type of this subscript from the parameter and
+  /// element types.
+  void computeType();
 
   /// \brief Returns whether the result of the subscript operation can be set.
   bool isSettable() const;
@@ -4976,6 +4986,9 @@ public:
 
   using BodySynthesizer = void (*)(AbstractFunctionDecl *);
 
+private:
+  ParameterList *Params;
+
 protected:
   // If a function has a body at all, we have either a parsed body AST node or
   // we have saved the end location of the unparsed body.
@@ -5001,14 +5014,14 @@ protected:
 
   AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent, DeclName Name,
                        SourceLoc NameLoc, bool Throws, SourceLoc ThrowsLoc,
-                       unsigned NumParameterLists,
+                       bool HasImplicitSelfDecl,
                        GenericParamList *GenericParams)
       : GenericContext(DeclContextKind::AbstractFunctionDecl, Parent),
         ValueDecl(Kind, Parent, Name, NameLoc),
         Body(nullptr), ThrowsLoc(ThrowsLoc) {
     setBodyKind(BodyKind::None);
     setGenericParams(GenericParams);
-    Bits.AbstractFunctionDecl.NumParameterLists = NumParameterLists;
+    Bits.AbstractFunctionDecl.HasImplicitSelfDecl = HasImplicitSelfDecl;
     Bits.AbstractFunctionDecl.Overridden = false;
     Bits.AbstractFunctionDecl.Throws = Throws;
     Bits.AbstractFunctionDecl.NeedsNewVTableEntry = false;
@@ -5016,9 +5029,6 @@ protected:
     Bits.AbstractFunctionDecl.DefaultArgumentResilienceExpansion =
         unsigned(ResilienceExpansion::Maximal);
     Bits.AbstractFunctionDecl.Synthesized = false;
-
-    // Verify no bitfield truncation.
-    assert(Bits.AbstractFunctionDecl.NumParameterLists == NumParameterLists);
   }
 
   void setBodyKind(BodyKind K) {
@@ -5064,7 +5074,6 @@ public:
     Bits.AbstractFunctionDecl.IAMStatus = newValue.getRawValue();
   }
 
-public:
   /// Retrieve the location of the 'throws' keyword, if present.
   SourceLoc getThrowsLoc() const { return ThrowsLoc; }
 
@@ -5176,6 +5185,10 @@ private:
   void computeNeedsNewVTableEntry();
 
 public:
+  /// Compute the interface type of this function declaration from the
+  /// parameter types.
+  void computeType(AnyFunctionType::ExtInfo Info = FunctionType::ExtInfo());
+
   /// Retrieve the source range of the function body.
   SourceRange getBodySourceRange() const;
 
@@ -5196,39 +5209,32 @@ public:
   /// depending on the function context.
   bool argumentNameIsAPIByDefault() const;
 
-  /// \brief Returns the "natural" number of argument clauses taken by this
-  /// function.  This value is one for free-standing functions, and two for
-  /// methods.
-  unsigned getNumParameterLists() const {
-    return Bits.AbstractFunctionDecl.NumParameterLists;
+  /// Retrieve the function's parameter list, not including 'self' if present.
+  ParameterList *getParameters() {
+    return Params;
+  }
+  const ParameterList *getParameters() const {
+    return Params;
   }
 
-  /// \brief Returns the parameter pattern(s) for the function definition that
-  /// determine the parameter names bound in the function body.
-  ///
-  /// The number of "top-level" elements in this pattern will match the number
-  /// of argument names in the compound name of the function or constructor.
-  MutableArrayRef<ParameterList *> getParameterLists();
-  ArrayRef<const ParameterList *> getParameterLists() const {
-    auto paramLists =
-        const_cast<AbstractFunctionDecl *>(this)->getParameterLists();
-    return ArrayRef<const ParameterList *>(paramLists.data(),paramLists.size());
-  }
-  ParameterList *getParameterList(unsigned i) {
-    return getParameterLists()[i];
-  }
-  const ParameterList *getParameterList(unsigned i) const {
-    return getParameterLists()[i];
+  void setParameters(ParamDecl *SelfDecl,
+                     ParameterList *Params);
+
+  bool hasImplicitSelfDecl() const {
+    return Bits.AbstractFunctionDecl.HasImplicitSelfDecl;
   }
 
-  /// \brief This method returns the implicit 'self' decl.
-  ///
-  /// Note that some functions don't have an implicit 'self' decl, for example,
-  /// free functions.  In this case nullptr is returned.
+  ParamDecl **getImplicitSelfDeclStorage();
+
+  /// Retrieve the implicit 'self' parameter for methods, or nullptr for free
+  /// functions.
   const ParamDecl *getImplicitSelfDecl() const {
     return const_cast<AbstractFunctionDecl*>(this)->getImplicitSelfDecl();
   }
-  ParamDecl *getImplicitSelfDecl();
+  ParamDecl *getImplicitSelfDecl() {
+    auto **selfDecl = getImplicitSelfDeclStorage();
+    return (selfDecl == nullptr ? nullptr : *selfDecl);
+  }
 
   /// Retrieve the declaration that this method overrides, if any.
   AbstractFunctionDecl *getOverriddenDecl() const {
@@ -5325,29 +5331,23 @@ class FuncDecl : public AbstractFunctionDecl {
   OperatorDecl *Operator = nullptr;
 
 protected:
-  ParameterList **getParameterListBuffer(); // defined inline below
-  ParameterList * const *getParameterListBuffer() const {
-    return const_cast<FuncDecl*>(this)->getParameterListBuffer();
-  }
-
   FuncDecl(DeclKind Kind,
            SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
            SourceLoc FuncLoc,
            DeclName Name, SourceLoc NameLoc,
            bool Throws, SourceLoc ThrowsLoc,
-           unsigned NumParameterLists,
+           bool HasImplicitSelfDecl,
            GenericParamList *GenericParams, DeclContext *Parent)
     : AbstractFunctionDecl(Kind, Parent,
                            Name, NameLoc,
                            Throws, ThrowsLoc,
-                           NumParameterLists, GenericParams),
+                           HasImplicitSelfDecl, GenericParams),
       StaticLoc(StaticLoc), FuncLoc(FuncLoc) {
     assert(!Name.getBaseName().isSpecial());
 
     Bits.FuncDecl.IsStatic =
       StaticLoc.isValid() || StaticSpelling != StaticSpellingKind::None;
     Bits.FuncDecl.StaticSpelling = static_cast<unsigned>(StaticSpelling);
-    assert(NumParameterLists > 0 && "Must have at least an empty tuple arg");
 
     Bits.FuncDecl.HasDynamicSelf = false;
     Bits.FuncDecl.ForcedStaticDispatch = false;
@@ -5361,7 +5361,7 @@ private:
                               DeclName Name, SourceLoc NameLoc,
                               bool Throws, SourceLoc ThrowsLoc,
                               GenericParamList *GenericParams,
-                              unsigned NumParameterLists,
+                              bool HasImplicitSelfDecl,
                               DeclContext *Parent,
                               ClangNode ClangN);
 
@@ -5373,7 +5373,7 @@ public:
                                       DeclName Name, SourceLoc NameLoc,
                                       bool Throws, SourceLoc ThrowsLoc,
                                       GenericParamList *GenericParams,
-                                      unsigned NumParameterLists,
+                                      bool HasImplicitSelfDecl,
                                       DeclContext *Parent);
 
   static FuncDecl *create(ASTContext &Context, SourceLoc StaticLoc,
@@ -5382,7 +5382,8 @@ public:
                           DeclName Name, SourceLoc NameLoc,
                           bool Throws, SourceLoc ThrowsLoc,
                           GenericParamList *GenericParams,
-                          ArrayRef<ParameterList *> ParameterLists,
+                          ParamDecl *SelfDecl,
+                          ParameterList *ParameterList,
                           TypeLoc FnRetType, DeclContext *Parent,
                           ClangNode ClangN = ClangNode());
 
@@ -5421,30 +5422,10 @@ public:
   void setSelfAccessKind(SelfAccessKind mod) {
     Bits.FuncDecl.SelfAccess = static_cast<unsigned>(mod);
   }
-      
-  /// \brief Returns the parameter lists(s) for the function definition.
-  ///
-  /// The number of "top-level" elements will match the number of argument names
-  /// in the compound name of the function or constructor.
-  MutableArrayRef<ParameterList *> getParameterLists() {
-    return {getParameterListBuffer(), getNumParameterLists()};
-  }
-  ArrayRef<const ParameterList *> getParameterLists() const {
-    return {getParameterListBuffer(), getNumParameterLists()};
-  }
-  ParameterList *getParameterList(unsigned i) {
-    return getParameterLists()[i];
-  }
-  const ParameterList *getParameterList(unsigned i) const {
-    return getParameterLists()[i];
-  }
-  
+
   /// \returns true if this is non-mutating due to applying a 'mutating'
   /// attribute. For example a "mutating set" accessor.
   bool isExplicitNonMutating() const;
-
-  void setDeserializedSignature(ArrayRef<ParameterList *> ParameterLists,
-                                TypeLoc FnRetType);
 
   SourceLoc getStaticLoc() const { return StaticLoc; }
   SourceLoc getFuncLoc() const { return FuncLoc; }
@@ -5496,7 +5477,9 @@ public:
   void getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const {
     return getCaptureInfo().getLocalCaptures(Result);
   }
-  
+
+  ParamDecl **getImplicitSelfDeclStorage();
+
   /// Get the supertype method this method overrides, if any.
   FuncDecl *getOverriddenDecl() const {
     return cast_or_null<FuncDecl>(AbstractFunctionDecl::getOverriddenDecl());
@@ -5582,7 +5565,7 @@ class AccessorDecl final : public FuncDecl {
                                   SourceLoc staticLoc,
                                   StaticSpellingKind staticSpelling,
                                   bool throws, SourceLoc throwsLoc,
-                                  unsigned numParameterLists,
+                                  bool hasImplicitSelfDecl,
                                   GenericParamList *genericParams,
                                   DeclContext *parent,
                                   ClangNode clangNode);
@@ -5598,7 +5581,7 @@ public:
                               StaticSpellingKind staticSpelling,
                               bool throws, SourceLoc throwsLoc,
                               GenericParamList *genericParams,
-                              unsigned numParameterLists,
+                              bool hasImplicitSelfDecl,
                               DeclContext *parent);
 
   static AccessorDecl *create(ASTContext &ctx, SourceLoc declLoc,
@@ -5610,7 +5593,8 @@ public:
                               StaticSpellingKind staticSpelling,
                               bool throws, SourceLoc throwsLoc,
                               GenericParamList *genericParams,
-                              ArrayRef<ParameterList *> parameterLists,
+                              ParamDecl *selfDecl,
+                              ParameterList *parameterList,
                               TypeLoc fnRetType, DeclContext *parent,
                               ClangNode clangNode = ClangNode());
 
@@ -5646,8 +5630,26 @@ public:
   bool isGetterOrSetter() const { return isGetter() || isSetter(); }
 
   bool isObservingAccessor() const {
-    return getAccessorKind() == AccessorKind::DidSet ||
-           getAccessorKind() == AccessorKind::WillSet;
+    switch (getAccessorKind()) {
+#define OBSERVING_ACCESSOR(ID, KEYWORD) \
+    case AccessorKind::ID: return true;
+#define ACCESSOR(ID) \
+    case AccessorKind::ID: return false;
+#include "swift/AST/AccessorKinds.def"
+    }
+    llvm_unreachable("bad accessor kind");
+  }
+
+  /// Is this accessor one of the kinds that's implicitly a coroutine?
+  bool isCoroutine() const {
+    switch (getAccessorKind()) {
+#define COROUTINE_ACCESSOR(ID, KEYWORD) \
+    case AccessorKind::ID: return true;
+#define ACCESSOR(ID) \
+    case AccessorKind::ID: return false;
+#include "swift/AST/AccessorKinds.def"
+    }
+    llvm_unreachable("bad accessor kind");
   }
 
   static bool classof(const Decl *D) {
@@ -5662,14 +5664,6 @@ public:
     return false;
   }
 };
-
-inline ParameterList **FuncDecl::getParameterListBuffer() {
-  if (!isa<AccessorDecl>(this)) {
-    assert(getKind() == DeclKind::Func && "no new kinds of functions");
-    return reinterpret_cast<ParameterList**>(this+1);
-  }
-  return reinterpret_cast<ParameterList**>(static_cast<AccessorDecl*>(this)+1);
-}
 
 inline AccessorDecl *
 AbstractStorageDecl::AccessorRecord::getAccessor(AccessorKind kind) const {
@@ -5773,9 +5767,9 @@ public:
     return hasName() ? getBaseName().getIdentifier().str() : "_";
   }
 
-  /// \returns false if there was an error during the computation rendering the
-  /// EnumElementDecl invalid, true otherwise.
-  bool computeType();
+  /// Set the interface type of this enum element to the constructor function
+  /// type; (Self.Type) -> Self or (Self.Type) -> (Args...) -> Self.
+  void computeType();
 
   Type getArgumentInterfaceType() const;
 
@@ -5894,7 +5888,7 @@ class ConstructorDecl : public AbstractFunctionDecl {
   /// The location of the '!' or '?' for a failable initializer.
   SourceLoc FailabilityLoc;
 
-  ParameterList *ParameterLists[2];
+  ParamDecl *SelfDecl;
 
   /// The interface type of the initializing constructor.
   Type InitializerInterfaceType;
@@ -5910,8 +5904,6 @@ public:
                   ParamDecl *SelfParam, ParameterList *BodyParams,
                   GenericParamList *GenericParams, 
                   DeclContext *Parent);
-
-  void setParameterLists(ParamDecl *selfParam, ParameterList *bodyParams);
 
   SourceLoc getConstructorLoc() const { return getNameLoc(); }
   SourceLoc getStartLoc() const { return getConstructorLoc(); }
@@ -5932,25 +5924,7 @@ public:
   Expr *getSuperInitCall() { return CallToSuperInit; }
   void setSuperInitCall(Expr *CallExpr) { CallToSuperInit = CallExpr; }
 
-  MutableArrayRef<ParameterList *> getParameterLists() {
-    return { ParameterLists, 2 };
-  }
-  ArrayRef<const ParameterList *> getParameterLists() const {
-    return AbstractFunctionDecl::getParameterLists();
-  }
-  ParameterList *getParameterList(unsigned i) {
-    return getParameterLists()[i];
-  }
-  const ParameterList *getParameterList(unsigned i) const {
-    return getParameterLists()[i];
-  }
-  
-  /// Returns the normal parameters to the initializer, not including self.
-  ParameterList *getParameters() { return ParameterLists[1]; }
-
-  /// Returns the normal parameters to the initializer, not including self.
-  const ParameterList *getParameters() const { return ParameterLists[1]; }
-
+  ParamDecl **getImplicitSelfDeclStorage() { return &SelfDecl; }
 
   /// Specifies the kind of initialization call performed within the body
   /// of the constructor, e.g., self.init or super.init.
@@ -6096,22 +6070,14 @@ public:
 /// }
 /// \endcode
 class DestructorDecl : public AbstractFunctionDecl {
-  ParameterList *SelfParameter;
+  ParamDecl *SelfDecl;
+
 public:
   DestructorDecl(SourceLoc DestructorLoc, ParamDecl *selfDecl,
                  DeclContext *Parent);
-  
-  void setSelfDecl(ParamDecl *selfDecl);
 
-  MutableArrayRef<ParameterList *> getParameterLists() {
-    return { &SelfParameter, 1 };
-  }
-  ArrayRef<const ParameterList *> getParameterLists() const {
-    return { &SelfParameter, 1 };
-  }
+  ParamDecl **getImplicitSelfDeclStorage() { return &SelfDecl; }
 
-
-  
   SourceLoc getDestructorLoc() const { return getNameLoc(); }
   SourceLoc getStartLoc() const { return getDestructorLoc(); }
   SourceRange getSourceRange() const;
@@ -6552,6 +6518,8 @@ AbstractStorageDecl::overwriteSetterAccess(AccessLevel accessLevel) {
     setter->overwriteAccess(accessLevel);
   if (auto materializeForSet = getMaterializeForSetFunc())
     materializeForSet->overwriteAccess(accessLevel);
+  if (auto modify = getModifyCoroutine())
+    modify->overwriteAccess(accessLevel);
   if (auto mutableAddressor = getMutableAddressor())
     mutableAddressor->overwriteAccess(accessLevel);
 }
@@ -6565,18 +6533,32 @@ inline bool AbstractStorageDecl::isStatic() const {
   return false;
 }
 
-inline MutableArrayRef<ParameterList *>
-AbstractFunctionDecl::getParameterLists() {
+/// Constructors and destructors always have a 'self' parameter,
+/// which is stored in an instance member. Functions only have a
+/// 'self' if they are declared inside of a nominal type or extension,
+/// in which case we tail-allocate storage for it.
+inline ParamDecl **AbstractFunctionDecl::getImplicitSelfDeclStorage() {
   switch (getKind()) {
   default: llvm_unreachable("Unknown AbstractFunctionDecl!");
   case DeclKind::Constructor:
-    return cast<ConstructorDecl>(this)->getParameterLists();
+    return cast<ConstructorDecl>(this)->getImplicitSelfDeclStorage();
   case DeclKind::Destructor:
-    return cast<DestructorDecl>(this)->getParameterLists();
+    return cast<DestructorDecl>(this)->getImplicitSelfDeclStorage();
   case DeclKind::Func:
   case DeclKind::Accessor:
-    return cast<FuncDecl>(this)->getParameterLists();
+    return cast<FuncDecl>(this)->getImplicitSelfDeclStorage();
   }
+}
+
+inline ParamDecl **FuncDecl::getImplicitSelfDeclStorage() {
+  if (!hasImplicitSelfDecl())
+    return nullptr;
+
+  if (!isa<AccessorDecl>(this)) {
+    assert(getKind() == DeclKind::Func && "no new kinds of functions");
+    return reinterpret_cast<ParamDecl **>(this+1);
+  }
+  return reinterpret_cast<ParamDecl **>(static_cast<AccessorDecl*>(this)+1);
 }
 
 inline DeclIterator &DeclIterator::operator++() {

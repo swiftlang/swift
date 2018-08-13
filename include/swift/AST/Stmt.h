@@ -84,6 +84,11 @@ protected:
     CaseCount : 32
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(YieldStmt, Stmt, 32,
+    : NumPadBits,
+    NumYields : 32
+  );
+
   } Bits;
 
   /// Return the given value for the 'implicit' flag if present, or if None,
@@ -209,7 +214,48 @@ public:
   
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Return;}
 };
+
+/// YieldStmt - A yield statement.  The yield-values sequence is not optional,
+/// but the parentheses are.
+///    yield 42
+class YieldStmt final
+    : public Stmt, private llvm::TrailingObjects<YieldStmt, Expr*> {
+  friend TrailingObjects;
+
+  SourceLoc YieldLoc;
+  SourceLoc LPLoc;
+  SourceLoc RPLoc;
+
+  YieldStmt(SourceLoc yieldLoc, SourceLoc lpLoc, ArrayRef<Expr *> yields,
+            SourceLoc rpLoc, Optional<bool> implicit = None)
+    : Stmt(StmtKind::Yield, getDefaultImplicitFlag(implicit, yieldLoc)),
+      YieldLoc(yieldLoc), LPLoc(lpLoc), RPLoc(rpLoc) {
+    Bits.YieldStmt.NumYields = yields.size();
+    memcpy(getMutableYields().data(), yields.data(),
+           yields.size() * sizeof(Expr*));
+  }
+
+public:
+  static YieldStmt *create(const ASTContext &ctx, SourceLoc yieldLoc,
+                           SourceLoc lp, ArrayRef<Expr*> yields, SourceLoc rp);
+
+  SourceLoc getYieldLoc() const { return YieldLoc; }
+  SourceLoc getLParenLoc() const { return LPLoc; }
+  SourceLoc getRParenLoc() const { return RPLoc; }
+
+  SourceLoc getStartLoc() const { return YieldLoc; }
+  SourceLoc getEndLoc() const;
+
+  ArrayRef<Expr*> getYields() const {
+    return {getTrailingObjects<Expr*>(), Bits.YieldStmt.NumYields};
+  }
+  MutableArrayRef<Expr*> getMutableYields() {
+    return {getTrailingObjects<Expr*>(), Bits.YieldStmt.NumYields};
+  }
   
+  static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Yield; }
+};
+
 /// DeferStmt - A 'defer' statement.  This runs the substatement it contains
 /// when the enclosing scope is exited.
 ///

@@ -265,9 +265,9 @@ static void emitResilientTagIndex(IRGenModule &IGM,
                                   const EnumImplStrategy *strategy,
                                   EnumElementDecl *Case) {
   auto resilientIdx = strategy->getTagIndex(Case);
-  auto global = IGM.getAddrOfEnumCase(Case, ForDefinition);
-  cast<llvm::GlobalVariable>(global.getAddress())
-      ->setInitializer(llvm::ConstantInt::get(IGM.Int32Ty, resilientIdx));
+  auto *global = cast<llvm::GlobalVariable>(
+    IGM.getAddrOfEnumCase(Case, ForDefinition).getAddress());
+  global->setInitializer(llvm::ConstantInt::get(IGM.Int32Ty, resilientIdx));
 }
 
 void
@@ -1365,10 +1365,11 @@ namespace {
                            SILType T) const {
       // If the layout is fixed, the size will be a constant.
       // Otherwise, do a memcpy of the dynamic size of the type.
-      IGF.Builder.CreateMemCpy(dest.getAddress(), src.getAddress(),
-                               TI->getSize(IGF, T),
-                               std::min(dest.getAlignment().getValue(),
-                                        src.getAlignment().getValue()));
+      IGF.Builder.CreateMemCpy(dest.getAddress(),
+                               dest.getAlignment().getValue(),
+                               src.getAddress(),
+                               src.getAlignment().getValue(),
+                               TI->getSize(IGF, T));
     }
 
     void emitPrimitiveStorePayloadAndExtraTag(IRGenFunction &IGF, Address dest,
@@ -5632,7 +5633,7 @@ SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
   if (ElementsWithPayload.empty()) {
     enumTy->setBody(ArrayRef<llvm::Type*>{}, /*isPacked*/ true);
     Alignment alignment(1);
-    applyLayoutAttributes(TC.IGM, Type.getASTType(), /*fixed*/true, alignment);
+    applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/true, alignment);
     return registerEnumTypeInfo(new LoadableEnumTypeInfo(*this, enumTy,
                                                          Size(0), {},
                                                          alignment,
@@ -5651,8 +5652,7 @@ SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
 
     if (TIK <= Opaque) {
       auto alignment = eltTI.getBestKnownAlignment();
-      applyLayoutAttributes(TC.IGM, Type.getASTType(), /*fixed*/false,
-                            alignment);
+      applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/false, alignment);
       auto enumAccessible =
         IsABIAccessible_t(TC.IGM.getSILModule().isTypeABIAccessible(Type));
       return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
@@ -5663,8 +5663,7 @@ SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
     } else {
       auto &fixedEltTI = cast<FixedTypeInfo>(eltTI);
       auto alignment = fixedEltTI.getFixedAlignment();
-      applyLayoutAttributes(TC.IGM, Type.getASTType(), /*fixed*/true,
-                            alignment);
+      applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/true, alignment);
 
       return getFixedEnumTypeInfo(enumTy,
                         fixedEltTI.getFixedSize(),
@@ -5700,7 +5699,7 @@ NoPayloadEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
   spareBits.extendWithSetBits(tagSize.getValueInBits());
 
   Alignment alignment(tagSize.getValue());
-  applyLayoutAttributes(TC.IGM, Type.getASTType(), /*fixed*/true, alignment);
+  applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/true, alignment);
 
   return registerEnumTypeInfo(new LoadableEnumTypeInfo(*this,
                                    enumTy, tagSize, std::move(spareBits),
@@ -5740,7 +5739,7 @@ CCompatibleEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
   enumTy->setBody(body, /*isPacked*/ false);
 
   auto alignment = rawFixedTI.getFixedAlignment();
-  applyLayoutAttributes(TC.IGM, Type.getASTType(), /*fixed*/true, alignment);
+  applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/true, alignment);
 
   assert(!TC.IGM.isResilient(theEnum, ResilienceExpansion::Minimal) &&
          "C-compatible enums cannot be resilient");
@@ -5811,7 +5810,7 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeFixedLayout(
   }
   
   auto alignment = payloadTI.getFixedAlignment();
-  applyLayoutAttributes(TC.IGM, Type.getASTType(), /*fixed*/true, alignment);
+  applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/true, alignment);
 
   getFixedEnumTypeInfo(
       enumTy, Size(sizeWithTag), std::move(spareBits), alignment,
@@ -5839,8 +5838,7 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeDynamicLayout(
   auto &payloadTI = getPayloadTypeInfo();
   auto alignment = payloadTI.getBestKnownAlignment();
   
-  applyLayoutAttributes(TC.IGM, Type.getASTType(), /*fixed*/false,
-                        alignment);
+  applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/false, alignment);
   
   auto enumAccessible =
     IsABIAccessible_t(TC.IGM.getSILModule().isTypeABIAccessible(Type));
@@ -6005,8 +6003,7 @@ MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
     assert(PayloadTagBits.count() == numTagBits);
   }
   
-  applyLayoutAttributes(TC.IGM, Type.getASTType(), /*fixed*/ true,
-                        worstAlignment);
+  applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/ true, worstAlignment);
 
   getFixedEnumTypeInfo(enumTy, Size(sizeWithTag), std::move(spareBits),
                        worstAlignment, isPOD, isBT);
@@ -6042,8 +6039,7 @@ TypeInfo *MultiPayloadEnumImplStrategy::completeDynamicLayout(
     bt &= payloadTI.isBitwiseTakable(ResilienceExpansion::Maximal);
   }
   
-  applyLayoutAttributes(TC.IGM, Type.getASTType(), /*fixed*/false,
-                        alignment);
+  applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/false, alignment);
 
   auto enumAccessible =
     IsABIAccessible_t(TC.IGM.getSILModule().isTypeABIAccessible(Type));
@@ -6110,25 +6106,26 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
   };
 
   if (auto fixedTI = dyn_cast<FixedTypeInfo>(ti)) {
-    DEBUG(llvm::dbgs() << "Layout for enum ";
-          type->print(llvm::dbgs());
-          llvm::dbgs() << ":\n";);
+    LLVM_DEBUG(llvm::dbgs() << "Layout for enum ";
+               type->print(llvm::dbgs());
+               llvm::dbgs() << ":\n";);
 
     SpareBitVector spareBits;
     fixedTI->applyFixedSpareBitsMask(spareBits);
 
     auto bitMask = strategy->getBitMaskForNoPayloadElements();
     assert(bitMask.size() == fixedTI->getFixedSize().getValueInBits());
-    DEBUG(llvm::dbgs() << "  no-payload mask:\t";
-          displayBitMask(bitMask));
-    DEBUG(llvm::dbgs() << "  spare bits mask:\t";
-          displayBitMask(spareBits));
+    LLVM_DEBUG(llvm::dbgs() << "  no-payload mask:\t";
+               displayBitMask(bitMask));
+    LLVM_DEBUG(llvm::dbgs() << "  spare bits mask:\t";
+               displayBitMask(spareBits));
 
     for (auto &elt : strategy->getElementsWithNoPayload()) {
       auto bitPattern = strategy->getBitPatternForNoPayloadElement(elt.decl);
       assert(bitPattern.size() == fixedTI->getFixedSize().getValueInBits());
-      DEBUG(llvm::dbgs() << "  no-payload case " << elt.decl->getName().str()
-                         << ":\t";
+      LLVM_DEBUG(llvm::dbgs() << "  no-payload case "
+                              << elt.decl->getName().str()
+                              << ":\t";
             displayBitMask(bitPattern));
 
       auto maskedBitPattern = bitPattern;
@@ -6139,8 +6136,8 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
     assert(tagBits.count() >= 32
             || static_cast<size_t>(static_cast<size_t>(1) << tagBits.count())
                >= strategy->getElementsWithPayload().size());
-    DEBUG(llvm::dbgs() << "  payload tag bits:\t";
-          displayBitMask(tagBits));
+    LLVM_DEBUG(llvm::dbgs() << "  payload tag bits:\t";
+               displayBitMask(tagBits));
 
     tagBits &= spareBits;
     assert(tagBits.none() && "tag bits overlap spare bits?!");

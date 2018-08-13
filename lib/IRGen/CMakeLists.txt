@@ -1,5 +1,6 @@
 add_swift_library(swiftIRGen STATIC
   AllocStackHoisting.cpp
+  ClassLayout.cpp
   DebugTypeInfo.cpp
   EnumPayload.cpp
   ExtraInhabitants.cpp
@@ -46,6 +47,7 @@ add_swift_library(swiftIRGen STATIC
   Outlining.cpp
   StructLayout.cpp
   SwiftTargetInfo.cpp
+  TypeLayoutDumper.cpp
   TypeLayoutVerifier.cpp
   LINK_LIBRARIES
     swiftAST

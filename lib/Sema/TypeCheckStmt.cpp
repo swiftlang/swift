@@ -313,6 +313,9 @@ public:
   /// expressions are not discarded.
   bool IsREPL;
 
+  /// Used to distinguish the first BraceStmt that starts a TopLevelCodeDecl.
+  bool IsBraceStmtFromTopLevelDecl;
+
   struct AddLabeledStmt {
     StmtChecker &SC;
     AddLabeledStmt(StmtChecker &SC, LabeledStmt *LS) : SC(SC) {
@@ -352,16 +355,21 @@ public:
   };
 
   StmtChecker(TypeChecker &TC, AbstractFunctionDecl *AFD)
-    : TC(TC), TheFunc(AFD), DC(AFD), IsREPL(false) { }
+      : TC(TC), TheFunc(AFD), DC(AFD), IsREPL(false),
+        IsBraceStmtFromTopLevelDecl(false) {}
 
   StmtChecker(TypeChecker &TC, ClosureExpr *TheClosure)
-    : TC(TC), TheFunc(TheClosure), DC(TheClosure), IsREPL(false) { }
+      : TC(TC), TheFunc(TheClosure), DC(TheClosure), IsREPL(false),
+        IsBraceStmtFromTopLevelDecl(false) {}
 
   StmtChecker(TypeChecker &TC, DeclContext *DC)
-    : TC(TC), TheFunc(), DC(DC), IsREPL(false) {
+      : TC(TC), TheFunc(), DC(DC), IsREPL(false),
+        IsBraceStmtFromTopLevelDecl(false) {
     if (const SourceFile *SF = DC->getParentSourceFile())
       if (SF->Kind == SourceFileKind::REPL)
         IsREPL = true;
+
+    IsBraceStmtFromTopLevelDecl = isa<TopLevelCodeDecl>(DC);
   }
 
   //===--------------------------------------------------------------------===//
@@ -466,6 +474,70 @@ public:
         TC.addEscapingFunctionAsReturnValue(FD, RS);
     return RS;
   }
+
+  Stmt *visitYieldStmt(YieldStmt *YS) {
+    // If the yield is in a defer, then it isn't valid.
+    if (isInDefer()) {
+      TC.diagnose(YS->getYieldLoc(), diag::jump_out_of_defer, "yield");
+      return YS;
+    }
+
+    SmallVector<AnyFunctionRef::YieldResult, 4> buffer;
+    auto yieldResults = TheFunc->getBodyYieldResults(buffer);
+
+    auto yieldExprs = YS->getMutableYields();
+    if (yieldExprs.size() != yieldResults.size()) {
+      TC.diagnose(YS->getYieldLoc(), diag::bad_yield_count,
+                  yieldResults.size());
+      return YS;
+    }
+
+    for (auto i : indices(yieldExprs)) {
+      Type yieldType = yieldResults[i].Ty;
+      auto exprToCheck = yieldExprs[i];
+
+      InOutExpr *inout = nullptr;
+
+      // Classify whether we're yielding by reference or by value.
+      ContextualTypePurpose contextTypePurpose;
+      Type contextType = yieldType;
+      if (yieldResults[i].Specifier == VarDecl::Specifier::InOut) {
+        contextTypePurpose = CTP_YieldByReference;
+        contextType = LValueType::get(contextType);
+
+        // Check that the yielded expression is a &.
+        if ((inout = dyn_cast<InOutExpr>(exprToCheck))) {
+          // Strip the & off so that the constraint system doesn't complain
+          // about the unparented &.
+          exprToCheck = inout->getSubExpr();
+        } else {
+          TC.diagnose(exprToCheck->getLoc(),
+                      diag::missing_address_of_yield, yieldType)
+            .highlight(exprToCheck->getSourceRange());
+          inout = new (TC.Context) InOutExpr(exprToCheck->getStartLoc(),
+                                             exprToCheck,
+                                             Type(), /*implicit*/ true);
+        }
+      } else {
+        contextTypePurpose = CTP_YieldByValue;
+      }
+
+      TC.typeCheckExpression(exprToCheck, DC,
+                             TypeLoc::withoutLoc(contextType),
+                             contextTypePurpose);
+
+      // Propagate the change into the inout expression we stripped before.
+      if (inout) {
+        inout->setSubExpr(exprToCheck);
+        inout->setType(InOutType::get(yieldType));
+        exprToCheck = inout;
+      }
+
+      // Note that this modifies the statement's expression list in-place.
+      yieldExprs[i] = exprToCheck;
+    }
+    return YS;
+  }
   
   Stmt *visitThrowStmt(ThrowStmt *TS) {
     // Coerce the operand to the exception type.
@@ -486,7 +558,7 @@ public:
     Expr *theCall = DS->getCallExpr();
     TC.typeCheckExpression(theCall, DC);
     DS->setCallExpr(theCall);
-    
+
     return DS;
   }
   
@@ -635,7 +707,8 @@ public:
       name += "$generator";
       generator = new (TC.Context)
         VarDecl(/*IsStatic*/false, VarDecl::Specifier::Var, /*IsCaptureList*/false,
-                S->getInLoc(), TC.Context.getIdentifier(name), generatorTy, DC);
+                S->getInLoc(), TC.Context.getIdentifier(name), DC);
+      generator->setType(generatorTy);
       generator->setInterfaceType(generatorTy->mapTypeOutOfContext());
       generator->setImplicit();
 
@@ -1333,6 +1406,21 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
 
 Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
   const SourceManager &SM = TC.Context.SourceMgr;
+
+  // Diagnose defer statement being last one in block (only if
+  // BraceStmt does not start a TopLevelDecl).
+  if (IsBraceStmtFromTopLevelDecl) {
+    IsBraceStmtFromTopLevelDecl = false;
+  } else if (BS->getNumElements() > 0) {
+    if (auto stmt =
+            BS->getElement(BS->getNumElements() - 1).dyn_cast<Stmt *>()) {
+      if (auto deferStmt = dyn_cast<DeferStmt>(stmt)) {
+        TC.diagnose(deferStmt->getStartLoc(), diag::defer_stmt_at_block_end)
+            .fixItReplace(deferStmt->getStartLoc(), "do");
+      }
+    }
+  }
+
   for (auto &elem : BS->getElements()) {
     if (auto *SubExpr = elem.dyn_cast<Expr*>()) {
       SourceLoc Loc = SubExpr->getStartLoc();
@@ -1388,43 +1476,12 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
 
     TC.typeCheckDecl(SubDecl);
   }
-  
+
   return BS;
 }
 
 /// Check the default arguments that occur within this pattern.
-static void checkDefaultArguments(TypeChecker &tc,
-                                  ParameterList *params,
-                                  unsigned &nextArgIndex) {
-  for (auto &param : *params) {
-    ++nextArgIndex;
-    if (!param->getDefaultValue() || !param->hasType() ||
-        param->getType()->hasError())
-      continue;
-
-    Expr *e = param->getDefaultValue();
-    auto initContext = param->getDefaultArgumentInitContext();
-
-    // Type-check the initializer, then flag that we did so.
-    auto resultTy = tc.typeCheckExpression(
-        e, initContext, TypeLoc::withoutLoc(param->getType()),
-        CTP_DefaultParameter);
-    if (resultTy) {
-      param->setDefaultValue(e);
-    } else {
-      param->setDefaultValue(nullptr);
-    }
-
-    tc.checkInitializerErrorHandling(initContext, e);
-
-    // Walk the checked initializer and contextualize any closures
-    // we saw there.
-    (void)tc.contextualizeInitializer(initContext, e);
-  }
-}
-
-/// Check the default arguments that occur within this pattern.
-void TypeChecker::checkDefaultArguments(ArrayRef<ParameterList *> paramLists,
+void TypeChecker::checkDefaultArguments(ParameterList *params,
                                         ValueDecl *VD) {
   auto access =
     VD->getFormalAccessScope(/*useDC=*/nullptr,
@@ -1447,9 +1504,31 @@ void TypeChecker::checkDefaultArguments(ArrayRef<ParameterList *> paramLists,
     EED->setDefaultArgumentResilienceExpansion(expansion);
   }
 
-  unsigned nextArgIndex = 0;
-  for (auto *paramList : paramLists)
-    ::checkDefaultArguments(*this, paramList, nextArgIndex);
+  for (auto *param : *params) {
+    if (!param->getDefaultValue() ||
+        !param->hasInterfaceType() ||
+        param->getInterfaceType()->hasError())
+      continue;
+
+    Expr *e = param->getDefaultValue();
+    auto initContext = param->getDefaultArgumentInitContext();
+
+    // Type-check the initializer, then flag that we did so.
+    auto resultTy = typeCheckExpression(
+        e, initContext, TypeLoc::withoutLoc(param->getType()),
+        CTP_DefaultParameter);
+    if (resultTy) {
+      param->setDefaultValue(e);
+    } else {
+      param->setDefaultValue(nullptr);
+    }
+
+    checkInitializerErrorHandling(initContext, e);
+
+    // Walk the checked initializer and contextualize any closures
+    // we saw there.
+    (void)contextualizeInitializer(initContext, e);
+  }
 }
 
 bool TypeChecker::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
@@ -1489,8 +1568,7 @@ bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   if (DebugTimeFunctionBodies || WarnLongFunctionBodies)
     timer.emplace(AFD, DebugTimeFunctionBodies, WarnLongFunctionBodies);
 
-  for (auto paramList : AFD->getParameterLists())
-    requestRequiredNominalTypeLayoutForParameters(paramList);
+  requestRequiredNominalTypeLayoutForParameters(AFD->getParameters());
 
   bool error = typeCheckAbstractFunctionBodyUntil(AFD, SourceLoc());
   AFD->setBodyTypeCheckedIfPresent();
@@ -1507,7 +1585,7 @@ bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
 bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
                                              SourceLoc EndTypeCheckLoc) {
   // Check the default argument definitions.
-  checkDefaultArguments(FD->getParameterLists(), FD);
+  checkDefaultArguments(FD->getParameters(), FD);
 
   // Clang imported inline functions do not have a Swift body to
   // typecheck.
@@ -1612,7 +1690,7 @@ static bool isKnownEndOfConstructor(ASTNode N) {
 bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
                                                 SourceLoc EndTypeCheckLoc) {
   // Check the default argument definitions.
-  checkDefaultArguments(ctor->getParameterLists(), ctor);
+  checkDefaultArguments(ctor->getParameters(), ctor);
 
   BraceStmt *body = ctor->getBody();
   if (!body)

@@ -68,14 +68,14 @@ static void deriveRawValueInit(AbstractFunctionDecl *initDecl) {
 
   // Get the param from init({string,int}Value:). self is the first param in the
   // list; stringValue is the second.
-  auto *valueParam = initDecl->getParameterList(1)->get(0);
+  auto *valueParam = initDecl->getParameters()->get(0);
   auto *valueParamExpr = new (C) DeclRefExpr(ConcreteDeclRef(valueParam),
                                              DeclNameLoc(), /*Implicit=*/true);
 
   // rawValue param to init(rawValue:)
   auto *rawValueDecl = new (C) ParamDecl(
       VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), C.Id_rawValue,
-      SourceLoc(), C.Id_rawValue, valueParam->getType(), parentDC);
+      SourceLoc(), C.Id_rawValue, parentDC);
   rawValueDecl->setInterfaceType(C.getIntDecl()->getDeclaredType());
   rawValueDecl->setImplicit();
   auto *paramList = ParameterList::createWithoutLoc(rawValueDecl);
@@ -117,7 +117,7 @@ static ValueDecl *deriveInitDecl(DerivedConformance &derived, Type paramType,
   // rawValue
   auto *rawDecl =
       new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
-                        paramName, SourceLoc(), paramName, paramType, parentDC);
+                        paramName, SourceLoc(), paramName, parentDC);
   rawDecl->setInterfaceType(paramType);
   rawDecl->setImplicit();
 
@@ -141,37 +141,11 @@ static ValueDecl *deriveInitDecl(DerivedConformance &derived, Type paramType,
   // Synthesize the body.
   synthesizer(initDecl);
 
-  // Compute the type of the initializer.
-  TupleTypeElt element(paramType, paramName);
-  TupleTypeElt interfaceElement(paramType, paramName);
-  auto interfaceArgType = TupleType::get(interfaceElement, C);
-
   // Compute the interface type of the initializer.
-  Type retInterfaceType =
-      OptionalType::get(parentDC->getDeclaredInterfaceType());
-  Type interfaceType = FunctionType::get(interfaceArgType, retInterfaceType);
-  auto selfParam = computeSelfParam(initDecl);
-  auto initSelfParam = computeSelfParam(initDecl, /*init*/ true);
+  if (auto env = parentDC->getGenericEnvironmentOfContext())
+    initDecl->setGenericEnvironment(env);
+  initDecl->computeType();
 
-  Type allocIfaceType;
-  Type initIfaceType;
-  if (auto sig = parentDC->getGenericSignatureOfContext()) {
-    initDecl->setGenericEnvironment(parentDC->getGenericEnvironmentOfContext());
-
-    allocIfaceType = GenericFunctionType::get(sig, {selfParam},
-                                              interfaceType,
-                                              FunctionType::ExtInfo());
-    initIfaceType = GenericFunctionType::get(sig, {initSelfParam},
-                                             interfaceType,
-                                             FunctionType::ExtInfo());
-  } else {
-    allocIfaceType = FunctionType::get({selfParam},
-                                       interfaceType, FunctionType::ExtInfo());
-    initIfaceType = FunctionType::get({initSelfParam},
-                                      interfaceType, FunctionType::ExtInfo());
-  }
-  initDecl->setInterfaceType(allocIfaceType);
-  initDecl->setInitializerInterfaceType(initIfaceType);
   initDecl->setAccess(derived.Nominal->getFormalAccess());
   initDecl->setValidationToChecked();
 
@@ -347,7 +321,7 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl) {
                                    /*HasBoundDecls=*/false, SourceLoc(),
                                    SourceLoc(), dfltBody));
 
-  auto *stringValueDecl = initDecl->getParameterList(1)->get(0);
+  auto *stringValueDecl = initDecl->getParameters()->get(0);
   auto *stringValueRef = new (C) DeclRefExpr(stringValueDecl, DeclNameLoc(),
                                              /*Implicit=*/true);
   auto *switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(),

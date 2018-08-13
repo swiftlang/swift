@@ -9,10 +9,10 @@ public:
   VersionRange All = VersionRange::all();
 
   VersionRange GreaterThanEqual10_10 =
-      VersionRange::allGTE(clang::VersionTuple(10, 10));
+      VersionRange::allGTE(llvm::VersionTuple(10, 10));
 
   VersionRange GreaterThanEqual10_9 =
-      VersionRange::allGTE(clang::VersionTuple(10, 9));
+      VersionRange::allGTE(llvm::VersionTuple(10, 9));
 
   VersionRange Empty = VersionRange::empty();
 

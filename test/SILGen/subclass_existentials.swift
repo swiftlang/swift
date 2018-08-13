@@ -43,7 +43,7 @@ class Derived : Base<Int>, P {
 protocol R {}
 
 // CHECK-LABEL: sil hidden @$S21subclass_existentials11conversions8baseAndP7derived0fE1R0dE5PType0F4Type0fE5RTypeyAA1P_AA4BaseCySiGXc_AA7DerivedCAA1R_ANXcAaI_ALXcXpANmAaO_ANXcXptF : $@convention(thin) (@guaranteed Base<Int> & P, @guaranteed Derived, @guaranteed Derived & R, @thick (Base<Int> & P).Type, @thick Derived.Type, @thick (Derived & R).Type) -> () {
-// CHECK: bb0([[ARG0:%.*]] : $Base<Int> & P,
+// CHECK: bb0([[ARG0:%.*]] : @guaranteed $Base<Int> & P,
 
 func conversions(
   baseAndP: Base<Int> & P,
@@ -115,7 +115,7 @@ func conversions(
 func methodCalls(
   baseAndP: Base<Int> & P,
   baseAndPType: (Base<Int> & P).Type) {
-  // CHECK: bb0([[ARG0:%.*]] : $Base<Int> & P,
+  // CHECK: bb0([[ARG0:%.*]] : @guaranteed $Base<Int> & P,
   // CHECK: [[PAYLOAD:%.*]] = open_existential_ref [[ARG0]] : $Base<Int> & P to $@opened("{{.*}}") Base<Int> & P
   // CHECK: [[REF:%.*]] = copy_value [[PAYLOAD]] : $@opened("{{.*}}") Base<Int> & P
   // CHECK: [[CLASS_REF:%.*]] = upcast [[REF]] : $@opened("{{.*}}") Base<Int> & P to $Base<Int>
@@ -249,7 +249,7 @@ func downcasts(
   derived: Derived,
   baseAndPType: (Base<Int> & P).Type,
   derivedType: Derived.Type) {
-  // CHECK: bb0([[ARG0:%.*]] : $Base<Int> & P, [[ARG1:%.*]] : $Derived, [[ARG2:%.*]] : $@thick (Base<Int> & P).Type, [[ARG3:%.*]] : $@thick Derived.Type):
+  // CHECK: bb0([[ARG0:%.*]] : @guaranteed $Base<Int> & P, [[ARG1:%.*]] : @guaranteed $Derived, [[ARG2:%.*]] : @trivial $@thick (Base<Int> & P).Type, [[ARG3:%.*]] : @trivial $@thick Derived.Type):
   // CHECK: [[COPIED:%.*]] = copy_value [[ARG0]] : $Base<Int> & P
   // CHECK-NEXT: checked_cast_br [[COPIED]] : $Base<Int> & P to $Derived
   let _ = baseAndP as? Derived
@@ -296,7 +296,7 @@ func archetypeUpcasts<T,
   baseTAndP: BaseTAndP,
   baseIntAndP : BaseIntAndP,
   derived : DerivedT) {
-  // CHECK: bb0([[ARG0:%.*]] : $BaseTAndP, [[ARG1:%.*]] : $BaseIntAndP, [[ARG2:%.*]] : $DerivedT)
+  // CHECK: bb0([[ARG0:%.*]] : @guaranteed $BaseTAndP, [[ARG1:%.*]] : @guaranteed $BaseIntAndP, [[ARG2:%.*]] : @guaranteed $DerivedT)
   // CHECK: [[COPIED:%.*]] = copy_value [[ARG0]] : $BaseTAndP
   // CHECK-NEXT: init_existential_ref [[COPIED]] : $BaseTAndP : $BaseTAndP, $Base<T> & P
   let _: Base<T> & P = baseTAndP
@@ -336,7 +336,7 @@ func archetypeDowncasts<S,
   baseTAndP_concrete: Base<T> & P,
   baseIntAndP_concrete: Base<Int> & P) {
 
-  // CHECK: ([[ARG0:%.*]] : $*S, [[ARG1:%.*]] : $*T, [[ARG2:%.*]] : $*PT, [[ARG3:%.*]] : $BaseT, [[ARG4:%.*]] : $BaseInt, [[ARG5:%.*]] : $BaseTAndP, [[ARG6:%.*]] : $BaseIntAndP, [[ARG7:%.*]] : $DerivedT, [[ARG8:%.*]] : $Derived & R, [[ARG9:%.*]] : $Base<T> & P, [[ARG10:%.*]] : $Base<Int> & P)
+  // CHECK: ([[ARG0:%.*]] : @trivial $*S, [[ARG1:%.*]] : @trivial $*T, [[ARG2:%.*]] : @trivial $*PT, [[ARG3:%.*]] : @guaranteed $BaseT, [[ARG4:%.*]] : @guaranteed $BaseInt, [[ARG5:%.*]] : @guaranteed $BaseTAndP, [[ARG6:%.*]] : @guaranteed $BaseIntAndP, [[ARG7:%.*]] : @guaranteed $DerivedT, [[ARG8:%.*]] : @guaranteed $Derived & R, [[ARG9:%.*]] : @guaranteed $Base<T> & P, [[ARG10:%.*]] : @guaranteed $Base<Int> & P)
 
   // CHECK:      [[COPY:%.*]] = alloc_stack $S
   // CHECK-NEXT: copy_addr %0 to [initialization] [[COPY]] : $*S

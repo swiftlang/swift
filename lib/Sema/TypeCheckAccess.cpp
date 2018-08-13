@@ -615,9 +615,7 @@ void AccessControlChecker::check(Decl *D) {
 
     checkGenericParamAccess(CD->getGenericParams(), CD);
 
-    if (CD->hasSuperclass()) {
-      const NominalTypeDecl *superclassDecl =
-          CD->getSuperclass()->getAnyNominal();
+    if (const NominalTypeDecl *superclassDecl = CD->getSuperclassDecl()) {
       // Be slightly defensive here in the presence of badly-ordered
       // inheritance clauses.
       auto superclassLocIter = std::find_if(CD->getInherited().begin(),
@@ -821,21 +819,19 @@ void AccessControlChecker::check(Decl *D) {
     const TypeRepr *complainRepr = nullptr;
     auto downgradeToWarning = DowngradeToWarning::No;
 
-    for (auto *PL : fn->getParameterLists().slice(isTypeContext)) {
-      for (auto &P : *PL) {
-        checkTypeAccess(P->getTypeLoc(), fn,
-                        [&](AccessScope typeAccessScope,
-                            const TypeRepr *thisComplainRepr,
-                            DowngradeToWarning downgradeDiag) {
-          if (typeAccessScope.isChildOf(minAccessScope) ||
-              (!complainRepr &&
-               typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
-            minAccessScope = typeAccessScope;
-            complainRepr = thisComplainRepr;
-            downgradeToWarning = downgradeDiag;
-          }
-        });
-      }
+    for (auto *P : *fn->getParameters()) {
+      checkTypeAccess(P->getTypeLoc(), fn,
+                      [&](AccessScope typeAccessScope,
+                          const TypeRepr *thisComplainRepr,
+                          DowngradeToWarning downgradeDiag) {
+        if (typeAccessScope.isChildOf(minAccessScope) ||
+            (!complainRepr &&
+             typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
+          minAccessScope = typeAccessScope;
+          complainRepr = thisComplainRepr;
+          downgradeToWarning = downgradeDiag;
+        }
+      });
     }
 
     bool problemIsResult = false;
@@ -1136,8 +1132,7 @@ void UsableFromInlineChecker::check(Decl *D) {
     checkGenericParamAccess(CD->getGenericParams(), CD);
 
     if (CD->hasSuperclass()) {
-      const NominalTypeDecl *superclassDecl =
-          CD->getSuperclass()->getAnyNominal();
+      const NominalTypeDecl *superclassDecl = CD->getSuperclassDecl();
       // Be slightly defensive here in the presence of badly-ordered
       // inheritance clauses.
       auto superclassLocIter = std::find_if(CD->getInherited().begin(),
@@ -1270,20 +1265,18 @@ void UsableFromInlineChecker::check(Decl *D) {
       ? FK_Initializer
       : isTypeContext ? FK_Method : FK_Function;
 
-    for (auto *PL : fn->getParameterLists().slice(isTypeContext)) {
-      for (auto &P : *PL) {
-        checkTypeAccess(P->getTypeLoc(), fn,
-                        [&](AccessScope typeAccessScope,
-                            const TypeRepr *complainRepr,
-                            DowngradeToWarning downgradeDiag) {
-          auto diagID = diag::function_type_usable_from_inline;
-          if (!TC.Context.isSwiftVersionAtLeast(5))
-            diagID = diag::function_type_usable_from_inline_warn;
-          auto diag = TC.diagnose(fn, diagID, functionKind,
-                                  /*problemIsResult=*/false);
-          highlightOffendingType(TC, diag, complainRepr);
-        });
-      }
+    for (auto *P : *fn->getParameters()) {
+      checkTypeAccess(P->getTypeLoc(), fn,
+                      [&](AccessScope typeAccessScope,
+                          const TypeRepr *complainRepr,
+                          DowngradeToWarning downgradeDiag) {
+        auto diagID = diag::function_type_usable_from_inline;
+        if (!TC.Context.isSwiftVersionAtLeast(5))
+          diagID = diag::function_type_usable_from_inline_warn;
+        auto diag = TC.diagnose(fn, diagID, functionKind,
+                                /*problemIsResult=*/false);
+        highlightOffendingType(TC, diag, complainRepr);
+      });
     }
 
     if (auto FD = dyn_cast<FuncDecl>(fn)) {

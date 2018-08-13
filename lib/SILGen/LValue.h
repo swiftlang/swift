@@ -100,11 +100,13 @@ public:
     OptionalObjectKind,         // optional projection
     OpenOpaqueExistentialKind,  // opened opaque existential
     AddressorKind,              // var/subscript addressor
+    CoroutineAccessorKind,      // coroutine accessor
     ValueKind,                  // random base pointer as an lvalue
     KeyPathApplicationKind,     // applying a key path
 
     // Logical LValue kinds
     GetterSetterKind,           // property or subscript getter/setter
+    MaterializeToTemporaryKind,
     OwnershipKind,              // weak pointer remapping
     AutoreleasingWritebackKind, // autorelease pointer on set
     WritebackPseudoKind,        // a fake component to customize writeback
@@ -261,13 +263,15 @@ public:
   virtual RValue get(SILGenFunction &SGF, SILLocation loc,
                      ManagedValue base, SGFContext c) && = 0;
 
-  /// Compare 'this' lvalue and the 'rhs' lvalue (which is guaranteed to have
-  /// the same dynamic PathComponent type as the receiver) to see if they are
-  /// identical.  If so, there is a conflicting writeback happening, so emit a
-  /// diagnostic.
-  virtual void diagnoseWritebackConflict(LogicalPathComponent *rhs,
-                                         SILLocation loc1, SILLocation loc2,
-                                         SILGenFunction &SGF) = 0;
+  struct AccessedStorage {
+    AbstractStorageDecl *Storage;
+    bool IsSuper;
+    const RValue *Indices;
+    Expr *IndexExprForDiagnostics;
+  };
+
+  /// Get the storage accessed by this component.
+  virtual Optional<AccessedStorage> getAccessedStorage() const = 0;
 
 
   /// Materialize the storage into memory.  If the access is for
@@ -313,10 +317,8 @@ public:
     return kind;
   }
 
-  void diagnoseWritebackConflict(LogicalPathComponent *RHS,
-                                 SILLocation loc1, SILLocation loc2,
-                                 SILGenFunction &SGF) override {
-    // no useful writeback diagnostics at this point
+  Optional<AccessedStorage> getAccessedStorage() const override {
+    return None;
   }
 
   RValue get(SILGenFunction &SGF, SILLocation loc,
@@ -428,25 +430,28 @@ public:
     Path.emplace_back(new T(std::forward<As>(args)...));
   }
 
+  void addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
+                                VarDecl *var, Optional<SubstitutionMap> subs,
+                                LValueOptions options,
+                                AccessStrategy strategy,
+                                CanType formalRValueType);
+
   /// Add a member component to the access path of this lvalue.
   void addMemberComponent(SILGenFunction &SGF, SILLocation loc,
                           AbstractStorageDecl *storage,
                           SubstitutionMap subs,
                           LValueOptions options,
                           bool isSuper,
-                          AccessKind accessKind,
-                          AccessSemantics accessSemantics,
                           AccessStrategy accessStrategy,
                           CanType formalRValueType,
-                          RValue &&indices);
+                          RValue &&indices,
+                          Expr *indexExprForDiagnostics);
 
   void addMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
                              VarDecl *var,
                              SubstitutionMap subs,
                              LValueOptions options,
                              bool isSuper,
-                             AccessKind accessKind,
-                             AccessSemantics accessSemantics,
                              AccessStrategy accessStrategy,
                              CanType formalRValueType);
 
@@ -455,8 +460,6 @@ public:
                                    SubstitutionMap subs,
                                    LValueOptions options,
                                    bool isSuper,
-                                   AccessKind accessKind,
-                                   AccessSemantics accessSemantics,
                                    AccessStrategy accessStrategy,
                                    CanType formalRValueType,
                                    RValue &&indices,

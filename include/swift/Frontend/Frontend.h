@@ -43,6 +43,7 @@
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/Host.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "clang/Basic/FileManager.h"
 
 #include <memory>
 
@@ -292,7 +293,7 @@ public:
   std::string getPCHHash() const;
 
   SourceFile::ImplicitModuleImportKind getImplicitModuleImportKind() {
-    if (getInputKind() == InputFileKind::IFK_SIL) {
+    if (getInputKind() == InputFileKind::SIL) {
       return SourceFile::ImplicitModuleImportKind::None;
     }
     if (getParseStdlib()) {
@@ -309,7 +310,7 @@ public:
                        bool alwaysSetModuleToMain, bool bePrimary,
                        serialization::ExtendedValidationInfo &extendedInfo);
   bool hasSerializedAST() {
-    return FrontendOpts.InputKind == InputFileKind::IFK_Swift_Library;
+    return FrontendOpts.InputKind == InputFileKind::SwiftLibrary;
   }
 
   const PrimarySpecificPaths &
@@ -409,6 +410,8 @@ public:
 
   DiagnosticEngine &getDiags() { return Diagnostics; }
 
+  clang::vfs::FileSystem &getFileSystem() { return *SourceMgr.getFileSystem(); }
+
   ASTContext &getASTContext() {
     return *Context;
   }
@@ -421,9 +424,9 @@ public:
     Diagnostics.addConsumer(*DC);
   }
 
-  void createDependencyTracker() {
+  void createDependencyTracker(bool TrackSystemDeps) {
     assert(!Context && "must be called before setup()");
-    DepTracker = llvm::make_unique<DependencyTracker>();
+    DepTracker = llvm::make_unique<DependencyTracker>(TrackSystemDeps);
   }
   DependencyTracker *getDependencyTracker() { return DepTracker.get(); }
 
@@ -495,14 +498,19 @@ public:
   bool setup(const CompilerInvocation &Invocation);
 
 private:
+  /// Set up the file system by loading and validating all VFS overlay YAML
+  /// files. If the process of validating VFS files failed, or the overlay
+  /// file system could not be initialized, this function returns true. Else it
+  /// returns false if setup succeeded.
+  bool setUpVirtualFileSystemOverlays();
   void setUpLLVMArguments();
   void setUpDiagnosticOptions();
   bool setUpModuleLoaders();
   bool isInputSwift() {
-    return Invocation.getInputKind() == InputFileKind::IFK_Swift;
+    return Invocation.getInputKind() == InputFileKind::Swift;
   }
   bool isInSILMode() {
-    return Invocation.getInputKind() == InputFileKind::IFK_SIL;
+    return Invocation.getInputKind() == InputFileKind::SIL;
   }
 
   bool setUpInputs();

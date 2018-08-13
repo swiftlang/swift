@@ -110,8 +110,6 @@ public:
     SequenceIteratorProtocol,
     /// \brief The element type of a generator.
     GeneratorElementType,
-    /// \brief The scalar type of a tuple type.
-    ScalarToTuple,
     /// \brief An argument passed in an autoclosure parameter
     /// position, which must match the autoclosure return type.
     AutoclosureResult,
@@ -131,8 +129,10 @@ public:
     TypeParameterRequirement,
     /// \brief Locator for a binding from an IUO disjunction choice.
     ImplicitlyUnwrappedDisjunctionChoice,
-    /// \brief A result of an expressoin involving dynamic lookup.
+    /// \brief A result of an expression involving dynamic lookup.
     DynamicLookupResult,
+    /// \brief The desired contextual type passed in to the constraint system.
+    ContextualType,
   };
 
   /// \brief Determine the number of numeric values used for the given path
@@ -160,13 +160,13 @@ public:
     case InstanceType:
     case SequenceIteratorProtocol:
     case GeneratorElementType:
-    case ScalarToTuple:
     case AutoclosureResult:
     case Requirement:
     case Witness:
     case OpenedGeneric:
     case ImplicitlyUnwrappedDisjunctionChoice:
     case DynamicLookupResult:
+    case ContextualType:
       return 0;
 
     case GenericArgument:
@@ -214,7 +214,6 @@ public:
     case ParentType:
     case LValueConversion:
     case RValueAdjustment:
-    case ScalarToTuple:
     case SubscriptIndex:
     case SubscriptMember:
     case SubscriptResult:
@@ -231,6 +230,7 @@ public:
     case TypeParameterRequirement:
     case ImplicitlyUnwrappedDisjunctionChoice:
     case DynamicLookupResult:
+    case ContextualType:
       return 0;
 
     case FunctionArgument:

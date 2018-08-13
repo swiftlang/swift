@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -324,9 +324,8 @@ CanType TypeJoin::visitFunctionType(CanType second) {
   if (firstExtInfo.withNoEscape(false) != secondExtInfo.withNoEscape(false))
     return Unimplemented;
 
-  // FIXME: Properly compute parameter types from getParams().
-  if (firstFnTy->getInput()->getCanonicalType() !=
-      secondFnTy->getInput()->getCanonicalType())
+  if (!AnyFunctionType::equalParams(firstFnTy->getParams(),
+                                    secondFnTy->getParams()))
     return Unimplemented;
 
   auto firstResult = firstFnTy->getResult()->getCanonicalType();
@@ -340,8 +339,8 @@ CanType TypeJoin::visitFunctionType(CanType second) {
   if (secondFnTy->getExtInfo().isNoEscape())
     extInfo = extInfo.withNoEscape(true);
 
-  return FunctionType::get(firstFnTy->getInput(), result,
-                           extInfo)->getCanonicalType();
+  return FunctionType::get(firstFnTy->getParams(), result, extInfo)
+      ->getCanonicalType();
 }
 
 CanType TypeJoin::visitGenericFunctionType(CanType second) {

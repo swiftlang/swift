@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -187,18 +187,26 @@ public:
   virtual void completePoundAvailablePlatform() = 0;
 
   /// Complete the import decl with importable modules.
-  virtual void completeImportDecl(std::vector<std::pair<Identifier, SourceLoc>> &Path) = 0;
+  virtual void
+  completeImportDecl(std::vector<std::pair<Identifier, SourceLoc>> &Path) = 0;
 
   /// Complete unresolved members after dot.
-  virtual void completeUnresolvedMember(UnresolvedMemberExpr *E,
-                                        ArrayRef<StringRef> Identifiers,
-                                        bool HasReturn) = 0;
+  virtual void completeUnresolvedMember(CodeCompletionExpr *E,
+                                        SourceLoc DotLoc) = 0;
 
   virtual void completeAssignmentRHS(AssignExpr *E) = 0;
 
   virtual void completeCallArg(CallExpr *E) = 0;
 
   virtual void completeReturnStmt(CodeCompletionExpr *E) = 0;
+
+  /// Complete a yield statement.  A missing yield index means that the
+  /// completion immediately follows the 'yield' keyword; it may be either
+  /// an expresion or a parenthesized expression list.  A present yield
+  /// index means that the completion is within the parentheses and is
+  /// for a specific yield value.
+  virtual void completeYieldStmt(CodeCompletionExpr *E,
+                                 Optional<unsigned> yieldIndex) = 0;
 
   virtual void completeAfterPound(CodeCompletionExpr *E, StmtKind ParentKind) = 0;
 
@@ -224,4 +232,3 @@ public:
 } // namespace swift
 
 #endif // LLVM_SWIFT_PARSE_CODE_COMPLETION_CALLBACKS_H
-

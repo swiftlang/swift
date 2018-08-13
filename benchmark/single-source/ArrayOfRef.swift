@@ -48,7 +48,7 @@ class POD : Constructible {
 
 @inline(never)
 func genPODRefArray() {
-  _ = ConstructibleArray<POD>(3)
+  blackHole(ConstructibleArray<POD>(3))
   // should be a nop
 }
 
@@ -64,7 +64,7 @@ class CommonRef : Constructible {
 @inline(never)
 func genCommonRefArray() {
   let d = Dummy()
-  _ = ConstructibleArray<CommonRef>(d)
+  blackHole(ConstructibleArray<CommonRef>(d))
   // should be a nop
 }
 
@@ -85,7 +85,7 @@ class RefArray<T> {
 @inline(never)
 func genRefEnumArray() {
   let e = RefEnum.Some(Dummy())
-  _ = RefArray<RefEnum>(e)
+  blackHole(RefArray<RefEnum>(e))
   // should be a nop
 }
 
@@ -99,13 +99,13 @@ struct S : Constructible {
 @inline(never)
 func genRefStructArray() {
   let d = Dummy()
-  _ = ConstructibleArray<S>(d)
+  blackHole(ConstructibleArray<S>(d))
   // should be a nop
 }
 
 @inline(never)
 public func run_ArrayOfRef(_ N: Int) {
-  for _ in 0...N {
+  for _ in 0..<N {
     genPODRefArray()
     genCommonRefArray()
     genRefEnumArray()

@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "SILParserFunctionBuilder.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -516,89 +517,78 @@ bool SILParser::diagnoseProblems() {
 
 /// getGlobalNameForDefinition - Given a definition of a global name, look
 /// it up and return an appropriate SIL function.
-SILFunction *SILParser::getGlobalNameForDefinition(Identifier Name,
-                                                   CanSILFunctionType Ty,
-                                                   SourceLoc Loc) {
+SILFunction *SILParser::getGlobalNameForDefinition(Identifier name,
+                                                   CanSILFunctionType ty,
+                                                   SourceLoc sourceLoc) {
+  SILParserFunctionBuilder builder(SILMod);
+  auto silLoc = RegularLocation(sourceLoc);
+
   // Check to see if a function of this name has been forward referenced.  If so
   // complete the forward reference.
-  auto It = TUState.ForwardRefFns.find(Name);
-  if (It != TUState.ForwardRefFns.end()) {
-    SILFunction *Fn = It->second.first;
-    
+  auto iter = TUState.ForwardRefFns.find(name);
+  if (iter != TUState.ForwardRefFns.end()) {
+    SILFunction *fn = iter->second.first;
+
     // Verify that the types match up.
-    if (Fn->getLoweredFunctionType() != Ty) {
-      P.diagnose(Loc, diag::sil_value_use_type_mismatch, Name.str(),
-                 Fn->getLoweredFunctionType(), Ty);
-      P.diagnose(It->second.second, diag::sil_prior_reference);
-      auto loc = RegularLocation(Loc);
-      Fn =
-          SILMod.createFunction(SILLinkage::Private, "", Ty, nullptr, loc,
-                                IsNotBare, IsNotTransparent, IsNotSerialized);
-      Fn->setDebugScope(new (SILMod) SILDebugScope(loc, Fn));
+    if (fn->getLoweredFunctionType() != ty) {
+      P.diagnose(sourceLoc, diag::sil_value_use_type_mismatch, name.str(),
+                 fn->getLoweredFunctionType(), ty);
+      P.diagnose(iter->second.second, diag::sil_prior_reference);
+      fn = builder.createFunctionForForwardReference("" /*name*/, ty, silLoc);
     }
-    
-    assert(Fn->isExternalDeclaration() && "Forward defns cannot have bodies!");
-    TUState.ForwardRefFns.erase(It);
+
+    assert(fn->isExternalDeclaration() && "Forward defns cannot have bodies!");
+    TUState.ForwardRefFns.erase(iter);
 
     // Move the function to this position in the module.
-    SILMod.getFunctionList().remove(Fn);
-    SILMod.getFunctionList().push_back(Fn);
+    //
+    // FIXME: Should we move this functionality into SILParserFunctionBuilder?
+    SILMod.getFunctionList().remove(fn);
+    SILMod.getFunctionList().push_back(fn);
 
-    return Fn;
-  }
-  
-  auto loc = RegularLocation(Loc);
-  // If we don't have a forward reference, make sure the function hasn't been
-  // defined already.
-  if (SILMod.lookUpFunction(Name.str()) != nullptr) {
-    P.diagnose(Loc, diag::sil_value_redefinition, Name.str());
-    auto *fn =
-        SILMod.createFunction(SILLinkage::Private, "", Ty, nullptr, loc,
-                              IsNotBare, IsNotTransparent, IsNotSerialized);
-    fn->setDebugScope(new (SILMod) SILDebugScope(loc, fn));
     return fn;
   }
 
+  // If we don't have a forward reference, make sure the function hasn't been
+  // defined already.
+  if (SILMod.lookUpFunction(name.str()) != nullptr) {
+    P.diagnose(sourceLoc, diag::sil_value_redefinition, name.str());
+    return builder.createFunctionForForwardReference("" /*name*/, ty, silLoc);
+  }
+
   // Otherwise, this definition is the first use of this name.
-  auto *fn = SILMod.createFunction(SILLinkage::Private, Name.str(), Ty,
-                                   nullptr, loc, IsNotBare,
-                                   IsNotTransparent, IsNotSerialized);
-  fn->setDebugScope(new (SILMod) SILDebugScope(loc, fn));
-  return fn;
+  return builder.createFunctionForForwardReference(name.str(), ty, silLoc);
 }
-
-
 
 /// getGlobalNameForReference - Given a reference to a global name, look it
 /// up and return an appropriate SIL function.
-SILFunction *SILParser::getGlobalNameForReference(Identifier Name,
-                                                  CanSILFunctionType Ty,
-                                                  SourceLoc Loc,
-                                                  bool IgnoreFwdRef) {
-  auto loc = RegularLocation(Loc);
-  
+SILFunction *SILParser::getGlobalNameForReference(Identifier name,
+                                                  CanSILFunctionType funcTy,
+                                                  SourceLoc sourceLoc,
+                                                  bool ignoreFwdRef) {
+  SILParserFunctionBuilder builder(SILMod);
+  auto silLoc = RegularLocation(sourceLoc);
+
   // Check to see if we have a function by this name already.
-  if (SILFunction *FnRef = SILMod.lookUpFunction(Name.str())) {
+  if (SILFunction *fn = SILMod.lookUpFunction(name.str())) {
     // If so, check for matching types.
-    if (FnRef->getLoweredFunctionType() != Ty) {
-      P.diagnose(Loc, diag::sil_value_use_type_mismatch,
-                 Name.str(), FnRef->getLoweredFunctionType(), Ty);
-      FnRef =
-          SILMod.createFunction(SILLinkage::Private, "", Ty, nullptr, loc,
-                                IsNotBare, IsNotTransparent, IsNotSerialized);
-      FnRef->setDebugScope(new (SILMod) SILDebugScope(loc, FnRef));
+    if (fn->getLoweredFunctionType() == funcTy) {
+      return fn;
     }
-    return FnRef;
+
+    P.diagnose(sourceLoc, diag::sil_value_use_type_mismatch, name.str(),
+               fn->getLoweredFunctionType(), funcTy);
+
+    return builder.createFunctionForForwardReference("" /*name*/, funcTy,
+                                                     silLoc);
   }
   
   // If we didn't find a function, create a new one - it must be a forward
   // reference.
-  auto *Fn = SILMod.createFunction(SILLinkage::Private, Name.str(), Ty,
-                                   nullptr, loc, IsNotBare,
-                                   IsNotTransparent, IsNotSerialized);
-  Fn->setDebugScope(new (SILMod) SILDebugScope(loc, Fn));
-  TUState.ForwardRefFns[Name] = { Fn, IgnoreFwdRef ? SourceLoc() : Loc };
-  return Fn;
+  auto *fn =
+      builder.createFunctionForForwardReference(name.str(), funcTy, silLoc);
+  TUState.ForwardRefFns[name] = {fn, ignoreFwdRef ? SourceLoc() : sourceLoc};
+  return fn;
 }
 
 
@@ -1244,6 +1234,8 @@ static Optional<AccessorKind> getAccessorKind(StringRef ident) {
            .Case("addressor", AccessorKind::Address)
            .Case("mutableAddressor", AccessorKind::MutableAddress)
            .Case("materializeForSet", AccessorKind::MaterializeForSet)
+           .Case("read", AccessorKind::Read)
+           .Case("modify", AccessorKind::Modify)
            .Default(None);
 }
 
@@ -2362,6 +2354,8 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       encoding = StringLiteralInst::Encoding::UTF16;
     } else if (P.Tok.getText() == "objc_selector") {
       encoding = StringLiteralInst::Encoding::ObjCSelector;
+    } else if (P.Tok.getText() == "bytes") {
+      encoding = StringLiteralInst::Encoding::Bytes;
     } else {
       P.diagnose(P.Tok, diag::sil_string_invalid_encoding, P.Tok.getText());
       return true;
@@ -2376,12 +2370,37 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     // Drop the double quotes.
     StringRef rawString = P.Tok.getText().drop_front().drop_back();
 
-    // Ask the lexer to interpret the entire string as a literal segment.
-    SmallVector<char, 128> stringBuffer;
-    StringRef string = P.L->getEncodedStringSegment(rawString, stringBuffer);
     P.consumeToken(tok::string_literal);
     if (parseSILDebugLocation(InstLoc, B))
       return true;
+
+    // Ask the lexer to interpret the entire string as a literal segment.
+    SmallVector<char, 128> stringBuffer;
+
+    if (encoding == StringLiteralInst::Encoding::Bytes) {
+      // Decode hex bytes.
+      if (rawString.size() & 1) {
+        P.diagnose(P.Tok, diag::expected_tok_in_sil_instr,
+                   "even number of hex bytes");
+        return true;
+      }
+      while (!rawString.empty()) {
+        unsigned byte1 = llvm::hexDigitValue(rawString[0]);
+        unsigned byte2 = llvm::hexDigitValue(rawString[1]);
+        if (byte1 == -1U || byte2 == -1U) {
+          P.diagnose(P.Tok, diag::expected_tok_in_sil_instr,
+                     "hex bytes should contain 0-9, a-f, A-F only");
+          return true;
+        }
+        stringBuffer.push_back((unsigned char)(byte1 << 4) | byte2);
+        rawString = rawString.drop_front(2);
+      }
+
+      ResultVal = B.createStringLiteral(InstLoc, stringBuffer, encoding);
+      break;
+    }
+
+    StringRef string = P.L->getEncodedStringSegment(rawString, stringBuffer);
     ResultVal = B.createStringLiteral(InstLoc, string, encoding);
     break;
   }
@@ -5090,7 +5109,6 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
         if (!F->getModule()
                  .getOptions()
                  .AssumeUnqualifiedOwnershipWhenParsing &&
-            F->getModule().getOptions().EnableSILOwnership &&
             parseSILOwnership(OwnershipKind))
           return true;
 
