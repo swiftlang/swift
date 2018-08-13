@@ -32,10 +32,11 @@ using namespace swift;
 
 /// Check the generic parameters in the given generic parameter list (and its
 /// parent generic parameter lists) according to the given resolver.
-void TypeChecker::checkGenericParamList(GenericSignatureBuilder *builder,
-                                        GenericParamList *genericParams,
-                                        GenericSignature *parentSig,
-                                        TypeResolution resolution) {
+void checkGenericParamList(TypeChecker &tc,
+                           GenericSignatureBuilder *builder,
+                           GenericParamList *genericParams,
+                           GenericSignature *parentSig,
+                           TypeResolution resolution) {
   // If there is a parent context, add the generic parameters and requirements
   // from that context.
   if (builder)
@@ -63,7 +64,7 @@ void TypeChecker::checkGenericParamList(GenericSignatureBuilder *builder,
 
   // Now, check the inheritance clauses of each parameter.
   for (auto param : *genericParams) {
-    checkInheritanceClause(param, resolution);
+    tc.checkInheritanceClause(param, resolution);
 
     if (builder)
       builder->addGenericParameterRequirements(param);
@@ -71,9 +72,9 @@ void TypeChecker::checkGenericParamList(GenericSignatureBuilder *builder,
 
   // Add the requirements clause to the builder, validating the types in
   // the requirements clause along the way.
-  validateRequirements(genericParams->getWhereLoc(),
-                       genericParams->getRequirements(), resolution,
-                       options, builder);
+  tc.validateRequirements(genericParams->getWhereLoc(),
+                          genericParams->getRequirements(), resolution,
+                          options, builder);
 }
 
 bool TypeChecker::validateRequirement(SourceLoc whereLoc, RequirementRepr &req,
@@ -260,7 +261,8 @@ static void revertDependentTypeLoc(TypeLoc &tl) {
 }
 
 /// Revert the dependent types within the given generic parameter list.
-void TypeChecker::revertGenericParamList(GenericParamList *genericParams) {
+static void revertGenericParamList(TypeChecker &tc,
+                                   GenericParamList *genericParams) {
   // Revert the inherited clause of the generic parameter list.
   for (auto param : *genericParams) {
     for (auto &inherited : param->getInherited())
@@ -268,7 +270,7 @@ void TypeChecker::revertGenericParamList(GenericParamList *genericParams) {
   }
 
   // Revert the requirements of the generic parameter list.
-  revertGenericRequirements(genericParams->getRequirements());
+  tc.revertGenericRequirements(genericParams->getRequirements());
 }
 
 void TypeChecker::revertGenericRequirements(
@@ -306,10 +308,9 @@ static void checkGenericFuncSignature(TypeChecker &tc,
   // Check the generic parameter list.
   auto genericParams = func->getGenericParams();
 
-  tc.checkGenericParamList(
-                         builder, genericParams,
-                         func->getDeclContext()->getGenericSignatureOfContext(),
-                         resolution);
+  checkGenericParamList(tc, builder, genericParams,
+                        func->getDeclContext()->getGenericSignatureOfContext(),
+                        resolution);
 
   // Check the parameter patterns.
   auto params = func->getParameters();
@@ -623,7 +624,7 @@ computeGenericFuncSignature(TypeChecker &tc, AbstractFunctionDecl *func) {
   // there might still be errors that have not yet been diagnosed. Revert the
   // generic function signature and type-check it again, completely.
   revertGenericFuncSignature(func);
-  tc.revertGenericParamList(gp);
+  revertGenericParamList(tc, gp);
 
   // Debugging of the generic signature.
   if (tc.Context.LangOpts.DebugGenericSignatures) {
@@ -673,10 +674,9 @@ static void checkGenericSubscriptSignature(TypeChecker &tc,
 
   auto *dc = subscript->getDeclContext();
 
-  tc.checkGenericParamList(
-                    builder, genericParams,
-                    dc->getGenericSignatureOfContext(),
-                    resolution);
+  checkGenericParamList(tc, builder, genericParams,
+                        dc->getGenericSignatureOfContext(),
+                        resolution);
 
   // Check the element type.
   tc.validateType(subscript->getElementTypeLoc(), resolution,
@@ -742,7 +742,7 @@ TypeChecker::validateGenericSubscriptSignature(SubscriptDecl *subscript) {
     // there might still be errors that have not yet been diagnosed. Revert the
     // generic function signature and type-check it again, completely.
     revertGenericSubscriptSignature(subscript);
-    revertGenericParamList(gp);
+    revertGenericParamList(*this, gp);
 
     // Debugging of generic signature generation.
     if (Context.LangOpts.DebugGenericSignatures) {
@@ -838,13 +838,14 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
       auto genericParamsDC = gpList->begin()[0]->getDeclContext();
       TypeResolution structuralResolution =
         TypeResolution::forStructural(genericParamsDC);
-        checkGenericParamList(&builder, gpList, nullptr, structuralResolution);
+        checkGenericParamList(*this, &builder, gpList, nullptr,
+                              structuralResolution);
       });
     } else {
       auto genericParamsDC = genericParams->begin()[0]->getDeclContext();
-    TypeResolution structuralResolution =
-      TypeResolution::forStructural(genericParamsDC);
-    checkGenericParamList(&builder, genericParams, parentSig,
+      TypeResolution structuralResolution =
+        TypeResolution::forStructural(genericParamsDC);
+      checkGenericParamList(*this, &builder, genericParams, parentSig,
                             structuralResolution);
     }
 
@@ -862,10 +863,10 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
     if (recursivelyVisitGenericParams) {
       visitOuterToInner(genericParams,
                         [&](GenericParamList *gpList) {
-        revertGenericParamList(gpList);
+        revertGenericParamList(*this, gpList);
       });
     } else {
-      revertGenericParamList(genericParams);
+      revertGenericParamList(*this, genericParams);
     }
 
     // Debugging of the generic signature builder and generic signature
@@ -891,13 +892,14 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
       auto paramsDC = gpList->getParams().front()->getDeclContext();
       TypeResolution interfaceResolution =
         TypeResolution::forInterface(paramsDC, sig);
-      checkGenericParamList(nullptr, gpList, nullptr, interfaceResolution);
+      checkGenericParamList(*this, nullptr, gpList, nullptr,
+                            interfaceResolution);
     });
   } else {
     auto paramsDC = genericParams->getParams().front()->getDeclContext();
     TypeResolution interfaceResolution =
       TypeResolution::forInterface(paramsDC, sig);
-    checkGenericParamList(nullptr, genericParams, parentSig,
+    checkGenericParamList(*this, nullptr, genericParams, parentSig,
                           interfaceResolution);
   }
 

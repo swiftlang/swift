@@ -676,11 +676,6 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
                                         /*allowConcreteGenericParams=*/true,
                                         /*ext=*/nullptr);
     parentSig = parentEnv->getGenericSignature();
-
-    // Compute the final set of archetypes.
-    revertGenericParamList(genericParams);
-    checkGenericParamList(nullptr, genericParams, parentSig,
-                          TypeResolution::forContextual(DC, parentEnv));
   }
 
   return parentEnv;
@@ -4864,18 +4859,6 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
                                          /*allowConcreteGenericParams=*/true,
                                          ext, inferExtendedTypeReqs,
                                          mustInferRequirements);
-
-  // Validate the generic parameters for the last time, to splat down
-  // actual archetypes.
-  visitOuterToInner(genericParams, [&](GenericParamList *gpList) {
-    tc.revertGenericParamList(gpList);
-  });
-
-  visitOuterToInner(genericParams, [&](GenericParamList *gpList) {
-    auto gpContext = gpList->getParams().front()->getDeclContext();
-    auto resolution = TypeResolution::forContextual(gpContext, env);
-    tc.checkGenericParamList(nullptr, gpList, nullptr, resolution);
-  });
 
   Type extContextType =
     env->mapTypeIntoContext(extInterfaceType);
