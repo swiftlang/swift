@@ -572,7 +572,7 @@ extension Dictionary: Sequence {
   ///   `(key: Key, value: Value)`.
   @inlinable
   @inline(__always)
-  public func makeIterator() -> Dictionary<Key, Value>.Iterator {
+  public func makeIterator() -> Iterator {
     return _variant.makeIterator()
   }
 }

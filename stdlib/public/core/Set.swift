@@ -233,7 +233,7 @@ extension Set: Sequence {
   /// Returns an iterator over the members of the set.
   @inlinable
   @inline(__always)
-  public func makeIterator() -> Set<Element>.Iterator {
+  public func makeIterator() -> Iterator {
     return _variant.makeIterator()
   }
 
