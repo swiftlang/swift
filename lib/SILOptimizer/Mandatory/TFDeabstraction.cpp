@@ -1885,7 +1885,7 @@ static SILValue getTensorProtocolHandleMember(SILValue v, SILLocation loc,
   // to get the handle out, but for now, we know we're always dealing with types
   // that store the field by-value so we can dig it out in with an easier
   // approach.  This handles structs of TensorHandle (like Tensor) and structs
-  // of structs of TensorHandle (like Tensor2D).
+  // of structs of TensorHandle.
   while (!isTensorHandle(v->getType())) {
     auto vTy = v->getType().getASTType();
     auto decl = vTy.getNominalOrBoundGenericNominal();
