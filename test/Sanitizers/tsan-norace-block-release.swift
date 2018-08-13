@@ -1,4 +1,5 @@
 // RUN: %target-swiftc_driver %s -g -sanitize=thread -target %sanitizers-target-triple -o %t_tsan-binary
+// RUN: %target-codesign %t_tsan-binary
 // RUN: env %env-TSAN_OPTIONS=abort_on_error=0:ignore_interceptors_accesses=1 %target-run %t_tsan-binary 2>&1 | %FileCheck %s
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
