@@ -173,6 +173,10 @@ struct SimpleIterator {
 public func testShapeList2() {
   let t = Tensor<Int32>([0])
   let handle: VariantHandle = #tfop(
+    "TensorSliceDataset", [t],
+    Toutput_types: [Int32.self],
+    output_shapes: [TensorShape()]
+  )
   let dataset = SimpleDataset(handle: handle, elementShape: TensorShape())
   let resource = #tfop("AnonymousIterator",
                        output_types: [Int32.self],
