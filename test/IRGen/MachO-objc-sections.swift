@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-ios8.0 -parse-stdlib -enable-objc-interop -disable-objc-attr-requires-foundation-module -I %S/Inputs/usr/include -emit-ir %s -o - | %FileCheck %s -check-prefix CHECK-MACHO
+// RUN: %swift -target arm64-apple-ios8.0 -parse-stdlib -enable-objc-interop -disable-objc-attr-requires-foundation-module -I %S/Inputs/usr/include -emit-ir %s -o - | %FileCheck %s -check-prefix CHECK-MACHO
 
 // REQUIRES: OS=ios
 
