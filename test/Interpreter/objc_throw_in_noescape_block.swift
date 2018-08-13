@@ -2,6 +2,7 @@
 //
 // RUN: %target-clang -fobjc-arc %S/Inputs/ObjCException.m -c -o %t/ObjCException.o
 // RUN: %target-build-swift -import-objc-header %S/Inputs/ObjcException.h -Xlinker %t/ObjCException.o %s -o %t/a.out
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 
 // REQUIRES: executable_test

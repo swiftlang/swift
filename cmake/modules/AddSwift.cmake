@@ -2187,6 +2187,21 @@ function(add_swift_target_executable name)
           ${SWIFTEXE_TARGET_EXCLUDE_FROM_ALL_FLAG_CURRENT}
           ${SWIFTEXE_TARGET_DONT_STRIP_NON_MAIN_SYMBOLS_FLAG}
           ${SWIFTEXE_DISABLE_ASLR_FLAG})
+
+      is_darwin_based_sdk("${sdk}" IS_DARWIN)
+      if(IS_DARWIN)
+        add_custom_command_target(unused_var2
+         COMMAND "codesign" "-f" "-s" "-" "${SWIFT_RUNTIME_OUTPUT_INTDIR}/${VARIANT_NAME}"
+         CUSTOM_TARGET_NAME "${VARIANT_NAME}_signed"
+         OUTPUT "${SWIFT_RUNTIME_OUTPUT_INTDIR}/${VARIANT_NAME}_signed"
+         DEPENDS ${VARIANT_NAME})
+      else()
+        # No code signing on other platforms.
+        add_custom_command_target(unused_var2
+         CUSTOM_TARGET_NAME "${VARIANT_NAME}_signed"
+         OUTPUT "${SWIFT_RUNTIME_OUTPUT_INTDIR}/${VARIANT_NAME}_signed"
+         DEPENDS ${VARIANT_NAME})
+       endif()
     endforeach()
   endforeach()
 endfunction()

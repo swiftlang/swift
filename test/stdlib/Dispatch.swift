@@ -1,6 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -o %t/a.out_swift3 -swift-version 3
 // RUN: %target-build-swift %s -o %t/a.out_swift4 -swift-version 4
+// RUN: %target-codesign %t/a.out_swift3
+// RUN: %target-codesign %t/a.out_swift4
 //
 // RUN: %target-run %t/a.out_swift3
 // RUN: %target-run %t/a.out_swift4
