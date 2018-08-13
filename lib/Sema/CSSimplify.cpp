@@ -4908,9 +4908,7 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix) {
     auto &log = ctx.TypeCheckerDebug->getStream();
     log.indent(solverState ? solverState->depth * 2 + 2 : 0)
       << "(attempting fix ";
-    fix->print(log);
-    log << " @";
-    getConstraintLocator(fix->getLocator())->dump(&ctx.SourceMgr, log);
+    fix->print(log, &ctx.SourceMgr);
     log << ")\n";
   }
 

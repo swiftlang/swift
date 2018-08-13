@@ -390,7 +390,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
 
   if (auto *fix = getFix()) {
     Out << ' ';
-    fix->print(Out);
+    fix->print(Out, sm);
   }
 
   if (Locator) {

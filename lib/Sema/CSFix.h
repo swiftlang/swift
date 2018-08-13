@@ -24,12 +24,16 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/TrailingObjects.h"
+#include <string>
 
 namespace llvm {
 class raw_ostream;
 }
 
 namespace swift {
+
+class SourceManager;
+
 namespace constraints {
 
 class ConstraintSystem;
@@ -78,12 +82,16 @@ public:
 
   FixKind getKind() const { return Kind; }
 
+  virtual std::string getName() const = 0;
+
   /// Diagnose a failure associated with this fix given
   /// root expression and information from well-formed solution.
   virtual bool diagnose(Expr *root, const Solution &solution) const = 0;
-  virtual void print(llvm::raw_ostream &Out) const = 0;
 
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+  void print(llvm::raw_ostream &Out, SourceManager *sm) const;
+
+  LLVM_ATTRIBUTE_DEPRECATED(void dump(SourceManager *sm)
+                                const LLVM_ATTRIBUTE_USED,
                             "only for use within the debugger");
 
   /// Retrieve anchor expression associated with this fix.
@@ -101,8 +109,8 @@ class ForceDowncast final : public ConstraintFix {
       : ConstraintFix(FixKind::ForceDowncast, locator), DowncastTo(toType) {}
 
 public:
+  std::string getName() const override;
   bool diagnose(Expr *root, const Solution &solution) const override;
-  void print(llvm::raw_ostream &Out) const override;
 
   static ForceDowncast *create(ConstraintSystem &cs, Type toType,
                                ConstraintLocator *locator);
@@ -114,10 +122,9 @@ class ForceOptional final : public ConstraintFix {
       : ConstraintFix(FixKind::ForceOptional, locator) {}
 
 public:
+  std::string getName() const override { return "force optional"; }
+
   bool diagnose(Expr *root, const Solution &solution) const override;
-  void print(llvm::raw_ostream &Out) const override {
-    Out << "[fix: force optional]";
-  }
 
   static ForceOptional *create(ConstraintSystem &cs,
                                ConstraintLocator *locator);
@@ -134,10 +141,11 @@ class UnwrapOptionalBase final : public ConstraintFix {
   }
 
 public:
-  bool diagnose(Expr *root, const Solution &solution) const override;
-  void print(llvm::raw_ostream &Out) const override {
-    Out << "[fix: unwrap optional base of member lookup]";
+  std::string getName() const override {
+    return "unwrap optional base of member lookup";
   }
+
+  bool diagnose(Expr *root, const Solution &solution) const override;
 
   static UnwrapOptionalBase *create(ConstraintSystem &cs, DeclName member,
                                     ConstraintLocator *locator);
@@ -153,10 +161,9 @@ class AddAddressOf final : public ConstraintFix {
       : ConstraintFix(FixKind::AddressOf, locator) {}
 
 public:
+  std::string getName() const override { return "add address-of"; }
+
   bool diagnose(Expr *root, const Solution &solution) const override;
-  void print(llvm::raw_ostream &Out) const override {
-    Out << "[fix: add address-of]";
-  }
 
   static AddAddressOf *create(ConstraintSystem &cs, ConstraintLocator *locator);
 };
@@ -167,10 +174,9 @@ class CoerceToCheckedCast final : public ConstraintFix {
       : ConstraintFix(FixKind::CoerceToCheckedCast, locator) {}
 
 public:
+  std::string getName() const override { return "as to as!"; }
+
   bool diagnose(Expr *root, const Solution &solution) const override;
-  void print(llvm::raw_ostream &Out) const override {
-    Out << "[fix: as to as!]";
-  }
 
   static CoerceToCheckedCast *create(ConstraintSystem &cs,
                                      ConstraintLocator *locator);
@@ -187,10 +193,9 @@ class MarkExplicitlyEscaping final : public ConstraintFix {
         ConvertTo(convertingTo) {}
 
 public:
+  std::string getName() const override { return "add @escaping"; }
+
   bool diagnose(Expr *root, const Solution &solution) const override;
-  void print(llvm::raw_ostream &Out) const override {
-    Out << "[fix: add @escaping]";
-  }
 
   static MarkExplicitlyEscaping *create(ConstraintSystem &cs,
                                         ConstraintLocator *locator,
@@ -215,14 +220,13 @@ class RelabelArguments final
   }
 
 public:
+  std::string getName() const override { return "re-label argument(s)"; }
+
   ArrayRef<Identifier> getLabels() const {
     return {getTrailingObjects<Identifier>(), NumLabels};
   }
 
   bool diagnose(Expr *root, const Solution &solution) const override;
-  void print(llvm::raw_ostream &Out) const override {
-    Out << "[fix: re-label argument(s)]";
-  }
 
   static RelabelArguments *create(ConstraintSystem &cs,
                                   llvm::ArrayRef<Identifier> correctLabels,
@@ -245,10 +249,11 @@ class MissingConformance final : public ConstraintFix {
         NonConformingType(type), Protocol(protocol) {}
 
 public:
-  bool diagnose(Expr *root, const Solution &solution) const override;
-  void print(llvm::raw_ostream &Out) const override {
-    Out << "[fix: add missing protocol conformance]";
+  std::string getName() const override {
+    return "add missing protocol conformance";
   }
+
+  bool diagnose(Expr *root, const Solution &solution) const override;
 
   static MissingConformance *create(ConstraintSystem &cs, Type type,
                                     ProtocolDecl *protocol,
