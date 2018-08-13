@@ -713,22 +713,28 @@ bool ConstraintSystem::tryTypeVariableBindings(
           newBindings.push_back({subtype, binding.Kind, binding.BindingSource});
       }
 
-      // If we were unsuccessful solving for T?, try solving for T.
-      if (auto objTy = type->getOptionalObjectType()) {
-        if (exploredTypes.insert(objTy->getCanonicalType()).second) {
-          // If T is a type variable, only attempt this if both the
-          // type variable we are trying bindings for, and the type
-          // variable we will attempt to bind, both have the same
-          // polarity with respect to being able to bind lvalues.
-          if (auto otherTypeVar = objTy->getAs<TypeVariableType>()) {
-            if (typeVar->getImpl().canBindToLValue() ==
-                otherTypeVar->getImpl().canBindToLValue()) {
+      // Allow solving for T even for a binding kind where that's invalid
+      // if fixes are allowed, because that gives us the opportunity to
+      // match T? values to the T binding by adding an unwrap fix.
+      if (binding.Kind == AllowedBindingKind::Subtypes ||
+          shouldAttemptFixes()) {
+        // If we were unsuccessful solving for T?, try solving for T.
+        if (auto objTy = type->getOptionalObjectType()) {
+          if (exploredTypes.insert(objTy->getCanonicalType()).second) {
+            // If T is a type variable, only attempt this if both the
+            // type variable we are trying bindings for, and the type
+            // variable we will attempt to bind, both have the same
+            // polarity with respect to being able to bind lvalues.
+            if (auto otherTypeVar = objTy->getAs<TypeVariableType>()) {
+              if (typeVar->getImpl().canBindToLValue() ==
+                  otherTypeVar->getImpl().canBindToLValue()) {
+                newBindings.push_back(
+                    {objTy, binding.Kind, binding.BindingSource});
+              }
+            } else {
               newBindings.push_back(
                   {objTy, binding.Kind, binding.BindingSource});
             }
-          } else {
-            newBindings.push_back(
-                {objTy, binding.Kind, binding.BindingSource});
           }
         }
       }
