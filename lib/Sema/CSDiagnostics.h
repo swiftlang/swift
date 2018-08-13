@@ -155,7 +155,7 @@ class MissingConformanceFailure final : public RequirementFailure {
 public:
   MissingConformanceFailure(Expr *expr, const Solution &solution,
                             ConstraintLocator *locator,
-                            std::pair<TypeBase *, ProtocolDecl *> conformance)
+                            std::pair<Type, ProtocolDecl *> conformance)
       : RequirementFailure(expr, solution, locator),
         NonConformingType(conformance.first), Protocol(conformance.second) {}
 

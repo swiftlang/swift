@@ -295,17 +295,11 @@ class Constraint final : public llvm::ilist_node<Constraint>,
   /// The kind of restriction placed on this constraint.
   ConversionRestrictionKind Restriction : 8;
 
-  /// Data associated with the fix.
-  uint16_t FixData;
-
-  /// The kind of fix to be applied to the constraint before visiting it.
-  FixKind TheFix;
+  /// The fix to be applied to the constraint before visiting it.
+  ConstraintFix *TheFix = nullptr;
 
   /// Whether the \c Restriction field is valid.
   unsigned HasRestriction : 1;
-
-  /// Whether the \c Fix field is valid.
-  unsigned HasFix : 1;
 
   /// Whether this constraint is currently active, i.e., stored in the worklist.
   unsigned IsActive : 1;
@@ -410,9 +404,8 @@ class Constraint final : public llvm::ilist_node<Constraint>,
              ArrayRef<TypeVariableType *> typeVars);
   
   /// Construct a relational constraint with a fix.
-  Constraint(ConstraintKind kind, Fix fix,
-             Type first, Type second, ConstraintLocator *locator,
-             ArrayRef<TypeVariableType *> typeVars);
+  Constraint(ConstraintKind kind, ConstraintFix *fix, Type first, Type second,
+             ConstraintLocator *locator, ArrayRef<TypeVariableType *> typeVars);
 
   /// Retrieve the type variables buffer, for internal mutation.
   MutableArrayRef<TypeVariableType *> getTypeVariablesBuffer() {
@@ -458,8 +451,7 @@ public:
 
   /// Create a relational constraint with a fix.
   static Constraint *createFixed(ConstraintSystem &cs, ConstraintKind kind,
-                                 Fix fix,
-                                 Type first, Type second,
+                                 ConstraintFix *fix, Type first, Type second,
                                  ConstraintLocator *locator);
 
   /// Create a new disjunction constraint.
@@ -481,12 +473,7 @@ public:
   }
 
   /// Retrieve the fix associated with this constraint.
-  Optional<Fix> getFix() const {
-    if (!HasFix)
-      return None;
-
-    return Fix(TheFix, FixData);
-  }
+  ConstraintFix *getFix() const { return TheFix; }
 
   /// Whether this constraint is active, i.e., in the worklist.
   bool isActive() const { return IsActive; }

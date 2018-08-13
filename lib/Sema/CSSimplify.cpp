@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "CSFix.h"
 #include "ConstraintSystem.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ParameterList.h"
@@ -730,8 +731,9 @@ public:
     if (!anchor || !isa<CallExpr>(anchor))
       return true;
 
-    CS.recordFix(Fix::fixArgumentLabels(CS, newLabels),
-                 CS.getConstraintLocator(anchor));
+    auto *locator = CS.getConstraintLocator(anchor);
+    auto *fix = RelabelArguments::create(CS, newLabels, locator);
+    CS.recordFix(fix);
     return false;
   }
 };
@@ -760,10 +762,12 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
     // Any. Allowing this would allow these functions to escape.
     if (auto *fnTy = argType->getAs<AnyFunctionType>()) {
       if (fnTy->isNoEscape()) {
+        auto *loc = cs.getConstraintLocator(locator);
         // Allow assigned of 'no-escape' function with recorded fix.
-        if (cs.shouldAttemptFixes() &&
-            !cs.recordFix(FixKind::ExplicitlyEscaping, locator))
-          return cs.getTypeMatchSuccess();
+        if (cs.shouldAttemptFixes()) {
+          if (!cs.recordFix(MarkExplicitlyEscaping::create(cs, loc)))
+            return cs.getTypeMatchSuccess();
+        }
 
         return cs.getTypeMatchFailure(locator);
       }
@@ -1386,9 +1390,13 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
     if (!fnTy || !fnTy->isNoEscape())
       return getTypeMatchSuccess();
 
-    if (shouldAttemptFixes() &&
-        !recordFix(FixKind::ExplicitlyEscapingToAny, locator))
-      return getTypeMatchSuccess();
+    if (shouldAttemptFixes()) {
+      auto &ctx = getASTContext();
+      auto *fix = MarkExplicitlyEscaping::create(
+          *this, getConstraintLocator(locator), ctx.TheAnyType);
+      if (!recordFix(fix))
+        return getTypeMatchSuccess();
+    }
 
     return getTypeMatchFailure(locator);
   }
@@ -1580,7 +1588,9 @@ ConstraintSystem::matchTypesBindTypeVar(
   if (auto *fnTy = type->getAs<AnyFunctionType>()) {
     if (fnTy->isNoEscape() && typeVar->getImpl().getArchetype()) {
       if (shouldAttemptFixes()) {
-        if (recordFix(FixKind::ExplicitlyEscaping, locator))
+        auto *fix = MarkExplicitlyEscaping::create(
+            *this, getConstraintLocator(locator));
+        if (recordFix(fix))
           return getTypeMatchFailure(locator);
 
         // Allow no-escape function to be bound with recorded fix.
@@ -2063,7 +2073,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         if (auto *fnTy = type1->getAs<AnyFunctionType>()) {
           if (fnTy->isNoEscape()) {
             if (shouldAttemptFixes()) {
-              if (recordFix(FixKind::ExplicitlyEscapingToAny, locator))
+              auto &ctx = getASTContext();
+              auto *fix = MarkExplicitlyEscaping::create(
+                  *this, getConstraintLocator(locator), ctx.TheAnyType);
+              if (recordFix(fix))
                 return getTypeMatchFailure(locator);
 
               // Allow 'no-escape' functions to be converted to 'Any'
@@ -2395,7 +2408,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       }
 
       if (forceUnwrapPossible) {
-        conversionsOrFixes.push_back(FixKind::ForceOptional);
+        conversionsOrFixes.push_back(
+            ForceOptional::create(*this, getConstraintLocator(locator)));
       }
     }
 
@@ -2404,7 +2418,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     // FIXME: Also allow types bridged through Objective-C classes.
     if (objectType1->isAnyObject() &&
         type2->getClassOrBoundGenericClass()) {
-      conversionsOrFixes.push_back(Fix::getForcedDowncast(*this, type2));
+      conversionsOrFixes.push_back(
+          ForceDowncast::create(*this, type2, getConstraintLocator(locator)));
     }
 
     // If we could perform a bridging cast, try it.
@@ -2420,12 +2435,14 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       }
 
       if (useFix)
-        conversionsOrFixes.push_back(Fix::getForcedDowncast(*this, type2));
+        conversionsOrFixes.push_back(
+            ForceDowncast::create(*this, type2, getConstraintLocator(locator)));
     }
 
     // If we're converting an lvalue to an inout type, add the missing '&'.
     if (type2->getRValueType()->is<InOutType>() && type1->is<LValueType>()) {
-      conversionsOrFixes.push_back(FixKind::AddressOf);
+      conversionsOrFixes.push_back(
+          AddAddressOf::create(*this, getConstraintLocator(locator)));
     }
   }
 
@@ -2703,7 +2720,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
         locator.withPathElement(LocatorPathElt::getGenericArgument(0)),
         subflags);
     if (result == SolutionKind::Solved) {
-      if (recordFix(FixKind::ForceOptional, getConstraintLocator(locator))) {
+      auto *fix = ForceOptional::create(*this, getConstraintLocator(locator));
+      if (recordFix(fix)) {
         return SolutionKind::Error;
       }
     }
@@ -2720,14 +2738,15 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     if (!path.empty() && path.back().getKind() ==
         ConstraintLocator::PathElementKind::TypeParameterRequirement) {
       auto typeRequirement = path.back();
-      std::pair<Expr *, unsigned> reqLoc = {anchor, typeRequirement.getValue()};
-      MissingConformances[reqLoc] = {type.getPointer(), protocol};
       // Let's strip all of the unnecessary information from locator,
       // diagnostics only care about anchor - to lookup type,
       // and what was the requirement# which is not satisfied.
       ConstraintLocatorBuilder requirement(getConstraintLocator(anchor));
-      if (!recordFix({FixKind::AddConformance},
-                     requirement.withPathElement(typeRequirement)))
+      auto *reqLoc =
+          getConstraintLocator(requirement.withPathElement(typeRequirement));
+
+      auto *fix = MissingConformance::create(*this, type, protocol, reqLoc);
+      if (!recordFix(fix))
         return SolutionKind::Solved;
     }
   }
@@ -3599,10 +3618,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
         locator->getAnchor()->getSourceRange().Start, innerTV);
     SmallVector<Constraint *, 2> optionalities;
     auto nonoptionalResult = Constraint::createFixed(
-        *this, ConstraintKind::Bind, Fix::getUnwrapOptionalBase(*this, member),
-        innerTV, memberTy, locator);
+        *this, ConstraintKind::Bind,
+        UnwrapOptionalBase::create(*this, member, locator), innerTV, memberTy,
+        locator);
     auto optionalResult = Constraint::createFixed(
-        *this, ConstraintKind::Bind, Fix::getUnwrapOptionalBase(*this, member),
+        *this, ConstraintKind::Bind,
+        UnwrapOptionalBase::createWithOptionalResult(*this, member, locator),
         optTy, memberTy, locator);
     optionalities.push_back(nonoptionalResult);
     optionalities.push_back(optionalResult);
@@ -4408,9 +4429,11 @@ ConstraintSystem::simplifyApplicableFnConstraint(
       return SolutionKind::Error;
 
     // Record any fixes we attempted to get to the correct solution.
-    while (unwrapCount-- > 0)
-      if (recordFix(FixKind::ForceOptional, getConstraintLocator(locator)))
+    auto *fix = ForceOptional::create(*this, getConstraintLocator(locator));
+    while (unwrapCount-- > 0) {
+      if (recordFix(fix))
         return SolutionKind::Error;
+    }
 
     return SolutionKind::Solved;
   }
@@ -4428,10 +4451,13 @@ ConstraintSystem::simplifyApplicableFnConstraint(
                                           getConstraintLocator(outerLocator));
 
     // Record any fixes we attempted to get to the correct solution.
-    if (simplified == SolutionKind::Solved)
-      while (unwrapCount-- > 0)
-        if (recordFix(FixKind::ForceOptional, getConstraintLocator(locator)))
+    if (simplified == SolutionKind::Solved) {
+      auto *fix = ForceOptional::create(*this, getConstraintLocator(locator));
+      while (unwrapCount-- > 0) {
+        if (recordFix(fix))
           return SolutionKind::Error;
+      }
+    }
 
     return simplified;
   }
@@ -4876,15 +4902,15 @@ ConstraintSystem::simplifyRestrictedConstraint(
   llvm_unreachable("Unhandled SolutionKind in switch.");
 }
 
-bool ConstraintSystem::recordFix(Fix fix, ConstraintLocatorBuilder locator) {
+bool ConstraintSystem::recordFix(ConstraintFix *fix) {
   auto &ctx = getASTContext();
   if (ctx.LangOpts.DebugConstraintSolver) {
     auto &log = ctx.TypeCheckerDebug->getStream();
     log.indent(solverState ? solverState->depth * 2 + 2 : 0)
       << "(attempting fix ";
-    fix.print(log, this);
+    fix->print(log);
     log << " @";
-    getConstraintLocator(locator)->dump(&ctx.SourceMgr, log);
+    getConstraintLocator(fix->getLocator())->dump(&ctx.SourceMgr, log);
     log << ")\n";
   }
 
@@ -4896,44 +4922,44 @@ bool ConstraintSystem::recordFix(Fix fix, ConstraintLocatorBuilder locator) {
   if (worseThanBestSolution())
     return true;
 
-  auto *loc = getConstraintLocator(locator);
-  auto existingFix =
-      llvm::find_if(Fixes, [&](std::pair<Fix, ConstraintLocator *> &e) {
-        // If we already have a fix like this recorded, let's not do it again,
-        // this situation might happen when the same fix kind is applicable to
-        // different overload choices.
-        return e.first == fix && e.second == loc;
-      });
+  auto *loc = fix->getLocator();
+  auto existingFix = llvm::find_if(Fixes, [&](const ConstraintFix *e) {
+    // If we already have a fix like this recorded, let's not do it again,
+    // this situation might happen when the same fix kind is applicable to
+    // different overload choices.
+    return e->getKind() == fix->getKind() && e->getLocator() == loc;
+  });
 
   if (existingFix == Fixes.end())
-    Fixes.push_back({fix, loc});
+    Fixes.push_back(fix);
+  else // if fix couldn't be recorded, it means that it's no longer needed.
+    Allocator.Deallocate(fix);
 
   return false;
 }
 
-ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyFixConstraint(Fix fix, Type type1, Type type2,
-                                        ConstraintKind matchKind,
-                                        TypeMatchOptions flags,
-                                        ConstraintLocatorBuilder locator) {
+ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
+    ConstraintFix *fix, Type type1, Type type2, ConstraintKind matchKind,
+    TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
   // Try with the fix.
   TypeMatchOptions subflags =
     getDefaultDecompositionOptions(flags) | TMF_ApplyingFix;
-  switch (fix.getKind()) {
+  switch (fix->getKind()) {
   case FixKind::ForceOptional: {
     // Assume that we've unwrapped the first type.
     auto result =
         matchTypes(type1->getRValueType()->getOptionalObjectType(), type2,
                    matchKind, subflags, locator);
     if (result == SolutionKind::Solved)
-      if (recordFix(fix, locator))
+      if (recordFix(fix))
         return SolutionKind::Error;
 
     return result;
   }
 
-  case FixKind::UnwrapOptionalBase: {
-    if (recordFix(fix, locator))
+  case FixKind::UnwrapOptionalBase:
+  case FixKind::UnwrapOptionalBaseWithOptionalResult: {
+    if (recordFix(fix))
       return SolutionKind::Error;
 
     // First type already appropriately set.
@@ -4942,7 +4968,7 @@ ConstraintSystem::simplifyFixConstraint(Fix fix, Type type1, Type type2,
 
   case FixKind::ForceDowncast:
     // These work whenever they are suggested.
-    if (recordFix(fix, locator))
+    if (recordFix(fix))
       return SolutionKind::Error;
 
     return SolutionKind::Solved;
@@ -4953,14 +4979,13 @@ ConstraintSystem::simplifyFixConstraint(Fix fix, Type type1, Type type2,
     auto result = matchTypes(InOutType::get(type1->getRValueType()), type2,
                              matchKind, subflags, locator);
     if (result == SolutionKind::Solved)
-      if (recordFix(fix, locator))
+      if (recordFix(fix))
         return SolutionKind::Error;
 
     return result;
   }
 
   case FixKind::ExplicitlyEscaping:
-  case FixKind::ExplicitlyEscapingToAny:
   case FixKind::CoerceToCheckedCast:
   case FixKind::RelabelArguments:
   case FixKind::AddConformance:
@@ -5213,9 +5238,9 @@ void ConstraintSystem::addExplicitConversionConstraint(
 
   if (allowFixes && shouldAttemptFixes()) {
     Constraint *downcastConstraint =
-      Constraint::createFixed(*this, ConstraintKind::CheckedCast,
-                              FixKind::CoerceToCheckedCast, fromType,
-                              toType, locatorPtr);
+        Constraint::createFixed(*this, ConstraintKind::CheckedCast,
+                                CoerceToCheckedCast::create(*this, locatorPtr),
+                                fromType, toType, locatorPtr);
     constraints.push_back(downcastConstraint);
   }
 
@@ -5242,9 +5267,9 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
 
     // If there is a fix associated with this constraint, apply it.
     if (auto fix = constraint.getFix()) {
-      return simplifyFixConstraint(*fix, constraint.getFirstType(),
-                                   constraint.getSecondType(), matchKind,
-                                   None, constraint.getLocator());
+      return simplifyFixConstraint(fix, constraint.getFirstType(),
+                                   constraint.getSecondType(), matchKind, None,
+                                   constraint.getLocator());
     }
 
     // If there is a restriction on this constraint, apply it directly rather
@@ -5326,8 +5351,8 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     // subexpression's type is unresolved. Don't record the fix until we
     // successfully simplify the constraint.
     if (result == SolutionKind::Solved) {
-      if (auto fix = constraint.getFix()) {
-        if (recordFix(*fix, constraint.getLocator())) {
+      if (auto *fix = constraint.getFix()) {
+        if (recordFix(fix)) {
           return SolutionKind::Error;
         }
       }

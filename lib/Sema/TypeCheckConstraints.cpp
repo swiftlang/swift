@@ -3355,11 +3355,11 @@ void Solution::dump(raw_ostream &out) const {
 
   if (!Fixes.empty()) {
     out << "\nFixes:\n";
-    for (auto &fix : Fixes) {
+    for (auto *fix : Fixes) {
       out.indent(2);
-      fix.first.print(out, &getConstraintSystem());
+      fix->print(out);
       out << " @ ";
-      fix.second->dump(sm, out);
+      fix->getLocator()->dump(sm, out);
       out << "\n";
     }
   }
@@ -3552,11 +3552,11 @@ void ConstraintSystem::print(raw_ostream &out) {
 
   if (!Fixes.empty()) {
     out << "\nFixes:\n";
-    for (auto &fix : Fixes) {
+    for (auto *fix : Fixes) {
       out.indent(2);
-      fix.first.print(out, this);
+      fix->print(out);
       out << " @ ";
-      fix.second->dump(&getTypeChecker().Context.SourceMgr, out);
+      fix->getLocator()->dump(&getTypeChecker().Context.SourceMgr, out);
       out << "\n";
     }
   }
