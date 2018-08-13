@@ -186,6 +186,26 @@ Totals,269
         self.assertTrue(isinstance(results[0], PerformanceTestResult))
         self.assertEquals(results[0].name, 'BitCount')
 
+    def test_parse_results_tab_delimited(self):
+        log = '34\tBitCount\t20\t3\t4\t4\t0\t4'
+        parser = LogParser()
+        results = parser.parse_results(log.splitlines())
+        self.assertTrue(isinstance(results[0], PerformanceTestResult))
+        self.assertEquals(results[0].name, 'BitCount')
+
+    def test_parse_results_formatted_text(self):
+        """Parse format that Benchmark_Driver prints to console"""
+        log = ("""
+# TEST      SAMPLES MIN(μs) MAX(μs) MEAN(μs) SD(μs) MEDIAN(μs) MAX_RSS(B)
+3 Array2D        20    2060    2188     2099      0       2099   20915200
+Totals        281 2693794 2882846  2748843      0          0          0""")
+        parser = LogParser()
+        results = parser.parse_results(log.splitlines()[1:])  # without 1st \n
+        self.assertTrue(isinstance(results[0], PerformanceTestResult))
+        r = results[0]
+        self.assertEquals(r.name, 'Array2D')
+        self.assertEquals(r.max_rss, 20915200)
+
     def test_parse_results_verbose(self):
         """Parse multiple performance test results with 2 sample formats:
         single line for N = 1; two lines for N > 1.

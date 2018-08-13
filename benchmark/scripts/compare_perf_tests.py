@@ -149,11 +149,15 @@ class LogParser(object):
 
     # Parse lines like this
     # #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs)
-    results_re = re.compile(r'(\d+,[ \t]*\w+,' +
-                            ','.join([r'[ \t]*[\d.]+'] * 6) + ')')
+    results_re = re.compile(r'(\d+[, \t]*\w+[, \t]*' +
+                            r'[, \t]*'.join([r'[\d.]+'] * 6) +
+                            r'[, \t]*[\d.]*)')  # optional MAX_RSS(B)
 
     def _append_result(self, result):
-        r = PerformanceTestResult(result.split(','))
+        columns = result.split(',')
+        if len(columns) < 8:
+            columns = result.split()
+        r = PerformanceTestResult(columns)
         if self.samples:
             r.all_samples = self.samples
         self.results.append(r)
