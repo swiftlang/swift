@@ -2018,6 +2018,9 @@ bool TFFunctionPartition::markFunction(bool &hasTensorOps) {
     for (auto bbi = BB->begin(), e = BB->end(); bbi != e; ++bbi) {
       auto *inst = &*bbi;
 
+      assert(!SILTensorOpInfo::decode(inst) &&
+             "The input to partition pass should not have any builtin TFops!");
+
       // Graph operations are tensor ops.
       auto *graphOp = dyn_cast<GraphOperationInst>(inst);
       if (!graphOp)
