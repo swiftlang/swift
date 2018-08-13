@@ -819,7 +819,7 @@ void CalleeCandidateInfo::filterContextualMemberList(Expr *argExpr) {
     if (isa<InOutExpr>(argExpr))
       argType = LValueType::get(argType);
     
-    return filterListArgs(AnyFunctionType::Param({argType, Identifier(), {}}));
+    return filterListArgs(AnyFunctionType::Param(argType));
   }
   
   // If we have a tuple expression, form a tuple type.

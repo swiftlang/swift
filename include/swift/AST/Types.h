@@ -54,6 +54,7 @@ namespace swift {
   class GenericParamList;
   class GenericSignature;
   class Identifier;
+  class InOutType;
   enum class ReferenceCounting : uint8_t;
   enum class ResilienceExpansion : unsigned;
   class SILModule;
@@ -2627,9 +2628,13 @@ public:
 
   class Param {
   public:
-    explicit Param(const TupleTypeElt &tte);
-    explicit Param(Type t, Identifier l, ParameterTypeFlags f);
-    
+    explicit Param(Type t,
+                   Identifier l = Identifier(),
+                   ParameterTypeFlags f = ParameterTypeFlags())
+        : Ty(t), Label(l), Flags(f) {
+      assert(!t || !t->is<InOutType>() && "set flags instead");
+    }
+
   private:
     /// The type of the parameter. For a variadic parameter, this is the
     /// element type.
@@ -2642,14 +2647,10 @@ public:
     ParameterTypeFlags Flags = {};
     
   public:
-    Type getType() const;
-    CanType getCanType() const {
-      assert(getType()->isCanonical());
-      return CanType(getType());
-    }
-    
     /// FIXME(Remove InOutType): This is mostly for copying between param
     /// types and should go away.
+    Type getType() const;
+
     Type getPlainType() const { return Ty; }
 
     bool hasLabel() const { return !Label.empty(); }
@@ -2694,6 +2695,7 @@ public:
     static CanParam getFromParam(const Param &param) { return CanParam(param); }
 
     CanType getType() const { return CanType(Param::getType()); }
+    CanType getPlainType() const { return CanType(Param::getPlainType()); }
   };
 
   using CanParamArrayRef =

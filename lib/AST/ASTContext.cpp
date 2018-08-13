@@ -3035,20 +3035,6 @@ Type TupleTypeElt::getType() const {
   return ElementType;
 }
 
-AnyFunctionType::Param::Param(const TupleTypeElt &tte)
-  : Ty(tte.isVararg() ? tte.getVarargBaseTy() : tte.getRawType()),
-    Label(tte.getName()), Flags(tte.getParameterFlags()) {
-  assert(getType()->is<InOutType>() == Flags.isInOut());
-}
-
-AnyFunctionType::Param::Param(Type t, Identifier l, ParameterTypeFlags f)
-  : Ty(t), Label(l), Flags(f) {
-  if (f.isInOut())
-    assert(!t->is<InOutType>() && "caller did not pass a base type");
-  if (!t.isNull() && t->is<InOutType>())
-    assert(f.isInOut() && "caller did not set flags correctly");
-}
-
 Type AnyFunctionType::Param::getType() const {
   if (Flags.isInOut()) return InOutType::get(Ty);
   // FIXME: Callers are inconsistenly setting this flag and retrieving this
@@ -3556,25 +3542,27 @@ void AnyFunctionType::decomposeInput(
   case TypeKind::Tuple: {
     auto tupleTy = cast<TupleType>(type.getPointer());
     for (auto &elt : tupleTy->getElements()) {
-      result.push_back(AnyFunctionType::Param(elt));
+      result.emplace_back((elt.isVararg()
+                           ? elt.getVarargBaseTy()
+                           : elt.getRawType()),
+                          elt.getName(),
+                          elt.getParameterFlags());
     }
     return;
   }
       
   case TypeKind::Paren: {
     auto pty = cast<ParenType>(type.getPointer());
-    result.push_back(AnyFunctionType::Param(pty->getUnderlyingType()->getInOutObjectType(),
-                                            Identifier(),
-                                            pty->getParameterFlags()));
+    result.emplace_back(pty->getUnderlyingType()->getInOutObjectType(),
+                        Identifier(),
+                        pty->getParameterFlags());
     return;
   }
       
   default:
-//    assert(type->is<InOutType>() && "Found naked inout type");
-    result.push_back(
-        AnyFunctionType::Param(type->getInOutObjectType(), Identifier(),
-                               ParameterTypeFlags::fromParameterType(
-                                   type, false, ValueOwnership::Default)));
+    result.emplace_back(type->getInOutObjectType(), Identifier(),
+                        ParameterTypeFlags::fromParameterType(
+                          type, false, ValueOwnership::Default));
     return;
   }
 }
@@ -3592,8 +3580,8 @@ Type AnyFunctionType::composeInput(ASTContext &ctx, ArrayRef<Param> params,
       else
         eltType = ArraySliceType::get(eltType);
     }
-    elements.push_back(TupleTypeElt(eltType, param.getLabel(),
-                                    param.getParameterFlags()));
+    elements.emplace_back(eltType, param.getLabel(),
+                          param.getParameterFlags());
   }
   return TupleType::get(elements, ctx);
 }
