@@ -12,7 +12,11 @@
 #  See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 #
 # ===---------------------------------------------------------------------===//
+"""
+This script is used for comparing performance test results.
 
+It is structured into several classes that can be imported into other modules.
+"""
 from __future__ import print_function
 
 import argparse
@@ -22,9 +26,10 @@ from math import sqrt
 
 
 class PerformanceTestResult(object):
-    """PerformanceTestResult holds results from executing an individual
-    benchmark from the Swift Benchmark Suite as reported by the test driver
-    (Benchmark_O, Benchmark_Onone, Benchmark_Osize or Benchmark_Driver).
+    u"""Result from executing an individual Swift Benchmark Suite benchmark.
+
+    Reported by the test driver (Benchmark_O, Benchmark_Onone, Benchmark_Osize
+    or Benchmark_Driver).
 
     It depends on the log format emitted by the test driver in the form:
     #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs),MAX_RSS(B)
@@ -33,9 +38,11 @@ class PerformanceTestResult(object):
     Benchmark_Driver to measure rough memory use during the execution of the
     benchmark.
     """
+
     def __init__(self, csv_row):
-        """PerformanceTestResult instance is created from an iterable with
-        length of 8 or 9. (Like a row provided by the CSV parser.)
+        """Initialized from a row with 8 or 9 columns with benchmark summary.
+
+        The row is an iterable, such as a row provided by the CSV parser.
         """
         # csv_row[0] is just an ordinal number of the test - skip that
         self.name = csv_row[1]          # Name of the performance test
@@ -52,6 +59,7 @@ class PerformanceTestResult(object):
             int(csv_row[8]) if len(csv_row) > 8 else None)
 
     def __repr__(self):
+        """Short summary for debugging purposes."""
         return (
             '<PerformanceTestResult name:{0.name!r} '
             'samples:{0.samples!r} min:{0.min!r} max:{0.max!r} '
