@@ -19,6 +19,7 @@ import sys
 import tempfile
 import unittest
 
+from compare_perf_tests import LogParser
 from compare_perf_tests import PerformanceTestResult
 from compare_perf_tests import ReportFormatter
 from compare_perf_tests import ResultComparison
@@ -121,37 +122,10 @@ class TestResultComparison(unittest.TestCase):
         self.assertTrue(ResultComparison(self.r2, self.r1).is_dubious)
 
 
-class OldAndNewLog(unittest.TestCase):
+class FileSystemIntegration(unittest.TestCase):
     def setUp(self):
         # Create a temporary directory
         self.test_dir = tempfile.mkdtemp()
-
-        self.old_log = self.write_temp_file('old.log', """
-1,AngryPhonebook,20,10458,12714,11000,0,11000,10204365
-2,AnyHashableWithAClass,20,247027,319065,259056,0,259056,10250445
-3,Array2D,20,335831,400221,346622,0,346622,28297216
-4,ArrayAppend,20,23641,29000,24990,0,24990,11149926
-34,BitCount,20,3,4,4,0,4,10192896
-35,ByteSwap,20,4,6,4,0,4,10185933
-
-Totals,269,67351871,70727022,68220188,0,0,0
-""")
-        # Log lines are deliberately in descending sort order in order to test
-        # the ordering of the comparison results.
-        # ArrayAppend is included twice to test results merging.
-        self.new_log = self.write_temp_file('new.log', """
-265,TwoSum,20,5006,5679,5111,0,5111
-35,ByteSwap,20,0,0,0,0,0
-34,BitCount,20,9,9,9,0,9
-4,ArrayAppend,20,23641,29000,24990,0,24990
-3,Array2D,20,335831,400221,346622,0,346622
-1,AngryPhonebook,20,10458,12714,11000,0,11000
-
-Totals,269,67351871,70727022,68220188,0,0,0
-4,ArrayAppend,1,20000,20000,20000,0,20000
-
-Totals,1,20000,20000,20000,0,0,0
-""")
 
     def tearDown(self):
         # Remove the directory after the test
@@ -163,27 +137,81 @@ Totals,1,20000,20000,20000,0,0,0
             f.write(data)
         return temp_file_name
 
+
+class OldAndNewLog(unittest.TestCase):
+    old_log_content = """1,AngryPhonebook,20,10458,12714,11000,0,11000,10204365
+2,AnyHashableWithAClass,20,247027,319065,259056,0,259056,10250445
+3,Array2D,20,335831,400221,346622,0,346622,28297216
+4,ArrayAppend,20,23641,29000,24990,0,24990,11149926
+34,BitCount,20,3,4,4,0,4,10192896
+35,ByteSwap,20,4,6,4,0,4,10185933"""
+
+    new_log_content = """265,TwoSum,20,5006,5679,5111,0,5111
+35,ByteSwap,20,0,0,0,0,0
+34,BitCount,20,9,9,9,0,9
+4,ArrayAppend,20,20000,29000,24990,0,24990
+3,Array2D,20,335831,400221,346622,0,346622
+1,AngryPhonebook,20,10458,12714,11000,0,11000"""
+
+    old_results = dict([(r.name, r)
+                        for r in
+                        map(PerformanceTestResult,
+                            [line.split(',')
+                             for line in
+                             old_log_content.splitlines()])])
+
+    new_results = dict([(r.name, r)
+                        for r in
+                        map(PerformanceTestResult,
+                            [line.split(',')
+                             for line in
+                             new_log_content.splitlines()])])
+
     def assert_report_contains(self, texts, report):
         assert not isinstance(texts, str)
         for text in texts:
             self.assertIn(text, report)
 
 
+class TestLogParser(FileSystemIntegration):
+    def test_load_from_csv(self):
+        """Ignores header row, empty lines and Totals row."""
+        log_file = self.write_temp_file('log.log',"""
+#,TEST,SAMPLES,MIN(us),MAX(us),MEAN(us),SD(us),MEDIAN(us)
+34,BitCount,20,3,4,4,0,4
+
+Totals,269
+""")
+        results = LogParser.load_from_csv(log_file)
+        self.assertEquals(results.keys(), ['BitCount'])
+        self.assertTrue(isinstance(results['BitCount'], PerformanceTestResult))
+
+    def test_merge(self):
+        concatenated_logs = self.write_temp_file('concat.log', """
+4,ArrayAppend,20,23641,29000,24990,0,24990
+4,ArrayAppend,1,20000,20000,20000,0,20000
+""")
+        results = LogParser.load_from_csv(concatenated_logs)
+        self.assertEquals(results.keys(), ['ArrayAppend'])
+        result = results['ArrayAppend']
+        self.assertTrue(isinstance(result, PerformanceTestResult))
+        self.assertEquals(result.min, 20000)
+        self.assertEquals(result.max, 29000)
+
+
 class TestTestComparator(OldAndNewLog):
     def test_init(self):
-        old_log, new_log = self.old_log, self.new_log
-
         def names(tests):
             return [t.name for t in tests]
 
-        tc = TestComparator(old_log, new_log, 0.05)
+        tc = TestComparator(self.old_results, self.new_results, 0.05)
         self.assertEquals(names(tc.unchanged), ['AngryPhonebook', 'Array2D'])
         self.assertEquals(names(tc.increased), ['ByteSwap', 'ArrayAppend'])
         self.assertEquals(names(tc.decreased), ['BitCount'])
         self.assertEquals(names(tc.added), ['TwoSum'])
         self.assertEquals(names(tc.removed), ['AnyHashableWithAClass'])
         # other way around
-        tc = TestComparator(new_log, old_log, 0.05)
+        tc = TestComparator(self.new_results, self.old_results, 0.05)
         self.assertEquals(names(tc.unchanged), ['AngryPhonebook', 'Array2D'])
         self.assertEquals(names(tc.increased), ['BitCount'])
         self.assertEquals(names(tc.decreased), ['ByteSwap', 'ArrayAppend'])
@@ -191,7 +219,7 @@ class TestTestComparator(OldAndNewLog):
         self.assertEquals(names(tc.removed), ['TwoSum'])
         # delta_threshold determines the sorting into change groups;
         # report only change above 100% (ByteSwap's runtime went to 0):
-        tc = TestComparator(old_log, new_log, 1)
+        tc = TestComparator(self.old_results, self.new_results, 1)
         self.assertEquals(
             names(tc.unchanged),
             ['AngryPhonebook', 'Array2D', 'ArrayAppend', 'BitCount']
@@ -203,7 +231,7 @@ class TestTestComparator(OldAndNewLog):
 class TestReportFormatter(OldAndNewLog):
     def setUp(self):
         super(TestReportFormatter, self).setUp()
-        self.tc = TestComparator(self.old_log, self.new_log, 0.05)
+        self.tc = TestComparator(self.old_results, self.new_results, 0.05)
         self.rf = ReportFormatter(self.tc, '', '', changes_only=False)
         self.markdown = self.rf.markdown()
         self.git = self.rf.git()
@@ -445,7 +473,7 @@ class Test_parse_args(unittest.TestCase):
         self.assertEquals(args.new_branch, 'amazing-optimization')
 
 
-class Test_compare_perf_tests_main(OldAndNewLog):
+class Test_compare_perf_tests_main(OldAndNewLog, FileSystemIntegration):
     """Integration test that invokes the whole comparison script."""
     markdown = [
         '<summary>Regression (1)</summary>',
@@ -458,6 +486,11 @@ class Test_compare_perf_tests_main(OldAndNewLog):
         'BitCount                3        9        +199.9%   **0.33x**',
     ]
     html = ['<html>', "<td align='left'>BitCount</td>"]
+
+    def setUp(self):
+        super(Test_compare_perf_tests_main, self).setUp()
+        self.old_log = self.write_temp_file('old.log', self.old_log_content)
+        self.new_log = self.write_temp_file('new.log', self.new_log_content)
 
     def execute_main_with_format(self, report_format, test_output=False):
         report_file = self.test_dir + 'report.log'
