@@ -91,8 +91,7 @@ GraphFunctionDeviceInfo::getForFunction(SILFunction &fn,
       if (tfopInfo->opName == "tfc.configureTPU") {
         // Decode: tfc.configureTPU(isInfeedEnabled: bool)
         deviceType = DeviceType::TPU;
-        auto infeedEnabled =
-            cast<IntegerLiteralInst>(tfopInfo->getAttrOperand(0));
+        auto infeedEnabled = cast<IntegerLiteralInst>(inst.getOperand(0));
         isTPUInfeedEnabled = !infeedEnabled->getValue().isNullValue();
       } else if (tfopInfo->opName == "tfc.configureGPU") {
         deviceType = DeviceType::GPU;
@@ -188,19 +187,6 @@ class DevicePartitionCloner
   void cloneFunction();
 
   void visitGraphOperationInst(GraphOperationInst *inst);
-  void visitTFOpInst(SILTensorOpInfo &tfopInfo);
-
-  void visitBuiltinInst(BuiltinInst *inst) {
-    if (auto tfopInfo = SILTensorOpInfo::decode(inst)) {
-      if (targetOps.count(inst))
-        visitTFOpInst(tfopInfo.getValue());
-      return;
-    }
-
-    // Other kinds of builtins such as "tf_tensor_to_i1" are cloned over
-    // directly.
-    SILClonerWithScopes::visitBuiltinInst(inst);
-  }
 
   // These get special handling, they are only used as operands to tfops.
   void visitIntegerLiteralInst(IntegerLiteralInst *inst) {}
@@ -350,39 +336,6 @@ void DevicePartitionCloner::visitGraphOperationInst(GraphOperationInst *inst) {
 
   for (unsigned i = 0, e = inst->getNumResults(); i != e; ++i)
     ValueMap[inst->getResult(i)] = newOp->getResult(i);
-}
-
-void DevicePartitionCloner::visitTFOpInst(SILTensorOpInfo &tfopInfo) {
-  auto deviceString = tfopInfo.getDeviceString();
-  auto deviceType = getOpDeviceType(deviceString);
-
-  bool shouldRunInstOnThisDevice =
-      deviceType == DeviceType::ALL || deviceType == thisDeviceType;
-  if (!shouldRunInstOnThisDevice) {
-    // Skip this inst
-    return;
-  }
-
-  auto &B = getBuilder();
-  auto *inst = tfopInfo.inst;
-  auto loc = remapLocation(getUserSourceLocation(inst->getDebugLocation()));
-
-  // Clone it over.
-  SmallVector<SILValue, 4> args;
-  assert(!isa<ApplyInst>(inst));
-  for (unsigned i = 0, e = inst->getNumOperands(); i != e; ++i) {
-    auto opValue = inst->getOperand(i);
-    if (isTensorFlowValue(opValue->getType())) {
-      args.push_back(remapValue(opValue));
-    } else {
-      args.push_back(cloneSingleInst(cast<SingleValueInstruction>(opValue)));
-    }
-  }
-
-  auto newName = B.getASTContext().getIdentifier(tfopInfo.builtinName);
-  auto result = B.createBuiltin(loc, newName, inst->getType(),
-                                /*no substitutions*/ {}, args);
-  ValueMap[inst] = result;
 }
 
 void DevicePartitionCloner::addD2DSend(GraphOperationInfo &graphOpInfo,
@@ -663,31 +616,6 @@ public:
 
     // return fn;
     return resultFn;
-  }
-
-  void visitBuiltinInst(BuiltinInst *inst) {
-    if (auto tfopInfo = SILTensorOpInfo::decode(inst))
-      return visitTFOpInst(inst, tfopInfo.getValue());
-
-    // For this magic builtin, it will be handled in graph lowering directly.
-    if (inst->getName().str() == "tf_tensor_to_i1")
-      return;
-
-    inst->dump();
-    llvm_unreachable(
-        "DevicePartitionerImpl cannot mark this instruction yet\n");
-  }
-
-  void visitTFOpInst(BuiltinInst *inst, SILTensorOpInfo &tfopInfo) {
-    auto deviceString = tfopInfo.getDeviceString();
-    auto deviceType = getOpDeviceType(deviceString);
-    markInstForDevice(deviceType, inst);
-
-    // If any operand of `inst` is produced on another device, insert a
-    // TensorTransfer inst if that has not been done yet.
-    for (unsigned i = 0, e = inst->getNumOperands(); i != e; ++i) {
-      makeOperandLocal(deviceType, inst, i);
-    }
   }
 
   void visitGraphOperationInst(GraphOperationInst *inst) {
