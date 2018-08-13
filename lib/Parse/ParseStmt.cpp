@@ -1445,7 +1445,6 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
       T(InVarOrLetPattern, wasLet ? IVOLP_InLet : IVOLP_InVar);
     
     ThePattern = parseMatchingPattern(/*isExprBasic*/ true);
-    Status |= Status;
     
     if (ThePattern.isNonNull()) {
       auto *P = new (Context) VarPattern(IntroducerLoc, wasLet,
