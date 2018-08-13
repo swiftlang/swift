@@ -1010,21 +1010,6 @@ private:
   /// The set of fixes applied to make the solution work.
   llvm::SmallVector<ConstraintFix *, 4> Fixes;
 
-  /// Types used in fixes.
-  std::vector<Type> FixedTypes;
-
-  /// Declaration names used in fixes.
-  std::vector<DeclName> FixedDeclNames;
-
-  /// Argument labels fixed by the constraint solver.
-  SmallVector<std::vector<Identifier>, 4> FixedArgLabels;
-
-  /// Conformances which solver "fixed" to help with
-  /// diagnosing problems related to generic requirements.
-  llvm::SmallDenseMap<std::pair<Expr *, unsigned>,
-                      std::pair<TypeBase *, ProtocolDecl *>>
-      MissingConformances;
-
   /// \brief The set of remembered disjunction choices used to reach
   /// the current constraint system.
   SmallVector<std::pair<ConstraintLocator*, unsigned>, 32>
@@ -1521,12 +1506,6 @@ private:
   /// Emit the fixes computed as part of the solution, returning true if we were
   /// able to emit an error message, or false if none of the fixits worked out.
   bool applySolutionFixes(Expr *E, const Solution &solution);
-
-  /// \brief Apply the specified Fix to this solution, producing a fix-it hint
-  /// diagnostic for it and returning true.  If the fix-it hint turned out to be
-  /// bogus, this returns false and doesn't emit anything.
-  bool applySolutionFix(Expr *expr, const Solution &solution,
-                        std::pair<Fix, ConstraintLocator *> &fix);
 
   /// \brief If there is more than one viable solution,
   /// attempt to pick the best solution and remove all of the rest.
