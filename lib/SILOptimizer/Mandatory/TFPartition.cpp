@@ -1411,23 +1411,13 @@ bool TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
 
   // Okay, we know that the instruction is a tensor op.  Decode its argument
   // list so we know how to handle the operands.
-  if (auto *graphOp = dyn_cast<GraphOperationInst>(&inst)) {
-    for (unsigned i = 0, e = graphOp->getNumOperands(); i != e; ++i) {
-      // Tensor and scalar input operands are recursively marked.
-      if (markValue(graphOp->getOperand(i), graphOp))
-        return true;
-    }
+  auto *graphOp = dyn_cast<GraphOperationInst>(&inst);
+  if (!graphOp)
     return false;
-  }
-
-  SILTensorOpInfo tfopInfo = SILTensorOpInfo::decode(&inst).getValue();
-  for (unsigned i = 0, e = inst.getNumOperands(); i != e; ++i) {
+  for (unsigned i = 0, e = graphOp->getNumOperands(); i != e; ++i) {
     // Tensor and scalar input operands are recursively marked.
-    if (tfopInfo.isInput(i) &&
-        // Don't mark array designators.
-        !inst.getOperand(i)->getType().is<MetatypeType>())
-      if (markValue(inst.getOperand(i), &inst))
-        return true;
+    if (markValue(graphOp->getOperand(i), graphOp))
+      return true;
   }
   return false;
 }
@@ -2029,50 +2019,15 @@ bool TFFunctionPartition::markFunction(bool &hasTensorOps) {
       auto *inst = &*bbi;
 
       // Graph operations are tensor ops.
-      // TODO: When deabstraction is done, this is the only case that matters.
-      if (auto *graphOp = dyn_cast<GraphOperationInst>(inst)) {
-        logInput();
-        tensorOps.push_back(inst);
-        tensorOpsSet.insert(inst);
-
-        auto opDevice = GraphOperationInfo(graphOp).getDeviceType();
-        deviceInfo.markDeviceUsed(opDevice);
+      auto *graphOp = dyn_cast<GraphOperationInst>(inst);
+      if (!graphOp)
         continue;
-      }
-
-      auto opInfo = SILTensorOpInfo::decode(inst);
-      if (!opInfo)
-        continue;
-
       logInput();
-
-      // Check to see if the usage of this op looks ok.  If not, reject it with
-      // an error and ignore it.
-      auto error = opInfo->checkAndDiagnoseOperands();
-      if (!error.empty()) {
-        // TODO: improve the diagnostic to talk about the parameter label in the
-        // user code, not the internal op attribute.  The bookkeeping for this
-        // isn't obvious though.
-        auto loc = getUserSourceLocation(inst);
-        diagnose(hostFn.getModule().getASTContext(), loc.getSourceLoc(),
-                 diag::tf_op_misuse, error)
-            .highlight(loc.getSourceRange());
-        invalidOpFound = true;
-        continue;
-      }
-
-      // Because we don't have deabstraction yet, and because generic
-      // deabstraction doesn't know about our builtins, we get scalars and
-      // constants passed by reference through a stack allocation.  We support
-      // this form on input, but want to canonicalize this away so the
-      // partitioning pass and data flow analysis code doesn't have to reason
-      // about it.
-      // TODO(clattner): Remove this when deabstraction subsumes it.
-      inst = opInfo->canonicalizeOperands(deviceInfo);
-      bbi = SILBasicBlock::iterator(inst);
-
       tensorOps.push_back(inst);
       tensorOpsSet.insert(inst);
+
+      auto opDevice = GraphOperationInfo(graphOp).getDeviceType();
+      deviceInfo.markDeviceUsed(opDevice);
     }
   }
   hasTensorOps = !tensorOps.empty();
@@ -2304,20 +2259,16 @@ public:
   }
 
   void visitGraphOperationInst(GraphOperationInst *inst);
-  void visitOpInst(SingleValueInstruction *inst, SILTensorOpInfo &tfopInfo);
   void visitScalarInst(SingleValueInstruction *inst);
 
   void visitScalarOrOpInst(SingleValueInstruction *inst) {
-    // Check to see if this is an op.
-    if (auto tfopInfo = SILTensorOpInfo::decode(inst))
-      return visitOpInst(inst, tfopInfo.getValue());
-
     // Otherwise it is a scalar to promote.
     visitScalarInst(inst);
   }
 
-  void visitBuiltinInst(BuiltinInst *inst) { visitScalarOrOpInst(inst); }
-  void visitApplyInst(ApplyInst *inst) { visitScalarOrOpInst(inst); }
+  void visitBuiltinInst(BuiltinInst *inst) { visitScalarInst(inst); }
+  // For scalar promotion.
+  void visitApplyInst(ApplyInst *inst) { visitScalarInst(inst); }
   void visitIntegerLiteralInst(IntegerLiteralInst *inst) {
     visitScalarInst(inst);
   }
@@ -2466,57 +2417,6 @@ void PartitionCloner::visitGraphOperationInst(GraphOperationInst *inst) {
   }
 
   return SILClonerWithScopes<PartitionCloner>::visitGraphOperationInst(inst);
-}
-
-// Transform ops builtin instructions to the one we need in the tensor program.
-void PartitionCloner::visitOpInst(SingleValueInstruction *inst,
-                                  SILTensorOpInfo &tfopInfo) {
-  auto &B = getBuilder();
-  auto loc = remapLocation(getUserSourceLocation(inst->getDebugLocation()));
-
-  // Handle special case "ops".
-  if (tfopInfo.opName == "tfc.scalarToTensor") {
-    assert(inst->getNumOperands() == 1 && "invalid tfc.scalarToTensor!");
-    // We just lower the result as the input, since the scalar input will have
-    // been promoted to a tensor already.  It is possible that the input will
-    // have been lowered to something like TensorHandle<Builtin.Int32> and we
-    // need a TensorHandle<Int32>. If that is the case, we insert an
-    // UncheckedRefCast to get it to the right type.  These are treated as noops
-    // by GraphGen.
-    auto result = remapValue(inst->getOperand(0));
-    if (!inst->getType().getASTType()->isEqual(
-            result->getType().getASTType())) {
-      result = B.createUncheckedRefCast(loc, result, inst->getType());
-    }
-
-    ValueMap[inst] = result;
-    return;
-  }
-
-  SmallVector<SILValue, 4> args;
-  auto cloneSingleInst =
-      [&](SingleValueInstruction *inst) -> SingleValueInstruction * {
-    auto ourInst = inst->clone();
-    ourInst->setDebugLocation(B.getSILDebugLocation(loc));
-    B.getInsertionBB()->push_back(ourInst);
-    return ourInst;
-  };
-
-  for (unsigned i = isa<ApplyInst>(inst), e = inst->getNumOperands(); i != e;
-       ++i) {
-    auto opValue = inst->getOperand(i);
-    if (isTensorFlowValue(opValue->getType())) {
-      // Tensor operands just become operands.
-      args.push_back(remapValue(opValue));
-    } else {
-      args.push_back(cloneSingleInst(cast<SingleValueInstruction>(opValue)));
-    }
-  }
-
-  auto name = B.getASTContext().getIdentifier(tfopInfo.builtinName);
-  auto result = B.createBuiltin(loc, name, inst->getType(),
-                                /*substitutionlist*/ {}, args);
-  ValueMap[inst] = result;
 }
 
 /// Create the attributes of a const tensor inst in accelerator code, where

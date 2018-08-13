@@ -1657,10 +1657,41 @@ static Type getArrayElementType(Type ty) {
   return Type();
 }
 
+/// If the specified value is a single-element struct_inst wrapper, look through
+/// them.  We special case arrays, and return Array<T> values as themselves.
+static SILValue getValueInsideStructInst(SILValue value) {
+  // Dig through one-argument struct insts.
+  while (auto structVal = dyn_cast<StructInst>(value)) {
+    // If this is an ArrayType, don't dig in.
+    if (getArrayElementType(structVal->getType().getASTType()))
+      break;
+
+    if (structVal->getNumOperands() != 1)
+      break;
+    value = structVal->getOperand(0);
+  }
+  return value;
+}
+
 /// Return true if this is a reference to the _allocateUninitialized helper
 /// in array in the standard library allocating zero elements.
-/// TODO: Move to deabstraction when other clients are removed.
-bool isArrayAllocUninit(SILValue op, SILValue &numElements);
+bool isArrayAllocUninit(SILValue op, SILValue &numElements) {
+  auto *apply = dyn_cast<ApplyInst>(op->getDefiningInstruction());
+  if (!apply)
+    return false;
+  auto *callee = dyn_cast<FunctionRefInst>(apply->getOperand(0));
+  if (!callee)
+    return false;
+
+  auto calleeName = callee->getReferencedFunction()->getName();
+  // FIXME: Gross hack because this is specialized by perf optimizer.  Remove
+  // when deabstraction does arrays.
+  if (!calleeName.contains("_allocateUninitializedArray"))
+    return false;
+
+  numElements = getValueInsideStructInst(apply->getOperand(1));
+  return true;
+}
 
 namespace {
 /// This is a little helper for working with literal arrays that may want to get
@@ -1786,10 +1817,97 @@ void TFDeabstraction::cleanupDeadInstructions() {
     removeArrayValueIfPossible(inst);
 }
 
+/// If the specified type conforms to the TensorProtocol protocol, return the
+/// Scalar type for it.  Otherwise return a null type.
+static Type conformsToTensorProtocol(Type ty, ModuleDecl *module) {
+  auto nominal = ty->getAnyNominal();
 
-// TODO: move this from TFUtilities when deabstraction is done.
-SILValue getTensorProtocolHandleMember(SILValue v, SILLocation loc,
-                                       SILBuilder &B);
+  auto &ctx = ty->getASTContext();
+  auto tensorProto = ctx.getProtocol(KnownProtocolKind::TensorProtocol);
+  if (!tensorProto || !nominal)
+    return Type();
+
+  SmallVector<ProtocolConformance *, 2> conformances;
+  nominal->lookupConformance(/*unused module*/ nullptr, tensorProto,
+                             conformances);
+  if (conformances.size() != 1)
+    return Type();
+
+  auto scalarMembers =
+      nominal->lookupDirect(DeclName(ctx.getIdentifier("Scalar")));
+  if (scalarMembers.size() != 1)
+    return Type();
+  if (auto member = dyn_cast<TypeDecl>(scalarMembers[0]))
+    return ty->getTypeOfMember(module, member,
+                               member->getDeclaredInterfaceType());
+  return Type();
+}
+
+/// Given something that conforms to the TensorProtocol protocol, extract the
+/// 'handle' out of it.
+static SILValue getTensorProtocolHandleMember(SILValue v, SILLocation loc,
+                                              SILBuilder &B) {
+  // If we already have a TensorHandle, just use it.
+  if (isTensorHandle(v->getType()))
+    return v;
+
+  auto module = B.getFunction().getModule().getSwiftModule();
+
+  auto vType = v->getType().getASTType();
+  if (!vType->getStructOrBoundGenericStruct() ||
+      !conformsToTensorProtocol(vType, module))
+    return SILValue();
+
+  // If this value is just a struct wrapper around a TensorHandle, use the
+  // input of it.  In the case of Tensor2D, we have multiple levels of struct
+  // wrapper.
+  while (1) {
+    auto si = dyn_cast<StructInst>(v);
+    if (!si)
+      break;
+
+    if (si->getNumOperands() != 1)
+      break;
+
+    auto operand = si->getOperand(0);
+    // If we found the TensorHandle itself, then we win - return it.
+    if (isTensorHandle(operand->getType()))
+      return operand;
+
+    // If we found a wrapper around another TensorProtocol, dig deeper.
+    if (!conformsToTensorProtocol(operand->getType().getASTType(), module))
+      break;
+
+    v = operand;
+  }
+
+  // TODO(clattner): it would be more correct to generate a call to an accessor
+  // to get the handle out, but for now, we know we're always dealing with types
+  // that store the field by-value so we can dig it out in with an easier
+  // approach.  This handles structs of TensorHandle (like Tensor) and structs
+  // of structs of TensorHandle (like Tensor2D).
+  while (!isTensorHandle(v->getType())) {
+    auto vTy = v->getType().getASTType();
+    auto decl = vTy.getNominalOrBoundGenericNominal();
+    assert(decl && "Type must be nominal to conform to TensorProtocol");
+
+    auto fieldIt = decl->getStoredProperties().begin();
+    assert(fieldIt != decl->getStoredProperties().end() &&
+           "Tensor should have one member");
+    VarDecl *field = *fieldIt++;
+    assert(fieldIt == decl->getStoredProperties().end() &&
+           "Expected one stored field in TensorProtocol type");
+
+    // 'vTy' is usually a bound generic type.  Use getTypeOfMember to substitute
+    // the type bound into the member type.
+    auto fieldTy = vTy->getTypeOfMember(module, field);
+
+    auto silTy = SILType::getPrimitiveObjectType(fieldTy->getCanonicalType());
+    v = B.createStructExtract(loc, v, field, silTy);
+  }
+
+  return v;
+}
 
 /// Replace the specified tensor operation with a GraphOperation instruction,
 /// emitting errors if attribute arguments could not be constant folded, or if
@@ -2065,7 +2183,6 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
       break;
     }
     case SILTensorOpInfo::OperandClass::ArrayElement:
-      // Match logic from checkAndDiagnoseOperands.
       inst->dump();
       assert(0 && "FIXME: array elem exprs aren't handled yet");
     case SILTensorOpInfo::OperandClass::Tensor:
