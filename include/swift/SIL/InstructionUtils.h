@@ -86,6 +86,9 @@ SILValue stripBorrow(SILValue V);
 /// copies the value of its first operand, possibly changing its type or
 /// ownership state, but otherwise having no effect.
 ///
+/// The returned instruction may have additional "incidental" operands;
+/// mark_dependence for example.
+///
 /// This is useful for checking all users of a value to verify that the value is
 /// only used in recognizable patterns without otherwise "escaping". These are
 /// instructions that the use-visitor can recurse into. Note that the value's
