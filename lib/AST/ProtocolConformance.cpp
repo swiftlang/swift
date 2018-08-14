@@ -1137,8 +1137,7 @@ void NominalTypeDecl::prepareConformanceTable() const {
 
   auto mutableThis = const_cast<NominalTypeDecl *>(this);
   ASTContext &ctx = getASTContext();
-  auto resolver = ctx.getLazyResolver();
-  ConformanceTable = new (ctx) ConformanceLookupTable(ctx, resolver);
+  ConformanceTable = new (ctx) ConformanceLookupTable(ctx);
   ++NumConformanceLookupTables;
 
   // If this type declaration was not parsed from source code or introduced
@@ -1190,7 +1189,6 @@ bool NominalTypeDecl::lookupConformance(
            module,
            const_cast<NominalTypeDecl *>(this),
            protocol,
-           getASTContext().getLazyResolver(),
            conformances);
 }
 
@@ -1198,7 +1196,6 @@ SmallVector<ProtocolDecl *, 2> NominalTypeDecl::getAllProtocols() const {
   prepareConformanceTable();
   SmallVector<ProtocolDecl *, 2> result;
   ConformanceTable->getAllProtocols(const_cast<NominalTypeDecl *>(this),
-                                    getASTContext().getLazyResolver(),
                                     result);
   return result;
 }
@@ -1209,7 +1206,6 @@ SmallVector<ProtocolConformance *, 2> NominalTypeDecl::getAllConformances(
   prepareConformanceTable();
   SmallVector<ProtocolConformance *, 2> result;
   ConformanceTable->getAllConformances(const_cast<NominalTypeDecl *>(this),
-                                       getASTContext().getLazyResolver(),
                                        sorted,
                                        result);
   return result;
@@ -1237,7 +1233,6 @@ NominalTypeDecl::getSatisfiedProtocolRequirementsForMember(
   prepareConformanceTable();
   return ConformanceTable->getSatisfiedProtocolRequirementsForMember(member,
                                            const_cast<NominalTypeDecl *>(this),
-                                           getASTContext().getLazyResolver(),
                                            sorted);
 }
 
@@ -1259,7 +1254,6 @@ DeclContext::getLocalProtocols(
   nominal->ConformanceTable->lookupConformances(
     nominal,
     const_cast<DeclContext *>(this),
-    getASTContext().getLazyResolver(),
     lookupKind,
     &result,
     nullptr,
@@ -1295,7 +1289,6 @@ DeclContext::getLocalConformances(
   nominal->ConformanceTable->lookupConformances(
     nominal,
     const_cast<DeclContext *>(this),
-    nominal->getASTContext().getLazyResolver(),
     lookupKind,
     nullptr,
     &result,

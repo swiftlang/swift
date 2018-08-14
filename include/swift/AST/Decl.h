@@ -488,7 +488,7 @@ protected:
     HasLazyConformances : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+2+8+16,
+  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+2+8+16,
     /// Whether the \c RequiresClass bit is valid.
     RequiresClassValid : 1,
 
@@ -510,9 +510,6 @@ protected:
     /// True if the protocol has requirements that cannot be satisfied (e.g.
     /// because they could not be imported from Objective-C).
     HasMissingRequirements : 1,
-
-    /// Whether we are currently computing inherited protocols.
-    ComputingInheritedProtocols : 1,
 
     /// The stage of the circularity check for this protocol.
     Circularity : 2,

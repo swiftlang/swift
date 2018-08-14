@@ -2490,31 +2490,6 @@ public:
       }
     }
 
-    /// Check the given list of protocols.
-    void verifyProtocolList(Decl *decl, ArrayRef<ProtocolDecl *> protocols) {
-      PrettyStackTraceDecl debugStack("verifying ProtocolList", decl);
-
-      // Make sure that the protocol list is fully expanded.
-      SmallVector<ProtocolDecl *, 4> nominalProtocols(protocols.begin(),
-                                                      protocols.end());
-      ProtocolType::canonicalizeProtocols(nominalProtocols);
-
-      SmallVector<Type, 4> protocolTypes;
-      for (auto proto : protocols)
-        protocolTypes.push_back(proto->getDeclaredType());
-      auto type = ProtocolCompositionType::get(Ctx, protocolTypes,
-                                               /*HasExplicitAnyObject=*/false);
-      auto layout = type->getExistentialLayout();
-      SmallVector<ProtocolDecl *, 4> canonicalProtocols;
-      for (auto *protoTy : layout.getProtocols())
-        canonicalProtocols.push_back(protoTy->getDecl());
-      if (nominalProtocols != canonicalProtocols) {
-        dumpRef(decl);
-        Out << " doesn't have a complete set of protocols\n";
-        abort();
-      }      
-    }
-
     /// Verify that the given conformance makes sense for the given
     /// type.
     void verifyConformance(Type type, ProtocolConformanceRef conformance) {
@@ -2731,9 +2706,6 @@ public:
     }
 
     void verifyChecked(NominalTypeDecl *nominal) {
-      // Make sure that the protocol list is fully expanded.
-      verifyProtocolList(nominal, nominal->getLocalProtocols());
-
       // Make sure that the protocol conformances are complete.
       // Only do so within the source file of the nominal type,
       // because anywhere else this can trigger new type-check requests.
@@ -2749,9 +2721,6 @@ public:
     }
 
     void verifyChecked(ExtensionDecl *ext) {
-      // Make sure that the protocol list is fully expanded.
-      verifyProtocolList(ext, ext->getLocalProtocols());
-
       // Make sure that the protocol conformances are complete.
       for (auto conformance : ext->getLocalConformances()) {
         verifyConformance(ext, conformance);

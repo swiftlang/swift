@@ -205,11 +205,6 @@ Type TypeChecker::resolveTypeInContext(
        TypeResolutionOptions options,
        bool isSpecialized,
        GenericTypeResolver *resolver) {
-  // If we're just resolving the structure, the decl itself is all we need to
-  // know: return the unbound generic type.
-  if (options.contains(TypeResolutionFlags::ResolveStructure))
-    return typeDecl->getDeclaredInterfaceType();
-
   GenericTypeToArchetypeResolver defaultResolver(fromDC);
   if (!resolver)
     resolver = &defaultResolver;
@@ -345,9 +340,6 @@ Type TypeChecker::applyGenericArguments(Type type,
                                         GenericIdentTypeRepr *generic,
                                         TypeResolutionOptions options,
                                         GenericTypeResolver *resolver) {
-  assert(!options.contains(TypeResolutionFlags::ResolveStructure) &&
-         "should not touch generic arguments when resolving structure");
-
   if (type->hasError()) {
     generic->setInvalid();
     return type;
@@ -432,8 +424,6 @@ Type TypeChecker::applyGenericArguments(Type type,
   }
 
   // Resolve the types of the generic arguments.
-  assert(!options.contains(TypeResolutionFlags::ResolveStructure) &&
-         "should not touch generic arguments when resolving structure");
   options = adjustOptionsForGenericArgs(options);
 
   SmallVector<Type, 2> args;
@@ -663,8 +653,7 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
 
   if (type->is<UnboundGenericType>() && !generic &&
       !options.is(TypeResolverContext::TypeAliasDecl) &&
-      !options.contains(TypeResolutionFlags::AllowUnboundGenerics) &&
-      !options.contains(TypeResolutionFlags::ResolveStructure)) {
+      !options.contains(TypeResolutionFlags::AllowUnboundGenerics)) {
     diagnoseUnboundGenericType(TC, type, loc);
     return ErrorType::get(TC.Context);
   }
@@ -675,7 +664,7 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
                                    loc, cast<AssociatedTypeDecl>(typeDecl));
   }
 
-  if (generic && !options.contains(TypeResolutionFlags::ResolveStructure)) {
+  if (generic) {
     // Apply the generic arguments to the type.
     type = TC.applyGenericArguments(type, loc, fromDC, generic,
                                     options, resolver);
@@ -1126,17 +1115,14 @@ static Type resolveNestedIdentTypeComponent(
               GenericTypeResolver *resolver) {
   auto maybeApplyGenericArgs = [&](Type memberType) {
     // If there are generic arguments, apply them now.
-    if (!options.contains(TypeResolutionFlags::ResolveStructure)) {
-      if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp)) {
-        return TC.applyGenericArguments(memberType, comp->getIdLoc(),
-                                        DC, genComp, options, resolver);
-      }
+    if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp)) {
+      return TC.applyGenericArguments(memberType, comp->getIdLoc(),
+                                      DC, genComp, options, resolver);
     }
 
     if (memberType->is<UnboundGenericType>() &&
         !options.is(TypeResolverContext::TypeAliasDecl) &&
-        !options.contains(TypeResolutionFlags::AllowUnboundGenerics) &&
-        !options.contains(TypeResolutionFlags::ResolveStructure)) {
+        !options.contains(TypeResolutionFlags::AllowUnboundGenerics)) {
       diagnoseUnboundGenericType(TC, memberType, comp->getLoc());
       return ErrorType::get(TC.Context);
     }
@@ -1414,10 +1400,6 @@ Type TypeChecker::resolveIdentifierType(
 bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
                                TypeResolutionOptions options,
                                GenericTypeResolver *resolver) {
-  // FIXME: Verify that these aren't circular and infinite size.
-  assert(!options.contains(TypeResolutionFlags::ResolveStructure) &&
-         "ResolveStructure does not do full validation");
-
   // If we've already validated this type, don't do so again.
   if (Loc.wasValidated())
     return Loc.isError();
@@ -2624,10 +2606,8 @@ Type TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
   if (!sliceTy)
     return ErrorType::get(Context);
 
-  if (!options.contains(TypeResolutionFlags::ResolveStructure)) {
-    // Check for _ObjectiveCBridgeable conformances in the element type.
-    useObjectiveCBridgeableConformances(DC, baseTy);
-  }
+  // Check for _ObjectiveCBridgeable conformances in the element type.
+  useObjectiveCBridgeableConformances(DC, baseTy);
 
   return sliceTy;
 }
@@ -2649,20 +2629,18 @@ Type TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
     // Check the requirements on the generic arguments.
     auto unboundTy = dictDecl->getDeclaredType()->castTo<UnboundGenericType>();
 
-    if (!options.contains(TypeResolutionFlags::ResolveStructure)) {
-      Type args[] = {keyTy, valueTy};
+    Type args[] = {keyTy, valueTy};
 
-      if (!TC.applyUnboundGenericArguments(
-              unboundTy, dictDecl, repr->getStartLoc(), DC, args,
-              Resolver)) {
-        return nullptr;
-      }
-
-      // Check for _ObjectiveCBridgeable conformances in the key and value
-      // types.
-      useObjectiveCBridgeableConformances(DC, keyTy);
-      useObjectiveCBridgeableConformances(DC, valueTy);
+    if (!TC.applyUnboundGenericArguments(
+            unboundTy, dictDecl, repr->getStartLoc(), DC, args,
+            Resolver)) {
+      return nullptr;
     }
+
+    // Check for _ObjectiveCBridgeable conformances in the key and value
+    // types.
+    useObjectiveCBridgeableConformances(DC, keyTy);
+    useObjectiveCBridgeableConformances(DC, valueTy);
 
     return dictTy;
   }
@@ -3003,6 +2981,9 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
 
       return memberType;
     }
+
+    if (baseTy->is<ErrorType>())
+      return ErrorType::get(memberType);
 
     subs = baseTy->getContextSubstitutionMap(module, member->getDeclContext());
     resultType = memberType.subst(subs, SubstFlags::UseErrorType);

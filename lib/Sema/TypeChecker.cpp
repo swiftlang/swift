@@ -470,33 +470,6 @@ void TypeChecker::bindExtension(ExtensionDecl *ext) {
   ::bindExtensionDecl(ext, *this);
 }
 
-void TypeChecker::resolveExtensionForConformanceConstruction(
-    ExtensionDecl *ext,
-    SmallVectorImpl<ConformanceConstructionInfo> &protocols) {
-  // and the protocols which it inherits from:
-  DependentGenericTypeResolver resolver;
-  TypeResolutionOptions options(TypeResolverContext::GenericSignature);
-  options |= TypeResolutionFlags::AllowUnavailableProtocol;
-  options |= TypeResolutionFlags::ResolveStructure;
-  for (auto &inherited : ext->getInherited()) {
-    // We don't want to have know about any generic params/archetypes, because
-    // that requires knowing a full generic environment for the extension (which
-    // can recur with conformance construction). Furthermore, we only *need* to
-    // resolve the protocol references, which won't involve any archetypes: an
-    // invalid inheritance like `struct Foo<T> {} extension Foo: SomeClass<T>
-    // {}` isn't relevant for conformance construction and is caught elsewhere.
-    auto type = inherited.getType();
-    if (!type)
-      type = resolveType(inherited.getTypeRepr(), ext, options, &resolver);
-
-    if (type && type->isExistentialType()) {
-      auto layout = type->getExistentialLayout();
-      for (auto proto : layout.getProtocols())
-        protocols.push_back({inherited.getLoc(), proto->getDecl()});
-    }
-  }
-}
-
 static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) {
   unsigned currentFunctionIdx = 0;
   unsigned currentExternalDef = TC.Context.LastCheckedExternalDefinition;
