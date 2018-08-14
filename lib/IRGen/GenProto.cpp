@@ -2108,8 +2108,8 @@ const ProtocolInfo &TypeConverter::getProtocolInfo(ProtocolDecl *protocol,
                                                    ProtocolInfoKind kind) {
   // Check whether we've already translated this protocol.
   auto it = Protocols.find(protocol);
-  if (it != Protocols.end() && it->second->getKind() >= kind)
-    return *it->second;
+  if (it != Protocols.end() && it->getSecond()->getKind() >= kind)
+    return *it->getSecond();
 
   // If not, lay out the protocol's witness table, if it needs one.
   WitnessTableLayout layout(kind);
@@ -2117,9 +2117,8 @@ const ProtocolInfo &TypeConverter::getProtocolInfo(ProtocolDecl *protocol,
     layout.visitProtocolDecl(protocol);
 
   // Create a ProtocolInfo object from the layout.
-  ProtocolInfo *info = ProtocolInfo::create(layout.getEntries(), kind);
-  info->NextConverted.setPointer(FirstProtocol);
-  FirstProtocol = info;
+  std::unique_ptr<ProtocolInfo> info = ProtocolInfo::create(layout.getEntries(),
+                                                            kind);
 
   // Verify that we haven't generated an incompatible layout.
   if (it != Protocols.end()) {
@@ -2133,18 +2132,19 @@ const ProtocolInfo &TypeConverter::getProtocolInfo(ProtocolDecl *protocol,
   }
 
   // Memoize.
-  Protocols[protocol] = info;
+  std::unique_ptr<const ProtocolInfo> &cachedInfo = Protocols[protocol];
+  cachedInfo = std::move(info);
 
   // Done.
-  return *info;
+  return *cachedInfo;
 }
 
 /// Allocate a new ProtocolInfo.
-ProtocolInfo *ProtocolInfo::create(ArrayRef<WitnessTableEntry> table,
-                                   ProtocolInfoKind kind) {
+std::unique_ptr<ProtocolInfo>
+ProtocolInfo::create(ArrayRef<WitnessTableEntry> table, ProtocolInfoKind kind) {
   size_t bufferSize = totalSizeToAlloc<WitnessTableEntry>(table.size());
   void *buffer = ::operator new(bufferSize);
-  return new(buffer) ProtocolInfo(table, kind);
+  return std::unique_ptr<ProtocolInfo>(new(buffer) ProtocolInfo(table, kind));
 }
 
 // Provide a unique home for the ConformanceInfo vtable.

@@ -1078,12 +1078,6 @@ TypeConverter::~TypeConverter() {
     I = Cur->NextConverted;
     delete Cur;
   }
-  
-  for (const ProtocolInfo *I = FirstProtocol; I != nullptr; ) {
-    const ProtocolInfo *Cur = I;
-    I = Cur->NextConverted.getPointer();
-    delete Cur;
-  }
 }
 
 void TypeConverter::pushGenericContext(CanGenericSignature signature) {
