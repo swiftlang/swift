@@ -2823,7 +2823,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 # Watchpoint testing is currently disabled: see rdar://38566150.
                 if [[ "$(true_false ${LLDB_TEST_SWIFT_ONLY})" == "TRUE" ]]; then
                     LLDB_TEST_SUBDIR_CLAUSE="--test-subdir lang/swift"
-                    LLDB_TEST_CATEGORIES="--skip-category=watchpoint --skip-category=dwo --skip-category=dsym --skip-category=gmodules -G swiftpr"
+                    LLDB_TEST_CATEGORIES="--skip-category=watchpoint --skip-category=dwo --skip-category=dsym --skip-category=gmodules"
                 else
                     LLDB_TEST_SUBDIR_CLAUSE=""
                     LLDB_TEST_CATEGORIES="--skip-category=watchpoint"
