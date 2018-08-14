@@ -7762,12 +7762,11 @@ Expr *ConstraintSystem::coerceToRValue(Expr *expr) {
 /// Emit the fixes computed as part of the solution, returning true if we were
 /// able to emit an error message, or false if none of the fixits worked out.
 bool ConstraintSystem::applySolutionFixes(Expr *E, const Solution &solution) {
-  llvm::SmallDenseMap<Expr *,
-                      SmallVector<std::pair<Fix, ConstraintLocator *>, 4>>
+  llvm::SmallDenseMap<Expr *, SmallVector<const ConstraintFix *, 4>>
       fixesPerExpr;
 
-  for (const auto &fix : solution.Fixes)
-    fixesPerExpr[fix.second->getAnchor()].push_back(fix);
+  for (auto *fix : solution.Fixes)
+    fixesPerExpr[fix->getAnchor()].push_back(fix);
 
   auto diagnoseExprFailures = [&](Expr *expr) -> bool {
     auto fixes = fixesPerExpr.find(expr);
@@ -7775,8 +7774,8 @@ bool ConstraintSystem::applySolutionFixes(Expr *E, const Solution &solution) {
       return false;
 
     bool diagnosed = false;
-    for (auto &fix : fixes->second)
-      diagnosed |= applySolutionFix(E, solution, fix);
+    for (const auto *fix : fixes->second)
+      diagnosed |= fix->diagnose(E, solution);
     return diagnosed;
   };
 
@@ -7792,86 +7791,6 @@ bool ConstraintSystem::applySolutionFixes(Expr *E, const Solution &solution) {
   diagnosed |= diagnoseExprFailures(E);
   return diagnosed;
 }
-
-/// \brief Apply the specified Fix to this solution, producing a fix-it hint
-/// diagnostic for it and returning true.  If the fix-it hint turned out to be
-/// bogus, this returns false and doesn't emit anything.
-bool ConstraintSystem::applySolutionFix(
-    Expr *expr, const Solution &solution,
-    std::pair<Fix, ConstraintLocator *> &fix) {
-  // Some fixes need more information from the locator.
-  ConstraintLocator *locator = fix.second;
-
-  // In the case of us having applied a type member constraint against a
-  // synthesized type variable during diagnostic generation, we may not have
-  // a valid locator.
-  if (!locator)
-    return false;
-
-  switch (fix.first.getKind()) {
-  case FixKind::ForceOptional: {
-    MissingOptionalUnwrapFailure failure(expr, solution, locator);
-    return failure.diagnose();
-  }
-          
-  case FixKind::UnwrapOptionalBase: {
-    auto memberName = fix.first.getDeclNameArgument(*this);
-    bool resultIsOptional =
-        fix.first.isUnwrapOptionalBaseByOptionalChaining(*this);
-    MemberAccessOnOptionalBaseFailure failure(expr, solution, locator,
-                                              memberName, resultIsOptional);
-    return failure.diagnose();
-  }
-
-  case FixKind::ForceDowncast: {
-    MissingExplicitConversionFailure failure(expr, solution, locator,
-                                             fix.first.getTypeArgument(*this));
-    return failure.diagnose();
-  }
-
-  case FixKind::AddressOf: {
-    MissingAddressOfFailure failure(expr, solution, locator);
-    return failure.diagnose();
-  }
-
-  case FixKind::CoerceToCheckedCast: {
-    MissingForcedDowncastFailure failure(expr, solution, locator);
-    return failure.diagnose();
-  }
-
-  case FixKind::ExplicitlyEscaping: {
-    NoEscapeFuncToTypeConversionFailure failure(expr, solution, locator);
-    return failure.diagnose();
-  }
-
-  case FixKind::ExplicitlyEscapingToAny: {
-    NoEscapeFuncToTypeConversionFailure failure(expr, solution, locator,
-                                                getASTContext().TheAnyType);
-    return failure.diagnose();
-  }
-
-  case FixKind::RelabelArguments: {
-    LabelingFailure failure(solution, fix.second,
-                            fix.first.getArgumentLabels(*this));
-    return failure.diagnose();
-  }
-
-  case FixKind::AddConformance: {
-    auto *anchor = locator->getAnchor();
-    auto &reqLoc = locator->getPath().back();
-    MissingConformanceFailure failure(
-        expr, solution, fix.second,
-        MissingConformances[{anchor, reqLoc.getValue()}]);
-    return failure.diagnose();
-  }
-  }
-
-  // FIXME: It would be really nice to emit a follow-up note showing where
-  // we got the other type information from, e.g., the parameter we're
-  // initializing.
-  return false;
-}
-
 
 /// \brief Apply a given solution to the expression, producing a fully
 /// type-checked expression.
