@@ -489,15 +489,11 @@ enum class TypeResolutionFlags : uint16_t {
   /// Whether this type resolution is guaranteed not to affect downstream files.
   KnownNonCascadingDependency = 1 << 8,
 
-  /// Whether we should resolve only the structure of the resulting
-  /// type rather than its complete semantic properties.
-  ResolveStructure = 1 << 9,
-
   /// Whether we are at the direct base of a type expression.
-  Direct = 1 << 10,
+  Direct = 1 << 9,
 
   /// Whether we should not produce diagnostics if the type is invalid.
-  SilenceErrors = 1 << 11,
+  SilenceErrors = 1 << 10,
 };
 
 /// Type resolution contexts that require special handling.
