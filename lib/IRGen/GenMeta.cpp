@@ -2169,8 +2169,7 @@ namespace {
 
       // Set a flag if the class uses Swift refcounting.
       auto type = Target->getDeclaredType()->getCanonicalType();
-      if (getReferenceCountingForType(IGM, type)
-            == ReferenceCounting::Native) {
+      if (type->getReferenceCounting() == ReferenceCounting::Native) {
         flags |= ClassFlags::UsesSwiftRefcounting;
       }
 

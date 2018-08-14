@@ -2268,7 +2268,7 @@ namespace {
                                    DynamicMetadataRequest request) {
       // All class types have the same layout.
       auto type = classDecl->getDeclaredType()->getCanonicalType();
-      switch (getReferenceCountingForType(IGF.IGM, type)) {
+      switch (type->getReferenceCounting()) {
       case ReferenceCounting::Native:
         return emitFromValueWitnessTable(IGF.IGM.Context.TheNativeObjectType);
 

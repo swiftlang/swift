@@ -1353,7 +1353,7 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T) {
   if (layout.requiresClass()) {
     // If we're not using the Objective-C runtime, we can use the
     // native reference counting entry points.
-    ReferenceCounting refcounting = getReferenceCountingForType(IGM, T);
+    ReferenceCounting refcounting = T->getReferenceCounting();
 
     llvm::PointerType *reprTy = nullptr;
     if (auto superclass = layout.getSuperclass()) {

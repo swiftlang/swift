@@ -3994,13 +3994,10 @@ bool UnownedStorageType::isLoadable(ResilienceExpansion resilience) const {
   auto ty = getReferentType();
   if (auto underlyingTy = ty->getOptionalObjectType())
     ty = underlyingTy;
-  return ty->usesNativeReferenceCounting(resilience);
+  return ty->getReferenceCounting() == ReferenceCounting::Native;
 }
 
-static ReferenceCounting getClassReferenceCounting(
-                                             ClassDecl *theClass,
-                                             ResilienceExpansion resilience) {
-  // TODO: Resilience? there might be some legal avenue of changing this.
+static ReferenceCounting getClassReferenceCounting(ClassDecl *theClass) {
   while (auto superclass = theClass->getSuperclassDecl()) {
     theClass = superclass;
   }
@@ -4010,8 +4007,7 @@ static ReferenceCounting getClassReferenceCounting(
            : ReferenceCounting::Native;
 }
 
-ReferenceCounting TypeBase::getReferenceCounting(
-                                              ResilienceExpansion resilience) {
+ReferenceCounting TypeBase::getReferenceCounting() {
   CanType type = getCanonicalType();
   ASTContext &ctx = type->getASTContext();
 
@@ -4037,20 +4033,17 @@ ReferenceCounting TypeBase::getReferenceCounting(
     return ReferenceCounting::Unknown;
 
   case TypeKind::Class:
-    return getClassReferenceCounting(cast<ClassType>(type)->getDecl(),
-                                     resilience);
+    return getClassReferenceCounting(cast<ClassType>(type)->getDecl());
   case TypeKind::BoundGenericClass:
     return getClassReferenceCounting(
-                                  cast<BoundGenericClassType>(type)->getDecl(),
-                                  resilience);
+                                  cast<BoundGenericClassType>(type)->getDecl());
   case TypeKind::UnboundGeneric:
     return getClassReferenceCounting(
-                    cast<ClassDecl>(cast<UnboundGenericType>(type)->getDecl()),
-                    resilience);
+                    cast<ClassDecl>(cast<UnboundGenericType>(type)->getDecl()));
 
   case TypeKind::DynamicSelf:
     return cast<DynamicSelfType>(type).getSelfType()
-        ->getReferenceCounting(resilience);
+        ->getReferenceCounting();
 
   case TypeKind::Archetype: {
     auto archetype = cast<ArchetypeType>(type);
@@ -4059,7 +4052,7 @@ ReferenceCounting TypeBase::getReferenceCounting(
     assert(archetype->requiresClass() ||
            (layout && layout->isRefCounted()));
     if (auto supertype = archetype->getSuperclass())
-      return supertype->getReferenceCounting(resilience);
+      return supertype->getReferenceCounting();
     return ReferenceCounting::Unknown;
   }
 
@@ -4068,7 +4061,7 @@ ReferenceCounting TypeBase::getReferenceCounting(
     auto layout = type->getExistentialLayout();
     assert(layout.requiresClass() && "Opaque existentials don't use refcounting");
     if (auto superclass = layout.getSuperclass())
-      return superclass->getReferenceCounting(resilience);
+      return superclass->getReferenceCounting();
     return ReferenceCounting::Unknown;
   }
 
@@ -4104,10 +4097,6 @@ ReferenceCounting TypeBase::getReferenceCounting(
   }
 
   llvm_unreachable("Unhandled type kind!");
-}
-
-bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
-  return getReferenceCounting(resilience) == ReferenceCounting::Native;
 }
 
 //

@@ -22,6 +22,7 @@
 #include "swift/AST/Builtins.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ReferenceCounting.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 
@@ -366,7 +367,7 @@ static ManagedValue emitBuiltinCastToNativeObject(SILGenFunction &SGF,
                                          SGFContext C) {
   auto ty = args[0].getType().getASTType();
   (void)ty;
-  assert(ty->usesNativeReferenceCounting(ResilienceExpansion::Maximal) &&
+  assert(ty->getReferenceCounting() == ReferenceCounting::Native &&
          "Can only cast types that use native reference counting to native "
          "object");
   return emitBuiltinUnsafeCastToNativeObject(SGF, loc, substitutions,
