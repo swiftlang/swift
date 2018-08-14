@@ -389,7 +389,8 @@ static bool paramIsIUO(Decl *decl, int paramNum) {
 ///
 /// "Specialized" is essentially a form of subtyping, defined below.
 static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
-                                  ValueDecl *decl1, ValueDecl *decl2) {
+                                  ValueDecl *decl1, ValueDecl *decl2,
+                                  bool isDynamicOverloadComparison = false) {
 
   if (tc.getLangOpts().DebugConstraintSolver) {
     auto &log = tc.Context.TypeCheckerDebug->getStream();
@@ -397,7 +398,9 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
     decl1->print(log); 
     log << "\nand\n";
     decl2->print(log);
-    log << "\n";
+    log << "\n(isDynamicOverloadComparison: ";
+    log << isDynamicOverloadComparison;
+    log << ")\n";
   }
 
   auto *innerDC1 = decl1->getInnermostDeclContext();
@@ -406,7 +409,9 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
   auto *outerDC1 = decl1->getDeclContext();
   auto *outerDC2 = decl2->getDeclContext();
 
-  if (!tc.specializedOverloadComparisonCache.count({decl1, decl2})) {
+  auto overloadComparisonKey =
+      std::make_tuple(decl1, decl2, isDynamicOverloadComparison);
+  if (!tc.specializedOverloadComparisonCache.count(overloadComparisonKey)) {
 
     auto compareSpecializations = [&] () -> bool {
       // If the kinds are different, there's nothing we can do.
@@ -451,7 +456,21 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       // exactly one member is in a protocol extension). Only apply this rule in
       // Swift 5 mode to better maintain source compatibility under Swift 4
       // mode.
-      if (tc.Context.isSwiftVersionAtLeast(5)) {
+      //
+      // Don't apply this rule when comparing two overloads found through
+      // dynamic lookup to ensure we keep cases like this ambiguous:
+      //
+      //    @objc protocol P {
+      //      var i: String { get }
+      //    }
+      //    class C {
+      //      @objc var i: Int { return 0 }
+      //    }
+      //    func foo(_ x: AnyObject) {
+      //      x.i // ensure ambiguous.
+      //    }
+      //
+      if (tc.Context.isSwiftVersionAtLeast(5) && !isDynamicOverloadComparison) {
         auto *proto1 = dyn_cast<ProtocolDecl>(outerDC1);
         auto *proto2 = dyn_cast<ProtocolDecl>(outerDC2);
         if (proto1 != proto2)
@@ -709,21 +728,21 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       return false;
     };
 
-    tc.specializedOverloadComparisonCache[{decl1, decl2}] = 
+    tc.specializedOverloadComparisonCache[overloadComparisonKey] =
         compareSpecializations();
   } else if (tc.getLangOpts().DebugConstraintSolver) {
     auto &log = tc.Context.TypeCheckerDebug->getStream();
-    log << "Found cached comparison: " 
-        << tc.specializedOverloadComparisonCache[{decl1, decl2}] << "\n";
+    log << "Found cached comparison: "
+        << tc.specializedOverloadComparisonCache[overloadComparisonKey] << "\n";
   }
 
   if (tc.getLangOpts().DebugConstraintSolver) {
     auto &log = tc.Context.TypeCheckerDebug->getStream();
-    auto result = tc.specializedOverloadComparisonCache[{decl1, decl2}];
+    auto result = tc.specializedOverloadComparisonCache[overloadComparisonKey];
     log << "comparison result: " << (result ? "better" : "not better") << "\n";
   }
 
-  return tc.specializedOverloadComparisonCache[{decl1, decl2}];
+  return tc.specializedOverloadComparisonCache[overloadComparisonKey];
 }
 
 Comparison TypeChecker::compareDeclarations(DeclContext *dc,
@@ -861,15 +880,23 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     case OverloadChoiceKind::DynamicMemberLookup:
       break;
     }
-    
+
+    // We don't apply some ranking rules to overloads found through dynamic
+    // lookup in order to keep a few potentially ill-formed cases ambiguous.
+    bool isDynamicOverloadComparison =
+        choice1.getKind() == OverloadChoiceKind::DeclViaDynamic &&
+        choice2.getKind() == OverloadChoiceKind::DeclViaDynamic;
+
     // Determine whether one declaration is more specialized than the other.
     bool firstAsSpecializedAs = false;
     bool secondAsSpecializedAs = false;
-    if (isDeclAsSpecializedAs(tc, cs.DC, decl1, decl2)) {
+    if (isDeclAsSpecializedAs(tc, cs.DC, decl1, decl2,
+                              isDynamicOverloadComparison)) {
       score1 += weight;
       firstAsSpecializedAs = true;
     }
-    if (isDeclAsSpecializedAs(tc, cs.DC, decl2, decl1)) {
+    if (isDeclAsSpecializedAs(tc, cs.DC, decl2, decl1,
+                              isDynamicOverloadComparison)) {
       score2 += weight;
       secondAsSpecializedAs = true;
     }
