@@ -32,7 +32,6 @@ namespace swift {
   class ProtocolConformance;
 
 namespace irgen {
-  class ConformanceInfo; // private to GenProto.cpp
   class IRGenModule;
   class TypeInfo;
 
@@ -161,11 +160,6 @@ class ProtocolInfo final :
   /// The number of table entries in this protocol layout.
   unsigned NumTableEntries;
 
-  /// A table of all the conformances we've needed so far for this
-  /// protocol.  We expect this to be quite small for most protocols.
-  mutable llvm::SmallDenseMap<const ProtocolConformance*, ConformanceInfo*, 2>
-    Conformances;
-
   ProtocolInfo(ArrayRef<WitnessTableEntry> table)
       : NumTableEntries(table.size()) {
     std::uninitialized_copy(table.begin(), table.end(),
@@ -175,10 +169,6 @@ class ProtocolInfo final :
   static ProtocolInfo *create(ArrayRef<WitnessTableEntry> table);
 
 public:
-  const ConformanceInfo &getConformance(IRGenModule &IGM,
-                                        ProtocolDecl *protocol,
-                                        const ProtocolConformance *conf) const;
-
   /// The number of witness slots in a conformance to this protocol;
   /// in other words, the size of the table in words.
   unsigned getNumWitnesses() const {
@@ -256,8 +246,19 @@ public:
     }
     llvm_unreachable("didn't find entry for associated conformance");
   }
+};
 
-  ~ProtocolInfo();
+/// Detail about how an object conforms to a protocol.
+class ConformanceInfo {
+  virtual void anchor();
+public:
+  virtual ~ConformanceInfo() = default;
+  virtual llvm::Value *getTable(IRGenFunction &IGF,
+                               llvm::Value **conformingMetadataCache) const = 0;
+  /// Try to get this table as a constant pointer.  This might just
+  /// not be supportable at all.
+  virtual llvm::Constant *tryGetConstantTable(IRGenModule &IGM,
+                                              CanType conformingType) const = 0;
 };
 
 } // end namespace irgen
