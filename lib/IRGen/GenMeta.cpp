@@ -3188,7 +3188,6 @@ namespace {
 
 /// Emit the type metadata or metadata template for a struct.
 void irgen::emitStructMetadata(IRGenModule &IGM, StructDecl *structDecl) {
-  // TODO: structs nested within generic types
   ConstantInitBuilder initBuilder(IGM);
   auto init = initBuilder.beginStruct();
   init.setPacked(true);
@@ -3405,7 +3404,6 @@ namespace {
 } // end anonymous namespace
 
 void irgen::emitEnumMetadata(IRGenModule &IGM, EnumDecl *theEnum) {
-  // TODO: enums nested inside generic types
   ConstantInitBuilder initBuilder(IGM);
   auto init = initBuilder.beginStruct();
   init.setPacked(true);
