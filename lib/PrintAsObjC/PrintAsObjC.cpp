@@ -932,9 +932,9 @@ private:
       renamedDecl = lookup.getSingleTypeResult();
     } else {
       SmallVector<ValueDecl *, 4> lookupResults;
-      declContext->lookupQualified(declContext->getSelfTypeInContext(),
-                                   renamedDeclName, NL_QualifiedDefault, NULL,
-                                   lookupResults);
+      declContext->lookupQualified(
+        declContext->getAsNominalTypeOrNominalTypeExtensionContext(),
+        renamedDeclName, NL_QualifiedDefault, lookupResults);
       for (auto candidate : lookupResults) {
         if (!shouldInclude(candidate))
           continue;
