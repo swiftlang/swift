@@ -80,7 +80,7 @@ targets mentioned above and modify it as necessary. lit.py also has several
 useful features, like timing tests and providing a timeout. Check these features
 out with ``lit.py -h``. We document some of the more useful ones below:
 
-##### Extra lit.py invocation options
+##### Standard lit.py invocation options
 
 * ``-s`` reduces the amount of output that lit shows.
 * ``-v`` causes a test's commandline and output to be printed if the test fails.
@@ -100,6 +100,9 @@ out with ``lit.py -h``. We document some of the more useful ones below:
   running a single test (in seconds). 0 (the default means no time limit.
 * ``--max-failures=<MAXFAILURES>`` stops execution after ``MAXFAILURES`` number
   of failures.
+
+##### Swift-specific testing options
+
 * ``--param gmalloc`` will run all tests under Guard Malloc (macOS only). See
   ``man libgmalloc`` for more information.
 * ``--param swift-version=<MAJOR>`` overrides the default Swift language
@@ -110,6 +113,22 @@ out with ``lit.py -h``. We document some of the more useful ones below:
 * ``--param swift_test_mode=<MODE>`` drives the various suffix variations
   mentioned above. Again, it's best to get the invocation from the existing
   build system targets and modify it rather than constructing it yourself.
+
+##### Remote testing options
+
+* ``--param remote_run_host=[USER@]<HOST>[:PORT]`` causes execution tests that
+  would normally be run on the host (via the ``%target-run`` substitutions
+  described below) to be run over SSH on another machine instead, using the
+  `remote-run` tool in the `utils` directory. Requires that `remote_run_tmpdir`
+  also be provided.
+* ``--param remote_run_tmpdir=<PATH>`` specifies the scratch directory to be
+  used on the remote machine when testing with `remote_run_host`.
+* ``--param remote_run_identity=<FILE>`` provides an SSH private key to be used
+  when testing with `remote_run_host`. (`remote-run` does not support
+  passwords.)
+* ``--param remote_run_skip_upload_stdlib`` assumes that the standard library
+  binaries have already been uploaded to `remote_run_tmpdir` and are up to date.
+  This is meant for repeat runs and probably shouldn't be used in automation.
 
 #### CMake
 
