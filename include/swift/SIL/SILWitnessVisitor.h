@@ -122,9 +122,18 @@ public:
     // Add the associated types if we haven't yet.
     addAssociatedTypes();
 
+    if (asDerived().shouldVisitRequirementSignatureOnly())
+      return;
+
     // Visit the witnesses for the direct members of a protocol.
     for (Decl *member : protocol->getMembers())
       ASTVisitor<T>::visit(member);
+  }
+
+  /// If true, only the base protocols and associated types will be visited.
+  /// The base implementation returns false.
+  bool shouldVisitRequirementSignatureOnly() const {
+    return false;
   }
 
   /// Fallback for unexpected protocol requirements.
