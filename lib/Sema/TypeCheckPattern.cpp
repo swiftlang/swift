@@ -1448,6 +1448,7 @@ recur:
     }
 
     // If there is a subpattern, push the enum element type down onto it.
+    validateDeclForNameLookup(elt);
     if (EEP->hasSubPattern()) {
       Pattern *sub = EEP->getSubPattern();
       if (!Context.isSwiftVersion3() && !elt->hasAssociatedValues()) {
