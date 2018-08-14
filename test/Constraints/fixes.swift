@@ -163,7 +163,10 @@ var s1116 = Set(1...10).subtracting(a1116.map({ $0.s })) // expected-error {{can
 
 
 func moreComplexUnwrapFixes() {
-  struct S { let value: Int }
+  struct S {
+    let value: Int
+    let optValue: Int? = nil
+  }
   struct T {
     let s: S
     let optS: S?
@@ -196,4 +199,46 @@ func moreComplexUnwrapFixes() {
   // expected-error@-2{{value of optional type 'S?' must be unwrapped to refer to member 'value' of wrapped base type 'S'}}
   // expected-note@-3{{chain the optional using '?'}}{{12-12=?}}
   // expected-note@-4{{force-unwrap using '!'}}{{17-17=!}}
+
+  takeNon(os?.value) // expected-error{{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+  // expected-note@-1{{force-unwrap using '!'}}{{13-14=!}}
+  // expected-note@-2{{coalesce}}
+  takeNon(os?.optValue) // expected-error{{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+  // expected-note@-1{{force-unwrap using '!'}}{{11-11=(}}{{23-23=)!}}
+  // expected-note@-2{{coalesce}}
+
+  func sample(a: Int?, b: Int!) {
+    let aa = a
+    // expected-note@-1{{short-circuit using 'guard'}}{{5-5=guard }} {{15-15= else \{ return \}}}
+    // expected-note@-2{{force-unwrap}}
+    // expected-note@-3{{coalesce}}
+
+    let bb = b // expected-note{{value inferred to be type 'Int?' when initialized with an implicitly unwrapped value}}
+    // expected-note@-1{{short-circuit using 'guard'}}{{5-5=guard }} {{15-15= else \{ return \}}}
+    // expected-note@-2{{force-unwrap}}
+    // expected-note@-3{{coalesce}}
+
+    let cc = a
+
+    takeNon(aa) // expected-error{{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+    // expected-note@-1{{force-unwrap}} expected-note@-1{{coalesce}}
+    takeNon(bb) // expected-error{{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+    // expected-note@-1{{force-unwrap}} expected-note@-1{{coalesce}}
+
+    _ = [].map { takeNon(cc) } // expected-error{{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+    // expected-note@-1{{force-unwrap}} expected-note@-1{{coalesce}}
+
+    takeOpt(cc)
+  }
+
+  func sample2(a: Int?) -> Int {
+    let aa = a
+    // expected-note@-1{{short-circuit using 'guard'}}{{5-5=guard }} {{15-15= else \{ return <#default value#> \}}}
+    // expected-note@-2{{force-unwrap}}
+    // expected-note@-3{{coalesce}}
+
+    return aa // expected-error{{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+    // expected-note@-1{{force-unwrap}} expected-note@-1{{coalesce}}
+
+  }
 }
