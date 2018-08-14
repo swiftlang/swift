@@ -807,7 +807,30 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           if (!isCascadingUse.hasValue())
             isCascadingUse = ED->isCascadingContextForLookup(false);
         } else if (auto *ND = dyn_cast<NominalTypeDecl>(DC)) {
-          ExtendedType = ND->getDeclaredType();
+          // Only look at members of this type (or its inherited types) when
+          // inside the body or a protocol's top-level 'where' clause. (Why the
+          // 'where' clause? Because that's where you put constraints on
+          // inherited associated types.)
+          bool wantsMemberLookup = false;
+          if (Loc.isValid() && ND->getBraces().isValid()) {
+            if (Ctx.SourceMgr.rangeContainsTokenLoc(ND->getBraces(), Loc)) {
+              wantsMemberLookup = true;
+            } else if (isa<ProtocolDecl>(ND)) {
+              if (auto *whereClause = ND->getTrailingWhereClause()) {
+                SourceRange whereClauseRange = whereClause->getSourceRange();
+                if (whereClauseRange.isValid() &&
+                    Ctx.SourceMgr.rangeContainsTokenLoc(whereClauseRange, Loc)){
+                  wantsMemberLookup = true;
+                }
+              }
+            }
+          } else {
+            // FIXME: Is this possible? Can we do unqualified lookup in a
+            // nominal type without a source location?
+            wantsMemberLookup = true;
+          }
+          if (wantsMemberLookup)
+            ExtendedType = ND->getDeclaredType();
           BaseDC = DC;
           MetaBaseDC = DC;
           if (!isCascadingUse.hasValue())
