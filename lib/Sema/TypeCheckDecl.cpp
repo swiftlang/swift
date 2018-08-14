@@ -352,7 +352,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
   // Check all of the types listed in the inheritance clause.
   Type superclassTy;
   SourceRange superclassRange;
-  llvm::SmallDenseMap<CanType, std::pair<unsigned, SourceRange>> inheritedTypes;
+  Optional<std::pair<unsigned, SourceRange>> inheritedAnyObject;
   for (unsigned i = 0, n = inheritedClause.size(); i != n; ++i) {
     auto &inherited = inheritedClause[i];
 
@@ -368,36 +368,36 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     if (inheritedTy->hasError())
       continue;
 
-    // Check whether we inherited from the same type twice.
-    auto knownPair = inheritedTypes.insert({ inheritedTy->getCanonicalType(),
-                                             {i, inherited.getSourceRange() }});
-    if (knownPair.second == /*insertion failed*/false) {
-      auto knownIndex = knownPair.first->second.first;
-      auto knownRange = knownPair.first->second.second;
-      // If the duplicated type is 'AnyObject', check whether the first was
-      // written as 'class'. Downgrade the error to a warning in such cases
-      // for backward compatibility with Swift <= 4.
-      if (!Context.LangOpts.isSwiftVersionAtLeast(5) &&
-          inheritedTy->isAnyObject() &&
-          (isa<ProtocolDecl>(decl) || isa<AbstractTypeParamDecl>(decl)) &&
-          Lexer::getTokenAtLocation(Context.SourceMgr, knownRange.Start)
-            .is(tok::kw_class)) {
-        SourceLoc classLoc = knownRange.Start;
+    // Check whether we inherited from 'AnyObject' twice.
+    // Other redundant-inheritance scenarios are checked below, the
+    // GenericSignatureBuilder (for protocol inheritance) or the
+    // ConformanceLookupTable (for protocol conformance).
+    if (inheritedTy->isAnyObject()) {
+      if (inheritedAnyObject) {
+        // If the first occurrence was written as 'class', downgrade the error
+        // to a warning in such cases
+        // for backward compatibility with Swift <= 4.
+        auto knownIndex = inheritedAnyObject->first;
+        auto knownRange = inheritedAnyObject->second;
         SourceRange removeRange = getRemovalRange(knownIndex);
+        if (!Context.LangOpts.isSwiftVersionAtLeast(5) &&
+            (isa<ProtocolDecl>(decl) || isa<AbstractTypeParamDecl>(decl)) &&
+            Lexer::getTokenAtLocation(Context.SourceMgr, knownRange.Start)
+              .is(tok::kw_class)) {
+          SourceLoc classLoc = knownRange.Start;
 
-        diagnose(classLoc, diag::duplicate_anyobject_class_inheritance)
-          .fixItRemoveChars(removeRange.Start, removeRange.End);
-        inherited.setInvalidType(Context);
+          diagnose(classLoc, diag::duplicate_anyobject_class_inheritance)
+            .fixItRemoveChars(removeRange.Start, removeRange.End);
+        } else {
+          diagnose(inherited.getSourceRange().Start,
+                 diag::duplicate_inheritance, inheritedTy)
+            .fixItRemoveChars(removeRange.Start, removeRange.End);
+        }
         continue;
       }
 
-      auto removeRange = getRemovalRange(i);
-      diagnose(inherited.getSourceRange().Start,
-               diag::duplicate_inheritance, inheritedTy)
-        .fixItRemoveChars(removeRange.Start, removeRange.End)
-        .highlight(knownRange);
-      inherited.setInvalidType(Context);
-      continue;
+      // Note that we saw inheritance from 'AnyObject'.
+      inheritedAnyObject = { i, inherited.getSourceRange() };
     }
 
     if (inheritedTy->isExistentialType()) {
@@ -455,10 +455,16 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     if (isa<EnumDecl>(decl)) {
       // Check if we already had a raw type.
       if (superclassTy) {
-        diagnose(inherited.getSourceRange().Start,
-                 diag::multiple_enum_raw_types, superclassTy, inheritedTy)
-          .highlight(superclassRange);
-        inherited.setInvalidType(Context);
+        if (superclassTy->isEqual(inheritedTy)) {
+          auto removeRange = getRemovalRange(i);
+          diagnose(inherited.getSourceRange().Start,
+                   diag::duplicate_inheritance, inheritedTy)
+            .fixItRemoveChars(removeRange.Start, removeRange.End);
+        } else {
+          diagnose(inherited.getSourceRange().Start,
+                   diag::multiple_enum_raw_types, superclassTy, inheritedTy)
+            .highlight(superclassRange);
+        }
         continue;
       }
       
@@ -487,12 +493,19 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       if (superclassTy) {
         // FIXME: Check for shadowed protocol names, i.e., NSObject?
 
-        // Complain about multiple inheritance.
-        // Don't emit a Fix-It here. The user has to think harder about this.
-        diagnose(inherited.getSourceRange().Start,
-                 diag::multiple_inheritance, superclassTy, inheritedTy)
-          .highlight(superclassRange);
-        inherited.setInvalidType(Context);
+        if (superclassTy->isEqual(inheritedTy)) {
+          // Duplicate superclass.
+          auto removeRange = getRemovalRange(i);
+          diagnose(inherited.getSourceRange().Start,
+                   diag::duplicate_inheritance, inheritedTy)
+            .fixItRemoveChars(removeRange.Start, removeRange.End);
+        } else {
+          // Complain about multiple inheritance.
+          // Don't emit a Fix-It here. The user has to think harder about this.
+          diagnose(inherited.getSourceRange().Start,
+                   diag::multiple_inheritance, superclassTy, inheritedTy)
+            .highlight(superclassRange);
+        }
         continue;
       }
 
