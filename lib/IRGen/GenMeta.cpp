@@ -654,7 +654,7 @@ namespace {
     }
 
     void addRequirements() {
-      auto &pi = IGM.getProtocolInfo(Proto);
+      auto &pi = IGM.getProtocolInfo(Proto, ProtocolInfoKind::Full);
 
       B.fillPlaceholderWithInt(*NumRequirements, IGM.Int32Ty,
                                pi.getNumWitnesses());
@@ -692,7 +692,8 @@ namespace {
     void addAssociatedTypeNames() {
       std::string AssociatedTypeNames;
 
-      auto &pi = IGM.getProtocolInfo(Proto);
+      auto &pi = IGM.getProtocolInfo(Proto,
+                                     ProtocolInfoKind::RequirementSignature);
       for (auto &entry : pi.getWitnessEntries()) {
         // Add the associated type name to the list.
         if (entry.isAssociatedType()) {

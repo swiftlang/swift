@@ -70,7 +70,7 @@ private:
   llvm::DenseMap<ProtocolDecl*, const ProtocolInfo*> Protocols;
   const TypeInfo *FirstType;
   
-  const ProtocolInfo *FirstProtocol;
+  const ProtocolInfo *FirstProtocol = nullptr;
   const LoadableTypeInfo *NativeObjectTI = nullptr;
   const LoadableTypeInfo *UnknownObjectTI = nullptr;
   const LoadableTypeInfo *BridgeObjectTI = nullptr;
@@ -146,7 +146,7 @@ public:
   const LoadableTypeInfo &getWitnessTablePtrTypeInfo();
   const LoadableTypeInfo &getEmptyTypeInfo();
   const TypeInfo &getResilientStructTypeInfo(IsABIAccessible_t abiAccessible);
-  const ProtocolInfo &getProtocolInfo(ProtocolDecl *P);
+  const ProtocolInfo &getProtocolInfo(ProtocolDecl *P, ProtocolInfoKind kind);
   const LoadableTypeInfo &getOpaqueStorageTypeInfo(Size storageSize,
                                                    Alignment storageAlign);
   const TypeInfo &getMetatypeTypeInfo(MetatypeRepresentation representation);

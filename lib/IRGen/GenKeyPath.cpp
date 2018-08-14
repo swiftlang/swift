@@ -974,7 +974,8 @@ emitKeyPathComponent(IRGenModule &IGM,
           idValue = llvm::ConstantInt::get(IGM.SizeTy, offset.getValue());
           idResolved = true;
         } else if (auto methodProto = dyn_cast<ProtocolDecl>(dc)) {
-          auto &protoInfo = IGM.getProtocolInfo(methodProto);
+          auto &protoInfo = IGM.getProtocolInfo(methodProto,
+                                                ProtocolInfoKind::Full);
           auto index = protoInfo.getFunctionIndex(
                                cast<AbstractFunctionDecl>(declRef.getDecl()));
           idValue = llvm::ConstantInt::get(IGM.SizeTy, -index.getValue());
