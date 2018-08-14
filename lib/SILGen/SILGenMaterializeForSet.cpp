@@ -446,7 +446,7 @@ public:
 
     // Metatypes and bases of non-mutating setters on value types
     //  are always rvalues.
-    if (!SubstSelfType->getRValueInstanceType()->mayHaveSuperclass()) {
+    if (!SubstSelfType->getMetatypeInstanceType()->mayHaveSuperclass()) {
       return LValue::forValue(self, SubstSelfType);
     }
 

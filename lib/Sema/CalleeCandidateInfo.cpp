@@ -675,7 +675,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
         if (baseType && C.level == 1 && C.getDecl()) {
           baseType = baseType
             ->getWithoutSpecifierType()
-            ->getRValueInstanceType();
+            ->getMetatypeInstanceType();
 
           if (baseType->isAnyObject())
             baseType = Type();
@@ -868,7 +868,7 @@ CalleeCandidateInfo::CalleeCandidateInfo(Type baseType,
       if (substType)
         substType = substType
         ->getWithoutSpecifierType()
-        ->getRValueInstanceType();
+        ->getMetatypeInstanceType();
       
       // If this is a DeclViaUnwrappingOptional, then we're actually looking
       // through an optional to get the member, and baseType is an Optional or

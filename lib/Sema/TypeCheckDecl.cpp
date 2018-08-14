@@ -3564,11 +3564,8 @@ void checkMemberOperator(TypeChecker &TC, FuncDecl *FD) {
     auto paramType = param->getInterfaceType();
     if (!paramType) break;
 
-    // Look through 'inout'.
-    paramType = paramType->getInOutObjectType();
     // Look through a metatype reference, if there is one.
-    if (auto metatypeType = paramType->getAs<AnyMetatypeType>())
-      paramType = metatypeType->getInstanceType();
+    paramType = paramType->getMetatypeInstanceType();
 
     // Is it the same nominal type?
     if (paramType->getAnyNominal() == selfNominal) return;

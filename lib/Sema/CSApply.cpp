@@ -340,7 +340,7 @@ diagnoseInvalidDynamicConstructorReferences(ConstraintSystem &cs,
                                             bool SuppressDiagnostics) {
   auto &tc = cs.getTypeChecker();
   auto baseTy = cs.getType(base)->getRValueType();
-  auto instanceTy = baseTy->getRValueInstanceType();
+  auto instanceTy = baseTy->getMetatypeInstanceType();
 
   bool isStaticallyDerived =
     base->isStaticallyDerivedMetatype(
@@ -534,7 +534,7 @@ namespace {
 
       const auto &base = params.front();
       if (wantsRValueInstanceType)
-        return base.getType()->getRValueInstanceType();
+        return base.getPlainType()->getMetatypeInstanceType();
 
       return base.getType();
     }
@@ -1083,7 +1083,8 @@ namespace {
                  cs.UnevaluatedRootExprs.count(
                    memberLocator.getBaseLocator()->getAnchor()) &&
                  "Attempt to reference an instance member of a metatype");
-          auto baseInstanceTy = cs.getType(base)->getRValueInstanceType();
+          auto baseInstanceTy = cs.getType(base)
+              ->getInOutObjectType()->getMetatypeInstanceType();
           base = new (context) UnevaluatedInstanceExpr(base, baseInstanceTy);
           cs.cacheType(base);
           base->setImplicit();

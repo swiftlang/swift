@@ -1090,7 +1090,7 @@ recur:
     VarDecl *var = NP->getDecl();
     if (var->isInvalid())
       type = ErrorType::get(Context);
-    var->setType(type->getInOutObjectType());
+    var->setType(type);
     // FIXME: wtf
     if (type->hasTypeParameter())
       var->setInterfaceType(type);

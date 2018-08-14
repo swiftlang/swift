@@ -942,7 +942,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
       if (func->hasDynamicSelf()) {
         auto params = openedFnType->getParams();
         assert(params.size() == 1);
-        Type selfTy = params.front().getType()->getRValueInstanceType();
+        Type selfTy = params.front().getPlainType()->getMetatypeInstanceType();
         openedType = openedType->replaceCovariantResultType(selfTy, 2);
         openedFnType = openedType->castTo<FunctionType>();
       }
@@ -1382,7 +1382,7 @@ ConstraintSystem::getTypeOfMemberReference(
   auto openedParams = openedFnType->getParams();
   assert(openedParams.size() == 1);
 
-  Type selfObjTy = openedParams.front().getType()->getRValueInstanceType();
+  Type selfObjTy = openedParams.front().getPlainType()->getMetatypeInstanceType();
   if (outerDC->getAsProtocolOrProtocolExtensionContext()) {
     // For a protocol, substitute the base object directly. We don't need a
     // conformance constraint because we wouldn't have found the declaration

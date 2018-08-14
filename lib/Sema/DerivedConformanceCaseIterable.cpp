@@ -60,12 +60,12 @@ void deriveCaseIterable_enum_getter(AbstractFunctionDecl *funcDecl) {
   funcDecl->setBody(body);
 }
 
-static ArraySliceType *computeAllCasesType(NominalTypeDecl *enumType) {
-  auto metaTy = enumType->getDeclaredInterfaceType();
-  if (!metaTy || metaTy->hasError())
+static ArraySliceType *computeAllCasesType(NominalTypeDecl *enumDecl) {
+  auto enumType = enumDecl->getDeclaredInterfaceType();
+  if (!enumType || enumType->hasError())
     return nullptr;
 
-  return ArraySliceType::get(metaTy->getRValueInstanceType());
+  return ArraySliceType::get(enumType);
 }
 
 static Type deriveCaseIterable_AllCases(DerivedConformance &derived) {

@@ -4346,7 +4346,7 @@ public:
     // Explode inout type.
     if (param.isInOut()) {
       insertText << "&";
-      Ty = param.getType()->getInOutObjectType();
+      Ty = param.getPlainType();
     }
     // @autoclosure; the type should be the result type.
     if (auto FT = param.getType()->getAs<AnyFunctionType>())
@@ -7008,7 +7008,7 @@ bool FailureDiagnosis::diagnoseClosureExpr(
     if (VD->hasType() && (VD->getType()->hasTypeVariable() ||
                           VD->getType()->hasError())) {
       VD->setType(CS.getASTContext().TheUnresolvedType);
-      VD->setInterfaceType(VD->getType()->getInOutObjectType());
+      VD->setInterfaceType(VD->getType());
     }
   }
 
