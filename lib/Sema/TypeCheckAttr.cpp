@@ -966,6 +966,7 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
   auto oneCandidate = candidates.front();
   candidates.filter([&](LookupResultEntry entry, bool isOuter) -> bool {
     auto cand = cast<SubscriptDecl>(entry.getValueDecl());
+    TC.validateDeclForNameLookup(cand);
     return isAcceptableDynamicMemberLookupSubscript(cand, decl, TC);
   });
 
