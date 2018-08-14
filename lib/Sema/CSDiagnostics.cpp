@@ -64,7 +64,7 @@ FailureDiagnostic::emitDiagnostic(ArgTypes &&... Args) const {
 }
 
 Type RequirementFailure::getOwnerType() const {
-  return getType(getAnchor())->getRValueInstanceType();
+  return getType(getAnchor())->getInOutObjectType()->getMetatypeInstanceType();
 }
 
 const Requirement &RequirementFailure::getRequirement() {

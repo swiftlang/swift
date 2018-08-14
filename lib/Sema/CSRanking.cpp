@@ -536,7 +536,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       auto getSelfType = [](AnyFunctionType *fnType) -> Type {
         auto params = fnType->getParams();
         assert(params.size() == 1);
-        return params.front().getType()->getRValueInstanceType();
+        return params.front().getPlainType()->getMetatypeInstanceType();
       };
 
       Type selfTy1;

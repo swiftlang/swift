@@ -2303,7 +2303,7 @@ void PrintAST::printOneParameter(const ParamDecl *param,
   // through the paren types so that we don't print excessive @escapings.
   unsigned numParens = 0;
   if (!willUseTypeReprPrinting(TheTypeLoc, CurrentType, Options)) {
-    auto type = TheTypeLoc.getType()->getInOutObjectType();
+    auto type = TheTypeLoc.getType();
 
     printParameterFlags(Printer, Options, paramFlags);
     while (auto parenTy = dyn_cast<ParenType>(type.getPointer())) {
@@ -3302,7 +3302,7 @@ public:
       if (i)
         Printer << ", ";
       const TupleTypeElt &TD = Fields[i];
-      Type EltType = TD.getType()->getInOutObjectType();
+      Type EltType = TD.getRawType();
 
       Printer.callPrintStructurePre(PrintStructureKind::TupleElement);
       SWIFT_DEFER {
