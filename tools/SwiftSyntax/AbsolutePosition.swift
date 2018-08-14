@@ -12,7 +12,7 @@
 
 /// An absolute position in a source file as text - the absolute utf8Offset from
 /// the start, line, and column.
-public final class AbsolutePosition {
+public struct AbsolutePosition {
   public let utf8Offset: Int
   public let line: Int
   public let column: Int
