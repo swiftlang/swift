@@ -148,10 +148,6 @@ namespace irgen {
   StructLayout *getClassLayoutWithTailElems(IRGenModule &IGM, SILType classType,
                                             llvm::ArrayRef<SILType> tailTypes);
 
-  /// What reference counting mechanism does a class-like type use?
-  ReferenceCounting getReferenceCountingForType(IRGenModule &IGM,
-                                                CanType type);
-
   ClassDecl *getRootClassForMetaclass(IRGenModule &IGM, ClassDecl *theClass);
 
   /// Does the class metadata for the given class require dynamic

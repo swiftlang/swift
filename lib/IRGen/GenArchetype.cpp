@@ -287,7 +287,7 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
   // representation.
   if (archetype->requiresClass() ||
       (layout && layout->isRefCounted())) {
-    auto refcount = getReferenceCountingForType(IGM, CanType(archetype));
+    auto refcount = archetype->getReferenceCounting();
 
     llvm::PointerType *reprTy;
 
