@@ -18,20 +18,15 @@ public func testSendsInALoopGPU() {
   TensorFlow.enableGPU()
   let maxCount = 10
   // a cannot be an integer tensor due to a TensorFlow Eigen bug (b/77737504).
-  // expected-warning @+1 {{value implicitly copied to the host}}
   var a = Tensor<Float>(1)
   var count = 1
 
   while count < maxCount {
-    // expected-warning @+2 {{implicitly copied to the accelerator}}
-    // expected-warning @+1 {{implicitly copied to the accelerator}}
     a += a    // expected-warning  {{implicitly copied to the host}}
     // One send.
     _hostOp(a.toHost())
     count += 1
   }
-  // expected-warning @+2 {{implicitly copied to the accelerator}}
-  // expected-warning @+1 {{implicitly copied to the accelerator}}
   a += a
   let _ = a.array
 }
@@ -44,15 +39,12 @@ public func testSendsInALoopGPU() {
 //
 // Sends/Receives/Transfers correspond to the warnings at 'a += a' within the loop body
 // CHECK:   bb3:
-// CHECK:      [[A:%.*]] = graph_op "tfc.RecvFromHost
-// CHECK:      [[B:%.*]] = graph_op "tfc.TensorTransfer,i"([[A]]
-// CHECK:      [[C:%.*]] = graph_op "tfc.RecvFromHost
-// CHECK:      [[D:%.*]] = graph_op "tfc.TensorTransfer,i"([[C]]
-// CHECK:      [[E:%.*]] = graph_op "Add,i,i"([[B]]{{.*}}[[D]]
-// CHECK:      [[F:%.*]] = graph_op "tfc.TensorTransfer,i"([[E]]{{.*}}
-// CHECK:      {{.*}} = graph_op "tfc.SendToHost,i"([[F]]
+// CHECK-NOT:  graph_op "tfc.RecvFromHost
+// CHECK:      graph_op "tfc.TensorTransfer
+// CHECK:      graph_op "tfc.TensorTransfer
+// CHECK:      graph_op "tfc.SendToHost
 // Send/Receives/Transfers correspond to warnings after the loop.
 // CHECK:  bb4:
-// CHECK:      [[A:%.*]] = graph_op "tfc.RecvFromHost
-// CHECK:      graph_op "tfc.TensorTransfer,i"([[A]]
-// CHECK:      [[B:%.*]] = graph_op "tfc.RecvFromHost
+// CHECK-NOT:  graph_op "tfc.RecvFromHost
+// CHECK-NOT:  graph_op "tfc.TensorTransfer
+// CHECK:      } // end sil function

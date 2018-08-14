@@ -158,6 +158,34 @@ public func testShapeList() {
             output_shapes: [dataset.elementShape]) as ResourceHandle
 }
 
+// Another test case for SR-8463.
+struct SimpleIterator {
+  let handle: ResourceHandle
+  let elementShape: TensorShape
+
+  mutating func next() -> Tensor<Float> {
+    return #tfop("IteratorGetNext", handle,
+                 output_types: [Int32.self],
+                 output_shapes: [elementShape])
+  }
+}
+
+public func testShapeList2() {
+  let t = Tensor<Int32>([0])
+  let handle: VariantHandle = #tfop(
+    "TensorSliceDataset", [t],
+    Toutput_types: [Int32.self],
+    output_shapes: [TensorShape()]
+  )
+  let dataset = SimpleDataset(handle: handle, elementShape: TensorShape())
+  let resource = #tfop("AnonymousIterator",
+                       output_types: [Int32.self],
+                       output_shapes: [dataset.elementShape]) as ResourceHandle
+
+  var it = SimpleIterator(handle: resource, elementShape: dataset.elementShape)
+  _ = it.next()
+}
+
 // CHECK-LABEL: ---- INPUT FUNCTION {{.*}}testShapeList
 // CHECK: graph_op "AnonymousIterator"() {output_types: [$Int32.Type: $Int32], output_shapes: [$TensorShape: ([$Int32: ])]
 
