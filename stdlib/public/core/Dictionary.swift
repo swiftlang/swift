@@ -2826,7 +2826,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
   //
   // Do not access this property directly.
   @nonobjc
-  internal var _heapStorageBridged_DoNotUse: AnyObject?
+  private var _bridgedStorage_DoNotUse: AnyObject?
 
   /// The unbridged elements.
   internal var native: _NativeDictionary<Key, Value>
@@ -2836,118 +2836,19 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     super.init()
   }
 
-  @objc(copyWithZone:)
-  internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
-    // Instances of this class should be visible outside of standard library as
-    // having `NSDictionary` type, which is immutable.
-    return self
-  }
-
-  //
-  // NSDictionary implementation.
-  //
-  // Do not call any of these methods from the standard library!  Use only
-  // `native`.
-  //
-
-  @objc
-  internal required init(
-    objects: UnsafePointer<AnyObject?>,
-    forKeys: UnsafeRawPointer,
-    count: Int
-  ) {
-    _sanityCheckFailure("don't call this designated initializer")
-  }
-
-  @objc(objectForKey:)
-  internal func objectFor(_ aKey: AnyObject) -> AnyObject? {
-    return bridgingObjectForKey(aKey)
-  }
-
-  @objc
-  internal func keyEnumerator() -> _NSEnumerator {
-    return enumerator()
-  }
-
-  @objc(getObjects:andKeys:count:)
-  internal func getObjects(
-    _ objects: UnsafeMutablePointer<AnyObject>?,
-    andKeys keys: UnsafeMutablePointer<AnyObject>?,
-    count: Int
-  ) {
-    _precondition(count >= 0, "Invalid count")
-    guard count > 0 else { return }
-    bridgeEverything()
-    var i = 0 // Current position in the output buffers
-    let bucketCount = native.bucketCount
-
-    if let unmanagedKeys = _UnmanagedAnyObjectArray(keys) {
-      if let unmanagedObjects = _UnmanagedAnyObjectArray(objects) {
-        // keys nonnull, objects nonnull
-        for position in 0..<bucketCount {
-          if bridgedDictionary.isInitializedEntry(at: position) {
-            unmanagedObjects[i] = bridgedDictionary.value(at: position)
-            unmanagedKeys[i] = bridgedDictionary.key(at: position)
-            i += 1
-            guard i < count else { break }
-          }
-        }
-      } else {
-        // keys nonnull, objects null
-        for position in 0..<bucketCount {
-          if bridgedDictionary.isInitializedEntry(at: position) {
-            unmanagedKeys[i] = bridgedDictionary.key(at: position)
-            i += 1
-            guard i < count else { break }
-          }
-        }
-      }
-    } else {
-      if let unmanagedObjects = _UnmanagedAnyObjectArray(objects) {
-        // keys null, objects nonnull
-        for position in 0..<bucketCount {
-          if bridgedDictionary.isInitializedEntry(at: position) {
-            unmanagedObjects[i] = bridgedDictionary.value(at: position)
-            i += 1
-            guard i < count else { break }
-          }
-        }
-      } else {
-        // do nothing, both are null
-      }
-    }
-  }
-
-  @objc(enumerateKeysAndObjectsWithOptions:usingBlock:)
-  internal func enumerateKeysAndObjects(options: Int,
-    using block: @convention(block) (Unmanaged<AnyObject>, Unmanaged<AnyObject>,
-     UnsafeMutablePointer<UInt8>) -> Void) {
-    bridgeEverything()
-    let bucketCount = native.bucketCount
-    var stop: UInt8 = 0
-    for position in 0..<bucketCount {
-      if bridgedDictionary.isInitializedEntry(at: position) {
-        block(Unmanaged.passUnretained(bridgedDictionary.key(at: position)),
-          Unmanaged.passUnretained(bridgedDictionary.value(at: position)),
-          &stop)
-      }
-      if stop != 0 { return }
-    }
-  }
-
   /// Returns the pointer to the stored property, which contains bridged
   /// Dictionary elements.
   @nonobjc
-  internal var _heapStorageBridgedPtr: UnsafeMutablePointer<AnyObject?> {
+  private var _bridgedStoragePtr: UnsafeMutablePointer<AnyObject?> {
     return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
       to: Optional<AnyObject>.self)
   }
 
   /// The buffer for bridged Dictionary elements, if present.
   @nonobjc
-  internal var _bridgedStorage: _RawNativeDictionaryStorage? {
+  private var _bridgedStorage: _RawNativeDictionaryStorage? {
     get {
-      if let ref = _stdlib_atomicLoadARCRef(object: _heapStorageBridgedPtr) {
+      if let ref = _stdlib_atomicLoadARCRef(object: _bridgedStoragePtr) {
         return unsafeDowncast(ref, to: _RawNativeDictionaryStorage.self)
       }
       return nil
@@ -2956,13 +2857,12 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
 
   /// Attach a buffer for bridged Dictionary elements.
   @nonobjc
-  internal func _initializeHeapStorageBridged(_ newStorage: AnyObject) {
-    _stdlib_atomicInitializeARCRef(
-      object: _heapStorageBridgedPtr, desired: newStorage)
+  private func _initializeBridgedStorage(_ storage: AnyObject) {
+    _stdlib_atomicInitializeARCRef(object: _bridgedStoragePtr, desired: storage)
   }
 
   /// Returns the bridged Dictionary values.
-  internal var bridgedDictionary: _NativeDictionary<AnyObject, AnyObject> {
+  internal var bridged: _NativeDictionary<AnyObject, AnyObject> {
     return _NativeDictionary(_storage: _bridgedStorage!)
   }
 
@@ -2992,7 +2892,114 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     }
 
     // Atomically put the bridged elements in place.
-    _initializeHeapStorageBridged(bridged._storage)
+    _initializeBridgedStorage(bridged._storage)
+  }
+
+  //
+  // NSDictionary implementation.
+  //
+  // Do not call any of these methods from the standard library!  Use only
+  // `native`.
+  //
+
+  @objc
+  internal required init(
+    objects: UnsafePointer<AnyObject?>,
+    forKeys: UnsafeRawPointer,
+    count: Int
+  ) {
+    _sanityCheckFailure("don't call this designated initializer")
+  }
+
+  @objc(copyWithZone:)
+  internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
+    // Instances of this class should be visible outside of standard library as
+    // having `NSDictionary` type, which is immutable.
+    return self
+  }
+
+  @objc(objectForKey:)
+  internal func objectFor(_ aKey: AnyObject) -> AnyObject? {
+    guard let nativeKey = _conditionallyBridgeFromObjectiveC(aKey, Key.self)
+    else { return nil }
+
+    let (i, found) = native._find(nativeKey)
+    if found {
+      bridgeEverything()
+      return bridged.value(at: i.bucket)
+    }
+    return nil
+  }
+
+  @objc
+  internal func keyEnumerator() -> _NSEnumerator {
+    return enumerator()
+  }
+
+  @objc(getObjects:andKeys:count:)
+  internal func getObjects(
+    _ objects: UnsafeMutablePointer<AnyObject>?,
+    andKeys keys: UnsafeMutablePointer<AnyObject>?,
+    count: Int
+  ) {
+    _precondition(count >= 0, "Invalid count")
+    guard count > 0 else { return }
+    bridgeEverything()
+    var i = 0 // Current position in the output buffers
+    let bucketCount = native.bucketCount
+
+    if let unmanagedKeys = _UnmanagedAnyObjectArray(keys) {
+      if let unmanagedObjects = _UnmanagedAnyObjectArray(objects) {
+        // keys nonnull, objects nonnull
+        for position in 0..<bucketCount {
+          if bridged.isInitializedEntry(at: position) {
+            unmanagedObjects[i] = bridged.value(at: position)
+            unmanagedKeys[i] = bridged.key(at: position)
+            i += 1
+            guard i < count else { break }
+          }
+        }
+      } else {
+        // keys nonnull, objects null
+        for position in 0..<bucketCount {
+          if bridged.isInitializedEntry(at: position) {
+            unmanagedKeys[i] = bridged.key(at: position)
+            i += 1
+            guard i < count else { break }
+          }
+        }
+      }
+    } else {
+      if let unmanagedObjects = _UnmanagedAnyObjectArray(objects) {
+        // keys null, objects nonnull
+        for position in 0..<bucketCount {
+          if bridged.isInitializedEntry(at: position) {
+            unmanagedObjects[i] = bridged.value(at: position)
+            i += 1
+            guard i < count else { break }
+          }
+        }
+      } else {
+        // do nothing, both are null
+      }
+    }
+  }
+
+  @objc(enumerateKeysAndObjectsWithOptions:usingBlock:)
+  internal func enumerateKeysAndObjects(options: Int,
+    using block: @convention(block) (Unmanaged<AnyObject>, Unmanaged<AnyObject>,
+     UnsafeMutablePointer<UInt8>) -> Void) {
+    bridgeEverything()
+    let bucketCount = native.bucketCount
+    var stop: UInt8 = 0
+    for position in 0..<bucketCount {
+      if bridged.isInitializedEntry(at: position) {
+        block(Unmanaged.passUnretained(bridged.key(at: position)),
+          Unmanaged.passUnretained(bridged.value(at: position)),
+          &stop)
+      }
+      if stop != 0 { return }
+    }
   }
 
   @objc
@@ -3000,25 +3007,10 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     return native.count
   }
 
-  @nonobjc
-  internal func bridgingObjectForKey(_ aKey: AnyObject)
-    -> AnyObject? {
-    guard let nativeKey = _conditionallyBridgeFromObjectiveC(aKey, Key.self)
-    else { return nil }
-
-    let (i, found) = native._find(
-      nativeKey, startBucket: native._bucket(nativeKey))
-    if found {
-      bridgeEverything()
-      return bridgedDictionary.value(at: i.bucket)
-    }
-    return nil
-  }
-
   @objc
   internal func enumerator() -> _NSEnumerator {
     bridgeEverything()
-    return _SwiftDictionaryNSEnumerator<AnyObject, AnyObject>(bridgedDictionary)
+    return _SwiftDictionaryNSEnumerator<AnyObject, AnyObject>(bridged)
   }
 
   @objc(countByEnumeratingWithState:objects:count:)
@@ -3058,7 +3050,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
         break
       }
 
-      let bridgedKey = bridgedDictionary.key(at: currIndex.bucket)
+      let bridgedKey = bridged.key(at: currIndex.bucket)
       unmanagedObjects[i] = bridgedKey
       stored += 1
       native.formIndex(after: &currIndex)

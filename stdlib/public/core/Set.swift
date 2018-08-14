@@ -2332,7 +2332,7 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
   //
   // Do not access this property directly.
   @nonobjc
-  internal var _heapStorageBridged_DoNotUse: AnyObject?
+  private var _heapStorageBridged_DoNotUse: AnyObject?
 
   /// The unbridged elements.
   internal var native: _NativeSet<Element>
@@ -2342,57 +2342,19 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
     super.init()
   }
 
-  @objc(copyWithZone:)
-  internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
-    // Instances of this class should be visible outside of standard library as
-    // having `NSSet` type, which is immutable.
-    return self
-  }
-
-  //
-  // NSSet implementation.
-  //
-  // Do not call any of these methods from the standard library!  Use only
-  // `native`.
-  //
-
-  @objc
-  internal required init(objects: UnsafePointer<AnyObject?>, count: Int) {
-    _sanityCheckFailure("don't call this designated initializer")
-  }
-
-  @objc
-  internal func member(_ object: AnyObject) -> AnyObject? {
-    guard let element =
-      _conditionallyBridgeFromObjectiveC(object, Element.self)
-    else { return nil }
-
-    let (i, found) = native._find(element)
-    if found {
-      bridgeEverything()
-      return bridgedSet.value(at: i.bucket)
-    }
-    return nil
-  }
-
-  @objc
-  internal func objectEnumerator() -> _NSEnumerator {
-    return enumerator()
-  }
-
   /// Returns the pointer to the stored property, which contains bridged
   /// Set elements.
   @nonobjc
-  internal var _heapStorageBridgedPtr: UnsafeMutablePointer<AnyObject?> {
+  private var _bridgedStoragePtr: UnsafeMutablePointer<AnyObject?> {
     return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
       to: Optional<AnyObject>.self)
   }
 
   /// The buffer for bridged Set elements, if present.
   @nonobjc
-  internal var _bridgedStorage: _RawNativeSetStorage? {
+  private var _bridgedStorage: _RawNativeSetStorage? {
     get {
-      if let ref = _stdlib_atomicLoadARCRef(object: _heapStorageBridgedPtr) {
+      if let ref = _stdlib_atomicLoadARCRef(object: _bridgedStoragePtr) {
         return unsafeDowncast(ref, to: _RawNativeSetStorage.self)
       }
       return nil
@@ -2401,13 +2363,12 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
 
   /// Attach a buffer for bridged Set elements.
   @nonobjc
-  internal func _initializeHeapStorageBridged(_ newStorage: AnyObject) {
-    _stdlib_atomicInitializeARCRef(
-      object: _heapStorageBridgedPtr, desired: newStorage)
+  private func _initializeBridgedStorage(_ storage: AnyObject) {
+    _stdlib_atomicInitializeARCRef(object: _bridgedStoragePtr, desired: storage)
   }
 
   /// Returns the bridged Set values.
-  internal var bridgedSet: _NativeSet<AnyObject> {
+  internal var bridged: _NativeSet<AnyObject> {
     return _NativeSet(_storage: _bridgedStorage!)
   }
 
@@ -2436,7 +2397,45 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
     }
 
     // Atomically put the bridged elements in place.
-    _initializeHeapStorageBridged(bridged._storage)
+    _initializeBridgedStorage(bridged._storage)
+  }
+
+  //
+  // NSSet implementation.
+  //
+  // Do not call any of these methods from the standard library!  Use only
+  // `base`.
+  //
+
+  @objc
+  internal required init(objects: UnsafePointer<AnyObject?>, count: Int) {
+    _sanityCheckFailure("don't call this designated initializer")
+  }
+
+  @objc(copyWithZone:)
+  internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
+    // Instances of this class should be visible outside of standard library as
+    // having `NSSet` type, which is immutable.
+    return self
+  }
+
+  @objc
+  internal func member(_ object: AnyObject) -> AnyObject? {
+    guard let element =
+      _conditionallyBridgeFromObjectiveC(object, Element.self)
+    else { return nil }
+
+    let (i, found) = native._find(element)
+    if found {
+      bridgeEverything()
+      return bridged.value(at: i.bucket)
+    }
+    return nil
+  }
+
+  @objc
+  internal func objectEnumerator() -> _NSEnumerator {
+    return enumerator()
   }
 
   @objc
@@ -2447,7 +2446,7 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
   @objc
   internal func enumerator() -> _NSEnumerator {
     bridgeEverything()
-    return _SwiftSetNSEnumerator<AnyObject>(bridgedSet)
+    return _SwiftSetNSEnumerator<AnyObject>(bridged)
   }
 
   @objc(countByEnumeratingWithState:objects:count:)
@@ -2486,7 +2485,7 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
         break
       }
 
-      let bridgedKey = bridgedSet.key(at: currIndex.bucket)
+      let bridgedKey = bridged.key(at: currIndex.bucket)
       unmanagedObjects[i] = bridgedKey
       stored += 1
       native.formIndex(after: &currIndex)
