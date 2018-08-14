@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module %S/Inputs/PrivateObjC.swift -o %t
-// RUN: %target-typecheck-verify-swift -I %t -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift -swift-version 4 -I %t -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift -swift-version 5 -I %t -verify-ignore-unknown
 
 // REQUIRES: objc_interop
 import Foundation
