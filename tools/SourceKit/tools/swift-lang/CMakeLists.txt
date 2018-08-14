@@ -2,10 +2,12 @@ if(SWIFT_SOURCEKIT_USE_INPROC_LIBRARY)
   set(EXTRA_COMPILE_FLAGS "-I" "${SOURCEKITD_SOURCE_DIR}/include/sourcekitd")
   set(SOURCEKITD_LINK_LIBS sourcekitdInProc)
   set(INSTALLED_COMP sourcekit-inproc)
+  set(DEPENDS_LIST "sourcekitd-test" "sourcekitdInProc")
 else()
   set(EXTRA_COMPILE_FLAGS "-F" "${SWIFT_LIBRARY_OUTPUT_INTDIR}")
   set(SOURCEKITD_LINK_LIBS sourcekitd)
   set(INSTALLED_COMP sourcekit-xpc-service)
+  set(DEPENDS_LIST "sourcekitd-test")
 endif()
 
 add_swift_library(swiftSwiftLang SHARED
@@ -16,7 +18,7 @@ add_swift_library(swiftSwiftLang SHARED
   SourceKitdUID.swift
   UIDs.swift.gyb
 
-  DEPENDS sourcekitd-test
+  DEPENDS ${DEPENDS_LIST}
   PRIVATE_LINK_LIBRARIES ${SOURCEKITD_LINK_LIBS}
   SWIFT_COMPILE_FLAGS ${EXTRA_COMPILE_FLAGS}
   INSTALL_IN_COMPONENT ${INSTALLED_COMP}
