@@ -950,21 +950,6 @@ func getX<T>(_ g: SomeGenericStruct<T>) -> Int {
 }
 
 
-// <rdar://problem/16189360> [DF] Assert on subscript with variadic parameter
-struct VariadicSubscript {
-  subscript(subs: Int...) -> Int {
-    get {
-      return 42
-    }
-  }
-
-  func test() {
-    var s = VariadicSubscript()
-    var x = s[0, 1, 2]
-  }
-}
-
-
 //<rdar://problem/16620121> Initializing constructor tries to initialize computed property overridden with willSet/didSet
 class ObservedBase {
      var printInfo: Ref!
