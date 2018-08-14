@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -o %t/a.out3 -swift-version 3 && %target-run %t/a.out3
+// RUN: %target-build-swift %s -o %t/a.out3 -swift-version 3 && %target-codesign %t/a.out3 && %target-run %t/a.out3
 // REQUIRES: executable_test
 
 import StdlibUnittest
