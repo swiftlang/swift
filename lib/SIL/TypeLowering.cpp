@@ -2038,7 +2038,7 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
   
   // Recursively collect transitive captures from captured local functions.
   llvm::DenseSet<AnyFunctionRef> visitedFunctions;
-  llvm::SetVector<CapturedValue> captures;
+  llvm::MapVector<ValueDecl*,CapturedValue> captures;
 
   // If there is a capture of 'self' with dynamic 'Self' type, it goes last so
   // that IRGen can pass dynamic 'Self' metadata.
@@ -2139,30 +2139,43 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
 
           // We're capturing a 'self' value with dynamic 'Self' type;
           // handle it specially.
-          if (!selfCapture &&
-              captureType->getClassOrBoundGenericClass()) {
-            selfCapture = capture;
+          if (captureType->getClassOrBoundGenericClass()) {
+            if (selfCapture)
+              selfCapture = selfCapture->mergeFlags(capture);
+            else
+              selfCapture = capture;
             continue;
           }
         }
 
         // Fall through to capture the storage.
       }
-      
+
       // Collect non-function captures.
-      captures.insert(capture);
+      ValueDecl *value = capture.getDecl();
+      auto existing = captures.find(value);
+      if (existing != captures.end()) {
+        existing->second = existing->second.mergeFlags(capture);
+      } else {
+        captures.insert(std::pair<ValueDecl *, CapturedValue>(value, capture));
+      }
     }
   };
   collectFunctionCaptures(fn);
+
+  SmallVector<CapturedValue, 4> resultingCaptures;
+  for (auto capturePair : captures) {
+    resultingCaptures.push_back(capturePair.second);
+  }
 
   // If we captured the dynamic 'Self' type and we have a 'self' value also,
   // add it as the final capture. Otherwise, add a fake hidden capture for
   // the dynamic 'Self' metatype.
   if (selfCapture.hasValue()) {
-    captures.insert(*selfCapture);
+    resultingCaptures.push_back(*selfCapture);
   } else if (capturesDynamicSelf) {
     selfCapture = CapturedValue::getDynamicSelfMetadata();
-    captures.insert(*selfCapture);
+    resultingCaptures.push_back(*selfCapture);
   }
 
   // Cache the uniqued set of transitive captures.
@@ -2171,7 +2184,7 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
   auto &cachedCaptures = inserted.first->second;
   cachedCaptures.setGenericParamCaptures(capturesGenericParams);
   cachedCaptures.setDynamicSelfType(capturesDynamicSelf);
-  cachedCaptures.setCaptures(Context.AllocateCopy(captures));
+  cachedCaptures.setCaptures(Context.AllocateCopy(resultingCaptures));
   
   return cachedCaptures;
 }
