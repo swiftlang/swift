@@ -496,7 +496,8 @@ struct MappingTraits<swift::syntax::TriviaPiece> {
 % else:
       StringRef text;
       in.mapRequired("value", text);
-      return swift::syntax::TriviaPiece(kind, text);
+      return swift::syntax::TriviaPiece(
+          kind, swift::OwnedString::makeRefCounted(text));
 % end
       break;
     }
