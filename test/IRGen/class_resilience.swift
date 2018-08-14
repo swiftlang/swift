@@ -333,36 +333,49 @@ extension ResilientGenericOutsideParent {
 
 
 // CHECK-LABEL: define private void @initialize_metadata_ClassWithResilientProperty
-// CHECK:             [[METADATA:%.*]] = call %swift.type* @swift_relocateClassMetadata({{.*}}, [[INT]] {{60|96}}, [[INT]] 4)
+// CHECK:           entry:
+// CHECK-NEXT:        [[FIELDS:%.*]] = alloca [3 x i8**]
+// CHECK-NEXT:        [[FIELDS_ADDR:%.*]] = bitcast [3 x i8**]* [[FIELDS]] to i8*
+// CHECK-NEXT:        call void @llvm.lifetime.start.p0i8(i64 {{12|24}}, i8* [[FIELDS_ADDR]])
+// CHECK-NEXT:        [[FIELDS_PTR:%.*]] = getelementptr inbounds [3 x i8**], [3 x i8**]* [[FIELDS]], i32 0, i32 0
+
 // CHECK:             [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S16resilient_struct4SizeVMa"([[INT]] 63)
 // CHECK-NEXT:        [[SIZE_METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK:             call void @swift_initClassMetadata(%swift.type* [[METADATA]], [[INT]] 0, [[INT]] 3, {{.*}})
-// CHECK-native:      [[METADATA_PTR:%.*]] = bitcast %swift.type* [[METADATA]] to [[INT]]*
-// CHECK-native-NEXT: [[FIELD_OFFSET_PTR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[METADATA_PTR]], [[INT]] {{12|15}}
-// CHECK-native-NEXT: [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* [[FIELD_OFFSET_PTR]]
+
+// -- ClassLayoutFlags = 0x100 (HasStaticVTable)
+// CHECK:             call void @swift_initClassMetadata(%swift.type* bitcast ({{.*}} @"$S16class_resilience26ClassWithResilientPropertyCMf", {{.*}}), [[INT]] 256, [[INT]] 3, i8*** [[FIELDS_PTR]], {{.*}})
+
+// CHECK-native:      [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* {{.*}}
 // CHECK-native-NEXT: store [[INT]] [[FIELD_OFFSET]], [[INT]]* @"$S16class_resilience26ClassWithResilientPropertyC1s16resilient_struct4SizeVvWvd"
-// CHECK-native-NEXT: [[FIELD_OFFSET_PTR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[METADATA_PTR]], [[INT]] {{13|16}}
-// CHECK-native-NEXT: [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* [[FIELD_OFFSET_PTR]]
+
+// CHECK-native:      [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* {{.*}}
 // CHECK-native-NEXT: store [[INT]] [[FIELD_OFFSET]], [[INT]]* @"$S16class_resilience26ClassWithResilientPropertyC5colors5Int32VvWvd"
-// CHECK:             store atomic %swift.type* [[METADATA]], %swift.type** @"$S16class_resilience26ClassWithResilientPropertyCML" release,
+
+// CHECK:             store atomic %swift.type* bitcast ({{.*}}), %swift.type** @"$S16class_resilience26ClassWithResilientPropertyCML" release
 // CHECK:             ret void
 
 
 // ClassWithResilientlySizedProperty metadata initialization function
 
 // CHECK-LABEL: define private void @initialize_metadata_ClassWithResilientlySizedProperty
-// CHECK:             [[METADATA:%.*]] = call %swift.type* @swift_relocateClassMetadata({{.*}}, [[INT]] {{60|96}}, [[INT]] 3)
+// CHECK:           entry:
+// CHECK-NEXT:        [[FIELDS:%.*]] = alloca [2 x i8**]
+// CHECK-NEXT:        [[FIELDS_ADDR:%.*]] = bitcast [2 x i8**]* [[FIELDS]] to i8*
+// CHECK-NEXT:        call void @llvm.lifetime.start.p0i8(i64 {{8|16}}, i8* [[FIELDS_ADDR]])
+
 // CHECK:             [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S16resilient_struct9RectangleVMa"([[INT]] 63)
 // CHECK-NEXT:        [[RECTANGLE_METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK:             call void @swift_initClassMetadata(%swift.type* [[METADATA]], [[INT]] 0, [[INT]] 2, {{.*}})
-// CHECK-native:      [[METADATA_PTR:%.*]] = bitcast %swift.type* [[METADATA]] to [[INT]]*
-// CHECK-native-NEXT: [[FIELD_OFFSET_PTR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[METADATA_PTR]], [[INT]] {{11|14}}
-// CHECK-native-NEXT: [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* [[FIELD_OFFSET_PTR]]
+
+// -- ClassLayoutFlags = 0x100 (HasStaticVTable)
+// CHECK:             call void @swift_initClassMetadata(%swift.type* bitcast ({{.*}} @"$S16class_resilience33ClassWithResilientlySizedPropertyCMf", {{.*}}), [[INT]] 256, [[INT]] 2, {{.*}})
+
+// CHECK-native:      [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* {{.*}}
 // CHECK-native-NEXT: store [[INT]] [[FIELD_OFFSET]], [[INT]]* @"$S16class_resilience33ClassWithResilientlySizedPropertyC1r16resilient_struct9RectangleVvWvd"
-// CHECK-native-NEXT: [[FIELD_OFFSET_PTR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[METADATA_PTR]], [[INT]] {{12|15}}
-// CHECK-native-NEXT: [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* [[FIELD_OFFSET_PTR]]
+
+// CHECK-native:      [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* {{.*}}
 // CHECK-native-NEXT: store [[INT]] [[FIELD_OFFSET]], [[INT]]* @"$S16class_resilience33ClassWithResilientlySizedPropertyC5colors5Int32VvWvd"
-// CHECK:             store atomic %swift.type* [[METADATA]], %swift.type** @"$S16class_resilience33ClassWithResilientlySizedPropertyCML" release,
+
+// CHECK:             store atomic %swift.type* bitcast ({{.*}}), %swift.type** @"$S16class_resilience33ClassWithResilientlySizedPropertyCML" release
 // CHECK:             ret void
 
 

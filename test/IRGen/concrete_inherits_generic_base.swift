@@ -80,7 +80,8 @@ presentBase(Base(x: 2))
 // CHECK:         [[TMP:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK-NEXT:    extractvalue %swift.metadata_response [[T0]], 1
 // CHECK-NEXT:    store %swift.type* [[TMP]], %swift.type** getelementptr inbounds ({{.*}} @"$S3foo12SuperDerivedCMf{{.*}}, i32 1), align
-// CHECK:         [[METADATA:%.*]] = call %swift.type* @swift_relocateClassMetadata({{.*}}, [[INT]] {{60|96}}, [[INT]] 0)
-// CHECK:         call void @swift_initClassMetadata(%swift.type* [[METADATA]], [[INT]] 0, {{.*}})
-// CHECK:         store atomic %swift.type* [[METADATA]], %swift.type** @"$S3foo12SuperDerivedCML" release,
+
+// -- ClassLayoutFlags = 0x100 (HasStaticVTable)
+// CHECK:         call void @swift_initClassMetadata(%swift.type* bitcast ({{.*}} @"$S3foo12SuperDerivedCMf", {{.*}}), [[INT]] 256, {{.*}})
+// CHECK:         store atomic %swift.type* bitcast {{.*}}, %swift.type** @"$S3foo12SuperDerivedCML" release,
 // CHECK:         ret void

@@ -20,7 +20,7 @@ public class Concrete : Derived<Int> {
 }
 
 
-//// Nominal type descriptor for 'Base' does not have any method descriptors.
+//// Nominal type descriptor for 'Base' with method descriptors.
 
 // CHECK-LABEL: @"$S14generic_vtable4BaseCMn" = {{(dllexport )?}}{{(protected )?}}constant
 // -- flags: has vtable, is class, is unique
@@ -28,8 +28,12 @@ public class Concrete : Derived<Int> {
 // -- vtable offset
 // CHECK-SAME: i32 10,
 // -- vtable size
-// CHECK-SAME: i32 3
-// -- no method descriptors -- class is fully concrete
+// CHECK-SAME: i32 3,
+// -- vtable entry for m1()
+// CHECK-SAME: void (%T14generic_vtable4BaseC*)* @"$S14generic_vtable4BaseC2m1yyF"
+// -- vtable entry for m2()
+// CHECK-SAME: void (%T14generic_vtable4BaseC*)* @"$S14generic_vtable4BaseC2m2yyF"
+// --
 // CHECK-SAME: section "{{.*}}", align 4
 
 //// Type metadata for 'Base' has a static vtable.
@@ -45,7 +49,7 @@ public class Concrete : Derived<Int> {
 // CHECK-SAME: , align 8
 
 
-//// Nominal type descriptor for 'Derived' has method descriptors.
+//// Nominal type descriptor for 'Derived' with method descriptors.
 
 // CHECK-LABEL: @"$S14generic_vtable7DerivedCMn" = {{(dllexport )?}}{{(protected )?}}constant
 // -- flags: has vtable, is class, is unique, is generic
@@ -69,7 +73,7 @@ public class Concrete : Derived<Int> {
 // CHECK-SAME: }>, align 8
 
 
-//// Nominal type descriptor for 'Concrete' has method descriptors.
+//// Nominal type descriptor for 'Concrete' with method descriptors.
 
 // CHECK-LABEL: @"$S14generic_vtable8ConcreteCMn" = {{(dllexport )?}}{{(protected )?}}constant
 // -- flags: has vtable, is class, is unique
@@ -83,14 +87,21 @@ public class Concrete : Derived<Int> {
 // --
 // CHECK-SAME: section "{{.*}}", align 4
 
-//// Type metadata for 'Concrete' does not have any vtable entries; the vtable is
-//// filled in at initialization time.
+//// Type metadata for 'Concrete' has a static vtable.
 
 // CHECK-LABEL: @"$S14generic_vtable8ConcreteCMf" = internal global <{{.*}}> <{
 // -- nominal type descriptor
 // CHECK-SAME: @"$S14generic_vtable8ConcreteCMn",
-// -- ivar destroyer
-// CHECK-SAME: i8* null
+// -- vtable entry for 'm1()'
+// CHECK-SAME: void (%T14generic_vtable4BaseC*)* @"$S14generic_vtable4BaseC2m1yyF"
+// -- vtable entry for 'm2()'
+// CHECK-SAME: void (%T14generic_vtable7DerivedC*)* @"$S14generic_vtable7DerivedC2m2yyF"
+// -- vtable entry for 'init()'
+// CHECK-SAME: %T14generic_vtable8ConcreteC* (%T14generic_vtable8ConcreteC*)* @"$S14generic_vtable8ConcreteCACycfc"
+// -- vtable entry for 'm3()'
+// CHECK-SAME: void (%T14generic_vtable8ConcreteC*)* @"$S14generic_vtable8ConcreteC2m3yyF"
+// -- vtable entry for 'm4()'
+// CHECK-SAME: void (%T14generic_vtable8ConcreteC*)* @"$S14generic_vtable8ConcreteC2m4yyF"
 // --
 // CHECK-SAME: }>, align 8
 
@@ -130,14 +141,9 @@ public class Concrete : Derived<Int> {
 // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S14generic_vtable7DerivedCySiGMa"(i64 1)
 // CHECK: [[SUPERCLASS:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK: store %swift.type* [[SUPERCLASS]], %swift.type** getelementptr inbounds {{.*}} @"$S14generic_vtable8ConcreteCMf"
-// CHECK: [[METADATA:%.*]] = call %swift.type* @swift_relocateClassMetadata({{.*}}, i64 96, i64 1)
-// CHECK: call void @swift_initClassMetadata(%swift.type* [[METADATA]], i64 0, {{.*}})
 
-// -- method override for 'init()'
-// CHECK: store i8* bitcast (%T14generic_vtable8ConcreteC* (%T14generic_vtable8ConcreteC*)* @"$S14generic_vtable8ConcreteCACycfc" to i8*), i8**
+// -- ClassLayoutFlags is 256 / 0x100, HasStaticVTable
+// CHECK: call void @swift_initClassMetadata(%swift.type* bitcast ({{.*}} @"$S14generic_vtable8ConcreteCMf", {{.*}}), i64 256, {{.*}})
 
-// -- method override for 'm3()'
-// CHECK: store i8* bitcast (void (%T14generic_vtable8ConcreteC*)* @"$S14generic_vtable8ConcreteC2m3yyF" to i8*), i8**
-
-// CHECK: store atomic %swift.type* [[METADATA]], %swift.type** @"$S14generic_vtable8ConcreteCML" release, align 8
+// CHECK: store atomic %swift.type* {{.*}}, %swift.type** @"$S14generic_vtable8ConcreteCML" release, align 8
 // CHECK: ret void

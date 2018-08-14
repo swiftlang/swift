@@ -1039,6 +1039,12 @@ enum class ClassLayoutFlags : uintptr_t {
 
   /// The ABI baseline algorithm, i.e. the algorithm implemented in Swift 5.
   Swift5Algorithm   = 0x00,
+
+  /// If true, the vtable for this class and all of its superclasses was emitted
+  /// statically in the class metadata. If false, the superclass vtable is
+  /// copied from superclass metadata, and the immediate class vtable is
+  /// initialized from the type context descriptor.
+  HasStaticVTable   = 0x100,
 };
 static inline ClassLayoutFlags operator|(ClassLayoutFlags lhs,
                                          ClassLayoutFlags rhs) {
@@ -1051,6 +1057,9 @@ static inline ClassLayoutFlags &operator|=(ClassLayoutFlags &lhs,
 static inline ClassLayoutFlags getLayoutAlgorithm(ClassLayoutFlags flags) {
   return ClassLayoutFlags(uintptr_t(flags)
                              & uintptr_t(ClassLayoutFlags::AlgorithmMask));
+}
+static inline bool hasStaticVTable(ClassLayoutFlags flags) {
+  return uintptr_t(flags) & uintptr_t(ClassLayoutFlags::HasStaticVTable);
 }
 
 /// Flags for enum layout.

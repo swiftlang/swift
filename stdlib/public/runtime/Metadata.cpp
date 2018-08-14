@@ -2065,30 +2065,9 @@ static void _swift_initGenericClassObjCName(ClassMetadata *theClass) {
 
 /// Initialize the invariant superclass components of a class metadata,
 /// such as the generic type arguments, field offsets, and so on.
-static void _swift_initializeSuperclass(ClassMetadata *theClass) {
-#if SWIFT_OBJC_INTEROP
-  // If the class is generic, we need to give it a name for Objective-C.
-  if (theClass->getDescription()->isGeneric())
-    _swift_initGenericClassObjCName(theClass);
-#endif
-
+static void _swift_initializeSuperclass(ClassMetadata *theClass,
+                                       ClassLayoutFlags layoutFlags) {
   const ClassMetadata *theSuperclass = theClass->Superclass;
-
-  // Copy the class's immediate methods from the nominal type descriptor
-  // to the class metadata.
-  {
-    const auto *description = theClass->getDescription();
-    auto *classWords = reinterpret_cast<void **>(theClass);
-
-    if (description->hasVTable()) {
-      auto *vtable = description->getVTableDescriptor();
-      for (unsigned i = 0, e = vtable->VTableSize; i < e; ++i) {
-        classWords[vtable->getVTableOffset(theClass) + i]
-          = description->getMethod(i);
-      }
-    }
-  }
-
   if (theSuperclass == nullptr)
     return;
 
@@ -2113,7 +2092,7 @@ static void _swift_initializeSuperclass(ClassMetadata *theClass) {
     }
 
     // Copy the vtable entries.
-    if (description->hasVTable()) {
+    if (description->hasVTable() && !hasStaticVTable(layoutFlags)) {
       auto *vtable = description->getVTableDescriptor();
       memcpy(classWords + vtable->getVTableOffset(ancestor),
              superWords + vtable->getVTableOffset(ancestor),
@@ -2205,9 +2184,28 @@ swift::swift_initClassMetadata(ClassMetadata *self,
     (void)unused;
     setUpObjCRuntimeGetImageNameFromClass();
   }, nullptr);
+
+  // If the class is generic, we need to give it a name for Objective-C.
+  if (self->getDescription()->isGeneric())
+    _swift_initGenericClassObjCName(self);
 #endif
 
-  _swift_initializeSuperclass(self);
+  // Copy the class's immediate methods from the nominal type descriptor
+  // to the class metadata.
+  if (!hasStaticVTable(layoutFlags)) {
+    const auto *description = self->getDescription();
+    auto *classWords = reinterpret_cast<void **>(self);
+
+    if (description->hasVTable()) {
+      auto *vtable = description->getVTableDescriptor();
+      for (unsigned i = 0, e = vtable->VTableSize; i < e; ++i) {
+        classWords[vtable->getVTableOffset(self) + i]
+          = description->getMethod(i);
+      }
+    }
+  }
+
+  _swift_initializeSuperclass(self, layoutFlags);
 
   // Start layout by appending to a standard heap object header.
   size_t size, alignMask;
