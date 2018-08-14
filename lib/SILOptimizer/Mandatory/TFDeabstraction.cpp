@@ -1314,8 +1314,7 @@ static SILValue explodeSILStructArgument(SILPHIArgument *arg) {
 /// things that cause a send.
 ///
 static SILValue
-propagateSSAOperand(ASTContext &ctx, SILValue v,
-                    SmallPtrSet<SILPHIArgument *, 8> &checkedPhis) {
+propagateSSAOperand(SILValue v, SmallPtrSet<SILPHIArgument *, 8> &checkedPhis) {
   // This is the series of struct/tuple extract indices that the value is
   // currently being projected through.  Consider an access like this:
   //     B = struct { #1, #2 }
@@ -1437,8 +1436,7 @@ void TFDeabstraction::propagateSSAValues() {
     for (auto &inst : bb)
       for (auto &operand : inst.getAllOperands()) {
         // Get the propagated value.
-        auto newVal = propagateSSAOperand(fn.getModule().getASTContext(),
-                                          operand.get(), checkedPhis);
+        auto newVal = propagateSSAOperand(operand.get(), checkedPhis);
 
         if (newVal == operand.get())
           continue;
