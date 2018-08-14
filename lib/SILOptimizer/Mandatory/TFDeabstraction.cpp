@@ -139,7 +139,7 @@ namespace {
 
     void promoteToSSA(ArrayRef<AllocStackInst *> allocs);
     void prepareStackAllocForPromotion(AllocStackInst *alloc);
-    void propagateTensorValues();
+    void propagateSSAValues();
     void checkAttributesAndFormGraphOps();
     void formGraphOp(SILTensorOpInfo &opInfo,
                      DenseMap<SILValue, SymbolicValue> &constants,
@@ -1308,13 +1308,14 @@ static SILValue explodeSILStructArgument(SILPHIArgument *arg) {
 
 /// We've promoted any stack allocations that are in the way of tensor operands
 /// so we now have proper SSA.  Look through struct and tuple injection and
-/// projection instructions to find the underlying value that feeds the tensor
-/// operation.  This is typically another tensor operation or a constant (for
-/// attributes) but may be variables or other things that cause a send.
+/// projection instructions to find the underlying value that can potentially
+/// feed the tensor operation or attribute.  This is typically another tensor
+/// operation or a constant (for attributes) but may be variables or other
+/// things that cause a send.
 ///
 static SILValue
-propagateTensorOperand(SILValue v,
-                       SmallPtrSet<SILPHIArgument*, 8> &checkedPhis) {
+propagateSSAOperand(ASTContext &ctx, SILValue v,
+                    SmallPtrSet<SILPHIArgument *, 8> &checkedPhis) {
   // This is the series of struct/tuple extract indices that the value is
   // currently being projected through.  Consider an access like this:
   //     B = struct { #1, #2 }
@@ -1363,19 +1364,6 @@ propagateTensorOperand(SILValue v,
           return lastRootValue; // Cannot handle this.
         continue;
       }
-
-      // Otherwise simplify inputs in predecessor blocks.
-      for (auto pi : arg->getParent()->getPredecessorBlocks()) {
-        if (auto *br = dyn_cast<BranchInst>(pi->getTerminator())) {
-          // We intentionally recalculate arg->getIndex() because its index can
-          // shift.  We know that recursive processing won't delete the bb arg
-          // though, as it is in checkedPhis.
-          auto incomingVal = br->getOperand(arg->getIndex());
-          incomingVal = propagateTensorOperand(incomingVal, checkedPhis);
-          br->setOperand(arg->getIndex(), incomingVal);
-        }
-      }
-
       continue;
     }
 
@@ -1417,31 +1405,53 @@ propagateTensorOperand(SILValue v,
 }
 
 /// Propagate the operand values for all tensors: this ensures that all tensor
-/// operands and results are directly linked together in the SSA graph at the
-/// TensorFlow value level, without going through intervening struct/tuple
-/// wrappers.
-void TFDeabstraction::propagateTensorValues() {
-  llvm::PrettyStackTraceFormat X("TFDeabstraction::propagateTensorValues");
+/// operands (including attributes) and results are directly linked together in
+/// the SSA graph at the TensorFlow value level, without going through
+/// intervening struct/tuple wrappers.
+/// This is essential in deabstracting constant tfop attribute values, and also
+/// helps reduce sends/recvs involving tensor operands.
+void TFDeabstraction::propagateSSAValues() {
+  llvm::PrettyStackTraceFormat X("TFDeabstraction::propagateSSAValues");
 
-  // Now that we have directly exposed retain/release instructions and tensor
-  // operations, go through and make sure they are directly linked to each
-  // other.
   SmallPtrSet<SILPHIArgument*, 8> checkedPhis;
-  for (auto *op : tensorOps) {
-    for (auto &operand : op->getAllOperands()) {
-      // Get the propagated value.  This call can change the tensor operand.
-      auto newVal = propagateTensorOperand(operand.get(), checkedPhis);
+  // Go through all insts and operands to find opportunities to propagate.
+  // Note that it is not sufficient to just process the operands of tensor ops.
+  //
+  // Example: need to propagate %188 to %190 (used as a tfop attr), where %189
+  // is not a const struct. This is so that const expr eval will only process
+  // the (const) struct field %188, and not the struct %189.  %188 is eventually
+  // used (through _allocateUninitializedArray()) by the tfop attr %181.
+  //
+  // function_ref _allocateUninitializedArray<A>(_:)
+  // %179 = function_ref @$Ss27_allocateUninitializedArrayySayxG_BptBwlF ...
+  // %180 = apply %179<TensorShape>(%178) ...
+  // %181 = tuple_extract %180 : $(Array<TensorShape>, Builtin.RawPointer), 0
+  // %183 = tuple_extract %180 : $(Array<TensorShape>, Builtin.RawPointer), 1
+  // %185 = pointer_to_address %183
+  // %188 = struct $TensorShape (%187 : $Array<Int32>)
+  // %189 = struct $SimpleIterator (%145 : $ResourceHandle, %188 : $TensorShape)
+  // %190 = struct_extract %189 : $SimpleIterator, #SimpleIterator.elementShape
+  // store %190 to %185 : $*TensorShape
+  // %193 = builtin "__tfop_someOp,...,shapes"(..., %181 : $Array<TensorShape>
+  for (auto &bb : fn)
+    for (auto &inst : bb)
+      for (auto &operand : inst.getAllOperands()) {
+        // Get the propagated value.
+        auto newVal = propagateSSAOperand(fn.getModule().getASTContext(),
+                                          operand.get(), checkedPhis);
 
-      // Get the (possibly-changed) instruction that used to be feeding the
-      // tensor operation and set the new value.
-      auto opInst = operand.get()->getDefiningInstruction();
-      operand.set(newVal);
+        if (newVal == operand.get())
+          continue;
 
-      // If the old instruction is unused, try to clean up the code.
-      if (opInst && !opInst->hasUsesOfAnyResult())
-        recursivelyDeleteTriviallyDeadInstructions(opInst);
-    }
-  }
+        // Get the (possibly-changed) instruction that used to be feeding the
+        // tensor operation and set the new value.
+        auto opInst = operand.get()->getDefiningInstruction();
+        operand.set(newVal);
+
+        // If the old instruction is unused, try to clean up the code.
+        if (opInst && !opInst->hasUsesOfAnyResult())
+          recursivelyDeleteTriviallyDeadInstructions(opInst);
+      }
 }
 
 /// If all the operands to a call to __tf_tensor_from_scalars are constants, we
@@ -1450,10 +1460,6 @@ void TFDeabstraction::propagateTensorValues() {
 ///
 /// On success, this removes the ApplyInst and returns a pointer to the new
 /// BuiltinInst that is created.  On failure, it returns a nullptr.
-///
-/// FIXME: This is a near duplication of the logic used by TFPartitioning in
-/// SILTensorOpInfo::decodeTensorFromScalars.  When constexpr propagation is
-/// done, we should remove the logic in SILTensorOpInfo.
 static GraphOperationInst *tryToPromoteTensorFromScalars(
     ApplyInst *inst, const DenseMap<SILValue, SymbolicValue> &constants,
     GraphFunctionDeviceInfo &deviceInfo) {
@@ -2030,8 +2036,7 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
         GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_InputListElt);
 
       // Add each element to the input list we're building, drilling down
-      // through any struct wrappers (like Tensor/Tensor2D, etc) that may be
-      // around it.
+      // through any struct wrappers (like Tensor, etc) that may be around it.
       //
       // It is common to have arrays with repeated elements.  These will
       // generally be uniqued on entry to this routine.  If so, make sure to
@@ -2349,9 +2354,9 @@ void TFDeabstraction::doIt() {
   // Now that we've promoted all the allocations in the way of our dataflow,
   // go through and propagate any tuple/struct values that are in the way of
   // our analysis.
-  propagateTensorValues();
+  propagateSSAValues();
 
-  logCurrentState("After propagateTensorValues", /*detailed*/true);
+  logCurrentState("After propagateSSAValues", /*detailed*/ true);
 
   // Canonicalize attribute arguments, check that they have constants,
   // flatten array attributes, and form graph_op instructions.
