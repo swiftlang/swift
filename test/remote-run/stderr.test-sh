@@ -1,0 +1,15 @@
+RUN: %debug-remote-run sh -c "echo hello; echo goodbye >&2" > %t.stdout.txt 2> %t.stderr.txt
+RUN: %FileCheck -check-prefix CHECK-STDOUT %s < %t.stdout.txt
+RUN: %FileCheck -check-prefix CHECK-STDERR %s < %t.stderr.txt
+
+RUN: not %debug-remote-run sh -c "echo hello; echo goodbye >&2; false" > %t.stdout.txt 2> %t.stderr.txt
+RUN: %FileCheck -check-prefix CHECK-STDOUT %s < %t.stdout.txt
+RUN: %FileCheck -check-prefix CHECK-STDERR %s < %t.stderr.txt
+
+CHECK-STDOUT-NOT: goodbye
+CHECK-STDOUT: {{^hello$}}
+CHECK-STDOUT-NOT: goodbye
+
+CHECK-STDERR-NOT: hello
+CHECK-STDERR: {{^goodbye$}}
+CHECK-STDERR-NOT: hello
