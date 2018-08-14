@@ -18,6 +18,15 @@ import Foundation
 /// exposed to clients.
 typealias NodeIdentifier = [Int]
 
+/// Box a value type into a reference type
+fileprivate class Box<T> {
+  let value: T
+
+  init(_ value: T) {
+    self.value = value
+  }
+}
+
 /// SyntaxData is the underlying storage for each Syntax node.
 /// It's modelled as an array that stores and caches a SyntaxData for each raw
 /// syntax node in its layout. It is up to the specific Syntax nodes to maintain
@@ -38,7 +47,7 @@ final class SyntaxData: Equatable {
 
   let childCaches: [AtomicCache<SyntaxData>]
 
-  let positionCache: AtomicCache<AbsolutePosition>
+  private let positionCache: AtomicCache<Box<AbsolutePosition>>
 
   fileprivate func calculatePosition() -> AbsolutePosition {
     guard let parent = parent else {
@@ -62,7 +71,7 @@ final class SyntaxData: Equatable {
 
   /// The position of the start of this node's leading trivia
   var position: AbsolutePosition {
-    return positionCache.value { return calculatePosition() }
+    return positionCache.value({ return Box(calculatePosition()) }).value
   }
 
   /// The position of the start of this node's content, skipping its trivia
@@ -93,7 +102,7 @@ final class SyntaxData: Equatable {
     self.indexInParent = indexInParent
     self.parent = parent
     self.childCaches = raw.layout.map { _ in AtomicCache<SyntaxData>() }
-    self.positionCache = AtomicCache<AbsolutePosition>()
+    self.positionCache = AtomicCache<Box<AbsolutePosition>>()
   }
 
   /// The index path from this node to the root. This can be used to uniquely
