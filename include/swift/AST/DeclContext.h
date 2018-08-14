@@ -500,7 +500,7 @@ public:
   /// lookup.
   ///
   /// \returns true if anything was found.
-  bool lookupQualified(ArrayRef<NominalTypeDecl *> types, DeclName member,
+  bool lookupQualified(ArrayRef<TypeDecl *> types, DeclName member,
                        NLOptions options,
                        SmallVectorImpl<ValueDecl *> &decls) const;
 
