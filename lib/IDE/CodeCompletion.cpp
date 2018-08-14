@@ -2909,72 +2909,7 @@ public:
       if (HaveLParen)
         return;
 
-      if (auto *VD = dyn_cast<VarDecl>(D)) {
-        addVarDeclRef(VD, Reason);
-        return;
-      }
-
-      if (auto *FD = dyn_cast<FuncDecl>(D)) {
-        // We cannot call operators with a postfix parenthesis syntax.
-        if (FD->isBinaryOperator() || FD->isUnaryOperator())
-          return;
-
-        // We cannot call accessors.  We use VarDecls and SubscriptDecls to
-        // produce completions that refer to getters and setters.
-        if (isa<AccessorDecl>(FD))
-          return;
-
-        // Do we want compound function names here?
-        if (shouldUseFunctionReference(FD)) {
-          addCompoundFunctionName(FD, Reason);
-          return;
-        }
-
-        addMethodCall(FD, Reason);
-        return;
-      }
-
-      if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
-        addNominalTypeRef(NTD, Reason);
-        addConstructorCallsForType(NTD->getDeclaredInterfaceType(),
-                                   NTD->getName(), Reason);
-        return;
-      }
-
-      if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
-        addTypeAliasRef(TAD, Reason);
-        auto type = TAD->mapTypeIntoContext(TAD->getUnderlyingTypeLoc().getType());
-        if (type->mayHaveMembers())
-          addConstructorCallsForType(type, TAD->getName(), Reason);
-        return;
-      }
-
-      if (auto *GP = dyn_cast<GenericTypeParamDecl>(D)) {
-        addGenericTypeParamRef(GP, Reason);
-        for (auto *protocol : GP->getConformingProtocols())
-          addConstructorCallsForType(protocol->getDeclaredInterfaceType(),
-                                     GP->getName(), Reason);
-        return;
-      }
-
-      if (auto *AT = dyn_cast<AssociatedTypeDecl>(D)) {
-        addAssociatedTypeRef(AT, Reason);
-        return;
-      }
-
-      if (auto *EED = dyn_cast<EnumElementDecl>(D)) {
-        addEnumElementRef(EED, Reason, /*HasTypeContext=*/false);
-      }
-
-      // Swift key path allows .[0]
-      if (shouldAddSubscriptCall()) {
-        if (auto *SD = dyn_cast<SubscriptDecl>(D)) {
-          if (ExprType->is<AnyMetatypeType>())
-            return;
-          addSubscriptCall(SD, Reason);
-        }
-      }
-      return;
+      LLVM_FALLTHROUGH;
 
     case LookupKind::ValueInDeclContext:
     case LookupKind::ImportFromModule:
@@ -3031,6 +2966,19 @@ public:
         return;
       }
 
+      if (auto *EED = dyn_cast<EnumElementDecl>(D)) {
+        addEnumElementRef(EED, Reason, /*HasTypeContext=*/false);
+        return;
+      }
+
+      // Swift key path allows .[0]
+      if (shouldAddSubscriptCall()) {
+        if (auto *SD = dyn_cast<SubscriptDecl>(D)) {
+          if (ExprType && !ExprType->is<AnyMetatypeType>())
+            addSubscriptCall(SD, Reason);
+          return;
+        }
+      }
       return;
 
     case LookupKind::EnumElement:
