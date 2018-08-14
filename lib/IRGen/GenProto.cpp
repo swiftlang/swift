@@ -980,19 +980,6 @@ bool irgen::isDependentConformance(const NormalProtocolConformance *conformance)
       conformance, [](unsigned, CanType, ProtocolDecl *) { return true; });
 }
 
-/// Detail about how an object conforms to a protocol.
-class irgen::ConformanceInfo {
-  friend ProtocolInfo;
-public:
-  virtual ~ConformanceInfo() {}
-  virtual llvm::Value *getTable(IRGenFunction &IGF,
-                               llvm::Value **conformingMetadataCache) const = 0;
-  /// Try to get this table as a constant pointer.  This might just
-  /// not be supportable at all.
-  virtual llvm::Constant *tryGetConstantTable(IRGenModule &IGM,
-                                              CanType conformingType) const = 0;
-};
-
 static llvm::Value *
 emitConditionalConformancesBuffer(IRGenFunction &IGF,
                                   const ProtocolConformance *conformance) {
@@ -1268,13 +1255,10 @@ llvm::Value *uniqueForeignWitnessTableRef(IRGenFunction &IGF,
 
       // TODO: Use the witness entry instead of falling through here.
 
-      // Look for a protocol type info.
-      const ProtocolInfo &basePI = IGM.getProtocolInfo(baseProto);
+      // Look for conformance info.
       auto *astConf = ConformanceInContext.getInheritedConformance(baseProto);
       assert(astConf->getType()->isEqual(ConcreteType));
-
-      const ConformanceInfo &conf =
-        basePI.getConformance(IGM, baseProto, astConf);
+      const ConformanceInfo &conf = IGM.getConformanceInfo(baseProto, astConf);
 
       // If we can emit the base witness table as a constant, do so.
       llvm::Constant *baseWitness = conf.tryGetConstantTable(IGM, ConcreteType);
@@ -1649,10 +1633,8 @@ getAssociatedTypeWitnessTableAccessFunction(AssociatedConformance requirement,
   if (associatedConformance.isConcrete()) {
     assert(associatedType->isEqual(associatedConformance.getConcrete()->getType()));
 
-    const ProtocolInfo &protocolI = IGM.getProtocolInfo(associatedProtocol);
-    conformanceI =
-      &protocolI.getConformance(IGM, associatedProtocol,
-                                associatedConformance.getConcrete());
+    conformanceI = &IGM.getConformanceInfo(associatedProtocol,
+                                           associatedConformance.getConcrete());
 
     // If we can emit a constant table, do so.
     // In principle, any time we can do this, we should try to re-use this
@@ -2131,53 +2113,54 @@ ProtocolInfo *ProtocolInfo::create(ArrayRef<WitnessTableEntry> table) {
   return new(buffer) ProtocolInfo(table);
 }
 
-ProtocolInfo::~ProtocolInfo() {
-  for (auto &conf : Conformances) {
-    delete conf.second;
-  }
-}
+// Provide a unique home for the ConformanceInfo vtable.
+void ConformanceInfo::anchor() {}
 
 /// Find the conformance information for a protocol.
 const ConformanceInfo &
-ProtocolInfo::getConformance(IRGenModule &IGM, ProtocolDecl *protocol,
-                             const ProtocolConformance *conformance) const {
+IRGenModule::getConformanceInfo(const ProtocolDecl *protocol,
+                                const ProtocolConformance *conformance) {
   assert(conformance->getProtocol() == protocol &&
          "conformance is for wrong protocol");
 
   auto checkCache =
-      [&](const ProtocolConformance *conf) -> Optional<ConformanceInfo *> {
+      [this](const ProtocolConformance *conf) -> const ConformanceInfo * {
     // Check whether we've already cached this.
     auto it = Conformances.find(conf);
     if (it != Conformances.end())
-      return it->second;
+      return it->second.get();
 
-    return None;
+    return nullptr;
   };
 
   if (auto found = checkCache(conformance))
-    return **found;
+    return *found;
 
   //  Drill down to the root normal
   auto normalConformance = conformance->getRootNormalConformance();
 
-  ConformanceInfo *info;
+  const ConformanceInfo *info;
   // If the conformance is dependent in any way, we need to unique it.
   // TODO: maybe this should apply whenever it's out of the module?
   // TODO: actually enable this
+  // FIXME: Both implementations of ConformanceInfo are trivially-destructible,
+  // so in theory we could allocate them on a BumpPtrAllocator. But there's not
+  // a good one for us to use. (The ASTContext's outlives the IRGenModule in
+  // batch mode.)
   if (isDependentConformance(normalConformance) ||
       // Foreign types need to go through the accessor to unique the witness
       // table.
       normalConformance->isSynthesizedNonUnique()) {
     info = new AccessorConformanceInfo(conformance);
-    Conformances.insert({conformance, info});
+    Conformances.try_emplace(conformance, info);
   } else {
     // Otherwise, we can use a direct-referencing conformance, which can get
     // away with the non-specialized conformance.
     if (auto found = checkCache(normalConformance))
-      return **found;
+      return *found;
 
     info = new DirectConformanceInfo(normalConformance);
-    Conformances.insert({normalConformance, info});
+    Conformances.try_emplace(normalConformance, info);
   }
 
   return *info;
@@ -2835,9 +2818,7 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
     LocalTypeDataKind::forConcreteProtocolWitnessTable(concreteConformance));
   if (wtable) return wtable;
 
-  auto &protoI = IGF.IGM.getProtocolInfo(proto);
-  auto &conformanceI =
-    protoI.getConformance(IGF.IGM, proto, concreteConformance);
+  auto &conformanceI = IGF.IGM.getConformanceInfo(proto, concreteConformance);
   wtable = conformanceI.getTable(IGF, srcMetadataCache);
 
   IGF.setScopedLocalTypeData(
