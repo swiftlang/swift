@@ -749,8 +749,24 @@ namespace {
   /// A class which lays out a witness table in the abstract.
   class WitnessTableLayout : public SILWitnessVisitor<WitnessTableLayout> {
     SmallVector<WitnessTableEntry, 16> Entries;
+    bool requirementSignatureOnly;
 
   public:
+    explicit WitnessTableLayout(ProtocolInfoKind resultKind) {
+      switch (resultKind) {
+      case ProtocolInfoKind::RequirementSignature:
+        requirementSignatureOnly = true;
+        break;
+      case ProtocolInfoKind::Full:
+        requirementSignatureOnly = false;
+        break;
+      }
+    }
+
+    bool shouldVisitRequirementSignatureOnly() {
+      return requirementSignatureOnly;
+    }
+
     void addProtocolConformanceDescriptor() { }
 
     /// The next witness is an out-of-line base protocol.
@@ -896,9 +912,11 @@ namespace {
 
         // Otherwise, if there isn't a better path through this base,
         // don't accumulate anything in the path.
-        } else if (!findBetterPath(base, IGM.getProtocolInfo(base),
-                                   lengthToBase)) {
-          continue;
+        } else {
+          const ProtocolInfo &baseInfo =
+              IGM.getProtocolInfo(base, ProtocolInfoKind::RequirementSignature);
+          if (!findBetterPath(base, baseInfo, lengthToBase))
+            continue;
         }
 
         // Okay, we've found a better path, and ReversePath contains a
@@ -1210,7 +1228,8 @@ llvm::Value *uniqueForeignWitnessTableRef(IRGenFunction &IGF,
                                                          Conformance.getDeclContext())),
           SILEntries(SILWT->getEntries()),
           SILConditionalConformances(SILWT->getConditionalConformances()),
-          PI(IGM.getProtocolInfo(SILWT->getConformance()->getProtocol())) {
+          PI(IGM.getProtocolInfo(SILWT->getConformance()->getProtocol(),
+                                 ProtocolInfoKind::Full)) {
       // If the conformance is resilient, we require runtime instantiation.
       if (isResilientConformance(&Conformance)) {
         RequiresSpecialization = true;
@@ -2079,38 +2098,53 @@ void IRGenModule::ensureRelativeSymbolCollocation(SILWitnessTable &wt) {
 }
 
 /// Do a memoized witness-table layout for a protocol.
-const ProtocolInfo &IRGenModule::getProtocolInfo(ProtocolDecl *protocol) {
-  return Types.getProtocolInfo(protocol);
+const ProtocolInfo &IRGenModule::getProtocolInfo(ProtocolDecl *protocol,
+                                                 ProtocolInfoKind kind) {
+  return Types.getProtocolInfo(protocol, kind);
 }
 
 /// Do a memoized witness-table layout for a protocol.
-const ProtocolInfo &TypeConverter::getProtocolInfo(ProtocolDecl *protocol) {
+const ProtocolInfo &TypeConverter::getProtocolInfo(ProtocolDecl *protocol,
+                                                   ProtocolInfoKind kind) {
   // Check whether we've already translated this protocol.
   auto it = Protocols.find(protocol);
-  if (it != Protocols.end()) return *it->second;
+  if (it != Protocols.end() && it->second->getKind() >= kind)
+    return *it->second;
 
   // If not, lay out the protocol's witness table, if it needs one.
-  WitnessTableLayout layout;
+  WitnessTableLayout layout(kind);
   if (Lowering::TypeConverter::protocolRequiresWitnessTable(protocol))
     layout.visitProtocolDecl(protocol);
 
   // Create a ProtocolInfo object from the layout.
-  ProtocolInfo *info = ProtocolInfo::create(layout.getEntries());
-  info->NextConverted = FirstProtocol;
+  ProtocolInfo *info = ProtocolInfo::create(layout.getEntries(), kind);
+  info->NextConverted.setPointer(FirstProtocol);
   FirstProtocol = info;
 
+  // Verify that we haven't generated an incompatible layout.
+  if (it != Protocols.end()) {
+    ArrayRef<WitnessTableEntry> originalEntries =
+        it->second->getWitnessEntries();
+    ArrayRef<WitnessTableEntry> newEntries = info->getWitnessEntries();
+    assert(newEntries.size() >= originalEntries.size());
+    assert(newEntries.take_front(originalEntries.size()) == originalEntries);
+    (void)originalEntries;
+    (void)newEntries;
+  }
+
   // Memoize.
-  Protocols.insert(std::make_pair(protocol, info));
+  Protocols[protocol] = info;
 
   // Done.
   return *info;
 }
 
 /// Allocate a new ProtocolInfo.
-ProtocolInfo *ProtocolInfo::create(ArrayRef<WitnessTableEntry> table) {
+ProtocolInfo *ProtocolInfo::create(ArrayRef<WitnessTableEntry> table,
+                                   ProtocolInfoKind kind) {
   size_t bufferSize = totalSizeToAlloc<WitnessTableEntry>(table.size());
   void *buffer = ::operator new(bufferSize);
-  return new(buffer) ProtocolInfo(table);
+  return new(buffer) ProtocolInfo(table, kind);
 }
 
 // Provide a unique home for the ConformanceInfo vtable.
@@ -2486,7 +2520,8 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
   case Component::Kind::OutOfLineBaseProtocol: {
     auto conformance = sourceKey.Kind.getProtocolConformance();
     auto protocol = conformance.getRequirement();
-    auto &pi = IGF.IGM.getProtocolInfo(protocol);
+    auto &pi = IGF.IGM.getProtocolInfo(protocol,
+                                       ProtocolInfoKind::RequirementSignature);
 
     auto &entry = pi.getWitnessEntries()[component.getPrimaryIndex()];
     assert(entry.isOutOfLineBase());
@@ -2522,7 +2557,8 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
     auto sourceType = sourceKey.Type;
     auto sourceConformance = sourceKey.Kind.getProtocolConformance();
     auto sourceProtocol = sourceConformance.getRequirement();
-    auto &pi = IGF.IGM.getProtocolInfo(sourceProtocol);
+    auto &pi = IGF.IGM.getProtocolInfo(sourceProtocol,
+                                       ProtocolInfoKind::RequirementSignature);
 
     auto &entry = pi.getWitnessEntries()[component.getPrimaryIndex()];
     assert(entry.isAssociatedConformance());
@@ -3244,7 +3280,7 @@ irgen::emitWitnessMethodValue(IRGenFunction &IGF,
   assert(!IGF.IGM.isResilient(proto, ResilienceExpansion::Maximal));
 
   // Find the witness we're interested in.
-  auto &fnProtoInfo = IGF.IGM.getProtocolInfo(proto);
+  auto &fnProtoInfo = IGF.IGM.getProtocolInfo(proto, ProtocolInfoKind::Full);
   auto index = fnProtoInfo.getFunctionIndex(fn);
   llvm::Value *witnessFnPtr =
     emitInvariantLoadOfOpaqueWitness(IGF, wtable,
@@ -3293,7 +3329,8 @@ irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
                                      llvm::Value *wtable,
                                      AssociatedType associatedType,
                                      DynamicMetadataRequest request) {
-  auto &pi = IGF.IGM.getProtocolInfo(associatedType.getSourceProtocol());
+  auto &pi = IGF.IGM.getProtocolInfo(associatedType.getSourceProtocol(),
+                                     ProtocolInfoKind::RequirementSignature);
   auto index = pi.getAssociatedTypeIndex(associatedType);
   llvm::Value *witness = emitInvariantLoadOfOpaqueWitness(IGF, wtable,
                                             index.forProtocolWitnessTable());

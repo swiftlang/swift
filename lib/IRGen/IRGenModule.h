@@ -129,6 +129,7 @@ namespace irgen {
   class NominalMetadataLayout;
   class OutliningMetadataCollector;
   class ProtocolInfo;
+  enum class ProtocolInfoKind : uint8_t;
   class Signature;
   class StructMetadataLayout;
   struct SymbolicMangling;
@@ -703,7 +704,7 @@ private:
   
 //--- Types -----------------------------------------------------------------
 public:
-  const ProtocolInfo &getProtocolInfo(ProtocolDecl *D);
+  const ProtocolInfo &getProtocolInfo(ProtocolDecl *D, ProtocolInfoKind kind);
 
   // Not strictly a type operation, but similar.
   const ConformanceInfo &
