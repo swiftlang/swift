@@ -1437,7 +1437,7 @@ extension Dictionary: Equatable where Value: Equatable {
       }
 
       for (k, v) in lhs {
-        let (i, found) = rhsNative._find(k, startBucket: rhsNative._bucket(k))
+        let (i, found) = rhsNative._find(k)
         if !found || rhsNative.value(at: i.bucket) != v {
           return false
         }
@@ -2135,8 +2135,7 @@ final internal class _HashableTypedNativeDictionaryStorage<Key: Hashable, Value>
     guard let nativeKey = _conditionallyBridgeFromObjectiveC(aKey, Key.self)
     else { return nil }
 
-    let (i, found) = native._find(nativeKey,
-        startBucket: native._bucket(nativeKey))
+    let (i, found) = native._find(nativeKey)
 
     if found {
       return native.bridgedValue(at: i)
@@ -2553,6 +2552,12 @@ extension _NativeDictionary where Key: Hashable {
     return (bucket &- 1) & _bucketMask
   }
 
+  @inlinable // FIXME(sil-serialize-all)
+  @inline(__always)
+  internal func _find(_ key: Key) -> (pos: Index, found: Bool) {
+    return _find(key, startBucket: _bucket(key))
+  }
+
   /// Search for a given key starting from the specified bucket.
   ///
   /// If the key is not present, returns the position where it could be
@@ -2593,7 +2598,7 @@ extension _NativeDictionary where Key: Hashable {
   /// This function does *not* update `count`.
   @inlinable // FIXME(sil-serialize-all)
   internal func unsafeAddNew(key newKey: Key, value: Value) {
-    let (i, found) = _find(newKey, startBucket: _bucket(newKey))
+    let (i, found) = _find(newKey)
     _precondition(
       !found, "Duplicate key found in Dictionary. Keys may have been mutated after insertion")
     initializeKey(newKey, value: value, at: i.bucket)
@@ -2610,8 +2615,7 @@ extension _NativeDictionary where Key: Hashable {
     var dictionary = _NativeDictionary(minimumCapacity: elements.count)
 
     for (key, value) in elements {
-      let (i, found) =
-        dictionary._find(key, startBucket: dictionary._bucket(key))
+      let (i, found) = dictionary._find(key)
       _precondition(!found, "Dictionary literal contains duplicate keys")
       dictionary.initializeKey(key, value: value, at: i.bucket)
     }
@@ -2724,7 +2728,7 @@ extension _NativeDictionary/*: _DictionaryBuffer */ where Key: Hashable {
       // Fast path that avoids computing the hash of the key.
       return nil
     }
-    let (i, found) = _find(key, startBucket: _bucket(key))
+    let (i, found) = _find(key)
     return found ? i : nil
   }
 
@@ -2736,7 +2740,7 @@ extension _NativeDictionary/*: _DictionaryBuffer */ where Key: Hashable {
       return nil
     }
 
-    let (i, found) = _find(key, startBucket: _bucket(key))
+    let (i, found) = _find(key)
     if found {
       return self.value(at: i.bucket)
     }
@@ -3552,7 +3556,7 @@ extension Dictionary._Variant: _DictionaryBuffer {
   internal mutating func nativeUpdateValue(
     _ value: Value, forKey key: Key
   ) -> Value? {
-    var (i, found) = asNative._find(key, startBucket: asNative._bucket(key))
+    var (i, found) = asNative._find(key)
 
     let minBuckets = found
       ? asNative.bucketCount
@@ -3562,7 +3566,7 @@ extension Dictionary._Variant: _DictionaryBuffer {
 
     let (_, capacityChanged) = ensureUniqueNative(withBucketCount: minBuckets)
     if capacityChanged {
-      i = asNative._find(key, startBucket: asNative._bucket(key)).pos
+      i = asNative._find(key).pos
     }
 
     let oldValue: Value? = found ? asNative.value(at: i.bucket) : nil
@@ -3638,7 +3642,7 @@ extension Dictionary._Variant: _DictionaryBuffer {
     forKey key: Key, insertingDefault defaultValue: () -> Value
   ) -> (inserted: Bool, pointer: UnsafeMutablePointer<Value>) {
 
-    var (i, found) = asNative._find(key, startBucket: asNative._bucket(key))
+    var (i, found) = asNative._find(key)
     if found {
       let pointer = nativePointerToValue(at: ._native(i))
       return (inserted: false, pointer: pointer)
@@ -3648,7 +3652,7 @@ extension Dictionary._Variant: _DictionaryBuffer {
     let (_, capacityChanged) = ensureUniqueNative(withCapacity: minCapacity)
 
     if capacityChanged {
-      i = asNative._find(key, startBucket: asNative._bucket(key)).pos
+      i = asNative._find(key).pos
     }
 
     asNative.initializeKey(key, value: defaultValue(), at: i.bucket)
@@ -3669,7 +3673,7 @@ extension Dictionary._Variant: _DictionaryBuffer {
     _ value: Value, forKey key: Key
   ) -> (inserted: Bool, memberAfterInsert: Value) {
 
-    var (i, found) = asNative._find(key, startBucket: asNative._bucket(key))
+    var (i, found) = asNative._find(key)
     if found {
       return (inserted: false, memberAfterInsert: asNative.value(at: i.bucket))
     }
@@ -3678,7 +3682,7 @@ extension Dictionary._Variant: _DictionaryBuffer {
     let (_, capacityChanged) = ensureUniqueNative(withCapacity: minCapacity)
 
     if capacityChanged {
-      i = asNative._find(key, startBucket: asNative._bucket(key)).pos
+      i = asNative._find(key).pos
     }
 
     asNative.initializeKey(key, value: value, at: i.bucket)
@@ -3720,7 +3724,7 @@ extension Dictionary._Variant: _DictionaryBuffer {
     uniquingKeysWith combine: (Value, Value) throws -> Value
   ) rethrows where S.Element == (Key, Value) {
     for (key, value) in keysAndValues {
-      var (i, found) = asNative._find(key, startBucket: asNative._bucket(key))
+      var (i, found) = asNative._find(key)
 
       if found {
         // This is in a separate variable to make the uniqueness check work in
@@ -3737,7 +3741,7 @@ extension Dictionary._Variant: _DictionaryBuffer {
         let minCapacity = asNative.count + 1
         let (_, capacityChanged) = ensureUniqueNative(withCapacity: minCapacity)
         if capacityChanged {
-          i = asNative._find(key, startBucket: asNative._bucket(key)).pos
+          i = asNative._find(key).pos
         }
 
         asNative.initializeKey(key, value: value, at: i.bucket)
@@ -3763,14 +3767,14 @@ extension Dictionary._Variant: _DictionaryBuffer {
     defer { _fixLifetime(asNative) }
     for value in values {
       let key = try keyForValue(value)
-      var (i, found) = asNative._find(key, startBucket: asNative._bucket(key))
+      var (i, found) = asNative._find(key)
       if found {
         asNative.values[i.bucket].append(value)
       } else {
         let minCapacity = asNative.count + 1
         let (_, capacityChanged) = ensureUniqueNative(withCapacity: minCapacity)
         if capacityChanged {
-          i = asNative._find(key, startBucket: asNative._bucket(key)).pos
+          i = asNative._find(key).pos
         }
 
         asNative.initializeKey(key, value: [value], at: i.bucket)

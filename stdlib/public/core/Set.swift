@@ -439,7 +439,7 @@ extension Set: Equatable {
 
       for member in lhs {
         let (_, found) =
-          rhsNative._find(member, startBucket: rhsNative._bucket(member))
+          rhsNative._find(member)
         if !found {
           return false
         }
@@ -1715,9 +1715,7 @@ final internal class _HashableTypedNativeSetStorage<Element: Hashable>
     guard let nativeKey = _conditionallyBridgeFromObjectiveC(aKey, Element.self)
     else { return nil }
 
-    let (i, found) = asNative._find(nativeKey,
-      startBucket: asNative._bucket(nativeKey))
-
+    let (i, found) = asNative._find(nativeKey)
     if found {
       return asNative.bridgedValue(at: i)
     }
@@ -2071,6 +2069,12 @@ extension _NativeSet/*: _SetBuffer*/ where Element: Hashable {
     return (bucket &- 1) & _bucketMask
   }
 
+  @inlinable // FIXME(sil-serialize-all)
+  @inline(__always)
+  internal func _find(_ key: Element) -> (pos: Index, found: Bool) {
+    return _find(key, startBucket: _bucket(key))
+  }
+
   /// Search for a given key starting from the specified bucket.
   ///
   /// If the key is not present, returns the position where it could be
@@ -2112,7 +2116,7 @@ extension _NativeSet/*: _SetBuffer*/ where Element: Hashable {
 
   @inlinable // FIXME(sil-serialize-all)
   internal func unsafeAddNew(key newKey: Element) {
-    let (i, found) = _find(newKey, startBucket: _bucket(newKey))
+    let (i, found) = _find(newKey)
     _precondition(
       !found, "Duplicate element found in Set. Elements may have been mutated after insertion")
     initializeKey(newKey, at: i.bucket)
@@ -2129,8 +2133,7 @@ extension _NativeSet/*: _SetBuffer*/ where Element: Hashable {
 
     var count = 0
     for key in elements {
-      let (i, found) =
-        native._find(key, startBucket: native._bucket(key))
+      let (i, found) = native._find(key)
       if found {
         continue
       }
@@ -2227,7 +2230,7 @@ extension _NativeSet/*: _SetBuffer*/ where Element: Hashable {
       // Fast path that avoids computing the hash of the key.
       return nil
     }
-    let (i, found) = _find(key, startBucket: _bucket(key))
+    let (i, found) = _find(key)
     return found ? i : nil
   }
 
@@ -2239,7 +2242,7 @@ extension _NativeSet/*: _SetBuffer*/ where Element: Hashable {
       return nil
     }
 
-    let (i, found) = _find(key, startBucket: _bucket(key))
+    let (i, found) = _find(key)
     if found {
       return self.key(at: i.bucket)
     }
@@ -2363,8 +2366,7 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
       _conditionallyBridgeFromObjectiveC(object, Element.self)
     else { return nil }
 
-    let (i, found) = native._find(
-      element, startBucket: native._bucket(element))
+    let (i, found) = native._find(element)
     if found {
       bridgeEverything()
       return bridgedSet.value(at: i.bucket)
@@ -2923,7 +2925,7 @@ extension Set._Variant: _SetBuffer {
   internal mutating func nativeUpdate(
     with key: Element
   ) -> Element? {
-    var (i, found) = asNative._find(key, startBucket: asNative._bucket(key))
+    var (i, found) = asNative._find(key)
 
     let minBuckets = found
       ? asNative.bucketCount
@@ -2933,7 +2935,7 @@ extension Set._Variant: _SetBuffer {
 
     let (_, capacityChanged) = ensureUniqueNative(withBucketCount: minBuckets)
     if capacityChanged {
-      i = asNative._find(key, startBucket: asNative._bucket(key)).pos
+      i = asNative._find(key).pos
     }
 
     let old: Element? = found ? asNative.key(at: i.bucket) : nil
@@ -2972,7 +2974,7 @@ extension Set._Variant: _SetBuffer {
   ) -> (inserted: Bool, memberAfterInsert: Element) {
     ensureNative()
 
-    var (i, found) = asNative._find(key, startBucket: asNative._bucket(key))
+    var (i, found) = asNative._find(key)
     if found {
       return (inserted: false, memberAfterInsert: asNative.key(at: i.bucket))
     }
@@ -2981,7 +2983,7 @@ extension Set._Variant: _SetBuffer {
     let (_, capacityChanged) = ensureUniqueNative(withCapacity: minCapacity)
 
     if capacityChanged {
-      i = asNative._find(key, startBucket: asNative._bucket(key)).pos
+      i = asNative._find(key).pos
     }
 
     asNative.initializeKey(key, at: i.bucket)
