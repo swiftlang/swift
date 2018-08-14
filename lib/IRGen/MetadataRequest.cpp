@@ -1663,6 +1663,19 @@ irgen::emitOnceTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
   return MetadataResponse::forComplete(relocatedMetadata);
 }
 
+static llvm::Value *
+emitIdempotentClassMetadataInitialization(IRGenFunction &IGF,
+                                          llvm::Value *metadata) {
+  if (IGF.IGM.ObjCInterop) {
+    metadata = IGF.Builder.CreateBitCast(metadata, IGF.IGM.ObjCClassPtrTy);
+    metadata = IGF.Builder.CreateCall(IGF.IGM.getGetInitializedObjCClassFn(),
+                                      metadata);
+    metadata = IGF.Builder.CreateBitCast(metadata, IGF.IGM.TypeMetadataPtrTy);
+  }
+
+  return metadata;
+}
+
 /// Emit the body of a metadata accessor function for the given type.
 ///
 /// This function is appropriate for ordinary situations where the
@@ -1710,6 +1723,10 @@ emitDirectTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
     if (!hasKnownSwiftMetadata(IGF.IGM, classDecl)) {
       return MetadataResponse::forComplete(emitObjCMetadataRef(IGF, classDecl));
     }
+
+    llvm::Constant *metadata = IGF.IGM.getAddrOfTypeMetadata(type);
+    return MetadataResponse::forComplete(
+      emitIdempotentClassMetadataInitialization(IGF, metadata));
   }
 
   // We should not be doing more serious work along this path.

@@ -2366,44 +2366,27 @@ namespace {
     }
 
   protected:
-    llvm::Value *emitFinishIdempotentInitialization(IRGenFunction &IGF,
-                                                    llvm::Value *metadata) {
-      if (IGF.IGM.ObjCInterop) {
-        metadata =
-          IGF.Builder.CreateBitCast(metadata, IGF.IGM.ObjCClassPtrTy);
-        metadata =
-          IGF.Builder.CreateCall(IGF.IGM.getGetInitializedObjCClassFn(),
-                                 metadata);
-        metadata =
-           IGF.Builder.CreateBitCast(metadata, IGF.IGM.TypeMetadataPtrTy);
-      }
-      return metadata;
-    }
-
     llvm::Value *emitFinishInitializationOfClassMetadata(IRGenFunction &IGF,
                                                          llvm::Value *metadata,
                                        MetadataDependencyCollector *collector) {
-      if (doesClassMetadataRequireInitialization(IGF.IGM, Target)) {
-        // We need to:
-        //   - fill out the subclass's field offset vector
-        //   - copy field offsets and generic arguments from higher in the
-        //     class hierarchy
-        auto classTy = Target->getDeclaredTypeInContext()->getCanonicalType();
-        auto loweredClassTy = IGF.IGM.getLoweredType(classTy);
-        emitInitializeFieldOffsetVector(IGF, loweredClassTy,
-                                        metadata, /*VWT is mutable*/ false,
-                                        collector);
+      assert(doesClassMetadataRequireInitialization(IGF.IGM, Target));
 
-        // Realizing the class with the ObjC runtime will copy back to the
-        // field offset globals for us; but if ObjC interop is disabled, we
-        // have to do that ourselves, assuming we didn't just emit them all
-        // correctly in the first place.
-        if (!IGF.IGM.ObjCInterop)
-          emitInitializeFieldOffsets(IGF, metadata);
-      } else {
-        // Otherwise, all we need to do is register with the ObjC runtime.
-        metadata = emitFinishIdempotentInitialization(IGF, metadata);
-      }
+      // We need to:
+      //   - fill out the subclass's field offset vector
+      //   - copy field offsets and generic arguments from higher in the
+      //     class hierarchy
+      auto classTy = Target->getDeclaredTypeInContext()->getCanonicalType();
+      auto loweredClassTy = IGF.IGM.getLoweredType(classTy);
+      emitInitializeFieldOffsetVector(IGF, loweredClassTy,
+                                      metadata, /*VWT is mutable*/ false,
+                                      collector);
+
+      // Realizing the class with the ObjC runtime will copy back to the
+      // field offset globals for us; but if ObjC interop is disabled, we
+      // have to do that ourselves, assuming we didn't just emit them all
+      // correctly in the first place.
+      if (!IGF.IGM.ObjCInterop)
+        emitInitializeFieldOffsets(IGF, metadata);
 
       emitInitializeMethodOverrides(IGF, metadata);
 
@@ -2473,7 +2456,6 @@ namespace {
     using super::B;
     using super::addReferenceToHeapMetadata;
     using super::emitFinishInitializationOfClassMetadata;
-    using super::emitFinishIdempotentInitialization;
 
     bool HasUnfilledSuperclass = false;
     Size AddressPoint;
@@ -2528,19 +2510,19 @@ namespace {
       assert(!Target->isGenericContext());
       auto type =cast<ClassType>(Target->getDeclaredType()->getCanonicalType());
 
+      // Fixed case.
+      if (!doesClassMetadataRequireInitialization(IGM, Target)) {
+        (void) createDirectTypeMetadataAccessFunction(IGM, type,
+                                                      /*allowExisting*/ false);
+        return;
+      }
+
+      // Resilient case.
+      //
+      // FIXME: Needs to support two-phase initialization.
       (void) createTypeMetadataAccessFunction(IGM, type, CacheStrategy::Lazy,
       [&](IRGenFunction &IGF, DynamicMetadataRequest request,
           llvm::Constant *cacheVar) -> MetadataResponse {
-        // There's an interesting special case where we can do the
-        // initialization idempotently and thus avoid the need for a lock.
-        if (!doesClassMetadataRequireInitialization(IGM, Target)) {
-          auto type = Target->getDeclaredType()->getCanonicalType();
-          auto metadata = IGF.IGM.getAddrOfTypeMetadata(type);
-          return MetadataResponse::forComplete(
-                   emitFinishIdempotentInitialization(IGF, metadata));
-        }
-
-        // Otherwise, use the generic path.
         return emitOnceTypeMetadataAccessFunctionBody(IGF, type, cacheVar,
           [&](IRGenFunction &IGF, llvm::Value *metadata) {
             return emitOnceMetadataInitialization(IGF, type, metadata);
