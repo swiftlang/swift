@@ -61,12 +61,6 @@
 using namespace swift;
 using namespace irgen;
 
-/// What reference counting mechanism does a class-like type have?
-ReferenceCounting irgen::getReferenceCountingForType(IRGenModule &IGM,
-                                                     CanType type) {
-  return type->getReferenceCounting(ResilienceExpansion::Maximal);
-}
-
 namespace {
   /// Layout information for class types.
   class ClassTypeInfo : public HeapTypeInfo<ClassTypeInfo> {
@@ -2180,7 +2174,7 @@ const TypeInfo *
 TypeConverter::convertClassType(CanType type, ClassDecl *D) {
   llvm::StructType *ST = IGM.createNominalType(type);
   llvm::PointerType *irType = ST->getPointerTo();
-  ReferenceCounting refcount = ::getReferenceCountingForType(IGM, type);
+  ReferenceCounting refcount = type->getReferenceCounting();
   
   SpareBitVector spareBits;
   
