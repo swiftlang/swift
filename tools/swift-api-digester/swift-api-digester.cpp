@@ -123,6 +123,9 @@ static llvm::cl::opt<bool>
 Verbose("v", llvm::cl::desc("Verbose"));
 
 static llvm::cl::opt<bool>
+Abi("abi", llvm::cl::desc("Dumping ABI interface"),  llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
 PrintModule("print-module", llvm::cl::desc("Print module names in diagnostics"));
 
 static llvm::cl::opt<ActionType>
@@ -250,6 +253,7 @@ public:
 };
 
 class SDKContext {
+  bool ABI;
   llvm::StringSet<> TextData;
   llvm::BumpPtrAllocator Allocator;
   UpdatedNodesMap UpdateMap;
@@ -257,6 +261,7 @@ class SDKContext {
   NodeMap RevertTypeAliasUpdateMap;
   TypeMemberDiffVector TypeMemberDiffs;
 public:
+  SDKContext(bool ABI): ABI(ABI) {}
   llvm::BumpPtrAllocator &allocator() {
     return Allocator;
   }
@@ -275,6 +280,7 @@ public:
   TypeMemberDiffVector &getTypeMemberDiffs() {
     return TypeMemberDiffs;
   }
+  bool checkingABI() const { return ABI; }
 };
 
 // A node matcher will traverse two trees of SDKNode and find matched nodes
@@ -1341,6 +1347,18 @@ static ReferenceOwnership getReferenceOwnership(ValueDecl *VD) {
   return ReferenceOwnership::Strong;
 }
 
+// Get a requirement with all types canonicalized.
+Requirement getCanonicalRequirement(Requirement &Req) {
+  auto kind = Req.getKind();
+  if (kind == RequirementKind::Layout) {
+    return Requirement(kind, Req.getFirstType()->getCanonicalType(),
+                       Req.getLayoutConstraint());
+  } else {
+    return Requirement(kind, Req.getFirstType()->getCanonicalType(),
+                       Req.getSecondType()->getCanonicalType());
+  }
+}
+
 static StringRef printGenericSignature(SDKContext &Ctx, ValueDecl *VD) {
   llvm::SmallString<32> Result;
   llvm::raw_svector_ostream OS(Result);
@@ -1355,7 +1373,10 @@ static StringRef printGenericSignature(SDKContext &Ctx, ValueDecl *VD) {
       } else {
         First = false;
       }
-      Req.print(OS, PrintOptions::printInterface());
+      if (Ctx.checkingABI())
+        getCanonicalRequirement(Req).print(OS, PrintOptions::printInterface());
+      else
+        Req.print(OS, PrintOptions::printInterface());
     }
     OS << ">";
     return Ctx.buffer(OS.str());
@@ -1363,7 +1384,10 @@ static StringRef printGenericSignature(SDKContext &Ctx, ValueDecl *VD) {
 
   if (auto *GC = VD->getAsGenericContext()) {
     if (auto *Sig = GC->getGenericSignature()) {
-      Sig->print(OS);
+      if (Ctx.checkingABI())
+        Sig->getCanonicalSignature()->print(OS);
+      else
+        Sig->print(OS);
       return Ctx.buffer(OS.str());
     }
   }
@@ -1438,6 +1462,9 @@ case SDKNodeKind::X:                                                           \
 // representing the return value type of a function decl.
 static SDKNode *constructTypeNode(SDKContext &Ctx, Type T,
                                   TypeInitInfo InitInfo = TypeInitInfo()) {
+  if (Ctx.checkingABI()) {
+    T = T->getCanonicalType();
+  }
   SDKNode* Root = SDKNodeInitInfo(Ctx, T, InitInfo)
     .createSDKNode(SDKNodeKind::TypeNominal);
 
@@ -3814,7 +3841,7 @@ static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath) {
     llvm::errs() << RightPath << " does not exist\n";
     return 1;
   }
-  SDKContext Ctx;
+  SDKContext Ctx(options::Abi);
   SwiftDeclCollector LeftCollector(Ctx);
   LeftCollector.deSerialize(LeftPath);
   SwiftDeclCollector RightCollector(Ctx);
@@ -3866,7 +3893,7 @@ static int compareSDKs(StringRef LeftPath, StringRef RightPath,
     return 1;
   }
   llvm::errs() << "Diffing: " << LeftPath << " and " << RightPath << "\n";
-  SDKContext Ctx;
+  SDKContext Ctx(options::Abi);
   SwiftDeclCollector LeftCollector(Ctx);
   LeftCollector.deSerialize(LeftPath);
   SwiftDeclCollector RightCollector(Ctx);
@@ -3990,7 +4017,7 @@ static int dumpSwiftModules(const CompilerInvocation &InitInvok,
     Modules.push_back(M);
   }
 
-  SDKContext Ctx;
+  SDKContext Ctx(options::Abi);
   for (auto M : Modules) {
     SwiftDeclCollector Collector(Ctx);
     SmallVector<Decl*, 256> Decls;
@@ -4047,7 +4074,7 @@ static int dumpSDKContent(const CompilerInvocation &InitInvok,
   }
   if (options::Verbose)
     llvm::errs() << "Scanning symbols...\n";
-  SDKContext SDKCtx;
+  SDKContext SDKCtx(options::Abi);
   SwiftDeclCollector Collector(SDKCtx);
   Collector.lookupVisibleDecls(Modules);
   if (options::Verbose)
@@ -4202,7 +4229,7 @@ static int deserializeSDKDump(StringRef dumpPath, StringRef OutputPath) {
     llvm::errs() << dumpPath << " does not exist\n";
     return 1;
   }
-  SDKContext Ctx;
+  SDKContext Ctx(options::Abi);
   SwiftDeclCollector Collector(Ctx);
   Collector.deSerialize(dumpPath);
   Collector.serialize(OutputPath);
@@ -4215,7 +4242,7 @@ static int findDeclUsr(StringRef dumpPath) {
     llvm::errs() << dumpPath << " does not exist\n";
     return 1;
   }
-  SDKContext Ctx;
+  SDKContext Ctx(options::Abi);
   SwiftDeclCollector Collector(Ctx);
   Collector.deSerialize(dumpPath);
   struct FinderByLocation: SDKNodeVisitor {
