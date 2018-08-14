@@ -2106,8 +2106,9 @@ extension _NativeSet/*: _SetBuffer*/ where Element: Hashable {
     maxLoadFactorInverse: Double
   ) -> Int {
     // `capacity + 1` below ensures that we don't fill in the last hole
-    return max(Int((Double(capacity) * maxLoadFactorInverse).rounded(.up)),
-               capacity + 1)
+    return Swift.max(
+      Int((Double(capacity) * maxLoadFactorInverse).rounded(.up)),
+      capacity + 1)
   }
 
   /// Buffer should be uniquely referenced.
@@ -3421,7 +3422,7 @@ extension Set.Index: Hashable {
   }
 }
 
-extension _NativeSet {
+extension _NativeSet: Sequence {
   @usableFromInline
   @_fixed_layout
   internal struct Iterator {
@@ -3463,7 +3464,7 @@ extension _NativeSet.Iterator: IteratorProtocol {
 }
 
 #if _runtime(_ObjC)
-extension _CocoaSet {
+extension _CocoaSet: Sequence {
   @usableFromInline
   final internal class Iterator {
     // Cocoa Set iterator has to be a class, otherwise we cannot

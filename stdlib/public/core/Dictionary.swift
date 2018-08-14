@@ -2080,10 +2080,6 @@ final internal class _HashableTypedNativeDictionaryStorage<Key: Hashable, Value>
     return _NativeDictionary(_storage: self)
   }
 
-  internal var full: Dictionary<Key, Value> {
-    return Dictionary(_native: native)
-  }
-
   @objc
   internal override func enumerator() -> _NSEnumerator {
     return _SwiftDictionaryNSEnumerator<Key, Value>(
@@ -2169,7 +2165,7 @@ final internal class _HashableTypedNativeDictionaryStorage<Key: Hashable, Value>
     if let unmanagedKeys = _UnmanagedAnyObjectArray(keys) {
       if let unmanagedObjects = _UnmanagedAnyObjectArray(objects) {
         // keys nonnull, objects nonnull
-        for (key, value) in full {
+        for (key, value) in native {
           unmanagedObjects[i] = _bridgeAnythingToObjectiveC(value)
           unmanagedKeys[i] = _bridgeAnythingToObjectiveC(key)
           i += 1
@@ -2177,7 +2173,7 @@ final internal class _HashableTypedNativeDictionaryStorage<Key: Hashable, Value>
         }
       } else {
         // keys nonnull, objects null
-        for (key, _) in full {
+        for (key, _) in native {
           unmanagedKeys[i] = _bridgeAnythingToObjectiveC(key)
           i += 1
           guard i < count else { break }
@@ -2186,7 +2182,7 @@ final internal class _HashableTypedNativeDictionaryStorage<Key: Hashable, Value>
     } else {
       if let unmanagedObjects = _UnmanagedAnyObjectArray(objects) {
         // keys null, objects nonnull
-        for (_, value) in full {
+        for (_, value) in native {
           unmanagedObjects[i] = _bridgeAnythingToObjectiveC(value)
           i += 1
           guard i < count else { break }
@@ -2589,8 +2585,9 @@ extension _NativeDictionary where Key: Hashable {
     maxLoadFactorInverse: Double
   ) -> Int {
     // `capacity + 1` below ensures that we don't fill in the last hole
-    return max(Int((Double(capacity) * maxLoadFactorInverse).rounded(.up)),
-               capacity + 1)
+    return Swift.max(
+      Int((Double(capacity) * maxLoadFactorInverse).rounded(.up)),
+      capacity + 1)
   }
 
   /// Self should be uniquely referenced.
@@ -4224,7 +4221,7 @@ extension Dictionary.Index: Hashable {
   }
 }
 
-extension _NativeDictionary {
+extension _NativeDictionary: Sequence {
   @usableFromInline
   @_fixed_layout
   internal struct Iterator {
@@ -4269,7 +4266,7 @@ extension _NativeDictionary.Iterator: IteratorProtocol {
 }
 
 #if _runtime(_ObjC)
-extension _CocoaDictionary {
+extension _CocoaDictionary: Sequence {
   @usableFromInline
   final internal class Iterator {
     // Cocoa Dictionary iterator has to be a class, otherwise we cannot
