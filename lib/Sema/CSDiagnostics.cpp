@@ -377,7 +377,7 @@ bool MissingOptionalUnwrapFailure::diagnose() {
 
   auto *tryExpr = dyn_cast<OptionalTryExpr>(unwrapped);
   if (!tryExpr)
-    return diagnoseUnwrap(getTypeChecker(), getDC(), unwrapped, type);
+    return diagnoseUnwrap(getConstraintSystem(), unwrapped, type);
 
   emitDiagnostic(tryExpr->getTryLoc(), diag::missing_unwrap_optional_try, type)
       .fixItReplace({tryExpr->getTryLoc(), tryExpr->getQuestionLoc()}, "try!");
